@@ -53,6 +53,8 @@
 #include "mongo/db/storage/execution_context.h"
 #include "mongo/db/storage/key_string.h"
 #include "mongo/db/storage/record_store.h"
+#include "mongo/db/storage/storage_parameters_gen.h"
+#include "mongo/db/timeseries/timeseries_constants.h"
 #include "mongo/logv2/log.h"
 #include "mongo/rpc/object_check.h"
 #include "mongo/util/fail_point.h"
@@ -74,6 +76,9 @@ const long long kInterruptIntervalNumBytes = 50 * 1024 * 1024;  // 50MB.
 static constexpr const char* kSchemaValidationFailedReason =
     "Detected one or more documents not compliant with the collection's schema. Check logs for log "
     "id 5363500.";
+static constexpr const char* kTimeseriesValidationInconsistencyReason =
+    "Detected one or more documents in this collection incompatible with time-series "
+    "specifications. For more info, see logs with log id 6698300.";
 
 /**
  * Validate that for each record in a clustered RecordStore the record key (RecordId) matches the
@@ -124,7 +129,56 @@ void schemaValidationFailed(CollectionValidation::ValidateState* state,
         results->warnings.push_back(kSchemaValidationFailedReason);
     }
 }
+/**
+ * Checks the value of the bucket's version and if it matches the types of the data fields.
+ */
+Status _validateTimeSeriesBucketRecord(const RecordId& recordId,
+                                       const BSONObj& recordBson,
+                                       ValidateResults* results) {
+    int controlVersion = recordBson.getField(timeseries::kBucketControlFieldName)
+                             .Obj()
+                             .getField(timeseries::kBucketControlVersionFieldName)
+                             .Number();
+    if (controlVersion != 1 && controlVersion != 2) {
+        return Status(
+            ErrorCodes::BadValue,
+            fmt::format("Invalid value for 'control.version'. Expected 1 or 2, but got {}.",
+                        controlVersion));
+    }
+    auto dataType = controlVersion == 1 ? BSONType::Object : BSONType::BinData;
+    // In addition to checking dataType, make sure that closed buckets have BinData Column subtype
+    auto isCorrectType = [&](BSONElement el) {
+        if (controlVersion == 1) {
+            return el.type() == BSONType::Object;
+        } else {
+            return el.type() == BSONType::BinData && el.binDataType() == BinDataType::Column;
+        }
+    };
+    BSONObj data = recordBson.getField(timeseries::kBucketDataFieldName).Obj();
+    for (BSONObjIterator bi(data); bi.more();) {
+        BSONElement e = bi.next();
+        if (!isCorrectType(e)) {
+            return Status(ErrorCodes::TypeMismatch,
+                          fmt::format("Mismatch between TimeSeries schema version and data field "
+                                      "type. Expected type {}, but got {}.",
+                                      mongo::typeName(dataType),
+                                      mongo::typeName(e.type())));
+        }
+    }
+    return Status::OK();
+}
 
+
+void _timeseriesValidationFailed(CollectionValidation::ValidateState* state,
+                                 ValidateResults* results) {
+    if (state->isTimeseriesDataInconsistent()) {
+        // Only report the warning message once.
+        return;
+    }
+    state->setTimeseriesDataInconsistent();
+
+    results->warnings.push_back(kTimeseriesValidationInconsistencyReason);
+}
 
 BSONObj rehydrateKey(const BSONObj& keyPattern, const BSONObj& indexKey) {
     // We need to rehydrate the indexKey for improved readability.
@@ -583,9 +637,10 @@ void ValidateAdaptor::traverseRecordStore(OperationContext* opCtx,
 
     // Because the progress meter is intended as an approximation, it's sufficient to get the number
     // of records when we begin traversing, even if this number may deviate from the final number.
+    const auto& coll = _validateState->getCollection();
     const char* curopMessage = "Validate: scanning documents";
-    const auto totalRecords = _validateState->getCollection()->getRecordStore()->numRecords(opCtx);
-    const auto rs = _validateState->getCollection()->getRecordStore();
+    const auto totalRecords = coll->getRecordStore()->numRecords(opCtx);
+    const auto rs = coll->getRecordStore();
     {
         stdx::unique_lock<Client> lk(*opCtx->getClient());
         _progress.set(CurOp::get(opCtx)->setProgress_inlock(curopMessage, totalRecords));
@@ -684,18 +739,33 @@ void ValidateAdaptor::traverseRecordStore(OperationContext* opCtx,
             // If the document is not corrupted, validate the document against this collection's
             // schema validator. Don't treat invalid documents as errors since documents can bypass
             // document validation when being inserted or updated.
-            auto result =
-                _validateState->getCollection()->checkValidation(opCtx, record->data.toBson());
+            auto result = coll->checkValidation(opCtx, record->data.toBson());
 
             if (result.first != Collection::SchemaValidationResult::kPass) {
                 LOGV2_WARNING(5363500,
                               "Document is not compliant with the collection's schema",
-                              logAttrs(_validateState->getCollection()->ns()),
+                              logAttrs(coll->ns()),
                               "recordId"_attr = record->id,
                               "reason"_attr = result.second);
 
                 nNonCompliantDocuments++;
                 schemaValidationFailed(_validateState, result.first, results);
+            } else if (coll->getTimeseriesOptions()) {
+                // Checks for time-series collection consistency.
+                Status bucketStatus =
+                    _validateTimeSeriesBucketRecord(record->id, record->data.toBson(), results);
+
+                // This log id should be kept in sync with the associated warning messages that are
+                // returned to the client.
+                if (!bucketStatus.isOK()) {
+                    LOGV2_WARNING(6698300,
+                                  "Document is not compliant with time-series specifications",
+                                  logAttrs(coll->ns()),
+                                  "recordId"_attr = record->id,
+                                  "reason"_attr = bucketStatus);
+                    nNonCompliantDocuments++;
+                    _timeseriesValidationFailed(_validateState, results);
+                }
             }
         }
 
@@ -718,20 +788,18 @@ void ValidateAdaptor::traverseRecordStore(OperationContext* opCtx,
                                                   << " invalid documents.");
     }
 
-    const auto fastCount = _validateState->getCollection()->numRecords(opCtx);
+    const auto fastCount = coll->numRecords(opCtx);
     if (_validateState->shouldEnforceFastCount() && fastCount != _numRecords) {
-        results->errors.push_back(str::stream() << "fast count (" << fastCount
-                                                << ") does not match number of records ("
-                                                << _numRecords << ") for collection '"
-                                                << _validateState->getCollection()->ns() << "'");
+        results->errors.push_back(
+            str::stream() << "fast count (" << fastCount << ") does not match number of records ("
+                          << _numRecords << ") for collection '" << coll->ns() << "'");
         results->valid = false;
     }
 
     // Do not update the record store stats if we're in the background as we've validated a
     // checkpoint and it may not have the most up-to-date changes.
     if (results->valid && !_validateState->isBackground()) {
-        _validateState->getCollection()->getRecordStore()->updateStatsAfterRepair(
-            opCtx, _numRecords, dataSizeTotal);
+        coll->getRecordStore()->updateStatsAfterRepair(opCtx, _numRecords, dataSizeTotal);
     }
 }
 

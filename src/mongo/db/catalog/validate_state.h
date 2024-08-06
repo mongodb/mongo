@@ -93,6 +93,13 @@ public:
         _collectionSchemaViolated = true;
     }
 
+    bool isTimeseriesDataInconsistent() {
+        return _timeseriesDataInconsistency;
+    }
+    void setTimeseriesDataInconsistent() {
+        _timeseriesDataInconsistency = true;
+    }
+
     bool fixErrors() const {
         return _repairMode == RepairMode::kFixErrors;
     }
@@ -214,6 +221,7 @@ private:
     ValidateMode _mode;
     RepairMode _repairMode;
     bool _collectionSchemaViolated = false;
+    bool _timeseriesDataInconsistency = false;
     ValidationVersion _validationVersion = currentValidationVersion;
 
     boost::optional<ShouldNotConflictWithSecondaryBatchApplicationBlock> _noPBWM;
