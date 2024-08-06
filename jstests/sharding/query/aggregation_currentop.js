@@ -155,7 +155,7 @@ function runCommandOnAllPrimaries({dbName, cmdObj, username, password}) {
 }
 
 // Functions to support running an operation in a parallel shell for testing allUsers behaviour.
-function runInParallelShell({conn, testfunc, username, password}) {
+function runInParallelShell({conn, testfunc, username, password, ns}) {
     TestData.aggCurOpTest = testfunc;
     TestData.aggCurOpUser = username;
     TestData.aggCurOpPwd = password;
@@ -164,7 +164,8 @@ function runInParallelShell({conn, testfunc, username, password}) {
         dbName: "admin",
         username: username,
         password: password,
-        cmdObj: {configureFailPoint: "setYieldAllLocksHang", mode: "alwaysOn"}
+        cmdObj:
+            {configureFailPoint: "setYieldAllLocksHang", data: {namespace: ns}, mode: "alwaysOn"}
     });
 
     testfunc = function() {
@@ -554,7 +555,8 @@ function runLocalOpsTests(conn) {
         },
         conn: conn,
         username: "admin",
-        password: "pwd"
+        password: "pwd",
+        ns: conn.getDB(jsTestName()).test.getFullName(),
     });
 
     assertCurrentOpHasSingleMatchingEntry({
