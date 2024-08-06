@@ -272,6 +272,9 @@ structs:
       batchId:
         type: uuid
         optional: true
+      lastKeyChecked:
+        type: object
+        optional: true
 
   DbCheckOplogCollection:
     description: "Oplog entry for dbCheck collection metadata"

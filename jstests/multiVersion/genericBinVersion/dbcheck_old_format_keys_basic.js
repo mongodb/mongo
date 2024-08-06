@@ -56,6 +56,7 @@ forEachNonArbiterNode(rst, function(node) {
     checkHealthLog(node.getDB("local").system.healthlog, logQueries.allErrorsOrWarningsQuery, 0);
     assertCompleteCoverage(node.getDB("local").system.healthlog,
                            defaultNumDocs,
+                           "a" /*indexName*/,
                            null /* docSuffix */,
                            null /* start */,
                            null /* end */);

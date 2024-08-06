@@ -35,13 +35,12 @@ dbCheckTest.upgradeRst();
 const rst = dbCheckTest.getRst();
 const primary = dbCheckTest.getPrimary();
 
-// TODO (SERVER-86323): Make sure this also works if we delete all docs except one
-// Delete all docs except first and last so that dbcheck still runs for the whole range.
+// Delete all docs.
 dbCheckTest.createExtraKeysRecordNotFoundOnSecondary(
-    dbName, collName, {$and: [{a: {$gt: 0}}, {a: {$lt: defaultNumDocs - 1}}]});
+    dbName, collName, {$and: [{a: {$gte: 0}}, {a: {$lte: defaultNumDocs - 1}}]});
 
 forEachNonArbiterSecondary(rst, function(node) {
-    assert.eq(node.getDB(dbName).getCollection(collName).find({}).count(), 2);
+    assert.eq(node.getDB(dbName).getCollection(collName).find({}).count(), 0);
 });
 
 const batchSize = 7;
@@ -59,8 +58,12 @@ runDbCheck(rst,
 const primaryHealthLog = primary.getDB("local").system.healthlog;
 checkHealthLog(primaryHealthLog, logQueries.allErrorsOrWarningsQuery, 0);
 checkHealthLog(primaryHealthLog, logQueries.infoBatchQuery, 1);
-assertCompleteCoverage(
-    primaryHealthLog, defaultNumDocs, null /* docSuffix */, null /* start */, null /* end */);
+assertCompleteCoverage(primaryHealthLog,
+                       defaultNumDocs,
+                       "a" /*indexName*/,
+                       null /* docSuffix */,
+                       null /* start */,
+                       null /* end */);
 
 // Check for inconsistent batch on secondary.
 forEachNonArbiterSecondary(rst, function(node) {
@@ -68,10 +71,10 @@ forEachNonArbiterSecondary(rst, function(node) {
     checkHealthLog(node.getDB("local").system.healthlog, logQueries.allErrorsOrWarningsQuery, 1);
     assertCompleteCoverage(node.getDB("local").system.healthlog,
                            defaultNumDocs,
+                           "a" /*indexName*/,
                            null /* docSuffix */,
                            null /* start */,
-                           null /* end */,
-                           true /* inconsistentBatch */);
+                           null /* end */);
 });
 
 resetSnapshotSize(rst);

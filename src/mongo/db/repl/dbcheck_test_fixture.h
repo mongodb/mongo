@@ -129,8 +129,9 @@ public:
      */
     Status runHashForExtraIndexKeysCheck(
         OperationContext* opCtx,
-        const BSONObj& start,
-        const BSONObj& end,
+        const BSONObj& batchStart,
+        const BSONObj& batchEnd,
+        const BSONObj& lastKeyChecked,
         boost::optional<SecondaryIndexCheckParameters> secondaryIndexCheckParams,
         int64_t maxCount = std::numeric_limits<int64_t>::max(),
         int64_t maxBytes = std::numeric_limits<int64_t>::max(),

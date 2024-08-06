@@ -72,6 +72,7 @@ TEST_F(DbCheckTest, DbCheckHasherErrorsOnExtraIndexKeysCheckTimeout) {
               runHashForExtraIndexKeysCheck(opCtx,
                                             docMinKey,
                                             docMaxKey,
+                                            docMaxKey,
                                             params,
                                             std::numeric_limits<int64_t>::max() /*maxCount*/,
                                             std::numeric_limits<int64_t>::max() /*maxBytes*/,

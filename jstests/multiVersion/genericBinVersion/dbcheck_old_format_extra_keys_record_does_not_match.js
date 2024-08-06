@@ -59,8 +59,12 @@ checkHealthLog(primaryHealthLog, logQueries.recordDoesNotMatchQuery, defaultNumD
 checkHealthLog(primaryHealthLog, logQueries.allErrorsOrWarningsQuery, defaultNumDocs);
 
 checkHealthLog(primaryHealthLog, logQueries.infoBatchQuery, numBatches);
-assertCompleteCoverage(
-    primaryHealthLog, defaultNumDocs, null /* docSuffix */, null /* start */, null /* end */);
+assertCompleteCoverage(primaryHealthLog,
+                       defaultNumDocs,
+                       "a" /*indexName*/,
+                       null /* docSuffix */,
+                       null /* start */,
+                       null /* end */);
 
 // Verify that no error or warning health log entries were logged on
 // secondary.
@@ -69,6 +73,7 @@ forEachNonArbiterSecondary(rst, function(node) {
     checkHealthLog(node.getDB("local").system.healthlog, logQueries.allErrorsOrWarningsQuery, 0);
     assertCompleteCoverage(node.getDB("local").system.healthlog,
                            defaultNumDocs,
+                           "a" /*indexName*/,
                            null /* docSuffix */,
                            null /* start */,
                            null /* end */);

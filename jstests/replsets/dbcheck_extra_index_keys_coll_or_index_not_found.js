@@ -322,7 +322,7 @@ function keysChangedBeforeHashing(collOpts) {
 function allIndexKeysNotFoundDuringReverseLookup(nDocs, docSuffix, collOpts) {
     clearRawMongoProgramOutput();
     jsTestLog(
-        `Testing that if all the index keys are deleted during reverse lookup we log a warning and exit dbcheck.
+        `Testing that if all the index keys are deleted during reverse lookup we still log a batch.
         collOpts: ${collOpts}`);
 
     resetAndInsert(replSet, primaryDB, collName, nDocs, docSuffix, collOpts);
@@ -355,20 +355,11 @@ function allIndexKeysNotFoundDuringReverseLookup(nDocs, docSuffix, collOpts) {
     hangAfterReverseLookupCatalogSnapshot.off();
 
     awaitDbCheckCompletion(replSet, primaryDB);
-    let query = {
-        severity: "warning",
-        "msg":
-            "abandoning dbCheck extra index keys check because there are no keys left in the index"
-    };
-    checkHealthLog(primaryHealthLog, query, 1);
-    // If all index keys are deleted during reverse lookup, we won't create any oplog entry.
-    checkHealthLog(secondaryHealthLog, query, 0);
 
-    checkHealthLog(primaryHealthLog, logQueries.infoBatchQuery, 1);
-    checkHealthLog(secondaryHealthLog, logQueries.infoBatchQuery, 1);
+    checkHealthLog(primaryHealthLog, logQueries.infoBatchQuery, 2);
+    checkHealthLog(secondaryHealthLog, logQueries.infoBatchQuery, 2);
 
-    // Only the one warning entry.
-    checkHealthLog(primaryHealthLog, logQueries.allErrorsOrWarningsQuery, 1);
+    checkHealthLog(primaryHealthLog, logQueries.allErrorsOrWarningsQuery, 0);
     checkHealthLog(secondaryHealthLog, logQueries.allErrorsOrWarningsQuery, 0);
 
     if (debugBuild) {

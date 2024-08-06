@@ -264,6 +264,7 @@ std::unique_ptr<HealthLogEntry> dbCheckBatchHealthLogEntry(
     const std::string& foundHash,
     const BSONObj& batchStart,
     const BSONObj& batchEnd,
+    const BSONObj& lastKeyChecked,
     const int64_t nConsecutiveIdenticalIndexKeysSeenAtEnd,
     const boost::optional<Timestamp>& readTimestamp,
     const repl::OpTime& optime,
@@ -477,10 +478,31 @@ BSONObj _builderToBsonSafeHelper(const key_string::Builder& builder, const Order
         builder.getBuffer(), builder.getSize(), ordering, builder.getTypeBits());
 }
 
+boost::optional<KeyStringEntry> _getNextDistinctKeyInIndex(
+    OperationContext* opCtx,
+    const std::unique_ptr<SortedDataInterfaceThrottleCursor>& indexCursor,
+    const key_string::Version& version,
+    const Ordering& ordering,
+    const BSONObj& currKeyStringBson) {
+    // We make a keystring to search with kExclusiveAfter so that seekForKeyString will seek to the
+    // next distinct keyString after the current one.
+    // The typical keystring layout is in the format of <key><kEnd><rid>. The result of
+    // makeKeyStringFromBSONKeyForSeek will create a keystring in the format of
+    // <key><kExclusiveAfter>. The kExclusiveAfter discriminator forces us to compare kGreater with
+    // kEnd, and kGreater is > kEnd so when the cursor then searches for the keystring, it will seek
+    // to the next distinct keyString after the current one.
+    key_string::Builder builder(version);
+    auto keyStringForSeekWithoutRecordId = IndexEntryComparison::makeKeyStringFromBSONKeyForSeek(
+        currKeyStringBson, ordering, true /*isForward*/, false /*inclusive*/, builder);
+
+    return indexCursor->seekForKeyString(opCtx, keyStringForSeekWithoutRecordId);
+}
+
 Status DbCheckHasher::hashForExtraIndexKeysCheck(OperationContext* opCtx,
                                                  const Collection* collection,
                                                  const BSONObj& batchStartBson,
-                                                 const BSONObj& batchEndBson) {
+                                                 const BSONObj& batchEndBson,
+                                                 const BSONObj& lastKeyCheckedBson) {
     // hashForExtraIndexKeysCheck must only be called if the hasher was created with indexName.
     invariant(_indexName);
     StringData indexName = _indexName.get();
@@ -505,6 +527,13 @@ Status DbCheckHasher::hashForExtraIndexKeysCheck(OperationContext* opCtx,
     const key_string::Value batchStartWithoutRecordId =
         buildKeyStringWithoutRecordId(batchStartBson);
     const key_string::Value batchEndWithoutRecordId = buildKeyStringWithoutRecordId(batchEndBson);
+    const key_string::Value lastKeyCheckedWithoutRecordId =
+        buildKeyStringWithoutRecordId(lastKeyCheckedBson);
+
+    const auto batchStartForLogging =
+        key_string::rehydrateKey(indexDescriptor->keyPattern(), batchStartBson);
+    const auto batchEndForLogging =
+        key_string::rehydrateKey(indexDescriptor->keyPattern(), batchEndBson);
 
     auto indexCursor =
         std::make_unique<SortedDataInterfaceThrottleCursor>(opCtx, iam, _dataThrottle);
@@ -529,12 +558,12 @@ Status DbCheckHasher::hashForExtraIndexKeysCheck(OperationContext* opCtx,
          currEntryWithRecordId = indexCursor->nextKeyString(opCtx)) {
         iassert(opCtx->checkForInterruptNoAssert());
         const auto currKeyStringWithRecordId = currEntryWithRecordId->keyString;
-        auto keyStringBson = _keyStringToBsonSafeHelper(currKeyStringWithRecordId, ordering);
+        auto currKeyStringBson = _keyStringToBsonSafeHelper(currKeyStringWithRecordId, ordering);
         LOGV2_DEBUG(7844907,
                     3,
                     "hasher adding keystring to hash",
                     "keyString"_attr =
-                        key_string::rehydrateKey(indexDescriptor->keyPattern(), keyStringBson),
+                        key_string::rehydrateKey(indexDescriptor->keyPattern(), currKeyStringBson),
                     "indexName"_attr = indexName);
         // Append the keystring to the hash without the recordId at end.
         size_t sizeWithoutRecordId =
@@ -544,43 +573,106 @@ Status DbCheckHasher::hashForExtraIndexKeysCheck(OperationContext* opCtx,
         _countKeysSeen += 1;
         md5_append(&_state, md5Cast(currKeyStringWithRecordId.getBuffer()), sizeWithoutRecordId);
 
-        _lastKeySeen = keyStringBson;
+        _lastKeySeen = currKeyStringBson;
 
         const int comparisonWithoutRecordId =
             key_string::compare(currKeyStringWithRecordId.getBuffer(),
-                                batchEndWithoutRecordId.getBuffer(),
+                                lastKeyCheckedWithoutRecordId.getBuffer(),
                                 sizeWithoutRecordId,
-                                batchEndWithoutRecordId.getSize());
+                                lastKeyCheckedWithoutRecordId.getSize());
 
         // Last keystring in batch is in a series of consecutive identical keys.
         if (comparisonWithoutRecordId == 0) {
             _nConsecutiveIdenticalIndexKeysSeenAtEnd += 1;
-            // TODO SERVER-86858: We should investigate storing the count in the oplog batch for
-            // secondaries to use instead.
+
+            // If we hit the dbCheckMaxConsecutiveIdenticalIndexKeysPerSnapshot, we should break
+            // and end the batch.
             if (_nConsecutiveIdenticalIndexKeysSeenAtEnd >=
                 repl::dbCheckMaxConsecutiveIdenticalIndexKeysPerSnapshot.load()) {
+
+                LOGV2_DEBUG(8632301,
+                            3,
+                            "hasher hit dbCheckMaxConsecutiveIdenticalIndexKeysPerSnapshot limit",
+                            "keyString"_attr = key_string::rehydrateKey(
+                                indexDescriptor->keyPattern(), currKeyStringBson),
+                            "indexName"_attr = indexName,
+                            "dbCheckMaxConsecutiveIdenticalIndexKeysPerSnapshot"_attr =
+                                repl::dbCheckMaxConsecutiveIdenticalIndexKeysPerSnapshot.load());
+
+                // In the case that the batchEnd is $maxKey, this means that this is the last
+                // batch in the dbcheck run. We should check if there are any other keys after the
+                // consecutive identical index keys. Since this is the last batch, this means that
+                // the primary will not have any, because they would go into a subsequent batch.
+                // This means that if the secondary has any more distinct keys, this is an
+                // inconsistency, so log it to the health log.
+                const BSONObj batchEndBsonFieldsRemoved = BSONObj::stripFieldNames(batchEndBson);
+                if (SimpleBSONObjComparator::kInstance.evaluate(batchEndBsonFieldsRemoved ==
+                                                                kMaxBSONKey)) {
+                    boost::optional<KeyStringEntry> maybeExtraKeyWithRecordId =
+                        _getNextDistinctKeyInIndex(
+                            opCtx, indexCursor, keyStringVersion, ordering, currKeyStringBson);
+                    if (!maybeExtraKeyWithRecordId) {
+                        break;
+                    }
+
+                    const auto extraKeyBson = key_string::rehydrateKey(
+                        indexDescriptor->keyPattern(),
+                        _keyStringToBsonSafeHelper(maybeExtraKeyWithRecordId.get().keyString,
+                                                   ordering));
+                    const auto msg =
+                        "dbcheck batch inconsistent: at least one index key was found on the "
+                        "secondary but not the primary.";
+                    const auto status = Status(ErrorCodes::DbCheckInconsistentHash, msg);
+
+                    LOGV2_DEBUG(
+                        8632302,
+                        3,
+                        "hasher found index key at the end of dbcheck on the secondary but not "
+                        "the primary",
+                        "batchStart"_attr = batchStartForLogging,
+                        "batchEnd"_attr = batchEndForLogging,
+                        "nConsecutiveIdenticalIndexKeysSeenAtEnd"_attr =
+                            _nConsecutiveIdenticalIndexKeysSeenAtEnd,
+                        "extraKeyString"_attr = extraKeyBson,
+                        "indexName"_attr = indexName);
+                    const auto logEntry = dbCheckErrorHealthLogEntry(
+                        _secondaryIndexCheckParameters,
+                        collection->ns(),
+                        collection->uuid(),
+                        msg,
+                        ScopeEnum::Document,
+                        OplogEntriesEnum::Batch,
+                        status,
+                        BSON("batchStart" << batchStartForLogging << "batchEnd"
+                                          << batchEndForLogging
+                                          << "nConsecutiveIdenticalIndexKeysSeenAtEnd"
+                                          << _nConsecutiveIdenticalIndexKeysSeenAtEnd << "extraKey"
+                                          << extraKeyBson));
+                    HealthLogInterface::get(opCtx)->log(*logEntry);
+                }
                 break;
             }
         }
 
         if (Date_t::now() > _deadlineOnSecondary) {
-            LOGV2_DEBUG(8889400,
-                        3,
-                        "Secondary ending batch early because it reached "
-                        "dbCheckSecondaryBatchMaxTimeMs limit",
-                        "dbCheckSecondaryBatchMaxTimeMs"_attr =
-                            repl::dbCheckSecondaryBatchMaxTimeMs.load(),
-                        "lastKeyStringSeen"_attr =
-                            key_string::rehydrateKey(indexDescriptor->keyPattern(), keyStringBson),
-                        logAttrs(collection->ns()),
-                        "uuid"_attr = collection->uuid(),
-                        "indexName"_attr = indexName);
+            LOGV2_DEBUG(
+                8889400,
+                3,
+                "Secondary ending batch early because it reached "
+                "dbCheckSecondaryBatchMaxTimeMs limit",
+                "dbCheckSecondaryBatchMaxTimeMs"_attr = repl::dbCheckSecondaryBatchMaxTimeMs.load(),
+                "lastKeyStringSeen"_attr =
+                    key_string::rehydrateKey(indexDescriptor->keyPattern(), currKeyStringBson),
+                logAttrs(collection->ns()),
+                "uuid"_attr = collection->uuid(),
+                "indexName"_attr = indexName);
             std::string errorMsg =
                 "Secondary ending batch early because it reached dbCheckSecondaryBatchMaxTimeMs "
                 "limit: " +
                 std::to_string(repl::dbCheckSecondaryBatchMaxTimeMs.load()) +
                 ", lastKeyStringSeen: " +
-                key_string::rehydrateKey(indexDescriptor->keyPattern(), keyStringBson).toString();
+                key_string::rehydrateKey(indexDescriptor->keyPattern(), currKeyStringBson)
+                    .toString();
             return Status(ErrorCodes::DbCheckSecondaryBatchTimeout, errorMsg);
         }
     }
@@ -592,11 +684,10 @@ Status DbCheckHasher::hashForExtraIndexKeysCheck(OperationContext* opCtx,
 
     LOGV2_DEBUG(7844904,
                 3,
-                "Finished hashing one batch in hashe≠",
-                "firstKeyString"_attr =
-                    key_string::rehydrateKey(indexDescriptor->keyPattern(), batchStartBson),
-                "lastKeyString"_attr =
-                    key_string::rehydrateKey(indexDescriptor->keyPattern(), batchEndBson),
+                "Finished hashing one batch in hasher",
+                "batchStart"_attr = batchStartForLogging,
+                "batchEnd"_attr = batchEndForLogging,
+                "lastKeySeen"_attr = _lastKeySeen,
                 "keysHashed"_attr = _countKeysSeen,
                 "bytesHashed"_attr = _bytesSeen,
                 "indexName"_attr = indexName,
@@ -931,8 +1022,9 @@ unsigned int batchesProcessed = 0;
 Status dbCheckBatchOnSecondary(OperationContext* opCtx,
                                const repl::OpTime& optime,
                                const DbCheckOplogBatch& entry,
-                               BSONObj batchStart,
-                               BSONObj batchEnd) {
+                               const BSONObj& batchStart,
+                               const BSONObj& batchEnd,
+                               const BSONObj& lastKeyChecked) {
     auto msg = "replication consistency check";
 
     // Set up the hasher,
@@ -979,21 +1071,9 @@ Status dbCheckBatchOnSecondary(OperationContext* opCtx,
             switch (validateMode) {
                 case mongo::DbCheckValidationModeEnum::extraIndexKeysCheck: {
                     StringData indexName = secondaryIndexCheckParameters.get().getSecondaryIndex();
-
-                    hasher.emplace(opCtx,
-                                   acquisition,
-                                   batchStart,
-                                   batchEnd,
-                                   entry.getSecondaryIndexCheckParameters(),
-                                   &dataThrottle,
-                                   indexName,
-                                   std::numeric_limits<int64_t>::max(), /*maxCount*/
-                                   std::numeric_limits<int64_t>::max(), /*maxBytes*/
-                                   Date_t::now() +
-                                       Milliseconds(repl::dbCheckSecondaryBatchMaxTimeMs.load()));
-
                     indexDescriptor =
                         collection.get()->getIndexCatalog()->findIndexByName(opCtx, indexName);
+
                     if (!indexDescriptor) {
                         std::string msg = "cannot find index " + indexName + " for ns " +
                             entry.getNss().toStringForErrorMsg();
@@ -1009,9 +1089,20 @@ Status dbCheckBatchOnSecondary(OperationContext* opCtx,
                         HealthLogInterface::get(opCtx)->log(*logEntry);
                         return Status::OK();
                     }
+                    hasher.emplace(opCtx,
+                                   acquisition,
+                                   batchStart,
+                                   batchEnd,
+                                   entry.getSecondaryIndexCheckParameters(),
+                                   &dataThrottle,
+                                   indexName,
+                                   std::numeric_limits<int64_t>::max(), /*maxCount*/
+                                   std::numeric_limits<int64_t>::max(), /*maxBytes*/
+                                   Date_t::now() +
+                                       Milliseconds(repl::dbCheckSecondaryBatchMaxTimeMs.load()));
 
                     uassertStatusOK(hasher->hashForExtraIndexKeysCheck(
-                        opCtx, collection.get(), batchStart, batchEnd));
+                        opCtx, collection.get(), batchStart, batchEnd, lastKeyChecked));
                     if (MONGO_unlikely(secondaryHangAfterExtraIndexKeysHashing.shouldFail())) {
                         LOGV2_DEBUG(3083200,
                                     3,
@@ -1077,12 +1168,17 @@ Status dbCheckBatchOnSecondary(OperationContext* opCtx,
                     "found"_attr = found,
                     "readTimestamp"_attr = entry.getReadTimestamp());
 
-        auto finalBatchEnd = hasher->lastKeySeen();
+        auto hasherLastKeyChecked = hasher->lastKeySeen();
+        auto batchStartForLogging = batchStart;
+        auto batchEndForLogging = batchEnd;
         if (indexDescriptor) {
             // TODO (SERVER-61796): Handle cases where the _id index doesn't exist. We should still
             // log with a rehydrated index key.
-            batchStart = key_string::rehydrateKey(indexDescriptor->keyPattern(), batchStart);
-            finalBatchEnd = key_string::rehydrateKey(indexDescriptor->keyPattern(), finalBatchEnd);
+            batchStartForLogging =
+                key_string::rehydrateKey(indexDescriptor->keyPattern(), batchStart);
+            batchEndForLogging = key_string::rehydrateKey(indexDescriptor->keyPattern(), batchEnd);
+            hasherLastKeyChecked =
+                key_string::rehydrateKey(indexDescriptor->keyPattern(), lastKeyChecked);
         }
         bool logIndexSpec = (secondaryIndexCheckParameters &&
                              (secondaryIndexCheckParameters.get().getValidateMode() ==
@@ -1096,8 +1192,9 @@ Status dbCheckBatchOnSecondary(OperationContext* opCtx,
             hasher->bytesSeen(),
             expected,
             found,
-            batchStart,
-            finalBatchEnd,
+            batchStartForLogging,
+            batchEndForLogging,
+            hasherLastKeyChecked,
             hasher->nConsecutiveIdenticalIndexKeysSeenAtEnd(),
             entry.getReadTimestamp(),
             optime,
@@ -1179,7 +1276,7 @@ Status dbCheckOplogCommand(OperationContext* opCtx,
             // TODO SERVER-78399: Clean up handling minKey/maxKey once feature flag is removed.
             // If the dbcheck oplog entry doesn't contain batchStart, convert minKey to a BSONObj to
             // be used as batchStart.
-            BSONObj batchStart, batchEnd, batchId;
+            BSONObj batchStart, batchEnd, batchId, lastKeyChecked;
             if (!invocation.getBatchStart()) {
                 batchStart = BSON("_id" << invocation.getMinKey().elem());
             } else {
@@ -1191,8 +1288,13 @@ Status dbCheckOplogCommand(OperationContext* opCtx,
                 batchEnd = invocation.getBatchEnd().get();
             }
 
+            if (invocation.getLastKeyChecked()) {
+                lastKeyChecked = invocation.getLastKeyChecked().get();
+            }
+
             if (!skipDbCheck && !repl::skipApplyingDbCheckBatchOnSecondary.load()) {
-                return dbCheckBatchOnSecondary(opCtx, opTime, invocation, batchStart, batchEnd);
+                return dbCheckBatchOnSecondary(
+                    opCtx, opTime, invocation, batchStart, batchEnd, lastKeyChecked);
             }
 
             if (invocation.getBatchId()) {

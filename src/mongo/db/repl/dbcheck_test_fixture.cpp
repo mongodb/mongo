@@ -246,8 +246,9 @@ Status DbCheckTest::runHashForCollectionCheck(
 
 Status DbCheckTest::runHashForExtraIndexKeysCheck(
     OperationContext* opCtx,
-    const BSONObj& start,
-    const BSONObj& end,
+    const BSONObj& batchStart,
+    const BSONObj& batchEnd,
+    const BSONObj& lastKeyChecked,
     boost::optional<SecondaryIndexCheckParameters> secondaryIndexCheckParams,
     int64_t maxCount,
     int64_t maxBytes,
@@ -259,15 +260,16 @@ Status DbCheckTest::runHashForExtraIndexKeysCheck(
     DataThrottle dataThrottle(opCtx, []() { return 0; });
     auto hasher = DbCheckHasher(opCtx,
                                 acquisition,
-                                start,
-                                end,
+                                batchStart,
+                                batchEnd,
                                 secondaryIndexCheckParams,
                                 &dataThrottle,
                                 secondaryIndexCheckParams.get().getSecondaryIndex(),
                                 maxCount,
                                 maxBytes,
                                 deadlineOnSecondary);
-    return hasher.hashForExtraIndexKeysCheck(opCtx, collection.get(), start, end);
+    return hasher.hashForExtraIndexKeysCheck(
+        opCtx, collection.get(), batchStart, batchEnd, lastKeyChecked);
 }
 
 SecondaryIndexCheckParameters DbCheckTest::createSecondaryIndexCheckParams(

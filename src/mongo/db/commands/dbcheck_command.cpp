@@ -735,8 +735,10 @@ void DbChecker::_extraIndexKeysCheck(OperationContext* opCtx) {
         // 2. Get the actual last keystring processed from reverse lookup.
         // If the first or last key of the batch is not initialized, that means there was an error
         // with batching.
-        if (batchStats.firstKeyCheckedWithRecordId.isEmpty() ||
-            batchStats.lastKeyCheckedWithRecordId.isEmpty()) {
+        if (batchStats.batchStartWithRecordId.isEmpty() ||
+            batchStats.batchEndWithRecordId.isEmpty() ||
+            batchStats.batchStartBsonWithoutRecordId.isEmpty() ||
+            batchStats.batchEndBsonWithoutRecordId.isEmpty()) {
             LOGV2_DEBUG(7844903,
                         3,
                         "abandoning extra index keys check because of error with batching",
@@ -927,11 +929,11 @@ Status DbChecker::_hashExtraIndexKeysCheck(OperationContext* opCtx,
         batchStats->nHasherBytes,
         batchStats->md5,
         batchStats->md5,
-        key_string::rehydrateKey(batchStats->keyPattern,
-                                 batchStats->firstBsonCheckedWithoutRecordId),
+        key_string::rehydrateKey(batchStats->keyPattern, batchStats->batchStartBsonWithoutRecordId),
+        key_string::rehydrateKey(batchStats->keyPattern, batchStats->batchEndBsonWithoutRecordId),
         key_string::rehydrateKey(batchStats->keyPattern,
                                  batchStats->lastBsonCheckedWithoutRecordId),
-        batchStats->nConsecutiveIdenticalKeysAtEnd,
+        batchStats->nHasherConsecutiveIdenticalKeysAtEnd,
         batchStats->readTimestamp,
         batchStats->time,
         boost::none /* collOpts */,
@@ -1012,19 +1014,27 @@ Status DbChecker::_runHashExtraKeyCheck(OperationContext* opCtx,
         batchStats->keyPattern = index->keyPattern();
         batchStats->indexSpec = index->infoObj();
 
+        const auto rehydratedBatchStartBsonWithoutRecordId = key_string::rehydrateKey(
+            index->keyPattern(), batchStats->batchStartBsonWithoutRecordId);
+        const auto rehydratedBatchEndBsonWithoutRecordId =
+            key_string::rehydrateKey(index->keyPattern(), batchStats->batchEndBsonWithoutRecordId);
+        const auto rehydratedLastBsonCheckedWithoutRecordId = key_string::rehydrateKey(
+            index->keyPattern(), batchStats->lastBsonCheckedWithoutRecordId);
+
         LOGV2_DEBUG(8520000,
                     3,
                     "Beginning hash for extra keys batch",
-                    "firstKeyString"_attr = batchStats->firstBsonCheckedWithoutRecordId,
-                    "lastKeyString"_attr = batchStats->lastBsonCheckedWithoutRecordId);
+                    "batchStart"_attr = rehydratedBatchStartBsonWithoutRecordId,
+                    "batchEnd"_attr = rehydratedBatchEndBsonWithoutRecordId,
+                    "lastKeyChecked"_attr = rehydratedLastBsonCheckedWithoutRecordId);
 
         // Create hasher.
         boost::optional<DbCheckHasher> hasher;
         try {
             hasher.emplace(opCtx,
                            *acquisitionSW.getValue(),
-                           batchStats->firstBsonCheckedWithoutRecordId,
-                           batchStats->lastBsonCheckedWithoutRecordId,
+                           rehydratedBatchStartBsonWithoutRecordId,
+                           rehydratedBatchEndBsonWithoutRecordId,
                            _info.secondaryIndexCheckParameters,
                            &_info.dataThrottle,
                            indexName,
@@ -1034,11 +1044,13 @@ Status DbChecker::_runHashExtraKeyCheck(OperationContext* opCtx,
             return e.toStatus();
         }
 
+
         Status status =
             hasher->hashForExtraIndexKeysCheck(opCtx,
                                                collection.get(),
-                                               batchStats->firstBsonCheckedWithoutRecordId,
-                                               batchStats->lastBsonCheckedWithoutRecordId);
+                                               rehydratedBatchStartBsonWithoutRecordId,
+                                               rehydratedBatchEndBsonWithoutRecordId,
+                                               rehydratedLastBsonCheckedWithoutRecordId);
         invariant(status.code() != ErrorCodes::DbCheckSecondaryBatchTimeout);
 
         if (!status.isOK()) {
@@ -1051,11 +1063,9 @@ Status DbChecker::_runHashExtraKeyCheck(OperationContext* opCtx,
         oplogBatch.setNss(_info.nss);
         oplogBatch.setReadTimestamp(*readTimestamp);
         oplogBatch.setMd5(md5);
-        oplogBatch.setBatchStart(key_string::rehydrateKey(
-            index->keyPattern(), batchStats->firstBsonCheckedWithoutRecordId));
-        oplogBatch.setBatchEnd(key_string::rehydrateKey(
-            index->keyPattern(), batchStats->lastBsonCheckedWithoutRecordId));
-
+        oplogBatch.setBatchStart(rehydratedBatchStartBsonWithoutRecordId);
+        oplogBatch.setBatchEnd(rehydratedBatchEndBsonWithoutRecordId);
+        oplogBatch.setLastKeyChecked(rehydratedLastBsonCheckedWithoutRecordId);
         if (_info.secondaryIndexCheckParameters) {
             oplogBatch.setSecondaryIndexCheckParameters(_info.secondaryIndexCheckParameters);
         }
@@ -1063,10 +1073,9 @@ Status DbChecker::_runHashExtraKeyCheck(OperationContext* opCtx,
         LOGV2_DEBUG(7844900,
                     3,
                     "hashed one batch on primary",
-                    "firstKeyString"_attr = key_string::rehydrateKey(
-                        index->keyPattern(), batchStats->firstBsonCheckedWithoutRecordId),
-                    "lastKeyString"_attr = key_string::rehydrateKey(
-                        index->keyPattern(), batchStats->lastBsonCheckedWithoutRecordId),
+                    "batchStart"_attr = rehydratedBatchStartBsonWithoutRecordId,
+                    "batchEnd"_attr = rehydratedBatchEndBsonWithoutRecordId,
+                    "hasherLastKeyChecked"_attr = hasher->lastKeySeen(),
                     "md5"_attr = md5,
                     "keysHashed"_attr = hasher->keysSeen(),
                     "bytesHashed"_attr = hasher->bytesSeen(),
@@ -1084,6 +1093,8 @@ Status DbChecker::_runHashExtraKeyCheck(OperationContext* opCtx,
         batchStats->nHasherKeys = hasher->keysSeen();
         batchStats->nHasherBytes = hasher->bytesSeen();
         batchStats->md5 = md5;
+        batchStats->nHasherConsecutiveIdenticalKeysAtEnd =
+            hasher->nConsecutiveIdenticalIndexKeysSeenAtEnd();
     }
 
     if (MONGO_unlikely(hangBeforeAddingDBCheckBatchToOplog.shouldFail())) {
@@ -1252,8 +1263,8 @@ Status DbChecker::_getCatalogSnapshotAndRunReverseLookup(
 
     // Set the index cursor's end position based on the inputted end parameter for when to stop
     // the dbcheck command.
-    auto maxKey = Helpers::toKeyFormat(_info.end);
-    indexCursor->setEndPosition(maxKey, true /*inclusive*/);
+    auto indexCursorEndKey = Helpers::toKeyFormat(_info.end);
+    indexCursor->setEndPosition(indexCursorEndKey, true /*inclusive*/);
     int64_t numKeysInSnapshot = 0;
     int64_t numBytesInSnapshot = 0;
 
@@ -1264,6 +1275,11 @@ Status DbChecker::_getCatalogSnapshotAndRunReverseLookup(
     // If we're in the middle of an index check, snapshotFirstKeyWithRecordId should be set.
     // Strip the recordId and seek.
     if (snapshotFirstKeyWithRecordId.is_initialized()) {
+        // If this is the beginning of a batch, update the batch first key.
+        if (batchStats.batchStartWithRecordId.isEmpty() &&
+            batchStats.batchStartBsonWithoutRecordId.isEmpty()) {
+            _updateBatchStartForBatchStats(&batchStats, snapshotFirstKeyWithRecordId.get(), iam);
+        }
         // Create keystring to seek without recordId. This is because if the index
         // is an older format unique index, the keystring will not have the recordId appended, so we
         // need to seek for the keystring without the recordId.
@@ -1279,40 +1295,26 @@ Status DbChecker::_getCatalogSnapshotAndRunReverseLookup(
         currIndexKeyWithRecordId =
             indexCursor->seekForKeyString(opCtx, snapshotFirstKeyWithoutRecordId);
     } else {
-        // If we're at the beginning of the entire index check (snapshotFirstKeyWithRecordId is not
-        // set), and the user has provided a start key, set snapshotFirstKeyWithoutRecordId to the
-        // start key.
-        if (SimpleBSONObjComparator::kInstance.evaluate(BSONObj::stripFieldNames(_info.start) !=
-                                                        kMinBSONKey)) {
-            key_string::Builder keyStringBuilder(version);
-            keyStringBuilder.resetToKey(_info.start, ordering);
+        // Set first key to _info.start. This is either $minKey or the user-specified start.
+        if (batchStats.batchStartWithRecordId.isEmpty() &&
+            batchStats.batchStartBsonWithoutRecordId.isEmpty()) {
+            _updateBatchStartForBatchStats(&batchStats, _info.start, iam);
+        }
+        key_string::Builder keyStringBuilder(version);
+        keyStringBuilder.resetToKey(_info.start, ordering);
 
-            auto snapshotFirstKeyWithoutRecordId = keyStringBuilder.finishAndGetBuffer();
+        auto snapshotFirstKeyWithoutRecordId = keyStringBuilder.finishAndGetBuffer();
+
+        // Seek for snapshotFirstKeyWithoutRecordId.
+        // Note that seekForKeyString always returns a keyString with RecordId appended,
+        // regardless of what format the index has.
+        currIndexKeyWithRecordId =
+            indexCursor->seekForKeyString(opCtx, snapshotFirstKeyWithoutRecordId);
+
+        if (currIndexKeyWithRecordId) {
             snapshotFirstKeyStringBsonRehydrated = key_string::rehydrateKey(
-                index->keyPattern(), _builderToBsonSafeHelper(keyStringBuilder, ordering));
-
-            // seek for snapshotFirstKeyWithoutRecordId.
-            // Note that seekForKeyString always returns a keyString with RecordId appended,
-            // regardless of what format the index has.
-            currIndexKeyWithRecordId =
-                indexCursor->seekForKeyString(opCtx, snapshotFirstKeyWithoutRecordId);
-        } else {
-
-            // Otherwise, we're at the beginning of the entire index check, and the user has not
-            // provided a start key, so just call nextKeyString, which will return the first key in
-            // the index.
-            //
-            // Note that nextKeyString always returns a keyString with RecordId appended, regardless
-            // of what format the index has.
-            currIndexKeyWithRecordId = indexCursor->nextKeyString(opCtx);
-
-            // Set the snapshot first keystring to the first key in the index. If this does not
-            // exist, we will log empty BSON and fail the dbCheck later.
-            if (currIndexKeyWithRecordId) {
-                snapshotFirstKeyStringBsonRehydrated = key_string::rehydrateKey(
-                    index->keyPattern(),
-                    _keyStringToBsonSafeHelper(currIndexKeyWithRecordId->keyString, ordering));
-            }
+                index->keyPattern(),
+                _keyStringToBsonSafeHelper(currIndexKeyWithRecordId->keyString, ordering));
         }
     }
 
@@ -1324,15 +1326,15 @@ Status DbChecker::_getCatalogSnapshotAndRunReverseLookup(
         LOGV2_DEBUG(7844803,
                     3,
                     "could not find any keys in index",
-                    "endPosition"_attr = maxKey,
+                    "endPosition"_attr =
+                        key_string::rehydrateKey(index->keyPattern(), indexCursorEndKey),
                     "snapshotFirstKeyStringBson"_attr = snapshotFirstKeyStringBsonRehydrated,
                     "indexName"_attr = indexName,
                     logAttrs(_info.nss),
                     "uuid"_attr = _info.uuid);
-        status = Status(ErrorCodes::IndexIsEmpty,
-                        str::stream() << "cannot find any keys in index " << indexName << " for ns "
-                                      << _info.nss.toStringForErrorMsg() << " and uuid "
-                                      << _info.uuid.toString());
+
+        // Set batch end to be the user specified end or $maxKey.
+        _updateBatchEndForBatchStats(&batchStats, _info.end, iam);
         batchStats.finishedIndexBatch = true;
         batchStats.finishedIndexCheck = true;
         return status;
@@ -1345,12 +1347,6 @@ Status DbChecker::_getCatalogSnapshotAndRunReverseLookup(
                 "indexName"_attr = indexName,
                 logAttrs(_info.nss),
                 "uuid"_attr = _info.uuid);
-
-    // Keep track of first key checked in the batch if it hasn't been set already, so that we can
-    // keep track of the batch bounds for hashing purposes.
-    if (batchStats.firstKeyCheckedWithRecordId.isEmpty()) {
-        _updateFirstKeyForBatchStats(&batchStats, currIndexKeyWithRecordId.get().keyString, iam);
-    }
 
     // Loop until we should finish a snapshot.
     bool finishSnapshot = false;
@@ -1379,7 +1375,8 @@ Status DbChecker::_getCatalogSnapshotAndRunReverseLookup(
         }
 
         // Keep track of lastKey in batch.
-        _updateLastKeyForBatchStats(&batchStats, currKeyStringWithRecordId, iam);
+        _updateLastKeyCheckedForBatchStats(&batchStats, currKeyStringWithRecordId, iam);
+        _updateBatchEndForBatchStats(&batchStats, currKeyStringWithRecordId, iam);
 
         numBytesInSnapshot += currKeyStringWithRecordId.getSize();
         numKeysInSnapshot++;
@@ -1441,10 +1438,11 @@ bool DbChecker::_shouldEndCatalogSnapshotOrBatch(
 
     // Helper for checking if there are still keys left in the index.
     auto checkNoMoreKeysInIndex =
-        [&batchStats](const boost::optional<KeyStringEntry>& nextIndexKeyWithRecordId) {
+        [&](const boost::optional<KeyStringEntry>& nextIndexKeyWithRecordId) {
             if (!nextIndexKeyWithRecordId) {
                 batchStats.finishedIndexCheck = true;
                 batchStats.finishedIndexBatch = true;
+                _updateBatchEndForBatchStats(&batchStats, _info.end, iam);
                 LOGV2_DEBUG(
                     7980004,
                     3,
@@ -1546,15 +1544,9 @@ bool DbChecker::_shouldEndCatalogSnapshotOrBatch(
         // key we just checked), we need update it to the next distinct one. We make a keystring to
         // search with kExclusiveAfter so that seekForKeyString will seek to the next distinct
         // keyString after the current one.
-        key_string::Builder builder(version);
-        auto keyStringForSeekWithoutRecordId =
-            IndexEntryComparison::makeKeyStringFromBSONKeyForSeek(
-                currKeyStringBson, ordering, true /*isForward*/, false /*inclusive*/, builder);
-
-
-        // Check to make sure there are still more distinct keys in the index.
         boost::optional<KeyStringEntry> maybeNextKeyToBeCheckedWithRecordId =
-            indexCursor->seekForKeyString(opCtx, keyStringForSeekWithoutRecordId);
+            _getNextDistinctKeyInIndex(opCtx, indexCursor, version, ordering, currKeyStringBson);
+        // Check to make sure there are still more distinct keys in the index.
         // If there are no more keys left in index, finish the batch and the index check as a whole.
         bool noMoreKeysInIndex = checkNoMoreKeysInIndex(maybeNextKeyToBeCheckedWithRecordId);
         if (!noMoreKeysInIndex) {
@@ -1855,21 +1847,21 @@ void DbChecker::_dataConsistencyCheck(OperationContext* opCtx) {
         }
 
         const auto stats = result.getValue();
-
-        auto entry =
-            dbCheckBatchHealthLogEntry(_info.secondaryIndexCheckParameters,
-                                       stats.batchId,
-                                       _info.nss,
-                                       _info.uuid,
-                                       stats.nCount,
-                                       stats.nBytes,
-                                       stats.md5,
-                                       stats.md5,
-                                       key_string::rehydrateKey(BSON("_id" << 1), start),
-                                       key_string::rehydrateKey(BSON("_id" << 1), stats.lastKey),
-                                       0 /*nConsecutiveIdenticalIndexKeysAtEnd*/,
-                                       stats.readTimestamp,
-                                       stats.time);
+        auto batchEnd = key_string::rehydrateKey(BSON("_id" << 1), stats.lastKey);
+        auto entry = dbCheckBatchHealthLogEntry(_info.secondaryIndexCheckParameters,
+                                                stats.batchId,
+                                                _info.nss,
+                                                _info.uuid,
+                                                stats.nCount,
+                                                stats.nBytes,
+                                                stats.md5,
+                                                stats.md5,
+                                                key_string::rehydrateKey(BSON("_id" << 1), start),
+                                                batchEnd,
+                                                batchEnd /*lastKeyChecked*/,
+                                                0 /*nConsecutiveIdenticalIndexKeysAtEnd*/,
+                                                stats.readTimestamp,
+                                                stats.time);
         if (kDebugBuild || entry->getSeverity() != SeverityEnum::Info || stats.logToHealthLog) {
             // On debug builds, health-log every batch result; on release builds, health-log
             // every N batches.
@@ -2120,29 +2112,88 @@ std::pair<bool, boost::optional<UUID>> DbChecker::_shouldLogOplogBatch(DbCheckOp
     return {shouldLog, boost::none};
 }
 
-void DbChecker::_updateFirstKeyForBatchStats(DbCheckExtraIndexKeysBatchStats* batchStats,
-                                             key_string::Value firstKeyCheckedWithRecordId,
-                                             const SortedDataIndexAccessMethod* iam) const {
+void DbChecker::_updateBatchStartForBatchStats(DbCheckExtraIndexKeysBatchStats* batchStats,
+                                               const key_string::Value batchStartWithRecordId,
+                                               const SortedDataIndexAccessMethod* iam) const {
     uassert(7985005,
-            "batchStats.firstKeyWithRecordId must be empty if we are setting it",
-            batchStats->firstKeyCheckedWithRecordId.isEmpty());
-    batchStats->firstKeyCheckedWithRecordId = firstKeyCheckedWithRecordId;
+            "batchStats.batchStartWithRecordId must be empty if we are setting it",
+            batchStats->batchStartWithRecordId.isEmpty() &&
+                batchStats->batchStartBsonWithoutRecordId.isEmpty());
+    batchStats->batchStartWithRecordId = batchStartWithRecordId;
 
     auto ordering = iam->getSortedDataInterface()->getOrdering();
     auto firstBsonWithoutRecordId =
-        _keyStringToBsonSafeHelper(batchStats->firstKeyCheckedWithRecordId, ordering);
-    batchStats->firstBsonCheckedWithoutRecordId = firstBsonWithoutRecordId;
+        _keyStringToBsonSafeHelper(batchStats->batchStartWithRecordId, ordering);
+    batchStats->batchStartBsonWithoutRecordId = firstBsonWithoutRecordId;
 }
 
-void DbChecker::_updateLastKeyForBatchStats(DbCheckExtraIndexKeysBatchStats* batchStats,
-                                            key_string::Value lastKeyCheckedWithRecordId,
-                                            const SortedDataIndexAccessMethod* iam) const {
+void DbChecker::_updateBatchStartForBatchStats(DbCheckExtraIndexKeysBatchStats* batchStats,
+                                               const BSONObj batchStartBsonWithoutRecordId,
+                                               const SortedDataIndexAccessMethod* iam) const {
+    uassert(8632300,
+            "batchStats.batchStartWithRecordId must be empty if we are setting it",
+            batchStats->batchStartWithRecordId.isEmpty() &&
+                batchStats->batchStartBsonWithoutRecordId.isEmpty());
+    batchStats->batchStartBsonWithoutRecordId = batchStartBsonWithoutRecordId;
+
+    const auto ordering = iam->getSortedDataInterface()->getOrdering();
+    const auto version = iam->getSortedDataInterface()->getKeyStringVersion();
+
+    key_string::Builder keyStringBuilder(version);
+    keyStringBuilder.resetToKey(batchStartBsonWithoutRecordId, ordering);
+
+    batchStats->batchStartWithRecordId = keyStringBuilder.getValueCopy();
+}
+
+void DbChecker::_updateLastKeyCheckedForBatchStats(
+    DbCheckExtraIndexKeysBatchStats* batchStats,
+    const key_string::Value lastKeyCheckedWithRecordId,
+    const SortedDataIndexAccessMethod* iam) const {
     batchStats->lastKeyCheckedWithRecordId = lastKeyCheckedWithRecordId;
 
     auto ordering = iam->getSortedDataInterface()->getOrdering();
     auto lastBsonWithoutRecordId =
         _keyStringToBsonSafeHelper(batchStats->lastKeyCheckedWithRecordId, ordering);
     batchStats->lastBsonCheckedWithoutRecordId = lastBsonWithoutRecordId;
+}
+
+void DbChecker::_updateLastKeyCheckedForBatchStats(DbCheckExtraIndexKeysBatchStats* batchStats,
+                                                   const BSONObj lastBsonCheckedWithoutRecordId,
+                                                   const SortedDataIndexAccessMethod* iam) const {
+    batchStats->lastBsonCheckedWithoutRecordId = lastBsonCheckedWithoutRecordId;
+
+    const auto ordering = iam->getSortedDataInterface()->getOrdering();
+    const auto version = iam->getSortedDataInterface()->getKeyStringVersion();
+
+    key_string::Builder keyStringBuilder(version);
+    keyStringBuilder.resetToKey(lastBsonCheckedWithoutRecordId, ordering);
+
+    batchStats->lastKeyCheckedWithRecordId = keyStringBuilder.getValueCopy();
+}
+
+void DbChecker::_updateBatchEndForBatchStats(DbCheckExtraIndexKeysBatchStats* batchStats,
+                                             const key_string::Value batchEndWithRecordId,
+                                             const SortedDataIndexAccessMethod* iam) const {
+    batchStats->batchEndWithRecordId = batchEndWithRecordId;
+
+    auto ordering = iam->getSortedDataInterface()->getOrdering();
+    auto batchEndBsonWithoutRecordId =
+        _keyStringToBsonSafeHelper(batchStats->batchEndWithRecordId, ordering);
+    batchStats->batchEndBsonWithoutRecordId = batchEndBsonWithoutRecordId;
+}
+
+void DbChecker::_updateBatchEndForBatchStats(DbCheckExtraIndexKeysBatchStats* batchStats,
+                                             const BSONObj batchEndBsonWithoutRecordId,
+                                             const SortedDataIndexAccessMethod* iam) const {
+    batchStats->batchEndBsonWithoutRecordId = batchEndBsonWithoutRecordId;
+
+    const auto ordering = iam->getSortedDataInterface()->getOrdering();
+    const auto version = iam->getSortedDataInterface()->getKeyStringVersion();
+
+    key_string::Builder keyStringBuilder(version);
+    keyStringBuilder.resetToKey(batchEndBsonWithoutRecordId, ordering);
+
+    batchStats->batchEndWithRecordId = keyStringBuilder.getValueCopy();
 }
 
 void DbChecker::_appendContextForLoggingExtraKeysCheck(DbCheckExtraIndexKeysBatchStats* batchStats,
@@ -2153,8 +2204,8 @@ void DbChecker::_appendContextForLoggingExtraKeysCheck(DbCheckExtraIndexKeysBatc
     if (!batchStats->indexSpec.isEmpty()) {
         builder->append("indexSpec", batchStats->indexSpec);
     }
-    if (!batchStats->firstBsonCheckedWithoutRecordId.isEmpty()) {
-        builder->append("firstKey", batchStats->firstBsonCheckedWithoutRecordId);
+    if (!batchStats->batchStartBsonWithoutRecordId.isEmpty()) {
+        builder->append("firstKey", batchStats->batchStartBsonWithoutRecordId);
     }
     if (!batchStats->lastBsonCheckedWithoutRecordId.isEmpty()) {
         builder->append("lastKey", batchStats->lastBsonCheckedWithoutRecordId);
