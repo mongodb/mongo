@@ -331,6 +331,18 @@ functions:
         wget "$binary_url" -O mongo-tools.tar.gz
         tar -xzvf mongo-tools.tar.gz -C mongodb/ --strip-components=1 "mong*/bin"
         echo "MongoDB tools installed successfully!"
+  generate atlas info:
+    - command: shell.exec
+      params:
+        working_dir: src
+        script: |
+          set -o errexit
+          set -o verbose
+
+          uarch=$(uname -p)
+          os=$(uname -r)
+          json="{ \"version\": \"${version}\", \"gitVersion\": \"${revision}\", \"uarch\": \"$uarch\", \"os\": \"$os\" }"
+          echo $json | jq '.' > mongodb/atlas_info.json
   generate feature flag list:
     - command: shell.exec
       params:
@@ -416,7 +428,7 @@ functions:
         remote_file: ${project}/${compile_variant}/${version_id}/dsi/supplementary-data.tgz
         bucket: mciuploads
         permissions: public-read
-        content_type: ${content_type|application/x-gzip}
+        content_type: application/x-gzip
         display_name: supplementary-data.tgz
   ###
 
@@ -524,14 +536,21 @@ tasks:
   ###
 
   - name: package_supplementary_data
+    depends_on:
+      - name: version_expansions_gen
+        variant: generate-tasks-for-version
     commands:
       - command: manifest.load
       - command: git.get_project
         params:
           directory: src
+          clone_depth: 1000
       - func: "set up venv"
+      - func: "get version expansions"
+      - func: "apply version expansions"
       - func: "download mongo tools"
       - func: "generate feature flag list"
+      - func: "generate atlas info"
       - func: "generate server params list"
       - func: "copy jstests"
       - func: "copy buildscripts"
