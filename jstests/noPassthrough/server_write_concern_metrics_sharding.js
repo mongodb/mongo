@@ -43,18 +43,13 @@ function initializeCluster() {
 function resetCollection(setupCommand) {
     testColl.drop();
     assert.commandWorked(testDB.createCollection(collName));
-    // The create coordinator issues a best effort refresh at the end of the coordinator which can
-    // inferfere with the counts in the test cases. Wait here for the refreshes to finish.
-    let curOps = [];
-    assert.soon(() => {
-        curOps = primary.getDB("admin")
-                     .aggregate([
-                         {$currentOp: {allUsers: true}},
-                         {$match: {"command._flushRoutingTableCacheUpdates": {$exists: true}}}
-                     ])
-                     .toArray();
-        return curOps.length == 0;
-    }, "Timed out waiting for create refreshes to finish, found: " + tojson(curOps));
+    // The collection creation does not include the refresh of its filtering metadata, which occurs
+    // upon the first data access on the namespace and can inferfere with the counters checked in
+    // the test cases (due to writes onto config.cache.collections/chunks).By performing a secomdary
+    // read here, we'll ensure that subsequent requests will see stable filtering metadata.
+    assert.commandWorked(testDB.runCommand(
+        {count: collName, $readPreference: {mode: 'secondary'}, readConcern: {'level': 'local'}}));
+
     if (setupCommand) {
         assert.commandWorked(testDB.runCommand(setupCommand));
     }
