@@ -183,6 +183,15 @@ TEST_F(DecorableTest, ExtendedAlignment) {
     ASSERT_EQ(reinterpret_cast<uintptr_t>(&x[bigBoys].boys[1]) % overAlignedRequirement, 0);
 }
 
+// Verify that a decorable with no decorations with alignment > 1 still has its buffer allocated
+// with alignment >= alignof(void*)
+TEST_F(DecorableTest, DefaultAlignment) {
+    struct X : Decorable<X> {};
+    X x;
+    auto reg = decorable_detail::getRegistry<X>();
+    ASSERT_EQ(reg.bufferAlignment() % alignof(void*), 0);
+}
+
 TEST_F(DecorableTest, MaplikeAccess) {
     struct X : Decorable<X> {};
     static auto d = X::declareDecoration<int>();

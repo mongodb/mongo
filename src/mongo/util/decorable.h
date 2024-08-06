@@ -192,7 +192,7 @@ public:
 private:
     std::vector<Entry> _entries;
     size_t _bufferSize = sizeof(void*);  // The owner pointer is always present.
-    size_t _bufferAlignment = 1;
+    size_t _bufferAlignment = alignof(void*);
 };
 
 /** Defined for gdb pretty-printer visibility only. */
