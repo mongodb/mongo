@@ -962,21 +962,27 @@ Status ShardingCatalogManager::_updateClusterCardinalityParameter(const Lock::Ex
     const auto shardRegistry = Grid::get(opCtx)->shardRegistry();
 
     while (true) {
-        try {
-            const auto cmdResponse =
-                shardRegistry->getConfigShard()->runCommandWithFixedRetryAttempts(
-                    opCtx,
-                    ReadPreferenceSetting(ReadPreference::PrimaryOnly),
-                    DatabaseName::kAdmin,
-                    configsvrSetClusterParameter.toBSON(),
-                    Shard::RetryPolicy::kIdempotent);
-            return Shard::CommandResponse::getEffectiveStatus(cmdResponse);
-        } catch (const ExceptionFor<ErrorCodes::ConflictingOperationInProgress>&) {
-            // Retry on ErrorCodes::ConflictingOperationInProgress errors,
-            // which can be caused by another ConfigsvrCoordinator runnning concurrently.
-            opCtx->sleepFor(Milliseconds(500));
-            continue;
+        const auto cmdResponse = shardRegistry->getConfigShard()->runCommandWithFixedRetryAttempts(
+            opCtx,
+            ReadPreferenceSetting(ReadPreference::PrimaryOnly),
+            DatabaseName::kAdmin,
+            configsvrSetClusterParameter.toBSON(),
+            Shard::RetryPolicy::kIdempotent);
+
+        auto status = Shard::CommandResponse::getEffectiveStatus(cmdResponse);
+
+        if (status != ErrorCodes::ConflictingOperationInProgress) {
+            return status;
         }
+
+        // Retry on ErrorCodes::ConflictingOperationInProgress errors, which can be caused by
+        // another ConfigsvrCoordinator runnning concurrently.
+        LOGV2_DEBUG(9314400,
+                    2,
+                    "Failed to update the cluster parameter. Retrying again after 500ms.",
+                    "error"_attr = status);
+
+        opCtx->sleepFor(Milliseconds(500));
     }
 }
 
