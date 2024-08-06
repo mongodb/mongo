@@ -250,6 +250,9 @@ txnNumber++;
 // Perform a second snapshot read under a new transaction.
 let newReadResult = assert.commandWorked(sessionDb.runCommand({
     find: collName,
+    // Use an explicit batchSize to avoid the config fuzzer choosing a batch size
+    // that does not exhaust the cursor (which would result in a non-zero cursor ID).
+    batchSize: 4,
     readConcern: {level: "snapshot"},
     txnNumber: NumberLong(txnNumber),
     startTransaction: true,
