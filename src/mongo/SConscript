@@ -56,23 +56,6 @@ env.SConscript(
 )
 
 sys.path.append("src/mongo")
-from src.mongo.mongo_config_header import get_config_header_substs
-
-
-def makeConfigHeaderDefine(self, key):
-    val = "// #undef {0}".format(key)
-    if key in self["CONFIG_HEADER_DEFINES"]:
-        val = "#define {0} {1}".format(key, self["CONFIG_HEADER_DEFINES"][key])
-    return val
-
-
-env.AddMethod(makeConfigHeaderDefine)
-
-generateConfigHeaderFile = env.Substfile(
-    "config.h.in",
-    SUBST_DICT=[(k, env.makeConfigHeaderDefine(v)) for (k, v) in get_config_header_substs()],
-)
-env.Alias("generated-sources", generateConfigHeaderFile)
 
 # NOTE: The 'base' library does not really belong here. Its presence
 # here is temporary. Do not add to this library, do not remove from

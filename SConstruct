@@ -1758,7 +1758,6 @@ envDict = dict(
     BENCHMARK_LIST="$BUILD_ROOT/benchmarks.txt",
     CONFIGUREDIR="$BUILD_ROOT/scons/$VARIANT_DIR/sconf_temp",
     CONFIGURELOG="$BUILD_ROOT/scons/config.log",
-    CONFIG_HEADER_DEFINES={},
     LIBDEPS_TAG_EXPANSIONS=[],
 )
 
@@ -1913,13 +1912,6 @@ if unknown_vars:
     env.FatalError("Unknown variables specified: {0}", ", ".join(list(unknown_vars.keys())))
 
 install_actions.setup(env, get_option("install-action"))
-
-
-def set_config_header_define(env, varname, varval=1):
-    env["CONFIG_HEADER_DEFINES"][varname] = varval
-
-
-env.AddMethod(set_config_header_define, "SetConfigHeaderDefine")
 
 detectEnv = env.Clone()
 
@@ -2303,8 +2295,6 @@ env["USE_VENDORED_LIBUNWIND"] = use_vendored_libunwind
 if use_system_libunwind and not use_libunwind:
     print("Error: --use-system-libunwind requires --use-libunwind")
     Exit(1)
-if use_libunwind == True:
-    env.SetConfigHeaderDefine("MONGO_CONFIG_USE_LIBUNWIND")
 
 if get_option("visibility-support") == "auto":
     visibility_annotations_enabled = not env.TargetOSIs("windows") and link_model.startswith(
@@ -2512,9 +2502,6 @@ if link_model.startswith("dynamic"):
                     return []
 
                 env["LIBDEPS_TAG_EXPANSIONS"].append(libdeps_tags_expand_incomplete)
-
-if optBuild != "off":
-    env.SetConfigHeaderDefine("MONGO_CONFIG_OPTIMIZED_BUILD")
 
 # Enable the fast decider if explicitly requested or if in 'auto' mode
 # and not in conflict with other options like the ninja option which
@@ -2839,9 +2826,7 @@ env["LIBDEPS_TAG_EXPANSIONS"].append(link_guard_libdeps_tag_expand)
 env.Tool("forceincludes")
 
 # ---- other build setup -----
-if debugBuild:
-    env.SetConfigHeaderDefine("MONGO_CONFIG_DEBUG_BUILD")
-else:
+if not debugBuild:
     env.AppendUnique(CPPDEFINES=["NDEBUG"])
 
 # Normalize our experimental optimiation and hardening flags
@@ -3379,14 +3364,6 @@ if get_option("wiredtiger") == "on":
         )
     else:
         wiredtiger = True
-        env.SetConfigHeaderDefine("MONGO_CONFIG_WIREDTIGER_ENABLED")
-
-if get_option("ocsp-stapling") == "on":
-    # OCSP Stapling needs to be disabled on ubuntu 18.04 machines because when TLS 1.3 is
-    # enabled on that machine, the status-response message sent contains garbage data. This
-    # is a known bug and needs to be fixed by upstream, but for the time being we need to
-    # disable OCSP Stapling on Ubuntu 18.04 machines. See SERVER-51364 for more details.
-    env.SetConfigHeaderDefine("MONGO_CONFIG_OCSP_STAPLING_ENABLED")
 
 if not env.TargetOSIs("windows", "macOS") and (env.ToolchainIs("GCC", "clang")):
     # By default, apply our current microarchitecture minima. If the
@@ -4097,40 +4074,6 @@ def doConfigure(myenv):
 
     conf.Finish()
 
-    # C11 memset_s - a secure memset
-    def CheckMemset_s(context):
-        test_body = """
-        #define __STDC_WANT_LIB_EXT1__ 1
-        #include <cstring>
-        int main(int argc, char* argv[]) {
-            void* data = nullptr;
-            return memset_s(data, 0, 0, 0);
-        }
-        """
-
-        context.Message("Checking for memset_s... ")
-        ret = context.TryLink(textwrap.dedent(test_body), ".cpp")
-        context.Result(ret)
-        return ret
-
-    conf = Configure(
-        env,
-        custom_tests={
-            "CheckMemset_s": CheckMemset_s,
-        },
-    )
-    if conf.CheckMemset_s():
-        conf.env.SetConfigHeaderDefine("MONGO_CONFIG_HAVE_MEMSET_S")
-
-    if conf.CheckFunc("strnlen"):
-        conf.env.SetConfigHeaderDefine("MONGO_CONFIG_HAVE_STRNLEN")
-
-    # Glibc 2.25+, OpenBSD 5.5+ and FreeBSD 11.0+ offer explicit_bzero, a secure way to zero memory
-    if conf.CheckFunc("explicit_bzero"):
-        conf.env.SetConfigHeaderDefine("MONGO_CONFIG_HAVE_EXPLICIT_BZERO")
-
-    conf.Finish()
-
     # If we are using libstdc++, check to see if we are using a
     # libstdc++ that is older than our GCC minimum of 5.3.0. This is
     # primarly to help people using clang on OS X but forgetting to
@@ -4245,33 +4188,11 @@ def doConfigure(myenv):
 
     # Check if we are on a system that support the POSIX clock_gettime function
     #  and the "monotonic" clock.
-    posix_monotonic_clock = False
     if posix_system:
-
-        def CheckPosixMonotonicClock(context):
-            test_body = """
-            #include <unistd.h>
-            #if !(defined(_POSIX_TIMERS) && _POSIX_TIMERS > 0)
-            #error POSIX clock_gettime not supported
-            #elif !(defined(_POSIX_MONOTONIC_CLOCK) && _POSIX_MONOTONIC_CLOCK >= 0)
-            #error POSIX monotonic clock not supported
-            #endif
-            """
-
-            context.Message("Checking if the POSIX monotonic clock is supported... ")
-            ret = context.TryCompile(textwrap.dedent(test_body), ".c")
-            context.Result(ret)
-            return ret
-
         conf = Configure(
             myenv,
             help=False,
-            custom_tests={
-                "CheckPosixMonotonicClock": CheckPosixMonotonicClock,
-            },
         )
-        posix_monotonic_clock = conf.CheckPosixMonotonicClock()
-
         # On 32-bit systems, we need to define this in order to get access to
         # the 64-bit versions of fseek, etc.
         # except on 32 bit android where it breaks boost
@@ -5072,39 +4993,6 @@ def doConfigure(myenv):
         if not "builtin-memcmp" in selected_experimental_optimizations:
             myenv.AddToCCFLAGSIfSupported("-fno-builtin-memcmp")
 
-    # pthread_setname_np was added in GLIBC 2.12, and Solaris 11.3
-    if posix_system:
-
-        def CheckPThreadSetNameNP(context):
-            compile_test_body = textwrap.dedent("""
-            #ifndef _GNU_SOURCE
-            #define _GNU_SOURCE
-            #endif
-            #include <pthread.h>
-
-            int main() {
-                pthread_setname_np(pthread_self(), "test");
-                return 0;
-            }
-            """)
-
-            context.Message("Checking if pthread_setname_np is supported... ")
-            result = context.TryCompile(compile_test_body, ".cpp")
-            context.Result(result)
-            return result
-
-        conf = Configure(
-            myenv,
-            custom_tests={
-                "CheckPThreadSetNameNP": CheckPThreadSetNameNP,
-            },
-        )
-
-        if conf.CheckPThreadSetNameNP():
-            conf.env.SetConfigHeaderDefine("MONGO_CONFIG_HAVE_PTHREAD_SETNAME_NP")
-
-        myenv = conf.Finish()
-
     def CheckBoostMinVersion(context):
         compile_test_body = textwrap.dedent("""
         #include <boost/version.hpp>
@@ -5235,65 +5123,6 @@ def doConfigure(myenv):
             maybeIssueDarwinSSLAdvice(conf.env)
             conf.env.ConfError("SSL is enabled, but is unavailable")
 
-        if conf.CheckDeclaration(
-            "FIPS_mode_set",
-            includes="""
-                #include <openssl/crypto.h>
-                #include <openssl/evp.h>
-            """,
-        ):
-            conf.env.SetConfigHeaderDefine("MONGO_CONFIG_HAVE_FIPS_MODE_SET")
-
-        if conf.CheckDeclaration(
-            "d2i_ASN1_SEQUENCE_ANY",
-            includes="""
-                #include <openssl/asn1.h>
-            """,
-        ):
-            conf.env.SetConfigHeaderDefine("MONGO_CONFIG_HAVE_ASN1_ANY_DEFINITIONS")
-
-        def CheckOpenSSL_EC_DH(context):
-            compile_test_body = textwrap.dedent("""
-            #include <openssl/ssl.h>
-
-            int main() {
-                SSL_CTX_set_ecdh_auto(0, 0);
-                SSL_set_ecdh_auto(0, 0);
-                return 0;
-            }
-            """)
-
-            context.Message("Checking if SSL_[CTX_]_set_ecdh_auto is supported... ")
-            result = context.TryCompile(compile_test_body, ".cpp")
-            context.Result(result)
-            return result
-
-        def CheckOpenSSL_EC_KEY_new(context):
-            compile_test_body = textwrap.dedent("""
-            #include <openssl/ssl.h>
-            #include <openssl/ec.h>
-
-            int main() {
-                SSL_CTX_set_tmp_ecdh(0, 0);
-                EC_KEY_new_by_curve_name(NID_X9_62_prime256v1);
-                EC_KEY_free(0);
-                return 0;
-            }
-            """)
-
-            context.Message("Checking if EC_KEY_new_by_curve_name is supported... ")
-            result = context.TryCompile(compile_test_body, ".cpp")
-            context.Result(result)
-            return result
-
-        conf.AddTest("CheckOpenSSL_EC_DH", CheckOpenSSL_EC_DH)
-        if conf.CheckOpenSSL_EC_DH():
-            conf.env.SetConfigHeaderDefine("MONGO_CONFIG_HAVE_SSL_SET_ECDH_AUTO")
-
-        conf.AddTest("CheckOpenSSL_EC_KEY_new", CheckOpenSSL_EC_KEY_new)
-        if conf.CheckOpenSSL_EC_KEY_new():
-            conf.env.SetConfigHeaderDefine("MONGO_CONFIG_HAVE_SSL_EC_KEY_NEW")
-
     # We require ssl by default unless the user has specified --ssl=off
     require_ssl = get_option("ssl") != "off"
 
@@ -5306,29 +5135,17 @@ def doConfigure(myenv):
     if conf.env.TargetOSIs("windows"):
         # SChannel on Windows
         ssl_provider = "windows"
-        conf.env.SetConfigHeaderDefine(
-            "MONGO_CONFIG_SSL_PROVIDER",
-            "MONGO_CONFIG_SSL_PROVIDER_WINDOWS",
-        )
         conf.env.Append(MONGO_CRYPTO=["windows"])
 
     elif conf.env.TargetOSIs("darwin", "macOS"):
         # SecureTransport on macOS
         ssl_provider = "apple"
-        conf.env.SetConfigHeaderDefine(
-            "MONGO_CONFIG_SSL_PROVIDER",
-            "MONGO_CONFIG_SSL_PROVIDER_APPLE",
-        )
         conf.env.Append(MONGO_CRYPTO=["apple"])
         conf.env.AppendUnique(FRAMEWORKS=["CoreFoundation", "Security"])
 
     elif require_ssl:
         checkOpenSSL(conf)
         # Working OpenSSL available, use it.
-        conf.env.SetConfigHeaderDefine(
-            "MONGO_CONFIG_SSL_PROVIDER",
-            "MONGO_CONFIG_SSL_PROVIDER_OPENSSL",
-        )
         conf.env.Append(MONGO_CRYPTO=["openssl"])
         ssl_provider = "openssl"
 
@@ -5339,7 +5156,6 @@ def doConfigure(myenv):
     if require_ssl:
         # Either crypto engine is native,
         # or it's OpenSSL and has been checked to be working.
-        conf.env.SetConfigHeaderDefine("MONGO_CONFIG_SSL")
         print("Using SSL Provider: {0}".format(ssl_provider))
     else:
         ssl_provider = "none"
@@ -5471,26 +5287,8 @@ def doConfigure(myenv):
         conf.FindSysLibDep("grpcxx_reflection", ["grpc++_reflection"])
 
     if posix_system:
-        conf.env.SetConfigHeaderDefine("MONGO_CONFIG_HAVE_HEADER_UNISTD_H")
         conf.CheckLib("rt")
         conf.CheckLib("dl")
-
-    if posix_monotonic_clock:
-        conf.env.SetConfigHeaderDefine("MONGO_CONFIG_HAVE_POSIX_MONOTONIC_CLOCK")
-
-    if get_option("use-diagnostic-latches") == "off":
-        conf.env.SetConfigHeaderDefine("MONGO_CONFIG_USE_RAW_LATCHES")
-
-    if get_option("use-tracing-profiler") == "on":
-        conf.env.SetConfigHeaderDefine("MONGO_CONFIG_USE_TRACING_PROFILER")
-
-    if (
-        conf.CheckCXXHeader("execinfo.h")
-        and conf.CheckDeclaration("backtrace", includes="#include <execinfo.h>")
-        and conf.CheckDeclaration("backtrace_symbols", includes="#include <execinfo.h>")
-        and conf.CheckDeclaration("backtrace_symbols_fd", includes="#include <execinfo.h>")
-    ):
-        conf.env.SetConfigHeaderDefine("MONGO_CONFIG_HAVE_EXECINFO_BACKTRACE")
 
     conf.env["_HAVEPCAP"] = conf.CheckLib(["pcap", "wpcap"], autoadd=False)
 
@@ -5568,68 +5366,6 @@ def doConfigure(myenv):
         if not check_all_atomics(" with libatomic"):
             myenv.ConfError("The toolchain does not support std::atomic, cannot continue")
 
-    def CheckExtendedAlignment(context, size):
-        test_body = """
-            #include <atomic>
-            #include <mutex>
-            #include <cstddef>
-
-            static_assert(alignof(std::max_align_t) < {0}, "whatever");
-
-            alignas({0}) std::mutex aligned_mutex;
-            alignas({0}) std::atomic<int> aligned_atomic;
-
-            struct alignas({0}) aligned_struct_mutex {{
-                std::mutex m;
-            }};
-
-            struct alignas({0}) aligned_struct_atomic {{
-                std::atomic<int> m;
-            }};
-
-            struct holds_aligned_mutexes {{
-                alignas({0}) std::mutex m1;
-                alignas({0}) std::mutex m2;
-            }} hm;
-
-            struct holds_aligned_atomics {{
-                alignas({0}) std::atomic<int> a1;
-                alignas({0}) std::atomic<int> a2;
-            }} ha;
-        """.format(size)
-
-        context.Message(
-            "Checking for extended alignment {0} for concurrency types... ".format(size)
-        )
-        ret = context.TryCompile(textwrap.dedent(test_body), ".cpp")
-        context.Result(ret)
-        return ret
-
-    conf.AddTest("CheckExtendedAlignment", CheckExtendedAlignment)
-
-    # If we don't have a specialized search sequence for this
-    # architecture, assume 64 byte cache lines, which is pretty
-    # standard. If for some reason the compiler can't offer that, try
-    # 32.
-    default_alignment_search_sequence = [64, 32]
-
-    # The following are the target architectures for which we have
-    # some knowledge that they have larger cache line sizes. In
-    # particular, POWER8 uses 128 byte lines and zSeries uses 256. We
-    # start at the goal state, and work down until we find something
-    # the compiler can actualy do for us.
-    extended_alignment_search_sequence = {
-        "ppc64le": [128, 64, 32],
-        "s390x": [256, 128, 64, 32],
-    }
-
-    for size in extended_alignment_search_sequence.get(
-        env["TARGET_ARCH"], default_alignment_search_sequence
-    ):
-        if conf.CheckExtendedAlignment(size):
-            conf.env.SetConfigHeaderDefine("MONGO_CONFIG_MAX_EXTENDED_ALIGNMENT", size)
-            break
-
     def CheckMongoCMinVersion(context):
         compile_test_body = textwrap.dedent("""
         #include <mongoc/mongoc.h>
@@ -5675,67 +5411,6 @@ def doConfigure(myenv):
     elif http_client == "on":
         checkHTTPLib(required=True)
 
-    if env["TARGET_ARCH"] == "ppc64le":
-        # This checks for an altivec optimization we use in full text search.
-        # Different versions of gcc appear to put output bytes in different
-        # parts of the output vector produced by vec_vbpermq.  This configure
-        # check looks to see which format the compiler produces.
-        #
-        # NOTE: This breaks cross compiles, as it relies on checking runtime functionality for the
-        # environment we're in.  A flag to choose the index, or the possibility that we don't have
-        # multiple versions to support (after a compiler upgrade) could solve the problem if we
-        # eventually need them.
-        def CheckAltivecVbpermqOutput(context, index):
-            test_body = """
-                #include <altivec.h>
-                #include <cstring>
-                #include <cstdint>
-                #include <cstdlib>
-
-                int main() {{
-                    using Native = __vector signed char;
-                    const size_t size = sizeof(Native);
-                    const Native bits = {{ 120, 112, 104, 96, 88, 80, 72, 64, 56, 48, 40, 32, 24, 16, 8, 0 }};
-
-                    uint8_t inputBuf[size];
-                    std::memset(inputBuf, 0xFF, sizeof(inputBuf));
-
-                    for (size_t offset = 0; offset <= size; offset++) {{
-                        Native vec = vec_vsx_ld(0, reinterpret_cast<const Native*>(inputBuf));
-
-                        uint64_t mask = vec_extract(vec_vbpermq(vec, bits), {0});
-
-                        size_t initialZeros = (mask == 0 ? size : __builtin_ctzll(mask));
-                        if (initialZeros != offset) {{
-			    return 1;
-                        }}
-
-                        if (offset < size) {{
-                            inputBuf[offset] = 0;  // Add an initial 0 for the next loop.
-                        }}
-                    }}
-
-		    return 0;
-                }}
-            """.format(index)
-
-            context.Message("Checking for vec_vbperm output in index {0}... ".format(index))
-            ret = context.TryRun(textwrap.dedent(test_body), ".cpp")
-            context.Result(ret[0])
-            return ret[0]
-
-        conf.AddTest("CheckAltivecVbpermqOutput", CheckAltivecVbpermqOutput)
-
-        outputIndex = next((idx for idx in [0, 1] if conf.CheckAltivecVbpermqOutput(idx)), None)
-        if outputIndex is not None:
-            conf.env.SetConfigHeaderDefine(
-                "MONGO_CONFIG_ALTIVEC_VEC_VBPERMQ_OUTPUT_INDEX", outputIndex
-            )
-        else:
-            myenv.ConfError(
-                "Running on ppc64le, but can't find a correct vec_vbpermq output index.  Compiler or platform not supported"
-            )
-
     if get_option("xray") == "on":
         if not (myenv.ToolchainIs("clang") and env.TargetOSIs("linux")):
             env.FatalError("LLVM Xray is only supported with clang on linux")
@@ -5748,47 +5423,6 @@ def doConfigure(myenv):
             LINKFLAGS=["-fxray-instrument"],
         )
 
-    myenv = conf.Finish()
-
-    conf = Configure(myenv)
-    usdt_enabled = get_option("enable-usdt-probes")
-    usdt_provider = None
-    if usdt_enabled in ("auto", "on"):
-        if env.TargetOSIs("linux"):
-            if conf.CheckHeader("sys/sdt.h"):
-                usdt_provider = "SDT"
-        # can put other OS targets here
-        if usdt_enabled == "on" and not usdt_provider:
-            myenv.ConfError(
-                "enable-usdt-probes flag was set to on, but no USDT provider could be found"
-            )
-        elif usdt_provider:
-            conf.env.SetConfigHeaderDefine("MONGO_CONFIG_USDT_ENABLED")
-            conf.env.SetConfigHeaderDefine("MONGO_CONFIG_USDT_PROVIDER", usdt_provider)
-    myenv = conf.Finish()
-
-    def CheckGlibcRseqPresent(context):
-        compile_test_body = textwrap.dedent("""
-        #include <sys/rseq.h>
-        #include <stdlib.h>
-        #include <stdio.h>
-
-        int main() {
-            printf("%d", __rseq_size);
-            return EXIT_SUCCESS;
-        }
-        """)
-
-        context.Message("Checking if glibc rseq implemenation is present...")
-        result = context.TryCompile(compile_test_body, ".cpp")
-        context.Result(result)
-        return result
-
-    conf = Configure(myenv)
-    conf.AddTest("CheckGlibcRseqPresent", CheckGlibcRseqPresent)
-
-    if conf.CheckGlibcRseqPresent():
-        conf.env.SetConfigHeaderDefine("MONGO_CONFIG_GLIBC_RSEQ")
     myenv = conf.Finish()
 
     return myenv
@@ -6174,13 +5808,7 @@ if gdb_index_enabled == True:
         env.FatalError("Could not enable explicit request for gdb index generation.")
 
 if env.get("ENABLE_GRPC_BUILD"):
-    env.SetConfigHeaderDefine("MONGO_CONFIG_GRPC")
     env.Tool("protobuf_compiler")
-
-if env["MONGO_ALLOCATOR"] == "tcmalloc-google":
-    env.SetConfigHeaderDefine("MONGO_CONFIG_TCMALLOC_GOOGLE")
-elif env["MONGO_ALLOCATOR"] == "tcmalloc-gperf":
-    env.SetConfigHeaderDefine("MONGO_CONFIG_TCMALLOC_GPERF")
 
 if get_option("separate-debug") == "on" or env.TargetOSIs("windows"):
     separate_debug = Tool("separate_debug")
@@ -6439,9 +6067,6 @@ def shouldBuildStreams(thisEnv):
 
 
 env.AddMethod(shouldBuildStreams, "ShouldBuildStreams")
-if env.ShouldBuildStreams():
-    # Set a config indicating this build has the stream processing module enabled (enterprise/src/streams)
-    env.SetConfigHeaderDefine("MONGO_CONFIG_STREAMS")
 
 
 def prefix_libdir_rpath_generator(env, source, target, for_signature):
