@@ -617,11 +617,6 @@ StatusWith<std::pair<ParsedCollModRequest, BSONObj>> parseCollModRequest(Operati
                 CollMod::kTimeseriesBucketsMayHaveMixedSchemaDataFieldName);
         }
 
-        if (!*mixedSchema) {
-            return {ErrorCodes::InvalidOptions,
-                    "Cannot set timeseriesBucketsMayHaveMixedSchemaData to false"};
-        }
-
         parsed.timeseriesBucketsMayHaveMixedSchemaData = mixedSchema;
         oplogEntryBuilder.append(CollMod::kTimeseriesBucketsMayHaveMixedSchemaDataFieldName,
                                  *mixedSchema);
