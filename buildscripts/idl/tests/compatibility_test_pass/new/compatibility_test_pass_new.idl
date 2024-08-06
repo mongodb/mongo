@@ -434,6 +434,17 @@ structs:
                 optional: true
                 unstable: false
 
+    NewOptionalBoolStruct:
+        description: "This struct gets another field of type optionalBool."
+        fields:
+            ok1:
+                type: bool
+                unstable: false
+                optional: true
+            ok2:
+                type: optionalBool
+                unstable: false
+
 commands:
     testCommand:
         description: "new passing test command, there was no change from the old version"
@@ -1432,3 +1443,35 @@ commands:
                 optional: true
                 unstable: false
         reply_type: ReplyWithNewNestedArrayTypeField
+
+    newParameterOptionalBool:
+        description: "new command can add parameters of type optionalBoolean"
+        command_name: newParameterOptionalBool
+        namespace: ignored
+        cpp_name: newParameterOptionalBool
+        strict: true
+        api_version: "1"
+        reply_type: OkReply
+        fields:
+            flag:
+                type: optionalBool
+                unstable: false
+
+    newReplyOptionalBool:
+        description: "new command can add reply fields of type optionalBoolean"
+        command_name: newReplyOptionalBool
+        namespace: ignored
+        cpp_name: newReplyOptionalBool
+        strict: true
+        api_version: "1"
+        reply_type: NewOptionalBoolStruct
+
+    newCommandTypeOptionalBool:
+        description: "new command can add type fields of type optionalBoolean"
+        command_name: newCommandTypeOptionalBool
+        namespace: type
+        type: NewOptionalBoolStruct
+        cpp_name: newCommandTypeOptionalBool
+        strict: true
+        api_version: "1"
+        reply_type: OkReply
