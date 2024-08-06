@@ -5,6 +5,16 @@ import {configureFailPoint} from "jstests/libs/fail_point_util.js";
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 
 export const defaultSnapshotSize = 1000;
+const infoBatchQuery = {
+    "severity": "info",
+    "operation": "dbCheckBatch",
+    "data.dbCheckParameters": {$exists: true}
+};
+const inconsistentBatchQuery = {
+    "severity": "error",
+    "msg": "dbCheck batch inconsistent",
+    "data.dbCheckParameters": {$exists: true}
+};
 export const logQueries = {
     allErrorsOrWarningsQuery: {
         $or: [{"severity": "warning"}, {"severity": "error"}],
@@ -55,15 +65,13 @@ export const logQueries = {
             {"severity": "error", "data.dbCheckParameters": {$exists: true}}
         ]
     },
-    infoBatchQuery: {
-        "severity": "info",
-        "operation": "dbCheckBatch",
-        "data.dbCheckParameters": {$exists: true}
-    },
-    inconsistentBatchQuery: {
-        "severity": "error",
-        "msg": "dbCheck batch inconsistent",
-        "data.dbCheckParameters": {$exists: true}
+    infoBatchQuery: infoBatchQuery,
+    inconsistentBatchQuery: inconsistentBatchQuery,
+    allBatchesQuery: {
+        $or: [
+            infoBatchQuery,
+            inconsistentBatchQuery,
+        ]
     },
     startStopQuery: {
         $or: [
@@ -101,6 +109,12 @@ export const logQueries = {
         severity: "error",
         operation: "dbCheckBatch",
         "data.error": "IndexNotFound: dbCheck needs _id index",
+    },
+    extraIndexKeyAtEndOfSecondary: {
+        severity: "error",
+        msg:
+            "dbcheck batch inconsistent: at least one index key was found on the secondary but not the primary.",
+        "data.dbCheckParameters": {$exists: true}
     },
     checkIdIndexOnClusteredCollectionWarningQuery: {
         severity: "warning",
@@ -332,24 +346,34 @@ export const checkHealthLog = (healthlog, query, numExpected, timeout = 60 * 100
 
 // Temporarily restart the secondary as a standalone, inject an inconsistency and
 // restart it back as a secondary.
-export const injectInconsistencyOnSecondary = (replSet, dbName, cmd, noCleanData = true) => {
-    const secondaryConn = replSet.getSecondary();
-    const secondaryNodeId = replSet.getNodeId(secondaryConn);
-    replSet.stop(secondaryNodeId, {forRestart: true /* preserve dbPath */});
+export const injectInconsistencyOnSecondary =
+    (replSet, dbName, cmd, withMissingIndexKeys = false, noCleanData = true) => {
+        const secondaryConn = replSet.getSecondary();
+        const secondaryNodeId = replSet.getNodeId(secondaryConn);
+        replSet.stop(secondaryNodeId, {forRestart: true /* preserve dbPath */});
 
-    const standaloneConn = MongoRunner.runMongod({
-        dbpath: secondaryConn.dbpath,
-        noCleanData: noCleanData,
-    });
+        const standaloneConn = MongoRunner.runMongod({
+            dbpath: secondaryConn.dbpath,
+            noCleanData: noCleanData,
+        });
 
-    const standaloneDB = standaloneConn.getDB(dbName);
-    assert.commandWorked(standaloneDB.runCommand(cmd));
+        const standaloneDB = standaloneConn.getDB(dbName);
+        let failpoint;
+        if (withMissingIndexKeys) {
+            failpoint =
+                configureFailPoint(standaloneDB, "skipIndexNewRecords", {skipIdIndex: false});
+        }
+        assert.commandWorked(standaloneDB.runCommand(cmd));
 
-    // Shut down the secondary and restart it as a member of the replica set.
-    MongoRunner.stopMongod(standaloneConn);
-    replSet.start(secondaryNodeId, {}, true /*restart*/);
-    replSet.awaitNodesAgreeOnPrimaryNoAuth();
-};
+        if (withMissingIndexKeys) {
+            failpoint.off();
+        }
+
+        // Shut down the secondary and restart it as a member of the replica set.
+        MongoRunner.stopMongod(standaloneConn);
+        replSet.start(secondaryNodeId, {}, true /*restart*/);
+        replSet.awaitNodesAgreeOnPrimaryNoAuth();
+    };
 
 // Returns a list of all collections in a given database excluding views.
 function listCollectionsWithoutViews(database) {
@@ -496,6 +520,7 @@ export const assertForDbCheckErrors =
                         errorsFound.push(err);
                         jsTestLog(tojson(err));
                     }
+                    jsTestLog("Full HealthLog: " + tojson(healthlog.find().toArray()));
                     assert(false, errMsg);
                 }
                 return true;
@@ -552,8 +577,10 @@ export function resetSnapshotSize(rst) {
 
 // Verifies that the healthlog contains entries that span the entire range that dbCheck should run
 // against.
+// TODO SERVER-92609: Currently this only works for extra index keys check. We should standardize
+// this for collection check as well.
 export function assertCompleteCoverage(
-    healthlog, nDocs, docSuffix, start, end, inconsistentBatch = false) {
+    healthlog, nDocs, indexName, docSuffix, start = null, end = null) {
     // For non-empty docSuffix like 'aaa' for instance, if we insert over 10 docs, the lexicographic
     // sorting order would be '0aaa', '1aaa', '10aaa', instead of increasing numerical order. Skip
     // these checks as we have test coverage without needing to account for these specific cases.
@@ -570,16 +597,13 @@ export function assertCompleteCoverage(
         return batchBoundary.substring(0, batchBoundary.indexOf(docSuffix));
     };
 
-    let query = logQueries.infoBatchQuery;
-    if (inconsistentBatch) {
-        query = {"severity": "error", "msg": "dbCheck batch inconsistent"};
-    }
+    const query = logQueries.allBatchesQuery;
 
     const batches = healthlog.find(query).toArray();
-    let expectedBatchStart = start === null ? 0 : start;
+    let expectedBatchStart = start === null ? MinKey : start;
     let batchEnd = "";
     for (let batch of batches) {
-        let batchStart = batch.data.batchStart.a;
+        let batchStart = batch.data.batchStart[indexName];
         if (docSuffix) {
             batchStart = truncateDocSuffix(batchStart, docSuffix);
         }
@@ -587,7 +611,7 @@ export function assertCompleteCoverage(
         // Verify that the batch start is correct.
         assert.eq(expectedBatchStart, batchStart);
         // Set our next expected batch start to the next value after the end of this batch.
-        batchEnd = batch.data.batchEnd.a;
+        batchEnd = batch.data.batchEnd[indexName];
         if (docSuffix) {
             batchEnd = truncateDocSuffix(batchEnd, docSuffix);
         }
@@ -596,8 +620,7 @@ export function assertCompleteCoverage(
 
     if (end === null) {
         // User did not issue a custom range, assert that we checked all documents.
-        // TODO (SERVER-86323): Fix this behavior and ensure maxKey is logged.
-        assert.eq(nDocs - 1, batchEnd);
+        assert.eq(MaxKey, batchEnd);
     } else {
         // User issued a custom end, but we do not know if the documents in the collection actually
         // ended at that range. Verify that we have hit either the end of the collection, or we

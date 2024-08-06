@@ -124,8 +124,9 @@ std::unique_ptr<HealthLogEntry> dbCheckBatchHealthLogEntry(
     int64_t bytes,
     const std::string& expectedHash,
     const std::string& foundHash,
-    const BSONObj& minKey,
-    const BSONObj& maxKey,
+    const BSONObj& batchStart,
+    const BSONObj& batchEnd,
+    const BSONObj& lastKeyChecked,
     int64_t nConsecutiveIdenticalIndexKeysAtEnd,
     const boost::optional<Timestamp>& timestamp,
     const repl::OpTime& optime,
@@ -145,6 +146,16 @@ struct ReadSourceWithTimestamp {
  */
 BSONObj _keyStringToBsonSafeHelper(const key_string::Value& keyString, const Ordering& ordering);
 BSONObj _builderToBsonSafeHelper(const key_string::Builder& builder, const Ordering& ordering);
+
+/**
+ * Helper for getting the next distinct key in the index after currKeyStringBson.
+ */
+boost::optional<KeyStringEntry> _getNextDistinctKeyInIndex(
+    OperationContext* opCtx,
+    const std::unique_ptr<SortedDataInterfaceThrottleCursor>& indexCursor,
+    const key_string::Version& version,
+    const Ordering& ordering,
+    const BSONObj& currKeyStringBson);
 
 /**
  * DbCheckAcquisition is a helper class to acquire locks and set RecoveryUnit state for the dbCheck
@@ -221,8 +232,9 @@ public:
      */
     Status hashForExtraIndexKeysCheck(OperationContext* opCtx,
                                       const Collection* collection,
-                                      const BSONObj& firstBson,
-                                      const BSONObj& lastBson);
+                                      const BSONObj& batchStartBson,
+                                      const BSONObj& batchEndBson,
+                                      const BSONObj& lastKeyCheckedBson);
 
     /**
      * Checks if a document has missing index keys by finding the index keys that should be

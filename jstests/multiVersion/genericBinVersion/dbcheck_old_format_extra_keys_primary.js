@@ -59,8 +59,12 @@ checkHealthLog(primaryHealthLog, logQueries.recordDoesNotMatchQuery, defaultNumD
 checkHealthLog(primaryHealthLog, logQueries.allErrorsOrWarningsQuery, defaultNumDocs);
 
 checkHealthLog(primaryHealthLog, logQueries.infoBatchQuery, numBatches);
-assertCompleteCoverage(
-    primaryHealthLog, defaultNumDocs, null /* docSuffix */, null /* start */, null /* end */);
+assertCompleteCoverage(primaryHealthLog,
+                       defaultNumDocs,
+                       "a" /*indexName*/,
+                       null /* docSuffix */,
+                       null /* start */,
+                       null /* end */);
 
 // Verify that the correct num of inconsistent batch entries were found on secondary.
 forEachNonArbiterSecondary(rst, function(node) {
@@ -71,10 +75,10 @@ forEachNonArbiterSecondary(rst, function(node) {
 
     assertCompleteCoverage(node.getDB("local").system.healthlog,
                            defaultNumDocs,
+                           "a" /*indexName*/,
                            null /* docSuffix */,
                            null /* start */,
-                           null /* end */,
-                           true /* inconsistentBatch */);
+                           null /* end */);
 });
 
 resetSnapshotSize(rst);
