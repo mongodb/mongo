@@ -1492,7 +1492,7 @@ tasks:
 
 - <<: *jstestfuzz_template
   name: resharding_timeseries_fuzzer_gen
-  tags: ["assigned_to_jira_team_server_cluster_scalability", "non_deterministic", "resharding_fuzzer", "require_npm", "random_name"]
+  tags: ["assigned_to_jira_team_server_cluster_scalability", "default", "feature_flag_guarded", "random_name", "require_npm", "requires_all_feature_flags"]
   commands:
   - func: "generate resmoke tasks"
     vars:
