@@ -109,12 +109,14 @@ replTest.start(
     true /* restart */);
 
 const checkLogs = function() {
-    // The index build was not yet completed at the recovery timestamp, it will be dropped and
-    // rebuilt.
-    checkLog.containsJson(primary(), 22206, {
+    // Found index from unfinished build.
+    checkLog.containsJson(primary(), 22253, {
         index: "a_1",
         namespace: coll().getFullName(),
     });
+
+    // Resetting unfinished index.
+    checkLog.containsJson(primary(), 6987700, {namespace: coll().getFullName(), index: "a_1"});
 
     // Index build restarting.
     checkLog.containsJson(primary(), 20660);

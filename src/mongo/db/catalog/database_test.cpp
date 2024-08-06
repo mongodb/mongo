@@ -261,7 +261,7 @@ void _testDropCollectionThrowsExceptionIfThereAreIndexesInProgress(OperationCont
             collection->ns(), indexInfoObj, IndexBuildMethod::kHybrid, UUID::gen());
         {
             WriteUnitOfWork wuow(opCtx);
-            ASSERT_OK(indexBuildBlock->init(opCtx, collection));
+            ASSERT_OK(indexBuildBlock->init(opCtx, collection, /*forRecovery=*/false));
             wuow.commit();
         }
         ON_BLOCK_EXIT([&indexBuildBlock, opCtx, collection] {

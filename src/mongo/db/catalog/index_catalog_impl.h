@@ -200,6 +200,9 @@ public:
     Status dropIndex(OperationContext* opCtx,
                      Collection* collection,
                      const IndexDescriptor* desc) override;
+    Status resetUnfinishedIndexForRecovery(OperationContext* opCtx,
+                                           Collection* collection,
+                                           const IndexDescriptor* desc) override;
     Status dropUnfinishedIndex(OperationContext* opCtx,
                                Collection* collection,
                                const IndexDescriptor* desc) override;

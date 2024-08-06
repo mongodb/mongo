@@ -419,6 +419,16 @@ public:
                              const IndexDescriptor* desc) = 0;
 
     /**
+     * Resets the index given its descriptor.
+     *
+     * This can only be called during startup recovery as it involves recreating the index table to
+     * allow bulk cursors to be used again.
+     */
+    virtual Status resetUnfinishedIndexForRecovery(OperationContext* opCtx,
+                                                   Collection* collection,
+                                                   const IndexDescriptor* desc) = 0;
+
+    /**
      * Drops an unfinished index given its descriptor.
      *
      * The caller must hold the collection X lock.

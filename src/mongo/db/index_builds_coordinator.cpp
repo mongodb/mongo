@@ -557,81 +557,52 @@ Status IndexBuildsCoordinator::_startIndexBuildForRecovery(OperationContext* opC
 
     CollectionWriter collection(opCtx, nss);
     {
-        // These steps are combined into a single WUOW to ensure there are no commits without
-        // the indexes.
-        // 1) Drop all unfinished indexes.
-        // 2) Start, but do not complete the index build process.
+        // These steps are combined into a single WUOW to ensure there are no commits without the
+        // indexes for repair.
         WriteUnitOfWork wuow(opCtx);
-        auto indexCatalog = collection.getWritableCollection()->getIndexCatalog();
-
-
-        for (size_t i = 0; i < indexNames.size(); i++) {
-            auto descriptor = indexCatalog->findIndexByName(
-                opCtx, indexNames[i], IndexCatalog::InclusionPolicy::kReady);
-            if (descriptor) {
-                Status s =
-                    indexCatalog->dropIndex(opCtx, collection.getWritableCollection(), descriptor);
-                if (!s.isOK()) {
-                    return s;
-                }
-                continue;
-            }
-
-            // If the index is not present in the catalog, then we are trying to drop an already
-            // aborted index. This may happen when rollback-via-refetch restarts an index build
-            // after an abort has been rolled back.
-            if (!collection->isIndexPresent(indexNames[i])) {
-                LOGV2(20652,
-                      "An index was not found in the catalog while trying to drop the index during "
-                      "recovery",
-                      "buildUUID"_attr = buildUUID,
-                      "index"_attr = indexNames[i]);
-                continue;
-            }
-
-            const auto durableBuildUUID = collection->getIndexBuildUUID(indexNames[i]);
-
-            // A build UUID is present if and only if we are rebuilding a two-phase build.
-            invariant((protocol == IndexBuildProtocol::kTwoPhase) ==
-                      durableBuildUUID.is_initialized());
-            // When a buildUUID is present, it must match the build UUID parameter to this
-            // function.
-            invariant(!durableBuildUUID || *durableBuildUUID == buildUUID,
-                      str::stream() << "durable build UUID: " << durableBuildUUID
-                                    << "buildUUID: " << buildUUID);
-
-            // If the unfinished index is in the IndexCatalog, drop it through there, otherwise drop
-            // it from the DurableCatalog. Rollback-via-refetch does not clear any in-memory state,
-            // so we should do it manually here.
-            descriptor = indexCatalog->findIndexByName(
-                opCtx,
-                indexNames[i],
-                IndexCatalog::InclusionPolicy::kReady | IndexCatalog::InclusionPolicy::kUnfinished |
-                    IndexCatalog::InclusionPolicy::kFrozen);
-            if (descriptor) {
-                Status s = indexCatalog->dropUnfinishedIndex(
-                    opCtx, collection.getWritableCollection(), descriptor);
-                if (!s.isOK()) {
-                    return s;
-                }
-            } else {
-                // There are no concurrent users of the index during startup recovery, so it is OK
-                // to pass in a nullptr for the index 'ident', promising that the index is not in
-                // use.
-                catalog::removeIndex(
-                    opCtx, indexNames[i], collection.getWritableCollection(), nullptr /* ident */);
-            }
-        }
 
         // We need to initialize the collection to rebuild the indexes. The collection may already
-        // be initialized when rebuilding indexes with rollback-via-refetch.
+        // be initialized when rebuilding multiple unfinished indexes on the same collection.
         if (!collection->isInitialized()) {
             collection.getWritableCollection()->init(opCtx);
         }
 
-        auto dbName = nss.db().toString();
+        if (storageGlobalParams.repair) {
+            Status status = _dropIndexesForRepair(opCtx, collection, indexNames);
+            if (!status.isOK()) {
+                return status;
+            }
+        } else {
+            // Unfinished index builds that are not resumable will drop and recreate the index table
+            // using the same ident to avoid doing untimestamped writes to the catalog.
+            for (const auto& indexName : indexNames) {
+                auto indexCatalog = collection.getWritableCollection()->getIndexCatalog();
+                auto desc =
+                    indexCatalog->findIndexByName(opCtx,
+                                                  indexName,
+                                                  IndexCatalog::InclusionPolicy::kUnfinished |
+                                                      IndexCatalog::InclusionPolicy::kFrozen);
+                Status status = indexCatalog->resetUnfinishedIndexForRecovery(
+                    opCtx, collection.getWritableCollection(), desc);
+                if (!status.isOK()) {
+                    return status;
+                }
+
+                const auto durableBuildUUID = collection->getIndexBuildUUID(indexName);
+
+                // A build UUID is present if and only if we are rebuilding a two-phase build.
+                invariant((protocol == IndexBuildProtocol::kTwoPhase) ==
+                          durableBuildUUID.has_value());
+                // When a buildUUID is present, it must match the build UUID parameter to this
+                // function.
+                invariant(!durableBuildUUID || *durableBuildUUID == buildUUID,
+                          str::stream() << "durable build UUID: " << durableBuildUUID
+                                        << "buildUUID: " << buildUUID);
+            }
+        }
+
         auto replIndexBuildState = std::make_shared<ReplIndexBuildState>(
-            buildUUID, collection->uuid(), dbName, specs, protocol);
+            buildUUID, collection->uuid(), nss.db().toString(), specs, protocol);
 
         Status status = activeIndexBuilds.registerIndexBuild(replIndexBuildState);
         if (!status.isOK()) {
@@ -640,6 +611,8 @@ Status IndexBuildsCoordinator::_startIndexBuildForRecovery(OperationContext* opC
 
         IndexBuildsManager::SetupOptions options;
         options.protocol = protocol;
+        // All indexes are dropped during repair and should be rebuilt normally.
+        options.forRecovery = !storageGlobalParams.repair;
         status = _indexBuildsManager.setUpIndexBuild(
             opCtx, collection, specs, buildUUID, MultiIndexBlock::kNoopOnInitFn, options);
         if (!status.isOK()) {
@@ -649,6 +622,39 @@ Status IndexBuildsCoordinator::_startIndexBuildForRecovery(OperationContext* opC
         }
 
         wuow.commit();
+    }
+
+    return Status::OK();
+}
+
+Status IndexBuildsCoordinator::_dropIndexesForRepair(OperationContext* opCtx,
+                                                     CollectionWriter& collection,
+                                                     const std::vector<std::string>& indexNames) {
+    invariant(collection->isInitialized());
+    for (const auto& indexName : indexNames) {
+        auto indexCatalog = collection.getWritableCollection()->getIndexCatalog();
+        auto descriptor =
+            indexCatalog->findIndexByName(opCtx, indexName, IndexCatalog::InclusionPolicy::kReady);
+        if (descriptor) {
+            Status s =
+                indexCatalog->dropIndex(opCtx, collection.getWritableCollection(), descriptor);
+            if (!s.isOK()) {
+                return s;
+            }
+            continue;
+        }
+
+        // The index must be unfinished or frozen if it isn't ready.
+        descriptor = indexCatalog->findIndexByName(opCtx,
+                                                   indexName,
+                                                   IndexCatalog::InclusionPolicy::kUnfinished |
+                                                       IndexCatalog::InclusionPolicy::kFrozen);
+        invariant(descriptor);
+        Status s = indexCatalog->dropUnfinishedIndex(
+            opCtx, collection.getWritableCollection(), descriptor);
+        if (!s.isOK()) {
+            return s;
+        }
     }
 
     return Status::OK();

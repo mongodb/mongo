@@ -114,6 +114,7 @@ public:
         CollectionWriter& collection,
         const std::vector<BSONObj>& specs,
         OnInitFn onInit,
+        bool forRecovery,
         const boost::optional<ResumeIndexInfo>& resumeInfo = boost::none);
     StatusWith<std::vector<BSONObj>> init(OperationContext* opCtx,
                                           CollectionWriter& collection,

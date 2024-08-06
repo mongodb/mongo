@@ -532,14 +532,24 @@ private:
     /**
      * Sets up the in-memory and durable state of the index build.
      *
-     * This function should only be called when in recovery mode, because we drop and replace
-     * existing indexes in a single WriteUnitOfWork.
+     * This function should only be called when in recovery mode, because the index tables are
+     * recreated.
      */
     Status _startIndexBuildForRecovery(OperationContext* opCtx,
                                        const NamespaceString& nss,
                                        const std::vector<BSONObj>& specs,
                                        const UUID& buildUUID,
                                        IndexBuildProtocol protocol);
+
+    /**
+     * Removes the in-memory and durable state of the passed in indexes in preparation of rebuilding
+     * them for repair.
+     *
+     * This function should only be called when in recovery mode.
+     */
+    Status _dropIndexesForRepair(OperationContext* opCtx,
+                                 CollectionWriter& collection,
+                                 const std::vector<std::string>& indexNames);
 
 protected:
     /**

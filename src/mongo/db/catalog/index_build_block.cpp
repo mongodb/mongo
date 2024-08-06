@@ -75,6 +75,11 @@ void IndexBuildBlock::_completeInit(OperationContext* opCtx, Collection* collect
         .registerIndex(desc->indexName(),
                        desc->keyPattern(),
                        IndexFeatures::make(desc, collection->ns().isOnInternalDb()));
+    opCtx->recoveryUnit()->onRollback(
+        [collectionDecorations = collection->getSharedDecorations(), indexName = _indexName] {
+            CollectionIndexUsageTrackerDecoration::get(collectionDecorations)
+                .unregisterIndex(indexName);
+        });
 }
 
 Status IndexBuildBlock::initForResume(OperationContext* opCtx,
@@ -122,7 +127,7 @@ Status IndexBuildBlock::initForResume(OperationContext* opCtx,
     return Status::OK();
 }
 
-Status IndexBuildBlock::init(OperationContext* opCtx, Collection* collection) {
+Status IndexBuildBlock::init(OperationContext* opCtx, Collection* collection, bool forRecovery) {
     // Being in a WUOW means all timestamping responsibility can be pushed up to the caller.
     invariant(opCtx->lockState()->inAWriteUnitOfWork());
 
@@ -150,14 +155,25 @@ Status IndexBuildBlock::init(OperationContext* opCtx, Collection* collection) {
             !replCoord->getMemberState().primary() && isBackgroundIndex;
     }
 
-    // Setup on-disk structures.
-    Status status = collection->prepareForIndexBuild(
-        opCtx, descriptor.get(), _buildUUID, isBackgroundSecondaryBuild);
-    if (!status.isOK())
-        return status;
+    if (!forRecovery) {
+        // Setup on-disk structures. We skip this during startup recovery for unfinished indexes as
+        // everything is already in-place.
+        Status status = collection->prepareForIndexBuild(
+            opCtx, descriptor.get(), _buildUUID, isBackgroundSecondaryBuild);
+        if (!status.isOK())
+            return status;
+    }
 
-    auto indexCatalogEntry = collection->getIndexCatalog()->createIndexEntry(
-        opCtx, collection, std::move(descriptor), CreateIndexEntryFlags::kNone);
+    auto indexCatalog = collection->getIndexCatalog();
+    IndexCatalogEntry* indexCatalogEntry = nullptr;
+    if (forRecovery) {
+        auto desc = indexCatalog->findIndexByName(
+            opCtx, _indexName, IndexCatalog::InclusionPolicy::kUnfinished);
+        indexCatalogEntry = desc->getEntry();
+    } else {
+        indexCatalogEntry = indexCatalog->createIndexEntry(
+            opCtx, collection, std::move(descriptor), CreateIndexEntryFlags::kNone);
+    }
 
     if (_method == IndexBuildMethod::kHybrid) {
         _indexBuildInterceptor = std::make_unique<IndexBuildInterceptor>(opCtx, indexCatalogEntry);

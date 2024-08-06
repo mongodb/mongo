@@ -62,7 +62,7 @@ public:
      *
      * Must be called from within a `WriteUnitOfWork`
      */
-    Status init(OperationContext* opCtx, Collection* collection);
+    Status init(OperationContext* opCtx, Collection* collection, bool forRecovery);
 
     /**
      * Makes sure that an entry for the index was created at startup in the IndexCatalog. Returns

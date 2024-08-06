@@ -95,6 +95,7 @@ public:
     /// ---------------------
 
     virtual void setIsReady(bool newIsReady) = 0;
+    virtual void setIsFrozen(bool newIsFrozen) = 0;
 
     virtual void setDropped() = 0;
     virtual bool isDropped() const = 0;

@@ -623,7 +623,7 @@ StatusWith<BSONObj> IndexCatalogImpl::createIndexOnEmptyCollection(OperationCont
     boost::optional<UUID> buildUUID = boost::none;
     IndexBuildBlock indexBuildBlock(
         collection->ns(), spec, IndexBuildMethod::kForeground, buildUUID);
-    status = indexBuildBlock.init(opCtx, collection);
+    status = indexBuildBlock.init(opCtx, collection, /*forRecovery=*/false);
     if (!status.isOK())
         return status;
 
@@ -1228,6 +1228,73 @@ Status IndexCatalogImpl::dropIndex(OperationContext* opCtx,
         return Status(ErrorCodes::InternalError, "cannot delete not ready index");
 
     return dropIndexEntry(opCtx, collection, entry);
+}
+
+Status IndexCatalogImpl::resetUnfinishedIndexForRecovery(OperationContext* opCtx,
+                                                         Collection* collection,
+                                                         const IndexDescriptor* desc) {
+    invariant(opCtx->lockState()->isCollectionLockedForMode(collection->ns(), MODE_X));
+    invariant(opCtx->lockState()->inAWriteUnitOfWork());
+
+    IndexCatalogEntry* entry = desc->getEntry();
+    const std::string indexName = entry->descriptor()->indexName();
+
+    // Only indexes that aren't ready can be reset.
+    invariant(!collection->isIndexReady(indexName));
+
+    auto released = [&] {
+        if (auto released = _readyIndexes.release(entry->descriptor())) {
+            invariant(!released, "Cannot reset a ready index");
+        }
+        if (auto released = _buildingIndexes.release(entry->descriptor())) {
+            return released;
+        }
+        if (auto released = _frozenIndexes.release(entry->descriptor())) {
+            return released;
+        }
+        MONGO_UNREACHABLE;
+    }();
+
+    LOGV2(6987700,
+          "Resetting unfinished index",
+          logAttrs(collection->ns()),
+          "index"_attr = indexName,
+          "ident"_attr = released->getIdent());
+
+    invariant(released.get() == entry);
+
+    // Drop the ident if it exists. The storage engine will return OK if the ident is not found.
+    auto engine = opCtx->getServiceContext()->getStorageEngine();
+    const std::string ident = released->getIdent();
+    Status status = engine->getEngine()->dropIdent(opCtx->recoveryUnit(), ident);
+    if (!status.isOK()) {
+        return status;
+    }
+
+    // Recreate the ident on-disk. DurableCatalog::createIndex() will lookup the ident internally
+    // using the catalogId and index name.
+    status = DurableCatalog::get(opCtx)->createIndex(opCtx,
+                                                     collection->getCatalogId(),
+                                                     collection->ns(),
+                                                     collection->getCollectionOptions(),
+                                                     released->descriptor());
+    if (!status.isOK()) {
+        return status;
+    }
+
+    // Update the index entry state in preparation to rebuild the index.
+    if (!released->accessMethod()) {
+        std::unique_ptr<SortedDataInterface> sdi = engine->getEngine()->getSortedDataInterface(
+            opCtx, collection->ns(), collection->getCollectionOptions(), ident, desc);
+        std::unique_ptr<IndexAccessMethod> accessMethod =
+            IndexAccessMethod::make(released.get(), std::move(sdi));
+        released->setAccessMethod(std::move(accessMethod));
+    }
+
+    released->setIsFrozen(false);
+    _buildingIndexes.add(std::move(released));
+
+    return Status::OK();
 }
 
 Status IndexCatalogImpl::dropUnfinishedIndex(OperationContext* opCtx,
