@@ -5,6 +5,10 @@
  * Tests which create views aren't expected to work when collections are implicitly sharded.
  * @tags: [
  *   assumes_unsharded_collection,
+ *   # Assumes FCV remain stable during the entire duration of the test
+ *   # TODO SERVER-92954: remove once validation of validator during creation of tracked collection
+ *   # is fixed.
+ *   cannot_run_during_upgrade_downgrade,
  *   uses_api_parameters,
  *   no_selinux,
  *   references_foreign_collection,
@@ -204,7 +208,7 @@ validator = {
     $expr: {$_testApiVersion: {deprecated: true}}
 };
 
-if (!useShardingCoordinatorForCreate) {
+if (!useShardingCoordinatorForCreate()) {
     // Creating a collection with the deprecated validator is not allowed with
     // apiDeprecationErrors:true.
     assert.commandFailedWithCode(testDb.runCommand({
