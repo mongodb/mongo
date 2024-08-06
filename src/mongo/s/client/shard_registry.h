@@ -383,6 +383,8 @@ public:
     std::shared_ptr<Shard> getShardForHostNoReload(const HostAndPort& shardHost) const;
 
 private:
+    friend class ShardRegistryTest;
+
     /**
      * The ShardRegistry uses the ReadThroughCache to handle refreshing itself.  The cache stores
      * a single entry, with key of Singleton, value of ShardRegistryData, and causal-consistency
@@ -395,63 +397,71 @@ private:
     struct Time {
         explicit Time() {}
 
-        explicit Time(Timestamp topologyTime,
-                      Increment rsmIncrement,
-                      Increment forceReloadIncrement)
-            : topologyTime(topologyTime),
-              rsmIncrement(rsmIncrement),
-              forceReloadIncrement(forceReloadIncrement) {}
-
         bool operator==(const Time& other) const {
-            return (topologyTime.isNull() || other.topologyTime.isNull() ||
-                    topologyTime == other.topologyTime) &&
-                rsmIncrement == other.rsmIncrement &&
-                forceReloadIncrement == other.forceReloadIncrement;
+            return tie() == other.tie();
         }
         bool operator!=(const Time& other) const {
-            return !(*this == other);
+            return tie() != other.tie();
         }
         bool operator>(const Time& other) const {
-            // SERVER-56950: When setFCV(v4.4) overlaps with a ShardRegistry reload,
-            // the ShardRegistry can fall into an infinite loop of lookups
-            return (!topologyTime.isNull() && !other.topologyTime.isNull() &&
-                    topologyTime > other.topologyTime) ||
-                rsmIncrement > other.rsmIncrement ||
-                forceReloadIncrement > other.forceReloadIncrement;
+            return tie() > other.tie();
         }
         bool operator>=(const Time& other) const {
-            return (*this > other) || (*this == other);
+            return tie() >= other.tie();
         }
         bool operator<(const Time& other) const {
-            return !(*this >= other);
+            return tie() < other.tie();
         }
         bool operator<=(const Time& other) const {
-            return !(*this > other);
+            return tie() <= other.tie();
         }
 
         std::string toString() const {
             BSONObjBuilder bob;
-            bob.append("topologyTime", topologyTime);
-            bob.append("rsmIncrement", rsmIncrement);
-            bob.append("forceReloadIncrement", forceReloadIncrement);
+            bob.append("forceReloadIncrement", _forceReloadIncrement);
+            bob.append("topologyTime", _topologyTime);
             return bob.obj().toString();
         }
 
-        Timestamp topologyTime;
+        /**
+         * Create a Time to trigger a forced reload.
+         */
+        static Time makeForForcedReload();
 
-        // The increments are used locally to trigger the lookup function.
-        //
-        // The rsmIncrement is used to indicate that that there are stashed RSM updates that need to
-        // be incorporated.
-        //
-        // The forceReloadIncrement is used to indicate that the latest data should be fetched from
-        // the configsvrs (ie. when the topologyTime can't be used for this, eg. in the first
-        // lookup, and in contexts like unittests where topologyTime isn't gossipped but the
-        // ShardRegistry still needs to be reloaded).  This is how reload() is able to force a
-        // refresh from the config servers - incrementing the forceReloadIncrement causes the cache
-        // to call _lookup() (rather than having reload() attempt to do a synchronous refresh).
-        Increment rsmIncrement{0};
-        Increment forceReloadIncrement{0};
+        /**
+         * Create a Time with the latest known topologyTime.
+         */
+        static Time makeLatestKnown(ServiceContext*);
+
+        /**
+         * Create a Time which will cause merging of force reload requests that have been made
+         * before 'lookupFn' is evaluated, and contain the topologyTime returned by 'lookupFn'.
+         */
+        static Time makeWithLookup(std::function<Timestamp(void)>&& lookupFn);
+
+    private:
+        explicit Time(Increment _forceReloadIncrement, Timestamp topologyTime)
+            : _forceReloadIncrement(_forceReloadIncrement), _topologyTime(topologyTime) {}
+
+        // Tie the Time components in a std::tuple, to leverage the total ordering comparators.
+        // We want the _forceReloadIncrement to be the most significative component, so a refresh
+        // is always forced when requested.
+        std::tuple<Increment, Timestamp> tie() const {
+            return std::tie(_forceReloadIncrement, _topologyTime);
+        }
+
+        // Source for the _forceReloadIncrement field.
+        static AtomicWord<Increment> _forceReloadIncrementSource;
+
+        // The _forceReloadIncrement is used to indicate that the latest data should be fetched
+        // from the configsvrs regardless of the topologyTime (ie. when the topologyTime can't be
+        // used for this, eg. in the first lookup, and in contexts like unittests where topologyTime
+        // isn't gossipped but the ShardRegistry still needs to be reloaded).  This is how reload()
+        // is able to force a refresh from the config servers - incrementing the
+        // _forceReloadIncrement causes the cache to call _lookup() (rather than having reload()
+        // attempt to do a synchronous refresh).
+        Increment _forceReloadIncrement{0};
+        Timestamp _topologyTime;
     };
 
     enum class Singleton { Only };
@@ -476,10 +486,23 @@ private:
      */
     SharedSemiFuture<Cache::ValueHandle> _getDataAsync();
 
+    SharedSemiFuture<Cache::ValueHandle> _getDataAsyncCommon();
+
+    /**
+     * Updates the timeInStore with the latest known topologyTime, or a time which would force a
+     * reload if 'forceReload' is true.
+     */
+    void _updateTimeInStore(bool forceReload = false);
+
     /**
      * Triggers a reload without waiting for it to complete.
      */
-    void _scheduleLookup();
+    void _scheduleForcedLookup();
+
+    /**
+     * Trigger a lookup only if the cache is out of sync with the latest known topologyTime.
+     */
+    void _scheduleLookupIfRequired();
 
     /**
      * Gets the latest-cached copy of the ShardRegistryData.  Never fetches from the config servers.
@@ -490,7 +513,7 @@ private:
 
     using LatestConnStrings = stdx::unordered_map<ShardId, ConnectionString, ShardId::Hasher>;
 
-    std::pair<std::vector<LatestConnStrings::value_type>, Increment> _getLatestConnStrings() const;
+    std::vector<LatestConnStrings::value_type> _getLatestConnStrings() const;
 
     void _removeReplicaSet(const std::string& setName);
 
@@ -527,12 +550,6 @@ private:
 
     mutable Mutex _cacheMutex = MONGO_MAKE_LATCH("ShardRegistry::_cacheMutex");
     std::unique_ptr<Cache> _cache;
-
-    // Counters for incrementing the rsmIncrement and forceReloadIncrement fields of the Time used
-    // by the _cache.  See the comments for these fields in the Time class above for an explanation
-    // of their purpose.
-    AtomicWord<Increment> _rsmIncrement{0};
-    AtomicWord<Increment> _forceReloadIncrement{0};
 
     // Protects _configShardData, and _latestNewConnStrings.
     mutable Mutex _mutex = MONGO_MAKE_LATCH("ShardRegistry::_mutex");
