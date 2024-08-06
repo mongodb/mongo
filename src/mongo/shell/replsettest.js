@@ -459,18 +459,22 @@ var ReplSetTest = function ReplSetTest(opts) {
      * This function may return an OpTime with Timestamp(0,0) and Term(0) if read concern majority
      * is not enabled, or if there has not been a committed snapshot yet.
      */
-    function _getReadConcernMajorityOpTime(conn) {
-        var replSetStatus =
-            assert.commandWorked(conn.getDB("admin").runCommand({replSetGetStatus: 1}));
+
+    ReplSetTest.prototype.getReadConcernMajorityOpTime = function(conn) {
+        const replSetStatus = asCluster(
+            this,
+            conn,
+            () => assert.commandWorked(conn.getDB("admin").runCommand({replSetGetStatus: 1})));
+
         return (replSetStatus.OpTimes || replSetStatus.optimes).readConcernMajorityOpTime ||
             {ts: Timestamp(0, 0), t: NumberLong(0)};
-    }
+    };
 
     /**
      * Returns the {readConcern: majority} OpTime for the host. Throws if not available.
      */
     ReplSetTest.prototype.getReadConcernMajorityOpTimeOrThrow = function(conn) {
-        const majorityOpTime = _getReadConcernMajorityOpTime(conn);
+        const majorityOpTime = this.getReadConcernMajorityOpTime(conn);
         if (friendlyEqual(majorityOpTime, {ts: Timestamp(0, 0), t: NumberLong(0)})) {
             throw new Error("readConcern majority optime not available");
         }
@@ -2028,7 +2032,7 @@ var ReplSetTest = function ReplSetTest(opts) {
      * Returns last oplog entry.
      */
     ReplSetTest.prototype.awaitLastOpCommitted = function(timeout, members) {
-        var rst = this;
+        let rst = this;
         var primary = rst.getPrimary();
         var primaryOpTime = _getLastOpTime(this, primary);
 
@@ -2051,11 +2055,15 @@ var ReplSetTest = function ReplSetTest(opts) {
                     var node = membersToCheck[i];
 
                     // Continue if we're connected to an arbiter
-                    var res = assert.commandWorked(node.adminCommand({replSetGetStatus: 1}));
+                    const res = asCluster(
+                        rst,
+                        node,
+                        () => assert.commandWorked(node.adminCommand({replSetGetStatus: 1})));
+
                     if (res.myState == ReplSetTest.State.ARBITER) {
                         continue;
                     }
-                    var rcmOpTime = _getReadConcernMajorityOpTime(node);
+                    var rcmOpTime = rst.getReadConcernMajorityOpTime(node);
                     if (friendlyEqual(rcmOpTime, {ts: Timestamp(0, 0), t: NumberLong(0)})) {
                         return false;
                     }

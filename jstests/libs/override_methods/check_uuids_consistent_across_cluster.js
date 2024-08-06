@@ -45,7 +45,7 @@ ShardingTest.prototype.checkUUIDsConsistentAcrossCluster = function() {
             }
             var rs = this._rs[i].test;
 
-            var keyFile = this._otherParams.keyFile;
+            var keyFile = this.keyFile;
             if (keyFile) {
                 authutil.asCluster(rs.nodes, keyFile, function() {
                     rs.awaitLastOpCommitted(timeout);
