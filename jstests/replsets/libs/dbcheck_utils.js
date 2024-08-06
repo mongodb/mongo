@@ -347,79 +347,83 @@ const collNamesIgnoredFromDBCheck = [
 
 // Run dbCheck for all collections in the database with given parameters and potentially wait for
 // completion.
-export const runDbCheckForDatabase =
-    (replSet, db, awaitCompletion = false, awaitCompletionTimeoutMs = null) => {
-        const secondaryIndexCheckEnabled =
-            checkSecondaryIndexChecksInDbCheckFeatureFlagEnabled(replSet.getPrimary());
-        let collDbCheckParameters = {};
-        if (secondaryIndexCheckEnabled) {
-            collDbCheckParameters = {validateMode: "dataConsistencyAndMissingIndexKeysCheck"};
+export const runDbCheckForDatabase = (replSet,
+                                      db,
+                                      awaitCompletion = false,
+                                      awaitCompletionTimeoutMs = null) => {
+    const secondaryIndexCheckEnabled =
+        checkSecondaryIndexChecksInDbCheckFeatureFlagEnabled(replSet.getPrimary());
+    let collDbCheckParameters = {};
+    if (secondaryIndexCheckEnabled) {
+        collDbCheckParameters = {validateMode: "dataConsistencyAndMissingIndexKeysCheck"};
+    }
+
+    const allowedErrorCodes = [
+        ErrorCodes.NamespaceNotFound /* collection got dropped. */,
+        ErrorCodes.CommandNotSupportedOnView /* collection got dropped and a view
+                                                got created with the same name. */
+        ,
+        40619 /* collection is not replicated error. */,
+        // Some tests adds an invalid view, resulting in a failure of the 'dbcheck'
+        // operation with an 'InvalidViewDefinition' error.
+        ErrorCodes.InvalidViewDefinition,
+        // Might hit stale shardVersion response from shard config while racing with
+        // 'dropCollection' command.
+        ErrorCodes.StaleConfig,
+        // TODO (SERVER-79850): Internally handle this within dbCheck.
+        ErrorCodes.ObjectIsBusy,
+        // TODO (SERVER-93173): listIndexes on tests which drop and recreate using different casing
+        // might fail due to attempting to create the database with only casing difference.
+        ErrorCodes.DatabaseDifferCase,
+    ];
+
+    listCollectionsWithoutViews(db).map(c => c.name).forEach(collName => {
+        if (collNamesIgnoredFromDBCheck.includes(collName)) {
+            jsTestLog("dbCheck (" + tojson(collDbCheckParameters) + ") is skipped on ns: " +
+                      db.getName() + "." + collName + " for RS: " + replSet.getURL());
+            return;
         }
 
-        const allowedErrorCodes = [
-            ErrorCodes.NamespaceNotFound /* collection got dropped. */,
-            ErrorCodes.CommandNotSupportedOnView /* collection got dropped and a view
-                                                    got created with the same name. */
-            ,
-            40619 /* collection is not replicated error. */,
-            // Some tests adds an invalid view, resulting in a failure of the 'dbcheck'
-            // operation with an 'InvalidViewDefinition' error.
-            ErrorCodes.InvalidViewDefinition,
-            // Might hit stale shardVersion response from shard config while racing with
-            // 'dropCollection' command.
-            ErrorCodes.StaleConfig,
-            // TODO (SERVER-79850): Internally handle this within dbCheck.
-            ErrorCodes.ObjectIsBusy,
-        ];
+        jsTestLog("dbCheck (" + tojson(collDbCheckParameters) + ") is starting on ns: " +
+                  db.getName() + "." + collName + " for RS: " + replSet.getURL());
+        runDbCheck(replSet,
+                   db,
+                   collName,
+                   collDbCheckParameters /* parameters */,
+                   true /* awaitCompletion */,
+                   false /* waitForHealthLogDbCheckStop */,
+                   allowedErrorCodes);
+        jsTestLog("dbCheck (" + tojson(collDbCheckParameters) + ") is done on ns: " + db.getName() +
+                  "." + collName + " for RS: " + replSet.getURL());
 
-        listCollectionsWithoutViews(db).map(c => c.name).forEach(collName => {
-            if (collNamesIgnoredFromDBCheck.includes(collName)) {
-                jsTestLog("dbCheck (" + tojson(collDbCheckParameters) + ") is skipped on ns: " +
-                          db.getName() + "." + collName + " for RS: " + replSet.getURL());
-                return;
-            }
+        if (!secondaryIndexCheckEnabled) {
+            return;
+        }
 
-            jsTestLog("dbCheck (" + tojson(collDbCheckParameters) + ") is starting on ns: " +
+        getIndexNames(db, collName, allowedErrorCodes).forEach(indexName => {
+            let extraIndexDbCheckParameters = {
+                validateMode: "extraIndexKeysCheck",
+                secondaryIndex: indexName
+            };
+            jsTestLog("dbCheck (" + tojson(extraIndexDbCheckParameters) + ") is starting on ns: " +
                       db.getName() + "." + collName + " for RS: " + replSet.getURL());
             runDbCheck(replSet,
                        db,
                        collName,
-                       collDbCheckParameters /* parameters */,
+                       extraIndexDbCheckParameters /* parameters */,
                        true /* awaitCompletion */,
                        false /* waitForHealthLogDbCheckStop */,
                        allowedErrorCodes);
-            jsTestLog("dbCheck (" + tojson(collDbCheckParameters) + ") is done on ns: " +
+            jsTestLog("dbCheck (" + tojson(extraIndexDbCheckParameters) + ") is done on ns: " +
                       db.getName() + "." + collName + " for RS: " + replSet.getURL());
-
-            if (!secondaryIndexCheckEnabled) {
-                return;
-            }
-
-            getIndexNames(db, collName, allowedErrorCodes).forEach(indexName => {
-                let extraIndexDbCheckParameters = {
-                    validateMode: "extraIndexKeysCheck",
-                    secondaryIndex: indexName
-                };
-                jsTestLog("dbCheck (" + tojson(extraIndexDbCheckParameters) +
-                          ") is starting on ns: " + db.getName() + "." + collName +
-                          " for RS: " + replSet.getURL());
-                runDbCheck(replSet,
-                           db,
-                           collName,
-                           extraIndexDbCheckParameters /* parameters */,
-                           true /* awaitCompletion */,
-                           false /* waitForHealthLogDbCheckStop */,
-                           allowedErrorCodes);
-                jsTestLog("dbCheck (" + tojson(extraIndexDbCheckParameters) + ") is done on ns: " +
-                          db.getName() + "." + collName + " for RS: " + replSet.getURL());
-            });
         });
+    });
 
-        if (awaitCompletion) {
-            awaitDbCheckCompletion(
-                replSet, db, false /*waitForHealthLogDbCheckStop*/, awaitCompletionTimeoutMs);
-        }
-    };
+    if (awaitCompletion) {
+        awaitDbCheckCompletion(
+            replSet, db, false /*waitForHealthLogDbCheckStop*/, awaitCompletionTimeoutMs);
+    }
+};
 
 // Assert no errors/warnings (i.e., found inconsistencies). Tolerate
 // SnapshotTooOld errors, as they can occur if the primary is slow enough processing a
