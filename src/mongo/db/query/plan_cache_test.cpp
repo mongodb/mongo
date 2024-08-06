@@ -595,7 +595,7 @@ TEST_F(PlanCacheTest, WorksValueIncreases) {
         ASSERT(entry->debugInfo);
         ASSERT(entry->debugInfo->decision);
         auto&& decision1 = entry->debugInfo->decision;
-        ASSERT_EQ(decision1->getStats<PlanStageStats>().candidatePlanStats[0]->common.works, 25U);
+        ASSERT_EQ(decision1->stats.candidatePlanStats[0]->common.works, 25U);
         ASSERT_TRUE(entry->readsOrWorks);
         ASSERT_EQ(entry->readsOrWorks->rawValue(), newNWorks);
     }

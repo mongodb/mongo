@@ -192,7 +192,7 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> make(
 StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> make(
     OperationContext* opCtx,
     std::unique_ptr<CanonicalQuery> cq,
-    sbe::CandidatePlans candidates,
+    sbe::plan_ranker::CandidatePlans candidates,
     const MultipleCollectionAccessor& collections,
     size_t plannerOptions,
     NamespaceString nss,

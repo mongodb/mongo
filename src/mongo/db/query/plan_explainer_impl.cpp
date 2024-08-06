@@ -935,7 +935,7 @@ std::vector<PlanExplainer::PlanStatsDetails> getCachedPlanStats(
     std::vector<PlanExplainer::PlanStatsDetails> res;
     auto winningPlanIdx = getWinningPlanIdx(nullptr);
 
-    for (auto&& stats : decision.getStats<PlanStageStats>().candidatePlanStats) {
+    for (auto&& stats : decision.stats.candidatePlanStats) {
         BSONObjBuilder bob;
         statsToBSON(*stats, verbosity, winningPlanIdx, &bob, &bob);
         res.push_back({bob.obj(),

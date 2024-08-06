@@ -316,7 +316,6 @@ public:
         NoTracking = 0x0,
         TrackReads = 1 << 0,
         TrackResults = 1 << 1,
-        TrackPlanningResults = 1 << 2,
     };
 
     // Bit mask to accumulate what stats are tracked when a TrialRunTracker is attached.
@@ -328,7 +327,13 @@ public:
                   TrialRunTrackingType trackingType)
         : _commonStats(stageType, nodeId),
           _participateInTrialRunTracking(participateInTrialRunTracking),
-          _trackingType(trackingType) {}
+          _trackingType(trackingType) {
+        tassert(8804701,
+                "Expect individual stages to track only reads, as results are tracked in the base "
+                "CanTrackStats code",
+                trackingType == TrialRunTrackingType::NoTracking ||
+                    trackingType == TrialRunTrackingType::TrackReads);
+    }
 
     /**
      * Returns a tree of stats. If the stage has any children it must propagate the request for
@@ -428,7 +433,7 @@ public:
                         isPlanningNode);
             } else if (isPlanningNode) {
                 foundPlanningRoot = true;
-                _trackingType |= TrialRunTrackingType::TrackPlanningResults;
+                _trackingType |= TrialRunTrackingType::TrackResults;
             }
         }
 
@@ -437,7 +442,7 @@ public:
         for (auto&& child : stage->_children) {
             auto childAttachResult = child->attachToTrialRunTracker(
                 tracker, runtimePlanningRootNodeId, foundPlanningRoot);
-            if (childAttachResult & TrialRunTrackingType::TrackPlanningResults) {
+            if (childAttachResult & TrialRunTrackingType::TrackResults) {
                 ++childrenWithPlanningRoot;
                 tassert(8523905,
                         "A part of the query that participated in runtime planning should be "
@@ -508,21 +513,6 @@ protected:
         }
     }
 
-    /**
-     * If trial run tracker is attached, increments the result metric and terminates the trial run
-     * with a special exception if metric has reached the limit.
-     */
-    void trackResult() {
-        tassert(8796902,
-                str::stream() << "Stage " << _commonStats.stageType
-                              << " tracks results but tracking type is " << _trackingType,
-                (_trackingType & TrialRunTrackingType::TrackResults));
-        if (_tracker && _tracker->trackProgress<TrialRunTracker::kNumResults>(1)) {
-            uasserted(ErrorCodes::QueryTrialRunCompleted,
-                      str::stream() << "Trial run early exit in " << _commonStats.stageType);
-        }
-    }
-
     PlanState trackPlanState(PlanState state) {
         if (state == PlanState::IS_EOF) {
             _commonStats.isEOF = true;
@@ -531,13 +521,11 @@ protected:
             _commonStats.advances++;
             _slotsAccessible = true;
 
-            if ((_trackingType & TrialRunTrackingType::TrackPlanningResults) && _tracker) {
-                bool trackerResult =
-                    _tracker->trackProgress<TrialRunTracker::kNumPlanningResults>(1);
-                tassert(
-                    8523903,
-                    "TrialRunTracker should not terminate plans on reaching kNumPlanningResults",
-                    !trackerResult);
+            if ((_trackingType & TrialRunTrackingType::TrackResults) && _tracker) {
+                bool trackerResult = _tracker->trackProgress<TrialRunTracker::kNumResults>(1);
+                tassert(8523903,
+                        "TrialRunTracker should not terminate plans on reaching kNumResults",
+                        !trackerResult);
             }
         }
         return state;
@@ -582,17 +570,6 @@ private:
         if (_trackingType & TrialRunTrackingType::TrackReads) {
             _tracker = tracker;
             result |= TrialRunTrackingType::TrackReads;
-        }
-        if (_trackingType & TrialRunTrackingType::TrackPlanningResults) {
-            _tracker = tracker;
-            result |= TrialRunTrackingType::TrackPlanningResults;
-        }
-        // If there are nested result tracking stages, we should only attach to the
-        // most deeply nested one.
-        if (_trackingType & TrialRunTrackingType::TrackResults &&
-            !(childrenAttachResult & TrialRunTrackingType::TrackResults)) {
-            _tracker = tracker;
-            result |= TrialRunTrackingType::TrackResults;
         }
         return result;
     }

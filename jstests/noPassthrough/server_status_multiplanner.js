@@ -7,8 +7,6 @@
  * @tags: [featureFlagSbeFull]
  */
 
-import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
-
 function sumHistogramBucketCounts(histogram) {
     let sum = 0;
     for (const bucket of histogram) {
@@ -34,25 +32,6 @@ assert.commandWorked(coll.insert({_id: 5, a: 1, b: 1}));
 assert.commandWorked(coll.createIndex({a: 1}));
 assert.commandWorked(coll.createIndex({b: 1}));
 
-function assertSbeMultiPlannerMetrics(multiPlannerMetrics, expectedCount, checkHistograms = true) {
-    if (checkHistograms) {
-        assert.eq(sumHistogramBucketCounts(multiPlannerMetrics.histograms.sbeMicros),
-                  expectedCount);
-        assert.eq(sumHistogramBucketCounts(multiPlannerMetrics.histograms.sbeNumReads),
-                  expectedCount);
-        assert.eq(sumHistogramBucketCounts(multiPlannerMetrics.histograms.sbeNumPlans),
-                  expectedCount);
-    }
-    assert.eq(multiPlannerMetrics.sbeCount, expectedCount);
-    if (expectedCount > 0) {
-        assert.gt(multiPlannerMetrics.sbeMicros, 0);
-        assert.gt(multiPlannerMetrics.sbeNumReads, 0);
-    } else {
-        assert.eq(multiPlannerMetrics.sbeMicros, 0);
-        assert.eq(multiPlannerMetrics.sbeNumReads, 0);
-    }
-}
-
 function assertClassicMultiPlannerMetrics(
     multiPlannerMetrics, expectedCount, checkHistograms = true) {
     if (checkHistograms) {
@@ -75,7 +54,6 @@ function assertClassicMultiPlannerMetrics(
 
 // Verify initial metrics.
 let multiPlannerMetrics = db.serverStatus().metrics.query.multiPlanner;
-assertSbeMultiPlannerMetrics(multiPlannerMetrics, 0);
 assertClassicMultiPlannerMetrics(multiPlannerMetrics, 0);
 
 // Run with classic engine and verify metrics.
@@ -85,7 +63,6 @@ assertClassicMultiPlannerMetrics(multiPlannerMetrics, 0);
     assert.commandWorked(coll.find({a: 1, b: 1, c: 1}).explain());
 
     multiPlannerMetrics = db.serverStatus().metrics.query.multiPlanner;
-    assertSbeMultiPlannerMetrics(multiPlannerMetrics, 0);
     assertClassicMultiPlannerMetrics(multiPlannerMetrics, 1);
 }
 
@@ -96,13 +73,7 @@ assertClassicMultiPlannerMetrics(multiPlannerMetrics, 0);
     assert.commandWorked(coll.find({a: 1, b: 1, c: 1}).explain());
 
     multiPlannerMetrics = db.serverStatus().metrics.query.multiPlanner;
-    if (FeatureFlagUtil.isPresentAndEnabled(db, "ClassicRuntimePlanningForSbe")) {
-        assertSbeMultiPlannerMetrics(multiPlannerMetrics, 0);
-        assertClassicMultiPlannerMetrics(multiPlannerMetrics, 2);
-    } else {
-        assertSbeMultiPlannerMetrics(multiPlannerMetrics, 1);
-        assertClassicMultiPlannerMetrics(multiPlannerMetrics, 1);
-    }
+    assertClassicMultiPlannerMetrics(multiPlannerMetrics, 2);
 }
 
 assert.soon(() => {
@@ -110,23 +81,12 @@ assert.soon(() => {
     const multiPlannerMetricsFtdc =
         verifyGetDiagnosticData(conn.getDB("admin")).serverStatus.metrics.query.multiPlanner;
 
-    let expectedClassicCount = 0;
-    let expectedSbeCount = 0;
-    if (FeatureFlagUtil.isPresentAndEnabled(db, "ClassicRuntimePlanningForSbe")) {
-        expectedSbeCount = 0;
-        expectedClassicCount = 2;
-    } else {
-        expectedSbeCount = 1;
-        expectedClassicCount = 1;
-    }
-    if (multiPlannerMetricsFtdc.sbeCount != expectedSbeCount ||
-        multiPlannerMetricsFtdc.classicCount != expectedClassicCount) {
+    const expectedClassicCount = 2;
+    if (multiPlannerMetricsFtdc.classicCount != expectedClassicCount) {
         // This is an indication we haven't retrieve the expected serverStatus metrics yet.
         return false;
     }
 
-    assertSbeMultiPlannerMetrics(
-        multiPlannerMetricsFtdc, expectedSbeCount, false /*checkHistograms*/);
     assertClassicMultiPlannerMetrics(
         multiPlannerMetricsFtdc, expectedClassicCount, false /*checkHistograms*/);
     // Verify FTDC omits detailed histograms.

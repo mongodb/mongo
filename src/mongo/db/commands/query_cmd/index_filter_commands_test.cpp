@@ -154,7 +154,7 @@ protected:
             why->scores.push_back(0U);
             why->candidateOrder.push_back(i);
         }
-        why->getStats<PlanStageStats>().candidatePlanStats = std::move(stats);
+        why->stats.candidatePlanStats = std::move(stats);
         return why;
     }
 
@@ -461,7 +461,7 @@ TEST_F(IndexFilterCommandsTest, SetAndClearFilters) {
         R"({query: {a: 1, b: 1},
             sort: {a: -1},
             projection: {_id: 0, a: 1},
-            collation: {locale: 'mock_reverse_string'}, 
+            collation: {locale: 'mock_reverse_string'},
             indexes: [{a: 1}]})");
 
     size_t expectedNumFilters = 1;

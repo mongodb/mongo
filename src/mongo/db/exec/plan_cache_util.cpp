@@ -224,53 +224,9 @@ void updateClassicPlanCacheFromClassicCandidatesForClassicExecution(
     const CanonicalQuery& query,
     std::unique_ptr<plan_ranker::PlanRankingDecision> ranking,
     std::vector<plan_ranker::CandidatePlan>& candidates) {
-    ReadsOrWorks nWorks =
-        visit(OverloadedVisitor{[&](const plan_ranker::StatsDetails& details) -> ReadsOrWorks {
-                                    return NumWorks{details.candidatePlanStats[0]->common.works};
-                                },
-                                [](const plan_ranker::SBEStatsDetails& details) -> ReadsOrWorks {
-                                    MONGO_UNREACHABLE;
-                                }},
-              ranking->stats);
-
+    ReadsOrWorks nWorks = NumWorks{ranking->stats.candidatePlanStats[0]->common.works};
     updateClassicPlanCacheFromClassicCandidatesImpl(
         opCtx, collection, query, nWorks, std::move(ranking), candidates);
-}
-
-void updateSbePlanCacheFromSbeCandidates(OperationContext* opCtx,
-                                         const MultipleCollectionAccessor& collections,
-                                         const CanonicalQuery& query,
-                                         std::unique_ptr<plan_ranker::PlanRankingDecision> ranking,
-                                         std::vector<sbe::plan_ranker::CandidatePlan>& candidates) {
-    auto winnerIdx = ranking->candidateOrder[0];
-    invariant(winnerIdx >= 0 && winnerIdx < candidates.size());
-    auto& winningPlan = candidates[winnerIdx];
-
-    if (!shouldCacheBasedOnQueryAndPlan(query, winningPlan.solution.get())) {
-        return;
-    }
-
-    tassert(6142201,
-            "The winning CandidatePlan should contain the original plan",
-            winningPlan.clonedPlan);
-
-    // Clone the winning SBE plan and its auxiliary data.
-    auto cachedPlan =
-        std::make_unique<sbe::CachedSbePlan>(std::move(winningPlan.clonedPlan->first),
-                                             std::move(winningPlan.clonedPlan->second.stageData),
-                                             winningPlan.solution->hash());
-    cachedPlan->indexFilterApplied = winningPlan.solution->indexFilterApplied;
-
-    NumReads nReads =
-        visit(OverloadedVisitor{
-                  [&](const plan_ranker::StatsDetails& details) -> NumReads { MONGO_UNREACHABLE; },
-                  [](const plan_ranker::SBEStatsDetails& details) -> NumReads {
-                      return NumReads{calculateNumberOfReads(details.candidatePlanStats[0].get())};
-                  }},
-              ranking->stats);
-
-    updateSbePlanCache(
-        opCtx, collections, query, nReads, winningPlan.solution.get(), std::move(cachedPlan));
 }
 
 void updateSbePlanCacheWithNumReads(
@@ -493,16 +449,7 @@ bool ConditionalClassicPlanCacheWriter::shouldCacheBasedOnCachingMode(
                 return false;
             }
 
-            auto numResults =
-                visit(OverloadedVisitor{[](const plan_ranker::StatsDetails& details) {
-                                            return details.candidatePlanStats[0]->common.advanced;
-                                        },
-                                        [](const plan_ranker::SBEStatsDetails& details) {
-                                            return details.candidatePlanStats[0]->common.advances;
-                                        }},
-                      ranking.stats);
-
-            if (numResults == 0) {
+            if (ranking.stats.candidatePlanStats[0]->common.advanced == 0) {
                 // We're using the "sometimes cache" mode, and the winning plan produced no results
                 // during the plan ranking trial period. We will not write a plan cache entry.
                 logNotCachingZeroResults(
@@ -523,9 +470,6 @@ NumReads computeNumReadsFromWorks(const PlanStageStats& stats,
                                   const plan_ranker::PlanRankingDecision& ranking) {
     auto winnerIdx = ranking.candidateOrder[0];
     auto summary = collectExecutionStatsSummary(&stats, winnerIdx);
-    tassert(8523807,
-            "Expected StatsDetails in classic runtime planner ranking decision.",
-            std::holds_alternative<plan_ranker::StatsDetails>(ranking.stats));
     return NumReads{summary.totalKeysExamined + summary.totalDocsExamined};
 }
 

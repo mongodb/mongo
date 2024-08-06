@@ -52,11 +52,7 @@ HashAggBaseStage<Derived>::HashAggBaseStage(StringData stageName,
                                             bool participateInTrialRunTracking,
                                             bool allowDiskUse,
                                             bool forceIncreasedSpilling)
-    : PlanStage(stageName,
-                yieldPolicy,
-                planNodeId,
-                participateInTrialRunTracking,
-                TrialRunTrackingType::TrackResults),
+    : PlanStage(stageName, yieldPolicy, planNodeId, participateInTrialRunTracking),
       _collatorAccessor(collatorAccessor),
       _allowDiskUse(allowDiskUse),
       _forceIncreasedSpilling(forceIncreasedSpilling) {

@@ -735,8 +735,6 @@ void BlockHashAggStage::open(bool reOpen) {
             }
         }
 
-        trackResult();
-
         // We no longer need any of the TokenizedBlocks or MonoBlocks that we created during this
         // iteration, so we can discard them now.
         _tokenInfos.clear();

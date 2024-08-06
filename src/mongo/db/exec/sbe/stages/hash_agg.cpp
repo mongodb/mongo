@@ -355,8 +355,6 @@ void HashAggStage::open(bool reOpen) {
                     checkMemoryUsageAndSpillIfNecessary(memoryCheckData);
                 }
             }
-
-            trackResult();
         }
 
         if (_optimizedClose) {

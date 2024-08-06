@@ -177,7 +177,7 @@ void addTieBreakingHeuristicsBonuses(
  *
  * Returns an error if there was an issue with plan ranking (e.g. there was no viable plan).
  */
-template <typename PlanStageStatsType, typename PlanStageType, typename ResultType, typename Data>
+template <typename PlanStageType, typename ResultType, typename Data>
 StatusWith<std::unique_ptr<PlanRankingDecision>> pickBestPlan(
     const std::vector<BaseCandidatePlan<PlanStageType, ResultType, Data>>& candidates) {
     invariant(!candidates.empty());
@@ -188,13 +188,9 @@ StatusWith<std::unique_ptr<PlanRankingDecision>> pickBestPlan(
     double eofBonus = 1.0;
 
     // Get stat trees from each plan.
-    std::vector<std::unique_ptr<PlanStageStatsType>> statTrees;
+    std::vector<std::unique_ptr<PlanStageStats>> statTrees;
     for (size_t i = 0; i < candidates.size(); ++i) {
-        if constexpr (std::is_same_v<PlanStageStatsType, PlanStageStats>) {
-            statTrees.push_back(candidates[i].root->getStats());
-        } else {
-            statTrees.push_back(candidates[i].root->getStats(false /* includeDebugInfo */));
-        }
+        statTrees.push_back(candidates[i].root->getStats());
     }
 
     // Holds (score, candidateIndex).
@@ -205,17 +201,8 @@ StatusWith<std::unique_ptr<PlanRankingDecision>> pickBestPlan(
 
     // Compute score for each tree.  Record the best.
     for (size_t i = 0; i < statTrees.size(); ++i) {
-        auto explainer = [&]() {
-            if constexpr (std::is_same_v<PlanStageStatsType, PlanStageStats>) {
-                return plan_explainer_factory::make(candidates[i].root,
-                                                    candidates[i].solution->_enumeratorExplainInfo);
-            } else {
-                static_assert(std::is_same_v<PlanStageStatsType, mongo::sbe::PlanStageStats>);
-                return plan_explainer_factory::make(candidates[i].root.get(),
-                                                    &candidates[i].data.stageData,
-                                                    candidates[i].solution.get());
-            }
-        }();
+        auto explainer = plan_explainer_factory::make(
+            candidates[i].root, candidates[i].solution->_enumeratorExplainInfo);
 
         if (candidates[i].status.isOK()) {
             log_detail::logScoringPlan([&]() { return candidates[i].solution->toString(); },
@@ -227,16 +214,7 @@ StatusWith<std::unique_ptr<PlanRankingDecision>> pickBestPlan(
                                        [&]() { return explainer->getPlanSummary(); },
                                        i,
                                        statTrees[i]->common.isEOF);
-            auto scorer = [solution = candidates[i].solution.get()]()
-                -> std::unique_ptr<PlanScorer<PlanStageStatsType>> {
-                if constexpr (std::is_same_v<PlanStageStatsType, PlanStageStats>) {
-                    return makePlanScorer();
-                } else {
-                    static_assert(std::is_same_v<PlanStageStatsType, mongo::sbe::PlanStageStats>);
-                    return sbe::plan_ranker::makePlanScorer(solution);
-                }
-            }();
-            double score = scorer->calculateScore(statTrees[i].get());
+            double score = makePlanScorer()->calculateScore(statTrees[i].get());
             log_detail::logScore(score);
             if (statTrees[i]->common.isEOF) {
                 log_detail::logEOFBonus(eofBonus);
@@ -282,41 +260,21 @@ StatusWith<std::unique_ptr<PlanRankingDecision>> pickBestPlan(
     }
 
     auto why = std::make_unique<PlanRankingDecision>();
-
-    if constexpr (std::is_same_v<PlanStageStatsType, mongo::sbe::PlanStageStats>) {
-        // For SBE, we need to store a serialized winning plan within the ranking decision to be
-        // able to included it into the explain output for a cached plan stats, since we cannot
-        // reconstruct it from a PlanStageStats tree.
-
-        // Get the winning candidate's index to get the correct winning plan.
-        size_t winnerIdx = scoresAndCandidateIndices[0].second;
-        auto explainer = plan_explainer_factory::make(candidates[winnerIdx].root.get(),
-                                                      &candidates[winnerIdx].data.stageData,
-                                                      candidates[winnerIdx].solution.get());
-        auto&& [stats, _] =
-            explainer->getWinningPlanStats(ExplainOptions::Verbosity::kQueryPlanner);
-        SBEStatsDetails details;
-        details.serializedWinningPlan = std::move(stats);
-        why->stats = std::move(details);
-    } else {
-        static_assert(std::is_same_v<PlanStageStatsType, PlanStageStats>);
-        why->stats = StatsDetails{};
-    }
+    why->stats = StatsDetails{};
 
     // Update results in 'why'
     // Stats and scores in 'why' are sorted in descending order by score.
-    auto&& stats = why->getStats<PlanStageStatsType>();
     why->failedCandidates = std::move(failed);
     for (size_t i = 0; i < scoresAndCandidateIndices.size(); ++i) {
         double score = scoresAndCandidateIndices[i].first;
         size_t candidateIndex = scoresAndCandidateIndices[i].second;
 
-        stats.candidatePlanStats.push_back(std::move(statTrees[candidateIndex]));
+        why->stats.candidatePlanStats.push_back(std::move(statTrees[candidateIndex]));
         why->scores.push_back(score);
         why->candidateOrder.push_back(candidateIndex);
     }
     for (auto& i : why->failedCandidates) {
-        stats.candidatePlanStats.push_back(std::move(statTrees[i]));
+        why->stats.candidatePlanStats.push_back(std::move(statTrees[i]));
     }
 
     return StatusWith<std::unique_ptr<PlanRankingDecision>>(std::move(why));

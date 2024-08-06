@@ -76,7 +76,7 @@ bool TrialRuntimeExecutor::fetchNextDocument(plan_ranker::CandidatePlan* candida
         _stashSizeBytes += obj.objsize();
         candidate->results.push_back({std::move(obj), {recordIdSlot != nullptr, recordId}});
         if (candidate->results.size() >= maxNumResults ||
-            candidate->data.tracker->metricReached<TrialRunTracker::kNumPlanningResults>() ||
+            candidate->data.tracker->metricReached<TrialRunTracker::kNumResults>() ||
             _stashSizeBytes >= _stashSizeMaxBytes) {
             return false;
         }

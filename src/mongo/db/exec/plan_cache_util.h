@@ -98,17 +98,6 @@ void updateClassicPlanCacheFromClassicCandidatesForClassicExecution(
 
 /**
  * Caches the best candidate execution plan for 'query' in SBE plan cache, chosen from the given
- * 'candidates' from SBE based on the 'ranking' decision, if the 'query' is of a type that can be
- * cached. Otherwise, does nothing.
- */
-void updateSbePlanCacheFromSbeCandidates(OperationContext* opCtx,
-                                         const MultipleCollectionAccessor& collections,
-                                         const CanonicalQuery& query,
-                                         std::unique_ptr<plan_ranker::PlanRankingDecision> ranking,
-                                         std::vector<sbe::plan_ranker::CandidatePlan>& candidates);
-
-/**
- * Caches the best candidate execution plan for 'query' in SBE plan cache, chosen from the given
  * 'candidates' based on the 'ranking' decision, if the 'query' is of a type that can be cached.
  * Otherwise, does nothing.
  *

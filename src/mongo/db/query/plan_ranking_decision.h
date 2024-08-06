@@ -40,25 +40,6 @@ struct StatsDetails {
     std::vector<std::unique_ptr<PlanStageStats>> candidatePlanStats;
 };
 
-struct SBEStatsDetails {
-    // Execution stats for each candidate plan sorted in descending order by score.
-    std::vector<std::unique_ptr<mongo::sbe::PlanStageStats>> candidatePlanStats;
-    // A serialized winning plan is it would appear in the Explain output at "queryPlanner"
-    // verbosity.
-    BSONObj serializedWinningPlan;
-};
-
-template <class Key>
-struct StatsToDetailMap {};
-template <>
-struct StatsToDetailMap<sbe::PlanStageStats> {
-    using Value = SBEStatsDetails;
-};
-template <>
-struct StatsToDetailMap<PlanStageStats> {
-    using Value = StatsDetails;
-};
-
 /**
  * Information about why a plan was picked to be the best.  Data here is placed into the cache
  * and used to compare expected performance with actual.
@@ -70,26 +51,13 @@ struct PlanRankingDecision {
      * Copy constructor performs deep copy.
      */
     PlanRankingDecision(const PlanRankingDecision& ranking) {
-        visit(OverloadedVisitor{
-                  [this](const StatsDetails& details) {
-                      std::vector<std::unique_ptr<PlanStageStats>> copy;
-                      copy.reserve(details.candidatePlanStats.size());
-                      for (const auto& stats : details.candidatePlanStats) {
-                          invariant(stats);
-                          copy.emplace_back(stats->clone());
-                      }
-                      stats = StatsDetails{std::move(copy)};
-                  },
-                  [this](const SBEStatsDetails& details) {
-                      std::vector<std::unique_ptr<mongo::sbe::PlanStageStats>> copy;
-                      copy.reserve(details.candidatePlanStats.size());
-                      for (const auto& stats : details.candidatePlanStats) {
-                          invariant(stats);
-                          copy.emplace_back(stats->clone());
-                      }
-                      stats = SBEStatsDetails{std::move(copy), details.serializedWinningPlan};
-                  }},
-              ranking.stats);
+        std::vector<std::unique_ptr<PlanStageStats>> copy;
+        copy.reserve(ranking.stats.candidatePlanStats.size());
+        for (const auto& stats : ranking.stats.candidatePlanStats) {
+            invariant(stats);
+            copy.emplace_back(stats->clone());
+        }
+        stats = StatsDetails{std::move(copy)};
         scores = ranking.scores;
         candidateOrder = ranking.candidateOrder;
         failedCandidates = ranking.failedCandidates;
@@ -106,21 +74,10 @@ struct PlanRankingDecision {
 
     uint64_t estimateObjectSizeInBytes() const {
         return  // Add size of 'stats' instance.
-            visit(OverloadedVisitor{
-                      [](const StatsDetails& details) {
-                          return container_size_helper::estimateObjectSizeInBytes(
-                              details.candidatePlanStats,
-                              [](auto&& stat) { return stat->estimateObjectSizeInBytes(); },
-                              true);
-                      },
-                      [](const SBEStatsDetails& details) {
-                          return details.serializedWinningPlan.objsize() +
-                              container_size_helper::estimateObjectSizeInBytes(
-                                     details.candidatePlanStats,
-                                     [](auto&& stat) { return stat->estimateObjectSizeInBytes(); },
-                                     true);
-                      }},
-                  stats) +
+            container_size_helper::estimateObjectSizeInBytes(
+                stats.candidatePlanStats,
+                [](auto&& stat) { return stat->estimateObjectSizeInBytes(); },
+                true) +
             // Add size of each element in 'candidateOrder' vector.
             container_size_helper::estimateObjectSizeInBytes(candidateOrder) +
             // Add size of each element in 'failedCandidates' vector.
@@ -129,16 +86,6 @@ struct PlanRankingDecision {
             container_size_helper::estimateObjectSizeInBytes(scores) +
             // Add size of the object.
             sizeof(*this);
-    }
-
-    template <typename PlanStageStatsType>
-    const auto& getStats() const {
-        return get<typename StatsToDetailMap<PlanStageStatsType>::Value>(stats);
-    }
-
-    template <typename PlanStageStatsType>
-    auto& getStats() {
-        return get<typename StatsToDetailMap<PlanStageStatsType>::Value>(stats);
     }
 
     /*
@@ -154,8 +101,7 @@ struct PlanRankingDecision {
     }
 
     // Execution stats details for each candidate plan.
-    // TODO SERVER-88047: We can make this a non-variant once we delete SBE runtime planning.
-    std::variant<StatsDetails, SBEStatsDetails> stats;
+    StatsDetails stats;
 
     // The "goodness" score corresponding to 'stats'.
     // Sorted in descending order.

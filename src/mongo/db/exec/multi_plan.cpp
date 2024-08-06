@@ -266,7 +266,7 @@ Status MultiPlanStage::pickBestPlan(PlanYieldPolicy* yieldPolicy) {
 
     // After picking best plan, ranking will own plan stats from candidate solutions (winner and
     // losers).
-    auto statusWithRanking = plan_ranker::pickBestPlan<PlanStageStats>(_candidates);
+    auto statusWithRanking = plan_ranker::pickBestPlan(_candidates);
     if (!statusWithRanking.isOK()) {
         return statusWithRanking.getStatus();
     }

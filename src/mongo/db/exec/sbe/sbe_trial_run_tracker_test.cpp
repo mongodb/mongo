@@ -90,7 +90,7 @@ TEST_F(TrialRunTrackerTest, TrackerAttachesToStreamingStage) {
                                            kEmptyPlanNodeId /* nodeId */,
                                            ScanCallbacks());
 
-    auto tracker = std::make_unique<TrialRunTracker>(size_t{0}, size_t{0}, size_t{0});
+    auto tracker = std::make_unique<TrialRunTracker>(size_t{0}, size_t{0});
     ON_BLOCK_EXIT([&]() { scanStage->detachFromTrialRunTracker(); });
 
     auto attachResult = scanStage->attachToTrialRunTracker(tracker.get());
@@ -112,11 +112,11 @@ TEST_F(TrialRunTrackerTest, TrackerAttachesToBlockingStage) {
                          nullptr /* yieldPolicy */,
                          kEmptyPlanNodeId);
 
-    auto tracker = std::make_unique<TrialRunTracker>(size_t{0}, size_t{0}, size_t{0});
+    auto tracker = std::make_unique<TrialRunTracker>(size_t{0}, size_t{0});
     ON_BLOCK_EXIT([&]() { sortStage->detachFromTrialRunTracker(); });
 
     auto attachResult = sortStage->attachToTrialRunTracker(tracker.get());
-    ASSERT_EQ(attachResult, PlanStage::TrialRunTrackingType::TrackResults);
+    ASSERT_EQ(attachResult, PlanStage::TrialRunTrackingType::NoTracking);
 }
 
 TEST_F(TrialRunTrackerTest, TrackerAttachesToBothBlockingAndStreamingStages) {
@@ -149,231 +149,13 @@ TEST_F(TrialRunTrackerTest, TrackerAttachesToBothBlockingAndStreamingStages) {
                                           nullptr /* yieldPolicy */,
                                           kEmptyPlanNodeId);
 
-    auto tracker = std::make_unique<TrialRunTracker>(size_t{0}, size_t{0}, size_t{0});
+    auto tracker = std::make_unique<TrialRunTracker>(size_t{0}, size_t{0});
     ON_BLOCK_EXIT([&]() { rootSortStage->detachFromTrialRunTracker(); });
 
     auto attachResult = rootSortStage->attachToTrialRunTracker(tracker.get());
     ASSERT_EQ(attachResult,
               PlanStage::TrialRunTrackingType::TrackReads |
-                  PlanStage::TrialRunTrackingType::TrackResults);
-}
-
-TEST_F(TrialRunTrackerTest, TrialEndsDuringOpenPhaseOfBlockingStage) {
-    auto ctx = makeCompileCtx();
-
-    // Build a mock scan that will provide 9 values to its parent SortStage. The test
-    // TrialRunTracker will have a 'numResults' limit of 8, so it will reach its limit when the
-    // SortStage it attaches to reaches the last value.
-    const size_t numResultsLimit = 8;
-    auto [inputTag, inputVal] =
-        stage_builder::makeValue(BSON_ARRAY(1 << 2 << 3 << 4 << 5 << 6 << 7 << 8 << 9));
-    auto [scanSlot, scanStage] = generateVirtualScan(inputTag, inputVal);
-
-    // Build a HashAggStage, group by the scanSlot and compute a simple count.
-    auto countsSlot = generateSlotId();
-    auto hashAggStage = makeS<HashAggStage>(
-        std::move(scanStage),
-        makeSV(scanSlot),
-        makeAggExprVector(
-            countsSlot,
-            nullptr,
-            stage_builder::makeFunction(
-                "sum",
-                makeE<EConstant>(value::TypeTags::NumberInt64, value::bitcastFrom<int64_t>(1)))),
-        makeSV(), /* Seek slot */
-        true,
-        boost::none,
-        false /* allowDiskUse */,
-        makeSlotExprPairVec(), /* mergingExprs */
-        nullptr /* yieldPolicy */,
-        kEmptyPlanNodeId);
-
-    auto tracker = std::make_unique<TrialRunTracker>(numResultsLimit, size_t{0}, size_t{0});
-    auto attachResult = hashAggStage->attachToTrialRunTracker(tracker.get());
-
-    // Note: A scan is a streaming stage, but the "virtual scan" used here does not attach to the
-    // tracker.
-    ASSERT_EQ(attachResult, PlanStage::TrialRunTrackingType::TrackResults);
-
-    // The 'prepareTree()' function opens the HashAggStage, causing it to read documents from its
-    // child. Because the child provides more documents than the 'numResults' limit, we expect the
-    // open operation to be interrupted by a 'QueryTrialRunCompleted' exception.
-    ASSERT_THROWS_CODE(prepareTree(ctx.get(), hashAggStage.get(), countsSlot),
-                       DBException,
-                       ErrorCodes::QueryTrialRunCompleted);
-}
-
-TEST_F(TrialRunTrackerTest, OnlyDeepestNestedBlockingStageHasTrialRunTracker) {
-    auto ctx = makeCompileCtx();
-
-    // The contrived PlanStage tree constructed here allows us to observe what happens when a
-    // HashAgg stage has a SortStage in its subtree. A UnionStage injects extra documents into the
-    // HashAgg stage, allowing for a test scenario where the parent HashAgg stage sees many more
-    // documents than the SortStage.
-
-    // This "upperScan" gets unioned with the output of the SortStage and provides 10 values.
-    auto [upperScanSlot, upperScanStage] = [this]() {
-        auto [inputTag, inputVal] =
-            stage_builder::makeValue(BSON_ARRAY(1 << 2 << 3 << 4 << 5 << 6 << 7 << 8 << 9 << 10));
-        return generateVirtualScan(inputTag, inputVal);
-    }();
-
-    auto [sortSlot, sortStage] = [this]() {
-        auto [inputTag, inputVal] =
-            stage_builder::makeValue(BSON_ARRAY(1 << 2 << 3 << 4 << 5 << 6 << 7 << 8 << 9));
-        auto [scanSlot, scanStage] = generateVirtualScan(inputTag, inputVal);
-
-        auto sortStage =
-            makeS<SortStage>(std::move(scanStage),
-                             makeSV(scanSlot),
-                             std::vector<value::SortDirection>{value::SortDirection::Ascending},
-                             makeSV(),
-                             nullptr /*limit*/,
-                             204857600,
-                             false,
-                             nullptr /* yieldPolicy */,
-                             kEmptyPlanNodeId);
-
-        return std::make_pair(scanSlot, std::move(sortStage));
-    }();
-
-    auto unionSlot = generateSlotId();
-    auto unionStage =
-        makeS<UnionStage>(makeSs(std::move(upperScanStage), std::move(sortStage)),
-                          std::vector<value::SlotVector>{makeSV(upperScanSlot), makeSV(sortSlot)},
-                          makeSV(unionSlot),
-                          kEmptyPlanNodeId);
-
-    auto countsSlot = generateSlotId();
-    auto hashAggStage = makeS<HashAggStage>(
-        std::move(unionStage),
-        makeSV(unionSlot),
-        makeAggExprVector(
-            countsSlot,
-            nullptr,
-            stage_builder::makeFunction(
-                "sum",
-                makeE<EConstant>(value::TypeTags::NumberInt64, value::bitcastFrom<int64_t>(1)))),
-        makeSV(), /* Seek slot */
-        true,
-        boost::none,
-        false /* allowDiskUse */,
-        makeSlotExprPairVec(), /* mergingExprs */
-        nullptr /* yieldPolicy */,
-        kEmptyPlanNodeId);
-
-    hashAggStage->prepare(*ctx);
-    hashAggStage->attachToOperationContext(operationContext());
-
-    {
-        // We expect the TrialRunTracker to attach to the SortStage but not the root HashAggStage.
-        auto tracker = std::make_unique<TrialRunTracker>(size_t{9}, size_t{0}, size_t{0});
-        ON_BLOCK_EXIT([&]() { hashAggStage->detachFromTrialRunTracker(); });
-        auto attachResult = hashAggStage->attachToTrialRunTracker(tracker.get());
-
-        // Note: A scan is a streaming stage, but the "virtual scan" used here does not attach to
-        // the tracker.
-        ASSERT_EQ(attachResult, PlanStage::TrialRunTrackingType::TrackResults);
-
-        // In this scenario, the HashAggStage will see 10+ documents (the 10 documents from the
-        // "upperScan" plus the documents from the SortStage), which exceeds the 'numResults'
-        // requirement of the TrialRunTracker. The 'open()' call will _succeed_, however, because
-        // the TrialRunTracker is not attached to the HashAggStage.
-        hashAggStage->open(false);
-
-        hashAggStage->close();
-    }
-
-    {
-        // We expect the TrialRunTracker to attach to the SortStage but not the root HashAggStage.
-        auto tracker = std::make_unique<TrialRunTracker>(size_t{2}, size_t{0}, size_t{0});
-        ON_BLOCK_EXIT([&]() { hashAggStage->detachFromTrialRunTracker(); });
-        auto attachResult = hashAggStage->attachToTrialRunTracker(tracker.get());
-
-        ASSERT_EQ(attachResult, PlanStage::TrialRunTrackingType::TrackResults);
-
-        // In this scenario, the SortStage will see more documents than the 2 permitted by the
-        // 'numResults' requirement of the TrialRunTracker. The 'open()' call will _fail_, because
-        // the TrialRunTracker is attached to the SortStage.
-        ASSERT_THROWS_CODE(
-            hashAggStage->open(false), DBException, ErrorCodes::QueryTrialRunCompleted);
-
-        hashAggStage->close();
-    }
-}
-
-TEST_F(TrialRunTrackerTest, SiblingBlockingStagesBothGetTrialRunTracker) {
-    auto ctx = makeCompileCtx();
-
-    // This PlanStage tree allows us to observe what happens when we attach a TrialRunTracker to two
-    // sibling HashAgg stages.
-
-    auto buildHashAgg = [&]() {
-        auto [inputTag, inputVal] = stage_builder::makeValue(BSON_ARRAY(1 << 2 << 3 << 4 << 5));
-        auto [scanSlot, scanStage] = generateVirtualScan(inputTag, inputVal);
-
-        // Build a HashAggStage, group by the scanSlot and compute a simple count.
-        auto countsSlot = generateSlotId();
-        auto hashAggStage = makeS<HashAggStage>(
-            std::move(scanStage),
-            makeSV(scanSlot),
-            makeAggExprVector(
-                countsSlot,
-                nullptr,
-                stage_builder::makeFunction("sum",
-                                            makeE<EConstant>(value::TypeTags::NumberInt64,
-                                                             value::bitcastFrom<int64_t>(1)))),
-            makeSV(), /* Seek slot */
-            true,
-            boost::none,
-            false /* allowDiskUse */,
-            makeSlotExprPairVec(), /* mergingExprs */
-            nullptr /* yieldPolicy */,
-            kEmptyPlanNodeId);
-
-        return std::make_pair(countsSlot, std::move(hashAggStage));
-    };
-
-    auto [leftCountsSlot, leftHashAggStage] = buildHashAgg();
-    auto [rightCountsSlot, rightHashAggStage] = buildHashAgg();
-
-    // The UnionStage allows us to establish the sibling relationship.
-    auto resultSlot = generateSlotId();
-    auto unionStage = makeS<UnionStage>(
-        makeSs(std::move(leftHashAggStage), std::move(rightHashAggStage)),
-        std::vector<value::SlotVector>{makeSV(leftCountsSlot), makeSV(rightCountsSlot)},
-        makeSV(resultSlot),
-        kEmptyPlanNodeId);
-
-    // The blocking SortStage at the root ensures that both of the child HashAgg stages will be
-    // opened during the open phase of the root stage.
-    auto sortStage =
-        makeS<SortStage>(std::move(unionStage),
-                         makeSV(resultSlot),
-                         std::vector<value::SortDirection>{value::SortDirection::Ascending},
-                         makeSV(),
-                         nullptr /*limit*/,
-                         204857600,
-                         false,
-                         nullptr /* yieldPolicy */,
-                         kEmptyPlanNodeId);
-
-    // We expect the TrialRunTracker to attach to _both_ HashAgg stages but not to the SortStage.
-    auto tracker = std::make_unique<TrialRunTracker>(size_t{9}, size_t{0}, size_t{0});
-    auto attachResult = sortStage->attachToTrialRunTracker(tracker.get());
-
-    // Note: A scan is a streaming stage, but the "virtual scan" used here does not attach to the
-    // tracker.
-    ASSERT_EQ(attachResult, PlanStage::TrialRunTrackingType::TrackResults);
-
-    // The 'prepareTree()' function opens the SortStage, causing it to read documents from its
-    // child. If only one of the HashAgg stages were attached to the TrialRunTracker, it would not
-    // increment the 'numResults' metric enough to end the trial, but with both stages together,
-    // `numResults` gets incremented to 10 (with a limit of 9), resulting in a
-    // QueryTrialRunCompleted exception.
-    ASSERT_THROWS_CODE(prepareTree(ctx.get(), sortStage.get(), resultSlot),
-                       DBException,
-                       ErrorCodes::QueryTrialRunCompleted);
+                  PlanStage::TrialRunTrackingType::NoTracking);
 }
 
 TEST_F(TrialRunTrackerTest, TrialRunTrackingCanBeDisabled) {
@@ -397,7 +179,7 @@ TEST_F(TrialRunTrackerTest, TrialRunTrackingCanBeDisabled) {
                               ScanCallbacks());
 
     scanStage->disableTrialRunTracking();
-    auto tracker = std::make_unique<TrialRunTracker>(size_t{0}, size_t{0}, size_t{0});
+    auto tracker = std::make_unique<TrialRunTracker>(size_t{0}, size_t{0});
     auto attachResult = scanStage->attachToTrialRunTracker(tracker.get());
     ASSERT_EQ(attachResult, PlanStage::TrialRunTrackingType::NoTracking);
 }
@@ -436,11 +218,11 @@ TEST_F(TrialRunTrackerTest, DisablingTrackingForChildDoesNotInhibitTrackingForPa
                                           kEmptyPlanNodeId);
 
 
-    auto tracker = std::make_unique<TrialRunTracker>(size_t{0}, size_t{0}, size_t{0});
+    auto tracker = std::make_unique<TrialRunTracker>(size_t{0}, size_t{0});
     ON_BLOCK_EXIT([&]() { rootSortStage->detachFromTrialRunTracker(); });
 
-    auto attachResult = rootSortStage->attachToTrialRunTracker(tracker.get());
-    ASSERT_EQ(attachResult, PlanStage::TrialRunTrackingType::TrackResults);
+    auto attachResult = rootSortStage->attachToTrialRunTracker(tracker.get(), PlanNodeId{1});
+    ASSERT_EQ(attachResult, PlanStage::TrialRunTrackingType::NoTracking);
 }
 
 TEST_F(TrialRunTrackerTest, DisablingTrackingForAChildStagePreventsEarlyExit) {
@@ -500,12 +282,12 @@ TEST_F(TrialRunTrackerTest, DisablingTrackingForAChildStagePreventsEarlyExit) {
                          kEmptyPlanNodeId);
 
     // We expect the TrialRunTracker to attach to _only_ the left child.
-    auto tracker = std::make_unique<TrialRunTracker>(size_t{9}, size_t{0}, size_t{0});
+    auto tracker = std::make_unique<TrialRunTracker>(size_t{9}, size_t{0});
     auto attachResult = sortStage->attachToTrialRunTracker(tracker.get());
 
     // Note: A scan is a streaming stage, but the "virtual scan" used here does not attach to the
     // tracker.
-    ASSERT_EQ(attachResult, PlanStage::TrialRunTrackingType::TrackResults);
+    ASSERT_EQ(attachResult, PlanStage::TrialRunTrackingType::NoTracking);
 
     // The 'prepareTree()' function opens the SortStage, causing it to read documents from its
     // child. Because only one of the HashAgg stages is attached to the TrialRunTracker, the
@@ -534,17 +316,14 @@ TEST_F(TrialRunTrackerTest, TrackerAttachesToPlanningRootStageAndTracksTheDocume
                          nullptr /* yieldPolicy */,
                          PlanNodeId{3});
 
-    auto tracker = std::make_unique<TrialRunTracker>(size_t{6}, size_t{0}, size_t{3});
-    auto attachResult = sortStage->attachToTrialRunTracker(tracker.get(), PlanNodeId{1});
-    ASSERT_EQ(attachResult,
-              PlanStage::TrialRunTrackingType::TrackPlanningResults |
-                  PlanStage::TrialRunTrackingType::TrackResults);
+    auto tracker = std::make_unique<TrialRunTracker>(size_t{3}, size_t{0});
+    auto attachResult = sortStage->attachToTrialRunTracker(tracker.get());
+    ASSERT_EQ(attachResult, PlanStage::TrialRunTrackingType::NoTracking);
 
     // The 'prepareTree()' function opens the SortStage, causing it to read documents from its
     // child. Only 3 documents should be returned by scan stage, which is marked as planning root,
     // but sort should have 6 results as input because of unwind.
     prepareTree(ctx.get(), sortStage.get(), unwindSlot);
-    ASSERT_EQ(tracker->getMetric<TrialRunTracker::kNumResults>(), 6);
-    ASSERT_EQ(tracker->getMetric<TrialRunTracker::kNumPlanningResults>(), 3);
+    ASSERT_EQ(tracker->getMetric<TrialRunTracker::kNumResults>(), 0);
 }
 }  // namespace mongo::sbe

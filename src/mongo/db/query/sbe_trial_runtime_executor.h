@@ -68,7 +68,7 @@ public:
      * Returns true if a document was fetched and the trial run should continue. Returns false if
      * one of the conditions to terminate the trial run has been reached:
      * * The plan returned maxNumResults documents.
-     * * The trial run tracker reached the limit of kNumPlanningResults metric.
+     * * The trial run tracker reached the limit of kNumResults metric.
      * * The stashed documents reached the memory limit.
      * * The plan reached EOF.
      * * An error has occured.

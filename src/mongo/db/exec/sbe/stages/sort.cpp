@@ -72,11 +72,7 @@ SortStage::SortStage(std::unique_ptr<PlanStage> input,
                      PlanYieldPolicy* yieldPolicy,
                      PlanNodeId planNodeId,
                      bool participateInTrialRunTracking)
-    : PlanStage("sort"_sd,
-                yieldPolicy,
-                planNodeId,
-                participateInTrialRunTracking,
-                TrialRunTrackingType::TrackResults),
+    : PlanStage("sort"_sd, yieldPolicy, planNodeId, participateInTrialRunTracking),
       _obs(std::move(obs)),
       _dirs(std::move(dirs)),
       _vals(std::move(vals)),
@@ -372,8 +368,6 @@ void SortStage::SortImpl<KeyRow, ValueRow>::open(bool reOpen) {
             }
             return vals;
         });
-
-        _stage.trackResult();
     }
 
     _stage._specificStats.totalDataSizeBytes += _sorter->stats().bytesSorted();

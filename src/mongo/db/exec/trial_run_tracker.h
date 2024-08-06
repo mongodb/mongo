@@ -47,17 +47,12 @@ public:
      * The type of metric which can be collected and tracked during a trial run.
      */
     enum TrialRunMetric : uint8_t {
-        // Number of documents returned during a trial run.
+        // Number of documents returned by the part of the plan that participated in the
+        // multi-planning.
         kNumResults,
         // Number of physical reads performed during a trial run. Once a storage cursor advances,
         // it counts as a single physical read.
         kNumReads,
-        // Number of documents returned by the part of the plan that participated in the
-        // multi-planning. This separate metric is only needed because SBE runtime planner uses
-        // kNumResults whereas the classic multi-planner for SBE uses kNumPlanningResults.
-        //
-        // TODO SERVER-88047: Remove this and replace with kNumResults.
-        kNumPlanningResults,
         // Must always be the last element to hold the number of element in the enum.
         kLastElem
     };

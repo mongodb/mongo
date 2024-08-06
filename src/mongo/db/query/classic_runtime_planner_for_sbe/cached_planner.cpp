@@ -102,7 +102,7 @@ sbe::plan_ranker::CandidatePlan collectExecutionStatsForCachedPlan(
     std::unique_ptr<sbe::PlanStage> root,
     stage_builder::PlanStageData data,
     size_t maxTrialPeriodNumReads) {
-    // If we have an aggregation pipeline, we should track results via kNumPlanningResults metric,
+    // If we have an aggregation pipeline, we should track results via kNumResults metric,
     // instead of returned documents, because aggregation stages like $unwind or $group can change
     // the amount of returned documents arbitrarily.
     const size_t maxNumResults = trial_period::getTrialPeriodNumToReturn(*plannerData.cq);
@@ -128,7 +128,7 @@ sbe::plan_ranker::CandidatePlan collectExecutionStatsForCachedPlan(
         switch (metric) {
             case TrialRunTracker::kNumReads:
                 return true;  // terminate the trial run
-            case TrialRunTracker::kNumPlanningResults:
+            case TrialRunTracker::kNumResults:
                 candidate.root->detachFromTrialRunTracker();
                 return false;  // upgrade the trial run into a normal one
             default:
@@ -136,10 +136,7 @@ sbe::plan_ranker::CandidatePlan collectExecutionStatsForCachedPlan(
         }
     };
     candidate.data.tracker = std::make_unique<TrialRunTracker>(
-        std::move(onMetricReached),
-        size_t{0} /*kNumResults - used only in SBE multi-planner*/,
-        maxTrialPeriodNumReads,
-        maxTrialResultsFromPlanningRoot);
+        std::move(onMetricReached), maxTrialResultsFromPlanningRoot, maxTrialPeriodNumReads);
     candidate.root->attachToTrialRunTracker(
         candidate.data.tracker.get(),
         candidate.data.stageData.staticData->runtimePlanningRootNodeId);

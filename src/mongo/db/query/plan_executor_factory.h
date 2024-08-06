@@ -53,7 +53,6 @@
 #include "mongo/db/query/plan_yield_policy_sbe.h"
 #include "mongo/db/query/query_solution.h"
 #include "mongo/db/query/sbe_plan_ranker.h"
-#include "mongo/db/query/sbe_runtime_planner.h"
 #include "mongo/db/query/stage_builder/sbe/builder_data.h"
 #include "mongo/db/shard_role.h"
 #include "mongo/util/duration.h"
@@ -155,7 +154,7 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> make(
 StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> make(
     OperationContext* opCtx,
     std::unique_ptr<CanonicalQuery> cq,
-    sbe::CandidatePlans candidates,
+    sbe::plan_ranker::CandidatePlans candidates,
     const MultipleCollectionAccessor& collections,
     size_t plannerOptions,
     NamespaceString nss,

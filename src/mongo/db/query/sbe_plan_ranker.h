@@ -65,6 +65,20 @@ using CandidatePlan =
                                           CandidatePlanData>;
 
 /**
+ * This struct holds a vector with all candidate plans evaluated by this RuntimePlanner, and an
+ * index pointing to the winning plan within this vector.
+ */
+struct CandidatePlans {
+    auto& winner() {
+        invariant(winnerIdx < plans.size());
+        return plans[winnerIdx];
+    }
+
+    std::vector<plan_ranker::CandidatePlan> plans;
+    size_t winnerIdx;
+};
+
+/**
  * A factory function to create a plan ranker for an SBE plan stage stats tree.
  */
 std::unique_ptr<mongo::plan_ranker::PlanScorer<PlanStageStats>> makePlanScorer(
