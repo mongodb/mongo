@@ -841,7 +841,26 @@ WORKSPACE.bazel @10gen/devprod-build
 /src/mongo/scripting/**/mozjs @10gen/query-integration
 
 # The following patterns are parsed from ./src/mongo/shell/OWNERS.yml
-/src/mongo/shell/**/* @10gen/server-security
+/src/mongo/shell/**/kms_* @10gen/server-security
+/src/mongo/shell/**/encrypted* @10gen/server-security
+/src/mongo/shell/**/keyvault.js @10gen/server-security
+/src/mongo/shell/**/replsettest.js @10gen/server-replication
+/src/mongo/shell/**/shardingtest.js @10gen/server-cluster-scalability
+/src/mongo/shell/**/assert.js @10gen/devprod-correctness
+/src/mongo/shell/**/bench* @10gen/devprod-correctness
+/src/mongo/shell/**/bridge.js @10gen/devprod-correctness
+/src/mongo/shell/**/check_log.js @10gen/devprod-correctness
+/src/mongo/shell/**/collection.js @10gen/devprod-correctness
+/src/mongo/shell/**/db.js @10gen/devprod-correctness
+/src/mongo/shell/**/explainable.js @10gen/devprod-correctness
+/src/mongo/shell/**/linenoise* @10gen/devprod-correctness
+/src/mongo/shell/**/mk_wcwidth* @10gen/devprod-correctness
+/src/mongo/shell/**/mongo* @10gen/devprod-correctness
+/src/mongo/shell/**/program_runner* @10gen/devprod-correctness
+/src/mongo/shell/**/shell* @10gen/devprod-correctness
+/src/mongo/shell/**/session.js @10gen/devprod-correctness
+/src/mongo/shell/**/types.js @10gen/devprod-correctness
+/src/mongo/shell/**/utils* @10gen/devprod-correctness
 
 # The following patterns are parsed from ./src/mongo/stdx/OWNERS.yml
 /src/mongo/stdx/**/* @10gen/server-service-architecture

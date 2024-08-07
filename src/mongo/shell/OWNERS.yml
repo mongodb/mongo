@@ -1,5 +1,62 @@
 version: 1.0.0
 filters:
-  - "*":
+  - "kms_*":
     approvers:
       - 10gen/server-security
+  - "encrypted*":
+    approvers:
+      - 10gen/server-security
+  - "keyvault.js":
+    approvers:
+      - 10gen/server-security
+  - "replsettest.js":
+    approvers:
+      - 10gen/server-replication
+  - "shardingtest.js":
+    approvers:
+      - 10gen/server-cluster-scalability
+  - "assert.js":
+    approvers:
+      - 10gen/devprod-correctness
+  - "bench*":
+    approvers:
+      - 10gen/devprod-correctness
+  - "bridge.js":
+    approvers:
+      - 10gen/devprod-correctness
+  - "check_log.js":
+    approvers:
+      - 10gen/devprod-correctness
+  - "collection.js":
+    approvers:
+      - 10gen/devprod-correctness
+  - "db.js":
+    approvers:
+      - 10gen/devprod-correctness
+  - "explainable.js":
+    approvers:
+      - 10gen/devprod-correctness
+  - "linenoise*":
+    approvers:
+      - 10gen/devprod-correctness
+  - "mk_wcwidth*":
+    approvers:
+      - 10gen/devprod-correctness
+  - "mongo*":
+    approvers:
+      - 10gen/devprod-correctness
+  - "program_runner*":
+    approvers:
+      - 10gen/devprod-correctness
+  - "shell*":
+    approvers:
+      - 10gen/devprod-correctness
+  - "session.js":
+    approvers:
+      - 10gen/devprod-correctness
+  - "types.js":
+    approvers:
+      - 10gen/devprod-correctness
+  - "utils*":
+    approvers:
+      - 10gen/devprod-correctness
