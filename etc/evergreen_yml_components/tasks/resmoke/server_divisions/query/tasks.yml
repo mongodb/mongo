@@ -845,12 +845,12 @@ tasks:
     tags:
       [
         "assigned_to_jira_team_server_query_execution",
-        "release_critical",
         "incompatible_mac",
         "incompatible_ppc",
         "incompatible_s390x",
         "incompatible_debug_mode",
         "jstestfuzz",
+        "non_deterministic",
         "common",
         "require_npm",
         "random_name",

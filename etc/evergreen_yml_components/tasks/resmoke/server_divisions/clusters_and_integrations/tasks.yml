@@ -2803,9 +2803,9 @@ tasks:
     tags:
       [
         "assigned_to_jira_team_server_catalog_and_routing",
-        "default",
         "incompatible_debug_mode",
         "jstestfuzz",
+        "non_deterministic",
         "causal",
         "require_npm",
         "random_name",
@@ -2827,9 +2827,9 @@ tasks:
     tags:
       [
         "assigned_to_jira_team_server_catalog_and_routing",
-        "default",
         "incompatible_debug_mode",
         "jstestfuzz",
+        "non_deterministic",
         "stepdowns",
         "require_npm",
         "random_name",
@@ -2851,12 +2851,12 @@ tasks:
     tags:
       [
         "assigned_to_jira_team_server_catalog_and_routing",
-        "default",
         "config_fuzzer",
         "incompatible_aubsan",
         "incompatible_debug_mode",
         "incompatible_tsan",
         "jstestfuzz",
+        "non_deterministic",
         "require_npm",
         "random_name",
         "stepdowns",
@@ -2881,10 +2881,10 @@ tasks:
     tags:
       [
         "assigned_to_jira_team_server_catalog_and_routing",
-        "release_critical",
         "incompatible_mac",
         "incompatible_debug_mode",
         "jstestfuzz",
+        "non_deterministic",
         "common",
         "sharding",
         "require_npm",
@@ -2907,9 +2907,9 @@ tasks:
     tags:
       [
         "assigned_to_jira_team_server_catalog_and_routing",
-        "default",
         "incompatible_debug_mode",
         "jstestfuzz",
+        "non_deterministic",
         "session",
         "require_npm",
         "random_name",
@@ -2931,9 +2931,9 @@ tasks:
     tags:
       [
         "assigned_to_jira_team_server_catalog_and_routing",
-        "default",
         "incompatible_debug_mode",
         "jstestfuzz",
+        "non_deterministic",
         "causal",
         "require_npm",
         "random_name",
@@ -2953,9 +2953,9 @@ tasks:
     tags:
       [
         "assigned_to_jira_team_server_catalog_and_routing",
-        "default",
         "incompatible_debug_mode",
         "jstestfuzz",
+        "non_deterministic",
         "stepdowns",
         "require_npm",
         "random_name",
@@ -2977,10 +2977,10 @@ tasks:
     tags:
       [
         "assigned_to_jira_team_server_catalog_and_routing",
-        "release_critical",
         "incompatible_mac",
         "incompatible_debug_mode",
         "jstestfuzz",
+        "non_deterministic",
         "common",
         "sharding",
         "require_npm",
@@ -3026,9 +3026,9 @@ tasks:
     tags:
       [
         "assigned_to_jira_team_server_catalog_and_routing",
-        "default",
         "incompatible_debug_mode",
         "jstestfuzz",
+        "non_deterministic",
         "session",
         "require_npm",
         "random_name",
@@ -3066,9 +3066,9 @@ tasks:
     tags:
       [
         "assigned_to_jira_team_server_catalog_and_routing",
-        "default",
         "incompatible_debug_mode",
         "jstestfuzz",
+        "non_deterministic",
         "sharding",
         "require_npm",
         "random_name",

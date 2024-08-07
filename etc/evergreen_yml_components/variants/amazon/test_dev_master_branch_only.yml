@@ -220,6 +220,7 @@ buildvariants:
       - name: .change_stream_fuzzer
       - name: .query_fuzzer
       - name: .updatefuzzer
+      - name: .jstestfuzz
 
   - name: &al2023-arm64-sep-benchmark al2023-arm64-sep-benchmark
     display_name: "! AL2023.3 arm64 Enterprise (SEP Benchmark)"

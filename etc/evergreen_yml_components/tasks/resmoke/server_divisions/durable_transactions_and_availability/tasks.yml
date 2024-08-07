@@ -790,12 +790,12 @@ tasks:
     tags:
       [
         "assigned_to_jira_team_server_repl",
-        "release_critical",
         "incompatible_mac",
         "incompatible_ppc",
         "incompatible_s390x",
         "incompatible_debug_mode",
         "jstestfuzz",
+        "non_deterministic",
         "common",
         "repl",
         "require_npm",
@@ -818,9 +818,9 @@ tasks:
     tags:
       [
         "assigned_to_jira_team_server_repl",
-        "default",
         "incompatible_debug_mode",
         "jstestfuzz",
+        "non_deterministic",
         "session",
         "require_npm",
         "random_name",
@@ -842,9 +842,9 @@ tasks:
     tags:
       [
         "assigned_to_jira_team_server_repl",
-        "default",
         "incompatible_debug_mode",
         "jstestfuzz",
+        "non_deterministic",
         "write_conflict",
         "require_npm",
         "random_name",
@@ -864,9 +864,9 @@ tasks:
     tags:
       [
         "assigned_to_jira_team_server_repl",
-        "default",
         "incompatible_debug_mode",
         "jstestfuzz",
+        "non_deterministic",
         "initsync",
         "fcbis",
         "require_npm",
@@ -890,12 +890,12 @@ tasks:
     tags:
       [
         "assigned_to_jira_team_server_repl",
-        "release_critical",
         "incompatible_mac",
         "incompatible_ppc",
         "incompatible_s390x",
         "incompatible_debug_mode",
         "jstestfuzz",
+        "non_deterministic",
         "common",
         "repl",
         "require_npm",
@@ -916,9 +916,9 @@ tasks:
     tags:
       [
         "assigned_to_jira_team_server_repl",
-        "default",
         "incompatible_debug_mode",
         "jstestfuzz",
+        "non_deterministic",
         "initsync",
         "require_npm",
         "random_name",
@@ -969,9 +969,9 @@ tasks:
     tags:
       [
         "assigned_to_jira_team_server_repl",
-        "default",
         "incompatible_debug_mode",
         "jstestfuzz",
+        "non_deterministic",
         "session",
         "require_npm",
         "random_name",
@@ -1009,9 +1009,9 @@ tasks:
     tags:
       [
         "assigned_to_jira_team_server_repl",
-        "default",
         "incompatible_debug_mode",
         "jstestfuzz",
+        "non_deterministic",
         "write_conflict",
         "require_npm",
         "random_name",
@@ -1885,7 +1885,6 @@ tasks:
       [
         "assigned_to_jira_team_server_execution",
         "config_fuzzer",
-        "default",
         "incompatible_aubsan",
         "incompatible_debug_mode",
         "incompatible_mac",
@@ -1893,6 +1892,7 @@ tasks:
         "incompatible_s390x",
         "incompatible_tsan",
         "jstestfuzz",
+        "non_deterministic",
         "require_npm",
       ]
     commands:
@@ -2115,12 +2115,12 @@ tasks:
     tags:
       [
         "assigned_to_jira_team_server_execution",
-        "release_critical",
         "incompatible_mac",
         "incompatible_ppc",
         "incompatible_s390x",
         "incompatible_debug_mode",
         "jstestfuzz",
+        "non_deterministic",
         "common",
         "require_npm",
         "random_name",
@@ -2142,9 +2142,9 @@ tasks:
     tags:
       [
         "assigned_to_jira_team_server_execution",
-        "default",
         "incompatible_debug_mode",
         "jstestfuzz",
+        "non_deterministic",
         "interrupt",
         "require_npm",
         "random_name",
@@ -2164,9 +2164,9 @@ tasks:
     tags:
       [
         "assigned_to_jira_team_server_execution",
-        "default",
         "incompatible_debug_mode",
         "jstestfuzz",
+        "non_deterministic",
         "interrupt",
         "require_npm",
         "random_name",

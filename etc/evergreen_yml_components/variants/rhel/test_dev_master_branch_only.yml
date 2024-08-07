@@ -913,6 +913,7 @@ buildvariants:
       - name: .change_stream_fuzzer
       - name: .query_fuzzer
       - name: .updatefuzzer
+      - name: .jstestfuzz
 
   - <<: *enterprise-rhel-8-64-bit-dynamic-all-feature-flags-template
     name: &enterprise-rhel-8-64-bit-dynamic-all-feature-flags-required-query-patch-only enterprise-rhel-8-64-bit-dynamic-all-feature-flags-required-query-patch-only
