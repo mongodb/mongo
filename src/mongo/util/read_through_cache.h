@@ -45,6 +45,7 @@
 #include "mongo/base/status_with.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/service_context.h"
+#include "mongo/logv2/log.h"
 #include "mongo/platform/mutex.h"
 #include "mongo/stdx/unordered_map.h"
 #include "mongo/util/assert_util.h"
@@ -55,6 +56,8 @@
 #include "mongo/util/invalidating_lru_cache.h"
 #include "mongo/util/str.h"
 #include "mongo/util/time_support.h"
+
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kDefault
 
 namespace mongo {
 
@@ -579,11 +582,17 @@ private:
                                        false);
 
             // There was a concurrent call to 'invalidate', so start all over
-            if (!inProgressLookup.valid(ul))
+            if (!inProgressLookup.valid(ul)) {
+                LOGV2_DEBUG(9280200,
+                            2,
+                            "Invalidate call happened during in-progress lookup. A reattempt will "
+                            "be made.");
+
                 return std::make_tuple(
                     std::vector<std::unique_ptr<SharedPromise<ValueHandle>>>{},
                     StatusWith<ValueHandle>(Status(ErrorCodes::Error(461541), "")),
                     true);
+            }
 
             // Lookup resulted in an error, which is not cancellation
             if (!sw.isOK())
@@ -831,3 +840,5 @@ private:
 };
 
 }  // namespace mongo
+
+#undef MONGO_LOGV2_DEFAULT_COMPONENT
