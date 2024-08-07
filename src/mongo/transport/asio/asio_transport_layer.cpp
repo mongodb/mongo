@@ -1458,6 +1458,11 @@ AsioTransportLayer::_createSSLContext(std::shared_ptr<SSLManagerInterface>& mana
             newSSLContext->ingress->native_handle(), asyncOCSPStaple);
 
         if (!resp.isOK()) {
+            // The stapleOCSPResponse call above may have started a periodic OCSP fetch job
+            // on a separate thread which keeps a copy of the manager shared pointer.
+            // This stops that thread so that the transient manager can be destructed.
+            // TODO: SERVER-93207 should fix stapleOCSPResponse to obviate the need for this
+            newSSLContext->manager->stopJobs();
             return Status(ErrorCodes::InvalidSSLConfiguration,
                           str::stream()
                               << "Can not staple OCSP Response. Reason: " << resp.reason());
