@@ -444,7 +444,7 @@ pipelineEnv.Library(
         "$BUILD_DIR/mongo/db/timeseries/catalog_helper",
         "$BUILD_DIR/mongo/db/update/update_document_diff",
         "$BUILD_DIR/mongo/db/views/resolved_view",
-        "$BUILD_DIR/third_party/shim_snappy",
+        "$BUILD_DIR/third_party/snappy/snappy",
         "abt_utils",
         "accumulator",
         "change_stream_error_extra_info",
@@ -923,7 +923,7 @@ bmEnv.Library(
     LIBDEPS=[
         "$BUILD_DIR/mongo/base",
         "$BUILD_DIR/mongo/db/exec/document_value/document_value",
-        "$BUILD_DIR/third_party/shim_benchmark",
+        "$BUILD_DIR/third_party/benchmark/benchmark",
     ],
 )
 

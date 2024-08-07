@@ -225,9 +225,9 @@ cslib = env.Library(target="wiredtiger_checksum", source=cssources, AIB_COMPONEN
 
 wtlib = env.Library(
     target="wiredtiger", source=wtsources, LIBDEPS_PRIVATE=[
-        '$BUILD_DIR/third_party/shim_snappy',
-        '$BUILD_DIR/third_party/shim_zlib',
-        '$BUILD_DIR/third_party/shim_zstd',
+        '$BUILD_DIR/third_party/snappy/snappy',
+        '$BUILD_DIR/third_party/zlib/zlib',
+        '$BUILD_DIR/third_party/zstandard/zstd',
         'wiredtiger_checksum',
     ], LIBDEPS_TAGS=[
         'init-no-global-side-effects',

@@ -68,7 +68,7 @@ baseEnv.Library(
         "$BUILD_DIR/mongo/db/query/bson/dotted_path_support",
         "$BUILD_DIR/mongo/db/query_expressions",
         "$BUILD_DIR/mongo/util/md5",
-        "$BUILD_DIR/third_party/shim_stemmer",
+        "$BUILD_DIR/third_party/libstemmer_c/stemmer",
     ],
 )
 

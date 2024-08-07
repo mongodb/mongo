@@ -291,7 +291,7 @@ bmEnv.Library(
     ],
     LIBDEPS=[
         "$BUILD_DIR/mongo/db/shard_role_api",
-        "$BUILD_DIR/third_party/shim_benchmark",
+        "$BUILD_DIR/third_party/benchmark/benchmark",
         "sorted_data_interface_test_harness",
     ],
 )
@@ -302,7 +302,7 @@ bmEnv.Library(
     ],
     LIBDEPS=[
         "$BUILD_DIR/mongo/db/shard_role_api",
-        "$BUILD_DIR/third_party/shim_benchmark",
+        "$BUILD_DIR/third_party/benchmark/benchmark",
         "record_store_test_harness",
     ],
 )

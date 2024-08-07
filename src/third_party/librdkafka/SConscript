@@ -124,8 +124,8 @@ kafka_nodelist = env.Library(
         'dist/src/lz4hc.c',
     ],
     LIBDEPS_PRIVATE=[
-        '$BUILD_DIR/third_party/shim_zlib',
-        '$BUILD_DIR/third_party/shim_zstd',
+        '$BUILD_DIR/third_party/zlib/zlib',
+        '$BUILD_DIR/third_party/zstandard/zstd',
     ],
     # TODO https://jira.mongodb.org/browse/SERVER-74963: Make sure no other system library dependencies are required here.
     SYSLIBDEPS=[

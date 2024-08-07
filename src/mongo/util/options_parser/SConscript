@@ -31,7 +31,7 @@ optsEnv.Library(
     CCFLAGS=no_misleading_indentation_flag + optsEnv.get("CCFLAGS", []),
     LIBDEPS=[
         "$BUILD_DIR/mongo/base",
-        "$BUILD_DIR/third_party/shim_yaml",
+        "$BUILD_DIR/third_party/yaml-cpp/yaml",
     ],
     LIBDEPS_PRIVATE=[
         "$BUILD_DIR/mongo/crypto/sha_block_${MONGO_CRYPTO}",

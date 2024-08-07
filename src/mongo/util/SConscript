@@ -146,7 +146,7 @@ env.Library(
         "password_digest.cpp",
     ],
     LIBDEPS_PRIVATE=[
-        "$BUILD_DIR/third_party/shim_tomcrypt_md5",
+        "$BUILD_DIR/third_party/tomcrypt-1.18.2/tomcrypt_md5",
     ],
 )
 
@@ -688,7 +688,7 @@ pcre_env.Library(
         "$BUILD_DIR/mongo/base",
     ],
     LIBDEPS_PRIVATE=[
-        "$BUILD_DIR/third_party/shim_pcre2",
+        "$BUILD_DIR/third_party/pcre2/pcre2",
     ],
 )
 
@@ -813,7 +813,7 @@ icuEnv.Library(
     ],
     LIBDEPS_PRIVATE=[
         "$BUILD_DIR/mongo/base",
-        "$BUILD_DIR/third_party/shim_icu",
+        "$BUILD_DIR/third_party/icu4c-57.1/source/icu_i18n",
     ],
 )
 
@@ -822,7 +822,7 @@ icuEnv.Library(
     source=["icu.cpp", "../../third_party/node/icu_get_string_width.cpp"],
     LIBDEPS_PRIVATE=[
         "$BUILD_DIR/mongo/base",
-        "$BUILD_DIR/third_party/shim_icu",
+        "$BUILD_DIR/third_party/icu4c-57.1/source/icu_i18n",
         "icu_init",
     ],
 )
@@ -915,7 +915,7 @@ icuEnv.CppUnitTest(
         "$BUILD_DIR/mongo/db/service_context_test_fixture",
         "$BUILD_DIR/mongo/executor/thread_pool_task_executor_test_fixture",
         "$BUILD_DIR/third_party/croaring/croaring",
-        "$BUILD_DIR/third_party/shim_tomcrypt_md5",
+        "$BUILD_DIR/third_party/tomcrypt-1.18.2/tomcrypt_md5",
         "alarm",
         "background_job",
         "caching",

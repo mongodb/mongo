@@ -29,7 +29,7 @@ ftdcEnv.Library(
         "$BUILD_DIR/mongo/bson/util/bson_extract",
         "$BUILD_DIR/mongo/db/service_context",
         "$BUILD_DIR/third_party/s2/s2",  # For VarInt
-        "$BUILD_DIR/third_party/shim_zlib",
+        "$BUILD_DIR/third_party/zlib/zlib",
     ],
     LIBDEPS_PRIVATE=[
         "$BUILD_DIR/mongo/db/admission/execution_admission_context",

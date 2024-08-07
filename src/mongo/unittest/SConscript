@@ -13,7 +13,7 @@ env.Library(
         "$BUILD_DIR/mongo/base",
     ],
     LIBDEPS_PRIVATE=[
-        "$BUILD_DIR/third_party/shim_yaml",
+        "$BUILD_DIR/third_party/yaml-cpp/yaml",
     ],
 )
 
@@ -40,7 +40,7 @@ utEnv.Library(
         "$BUILD_DIR/mongo/util/options_parser/options_parser",
         "$BUILD_DIR/mongo/util/pcre_util",
         "$BUILD_DIR/mongo/util/pcre_wrapper",
-        "$BUILD_DIR/third_party/shim_yaml",
+        "$BUILD_DIR/third_party/yaml-cpp/yaml",
     ],
 )
 
@@ -101,7 +101,7 @@ bmEnv.Library(
         # Examples can be found in fail_point_bm and commands_bm. See SERVER-60691.
         "$BUILD_DIR/mongo/base",
         "$BUILD_DIR/mongo/util/options_parser/options_parser",
-        "$BUILD_DIR/third_party/shim_benchmark",
+        "$BUILD_DIR/third_party/benchmark/benchmark",
     ],
     AIB_COMPONENT="benchmarks",
 )

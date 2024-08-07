@@ -96,7 +96,7 @@ tlEnv.Library(
     ],
     LIBDEPS_PRIVATE=[
         "$BUILD_DIR/mongo/db/server_base",
-        "$BUILD_DIR/third_party/shim_asio",
+        "$BUILD_DIR/third_party/asio-master/asio",
         "service_executor",
         "session_manager",
     ],
@@ -130,7 +130,7 @@ tlEnv.Library(
         "$BUILD_DIR/mongo/util/concurrency/spin_lock",
         "$BUILD_DIR/mongo/util/net/ssl_manager",
         "$BUILD_DIR/mongo/util/options_parser/options_parser",
-        "$BUILD_DIR/third_party/shim_asio",
+        "$BUILD_DIR/third_party/asio-master/asio",
         "service_executor",
         "session_manager",
     ],
@@ -164,7 +164,7 @@ tlEnv.Library(
         "$BUILD_DIR/mongo/db/server_base",
         "$BUILD_DIR/mongo/util/concurrency/thread_pool",
         "$BUILD_DIR/mongo/util/processinfo",
-        "$BUILD_DIR/third_party/shim_asio",
+        "$BUILD_DIR/third_party/asio-master/asio",
         "transport_layer_common",
     ],
 )
@@ -211,9 +211,9 @@ zlibEnv.Library(
     LIBDEPS=[
         "$BUILD_DIR/mongo/base",
         "$BUILD_DIR/mongo/util/options_parser/options_parser",
-        "$BUILD_DIR/third_party/shim_snappy",
-        "$BUILD_DIR/third_party/shim_zlib",
-        "$BUILD_DIR/third_party/shim_zstd",
+        "$BUILD_DIR/third_party/snappy/snappy",
+        "$BUILD_DIR/third_party/zlib/zlib",
+        "$BUILD_DIR/third_party/zstandard/zstd",
     ],
 )
 
@@ -268,7 +268,7 @@ tlEnv.CppUnitTest(
         "$BUILD_DIR/mongo/util/clock_source_mock",
         "$BUILD_DIR/mongo/util/concurrency/thread_pool",
         "$BUILD_DIR/mongo/util/periodic_runner_factory" if shouldBuildGRPC(tlEnv) else [],
-        "$BUILD_DIR/third_party/shim_asio",
+        "$BUILD_DIR/third_party/asio-master/asio",
         "$BUILD_DIR/third_party/shim_grpc" if shouldBuildGRPC(tlEnv) else [],
         "message_compressor",
         "message_compressor_options_server",
@@ -306,7 +306,7 @@ tlEnvTest.CppIntegrationTest(
         "$BUILD_DIR/mongo/executor/task_executor_interface",
         "$BUILD_DIR/mongo/util/net/network",
         "$BUILD_DIR/mongo/util/version_impl",
-        "$BUILD_DIR/third_party/shim_asio",
+        "$BUILD_DIR/third_party/asio-master/asio",
         "transport_layer_egress_init",
     ],
 )

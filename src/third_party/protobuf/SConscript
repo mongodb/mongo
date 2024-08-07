@@ -169,7 +169,7 @@ protobuf_env.Library(
         '$BUILD_DIR/third_party/abseil-cpp/absl_strings',
         '$BUILD_DIR/third_party/abseil-cpp/absl_synchronization',
         '$BUILD_DIR/third_party/abseil-cpp/absl_time',
-        '$BUILD_DIR/third_party/shim_zlib',
+        '$BUILD_DIR/third_party/zlib/zlib',
         'utf8_validity',
     ],
 )

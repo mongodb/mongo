@@ -47,7 +47,7 @@ cryptoEnv.Library(
         "sha256_block",
     ],
     LIBDEPS_PRIVATE=[
-        "$BUILD_DIR/third_party/shim_tomcrypt" if "tom" in env["MONGO_CRYPTO"] else [],
+        "$BUILD_DIR/third_party/tomcrypt-1.18.2/tomcrypt" if "tom" in env["MONGO_CRYPTO"] else [],
     ],
 )
 
@@ -63,7 +63,7 @@ cryptoEnv.Library(
         "$BUILD_DIR/mongo/util/secure_zero_memory",
     ],
     LIBDEPS_PRIVATE=[
-        "$BUILD_DIR/third_party/shim_tomcrypt" if "tom" in env["MONGO_CRYPTO"] else [],
+        "$BUILD_DIR/third_party/tomcrypt-1.18.2/tomcrypt" if "tom" in env["MONGO_CRYPTO"] else [],
     ],
 )
 

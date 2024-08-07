@@ -402,97 +402,6 @@ if use_libunwind:
 
     unwindEnv.ShimLibrary(name="unwind", NINJA_GENSOURCE_INDEPENDENT=True)
 
-pcre2Env = env.Clone()
-if use_system_version_of_library("pcre2"):
-    pcre2Env = pcre2Env.Clone(SYSLIBDEPS=[
-        env['LIBDEPS_PCRE2_SYSLIBDEP'],
-    ])
-else:
-    pcre2Env = pcre2Env.Clone()
-    pcre2Env = pcre2Env.Clone(LIBDEPS_INTERFACE=[
-        'pcre2/pcre2',
-    ])
-
-pcre2Env.ShimLibrary(name="pcre2")
-
-snappyEnv = env.Clone()
-if use_system_version_of_library("snappy"):
-    snappyEnv = snappyEnv.Clone(SYSLIBDEPS=[
-        env['LIBDEPS_SNAPPY_SYSLIBDEP'],
-    ])
-else:
-    snappyEnv = snappyEnv.Clone()
-    snappyEnv = snappyEnv.Clone(LIBDEPS_INTERFACE=[
-        'snappy/snappy',
-    ])
-
-snappyEnv.ShimLibrary(name="snappy")
-
-zlibEnv = env.Clone()
-if use_system_version_of_library("zlib"):
-    zlibEnv = zlibEnv.Clone(SYSLIBDEPS=[
-        env['LIBDEPS_ZLIB_SYSLIBDEP'],
-    ])
-else:
-    zlibEnv = zlibEnv.Clone()
-    zlibEnv = zlibEnv.Clone(LIBDEPS_INTERFACE=[
-        'zlib/zlib',
-    ])
-
-zlibEnv.ShimLibrary(name="zlib", NINJA_GENSOURCE_INDEPENDENT=True)
-
-zstdEnv = env.Clone()
-if use_system_version_of_library("zstd"):
-    zstdEnv = zstdEnv.Clone(SYSLIBDEPS=[
-        env['LIBDEPS_ZSTD_SYSLIBDEP'],
-    ])
-else:
-    zstdEnv = zstdEnv.Clone()
-    zstdEnv = zstdEnv.Clone(LIBDEPS_INTERFACE=[
-        'zstandard/zstd',
-    ])
-
-zstdEnv.ShimLibrary(name="zstd", )
-
-benchmarkEnv = env.Clone()
-if use_system_version_of_library("google-benchmark"):
-    benchmarkEnv = benchmarkEnv.Clone(SYSLIBDEPS=[
-        env['LIBDEPS_BENCHMARK_SYSLIBDEP'],
-    ])
-else:
-    benchmarkEnv = benchmarkEnv.Clone()
-    benchmarkEnv = benchmarkEnv.Clone(LIBDEPS_INTERFACE=[
-        'benchmark/benchmark',
-    ])
-
-benchmarkEnv.ShimLibrary(name="benchmark")
-
-if "tom" in env["MONGO_CRYPTO"]:
-    tomcryptEnv = env.Clone()
-    tomcryptEnv.SConscript(
-        'tomcrypt' + tomcryptSuffix + '/SConscript',
-        exports={'env': tomcryptEnv},
-    )
-    tomcryptEnv = tomcryptEnv.Clone(LIBDEPS_INTERFACE=[
-        'tomcrypt' + tomcryptSuffix + '/tomcrypt',
-    ])
-
-    tomcryptEnv.ShimLibrary(name="tomcrypt", )
-
-md5Env = env.Clone()
-if use_system_version_of_library("tomcrypt"):
-    md5Env = md5Env.Clone(SYSLIBDEPS=[
-        env['LIBDEPS_TOMCRYPT_SYSLIBDEP'],
-    ])
-else:
-    md5Env = md5Env.Clone()
-    md5Env.InjectThirdParty(libraries=['tomcrypt_md5'])
-    md5Env = md5Env.Clone(LIBDEPS_INTERFACE=[
-        'tomcrypt' + tomcryptSuffix + '/tomcrypt_md5',
-    ])
-
-md5Env.ShimLibrary(name="tomcrypt_md5")
-
 # libunwind and tcmalloc are both added as global dependencies. Skip
 # inheriting global dependencies to avoid a circular dependency.
 tcmallocEnv = env.Clone(
@@ -551,42 +460,6 @@ tcmallocEnv.ShimLibrary(
     NINJA_GENSOURCE_INDEPENDENT=True,
 )
 
-stemmerEnv = env.Clone()
-if use_system_version_of_library("stemmer"):
-    stemmerEnv = stemmerEnv.Clone(SYSLIBDEPS=[
-        env['LIBDEPS_STEMMER_SYSLIBDEP'],
-    ])
-else:
-    stemmerEnv = stemmerEnv.Clone()
-    stemmerEnv.InjectThirdParty(libraries=['stemmer'])
-    stemmerEnv = stemmerEnv.Clone(LIBDEPS_INTERFACE=[
-        'libstemmer_c/stemmer',
-    ])
-
-stemmerEnv.ShimLibrary(name="stemmer")
-
-yamlEnv = env.Clone()
-if use_system_version_of_library("yaml"):
-    yamlEnv = yamlEnv.Clone(SYSLIBDEPS=[
-        env['LIBDEPS_YAML_SYSLIBDEP'],
-    ])
-else:
-    yamlEnv = yamlEnv.Clone()
-    yamlEnv.InjectThirdParty(libraries=['yaml', 'boost'])
-    yamlEnv = yamlEnv.Clone(LIBDEPS_INTERFACE=[
-        'yaml-cpp/yaml',
-    ], )
-
-yamlEnv.ShimLibrary(name="yaml")
-
-timelibEnv = env.Clone()
-timelibEnv.InjectThirdParty(libraries=['timelib'])
-timelibEnv = timelibEnv.Clone(LIBDEPS_INTERFACE=[
-    'timelib' + '/timelib',
-])
-
-timelibEnv.ShimLibrary(name='timelib', )
-
 wiredtigerEnv = env.Clone()
 if wiredtiger:
     if use_system_version_of_library("wiredtiger"):
@@ -602,47 +475,6 @@ if wiredtiger:
         ])
 
     wiredtigerEnv.ShimLibrary(name="wiredtiger")
-
-asioEnv = env.Clone()
-if use_system_version_of_library("asio"):
-    # Normally, we would request LIBDEPS_ASIO_SYSLIBDEP here, but on most systems, the system asio
-    # will be header only so there is no library required. In the rare case where one is, it can be
-    # injected via LIBS= on the command line.
-    asioEnv = asioEnv.Clone()
-else:
-    asioEnv = asioEnv.Clone(LIBDEPS_INTERFACE=[
-        'asio-master/asio',
-    ])
-
-asioEnv.ShimLibrary(name="asio")
-
-icuEnv = env.Clone()
-if use_system_version_of_library("icu"):
-    icuEnv = icuEnv.Clone(SYSLIBDEPS=[
-        env['LIBDEPS_ICUDATA_SYSLIBDEP'],
-        env['LIBDEPS_ICUI18N_SYSLIBDEP'],
-        env['LIBDEPS_ICUUC_SYSLIBDEP'],
-    ])
-else:
-    icuEnv = icuEnv.Clone()
-    icuEnv = icuEnv.Clone(LIBDEPS_INTERFACE=[
-        'icu4c' + icuSuffix + '/source/icu_i18n',
-    ])
-
-icuEnv.ShimLibrary(name="icu", )
-
-libbsonEnv = env.Clone()
-if use_system_version_of_library("bson"):
-    libbsonEnv = libbsonEnv.Clone(SYSLIBDEPS=[
-        env['LIBDEPS_LIBBSON_SYSLIBDEP'],
-    ])
-else:
-    libbsonEnv = libbsonEnv.Clone()
-    libbsonEnv = libbsonEnv.Clone(LIBDEPS_INTERFACE=[
-        'libbson/bson',
-    ])
-
-libbsonEnv.ShimLibrary(name="libbson", )
 
 mcEnv = env.Clone()
 if use_system_version_of_library("libmongocrypt"):

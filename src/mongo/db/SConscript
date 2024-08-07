@@ -2505,7 +2505,7 @@ env.Library(
         else [],
         "$BUILD_DIR/mongo/util/version_impl",
         "$BUILD_DIR/mongo/watchdog/watchdog_mongod",
-        "$BUILD_DIR/third_party/shim_snappy",
+        "$BUILD_DIR/third_party/snappy/snappy",
         "admission/queues_server_status_section",
         "auth/auth_op_observer",
         "auth/authserver",
@@ -3107,6 +3107,6 @@ bmEnv.Library(
     ],
     LIBDEPS=[
         "$BUILD_DIR/mongo/base",
-        "$BUILD_DIR/third_party/shim_benchmark",
+        "$BUILD_DIR/third_party/benchmark/benchmark",
     ],
 )

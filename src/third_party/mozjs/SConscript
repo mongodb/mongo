@@ -260,8 +260,8 @@ env.Library(
         'illegal_cyclic_or_unresolved_dependencies_allowlisted',
     ],
     LIBDEPS=[
-        '$BUILD_DIR/third_party/shim_icu',
-        '$BUILD_DIR/third_party/shim_zlib',
+        '$BUILD_DIR/third_party/icu4c-57.1/source/icu_i18n',
+        '$BUILD_DIR/third_party/zlib/zlib',
     ],
 )
 

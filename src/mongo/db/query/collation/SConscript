@@ -94,7 +94,7 @@ icuEnv.Library(
         "$BUILD_DIR/mongo/bson/util/bson_extract",
         "$BUILD_DIR/mongo/db/server_base",
         "$BUILD_DIR/mongo/util/icu_init",
-        "$BUILD_DIR/third_party/shim_icu",
+        "$BUILD_DIR/third_party/icu4c-57.1/source/icu_i18n",
         "collator_factory_interface",
     ],
 )
