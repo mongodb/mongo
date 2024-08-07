@@ -788,7 +788,18 @@ inline CatalogStateForNamespace acquireCatalogStateForNamespace(
 }  // namespace
 
 const Collection* AutoGetCollectionForReadLockFree::_restoreFromYield(OperationContext* opCtx,
-                                                                      UUID uuid) {
+                                                                      boost::optional<UUID> optUuid,
+                                                                      bool hasSecondaryNamespaces) {
+
+    if (!optUuid) {
+        tassert(9233200,
+                "Restoring a non existent namespace in the presence of requested secondary "
+                "namespaces in a lock-free context",
+                !hasSecondaryNamespaces);
+        return nullptr;
+    }
+
+    const auto& uuid = *optUuid;
     auto nsOrUUID = NamespaceStringOrUUID(_resolvedDbName, uuid);
     auto& readConcernArgs = repl::ReadConcernArgs::get(opCtx);
 
@@ -872,7 +883,7 @@ AutoGetCollectionForReadLockFree::AutoGetCollectionForReadLockFree(
         // Nested operations should never yield as we don't yield when the global lock is held
         // recursively. But this is not known when we create the Query plan for this sub operation.
         // Pretend that we are yieldable but don't allow yield to actually be called.
-        _collectionPtr.makeYieldable(opCtx, [](OperationContext*, UUID) {
+        _collectionPtr.makeYieldable(opCtx, [](OperationContext*, boost::optional<UUID>) {
             MONGO_UNREACHABLE;
             return nullptr;
         });
@@ -893,8 +904,12 @@ AutoGetCollectionForReadLockFree::AutoGetCollectionForReadLockFree(
         _collectionPtr = CollectionPtr(catalogStateForNamespace.collection);
 
         _collectionPtr.makeYieldable(
-            opCtx, [this](OperationContext* opCtx, UUID uuid) -> const Collection* {
-                return _restoreFromYield(opCtx, std::move(uuid));
+            opCtx,
+            [this,
+             hasSecondaryNamespaces = (std::distance(_options._secondaryNssOrUUIDsBegin,
+                                                     _options._secondaryNssOrUUIDsEnd) > 0)](
+                OperationContext* opCtx, boost::optional<UUID> uuid) -> const Collection* {
+                return _restoreFromYield(opCtx, std::move(uuid), hasSecondaryNamespaces);
             });
     }
 

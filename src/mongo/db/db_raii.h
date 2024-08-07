@@ -199,7 +199,9 @@ public:
     }
 
 private:
-    const Collection* _restoreFromYield(OperationContext* opCtx, UUID uuid);
+    const Collection* _restoreFromYield(OperationContext* opCtx,
+                                        boost::optional<UUID> optUuid,
+                                        bool hasSecondaryNamespaces);
 
     // Used so that we can reset the read source back to the original read source when this instance
     // of AutoGetCollectionForReadLockFree is destroyed.

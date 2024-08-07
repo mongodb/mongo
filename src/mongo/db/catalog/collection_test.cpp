@@ -679,7 +679,7 @@ TEST_F(CatalogTestFixture, CollectionPtrYieldable) {
 
     CollectionPtr coll(&beforeYield);
     coll.makeYieldable(operationContext(),
-                       [&afterYield, &numRestoreCalls](OperationContext*, UUID) {
+                       [&afterYield, &numRestoreCalls](OperationContext*, boost::optional<UUID>) {
                            ++numRestoreCalls;
                            return &afterYield;
                        });

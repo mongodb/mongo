@@ -69,12 +69,18 @@ LockedCollectionYieldRestore::LockedCollectionYieldRestore(OperationContext* opC
 }
 
 const Collection* LockedCollectionYieldRestore::operator()(OperationContext* opCtx,
-                                                           const UUID& uuid) const {
+                                                           boost::optional<UUID> optUuid) const {
     // Confirm that we were set with a valid collection instance at construction if yield is
     // performed.
     invariant(!_nss.isEmpty());
     // Confirm that we are holding the necessary collection level lock.
     invariant(locked(opCtx, _nss));
+
+    // If no UUID was provided, just do nothing.
+    if (!optUuid) {
+        return nullptr;
+    }
+    const auto& uuid = *optUuid;
 
     // Hold reference to the catalog for collection lookup without locks to be safe.
     auto catalog = CollectionCatalog::get(opCtx);

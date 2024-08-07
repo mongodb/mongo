@@ -43,7 +43,7 @@ namespace mongo {
 class LockedCollectionYieldRestore {
 public:
     explicit LockedCollectionYieldRestore(OperationContext* opCtx, const CollectionPtr& coll);
-    const Collection* operator()(OperationContext* opCtx, const UUID& uuid) const;
+    const Collection* operator()(OperationContext* opCtx, boost::optional<UUID> optUuid) const;
 
 private:
     const NamespaceString _nss;

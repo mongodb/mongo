@@ -110,8 +110,9 @@ protected:
         _collectionPtr =
             CollectionPtr{CollectionCatalog::get(opCtx())->lookupCollectionByUUID(opCtx(), _uuid)};
         _collectionPtr.makeYieldable(
-            opCtx(), [](OperationContext* opCtx, UUID uuid) -> const Collection* {
-                return CollectionCatalog::get(opCtx)->lookupCollectionByUUID(opCtx, uuid);
+            opCtx(), [](OperationContext* opCtx, boost::optional<UUID> uuid) -> const Collection* {
+                ASSERT(uuid.has_value());
+                return CollectionCatalog::get(opCtx)->lookupCollectionByUUID(opCtx, *uuid);
             });
     }
 

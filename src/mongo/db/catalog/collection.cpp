@@ -50,21 +50,26 @@ bool CollectionPtr::yieldable() const {
 }
 
 void CollectionPtr::yield() const {
-    // Yield if we are yieldable and have a valid collection
+    // Yield if we are yieldable and have a valid collection.
     if (_collection) {
         invariant(_opCtx);
         _yieldedUUID = _collection->uuid();
         _collection = nullptr;
     }
+    // Enter in 'yielded' state whether or not we held a valid collection pointer.
+    _yielded = true;
 }
 void CollectionPtr::restore() const {
-    // Restore from yield if we are yieldable and if uuid was set in a previous yield.
+    // Restore from yield if we are yieldable and if we are in 'yielded' state.
     invariant(_opCtx);
-    if (_yieldedUUID) {
+    if (_yielded) {
         // We may only do yield restore when we were holding locks that was yielded so we need to
-        // refresh from the catalog to make sure we have a valid collection pointer.
-        _collection = _restoreFn(_opCtx, *_yieldedUUID);
+        // refresh from the catalog to make sure we have a valid collection pointer. This call may
+        // still return a null collection pointer if the yieldedUUID is boost::none or if the
+        // collection no longer exists.
+        _collection = _restoreFn(_opCtx, _yieldedUUID);
         _yieldedUUID.reset();
+        _yielded = false;
     }
 }
 
