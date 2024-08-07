@@ -99,7 +99,6 @@ components:
     # Empty since the library is linked and not in the source tree
     local_directory_path:
     team_owner: "Server Security"
-    upgrade_suppression: TODO SERVER-89876
 
   "dcleblanc/SafeInt":
     homepage_url: https://github.com/dcleblanc/SafeInt

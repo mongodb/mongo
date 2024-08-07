@@ -66,8 +66,6 @@ buildvariants:
       compile_flags: >-
         --ssl
         MONGO_DISTMOD=windows
-        CPPPATH="c:/sasl/include"
-        LIBPATH="c:/sasl/lib"
         -j$(bc <<< "$(grep -c '^processor' /proc/cpuinfo) / 1.5")
         --win-version-min=win10
       num_scons_link_jobs_available: 0.2

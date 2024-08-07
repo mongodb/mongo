@@ -59,8 +59,6 @@ buildvariants:
       compile_flags: >-
         --ssl
         MONGO_DISTMOD=windows
-        CPPPATH="c:/sasl/include c:/snmp/include"
-        LIBPATH="c:/sasl/lib c:/snmp/lib"
         -j$(bc <<< "$(grep -c '^processor' /proc/cpuinfo) / 1.5")
         --win-version-min=win10
       compile_variant: enterprise-windows-ninja
@@ -95,9 +93,7 @@ buildvariants:
       compile_flags: >-
         --ssl
         MONGO_DISTMOD=windows
-        CPPPATH="c:/sasl/include c:/snmp/include"
         -j$(bc <<< "$(grep -c '^processor' /proc/cpuinfo) / 1.5")
-        LIBPATH="c:/sasl/lib c:/snmp/lib"
         --win-version-min=win10
     tasks:
       - name: compile_ninja_default_profile_TG

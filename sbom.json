@@ -292,7 +292,7 @@
         "name": "Organization: github"
       },
       "name": "Cyrus SASL",
-      "version": "2.1.26",
+      "version": "2.1.28",
       "licenses": [
         {
           "license": {
@@ -300,7 +300,7 @@
           }
         }
       ],
-      "purl": "pkg:github/cyrusimap/cyrus-sasl@cyrus-sasl-2.1.26",
+      "purl": "pkg:github/cyrusimap/cyrus-sasl@cyrus-sasl-2.1.28",
       "properties": [
         {
           "name": "internal:team_responsible",
