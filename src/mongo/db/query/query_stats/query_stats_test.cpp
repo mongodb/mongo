@@ -48,6 +48,8 @@
 namespace mongo::query_stats {
 class QueryStatsTest : public ServiceContextTest {};
 
+// TODO SERVER-92118: Remove references to `wasRateLimited`.
+
 TEST_F(QueryStatsTest, TwoRegisterRequestsWithSameOpCtxRateLimitedFirstCall) {
     // This test simulates what happens with queries over views where two calls to registerRequest()
     // can be made with the same opCtx.

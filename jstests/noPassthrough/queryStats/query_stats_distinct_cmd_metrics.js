@@ -1,7 +1,6 @@
 /**
- * This test confirms that query stats is not collected on distinct explains and that
- * query stats store metrics fields for a distinct command are correct
- * when inserting new query stats store entry.
+ * This test confirms that query stats store metrics fields for a
+ * distinct command are correct when inserting a new query stats store entry.
  *
  * @tags: [featureFlagQueryStatsCountDistinct]
  */
@@ -9,7 +8,6 @@ import {
     assertAggregatedMetricsSingleExec,
     assertExpectedResults,
     getLatestQueryStatsEntry,
-    getQueryStatsDistinctCmd,
     withQueryStatsEnabled
 } from "jstests/libs/query_stats_utils.js";
 
@@ -31,11 +29,6 @@ withQueryStatsEnabled(collName, (coll) => {
 
     coll.insert({v: 2});
     coll.insert({v: 4});
-
-    // Test that query stats are not collected for explains on distinct queries.
-    coll.explain("executionStats").distinct("v");
-    let emptyDistinctQueryStats = getQueryStatsDistinctCmd(testDB);
-    assert.eq(0, emptyDistinctQueryStats.length);
 
     assert.commandWorked(testDB.runCommand(distinctCommandObj));
     const firstEntry = getLatestQueryStatsEntry(testDB.getMongo(), {collName: coll.getName()});

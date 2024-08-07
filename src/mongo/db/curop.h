@@ -390,13 +390,15 @@ public:
      * OpDebug together (SERVER-83280).
      *
      * ClusterClientCursorImpl and ClientCursor also contain _queryStatsKey and _queryStatsKeyHash
-     * members but NOT a wasRateLimited member. Variable names & accesses would be more consistent
-     * across the code if ClusterClientCursorImpl and ClientCursor each also had a QueryStatsInfo
-     * struct, but we considered and rejected two different potential implementations of this:
+     * members but NOT a wasRateLimited member. Variable names & accesses would be
+     * more consistent across the code if ClusterClientCursorImpl and ClientCursor each also had a
+     * QueryStatsInfo struct, but we considered and rejected two different potential implementations
+     * of this:
      *  - Option 1:
      *    Declare a QueryStatsInfo struct in each .h file. Every struct would have key and keyHash
-     *    fields, and a wasRateLimited field would be added only to CurOp. But, it seemed confusing
-     *    to have slightly different structs with the same name declared three different times.
+     *    fields, and a wasRateLimited field would be added only to CurOp. But, it
+     * seemed confusing to have slightly different structs with the same name declared three
+     * different times.
      *  - Option 2:
      *    Create a query_stats_info.h that declares QueryStatsInfo--identical to the version defined
      *    in this file. CurOp/OpDebug, ClientCursor, and ClusterClientCursorImpl would then all
@@ -413,16 +415,27 @@ public:
      *        never needing the wasRateLimited field.
      */
 
-    // Note that the only case when key, keyHash, and wasRateLimited of the below struct are null,
-    // none, and false is if the query stats feature flag is turned off.
+    // Note that the only case when key, keyHash, and wasRateLimited of the below
+    // struct are null, none, and false is if the query stats feature flag is turned off.
     struct QueryStatsInfo {
         // Uniquely identifies one query stats entry.
         // nullptr if `wasRateLimited` is true.
+        // `key` may be a nullptr during a subquery execution, but will
+        // be non-null at the highest-level operation as long as query stats are
+        // being collected and the query is not rate limited.
         std::unique_ptr<query_stats::Key> key;
         // A cached value of `absl::HashOf(key)`.
-        // Always populated if `key` is non-null. boost::none if `wasRateLimited` is true.
+        // Always populated if `key` is non-null at the highest-level operation.
+        // boost::none if `wasRateLimited` is true.
         boost::optional<std::size_t> keyHash;
+        // True if a subquery is being run, such as if the original query has been resolved to a
+        // view running an aggregation pipeline. If true, stats should not be registered at the
+        // current point in execution.
+        bool disableForSubqueryExecution = false;
         // True if the request was rate limited and stats should not be collected.
+        // TODO SERVER-92118: Remove this flag, where it is used in `registerRequest`, and any
+        // references to it. Instead, always set `disableForSubqueryExecution` to true
+        // before running views.
         bool wasRateLimited = false;
         // True if the request was a change stream request.
         bool willNeverExhaust = false;

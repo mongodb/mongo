@@ -94,7 +94,7 @@ function assertMetricsEqual(cursor, {
 
     {
         // Find command against a view - internally rewritten to an aggregate.
-        var viewName = jsTestName() + "_view";
+        var viewName = jsTestName() + "_find_view";
         assert.commandWorked(testDB.createView(viewName, coll.getName(), [{$match: {a: 1}}]));
         const result = testDB.runCommand({find: viewName, includeQueryStatsMetrics: true});
         assert.commandWorked(result);
@@ -188,6 +188,28 @@ function assertMetricsEqual(cursor, {
                 docsExamined: 5,
                 hasSortStage: false,
                 usedDisk: false,
+                fromMultiPlanner: false
+            });
+        }
+
+        {
+            // Distinct command against a view - internally rewritten to an aggregate.
+            var viewName = jsTestName() + "_distinct_view";
+            assert.commandWorked(testDB.createView(viewName, coll.getName(), []));
+            const result =
+                testDB.runCommand({distinct: viewName, key: "b", includeQueryStatsMetrics: true});
+            assert.commandWorked(result);
+            const spillParameter = testDB.adminCommand({
+                getParameter: 1,
+                internalQueryEnableAggressiveSpillsInGroup: 1,
+            });
+            const aggressiveSpillsInGroup =
+                spillParameter["internalQueryEnableAggressiveSpillsInGroup"];
+            assertMetricsEqual(result, {
+                keysExamined: 0,
+                docsExamined: 5,
+                hasSortStage: false,
+                usedDisk: aggressiveSpillsInGroup,
                 fromMultiPlanner: false
             });
         }

@@ -79,7 +79,8 @@ Status ViewResponseFormatter::appendAsCountResponse(BSONObjBuilder* resultBuilde
 }
 
 Status ViewResponseFormatter::appendAsDistinctResponse(BSONObjBuilder* resultBuilder,
-                                                       boost::optional<TenantId> tenantId) {
+                                                       boost::optional<TenantId> tenantId,
+                                                       boost::optional<BSONObj> metrics) {
     auto cursorResponse = CursorResponse::parseFromBSON(_response, nullptr, tenantId);
     if (!cursorResponse.isOK())
         return cursorResponse.getStatus();
@@ -93,6 +94,10 @@ Status ViewResponseFormatter::appendAsDistinctResponse(BSONObjBuilder* resultBui
         invariant(cursorFirstBatch.size() == 1);
         auto distinctObj = cursorFirstBatch.back();
         resultBuilder->appendArray(kDistinctField, distinctObj["distinct"].embeddedObject());
+    }
+
+    if (metrics) {
+        resultBuilder->append("metrics", metrics.value());
     }
 
     resultBuilder->append(kOkField, 1);

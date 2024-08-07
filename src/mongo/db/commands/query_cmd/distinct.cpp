@@ -635,6 +635,13 @@ public:
             viewAggCmd, vts, verbosity, serializationContext);
         viewAggRequest.setQuerySettings(canonicalQuery->getExpCtx()->getQuerySettings());
 
+        auto curOp = CurOp::get(opCtx);
+
+        // We must store the key in distinct to prevent collecting query stats when the aggregation
+        // runs.
+        auto ownedQueryStatsKey = std::move(curOp->debug().queryStatsInfo.key);
+        curOp->debug().queryStatsInfo.disableForSubqueryExecution = true;
+
         // If running explain distinct on view, then aggregate is executed without privilege checks
         // and without response formatting.
         if (verbosity) {
@@ -668,8 +675,21 @@ public:
 
         // Reset the builder state, as the response will be written to the same builder.
         resultBuilder.resetToEmpty();
+
+        // Include queryStats metrics in the result to be sent to mongos. While most views for
+        // distinct on mongos will run through an aggregate pipeline on mongos, views on collections
+        // that can be read completely locally, such as non-existent database collections or
+        // unsplittable collections, will run through this distinct path on mongod and return
+        // metrics back to mongos.
+        const bool includeMetrics = curOp->debug().queryStatsInfo.metricsRequested;
+        boost::optional<BSONObj> metrics = includeMetrics
+            ? boost::make_optional(curOp->debug().getCursorMetrics().toBSON())
+            : boost::none;
         uassertStatusOK(
-            responseFormatter.appendAsDistinctResponse(&resultBuilder, dbName.tenantId()));
+            responseFormatter.appendAsDistinctResponse(&resultBuilder, dbName.tenantId(), metrics));
+
+        curOp->setEndOfOpMetrics(resultBuilder.asTempObj().getObjectField("values").nFields());
+        collectQueryStatsMongod(opCtx, canonicalQuery->getExpCtx(), std::move(ownedQueryStatsKey));
     }
 
     void appendMirrorableRequest(BSONObjBuilder* bob, const BSONObj& cmdObj) const override {

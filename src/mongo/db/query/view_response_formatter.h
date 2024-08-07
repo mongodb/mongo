@@ -72,7 +72,8 @@ public:
      * status is returned and 'resultBuilder' will not be modified.
      */
     Status appendAsDistinctResponse(BSONObjBuilder* resultBuilder,
-                                    boost::optional<TenantId> tenantId);
+                                    boost::optional<TenantId> tenantId,
+                                    boost::optional<BSONObj> metrics = boost::none);
 
 private:
     BSONObj _response;

@@ -316,6 +316,16 @@ void registerRequest(OperationContext* opCtx,
 
     auto& opDebug = CurOp::get(opCtx)->debug();
 
+    if (opDebug.queryStatsInfo.disableForSubqueryExecution) {
+        LOGV2_DEBUG(
+            9219800,
+            4,
+            "Query stats disabled for subquery execution. We expect this is a query on a view");
+        return;
+    }
+
+    // TODO SERVER-92118: Remove this and the following if statement when removing the
+    // `wasRateLimited` flag.
     if (opDebug.queryStatsInfo.wasRateLimited) {
         LOGV2_DEBUG(
             8288900,
@@ -366,10 +376,14 @@ void registerRequest(OperationContext* opCtx,
 bool shouldRequestRemoteMetrics(const OpDebug& opDebug) {
     // metricsRequested should only be set to true when the feature flag is set; we don't need to
     // re-check the feature flag in that case.
+    // If the key is non-null, we expect that query stats should be collected at this level of
+    // execution. If the keyHash is non-null, then we expect we should forward remote query stats
+    // metrics to a higher level of execution, such as running an aggregation for a view, or there
+    // are multiple cursors open in a single operation context, such as in $search.
     return opDebug.queryStatsInfo.metricsRequested ||
         (feature_flags::gFeatureFlagQueryStatsDataBearingNodes.isEnabled(
              serverGlobalParams.featureCompatibility.acquireFCVSnapshot()) &&
-         opDebug.queryStatsInfo.key != nullptr);
+         (opDebug.queryStatsInfo.key != nullptr || opDebug.queryStatsInfo.keyHash != boost::none));
 }
 
 QueryStatsStore& getQueryStatsStore(OperationContext* opCtx) {

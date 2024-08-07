@@ -442,6 +442,13 @@ public:
             viewAggRequest.setQuerySettings(querySettings);
         }
 
+        auto curOp = CurOp::get(opCtx);
+
+        // We must store the key in distinct to prevent collecting query stats when the aggregation
+        // runs.
+        auto ownedQueryStatsKey = std::move(curOp->debug().queryStatsInfo.key);
+        curOp->debug().queryStatsInfo.disableForSubqueryExecution = true;
+
         // If running explain distinct on view, then aggregate is executed without plivilege checks
         // and without response formatting.
         if (verbosity) {
@@ -465,6 +472,9 @@ public:
         // Reset the builder state, as the response will be written to the same builder.
         bob.resetToEmpty();
         uassertStatusOK(responseFormatter.appendAsDistinctResponse(&bob, dbName.tenantId()));
+
+        curOp->setEndOfOpMetrics(bob.asTempObj().getObjectField("values").nFields());
+        collectQueryStatsMongos(opCtx, std::move(ownedQueryStatsKey));
     }
 };
 MONGO_REGISTER_COMMAND(DistinctCmd).forRouter();
