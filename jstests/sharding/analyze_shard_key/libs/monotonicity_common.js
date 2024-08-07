@@ -31,7 +31,11 @@ export const kOrderTypes = [
     }
 ];
 
-export const numNodesPerRS = 2;
+// Only use a single-node RS for montonicity tests. By default, the router runs the analyzeShardKey
+// command with readPreference "secondaryPreferred", and the noise in insertion-order from parallel
+// oplog application on secondaries can cause the monotonicity check on secondaries to return an
+// incorrect result.
+export const numNodesPerRS = 1;
 export const insertBatchSize = 1000;
 
 /**
