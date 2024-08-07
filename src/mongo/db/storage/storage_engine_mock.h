@@ -144,7 +144,7 @@ public:
         return Timestamp();
     }
     void setOldestTimestampFromStable() final {}
-    void setOldestTimestamp(Timestamp timestamp, bool force) final {}
+    void setOldestTimestamp(Timestamp timestamp) final {}
     Timestamp getOldestTimestamp() const final {
         return {};
     };

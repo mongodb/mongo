@@ -589,7 +589,7 @@ void ReplicationRecoveryImpl::_recoverFromUnstableCheckpoint(OperationContext* o
         // unfortunately, conflicts with the usage above.
         DurableHistoryRegistry::get(opCtx->getServiceContext())->clearPins(opCtx);
         opCtx->getServiceContext()->getStorageEngine()->setOldestTimestamp(
-            appliedThrough.getTimestamp(), true /*force*/);
+            appliedThrough.getTimestamp());
 
         if (startupRecoveryForRestore) {
             // When we're recovering for a restore, we may be recovering a large number of oplog
@@ -750,7 +750,7 @@ Timestamp ReplicationRecoveryImpl::_applyOplogOperations(OperationContext* opCtx
             invariant(!applyThroughOpTime.isNull());
             _consistencyMarkers->setAppliedThrough(opCtx, applyThroughOpTime);
             replCoord->getServiceContext()->getStorageEngine()->setOldestTimestamp(
-                applyThroughOpTime.getTimestamp(), true /*force*/);
+                applyThroughOpTime.getTimestamp());
         }
     }
     stats.complete(applyThroughOpTime);

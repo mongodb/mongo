@@ -1119,7 +1119,8 @@ void StorageEngineImpl::setOldestTimestampFromStable() {
     _engine->setOldestTimestampFromStable();
 }
 
-void StorageEngineImpl::setOldestTimestamp(Timestamp newOldestTimestamp, bool force) {
+void StorageEngineImpl::setOldestTimestamp(Timestamp newOldestTimestamp) {
+    const bool force = true;
     _engine->setOldestTimestamp(newOldestTimestamp, force);
 }
 

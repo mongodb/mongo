@@ -137,8 +137,7 @@ public:
         ASSERT(c->getIndexCatalog()->haveIdIndex(&_opCtx));
         wuow.commit();
 
-        _opCtx.getServiceContext()->getStorageEngine()->setOldestTimestamp(Timestamp(1, 1),
-                                                                           false /*force*/);
+        _opCtx.getServiceContext()->getStorageEngine()->setOldestTimestamp(Timestamp(1, 1));
 
         // Start with a fresh oplog.
         deleteAll(cllNS());
@@ -230,7 +229,7 @@ protected:
             if (ops.size() > 0) {
                 if (auto tsElem = ops.front()["ts"]) {
                     _opCtx.getServiceContext()->getStorageEngine()->setOldestTimestamp(
-                        tsElem.timestamp(), true /*force*/);
+                        tsElem.timestamp());
                 }
             }
         }
