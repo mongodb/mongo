@@ -56,16 +56,11 @@ kv_workload_generator_spec::kv_workload_generator_spec()
     insert = 0.75;
     remove = 0.15;
     set_commit_timestamp = 0.05;
-    /*
-     * FIXME-WT-13232 Enable the eviction operator when we've determined how to handle prepare
-     * conflicts with keys adjacent to the truncation range. Set to 0.005.
-     */
-    truncate = 0.0;
+    truncate = 0.005;
 
     checkpoint = 0.02;
     crash = 0.002;
-    /* FIXME-WT-12972 Enable the eviction operator when it is safe to do so. Set to 0.1. */
-    evict = 0.0;
+    evict = 0.1;
     restart = 0.002;
     rollback_to_stable = 0.005;
     set_oldest_timestamp = 0.1;
@@ -425,13 +420,15 @@ kv_workload_generator::generate_transaction(size_t seq_no)
                 table_context_ptr table = choose_table(txn_ptr);
 
                 /*
-                 * Don't use truncate on FLCS tables, because a truncate on an FLCS table can
-                 * conflict with operations adjacent to the truncation range's key range. For
-                 * example, if a user wants to truncate range 10-12 on a table with keys [10, 11,
-                 * 12, 13, 14], a concurrent update to key 13 would result in a conflict (while an
-                 * update to 14 would be able proceed). This does not happen with the other table
-                 * types, which are implemented using bounded cursors; FLCS does not support bounded
-                 * cursors, so it uses a different implementation.
+                 * FIXME-WT-13232 Don't use truncate on FLCS tables, because a truncate on an FLCS
+                 * table can conflict with operations adjacent to the truncation range's key range.
+                 * For example, if a user wants to truncate range 10-12 on a table with keys [10,
+                 * 11, 12, 13, 14], a concurrent update to key 13 would result in a conflict (while
+                 * an update to 14 would be able proceed).
+                 *
+                 * FIXME-WT-13350 Similarly, truncating an implicitly created range of keys in an
+                 * FLCS table conflicts with a concurrent insert operation that caused this range of
+                 * keys to be created.
                  *
                  * The workload generator cannot currently account for this, so don't use truncate
                  * with FLCS tables for now.

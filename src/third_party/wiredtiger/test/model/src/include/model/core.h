@@ -246,4 +246,35 @@ public:
     inline wiredtiger_abort_exception() noexcept : std::runtime_error("WiredTiger would abort") {}
 };
 
+/*
+ * known_issue_exception --
+ *     An exception for known WiredTiger issues.
+ */
+class known_issue_exception : public std::runtime_error {
+
+public:
+    /*
+     * known_issue_exception::known_issue_exception --
+     *     Create a new instance of the exception.
+     */
+    inline known_issue_exception(const char *issue) noexcept
+        : std::runtime_error(std::string("Hit a known WiredTiger issue: ") + issue), _issue(issue)
+    {
+    }
+
+    /*
+     * known_issue_exception::issue --
+     *     Get the ticket number for the known issue as a C string. The lifetime of the pointer
+     *     corresponds to the lifetime of this exception.
+     */
+    inline const char *
+    issue() noexcept
+    {
+        return _issue.c_str();
+    }
+
+private:
+    std::string _issue;
+};
+
 } /* namespace model */

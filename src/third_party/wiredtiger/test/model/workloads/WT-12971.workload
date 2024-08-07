@@ -1,0 +1,8 @@
+create_table(3, table3, r, 8t)
+begin_transaction(108)
+insert(3, 108, 78699, 40)
+remove(3, 108, 10250)
+remove(3, 108, 99041)
+prepare_transaction(108, 160265)
+evict(3, 94201)
+commit_transaction(108, 160523, 160753)

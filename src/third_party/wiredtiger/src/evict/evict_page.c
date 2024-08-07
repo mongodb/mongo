@@ -772,7 +772,7 @@ __evict_review_obsolete_time_window(WT_SESSION_IMPL *session, WT_REF *ref)
      * Mark the page as dirty to allow the page reconciliation to remove all information related to
      * an obsolete time window.
      */
-    if (__wt_txn_newest_visible_all(session, newest_ta.newest_txn,
+    if (__wt_txn_has_newest_and_visible_all(session, newest_ta.newest_txn,
           WT_MAX(newest_ta.newest_start_durable_ts, newest_ta.newest_stop_durable_ts))) {
         __wt_verbose(session, WT_VERB_EVICT,
           "%p in-memory page obsolete time window: time aggregate %s", (void *)ref,

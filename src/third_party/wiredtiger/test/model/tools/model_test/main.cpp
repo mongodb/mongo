@@ -96,6 +96,10 @@ run_and_verify(std::shared_ptr<model::kv_workload> workload, const std::string &
 
         /* When we load the workload from WiredTiger, that would be after running recovery. */
         database.restart();
+    } catch (model::known_issue_exception &e) {
+        std::cerr << "Warning: Reproduced known WiredTiger issue " << e.issue()
+                  << " (skip the rest of the test)" << std::endl;
+        return;
     } catch (std::exception &e) {
         throw std::runtime_error(
           "Failed to run the workload in the model: " + std::string(e.what()));

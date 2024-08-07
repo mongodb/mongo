@@ -151,6 +151,8 @@ def parse_chkpt_info(f):
         raise RuntimeError("Could not find checkpoint name")
     line = f.readline()
     if not line.startswith("Root:"):
+        if not line.strip():
+            raise Exception("Root not found, there is no data to parse")
         raise Exception(f"Expected the line starts with 'Root:' but found '{line}'")
     line = f.readline()
     root_addr = parse_metadata(line[3:-1]) # remove metadata symbol
@@ -170,7 +172,7 @@ def parse_dump_blocks():
         lines = f.readlines()
 
     checkpoint_name = None
-    is_root = False
+    is_root, has_root = False, False
     data = {}
 
     for line in lines:
@@ -198,7 +200,7 @@ def parse_dump_blocks():
 
         # Check for the root info.
         if x := re.search(r"^Root:$", line):
-            is_root = True
+            has_root = is_root = True
             continue
 
         # Check for any other addr info.
@@ -220,7 +222,8 @@ def parse_dump_blocks():
 
             data[checkpoint_name][page_type] += [(addr_start, size)]
             continue
-
+    if not has_root:
+        raise Exception("Root not found, there is no data to parse")
     # Sort by offset.
     for checkpoint in data:
         for page_type in data[checkpoint]:

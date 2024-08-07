@@ -58,6 +58,14 @@ struct __wt_cursor_backup {
 #define WT_CURSOR_BACKUP_ID(cursor) (((WT_CURSOR_BACKUP *)(cursor))->maxid)
     uint32_t maxid; /* Maximum log file ID seen */
 
+    /*
+     * Keep a list of configuration values for each file to be copied for an incremental backup. We
+     * use it to keep the bitmap at the time the backup starts. This list should be kept and managed
+     * in lock-step with the list of files.
+     */
+    char **cfg_list; /* List of metadata configs for files to be copied. */
+    size_t cfg_allocated;
+    char *cfg_current;
     char **list; /* List of files to be copied. */
     size_t list_allocated;
     size_t list_next;

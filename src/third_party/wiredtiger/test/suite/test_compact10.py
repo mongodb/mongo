@@ -67,11 +67,6 @@ class test_compact10(backup_base, compact_util):
 
         return uris
 
-    def turn_on_bg_compact(self, config = ''):
-        self.session.compact(None, f'background=true,{config}')
-        while not self.get_bg_compaction_running():
-            time.sleep(0.1)
-
     # This test:
     # - Creates a full backup before background compaction is enabled.
     # - Waits for background compaction to compact all the files and create a new full backup.
