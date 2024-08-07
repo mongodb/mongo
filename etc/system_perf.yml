@@ -171,6 +171,20 @@ functions:
         permissions: public-read
         content_type: application/x-gzip
         display_name: DSI Artifacts - Execution ${execution}
+    - command: shell.exec
+      params:
+        script: |
+          cp ./build/Artifacts/DSIArtifacts/WorkloadOutput/reports/ycsb_100read/mongod.0/pre_post_task_output/default.profdata.tgz ./default.profdata.tgz || true
+    - command: s3.put
+      params:
+        aws_key: ${aws_key}
+        aws_secret: ${aws_secret}
+        local_file: ./default.profdata.tgz
+        remote_file: ${project_dir}/${build_variant}/${revision}/${task_id}/${version_id}/logs/default.profdata.tgz
+        bucket: mciuploads
+        permissions: public-read
+        content_type: application/x-gzip
+        display_name: PGO profile data - Execution ${execution}
     - command: s3.put
       params:
         aws_key: ${aws_key}

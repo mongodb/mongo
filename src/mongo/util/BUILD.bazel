@@ -48,5 +48,8 @@ mongo_cc_library(
     local_defines = select({
         "//bazel/config:gcov_enabled": ["MONGO_GCOV"],
         "//conditions:default": [],
+    }) + select({
+        "//bazel/config:pgo_profile_enabled": ["MONGO_PGO_PROFILE"],
+        "//conditions:default": [],
     }),
 )

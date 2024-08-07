@@ -67,6 +67,11 @@
 #include <xray/xray_log_interface.h>
 #endif
 
+#ifdef MONGO_PGO_PROFILE
+extern "C" void __llvm_profile_dump();
+extern "C" void __llvm_profile_reset_counters();
+#endif
+
 #ifdef MONGO_GCOV
 extern "C" void __gcov_flush();
 extern "C" void __gcov_dump();
@@ -92,6 +97,11 @@ void quickExitWithoutLogging(ExitCode code) {
 #else
     __gcov_flush();
 #endif
+#endif
+
+#ifdef MONGO_PGO_PROFILE
+    __llvm_profile_dump();
+    __llvm_profile_reset_counters();
 #endif
 
 #if __has_feature(xray_instrument)

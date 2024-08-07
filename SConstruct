@@ -464,6 +464,18 @@ add_option(
 )
 
 add_option(
+    "pgo-profile",
+    help="compile with pgo profiling",
+    nargs=0,
+)
+
+add_option(
+    "pgo",
+    help="compile with pgo. Assumes profile file default.profdata at root of repository",
+    nargs=0,
+)
+
+add_option(
     "enable-http-client",
     choices=["auto", "on", "off"],
     default="auto",
@@ -4829,15 +4841,42 @@ def doConfigure(myenv):
                 myenv.ConfError("Failed to enable thin LTO")
 
         if linker_ld != "gold" and not env.TargetOSIs("darwin", "macOS"):
-            myenv.AppendUnique(
-                CCFLAGS=["-ffunction-sections"],
-                LINKFLAGS=[
-                    "-Wl,--symbol-ordering-file=symbols.orderfile",
-                    "-Wl,--no-warn-symbol-ordering",
-                ],
-            )
+            if has_option("pgo"):
+                print("WARNING: skipping symbol ordering as pgo is enabled")
+            else:
+                myenv.AppendUnique(
+                    CCFLAGS=["-ffunction-sections"],
+                    LINKFLAGS=[
+                        "-Wl,--symbol-ordering-file=symbols.orderfile",
+                        "-Wl,--no-warn-symbol-ordering",
+                    ],
+                )
         else:
             print("WARNING: lld linker is required to sort symbols")
+
+        if has_option("pgo-profile"):
+            if (
+                not myenv.ToolchainIs("clang")
+                or not myenv.TargetOSIs("linux")
+                or linker_ld == "gold"
+            ):
+                myenv.FatalError("Error: pgo only works on linux with clang + lld")
+            myenv.AppendUnique(
+                CCFLAGS=["-fprofile-instr-generate"],
+                LINKFLAGS=["-fprofile-instr-generate"],
+            )
+
+        if has_option("pgo"):
+            if (
+                not myenv.ToolchainIs("clang")
+                or not myenv.TargetOSIs("linux")
+                or linker_ld == "gold"
+            ):
+                myenv.FatalError("Error: pgo only works on linux with clang + lld")
+            myenv.AppendUnique(
+                _NON_CONF_CCFLAGS_GEN=["-fprofile-use=./default.profdata"],
+            )
+            myenv["CCFLAGS_WERROR"].remove("-Werror")
 
         # As far as we know these flags only apply on posix-y systems,
         # and not on Darwin.

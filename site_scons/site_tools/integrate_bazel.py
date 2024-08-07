@@ -769,6 +769,7 @@ def generate(env: SCons.Environment.Environment) -> None:
         f'--//bazel/config:visibility_support={env.GetOption("visibility-support")}',
         f'--//bazel/config:disable_warnings_as_errors={env.GetOption("disable-warnings-as-errors") == "source"}',
         f'--//bazel/config:gcov={env.GetOption("gcov") is not None}',
+        f'--//bazel/config:pgo_profile={env.GetOption("pgo-profile") is not None}',
         f"--platforms=//bazel/platforms:{distro_or_os}_{normalized_arch}_{env.ToolchainName()}",
         f"--host_platform=//bazel/platforms:{distro_or_os}_{normalized_arch}_{env.ToolchainName()}",
         f'--//bazel/config:ssl={"True" if env.GetOption("ssl") == "on" else "False"}',

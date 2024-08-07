@@ -20,6 +20,7 @@ load(
     "lsan",
     "msan",
     "opt",
+    "pgo_profile",
     "release",
     "separate_debug",
     "shared_archive",
@@ -1776,5 +1777,21 @@ config_setting(
     name = "gcov_enabled",
     flag_values = {
         "//bazel/config:gcov": "True",
+    },
+)
+
+# --------------------------------------
+# pgo_profile options
+# --------------------------------------
+
+pgo_profile(
+    name = "pgo_profile",
+    build_setting_default = False,
+)
+
+config_setting(
+    name = "pgo_profile_enabled",
+    flag_values = {
+        "//bazel/config:pgo_profile": "True",
     },
 )

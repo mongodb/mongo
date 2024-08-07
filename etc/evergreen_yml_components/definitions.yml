@@ -2647,6 +2647,15 @@ functions:
         args:
           - "./src/evergreen/sasl_windows_cyrussasl_teardown.sh"
 
+  "fetch pgo profile":
+    command: subprocess.exec
+    params:
+      binary: bash
+      args:
+        - "./src/evergreen/functions/download_pgo_profile.sh"
+      env:
+        PGO_PROFILE_URL: ${pgo_profile_url}
+
   "process code coverage data": &process_code_coverage_data
     command: subprocess.exec
     params:

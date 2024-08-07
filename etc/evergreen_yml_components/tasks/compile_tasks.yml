@@ -38,6 +38,7 @@ variables:
       - func: "set task expansion macros"
       - func: "f_expansions_write"
       - func: "get engflow creds"
+      - func: "fetch pgo profile"
     teardown_task:
       - func: "f_expansions_write"
       - func: "attach scons logs"
