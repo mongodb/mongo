@@ -288,6 +288,24 @@ void StorageEngineImpl::loadCatalog(OperationContext* opCtx,
         }
     }
 
+    bool setMinVisibleToOldestFailpointSet = false;
+    if (MONGO_unlikely(setMinVisibleForAllCollectionsToOldestOnStartup.shouldFail())) {
+        // Failpoint is intended to apply to all collections. Additionally, we want to leverage
+        // nTimes to execute the failpoint for a single 'loadCatalog' call.
+        LOGV2(9106700, "setMinVisibleForAllCollectionsToOldestOnStartup failpoint is set");
+        setMinVisibleToOldestFailpointSet = true;
+
+        // Versions > 7.0 use this failpoint in {mode: {times:1}} to execute it exactly once during
+        // startup only, which prevents issues with the historical ident tracker when reopening the
+        // catalog in rollback. Versions <7.0 do not have point in time catalog lookups, and have no
+        // historical ident tracker. Those versions must set the minVisibleTs even on rollback, so
+        // the resharding_test_fixture cannot use {times: 1} on the failpoint. 7.0 by itself might
+        // use {times: 1}, but cannot due to multi-version. The work around is to disable the
+        // failpoint inside the server, after the first hit. This failpoint is only ever used as a
+        // startup parameter in the resharding_test_fixture, so this is fine.
+        setMinVisibleForAllCollectionsToOldestOnStartup.setMode(FailPoint::off);
+    }
+
     const auto loadingFromUncleanShutdownOrRepair =
         lastShutdownState == LastShutdownState::kUnclean || _options.forRepair;
     BatchedCollectionCatalogWriter catalogBatchWriter{opCtx};
@@ -403,11 +421,11 @@ void StorageEngineImpl::loadCatalog(OperationContext* opCtx,
             // server starts (e.g. resharding). It is likely only safe for tests which don't run
             // operations that bump the minimum visible timestamp and can guarantee the collection
             // always exists for the atClusterTime value(s).
-            setMinVisibleForAllCollectionsToOldestOnStartup.execute([&](const BSONObj& data) {
-                minVisibleTs = _engine->getOldestTimestamp();
-                if (collectionMinValidTs > minVisibleTs)
-                    collectionMinValidTs = minVisibleTs;
-            });
+            if (MONGO_unlikely(setMinVisibleToOldestFailpointSet)) {
+                auto oldestTs = _engine->getOldestTimestamp();
+                if (collectionMinValidTs > oldestTs)
+                    collectionMinValidTs = oldestTs;
+            }
         }
 
         _initCollection(opCtx,
