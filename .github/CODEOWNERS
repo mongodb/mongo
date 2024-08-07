@@ -659,9 +659,6 @@ WORKSPACE.bazel @10gen/devprod-build
 /src/mongo/db/storage/**/*named_pipe* @10gen/query-integration
 /src/mongo/db/storage/**/*column_store* @10gen/query-integration
 
-# The following patterns are parsed from ./src/mongo/db/storage/wiredtiger/OWNERS.yml
-/src/mongo/db/storage/wiredtiger/**/*column_store* @10gen/query-integration
-
 # The following patterns are parsed from ./src/mongo/db/test_output/exec/OWNERS.yml
 /src/mongo/db/test_output/exec/**/* @10gen/query-execution
 
