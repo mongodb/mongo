@@ -186,12 +186,4 @@ if [[ $exit_status -ne 0 ]]; then
   touch ${skip_tests}
 fi
 
-scons_config_file=$(find build -wholename '*mongo/config.h' -print -quit)
-bazel_config_file=bazel-bin/src/mongo/config.h
-if [ -f "${scons_config_file}" ] && [ -f "${bazel_config_file}" ]; then
-  echo "This should never fail unless you're modifying mongo/config.h generation logic.
-  echo "If this fails, please report it to #ask-devprod-build"
-  diff -u ${scons_config_file} ${bazel_config_file}
-fi
-
 exit $exit_status
