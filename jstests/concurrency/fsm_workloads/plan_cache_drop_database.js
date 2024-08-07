@@ -31,6 +31,7 @@ export const $config = (function() {
                 // These sharding error codes can bubble up if we exhaust all retries.
                 expectedErrorCodes.push(ErrorCodes.CannotImplicitlyCreateCollection);
                 expectedErrorCodes.push(ErrorCodes.StaleDbVersion);
+                expectedErrorCodes.push(ErrorCodes.StaleConfig);
             }
             assert.commandWorkedOrFailedWithCode(coll.createIndex({a: 1}), expectedErrorCodes);
             assert.commandWorkedOrFailedWithCode(coll.createIndex({b: 1}), expectedErrorCodes);
