@@ -457,6 +457,8 @@ env.Library(
         "$BUILD_DIR/mongo/db/service_context",
         '$BUILD_DIR/mongo/db/storage/execution_context',
         '$BUILD_DIR/mongo/db/storage/key_string',
+        '$BUILD_DIR/mongo/db/timeseries/bucket_catalog',
+        '$BUILD_DIR/mongo/db/timeseries/timeseries_options',
         '$BUILD_DIR/mongo/idl/basic_types',
         'catalog_impl',
         'collection_options',

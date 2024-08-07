@@ -54,7 +54,9 @@
 #include "mongo/db/storage/key_string.h"
 #include "mongo/db/storage/record_store.h"
 #include "mongo/db/storage/storage_parameters_gen.h"
+#include "mongo/db/timeseries/flat_bson.h"
 #include "mongo/db/timeseries/timeseries_constants.h"
+#include "mongo/db/timeseries/timeseries_options.h"
 #include "mongo/logv2/log.h"
 #include "mongo/rpc/object_check.h"
 #include "mongo/util/fail_point.h"
@@ -130,11 +132,9 @@ void schemaValidationFailed(CollectionValidation::ValidateState* state,
     }
 }
 /**
- * Checks the value of the bucket's version and if it matches the types of the data fields.
+ * Checks the value of the bucket's version and if it matches the types of 'data' fields.
  */
-Status _validateTimeSeriesBucketRecord(const RecordId& recordId,
-                                       const BSONObj& recordBson,
-                                       ValidateResults* results) {
+Status _validateTimeseriesControlVersion(const BSONObj& recordBson) {
     int controlVersion = recordBson.getField(timeseries::kBucketControlFieldName)
                              .Obj()
                              .getField(timeseries::kBucketControlVersionFieldName)
@@ -159,12 +159,117 @@ Status _validateTimeSeriesBucketRecord(const RecordId& recordId,
         BSONElement e = bi.next();
         if (!isCorrectType(e)) {
             return Status(ErrorCodes::TypeMismatch,
-                          fmt::format("Mismatch between TimeSeries schema version and data field "
+                          fmt::format("Mismatch between time-series schema version and data field "
                                       "type. Expected type {}, but got {}.",
                                       mongo::typeName(dataType),
                                       mongo::typeName(e.type())));
         }
     }
+    return Status::OK();
+}
+
+/**
+ * Checks the equivalence between the min and max fields in 'control' for a bucket and
+ * the corresponding value in 'data'.
+ */
+Status _validateTimeseriesMinMax(const BSONObj& recordBson, const CollectionPtr& coll) {
+    BSONObj data = recordBson.getField(timeseries::kBucketDataFieldName).Obj();
+    BSONObj control = recordBson.getField(timeseries::kBucketControlFieldName).Obj();
+    BSONObj controlMin = control.getField(timeseries::kBucketControlMinFieldName).Obj();
+    BSONObj controlMax = control.getField(timeseries::kBucketControlMaxFieldName).Obj();
+
+    auto dataFields = data.getFieldNames<std::set<std::string>>();
+    auto controlMinFields = controlMin.getFieldNames<std::set<std::string>>();
+    auto controlMaxFields = controlMax.getFieldNames<std::set<std::string>>();
+
+    // Checks that the number of 'control.min' and 'control.max' fields agrees with number of 'data'
+    // fields.
+    if (dataFields.size() != controlMinFields.size() ||
+        dataFields.size() != controlMaxFields.size()) {
+        return Status(
+            ErrorCodes::BadValue,
+            fmt::format(
+                "Mismatch between the number of time-series control fields and the number "
+                "of data fields. "
+                "Control had {} min fields and {} max fields, but observed data had {} fields.",
+                controlMinFields.size(),
+                controlMaxFields.size(),
+                dataFields.size()));
+    };
+
+    // Used when checking min timestamp, which is rounded down by granularity.
+    auto granularity = coll->getTimeseriesOptions()->getGranularity();
+
+    // Validates that the 'control.min' and 'control.max' field values agree with 'data' field
+    // values.
+    for (auto fieldName : dataFields) {
+        timeseries::MinMax minmax;
+        auto field = data.getField(fieldName);
+
+        for (BSONElement el : field.Obj()) {
+            minmax.update(el.wrap(fieldName), boost::none, coll->getDefaultCollator());
+        }
+
+        auto controlFieldMin = controlMin.getField(fieldName);
+        auto controlFieldMax = controlMax.getField(fieldName);
+        auto min = minmax.min();
+        auto max = minmax.max();
+
+        // Checks whether the min and max values between 'control' and 'data' match, taking
+        // timestamp granularity into account.
+        auto checkMinAndMaxMatch = [&]() {
+            if (fieldName == coll->getTimeseriesOptions()->getTimeField()) {
+                return controlFieldMin.Date() ==
+                    timeseries::roundTimestampToGranularity(min.getField(fieldName).Date(),
+                                                            granularity) &&
+                    controlFieldMax.Date() == max.getField(fieldName).Date();
+            } else {
+                return controlFieldMin.wrap().woCompare(min) == 0 &&
+                    controlFieldMax.wrap().woCompare(max) == 0;
+            }
+        };
+
+        if (!checkMinAndMaxMatch()) {
+            return Status(
+                ErrorCodes::BadValue,
+                fmt::format(
+                    "Mismatch between time-series control and observed min or max for field {}. "
+                    "Control had min {} and max {}, but observed data had min {} and max {}.",
+                    fieldName,
+                    controlFieldMin.toString(),
+                    controlFieldMax.toString(),
+                    min.toString(),
+                    max.toString()));
+        }
+    }
+
+    return Status::OK();
+}
+
+/**
+ * Validates the consistency of a time-series bucket.
+ */
+Status _validateTimeSeriesBucketRecord(const CollectionPtr& collection,
+                                       const BSONObj& recordBson,
+                                       ValidateResults* results) {
+
+    if (Status status = _validateTimeseriesControlVersion(recordBson); !status.isOK()) {
+        return status;
+    }
+
+    int version = recordBson.getField(timeseries::kBucketControlFieldName)
+                      .Obj()
+                      .getField(timeseries::kBucketControlVersionFieldName)
+                      .Number();
+
+    // TODO(SERVER-67023): Check closed bucket as part of validation.
+    if (version == 1) {
+        if (Status status = _validateTimeseriesMinMax(recordBson, collection); !status.isOK()) {
+            return status;
+        }
+    }
+
+
     return Status::OK();
 }
 
@@ -753,7 +858,7 @@ void ValidateAdaptor::traverseRecordStore(OperationContext* opCtx,
             } else if (coll->getTimeseriesOptions()) {
                 // Checks for time-series collection consistency.
                 Status bucketStatus =
-                    _validateTimeSeriesBucketRecord(record->id, record->data.toBson(), results);
+                    _validateTimeSeriesBucketRecord(coll, record->data.toBson(), results);
 
                 // This log id should be kept in sync with the associated warning messages that are
                 // returned to the client.
