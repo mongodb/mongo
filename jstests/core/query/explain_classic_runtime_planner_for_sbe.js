@@ -2,9 +2,8 @@
 // queryPlanner and allPlansExecution, but SBE format for executionStats.
 // @tags: [
 //  assumes_unsharded_collection,
-//  featureFlagClassicRuntimePlanningForSbe,
 //  featureFlagSbeFull,
-//  requires_fcv_80,  # because featureFlagClassicRuntimePlanningForSbe was enabled starting in 8.0
+//  requires_fcv_80,  # because ClassicRuntimePlanningForSbe was enabled starting in 8.0
 // ]
 
 import {

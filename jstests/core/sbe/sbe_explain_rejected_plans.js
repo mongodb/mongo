@@ -76,13 +76,4 @@ for (let rejectedPlan of getRejectedPlans(explain)) {
     for (let ixscan of ixscans) {
         assert.contains(ixscan.indexName, [a1IndexName, b1IndexName], ixscan);
     }
-
-    // TODO SERVER-83887: Delete this block when "featureFlagClassicRuntimePlanningForSbe" is
-    // deleted.
-    if (!FeatureFlagUtil.isPresentAndEnabled(db, "ClassicRuntimePlanningForSbe")) {
-        assert(!rejectedPlan.slotBasedPlan.stages.includes("@\"a_1_b_1\""), explain);
-        assert(rejectedPlan.slotBasedPlan.stages.includes("@\"a_1\"") ||
-                   rejectedPlan.slotBasedPlan.stages.includes("@\"b_1\""),
-               explain);
-    }
 }

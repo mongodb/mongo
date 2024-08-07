@@ -1,17 +1,8 @@
 // Tests that a query with $in filter over a large array chooses the optimal index. We ban SBE
 // multi planner to run as it chooses a plan with a suboptimal index.
 import {getPlanStage} from "jstests/libs/analyze_plan.js";
-import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
-import {checkSbeFullyEnabled} from "jstests/libs/sbe_util.js";
 
 // The SBE multi planner chooses the wrong index.
-//
-// TODO SERVER-83887 Remove this block once the feature flag is removed.
-if (checkSbeFullyEnabled(db) &&
-    !FeatureFlagUtil.isPresentAndEnabled(db, "ClassicRuntimePlanningForSbe")) {
-    jsTestLog("Skipping test since SBE is enabled without classic runtime planning for SBE.");
-    quit();
-}
 
 const coll = db.large_in_with_indexes;
 coll.drop();

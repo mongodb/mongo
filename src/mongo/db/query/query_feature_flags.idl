@@ -118,14 +118,6 @@ feature_flags:
       default: true
       shouldBeFCVGated: false
 
-    featureFlagClassicRuntimePlanningForSbe:
-      description: "Enables use of the classic engine's MultiPlanStage and SubplanStage to perform
-                    plan selection for queries that use SBE. When disabled, the SBE multi-planner
-                    and subplanner are used instead."
-      cpp_varname: gFeatureFlagClassicRuntimePlanningForSbe
-      default: true
-      shouldBeFCVGated: false
-
     featureFlagBinDataConvert:
       description: "Feature flag to enable BinData support in $convert."
       cpp_varname: gFeatureFlagBinDataConvert

@@ -4,7 +4,6 @@
  *   requires_profiling,
  * ]
  */
-import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {assertCacheUsage, setUpActiveCacheEntry} from "jstests/libs/plan_cache_utils.js";
 import {
     checkSbeFullFeatureFlagEnabled,
@@ -18,14 +17,6 @@ coll.drop();
 
 const sbeEnabled = checkSbeFullyEnabled(db);
 const sbePlanCacheEnabled = checkSbeFullFeatureFlagEnabled(db);
-// TODO SERVER-83887: Delete this block when "featureFlagClassicRuntimePlanningForSbe" is
-// deleted.
-if (sbeEnabled && !FeatureFlagUtil.isPresentAndEnabled(db, "ClassicRuntimePlanningForSbe")) {
-    jsTestLog("Skipping test since SBE without featureFlagClassicRuntimePlanningForSbe " +
-              "doesn't handle $unwind and replanning correctly");
-    MongoRunner.stopMongod(conn);
-    quit();
-}
 
 assert.commandWorked(db.setProfilingLevel(2));
 
