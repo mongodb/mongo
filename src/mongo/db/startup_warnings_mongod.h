@@ -33,6 +33,9 @@
 
 namespace mongo {
 
+constexpr inline auto kTHPEnabledParameter = "enabled";
+constexpr inline auto kTHPDefragParameter = "defrag";
+
 struct StorageGlobalParams;
 struct ServerGlobalParams;
 

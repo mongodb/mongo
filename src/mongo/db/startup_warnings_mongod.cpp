@@ -56,6 +56,18 @@ namespace {
 
 #define TRANSPARENT_HUGE_PAGES_DIR "/sys/kernel/mm/transparent_hugepage"
 
+inline bool isValidOpMode(const std::string& opMode, const std::string& param) noexcept {
+    if (param == kTHPEnabledParameter) {
+        return opMode == "always" || opMode == "madvise" || opMode == "never";
+    }
+    if (param == kTHPDefragParameter) {
+        return opMode == "always" || opMode == "madvise" || opMode == "never" ||
+            opMode == "defer" || opMode == "defer+madvise";
+    }
+
+    return false;
+}
+
 }  // namespace
 
 using std::ios_base;
@@ -120,7 +132,7 @@ StatusWith<std::string> StartupWarningsMongod::readTransparentHugePagesParameter
         }
 
         // Check against acceptable values of opMode.
-        if (opMode != "always" && opMode != "madvise" && opMode != "never") {
+        if (!isValidOpMode(opMode, parameter)) {
             return StatusWith<std::string>(
                 ErrorCodes::BadValue,
                 str::stream()
@@ -240,7 +252,7 @@ void logMongodStartupWarnings(const StorageGlobalParams& storageParams,
 
     // Transparent Hugepages checks
     StatusWith<std::string> transparentHugePagesEnabledResult =
-        StartupWarningsMongod::readTransparentHugePagesParameter("enabled");
+        StartupWarningsMongod::readTransparentHugePagesParameter(kTHPEnabledParameter);
     bool shouldWarnAboutDefragAlways = false;
     if (transparentHugePagesEnabledResult.isOK()) {
         if (transparentHugePagesEnabledResult.getValue() == "always") {
@@ -263,7 +275,7 @@ void logMongodStartupWarnings(const StorageGlobalParams& storageParams,
     }
 
     StatusWith<std::string> transparentHugePagesDefragResult =
-        StartupWarningsMongod::readTransparentHugePagesParameter("defrag");
+        StartupWarningsMongod::readTransparentHugePagesParameter(kTHPDefragParameter);
     if (transparentHugePagesDefragResult.isOK()) {
         if (shouldWarnAboutDefragAlways &&
             transparentHugePagesDefragResult.getValue() == "always") {

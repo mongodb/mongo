@@ -122,17 +122,78 @@ TEST(StartupWarningsMongodTest, ReadTransparentHugePagesParameterUnrecognizedOpM
     ASSERT_EQUALS(ErrorCodes::BadValue, result.getStatus().code());
 }
 
-TEST(StartupWarningsMongodTest, ReadTransparentHugePagesParameterValidFormat) {
-    TempDir tempDir("StartupWarningsMongodTest_ReadTransparentHugePagesParameterBlankLine");
+void readTransparentHugePagesParameter(const std::string& parameter, const std::string& valueStr) {
+    TempDir tempDir("StartupWarningsMongodTest_ReadTransparentHugePagesParameter");
     {
-        std::string filename(tempDir.path() + "/param");
+        std::string filename(tempDir.path() + "/" + parameter);
         std::ofstream ofs(filename.c_str());
-        ofs << "always madvise [never]" << std::endl;
+        ofs << valueStr << std::endl;
     }
-    StatusWith<std::string> result =
-        StartupWarningsMongod::readTransparentHugePagesParameter("param", tempDir.path());
+
+    std::string::size_type posBegin = valueStr.find('[');
+    std::string::size_type posEnd = valueStr.find(']');
+    std::string mode = valueStr.substr(posBegin + 1, posEnd - posBegin - 1);
+
+    auto result =
+        StartupWarningsMongod::readTransparentHugePagesParameter(parameter, tempDir.path());
+
+    if (parameter == kTHPEnabledParameter && (mode == "defer" || mode == "defer+madvise")) {
+        ASSERT_NOT_OK(result.getStatus());
+        ASSERT_EQUALS(ErrorCodes::BadValue, result.getStatus().code());
+        return;
+    }
     ASSERT_OK(result.getStatus());
-    ASSERT_EQUALS("never", result.getValue());
+    ASSERT_EQUALS(mode, result.getValue());
+}
+
+TEST(StartupWarningsMongodTest, ReadTransparentHugePagesEnabledAlways) {
+    readTransparentHugePagesParameter(kTHPEnabledParameter,
+                                      "[always] defer defer+madvise madvise never");
+}
+
+TEST(StartupWarningsMongodTest, ReadTransparentHugePagesDefragAlways) {
+    readTransparentHugePagesParameter(kTHPDefragParameter,
+                                      "[always] defer defer+madvise madvise never");
+}
+
+TEST(StartupWarningsMongodTest, ReadTransparentHugePagesEnabledDefer) {
+    readTransparentHugePagesParameter(kTHPEnabledParameter,
+                                      "always [defer] defer+madvise madvise never");
+}
+
+TEST(StartupWarningsMongodTest, ReadTransparentHugePagesDefragDefer) {
+    readTransparentHugePagesParameter(kTHPDefragParameter,
+                                      "always [defer] defer+madvise madvise never");
+}
+
+TEST(StartupWarningsMongodTest, ReadTransparentHugePagesEnabledDeferMadvise) {
+    readTransparentHugePagesParameter(kTHPEnabledParameter,
+                                      "always defer [defer+madvise] madvise never");
+}
+
+TEST(StartupWarningsMongodTest, ReadTransparentHugePagesDefragDeferMadvise) {
+    readTransparentHugePagesParameter(kTHPDefragParameter,
+                                      "always defer [defer+madvise] madvise never");
+}
+
+TEST(StartupWarningsMongodTest, ReadTransparentHugePagesEnabledMadvise) {
+    readTransparentHugePagesParameter(kTHPEnabledParameter,
+                                      "always defer defer+madvise [madvise] never");
+}
+
+TEST(StartupWarningsMongodTest, ReadTransparentHugePagesDefragMadvise) {
+    readTransparentHugePagesParameter(kTHPDefragParameter,
+                                      "always defer defer+madvise [madvise] never");
+}
+
+TEST(StartupWarningsMongodTest, ReadTransparentHugePagesEnabledNever) {
+    readTransparentHugePagesParameter(kTHPEnabledParameter,
+                                      "always defer defer+madvise madvise [never]");
+}
+
+TEST(StartupWarningsMongodTest, ReadTransparentHugePagesDefragNever) {
+    readTransparentHugePagesParameter(kTHPDefragParameter,
+                                      "always defer defer+madvise madvise [never]");
 }
 
 }  // namespace
