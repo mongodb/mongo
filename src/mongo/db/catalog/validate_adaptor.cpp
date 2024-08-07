@@ -756,6 +756,9 @@ void ValidateAdaptor::traverseRecordStore(OperationContext* opCtx,
         return;
     }
 
+    bool bucketMixedSchemaDataError = false;
+    bool bucketMinMaxMalformedError = false;
+    bool bucketMixedSchemaDataWarning = false;
     bool corruptRecordsSizeLimitWarning = false;
     const std::unique_ptr<SeekableRecordThrottleCursor>& traverseRecordStoreCursor =
         _validateState->getTraverseRecordStoreCursor();
@@ -870,6 +873,49 @@ void ValidateAdaptor::traverseRecordStore(OperationContext* opCtx,
                                   "reason"_attr = bucketStatus);
                     nNonCompliantDocuments++;
                     _timeseriesValidationFailed(_validateState, results);
+                } else {
+                    auto containsMixedSchemaDataResponse =
+                        coll->doesTimeseriesBucketsDocContainMixedSchemaData(record->data.toBson());
+                    if (!containsMixedSchemaDataResponse.isOK() && !bucketMinMaxMalformedError) {
+                        bucketMinMaxMalformedError = true;
+                        LOGV2_WARNING(8469900,
+                                      "Detected a time-series bucket with malformed min/max values",
+                                      logAttrs(coll->ns()),
+                                      "bucketId"_attr = record->id,
+                                      "error"_attr = containsMixedSchemaDataResponse.getStatus());
+                        results->errors.push_back(
+                            str::stream()
+                            << "Detected a time-series bucket with malformed min/max values");
+                        results->valid = false;
+                    } else if (containsMixedSchemaDataResponse.isOK() &&
+                               containsMixedSchemaDataResponse.getValue()) {
+                        bool mixedSchemaAllowed =
+                            coll->getTimeseriesBucketsMayHaveMixedSchemaData().value_or(true);
+                        if (mixedSchemaAllowed && !bucketMixedSchemaDataWarning) {
+                            bucketMixedSchemaDataWarning = true;
+                            LOGV2_WARNING(8469901,
+                                          "Detected a time-series bucket with mixed schema data",
+                                          logAttrs(coll->ns()),
+                                          "bucketId"_attr = record->id);
+                            results->warnings.push_back(
+                                str::stream()
+                                << "Detected a time-series bucket with mixed schema data");
+                        } else if (!mixedSchemaAllowed && !bucketMixedSchemaDataError) {
+                            bucketMixedSchemaDataError = true;
+                            LOGV2_WARNING(8469902,
+                                          "Detected a time-series bucket with mixed schema data "
+                                          "when timeseriesBucketsMayHaveMixedSchemaData is false. "
+                                          "You can run the collMod command to set this flag",
+                                          logAttrs(coll->ns()),
+                                          "bucketId"_attr = record->id);
+                            results->errors.push_back(
+                                str::stream()
+                                << "Detected a time-series bucket with mixed schema data when "
+                                   "timeseriesBucketsMayHaveMixedSchemaData is false. You can run "
+                                   "the collMod command to set this flag");
+                            results->valid = false;
+                        }
+                    }
                 }
             }
         }
