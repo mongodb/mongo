@@ -25,7 +25,12 @@ const mongosParameters = Object.assign({logComponentVerbosity: tojson({network: 
 var st = new ShardingTest({
     shards: 3,
     mongos: [{setParameter: mongosParameters}],
-    other: {rs: true, rsOptions: {nodes: 2}}
+    other: {
+        rs: true,
+        // Disables elections to avoid secondaries becoming primaries after stepdowns. The test
+        // relies on specific topology changes done explicitly.
+        rsOptions: {nodes: 2, settings: {electionTimeoutMillis: ReplSetTest.kForeverMillis}}
+    },
 });
 
 var mongos = st.s0;
