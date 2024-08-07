@@ -425,7 +425,7 @@ buildvariants:
     name: &rhel8-debug-aubsan-all-feature-flags rhel8-debug-aubsan-all-feature-flags
     display_name: "* Shared Library {A,UB}SAN Enterprise RHEL 8 DEBUG (all feature flags)"
     tags: ["suggested"]
-    cron: "0 4 * * *" # From the ${project_required_suggested_cron} parameter
+    cron: "0 4 1-31/2 * *" # For cost reasons, we run this variant every other day
     run_on:
       - rhel8.8-large
     expansions:
