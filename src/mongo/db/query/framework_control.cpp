@@ -56,39 +56,7 @@ void QueryFrameworkControl::append(OperationContext*,
 }
 
 Status QueryFrameworkControl::setFromString(StringData value, const boost::optional<TenantId>&) {
-    auto newVal =
-        QueryFrameworkControl_parse(IDLParserContext("internalQueryFrameworkControl"), value);
-
-    // To enable Bonsai, the feature flag must be enabled. Here, we return an error to the user if
-    // they try to set the framework control knob to use Bonsai while the feature flag is disabled.
-    //
-    // The feature flag should be initialized by this point because
-    // server_options_detail::applySetParameterOptions(std::map ...)
-    // handles setParameters in alphabetical order, so "feature" comes before "internal".
-
-    switch (newVal) {
-        case QueryFrameworkControlEnum::kForceClassicEngine:
-        case QueryFrameworkControlEnum::kTrySbeEngine:
-        case QueryFrameworkControlEnum::kTrySbeRestricted:
-            break;
-        case QueryFrameworkControlEnum::kTryBonsai:
-            if (feature_flags::gFeatureFlagCommonQueryFramework.isEnabled(
-                    serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
-                break;
-            }
-            return {ErrorCodes::IllegalOperation,
-                    "featureFlagCommonQueryFramework must be enabled to run with tryBonsai"};
-        case QueryFrameworkControlEnum::kTryBonsaiExperimental:
-        case QueryFrameworkControlEnum::kForceBonsai:
-            if (getTestCommandsEnabled()) {
-                break;
-            }
-            return {
-                ErrorCodes::IllegalOperation,
-                "testCommands must be enabled to run with tryBonsaiExperimental or forceBonsai"};
-    }
-
-    _data = std::move(newVal);
+    _data = QueryFrameworkControl_parse(IDLParserContext("internalQueryFrameworkControl"), value);
     return Status::OK();
 }
 

@@ -45,7 +45,6 @@
 #include "mongo/db/pipeline/pipeline.h"
 #include "mongo/db/pipeline/plan_executor_pipeline.h"
 #include "mongo/db/query/canonical_query.h"
-#include "mongo/db/query/cqf_get_executor.h"
 #include "mongo/db/query/multiple_collection_accessor.h"
 #include "mongo/db/query/optimizer/explain_interface.h"
 #include "mongo/db/query/plan_executor.h"

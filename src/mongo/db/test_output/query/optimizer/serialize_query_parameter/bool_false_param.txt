@@ -1,5 +1,0 @@
-# Golden test output of SerializeQueryParameter/BoolFalseParam
-
-==== VARIATION: bool false ====
--- OUTPUT:
-{ 0: { value: "false", type: "Boolean" } }

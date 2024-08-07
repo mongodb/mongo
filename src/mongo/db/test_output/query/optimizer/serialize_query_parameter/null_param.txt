@@ -1,5 +1,0 @@
-# Golden test output of SerializeQueryParameter/NullParam
-
-==== VARIATION: null ====
--- OUTPUT:
-{ 0: { value: "null", type: "Null" } }

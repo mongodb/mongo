@@ -1,5 +1,0 @@
-# Golden test output of SerializeQueryParameter/MultipleParams
-
-==== VARIATION: multiple params ====
--- OUTPUT:
-{ 0: { value: "5", type: "NumberInt32" }, 1: { value: ""hello"", type: "StringSmall" }, 2: { value: "7.5", type: "NumberDouble" }, 3: { value: "{}", type: "Object" } }

@@ -1,5 +1,0 @@
-# Golden test output of SerializeQueryParameter/NothingParam
-
-==== VARIATION: nothing ====
--- OUTPUT:
-{ 0: { value: "Nothing", type: "Nothing" } }

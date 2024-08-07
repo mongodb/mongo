@@ -101,9 +101,6 @@
 #include "mongo/db/query/collation/collation_spec.h"
 #include "mongo/db/query/collation/collator_interface.h"
 #include "mongo/db/query/collection_query_info.h"
-#include "mongo/db/query/cqf_command_utils.h"
-#include "mongo/db/query/cqf_fast_paths.h"
-#include "mongo/db/query/cqf_get_executor.h"
 #include "mongo/db/query/cursor_response.h"
 #include "mongo/db/query/explain.h"
 #include "mongo/db/query/explain_options.h"
@@ -784,7 +781,7 @@ void performValidationChecks(const OperationContext* opCtx,
     aggregation_request_helper::validateRequestFromClusterQueryWithoutShardKey(request);
 }
 
-std::vector<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> createLegacyExecutor(
+std::vector<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> createExecutor(
     std::unique_ptr<Pipeline, PipelineDeleter> pipeline,
     const LiteParsedPipeline& liteParsedPipeline,
     const NamespaceString& nss,
@@ -1568,115 +1565,15 @@ Status _runAggregate(OperationContext* opCtx,
                 .getAsync([](auto) {});
         }
 
-        auto bonsaiEligibility =
-            determineBonsaiEligibility(opCtx, collections.getMainCollection(), request, *pipeline);
-        const bool bonsaiEligible = isEligibleForBonsaiUnderFrameworkControl(
-            expCtx, request.getExplain().has_value(), bonsaiEligibility);
+        execs = createExecutor(std::move(pipeline),
+                               liteParsedPipeline,
+                               nss,
+                               collections,
+                               request,
+                               curOp,
+                               resetContext);
 
-        bool bonsaiExecSuccess = true;
-        if (bonsaiEligible) {
-            uassert(6624344,
-                    "Exchanging is not supported in the Cascades optimizer",
-                    !request.getExchange().has_value());
-            uassert(ErrorCodes::InternalErrorNotSupported,
-                    "runtimeConstants unsupported in CQF",
-                    !request.getLegacyRuntimeConstants());
-            uassert(ErrorCodes::InternalErrorNotSupported,
-                    "$_requestReshardingResumeToken in CQF",
-                    !request.getRequestReshardingResumeToken());
-            uassert(ErrorCodes::InternalErrorNotSupported,
-                    "collation unsupported in CQF",
-                    !request.getCollation() || request.getCollation()->isEmpty() ||
-                        SimpleBSONObjComparator::kInstance.evaluate(*request.getCollation() ==
-                                                                    CollationSpec::kSimpleSpec));
-
-            optimizer::QueryHints queryHints = getHintsFromQueryKnobs();
-            const bool fastIndexNullHandling = queryHints._fastIndexNullHandling;
-            auto timeBegin = Date_t::now();
-            auto maybeExec = [&] {
-                // If the query is eligible for a fast path, use the fast path plan instead of
-                // invoking the optimizer.
-                if (auto fastPathExec = optimizer::fast_path::tryGetSBEExecutorViaFastPath(
-                        opCtx,
-                        expCtx,
-                        nss,
-                        collections,
-                        request.getExplain().has_value(),
-                        request.getHint(),
-                        pipeline.get())) {
-                    return fastPathExec;
-                }
-
-                // Checks that the pipeline is M2/M4-eligible in Bonsai. An eligible pipeline has
-                // (1) a $match first stage, and (2) an optional $project second stage. All other
-                // stages are unsupported.
-                auto fullyEligible = [](auto& sources) {
-                    // Sources cannot contain more than two stages.
-                    if (sources.size() > 2) {
-                        return false;
-                    }
-                    const auto& firstStageItr = sources.begin();
-                    // If optional second stage exists, must be a projection stage.
-                    if (auto secondStageItr = std::next(firstStageItr);
-                        secondStageItr != sources.end()) {
-                        return secondStageItr->get()->getSourceName() ==
-                            DocumentSourceProject::kStageName;
-                    }
-                    return true;
-                };
-
-                if (internalCascadesOptimizerEnableParameterization.load() &&
-                    bonsaiEligibility.isFullyEligible() && pipeline->canParameterize() &&
-                    fullyEligible(pipeline->getSources())) {
-                    pipeline->parameterize();
-                }
-
-                return getSBEExecutorViaCascadesOptimizer(opCtx,
-                                                          expCtx,
-                                                          nss,
-                                                          collections,
-                                                          std::move(queryHints),
-                                                          request.getHint(),
-                                                          bonsaiEligibility,
-                                                          pipeline.get());
-            }();
-            if (maybeExec) {
-                // Pass ownership of the pipeline to the executor. This is done to allow binding of
-                // parameters to use views onto the constants living in the MatchExpression (in the
-                // DocumentSourceMatch in the Pipeline), so we can avoid copying them into the SBE
-                // runtime environment. We must ensure that the MatchExpression lives at least as
-                // long as the executor.
-                execs.emplace_back(uassertStatusOK(makeExecFromParams(
-                    nullptr, std::move(pipeline), collections, std::move(*maybeExec))));
-            } else {
-                // If we had an optimization failure, only error if we're not in tryBonsai.
-                bonsaiExecSuccess = false;
-                auto queryControl =
-                    expCtx->getQueryKnobConfiguration().getInternalQueryFrameworkControlForOp();
-                tassert(7319401,
-                        "Optimization failed either without tryBonsai set, or without a hint.",
-                        queryControl == QueryFrameworkControlEnum::kTryBonsai &&
-                            request.getHint() && !request.getHint()->isEmpty() &&
-                            !fastIndexNullHandling);
-            }
-
-            auto elapsed =
-                (Date_t::now().toMillisSinceEpoch() - timeBegin.toMillisSinceEpoch()) / 1000.0;
-            OPTIMIZER_DEBUG_LOG(
-                6264804, 5, "Cascades optimization time elapsed", "time"_attr = elapsed);
-        }
-
-        if (!bonsaiEligible || !bonsaiExecSuccess) {
-            execs = createLegacyExecutor(std::move(pipeline),
-                                         liteParsedPipeline,
-                                         nss,
-                                         collections,
-                                         request,
-                                         curOp,
-                                         resetContext);
-        }
         tassert(6624353, "No executors", !execs.empty());
-
 
         {
             auto planSummary = execs[0]->getPlanExplainer().getPlanSummary();

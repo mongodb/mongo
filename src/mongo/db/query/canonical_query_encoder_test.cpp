@@ -244,16 +244,6 @@ protected:
             expCtx.get(), pipeline, canonical_query_encoder::Optimizer::kBonsai);
         gctx.outStream() << key << std::endl;
     }
-
-    CanonicalQuery::QueryShapeString encodeBonsai(const char* queryStr) {
-        RAIIServerParameterControllerForTest cqf("featureFlagCommonQueryFramework", "true");
-        RAIIServerParameterControllerForTest tryBonsai("internalQueryFrameworkControl",
-                                                       "tryBonsai");
-        auto cqfQuery = canonicalize(opCtx(), queryStr);
-        cqfQuery->setSbeCompatible(true);
-        return canonical_query_encoder::encodeSBE(*cqfQuery,
-                                                  canonical_query_encoder::Optimizer::kBonsai);
-    }
 };
 
 TEST_F(CanonicalQueryEncoderTest, ComputeKey) {
@@ -794,33 +784,6 @@ TEST_F(CanonicalQueryEncoderTest, EncodeOptimizerType) {
     auto cqfEncoding =
         canonical_query_encoder::encodeSBE(*query, canonical_query_encoder::Optimizer::kBonsai);
     ASSERT_NE(classicEncoding, cqfEncoding);
-}
-
-TEST_F(CanonicalQueryEncoderTest, BonsaiComparisonOperationsEncodeTypes) {
-    ASSERT_NE(encodeBonsai("{a: 1}"), encodeBonsai("{a: 'str'}"));
-    ASSERT_NE(encodeBonsai("{a: {$gt: 1}}"), encodeBonsai("{a: {$gt: 'str'}}"));
-    ASSERT_NE(encodeBonsai("{a: {$gte: 1}}"), encodeBonsai("{a: {$gte: 'str'}}"));
-    ASSERT_NE(encodeBonsai("{a: {$lt: 1}}"), encodeBonsai("{a: {$lt: 'str'}}"));
-    ASSERT_NE(encodeBonsai("{a: {$lte: 1}}"), encodeBonsai("{a: {$lte: 'str'}}"));
-
-    // Different constants of the same canonical BSON type should have the same key.
-    ASSERT_EQ(encodeBonsai("{a: 1}"), encodeBonsai("{a: 5}"));
-    ASSERT_EQ(encodeBonsai("{a: 1}"), encodeBonsai("{a: 5.0}"));
-}
-
-TEST_F(CanonicalQueryEncoderTest, BonsaiInEncoding) {
-    // Single element $in's are translated as $eq's, which means that two single element $in's with
-    // different types shouldn't have the same key.
-    ASSERT_NE(encodeBonsai("{a: {$in: [1]}}"), encodeBonsai("{a: {$in: ['str']}}"));
-    // $in with length 1 is optimized to an $eq. It should have a different key than a $in with an
-    // arbitrary length.
-    ASSERT_NE(encodeBonsai("{a: {$in: [1]}}"), encodeBonsai("{a: {$in: [1, 2]}}"));
-    // $in's with different lengths should have the same key.
-    ASSERT_EQ(encodeBonsai("{a: {$in: [1, 2]}}"), encodeBonsai("{a: {$in: [1, 2, 3]}}"));
-    ASSERT_EQ(encodeBonsai("{a: {$in: [1, 2]}}"),
-              encodeBonsai("{a: {$in: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]}}"));
-    // $in with same length but different types have the same key.
-    ASSERT_EQ(encodeBonsai("{a: {$in: [1, 2]}}"), encodeBonsai("{a: {$in: ['str1', 'str2']}}"));
 }
 
 }  // namespace

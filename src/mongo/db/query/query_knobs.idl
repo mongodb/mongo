@@ -55,14 +55,6 @@ enums:
             kTrySbeRestricted: "trySbeRestricted"
             # Attempt to use SBE for eligible queries, otherwise fallback to the classic engine.
             kTrySbeEngine: "trySbeEngine"
-            # Attempt to use the Bonsai optimizer and lower to SBE for eligible queries, otherwise
-            # fallback to the default framework control.
-            kTryBonsai: "tryBonsai"
-            # Like, "tryBonsai", but additionally includes features that should not be enabled by
-            # default. Falls back to the default framework control for ineligible queries.
-            kTryBonsaiExperimental: "tryBonsaiExperimental"
-            # Force the Bonsai optimizer for all queries.
-            kForceBonsai: "forceBonsai"
 
 structs:
   InternalQueryCutoffForSampleFromRandomCursorStorage:

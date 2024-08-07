@@ -1,7 +1,0 @@
-# Golden test output of FastPathPlanGeneration/EmptyQuery
-
-==== VARIATION: Empty query ====
--- INPUT:
-filter = {}
--- OUTPUT:
-[0] scan s1 none none none none none none none lowPriority [] @"00000000-0000-0000-0000-000000000000" true false 

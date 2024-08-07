@@ -81,9 +81,6 @@ bool QueryKnobConfiguration::canPushDownFullyCompatibleStages() const {
     switch (_queryFrameworkControlValue) {
         case QueryFrameworkControlEnum::kForceClassicEngine:
         case QueryFrameworkControlEnum::kTrySbeRestricted:
-        case QueryFrameworkControlEnum::kTryBonsai:
-        case QueryFrameworkControlEnum::kTryBonsaiExperimental:
-        case QueryFrameworkControlEnum::kForceBonsai:
             return false;
         case QueryFrameworkControlEnum::kTrySbeEngine:
             return true;

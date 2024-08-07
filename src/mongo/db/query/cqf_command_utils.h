@@ -190,46 +190,6 @@ void coutPrint(const std::string& msg, const logv2::detail::NamedArg<Args>&... a
         ::mongo::coutPrint(FMTSTR_MESSAGE, __VA_ARGS__);
 
 /**
- * Determine eligibility of a query independent of the internalQueryFrameworkControl knob.
- */
-BonsaiEligibility determineBonsaiEligibility(OperationContext* opCtx,
-                                             const CollectionPtr& collection,
-                                             const CanonicalQuery& cq);
-
-/**
- * Determine eligibility of a query independent of the internalQueryFrameworkControl knob.
- */
-BonsaiEligibility determineBonsaiEligibility(OperationContext* opCtx,
-                                             const CollectionPtr& collection,
-                                             const AggregateCommandRequest& request,
-                                             const Pipeline& pipeline);
-
-/**
- * Given a query's eligibility, determine whether it should be optimized using Bonsai taking into
- * account the value of internalQueryFrameworkControl knob for the current operation.
- */
-bool isEligibleForBonsaiUnderFrameworkControl(const boost::intrusive_ptr<ExpressionContext>& expCtx,
-                                              bool isExplain,
-                                              BonsaiEligibility eligibility);
-
-/**
- * Returns whether the given query is eligible to use the Bonsai optimizer under the
- * internalQueryFrameworkControl knob for the current operation.
- */
-bool isEligibleForBonsai(OperationContext* opCtx,
-                         const CollectionPtr& collection,
-                         const AggregateCommandRequest& request,
-                         const Pipeline& pipeline);
-
-/**
- * Returns whether the given query is eligible to use the Bonsai optimizer under the
- * internalQueryFrameworkControl knob for the current operation.
- */
-bool isEligibleForBonsai(OperationContext* opCtx,
-                         const CollectionPtr& collection,
-                         const CanonicalQuery& cq);
-
-/**
  * These functions are exposed only for testing; they only perform checks against the query
  * structure. Other callers should use the functions above, which check command and collection
  * options for further details.

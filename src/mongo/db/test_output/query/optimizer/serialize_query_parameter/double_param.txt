@@ -1,5 +1,0 @@
-# Golden test output of SerializeQueryParameter/DoubleParam
-
-==== VARIATION: double ====
--- OUTPUT:
-{ 0: { value: "5.5", type: "NumberDouble" } }

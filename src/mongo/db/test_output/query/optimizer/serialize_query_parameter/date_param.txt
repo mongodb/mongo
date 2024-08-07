@@ -1,5 +1,0 @@
-# Golden test output of SerializeQueryParameter/DateParam
-
-==== VARIATION: date ====
--- OUTPUT:
-{ 0: { value: "-9223372036854775808", type: "Date" } }

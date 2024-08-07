@@ -37,7 +37,6 @@
 #include "mongo/db/query/classic_plan_cache.h"
 #include "mongo/db/query/classic_runtime_planner_for_sbe/classic_runtime_planner_for_sbe_test_util.h"
 #include "mongo/db/query/classic_runtime_planner_for_sbe/planner_interface.h"
-#include "mongo/db/query/cqf_get_executor.h"
 #include "mongo/db/query/index_entry.h"
 #include "mongo/db/query/multiple_collection_accessor.h"
 #include "mongo/db/query/plan_cache_key_factory.h"

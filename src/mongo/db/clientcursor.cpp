@@ -488,8 +488,6 @@ void collectQueryStatsMongod(OperationContext* opCtx,
     if (internalQueryCollectOptimizerMetrics.load()) {
         auto metricType(query_stats::SupplementalMetricType::Unknown);
 
-        const auto frameworkControlKnob =
-            expCtx->getQueryKnobConfiguration().getInternalQueryFrameworkControlForOp();
         switch (opDebug.queryFramework) {
             case PlanExecutor::QueryFramework::kClassicOnly:
             case PlanExecutor::QueryFramework::kClassicHybrid:
@@ -500,15 +498,6 @@ void collectQueryStatsMongod(OperationContext* opCtx,
                 metricType = query_stats::SupplementalMetricType::SBE;
                 break;
             case PlanExecutor::QueryFramework::kCQF:
-                if (frameworkControlKnob == QueryFrameworkControlEnum::kTryBonsai) {
-                    metricType = query_stats::SupplementalMetricType::BonsaiM2;
-                } else if (frameworkControlKnob ==
-                           QueryFrameworkControlEnum::kTryBonsaiExperimental) {
-                    metricType = query_stats::SupplementalMetricType::BonsaiM4;
-                } else if (frameworkControlKnob == QueryFrameworkControlEnum::kForceBonsai) {
-                    metricType = query_stats::SupplementalMetricType::ForceBonsai;
-                }
-                break;
             case PlanExecutor::QueryFramework::kUnknown:
                 break;
         }

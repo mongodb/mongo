@@ -1,5 +1,0 @@
-# Golden test output of SerializeQueryParameter/Int32Param
-
-==== VARIATION: int32 ====
--- OUTPUT:
-{ 0: { value: "5", type: "NumberInt32" } }

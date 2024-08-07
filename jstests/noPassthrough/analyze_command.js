@@ -6,9 +6,6 @@ assert.neq(null, conn, "mongod was unable to start up");
 
 const db = conn.getDB(jsTestName());
 
-assert.commandWorked(
-    db.adminCommand({setParameter: 1, internalQueryFrameworkControl: "tryBonsaiExperimental"}));
-
 const coll = db.cqf_analyze;
 const syscoll = db.system.statistics.cqf_analyze;
 

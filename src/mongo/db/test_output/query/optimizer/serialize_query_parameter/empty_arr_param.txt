@@ -1,5 +1,0 @@
-# Golden test output of SerializeQueryParameter/EmptyArrParam
-
-==== VARIATION: empty arr ====
--- OUTPUT:
-{ 0: { value: "[]", type: "Array" } }

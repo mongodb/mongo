@@ -1,5 +1,0 @@
-# Golden test output of SerializeQueryParameter/MinKeyParam
-
-==== VARIATION: MinKey ====
--- OUTPUT:
-{ 0: { value: "minKey", type: "MinKey" } }

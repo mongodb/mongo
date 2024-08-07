@@ -1,5 +1,0 @@
-# Golden test output of SerializeQueryParameter/EmptyObjParam
-
-==== VARIATION: empty obj ====
--- OUTPUT:
-{ 0: { value: "{}", type: "Object" } }
