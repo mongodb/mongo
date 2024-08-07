@@ -6,6 +6,7 @@
  *    requires_sharding,
  * ]
  */
+import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {
     checkCascadesOptimizerEnabled,
     checkExperimentalCascadesOptimizerEnabled
@@ -267,7 +268,13 @@ function runTests({conn, currentOp, truncatedOps, localOps}) {
                 },
                 command: "distinct",
                 planSummary: "COLLSCAN",
-                queryFramework: sbeEnabled ? "sbe" : "classic",
+                /* Distinct multiplanning does not generate SBE plans, even if the resulting query
+                   solution doesn't contain a DISTINCT_SCAN. */
+                queryFramework:
+                    (!FeatureFlagUtil.isPresentAndEnabled(conn, "ShardFilteringDistinctScan") &&
+                     sbeEnabled)
+                    ? "sbe"
+                    : "classic",
                 currentOpFilter:
                     {"command.query.$comment": "currentop_query", "command.collation.locale": "fr"}
             },

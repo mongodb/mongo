@@ -132,11 +132,7 @@ TEST_F(QueryPlannerDistinctTest, SortCovered) {
     assertNumSolutions(2);
     // Index {x: 1, y: 1} is transformed since it covers the sort.
     assertCandidateExists("{fetch: {node: {distinct: {key: 'y', indexPattern: {x: 1, y: 1}}}}}");
-    // Index {x: 1} is also transformed even though it doesn't contain the distinct field since it
-    // is eligible from the perspective of the function `turnIxscanIntoDistinctScan`, but it won't
-    // be included in the suitable list of indexes by the function `getIndexEntriesForDistinct` of
-    // the class `QueryPlannerParams` before calling the query planner.
-    assertCandidateExists("{fetch: {node: {distinct: {indexPattern: {x: 1}}}}}");
+    assertCandidateExists("{fetch: {node: {ixscan: {pattern: {x: 1}}}}}");
 }
 
 /**

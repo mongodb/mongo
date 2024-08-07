@@ -33,6 +33,7 @@
 #include "mongo/db/index/columns_access_method.h"
 #include "mongo/db/index/multikey_metadata_access_stats.h"
 #include "mongo/db/index/wildcard_access_method.h"
+#include "mongo/db/query/distinct_access.h"
 #include "mongo/db/query/multiple_collection_accessor.h"
 #include "mongo/db/query/planner_ixselect.h"
 #include "mongo/db/query/query_settings/query_settings_gen.h"
@@ -660,35 +661,6 @@ QueryPlannerParams::QueryPlannerParams(QueryPlannerParams::ArgsForDistinct&& dis
         mainCollectionInfo.indexes =
             QueryPlannerIXSelect::findIndexesByHint(hint, mainCollectionInfo.indexes);
     }
-}
-
-bool isAnyComponentOfPathMultikey(const BSONObj& indexKeyPattern,
-                                  bool isMultikey,
-                                  const MultikeyPaths& indexMultikeyInfo,
-                                  StringData path) {
-    if (!isMultikey) {
-        return false;
-    }
-
-    size_t keyPatternFieldIndex = 0;
-    bool found = false;
-    if (indexMultikeyInfo.empty()) {
-        // There is no path-level multikey information available, so we must assume 'path' is
-        // multikey.
-        return true;
-    }
-
-    for (auto&& elt : indexKeyPattern) {
-        if (elt.fieldNameStringData() == path) {
-            found = true;
-            break;
-        }
-        keyPatternFieldIndex++;
-    }
-    invariant(found);
-
-    invariant(indexMultikeyInfo.size() > keyPatternFieldIndex);
-    return !indexMultikeyInfo[keyPatternFieldIndex].empty();
 }
 
 bool shouldWaitForOplogVisibility(OperationContext* opCtx,

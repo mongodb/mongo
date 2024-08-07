@@ -52,6 +52,7 @@
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/index_names.h"
 #include "mongo/db/pipeline/expression_context_for_test.h"
+#include "mongo/db/query/distinct_access.h"
 #include "mongo/db/query/find_command.h"
 #include "mongo/db/query/get_executor.h"
 #include "mongo/db/query/plan_cache/classic_plan_cache.h"

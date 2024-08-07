@@ -185,14 +185,31 @@ std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> createExecutorForDistinctCo
             getExecutorFind(opCtx, collections, std::move(canonicalQuery), yieldPolicy));
     }
 
+    const auto fcvSnapshot = serverGlobalParams.featureCompatibility.acquireFCVSnapshot();
+    bool isDistinctMultiplanningEnabled = feature_flags::gFeatureFlagShardFilteringDistinctScan
+                                              .isEnabledUseLastLTSFCVWhenUninitialized(fcvSnapshot);
+
     // Try creating a plan that does DISTINCT_SCAN.
-    auto swQuerySolution =
-        tryGetQuerySolutionForDistinct(collections, QueryPlannerParams::DEFAULT, *canonicalQuery);
+    auto swQuerySolution = tryGetQuerySolutionForDistinct(
+        collections, QueryPlannerParams::DEFAULT, *canonicalQuery, isDistinctMultiplanningEnabled);
     if (swQuerySolution.isOK()) {
         return uassertStatusOK(getExecutorDistinct(collections,
                                                    QueryPlannerParams::DEFAULT,
                                                    std::move(canonicalQuery),
                                                    std::move(swQuerySolution.getValue())));
+    }
+
+    // TODO SERVER-93059: Investigate whether to keep the projection field of the canonical query
+    // when multiplanning is enabled.
+    if (isDistinctMultiplanningEnabled) {
+        return uassertStatusOK(
+            getExecutorFind(opCtx,
+                            collections,
+                            std::move(canonicalQuery),
+                            yieldPolicy,
+                            // TODO SERVER-93018: Investigate why we prefer a collection scan
+                            // against a GENERATE_COVERED_IXSCANS when no filter is present.
+                            QueryPlannerParams::DEFAULT));
     }
 
     // If there is no DISTINCT_SCAN plan, create whatever non-distinct plan is appropriate, because

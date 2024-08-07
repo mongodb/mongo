@@ -1832,70 +1832,6 @@ bool turnIxscanIntoCount(QuerySolution* soln) {
     return true;
 }
 
-/**
- * Returns true if indices contains an index that can be used with DistinctNode (the "fast distinct
- * hack" node, which can be used only if there is an empty query predicate).  Sets indexOut to the
- * array index of PlannerParams::indices.  Look for the index for the fewest fields.  Criteria for
- * suitable index is that the index should be of type BTREE or HASHED and the index cannot be a
- * partial index.
- *
- * Multikey indices are not suitable for DistinctNode when the projection is on an array element.
- * Arrays are flattened in a multikey index which makes it impossible for the distinct scan stage
- * (plan stage generated from DistinctNode) to select the requested element by array index.
- *
- * Multikey indices cannot be used for the fast distinct hack if the field is dotted.  Currently the
- * solution generated for the distinct hack includes a projection stage and the projection stage
- * cannot be covered with a dotted field.
- */
-bool getDistinctNodeIndex(const std::vector<IndexEntry>& indices,
-                          const std::string& field,
-                          const CollatorInterface* collator,
-                          size_t* indexOut) {
-    invariant(indexOut);
-    int minFields = std::numeric_limits<int>::max();
-    for (size_t i = 0; i < indices.size(); ++i) {
-        // Skip indices with non-matching collator.
-        if (!CollatorInterface::collatorsMatch(indices[i].collator, collator)) {
-            continue;
-        }
-        // Skip partial indices.
-        if (indices[i].filterExpr) {
-            continue;
-        }
-        // Skip indices where the first key is not 'field'.
-        auto firstIndexField = indices[i].keyPattern.firstElement();
-        if (firstIndexField.fieldNameStringData() != StringData(field)) {
-            continue;
-        }
-        // Skip the index if the first key is a "plugin" such as "hashed", "2dsphere", and so on.
-        if (!firstIndexField.isNumber()) {
-            continue;
-        }
-        // Compound hashed indexes can use distinct scan if the first field is 1 or -1. For the
-        // other special indexes, the 1 or -1 index fields may be stored as a function of the data
-        // rather than the raw data itself. Storing f(d) instead of 'd' precludes the distinct_scan
-        // due to the possibility that f(d1) == f(d2).  Therefore, after fetching the base data,
-        // either d1 or d2 would be incorrectly missing from the result set.
-        auto indexPluginName = IndexNames::findPluginName(indices[i].keyPattern);
-        switch (IndexNames::nameToType(indexPluginName)) {
-            case IndexType::INDEX_BTREE:
-            case IndexType::INDEX_HASHED:
-                break;
-            default:
-                // All other index types are not eligible.
-                continue;
-        }
-
-        int nFields = indices[i].keyPattern.nFields();
-        // Pick the index with the lowest number of fields.
-        if (nFields < minFields) {
-            minFields = nFields;
-            *indexOut = i;
-        }
-    }
-    return minFields != std::numeric_limits<int>::max();
-}
-
 }  // namespace
 
 StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorCount(
@@ -2007,84 +1943,11 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorCoun
     return result->runtimePlanner->makeExecutor(std::move(cq));
 }
 
-namespace {
-
-std::unique_ptr<QuerySolution> createDistinctScanSolution(const CanonicalQuery& canonicalQuery,
-                                                          const QueryPlannerParams& plannerParams,
-                                                          bool flipDistinctScanDirection) {
-    const CanonicalDistinct& canonicalDistinct = *canonicalQuery.getDistinct();
-    if (canonicalQuery.getFindCommandRequest().getFilter().isEmpty() &&
-        !canonicalQuery.getSortPattern()) {
-        // If a query has neither a filter nor a sort, the query planner won't attempt to use an
-        // index for it even if the index could provide the distinct semantics on the key from the
-        // 'canonicalDistinct'. So, we create the solution "manually" from a suitable index.
-        // The direction of the index doesn't matter in this case.
-        size_t distinctNodeIndex = 0;
-        auto collator = canonicalQuery.getCollator();
-        if (getDistinctNodeIndex(plannerParams.mainCollectionInfo.indexes,
-                                 canonicalDistinct.getKey(),
-                                 collator,
-                                 &distinctNodeIndex)) {
-            auto dn = std::make_unique<DistinctNode>(
-                plannerParams.mainCollectionInfo.indexes[distinctNodeIndex]);
-            dn->direction = 1;
-            IndexBoundsBuilder::allValuesBounds(
-                dn->index.keyPattern, &dn->bounds, dn->index.collator != nullptr);
-            dn->queryCollator = collator;
-            dn->fieldNo = 0;
-
-            // An index with a non-simple collation requires a FETCH stage.
-            std::unique_ptr<QuerySolutionNode> solnRoot = std::move(dn);
-            if (plannerParams.mainCollectionInfo.indexes[distinctNodeIndex].collator) {
-                if (!solnRoot->fetched()) {
-                    auto fetch = std::make_unique<FetchNode>();
-                    fetch->children.push_back(std::move(solnRoot));
-                    solnRoot = std::move(fetch);
-                }
-            }
-
-            // While on this path there are no sort or filter, the solution still needs to create
-            // the projection and 'analyzeDataAccess()' would do that. NB: whether other aspects of
-            // data access are important, it's hard to say, this code has been like this since long
-            // ago (and it has always passed in new 'QueryPlannerParams').
-            auto soln = QueryPlannerAnalysis::analyzeDataAccess(
-                canonicalQuery,
-                // TODO SERVER-87683 Investigate why empty parameters are used instead of
-                // 'plannerParams'.
-                QueryPlannerParams{QueryPlannerParams::ArgsForTest{}},
-                std::move(solnRoot));
-            uassert(8404000, "Failed to finalize a DISTINCT_SCAN plan", soln);
-            return soln;
-        }
-    } else {
-        // Ask the QueryPlanner for a list of solutions that scan one of the indexes from
-        // 'plannerParams' (i.e., the indexes that include the distinct field). Then try to convert
-        // one of these plans to a DISTINCT_SCAN.
-        auto multiPlanSolns = QueryPlanner::plan(canonicalQuery, plannerParams);
-        if (multiPlanSolns.isOK()) {
-            auto& solutions = multiPlanSolns.getValue();
-            const bool strictDistinctOnly = (plannerParams.mainCollectionInfo.options &
-                                             QueryPlannerParams::STRICT_DISTINCT_ONLY);
-
-            for (size_t i = 0; i < solutions.size(); ++i) {
-                if (turnIxscanIntoDistinctIxscan(solutions[i].get(),
-                                                 canonicalDistinct.getKey(),
-                                                 strictDistinctOnly,
-                                                 flipDistinctScanDirection)) {
-                    // The first suitable distinct scan is as good as any other.
-                    return std::move(solutions[i]);
-                }
-            }
-        }
-    }
-    return nullptr;  // no suitable solution has been found
-}
-}  // namespace
-
 StatusWith<std::unique_ptr<QuerySolution>> tryGetQuerySolutionForDistinct(
     const MultipleCollectionAccessor& collections,
     size_t plannerOptions,
     const CanonicalQuery& canonicalQuery,
+    bool isDistinctMultiplanningEnabled,
     bool flipDistinctScanDirection) {
     tassert(9245500, "Expected distinct property on CanonicalQuery", canonicalQuery.getDistinct());
 
@@ -2110,8 +1973,10 @@ StatusWith<std::unique_ptr<QuerySolution>> tryGetQuerySolutionForDistinct(
         if (plannerParams->mainCollectionInfo.indexes.empty()) {
             return nullptr;
         }
-        return createDistinctScanSolution(
-            canonicalQuery, *plannerParams, flipDistinctScanDirection);
+        return createDistinctScanSolution(canonicalQuery,
+                                          *plannerParams,
+                                          isDistinctMultiplanningEnabled,
+                                          flipDistinctScanDirection);
     };
     auto soln = getQuerySolution(plannerOptions);
     if (!soln) {

@@ -146,6 +146,9 @@ StatusWith<std::unique_ptr<QuerySolution>> tryGetQuerySolutionForDistinct(
     const MultipleCollectionAccessor& collections,
     size_t plannerOptions,
     const CanonicalQuery& canonicalQuery,
+    /* Keep multiplanning configurable for aggregation.
+    TODO SERVER-92615: Refactor it in the aggregation path. */
+    bool allowMultiplanning,
     bool flipDistinctScanDirection = false);
 
 /**

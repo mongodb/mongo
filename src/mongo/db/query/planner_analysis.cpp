@@ -1346,8 +1346,16 @@ std::unique_ptr<QuerySolution> QueryPlannerAnalysis::analyzeDataAccess(
     // data.
 
     // If we're answering a query on a sharded system, we need to drop documents that aren't
-    // logically part of our shard.
-    if (params.mainCollectionInfo.options & QueryPlannerParams::INCLUDE_SHARD_FILTER) {
+    // logically part of our shard. Inserting the sharding filter stage in a canonical query makes
+    // it ineligible to the DISTINCT_SCAN conversion.
+    //
+    // In case of a distinct query for the fallback find we want to avoid inserting a sharding
+    // filter since it would block any potential transition to DISTINCT_SCAN.
+    //
+    // TODO SERVER-92458: Remove the restriction when the distinct conversion can accept a sharding
+    // filter.
+    if (!query.getDistinct() &&
+        (params.mainCollectionInfo.options & QueryPlannerParams::INCLUDE_SHARD_FILTER)) {
         if (!solnRoot->fetched()) {
             // See if we need to fetch information for our shard key.
             // NOTE: Solution nodes only list ordinary, non-transformed index keys for now
@@ -1452,7 +1460,8 @@ std::unique_ptr<QuerySolution> QueryPlannerAnalysis::analyzeDataAccess(
         query.getDistinct()) {
         const bool strictDistinctOnly =
             (params.mainCollectionInfo.options & QueryPlannerParams::STRICT_DISTINCT_ONLY);
-        turnIxscanIntoDistinctIxscan(soln.get(),
+        turnIxscanIntoDistinctIxscan(query,
+                                     soln.get(),
                                      query.getDistinct()->getKey(),
                                      strictDistinctOnly,
                                      params.flipDistinctScanDirection);

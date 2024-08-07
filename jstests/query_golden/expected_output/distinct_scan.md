@@ -10,6 +10,13 @@
 	"rejectedPlans" : [ ],
 	"winningPlan" : [
 		{
+			"stage" : "PROJECTION_SIMPLE",
+			"transformBy" : {
+				"_id" : 0,
+				"a" : 1
+			}
+		},
+		{
 			"direction" : "forward",
 			"stage" : "COLLSCAN"
 		}
@@ -406,6 +413,13 @@
 {
 	"rejectedPlans" : [ ],
 	"winningPlan" : [
+		{
+			"stage" : "PROJECTION_SIMPLE",
+			"transformBy" : {
+				"_id" : 0,
+				"a" : 1
+			}
+		},
 		{
 			"stage" : "FETCH"
 		},

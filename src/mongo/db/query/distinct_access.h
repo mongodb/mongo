@@ -35,6 +35,17 @@
 namespace mongo {
 
 /**
+ * Return whether or not any component of the path 'path' is multikey given an index key pattern
+ * and multikeypaths. If no multikey metdata is available for the index, and the index is marked
+ * multikey, conservatively assumes that a component of 'path' _is_ multikey. The 'isMultikey'
+ * property of an index is false for indexes that definitely have no multikey paths.
+ */
+bool isAnyComponentOfPathMultikey(const BSONObj& indexKeyPattern,
+                                  bool isMultikey,
+                                  const MultikeyPaths& indexMultikeyInfo,
+                                  StringData path);
+
+/**
  * If possible, turn the provided QuerySolution into a QuerySolution that uses a DistinctNode
  * to provide results for the distinct command.
  *
@@ -45,9 +56,22 @@ namespace mongo {
  * If the provided solution could be mutated successfully, returns true, otherwise returns
  * false. This conversion is known as the 'distinct hack'.
  */
-bool turnIxscanIntoDistinctIxscan(QuerySolution* soln,
+bool turnIxscanIntoDistinctIxscan(const CanonicalQuery& canonicalQuery,
+                                  QuerySolution* soln,
                                   const std::string& field,
                                   bool strictDistinctOnly,
                                   bool flipDistinctScanDirection = false);
+
+/**
+ * If the canonical query doesn't have a filter and a sort, the query planner won't try to build an
+ * index scan, so we will try to create a DISTINCT_SCAN manually.
+ *
+ * Othewise, if the distinct multiplanner is disabled, we will return the first query solution that
+ * can be transformed to an DISTINCT_SCAN from the candidates returned by the query planner.
+ */
+std::unique_ptr<QuerySolution> createDistinctScanSolution(const CanonicalQuery& canonicalQuery,
+                                                          const QueryPlannerParams& plannerParams,
+                                                          bool isDistinctMultiplanningEnabled,
+                                                          bool flipDistinctScanDirection);
 
 }  // namespace mongo

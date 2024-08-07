@@ -1158,6 +1158,9 @@ tryPrepareDistinctExecutor(const intrusive_ptr<ExpressionContext>& expCtx,
         tryGetQuerySolutionForDistinct(collections,
                                        plannerOpts | QueryPlannerParams::STRICT_DISTINCT_ONLY,
                                        *cq,
+                                       /* TODO SERVER-92615: Support multiplanning for the distinct
+                                          scan within the aggregation path. */
+                                       false,
                                        flipDistinctScanDirection);
     if (swQuerySolution.isOK()) {
         auto swExecutorGrouped =

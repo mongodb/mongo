@@ -1,6 +1,10 @@
 /**
  * Tests the results and explain for distinct() and aggregation queries which might be able
  * to leverage a DISTINCT_SCAN.
+ *
+ * @tags: [
+ *   featureFlagShardFilteringDistinctScan,
+ * ]
  */
 
 import {
