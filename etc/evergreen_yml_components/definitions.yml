@@ -626,6 +626,7 @@ functions:
   "run clang tidy": &run_clang_tidy
     - *f_expansions_write
     - command: subprocess.exec
+      type: test
       params:
         binary: bash
         add_expansions_to_env: true
