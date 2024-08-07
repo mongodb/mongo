@@ -44,4 +44,4 @@ ls -al $HOME/azure_remote_key
 # This script enables ingress on the Azure Container App instance that we will use to obtain our managed identity token,
 # restrict ingress to the local, publicly-facing IP of the host we are running on, and then output the hostname of the container app into a local file
 # so that it can be dynamically consumed by subsequent test steps (such as get_token.py)
-python src/mongo/db/modules/enterprise/jstests/external_auth_oidc_azure/lib/toggle_ingress.py enable --config_file=$HOME/azure_e2e_config.json --debug | tee $HOME/azure_remote_host
+python src/mongo/db/modules/enterprise/jstests/external_auth_oidc_azure/lib/toggle_ingress.py enable --config_file=$HOME/azure_e2e_config.json --lock_file=/tmp/azure_oidc.lock | tee $HOME/azure_remote_host
