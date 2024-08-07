@@ -1019,7 +1019,7 @@ tasks:
     depends_on:
       - name: version_expansions_gen
         variant: generate-tasks-for-version
-    exec_timeout_secs: 21600 # 6 hours
+    exec_timeout_secs: 32400 # 9 hours
     commands:
       - func: "scons compile"
         vars:
@@ -1034,14 +1034,14 @@ tasks:
         vars:
           suite: unittests_first_quarter
           install_dir: build/install/bin
-          exec_timeout_secs: 21600 # 6 hours
+          exec_timeout_secs: 32400 # 9 hours
 
   - name: compile_and_run_unittests_second_quarter
     tags: ["assigned_to_jira_team_devprod_build", "auxiliary"]
     depends_on:
       - name: version_expansions_gen
         variant: generate-tasks-for-version
-    exec_timeout_secs: 21600 # 6 hours
+    exec_timeout_secs: 32400 # 9 hours
     commands:
       - func: "scons compile"
         vars:
@@ -1056,14 +1056,14 @@ tasks:
         vars:
           suite: unittests_second_quarter
           install_dir: build/install/bin
-          exec_timeout_secs: 21600 # 6 hours
+          exec_timeout_secs: 32400 # 9 hours
 
   - name: compile_and_run_unittests_third_quarter
     tags: ["assigned_to_jira_team_devprod_build", "auxiliary"]
     depends_on:
       - name: version_expansions_gen
         variant: generate-tasks-for-version
-    exec_timeout_secs: 21600 # 6 hours
+    exec_timeout_secs: 32400 # 9 hours
     commands:
       - func: "scons compile"
         vars:
@@ -1078,14 +1078,14 @@ tasks:
         vars:
           suite: unittests_third_quarter
           install_dir: build/install/bin
-          exec_timeout_secs: 21600 # 6 hours
+          exec_timeout_secs: 32400 # 9 hours
 
   - name: compile_and_run_unittests_fourth_quarter
     tags: ["assigned_to_jira_team_devprod_build", "auxiliary"]
     depends_on:
       - name: version_expansions_gen
         variant: generate-tasks-for-version
-    exec_timeout_secs: 21600 # 6 hours
+    exec_timeout_secs: 32400 # 9 hours
     commands:
       - func: "scons compile"
         vars:
@@ -1100,7 +1100,7 @@ tasks:
         vars:
           suite: unittests_fourth_quarter
           install_dir: build/install/bin
-          exec_timeout_secs: 21600 # 6 hours
+          exec_timeout_secs: 32400 # 9 hours
 
   - <<: *compile_unittests
     name: compile_unittests_future_git_tag_multiversion
