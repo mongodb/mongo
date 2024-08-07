@@ -13,6 +13,10 @@ mongo_cc_library(
     ],
     hdrs = [
         "boost_assert_shim.h",
+        "//src/third_party/boost:headers",
+    ],
+    copts = [
+        "-Isrc/third_party/boost",
     ],
 )
 

@@ -267,13 +267,6 @@ if get_option("ssl") == "on":
         )
 
 env.Library(
-    target="linenoise_utf8",
-    source=[
-        "linenoise_utf8.cpp",
-    ],
-)
-
-env.Library(
     target="linenoise",
     source=[
         "linenoise.cpp",
