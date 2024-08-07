@@ -61,12 +61,12 @@ BackupBlock::BackupBlock(OperationContext* opCtx,
       _length(length),
       _fileSize(fileSize),
       _nss(nss),
-      _uuid(uuid) {}
+      _uuid(uuid) {
+    fassert(6355400, _filePath.has_root_directory());
+}
 
 bool BackupBlock::isRequired() const {
-    // Extract the filename from the path.
-    boost::filesystem::path path(_filePath);
-    const std::string filename = path.filename().string();
+    const std::string filename = _filePath.filename().string();
 
     // Check whether this is a required WiredTiger file.
     if (kRequiredWTFiles.find(filename) != kRequiredWTFiles.end()) {
@@ -86,7 +86,7 @@ bool BackupBlock::isRequired() const {
     // All files for the encrypted storage engine are required.
     boost::filesystem::path basePath(storageGlobalParams.dbpath);
     boost::filesystem::path keystoreBasePath(basePath / "key.store");
-    if (StringData(path.string()).startsWith(keystoreBasePath.string())) {
+    if (StringData(_filePath.string()).startsWith(keystoreBasePath.string())) {
         return true;
     }
 

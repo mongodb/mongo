@@ -119,7 +119,7 @@ public:
     bool isEmpty(OperationContext* opCtx) override;
     int64_t numEntries(OperationContext* opCtx) const override;
 
-    static std::string makeKey_ForTest(PathView path, RowId id) {
+    static std::string makeKey_forTest(PathView path, RowId id) {
         return makeKey(path, id);
     }
 

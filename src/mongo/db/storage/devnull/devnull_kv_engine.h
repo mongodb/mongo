@@ -209,5 +209,6 @@ private:
     std::shared_ptr<void> _catalogInfo;
     int _cachePressureForTest;
     std::deque<BackupBlock> _mockBackupBlocks;
+    boost::filesystem::path _engineDbPath;
 };
 }  // namespace mongo

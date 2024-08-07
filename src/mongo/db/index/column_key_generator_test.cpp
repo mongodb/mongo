@@ -92,7 +92,7 @@ private:
     BSONArrayBuilder builder;
 };
 
-enum Flags_ForTest {
+enum Flags_forTest {
     kNoFlags = 0,
     kHasDuplicateFields = 1 << 0,
     kHasSubPath = 1 << 1,
@@ -100,7 +100,7 @@ enum Flags_ForTest {
     kHasDoubleNestedArrays = 1 << 3,
 };
 
-struct UnencodedCellValue_ForTest {
+struct UnencodedCellValue_forTest {
     StringData valsJson;  // Comma-separated values
     std::string arrayInfo;
     int flags = kNoFlags;
@@ -123,7 +123,7 @@ using ProjPairVector = std::vector<std::pair<std::unique_ptr<ColumnKeyGenerator>
 
 void insertTest(int line,
                 const BSONObj& doc,
-                const StringMap<UnencodedCellValue_ForTest>& expected,
+                const StringMap<UnencodedCellValue_forTest>& expected,
                 const ColumnKeyGenerator& keyGen) {
     BSONObj owner;
     std::vector<BSONElement> elems;
@@ -157,7 +157,7 @@ void insertTest(int line,
 
 void insertMultiTest(int line,
                      const BSONObj& doc,
-                     const StringMap<UnencodedCellValue_ForTest>& expected,
+                     const StringMap<UnencodedCellValue_forTest>& expected,
                      const ColumnKeyGenerator& keyGen) {
     // Test with both 1 and 2 records because they use different code paths.
     for (size_t size = 1; size <= 2; size++) {
@@ -212,7 +212,7 @@ void insertMultiTest(int line,
 
 void deleteTest(int line,
                 const BSONObj& doc,
-                const StringMap<UnencodedCellValue_ForTest>& expected,
+                const StringMap<UnencodedCellValue_forTest>& expected,
                 const ColumnKeyGenerator& keyGen) {
     StringSet seenPaths;
     keyGen.visitPathsForDelete(doc, [&](PathView path) {
@@ -234,7 +234,7 @@ void deleteTest(int line,
 
 void updateToEmptyTest(int line,
                        const BSONObj& doc,
-                       const StringMap<UnencodedCellValue_ForTest>& expected,
+                       const StringMap<UnencodedCellValue_forTest>& expected,
                        const ColumnKeyGenerator& keyGen) {
     StringSet seenPaths;
     keyGen.visitDiffForUpdate(
@@ -266,7 +266,7 @@ void updateToEmptyTest(int line,
 
 void updateFromEmptyTest(int line,
                          const BSONObj& doc,
-                         const StringMap<UnencodedCellValue_ForTest>& expected,
+                         const StringMap<UnencodedCellValue_forTest>& expected,
                          const ColumnKeyGenerator& keyGen) {
     BSONObj owner;
     std::vector<BSONElement> elems;
@@ -318,11 +318,11 @@ void updateWithNoChange(int line, const BSONObj& doc, const ColumnKeyGenerator& 
 
 void basicTests(int line,
                 std::string json,
-                const StringMap<UnencodedCellValue_ForTest>& pathMap,
+                const StringMap<UnencodedCellValue_forTest>& pathMap,
                 ProjPairVector expected) {
     const BSONObj doc = fromjson(json);
     for (auto&& [keyGen, expectedPaths] : expected) {
-        StringMap<UnencodedCellValue_ForTest> expected;
+        StringMap<UnencodedCellValue_forTest> expected;
         // Create expected by retrieving flags and vals from expected paths
         for (const auto& path : expectedPaths) {
             expected.insert({path, pathMap.find(path)->second});
@@ -681,7 +681,7 @@ TEST(ColKeyGen, DeepObjectTests) {
     {  // Just object nesting
         std::string obj;
         funcs::addObjToStr(obj, kDepth);
-        StringMap<UnencodedCellValue_ForTest> expected;
+        StringMap<UnencodedCellValue_forTest> expected;
         StringSet expectedPaths;
         for (int i = 1; i < kDepth; i++) {
             expected[funcs::dottedPath(i)] = {"", "", kHasSubPath};
@@ -712,7 +712,7 @@ TEST(ColKeyGen, DeepObjectTests) {
     {  // Innermost array.
         std::string obj;
         funcs::addAlternatingObjToStr(obj, kDepth);
-        StringMap<UnencodedCellValue_ForTest> expected;
+        StringMap<UnencodedCellValue_forTest> expected;
         StringSet expectedPaths;
         constexpr auto kPathLen = kDepth / 2;
         for (int i = 1; i < kPathLen; i++) {
@@ -728,7 +728,7 @@ TEST(ColKeyGen, DeepObjectTests) {
     {  // Innermost object.
         std::string obj;
         funcs::addAlternatingObjToStr(obj, kDepth + 1);
-        StringMap<UnencodedCellValue_ForTest> expected;
+        StringMap<UnencodedCellValue_forTest> expected;
         StringSet expectedPaths;
         constexpr auto kPathLen = kDepth / 2 + 1;
         for (int i = 1; i < kPathLen; i++) {
@@ -991,12 +991,12 @@ void updateTest(
     int line,
     std::string jsonOld,
     std::string jsonNew,
-    StringMap<std::pair<ColumnKeyGenerator::DiffAction, UnencodedCellValue_ForTest>> pathMap,
+    StringMap<std::pair<ColumnKeyGenerator::DiffAction, UnencodedCellValue_forTest>> pathMap,
     ProjPairVector projPairs) {
     BSONObj owner;
     std::vector<BSONElement> elems;
     for (auto&& [keyGen, expectedPaths] : projPairs) {
-        StringMap<std::pair<ColumnKeyGenerator::DiffAction, UnencodedCellValue_ForTest>> expected;
+        StringMap<std::pair<ColumnKeyGenerator::DiffAction, UnencodedCellValue_forTest>> expected;
         for (const auto& path : expectedPaths) {
             expected.insert({path, pathMap.find(path)->second});
         }

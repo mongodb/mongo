@@ -267,7 +267,7 @@ private:
     // Allow MutableReplSetConfig to modify the newlyAdded field.
     friend class MutableReplSetConfig;
 
-    friend void setNewlyAdded_ForTest(MemberConfig*, boost::optional<bool>);
+    friend void setNewlyAdded_forTest(MemberConfig*, boost::optional<bool>);
 
     /**
      * Constructor used by IDL; does not set up tags because we cannot pass TagConfig through IDL.

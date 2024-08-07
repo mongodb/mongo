@@ -67,7 +67,7 @@ public:
     ~BackupBlock() = default;
 
     std::string filePath() const {
-        return _filePath;
+        return _filePath.string();
     }
 
     boost::optional<NamespaceString> ns() const {
@@ -96,7 +96,7 @@ public:
     bool isRequired() const;
 
 private:
-    const std::string _filePath;
+    const boost::filesystem::path _filePath;
     const std::uint64_t _offset;
     const std::uint64_t _length;
     const std::uint64_t _fileSize;

@@ -51,6 +51,7 @@
 #include "mongo/db/storage/recovery_unit.h"
 #include "mongo/db/storage/recovery_unit_noop.h"
 #include "mongo/db/storage/sorted_data_interface.h"
+#include "mongo/db/storage/storage_options.h"
 #include "mongo/stdx/unordered_map.h"
 #include "mongo/util/uuid.h"
 
@@ -303,11 +304,12 @@ public:
     }
 };
 
-DevNullKVEngine::DevNullKVEngine() {
+DevNullKVEngine::DevNullKVEngine() : _engineDbPath(storageGlobalParams.dbpath) {
+    auto testFilePath = _engineDbPath / "testFile.txt";
     _mockBackupBlocks.push_back(BackupBlock(/*opCtx=*/nullptr,
                                             /*nss=*/boost::none,
                                             /*uuid=*/boost::none,
-                                            "filename.wt"));
+                                            /*filePath=*/testFilePath.string()));
 }
 
 DevNullKVEngine::~DevNullKVEngine() = default;
@@ -394,7 +396,8 @@ StatusWith<std::unique_ptr<StorageEngine::StreamingCursor>> DevNullKVEngine::beg
 }
 
 StatusWith<std::deque<std::string>> DevNullKVEngine::extendBackupCursor(OperationContext* opCtx) {
-    std::deque<std::string> filesToCopy = {"journal/WiredTigerLog.999"};
+    std::deque<std::string> filesToCopy = {
+        (_engineDbPath / "journal" / "WiredTigerLog.999").string()};
     return filesToCopy;
 }
 
