@@ -10,9 +10,18 @@ include:
   - filename: etc/evergreen_yml_components/tasks/compile_tasks.yml
   - filename: etc/evergreen_yml_components/tasks/misc_tasks.yml
   - filename: etc/evergreen_yml_components/variants/misc/task_generation.yml
-  - filename: etc/system_perf_yml_components/tasks.yml
-  - filename: etc/system_perf_yml_components/variants.yml
-  - filename: etc/system_perf_yml_components/variants_branching.yml
+  # lint_yaml trim start
+  #
+  # The lines below are trimmed by yamllinters.sh so that `evergreen evaluate` works on this file.
+  # This allows us to test that non-dsi imports continue to work.
+  #
+  - filename: evergreen/system_perf/master/variants.yml
+    module: dsi
+  - filename: evergreen/system_perf/master/master_variants.yml
+    module: dsi
+  - filename: evergreen/system_perf/shared_tasks.yml
+    module: dsi
+  # lint_yaml trim end
 
 ## Parameters for parameterized builds (see https://github.com/evergreen-ci/evergreen/wiki/Parameterized-Builds)
 parameters:
@@ -142,35 +151,7 @@ timeout:
 ###
 
 functions:
-  ###
-  # Same in every DSI project
-  f_dsi_pre_run:
-    - command: manifest.load
-  f_dsi_post_run:
-    - command: shell.exec
-      params:
-        script: ./src/dsi/run-dsi post_run
-    - command: perf.send
-      params:
-        file: ./build/CedarReports/cedar_report.json
-        aws_key: ${terraform_key}
-        aws_secret: ${terraform_secret}
-        bucket: genny-metrics
-        region: us-east-1
-        prefix: ${task_id}_${execution}
-    - command: attach.results
-      params:
-        file_location: ./build/EvergreenResultsJson/results.json
-    - command: s3.put
-      params:
-        aws_key: ${aws_key}
-        aws_secret: ${aws_secret}
-        local_file: ./build/Artifacts/DSIArtifacts.tgz
-        remote_file: ${project_dir}/${build_variant}/${revision}/${task_id}/${version_id}/logs/dsi-artifacts-${task_name}-${build_id}-${execution}.tgz
-        bucket: mciuploads
-        permissions: public-read
-        content_type: application/x-gzip
-        display_name: DSI Artifacts - Execution ${execution}
+  f_other_post_ops:
     - command: shell.exec
       params:
         script: |
@@ -185,33 +166,6 @@ functions:
         permissions: public-read
         content_type: application/x-gzip
         display_name: PGO profile data - Execution ${execution}
-    - command: s3.put
-      params:
-        aws_key: ${aws_key}
-        aws_secret: ${aws_secret}
-        local_file: ./build/Documentation/index.html
-        remote_file: ${project_dir}/${build_variant}/${revision}/${task_id}/${version_id}/logs/${task_name}-${build_id}-index.html
-        bucket: mciuploads
-        permissions: public-read
-        content_type: text/html
-        display_name: Documentation
-    - command: s3.put
-      params:
-        aws_key: ${aws_key}
-        aws_secret: ${aws_secret}
-        local_file: bootstrap.yml
-        remote_file: ${project_dir}/${build_variant}/${revision}/${task_id}/${version_id}/bootstrap-${task_name}-${build_id}-${execution}.yml
-        bucket: mciuploads
-        permissions: public-read
-        content_type: text/plain
-        display_name: Task Bootstrap Config
-  f_dsi_timeout:
-    - command: shell.exec
-      params:
-        script: ./src/dsi/run-dsi on_timeout
-  ###
-
-  f_other_post_ops:
     - command: shell.exec
       params:
         working_dir: src
@@ -236,43 +190,6 @@ functions:
     # Can't be empty so just `echo`.
     - command: shell.exec
       params: {script: "echo"}
-
-  f_generate_all_variant_auto_tasks:
-    - command: git.get_project
-      params:
-        directory: *src_dir
-        revisions:
-          dsi: ${dsi_rev}
-          genny: ${genny_rev}
-          linkbench: ${linkbench_rev}
-          linkbench2: ${linkbench2_rev}
-          tsbs: ${tsbs_rev}
-          workloads: ${workloads_rev}
-          mongo-perf: ${mongo-perf_rev}
-          YCSB: ${YCSB_rev}
-          py-tpcc: ${py-tpcc_rev}
-          PrivateWorkloads: ${PrivateWorkloads_rev}
-    - command: expansions.write
-      params:
-        file: ./expansions.yml
-    - command: shell.exec
-      params:
-        # The script below makes sure that if we generate all tasks in a patch, we will only generate
-        # them and not run all of them, since activating all tasks is the default behavior for task
-        # generation in a patch.
-        script: |
-          pushd ./src/mongo
-          ~/evergreen evaluate ./etc/system_perf.yml > evaluated_project_configuration.yml
-          popd
-          if [ "${is_patch|false}" = "true" ]; then
-            ./src/genny/run-genny auto-tasks-all --project-file ./src/mongo/evaluated_project_configuration.yml --no-activate
-          else
-            ./src/genny/run-genny auto-tasks-all --project-file ./src/mongo/evaluated_project_configuration.yml
-          fi
-    - command: generate.tasks
-      params:
-        files:
-          - build/TaskJSON/Tasks.json
 
   ###
   # Package the supplementary DSI data (mongo tools, feature flag list,
@@ -472,17 +389,6 @@ tasks:
       - func: "upload supplementary data"
 
 buildvariants:
-  - name: task_generation
-    display_name: " * Task Generation"
-    cron: "0 0 1 1 *" # Every year starting 1/1 at 00:00
-    modules: *modules
-    run_on:
-      - amazon2-build
-    tasks:
-      - name: generate_all_variant_auto_tasks
-        activate: true
-      - name: schedule_global_auto_tasks
-
   - name: amazon2-x86-compile
     display_name: "* Compile for Amazon Linux 2 x86"
     expansions:
