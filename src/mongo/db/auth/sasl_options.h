@@ -54,45 +54,45 @@ struct SASLGlobalParams {
     std::string hostName;
     std::string serviceName;
     std::string authdPath;
-    AtomicWord<int> scramSHA1IterationCount;
-    AtomicWord<int> scramSHA256IterationCount;
-    AtomicWord<int> authFailedDelay;
+    Atomic<int> scramSHA1IterationCount;
+    Atomic<int> scramSHA256IterationCount;
+    Atomic<int> authFailedDelay;
 
     SASLGlobalParams();
 
     static Status onSetAuthenticationMechanism(const std::vector<std::string>&) {
-        saslGlobalParams.numTimesAuthenticationMechanismsSet++;
+        saslGlobalParams.numTimesAuthenticationMechanismsSet.fetchAndAdd(1);
         return Status::OK();
     }
 
     static Status onSetHostName(const std::string&) {
-        saslGlobalParams.haveHostName = true;
+        saslGlobalParams.haveHostName.store(true);
         return Status::OK();
     }
     static Status onSetServiceName(const std::string&) {
-        saslGlobalParams.haveServiceName = true;
+        saslGlobalParams.haveServiceName.store(true);
         return Status::OK();
     }
     static Status onSetAuthdPath(const std::string&) {
-        saslGlobalParams.haveAuthdPath = true;
+        saslGlobalParams.haveAuthdPath.store(true);
         return Status::OK();
     }
     static Status onSetScramSHA1IterationCount(const int) {
-        saslGlobalParams.numTimesScramSHA1IterationCountSet++;
+        saslGlobalParams.numTimesScramSHA1IterationCountSet.fetchAndAdd(1);
         return Status::OK();
     }
     static Status onSetScramSHA256IterationCount(const int) {
-        saslGlobalParams.numTimesScramSHA256IterationCountSet++;
+        saslGlobalParams.numTimesScramSHA256IterationCountSet.fetchAndAdd(1);
         return Status::OK();
     }
 
 
-    int numTimesAuthenticationMechanismsSet = 0;
-    bool haveHostName = false;
-    bool haveServiceName = false;
-    bool haveAuthdPath = false;
-    int numTimesScramSHA1IterationCountSet = 0;
-    int numTimesScramSHA256IterationCountSet = 0;
+    Atomic<int> numTimesAuthenticationMechanismsSet;
+    Atomic<bool> haveHostName;
+    Atomic<bool> haveServiceName;
+    Atomic<bool> haveAuthdPath;
+    Atomic<int> numTimesScramSHA1IterationCountSet;
+    Atomic<int> numTimesScramSHA256IterationCountSet;
 };
 
 Status addSASLOptions(moe::OptionSection* options);

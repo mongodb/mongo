@@ -44,6 +44,12 @@ SASLGlobalParams saslGlobalParams;
 SASLGlobalParams::SASLGlobalParams() {
     scramSHA1IterationCount.store(kScramIterationCountDefault);
     scramSHA256IterationCount.store(kScramSHA256IterationCountDefault);
+    numTimesAuthenticationMechanismsSet.store(0);
+    haveHostName.store(false);
+    haveServiceName.store(false);
+    haveAuthdPath.store(false);
+    numTimesScramSHA1IterationCountSet.store(0);
+    numTimesScramSHA256IterationCountSet.store(0);
     authenticationMechanisms = kDefaultAuthenticationMechanisms;
 
     // Default value for auth failed delay
