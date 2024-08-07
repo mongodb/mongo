@@ -173,6 +173,11 @@ selector:
     # moveChunk can be blocked by multi updates causing these tests to not be able to transition to dedicated.
     - jstests/core/index/geo/geo_update_btree.js
     - jstests/core/write/delete/removec.js
+    # Exclude tests that run cleanupOrphaned, which can fail running on a config shard if a
+    # concurrent migration fails due to the config shard transitioning to dedicated.
+    - jstests/core/administrative/cleanup_orphaned.js
+    - jstests/core/views/views_all_commands.js
+    - jstests/core/commands_namespace_parsing.js
 
   exclude_with_any_tags:
     - assumes_standalone_mongod

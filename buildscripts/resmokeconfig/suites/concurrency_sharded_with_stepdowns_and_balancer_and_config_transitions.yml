@@ -139,6 +139,10 @@ selector:
     # to finish. This can cause the CheckMetadataConsistency hook to hit LockBusy errors.
     - jstests/concurrency/fsm_workloads/timeseries_insert_idle_bucket_expiration.js
 
+    # Exclude tests that run cleanupOrphaned, which can fail running on a config shard if a
+    # concurrent migration fails due to the config shard transitioning to dedicated.
+    - jstests/concurrency/fsm_workloads/cleanupOrphanedWhileMigrating.js
+
   exclude_with_any_tags:
     - assumes_against_mongod_not_mongos
     - assumes_balancer_off

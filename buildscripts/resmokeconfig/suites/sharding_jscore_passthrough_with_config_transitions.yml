@@ -74,6 +74,12 @@ selector:
     # TODO (SERVER-90646): Re-enable background_unique_indexes.js in config transition suites.
     - jstests/core/ddl/background_unique_indexes.js
 
+    # Exclude tests that run cleanupOrphaned, which can fail running on a config shard if a
+    # concurrent migration fails due to the config shard transitioning to dedicated.
+    - jstests/core/administrative/cleanup_orphaned.js
+    - jstests/core/views/views_all_commands.js
+    - jstests/core/commands_namespace_parsing.js
+
   exclude_with_any_tags:
     - assumes_standalone_mongod
     - assumes_against_mongod_not_mongos
