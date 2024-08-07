@@ -668,6 +668,11 @@ void ProcessInfo::getExtraInfo(BSONObjBuilder& info) {
 
     appendNumber("voluntary_context_switches", ru.ru_nvcsw);
     appendNumber("involuntary_context_switches", ru.ru_nivcsw);
+
+    LinuxProc p(_pid);
+
+    // Append the number of thread in use
+    appendNumber("threads", p._nlwp);
 }
 
 /**
