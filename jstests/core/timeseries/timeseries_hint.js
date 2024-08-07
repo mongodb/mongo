@@ -14,6 +14,7 @@
  * ]
  */
 import {getAggPlanStage} from "jstests/libs/analyze_plan.js";
+import {exhaustFindCursorAndReturnResults} from "jstests/libs/find_cmd_util.js";
 
 const coll = db.timeseries_hint;
 coll.drop();
@@ -33,8 +34,16 @@ const docsDesc = docsAsc.slice().reverse();
 assert.commandWorked(coll.insert(docsAsc));
 
 function runTest({command, expectedResult, expectedDirection}) {
-    const result = assert.commandWorked(db.runCommand(command));
-    assert.docEq(expectedResult, result.cursor.firstBatch);
+    if (command.cursor) {
+        const result = assert.commandWorked(db.runCommand(command));
+        assert.docEq(expectedResult, result.cursor.firstBatch);
+    } else {
+        // Exhaust the cursor when the cursor/batch size isn't specified to ensure that we return
+        // all results even if the value of internalQueryFindCommandBatchSize is less than the
+        // result size.
+        const result = exhaustFindCursorAndReturnResults(db, command);
+        assert.docEq(expectedResult, result);
+    }
 
     const plan = db.runCommand({explain: command});
     const scan = getAggPlanStage(plan, 'COLLSCAN');
