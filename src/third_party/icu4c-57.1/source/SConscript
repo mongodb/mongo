@@ -14,7 +14,6 @@ env.Append(
         ('UCONFIG_NO_TRANSLITERATION', 1),
         ('UCONFIG_NO_REGULAR_EXPRESSIONS', 1),
         ('U_CHARSET_IS_UTF8', 1),
-        ('U_DISABLE_RENAMING', 1),
         ('U_STATIC_IMPLEMENTATION', 1),
         ('U_USING_ICU_NAMESPACE', 0),
     ], )
