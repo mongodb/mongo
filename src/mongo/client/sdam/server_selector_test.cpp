@@ -459,6 +459,50 @@ TEST_F(ServerSelectorTestFixture, ShouldNotSelectWhenPrimaryExcludedAndPrimaryOn
     ASSERT_FALSE(frequencyInfo[HostAndPort("s1")]);
 }
 
+TEST_F(ServerSelectorTestFixture, ShouldOnlyChooseSecondaryWithHighLatencyPrimary) {
+    TopologyStateMachine stateMachine(sdamConfiguration);
+    auto topologyDescription = std::make_shared<TopologyDescription>(sdamConfiguration);
+
+    const auto s0 = ServerDescriptionBuilder()
+                        .withAddress(HostAndPort("s0"))
+                        .withType(ServerType::kRSPrimary)
+                        .withLastUpdateTime(Date_t::now())
+                        .withLastWriteDate(Date_t::now())
+                        .withRtt(Milliseconds{1000000})
+                        .withSetName("set")
+                        .withHost(HostAndPort("s0"))
+                        .withHost(HostAndPort("s1"))
+                        .withMinWireVersion(WireVersion::SUPPORTS_OP_MSG)
+                        .withMaxWireVersion(WireVersion::LATEST_WIRE_VERSION)
+                        .withElectionId(kOidOne)
+                        .withSetVersion(100)
+                        .instance();
+    stateMachine.onServerDescription(*topologyDescription, s0);
+
+    const auto s1 = ServerDescriptionBuilder()
+                        .withAddress(HostAndPort("s1"))
+                        .withType(ServerType::kRSSecondary)
+                        .withRtt(Milliseconds{10})
+                        .withSetName("set")
+                        .withMinWireVersion(WireVersion::SUPPORTS_OP_MSG)
+                        .withMaxWireVersion(WireVersion::LATEST_WIRE_VERSION)
+                        .withLastUpdateTime(Date_t::now())
+                        .withLastWriteDate(Date_t::now())
+                        .withElectionId(kOidOne)
+                        .withSetVersion(100)
+                        .instance();
+    stateMachine.onServerDescription(*topologyDescription, s1);
+
+    auto excludedHosts = std::vector<HostAndPort>();
+    auto server = selector.selectServers(
+        topologyDescription, ReadPreferenceSetting(ReadPreference::Nearest), excludedHosts);
+
+    // Should only select secondary since primary had too much network lag.
+    ASSERT_TRUE(server && !(*server).empty());
+    ASSERT_EQ((*server).size(), 1);
+    ASSERT_EQ((*server)[0]->getType(), ServerType::kRSSecondary);
+}
+
 TEST_F(ServerSelectorTestFixture, ShouldFilterByLastWriteTime) {
     TopologyStateMachine stateMachine(sdamConfiguration);
     auto topologyDescription = std::make_shared<TopologyDescription>(sdamConfiguration);
