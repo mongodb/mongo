@@ -57,3 +57,33 @@ mongo_cc_library(
         "//conditions:default": [],
     }),
 )
+
+mongo_cc_library(
+    name = "winutil",
+    srcs = [
+        "winutil.cpp",
+    ],
+    hdrs = [
+        "//src/mongo/base:error_codes_header",
+        "//src/mongo/base:error_extra_info.h",
+        "//src/mongo/base:static_assert.h",
+        "//src/mongo/base:status.h",
+        "//src/mongo/base:status_with.h",
+        "//src/mongo/base:string_data.h",
+        "//src/mongo/bson/util:builder_fwd.h",
+        "//src/mongo/platform:atomic.h",
+        "//src/mongo/platform:atomic_word.h",
+        "//src/mongo/platform:compiler.h",
+        "//src/mongo/platform:compiler_msvc.h",
+        "//src/mongo/stdx:type_traits.h",
+        "//src/mongo/unittest:stringify.h",
+        "//src/mongo/util:assert_util_core.h",
+        "//src/mongo/util:ctype.h",
+        "//src/mongo/util:debug_util.h",
+        "//src/mongo/util:intrusive_counter.h",
+        "//src/mongo/util:optional_util.h",
+        "//src/mongo/util:static_immortal.h",
+        "//src/mongo/util:text.h",
+        "//src/mongo/util:winutil.h",
+    ],
+)

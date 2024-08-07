@@ -445,13 +445,6 @@ else:
     )
 
 env.Library(
-    target="winutil",
-    source=[
-        "winutil.cpp",
-    ],
-)
-
-env.Library(
     target="ntservice",
     source=[
         "ntservice.cpp",
