@@ -606,6 +606,10 @@ public:
         void explain(OperationContext* opCtx,
                      ExplainOptions::Verbosity verbosity,
                      rpc::ReplyBuilderInterface* result) override {
+            // Start the query planning timer right after parsing. In explain, there's only ever
+            // one sub-operation, so we won't create nested CurOps.
+            CurOp::get(opCtx)->beginQueryPlanningTimer();
+
             uassert(ErrorCodes::InvalidLength,
                     "explained write batches must be of size 1",
                     request().getUpdates().size() == 1);
@@ -777,6 +781,10 @@ public:
         void explain(OperationContext* opCtx,
                      ExplainOptions::Verbosity verbosity,
                      rpc::ReplyBuilderInterface* result) override {
+            // Start the query planning timer right after parsing. In explain, there's only ever
+            // one sub-operation, so we won't create nested CurOps.
+            CurOp::get(opCtx)->beginQueryPlanningTimer();
+
             uassert(ErrorCodes::InvalidLength,
                     "explained write batches must be of size 1",
                     request().getDeletes().size() == 1);

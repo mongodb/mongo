@@ -1097,6 +1097,9 @@ bool handleDeleteOp(OperationContext* opCtx,
         // Initialize curOp information.
         setCurOpInfoAndEnsureStarted(opCtx, &curOp, LogicalOp::opDelete, nsEntry, op->toBSON());
 
+        // Begin query planning timing once we have the nested CurOp.
+        CurOp::get(opCtx)->beginQueryPlanningTimer();
+
         auto deleteRequest = bulk_write_common::makeDeleteRequestFromDeleteOp(
             opCtx, nsEntry, op, stmtId, req.getLet());
 
@@ -1402,6 +1405,10 @@ public:
             const auto& req = request();
             const auto& ops = req.getOps();
 
+            // Start the query planning timer right after parsing. In explain, there's only ever
+            // one sub-operation, so we won't create nested CurOps.
+            CurOp::get(opCtx)->beginQueryPlanningTimer();
+
             uassert(ErrorCodes::InvalidLength,
                     "explained bulkWrite ops must be of size 1",
                     ops.size() == 1);
@@ -1671,6 +1678,9 @@ bool handleUpdateOp(OperationContext* opCtx,
 
         // Initialize curOp information.
         setCurOpInfoAndEnsureStarted(opCtx, &curOp, LogicalOp::opUpdate, nsEntry, op->toBSON());
+
+        // Begin query planning timing once we have the nested CurOp.
+        CurOp::get(opCtx)->beginQueryPlanningTimer();
 
         // Handle non-retryable normal and timeseries updates, as well as retryable normal
         // updates that were not already executed.

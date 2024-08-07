@@ -136,6 +136,9 @@ CanonicalDistinct parseDistinctCmd(OperationContext* opCtx,
         IDLParserContext("distinctCommandRequest", vts, nss.tenantId(), serializationContext),
         cmdObj));
 
+    // Start the query planning timer right after parsing.
+    CurOp::get(opCtx)->beginQueryPlanningTimer();
+
     // Forbid users from passing 'querySettings' explicitly.
     uassert(7923000,
             "BSON field 'querySettings' is an unknown field",
@@ -323,8 +326,6 @@ public:
 
         auto canonicalDistinct = parseDistinctCmd(
             opCtx, nss, cmdObj, ExtensionsCallbackReal(opCtx, &nss), defaultCollator, verbosity);
-
-        CurOp::get(opCtx)->beginQueryPlanningTimer();
 
         if (collectionOrView->isView()) {
             // Relinquish locks. The aggregation command will re-acquire them.

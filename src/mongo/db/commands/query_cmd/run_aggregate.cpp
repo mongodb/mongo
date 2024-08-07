@@ -1485,6 +1485,9 @@ Status _runAggregate(OperationContext* opCtx,
                                                origRequest);
         expCtx = pipeline->getContext();
 
+        // Start the query planning timer right after parsing.
+        CurOp::get(opCtx)->beginQueryPlanningTimer();
+
         if (expCtx->hasServerSideJs.accumulator && _samplerAccumulatorJs.tick()) {
             LOGV2_WARNING(
                 8996502,
@@ -1504,8 +1507,6 @@ Status _runAggregate(OperationContext* opCtx,
                 "Manually setting 'runtimeConstants' is not supported. Use 'let' for user-defined "
                 "constants.",
                 expCtx->fromMongos || !request.getLegacyRuntimeConstants());
-
-        CurOp::get(opCtx)->beginQueryPlanningTimer();
 
         // This prevents opening a new change stream in the critical section of a serverless shard
         // split or merge operation to prevent resuming on the recipient with a resume token higher
