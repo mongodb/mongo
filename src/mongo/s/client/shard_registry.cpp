@@ -447,7 +447,7 @@ void ShardRegistry::updateReplSetHosts(const ConnectionString& givenConnString,
             _configShardData = newData;
         }
 
-        LOGV2_DEBUG(9112106,
+        LOGV2_DEBUG(9310104,
                     2,
                     "Forcing a reload after receiving updated connection string",
                     "newConnString"_attr = newConnString);
@@ -589,7 +589,7 @@ SharedSemiFuture<ShardRegistry::Cache::ValueHandle> ShardRegistry::_getDataAsync
 
 void ShardRegistry::_updateTimeInStore(bool forceReload) {
     auto newTime = forceReload ? Time::makeForForcedReload() : Time::makeLatestKnown(_service);
-    LOGV2_DEBUG(9112105,
+    LOGV2_DEBUG(9310103,
                 2,
                 "Advancing ShardRegistry timeInStore",
                 "forceReload"_attr = forceReload,
@@ -657,7 +657,7 @@ void ShardRegistry::_scheduleLookupIfRequired() {
         .ignoreValue()
         .getAsync([](const Status& status) {
             if (!status.isOK()) {
-                LOGV2(9112102, "Error during scheduled lookup", "error"_attr = redact(status));
+                LOGV2(9310100, "Error during scheduled lookup", "error"_attr = redact(status));
             }
         });
 }
@@ -771,7 +771,7 @@ std::pair<ShardRegistryData, ShardRegistryData::ShardMap> ShardRegistryData::mer
         }
     }
 
-    LOGV2_DEBUG(9112103,
+    LOGV2_DEBUG(9310101,
                 2,
                 "Merge ShardRegistryData",
                 "cached"_attr = alreadyCachedData.toBSON(),
@@ -785,7 +785,7 @@ ShardRegistryData ShardRegistryData::createFromExisting(const ShardRegistryData&
                                                         ShardFactory* shardFactory) {
     ShardRegistryData data(existingData);
 
-    LOGV2_DEBUG(9112104,
+    LOGV2_DEBUG(9310102,
                 2,
                 "ShardRegistryData::createFromExisting",
                 "existing"_attr = existingData.toBSON(),
