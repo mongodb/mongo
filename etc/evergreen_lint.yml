@@ -70,6 +70,9 @@ rules:
           - assigned_to_jira_team_server_servicearch
           - assigned_to_jira_team_server_execution
           - assigned_to_jira_team_server_storage_engines
+          - assigned_to_jira_team_server_programmability
+          - assigned_to_jira_team_server_workload_scheduling
+          - assigned_to_jira_team_server_networking_and_observability
 
           # https://github.com/10gen/mothra/blob/main/mothra/teams/rnd_dev_prod.yaml
           - assigned_to_jira_team_devprod_build
