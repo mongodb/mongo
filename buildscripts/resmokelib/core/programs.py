@@ -50,7 +50,7 @@ def get_binary_version(executable):
     # pylint: disable=wrong-import-position
     from buildscripts.resmokelib.multiversionconstants import LATEST_FCV
 
-    split_executable = executable.split("-")
+    split_executable = os.path.basename(executable).split("-")
     version_regex = re.compile(version.VERSION_PATTERN, re.VERBOSE | re.IGNORECASE)
     if len(split_executable) > 1 and version_regex.match(split_executable[-1]):
         return split_executable[-1]
