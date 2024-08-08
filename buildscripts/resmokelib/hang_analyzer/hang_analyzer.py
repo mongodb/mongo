@@ -120,17 +120,18 @@ class HangAnalyzer(Subcommand):
                 quit_processes: list[psutil.Process] = []
                 for pinfo in take_core_processes:
                     for pid in pinfo.pidv:
-                        # The mongo signal processing thread needs to be resumed to handle the SIGQUIT.
+                        # The mongo signal processing thread needs to be resumed to handle the SIGABRT.
                         quit_process = psutil.Process(pid)
                         process.resume_process(self.root_logger, pinfo.name, pid)
                         self.root_logger.info(
                             "Process %d may be running a sanitizer which uses a large amount of virtual memory.",
                             pid)
                         self.root_logger.info(
-                            "Sending SIGQUIT to capture a more manageable sized core dump")
-                        process.quit_process(self.root_logger, pinfo.name, pid)
+                            "Attempting to send SIGABRT from resmoke to capture a more manageable sized core dump"
+                        )
+                        process.signal_process(self.root_logger, pid, signal.SIGABRT)
                         quit_processes.append(quit_process)
-                self.root_logger.info("Waiting for all processes to end after SIGQUIT")
+                self.root_logger.info("Waiting for all processes to end after SIGABRT")
                 assert isinstance(dumpers.dbg, dumper.GDBDumper)
                 timeout = dumpers.dbg.get_timeout_secs()
                 start_time = time.time()
@@ -152,7 +153,7 @@ class HangAnalyzer(Subcommand):
 
                     if time.time() - start_time > timeout:
                         raise RuntimeError(
-                            f"The following processes took too long to end after SIGQUIT: {alive_processes}"
+                            f"The following processes took too long to end after SIGABRT: {alive_processes}"
                         )
 
                     time.sleep(.1)
