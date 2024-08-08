@@ -34,11 +34,15 @@
 #include "mongo/db/pipeline/aggregation_context_fixture.h"
 #include "mongo/db/pipeline/document_source_rank_fusion.h"
 #include "mongo/db/pipeline/pipeline.h"
+#include "mongo/util/assert_util.h"
 
 namespace mongo {
 namespace {
 
 using DocumentSourceRankFusionTest = AggregationContextFixture;
+
+// TODO SERVER-92213: Adapt all the tests that "ASSERT_DOES_NOT_THROW" to confirm that the desugared
+// pipeline returns the correct list of stages when the $rankFusion implementation is complete.
 
 TEST_F(DocumentSourceRankFusionTest, ErrorsIfNoInputsField) {
     auto spec = fromjson(R"({
@@ -104,8 +108,6 @@ TEST_F(DocumentSourceRankFusionTest, ErrorsIfMissingPipeline) {
                        ErrorCodes::IDLFailedToParse);
 }
 
-// TODO SERVER-92213: Remove this test or adapt it to test the stage functionality when $rankFusion
-// implementation is complete.
 TEST_F(DocumentSourceRankFusionTest, CheckOnePipelineAllowed) {
     auto spec = fromjson(R"({
         $rankFusion: {
@@ -124,58 +126,14 @@ TEST_F(DocumentSourceRankFusionTest, CheckOnePipelineAllowed) {
         DocumentSourceRankFusion::createFromBson(spec.firstElement(), getExpCtx()));
 }
 
-// TODO SERVER-92213: Remove this test or adapt it to test the stage functionality when $rankFusion
-// implementation is complete.
-TEST_F(DocumentSourceRankFusionTest, CheckMultiplePipelinesAllowed) {
-    auto spec = fromjson(R"({
-        $rankFusion: {
-            inputs: [
-               {
-                pipeline: [
-                    { $match : { author : "dave" } }
-                ]
-               },
-               {
-                pipeline: [
-                    {
-                        $search: {
-                            index: "search_index",
-                            text: {
-                                query: "coffee",
-                                path: "flavors"
-                            }
-                        }
-                    }
-                ]
-               }, 
-               {
-                pipeline: [
-                    {
-                        $vectorSearch: {
-                            queryVector: [1.0, 2.0, 3.0],
-                            path: "plot_embedding",
-                            numCandidates: 300,
-                            index: "vector_index",
-                            limit: 10
-                        }
-                    }
-                ]
-               }
-            ]
-        }
-    })");
-
-    ASSERT_DOES_NOT_THROW(
-        DocumentSourceRankFusion::createFromBson(spec.firstElement(), getExpCtx()));
-}
-
 TEST_F(DocumentSourceRankFusionTest, ErrorsIfUnknownFieldInsideInputs) {
     auto spec = fromjson(R"({
         $rankFusion: {
             inputs: [
                {
                 pipeline: [
-                    { $match : { author : "dave" } }
+                    { $match : { author : "Agatha Christie" } },
+                    { $sort: {author: 1} }
                 ],
                 unknown: "bad field"
                }
@@ -194,9 +152,16 @@ TEST_F(DocumentSourceRankFusionTest, ErrorsIfRankConstantIsNotInt) {
             inputs: [
                {
                 pipeline: [
-                    { $match : { author : "dave" } }
+                    { $match : { author : "Agatha Christie" } },
+                    { $sort: {author: 1} }
                 ],
                 rankConstant: 1.5
+               },
+               {
+                pipeline: [
+                    { $match : { author : "Agatha Christie" } },
+                    { $sort: {author: 1} }
+                ]
                }
             ]
         }
@@ -213,9 +178,16 @@ TEST_F(DocumentSourceRankFusionTest, ErrorsIfAsIsNotString) {
             inputs: [
                {
                 pipeline: [
-                    { $match : { author : "dave" } }
+                    { $match : { author : "Agatha Christie" } },
+                    { $sort: {author: 1} }
                 ],
                 as: 1
+               },
+               {
+                pipeline: [
+                    { $match : { author : "Agatha Christie" } },
+                    { $sort: {author: 1} }
+                ]
                }
             ]
         }
@@ -226,25 +198,71 @@ TEST_F(DocumentSourceRankFusionTest, ErrorsIfAsIsNotString) {
                        ErrorCodes::TypeMismatch);
 }
 
-// TODO SERVER-92213: Remove this test or adapt it to test the stage functionality when $rankFusion
-// implementation is complete.
-TEST_F(DocumentSourceRankFusionTest, CheckOptionalArgumentsAllowed) {
+TEST_F(DocumentSourceRankFusionTest, ErrorsIfNotRankedPipeline) {
     auto spec = fromjson(R"({
         $rankFusion: {
             inputs: [
                {
                 pipeline: [
-                    { $match : { author : "dave" } }
+                    { $match : { author : "Agatha Christie" } },
+                    { $sort: {author: 1} }
+                ]
+               },
+               {
+                pipeline: [
+                    { $match : { age : 50 } }
+                ]
+               }
+            ]
+        }
+    })");
+
+    ASSERT_THROWS_CODE(DocumentSourceRankFusion::createFromBson(spec.firstElement(), getExpCtx()),
+                       AssertionException,
+                       9191100);
+}
+
+TEST_F(DocumentSourceRankFusionTest, CheckMultiplePipelinesAndOptionalArgumentsAllowed) {
+    auto spec = fromjson(R"({
+        $rankFusion: {
+            inputs: [
+               {
+                pipeline: [
+                    { $match : { author : "Agatha Christie" } },
+                    { $sort: {author: 1} }
                 ],
                 rankConstant: 2,
                 as: "matchAuthor"
                },
                {
-	            pipeline: [
-                    { $match : { age : 50 } }
-	            ],
-                rankConstant: 5,
-                as: "matchAge"
+                pipeline: [
+                    {
+                        $search: {
+                            index: "search_index",
+                            text: {
+                                query: "mystery",
+                                path: "genres"
+                            }
+                        }
+                    }
+                ],
+                rankConstant: 2,
+                as: "matchGenres"
+               },
+               {
+                pipeline: [
+                    {
+                        $vectorSearch: {
+                            queryVector: [1.0, 2.0, 3.0],
+                            path: "plot_embedding",
+                            numCandidates: 300,
+                            index: "vector_index",
+                            limit: 10
+                        }
+                    }
+                ],
+                rankConstant: 2,
+                as: "matchPlot"
                }
             ]
         }
@@ -253,5 +271,262 @@ TEST_F(DocumentSourceRankFusionTest, CheckOptionalArgumentsAllowed) {
     ASSERT_DOES_NOT_THROW(
         DocumentSourceRankFusion::createFromBson(spec.firstElement(), getExpCtx()));
 }
+
+TEST_F(DocumentSourceRankFusionTest, ErrorsIfSearchMetaUsed) {
+    auto spec = fromjson(R"({
+        $rankFusion: {
+            inputs: [
+               {
+                pipeline: [
+                    { $match : { author : "Agatha Christie" } },
+                    { $sort: {author: 1} }
+                ],
+                rankConstant: 2,
+                as: "matchAuthor"
+               },
+               {
+                pipeline: [
+                    {
+                        $searchMeta: {
+                            index: "search_index",
+                            text: {
+                                query: "mystery",
+                                path: "genres"
+                            }
+                        }
+                    },
+                    { $sort: {genres: 1} }
+                ],
+                rankConstant: 2,
+                as: "matchGenres"
+               }
+            ]
+        }
+    })");
+
+    ASSERT_THROWS_CODE(DocumentSourceRankFusion::createFromBson(spec.firstElement(), getExpCtx()),
+                       AssertionException,
+                       9191103);
+}
+
+TEST_F(DocumentSourceRankFusionTest, ErrorsIfSearchStoredSourceUsed) {
+    auto spec = fromjson(R"({
+        $rankFusion: {
+            inputs: [
+               {
+                pipeline: [
+                    { $match : { author : "Agatha Christie" } },
+                    { $sort: {author: 1} }
+                ],
+                rankConstant: 2,
+                as: "matchAuthor"
+               },
+               {
+                pipeline: [
+                    {
+                        $search: {
+                            index: "search_index",
+                            text: {
+                                query: "mystery",
+                                path: "genres"
+                            },
+                            "returnStoredSource": true
+                        }
+                    },
+                    { $sort: {genres: 1} }
+                ],
+                rankConstant: 2,
+                as: "matchGenres"
+               }
+            ]
+        }
+    })");
+
+    ASSERT_THROWS_CODE(DocumentSourceRankFusion::createFromBson(spec.firstElement(), getExpCtx()),
+                       AssertionException,
+                       9191102);
+}
+
+TEST_F(DocumentSourceRankFusionTest, ErrorsIfInternalSearchMongotRemoteUsed) {
+    auto spec = fromjson(R"({
+        $rankFusion: {
+            inputs: [
+               {
+                pipeline: [
+                    { $match : { author : "Agatha Christie" } },
+                    { $sort: {author: 1} }
+                ],
+                rankConstant: 2,
+                as: "matchAuthor"
+               },
+               {
+                pipeline: [
+                    {
+                        $_internalSearchMongotRemote: {
+                            index: "search_index",
+                            text: {
+                                query: "mystery",
+                                path: "genres"
+                            }
+                        }
+                    },
+                    { $sort: {genres: 1} }
+                ],
+                rankConstant: 2,
+                as: "matchGenres"
+               }
+            ]
+        }
+    })");
+
+    ASSERT_THROWS_CODE(DocumentSourceRankFusion::createFromBson(spec.firstElement(), getExpCtx()),
+                       AssertionException,
+                       9191103);
+}
+
+TEST_F(DocumentSourceRankFusionTest, CheckLimitSampleAllowed) {
+    auto expCtx = getExpCtx();
+
+    auto spec = fromjson(R"({
+        $rankFusion: {
+            inputs: [
+               {
+                pipeline: [
+                    { $sample: { size: 10 } },
+                    { $sort: {author: 1} },
+                    { $limit: 10 }
+                ]
+               }
+            ]
+        }
+    })");
+
+    ASSERT_DOES_NOT_THROW(DocumentSourceRankFusion::createFromBson(spec.firstElement(), expCtx));
+}
+
+TEST_F(DocumentSourceRankFusionTest, ErrorsIfUnionWith) {
+    auto expCtx = getExpCtx();
+    auto nsToUnionWith1 =
+        NamespaceString::createNamespaceString_forTest(expCtx->ns.dbName(), "novels");
+    expCtx->addResolvedNamespaces({nsToUnionWith1});
+
+    auto spec = fromjson(R"({
+        $rankFusion: {
+            inputs: [
+               {
+                pipeline: [
+                    { $sample: { size: 10 } },
+                    { $sort: {author: 1} },
+                    { $limit: 10 }
+                ]
+               },
+               {
+                pipeline: [
+                    { $unionWith: 
+                        { coll: "novels" } 
+                    },
+                    { $sort: {author: 1} }
+                ]
+               }
+               
+            ]
+        }
+    })");
+
+    ASSERT_THROWS_CODE(DocumentSourceRankFusion::createFromBson(spec.firstElement(), expCtx),
+                       AssertionException,
+                       9191103);
+}
+
+TEST_F(DocumentSourceRankFusionTest, CheckGeoNearAllowedWhenNoIncludeLocs) {
+    auto spec = fromjson(R"({
+        $rankFusion: {
+            inputs: [
+               {
+                pipeline: [
+                    { $match : { author : "Agatha Christie" } },
+                    { $sort: {author: 1} }
+                ]
+               },
+               {
+                pipeline: [
+                    {
+                        $geoNear: {
+                            near: { type: "Point", coordinates: [ -73.99279 , 40.719296 ] },
+                            distanceField: "dist.calculated",
+                            maxDistance: 2,
+                            query: { category: "Parks" },
+                            spherical: true
+                        }
+                    }
+                ]
+               }
+            ]
+        }
+    })");
+
+    ASSERT_DOES_NOT_THROW(
+        DocumentSourceRankFusion::createFromBson(spec.firstElement(), getExpCtx()));
+}
+
+TEST_F(DocumentSourceRankFusionTest, ErrorsIfGeoNearIncludeLocs) {
+    auto spec = fromjson(R"({
+        $rankFusion: {
+            inputs: [
+               {
+                pipeline: [
+                    { $match : { author : "Agatha Christie" } },
+                    { $sort: {author: 1} }
+                ]
+               },
+               {
+                pipeline: [
+                    {
+                        $geoNear: {
+                            near: { type: "Point", coordinates: [ -73.99279 , 40.719296 ] },
+                            distanceField: "dist.calculated",
+                            maxDistance: 2,
+                            query: { category: "Parks" },
+                            includeLocs: "dist.location",
+                            spherical: true
+                        }
+                    }
+                ]
+               }
+            ]
+        }
+    })");
+
+    ASSERT_THROWS_CODE(DocumentSourceRankFusion::createFromBson(spec.firstElement(), getExpCtx()),
+                       AssertionException,
+                       9191101);
+}
+
+TEST_F(DocumentSourceRankFusionTest, ErrorsIfIncludeProject) {
+    auto spec = fromjson(R"({
+        $rankFusion: {
+            inputs: [
+               {
+                pipeline: [
+                    { $match : { author : "Agatha Christie" } },
+                    { $sort: {author: 1} }
+                ]
+               },
+               {
+                pipeline: [
+                    { $match : { age : 50 } },
+                    { $sort: {author: 1} },
+                    { $project: { author: 1 } }
+                ]
+               }
+            ]
+        }
+    })");
+
+    ASSERT_THROWS_CODE(DocumentSourceRankFusion::createFromBson(spec.firstElement(), getExpCtx()),
+                       AssertionException,
+                       9191103);
+}
+
 }  // namespace
 }  // namespace mongo

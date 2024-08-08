@@ -51,6 +51,7 @@ namespace mongo {
 class DocumentSourceRankFusion final {
 public:
     static constexpr StringData kStageName = "$rankFusion"_sd;
+
     /**
      * Returns a list of stages to execute hybrid scoring with rank fusion.
      */

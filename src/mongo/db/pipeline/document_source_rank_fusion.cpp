@@ -27,14 +27,21 @@
  *    it in the license file.
  */
 
+#include "mongo/base/string_data.h"
+#include "mongo/db/pipeline/search/document_source_vector_search.h"
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 
 #include "mongo/base/error_codes.h"
 #include "mongo/bson/bsontypes.h"
+#include "mongo/db/pipeline/document_source.h"
+#include "mongo/db/pipeline/document_source_geo_near.h"
 #include "mongo/db/pipeline/document_source_rank_fusion.h"
+#include "mongo/db/pipeline/document_source_sort.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/lite_parsed_document_source.h"
 #include "mongo/db/pipeline/pipeline.h"
+#include "mongo/db/pipeline/search/document_source_search.h"
+#include "mongo/db/pipeline/search/document_source_vector_search.h"
 #include "mongo/db/query/allowed_contexts.h"
 
 namespace mongo {
@@ -44,6 +51,61 @@ REGISTER_DOCUMENT_SOURCE_WITH_FEATURE_FLAG(rankFusion,
                                            DocumentSourceRankFusion::createFromBson,
                                            AllowedWithApiStrict::kNeverInVersion1,
                                            feature_flags::gFeatureFlagSearchHybridScoring);
+
+namespace {
+/**
+ * Checks that the input pipeline is a valid ranked pipeline. This means it is either one of
+ * $search, $vectorSearch, $geoNear, $rankFusion (which have ordered output) or has an explicit
+ * $sort stage. A ranked pipeline must also be a 'selection pipeline', which means no stage can
+ * modify the documents in any way. Only stages that retrieve, limit, or order documents are
+ * allowed.
+ */
+static void rankFusionPipelineValidator(const Pipeline& pipeline) {
+    // Note that we don't check for $rankFusion explicitly because it will be desugared by this
+    // point.
+    static const std::set<StringData> implicitlyOrderedStages{
+        DocumentSourceVectorSearch::kStageName,
+        DocumentSourceSearch::kStageName,
+        DocumentSourceGeoNear::kStageName};
+    auto sources = pipeline.getSources();
+    auto firstStageName = sources.front()->getSourceName();
+    auto isRankedPipeline = implicitlyOrderedStages.contains(firstStageName) ||
+        std::any_of(sources.begin(), sources.end(), [](auto& stage) {
+                                return stage->getSourceName() == DocumentSourceSort::kStageName;
+                            });
+    uassert(9191100,
+            str::stream()
+                << "All subpipelines to the $rankFusion stage must begin with one of $search, "
+                   "$vectorSearch, $geoNear, $rankFusion or have a custom $sort in the pipeline.",
+            isRankedPipeline);
+
+    std::for_each(sources.begin(), sources.end(), [](auto& stage) {
+        if (stage->getSourceName() == DocumentSourceGeoNear::kStageName) {
+            uassert(9191101,
+                    str::stream() << "$geoNear can be used in a $rankFusion subpipeline but not "
+                                     "when includeLocs or distanceField is specified because they "
+                                     "modify the documents by adding an output field. Only stages "
+                                     "that retrieve, limit, or order documents are allowed.",
+                    stage->constraints().noFieldModifications);
+        } else if (stage->getSourceName() == DocumentSourceSearch::kStageName) {
+            uassert(
+                9191102,
+                str::stream()
+                    << "$search can be used in a $rankFusion subpipeline but not when "
+                       "returnStoredSource is set to true because it modifies the output fields. "
+                       "Only stages that retrieve, limit, or order documents are allowed.",
+                stage->constraints().noFieldModifications);
+        } else {
+            uassert(9191103,
+                    str::stream() << stage->getSourceName()
+                                  << " is not allowed in a $rankFusion subpipeline because it "
+                                     "modifies the documents or transforms their fields. Only "
+                                     "stages that retrieve, limit, or order documents are allowed.",
+                    stage->constraints().noFieldModifications);
+        }
+    });
+}
+}  // namespace
 
 std::list<boost::intrusive_ptr<DocumentSource>> DocumentSourceRankFusion::createFromBson(
     BSONElement elem, const boost::intrusive_ptr<ExpressionContext>& pExpCtx) {
@@ -55,12 +117,15 @@ std::list<boost::intrusive_ptr<DocumentSource>> DocumentSourceRankFusion::create
 
     auto spec = RankFusionSpec::parse(IDLParserContext(kStageName), elem.embeddedObject());
 
+    std::list<std::unique_ptr<Pipeline, PipelineDeleter>> inputPipelines;
+    // Ensure that all pipelines are valid ranked selection pipelines.
     for (const auto& input : spec.getInputs()) {
-        auto pipeline =
-            Pipeline::parse(input.getPipeline(), pExpCtx->copyForSubPipeline(pExpCtx->ns));
+        inputPipelines.push_back(Pipeline::parse(input.getPipeline(),
+                                                 pExpCtx->copyForSubPipeline(pExpCtx->ns),
+                                                 rankFusionPipelineValidator));
     }
 
-    // TODO SERVER-91911: Validate that these are ranked pipelines.
+    // TODO SERVER-92213: Implement the desugaring of $rankFusion.
 
     return {};
 }

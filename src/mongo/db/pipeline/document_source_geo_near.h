@@ -72,14 +72,20 @@ public:
     }
 
     StageConstraints constraints(Pipeline::SplitState pipeState) const final {
-        return {StreamType::kStreaming,
-                PositionRequirement::kCustom,
-                HostTypeRequirement::kAnyShard,
-                DiskUseRequirement::kNoDiskUse,
-                FacetRequirement::kNotAllowed,
-                TransactionRequirement::kAllowed,
-                LookupRequirement::kAllowed,
-                UnionRequirement::kAllowed};
+        StageConstraints constraints{StreamType::kStreaming,
+                                     PositionRequirement::kCustom,
+                                     HostTypeRequirement::kAnyShard,
+                                     DiskUseRequirement::kNoDiskUse,
+                                     FacetRequirement::kNotAllowed,
+                                     TransactionRequirement::kAllowed,
+                                     LookupRequirement::kAllowed,
+                                     UnionRequirement::kAllowed};
+        // TODO SERVER-35581: Once distanceField is made optional, this stage will be considered a
+        // selection stage if distanceField is also not set (same as includeLocs).
+        if (!includeLocs) {
+            constraints.noFieldModifications = true;
+        }
+        return constraints;
     }
 
     void validatePipelinePosition(bool alreadyOptimized,

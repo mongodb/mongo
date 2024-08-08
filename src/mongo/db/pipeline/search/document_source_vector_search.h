@@ -86,6 +86,7 @@ public:
                                      UnionRequirement::kNotAllowed,
                                      ChangeStreamRequirement::kDenylist);
         constraints.requiresInputDocSource = false;
+        constraints.noFieldModifications = true;
         return constraints;
     };
 

@@ -560,6 +560,7 @@ TEST_F(DocumentSourceUnionWithTest, ConstraintsWithStrictSubPipelineAreCorrect) 
                             StageConstraints::UnionRequirement::kAllowed);
     ASSERT_TRUE(unionStage.constraints(Pipeline::SplitState::kUnsplit) == strict);
 }
+
 TEST_F(DocumentSourceUnionWithTest, StricterConstraintsFromSubSubPipelineAreInherited) {
     const auto mock = DocumentSourceMock::createForTest(getExpCtx());
     StageConstraints strictConstraint(StageConstraints::StreamType::kStreaming,
