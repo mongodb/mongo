@@ -81,6 +81,15 @@ public:
 
     /**
      * `Entry` ties together the common identifiers of a single `_mdb_catalog` document.
+     *
+     * Idents can come in 4 forms depending on server parameters:
+     * wtdfi    = --wiredTigerDirectoryForIndexes
+     * dirperdb = --directoryperdb
+     *
+     * default:          <collection|index>-<counter>-<random number>
+     * dirperdb:         <db>/<collection|index>-<counter>-<random number>
+     * wtdfi:            <collection|index>/<counter>-<random number>
+     * dirperdb & wtdfi: <db>/<collection|index>/<counter>-<random number>
      */
     struct EntryIdentifier {
         EntryIdentifier() {}

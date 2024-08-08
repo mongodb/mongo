@@ -2450,7 +2450,18 @@ creation or drop, as well as `collMod` operations.
 
 **ident**: An ident is a unique identifier given to a storage engine resource. Collections and
 indexes map application-layer names to storage engine idents. In WiredTiger, idents are implemented
-as tables. For example, collection idents have the form: `collection-<counter>-<random number>`.
+as tables. Idents map to files on disk, but with a `.wt` file extension.
+
+Examples:
+
+- collection idents: `collection-<counter>-<random number>`
+- index idents: `index-<counter>-<random number>`
+
+Server flags that alter the form of idents (this applies to indexes as well):
+
+- `--directoryperdb`: `<db name>/collection-<counter>-<random number>`
+- `--wiredTigerDirectoryForIndexes`: `collection/<counter>-<random number>`
+- (both of the above): `<db name>/collection/<counter-<random number>`
 
 **oplog hole**: An uncommitted oplog write that can exist with out-of-order writes when a later
 timestamped write happens to commit first. Oplog holes can exist in-memory and persisted on disk.
