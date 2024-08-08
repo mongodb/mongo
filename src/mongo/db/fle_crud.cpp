@@ -64,6 +64,7 @@
 #include "mongo/db/curop.h"
 #include "mongo/db/database_name.h"
 #include "mongo/db/dbdirectclient.h"
+#include "mongo/db/error_labels.h"
 #include "mongo/db/fle_crud.h"
 #include "mongo/db/logical_time.h"
 #include "mongo/db/multitenancy_gen.h"
@@ -143,6 +144,23 @@ void appendPossibleWriteConcernErrorToReply(const WriteConcernErrorDetail& wce,
                                             write_ops::WriteCommandReplyBase* replyBase) {
     if (wce.isValid(nullptr)) {
         replyBase->setWriteConcernError(wce.toBSON());
+    }
+}
+
+// Throw transientTransaction errors as top-level errors instead of returning them as writeErrors.
+// By throwing them, the top-level error handling code kicks in and adds the error label. Also
+// discards the writeErrors.
+void throwTransientTransactionErrorIfNeeded(
+    bool hasWriteConcernError,
+    const boost::optional<std::vector<write_ops::WriteError>>& writeErrors) {
+    if (!writeErrors.has_value()) {
+        return;
+    }
+
+    for (const auto& e : writeErrors.value()) {
+        if (isTransientTransactionError(e.getStatus().code(), hasWriteConcernError, true)) {
+            uassertStatusOK(e.getStatus());
+        }
     }
 }
 
@@ -543,6 +561,9 @@ std::pair<FLEBatchResult, write_ops::InsertCommandReply> processInsert(
         writeBase.setRetriedStmtIds(std::move(retriedStmtIds));
     }
     appendPossibleWriteConcernErrorToReply(wcError, &writeBase);
+
+    throwTransientTransactionErrorIfNeeded(wcError.isValid(nullptr), writeErrors);
+
     returnReply.setWriteCommandReplyBase(writeBase);
 
     return {FLEBatchResult::kProcessed, returnReply};
@@ -613,6 +634,8 @@ write_ops::DeleteCommandReply processDelete(OperationContext* opCtx,
             return SemiFuture<void>::makeReady();
         });
 
+    bool hasWriteConcernError = false;
+
     if (!swResult.isOK()) {
         // FLETransactionAbort is used for control flow so it means we have a valid
         // InsertCommandReply with write errors so we should return that.
@@ -623,6 +646,9 @@ write_ops::DeleteCommandReply processDelete(OperationContext* opCtx,
         appendSingleStatusToWriteErrors(swResult.getStatus(), &reply->getWriteCommandReplyBase());
     } else if (!swResult.getValue().getEffectiveStatus().isOK()) {
         auto& commitResult = swResult.getValue();
+
+        hasWriteConcernError = commitResult.wcError.isValid(nullptr);
+
         appendPossibleWriteConcernErrorToReply(commitResult.wcError,
                                                &reply->getWriteCommandReplyBase());
         if (!commitResult.cmdStatus.isOK()) {
@@ -630,6 +656,9 @@ write_ops::DeleteCommandReply processDelete(OperationContext* opCtx,
                                             &reply->getWriteCommandReplyBase());
         }
     }
+
+    throwTransientTransactionErrorIfNeeded(hasWriteConcernError,
+                                           reply->getWriteCommandReplyBase().getWriteErrors());
 
     return *reply;
 }
@@ -712,6 +741,7 @@ write_ops::UpdateCommandReply processUpdate(OperationContext* opCtx,
             return SemiFuture<void>::makeReady();
         });
 
+    bool hasWriteConcernError = false;
     if (!swResult.isOK()) {
         // FLETransactionAbort is used for control flow so it means we have a valid
         // InsertCommandReply with write errors so we should return that.
@@ -722,6 +752,9 @@ write_ops::UpdateCommandReply processUpdate(OperationContext* opCtx,
         appendSingleStatusToWriteErrors(swResult.getStatus(), &reply->getWriteCommandReplyBase());
     } else if (!swResult.getValue().getEffectiveStatus().isOK()) {
         auto& commitResult = swResult.getValue();
+
+        hasWriteConcernError = commitResult.wcError.isValid(nullptr);
+
         appendPossibleWriteConcernErrorToReply(commitResult.wcError,
                                                &reply->getWriteCommandReplyBase());
         if (!commitResult.cmdStatus.isOK()) {
@@ -729,6 +762,10 @@ write_ops::UpdateCommandReply processUpdate(OperationContext* opCtx,
                                             &reply->getWriteCommandReplyBase());
         }
     }
+
+    throwTransientTransactionErrorIfNeeded(hasWriteConcernError,
+                                           reply->getWriteCommandReplyBase().getWriteErrors());
+
 
     return *reply;
 }
