@@ -2324,6 +2324,20 @@ functions:
     - *tar_system_resource_information
     - *archive_system_resource_information
 
+  "save bazel headers": &save_bazel_headers
+    command: s3.put
+    display_name: "attach generated bazel header list"
+    params:
+      optional: true
+      aws_key: ${aws_key}
+      aws_secret: ${aws_secret}
+      local_file: src/bazel_headers.txt
+      remote_file: ${project}/${build_variant}/${revision}/bazel_headers-${task_id}-${execution}.txt
+      bucket: mciuploads
+      permissions: public-read
+      content_type: text/plain
+      display_name: Bazel Header List
+
   "tar UndoDB recordings": &tar_undodb_recordings
     command: archive.targz_pack
     params:

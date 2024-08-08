@@ -191,6 +191,12 @@ add_option(
 )
 
 add_option(
+    "bazel-includes-info",
+    help="write included headers in bazel label format to put files ([library].bazel_includes)",
+    default="",
+)
+
+add_option(
     "install-mode",
     choices=["hygienic"],
     default="hygienic",
@@ -6548,6 +6554,88 @@ clang_tidy_config = env.Substfile(
     SUBST_DICT=replacements,
 )
 env.Alias("generated-sources", clang_tidy_config)
+
+if get_option("bazel-includes-info"):
+    target_library = get_option("bazel-includes-info").replace("\\", "/")
+
+    def bazel_includes_emitter(target, source, env):
+        rel_target = os.path.relpath(str(target[0].abspath), start=env.Dir("#").abspath).replace(
+            "\\", "/"
+        )
+
+        if rel_target == target_library:
+            objsuffix = (
+                env.subst("$OBJSUFFIX")
+                if not env.TargetOSIs("linux")
+                else env.subst("$SHOBJSUFFIX")
+            )
+            builder_name = (
+                "StaticLibrary" if not env.TargetOSIs("linux") == "nt" else "SharedLibrary"
+            )
+            os.makedirs(os.path.dirname(str(target[0].abspath)), exist_ok=True)
+            with open(str(target[0].abspath) + ".obj_files", "w") as f:
+                for s in source:
+                    if str(s).endswith(objsuffix):
+                        f.write(os.path.relpath(str(s.abspath), start=env.Dir("#").abspath) + "\n")
+            with open(str(target[0].abspath) + ".env_vars", "w") as f:
+                json.dump(env["ENV"], f)
+            with open(str(target[0].abspath) + ".bazel_headers", "w") as f:
+                # note we can't know about LIBDEPS_DEPDENDENTS (reverse deps) in an emitter
+                # however we do co-opt the libdeps linter to check for these at the end of reading
+                # sconscripts
+                for s in (
+                    env.get("LIBDEPS", [])
+                    + env.get("LIBDEPS_PRIVATE", [])
+                    + env.get("LIBDEPS_INTERFACE", [])
+                ):
+                    if not s:
+                        continue
+
+                    libnode = libdeps._get_node_with_ixes(env, s, builder_name)
+
+                    libnode_path = os.path.relpath(
+                        str(libnode.abspath), start=env.Dir("#").abspath
+                    ).replace("\\", "/")
+                    if (
+                        libnode.has_builder()
+                        and libnode.get_builder().get_name(env) != "ThinTarget"
+                    ):
+                        print(
+                            f"ERROR: can generate correct bazel header list because {target[0]} has non-bazel dependency: {libnode}"
+                        )
+                        sys.exit(1)
+                    if str(libnode_path) in env["SCONS2BAZEL_TARGETS"].scons2bazel_targets:
+                        bazel_target = env["SCONS2BAZEL_TARGETS"].bazel_target(str(libnode_path))
+                        # new query to run, run and cache it
+                        bazel_query = (
+                            ["cquery"]
+                            + env["BAZEL_FLAGS_STR"]
+                            + [
+                                f'filter("[\\.h,\\.ipp,\\.hpp].*$", kind("source", deps(@{bazel_target})))',
+                                "--output",
+                                "files",
+                            ]
+                        )
+                        results = env.RunBazelQuery(bazel_query, "getting bazel headers")
+
+                        if results.returncode != 0:
+                            print("ERROR: bazel libdeps query failed:")
+                            print(results)
+                            sys.exit(1)
+                        results = set(
+                            [line for line in results.stdout.split("\n") if line.startswith("src/")]
+                        )
+
+                        for header in results:
+                            f.write(header + "\n")
+
+        return target, source
+
+    for builder_name in ["SharedLibrary", "StaticLibrary", "Program"]:
+        builder = env["BUILDERS"][builder_name]
+        base_emitter = builder.emitter
+        new_emitter = SCons.Builder.ListEmitter([base_emitter, bazel_includes_emitter])
+        builder.emitter = new_emitter
 
 env.SConscript(
     dirs=[

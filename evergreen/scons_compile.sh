@@ -175,6 +175,11 @@ if [[ -n "${bazel_scons_diff_targets}" ]]; then
     ${bazel_scons_diff_targets}
 fi
 
+if [[ -n "${convert_bazel_headers_target}" ]]; then
+  eval ${compile_env} $python ./buildscripts/convert_bazel_headers.py --target-library=${convert_bazel_headers_target} --silent > bazel_headers.txt
+  exit 1
+fi
+
 eval ${compile_env} $python ./buildscripts/scons.py \
   ${compile_flags} ${task_compile_flags} ${task_compile_flags_extra} \
   ${scons_cache_args} $extra_args \

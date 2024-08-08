@@ -235,6 +235,7 @@ class LibdepLinter:
     registered_linting_time = False
 
     dangling_dep_dependents = set()
+    bazel_header_info = dict()
 
     @staticmethod
     def _make_linter_decorator():
@@ -429,12 +430,28 @@ class LibdepLinter:
         ]
         self.__class__.dangling_dep_dependents.update(deps_depends)
 
+        for dep in deps_depends:
+            if dep[0] not in self.__class__.bazel_header_info:
+                self.__class__.bazel_header_info[dep[0]] = []
+            self.__class__.bazel_header_info[dep[0]].append(self.target[0])
+
     @linter_final_check
     def linter_rule_no_dangling_dep_final_check(self):
         # At this point the SConscripts have defined all the build items,
         # and so we can go check any DEPS_DEPENDENTS listed and make sure a builder
         # was instantiated to build them.
         for dep_dependent in self.__class__.dangling_dep_dependents:
+            # This next block is for bazel header generation. We are co-opting
+            # the linter for simplicity to make sure we record the libdeps dependents
+            # which can't be access via a libraries emitter.
+            for target, deps in self.__class__.bazel_header_info.items():
+                try:
+                    with open(str(target.abspath) + ".libdeps", "a") as f:
+                        for dep in deps:
+                            f.write(os.path.relpath(dep.abspath, start=dep.Dir("#").abspath) + "\n")
+                except FileNotFoundError:
+                    pass
+
             if not dep_dependent[0].has_builder():
                 self._raise_libdep_lint_exception(
                     textwrap.dedent(f"""\

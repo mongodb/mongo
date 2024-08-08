@@ -148,6 +148,7 @@ def CompilationDbEntryAction(target, source, env, **kw):
     tool = env["__COMPILATIONDB_ENV"].subst(
         tool_subst, target=env["__COMPILATIONDB_UTARGET"], source=env["__COMPILATIONDB_USOURCE"]
     )
+
     tool_index = cmd_list.index(tool) + 1
     tool_list = cmd_list[:tool_index]
     cmd_list = cmd_list[tool_index:]
@@ -156,7 +157,11 @@ def CompilationDbEntryAction(target, source, env, **kw):
         wrapper = env.subst(wrapper_ignore, target=target, source=source)
         if wrapper in tool_list:
             tool_list.remove(wrapper)
-    cmd_list = tool_list + cmd_list
+
+    tool_abspaths = []
+    for tool in tool_list:
+        tool_abspaths.append('"' + env.WhereIs(tool) + '"')
+    cmd_list = tool_abspaths + cmd_list
 
     entry = {
         "directory": env.Dir("#").abspath,
@@ -195,7 +200,7 @@ def WriteCompilationDb(target, source, env):
             + ["//:compiledb", "--"]
             + env["BAZEL_FLAGS_STR"]
         )
-    print(f"BAZEL COMDB: {bazel_compdb}")
+
     subprocess.run(
         [
             sys.executable,
