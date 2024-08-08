@@ -377,6 +377,9 @@ public:
      * Call this only on an empty collection from inside a WriteUnitOfWork. Index creation on an
      * empty collection can be rolled back as part of a larger WUOW. Returns the full specification
      * of the created index, as it is stored in this index catalog.
+     *
+     * This function doesn't apply the default collation because this function is called in
+     * different cases where we want to make an index with a non-default collator.
      */
     virtual StatusWith<BSONObj> createIndexOnEmptyCollection(OperationContext* opCtx,
                                                              Collection* collection,

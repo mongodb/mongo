@@ -331,7 +331,9 @@ Status _createView(OperationContext* opCtx,
     });
 }
 
-Status _createDefaultTimeseriesIndex(OperationContext* opCtx, CollectionWriter& collection) {
+Status _createDefaultTimeseriesIndex(OperationContext* opCtx,
+                                     CollectionWriter& collection,
+                                     BSONObj collation) {
     auto tsOptions = collection->getCollectionOptions().timeseries;
     if (!tsOptions->getMetaField()) {
         return Status::OK();
@@ -345,11 +347,22 @@ Status _createDefaultTimeseriesIndex(OperationContext* opCtx, CollectionWriter& 
 
     const std::string indexName = str::stream()
         << *tsOptions->getMetaField() << "_1_" << tsOptions->getTimeField() << "_1";
-    IndexBuildsCoordinator::get(opCtx)->createIndexesOnEmptyCollection(
-        opCtx,
-        collection,
-        {BSON("v" << 2 << "name" << indexName << "key" << swBucketsSpec.getValue())},
-        /*fromMigrate=*/false);
+
+    BSONObjBuilder builder;
+    builder.append("v", 2);
+    builder.append("name", indexName);
+    builder.append("key", swBucketsSpec.getValue());
+
+    // Add the collection collation when building the default timeseries index if the collation is
+    // non-empty.
+    if (!collation.isEmpty()) {
+        builder.append("collation", collation);
+    }
+
+    IndexBuildsCoordinator::get(opCtx)->createIndexesOnEmptyCollection(opCtx,
+                                                                       collection,
+                                                                       {builder.obj()},
+                                                                       /*fromMigrate=*/false);
     return Status::OK();
 }
 
@@ -482,7 +495,6 @@ Status _createTimeseries(OperationContext* opCtx,
                          const CollectionOptions& optionsArg,
                          const boost::optional<BSONObj>& idIndex) {
 
-
     // This path should only be taken when a user creates a new time-series collection on the
     // primary. Secondaries replicate individual oplog entries.
     invariant(opCtx->writesAreReplicated());
@@ -606,7 +618,23 @@ Status _createTimeseries(OperationContext* opCtx,
 
         CollectionWriter collectionWriter(opCtx, bucketsNs);
 
-        uassertStatusOK(_createDefaultTimeseriesIndex(opCtx, collectionWriter));
+        // The collator validation occurs in userCreateNS and normalizes the collation (adding
+        // additional fields to the collation) when doing the validation.
+        //
+        // We call the collator validator but we need the normalized collator for the default
+        // timeseries index. We ensure that the collation is non-empty because validateCollator will
+        // return a nullptr.
+        auto validatedCollator = bucketsOptions.collation;
+        if (!bucketsOptions.collation.isEmpty()) {
+            auto swCollator = db->validateCollator(opCtx, bucketsOptions);
+
+            // The userCreateNS already has a uassertStatusOK and validateCollator is called in it,
+            // so we should have the case that the status of the swCollator is ok.
+            invariant(swCollator.getStatus());
+            validatedCollator = swCollator.getValue()->getSpec().toBSON();
+        }
+
+        uassertStatusOK(_createDefaultTimeseriesIndex(opCtx, collectionWriter, validatedCollator));
         wuow.commit();
         return Status::OK();
     });

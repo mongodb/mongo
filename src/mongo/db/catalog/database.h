@@ -162,6 +162,9 @@ public:
                                                 const CollectionOptions& opts,
                                                 const VirtualCollectionOptions& vopts) const = 0;
 
+    virtual StatusWith<std::unique_ptr<CollatorInterface>> validateCollator(
+        OperationContext* opCtx, CollectionOptions& opts) const = 0;
+
     virtual Status createView(OperationContext* opCtx,
                               const NamespaceString& viewName,
                               const CollectionOptions& options) const = 0;

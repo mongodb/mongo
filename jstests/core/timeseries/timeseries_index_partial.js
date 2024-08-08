@@ -29,24 +29,19 @@ import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 const coll = db.timeseries_index_partial;
 const timeField = 'time';
 const metaField = 'm';
-let extraIndexes = [];
 let extraBucketIndexes = [];
 let buckets = [];
 
+function addCollation(baseSpec, collation) {
+    return collation ? {...baseSpec, collation: collation} : baseSpec;
+}
+
+// When enabled, the {meta: 1, time: 1} index gets built by default on the time-series
+// bucket collection.
 function resetCollection(collation) {
     coll.drop();
-    extraIndexes = [];
     extraBucketIndexes = [];
 
-    if (collation) {
-        assert.commandWorked(db.createCollection(coll.getName(), {
-            timeseries: {timeField, metaField},
-            collation: collation,
-        }));
-    } else {
-        assert.commandWorked(
-            db.createCollection(coll.getName(), {timeseries: {timeField, metaField}}));
-    }
     buckets = db.getCollection('system.buckets.' + coll.getName());
     // If the collection is sharded, expect an implicitly-created index on time. It will appear
     // differently in listIndexes depending on whether you look at the time-series collection or
@@ -54,36 +49,35 @@ function resetCollection(collation) {
     // TODO SERVER-79304 the test shouldn't rely on the feature flag.
     const newShardKeyIndex =
         FeatureFlagUtil.isPresentAndEnabled(db, "AuthoritativeShardCollection");
+
+    const createTimeseriesSpec = {
+        timeseries: {timeField, metaField},
+    };
+    assert.commandWorked(
+        db.createCollection(coll.getName(), addCollation(createTimeseriesSpec, collation)));
+
     if (FixtureHelpers.isSharded(buckets)) {
-        extraIndexes.push({
-            "v": 2,
-            "key": {"time": 1},
-            "name": newShardKeyIndex ? "time_1" : "control.min.time_1",
-        });
-        extraBucketIndexes.push({
+        const extraBucketIndexesShardedSpec = {
             "v": 2,
             "key": newShardKeyIndex ? {"control.min.time": 1, "control.max.time": 1}
                                     : {"control.min.time": 1},
             "name": newShardKeyIndex ? "time_1" : "control.min.time_1",
-        });
+        };
+        extraBucketIndexes.push(addCollation(extraBucketIndexesShardedSpec, collation));
     }
-    // When enabled, the {meta: 1, time: 1} index gets built by default on the time-series
-    // bucket collection.
-    extraIndexes.push({
-        "v": 2,
-        "key": {"m": 1, "time": 1},
-        "name": "m_1_time_1",
-    });
-    extraBucketIndexes.push({
+
+    const extraBucketIndexesSpec = {
         "v": 2,
         "key": {"meta": 1, "control.min.time": 1, "control.max.time": 1},
         "name": "m_1_time_1",
-    });
+    };
+    extraBucketIndexes.push(addCollation(extraBucketIndexesSpec, collation));
 }
 
 resetCollection();
 
-assert.sameMembers(coll.getIndexes(), extraIndexes);
+// Check that there is no collation in the default index.
+assert.eq(coll.getIndexes()[0].collation, null);
 assert.sameMembers(buckets.getIndexes(), extraBucketIndexes);
 
 assert.commandWorked(coll.insert([
@@ -231,7 +225,8 @@ assert.commandFailedWithCode(coll.createIndex({a: 1}, {partialFilterExpression: 
     }
 
     assert.commandWorked(coll.dropIndex({a: 1}));
-    assert.sameMembers(coll.getIndexes(), extraIndexes);
+    // Check that there is no collation in the default index.
+    assert.eq(coll.getIndexes()[0].collation, null);
     assert.sameMembers(buckets.getIndexes(), extraBucketIndexes);
     assert.gt(ixscanInWinningPlan, 0);
 }
@@ -431,7 +426,10 @@ assert.sameMembers(buckets.getIndexes(), extraBucketIndexes.concat([
 // partialFilterExpression is what we expect.
 {
     assert.commandWorked(coll.dropIndex({a: 1}));
-    assert.sameMembers(coll.getIndexes(), extraIndexes);
+    // Check that there is collation in the default index (and that it matches the default
+    // collation).
+    assert.eq(coll.getIndexes()[0].collation.locale, "en_US");
+    assert.eq(coll.getIndexes()[0].collation.numericOrdering, true);
     function checkPredicateDisallowed(predicate) {
         assert.commandFailedWithCode(coll.createIndex({a: 1}, {partialFilterExpression: predicate}),
                                      [5916301]);

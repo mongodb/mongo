@@ -14,6 +14,7 @@
  * ]
  */
 import {TimeseriesTest} from "jstests/core/timeseries/libs/timeseries.js";
+import {IndexCatalogHelpers} from "jstests/libs/index_catalog_helpers.js";
 
 TimeseriesTest.run((insert) => {
     const coll = db.timeseries_collation;
@@ -28,6 +29,12 @@ TimeseriesTest.run((insert) => {
         collation: {locale: 'en', strength: 1, numericOrdering: true}
     }));
     assert.contains(bucketsColl.getName(), db.getCollectionNames());
+
+    // Ensure the default index has the collation.
+    let indexSpec = IndexCatalogHelpers.findByName(coll.getIndexes(),
+                                                   metaFieldName + "_1_" + timeFieldName + "_1");
+    assert.neq(indexSpec, null);
+    assert.eq(indexSpec.collation.locale, "en", tojson(indexSpec));
 
     const docs = [
         {

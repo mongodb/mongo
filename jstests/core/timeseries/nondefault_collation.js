@@ -226,10 +226,12 @@ const insensitive = {
     assert.commandWorked(coll.insert({time: ISODate(), meta: 42}));
     assert.commandWorked(coll.insert({time: ISODate(), meta: "the answer"}));
 
-    // Queries that don't specify explicit collation should use the collection's default collation
-    // which isn't compatible with the index, so the index should NOT be used.
-    let query = coll.find({meta: "str"}).explain();
-    assert(!aggPlanHasStage(query, "IXSCAN"), query);
+    // Queries that don't specify explicit collation should use the collection's default collation.
+    // We can have an index scan because the default timeseries index uses the default collation.
+    // However, the default collation isn't compatible with the index with a different collation,
+    // so the non-default index should not be used.
+    let query = assert.commandWorked(coll.find({meta: "str"}).explain());
+    assert(aggPlanHasStage(query, "IXSCAN"), query);
 
     // Queries with an explicit collation which isn't compatible with the index, should NOT do
     // index scan.

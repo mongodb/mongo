@@ -526,6 +526,9 @@ public:
      * collection. For two phase index builds, writes both startIndexBuild and commitIndexBuild
      * oplog entries on success. No two phase index build oplog entries, including abortIndexBuild,
      * will be written on failure. Throws exception on error.
+     *
+     * This function doesn't apply the default collation because this function is called in
+     * different cases where we want to make an index with a non-default collator.
      */
     static void createIndexesOnEmptyCollection(OperationContext* opCtx,
                                                CollectionWriter& collection,

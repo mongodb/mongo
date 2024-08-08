@@ -95,6 +95,10 @@ last-continuous:
       ticket: SERVER-89664
     - test_file: jstests/sharding/non_transaction_snapshot_reads_retry.js
       ticket: SERVER-89664
+    - test_file: jstests/core/timeseries/timeseries_collation.js
+      ticket: SERVER_89698
+    - test_file: jstests/core/timeseries/timeseries_index_partial.js
+      ticket: SERVER_89698
     - test_file: jstests/core/index/express_write.js
       ticket: SERVER-83760
     - test_file: jstests/core/index/express_write_explicit_coll_creation.js
@@ -308,6 +312,10 @@ last-lts:
       ticket: SERVER-89664
     - test_file: jstests/sharding/non_transaction_snapshot_reads_retry.js
       ticket: SERVER-89664
+    - test_file: jstests/core/timeseries/timeseries_collation.js
+      ticket: SERVER_89698
+    - test_file: jstests/core/timeseries/timeseries_index_partial.js
+      ticket: SERVER_89698
     - test_file: jstests/core/index/express_write.js
       ticket: SERVER-83760
     - test_file: jstests/core/index/express_write_explicit_coll_creation.js

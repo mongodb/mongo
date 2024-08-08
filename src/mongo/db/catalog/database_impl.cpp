@@ -924,7 +924,7 @@ Collection* DatabaseImpl::_createCollection(
     return collection;
 }
 
-StatusWith<std::unique_ptr<CollatorInterface>> DatabaseImpl::_validateCollator(
+StatusWith<std::unique_ptr<CollatorInterface>> DatabaseImpl::validateCollator(
     OperationContext* opCtx, CollectionOptions& opts) const {
     std::unique_ptr<CollatorInterface> collator;
     if (!opts.collation.isEmpty()) {
@@ -967,7 +967,7 @@ Status DatabaseImpl::userCreateNS(OperationContext* opCtx,
                       str::stream() << "invalid ns: " << nss.toStringForErrorMsg());
 
     // Validate the collation, if there is one.
-    auto swCollator = _validateCollator(opCtx, collectionOptions);
+    auto swCollator = validateCollator(opCtx, collectionOptions);
     if (!swCollator.isOK()) {
         return swCollator.getStatus();
     }
@@ -1077,7 +1077,7 @@ Status DatabaseImpl::userCreateVirtualNS(OperationContext* opCtx,
                       str::stream() << "invalid ns: " << nss.toStringForErrorMsg());
 
     // Validate the collation, if there is one.
-    if (auto swCollator = _validateCollator(opCtx, opts); !swCollator.isOK()) {
+    if (auto swCollator = validateCollator(opCtx, opts); !swCollator.isOK()) {
         return swCollator.getStatus();
     }
 
