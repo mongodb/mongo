@@ -259,8 +259,9 @@ OSTType_Double getTypeInfoDouble(double value,
 
         // Take a number of xxxx.ppppp and truncate it xxxx.ppp if precision = 3. We do not change
         // the digits before the decimal place.
-        double v_prime = trunc(value * exp10Double(precision.get())) / exp10Double(precision.get());
-        int64_t v_prime2 = (v_prime - min.get()) * exp10Double(precision.get());
+        int64_t scaled_value = (int64_t)trunc(value * exp10Double(precision.get()));
+        int64_t scaled_min = (int64_t)(min.get() * exp10Double(precision.get()));
+        int64_t v_prime2 = scaled_value - scaled_min;
 
         invariant(v_prime2 < std::numeric_limits<int64_t>::max() && v_prime2 >= 0);
 
