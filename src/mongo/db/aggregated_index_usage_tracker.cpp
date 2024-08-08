@@ -193,6 +193,15 @@ long long AggregatedIndexUsageTracker::getCount() const {
     return _count.loadRelaxed();
 }
 
+void AggregatedIndexUsageTracker::resetToZero() {
+    forEachFeature([](auto feature, const auto& constStats) {
+        auto& stats = const_cast<IndexFeatureStats&>(constStats);
+        stats.accesses.store(0);
+        stats.count.store(0);
+    });
+    _count.store(0);
+}
+
 class IndexStatsSSS : public ServerStatusSection {
 public:
     using ServerStatusSection::ServerStatusSection;

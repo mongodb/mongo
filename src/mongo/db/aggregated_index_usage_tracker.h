@@ -131,6 +131,11 @@ public:
      */
     long long getCount() const;
 
+    /**
+     * Reset all stats to zero.
+     */
+    void resetToZero();
+
 private:
     mutable IndexStatsType _indexTypeStats;
     mutable FeatureStatsType _featureStats;

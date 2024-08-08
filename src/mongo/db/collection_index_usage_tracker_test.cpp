@@ -47,7 +47,8 @@ namespace {
 
 class CollectionIndexUsageTrackerTest : public unittest::Test {
 protected:
-    CollectionIndexUsageTrackerTest() : _tracker(&_aggregatedIndexUsage, &_clockSource) {}
+    CollectionIndexUsageTrackerTest()
+        : _aggregatedIndexUsage(), _tracker(&_aggregatedIndexUsage, &_clockSource) {}
 
     /**
      * Returns an unowned pointer to the tracker owned by this test fixture.
@@ -65,6 +66,10 @@ protected:
 
     AggregatedIndexUsageTracker* getAggregatedIndexUsage() {
         return &_aggregatedIndexUsage;
+    }
+
+    void resetToZero() {
+        _aggregatedIndexUsage.resetToZero();
     }
 
 private:
@@ -161,180 +166,126 @@ TEST_F(CollectionIndexUsageTrackerTest, DateTimeAfterDeregister) {
 }
 
 namespace {
-int getFeatureUseCount(AggregatedIndexUsageTracker* aggregatedIndexUsage,
-                       std::string featureSearch) {
-    int count = 0;
-    aggregatedIndexUsage->forEachFeature([&](auto feature, auto& stats) {
-        if (featureSearch == feature) {
-            count += stats.count.load();
-        }
-    });
-    return count;
-}
-
-int getFeatureAccessCount(AggregatedIndexUsageTracker* aggregatedIndexUsage,
-                          std::string featureSearch) {
-    int accesses = 0;
-    aggregatedIndexUsage->forEachFeature([&](auto feature, auto& stats) {
-        if (featureSearch == feature) {
-            accesses += stats.accesses.load();
-        }
-    });
-    return accesses;
-}
+struct TestCase {
+    BSONObj spec;
+    std::vector<std::string> features;
+};
+std::vector<TestCase>
+    testCases =
+        {
+            {BSON("key" << BSON("_id" << 1) << "v" << 2), {"id"}},
+            {BSON("key" << BSON("foo" << 1) << "v" << 2), {"normal", "single"}},
+            {BSON("key" << BSON("foo" << 1) << "sparse" << true << "v" << 2),
+             {"normal", "single", "sparse"}},
+            {BSON("key" << BSON("foo" << 1) << "unique" << true << "v" << 2),
+             {"normal", "single", "unique"}},
+            {BSON("key" << BSON("foo" << 1) << "unique" << false << "v" << 2),
+             {"normal", "single"}},
+            {BSON("key" << BSON("foo" << 1) << "partialFilterExpression" << BSON("foo" << 1) << "v"
+                        << 2),
+             {"normal", "single", "partial"}},
+            {BSON("key" << BSON("foo" << 1) << "prepareUnique" << true << "v" << 2),
+             {"normal", "single", "prepareUnique"}},
+            {BSON("key" << BSON("foo" << 1) << "prepareUnique" << false << "v" << 2),
+             {"normal", "single"}},
+            {BSON("key" << BSON("foo"
+                                << "2d")
+                        << "v" << 2),
+             {"2d", "single"}},
+            {BSON("key" << BSON("foo"
+                                << "2dsphere")
+                        << "v" << 2),
+             {"2dsphere", "single"}},
+            {BSON("key" << BSON("foo"
+                                << "2dsphere_bucket")
+                        << "v" << 2),
+             {"2dsphere_bucket", "single"}},
+            {BSON("key" << BSON("foo" << 1) << "collation"
+                        << BSON("locale"
+                                << "en")
+                        << "v" << 2),
+             {"normal", "single", "collation"}},
+            {BSON("key" << BSON("$**"
+                                << "columnstore")
+                        << "v" << 2),
+             {"columnstore", "single"}},
+            {BSON("key" << BSON("foo" << 1 << "bar" << 1) << "v" << 2), {"normal", "compound"}},
+            {BSON("key" << BSON("foo"
+                                << "hashed")
+                        << "v" << 2),
+             {"hashed", "single"}},
+            {BSON("key" << BSON("foo"
+                                << "text")
+                        << "v" << 2),
+             {"text", "single"}},
+            {BSON("key" << BSON("foo" << 1) << "expireAfterSeconds" << 100 << "v" << 2),
+             {"normal", "single", "ttl"}},
+            {BSON("key" << BSON("wild.$**" << 1) << "v" << 2), {"wildcard", "single"}},
+};
 }  // namespace
 
-TEST_F(CollectionIndexUsageTrackerTest, GlobalFeatureUsageBasic) {
-    auto idSpec = BSON("key" << BSON("_id" << 1) << "unique" << true << "v" << 2);
-    auto idDesc = IndexDescriptor("", idSpec);
-    getTracker()->registerIndex("_id_", idSpec, IndexFeatures::make(&idDesc, false /* internal */));
-    getTracker()->recordIndexAccess("_id_");
+TEST_F(CollectionIndexUsageTrackerTest, CheckForUntestedFeatures) {
+    std::set<std::string> testedFeatures;
+    for (auto&& testCase : testCases) {
+        for (auto&& feature : testCase.features) {
+            testedFeatures.insert(feature);
+        }
+    }
 
-    ASSERT_EQ(1, getAggregatedIndexUsage()->getCount());
-    ASSERT_EQ(1, getFeatureUseCount(getAggregatedIndexUsage(), "id"));
-    ASSERT_EQ(0, getFeatureUseCount(getAggregatedIndexUsage(), "normal"));
-    ASSERT_EQ(0, getFeatureUseCount(getAggregatedIndexUsage(), "single"));
-    ASSERT_EQ(0, getFeatureUseCount(getAggregatedIndexUsage(), "sparse"));
-    ASSERT_EQ(0, getFeatureUseCount(getAggregatedIndexUsage(), "unique"));
-    ASSERT_EQ(0, getFeatureUseCount(getAggregatedIndexUsage(), "prepareUnique"));
-
-    ASSERT_EQ(1, getFeatureAccessCount(getAggregatedIndexUsage(), "id"));
-    ASSERT_EQ(0, getFeatureAccessCount(getAggregatedIndexUsage(), "normal"));
-    ASSERT_EQ(0, getFeatureAccessCount(getAggregatedIndexUsage(), "prepareUnique"));
-    ASSERT_EQ(0, getFeatureAccessCount(getAggregatedIndexUsage(), "single"));
-    ASSERT_EQ(0, getFeatureAccessCount(getAggregatedIndexUsage(), "sparse"));
-    ASSERT_EQ(0, getFeatureAccessCount(getAggregatedIndexUsage(), "unique"));
-
-    auto spec = BSON("key" << BSON("foo" << 1) << "unique" << true << "sparse" << true << "v" << 2);
-    auto desc = IndexDescriptor("", spec);
-    getTracker()->registerIndex("foo", spec, IndexFeatures::make(&desc, false /* internal */));
-    getTracker()->recordIndexAccess("foo");
-
-    ASSERT_EQ(2, getAggregatedIndexUsage()->getCount());
-    ASSERT_EQ(1, getFeatureUseCount(getAggregatedIndexUsage(), "id"));
-    ASSERT_EQ(1, getFeatureUseCount(getAggregatedIndexUsage(), "normal"));
-    ASSERT_EQ(0, getFeatureUseCount(getAggregatedIndexUsage(), "prepareUnique"));
-    ASSERT_EQ(1, getFeatureUseCount(getAggregatedIndexUsage(), "single"));
-    ASSERT_EQ(1, getFeatureUseCount(getAggregatedIndexUsage(), "sparse"));
-    ASSERT_EQ(1, getFeatureUseCount(getAggregatedIndexUsage(), "unique"));
-
-    ASSERT_EQ(1, getFeatureAccessCount(getAggregatedIndexUsage(), "id"));
-    ASSERT_EQ(1, getFeatureAccessCount(getAggregatedIndexUsage(), "normal"));
-    ASSERT_EQ(0, getFeatureAccessCount(getAggregatedIndexUsage(), "prepareUnique"));
-    ASSERT_EQ(1, getFeatureAccessCount(getAggregatedIndexUsage(), "single"));
-    ASSERT_EQ(1, getFeatureAccessCount(getAggregatedIndexUsage(), "sparse"));
-    ASSERT_EQ(1, getFeatureAccessCount(getAggregatedIndexUsage(), "unique"));
-
-    // Register an internal index and expect nothing to change.
-    getTracker()->registerIndex("foo2", spec, IndexFeatures::make(&desc, true /* internal */));
-
-    ASSERT_EQ(2, getAggregatedIndexUsage()->getCount());
-    ASSERT_EQ(1, getFeatureUseCount(getAggregatedIndexUsage(), "id"));
-    ASSERT_EQ(1, getFeatureUseCount(getAggregatedIndexUsage(), "normal"));
-    ASSERT_EQ(0, getFeatureUseCount(getAggregatedIndexUsage(), "prepareUnique"));
-    ASSERT_EQ(1, getFeatureUseCount(getAggregatedIndexUsage(), "single"));
-    ASSERT_EQ(1, getFeatureUseCount(getAggregatedIndexUsage(), "sparse"));
-    ASSERT_EQ(1, getFeatureUseCount(getAggregatedIndexUsage(), "unique"));
-
-    ASSERT_EQ(1, getFeatureAccessCount(getAggregatedIndexUsage(), "id"));
-    ASSERT_EQ(1, getFeatureAccessCount(getAggregatedIndexUsage(), "normal"));
-    ASSERT_EQ(0, getFeatureAccessCount(getAggregatedIndexUsage(), "prepareUnique"));
-    ASSERT_EQ(1, getFeatureAccessCount(getAggregatedIndexUsage(), "single"));
-    ASSERT_EQ(1, getFeatureAccessCount(getAggregatedIndexUsage(), "sparse"));
-    ASSERT_EQ(1, getFeatureAccessCount(getAggregatedIndexUsage(), "unique"));
-
-    getTracker()->unregisterIndex("foo2");
-    ASSERT_EQ(2, getAggregatedIndexUsage()->getCount());
-    ASSERT_EQ(1, getFeatureUseCount(getAggregatedIndexUsage(), "id"));
-    ASSERT_EQ(1, getFeatureUseCount(getAggregatedIndexUsage(), "normal"));
-    ASSERT_EQ(0, getFeatureUseCount(getAggregatedIndexUsage(), "prepareUnique"));
-    ASSERT_EQ(1, getFeatureUseCount(getAggregatedIndexUsage(), "single"));
-    ASSERT_EQ(1, getFeatureUseCount(getAggregatedIndexUsage(), "sparse"));
-    ASSERT_EQ(1, getFeatureUseCount(getAggregatedIndexUsage(), "unique"));
-
-    ASSERT_EQ(1, getFeatureAccessCount(getAggregatedIndexUsage(), "id"));
-    ASSERT_EQ(1, getFeatureAccessCount(getAggregatedIndexUsage(), "normal"));
-    ASSERT_EQ(0, getFeatureAccessCount(getAggregatedIndexUsage(), "prepareUnique"));
-    ASSERT_EQ(1, getFeatureAccessCount(getAggregatedIndexUsage(), "single"));
-    ASSERT_EQ(1, getFeatureAccessCount(getAggregatedIndexUsage(), "sparse"));
-    ASSERT_EQ(1, getFeatureAccessCount(getAggregatedIndexUsage(), "unique"));
-
-    getTracker()->unregisterIndex("foo");
-    ASSERT_EQ(1, getAggregatedIndexUsage()->getCount());
-    ASSERT_EQ(1, getFeatureUseCount(getAggregatedIndexUsage(), "id"));
-    ASSERT_EQ(0, getFeatureUseCount(getAggregatedIndexUsage(), "normal"));
-    ASSERT_EQ(0, getFeatureUseCount(getAggregatedIndexUsage(), "prepareUnique"));
-    ASSERT_EQ(0, getFeatureUseCount(getAggregatedIndexUsage(), "single"));
-    ASSERT_EQ(0, getFeatureUseCount(getAggregatedIndexUsage(), "sparse"));
-    ASSERT_EQ(0, getFeatureUseCount(getAggregatedIndexUsage(), "unique"));
-
-    ASSERT_EQ(1, getFeatureAccessCount(getAggregatedIndexUsage(), "id"));
-    ASSERT_EQ(1, getFeatureAccessCount(getAggregatedIndexUsage(), "normal"));
-    ASSERT_EQ(0, getFeatureAccessCount(getAggregatedIndexUsage(), "prepareUnique"));
-    ASSERT_EQ(1, getFeatureAccessCount(getAggregatedIndexUsage(), "single"));
-    ASSERT_EQ(1, getFeatureAccessCount(getAggregatedIndexUsage(), "sparse"));
-    ASSERT_EQ(1, getFeatureAccessCount(getAggregatedIndexUsage(), "unique"));
-
-    getTracker()->unregisterIndex("_id_");
-    ASSERT_EQ(0, getAggregatedIndexUsage()->getCount());
-    ASSERT_EQ(0, getFeatureUseCount(getAggregatedIndexUsage(), "id"));
-    ASSERT_EQ(0, getFeatureUseCount(getAggregatedIndexUsage(), "normal"));
-    ASSERT_EQ(0, getFeatureUseCount(getAggregatedIndexUsage(), "prepareUnique"));
-    ASSERT_EQ(0, getFeatureUseCount(getAggregatedIndexUsage(), "single"));
-    ASSERT_EQ(0, getFeatureUseCount(getAggregatedIndexUsage(), "sparse"));
-    ASSERT_EQ(0, getFeatureUseCount(getAggregatedIndexUsage(), "unique"));
-
-    ASSERT_EQ(1, getFeatureAccessCount(getAggregatedIndexUsage(), "id"));
-    ASSERT_EQ(1, getFeatureAccessCount(getAggregatedIndexUsage(), "normal"));
-    ASSERT_EQ(0, getFeatureAccessCount(getAggregatedIndexUsage(), "prepareUnique"));
-    ASSERT_EQ(1, getFeatureAccessCount(getAggregatedIndexUsage(), "single"));
-    ASSERT_EQ(1, getFeatureAccessCount(getAggregatedIndexUsage(), "sparse"));
-    ASSERT_EQ(1, getFeatureAccessCount(getAggregatedIndexUsage(), "unique"));
+    getAggregatedIndexUsage()->forEachFeature([&](auto f, auto& stats) {
+        ASSERT(testedFeatures.contains(f)) << "untested feature: " << f;
+    });
 }
 
-// Unregister and re-register an index with prepareUnique
-TEST_F(CollectionIndexUsageTrackerTest, RegisterPrepareUnique) {
-    auto spec = BSON("key" << BSON("foo" << 1) << "v" << 2);
-    auto desc = IndexDescriptor("", spec);
-    getTracker()->registerIndex("foo", spec, IndexFeatures::make(&desc, false /* internal */));
-    getTracker()->recordIndexAccess("foo");
+TEST_F(CollectionIndexUsageTrackerTest, ExhaustiveFeatures) {
+    for (auto&& testCase : testCases) {
+        resetToZero();
 
-    ASSERT_EQ(1, getAggregatedIndexUsage()->getCount());
-    ASSERT_EQ(0, getFeatureUseCount(getAggregatedIndexUsage(), "id"));
-    ASSERT_EQ(1, getFeatureUseCount(getAggregatedIndexUsage(), "normal"));
-    ASSERT_EQ(0, getFeatureUseCount(getAggregatedIndexUsage(), "prepareUnique"));
-    ASSERT_EQ(1, getFeatureUseCount(getAggregatedIndexUsage(), "single"));
-    ASSERT_EQ(0, getFeatureUseCount(getAggregatedIndexUsage(), "sparse"));
-    ASSERT_EQ(0, getFeatureUseCount(getAggregatedIndexUsage(), "unique"));
+        const auto& spec = testCase.spec;
+        const auto& features = testCase.features;
 
-    ASSERT_EQ(0, getFeatureAccessCount(getAggregatedIndexUsage(), "id"));
-    ASSERT_EQ(1, getFeatureAccessCount(getAggregatedIndexUsage(), "normal"));
-    ASSERT_EQ(0, getFeatureAccessCount(getAggregatedIndexUsage(), "prepareUnique"));
-    ASSERT_EQ(1, getFeatureAccessCount(getAggregatedIndexUsage(), "single"));
-    ASSERT_EQ(0, getFeatureAccessCount(getAggregatedIndexUsage(), "sparse"));
-    ASSERT_EQ(0, getFeatureAccessCount(getAggregatedIndexUsage(), "unique"));
+        const std::string pluginName = IndexNames::findPluginName(spec["key"].Obj());
+        const auto desc = IndexDescriptor(pluginName, spec);
+        const auto name = "test";
+        getTracker()->registerIndex(name, spec, IndexFeatures::make(&desc, false /* internal */));
+        ASSERT_EQ(1, getAggregatedIndexUsage()->getCount());
 
-    // Unregister an re-register with different options.
-    getTracker()->unregisterIndex("foo");
-    auto spec2 = BSON("key" << BSON("foo" << 1) << "prepareUnique" << true << "v" << 2);
-    auto desc2 = IndexDescriptor("", spec2);
-    getTracker()->registerIndex("foo", spec2, IndexFeatures::make(&desc2, false /* internal */));
-    getTracker()->recordIndexAccess("foo");
+        getAggregatedIndexUsage()->forEachFeature([&](auto f, auto& stats) {
+            if (std::find(features.begin(), features.end(), f) != features.end()) {
+                ASSERT_EQ(1, stats.count.load()) << f << " in " << spec;
+            } else {
+                ASSERT_EQ(0, stats.count.load()) << f << " in " << spec;
+            }
+        });
 
-    ASSERT_EQ(1, getAggregatedIndexUsage()->getCount());
-    ASSERT_EQ(0, getFeatureUseCount(getAggregatedIndexUsage(), "id"));
-    ASSERT_EQ(1, getFeatureUseCount(getAggregatedIndexUsage(), "normal"));
-    ASSERT_EQ(1, getFeatureUseCount(getAggregatedIndexUsage(), "prepareUnique"));
-    ASSERT_EQ(1, getFeatureUseCount(getAggregatedIndexUsage(), "single"));
-    ASSERT_EQ(0, getFeatureUseCount(getAggregatedIndexUsage(), "sparse"));
-    ASSERT_EQ(0, getFeatureUseCount(getAggregatedIndexUsage(), "unique"));
+        getTracker()->recordIndexAccess(name);
+        getAggregatedIndexUsage()->forEachFeature([&](auto f, auto& stats) {
+            if (std::find(features.begin(), features.end(), f) != features.end()) {
+                ASSERT_EQ(1, stats.accesses.load()) << f << " in " << spec;
+            } else {
+                ASSERT_EQ(0, stats.accesses.load()) << f << " in " << spec;
+            }
+        });
 
-    ASSERT_EQ(0, getFeatureAccessCount(getAggregatedIndexUsage(), "id"));
-    ASSERT_EQ(2, getFeatureAccessCount(getAggregatedIndexUsage(), "normal"));
-    ASSERT_EQ(1, getFeatureAccessCount(getAggregatedIndexUsage(), "prepareUnique"));
-    ASSERT_EQ(2, getFeatureAccessCount(getAggregatedIndexUsage(), "single"));
-    ASSERT_EQ(0, getFeatureAccessCount(getAggregatedIndexUsage(), "sparse"));
-    ASSERT_EQ(0, getFeatureAccessCount(getAggregatedIndexUsage(), "unique"));
+        getTracker()->unregisterIndex(name);
+        ASSERT_EQ(0, getAggregatedIndexUsage()->getCount());
+
+        getAggregatedIndexUsage()->forEachFeature([&](auto f, auto& stats) {
+            if (std::find(features.begin(), features.end(), f) != features.end()) {
+                ASSERT_EQ(0, stats.count.load()) << f << " in " << spec;
+            } else {
+                ASSERT_EQ(0, stats.count.load()) << f << " in " << spec;
+            }
+        });
+
+        getAggregatedIndexUsage()->forEachFeature([&](auto f, auto& stats) {
+            if (std::find(features.begin(), features.end(), f) != features.end()) {
+                ASSERT_EQ(1, stats.accesses.load()) << f << " in " << spec;
+            } else {
+                ASSERT_EQ(0, stats.accesses.load()) << f << " in " << spec;
+            }
+        });
+    }
 }
 
 }  // namespace
