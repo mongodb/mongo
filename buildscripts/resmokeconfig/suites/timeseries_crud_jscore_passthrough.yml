@@ -142,7 +142,6 @@ selector:
     - jstests/core/long_index_rename.js # rename
     - jstests/core/positional_projection_multiple_array_fields.js # $slice
     - jstests/core/query/elemmatch/**/*.js # $elemMatch
-    - jstests/core/query/plan_cache/elem_match_index_diff_types.js # $elemMatch
     - jstests/core/query/plan_cache/match_or_duplicate_predicate_plan_cache.js # locking
     - jstests/core/query/plan_cache/query_solution_hash.js # locking
     - jstests/core/sbe_plan_cache_autoparameterize_collscan.js # locking

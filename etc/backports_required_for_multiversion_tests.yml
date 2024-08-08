@@ -225,8 +225,6 @@ last-continuous:
       ticket: SERVER-84359
     - test_file: jstests/core/index/geo/geo_2d_point_near_zero.js
       ticket: SERVER-92930
-    - test_file: jstests/core/query/plan_cache/elem_match_index_diff_types.js
-      ticket: SERVER-92806
     - test_file: jstests/core/timeseries/timeseries_insert_mixed_schema_bucket.js
       ticket: SERVER-93099
     - test_file: jstests/core/timeseries/timeseries_update_mixed_schema_bucket.js
@@ -470,8 +468,6 @@ last-lts:
       ticket: SERVER-84359
     - test_file: jstests/core/index/geo/geo_2d_point_near_zero.js
       ticket: SERVER-92930
-    - test_file: jstests/core/query/plan_cache/elem_match_index_diff_types.js
-      ticket: SERVER-92806
     - test_file: jstests/core/timeseries/timeseries_insert_mixed_schema_bucket.js
       ticket: SERVER-93099
     - test_file: jstests/core/timeseries/timeseries_update_mixed_schema_bucket.js

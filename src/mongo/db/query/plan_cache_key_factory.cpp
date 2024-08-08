@@ -64,29 +64,12 @@ void encodeIndexabilityForDiscriminators(const MatchExpression* tree,
 
 void encodeIndexabilityRecursive(const MatchExpression* tree,
                                  const PlanCacheIndexabilityState& indexabilityState,
-                                 StringBuilder* keyBuilder,
-                                 StringData parentPath = {}) {
-    std::string fullPath;
-    // Accumulate the path components from any ancestors with partial paths (eg. $elemMatch) through
-    // the tree to the leaves. Leaf expressions as children of these partial-path expressions will
-    // have an empty path and would otherwise fail to include the discriminators in the key.
-    StringData path;
+                                 StringBuilder* keyBuilder) {
     if (!tree->path().empty()) {
-        // This expression has a path component. Either use it, or append it to the parent path.
-        if (parentPath.empty()) {
-            path = tree->path();
-        } else {
-            fullPath = parentPath.toString() + "." + tree->path();
-            path = fullPath;
-        }
-    } else {
-        path = parentPath;
-    }
-    if (!path.empty()) {
         const IndexToDiscriminatorMap& discriminators =
-            indexabilityState.getPathDiscriminators(path);
+            indexabilityState.getPathDiscriminators(tree->path());
         IndexToDiscriminatorMap wildcardDiscriminators =
-            indexabilityState.buildWildcardDiscriminators(path);
+            indexabilityState.buildWildcardDiscriminators(tree->path());
         if (!discriminators.empty() || !wildcardDiscriminators.empty()) {
             *keyBuilder << kEncodeDiscriminatorsBegin;
             // For each discriminator on this path, append the character '0' or '1'.
@@ -104,7 +87,7 @@ void encodeIndexabilityRecursive(const MatchExpression* tree,
     }
 
     for (size_t i = 0; i < tree->numChildren(); ++i) {
-        encodeIndexabilityRecursive(tree->getChild(i), indexabilityState, keyBuilder, path);
+        encodeIndexabilityRecursive(tree->getChild(i), indexabilityState, keyBuilder);
     }
 }
 
