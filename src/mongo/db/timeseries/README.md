@@ -347,7 +347,8 @@ equivalently the value of its `control.min.<time field>`, will be taken from the
 inserted to the bucket and rounded down based on the `bucketRoundingSeconds`. This rounding will
 generally be accomplished by basic modulus arithmetic operating on the number of seconds since the
 epoch i.e. for an input timestamp `t` and a rounding value `r`, the rounded timestamp will be
-taken as `t - (t % r)`.
+taken as `t - (t % r)`. See [jstests/core/timeseries/bucket_timestamp_rounding.js](https://github.com/mongodb/mongo/blob/master/jstests/core/timeseries/bucket_timestamp_rounding.js) for edge
+cases on rounding and bucket timespans.
 
 A user may choose to set `bucketMaxSpanSeconds` and `bucketRoundingSeconds` directly when creating a
 new collection in order to use "fixed bucketing". In this case we require that these two values are
@@ -355,9 +356,13 @@ equal to each other, strictly positive, and no more than 31536000 (365 days).
 
 In most cases though, the user will instead want to use the `granularity` option. This option is
 intended to convey the scale of the time between measurements in a given time-series, and encodes
-some reasonable presets of "seconds", "minutes" and "hours". These presets correspond to
-`bucketMaxSpanSeconds` values of 3600 (1 hour), 86400 (1 day), and 2592000 (30 days); and
-`bucketRoundingSeconds` values of 60 (1 minute), 3600 (1 hour), and 86400 (1 day), respectively.
+some reasonable presets of "seconds", "minutes" and "hours".
+
+| Granularity | `bucketRoundingSeconds` | `bucketMaxSpanSeconds` |
+| ----------- | ----------------------- | ---------------------- |
+| _Seconds_   | 60 (1 minute)           | 3,600 (1 hour)         |
+| _Hours_     | 3,600 (1 hour)          | 86,400 (1 day)         |
+| _Days_      | 86,400 (1 day)          | 25,592,000 (30 days)   |
 
 If the user does not specify any bucketing parameters when creating a collection, the default value
 is `{granularity: "seconds"}`.
@@ -366,6 +371,19 @@ A `collMod` operation can change these settings as long as the net effect is tha
 `bucketMaxSpanSeconds` and `bucketRoundingSeconds` do not decrease, and the values remain in the
 valid ranges. Notably, one can convert from fixed range bucketing to one of the `granularity`
 presets or vice versa, as long as the associated seconds parameters do not decrease as a result.
+
+## Bucket Timestamps
+
+Though the time component of the bucket's ObjectID should be equal to the `control.min.<time>` field,
+the ObjectID type stores timestamps as 4-byte unix timestamps with precision of seconds from 1970 to
+2038 that can overflow. The control block stores an 8-byte timestamp with precision of milliseconds
+that can exceed 2038.
+
+The bucket's ObjectID has no inherent relation to the time component of the `_id` of a measurement.
+The `_id` of a measurement (not the bucket) will have a time component that is indicative of
+insert time, not measurement time. Insert time and measurement time are roughly correlated for
+real-time workloads, but for loading historical data or late-arriving measurements these two
+will skew.
 
 ## Updates and Deletes
 
@@ -436,6 +454,25 @@ See:
 # Glossary
 
 **bucket**: A group of measurements with the same meta-data over a limited period of time.
+
+- **alternate bucket**: Used in the context of [useAlternateBucket()](https://github.com/mongodb/mongo/blob/4fb9fe8ef26cde41d3fe1c261bae1ef75c2c3bfc/src/mongo/db/timeseries/bucket_catalog/bucket_catalog_internal.h#L158-L163) and refers to any eligible bucket
+  that can be found in memory for reopening.
+
+- **archived bucket**: A bucket that resides on-disk with a crumb of info [still in memory](https://github.com/10gen/mongo/blob/883a40fdd73056c88221aa668a627cd2e6c621a6/src/mongo/db/timeseries/bucket_catalog/bucket_catalog.h#L166-L175)
+  to support efficient reopening without querying. Adding new measurements to this
+  bucket will require materializing data from disk.
+
+- **closed bucket**: A bucket that solely exists on-disk. It could have been closed for a few reasons:
+
+  - too large (number of measurements or physical size of bucket)
+  - memory pressure
+
+- **frozen bucket**: A bucket that is no longer eligible for new measurements due to inability to compress.
+
+- **idle bucket**: A bucket that is open but does not have any pending uncommitted measurements. Relevant
+  to closing buckets due to memory pressure.
+
+- **open bucket**: A bucket that resides in memory. It can efficiently accept new measurements.
 
 **bucket collection**: A system collection used for storing the buckets underlying a time-series
 collection. Replication, sharding and indexing are all done at the level of buckets in the bucket

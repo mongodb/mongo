@@ -56,17 +56,26 @@ TEST(TimeseriesOptionsTest, RoundTimestampToGranularity) {
     TimeseriesOptions optionsHours =
         createTimeseriesOptionsWithGranularity(BucketGranularityEnum::Hours);
     std::vector<std::tuple<TimeseriesOptions, std::string, std::string>> testCases{
+        {optionsSeconds, "2021-01-01T00:00:00.000Z", "2021-01-01T00:00:00.000Z"},
+        {optionsSeconds, "2021-01-01T00:00:00.001Z", "2021-01-01T00:00:00.000Z"},
         {optionsSeconds, "2021-01-01T00:00:15.555Z", "2021-01-01T00:00:00.000Z"},
         {optionsSeconds, "2021-01-01T00:00:30.555Z", "2021-01-01T00:00:00.000Z"},
         {optionsSeconds, "2021-01-01T00:00:45.555Z", "2021-01-01T00:00:00.000Z"},
+        {optionsSeconds, "2021-01-01T00:00:59.999Z", "2021-01-01T00:00:00.000Z"},
 
+        {optionsMinutes, "2021-01-01T00:00:00.000Z", "2021-01-01T00:00:00.000Z"},
+        {optionsMinutes, "2021-01-01T00:00:00.001Z", "2021-01-01T00:00:00.000Z"},
         {optionsMinutes, "2021-01-01T00:15:00.000Z", "2021-01-01T00:00:00.000Z"},
         {optionsMinutes, "2021-01-01T00:30:00.000Z", "2021-01-01T00:00:00.000Z"},
         {optionsMinutes, "2021-01-01T00:45:00.000Z", "2021-01-01T00:00:00.000Z"},
+        {optionsMinutes, "2021-01-01T00:59:59.999Z", "2021-01-01T00:00:00.000Z"},
 
+        {optionsHours, "2021-01-01T00:00:00.000Z", "2021-01-01T00:00:00.000Z"},
+        {optionsHours, "2021-01-01T00:00:00.001Z", "2021-01-01T00:00:00.000Z"},
         {optionsHours, "2021-01-01T06:00:00.000Z", "2021-01-01T00:00:00.000Z"},
         {optionsHours, "2021-01-01T12:00:00.000Z", "2021-01-01T00:00:00.000Z"},
         {optionsHours, "2021-01-01T18:00:00.000Z", "2021-01-01T00:00:00.000Z"},
+        {optionsHours, "2021-01-01T23:59:59.999Z", "2021-01-01T00:00:00.000Z"},
     };
 
     for (const auto& [granularity, input, expectedOutput] : testCases) {
@@ -74,6 +83,46 @@ TEST(TimeseriesOptionsTest, RoundTimestampToGranularity) {
         ASSERT_OK(inputDate);
         auto roundedDate =
             timeseries::roundTimestampToGranularity(inputDate.getValue(), granularity);
+        ASSERT_EQ(dateToISOStringUTC(roundedDate), expectedOutput);
+    }
+}
+
+TEST(TimeseriesOptionsTest, RoundTimestampBySeconds) {
+    std::vector<std::tuple<long long, std::string, std::string>> testCases{
+        {60l, "2024-08-08T00:00:00.000Z", "2024-08-08T00:00:00.000Z"},
+        {60l, "2024-08-08T00:00:00.001Z", "2024-08-08T00:00:00.000Z"},
+        {60l, "2024-08-08T00:00:15.555Z", "2024-08-08T00:00:00.000Z"},
+        {60l, "2024-08-08T00:00:30.555Z", "2024-08-08T00:00:00.000Z"},
+        {60l, "2024-08-08T00:00:45.555Z", "2024-08-08T00:00:00.000Z"},
+        {60l, "2024-08-08T00:00:59.999Z", "2024-08-08T00:00:00.000Z"},
+
+        {60l, "2024-08-08T05:04:00.000Z", "2024-08-08T05:04:00.000Z"},
+        {60l, "2024-08-08T05:04:00.001Z", "2024-08-08T05:04:00.000Z"},
+        {60l, "2024-08-08T05:04:15.555Z", "2024-08-08T05:04:00.000Z"},
+        {60l, "2024-08-08T05:04:30.555Z", "2024-08-08T05:04:00.000Z"},
+        {60l, "2024-08-08T05:04:45.555Z", "2024-08-08T05:04:00.000Z"},
+        {60l, "2024-08-08T05:04:59.999Z", "2024-08-08T05:04:00.000Z"},
+
+        {3600l, "2024-08-08T00:00:00.000Z", "2024-08-08T00:00:00.000Z"},
+        {3600l, "2024-08-08T00:00:00.001Z", "2024-08-08T00:00:00.000Z"},
+        {3600l, "2024-08-08T00:15:00.000Z", "2024-08-08T00:00:00.000Z"},
+        {3600l, "2024-08-08T00:30:00.000Z", "2024-08-08T00:00:00.000Z"},
+        {3600l, "2024-08-08T00:45:00.000Z", "2024-08-08T00:00:00.000Z"},
+        {3600l, "2024-08-08T00:59:59.999Z", "2024-08-08T00:00:00.000Z"},
+
+        {86400l, "2024-08-08T00:00:00.000Z", "2024-08-08T00:00:00.000Z"},
+        {86400l, "2024-08-08T00:00:00.001Z", "2024-08-08T00:00:00.000Z"},
+        {86400l, "2024-08-08T06:00:00.000Z", "2024-08-08T00:00:00.000Z"},
+        {86400l, "2024-08-08T12:00:00.000Z", "2024-08-08T00:00:00.000Z"},
+        {86400l, "2024-08-08T18:00:00.000Z", "2024-08-08T00:00:00.000Z"},
+        {86400l, "2024-08-08T23:59:59.999Z", "2024-08-08T00:00:00.000Z"},
+    };
+
+    for (const auto& [roundingSeconds, input, expectedOutput] : testCases) {
+        auto inputDate = dateFromISOString(input);
+        ASSERT_OK(inputDate);
+        auto roundedDate =
+            timeseries::roundTimestampBySeconds(inputDate.getValue(), roundingSeconds);
         ASSERT_EQ(dateToISOStringUTC(roundedDate), expectedOutput);
     }
 }
