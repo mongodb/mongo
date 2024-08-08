@@ -196,11 +196,11 @@ public:
         _containsDotsAndDollarsField = containsDotsAndDollarsField;
     }
 
-    bool preserveEmptyTS() const {
-        return _preserveEmptyTS;
+    bool bypassEmptyTsReplacement() const {
+        return _bypassEmptyTsReplacement;
     }
-    void setPreserveEmptyTS(bool preserveEmptyTS) {
-        _preserveEmptyTS = preserveEmptyTS;
+    void setBypassEmptyTsReplacement(bool bypassEmptyTsReplacement) {
+        _bypassEmptyTsReplacement = bypassEmptyTsReplacement;
     }
 
     /**
@@ -246,7 +246,7 @@ private:
     // True if this update comes from an oplog application.
     bool _fromOplogApplication = false;
 
-    bool _preserveEmptyTS = false;
+    bool _bypassEmptyTsReplacement = false;
 
     // True if this update is guaranteed not to contain dots or dollars fields and should skip the
     // check.

@@ -87,7 +87,7 @@ Status validateDepth(const BSONObj& obj) {
 
 StatusWith<BSONObj> fixDocumentForInsert(OperationContext* opCtx,
                                          const BSONObj& doc,
-                                         bool preserveEmptyTimestamps,
+                                         bool bypassEmptyTsReplacement,
                                          bool* containsDotsAndDollarsField) {
     bool validationDisabled = DocumentValidationSettings::get(opCtx).isInternalValidationDisabled();
 
@@ -140,7 +140,7 @@ StatusWith<BSONObj> fixDocumentForInsert(OperationContext* opCtx,
             }
 
             if (!validationDisabled) {
-                if (!preserveEmptyTimestamps && e.type() == bsonTimestamp &&
+                if (!bypassEmptyTsReplacement && e.type() == bsonTimestamp &&
                     e.timestampValue() == 0) {
                     // we replace Timestamp(0,0) at the top level with a correct value
                     // in the fast pass, we just mark that we want to swap
@@ -189,7 +189,7 @@ StatusWith<BSONObj> fixDocumentForInsert(OperationContext* opCtx,
         BSONElement e = i.next();
         if (hadId && e.fieldNameStringData() == "_id") {
             // no-op
-        } else if (!preserveEmptyTimestamps && e.type() == bsonTimestamp &&
+        } else if (!bypassEmptyTsReplacement && e.type() == bsonTimestamp &&
                    e.timestampValue() == 0) {
             auto nextTime = VectorClockMutable::get(opCtx)->tickClusterTime(1);
             b.append(e.fieldName(), nextTime.asTimestamp());

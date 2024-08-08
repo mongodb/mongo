@@ -179,6 +179,10 @@ bool BatchedCommandRequest::requiresWriteAcknowledgement() const {
     return false;
 }
 
+const OptionalBool& BatchedCommandRequest::getBypassEmptyTsReplacement() const {
+    return _visit([](auto&& op) -> decltype(auto) { return op.getBypassEmptyTsReplacement(); });
+};
+
 const write_ops::WriteCommandRequestBase& BatchedCommandRequest::getWriteCommandRequestBase()
     const {
     return _visit([](auto&& op) -> decltype(auto) { return op.getWriteCommandRequestBase(); });

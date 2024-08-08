@@ -118,6 +118,12 @@ int getWriteCommandRequestBaseSize(const write_ops::WriteCommandRequestBase& bas
             kBoolSize + kPerElementOverhead;
     }
 
+    if (auto bypassEmptyTsReplacement = base.getBypassEmptyTsReplacement();
+        bypassEmptyTsReplacement.has_value()) {
+        estSize += write_ops::WriteCommandRequestBase::kBypassEmptyTsReplacementFieldName.size() +
+            kBoolSize + kPerElementOverhead;
+    }
+
     return estSize;
 }
 

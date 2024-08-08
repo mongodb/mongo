@@ -1510,6 +1510,7 @@ public:
             updateRequest.setLegacyRuntimeConstants(request().getLegacyRuntimeConstants().value_or(
                 Variables::generateRuntimeConstants(opCtx)));
             updateRequest.setLetParameters(request().getLet());
+            updateRequest.setBypassEmptyTsReplacement(request().getBypassEmptyTsReplacement());
             updateRequest.setYieldPolicy(PlanYieldPolicy::YieldPolicy::YIELD_AUTO);
             updateRequest.setExplain(verbosity);
 

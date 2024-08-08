@@ -159,6 +159,10 @@ last-continuous:
     ticket: SERVER-89618
   - test_file: jstests/core/timeseries/timeseries_lookup.js
     ticket: SERVER-79637
+  - test_file: jstests/core/bypass_empty_ts_replacement.js
+    ticket: SERVER-88750
+  - test_file: jstests/core/bypass_empty_ts_replacement_timeseries.js
+    ticket: SERVER-88750
   suites:
     change_streams_multiversion_passthrough: null
     change_streams_sharded_collections_multiversion_passthrough: null
@@ -382,6 +386,10 @@ last-lts:
     ticket: SERVER-79637
   - test_file: jstests/replsets/log_wt_stats_during_secondary_oplog_application.js
     ticket: SERVER-78509
+  - test_file: jstests/core/bypass_empty_ts_replacement.js
+    ticket: SERVER-88750
+  - test_file: jstests/core/bypass_empty_ts_replacement_timeseries.js
+    ticket: SERVER-88750
   suites:
     change_streams_multiversion_passthrough: null
     change_streams_sharded_collections_multiversion_passthrough: null

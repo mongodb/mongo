@@ -158,10 +158,14 @@ void UpdateDriver::parse(
                 "multi update is not supported for replacement-style update",
                 !multi);
 
-        const bool preserveEmptyTimestamps = _preserveEmptyTS || _fromOplogApplication;
+        // For updates that originated from the oplog, we're required to apply the update
+        // exactly as it was recorded (even if it contains zero-valued timestamps). Therefore,
+        // we should only replace zero-valued timestamps with the current time when both
+        // '_bypassEmptyTsReplacement' and '_fromOplogApplication' are false.
+        const bool bypassEmptyTsReplacement = _bypassEmptyTsReplacement || _fromOplogApplication;
 
         _updateExecutor = std::make_unique<ObjectReplaceExecutor>(updateMod.getUpdateReplacement(),
-                                                                  preserveEmptyTimestamps);
+                                                                  bypassEmptyTsReplacement);
 
         // Register the fact that this driver will only do full object replacements.
         _updateType = UpdateType::kReplacement;

@@ -167,6 +167,11 @@ structs:
                               to the time-series view, but got rewritten to target time-series
                               buckets namespace."
                 type: optionalBool
+            bypassEmptyTsReplacement:
+                description: "Only applicable for inserts and replacement updates. If set to true,
+                              any empty timestamps (Timestamp(0,0)) in 'documents' or 'u' will not
+                              be replaced by the current time and instead will be preserved as-is."
+                type: optionalBool
 
     UpdateOpEntry:
         description: "Parser for the entries in the 'updates' array of an update command."
@@ -444,3 +449,8 @@ commands:
                 description: "Describes the write concern."
                 type: object
                 optional: true
+            bypassEmptyTsReplacement:
+                description: "Only applicable when 'update' is a replacement update. If set, any
+                              empty timestamps (Timestamp(0, 0)) in the update will not be replaced
+                              by the current time and instead will be preserved as-is."
+                type: optionalBool

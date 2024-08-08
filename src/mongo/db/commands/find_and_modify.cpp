@@ -173,6 +173,8 @@ void makeUpdateRequest(OperationContext* opCtx,
     requestOut->setYieldPolicy(opCtx->inMultiDocumentTransaction()
                                    ? PlanYieldPolicy::YieldPolicy::INTERRUPT_ONLY
                                    : PlanYieldPolicy::YieldPolicy::YIELD_AUTO);
+
+    requestOut->setBypassEmptyTsReplacement(request.getBypassEmptyTsReplacement());
 }
 
 void makeDeleteRequest(OperationContext* opCtx,
