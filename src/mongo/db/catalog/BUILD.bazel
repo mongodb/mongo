@@ -8,3 +8,16 @@ exports_files(
         "*.cpp",
     ]),
 )
+
+mongo_cc_library(
+    name = "cannot_convert_index_to_unique_info",
+    srcs = [
+        "cannot_convert_index_to_unique_info.cpp",
+    ],
+    hdrs = [
+        "cannot_convert_index_to_unique_info.h",
+    ],
+    deps = [
+        "//src/mongo:base",
+    ],
+)

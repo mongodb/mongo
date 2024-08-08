@@ -138,16 +138,6 @@ env.Library(
 )
 
 env.Library(
-    target="cluster_auth_mode",
-    source=[
-        "cluster_auth_mode.cpp",
-    ],
-    LIBDEPS=[
-        "$BUILD_DIR/mongo/base",
-    ],
-)
-
-env.Library(
     target="auth_options",
     source=[
         "auth_options.idl",

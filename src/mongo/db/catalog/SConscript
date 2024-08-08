@@ -628,16 +628,6 @@ env.Library(
 )
 
 env.Library(
-    target="cannot_convert_index_to_unique_info",
-    source=[
-        "cannot_convert_index_to_unique_info.cpp",
-    ],
-    LIBDEPS_PRIVATE=[
-        "$BUILD_DIR/mongo/base",
-    ],
-)
-
-env.Library(
     target="collection_uuid_mismatch_info",
     source=[
         "collection_uuid_mismatch_info.cpp",

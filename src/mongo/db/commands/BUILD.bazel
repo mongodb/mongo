@@ -12,3 +12,16 @@ idl_generator(
     name = "test_commands_enabled_gen",
     src = "test_commands_enabled.idl",
 )
+
+mongo_cc_library(
+    name = "list_collections_filter",
+    srcs = [
+        "list_collections_filter.cpp",
+    ],
+    hdrs = [
+        "list_collections_filter.h",
+    ],
+    deps = [
+        "//src/mongo:base",
+    ],
+)

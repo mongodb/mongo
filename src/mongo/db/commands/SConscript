@@ -722,16 +722,6 @@ env.Library(
 )
 
 env.Library(
-    target="list_collections_filter",
-    source=[
-        "list_collections_filter.cpp",
-    ],
-    LIBDEPS=[
-        "$BUILD_DIR/mongo/base",
-    ],
-)
-
-env.Library(
     target="tenant_migration_cmds_request",
     source=[
         "tenant_migration_donor_cmds.idl",

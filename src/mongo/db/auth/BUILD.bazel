@@ -8,3 +8,16 @@ exports_files(
         "*.cpp",
     ]),
 )
+
+mongo_cc_library(
+    name = "cluster_auth_mode",
+    srcs = [
+        "cluster_auth_mode.cpp",
+    ],
+    hdrs = [
+        "cluster_auth_mode.h",
+    ],
+    deps = [
+        "//src/mongo:base",
+    ],
+)
