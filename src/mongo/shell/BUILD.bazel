@@ -16,16 +16,8 @@ mongo_cc_library(
     ],
     hdrs = [
         "linenoise_utf8.h",
-        "//src/mongo/base:static_assert.h",
-        "//src/mongo/base:string_data.h",
-        "//src/mongo/platform:atomic.h",
-        "//src/mongo/platform:atomic_word.h",
-        "//src/mongo/platform:compiler.h",
-        "//src/mongo/platform:compiler_msvc.h",
-        "//src/mongo/stdx:type_traits.h",
-        "//src/mongo/util:assert_util_core.h",
-        "//src/mongo/util:ctype.h",
-        "//src/mongo/util:debug_util.h",
-        "//src/mongo/util:text.h",
+    ],
+    deps = [
+        "//src/mongo:base",
     ],
 )
