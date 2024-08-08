@@ -43,7 +43,6 @@
 #include "mongo/logv2/log_component.h"
 #include "mongo/util/assert_util_core.h"
 #include "mongo/util/processinfo.h"
-#include "mongo/util/stacktrace.h"
 #include "mongo/util/testing_proctor.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kStorage
@@ -310,11 +309,6 @@ void ThroughputProbing::_resize(OperationContext* opCtx,
 
         if (TestingProctor::instance().isEnabled()) {
             dumpLockManager();
-
-#if defined(MONGO_STACKTRACE_CAN_DUMP_ALL_THREADS)
-            // Dump the stack of each thread.
-            printAllThreadStacksBlocking();
-#endif
         }
     }
 }
