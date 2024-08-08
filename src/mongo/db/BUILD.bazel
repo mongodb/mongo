@@ -6,3 +6,16 @@ idl_generator(
     name = "basic_types_gen",
     src = "basic_types.idl",
 )
+
+mongo_cc_library(
+    name = "profile_filter",
+    srcs = [
+        "profile_filter.cpp",
+    ],
+    hdrs = [
+        "profile_filter.h",
+    ],
+    deps = [
+        "//src/mongo:base",
+    ],
+)

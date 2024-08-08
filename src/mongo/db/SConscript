@@ -246,16 +246,6 @@ env.Library(
     ],
 )
 
-env.Library(
-    target="profile_filter",
-    source=[
-        "profile_filter.cpp",
-    ],
-    LIBDEPS=[
-        "$BUILD_DIR/mongo/base",
-    ],
-)
-
 env.Benchmark(
     target="profile_filter_bm",
     source=[
