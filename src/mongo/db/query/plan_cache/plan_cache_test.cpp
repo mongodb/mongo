@@ -28,7 +28,7 @@
  */
 
 /**
- * This file contains tests for mongo/db/query/plan_cache.h
+ * This file contains tests for mongo/db/query/plan_cache/plan_cache.h
  */
 
 #include <boost/cstdint.hpp>
@@ -59,16 +59,17 @@
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/query/canonical_query.h"
 #include "mongo/db/query/canonical_query_test_util.h"
-#include "mongo/db/query/classic_plan_cache.h"
 #include "mongo/db/query/collation/collator_interface.h"
 #include "mongo/db/query/collation/collator_interface_mock.h"
 #include "mongo/db/query/find_command.h"
 #include "mongo/db/query/index_entry.h"
-#include "mongo/db/query/plan_cache.h"
-#include "mongo/db/query/plan_cache_indexability.h"
-#include "mongo/db/query/plan_cache_key_factory.h"
-#include "mongo/db/query/plan_cache_key_info.h"
-#include "mongo/db/query/plan_cache_test_util.h"
+#include "mongo/db/query/plan_cache/classic_plan_cache.h"
+#include "mongo/db/query/plan_cache/plan_cache.h"
+#include "mongo/db/query/plan_cache/plan_cache_indexability.h"
+#include "mongo/db/query/plan_cache/plan_cache_key_factory.h"
+#include "mongo/db/query/plan_cache/plan_cache_key_info.h"
+#include "mongo/db/query/plan_cache/plan_cache_test_util.h"
+#include "mongo/db/query/plan_cache/sbe_plan_cache.h"
 #include "mongo/db/query/query_knobs_gen.h"
 #include "mongo/db/query/query_planner.h"
 #include "mongo/db/query/query_planner_params.h"
@@ -76,7 +77,6 @@
 #include "mongo/db/query/query_request_helper.h"
 #include "mongo/db/query/query_solution.h"
 #include "mongo/db/query/query_test_service_context.h"
-#include "mongo/db/query/sbe_plan_cache.h"
 #include "mongo/db/query/stage_types.h"
 #include "mongo/db/service_context.h"
 #include "mongo/logv2/log.h"

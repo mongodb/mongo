@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#include "mongo/db/query/plan_cache_key_factory.h"
+#include "mongo/db/query/plan_cache/plan_cache_key_factory.h"
 
 #include <cstddef>
 #include <map>
@@ -43,7 +43,7 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/query/canonical_query_encoder.h"
 #include "mongo/db/query/collection_query_info.h"
-#include "mongo/db/query/plan_cache_key_info.h"
+#include "mongo/db/query/plan_cache/plan_cache_key_info.h"
 #include "mongo/db/query/planner_ixselect.h"
 #include "mongo/db/query/query_settings/query_settings_gen.h"
 #include "mongo/db/s/operation_sharding_state.h"

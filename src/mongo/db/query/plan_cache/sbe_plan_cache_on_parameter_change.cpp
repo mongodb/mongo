@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#include "mongo/db/query/sbe_plan_cache_on_parameter_change.h"
+#include "mongo/db/query/plan_cache/sbe_plan_cache_on_parameter_change.h"
 
 #include <utility>
 

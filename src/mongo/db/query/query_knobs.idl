@@ -35,7 +35,7 @@ global:
     - "mongo/db/query/cost_model/cost_model_on_update.h"
     - "mongo/db/query/ce_mode_parameter.h"
     - "mongo/db/query/explain_version_validator.h"
-    - "mongo/db/query/sbe_plan_cache_on_parameter_change.h"
+    - "mongo/db/query/plan_cache/sbe_plan_cache_on_parameter_change.h"
     - "mongo/db/query/query_knob_expressions.h"
     - "mongo/db/query/query_stats/query_stats_on_parameter_change.h"
     - "mongo/platform/atomic_proxy.h"

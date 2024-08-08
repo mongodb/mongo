@@ -521,6 +521,9 @@ WORKSPACE.bazel @10gen/devprod-build
 # The following patterns are parsed from ./src/mongo/db/query/optimizer/OWNERS.yml
 /src/mongo/db/query/optimizer/**/* @10gen/query-optimization
 
+# The following patterns are parsed from ./src/mongo/db/query/plan_cache/OWNERS.yml
+/src/mongo/db/query/plan_cache/**/* @10gen/query-optimization
+
 # The following patterns are parsed from ./src/mongo/db/query/plan_enumerator/OWNERS.yml
 /src/mongo/db/query/plan_enumerator/**/* @10gen/query-optimization
 

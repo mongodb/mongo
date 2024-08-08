@@ -38,7 +38,7 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/query/canonical_query.h"
 #include "mongo/db/query/canonical_query_encoder.h"
-#include "mongo/db/query/plan_cache_debug_info.h"
+#include "mongo/db/query/plan_cache/plan_cache_debug_info.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/hex.h"
 

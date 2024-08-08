@@ -28,14 +28,13 @@
  */
 
 
-#include "mongo/db/query/sbe_plan_cache.h"
+#include "mongo/db/query/plan_cache/sbe_plan_cache.h"
 
 #include <absl/container/node_hash_map.h>
 
-
 #include "mongo/base/status_with.h"
+#include "mongo/db/query/plan_cache/sbe_plan_cache_on_parameter_change.h"
 #include "mongo/db/query/query_knobs_gen.h"
-#include "mongo/db/query/sbe_plan_cache_on_parameter_change.h"
 #include "mongo/db/query/util/memory_util.h"
 #include "mongo/logv2/log.h"
 #include "mongo/logv2/log_attr.h"

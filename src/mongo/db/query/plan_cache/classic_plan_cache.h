@@ -41,9 +41,9 @@
 
 #include "mongo/db/query/canonical_query.h"
 #include "mongo/db/query/index_entry.h"
-#include "mongo/db/query/plan_cache.h"
-#include "mongo/db/query/plan_cache_debug_info.h"
-#include "mongo/db/query/plan_cache_key_info.h"
+#include "mongo/db/query/plan_cache/plan_cache.h"
+#include "mongo/db/query/plan_cache/plan_cache_debug_info.h"
+#include "mongo/db/query/plan_cache/plan_cache_key_info.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/container_size_helper.h"
 

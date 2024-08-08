@@ -28,7 +28,7 @@
  */
 
 
-#include "mongo/db/query/plan_cache_callbacks.h"
+#include "mongo/db/query/plan_cache/plan_cache_callbacks.h"
 
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"

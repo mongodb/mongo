@@ -37,8 +37,8 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/query/canonical_query.h"
-#include "mongo/db/query/classic_plan_cache.h"
-#include "mongo/db/query/sbe_plan_cache.h"
+#include "mongo/db/query/plan_cache/classic_plan_cache.h"
+#include "mongo/db/query/plan_cache/sbe_plan_cache.h"
 #include "mongo/stdx/unordered_set.h"
 #include "mongo/util/uuid.h"
 

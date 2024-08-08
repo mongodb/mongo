@@ -1,0 +1,66 @@
+Import(
+    [
+        "env",
+    ]
+)
+
+env = env.Clone()
+
+env.Library(
+    target="query_plan_cache",
+    source=[
+        "classic_plan_cache.cpp",
+        "plan_cache_callbacks.cpp",
+        "plan_cache_invalidator.cpp",
+        "sbe_plan_cache.cpp",
+    ],
+    LIBDEPS=[
+        "$BUILD_DIR/mongo/base",
+        "$BUILD_DIR/mongo/db/exec/sbe/query_sbe",
+        "$BUILD_DIR/mongo/db/query/canonical_query",
+        "$BUILD_DIR/mongo/db/query/memory_util",
+        "$BUILD_DIR/mongo/db/query/query_settings/utils",
+        "$BUILD_DIR/mongo/db/query_expressions",
+    ],
+)
+
+env.Library(
+    target="plan_cache_test_util",
+    source=[
+        "plan_cache_test_util.cpp",
+    ],
+    LIBDEPS=["$BUILD_DIR/mongo/db/query_exec"],
+)
+
+env.Benchmark(
+    target="plan_cache_key_encoding_bm",
+    source=[
+        "plan_cache_key_encoding_agg_bm.cpp",
+        "plan_cache_key_encoding_find_bm.cpp",
+        "plan_cache_parse_encode_bm.cpp",
+        "plan_cache_parse_encode_pipeline_bm.cpp",
+    ],
+    LIBDEPS=[
+        "$BUILD_DIR/mongo/db/bonsai_query_bm_fixture",
+        "$BUILD_DIR/mongo/db/pipeline/pipeline",
+        "$BUILD_DIR/mongo/db/query/canonical_query",
+        "$BUILD_DIR/mongo/db/query/query_test_service_context",
+        "$BUILD_DIR/mongo/db/query_exec",
+        "$BUILD_DIR/mongo/db/query_expressions",
+        "$BUILD_DIR/mongo/db/service_context_non_d",
+    ],
+)
+
+env.Benchmark(
+    target="plan_cache_classic_bm",
+    source=[
+        "plan_cache_classic_bm.cpp",
+    ],
+    LIBDEPS=[
+        "$BUILD_DIR/mongo/db/catalog/catalog_impl",
+        "$BUILD_DIR/mongo/db/query/canonical_query",
+        "$BUILD_DIR/mongo/db/query/query_test_service_context",
+        "$BUILD_DIR/mongo/s/sharding_router_api",
+        "plan_cache_test_util",
+    ],
+)

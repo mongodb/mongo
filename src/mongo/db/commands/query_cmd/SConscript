@@ -126,7 +126,7 @@ env.Library(
         "$BUILD_DIR/mongo/db/commands/set_cluster_parameter_impl",
         "$BUILD_DIR/mongo/db/dbdirectclient",
         "$BUILD_DIR/mongo/db/query/canonical_query",
-        "$BUILD_DIR/mongo/db/query/query_plan_cache",
+        "$BUILD_DIR/mongo/db/query/plan_cache/query_plan_cache",
         "$BUILD_DIR/mongo/db/query/query_settings/manager",
         "$BUILD_DIR/mongo/db/query/query_settings/utils",
         "$BUILD_DIR/mongo/db/query/query_shape/query_shape",

@@ -32,7 +32,7 @@
 #include "mongo/db/exec/trial_period_utils.h"
 #include "mongo/db/query/all_indices_required_checker.h"
 #include "mongo/db/query/bind_input_params.h"
-#include "mongo/db/query/plan_cache_key_factory.h"
+#include "mongo/db/query/plan_cache/plan_cache_key_factory.h"
 #include "mongo/db/query/plan_executor_factory.h"
 #include "mongo/db/query/planner_analysis.h"
 #include "mongo/db/query/sbe_trial_runtime_executor.h"

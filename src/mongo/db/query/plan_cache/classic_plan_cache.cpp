@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#include "mongo/db/query/classic_plan_cache.h"
+#include "mongo/db/query/plan_cache/classic_plan_cache.h"
 
 #include <boost/optional/optional.hpp>
 

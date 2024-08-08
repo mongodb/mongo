@@ -41,7 +41,7 @@
 #include "mongo/bson/simple_bsonobj_comparator.h"
 #include "mongo/db/query/canonical_query.h"
 #include "mongo/db/query/index_entry.h"
-#include "mongo/db/query/plan_cache.h"
+#include "mongo/db/query/plan_cache/plan_cache.h"
 #include "mongo/platform/atomic.h"
 #include "mongo/platform/mutex.h"
 #include "mongo/stdx/unordered_map.h"

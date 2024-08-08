@@ -18,6 +18,7 @@ env.SConscript(
         "cost_model",
         "datetime",
         "optimizer",
+        "plan_cache",
         "query_settings",
         "query_stats",
         "query_shape",
@@ -75,7 +76,7 @@ env.Library(
         "expression_index.cpp",
         "index_bounds_builder.cpp",
         "interval_evaluation_tree.cpp",
-        "plan_cache_indexability.cpp",
+        "plan_cache/plan_cache_indexability.cpp",
         "plan_enumerator/enumerator_memo.cpp",
         "plan_enumerator/memo_prune.cpp",
         "plan_enumerator/plan_enumerator.cpp",
@@ -103,9 +104,9 @@ env.Library(
         "$BUILD_DIR/mongo/db/commands/server_status_core",
         "$BUILD_DIR/mongo/db/fts/base_fts",
         "$BUILD_DIR/mongo/db/index/index_access_method",
+        "$BUILD_DIR/mongo/db/query/plan_cache/query_plan_cache",
         "$BUILD_DIR/mongo/db/record_id_helpers",
         "$BUILD_DIR/mongo/db/server_base",
-        "query_plan_cache",
     ],
 )
 
@@ -131,24 +132,6 @@ env.Library(
     LIBDEPS=[
         "$BUILD_DIR/mongo/util/pcre_wrapper",
         "$BUILD_DIR/mongo/util/processinfo",
-    ],
-)
-
-env.Library(
-    target="query_plan_cache",
-    source=[
-        "classic_plan_cache.cpp",
-        "plan_cache_callbacks.cpp",
-        "plan_cache_invalidator.cpp",
-        "sbe_plan_cache.cpp",
-    ],
-    LIBDEPS=[
-        "$BUILD_DIR/mongo/base",
-        "$BUILD_DIR/mongo/db/exec/sbe/query_sbe",
-        "$BUILD_DIR/mongo/db/query_expressions",
-        "canonical_query",
-        "memory_util",
-        "query_settings/utils",
     ],
 )
 
@@ -323,7 +306,7 @@ env.Library(
         "query_feature_flags.idl",
         "query_knobs.idl",
         "query_stats/query_stats_on_parameter_change.cpp",
-        "sbe_plan_cache_on_parameter_change.cpp",
+        "plan_cache/sbe_plan_cache_on_parameter_change.cpp",
     ],
     LIBDEPS_PRIVATE=[
         "$BUILD_DIR/mongo/db/commands/test_commands_enabled",
@@ -446,14 +429,6 @@ env.Library(
     ],
 )
 
-env.Library(
-    target="plan_cache_test_util",
-    source=[
-        "plan_cache_test_util.cpp",
-    ],
-    LIBDEPS=["$BUILD_DIR/mongo/db/query_exec"],
-)
-
 env.CppUnitTest(
     target="db_query_test",
     source=[
@@ -486,9 +461,9 @@ env.CppUnitTest(
         "killcursors_request_test.cpp",
         "lru_key_value_test.cpp",
         "map_reduce_output_format_test.cpp",
-        "plan_cache_indexability_test.cpp",
-        "plan_cache_key_info_test.cpp",
-        "plan_cache_test.cpp",
+        "plan_cache/plan_cache_indexability_test.cpp",
+        "plan_cache/plan_cache_key_info_test.cpp",
+        "plan_cache/plan_cache_test.cpp",
         "plan_ranker_index_prefix_test.cpp",
         "plan_ranker_test.cpp",
         "planner_access_test.cpp",
@@ -553,6 +528,7 @@ env.CppUnitTest(
         "$BUILD_DIR/mongo/db/pipeline/abt_translation",
         "$BUILD_DIR/mongo/db/pipeline/aggregation_request_helper",
         "$BUILD_DIR/mongo/db/pipeline/document_source_mock",
+        "$BUILD_DIR/mongo/db/query/plan_cache/plan_cache_test_util",
         "$BUILD_DIR/mongo/db/query_exec",
         "$BUILD_DIR/mongo/db/record_id_helpers",
         "$BUILD_DIR/mongo/db/repl/replmocks",
@@ -571,7 +547,6 @@ env.CppUnitTest(
         "index_hint",
         "map_reduce_output_format",
         "optimizer/unit_test_utils",
-        "plan_cache_test_util",
         "query_common",
         "query_planner",
         "query_planner_test_fixture",
@@ -622,25 +597,6 @@ env.Benchmark(
 )
 
 env.Benchmark(
-    target="plan_cache_key_encoding_bm",
-    source=[
-        "plan_cache_key_encoding_agg_bm.cpp",
-        "plan_cache_key_encoding_find_bm.cpp",
-        "plan_cache_parse_encode_bm.cpp",
-        "plan_cache_parse_encode_pipeline_bm.cpp",
-    ],
-    LIBDEPS=[
-        "$BUILD_DIR/mongo/db/bonsai_query_bm_fixture",
-        "$BUILD_DIR/mongo/db/pipeline/pipeline",
-        "$BUILD_DIR/mongo/db/query/canonical_query",
-        "$BUILD_DIR/mongo/db/query/query_test_service_context",
-        "$BUILD_DIR/mongo/db/query_exec",
-        "$BUILD_DIR/mongo/db/query_expressions",
-        "$BUILD_DIR/mongo/db/service_context_non_d",
-    ],
-)
-
-env.Benchmark(
     target="query_planner_bm",
     source=[
         "query_planner_bm.cpp",
@@ -648,19 +604,5 @@ env.Benchmark(
     LIBDEPS=[
         "query_planner",
         "query_test_service_context",
-    ],
-)
-
-env.Benchmark(
-    target="plan_cache_classic_bm",
-    source=[
-        "plan_cache_classic_bm.cpp",
-    ],
-    LIBDEPS=[
-        "$BUILD_DIR/mongo/db/catalog/catalog_impl",
-        "$BUILD_DIR/mongo/db/query/canonical_query",
-        "$BUILD_DIR/mongo/db/query/query_test_service_context",
-        "$BUILD_DIR/mongo/s/sharding_router_api",
-        "plan_cache_test_util",
     ],
 )

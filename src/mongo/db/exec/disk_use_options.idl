@@ -29,7 +29,7 @@
 global:
   cpp_namespace: "mongo"
   cpp_includes:
-    - "mongo/db/query/sbe_plan_cache_on_parameter_change.h"
+    - "mongo/db/query/plan_cache/sbe_plan_cache_on_parameter_change.h"
 
 server_parameters:
   allowDiskUseByDefault:

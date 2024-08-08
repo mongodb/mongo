@@ -39,7 +39,7 @@
 #include "mongo/db/query/collation/collator_interface.h"
 #include "mongo/db/query/index_entry.h"
 #include "mongo/db/query/interval_evaluation_tree.h"
-#include "mongo/db/query/plan_cache_debug_info.h"
+#include "mongo/db/query/plan_cache/plan_cache_debug_info.h"
 #include "mongo/stdx/unordered_map.h"
 #include "mongo/util/string_listset.h"
 
