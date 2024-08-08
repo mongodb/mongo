@@ -249,7 +249,7 @@ public:
                 auto status = checkMetadataForDb();
                 if (!status.isOK()) {
                     auto extraInfo = status.extraInfo<StaleDbRoutingVersion>();
-                    if (extraInfo->getVersionWanted()) {
+                    if (!extraInfo || extraInfo->getVersionWanted()) {
                         // In case there is a wanted shard version means that the metadata is stale
                         // and we are going to skip the checks.
                         skippedMetadataChecks = true;
