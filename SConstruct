@@ -97,15 +97,13 @@ def has_option(name):
 
 
 def use_system_version_of_library(name):
-    return has_option("use-system-all") or has_option("use-system-" + name)
+    # Disabled during Bazel migration
+    return False
 
 
-# Returns true if we have been configured to use a system version of any C++ library. If you
-# add a new C++ library dependency that may be shimmed out to the system, add it to the below
-# list.
 def using_system_version_of_cxx_libraries():
-    cxx_library_names = ["tcmalloc-google", "boost", "tcmalloc-gperf"]
-    return True in [use_system_version_of_library(x) for x in cxx_library_names]
+    # Disabled during Bazel migration
+    return False
 
 
 def make_variant_dir_generator():
@@ -503,65 +501,6 @@ add_option(
     default="off",
     help="Enable tracing profiler statistic collection",
     type="choice",
-)
-
-# Most of the "use-system-*" options follow a simple form.
-for pack in [
-    (
-        "asio",
-        "ASIO",
-    ),
-    ("boost",),
-    ("fmt",),
-    ("google-benchmark", "Google benchmark"),
-    ("grpc",),
-    ("icu", "ICU"),
-    ("intel_decimal128", "intel decimal128"),
-    ("bson",),
-    ("libmongocrypt",),
-    ("tomcrypt",),
-    ("pcre2",),
-    ("protobuf", "Protocol Buffers"),
-    ("snappy",),
-    ("stemmer",),
-    ("tcmalloc-google",),
-    ("tcmalloc-gperf",),
-    ("libunwind",),
-    ("valgrind",),
-    ("wiredtiger",),
-    ("yaml",),
-    ("zlib",),
-    ("zstd", "Zstandard"),
-]:
-    name = pack[0]
-    pretty = name
-    if len(pack) == 2:
-        pretty = pack[1]
-    add_option(
-        f"use-system-{name}",
-        help=f"use system version of {pretty} library",
-        nargs=0,
-    )
-
-add_option(
-    "system-boost-lib-search-suffixes",
-    help="Comma delimited sequence of boost library suffixes to search",
-)
-
-add_option(
-    "use-system-mongo-c",
-    choices=["on", "off", "auto"],
-    const="on",
-    default="auto",
-    help="use system version of the mongo-c-driver (auto will use it if it's found)",
-    nargs="?",
-    type="choice",
-)
-
-add_option(
-    "use-system-all",
-    help="use all system libraries",
-    nargs=0,
 )
 
 add_option(
@@ -3428,20 +3367,6 @@ if not env.TargetOSIs("windows", "macOS") and (env.ToolchainIs("GCC", "clang")):
             ):
                 env.Append(CCFLAGS=[f"{targeting_flag}{targeting_flag_value}"])
 
-# boostSuffixList is used when using system boost to select a search sequence
-# for boost libraries.
-boostSuffixList = ["-mt", ""]
-if get_option("system-boost-lib-search-suffixes") is not None:
-    if not use_system_version_of_library("boost"):
-        env.FatalError(
-            "The --system-boost-lib-search-suffixes option is only valid " "with --use-system-boost"
-        )
-    boostSuffixList = get_option("system-boost-lib-search-suffixes")
-    if boostSuffixList == "":
-        boostSuffixList = []
-    else:
-        boostSuffixList = boostSuffixList.split(",")
-
 # discover modules, and load the (python) module for each module's build.py
 mongo_modules = moduleconfig.discover_modules("src/mongo/db/modules", get_option("modules"))
 
@@ -5306,26 +5231,6 @@ def doConfigure(myenv):
             ]
         )
 
-    if use_system_version_of_library("boost"):
-        if not conf.CheckCXXHeader("boost/filesystem/operations.hpp"):
-            myenv.ConfError("can't find boost headers")
-        if not conf.CheckBoostMinVersion():
-            myenv.ConfError("system's version of boost is too old. version 1.49 or better required")
-
-        # Note that on Windows with using-system-boost builds, the following
-        # FindSysLibDep calls do nothing useful (but nothing problematic either)
-        #
-        # NOTE: Pass --system-boost-lib-search-suffixes= to suppress these checks, which you
-        # might want to do if using autolib linking on Windows, for example.
-        if boostSuffixList:
-            for b in boostLibs:
-                boostlib = "boost_" + b
-                conf.FindSysLibDep(
-                    boostlib,
-                    [boostlib + suffix for suffix in boostSuffixList],
-                    language="C++",
-                )
-
     if use_system_version_of_library("protobuf"):
         conf.FindSysLibDep("protobuf", ["protobuf"])
         conf.FindSysLibDep("protoc", ["protoc"])
@@ -5431,21 +5336,7 @@ def doConfigure(myenv):
 
     conf.AddTest("CheckMongoCMinVersion", CheckMongoCMinVersion)
 
-    mongoc_mode = get_option("use-system-mongo-c")
     conf.env["MONGO_HAVE_LIBMONGOC"] = False
-    if mongoc_mode != "off":
-        if conf.CheckLibWithHeader(
-            ["mongoc-1.0"],
-            ["mongoc/mongoc.h"],
-            "C",
-            "mongoc_get_major_version();",
-            autoadd=False,
-        ):
-            conf.env["MONGO_HAVE_LIBMONGOC"] = True
-        if not conf.env["MONGO_HAVE_LIBMONGOC"] and mongoc_mode == "on":
-            myenv.ConfError("Failed to find the required C driver headers")
-        if conf.env["MONGO_HAVE_LIBMONGOC"] and not conf.CheckMongoCMinVersion():
-            myenv.ConfError("Version of mongoc is too old. Version 1.13+ required")
 
     # ask each module to configure itself and the build environment.
     moduleconfig.configure_modules(mongo_modules, conf)
