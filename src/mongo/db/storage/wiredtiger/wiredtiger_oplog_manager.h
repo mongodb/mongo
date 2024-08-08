@@ -33,7 +33,6 @@
 
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/operation_context.h"
-#include "mongo/db/storage/wiredtiger/wiredtiger_record_store.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_session_cache.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/platform/mutex.h"
@@ -43,7 +42,7 @@
 
 namespace mongo {
 
-class WiredTigerRecordStore;
+class RecordStore;
 class WiredTigerSessionCache;
 
 /**
@@ -72,7 +71,7 @@ public:
     /*
      * Initializes the oplog read timestamp and start the update visibility thread.
      */
-    void startVisibilityThread(OperationContext* opCtx, WiredTigerRecordStore* oplogRecordStore);
+    void startVisibilityThread(OperationContext* opCtx, RecordStore* oplogRecordStore);
     void haltVisibilityThread();
 
     bool isRunning() {
@@ -88,7 +87,7 @@ public:
      * Waits for all committed writes at this time to become visible (that is, until no holes exist
      * in the oplog up to the time we start waiting.)
      */
-    void waitForAllEarlierOplogWritesToBeVisible(const WiredTigerRecordStore* oplogRecordStore,
+    void waitForAllEarlierOplogWritesToBeVisible(const RecordStore* oplogRecordStore,
                                                  OperationContext* opCtx);
 
     /**
@@ -109,7 +108,7 @@ private:
      * _shuttingDown is set to true.
      */
     void _updateOplogVisibilityLoop(WiredTigerSessionCache* sessionCache,
-                                    WiredTigerRecordStore* oplogRecordStore);
+                                    RecordStore* oplogRecordStore);
 
     void _setOplogReadTimestamp(WithLock, uint64_t newTimestamp);
 

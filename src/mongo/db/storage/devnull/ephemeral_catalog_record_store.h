@@ -171,8 +171,6 @@ protected:
 
     virtual const EphemeralForTestRecord* recordFor(WithLock, const RecordId& loc) const;
     virtual EphemeralForTestRecord* recordFor(WithLock, const RecordId& loc);
-    void waitForAllEarlierOplogWritesToBeVisibleImpl(OperationContext* opCtx) const override {}
-
 
 public:
     //

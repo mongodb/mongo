@@ -69,7 +69,7 @@ MONGO_FAIL_POINT_DEFINE(WTPauseOplogVisibilityUpdateLoop);
 const int kDelayMillis = 100;
 
 void WiredTigerOplogManager::startVisibilityThread(OperationContext* opCtx,
-                                                   WiredTigerRecordStore* oplogRecordStore) {
+                                                   RecordStore* oplogRecordStore) {
     invariant(!_isRunning.loadRelaxed());
     // Prime the oplog read timestamp.
     std::unique_ptr<SeekableRecordCursor> reverseOplogCursor =
@@ -148,7 +148,7 @@ void WiredTigerOplogManager::triggerOplogVisibilityUpdate() {
 }
 
 void WiredTigerOplogManager::waitForAllEarlierOplogWritesToBeVisible(
-    const WiredTigerRecordStore* oplogRecordStore, OperationContext* opCtx) {
+    const RecordStore* oplogRecordStore, OperationContext* opCtx) {
     invariant(!shard_role_details::getLocker(opCtx)->inAWriteUnitOfWork());
 
     // In order to reliably detect rollback situations, we need to fetch the latestVisibleTimestamp
@@ -212,7 +212,7 @@ void WiredTigerOplogManager::waitForAllEarlierOplogWritesToBeVisible(
 }
 
 void WiredTigerOplogManager::_updateOplogVisibilityLoop(WiredTigerSessionCache* sessionCache,
-                                                        WiredTigerRecordStore* oplogRecordStore) {
+                                                        RecordStore* oplogRecordStore) {
     Client::initThread("OplogVisibilityThread",
                        getGlobalServiceContext()->getService(ClusterRole::ShardServer));
 

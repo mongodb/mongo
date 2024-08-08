@@ -55,6 +55,8 @@
 
 namespace mongo {
 
+inline constexpr auto kWiredTigerEngineName = "wiredTiger"_sd;
+
 class BSONObjBuilder;
 class OperationContext;
 class WiredTigerConfigParser;

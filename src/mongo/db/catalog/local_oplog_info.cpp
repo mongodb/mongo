@@ -112,6 +112,8 @@ std::vector<OplogSlot> LocalOplogInfo::getNextOpTimes(OperationContext* opCtx, s
         }
     });
 
+    auto storageEngine = opCtx->getServiceContext()->getStorageEngine();
+
     // Allow the storage engine to start the transaction outside the critical section.
     shard_role_details::getRecoveryUnit(opCtx)->preallocateSnapshot();
     {
@@ -124,7 +126,7 @@ std::vector<OplogSlot> LocalOplogInfo::getNextOpTimes(OperationContext* opCtx, s
         // We can't establish it here because that would require locking the local database, which
         // would be a lock order violation.
         invariant(_rs);
-        fassert(28560, _rs->oplogDiskLocRegister(opCtx, ts, orderedCommit));
+        fassert(28560, storageEngine->oplogDiskLocRegister(opCtx, _rs, ts, orderedCommit));
     }
 
     Timer oplogSlotDurationTimer;

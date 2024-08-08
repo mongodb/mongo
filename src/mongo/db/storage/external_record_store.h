@@ -170,10 +170,6 @@ protected:
         unimplementedTasserted();
     }
 
-    void waitForAllEarlierOplogWritesToBeVisibleImpl(OperationContext*) const final {
-        unimplementedTasserted();
-    }
-
     RecordId getLargestKey(OperationContext* opCtx) const final {
         unimplementedTasserted();
         return RecordId();

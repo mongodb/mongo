@@ -2706,6 +2706,66 @@ void WiredTigerKVEngine::haltOplogManager(WiredTigerRecordStore* oplogRecordStor
     }
 }
 
+Status WiredTigerKVEngine::oplogDiskLocRegister(OperationContext* opCtx,
+                                                RecordStore* oplogRecordStore,
+                                                const Timestamp& opTime,
+                                                bool orderedCommit) {
+    // Callers should be updating visibility as part of a write operation. We want to ensure that
+    // we never get here while holding an uninterruptible, read-ticketed lock. That would indicate
+    // that we are operating with the wrong global lock semantics, and either hold too weak a lock
+    // (e.g. IS) or that we upgraded in a way we shouldn't (e.g. IS -> IX).
+    invariant(!shard_role_details::getLocker(opCtx)->hasReadTicket() ||
+              !opCtx->uninterruptibleLocksRequested_DO_NOT_USE());  // NOLINT
+
+    shard_role_details::getRecoveryUnit(opCtx)->setOrderedCommit(orderedCommit);
+
+    if (!orderedCommit) {
+        // This labels the current transaction with a timestamp.
+        // This is required for oplog visibility to work correctly, as WiredTiger uses the
+        // transaction list to determine where there are holes in the oplog.
+        return shard_role_details::getRecoveryUnit(opCtx)->setTimestamp(opTime);
+    }
+
+    // This handles non-primary (secondary) state behavior; we simply set the oplog visiblity read
+    // timestamp here, as there cannot be visible holes prior to the opTime passed in.
+    getOplogManager()->setOplogReadTimestamp(opTime);
+
+    // Inserts and updates usually notify waiters on commit, but the oplog collection has special
+    // visibility rules and waiters must be notified whenever the oplog read timestamp is forwarded.
+    oplogRecordStore->notifyCappedWaitersIfNeeded();
+    return Status::OK();
+}
+
+void WiredTigerKVEngine::waitForAllEarlierOplogWritesToBeVisible(
+    OperationContext* opCtx, RecordStore* oplogRecordStore) const {
+    // Callers are waiting for other operations to finish updating visibility. We want to ensure
+    // that we never get here while holding an uninterruptible, write-ticketed lock. That could
+    // indicate we are holding a stronger lock than we need to, and that we could actually
+    // contribute to ticket-exhaustion. That could prevent the write we are waiting on from
+    // acquiring the lock it needs to update the oplog visibility.
+    invariant(!shard_role_details::getLocker(opCtx)->hasWriteTicket() ||
+              !opCtx->uninterruptibleLocksRequested_DO_NOT_USE());  // NOLINT
+
+    // Make sure that callers do not hold an active snapshot so it will be able to see the oplog
+    // entries it waited for afterwards.
+    if (shard_role_details::getRecoveryUnit(opCtx)->isActive()) {
+        shard_role_details::getLocker(opCtx)->dump();
+        invariant(!shard_role_details::getRecoveryUnit(opCtx)->isActive(),
+                  str::stream() << "Unexpected open storage txn. RecoveryUnit state: "
+                                << RecoveryUnit::toString(
+                                       shard_role_details::getRecoveryUnit(opCtx)->getState())
+                                << ", inMultiDocumentTransaction:"
+                                << (opCtx->inMultiDocumentTransaction() ? "true" : "false"));
+    }
+
+    auto oplogManager = getOplogManager();
+    if (oplogManager->isRunning()) {
+        oplogManager->waitForAllEarlierOplogWritesToBeVisible(
+            checked_cast<WiredTigerRecordStore*>(oplogRecordStore), opCtx);
+    }
+}
+
+
 Timestamp WiredTigerKVEngine::getStableTimestamp() const {
     return Timestamp(_stableTimestamp.load());
 }

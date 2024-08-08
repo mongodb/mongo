@@ -101,7 +101,8 @@ void openCallback(OperationContext* opCtx, const CollectionPtr& collection) {
     // storage engine snapshot while waiting. Otherwise, we will end up reading from the
     // snapshot where the oplog entries are not yet visible even after the wait.
     shard_role_details::getRecoveryUnit(opCtx)->abandonSnapshot();
-    collection->getRecordStore()->waitForAllEarlierOplogWritesToBeVisible(opCtx);
+    auto storageEngine = opCtx->getServiceContext()->getStorageEngine();
+    storageEngine->waitForAllEarlierOplogWritesToBeVisible(opCtx, collection->getRecordStore());
 }
 
 /**

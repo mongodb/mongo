@@ -1440,6 +1440,18 @@ void StorageEngineImpl::setPinnedOplogTimestamp(const Timestamp& pinnedTimestamp
     _engine->setPinnedOplogTimestamp(pinnedTimestamp);
 }
 
+Status StorageEngineImpl::oplogDiskLocRegister(OperationContext* opCtx,
+                                               RecordStore* oplogRecordStore,
+                                               const Timestamp& opTime,
+                                               bool orderedCommit) {
+    return _engine->oplogDiskLocRegister(opCtx, oplogRecordStore, opTime, orderedCommit);
+}
+
+void StorageEngineImpl::waitForAllEarlierOplogWritesToBeVisible(
+    OperationContext* opCtx, RecordStore* oplogRecordStore) const {
+    _engine->waitForAllEarlierOplogWritesToBeVisible(opCtx, oplogRecordStore);
+}
+
 DurableCatalog* StorageEngineImpl::getCatalog() {
     return _catalog.get();
 }

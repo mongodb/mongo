@@ -48,7 +48,6 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/mutable/damage_vector.h"
 #include "mongo/bson/timestamp.h"
-#include "mongo/db/exec/collection_scan_common.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/record_id.h"
 #include "mongo/db/storage/compact_options.h"
@@ -648,31 +647,6 @@ public:
     };
 
     /**
-     * When we write to an oplog, we call this so that that the storage engine can manage the
-     * visibility of oplog entries to ensure they are ordered.
-     *
-     * Since this is called inside of a WriteUnitOfWork while holding a std::mutex, it is
-     * illegal to acquire any LockManager locks inside of this function.
-     *
-     * If `orderedCommit` is true, the storage engine can assume the input `opTime` has become
-     * visible in the oplog. Otherwise the storage engine must continue to maintain its own
-     * visibility management. Calls with `orderedCommit` true will not be concurrent with calls of
-     * `orderedCommit` false.
-     */
-    Status oplogDiskLocRegister(OperationContext* opCtx,
-                                const Timestamp& opTime,
-                                bool orderedCommit);
-
-    /**
-     * Waits for all writes that completed before this call to be visible to forward scans.
-     * See the comment on RecordCursor for more details about the visibility rules.
-     *
-     * It is only legal to call this on an oplog. It is illegal to call this inside a
-     * WriteUnitOfWork.
-     */
-    void waitForAllEarlierOplogWritesToBeVisible(OperationContext* opCtx) const;
-
-    /**
      * Returns the largest RecordId in the RecordStore, regardless of visibility rules. If the store
      * is empty, returns a null RecordId.
      *
@@ -791,14 +765,6 @@ protected:
     virtual StatusWith<int64_t> doCompact(OperationContext* opCtx, const CompactOptions& options) {
         MONGO_UNREACHABLE;
     }
-
-    virtual Status oplogDiskLocRegisterImpl(OperationContext* opCtx,
-                                            const Timestamp& opTime,
-                                            bool orderedCommit) {
-        return Status::OK();
-    }
-
-    virtual void waitForAllEarlierOplogWritesToBeVisibleImpl(OperationContext* opCtx) const = 0;
 
     std::shared_ptr<Ident> _ident;
 

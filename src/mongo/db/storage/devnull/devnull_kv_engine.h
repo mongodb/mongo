@@ -198,6 +198,16 @@ public:
 
     void setPinnedOplogTimestamp(const Timestamp& pinnedTimestamp) override {}
 
+    void waitForAllEarlierOplogWritesToBeVisible(OperationContext* opCtx,
+                                                 RecordStore* recordsStore) const override {}
+
+    Status oplogDiskLocRegister(OperationContext* opCtx,
+                                RecordStore* oplogRecordStore,
+                                const Timestamp& opTime,
+                                bool orderedCommit) override {
+        return Status::OK();
+    }
+
     void dump() const override {}
 
     // This sets the results of the backup cursor for unit tests.

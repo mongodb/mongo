@@ -34,7 +34,6 @@
 
 #include "mongo/db/operation_context.h"
 #include "mongo/db/storage/record_store.h"
-#include "mongo/db/transaction_resources.h"
 
 namespace mongo {
 namespace {
@@ -119,31 +118,6 @@ StatusWith<int64_t> RecordStore::compact(OperationContext* opCtx, const CompactO
     return doCompact(opCtx, options);
 }
 
-
-Status RecordStore::oplogDiskLocRegister(OperationContext* opCtx,
-                                         const Timestamp& opTime,
-                                         bool orderedCommit) {
-    // Callers should be updating visibility as part of a write operation. We want to ensure that
-    // we never get here while holding an uninterruptible, read-ticketed lock. That would indicate
-    // that we are operating with the wrong global lock semantics, and either hold too weak a lock
-    // (e.g. IS) or that we upgraded in a way we shouldn't (e.g. IS -> IX).
-    invariant(!shard_role_details::getLocker(opCtx)->hasReadTicket() ||
-              !opCtx->uninterruptibleLocksRequested_DO_NOT_USE());  // NOLINT
-
-    return oplogDiskLocRegisterImpl(opCtx, opTime, orderedCommit);
-}
-
-void RecordStore::waitForAllEarlierOplogWritesToBeVisible(OperationContext* opCtx) const {
-    // Callers are waiting for other operations to finish updating visibility. We want to ensure
-    // that we never get here while holding an uninterruptible, write-ticketed lock. That could
-    // indicate we are holding a stronger lock than we need to, and that we could actually
-    // contribute to ticket-exhaustion. That could prevent the write we are waiting on from
-    // acquiring the lock it needs to update the oplog visibility.
-    invariant(!shard_role_details::getLocker(opCtx)->hasWriteTicket() ||
-              !opCtx->uninterruptibleLocksRequested_DO_NOT_USE());  // NOLINT
-
-    waitForAllEarlierOplogWritesToBeVisibleImpl(opCtx);
-}
 
 void CappedInsertNotifier::notifyAll() const {
     stdx::lock_guard<Latch> lk(_mutex);

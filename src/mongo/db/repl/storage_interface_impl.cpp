@@ -1531,7 +1531,8 @@ void StorageInterfaceImpl::waitForAllEarlierOplogWritesToBeVisible(OperationCont
         return;
     const auto& oplog = oplogRead.getCollection();
     uassert(ErrorCodes::NotYetInitialized, "The oplog does not exist", oplog);
-    oplog->getRecordStore()->waitForAllEarlierOplogWritesToBeVisible(opCtx);
+    opCtx->getServiceContext()->getStorageEngine()->waitForAllEarlierOplogWritesToBeVisible(
+        opCtx, oplog->getRecordStore());
 }
 
 void StorageInterfaceImpl::oplogDiskLocRegister(OperationContext* opCtx,
@@ -1543,9 +1544,9 @@ void StorageInterfaceImpl::oplogDiskLocRegister(OperationContext* opCtx,
         opCtx, AdmissionContext::Priority::kExempt);
 
     AutoGetOplogFastPath oplogRead(opCtx, OplogAccessMode::kRead);
-    fassert(28557,
-            oplogRead.getCollection()->getRecordStore()->oplogDiskLocRegister(
-                opCtx, ts, orderedCommit));
+    auto oplogRs = oplogRead.getCollection()->getRecordStore();
+    auto storageEngine = opCtx->getServiceContext()->getStorageEngine();
+    fassert(28557, storageEngine->oplogDiskLocRegister(opCtx, oplogRs, ts, orderedCommit));
 }
 
 boost::optional<Timestamp> StorageInterfaceImpl::getLastStableRecoveryTimestamp(

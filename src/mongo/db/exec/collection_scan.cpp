@@ -282,7 +282,9 @@ PlanStage::StageState CollectionScan::doWork(WorkingSetID* out) {
                     invariant(!_params.tailable && collPtr->ns().isOplog());
 
                     shard_role_details::getRecoveryUnit(opCtx())->abandonSnapshot();
-                    collPtr->getRecordStore()->waitForAllEarlierOplogWritesToBeVisible(opCtx());
+                    auto storageEngine = opCtx()->getServiceContext()->getStorageEngine();
+                    storageEngine->waitForAllEarlierOplogWritesToBeVisible(
+                        opCtx(), collPtr->getRecordStore());
                 }
 
                 try {

@@ -574,6 +574,7 @@ bool CollectionImpl::requiresIdIndex() const {
 
 std::unique_ptr<SeekableRecordCursor> CollectionImpl::getCursor(OperationContext* opCtx,
                                                                 bool forward) const {
+    dassert(shard_role_details::getLocker(opCtx)->isReadLocked());
     if (usesCappedSnapshots() && forward) {
         if (shard_role_details::getRecoveryUnit(opCtx)->isActive()) {
             auto snapshot =

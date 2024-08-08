@@ -174,6 +174,17 @@ public:
 
     void setPinnedOplogTimestamp(const Timestamp& pinnedTimestamp) override {}
 
+    Status oplogDiskLocRegister(OperationContext* opCtx,
+                                RecordStore* oplogRecordStore,
+                                const Timestamp& opTime,
+                                bool orderedCommit) override {
+        return Status::OK();
+    }
+
+    void waitForAllEarlierOplogWritesToBeVisible(OperationContext* opCtx,
+                                                 RecordStore* oplogRecordStore) const override {}
+
+
     void dump() const override {}
 
     // List of ident names removed using dropIdent().

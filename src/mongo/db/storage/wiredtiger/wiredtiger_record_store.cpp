@@ -842,8 +842,6 @@ long long WiredTigerRecordStore::numRecords(OperationContext* opCtx) const {
 int64_t WiredTigerRecordStore::storageSize(OperationContext* opCtx,
                                            BSONObjBuilder* extraInfo,
                                            int infoLevel) const {
-    dassert(shard_role_details::getLocker(opCtx)->isReadLocked());
-
     if (_isEphemeral) {
         return dataSize(opCtx);
     }
@@ -864,8 +862,6 @@ int64_t WiredTigerRecordStore::storageSize(OperationContext* opCtx,
 }
 
 int64_t WiredTigerRecordStore::freeStorageSize(OperationContext* opCtx) const {
-    invariant(shard_role_details::getLocker(opCtx)->isReadLocked());
-
     WiredTigerSession* session = WiredTigerRecoveryUnit::get(opCtx)->getSessionNoTxn();
     return WiredTigerUtil::getIdentReuseSize(session->getSession(), getURI());
 }
@@ -895,7 +891,7 @@ RecordData WiredTigerRecordStore::_getData(const WiredTigerCursor& cursor) const
 }
 
 void WiredTigerRecordStore::doDeleteRecord(OperationContext* opCtx, const RecordId& id) {
-    invariant(shard_role_details::getLocker(opCtx)->inAWriteUnitOfWork());
+    invariant(shard_role_details::getRecoveryUnit(opCtx)->inUnitOfWork());
 
     // SERVER-48453: Initialize the next record id counter before deleting. This ensures we won't
     // reuse record ids, which can be problematic for the _mdb_catalog.
@@ -1059,7 +1055,7 @@ Status WiredTigerRecordStore::_insertRecords(OperationContext* opCtx,
                                              Record* records,
                                              const Timestamp* timestamps,
                                              size_t nRecords) {
-    invariant(shard_role_details::getLocker(opCtx)->inAWriteUnitOfWork());
+    invariant(shard_role_details::getRecoveryUnit(opCtx)->inUnitOfWork());
 
     WiredTigerCursor curwrap(*WiredTigerRecoveryUnit::get(opCtx), _uri, _tableId, _overwrite);
     curwrap.assertInActiveTxn();
@@ -1240,7 +1236,7 @@ StatusWith<Timestamp> WiredTigerRecordStore::getLatestOplogTimestamp(
     // Using this function inside a UOW is not supported because the main reason to call it is to
     // synchronize to the last op before waiting for write concern, so it makes little sense to do
     // so in a UOW. This also ensures we do not return uncommited entries.
-    invariant(!shard_role_details::getLocker(opCtx)->inAWriteUnitOfWork());
+    invariant(!shard_role_details::getRecoveryUnit(opCtx)->inUnitOfWork());
 
     auto wtRu = WiredTigerRecoveryUnit::get(opCtx);
     bool ruWasActive = wtRu->isActive();
@@ -1275,7 +1271,6 @@ StatusWith<Timestamp> WiredTigerRecordStore::getLatestOplogTimestamp(
 StatusWith<Timestamp> WiredTigerRecordStore::getEarliestOplogTimestamp(OperationContext* opCtx) {
     invariant(_isOplog);
     invariant(_keyFormat == KeyFormat::Long);
-    dassert(shard_role_details::getLocker(opCtx)->isReadLocked());
 
     // Using relaxed loads is fine here. The returned timestamp can be from a deleted oplog entry by
     // the time we return from the method. Additionally we perform initialisation that uses strong
@@ -1310,7 +1305,7 @@ Status WiredTigerRecordStore::doUpdateRecord(OperationContext* opCtx,
                                              const RecordId& id,
                                              const char* data,
                                              int len) {
-    invariant(shard_role_details::getLocker(opCtx)->inAWriteUnitOfWork());
+    invariant(shard_role_details::getRecoveryUnit(opCtx)->inUnitOfWork());
 
     WiredTigerCursor curwrap(*WiredTigerRecoveryUnit::get(opCtx), _uri, _tableId, true);
     curwrap.assertInActiveTxn();
@@ -1596,8 +1591,6 @@ Status WiredTigerRecordStore::doRangeTruncate(OperationContext* opCtx,
 
 StatusWith<int64_t> WiredTigerRecordStore::doCompact(OperationContext* opCtx,
                                                      const CompactOptions& options) {
-    dassert(shard_role_details::getLocker(opCtx)->isWriteLocked());
-
     WiredTigerSessionCache* cache = WiredTigerRecoveryUnit::get(opCtx)->getSessionCache();
     if (cache->isEphemeral()) {
         return 0;
@@ -1639,8 +1632,6 @@ StatusWith<int64_t> WiredTigerRecordStore::doCompact(OperationContext* opCtx,
 }
 
 void WiredTigerRecordStore::validate(OperationContext* opCtx, bool full, ValidateResults* results) {
-    dassert(shard_role_details::getLocker(opCtx)->isReadLocked());
-
     if (_isEphemeral) {
         return;
     }
@@ -1742,26 +1733,6 @@ void WiredTigerRecordStore::appendAllCustomStats(OperationContext* opCtx,
     appendNumericStats(s, getURI(), bob);
 }
 
-void WiredTigerRecordStore::waitForAllEarlierOplogWritesToBeVisibleImpl(
-    OperationContext* opCtx) const {
-    // Make sure that callers do not hold an active snapshot so it will be able to see the oplog
-    // entries it waited for afterwards.
-    if (shard_role_details::getRecoveryUnit(opCtx)->isActive()) {
-        shard_role_details::getLocker(opCtx)->dump();
-        invariant(!shard_role_details::getRecoveryUnit(opCtx)->isActive(),
-                  str::stream() << "Unexpected open storage txn. RecoveryUnit state: "
-                                << RecoveryUnit::toString(
-                                       shard_role_details::getRecoveryUnit(opCtx)->getState())
-                                << ", inMultiDocumentTransaction:"
-                                << (opCtx->inMultiDocumentTransaction() ? "true" : "false"));
-    }
-
-    auto oplogManager = _kvEngine->getOplogManager();
-    if (oplogManager->isRunning()) {
-        oplogManager->waitForAllEarlierOplogWritesToBeVisible(this, opCtx);
-    }
-}
-
 void WiredTigerRecordStore::updateStatsAfterRepair(OperationContext* opCtx,
                                                    long long numRecords,
                                                    long long dataSize) {
@@ -1820,7 +1791,7 @@ RecordId WiredTigerRecordStore::getLargestKey(OperationContext* opCtx) const {
     WiredTigerSession sessRaii(_kvEngine->getConnection());
     auto wtSession = sessRaii.getSession();
 
-    if (shard_role_details::getLocker(opCtx)->inAWriteUnitOfWork()) {
+    if (shard_role_details::getRecoveryUnit(opCtx)->inUnitOfWork()) {
         // We must limit the amount of time spent blocked on cache eviction to avoid a deadlock with
         // ourselves. The calling operation may have a session open that has written a large amount
         // of data, and by creating a new session, we are preventing WT from being able to roll back
@@ -2021,29 +1992,6 @@ void WiredTigerRecordStore::doCappedTruncateAfter(
     }
 }
 
-Status WiredTigerRecordStore::oplogDiskLocRegisterImpl(OperationContext* opCtx,
-                                                       const Timestamp& ts,
-                                                       bool orderedCommit) {
-    shard_role_details::getRecoveryUnit(opCtx)->setOrderedCommit(orderedCommit);
-
-    if (!orderedCommit) {
-        // This labels the current transaction with a timestamp.
-        // This is required for oplog visibility to work correctly, as WiredTiger uses the
-        // transaction list to determine where there are holes in the oplog.
-        return shard_role_details::getRecoveryUnit(opCtx)->setTimestamp(ts);
-    }
-
-    // This handles non-primary (secondary) state behavior; we simply set the oplog visiblity read
-    // timestamp here, as there cannot be visible holes prior to the opTime passed in.
-    _kvEngine->getOplogManager()->setOplogReadTimestamp(ts);
-
-    // Inserts and updates usually notify waiters on commit, but the oplog collection has special
-    // visibility rules and waiters must be notified whenever the oplog read timestamp is forwarded.
-    notifyCappedWaitersIfNeeded();
-
-    return Status::OK();
-}
-
 std::unique_ptr<SeekableRecordCursor> WiredTigerRecordStore::getCursor(OperationContext* opCtx,
                                                                        bool forward) const {
     if (_isOplog) {
@@ -2221,7 +2169,6 @@ RecordId WiredTigerRecordStoreCursor::seekIdCommon(const RecordId& start,
                                                    BoundInclusion boundInclusion,
                                                    bool restoring) {
     invariant(_hasRestored || restoring);
-    dassert(shard_role_details::getLocker(_opCtx)->isReadLocked());
 
     // Ensure an active transaction is open.
     auto session = WiredTigerRecoveryUnit::get(_opCtx)->getSession();

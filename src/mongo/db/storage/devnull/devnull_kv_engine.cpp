@@ -207,9 +207,6 @@ public:
         }
     };
 
-protected:
-    void waitForAllEarlierOplogWritesToBeVisibleImpl(OperationContext* opCtx) const override {}
-
 private:
     CollectionOptions _options;
     KeyFormat _keyFormat;

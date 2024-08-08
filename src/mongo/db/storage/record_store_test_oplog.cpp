@@ -61,11 +61,12 @@ namespace mongo {
 namespace {
 
 StatusWith<RecordId> insertBSON(ServiceContext::UniqueOperationContext& opCtx,
+                                KVEngine* engine,
                                 std::unique_ptr<RecordStore>& rs,
                                 const Timestamp& opTime) {
     BSONObj obj = BSON("ts" << opTime);
     WriteUnitOfWork wuow(opCtx.get());
-    Status status = rs->oplogDiskLocRegister(opCtx.get(), opTime, false);
+    Status status = engine->oplogDiskLocRegister(opCtx.get(), rs.get(), opTime, false);
     if (!status.isOK())
         return StatusWith<RecordId>(status);
     StatusWith<RecordId> res = rs->insertRecord(opCtx.get(), obj.objdata(), obj.objsize(), opTime);
@@ -75,10 +76,11 @@ StatusWith<RecordId> insertBSON(ServiceContext::UniqueOperationContext& opCtx,
 }
 
 RecordId _oplogOrderInsertOplog(OperationContext* opCtx,
+                                KVEngine* engine,
                                 const std::unique_ptr<RecordStore>& rs,
                                 int inc) {
     Timestamp opTime = Timestamp(5, inc);
-    Status status = rs->oplogDiskLocRegister(opCtx, opTime, false);
+    Status status = engine->oplogDiskLocRegister(opCtx, rs.get(), opTime, false);
     ASSERT_OK(status);
     BSONObj obj = BSON("ts" << opTime);
     StatusWith<RecordId> res = rs->insertRecord(opCtx, obj.objdata(), obj.objsize(), opTime);
@@ -89,11 +91,14 @@ RecordId _oplogOrderInsertOplog(OperationContext* opCtx,
 TEST(RecordStoreTestHarness, SeekOplog) {
     std::unique_ptr<RecordStoreHarnessHelper> harnessHelper = newRecordStoreHarnessHelper();
     std::unique_ptr<RecordStore> rs(harnessHelper->newOplogRecordStore());
+    auto engine = harnessHelper->getEngine();
+
     {
         ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
 
         // always illegal
-        ASSERT_EQ(insertBSON(opCtx, rs, Timestamp(2, -1)).getStatus(), ErrorCodes::BadValue);
+        ASSERT_EQ(insertBSON(opCtx, engine, rs, Timestamp(2, -1)).getStatus(),
+                  ErrorCodes::BadValue);
 
         {
             WriteUnitOfWork wuow(opCtx.get());
@@ -111,16 +116,20 @@ TEST(RecordStoreTestHarness, SeekOplog) {
                       ErrorCodes::BadValue);
         }
 
-        ASSERT_EQ(insertBSON(opCtx, rs, Timestamp(-2, 1)).getStatus(), ErrorCodes::BadValue);
+        ASSERT_EQ(insertBSON(opCtx, engine, rs, Timestamp(-2, 1)).getStatus(),
+                  ErrorCodes::BadValue);
 
         // success cases
-        ASSERT_EQ(insertBSON(opCtx, rs, Timestamp(1, 1)).getValue(), RecordId(1, 1));
-        ASSERT_EQ(insertBSON(opCtx, rs, Timestamp(1, 2)).getValue(), RecordId(1, 2));
-        ASSERT_EQ(insertBSON(opCtx, rs, Timestamp(2, 2)).getValue(), RecordId(2, 2));
+        ASSERT_EQ(insertBSON(opCtx, engine, rs, Timestamp(1, 1)).getValue(), RecordId(1, 1));
+        ASSERT_EQ(insertBSON(opCtx, engine, rs, Timestamp(1, 2)).getValue(), RecordId(1, 2));
+        ASSERT_EQ(insertBSON(opCtx, engine, rs, Timestamp(2, 2)).getValue(), RecordId(2, 2));
     }
 
     // Make sure all are visible.
-    rs->waitForAllEarlierOplogWritesToBeVisible(harnessHelper->newOperationContext().get());
+    {
+        auto opCtx = harnessHelper->newOperationContext();
+        engine->waitForAllEarlierOplogWritesToBeVisible(opCtx.get(), rs.get());
+    }
 
     // Forward cursor seeks
     {
@@ -222,18 +231,19 @@ TEST(RecordStoreTestHarness, SeekOplog) {
 TEST(RecordStoreTestHarness, OplogInsertOutOfOrder) {
     std::unique_ptr<RecordStoreHarnessHelper> harnessHelper = newRecordStoreHarnessHelper();
     std::unique_ptr<RecordStore> rs(harnessHelper->newOplogRecordStore());
+    auto engine = harnessHelper->getEngine();
 
     {
         ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
 
         // RecordId's are inserted out-of-order.
-        ASSERT_EQ(insertBSON(opCtx, rs, Timestamp(1, 1)).getValue(), RecordId(1, 1));
-        ASSERT_EQ(insertBSON(opCtx, rs, Timestamp(2, 2)).getValue(), RecordId(2, 2));
-        ASSERT_EQ(insertBSON(opCtx, rs, Timestamp(1, 2)).getValue(), RecordId(1, 2));
+        ASSERT_EQ(insertBSON(opCtx, engine, rs, Timestamp(1, 1)).getValue(), RecordId(1, 1));
+        ASSERT_EQ(insertBSON(opCtx, engine, rs, Timestamp(2, 2)).getValue(), RecordId(2, 2));
+        ASSERT_EQ(insertBSON(opCtx, engine, rs, Timestamp(1, 2)).getValue(), RecordId(1, 2));
     }
     {
         ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
-        rs->waitForAllEarlierOplogWritesToBeVisible(opCtx.get());
+        engine->waitForAllEarlierOplogWritesToBeVisible(opCtx.get(), rs.get());
         auto cursor = rs->getCursor(opCtx.get());
         ASSERT_EQ(cursor->next()->id, RecordId(1, 1));
         ASSERT_EQ(cursor->next()->id, RecordId(1, 2));
@@ -275,6 +285,7 @@ std::string stringifyForDebug(OperationContext* opCtx,
 TEST(RecordStoreTestHarness, OplogOrder) {
     std::unique_ptr<RecordStoreHarnessHelper> harnessHelper(newRecordStoreHarnessHelper());
     std::unique_ptr<RecordStore> rs(harnessHelper->newOplogRecordStore());
+    auto engine = harnessHelper->getEngine();
 
     RecordId id1, id2, id3;
 
@@ -282,13 +293,16 @@ TEST(RecordStoreTestHarness, OplogOrder) {
         ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
         {
             WriteUnitOfWork uow(opCtx.get());
-            id1 = _oplogOrderInsertOplog(opCtx.get(), rs, 1);
+            id1 = _oplogOrderInsertOplog(opCtx.get(), engine, rs, 1);
             uow.commit();
         }
     }
 
     // Make sure it is visible.
-    rs->waitForAllEarlierOplogWritesToBeVisible(harnessHelper->newOperationContext().get());
+    {
+        auto opCtx = harnessHelper->newOperationContext();
+        engine->waitForAllEarlierOplogWritesToBeVisible(opCtx.get(), rs.get());
+    }
 
     {
         ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
@@ -318,7 +332,7 @@ TEST(RecordStoreTestHarness, OplogOrder) {
         auto client1 = harnessHelper->serviceContext()->getService()->makeClient("c1");
         auto t1 = harnessHelper->newOperationContext(client1.get());
         WriteUnitOfWork w1(t1.get());
-        id2 = _oplogOrderInsertOplog(t1.get(), rs, 20);
+        id2 = _oplogOrderInsertOplog(t1.get(), engine, rs, 20);
         // do not commit yet
 
         {  // create 2nd doc
@@ -326,7 +340,7 @@ TEST(RecordStoreTestHarness, OplogOrder) {
             auto t2 = harnessHelper->newOperationContext(client2.get());
             {
                 WriteUnitOfWork w2(t2.get());
-                id3 = _oplogOrderInsertOplog(t2.get(), rs, 30);
+                id3 = _oplogOrderInsertOplog(t2.get(), engine, rs, 30);
                 w2.commit();
             }
         }
@@ -402,7 +416,10 @@ TEST(RecordStoreTestHarness, OplogOrder) {
         w1.commit();
     }
 
-    rs->waitForAllEarlierOplogWritesToBeVisible(harnessHelper->newOperationContext().get());
+    {
+        auto opCtx = harnessHelper->newOperationContext();
+        engine->waitForAllEarlierOplogWritesToBeVisible(opCtx.get(), rs.get());
+    }
 
     {  // now all 3 docs should be visible
         auto client2 = harnessHelper->serviceContext()->getService()->makeClient("c2");
@@ -437,7 +454,10 @@ TEST(RecordStoreTestHarness, OplogOrder) {
             opCtx.get(), id1, false /* inclusive */, nullptr /* aboutToDelete callback */);
     }
 
-    rs->waitForAllEarlierOplogWritesToBeVisible(harnessHelper->newOperationContext().get());
+    {
+        auto opCtx = harnessHelper->newOperationContext();
+        engine->waitForAllEarlierOplogWritesToBeVisible(opCtx.get(), rs.get());
+    }
 
     {
         // Now we insert 2 docs with timestamps earlier than before, but commit the 2nd one first.
@@ -452,7 +472,7 @@ TEST(RecordStoreTestHarness, OplogOrder) {
         auto client1 = harnessHelper->serviceContext()->getService()->makeClient("c1");
         auto t1 = harnessHelper->newOperationContext(client1.get());
         WriteUnitOfWork w1(t1.get());
-        RecordId id2 = _oplogOrderInsertOplog(t1.get(), rs, 2);
+        RecordId id2 = _oplogOrderInsertOplog(t1.get(), engine, rs, 2);
 
         // do not commit yet
 
@@ -462,7 +482,7 @@ TEST(RecordStoreTestHarness, OplogOrder) {
             auto t2 = harnessHelper->newOperationContext(client2.get());
             {
                 WriteUnitOfWork w2(t2.get());
-                id3 = _oplogOrderInsertOplog(t2.get(), rs, 3);
+                id3 = _oplogOrderInsertOplog(t2.get(), engine, rs, 3);
                 w2.commit();
             }
         }
@@ -502,7 +522,10 @@ TEST(RecordStoreTestHarness, OplogOrder) {
         w1.commit();
     }
 
-    rs->waitForAllEarlierOplogWritesToBeVisible(harnessHelper->newOperationContext().get());
+    {
+        auto opCtx = harnessHelper->newOperationContext();
+        engine->waitForAllEarlierOplogWritesToBeVisible(opCtx.get(), rs.get());
+    }
 
     {  // now all 3 docs should be visible
         ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
