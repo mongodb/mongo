@@ -38,10 +38,10 @@ proc = subprocess.run(
     text=True,
 )
 
-targets = []
+targets = set()
 for line in proc.stdout.splitlines():
     if line.startswith("  Target: "):
-        targets.append(line.split()[-1])
+        targets.add(line.split()[-1])
 
 coverity_dir = os.path.dirname(__file__)
 analysis_dir = os.path.join(coverity_dir, "analysis")
