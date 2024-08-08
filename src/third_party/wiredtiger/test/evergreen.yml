@@ -638,18 +638,7 @@ functions:
       script: |
         set -o verbose
         ${PREPARE_TEST_ENV}
-        # Get the current setting of the required perf field
-        paranoia_level=`sudo sysctl kernel.perf_event_paranoid | cut -d '=' -f 2 | xargs`
-        sudo sysctl -w kernel.perf_event_paranoid=2
-        ./run -t ${test_name} -C '${test_config}' -f ${test_config_filename} -l 2
-        exit_code=$?
-        # Restore the kernel perf event paranoid level
-        sudo sysctl -w kernel.perf_event_paranoid=$paranoia_level
-        echo "$exit_code" > cppsuite_exit_code
-        if [ "$exit_code" != 0 ]; then
-          echo "[{\"info\":{\"test_name\": \"${test_name}\"},\"metrics\": []}]" > ${test_name}.json
-        fi
-        exit 0
+        ../../../test/evergreen/cppsuite_test_run.sh ${test_name} ${test_config_filename} "${test_config}"
 
   # The following cppsuite tasks define a greater overall task.
   "cppsuite test run all": &cppsuite_test_run_all
@@ -877,46 +866,8 @@ functions:
         set -o errexit
         set -o verbose
         ${PREPARE_TEST_ENV}
-        # Get a random value with leading zeroes removed, /bin/sh version.
-        rando() {
-          tr -cd 0-9 </dev/urandom | head -c 5 | sed -e 's/0*\(.\)/\1/'
-        }
-        # Fail, showing the configuration file.
-        fail() {
-          echo "======= FAILURE =========="
-          for file; do
-            if [ -f "$file" ]; then
-              echo Contents of "$file":
-              cat "$file"
-              echo "================"
-            fi
-          done
-          exit 1
-        }
-        runtime=3  # minutes
-        config=../../../test/format/CONFIG.replay
-        for i in $(seq ${times}); do
-          echo Iteration $i/${times}
-          x2=$(rando)
-          x3=$(rando)
-          rm -rf RUNDIR_1 RUNDIR_2 RUNDIR_3
 
-          first_run_args="-c $config runs.timer=$runtime"
-          ./t -h RUNDIR_1 $first_run_args ${test_format_extra_args} || fail RUNDIR_1/CONFIG 2>&1
-          stable_hex=$(../../../tools/wt_timestamps RUNDIR_1 | sed -e '/stable=/!d' -e 's/.*=//')
-          ops=$(echo $((0x$stable_hex)))
-
-          # Do the second run up to the stable timestamp, using the same data seed,
-          # but with a different extra seed.  Compare it when done.
-          common_args="-c RUNDIR_1/CONFIG runs.timer=0 runs.ops=$ops"
-          ./t -h RUNDIR_2 $common_args random.extra_seed=$x2 || fail RUNDIR_2/CONFIG 2>&1
-          ../../../tools/wt_cmp_dir RUNDIR_1 RUNDIR_2 || fail RUNDIR_1/CONFIG RUNDIR_2/CONFIG 2>&1
-
-          # Do the third run up to the stable timestamp, using the same data seed,
-          # but with a different extra seed.  Compare it to the second run when done.
-          ./t -h RUNDIR_3 $common_args random.extra_seed=$x3 || fail RUNDIR_3/CONFIG 2>&1
-          ../../../tools/wt_cmp_dir RUNDIR_2 RUNDIR_3 || fail RUNDIR_2/CONFIG RUNDIR_3/CONFIG 2>&1
-        done
+        ../../../test/evergreen/format_test_predictable.sh ${times} ${test_format_extra_args}
   "format test script":
     command: shell.exec
     params:
@@ -949,13 +900,7 @@ functions:
         set -o errexit
         set -o verbose
         ${PREPARE_TEST_ENV}
-        format_args="tiered_storage.storage_source=dir_store tiered_storage.flush_frequency=60 checkpoint.wait=15 runs.source=table runs.timer=10 runs.in_memory=0"
-        for i in $(seq ${times}); do
-          echo Iteration $i/${times}
-          rm -rf RUNDIR
-          ./t $format_args ${test_format_extra_args}
-          ./t -R $format_args ${test_format_extra_args}
-        done
+        ../../../test/evergreen/format_test_tiered.sh ${times} ${test_format_extra_args}
   "many dbs test":
     command: shell.exec
     params:
@@ -986,93 +931,19 @@ functions:
         set -o verbose
         ${PREPARE_TEST_ENV}
 
-        for i in $(seq ${times|1}); do
-          # Run the various combinations of args. Let time and threads be random. Add a
-          # timing stress to test_timestamp_abort every other run.
-          if [ $(( $i % 2 )) -eq 0 ]; then
-            test_timestamp_abort_args=-s
-          else
-            test_timestamp_abort_args=
-          fi
-
-          # Run current version with write-no-sync txns.
-          ./random_abort/test_random_abort 2>&1
-          ./timestamp_abort/test_timestamp_abort $test_timestamp_abort_args 2>&1
-
-          # Current version with memory-based txns (MongoDB usage).
-          ./random_abort/test_random_abort -m 2>&1
-          ./timestamp_abort/test_timestamp_abort -m $test_timestamp_abort_args 2>&1
-
-          # V1 log compatibility mode with write-no-sync txns.
-          ./random_abort/test_random_abort -C 2>&1
-          ./timestamp_abort/test_timestamp_abort -C $test_timestamp_abort_args 2>&1
-
-          # V1 log compatibility mode with memory-based txns.
-          ./random_abort/test_random_abort -C -m 2>&1
-          ./timestamp_abort/test_timestamp_abort -C -m $test_timestamp_abort_args 2>&1
-
-          ./truncated_log/test_truncated_log ${truncated_log_args|} 2>&1
-
-          # Just let the system take a breath
-          sleep 10s
-        done
+        ../../../test/evergreen/recovery_stress_test_script.sh ${times|1} ${truncated_log_args|}
   "schema abort predictable":
     command: shell.exec
     params:
       working_dir: "wiredtiger/cmake_build/test/csuite/schema_abort"
       shell: bash
       script: |
-        # Get a random value with leading zeroes removed, /bin/sh version.
-        rando() {
-          tr -cd 0-9 </dev/urandom | head -c 5 | sed -e 's/0*\(.\)/\1/'
-        }
-
         # Run schema_abort in a way that can test predictable replay.
         set -o errexit
         set -o verbose
         ${PREPARE_TEST_ENV}
-        runtime=20  # seconds
-        nthreads=5
 
-        toolsdir=../../../../tools
-        wtutil=../../../wt
-
-        r=$(rando)$(rando)
-        x0=$(rando)$(rando)
-
-        rm -rf RUNDIR_0
-        # The first run is for calibration only.  We just want to run for the designated
-        # time and get an appropriate stop timestamp that can be used in later runs.
-        calibration_run_args="-PSD$r,E$x0 -T $nthreads -t $runtime"
-        ./test_schema_abort -p -h RUNDIR_0 $calibration_run_args || exit 1
-        echo "Finished calibration run"
-        stable_hex=$($toolsdir/wt_timestamps RUNDIR_0/WT_HOME | sed -e '/stable=/!d' -e 's/.*=//')
-        op_count=$(echo $((0x$stable_hex)))
-
-        for i in $(seq ${times}); do
-          echo Iteration $i/${times}
-          x1=$(rando)$(rando)
-          x2=$(rando)$(rando)
-          rm -rf RUNDIR_1 RUNDIR_2
-
-          # Run with up to a slightly different timestamp for each iteration.
-          ops=$(($op_count + $(rando) % 100))
-
-          # Do two runs up to the stable timestamp, using the same data seed,
-          # but with a different extra seed.  Compare it when done.
-          first_run_args="-PSD$r,E$x1 -T $nthreads -s $ops"
-          echo "First run with args $first_run_args"
-          ./test_schema_abort -p -h RUNDIR_1 $first_run_args  || exit 1
-
-          second_run_args="-PSD$r,E$x2 -T $nthreads -s $ops"
-          echo "Second run with args $second_run_args"
-          ./test_schema_abort -p -h RUNDIR_2 $second_run_args  || exit 1
-
-          # We are ignoring the table:wt table. This table does not participate in
-          # predictable replay, as it may be concurrently created, opened (regular or bulk cursor),
-          # verified and dropped by multiple threads in test_schema_abort.
-          $toolsdir/wt_cmp_dir -i '^table:wt$' RUNDIR_1/WT_HOME RUNDIR_2/WT_HOME || exit 1
-        done
+        ../../../../test/evergreen/schema_abort_predictable.sh ${times} ${truncated_log_args|}
   "upload artifact":
     - command: archive.targz_pack
       type: setup
@@ -1181,49 +1052,12 @@ functions:
       working_dir: "wiredtiger/cmake_build/test/checkpoint"
       shell: bash
       script: |
-        # Get a random value with leading zeroes removed, /bin/sh version.
-        rando() {
-          tr -cd 0-9 </dev/urandom | head -c 5 | sed -e 's/0*\(.\)/\1/'
-        }
-
         # Run test/checkpoint in a way that can test predictable replay.
         set -o errexit
         set -o verbose
         ${PREPARE_TEST_ENV}
 
-        toolsdir=../../../tools
-        wtutil=../../wt
-
-        r=$(rando)$(rando)
-        x0=$(rando)$(rando)
-
-        # Always run with timestamps and in the predictable mode
-        base_args="-x -R"
-
-        rm -rf RUNDIR_0
-        # The first run is for calibration only.  We just want to run for the designated
-        # time and get an approriate stop timestamp that can be used in later runs.
-        calibration_run_args="-PSD$r,E$x0"
-        ./test_checkpoint -h RUNDIR_0 $base_args ${checkpoint_args} $calibration_run_args || exit 1
-        echo "Finished calibration run"
-        stable_hex=$($toolsdir/wt_timestamps RUNDIR_0 | sed -e '/stable=/!d' -e 's/.*=//')
-        stop_ts=$(echo $((0x$stable_hex)))
-        for i in $(seq ${times}); do
-          echo Iteration $i/${times}
-          x1=$(rando)$(rando)
-          x2=$(rando)$(rando)
-          rm -rf RUNDIR_1 RUNDIR_2
-          # Do two runs up to the stable timestamp, using the same data seed,
-          # but with a different extra seed.  Compare it when done.
-          first_run_args="-PSD$r,E$x1 -S $stop_ts"
-          echo "First run with args $base_args ${checkpoint_args} $first_run_args"
-          ./test_checkpoint -h RUNDIR_1 $base_args ${checkpoint_args} $first_run_args || exit 1
-          second_run_args="-PSD$r,E$x2 -S $stop_ts"
-          echo "Second run with args $base_args ${checkpoint_args} $second_run_args"
-          ./test_checkpoint -h RUNDIR_2 $base_args ${checkpoint_args} $second_run_args || exit 1
-          # Compare the runs.
-          $toolsdir/wt_cmp_dir RUNDIR_1 RUNDIR_2 || exit 1
-        done
+        ../../../test/evergreen/checkpoint_test_predictable.sh ${times} ${checkpoint_args}
 
   "checkpoint stress test":
     command: shell.exec
@@ -1234,33 +1068,7 @@ functions:
         set -o errexit
         set -o verbose
         ${PREPARE_TEST_ENV}
-        export WIREDTIGER_CONFIG='checkpoint_sync=0,transaction_sync=(method=none)'
-        CMD='./test_checkpoint -h WT_TEST.$i.$t -t r -r 2 -W 3 -n 1000000 -k 1000000 -C "cache_size=100MB"'
-        if [ ${tiered|0} -eq 1 ]; then
-            CMD="$CMD -PT"
-        fi
-
-        for i in $(seq ${times|1}); do
-          for t in $(seq ${no_of_procs|1}); do
-            eval nohup $CMD > nohup.out.$i.$t 2>&1 &
-          done
-
-          failure=0
-          for t in $(seq ${no_of_procs|1}); do
-            ret=0
-            wait -n || ret=$?
-            if [ $ret -ne 0 ]; then
-              # Skip the below lines from nohup output file because they are very verbose and
-              # print only the errors to evergreen log file.
-              grep -v "Finished verifying" nohup.out.* | grep -v "Finished a checkpoint" | grep -v "thread starting"
-              failure=1
-              fail_ret=$ret
-            fi
-          done
-          if [ $failure -eq 1 ]; then
-            exit $fail_ret
-          fi
-        done
+        ../../../test/evergreen/checkpoint_stress_test.sh ${tiered|0} ${times|1} ${no_of_procs|1}
 
   "compatibility test":
     - command: shell.exec
