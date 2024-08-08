@@ -39,6 +39,8 @@ function setupTest({failPoint, extraFailPointData, secondaryStartupParams}) {
 
     jsTestLog("Restarting secondary with failPoint " + failPoint + " set for " + nss);
     secondaryStartupParams = secondaryStartupParams || {};
+    secondaryStartupParams = Object.merge(
+        secondaryStartupParams, {logComponentVerbosity: tojson({replication: {verbosity: 2}})});
     secondaryStartupParams['failpoint.' + failPoint] = tojson({mode: 'alwaysOn', data: data});
     // Skip clearing initial sync progress after a successful initial sync attempt so that we
     // can check initialSyncStatus fields after initial sync is complete.
@@ -67,6 +69,11 @@ function finishTest({failPoint, expectedLog, waitForDrop, createNew}) {
     const uuid_obj = getUUIDFromListCollections(primaryDB, collName);
     const uuid = extractUUIDFromObject(uuid_obj);
 
+    jsTestLog("Doing further inserts and updates on the collection");
+    assert.commandWorked(primaryColl.insert([{_id: 11}]));
+    assert.commandWorked(primaryColl.update({_id: 1}, {a: 2}));
+    assert.commandWorked(primaryColl.update({_id: 11}, {a: 22}));
+    assert.commandWorked(primaryColl.remove({_id: 2}));
     jsTestLog("Dropping collection on primary: " + primaryColl.getFullName());
     assert(primaryColl.drop());
 
@@ -111,6 +118,21 @@ function finishTest({failPoint, expectedLog, waitForDrop, createNew}) {
     } else {
         assert.eq(0, secondaryColl.find().itcount());
     }
+
+    // The additional ops should fail with NamespaceNotFound.  We ignore the failure but
+    // log it.
+    const kNamespaceNotFoundInCrudOp = 9067401;
+    checkLog.checkContainsWithCountJson(
+        secondary,
+        kNamespaceNotFoundInCrudOp,
+        {} /*attrs*/,
+        4 /* count */,
+        null /* severity */,
+        true /* isRelaxed */,
+        (actual, expected) => {
+            assert.eq(actual, expected, "Wrong number of NamespaceNotFound log messages");
+            return true;
+        });
     replTest.checkReplicatedDataHashes();
 }
 

@@ -209,6 +209,23 @@ void CollectionCloner::postStage() {
     _stats.end = getSharedData()->getClock()->now();
 }
 
+void CollectionCloner::_maybeDropCollectionOnSyncSourceDrop() {
+    if (!_collLoader)
+        return;             // Collection was never created, so nothing needs to be done.
+    _collLoader = nullptr;  // Abort collection bulk loading.
+    LOGV2(9067400,
+          "CollectionCloner dropping collection that was dropped on source",
+          logAttrs(getSourceNss()),
+          "uuid"_attr = getSourceUuid());
+
+    // The drop should always succeed, since we checked that the collection existed already.
+    auto opCtx = cc().makeOperationContext();
+    UnreplicatedWritesBlock uwb(opCtx.get());
+    // Note that the storageInterface dropCollection drops with no opTime (immediate drop, not
+    // two-phase drop) and always allows system collections to be dropped.
+    uassertStatusOK(getStorageInterface()->dropCollection(opCtx.get(), getSourceNss()));
+}
+
 // Collection cloner stages exit normally if the collection is not found.
 BaseCloner::AfterStageBehavior CollectionCloner::CollectionClonerStage::run() {
     try {
@@ -219,6 +236,7 @@ BaseCloner::AfterStageBehavior CollectionCloner::CollectionClonerStage::run() {
               logAttrs(getCloner()->getSourceNss()),
               "uuid"_attr = getCloner()->getSourceUuid());
         getCloner()->waitForDatabaseWorkToComplete();
+        getCloner()->_maybeDropCollectionOnSyncSourceDrop();
         return kSkipRemainingStages;
     } catch (const DBException&) {
         getCloner()->waitForDatabaseWorkToComplete();

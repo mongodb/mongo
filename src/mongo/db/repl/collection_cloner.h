@@ -251,6 +251,12 @@ private:
      */
     void runQuery();
 
+    /**
+     * Drops the collection if it was dropped on the sync source, if we'd created it and not
+     * finished loading it.
+     */
+    void _maybeDropCollectionOnSyncSourceDrop();
+
     // All member variables are labeled with one of the following codes indicating the
     // synchronization rules for accessing them.
     //

@@ -681,6 +681,13 @@ Status OplogApplierUtils::applyOplogBatchCommon(
                 if (inStableRecovery) {
                     repl::OplogApplication::checkOnOplogFailureForRecovery(
                         opCtx, op->getNss(), redact(op->toBSONForLogging()), redact(e));
+                } else {
+                    LOGV2_DEBUG(
+                        9067401,
+                        2,
+                        "Attempted to apply operation to missing namespace when this was allowed",
+                        "error"_attr = redact(e),
+                        "oplogEntry"_attr = redact(op->toBSONForLogging()));
                 }
                 continue;
             }
