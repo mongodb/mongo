@@ -11,6 +11,8 @@
  *   requires_pipeline_optimization,
  *   # We need a timeseries collection.
  *   requires_timeseries,
+ *   # Requires a batch size greater than one.
+ *   does_not_support_config_fuzzer,
  * ]
  */
 import {getAggPlanStage} from "jstests/libs/analyze_plan.js";
