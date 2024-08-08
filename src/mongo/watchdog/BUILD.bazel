@@ -8,3 +8,16 @@ exports_files(
         "*.cpp",
     ]),
 )
+
+mongo_cc_library(
+    name = "watchdog_register",
+    srcs = [
+        "watchdog_register.cpp",
+    ],
+    hdrs = [
+        "watchdog_register.h",
+    ],
+    deps = [
+        "//src/mongo:base",
+    ],
+)

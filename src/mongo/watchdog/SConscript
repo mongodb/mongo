@@ -15,13 +15,6 @@ env.Library(
 )
 
 env.Library(
-    target="watchdog_register",
-    source=[
-        "watchdog_register.cpp",
-    ],
-)
-
-env.Library(
     target="watchdog_mongod",
     source=[
         "watchdog_mongod.cpp",
