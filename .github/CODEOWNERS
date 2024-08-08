@@ -440,11 +440,13 @@ WORKSPACE.bazel @10gen/devprod-build
 /src/mongo/db/pipeline/**/document_source_current_op* @10gen/query-execution
 /src/mongo/db/pipeline/**/document_source_densify* @10gen/query-integration
 /src/mongo/db/pipeline/**/document_source_fill* @10gen/query-integration
+/src/mongo/db/pipeline/**/document_source_hybrid_scoring* @10gen/query-integration
 /src/mongo/db/pipeline/**/document_source_index_stats* @10gen/query-execution
 /src/mongo/db/pipeline/**/document_source_internal_unpack_bucket* @10gen/query-integration
 /src/mongo/db/pipeline/**/document_source_internal_convert_bucket_index_stats* @10gen/query-integration
 /src/mongo/db/pipeline/**/document_source_parsing_validators* @10gen/query-optimization
 /src/mongo/db/pipeline/**/document_source_query_stats* @10gen/query-integration
+/src/mongo/db/pipeline/**/document_source_rank_fusion* @10gen/query-integration
 /src/mongo/db/pipeline/**/document_source_set_window_fields* @10gen/query-integration
 /src/mongo/db/pipeline/**/granularity_rounder* @10gen/query-execution
 /src/mongo/db/pipeline/**/javascript_execution* @10gen/query-integration

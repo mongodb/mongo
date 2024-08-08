@@ -27,41 +27,18 @@
  *    it in the license file.
  */
 
-#include <boost/smart_ptr/intrusive_ptr.hpp>
-
+#include "mongo/db/pipeline/document_source_hybrid_scoring_util.h"
 #include "mongo/base/error_codes.h"
-#include "mongo/bson/bsontypes.h"
-#include "mongo/db/pipeline/document_source_rank_fusion.h"
-#include "mongo/db/pipeline/expression_context.h"
-#include "mongo/db/pipeline/lite_parsed_document_source.h"
-#include "mongo/db/pipeline/pipeline.h"
-#include "mongo/db/query/allowed_contexts.h"
+#include "mongo/util/str.h"
 
 namespace mongo {
 
-REGISTER_DOCUMENT_SOURCE_WITH_FEATURE_FLAG(rankFusion,
-                                           LiteParsedDocumentSourceDefault::parse,
-                                           DocumentSourceRankFusion::createFromBson,
-                                           AllowedWithApiStrict::kNeverInVersion1,
-                                           feature_flags::gFeatureFlagSearchHybridScoring);
-
-std::list<boost::intrusive_ptr<DocumentSource>> DocumentSourceRankFusion::createFromBson(
-    BSONElement elem, const boost::intrusive_ptr<ExpressionContext>& pExpCtx) {
-    uassert(ErrorCodes::FailedToParse,
-            str::stream() << "The " << kStageName
-                          << " stage specification must be an object, found "
-                          << typeName(elem.type()),
-            elem.type() == BSONType::Object);
-
-    auto spec = RankFusionSpec::parse(IDLParserContext(kStageName), elem.embeddedObject());
-
-    for (const auto& input : spec.getInputs()) {
-        auto pipeline =
-            Pipeline::parse(input.getPipeline(), pExpCtx->copyForSubPipeline(pExpCtx->ns));
+Status validateRankFusionMinInputs(const std::vector<RankFusionInputsSpec>& inputs) {
+    if (inputs.size() < 1) {
+        return {
+            ErrorCodes::BadValue,
+            str::stream() << "A hybrid scoring stage should be run with at least one pipeline."};
     }
-
-    // TODO SERVER-91911: Validate that these are ranked pipelines.
-
-    return {};
+    return Status::OK();
 }
 }  // namespace mongo

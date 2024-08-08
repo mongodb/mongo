@@ -29,37 +29,14 @@
 
 #pragma once
 
-#include <list>
-
-#include <boost/smart_ptr/intrusive_ptr.hpp>
-
-#include "mongo/bson/bsonelement.h"
-#include "mongo/db/exec/document_value/value.h"
-#include "mongo/db/pipeline/document_source.h"
-#include "mongo/db/pipeline/document_source_rank_fusion_gen.h"
+#include "mongo/base/status.h"
 #include "mongo/db/pipeline/document_source_rank_fusion_inputs_gen.h"
-#include "mongo/db/pipeline/expression_context.h"
 
 namespace mongo {
-
 /**
- * The $rankFusion stage is syntactic sugar for generating an output of ranked results by combining
- * the results of any number of ranked subpipelines with reciprocal rank fusion.
- * TODO SERVER-92213: Elaborate on this header comment with more details to what the stage gets
- * desugared to.
+ * Helper function to validate that there is at least one input pipeline for a hybrid scoring
+ * $rankFusion stage.
  */
-class DocumentSourceRankFusion final {
-public:
-    static constexpr StringData kStageName = "$rankFusion"_sd;
-    /**
-     * Returns a list of stages to execute hybrid scoring with rank fusion.
-     */
-    static std::list<boost::intrusive_ptr<DocumentSource>> createFromBson(
-        BSONElement elem, const boost::intrusive_ptr<ExpressionContext>& pExpCtx);
-
-private:
-    // It is illegal to construct a DocumentSourceRankFusion directly, use createFromBson() instead.
-    DocumentSourceRankFusion() = default;
-};
+Status validateRankFusionMinInputs(const std::vector<RankFusionInputsSpec>& inputs);
 
 }  // namespace mongo
