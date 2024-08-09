@@ -1,0 +1,4 @@
+sh_binary(
+    name = "repin_dockerfiles",
+    srcs = ["repin_dockerfiles.sh"],
+)
