@@ -926,21 +926,6 @@ config_setting(
     },
 )
 
-config_setting(
-    name = "use_disable_ref_track_disabled",
-    flag_values = {
-        "//bazel/config:use_disable_ref_track": "False",
-    },
-)
-
-selects.config_setting_group(
-    name = "selected_disable_ref_track",
-    match_any = [
-        ":use_disable_ref_track_disabled",
-        ":release_enabled",
-    ],
-)
-
 # --------------------------------------
 # wiredtiger options
 # --------------------------------------

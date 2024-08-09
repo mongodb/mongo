@@ -6,8 +6,7 @@
 #    --output-path mongo.h --template-path mongo.h.in \
 #    --check-path mongo_checks.py --log-path mongo.h.log
 import argparse
-import textwrap
-import inspect
+import importlib
 from typing import Dict
 import sys
 import os
@@ -44,36 +43,17 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     sys.path.append(".")
-    generate_config_module = os.path.splitext(args.check_path)[0].replace("/", ".")
-    module = __import__(generate_config_module, fromlist=["generate_config_header"])
-    generate_config_header_func = getattr(module, "generate_config_header")
-    try:
-        generate_config_header_args = {
-            "compiler_path": args.compiler_path,
-            "compiler_args": args.compiler_args,
-            "env_vars": args.env_vars,
-            "logpath": args.log_path,
-            "additional_inputs": args.additional_input,
-            "extra_definitions": args.extra_definitions,
-        }
-        definitions = generate_config_header_func(**generate_config_header_args)
-        write_config_header(args.template_path, args.output_path, definitions)
-    except TypeError as exc:
-        called_args = inspect.getfullargspec(generate_config_header_func).args
-        print(
-            textwrap.dedent(
-                """\
-                              
-            ERROR: called import config header generator:
-                    %s
-                imported "generate_config_header" requires has these args:
-                    %s
-                but was passed these args:
-                    %s
-            
-            """
-                % (generate_config_module, called_args, list(generate_config_header_args.keys()))
-            )
-        )
+    module = __import__(
+        os.path.splitext(args.check_path)[0].replace("/", "."), fromlist=["generate_config_header"]
+    )
+    generate_config_header = getattr(module, "generate_config_header")
 
-        raise exc
+    definitions = generate_config_header(
+        args.compiler_path,
+        args.compiler_args,
+        args.env_vars,
+        args.log_path,
+        args.additional_input,
+        args.extra_definitions,
+    )
+    write_config_header(args.template_path, args.output_path, definitions)

@@ -17,7 +17,7 @@
 /* #undef HAVE_BUILTIN_EXTENSION_ZLIB */
 
 /* Define to 1 if you have the `clock_gettime' function. */
-#define HAVE_CLOCK_GETTIME 1
+/* #undef HAVE_CLOCK_GETTIME */
 
 /* Define to 1 for diagnostic tests. */
 /* #undef HAVE_DIAGNOSTIC */
@@ -26,16 +26,16 @@
 #define HAVE_DLFCN_H 1
 
 /* Define to 1 if you have the `fallocate' function. */
-@HAVE_FALLOCATE@
+/* #undef HAVE_FALLOCATE */
 
 /* Define to 1 if you have the `fcntl' function. */
 #define HAVE_FCNTL 1
 
 /* Define to 1 if you have the `fdatasync' function. */
-#define HAVE_FDATASYNC 1
+/* #undef HAVE_FDATASYNC */
 
 /* Define to 1 if you have the `fread_unlocked' function. */
-#define HAVE_FREAD_UNLOCKED 1
+/* #undef HAVE_FREAD_UNLOCKED */
 
 /* Define to 1 if you have the `ftruncate' function. */
 #define HAVE_FTRUNCATE 1
@@ -59,7 +59,7 @@
 #define HAVE_LIBPTHREAD 1
 
 /* Define to 1 if you have the `rt' library (-lrt). */
-#define HAVE_LIBRT 1
+/* #undef HAVE_LIBRT */
 
 /* Define to 1 if you have the `snappy' library (-lsnappy). */
 /* #undef HAVE_LIBSNAPPY */
@@ -71,19 +71,16 @@
 #define HAVE_MEMORY_H 1
 
 /* Define to 1 if you have the `posix_fadvise' function. */
-#define HAVE_POSIX_FADVISE 1
+/* #undef HAVE_POSIX_FADVISE */
 
 /* Define to 1 if you have the `posix_fallocate' function. */
-#define HAVE_POSIX_FALLOCATE 1
+/* #undef HAVE_POSIX_FALLOCATE */
 
 /* Define to 1 if you have the `posix_madvise' function. */
 #define HAVE_POSIX_MADVISE 1
 
 /* Define to 1 if you have the `posix_memalign' function. */
 #define HAVE_POSIX_MEMALIGN 1
-
-/* Define to 1 if pthread condition variables support monotonic clocks. */
-#define HAVE_PTHREAD_COND_MONOTONIC 1
 
 /* Define to 1 if you have the <pthread_np.h> header file. */
 /* #undef HAVE_PTHREAD_NP_H */
@@ -107,7 +104,7 @@
 #define HAVE_STRTOUQ 1
 
 /* Define to 1 if you have the `sync_file_range' function. */
-@HAVE_SYNC_FILE_RANGE@
+/* #undef HAVE_SYNC_FILE_RANGE */
 
 /* Define to 1 if you have the <sys/stat.h> header file. */
 #define HAVE_SYS_STAT_H 1
@@ -122,7 +119,7 @@
 /* #undef HAVE_VERBOSE */
 
 /* Define to 1 if you have the <x86intrin.h> header file. */
-@HAVE_X86INTRIN_H@
+/* #undef HAVE_X86INTRIN_H */
 
 /* Spinlock type from mutex.h. */
 #define SPINLOCK_TYPE SPINLOCK_PTHREAD_MUTEX
@@ -143,7 +140,7 @@
 #endif
 
 /* Default alignment of buffers used for I/O */
-#define WT_BUFFER_ALIGNMENT_DEFAULT 4096
+#define WT_BUFFER_ALIGNMENT_DEFAULT 0
 
 /* Size of a transaction timestamp in bytes */
 #define WT_TIMESTAMP_SIZE 8
@@ -158,6 +155,3 @@
 
 /* Define for large files, on AIX-style hosts. */
 /* #undef _LARGE_FILES */
-
-/* Define for arm neon intrinsics. */
-@HAVE_ARM_NEON_INTRIN_H@

@@ -673,15 +673,8 @@ def exists(env: SCons.Environment.Environment) -> bool:
 
 def handle_bazel_program_exception(env, target, outputs):
     prog_suf = env.subst("$PROGSUFFIX")
-    dbg_suffix = ".pdb" if sys.platform == "win32" else env.subst("$SEPDBG_SUFFIX")
+    dbg_suffix = env.subst("$SEPDBG_SUFFIX")
     bazel_program = False
-
-    # on windows the pdb for dlls contains no double extensions
-    # so we need to check all the outputs up front to know
-    for bazel_output_file in outputs:
-        if bazel_output_file.endswith(".dll"):
-            return False
-
     if os.path.splitext(outputs[0])[1] in [prog_suf, dbg_suffix]:
         for bazel_output_file in outputs:
             first_ext = os.path.splitext(bazel_output_file)[1]
@@ -690,11 +683,8 @@ def handle_bazel_program_exception(env, target, outputs):
             else:
                 second_ext = None
 
-            if (
-                (second_ext is not None and second_ext + first_ext == prog_suf + dbg_suffix)
-                or (second_ext is None and first_ext == prog_suf)
-                or first_ext == ".exe"
-                or first_ext == ".pdb"
+            if (second_ext is not None and second_ext + first_ext == prog_suf + dbg_suffix) or (
+                second_ext is None and first_ext == prog_suf
             ):
                 bazel_program = True
                 scons_node_str = bazel_output_file.replace(
@@ -969,7 +959,7 @@ def generate(env: SCons.Environment.Environment) -> None:
                 "bazel_output": bazel_output_file.replace("\\", "/"),
             }
 
-    for scons_node in sorted(Globals.scons2bazel_targets):
+    for scons_node in Globals.scons2bazel_targets:
         bazel_debug(f"Created ThinTarget {scons_node} from {Globals.bazel_output(scons_node)}")
 
     globals = Globals()
