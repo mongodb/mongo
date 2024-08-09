@@ -5473,6 +5473,61 @@ const char* ExpressionSlice::getOpName() const {
     return "$slice";
 }
 
+/* ----------------------- ExpressionSigmoid ----------------------- */
+
+/**
+ * A $sigmoid expression gets desugared to the following:
+ * {
+ *     $divide: [1,
+ *         { $add: [
+ *             1,
+ *             { $exp: {$multiply: [-1, <input>]} }
+ *         ] }
+ *     ]
+ * }
+ */
+static intrusive_ptr<Expression> parseExpressionSigmoid(ExpressionContext* const expCtx,
+                                                        BSONElement expr,
+                                                        const VariablesParseState& vps) {
+    // TODO SERVER-92973: Improve error handling so that any field or expression that resolves to a
+    // non-numeric input is handled by $sigmoid instead of the desugared $multiply.
+
+    // Check that the input to $sigmoid is not an array or a string.
+    BSONType type = expr.type();
+    uassert(ErrorCodes::TypeMismatch,
+            str::stream() << "$sigmoid only supports numeric types, not " << typeName(type),
+            (type != String ? true : expr.valueStringData().starts_with('$')) && type != Array);
+
+    auto inputExpression = Expression::parseOperand(expCtx, expr, vps);
+
+    // Built the multiply expression: {$multiply: [-1, <input>]}.
+    std::vector<boost::intrusive_ptr<Expression>> multiplyChildren = {
+        make_intrusive<ExpressionConstant>(expCtx, Value(-1)), std::move(inputExpression)};
+    auto multiplyExpression =
+        make_intrusive<ExpressionMultiply>(expCtx, std::move(multiplyChildren));
+
+    // Built the exponent expression: { $exp: {$multiply: [-1, <input>]} }.
+    std::vector<boost::intrusive_ptr<Expression>> expChildren = {std::move(multiplyExpression)};
+    auto expExpression = make_intrusive<ExpressionExp>(expCtx, std::move(expChildren));
+
+    // Built the addition expression: { $add: [1, {$exp: {$multiply: [-1, <input>]} }.
+    std::vector<boost::intrusive_ptr<Expression>> addChildren = {
+        make_intrusive<ExpressionConstant>(expCtx, Value(1)), std::move(expExpression)};
+    auto addExpression = make_intrusive<ExpressionAdd>(expCtx, std::move(addChildren));
+
+    // Build and return the divide expression: { $divide: [1, { $add: [1, { $exp: {$multiply: [-1,
+    // <input>]} }] }] }.
+    std::vector<boost::intrusive_ptr<Expression>> divideChildren = {
+        make_intrusive<ExpressionConstant>(expCtx, Value(1)), std::move(addExpression)};
+    return make_intrusive<ExpressionDivide>(expCtx, std::move(divideChildren));
+}
+
+REGISTER_EXPRESSION_WITH_FEATURE_FLAG(sigmoid,
+                                      parseExpressionSigmoid,
+                                      AllowedWithApiStrict::kNeverInVersion1,
+                                      AllowedWithClientType::kAny,
+                                      feature_flags::gFeatureFlagSearchHybridScoringPrerequisites);
+
 /* ----------------------- ExpressionSize ---------------------------- */
 
 Value ExpressionSize::evaluate(const Document& root, Variables* variables) const {
