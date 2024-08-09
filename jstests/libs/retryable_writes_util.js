@@ -126,7 +126,7 @@ export var RetryableWritesUtil = (function() {
     }
 
     function runCommandWithRetries(conn, cmd) {
-        return retryOnRetryableCode(() => conn.runCommand(cmd),
+        return retryOnRetryableCode(() => assert.commandWorked(conn.runCommand(cmd)),
                                     "Retry interrupt: runCommand(" + tojson(cmd) + ")");
     }
 
