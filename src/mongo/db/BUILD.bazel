@@ -363,6 +363,7 @@ mongo_cc_library(
     deps = [
         ":service_context",
         "//src/mongo:base",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/db/commands:server_status_core",
     ],
 )
 

@@ -28,6 +28,7 @@
  */
 
 #include "mongo/db/curop.h"
+#include "mongo/db/prepare_conflict_tracker.h"
 #include "mongo/db/service_context_test_fixture.h"
 #include "mongo/db/transaction_resources.h"
 #include "mongo/unittest/assert.h"
@@ -84,20 +85,25 @@ TEST_F(CurOpStatsTest, CheckWorkingMillisValue) {
     Milliseconds waitForFlowControlTicket = Milliseconds(4);
 
     auto tickSourceMock = std::make_unique<TickSourceMock<Microseconds>>();
-    // The tick source is initialized to a non-zero value as CurOp equates a value of 0 with a
+    auto& tickSource = *tickSourceMock.get();
+
+    // The prepare conflict tracker uses the service context's tick source to measure time.
+    opCtx->getServiceContext()->setTickSource(std::move(tickSourceMock));
+
+    // The tick source is set to a non-zero value as CurOp equates a value of 0 with a
     // not-started timer.
-    tickSourceMock->advance(Milliseconds{100});
-    curop->setTickSource_forTest(tickSourceMock.get());
+    tickSource.advance(Milliseconds{100});
+    curop->setTickSource_forTest(&tickSource);
 
     // Check that execution time advances as expected
     curop->ensureStarted();
-    tickSourceMock->advance(executionTime);
+    tickSource.advance(executionTime);
     curop->done();
     ASSERT_EQ(duration_cast<Milliseconds>(curop->elapsedTimeExcludingPauses()), executionTime);
 
     // Check that workingTimeMillis correctly accounts for ticket wait time
     auto locker = shard_role_details::getLocker(opCtx.get());
-    addTicketQueueTime(admCtx, tickSourceMock.get(), executionTime, waitForTickets);
+    addTicketQueueTime(admCtx, &tickSource, executionTime, waitForTickets);
     curop->completeAndLogOperation({logv2::LogComponent::kTest}, nullptr);
     ASSERT_EQ(curop->debug().workingTimeMillis, executionTime - waitForTickets);
 
@@ -112,6 +118,16 @@ TEST_F(CurOpStatsTest, CheckWorkingMillisValue) {
         Microseconds(addWaitForLock(opCtx.get(), getServiceContext(), locker, Milliseconds(8))));
 
     curop->completeAndLogOperation({logv2::LogComponent::kTest}, nullptr);
+    ASSERT_EQ(curop->debug().workingTimeMillis,
+              executionTime - waitForTickets - waitForFlowControlTicket - waitForLocks);
+
+    // Check that workingTimeMillis correctly excludes time spent waiting for prepare conflicts.
+    // Simulate a prepare conflict and check that workingMillis is the same as before.
+    PrepareConflictTracker::get(opCtx.get()).beginPrepareConflict(tickSource);
+    tickSource.advance(Milliseconds(1000));
+    PrepareConflictTracker::get(opCtx.get()).endPrepareConflict(tickSource);
+    curop->completeAndLogOperation({logv2::LogComponent::kTest}, nullptr);
+    // This wait time should be excluded from workingTimeMillis.
     ASSERT_EQ(curop->debug().workingTimeMillis,
               executionTime - waitForTickets - waitForFlowControlTicket - waitForLocks);
 }

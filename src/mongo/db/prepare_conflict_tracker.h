@@ -56,39 +56,58 @@ public:
     bool isWaitingOnPrepareConflict() const;
 
     /**
-     * Sets _waitOnPrepareConflict to true after a read thread hits a WT_PREPARE_CONFLICT
-     * error code.
+     * Marks the start of a prepare conflict. Call updatePrepareConfict() to advance waiting metrics
+     * during a conflict, and endPrepareConflict() to mark a prepare conflict as resolved.
      */
-    void beginPrepareConflict(OperationContext* opCtx);
+    void beginPrepareConflict(TickSource& tickSource);
+
+    void updatePrepareConflict(TickSource& tickSource);
+
+    void endPrepareConflict(TickSource& tickSource);
 
     /**
-     * Sets _waitOnPrepareConflict to false after wiredTigerPrepareConflictRetry returns,
-     * implying that the read thread is not blocked on a prepare conflict.
+     * Returns the duration of time spent blocked on this prepare conflict.
      */
-    void endPrepareConflict(OperationContext* opCtx);
+    Microseconds getThisOpPrepareConflictDuration();
 
     /**
-     * Returns the total duration of time spent blocked on prepare conflicts.
+     * Returns the number of prepare conflicts caused by this operation.
      */
-    Microseconds getPrepareConflictDuration();
+    long long getThisOpPrepareConflictCount();
+
+    /**
+     * Returns the statistics about prepare conflicts as would show up in serverStatus
+     */
+    static long long getGlobalNumPrepareConflicts();
+    static long long getGlobalWaitingForPrepareConflictsMicros();
+
+    /**
+     * Sets the global prepare conflict statistics to zero.
+     */
+    void resetGlobalPrepareConflictStats();
 
 private:
     /**
      * Set to true when a read operation is currently blocked on a prepare conflict.
      */
-    AtomicWord<bool> _waitOnPrepareConflict{false};
+    AtomicWord<bool> _waitingOnPrepareConflict{false};
 
     /**
-     * Multiple prepare read conflicts can be hit during the life time of the prepare conflict
-     * tracker. _prepareConflictStartTime indicates the most recent time a block started due to a
-     * prepare read conflict.
+     * Prepare conflicts are monitored continuously over their duration.
+     * _prepareConflictLastUpdateTime indicates the time since a prepare conflict was last measured.
      */
-    TickSource::Tick _prepareConflictStartTime{0};
+    TickSource::Tick _prepareConflictLastUpdateTime{0};
 
     /**
-     * Stores the total amount of time spent blocked on prepare read conflicts.
+     * Stores the number of prepare conflicts caused by this operation, if any.
      */
-    AtomicWord<Microseconds> _prepareConflictDuration{Microseconds(0)};
+    long long _numPrepareConflictsThisOp{0};
+
+    /**
+     * Stores the amount of time spent blocked on a prepare read conflict for this operation, if
+     * any.
+     */
+    Microseconds _thisOpPrepareConflictDuration{Microseconds(0)};
 };
 
 }  // namespace mongo

@@ -34,6 +34,7 @@
 
 #include "mongo/base/string_data.h"
 #include "mongo/db/curop.h"
+#include "mongo/db/prepare_conflict_tracker.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/storage/recovery_unit.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_kv_engine.h"
@@ -97,6 +98,7 @@ TEST_F(WiredTigerPrepareConflictTest, SuccessWithNoConflict) {
     ASSERT_EQ(wiredTigerPrepareConflictRetry(opCtx.get(), *recoveryUnit.get(), successOnFirstTry),
               0);
     ASSERT_EQ(CurOp::get(opCtx.get())->debug().additiveMetrics.prepareReadConflicts.load(), 0);
+    ASSERT_EQ(PrepareConflictTracker::get(opCtx.get()).getThisOpPrepareConflictCount(), 0);
 }
 
 TEST_F(WiredTigerPrepareConflictTest, HandleWTPrepareConflictOnce) {
@@ -109,6 +111,7 @@ TEST_F(WiredTigerPrepareConflictTest, HandleWTPrepareConflictOnce) {
                   opCtx.get(), *recoveryUnit.get(), throwWTPrepareConflictOnce),
               0);
     ASSERT_EQ(CurOp::get(opCtx.get())->debug().additiveMetrics.prepareReadConflicts.load(), 1);
+    ASSERT_EQ(PrepareConflictTracker::get(opCtx.get()).getThisOpPrepareConflictCount(), 1);
 }
 
 TEST_F(WiredTigerPrepareConflictTest, HandleWTPrepareConflictMultipleTimes) {
@@ -125,7 +128,9 @@ TEST_F(WiredTigerPrepareConflictTest, HandleWTPrepareConflictMultipleTimes) {
 
     ASSERT_EQ(wiredTigerPrepareConflictRetry(opCtx.get(), *ru, throwWTPrepareConflictMultipleTimes),
               0);
-    ASSERT_EQ(CurOp::get(opCtx.get())->debug().additiveMetrics.prepareReadConflicts.load(), 100);
+    // Multiple retries are still considered to be one prepare conflict.
+    ASSERT_EQ(CurOp::get(opCtx.get())->debug().additiveMetrics.prepareReadConflicts.load(), 1);
+    ASSERT_EQ(PrepareConflictTracker::get(opCtx.get()).getThisOpPrepareConflictCount(), 1);
 }
 
 TEST_F(WiredTigerPrepareConflictTest, ThrowNonBlocking) {

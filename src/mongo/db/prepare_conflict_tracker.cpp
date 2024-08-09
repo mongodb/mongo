@@ -31,45 +31,69 @@
 
 #include <utility>
 
-
+#include "mongo/db/commands/server_status_metric.h"
 #include "mongo/db/service_context.h"
 #include "mongo/util/assert_util_core.h"
 #include "mongo/util/decorable.h"
 
 namespace mongo {
 
+namespace {
+
+auto& prepareConflictWaitMicros = *MetricBuilder<Counter64>("operation.prepareConflictWaitMicros");
+auto& prepareConflicts = *MetricBuilder<Counter64>{"operation.prepareConflicts"};
+}  // namespace
+
 const OperationContext::Decoration<PrepareConflictTracker> PrepareConflictTracker::get =
     OperationContext::declareDecoration<PrepareConflictTracker>();
 
 bool PrepareConflictTracker::isWaitingOnPrepareConflict() const {
-    return _waitOnPrepareConflict.load();
+    return _waitingOnPrepareConflict.load();
 }
 
-void PrepareConflictTracker::beginPrepareConflict(OperationContext* opCtx) {
-    // Implies that the current read operation is blocked on a prepared transaction.
-    _waitOnPrepareConflict.store(true);
-    invariant(_prepareConflictStartTime == 0);
-    _prepareConflictStartTime = opCtx->getServiceContext()->getTickSource()->getTicks();
+void PrepareConflictTracker::beginPrepareConflict(TickSource& tickSource) {
+    invariant(!_waitingOnPrepareConflict.load());
+    _waitingOnPrepareConflict.store(true);
+    prepareConflicts.increment();
+    _numPrepareConflictsThisOp++;
+    _prepareConflictLastUpdateTime = tickSource.getTicks();
 }
 
-void PrepareConflictTracker::endPrepareConflict(OperationContext* opCtx) {
-    if (_waitOnPrepareConflict.load()) {
-        auto tickSource = opCtx->getServiceContext()->getTickSource();
-        auto curTick = tickSource->getTicks();
+void PrepareConflictTracker::updatePrepareConflict(TickSource& tickSource) {
+    invariant(_waitingOnPrepareConflict.load());
 
-        auto curConflictDuration =
-            tickSource->ticksTo<Microseconds>(curTick - _prepareConflictStartTime);
-        _prepareConflictDuration.store(_prepareConflictDuration.load() + curConflictDuration);
-        _prepareConflictStartTime = 0;
+    auto curTick = tickSource.getTicks();
 
-        // Implies that the current read operation is not blocked on a prepared transaction.
-        _waitOnPrepareConflict.store(false);
-    }
-    invariant(_prepareConflictStartTime == 0);
+    auto increment = tickSource.ticksTo<Microseconds>(curTick - _prepareConflictLastUpdateTime);
+    _thisOpPrepareConflictDuration += increment;
+
+    prepareConflictWaitMicros.increment(increment.count());
+    _prepareConflictLastUpdateTime = curTick;
 }
 
-Microseconds PrepareConflictTracker::getPrepareConflictDuration() {
-    return _prepareConflictDuration.load();
+void PrepareConflictTracker::endPrepareConflict(TickSource& tickSource) {
+    updatePrepareConflict(tickSource);
+    _waitingOnPrepareConflict.store(false);
 }
 
+long long PrepareConflictTracker::getThisOpPrepareConflictCount() {
+    return _numPrepareConflictsThisOp;
+}
+
+Microseconds PrepareConflictTracker::getThisOpPrepareConflictDuration() {
+    return _thisOpPrepareConflictDuration;
+}
+
+long long PrepareConflictTracker::getGlobalNumPrepareConflicts() {
+    return prepareConflicts.get();
+}
+
+long long PrepareConflictTracker::getGlobalWaitingForPrepareConflictsMicros() {
+    return prepareConflictWaitMicros.get();
+}
+
+void PrepareConflictTracker::resetGlobalPrepareConflictStats() {
+    prepareConflicts.setToZero();
+    prepareConflictWaitMicros.setToZero();
+}
 }  // namespace mongo

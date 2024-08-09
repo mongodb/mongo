@@ -565,6 +565,8 @@ Microseconds CurOp::computeElapsedTimeTotal(TickSource::Tick startTime,
 
 Milliseconds CurOp::_sumBlockedTimeTotal() {
     auto locker = shard_role_details::getLocker(opCtx());
+    auto prepareConflictDurationMicros =
+        PrepareConflictTracker::get(opCtx()).getThisOpPrepareConflictDuration();
     auto cumulativeLockWaitTime = Microseconds(locker->stats().getCumulativeWaitTimeMicros());
     auto timeQueuedForTickets = ExecutionAdmissionContext::get(opCtx()).totalTimeQueuedMicros();
     auto timeQueuedForFlowControl = Microseconds(locker->getFlowControlStats().timeAcquiringMicros);
@@ -576,7 +578,7 @@ Milliseconds CurOp::_sumBlockedTimeTotal() {
     }
 
     return duration_cast<Milliseconds>(cumulativeLockWaitTime + timeQueuedForTickets +
-                                       timeQueuedForFlowControl);
+                                       timeQueuedForFlowControl + prepareConflictDurationMicros);
 }
 
 void CurOp::enter_inlock(NamespaceString nss, int dbProfileLevel) {
@@ -699,7 +701,7 @@ bool CurOp::completeAndLogOperation(const logv2::LogOptions& logOptions,
 
         // Gets the time spent blocked on prepare conflicts.
         auto prepareConflictDurationMicros =
-            PrepareConflictTracker::get(opCtx).getPrepareConflictDuration();
+            PrepareConflictTracker::get(opCtx).getThisOpPrepareConflictDuration();
         _debug.prepareConflictDurationMillis =
             duration_cast<Milliseconds>(prepareConflictDurationMicros);
 

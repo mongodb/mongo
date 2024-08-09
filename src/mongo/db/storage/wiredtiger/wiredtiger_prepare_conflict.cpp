@@ -88,8 +88,12 @@ int wiredTigerPrepareConflictRetrySlow(OperationContext* opCtx,
 
     // If we return from this function, we have either returned successfully or we've returned an
     // error other than WT_PREPARE_CONFLICT. Reset PrepareConflictTracker accordingly.
-    ON_BLOCK_EXIT([opCtx] { PrepareConflictTracker::get(opCtx).endPrepareConflict(opCtx); });
-    PrepareConflictTracker::get(opCtx).beginPrepareConflict(opCtx);
+    ON_BLOCK_EXIT([opCtx] {
+        PrepareConflictTracker::get(opCtx).endPrepareConflict(
+            *opCtx->getServiceContext()->getTickSource());
+    });
+    PrepareConflictTracker::get(opCtx).beginPrepareConflict(
+        *opCtx->getServiceContext()->getTickSource());
 
     auto client = opCtx->getClient();
     if (client->isFromSystemConnection()) {
@@ -126,8 +130,8 @@ int wiredTigerPrepareConflictRetrySlow(OperationContext* opCtx,
 
         if (ret != WT_PREPARE_CONFLICT)
             return ret;
-
-        CurOp::get(opCtx)->debug().additiveMetrics.incrementPrepareReadConflicts(1);
+        PrepareConflictTracker::get(opCtx).updatePrepareConflict(
+            *opCtx->getServiceContext()->getTickSource());
         wiredTigerPrepareConflictLog(attempts);
 
         // Wait on the session cache to signal that a unit of work has been committed or aborted.

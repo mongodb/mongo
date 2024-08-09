@@ -514,6 +514,17 @@ env.CppUnitTest(
     ],
 )
 
+env.CppUnitTest(
+    target="prepare_conflict_tracker_test",
+    source=[
+        "prepare_conflict_tracker_test.cpp",
+    ],
+    LIBDEPS=[
+        "$BUILD_DIR/mongo/unittest/unittest",
+        "prepare_conflict_tracker",
+    ],
+)
+
 env.Library(
     target="mirror_maestro",
     source=[
@@ -2416,6 +2427,7 @@ if wiredtiger:
             "curop_stats_test.cpp",
         ],
         LIBDEPS=[
+            "$BUILD_DIR/mongo/db/prepare_conflict_tracker",
             "$BUILD_DIR/mongo/transport/transport_layer_mock",
             "auth/auth",
             "auth/authmocks",
