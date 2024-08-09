@@ -278,10 +278,20 @@ Status AbstractIndexAccessMethod::insertKeys(OperationContext* opCtx,
     if (numInserted) {
         *numInserted = 0;
     }
+    bool unique = _descriptor->unique();
+    // Oplog application should avoid checking for duplicates on unique indexes except when:
+    // 1. Building an index. We have to use the duplicate key error to record possible conflicts.
+    // 2. Inserting into the '_id' index. We never allow duplicates in the '_id' index.
+    //
+    // Additionally, unique indexes conflict checking can cause out-of-order updates in wiredtiger.
+    // See SERVER-59831.
+    bool dupsAllowed = !_descriptor->isIdIndex() && !opCtx->isEnforcingConstraints() &&
+            coll->isIndexReady(_descriptor->indexName())
+        ? true
+        : !unique;
     // Add all new keys into the index. The RecordId for each is already encoded in the KeyString.
     for (const auto& keyString : keys) {
-        bool unique = _descriptor->unique();
-        auto result = _newInterface->insert(opCtx, keyString, !unique /* dupsAllowed */);
+        auto result = _newInterface->insert(opCtx, keyString, dupsAllowed);
 
         // When duplicates are encountered and allowed, retry with dupsAllowed. Call
         // onDuplicateKey() with the inserted duplicate key.

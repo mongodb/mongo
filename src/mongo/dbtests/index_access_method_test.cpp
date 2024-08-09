@@ -31,8 +31,10 @@
 
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/simple_bsonobj_comparator.h"
+#include "mongo/db/client.h"
 #include "mongo/db/index/index_access_method.h"
 #include "mongo/db/json.h"
+#include "mongo/dbtests/dbtests.h"
 #include "mongo/unittest/unittest.h"
 
 namespace mongo {
@@ -221,6 +223,37 @@ TEST(IndexAccessMethodSetDifference, ShouldNotReportOverlapsFromNonDisjointSets)
         ASSERT_BSONOBJ_NE(obj, BSON("" << 1));
         ASSERT_BSONOBJ_NE(obj, BSON("" << 4));
     }
+}
+
+TEST(IndexAccessMethodInsertKeys, DuplicatesCheckingOnSecondaryUniqueIndexes) {
+    ServiceContext::UniqueOperationContext opCtxRaii = cc().makeOperationContext();
+    OperationContext* opCtx = opCtxRaii.get();
+    NamespaceString nss("unittests.DuplicatesCheckingOnSecondaryUniqueIndexes");
+    auto indexName = "a_1";
+    auto indexSpec = BSON("name" << indexName << "key" << BSON("a" << 1) << "unique" << true << "v"
+                                 << static_cast<int>(IndexDescriptor::IndexVersion::kV2));
+    ASSERT_OK(dbtests::createIndexFromSpec(opCtx, nss.ns(), indexSpec));
+
+    AutoGetCollection autoColl(opCtx, nss, LockMode::MODE_X);
+    const auto& coll = autoColl.getCollection();
+    auto indexDescriptor = coll->getIndexCatalog()->findIndexByName(opCtx, indexName);
+    IndexAccessMethod* indexAccessMethod =
+        coll->getIndexCatalog()->getEntry(indexDescriptor)->accessMethod();
+
+    KeyString::HeapBuilder keyString1(
+        KeyString::Version::kLatestVersion, BSON("" << 1), Ordering::make(BSONObj()), RecordId(1));
+    KeyString::HeapBuilder keyString2(
+        KeyString::Version::kLatestVersion, BSON("" << 1), Ordering::make(BSONObj()), RecordId(2));
+    KeyStringSet keys{keyString1.release(), keyString2.release()};
+    struct InsertDeleteOptions options; /* options.dupsAllowed = false */
+
+    // Checks duplicates and returns the error code when constraints are enforced.
+    auto status = indexAccessMethod->insertKeys(opCtx, coll, keys, {}, options, {}, nullptr);
+    ASSERT_EQ(status.code(), ErrorCodes::DuplicateKey);
+
+    // Skips the check on duplicates when constraints are not enforced.
+    opCtx->setEnforceConstraints(false);
+    ASSERT_OK(indexAccessMethod->insertKeys(opCtx, coll, keys, {}, options, {}, nullptr));
 }
 
 }  // namespace
