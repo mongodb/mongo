@@ -36,11 +36,27 @@ class TestRuntimeFuzzGeneration(unittest.TestCase):
         start_time = 1625140800
         mock_time.return_value = start_time
 
-        from buildscripts.resmokelib.config_fuzzer_limits import (
-            runtime_parameter_fuzzer_params,
-        )
+        test_runtime_params = {
+            "mongod": {
+                "ShardingTaskExecutorPoolMinSize": {"min": 1, "max": 50, "period": 5},
+                "ingressAdmissionControllerTicketPoolSize": {
+                    "choices": [500_000, 1_000_000, 2_000_000],
+                    "lower_bound": 1000,
+                    "upper_bound": 5_000_000,
+                    "isRandomizedChoice": True,
+                    "period": 1,
+                },
+                "ingressAdmissionControlEnabled": {
+                    "choices": [True, False],
+                    "period": 10,
+                },
+            },
+            "mongos": {
+                "ShardingTaskExecutorPoolMinSize": {"min": 1, "max": 50, "period": 5},
+            },
+        }
 
-        mongod_spec = runtime_parameter_fuzzer_params["mongod"]
+        mongod_spec = test_runtime_params["mongod"]
         runtimeFuzzerParamState = _runtime_fuzzer.RuntimeParametersState(
             mongod_spec, random.randrange(sys.maxsize)
         )

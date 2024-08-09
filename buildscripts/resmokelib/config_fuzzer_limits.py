@@ -160,20 +160,15 @@ config_fuzzer_params = {
 
 runtime_parameter_fuzzer_params = {
     "mongod": {
-        "ShardingTaskExecutorPoolMinSize": {"min": 1, "max": 50, "period": 5},
         "ingressAdmissionControllerTicketPoolSize": {
-            "choices": [500_000, 1_000_000, 2_000_000],
-            "lower_bound": 1000,
-            "upper_bound": 5_000_000,
+            "choices": [1_000, 10_000, 100_000, 1_000_000],
+            "lower_bound": 1_000,
+            "upper_bound": 1_000_000,
             "isRandomizedChoice": True,
-            "period": 1,
-        },
-        "ingressAdmissionControlEnabled": {
-            "choices": [True, False],
-            "period": 10,
+            "period": 5,
         },
     },
     "mongos": {
-        "ShardingTaskExecutorPoolMinSize": {"min": 1, "max": 50, "period": 5},
+        "userCacheInvalidationIntervalSecs": {"min": 1, "max": 86400, "period": 5},
     },
 }

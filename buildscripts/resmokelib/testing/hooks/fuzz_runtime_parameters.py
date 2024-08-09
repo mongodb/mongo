@@ -316,8 +316,6 @@ class _SetParameterThread(threading.Thread):
         mongod_params_to_set = self._mongod_param_state.generate_parameters()
         mongos_params_to_set = self._mongos_param_state.generate_parameters()
 
-        # TODO SERVER-91123 Accept failure of the command in certain cases. This command can run
-        # regardless of replication state but may fail on terminate primary suites.
         def invoke_set_parameter(client, params):
             # Do nothing if there are no params to set this iteration.
             if not params:

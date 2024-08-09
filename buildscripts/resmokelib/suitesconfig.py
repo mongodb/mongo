@@ -502,6 +502,11 @@ class SuiteFinder(object):
         if _config.NOOP_MONGO_D_S_PROCESSES:
             make_external(suite)
 
+        # Mutate the suite config as required by our own (resmokes) config. Pull this out into its own
+        # function if it gets too big.
+        if _config.FUZZ_RUNTIME_PARAMS:
+            suite["executor"]["hooks"].append({"class": "FuzzRuntimeParameters"})
+
         return suite
 
 

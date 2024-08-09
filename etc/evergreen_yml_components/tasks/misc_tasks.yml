@@ -225,6 +225,7 @@ tasks:
           resmoke_args: >-
             --fuzzMongodConfigs=stress
             --fuzzMongosConfigs=normal
+            --fuzzRuntimeParams
             --excludeWithAnyTags=does_not_support_config_fuzzer
             --runAllFeatureFlagTests
 

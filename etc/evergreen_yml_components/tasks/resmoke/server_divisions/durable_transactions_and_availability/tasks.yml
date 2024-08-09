@@ -1876,6 +1876,7 @@ tasks:
           suite: concurrency_replication
           resmoke_args: >-
             --fuzzMongodConfigs=normal
+            --fuzzRuntimeParams
             --excludeWithAnyTags=does_not_support_config_fuzzer
           use_large_distro: "true"
 
@@ -1906,6 +1907,7 @@ tasks:
           resmoke_args: >-
             --numClientsPerFixture=10
             --fuzzMongodConfigs=normal
+            --fuzzRuntimeParams
             --excludeWithAnyTags=does_not_support_config_fuzzer
 
   - <<: *gen_task_template
@@ -1928,6 +1930,7 @@ tasks:
           resmoke_args: >-
             --fuzzMongodConfigs=normal
             --fuzzMongosConfigs=normal
+            --fuzzRuntimeParams
             --excludeWithAnyTags=does_not_support_config_fuzzer
           use_xlarge_distro: "true"
           resmoke_jobs_max: 1
@@ -1950,6 +1953,7 @@ tasks:
           suite: concurrency_simultaneous_replication
           resmoke_args: >-
             --fuzzMongodConfigs=normal
+            --fuzzRuntimeParams
             --excludeWithAnyTags=does_not_support_config_fuzzer
           use_large_distro: "true"
 
@@ -1963,6 +1967,7 @@ tasks:
           suite: core
           resmoke_args: >-
             --fuzzMongodConfigs=normal
+            --fuzzRuntimeParams
             --excludeWithAnyTags=does_not_support_config_fuzzer
 
   - <<: *gen_task_template
@@ -1983,6 +1988,7 @@ tasks:
           suite: replica_sets_jscore_passthrough
           resmoke_args: >-
             --fuzzMongodConfigs=normal
+            --fuzzRuntimeParams
             --excludeWithAnyTags=does_not_support_config_fuzzer
           use_large_distro: "true"
 
@@ -2005,6 +2011,7 @@ tasks:
           resmoke_args: >-
             --fuzzMongodConfigs=normal
             --fuzzMongosConfigs=normal
+            --fuzzRuntimeParams
             --excludeWithAnyTags=does_not_support_config_fuzzer
           use_large_distro: "true"
 
@@ -2027,6 +2034,7 @@ tasks:
           suite: simulate_crash_concurrency_replication
           resmoke_args: >-
             --fuzzMongodConfigs=normal
+            --fuzzRuntimeParams
             --excludeWithAnyTags=does_not_support_config_fuzzer
           use_large_distro: "true"
 
@@ -2047,6 +2055,7 @@ tasks:
           suite: concurrency_replication
           resmoke_args: >-
             --fuzzMongodConfigs=stress
+            --fuzzRuntimeParams
             --excludeWithAnyTags=does_not_support_config_fuzzer
           use_large_distro: "true"
           exec_timeout_secs: 14400 # 4 hours
@@ -2070,6 +2079,7 @@ tasks:
           resmoke_args: >-
             --fuzzMongodConfigs=stress
             --fuzzMongosConfigs=normal
+            --fuzzRuntimeParams
             --excludeWithAnyTags=does_not_support_config_fuzzer
           use_large_distro: "true"
           exec_timeout_secs: 14400 # 4 hours
