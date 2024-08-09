@@ -12,3 +12,5 @@ py_binary(
         ),
     ],
 )
+
+exports_files(["cheetah_source_generator.py"])

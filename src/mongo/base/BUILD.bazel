@@ -10,7 +10,17 @@ exports_files(
 
 render_template(
     name = "error_codes_source",
-    generator_script = "generate_error_codes.py",
+    srcs = [
+        "error_codes.tpl.cpp",
+        "error_codes.yml",
+        "generate_error_codes.py",
+    ],
+    cmd = [
+        "$(location generate_error_codes.py)",
+        "$(location error_codes.yml)",
+        "$(location error_codes.tpl.cpp)",
+        "$(location error_codes.cpp)",
+    ],
     output = "error_codes.cpp",
     python_libs = [
         dependency(
@@ -22,13 +32,21 @@ render_template(
             group = "core",
         ),
     ],
-    template = "error_codes.tpl.cpp",
-    yml = "error_codes.yml",
 )
 
 render_template(
     name = "error_codes_header",
-    generator_script = "generate_error_codes.py",
+    srcs = [
+        "error_codes.tpl.h",
+        "error_codes.yml",
+        "generate_error_codes.py",
+    ],
+    cmd = [
+        "$(location generate_error_codes.py)",
+        "$(location error_codes.yml)",
+        "$(location error_codes.tpl.h)",
+        "$(location error_codes.h)",
+    ],
     output = "error_codes.h",
     python_libs = [
         dependency(
@@ -40,8 +58,6 @@ render_template(
             group = "core",
         ),
     ],
-    template = "error_codes.tpl.h",
-    yml = "error_codes.yml",
 )
 
 mongo_cc_library(

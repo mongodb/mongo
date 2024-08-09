@@ -1,0 +1,36 @@
+load("//bazel/config:render_template.bzl", "render_template")
+load("@poetry//:dependencies.bzl", "dependency")
+
+package(default_visibility = ["//visibility:public"])
+
+render_template(
+    name = "releases_header",
+    srcs = [
+        "releases.h.tpl",
+        "releases.yml",
+        "//buildscripts:cheetah_source_generator.py",
+    ],
+    cmd = [
+        "$(location //buildscripts:cheetah_source_generator.py)",
+        "-o",
+        "$(location releases.h)",
+        "$(location releases.h.tpl)",
+        "$(location releases.yml)",
+        "$(MONGO_VERSION)",
+    ],
+    output = "releases.h",
+    python_libs = [
+        dependency(
+            "cheetah3",
+            group = "compile",
+        ),
+        dependency(
+            "pyyaml",
+            group = "core",
+        ),
+        dependency(
+            "packaging",
+            group = "compile",
+        ),
+    ],
+)

@@ -773,6 +773,8 @@ def generate(env: SCons.Environment.Environment) -> None:
         f"--platforms=//bazel/platforms:{distro_or_os}_{normalized_arch}_{env.ToolchainName()}",
         f"--host_platform=//bazel/platforms:{distro_or_os}_{normalized_arch}_{env.ToolchainName()}",
         f'--//bazel/config:ssl={"True" if env.GetOption("ssl") == "on" else "False"}',
+        "--define",
+        f"MONGO_VERSION={env['MONGO_VERSION']}",
         "--compilation_mode=dbg",  # always build this compilation mode as we always build with -g
     ]
 
