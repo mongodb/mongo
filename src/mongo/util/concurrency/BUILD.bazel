@@ -5,3 +5,15 @@ package(default_visibility = ["//visibility:public"])
 exports_files(
     glob(["*.h"]) + glob(["*.cpp"]),
 )
+
+# Headers designed to be used without source code. Split these out
+# into targets if they're meant to be used with source code.
+filegroup(
+    name = "headers",
+    srcs = [
+        "admission_context.h",
+        "lock_free_read_list.h",
+        "spin_lock.h",
+        "ticketholder.h",
+    ],
+)

@@ -6,6 +6,25 @@ exports_files(
     glob(["*.h"]) + glob(["*.cpp"]),
 )
 
+# Headers designed to be used without source code. Split these out
+# into targets if they're meant to be used with source code.
+filegroup(
+    name = "headers",
+    srcs = [
+        "cancellation.h",
+        "database_name_util.h",
+        "fail_point.h",
+        "inline_memory.h",
+        "make_array_type.h",
+        "namespace_string_util.h",
+        "overloaded_visitor.h",
+        "periodic_runner.h",
+        "safe_num.h",
+        "scoped_unlock.h",
+        "serialization_context.h",
+    ],
+)
+
 mongo_cc_library(
     name = "boost_assert_shim",
     srcs = [
@@ -43,6 +62,19 @@ mongo_cc_library(
     ],
     hdrs = [
         "winutil.h",
+    ],
+    deps = [
+        "//src/mongo:base",
+    ],
+)
+
+mongo_cc_library(
+    name = "secure_compare_memory",
+    srcs = [
+        "secure_compare_memory.cpp",
+    ],
+    hdrs = [
+        "secure_compare_memory.h",
     ],
     deps = [
         "//src/mongo:base",

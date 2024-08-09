@@ -517,16 +517,6 @@ env.Library(
 )
 
 env.Library(
-    target="secure_compare_memory",
-    source=[
-        "secure_compare_memory.cpp",
-    ],
-    LIBDEPS=[
-        "$BUILD_DIR/mongo/base",
-    ],
-)
-
-env.Library(
     target="dns_query",
     source=[
         "dns_query.cpp",

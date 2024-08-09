@@ -63,16 +63,6 @@ env.Library(
     ],
 )
 
-env.Library(
-    target="flow_control_ticketholder",
-    source=[
-        "flow_control_ticketholder.cpp",
-    ],
-    LIBDEPS_PRIVATE=[
-        "$BUILD_DIR/mongo/base",
-    ],
-)
-
 env.CppUnitTest(
     target="lock_manager_test",
     source=[

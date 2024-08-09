@@ -8,3 +8,16 @@ exports_files(
         "*.cpp",
     ]),
 )
+
+# Headers designed to be used without source code. Split these out
+# into targets if they're meant to be used with source code.
+filegroup(
+    name = "headers",
+    srcs = [
+        "cidr.h",
+        "hostandport.h",
+        "sockaddr.h",
+        "ssl_peer_info.h",
+        "ssl_types.h",
+    ],
+)
