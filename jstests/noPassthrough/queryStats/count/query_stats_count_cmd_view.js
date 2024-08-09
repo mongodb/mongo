@@ -7,6 +7,7 @@
 
 import {
     assertAggregatedMetricsSingleExec,
+    assertExpectedResults,
     getLatestQueryStatsEntry,
     getQueryStats,
     resetQueryStatsStore,
@@ -42,13 +43,12 @@ withQueryStatsEnabled(jsTestName(), (coll) => {
         fromMultiPlanner: false,
         fromPlanCache: false
     });
-    // TODO SERVER-92771: Uncomment this test when docsReturned is properly set to 1.
-    // assertExpectedResults(entry,
-    //                       entry.key,
-    //                       /* expectedExecCount */ 1,
-    //                       /* expectedDocsReturnedSum */ 1,
-    //                       /* expectedDocsReturnedMax */ 1,
-    //                       /* expectedDocsReturnedMin */ 1,
-    //                       /* expectedDocsReturnedSumOfSq */ 1,
-    //                       /* getMores */ false);
+    assertExpectedResults(entry,
+                          entry.key,
+                          /* expectedExecCount */ 1,
+                          /* expectedDocsReturnedSum */ 1,
+                          /* expectedDocsReturnedMax */ 1,
+                          /* expectedDocsReturnedMin */ 1,
+                          /* expectedDocsReturnedSumOfSq */ 1,
+                          /* getMores */ false);
 });
