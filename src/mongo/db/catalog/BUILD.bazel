@@ -1,4 +1,4 @@
-load("//bazel:mongo_src_rules.bzl", "mongo_cc_library")
+load("//bazel:mongo_src_rules.bzl", "idl_generator", "mongo_cc_library")
 
 package(default_visibility = ["//visibility:public"])
 
@@ -19,5 +19,26 @@ mongo_cc_library(
     ],
     deps = [
         "//src/mongo:base",
+    ],
+)
+
+idl_generator(
+    name = "commit_quorum_gen",
+    src = "commit_quorum.idl",
+)
+
+idl_generator(
+    name = "collection_options_gen",
+    src = "collection_options.idl",
+    deps = [
+        "//src/mongo/db:basic_types_gen",
+    ],
+)
+
+idl_generator(
+    name = "clustered_collection_options_gen",
+    src = "clustered_collection_options.idl",
+    deps = [
+        "//src/mongo/db:basic_types_gen",
     ],
 )

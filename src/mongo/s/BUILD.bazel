@@ -1,4 +1,4 @@
-load("//bazel:mongo_src_rules.bzl", "mongo_cc_library")
+load("//bazel:mongo_src_rules.bzl", "idl_generator", "mongo_cc_library")
 
 package(default_visibility = ["//visibility:public"])
 
@@ -7,4 +7,29 @@ exports_files(
         "*.h",
         "*.cpp",
     ]),
+)
+
+idl_generator(
+    name = "sharding_types_gen",
+    src = "sharding_types.idl",
+    deps = [
+        "//src/mongo/db:basic_types_gen",
+    ],
+)
+
+idl_generator(
+    name = "chunk_version_gen",
+    src = "chunk_version.idl",
+    deps = [
+        "//src/mongo/db:basic_types_gen",
+    ],
+)
+
+idl_generator(
+    name = "gossiped_routing_cache_gen",
+    src = "gossiped_routing_cache.idl",
+    deps = [
+        ":chunk_version_gen",
+        "//src/mongo/db:basic_types_gen",
+    ],
 )

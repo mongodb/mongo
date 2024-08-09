@@ -206,7 +206,7 @@ env.Library(
         "allowed_contexts.cpp",
         "analyze_regex.cpp",
         "explain_options.cpp",
-        "explain_verbosity.idl",
+        "explain_verbosity_gen.cpp",
     ],
     LIBDEPS=[
         "$BUILD_DIR/mongo/db/api_parameters",

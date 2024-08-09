@@ -73,7 +73,7 @@ env.Library(
     target="bson_validate",
     source=[
         "bson_validate.cpp",
-        "bson_validate.idl",
+        "bson_validate_gen.cpp",
     ],
     LIBDEPS_PRIVATE=[
         "$BUILD_DIR/mongo/base",

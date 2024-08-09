@@ -17,7 +17,7 @@ env.SConscript(
 env.Library(
     target="change_stream_pre_and_post_images_options",
     source=[
-        "change_stream_pre_and_post_images_options.idl",
+        "change_stream_pre_and_post_images_options_gen.cpp",
     ],
     LIBDEPS=[
         "$BUILD_DIR/mongo/base",
@@ -590,7 +590,7 @@ env.Library(
         "resume_token.idl",
         "resume_token.cpp",
         "search/plan_sharded_search.idl",
-        "storage_stats_spec.idl",
+        "storage_stats_spec_gen.cpp",
     ],
     LIBDEPS=[
         "$BUILD_DIR/mongo/base",

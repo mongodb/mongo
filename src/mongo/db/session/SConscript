@@ -26,7 +26,7 @@ env.Library(
     target="logical_session_id",
     source=[
         "logical_session_id.cpp",
-        "logical_session_id.idl",
+        "logical_session_id_gen.cpp",
     ],
     LIBDEPS=[
         "$BUILD_DIR/mongo/base",

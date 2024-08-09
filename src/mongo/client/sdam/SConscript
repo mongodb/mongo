@@ -8,7 +8,7 @@ env.Library(
     target="sdam",
     source=[
         "sdam_configuration.cpp",
-        "sdam_configuration_parameters.idl",
+        "sdam_configuration_parameters_gen.cpp",
         "sdam_datatypes.cpp",
         "server_description.cpp",
         "server_selector.cpp",
@@ -66,7 +66,7 @@ env.Library(
     target="json_test",
     source=[
         "json_test_arg_parser.cpp",
-        "json_test_runner_cli_options.idl",
+        "json_test_runner_cli_options_gen.cpp",
     ],
     LIBDEPS=[
         "$BUILD_DIR/mongo/base",

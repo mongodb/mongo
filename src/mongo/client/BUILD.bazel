@@ -1,4 +1,4 @@
-load("//bazel:mongo_src_rules.bzl", "mongo_cc_library")
+load("//bazel:mongo_src_rules.bzl", "idl_generator", "mongo_cc_library")
 
 package(default_visibility = ["//visibility:public"])
 
@@ -7,4 +7,91 @@ exports_files(
         "*.h",
         "*.cpp",
     ]),
+)
+
+idl_generator(
+    name = "sasl_aws_protocol_common_gen",
+    src = "sasl_aws_protocol_common.idl",
+    deps = [
+        "//src/mongo/db:basic_types_gen",
+    ],
+)
+
+idl_generator(
+    name = "sasl_aws_client_protocol_gen",
+    src = "sasl_aws_client_protocol.idl",
+    deps = [
+        "//src/mongo/db:basic_types_gen",
+    ],
+)
+
+idl_generator(
+    name = "sasl_oidc_client_types_gen",
+    src = "sasl_oidc_client_types.idl",
+    deps = [
+        "//src/mongo/db:basic_types_gen",
+    ],
+)
+
+idl_generator(
+    name = "sasl_aws_client_options_gen",
+    src = "sasl_aws_client_options.idl",
+    deps = [
+        "//src/mongo/db:basic_types_gen",
+    ],
+)
+
+idl_generator(
+    name = "sasl_sspi_options_gen",
+    src = "sasl_sspi_options.idl",
+    deps = [
+        "//src/mongo/db:basic_types_gen",
+    ],
+)
+
+idl_generator(
+    name = "client_api_version_parameters_gen",
+    src = "client_api_version_parameters.idl",
+    deps = [
+        "//src/mongo/db:basic_types_gen",
+    ],
+)
+
+idl_generator(
+    name = "global_conn_pool_gen",
+    src = "global_conn_pool.idl",
+    deps = [
+        "//src/mongo/db:basic_types_gen",
+    ],
+)
+
+idl_generator(
+    name = "replica_set_monitor_server_parameters_gen",
+    src = "replica_set_monitor_server_parameters.idl",
+)
+
+idl_generator(
+    name = "read_preference_setting_gen",
+    src = "read_preference_setting.idl",
+    deps = [
+        ":read_preference_gen",
+        "//src/mongo/db:basic_types_gen",
+    ],
+)
+
+idl_generator(
+    name = "read_preference_gen",
+    src = "read_preference.idl",
+    deps = [
+        ":hedging_mode_gen",
+        "//src/mongo/db:basic_types_gen",
+    ],
+)
+
+idl_generator(
+    name = "hedging_mode_gen",
+    src = "hedging_mode.idl",
+    deps = [
+        "//src/mongo/db:basic_types_gen",
+    ],
 )

@@ -292,10 +292,10 @@ env.Library(
 env.Library(
     target="authprivilege",
     source=[
-        "access_checks.idl",
+        "access_checks_gen.cpp",
         "action_set.cpp",
         "action_type.cpp",
-        "action_type.idl",
+        "action_type_gen.cpp",
         "authorization_contract.cpp",
         "parsed_privilege.idl",
         "privilege.cpp",

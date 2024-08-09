@@ -16,7 +16,7 @@ env.SConscript(
 env.Library(
     target="timeseries_options",
     source=[
-        "timeseries.idl",
+        "timeseries_gen.cpp",
         "timeseries_global_options.cpp",
         "timeseries_options.cpp",
     ],

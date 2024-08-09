@@ -68,62 +68,62 @@ env.SConscript(
 env.Library(
     target="server_base",
     source=[
-        "$BUILD_DIR/mongo/client/hedging_mode.idl",
+        "$BUILD_DIR/mongo/client/hedging_mode_gen.cpp",
         "$BUILD_DIR/mongo/client/read_preference.cpp",
-        "$BUILD_DIR/mongo/client/read_preference.idl",
-        "$BUILD_DIR/mongo/client/read_preference_setting.idl",
+        "$BUILD_DIR/mongo/client/read_preference_gen.cpp",
+        "$BUILD_DIR/mongo/client/read_preference_setting_gen.cpp",
         "$BUILD_DIR/mongo/client/read_preference_validators.cpp",
         "$BUILD_DIR/mongo/idl/command_generic_argument.cpp",
         "$BUILD_DIR/mongo/idl/generic_argument.cpp",
-        "$BUILD_DIR/mongo/idl/generic_argument.idl",
-        "$BUILD_DIR/mongo/rpc/metadata/impersonated_user_metadata.idl",
+        "$BUILD_DIR/mongo/idl/generic_argument_gen.cpp",
+        "$BUILD_DIR/mongo/rpc/metadata/impersonated_user_metadata_gen.cpp",
         "$BUILD_DIR/mongo/s/chunk_version.cpp",
-        "$BUILD_DIR/mongo/s/chunk_version.idl",
+        "$BUILD_DIR/mongo/s/chunk_version_gen.cpp",
         "$BUILD_DIR/mongo/s/database_version.cpp",
         "$BUILD_DIR/mongo/s/database_version.idl",
         "$BUILD_DIR/mongo/s/database_version_base.idl",
-        "$BUILD_DIR/mongo/s/gossiped_routing_cache.idl",
+        "$BUILD_DIR/mongo/s/gossiped_routing_cache_gen.cpp",
         "$BUILD_DIR/mongo/s/index_version.cpp",
         "$BUILD_DIR/mongo/s/index_version.idl",
         "$BUILD_DIR/mongo/s/shard_version.cpp",
         "$BUILD_DIR/mongo/s/shard_version.idl",
-        "$BUILD_DIR/mongo/s/sharding_types.idl",
+        "$BUILD_DIR/mongo/s/sharding_types_gen.cpp",
         "$BUILD_DIR/mongo/util/database_name_util.cpp",
         "$BUILD_DIR/mongo/util/namespace_string_util.cpp",
         "auth/auth_name.cpp",
-        "auth/auth_types.idl",
+        "auth/auth_types_gen.cpp",
         "auth/validated_tenancy_scope.cpp",
         "basic_types_gen.cpp",
-        "catalog_shard_feature_flag.idl",
+        "catalog_shard_feature_flag_gen.cpp",
         "cluster_role.cpp",
         "dump_lock_manager.cpp",
-        "feature_compatibility_version_document.idl",
+        "feature_compatibility_version_document_gen.cpp",
         "feature_compatibility_version_parser.cpp",
         "feature_flag.cpp",
         "generic_argument_util.cpp",
         "index_names.cpp",
         "keypattern.cpp",
         "logical_time.cpp",
-        "multitenancy.idl",
+        "multitenancy_gen.cpp",
         "namespace_string.cpp",
         "read_write_concern_provenance.cpp",
-        "read_write_concern_provenance_base.idl",
-        "repl/read_concern.idl",
+        "read_write_concern_provenance_base_gen.cpp",
+        "repl/read_concern_gen.cpp",
         "repl/read_concern_args.cpp",
-        "repl/read_concern_args.idl",
+        "repl/read_concern_args_gen.cpp",
         "repl/read_concern_idl.cpp",
         "server_options.cpp",
         "server_parameter.cpp",
-        "server_parameter.idl",
+        "server_parameter_gen.cpp",
         "server_parameter_with_storage.cpp",
         "shard_id.cpp",
         "shutdown_in_progress_quiesce_info.cpp",
         "tenant_id.cpp",
-        "vector_clock.idl",
+        "vector_clock_gen.cpp",
         "write_concern_idl.cpp",
-        "write_concern.idl",
+        "write_concern_gen.cpp",
         "write_concern_options.cpp",
-        "write_concern_options.idl",
+        "write_concern_options_gen.cpp",
     ],
     LIBDEPS=[
         "$BUILD_DIR/mongo/base",
@@ -326,7 +326,7 @@ env.Library(
     target="server_feature_flags",
     source=[
         "feature_flag_test.idl",
-        "server_feature_flags.idl",
+        "server_feature_flags_gen.cpp",
     ],
     LIBDEPS_PRIVATE=[
         "$BUILD_DIR/mongo/idl/cluster_server_parameter",
@@ -338,7 +338,7 @@ env.Library(
     target="server_options",
     source=[
         "server_options_helpers.cpp",
-        "server_options_helpers.idl",
+        "server_options_helpers_gen.cpp",
     ],
     LIBDEPS=[
         "$BUILD_DIR/mongo/util/cmdline_utils/cmdline_utils",
@@ -353,7 +353,7 @@ if env.TargetOSIs("windows"):
     env.Library(
         target="windows_options",
         source=[
-            "windows_options.idl",
+            "windows_options_gen.cpp",
         ],
         LIBDEPS_PRIVATE=[
             "$BUILD_DIR/mongo/util/options_parser/options_parser",
@@ -364,12 +364,12 @@ env.Library(
     target="server_options_base",
     source=[
         "server_options_base.cpp",
-        "cluster_auth_mode_option.idl",
-        "keyfile_option.idl",
-        "server_options_base.idl",
-        "server_options_general.idl",
-        "server_options_nongeneral.idl",
-        "server_options_upgrade_downgrade.idl",
+        "cluster_auth_mode_option_gen.cpp",
+        "keyfile_option_gen.cpp",
+        "server_options_base_gen.cpp",
+        "server_options_general_gen.cpp",
+        "server_options_nongeneral_gen.cpp",
+        "server_options_upgrade_downgrade_gen.cpp",
     ],
     LIBDEPS_PRIVATE=[
         "$BUILD_DIR/mongo/util/options_parser/options_parser",
@@ -403,7 +403,7 @@ env.Library(
     target="serverinit",
     source=[
         "initialize_server_global_state.cpp",
-        "initialize_server_global_state.idl",
+        "initialize_server_global_state_gen.cpp",
         "server_options_init.cpp",
     ],
     LIBDEPS_PRIVATE=[
@@ -429,7 +429,7 @@ env.Library(
 env.Library(
     target="connection_health_metrics_parameter",
     source=[
-        "connection_health_metrics_parameter.idl",
+        "connection_health_metrics_parameter_gen.cpp",
     ],
     LIBDEPS_PRIVATE=[
         "$BUILD_DIR/mongo/util/options_parser/options_parser",
@@ -440,7 +440,7 @@ env.Library(
 env.Library(
     target="namespace_spec",
     source=[
-        "namespace_spec.idl",
+        "namespace_spec_gen.cpp",
     ],
     LIBDEPS_PRIVATE=[
         "server_base",
@@ -451,11 +451,11 @@ env.Library(
     target="mongod_options",
     source=[
         "mongod_options.cpp",
-        "mongod_options_general.idl",
-        "mongod_options_legacy.idl",
-        "mongod_options_replication.idl",
-        "mongod_options_sharding.idl",
-        "mongod_options_storage.idl",
+        "mongod_options_general_gen.cpp",
+        "mongod_options_legacy_gen.cpp",
+        "mongod_options_replication_gen.cpp",
+        "mongod_options_sharding_gen.cpp",
+        "mongod_options_storage_gen.cpp",
     ],
     LIBDEPS_PRIVATE=[
         "$BUILD_DIR/mongo/s/common_s",
@@ -477,7 +477,7 @@ env.Library(
     target="read_write_concern_defaults",
     source=[
         "read_write_concern_defaults.cpp",
-        "read_write_concern_defaults.idl",
+        "read_write_concern_defaults_gen.cpp",
     ],
     LIBDEPS=[
         "repl/read_concern_args",
@@ -494,7 +494,7 @@ env.Library(
 env.Library(
     target="default_max_time_ms_cluster_parameter",
     source=[
-        "default_max_time_ms_cluster_parameter.idl",
+        "default_max_time_ms_cluster_parameter_gen.cpp",
         "default_max_time_ms_cluster_parameter.cpp",
     ],
     LIBDEPS_PRIVATE=[
@@ -510,7 +510,7 @@ env.Library(
 env.Library(
     target="change_stream_options",
     source=[
-        "change_stream_options.idl",
+        "change_stream_options_gen.cpp",
     ],
     LIBDEPS_PRIVATE=[
         "$BUILD_DIR/mongo/idl/cluster_server_parameter",
@@ -522,7 +522,7 @@ env.Library(
     target="change_stream_options_manager",
     source=[
         "change_stream_options_manager.cpp",
-        "change_stream_options_parameter.idl",
+        "change_stream_options_parameter_gen.cpp",
     ],
     LIBDEPS_PRIVATE=[
         "change_stream_options",
@@ -537,7 +537,7 @@ env.Library(
 env.Library(
     target="change_streams_cluster_parameter",
     source=[
-        "change_streams_cluster_parameter.idl",
+        "change_streams_cluster_parameter_gen.cpp",
         "change_streams_cluster_parameter.cpp",
     ],
     LIBDEPS_PRIVATE=[
@@ -552,7 +552,7 @@ env.Library(
 env.Library(
     target="change_stream_state",
     source=[
-        "change_stream_state.idl",
+        "change_stream_state_gen.cpp",
     ],
     LIBDEPS_PRIVATE=[
         "server_base",
@@ -563,7 +563,7 @@ env.Library(
     target="set_change_stream_state_coordinator",
     source=[
         "set_change_stream_state_coordinator.cpp",
-        "set_change_stream_state_coordinator.idl",
+        "set_change_stream_state_coordinator_gen.cpp",
     ],
     LIBDEPS=[
         "$BUILD_DIR/mongo/db/change_stream_change_collection_manager",
@@ -822,7 +822,7 @@ env.Library(
     target="mirror_maestro",
     source=[
         "mirror_maestro.cpp",
-        "mirror_maestro.idl",
+        "mirror_maestro_gen.cpp",
         "mirroring_sampler.cpp",
     ],
     LIBDEPS=[
@@ -876,7 +876,7 @@ env.CppUnitTest(
 env.Library(
     target="coll_mod_command_idl",
     source=[
-        "coll_mod.idl",
+        "coll_mod_gen.cpp",
     ],
     LIBDEPS=[
         "catalog/collection_options",
@@ -891,7 +891,7 @@ env.Library(
 env.Library(
     target="dbcommands_idl",
     source=[
-        "dbcommands.idl",
+        "dbcommands_gen.cpp",
     ],
     LIBDEPS_PRIVATE=[
         "catalog/collection_options",
@@ -903,7 +903,7 @@ env.Library(
 env.Library(
     target="metadata_consistency_types_idl",
     source=[
-        "metadata_consistency_types.idl",
+        "metadata_consistency_types_gen.cpp",
     ],
     LIBDEPS_PRIVATE=[
         "server_base",
@@ -917,10 +917,10 @@ env.Library(
         "commands.cpp",
         "commands/query_cmd/explain.idl",
         "curop.cpp",
-        "drop.idl",
-        "drop_database.idl",
-        "list_collections.idl",
-        "list_indexes.idl",
+        "drop_gen.cpp",
+        "drop_database_gen.cpp",
+        "list_collections_gen.cpp",
+        "list_indexes_gen.cpp",
     ],
     LIBDEPS=[
         "$BUILD_DIR/mongo/db/admission/execution_admission_context",
@@ -1091,7 +1091,7 @@ env.CppUnitTest(
 env.Library(
     target="internal_transactions_feature_flag",
     source=[
-        "internal_transactions_feature_flag.idl",
+        "internal_transactions_feature_flag_gen.cpp",
     ],
     LIBDEPS_PRIVATE=[
         "server_base",
@@ -1308,7 +1308,7 @@ env.Library(
 env.Library(
     target="resumable_index_builds_idl",
     source=[
-        "resumable_index_builds.idl",
+        "resumable_index_builds_gen.cpp",
     ],
     LIBDEPS=[
         "$BUILD_DIR/mongo/base",
@@ -1419,7 +1419,7 @@ env.Library(
     target="cloner",
     source=[
         "cloner.cpp",
-        "cloner.idl",
+        "cloner_gen.cpp",
     ],
     LIBDEPS_PRIVATE=[
         "$BUILD_DIR/mongo/client/authentication",
@@ -1491,7 +1491,7 @@ env.Library(
     target="read_concern_d_impl",
     source=[
         "read_concern_mongod.cpp",
-        "read_concern_mongod.idl",
+        "read_concern_mongod_gen.cpp",
     ],
     LIBDEPS_PRIVATE=[
         "concurrency/exception_util",
@@ -1522,7 +1522,7 @@ env.Library(
     target="ttl_d",
     source=[
         "ttl.cpp",
-        "ttl.idl",
+        "ttl_gen.cpp",
     ],
     LIBDEPS_PRIVATE=[
         "catalog/catalog_helpers",
@@ -1991,8 +1991,8 @@ env.Library(
 env.Library(
     target="index_commands_idl",
     source=[
-        "create_indexes.idl",
-        "drop_indexes.idl",
+        "create_indexes_gen.cpp",
+        "drop_indexes_gen.cpp",
     ],
     LIBDEPS_PRIVATE=[
         "$BUILD_DIR/mongo/db/auth/authprivilege",
@@ -2037,7 +2037,7 @@ env.Library(
     target="api_parameters",
     source=[
         "api_parameters.cpp",
-        "api_parameters.idl",
+        "api_parameters_gen.cpp",
     ],
     LIBDEPS_PRIVATE=[
         "server_base",
@@ -2097,7 +2097,7 @@ env.Library(
 env.Library(
     target="snapshot_window_options",
     source=[
-        "snapshot_window_options.idl",
+        "snapshot_window_options_gen.cpp",
     ],
     LIBDEPS_PRIVATE=[
         "server_base",
@@ -2131,7 +2131,7 @@ env.Library(
 env.Library(
     target="keys_collection_document",
     source=[
-        "keys_collection_document.idl",
+        "keys_collection_document_gen.cpp",
     ],
     LIBDEPS_PRIVATE=[
         "server_base",
@@ -2185,11 +2185,11 @@ env.Library(
         "key_generator.cpp",
         "keys_collection_cache.cpp",
         "keys_collection_manager.cpp",
-        "keys_collection_manager.idl",
+        "keys_collection_manager_gen.cpp",
         "logical_time_validator.cpp",
         "time_proof_service.cpp",
         "vector_clock.cpp",
-        "vector_clock_document.idl",
+        "vector_clock_document_gen.cpp",
     ],
     LIBDEPS=[
         "$BUILD_DIR/mongo/transport/transport_layer_common",
@@ -2343,7 +2343,7 @@ env.Library(
     target="cursor_server_params",
     source=[
         "cursor_server_params.cpp",
-        "cursor_server_params.idl",
+        "cursor_server_params_gen.cpp",
     ],
     LIBDEPS_PRIVATE=[
         "server_base",
@@ -2354,7 +2354,7 @@ env.Library(
     target="generic_cursor",
     source=[
         "allocate_cursor_id.cpp",
-        "generic_cursor.idl",
+        "generic_cursor_gen.cpp",
     ],
     LIBDEPS=[
         "repl/optime",
@@ -2397,7 +2397,7 @@ env.Library(
     source=[
         "traffic_recorder.cpp",
         "traffic_recorder_validators.cpp",
-        "traffic_recorder.idl",
+        "traffic_recorder_gen.cpp",
     ],
     LIBDEPS_PRIVATE=[
         "$BUILD_DIR/mongo/db/commands/server_status_core",
@@ -2786,7 +2786,7 @@ env.CppUnitTest(
 env.Library(
     target="commands_test_example",
     source=[
-        "commands_test_example.idl",
+        "commands_test_example_gen.cpp",
     ],
     LIBDEPS_PRIVATE=[
         "commands",

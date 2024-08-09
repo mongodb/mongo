@@ -17,10 +17,10 @@ env.SConscript(
 env.Library(
     target="collection_options",
     source=[
-        "clustered_collection_options.idl",
+        "clustered_collection_options_gen.cpp",
         "clustered_collection_util.cpp",
         "collection_options.cpp",
-        "collection_options.idl",
+        "collection_options_gen.cpp",
         "collection_options_validation.cpp",
     ],
     LIBDEPS=[
@@ -51,7 +51,7 @@ env.Library(
 env.Library(
     target="commit_quorum_options",
     source=[
-        "commit_quorum.idl",
+        "commit_quorum_gen.cpp",
         "commit_quorum_options.cpp",
     ],
     LIBDEPS_PRIVATE=[

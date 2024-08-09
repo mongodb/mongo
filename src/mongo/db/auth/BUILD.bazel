@@ -1,4 +1,4 @@
-load("//bazel:mongo_src_rules.bzl", "mongo_cc_library")
+load("//bazel:mongo_src_rules.bzl", "idl_generator", "mongo_cc_library")
 
 package(default_visibility = ["//visibility:public"])
 
@@ -19,5 +19,26 @@ mongo_cc_library(
     ],
     deps = [
         "//src/mongo:base",
+    ],
+)
+
+idl_generator(
+    name = "action_type_gen",
+    src = "action_type.idl",
+    deps = [
+        "//src/mongo/db:basic_types_gen",
+    ],
+)
+
+idl_generator(
+    name = "access_checks_gen",
+    src = "access_checks.idl",
+)
+
+idl_generator(
+    name = "auth_types_gen",
+    src = "auth_types.idl",
+    deps = [
+        "//src/mongo/db:basic_types_gen",
     ],
 )

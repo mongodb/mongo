@@ -52,7 +52,7 @@ if get_option("ssl") == "on":
             "sasl_aws_common",
         ],
         source=[
-            "sasl_aws_protocol_common.idl",
+            "sasl_aws_protocol_common_gen.cpp",
         ],
         LIBDEPS_PRIVATE=[
             "$BUILD_DIR/mongo/db/server_base",
@@ -69,7 +69,7 @@ if get_option("ssl") == "on":
         ],
         source=[
             "sasl_aws_client_protocol.cpp",
-            "sasl_aws_client_protocol.idl",
+            "sasl_aws_client_protocol_gen.cpp",
         ],
         LIBDEPS_PRIVATE=[
             "$BUILD_DIR/mongo/bson/bson_validate",
@@ -90,7 +90,7 @@ nativeSaslClientSource = [
     "sasl_client_conversation.cpp",
     "sasl_client_session.cpp",
     "sasl_oidc_client_conversation.cpp",
-    "sasl_oidc_client_types.idl",
+    "sasl_oidc_client_types_gen.cpp",
     "sasl_plain_client_conversation.cpp",
     "sasl_scram_client_conversation.cpp",
 ]
@@ -99,7 +99,7 @@ if get_option("ssl") == "on":
     nativeSaslClientSource.extend(
         [
             "sasl_aws_client_conversation.cpp",
-            "sasl_aws_client_options.idl",
+            "sasl_aws_client_options_gen.cpp",
         ]
     )
 
@@ -144,7 +144,7 @@ if env["MONGO_BUILD_SASL_CLIENT"]:
             "cyrus_sasl_client_session.cpp",
             "sasl_sspi.cpp",
             "sasl_sspi_options.cpp",
-            "sasl_sspi_options.idl",
+            "sasl_sspi_options_gen.cpp",
         ],
         LIBDEPS=[
             "native_sasl_client",
@@ -200,7 +200,7 @@ if shouldBuildGRPC(env):
 clientDriverEnv.Library(
     target="clientdriver_minimal",
     source=[
-        "client_api_version_parameters.idl",
+        "client_api_version_parameters_gen.cpp",
         "dbclient_base.cpp",
         "dbclient_cursor.cpp",
         "index_spec.cpp",
@@ -234,7 +234,7 @@ clientDriverEnv.Library(
         "dbclient_rs.cpp",
         "dbclient_session.cpp",
         "global_conn_pool.cpp",
-        "global_conn_pool.idl",
+        "global_conn_pool_gen.cpp",
         "replica_set_change_notifier.cpp",
         "replica_set_monitor.cpp",
         "replica_set_monitor_manager.cpp",
@@ -276,7 +276,7 @@ env.Library(
     target="replica_set_monitor_server_parameters",
     source=[
         "replica_set_monitor_server_parameters.cpp",
-        "replica_set_monitor_server_parameters.idl",
+        "replica_set_monitor_server_parameters_gen.cpp",
     ],
     LIBDEPS_PRIVATE=[
         "$BUILD_DIR/mongo/db/server_base",

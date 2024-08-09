@@ -14,6 +14,431 @@ idl_generator(
     src = "basic_types.idl",
 )
 
+idl_generator(
+    name = "catalog_shard_feature_flag_gen",
+    src = "catalog_shard_feature_flag.idl",
+)
+
+idl_generator(
+    name = "feature_compatibility_version_document_gen",
+    src = "feature_compatibility_version_document.idl",
+    deps = [
+        ":basic_types_gen",
+    ],
+)
+
+idl_generator(
+    name = "multitenancy_gen",
+    src = "multitenancy.idl",
+)
+
+idl_generator(
+    name = "server_parameter_gen",
+    src = "server_parameter.idl",
+    deps = [
+        ":basic_types_gen",
+    ],
+)
+
+idl_generator(
+    name = "vector_clock_gen",
+    src = "vector_clock.idl",
+    deps = [
+        ":basic_types_gen",
+    ],
+)
+
+idl_generator(
+    name = "write_concern_options_gen",
+    src = "write_concern_options.idl",
+    deps = [
+        ":basic_types_gen",
+        ":read_write_concern_provenance_base_gen",
+    ],
+)
+
+idl_generator(
+    name = "server_feature_flags_gen",
+    src = "server_feature_flags.idl",
+)
+
+idl_generator(
+    name = "server_options_helpers_gen",
+    src = "server_options_helpers.idl",
+)
+
+idl_generator(
+    name = "windows_options_gen",
+    src = "windows_options.idl",
+)
+
+idl_generator(
+    name = "cluster_auth_mode_option_gen",
+    src = "cluster_auth_mode_option.idl",
+)
+
+idl_generator(
+    name = "keyfile_option_gen",
+    src = "keyfile_option.idl",
+)
+
+idl_generator(
+    name = "server_options_base_gen",
+    src = "server_options_base.idl",
+)
+
+idl_generator(
+    name = "server_options_general_gen",
+    src = "server_options_general.idl",
+)
+
+idl_generator(
+    name = "server_options_nongeneral_gen",
+    src = "server_options_nongeneral.idl",
+)
+
+idl_generator(
+    name = "server_options_upgrade_downgrade_gen",
+    src = "server_options_upgrade_downgrade.idl",
+)
+
+idl_generator(
+    name = "initialize_server_global_state_gen",
+    src = "initialize_server_global_state.idl",
+)
+
+idl_generator(
+    name = "connection_health_metrics_parameter_gen",
+    src = "connection_health_metrics_parameter.idl",
+)
+
+idl_generator(
+    name = "namespace_spec_gen",
+    src = "namespace_spec.idl",
+    deps = [
+        ":basic_types_gen",
+    ],
+)
+
+idl_generator(
+    name = "mongod_options_general_gen",
+    src = "mongod_options_general.idl",
+)
+
+idl_generator(
+    name = "mongod_options_legacy_gen",
+    src = "mongod_options_legacy.idl",
+)
+
+idl_generator(
+    name = "mongod_options_replication_gen",
+    src = "mongod_options_replication.idl",
+)
+
+idl_generator(
+    name = "mongod_options_sharding_gen",
+    src = "mongod_options_sharding.idl",
+)
+
+idl_generator(
+    name = "mongod_options_storage_gen",
+    src = "mongod_options_storage.idl",
+)
+
+idl_generator(
+    name = "read_write_concern_defaults_gen",
+    src = "read_write_concern_defaults.idl",
+    deps = [
+        ":basic_types_gen",
+        ":write_concern_options_gen",
+        "//src/mongo/db/repl:read_concern_args_gen",
+    ],
+)
+
+idl_generator(
+    name = "default_max_time_ms_cluster_parameter_gen",
+    src = "default_max_time_ms_cluster_parameter.idl",
+    deps = [
+        "//src/mongo/idl:cluster_server_parameter_gen",
+    ],
+)
+
+idl_generator(
+    name = "change_stream_options_gen",
+    src = "change_stream_options.idl",
+    deps = [
+        ":basic_types_gen",
+        "//src/mongo/idl:cluster_server_parameter_gen",
+    ],
+)
+
+idl_generator(
+    name = "change_stream_options_parameter_gen",
+    src = "change_stream_options_parameter.idl",
+)
+
+idl_generator(
+    name = "change_streams_cluster_parameter_gen",
+    src = "change_streams_cluster_parameter.idl",
+    deps = [
+        ":basic_types_gen",
+        "//src/mongo/idl:cluster_server_parameter_gen",
+    ],
+)
+
+idl_generator(
+    name = "change_stream_state_gen",
+    src = "change_stream_state.idl",
+    deps = [
+        ":basic_types_gen",
+        "//src/mongo/idl:generic_argument_gen",
+    ],
+)
+
+idl_generator(
+    name = "set_change_stream_state_coordinator_gen",
+    src = "set_change_stream_state_coordinator.idl",
+    deps = [
+        ":basic_types_gen",
+        "//src/mongo/db/session:logical_session_id_gen",
+    ],
+)
+
+idl_generator(
+    name = "mirror_maestro_gen",
+    src = "mirror_maestro.idl",
+    deps = [
+        ":basic_types_gen",
+    ],
+)
+
+idl_generator(
+    name = "coll_mod_gen",
+    src = "coll_mod.idl",
+    deps = [
+        ":basic_types_gen",
+        "//src/mongo/db/auth:access_checks_gen",
+        "//src/mongo/db/auth:action_type_gen",
+        "//src/mongo/db/catalog:collection_options_gen",
+        "//src/mongo/db/pipeline:change_stream_pre_and_post_images_options_gen",
+        "//src/mongo/db/timeseries:timeseries_gen",
+        "//src/mongo/idl:generic_argument_gen",
+    ],
+)
+
+idl_generator(
+    name = "dbcommands_gen",
+    src = "dbcommands.idl",
+    deps = [
+        ":basic_types_gen",
+        "//src/mongo/db/catalog:collection_options_gen",
+        "//src/mongo/db/pipeline:storage_stats_spec_gen",
+        "//src/mongo/idl:generic_argument_gen",
+    ],
+)
+
+idl_generator(
+    name = "metadata_consistency_types_gen",
+    src = "metadata_consistency_types.idl",
+    deps = [
+        ":basic_types_gen",
+        "//src/mongo/s:sharding_types_gen",
+    ],
+)
+
+idl_generator(
+    name = "drop_gen",
+    src = "drop.idl",
+    deps = [
+        ":basic_types_gen",
+        "//src/mongo/db/auth:action_type_gen",
+        "//src/mongo/idl:generic_argument_gen",
+    ],
+)
+
+idl_generator(
+    name = "drop_database_gen",
+    src = "drop_database.idl",
+    deps = [
+        ":basic_types_gen",
+        "//src/mongo/db/auth:action_type_gen",
+        "//src/mongo/idl:generic_argument_gen",
+    ],
+)
+
+idl_generator(
+    name = "list_collections_gen",
+    src = "list_collections.idl",
+    deps = [
+        ":basic_types_gen",
+        "//src/mongo/db/auth:access_checks_gen",
+        "//src/mongo/db/auth:action_type_gen",
+        "//src/mongo/idl:generic_argument_gen",
+    ],
+)
+
+idl_generator(
+    name = "list_indexes_gen",
+    src = "list_indexes.idl",
+    deps = [
+        ":basic_types_gen",
+        ":create_indexes_gen",
+        "//src/mongo/db/auth:access_checks_gen",
+        "//src/mongo/db/auth:action_type_gen",
+        "//src/mongo/idl:generic_argument_gen",
+    ],
+)
+
+idl_generator(
+    name = "internal_transactions_feature_flag_gen",
+    src = "internal_transactions_feature_flag.idl",
+    deps = [
+        ":basic_types_gen",
+    ],
+)
+
+idl_generator(
+    name = "record_id_gen",
+    src = "record_id.idl",
+)
+
+idl_generator(
+    name = "resumable_index_builds_gen",
+    src = "resumable_index_builds.idl",
+    deps = [
+        ":basic_types_gen",
+        ":record_id_gen",
+        "//src/mongo/db/sorter:sorter_gen",
+    ],
+)
+
+idl_generator(
+    name = "cloner_gen",
+    src = "cloner.idl",
+)
+
+idl_generator(
+    name = "read_concern_mongod_gen",
+    src = "read_concern_mongod.idl",
+)
+
+idl_generator(
+    name = "ttl_gen",
+    src = "ttl.idl",
+)
+
+idl_generator(
+    name = "create_indexes_gen",
+    src = "create_indexes.idl",
+    deps = [
+        ":basic_types_gen",
+        "//src/mongo/db/auth:action_type_gen",
+        "//src/mongo/db/catalog:commit_quorum_gen",
+        "//src/mongo/idl:generic_argument_gen",
+    ],
+)
+
+idl_generator(
+    name = "drop_indexes_gen",
+    src = "drop_indexes.idl",
+    deps = [
+        ":basic_types_gen",
+        "//src/mongo/db/auth:action_type_gen",
+        "//src/mongo/idl:generic_argument_gen",
+    ],
+)
+
+idl_generator(
+    name = "api_parameters_gen",
+    src = "api_parameters.idl",
+    deps = [
+        ":basic_types_gen",
+    ],
+)
+
+idl_generator(
+    name = "snapshot_window_options_gen",
+    src = "snapshot_window_options.idl",
+    deps = [
+        ":basic_types_gen",
+    ],
+)
+
+idl_generator(
+    name = "keys_collection_document_gen",
+    src = "keys_collection_document.idl",
+    deps = [
+        ":basic_types_gen",
+        "//src/mongo/crypto:sha1_block_gen",
+    ],
+)
+
+idl_generator(
+    name = "keys_collection_manager_gen",
+    src = "keys_collection_manager.idl",
+    deps = [
+        ":basic_types_gen",
+    ],
+)
+
+idl_generator(
+    name = "vector_clock_document_gen",
+    src = "vector_clock_document.idl",
+    deps = [
+        ":basic_types_gen",
+    ],
+)
+
+idl_generator(
+    name = "cursor_server_params_gen",
+    src = "cursor_server_params.idl",
+)
+
+idl_generator(
+    name = "generic_cursor_gen",
+    src = "generic_cursor.idl",
+    deps = [
+        ":basic_types_gen",
+        "//src/mongo/db/repl:replication_types_gen",
+        "//src/mongo/db/session:logical_session_id_gen",
+    ],
+)
+
+idl_generator(
+    name = "traffic_recorder_gen",
+    src = "traffic_recorder.idl",
+    deps = [
+        ":basic_types_gen",
+        "//src/mongo/idl:generic_argument_gen",
+    ],
+)
+
+idl_generator(
+    name = "commands_test_example_gen",
+    src = "commands_test_example.idl",
+    deps = [
+        ":basic_types_gen",
+        "//src/mongo/idl:generic_argument_gen",
+    ],
+)
+
+idl_generator(
+    name = "read_write_concern_provenance_base_gen",
+    src = "read_write_concern_provenance_base.idl",
+    deps = [
+        ":basic_types_gen",
+    ],
+)
+
+idl_generator(
+    name = "write_concern_gen",
+    src = "write_concern.idl",
+    deps = [
+        ":basic_types_gen",
+        ":read_write_concern_provenance_base_gen",
+    ],
+)
+
 mongo_cc_library(
     name = "profile_filter",
     srcs = [

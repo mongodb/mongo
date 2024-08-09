@@ -54,7 +54,7 @@ if wiredtiger:
 sorterBaseEnv.Library(
     target="sorter_base",
     source=[
-        "sorter.idl",
+        "sorter_gen.cpp",
         "sorter_checksum_calculator.cpp",
     ],
     LIBDEPS=[
