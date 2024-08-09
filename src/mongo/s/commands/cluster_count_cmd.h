@@ -40,6 +40,7 @@
 #include "mongo/db/query/count_command_gen.h"
 #include "mongo/db/query/view_response_formatter.h"
 #include "mongo/db/views/resolved_view.h"
+#include "mongo/platform/overflow_arithmetic.h"
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/s/catalog_cache.h"
 #include "mongo/s/cluster_commands_helpers.h"
@@ -47,6 +48,7 @@
 #include "mongo/s/commands/strategy.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/query/cluster_aggregate.h"
+#include "mongo/util/assert_util.h"
 #include "mongo/util/timer.h"
 
 namespace mongo {
@@ -117,9 +119,7 @@ public:
         std::vector<AsyncRequestsSender::Response> shardResponses;
         try {
             auto countRequest = CountCommandRequest::parse(IDLParserContext("count"), cmdObj);
-
             if (shouldDoFLERewrite(countRequest)) {
-
                 if (!countRequest.getEncryptionInformation()->getCrudProcessed().value_or(false)) {
                     processFLECountS(opCtx, nss, &countRequest);
                 }
@@ -132,8 +132,16 @@ public:
             // counts.
             if (countRequest.getLimit() && countRequest.getSkip()) {
                 const auto limit = countRequest.getLimit().value();
+                const auto skip = countRequest.getSkip().value();
                 if (limit != 0) {
-                    countRequest.setLimit(limit + countRequest.getSkip().value());
+                    std::int64_t sum = 0;
+                    uassert(ErrorCodes::Overflow,
+                            str::stream()
+                                << "Overflow on the count command: The sum of the limit and skip "
+                                   "fields must fit into a long integer. Limit: "
+                                << limit << "   Skip: " << skip,
+                            !overflow::add(limit, skip, &sum));
+                    countRequest.setLimit(sum);
                 }
             }
             countRequest.setSkip(boost::none);
