@@ -6,6 +6,7 @@ IFS=$'\n\t'
 
 set -vx
 
+VERSION=20230227-snapshot-093ba93c
 LIB_GIT_REVISION=mongo-20240522
 LIB_GIT_REPO=git@github.com:mongodb-forks/tcmalloc.git
 

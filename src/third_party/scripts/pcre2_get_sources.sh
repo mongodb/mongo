@@ -29,7 +29,7 @@ if [ "$#" -ne 0 ]; then
 fi
 
 NAME=pcre2
-SUFFIX=10.40
+VERSION=10.40
 GIT_SSH=git@github.com:PCRE2Project/pcre2.git
 THIRD_PARTY_DIR=$(git rev-parse --show-toplevel)/src/third_party
 DEST_DIR=$THIRD_PARTY_DIR/$NAME
@@ -49,7 +49,7 @@ fi
 echo TARGET_UNAME: $TARGET_UNAME
 
 git clone $GIT_SSH $TEMP_DIR
-git -C $TEMP_DIR checkout $NAME-$SUFFIX -b master-$SUFFIX
+git -C $TEMP_DIR checkout $NAME-$VERSION -b master-$VERSION
 
 rm -rf $TEMP_DIR/.git
 rm -rf $THIRD_PARTY_DIR/pcre2*

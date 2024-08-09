@@ -18,7 +18,7 @@ TEMP_DIR=$(mktemp -d /tmp/librdkafka.XXXXXX)
 DEST_DIR=$(git rev-parse --show-toplevel)/src/third_party/librdkafka
 DIST_DIR=$DEST_DIR/dist
 PLATFORM_DIR=$DIST_DIR/platform
-VERSION="2.0.2"
+VERSION = "wrong version"
 
 # Clean the output directories
 rm -rf $DIST_DIR

@@ -12,6 +12,7 @@ This policy applies to [github.com/mongodb/mongo](https://github.com/mongodb/mon
 3. Include the added library in `/sbom.json` under `components`. This will be verified by the linter in `buildscripts/sbom_linter.py`.
 4. Include a `scripts/import.sh` script inside the vendored library.
     > **Note:** A specific reference to the forked branch in [github.com/mongodb-forks](https://github.com/mongodb-forks) must be hardcoded. This helps developers understand and replicate the process used to vendor a specific library, facilitating maintenance.
+5. Include a `VERSION=XYZ` line in the `scripts/import.sh` script (here `XYZ` indicates the version of the third party library).
 
 ## Updating a third-party library in the server to a new upstream version
 

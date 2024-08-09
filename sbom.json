@@ -44,6 +44,10 @@
         {
           "name": "info_link",
           "value": "https://github.com/abseil/abseil-cpp"
+        },
+        {
+          "name": "import_script_path",
+          "value": "src/third_party/abseil-cpp/scripts/import.sh"
         }
       ],
       "type": "library",
@@ -122,6 +126,10 @@
         {
           "name": "info_link",
           "value": "https://github.com/chriskohlhoff/asio"
+        },
+        {
+          "name": "import_script_path",
+          "value": "src/third_party/scripts/asio_get_sources.sh"
         }
       ],
       "type": "library",
@@ -161,6 +169,10 @@
         {
           "name": "info_link",
           "value": "https://github.com/google/benchmark"
+        },
+        {
+          "name": "import_script_path",
+          "value": "src/third_party/benchmark/scripts/import.sh"
         }
       ],
       "type": "library",
@@ -200,6 +212,10 @@
         {
           "name": "info_link",
           "value": "http://www.boost.org/"
+        },
+        {
+          "name": "import_script_path",
+          "value": "src/third_party/scripts/boost_get_sources.sh"
         }
       ],
       "type": "library",
@@ -239,6 +255,10 @@
         {
           "name": "info_link",
           "value": "https://c-ares.org/"
+        },
+        {
+          "name": "import_script_path",
+          "value": "src/third_party/cares/scripts/import.sh"
         }
       ],
       "type": "library",
@@ -341,6 +361,10 @@
         {
           "name": "info_link",
           "value": "https://github.com/dcleblanc/SafeInt"
+        },
+        {
+          "name": "import_script_path",
+          "value": "src/third_party/scripts/safeint_get_sources.sh"
         }
       ],
       "type": "library",
@@ -379,6 +403,10 @@
         {
           "name": "info_link",
           "value": "https://github.com/derickr/timelib"
+        },
+        {
+          "name": "import_script_path",
+          "value": "src/third_party/timelib/scripts/import.sh"
         }
       ],
       "type": "library",
@@ -454,6 +482,10 @@
         {
           "name": "info_link",
           "value": "http://fmtlib.net/"
+        },
+        {
+          "name": "import_script_path",
+          "value": "src/third_party/fmt/scripts/import.sh"
         }
       ],
       "type": "library",
@@ -493,6 +525,10 @@
         {
           "name": "info_link",
           "value": "https://github.com/google/re2"
+        },
+        {
+          "name": "import_script_path",
+          "value": "src/third_party/re2/scripts/import.sh"
         }
       ],
       "type": "library",
@@ -571,6 +607,10 @@
         {
           "name": "info_link",
           "value": "https://github.com/google/snappy/releases"
+        },
+        {
+          "name": "import_script_path",
+          "value": "src/third_party/snappy/scripts/import.sh"
         }
       ],
       "type": "library",
@@ -610,6 +650,10 @@
         {
           "name": "info_link",
           "value": "https://github.com/gperftools/gperftools"
+        },
+        {
+          "name": "import_script_path",
+          "value": "src/third_party/gperftools/scripts/import.sh"
         }
       ],
       "type": "library",
@@ -649,6 +693,10 @@
         {
           "name": "info_link",
           "value": "https://github.com/grpc/grpc"
+        },
+        {
+          "name": "import_script_path",
+          "value": "src/third_party/grpc/scripts/import.sh"
         }
       ],
       "type": "library",
@@ -703,6 +751,10 @@
         {
           "name": "info_link",
           "value": "http://site.icu-project.org/download/"
+        },
+        {
+          "name": "import_script_path",
+          "value": "src/third_party/scripts/icu_get_sources.sh"
         }
       ],
       "type": "library",
@@ -781,6 +833,10 @@
         {
           "name": "info_link",
           "value": "https://github.com/jbeder/yaml-cpp/releases"
+        },
+        {
+          "name": "import_script_path",
+          "value": "src/third_party/scripts/yaml-cpp_get_sources.sh"
         }
       ],
       "type": "library",
@@ -859,6 +915,10 @@
         {
           "name": "info_link",
           "value": "https://github.com/mongodb/libmongocrypt"
+        },
+        {
+          "name": "import_script_path",
+          "value": "src/third_party/libmongocrypt/import.sh"
         }
       ],
       "type": "library",
@@ -933,6 +993,10 @@
         {
           "name": "info_link",
           "value": "https://github.com/confluentinc/librdkafka"
+        },
+        {
+          "name": "import_script_path",
+          "value": "src/third_party/librdkafka/scripts/librdkafka_get_sources.sh"
         }
       ],
       "type": "library",
@@ -977,6 +1041,10 @@
         {
           "name": "info_link",
           "value": "https://github.com/libtom/libtomcrypt/releases"
+        },
+        {
+          "name": "import_script_path",
+          "value": "src/third_party/scripts/tomcrypt_get_sources.sh"
         }
       ],
       "type": "library",
@@ -1016,6 +1084,10 @@
         {
           "name": "info_link",
           "value": "http://www.nongnu.org/libunwind/"
+        },
+        {
+          "name": "import_script_path",
+          "value": "src/third_party/unwind/scripts/import.sh"
         }
       ],
       "type": "library",
@@ -1097,6 +1169,10 @@
         {
           "name": "info_link",
           "value": "https://github.com/mongodb/mongo-c-driver"
+        },
+        {
+          "name": "import_script_path",
+          "value": "src/third_party/libbson/import.sh"
         }
       ],
       "type": "library",
@@ -1132,6 +1208,10 @@
         {
           "name": "info_link",
           "value": "https://www.mozilla.org/en-US/security/known-vulnerabilities/firefox-esr"
+        },
+        {
+          "name": "import_script_path",
+          "value": "src/third_party/mozjs/get-sources.sh"
         }
       ],
       "type": "library",
@@ -1324,6 +1404,10 @@
         {
           "name": "info_link",
           "value": "http://www.pcre.org/"
+        },
+        {
+          "name": "import_script_path",
+          "value": "src/third_party/scripts/pcre2_get_sources.sh"
         }
       ],
       "type": "library",
@@ -1363,6 +1447,10 @@
         {
           "name": "info_link",
           "value": "https://github.com/protocolbuffers/protobuf"
+        },
+        {
+          "name": "import_script_path",
+          "value": "src/third_party/protobuf/scripts/import.sh"
         }
       ],
       "type": "library",
@@ -1437,6 +1525,10 @@
         {
           "name": "info_link",
           "value": "https://github.com/RoaringBitmap/CRoaring"
+        },
+        {
+          "name": "import_script_path",
+          "value": "src/third_party/croaring/scripts/import.sh"
         }
       ],
       "type": "library",
@@ -1664,6 +1756,10 @@
         {
           "name": "info_link",
           "value": "https://github.com/google/tcmalloc"
+        },
+        {
+          "name": "import_script_path",
+          "value": "src/third_party/tcmalloc/scripts/import.sh"
         }
       ],
       "type": "library",
@@ -1891,6 +1987,10 @@
         {
           "name": "info_link",
           "value": "https://zlib.net/"
+        },
+        {
+          "name": "import_script_path",
+          "value": "src/third_party/scripts/zlib_get_sources.sh"
         }
       ],
       "type": "library",
@@ -1935,6 +2035,10 @@
         {
           "name": "info_link",
           "value": "https://github.com/facebook/zstd"
+        },
+        {
+          "name": "import_script_path",
+          "value": "src/third_party/scripts/zstandard_get_sources.sh"
         }
       ],
       "type": "library",

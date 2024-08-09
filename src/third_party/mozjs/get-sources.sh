@@ -8,6 +8,7 @@ set -vx
 
 NAME=spidermonkey
 
+VERSION="115.7.0esr"
 LIB_GIT_BRANCH=spidermonkey-esr115.7-cpp-only
 LIB_GIT_REVISION=e696addae6303fddfe1128f8d6090130bb68d61d
 LIB_GIT_REPO=git@github.com:mongodb-forks/spidermonkey.git

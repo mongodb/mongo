@@ -18,7 +18,7 @@ if grep -q Microsoft /proc/version; then
 fi
 
 NAME=libbson
-REVISION=1.27.1
+VERSION=1.27.1
 
 if grep -q Microsoft /proc/version; then
     SRC_ROOT=$(wslpath -u $(powershell.exe -Command "Get-ChildItem Env:TEMP | Get-Content | Write-Host"))
@@ -43,7 +43,7 @@ if [ ! -d $SRC ]; then
     $GIT_EXE clone https://github.com/mongodb/mongo-c-driver $CLONE_DEST
 
     pushd $SRC
-    $GIT_EXE checkout $REVISION
+    $GIT_EXE checkout $VERSION
     popd
 fi
 

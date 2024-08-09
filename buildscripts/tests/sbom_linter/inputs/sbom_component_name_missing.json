@@ -11,7 +11,6 @@
   "components": [
     {
       "type": "library",
-      "name": "kafka",
       "version": "v2.0.2",
       "scope": "required",
       "cpe": "test_cpe",
@@ -32,43 +31,6 @@
           }
         ]
       }
-    },
-    {
-      "type": "library",
-      "name": "protobuf",
-      "version": "v4.25.0",
-      "scope": "required",
-      "purl": "test_purl",
-      "properties": [
-        {
-          "name": "internal:team_responsible",
-          "value": "server_security"
-        },
-        {
-          "name": "import_script_path",
-          "value": "buildscripts/tests/sbom_linter/inputs/import_script_with_mongo_prefix_version.sh"
-        }
-      ],
-      "evidence": {
-        "occurrences": [
-          {
-            "location": "src/third_party/protobuf"
-          }
-        ]
-      }
-    },
-    {
-      "type": "library",
-      "name": "unicode",
-      "version": "8.0",
-      "scope": "optional",
-      "purl": "test_purl",
-      "properties": [
-        {
-          "name": "internal:team_responsible",
-          "value": "server_security"
-        }
-      ]
     }
   ]
 }
