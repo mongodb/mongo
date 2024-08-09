@@ -2,8 +2,6 @@
 // All V2 2dsphere indices are sparse in the geo fields.
 //
 // @tags: [
-//     # TODO(SERVER-60823): remove incompatible_with_gcov
-//     incompatible_with_gcov,
 // ]
 
 const collNamePrefix = 'geo_s2sparse_';

@@ -1,8 +1,6 @@
 /**
  * Test the $sampleRate match expression.
  * @tags: [
- *     # TODO(SERVER-60823): remove incompatible_with_gcov
- *     incompatible_with_gcov,
  * ]
  */
 const coll = db.expression_sample_rate;
