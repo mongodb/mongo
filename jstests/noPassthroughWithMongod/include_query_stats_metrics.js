@@ -1,6 +1,6 @@
 /**
  * Test the behavior of the includeQueryStatsMetrics option for find, aggregate, and getMore.
- * @tags: [requires_fcv_80]
+ * @tags: [featureFlagQueryStatsDataBearingNodes]
  *
  * TODO SERVER-84678: move this test into core once mongos supports includeQueryStatsMetrics
  */

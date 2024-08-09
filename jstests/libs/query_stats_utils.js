@@ -261,7 +261,10 @@ export function assertExpectedResults(results,
     for (const field of distributionFields) {
         assert.neq(totalExecMicros[field], NumberLong(0));
         assert.neq(firstResponseExecMicros[field], NumberLong(0));
-        assert(bsonWoCompare(workingTimeMillis[field], NumberLong(0)) >= 0);
+
+        // TODO SERVER-93216: Add an assertion for 'workingTimeMillis' after
+        // 'featureFlagQueryStatsDataBearingNodes' is enabled on 8.0.
+
         if (metrics.execCount > 1) {
             // If there are prior executions of the same query shape, we can't be certain if those
             // runs had getMores or not, so we can only check totalExec >= firstResponse.

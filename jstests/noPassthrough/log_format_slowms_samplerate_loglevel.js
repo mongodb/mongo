@@ -480,11 +480,6 @@ for (let testDB of [shardDB, mongosDB]) {
     unlogged = getUnloggedTests(testsRun, logLines);
     assert.eq(unlogged.length, 0, unlogged);
 
-    // Test with query stats enabled. This should only affect the log format in the mongos case,
-    // but we'll run against both the mongos and the shard to make sure.
-    [testsRun, logLines] = runLoggingTests(
-        {db: testDB, slowMs: -1, logLevel: 0, sampleRate: 1.0, enableQueryStats: true});
-    unlogged = getUnloggedTests(testsRun, logLines);
-    assert.eq(unlogged.length, 0, unlogged);
+    // TODO SERVER-93216: Add an assertion for enableQueryStats: true
 }
 st.stop();

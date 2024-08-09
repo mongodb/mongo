@@ -3,7 +3,8 @@
  * @tags: [
  *      # This test doesn't work with the in-memory storage engine
  *      requires_persistence,
- *      requires_fcv_80
+ *      requires_fcv_80,
+ *      featureFlagQueryStatsDataBearingNodes,
  * ]
  */
 

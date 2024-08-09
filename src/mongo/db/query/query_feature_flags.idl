@@ -70,8 +70,7 @@ feature_flags:
     featureFlagQueryStatsDataBearingNodes:
       description: "Feature flag for enabling aggregation of queryStats from data bearing nodes."
       cpp_varname: gFeatureFlagQueryStatsDataBearingNodes
-      default: true
-      version: 8.0
+      default: false
       shouldBeFCVGated: true
 
     featureFlagSearchBatchSizeLimit:

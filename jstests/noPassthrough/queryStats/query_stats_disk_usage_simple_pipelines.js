@@ -1,6 +1,8 @@
 /**
  * Test that query stats are collected from data bearing nodes for simple aggregate queries.
- * @tags: [requires_fcv_80]
+ * @tags: [
+ * featureFlagQueryStatsDataBearingNodes,
+ * ]
  */
 
 import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";

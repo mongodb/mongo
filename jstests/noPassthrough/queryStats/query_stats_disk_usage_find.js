@@ -1,6 +1,8 @@
 /**
  * Test that query stats are collected from data bearing nodes for find queries.
- * @tags: [requires_fcv_80]
+ * @tags: [
+ * featureFlagQueryStatsDataBearingNodes,
+ * ]
  */
 
 import {

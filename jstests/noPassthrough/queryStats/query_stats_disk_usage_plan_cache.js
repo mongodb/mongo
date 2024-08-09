@@ -1,6 +1,8 @@
 /**
  * Test that query stats regarding the plan cache are collected from data bearing nodes.
- * @tags: [requires_fcv_80]
+ * @tags: [
+ * featureFlagQueryStatsDataBearingNodes,
+ * ]
  */
 
 import {
