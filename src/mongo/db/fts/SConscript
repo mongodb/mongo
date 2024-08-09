@@ -73,16 +73,6 @@ baseEnv.Library(
 )
 
 env.Library(
-    target="fts_query_noop",
-    source=[
-        "fts_query_noop.cpp",
-    ],
-    LIBDEPS=[
-        "$BUILD_DIR/mongo/base",
-    ],
-)
-
-env.Library(
     target="ftsmongod",
     source=[
         "ftsmongod.cpp",

@@ -8,3 +8,17 @@ exports_files(
         "*.cpp",
     ]),
 )
+
+mongo_cc_library(
+    name = "fts_query_noop",
+    srcs = ["fts_query_noop.cpp"],
+    hdrs = [
+        "fts_query.h",
+        "fts_query_noop.h",
+        "fts_util.h",
+        "//src/mongo/db:jsobj.h",
+    ],
+    deps = [
+        "//src/mongo:base",
+    ],
+)
