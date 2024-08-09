@@ -61,6 +61,16 @@ namespace {
 // The # of documents returned is always 1 for the count command.
 static constexpr long long kNReturned = 1;
 
+BSONObj prepareCountForPassthrough(const BSONObj& cmdObj, bool requestQueryStats) {
+    if (!requestQueryStats) {
+        return CommandHelpers::filterCommandRequestForPassthrough(cmdObj);
+    }
+
+    BSONObjBuilder bob(cmdObj);
+    bob.append("includeQueryStatsMetrics", true);
+    return CommandHelpers::filterCommandRequestForPassthrough(bob.done());
+}
+
 }  // namespace
 
 /**
@@ -126,6 +136,9 @@ public:
                               << "'",
                 nss.isValid());
 
+        // Specifies whether or not we ultimately request query stats from each shard.
+        bool requestQueryStats = false;
+
         std::vector<AsyncRequestsSender::Response> shardResponses;
         try {
             auto countRequest = CountCommandRequest::parse(IDLParserContext("count"), cmdObj);
@@ -185,6 +198,11 @@ public:
             }
             countRequest.setSkip(boost::none);
 
+            // The includeQueryStatsMetrics field is not supported on mongos for the count command,
+            // so we do not need to check the value on the original request when updating
+            // requestQueryStats here.
+            requestQueryStats = query_stats::shouldRequestRemoteMetrics(CurOp::get(opCtx)->debug());
+
             shardResponses = scatterGatherVersionedTargetByRoutingTable(
                 expCtx,
                 dbName,
@@ -193,7 +211,7 @@ public:
                 applyReadWriteConcern(
                     opCtx,
                     this,
-                    CommandHelpers::filterCommandRequestForPassthrough(countRequest.toBSON())),
+                    prepareCountForPassthrough(countRequest.toBSON(), requestQueryStats)),
                 ReadPreferenceSetting::get(opCtx),
                 Shard::RetryPolicy::kIdempotent,
                 countRequest.getQuery(),
@@ -232,6 +250,7 @@ public:
         }
 
         long long total = 0;
+        bool allShardMetricsReturned = true;
         BSONObjBuilder shardSubTotal(result.subobjStart("shards"));
 
         for (const auto& response : shardResponses) {
@@ -239,9 +258,22 @@ public:
             if (status.isOK()) {
                 status = getStatusFromCommandResult(response.swResponse.getValue().data);
                 if (status.isOK()) {
-                    long long shardCount = response.swResponse.getValue().data["n"].numberLong();
+                    const BSONObj& data = response.swResponse.getValue().data;
+                    const long long shardCount = data["n"].numberLong();
                     shardSubTotal.appendNumber(response.shardId.toString(), shardCount);
                     total += shardCount;
+
+                    // We aggregate the metrics from all the shards. If any shard does not include
+                    // metrics, we avoid collecting the remote metrics for the entire query and do
+                    // not write an entry to the query stats store. Note that we do not expect
+                    // shards to fail to collect metrics for the count command; this is just
+                    // thorough error handling.
+                    BSONElement shardMetrics = data["metrics"];
+                    if (allShardMetricsReturned &= shardMetrics.isABSONObj()) {
+                        const auto metrics = CursorMetrics::parse(IDLParserContext("CursorMetrics"),
+                                                                  shardMetrics.Obj());
+                        CurOp::get(opCtx)->debug().additiveMetrics.aggregateCursorMetrics(metrics);
+                    }
                     continue;
                 }
             }
@@ -259,7 +291,9 @@ public:
         auto* curOp = CurOp::get(opCtx);
         curOp->setEndOfOpMetrics(kNReturned);
 
-        collectQueryStatsMongos(opCtx, std::move(curOp->debug().queryStatsInfo.key));
+        if (allShardMetricsReturned) {
+            collectQueryStatsMongos(opCtx, std::move(curOp->debug().queryStatsInfo.key));
+        }
 
         return true;
     }

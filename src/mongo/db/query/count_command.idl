@@ -115,3 +115,7 @@ commands:
                 type: uuid
                 optional: true
                 stability: unstable
+            includeQueryStatsMetrics:
+                description: "Indicates whether or not query stats metrics should be included in the response."
+                type: optionalBool
+                stability: internal

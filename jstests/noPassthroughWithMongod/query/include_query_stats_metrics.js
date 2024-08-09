@@ -1,6 +1,6 @@
 /**
- * Test the behavior of the includeQueryStatsMetrics option for find, aggregate, distinct, and
- * getMore.
+ * Test the behavior of the includeQueryStatsMetrics option for find, aggregate, getMore, distinct,
+ * and count.
  * @tags: [requires_fcv_80]
  *
  * TODO SERVER-84678: move this test into core once mongos supports includeQueryStatsMetrics
@@ -211,6 +211,49 @@ function assertMetricsEqual(cursor, {
                 hasSortStage: false,
                 usedDisk: aggressiveSpillsInGroup,
                 fromMultiPlanner: false
+            });
+        }
+
+        {
+            // includeQueryStatsMetrics is false, no metrics should be included.
+            const result = testDB.runCommand(
+                {count: coll.getName(), query: {a: 1}, includeQueryStatsMetrics: false});
+            assert.commandWorked(result);
+            assert(!result.hasOwnProperty("metrics"));
+        }
+
+        {
+            // Basic count command with includeQueryStatsMetrics, metrics should appear.
+            const result = testDB.runCommand(
+                {count: coll.getName(), query: {a: 1}, includeQueryStatsMetrics: true});
+            assert.commandWorked(result);
+            assertMetricsEqual(result, {
+                keysExamined: 0,
+                docsExamined: 5,
+                hasSortStage: false,
+                usedDisk: false,
+                fromMultiPlanner: false
+            });
+        }
+
+        {
+            // Count command against a non-existent collection, metrics should still appear.
+            const collName = jsTestName() + "_does_not_exist";
+            const nonExistentCollection = testDB[collName];
+            nonExistentCollection.drop();
+            const result = testDB.runCommand({
+                count: nonExistentCollection.getName(),
+                query: {a: 1},
+                includeQueryStatsMetrics: true
+            });
+            assert.commandWorked(result);
+            assertMetricsEqual(result, {
+                keysExamined: 0,
+                docsExamined: 0,
+                hasSortStage: false,
+                usedDisk: false,
+                fromMultiPlanner: false,
+                fromPlanCache: false
             });
         }
     }

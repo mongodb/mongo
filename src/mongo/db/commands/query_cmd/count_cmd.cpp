@@ -400,6 +400,12 @@ public:
                                                                request.getMaxTimeMS().has_value(),
                                                                ctx->getCollectionType());
             });
+
+            if (request.getIncludeQueryStatsMetrics() &&
+                feature_flags::gFeatureFlagQueryStatsDataBearingNodes.isEnabled(
+                    serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
+                curOp->debug().queryStatsInfo.metricsRequested = true;
+            }
         }
 
         if (ctx->getView()) {
@@ -472,6 +478,10 @@ public:
         expCtx = cq ? cq->getExpCtx()
                     : ExpressionContext::makeBlankExpressionContext(opCtx, exec->nss());
         collectQueryStatsMongod(opCtx, expCtx, std::move(curOp->debug().queryStatsInfo.key));
+
+        if (curOp->debug().queryStatsInfo.metricsRequested) {
+            result.append("metrics", curOp->debug().getCursorMetrics().toBSON());
+        }
 
         return true;
     }

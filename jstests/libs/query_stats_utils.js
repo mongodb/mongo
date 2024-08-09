@@ -652,6 +652,36 @@ export function getAggregateQueryStatsKey(conn, collName, queryShapeExtra, extra
 }
 
 /**
+ * Helper function to construct a query stats key for a count query.
+ * @param {object} coll - The given collection to run on
+ * @param {string} collName - The collection name
+ * @param {object} queryShapeExtra - The count-specific elements in its query shape, such as query,
+ *     limit, etc.
+ */
+export function getCountQueryStatsKey(conn, collName, queryShapeExtra) {
+    const baseQueryShape = {
+        cmdNs: {db: "test", coll: collName},
+        command: "count",
+    };
+    const queryStatsKey = {
+        queryShape: Object.assign(baseQueryShape, queryShapeExtra),
+        client: {application: {name: "MongoDB Shell"}},
+    };
+
+    const coll = conn.getDB("test")[collName];
+    if (!conn.isMongos()) {
+        // TODO SERVER-76263 - make this apply to mongos once it has collection telemetry info.
+        queryStatsKey.collectionType = isView(conn, coll) ? "view" : "collection";
+    }
+
+    if (FixtureHelpers.isReplSet(conn.getDB("test"))) {
+        queryStatsKey["$readPreference"] = {mode: "secondaryPreferred"};
+    }
+
+    return queryStatsKey;
+}
+
+/**
  * Helper function to construct a query stats key for a distinct query.
  * @param {object} coll - The given collection to run on
  * @param {string} collName - The collection name
