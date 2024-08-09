@@ -37,28 +37,6 @@ mongo_cc_library(
 )
 
 mongo_cc_library(
-    name = "quick_exit",
-    srcs = [
-        "quick_exit.cpp",
-    ],
-    hdrs = [
-        "exit_code.h",
-        "quick_exit.h",
-        "//src/mongo/platform:compiler.h",
-        "//src/mongo/stdx:mutex.h",
-        "//src/mongo/util:assert_util.h",
-        "//src/mongo/util:testing_proctor.h",
-    ],
-    local_defines = select({
-        "//bazel/config:gcov_enabled": ["MONGO_GCOV"],
-        "//conditions:default": [],
-    }) + select({
-        "//bazel/config:pgo_profile_enabled": ["MONGO_PGO_PROFILE"],
-        "//conditions:default": [],
-    }),
-)
-
-mongo_cc_library(
     name = "winutil",
     srcs = [
         "winutil.cpp",

@@ -14,7 +14,9 @@ import typer
 
 
 def main(
-    target_library: Annotated[str, typer.Option()], silent: Annotated[bool, typer.Option()] = False
+    target_library: Annotated[str, typer.Option()],
+    silent: Annotated[bool, typer.Option()] = False,
+    skip_scons: Annotated[bool, typer.Option()] = False,
 ):
     extra_args = []
     if os.name == "nt":
@@ -43,20 +45,20 @@ def main(
         "compiledb",
     ] + extra_args
 
-    p = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
+    if not skip_scons:
+        p = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
 
-    while True:
-        line = p.stdout.readline()
-        if not line:
-            break
-        if not silent:
-            print(line.strip())
+        while True:
+            line = p.stdout.readline()
+            if not line:
+                break
+            print(line.strip(), file=sys.stderr)
 
-    _, _ = p.communicate()
+        _, _ = p.communicate()
 
-    if p.returncode != 0:
-        print(f"SCons build failed, exit code {p.returncode}", file=sys.stderr)
-        sys.exit(1)
+        if p.returncode != 0:
+            print(f"SCons build failed, exit code {p.returncode}", file=sys.stderr)
+            sys.exit(1)
 
     with open("compile_commands.json") as f:
         cc = json.load(f)
@@ -158,12 +160,68 @@ def main(
                 if not silent:
                     print(f"finished {jobs[completed_job]}")
 
+    with open(".bazel_include_info.json") as f:
+        bazel_include_info = json.load(f)
+
+    header_map = bazel_include_info["header_map"]
+    bazel_exec = bazel_include_info["bazel_exec"]
+    bazel_config = bazel_include_info["config"]
+
+    reverse_header_map = {}
+    for k, v in header_map.items():
+        for hdr in v:
+            if not hdr or hdr.endswith(("/config.h", "/basic.h", "windows_basic.h")):
+                continue
+            bazel_header = "//" + hdr.replace("\\", "/")
+            bazel_header = ":".join(bazel_header.rsplit("/", 1))
+            if bazel_header.startswith("//src/third_party/SafeInt"):
+                reverse_header_map[bazel_header] = "//src/third_party/SafeInt:headers"
+            elif bazel_header.startswith("//src/third_party/immer"):
+                reverse_header_map[bazel_header] = "//src/third_party/immer:headers"
+            elif bazel_header in reverse_header_map:
+                if bazel_header.startswith("//src/third_party/"):
+                    continue
+                raise Exception(
+                    f"Header {bazel_header} already in map, existing: {reverse_header_map[bazel_header]}, new {k}"
+                )
+            else:
+                reverse_header_map[bazel_header] = k
+
+    recommended_deps = set()
+    minimal_headers = []
+    for header in headers:
+        if header in reverse_header_map:
+            recommended_deps.add(reverse_header_map[header])
+        else:
+            minimal_headers.append(header)
+
+    working_deps = recommended_deps.copy()
+    for dep in recommended_deps:
+        if dep in working_deps:
+            p = subprocess.run(
+                [bazel_exec, "cquery"]
+                + bazel_config
+                + [f'kind("extract_debuginfo", deps(@{dep}))'],
+                capture_output=True,
+                text=True,
+            )
+            dep_text = "\n".join([line for line in p.stdout.splitlines() if line.startswith("//")])
+            for test_dep in recommended_deps:
+                if test_dep == dep:
+                    continue
+                if test_dep in working_deps and test_dep in dep_text:
+                    working_deps.remove(test_dep)
+
     uniq_dirs = dict()
-    for header in original_headers:
-        dir_name = os.path.dirname(header)
+    for header in minimal_headers:
+        normal_header = "/".join(header[2:].rsplit(":", 1))
+        dir_name = os.path.dirname(normal_header)
         if dir_name not in uniq_dirs:
             uniq_dirs[dir_name] = []
-        uniq_dirs[dir_name].append(header)
+        uniq_dirs[dir_name].append(normal_header)
+
+    with open(target_library + ".bazel_deps") as f:
+        original_deps = f.readlines()
 
     print(f"header list for {target_library}")
     print("  header utilization per directory:")
@@ -181,8 +239,16 @@ def main(
             print(
                 f"found no headers in dir {uniq_dir}, but had headers listed: {uniq_dirs[uniq_dir]}"
             )
+    print("  recommend deps list:")
+    for dep in sorted(list(working_deps) + list(set(original_deps))):
+        dep_comment = ""
+        if dep in original_deps:
+            dep_comment = "# from SCons"
+        else:
+            dep_comment = "# from generator"
+        print(f'    "{dep.strip()}", {dep_comment}')
     print("  header list:")
-    for header in sorted(headers):
+    for header in sorted(minimal_headers):
         print(f'    "{header}",')
 
 

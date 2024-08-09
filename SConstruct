@@ -6558,6 +6558,51 @@ env.Alias("generated-sources", clang_tidy_config)
 if get_option("bazel-includes-info"):
     target_library = get_option("bazel-includes-info").replace("\\", "/")
 
+    header_map = {}
+    bazel_query = ["aquery"] + env["BAZEL_FLAGS_STR"] + ['mnemonic("CppArchive", //src/...)']
+
+    results = env.RunBazelQuery(bazel_query, "getting all bazel libraries")
+    targets = set()
+    for line in results.stdout.split("\n"):
+        if "  Target: //src" in line:
+            target = line.split("  Target: ")[-1]
+            targets.add(target)
+
+    for target in targets:
+        print(f"getting headers for {target}")
+        bazel_query = (
+            ["cquery"]
+            + env["BAZEL_FLAGS_STR"]
+            + [
+                f'filter("[\\.h,\\.ipp,\\.hpp].*$", labels(hdrs, @{target}))',
+                "--output",
+                "files",
+            ]
+        )
+        results = env.RunBazelQuery(bazel_query, f"getting {target} headers")
+
+        bazel_query = (
+            ["cquery"]
+            + env["BAZEL_FLAGS_STR"]
+            + [
+                f'kind("extract_debuginfo", rdeps(@//src/mongo/..., @{target},  1))',
+            ]
+        )
+        target_results = env.RunBazelQuery(bazel_query, "getting real target")
+        target = target_results.stdout.split(" ")[0]
+        header_map[target] = []
+        for line in results.stdout.split("\n"):
+            header_map[target] += [line]
+
+    bazel_include_info = {
+        "header_map": header_map,
+        "bazel_exec": env["SCONS2BAZEL_TARGETS"].bazel_executable,
+        "config": env["BAZEL_FLAGS_STR"] + ["--config=local"],
+    }
+
+    with open(".bazel_include_info.json", "w") as f:
+        json.dump(bazel_include_info, f)
+
     def bazel_includes_emitter(target, source, env):
         rel_target = os.path.relpath(str(target[0].abspath), start=env.Dir("#").abspath).replace(
             "\\", "/"
@@ -6579,10 +6624,16 @@ if get_option("bazel-includes-info"):
                         f.write(os.path.relpath(str(s.abspath), start=env.Dir("#").abspath) + "\n")
             with open(str(target[0].abspath) + ".env_vars", "w") as f:
                 json.dump(env["ENV"], f)
-            with open(str(target[0].abspath) + ".bazel_headers", "w") as f:
+
+            with (
+                open(str(target[0].abspath) + ".bazel_headers", "w") as fheaders,
+                open(str(target[0].abspath) + ".bazel_deps", "w") as fdeps,
+            ):
                 # note we can't know about LIBDEPS_DEPDENDENTS (reverse deps) in an emitter
                 # however we do co-opt the libdeps linter to check for these at the end of reading
                 # sconscripts
+
+                deps = []
                 for s in (
                     env.get("LIBDEPS", [])
                     + env.get("LIBDEPS_PRIVATE", [])
@@ -6607,6 +6658,7 @@ if get_option("bazel-includes-info"):
                     if str(libnode_path) in env["SCONS2BAZEL_TARGETS"].scons2bazel_targets:
                         bazel_target = env["SCONS2BAZEL_TARGETS"].bazel_target(str(libnode_path))
                         # new query to run, run and cache it
+                        deps.append(bazel_target)
                         bazel_query = (
                             ["cquery"]
                             + env["BAZEL_FLAGS_STR"]
@@ -6627,7 +6679,9 @@ if get_option("bazel-includes-info"):
                         )
 
                         for header in results:
-                            f.write(header + "\n")
+                            fheaders.write(header + "\n")
+                        for dep in deps:
+                            fdeps.write(dep + "\n")
 
         return target, source
 

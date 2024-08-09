@@ -279,7 +279,7 @@ buildifier
 .bazel_info_for_ninja.txt
 .ninja_last_command_line_targets.txt
 bazel/coverity/analysis/BUILD.bazel
-
+.bazel_include_info.json
 # generated configs for external fixture suites
 docker_compose/
 
