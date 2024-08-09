@@ -90,7 +90,6 @@ env.SConscript(
         "net",
         "options_parser",
         "tracing_profiler",
-        "version",
     ],
     exports=[
         "env",

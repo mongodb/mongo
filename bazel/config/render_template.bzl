@@ -21,7 +21,6 @@ def render_template_impl(ctx):
         env = {"PYTHONPATH": ctx.configuration.host_path_separator.join(python_path)},
         mnemonic = "TemplateRenderer",
     )
-    print("Generated error codes file at: " + ctx.outputs.output.path)
 
     return [DefaultInfo(files = depset([ctx.outputs.output]))]
 

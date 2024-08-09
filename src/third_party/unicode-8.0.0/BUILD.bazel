@@ -1,0 +1,6 @@
+package(default_visibility = ["//visibility:public"])
+
+exports_files([
+    "CaseFolding.txt",
+    "PropList.txt",
+])
