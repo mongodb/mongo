@@ -354,10 +354,12 @@ def macos_extraction(ctx, cc_toolchain, inputs):
     return provided_info
 
 def windows_extraction(ctx, cc_toolchain, inputs):
+    pdb = None
     if ctx.attr.type == "library":
         ext = ".lib"
     elif ctx.attr.type == "program":
         ext = ".exe"
+        pdb = ctx.attr.binary_with_debug[OutputGroupInfo].pdb_file
     else:
         fail("Can't extract debug info from unknown type: " + ctx.attr.type)
 
@@ -378,10 +380,22 @@ def windows_extraction(ctx, cc_toolchain, inputs):
             output_library = output
         if ext == ".dll":
             output_dynamic_library = output
+            # TODO support PDB outputs for dynamic windows builds when we are on bazel 7.2
+            # https://github.com/bazelbuild/bazel/pull/21900/files
 
         ctx.actions.symlink(
             output = output,
             target_file = input,
+        )
+
+    if pdb:
+        basename = input.basename[:-len(WITH_DEBUG_SUFFIX + ext)]
+        output = ctx.actions.declare_file(basename + ".pdb")
+        outputs.append(output)
+
+        ctx.actions.symlink(
+            output = output,
+            target_file = pdb.to_list()[0],
         )
 
     if ctx.attr.shared_archive:
