@@ -29,7 +29,7 @@
 
 #include "mongo/db/replica_set_endpoint_test_fixture.h"
 
-#include "mongo/db/s/sharding_cluster_parameters_gen.h"
+#include "mongo/s/sharding_cluster_parameters_gen.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
 

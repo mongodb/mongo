@@ -403,7 +403,6 @@ env.Library(
         "$BUILD_DIR/mongo/util/pcre_wrapper",
         "forwardable_operation_metadata",
         "resharding_server_parameters_idl",
-        "sharding_cluster_parameters_idl",
         "sharding_logging",
         "user_writes_recoverable_critical_section",
     ],
@@ -736,15 +735,6 @@ env.Library(
     LIBDEPS_PRIVATE=["$BUILD_DIR/mongo/db/server_base"],
 )
 
-env.Library(
-    target="sharding_cluster_parameters_idl",
-    source=["sharding_cluster_parameters.idl"],
-    LIBDEPS_PRIVATE=[
-        "$BUILD_DIR/mongo/db/server_base",
-        "$BUILD_DIR/mongo/idl/cluster_server_parameter",
-    ],
-)
-
 env.CppUnitTest(
     target="shard_server_op_observer_test",
     source=[
@@ -955,7 +945,6 @@ env.CppUnitTest(
         "$BUILD_DIR/mongo/idl/cluster_server_parameter_common",
         "$BUILD_DIR/mongo/util/version_impl",
         "config_server_test_fixture",
-        "sharding_cluster_parameters_idl",
         "sharding_commands_d",
     ],
 )

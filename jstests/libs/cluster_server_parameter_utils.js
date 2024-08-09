@@ -5,15 +5,20 @@
  *   If it's test-only, add its definition to kTestOnlyClusterParameters.
  *   Otherwise, add to kNonTestOnlyClusterParameters.
  * The keyname will be the name of the cluster-wide server parameter,
- * it's value will be an object with at least three keys named:
+ * its value will be an object with at least two keys named:
  *   * 'default': Properties to expect on an unset CWSP
  *   * 'testValues': List of two other valid values of the CWSP to set for testing purposes
- * An additional property 'featureFlag' may also be set if the
- *   parameter depends on a featureFlag.
- * Use the name of the featureFlag if it is required in
- *   order to consider the parameter.
- * Prefix the name with a bang '!' if it is only considered
- *   when the featureFlag is disabled.
+ *
+ * An additional property 'featureFlag' may also be set if the parameter depends on a featureFlag.
+ * Use the name of the featureFlag if it is required in order to consider the parameter.
+ * Prefix the name with a bang '!' if it is only considered when the featureFlag is disabled.
+ *
+ * Analogously, the 'setParameters', 'serverless' and 'standaloneIncompatible' properties may
+ * be set to specify that the scenarios under which a parameter can be validated.
+ *
+ * CWSPs with the 'isSetInternally' property are set by the cluster itself, and generally not by
+ * the user. We don't set them nor check their value from generic tests, as we can not assume that
+ * they will remain at a given value. However, we check that they exist, i.e. that we can get them.
  */
 
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
@@ -47,6 +52,20 @@ export const kNonTestOnlyClusterParameters = {
         setParameters: {'multitenancySupport': true},
         serverless: true,
         standaloneIncompatible: false,
+    },
+    addOrRemoveShardInProgress: {
+        default: {inProgress: false},
+        testValues: [{inProgress: true}, {inProgress: false}],
+        isSetInternally: true,
+    },
+    shardedClusterCardinalityForDirectConns: {
+        default: {hasTwoOrMoreShards: false},
+        testValues: [{hasTwoOrMoreShards: true}, {hasTwoOrMoreShards: false}],
+        isSetInternally: true,
+    },
+    configServerReadPreferenceForCatalogQueries: {
+        default: {mustAlwaysUseNearest: false},
+        testValues: [{mustAlwaysUseNearest: true}, {mustAlwaysUseNearest: false}],
     }
 };
 
@@ -76,6 +95,9 @@ export const kAllClusterParameters =
     Object.assign({}, kNonTestOnlyClusterParameters, kTestOnlyClusterParameters);
 
 export const kAllClusterParameterNames = Object.keys(kAllClusterParameters);
+
+export const kAllClusterParameterSetInternallyNames =
+    kAllClusterParameterNames.filter(name => kAllClusterParameters[name].isSetInternally);
 
 export const kAllClusterParameterDefaults = kAllClusterParameterNames.map(
     (name) => Object.assign({_id: name}, kAllClusterParameters[name].default));
@@ -175,6 +197,12 @@ export function runSetClusterParameter(conn, update, tenantId) {
     if (!considerParameter(paramName, conn)) {
         return;
     }
+    if (kAllClusterParameterSetInternallyNames.includes(paramName)) {
+        // Skip setting parameters used internally by the cluster,
+        // as this may break the cluster in ways generic tests aren't prepared to handle.
+        return;
+    }
+
     let updateCopy = Object.assign({}, update);
     delete updateCopy._id;
     delete updateCopy.clusterParameterTime;
@@ -243,6 +271,12 @@ export function runGetClusterParameterNode(conn,
         if (actual[id] === undefined) {
             jsTest.log('Expected to retreive ' + id + ' but it was not returned');
             return false;
+        }
+
+        if (kAllClusterParameterSetInternallyNames.includes(expectedClusterParameters[i]._id)) {
+            // Skip validation of parameters used internally by the cluster,
+            // as their values could change for reasons outside the control of the tests.
+            continue;
         }
 
         if (bsonWoCompare(expectedClusterParameters[i], actual[id]) !== 0) {
