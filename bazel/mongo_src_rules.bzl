@@ -1,6 +1,7 @@
 # Common mongo-specific bazel build rules intended to be used in individual BUILD files in the "src/" subtree.
 load("@poetry//:dependencies.bzl", "dependency")
 load("//bazel:separate_debug.bzl", "CC_SHARED_LIBRARY_SUFFIX", "SHARED_ARCHIVE_SUFFIX", "WITH_DEBUG_SUFFIX", "extract_debuginfo", "extract_debuginfo_binary")
+load("//bazel:header_deps.bzl", "HEADER_DEP_SUFFIX", "create_header_dep")
 
 # https://learn.microsoft.com/en-us/cpp/build/reference/md-mt-ld-use-run-time-library?view=msvc-170
 #   /MD defines _MT and _DLL and links in MSVCRT.lib into each .obj file
@@ -1185,6 +1186,7 @@ def mongo_cc_library(
         srcs = [],
         hdrs = [],
         deps = [],
+        header_deps = [],
         testonly = False,
         visibility = None,
         data = [],
@@ -1208,6 +1210,7 @@ def mongo_cc_library(
       srcs: The source files to build.
       hdrs: The headers files of the target library.
       deps: The targets the library depends on.
+      header_deps: The targets the library depends on only for headers, omits linking.
       testonly: Whether or not the target is purely for tests.
       visibility: The visibility of the target library.
       data: Data targets the library depends on.
@@ -1280,12 +1283,17 @@ def mongo_cc_library(
         "//bazel/config:macos_aarch64": macos_rpath_flags,
     })
 
+    create_header_dep(
+        name = name + HEADER_DEP_SUFFIX,
+        header_deps = header_deps,
+    )
+
     # Create a cc_library entry to generate a shared archive of the target.
     native.cc_library(
         name = name + SHARED_ARCHIVE_SUFFIX,
         srcs = srcs + SANITIZER_DENYLIST_HEADERS,
         hdrs = hdrs + fincludes_hdr + MONGO_GLOBAL_ACCESSIBLE_HEADERS,
-        deps = deps,
+        deps = deps + [name + HEADER_DEP_SUFFIX],
         visibility = visibility,
         testonly = testonly,
         copts = MONGO_GLOBAL_COPTS + package_specific_copts + copts + fincludes_copt,
@@ -1308,7 +1316,7 @@ def mongo_cc_library(
         name = name + WITH_DEBUG_SUFFIX,
         srcs = srcs + SANITIZER_DENYLIST_HEADERS,
         hdrs = hdrs + fincludes_hdr + MONGO_GLOBAL_ACCESSIBLE_HEADERS,
-        deps = deps,
+        deps = deps + [name + HEADER_DEP_SUFFIX],
         visibility = visibility,
         testonly = testonly,
         copts = MONGO_GLOBAL_COPTS + package_specific_copts + copts + fincludes_copt,
@@ -1358,13 +1366,14 @@ def mongo_cc_library(
             "//bazel/config:shared_archive_enabled": ":" + name + SHARED_ARCHIVE_SUFFIX,
             "//conditions:default": None,
         }),
-        deps = deps,
+        deps = deps + [name + HEADER_DEP_SUFFIX],
     )
 
 def mongo_cc_binary(
         name,
         srcs = [],
         deps = [],
+        header_deps = [],
         testonly = False,
         visibility = None,
         data = [],
@@ -1384,6 +1393,7 @@ def mongo_cc_binary(
       name: The name of the library the target is compiling.
       srcs: The source files to build.
       deps: The targets the library depends on.
+      header_deps: The targets the library depends on only for headers, omits linking.
       testonly: Whether or not the target is purely for tests.
       visibility: The visibility of the target library.
       data: Data targets the library depends on.
@@ -1429,10 +1439,15 @@ def mongo_cc_binary(
         "//bazel/config:macos_aarch64": macos_rpath_flags,
     })
 
+    create_header_dep(
+        name = name + HEADER_DEP_SUFFIX,
+        header_deps = header_deps,
+    )
+
     native.cc_binary(
         name = name + WITH_DEBUG_SUFFIX,
         srcs = srcs + fincludes_hdr + MONGO_GLOBAL_ACCESSIBLE_HEADERS + SANITIZER_DENYLIST_HEADERS,
-        deps = all_deps,
+        deps = all_deps + [name + HEADER_DEP_SUFFIX],
         visibility = visibility,
         testonly = testonly,
         copts = MONGO_GLOBAL_COPTS + package_specific_copts + copts + fincludes_copt,

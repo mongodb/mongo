@@ -6574,7 +6574,7 @@ if get_option("bazel-includes-info"):
             ["cquery"]
             + env["BAZEL_FLAGS_STR"]
             + [
-                f'filter("[\\.h,\\.ipp,\\.hpp].*$", labels(hdrs, @{target}))',
+                f"labels(hdrs, @{target})",
                 "--output",
                 "files",
             ]
@@ -6592,7 +6592,38 @@ if get_option("bazel-includes-info"):
         target = target_results.stdout.split(" ")[0]
         header_map[target] = []
         for line in results.stdout.split("\n"):
-            header_map[target] += [line]
+            if not line.endswith("src/mongo/config.h"):
+                header_map[target] += [line]
+
+    bazel_query = (
+        ["aquery"]
+        + env["BAZEL_FLAGS_STR"]
+        + ['mnemonic("IdlcGenerator|TemplateRenderer|ConfigHeaderGen", //src/...)']
+    )
+
+    source_gen_targets = set()
+    results = env.RunBazelQuery(bazel_query, "getting all source gen targets")
+    for line in results.stdout.split("\n"):
+        if "  Target: //src" in line:
+            target = line.split("  Target: ")[-1]
+            source_gen_targets.add(target)
+
+    for target in source_gen_targets:
+        print(f"getting headers for {target}")
+        bazel_query = (
+            ["cquery"]
+            + env["BAZEL_FLAGS_STR"]
+            + [
+                f"@{target}",
+                "--output",
+                "files",
+            ]
+        )
+        results = env.RunBazelQuery(bazel_query, f"getting {target} headers")
+        header_map[target] = []
+        for line in results.stdout.split("\n"):
+            if line.endswith(".h") and not line.endswith("src/mongo/config.h"):
+                header_map[target] += [line]
 
     bazel_include_info = {
         "header_map": header_map,

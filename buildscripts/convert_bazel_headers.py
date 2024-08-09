@@ -123,7 +123,7 @@ def main(
                                 line, start=os.getcwd().replace("\\", "/")
                             ).replace("\\", "/")
                             if line not in bazel_headers:
-                                if line.startswith("src/"):
+                                if line.startswith("src/") or line.startswith("bazel-out/"):
                                     original_headers.add(line)
                                     line = "//" + line
                                     line = ":".join(line.rsplit("/", 1))
@@ -131,7 +131,7 @@ def main(
                                     headers.add(line)
                     else:
                         for line in p.stderr.split("\n"):
-                            if ". src/" in line:
+                            if ". src/" in line or ". bazel-out/" in line:
                                 while line.startswith("."):
                                     line = line[1:]
                                 line = line.replace("\\", "/")
@@ -167,10 +167,18 @@ def main(
     bazel_exec = bazel_include_info["bazel_exec"]
     bazel_config = bazel_include_info["config"]
 
+    global_headers = (
+        "src/mongo:config.h",
+        "src/mongo/config.h",
+        "src/mongo/platform/basic.h",
+        "src/mongo/platform/windows_basic.h",
+    )
+
     reverse_header_map = {}
+    reverse_header_gen_map = {}
     for k, v in header_map.items():
         for hdr in v:
-            if not hdr or hdr.endswith(("/config.h", "/basic.h", "windows_basic.h")):
+            if not hdr or hdr.endswith(global_headers):
                 continue
             bazel_header = "//" + hdr.replace("\\", "/")
             bazel_header = ":".join(bazel_header.rsplit("/", 1))
@@ -178,6 +186,8 @@ def main(
                 reverse_header_map[bazel_header] = "//src/third_party/SafeInt:headers"
             elif bazel_header.startswith("//src/third_party/immer"):
                 reverse_header_map[bazel_header] = "//src/third_party/immer:headers"
+            elif bazel_header.startswith("//bazel-out/"):
+                reverse_header_gen_map[bazel_header] = k
             elif bazel_header in reverse_header_map:
                 if bazel_header.startswith("//src/third_party/"):
                     continue
@@ -192,8 +202,11 @@ def main(
     for header in headers:
         if header in reverse_header_map:
             recommended_deps.add(reverse_header_map[header])
+        elif header in reverse_header_gen_map:
+            minimal_headers.append(reverse_header_gen_map[header])
         else:
-            minimal_headers.append(header)
+            if not header.endswith(global_headers):
+                minimal_headers.append(header)
 
     working_deps = recommended_deps.copy()
     for dep in recommended_deps:
@@ -223,6 +236,14 @@ def main(
     with open(target_library + ".bazel_deps") as f:
         original_deps = f.readlines()
 
+    link_deps = []
+    header_deps = []
+    for dep in sorted(list(working_deps) + list(set(original_deps))):
+        if dep in original_deps:
+            link_deps.append(dep)
+        else:
+            header_deps.append(dep)
+
     print(f"header list for {target_library}")
     print("  header utilization per directory:")
     for uniq_dir in sorted(uniq_dirs):
@@ -239,14 +260,12 @@ def main(
             print(
                 f"found no headers in dir {uniq_dir}, but had headers listed: {uniq_dirs[uniq_dir]}"
             )
-    print("  recommend deps list:")
-    for dep in sorted(list(working_deps) + list(set(original_deps))):
-        dep_comment = ""
-        if dep in original_deps:
-            dep_comment = "# from SCons"
-        else:
-            dep_comment = "# from generator"
-        print(f'    "{dep.strip()}", {dep_comment}')
+    print(" recommend deps list:")
+    for dep in sorted(link_deps):
+        print(f'    "{dep.strip()}",')
+    print(" recommend header_deps list:")
+    for dep in sorted(header_deps):
+        print(f'    "{dep.strip()}",')
     print("  header list:")
     for header in sorted(minimal_headers):
         print(f'    "{header}",')

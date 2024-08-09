@@ -43,6 +43,7 @@ def generate_config_header_impl(ctx):
     ctx.actions.run(
         executable = python.interpreter.path,
         outputs = [ctx.outputs.output, ctx.outputs.logfile],
+        mnemonic = "ConfigHeaderGen",
         inputs = depset(transitive = [
             cc_toolchain.all_files,
             python.files,
