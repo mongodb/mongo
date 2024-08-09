@@ -69,3 +69,16 @@ mongo_cc_library(
         "environment_buffer.h",
     ],
 )
+
+mongo_cc_library(
+    name = "system_error",
+    srcs = [
+        "system_error.cpp",
+    ],
+    hdrs = [
+        "system_error.h",
+    ],
+    deps = [
+        "//src/mongo:base",
+    ],
+)

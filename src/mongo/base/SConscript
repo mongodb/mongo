@@ -6,18 +6,6 @@ env = env.Clone()
 
 env.Library(
     target=[
-        "system_error",
-    ],
-    source=[
-        "system_error.cpp",
-    ],
-    LIBDEPS=[
-        "$BUILD_DIR/mongo/base",
-    ],
-)
-
-env.Library(
-    target=[
         "secure_allocator",
     ],
     source=[
