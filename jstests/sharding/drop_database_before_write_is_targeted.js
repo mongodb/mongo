@@ -5,7 +5,11 @@
  * @tags: [
  *   # TODO (SERVER-84043): Requires the mongos to define the fail point. Enable multiversion
  *   # once 8.0 becomes last LTS.
- *   multiversion_incompatible
+ *   multiversion_incompatible,
+ *   # The createDatabase command inside of the write might fail with FailedToSatisfyReadPreference
+ *   # if it does not find a primary. This is not a retriable error, and is correct, but
+ *   # incompatible with this test.
+ *   does_not_support_stepdowns,
  * ]
  */
 
