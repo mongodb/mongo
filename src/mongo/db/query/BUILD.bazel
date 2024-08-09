@@ -13,3 +13,11 @@ idl_generator(
     name = "explain_verbosity_gen",
     src = "explain_verbosity.idl",
 )
+
+idl_generator(
+    name = "cursor_response_gen",
+    src = "cursor_response.idl",
+    deps = [
+        "//src/mongo/db:basic_types_gen",
+    ],
+)

@@ -3,16 +3,6 @@
 Import("env")
 
 env.Library(
-    target="query_sbe_plan_stats",
-    source=[
-        "stages/plan_stats.cpp",
-    ],
-    LIBDEPS=[
-        "$BUILD_DIR/mongo/base",
-    ],
-)
-
-env.Library(
     target="query_sbe_makeobj_spec",
     source=[
         "makeobj_spec.cpp",

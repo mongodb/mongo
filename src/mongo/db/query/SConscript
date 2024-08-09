@@ -232,7 +232,7 @@ env.Library(
     target="cursor_response_idl",
     source=[
         "cursor_idl_validator.cpp",
-        "cursor_response.idl",
+        "cursor_response_gen.cpp",
     ],
     LIBDEPS_PRIVATE=[
         "$BUILD_DIR/mongo/db/server_base",
