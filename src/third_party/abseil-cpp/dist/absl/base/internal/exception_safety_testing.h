@@ -177,7 +177,7 @@ class ConstructorTracker {
                                   int countdown,
                                   const std::string& error_description) {
     return absl::Substitute(
-        "With coundtown at $0:\n"
+        "With countdown at $0:\n"
         "  $1\n"
         "  Object originally constructed by $2\n"
         "  Object address: $3\n",
