@@ -36,3 +36,30 @@ mongo_cc_library(
         "//src/mongo:base",
     ],
 )
+
+mongo_cc_library(
+    name = "bson_extract",
+    srcs = [
+        "bson_extract.cpp",
+    ],
+    hdrs = [
+        "bson_extract.h",
+    ],
+    deps = [
+        "//src/mongo:base",
+    ],
+)
+
+mongo_cc_library(
+    name = "bson_column_fuzzer_impl",
+    srcs = [
+        "bsoncolumn_fuzzer_impl.cpp",
+    ],
+    hdrs = [
+        "bsoncolumn_fuzzer_impl.h",
+    ],
+    deps = [
+        ":bson_column",
+        "//src/mongo:base",
+    ],
+)

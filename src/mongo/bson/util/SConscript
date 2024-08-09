@@ -4,16 +4,6 @@ Import("env")
 
 env = env.Clone()
 
-env.Library(
-    target="bson_extract",
-    source=[
-        "bson_extract.cpp",
-    ],
-    LIBDEPS=[
-        "$BUILD_DIR/mongo/base",
-    ],
-)
-
 env.Program(
     target="bson_column_encoder",
     source=[
@@ -30,17 +20,6 @@ env.Benchmark(
     target="simple8b_bm",
     source=[
         "simple8b_bm.cpp",
-    ],
-    LIBDEPS=[
-        "$BUILD_DIR/mongo/base",
-        "bson_column",
-    ],
-)
-
-env.Library(
-    target="bson_column_fuzzer_impl",
-    source=[
-        "bsoncolumn_fuzzer_impl.cpp",
     ],
     LIBDEPS=[
         "$BUILD_DIR/mongo/base",
