@@ -12,7 +12,7 @@ env.Library(
     source=[
         "cidr.cpp",
         "hostandport.cpp",
-        "hostandport.idl",
+        "hostandport_gen.cpp",
         "hostname_canonicalization.cpp",
         "sockaddr.cpp",
         "socket_exception.cpp",

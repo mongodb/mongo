@@ -17,3 +17,11 @@ idl_generator(
         "//src/mongo/db/auth:auth_types_gen",
     ],
 )
+
+idl_generator(
+    name = "client_metadata_gen",
+    src = "client_metadata.idl",
+    deps = [
+        "//src/mongo/db:basic_types_gen",
+    ],
+)

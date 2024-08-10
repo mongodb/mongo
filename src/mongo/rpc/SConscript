@@ -113,7 +113,7 @@ env.Library(
         "metadata/egress_metadata_hook_list.cpp",
         "metadata/repl_set_metadata.cpp",
         "metadata/oplog_query_metadata.cpp",
-        "topology_version.idl",
+        "topology_version_gen.cpp",
     ],
     LIBDEPS=[
         "$BUILD_DIR/mongo/bson/util/bson_extract",
@@ -157,7 +157,7 @@ env.Library(
     target="client_metadata",
     source=[
         "metadata/client_metadata.cpp",
-        "metadata/client_metadata.idl",
+        "metadata/client_metadata_gen.cpp",
     ],
     LIBDEPS=[
         "$BUILD_DIR/mongo/base",

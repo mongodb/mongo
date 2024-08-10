@@ -24,3 +24,273 @@ idl_generator(
         "//src/mongo/db:basic_types_gen",
     ],
 )
+
+idl_generator(
+    name = "legacy_runtime_constants_gen",
+    src = "legacy_runtime_constants.idl",
+    deps = [
+        "//src/mongo/db:basic_types_gen",
+    ],
+)
+
+idl_generator(
+    name = "document_source_change_stream_gen",
+    src = "document_source_change_stream.idl",
+    deps = [
+        ":resume_token_gen",
+        "//src/mongo/db:basic_types_gen",
+    ],
+)
+
+idl_generator(
+    name = "resume_token_gen",
+    src = "resume_token.idl",
+    deps = [
+        "//src/mongo/db:basic_types_gen",
+    ],
+)
+
+idl_generator(
+    name = "value_gen",
+    src = "value.idl",
+)
+
+idl_generator(
+    name = "change_stream_preimage_gen",
+    src = "change_stream_preimage.idl",
+    deps = [
+        "//src/mongo/db:basic_types_gen",
+    ],
+)
+
+idl_generator(
+    name = "aggregate_command_gen",
+    src = "aggregate_command.idl",
+    deps = [
+        ":exchange_spec_gen",
+        ":external_data_source_option_gen",
+        ":legacy_runtime_constants_gen",
+        "//src/mongo/crypto:fle_field_schema_gen",
+        "//src/mongo/db:basic_types_gen",
+        "//src/mongo/db:write_concern_options_gen",
+        "//src/mongo/db/auth:access_checks_gen",
+        "//src/mongo/db/auth:action_type_gen",
+        "//src/mongo/db/query:cursor_response_gen",
+        "//src/mongo/db/query:hint_gen",
+        "//src/mongo/db/query/query_settings:query_settings_gen",
+        "//src/mongo/idl:generic_argument_gen",
+    ],
+)
+
+idl_generator(
+    name = "external_data_source_option_gen",
+    src = "external_data_source_option.idl",
+    deps = [
+        "//src/mongo/db:basic_types_gen",
+    ],
+)
+
+idl_generator(
+    name = "name_expression_gen",
+    src = "name_expression.idl",
+    deps = [
+        "//src/mongo/db:basic_types_gen",
+    ],
+)
+
+idl_generator(
+    name = "accumulator_percentile_gen",
+    src = "accumulator_percentile.idl",
+    deps = [
+        "//src/mongo/db:basic_types_gen",
+    ],
+)
+
+idl_generator(
+    name = "map_reduce_options_gen",
+    src = "map_reduce_options.idl",
+)
+
+idl_generator(
+    name = "document_source_coll_stats_gen",
+    src = "document_source_coll_stats.idl",
+    deps = [
+        ":storage_stats_spec_gen",
+        "//src/mongo/db:basic_types_gen",
+    ],
+)
+
+idl_generator(
+    name = "document_source_current_op_gen",
+    src = "document_source_current_op.idl",
+    deps = [
+        "//src/mongo/db:basic_types_gen",
+    ],
+)
+
+idl_generator(
+    name = "document_source_densify_gen",
+    src = "document_source_densify.idl",
+    deps = [
+        ":value_gen",
+        "//src/mongo/db:basic_types_gen",
+    ],
+)
+
+idl_generator(
+    name = "document_source_fill_gen",
+    src = "document_source_fill.idl",
+    deps = [
+        ":value_gen",
+        "//src/mongo/db:basic_types_gen",
+    ],
+)
+
+idl_generator(
+    name = "document_source_internal_all_collection_stats_gen",
+    src = "document_source_internal_all_collection_stats.idl",
+    deps = [
+        ":document_source_coll_stats_gen",
+        ":storage_stats_spec_gen",
+        "//src/mongo/db:basic_types_gen",
+    ],
+)
+
+idl_generator(
+    name = "document_source_internal_apply_oplog_update_gen",
+    src = "document_source_internal_apply_oplog_update.idl",
+    deps = [
+        "//src/mongo/db:basic_types_gen",
+    ],
+)
+
+idl_generator(
+    name = "document_source_internal_projection_gen",
+    src = "document_source_internal_projection.idl",
+    deps = [
+        "//src/mongo/db:basic_types_gen",
+    ],
+)
+
+idl_generator(
+    name = "document_source_list_sampled_queries_gen",
+    src = "document_source_list_sampled_queries.idl",
+    deps = [
+        "//src/mongo/db:basic_types_gen",
+        "//src/mongo/s:analyze_shard_key_documents_gen",
+    ],
+)
+
+idl_generator(
+    name = "document_source_list_sessions_gen",
+    src = "document_source_list_sessions.idl",
+    deps = [
+        "//src/mongo/db:basic_types_gen",
+    ],
+)
+
+idl_generator(
+    name = "document_source_merge_gen",
+    src = "document_source_merge.idl",
+    deps = [
+        ":document_source_merge_modes_gen",
+        "//src/mongo/db:basic_types_gen",
+        "//src/mongo/db:namespace_spec_gen",
+        "//src/mongo/s:chunk_version_gen",
+    ],
+)
+
+idl_generator(
+    name = "document_source_merge_modes_gen",
+    src = "document_source_merge_modes.idl",
+    deps = [
+        "//src/mongo/db:basic_types_gen",
+    ],
+)
+
+idl_generator(
+    name = "document_source_out_gen",
+    src = "document_source_out.idl",
+    deps = [
+        "//src/mongo/db:basic_types_gen",
+        "//src/mongo/db/timeseries:timeseries_gen",
+    ],
+)
+
+idl_generator(
+    name = "document_source_query_settings_gen",
+    src = "document_source_query_settings.idl",
+    deps = [
+        "//src/mongo/db:basic_types_gen",
+    ],
+)
+
+idl_generator(
+    name = "document_source_query_stats_gen",
+    src = "document_source_query_stats.idl",
+    deps = [
+        "//src/mongo/db:basic_types_gen",
+        "//src/mongo/db/query/query_stats:transform_algorithm_gen",
+    ],
+)
+
+idl_generator(
+    name = "document_source_rank_fusion_gen",
+    src = "document_source_rank_fusion.idl",
+    deps = [
+        ":document_source_rank_fusion_inputs_gen",
+        "//src/mongo/db:basic_types_gen",
+    ],
+)
+
+idl_generator(
+    name = "document_source_rank_fusion_inputs_gen",
+    src = "document_source_rank_fusion_inputs.idl",
+    deps = [
+        ":aggregate_command_gen",
+        "//src/mongo/db:basic_types_gen",
+    ],
+)
+
+idl_generator(
+    name = "document_source_replace_root_gen",
+    src = "document_source_replace_root.idl",
+    deps = [
+        ":value_gen",
+        "//src/mongo/db:basic_types_gen",
+    ],
+)
+
+idl_generator(
+    name = "document_source_set_variable_from_subpipeline_gen",
+    src = "document_source_set_variable_from_subpipeline.idl",
+    deps = [
+        ":aggregate_command_gen",
+        "//src/mongo/db:basic_types_gen",
+    ],
+)
+
+idl_generator(
+    name = "document_source_set_window_fields_gen",
+    src = "document_source_set_window_fields.idl",
+    deps = [
+        "//src/mongo/db:basic_types_gen",
+    ],
+)
+
+idl_generator(
+    name = "document_source_union_with_gen",
+    src = "document_source_union_with.idl",
+    deps = [
+        ":aggregate_command_gen",
+        "//src/mongo/db:basic_types_gen",
+    ],
+)
+
+idl_generator(
+    name = "exchange_spec_gen",
+    src = "exchange_spec.idl",
+    deps = [
+        "//src/mongo/db:basic_types_gen",
+    ],
+)

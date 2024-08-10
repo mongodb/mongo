@@ -8,11 +8,3 @@ exports_files(
         "*.cpp",
     ]),
 )
-
-idl_generator(
-    name = "query_shape_hash_gen",
-    src = "query_shape_hash.idl",
-    deps = [
-        "//src/mongo/crypto:sha256_block_gen",
-    ],
-)

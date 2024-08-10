@@ -42,3 +42,29 @@ idl_generator(
         "//src/mongo/db:basic_types_gen",
     ],
 )
+
+idl_generator(
+    name = "parsed_privilege_gen",
+    src = "parsed_privilege.idl",
+    deps = [
+        ":auth_types_gen",
+        "//src/mongo/db:basic_types_gen",
+    ],
+)
+
+idl_generator(
+    name = "address_restriction_gen",
+    src = "address_restriction.idl",
+    deps = [
+        "//src/mongo/db:basic_types_gen",
+    ],
+)
+
+idl_generator(
+    name = "user_management_commands_parser_gen",
+    src = "user_management_commands_parser.idl",
+    deps = [
+        ":auth_types_gen",
+        "//src/mongo/db:basic_types_gen",
+    ],
+)

@@ -153,7 +153,7 @@ env.Library(
 env.Library(
     target="index_hint",
     source=[
-        "index_hint.idl",
+        "index_hint_gen.cpp",
         "index_hint.cpp",
     ],
     LIBDEPS_PRIVATE=[
@@ -270,12 +270,12 @@ env.Library(
 env.Library(
     target="query_request",
     source=[
-        "distinct_command.idl",
-        "find_command.idl",
+        "distinct_command_gen.cpp",
+        "find_command_gen.cpp",
         "getmore_command.idl",
         "query_request_helper.cpp",
         "tailable_mode.cpp",
-        "tailable_mode.idl",
+        "tailable_mode_gen.cpp",
     ],
     LIBDEPS=[
         "$BUILD_DIR/mongo/crypto/fle_fields",
@@ -303,8 +303,8 @@ env.Library(
         "cost_model/cost_model_on_update.cpp",
         "explain_version_validator.cpp",
         "framework_control.cpp",
-        "query_feature_flags.idl",
-        "query_knobs.idl",
+        "query_feature_flags_gen.cpp",
+        "query_knobs_gen.cpp",
         "query_stats/query_stats_on_parameter_change.cpp",
         "plan_cache/sbe_plan_cache_on_parameter_change.cpp",
     ],
@@ -360,7 +360,7 @@ env.Library(
     target="hint_parser",
     source=[
         "hint_parser.cpp",
-        "hint.idl",
+        "hint_gen.cpp",
     ],
     LIBDEPS=[
         "$BUILD_DIR/mongo/base",

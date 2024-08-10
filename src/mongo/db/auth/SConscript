@@ -297,7 +297,7 @@ env.Library(
         "action_type.cpp",
         "action_type_gen.cpp",
         "authorization_contract.cpp",
-        "parsed_privilege.idl",
+        "parsed_privilege_gen.cpp",
         "privilege.cpp",
         "resource_pattern.cpp",
     ],
@@ -478,7 +478,7 @@ env.Library(
     target="address_restriction",
     source=[
         "address_restriction.cpp",
-        "address_restriction.idl",
+        "address_restriction_gen.cpp",
     ],
     LIBDEPS_PRIVATE=[
         "$BUILD_DIR/mongo/base",

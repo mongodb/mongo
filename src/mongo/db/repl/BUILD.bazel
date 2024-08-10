@@ -10,6 +10,144 @@ exports_files(
 )
 
 idl_generator(
+    name = "dbcheck_gen",
+    src = "dbcheck.idl",
+    deps = [
+        ":replication_types_gen",
+        "//src/mongo/bson:bson_validate_gen",
+        "//src/mongo/db:basic_types_gen",
+        "//src/mongo/db:record_id_gen",
+        "//src/mongo/db:write_concern_options_gen",
+    ],
+)
+
+idl_generator(
+    name = "rollback_gen",
+    src = "rollback.idl",
+    deps = [
+        ":replication_types_gen",
+        "//src/mongo/db:basic_types_gen",
+    ],
+)
+
+idl_generator(
+    name = "replication_consistency_markers_gen",
+    src = "replication_consistency_markers.idl",
+    deps = [
+        ":replication_types_gen",
+        "//src/mongo/db:basic_types_gen",
+    ],
+)
+
+idl_generator(
+    name = "rollback_impl_gen",
+    src = "rollback_impl.idl",
+)
+
+idl_generator(
+    name = "oplog_entry_gen",
+    src = "oplog_entry.idl",
+    deps = [
+        "//src/mongo/db:basic_types_gen",
+        "//src/mongo/db:multitenancy_gen",
+        "//src/mongo/db:record_id_gen",
+        "//src/mongo/db/pipeline:value_gen",
+        "//src/mongo/db/repl:optime_base_gen",
+        "//src/mongo/db/repl:replication_types_gen",
+        "//src/mongo/db/session:logical_session_id_gen",
+        "//src/mongo/s:sharding_types_gen",
+    ],
+)
+
+idl_generator(
+    name = "topology_coordinator_gen",
+    src = "topology_coordinator.idl",
+)
+
+idl_generator(
+    name = "replication_coordinator_impl_gen",
+    src = "replication_coordinator_impl.idl",
+)
+
+idl_generator(
+    name = "repl_set_test_egress_gen",
+    src = "repl_set_test_egress.idl",
+    deps = [
+        "//src/mongo/db:basic_types_gen",
+        "//src/mongo/idl:generic_argument_gen",
+    ],
+)
+
+idl_generator(
+    name = "optime_base_gen",
+    src = "optime_base.idl",
+    deps = [
+        "//src/mongo/db:basic_types_gen",
+    ],
+)
+
+idl_generator(
+    name = "database_cloner_gen",
+    src = "database_cloner.idl",
+    deps = [
+        "//src/mongo/db:basic_types_gen",
+    ],
+)
+
+idl_generator(
+    name = "hello_gen",
+    src = "hello.idl",
+    deps = [
+        "//src/mongo/db:basic_types_gen",
+        "//src/mongo/db:write_concern_options_gen",
+        "//src/mongo/db/auth:auth_types_gen",
+        "//src/mongo/db/repl:replication_types_gen",
+        "//src/mongo/idl:generic_argument_gen",
+        "//src/mongo/rpc:topology_version_gen",
+        "//src/mongo/rpc/metadata:client_metadata_gen",
+    ],
+)
+
+idl_generator(
+    name = "tenant_migration_state_machine_gen",
+    src = "tenant_migration_state_machine.idl",
+    deps = [
+        "//src/mongo/client:read_preference_setting_gen",
+        "//src/mongo/db:basic_types_gen",
+        "//src/mongo/db/repl:replication_types_gen",
+        "//src/mongo/db/serverless:serverless_types_gen",
+    ],
+)
+
+idl_generator(
+    name = "replication_metrics_gen",
+    src = "replication_metrics.idl",
+    deps = [
+        ":replication_types_gen",
+        "//src/mongo/db:basic_types_gen",
+    ],
+)
+
+idl_generator(
+    name = "election_reason_counter_gen",
+    src = "election_reason_counter.idl",
+    deps = [
+        ":replication_types_gen",
+        "//src/mongo/db:basic_types_gen",
+    ],
+)
+
+idl_generator(
+    name = "image_collection_entry_gen",
+    src = "image_collection_entry.idl",
+    deps = [
+        "//src/mongo/db:basic_types_gen",
+        "//src/mongo/db/repl:oplog_entry_gen",
+        "//src/mongo/db/session:logical_session_id_gen",
+    ],
+)
+
+idl_generator(
     name = "read_concern_gen",
     src = "read_concern.idl",
     deps = [
@@ -32,5 +170,47 @@ idl_generator(
     src = "replication_types.idl",
     deps = [
         "//src/mongo/db:basic_types_gen",
+    ],
+)
+
+idl_generator(
+    name = "member_config_gen",
+    src = "member_config.idl",
+    deps = [
+        "//src/mongo/db:basic_types_gen",
+    ],
+)
+
+idl_generator(
+    name = "repl_server_parameters_gen",
+    src = "repl_server_parameters.idl",
+    deps = [
+        "//src/mongo/db:basic_types_gen",
+    ],
+)
+
+idl_generator(
+    name = "repl_set_config_params_gen",
+    src = "repl_set_config_params.idl",
+)
+
+idl_generator(
+    name = "apply_ops_gen",
+    src = "apply_ops.idl",
+    deps = [
+        "//src/mongo/db:basic_types_gen",
+    ],
+)
+
+idl_generator(
+    name = "repl_set_config_gen",
+    src = "repl_set_config.idl",
+    deps = [
+        ":member_config_gen",
+        ":replication_types_gen",
+        "//src/mongo/db:basic_types_gen",
+        "//src/mongo/db:write_concern_gen",
+        "//src/mongo/db:write_concern_options_gen",
+        "//src/mongo/util/net:hostandport_gen",
     ],
 )

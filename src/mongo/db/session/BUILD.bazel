@@ -17,3 +17,8 @@ idl_generator(
         "//src/mongo/db:basic_types_gen",
     ],
 )
+
+idl_generator(
+    name = "logical_session_cache_gen",
+    src = "logical_session_cache.idl",
+)

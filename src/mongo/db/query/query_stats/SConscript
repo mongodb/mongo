@@ -23,7 +23,7 @@ env.Library(
 env.Library(
     target="query_stats_parse",
     source=[
-        "transform_algorithm.idl",
+        "transform_algorithm_gen.cpp",
     ],
     LIBDEPS=[
         "$BUILD_DIR/mongo/db/server_base",

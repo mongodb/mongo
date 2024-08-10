@@ -15,9 +15,69 @@ idl_generator(
 )
 
 idl_generator(
+    name = "hint_gen",
+    src = "hint.idl",
+)
+
+idl_generator(
     name = "cursor_response_gen",
     src = "cursor_response.idl",
     deps = [
         "//src/mongo/db:basic_types_gen",
+    ],
+)
+
+idl_generator(
+    name = "find_command_gen",
+    src = "find_command.idl",
+    deps = [
+        ":cursor_response_gen",
+        ":hint_gen",
+        "//src/mongo/crypto:fle_field_schema_gen",
+        "//src/mongo/db:basic_types_gen",
+        "//src/mongo/db/auth:access_checks_gen",
+        "//src/mongo/db/auth:action_type_gen",
+        "//src/mongo/db/pipeline:legacy_runtime_constants_gen",
+        "//src/mongo/db/query/query_settings:query_settings_gen",
+        "//src/mongo/db/session:logical_session_id_gen",
+        "//src/mongo/idl:generic_argument_gen",
+    ],
+)
+
+idl_generator(
+    name = "index_hint_gen",
+    src = "index_hint.idl",
+    deps = [
+        "//src/mongo/db:basic_types_gen",
+    ],
+)
+
+idl_generator(
+    name = "query_knobs_gen",
+    src = "query_knobs.idl",
+    deps = [
+        "//src/mongo/db:basic_types_gen",
+        "//src/mongo/idl:cluster_server_parameter_gen",
+    ],
+)
+
+idl_generator(
+    name = "tailable_mode_gen",
+    src = "tailable_mode.idl",
+)
+
+idl_generator(
+    name = "query_feature_flags_gen",
+    src = "query_feature_flags.idl",
+)
+
+idl_generator(
+    name = "distinct_command_gen",
+    src = "distinct_command.idl",
+    deps = [
+        ":hint_gen",
+        "//src/mongo/db:basic_types_gen",
+        "//src/mongo/db/query/query_settings:query_settings_gen",
+        "//src/mongo/idl:generic_argument_gen",
     ],
 )

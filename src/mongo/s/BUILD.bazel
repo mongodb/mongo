@@ -33,3 +33,141 @@ idl_generator(
         "//src/mongo/db:basic_types_gen",
     ],
 )
+
+idl_generator(
+    name = "database_version_base_gen",
+    src = "database_version_base.idl",
+    deps = [
+        "//src/mongo/db:basic_types_gen",
+    ],
+)
+
+idl_generator(
+    name = "analyze_shard_key_documents_gen",
+    src = "analyze_shard_key_documents.idl",
+    deps = [
+        ":analyze_shard_key_common_gen",
+        "//src/mongo/db:basic_types_gen",
+        "//src/mongo/db/pipeline:legacy_runtime_constants_gen",
+    ],
+)
+
+idl_generator(
+    name = "analyze_shard_key_common_gen",
+    src = "analyze_shard_key_common.idl",
+    deps = [
+        "//src/mongo/db:basic_types_gen",
+    ],
+)
+
+idl_generator(
+    name = "router_transactions_stats_gen",
+    src = "router_transactions_stats.idl",
+    deps = [
+        "//src/mongo/db:basic_types_gen",
+    ],
+)
+
+idl_generator(
+    name = "sharding_task_executor_pool_gen",
+    src = "sharding_task_executor_pool.idl",
+)
+
+idl_generator(
+    name = "analyze_shard_key_server_parameters_gen",
+    src = "analyze_shard_key_server_parameters.idl",
+    deps = [
+        "//src/mongo/db:basic_types_gen",
+    ],
+)
+
+idl_generator(
+    name = "analyze_shard_key_cmd_gen",
+    src = "analyze_shard_key_cmd.idl",
+    deps = [
+        ":analyze_shard_key_common_gen",
+        "//src/mongo/client:read_preference_setting_gen",
+        "//src/mongo/db:basic_types_gen",
+        "//src/mongo/db:keypattern_gen",
+        "//src/mongo/idl:generic_argument_gen",
+    ],
+)
+
+idl_generator(
+    name = "check_metadata_consistency_gen",
+    src = "check_metadata_consistency.idl",
+    deps = [
+        "//src/mongo/db:basic_types_gen",
+        "//src/mongo/db:metadata_consistency_types_gen",
+        "//src/mongo/db/query:cursor_response_gen",
+        "//src/mongo/idl:generic_argument_gen",
+    ],
+)
+
+idl_generator(
+    name = "configure_query_analyzer_cmd_gen",
+    src = "configure_query_analyzer_cmd.idl",
+    deps = [
+        ":analyze_shard_key_common_gen",
+        "//src/mongo/db:basic_types_gen",
+        "//src/mongo/idl:generic_argument_gen",
+    ],
+)
+
+idl_generator(
+    name = "error_status_gen",
+    src = "error_status.idl",
+)
+
+idl_generator(
+    name = "mongod_and_mongos_server_parameters_gen",
+    src = "mongod_and_mongos_server_parameters.idl",
+    deps = [
+        "//src/mongo/db:basic_types_gen",
+    ],
+)
+
+idl_generator(
+    name = "refresh_query_analyzer_configuration_cmd_gen",
+    src = "refresh_query_analyzer_configuration_cmd.idl",
+    deps = [
+        ":analyze_shard_key_common_gen",
+        "//src/mongo/db:basic_types_gen",
+        "//src/mongo/idl:generic_argument_gen",
+    ],
+)
+
+idl_generator(
+    name = "sharding_cluster_parameters_gen",
+    src = "sharding_cluster_parameters.idl",
+    deps = [
+        "//src/mongo/idl:cluster_server_parameter_gen",
+    ],
+)
+
+idl_generator(
+    name = "sharding_feature_flags_gen",
+    src = "sharding_feature_flags.idl",
+)
+
+idl_generator(
+    name = "type_collection_common_types_gen",
+    src = "type_collection_common_types.idl",
+    deps = [
+        "//src/mongo/db:basic_types_gen",
+        "//src/mongo/db/timeseries:timeseries_gen",
+    ],
+)
+
+idl_generator(
+    name = "mongos_server_parameters_gen",
+    src = "mongos_server_parameters.idl",
+    deps = [
+        "//src/mongo/db:basic_types_gen",
+    ],
+)
+
+idl_generator(
+    name = "mongos_options_gen",
+    src = "mongos_options.idl",
+)

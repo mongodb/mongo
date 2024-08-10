@@ -27,7 +27,7 @@ env.Library(
 env.Library(
     target="query_shape_hash",
     source=[
-        "query_shape_hash.idl",
+        "query_shape_hash_gen.cpp",
     ],
     LIBDEPS=[
         "$BUILD_DIR/mongo/crypto/sha256_block",

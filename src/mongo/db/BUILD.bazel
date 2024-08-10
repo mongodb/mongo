@@ -113,6 +113,11 @@ idl_generator(
 )
 
 idl_generator(
+    name = "keypattern_gen",
+    src = "keypattern.idl",
+)
+
+idl_generator(
     name = "namespace_spec_gen",
     src = "namespace_spec.idl",
     deps = [
