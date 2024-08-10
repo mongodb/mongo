@@ -5,7 +5,7 @@ import {basicReplsetTest} from "jstests/replsets/libs/basic_replset_test.js";
 
 // Do not fail if this test leaves unterminated processes because this file expects replset1.js to
 // throw for invalid SSL options.
-TestData.failIfUnterminatedProcesses = false;
+TestData.ignoreUnterminatedProcesses = true;
 
 //=== Shared SSL testing library functions and constants ===
 

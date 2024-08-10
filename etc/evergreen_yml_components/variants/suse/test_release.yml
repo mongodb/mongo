@@ -34,8 +34,6 @@ buildvariants:
       packager_distro: suse15
       repo_edition: enterprise
       scons_cache_scope: shared
-      # TODO SERVER-64479 remove external_auth_jobs_max once resolved
-      external_auth_jobs_max: 1
       compile_variant: enterprise-suse15-64
       core_analyzer_distro_name: suse15sp5-large
       core_analyzer_gdb_index_cache: off

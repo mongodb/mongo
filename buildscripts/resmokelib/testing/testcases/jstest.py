@@ -70,7 +70,8 @@ class _SingleJSTestCase(interface.ProcessTestCase):
         test_data["maxPort"] = core.network.PortAllocator.max_test_port(self.fixture.job_num)
         test_data["peerPids"] = self.fixture.pids()
         test_data["alwaysUseLogFiles"] = config.ALWAYS_USE_LOG_FILES
-        test_data["failIfUnterminatedProcesses"] = True
+        test_data["ignoreUnterminatedProcesses"] = False
+        test_data["ignoreChildProcessErrorCode"] = False
 
         # The tests in 'timeseries' directory need to use a different logic for implicity sharding
         # the collection. Make sure that we consider both unix and windows directory structures.
