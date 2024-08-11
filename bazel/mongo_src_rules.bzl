@@ -82,6 +82,9 @@ WINDOWS_GENERAL_COPTS = select({
 
         # Don't send error reports in case of internal compiler error
         "/errorReport:none",
+
+        # Generate debug info into the object files
+        "/Z7",
     ],
     "//conditions:default": [],
 })
@@ -1350,6 +1353,10 @@ def mongo_cc_library(
             "//conditions:default": ["@platforms//:incompatible"],
         }) + target_compatible_with,
         dynamic_deps = deps,
+        features = select({
+            "@platforms//os:windows": ["generate_pdb_file"],
+            "//conditions:default": [],
+        }),
         additional_linker_inputs = additional_linker_inputs,
     )
 
@@ -1458,7 +1465,10 @@ def mongo_cc_binary(
         local_defines = MONGO_GLOBAL_DEFINES + local_defines,
         defines = defines,
         includes = includes,
-        features = MONGO_GLOBAL_FEATURES + ["pie"] + features,
+        features = MONGO_GLOBAL_FEATURES + ["pie"] + features + select({
+            "@platforms//os:windows": ["generate_pdb_file"],
+            "//conditions:default": [],
+        }),
         dynamic_deps = select({
             "//bazel/config:linkstatic_disabled": deps,
             "//conditions:default": [],
@@ -1563,13 +1573,12 @@ idl_generator = rule(
 )
 
 def symlink_impl(ctx):
-    output = ctx.actions.declare_file(ctx.bin_dir.path + "/" + ctx.attr.output.files.to_list()[0].path)
     ctx.actions.symlink(
-        output = output,
+        output = ctx.outputs.output,
         target_file = ctx.attr.input.files.to_list()[0],
     )
 
-    return [DefaultInfo(files = depset([output]))]
+    return [DefaultInfo(files = depset([ctx.outputs.output]))]
 
 symlink = rule(
     symlink_impl,
@@ -1578,9 +1587,8 @@ symlink = rule(
             doc = "The File that the output symlink will point to.",
             allow_single_file = True,
         ),
-        "output": attr.label(
+        "output": attr.output(
             doc = "The output of this rule.",
-            allow_single_file = True,
         ),
     },
 )
