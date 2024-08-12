@@ -4,7 +4,6 @@
  *   featureFlagSecondaryIndexChecksInDbCheck
  * ]
  */
-import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {
     checkHealthLog,
     checkSecondaryIndexChecksInDbCheckFeatureFlagEnabled,

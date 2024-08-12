@@ -11,7 +11,6 @@
  */
 
 import {_copyFileHelper, openBackupCursor} from "jstests/libs/backup_utils.js";
-import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {
     checkHealthLog,
     insertDocsWithMissingIndexKeys,

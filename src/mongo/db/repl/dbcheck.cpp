@@ -605,51 +605,54 @@ Status DbCheckHasher::hashForExtraIndexKeysCheck(OperationContext* opCtx,
                 // the primary will not have any, because they would go into a subsequent batch.
                 // This means that if the secondary has any more distinct keys, this is an
                 // inconsistency, so log it to the health log.
-                const BSONObj batchEndBsonFieldsRemoved = BSONObj::stripFieldNames(batchEndBson);
-                if (SimpleBSONObjComparator::kInstance.evaluate(batchEndBsonFieldsRemoved ==
-                                                                kMaxBSONKey)) {
-                    boost::optional<KeyStringEntry> maybeExtraKeyWithRecordId =
-                        _getNextDistinctKeyInIndex(
-                            opCtx, indexCursor, keyStringVersion, ordering, currKeyStringBson);
-                    if (!maybeExtraKeyWithRecordId) {
-                        break;
-                    }
 
-                    const auto extraKeyBson = key_string::rehydrateKey(
-                        indexDescriptor->keyPattern(),
-                        _keyStringToBsonSafeHelper(maybeExtraKeyWithRecordId.get().keyString,
-                                                   ordering));
-                    const auto msg =
-                        "dbcheck batch inconsistent: at least one index key was found on the "
-                        "secondary but not the primary.";
-                    const auto status = Status(ErrorCodes::DbCheckInconsistentHash, msg);
+                // TODO SERVER-93406: Uncomment this check.
+                // const BSONObj batchEndBsonFieldsRemoved = BSONObj::stripFieldNames(batchEndBson);
+                // if (SimpleBSONObjComparator::kInstance.evaluate(batchEndBsonFieldsRemoved ==
+                //                                                 kMaxBSONKey)) {
+                //     boost::optional<KeyStringEntry> maybeExtraKeyWithRecordId =
+                //         _getNextDistinctKeyInIndex(
+                //             opCtx, indexCursor, keyStringVersion, ordering, currKeyStringBson);
+                //     if (!maybeExtraKeyWithRecordId) {
+                //         break;
+                //     }
 
-                    LOGV2_DEBUG(
-                        8632302,
-                        3,
-                        "hasher found index key at the end of dbcheck on the secondary but not "
-                        "the primary",
-                        "batchStart"_attr = batchStartForLogging,
-                        "batchEnd"_attr = batchEndForLogging,
-                        "nConsecutiveIdenticalIndexKeysSeenAtEnd"_attr =
-                            _nConsecutiveIdenticalIndexKeysSeenAtEnd,
-                        "extraKeyString"_attr = extraKeyBson,
-                        "indexName"_attr = indexName);
-                    const auto logEntry = dbCheckErrorHealthLogEntry(
-                        _secondaryIndexCheckParameters,
-                        collection->ns(),
-                        collection->uuid(),
-                        msg,
-                        ScopeEnum::Document,
-                        OplogEntriesEnum::Batch,
-                        status,
-                        BSON("batchStart" << batchStartForLogging << "batchEnd"
-                                          << batchEndForLogging
-                                          << "nConsecutiveIdenticalIndexKeysSeenAtEnd"
-                                          << _nConsecutiveIdenticalIndexKeysSeenAtEnd << "extraKey"
-                                          << extraKeyBson));
-                    HealthLogInterface::get(opCtx)->log(*logEntry);
-                }
+                //     const auto extraKeyBson = key_string::rehydrateKey(
+                //         indexDescriptor->keyPattern(),
+                //         _keyStringToBsonSafeHelper(maybeExtraKeyWithRecordId.get().keyString,
+                //                                    ordering));
+                //     const auto msg =
+                //         "dbcheck batch inconsistent: at least one index key was found on the "
+                //         "secondary but not the primary.";
+                //     const auto status = Status(ErrorCodes::DbCheckInconsistentHash, msg);
+
+                //     LOGV2_DEBUG(
+                //         8632302,
+                //         3,
+                //         "hasher found index key at the end of dbcheck on the secondary but not "
+                //         "the primary",
+                //         "batchStart"_attr = batchStartForLogging,
+                //         "batchEnd"_attr = batchEndForLogging,
+                //         "nConsecutiveIdenticalIndexKeysSeenAtEnd"_attr =
+                //             _nConsecutiveIdenticalIndexKeysSeenAtEnd,
+                //         "extraKeyString"_attr = extraKeyBson,
+                //         "indexName"_attr = indexName);
+                //     const auto logEntry = dbCheckErrorHealthLogEntry(
+                //         _secondaryIndexCheckParameters,
+                //         collection->ns(),
+                //         collection->uuid(),
+                //         msg,
+                //         ScopeEnum::Document,
+                //         OplogEntriesEnum::Batch,
+                //         status,
+                //         BSON("batchStart" << batchStartForLogging << "batchEnd"
+                //                           << batchEndForLogging
+                //                           << "nConsecutiveIdenticalIndexKeysSeenAtEnd"
+                //                           << _nConsecutiveIdenticalIndexKeysSeenAtEnd <<
+                //                           "extraKey"
+                //                           << extraKeyBson));
+                //     HealthLogInterface::get(opCtx)->log(*logEntry);
+                // }
                 break;
             }
         }
