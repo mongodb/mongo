@@ -32,10 +32,14 @@ pipx install "gcovr==7.2" || exit 1
 gcovr \
   --output gcovr-coveralls.json \
   --coveralls \
+  --exclude build/debug/mongo/idl/ \
+  --exclude src/mongo/db/modules/enterprise/src/streams/third_party/ \
   --exclude src/third_party/ \
   --gcov-ignore-errors no_working_dir_found \
   --gcov-ignore-parse-errors negative_hits.warn \
-  --gcov-exclude-directories build/debug/third_party \
+  --gcov-exclude-directories build/debug/mongo/db/modules/enterprise/src/streams/third_party \
+  --gcov-exclude-directories build/debug/mongo/idl/ \
+  --gcov-exclude-directories build/debug/third_party/ \
   --gcov-executable ${GCOV_TOOL[@]} \
   build/debug
 
