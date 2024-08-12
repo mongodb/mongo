@@ -417,7 +417,6 @@ export const runDbCheckForDatabase = (replSet,
     if (secondaryIndexCheckEnabled) {
         collDbCheckParameters = {validateMode: "dataConsistencyAndMissingIndexKeysCheck"};
     }
-
     const allowedErrorCodes = [
         ErrorCodes.NamespaceNotFound /* collection got dropped. */,
         ErrorCodes.CommandNotSupportedOnView /* collection got dropped and a view

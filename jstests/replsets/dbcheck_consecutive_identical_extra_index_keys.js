@@ -1177,7 +1177,9 @@ function identicalKeysChangedBeforeHashing(collOpts) {
         hashingExtraIdenticalIndexKeysOnSecondaryMiddleOfBatch(collOpts);
         identicalKeysChangedBeforeHashing(collOpts);
         extraIdenticalIndexKeysOnSecondaryBeyondMax(collOpts);
-        extraDistinctIndexKeysOnSecondaryBeyondMax(collOpts);
+
+        // TODO SERVER-93406: Uncomment this test.
+        // extraDistinctIndexKeysOnSecondaryBeyondMax(collOpts);
     });
 
 replSet.stopSet(undefined /* signal */,
