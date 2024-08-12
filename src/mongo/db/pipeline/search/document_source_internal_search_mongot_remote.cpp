@@ -185,11 +185,6 @@ bool DocumentSourceInternalSearchMongotRemote::shouldReturnEOF() {
         return true;
     }
 
-    // TODO SERVER-91828 Explain execution stats not supported for sharded queries yet.
-    if (pExpCtx->needsMerge && pExpCtx->explain) {
-        return true;
-    }
-
     if (pExpCtx->explain &&
         !feature_flags::gFeatureFlagSearchExplainExecutionStats.isEnabled(
             serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {

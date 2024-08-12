@@ -1,6 +1,9 @@
 /**
- * Sharding test of `$search` aggregation stage within $unionWith and $lookup stages.
+ * Sharding test of `$search` aggregation stage within $unionWith and $lookup stages. Also checks
+ * explain results.
  */
+import {getAggPlanStage, getAggPlanStages} from "jstests/libs/analyze_plan.js";
+import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {getUUIDFromListCollections} from "jstests/libs/uuid_util.js";
 import {
     getDefaultProtocolVersionForPlanShardedSearch,
@@ -10,6 +13,9 @@ import {
 import {
     ShardingTestWithMongotMock
 } from "jstests/with_mongot/mongotmock/lib/shardingtest_with_mongotmock.js";
+import {
+    getDefaultLastExplainContents,
+} from "jstests/with_mongot/mongotmock/lib/utils.js";
 
 const stWithMock = new ShardingTestWithMongotMock({
     name: "sharded_search",
@@ -99,72 +105,89 @@ const mongotQuery = {
     query: "cakes",
     path: "title"
 };
+const expectedExplainContents = getDefaultLastExplainContents();
 
 //------------------------
 // Define mocks' responses
 //------------------------
 
-function searchQueryExpectedByMock(searchColl, protocolVersion = null) {
+function searchQueryExpectedByMock(searchColl, protocolVersion = null, explainVerbosity = null) {
     return mongotCommandForQuery({
         query: mongotQuery,
         collName: searchColl.getName(),
         db: testDB.getName(),
         collectionUUID: getUUIDFromListCollections(testDB, searchColl.getName()),
-        protocolVersion: protocolVersion
+        protocolVersion,
+        explainVerbosity,
     });
 }
 
-const shard1HistorySharded = [
-    {
-        expectedCommand: searchQueryExpectedByMock(shardedSearchColl, protocolVersion),
-        response: mongotMultiCursorResponseForBatch(
-            [{_id: 0, $searchScore: 0.99}, {_id: 1, $searchScore: 0.20}],
-            NumberLong(0),
-            // Unmerged search metadata.  There are a total of 2 docs from this mongot.
-            [{count: 1}, {count: 1}],  // mongot can return any number of metadata docs to merge.
-            NumberLong(0),
-            shardedSearchColl.getFullName(),
-            true)
-    },
-];
+function shard1HistorySharded(explainVerbosity = null) {
+    return [
+        {
+            expectedCommand:
+                searchQueryExpectedByMock(shardedSearchColl, protocolVersion, explainVerbosity),
+            response: mongotMultiCursorResponseForBatch(
+                [{_id: 0, $searchScore: 0.99}, {_id: 1, $searchScore: 0.20}],
+                NumberLong(0),
+                // Unmerged search metadata.  There are a total of 2 docs from this mongot.
+                [
+                    {count: 1},
+                    {count: 1}
+                ],  // mongot can return any number of metadata docs to merge.
+                NumberLong(0),
+                shardedSearchColl.getFullName(),
+                true,
+                explainVerbosity ? expectedExplainContents : null)
+        },
+    ];
+}
 
-const shard0HistorySharded = [
-    {
-        expectedCommand: searchQueryExpectedByMock(shardedSearchColl, protocolVersion),
-        response: mongotMultiCursorResponseForBatch(
-            [
-                {_id: 4, $searchScore: 0.33},
-                {_id: 5, $searchScore: 0.38},
-                {_id: 7, $searchScore: 0.45}
-            ],
-            NumberLong(0),
-            // Unmerged search metadata.  There are a total of 3 docs from this mongot.
-            [{count: 2}, {count: 1}, {count: 0}, {count: 0}],
-            NumberLong(0),
-            shardedSearchColl.getFullName(),
-            true)
-    },
-];
-
-const shard1HistoryUnsharded = [
-    {
-        expectedCommand: searchQueryExpectedByMock(unshardedSearchColl),
-        response: {
-            cursor: {
-                id: NumberLong(0),
-                ns: unshardedSearchColl.getFullName(),
-                nextBatch: [
-                    {_id: 0, $searchScore: 0.99},
-                    {_id: 1, $searchScore: 0.20},
+function shard0HistorySharded(explainVerbosity = null) {
+    return [
+        {
+            expectedCommand:
+                searchQueryExpectedByMock(shardedSearchColl, protocolVersion, explainVerbosity),
+            response: mongotMultiCursorResponseForBatch(
+                [
                     {_id: 4, $searchScore: 0.33},
                     {_id: 5, $searchScore: 0.38},
                     {_id: 7, $searchScore: 0.45}
-                ]
-            },
-            vars: {SEARCH_META: {count: 5}}
-        }
-    },
-];
+                ],
+                NumberLong(0),
+                // Unmerged search metadata.  There are a total of 3 docs from this mongot.
+                [{count: 2}, {count: 1}, {count: 0}, {count: 0}],
+                NumberLong(0),
+                shardedSearchColl.getFullName(),
+                true,
+                explainVerbosity ? expectedExplainContents : null)
+        },
+    ];
+}
+
+function shard1HistoryUnsharded(explainVerbosity = null) {
+    let response = {
+        cursor: {
+            id: NumberLong(0),
+            ns: unshardedSearchColl.getFullName(),
+            nextBatch: [
+                {_id: 0, $searchScore: 0.99},
+                {_id: 1, $searchScore: 0.20},
+                {_id: 4, $searchScore: 0.33},
+                {_id: 5, $searchScore: 0.38},
+                {_id: 7, $searchScore: 0.45}
+            ]
+        },
+        vars: {SEARCH_META: {count: 5}},
+    };
+    if (explainVerbosity != null) {
+        response.explain = expectedExplainContents;
+    }
+    return [{
+        expectedCommand: searchQueryExpectedByMock(unshardedSearchColl, null, explainVerbosity),
+        response
+    }];
+}
 
 //--------------
 // $lookup tests
@@ -214,15 +237,19 @@ const kPlanMaybe = "planSearchMaybe";
 const kSearch = "search";
 let cursorId = 1000;
 
-function setupMockRequest(searchColl, mongot, requestType) {
+function setupMockRequest(searchColl, mongot, requestType, explainVerbosity = null) {
     if (requestType == kPlan || requestType == kPlanMaybe) {
+        let expectedCommand = {
+            planShardedSearch: searchColl.getName(),
+            query: mongotQuery,
+            $db: dbName,
+            searchFeatures: {shardedSort: 1},
+        };
+        if (explainVerbosity != null) {
+            expectedCommand.explain = explainVerbosity;
+        }
         const mergingPipelineHistory = [{
-            expectedCommand: {
-                planShardedSearch: searchColl.getName(),
-                query: mongotQuery,
-                $db: dbName,
-                searchFeatures: {shardedSort: 1}
-            },
+            expectedCommand,
             response: {
                 ok: 1,
                 protocolVersion: protocolVersion,
@@ -237,10 +264,10 @@ function setupMockRequest(searchColl, mongot, requestType) {
         assert(mongot != sMongot, "only plan requests should go to mongoS");
         assert(!(searchColl == unshardedSearchColl && mongot == d0Mongot),
                "unsharded requests should not go to secondary");
-        const history =
-            (mongot == d1Mongot
-                 ? (searchColl == shardedSearchColl ? shard1HistorySharded : shard1HistoryUnsharded)
-                 : shard0HistorySharded);
+        const history = (mongot == d1Mongot ? (searchColl == shardedSearchColl
+                                                   ? shard1HistorySharded(explainVerbosity)
+                                                   : shard1HistoryUnsharded(explainVerbosity))
+                                            : shard0HistorySharded(explainVerbosity));
         if (searchColl === shardedSearchColl) {
             mongot.setMockResponses(history, cursorId, NumberLong(cursorId + 1001));
         } else {
@@ -250,15 +277,15 @@ function setupMockRequest(searchColl, mongot, requestType) {
     cursorId += 1;
 }
 
-function setupAllMockRequests(searchColl, mockResponses) {
+function setupAllMockRequests(searchColl, mockResponses, explainVerbosity = null) {
     for (const i of mockResponses["mongos"]) {
-        setupMockRequest(searchColl, sMongot, i);
+        setupMockRequest(searchColl, sMongot, i, explainVerbosity);
     }
     for (const i of mockResponses["primary"]) {
-        setupMockRequest(searchColl, d1Mongot, i);
+        setupMockRequest(searchColl, d1Mongot, i, explainVerbosity);
     }
     for (const i of mockResponses["secondary"]) {
-        setupMockRequest(searchColl, d0Mongot, i);
+        setupMockRequest(searchColl, d0Mongot, i, explainVerbosity);
     }
 }
 
@@ -336,5 +363,72 @@ unionTest(shardedBaseColl, unshardedSearchColl, {mongos: [], primary: [kSearch],
 unionTest(shardedBaseColl,
           shardedSearchColl,
           {mongos: [], primary: [kPlanMaybe, kSearch], secondary: [kPlanMaybe, kSearch]});
+
+// TODO SERVER-85637 Remove check for SearchExplainExecutionStats after the feature flag is removed.
+if (!FeatureFlagUtil.isPresentAndEnabled(testDB.getMongo(), 'SearchExplainExecutionStats')) {
+    jsTestLog(
+        "Skipping explain tests with $lookup and $unionWith because search explain execution stats must be enabled.");
+    stWithMock.stop();
+    quit();
+}
+
+// ----------------------
+// $lookup explain tests
+// ----------------------
+// Test $lookup with "executionStats" explain. $lookup does not include explain info about its
+// subpipeline, so we check the result of the $lookup output instead.
+
+// We can't mock all responses with the explain verbosity since $lookup doesn't propogate the
+// explain to its pipeline if run on a sharded collection.
+function lookupWithExplainExecStatsDoesNotThrow(
+    baseColl, searchColl, mockResponsesWithExplain, mockResponses) {
+    setupAllMockRequests(searchColl, mockResponsesWithExplain, {verbosity: "executionStats"});
+    setupAllMockRequests(searchColl, mockResponses);
+    let result = baseColl.explain("executionStats").aggregate(makeLookupPipeline(searchColl));
+    stWithMock.assertEmptyMocks();
+    return result;
+}
+
+// Query is run to completion, so $lookup should return two documents.
+let result = lookupWithExplainExecStatsDoesNotThrow(unshardedBaseColl,
+                                                    unshardedSearchColl,
+                                                    {mongos: [], primary: [kSearch], secondary: []},
+                                                    {mongos: [], primary: [], secondary: []});
+
+let lookupStage = getAggPlanStage(result, "$lookup");
+assert.neq(lookupStage, null, result);
+assert(lookupStage.hasOwnProperty("nReturned"));
+assert.eq(NumberLong(2), lookupStage["nReturned"]);
+
+// Query is fully executed on primary shard and $lookup should return two documents.
+result =
+    lookupWithExplainExecStatsDoesNotThrow(unshardedBaseColl,
+                                           shardedSearchColl,
+                                           {mongos: [], primary: [kPlan], secondary: []},
+                                           {mongos: [], primary: [kSearch], secondary: [kSearch]});
+lookupStage = getAggPlanStage(result, "$lookup");
+assert.neq(lookupStage, null, result);
+assert(lookupStage.hasOwnProperty("nReturned"));
+assert.eq(NumberLong(2), lookupStage["nReturned"]);
+
+//$lookup is on the merging shard, so $search should not query mongot.
+result = lookupWithExplainExecStatsDoesNotThrow(shardedBaseColl,
+                                                unshardedSearchColl,
+                                                {mongos: [], primary: [], secondary: []},
+                                                {mongos: [], primary: [], secondary: []});
+
+// Each shard will run $lookup, and $lookup should return one doc for each shard.
+result = lookupWithExplainExecStatsDoesNotThrow(
+    shardedBaseColl,
+    shardedSearchColl,
+    {mongos: [], primary: [kPlan], secondary: [kPlan]},
+    {mongos: [], primary: [kSearch, kSearch], secondary: [kSearch, kSearch]});
+let lookupStages = getAggPlanStages(result, "$lookup");
+for (let stage of lookupStages) {
+    assert.neq(stage, null, result);
+    assert(stage.hasOwnProperty("nReturned"));
+    assert.eq(NumberLong(1), stage["nReturned"]);
+}
+// TODO SERVER-92337 Add $unionWith explain tests.
 
 stWithMock.stop();

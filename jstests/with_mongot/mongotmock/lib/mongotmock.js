@@ -61,15 +61,30 @@ export function mongotResponseForBatch(nextBatch, id, ns, ok, explainContents = 
 /**
  * Same as above but for multiple cursors.
  */
-export function mongotMultiCursorResponseForBatch(
-    firstCursorBatch, firstId, secondCursorBatch, secondId, ns, ok) {
-    return {
-        ok,
-        cursors: [
-            {cursor: {id: firstId, ns, nextBatch: firstCursorBatch, type: "results"}, ok},
-            {cursor: {id: secondId, ns, nextBatch: secondCursorBatch, type: "meta"}, ok}
-        ]
+export function mongotMultiCursorResponseForBatch(firstCursorBatch,
+                                                  firstId,
+                                                  secondCursorBatch,
+                                                  secondId,
+                                                  ns,
+                                                  ok,
+                                                  explainContents = null,
+                                                  metaExplainContents = null) {
+    let resultsCursor = {
+        cursor: {id: firstId, ns, nextBatch: firstCursorBatch, type: "results"},
+        ok
     };
+    let metaCursor = {cursor: {id: secondId, ns, nextBatch: secondCursorBatch, type: "meta"}, ok};
+    if (explainContents != null) {
+        resultsCursor.explain = explainContents;
+        assert(metaExplainContents,
+               "metaExplainContents should not be null as explainContents is not null");
+    }
+    if (metaExplainContents != null) {
+        metaCursor.explain = metaExplainContents;
+        assert(explainContents,
+               "explainContents should not be null as metaExplainContents is not null");
+    }
+    return {ok, cursors: [resultsCursor, metaCursor]};
 }
 
 /**

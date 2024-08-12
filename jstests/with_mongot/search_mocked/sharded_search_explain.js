@@ -1,16 +1,31 @@
 /**
- * Sharding tests for using "explain" with the $search aggregation stage.
+ * Sharding tests for using "explain" with the $search aggregation stage for queries that do not
+ * contain meaningful executionStats. This tests "queryPlanner" verbosity (no execution stats). It
+ * also tests  "executionStats" and "allPlansExecution" without the feature flag for explain
+ * execution stats enabled.
+ *
+ * @tags:[featureFlagSearchExplainExecutionStats_incompatible]
  */
-import {getAggPlanStages} from "jstests/libs/analyze_plan.js";
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {checkSbeRestrictedOrFullyEnabled} from "jstests/libs/sbe_util.js";
 import {getUUIDFromListCollections} from "jstests/libs/uuid_util.js";
 import {
+    getDefaultProtocolVersionForPlanShardedSearch,
+    mongotCommandForQuery,
+} from "jstests/with_mongot/mongotmock/lib/mongotmock.js";
+import {
     ShardingTestWithMongotMock
 } from "jstests/with_mongot/mongotmock/lib/shardingtest_with_mongotmock.js";
+import {
+    getDefaultLastExplainContents,
+    getShardedSearchStagesAndVerifyExplainOutput,
+    setUpMongotReturnExplain,
+    setUpMongotReturnExplainAndCursor,
+    verifyShardsPartExplainOutput,
+} from "jstests/with_mongot/mongotmock/lib/utils.js";
 
-const dbName = "test";
-const collName = "sharded_search_explain";
+const dbName = jsTestName();
+const collName = "search";
 
 const stWithMock = new ShardingTestWithMongotMock({
     name: "sharded_search",
@@ -56,11 +71,10 @@ const searchQuery = {
     path: "element"
 };
 
-const explainContents = {
-    destiny: "avatar"
-};
+const expectedExplainContents = getDefaultLastExplainContents();
 
 const cursorId = NumberLong(123);
+const protocolVersion = getDefaultProtocolVersionForPlanShardedSearch();
 
 function runTestOnPrimaries(testFn) {
     testDB.getMongo().setReadPref("primary");
@@ -72,22 +86,32 @@ function runTestOnSecondaries(testFn) {
     testFn(st.rs0.getSecondary(), st.rs1.getSecondary());
 }
 
-// Tests $search works with each explain verbosity.
-for (const currentVerbosity of ["queryPlanner", "executionStats", "allPlansExecution"]) {
+function runExplainTest(verbosity) {
     function testExplainCase(shard0Conn, shard1Conn) {
+        // sX is shard num X.
+        const s0Mongot = stWithMock.getMockConnectedToHost(shard0Conn);
+        const s1Mongot = stWithMock.getMockConnectedToHost(shard1Conn);
         // Ensure there is never a staleShardVersionException to cause a retry on any shard.
         // If a retry happens on one shard and not another, then the shard that did not retry
         // will see multiple instances of the explain command, which the test does not expect,
         // causing an error.
         st.refreshCatalogCacheForNs(mongos, coll.getFullName());
 
-        const searchCmd = {
-            search: collName,
-            collectionUUID: collUUID,
+        const searchCmd = mongotCommandForQuery({
             query: searchQuery,
-            explain: {verbosity: currentVerbosity},
-            $db: dbName
-        };
+            collName: collName,
+            db: dbName,
+            collectionUUID: collUUID,
+            explainVerbosity: {verbosity},
+        });
+        const metaPipeline = [{
+            "$group": {
+                "_id": {"type": "$type", "path": "$path", "bucket": "$bucket"},
+                "value": {
+                    "$sum": "$metaVal",
+                }
+            }
+        }];
 
         const mergingPipelineHistory = [{
             expectedCommand: {
@@ -95,48 +119,92 @@ for (const currentVerbosity of ["queryPlanner", "executionStats", "allPlansExecu
                 query: searchQuery,
                 $db: dbName,
                 searchFeatures: {shardedSort: 1},
-                explain: {verbosity: currentVerbosity},
+                explain: {verbosity}
             },
             response: {
                 ok: 1,
-                protocolVersion: NumberInt(42),
-                metaPipeline: [{
-                    "$group": {
-                        "_id": {"type": "$type", "path": "$path", "bucket": "$bucket"},
-                        "value": {
-                            "$sum": "$metaVal",
-                        }
-                    }
-                }]
+                protocolVersion,
+                metaPipeline,
             }
         }];
-        stWithMock.getMockConnectedToHost(stWithMock.st.s)
-            .setMockResponses(mergingPipelineHistory, cursorId);
+        // TODO SERVER-91594: Testing "executionStats" and "allPlansExecution" with
+        // setUpMongotReturnExplain() is not necessary after mongot will always return a cursor for
+        // execution stats verbosities.
+        {
+            stWithMock.getMockConnectedToHost(stWithMock.st.s)
+                .setMockResponses(mergingPipelineHistory, cursorId);
 
-        const history = [{
-            expectedCommand: searchCmd,
-            response: {explain: explainContents, ok: 1},
-        }];
-        // sX is shard num X.
-        const s0Mongot = stWithMock.getMockConnectedToHost(shard0Conn);
-        s0Mongot.setMockResponses(history, cursorId);
+            setUpMongotReturnExplain({
+                searchCmd,
+                mongotMock: s0Mongot,
+            });
+            setUpMongotReturnExplain({
+                searchCmd,
+                mongotMock: s1Mongot,
+            });
 
-        const s1Mongot = stWithMock.getMockConnectedToHost(shard1Conn);
-        s1Mongot.setMockResponses(history, cursorId);
+            const result = coll.explain(verbosity).aggregate([{$search: searchQuery}]);
 
-        const result = coll.explain(currentVerbosity).aggregate([{$search: searchQuery}]);
+            getShardedSearchStagesAndVerifyExplainOutput({
+                result,
+                stageType: "$_internalSearchMongotRemote",
+                expectedNumStages: 2,
+                verbosity,
+                nReturnedList: [NumberLong(0), NumberLong(0)],
+                expectedExplainContents,
+            });
+            verifyShardsPartExplainOutput(
+                {result, searchType: "$search", metaPipeline, protocolVersion});
+        }
 
-        const searchStages = getAggPlanStages(result, "$_internalSearchMongotRemote");
-        assert.eq(searchStages.length,
-                  2,
-                  searchStages);  // check there are 2 explain results for 2 shards
-        for (const outerStage of searchStages) {
-            const stage = outerStage["$_internalSearchMongotRemote"];
-            assert(stage.hasOwnProperty("explain"), stage);
-            assert.eq(explainContents, stage["explain"]);
+        // TODO SERVER-85637 Remove the following block of code with
+        // setUpMongotReturnExplainAndMultiCursor(), as it will fail with the feature flag
+        // removed. This scenario is already tested with execution stats enabled in
+        // sharded_search_explain_execution_stats.js.
+        if (verbosity != "queryPlanner") {
+            {
+                stWithMock.getMockConnectedToHost(stWithMock.st.s)
+                    .setMockResponses(mergingPipelineHistory, cursorId);
+
+                // With the feature flag disabled, the protocolVersion will not be included, so only
+                // an explain and cursor object will be returned.
+                setUpMongotReturnExplainAndCursor({
+                    mongotMock: s0Mongot,
+                    coll,
+                    searchCmd,
+                    nextBatch: [
+                        {_id: 1, $searchScore: 0.321},
+                    ],
+                });
+                setUpMongotReturnExplainAndCursor({
+                    mongotMock: s1Mongot,
+                    coll,
+                    searchCmd,
+                    nextBatch: [
+                        {_id: 1, $searchScore: 0.321},
+                    ],
+                });
+
+                const result = coll.explain(verbosity).aggregate([{$search: searchQuery}]);
+                getShardedSearchStagesAndVerifyExplainOutput({
+                    result,
+                    stageType: "$_internalSearchMongotRemote",
+                    expectedNumStages: 2,
+                    verbosity,
+                    nReturnedList: [NumberLong(0), NumberLong(0)],
+                    expectedExplainContents,
+                });
+                verifyShardsPartExplainOutput(
+                    {result, searchType: "$search", metaPipeline, protocolVersion});
+            }
         }
     }
     runTestOnPrimaries(testExplainCase);
     runTestOnSecondaries(testExplainCase);
 }
+
+runExplainTest("queryPlanner");
+runExplainTest("executionStats");
+runExplainTest("allPlansExecution");
+
 stWithMock.stop();

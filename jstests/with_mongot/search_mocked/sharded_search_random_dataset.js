@@ -158,8 +158,7 @@ const expectedMongotCommand = mongotCommandForQuery({
                 [{val: 1}],
                 metaCursorId,
                 collNS,
-                responseOk,
-                true),
+                responseOk),
         },
         {
             expectedCommand: {getMore: cursorId, collection: collName},

@@ -2,8 +2,14 @@
  * Utility functions for mongot tests.
  */
 
-import {getAggPlanStage} from "jstests/libs/analyze_plan.js";
-import {mongotResponseForBatch} from "jstests/with_mongot//mongotmock/lib/mongotmock.js";
+import {
+    getAggPlanStage,
+} from "jstests/libs/analyze_plan.js";
+import {
+    mongotMultiCursorResponseForBatch,
+    mongotResponseForBatch
+} from "jstests/with_mongot/mongotmock/lib/mongotmock.js";
+
 /**
  * @param {Object} expectedCommand The expected mongot $search or $vectorSearch command.
  * @param {DBCollection} coll
@@ -117,8 +123,7 @@ export function getDefaultLastExplainContents() {
 }
 
 /**
- * Mocks mongot returning an explain object only to a search query. Checks stats and returns result
- * of executing pipeline with explain verbosity set to 'verbosity'.
+ * Mocks mongot returning an explain object only to a search query.
  *
  * @param {MongotMock} mongotMock fixture
  * @param {Object} searchCmd the search query to send to mongot
@@ -139,8 +144,7 @@ export function setUpMongotReturnExplain({
 }
 
 /**
- * Mocks mongot returning an explain object and exhausted cursor to a search query. Checks stats and
- * returns result of executing pipeline with explain verbosity set to 'verbosity'. Uses provided
+ * Mocks mongot returning an explain object and exhausted cursor to a search query. Uses provided
  * batch for cursor response.
  *
  * @param {MongotMock} mongotMock fixture
@@ -171,10 +175,71 @@ export function setUpMongotReturnExplainAndCursor({
 }
 
 /**
- * Mocks mongot returning an explain object and cursor with getMore's for the cursor. The last
- * getMore will use a different explain object as n response. Uses the provided batches in batchList
- * as responses for the cursor. Checks stats and returns result of executing pipeline with explain
- * verbosity set to 'verbosity'.
+ * Mocks mongot returning an explain object and exhausted cursor to a sharded search query. Uses
+ * nextBatch for results cursor response, and metaBatch for metadata cursor response.
+ *
+ * @param {MongotMock} mongotMock mongotMock for specific shard
+ * @param {DBCollection} coll
+ * @param {Object} searchCmd the search query to send to mongot
+ * @param {Array{Object}} nextBatch batch of results that mongot should return for results cursor
+ * @param {Array{Object}} metaBatch batch of meta documents that mongot should return for metadata
+ *     cursor.
+ * @param {NumberLong} cursorId optional
+ * @param {NumberLong} metaCursorId optional
+ * @param {Object} explainContents optional - explain object that mongot should return
+ */
+export function setUpMongotReturnExplainAndMultiCursor({
+    mongotMock,
+    coll,
+    searchCmd,
+    nextBatch,
+    metaBatch,
+    cursorId = NumberLong(123),
+    metaCursorId = NumberLong(1230),
+    explainContents = defaultLastExplainContents,
+}) {
+    let history = [{
+        expectedCommand: searchCmd,
+        response: mongotMultiCursorResponseForBatch(nextBatch,
+                                                    NumberLong(0),
+                                                    metaBatch,
+                                                    NumberLong(0),
+                                                    coll.getFullName(),
+                                                    1,
+                                                    explainContents /*results explain*/,
+                                                    explainContents /*meta explain*/)
+    }];
+    mongotMock.setMockResponses(history, cursorId, metaCursorId);
+}
+
+/**
+ * Helper to set up getMores for history. Adds a getMore to history starting from the 2nd entry
+ * in batchList.
+ */
+function setUpGetMoreHistory(
+    history, batchList, collName, collNS, cursorId, explainContents, lastExplainContents) {
+    assert(batchList.length > 1, "To set up getMore's, batchList must have at least 2 responses.");
+    for (let i = 1; i < batchList.length - 1; i++) {
+        let getMoreResponse = {
+            expectedCommand: {getMore: cursorId, collection: collName},
+            response: mongotResponseForBatch(batchList[i], cursorId, collNS, 1, explainContents),
+        };
+        history.push(getMoreResponse);
+    }
+    // Last response should return a closed cursor and use different explain content to
+    // differentiate the explain.
+    const lastGetMore = {
+        expectedCommand: {getMore: cursorId, collection: collName},
+        response: mongotResponseForBatch(
+            batchList[batchList.length - 1], NumberLong(0), collNS, 1, lastExplainContents),
+    };
+    history.push(lastGetMore);
+    return history;
+}
+
+/**
+ * Mocks mongot returning an explain object and cursor with getMore's for the cursor in an unsharded
+ * scenario. The last getMore will use a different explain object as an response.
  *
  * @param {MongotMock} mongotMock fixture
  * @param {DBCollection} coll
@@ -210,29 +275,83 @@ export function setUpMongotReturnExplainAndCursorGetMore({
         response: mongotResponseForBatch(batchList[0], cursorId, collNS, 1, explainContents, vars)
     });
 
-    for (let i = 1; i < batchList.length - 1; i++) {
-        let getMoreResponse = {
-            expectedCommand: {getMore: cursorId, collection: collName},
-            response: mongotResponseForBatch(batchList[i], cursorId, collNS, 1, explainContents),
-        };
-        history.push(getMoreResponse);
-    }
-    // Last response should return a closed cursor and use different explain content to
-    // differentiate the explain.
-    const lastGetMore = {
-        expectedCommand: {getMore: cursorId, collection: collName},
-        response: mongotResponseForBatch(
-            batchList[batchList.length - 1], NumberLong(0), collNS, 1, lastExplainContents),
-    };
-    history.push(lastGetMore);
+    history = setUpGetMoreHistory(
+        history, batchList, collName, collNS, cursorId, explainContents, lastExplainContents);
     mongotMock.setMockResponses(history, cursorId);
+}
+
+/**
+ * Mocks mongot returning an explain object and cursor with getMore's for results and/or metadata
+ * cursor. The results cursor uses batchList and the metadata cursor uses metaBatchList. The last
+ * getMore for each cursor will use a different explain object as a response.
+ *
+ * @param {MongotMock} mongotMock mongotMock for specific shard
+ * @param {DBCollection} coll
+ * @param {Object} searchCmd the search query to send to mongot
+ * @param {Array} batchList Array of batches that mongot should return in order for results cursor.
+ * @param {Array} metaBatchList Array of batches that mongot should return in order for metadata
+ *     cursor.
+ * @param {NumberLong} cursorId optional
+ * @param {NumberLong} metaCursorId optional
+ * @param {Object} explainContents optional - explain object that mongot should return for most
+ *     responses
+ * @param {Object} lastExplainContents optional - the explain object for the last getMore
+ */
+export function setUpMongotReturnExplainAndMultiCursorGetMore({
+    mongotMock,
+    coll,
+    searchCmd,
+    batchList,
+    metaBatchList,
+    cursorId = NumberLong(123),
+    metaCursorId = NumberLong(1230),
+    explainContents = defaultExplainContents,
+    lastExplainContents = defaultLastExplainContents,
+}) {
+    const collName = coll.getName();
+    const collNS = coll.getFullName();
+
+    // Will contain first response for both cursors and then getMores for results cursor.
+    let history = [];
+    // Will contain getMores for the meta cursor.
+    let metaHistory = [];
+
+    let response = mongotMultiCursorResponseForBatch(
+        batchList[0],
+        batchList.length == 1 ? NumberLong(0) : cursorId,
+        metaBatchList[0],
+        metaBatchList.length == 1 ? NumberLong(0) : metaCursorId,
+        coll.getFullName(),
+        1,
+        batchList.length == 1 ? lastExplainContents : explainContents,
+        metaBatchList.length == 1 ? lastExplainContents : explainContents);
+
+    history.push({expectedCommand: searchCmd, response});
+
+    if (batchList.length > 1) {
+        history = setUpGetMoreHistory(
+            history, batchList, collName, collNS, cursorId, explainContents, lastExplainContents);
+    }
+    mongotMock.setMockResponses(history, cursorId, metaCursorId);
+
+    // Set up metaHistory for "meta" cursor.
+    if (metaBatchList.length > 1) {
+        metaHistory = setUpGetMoreHistory(metaHistory,
+                                          metaBatchList,
+                                          collName,
+                                          collNS,
+                                          metaCursorId,
+                                          explainContents,
+                                          lastExplainContents);
+        mongotMock.setMockResponses(metaHistory, metaCursorId);
+    }
 }
 
 /**
  * Helper function to obtain the search stage (ex. $searchMeta, $_internalSearchMongotRemote) and to
  * check its explain result. Will only check $_internalSearchIdLookup if 'nReturnedIdLookup is
  * provided.
- * @param {Object} result explain result
+ * @param {Object} result the results from running coll.explain().aggregate([[$search: ....], ...])
  * @param {string} stageType ex. "$_internalSearchMongotRemote" , "$searchMeta",
  *     "$_internalSearchIdLookup "
  * @param {string} verbosity The verbosity of explain. "nReturned" and "executionTimeMillisEstimate"
@@ -268,6 +387,94 @@ export function getSearchStagesAndVerifyExplainOutput(
 }
 
 /**
+ * Checks that the explain object for a sharded search query contains the correct "metaPipeline" and
+ * "protocolVersion". Checks 'sortSpec' if it's provided.
+ * * @param {Object} result the results from running coll.explain().aggregate([[$search: ....],
+ * ...])
+ * @param {string} searchType ex. "$search", "$searchMeta"
+ * @param {Object} metaPipeline
+ * @param {NumberInt()} protocolVersion To check the value of the protocolVersion, the value
+ *     returned from explain will be wrapped with NumberInt().
+ * @param {Object} sortSpec
+ */
+export function verifyShardsPartExplainOutput(
+    {result, searchType, metaPipeline, protocolVersion, sortSpec = null}) {
+    // Checks index 0 of 'shardsPart' since $search, $searchMeta need to come first in the pipeline
+    assert.eq(result.splitPipeline.shardsPart[0][searchType].mergingPipeline, metaPipeline);
+    assert.eq(
+        NumberInt(result.splitPipeline.shardsPart[0][searchType].metadataMergeProtocolVersion),
+        protocolVersion);
+    if (sortSpec != null) {
+        assert.eq(result.splitPipeline.shardsPart[0][searchType].sortSpec, sortSpec);
+    }
+}
+
+/**
+ * Helper function for sharded clusters to obtain the stage specified. Will check nReturned for non
+ * "queryPlanner" verbosity, and explainContents if specified.
+ *
+ * @param {Object} result the results from running coll.explain().aggregate([[$search: ....], ...])
+ * @param {string} stageType ex. "$_internalSearchMongotRemote" , "$searchMeta",
+ *     "$_internalSearchIdLookup "
+ * @param {Integer} expectedNumStages The number of aggPlanStages expected for the stageType,
+ *     generally one per shard.
+ * @param {string} verbosity The verbosity of explain. "nReturned" and "executionTimeMillisEstimate"
+ *     will not be checked for 'queryPlanner' verbosity "
+ * @param {Array{NumberLong}} nReturnedList Index i should be nReturned for shard i. Length must
+ *     match expectedNumStages.
+ * @param {Object} expectedExplainContents Optional - The explain object that the stage should
+ *     contain.
+ */
+export function getShardedSearchStagesAndVerifyExplainOutput(
+    {result, stageType, expectedNumStages, verbosity, nReturnedList, expectedExplainContents}) {
+    if (stageType === "$_internalSearchMongotRemote" || stageType === "$searchMeta") {
+        // This function will also fail for non-search stages, checked in
+        // verifySearchStageExplainOutput().
+        assert(expectedExplainContents != null,
+               "Explain is null but needs to be provided for initial search stage.");
+    }
+    assert.eq(nReturnedList.length, expectedNumStages);
+    assert(result.hasOwnProperty("shards"), result + "has no shards property, but it should.");
+
+    let counter = 0;
+    // Since the explain object shard results are unordered, we manually check which shard
+    // we are currently checking.
+    for (let elem in result.shards) {
+        // Get the number at the end of the string for which shard to check, since shards are
+        // labeled rs0/rs1/etc.
+        let index = parseInt(elem.match(/\d+$/)[0], 10);
+        jsTestLog("Checking shard " + index);
+        let stage = null;
+        // We need to look through the stages for the stage that matches the stageType.
+        let stages = result.shards[elem].stages;
+        for (let i = 0; i < stages.length; i++) {
+            let properties = Object.getOwnPropertyNames(stages[i]);
+            if (properties[0] === stageType) {
+                stage = stages[i];
+            }
+        }
+        assert(stage,
+               "Unable to find stageType: " + stageType + " for shard " + index +
+                   " in result: " + tojson(result));
+
+        verifySearchStageExplainOutput({
+            stage: stage,
+            stageType: stageType,
+            nReturned: nReturnedList[index],
+            explain: expectedExplainContents,
+            verbosity: verbosity,
+        });
+        counter++;
+    }
+
+    assert.eq(counter,
+              expectedNumStages,
+              "Number of shards checked: " + counter + " did not match the expectedNumber: " +
+                  expectedNumStages + " in the result: " + tojson(result));
+}
+
+const searchStages = ["$_internalSearchMongotRemote", "$searchMeta", "$_internalSearchIdLookup"];
+/**
  * This function checks that a search stage from an explain output contains the information that
  * it should.
  * @param {Object} stage The object representing a search stage ($_internalSearchMongotRemote,
@@ -282,6 +489,8 @@ export function getSearchStagesAndVerifyExplainOutput(
  */
 export function verifySearchStageExplainOutput(
     {stage, stageType, nReturned, explain = null, verbosity}) {
+    assert(searchStages.includes(stageType),
+           "stageType must be a search stage found in searchStages.");
     if (verbosity != "queryPlanner") {
         assert(stage.hasOwnProperty("nReturned"));
         assert.eq(nReturned, stage["nReturned"]);

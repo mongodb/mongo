@@ -1,8 +1,14 @@
 /**
  * Test that a $limit gets pushed to the shards.
  */
+import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
+import {checkSbeRestrictedOrFullyEnabled} from "jstests/libs/sbe_util.js";
 import {getUUIDFromListCollections} from "jstests/libs/uuid_util.js";
-import {mockPlanShardedSearchResponse} from "jstests/with_mongot/mongotmock/lib/mongotmock.js";
+import {
+    getDefaultProtocolVersionForPlanShardedSearch,
+    mockPlanShardedSearchResponse,
+    mongotResponseForBatch
+} from "jstests/with_mongot/mongotmock/lib/mongotmock.js";
 import {
     ShardingTestWithMongotMock
 } from "jstests/with_mongot/mongotmock/lib/shardingtest_with_mongotmock.js";
@@ -27,7 +33,14 @@ const st = stWithMock.st;
 const mongos = st.s;
 const testDB = mongos.getDB(dbName);
 const testColl = testDB.getCollection(collName);
-const collNS = testColl.getFullName();
+let protocolVersion = null;
+
+// TODO SERVER-85637 Remove check for SearchExplainExecutionStats after the feature flag is removed.
+if (FeatureFlagUtil.isPresentAndEnabled(testDB.getMongo(), 'SearchExplainExecutionStats') &&
+    !(checkSbeRestrictedOrFullyEnabled(testDB) &&
+      FeatureFlagUtil.isPresentAndEnabled(testDB.getMongo(), 'SearchInSbe'))) {
+    protocolVersion = getDefaultProtocolVersionForPlanShardedSearch();
+}
 
 // Shard the test collection, split it at {_id: 10}, and move the higher chunk to shard1.
 assert.commandWorked(
@@ -54,6 +67,9 @@ let expectedMongotCommand = {
     explain: {verbosity: explainVerbosity},
     $db: "test"
 };
+if (protocolVersion != null) {
+    expectedMongotCommand.intermediate = protocolVersion;
+}
 let cursorId = NumberLong(123);
 let pipeline = [
     {$search: mongotQuery},
@@ -93,7 +109,8 @@ function assertLimitAbsorbed(explainRes, query) {
 function testBasicCase(shard0Conn, shard1Conn, cursorId) {
     const history = [{
         expectedCommand: expectedMongotCommand,
-        response: {explain: {"garbage": true}, ok: 1},
+        response:
+            mongotResponseForBatch([], NumberLong(0), testColl.getFullName(), 1, {"garbage": true})
     }];
     const s0Mongot = stWithMock.getMockConnectedToHost(shard0Conn);
     s0Mongot.setMockResponses(history, cursorId);
@@ -130,5 +147,8 @@ expectedMongotCommand = {
     explain: {verbosity: explainVerbosity},
     $db: "test"
 };
+if (protocolVersion != null) {
+    expectedMongotCommand.intermediate = protocolVersion;
+}
 runTestOnPrimaries(testBasicCase, NumberLong(124));
 stWithMock.stop();

@@ -219,9 +219,6 @@ std::vector<std::unique_ptr<executor::TaskExecutorCursor>> establishCursors(
     std::vector<std::unique_ptr<executor::TaskExecutorCursor>> additionalCursors;
 
     if (expCtx->explain) {
-        tassert(8431800,
-                "Sharded $search queries should not establishCursors() for explain.",
-                !expCtx->needsMerge);
         initialCursor = makeTaskExecutorCursorForExplain(
             expCtx, command, taskExecutor, std::move(getMoreStrategy), std::move(yieldPolicy));
 
@@ -231,8 +228,9 @@ std::vector<std::unique_ptr<executor::TaskExecutorCursor>> establishCursors(
                                                command,
                                                {std::move(getMoreStrategy), std::move(yieldPolicy)},
                                                makeRetryOnNetworkErrorPolicy());
-        additionalCursors = initialCursor->releaseAdditionalCursors();
     }
+
+    additionalCursors = initialCursor->releaseAdditionalCursors();
     cursors.push_back(std::move(initialCursor));
     // Preserve cursor order. Expect cursors to be labeled, so this may not be necessary.
     for (auto& thisCursor : additionalCursors) {
