@@ -1,0 +1,24 @@
+overall_thresholds:
+  hot_bf_count: 15
+  cold_bf_count: 50
+  perf_bf_count: 15
+
+team_default_thresholds:
+  hot_bf_count: 3
+  cold_bf_count: 10
+  perf_bf_count: 5
+
+team_groups:
+  ######################################################################
+  #                  Team group configuration example                  #
+  ######################################################################
+  # - name: Group Name
+  #   teams:
+  #     - Team Name 1 # Should exactly match "Assigned Teams" field value
+  #     - Team Name 2
+  #     - Team Name 3
+  #   thresholds:
+  #     hot_bf_count: 3
+  #     cold_bf_count: 10
+  #     perf_bf_count: 5
+  ######################################################################

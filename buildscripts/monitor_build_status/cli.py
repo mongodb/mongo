@@ -9,6 +9,7 @@ from typing import Dict, Iterable, List, Optional, Tuple
 
 import structlog
 import typer
+from tabulate import tabulate
 from typing_extensions import Annotated
 
 # Get relative imports to work when the package is not installed on the PYTHONPATH.
@@ -16,17 +17,19 @@ if __name__ == "__main__" and __package__ is None:
     sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 
 from buildscripts.client.jiraclient import JiraAuth, JiraClient
-from buildscripts.monitor_build_status.bfs_report import BFsReport
+from buildscripts.monitor_build_status.bfs_report import BfCategory, BFsReport
+from buildscripts.monitor_build_status.code_lockdown_config import (
+    BfCountThresholds,
+    CodeLockdownConfig,
+)
 from buildscripts.monitor_build_status.evergreen_service import (
     EvergreenService,
     EvgProjectsInfo,
     TaskStatusCounts,
 )
 from buildscripts.monitor_build_status.jira_service import (
-    BfTemperature,
     JiraCustomFieldNames,
     JiraService,
-    TestType,
 )
 from buildscripts.resmokelib.utils.evergreen_conn import get_evergreen_api
 from buildscripts.util.cmdutils import enable_logging
@@ -34,6 +37,7 @@ from buildscripts.util.cmdutils import enable_logging
 LOGGER = structlog.get_logger(__name__)
 
 BLOCK_ON_RED_PLAYBOOK_URL = "http://go/blockonred"
+CODE_LOCKDOWN_CONFIG = "etc/code_lockdown.yml"
 
 JIRA_SERVER = "https://jira.mongodb.org"
 DEFAULT_REPO = "10gen/mongo"
@@ -41,13 +45,6 @@ DEFAULT_BRANCH = "master"
 SLACK_CHANNEL = "#10gen-mongo-code-lockdown"
 FRIDAY_INDEX = 4  # datetime.weekday() returns Monday as 0 and Sunday as 6
 EVERGREEN_LOOKBACK_DAYS = 14
-
-OVERALL_HOT_BF_COUNT_THRESHOLD = 15
-OVERALL_COLD_BF_COUNT_THRESHOLD = 50
-OVERALL_PERF_BF_COUNT_THRESHOLD = 15
-PER_TEAM_HOT_BF_COUNT_THRESHOLD = 3
-PER_TEAM_COLD_BF_COUNT_THRESHOLD = 10
-PER_TEAM_PERF_BF_COUNT_THRESHOLD = 5
 
 GREEN_THRESHOLD_PERCENTS = 100
 RED_THRESHOLD_PERCENTS = 200
@@ -129,9 +126,11 @@ class MonitorBuildStatusOrchestrator:
         self,
         jira_service: JiraService,
         evg_service: EvergreenService,
+        code_lockdown_config: CodeLockdownConfig,
     ) -> None:
         self.jira_service = jira_service
         self.evg_service = evg_service
+        self.code_lockdown_config = code_lockdown_config
 
     def evaluate_build_redness(
         self, repo: str, branch: str, notify: bool, input_status_file: str, output_status_file: str
@@ -147,7 +146,9 @@ class MonitorBuildStatusOrchestrator:
         LOGGER.info("Got Evergreen projects data")
 
         bfs_report = self._make_bfs_report(evg_projects_info)
-        bf_count_status_msg, bf_count_percentages = self._get_bf_counts_status(bfs_report)
+        bf_count_status_msg, bf_count_percentages = self._get_bf_counts_status(
+            bfs_report, self.code_lockdown_config
+        )
         status_message = f"{status_message}\n{bf_count_status_msg}\n"
         threshold_percentages.extend(bf_count_percentages)
 
@@ -242,75 +243,63 @@ class MonitorBuildStatusOrchestrator:
         return bfs_report
 
     @staticmethod
-    def _get_bf_counts_status(bfs_report: BFsReport) -> Tuple[str, List[float]]:
+    def _get_bf_counts_status(
+        bfs_report: BFsReport, code_lockdown_config: CodeLockdownConfig
+    ) -> Tuple[str, List[float]]:
+        for group in code_lockdown_config.team_groups or []:
+            bfs_report.combine_teams(group.teams, group.name)
+
         percentages = []
         status_message = "`[STATUS]` The current BF count"
-        status_message = f"{status_message}\n" f"```\n" f"{bfs_report.as_str_table()}\n" f"```"
+        headers = ["Assigned Team/Group", "Hot BFs", "Cold BFs", "Perf BFs"]
+        table_data = []
 
-        def _make_status_msg(scope_: str, bf_type: str, bf_count: int, threshold: int) -> str:
-            percentage = bf_count / threshold * 100
-            percentages.append(percentage)
-            return (
-                f"{scope_} {bf_type} BFs: {bf_count} ({percentage:.2f}% of threshold {threshold})"
+        def _process_thresholds(
+            label: str,
+            hot_bf_count: int,
+            cold_bf_count: int,
+            perf_bf_count: int,
+            thresholds: BfCountThresholds,
+        ) -> None:
+            if all(count == 0 for count in [hot_bf_count, cold_bf_count, perf_bf_count]):
+                return
+
+            hot_bf_percentage = hot_bf_count / thresholds.hot_bf_count * 100
+            cold_bf_percentage = cold_bf_count / thresholds.cold_bf_count * 100
+            perf_bf_percentage = perf_bf_count / thresholds.perf_bf_count * 100
+
+            percentages.extend([hot_bf_percentage, cold_bf_percentage, perf_bf_percentage])
+
+            table_data.append(
+                [
+                    label,
+                    f"{hot_bf_percentage:.0f}% ({hot_bf_count} / {thresholds.hot_bf_count})",
+                    f"{cold_bf_percentage:.0f}% ({cold_bf_count} / {thresholds.cold_bf_count})",
+                    f"{perf_bf_percentage:.0f}% ({perf_bf_count} / {thresholds.perf_bf_count})",
+                ]
             )
 
-        overall_hot_bf_count = bfs_report.get_bf_count(
-            test_types=[TestType.CORRECTNESS],
-            bf_temperatures=[BfTemperature.HOT],
-        )
-        overall_cold_bf_count = bfs_report.get_bf_count(
-            test_types=[TestType.CORRECTNESS],
-            bf_temperatures=[BfTemperature.COLD, BfTemperature.NONE],
-        )
-        overall_perf_bf_count = bfs_report.get_bf_count(
-            test_types=[TestType.PERFORMANCE],
-            bf_temperatures=[BfTemperature.HOT, BfTemperature.COLD, BfTemperature.NONE],
-        )
-
-        scope = "Overall"
-        status_message = (
-            f"{status_message}"
-            f"\n{_make_status_msg(scope, 'Hot', overall_hot_bf_count, OVERALL_HOT_BF_COUNT_THRESHOLD)}"
-            f"\n{_make_status_msg(scope, 'Cold', overall_cold_bf_count, OVERALL_COLD_BF_COUNT_THRESHOLD)}"
-            f"\n{_make_status_msg(scope, 'Perf', overall_perf_bf_count, OVERALL_PERF_BF_COUNT_THRESHOLD)}"
-        )
-
-        max_per_team_hot_bf_count = 0
-        max_per_team_cold_bf_count = 0
-        max_per_team_perf_bf_count = 0
-
-        for team in bfs_report.all_assigned_teams:
-            per_team_hot_bf_count = bfs_report.get_bf_count(
-                test_types=[TestType.CORRECTNESS],
-                bf_temperatures=[BfTemperature.HOT],
-                assigned_team=team,
+        for assigned_team in sorted(list(bfs_report.team_reports.keys())):
+            _process_thresholds(
+                assigned_team,
+                bfs_report.get_bf_count(BfCategory.HOT, assigned_team),
+                bfs_report.get_bf_count(BfCategory.COLD, assigned_team),
+                bfs_report.get_bf_count(BfCategory.PERF, assigned_team),
+                code_lockdown_config.get_thresholds(assigned_team),
             )
-            if per_team_hot_bf_count > max_per_team_hot_bf_count:
-                max_per_team_hot_bf_count = per_team_hot_bf_count
 
-            per_team_cold_bf_count = bfs_report.get_bf_count(
-                test_types=[TestType.CORRECTNESS],
-                bf_temperatures=[BfTemperature.COLD, BfTemperature.NONE],
-                assigned_team=team,
-            )
-            if per_team_cold_bf_count > max_per_team_cold_bf_count:
-                max_per_team_cold_bf_count = per_team_cold_bf_count
-
-            per_team_perf_bf_count = bfs_report.get_bf_count(
-                test_types=[TestType.PERFORMANCE],
-                bf_temperatures=[BfTemperature.HOT, BfTemperature.COLD, BfTemperature.NONE],
-                assigned_team=team,
-            )
-            if per_team_perf_bf_count > max_per_team_perf_bf_count:
-                max_per_team_perf_bf_count = per_team_perf_bf_count
-
-        scope = "Max per Assigned Team"
-        status_message = (
-            f"{status_message}"
-            f"\n{_make_status_msg(scope, 'Hot', max_per_team_hot_bf_count, PER_TEAM_HOT_BF_COUNT_THRESHOLD)}"
-            f"\n{_make_status_msg(scope, 'Cold', max_per_team_cold_bf_count, PER_TEAM_COLD_BF_COUNT_THRESHOLD)}"
-            f"\n{_make_status_msg(scope, 'Perf', max_per_team_perf_bf_count, PER_TEAM_PERF_BF_COUNT_THRESHOLD)}"
+        _process_thresholds(
+            "Overall",
+            bfs_report.get_bf_count(BfCategory.HOT),
+            bfs_report.get_bf_count(BfCategory.COLD),
+            bfs_report.get_bf_count(BfCategory.PERF),
+            code_lockdown_config.overall_thresholds,
         )
+
+        table_str = tabulate(
+            table_data, headers, tablefmt="outline", colalign=("left", "right", "right", "right")
+        )
+        status_message = f"{status_message}\n```\n{table_str}\n```"
 
         return status_message, percentages
 
@@ -488,8 +477,11 @@ def main(
 
     jira_service = JiraService(jira_client=jira_client)
     evg_service = EvergreenService(evg_api=evg_api)
+    code_lockdown_config = CodeLockdownConfig.from_yaml_config(CODE_LOCKDOWN_CONFIG)
     orchestrator = MonitorBuildStatusOrchestrator(
-        jira_service=jira_service, evg_service=evg_service
+        jira_service=jira_service,
+        evg_service=evg_service,
+        code_lockdown_config=code_lockdown_config,
     )
 
     exit_code = orchestrator.evaluate_build_redness(
