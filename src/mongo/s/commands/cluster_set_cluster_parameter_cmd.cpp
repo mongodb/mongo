@@ -33,6 +33,7 @@
 #include <utility>
 
 #include <boost/move/utility_core.hpp>
+#include <fmt/format.h>
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/shim.h"
@@ -59,8 +60,9 @@
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding
 
-
 namespace mongo {
+
+using namespace fmt::literals;
 namespace {
 
 class SetClusterParameterCmd final : public TypedCommand<SetClusterParameterCmd> {
@@ -87,11 +89,19 @@ public:
             auto service = opCtx->getService();
             invariant(service->role().hasExclusively(ClusterRole::RouterServer),
                       "Attempted to run a router-only command directly from the shard role.");
+
+            uassert(ErrorCodes::NoSuchKey,
+                    "No cluster parameter provided",
+                    request().getCommandParameter().nFields() > 0);
+
+            uassert(ErrorCodes::InvalidOptions,
+                    "{} only supports setting exactly one parameter"_format(Request::kCommandName),
+                    request().getCommandParameter().nFields() == 1);
+
             uassert(
                 ErrorCodes::NoSuchKey,
-                str::stream()
-                    << "Unknown server parameter: "
-                    << query_settings::QuerySettingsManager::kQuerySettingsClusterParameterName,
+                "Unknown server parameter: {}"_format(
+                    query_settings::QuerySettingsManager::kQuerySettingsClusterParameterName),
                 !request().getCommandParameter()
                      [query_settings::QuerySettingsManager::kQuerySettingsClusterParameterName]);
 

@@ -65,8 +65,9 @@
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kCommand
 
-
 namespace mongo {
+
+using namespace fmt::literals;
 namespace {
 const WriteConcernOptions kMajorityWriteConcern{WriteConcernOptions::kMajority,
                                                 WriteConcernOptions::SyncMode::UNSET,
@@ -100,13 +101,22 @@ public:
             auto service = opCtx->getService();
             invariant(service->role().hasExclusively(ClusterRole::ShardServer),
                       "Attempted to run a shard-only command directly from the router role.");
+
+            uassert(ErrorCodes::NoSuchKey,
+                    "No cluster parameter provided",
+                    request().getCommandParameter().nFields() > 0);
+
+            uassert(ErrorCodes::InvalidOptions,
+                    "{} only supports setting exactly one parameter"_format(Request::kCommandName),
+                    request().getCommandParameter().nFields() == 1);
+
             uassert(
                 ErrorCodes::NoSuchKey,
-                str::stream()
-                    << "Unknown server parameter: "
-                    << query_settings::QuerySettingsManager::kQuerySettingsClusterParameterName,
+                "Unknown server parameter: {}"_format(
+                    query_settings::QuerySettingsManager::kQuerySettingsClusterParameterName),
                 !request().getCommandParameter()
                      [query_settings::QuerySettingsManager::kQuerySettingsClusterParameterName]);
+
             static auto impl = getSetClusterParameterImpl(service);
             impl(opCtx,
                  request(),
