@@ -159,3 +159,7 @@ overrides:
       exec_timeout: 150 # 2.5 hours
     - task: aggregation_blockprocessing_fuzzer
       exec_timeout: 150 # 2.5 hours
+
+  enterprise-rhel-81-ppc64le:
+    - task: buildscripts_test
+      exec_timeout: 30
