@@ -1488,6 +1488,7 @@ def mongo_cc_binary(
 IdlInfo = provider(
     fields = {
         "idl_deps": "depset of idl files",
+        "header_output": "header output of the idl",
     },
 )
 
@@ -1499,6 +1500,7 @@ def idl_generator_impl(ctx):
     python = ctx.toolchains["@bazel_tools//tools/python:toolchain_type"].py3_runtime
     idlc_path = ctx.attr.idlc.files.to_list()[0].path
     dep_depsets = [dep[IdlInfo].idl_deps for dep in ctx.attr.deps]
+    transitive_header_outputs = [dep[IdlInfo].header_output for dep in ctx.attr.deps]
 
     # collect deps from python modules and setup the corresponding
     # path so all modules can be found by the toolchain.
@@ -1539,10 +1541,11 @@ def idl_generator_impl(ctx):
 
     return [
         DefaultInfo(
-            files = depset([gen_source, gen_header]),
+            files = depset([gen_source, gen_header], transitive = [depset(transitive_header_outputs)]),
         ),
         IdlInfo(
             idl_deps = depset(ctx.attr.src.files.to_list(), transitive = [dep[IdlInfo].idl_deps for dep in ctx.attr.deps]),
+            header_output = gen_header,
         ),
     ]
 
