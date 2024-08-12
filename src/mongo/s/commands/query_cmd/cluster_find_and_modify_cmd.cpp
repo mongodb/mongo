@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#include "mongo/s/commands/cluster_find_and_modify_cmd.h"
+#include "mongo/s/commands/query_cmd/cluster_find_and_modify_cmd.h"
 
 #include <boost/cstdint.hpp>
 #include <boost/none.hpp>
@@ -91,8 +91,8 @@
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/cluster_commands_helpers.h"
 #include "mongo/s/cluster_ddl.h"
-#include "mongo/s/commands/cluster_explain.h"
 #include "mongo/s/commands/document_shard_key_update_util.h"
+#include "mongo/s/commands/query_cmd/cluster_explain.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/multi_statement_transaction_requests_sender.h"
 #include "mongo/s/query_analysis_sampler_util.h"

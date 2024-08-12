@@ -1,0 +1,19 @@
+version: 1.0.0
+filters:
+  # The top-level command implementations are neither clearly QE or QO, so files in this directory
+  # are owned by the entire query team by default.
+  - "*":
+    approvers:
+      - 10gen/query
+  - "cluster_analyze_cmd.cpp":
+    approvers:
+      - 10gen/query-optimization
+  - "cluster_index_filter_cmd.cpp":
+    approvers:
+      - 10gen/query-optimization
+  - "cluster_plan_cache_clear_cmd.cpp":
+    approvers:
+      - 10gen/query-optimization
+  - "cluster_profile_cmd.cpp":
+    approvers:
+      - 10gen/query-integration

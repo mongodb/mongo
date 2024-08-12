@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2022-present MongoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
@@ -27,46 +27,52 @@
  *    it in the license file.
  */
 
-#include <boost/none.hpp>
-#include <boost/optional/optional.hpp>
+#include <memory>
+#include <set>
+#include <string>
+#include <vector>
 
-#include "mongo/bson/bsonobj.h"
-#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/base/string_data.h"
+#include "mongo/db/auth/authorization_checks.h"
+#include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/commands.h"
-#include "mongo/db/commands/query_cmd/map_reduce_command_base.h"
-#include "mongo/db/database_name.h"
+#include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
-#include "mongo/db/query/explain_options.h"
-#include "mongo/db/service_context.h"
-#include "mongo/s/commands/cluster_map_reduce_agg.h"
+#include "mongo/db/pipeline/aggregation_request_helper.h"
+#include "mongo/db/query/parsed_find_command.h"
+#include "mongo/s/commands/query_cmd/cluster_find_cmd.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/intrusive_counter.h"
 
 namespace mongo {
 namespace {
 
-class ClusterMapReduceCommand : public MapReduceCommandBase {
-public:
-    ClusterMapReduceCommand() = default;
+/**
+ * Implements the cluster find command on mongos.
+ */
+struct ClusterFindCmdS {
+    static constexpr StringData kName = "find"_sd;
 
-    AllowedOnSecondary secondaryAllowed(ServiceContext*) const override {
-        return AllowedOnSecondary::kAlways;
+    static const std::set<std::string>& getApiVersions() {
+        return kApiVersions1;
     }
 
-    void _explainImpl(OperationContext* opCtx,
-                      const DatabaseName& dbName,
-                      const BSONObj& cmd,
-                      BSONObjBuilder& result,
-                      boost::optional<ExplainOptions::Verbosity> verbosity) const override {
-        runAggregationMapReduce(opCtx, dbName, cmd, result, verbosity);
+    static void doCheckAuthorization(OperationContext* opCtx,
+                                     bool hasTerm,
+                                     const NamespaceString& nss) {
+        uassertStatusOK(
+            auth::checkAuthForFind(AuthorizationSession::get(opCtx->getClient()), nss, hasTerm));
     }
 
-    bool run(OperationContext* opCtx,
-             const DatabaseName& dbName,
-             const BSONObj& cmdObj,
-             BSONObjBuilder& result) override {
-        return runAggregationMapReduce(opCtx, dbName, cmdObj, result, boost::none);
+    static void checkCanRunHere(OperationContext* opCtx) {
+        // Can always run on a mongos.
+    }
+
+    static void checkCanExplainHere(OperationContext* opCtx) {
+        // Can always run on a mongos.
     }
 };
-MONGO_REGISTER_COMMAND(ClusterMapReduceCommand).forRouter();
+MONGO_REGISTER_COMMAND(ClusterFindCmdBase<ClusterFindCmdS>).forRouter();
 
 }  // namespace
 }  // namespace mongo

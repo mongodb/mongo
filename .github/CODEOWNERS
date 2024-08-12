@@ -648,6 +648,9 @@ WORKSPACE.bazel @10gen/devprod-build
 # The following patterns are parsed from ./src/mongo/db/s/migration_blocking_operation/OWNERS.yml
 /src/mongo/db/s/migration_blocking_operation/**/* @10gen/server-cluster-scalability
 
+# The following patterns are parsed from ./src/mongo/db/s/query_cmd/OWNERS.yml
+/src/mongo/db/s/query_cmd/**/* @10gen/query
+
 # The following patterns are parsed from ./src/mongo/db/s/resharding/OWNERS.yml
 /src/mongo/db/s/resharding/**/* @10gen/server-cluster-scalability
 
@@ -797,6 +800,14 @@ WORKSPACE.bazel @10gen/devprod-build
 /src/mongo/s/commands/**/cluster_refine_collection_shard_key_cmd.cpp @10gen/server-catalog-and-routing
 /src/mongo/s/commands/**/cluster_remove_* @10gen/server-catalog-and-routing
 /src/mongo/s/commands/**/*placement_history* @10gen/server-catalog-and-routing
+/src/mongo/s/commands/**/sharding_expressions* @10gen/query-integration
+
+# The following patterns are parsed from ./src/mongo/s/commands/query_cmd/OWNERS.yml
+/src/mongo/s/commands/query_cmd/**/* @10gen/query
+/src/mongo/s/commands/query_cmd/**/cluster_analyze_cmd.cpp @10gen/query-optimization
+/src/mongo/s/commands/query_cmd/**/cluster_index_filter_cmd.cpp @10gen/query-optimization
+/src/mongo/s/commands/query_cmd/**/cluster_plan_cache_clear_cmd.cpp @10gen/query-optimization
+/src/mongo/s/commands/query_cmd/**/cluster_profile_cmd.cpp @10gen/query-integration
 
 # The following patterns are parsed from ./src/mongo/s/migration_blocking_operation/OWNERS.yml
 /src/mongo/s/migration_blocking_operation/**/* @10gen/server-cluster-scalability

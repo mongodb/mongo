@@ -27,16 +27,14 @@
  *    it in the license file.
  */
 
-
-#include "mongo/s/commands/cluster_write_cmd.h"
-
-#include <boost/smart_ptr.hpp>
-#include <cstddef>
-#include <tuple>
+#include "mongo/s/commands/query_cmd/cluster_write_cmd.h"
 
 #include <boost/move/utility_core.hpp>
 #include <boost/none.hpp>
 #include <boost/optional/optional.hpp>
+#include <boost/smart_ptr.hpp>
+#include <cstddef>
+#include <tuple>
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/error_extra_info.h"
@@ -74,8 +72,8 @@
 #include "mongo/s/cluster_commands_helpers.h"
 #include "mongo/s/cluster_write.h"
 #include "mongo/s/collection_routing_info_targeter.h"
-#include "mongo/s/commands/cluster_explain.h"
 #include "mongo/s/commands/document_shard_key_update_util.h"
+#include "mongo/s/commands/query_cmd/cluster_explain.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/multi_statement_transaction_requests_sender.h"
 #include "mongo/s/request_types/cluster_commands_without_shard_key_gen.h"

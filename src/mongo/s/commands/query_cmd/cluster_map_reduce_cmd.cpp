@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2022-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MongoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
@@ -27,46 +27,46 @@
  *    it in the license file.
  */
 
-#include <set>
-#include <string>
-#include <vector>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
 
-#include "mongo/base/status.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/commands.h"
+#include "mongo/db/commands/query_cmd/map_reduce_command_base.h"
 #include "mongo/db/database_name.h"
 #include "mongo/db/operation_context.h"
-#include "mongo/s/commands/cluster_count_cmd.h"
-#include "mongo/util/assert_util.h"
+#include "mongo/db/query/explain_options.h"
+#include "mongo/db/service_context.h"
+#include "mongo/s/commands/query_cmd/cluster_map_reduce_agg.h"
 
 namespace mongo {
 namespace {
 
-/**
- * Implements the cluster count command on mongos.
- */
-struct ClusterCountCmdS {
-    static constexpr StringData kName = "count"_sd;
+class ClusterMapReduceCommand : public MapReduceCommandBase {
+public:
+    ClusterMapReduceCommand() = default;
 
-    static const std::set<std::string>& getApiVersions() {
-        return kApiVersions1;
+    AllowedOnSecondary secondaryAllowed(ServiceContext*) const override {
+        return AllowedOnSecondary::kAlways;
     }
 
-    static Status checkAuthForOperation(OperationContext*, const DatabaseName&, const BSONObj&) {
-        // No additional required privileges on a mongos.
-        return Status::OK();
+    void _explainImpl(OperationContext* opCtx,
+                      const DatabaseName& dbName,
+                      const BSONObj& cmd,
+                      BSONObjBuilder& result,
+                      boost::optional<ExplainOptions::Verbosity> verbosity) const override {
+        runAggregationMapReduce(opCtx, dbName, cmd, result, verbosity);
     }
 
-    static void checkCanRunHere(OperationContext* opCtx) {
-        // Can always run on a mongos.
-    }
-
-    static void checkCanExplainHere(OperationContext* opCtx) {
-        // Can always run on a mongos.
+    bool run(OperationContext* opCtx,
+             const DatabaseName& dbName,
+             const BSONObj& cmdObj,
+             BSONObjBuilder& result) override {
+        return runAggregationMapReduce(opCtx, dbName, cmdObj, result, boost::none);
     }
 };
-MONGO_REGISTER_COMMAND(ClusterCountCmdBase<ClusterCountCmdS>).forRouter();
+MONGO_REGISTER_COMMAND(ClusterMapReduceCommand).forRouter();
 
 }  // namespace
 }  // namespace mongo

@@ -31,117 +31,85 @@
 #include <set>
 #include <string>
 
-#include "mongo/base/error_codes.h"
 #include "mongo/base/string_data.h"
-#include "mongo/db/auth/action_type.h"
 #include "mongo/db/auth/authorization_session.h"
-#include "mongo/db/auth/resource_pattern.h"
 #include "mongo/db/commands.h"
-#include "mongo/db/database_name.h"
+#include "mongo/db/commands/query_cmd/write_commands_common.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/ops/write_ops_gen.h"
-#include "mongo/s/commands/cluster_write_cmd.h"
-#include "mongo/s/grid.h"
-#include "mongo/s/sharding_state.h"
-#include "mongo/util/assert_util.h"
+#include "mongo/s/commands/query_cmd/cluster_write_cmd.h"
 
 namespace mongo {
 namespace {
 
-struct ClusterInsertCmdD {
-    static constexpr StringData kName = "clusterInsert"_sd;
+struct ClusterInsertCmdS {
+    static constexpr StringData kName = "insert"_sd;
 
     static const std::set<std::string>& getApiVersions() {
-        return kNoApiVersions;
+        return kApiVersions1;
     }
 
     static void doCheckAuthorization(AuthorizationSession* authzSession,
                                      bool bypass,
                                      const write_ops::InsertCommandRequest& op) {
-        uassert(ErrorCodes::Unauthorized,
-                "Unauthorized",
-                authzSession->isAuthorizedForActionsOnResource(
-                    ResourcePattern::forClusterResource(op.getDbName().tenantId()),
-                    ActionType::internal));
+        auth::checkAuthForInsertCommand(authzSession, bypass, op);
     }
 
     static void checkCanRunHere(OperationContext* opCtx) {
-        Grid::get(opCtx)->assertShardingIsInitialized();
-
-        // A cluster command on the config server may attempt to use a ShardLocal to target itself,
-        // which triggers an invariant, so only shard servers can run this.
-        ShardingState::get(opCtx)->assertCanAcceptShardedCommands();
+        // Can always run on a mongos.
     }
 
     static void checkCanExplainHere(OperationContext* opCtx) {
-        uasserted(ErrorCodes::CommandNotSupported,
-                  "Cannot explain a cluster insert command on a mongod");
+        // Can always run on a mongos.
     }
 };
-MONGO_REGISTER_COMMAND(ClusterInsertCmdBase<ClusterInsertCmdD>).forShard();
+MONGO_REGISTER_COMMAND(ClusterInsertCmdBase<ClusterInsertCmdS>).forRouter();
 
-struct ClusterUpdateCmdD {
-    static constexpr StringData kName = "clusterUpdate"_sd;
+struct ClusterUpdateCmdS {
+    static constexpr StringData kName = "update"_sd;
 
     static const std::set<std::string>& getApiVersions() {
-        return kNoApiVersions;
+        return kApiVersions1;
     }
 
     static void doCheckAuthorization(AuthorizationSession* authzSession,
                                      bool bypass,
                                      const write_ops::UpdateCommandRequest& op) {
-        uassert(ErrorCodes::Unauthorized,
-                "Unauthorized",
-                authzSession->isAuthorizedForActionsOnResource(
-                    ResourcePattern::forClusterResource(op.getDbName().tenantId()),
-                    ActionType::internal));
+        auth::checkAuthForUpdateCommand(authzSession, bypass, op);
     }
 
     static void checkCanRunHere(OperationContext* opCtx) {
-        Grid::get(opCtx)->assertShardingIsInitialized();
-
-        // A cluster command on the config server may attempt to use a ShardLocal to target itself,
-        // which triggers an invariant, so only shard servers can run this.
-        ShardingState::get(opCtx)->assertCanAcceptShardedCommands();
+        // Can always run on a mongos.
     }
 
     static void checkCanExplainHere(OperationContext* opCtx) {
-        uasserted(ErrorCodes::CommandNotSupported, "Explain on a clusterDelete is not supported");
+        // Can always run on a mongos.
     }
 };
-MONGO_REGISTER_COMMAND(ClusterUpdateCmdBase<ClusterUpdateCmdD>).forShard();
+MONGO_REGISTER_COMMAND(ClusterUpdateCmdBase<ClusterUpdateCmdS>).forRouter();
 
-struct ClusterDeleteCmdD {
-    static constexpr StringData kName = "clusterDelete"_sd;
+struct ClusterDeleteCmdS {
+    static constexpr StringData kName = "delete"_sd;
 
     static const std::set<std::string>& getApiVersions() {
-        return kNoApiVersions;
+        return kApiVersions1;
     }
 
     static void doCheckAuthorization(AuthorizationSession* authzSession,
                                      bool bypass,
                                      const write_ops::DeleteCommandRequest& op) {
-        uassert(ErrorCodes::Unauthorized,
-                "Unauthorized",
-                authzSession->isAuthorizedForActionsOnResource(
-                    ResourcePattern::forClusterResource(op.getDbName().tenantId()),
-                    ActionType::internal));
+        auth::checkAuthForDeleteCommand(authzSession, bypass, op);
     }
 
     static void checkCanRunHere(OperationContext* opCtx) {
-        Grid::get(opCtx)->assertShardingIsInitialized();
-
-        // A cluster command on the config server may attempt to use a ShardLocal to target itself,
-        // which triggers an invariant, so only shard servers can run this.
-        ShardingState::get(opCtx)->assertCanAcceptShardedCommands();
+        // Can always run on a mongos.
     }
 
     static void checkCanExplainHere(OperationContext* opCtx) {
-        uasserted(ErrorCodes::CommandNotSupported,
-                  "Cannot explain a cluster delete command on a mongod");
+        // Can always run on a mongos.
     }
 };
-MONGO_REGISTER_COMMAND(ClusterDeleteCmdBase<ClusterDeleteCmdD>).forShard();
+MONGO_REGISTER_COMMAND(ClusterDeleteCmdBase<ClusterDeleteCmdS>).forRouter();
 
 }  // namespace
 }  // namespace mongo

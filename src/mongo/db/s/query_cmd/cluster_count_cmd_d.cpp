@@ -27,48 +27,48 @@
  *    it in the license file.
  */
 
-#include <memory>
 #include <set>
 #include <string>
 #include <vector>
 
 #include "mongo/base/error_codes.h"
+#include "mongo/base/status.h"
 #include "mongo/base/string_data.h"
+#include "mongo/bson/bsonobj.h"
 #include "mongo/db/auth/action_type.h"
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/auth/resource_pattern.h"
 #include "mongo/db/commands.h"
-#include "mongo/db/namespace_string.h"
+#include "mongo/db/database_name.h"
 #include "mongo/db/operation_context.h"
-#include "mongo/db/pipeline/aggregation_request_helper.h"
-#include "mongo/db/query/parsed_find_command.h"
-#include "mongo/s/commands/cluster_find_cmd.h"
+#include "mongo/s/commands/query_cmd/cluster_count_cmd.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/sharding_state.h"
 #include "mongo/util/assert_util.h"
-#include "mongo/util/intrusive_counter.h"
 
 namespace mongo {
 namespace {
 
 /**
- * Implements the cluster find command on mongod.
+ * Implements the cluster count command on mongod.
  */
-struct ClusterFindCmdD {
-    static constexpr StringData kName = "clusterFind"_sd;
+struct ClusterCountCmdD {
+    static constexpr StringData kName = "clusterCount"_sd;
 
     static const std::set<std::string>& getApiVersions() {
         return kNoApiVersions;
     }
 
-    static void doCheckAuthorization(OperationContext* opCtx,
-                                     bool hasTerm,
-                                     const NamespaceString& nss) {
-        uassert(ErrorCodes::Unauthorized,
-                "Unauthorized",
-                AuthorizationSession::get(opCtx->getClient())
-                    ->isAuthorizedForActionsOnResource(
-                        ResourcePattern::forClusterResource(nss.tenantId()), ActionType::internal));
+    static Status checkAuthForOperation(OperationContext* opCtx,
+                                        const DatabaseName& dbName,
+                                        const BSONObj& cmdObj) {
+        auto* as = AuthorizationSession::get(opCtx->getClient());
+        if (!as->isAuthorizedForActionsOnResource(
+                ResourcePattern::forClusterResource(dbName.tenantId()), ActionType::internal)) {
+            return {ErrorCodes::Unauthorized, "unauthorized"};
+        }
+
+        return Status::OK();
     }
 
     static void checkCanRunHere(OperationContext* opCtx) {
@@ -81,10 +81,10 @@ struct ClusterFindCmdD {
 
     static void checkCanExplainHere(OperationContext* opCtx) {
         uasserted(ErrorCodes::CommandNotSupported,
-                  "Cannot explain a cluster find command on a mongod");
+                  "Cannot explain a cluster count command on a mongod");
     }
 };
-MONGO_REGISTER_COMMAND(ClusterFindCmdBase<ClusterFindCmdD>).forShard();
+MONGO_REGISTER_COMMAND(ClusterCountCmdBase<ClusterCountCmdD>).forShard();
 
 }  // namespace
 }  // namespace mongo

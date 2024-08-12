@@ -27,45 +27,46 @@
  *    it in the license file.
  */
 
-#include <memory>
 #include <set>
 #include <string>
+#include <vector>
 
+#include "mongo/base/status.h"
 #include "mongo/base/string_data.h"
-#include "mongo/db/auth/authorization_checks.h"
-#include "mongo/db/auth/authorization_session.h"
+#include "mongo/bson/bsonobj.h"
 #include "mongo/db/commands.h"
-#include "mongo/db/namespace_string.h"
+#include "mongo/db/database_name.h"
 #include "mongo/db/operation_context.h"
-#include "mongo/s/commands/cluster_getmore_cmd.h"
+#include "mongo/s/commands/query_cmd/cluster_count_cmd.h"
 #include "mongo/util/assert_util.h"
 
 namespace mongo {
 namespace {
 
 /**
- * Implements the cluster getMore command on mongos.
+ * Implements the cluster count command on mongos.
  */
-struct ClusterGetMoreCmdS {
-    static constexpr StringData kName = "getMore"_sd;
+struct ClusterCountCmdS {
+    static constexpr StringData kName = "count"_sd;
 
     static const std::set<std::string>& getApiVersions() {
         return kApiVersions1;
     }
 
-    static void doCheckAuthorization(OperationContext* opCtx,
-                                     const NamespaceString& nss,
-                                     long long cursorID,
-                                     bool hasTerm) {
-        uassertStatusOK(auth::checkAuthForGetMore(
-            AuthorizationSession::get(opCtx->getClient()), nss, cursorID, hasTerm));
+    static Status checkAuthForOperation(OperationContext*, const DatabaseName&, const BSONObj&) {
+        // No additional required privileges on a mongos.
+        return Status::OK();
     }
 
     static void checkCanRunHere(OperationContext* opCtx) {
         // Can always run on a mongos.
     }
+
+    static void checkCanExplainHere(OperationContext* opCtx) {
+        // Can always run on a mongos.
+    }
 };
-MONGO_REGISTER_COMMAND(ClusterGetMoreCmdBase<ClusterGetMoreCmdS>).forRouter();
+MONGO_REGISTER_COMMAND(ClusterCountCmdBase<ClusterCountCmdS>).forRouter();
 
 }  // namespace
 }  // namespace mongo

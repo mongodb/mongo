@@ -31,52 +31,41 @@
 #include <set>
 #include <string>
 
-#include "mongo/base/error_codes.h"
 #include "mongo/base/string_data.h"
-#include "mongo/db/auth/action_type.h"
+#include "mongo/db/auth/authorization_checks.h"
 #include "mongo/db/auth/authorization_session.h"
-#include "mongo/db/auth/resource_pattern.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
-#include "mongo/s/commands/cluster_getmore_cmd.h"
-#include "mongo/s/grid.h"
-#include "mongo/s/sharding_state.h"
+#include "mongo/s/commands/query_cmd/cluster_getmore_cmd.h"
 #include "mongo/util/assert_util.h"
 
 namespace mongo {
 namespace {
 
 /**
- * Implements the cluster getMore command on mongod.
+ * Implements the cluster getMore command on mongos.
  */
-struct ClusterGetMoreCmdD {
-    static constexpr StringData kName = "clusterGetMore"_sd;
+struct ClusterGetMoreCmdS {
+    static constexpr StringData kName = "getMore"_sd;
 
     static const std::set<std::string>& getApiVersions() {
-        return kNoApiVersions;
+        return kApiVersions1;
     }
 
     static void doCheckAuthorization(OperationContext* opCtx,
                                      const NamespaceString& nss,
                                      long long cursorID,
                                      bool hasTerm) {
-        uassert(ErrorCodes::Unauthorized,
-                "Unauthorized",
-                AuthorizationSession::get(opCtx->getClient())
-                    ->isAuthorizedForActionsOnResource(
-                        ResourcePattern::forClusterResource(nss.tenantId()), ActionType::internal));
+        uassertStatusOK(auth::checkAuthForGetMore(
+            AuthorizationSession::get(opCtx->getClient()), nss, cursorID, hasTerm));
     }
 
     static void checkCanRunHere(OperationContext* opCtx) {
-        Grid::get(opCtx)->assertShardingIsInitialized();
-
-        // A cluster command on the config server may attempt to use a ShardLocal to target itself,
-        // which triggers an invariant, so only shard servers can run this.
-        ShardingState::get(opCtx)->assertCanAcceptShardedCommands();
+        // Can always run on a mongos.
     }
 };
-MONGO_REGISTER_COMMAND(ClusterGetMoreCmdBase<ClusterGetMoreCmdD>).forShard();
+MONGO_REGISTER_COMMAND(ClusterGetMoreCmdBase<ClusterGetMoreCmdS>).forRouter();
 
 }  // namespace
 }  // namespace mongo

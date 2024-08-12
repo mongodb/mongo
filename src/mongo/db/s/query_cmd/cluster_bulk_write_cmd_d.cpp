@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2022-present MongoDB, Inc.
+ *    Copyright (C) 2023-present MongoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
@@ -27,52 +27,44 @@
  *    it in the license file.
  */
 
-#include <memory>
-#include <set>
-#include <string>
-#include <vector>
-
-#include "mongo/base/string_data.h"
-#include "mongo/db/auth/authorization_checks.h"
-#include "mongo/db/auth/authorization_session.h"
-#include "mongo/db/commands.h"
-#include "mongo/db/namespace_string.h"
-#include "mongo/db/operation_context.h"
-#include "mongo/db/pipeline/aggregation_request_helper.h"
-#include "mongo/db/query/parsed_find_command.h"
-#include "mongo/s/commands/cluster_find_cmd.h"
-#include "mongo/util/assert_util.h"
-#include "mongo/util/intrusive_counter.h"
+#include "mongo/s/commands/query_cmd/cluster_bulk_write_cmd.h"
+#include "mongo/s/grid.h"
+#include "mongo/s/sharding_state.h"
 
 namespace mongo {
 namespace {
 
-/**
- * Implements the cluster find command on mongos.
- */
-struct ClusterFindCmdS {
-    static constexpr StringData kName = "find"_sd;
+struct ClusterBulkWriteCmdD {
+    static constexpr StringData kName = "clusterBulkWrite"_sd;
 
     static const std::set<std::string>& getApiVersions() {
-        return kApiVersions1;
+        return kNoApiVersions;
     }
 
-    static void doCheckAuthorization(OperationContext* opCtx,
-                                     bool hasTerm,
-                                     const NamespaceString& nss) {
-        uassertStatusOK(
-            auth::checkAuthForFind(AuthorizationSession::get(opCtx->getClient()), nss, hasTerm));
+    static void doCheckAuthorization(AuthorizationSession* authzSession,
+                                     bool bypass,
+                                     const BulkWriteCommandRequest& op) {
+        uassert(ErrorCodes::Unauthorized,
+                "Unauthorized",
+                authzSession->isAuthorizedForActionsOnResource(
+                    ResourcePattern::forClusterResource(op.getDbName().tenantId()),
+                    ActionType::internal));
     }
 
     static void checkCanRunHere(OperationContext* opCtx) {
-        // Can always run on a mongos.
+        Grid::get(opCtx)->assertShardingIsInitialized();
+
+        // A cluster command on the config server may attempt to use a ShardLocal to target itself,
+        // which triggers an invariant, so only shard servers can run this.
+        ShardingState::get(opCtx)->assertCanAcceptShardedCommands();
     }
 
     static void checkCanExplainHere(OperationContext* opCtx) {
-        // Can always run on a mongos.
+        uasserted(ErrorCodes::CommandNotSupported,
+                  "Cannot explain a cluster insert command on a mongod");
     }
 };
-MONGO_REGISTER_COMMAND(ClusterFindCmdBase<ClusterFindCmdS>).forRouter();
+MONGO_REGISTER_COMMAND(ClusterBulkWriteCmd<ClusterBulkWriteCmdD>).forShard();
 
 }  // namespace
 }  // namespace mongo

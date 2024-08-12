@@ -30,63 +30,53 @@
 #include <memory>
 #include <set>
 #include <string>
-#include <utility>
-
-#include <absl/container/node_hash_map.h>
-#include <boost/optional/optional.hpp>
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/string_data.h"
+#include "mongo/db/auth/action_type.h"
 #include "mongo/db/auth/authorization_session.h"
-#include "mongo/db/auth/privilege.h"
+#include "mongo/db/auth/resource_pattern.h"
 #include "mongo/db/commands.h"
+#include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
-#include "mongo/db/pipeline/aggregate_command_gen.h"
-#include "mongo/db/pipeline/aggregation_request_helper.h"
-#include "mongo/db/query/explain_options.h"
-#include "mongo/rpc/op_msg.h"
-#include "mongo/s/commands/cluster_pipeline_cmd.h"
+#include "mongo/s/commands/query_cmd/cluster_getmore_cmd.h"
+#include "mongo/s/grid.h"
+#include "mongo/s/sharding_state.h"
 #include "mongo/util/assert_util.h"
-#include "mongo/util/database_name_util.h"
 
 namespace mongo {
 namespace {
 
 /**
- * Implements the cluster aggregate command on mongos.
+ * Implements the cluster getMore command on mongod.
  */
-struct ClusterPipelineCommandS {
-    static constexpr StringData kName = "aggregate"_sd;
+struct ClusterGetMoreCmdD {
+    static constexpr StringData kName = "clusterGetMore"_sd;
 
     static const std::set<std::string>& getApiVersions() {
-        return kApiVersions1;
+        return kNoApiVersions;
     }
 
     static void doCheckAuthorization(OperationContext* opCtx,
-                                     const OpMsgRequest&,
-                                     const PrivilegeVector& privileges) {
-        uassert(
-            ErrorCodes::Unauthorized,
-            "unauthorized",
-            AuthorizationSession::get(opCtx->getClient())->isAuthorizedForPrivileges(privileges));
+                                     const NamespaceString& nss,
+                                     long long cursorID,
+                                     bool hasTerm) {
+        uassert(ErrorCodes::Unauthorized,
+                "Unauthorized",
+                AuthorizationSession::get(opCtx->getClient())
+                    ->isAuthorizedForActionsOnResource(
+                        ResourcePattern::forClusterResource(nss.tenantId()), ActionType::internal));
     }
 
     static void checkCanRunHere(OperationContext* opCtx) {
-        // Can always run on a mongos.
-    }
+        Grid::get(opCtx)->assertShardingIsInitialized();
 
-    static void checkCanExplainHere(OperationContext* opCtx) {
-        // Can always run on a mongos.
-    }
-
-    static AggregateCommandRequest parseAggregationRequest(
-        const OpMsgRequest& opMsgRequest,
-        boost::optional<ExplainOptions::Verbosity> explainVerbosity) {
-        return aggregation_request_helper::parseFromBSON(
-            opMsgRequest.body, opMsgRequest.validatedTenancyScope, explainVerbosity);
+        // A cluster command on the config server may attempt to use a ShardLocal to target itself,
+        // which triggers an invariant, so only shard servers can run this.
+        ShardingState::get(opCtx)->assertCanAcceptShardedCommands();
     }
 };
-MONGO_REGISTER_COMMAND(ClusterPipelineCommandBase<ClusterPipelineCommandS>).forRouter();
+MONGO_REGISTER_COMMAND(ClusterGetMoreCmdBase<ClusterGetMoreCmdD>).forShard();
 
 }  // namespace
 }  // namespace mongo

@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#include "mongo/s/commands/cluster_map_reduce_agg.h"
+#include "mongo/s/commands/query_cmd/cluster_map_reduce_agg.h"
 
 #include <absl/container/node_hash_map.h>
 #include <boost/move/utility_core.hpp>

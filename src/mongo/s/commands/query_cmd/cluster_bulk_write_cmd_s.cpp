@@ -27,44 +27,39 @@
  *    it in the license file.
  */
 
-#include "mongo/s/commands/cluster_bulk_write_cmd.h"
-#include "mongo/s/grid.h"
-#include "mongo/s/sharding_state.h"
+#include "mongo/db/operation_context.h"
+#include "mongo/s/commands/query_cmd/cluster_bulk_write_cmd.h"
+
+#include "mongo/db/commands/query_cmd/bulk_write_common.h"
 
 namespace mongo {
 namespace {
 
-struct ClusterBulkWriteCmdD {
-    static constexpr StringData kName = "clusterBulkWrite"_sd;
+struct ClusterBulkWriteCmdS {
+    static constexpr StringData kName = "bulkWrite"_sd;
 
     static const std::set<std::string>& getApiVersions() {
-        return kNoApiVersions;
+        return kApiVersions1;
     }
 
     static void doCheckAuthorization(AuthorizationSession* authzSession,
                                      bool bypass,
                                      const BulkWriteCommandRequest& op) {
         uassert(ErrorCodes::Unauthorized,
-                "Unauthorized",
-                authzSession->isAuthorizedForActionsOnResource(
-                    ResourcePattern::forClusterResource(op.getDbName().tenantId()),
-                    ActionType::internal));
+                "unauthorized",
+                authzSession->isAuthorizedForPrivileges(bulk_write_common::getPrivileges(op)));
     }
 
     static void checkCanRunHere(OperationContext* opCtx) {
-        Grid::get(opCtx)->assertShardingIsInitialized();
-
-        // A cluster command on the config server may attempt to use a ShardLocal to target itself,
-        // which triggers an invariant, so only shard servers can run this.
-        ShardingState::get(opCtx)->assertCanAcceptShardedCommands();
+        // Can always run on a mongos.
     }
 
     static void checkCanExplainHere(OperationContext* opCtx) {
-        uasserted(ErrorCodes::CommandNotSupported,
-                  "Cannot explain a cluster insert command on a mongod");
+        // Can always run on a mongos.
     }
 };
-MONGO_REGISTER_COMMAND(ClusterBulkWriteCmd<ClusterBulkWriteCmdD>).forShard();
+
+MONGO_REGISTER_COMMAND(ClusterBulkWriteCmd<ClusterBulkWriteCmdS>).forRouter();
 
 }  // namespace
 }  // namespace mongo

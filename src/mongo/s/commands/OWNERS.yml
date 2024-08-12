@@ -72,3 +72,6 @@ filters:
   - "*placement_history*":
     approvers:
       - 10gen/server-catalog-and-routing
+  - "sharding_expressions*":
+    approvers:
+      - 10gen/query-integration

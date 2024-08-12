@@ -27,48 +27,57 @@
  *    it in the license file.
  */
 
+#include <memory>
 #include <set>
 #include <string>
-#include <vector>
+#include <utility>
+
+#include <absl/container/node_hash_map.h>
+#include <boost/optional/optional.hpp>
 
 #include "mongo/base/error_codes.h"
-#include "mongo/base/status.h"
 #include "mongo/base/string_data.h"
+#include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/auth/action_type.h"
 #include "mongo/db/auth/authorization_session.h"
+#include "mongo/db/auth/privilege.h"
 #include "mongo/db/auth/resource_pattern.h"
 #include "mongo/db/commands.h"
-#include "mongo/db/database_name.h"
 #include "mongo/db/operation_context.h"
-#include "mongo/s/commands/cluster_count_cmd.h"
+#include "mongo/db/pipeline/aggregate_command_gen.h"
+#include "mongo/db/pipeline/aggregation_request_helper.h"
+#include "mongo/db/query/explain_options.h"
+#include "mongo/rpc/op_msg.h"
+#include "mongo/s/commands/query_cmd/cluster_pipeline_cmd.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/sharding_state.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/database_name_util.h"
 
 namespace mongo {
 namespace {
 
 /**
- * Implements the cluster count command on mongod.
+ * Implements the cluster aggregate command on mongod.
  */
-struct ClusterCountCmdD {
-    static constexpr StringData kName = "clusterCount"_sd;
+struct ClusterPipelineCommandD {
+    static constexpr StringData kName = "clusterAggregate"_sd;
 
     static const std::set<std::string>& getApiVersions() {
         return kNoApiVersions;
     }
 
-    static Status checkAuthForOperation(OperationContext* opCtx,
-                                        const DatabaseName& dbName,
-                                        const BSONObj& cmdObj) {
-        auto* as = AuthorizationSession::get(opCtx->getClient());
-        if (!as->isAuthorizedForActionsOnResource(
-                ResourcePattern::forClusterResource(dbName.tenantId()), ActionType::internal)) {
-            return {ErrorCodes::Unauthorized, "unauthorized"};
-        }
-
-        return Status::OK();
+    static void doCheckAuthorization(OperationContext* opCtx,
+                                     const OpMsgRequest& opMsgRequest,
+                                     const PrivilegeVector& privileges) {
+        uassert(ErrorCodes::Unauthorized,
+                "Unauthorized",
+                AuthorizationSession::get(opCtx->getClient())
+                    ->isAuthorizedForActionsOnResource(
+                        ResourcePattern::forClusterResource(opMsgRequest.getValidatedTenantId()),
+                        ActionType::internal));
     }
 
     static void checkCanRunHere(OperationContext* opCtx) {
@@ -81,10 +90,20 @@ struct ClusterCountCmdD {
 
     static void checkCanExplainHere(OperationContext* opCtx) {
         uasserted(ErrorCodes::CommandNotSupported,
-                  "Cannot explain a cluster count command on a mongod");
+                  "Cannot explain a cluster aggregate command on a mongod");
+    }
+
+    static AggregateCommandRequest parseAggregationRequest(
+        const OpMsgRequest& opMsgRequest,
+        boost::optional<ExplainOptions::Verbosity> explainVerbosity) {
+        // Replace clusterAggregate in the request body because the parser doesn't recognize it.
+        auto modifiedRequestBody =
+            opMsgRequest.body.replaceFieldNames(BSON(AggregateCommandRequest::kCommandName << 1));
+        return aggregation_request_helper::parseFromBSON(
+            modifiedRequestBody, opMsgRequest.validatedTenancyScope, explainVerbosity);
     }
 };
-MONGO_REGISTER_COMMAND(ClusterCountCmdBase<ClusterCountCmdD>).forShard();
+MONGO_REGISTER_COMMAND(ClusterPipelineCommandBase<ClusterPipelineCommandD>).forShard();
 
 }  // namespace
 }  // namespace mongo
