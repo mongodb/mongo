@@ -1253,7 +1253,7 @@ def query_for_results(env, bazel_target, libdeps_ext, bazel_targets_checked):
         bazel_query = (
             ["cquery"]
             + env["BAZEL_FLAGS_STR"]
-            + [f'kind("extract_debuginfo", deps(@{bazel_target}))', "--output", "files"]
+            + [f'kind("extract_debuginfo", deps("@{bazel_target}"))', "--output", "files"]
         )
         results = env.RunBazelQuery(bazel_query, "getting bazel libdeps")
         if results.returncode != 0:

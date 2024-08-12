@@ -52,6 +52,9 @@ thirdPartyEnvironmentModifications = {
             '#/src/third_party/librdkafka/dist/src',
             '#/src/third_party/librdkafka/dist/src-cpp',
         ],
+        'SYSLIBDEPS_PRIVATE': [
+            'curl',
+        ],
     },
 }
 
@@ -528,8 +531,3 @@ if env.TargetOSIs('linux') and env['ENABLE_GRPC_BUILD']:
 if env.ShouldBuildStreams():
     libKafkaEnv = env.Clone()
     libKafkaEnv.InjectThirdParty(libraries=['librdkafka'])
-    libKafkaEnv.SConscript('librdkafka/SConscript', exports={'env': libKafkaEnv})
-    libKafkaEnv = libKafkaEnv.Clone(LIBDEPS_INTERFACE=[
-        'librdkafka/rdkafka',
-        'librdkafka/rdkafka++',
-    ])

@@ -107,7 +107,7 @@ def get_bazel_args(compiler_type: str, extra_args: list[str]) -> list[str]:
 def bazel_compile_commands(
     bazel_bin: str, bazel_targets: list[str], bazel_args: list[str]
 ) -> list[str]:
-    debug_targets = " ".join([f"{target}_with_debug" for target in bazel_targets])
+    debug_targets = " ".join([f'"{target}_with_debug"' for target in bazel_targets])
     proc = log_subprocess_run(
         [
             bazel_bin,
@@ -184,9 +184,9 @@ def bazel_linker_commands(
 ) -> list[str]:
     debug_targets = " ".join(
         [
-            f"{target}_shared_with_debug"
+            f'"{target}_shared_with_debug"'
             if target_type_map[target] == "library" and not link_static
-            else f"{target}_with_debug"
+            else f'"{target}_with_debug"'
             for target in bazel_targets
         ]
     )

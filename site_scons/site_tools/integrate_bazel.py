@@ -601,7 +601,7 @@ def auto_install_bazel(env, libdep, shlib_suffix):
         bazel_query = (
             ["cquery"]
             + env["BAZEL_FLAGS_STR"]
-            + [f"kind('extract_debuginfo', deps(@{bazel_target}))", "--output=files"]
+            + [f'kind("extract_debuginfo", deps("@{bazel_target}"))', "--output=files"]
         )
         try:
             query_results = retry_call(

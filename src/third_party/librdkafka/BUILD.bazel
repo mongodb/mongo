@@ -1,0 +1,180 @@
+load("//bazel:mongo_src_rules.bzl", "mongo_cc_library")
+load("@bazel_skylib//rules:copy_file.bzl", "copy_file")
+
+package(default_visibility = ["//visibility:public"])
+
+[
+    # Make the platform-specific config header available at `dist` and create a
+    # directory so that this path is usable as "../config.h" within the GENDIR.
+    #
+    # To use it in depending targets, add Both ":dist_config_h", and
+    # ":dist_FAKE_config_h" to the sources of the initial target and add
+    # "-I$(GENDIR)/src/third_party/librdkafka/dist/src" to the copts of targets
+    # that include this header (i.e. only to librdkafka and librdkafka++).
+    copy_file(
+        name = "{}_config_h".format(out.replace("/", "_")),
+        src = select({
+            "//bazel/config:{}".format(platform): "dist/platform/{}/include/config.h".format(platform)
+            for platform in [
+                "linux_aarch64",
+                "linux_x86_64",
+            ]
+        }),
+        out = "{}/config.h".format(out),
+        target_compatible_with = select({
+            "//bazel/config:linux_x86_64": [],
+            "//bazel/config:linux_aarch64": [],
+            "//conditions:default": ["@platforms//:incompatible"],
+        }),
+    )
+    for out in [
+        "dist",
+        "dist/FAKE",
+    ]
+]
+
+mongo_cc_library(
+    name = "rdkafka",
+    srcs = [
+        "dist/src/cJSON.c",
+        "dist/src/crc32c.c",
+        "dist/src/lz4.c",
+        "dist/src/lz4frame.c",
+        "dist/src/lz4hc.c",
+        "dist/src/rdaddr.c",
+        "dist/src/rdavl.c",
+        "dist/src/rdbuf.c",
+        "dist/src/rdcrc32.c",
+        "dist/src/rddl.c",
+        "dist/src/rdfnv1a.c",
+        "dist/src/rdgz.c",
+        "dist/src/rdhdrhistogram.c",
+        "dist/src/rdhttp.c",
+        "dist/src/rdkafka.c",
+        "dist/src/rdkafka_admin.c",
+        "dist/src/rdkafka_assignment.c",
+        "dist/src/rdkafka_assignor.c",
+        "dist/src/rdkafka_aux.c",
+        "dist/src/rdkafka_background.c",
+        "dist/src/rdkafka_broker.c",
+        "dist/src/rdkafka_buf.c",
+        "dist/src/rdkafka_cert.c",
+        "dist/src/rdkafka_cgrp.c",
+        "dist/src/rdkafka_conf.c",
+        "dist/src/rdkafka_coord.c",
+        "dist/src/rdkafka_error.c",
+        "dist/src/rdkafka_event.c",
+        "dist/src/rdkafka_feature.c",
+        "dist/src/rdkafka_fetcher.c",
+        "dist/src/rdkafka_header.c",
+        "dist/src/rdkafka_idempotence.c",
+        "dist/src/rdkafka_interceptor.c",
+        "dist/src/rdkafka_lz4.c",
+        "dist/src/rdkafka_metadata.c",
+        "dist/src/rdkafka_metadata_cache.c",
+        "dist/src/rdkafka_mock.c",
+        "dist/src/rdkafka_mock_cgrp.c",
+        "dist/src/rdkafka_mock_handlers.c",
+        "dist/src/rdkafka_msg.c",
+        "dist/src/rdkafka_msgset_reader.c",
+        "dist/src/rdkafka_msgset_writer.c",
+        "dist/src/rdkafka_offset.c",
+        "dist/src/rdkafka_op.c",
+        "dist/src/rdkafka_partition.c",
+        "dist/src/rdkafka_pattern.c",
+        "dist/src/rdkafka_plugin.c",
+        "dist/src/rdkafka_queue.c",
+        "dist/src/rdkafka_range_assignor.c",
+        "dist/src/rdkafka_request.c",
+        "dist/src/rdkafka_roundrobin_assignor.c",
+        "dist/src/rdkafka_sasl.c",
+        "dist/src/rdkafka_sasl_cyrus.c",
+        "dist/src/rdkafka_sasl_oauthbearer.c",
+        "dist/src/rdkafka_sasl_oauthbearer_oidc.c",
+        "dist/src/rdkafka_sasl_plain.c",
+        "dist/src/rdkafka_sasl_scram.c",
+        "dist/src/rdkafka_ssl.c",
+        "dist/src/rdkafka_sticky_assignor.c",
+        "dist/src/rdkafka_subscription.c",
+        "dist/src/rdkafka_timer.c",
+        "dist/src/rdkafka_topic.c",
+        "dist/src/rdkafka_transport.c",
+        "dist/src/rdkafka_txnmgr.c",
+        "dist/src/rdkafka_zstd.c",
+        "dist/src/rdlist.c",
+        "dist/src/rdlog.c",
+        "dist/src/rdmap.c",
+        "dist/src/rdmurmur2.c",
+        "dist/src/rdports.c",
+        "dist/src/rdrand.c",
+        "dist/src/rdregex.c",
+        "dist/src/rdstring.c",
+        "dist/src/rdunittest.c",
+        "dist/src/rdvarint.c",
+        "dist/src/rdxxhash.c",
+        "dist/src/regexp.c",
+        "dist/src/snappy.c",
+        "dist/src/tinycthread.c",
+        "dist/src/tinycthread_extra.c",
+        ":dist_FAKE_config_h",
+        ":dist_config_h",
+    ],
+    hdrs = glob(["dist/src/**/*.h"]) + [
+        "dist/src/lz4.c",  # This file is textually included.
+    ],
+    copts = [
+        "-Wno-unused-variable",
+        "-Wno-implicit-fallthrough",
+        "-I$(GENDIR)/src/third_party/librdkafka/dist/FAKE",
+        "-U_GNU_SOURCE",
+        "-U_XOPEN_SOURCE",
+    ] + select({
+        "//bazel/config:compiler_type_clang": ["-Wno-uninitialized"],
+        "//bazel/config:compiler_type_gcc": [
+            "-Wno-maybe-uninitialized",
+            "-Wno-unused-but-set-variable",
+        ],
+        "//conditions:default": ["//conditions:incompatible"],
+    }),
+    linkopts = [
+        "-lcurl",
+        "-lsasl2",
+        # TODO(SERVER-74963): We shouldn't require libcrypto and libssl here.
+        "-lcrypto",
+        "-lssl",
+    ],
+    target_compatible_with = select({
+        "//bazel/config:linux_x86_64": [],
+        "//bazel/config:linux_aarch64": [],
+        "//conditions:default": ["@platforms//:incompatible"],
+    }),
+    deps = [
+        "//src/third_party/zlib",
+        "//src/third_party/zstandard:zstd",
+    ],
+)
+
+mongo_cc_library(
+    name = "rdkafka++",
+    srcs = [
+        "dist/src-cpp/ConfImpl.cpp",
+        "dist/src-cpp/ConsumerImpl.cpp",
+        "dist/src-cpp/HandleImpl.cpp",
+        "dist/src-cpp/HeadersImpl.cpp",
+        "dist/src-cpp/KafkaConsumerImpl.cpp",
+        "dist/src-cpp/MessageImpl.cpp",
+        "dist/src-cpp/MetadataImpl.cpp",
+        "dist/src-cpp/ProducerImpl.cpp",
+        "dist/src-cpp/QueueImpl.cpp",
+        "dist/src-cpp/RdKafka.cpp",
+        "dist/src-cpp/TopicImpl.cpp",
+        "dist/src-cpp/TopicPartitionImpl.cpp",
+    ],
+    hdrs = glob(["dist/src-cpp/**/*.h"]),
+    copts = [
+        "-I$(GENDIR)/src/third_party/librdkafka/dist/FAKE",
+    ],
+    deps = [
+        ":rdkafka",
+    ],
+)
