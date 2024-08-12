@@ -1362,8 +1362,8 @@ grpc_unittest_env.AppendUnique(
 
 grpc_unittest_env.Append(CPPPATH=[
     '#src',
-    '$BUILD_DIR',
     '#$BAZEL_OUT_DIR/src'
+    '$BUILD_DIR',
 ], )
 
 grpc_unittest_env.CppUnitTest(
