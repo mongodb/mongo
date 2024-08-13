@@ -238,7 +238,7 @@ WORKSPACE.bazel @10gen/devprod-build
 /src/mongo/db/**/*txn* @10gen/server-cluster-scalability
 /src/mongo/db/**/ttl* @10gen/server-storage-execution
 /src/mongo/db/**/service_entry_point_shard_role* @10gen/server-service-architecture
-/src/mongo/db/**/fle* @10gen/server-security
+/src/mongo/db/**/fle* @10gen/query-integration @10gen/server-security
 /src/mongo/db/**/server_options* @10gen/server-security
 /src/mongo/db/**/server_parameter* @10gen/server-security
 /src/mongo/db/**/*change_stream* @10gen/query-execution
@@ -257,7 +257,6 @@ WORKSPACE.bazel @10gen/devprod-build
 /src/mongo/db/**/drop*idl @10gen/server-catalog-and-routing
 /src/mongo/db/**/startup_recovery* @10gen/server-storage-execution
 /src/mongo/db/**/field_ref* @10gen/query
-/src/mongo/db/**/fle_* @10gen/query-integration
 
 # The following patterns are parsed from ./src/mongo/db/auth/OWNERS.yml
 /src/mongo/db/auth/**/* @10gen/server-security

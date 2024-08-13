@@ -37,6 +37,7 @@ filters:
   - "fle*":
     approvers:
       - 10gen/server-security
+      - 10gen/query-integration
   - "server_options*":
     approvers:
       - 10gen/server-security
@@ -91,6 +92,3 @@ filters:
   - "field_ref*":
     approvers:
       - 10gen/query
-  - "fle_*":
-    approvers:
-      - 10gen/query-integration
