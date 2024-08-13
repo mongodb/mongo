@@ -206,6 +206,8 @@ const char* typeName(BinDataType type) {
             return "column";
         case Sensitive:
             return "sensitive";
+        case Vector:
+            return "vector";
         case bdtCustom:
             return "Custom";
         default:
@@ -225,6 +227,7 @@ bool isValidBinDataType(int type) {
         case Column:
         case bdtCustom:
         case Sensitive:
+        case Vector:
             return true;
         default:
             return false;

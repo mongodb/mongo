@@ -206,6 +206,7 @@ enum BinDataType {
     Encrypt = 6,   /* encryption placeholder or encrypted data */
     Column = 7,    /* compressed column */
     Sensitive = 8, /* data that should be redacted and protected from unnecessary exposure */
+    Vector = 9,    /* A denser format of an array of numbers representing a vector */
     bdtCustom = 128
 };
 

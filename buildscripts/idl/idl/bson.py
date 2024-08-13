@@ -74,6 +74,7 @@ _BINDATA_SUBTYPE = {
     "md5": {"scalar": True, "bindata_enum": "MD5Type"},
     "encrypt": {"scalar": True, "bindata_enum": "Encrypt"},
     "sensitive": {"scalar": True, "bindata_enum": "Sensitive"},
+    "vector": {"scalar": True, "bindata_enum": "Vector"},
 }
 
 
