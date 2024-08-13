@@ -429,6 +429,26 @@ buildvariants:
       - name: compile_and_package_serial_no_unittests_TG
       - name: package_supplementary_data
 
+  - name: amazon2-arm64-compile-pgo
+    display_name: "* Compile for Amazon Linux 2 arm64 PGO"
+    expansions:
+      <<: *shared_compile_expansions
+      pgo_profile_url: https://mciuploads.s3.amazonaws.com/dsi/perf-3-node-replSet.arm.aws.2024-05/b49fc707fb83a45727ad3f9f7cfa4c940a6805fe/sys_perf_perf_3_node_replSet.arm.aws.2024_05_ycsb.100read.2024_05_patch_b49fc707fb83a45727ad3f9f7cfa4c940a6805fe_66b035d75b27a40007f52c27_24_08_05_02_16_15/66b035d75b27a40007f52c27/logs/default.profdata.tgz
+      compile_variant: amazon2-arm64-compile-pgo
+      compile_flags: >-
+        --ssl
+        MONGO_DISTMOD=amazon2
+        -j$(grep -c ^processor /proc/cpuinfo)
+        --release
+        --thin-lto
+        --pgo
+        --variables-files=etc/scons/mongodbtoolchain_stable_clang.vars
+    run_on:
+      - amazon2-arm64-xlarge
+    tasks:
+      - name: compile_and_package_serial_no_unittests_TG
+      - name: package_supplementary_data
+
   - name: amazon2-arm64-mongocrypt-shlib-compile
     display_name: "* Compile mongo_crypt_v1.so for Amazon Linux 2 arm64"
     modules: *modules
