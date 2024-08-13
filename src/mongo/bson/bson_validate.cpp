@@ -238,19 +238,23 @@ private:
 
     void _checkRegexOptions(const BSONElementValue& regex) {
         // Checks that the options are in ascending alphabetical order and that they're all valid.
-        std::string validRegexOptions("ilmsux");
-        auto options = regex.RegexFlags();
-        for (const auto& option : std::string(options)) {
+        const static std::string validRegexOptions("ilmsux");
+        std::string options = regex.RegexFlags();
+        for (size_t i = 0; i < options.size(); i++) {
+            char option = options.at(i);
             uassert(
                 NonConformantBSON,
                 fmt::format("Valid regex options are [ i, l, m, s, u, x], but found '{}' instead.",
                             option),
                 validRegexOptions.find(option) != std::string::npos);
-            uassert(NonConformantBSON,
-                    fmt::format("Regex options should be in ascending alphabetical order. "
-                                "Found {} instead.",
-                                options),
-                    &option == options || option > *(&option - 1));
+            if (i > 0) {
+                char previousOption = options.at(i - 1);
+                uassert(NonConformantBSON,
+                        fmt::format("Regex options should be in ascending alphabetical order. "
+                                    "Found {} instead.",
+                                    options),
+                        option > previousOption);
+            }
         }
     }
 
