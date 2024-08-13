@@ -23,12 +23,20 @@
 import {awaitRSClientHosts} from "jstests/replsets/rslib.js";
 
 var st, replTest;
+// We use a high election timeout to avoid unplanned elections, in particular while restarting the
+// set.
 if (TestData.configShard) {
     // Use a second shard so we don't shut down the config server.
-    st = new ShardingTest({shards: 2, rs: {oplogSize: 10}});
+    st = new ShardingTest({
+        shards: 2,
+        rs: {oplogSize: 10, settings: {electionTimeoutMillis: ReplSetTest.kForeverMillis}}
+    });
     replTest = st.rs1;
 } else {
-    st = new ShardingTest({shards: 1, rs: {oplogSize: 10}});
+    st = new ShardingTest({
+        shards: 1,
+        rs: {oplogSize: 10, settings: {electionTimeoutMillis: ReplSetTest.kForeverMillis}}
+    });
     replTest = st.rs0;
 }
 
