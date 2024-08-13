@@ -28,6 +28,7 @@
  */
 
 
+#include "variables.h"
 #include <absl/container/flat_hash_map.h>
 #include <iterator>
 
@@ -103,7 +104,9 @@ std::unique_ptr<Pipeline, PipelineDeleter> buildPipelineFromViewDefinition(
 DocumentSourceUnionWith::DocumentSourceUnionWith(
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
     std::unique_ptr<Pipeline, PipelineDeleter> pipeline)
-    : DocumentSource(kStageName, expCtx), _pipeline(std::move(pipeline)) {
+    : DocumentSource(kStageName, expCtx),
+      _pipeline(std::move(pipeline)),
+      _variablesParseState(_variables.useIdGenerator()) {
     if (!_pipeline->getContext()->ns.isOnInternalDb()) {
         globalOpCounters.gotNestedAggregate();
     }
@@ -260,6 +263,15 @@ DocumentSource::GetNextResult DocumentSourceUnionWith::doGetNext() {
     }
 
     if (_executionState == ExecutionProgress::kStartingSubPipeline) {
+        // Since the subpipeline will be executed again for explain, we store the starting
+        // state of the variables to reset them later.
+        if (pExpCtx->explain) {
+            auto expCtx = _pipeline->getContext();
+            _variables = expCtx->variables;
+            _variablesParseState =
+                expCtx->variablesParseState.copyWith(_variables.useIdGenerator());
+        }
+
         auto serializedPipe = _pipeline->serializeToBson();
         logStartingSubPipeline(serializedPipe);
         try {
@@ -409,6 +421,10 @@ Value DocumentSourceUnionWith::serialize(const SerializationOptions& opts) const
         invariant(pipeCopy);
 
         auto preparePipelineAndExplain = [&](Pipeline* ownedPipeline) {
+            if (*opts.verbosity >= ExplainOptions::Verbosity::kExecStats) {
+                // We reset the variables to their inital state for another execution.
+                _variables.copyToExpCtx(_variablesParseState, _pipeline->getContext().get());
+            }
             // Query settings are looked up after parsing and therefore are not populated in the
             // context of the unionWith '_pipeline' as part of DocumentSourceUnionWith
             // constructor. Attach query settings to the '_pipeline->getContext()' by copying

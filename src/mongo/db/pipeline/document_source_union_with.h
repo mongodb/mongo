@@ -108,7 +108,9 @@ public:
                               newExpCtx->getResolvedNamespace(original._userNss).uuid)
                         : nullptr)),
           _userNss(original._userNss),
-          _userPipeline(original._userPipeline) {
+          _userPipeline(original._userPipeline),
+          _variables(original._variables),
+          _variablesParseState(original._variablesParseState) {
         _pipeline->getContext()->inUnionWith = true;
     }
 
@@ -250,6 +252,14 @@ private:
     std::vector<BSONObj> _pushedDownStages;
     ExecutionProgress _executionState = ExecutionProgress::kIteratingSource;
     UnionWithStats _stats;
+
+    // $unionWith will execute the subpipeline twice for explain with execution stats - once for
+    // results and once for explain info. During the first execution, built in variables (such as
+    // SEARCH_META) might be set, which are not allowed to be set at the start of the second
+    // execution. We need to store the initial state of the variables to reset them for the second
+    // execution
+    Variables _variables;
+    VariablesParseState _variablesParseState;
 };
 
 }  // namespace mongo

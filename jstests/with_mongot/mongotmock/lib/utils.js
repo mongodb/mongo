@@ -434,7 +434,8 @@ export function getShardedSearchStagesAndVerifyExplainOutput(
                "Explain is null but needs to be provided for initial search stage.");
     }
     assert.eq(nReturnedList.length, expectedNumStages);
-    assert(result.hasOwnProperty("shards"), result + "has no shards property, but it should.");
+    assert(result.hasOwnProperty("shards"),
+           tojson(result) + "has no shards property, but it should.");
 
     let counter = 0;
     // Since the explain object shard results are unordered, we manually check which shard
