@@ -101,6 +101,10 @@ DBQuery.prototype._canUseFindCommand = function() {
         (this._options & DBQuery.Option.exhaust) === 0;
 };
 
+DBQuery.prototype._isTailableCursor = function() {
+    return (this._options & DBQuery.Option.tailable) !== 0;
+};
+
 DBQuery.prototype._exec = function() {
     if (!this._cursor) {
         assert.eq(0, this._numReturned);
@@ -287,7 +291,9 @@ DBQuery.prototype.skip = function(skip) {
 DBQuery.prototype.hasNext = function() {
     this._exec();
 
-    if (this._limit > 0 && this._cursorSeen >= this._limit) {
+    // Return when limit is reached for tailable cursors. For other cursor options, like an exhaust
+    // cursor, the server manages closing.
+    if (this._isTailableCursor() && this._limit > 0 && this._cursorSeen >= this._limit) {
         this._cursor.close();
         return false;
     }
