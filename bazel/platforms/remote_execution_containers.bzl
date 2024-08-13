@@ -12,14 +12,14 @@ REMOTE_EXECUTION_CONTAINERS = {
         "web-url": "https://quay.io/repository/mongodb/bazel-remote-execution/manifest/sha256:06fc8103d2e2af9878ee7c5a792f32b3de1c8d68266c193f7ab35b7a136da519",
     },
     "debian10": {
-        "container-url": "docker://quay.io/mongodb/bazel-remote-execution@sha256:f147b396a33ea443b6d15e1ad41ebddadb8dd2f4fcec7376036f8aba649f1676",
+        "container-url": "docker://quay.io/mongodb/bazel-remote-execution@sha256:4917278b646f5cd298013cad8a6bf645a258d14a22b93b5389975d2db80baff4",
         "dockerfile": "bazel/remote_execution_container/debian10/Dockerfile",
-        "web-url": "https://quay.io/repository/mongodb/bazel-remote-execution/manifest/sha256:f147b396a33ea443b6d15e1ad41ebddadb8dd2f4fcec7376036f8aba649f1676",
+        "web-url": "https://quay.io/repository/mongodb/bazel-remote-execution/manifest/sha256:4917278b646f5cd298013cad8a6bf645a258d14a22b93b5389975d2db80baff4",
     },
     "debian12": {
-        "container-url": "docker://quay.io/mongodb/bazel-remote-execution@sha256:27f95376c57306129c36a689f45d19a6932e4b91f86ac3e317e8202fbfc55e1c",
+        "container-url": "docker://quay.io/mongodb/bazel-remote-execution@sha256:d1df0fd76f9fdf28813fbe25dc9b989b5228f94cd37eae11fb194f67d3afdbbb",
         "dockerfile": "bazel/remote_execution_container/debian12/Dockerfile",
-        "web-url": "https://quay.io/repository/mongodb/bazel-remote-execution/manifest/sha256:27f95376c57306129c36a689f45d19a6932e4b91f86ac3e317e8202fbfc55e1c",
+        "web-url": "https://quay.io/repository/mongodb/bazel-remote-execution/manifest/sha256:d1df0fd76f9fdf28813fbe25dc9b989b5228f94cd37eae11fb194f67d3afdbbb",
     },
     "linux": {
         "_COMMENT": "Uses amazon linux 2 container",
@@ -43,23 +43,23 @@ REMOTE_EXECUTION_CONTAINERS = {
         "web-url": "https://quay.io/repository/mongodb/bazel-remote-execution/manifest/sha256:5295903271760e7e555590fb8858c1f7a74d3c0dd109d8ca200130ce07343ea4",
     },
     "ubuntu18": {
-        "container-url": "docker://quay.io/mongodb/bazel-remote-execution@sha256:eb517902338241f66666619a885786ca92b87501d95ae22cf372b8d60c01bd4d",
+        "container-url": "docker://quay.io/mongodb/bazel-remote-execution@sha256:fad0b715ba85885f23eb43292014529bd4b9946e1ca1b825c2d8c9443f95a3e1",
         "dockerfile": "bazel/remote_execution_container/ubuntu18/Dockerfile",
-        "web-url": "https://quay.io/repository/mongodb/bazel-remote-execution/manifest/sha256:eb517902338241f66666619a885786ca92b87501d95ae22cf372b8d60c01bd4d",
+        "web-url": "https://quay.io/repository/mongodb/bazel-remote-execution/manifest/sha256:fad0b715ba85885f23eb43292014529bd4b9946e1ca1b825c2d8c9443f95a3e1",
     },
     "ubuntu20": {
-        "container-url": "docker://quay.io/mongodb/bazel-remote-execution@sha256:0c7f442b0013fbb93f49867164d1d37bc7d77ba0c832e88c8731904e0cc5ec43",
+        "container-url": "docker://quay.io/mongodb/bazel-remote-execution@sha256:ed2d5bd04f0f23dbb57ff4e0f6d73f732e87b5ec976f7283908003a45b98a82e",
         "dockerfile": "bazel/remote_execution_container/ubuntu20/Dockerfile",
-        "web-url": "https://quay.io/repository/mongodb/bazel-remote-execution/manifest/sha256:0c7f442b0013fbb93f49867164d1d37bc7d77ba0c832e88c8731904e0cc5ec43",
+        "web-url": "https://quay.io/repository/mongodb/bazel-remote-execution/manifest/sha256:ed2d5bd04f0f23dbb57ff4e0f6d73f732e87b5ec976f7283908003a45b98a82e",
     },
     "ubuntu22": {
-        "container-url": "docker://quay.io/mongodb/bazel-remote-execution@sha256:47b9cc1b0e178e4d3a9c2f4d995d4623ba9bc59a1f207127a0e8b15d0c26a99b",
+        "container-url": "docker://quay.io/mongodb/bazel-remote-execution@sha256:c1e4291aa0a1054e5c119a6c6a2ac3b43b2903e2f2c68d30148da7b57691ee9d",
         "dockerfile": "bazel/remote_execution_container/ubuntu22/Dockerfile",
-        "web-url": "https://quay.io/repository/mongodb/bazel-remote-execution/manifest/sha256:47b9cc1b0e178e4d3a9c2f4d995d4623ba9bc59a1f207127a0e8b15d0c26a99b",
+        "web-url": "https://quay.io/repository/mongodb/bazel-remote-execution/manifest/sha256:c1e4291aa0a1054e5c119a6c6a2ac3b43b2903e2f2c68d30148da7b57691ee9d",
     },
     "ubuntu24": {
-        "container-url": "docker://quay.io/mongodb/bazel-remote-execution@sha256:83c63a552747517a6405f91c38e634b7391d9458f1b81e5f92846ed589527295",
+        "container-url": "docker://quay.io/mongodb/bazel-remote-execution@sha256:8028f63bd4514e47871c7506aee6280e9f83db1d74e90a525ec61d30375f85bb",
         "dockerfile": "bazel/remote_execution_container/ubuntu24/Dockerfile",
-        "web-url": "https://quay.io/repository/mongodb/bazel-remote-execution/manifest/sha256:83c63a552747517a6405f91c38e634b7391d9458f1b81e5f92846ed589527295",
+        "web-url": "https://quay.io/repository/mongodb/bazel-remote-execution/manifest/sha256:8028f63bd4514e47871c7506aee6280e9f83db1d74e90a525ec61d30375f85bb",
     },
 }

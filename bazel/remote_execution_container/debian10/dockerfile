@@ -17,6 +17,7 @@ RUN apt-get update && \
         libcurl4-openssl-dev=7.64.0-4+deb10u9 \
         libfl2=2.6.4-6.2 \
         libgssapi-krb5-2=1.17-3+deb10u6 \
+        libkrb5-dev=1.17-3+deb10u6 \
         libldap2-dev=2.4.47+dfsg-3+deb10u7 \
         libsasl2-dev=2.1.27+dfsg-1+deb10u2 \
         libssl-dev=1.1.1n-0+deb10u6 \

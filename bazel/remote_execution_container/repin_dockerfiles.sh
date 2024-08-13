@@ -42,6 +42,7 @@ libldap2-dev
 libsasl2-dev
 libssl-dev
 libxml2-dev
+libkrb5-dev
 "
 
 COMMON_PACKAGES["suse"]="

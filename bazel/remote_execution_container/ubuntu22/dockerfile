@@ -16,6 +16,7 @@ RUN apt-get update && \
         build-essential=12.9ubuntu3 \
         libcurl4-openssl-dev=7.81.0-1ubuntu1.17 \
         libgssapi-krb5-2=1.19.2-2ubuntu0.4 \
+        libkrb5-dev=1.19.2-2ubuntu0.4 \
         libldap2-dev=2.5.18+dfsg-0ubuntu0.22.04.2 \
         libsasl2-dev=2.1.27+dfsg2-3ubuntu1.2 \
         libssl-dev=3.0.2-0ubuntu1.17 \
