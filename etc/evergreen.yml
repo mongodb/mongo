@@ -90,6 +90,8 @@ include:
 
   - filename: etc/evergreen_yml_components/variants/wiredtiger/test_dev_master_branch_only.yml
 
+  - filename: etc/evergreen_yml_components/variants/codecoverage/test_dev.yml
+
 parameters:
   - key: evergreen_config_file_path
     value: "etc/evergreen.yml"

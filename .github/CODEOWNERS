@@ -81,6 +81,9 @@ WORKSPACE.bazel @10gen/devprod-build
 # The following patterns are parsed from ./etc/evergreen_yml_components/tasks/resmoke/server_divisions/query/OWNERS.yml
 /etc/evergreen_yml_components/tasks/resmoke/server_divisions/query/**/* @10gen/query
 
+# The following patterns are parsed from ./etc/evergreen_yml_components/variants/codecoverage/OWNERS.yml
+/etc/evergreen_yml_components/variants/codecoverage/**/* @10gen/devprod-build @10gen/devprod-correctness
+
 # The following patterns are parsed from ./etc/evergreen_yml_components/variants/mongot/OWNERS.yml
 /etc/evergreen_yml_components/variants/mongot/**/* @TedTuckman @madelinezec
 
