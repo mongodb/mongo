@@ -6574,7 +6574,7 @@ if get_option("bazel-includes-info"):
             ["cquery"]
             + env["BAZEL_FLAGS_STR"]
             + [
-                f"labels(hdrs, @{target})",
+                f'labels(hdrs, "@{target}")',
                 "--output",
                 "files",
             ]
@@ -6585,7 +6585,7 @@ if get_option("bazel-includes-info"):
             ["cquery"]
             + env["BAZEL_FLAGS_STR"]
             + [
-                f'kind("extract_debuginfo", rdeps(@//src/mongo/..., @{target},  1))',
+                f'kind("extract_debuginfo", rdeps(@//src/mongo/..., "@{target}",  1))',
             ]
         )
         target_results = env.RunBazelQuery(bazel_query, "getting real target")
@@ -6609,7 +6609,7 @@ if get_option("bazel-includes-info"):
             source_gen_targets.add(target)
 
     for target in source_gen_targets:
-        print(f"getting headers for {target}")
+        print(f"getting generated headers for {target}")
         bazel_query = (
             ["cquery"]
             + env["BAZEL_FLAGS_STR"]
@@ -6694,7 +6694,7 @@ if get_option("bazel-includes-info"):
                             ["cquery"]
                             + env["BAZEL_FLAGS_STR"]
                             + [
-                                f'filter("[\\.h,\\.ipp,\\.hpp].*$", kind("source", deps(@{bazel_target})))',
+                                f'filter("[\\.h,\\.ipp,\\.hpp].*$", kind("source", deps("@{bazel_target}")))',
                                 "--output",
                                 "files",
                             ]

@@ -191,8 +191,8 @@ def main(
             elif bazel_header in reverse_header_map:
                 if bazel_header.startswith("//src/third_party/"):
                     continue
-                raise Exception(
-                    f"Header {bazel_header} already in map, existing: {reverse_header_map[bazel_header]}, new {k}"
+                print(
+                    f"Redundent header found: {bazel_header} already in map, existing: {reverse_header_map[bazel_header]}, new {k}"
                 )
             else:
                 reverse_header_map[bazel_header] = k
@@ -214,7 +214,7 @@ def main(
             p = subprocess.run(
                 [bazel_exec, "cquery"]
                 + bazel_config
-                + [f'kind("extract_debuginfo", deps(@{dep}))'],
+                + [f'kind("extract_debuginfo", deps("@{dep}"))'],
                 capture_output=True,
                 text=True,
             )
