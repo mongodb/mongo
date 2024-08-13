@@ -297,6 +297,13 @@ def mongo_shell_program(
             # Only use 'opt_default' if the property wasn't set in the YAML configuration.
             test_data[opt_name] = opt_default
 
+    if config.CONFIG_FUZZER_ENCRYPTION_OPTS:
+        for opt_name in config.CONFIG_FUZZER_ENCRYPTION_OPTS:
+            if opt_name in test_data:
+                continue
+
+            test_data[opt_name] = config.CONFIG_FUZZER_ENCRYPTION_OPTS[opt_name]
+
     if config.SHELL_TLS_ENABLED:
         test_data["shellTlsEnabled"] = True
 

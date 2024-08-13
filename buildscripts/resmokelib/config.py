@@ -70,6 +70,7 @@ DEFAULTS = {
     "fuzz_runtime_params": None,
     "fuzz_mongos_configs": None,
     "config_fuzz_seed": None,
+    "disable_encryption_fuzzing": False,
     "genny_executable": None,
     "include_with_any_tags": None,
     "include_with_all_tags": None,
@@ -416,6 +417,9 @@ FUZZ_MONGOS_CONFIGS = None
 # This seeds the random number generator used to fuzz mongod and mongos parameters
 CONFIG_FUZZ_SEED = None
 
+# Disables the fuzzing that sometimes enables the encrypted storage engine.
+DISABLE_ENCRYPTION_FUZZING = None
+
 # Executable file for genny, passed in as a command line arg.
 GENNY_EXECUTABLE = None
 
@@ -715,3 +719,6 @@ NOOP_MONGO_D_S_PROCESSES = False
 # If resmoke is running from within a `workload` container,
 # we may need to do additional setup to run the suite successfully.
 REQUIRES_WORKLOAD_CONTAINER_SETUP = False
+
+# Config fuzzer encryption options, this is only set when the fuzzer is run
+CONFIG_FUZZER_ENCRYPTION_OPTS = None

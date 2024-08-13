@@ -2048,10 +2048,13 @@ tasks:
       - func: "generate resmoke tasks"
         vars:
           suite: simulate_crash_concurrency_replication
+          # We disable encryption fuzzing because it increases the runtime of this task
+          # significantly (over 5x in testing). It does not cause correctness issues.
           resmoke_args: >-
             --fuzzMongodConfigs=normal
             --fuzzRuntimeParams
             --excludeWithAnyTags=does_not_support_config_fuzzer
+            --disableEncryptionFuzzing
           use_large_distro: "true"
 
   - <<: *gen_task_template

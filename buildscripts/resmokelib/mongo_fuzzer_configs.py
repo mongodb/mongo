@@ -1,7 +1,7 @@
 """Generator functions for all parameters that we fuzz when invoked with --fuzzMongodConfigs."""
 
 import random
-from buildscripts.resmokelib import utils
+from buildscripts.resmokelib import config, utils
 
 
 def generate_normal_wt_parameters(rng, value):
@@ -192,6 +192,28 @@ def generate_table_configs(rng):
     )
 
 
+def generate_encryption_config(rng: random.Random):
+    ret = {}
+    # encryption requires the wiredtiger storage engine.
+    # encryption also required an enterprise binary.
+    if (
+        config.STORAGE_ENGINE != "wiredTiger"
+        or config.ENABLE_ENTERPRISE_TESTS != "on"
+        or config.DISABLE_ENCRYPTION_FUZZING
+    ):
+        return ret
+    chance_to_encrypt = 0.33
+    if rng.random() < chance_to_encrypt:
+        ret["enableEncryption"] = ""
+        ret["encryptionKeyFile"] = "src/mongo/db/modules/enterprise/jstests/encryptdb/libs/ekf2"
+
+        chance_to_use_gcm = 0.50
+        if rng.random() < chance_to_use_gcm:
+            ret["encryptionCipherMode"] = "AES256-GCM"
+
+    return ret
+
+
 def generate_normal_mongo_parameters(rng, value):
     """Returns the value assigned the mongod or mongos parameter based on the fields of the parameters in the config_fuzzer_limits.py."""
 
@@ -227,7 +249,7 @@ def generate_special_mongod_parameters(rng, ret, fuzzer_stress_mode, params):
     )
 
     # "mirrorReads" and "throughputProbingConcurrencyMovingAverageWeight" both are the only parameters that use rng.random().
-    ret["mirrorReads"] = {"samplingRate": rng.random()}
+    ret["mirrorReads"] = {"samplingRate": rng.choice(params["mirrorReads"]["choices"])}
     ret["throughputProbingConcurrencyMovingAverageWeight"] = 1 - rng.random()
 
     # Deal with other special cases of parameters (having to add other sources of randomization, depending on another variable, etc.).
@@ -347,6 +369,7 @@ def fuzz_mongod_set_parameters(fuzzer_stress_mode, seed, user_provided_params):
         generate_eviction_configs(rng, fuzzer_stress_mode),
         generate_table_configs(rng),
         generate_table_configs(rng),
+        generate_encryption_config(rng),
     )
 
 

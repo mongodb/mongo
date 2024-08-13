@@ -1695,6 +1695,13 @@ class RunPlugin(PluginInterface):
         )
 
         mongodb_server_options.add_argument(
+            "--disableEncryptionFuzzing",
+            dest="disable_encryption_fuzzing",
+            action="store_true",
+            help="Disables the fuzzing that sometimes enables the encrypted storage engine.",
+        )
+
+        mongodb_server_options.add_argument(
             "--configShard",
             dest="config_shard",
             metavar="CONFIG",

@@ -504,6 +504,13 @@ class MongodLauncher(object):
         if "configsvr" in mongod_options:
             mongod_options["storageEngine"] = "wiredTiger"
 
+        if self.config.CONFIG_FUZZER_ENCRYPTION_OPTS:
+            for opt_name in self.config.CONFIG_FUZZER_ENCRYPTION_OPTS:
+                if opt_name in mongod_options:
+                    continue
+
+                mongod_options[opt_name] = self.config.CONFIG_FUZZER_ENCRYPTION_OPTS[opt_name]
+
         return self.fixturelib.mongod_program(
             logger, job_num, executable, process_kwargs, mongod_options
         )

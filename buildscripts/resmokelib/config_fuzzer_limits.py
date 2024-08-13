@@ -119,7 +119,7 @@ config_fuzzer_params = {
         "wiredTigerSizeStorerPeriodicSyncHits": {"min": 1, "max": 100000},
         "wiredTigerSizeStorerPeriodicSyncPeriodMillis": {"min": 1, "max": 60000},
         "queryAnalysisWriterMaxMemoryUsageBytes": {"min": 1024 * 1024, "max": 1024 * 1024 * 100},
-        "mirrorReads": {"samplingRate": {"min": 0.0, "max": 1.0}},
+        "mirrorReads": {"choices": [0, 0.25, 0.50, 0.75, 1.0]},
         # Flow control related parameters
         "enableFlowControl": {"choices": [True, False]},
         "flowControlMaxSamples": {"min": 1, "max": 1000 * 1000},

@@ -1232,46 +1232,6 @@ tasks:
         vars:
           resmoke_jobs_max: 1
 
-  - <<: *gen_task_template
-    name: replica_sets_max_mirroring_large_txns_format_ese_gcm_gen
-    tags:
-      [
-        "assigned_to_jira_team_server_security",
-        "release_critical",
-        "incompatible_community",
-        "incompatible_mac",
-        "incompatible_windows",
-        "incompatible_debug_mode",
-        "replica_sets",
-        "encrypt",
-        "san",
-        "gcm",
-        "multi_oplog",
-      ]
-    commands:
-      - func: "generate resmoke tasks"
-        vars:
-          use_large_distro: "true"
-
-  - <<: *gen_task_template
-    name: replica_sets_max_mirroring_large_txns_format_ese_gen
-    tags:
-      [
-        "assigned_to_jira_team_server_security",
-        "release_critical",
-        "incompatible_community",
-        "incompatible_mac",
-        "incompatible_debug_mode",
-        "replica_sets",
-        "encrypt",
-        "san",
-        "multi_oplog",
-      ]
-    commands:
-      - func: "generate resmoke tasks"
-        vars:
-          use_large_distro: "true"
-
   - <<: *task_template
     name: sasl
     tags:
@@ -1329,44 +1289,6 @@ tasks:
         "incompatible_windows",
         "incompatible_ppc",
         "incompatible_s390x",
-      ]
-    commands:
-      - func: "generate resmoke tasks"
-        vars:
-          use_large_distro: "true"
-
-  - <<: *gen_task_template
-    name: sharding_max_mirroring_opportunistic_secondary_targeting_ese_gcm_gen
-    tags:
-      [
-        "assigned_to_jira_team_server_security",
-        "release_critical",
-        "incompatible_community",
-        "incompatible_mac",
-        "incompatible_windows",
-        "incompatible_debug_mode",
-        "sharding",
-        "common",
-        "encrypt",
-        "gcm",
-      ]
-    commands:
-      - func: "generate resmoke tasks"
-        vars:
-          use_large_distro: "true"
-
-  - <<: *gen_task_template
-    name: sharding_max_mirroring_opportunistic_secondary_targeting_ese_gen
-    tags:
-      [
-        "assigned_to_jira_team_server_security",
-        "release_critical",
-        "incompatible_community",
-        "incompatible_mac",
-        "incompatible_debug_mode",
-        "sharding",
-        "common",
-        "encrypt",
       ]
     commands:
       - func: "generate resmoke tasks"
