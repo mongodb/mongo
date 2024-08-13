@@ -45,6 +45,7 @@ executor:
     - class: CheckReplOplogs
     - class: CheckReplDBHash
     - class: CheckMetadataConsistencyInBackground
+    - class: RunQueryStats
     - class: ValidateCollections
     - class: CheckOrphansDeleted
     - class: CleanEveryN

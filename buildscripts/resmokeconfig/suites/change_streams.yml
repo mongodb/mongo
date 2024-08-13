@@ -42,6 +42,7 @@ executor:
     # validating the entire contents of the collection.
     - class: CheckReplOplogs
     - class: CheckReplDBHash
+    - class: RunQueryStats
     - class: ValidateCollections
     - class: CleanEveryN
       n: 20

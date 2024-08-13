@@ -55,6 +55,7 @@ executor:
     - class: EnableChangeStream
     - class: CheckReplDBHash
     - class: CheckMetadataConsistencyInBackground
+    - class: RunQueryStats
     - class: ValidateCollections
     - class: CheckOrphansDeleted
     - class: CleanEveryN

@@ -83,6 +83,7 @@ executor:
     # on the secondaries, so we run the ValidateCollections hook after it to ensure we're
     # validating the entire contents of the collection.
     - class: CheckReplDBHash
+    - class: RunQueryStats
     - class: ValidateCollections
     - class: CleanEveryN
       n: 20

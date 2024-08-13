@@ -52,6 +52,7 @@ executor:
     # TODO (SERVER-83433): Add back the test coverage for running db hash check on replica set
     # that is fsync locked and has replica set endpoint enabled.
     # - CheckReplDBHash
+    - class: RunQueryStats
     - class: ValidateCollections
     - class: CleanEveryN
       n: 20
