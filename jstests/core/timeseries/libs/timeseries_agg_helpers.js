@@ -131,7 +131,7 @@ export var TimeseriesAggTests = class {
         }
 
         // Assumes that the pipeline's last stage outputs result into 'outColl'.
-        assert.doesNotThrow(() => inColl.aggregate(pipeline));
+        assert.doesNotThrow(() => retryOnRetryableError(() => inColl.aggregate(pipeline)));
 
         return outColl.find({}, {"_id": 0, "time": 1, "hostid": 1, "cpu": 1, "idle": 1})
             .sort({"time": 1})
