@@ -31,7 +31,8 @@ pipx install "gcovr==7.2" || exit 1
 # Process code coverage files (.gcno/.gcda) directly into coveralls format
 gcovr \
   --output gcovr-coveralls.json \
-  --coveralls \
+  --coveralls-pretty \
+  --exclude 'build/debug/.*_gen\.(h|hpp|cpp)' \
   --exclude build/debug/mongo/idl/ \
   --exclude src/mongo/db/modules/enterprise/src/streams/third_party/ \
   --exclude src/third_party/ \
