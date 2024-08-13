@@ -456,3 +456,23 @@ mongo_cc_library(
         "//src/mongo:base",
     ],
 )
+
+mongo_cc_library(
+    name = "wire_version",
+    srcs = [
+        "wire_version.cpp",
+    ],
+    hdrs = [
+        "//src/mongo/db:wire_version.h",
+    ],
+    header_deps = [
+        "//src/mongo/bson/util:bson_column",
+        "//src/mongo/db/auth:cluster_auth_mode",
+        "//src/mongo/db/concurrency:flow_control_ticketholder",
+        "//src/mongo/db/fts:fts_query_noop",
+    ],
+    deps = [
+        "//src/mongo:base",
+        "//src/mongo/bson/util:bson_extract",
+    ],
+)

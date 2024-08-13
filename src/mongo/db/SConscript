@@ -2375,19 +2375,6 @@ env.Library(
     ],
 )
 
-env.Library(
-    target="wire_version",
-    source=[
-        "wire_version.cpp",
-    ],
-    LIBDEPS=[
-        "$BUILD_DIR/mongo/base",
-    ],
-    LIBDEPS_PRIVATE=[
-        "$BUILD_DIR/mongo/bson/util/bson_extract",
-    ],
-)
-
 asioEnv = env.Clone()
 asioEnv.InjectThirdParty("asio")
 
