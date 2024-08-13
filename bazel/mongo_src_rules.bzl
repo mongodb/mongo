@@ -1063,6 +1063,7 @@ MONGO_GLOBAL_INCLUDE_DIRECTORIES = [
     "-I$(GENDIR)/src",
     "-Isrc/third_party/immer/dist",
     "-Isrc/third_party/SafeInt",
+    "-Isrc/mongo/db/modules/enterprise/src",
 ]
 
 MONGO_GLOBAL_ACCESSIBLE_HEADERS = [
