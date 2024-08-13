@@ -148,8 +148,9 @@ mongo_custom_check = env.SharedLibrary(
         "MongoInvariantStatusIsOKCheck.cpp",
     ],
     LIBDEPS_NO_INHERIT=[
-        "$BUILD_DIR/third_party/shim_allocator",
-        "$BUILD_DIR/third_party/shim_unwind",
+        "$BUILD_DIR/third_party/unwind/unwind",
+        "$BUILD_DIR/third_party/tcmalloc/tcmalloc",
+        "$BUILD_DIR/third_party/gperftools/tcmalloc_minimal",
     ],
     AIB_COMPONENT="mongo-tidy-checks",
 )

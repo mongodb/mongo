@@ -161,8 +161,9 @@ def slurpBlaze(target, source, exports, env):
         # libunwind and tcmalloc are both added as global dependencies. Skip
         # inheriting global dependencies to avoid a circular dependency.
         kwargs['LIBDEPS_NO_INHERIT'] = [
-            '$BUILD_DIR/third_party/shim_allocator',
-            '$BUILD_DIR/third_party/shim_unwind',
+            '$BUILD_DIR/third_party/unwind/unwind',
+            "$BUILD_DIR/third_party/tcmalloc/tcmalloc",
+            "$BUILD_DIR/third_party/gperftools/tcmalloc_minimal",
         ]
 
         for cf in libDef.get('copts', []):

@@ -34,8 +34,9 @@ ca = env.SharedLibrary(
     ],
     # We don't want any special allocator here either.
     LIBDEPS_NO_INHERIT=[
-        "$BUILD_DIR/third_party/shim_allocator",
-        "$BUILD_DIR/third_party/shim_unwind",
+        "$BUILD_DIR/third_party/gperftools/tcmalloc_minimal",
+        "$BUILD_DIR/third_party/tcmalloc/tcmalloc",
+        "$BUILD_DIR/third_party/unwind/unwind",
     ],
     AIB_COMPONENT="msi-util",
     AIB_ROLE="runtime",

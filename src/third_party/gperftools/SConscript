@@ -1,9 +1,0 @@
-# -*- mode: python -*-
-
-Import("env")
-
-gperftools_root = env.Dir("#/src/third_party/gperftools")
-gperftools_platform = gperftools_root.Dir("platform/${TARGET_OS}_${TARGET_ARCH}")
-
-# propagates to consumers that Inject (depend on) gperftools.
-env.RegisterConsumerModifications(CPPPATH=[gperftools_platform.Dir("include")])

@@ -16,8 +16,13 @@ env = env.Clone()
 # or libstdx or similar.
 env.AppendUnique(
     LIBDEPS_GLOBAL=[
-        "$BUILD_DIR/third_party/shim_allocator",
-        "$BUILD_DIR/third_party/shim_unwind" if use_libunwind else [],
+        "$BUILD_DIR/third_party/gperftools/tcmalloc_minimal"
+        if env["MONGO_ALLOCATOR"] in ["tcmalloc-gperftools"]
+        else [],
+        "$BUILD_DIR/third_party/tcmalloc/tcmalloc"
+        if env["MONGO_ALLOCATOR"] in ["tcmalloc-google"]
+        else [],
+        "$BUILD_DIR/third_party/unwind/unwind" if use_libunwind else [],
     ],
 )
 

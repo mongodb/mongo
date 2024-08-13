@@ -7,9 +7,7 @@ Import([
     'get_option',
     'jsEngine',
     'use_libunwind',
-    'use_system_libunwind',
     'use_system_version_of_library',
-    'use_vendored_libunwind',
     'wiredtiger',
     'releaseBuild',
     'ssl_provider',
@@ -36,7 +34,11 @@ thirdPartyEnvironmentModifications = {
         'CPPDEFINES': [('SAFEINT_USE_INTRINSICS', 0)],
     },
     'timelib': {'CPPPATH': ['#/src/third_party/timelib/dist'], },
-    'unwind': {},
+    'unwind': {
+        'CPPPATH':  [
+            "#/src/third_party/unwind/platform/${TARGET_OS}_${TARGET_ARCH}/install/include",
+        ]
+    },
     'mozjs': {
         'CPPPATH': [
             '#/src/third_party/mozjs/include',
@@ -89,7 +91,9 @@ env.AddMethod(injectMozJS, 'InjectMozJS')
 
 if not use_system_version_of_library('tcmalloc-gperf'):
     # GPerftools does this slightly differently than the others.
-    thirdPartyEnvironmentModifications['gperftools'] = {}
+    thirdPartyEnvironmentModifications['gperftools'] = {
+        'CPPPATH': ["#/src/third_party/gperftools/platform/${TARGET_OS}_${TARGET_ARCH}/include"]
+    }
 
 if not use_system_version_of_library('tcmalloc-google'):
     thirdPartyEnvironmentModifications['tcmalloc'] = {
@@ -293,11 +297,7 @@ if not use_system_version_of_library('grpc'):
 # However, the system libunwind is assumed to need `lzma` unconditionally.
 vendored_libunwind_needs_lzma = False
 
-if use_system_libunwind:
-    thirdPartyEnvironmentModifications['unwind'] = {
-        'SYSLIBDEPS_PRIVATE': [env['LIBDEPS_UNWIND_SYSLIBDEP'], env['LIBDEPS_LZMA_SYSLIBDEP']],
-    }
-elif use_vendored_libunwind and vendored_libunwind_needs_lzma:
+if vendored_libunwind_needs_lzma:
     thirdPartyEnvironmentModifications['unwind'] = {
         'SYSLIBDEPS_PRIVATE': [env['LIBDEPS_LZMA_SYSLIBDEP']],
     }
@@ -370,98 +370,6 @@ s2Env.SConscript('s2/SConscript', exports={'env': s2Env})
 if jsEngine:
     mozjsEnv = env.Clone()
     mozjsEnv.SConscript('mozjs/SConscript', exports={'env': mozjsEnv})
-
-if use_libunwind:
-    unwindEnv = env.Clone(
-        LIBDEPS_NO_INHERIT=[
-            '$BUILD_DIR/third_party/shim_allocator',
-            '$BUILD_DIR/third_party/shim_unwind',
-        ], )
-    if use_system_libunwind:
-        unwindEnv = unwindEnv.Clone(SYSLIBDEPS=[
-            env['LIBDEPS_UNWIND_SYSLIBDEP'],
-        ])
-    else:
-        unwindEnv = unwindEnv.Clone()
-
-        # SCons uses the "$CC" tool for both C and assembler files. Distinguish them for the sake of
-        # later tools like our Ninja SCons module.
-        unwindEnv['ASPP'] = '$CC'
-        unwindEnv['ASPPCOM'] = unwindEnv['ASPPCOM'].replace('$CC ', '$ASPP ')
-
-        def registerConsumerModifications(env, **kwargs):
-            for k, v in kwargs.items():
-                thirdPartyEnvironmentModifications['unwind'][k] = v
-
-        unwindEnv.AddMethod(registerConsumerModifications, 'RegisterConsumerModifications')
-        unwindEnv.SConscript(
-            'unwind/SConscript', exports={
-                'env': unwindEnv,
-                'vendored_libunwind_needs_lzma': vendored_libunwind_needs_lzma,
-            })
-        unwindEnv.Append(LIBDEPS_INTERFACE=[
-            'unwind/unwind',
-        ])
-
-    unwindEnv.ShimLibrary(name="unwind", NINJA_GENSOURCE_INDEPENDENT=True)
-
-# libunwind and tcmalloc are both added as global dependencies. Skip
-# inheriting global dependencies to avoid a circular dependency.
-tcmallocEnv = env.Clone(
-    LIBDEPS_NO_INHERIT=[
-        '$BUILD_DIR/third_party/shim_allocator',
-        '$BUILD_DIR/third_party/shim_unwind',
-    ], )
-if tcmallocEnv['MONGO_ALLOCATOR'] in ["tcmalloc-google"]:
-    if use_system_version_of_library("tcmalloc-google"):
-        tcmallocEnv = tcmallocEnv.Clone(SYSLIBDEPS=[
-            env['LIBDEPS_TCMALLOC_SYSLIBDEP'],
-        ])
-    else:
-        tcmallocDirectory = 'tcmalloc'
-        tcmallocEnv = tcmallocEnv.Clone()
-        tcmallocEnv = tcmallocEnv.Clone(LIBDEPS_INTERFACE=[
-            'tcmalloc/tcmalloc',
-        ])
-elif tcmallocEnv['MONGO_ALLOCATOR'] in ["tcmalloc-gperf"]:
-    if use_system_version_of_library("tcmalloc-gperf"):
-        tcmallocEnv = tcmallocEnv.Clone(SYSLIBDEPS=[
-            env['LIBDEPS_TCMALLOC_SYSLIBDEP'],
-        ])
-    else:
-        tcmallocEnv = tcmallocEnv.Clone()
-        tcmallocEnv.InjectThirdParty(libraries=['gperftools'])
-
-        # Allow gperftools to determine its own consumer-side include/ dirs.
-        # Needed because those are in a platform-specific subdirectory.
-        def registerConsumerModifications(env, **kwargs):
-            for k, v in kwargs.items():
-                thirdPartyEnvironmentModifications['gperftools'][k] = v
-
-        tcmallocEnv.AddMethod(registerConsumerModifications, 'RegisterConsumerModifications')
-        tcmallocEnv.SConscript(
-            'gperftools' + '/SConscript',
-            exports={'env': tcmallocEnv},
-        )
-        tcmallocEnv = tcmallocEnv.Clone(LIBDEPS_INTERFACE=[
-            'gperftools/tcmalloc_minimal',
-        ])
-
-tcmallocEnv.ShimLibrary(
-    name="allocator",
-    LIBDEPS_TAGS=[
-        # TODO: Remove when SERVER-48291 is merged into stable build tools.
-        # An inserted dependency must be linked to every node, including what would
-        # be considered a leaf node to ensure that a system dependency is not linked
-        # in before this one. This tag allows nodes tagged as leaf nodes to still
-        # get the correct allocator.
-        'lint-leaf-node-allowed-dep',
-        # This tag allows this dependency to be linked to nodes marked as not
-        # allowed to have public dependencies.
-        'lint-public-dep-allowed'
-    ],
-    NINJA_GENSOURCE_INDEPENDENT=True,
-)
 
 wiredtigerEnv = env.Clone()
 if wiredtiger:

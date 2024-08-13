@@ -10,82 +10,88 @@ import re
 
 # This is the list of libraries that are desired to be extracted out of the
 # ninja file
-target_libs = set([
-    'absl_bad_optional_access',
-    'absl_bad_variant_access',
-    'absl_base',
-    'absl_city',
-    'absl_civil_time',
-    'absl_cord',
-    'absl_cord_internal',
-    'absl_cordz_functions',
-    'absl_cordz_handle',
-    'absl_cordz_info',
-    'absl_debugging_internal',
-    'absl_demangle_internal',
-    'absl_exponential_biased',
-    'absl_flags',
-    'absl_graphcycles_internal',
-    'absl_hash',
-    'absl_hashtablez_sampler',
-    'absl_int128',
-    'absl_log_severity',
-    'absl_low_level_hash',
-    'absl_malloc_internal',
-    'absl_random_distributions',
-    'absl_random_internal_platform',
-    'absl_random_internal_pool_urbg',
-    'absl_random_internal_randen',
-    'absl_random_internal_randen_hwaes',
-    'absl_random_internal_randen_hwaes_impl',
-    'absl_random_internal_randen_slow',
-    'absl_random_internal_seed_material',
-    'absl_random_seed_gen_exception',
-    'absl_random_seed_sequences',
-    'absl_raw_hash_set',
-    'absl_raw_logging_internal',
-    'absl_spinlock_wait',
-    'absl_stacktrace',
-    'absl_status',
-    'absl_statusor',
-    'absl_str_format_internal',
-    'absl_strings',
-    'absl_strings_internal',
-    'absl_symbolize',
-    'absl_synchronization',
-    'absl_throw_delegate',
-    'absl_time',
-    'absl_time_zone',
-])
+target_libs = set(
+    [
+        "absl_bad_optional_access",
+        "absl_bad_variant_access",
+        "absl_base",
+        "absl_city",
+        "absl_civil_time",
+        "absl_cord",
+        "absl_cord_internal",
+        "absl_cordz_functions",
+        "absl_cordz_handle",
+        "absl_cordz_info",
+        "absl_debugging_internal",
+        "absl_demangle_internal",
+        "absl_exponential_biased",
+        "absl_flags",
+        "absl_graphcycles_internal",
+        "absl_hash",
+        "absl_hashtablez_sampler",
+        "absl_int128",
+        "absl_log_severity",
+        "absl_low_level_hash",
+        "absl_malloc_internal",
+        "absl_random_distributions",
+        "absl_random_internal_platform",
+        "absl_random_internal_pool_urbg",
+        "absl_random_internal_randen",
+        "absl_random_internal_randen_hwaes",
+        "absl_random_internal_randen_hwaes_impl",
+        "absl_random_internal_randen_slow",
+        "absl_random_internal_seed_material",
+        "absl_random_seed_gen_exception",
+        "absl_random_seed_sequences",
+        "absl_raw_hash_set",
+        "absl_raw_logging_internal",
+        "absl_spinlock_wait",
+        "absl_stacktrace",
+        "absl_status",
+        "absl_statusor",
+        "absl_str_format_internal",
+        "absl_strings",
+        "absl_strings_internal",
+        "absl_symbolize",
+        "absl_synchronization",
+        "absl_throw_delegate",
+        "absl_time",
+        "absl_time_zone",
+    ]
+)
 
 # this is the path for cmake to use to generate abseil native ninja file.
-cmake_bin_path = '/opt/mongodbtoolchain/v4/bin/cmake'
+cmake_bin_path = "/opt/mongodbtoolchain/v4/bin/cmake"
 
-if sys.platform == 'win32' or sys.platform == 'darwin':
+if sys.platform == "win32" or sys.platform == "darwin":
     raise Exception("This script is currently not supported on windows or macos.")
 
 logging.basicConfig(
-    filename=os.path.splitext(__file__)[0] + '.log', filemode='w',
-    format='%(asctime)s,%(msecs)d %(name)s %(levelname)s %(message)s', datefmt='%H:%M:%S',
-    level=logging.DEBUG)
+    filename=os.path.splitext(__file__)[0] + ".log",
+    filemode="w",
+    format="%(asctime)s,%(msecs)d %(name)s %(levelname)s %(message)s",
+    datefmt="%H:%M:%S",
+    level=logging.DEBUG,
+)
 
 original_target_libs = target_libs.copy()
-logging.info(f'Original list: {original_target_libs}')
+logging.info(f"Original list: {original_target_libs}")
 
-ninja_build_dir = pathlib.Path(__file__).parent.parent / 'dist' / 'scons_gen_build'
+ninja_build_dir = pathlib.Path(__file__).parent.parent / "dist" / "scons_gen_build"
 if not os.path.exists(ninja_build_dir):
     os.mkdir(ninja_build_dir)
     environ = os.environ.copy()
-    environ['CC'] = '/opt/mongodbtoolchain/v4/bin/gcc'
-    environ['CXX'] = '/opt/mongodbtoolchain/v4/bin/g++'
-    subprocess.run([cmake_bin_path, '-G', 'Ninja', '..'], cwd=ninja_build_dir, check=True, env=environ)
+    environ["CC"] = "/opt/mongodbtoolchain/v4/bin/gcc"
+    environ["CXX"] = "/opt/mongodbtoolchain/v4/bin/g++"
+    subprocess.run(
+        [cmake_bin_path, "-G", "Ninja", ".."], cwd=ninja_build_dir, check=True, env=environ
+    )
 
-with open(ninja_build_dir / 'build.ninja') as fninja:
+with open(ninja_build_dir / "build.ninja") as fninja:
     content = fninja.readlines()
 
-with open(pathlib.Path(__file__).parent.parent / 'SConscript', 'w') as sconscript:
-    with  open(pathlib.Path(__file__).parent.parent / 'BUILD.bazel', 'w') as bazel:
-
+with open(pathlib.Path(__file__).parent.parent / "SConscript", "w") as sconscript:
+    with open(pathlib.Path(__file__).parent.parent / "BUILD.bazel", "w") as bazel:
         sconscript.write("""\
 # AUTO-GENERATED FILE DO NOT MANUALLY EDIT
 # generated from the parse_libs_from_ninja.py script in scripts directory via `python ./parse_libs_from_ninja.py`
@@ -93,9 +99,10 @@ Import("env")
 env = env.Clone(NINJA_GENSOURCE_INDEPENDENT=True, LIBDEPS_NO_INHERIT=[
     # libunwind and tcmalloc are both added as global dependencies. Skip
     # inheriting global dependencies to avoid a circular dependency.
-    '$BUILD_DIR/third_party/shim_allocator',
-    '$BUILD_DIR/third_party/shim_unwind',
-])
+    '$BUILD_DIR/third_party/unwind/unwind',
+    "$BUILD_DIR/third_party/tcmalloc/tcmalloc",
+    "$BUILD_DIR/third_party/gperftools/tcmalloc_minimal",
+]
 env.InjectThirdParty(libraries=['abseil-cpp'])
 if env.ToolchainIs('msvc'):
     env.Append(
@@ -111,9 +118,15 @@ if env.ToolchainIs('gcc'):
             '-Wno-error=ignored-attributes',
         ], )
 """)
-    
-        abseil_headers = glob.glob(str(pathlib.Path(__file__).parent.parent / "dist/absl/**/*.h"), recursive=True) + glob.glob(str(pathlib.Path(__file__).parent.parent / "dist/absl/**/*.inc"), recursive=True)
-        abseil_headers = sorted([os.path.relpath(path, pathlib.Path(__file__).parent.parent) for path in abseil_headers])
+
+        abseil_headers = glob.glob(
+            str(pathlib.Path(__file__).parent.parent / "dist/absl/**/*.h"), recursive=True
+        ) + glob.glob(
+            str(pathlib.Path(__file__).parent.parent / "dist/absl/**/*.inc"), recursive=True
+        )
+        abseil_headers = sorted(
+            [os.path.relpath(path, pathlib.Path(__file__).parent.parent) for path in abseil_headers]
+        )
         bazel.write(f"""\
 # AUTO-GENERATED FILE DO NOT MANUALLY EDIT
 # generated from the parse_libs_from_ninja.py script in scripts directory via `python ./parse_libs_from_ninja.py` 
@@ -142,17 +155,15 @@ ABSEIL_SKIP_GLOBAL_DEPS = [
         # so several passes the the ninja file may be required as new dependencies are found.
         written_libs = set()
         while written_libs != target_libs:
-
             cur_libs_num = len(written_libs)
 
             for line in content:
-
                 # found an interesting line with potential, ninja build edges always start with
                 # "build {targets}"
-                if line.startswith('build absl'):
+                if line.startswith("build absl"):
                     found_target_lib = None
 
-                    match = re.search(r'lib(absl_\w+)\.a: CXX_STATIC_LIBRARY_LINKER', line)
+                    match = re.search(r"lib(absl_\w+)\.a: CXX_STATIC_LIBRARY_LINKER", line)
                     if match:
                         found_target_lib = match[1]
                         target_libs.add(found_target_lib)
@@ -167,12 +178,12 @@ ABSEIL_SKIP_GLOBAL_DEPS = [
                     # else we have found a new library so lets parse out the source files and dependent
                     # libraries. Ninja format use spaces as delimiters and $ as an escape. The loop below
                     # while extract the spaces which should be exacped and put them in the tokens.
-                    raw_tokens = line.split(' ')
+                    raw_tokens = line.split(" ")
                     tokens = []
                     index = 0
                     while index < len(raw_tokens):
                         token = raw_tokens[index]
-                        while token.endswith('$'):
+                        while token.endswith("$"):
                             index += 1
                             token = token[:-1]
                             token += raw_tokens[index]
@@ -181,7 +192,7 @@ ABSEIL_SKIP_GLOBAL_DEPS = [
 
                     # the dependent liraries will be listed after the explicit deps separator '||'
                     try:
-                        deps_token_index = tokens.index('||')
+                        deps_token_index = tokens.index("||")
                     except ValueError:
                         deps_token_index = len(tokens)
 
@@ -199,14 +210,14 @@ ABSEIL_SKIP_GLOBAL_DEPS = [
                     # we need strip the cmake output dir, and the object file extension
                     print(f"Found library: {found_target_lib}")
                     for raw_source in raw_source_files:
-                        path_elems = raw_source.split('/')
-                        path_elems.remove('CMakeFiles')
-                        path_elems.remove(found_target_lib.replace('absl_', '') + '.dir')
+                        path_elems = raw_source.split("/")
+                        path_elems.remove("CMakeFiles")
+                        path_elems.remove(found_target_lib.replace("absl_", "") + ".dir")
 
-                        source_files.append(os.path.splitext(os.path.join('dist', *path_elems))[0])
+                        source_files.append(os.path.splitext(os.path.join("dist", *path_elems))[0])
 
                     # now extract the library dependencies
-                    raw_libdeps = tokens[deps_token_index + 1:]
+                    raw_libdeps = tokens[deps_token_index + 1 :]
                     libdeps = []
 
                     for raw_libdep in raw_libdeps:
@@ -252,6 +263,7 @@ mongo_cc_library(
 
             if len(written_libs) == cur_libs_num:
                 raise Exception(
-                    f"Did not find any more requested libs {target_libs.difference(written_libs)}, " +
-                    "the library must exist in the abseil build, check the build.ninja file " +
-                    "and the parse_lib_from_ninja.log file.")
+                    f"Did not find any more requested libs {target_libs.difference(written_libs)}, "
+                    + "the library must exist in the abseil build, check the build.ninja file "
+                    + "and the parse_lib_from_ninja.log file."
+                )
