@@ -1602,26 +1602,6 @@ tasks:
       - func: "upload pip requirements"
       - func: "generate version burn in"
 
-  - &version_expansions_gen
-    name: version_expansions_gen
-    tags: ["assigned_to_jira_team_devprod_build", "auxiliary"]
-    priority: 10
-    commands:
-      - command: manifest.load
-      - func: "git get shallow project"
-      - func: "f_expansions_write"
-      - func: "restore git history and tags"
-      - func: "add git tag"
-      - func: "kill processes"
-      - func: "cleanup environment"
-      - func: "set up venv"
-      - func: "upload pip requirements"
-      - func: "generate and upload version expansions"
-      - func: "generate and upload resmoke constants"
-
-  - <<: *version_expansions_gen
-    name: version_expansions_future_git_tag_multiversion_gen
-
   - name: version_gen
     run_on: ubuntu2004-medium
     tags: ["assigned_to_jira_team_devprod_correctness", "auxiliary"]

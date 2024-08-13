@@ -5,13 +5,7 @@ timeout_secs: &timeout_secs 7200
 
 include:
   - filename: etc/evergreen_yml_components/definitions.yml
-  - filename: etc/evergreen_yml_components/tasks/resmoke/server_divisions/durable_transactions_and_availability/tasks.yml
-  - filename: etc/evergreen_yml_components/tasks/resmoke/server_divisions/query/tasks.yml
-  - filename: etc/evergreen_yml_components/tasks/compile_tasks.yml
-  - filename: etc/evergreen_yml_components/tasks/misc_tasks.yml
-  # This is a substitute task_generation.yml for sys-perf that doesn't
-  # generate resmoke tasks.
-  - filename: etc/system_perf_yml_components/variants/task_generation.yml
+  - filename: etc/evergreen_yml_components/tasks/compile_tasks_shared.yml
   ### lint_yaml trim start ###
   #
   # The lines below are trimmed by yamllinters.sh so that `evergreen evaluate` works on this file.
@@ -391,6 +385,16 @@ tasks:
       - func: "upload supplementary data"
 
 buildvariants:
+  # Replacement for generate-tasks-for-version from
+  # evergreen_yml_components/variants/misc/task_generation.yml.
+  - name: generate-tasks-for-version
+    display_name: "~ Generate tasks for evergreen version"
+    activate: true
+    run_on:
+      - rhel8.8-medium
+    tasks:
+      - name: version_expansions_gen
+
   - name: amazon2-x86-compile
     display_name: "* Compile for Amazon Linux 2 x86"
     expansions:

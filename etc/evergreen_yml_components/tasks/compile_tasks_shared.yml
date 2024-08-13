@@ -1,0 +1,463 @@
+variables:
+  # THIS HAS COPIES IN
+  # - etc/evergreen_yml_components/tasks/resmoke/server_divisions/clusters_and_integrations/tasks.yml
+  # - etc/evergreen_yml_components/tasks/compile_tasks.yml
+  # - etc/evergreen_yml_components/tasks/compile_tasks_shared.yml
+  # ANY MODIFICATIONS HERE SHOULD ALSO BE MADE IN THOSE FILES
+  - &compile_task_group_template
+    name: compile_task_group_template
+    max_hosts: 1
+    tasks: []
+    setup_task:
+      - func: "f_expansions_write"
+      - func: "apply compile expansions"
+      - func: "f_expansions_write"
+      - func: "set task expansion macros"
+      - func: "f_expansions_write"
+      - func: "get engflow creds"
+      - func: "fetch pgo profile"
+    teardown_task:
+      - func: "f_expansions_write"
+      - func: "attach scons logs"
+      - func: "attach report"
+      - func: "attach artifacts"
+      - func: "attach local resmoke invocation"
+      - func: "attach multiversion download links"
+      - func: "kill processes"
+      - func: "save code coverage data"
+      - func: "save mongo coredumps"
+      - func: "generate hang analyzer tasks"
+      - func: "save failed unittests"
+      - func: "save UndoDB recordings"
+      - func: "save unstripped dbtest"
+      - func: "save bazel headers"
+      - func: "save hang analyzer debugger files"
+      - func: "save disk statistics"
+      - func: "save system resource information"
+      - func: "save libfuzzertest corpora"
+      - func: "remove files"
+        vars:
+          files: >-
+            src/resmoke_error_code
+            src/build/scons/config.log
+            src/*.gcda.gcov
+            src/gcov-intermediate-files.tgz
+            src/*.core src/*.mdmp src/*.core.gz src/*.mdmp.gz
+            mongo-coredumps.json
+            src/dist-unittests/bin/*
+            src/dist-unittests/lib/*
+            mongo-unittests.tgz
+            src/debugger*.*
+            src/mongo-hanganalyzer.tgz
+            diskstats.tgz
+            system-resource-info.tgz
+            ${report_file|src/report.json}
+            ${archive_file|src/archive.json}
+    setup_group_can_fail_task: true
+    setup_group:
+      - command: manifest.load
+      - func: "git get project and add git tag"
+      - func: "set task expansion macros"
+      - func: "f_expansions_write"
+      - func: "kill processes"
+      - func: "cleanup environment"
+      # The python virtual environment is installed in ${workdir}, which is created in
+      # "set up venv".
+      - func: "set up venv"
+      - func: "upload pip requirements"
+      - func: "f_expansions_write"
+      - func: "configure evergreen api credentials"
+      - func: "get buildnumber"
+      - func: "f_expansions_write"
+      - func: "set up credentials"
+      - func: "f_expansions_write"
+      - func: "use WiredTiger develop" # noop if ${use_wt_develop} is not "true"
+      - func: "f_expansions_write"
+      - func: "set up win mount script"
+      - func: "f_expansions_write"
+      - func: "generate compile expansions"
+      - func: "f_expansions_write"
+    teardown_group:
+      - func: "f_expansions_write"
+      - func: "umount shared scons directory"
+      - func: "cleanup environment"
+    timeout:
+      - func: "f_expansions_write"
+      - func: "run hang analyzer"
+      - func: "wait for resmoke to shutdown"
+
+task_groups:
+  - <<: *compile_task_group_template
+    name: compile_and_package_serial_no_unittests_TG
+    tasks:
+      - compile_dist_test
+      - archive_dist_test
+      - archive_dist_test_debug
+
+tasks:
+  - &version_expansions_gen
+    name: version_expansions_gen
+    tags: ["assigned_to_jira_team_devprod_build", "auxiliary"]
+    priority: 10
+    commands:
+      - command: manifest.load
+      - func: "git get shallow project"
+      - func: "f_expansions_write"
+      - func: "restore git history and tags"
+      - func: "add git tag"
+      - func: "kill processes"
+      - func: "cleanup environment"
+      - func: "set up venv"
+      - func: "upload pip requirements"
+      - func: "generate and upload version expansions"
+      - func: "generate and upload resmoke constants"
+
+  - <<: *version_expansions_gen
+    name: version_expansions_future_git_tag_multiversion_gen
+
+  ## compile - build all scons targets except unittests ##
+  - &compile_dist_test
+    name: compile_dist_test
+    tags: ["assigned_to_jira_team_devprod_build", "auxiliary", "bazel_check"]
+    depends_on:
+      - name: version_expansions_gen
+        variant: generate-tasks-for-version
+    commands:
+      - func: "scons compile"
+        vars:
+          targets: >-
+            install-dist-test
+            ${additional_compile_targets|}
+          task_compile_flags: >-
+            PREFIX=dist-test
+
+  - <<: *compile_dist_test
+    name: compile_dist_test_future_git_tag_multiversion
+    depends_on:
+      - name: version_expansions_future_git_tag_multiversion_gen
+
+  - &archive_dist_test
+    name: archive_dist_test
+    tags: ["assigned_to_jira_team_devprod_build", "auxiliary"]
+    depends_on:
+      - name: compile_dist_test
+    commands:
+      - func: "scons compile"
+        vars:
+          targets: >-
+            archive-dist-test
+          task_compile_flags: >-
+            PREFIX=dist-test
+      - func: "f_expansions_write"
+      - command: subprocess.exec
+        params:
+          binary: bash
+          add_expansions_to_env: true
+          args:
+            - "src/evergreen/run_python_script.sh"
+            - "evergreen/macos_notary.py"
+            - "mongodb-binaries.${ext|tgz}"
+
+      - command: s3.put
+        params:
+          optional: true
+          aws_key: ${aws_key}
+          aws_secret: ${aws_secret}
+          local_file: src/mongodb-binaries.${ext|tgz}
+          remote_file: ${mongo_binaries}
+          bucket: mciuploads
+          permissions: public-read
+          content_type: application/gzip
+          display_name: Binaries
+
+      - func: "f_expansions_write"
+      - func: "gen feature flags"
+      - func: "fetch resmoke constants"
+
+      - command: archive.targz_pack
+        params:
+          target: "artifacts.tgz"
+          source_dir: "src"
+          include:
+            - ".resmoke_mongo_version.yml"
+            - ".resmoke_mongo_release_values.yml"
+            - "patch_test_tags.tgz"
+            - "./build/**.gcno"
+            - "./etc/*san.suppressions"
+            - "./etc/backports_required_for_multiversion_tests.yml"
+            - "./etc/evergreen_timeouts.yml"
+            - "./etc/expansions.default.yml"
+            - "./etc/evergreen_nightly.yml"
+            - "./etc/evergreen.yml"
+            - "./etc/evergreen_yml_components/**"
+            - "./etc/repo_config.yaml"
+            - "./etc/scons/**"
+            - "./etc/macos_dev_entitlements.xml"
+            - "docker_compose/**"
+            - "buildscripts/**"
+            - "jstests/**"
+            - "patch_files.txt"
+            - "evergreen/**"
+            - "src/**.idl"
+            - "src/mongo/client/sdam/json_tests/sdam_tests/**"
+            - "src/mongo/client/sdam/json_tests/server_selection_tests/**"
+            - "src/mongo/db/modules/enterprise/docs/**"
+            - "src/mongo/db/modules/enterprise/jstests/**"
+            - "src/mongo/db/modules/subscription/jstests/**"
+            - "src/mongo/util/options_parser/test_config_files/**"
+            - "src/third_party/JSON-Schema-Test-Suite/tests/draft4/**"
+            - "src/third_party/mock_ocsp_responder/**"
+            - "src/third_party/schemastore.org/**"
+            - "poetry.lock"
+            - "pyproject.toml"
+          exclude_files:
+            - "*_test.pdb"
+
+      - command: s3.put
+        params:
+          aws_key: ${aws_key}
+          aws_secret: ${aws_secret}
+          local_file: artifacts.tgz
+          remote_file: ${mongo_artifacts}
+          bucket: mciuploads
+          permissions: private
+          visibility: signed
+          content_type: application/tar
+          display_name: Artifacts
+
+      - command: archive.targz_pack
+        params:
+          target: "venv.tgz"
+          source_dir: "./"
+          include:
+            - "./venv/**"
+            - "./venv_readme.txt"
+
+      - command: s3.put
+        params:
+          aws_key: ${aws_key}
+          aws_secret: ${aws_secret}
+          local_file: venv.tgz
+          remote_file: ${mongo_venv}
+          bucket: mciuploads
+          permissions: private
+          visibility: signed
+          content_type: application/tar
+          display_name: Python venv (see included venv_readme.txt)
+
+  - <<: *archive_dist_test
+    name: archive_dist_test_future_git_tag_multiversion
+    depends_on:
+      - name: compile_dist_test_future_git_tag_multiversion
+
+  - &archive_dist_test_debug
+    name: archive_dist_test_debug
+    tags: ["assigned_to_jira_team_devprod_build", "auxiliary"]
+    depends_on:
+      - name: archive_dist_test
+    commands:
+      - func: "scons compile"
+        vars:
+          targets: >-
+            archive-dist-test-debug
+          task_compile_flags: >-
+            PREFIX=dist-test
+      - func: "upload debugsymbols"
+      - func: "f_expansions_write"
+      - command: subprocess.exec
+        params:
+          binary: bash
+          args:
+            - "./src/evergreen/record_mongodb_server_version.sh"
+            - "./build/install/dist-test/bin/mongod"
+            - "./version_info_mongod.txt"
+      - command: s3.put
+        params:
+          optional: true
+          aws_key: ${aws_key}
+          aws_secret: ${aws_secret}
+          local_file: src/version_info_mongod.txt
+          remote_file: ${project}/${build_variant}/${version_id}/version-info-mongod-${task_id}.txt
+          bucket: mciuploads
+          permissions: public-read
+          content_type: text/plain
+          display_name: mongod --version output
+
+  - <<: *archive_dist_test_debug
+    name: archive_dist_test_debug_future_git_tag_multiversion
+    depends_on:
+      - name: archive_dist_test_future_git_tag_multiversion
+
+  - name: crypt_create_lib
+    tags:
+      [
+        "assigned_to_jira_team_server_security",
+        "release_critical",
+        "incompatible_community",
+        "incompatible_tsan",
+        "incompatible_aubsan",
+        "requires_compile_variant",
+        "requires_large_host_debug_mode",
+        "crypt",
+        "bazel_check",
+      ]
+    depends_on:
+      - name: version_expansions_gen
+        variant: generate-tasks-for-version
+    commands:
+      - func: "do scons setup"
+      - func: "f_expansions_write"
+      - func: "scons compile"
+        vars:
+          targets: archive-mongo-crypt-dev
+          task_compile_flags: >-
+            --allocator=system
+            --enterprise-features=fle
+            --js-engine=none
+            --link-model=dynamic-sdk
+            --enable-http-client=off
+            --ssl=off
+            ${crypt_task_compile_flags}
+            DESTDIR='$BUILD_ROOT/crypt-lib-$MONGO_VERSION'
+      - command: subprocess.exec
+        params:
+          binary: bash
+          args:
+            - "src/evergreen/crypt_run_tests.sh"
+      - command: s3.put
+        params:
+          aws_key: ${aws_key}
+          aws_secret: ${aws_secret}
+          local_file: "src/mongo-crypt-dev.${ext|tgz}"
+          remote_file: "${project}/mongo_crypt/${build_variant}/${revision}/mongo_crypt_shared_v1-${version}.${ext|tgz}"
+          bucket: mciuploads
+          permissions: public-read
+          content_type: ${content_type|application/tar}
+          display_name: "Mongo crypt Library"
+
+  - name: package
+    tags: ["assigned_to_jira_team_devprod_build", "auxiliary"]
+    depends_on:
+      - name: compile_dist_test
+    commands:
+      - func: "f_expansions_write"
+      - func: "scons compile"
+        vars:
+          targets: >-
+            archive-dist
+            archive-dist-debug
+            archive-jstestshell
+            archive-jstestshell-debug
+            ${additional_package_targets|}
+          task_compile_flags: >-
+            --legacy-tarball
+      - command: subprocess.exec
+        params:
+          binary: bash
+          add_expansions_to_env: true
+          args:
+            - "src/evergreen/run_python_script.sh"
+            - "evergreen/macos_notary.py"
+            - "mongodb-dist.${ext|tgz}"
+      - func: "f_expansions_write"
+      - command: subprocess.exec
+        params:
+          binary: bash
+          args:
+            - "src/evergreen/package.sh"
+      - command: s3.put
+        params:
+          optional: true
+          aws_key: ${aws_key}
+          aws_secret: ${aws_secret}
+          local_file: src/mongodb-dist.${ext|tgz}
+          remote_file: ${project}/${build_variant}/${revision}/dist/mongo-${build_id}.${ext|tgz}
+          bucket: mciuploads
+          permissions: public-read
+          content_type: application/tar
+          display_name: Dist Tarball
+      - command: s3.put
+        params:
+          optional: true
+          aws_key: ${aws_key}
+          aws_secret: ${aws_secret}
+          local_file: src/mongodb-dist-debugsymbols.${ext|tgz}
+          remote_file: ${project}/${build_variant}/${revision}/dist/mongo-${build_id}-debugsymbols.${ext|tgz}
+          bucket: mciuploads
+          permissions: public-read
+          content_type: application/tar
+          display_name: Dist Debugsymbols
+      - command: s3.put
+        params:
+          aws_key: ${aws_key}
+          aws_secret: ${aws_secret}
+          local_file: src/mongodb-jstestshell.${ext|tgz}
+          remote_file: ${mongo_jstestshell}
+          bucket: mciuploads
+          permissions: public-read
+          content_type: ${content_type|application/gzip}
+          display_name: Jstestshell
+      - command: s3.put
+        params:
+          aws_key: ${aws_key}
+          aws_secret: ${aws_secret}
+          local_file: src/mongodb-jstestshell-debugsymbols.${ext|tgz}
+          remote_file: ${mongo_jstestshell_debugsymbols}
+          bucket: mciuploads
+          permissions: public-read
+          content_type: ${content_type|application/gzip}
+          display_name: Jstestshell Debugsymbols
+      - command: s3.put
+        params:
+          optional: true
+          aws_key: ${aws_key}
+          aws_secret: ${aws_secret}
+          local_file: src/mongodb-cryptd.${ext|tgz}
+          remote_file: ${mongo_cryptd}
+          bucket: mciuploads
+          permissions: public-read
+          content_type: ${content_type|application/gzip}
+          display_name: CryptD Binaries
+      - command: s3.put
+        params:
+          optional: true
+          aws_key: ${aws_key}
+          aws_secret: ${aws_secret}
+          local_file: src/mongodb-cryptd-debugsymbols.${ext|tgz}
+          remote_file: ${mongo_cryptd_debugsymbols}
+          bucket: mciuploads
+          permissions: public-read
+          content_type: ${content_type|application/gzip}
+          display_name: CryptD Debugsymbols
+      - func: "run packager.py"
+      - command: archive.targz_pack
+        params:
+          target: "packages.tgz"
+          source_dir: "src"
+          include:
+            - "repo/**"
+            - "./**.msi"
+      - command: s3.put
+        params:
+          optional: true
+          aws_key: ${aws_key}
+          aws_secret: ${aws_secret}
+          local_file: packages.tgz
+          remote_file: ${project}/${build_variant}/${revision}/artifacts/${build_id}-packages.tgz
+          bucket: mciuploads
+          permissions: public-read
+          content_type: application/tar
+          display_name: Packages
+      # We perform package task generally in the middle of larger task groups running
+      # on the same host serially. In order to reduce peak required disk space, we can delete
+      # these generated files since we have already uploaded them to aws at this point.
+      - func: "remove files"
+        vars:
+          files: >-
+            packages.tgz
+            src/mongodb-cryptd-debugsymbols.${ext|tgz}
+            src/mongodb-cryptd.${ext|tgz}
+            src/mongodb-jstestshell-debugsymbols.${ext|tgz}
+            src/mongodb-jstestshell.${ext|tgz}
+            src/mongodb-dist-debugsymbols.${ext|tgz}
+            src/mongodb-dist.${ext|tgz}
