@@ -6529,16 +6529,16 @@ else:
 
 
 def injectMongoIncludePaths(thisEnv):
-    thisEnv.AppendUnique(CPPPATH=["$BUILD_DIR"])
     if thisEnv.get("BAZEL_OUT_DIR"):
         thisEnv.AppendUnique(CPPPATH=["#$BAZEL_OUT_DIR/src"])
+    thisEnv.AppendUnique(CPPPATH=["$BUILD_DIR"])
 
 
 env.AddMethod(injectMongoIncludePaths, "InjectMongoIncludePaths")
 
 gen_header_paths = [
-    (pathlib.Path(env.Dir("$BUILD_DIR").path) / "mongo").as_posix(),
     (pathlib.Path(env.Dir("$BAZEL_OUT_DIR").path) / "src" / "mongo").as_posix(),
+    (pathlib.Path(env.Dir("$BUILD_DIR").path) / "mongo").as_posix(),
 ]
 
 replacements = {
