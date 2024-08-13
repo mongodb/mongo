@@ -89,7 +89,7 @@ buildvariants:
       - name: initial_sync_fuzzer_gen
       - name: .jscore .common !.decimal
       - name: jsCore_txns_large_txns_format
-      - name: .jstestfuzz !.initsync !.feature_flag_guarded
+      - name: .jstestfuzz !.initsync !.feature_flag_guarded !.incompatible_inmemory
       - name: .multi_shard .common
       - name: multi_stmt_txn_jscore_passthrough_with_migration_gen
       - name: .read_write_concern !.durable_history

@@ -1863,12 +1863,14 @@ tasks:
     tags:
       [
         "assigned_to_jira_team_server_execution",
-        "default",
+        "concurrency",
         "config_fuzzer",
+        "default",
         "large",
         "incompatible_tsan",
         "incompatible_aubsan",
         "incompatible_debug_mode",
+        "incompatible_inmemory",
       ]
     commands:
       - func: "generate resmoke tasks"
@@ -1888,6 +1890,7 @@ tasks:
         "config_fuzzer",
         "incompatible_aubsan",
         "incompatible_debug_mode",
+        "incompatible_inmemory",
         "incompatible_mac",
         "incompatible_ppc",
         "incompatible_s390x",
@@ -1915,13 +1918,15 @@ tasks:
     tags:
       [
         "assigned_to_jira_team_server_execution",
-        "default",
+        "concurrency",
         "config_fuzzer",
+        "default",
         "large",
         "sharded",
         "incompatible_tsan",
         "incompatible_aubsan",
         "incompatible_debug_mode",
+        "incompatible_inmemory",
       ]
     commands:
       - func: "generate resmoke tasks"
@@ -1940,12 +1945,14 @@ tasks:
     tags:
       [
         "assigned_to_jira_team_server_execution",
-        "default",
+        "concurrency",
         "config_fuzzer",
+        "default",
         "large",
         "incompatible_tsan",
         "incompatible_aubsan",
         "incompatible_debug_mode",
+        "incompatible_inmemory",
       ]
     commands:
       - func: "generate resmoke tasks"
@@ -1959,7 +1966,13 @@ tasks:
 
   - <<: *task_template
     name: config_fuzzer_jsCore
-    tags: ["assigned_to_jira_team_server_execution", "default", "config_fuzzer"]
+    tags:
+      [
+        "assigned_to_jira_team_server_execution",
+        "default",
+        "config_fuzzer",
+        "incompatible_inmemory",
+      ]
     commands:
       - func: "do setup"
       - func: "run tests"
@@ -1981,6 +1994,7 @@ tasks:
         "incompatible_tsan",
         "incompatible_aubsan",
         "incompatible_debug_mode",
+        "incompatible_inmemory",
       ]
     commands:
       - func: "generate resmoke tasks"
@@ -2003,6 +2017,7 @@ tasks:
         "incompatible_tsan",
         "incompatible_aubsan",
         "incompatible_debug_mode",
+        "incompatible_inmemory",
       ]
     commands:
       - func: "generate resmoke tasks"
@@ -2027,6 +2042,7 @@ tasks:
         "incompatible_tsan",
         "incompatible_aubsan",
         "incompatible_debug_mode",
+        "incompatible_inmemory",
       ]
     commands:
       - func: "generate resmoke tasks"

@@ -2686,6 +2686,7 @@ tasks:
         "config_fuzzer",
         "incompatible_aubsan",
         "incompatible_debug_mode",
+        "incompatible_inmemory",
         "incompatible_tsan",
         "jstestfuzz",
         "non_deterministic",
