@@ -8,15 +8,11 @@
  * @tags: [resource_intensive]
  */
 
-function isSlow(mongoInstance) {
-    const buildInfo = assert.commandWorked(mongoInstance.adminCommand({"buildInfo": 1}));
-    const isCodeCoverageEnabled = buildInfo.buildEnvironment.ccflags.includes('-ftest-coverage');
-    const isSanitizerEnabled = buildInfo.buildEnvironment.ccflags.includes('-fsanitize');
-    return isCodeCoverageEnabled || isSanitizerEnabled;
-}
-
-var st = new ShardingTest({shards: 2, mongos: 1});
-const slowTestVariant = isSlow(st.s0) || isSlow(st.shard0) || isSlow(st.shard1);
+var st = new ShardingTest({
+    shards: 2,
+    mongos: 1,
+    rs: {nodes: 2, setParameter: {defaultConfigCommandTimeoutMS: 5 * 60 * 1000}}
+});
 
 var dbname = "test";
 var coll = "foo";
@@ -42,15 +38,8 @@ assert.commandWorked(st.s0.adminCommand({shardcollection: ns, key: {a: 1}}));
 var join = startParallelShell("db." + coll + ".remove({});", st.s0.port);
 
 // migrate while deletions are happening
-try {
-    assert.commandWorked(st.s0.adminCommand(
-        {moveChunk: ns, find: {a: 1}, to: st.getOther(st.getPrimaryShard(dbname)).name}));
-} catch (e) {
-    const expectedFailureMessage = "startCommit timed out waiting for the catch up completion.";
-    if (!slowTestVariant || !e.message.match(expectedFailureMessage)) {
-        throw e;
-    }
-}
+assert.commandWorked(st.s0.adminCommand(
+    {moveChunk: ns, find: {a: 1}, to: st.getOther(st.getPrimaryShard(dbname)).name}));
 
 join();
 
