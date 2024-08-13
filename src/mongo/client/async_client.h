@@ -109,6 +109,10 @@ public:
 
     Future<void> initWireVersion(const std::string& appName, executor::NetworkConnectionHook* hook);
 
+    /**
+     * Interrupts any ongoing async operations being run on behalf of this client.
+     * Has no effect if there are no operations in progress.
+     */
     void cancel(const BatonHandle& baton = nullptr);
 
     bool isStillConnected();
@@ -119,12 +123,27 @@ public:
     static constexpr Seconds kSlowConnAcquiredToWireLogSuppresionPeriod{5};
 
 private:
+    /**
+     * kDefault -> kInProgress when starting a command.
+     *
+     * kInProgress,kDirty -> kDefault when receiving a response successfully with
+     * moreToCome unset or successfully performing a fire-and-forget write.
+     *
+     * kInProgress -> kDirty upon failing to read/write to the socket or when being
+     * cancelled in the middle of a read or write.
+     */
+    enum class State { kDefault, kInProgress, kDirty };
+
+    static const Status kDirtyCancellationStatus;
+
     Future<executor::RemoteCommandResponse> _continueReceiveExhaustResponse(
         ClockSource::StopWatch stopwatch,
         boost::optional<int32_t> msgId,
         const BatonHandle& baton = nullptr);
+    Future<Message> _sourceMessage(const std::shared_ptr<Baton>& baton);
     Future<Message> _waitForResponse(boost::optional<int32_t> msgId,
                                      const BatonHandle& baton = nullptr);
+    Future<void> _sinkMessage(Message request, const std::shared_ptr<Baton>& baton);
     Future<void> _call(Message request, int32_t msgId, const BatonHandle& baton = nullptr);
     BSONObj _buildHelloRequest(const std::string& appName, executor::NetworkConnectionHook* hook);
     void _parseHelloResponse(BSONObj request, const std::unique_ptr<rpc::ReplyInterface>& response);
@@ -134,6 +153,9 @@ private:
     std::shared_ptr<transport::Session> _session;
     ServiceContext* const _svcCtx;
     MessageCompressorManager _compressorManager;
+
+    Mutex _stateMutex;
+    State _state = State::kDefault;
 };
 
 }  // namespace mongo

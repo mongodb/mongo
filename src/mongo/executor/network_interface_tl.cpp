@@ -39,6 +39,7 @@
 #include <fmt/format.h>
 // IWYU pragma: no_include "cxxabi.h"
 #include <algorithm>
+#include <memory>
 #include <tuple>
 #include <type_traits>
 
@@ -66,6 +67,7 @@
 #include "mongo/logv2/redaction.h"
 #include "mongo/platform/compiler.h"
 #include "mongo/rpc/get_status_from_command_result.h"
+#include "mongo/stdx/mutex.h"
 #include "mongo/transport/ssl_connection_context.h"
 #include "mongo/transport/transport_layer_manager_impl.h"
 #include "mongo/util/assert_util.h"
@@ -88,6 +90,7 @@ using namespace fmt::literals;
 namespace {
 MONGO_FAIL_POINT_DEFINE(triggerSendRequestNetworkTimeout);
 MONGO_FAIL_POINT_DEFINE(forceConnectionNetworkTimeout);
+MONGO_FAIL_POINT_DEFINE(waitForShutdownBeforeSendRequest);
 
 auto& numConnectionNetworkTimeouts =
     *MetricBuilder<Counter64>("operation.numConnectionNetworkTimeouts");
@@ -248,7 +251,7 @@ NetworkInterfaceTL::~NetworkInterfaceTL() {
     shutdown();
 
     {
-        stdx::unique_lock lk(_stateMutex);
+        stdx::unique_lock lk(_mutex);
         _stoppedCV.wait(lk, [&] { return _state == kStopped; });
     }
 
@@ -286,7 +289,7 @@ void NetworkInterfaceTL::startup() {
         _run();
     });
 
-    stdx::lock_guard stateLock(_stateMutex);
+    stdx::lock_guard lk(_mutex);
     invariant(_state == kDefault, "Network interface has already started");
     _state = kStarted;
 }
@@ -297,11 +300,6 @@ void NetworkInterfaceTL::_run() {
     // This returns when the reactor is stopped in shutdown()
     _reactor->run();
 
-    // Note that the pool will shutdown again when the ConnectionPool dtor runs
-    // This prevents new timers from being set, calls all cancels via the factory registry, and
-    // destructs all connections for all existing pools.
-    _pool->shutdown();
-
     // Close out all remaining tasks in the reactor now that they've all been canceled.
     _reactor->drain();
 
@@ -309,16 +307,21 @@ void NetworkInterfaceTL::_run() {
 }
 
 void NetworkInterfaceTL::shutdown() {
-
+    decltype(_inProgress) inProgress;
     {
-        stdx::lock_guard lk(_stateMutex);
+        stdx::lock_guard lk(_mutex);
         switch (_state) {
             case kDefault:
                 _state = kStopped;
+                // If we never started, there aren't any commands running.
+                invariant(_inProgress.empty());
                 _stoppedCV.notify_one();
                 return;
             case kStarted:
                 _state = kStopping;
+                // Grap a copy of the remaining commands. Any attempt to register new commands will
+                // throw, so only these need to be cancelled.
+                inProgress = _inProgress;
                 break;
             case kStopping:
             case kStopped:
@@ -332,16 +335,11 @@ void NetworkInterfaceTL::shutdown() {
     LOGV2_DEBUG(22594, 2, "Shutting down network interface.");
 
     const ScopeGuard finallySetStopped = [&] {
-        stdx::lock_guard lk(_stateMutex);
+        stdx::lock_guard lk(_mutex);
         _state = kStopped;
+        invariant(_inProgress.size() == 0);
         _stoppedCV.notify_one();
     };
-
-    // Cancel any remaining commands. Any attempt to register new commands will throw.
-    auto inProgress = [&] {
-        stdx::lock_guard lk(_inProgressMutex);
-        return std::exchange(_inProgress, {});
-    }();
 
     for (auto& [_, weakCmdState] : inProgress) {
         auto cmdState = weakCmdState.lock();
@@ -361,7 +359,22 @@ void NetworkInterfaceTL::shutdown() {
         cmdState->promiseFulfilled.get();
     }
 
-    // Stop the reactor/thread first so that nothing runs on a partially dtor'd pool.
+    // This prevents new timers from being set, cancels any ongoing operations on all connections,
+    // and destructs all connections for all existing pools.
+    _pool->shutdown();
+
+    // Now that the commands have been canceled, ensure they've fully finished and cleaned up before
+    // stopping the reactor.
+    {
+        stdx::unique_lock lk(_mutex);
+        LOGV2_DEBUG(9213400,
+                    2,
+                    "Waiting for any pending network interface operations to complete",
+                    "numPending"_attr = _inProgress.size());
+        invariant(_state == kStopping);
+        _stoppedCV.wait(lk, [&] { return _inProgress.size() == 0; });
+    }
+
     _reactor->stop();
 
     _shutdownAllAlarms();
@@ -370,7 +383,7 @@ void NetworkInterfaceTL::shutdown() {
 }
 
 bool NetworkInterfaceTL::inShutdown() const {
-    stdx::lock_guard lk(_stateMutex);
+    stdx::lock_guard lk(_mutex);
     return _state == kStopping || _state == kStopped;
 }
 
@@ -398,6 +411,17 @@ Date_t NetworkInterfaceTL::now() {
     return _reactor->now();
 }
 
+void NetworkInterfaceTL::_registerCommand(const TaskExecutor::CallbackHandle& cbHandle,
+                                          std::shared_ptr<CommandStateBase> cmdState) {
+    stdx::lock_guard lk(_mutex);
+
+    if (_state == State::kStopping || _state == State::kStopped) {
+        uassertStatusOK(kNetworkInterfaceShutdownInProgress);
+    }
+
+    _inProgress.insert({cbHandle, cmdState});
+}
+
 NetworkInterfaceTL::CommandStateBase::CommandStateBase(
     NetworkInterfaceTL* interface_,
     RemoteCommandRequestOnAny request_,
@@ -407,6 +431,10 @@ NetworkInterfaceTL::CommandStateBase::CommandStateBase(
       cbHandle(cbHandle_),
       timer(interface->_reactor->makeTimer()),
       operationKey(requestOnAny.operationKey) {}
+
+NetworkInterfaceTL::CommandStateBase::~CommandStateBase() {
+    interface->_unregisterCommand(cbHandle);
+}
 
 NetworkInterfaceTL::CommandState::CommandState(NetworkInterfaceTL* interface_,
                                                RemoteCommandRequestOnAny request_,
@@ -422,6 +450,12 @@ auto NetworkInterfaceTL::CommandState::make(NetworkInterfaceTL* interface,
     auto state = std::make_shared<CommandState>(interface, std::move(request), cbHandle);
     auto [promise, future] = makePromiseFuture<RemoteCommandOnAnyResponse>();
     state->promise = std::move(promise);
+    state->requestManager = std::make_unique<RequestManager>(state.get());
+
+    interface->_registerCommand(cbHandle, state);
+
+    // Set the callbacks after successfully registering the command, since since the reference cycle
+    // can only be broken if this future chain is fulfilled.
     future = std::move(future)
                  .onError([state](Status error) {
                      // If command promise was canceled or timed out, wrap the error in a RCRsp
@@ -429,39 +463,19 @@ auto NetworkInterfaceTL::CommandState::make(NetworkInterfaceTL* interface,
                          boost::none, std::move(error), state->stopwatch.elapsed());
                  })
                  .tapAll([state](const auto& swRequest) {
-                     // swRequest is either populated from the success path or the value returning
-                     // onError above. swRequest.isOK() should not be possible.
+                     // swRequest is either populated from the success path or the value
+                     // returning onError above. swRequest.isOK() should not be possible.
                      invariant(swRequest.getStatus());
 
                      // At this point, the command has either been sent and returned an RCRsp or
                      // has received a local interruption that was wrapped in a RCRsp.
                      state->tryFinish(swRequest.getValue().status);
                  });
-
-    state->requestManager = std::make_unique<RequestManager>(state.get());
-
-    {
-        stdx::lock_guard lk(interface->_inProgressMutex);
-        if (interface->inShutdown()) {
-            // If we're in shutdown, we can't add a new command.
-            uassertStatusOK(kNetworkInterfaceShutdownInProgress);
-        }
-
-        interface->_inProgress.insert({cbHandle, state});
-    }
-
     return std::pair(state, std::move(future));
 }
 
-AsyncDBClient* NetworkInterfaceTL::RequestState::getClient(const ConnectionHandle& conn) noexcept {
-    if (!conn) {
-        return nullptr;
-    }
-
-    return checked_cast<connection_pool_tl::TLConnection*>(conn.get())->client();
-}
-
-void NetworkInterfaceTL::CommandStateBase::setTimer(std::shared_ptr<RequestState> requestState) {
+void NetworkInterfaceTL::CommandStateBase::setTimer(
+    const std::shared_ptr<RequestState>& requestState) {
     auto nowVal = interface->now();
 
     triggerSendRequestNetworkTimeout.executeIf(
@@ -485,12 +499,22 @@ void NetworkInterfaceTL::CommandStateBase::setTimer(std::shared_ptr<RequestState
     const auto timeoutCode =
         requestOnAny.timeoutCode.get_value_or(ErrorCodes::NetworkInterfaceExceededTimeLimit);
 
-    // TODO reform with SERVER-41459
+    // We don't need to capture an anchor for the CommandStateBase (i.e. this) since requestState
+    // owns a full shared_ptr to it. If the request gets fulfilled and misses cancelling the
+    // timer (i.e. we can't lock the weak_ptr), we just want to return. Ideally we'd ensure that
+    // cancellation could never miss timers, but since they will eventually fire anyways it's not a
+    // huge deal that we don't.
     timer->waitUntil(deadline, baton)
-        .getAsync([this, anchor = shared_from_this(), timeoutCode, requestState](Status status) {
+        .getAsync([this, timeoutCode, weakReq = std::weak_ptr(requestState)](Status status) {
             if (!status.isOK()) {
                 return;
             }
+
+            auto requestState = weakReq.lock();
+            if (!requestState) {
+                return;
+            }
+
             if (promiseFulfilling.swap(true)) {
                 return;
             }
@@ -511,10 +535,26 @@ void NetworkInterfaceTL::CommandStateBase::setTimer(std::shared_ptr<RequestState
         });
 }
 
-void NetworkInterfaceTL::RequestState::returnConnection(Status status) noexcept {
-    invariant(conn);
+Future<RemoteCommandResponse> NetworkInterfaceTL::RequestState::withConnection(
+    std::function<Future<RemoteCommandResponse>(connection_pool_tl::TLConnection&)> f) {
+    stdx::lock_guard lk(mutex);
+    if (isCancelled) {
+        return Status(ErrorCodes::CallbackCanceled, "Request was cancelled");
+    }
 
-    auto connToReturn = std::exchange(conn, {});
+    auto tlConn = checked_cast<connection_pool_tl::TLConnection*>(conn.get());
+    invariant(tlConn);
+    return f(*tlConn);
+}
+
+void NetworkInterfaceTL::RequestState::returnConnection(Status status) noexcept {
+    ConnectionHandle connToReturn;
+    {
+        stdx::lock_guard lk(mutex);
+        invariant(conn);
+
+        connToReturn = std::exchange(conn, {});
+    }
 
     if (!status.isOK()) {
         connToReturn->indicateFailure(std::move(status));
@@ -569,17 +609,32 @@ void NetworkInterfaceTL::CommandStateBase::tryFinish(Status status) noexcept {
     });
 }
 
-void NetworkInterfaceTL::CommandStateBase::done() {
-    // We've finished, we're not in progress anymore
-    stdx::lock_guard lk(interface->_inProgressMutex);
-    interface->_inProgress.erase(cbHandle);
+void NetworkInterfaceTL::_unregisterCommand(const TaskExecutor::CallbackHandle& cbHandle) {
+    stdx::lock_guard lk(_mutex);
+    if (!_inProgress.erase(cbHandle)) {
+        // We never made it into the inProgress list.
+        return;
+    }
+    if (_state == State::kStopping && _inProgress.size() == 0) {
+        _stoppedCV.notify_one();
+    }
 }
 
 void NetworkInterfaceTL::RequestState::cancel() noexcept {
-    auto connToCancel = weakConn.lock();
-    if (auto clientPtr = getClient(connToCancel)) {
+    ConnectionHandle anchor;
+
+    {
+        stdx::lock_guard lk(mutex);
+        if (std::exchange(isCancelled, true)) {
+            return;
+        }
+
+        anchor = conn;
+    }
+
+    if (auto tlConn = checked_cast<connection_pool_tl::TLConnection*>(anchor.get())) {
         // If we have a client, cancel it
-        clientPtr->cancel(cmdState->baton);
+        tlConn->client()->cancel(cmdState->baton);
     }
 }
 
@@ -680,7 +735,6 @@ Status NetworkInterfaceTL::startCommand(const TaskExecutor::CallbackHandle& cbHa
                                }
                            },
                            "The finish callback failed. Aborting command.");
-            cmdState->done();
         });
 
     if (MONGO_unlikely(networkInterfaceDiscardCommandsBeforeAcquireConn.shouldFail())) {
@@ -730,14 +784,12 @@ void NetworkInterfaceTL::testEgress(const HostAndPort& hostAndPort,
 
 Future<RemoteCommandResponse> NetworkInterfaceTL::CommandState::sendRequest(
     std::shared_ptr<RequestState> requestState) {
-    return makeReadyFutureWith([this, requestState] {
-               setTimer(requestState);
-               const auto connAcquiredTimer =
-                   checked_cast<connection_pool_tl::TLConnection*>(requestState->conn.get())
-                       ->getConnAcquiredTimer();
-               return RequestState::getClient(requestState->conn)
-                   ->runCommandRequest(*requestState->request, baton, std::move(connAcquiredTimer));
-           })
+    setTimer(requestState);
+    return requestState
+        ->withConnection([&](connection_pool_tl::TLConnection& conn) {
+            return conn.client()->runCommandRequest(
+                *requestState->request, baton, conn.getConnAcquiredTimer());
+        })
         .then([this, requestState](RemoteCommandResponse response) {
             catchingInvoke(
                 [&] { doMetadataHook(RemoteCommandOnAnyResponse(requestState->host, response)); },
@@ -769,6 +821,9 @@ void NetworkInterfaceTL::RequestManager::cancelRequests() {
     std::vector<std::shared_ptr<RequestState>> requestsToCancel;
     {
         stdx::lock_guard<Latch> lk(mutex);
+
+        // Once we've set isLocked to true, no more requests will be created for this manager.
+        // Thus, only those that have been sent already need to be cancelled.
         isLocked = true;
 
         for (size_t i = 0; i < sentIdx; i++) {
@@ -909,9 +964,8 @@ void NetworkInterfaceTL::RequestManager::trySend(
         requestState = std::make_shared<RequestState>(this, cmdState->shared_from_this());
         requestState->isHedge = currentSentIdx > 0;
 
-        // Set conn/weakConn+request under the lock so they will always be observed during cancel.
+        // Set conn under the lock so it will always be observed during cancel.
         requestState->conn = std::move(swConn.getValue());
-        requestState->weakConn = requestState->conn;
 
         requestState->request = RemoteCommandRequest(cmdState->requestOnAny, idx);
         requestState->host = requestState->request->target;
@@ -945,12 +999,6 @@ void NetworkInterfaceTL::RequestManager::trySend(
         context.request = requestState;
     }
 
-    LOGV2_DEBUG(4646300,
-                2,
-                "Sending request",
-                "requestId"_attr = cmdState->requestOnAny.id,
-                "target"_attr = cmdState->requestOnAny.target[idx]);
-
     if (logSetMaxTimeMSHedge) {
         LOGV2_DEBUG(4647200,
                     2,
@@ -970,14 +1018,18 @@ void NetworkInterfaceTL::RequestManager::trySend(
                     "target"_attr = cmdState->requestOnAny.target[idx]);
     }
 
-    networkInterfaceHangCommandsAfterAcquireConn.pauseWhileSet();
-
-    // We have a connection and the command hasn't already been attempted
     LOGV2_DEBUG(4630601,
                 2,
                 "Request acquired a connection",
                 "requestId"_attr = requestState->request->id,
                 "target"_attr = requestState->request->target);
+
+    networkInterfaceHangCommandsAfterAcquireConn.pauseWhileSet();
+
+    if (waitForShutdownBeforeSendRequest.shouldFail()) {
+        invariant(!cmdState->interface->onNetworkThread());
+        cmdState->promiseFulfilled.get();
+    }
 
     // An attempt to avoid sending a request after its command has been canceled or already executed
     // using another connection. Just a best effort to mitigate unnecessary resource consumption if
@@ -991,6 +1043,12 @@ void NetworkInterfaceTL::RequestManager::trySend(
         requestState->returnConnection(Status::OK());
         return;
     }
+
+    LOGV2_DEBUG(4646300,
+                2,
+                "Sending request",
+                "requestId"_attr = cmdState->requestOnAny.id,
+                "target"_attr = cmdState->requestOnAny.target[idx]);
 
     if (auto counters = cmdState->interface->_counters) {
         counters->recordSent();
@@ -1073,7 +1131,13 @@ auto NetworkInterfaceTL::ExhaustCommandState::make(NetworkInterfaceTL* interface
     auto state = std::make_shared<ExhaustCommandState>(
         interface, std::move(request), cbHandle, std::move(onReply));
     auto [promise, future] = makePromiseFuture<void>();
+    state->requestManager = std::make_unique<RequestManager>(state.get());
     state->promise = std::move(promise);
+
+    interface->_registerCommand(cbHandle, state);
+
+    // Set the callbacks after successfully registering the command, since since the reference cycle
+    // can only be broken if this future chain is fulfilled.
     std::move(future)
         .thenRunOn(makeGuaranteedExecutor(baton, interface->_reactor))
         .onError([state](Status error) {
@@ -1084,19 +1148,7 @@ auto NetworkInterfaceTL::ExhaustCommandState::make(NetworkInterfaceTL* interface
         .getAsync([state](Status status) {
             state->tryFinish(
                 Status{ErrorCodes::ExhaustCommandFinished, "Exhaust command finished"});
-            state->done();
         });
-
-    state->requestManager = std::make_unique<RequestManager>(state.get());
-
-    {
-        stdx::lock_guard lk(interface->_inProgressMutex);
-        if (interface->inShutdown()) {
-            // If we're in shutdown, we can't add a new command.
-            uassertStatusOK(kNetworkInterfaceShutdownInProgress);
-        }
-        interface->_inProgress.insert({cbHandle, state});
-    }
 
     return state;
 }
@@ -1107,8 +1159,11 @@ Future<RemoteCommandResponse> NetworkInterfaceTL::ExhaustCommandState::sendReque
     finalResponsePromise = std::move(promise);
 
     setTimer(requestState);
-    requestState->getClient(requestState->conn)
-        ->beginExhaustCommandRequest(*requestState->request, baton)
+
+    requestState
+        ->withConnection([&](connection_pool_tl::TLConnection& conn) {
+            return conn.client()->beginExhaustCommandRequest(*requestState->request, baton);
+        })
         .thenRunOn(requestState->interface()->_reactor)
         .getAsync([this, requestState](StatusWith<RemoteCommandResponse> swResponse) mutable {
             continueExhaustRequest(std::move(requestState), swResponse);
@@ -1182,8 +1237,10 @@ void NetworkInterfaceTL::ExhaustCommandState::continueExhaustRequest(
                         "Exhaust command setTimer"))
         return;
 
-    requestState->getClient(requestState->conn)
-        ->awaitExhaustCommand(baton)
+    requestState
+        ->withConnection([&](connection_pool_tl::TLConnection& conn) {
+            return conn.client()->awaitExhaustCommand(baton);
+        })
         .thenRunOn(requestState->interface()->_reactor)
         .getAsync([this, requestState](StatusWith<RemoteCommandResponse> swResponse) mutable {
             continueExhaustRequest(std::move(requestState), swResponse);
@@ -1237,7 +1294,7 @@ void NetworkInterfaceTL::cancelCommand(const TaskExecutor::CallbackHandle& cbHan
                                        const BatonHandle&) {
     std::shared_ptr<NetworkInterfaceTL::CommandStateBase> cmdStateToCancel;
     {
-        stdx::unique_lock<Latch> lk(_inProgressMutex);
+        stdx::unique_lock<Mutex> lk(_mutex);
         auto it = _inProgress.find(cbHandle);
         if (it == _inProgress.end()) {
             return;
@@ -1342,7 +1399,7 @@ Status NetworkInterfaceTL::setAlarm(const TaskExecutor::CallbackHandle& cbHandle
     auto weakAlarmState = std::weak_ptr<AlarmState>(alarmState);
 
     {
-        stdx::lock_guard<Latch> lk(_inProgressMutex);
+        stdx::lock_guard<Mutex> lk(_mutex);
 
         if (_inProgressAlarmsInShutdown) {
             // Check that we've won any possible race with _shutdownAllAlarms();
@@ -1370,7 +1427,7 @@ Status NetworkInterfaceTL::setAlarm(const TaskExecutor::CallbackHandle& cbHandle
 }
 
 void NetworkInterfaceTL::cancelAlarm(const TaskExecutor::CallbackHandle& cbHandle) {
-    stdx::unique_lock<Latch> lk(_inProgressMutex);
+    stdx::unique_lock<Mutex> lk(_mutex);
 
     auto iter = _inProgressAlarms.find(cbHandle);
 
@@ -1394,7 +1451,7 @@ void NetworkInterfaceTL::cancelAlarm(const TaskExecutor::CallbackHandle& cbHandl
 
 void NetworkInterfaceTL::_shutdownAllAlarms() {
     auto alarms = [&] {
-        stdx::unique_lock<Latch> lk(_inProgressMutex);
+        stdx::unique_lock<Mutex> lk(_mutex);
 
         // Prevent any more alarms from registering
         _inProgressAlarmsInShutdown = true;
@@ -1443,7 +1500,7 @@ void NetworkInterfaceTL::_answerAlarm(Status status, std::shared_ptr<AlarmState>
 
     // Erase the AlarmState from the map.
     {
-        stdx::lock_guard<Latch> lk(_inProgressMutex);
+        stdx::lock_guard<Mutex> lk(_mutex);
 
         auto iter = _inProgressAlarms.find(state->cbHandle);
         if (iter == _inProgressAlarms.end()) {

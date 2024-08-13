@@ -87,6 +87,11 @@ public:
 
     NetworkInterface& net();
 
+    /**
+     * A NetworkInterface used for test fixture needs (e.g. failpoints).
+     */
+    NetworkInterface& fixtureNet();
+
     ConnectionString fixture();
 
     void setRandomNumberGenerator(PseudoRandom* generator);
@@ -104,6 +109,11 @@ public:
 
     Future<RemoteCommandOnAnyResponse> runCommandOnAny(const TaskExecutor::CallbackHandle& cbHandle,
                                                        RemoteCommandRequestOnAny request);
+
+    /**
+     * Runs a command on the fixture NetworkInterface and asserts it suceeded.
+     */
+    void runSetupCommandSync(const DatabaseName& db, BSONObj cmdObj);
 
     Future<void> startExhaustCommand(
         const TaskExecutor::CallbackHandle& cbHandle,
@@ -141,6 +151,7 @@ private:
     void _onSchedulingCommand();
     void _onCompletingCommand();
 
+    std::unique_ptr<NetworkInterface> _fixtureNet;
     std::unique_ptr<NetworkInterface> _net;
     PseudoRandom* _rng = nullptr;
 

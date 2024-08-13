@@ -79,17 +79,20 @@ void NetworkInterfaceIntegrationFixture::createNet(
 #endif
     _net = makeNetworkInterface(
         "NetworkInterfaceIntegrationFixture", std::move(connectHook), nullptr, std::move(options));
+    _fixtureNet = makeNetworkInterface("FixtureNet", nullptr, nullptr);
 }
 
 void NetworkInterfaceIntegrationFixture::startNet(
     std::unique_ptr<NetworkConnectionHook> connectHook) {
     createNet(std::move(connectHook));
     net().startup();
+    fixtureNet().startup();
 }
 
 void NetworkInterfaceIntegrationFixture::tearDown() {
     // Network interface will only shutdown once because of an internal shutdown guard
     _net->shutdown();
+    _fixtureNet->shutdown();
 
     auto lk = stdx::unique_lock(_mutex);
     auto checkIdle = [&]() {
@@ -100,6 +103,10 @@ void NetworkInterfaceIntegrationFixture::tearDown() {
 
 NetworkInterface& NetworkInterfaceIntegrationFixture::net() {
     return *_net;
+}
+
+NetworkInterface& NetworkInterfaceIntegrationFixture::fixtureNet() {
+    return *_fixtureNet;
 }
 
 ConnectionString NetworkInterfaceIntegrationFixture::fixture() {
@@ -206,6 +213,17 @@ Future<void> NetworkInterfaceIntegrationFixture::startExhaustCommand(
         return status;
     }
     return std::move(pf.future);
+}
+
+void NetworkInterfaceIntegrationFixture::runSetupCommandSync(const DatabaseName& db,
+                                                             BSONObj cmdObj) {
+    RemoteCommandRequestOnAny request(
+        {fixture().getServers()[0]}, db, std::move(cmdObj), BSONObj(), nullptr, Minutes(1));
+    request.sslMode = transport::kGlobalSSLMode;
+
+    auto res = fixtureNet().startCommand(makeCallbackHandle(), request).get();
+    ASSERT_OK(res.status);
+    ASSERT_OK(getStatusFromCommandResult(res.data));
 }
 
 RemoteCommandResponse NetworkInterfaceIntegrationFixture::runCommandSync(

@@ -588,13 +588,20 @@ ConnectionPool::~ConnectionPool() {
 }
 
 void ConnectionPool::shutdown() {
-    _factory->shutdown();
-
     // Grab all current pools (under the lock)
-    auto pools = [&] {
+    decltype(_pools) pools;
+    {
         stdx::lock_guard lk(_mutex);
-        return _pools;
-    }();
+        if (std::exchange(_isShutDown, true)) {
+            return;
+        }
+
+        // Need to make a copy of the list because as part of shutdown, pools will remove themselves
+        // from _pools.
+        pools = _pools;
+    };
+
+    _factory->shutdown();
 
     for (const auto& pair : pools) {
         stdx::lock_guard lk(_mutex);
@@ -680,6 +687,11 @@ SemiFuture<ConnectionPool::ConnectionHandle> ConnectionPool::_get(const HostAndP
     auto connRequestedAt = _factory->now();
 
     stdx::lock_guard lk(_mutex);
+
+    if (_isShutDown) {
+        return Status(ErrorCodes::ShutdownInProgress,
+                      "Cannot retrieve connection because pool is shutting down");
+    }
 
     auto& pool = _pools[hostAndPort];
     if (!pool) {
