@@ -62,6 +62,11 @@ assert.commandWorked(
 assert.eq(TimeseriesTest.bucketsMayHaveMixedSchemaData(bucketsColl), true);
 assert.commandWorked(bucketsColl.insert(bucket));
 assert.commandWorked(bucketsColl.deleteOne({_id: bucket._id}));
+
+// The following collMod is not timestamped, so background validations
+// could potentially see it before the previous deletion unless we fsync
+assert.commandWorked(testDB.adminCommand({fsync: 1}));
+
 assert.commandWorked(
     testDB.runCommand({collMod: collName, timeseriesBucketsMayHaveMixedSchemaData: false}));
 assert.eq(TimeseriesTest.bucketsMayHaveMixedSchemaData(bucketsColl), false);
