@@ -1162,11 +1162,12 @@ Bucket& allocateBucket(OperationContext* opCtx,
     OID oid;
     Date_t roundedTime;
     tracked_unordered_map<BucketId, unique_tracked_ptr<Bucket>, BucketHasher>::iterator it;
-    bool inserted = false;
-    for (int retryAttempts = 0; !inserted && retryAttempts < maxRetries; ++retryAttempts) {
+    bool successfullyCreatedId = false;
+    for (int retryAttempts = 0; !successfullyCreatedId && retryAttempts < maxRetries;
+         ++retryAttempts) {
         std::tie(oid, roundedTime) = generateBucketOID(time, info.options);
         auto bucketId = BucketId{info.key.collectionUUID, oid, info.key.signature()};
-        std::tie(it, inserted) = stripe.openBucketsById.try_emplace(
+        std::tie(it, successfullyCreatedId) = stripe.openBucketsById.try_emplace(
             bucketId,
             make_unique_tracked<Bucket>(
                 getTrackingContext(catalog.trackingContexts, TrackingScope::kOpenBucketsById),
@@ -1176,26 +1177,25 @@ Bucket& allocateBucket(OperationContext* opCtx,
                 info.options.getTimeField(),
                 roundedTime,
                 catalog.bucketStateRegistry));
-        if (!inserted) {
+        if (successfullyCreatedId) {
+            Bucket* bucket = it->second.get();
+            auto status = initializeBucketState(catalog.bucketStateRegistry, bucket->bucketId);
+            if (!status.isOK()) {
+                successfullyCreatedId = false;
+            }
+        }
+        if (!successfullyCreatedId) {
+            stripe.openBucketsById.erase(bucketId);
             resetBucketOIDCounter();
         }
     }
     uassert(6130900,
             "Unable to insert documents due to internal OID generation collision. Increase the "
             "value of server parameter 'timeseriesInsertMaxRetriesOnDuplicates' and try again",
-            inserted);
+            successfullyCreatedId);
 
     Bucket* bucket = it->second.get();
     stripe.openBucketsByKey[info.key].emplace(bucket);
-
-    auto status = initializeBucketState(catalog.bucketStateRegistry, bucket->bucketId);
-    if (!status.isOK()) {
-        // Don't track the memory usage for the bucket keys in this data structure because it is
-        // already being tracked by the Bucket itself.
-        stripe.openBucketsByKey[info.key].erase(bucket);
-        stripe.openBucketsById.erase(it);
-        throwWriteConflictException(status.reason());
-    }
 
     catalog.numberOfActiveBuckets.fetchAndAdd(1);
     // Make sure we set the control.min time field to match the rounded _id timestamp.
