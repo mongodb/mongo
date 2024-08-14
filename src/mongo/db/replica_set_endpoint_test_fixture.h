@@ -29,7 +29,7 @@
 
 #pragma once
 
-#include "mongo/db/s/sharding_cluster_parameters_gen.h"
+#include "mongo/s/sharding_cluster_parameters_gen.h"
 #include "mongo/unittest/unittest.h"
 
 namespace mongo {

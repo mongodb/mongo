@@ -31,9 +31,9 @@
 
 #include "mongo/db/auth/authz_manager_external_state_mock.h"
 #include "mongo/db/replica_set_endpoint_test_fixture.h"
-#include "mongo/db/s/sharding_cluster_parameters_gen.h"
 #include "mongo/db/service_context_d_test_fixture.h"
 #include "mongo/idl/server_parameter_test_util.h"
+#include "mongo/s/sharding_cluster_parameters_gen.h"
 #include "mongo/unittest/death_test.h"
 
 namespace mongo {
