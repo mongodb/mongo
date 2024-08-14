@@ -107,6 +107,9 @@ export class MagicRestoreUtils {
      * returns the backup cursor metadata object.
      */
     takeCheckpointAndOpenBackup(backupCursorOpts = {}) {
+        // If we are taking a backup of a secondary, we should ensure expected writes have been
+        // replicated.
+        this.rst.awaitReplication();
         // Take the initial checkpoint.
         assert.commandWorked(this.backupSource.adminCommand({fsync: 1}));
 
@@ -625,10 +628,10 @@ export class ShardedMagicRestoreTest {
         this.pointInTimeTimestamp = Timestamp(0, 0);
         this.magicRestoreUtils.forEach((magicRestoreUtil) => {
             let {lastOplogEntryTs} = magicRestoreUtil.getEntriesAfterBackup();
+            // Store the last oplog entry for each replica set. This is used to check the stable
+            // timestamp at the end of restore.
+            magicRestoreUtil.expectedStableTimestamp = lastOplogEntryTs;
             if (timestampCmp(lastOplogEntryTs, this.pointInTimeTimestamp) > 0) {
-                // Store the last oplog entry for each replica set. This is used to check the stable
-                // timestamp at the end of restore.
-                magicRestoreUtil.expectedStableTimestamp = lastOplogEntryTs;
                 this.pointInTimeTimestamp = lastOplogEntryTs;
             }
         });
