@@ -395,9 +395,8 @@ if use_system_version_of_library("libmongocrypt"):
 else:
     mcEnv = mcEnv.Clone()
     mcEnv.InjectThirdParty(libraries=['libmongocrypt'])
-    mcEnv.SConscript('libmongocrypt/SConscript', exports={'env': mcEnv})
     mcEnv = mcEnv.Clone(LIBDEPS_INTERFACE=[
-        'libmongocrypt/libmongocrypt',
+        'libmongocrypt/mongocrypt',
     ])
 
 mcEnv.ShimLibrary(name="libmongocrypt", )

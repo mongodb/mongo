@@ -1,0 +1,200 @@
+load("//bazel:mongo_src_rules.bzl", "mongo_cc_library")
+
+package(default_visibility = ["//visibility:public"])
+
+CRYPTO_CONFIGS = {
+    "//bazel/config:ssl_disabled": {
+        "local_defines": ["MONGOCRYPT_ENABLE_CRYPTO"],
+        "includes": ["build_none"],
+        "srcs": [
+            "dist/kms-message/src/kms_crypto_none.c",
+            "dist/src/crypto/none.c",
+        ],
+    },
+    "//bazel/config:ssl_enabled_windows": {
+        "local_defines": ["KMS_MESSAGE_ENABLE_CRYPTO_CNG"],
+        "includes": ["build_cng"],
+        "srcs": [
+            "dist/kms-message/src/kms_crypto_windows.c",
+            "dist/src/crypto/cng.c",
+        ],
+    },
+    "//bazel/config:ssl_enabled_macos": {
+        "local_defines": ["KMS_MESSAGE_ENABLE_CRYPTO_COMMON_CRYPTO"],
+        "includes": ["build_commoncrypto"],
+        "srcs": [
+            "dist/kms-message/src/kms_crypto_apple.c",
+            "dist/src/crypto/commoncrypto.c",
+        ],
+    },
+    "//bazel/config:ssl_enabled_linux": {
+        "local_defines": ["KMS_MESSAGE_ENABLE_CRYPTO_LIBCRYPTO"],
+        "includes": ["build_libcrypto"],
+        "srcs": [
+            "dist/kms-message/src/kms_crypto_libcrypto.c",
+            "dist/src/crypto/libcrypto.c",
+        ],
+    },
+}
+
+CRYPTO_SRCS = select({
+    config: value["srcs"]
+    for config, value in CRYPTO_CONFIGS.items()
+})
+
+CRYPTO_INCLUDES = select({
+    config: value["includes"]
+    for config, value in CRYPTO_CONFIGS.items()
+})
+
+CRYPTO_LOCAL_DEFINES = select({
+    config: value["local_defines"]
+    for config, value in CRYPTO_CONFIGS.items()
+})
+
+mongo_cc_library(
+    name = "mongocrypt",
+    srcs = [
+        "dist/kms-message/src/hexlify.c",
+        "dist/kms-message/src/kms_azure_request.c",
+        "dist/kms-message/src/kms_b64.c",
+        "dist/kms-message/src/kms_caller_identity_request.c",
+        "dist/kms-message/src/kms_decrypt_request.c",
+        "dist/kms-message/src/kms_encrypt_request.c",
+        "dist/kms-message/src/kms_gcp_request.c",
+        "dist/kms-message/src/kms_kmip_reader_writer.c",
+        "dist/kms-message/src/kms_kmip_request.c",
+        "dist/kms-message/src/kms_kmip_response.c",
+        "dist/kms-message/src/kms_kmip_response_parser.c",
+        "dist/kms-message/src/kms_kv_list.c",
+        "dist/kms-message/src/kms_message.c",
+        "dist/kms-message/src/kms_port.c",
+        "dist/kms-message/src/kms_request.c",
+        "dist/kms-message/src/kms_request_opt.c",
+        "dist/kms-message/src/kms_request_str.c",
+        "dist/kms-message/src/kms_response.c",
+        "dist/kms-message/src/kms_response_parser.c",
+        "dist/kms-message/src/sort.c",
+        "dist/src/mc-array.c",
+        "dist/src/mc-efc.c",
+        "dist/src/mc-fle2-encryption-placeholder.c",
+        "dist/src/mc-fle2-find-equality-payload.c",
+        "dist/src/mc-fle2-find-equality-payload-v2.c",
+        "dist/src/mc-fle2-find-range-payload.c",
+        "dist/src/mc-fle2-find-range-payload-v2.c",
+        "dist/src/mc-fle2-insert-update-payload.c",
+        "dist/src/mc-fle2-insert-update-payload-v2.c",
+        "dist/src/mc-fle2-payload-iev.c",
+        "dist/src/mc-fle2-payload-iev-v2.c",
+        "dist/src/mc-fle2-payload-uev.c",
+        "dist/src/mc-fle2-payload-uev-common.c",
+        "dist/src/mc-fle2-payload-uev-v2.c",
+        "dist/src/mc-fle2-rfds.c",
+        "dist/src/mc-range-edge-generation.c",
+        "dist/src/mc-range-encoding.c",
+        "dist/src/mc-range-mincover.c",
+        "dist/src/mc-rangeopts.c",
+        "dist/src/mc-reader.c",
+        "dist/src/mc-tokens.c",
+        "dist/src/mc-writer.c",
+        "dist/src/mongocrypt.c",
+        "dist/src/mongocrypt-binary.c",
+        "dist/src/mongocrypt-buffer.c",
+        "dist/src/mongocrypt-cache.c",
+        "dist/src/mongocrypt-cache-collinfo.c",
+        "dist/src/mongocrypt-cache-key.c",
+        "dist/src/mongocrypt-cache-oauth.c",
+        "dist/src/mongocrypt-ciphertext.c",
+        "dist/src/mongocrypt-crypto.c",
+        "dist/src/mongocrypt-ctx.c",
+        "dist/src/mongocrypt-ctx-datakey.c",
+        "dist/src/mongocrypt-ctx-decrypt.c",
+        "dist/src/mongocrypt-ctx-encrypt.c",
+        "dist/src/mongocrypt-ctx-rewrap-many-datakey.c",
+        "dist/src/mongocrypt-endpoint.c",
+        "dist/src/mongocrypt-kek.c",
+        "dist/src/mongocrypt-key.c",
+        "dist/src/mongocrypt-key-broker.c",
+        "dist/src/mongocrypt-kms-ctx.c",
+        "dist/src/mongocrypt-log.c",
+        "dist/src/mongocrypt-marking.c",
+        "dist/src/mongocrypt-opts.c",
+        "dist/src/mongocrypt-status.c",
+        "dist/src/mongocrypt-traverse-util.c",
+        "dist/src/mongocrypt-util.c",
+    ] + CRYPTO_SRCS + select({
+        "@platforms//os:windows": [
+            "dist/src/os_win/os_dll.c",
+            "dist/src/os_win/os_mutex.c",
+        ],
+        "//conditions:default": [
+            "dist/src/os_posix/os_dll.c",
+            "dist/src/os_posix/os_mutex.c",
+        ],
+    }) + glob(["**/*.h"]),
+    hdrs = select({
+        "@platforms//os:{}".format(os): [
+            "build_{}/mongocrypt-export.h".format(os),
+        ]
+        for os in [
+            "windows",
+            "osx",
+            "linux",
+        ]
+    } | {
+        "//conditions:default": ["//conditions:incompatible"],
+    }),
+    copts = [
+        "-U_GNU_SOURCE",
+    ] + select({
+        "@platforms//os:windows": [
+            # Allow a macro redefinition for MONGOCRYPT_ENABLE_CRYPTO
+            "/wd4005",
+
+            # Disable warnings about deprecated functions
+            "/wd4996",
+        ],
+        "//conditions:default": [
+            "-Wno-sign-compare",
+            "-Wno-implicit-fallthrough",
+        ],
+    }),
+    defines = [
+        "KMS_MSG_STATIC",
+        "MONGOCRYPT_STATIC_DEFINE",
+    ],
+    includes = [
+        "dist/kms-message/src",
+        "dist/src",
+    ] + select({
+        "@platforms//os:{}".format(os): ["build_{}".format(os)]
+        for os in [
+            "windows",
+            "osx",
+            "linux",
+        ]
+    } | {
+        "//conditions:default": ["//conditions:incompatible"],
+    }) + CRYPTO_INCLUDES,
+    local_defines = [
+        "MLIB_USER",
+    ] + CRYPTO_LOCAL_DEFINES + select({
+        "@platforms//os:windows": [],
+        "//conditions:default": [
+            "MLIB_HAVE_STRINGS_H",
+        ],
+    }) + select({
+        "@platforms//cpu:s390x": [
+            "MONGOCRYPT_BIG_ENDIAN",
+            "KMS_MESSAGE_BIG_ENDIAN",
+        ],
+        "//conditions:default": [
+            "MONGOCRYPT_LITTLE_ENDIAN",
+            "KMS_MESSAGE_LITTLE_ENDIAN",
+        ],
+    }),
+    deps = [
+        "//src/third_party/IntelRDFPMathLib20U1:intel_decimal128",
+        "//src/third_party/libbson:bson",
+    ],
+)
