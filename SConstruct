@@ -18,6 +18,7 @@ import textwrap
 import threading
 import time
 import uuid
+import warnings
 from datetime import datetime
 from glob import glob
 
@@ -71,6 +72,11 @@ atexit.register(mongo.print_build_failures)
 # (https://github.com/SCons/scons/issues/4187). Upon a future upgrade to SCons
 # that incorporates #4187, we should replace this solution with that.
 _parser = SCons.Script.SConsOptions.Parser("")
+
+# TODO：SERVER-93552： Bumping pymongo to the new version
+warnings.filterwarnings(
+    "ignore", message="Properties that return a naïve datetime", category=UserWarning
+)
 
 
 def add_option(name, **kwargs):
