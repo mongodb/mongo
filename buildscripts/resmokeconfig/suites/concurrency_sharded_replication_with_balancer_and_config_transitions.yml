@@ -107,10 +107,6 @@ selector:
     - jstests/concurrency/fsm_workloads/yield_text.js
     - jstests/concurrency/fsm_workloads/yield_with_drop.js
 
-    # TODO (SERVER-90737): Re-enable schema_validator_with_expr_variables.js in
-    # concurrency_sharded_replication_with_balancer_and_config_transitions suite.
-    - jstests/concurrency/fsm_workloads/schema_validator_with_expr_variables.js
-
     # TODO SERVER-92349: Re-enable this test once completed.
     - jstests/concurrency/fsm_workloads/indexed_insert_ttl.js
 
