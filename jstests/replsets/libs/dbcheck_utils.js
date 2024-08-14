@@ -124,6 +124,11 @@ export const logQueries = {
         "data.error":
             "DbCheckAttemptOnClusteredCollectionIdIndex: Clustered collection doesn't have an _id index.",
     },
+    indexKeyOrderViolationQuery: {
+        severity: "error",
+        operation: "dbCheckBatch",
+        "data.error": {$regex: /^IndexKeyOrderViolation.*/},
+    },
 };
 
 // Apply function on all secondary nodes except arbiters.

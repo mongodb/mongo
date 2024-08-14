@@ -326,6 +326,26 @@ std::unique_ptr<HealthLogEntry> dbCheckBatchHealthLogEntry(
                                  builder.obj());
 }
 
+bool isIndexOrderAndUniquenessPreserved(const KeyStringEntry& curr,
+                                        const KeyStringEntry& next,
+                                        bool isUnique) {
+    const int comparisonWithRecordId = curr.keyString.compare(next.keyString);
+    if (comparisonWithRecordId >= 0) {
+        return false;
+    }
+
+    if (isUnique) {
+        if (curr.loc.isLong()) {
+            return curr.keyString.compareWithoutRecordIdLong(next.keyString) < 0;
+        } else if (curr.loc.isStr()) {
+            return curr.keyString.compareWithoutRecordIdStr(next.keyString) < 0;
+        }
+        MONGO_UNREACHABLE;
+    }
+
+    return true;
+}
+
 template <typename T>
 const md5_byte_t* md5Cast(const T* ptr) {
     return reinterpret_cast<const md5_byte_t*>(ptr);
@@ -547,6 +567,7 @@ Status DbCheckHasher::hashForExtraIndexKeysCheck(OperationContext* opCtx,
 
 
     _nConsecutiveIdenticalIndexKeysSeenAtEnd = 0;
+    boost::optional<KeyStringEntry> nextEntryWithRecordId = boost::none;
     // Iterate through index table.
     // Note that seekForKeyString/nextKeyString always return a keyString with RecordId appended,
     // regardless of what format the index has.
@@ -555,7 +576,7 @@ Status DbCheckHasher::hashForExtraIndexKeysCheck(OperationContext* opCtx,
                                            StringData(batchStartWithoutRecordId.getBuffer(),
                                                       batchStartWithoutRecordId.getSize()));
          currEntryWithRecordId;
-         currEntryWithRecordId = indexCursor->nextKeyString(opCtx)) {
+         currEntryWithRecordId = nextEntryWithRecordId) {
         iassert(opCtx->checkForInterruptNoAssert());
         const auto currKeyStringWithRecordId = currEntryWithRecordId->keyString;
         auto currKeyStringBson = _keyStringToBsonSafeHelper(currKeyStringWithRecordId, ordering);
@@ -655,6 +676,21 @@ Status DbCheckHasher::hashForExtraIndexKeysCheck(OperationContext* opCtx,
                 // }
                 break;
             }
+        }
+
+        nextEntryWithRecordId = indexCursor->nextKeyString(opCtx);
+        if (nextEntryWithRecordId &&
+            !isIndexOrderAndUniquenessPreserved(
+                *currEntryWithRecordId, *nextEntryWithRecordId, indexDescriptor->unique())) {
+            auto nextKeyStringBson =
+                _keyStringToBsonSafeHelper(nextEntryWithRecordId->keyString, ordering);
+            std::string errorMsg = "Dbcheck found an index key ordering violation. current key: " +
+                key_string::rehydrateKey(indexDescriptor->keyPattern(), currKeyStringBson)
+                    .toString() +
+                ", next key: " +
+                key_string::rehydrateKey(indexDescriptor->keyPattern(), nextKeyStringBson)
+                    .toString();
+            return Status(ErrorCodes::IndexKeyOrderViolation, errorMsg);
         }
 
         if (Date_t::now() > _deadlineOnSecondary) {
