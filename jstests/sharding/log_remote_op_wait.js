@@ -8,7 +8,7 @@
  * ]
  *
  */
-import {findMatchingLogLine, findMatchingLogLines} from "jstests/libs/log.js";
+import {findMatchingLogLine, iterateMatchingLogLines} from "jstests/libs/log.js";
 
 const st = new ShardingTest({shards: 2, rs: {nodes: 1}});
 st.stopBalancer();
@@ -91,7 +91,7 @@ cursor.hasNext();
 {
     const mongosLog = assert.commandWorked(st.s.adminCommand({getLog: "global"}));
     const lines =
-        [...findMatchingLogLines(mongosLog.log, {msg: "Slow query", comment: pipelineComment})];
+        [...iterateMatchingLogLines(mongosLog.log, {msg: "Slow query", comment: pipelineComment})];
     const line = lines.find(line => line.match(/command.{1,4}getMore/));
     assert(line, 'Failed to find a getMore log line matching the comment');
     const remoteOpWait = getRemoteOpWait(line);
@@ -142,8 +142,8 @@ coll.aggregate(pipeline2, {allowDiskUse: true, comment: pipelineComment2}).next(
     const shard0Log = assert.commandWorked(st.shard0.adminCommand({getLog: "global"}));
     const shard1Log = assert.commandWorked(st.shard1.adminCommand({getLog: "global"}));
     const bothShardsLogLines = shard0Log.log.concat(shard1Log.log);
-    const lines = [...findMatchingLogLines(bothShardsLogLines,
-                                           {msg: "Slow query", comment: pipelineComment2})];
+    const lines = [...iterateMatchingLogLines(bothShardsLogLines,
+                                              {msg: "Slow query", comment: pipelineComment2})];
     // The line we want is whichever had a $mergeCursors stage.
     const line = lines.find(line => line.match(/mergeCursors/));
     assert(line, `Failed to find a log line mentioning 'mergeCursors': ${lines}`);

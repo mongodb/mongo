@@ -6,7 +6,7 @@
  * ]
  */
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";
-import {findMatchingLogLines} from "jstests/libs/log.js";
+import {iterateMatchingLogLines} from "jstests/libs/log.js";
 
 const expectedLogId = 6983000;
 const sleepMillisInSendResponse = 200;
@@ -22,7 +22,7 @@ const expectedFields = [
 
 function getSlowLogAndCount(conn) {
     let allLogLines = checkLog.getGlobalLog(conn);
-    let slowSessionWorkflowLines = findMatchingLogLines(allLogLines, {id: expectedLogId});
+    let slowSessionWorkflowLines = [...iterateMatchingLogLines(allLogLines, {id: expectedLogId})];
     let slowLinesArr = [];
     if (slowSessionWorkflowLines !== null) {
         slowLinesArr = Array.from(slowSessionWorkflowLines);

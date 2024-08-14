@@ -1,9 +1,17 @@
 
-// Yields every logline that contains the specified fields. The regex escape function used here is
-// drawn from the following:
-// https://stackoverflow.com/questions/3561493/is-there-a-regexp-escape-function-in-javascript
-// https://github.com/ljharb/regexp.escape
-export function* findMatchingLogLines(logLines, fields, ignoreFields) {
+/**
+ * Iterates log lines that match the given filter.
+ * Yields every logline that contains the specified fields. The regex escape function used here is
+ * drawn from the following:
+ * https://stackoverflow.com/questions/3561493/is-there-a-regexp-escape-function-in-javascript
+ * https://github.com/ljharb/regexp.escape
+ *
+ * @param {Array} logLines - An array of log lines.
+ * @param {Object} fields - The fields to match log lines.
+ * @param {Object} ignoreFields - The fields to ignore log lines.
+ * @returns {Iterator} A iterator function that yields matching log lines.
+ */
+export function* iterateMatchingLogLines(logLines, fields, ignoreFields) {
     ignoreFields = ignoreFields || [];
     function escapeRegex(input) {
         return (typeof input === "string" ? input.replace(/[\^\$\\\.\*\+\?\(\)\[\]\{\}]/g, '\\$&')
@@ -62,8 +70,16 @@ export function* findMatchingLogLines(logLines, fields, ignoreFields) {
 // Finds and returns a logline containing all the specified fields, or null if no such logline
 // was found.
 export function findMatchingLogLine(logLines, fields, ignoreFields) {
-    for (const line of findMatchingLogLines(logLines, fields, ignoreFields)) {
+    for (const line of iterateMatchingLogLines(logLines, fields, ignoreFields)) {
         return line;
     }
     return null;
+}
+
+export function getMatchingLoglinesCount(logLines, fields, ignoreFields) {
+    let count = 0;
+    for (const _line of iterateMatchingLogLines(logLines, fields, ignoreFields)) {
+        count++;
+    }
+    return count;
 }

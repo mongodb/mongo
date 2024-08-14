@@ -5,7 +5,7 @@
 // the multiple invocations in an effort to not clutter the dev's console.
 // More specifically, we expect to only log 1 out of 128 events.
 
-import {findMatchingLogLines} from "jstests/libs/log.js";
+import {iterateMatchingLogLines} from "jstests/libs/log.js";
 
 const dbName = 'testDB';
 const collName = 'testColl';
@@ -106,7 +106,7 @@ const data = [
 
 function checkLogs(db, deprecationMsg, numLogLines) {
     const globalLogs = db.adminCommand({getLog: 'global'});
-    const matchingLogLines = [...findMatchingLogLines(globalLogs.log, deprecationMsg)];
+    const matchingLogLines = [...iterateMatchingLogLines(globalLogs.log, deprecationMsg)];
     assert.eq(matchingLogLines.length, numLogLines, matchingLogLines);
 }
 

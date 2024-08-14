@@ -5,7 +5,7 @@
 // the multiple invocations in an effort to not clutter the dev's console.
 // More specifically, we expect to only log 1/127 of mapReduce() events.
 
-import {findMatchingLogLines} from "jstests/libs/log.js";
+import {iterateMatchingLogLines} from "jstests/libs/log.js";
 
 jsTest.log('Test standalone');
 const caseInsensitive = {
@@ -35,7 +35,7 @@ assert.commandWorked(coll.insert({cust_id: "B", amount: 50, status: "B"}));
 
 // Assert that deprecation msg is not logged before map reduce command is even run.
 var globalLogs = db.adminCommand({getLog: 'global'});
-var matchingLogLines = [...findMatchingLogLines(globalLogs.log, fieldMatcher)];
+var matchingLogLines = [...iterateMatchingLogLines(globalLogs.log, fieldMatcher)];
 assert.eq(matchingLogLines.length, 0, matchingLogLines);
 
 assert.commandWorked(db.runCommand(
@@ -53,7 +53,7 @@ assert.commandWorked(db.runCommand(
 
 // Now that we have ran map reduce command, make sure the deprecation message is logged once.
 globalLogs = db.adminCommand({getLog: 'global'});
-matchingLogLines = [...findMatchingLogLines(globalLogs.log, fieldMatcher)];
+matchingLogLines = [...iterateMatchingLogLines(globalLogs.log, fieldMatcher)];
 assert.eq(matchingLogLines.length, 1, matchingLogLines);
 MongoRunner.stopMongod(standalone);
 
@@ -82,12 +82,12 @@ assert.commandWorked(
 
 // Assert that deprecation msg is not logged before map reduce command is even run.
 globalLogs = mongosDB.adminCommand({getLog: 'global'});
-matchingLogLines = [...findMatchingLogLines(globalLogs.log, fieldMatcher)];
+matchingLogLines = [...iterateMatchingLogLines(globalLogs.log, fieldMatcher)];
 assert.eq(matchingLogLines.length, 0, matchingLogLines);
 
 // Check the logs of the primary shard of the mongos.
 globalLogs = st.shard0.getDB("test").adminCommand({getLog: 'global'});
-matchingLogLines = [...findMatchingLogLines(globalLogs.log, fieldMatcher)];
+matchingLogLines = [...iterateMatchingLogLines(globalLogs.log, fieldMatcher)];
 assert.eq(matchingLogLines.length, 0, matchingLogLines);
 
 assert.commandWorked(mongosDB.runCommand({
@@ -120,12 +120,12 @@ assert.commandWorked(mongosDB.runCommand({
 
 // Now that we have ran map reduce command, make sure the deprecation message is logged once.
 globalLogs = mongosDB.adminCommand({getLog: 'global'});
-matchingLogLines = [...findMatchingLogLines(globalLogs.log, fieldMatcher)];
+matchingLogLines = [...iterateMatchingLogLines(globalLogs.log, fieldMatcher)];
 assert.eq(matchingLogLines.length, 1, matchingLogLines);
 
 // Check the logs of the primary shard of the mongos.
 globalLogs = st.shard0.getDB("test").adminCommand({getLog: 'global'});
-matchingLogLines = [...findMatchingLogLines(globalLogs.log, fieldMatcher)];
+matchingLogLines = [...iterateMatchingLogLines(globalLogs.log, fieldMatcher)];
 assert.eq(matchingLogLines.length, 0, matchingLogLines);
 
 st.stop();

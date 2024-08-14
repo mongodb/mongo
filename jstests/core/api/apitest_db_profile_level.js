@@ -10,7 +10,7 @@
  * ]
  */
 
-import {findMatchingLogLines} from "jstests/libs/log.js";
+import {iterateMatchingLogLines} from "jstests/libs/log.js";
 
 /*
  *  be sure the public collection API is complete
@@ -27,7 +27,7 @@ function profilerChangeWasLogged({from, to, db}) {
     const globalLog = assert.commandWorked(profileLevelDB.adminCommand({getLog: 'global'}));
 
     const fieldMatcher = {msg: "Profiler settings changed"};
-    const lines = [...findMatchingLogLines(globalLog.log, fieldMatcher)];
+    const lines = [...iterateMatchingLogLines(globalLog.log, fieldMatcher)];
     const matches = lines.filter((line) => {
         const attr = JSON.parse(line).attr;
         return attr.from.level == from && attr.to.level == to && attr.db == db;

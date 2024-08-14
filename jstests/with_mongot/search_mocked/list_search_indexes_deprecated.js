@@ -3,7 +3,7 @@
  * mongot/search is configured, so don't configure search for this test.
  */
 
-import {findMatchingLogLines} from "jstests/libs/log.js";
+import {iterateMatchingLogLines} from "jstests/libs/log.js";
 
 const dbName = jsTestName();
 const collName = jsTestName();
@@ -18,7 +18,7 @@ function getMatchingLogLines() {
             "Use of the listSearchIndexes command is deprecated. Instead use the '$listSearchIndexes' aggregation stage."
     };
     const globalLogs = testDB.adminCommand({getLog: 'global'});
-    return [...findMatchingLogLines(globalLogs.log, fieldMatcher)];
+    return [...iterateMatchingLogLines(globalLogs.log, fieldMatcher)];
 }
 
 function runDeprecatedCommand() {

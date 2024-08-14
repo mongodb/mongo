@@ -1,5 +1,5 @@
 // Provides function to get the number of local reads via logs.
-import {findMatchingLogLines} from "jstests/libs/log.js";
+import {getMatchingLoglinesCount} from "jstests/libs/log.js";
 
 function logLinesExceededBufferSize(node) {
     const log = assert.commandWorked(node.adminCommand({getLog: "global"}));
@@ -17,7 +17,5 @@ export function getLocalReadCount(node, namespace, comment) {
                   'buffer size. Some local read log lines may be missing!');
     }
     const log = assert.commandWorked(node.adminCommand({getLog: "global"})).log;
-    return [
-        ...findMatchingLogLines(log, {id: 5837600, namespace, comment: {comment: comment}})
-    ].length;
+    return getMatchingLoglinesCount(log, {id: 5837600, namespace, comment: {comment: comment}});
 }

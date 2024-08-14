@@ -1,5 +1,5 @@
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";
-import {findMatchingLogLines} from "jstests/libs/log.js";
+import {iterateMatchingLogLines} from "jstests/libs/log.js";
 
 export function ingressHandshakeMetricsTest(conn, options) {
     // Unpack test options
@@ -64,7 +64,7 @@ export function ingressHandshakeMetricsTest(conn, options) {
 
     function logLineExists(id, predicate) {
         let serverLog = assert.commandWorked(conn.adminCommand({getLog: "global"})).log;
-        for (const line of findMatchingLogLines(serverLog, {id: id})) {
+        for (const line of iterateMatchingLogLines(serverLog, {id: id})) {
             if (predicate(JSON.parse(line))) {
                 return true;
             }
