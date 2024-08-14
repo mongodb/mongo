@@ -105,7 +105,6 @@ env.Library(
         "test_utils.cpp",
     ],
     LIBDEPS=[
-        "$BUILD_DIR/mongo/db/exec/sbe/sbe_abt_test_util",
         "$BUILD_DIR/mongo/db/query/optimizer/unit_test_pipeline_utils",
         "$BUILD_DIR/mongo/db/sbe_values",
         "$BUILD_DIR/mongo/db/server_base",
@@ -193,17 +192,6 @@ env.CppUnitTest(
     target="maxdiff_histogram_test",
     source=[
         "maxdiff_histogram_test.cpp",
-    ],
-    LIBDEPS=[
-        "$BUILD_DIR/mongo/db/query/stats/stats_test_utils",
-        "test_utils",
-    ],
-)
-
-env.CppUnitTest(
-    target="sampling_estimator_test",
-    source=[
-        "sampling_estimator_test.cpp",
     ],
     LIBDEPS=[
         "$BUILD_DIR/mongo/db/query/stats/stats_test_utils",

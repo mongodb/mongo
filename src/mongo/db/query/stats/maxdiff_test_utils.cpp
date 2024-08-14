@@ -38,11 +38,18 @@
 
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/json.h"
-#include "mongo/db/exec/sbe/abt/sbe_abt_test_util.h"
 #include "mongo/db/exec/sbe/values/value.h"
+#include "mongo/db/pipeline/aggregate_command_gen.h"
+#include "mongo/db/pipeline/document_source_queue.h"
+#include "mongo/db/pipeline/expression_context_for_test.h"
+#include "mongo/db/pipeline/pipeline.h"
+#include "mongo/db/query/plan_executor.h"
+#include "mongo/db/query/plan_executor_factory.h"
 #include "mongo/db/query/stats/array_histogram.h"
 #include "mongo/db/query/stats/max_diff.h"
 #include "mongo/stdx/unordered_map.h"
+#include "mongo/unittest/assert.h"
+#include "mongo/unittest/temp_dir.h"
 
 namespace mongo::stats {
 
@@ -67,10 +74,75 @@ static std::vector<BSONObj> convertToBSON(const std::vector<SBEValue>& input) {
     return result;
 }
 
+std::unique_ptr<mongo::Pipeline, mongo::PipelineDeleter> parsePipeline(
+    const std::vector<BSONObj>& rawPipeline, NamespaceString nss, OperationContext* opCtx) {
+    AggregateCommandRequest request(std::move(nss), rawPipeline);
+    boost::intrusive_ptr<ExpressionContextForTest> ctx(
+        new ExpressionContextForTest(opCtx, request));
+
+    static unittest::TempDir tempDir("ABTPipelineTest");
+    ctx->tempDir = tempDir.path();
+
+    return Pipeline::parse(request.getPipeline(), ctx);
+}
+
+std::unique_ptr<mongo::Pipeline, mongo::PipelineDeleter> parsePipeline(
+    const std::string& pipelineStr, NamespaceString nss, OperationContext* opCtx) {
+    const BSONObj inputBson = fromjson("{pipeline: " + pipelineStr + "}");
+
+    std::vector<BSONObj> rawPipeline;
+    for (auto&& stageElem : inputBson["pipeline"].Array()) {
+        ASSERT_EQUALS(stageElem.type(), BSONType::Object);
+        rawPipeline.push_back(stageElem.embeddedObject());
+    }
+    return parsePipeline(rawPipeline, std::move(nss), opCtx);
+}
+
+std::vector<BSONObj> runPipeline(OperationContext* opCtx,
+                                 const std::string& pipelineStr,
+                                 const std::vector<BSONObj>& inputObjs) {
+    NamespaceString nss = NamespaceString::createNamespaceString_forTest("test");
+    std::unique_ptr<mongo::Pipeline, mongo::PipelineDeleter> pipeline =
+        parsePipeline(pipelineStr, nss, opCtx);
+
+    const auto queueStage = DocumentSourceQueue::create(pipeline->getContext());
+    for (const auto& bsonObj : inputObjs) {
+        queueStage->emplace_back(Document{bsonObj});
+    }
+
+    pipeline->addInitialSource(queueStage);
+
+    boost::intrusive_ptr<ExpressionContext> expCtx;
+    expCtx.reset(new ExpressionContext(opCtx, nullptr, nss));
+
+    std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> planExec =
+        plan_executor_factory::make(expCtx, std::move(pipeline));
+
+    std::vector<BSONObj> results;
+    bool done = false;
+    while (!done) {
+        BSONObj outObj;
+        auto result = planExec->getNext(&outObj, nullptr);
+        switch (result) {
+            case PlanExecutor::ADVANCED:
+                results.push_back(outObj);
+                break;
+            case PlanExecutor::IS_EOF:
+                done = true;
+                break;
+
+            default:
+                MONGO_UNREACHABLE;
+        }
+    }
+
+    return results;
+}
+
 size_t getActualCard(OperationContext* opCtx,
                      const std::vector<SBEValue>& input,
                      const std::string& query) {
-    return mongo::optimizer::runPipeline(opCtx, query, convertToBSON(input)).size();
+    return runPipeline(opCtx, query, convertToBSON(input)).size();
 }
 
 std::string makeMatchExpr(const SBEValue& val, optimizer::ce::EstimationType cmpOp) {

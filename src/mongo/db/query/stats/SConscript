@@ -89,6 +89,8 @@ env.CppUnitTest(
     LIBDEPS=[
         "$BUILD_DIR/mongo/base",
         "$BUILD_DIR/mongo/db/service_context",
+        "$BUILD_DIR/mongo/db/service_context_test_fixture",
+        "stats",
         "stats_test_utils",
     ],
 )
@@ -115,7 +117,10 @@ env.Library(
     ],
     LIBDEPS=[
         "$BUILD_DIR/mongo/base",
-        "$BUILD_DIR/mongo/db/exec/sbe/sbe_abt_test_util",
+        "$BUILD_DIR/mongo/db/pipeline/pipeline",
+        "$BUILD_DIR/mongo/db/query/query_test_service_context",
+        "$BUILD_DIR/mongo/db/query_exec",
+        "$BUILD_DIR/mongo/unittest/unittest",
         "stats_gen",
         "stats_histograms",
     ],

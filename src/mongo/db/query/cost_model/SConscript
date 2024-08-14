@@ -21,7 +21,6 @@ env.CppUnitTest(
     target="query_cost_model_test",
     source=[
         "cost_estimator_test.cpp",
-        "cost_model_test.cpp",
     ],
     LIBDEPS=[
         "$BUILD_DIR/mongo/db/concurrency/lock_manager",
