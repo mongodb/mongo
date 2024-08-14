@@ -10,6 +10,7 @@ class BfCountThresholds(BaseModel):
     hot_bf_count: int
     cold_bf_count: int
     perf_bf_count: int
+    include_bfs_older_than_hours: int
 
 
 class TeamGroupConfig(BaseModel):
@@ -38,8 +39,8 @@ class CodeLockdownConfig(BaseModel):
         """
         Get group or default team thresholds.
 
-        :param group_name: The name of the group or team.
-        :return: Group or default team thresholds.
+        :param group_name: The name of the group.
+        :return: Group thresholds or default team thresholds.
         """
         for group in self.team_groups or []:
             if group.name == group_name:

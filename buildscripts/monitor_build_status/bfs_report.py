@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from datetime import datetime, timezone
 from enum import Enum
 from typing import Dict, List, NamedTuple, Optional, Set
 
@@ -14,9 +15,9 @@ class BfCategory(str, Enum):
 
 
 class CategorizedBFs(NamedTuple):
-    hot_bfs: Set[str]
-    cold_bfs: Set[str]
-    perf_bfs: Set[str]
+    hot_bfs: Set[BfIssue]
+    cold_bfs: Set[BfIssue]
+    perf_bfs: Set[BfIssue]
 
     @classmethod
     def empty(cls) -> CategorizedBFs:
@@ -36,13 +37,13 @@ class CategorizedBFs(NamedTuple):
             test_type = TestType.from_evg_project_name(evg_project)
 
             if test_type == TestType.PERFORMANCE:
-                self.perf_bfs.add(bf.key)
+                self.perf_bfs.add(bf)
 
             if test_type == TestType.CORRECTNESS:
                 if bf.temperature == BfTemperature.HOT:
-                    self.hot_bfs.add(bf.key)
+                    self.hot_bfs.add(bf)
                 if bf.temperature in [BfTemperature.COLD, BfTemperature.NONE]:
-                    self.cold_bfs.add(bf.key)
+                    self.cold_bfs.add(bf)
 
     def add(self, more_bfs: CategorizedBFs) -> None:
         """
@@ -76,43 +77,38 @@ class BFsReport(NamedTuple):
     def get_bf_count(
         self,
         bf_category: BfCategory,
-        assigned_team: Optional[str] = None,
+        include_bfs_older_than_time: Optional[datetime] = None,
+        assigned_teams: Optional[List[str]] = None,
     ) -> int:
         """
         Calculate BFs count for a given criteria.
 
         :param bf_category: BF category (hot, cold, perf).
-        :param assigned_team: Assigned team criterion, all teams if None.
+        :param include_bfs_older_than_time: Count BFs that have created date older than provided time.
+        :param assigned_teams: List of Assigned teams criterion, all teams if None.
         :return: BFs count.
         """
         total_bf_count = 0
 
+        if include_bfs_older_than_time is None:
+            include_bfs_older_than_time = datetime.utcnow().replace(tzinfo=timezone.utc)
+
         team_reports = self.team_reports.values()
-        if assigned_team is not None:
-            team_reports = [self.team_reports[assigned_team]]
+        if assigned_teams is not None:
+            team_reports = [
+                self.team_reports.get(team, CategorizedBFs.empty()) for team in assigned_teams
+            ]
 
         for team_report in team_reports:
+            bfs = set()
             if bf_category == BfCategory.HOT:
-                total_bf_count += len(team_report.hot_bfs)
+                bfs = team_report.hot_bfs
             if bf_category == BfCategory.COLD:
-                total_bf_count += len(team_report.cold_bfs)
+                bfs = team_report.cold_bfs
             if bf_category == BfCategory.PERF:
-                total_bf_count += len(team_report.perf_bfs)
+                bfs = team_report.perf_bfs
+            total_bf_count += len(
+                [bf for bf in bfs if bf.created_time < include_bfs_older_than_time]
+            )
 
         return total_bf_count
-
-    def combine_teams(self, team_names: List[str], group_name: str) -> None:
-        """
-        Mutate `self.team_reports` by removing `team_names` entries and combining their BFs under `group_name`.
-
-        :param team_names: Names of teams to combine BFs.
-        :param group_name: Group name to combine BFs under.
-        """
-        group_bfs = CategorizedBFs.empty()
-
-        for team in team_names:
-            team_bfs = self.team_reports.pop(team, None)
-            if team_bfs is not None:
-                group_bfs.add(team_bfs)
-
-        self.team_reports[group_name] = group_bfs

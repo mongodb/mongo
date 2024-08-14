@@ -1,9 +1,11 @@
 from __future__ import annotations
 
 import re
+from datetime import datetime
 from enum import Enum
-from typing import List, NamedTuple, Optional
+from typing import Any, List, NamedTuple, Optional
 
+import dateutil.parser
 from jira import Issue
 
 from buildscripts.client.jiraclient import JiraClient
@@ -58,6 +60,7 @@ class BfIssue(NamedTuple):
     assigned_team: str
     evergreen_projects: List[str]
     temperature: BfTemperature
+    created_time: datetime
 
     @classmethod
     def from_jira_issue(cls, issue: Issue) -> BfIssue:
@@ -88,7 +91,14 @@ class BfIssue(NamedTuple):
             assigned_team=assigned_team,
             evergreen_projects=evergreen_projects,
             temperature=temperature,
+            created_time=dateutil.parser.parse(issue.fields.created),
         )
+
+    def __eq__(self, other: Any) -> bool:
+        return isinstance(other, self.__class__) and self.key == other.key
+
+    def __hash__(self) -> int:
+        return hash(self.key)
 
 
 class JiraService:

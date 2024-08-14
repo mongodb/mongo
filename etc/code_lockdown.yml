@@ -1,12 +1,14 @@
 overall_thresholds:
-  hot_bf_count: 15
-  cold_bf_count: 50
-  perf_bf_count: 15
+  hot_bf_count: 30
+  cold_bf_count: 100
+  perf_bf_count: 30
+  include_bfs_older_than_hours: 168 # 7 days
 
 team_default_thresholds:
   hot_bf_count: 3
   cold_bf_count: 10
   perf_bf_count: 5
+  include_bfs_older_than_hours: 48
 
 team_groups:
   ######################################################################
@@ -14,11 +16,48 @@ team_groups:
   ######################################################################
   # - name: Group Name
   #   teams:
-  #     - Team Name 1 # Should exactly match "Assigned Teams" field value
+  #     - Team Name 1 # Should exactly match "Assigned Teams" Jira BF field value
   #     - Team Name 2
   #     - Team Name 3
   #   thresholds:
   #     hot_bf_count: 3
   #     cold_bf_count: 10
   #     perf_bf_count: 5
+  #     include_bfs_older_than_hours: 168 # 7 days
   ######################################################################
+
+  # Core Server Team VP orgs as described in https://wiki.corp.mongodb.com/pages/viewpage.action?spaceKey=KERNEL&title=Server+Home
+  - name: "Clusters & Integrations"
+    teams:
+      - Server Security
+      - Networking & Observability
+      - Workload Scheduling
+      - Server Programmability
+      - Cluster Scalability
+      - Catalog and Routing
+    thresholds:
+      hot_bf_count: 15
+      cold_bf_count: 50
+      perf_bf_count: 15
+      include_bfs_older_than_hours: 168 # 7 days
+  - name: "Durable Transactions & Availability"
+    teams:
+      - Replication
+      - Storage Execution
+      - RSS Sydney
+      - Storage Engines
+    thresholds:
+      hot_bf_count: 15
+      cold_bf_count: 50
+      perf_bf_count: 15
+      include_bfs_older_than_hours: 168 # 7 days
+  - name: "Query"
+    teams:
+      - Query Execution
+      - Query Optimization
+      - Query Integration
+    thresholds:
+      hot_bf_count: 15
+      cold_bf_count: 50
+      perf_bf_count: 15
+      include_bfs_older_than_hours: 168 # 7 days
