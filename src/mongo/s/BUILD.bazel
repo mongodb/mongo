@@ -171,3 +171,29 @@ idl_generator(
     name = "mongos_options_gen",
     src = "mongos_options.idl",
 )
+
+idl_generator(
+    name = "database_version_gen",
+    src = "database_version.idl",
+    deps = [
+        ":database_version_base_gen",
+    ],
+)
+
+idl_generator(
+    name = "index_version_gen",
+    src = "index_version.idl",
+    deps = [
+        "//src/mongo/db:basic_types_gen",
+    ],
+)
+
+idl_generator(
+    name = "shard_version_gen",
+    src = "shard_version.idl",
+    deps = [
+        ":chunk_version_gen",
+        ":index_version_gen",
+        "//src/mongo/db:basic_types_gen",
+    ],
+)

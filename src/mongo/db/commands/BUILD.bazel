@@ -404,6 +404,16 @@ idl_generator(
     ],
 )
 
+idl_generator(
+    name = "fle2_get_count_info_command_gen",
+    src = "fle2_get_count_info_command.idl",
+    deps = [
+        "//src/mongo/crypto:fle_stats_gen",
+        "//src/mongo/db:basic_types_gen",
+        "//src/mongo/idl:generic_argument_gen",
+    ],
+)
+
 mongo_cc_library(
     name = "list_collections_filter",
     srcs = [

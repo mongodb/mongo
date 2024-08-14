@@ -7,7 +7,7 @@ env = env.Clone()
 env.Library(
     target="security_token",
     source=[
-        "validated_tenancy_scope.idl",
+        "validated_tenancy_scope_gen.cpp",
         "validated_tenancy_scope_decoration.cpp",
     ],
     LIBDEPS=[
@@ -140,7 +140,7 @@ env.Library(
 env.Library(
     target="auth_options",
     source=[
-        "auth_options.idl",
+        "auth_options_gen.cpp",
     ],
     LIBDEPS_PRIVATE=[
         "$BUILD_DIR/mongo/db/server_base",
@@ -151,7 +151,7 @@ env.Library(
     target="auth_impl_internal",
     source=[
         "authorization_manager_impl.cpp",
-        "authorization_manager_impl_parameters.idl",
+        "authorization_manager_impl_parameters_gen.cpp",
         "authorization_session_impl.cpp",
         "authz_manager_external_state.cpp",
         "authz_session_external_state.cpp",
@@ -207,7 +207,7 @@ env.Library(
     target="user_cache_invalidator",
     source=[
         "user_cache_invalidator_job.cpp",
-        "user_cache_invalidator_job_parameters.idl",
+        "user_cache_invalidator_job_parameters_gen.cpp",
     ],
     LIBDEPS=[
         "auth",
@@ -229,7 +229,7 @@ env.Library(
         "authz_session_external_state_server_common.cpp",
         "authz_session_external_state_d.cpp",
         "authz_session_external_state_s.cpp",
-        "enable_localhost_auth_bypass_parameter.idl",
+        "enable_localhost_auth_bypass_parameter_gen.cpp",
     ],
     LIBDEPS=[
         "auth",
@@ -332,7 +332,7 @@ env.Library(
     target="authorization_manager_global",
     source=[
         "authorization_manager_global.cpp",
-        "authorization_manager_global_parameters.idl",
+        "authorization_manager_global_parameters_gen.cpp",
     ],
     LIBDEPS=[
         "auth",
@@ -374,7 +374,7 @@ env.Library(
     target="sasl_commands",
     source=[
         "sasl_commands.cpp",
-        "sasl_commands.idl",
+        "sasl_commands_gen.cpp",
         "sasl_payload.cpp",
     ],
     LIBDEPS_PRIVATE=[
@@ -419,7 +419,7 @@ env.Library(
     target="sasl_options_init",
     source=[
         "sasl_options_init.cpp",
-        "sasl_options.idl",
+        "sasl_options_gen.cpp",
     ],
     LIBDEPS=[
         "sasl_options",
@@ -504,9 +504,9 @@ env.Library(
 env.Library(
     target="oidc_protocol",
     source=[
-        "oauth_authorization_server_metadata.idl",
+        "oauth_authorization_server_metadata_gen.cpp",
         "oauth_discovery_factory.cpp",
-        "oidc_protocol.idl",
+        "oidc_protocol_gen.cpp",
     ],
     LIBDEPS_PRIVATE=[
         "$BUILD_DIR/mongo/base",

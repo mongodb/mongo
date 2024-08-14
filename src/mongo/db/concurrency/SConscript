@@ -24,7 +24,7 @@ env.Library(
     target="exception_util",
     source=[
         "exception_util.cpp",
-        "exception_util.idl",
+        "exception_util_gen.cpp",
     ],
     LIBDEPS_PRIVATE=[
         "$BUILD_DIR/mongo/db/commands/server_status_core",

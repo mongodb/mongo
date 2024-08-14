@@ -8,7 +8,7 @@ env.Library(
     target="ingress_admission_control",
     source=[
         "ingress_admission_controller.cpp",
-        "ingress_admission_control.idl",
+        "ingress_admission_control_gen.cpp",
     ],
     LIBDEPS=[
         "ingress_admission_context",
@@ -51,7 +51,7 @@ env.CppUnitTest(
 env.Library(
     target="execution_control_feature_flags",
     source=[
-        "execution_control_feature_flags.idl",
+        "execution_control_feature_flags_gen.cpp",
     ],
     LIBDEPS_PRIVATE=[
         "$BUILD_DIR/mongo/db/server_base",
@@ -91,10 +91,10 @@ env.Library(
     target="execution_control",
     source=[
         "concurrency_adjustment_validator.cpp",
-        "execution_control_parameters.idl",
+        "execution_control_parameters_gen.cpp",
         "execution_control_init.cpp",
         "throughput_probing.cpp",
-        "throughput_probing.idl",
+        "throughput_probing_gen.cpp",
     ],
     LIBDEPS=[
         "ticketholder_manager",

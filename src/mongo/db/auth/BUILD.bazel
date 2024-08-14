@@ -68,3 +68,75 @@ idl_generator(
         "//src/mongo/db:basic_types_gen",
     ],
 )
+
+idl_generator(
+    name = "validated_tenancy_scope_gen",
+    src = "validated_tenancy_scope.idl",
+    deps = [
+        "//src/mongo/db:basic_types_gen",
+    ],
+)
+
+idl_generator(
+    name = "auth_options_gen",
+    src = "auth_options.idl",
+    deps = [
+        "//src/mongo/db:basic_types_gen",
+    ],
+)
+
+idl_generator(
+    name = "authorization_manager_impl_parameters_gen",
+    src = "authorization_manager_impl_parameters.idl",
+    deps = [
+        "//src/mongo/db:basic_types_gen",
+    ],
+)
+
+idl_generator(
+    name = "user_cache_invalidator_job_parameters_gen",
+    src = "user_cache_invalidator_job_parameters.idl",
+    deps = [
+        "//src/mongo/db:basic_types_gen",
+    ],
+)
+
+idl_generator(
+    name = "enable_localhost_auth_bypass_parameter_gen",
+    src = "enable_localhost_auth_bypass_parameter.idl",
+)
+
+idl_generator(
+    name = "authorization_manager_global_parameters_gen",
+    src = "authorization_manager_global_parameters.idl",
+)
+
+idl_generator(
+    name = "sasl_commands_gen",
+    src = "sasl_commands.idl",
+    deps = [
+        "//src/mongo/db:basic_types_gen",
+        "//src/mongo/idl:generic_argument_gen",
+    ],
+)
+
+idl_generator(
+    name = "sasl_options_gen",
+    src = "sasl_options.idl",
+)
+
+idl_generator(
+    name = "oauth_authorization_server_metadata_gen",
+    src = "oauth_authorization_server_metadata.idl",
+    deps = [
+        "//src/mongo/db:basic_types_gen",
+    ],
+)
+
+idl_generator(
+    name = "oidc_protocol_gen",
+    src = "oidc_protocol.idl",
+    deps = [
+        "//src/mongo/db:basic_types_gen",
+    ],
+)

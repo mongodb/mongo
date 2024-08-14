@@ -63,7 +63,7 @@ env.Library(
 env.Library(
     target="validate_idl",
     source=[
-        "validate.idl",
+        "validate_gen.cpp",
     ],
     LIBDEPS_PRIVATE=[
         "$BUILD_DIR/mongo/db/server_base",
@@ -73,7 +73,7 @@ env.Library(
 env.Library(
     target="index_build_entry_idl",
     source=[
-        "index_build_entry.idl",
+        "index_build_entry_gen.cpp",
     ],
     LIBDEPS_PRIVATE=[
         "$BUILD_DIR/mongo/db/server_base",
@@ -85,7 +85,7 @@ env.Library(
 env.Library(
     target="health_log_interface",
     source=[
-        "health_log.idl",
+        "health_log_gen.cpp",
         "health_log_interface.cpp",
     ],
     LIBDEPS_PRIVATE=[
@@ -245,7 +245,7 @@ env.Library(
     target="multi_index_block",
     source=[
         "multi_index_block.cpp",
-        "multi_index_block.idl",
+        "multi_index_block_gen.cpp",
     ],
     LIBDEPS_PRIVATE=[
         "$BUILD_DIR/mongo/db/concurrency/exception_util",
@@ -604,7 +604,7 @@ env.Library(
 env.Library(
     target="import_collection_oplog_entry",
     source=[
-        "import_collection_oplog_entry.idl",
+        "import_collection_oplog_entry_gen.cpp",
     ],
     LIBDEPS_PRIVATE=[
         "$BUILD_DIR/mongo/db/server_base",

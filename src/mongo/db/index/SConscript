@@ -49,7 +49,7 @@ iamEnv.Library(
         "hash_access_method.cpp",
         "index_access_method.cpp",
         "index_build_interceptor.cpp",
-        "index_build_interceptor.idl",
+        "index_build_interceptor_gen.cpp",
         "index_descriptor.cpp",
         "multikey_paths.cpp",
         "s2_access_method.cpp",

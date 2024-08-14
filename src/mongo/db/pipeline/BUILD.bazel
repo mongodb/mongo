@@ -294,3 +294,11 @@ idl_generator(
         "//src/mongo/db:basic_types_gen",
     ],
 )
+
+idl_generator(
+    name = "expression_parser_gen",
+    src = "expression_parser.idl",
+    deps = [
+        "//src/mongo/db:basic_types_gen",
+    ],
+)

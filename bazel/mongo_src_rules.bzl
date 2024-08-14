@@ -1518,14 +1518,16 @@ def idl_generator_impl(ctx):
         python.files,
     ] + dep_depsets + py_depsets)
 
+    include_directives = ["--include", "src"]
+    if "src/mongo/db/modules/enterprise/src" in ctx.attr.src.files.to_list()[0].path:
+        include_directives += ["--include", "src/mongo/db/modules/enterprise/src"]
+
     ctx.actions.run(
         executable = python.interpreter.path,
         outputs = [gen_source, gen_header],
         inputs = inputs,
         arguments = [
             "buildscripts/idl/idlc.py",
-            "--include",
-            "src",
             "--base_dir",
             ctx.bin_dir.path + "/src",
             "--target_arch",
@@ -1535,7 +1537,7 @@ def idl_generator_impl(ctx):
             "--output",
             gen_source.path,
             ctx.attr.src.files.to_list()[0].path,
-        ],
+        ] + include_directives,
         mnemonic = "IdlcGenerator",
         env = {"PYTHONPATH": ctx.configuration.host_path_separator.join(python_path)},
     )

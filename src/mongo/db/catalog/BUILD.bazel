@@ -42,3 +42,42 @@ idl_generator(
         "//src/mongo/db:basic_types_gen",
     ],
 )
+
+idl_generator(
+    name = "validate_gen",
+    src = "validate.idl",
+)
+
+idl_generator(
+    name = "index_build_entry_gen",
+    src = "index_build_entry.idl",
+    deps = [
+        "//src/mongo/db:basic_types_gen",
+        "//src/mongo/db/catalog:commit_quorum_gen",
+        "//src/mongo/util/net:hostandport_gen",
+    ],
+)
+
+idl_generator(
+    name = "health_log_gen",
+    src = "health_log.idl",
+    deps = [
+        "//src/mongo/db:basic_types_gen",
+    ],
+)
+
+idl_generator(
+    name = "multi_index_block_gen",
+    src = "multi_index_block.idl",
+    deps = [
+        "//src/mongo/db:basic_types_gen",
+    ],
+)
+
+idl_generator(
+    name = "import_collection_oplog_entry_gen",
+    src = "import_collection_oplog_entry.idl",
+    deps = [
+        "//src/mongo/db:basic_types_gen",
+    ],
+)
