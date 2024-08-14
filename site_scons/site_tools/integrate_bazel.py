@@ -149,9 +149,49 @@ def bazel_builder_action(
     # now copy all the targets out to the scons tree, note that target is a
     # list of nodes so we need to stringify it for copyfile
     for t in target:
-        s = Globals.bazel_output(t)
-        shutil.copy(s, str(t))
-        os.chmod(str(t), os.stat(str(t)).st_mode | stat.S_IWUSR)
+        dSYM_found = False
+        if ".dSYM/" in str(t):
+            # ignore dSYM plist file, as we skipped it prior
+            if str(t).endswith(".plist"):
+                continue
+
+            dSYM_found = True
+
+        if dSYM_found:
+            # Here we handle the difference between scons and bazel for dSYM dirs. SCons uses list
+            # actions to perform operations on the same target during some action. Bazel does not
+            # have an exact corresponding feature. Each action in bazel should have unique inputs and
+            # outputs. The file and targets wont line up exactly between scons and our mongo_cc_library,
+            # custom rule, specifically the way dsymutil generates the dwarf file inside the dSYM dir. So
+            # we remap the special filename suffixes we use for our bazel intermediate cc_library rules.
+            #
+            # So we will do the renaming of dwarf file to what scons expects here, before we copy to scons tree
+            substring_end = str(t).find(".dSYM/") + 5
+            t = str(t)[:substring_end]
+            s = Globals.bazel_output(t)
+            dwarf_info_base = os.path.splitext(os.path.splitext(os.path.basename(t))[0])[0]
+            dwarf_sym_with_debug = os.path.join(
+                s, f"Contents/Resources/DWARF/{dwarf_info_base}_shared_with_debug.dylib"
+            )
+
+            # this handles shared libs or program binaries
+            if os.path.exists(dwarf_sym_with_debug):
+                dwarf_sym = os.path.join(s, f"Contents/Resources/DWARF/{dwarf_info_base}.dylib")
+            else:
+                dwarf_sym_with_debug = os.path.join(
+                    s, f"Contents/Resources/DWARF/{dwarf_info_base}_with_debug"
+                )
+                dwarf_sym = os.path.join(s, f"Contents/Resources/DWARF/{dwarf_info_base}")
+            # rename the file for scons
+            shutil.copy(dwarf_sym_with_debug, dwarf_sym)
+
+            # copy the whole dSYM in one operation. Clean any existing files that might be in the way.
+            shutil.rmtree(str(t), ignore_errors=True)
+            shutil.copytree(s, str(t))
+        else:
+            s = Globals.bazel_output(t)
+            shutil.copy(s, str(t))
+            os.chmod(str(t), os.stat(str(t)).st_mode | stat.S_IWUSR)
 
 
 BazelCopyOutputsAction = SCons.Action.FunctionAction(
