@@ -493,12 +493,6 @@ void logOplogRecords(OperationContext* opCtx,
                                     << ". Commit Time: " << commitTime->toString());
         }
 
-        // Optionally hang before advancing lastApplied.
-        if (MONGO_unlikely(hangBeforeLogOpAdvancesLastApplied.shouldFail())) {
-            LOGV2(21243, "hangBeforeLogOpAdvancesLastApplied fail point enabled");
-            hangBeforeLogOpAdvancesLastApplied.pauseWhileSet(opCtx);
-        }
-
         // Optimes on the primary should always represent consistent database states.
         replCoord->setMyLastAppliedAndLastWrittenOpTimeAndWallTimeForward({finalOpTime, wallTime});
 
