@@ -28,6 +28,7 @@ wtEnv.InjectThirdParty(libraries=["valgrind"])
 wtEnv.Library(
     target="storage_wiredtiger_core",
     source=[
+        "oplog_truncate_marker_parameters.idl",
         "oplog_truncate_markers_server_status_section.cpp",
         "wiredtiger_begin_transaction_block.cpp",
         "wiredtiger_column_store.cpp",
@@ -52,22 +53,16 @@ wtEnv.Library(
     ],
     LIBDEPS=[
         "$BUILD_DIR/mongo/db/catalog/collection_options",
-        "$BUILD_DIR/mongo/db/concurrency/lock_manager",
         "$BUILD_DIR/mongo/db/global_settings",
-        "$BUILD_DIR/mongo/db/index/index_access_method",
         "$BUILD_DIR/mongo/db/prepare_conflict_tracker",
-        "$BUILD_DIR/mongo/db/query/bson/dotted_path_support",
-        "$BUILD_DIR/mongo/db/query/query_stats/query_stats",
         "$BUILD_DIR/mongo/db/record_id_helpers",
         "$BUILD_DIR/mongo/db/repl/repl_settings",
-        "$BUILD_DIR/mongo/db/server_options_servers",
         "$BUILD_DIR/mongo/db/service_context",
         "$BUILD_DIR/mongo/db/storage/index_entry_comparison",
         "$BUILD_DIR/mongo/db/storage/key_string",
         "$BUILD_DIR/mongo/db/storage/record_store_base",
         "$BUILD_DIR/mongo/db/storage/recovery_unit_base",
         "$BUILD_DIR/mongo/db/storage/storage_file_util",
-        "$BUILD_DIR/mongo/util/concurrency/ticketholder",
         "$BUILD_DIR/mongo/util/elapsed_tracker",
         "$BUILD_DIR/mongo/util/processinfo",
         "$BUILD_DIR/third_party/shim_wiredtiger",
@@ -80,7 +75,6 @@ wtEnv.Library(
         "$BUILD_DIR/mongo/db/commands/server_status_core",
         "$BUILD_DIR/mongo/db/concurrency/exception_util",
         "$BUILD_DIR/mongo/db/mongod_options",
-        "$BUILD_DIR/mongo/db/multitenancy",
         "$BUILD_DIR/mongo/db/server_base",
         "$BUILD_DIR/mongo/db/server_feature_flags",
         "$BUILD_DIR/mongo/db/shard_role",
@@ -90,10 +84,7 @@ wtEnv.Library(
         "$BUILD_DIR/mongo/db/storage/capped_snapshots",
         "$BUILD_DIR/mongo/db/storage/storage_options",
         "$BUILD_DIR/mongo/db/storage/storage_repair_observer",
-        "$BUILD_DIR/mongo/util/concurrency/spin_lock",
         "$BUILD_DIR/mongo/util/log_and_backoff",
-        "$BUILD_DIR/mongo/util/options_parser/options_parser",
-        "oplog_truncate_marker_parameters",
     ],
 )
 
@@ -113,7 +104,6 @@ wtEnv.Library(
         "storage_wiredtiger_customization_hooks",
     ],
     LIBDEPS_PRIVATE=[
-        "$BUILD_DIR/mongo/db/catalog/database_holder",
         "$BUILD_DIR/mongo/db/commands/server_status_core",
         "$BUILD_DIR/mongo/db/shard_role",
         "$BUILD_DIR/mongo/db/storage/storage_engine_common",
@@ -188,6 +178,7 @@ wtEnv.Library(
         "wiredtiger_index_test_harness.cpp",
     ],
     LIBDEPS=[
+        "$BUILD_DIR/mongo/db/index/index_access_method",
         "$BUILD_DIR/mongo/db/service_context_test_fixture",
         "$BUILD_DIR/mongo/db/shard_role_api",
         "$BUILD_DIR/mongo/db/storage/sorted_data_interface_test_harness",
@@ -195,16 +186,6 @@ wtEnv.Library(
     ],
     LIBDEPS_PRIVATE=[
         "$BUILD_DIR/mongo/db/service_context_non_d",
-    ],
-)
-
-wtEnv.Library(
-    target="oplog_truncate_marker_parameters",
-    source=[
-        "oplog_truncate_marker_parameters.idl",
-    ],
-    LIBDEPS=[
-        "$BUILD_DIR/mongo/db/server_base",
     ],
 )
 
