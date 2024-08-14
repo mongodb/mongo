@@ -1012,7 +1012,7 @@ function shouldRetryTxnOnException(cmdName, cmdObj, exception) {
 // Note that a transaction may fail and be retried up to this many times on
 // each call to runCommand, for a total number of retries on the order of
 // maxOpsInTransaction * kMaxNumTxnErrorRetries.
-const kMaxNumTxnErrorRetries = 5;
+const kMaxNumTxnErrorRetries = TestData.overrideRetryAttempts || 5;
 const kMaxTxnRetryTimeout = 5 * 60 * 1000;
 
 function txnRetryOverrideBody(conn, dbName, cmdName, cmdObj, lsid, clientFunction, makeFuncArgs) {
