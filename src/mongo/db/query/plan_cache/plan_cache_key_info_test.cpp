@@ -428,6 +428,170 @@ TEST_F(PlanCacheKeyInfoTest, ComputeKeyCollationIndex) {
               makeKey(*inContainsStringHasCollation, indexCores));
     ASSERT_EQ(makeKey(*inNoStrings, indexCores).getIndexabilityDiscriminators(),
               makeKey(*inContainsStringHasCollation, indexCores).getIndexabilityDiscriminators());
+
+    unique_ptr<CanonicalQuery> elemMatchString(canonicalize("{a: {$elemMatch: {$eq: 'abc'}}}"));
+    unique_ptr<CanonicalQuery> elemMatchNoString(canonicalize("{a: {$elemMatch: {$eq: 5}}}"));
+
+    // 'elemMatchString' and 'elemMatchNoString' should have different discriminators.
+    assertPlanCacheKeysUnequalDueToDiscriminators(makeKey(*elemMatchString, indexCores),
+                                                  makeKey(*elemMatchNoString, indexCores));
+
+    unique_ptr<CanonicalQuery> elemMatchAndFirstBoundString(
+        canonicalize("{a: {$elemMatch: {$gt: 'A', $lt: 5}}}"));
+    unique_ptr<CanonicalQuery> elemMatchAndSecondBoundString(
+        canonicalize("{a: {$elemMatch: {$gt: 1, $lt: 'B'}}}"));
+    unique_ptr<CanonicalQuery> elemMatchAndNoString(
+        canonicalize("{a: {$elemMatch: {$gt: 1, $lt: 5}}}"));
+
+    // 'elemMatchAndFirstBoundString'/'elemMatchAndSecondBoundString' and 'elemMatchAndNoString'
+    // should have different discriminators.
+    assertPlanCacheKeysUnequalDueToDiscriminators(
+        makeKey(*elemMatchAndFirstBoundString, indexCores),
+        makeKey(*elemMatchAndNoString, indexCores));
+    assertPlanCacheKeysUnequalDueToDiscriminators(
+        makeKey(*elemMatchAndSecondBoundString, indexCores),
+        makeKey(*elemMatchAndNoString, indexCores));
+}
+
+TEST_F(PlanCacheKeyInfoTest, ComputeKeyElemMatchNoIndexOnPath) {
+    CollatorInterfaceMock collator(CollatorInterfaceMock::MockType::kReverseString);
+    const auto keyPattern = BSON("a" << 1);
+    const std::vector<CoreIndexInfo> indexCores = {
+        CoreIndexInfo(keyPattern,
+                      IndexNames::nameToType(IndexNames::findPluginName(keyPattern)),
+                      false,                       // sparse
+                      IndexEntry::Identifier{""},  // name
+                      nullptr,                     // filterExpr
+                      &collator)};                 // collation
+
+    // $elemMatch on "b.a" cannot use the index on field "a"; it should recognize that the field "a"
+    // being referred to in the query is not top-level.
+    unique_ptr<CanonicalQuery> valueElemMatchOnDiffField(
+        canonicalize("{b: {$elemMatch: {a: {$eq: 5}}}}"));
+    ASSERT_EQ(makeKey(*valueElemMatchOnDiffField, indexCores).getIndexabilityDiscriminators(), "");
+}
+
+TEST_F(PlanCacheKeyInfoTest, ComputeKeyObjectElemMatch) {
+    CollatorInterfaceMock collator(CollatorInterfaceMock::MockType::kReverseString);
+    const auto keyPattern = BSON("a.b" << 1);
+    const std::vector<CoreIndexInfo> indexCores = {
+        CoreIndexInfo(keyPattern,
+                      IndexNames::nameToType(IndexNames::findPluginName(keyPattern)),
+                      false,                       // sparse
+                      IndexEntry::Identifier{""},  // name
+                      nullptr,                     // filterExpr
+                      &collator)};                 // collation
+
+    // Object elemMatch on "a.b" should detect string comparison when query collation differs.
+    unique_ptr<CanonicalQuery> objElemMatchNoString(
+        canonicalize("{a: {$elemMatch: {b: {$eq: 5}}}}"));
+    unique_ptr<CanonicalQuery> objElemMatchString(
+        canonicalize("{a: {$elemMatch: {b: {$eq: 'str'}}}}"));
+    assertPlanCacheKeysUnequalDueToDiscriminators(makeKey(*objElemMatchNoString, indexCores),
+                                                  makeKey(*objElemMatchString, indexCores));
+
+    // Object elemMatch with multiple predicates on "a.b" should detect string comparison when query
+    // collation differs.
+    unique_ptr<CanonicalQuery> objElemMatchWithOrNoString(
+        canonicalize("{a: {$elemMatch: {$or: [{b: {$eq: 5}}, {b: {$eq: 10}}]}}}"));
+    unique_ptr<CanonicalQuery> objElemMatchWithOrString(
+        canonicalize("{a: {$elemMatch: {$or: [{b: {$eq: 'A'}}, {b: {$eq: 10}}]}}}"));
+
+    assertPlanCacheKeysUnequalDueToDiscriminators(makeKey(*objElemMatchWithOrNoString, indexCores),
+                                                  makeKey(*objElemMatchWithOrString, indexCores));
+}
+
+TEST_F(PlanCacheKeyInfoTest, ComputeKeyWithNot) {
+    const auto keyPattern = BSON("a.b" << 1);
+    const auto keyPattern2 = BSON("a" << 1);
+
+    const std::vector<CoreIndexInfo> indexCores = {
+        CoreIndexInfo(keyPattern,
+                      IndexNames::nameToType(IndexNames::findPluginName(keyPattern)),
+                      false,                       // sparse
+                      IndexEntry::Identifier{""},  // name
+                      nullptr,                     // filterExpr
+                      nullptr),                    // collation
+        CoreIndexInfo(keyPattern2,
+                      IndexNames::nameToType(IndexNames::findPluginName(keyPattern2)),
+                      false,                       // sparse
+                      IndexEntry::Identifier{""},  // name
+                      nullptr,                     // filterExpr
+                      nullptr),                    // collation
+    };
+
+    // $not with a child that does array matching should be differentiated from $not when the child
+    // does not do array matching.
+    unique_ptr<CanonicalQuery> dottedMatchNoArray(canonicalize("{'a.b': {$not: {$eq: 5}}}"));
+    unique_ptr<CanonicalQuery> dottedMatchArray(canonicalize("{'a.b': {$not: {$eq: []}}}"));
+    assertPlanCacheKeysUnequalDueToDiscriminators(makeKey(*dottedMatchNoArray, indexCores),
+                                                  makeKey(*dottedMatchArray, indexCores));
+
+    unique_ptr<CanonicalQuery> matchNoArray(canonicalize("{a: {$not: {$eq: 5}}}"));
+    unique_ptr<CanonicalQuery> matchArray(canonicalize("{a: {$not: {$eq: []}}}"));
+    assertPlanCacheKeysUnequalDueToDiscriminators(makeKey(*matchNoArray, indexCores),
+                                                  makeKey(*matchArray, indexCores));
+
+
+    // Tests the same as above, but where the $not is under $elemMatch.
+    unique_ptr<CanonicalQuery> objElemMatchNoArray(
+        canonicalize("{a: {$elemMatch: {b: {$not: {$eq: 5}}}}}"));
+    unique_ptr<CanonicalQuery> objElemMatchArray(
+        canonicalize("{a: {$elemMatch: {b: {$not: {$eq: []}}}}}"));
+    assertPlanCacheKeysUnequalDueToDiscriminators(makeKey(*objElemMatchNoArray, indexCores),
+                                                  makeKey(*objElemMatchArray, indexCores));
+
+    unique_ptr<CanonicalQuery> valueElemMatchNoArray(
+        canonicalize("{a: {$elemMatch: {$not: {$eq: 5}}}}"));
+    unique_ptr<CanonicalQuery> valueElemMatchArray(
+        canonicalize("{a: {$elemMatch: {$not: {$eq: []}}}}"));
+    assertPlanCacheKeysUnequalDueToDiscriminators(makeKey(*valueElemMatchNoArray, indexCores),
+                                                  makeKey(*valueElemMatchArray, indexCores));
+}
+
+TEST_F(PlanCacheKeyInfoTest, ComputeKeyWithLogicalNodes) {
+    // Test that we don't include discriminators for logical nodes $and/$or, since those have no
+    // effect on indexability.
+    CollatorInterfaceMock collator(CollatorInterfaceMock::MockType::kReverseString);
+    const auto keyPattern = BSON("a" << 1);
+    const auto dottedKeyPattern = BSON("a.b" << 1);
+    const std::vector<CoreIndexInfo> indexCores = {
+        CoreIndexInfo(keyPattern,
+                      IndexNames::nameToType(IndexNames::findPluginName(keyPattern)),
+                      false,                       // sparse
+                      IndexEntry::Identifier{""},  // name
+                      nullptr,                     // filterExpr
+                      &collator),                  // collation
+        CoreIndexInfo(dottedKeyPattern,
+                      IndexNames::nameToType(IndexNames::findPluginName(dottedKeyPattern)),
+                      false,                       // sparse
+                      IndexEntry::Identifier{""},  // name
+                      nullptr,                     // filterExpr
+                      &collator)};                 // collation
+
+    // Top-level logical nodes have no path, so they shouldn't be included.
+    unique_ptr<CanonicalQuery> simpleAnd(canonicalize("{$and: [{a: 1}, {b: 1}]}"));
+    ASSERT_EQ(makeKey(*simpleAnd, indexCores).getIndexabilityDiscriminators(), "<1>");
+    unique_ptr<CanonicalQuery> simpleOr(canonicalize("{$or: [{a: 1}, {b: 1}]}"));
+    ASSERT_EQ(makeKey(*simpleOr, indexCores).getIndexabilityDiscriminators(), "<1>");
+    unique_ptr<CanonicalQuery> orAnd(canonicalize("{$or: [{a: 1, b: 1}, {a: 5, b: 5}]}"));
+    ASSERT_EQ(makeKey(*orAnd, indexCores).getIndexabilityDiscriminators(), "<1><1>");
+    unique_ptr<CanonicalQuery> andOr(canonicalize("{a: 1, $or: [{c: 1}, {b: 1}]}"));
+    ASSERT_EQ(makeKey(*andOr, indexCores).getIndexabilityDiscriminators(), "<1>");
+
+    // Similar tests, but under an $elemMatch. Expect entries for the $elemMatch on "a" and each
+    // nested comparison on "a.b", and no other entries.
+    unique_ptr<CanonicalQuery> elemMatchSimpleAnd(
+        canonicalize("{a: {$elemMatch: {$and: [{c: 1}, {b: 1}]}}}"));
+    ASSERT_EQ(makeKey(*elemMatchSimpleAnd, indexCores).getIndexabilityDiscriminators(), "<1><1>");
+    unique_ptr<CanonicalQuery> elemMatchSimpleOr(
+        canonicalize("{a: {$elemMatch: {$or: [{c: 1}, {b: 1}]}}}"));
+    ASSERT_EQ(makeKey(*elemMatchSimpleOr, indexCores).getIndexabilityDiscriminators(), "<1><1>");
+    unique_ptr<CanonicalQuery> elemMatchWithLogicalNodes(
+        canonicalize("{a: {$elemMatch: {$or: [{$and: [{b: {$gte: 3}}, {b: {$lte: 5}}]}, {$and: "
+                     "[{b: {$gte: 1}}, {b: {$lte: 2}}]}]}}}"));
+    ASSERT_EQ(makeKey(*elemMatchWithLogicalNodes, indexCores).getIndexabilityDiscriminators(),
+              "<1><1><1><1><1>");
 }
 
 TEST_F(PlanCacheKeyInfoTest, ComputeKeyWildcardIndex) {
