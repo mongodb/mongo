@@ -218,7 +218,6 @@ public:
 
         InterruptBehavior _interruptBehavior;
         bool _skipRSTLLock;
-        const bool _isOutermostLock;
     };
 
     /**
