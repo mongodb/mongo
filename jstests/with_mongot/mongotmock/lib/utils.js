@@ -350,7 +350,7 @@ export function setUpMongotReturnExplainAndMultiCursorGetMore({
 /**
  * Helper function to obtain the search stage (ex. $searchMeta, $_internalSearchMongotRemote) and to
  * check its explain result. Will only check $_internalSearchIdLookup if 'nReturnedIdLookup is
- * provided.
+ * provided. Function will fail for non-search stages.
  * @param {Object} result the results from running coll.explain().aggregate([[$search: ....], ...])
  * @param {string} stageType ex. "$_internalSearchMongotRemote" , "$searchMeta",
  *     "$_internalSearchIdLookup "
@@ -358,32 +358,19 @@ export function setUpMongotReturnExplainAndMultiCursorGetMore({
  *     will not be checked for 'queryPlanner' verbosity "
  * @param {NumberLong} nReturned The number of documents that should be returned in the
  *     searchStage.
- * @param {NumberLong} nReturnedIdLookup The number of documents that should be returned in the
- *     idLookup stage if it exists in the result.
  * @param {Object} explainContents The explain object that the stage should contain.
  */
 export function getSearchStagesAndVerifyExplainOutput(
-    {result, stageType, verbosity, nReturned, nReturnedIdLookup = null, explainContents}) {
+    {result, stageType, verbosity, nReturned, explainObject = null}) {
     const searchStage = getAggPlanStage(result, stageType);
     assert.neq(searchStage, null, result);
     verifySearchStageExplainOutput({
         stage: searchStage,
         stageType: stageType,
         nReturned: nReturned,
-        explain: explainContents,
+        explain: explainObject,
         verbosity: verbosity,
     });
-
-    if (nReturnedIdLookup != null) {
-        const searchIdLookupStage = getAggPlanStage(result, "$_internalSearchIdLookup");
-        assert.neq(searchIdLookupStage, null, result);
-        verifySearchStageExplainOutput({
-            stage: searchIdLookupStage,
-            stageType: "$_internalSearchIdLookup",
-            nReturned: nReturnedIdLookup,
-            verbosity: verbosity,
-        });
-    }
 }
 
 /**
@@ -411,7 +398,8 @@ export function verifyShardsPartExplainOutput(
 
 /**
  * Helper function for sharded clusters to obtain the stage specified. Will check nReturned for non
- * "queryPlanner" verbosity, and explainContents if specified.
+ * "queryPlanner" verbosity, and explainContents if specified. This function will fail for
+ * non-search stages.
  *
  * @param {Object} result the results from running coll.explain().aggregate([[$search: ....], ...])
  * @param {string} stageType ex. "$_internalSearchMongotRemote" , "$searchMeta",
@@ -427,12 +415,6 @@ export function verifyShardsPartExplainOutput(
  */
 export function getShardedSearchStagesAndVerifyExplainOutput(
     {result, stageType, expectedNumStages, verbosity, nReturnedList, expectedExplainContents}) {
-    if (stageType === "$_internalSearchMongotRemote" || stageType === "$searchMeta") {
-        // This function will also fail for non-search stages, checked in
-        // verifySearchStageExplainOutput().
-        assert(expectedExplainContents != null,
-               "Explain is null but needs to be provided for initial search stage.");
-    }
     assert.eq(nReturnedList.length, expectedNumStages);
     assert(result.hasOwnProperty("shards"),
            tojson(result) + "has no shards property, but it should.");
@@ -492,12 +474,18 @@ export function verifySearchStageExplainOutput(
     {stage, stageType, nReturned, explain = null, verbosity}) {
     assert(searchStages.includes(stageType),
            "stageType must be a search stage found in searchStages.");
+    assert(stage[stageType],
+           "Given stage isn't the expected stage. " + stageType + " is not found.");
+
     if (verbosity != "queryPlanner") {
         assert(stage.hasOwnProperty("nReturned"));
         assert.eq(nReturned, stage["nReturned"]);
         assert(stage.hasOwnProperty("executionTimeMillisEstimate"));
     }
 
+    if (stageType === "$_internalSearchMongotRemote" || stageType === "$searchMeta") {
+        assert(explain, "Explain is null but needs to be provided for initial search stage.");
+    }
     if (explain != null) {
         const explainStage = stage[stageType];
         assert(explainStage.hasOwnProperty("explain"), explainStage);

@@ -130,8 +130,6 @@ const pipeline1 = [{$search: searchQuery1}];
 const pipeline2 = [{$search: searchQuery2}];
 
 // Test SBE pushdown.
-// TODO SERVER-91594: This test for mongot returning explain only can be removed when mongot no
-// longer returns just the explain object.
 {
     const history = [{
         expectedCommand: mongotCommandForQuery({
@@ -142,43 +140,6 @@ const pipeline2 = [{$search: searchQuery2}];
             explainVerbosity: {verbosity: "queryPlanner"}
         }),
         response: {explain: explainContents, ok: 1}
-    }];
-    assert.commandWorked(mongotConn.adminCommand(
-        {setMockResponses: 1, cursorId: NumberLong(123), history: history}));
-
-    const explain = coll.explain().aggregate(pipeline1);
-    // We should have a $search stage.
-    assert.eq(1, getAggPlanStages(explain, "SEARCH").length, explain);
-
-    assert.commandWorked(mongotConn.adminCommand(
-        {setMockResponses: 1, cursorId: NumberLong(123), history: history}));
-    // $search uses SBE engine.
-    assertEngine(pipeline1, "sbe" /* engine */, coll);
-}
-
-// Test SBE pushdown when mongot returns both explain and cursor.
-{
-    const history = [{
-        expectedCommand: mongotCommandForQuery({
-            query: searchQuery1,
-            collName: coll.getName(),
-            db: "test",
-            collectionUUID: collUUID,
-            explainVerbosity: {verbosity: "queryPlanner"}
-        }),
-        response: {
-            ok: 1,
-            cursor: {
-                id: NumberLong(0),
-                ns: coll.getFullName(),
-                nextBatch: [
-                    {_id: 2, $searchScore: 0.654},
-                    {_id: 1, $searchScore: 0.321},
-                    {_id: 3, $searchScore: 0.123}
-                ]
-            },
-            explain: explainContents,
-        }
     }];
     assert.commandWorked(mongotConn.adminCommand(
         {setMockResponses: 1, cursorId: NumberLong(123), history: history}));

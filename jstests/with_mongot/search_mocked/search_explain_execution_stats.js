@@ -84,8 +84,13 @@ function runExplainTest(verbosity) {
             stageType: "$_internalSearchMongotRemote",
             verbosity,
             nReturned: NumberLong(0),
-            nReturnedIdLookup: NumberLong(0),
             explainObject
+        });
+        getSearchStagesAndVerifyExplainOutput({
+            result,
+            stageType: "$_internalSearchIdLookup",
+            verbosity,
+            nReturned: NumberLong(0),
         });
     }
     {
@@ -106,8 +111,13 @@ function runExplainTest(verbosity) {
             stageType: "$_internalSearchMongotRemote",
             verbosity,
             nReturned: NumberLong(4),
-            nReturnedIdLookup: NumberLong(3),
             explainObject
+        });
+        getSearchStagesAndVerifyExplainOutput({
+            result,
+            stageType: "$_internalSearchIdLookup",
+            verbosity,
+            nReturned: NumberLong(3),
         });
     }
     {
@@ -127,8 +137,13 @@ function runExplainTest(verbosity) {
             stageType: "$_internalSearchMongotRemote",
             verbosity,
             nReturned: NumberLong(5),
-            nReturnedIdLookup: NumberLong(4),
             explainObject
+        });
+        getSearchStagesAndVerifyExplainOutput({
+            result,
+            stageType: "$_internalSearchIdLookup",
+            verbosity,
+            nReturned: NumberLong(4),
         });
     }
 }

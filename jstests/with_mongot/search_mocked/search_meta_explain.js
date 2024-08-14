@@ -60,7 +60,6 @@ function runExplainTest(verbosity) {
         explainVerbosity: {verbosity}
     });
     const pipeline = [{$searchMeta: searchQuery}];
-    const stageType = "$searchMeta";
     {
         // TODO SERVER-91594: setUpMongotReturnExplain() should only be run for 'queryPlanner'
         // verbosity when mongot always returns a cursor for execution stats. Remove the extra
@@ -81,8 +80,10 @@ function runExplainTest(verbosity) {
         }
         const result = coll.explain(verbosity).aggregate(pipeline);
         getSearchStagesAndVerifyExplainOutput(
-            {result, stageType, verbosity, nReturned: NumberLong(0), explainObject});
+            {result, stageType: "$searchMeta", verbosity, nReturned: NumberLong(0), explainObject});
     }
+    // TODO SERVER-85637 Remove check for SearchExplainExecutionStats after the feature flag is
+    // removed.
     if (verbosity != "queryPlanner") {
         setUpMongotReturnExplainAndCursor({
             mongotMock: mongotmock,
@@ -97,7 +98,7 @@ function runExplainTest(verbosity) {
         });
         const result = coll.explain(verbosity).aggregate(pipeline);
         getSearchStagesAndVerifyExplainOutput(
-            {result, stageType, verbosity, nReturned: NumberLong(1), explainObject});
+            {result, stageType: "$searchMeta", verbosity, nReturned: NumberLong(1), explainObject});
     }
 }
 

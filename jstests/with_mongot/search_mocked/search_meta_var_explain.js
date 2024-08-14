@@ -104,14 +104,18 @@ function testUnionWith(searchCmd, verbosity) {
     ]);
 
     // Check stats for toplevel pipeline.
-    const searchStage = getAggPlanStage(result, "$_internalSearchMongotRemote");
-    assert.neq(searchStage, null, result);
-    verifySearchStageExplainOutput({
-        stage: searchStage,
+    getSearchStagesAndVerifyExplainOutput({
+        result,
         stageType: "$_internalSearchMongotRemote",
         nReturned: NumberLong(3),
-        nReturnedIdLookup: NumberLong(3),
-        explain: explainContents,
+        explainObject: explainContents,
+        verbosity: verbosity,
+    });
+
+    getSearchStagesAndVerifyExplainOutput({
+        result,
+        stageType: "$_internalSearchIdLookup",
+        nReturned: NumberLong(3),
         verbosity: verbosity,
     });
     const projectStage = getAggPlanStage(result, "$project");
@@ -126,17 +130,26 @@ function testUnionWith(searchCmd, verbosity) {
     const pipeline = unionWithStage["$unionWith"]["pipeline"];
     const unionWithSearchStage = pipeline[0];
     assert.neq(unionWithSearchStage, null, unionWithStage);
-    const unionWithProjectStage = pipeline[0];
-    assert.neq(unionWithProjectStage, null, unionWithStage);
-
+    const unionWithSearchIdLookup = pipeline[1];
+    assert.neq(unionWithSearchIdLookup, null, unionWithStage);
     verifySearchStageExplainOutput({
         stage: unionWithSearchStage,
         stageType: "$_internalSearchMongotRemote",
-        explain: explainContents,
         nReturned: NumberLong(3),
-        nReturnedIdLookup: NumberLong(3),
+        verbosity: verbosity,
+        explain: explainContents,
+    });
+
+    verifySearchStageExplainOutput({
+        stage: unionWithSearchIdLookup,
+        stageType: "$_internalSearchIdLookup",
+        nReturned: NumberLong(3),
         verbosity: verbosity,
     });
+
+    const unionWithProjectStage = pipeline[2];
+    assert.neq(unionWithProjectStage, null, unionWithStage);
+    assert(unionWithProjectStage["$project"], unionWithProjectStage);
     assert.eq(NumberLong(3), unionWithProjectStage["nReturned"]);
 }
 
@@ -153,7 +166,6 @@ function runExplainTest(verbosity) {
         {$project: {_id: 1, meta: "$$SEARCH_META"}},
     ];
     const vars = {SEARCH_META: {value: 42}};
-    const stageType = "$_internalSearchMongotRemote";
     {
         // TODO SERVER-91594: setUpMongotReturnExplain() should only be run for 'queryPlanner'
         // verbosity when mongot always returns a cursor for execution stats. Remove the extra
@@ -173,8 +185,19 @@ function runExplainTest(verbosity) {
             });
         }
         const result = coll.explain(verbosity).aggregate(pipeline);
-        getSearchStagesAndVerifyExplainOutput(
-            {result, stageType, verbosity, nReturned: NumberLong(0), explainObject});
+        getSearchStagesAndVerifyExplainOutput({
+            result,
+            stageType: "$_internalSearchMongotRemote",
+            verbosity,
+            nReturned: NumberLong(0),
+            explainObject
+        });
+        getSearchStagesAndVerifyExplainOutput({
+            result,
+            stageType: "$_internalSearchIdLookup",
+            verbosity,
+            nReturned: NumberLong(0),
+        });
     }
     if (verbosity != "queryPlanner") {
         {
@@ -192,11 +215,16 @@ function runExplainTest(verbosity) {
             const result = coll.explain(verbosity).aggregate(pipeline);
             getSearchStagesAndVerifyExplainOutput({
                 result,
-                stageType,
+                stageType: "$_internalSearchMongotRemote",
                 verbosity,
                 nReturned: NumberLong(3),
-                nReturnedIdLookup: NumberLong(3),
                 explainObject
+            });
+            getSearchStagesAndVerifyExplainOutput({
+                result,
+                stageType: "$_internalSearchIdLookup",
+                verbosity,
+                nReturned: NumberLong(3),
             });
             const projectStage = getAggPlanStage(result, "$project");
             assert.eq(NumberLong(3), projectStage["nReturned"]);
@@ -217,11 +245,16 @@ function runExplainTest(verbosity) {
             const result = coll.explain(verbosity).aggregate(pipeline, {cursor: {batchSize: 2}});
             getSearchStagesAndVerifyExplainOutput({
                 result,
-                stageType,
+                stageType: "$_internalSearchMongotRemote",
                 verbosity,
                 nReturned: NumberLong(5),
-                nReturnedIdLookup: NumberLong(3),
                 explainObject
+            });
+            getSearchStagesAndVerifyExplainOutput({
+                result,
+                stageType: "$_internalSearchIdLookup",
+                verbosity,
+                nReturned: NumberLong(3),
             });
             const projectStage = getAggPlanStage(result, "$project");
             assert.eq(NumberLong(3), projectStage["nReturned"]);
