@@ -72,7 +72,7 @@ env.Library(
 env.Library(
     target="query_planner",
     source=[
-        "expression_index_knobs.idl",
+        "expression_index_knobs_gen.cpp",
         "expression_index.cpp",
         "index_bounds_builder.cpp",
         "interval_evaluation_tree.cpp",
@@ -242,13 +242,13 @@ env.Library(
 env.Library(
     target="command_request_response",
     source=[
-        "analyze_command.idl",
+        "analyze_command_gen.cpp",
         "count_command_as_aggregation_command.cpp",
-        "count_command.idl",
+        "count_command_gen.cpp",
         "count_request.cpp",
         "cursor_request.cpp",
         "cursor_response.cpp",
-        "kill_cursors.idl",
+        "kill_cursors_gen.cpp",
         "view_response_formatter.cpp",
     ],
     LIBDEPS=[
@@ -272,7 +272,7 @@ env.Library(
     source=[
         "distinct_command_gen.cpp",
         "find_command_gen.cpp",
-        "getmore_command.idl",
+        "getmore_command_gen.cpp",
         "query_request_helper.cpp",
         "tailable_mode.cpp",
         "tailable_mode_gen.cpp",

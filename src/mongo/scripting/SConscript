@@ -23,7 +23,7 @@ scripting_common_env.Library(
     target="scripting_common",
     source=[
         "deadline_monitor.cpp",
-        "deadline_monitor.idl",
+        "deadline_monitor_gen.cpp",
         "dbdirectclient_factory.cpp",
         "engine.cpp",
         "jsexception.cpp",
@@ -136,8 +136,8 @@ if jsEngine:
             "mozjs/uri.cpp",
             "mozjs/valuereader.cpp",
             "mozjs/valuewriter.cpp",
-            "mozjs/engine.idl",
-            "mozjs/scripting_util.idl",
+            "mozjs/engine_gen.cpp",
+            "mozjs/scripting_util_gen.cpp",
         ],
         LIBDEPS=[
             "scripting_common",

@@ -16,3 +16,21 @@ idl_generator(
         "//src/mongo/db:basic_types_gen",
     ],
 )
+
+idl_generator(
+    name = "write_concern_error_gen",
+    src = "write_concern_error.idl",
+    deps = [
+        "//src/mongo/db:basic_types_gen",
+    ],
+)
+
+idl_generator(
+    name = "object_check_gen",
+    src = "object_check.idl",
+)
+
+idl_generator(
+    name = "rewrite_state_change_errors_server_parameter_gen",
+    src = "rewrite_state_change_errors_server_parameter.idl",
+)

@@ -22,3 +22,36 @@ idl_generator(
     name = "logical_session_cache_gen",
     src = "logical_session_cache.idl",
 )
+
+idl_generator(
+    name = "logical_session_cache_stats_gen",
+    src = "logical_session_cache_stats.idl",
+    deps = [
+        "//src/mongo/db:basic_types_gen",
+    ],
+)
+
+idl_generator(
+    name = "kill_sessions_gen",
+    src = "kill_sessions.idl",
+    deps = [
+        ":logical_session_id_gen",
+        "//src/mongo/crypto:sha256_block_gen",
+        "//src/mongo/db:basic_types_gen",
+    ],
+)
+
+idl_generator(
+    name = "internal_transactions_reap_service_gen",
+    src = "internal_transactions_reap_service.idl",
+)
+
+idl_generator(
+    name = "session_txn_record_gen",
+    src = "session_txn_record.idl",
+    deps = [
+        ":logical_session_id_gen",
+        "//src/mongo/db:basic_types_gen",
+        "//src/mongo/db/repl:replication_types_gen",
+    ],
+)

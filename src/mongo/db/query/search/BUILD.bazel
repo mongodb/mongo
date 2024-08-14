@@ -1,4 +1,4 @@
-load("//bazel:mongo_src_rules.bzl", "mongo_cc_library")
+load("//bazel:mongo_src_rules.bzl", "idl_generator", "mongo_cc_library")
 
 package(default_visibility = ["//visibility:public"])
 
@@ -7,4 +7,41 @@ exports_files(
         "*.h",
         "*.cpp",
     ]),
+)
+
+idl_generator(
+    name = "internal_search_cluster_parameters_gen",
+    src = "internal_search_cluster_parameters.idl",
+    deps = [
+        "//src/mongo/db:basic_types_gen",
+        "//src/mongo/db/query:query_feature_flags_gen",
+        "//src/mongo/idl:cluster_server_parameter_gen",
+    ],
+)
+
+idl_generator(
+    name = "internal_search_mongot_remote_spec_gen",
+    src = "internal_search_mongot_remote_spec.idl",
+    deps = [
+        "//src/mongo/db:basic_types_gen",
+        "//src/mongo/db/pipeline/visitors:docs_needed_bounds_gen",
+    ],
+)
+
+idl_generator(
+    name = "mongot_options_gen",
+    src = "mongot_options.idl",
+)
+
+idl_generator(
+    name = "search_index_options_gen",
+    src = "search_index_options.idl",
+)
+
+idl_generator(
+    name = "manage_search_index_request_gen",
+    src = "manage_search_index_request.idl",
+    deps = [
+        "//src/mongo/db:basic_types_gen",
+    ],
 )

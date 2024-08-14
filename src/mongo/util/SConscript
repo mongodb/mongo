@@ -190,7 +190,7 @@ env.Library(
     target="fail_point",
     source=[
         "fail_point.cpp",
-        "fail_point_server_parameter.idl",
+        "fail_point_server_parameter_gen.cpp",
     ],
     LIBDEPS_PRIVATE=[
         "$BUILD_DIR/mongo/bson/util/bson_extract",
@@ -212,7 +212,7 @@ env.Library(
     target="testing_options",
     source=[
         "testing_options.cpp",
-        "testing_options.idl",
+        "testing_options_gen.cpp",
     ],
     LIBDEPS_PRIVATE=[
         "$BUILD_DIR/mongo/db/server_base",
@@ -387,7 +387,7 @@ if tcmallocAttrs:
         target="tcmalloc_set_parameter",
         source=[
             "tcmalloc_set_parameter.cpp",
-            "tcmalloc_parameters.idl",
+            "tcmalloc_parameters_gen.cpp",
         ],
         LIBDEPS_PRIVATE=[
             "$BUILD_DIR/mongo/db/server_base",
@@ -575,7 +575,7 @@ env.Library(
     target="password",
     source=[
         "password.cpp",
-        "password_params.idl",
+        "password_params_gen.cpp",
     ],
     LIBDEPS_PRIVATE=[
         "$BUILD_DIR/mongo/db/server_base",
@@ -650,7 +650,7 @@ if env.TargetOSIs("linux"):
         target="pin_code_segments",
         source=[
             "pin_code_segments.cpp",
-            "pin_code_segments_params.idl",
+            "pin_code_segments_params_gen.cpp",
         ],
         LIBDEPS_PRIVATE=[
             "$BUILD_DIR/mongo/db/server_base",

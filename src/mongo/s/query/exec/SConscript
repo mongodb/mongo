@@ -55,7 +55,7 @@ env.Library(
         "async_results_merger.cpp",
         "blocking_results_merger.cpp",
         "establish_cursors.cpp",
-        "async_results_merger_params.idl",
+        "async_results_merger_params_gen.cpp",
     ],
     LIBDEPS=[
         "$BUILD_DIR/mongo/db/query/command_request_response",

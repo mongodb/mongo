@@ -181,7 +181,7 @@ env.Library(
     source=[
         "connection_pool_tl.cpp",
         "network_interface_tl.cpp",
-        "network_interface_tl.idl",
+        "network_interface_tl_gen.cpp",
     ],
     LIBDEPS=[
         "$BUILD_DIR/mongo/client/async_client",
@@ -339,7 +339,7 @@ env.Library(
     target="task_executor_pool",
     source=[
         "task_executor_pool.cpp",
-        "task_executor_pool_parameters.idl",
+        "task_executor_pool_parameters_gen.cpp",
     ],
     LIBDEPS=[
         "$BUILD_DIR/mongo/util/processinfo",
@@ -355,7 +355,7 @@ env.Library(
     source=[
         "task_executor_cursor.cpp",
         "task_executor_cursor_options.cpp",
-        "task_executor_cursor_parameters.idl",
+        "task_executor_cursor_parameters_gen.cpp",
     ],
     LIBDEPS=[
         "$BUILD_DIR/mongo/db/query/command_request_response",

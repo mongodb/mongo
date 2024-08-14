@@ -9,8 +9,8 @@ env.SConscript(dirs=["mongotmock"], exports=["env"])
 env.Library(
     target="mongot_cursor",
     source=[
-        "internal_search_cluster_parameters.idl",
-        "internal_search_mongot_remote_spec.idl",
+        "internal_search_cluster_parameters_gen.cpp",
+        "internal_search_mongot_remote_spec_gen.cpp",
         "mongot_cursor.cpp",
         "mongot_cursor_getmore_strategy.cpp",
     ],
@@ -42,7 +42,7 @@ env.Library(
     target="mongot_options",
     source=[
         "mongot_options.cpp",
-        "mongot_options.idl",
+        "mongot_options_gen.cpp",
     ],
     LIBDEPS_PRIVATE=[
         "$BUILD_DIR/mongo/db/server_base",
@@ -100,7 +100,7 @@ env.Library(
     target="search_index_options",
     source=[
         "search_index_options.cpp",
-        "search_index_options.idl",
+        "search_index_options_gen.cpp",
     ],
     LIBDEPS_PRIVATE=[
         "$BUILD_DIR/mongo/db/server_base",
@@ -114,7 +114,7 @@ env.Library(
 env.Library(
     target="search_index_common",
     source=[
-        "manage_search_index_request.idl",
+        "manage_search_index_request_gen.cpp",
         "search_index_common.cpp",
     ],
     LIBDEPS=[

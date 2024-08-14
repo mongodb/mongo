@@ -1,5 +1,15 @@
+load("//bazel:mongo_src_rules.bzl", "idl_generator", "mongo_cc_library")
+
 package(default_visibility = ["//visibility:public"])
 
 exports_files(
     glob(["*.h"]) + glob(["*.cpp"]),
+)
+
+idl_generator(
+    name = "logv2_options_gen",
+    src = "logv2_options.idl",
+    deps = [
+        "//src/mongo/db:basic_types_gen",
+    ],
 )

@@ -1,4 +1,4 @@
-load("//bazel:mongo_src_rules.bzl", "mongo_cc_library")
+load("//bazel:mongo_src_rules.bzl", "idl_generator", "mongo_cc_library")
 
 package(default_visibility = ["//visibility:public"])
 
@@ -7,4 +7,43 @@ exports_files(
         "*.h",
         "*.cpp",
     ]),
+)
+
+idl_generator(
+    name = "cluster_commands_gen",
+    src = "cluster_commands.idl",
+    deps = [
+        "//src/mongo/db:basic_types_gen",
+        "//src/mongo/idl:generic_argument_gen",
+        "//src/mongo/s:sharding_types_gen",
+    ],
+)
+
+idl_generator(
+    name = "cluster_fsync_unlock_cmd_gen",
+    src = "cluster_fsync_unlock_cmd.idl",
+    deps = [
+        "//src/mongo/db:basic_types_gen",
+        "//src/mongo/idl:generic_argument_gen",
+    ],
+)
+
+idl_generator(
+    name = "refine_collection_shard_key_gen",
+    src = "refine_collection_shard_key.idl",
+    deps = [
+        "//src/mongo/db:basic_types_gen",
+        "//src/mongo/idl:generic_argument_gen",
+    ],
+)
+
+idl_generator(
+    name = "shard_collection_gen",
+    src = "shard_collection.idl",
+    deps = [
+        "//src/mongo/db:basic_types_gen",
+        "//src/mongo/db/timeseries:timeseries_gen",
+        "//src/mongo/idl:generic_argument_gen",
+        "//src/mongo/s:sharding_types_gen",
+    ],
 )

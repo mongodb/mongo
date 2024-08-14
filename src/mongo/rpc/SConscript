@@ -13,7 +13,7 @@ env.Library(
     source=[
         "get_status_from_command_result.cpp",
         "write_concern_error_detail.cpp",
-        "write_concern_error.idl",
+        "write_concern_error_gen.cpp",
     ],
     LIBDEPS=[
         "$BUILD_DIR/mongo/bson/util/bson_extract",
@@ -57,7 +57,7 @@ env.Library(
         "legacy_reply_builder.cpp",
         "legacy_request.cpp",
         "object_check.cpp",
-        "object_check.idl",
+        "object_check_gen.cpp",
         "reply_builder_interface.cpp",
     ],
     LIBDEPS=[
@@ -79,7 +79,7 @@ env.Library(
     target="rewrite_state_change_errors",
     source=[
         "rewrite_state_change_errors.cpp",
-        "rewrite_state_change_errors_server_parameter.idl",
+        "rewrite_state_change_errors_server_parameter_gen.cpp",
     ],
     LIBDEPS_PRIVATE=[
         "$BUILD_DIR/mongo/base",

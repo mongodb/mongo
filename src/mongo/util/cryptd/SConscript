@@ -12,7 +12,7 @@ env.Library(
         "cryptd_options_init.cpp",
         "cryptd_service_entry_point.cpp",
         "cryptd_watchdog.cpp",
-        "cryptd_options.idl",
+        "cryptd_options_gen.cpp",
     ],
     LIBDEPS_PRIVATE=[
         "$BUILD_DIR/mongo/db/commands",

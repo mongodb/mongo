@@ -35,3 +35,81 @@ idl_generator(
         "//src/mongo/s:sharding_types_gen",
     ],
 )
+
+idl_generator(
+    name = "cluster_server_parameter_refresher_gen",
+    src = "cluster_server_parameter_refresher.idl",
+    deps = [
+        "//src/mongo/db:basic_types_gen",
+    ],
+)
+
+idl_generator(
+    name = "cluster_server_parameter_test_gen",
+    src = "cluster_server_parameter_test.idl",
+    deps = [
+        ":cluster_server_parameter_gen",
+        "//src/mongo/db:basic_types_gen",
+    ],
+)
+
+idl_generator(
+    name = "config_option_no_init_test_gen",
+    src = "config_option_no_init_test.idl",
+)
+
+idl_generator(
+    name = "config_option_test_gen",
+    src = "config_option_test.idl",
+)
+
+idl_generator(
+    name = "server_parameter_specialized_test_gen",
+    src = "server_parameter_specialized_test.idl",
+)
+
+idl_generator(
+    name = "server_parameter_with_storage_test_structs_gen",
+    src = "server_parameter_with_storage_test_structs.idl",
+    deps = [
+        ":cluster_server_parameter_gen",
+        "//src/mongo/db:basic_types_gen",
+    ],
+)
+
+idl_generator(
+    name = "server_parameter_with_storage_test_gen",
+    src = "server_parameter_with_storage_test.idl",
+    deps = [
+        ":server_parameter_with_storage_test_structs_gen",
+        "//src/mongo/db:basic_types_gen",
+    ],
+)
+
+idl_generator(
+    name = "unittest_import_gen",
+    src = "unittest_import.idl",
+    deps = [
+        "//src/mongo/db:basic_types_gen",
+    ],
+)
+
+idl_generator(
+    name = "unittest_gen",
+    src = "unittest.idl",
+    deps = [
+        ":generic_argument_gen",
+        ":unittest_import_gen",
+        "//src/mongo/db:basic_types_gen",
+        "//src/mongo/db/auth:access_checks_gen",
+        "//src/mongo/db/auth:action_type_gen",
+    ],
+)
+
+idl_generator(
+    name = "idl_parser_bm_gen",
+    src = "idl_parser_bm.idl",
+    deps = [
+        "//src/mongo/db:basic_types_gen",
+    ],
+)

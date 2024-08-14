@@ -18,7 +18,7 @@ env.Library(
         "event_queue.cpp",
         "simulation.cpp",
         "simulator_options.cpp",
-        "simulator_options.idl",
+        "simulator_options_gen.cpp",
         "simulator_options_init.cpp",
     ],
     LIBDEPS_PRIVATE=[

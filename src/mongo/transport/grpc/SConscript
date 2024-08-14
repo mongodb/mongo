@@ -10,7 +10,7 @@ env.Library(
     source=[
         "client.cpp",
         "client_cache.cpp",
-        "grpc_feature_flag.idl",
+        "grpc_feature_flag_gen.cpp",
         "grpc_session_manager.cpp",
         "grpc_transport_layer_impl.cpp",
         "server.cpp",
@@ -40,7 +40,7 @@ env.Library(
 env.Library(
     target="grpc_transport_server_options",
     source=[
-        "grpc_parameters.idl",
+        "grpc_parameters_gen.cpp",
     ],
     LIBDEPS=[
         "$BUILD_DIR/mongo/base",

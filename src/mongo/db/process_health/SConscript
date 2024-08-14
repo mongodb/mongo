@@ -13,7 +13,7 @@ env.Library(
         "fault_manager.cpp",
         "fault.cpp",
         "health_monitoring_server_parameters.cpp",
-        "health_monitoring_server_parameters.idl",
+        "health_monitoring_server_parameters_gen.cpp",
         "health_monitoring_server_status_section.cpp",
         "health_observer_base.cpp",
         "health_observer_registration.cpp",

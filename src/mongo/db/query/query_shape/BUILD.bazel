@@ -16,3 +16,19 @@ idl_generator(
         "//src/mongo/crypto:sha256_block_gen",
     ],
 )
+
+idl_generator(
+    name = "query_shape_gen",
+    src = "query_shape.idl",
+    deps = [
+        "//src/mongo/db:basic_types_gen",
+    ],
+)
+
+idl_generator(
+    name = "query_shape_test_gen",
+    src = "query_shape_test.idl",
+    deps = [
+        "//src/mongo/db:basic_types_gen",
+    ],
+)

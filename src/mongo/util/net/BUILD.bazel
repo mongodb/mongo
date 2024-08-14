@@ -26,3 +26,38 @@ idl_generator(
     name = "hostandport_gen",
     src = "hostandport.idl",
 )
+
+idl_generator(
+    name = "ssl_options_client_gen",
+    src = "ssl_options_client.idl",
+    deps = [
+        "//src/mongo/db:basic_types_gen",
+    ],
+)
+
+idl_generator(
+    name = "ssl_options_server_gen",
+    src = "ssl_options_server.idl",
+    deps = [
+        "//src/mongo/db:basic_types_gen",
+    ],
+)
+
+idl_generator(
+    name = "ssl_parameters_gen",
+    src = "ssl_parameters.idl",
+    deps = [
+        "//src/mongo/crypto:sha256_block_gen",
+        "//src/mongo/db/auth:auth_types_gen",
+    ],
+)
+
+idl_generator(
+    name = "ssl_parameters_auth_gen",
+    src = "ssl_parameters_auth.idl",
+)
+
+idl_generator(
+    name = "http_client_options_gen",
+    src = "http_client_options.idl",
+)

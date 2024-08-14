@@ -25,7 +25,7 @@ env.Library(
     source=[
         "array_histogram.cpp",
         "scalar_histogram.cpp",
-        "stats.idl",
+        "stats_gen.cpp",
         "value_utils.cpp",
     ],
     LIBDEPS=[

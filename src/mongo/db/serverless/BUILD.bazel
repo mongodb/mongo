@@ -16,3 +16,22 @@ idl_generator(
         "//src/mongo/db:basic_types_gen",
     ],
 )
+
+idl_generator(
+    name = "shard_split_state_machine_gen",
+    src = "shard_split_state_machine.idl",
+    deps = [
+        "//src/mongo/db:basic_types_gen",
+        "//src/mongo/db/repl:replication_types_gen",
+    ],
+)
+
+idl_generator(
+    name = "shard_split_commands_gen",
+    src = "shard_split_commands.idl",
+    deps = [
+        ":shard_split_state_machine_gen",
+        "//src/mongo/db:basic_types_gen",
+        "//src/mongo/idl:generic_argument_gen",
+    ],
+)

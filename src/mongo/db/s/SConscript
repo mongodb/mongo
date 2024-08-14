@@ -352,7 +352,7 @@ env.Library(
         "sharding_util.cpp",
         "split_chunk_request_type.cpp",
         "type_shard_identity.cpp",
-        "type_shard_identity.idl",
+        "type_shard_identity_gen.cpp",
     ],
     LIBDEPS_PRIVATE=[
         "$BUILD_DIR/mongo/base",

@@ -31,3 +31,14 @@ idl_generator(
         "//src/mongo/idl:generic_argument_gen",
     ],
 )
+
+idl_generator(
+    name = "delete_request_gen",
+    src = "delete_request.idl",
+    deps = [
+        "//src/mongo/db:basic_types_gen",
+        "//src/mongo/db/pipeline:legacy_runtime_constants_gen",
+        "//src/mongo/db/query:hint_gen",
+        "//src/mongo/db/session:logical_session_id_gen",
+    ],
+)

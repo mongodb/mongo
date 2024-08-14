@@ -286,7 +286,7 @@ env.Library(
     source=[
         "visitors/docs_needed_bounds.cpp",
         "visitors/docs_needed_bounds_util.cpp",
-        "visitors/docs_needed_bounds.idl",
+        "visitors/docs_needed_bounds_gen.cpp",
     ],
     LIBDEPS=["$BUILD_DIR/mongo/base", "$BUILD_DIR/mongo/idl/idl_parser"],
 )
@@ -383,9 +383,9 @@ pipelineEnv.Library(
         "search/document_source_internal_search_id_lookup.cpp",
         "search/document_source_internal_search_mongot_remote.cpp",
         "search/document_source_list_search_indexes.cpp",
-        # document_source_list_search_indexes.idl must be compiled with the corresponding .cpp file
+        # document_source_list_search_indexes_gen.cpp must be compiled with the corresponding .cpp file
         # since the idl relies on a cpp_validator_func definition.
-        "search/document_source_list_search_indexes.idl",
+        "search/document_source_list_search_indexes_gen.cpp",
         "search/document_source_search.cpp",
         "search/document_source_search_meta.cpp",
         "search/document_source_vector_search.cpp",
@@ -590,7 +590,7 @@ env.Library(
         "exchange_spec_gen.cpp",
         "resume_token_gen.cpp",
         "resume_token.cpp",
-        "search/plan_sharded_search.idl",
+        "search/plan_sharded_search_gen.cpp",
         "storage_stats_spec_gen.cpp",
     ],
     LIBDEPS=[

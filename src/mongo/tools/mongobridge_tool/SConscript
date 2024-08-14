@@ -12,7 +12,7 @@ mongobridge = env.Program(
         "bridge.cpp",
         "bridge_commands.cpp",
         "mongobridge_options.cpp",
-        "mongobridge_options.idl",
+        "mongobridge_options_gen.cpp",
         "mongobridge_options_init.cpp",
     ],
     LIBDEPS=[

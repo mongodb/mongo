@@ -37,7 +37,7 @@ env.Library(
 env.Library(
     target="query_shape_common",
     source=[
-        "query_shape.idl",
+        "query_shape_gen.cpp",
         "serialization_options.cpp",
     ],
     LIBDEPS=[
@@ -51,7 +51,7 @@ env.CppUnitTest(
     target="db_query_query_shape_test",
     source=[
         "query_shape_test.cpp",
-        "query_shape_test.idl",
+        "query_shape_test_gen.cpp",
     ],
     LIBDEPS=[
         "$BUILD_DIR/mongo/db/auth/authmocks",

@@ -14,8 +14,8 @@ env.Library(
         "transaction_metrics_observer.cpp",
         "transaction_participant.cpp",
         "transaction_participant_resource_yielder.cpp",
-        "transaction_participant.idl",
-        "transactions_stats.idl",
+        "transaction_participant_gen.cpp",
+        "transactions_stats_gen.cpp",
     ],
     LIBDEPS_PRIVATE=[
         "$BUILD_DIR/mongo/db/catalog/collection_crud",

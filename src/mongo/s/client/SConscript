@@ -25,7 +25,7 @@ env.Library(
     target="shard_interface",
     source=[
         "shard.cpp",
-        "shard.idl",
+        "shard_gen.cpp",
     ],
     LIBDEPS=[
         "$BUILD_DIR/mongo/client/remote_command_retry_scheduler",

@@ -93,7 +93,7 @@ env.Library(
     target="cluster_server_parameter_refresher",
     source=[
         "cluster_server_parameter_refresher.cpp",
-        "cluster_server_parameter_refresher.idl",
+        "cluster_server_parameter_refresher_gen.cpp",
     ],
     LIBDEPS_PRIVATE=[
         "$BUILD_DIR/mongo/db/audit",
@@ -115,7 +115,7 @@ env.CppUnitTest(
         "cluster_server_parameter_refresher_test.cpp",
         "cluster_server_parameter_server_status_test.cpp",
         "cluster_server_parameter_test_util.cpp",
-        "cluster_server_parameter_test.idl",
+        "cluster_server_parameter_test_gen.cpp",
     ],
     LIBDEPS=[
         "$BUILD_DIR/mongo/db/auth/authmocks",
@@ -145,18 +145,18 @@ env.CppUnitTest(
     target="idl_test",
     source=[
         "command_generic_argument_test.cpp",
-        "config_option_no_init_test.idl",
+        "config_option_no_init_test_gen.cpp",
         "config_option_test.cpp",
-        "config_option_test.idl",
+        "config_option_test_gen.cpp",
         "feature_flag_test.cpp",
         "idl_test.cpp",
         "server_parameter_specialized_test.cpp",
-        "server_parameter_specialized_test.idl",
-        "server_parameter_with_storage_test_structs.idl",
+        "server_parameter_specialized_test_gen.cpp",
+        "server_parameter_with_storage_test_structs_gen.cpp",
         "server_parameter_with_storage_test.cpp",
-        "server_parameter_with_storage_test.idl",
-        "unittest_import.idl",
-        "unittest.idl",
+        "server_parameter_with_storage_test_gen.cpp",
+        "unittest_import_gen.cpp",
+        "unittest_gen.cpp",
     ],
     LIBDEPS=[
         "$BUILD_DIR/mongo/client/connection_string",
@@ -177,7 +177,7 @@ env.Benchmark(
     target="idl_parser_bm",
     source=[
         "idl_parser_bm.cpp",
-        "idl_parser_bm.idl",
+        "idl_parser_bm_gen.cpp",
     ],
     LIBDEPS=[
         "$BUILD_DIR/mongo/db/auth/authprivilege",

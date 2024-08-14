@@ -12,7 +12,7 @@ env.Library(
     source=[
         "framework_options_init.cpp",
         "framework_options.cpp",
-        "framework_options.idl",
+        "framework_options_gen.cpp",
         "framework.cpp",
     ],
     LIBDEPS=[

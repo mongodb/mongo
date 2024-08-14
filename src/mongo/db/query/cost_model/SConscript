@@ -8,7 +8,7 @@ env.Library(
     target="query_cost_model",
     source=[
         "cost_estimator_impl.cpp",
-        "cost_model.idl",
+        "cost_model_gen.cpp",
         "cost_model_manager.cpp",
         "cost_model_utils.cpp",
     ],

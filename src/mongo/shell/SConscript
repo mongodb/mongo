@@ -129,8 +129,8 @@ if shouldBuildGRPC(env):
 env.Library(
     target="shell_options_register",
     source=[
-        "shell_options.idl",
-        "shell_options_grpc.idl" if shouldBuildGRPC(env) else [],
+        "shell_options_gen.cpp",
+        "shell_options_grpc_gen.cpp" if shouldBuildGRPC(env) else [],
     ],
     LIBDEPS=[
         "$BUILD_DIR/mongo/base",
@@ -188,7 +188,7 @@ env.Library(
 env.Library(
     target="kms_idl",
     source=[
-        "kms.idl",
+        "kms_gen.cpp",
     ],
     LIBDEPS_PRIVATE=[
         "$BUILD_DIR/mongo/db/server_base",

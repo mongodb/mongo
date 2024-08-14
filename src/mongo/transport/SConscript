@@ -112,7 +112,7 @@ tlEnv.Library(
         "asio/asio_transport_layer.cpp",
         "asio/asio_utils.cpp",
         "proxy_protocol_header_parser.cpp",
-        "transport_options.idl",
+        "transport_options_gen.cpp",
     ],
     LIBDEPS=[
         "$BUILD_DIR/mongo/base/system_error",
@@ -155,7 +155,7 @@ tlEnv.Library(
         "service_executor_reserved.cpp",
         "service_executor_synchronous.cpp",
         "service_executor_utils.cpp",
-        "service_executor.idl",
+        "service_executor_gen.cpp",
     ],
     LIBDEPS=[
         "$BUILD_DIR/mongo/db/service_context",
@@ -172,7 +172,7 @@ tlEnv.Library(
 env.Library(
     target="session_manager",
     source=[
-        "session_manager_common.idl",
+        "session_manager_common_gen.cpp",
         "session_manager_common.cpp",
         "session_workflow.cpp",
     ],
@@ -220,7 +220,7 @@ zlibEnv.Library(
 env.Library(
     target="message_compressor_options_client",
     source=[
-        "message_compressor_options_client.idl",
+        "message_compressor_options_client_gen.cpp",
     ],
     LIBDEPS=[
         "$BUILD_DIR/mongo/base",
@@ -231,7 +231,7 @@ env.Library(
 env.Library(
     target="message_compressor_options_server",
     source=[
-        "message_compressor_options_server.idl",
+        "message_compressor_options_server_gen.cpp",
     ],
     LIBDEPS=[
         "$BUILD_DIR/mongo/base",

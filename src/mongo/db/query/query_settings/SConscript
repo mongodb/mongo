@@ -23,7 +23,7 @@ env.Library(
 env.Library(
     target="manager",
     source=[
-        "query_settings_cluster_parameter.idl",
+        "query_settings_cluster_parameter_gen.cpp",
         "query_settings_manager.cpp",
     ],
     LIBDEPS_PRIVATE=[

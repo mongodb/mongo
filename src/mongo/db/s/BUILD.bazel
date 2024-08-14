@@ -13,3 +13,11 @@ idl_generator(
     name = "sharding_api_d_params_gen",
     src = "sharding_api_d_params.idl",
 )
+
+idl_generator(
+    name = "type_shard_identity_gen",
+    src = "type_shard_identity.idl",
+    deps = [
+        "//src/mongo/db:basic_types_gen",
+    ],
+)

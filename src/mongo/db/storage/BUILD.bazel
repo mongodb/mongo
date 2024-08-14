@@ -1,4 +1,4 @@
-load("//bazel:mongo_src_rules.bzl", "mongo_cc_library")
+load("//bazel:mongo_src_rules.bzl", "idl_generator", "mongo_cc_library")
 
 package(default_visibility = ["//visibility:public"])
 
@@ -7,4 +7,19 @@ exports_files(
         "*.h",
         "*.cpp",
     ]),
+)
+
+idl_generator(
+    name = "storage_parameters_gen",
+    src = "storage_parameters.idl",
+)
+
+idl_generator(
+    name = "flow_control_parameters_gen",
+    src = "flow_control_parameters.idl",
+)
+
+idl_generator(
+    name = "two_phase_index_build_knobs_gen",
+    src = "two_phase_index_build_knobs.idl",
 )

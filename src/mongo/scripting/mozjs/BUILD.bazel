@@ -1,3 +1,5 @@
+load("//bazel:mongo_src_rules.bzl", "idl_generator", "mongo_cc_library")
+
 package(default_visibility = ["//visibility:public"])
 
 exports_files(
@@ -5,4 +7,17 @@ exports_files(
         "*.h",
         "*.cpp",
     ]),
+)
+
+idl_generator(
+    name = "engine_gen",
+    src = "engine.idl",
+)
+
+idl_generator(
+    name = "scripting_util_gen",
+    src = "scripting_util.idl",
+    deps = [
+        "//src/mongo/db:basic_types_gen",
+    ],
 )

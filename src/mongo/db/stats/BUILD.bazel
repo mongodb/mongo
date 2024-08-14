@@ -1,4 +1,4 @@
-load("//bazel:mongo_src_rules.bzl", "mongo_cc_library")
+load("//bazel:mongo_src_rules.bzl", "idl_generator", "mongo_cc_library")
 
 package(default_visibility = ["//visibility:public"])
 
@@ -7,4 +7,31 @@ exports_files(
         "*.h",
         "*.cpp",
     ]),
+)
+
+idl_generator(
+    name = "read_concern_stats_gen",
+    src = "read_concern_stats.idl",
+    deps = [
+        "//src/mongo/db:basic_types_gen",
+    ],
+)
+
+idl_generator(
+    name = "server_write_concern_metrics_gen",
+    src = "server_write_concern_metrics.idl",
+)
+
+idl_generator(
+    name = "read_preference_metrics_gen",
+    src = "read_preference_metrics.idl",
+    deps = [
+        "//src/mongo/client:read_preference_gen",
+        "//src/mongo/db:basic_types_gen",
+    ],
+)
+
+idl_generator(
+    name = "operation_resource_consumption_gen",
+    src = "operation_resource_consumption.idl",
 )

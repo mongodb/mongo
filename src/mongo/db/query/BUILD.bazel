@@ -81,3 +81,54 @@ idl_generator(
         "//src/mongo/idl:generic_argument_gen",
     ],
 )
+
+idl_generator(
+    name = "expression_index_knobs_gen",
+    src = "expression_index_knobs.idl",
+)
+
+idl_generator(
+    name = "analyze_command_gen",
+    src = "analyze_command.idl",
+    deps = [
+        "//src/mongo/db:basic_types_gen",
+        "//src/mongo/db/auth:access_checks_gen",
+        "//src/mongo/db/auth:action_type_gen",
+        "//src/mongo/idl:generic_argument_gen",
+    ],
+)
+
+idl_generator(
+    name = "count_command_gen",
+    src = "count_command.idl",
+    deps = [
+        ":hint_gen",
+        "//src/mongo/crypto:fle_field_schema_gen",
+        "//src/mongo/db:basic_types_gen",
+        "//src/mongo/db/auth:access_checks_gen",
+        "//src/mongo/db/auth:action_type_gen",
+        "//src/mongo/idl:generic_argument_gen",
+    ],
+)
+
+idl_generator(
+    name = "kill_cursors_gen",
+    src = "kill_cursors.idl",
+    deps = [
+        "//src/mongo/db:basic_types_gen",
+        "//src/mongo/db/auth:access_checks_gen",
+        "//src/mongo/db/auth:action_type_gen",
+        "//src/mongo/idl:generic_argument_gen",
+    ],
+)
+
+idl_generator(
+    name = "getmore_command_gen",
+    src = "getmore_command.idl",
+    deps = [
+        ":cursor_response_gen",
+        "//src/mongo/db:basic_types_gen",
+        "//src/mongo/db/repl:replication_types_gen",
+        "//src/mongo/idl:generic_argument_gen",
+    ],
+)

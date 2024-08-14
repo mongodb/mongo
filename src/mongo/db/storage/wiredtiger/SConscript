@@ -28,7 +28,7 @@ wtEnv.InjectThirdParty(libraries=["valgrind"])
 wtEnv.Library(
     target="storage_wiredtiger_core",
     source=[
-        "oplog_truncate_marker_parameters.idl",
+        "oplog_truncate_marker_parameters_gen.cpp",
         "oplog_truncate_markers_server_status_section.cpp",
         "wiredtiger_begin_transaction_block.cpp",
         "wiredtiger_column_store.cpp",
@@ -49,7 +49,7 @@ wtEnv.Library(
         "wiredtiger_snapshot_manager.cpp",
         "wiredtiger_size_storer.cpp",
         "wiredtiger_util.cpp",
-        "wiredtiger_parameters.idl",
+        "wiredtiger_parameters_gen.cpp",
     ],
     LIBDEPS=[
         "$BUILD_DIR/mongo/db/catalog/collection_options",
@@ -94,7 +94,7 @@ wtEnv.Library(
         "wiredtiger_init.cpp",
         "wiredtiger_options_init.cpp",
         "wiredtiger_server_status.cpp",
-        "wiredtiger_global_options.idl",
+        "wiredtiger_global_options_gen.cpp",
     ],
     LIBDEPS=[
         "$BUILD_DIR/mongo/db/storage/storage_engine_impl",

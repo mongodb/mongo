@@ -20,3 +20,14 @@ idl_generator(
         "//src/mongo/db/query/query_shape:query_shape_hash_gen",
     ],
 )
+
+idl_generator(
+    name = "query_settings_cluster_parameter_gen",
+    src = "query_settings_cluster_parameter.idl",
+    deps = [
+        "//src/mongo/db:basic_types_gen",
+        "//src/mongo/db/query:query_feature_flags_gen",
+        "//src/mongo/db/query/query_settings:query_settings_gen",
+        "//src/mongo/idl:cluster_server_parameter_gen",
+    ],
+)

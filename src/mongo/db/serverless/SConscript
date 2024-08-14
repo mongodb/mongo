@@ -16,7 +16,7 @@ env.Library(
 env.Library(
     target="shard_split_state_machine",
     source=[
-        "shard_split_state_machine.idl",
+        "shard_split_state_machine_gen.cpp",
     ],
     LIBDEPS=[
         "$BUILD_DIR/mongo/client/connection_string",
@@ -28,7 +28,7 @@ env.Library(
 env.Library(
     target="shard_split_commands",
     source=[
-        "shard_split_commands.idl",
+        "shard_split_commands_gen.cpp",
         "shard_split_commands.cpp",
     ],
     LIBDEPS=[

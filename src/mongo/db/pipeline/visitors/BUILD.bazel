@@ -1,3 +1,5 @@
+load("//bazel:mongo_src_rules.bzl", "idl_generator", "mongo_cc_library")
+
 package(default_visibility = ["//visibility:public"])
 
 exports_files(
@@ -5,4 +7,12 @@ exports_files(
         "*.h",
         "*.cpp",
     ]),
+)
+
+idl_generator(
+    name = "docs_needed_bounds_gen",
+    src = "docs_needed_bounds.idl",
+    deps = [
+        "//src/mongo/db:basic_types_gen",
+    ],
 )
