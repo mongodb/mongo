@@ -390,11 +390,11 @@ def windows_extraction(ctx, cc_toolchain, inputs):
 
     if pdb:
         basename = input.basename[:-len(WITH_DEBUG_SUFFIX + ext)]
-        output = ctx.actions.declare_file(basename + ".pdb")
-        outputs.append(output)
+        pdb_output = ctx.actions.declare_file(basename + ".pdb")
+        outputs.append(pdb_output)
 
         ctx.actions.symlink(
-            output = output,
+            output = pdb_output,
             target_file = pdb.to_list()[0],
         )
 
