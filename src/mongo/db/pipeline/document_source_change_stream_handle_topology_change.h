@@ -51,8 +51,8 @@
 #include "mongo/db/pipeline/variables.h"
 #include "mongo/db/query/query_shape/serialization_options.h"
 #include "mongo/db/shard_id.h"
-#include "mongo/s/query/async_results_merger_params_gen.h"
-#include "mongo/s/query/document_source_merge_cursors.h"
+#include "mongo/s/query/exec/async_results_merger_params_gen.h"
+#include "mongo/s/query/exec/document_source_merge_cursors.h"
 #include "mongo/util/intrusive_counter.h"
 
 namespace mongo {

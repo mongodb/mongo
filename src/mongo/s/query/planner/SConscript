@@ -1,0 +1,65 @@
+# -*- mode: python -*-
+
+Import("env")
+
+env = env.Clone()
+
+env.Library(
+    target="cluster_aggregate",
+    source=[
+        "cluster_aggregate.cpp",
+        "cluster_aggregation_planner.cpp",
+    ],
+    LIBDEPS=[
+        "$BUILD_DIR/mongo/db/fle_crud",
+        "$BUILD_DIR/mongo/db/pipeline/pipeline",
+        "$BUILD_DIR/mongo/db/pipeline/process_interface/mongos_process_interface",
+        "$BUILD_DIR/mongo/db/pipeline/sharded_agg_helpers",
+        "$BUILD_DIR/mongo/db/query/query_shape/query_shape",
+        "$BUILD_DIR/mongo/db/shared_request_handling",
+        "$BUILD_DIR/mongo/db/views/view_catalog_helpers",
+        "$BUILD_DIR/mongo/db/views/views",
+        "$BUILD_DIR/mongo/s/query/exec/router_exec_stage",
+    ],
+    LIBDEPS_PRIVATE=[
+        "$BUILD_DIR/mongo/db/catalog/collection_uuid_mismatch_info",
+        "$BUILD_DIR/mongo/db/pipeline/docs_needed_bounds_visitor",
+        "$BUILD_DIR/mongo/db/query/query_settings/utils",
+        "$BUILD_DIR/mongo/db/timeseries/timeseries_options",
+        "$BUILD_DIR/mongo/s/query/exec/async_results_merger",
+        "$BUILD_DIR/mongo/util/concurrency/spin_lock",
+        "cqf_utils",
+    ],
+)
+
+env.Library(
+    target="cluster_find",
+    source=[
+        "cluster_find.cpp",
+    ],
+    LIBDEPS=[
+        "$BUILD_DIR/mongo/db/commands",
+        "$BUILD_DIR/mongo/db/curop_failpoint_helpers",
+        "$BUILD_DIR/mongo/db/query/command_request_response",
+        "$BUILD_DIR/mongo/db/query/query_common",
+        "$BUILD_DIR/mongo/db/query/query_stats/query_stats",
+        "$BUILD_DIR/mongo/s/query/exec/cluster_cursor",
+    ],
+    LIBDEPS_PRIVATE=[
+        "$BUILD_DIR/mongo/db/catalog/collection_uuid_mismatch_info",
+        "$BUILD_DIR/mongo/db/server_base",
+        "$BUILD_DIR/mongo/s/sharding_router_api",
+        "$BUILD_DIR/mongo/util/concurrency/spin_lock",
+    ],
+)
+
+env.Library(
+    target="cqf_utils",
+    source=[
+        "cqf_utils.cpp",
+    ],
+    LIBDEPS_PRIVATE=[
+        "$BUILD_DIR/mongo/db/pipeline/pipeline",
+        "$BUILD_DIR/mongo/s/query/exec/router_exec_stage",
+    ],
+)

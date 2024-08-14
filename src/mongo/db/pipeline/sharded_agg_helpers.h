@@ -56,7 +56,7 @@
 #include "mongo/s/async_requests_sender.h"
 #include "mongo/s/catalog_cache.h"
 #include "mongo/s/client/shard.h"
-#include "mongo/s/query/owned_remote_cursor.h"
+#include "mongo/s/query/exec/owned_remote_cursor.h"
 #include "mongo/s/stale_shard_version_helpers.h"
 
 namespace mongo {

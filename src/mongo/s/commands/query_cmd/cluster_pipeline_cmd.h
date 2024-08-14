@@ -36,7 +36,7 @@
 #include "mongo/db/pipeline/aggregate_command_gen.h"
 #include "mongo/db/pipeline/lite_parsed_pipeline.h"
 #include "mongo/db/views/resolved_view.h"
-#include "mongo/s/query/cluster_aggregate.h"
+#include "mongo/s/query/planner/cluster_aggregate.h"
 
 namespace mongo {
 namespace {

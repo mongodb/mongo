@@ -51,7 +51,7 @@
 #include "mongo/db/service_context.h"
 #include "mongo/executor/remote_command_request.h"
 #include "mongo/s/commands/cluster_command_test_fixture.h"
-#include "mongo/s/query/cluster_aggregate.h"
+#include "mongo/s/query/planner/cluster_aggregate.h"
 #include "mongo/unittest/assert.h"
 #include "mongo/unittest/framework.h"
 #include "mongo/util/assert_util.h"

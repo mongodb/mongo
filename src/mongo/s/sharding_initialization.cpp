@@ -81,7 +81,7 @@
 #include "mongo/s/grid.h"
 #include "mongo/s/initialize_tenant_to_shard_cache.h"
 #include "mongo/s/mongod_and_mongos_server_parameters_gen.h"
-#include "mongo/s/query/cluster_cursor_manager.h"
+#include "mongo/s/query/exec/cluster_cursor_manager.h"
 #include "mongo/s/query_analysis_client.h"
 #include "mongo/s/query_analysis_sampler.h"
 #include "mongo/s/routing_table_cache_gossip_metadata_hook.h"

@@ -2,16 +2,7 @@ version: 1.0.0
 filters:
   - "*":
     approvers:
-      - 10gen/query-execution
-  - "cluster_aggregate*":
+      - 10gen/query
+  - "document_source_visitor_docs_needed_bounds*":
     approvers:
-      - 10gen/query-optimization
-  - "cluster_aggregation_planner*":
-    approvers:
-      - 10gen/query-optimization
-  - "cluster_find*":
-    approvers:
-      - 10gen/query-optimization
-  - "cqf_utils*":
-    approvers:
-      - 10gen/query-optimization
+      - 10gen/query-integration

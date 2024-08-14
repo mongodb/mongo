@@ -62,7 +62,7 @@
 #include "mongo/s/cluster_commands_helpers.h"
 #include "mongo/s/collection_routing_info_targeter.h"
 #include "mongo/s/grid.h"
-#include "mongo/s/query/store_possible_cursor.h"
+#include "mongo/s/query/exec/store_possible_cursor.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/decorable.h"
 #include "mongo/util/str.h"

@@ -46,7 +46,7 @@
 #include "mongo/db/repl/storage_interface_mock.h"
 #include "mongo/executor/network_test_env.h"
 #include "mongo/executor/remote_command_request.h"
-#include "mongo/s/query/sharded_agg_test_fixture.h"
+#include "mongo/s/query/exec/sharded_agg_test_fixture.h"
 #include "mongo/s/request_types/sharded_ddl_commands_gen.h"
 #include "mongo/unittest/assert.h"
 #include "mongo/unittest/bson_test_util.h"

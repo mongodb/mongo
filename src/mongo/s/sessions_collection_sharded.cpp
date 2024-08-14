@@ -60,7 +60,7 @@
 #include "mongo/s/chunk_manager.h"
 #include "mongo/s/cluster_write.h"
 #include "mongo/s/grid.h"
-#include "mongo/s/query/cluster_find.h"
+#include "mongo/s/query/planner/cluster_find.h"
 #include "mongo/s/sessions_collection_sharded.h"
 #include "mongo/s/write_ops/batch_write_exec.h"
 #include "mongo/s/write_ops/batched_command_request.h"

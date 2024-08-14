@@ -32,7 +32,7 @@
 #include "mongo/db/s/migration_blocking_operation/migration_blocking_operation_coordinator.h"
 #include "mongo/s/cluster_commands_helpers.h"
 #include "mongo/s/grid.h"
-#include "mongo/s/query/cluster_aggregate.h"
+#include "mongo/s/query/planner/cluster_aggregate.h"
 #include "mongo/s/service_entry_point_router_role.h"
 #include "mongo/s/stale_shard_version_helpers.h"
 

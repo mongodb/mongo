@@ -112,7 +112,7 @@ env.Library(
         "$BUILD_DIR/mongo/db/query_exec",
         "$BUILD_DIR/mongo/db/service_context",
         "$BUILD_DIR/mongo/s/grid",
-        "$BUILD_DIR/mongo/s/query/cluster_cursor_manager",
+        "$BUILD_DIR/mongo/s/query/exec/cluster_cursor_manager",
         "$BUILD_DIR/mongo/util/clock_sources",
         "$BUILD_DIR/mongo/util/periodic_runner",
     ],

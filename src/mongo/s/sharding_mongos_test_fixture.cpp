@@ -87,7 +87,7 @@
 #include "mongo/s/client/shard_remote.h"
 #include "mongo/s/config_server_catalog_cache_loader.h"
 #include "mongo/s/grid.h"
-#include "mongo/s/query/cluster_cursor_manager.h"
+#include "mongo/s/query/exec/cluster_cursor_manager.h"
 #include "mongo/s/sharding_initialization.h"
 #include "mongo/s/sharding_state.h"
 #include "mongo/s/sharding_task_executor.h"

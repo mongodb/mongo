@@ -68,7 +68,7 @@
 #include "mongo/s/commands/strategy.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/load_balancer_support.h"
-#include "mongo/s/query/cluster_cursor_manager.h"
+#include "mongo/s/query/exec/cluster_cursor_manager.h"
 #include "mongo/s/service_entry_point_router_role.h"
 #include "mongo/s/transaction_router.h"
 #include "mongo/util/assert_util.h"

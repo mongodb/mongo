@@ -815,11 +815,14 @@ WORKSPACE.bazel @10gen/devprod-build
 /src/mongo/s/migration_blocking_operation/**/* @10gen/server-cluster-scalability
 
 # The following patterns are parsed from ./src/mongo/s/query/OWNERS.yml
-/src/mongo/s/query/**/* @10gen/query-execution
-/src/mongo/s/query/**/cluster_aggregate* @10gen/query-optimization
-/src/mongo/s/query/**/cluster_aggregation_planner* @10gen/query-optimization
-/src/mongo/s/query/**/cluster_find* @10gen/query-optimization
-/src/mongo/s/query/**/cqf_utils* @10gen/query-optimization
+/src/mongo/s/query/**/* @10gen/query
+/src/mongo/s/query/**/document_source_visitor_docs_needed_bounds* @10gen/query-integration
+
+# The following patterns are parsed from ./src/mongo/s/query/exec/OWNERS.yml
+/src/mongo/s/query/exec/**/* @10gen/query-execution
+
+# The following patterns are parsed from ./src/mongo/s/query/planner/OWNERS.yml
+/src/mongo/s/query/planner/**/* @10gen/query-optimization
 
 # The following patterns are parsed from ./src/mongo/s/request_types/OWNERS.yml
 /src/mongo/s/request_types/**/coordinate_multi_update.idl @10gen/server-cluster-scalability

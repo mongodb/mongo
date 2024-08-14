@@ -77,7 +77,7 @@
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/config_server_catalog_cache_loader.h"
 #include "mongo/s/database_version.h"
-#include "mongo/s/query/cluster_cursor_manager.h"
+#include "mongo/s/query/exec/cluster_cursor_manager.h"
 #include "mongo/s/routing_information_cache.h"
 #include "mongo/s/write_ops/batched_command_response.h"
 #include "mongo/util/str.h"

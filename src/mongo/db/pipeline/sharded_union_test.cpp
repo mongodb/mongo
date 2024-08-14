@@ -79,7 +79,7 @@
 #include "mongo/s/chunk_manager.h"
 #include "mongo/s/chunk_version.h"
 #include "mongo/s/index_version.h"
-#include "mongo/s/query/sharded_agg_test_fixture.h"
+#include "mongo/s/query/exec/sharded_agg_test_fixture.h"
 #include "mongo/s/shard_key_pattern.h"
 #include "mongo/s/shard_version.h"
 #include "mongo/s/shard_version_factory.h"

@@ -45,7 +45,7 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/query/kill_cursors_gen.h"
 #include "mongo/s/grid.h"
-#include "mongo/s/query/cluster_cursor_manager.h"
+#include "mongo/s/query/exec/cluster_cursor_manager.h"
 
 namespace mongo {
 namespace {

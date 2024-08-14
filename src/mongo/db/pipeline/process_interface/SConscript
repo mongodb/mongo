@@ -119,8 +119,8 @@ env.Library(
     LIBDEPS=[
         "$BUILD_DIR/mongo/db/pipeline/pipeline",
         "$BUILD_DIR/mongo/db/pipeline/sharded_agg_helpers",
-        "$BUILD_DIR/mongo/s/query/async_results_merger",
-        "$BUILD_DIR/mongo/s/query/cluster_query",
+        "$BUILD_DIR/mongo/s/query/exec/async_results_merger",
+        "$BUILD_DIR/mongo/s/query/exec/cluster_cursor",
         "common_process_interface",
     ],
     LIBDEPS_PRIVATE=[

@@ -51,7 +51,7 @@
 #include "mongo/db/s/config/initial_split_policy.h"
 #include "mongo/db/shard_id.h"
 #include "mongo/idl/server_parameter_test_util.h"
-#include "mongo/s/query/sharded_agg_test_fixture.h"
+#include "mongo/s/query/exec/sharded_agg_test_fixture.h"
 #include "mongo/s/shard_key_pattern.h"
 #include "mongo/unittest/assert.h"
 #include "mongo/unittest/bson_test_util.h"

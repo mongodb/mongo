@@ -1,0 +1,147 @@
+# -*- mode: python -*-
+
+Import("env")
+
+env = env.Clone()
+
+env.Library(
+    target="cluster_cursor",
+    source=[
+        "cluster_client_cursor_impl.cpp",
+        "cluster_client_cursor_params.cpp",
+        "store_possible_cursor.cpp",
+    ],
+    LIBDEPS=[
+        "$BUILD_DIR/mongo/db/commands",
+        "$BUILD_DIR/mongo/db/curop_failpoint_helpers",
+        "$BUILD_DIR/mongo/db/query/command_request_response",
+        "$BUILD_DIR/mongo/db/query/query_common",
+        "$BUILD_DIR/mongo/db/query/query_stats/query_stats",
+        "async_results_merger",
+        "cluster_cursor_cleanup_job",
+        "cluster_cursor_manager",
+        "router_exec_stage",
+    ],
+    LIBDEPS_PRIVATE=[
+        "$BUILD_DIR/mongo/db/catalog/collection_uuid_mismatch_info",
+        "$BUILD_DIR/mongo/db/server_base",
+        "$BUILD_DIR/mongo/s/sharding_router_api",
+        "$BUILD_DIR/mongo/util/concurrency/spin_lock",
+    ],
+)
+
+env.Library(
+    target="router_exec_stage",
+    source=[
+        "document_source_merge_cursors.cpp",
+        "router_stage_limit.cpp",
+        "router_stage_mock.cpp",
+        "router_stage_pipeline.cpp",
+        "router_stage_queued_data.cpp",
+        "router_stage_remove_metadata_fields.cpp",
+        "router_stage_skip.cpp",
+    ],
+    LIBDEPS=[
+        "$BUILD_DIR/mongo/db/pipeline/pipeline",
+        "$BUILD_DIR/mongo/s/resource_yielders",
+        "$BUILD_DIR/mongo/s/sharding_router_api",
+        "async_results_merger",
+    ],
+)
+
+env.Library(
+    target="async_results_merger",
+    source=[
+        "async_results_merger.cpp",
+        "blocking_results_merger.cpp",
+        "establish_cursors.cpp",
+        "async_results_merger_params.idl",
+    ],
+    LIBDEPS=[
+        "$BUILD_DIR/mongo/db/query/command_request_response",
+        "$BUILD_DIR/mongo/db/query/query_common",
+        "$BUILD_DIR/mongo/executor/task_executor_interface",
+        "$BUILD_DIR/mongo/s/client/sharding_client",
+    ],
+    LIBDEPS_PRIVATE=[
+        "$BUILD_DIR/mongo/db/catalog/collection_uuid_mismatch_info",
+        "$BUILD_DIR/mongo/db/server_feature_flags",
+        "$BUILD_DIR/mongo/executor/async_multicaster",
+        "$BUILD_DIR/mongo/s/sharding_router_api",
+    ],
+)
+
+env.Library(
+    target="cluster_cursor_manager",
+    source=[
+        "cluster_cursor_manager.cpp",
+    ],
+    LIBDEPS=[
+        "$BUILD_DIR/mongo/base",
+        "$BUILD_DIR/mongo/db/auth/auth",
+        "$BUILD_DIR/mongo/db/auth/authprivilege",
+        "$BUILD_DIR/mongo/db/commands",
+        "$BUILD_DIR/mongo/db/generic_cursor",
+        "$BUILD_DIR/mongo/db/query/query_knobs",
+        "$BUILD_DIR/mongo/db/query/query_stats/query_stats",
+        "$BUILD_DIR/mongo/db/session/kill_sessions",
+        "$BUILD_DIR/mongo/db/session/logical_session_cache",
+        "$BUILD_DIR/mongo/db/session/logical_session_id",
+    ],
+    LIBDEPS_PRIVATE=[
+        "$BUILD_DIR/mongo/util/concurrency/spin_lock",
+    ],
+)
+
+env.Library(
+    target="cluster_cursor_cleanup_job",
+    source=[
+        "cluster_cursor_cleanup_job.cpp",
+    ],
+    LIBDEPS=[
+        "$BUILD_DIR/mongo/db/cursor_server_params",
+        "$BUILD_DIR/mongo/s/grid",
+        "$BUILD_DIR/mongo/util/background_job",
+    ],
+)
+
+env.CppUnitTest(
+    target="s_query_exec_test",
+    source=[
+        "async_results_merger_test.cpp",
+        "blocking_results_merger_test.cpp",
+        "cluster_client_cursor_impl_test.cpp",
+        "cluster_client_cursor_mock.cpp",
+        "cluster_cursor_manager_test.cpp",
+        "cluster_exchange_test.cpp",
+        "establish_cursors_test.cpp",
+        "results_merger_test_fixture.cpp",
+        "router_stage_limit_test.cpp",
+        "router_stage_remove_metadata_fields_test.cpp",
+        "router_stage_skip_test.cpp",
+        "store_possible_cursor_test.cpp",
+    ],
+    LIBDEPS=[
+        "$BUILD_DIR/mongo/db/auth/authmocks",
+        "$BUILD_DIR/mongo/db/auth/saslauth",
+        "$BUILD_DIR/mongo/db/query/query_request",
+        "$BUILD_DIR/mongo/db/query/query_test_service_context",
+        "$BUILD_DIR/mongo/db/service_context_non_d",
+        "$BUILD_DIR/mongo/db/session/logical_session_id",
+        "$BUILD_DIR/mongo/db/shared_request_handling",
+        "$BUILD_DIR/mongo/db/vector_clock",
+        "$BUILD_DIR/mongo/executor/thread_pool_task_executor_test_fixture",
+        # Linking to cluster_commands is necessary for async_results_merger_test.cpp since it
+        # requires linking to the getMore command. Otherwise the test fails due to a uassert
+        # being thrown.
+        "$BUILD_DIR/mongo/s/commands/cluster_commands",
+        "$BUILD_DIR/mongo/s/commands/cluster_commands_common",
+        "$BUILD_DIR/mongo/s/query/planner/cluster_aggregate",
+        "$BUILD_DIR/mongo/s/sharding_mongos_test_fixture",
+        "$BUILD_DIR/mongo/util/clock_source_mock",
+        "async_results_merger",
+        "cluster_cursor",
+        "cluster_cursor_manager",
+        "router_exec_stage",
+    ],
+)
