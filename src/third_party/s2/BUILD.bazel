@@ -1,0 +1,78 @@
+load("//bazel:mongo_src_rules.bzl", "mongo_cc_library")
+
+package(default_visibility = ["//visibility:public"])
+
+mongo_cc_library(
+    name = "s2",
+    srcs = [
+        "base/int128.cc",
+        "base/logging.cc",
+        "base/logging_mongo.cc",
+        "base/stringprintf.cc",
+        "base/strtoint.cc",
+        "s1angle.cc",
+        "s1interval.cc",
+        "s2.cc",
+        "s2cap.cc",
+        "s2cell.cc",
+        "s2cellid.cc",
+        "s2cellunion.cc",
+        "s2edgeindex.cc",
+        "s2edgeutil.cc",
+        "s2latlng.cc",
+        "s2latlngrect.cc",
+        "s2loop.cc",
+        "s2pointregion.cc",
+        "s2polygon.cc",
+        "s2polygonbuilder.cc",
+        "s2polyline.cc",
+        "s2r2rect.cc",
+        "s2region.cc",
+        "s2regioncoverer.cc",
+        "s2regionintersection.cc",
+        "s2regionunion.cc",
+        "strings/split.cc",
+        "strings/stringprintf.cc",
+        "strings/strutil.cc",
+        "util/coding/coder.cc",
+        "util/coding/varint.cc",
+        "util/math/mathutil.cc",
+    ] + glob([
+        "base/*.h",
+        "strings/*.h",
+        "util/coding/*.h",
+        "util/math/*.h",
+    ]) + [
+        "util/endian/endian.h",
+        "util/hash/hash_jenkins_lookup2.h",
+    ],
+    hdrs = glob(["*.h"]) + [
+        "util/math/mathlimits.cc",
+    ],
+    copts = [
+        "-Isrc/third_party/s2/strings",
+    ] + select({
+        "//bazel/config:compiler_type_msvc": [
+            # C4996: 'memccpy': The POSIX name for this item is deprecated.
+            #        Instead, use the ISO C and C++ conformant name: _memccpy.
+            "/wd4996",
+
+            # C4305: 'initializing': truncation from '...' to '...'
+            "/wd4305",
+        ],
+        "//bazel/config:compiler_type_clang": [
+            # Clang warns about struct/class tag mismatch, but as long as this
+            # is not a problem on Windows, these mismatches can be ignored
+            # http://stackoverflow.com/questions/4866425/mixing-class-and-struct.
+            "-Wno-mismatched-tags",
+        ],
+        "//conditions:default": [],
+    }),
+    includes = ["."],
+    local_defines = [
+        "DEBUG_MODE=false",
+    ],
+    deps = [
+        "//src/mongo:base",
+    ],
+)

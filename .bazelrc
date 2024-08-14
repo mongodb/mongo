@@ -50,6 +50,9 @@ common:windows --config=local
 build:windows --cxxopt=-D_WIN32_WINNT=0x0A00
 build:windows --cxxopt=-DBOOST_USE_WINAPI_VERSION=0x0A00
 build:windows --cxxopt=-DNTDDI_VERSION=0x0A000000
+# TODO(SERVER-93585): Remove this and fix s2 to work with Bazel's default which
+#                     sets COMPILER_MSVC on windows.
+build:windows --cxxopt=-UCOMPILER_MSVC
 
 # remote execution is the default, but only mongodb employees will be able to access
 # the engflow cluster. External builders should use the local option below
