@@ -28,10 +28,10 @@
  */
 #pragma once
 
+#include <boost/optional/optional.hpp>
 #include <vector>
 
-#include <boost/optional/optional.hpp>
-
+#include "mongo/db/exec/document_value/value.h"
 #include "mongo/db/pipeline/percentile_algo.h"
 
 namespace mongo {
@@ -40,7 +40,7 @@ namespace mongo {
  * 'AccuratePercentile' class for common functionality between discrete and continuous
  * percentiles
  */
-class AccuratePercentile : public PercentileAlgorithm {
+class AccuratePercentile : public PercentileAlgorithm, public PartialPercentile<Value> {
 
 public:
     AccuratePercentile() = default;  // no config required for this algorithm
@@ -51,6 +51,10 @@ public:
     long memUsageBytes() const final {
         return _accumulatedValues.capacity() * sizeof(double);
     }
+
+    Value serialize() final;
+
+    void combine(const Value& partial) final;
 
     std::vector<double> computePercentiles(const std::vector<double>& ps) final;
 
@@ -65,7 +69,5 @@ protected:
 
     bool _shouldSort = true;
 };
-std::unique_ptr<AccuratePercentile> createDiscretePercentile();
-std::unique_ptr<AccuratePercentile> createContinuousPercentile();
 
 }  // namespace mongo

@@ -89,9 +89,16 @@ public:
     static std::pair<std::vector<double> /*ps*/, PercentileMethod> parsePercentileAndMethod(
         ExpressionContext* expCtx, BSONElement elem, VariablesParseState vps);
     static Value formatFinalValue(int nPercentiles, const std::vector<double>& pctls);
+
+    /**
+     * maxMemoryUsageBytes sets the accumulator's memory limit before it will spill to disk. Passing
+     * in boost::none will result in the default query knob value
+     * internalQueryMaxPercentileAccumulatorBytes being used.
+     */
     AccumulatorPercentile(ExpressionContext* expCtx,
                           const std::vector<double>& ps,
-                          PercentileMethod method);
+                          PercentileMethod method,
+                          boost::optional<int> maxMemoryUsageBytes = boost::none);
 
     /**
      * Ingressing values and computing the requested percentiles.
@@ -175,10 +182,15 @@ public:
      * We are matching the signature of the AccumulatorPercentile for the purpose of using
      * ExpressionFromAccumulatorQuantile as a template for both $median and $percentile. This is the
      * reason for passing in `unused` and it will not be referenced.
+     *
+     * maxMemoryUsageBytes sets the accumulator's memory limit before it will spill to disk. Passing
+     * in boost::none will result in the default query knob value
+     * internalQueryMaxPercentileAccumulatorBytes being used.
      */
     AccumulatorMedian(ExpressionContext* expCtx,
                       const std::vector<double>& unused,
-                      PercentileMethod method);
+                      PercentileMethod method,
+                      boost::optional<int> maxMemoryUsageBytes = boost::none);
 
     /**
      * Necessary for supporting $median as window functions and/or as expression.

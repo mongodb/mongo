@@ -102,4 +102,7 @@ struct PartialPercentile {
 std::unique_ptr<PercentileAlgorithm> createTDigest();
 std::unique_ptr<PercentileAlgorithm> createTDigestDistributedClassic();
 
+std::unique_ptr<PercentileAlgorithm> createDiscretePercentile();
+std::unique_ptr<PercentileAlgorithm> createContinuousPercentile();
+
 }  // namespace mongo

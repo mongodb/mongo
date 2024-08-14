@@ -71,6 +71,14 @@ testWithSingleGroup({
 
 testWithSingleGroup({
     coll: coll,
+    docs: [{x: -Infinity}, {x: 0}, {x: 1}, {x: 2}, {x: Infinity}, {x: Infinity}, {x: Infinity}],
+    percentileSpec: {$percentile: {p: [0.5, 0.9, 0.1], input: "$x", method: "discrete"}},
+    expectedResult: [2, Infinity, -Infinity],
+    msg: "Multiple percentiles with infinities"
+});
+
+testWithSingleGroup({
+    coll: coll,
     docs: [{x: 0}, {x: 1}, {x: 2}],
     percentileSpec: {$percentile: {p: "$$ps", input: "$x", method: "discrete"}},
     letSpec: {ps: [0.5, 0.9, 0.1]},

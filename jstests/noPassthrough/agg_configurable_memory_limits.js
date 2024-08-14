@@ -1,3 +1,5 @@
+// @tags: [featureFlagAccuratePercentiles]
+
 // Tests that certain aggregation operators have configurable memory limits.
 const conn = MongoRunner.runMongod();
 assert.neq(null, conn, "mongod was unable to start up");
@@ -76,6 +78,66 @@ assert.commandWorked(bulk.execute());
         db.adminCommand({setParameter: 1, internalQueryTopNAccumulatorBytes: 100});
         assert.throwsWithCode(() => coll.aggregate([{$group: {_id: null, strings: {[op]: spec}}}]),
                               ErrorCodes.ExceededMemoryLimit);
+    }
+}());
+
+// TODO SERVER-92994: This test will no longer be valid once spilling is supported while merging the
+// accumulator state from $group spills. Write new tests here that check for correctness in the
+// query results when spilling.
+(function testinternalQueryMaxPercentileAccumulatorBytesSetting() {
+    // Capture the default value of 'internalQueryMaxPercentileAccumulatorBytes' to reset in between
+    // runs.
+    const res = assert.commandWorked(
+        db.adminCommand({getParameter: 1, internalQueryMaxPercentileAccumulatorBytes: 1}));
+    assert(res.hasOwnProperty("internalQueryMaxPercentileAccumulatorBytes"));
+    const percentileDefault = res["internalQueryMaxPercentileAccumulatorBytes"];
+
+    // Force $group to spill.
+    assert.commandWorked(
+        db.adminCommand({setParameter: 1, internalDocumentSourceGroupMaxMemoryBytes: 2}));
+
+    // Test that both accurate methods of percentile behave similarly.
+    for (const meth of ["discrete", "continuous"]) {
+        // First, verify that the accumulator doesn't throw when it does not exceed its memory
+        // limit.
+        assert.commandWorked(db.adminCommand(
+            {setParameter: 1, internalQueryMaxPercentileAccumulatorBytes: percentileDefault}));
+
+        coll.drop();
+        assert.commandWorked(coll.insertMany([{x: 0}, {x: 1}, {x: 2}]));
+
+        assert.doesNotThrow(() => coll.aggregate([
+            {$group: {_id: null, p: {$percentile: {p: [0.5, 0.9, 0.1], input: "$x", method: meth}}}}
+        ]));
+
+        coll.drop();
+        assert.commandWorked(coll.insertMany(
+            [{k: 0, x: 0}, {k: 0, x: 1}, {k: 1, x: 2}, {k: 2}, {k: 0, x: "str"}, {k: 1, x: 0}]));
+
+        assert.doesNotThrow(
+            () => coll.aggregate(
+                [{$group: {_id: "$k", p: {$percentile: {p: [0.9], input: "$x", method: meth}}}}]));
+
+        // Then, verify that the memory limit throws when lowered.
+        assert.commandWorked(
+            db.adminCommand({setParameter: 1, internalQueryMaxPercentileAccumulatorBytes: 2}));
+
+        coll.drop();
+        assert.commandWorked(coll.insertMany([{x: 0}, {x: 1}, {x: 2}]));
+
+        assert.throwsWithCode(() => coll.aggregate([
+            {$group: {_id: null, p: {$percentile: {p: [0.5, 0.9, 0.1], input: "$x", method: meth}}}}
+        ]),
+                              ErrorCodes.ExceededMemoryLimit);
+
+        coll.drop();
+        assert.commandWorked(coll.insertMany(
+            [{k: 0, x: 0}, {k: 0, x: 1}, {k: 1, x: 2}, {k: 2}, {k: 0, x: "str"}, {k: 1, x: 0}]));
+
+        assert.throwsWithCode(
+            () => coll.aggregate(
+                [{$group: {_id: "$k", p: {$percentile: {p: [0.9], input: "$x", method: meth}}}}]),
+            ErrorCodes.ExceededMemoryLimit);
     }
 }());
 

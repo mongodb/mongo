@@ -659,6 +659,18 @@ server_parameters:
     on_update: plan_cache_util::clearSbeCacheOnParameterChange
     redact: false
 
+  internalQueryMaxPercentileAccumulatorBytes:
+    description: "The maximum amount of memory that can be used by an individual $percentile accumulator."
+    set_at: [ startup, runtime ]
+    cpp_varname: "internalQueryMaxPercentileAccumulatorBytes"
+    cpp_vartype: AtomicWord<long long>
+    default:
+      expr: 100 * 1024 * 1024
+    validator:
+        gt: 0
+    on_update: plan_cache_util::clearSbeCacheOnParameterChange
+    redact: false
+
   internalQueryJavaScriptHeapSizeLimitMB:
     description: "Limits the JavaScript heap size used in aggregation. Will defer to the global
     'jsHeapLimitMB' limit if the global limit is smaller."

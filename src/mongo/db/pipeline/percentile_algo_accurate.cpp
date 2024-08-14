@@ -69,6 +69,39 @@ void AccuratePercentile::incorporate(const std::vector<double>& inputs) {
     }
 }
 
+/*
+ * Serialize data currently in algorithm by casting to Value type.
+ */
+Value AccuratePercentile::serialize() {
+    std::vector<Value> serializedValues(_accumulatedValues.begin(), _accumulatedValues.end());
+
+    serializedValues.reserve(serializedValues.size() + _negInfCount + _posInfCount);
+
+    for (int i = 0; i < _negInfCount; i++) {
+        serializedValues.push_back(Value(-std::numeric_limits<double>::infinity()));
+    }
+
+    for (int i = 0; i < _posInfCount; i++) {
+        serializedValues.push_back(Value(std::numeric_limits<double>::infinity()));
+    }
+
+    return Value(std::move(serializedValues));
+}
+
+void AccuratePercentile::combine(const Value& partial) {
+    tassert(9299300,
+            str::stream() << "'partial' is expected to be an array; found " << partial.getType(),
+            partial.isArray());
+
+    auto partialArray = partial.getArray();
+
+    _accumulatedValues.reserve(_accumulatedValues.size() + partialArray.size());
+
+    for (auto& value : partialArray) {
+        incorporate(value.getDouble());
+    }
+}
+
 vector<double> AccuratePercentile::computePercentiles(const vector<double>& ps) {
 
     if (_accumulatedValues.empty() && _negInfCount == 0 && _posInfCount == 0) {

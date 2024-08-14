@@ -66,7 +66,7 @@ boost::optional<double> DiscretePercentile::computePercentile(double p) {
     return _accumulatedValues[rank];
 }
 
-std::unique_ptr<AccuratePercentile> createDiscretePercentile() {
+std::unique_ptr<PercentileAlgorithm> createDiscretePercentile() {
     return std::make_unique<DiscretePercentile>();
 }
 

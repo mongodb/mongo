@@ -197,6 +197,16 @@ boost::intrusive_ptr<Expression> AccumulatorPercentile::parseExpression(
 void AccumulatorPercentile::processInternal(const Value& input, bool merging) {
     if (merging) {
         dynamic_cast<PartialPercentile<Value>*>(_algo.get())->combine(input);
+
+        // TODO SERVER-92994: Both uasserts should be removed once spilling is supported while
+        // merging the accumulator state from $group spills
+        _memUsageTracker.set(sizeof(*this) + _algo->memUsageBytes());
+        uassert(ErrorCodes::ExceededMemoryLimit,
+                str::stream() << fmt::format("$percentile used too much memory and cannot spill to "
+                                             "disk. Used: {0} bytes. Memory limit: {1} bytes",
+                                             _memUsageTracker.currentMemoryBytes(),
+                                             _memUsageTracker.maxAllowedMemoryUsageBytes()),
+                _memUsageTracker.withinMemoryLimit());
         return;
     }
 
@@ -205,6 +215,12 @@ void AccumulatorPercentile::processInternal(const Value& input, bool merging) {
     }
     _algo->incorporate(input.coerceToDouble());
     _memUsageTracker.set(sizeof(*this) + _algo->memUsageBytes());
+    uassert(ErrorCodes::ExceededMemoryLimit,
+            str::stream() << fmt::format("$percentile used too much memory and cannot spill to "
+                                         "disk. Used: {0} bytes. Memory limit: {1} bytes",
+                                         _memUsageTracker.currentMemoryBytes(),
+                                         _memUsageTracker.maxAllowedMemoryUsageBytes()),
+            _memUsageTracker.withinMemoryLimit());
 }
 
 Value AccumulatorPercentile::formatFinalValue(int nPercentiles, const std::vector<double>& pctls) {
@@ -245,8 +261,10 @@ std::unique_ptr<PercentileAlgorithm> createPercentileAlgorithm(PercentileMethod 
 
 AccumulatorPercentile::AccumulatorPercentile(ExpressionContext* const expCtx,
                                              const std::vector<double>& ps,
-                                             PercentileMethod method)
-    : AccumulatorState(expCtx),
+                                             PercentileMethod method,
+                                             boost::optional<int> maxMemoryUsageBytes)
+    : AccumulatorState(
+          expCtx, maxMemoryUsageBytes.value_or(internalQueryMaxPercentileAccumulatorBytes.load())),
       _percentiles(ps),
       _algo(createPercentileAlgorithm(method)),
       _method(method) {
@@ -343,8 +361,13 @@ boost::intrusive_ptr<Expression> AccumulatorMedian::parseExpression(ExpressionCo
 
 AccumulatorMedian::AccumulatorMedian(ExpressionContext* expCtx,
                                      const std::vector<double>& /* unused */,
-                                     PercentileMethod method)
-    : AccumulatorPercentile(expCtx, {0.5} /* ps */, method){};
+                                     PercentileMethod method,
+                                     boost::optional<int> maxMemoryUsageBytes)
+    : AccumulatorPercentile(
+          expCtx,
+          {0.5} /* Median is equivalent to asking for the 50th percentile */,
+          method,
+          maxMemoryUsageBytes.value_or(internalQueryMaxPercentileAccumulatorBytes.load())) {}
 
 intrusive_ptr<AccumulatorState> AccumulatorMedian::create(ExpressionContext* expCtx,
                                                           const std::vector<double>& /* unused */,
