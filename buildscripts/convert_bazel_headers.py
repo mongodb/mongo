@@ -164,6 +164,7 @@ def main(
         bazel_include_info = json.load(f)
 
     header_map = bazel_include_info["header_map"]
+    gen_header_map = bazel_include_info["gen_header_map"]
     bazel_exec = bazel_include_info["bazel_exec"]
     bazel_config = bazel_include_info["config"]
 
@@ -175,7 +176,6 @@ def main(
     )
 
     reverse_header_map = {}
-    reverse_header_gen_map = {}
     for k, v in header_map.items():
         for hdr in v:
             if not hdr or hdr.endswith(global_headers):
@@ -186,8 +186,6 @@ def main(
                 reverse_header_map[bazel_header] = "//src/third_party/SafeInt:headers"
             elif bazel_header.startswith("//src/third_party/immer"):
                 reverse_header_map[bazel_header] = "//src/third_party/immer:headers"
-            elif bazel_header.startswith("//bazel-out/"):
-                reverse_header_gen_map[bazel_header] = k
             elif bazel_header in reverse_header_map:
                 if bazel_header.startswith("//src/third_party/"):
                     continue
@@ -197,16 +195,26 @@ def main(
             else:
                 reverse_header_map[bazel_header] = k
 
+    for k, v in gen_header_map.items():
+        for hdr in v:
+            if not hdr or hdr.endswith(global_headers):
+                continue
+            bazel_header = "//" + hdr.replace("\\", "/")
+            bazel_header = ":".join(bazel_header.rsplit("/", 1))
+            if bazel_header not in reverse_header_map:
+                reverse_header_map[bazel_header] = k
+
     recommended_deps = set()
-    minimal_headers = []
+    minimal_headers = set()
     for header in headers:
         if header in reverse_header_map:
-            recommended_deps.add(reverse_header_map[header])
-        elif header in reverse_header_gen_map:
-            minimal_headers.append(reverse_header_gen_map[header])
+            if reverse_header_map[header] in gen_header_map:
+                minimal_headers.add(reverse_header_map[header])
+            else:
+                recommended_deps.add(reverse_header_map[header])
         else:
             if not header.endswith(global_headers):
-                minimal_headers.append(header)
+                minimal_headers.add(header)
 
     working_deps = recommended_deps.copy()
     for dep in recommended_deps:
