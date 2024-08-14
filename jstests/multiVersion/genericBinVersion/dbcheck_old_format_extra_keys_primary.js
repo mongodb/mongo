@@ -68,8 +68,11 @@ assertCompleteCoverage(primaryHealthLog,
 
 // Verify that the correct num of inconsistent batch entries were found on secondary.
 forEachNonArbiterSecondary(rst, function(node) {
+    // The first batch should return IndexKeyOrderViolation error because the keys in this unique
+    // index are the same (set to {a: null}).
     checkHealthLog(
-        node.getDB("local").system.healthlog, logQueries.inconsistentBatchQuery, numBatches);
+        node.getDB("local").system.healthlog, logQueries.inconsistentBatchQuery, numBatches - 1);
+    checkHealthLog(node.getDB("local").system.healthlog, logQueries.indexKeyOrderViolationQuery, 1);
     checkHealthLog(
         node.getDB("local").system.healthlog, logQueries.allErrorsOrWarningsQuery, numBatches);
 

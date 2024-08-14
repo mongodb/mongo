@@ -845,6 +845,7 @@ error_codes:
   - {code: 427, name: DbCheckSecondaryBatchTimeout}
   - {code: 428, name: DbCheckAttemptOnClusteredCollectionIdIndex}
   - {code: 429, name: DbCheckInconsistentHash}
+  - {code: 430, name: IndexKeyOrderViolation}
 
   # Error codes 4000-8999 are reserved.
 

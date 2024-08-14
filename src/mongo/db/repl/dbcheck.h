@@ -133,6 +133,9 @@ std::unique_ptr<HealthLogEntry> dbCheckBatchHealthLogEntry(
     const boost::optional<CollectionOptions>& options = boost::none,
     const boost::optional<BSONObj>& indexSpec = boost::none);
 
+bool isIndexOrderAndUniquenessPreserved(const KeyStringEntry& curr,
+                                        const KeyStringEntry& next,
+                                        bool isUnique);
 
 struct ReadSourceWithTimestamp {
     RecoveryUnit::ReadSource readSource;

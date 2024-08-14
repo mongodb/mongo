@@ -208,4 +208,65 @@ TEST_F(DbCheckClusteredCollectionTest, DbCheckIdRecordIdMismatch) {
     ASSERT_EQ(1, getNumDocsFoundInHealthLog(opCtx, errQuery));
 }
 
+TEST(DbCheckHelperTest, IsIndexOrderAndUniquenessPreservedCorrectOrder) {
+    RecordId recordId1(1);
+    RecordId recordId2(2);
+    key_string::HeapBuilder keyString1(
+        key_string::Version::kLatestVersion, BSON("a" << 1), Ordering::make(BSONObj()), recordId1);
+    key_string::HeapBuilder keyString2(
+        key_string::Version::kLatestVersion, BSON("a" << 2), Ordering::make(BSONObj()), recordId2);
+    KeyStringEntry entry1(keyString1.release(), recordId1);
+    KeyStringEntry entry2(keyString2.release(), recordId2);
+
+    ASSERT_TRUE(isIndexOrderAndUniquenessPreserved(entry1, entry2, false /*isUnique*/));
+    ASSERT_TRUE(isIndexOrderAndUniquenessPreserved(entry1, entry2, true /*isUnique*/));
+}
+
+TEST(DbCheckHelperTest, IsIndexOrderAndUniquenessPreservedKeyOrderViolation) {
+    RecordId recordId1(1);
+    RecordId recordId2(2);
+    key_string::HeapBuilder keyString1(
+        key_string::Version::kLatestVersion, BSON("a" << 2), Ordering::make(BSONObj()), recordId1);
+    key_string::HeapBuilder keyString2(
+        key_string::Version::kLatestVersion, BSON("a" << 1), Ordering::make(BSONObj()), recordId2);
+    KeyStringEntry entry1(keyString1.release(), recordId1);
+    KeyStringEntry entry2(keyString2.release(), recordId2);
+
+    // The check should fail when the key order is violated regardless of index type and recordId.
+    ASSERT_FALSE(isIndexOrderAndUniquenessPreserved(entry1, entry2, false /*isUnique*/));
+    ASSERT_FALSE(isIndexOrderAndUniquenessPreserved(entry1, entry2, true /*isUnique*/));
+}
+
+TEST(DbCheckHelperTest, IsIndexOrderAndUniquenessPreservedSameKeyDifferentRecordId) {
+    RecordId recordId1(1);
+    RecordId recordId2(2);
+    key_string::HeapBuilder keyString1(
+        key_string::Version::kLatestVersion, BSON("a" << 1), Ordering::make(BSONObj()), recordId1);
+    key_string::HeapBuilder keyString2(
+        key_string::Version::kLatestVersion, BSON("a" << 1), Ordering::make(BSONObj()), recordId2);
+    KeyStringEntry entry1(keyString1.release(), recordId1);
+    KeyStringEntry entry2(keyString2.release(), recordId2);
+
+    // The check should only fail when it is on unique index because unique index should not have
+    // the same key string.
+    ASSERT_TRUE(isIndexOrderAndUniquenessPreserved(entry1, entry2, false /*isUnique*/));
+    ASSERT_FALSE(isIndexOrderAndUniquenessPreserved(entry1, entry2, true /*isUnique*/));
+}
+
+TEST(DbCheckHelperTest, IsIndexOrderAndUniquenessPreservedSameKeySameRecordId) {
+    RecordId recordId1(1);
+    RecordId recordId2(1);
+    key_string::HeapBuilder keyString1(
+        key_string::Version::kLatestVersion, BSON("a" << 1), Ordering::make(BSONObj()), recordId1);
+    key_string::HeapBuilder keyString2(
+        key_string::Version::kLatestVersion, BSON("a" << 1), Ordering::make(BSONObj()), recordId2);
+    KeyStringEntry entry1(keyString1.release(), recordId1);
+    KeyStringEntry entry2(keyString2.release(), recordId2);
+
+    // The check should fail for both unique and non-unique indexes because (key string + recordId)
+    // should always be unique.
+    ASSERT_FALSE(isIndexOrderAndUniquenessPreserved(entry1, entry2, false /*isUnique*/));
+    ASSERT_FALSE(isIndexOrderAndUniquenessPreserved(entry1, entry2, true /*isUnique*/));
+}
+
 }  // namespace mongo
