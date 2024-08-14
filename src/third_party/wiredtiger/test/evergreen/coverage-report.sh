@@ -16,6 +16,14 @@ python_binary=$2
 github_commit=$3
 pr_args=$4
 
+echo "coverage-report.sh"
+echo "==========================="
+echo "Current args:"
+echo ". is_patch            =  $is_patch"
+echo ". python_binary       =  $python_binary"
+echo ". github_commit       =  $github_commit"
+echo ". pr_args             =  $pr_args"
+
 virtualenv -p $python_binary venv
 source venv/bin/activate
 pip3 install pygit2==1.10.1 requests==2.32.3

@@ -113,11 +113,22 @@ kv_workload_runner_wt::run(const kv_workload &workload)
     /* Clean up the pointer at the end, just before the actual shared memory gets cleaned up. */
     at_cleanup cleanup_state([this]() { _state = nullptr; });
 
+    /* Process the initial set of WiredTiger config operations before opening the connection. */
+    size_t p = 0; /* Position in the workload. */
+    for (; p < workload.size(); p++) {
+        const kv_workload_operation &op = workload[p];
+        if (!std::holds_alternative<operation::wt_config>(op.operation))
+            break;
+        int ret = run_operation(op.operation);
+        if (ret != 0)
+            throw wiredtiger_exception(ret); /* This should not happen. */
+        _state->return_codes[p] = ret;
+    }
+
     /*
      * Run the workload in a child process, so that we can properly handle crashes. If the child
      * process crashes intentionally, we'll learn about it through the shared state.
      */
-    size_t p = 0; /* Position in the workload. */
     for (;;) {
         bool crashed = _state->expect_crash;
         _state->expect_crash = false;
@@ -346,8 +357,10 @@ kv_workload_runner_wt::do_operation(const operation::create_table &op)
      */
     config << "log=(enabled=false)";
     config << ",key_format=" << op.key_format << ",value_format=" << op.value_format;
-    if (!_table_config.empty())
-        config << "," << _table_config;
+    if (_state->table_config[0] != '\0')
+        config << "," << _state->table_config;
+    if (!_table_config_override.empty())
+        config << "," << _table_config_override;
     std::string config_str = config.str();
 
     std::string uri = std::string("table:") + op.name;
@@ -380,6 +393,17 @@ kv_workload_runner_wt::do_operation(const operation::insert &op)
     session_context_ptr session = txn_session(op.txn_id);
     WT_CURSOR *cursor = session->cursor(op.table_id);
     return wt_cursor_insert(cursor, op.key, op.value);
+}
+
+/*
+ * kv_workload_runner_wt::do_operation --
+ *     Execute the given workload operation in WiredTiger.
+ */
+int
+kv_workload_runner_wt::do_operation(const operation::nop &op)
+{
+    (void)op;
+    return 0;
 }
 
 /*
@@ -518,6 +542,32 @@ kv_workload_runner_wt::do_operation(const operation::truncate &op)
 }
 
 /*
+ * kv_workload_runner_wt::do_operation --
+ *     Execute the given workload operation in WiredTiger.
+ */
+int
+kv_workload_runner_wt::do_operation(const operation::wt_config &op)
+{
+    std::unique_lock lock(_connection_lock);
+
+    size_t l = op.value.size() + 1; /* In-memory size, including the NUL byte. */
+    const char *v = op.value.c_str();
+
+    if (op.type == "connection") {
+        if (l > sizeof(_state->connection_config))
+            throw model_exception("The connection config is too long");
+        memcpy(_state->connection_config, v, l);
+    } else if (op.type == "table") {
+        if (l > sizeof(_state->table_config))
+            throw model_exception("The table config is too long");
+        memcpy(_state->table_config, v, l);
+    } else
+        throw model_exception("Unknown config type");
+
+    return 0;
+}
+
+/*
  * kv_workload_runner_wt::wiredtiger_open_nolock --
  *     Open WiredTiger, assume the right locks are held.
  */
@@ -527,7 +577,15 @@ kv_workload_runner_wt::wiredtiger_open_nolock()
     if (_connection != nullptr)
         throw model_exception("WiredTiger is already open");
 
-    int ret = ::wiredtiger_open(_home.c_str(), nullptr, _connection_config.c_str(), &_connection);
+    std::ostringstream config;
+    config << k_config_base;
+    if (_state->connection_config[0] != '\0')
+        config << "," << _state->connection_config;
+    if (!_connection_config_override.empty())
+        config << "," << _connection_config_override;
+    std::string config_str = config.str();
+
+    int ret = ::wiredtiger_open(_home.c_str(), nullptr, config_str.c_str(), &_connection);
     if (ret != 0)
         throw wiredtiger_exception("Cannot open WiredTiger", ret);
 }

@@ -3001,7 +3001,11 @@ tasks:
                 pr_args+="--github_token ${github_app_token} "
             fi
 
-            ./test/evergreen/coverage-report.sh ${is_patch} ${python_binary|python3} ${github_commit} "${pr_args}"
+            if [ ${is_patch|false} = true ]; then
+                ./test/evergreen/coverage-report.sh true ${python_binary|python3} ${github_commit} "${pr_args}"
+            else
+                ./test/evergreen/coverage-report.sh false ${python_binary|python3} ${github_commit} "${pr_args}"
+            fi
 
       - func: "code coverage publish report"
 

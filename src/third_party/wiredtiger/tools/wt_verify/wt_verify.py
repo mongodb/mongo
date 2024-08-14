@@ -160,7 +160,7 @@ def parse_chkpt_info(f):
     return [root_addr, line, chkpt_info]
 
 
-def parse_dump_blocks():
+def parse_dump_blocks(input_file: str):
     """
     Parse the output file of dump_blocks.
     Return a dictionary that has checkpoint names as keys. Each checkpoint has a set of keys that
@@ -168,7 +168,7 @@ def parse_dump_blocks():
     offset.
     """
 
-    with open(WT_OUTPUT_FILE, "r") as f:
+    with open(input_file, "r") as f:
         lines = f.readlines()
 
     checkpoint_name = None
@@ -231,11 +231,11 @@ def parse_dump_blocks():
 
     return data
 
-def parse_dump_pages():
+def parse_dump_pages(input_file: str):
     """
-    Parse the output file of dump_pages
+    Parse the output file of dump_pages.
     """
-    with open(WT_OUTPUT_FILE, "r") as f:
+    with open(input_file, "r") as f:
         output = {}
         line = f.readline()
         while line:
@@ -506,9 +506,9 @@ def visualize(tree_data, fields):
     serve(imgs)
 
 
-def execute_command(command):
+def execute_command(command: str, output_file: str) -> None:
     """
-    Execute a given command and return its output in a file.
+    Execute a given command and writes its output in a file.
     """
     try:
         result = subprocess.run(command, shell=True, check=True,
@@ -519,9 +519,9 @@ def execute_command(command):
         sys.exit(1)
     
     try:
-        with open(WT_OUTPUT_FILE, 'w') as file:
+        with open(output_file, 'w') as file:
             file.write(result.stdout)
-        print(f"WT tool output written to {WT_OUTPUT_FILE}")
+        print(f"WT tool output written to {output_file}")
     except IOError as e:
         print(f"Failed to write output to file: {e}", file=sys.stderr)
         sys.exit(1)
@@ -558,7 +558,7 @@ def find_wt_exec_path():
     return result[0]
 
 
-def construct_command(args):
+def construct_command(args) -> str:
     """
     Construct the WiredTiger verify command based on provided arguments.
     """
@@ -577,9 +577,10 @@ def construct_command(args):
 
 def main():
     parser = argparse.ArgumentParser(description="Script to run the WiredTiger verify command with specified options.")
-    parser.add_argument('-d', '--dump', required=True, choices=['dump_blocks','dump_pages'], help='Option to specify dump_pages configuration.')
-    parser.add_argument('-f', '--filename', required=True, help='Name of the WiredTiger file to verify (such as file:foo.wt).')
+    parser.add_argument('-d', '--dump', required=True, choices=['dump_blocks','dump_pages'], help='wt verify configuration options.')
+    parser.add_argument('-f', '--filename', help='Name of the WiredTiger file to verify (such as file:foo.wt).')
     parser.add_argument('-hd', '--home_dir', default='.', help='Path to the WiredTiger database home directory (default is current directory).')
+    parser.add_argument('-i', '--input_file', help='Input file (output of a wt verify command)')
     parser.add_argument('-o', '--output_file', help='Optionally save output to the provided output file.')
     parser.add_argument('-p', '--print_output', action='store_true', default=False, help='Print the output to stdout (default is off)')
     parser.add_argument('-v', '--visualize', choices=ALL_VISUALIZATION_CHOICES, nargs='*',
@@ -587,20 +588,29 @@ def main():
     parser.add_argument('-wt', '--wt_exec_path', help='Path of the WT tool executable.')
 
     args = parser.parse_args()
-    command = construct_command(args)
-    try:
-        execute_command(command)
-    except (RuntimeError, ValueError, TypeError) as e:
-        print(str(e), file=sys.stderr)
-        sys.exit(1)
+
+    # If the user has given an input file, don't generate anything.
+    input_file = args.input_file
+    if not input_file:
+        if not args.filename:
+            raise Exception("Argument -f/--filename is required")
+        command = construct_command(args)
+        try:
+            execute_command(command, WT_OUTPUT_FILE)
+        except (RuntimeError, ValueError, TypeError) as e:
+            print(str(e), file=sys.stderr)
+            sys.exit(1)
+        # Use the generated output file as the input file for the next steps.
+        input_file = WT_OUTPUT_FILE
 
     parsed_data = None
 
-    if "dump_pages" in command:
-        parsed_data = parse_dump_pages()
+    if "dump_pages" in args.dump:
+        parsed_data = parse_dump_pages(input_file)
     else:
-        # If it's "dump_blocks" then do parse_dump_blocks()
-        parsed_data = parse_dump_blocks()
+        if not "dump_blocks" in args.dump:
+            raise Exception(f"dump_blocks not found in {args.dump}")
+        parsed_data = parse_dump_blocks(input_file)
 
     # If we don't have data, nothing to do.
     if not parsed_data:
@@ -622,7 +632,7 @@ def main():
     if args.print_output:
         print(pretty_output)
 
-    if "dump_blocks" in command:
+    if "dump_blocks" in args.dump:
         imgs = show_block_distribution_broken_barh(args.filename, parsed_data)
         imgs += show_block_distribution_hist(args.filename, parsed_data)
         imgs += show_free_block_distribution(args.filename, parsed_data)

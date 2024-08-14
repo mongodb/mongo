@@ -91,6 +91,9 @@ struct kv_workload_generator_spec {
     /* The probability of starting a prepared transaction. */
     float prepared_transaction;
 
+    /* The maximum delay after preparing a transaction (expressed as operation count). */
+    size_t max_delay_after_prepare;
+
     /* Probabilities of transaction rollback. */
     float nonprepared_transaction_rollback;
     float prepared_transaction_rollback_after_prepare;

@@ -1,3 +1,4 @@
+wt_config("table", "leaf_page_max=4KB")
 create_table(1, table1, Q, Q)
 create_table(2, table2, Q, Q)
 create_table(3, table3, Q, Q)

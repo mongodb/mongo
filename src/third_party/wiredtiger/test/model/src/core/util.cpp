@@ -374,6 +374,27 @@ parse_uint64(const char *str, const char **end)
 }
 
 /*
+ * quote --
+ *     Return a string in quotes, with appropriate escaping.
+ */
+std::string
+quote(const std::string &str)
+{
+    std::ostringstream out;
+    out << "\"";
+
+    for (char c : str) {
+        if (c == '"')
+            out << "\\\"";
+        else
+            out << c;
+    }
+
+    out << "\"";
+    return out.str();
+}
+
+/*
  * wt_evict --
  *     Evict a WiredTiger page with the given key.
  */

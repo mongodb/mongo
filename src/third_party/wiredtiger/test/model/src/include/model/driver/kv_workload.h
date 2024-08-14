@@ -34,6 +34,7 @@
 #include "model/core.h"
 #include "model/data_value.h"
 #include "model/kv_database.h"
+#include "model/util.h"
 
 namespace model {
 
@@ -252,7 +253,7 @@ struct checkpoint : public without_txn_id, public without_table_id {
 inline std::ostream &
 operator<<(std::ostream &out, const checkpoint &op)
 {
-    out << "checkpoint(" << op.name << ")";
+    out << "checkpoint(" << (op.name.empty() ? "" : quote(op.name)) << ")";
     return out;
 }
 
@@ -401,8 +402,8 @@ struct create_table : public without_txn_id, public with_table_id {
 inline std::ostream &
 operator<<(std::ostream &out, const create_table &op)
 {
-    out << "create_table(" << op.table_id << ", " << op.name << ", " << op.key_format << ", "
-        << op.value_format << ")";
+    out << "create_table(" << op.table_id << ", " << quote(op.name) << ", " << quote(op.key_format)
+        << ", " << quote(op.value_format) << ")";
     return out;
 }
 
@@ -500,6 +501,50 @@ operator<<(std::ostream &out, const insert &op)
 {
     out << "insert(" << op.table_id << ", " << op.txn_id << ", " << op.key << ", " << op.value
         << ")";
+    return out;
+}
+
+/*
+ * nop --
+ *     A representation of this workload operation.
+ */
+struct nop : public without_txn_id, public without_table_id {
+
+    /*
+     * nop::nop --
+     *     Create the operation.
+     */
+    inline nop() {}
+
+    /*
+     * nop::operator== --
+     *     Compare for equality.
+     */
+    inline bool
+    operator==(const nop &other) const noexcept
+    {
+        return true;
+    }
+
+    /*
+     * nop::operator!= --
+     *     Compare for inequality.
+     */
+    inline bool
+    operator!=(const nop &other) const noexcept
+    {
+        return !(*this == other);
+    }
+};
+
+/*
+ * operator<< --
+ *     Human-readable output.
+ */
+inline std::ostream &
+operator<<(std::ostream &out, const nop &op)
+{
+    out << "nop()";
     return out;
 }
 
@@ -926,12 +971,65 @@ operator<<(std::ostream &out, const truncate &op)
 }
 
 /*
+ * wt_config --
+ *     A representation of this workload operation.
+ */
+struct wt_config : public without_txn_id, public without_table_id {
+    std::string type;
+    std::string value;
+
+    /*
+     * wt_config::wt_config --
+     *     Create the operation.
+     */
+    inline wt_config(const char *type, const char *value) : type(type), value(value) {}
+
+    /*
+     * wt_config::wt_config --
+     *     Create the operation.
+     */
+    inline wt_config(const char *type, const std::string &value) : type(type), value(value) {}
+
+    /*
+     * wt_config::operator== --
+     *     Compare for equality.
+     */
+    inline bool
+    operator==(const wt_config &other) const noexcept
+    {
+        return type == other.type && value == other.value;
+    }
+
+    /*
+     * wt_config::operator!= --
+     *     Compare for inequality.
+     */
+    inline bool
+    operator!=(const wt_config &other) const noexcept
+    {
+        return !(*this == other);
+    }
+};
+
+/*
+ * operator<< --
+ *     Human-readable output.
+ */
+inline std::ostream &
+operator<<(std::ostream &out, const wt_config &op)
+{
+    out << "wt_config(" << quote(op.type) << ", " << quote(op.value) << ")";
+    return out;
+}
+
+/*
  * any --
  *     Any workload operation.
  */
-using any = std::variant<begin_transaction, checkpoint, commit_transaction, crash, create_table,
-  evict, insert, prepare_transaction, remove, restart, rollback_to_stable, rollback_transaction,
-  set_commit_timestamp, set_oldest_timestamp, set_stable_timestamp, truncate>;
+using any =
+  std::variant<begin_transaction, checkpoint, commit_transaction, crash, create_table, evict,
+    insert, nop, prepare_transaction, remove, restart, rollback_to_stable, rollback_transaction,
+    set_commit_timestamp, set_oldest_timestamp, set_stable_timestamp, truncate, wt_config>;
 
 /*
  * operator<< --
@@ -1102,6 +1200,28 @@ public:
     operator<<(kv_workload_operation &&op)
     {
         _operations.push_back(std::move(op));
+        return *this;
+    }
+
+    /*
+     * kv_workload::prepend --
+     *     Prepend an operation to the workload.
+     */
+    inline kv_workload &
+    prepend(const operation::any &op)
+    {
+        _operations.push_front(kv_workload_operation(op));
+        return *this;
+    }
+
+    /*
+     * kv_workload::prepend --
+     *     Prepend an operation to the workload.
+     */
+    inline kv_workload &
+    prepend(operation::any &&op)
+    {
+        _operations.push_front(kv_workload_operation(std::move(op)));
         return *this;
     }
 

@@ -44,6 +44,10 @@ namespace model {
  */
 class kv_workload_runner_wt {
 
+public:
+    /* Base connection configuration applied to every connection. */
+    constexpr static const char *k_config_base = "create=true,log=(enabled=false)";
+
 protected:
     /*
      * session_context --
@@ -57,7 +61,7 @@ protected:
     public:
         /*
          * session_context::session_context --
-         *     Create the
+         *     Create the session context.
          */
         inline session_context(kv_workload_runner_wt &workload_context, WT_SESSION *session)
             : _session(session), _workload_context(workload_context)
@@ -151,9 +155,13 @@ protected:
         size_t failed_operation;     /* The operation that caused an exception. */
         char exception_message[256]; /* The exception message. */
 
-        /* The map of table IDs to URIs, needed to resume the workload from a crash. */
+        /* The map of table IDs to table states, needed to resume the workload from a crash. */
         size_t num_tables;
         table_state tables[256]; /* The table states; protected by the same lock as the URI map. */
+
+        /* WiredTiger configuration specified by the workload (protected by the connection lock). */
+        char connection_config[256];
+        char table_config[256];
 
         /* Return codes. */
         size_t num_operations; /* The number of executed operations. */
@@ -163,13 +171,16 @@ protected:
 public:
     /*
      * kv_workload_runner_wt::kv_workload_runner_wt --
-     *     Create a new workload
+     *     Create a new workload runner. The provided connection and table configuration strings are
+     *     applied after the configuration provided within the workload file, if any.
      */
     inline kv_workload_runner_wt(
-      const char *home, const char *connection_config, const char *table_config)
+      const char *home, const char *connection_config_override, const char *table_config_override)
         : _connection(nullptr),
-          _connection_config(connection_config == nullptr ? "" : connection_config), _home(home),
-          _state(nullptr), _table_config(table_config == nullptr ? "" : table_config)
+          _connection_config_override(
+            connection_config_override == nullptr ? "" : connection_config_override),
+          _home(home), _state(nullptr),
+          _table_config_override(table_config_override == nullptr ? "" : table_config_override)
     {
     }
 
@@ -278,6 +289,12 @@ protected:
      * kv_workload_runner_wt::do_operation --
      *     Execute the given workload operation in WiredTiger.
      */
+    int do_operation(const operation::nop &op);
+
+    /*
+     * kv_workload_runner_wt::do_operation --
+     *     Execute the given workload operation in WiredTiger.
+     */
     int do_operation(const operation::prepare_transaction &op);
 
     /*
@@ -327,6 +344,12 @@ protected:
      *     Execute the given workload operation in WiredTiger.
      */
     int do_operation(const operation::truncate &op);
+
+    /*
+     * kv_workload_runner_wt::do_operation --
+     *     Execute the given workload operation in WiredTiger.
+     */
+    int do_operation(const operation::wt_config &op);
 
     /*
      * kv_workload_runner_wt::wiredtiger_open_nolock --
@@ -398,9 +421,11 @@ protected:
     }
 
 private:
-    std::string _connection_config;
     std::string _home;
-    std::string _table_config;
+
+    /* Configurations that override those specified directly in the workload. */
+    std::string _connection_config_override;
+    std::string _table_config_override;
 
     shared_state *_state; /* The shared state between the executor and the parent process. */
 

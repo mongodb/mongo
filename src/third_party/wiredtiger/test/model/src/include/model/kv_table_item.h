@@ -97,6 +97,16 @@ public:
     bool exists(kv_checkpoint_ptr checkpoint) const;
 
     /*
+     * kv_table_item::exists --
+     *     Check whether the latest value exists for the given transaction snapshot.
+     */
+    inline bool
+    exists(kv_transaction_ptr txn) const
+    {
+        return get(std::move(txn)) != NONE;
+    }
+
+    /*
      * kv_table_item::exists_opt --
      *     Check whether the latest value exists, using the checkpoint if provided.
      */

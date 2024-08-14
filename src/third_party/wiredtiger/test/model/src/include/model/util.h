@@ -523,6 +523,26 @@ parse_uint64(const std::string &str)
 }
 
 /*
+ * join --
+ *     Join two strings with a comma (or the specified separator) if need be.
+ */
+inline std::string
+join(const std::string &a, const std::string &b, const std::string &sep = ",")
+{
+    if (a.empty())
+        return b;
+    if (b.empty())
+        return a;
+    return a + sep + b;
+}
+
+/*
+ * quote --
+ *     Return a string in quotes, with appropriate escaping.
+ */
+std::string quote(const std::string &str);
+
+/*
  * starts_with --
  *     Check whether the string has the given prefix. (C++ does not have this until C++20.)
  */

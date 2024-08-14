@@ -70,6 +70,7 @@ kv_workload_generator_spec::kv_workload_generator_spec()
     update_existing = 0.1;
 
     prepared_transaction = 0.25;
+    max_delay_after_prepare = 25; /* FIXME-WT-13232 This must be a small number until it's fixed. */
     use_set_commit_timestamp = 0.25;
     nonprepared_transaction_rollback = 0.1;
     prepared_transaction_rollback_after_prepare = 0.1;
@@ -385,6 +386,13 @@ kv_workload_generator::generate_transaction(size_t seq_no)
                         txn << operation::rollback_transaction(txn_id);
                     else {
                         txn << operation::prepare_transaction(txn_id, k_timestamp_none);
+
+                        /* Add a delay before finishing the transaction. */
+                        size_t delay = _random.next_uint64(_spec.max_delay_after_prepare);
+                        for (size_t i = 0; i < delay; i++)
+                            txn << operation::nop();
+
+                        /* Finish the transaction. */
                         if (_random.next_float() <
                           _spec.prepared_transaction_rollback_after_prepare)
                             txn << operation::rollback_transaction(txn_id);
@@ -654,7 +662,8 @@ kv_workload_generator::run()
         if (s->next_operation_index >= s->sequence->size())
             throw model_exception("Internal error: No more operations left in a sequence");
         const operation::any &op = (*s->sequence)[s->next_operation_index++];
-        _workload << kv_workload_operation(op, s->sequence->seq_no());
+        if (!std::holds_alternative<operation::nop>(op))
+            _workload << kv_workload_operation(op, s->sequence->seq_no());
 
         /* If the operation resulted in a database crash or restart, stop all started sequences. */
         if (std::holds_alternative<operation::crash>(op) ||

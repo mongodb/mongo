@@ -282,14 +282,14 @@ kv_table::truncate(kv_transaction_ptr txn, const data_value &start, const data_v
         for (auto i = stop_iter; i != _data.end(); i++) {
             if (i->second.has_prepared())
                 throw known_issue_exception("WT-13232");
-            if (!i->second.exists() || i->second.implicit())
+            if (!i->second.exists(txn) || i->second.implicit())
                 continue;
             break;
         }
         for (auto i = std::reverse_iterator(start_iter); i != _data.rend(); i++) {
             if (i->second.has_prepared())
                 throw known_issue_exception("WT-13232");
-            if (!i->second.exists() || i->second.implicit())
+            if (!i->second.exists(txn) || i->second.implicit())
                 continue;
             break;
         }
