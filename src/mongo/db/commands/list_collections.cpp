@@ -206,7 +206,7 @@ BSONObj buildViewBson(const ViewDefinition& view, bool nameOnly) {
     return b.obj();
 }
 
-BSONObj buildTimeseriesBson(const Collection* collection, bool nameOnly) {
+BSONObj buildTimeseriesBson(OperationContext* opCtx, const Collection* collection, bool nameOnly) {
     invariant(collection);
 
     BSONObjBuilder builder;
@@ -220,12 +220,12 @@ BSONObj buildTimeseriesBson(const Collection* collection, bool nameOnly) {
     builder.append("options",
                    collection->getCollectionOptions().toBSON(
                        false /* includeUUID */, timeseries::kAllowedCollectionCreationOptions));
-    builder.append("info", BSON("readOnly" << false));
+    builder.append("info", BSON("readOnly" << opCtx->readOnly()));
 
     return builder.obj();
 }
 
-BSONObj buildTimeseriesBson(StringData collName, bool nameOnly) {
+BSONObj buildTimeseriesBson(OperationContext* opCtx, StringData collName, bool nameOnly) {
     BSONObjBuilder builder;
     builder.append("name", collName);
     builder.append("type", "timeseries");
@@ -235,7 +235,7 @@ BSONObj buildTimeseriesBson(StringData collName, bool nameOnly) {
     }
 
     builder.append("options", BSONObj{});
-    builder.append("info", BSON("readOnly" << false));
+    builder.append("info", BSON("readOnly" << opCtx->readOnly()));
 
     return builder.obj();
 }
@@ -426,7 +426,8 @@ public:
                                     if (auto bucketsCollection =
                                             catalog->establishConsistentCollection(
                                                 opCtx, view->viewOn(), readTimestamp)) {
-                                        return buildTimeseriesBson(bucketsCollection, nameOnly);
+                                        return buildTimeseriesBson(
+                                            opCtx, bucketsCollection, nameOnly);
                                     } else {
                                         // The buckets collection does not exist, so the time-series
                                         // view will be appended when we iterate through the view
@@ -455,11 +456,12 @@ public:
                                          ResourcePattern::forExactNamespace(viewNss)))) {
                                     // The time-series view for this buckets namespace exists, so
                                     // add it here while we have the collection options.
-                                    _addWorkingSetMember(opCtx,
-                                                         buildTimeseriesBson(collection, nameOnly),
-                                                         matcher.get(),
-                                                         ws.get(),
-                                                         root.get());
+                                    _addWorkingSetMember(
+                                        opCtx,
+                                        buildTimeseriesBson(opCtx, collection, nameOnly),
+                                        matcher.get(),
+                                        ws.get(),
+                                        root.get());
                                 }
                             }
 
@@ -507,7 +509,7 @@ public:
                                     // buckets collection above.
                                     _addWorkingSetMember(
                                         opCtx,
-                                        buildTimeseriesBson(view.name().coll(), nameOnly),
+                                        buildTimeseriesBson(opCtx, view.name().coll(), nameOnly),
                                         matcher.get(),
                                         ws.get(),
                                         root.get());
