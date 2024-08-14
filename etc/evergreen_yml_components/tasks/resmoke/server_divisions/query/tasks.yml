@@ -1252,29 +1252,6 @@ tasks:
           exec_timeout_secs: 18000 # 5 hour timeout.
           resmoke_jobs_max: 1
 
-  # Disabled under SERVER-64949.
-  # - <<: *benchmark_template
-  #   name: benchmarks_cst
-  #   tags: ["assigned_to_jira_team_server_query_optimization", "experimental, "benchmarks"]
-  #   commands:
-  #   - func: "do benchmark setup"
-  #   - func: "run benchmark tests"
-  #     vars:
-  #       suite: benchmarks_cst
-  #       resmoke_jobs_max: 1
-
-  - <<: *task_template
-    name: cst_jscore_passthrough
-    tags:
-      [
-        "assigned_to_jira_team_server_query_optimization",
-        "experimental",
-        "jscore",
-      ]
-    commands:
-      - func: "do setup"
-      - func: "run tests"
-
   ## Standalone generational fuzzer for checking optimized and unoptimized change stream pipelines ##
   - <<: *jstestfuzz_template
     name: change_stream_optimization_fuzzer_gen

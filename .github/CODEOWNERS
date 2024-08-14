@@ -301,7 +301,6 @@ WORKSPACE.bazel @10gen/devprod-build
 /src/mongo/db/commands/query_cmd/**/* @10gen/query
 /src/mongo/db/commands/query_cmd/**/analyze_cmd* @10gen/query-optimization
 /src/mongo/db/commands/query_cmd/**/change_stream_state_command.cpp @10gen/query-execution
-/src/mongo/db/commands/query_cmd/**/cst_command.cpp @10gen/query-optimization
 /src/mongo/db/commands/query_cmd/**/index_filter_commands.* @10gen/query-optimization
 /src/mongo/db/commands/query_cmd/**/explain.idl @10gen/query-optimization
 /src/mongo/db/commands/query_cmd/**/explain_test.cpp @10gen/query-optimization
@@ -311,9 +310,6 @@ WORKSPACE.bazel @10gen/devprod-build
 
 # The following patterns are parsed from ./src/mongo/db/concurrency/OWNERS.yml
 /src/mongo/db/concurrency/**/exception_util* @10gen/server-service-architecture
-
-# The following patterns are parsed from ./src/mongo/db/cst/OWNERS.yml
-/src/mongo/db/cst/**/* @10gen/query-optimization
 
 # The following patterns are parsed from ./src/mongo/db/exec/OWNERS.yml
 /src/mongo/db/exec/**/* @10gen/query-execution

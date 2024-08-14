@@ -822,7 +822,6 @@ env.CppUnitTest(
         "$BUILD_DIR/mongo/db/change_stream_pre_image_util",
         "$BUILD_DIR/mongo/db/change_stream_pre_images_collection_manager",
         "$BUILD_DIR/mongo/db/change_streams_cluster_parameter",
-        "$BUILD_DIR/mongo/db/cst/cst",
         "$BUILD_DIR/mongo/db/exec/document_value/document_value",
         "$BUILD_DIR/mongo/db/exec/document_value/document_value_test_util",
         "$BUILD_DIR/mongo/db/mongohasher",
