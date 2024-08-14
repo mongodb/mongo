@@ -82,21 +82,21 @@ PlanExecutorPipeline::PlanExecutorPipeline(boost::intrusive_ptr<ExpressionContex
 
 PlanExecutor::ExecState PlanExecutorPipeline::getNext(BSONObj* objOut, RecordId* recordIdOut) {
     // The pipeline-based execution engine does not track the record ids associated with documents,
-    // so it is an error for the caller to ask for one. For the same reason, we expect the caller to
-    // provide a non-null BSONObj pointer for 'objOut'.
+    // so it is an error for the caller to ask for one.
     invariant(!recordIdOut);
-    invariant(objOut);
 
     if (!_stash.empty()) {
-        *objOut = std::move(_stash.front());
+        if (objOut) {
+            *objOut = std::move(_stash.front());
+        }
         _stash.pop();
         _planExplainer.incrementNReturned();
         return PlanExecutor::ADVANCED;
     }
 
     Document docOut;
-    auto execState = getNextDocument(&docOut, nullptr);
-    if (execState == PlanExecutor::ADVANCED) {
+    auto execState = getNextDocument(objOut ? &docOut : nullptr, nullptr);
+    if (objOut && execState == PlanExecutor::ADVANCED) {
         *objOut = _trySerializeToBson(docOut);
     }
     return execState;
@@ -105,17 +105,17 @@ PlanExecutor::ExecState PlanExecutorPipeline::getNext(BSONObj* objOut, RecordId*
 PlanExecutor::ExecState PlanExecutorPipeline::getNextDocument(Document* docOut,
                                                               RecordId* recordIdOut) {
     // The pipeline-based execution engine does not track the record ids associated with documents,
-    // so it is an error for the caller to ask for one. For the same reason, we expect the caller to
-    // provide a non-null pointer for 'docOut'.
+    // so it is an error for the caller to ask for one.
     invariant(!recordIdOut);
-    invariant(docOut);
 
     // Callers which use 'stashResult()' are not allowed to use 'getNextDocument()', and must
     // instead use 'getNext()'.
     invariant(_stash.empty());
 
     if (auto next = _getNext()) {
-        *docOut = std::move(*next);
+        if (docOut) {
+            *docOut = std::move(*next);
+        }
         _planExplainer.incrementNReturned();
         return PlanExecutor::ADVANCED;
     }

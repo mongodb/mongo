@@ -204,8 +204,10 @@ public:
 
     ExecState getNextDocument(Document* objOut, RecordId* dlOut) override {
         BSONObj bsonDoc;
-        auto state = getNext(&bsonDoc, dlOut);
-        *objOut = Document(bsonDoc);
+        auto state = getNext(objOut ? &bsonDoc : nullptr, dlOut);
+        if (objOut) {
+            *objOut = Document(bsonDoc);
+        }
         return state;
     }
 
@@ -217,12 +219,6 @@ public:
         MONGO_UNREACHABLE_TASSERT(8375802);
     }
 
-    UpdateResult executeUpdate() override {
-        BSONObj obj;
-        getNext(&obj, nullptr);
-        return getUpdateResult();
-    }
-
     UpdateResult getUpdateResult() const override {
         return {_writeOperationStats.docsUpdated() > 0, /* existing */
                 _writeOperationStats.isModUpdate(),     /* is a $mod update */
@@ -230,14 +226,6 @@ public:
                 _writeOperationStats.docsMatched(),     /* numDocsMatched */
                 BSONObj::kEmptyObject,                  /* upserted Doc */
                 _writeOperationStats.containsDotsAndDollarsField()};
-    }
-
-    long long executeDelete() override {
-        BSONObj unusedObj;
-        while (getNext(&unusedObj, nullptr /* record id out */) != ExecState::IS_EOF) {
-            // Keep deleting!
-        }
-        return _writeOperationStats.docsDeleted();
     }
 
     long long getDeleteResult() const override {
@@ -397,12 +385,14 @@ PlanExecutor::ExecState PlanExecutorExpress<Plan>::getNext(BSONObj* out, RecordI
         _opCtx->checkForInterrupt();
 
         progress = _plan.proceed(_opCtx, [&](RecordId rid, BSONObj obj) {
-            *out = std::move(obj);
             if (dlOut) {
                 *dlOut = std::move(rid);
             }
-            if (_mustReturnOwnedBson) {
-                out->makeOwned();
+            if (out) {
+                *out = std::move(obj);
+                if (_mustReturnOwnedBson) {
+                    out->makeOwned();
+                }
             }
             haveOutput = true;
             return express::Ready();

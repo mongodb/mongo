@@ -29,18 +29,20 @@
 
 #include "mongo/db/query/plan_executor.h"
 
-#include <utility>
-
 #include <boost/move/utility_core.hpp>
 #include <boost/optional/optional.hpp>
+#include <utility>
 
 #include "mongo/base/error_codes.h"
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/s/collection_sharding_state.h"
 #include "mongo/db/shard_role.h"
+#include "mongo/logv2/log.h"
 #include "mongo/platform/compiler.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/fail_point.h"
+
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
 
 namespace mongo {
 namespace {
@@ -60,6 +62,18 @@ std::string PlanExecutor::stateToStr(ExecState execState) {
     MONGO_UNREACHABLE;
 }
 
+std::string PlanExecutor::writeTypeToStr(PlanExecWriteType writeType) {
+    switch (writeType) {
+        case PlanExecWriteType::kUpdate:
+            return "update";
+        case PlanExecWriteType::kDelete:
+            return "delete";
+        case PlanExecWriteType::kFindAndModify:
+            return "findAndModify";
+    }
+    MONGO_UNREACHABLE;
+}
+
 void PlanExecutor::checkFailPointPlanExecAlwaysFails() {
     if (auto scoped = planExecutorAlwaysFails.scoped(); MONGO_unlikely(scoped.isActive())) {
         if (scoped.getData().hasField("tassert") && scoped.getData().getBoolField("tassert")) {
@@ -74,14 +88,16 @@ size_t PlanExecutor::getNextBatch(const size_t batchSize, AppendBSONObjFn append
     uint64_t numResults = 0;
     BSONObj obj;
     PlanExecutor::ExecState state = PlanExecutor::ADVANCED;
+    const bool hasAppendFn = static_cast<bool>(append);
+    BSONObj* objPtr = hasAppendFn ? &obj : nullptr;
 
     while (numResults < batchSize) {
-        state = getNext(&obj, nullptr);
+        state = getNext(objPtr, nullptr);
         if (state == PlanExecutor::IS_EOF) {
             break;
         }
 
-        if (!append(obj, getPostBatchResumeToken(), numResults)) {
+        if (hasAppendFn && !append(obj, getPostBatchResumeToken(), numResults)) {
             stashResult(obj);
             break;
         }
@@ -91,12 +107,75 @@ size_t PlanExecutor::getNextBatch(const size_t batchSize, AppendBSONObjFn append
     return numResults;
 }
 
-void PlanExecutor::executeExhaustive() {
-    // Subclasses may override this in order to provide a more optimized loop.
-    BSONObj obj;
-    while (getNext(&obj, nullptr) == PlanExecutor::ADVANCED) {
-        // Discard the resulting documents.
+boost::optional<BSONObj> PlanExecutor::executeWrite(PlanExecWriteType writeType) {
+    BSONObj value;
+    PlanExecutor::ExecState state;
+    try {
+        // Multi-updates and multi-deletes never return 'ADVANCED'. Therefore, running 'getNext()'
+        // once will either perform a single write for multi:false statements, or will perform an
+        // entire multi:true statement.
+        state = getNext(&value, nullptr);
+    } catch (const StorageUnavailableException&) {
+        throw;
+    } catch (ExceptionFor<ErrorCodes::StaleConfig>& ex) {
+        // A 'StaleConfig' exception needs to be changed to an operation-fatal 'QueryPlanKilled'
+        // exception for multi-updates that have already modified some documents. First, re-throw
+        // the exception if we're not an update.
+        if (writeType != PlanExecWriteType::kUpdate) {
+            throw;
+        }
+
+        const auto updateResult = getUpdateResult();
+        tassert(9146500,
+                "An update plan should never yield after having performed an upsert",
+                updateResult.upsertedId.isEmpty());
+        if (updateResult.numDocsModified > 0 && !getOpCtx()->isRetryableWrite()) {
+            // An update plan can fail with StaleConfig error after having performed some writes but
+            // not completed. This can happen when the collection is moved. Routers consider
+            // StaleConfig as retryable. However, it is unsafe to retry, because if the update is
+            // not idempotent it would cause some documents to be updated twice. To prevent that, we
+            // rewrite the error code to QueryPlanKilled, which routers won't retry on.
+            ex.addContext("Update plan failed after having partially executed");
+            uasserted(ErrorCodes::QueryPlanKilled, ex.reason());
+        } else {
+            throw;
+        }
+    } catch (DBException& exception) {
+        auto&& explainer = getPlanExplainer();
+        auto&& [stats, _] = explainer.getWinningPlanStats(ExplainOptions::Verbosity::kExecStats);
+        auto operationName = writeTypeToStr(writeType);
+        LOGV2_WARNING(7267501,
+                      "Plan executor error",
+                      "operation"_attr = operationName,
+                      "error"_attr = exception.toStatus(),
+                      "stats"_attr = redact(stats));
+
+        exception.addContext(str::stream() << "Plan executor error during " << operationName);
+        throw;
     }
+
+    if (PlanExecutor::ADVANCED == state) {
+        return {std::move(value)};
+    }
+
+    invariant(state == PlanExecutor::IS_EOF);
+    return boost::none;
+}
+
+UpdateResult PlanExecutor::executeUpdate() {
+    auto doc = executeWrite(PlanExecWriteType::kUpdate);
+    tassert(9212600, "expected 'boost::none' return value from executeWrite()", !doc);
+    return getUpdateResult();
+}
+
+long long PlanExecutor::executeDelete() {
+    auto doc = executeWrite(PlanExecWriteType::kDelete);
+    tassert(9212601, "expected 'boost::none' return value from executeWrite()", !doc);
+    return getDeleteResult();
+}
+
+boost::optional<BSONObj> PlanExecutor::executeFindAndModify() {
+    return executeWrite(PlanExecWriteType::kFindAndModify);
 }
 
 void PlanExecutor::releaseAllAcquiredResources() {

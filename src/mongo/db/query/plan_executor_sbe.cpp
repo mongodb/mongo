@@ -295,7 +295,7 @@ PlanExecutor::ExecState PlanExecutorSBE::getNextDocument(Document* objOut, Recor
 
     Document obj;
     auto result = getNextImpl(&obj, dlOut);
-    if (result == PlanExecutor::ExecState::ADVANCED) {
+    if (objOut && result == PlanExecutor::ExecState::ADVANCED) {
         *objOut = std::move(obj);
     }
     return result;
@@ -308,7 +308,7 @@ PlanExecutor::ExecState PlanExecutorSBE::getNext(BSONObj* out, RecordId* dlOut) 
 
     BSONObj obj;
     auto result = getNextImpl(&obj, dlOut);
-    if (result == PlanExecutor::ExecState::ADVANCED) {
+    if (out && result == PlanExecutor::ExecState::ADVANCED) {
         *out = std::move(obj);
     }
     return result;
@@ -330,6 +330,11 @@ PlanExecutor::ExecState PlanExecutorSBE::getNextImpl(ObjectType* out, RecordId* 
     static_assert(isDocument || isBson);
 
     invariant(!_isDisposed);
+
+    // TODO SERVER-93079: This function expects to always produce an output document. This could be
+    // optimized in the future if we wish to use SBE for count-like queries which do not need to
+    // produce any documents.
+    tassert(9212602, "fetchNextImpl() expects a non-null object pointer", out);
 
     checkFailPointPlanExecAlwaysFails();
 

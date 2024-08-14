@@ -22,6 +22,8 @@ var shardIdentityDoc = {
     clusterId: ObjectId()
 };
 
+const updateErrorMsgPrefix = "Plan executor error during update :: caused by :: ";
+
 // TODO: SERVER-67837 Change to test that the server crashed when auto-bootstrapping is enabled by
 // default.
 //
@@ -41,7 +43,8 @@ res = assert.commandFailedWithCode(
     ErrorCodes.UnsupportedFormat);
 assert.eq(
     res.writeErrors[0].errmsg,
-    "Invalid shard identity document: the shard name for a shard server cannot be \"config\"");
+    updateErrorMsgPrefix +
+        "Invalid shard identity document: the shard name for a shard server cannot be \"config\"");
 
 // Update with shard name "pizza" on config server should fail
 shardIdentityDoc.shardName = "pizza";
@@ -51,7 +54,8 @@ res = assert.commandFailedWithCode(
     ErrorCodes.UnsupportedFormat);
 assert.eq(
     res.writeErrors[0].errmsg,
-    "Invalid shard identity document: the shard name for a config server cannot be \"pizza\"");
+    updateErrorMsgPrefix +
+        "Invalid shard identity document: the shard name for a config server cannot be \"pizza\"");
 
 // TODO SERVER-74570: Enable parallel shutdown
 st.stop({parallelSupported: false});

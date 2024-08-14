@@ -116,17 +116,6 @@ bool insertBatchAndHandleErrors(OperationContext* opCtx,
                                 WriteResult* out);
 
 /**
- * If the operation succeeded, then returns either a document to return to the client, or
- * boost::none if no matching document to update/remove was found. If the operation failed, throws.
- * Accepts the name of the operation (e.g. "delete", "update", "findAndModify") for use in the
- * exception and log messages.
- */
-boost::optional<BSONObj> advanceExecutor(OperationContext* opCtx,
-                                         PlanExecutor* exec,
-                                         bool isRemove,
-                                         StringData operationName);
-
-/**
  * Executes an update, supports returning a pre/post image. The returned document is placed into
  * docFound (if applicable). Should be called in a writeConflictRetry loop.
  */

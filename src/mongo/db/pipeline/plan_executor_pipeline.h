@@ -127,13 +127,7 @@ public:
     long long executeCount() override {
         MONGO_UNREACHABLE;
     }
-    UpdateResult executeUpdate() override {
-        MONGO_UNREACHABLE;
-    }
     UpdateResult getUpdateResult() const override {
-        MONGO_UNREACHABLE;
-    }
-    long long executeDelete() override {
         MONGO_UNREACHABLE;
     }
     long long getDeleteResult() const override {

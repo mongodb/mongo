@@ -81,7 +81,6 @@
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
 
-
 namespace mongo {
 using namespace fmt::literals;
 using std::string;
@@ -505,6 +504,7 @@ bool PlanExecutorImpl::_handleEOFAndExit(PlanStage::StageState code,
 
 size_t PlanExecutorImpl::getNextBatch(size_t batchSize, AppendBSONObjFn append) {
     const bool includeMetadata = _expCtx && _expCtx->needsMerge;
+    const bool hasAppendFn = static_cast<bool>(append);
     if (batchSize == 0) {
         return 0;
     }
@@ -533,7 +533,9 @@ size_t PlanExecutorImpl::getNextBatch(size_t batchSize, AppendBSONObjFn append) 
     if (!_stash.empty()) {
         objOut = includeMetadata ? _stash.front().toBson() : _stash.front().toBsonWithMetaData();
         _stash.pop_front();
-        append(objOut, getPostBatchResumeToken(), numResults);
+        if (hasAppendFn) {
+            append(objOut, getPostBatchResumeToken(), numResults);
+        }
         numResults++;
     }
 
@@ -572,7 +574,8 @@ size_t PlanExecutorImpl::getNextBatch(size_t batchSize, AppendBSONObjFn append) 
 
             _workingSet->free(id);
 
-            if (MONGO_unlikely(!append(objOut, getPostBatchResumeToken(), numResults))) {
+            if (MONGO_unlikely(hasAppendFn &&
+                               !append(objOut, getPostBatchResumeToken(), numResults))) {
                 stashResult(objOut);
                 break;
             }
@@ -617,85 +620,17 @@ void PlanExecutorImpl::dispose(OperationContext* opCtx) {
     _currentState = kDisposed;
 }
 
-void PlanExecutorImpl::executeExhaustive() {
-    // We don't check batch size or do anything with returned BSON in exhaustDoWork().
-    checkFailPointPlanExecAlwaysFails();
-    _checkIfKilled();
-
-    const auto whileYieldingFn = [opCtx = _opCtx]() {
-        return doYield(opCtx);
-    };
-    auto notifier = makeNotifier();
-
-    WorkingSetID id = WorkingSet::INVALID_ID;
-    PlanStage::StageState code;
-
-    // The below are incremented on every WriteConflict or TemporarilyUnavailable error
-    // accordingly, and reset to 0 on any successful call to _root->work.
-    size_t writeConflictsInARow = 0;
-    size_t tempUnavailErrorsInARow = 0;
-
-    for (;;) {
-        _checkIfMustYield(whileYieldingFn);
-
-        code = _root->work(&id);
-
-        if (code != PlanStage::NEED_YIELD) {
-            writeConflictsInARow = 0;
-            tempUnavailErrorsInARow = 0;
-        }
-
-        if (code == PlanStage::ADVANCED) {
-            // Free WSM.
-            _workingSet->free(id);
-
-            // Only check if the query has been killed or if we've filled up the batch once a result
-            // has been produced. Doing these checks every loop can impact the performace of queries
-            // that repeatedly return NEED_TIME.
-            _checkIfKilled();
-
-        } else if (code == PlanStage::NEED_YIELD) {
-            _handleNeedYield(writeConflictsInARow, tempUnavailErrorsInARow);
-
-        } else if (code == PlanStage::NEED_TIME) {
-            // Do nothing except reset counters; need more time.
-
-        } else if (_handleEOFAndExit(code, notifier)) {
-            break;
-        }
-    }
-}
-
 long long PlanExecutorImpl::executeCount() {
     invariant(_root->stageType() == StageType::STAGE_COUNT ||
               _root->stageType() == StageType::STAGE_RECORD_STORE_FAST_COUNT);
 
-    executeExhaustive();
+    // Iterate until EOF, returning no data.
+    int numResults = getNextBatch(std::numeric_limits<int64_t>::max(), nullptr);
+    tassert(
+        9212603, "PlanExecutorImpl expects count plans to return no documents", numResults == 0);
+
     auto countStats = static_cast<const CountStats*>(_root->getSpecificStats());
     return countStats->nCounted;
-}
-
-UpdateResult PlanExecutorImpl::executeUpdate() {
-    try {
-        executeExhaustive();
-    } catch (ExceptionFor<ErrorCodes::StaleConfig>& ex) {
-        const auto updateResult = getUpdateResult();
-        tassert(9146500,
-                "An update plan should never yield after having performed an upsert",
-                updateResult.upsertedId.isEmpty());
-        if (updateResult.numDocsModified > 0 && !_opCtx->isRetryableWrite()) {
-            // An update plan can fail with StaleConfig error after having performed some writes but
-            // not completed. This can happen when the collection is moved. Routers consider
-            // StaleConfig as retryable. However, it is unsafe to retry, because if the update is
-            // not idempotent it would cause some documents to be updated twice. To prevent that, we
-            // rewrite the error code to QueryPlanKilled, which routers won't retry on.
-            ex.addContext("Update plan failed after having partially executed");
-            uasserted(ErrorCodes::QueryPlanKilled, ex.reason());
-        } else {
-            throw;
-        }
-    }
-    return getUpdateResult();
 }
 
 UpdateResult PlanExecutorImpl::getUpdateResult() const {
@@ -757,11 +692,6 @@ UpdateResult PlanExecutorImpl::getUpdateResult() const {
         default:
             MONGO_UNREACHABLE_TASSERT(7314606);
     }
-}
-
-long long PlanExecutorImpl::executeDelete() {
-    executeExhaustive();
-    return getDeleteResult();
 }
 
 long long PlanExecutorImpl::getDeleteResult() const {

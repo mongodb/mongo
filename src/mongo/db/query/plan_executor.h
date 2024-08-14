@@ -323,7 +323,9 @@ public:
     /**
      * Produces the next document from the query execution plan. The caller can request that the
      * executor returns documents by passing a non-null pointer for the 'objOut' output parameter,
-     * and similarly can request the RecordId by passing a non-null pointer for 'dlOut'.
+     * and similarly can request the RecordId by passing a non-null pointer for 'dlOut'. Both 'out'
+     * and 'dlOut' may be null if the caller wants to execute the query without producing documents,
+     * e.g. for count queries or to collect stats for explain.
      *
      * If a query-fatal error occurs, this method will throw an exception. If an exception is
      * thrown, then the PlanExecutor is no longer capable of executing. The caller may extract stats
@@ -356,14 +358,11 @@ public:
      * 'batchSize', or until the provided append() function returns false. The 'pbrt' is an output
      * parameter for storing the post-batch resume token for the last successful append(). Note that
      * getNextBatch() will stash the current object on a failed append().
+     *
+     * Like getNext(), the caller can indicate that they wish to discard the entire batch of results
+     * by passing a null 'append' callback.
      */
     virtual size_t getNextBatch(size_t batchSize, AppendBSONObjFn append);
-
-    /**
-     * Looping version of getNext() which exhausts the execution plan, but does nothing with any
-     * resulting documents.
-     */
-    virtual void executeExhaustive();
 
     /**
      * Similar to 'getNext()', but returns a Document rather than a BSONObj.
@@ -392,9 +391,13 @@ public:
     /**
      * If this plan executor was constructed to execute an update, e.g. it was obtained by calling
      * 'getExecutorUpdate()', then executes the update operation and returns an 'UpdateResult'
-     * describing the outcome. Illegal to call on other plan executors.
+     * describing the outcome.
+     *
+     * Illegal to call on other plan executors (for operations that are not updates). Also illegal
+     * to call for update statements that return either the pre-image or post-image. In this case,
+     * the caller should instead use 'executeFindAndModify()'.
      */
-    virtual UpdateResult executeUpdate() = 0;
+    UpdateResult executeUpdate();
 
     /**
      * If this plan executor has already executed an update operation, returns the an 'UpdateResult'
@@ -407,9 +410,14 @@ public:
     /**
      * If this plan executor was constructed to execute a delete, e.g. it was obtained by calling
      * 'getExecutorDelete()', then executes the delete operation and returns the number of documents
-     * that were deleted. Illegal to call on other plan executors.
+     * that were deleted.
+     *
+     * Illegal to call on other plan executors (for operations that are not delete). Also illegal to
+     * call for delete statements that return documents. In this case, the caller should instead use
+     * 'executeFindAndModify()' or should iterate the executor using 'getNext()' for multi-deletes
+     * that return the deleted documents.
      */
-    virtual long long executeDelete() = 0;
+    long long executeDelete();
 
     /**
      * If this plan executor has already executed a delete operation, returns the the number of
@@ -427,6 +435,14 @@ public:
      * 'getNext()' until end-of-stream.
      */
     virtual BatchedDeleteStats getBatchedDeleteStats() = 0;
+
+    /**
+     * Executes a findAndModify operation (which may either perform a single update or single
+     * delete). Returns the resulting document as called for by the findAndModify (the deleted
+     * document, the update pre-image, or the update post-image), or returns boost::none if no write
+     * occurred.
+     */
+    boost::optional<BSONObj> executeFindAndModify();
 
     //
     // Concurrency-related methods.
@@ -544,6 +560,16 @@ public:
      * CollectionPtr/AutoGet approach.
      */
     virtual bool usesCollectionAcquisitions() const = 0;
+
+private:
+    // Used by 'executeWrite()'.
+    enum class PlanExecWriteType { kUpdate, kDelete, kFindAndModify };
+    std::string writeTypeToStr(PlanExecWriteType);
+
+    // Helper for executing PlanExecutors for updates or deletes, including findAndModify-style
+    // update or delete which return a document. The return value is boost::none unless the
+    // operation is a findAndModify that performed a write.
+    boost::optional<BSONObj> executeWrite(PlanExecWriteType writeType);
 };
 
 }  // namespace mongo

@@ -373,7 +373,10 @@ void generateExecutionInfo(PlanExecutor* exec,
  * If 'exec' is configured for yielding, then a call to this helper could result in a yield.
  */
 void executePlan(PlanExecutor* exec) {
-    exec->executeExhaustive();
+    // Using 'getNextBatch()' rather than 'getNext()' means we iterate the PlanExecutor in a tighter
+    // loop. We passing a null callback function because explain wishes to simply discard the query
+    // result set.
+    (void)exec->getNextBatch(std::numeric_limits<int64_t>::max(), nullptr);
 }
 
 /**

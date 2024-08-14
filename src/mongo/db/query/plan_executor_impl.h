@@ -164,13 +164,10 @@ public:
     ExecState getNextDocument(Document* objOut, RecordId* dlOut) final;
     ExecState getNext(BSONObj* out, RecordId* dlOut) final;
     size_t getNextBatch(size_t batchSize, AppendBSONObjFn append) final;
-    void executeExhaustive() final;
 
     bool isEOF() final;
     long long executeCount() override;
-    UpdateResult executeUpdate() override;
     UpdateResult getUpdateResult() const override;
-    long long executeDelete() override;
     long long getDeleteResult() const override;
     BatchedDeleteStats getBatchedDeleteStats() override;
     void markAsKilled(Status killStatus) final;

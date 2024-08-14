@@ -137,25 +137,14 @@ public:
         MONGO_UNREACHABLE;
     }
 
-    UpdateResult executeUpdate() override {
-        // Using SBE to execute an update command is not yet supported.
-        MONGO_UNREACHABLE;
-    }
     UpdateResult getUpdateResult() const override {
         // Using SBE to execute an update command is not yet supported.
         MONGO_UNREACHABLE;
     }
-
-    long long executeDelete() override {
-        // Using SBE to execute a delete command is not yet supported.
-        MONGO_UNREACHABLE;
-    }
-
     long long getDeleteResult() const override {
         // Using SBE to execute a delete command is not yet supported.
         MONGO_UNREACHABLE;
     }
-
     BatchedDeleteStats getBatchedDeleteStats() override {
         // Using SBE to execute a batched delete command is not yet supported.
         MONGO_UNREACHABLE;
