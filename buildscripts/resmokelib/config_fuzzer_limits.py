@@ -148,6 +148,11 @@ config_fuzzer_params = {
             "max": 180,
             "isRandomizedChoice": True,
         },
+        "connPoolMaxInUseConnsPerHost": {"min": 50, "max": 100},
+        "globalConnPoolIdleTimeoutMinutes": {"min": 1, "max": 10},
+        "ShardingTaskExecutorPoolMaxConnecting": {"min": 1, "max": 2},
+        "warmMinConnectionsInShardingTaskExecutorPoolOnStartup": {"choices": [True, False]},
+        "oplogBatchDelayMillis": {"min": 0, "max": 50},
     },
     "mongos": {
         # We need a higher timeout to account for test slowness
