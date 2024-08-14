@@ -175,6 +175,8 @@ namespace {
 // Failpoint to block after a write and its oplog entry have been written to the storage engine and
 // are visible, but before we have advanced 'lastApplied' for the write.
 MONGO_FAIL_POINT_DEFINE(hangBeforeLogOpAdvancesLastApplied);
+// Failpoint to block oplog application after receiving an IndexBuildAlreadyInProgress error.
+MONGO_FAIL_POINT_DEFINE(hangAfterIndexBuildConflict);
 
 void abortIndexBuilds(OperationContext* opCtx,
                       const OplogEntry::CommandType& commandType,
@@ -2499,6 +2501,23 @@ Status applyCommand_inlock(OperationContext* opCtx,
                         "command",
                         opObj,
                         status);
+
+                    // Even though steady state constraints are not enforced, we need to retry index
+                    // builds that conflict in case the existing index build fails.
+                    if (status.code() == ErrorCodes::IndexBuildAlreadyInProgress) {
+                        if (MONGO_unlikely(hangAfterIndexBuildConflict.shouldFail())) {
+                            LOGV2(8539001, "Hanging due to hangAfterIndexBuildConflict failpoint");
+                            hangAfterIndexBuildConflict.pauseWhileSet();
+                        }
+
+                        auto deadline = Date_t::now() + Milliseconds(1000);
+                        LOGV2(8539000,
+                              "Waiting for existing index build to complete before retrying the "
+                              "conflicting operation");
+                        IndexBuildsCoordinator::get(opCtx)->waitUntilAnIndexBuildFinishes(opCtx,
+                                                                                          deadline);
+                        break;
+                    }
                 } else {
                     LOGV2_DEBUG(51776,
                                 1,

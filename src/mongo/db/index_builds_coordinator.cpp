@@ -2126,8 +2126,9 @@ void IndexBuildsCoordinator::awaitNoBgOpInProgForDb(OperationContext* opCtx,
     activeIndexBuilds.awaitNoBgOpInProgForDb(opCtx, dbName);
 }
 
-void IndexBuildsCoordinator::waitUntilAnIndexBuildFinishes(OperationContext* opCtx) {
-    activeIndexBuilds.waitUntilAnIndexBuildFinishes(opCtx);
+void IndexBuildsCoordinator::waitUntilAnIndexBuildFinishes(OperationContext* opCtx,
+                                                           Date_t deadline) {
+    activeIndexBuilds.waitUntilAnIndexBuildFinishes(opCtx, deadline);
 }
 
 void IndexBuildsCoordinator::appendBuildInfo(const UUID& buildUUID, BSONObjBuilder* builder) const {

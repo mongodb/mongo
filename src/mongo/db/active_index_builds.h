@@ -85,7 +85,7 @@ public:
 
     void assertNoIndexBuildInProgress() const;
 
-    void waitUntilAnIndexBuildFinishes(OperationContext* opCtx);
+    void waitUntilAnIndexBuildFinishes(OperationContext* opCtx, Date_t deadline);
 
     void sleepIndexBuilds_forTestOnly(bool sleep);
 

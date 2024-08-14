@@ -98,14 +98,14 @@ void ActiveIndexBuilds::assertNoIndexBuildInProgress() const {
     }
 }
 
-void ActiveIndexBuilds::waitUntilAnIndexBuildFinishes(OperationContext* opCtx) {
+void ActiveIndexBuilds::waitUntilAnIndexBuildFinishes(OperationContext* opCtx, Date_t deadline) {
     stdx::unique_lock<Latch> lk(_mutex);
     if (_allIndexBuilds.empty()) {
         return;
     }
     const auto generation = _indexBuildsCompletedGen;
-    opCtx->waitForConditionOrInterrupt(
-        _indexBuildsCondVar, lk, [&] { return _indexBuildsCompletedGen != generation; });
+    opCtx->waitForConditionOrInterruptUntil(
+        _indexBuildsCondVar, lk, deadline, [&] { return _indexBuildsCompletedGen != generation; });
 }
 
 void ActiveIndexBuilds::sleepIndexBuilds_forTestOnly(bool sleep) {

@@ -486,10 +486,10 @@ public:
     void awaitNoBgOpInProgForDb(OperationContext* opCtx, const DatabaseName& dbName);
 
     /**
-     * Waits until an index build completes. If there are no index builds in progress, returns
-     * immediately.
+     * Waits until an index build completes or the deadline expires. If there are no index builds in
+     * progress, returns immediately.
      */
-    void waitUntilAnIndexBuildFinishes(OperationContext* opCtx);
+    void waitUntilAnIndexBuildFinishes(OperationContext* opCtx, Date_t deadline = Date_t::max());
 
 
     /**
