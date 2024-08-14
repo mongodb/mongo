@@ -22,11 +22,12 @@ const res = assert.commandWorked(localDB.runCommand(
     {find: "test", filter: {}, maxTimeMS: 60000, readConcern: {level: "local"}}));
 assert.eq([{_id: 0}], res.cursor.firstBatch);
 
-jsTestLog("Majority readConcern should fail with NotYetInitialized.");
+jsTestLog("Majority readConcern should fail with NotPrimaryNoSecondaryOk or NotYetInitialized.");
 assert.commandFailedWithCode(
     localDB.runCommand(
         {find: "test", filter: {}, maxTimeMS: 60000, readConcern: {level: "majority"}}),
-    ErrorCodes.NotYetInitialized);
+    // Fails with NotPrimaryNoSecondaryOk as of SERVER-53813.
+    [ErrorCodes.NotPrimaryNoSecondaryOk, ErrorCodes.NotYetInitialized]);
 
 // Nodes don't process $clusterTime metadata when in an unreadable state, so this read will fail
 // because the logical clock's latest value is less than the given afterClusterTime timestamp.

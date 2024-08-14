@@ -802,6 +802,7 @@ env.Library(
     ],
     LIBDEPS_PRIVATE=[
         "$BUILD_DIR/mongo/db/storage/storage_options",
+        "repl_server_parameters",
         "repl_settings",
     ],
 )

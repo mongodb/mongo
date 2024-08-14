@@ -124,6 +124,7 @@ executor:
             readPreference:
               mode: "primary"
             retryWrites: true
+            maybeUseCausalConsistency: true
       # We specify nodb so the shell used by each test will attempt to connect after loading the
       # retry logic in auto_retry_on_network_error.js.
       nodb: ""

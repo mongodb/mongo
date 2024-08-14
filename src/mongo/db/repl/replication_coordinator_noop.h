@@ -337,6 +337,8 @@ public:
 
     void createWMajorityWriteAvailabilityDateWaiter(OpTime opTime) final;
 
+    Status waitForPrimaryMajorityReadsAvailable(OperationContext* opCtx) const final;
+
     Status stepUpIfEligible(bool skipDryRun) final;
 
     Status abortCatchupIfNeeded(PrimaryCatchUpConclusionReason reason) final;

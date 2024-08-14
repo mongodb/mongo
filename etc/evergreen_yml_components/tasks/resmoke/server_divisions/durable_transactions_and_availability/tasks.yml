@@ -1429,6 +1429,12 @@ tasks:
       - func: "generate resmoke tasks"
 
   - <<: *gen_task_template
+    name: no_causal_consistency_replica_sets_kill_stepdown_terminate_jscore_passthrough_gen
+    tags: ["assigned_to_jira_team_server_repl", "default"]
+    commands:
+      - func: "generate resmoke tasks"
+
+  - <<: *gen_task_template
     name: replica_sets_recordids_replicated_jscore_passthrough_gen
     tags:
       [

@@ -30,6 +30,16 @@ Mongo.prototype.getDB = function(dbName) {
         return getDBOriginal.apply(this, arguments);
     }
 
+    if (sessionOptions && sessionOptions.hasOwnProperty("maybeUseCausalConsistency") &&
+        sessionOptions.maybeUseCausalConsistency === true) {
+        const causalConsistency = Math.random() < 0.5;
+        sessionOptions.causalConsistency = causalConsistency;
+        jsTestLog(
+            `Sessions override setting causalConsistency=${causalConsistency} for db ${dbName}`);
+
+        delete sessionOptions.maybeUseCausalConsistency;
+    }
+
     if (!sessionMap.has(this)) {
         const session = this.startSession(sessionOptions);
         // Override the endSession function to be a no-op so jstestfuzz doesn't accidentally

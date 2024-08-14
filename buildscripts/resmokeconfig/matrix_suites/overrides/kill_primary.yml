@@ -31,6 +31,10 @@
                 readPreference:
                   mode: "primary"
                 retryWrites: true
+                # Probabilistically choose to use/not use causal consistency. As of SERVER-53813
+                # causal consistency should not be required to read your own writes on the new primary
+                # after the old one is killed.
+                maybeUseCausalConsistency: true
           # We specify nodb so the shell used by each test will attempt to connect after loading the
           # retry logic in auto_retry_on_network_error.js.
           nodb: ""
@@ -100,6 +104,10 @@
                 readPreference:
                   mode: "primary"
                 retryWrites: true
+                # Probabilistically choose to use/not use causal consistency. As of SERVER-53813
+                # causal consistency should not be required to read your own writes on the new primary
+                # after the old one is killed.
+                maybeUseCausalConsistency: true
 
 ###
 # Fixture options.

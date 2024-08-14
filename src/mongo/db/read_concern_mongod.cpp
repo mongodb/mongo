@@ -101,6 +101,7 @@ namespace mongo {
 namespace {
 
 MONGO_FAIL_POINT_DEFINE(hangBeforeLinearizableReadConcern);
+const ReadPreferenceSetting kPrimaryOnlyReadPreference(ReadPreference::PrimaryOnly);
 
 /**
  *  Synchronize writeRequests
@@ -464,6 +465,23 @@ Status waitForReadConcernImpl(OperationContext* opCtx,
 
         const int debugLevel =
             serverGlobalParams.clusterRole.has(ClusterRole::ConfigServer) ? 1 : 2;
+
+        // If this is is a new primary, it is possible that it has a stale view of the majority
+        // commit point. To avoid serving stale data for users reading with majority read concern
+        // and primary read preference, we wait until majority writes are available on the node.
+        // That means that the new primary's first write in the new term is majority committed and
+        // that therefore all earlier writes are also part of the commit point, and this node has an
+        // up-to-date view of the commit point.
+        if (ReadPreferenceSetting::get(opCtx).equals(kPrimaryOnlyReadPreference)) {
+            LOGV2_DEBUG(5381300,
+                        debugLevel,
+                        "Waiting for majority writes to be available on primary before serving "
+                        "majority read to ensure commit point is not stale");
+            auto status = replCoord->waitForPrimaryMajorityReadsAvailable(opCtx);
+            if (!status.isOK()) {
+                return status;
+            }
+        }
 
         LOGV2_DEBUG(
             20991,

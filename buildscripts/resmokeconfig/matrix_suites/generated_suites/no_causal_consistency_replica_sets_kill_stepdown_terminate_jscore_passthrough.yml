@@ -3,7 +3,7 @@
 # IF YOU WISH TO MODIFY THIS SUITE, MODIFY THE CORRESPONDING MATRIX SUITE MAPPING FILE
 # AND REGENERATE THE MATRIX SUITES.
 #
-# matrix suite mapping file: buildscripts/resmokeconfig/matrix_suites/mappings/change_streams_pre_images_replica_sets_stepdown_primary_jscore_passthrough.yml
+# matrix suite mapping file: buildscripts/resmokeconfig/matrix_suites/mappings/no_causal_consistency_replica_sets_kill_stepdown_terminate_jscore_passthrough.yml
 # regenerate matrix suites: buildscripts/resmoke.py generate-matrix-suites
 ##########################################################
 executor:
@@ -11,8 +11,6 @@ executor:
     hooks:
     - CheckReplDBHash
     - CheckReplOplogs
-    - CheckReplPreImagesConsistency
-    - CheckReplChangeCollectionConsistency
     - ValidateCollections
     tests: true
   config:
@@ -29,50 +27,42 @@ executor:
           logRetryAttempts: true
           networkErrorAndTxnOverrideConfig:
             retryOnNetworkErrors: true
-          overrideRetryAttempts: 6
+          overrideRetryAttempts: 3
           sessionOptions:
-            maybeUseCausalConsistency: true
+            causalConsistency: false
             readConcern:
               level: majority
             readPreference:
               mode: primary
             retryWrites: true
+            writeConcern:
+              w: majority
       nodb: ''
   fixture:
     all_nodes_electable: true
     class: ReplicaSetFixture
     mongod_options:
       set_parameters:
+        allowEmptyOplogBatchesToPropagateCommitPoint: false
         enableElectionHandoff: 0
         enableTestCommands: 1
-        expiredChangeStreamPreImageRemovalJobSleepSecs: 1
-        failpoint.preImagesEnabledOnAllCollectionsByDefault: '{mode: ''alwaysOn''}'
         logComponentVerbosity:
           replication:
             heartbeats: 2
             rollback: 2
           storage:
             recovery: 2
-        preImagesCollectionTruncateMarkersMinBytes: 4096
       syncdelay: 5
-      wiredTigerCollectionConfigString: allocation_size=1k,leaf_page_max=1k
       wiredTigerEngineConfigString: debug_mode=(table_logging=true)
     num_nodes: 3
     replset_config_options:
       settings:
         catchUpTimeoutMillis: 0
   hooks:
-  - class: ClusterParameter
-    key: changeStreamOptions
-    value:
-      preAndPostImages:
-        expireAfterSeconds: 10
   - class: ContinuousStepdown
-    kill: false
-    terminate: false
+    randomize_kill: true
+    stepdown_interval_ms: 15000
   - class: CheckReplOplogs
-  - class: CheckReplPreImagesConsistency
-  - class: CheckReplChangeCollectionConsistency
   - class: CheckReplDBHash
   - class: ValidateCollections
     shell_options:

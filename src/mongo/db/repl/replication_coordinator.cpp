@@ -32,6 +32,7 @@
 
 #include "mongo/db/client.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/repl/repl_server_parameters_gen.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/storage/storage_options.h"
@@ -117,6 +118,19 @@ bool ReplicationCoordinator::isInInitialSyncOrRollback() const {
 
     const auto memberState = getMemberState();
     return memberState.startup2() || memberState.rollback();
+}
+
+bool ReplicationCoordinator::shouldUseEmptyOplogBatchToPropagateCommitPoint(
+    OpTime clientOpTime) const {
+    if (!repl::allowEmptyOplogBatchesToPropagateCommitPoint) {
+        return false;
+    }
+
+    // For getMore operations with a last committed opTime, we should not wait if our
+    // lastCommittedOpTime has progressed past the client's lastCommittedOpTime. In that case,
+    // we will return early so that we can inform the client of the new lastCommittedOpTime
+    // immediately.
+    return clientOpTime < getLastCommittedOpTime();
 }
 
 }  // namespace repl

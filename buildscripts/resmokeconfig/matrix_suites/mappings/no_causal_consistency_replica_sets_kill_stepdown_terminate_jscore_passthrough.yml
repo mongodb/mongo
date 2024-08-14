@@ -1,0 +1,13 @@
+# Run a kill/stepdown/terminate primary suite with causal consistency disabled to test that SERVER-53813
+# correctly has us read our own writes when doing primary reads with majority read concern, even
+# across a failover.
+base_suite: replica_sets_jscore_passthrough
+overrides:
+  - "no_causal_consistency.replica_sets_shell_options"
+  - "bulk_write.kill_stepdown_hooks"
+  - "kill_primary.replica_sets_archive"
+  - "no_causal_consistency.replica_sets_fixture"
+  - "replica_sets_stepdown_selector.kill_primary_jscore_passthrough_exclude_files_base"
+  - "replica_sets_stepdown_selector.kill_primary_jscore_passthrough_exclude_with_any_tags"
+excludes:
+  - "replica_sets_stepdown_selector.kill_primary_jscore_passthrough_exclude_files_fle"

@@ -536,7 +536,8 @@ ReplicationCoordinatorImpl::ReplicationCoordinatorImpl(
           },
           [this](WithLock lk, int64_t limit) { return _nextRandomInt64(lk, limit); }),
       _random(prngSeed),
-      _splitSessionManager(InternalSessionPool::get(service)) {
+      _splitSessionManager(InternalSessionPool::get(service)),
+      _primaryMajorityReadsAvailability(PrimaryMajorityReadsAvailability()) {
 
     _termShadow.store(OpTime::kUninitializedTerm);
     _electionIdTermShadow.store(_topCoord->getElectionIdTerm());
@@ -5108,6 +5109,15 @@ ReplicationCoordinatorImpl::_updateMemberStateFromTopologyCoordinator(WithLock l
         _replicationWaiterList.setErrorAll(
             lk,
             {ErrorCodes::PrimarySteppedDown, "Primary stepped down while waiting for replication"});
+
+        if (_memberState.primary()) {
+            // We may have already disallowed primary majority reads via failing a replication
+            // waiter in the previous line. However, it's possible we are stepping down here before
+            // we managed to create a waiter, so in that case we should explicitly indicate that we
+            // have stepped down.
+            _primaryMajorityReadsAvailability.onBecomeNonPrimary();
+        }
+
         // Wake up the optime waiter that is waiting for primary catch-up to finish.
         _lastAppliedOpTimeWaiterList.setErrorAll(
             lk,
@@ -5176,6 +5186,13 @@ ReplicationCoordinatorImpl::_updateMemberStateFromTopologyCoordinator(WithLock l
                             auto opCtx = cc().makeOperationContext();
                             _startDataReplication(opCtx.get());
                         });
+    }
+
+
+    if (newState.primary()) {
+        // Since we are stepping up, we need to reset the primary majority read availability state
+        // to track availabiltity of those reads in our new term.
+        _primaryMajorityReadsAvailability.onBecomePrimary();
     }
 
     LOGV2(21358,
@@ -6548,6 +6565,9 @@ void ReplicationCoordinatorImpl::createWMajorityWriteAvailabilityDateWaiter(OpTi
         if (status.isOK()) {
             ReplicationMetrics::get(getServiceContext())
                 .setWMajorityWriteAvailabilityDate(_replExecutor->now());
+            _primaryMajorityReadsAvailability.allowReads();
+        } else {
+            _primaryMajorityReadsAvailability.disallowReads(status);
         }
     };
 
@@ -6561,6 +6581,11 @@ void ReplicationCoordinatorImpl::createWMajorityWriteAvailabilityDateWaiter(OpTi
     auto waiter = std::make_shared<Waiter>(std::move(pf.promise), writeConcern);
     auto future = std::move(pf.future).onCompletion(setOpTimeCB);
     _replicationWaiterList.add(lk, opTime, waiter);
+}
+
+Status ReplicationCoordinatorImpl::waitForPrimaryMajorityReadsAvailable(
+    OperationContext* opCtx) const {
+    return _primaryMajorityReadsAvailability.waitForReadsAvailable(opCtx);
 }
 
 bool ReplicationCoordinatorImpl::_updateCommittedSnapshot(WithLock lk,

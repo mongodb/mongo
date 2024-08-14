@@ -765,6 +765,11 @@ void ReplicationCoordinatorMock::createWMajorityWriteAvailabilityDateWaiter(OpTi
     return;
 }
 
+Status ReplicationCoordinatorMock::waitForPrimaryMajorityReadsAvailable(
+    OperationContext* opCtx) const {
+    return Status::OK();
+}
+
 WriteConcernOptions ReplicationCoordinatorMock::populateUnsetWriteConcernOptionsSyncMode(
     WriteConcernOptions wc) {
     if (wc.syncMode == WriteConcernOptions::SyncMode::UNSET) {

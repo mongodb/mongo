@@ -1065,6 +1065,12 @@ public:
     virtual void createWMajorityWriteAvailabilityDateWaiter(OpTime opTime) = 0;
 
     /**
+     * Waits until the "new primary" no-op entry written in this node's latest step-up attempt has
+     * been majority committed.
+     */
+    virtual Status waitForPrimaryMajorityReadsAvailable(OperationContext* opCtx) const = 0;
+
+    /**
      * Returns a new WriteConcernOptions based on "wc" but with UNSET syncMode reset to JOURNAL or
      * NONE based on our rsConfig.
      */
@@ -1302,6 +1308,13 @@ public:
      * Returns true if the node undergoes initial sync or rollback.
      */
     bool isInInitialSyncOrRollback() const;
+
+    /**
+     * Returns whether the provided client last committed opTime is older than our view of
+     * last committed. If so, we should attempt to advance the client view of the commit point
+     * using an empty oplog batch rather than waiting on new data to return.
+     */
+    bool shouldUseEmptyOplogBatchToPropagateCommitPoint(OpTime clientOpTime) const;
 
 protected:
     ReplicationCoordinator();

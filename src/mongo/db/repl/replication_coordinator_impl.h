@@ -472,6 +472,8 @@ public:
 
     void createWMajorityWriteAvailabilityDateWaiter(OpTime opTime) override;
 
+    Status waitForPrimaryMajorityReadsAvailable(OperationContext* opCtx) const override;
+
     WriteConcernOptions populateUnsetWriteConcernOptionsSyncMode(WriteConcernOptions wc) override;
 
     Status stepUpIfEligible(bool skipDryRun) override;
@@ -2120,6 +2122,105 @@ private:
     // completes, after storage recovers from a stable checkpoint, or after replication recovery
     // from an unstable checkpoint.
     AtomicWord<bool> _isDataConsistent{false};
+
+    /**
+     * Manages tracking for whether this node is able to serve (non-stale) majority reads with
+     * primary read preference.
+     */
+    class PrimaryMajorityReadsAvailability {
+    public:
+        PrimaryMajorityReadsAvailability() : _promise(nullptr) {}
+
+        /**
+         * Resets the state of this type to track a new step-up and term as primary.
+         * It is an error to call this method but not follow it with a call to one of
+         * `allowReads()`, `disallowReads()`, or `onBecomeNonPrimary()`.
+         */
+        void onBecomePrimary() {
+            auto lock = _mutex.writeLock();
+            invariant(!_promise);
+            _promise = std::make_unique<SharedPromise<void>>();
+        }
+
+        /**
+         * This method must be called when a node that was primary steps down. This will unblock
+         * any reads that are currently waiting for the node to be able to serve primary majority
+         * reads.
+         */
+        void onBecomeNonPrimary() {
+            auto lock = _mutex.writeLock();
+            invariant(_promise);
+            // If we already completed the promise (either with success or error) then no reads
+            // are waiting on it and we don't need to change it, as read preference validation
+            // will reject primary read preference reads going forward.
+            // However, if we have not completed the promise (this can happen if we stepped down
+            // before we managed to create a waiter to complete it) then we need to explicitly
+            // fail it here.
+            if (!_promise->getFuture().isReady()) {
+                _promise->setError({ErrorCodes::PrimarySteppedDown,
+                                    "Primary stepped down while waiting for replication"});
+            }
+            _promise = nullptr;
+        }
+
+        /**
+         * Mark that this node can now serve primary majority reads.
+         */
+        void allowReads() {
+            auto lock = _mutex.readLock();
+            invariant(_promise);
+            _promise->emplaceValue();
+        }
+
+        /**
+         * Mark that this node cannot serve primary majority reads. This indicates the node failed
+         * to become primary. Any reads that were waiting for availability will be failed with the
+         * provided status.
+         */
+        void disallowReads(Status status) {
+            invariant(!status.isOK());
+            auto lock = _mutex.readLock();
+            invariant(_promise);
+            _promise->setError(status);
+        }
+
+        /**
+         * Waits until this node is able to serve primary majority reads.
+         */
+        Status waitForReadsAvailable(OperationContext* opCtx) const {
+            SharedSemiFuture<void> future;
+            {
+                auto lock = _mutex.readLock();
+                if (!_promise) {
+                    return {ErrorCodes::NotPrimaryNoSecondaryOk,
+                            "not primary and secondaryOk=false"};
+                }
+                future = _promise->getFuture();
+            }
+            return future.getNoThrow(opCtx);
+        }
+
+
+    private:
+        // Synchronizes reads/writes of _promise.
+        mutable WriteRarelyRWMutex _mutex;
+
+        // A promise which is fulfilled once a new primary's first write in its new term has been
+        // majority committed.
+        // This is significant as once that entry is majority committed, we know the node has
+        // majority committed all writes from earlier terms as well, and thus the node has an up-
+        // to-date view of the commit point and will not serve stale reads.
+        // This promise should always be completed (either with success or error) when a node is not
+        // primary. When a node is stepping up and before it starts accepting reads with primary
+        // read preference, it is reset with a fresh promise that will either be succeeded or failed
+        // depending on whether we successfully majority commit the node's "new primary" oplog entry
+        // written during step-up. In order to read this member and call any method on it, obtain a
+        // read lock from _mutex. A write lock is only necessary when actually overwriting the value
+        // of this member, as SharedPromise provides safety for concurrent calls to its methods.
+        std::unique_ptr<SharedPromise<void>> _promise;
+    };
+
+    PrimaryMajorityReadsAvailability _primaryMajorityReadsAvailability;  // (S)
 };
 
 extern Counter64& replicationWaiterListMetric;

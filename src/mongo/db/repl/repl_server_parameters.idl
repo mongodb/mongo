@@ -876,6 +876,17 @@ server_parameters:
             gte: 0
         redact: false
 
+    allowEmptyOplogBatchesToPropagateCommitPoint:
+        description: >-
+            Whether oplog cursors should skip waiting for new data to return if the commit point advances.
+            This can be useful to disable in testing to intentionally slow commit point propagation.
+        test_only: true
+        set_at: startup
+        cpp_vartype: bool
+        cpp_varname: allowEmptyOplogBatchesToPropagateCommitPoint
+        default: true
+        redact: false
+
 feature_flags:
     featureFlagShardMerge:
         description: When enabled, multitenant migration uses the "shard merge" protocol.

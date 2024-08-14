@@ -1,0 +1,89 @@
+## Overrides for the no_causal_consistency_replica_sets_kill_stepdown_terminate suite.
+
+- name: replica_sets_shell_options
+  value:
+    executor:
+      config:
+        shell_options:
+          eval: >-
+            globalThis.testingReplication = true;
+            await import('jstests/libs/override_methods/network_error_and_txn_override.js');
+            globalThis.db = connect(TestData.connectionString);
+            await import("jstests/libs/override_methods/enable_sessions.js");
+            await import("jstests/libs/override_methods/set_read_and_write_concerns.js");
+            await import("jstests/libs/override_methods/fail_unclean_shutdown_incompatible_commands.js");
+            await import("jstests/libs/override_methods/fail_unclean_shutdown_start_parallel_shell.js");
+          global_vars:
+            TestData:
+              alwaysInjectTransactionNumber: true
+              defaultReadConcernLevel: "majority"
+              logRetryAttempts: true
+              networkErrorAndTxnOverrideConfig:
+                retryOnNetworkErrors: true
+              overrideRetryAttempts: 3
+              sessionOptions:
+                readConcern:
+                  level: "majority"
+                # Force DBClientRS to find the primary for non-write commands.
+                readPreference:
+                  mode: "primary"
+                retryWrites: true
+                writeConcern:
+                  w: majority
+                # Explicitly disable causal consistency to confirm we can still read our own writes
+                # as of SERVER-53813.
+                causalConsistency: false
+          # We specify nodb so the shell used by each test will attempt to connect after loading the
+          # retry logic in auto_retry_on_network_error.js.
+          nodb: ""
+
+###
+# Fixture options.
+###
+- name: replica_sets_fixture
+  value:
+    executor:
+      fixture:
+        class: ReplicaSetFixture
+        mongod_options:
+          syncdelay: 5 # set to a low value to increase coverage of timestamping code.
+          wiredTigerEngineConfigString: "debug_mode=(table_logging=true)"
+          set_parameters:
+            enableTestCommands: 1
+            enableElectionHandoff: 0
+            logComponentVerbosity:
+              replication:
+                heartbeats: 2
+                rollback: 2
+              storage:
+                recovery: 2
+            # Disable using empty oplog batches for commit point propagation. This increases the chance
+            # that the new primary has a stale view of the commit point after a failover and therefore
+            # increases the likelihood that the logic added in SERVER-53813 is exercised.
+            allowEmptyOplogBatchesToPropagateCommitPoint: false
+        all_nodes_electable: true
+        num_nodes: 3
+        replset_config_options:
+          settings:
+            catchUpTimeoutMillis: 0
+
+- name: kill_stepdown_hooks
+  value:
+    executor:
+      hooks:
+        - class: ContinuousStepdown
+          randomize_kill: true
+
+        # The CheckReplDBHash hook waits until all operations have replicated to and have been applied
+        # on the secondaries, so we run the ValidateCollections hook after it to ensure we're
+        # validating the entire contents of the collection.
+        - class: CheckReplOplogs
+        - class: CheckReplDBHash
+        - class: ValidateCollections
+          shell_options:
+            global_vars:
+              TestData:
+                # Unclean shutdown can lead to inaccurate fast count.
+                skipEnforceFastCountOnValidate: true
+        - class: CleanEveryN
+          n: 20

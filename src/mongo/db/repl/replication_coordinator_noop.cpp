@@ -546,6 +546,11 @@ void ReplicationCoordinatorNoOp::createWMajorityWriteAvailabilityDateWaiter(OpTi
     MONGO_UNREACHABLE;
 }
 
+Status ReplicationCoordinatorNoOp::waitForPrimaryMajorityReadsAvailable(
+    OperationContext* opCtx) const {
+    MONGO_UNREACHABLE;
+}
+
 void ReplicationCoordinatorNoOp::clearCommittedSnapshot() {
     MONGO_UNREACHABLE;
 }

@@ -73,14 +73,14 @@ bool shouldWaitForInserts(OperationContext* opCtx,
         // We expect awaitData cursors to be yielding.
         invariant(yieldPolicy->canReleaseLocksDuringExecution());
 
-        // For operations with a last committed opTime, we should not wait if the replication
-        // coordinator's lastCommittedOpTime has progressed past the client's lastCommittedOpTime.
-        // In that case, we will return early so that we can inform the client of the new
-        // lastCommittedOpTime immediately.
+        // For operations with a last committed opTime, we are fetching oplog entries and should not
+        // wait if the replication coordinator's lastCommittedOpTime has progressed past the
+        // client's lastCommittedOpTime. In that case, we will return early so that we can inform
+        // the client of the new lastCommittedOpTime immediately.
         if (clientsLastKnownCommittedOpTime(opCtx)) {
             auto replCoord = repl::ReplicationCoordinator::get(opCtx);
-            return clientsLastKnownCommittedOpTime(opCtx).value() >=
-                replCoord->getLastCommittedOpTime();
+            return !replCoord->shouldUseEmptyOplogBatchToPropagateCommitPoint(
+                clientsLastKnownCommittedOpTime(opCtx).value());
         }
         return true;
     }

@@ -30,6 +30,7 @@ executor:
             retryOnNetworkErrors: true
           overrideRetryAttempts: 3
           sessionOptions:
+            maybeUseCausalConsistency: true
             readConcern:
               level: majority
             readPreference:

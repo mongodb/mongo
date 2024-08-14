@@ -394,6 +394,8 @@ public:
 
     void createWMajorityWriteAvailabilityDateWaiter(OpTime opTime) override;
 
+    Status waitForPrimaryMajorityReadsAvailable(OperationContext* opCtx) const override;
+
     WriteConcernOptions populateUnsetWriteConcernOptionsSyncMode(WriteConcernOptions wc) override;
 
     Status stepUpIfEligible(bool skipDryRun) override;
