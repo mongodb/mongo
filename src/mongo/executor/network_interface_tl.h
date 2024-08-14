@@ -62,7 +62,6 @@
 #include "mongo/platform/mutex.h"
 #include "mongo/rpc/metadata/metadata_hook.h"
 #include "mongo/stdx/condition_variable.h"
-#include "mongo/stdx/mutex.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/stdx/unordered_map.h"
 #include "mongo/transport/baton.h"
@@ -182,7 +181,7 @@ private:
         CommandStateBase(NetworkInterfaceTL* interface_,
                          RemoteCommandRequestOnAny request_,
                          const TaskExecutor::CallbackHandle& cbHandle_);
-        virtual ~CommandStateBase();
+        virtual ~CommandStateBase() = default;
 
         /**
          * Use the current RequestState to send out a command request.
@@ -193,7 +192,7 @@ private:
         /**
          * Set a timer to fulfill the promise with a timeout error.
          */
-        void setTimer(const std::shared_ptr<RequestState>& requestState);
+        virtual void setTimer(std::shared_ptr<RequestState> requestState);
 
         /**
          * Fulfill the promise with the response.
@@ -350,6 +349,7 @@ private:
 
     struct RequestState final : public std::enable_shared_from_this<RequestState> {
         using ConnectionHandle = std::shared_ptr<ConnectionPool::ConnectionHandle::element_type>;
+        using WeakConnectionHandle = std::weak_ptr<ConnectionPool::ConnectionHandle::element_type>;
         RequestState(RequestManager* mgr, std::shared_ptr<CommandStateBase> cmdState_)
             : cmdState{std::move(cmdState_)}, requestManager(mgr) {}
 
@@ -359,18 +359,6 @@ private:
          * Return the client for a given connection
          */
         static AsyncDBClient* getClient(const ConnectionHandle& conn) noexcept;
-
-        /**
-         * Acquires the mutex and executes the provided lambda while holding it, returning its
-         * return value.
-         *
-         * If the request has already been cancelled, the lambda will
-         * not be invoked and the returned future will be ready with an error.
-         *
-         * Must not be called after the connection has already been returned.
-         */
-        Future<RemoteCommandResponse> withConnection(
-            std::function<Future<RemoteCommandResponse>(connection_pool_tl::TLConnection&)> f);
 
         /**
          * Cancel the current client operation or do nothing if there is no client.
@@ -401,11 +389,8 @@ private:
 
         boost::optional<RemoteCommandRequest> request;
         HostAndPort host;
-
-        // Guards conn and isCancelled.
-        Mutex mutex;
         ConnectionHandle conn;
-        bool isCancelled{false};
+        WeakConnectionHandle weakConn;
 
         // True if this request is an additional request sent to hedge the operation.
         bool isHedge{false};
@@ -441,24 +426,10 @@ private:
 
     Status _killOperation(CommandStateBase* cmdStateToKill, size_t idx);
 
-    /**
-     * Adds the provided cmdState to the list of in-progress commands.
-     * Throws an exception and does not add the state to the list if shutdown has started or
-     * completed.
-     */
-    void _registerCommand(const TaskExecutor::CallbackHandle& cbHandle,
-                          std::shared_ptr<CommandStateBase> cmdState);
-    /**
-     * Removes the provided cmdState to the list of in-progress commands.
-     * This is invoked by the CommandStateBase destructor.
-     * Has no effect if the command was never registered.
-     */
-    void _unregisterCommand(const TaskExecutor::CallbackHandle& cbHandle);
-
     std::string _instanceName;
     ServiceContext* _svcCtx = nullptr;
     transport::TransportLayerManager* _tl = nullptr;
-    // Will be created if ServiceContext is null, or if no TransportLayer was configured at startup.
+    // Will be created if ServiceContext is null, or if no TransportLayer was configured at startup
     std::unique_ptr<transport::TransportLayerManager> _ownedTransportLayer;
     transport::ReactorHandle _reactor;
 
@@ -491,22 +462,18 @@ private:
             .at(s);
     }
 
-    // Guards _state, _inProgress, _inProgressAlarmsInShutdown, and
-    // _inProgressAlarms.
-    mutable Mutex _mutex;
-
     // This condition variable is dedicated to block a thread calling this class
     // destructor, strictly when another thread is performing the network
     // interface shutdown which depends on the _ioThread termination and may
     // take an undeterministic amount of time to return.
+    mutable stdx::mutex _stateMutex;  // NOLINT
     stdx::condition_variable _stoppedCV;
     State _state;
 
     stdx::thread _ioThread;
 
-    // New entries cannot be added once shutdown has begun.
-    // CommandStateBase instances will remove themselves from this map upon destruction.
-    // shutdown() will block until this list is empty.
+    Mutex _inProgressMutex =
+        MONGO_MAKE_LATCH(HierarchicalAcquisitionLevel(0), "NetworkInterfaceTL::_inProgressMutex");
     stdx::unordered_map<TaskExecutor::CallbackHandle, std::weak_ptr<CommandStateBase>> _inProgress;
 
     bool _inProgressAlarmsInShutdown = false;

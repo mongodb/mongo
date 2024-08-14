@@ -59,7 +59,6 @@
 #include "mongo/client/async_client.h"
 #include "mongo/client/connection_string.h"
 #include "mongo/db/client.h"
-#include "mongo/db/database_name.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/wire_version.h"
@@ -68,11 +67,9 @@
 #include "mongo/executor/network_connection_hook.h"
 #include "mongo/executor/network_interface.h"
 #include "mongo/executor/network_interface_integration_fixture.h"
-#include "mongo/executor/network_interface_tl.h"
 #include "mongo/executor/remote_command_request.h"
 #include "mongo/executor/remote_command_response.h"
 #include "mongo/executor/task_executor.h"
-#include "mongo/idl/generic_argument_gen.h"
 #include "mongo/logv2/log.h"
 #include "mongo/logv2/log_component.h"
 #include "mongo/platform/mutex.h"
@@ -227,13 +224,7 @@ public:
                                          BSONObj cmd,
                                          OperationContext* opCtx = nullptr,
                                          RemoteCommandRequest::Options options = {},
-                                         boost::optional<ErrorCodes::Error> timeoutCode = {},
-                                         boost::optional<UUID> operationKey = {}) {
-        if (operationKey) {
-            cmd = cmd.addField(BSON(GenericArguments::kClientOperationKeyFieldName << *operationKey)
-                                   .firstElement());
-        }
-
+                                         boost::optional<ErrorCodes::Error> timeoutCode = {}) {
         auto cs = fixture();
         RemoteCommandRequest request(cs.getServers().front(),
                                      DatabaseName::kAdmin,
@@ -241,8 +232,7 @@ public:
                                      BSONObj(),
                                      opCtx,
                                      timeout,
-                                     std::move(options),
-                                     operationKey);
+                                     std::move(options));
         // Don't override possible opCtx error code.
         if (timeoutCode) {
             request.timeoutCode = timeoutCode;
@@ -1401,67 +1391,6 @@ TEST_F(NetworkInterfaceTest, ConnectionErrorAssociatedWithRemote) {
     ASSERT_EQ(ErrorCodes::HostUnreachable, result.status);
     ASSERT_EQ(result.target, fixture().getServers().front());
     assertNumOps(0u, 0u, 1u, 0u);
-}
-
-TEST_F(NetworkInterfaceTest, ShutdownBeforeSendRequest) {
-    auto operationKey = UUID::gen();
-
-    // Block the remote handling of "echo" indefinitely. If the NI sends the command and is
-    // (incorrectly) unable to cancel it, then this test will waiting for shutdown to complete.
-    runSetupCommandSync(DatabaseName::kAdmin,
-                        BSON("configureFailPoint"
-                             << "failCommand"
-                             << "mode" << BSON("times" << 1) << "data"
-                             << BSON("blockConnection" << true << "blockTimeMS" << 1000000000
-                                                       << "failCommands" << BSON_ARRAY("echo"))));
-
-    ON_BLOCK_EXIT([&] {
-        // TODO SERVER-93077: remove this killOp once disabling the failpoint is sufficient.
-        runSetupCommandSync(
-            DatabaseName::kAdmin,
-            BSON("_killOperations" << 1 << "operationKeys" << BSON_ARRAY(operationKey)));
-        // Disable blockConnection.
-        runSetupCommandSync(DatabaseName::kAdmin,
-                            BSON("configureFailPoint"
-                                 << "failCommand"
-                                 << "mode"
-                                 << "off"));
-    });
-
-    // Populate the pool with a connection so the getConnection future is ready immediately and its
-    // callbacks run on the main test thread.
-    assertCommandOK(DatabaseName::kAdmin, BSON("ping" << 1));
-
-    // Block the command thread after it acquires a connection but before it sends the request.
-    FailPointEnableBlock fpb("waitForShutdownBeforeSendRequest");
-
-    auto commandThread = stdx::thread([&]() {
-        auto cb = makeCallbackHandle();
-        auto request = makeTestCommand(kNoTimeout, makeEchoCmdObj(), nullptr, {}, {}, operationKey);
-        auto deferred = runCommandOnAny(cb, request);
-
-        auto result = deferred.get();
-        ASSERT_EQ(ErrorCodes::ShutdownInProgress, result.status);
-    });
-    ON_BLOCK_EXIT([&] { commandThread.join(); });
-
-    // Once the command thread has reached the failpoint, begin shutdown.
-    // Shutdown and draining should complete despite the blocking failCommand, since the request
-    // will either never have been sent (due to NI noticing the command has already been cancelled
-    // before sending the request) or the socket read/write will be interrupted.
-    fpb->waitForTimesEntered(1);
-    Notification<void> shutdownComplete;
-    auto shutdownThread = stdx::thread([&]() {
-        net().shutdown();
-        shutdownComplete.set();
-    });
-    ON_BLOCK_EXIT([&] { shutdownThread.join(); });
-
-    auto client = getGlobalServiceContext()->getService()->makeClient(__FILE__);
-    auto opCtx = client->makeOperationContext();
-    ASSERT(shutdownComplete.waitFor(opCtx.get(), Seconds(30)));
-
-    assertNumOps(1u, 0u, 0u, 1u);
 }
 
 }  // namespace

@@ -70,7 +70,6 @@
 #include "mongo/rpc/metadata/client_metadata.h"
 #include "mongo/rpc/protocol.h"
 #include "mongo/rpc/reply_interface.h"
-#include "mongo/stdx/mutex.h"
 #include "mongo/transport/transport_layer_manager.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/fail_point.h"
@@ -93,9 +92,6 @@ namespace {
 auto& totalTimeForEgressConnectionAcquiredToWireMicros =
     *MetricBuilder<Counter64>{"network.totalTimeForEgressConnectionAcquiredToWireMicros"};
 }  // namespace
-
-const Status AsyncDBClient::kDirtyCancellationStatus(ErrorCodes::CallbackCanceled,
-                                                     "Connection was invalidated");
 
 Future<AsyncDBClient::Handle> AsyncDBClient::connect(
     const HostAndPort& peer,
@@ -289,23 +285,7 @@ Future<void> AsyncDBClient::initWireVersion(const std::string& appName,
         });
 }
 
-Future<void> AsyncDBClient::_sinkMessage(Message request, const std::shared_ptr<Baton>& baton) {
-    stdx::lock_guard lk(_stateMutex);
-
-    if (_state == State::kDirty) {
-        return kDirtyCancellationStatus;
-    } else if (_state == State::kInProgress) {
-        return Status(ErrorCodes::ProtocolError,
-                      "Cannot send message: client already has an operation in progress");
-    }
-
-    _state = State::kInProgress;
-    return _session->asyncSinkMessage(request, baton);
-}
-
 Future<void> AsyncDBClient::_call(Message request, int32_t msgId, const BatonHandle& baton) {
-    bool isFireAndForget = OpMsg::isFlagSet(request, OpMsg::kMoreToCome);
-
     auto swm = _compressorManager.compressMessage(request);
     if (!swm.isOK()) {
         return swm.getStatus();
@@ -322,34 +302,13 @@ Future<void> AsyncDBClient::_call(Message request, int32_t msgId, const BatonHan
     OpMsg::appendChecksum(&request);
 #endif
 
-    return _sinkMessage(std::move(request), baton).tapAll([this, isFireAndForget](auto status) {
-        stdx::lock_guard lk(_stateMutex);
-
-        if (!status.isOK()) {
-            _state = State::kDirty;
-        } else if (isFireAndForget) {
-            // If we're not expecting a response, then the client can be used for subsequent
-            // requests.
-            _state = State::kDefault;
-        }
-    });
-}
-
-Future<Message> AsyncDBClient::_sourceMessage(const std::shared_ptr<Baton>& baton) {
-    stdx::lock_guard lk(_stateMutex);
-    if (_state == State::kDirty) {
-        return kDirtyCancellationStatus;
-    } else if (_state == State::kDefault) {
-        return Status(ErrorCodes::ExhaustCommandFinished,
-                      "No further exhaust responses can be read");
-    }
-    return _session->asyncSourceMessage(baton);
+    return _session->asyncSinkMessage(request, baton);
 }
 
 Future<Message> AsyncDBClient::_waitForResponse(boost::optional<int32_t> msgId,
                                                 const BatonHandle& baton) {
-    return _sourceMessage(baton)
-        .then([this, msgId](Message response) -> StatusWith<Message> {
+    return _session->asyncSourceMessage(baton).then(
+        [this, msgId](Message response) -> StatusWith<Message> {
             uassert(50787,
                     "ResponseId did not match sent message ID.",
                     msgId ? response.header().getResponseToMsgId() == msgId : true);
@@ -357,19 +316,6 @@ Future<Message> AsyncDBClient::_waitForResponse(boost::optional<int32_t> msgId,
                 return _compressorManager.decompressMessage(response);
             } else {
                 return response;
-            }
-        })
-        .tapAll([this](const StatusWith<Message>& swMsg) {
-            stdx::lock_guard lk(_stateMutex);
-
-            if (!swMsg.isOK()) {
-                _state = State::kDirty;
-                return;
-            }
-
-            // If moreToCome is not set, then this connection is ready for subsequent requests.
-            if (!OpMsg::isFlagSet(swMsg.getValue(), OpMsg::kMoreToCome)) {
-                _state = State::kDefault;
             }
         });
 }
@@ -481,28 +427,10 @@ Future<executor::RemoteCommandResponse> AsyncDBClient::beginExhaustCommandReques
 }
 
 void AsyncDBClient::cancel(const BatonHandle& baton) {
-    bool shouldCancel = false;
-
-    {
-        stdx::lock_guard lk(_stateMutex);
-        if (_state == State::kInProgress) {
-            _state = State::kDirty;
-            shouldCancel = true;
-        }
-    }
-
-    if (shouldCancel) {
-        _session->cancelAsyncOperations(baton);
-    }
+    _session->cancelAsyncOperations(baton);
 }
 
 bool AsyncDBClient::isStillConnected() {
-    {
-        stdx::lock_guard lk(_stateMutex);
-        if (_state == State::kDirty) {
-            return false;
-        }
-    }
     return _session->isConnected();
 }
 

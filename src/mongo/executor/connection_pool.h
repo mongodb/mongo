@@ -334,7 +334,6 @@ private:
         MONGO_MAKE_LATCH(HierarchicalAcquisitionLevel(1), "ExecutorConnectionPool::_mutex");
     PoolId _nextPoolId = 0;
     stdx::unordered_map<HostAndPort, std::shared_ptr<SpecificPool>> _pools;
-    bool _isShutDown = false;
 
     EgressConnectionCloserManager* _manager;
 
