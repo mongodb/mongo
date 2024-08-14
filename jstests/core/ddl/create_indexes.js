@@ -196,6 +196,23 @@ res = t.runCommand('createIndexes', {
 });
 assert.commandFailedWithCode(res, ErrorCodes.IndexKeySpecsConflict);
 
+// Test that creating an index on a view fails with CollectionUUIDMismatch if a collection UUID is
+// provided. CollectionUUIDMismatch has to prevail over CommandNotSupportedOnView for mongosync.
+assert.commandWorked(db.createView("toApple", "apple", []));
+res = db.runCommand({
+    createIndexes: 'toApple',
+    collectionUUID: UUID(),
+    indexes: [{name: "_id_hashed", key: {_id: "hashed"}}]
+});
+assert.commandFailedWithCode(res, ErrorCodes.CollectionUUIDMismatch);
+
+// Test that creating an index on a view fails with CommandNotSupportedOnView ifc a collection UUID
+// is not provided
+assert.commandWorked(db.createView("toApple", "apple", []));
+res = db.runCommand(
+    {createIndexes: 'toApple', indexes: [{name: "_id_hashed", key: {_id: "hashed"}}]});
+assert.commandFailedWithCode(res, ErrorCodes.CommandNotSupportedOnView);
+
 // Test that user is not allowed to create indexes in config.transactions.
 const configDB = db.getSiblingDB('config');
 res =
