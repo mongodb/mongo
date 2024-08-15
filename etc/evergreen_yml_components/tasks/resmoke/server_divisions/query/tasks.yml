@@ -1062,8 +1062,8 @@ tasks:
       - func: "generate resmoke tasks"
         vars:
           <<: *jstestfuzz_config_vars
-          num_files: 20
-          num_tasks: 20
+          num_files: 10
+          num_tasks: 40
           jstestfuzz_vars: --useEsModules
           npm_command: update-fuzzer
           resmoke_args: "--mongodSetParameters='{logComponentVerbosity: {command: 2}}'"
@@ -1092,8 +1092,8 @@ tasks:
       - func: "generate resmoke tasks"
         vars:
           <<: *jstestfuzz_config_vars
-          num_files: 20
-          num_tasks: 20
+          num_files: 10
+          num_tasks: 40
           jstestfuzz_vars: --useEsModules
           npm_command: update-fuzzer
           resmoke_args: "--mongodSetParameters='{logComponentVerbosity: {command: 2}}'"
@@ -1115,8 +1115,8 @@ tasks:
       - func: "generate resmoke tasks"
         vars:
           <<: *jstestfuzz_config_vars
-          num_files: 20
-          num_tasks: 20
+          num_files: 10
+          num_tasks: 40
           jstestfuzz_vars: --diffTestingMode timeseries --useEsModules
           npm_command: update-fuzzer
           suite: generational_fuzzer
