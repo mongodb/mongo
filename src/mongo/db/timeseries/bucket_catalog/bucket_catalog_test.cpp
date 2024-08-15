@@ -145,6 +145,12 @@ protected:
 
     Status _reopenBucket(const CollectionPtr& coll, const BSONObj& bucketDoc);
 
+    RolloverAction _rolloverAction(const std::shared_ptr<WriteBatch>& batch);
+
+    void _testUseBucketSkipsConflictingBucket(std::function<void(BucketCatalog&, Bucket&)>);
+    void _testUseAlternateBucketSkipsConflictingBucket(
+        std::function<void(BucketCatalog&, Bucket&)>);
+
     OperationContext* _opCtx;
     BucketCatalog* _bucketCatalog;
 
@@ -438,6 +444,90 @@ Status BucketCatalogTest::_reopenBucket(const CollectionPtr& coll, const BSONObj
         .getStatus();
 }
 
+RolloverAction BucketCatalogTest::_rolloverAction(const std::shared_ptr<WriteBatch>& batch) {
+    auto& stripe =
+        _bucketCatalog->stripes[internal::getStripeNumber(*_bucketCatalog, batch->bucketId)];
+    auto& [key, bucket] = *stripe->openBucketsById.find(batch->bucketId);
+    return bucket->rolloverAction;
+}
+
+void BucketCatalogTest::_testUseBucketSkipsConflictingBucket(
+    std::function<void(BucketCatalog&, Bucket&)> makeBucketConflict) {
+    BSONObj measurement = BSON(_timeField << Date_t::now() << _metaField << 1);
+    auto swResult =
+        prepareInsert(*_bucketCatalog, _uuid1, nullptr, _getTimeseriesOptions(_ns1), measurement);
+    ASSERT_OK(swResult);
+    auto& [insertCtx, time] = swResult.getValue();
+
+    Bucket& bucket1 = internal::allocateBucket(_opCtx,
+                                               *_bucketCatalog,
+                                               *_bucketCatalog->stripes[insertCtx.stripeNumber],
+                                               WithLock::withoutLock(),
+                                               insertCtx,
+                                               time);
+    makeBucketConflict(*_bucketCatalog, bucket1);
+
+    Bucket& bucket2 = internal::allocateBucket(_opCtx,
+                                               *_bucketCatalog,
+                                               *_bucketCatalog->stripes[insertCtx.stripeNumber],
+                                               WithLock::withoutLock(),
+                                               insertCtx,
+                                               time);
+
+    ASSERT_EQ(&bucket2,
+              internal::useBucket(_opCtx,
+                                  *_bucketCatalog,
+                                  *_bucketCatalog->stripes[insertCtx.stripeNumber],
+                                  WithLock::withoutLock(),
+                                  _ns1,
+                                  insertCtx,
+                                  internal::AllowBucketCreation::kNo,
+                                  time));
+}
+
+void BucketCatalogTest::_testUseAlternateBucketSkipsConflictingBucket(
+    std::function<void(BucketCatalog&, Bucket&)> makeBucketConflict) {
+    BSONObj measurement = BSON(_timeField << Date_t::now() << _metaField << 1);
+    auto swResult =
+        prepareInsert(*_bucketCatalog, _uuid1, nullptr, _getTimeseriesOptions(_ns1), measurement);
+    ASSERT_OK(swResult);
+    auto& [insertCtx, time] = swResult.getValue();
+
+    Bucket& bucket1 = internal::allocateBucket(_opCtx,
+                                               *_bucketCatalog,
+                                               *_bucketCatalog->stripes[insertCtx.stripeNumber],
+                                               WithLock::withoutLock(),
+                                               insertCtx,
+                                               time);
+    makeBucketConflict(*_bucketCatalog, bucket1);
+
+    Bucket& bucket2 = internal::allocateBucket(_opCtx,
+                                               *_bucketCatalog,
+                                               *_bucketCatalog->stripes[insertCtx.stripeNumber],
+                                               WithLock::withoutLock(),
+                                               insertCtx,
+                                               time);
+    // Temporarily mark bucket2 rolled over so we can open another.
+    bucket2.rolloverAction = RolloverAction::kArchive;
+
+    Bucket& bucket3 = internal::allocateBucket(_opCtx,
+                                               *_bucketCatalog,
+                                               *_bucketCatalog->stripes[insertCtx.stripeNumber],
+                                               WithLock::withoutLock(),
+                                               insertCtx,
+                                               time);
+    // Unmark bucket2 to ensure we have an open bucket to skip as well.
+    bucket2.rolloverAction = RolloverAction::kNone;
+    bucket3.rolloverAction = RolloverAction::kArchive;
+
+    ASSERT_EQ(&bucket3,
+              internal::useAlternateBucket(*_bucketCatalog,
+                                           *_bucketCatalog->stripes[insertCtx.stripeNumber],
+                                           WithLock::withoutLock(),
+                                           _ns1,
+                                           insertCtx,
+                                           time));
+}
 
 TEST_F(BucketCatalogTest, InsertIntoSameBucket) {
     // The first insert should be able to take commit rights
@@ -903,6 +993,43 @@ TEST_F(BucketCatalogTest, PrepareCommitOnAlreadyAbortedBatch) {
     ASSERT_NOT_OK(prepareCommit(*_bucketCatalog, _ns1, batch));
     ASSERT(isWriteBatchFinished(*batch));
     ASSERT_EQ(getWriteBatchResult(*batch).getStatus(), ErrorCodes::TimeseriesBucketCleared);
+}
+
+TEST_F(BucketCatalogTest, InsertRollsOverAlternateBucket) {
+    // Open an initial bucket.
+    auto result1 =
+        _insertOneHelper(_opCtx, *_bucketCatalog, _ns1, _uuid1, BSON(_timeField << Date_t::now()));
+    auto batch1 = get<SuccessfulInsertion>(result1.getValue()).batch;
+
+    // Insert something backward in time, so mark the first bucket to be archived.
+    auto result2 = _insertOneHelper(
+        _opCtx, *_bucketCatalog, _ns1, _uuid1, BSON(_timeField << (Date_t::now() - Days{1})));
+    auto batch2 = get<SuccessfulInsertion>(result2.getValue()).batch;
+    ASSERT_NE(batch1->bucketId.oid, batch2->bucketId.oid);
+    ASSERT_EQ(_rolloverAction(batch1), RolloverAction::kArchive);
+
+    // Continue to insert more to the initial bucket until we rollover to new bucket.
+    size_t bucketCount = 1;
+    while (true) {
+        // Using tryInsert will let us select an alternate bucket, even though it's been marked for
+        // archival.
+        auto result = _tryInsertOneHelper(
+            _opCtx, *_bucketCatalog, _ns1, _uuid1, BSON(_timeField << Date_t::now()));
+        auto batch = get<SuccessfulInsertion>(result.getValue()).batch;
+
+        if (batch->bucketId.oid != batch1->bucketId.oid) {
+            // We expect this rollover only happened because we hit a limit that results in a hard
+            // closure.
+            ASSERT_EQ(_rolloverAction(batch1), RolloverAction::kHardClose);
+            // We should go back and mark the open (non-alternate) bucket closed.
+            ASSERT_EQ(_rolloverAction(batch2), RolloverAction::kSoftClose);
+            // The new bucket should be open.
+            ASSERT_EQ(_rolloverAction(batch), RolloverAction::kNone);
+            break;
+        }
+
+        ASSERT_LTE(++bucketCount, gTimeseriesBucketMaxCount);
+    }
 }
 
 TEST_F(BucketCatalogTest, CombiningWithInsertsFromOtherClients) {
@@ -2344,6 +2471,42 @@ TEST_F(BucketCatalogTest, OIDCollisionIsHandledForFrozenBucket) {
     ASSERT_NE(nextBucketId, batch2->bucketId);
     // We should check that the bucketID that we failed to create is not stored in the stripe.
     ASSERT(!_bucketCatalog->stripes[0]->openBucketsById.contains(nextBucketId));
+}
+
+TEST_F(BucketCatalogTest, UseBucketSkipsBucketWithDirectWrite) {
+    _testUseBucketSkipsConflictingBucket([](BucketCatalog& catalog, Bucket& bucket) {
+        directWriteStart(catalog.bucketStateRegistry, bucket.bucketId);
+    });
+}
+
+TEST_F(BucketCatalogTest, UseBucketSkipsClearedBucket) {
+    _testUseBucketSkipsConflictingBucket([](BucketCatalog& catalog, Bucket& bucket) {
+        clear(catalog, bucket.bucketId.collectionUUID);
+    });
+}
+
+TEST_F(BucketCatalogTest, UseBucketSkipsFrozenBucket) {
+    _testUseBucketSkipsConflictingBucket([](BucketCatalog& catalog, Bucket& bucket) {
+        freezeBucket(catalog.bucketStateRegistry, bucket.bucketId);
+    });
+}
+
+TEST_F(BucketCatalogTest, UseAlternateBucketSkipsBucketWithDirectWrite) {
+    _testUseAlternateBucketSkipsConflictingBucket([](BucketCatalog& catalog, Bucket& bucket) {
+        directWriteStart(catalog.bucketStateRegistry, bucket.bucketId);
+    });
+}
+
+TEST_F(BucketCatalogTest, UseAlternateBucketSkipsClearedBucket) {
+    _testUseAlternateBucketSkipsConflictingBucket([](BucketCatalog& catalog, Bucket& bucket) {
+        clear(catalog, bucket.bucketId.collectionUUID);
+    });
+}
+
+TEST_F(BucketCatalogTest, UseAlternateBucketSkipsFrozenBucket) {
+    _testUseAlternateBucketSkipsConflictingBucket([](BucketCatalog& catalog, Bucket& bucket) {
+        freezeBucket(catalog.bucketStateRegistry, bucket.bucketId);
+    });
 }
 
 }  // namespace

@@ -251,6 +251,7 @@ Status initializeBucketState(BucketStateRegistry& registry,
                 "Bucket initialization failed: bucket is frozen"};
     }
 
+    invariant(isBucketStateCleared(it->second));
     invariant(!isBucketStatePrepared(it->second));
     it->second = BucketState::kNormal;
 
