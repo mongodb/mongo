@@ -39,3 +39,37 @@ for (let index = 0; index < results.length; index++) {
     assert.eq(null, results[index].stdDevPop);
     assert.eq(null, results[index].stdDevSamp);
 }
+
+// Test leading non-finite value generates correct result.
+for (let nonFinite of [NaN, Infinity]) {
+    assert.eq(true, coll.drop());
+    assert.commandWorked(coll.insertMany([
+        {_id: 0, a: nonFinite},
+        {_id: 1, a: 1},
+        {_id: 2, a: 2},
+        {_id: 3, a: nonFinite},
+    ]));
+    const cursor = coll.aggregate([
+        {
+            $setWindowFields: {
+                partitionBy: null,
+                sortBy: {_id: 1},
+                output: {
+                    b: {$stdDevSamp: "$a", window: {documents: [1, 2]}},
+                    c: {$stdDevPop: "$a", window: {documents: [1, 2]}},
+                }
+            }
+        },
+        {
+            $project: {
+                stdDevSamp: {$trunc: ["$b", 2]},
+                stdDevPop: {$trunc: ["$c", 2]},
+                _id: 0,
+            }
+        },
+    ]);
+    let result = cursor.next();
+    assert.docEq({stdDevSamp: 0.7, stdDevPop: 0.5}, result, result);
+    result = cursor.next();
+    assert.docEq({stdDevSamp: null, stdDevPop: null}, result, result);
+}

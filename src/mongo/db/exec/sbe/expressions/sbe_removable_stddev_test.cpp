@@ -275,8 +275,8 @@ TEST_F(SBERemovableStdDevTest, InfTest) {
         {value::TypeTags::Null, 0},
         {value::TypeTags::Null, 0},
         {value::TypeTags::Null, 0},
-        {value::TypeTags::NumberDouble, value::bitcastFrom<double>(22.1454)},
-        {value::TypeTags::NumberDouble, value::bitcastFrom<double>(28.4634)},
+        {value::TypeTags::NumberDouble, value::bitcastFrom<double>(14.3643)},
+        {value::TypeTags::NumberDouble, value::bitcastFrom<double>(15.5563)},
         {value::TypeTags::Null, 0},
         {value::TypeTags::Null, 0},
     };
@@ -290,8 +290,8 @@ TEST_F(SBERemovableStdDevTest, InfTest) {
         {value::TypeTags::Null, 0},
         {value::TypeTags::Null, 0},
         {value::TypeTags::Null, 0},
-        {value::TypeTags::NumberDouble, value::bitcastFrom<double>(18.0816)},
-        {value::TypeTags::NumberDouble, value::bitcastFrom<double>(20.1267)},
+        {value::TypeTags::NumberDouble, value::bitcastFrom<double>(11.7284)},
+        {value::TypeTags::NumberDouble, value::bitcastFrom<double>(11)},
         {value::TypeTags::NumberInt32, 0},
         {value::TypeTags::Null, 0},
     };

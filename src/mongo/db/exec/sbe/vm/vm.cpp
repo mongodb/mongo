@@ -8584,7 +8584,6 @@ void ByteCode::aggRemovableStdDevImpl(value::TypeTags stateTag,
          !std::isfinite(value::bitcastTo<double>(inputVal))) ||
         (inputTag == value::TypeTags::NumberDecimal &&
          !value::bitcastTo<Decimal128>(inputVal).isFinite())) {
-        count += quantity;
         nonFiniteCount += quantity;
         updateRemovableStdDevState(state, count, nonFiniteCount);
         return;

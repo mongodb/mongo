@@ -94,7 +94,6 @@ private:
         if ((value.getType() == NumberDouble && !std::isfinite(value.getDouble())) ||
             (value.getType() == NumberDecimal && !value.getDecimal().isFinite())) {
             _nonfiniteValueCount += quantity;
-            _count += quantity;
             return;
         }
 
