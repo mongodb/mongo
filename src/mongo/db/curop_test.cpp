@@ -400,7 +400,7 @@ TEST(CurOpTest, OptionalAdditiveMetricsNotDisplayedIfUninitialized) {
     }
 
     BSONObjBuilder builder;
-    od.append(opCtx.get(), ls, {}, false /*omitCommand*/, builder);
+    od.append(opCtx.get(), ls, {}, builder);
     auto bs = builder.done();
 
     // Append should always include these basic fields.

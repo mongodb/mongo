@@ -569,7 +569,7 @@ public:
             // RAII object which holds references to objects on this stack frame, which will be used
             // to print diagnostics in the event of a tassert or invariant.
             ScopedDebugInfo findCmdDiagnostics("queryDiagnostics",
-                                               query_diagnostics::Printer{opCtx});
+                                               query_diagnostics::Printer{cmdObj});
 
             // Parse the command BSON to a FindCommandRequest. Pass in the parsedNss in case cmdObj
             // does not have a UUID.
