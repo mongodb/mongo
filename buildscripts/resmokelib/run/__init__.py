@@ -319,20 +319,51 @@ class TestRunner(Subcommand):
         self._log_suite_summary(suite)
         return interrupted
 
+    def _get_fuzzed_param_resmoke_invocation(self, set_parameters):
+        """
+        Formats fuzzed parameter resmoke string to be used in a a resmoke invocation with parameters for flags --mongo(d/s)SetParameters.
+
+        Input:
+        set_parameters - A string consisting with a key of being the parameter being fuzzed and the value being the fuzzed parameter value.
+                        e.g.:
+                        analyzeShardKeySplitPointExpirationSecs: 50
+                        chunkMigrationConcurrency: 4
+                        ...
+                        mirrorReads:
+                            samplingRate: 0.25
+
+        Output:
+        A string that can be used for an argument to --mongo(d/s)SetParameters
+        e.g.:
+        '{analyzeShardKeySplitPointExpirationSecs: 216, chunkMigrationConcurrency: 4, ..., mirrorReads: {samplingRate: 0.25}}'
+        """
+
+        def format_item(key, value):
+            if isinstance(value, dict):
+                # Recursively format nested dictionaries
+                inner_items = ", ".join(format_item(k, v) for k, v in value.items())
+                return f"{key}: {{{inner_items}}}"
+            else:
+                return f"{key}: {value}"
+
+        set_parameters = yaml.safe_load(set_parameters)
+        items = ", ".join(format_item(k, v) for k, v in set_parameters.items())
+        return f"{{{items}}}"
+
     def _get_fuzzed_param_log_str(self, binary_name_str, set_parameters):
         """
-        Helper function that creates a string containing the fuzzed parameters when the config fuzzer is invoked, along with the fuzzed parameters' min and maxes.
+        Formats a string containing the fuzzed parameter's name, the fuzzed parameter's values, and the fuzzed parameters' min and maxes for logging.
 
         Input:
         binary_name_str - A string that represents the parameters of the binary that is getting fuzzed, e.g. "mongod"
-        set_parameters - A dictionary consisting with a key of being the parameter being fuzzed and the value being the fuzzed parameter value.
-                         e.g. {
-                         "analyzeShardKeySplitPointExpirationSecs": 50,
-                         "chunkMigrationConcurrency": 4,
+        set_parameters - A string consisting with a key of being the parameter being fuzzed and the value being the fuzzed parameter value.
+                         e.g.:
+                         analyzeShardKeySplitPointExpirationSecs: 50
+                         chunkMigrationConcurrency: 4
                          ...
-                         }
 
         Output:
+        e.g.:
         analyzeShardKeySplitPointExpirationSecs: 216, 50: 1, max: 300
         chunkMigrationConcurrency: 4, min: 1, max: 16, options: [1, 4, 16]
         ...
@@ -358,14 +389,17 @@ class TestRunner(Subcommand):
             params_str += curr_params_str + "\n"
         return params_str
 
-    def _log_fuzzed_wired_tiger_config_str(self):
+    def _format_wired_tiger_engine_config_str(self, isFuzzed):
         """
-        Helper function that logs the fuzzed WiredTiger config string, along with the fuzzed parameters' min and maxes.
+        Helper function that logs the wiredTigerEngineConfigString's parameter names, parameter values, and parameters' min and maxes.
+        To accept both when the wiredTigerEngineConfigStrings that are created through the fuzzer and that are passed in by the user, we have to accept both [] and () braces for the nested parameter arguments.
 
         This function only supports one level of WT config string nesting.
 
         Input:
         debug_mode=(eviction=false,realloc_exact=true,rollback_error=0,slow_checkpoint=false),eviction_checkpoint_target=4
+        OR
+         debug_mode=[eviction=false,realloc_exact=true,rollback_error=0,slow_checkpoint=false],eviction_checkpoint_target=4
 
         Output:
         debug_mode.eviction: false
@@ -401,20 +435,21 @@ class TestRunner(Subcommand):
         prev_word_closing_paren = False
         # Parsing the WiredTiger configuration string, accounting for when there is one-level nested arguments.
         for char in str(config.WT_ENGINE_CONFIG):
-            if char == "(":
+            if char == "(" or char == "[":
                 curr_paren_word = current_word[: len(current_word) - 2]
                 current_word = ""
             elif char == "=":
                 curr_param_name = current_word
                 current_word += ": "
-            elif char in (",", ")"):
-                limit_substr = ""
-
+            elif char in (",", ")", "]"):
                 # Checks both the wt_table_params and wt_params to see if the current parameters has limits in either of these limit dictionaries.
                 # check_limit_dict returns an empty string if there are no limits found in a dictionary, so we can append results from
                 # checking both limit dictionaries.
-                limit_substr += check_limit_dict(wt_table_params, curr_param_name)
-                limit_substr += check_limit_dict(wt_params, curr_param_name)
+                # Only checks the limits when it is a fuzzed parameter.
+                limit_substr = ""
+                if isFuzzed:
+                    limit_substr += check_limit_dict(wt_table_params, curr_param_name)
+                    limit_substr += check_limit_dict(wt_params, curr_param_name)
                 if not prev_word_closing_paren:
                     if curr_paren_word != "":
                         wt_engine_config_str.append(
@@ -423,7 +458,7 @@ class TestRunner(Subcommand):
                     else:
                         wt_engine_config_str.append(current_word.strip() + limit_substr)
 
-                if char == ")":
+                if char == ")" or char == "]":
                     prev_word_closing_paren = True
                     curr_paren_word = ""
                 else:
@@ -435,26 +470,50 @@ class TestRunner(Subcommand):
         if current_word:
             wt_engine_config_str.append(current_word.strip())
 
-        # Blank line for readability
-        wt_engine_config_str.append("")
-        wt_engine_config_str = "\n".join(wt_engine_config_str)
-        self._resmoke_logger.info("Fuzzed wiredTigerConnectionString: \n%s", wt_engine_config_str)
+        return "\n".join(wt_engine_config_str) + "\n"
+
+    def _format_config_str(self, config_str):
+        pairs = config_str.split(",")
+        formatted_lines = []
+        for pair in pairs:
+            if "=" in pair:
+                key, value = pair.split("=")
+                formatted_lines.append(f"{key}: {value}")
+        return "\n".join(formatted_lines) + "\n"
 
     def _log_local_resmoke_invocation(self):
         """Log local resmoke invocation example."""
+
+        # We want to log the following parameters when the config fuzzer is run locally, which is why we log them before the Evergreen check.
+        if config.FUZZ_MONGOD_CONFIGS or config.FUZZ_MONGOS_CONFIGS:
+            self._resmoke_logger.info("configFuzzSeed: %s\n", str(config.CONFIG_FUZZ_SEED))
+
         if config.FUZZ_MONGOD_CONFIGS:
             params_str = self._get_fuzzed_param_log_str("mongod", config.MONGOD_SET_PARAMETERS)
             self._resmoke_logger.info("Fuzzed mongodSetParameters:\n%s", params_str)
-            self._log_fuzzed_wired_tiger_config_str()
 
         if config.FUZZ_MONGOS_CONFIGS:
             params_str = self._get_fuzzed_param_log_str("mongos", config.MONGOS_SET_PARAMETERS)
             self._resmoke_logger.info("Fuzzed mongosSetParameters:\n%s", params_str)
 
-        if config.FUZZ_MONGOD_CONFIGS or config.FUZZ_MONGOS_CONFIGS:
-            self._resmoke_logger.info("configFuzzSeed: \n%s", str(config.CONFIG_FUZZ_SEED))
+        if config.WT_ENGINE_CONFIG:
+            self._resmoke_logger.info(
+                "wiredTigerEngineConfigString:\n%s",
+                self._format_wired_tiger_engine_config_str(config.FUZZ_MONGOD_CONFIGS),
+            )
 
-        # Do not log local args if this is not being ran in evergreen
+        if config.WT_COLL_CONFIG:
+            self._resmoke_logger.info(
+                "wiredTigerCollectionConfigString:\n%s",
+                self._format_config_str(config.WT_COLL_CONFIG),
+            )
+
+        if config.WT_INDEX_CONFIG:
+            self._resmoke_logger.info(
+                "wiredTigerIndexConfigString:\n%s", self._format_config_str(config.WT_INDEX_CONFIG)
+            )
+
+        # We don't need to return the resmoke invocation if we aren't running on evergreen.
         if not config.EVERGREEN_TASK_ID:
             print("Skipping local invocation because evergreen task id was not provided.")
             return
@@ -504,9 +563,18 @@ class TestRunner(Subcommand):
 
         local_args = to_local_args()
         local_args = strip_fuzz_config_params(local_args)
+
+        # We have two lines that are provided to the user. The local_resmoke_invocation has the --configFuzzSeed and --fuzzMongo(d/s)Configs
+        # local_resmoke_invocation_with_params directly includes the engine, index, and collection storage engine configuration.
         local_resmoke_invocation = (
             f"{os.path.join('buildscripts', 'resmoke.py')} {' '.join(local_args)}"
         )
+        local_resmoke_invocation_with_params = (
+            f"{os.path.join('buildscripts', 'resmoke.py')} {' '.join(local_args)}"
+        )
+
+        if config.FUZZ_MONGOD_CONFIGS or config.FUZZ_MONGOS_CONFIGS:
+            local_resmoke_invocation += f" --configFuzzSeed={str(config.CONFIG_FUZZ_SEED)}"
 
         if config.FUZZ_MONGOD_CONFIGS:
             local_resmoke_invocation += f" --fuzzMongodConfigs={config.FUZZ_MONGOD_CONFIGS}"
@@ -514,12 +582,30 @@ class TestRunner(Subcommand):
         if config.FUZZ_MONGOS_CONFIGS:
             local_resmoke_invocation += f" --fuzzMongosConfigs={config.FUZZ_MONGOS_CONFIGS}"
 
-        if config.FUZZ_MONGOD_CONFIGS or config.FUZZ_MONGOS_CONFIGS:
-            local_resmoke_invocation += f" --configFuzzSeed={str(config.CONFIG_FUZZ_SEED)}"
+        if config.WT_ENGINE_CONFIG:
+            # Make the engine_config_str correctly formatted for the resmoke output by replacing round braces with square braces.
+            local_resmoke_invocation_with_params += f" --wiredTigerEngineConfigString '{config.WT_ENGINE_CONFIG.replace('(', '[').replace(')', ']')}'"
+
+        if config.WT_COLL_CONFIG:
+            local_resmoke_invocation_with_params += (
+                f" --wiredTigerCollectionConfigString '{config.WT_COLL_CONFIG}'"
+            )
+
+        if config.WT_INDEX_CONFIG:
+            local_resmoke_invocation_with_params += (
+                f" --wiredTigerIndexConfigString '{config.WT_INDEX_CONFIG}'"
+            )
+
+        if config.MONGOD_SET_PARAMETERS:
+            local_resmoke_invocation_with_params += f" --mongodSetParameters='{self._get_fuzzed_param_resmoke_invocation(config.MONGOD_SET_PARAMETERS)}'"
+
+        if config.MONGOS_SET_PARAMETERS:
+            local_resmoke_invocation_with_params += f" --mongosSetParameters='{self._get_fuzzed_param_resmoke_invocation(config.MONGOS_SET_PARAMETERS)}'"
 
         if multiversion_bin_version:
             default_tag_file = config.DEFAULTS["exclude_tags_file_path"]
             local_resmoke_invocation += f" --tagFile={default_tag_file}"
+            local_resmoke_invocation_with_params += f" --tagFile={default_tag_file}"
 
         resmoke_env_options = ""
         if os.path.exists("resmoke_env_options.txt"):
@@ -527,8 +613,17 @@ class TestRunner(Subcommand):
                 resmoke_env_options = fin.read().strip()
 
         local_resmoke_invocation = f"{resmoke_env_options} {local_resmoke_invocation}"
+        if config.FUZZ_MONGOD_CONFIGS or config.FUZZ_MONGOS_CONFIGS:
+            self._resmoke_logger.info(
+                "resmoke.py invocation for local usage: %s", local_resmoke_invocation
+            )
+
+        local_resmoke_invocation_with_params = (
+            f"{resmoke_env_options} {local_resmoke_invocation_with_params}"
+        )
         self._resmoke_logger.info(
-            "resmoke.py invocation for local usage: %s", local_resmoke_invocation
+            "resmoke.py invocation with params for local usage: %s",
+            local_resmoke_invocation_with_params,
         )
 
         lines = []
@@ -581,7 +676,10 @@ class TestRunner(Subcommand):
             lines.append(f"tar -xf {jstests_tar} -C {jstestfuzz_dir} && \\")
             lines.append(f"rm {jstests_tar} && \\")
 
-        lines.append(local_resmoke_invocation)
+        if config.FUZZ_MONGOD_CONFIGS or config.FUZZ_MONGOS_CONFIGS:
+            lines.append(local_resmoke_invocation)
+            lines.append("\n")
+        lines.append(local_resmoke_invocation_with_params)
 
         with open("local-resmoke-invocation.txt", "w") as fh:
             fh.write("\n".join(lines))
