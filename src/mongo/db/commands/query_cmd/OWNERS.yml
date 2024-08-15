@@ -11,6 +11,9 @@ filters:
   - "change_stream_state_command.cpp":
     approvers:
       - 10gen/query-execution
+  - "cst_command.cpp":
+    approvers:
+      - 10gen/query-optimization
   - "index_filter_commands.*":
     approvers:
       - 10gen/query-optimization

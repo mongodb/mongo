@@ -33,6 +33,7 @@ env.SConscript(
         "catalog",
         "commands",
         "concurrency",
+        "cst",
         "exec",
         "fts",
         "ftdc",

@@ -42,6 +42,8 @@ selector:
     - build/install/bin/chunk_manager_refresh_bm*
     - build/install/bin/migration_chunk_cloner_source_legacy_bm*
     - build/install/bin/sharding_write_router_bm*
+    # These benchmarks included in the benchmarks_cst.yml test suite are disabled under SERVER-64949.
+    # - build/install/bin/cst_bm*
     # These benchmarks are being run as part of the benchmarks_bsoncolumn.yml test suite.
     - build/install/bin/bsoncolumn_bm*
     - build/install/bin/simple8b_bm*
