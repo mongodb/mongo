@@ -159,7 +159,6 @@ toolchain(
     exec_compatible_with = [
         "@platforms//os:linux",
         "@platforms//cpu:{platforms_arch}",
-        "@bazel_tools//tools/cpp:gcc",
     ],
     target_compatible_with = [
         "@platforms//os:linux",
@@ -167,13 +166,6 @@ toolchain(
     ],
     toolchain = ":cc_mongo_toolchain",
     toolchain_type = "@bazel_tools//tools/cpp:toolchain_type",
-)
-
-cc_toolchain_suite(
-    name = "toolchain_suite",
-    toolchains = {
-        "{bazel_toolchain_cpu}": ":cc_mongo_toolchain",
-    },
 )
 
 # This file group makes it possible to set the clang-tidy configuration setting:

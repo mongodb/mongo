@@ -7,6 +7,9 @@ info --config=local
 # This automatically sets a config based on host platform, ex: --config=macos if the host is macos
 build --enable_platform_specific_config=true
 
+# Don't use legacy toolchain resolution.
+build --incompatible_enable_cc_toolchain_resolution
+
 # This makes builds more hermetic by preventing environment variables from leaking into the execution of rules
 build --incompatible_strict_action_env=true
 
@@ -17,11 +20,6 @@ build --experimental_inprocess_symlink_creation
 # cc_library transitively propagates link opts. The build uses cc_shared_library to avoid this when linking
 # dynamically.
 build --experimental_cc_shared_library
-
-# This supports the "crosstool" feature (aka building from our toolchain).
-# Currently the only platform with a custom toolchain config is linux, use the default
-# toolchain_suite elsewhere.
-build:linux --crosstool_top=@mongo_toolchain//:toolchain_suite
 
 # Disable the default compiler flags to avoid certain flags that conflict with flags we setup.
 build:windows --features=-smaller_binary
