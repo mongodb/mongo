@@ -302,17 +302,3 @@ idl_generator(
         "//src/mongo/db:basic_types_gen",
     ],
 )
-
-mongo_cc_library(
-    name = "change_stream_pre_and_post_images_options",
-    srcs = [
-        ":change_stream_pre_and_post_images_options_gen",
-    ],
-    header_deps = [
-        "//src/mongo/executor:async_rpc_error_info",
-    ],
-    deps = [
-        "//src/mongo:base",
-        "//src/mongo/idl:idl_parser",
-    ],
-)
