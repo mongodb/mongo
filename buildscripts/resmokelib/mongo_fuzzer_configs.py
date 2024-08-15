@@ -6,7 +6,6 @@ from buildscripts.resmokelib import config, utils
 
 def generate_normal_wt_parameters(rng, value):
     """Returns the value assigned the WiredTiger parameters (both eviction or table) based on the fields of the parameters in the config_fuzzer_wt_limits.py."""
-
     if "choices" in value:
         ret = rng.choice(value["choices"])
         if "multiplier" in value:
@@ -26,22 +25,28 @@ def generate_special_eviction_configs(rng, ret, fuzzer_stress_mode, params):
         params["eviction_target"]["min"], params["eviction_target"]["max"]
     )
     ret["eviction_trigger"] = rng.randint(
-        ret["eviction_target"] + params["eviction_trigger"]["min"],
-        params["eviction_trigger"]["max"],
+        ret["eviction_target"] + params["eviction_trigger"]["lower_bound"],
+        params["eviction_trigger"]["upper_bound"],
     )
 
     # Fuzz eviction_dirty_target and trigger both as relative and absolute values.
     ret["eviction_dirty_target"] = rng.choice(
         [
             rng.randint(
-                params["eviction_dirty_target_1"]["min"], params["eviction_dirty_target_1"]["max"]
+                params["eviction_dirty_target_1"]["lower_bound"],
+                params["eviction_dirty_target_1"]["upper_bound"],
             ),
             rng.randint(
-                params["eviction_dirty_target_2"]["min"], params["eviction_dirty_target_2"]["max"]
+                params["eviction_dirty_target_2"]["lower_bound"],
+                params["eviction_dirty_target_2"]["upper_bound"],
             ),
         ]
     )
-    ret["trigger_max"] = 75 if ret["eviction_dirty_target"] <= 50 else target_bytes_max
+    ret["trigger_max"] = (
+        params["trigger_max"]["min"]
+        if ret["eviction_dirty_target"] <= 50
+        else params["trigger_max"]["max"]
+    )
     ret["eviction_dirty_trigger"] = rng.randint(
         ret["eviction_dirty_target"] + 1, ret["trigger_max"]
     )
@@ -54,7 +59,9 @@ def generate_special_eviction_configs(rng, ret, fuzzer_stress_mode, params):
     # dirty equivalents. The default updates target is 2.5% of the cache, so let's start fuzzing
     # from 2%.
     ret["updates_target_min"] = (
-        2 if ret["eviction_dirty_target"] <= 100 else 20 * 1024 * 1024
+        params["updates_target_min"]["min"]
+        if ret["eviction_dirty_target"] <= 100
+        else params["updates_target_min"]["max"]
     )  # 2% of 1GB cache
     ret["eviction_updates_target"] = rng.randint(
         ret["updates_target_min"], ret["eviction_dirty_target"] - 1
@@ -90,6 +97,8 @@ def generate_eviction_configs(rng, fuzzer_stress_mode):
         "dbg_rollback_error",
         "dbg_slow_checkpoint",
         "eviction_dirty_target",
+        "eviction_dirty_target_1",
+        "eviction_dirty_target_2",
         "eviction_dirty_trigger",
         "eviction_target",
         "eviction_trigger",
@@ -140,11 +149,10 @@ def generate_special_table_configs(rng, ret, params):
     ret["memory_page_max_upper_bound"] = round(
         (
             rng.randint(
-                params["memory_page_max_upper_bound"]["min"],
-                params["memory_page_max_upper_bound"]["max"],
+                params["memory_page_max_upper_bound"]["lower_bound"],
+                params["memory_page_max_upper_bound"]["upper_bound"],
             )
-            * 1024
-            * 1024
+            * params["memory_page_max_upper_bound"]["multiplier"]
         )
         / 10
     )  # cache_size / 10
@@ -227,6 +235,8 @@ def generate_normal_mongo_parameters(rng, value):
         ret = rng.choice(value["choices"])
     elif "min" in value and "max" in value:
         ret = rng.randint(value["min"], value["max"])
+        if "multiplier" in value:
+            ret *= value["multiplier"]
     elif "default" in value:
         ret = value["default"]
     return ret
@@ -257,8 +267,8 @@ def generate_special_mongod_parameters(rng, ret, fuzzer_stress_mode, params):
         [
             1,
             rng.randint(
-                params["internalQueryExecYieldIterations"]["min"],
-                params["internalQueryExecYieldIterations"]["max"],
+                params["internalQueryExecYieldIterations"]["lower_bound"],
+                params["internalQueryExecYieldIterations"]["upper_bound"],
             ),
         ],
         weights=[1, 10],
@@ -304,10 +314,11 @@ def generate_mongod_parameters(rng, fuzzer_stress_mode):
 
     # Parameter sets with different behaviors.
     flow_control_params = [
-        "flowControlTargetLagSeconds",
         "flowControlMaxSamples",
-        "flowControlSamplePeriod",
         "flowControlMinTicketsPerSecond",
+        "flowControlSamplePeriod",
+        "flowControlTargetLagSeconds",
+        "flowControlThresholdLagPercentage",
     ]
 
     # excluded_normal_params are params that we want to exclude from the for-loop because they have some different assignment behavior
@@ -315,7 +326,7 @@ def generate_mongod_parameters(rng, fuzzer_stress_mode):
     excluded_normal_params = [
         "disableLogicalSessionCacheRefresh",
         "internalQueryExecYieldIterations",
-        "logicalSessionRefreshMilli",
+        "logicalSessionRefreshMillis",
         "maxNumberOfTransactionOperationsInSingleOplogEntry",
         "mirrorReads",
         "storageEngineConcurrencyAdjustmentAlgorithm",
