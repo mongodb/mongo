@@ -125,6 +125,9 @@ WORKSPACE.bazel @10gen/devprod-build
 /jstests/core/clustered/* @10gen/server-storage-execution
 /jstests/core/timeseries/* @10gen/server-storage-execution
 
+# The following patterns are parsed from ./jstests/core/txns/OWNERS.yml
+/jstests/core/txns/**/* @10gen/server-replication
+
 # The following patterns are parsed from ./jstests/fail_point/OWNERS.yml
 /jstests/fail_point/**/* @10gen/server-service-architecture
 
@@ -161,6 +164,7 @@ WORKSPACE.bazel @10gen/devprod-build
 /jstests/noPassthroughWithMongod/**/log_component_helpers.js @10gen/server-service-architecture
 
 # The following patterns are parsed from ./jstests/replsets/OWNERS.yml
+/jstests/replsets/**/* @10gen/server-replication
 /jstests/replsets/**/*capped* @10gen/server-storage-execution
 
 # The following patterns are parsed from ./jstests/sharding/OWNERS.yml
@@ -257,6 +261,10 @@ WORKSPACE.bazel @10gen/devprod-build
 /src/mongo/db/**/drop*idl @10gen/server-catalog-and-routing
 /src/mongo/db/**/startup_recovery* @10gen/server-storage-execution
 /src/mongo/db/**/field_ref* @10gen/query
+/src/mongo/db/**/read_concern* @10gen/server-replication
+/src/mongo/db/**/read_write_concern* @10gen/server-replication
+/src/mongo/db/**/write_concern* @10gen/server-replication
+/src/mongo/db/**/feature_compatibility* @10gen/server-replication
 
 # The following patterns are parsed from ./src/mongo/db/auth/OWNERS.yml
 /src/mongo/db/auth/**/* @10gen/server-security
@@ -296,6 +304,9 @@ WORKSPACE.bazel @10gen/devprod-build
 /src/mongo/db/commands/**/rename* @10gen/server-catalog-and-routing
 /src/mongo/db/commands/**/set_cluster* @10gen/server-catalog-and-routing
 /src/mongo/db/commands/**/set_profiling_filter_globally_cmd* @10gen/query-integration
+/src/mongo/db/commands/**/dbcheck* @10gen/server-replication
+/src/mongo/db/commands/**/feature_compatibility* @10gen/server-replication
+/src/mongo/db/commands/**/oplog* @10gen/server-replication
 
 # The following patterns are parsed from ./src/mongo/db/commands/query_cmd/OWNERS.yml
 /src/mongo/db/commands/query_cmd/**/* @10gen/query
@@ -375,8 +386,12 @@ WORKSPACE.bazel @10gen/devprod-build
 # The following patterns are parsed from ./src/mongo/db/modules/enterprise/docs/testing/OWNERS.yml
 /src/mongo/db/modules/enterprise/docs/testing/**/* @10gen/devprod-correctness
 
+# The following patterns are parsed from ./src/mongo/db/modules/enterprise/jstests/fcbis/OWNERS.yml
+/src/mongo/db/modules/enterprise/jstests/fcbis/**/* @10gen/server-replication
+
 # The following patterns are parsed from ./src/mongo/db/modules/enterprise/jstests/hot_backups/OWNERS.yml
 /src/mongo/db/modules/enterprise/jstests/hot_backups/**/* @10gen/server-rss-sydney
+/src/mongo/db/modules/enterprise/jstests/hot_backups/**/magic_restore* @10gen/server-replication
 
 # The following patterns are parsed from ./src/mongo/db/modules/enterprise/jstests/streams/OWNERS.yml
 /src/mongo/db/modules/enterprise/jstests/streams/**/* @10gen/streams-engine
@@ -386,6 +401,9 @@ WORKSPACE.bazel @10gen/devprod-build
 
 # The following patterns are parsed from ./src/mongo/db/modules/enterprise/src/encryptdb/OWNERS.yml
 /src/mongo/db/modules/enterprise/src/encryptdb/**/* @10gen/server-security
+
+# The following patterns are parsed from ./src/mongo/db/modules/enterprise/src/fcbis/OWNERS.yml
+/src/mongo/db/modules/enterprise/src/fcbis/**/* @10gen/server-replication
 
 # The following patterns are parsed from ./src/mongo/db/modules/enterprise/src/fips/OWNERS.yml
 /src/mongo/db/modules/enterprise/src/fips/**/* @10gen/server-security
@@ -412,6 +430,9 @@ WORKSPACE.bazel @10gen/devprod-build
 # The following patterns are parsed from ./src/mongo/db/modules/enterprise/src/live_import/OWNERS.yml
 /src/mongo/db/modules/enterprise/src/live_import/**/* @10gen/server-rss-sydney
 
+# The following patterns are parsed from ./src/mongo/db/modules/enterprise/src/magic_restore/OWNERS.yml
+/src/mongo/db/modules/enterprise/src/magic_restore/**/* @10gen/server-replication
+
 # The following patterns are parsed from ./src/mongo/db/modules/enterprise/src/queryable/OWNERS.yml
 /src/mongo/db/modules/enterprise/src/queryable/**/* @10gen/server-rss-sydney
 
@@ -424,6 +445,8 @@ WORKSPACE.bazel @10gen/devprod-build
 # The following patterns are parsed from ./src/mongo/db/op_observer/OWNERS.yml
 /src/mongo/db/op_observer/**/user_write_block_mode* @10gen/server-security
 /src/mongo/db/op_observer/**/batched_write* @10gen/server-storage-execution
+/src/mongo/db/op_observer/**/op_observer_impl* @10gen/server-replication
+/src/mongo/db/op_observer/**/fcv_op_observer* @10gen/server-replication
 
 # The following patterns are parsed from ./src/mongo/db/ops/OWNERS.yml
 /src/mongo/db/ops/**/* @10gen/query-optimization
@@ -549,6 +572,9 @@ WORKSPACE.bazel @10gen/devprod-build
 
 # The following patterns are parsed from ./src/mongo/db/query/timeseries/OWNERS.yml
 /src/mongo/db/query/timeseries/**/* @10gen/query-integration
+
+# The following patterns are parsed from ./src/mongo/db/repl/OWNERS.yml
+/src/mongo/db/repl/**/* @10gen/server-replication
 
 # The following patterns are parsed from ./src/mongo/db/s/OWNERS.yml
 /src/mongo/db/s/**/*active_migrations_registry* @10gen/server-cluster-scalability
@@ -692,6 +718,9 @@ WORKSPACE.bazel @10gen/devprod-build
 
 # The following patterns are parsed from ./src/mongo/db/timeseries/OWNERS.yml
 /src/mongo/db/timeseries/**/* @10gen/server-storage-execution
+
+# The following patterns are parsed from ./src/mongo/db/transaction/OWNERS.yml
+/src/mongo/db/transaction/**/* @10gen/server-replication
 
 # The following patterns are parsed from ./src/mongo/db/update/OWNERS.yml
 /src/mongo/db/update/**/* @10gen/query-execution

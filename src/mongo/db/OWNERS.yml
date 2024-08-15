@@ -92,3 +92,15 @@ filters:
   - "field_ref*":
     approvers:
       - 10gen/query
+  - "read_concern*":
+    approvers:
+      - 10gen/server-replication
+  - "read_write_concern*":
+    approvers:
+      - 10gen/server-replication
+  - "write_concern*":
+    approvers:
+      - 10gen/server-replication
+  - "feature_compatibility*":
+    approvers:
+      - 10gen/server-replication

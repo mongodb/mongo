@@ -3,6 +3,3 @@ filters:
   - "*":
     approvers:
       - 10gen/server-replication
-  - "*capped*":
-    approvers:
-      - 10gen/server-storage-execution

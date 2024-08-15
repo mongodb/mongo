@@ -6,3 +6,9 @@ filters:
   - "batched_write*":
     approvers:
       - 10gen/server-storage-execution
+  - "op_observer_impl*":
+    approvers:
+      - 10gen/server-replication
+  - "fcv_op_observer*":
+    approvers:
+      - 10gen/server-replication
