@@ -87,16 +87,6 @@ env.Library(
 )
 
 env.Library(
-    target="variable_validation",
-    source=[
-        "variable_validation.cpp",
-    ],
-    LIBDEPS=[
-        "$BUILD_DIR/mongo/base",
-    ],
-)
-
-env.Library(
     target="dependencies",
     source=[
         "dependencies.cpp",
@@ -222,18 +212,6 @@ env.Library(
     LIBDEPS=[
         "$BUILD_DIR/mongo/db/common",
         "$BUILD_DIR/mongo/db/exec/document_value/document_value",
-    ],
-)
-
-env.Library(
-    target="change_stream_error_extra_info",
-    source=[
-        "change_stream_topology_change_info.cpp",
-        "change_stream_invalidation_info.cpp",
-        "change_stream_start_after_invalidate_info.cpp",
-    ],
-    LIBDEPS=[
-        "$BUILD_DIR/mongo/base",
     ],
 )
 

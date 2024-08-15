@@ -302,3 +302,33 @@ idl_generator(
         "//src/mongo/db:basic_types_gen",
     ],
 )
+
+mongo_cc_library(
+    name = "change_stream_error_extra_info",
+    srcs = [
+        "change_stream_invalidation_info.cpp",
+        "change_stream_start_after_invalidate_info.cpp",
+        "change_stream_topology_change_info.cpp",
+    ],
+    hdrs = [
+        "change_stream_invalidation_info.h",
+        "change_stream_start_after_invalidate_info.h",
+        "change_stream_topology_change_info.h",
+    ],
+    deps = [
+        "//src/mongo:base",
+    ],
+)
+
+mongo_cc_library(
+    name = "variable_validation",
+    srcs = [
+        "variable_validation.cpp",
+    ],
+    hdrs = [
+        "variable_validation.h",
+    ],
+    deps = [
+        "//src/mongo:base",
+    ],
+)

@@ -6,16 +6,6 @@ Import("get_option")
 env = env.Clone()
 
 env.Library(
-    target="mongo_process_interface",
-    source=[
-        "mongo_process_interface.cpp",
-    ],
-    LIBDEPS=[
-        "$BUILD_DIR/mongo/base",
-    ],
-)
-
-env.Library(
     target="common_process_interface",
     source=[
         "common_process_interface.cpp",

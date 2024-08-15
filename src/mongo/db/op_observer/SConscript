@@ -4,17 +4,6 @@ Import("env")
 
 env = env.Clone()
 
-env.Library(
-    target="op_observer",
-    source=[
-        "op_observer.cpp",
-        "op_observer_registry.cpp",
-    ],
-    LIBDEPS=[
-        "$BUILD_DIR/mongo/base",
-    ],
-)
-
 env.Benchmark(
     target="op_observer_bm",
     source=[
@@ -68,16 +57,6 @@ env.Library(
     LIBDEPS_PRIVATE=[
         "$BUILD_DIR/mongo/base",
         "$BUILD_DIR/mongo/db/repl/oplog",
-    ],
-)
-
-env.Library(
-    target="operation_logger_transaction_proxy",
-    source=[
-        "operation_logger_transaction_proxy.cpp",
-    ],
-    LIBDEPS_PRIVATE=[
-        "$BUILD_DIR/mongo/base",
     ],
 )
 
