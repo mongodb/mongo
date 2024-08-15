@@ -14,16 +14,6 @@ env.SConscript(
     ],
 )
 
-env.Library(
-    target="change_stream_pre_and_post_images_options",
-    source=[
-        "change_stream_pre_and_post_images_options_gen.cpp",
-    ],
-    LIBDEPS=[
-        "$BUILD_DIR/mongo/base",
-        "$BUILD_DIR/mongo/idl/idl_parser",
-    ],
-)
 
 env.Library(
     target="change_stream_preimage",
