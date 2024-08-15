@@ -48,7 +48,7 @@ function testTimeout(cmdDBName, ddlCmd) {
     assert.commandWorked(sessionColl.insert({a: 5, b: 6}));
     assert.commandFailedWithCode(
         testDB.getSiblingDB(cmdDBName).runCommand(Object.assign({}, ddlCmd, {maxTimeMS: 500})),
-        [ErrorCodes.MaxTimeMSExpired, ErrorCodes.CommandFailed]);
+        ErrorCodes.MaxTimeMSExpired);
     assert.commandWorked(session.commitTransaction_forTesting());
 }
 
@@ -122,40 +122,53 @@ testSuccessOnTxnCommit(dbName, dropDatabaseCmd, {
     ]
 });
 
-jsTestLog("Testing that 'renameCollection' within databases blocks on transactions");
-assert.commandWorked(testDB.runCommand({drop: otherCollName, writeConcern: {w: "majority"}}));
-// TODO(SERVER-90070): remove 'dropTarget: true'.
-const renameCollectionCmdSameDB = {
-    renameCollection: sessionColl.getFullName(),
-    to: dbName + "." + otherCollName,
-    dropTarget: true,
-    writeConcern: {w: "majority"}
-};
-testTimeout("admin", renameCollectionCmdSameDB);
-testSuccessOnTxnCommit("admin", renameCollectionCmdSameDB, {
-    $or: [
-        {"command._shardsvrRenameCollectionParticipant": collName},
-        {$and: [{"command.renameCollection": sessionColl.getFullName()}, {waitingForLock: true}]}
-    ]
-});
+// TODO(SERVER-90070): Unblock the renames on mongos and for RS endpoint when the timeout test no
+// longer executes the rename.
+if (!FixtureHelpers.isMongos(db) && !TestData.testingReplicaSetEndpoint) {
+    jsTestLog("Testing that 'renameCollection' within databases blocks on transactions");
+    assert.commandWorked(testDB.runCommand({drop: otherCollName, writeConcern: {w: "majority"}}));
+    const renameCollectionCmdSameDB = {
+        renameCollection: sessionColl.getFullName(),
+        to: dbName + "." + otherCollName,
+        writeConcern: {w: "majority"}
+    };
+    testTimeout("admin", renameCollectionCmdSameDB);
+    testSuccessOnTxnCommit("admin", renameCollectionCmdSameDB, {
+        $or: [
+            {"command._shardsvrRenameCollectionParticipant": collName},
+            {
+                $and: [
+                    {"command.renameCollection": sessionColl.getFullName()},
+                    {waitingForLock: true}
+                ]
+            }
+        ]
+    });
 
-jsTestLog("Testing that 'renameCollection' across databases blocks on transactions");
-assert.commandWorked(testDB.getSiblingDB(otherDBName)
-                         .runCommand({drop: otherCollName, writeConcern: {w: "majority"}}));
-// TODO(SERVER-90070): remove 'dropTarget: true'.
-const renameCollectionCmdDifferentDB = {
-    renameCollection: sessionColl.getFullName(),
-    to: otherDBName + "." + otherCollName,
-    dropTarget: true,
-    writeConcern: {w: "majority"}
-};
-testTimeout("admin", renameCollectionCmdDifferentDB);
-testSuccessOnTxnCommit("admin", renameCollectionCmdSameDB, {
-    $or: [
-        {"command._shardsvrRenameCollectionParticipant": collName},
-        {$and: [{"command.renameCollection": sessionColl.getFullName()}, {waitingForLock: true}]}
-    ]
-});
+    // TODO(SERVER-90070): This test should remain blocked on mongos as on sharded cluster the
+    // primary shard for database can land on different shards and rename across different primary
+    // shards is not allowed.
+    jsTestLog("Testing that 'renameCollection' across databases blocks on transactions");
+    assert.commandWorked(testDB.getSiblingDB(otherDBName)
+                             .runCommand({drop: otherCollName, writeConcern: {w: "majority"}}));
+    const renameCollectionCmdDifferentDB = {
+        renameCollection: sessionColl.getFullName(),
+        to: otherDBName + "." + otherCollName,
+        writeConcern: {w: "majority"}
+    };
+    testTimeout("admin", renameCollectionCmdDifferentDB);
+    testSuccessOnTxnCommit("admin", renameCollectionCmdDifferentDB, {
+        $or: [
+            {"command._shardsvrRenameCollectionParticipant": collName},
+            {
+                $and: [
+                    {"command.renameCollection": sessionColl.getFullName()},
+                    {waitingForLock: true}
+                ]
+            }
+        ]
+    });
+}
 
 jsTestLog("Testing that 'createIndexes' blocks on transactions");
 // The transaction will insert a document that has a field 'a'.
