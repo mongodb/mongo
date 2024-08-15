@@ -68,29 +68,29 @@ EstimationResult getTotals(const stats::ArrayHistogram& ah);
  * Estimates the selectivity of an equality predicate given an ArrayHistogram and an SBE value and
  * type tag pair.
  */
-SelectivityType estimateSelectivityEq(const stats::ArrayHistogram& ah,
-                                      sbe::value::TypeTags tag,
-                                      sbe::value::Value val,
-                                      bool includeScalar);
+Selectivity estimateSelectivityEq(const stats::ArrayHistogram& ah,
+                                  sbe::value::TypeTags tag,
+                                  sbe::value::Value val,
+                                  bool includeScalar);
 
 /**
  * Estimates the selectivity of a range predicate given an ArrayHistogram and a range predicate.
  * Set 'includeScalar' to true to indicate whether or not the provided range should include no-array
  * values. The other fields define the range of the estimation.
  */
-SelectivityType estimateSelectivityRange(const stats::ArrayHistogram& ah,
-                                         bool lowInclusive,
-                                         sbe::value::TypeTags tagLow,
-                                         sbe::value::Value valLow,
-                                         bool highInclusive,
-                                         sbe::value::TypeTags tagHigh,
-                                         sbe::value::Value valHigh,
-                                         bool includeScalar,
-                                         EstimationAlgo estAlgo = EstimationAlgo::HistogramV2);
+Selectivity estimateSelectivityRange(const stats::ArrayHistogram& ah,
+                                     bool lowInclusive,
+                                     sbe::value::TypeTags tagLow,
+                                     sbe::value::Value valLow,
+                                     bool highInclusive,
+                                     sbe::value::TypeTags tagHigh,
+                                     sbe::value::Value valHigh,
+                                     bool includeScalar,
+                                     EstimationAlgo estAlgo = EstimationAlgo::HistogramV2);
 
 /**
  * Converts an input cardinality to a selectivity based on the histogram's sample size.
  */
-SelectivityType getSelectivity(const stats::ArrayHistogram& ah, CEType cardinality);
+Selectivity getSelectivity(const stats::ArrayHistogram& ah, Cardinality cardinality);
 
 }  // namespace mongo::optimizer::cbp::ce

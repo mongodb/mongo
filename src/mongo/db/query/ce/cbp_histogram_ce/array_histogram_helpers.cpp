@@ -142,29 +142,29 @@ EstimationResult getTotals(const stats::ArrayHistogram& ah) {
     return {};
 }
 
-SelectivityType estimateSelectivityEq(const stats::ArrayHistogram& ah,
-                                      sbe::value::TypeTags tag,
-                                      sbe::value::Value val,
-                                      bool includeScalar) {
+Selectivity estimateSelectivityEq(const stats::ArrayHistogram& ah,
+                                  sbe::value::TypeTags tag,
+                                  sbe::value::Value val,
+                                  bool includeScalar) {
     const auto ce = estimateCardinalityEq(ah, tag, val, includeScalar);
     return getSelectivity(ah, ce.card);
 }
 
-SelectivityType estimateSelectivityRange(const stats::ArrayHistogram& ah,
-                                         bool lowInclusive,
-                                         sbe::value::TypeTags tagLow,
-                                         sbe::value::Value valLow,
-                                         bool highInclusive,
-                                         sbe::value::TypeTags tagHigh,
-                                         sbe::value::Value valHigh,
-                                         bool includeScalar,
-                                         EstimationAlgo estAlgo) {
+Selectivity estimateSelectivityRange(const stats::ArrayHistogram& ah,
+                                     bool lowInclusive,
+                                     sbe::value::TypeTags tagLow,
+                                     sbe::value::Value valLow,
+                                     bool highInclusive,
+                                     sbe::value::TypeTags tagHigh,
+                                     sbe::value::Value valHigh,
+                                     bool includeScalar,
+                                     EstimationAlgo estAlgo) {
     const auto ce = estimateCardinalityRange(
         ah, lowInclusive, tagLow, valLow, highInclusive, tagHigh, valHigh, includeScalar, estAlgo);
     return getSelectivity(ah, ce.card);
 }
 
-SelectivityType getSelectivity(const stats::ArrayHistogram& ah, CEType cardinality) {
+Selectivity getSelectivity(const stats::ArrayHistogram& ah, Cardinality cardinality) {
     // TODO: to implement
     return {};
 }

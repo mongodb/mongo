@@ -43,19 +43,19 @@ public:
      * e.g., $elemMatch should exclude the non-array values with includeScalar=false.
      * 'inputCard' represents the input cardinality from the child stage.
      */
-    static CEType estimateCardinality(const stats::ArrayHistogram& hist,
-                                      const OrderedIntervalList& oil,
-                                      bool includeScalar,
-                                      boost::optional<CEType> inputCard);
+    static Cardinality estimateCardinality(const stats::ArrayHistogram& hist,
+                                           const OrderedIntervalList& oil,
+                                           bool includeScalar,
+                                           boost::optional<Cardinality> inputCard);
 
     /**
      * Estimates the selectivity of an interval based on the provided histogram.
      * 'inputScalar' indicates whether or not the provided interval should include non-array values.
      * e.g., $elemMatch should exclude the non-array values with includeScalar=false.
      */
-    static SelectivityType estimateSelectivity(const stats::ArrayHistogram& hist,
-                                               const OrderedIntervalList& oil,
-                                               bool includeScalar);
+    static Selectivity estimateSelectivity(const stats::ArrayHistogram& hist,
+                                           const OrderedIntervalList& oil,
+                                           bool includeScalar);
 };
 
 }  // namespace mongo::optimizer::cbp::ce

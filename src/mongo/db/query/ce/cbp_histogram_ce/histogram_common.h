@@ -31,11 +31,13 @@
 
 #include "mongo/db/exec/document_value/value.h"
 #include "mongo/db/exec/sbe/values/value.h"
-#include "mongo/db/query/optimizer/defs.h"
 #include "mongo/db/query/stats/array_histogram.h"
 #include "mongo/db/query/stats/scalar_histogram.h"
 
 namespace mongo::optimizer::cbp::ce {
+
+using Cardinality = double;
+using Selectivity = double;
 
 struct EstimationResult {
     double card;

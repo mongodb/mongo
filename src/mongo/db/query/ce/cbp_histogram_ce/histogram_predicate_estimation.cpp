@@ -32,17 +32,17 @@
 
 namespace mongo::optimizer::cbp::ce {
 
-static CEType estimateCardinality(const stats::ArrayHistogram& hist,
-                                  const OrderedIntervalList& oil,
-                                  bool includeScalar,
-                                  boost::optional<CEType> inputCard) {
+static Cardinality estimateCardinality(const stats::ArrayHistogram& hist,
+                                       const OrderedIntervalList& oil,
+                                       bool includeScalar,
+                                       boost::optional<Cardinality> inputCard) {
     // TODO: Implement
     return 0.0;
 }
 
-static SelectivityType estimateSelectivity(const stats::ArrayHistogram& hist,
-                                           const OrderedIntervalList& oil,
-                                           bool includeScalar) {
+static Selectivity estimateSelectivity(const stats::ArrayHistogram& hist,
+                                       const OrderedIntervalList& oil,
+                                       bool includeScalar) {
     // TODO: Implement
     return {};
 }
