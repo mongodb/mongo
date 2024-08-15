@@ -59,7 +59,8 @@ union __wt_lsn {
     __wt_atomic_store64(&(dstl)->file_offset, __wt_atomic_load64(&(srcl)->file_offset))
 #define WT_SET_LSN(l, f, o) __wt_atomic_store64(&(l)->file_offset, (((uint64_t)(f) << 32) + (o)))
 
-#define WT_INIT_LSN(l) WT_SET_LSN((l), 1, 0)
+#define WT_INIT_LSN_FILE 1
+#define WT_INIT_LSN(l) WT_SET_LSN((l), WT_INIT_LSN_FILE, 0)
 
 #define WT_MAX_LSN(l) WT_SET_LSN((l), UINT32_MAX, INT32_MAX)
 
@@ -238,15 +239,18 @@ struct __wt_myslot {
 #define WT_LOG_END_HEADER log->allocsize
 
 struct __wt_log {
-    uint32_t allocsize;             /* Allocation alignment size */
-    uint32_t first_record;          /* Offset of first record in file */
-    wt_off_t log_written;           /* Amount of log written this period */
-                                    /*
-                                     * Log file information
-                                     */
-    uint32_t fileid;                /* Current log file number */
-    uint32_t prep_fileid;           /* Pre-allocated file number */
-    wt_shared uint32_t tmp_fileid;  /* Temporary file number */
+    uint32_t allocsize;            /* Allocation alignment size */
+    uint32_t first_record;         /* Offset of first record in file */
+    wt_off_t log_written;          /* Amount of log written this period */
+                                   /*
+                                    * Log file information
+                                    */
+    uint32_t fileid;               /* Current log file number */
+    uint32_t prep_fileid;          /* Pre-allocated file number */
+    wt_shared uint32_t tmp_fileid; /* Temporary file number */
+#ifdef HAVE_DIAGNOSTIC
+    uint32_t min_fileid; /* Minimum file number needed */
+#endif
     uint32_t prep_missed;           /* Pre-allocated file misses */
     WT_FH *log_fh;                  /* Logging file handle */
     WT_FH *log_dir_fh;              /* Log directory file handle */
