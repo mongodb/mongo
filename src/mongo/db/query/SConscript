@@ -357,17 +357,6 @@ env.Library(
 )
 
 env.Library(
-    target="hint_parser",
-    source=[
-        "hint_parser.cpp",
-        "hint_gen.cpp",
-    ],
-    LIBDEPS=[
-        "$BUILD_DIR/mongo/base",
-    ],
-)
-
-env.Library(
     target="sort_pattern",
     source=[
         "sort_pattern.cpp",

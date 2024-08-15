@@ -132,3 +132,21 @@ idl_generator(
         "//src/mongo/idl:generic_argument_gen",
     ],
 )
+
+mongo_cc_library(
+    name = "hint_parser",
+    srcs = [
+        "hint_parser.cpp",
+        ":hint_gen",
+    ],
+    hdrs = [
+        "hint_parser.h",
+        ":hint_gen",
+    ],
+    header_deps = [
+        "//src/mongo/db/concurrency:flow_control_ticketholder",
+    ],
+    deps = [
+        "//src/mongo:base",
+    ],
+)
