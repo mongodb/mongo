@@ -2681,6 +2681,7 @@ functions:
         GCOV_TOOL: ${gcov_tool}
         COVERALLS_REPO_TOKEN: ${coveralls_token}
         TRAVIS_JOB_ID: ${revision_order_id}
+        TRAVIS_PULL_REQUEST: ${github_pr_number}
 
   "save code coverage data":
     - *f_expansions_write

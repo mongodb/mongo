@@ -130,3 +130,7 @@ patch_aliases:
     description: "Runs all $search, $vectorSearch tests"
     variant: ".*"
     task: "^.*search*"
+  - alias: codecoverage
+    description: "Run tests and report code coverage"
+    variant: ".*-coverage"
+    task: ".*"
