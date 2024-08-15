@@ -1432,6 +1432,7 @@ void OpDebug::reportStorageStats(logv2::DynamicAttributes* pAttrs) const {
 void OpDebug::append(OperationContext* opCtx,
                      const SingleThreadedLockStats& lockStats,
                      FlowControlTicketholder::CurOp flowControlStats,
+                     bool omitCommand,
                      BSONObjBuilder& b) const {
     auto& curop = *CurOp::get(opCtx);
 
@@ -1439,12 +1440,14 @@ void OpDebug::append(OperationContext* opCtx,
 
     b.append("ns", curop.getNS());
 
-    appendAsObjOrString(
-        "command", appendCommentField(opCtx, curop.opDescription()), appendMaxElementSize, &b);
+    if (!omitCommand) {
+        appendAsObjOrString(
+            "command", appendCommentField(opCtx, curop.opDescription()), appendMaxElementSize, &b);
 
-    auto originatingCommand = curop.originatingCommand();
-    if (!originatingCommand.isEmpty()) {
-        appendAsObjOrString("originatingCommand", originatingCommand, appendMaxElementSize, &b);
+        auto originatingCommand = curop.originatingCommand();
+        if (!originatingCommand.isEmpty()) {
+            appendAsObjOrString("originatingCommand", originatingCommand, appendMaxElementSize, &b);
+        }
     }
 
     if (!resolvedViews.empty()) {

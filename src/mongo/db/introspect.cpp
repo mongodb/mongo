@@ -122,6 +122,7 @@ void profile(OperationContext* opCtx, NetworkOp op) {
             opCtx,
             lockerInfo.stats,
             shard_role_details::getLocker(opCtx)->getFlowControlStats(),
+            false /*omitCommand*/,
             b);
     }
 

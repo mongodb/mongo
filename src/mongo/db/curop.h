@@ -290,6 +290,7 @@ public:
     void append(OperationContext* opCtx,
                 const SingleThreadedLockStats& lockStats,
                 FlowControlTicketholder::CurOp flowControlStats,
+                bool omitCommand,
                 BSONObjBuilder& builder) const;
 
     static std::function<BSONObj(ProfileFilter::Args args)> appendStaged(StringSet requestedFields,

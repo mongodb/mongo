@@ -29,9 +29,12 @@
 
 #pragma once
 
-#include "mongo/bson/bsonobj.h"
-#include "mongo/logv2/redaction.h"
 #include <fmt/format.h>
+
+#include "mongo/bson/bsonobj.h"
+#include "mongo/db/curop.h"
+#include "mongo/db/operation_context.h"
+#include "mongo/logv2/redaction.h"
 
 /*
  * This file contains functions which will compute a diagnostic string for use during a tassert or
@@ -41,14 +44,33 @@
  */
 
 namespace mongo::query_diagnostics {
+
 struct Printer {
     auto format(auto& fc) const {
+        // It's assumed that 'opCtx' is a valid pointer and has been decorated with a CurOp. This
+        // class should not be used in scopes where that assumption doesn't hold.
+        auto& curOp = *CurOp::get(opCtx);
         auto out = fc.out();
-        out = format_to(out, FMT_STRING("{{'originalCommand': {}}}"), redact(cmdObj).toString());
+        out = format_to(
+            out,
+            FMT_STRING("{{'currentOp': {}, 'opDescription': {}, 'originatingCommand': {}}}"),
+            redact(serializeOpDebug(curOp)).toString(),
+            redact(curOp.opDescription()).toString(),
+            redact(curOp.originatingCommand()).toString());
         return out;
     }
 
-    const BSONObj& cmdObj;
+    OperationContext* opCtx;
+
+private:
+    BSONObj serializeOpDebug(CurOp& curOp) const {
+        BSONObjBuilder bob;
+        // 'opDescription' and 'originatingCommand' are logged separately to avoid having to
+        // truncate them due to the BSON size limit.
+        const bool omitCommand = true;
+        curOp.debug().append(opCtx, {} /*lockStats*/, {} /*flowControlStats*/, omitCommand, bob);
+        return bob.obj();
+    }
 };
 
 }  // namespace mongo::query_diagnostics
