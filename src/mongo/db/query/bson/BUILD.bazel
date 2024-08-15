@@ -8,3 +8,19 @@ exports_files(
         "*.cpp",
     ]),
 )
+
+mongo_cc_library(
+    name = "dotted_path_support",
+    srcs = [
+        "dotted_path_support.cpp",
+    ],
+    hdrs = [
+        "//src/mongo/db/query/bson:dotted_path_support.h",
+    ],
+    header_deps = [
+        "//src/mongo/db/exec/sbe:query_sbe_plan_stats",
+    ],
+    deps = [
+        "//src/mongo:base",
+    ],
+)
