@@ -102,6 +102,7 @@ selector:
     - jstests/concurrency/fsm_workloads/view_catalog.js
     - jstests/concurrency/fsm_workloads/view_catalog_cycle_with_drop.js
     - jstests/concurrency/fsm_workloads/random_moveChunk_timeseries_deletes.js
+    - jstests/concurrency/fsm_workloads/timeseries_crud_operations_respect_control_closed.js
     - jstests/concurrency/fsm_workloads/timeseries_deletes_and_inserts.js
     - jstests/concurrency/fsm_workloads/timeseries_findAndModify_remove_and_inserts.js
     - jstests/concurrency/fsm_workloads/timeseries_updates_and_inserts.js
