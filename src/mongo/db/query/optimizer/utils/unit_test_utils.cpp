@@ -38,8 +38,6 @@
 #include <boost/optional/optional.hpp>
 
 #include "mongo/db/pipeline/abt/utils.h"
-#include "mongo/db/query/ce/heuristic_estimator.h"
-#include "mongo/db/query/ce/hinted_estimator.h"
 #include "mongo/db/query/cost_model/cost_estimator_impl.h"
 #include "mongo/db/query/cost_model/cost_model_manager.h"
 #include "mongo/db/query/optimizer/cascades/memo.h"
@@ -70,14 +68,6 @@ void maybePrintABT(const ABT::reference_type abt) {
         std::cout << "BSON: " << strBSON << "\n";
     }
 }
-
-std::string getPropsStrForExplain(const OptPhaseManager& phaseManager) {
-    return ExplainGenerator::explainV2(
-        make<MemoPhysicalDelegatorNode>(phaseManager.getPhysicalNodeId()),
-        true /*displayPhysicalProperties*/,
-        &phaseManager.getMemo());
-}
-
 
 ABT makeIndexPath(FieldPathType fieldPath, bool isMultiKey) {
     ABT result = make<PathIdentity>();
@@ -120,128 +110,8 @@ IndexDefinition makeCompositeIndexDefinition(std::vector<TestIndexField> indexFi
     return IndexDefinition{std::move(idxCollSpec), isMultiKey};
 }
 
-std::unique_ptr<CardinalityEstimator> makeHeuristicCE() {
-    return std::make_unique<ce::HeuristicEstimator>();
-}
-
-std::unique_ptr<CardinalityEstimator> makeHintedCE(
-    ce::PartialSchemaSelHints hints, ce::PartialSchemaIntervalSelHints intervalHints) {
-    return std::make_unique<ce::HintedEstimator>(std::move(hints), std::move(intervalHints));
-}
-
 cost_model::CostModelCoefficients getTestCostModel() {
     return cost_model::CostModelManager::getDefaultCoefficients();
-}
-
-std::unique_ptr<CostEstimator> makeCostEstimator() {
-    return makeCostEstimator(getTestCostModel());
-}
-
-std::unique_ptr<CostEstimator> makeCostEstimator(
-    const cost_model::CostModelCoefficients& costModel) {
-    return std::make_unique<cost_model::CostEstimatorImpl>(costModel);
-}
-
-
-OptPhaseManager makePhaseManager(
-    OptPhaseManager::PhaseSet phaseSet,
-    PrefixId& prefixId,
-    Metadata metadata,
-    const boost::optional<cost_model::CostModelCoefficients>& costModel,
-    DebugInfo debugInfo,
-    QueryHints queryHints) {
-    return makePhaseManager({std::move(phaseSet), kDefaultExplorationSet, kDefaultSubstitutionSet},
-                            prefixId,
-                            std::move(metadata),
-                            costModel,
-                            std::move(debugInfo),
-                            std::move(queryHints));
-}
-
-OptPhaseManager makePhaseManager(
-    OptPhaseManager::PhasesAndRewrites phasesAndRewrites,
-    PrefixId& prefixId,
-    Metadata metadata,
-    const boost::optional<cost_model::CostModelCoefficients>& costModel,
-    DebugInfo debugInfo,
-    QueryHints queryHints) {
-    OptimizerCounterInfo optCounterInfo;
-    return OptPhaseManager{std::move(phasesAndRewrites),
-                           prefixId,
-                           false /*requireRID*/,
-                           std::move(metadata),
-                           makeHeuristicCE(),  // primary CE
-                           makeHeuristicCE(),  // substitution phase CE, same as primary
-                           makeCostEstimator(costModel ? *costModel : getTestCostModel()),
-                           defaultConvertPathToInterval,
-                           ConstEval::constFold,
-                           std::move(debugInfo),
-                           std::move(queryHints),
-                           {} /*queryParameters*/,
-                           optCounterInfo};
-}
-
-OptPhaseManager makePhaseManager(
-    OptPhaseManager::PhaseSet phaseSet,
-    PrefixId& prefixId,
-    Metadata metadata,
-    std::unique_ptr<CardinalityEstimator> ce,
-    const boost::optional<cost_model::CostModelCoefficients>& costModel,
-    DebugInfo debugInfo,
-    QueryHints queryHints) {
-    return makePhaseManager({std::move(phaseSet), kDefaultExplorationSet, kDefaultSubstitutionSet},
-                            prefixId,
-                            std::move(metadata),
-                            std::move(ce),
-                            costModel,
-                            std::move(debugInfo),
-                            std::move(queryHints));
-}
-
-OptPhaseManager makePhaseManager(
-    OptPhaseManager::PhasesAndRewrites phasesAndRewrites,
-    PrefixId& prefixId,
-    Metadata metadata,
-    std::unique_ptr<CardinalityEstimator> ce,
-    const boost::optional<cost_model::CostModelCoefficients>& costModel,
-    DebugInfo debugInfo,
-    QueryHints queryHints) {
-    OptimizerCounterInfo optCounterInfo;
-    return OptPhaseManager{std::move(phasesAndRewrites),
-                           prefixId,
-                           false /*requireRID*/,
-                           std::move(metadata),
-                           std::move(ce),      // primary CE
-                           makeHeuristicCE(),  // substitution phase CE
-                           makeCostEstimator(costModel ? *costModel : getTestCostModel()),
-                           defaultConvertPathToInterval,
-                           ConstEval::constFold,
-                           std::move(debugInfo),
-                           std::move(queryHints),
-                           {} /*queryParameters*/,
-                           optCounterInfo};
-}
-
-
-OptPhaseManager makePhaseManagerRequireRID(OptPhaseManager::PhaseSet phaseSet,
-                                           PrefixId& prefixId,
-                                           Metadata metadata,
-                                           DebugInfo debugInfo,
-                                           QueryHints queryHints) {
-    OptimizerCounterInfo optCounterInfo;
-    return OptPhaseManager{{std::move(phaseSet), kDefaultExplorationSet, kDefaultSubstitutionSet},
-                           prefixId,
-                           true /*requireRID*/,
-                           std::move(metadata),
-                           makeHeuristicCE(),  // primary CE
-                           makeHeuristicCE(),  // substitution phase CE, same as primary
-                           makeCostEstimator(),
-                           defaultConvertPathToInterval,
-                           ConstEval::constFold,
-                           std::move(debugInfo),
-                           std::move(queryHints),
-                           {} /*queryParameters*/,
-                           optCounterInfo};
 }
 
 bool planComparator(const PlanAndProps& e1, const PlanAndProps& e2) {

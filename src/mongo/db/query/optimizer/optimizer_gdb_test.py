@@ -54,42 +54,6 @@ if __name__ == "__main__":
             + 'Scan["coll", "root"]\n',
         )
 
-        # After exploration phase, the optimized ABT should demonstrate the conversion to
-        # SargableNodes. Since the test program mimics an index over 'a', only one of the
-        #  predicates can use the index with the other remaining as residual.
-        assertPrintedOutput(
-            "optimized",
-            '\nRoot["root"]\n'
-            + 'RIDIntersect["root"]\n'
-            + "|   Sargable [Seek]\n"
-            + "|   |   |   |   requirements:     root, 'PathGet [b] PathIdentity []', =Const [1], \n"
-            + "|   |   |   candidateIndexes: [], \n"
-            + '|   |   scan_params: (fields: std::map with 1 element : (["b"] : "evalTemp_4"), '
-            "residual: <refProj: \"evalTemp_4\", path: 'PathIdentity'>), \n"
-            + '|   Scan["coll", "root"], \n'
-            + "Sargable [Index]\n"
-            + "|   |   requirements:     root, 'PathGet [a] PathIdentity []', =Const [1], \n"
-            + "|   candidateIndexes: [<id: 0, index1, , SimpleEquality, =Const [1]>], \n"
-            + 'Scan["coll", "root"]\n',
-        )
-
-        # Verify interesting pieces of the indexed SargableNode.
-        assertPrintedOutput(
-            "indexSargable.getCandidateIndexes()",
-            "std::vector of length 1, capacity 1 = {index1, {}, {SimpleEquality}, {{{=Const [1]}}}\n}",
-        )
-
-        # Verify interesting pieces of the seek SargableNode, including the residual predicates in the scan params.
-        assertPrintedOutput(
-            "residualSargable",
-            "Sargable [Seek] = {\n"
-            + "|   |   |    = requirements:     {{{root, 'PathGet [b] PathIdentity []', {{{=Const [1]}}}}}}, \n"
-            + "|   |    = candidateIndexes: [], \n"
-            + '|    = scan_params: (fields: {std::map with 1 element : (["b"] : "evalTemp_4")}, '
-            "residual: <refProj: \"evalTemp_4\", path: 'PathIdentity'>), \n"
-            + ' = Scan["coll", "root"]}\n',
-        )
-
         assertPrintedOutput(
             "testInterval",
             "{\n"

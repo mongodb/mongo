@@ -44,13 +44,10 @@
 #include "mongo/db/query/optimizer/cascades/memo.h"
 #include "mongo/db/query/optimizer/explain.h"
 #include "mongo/db/query/optimizer/metadata_factory.h"
-#include "mongo/db/query/optimizer/opt_phase_manager.h"
 #include "mongo/db/query/optimizer/props.h"
 #include "mongo/db/query/optimizer/rewrites/const_eval.h"
 #include "mongo/db/query/optimizer/utils/const_fold_interface.h"
 #include "mongo/db/query/optimizer/utils/strong_alias.h"
-#include "mongo/db/query/optimizer/utils/unit_test_pipeline_utils.h"
-#include "mongo/db/query/optimizer/utils/unit_test_utils.h"
 #include "mongo/db/query/stats/value_utils.h"
 #include "mongo/db/storage/key_string.h"
 #include "mongo/unittest/assert.h"
@@ -58,130 +55,6 @@
 
 namespace mongo::optimizer::ce {
 namespace value = sbe::value;
-
-CETester::CETester(std::string collName,
-                   CEType collCard,
-                   const OptPhaseManager::PhaseSet& optPhases)
-    : _optPhases(optPhases),
-      _prefixId(PrefixId::createForTests()),
-      _hints(),
-      _metadata(),
-      _collName(collName) {
-    addCollection(collName, collCard);
-}
-
-CEType CETester::getMatchCE(const std::string& queryPredicate,
-                            std::function<bool(const ABT&)> nodePredicate) const {
-    return getCE("[{$match: " + queryPredicate + "}]", nodePredicate);
-}
-
-CEType CETester::getCE(const std::string& pipeline,
-                       std::function<bool(const ABT&)> nodePredicate) const {
-    if constexpr (kCETestLogOnly) {
-        std::cout << "\n\nQuery: " << pipeline << "\n";
-    }
-
-    // Construct ABT from pipeline and optimize.
-    ABT abt =
-        translatePipeline(_metadata, pipeline, _prefixId.getNextId("scan"), _collName, _prefixId);
-
-    // Get cardinality estimate.
-    return getCE(abt, nodePredicate);
-}
-
-CEType CETester::getCE(ABT& abt, std::function<bool(const ABT&)> nodePredicate) const {
-    if constexpr (kCETestLogOnly) {
-        std::cout << ExplainGenerator::explainV2(abt) << std::endl;
-    }
-
-    QueryParameterMap qp;  // Intentionally unused
-    OptimizerCounterInfo optCounterInfo;
-    OptPhaseManager phaseManager{{_optPhases, kDefaultExplorationSet, kDefaultSubstitutionSet},
-                                 _prefixId,
-                                 false /*requireRID*/,
-                                 _metadata,
-                                 getEstimator(),
-                                 makeHeuristicCE(),
-                                 makeCostEstimator(),
-                                 defaultConvertPathToInterval,
-                                 ConstEval::constFold,
-                                 DebugInfo::kDefaultForTests,
-                                 _hints,
-                                 qp,
-                                 optCounterInfo};
-    optimize(phaseManager, abt);
-
-    const auto& memo = phaseManager.getMemo();
-    if constexpr (kCETestLogOnly) {
-        std::cout << ExplainGenerator::explainMemo(memo) << std::endl;
-    }
-
-    auto cht = getEstimator(true /* forValidation */);
-
-    // If we are running no optimization phases, we are ensuring that we get the correct estimate on
-    // the original ABT (usually testing the CE for FilterNodes). The memo won't have any groups for
-    // us to estimate directly yet.
-    if (_optPhases.empty()) {
-        auto card = cht->deriveCE(_metadata, memo, {}, qp, abt.ref());
-
-        if constexpr (kCETestLogOnly) {
-            std::cout << "CE: {" << card._ce << ", " << card._mode << "}" << std::endl;
-        }
-
-        return card._ce;
-    }
-
-    boost::optional<CEType> outCard;
-    for (size_t groupId = 0; groupId < memo.getGroupCount(); groupId++) {
-        // We only want to return the cardinality for the memo group matching the 'nodePredicate'.
-        if (const auto& node = memo.getLogicalNodes(groupId).front(); nodePredicate(node)) {
-            const auto& logicalProps = memo.getLogicalProps(groupId);
-            outCard = properties::getPropertyConst<properties::CardinalityEstimate>(logicalProps)
-                          .getEstimate();
-        }
-    }
-
-    ASSERT_TRUE(outCard.has_value());
-
-    if constexpr (kCETestLogOnly) {
-        std::cout << "CE: " << *outCard << std::endl;
-    }
-
-    return *outCard;
-}
-
-void CETester::optimize(OptPhaseManager& phaseManager, ABT& abt) const {
-    phaseManager.optimize(abt);
-}
-
-ScanDefinition& CETester::getCollScanDefinition() {
-    auto it = _metadata._scanDefs.find(_collName);
-    invariant(it != _metadata._scanDefs.end());
-    return it->second;
-}
-
-
-void CETester::setCollCard(CEType card) {
-    auto& scanDef = getCollScanDefinition();
-    addCollection(_collName, card, scanDef.getIndexDefs());
-}
-
-void CETester::setIndexes(opt::unordered_map<std::string, IndexDefinition> indexes) {
-    auto& scanDef = getCollScanDefinition();
-    addCollection(_collName, scanDef.getCE(), indexes);
-}
-
-void CETester::addCollection(std::string collName,
-                             boost::optional<CEType> numRecords,
-                             opt::unordered_map<std::string, IndexDefinition> indexes) {
-    _metadata._scanDefs.insert_or_assign(collName,
-                                         createScanDef({},
-                                                       indexes,
-                                                       ConstEval::constFold,
-                                                       {DistributionType::Centralized},
-                                                       true /*exists*/,
-                                                       numRecords));
-}
 
 stats::ScalarHistogram createHistogram(const std::vector<BucketData>& data) {
     value::Array bounds;

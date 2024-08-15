@@ -40,15 +40,9 @@
 
 #include "mongo/db/exec/document_value/value.h"
 #include "mongo/db/query/ce/histogram_predicate_estimation.h"
-#include "mongo/db/query/optimizer/cascades/interfaces.h"
-#include "mongo/db/query/optimizer/containers.h"
 #include "mongo/db/query/optimizer/defs.h"
-#include "mongo/db/query/optimizer/metadata.h"
 #include "mongo/db/query/optimizer/node.h"  // IWYU pragma: keep
-#include "mongo/db/query/optimizer/opt_phase_manager.h"
-#include "mongo/db/query/optimizer/partial_schema_requirements.h"
 #include "mongo/db/query/optimizer/syntax/syntax.h"
-#include "mongo/db/query/optimizer/utils/utils.h"
 #include "mongo/db/query/stats/scalar_histogram.h"
 
 namespace mongo::optimizer::ce {
@@ -56,14 +50,6 @@ namespace mongo::optimizer::ce {
 constexpr bool kCETestLogOnly = false;
 
 const double kMaxCEError = 0.01;
-
-const OptPhaseManager::PhaseSet kDefaultCETestPhaseSet{OptPhase::MemoSubstitutionPhase,
-                                                       OptPhase::MemoExplorationPhase,
-                                                       OptPhase::MemoImplementationPhase};
-
-const OptPhaseManager::PhaseSet kOnlySubPhaseSet{OptPhase::MemoSubstitutionPhase};
-
-const OptPhaseManager::PhaseSet kNoOptPhaseSet{};
 
 #define ASSERT_CE_APPROX_EQUAL(estimatedCE, expectedCE, kMaxCEError) \
     ASSERT_APPROX_EQUAL(                                             \
@@ -120,139 +106,6 @@ constexpr double absCEDiff(const T1 v1, const T2 v2) {
 #define ASSERT_EQ_ELEMMATCH_CE_NODE(tester, expectedCE, elemMatchExpectedCE, field, predicate, n) \
     ASSERT_MATCH_CE_NODE(tester, _PREDICATE(field, predicate), expectedCE, n);                    \
     ASSERT_MATCH_CE_NODE(tester, _ELEMMATCH_PREDICATE(field, predicate), elemMatchExpectedCE, n)
-
-// Some commonly used functions for picking nodes in the memo for testing estimation.
-template <size_t NumReq>
-bool isSargableNode(const ABT& n) {
-    if constexpr (NumReq == 0) {
-        return n.is<optimizer::SargableNode>();
-    }
-
-    // Sometimes SargableNodes get split and placed into different memo groups, but we are looking
-    // for a SargableNode with a specific number of predicates. For tests, we only care about
-    // verifying the cardinality of that one.
-    if (auto* sargable = n.cast<optimizer::SargableNode>()) {
-        return PSRExpr::numLeaves(sargable->getReqMap()) == NumReq;
-    }
-    return false;
-}
-const auto isSargable = isSargableNode<0>;
-const auto isSargable1 = isSargableNode<1>;
-const auto isSargable2 = isSargableNode<2>;
-const auto isSargable3 = isSargableNode<3>;
-const auto isSargable4 = isSargableNode<4>;
-const auto isRoot = [](const ABT& n) -> bool {
-    return n.is<optimizer::RootNode>();
-};
-
-/**
- * A test utility class for helping verify the cardinality of CE transports on a given $match
- * predicate.
- */
-class CETester {
-public:
-    /**
-     * The tester initializes at least one collection with the name 'collName' and the cardinality
-     * 'numRecords' in the metadata.
-     */
-    CETester(std::string collName,
-             CEType collCard,
-             const OptPhaseManager::PhaseSet& optPhases = kDefaultCETestPhaseSet);
-
-    virtual ~CETester() = default;
-
-    /**
-     * Returns the estimated cardinality of a given 'matchPredicate'.
-     *
-     * 'nodePredicate' identifies the node in the memo we want to estimate.
-     */
-    CEType getMatchCE(const std::string& matchPredicate,
-                      std::function<bool(const ABT&)> nodePredicate = isRoot) const;
-
-    /**
-     * Returns the estimated cardinality of a given 'pipeline'.
-     *
-     * 'nodePredicate' identifies the node in the memo we want to estimate.
-     */
-    CEType getCE(const std::string& pipeline,
-                 std::function<bool(const ABT&)> nodePredicate = isRoot) const;
-
-    /**
-     * Returns the estimated cardinality of a given 'abt'.
-     *
-     * 'nodePredicate' identifies the node in the memo we want to estimate.
-     */
-    CEType getCE(ABT& abt, std::function<bool(const ABT&)> nodePredicate = isRoot) const;
-
-    /**
-     * Updates the cardinality of the collection '_collName'.
-     */
-    void setCollCard(CEType card);
-
-    /**
-     * Updates the indexes used by the collection '_collName'.
-     */
-    void setIndexes(opt::unordered_map<std::string, IndexDefinition> indexes);
-
-    /**
-     * Adds a ScanDefinition for an additional collection for the test.
-     */
-    void addCollection(std::string collName,
-                       boost::optional<CEType> numRecords,
-                       opt::unordered_map<std::string, IndexDefinition> indexes = {});
-
-    /**
-     * Prevents the optimizer from generating collection scan plans.
-     */
-    void setDisableScan(bool disableScan) {
-        _hints._disableScan = disableScan;
-    }
-
-    /**
-     * Returns the name of the collection tests will be executed against.
-     */
-    const std::string& getCollName() const {
-        return _collName;
-    }
-
-protected:
-    /**
-     * Subclasses need to override this method to initialize the cardinality estimators they are
-     * testing.
-     *
-     * A 'forValidation' hint can be set to 'true' to indicate that an estimator will be used for
-     * validation purpose rather than by the optimizer. Some implementations may need to know about
-     * it.
-     */
-    virtual std::unique_ptr<cascades::CardinalityEstimator> getEstimator(
-        bool forValidation = false) const = 0;
-
-    /**
-     * Optimizes the given ABT using the provided OptPhaseManager. Can be overridden by sub-classes.
-     */
-    virtual void optimize(OptPhaseManager& phaseManager, ABT& abt) const;
-
-private:
-    /**
-     * Helper to find the ScanDefinition of '_collName' in _metadata.
-     */
-    ScanDefinition& getCollScanDefinition();
-
-    // Phases to use when optimizing an input query.
-    const OptPhaseManager::PhaseSet& _optPhases;
-
-    // Used to initialize the OptPhaseManager.
-    mutable PrefixId _prefixId;
-
-    // Allows us to pass hints to the optimizer.
-    QueryHints _hints;
-
-    // Stores the ScanDefinitions for all collections defined in the test.
-    Metadata _metadata;
-
-    // Name of the collection tests will be executed against.
-    std::string _collName;
-};
 
 /**
  * Test utility for helping with creation of manual histograms in the unit tests.

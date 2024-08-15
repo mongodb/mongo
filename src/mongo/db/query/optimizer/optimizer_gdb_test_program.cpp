@@ -35,7 +35,6 @@
 #include "mongo/db/query/optimizer/metadata_factory.h"
 #include "mongo/db/query/optimizer/node.h"  // IWYU pragma: keep
 #include "mongo/db/query/optimizer/node_defs.h"
-#include "mongo/db/query/optimizer/opt_phase_manager.h"
 #include "mongo/db/query/optimizer/partial_schema_requirements.h"
 #include "mongo/db/query/optimizer/reference_tracker.h"
 #include "mongo/db/query/optimizer/rewrites/const_eval.h"
@@ -69,55 +68,22 @@ int clang_optnone main(int argc, char** argv) {
                       .finish(_scan("root", "coll"));
 
     auto prefixId = PrefixId::createForTests();
-    auto phaseManager = makePhaseManager(
-        {OptPhase::MemoSubstitutionPhase, OptPhase::MemoExplorationPhase},
-        prefixId,
-        {{{"coll",
-           createScanDef(
-               {},
-               {{"index1",
-                 IndexDefinition{// collation
-                                 {{makeIndexPath(FieldPathType{"a"}, false /*isMultiKey*/),
-                                   CollationOp::Ascending}},
-                                 false /*isMultiKey*/}}})}}},
-        boost::none /*costModel*/,
-        {true /*debugMode*/, 2 /*debugLevel*/, DebugInfo::kIterationLimitForTests});
-
-    ABT optimized = testABT;
-    phaseManager.optimize(optimized);
 
     // Verify output as a sanity check, the real test is in the gdb test file.
     ASSERT_EXPLAIN_V2_AUTO(
         "Root [{root}]\n"
-        "RIDIntersect [root]\n"
-        "|   Sargable [Seek]\n"
-        "|   |   |   requirements: \n"
-        "|   |   |       {{{root, 'PathGet [b] PathIdentity []', {{{=Const [1]}}}}}}\n"
-        "|   |   scanParams: \n"
-        "|   |       {'b': evalTemp_4}\n"
-        "|   |           residualReqs: \n"
-        "|   |               {{{evalTemp_4, 'PathIdentity []', {{{=Const [1]}}}, entryIndex: 0}}}\n"
-        "|   Scan [coll, {root}]\n"
-        "Sargable [Index]\n"
-        "|   |   requirements: \n"
-        "|   |       {{{root, 'PathGet [a] PathIdentity []', {{{=Const [1]}}}}}}\n"
-        "|   candidateIndexes: \n"
-        "|       candidateId: 1, index1, {}, {SimpleEquality}, {{{=Const [1]}}}\n"
+        "Filter []\n"
+        "|   EvalFilter []\n"
+        "|   |   Variable [root]\n"
+        "|   PathComposeM []\n"
+        "|   |   PathGet [b]\n"
+        "|   |   PathCompare [Eq]\n"
+        "|   |   Const [1]\n"
+        "|   PathGet [a]\n"
+        "|   PathCompare [Eq]\n"
+        "|   Const [1]\n"
         "Scan [coll, {root}]\n",
-        optimized);
-
-    // Retrieve the SargableNodes, which allows for printing candidate indexes as well as
-    // requirements.
-    [[maybe_unused]] const SargableNode& indexSargable = *optimized.cast<RootNode>()
-                                                              ->getChild()
-                                                              .cast<RIDIntersectNode>()
-                                                              ->getLeftChild()
-                                                              .cast<SargableNode>();
-    [[maybe_unused]] const SargableNode& residualSargable = *optimized.cast<RootNode>()
-                                                                 ->getChild()
-                                                                 .cast<RIDIntersectNode>()
-                                                                 ->getRightChild()
-                                                                 .cast<SargableNode>();
+        testABT);
 
     auto testInterval = _disj(_interval(_incl("1"_cint32), _incl("3"_cint32)),
                               _interval(_incl("4"_cint32), _incl("5"_cint32)));

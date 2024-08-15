@@ -17,17 +17,6 @@ env.Library(
 )
 
 env.Library(
-    target="ce_heuristic_estimation",
-    source=[
-        "heuristic_predicate_estimation.cpp",
-    ],
-    LIBDEPS_PRIVATE=[
-        "$BUILD_DIR/mongo/db/query/optimizer/optimizer_memo",
-        "ce_utils",
-    ],
-)
-
-env.Library(
     target="ce_histogram_estimation",
     source=[
         "histogram_predicate_estimation.cpp",
@@ -39,90 +28,14 @@ env.Library(
 )
 
 env.Library(
-    target="query_ce_heuristic",
-    source=[
-        "heuristic_estimator.cpp",
-    ],
-    LIBDEPS_PRIVATE=[
-        "$BUILD_DIR/mongo/db/query/optimizer/optimizer_memo",
-        "ce_heuristic_estimation",
-        "ce_utils",
-    ],
-)
-
-env.Library(
-    target="query_ce_hinted",
-    source=[
-        "hinted_estimator.cpp",
-    ],
-    LIBDEPS_PRIVATE=[
-        "$BUILD_DIR/mongo/db/query/optimizer/optimizer_memo",
-        "ce_utils",
-        "query_ce_heuristic",
-    ],
-)
-
-env.Library(
-    target="query_ce_histogram",
-    source=[
-        "histogram_estimator.cpp",
-    ],
-    LIBDEPS=[
-        "ce_histogram_estimation",
-    ],
-    LIBDEPS_PRIVATE=[
-        "$BUILD_DIR/mongo/db/query/optimizer/optimizer_memo",
-        "ce_heuristic_estimation",
-        "ce_utils",
-    ],
-)
-
-env.Library(
-    target="query_ce_sampling",
-    source=[
-        "sampling_estimator.cpp",
-    ],
-    LIBDEPS_PRIVATE=[
-        "$BUILD_DIR/mongo/db/query/optimizer/optimizer",
-        "ce_utils",
-    ],
-)
-
-env.Library(
-    target="query_ce_sampling_executor",
-    source=[
-        "sampling_executor.cpp",
-    ],
-    LIBDEPS_PRIVATE=[
-        "$BUILD_DIR/mongo/db/exec/sbe/query_sbe_abt",
-        "query_ce_sampling",
-    ],
-)
-
-env.Library(
     target="test_utils",
     source=[
         "test_utils.cpp",
     ],
     LIBDEPS=[
-        "$BUILD_DIR/mongo/db/query/optimizer/unit_test_pipeline_utils",
         "$BUILD_DIR/mongo/db/sbe_values",
         "$BUILD_DIR/mongo/db/server_base",
-        "query_ce_heuristic",
-        "query_ce_histogram",
-        "query_ce_sampling",
-        "query_ce_sampling_executor",
-    ],
-)
-
-env.CppUnitTest(
-    target="histogram_estimator_test",
-    source=[
-        "histogram_estimator_test.cpp",
-    ],
-    LIBDEPS=[
-        "$BUILD_DIR/mongo/db/query/stats/stats_test_utils",
-        "test_utils",
+        "ce_histogram_estimation",
     ],
 )
 
@@ -130,16 +43,6 @@ env.CppUnitTest(
     target="histogram_interpolation_test",
     source=[
         "histogram_interpolation_test.cpp",
-    ],
-    LIBDEPS=[
-        "test_utils",
-    ],
-)
-
-env.CppUnitTest(
-    target="heuristic_estimator_test",
-    source=[
-        "heuristic_estimator_test.cpp",
     ],
     LIBDEPS=[
         "test_utils",
@@ -169,16 +72,6 @@ env.CppUnitTest(
 )
 
 env.CppUnitTest(
-    target="heuristic_dataflow_nodes_test",
-    source=[
-        "heuristic_dataflow_nodes_test.cpp",
-    ],
-    LIBDEPS=[
-        "test_utils",
-    ],
-)
-
-env.CppUnitTest(
     target="generated_histograms_test",
     source=[
         "generated_histograms_test.cpp",
@@ -195,19 +88,7 @@ env.CppUnitTest(
     ],
     LIBDEPS=[
         "$BUILD_DIR/mongo/db/query/stats/stats_test_utils",
-        "test_utils",
-    ],
-)
-
-env.CppUnitTest(
-    target="ce_benchmark_test",
-    source=[
-        "benchmark_test.cpp",
-        "benchmark_utils.cpp",
-    ],
-    LIBDEPS=[
-        "$BUILD_DIR/mongo/db/query/optimizer/optimizer",
-        "$BUILD_DIR/mongo/db/query/stats/stats_test_utils",
+        "$BUILD_DIR/mongo/db/service_context_test_fixture",
         "test_utils",
     ],
 )

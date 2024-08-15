@@ -810,7 +810,6 @@ env.CppUnitTest(
         "$BUILD_DIR/mongo/db/pipeline/change_stream_expired_pre_image_remover",
         "$BUILD_DIR/mongo/db/query/collation/collator_interface_mock",
         "$BUILD_DIR/mongo/db/query/optimizer/optimizer",
-        "$BUILD_DIR/mongo/db/query/optimizer/unit_test_pipeline_utils",
         "$BUILD_DIR/mongo/db/query/query_test_service_context",
         "$BUILD_DIR/mongo/db/query/search/mongot_options",
         "$BUILD_DIR/mongo/db/query_expressions",

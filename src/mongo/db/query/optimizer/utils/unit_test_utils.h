@@ -35,13 +35,11 @@
 #include <vector>
 
 #include "mongo/db/query/bson/dotted_path_support.h"
-#include "mongo/db/query/ce/hinted_estimator.h"
 #include "mongo/db/query/cost_model/cost_model_gen.h"
 #include "mongo/db/query/optimizer/cascades/interfaces.h"
 #include "mongo/db/query/optimizer/defs.h"
 #include "mongo/db/query/optimizer/explain.h"
 #include "mongo/db/query/optimizer/metadata.h"
-#include "mongo/db/query/optimizer/opt_phase_manager.h"
 #include "mongo/db/query/optimizer/syntax/syntax.h"
 #include "mongo/db/query/optimizer/utils/utils.h"
 #include "mongo/platform/source_location.h"
@@ -55,9 +53,6 @@ namespace mongo::optimizer {
 constexpr SelectivityType kDefaultSelectivity{0.1};
 
 void maybePrintABT(ABT::reference_type abt);
-
-std::string getPropsStrForExplain(const OptPhaseManager& phaseManager);
-
 
 #define ASSERT_EXPLAIN(expected, abt) \
     maybePrintABT(abt);               \
@@ -181,88 +176,9 @@ IndexDefinition makeCompositeIndexDefinition(std::vector<TestIndexField> indexFi
                                              bool isMultiKey = true);
 
 /**
- * A factory function to create a heuristic-based cardinality estimator.
- */
-std::unique_ptr<CardinalityEstimator> makeHeuristicCE();
-
-/**
- * A factory function to create a hint-based cardinality estimator.
- */
-std::unique_ptr<CardinalityEstimator> makeHintedCE(
-    ce::PartialSchemaSelHints hints, ce::PartialSchemaIntervalSelHints intervalHints = {});
-
-/**
  * Return default CostModel used in unit tests.
  */
 cost_model::CostModelCoefficients getTestCostModel();
-
-/*
- * A convenience factory function to create costing with default CostModel.
- */
-std::unique_ptr<CostEstimator> makeCostEstimator();
-
-/**
- * A convenience factory function to create costing with overriden CostModel.
- */
-std::unique_ptr<CostEstimator> makeCostEstimator(
-    const cost_model::CostModelCoefficients& costModel);
-
-/**
- * A convenience factory function to create OptPhaseManager for unit tests with cost model.
- */
-OptPhaseManager makePhaseManager(
-    OptPhaseManager::PhaseSet phaseSet,
-    PrefixId& prefixId,
-    Metadata metadata,
-    const boost::optional<cost_model::CostModelCoefficients>& costModel,
-    DebugInfo debugInfo,
-    QueryHints queryHints = {});
-
-/**
- * A convenience factory function to create OptPhaseManager for unit tests with cost model.
- */
-OptPhaseManager makePhaseManager(
-    OptPhaseManager::PhasesAndRewrites phasesAndRewrites,
-    PrefixId& prefixId,
-    Metadata metadata,
-    std::unique_ptr<CardinalityEstimator> ce,
-    const boost::optional<cost_model::CostModelCoefficients>& costModel,
-    DebugInfo debugInfo,
-    QueryHints queryHints = {});
-
-/**
- * A convenience factory function to create OptPhaseManager for unit tests with CE hints and cost
- * model.
- */
-OptPhaseManager makePhaseManager(
-    OptPhaseManager::PhaseSet phaseSet,
-    PrefixId& prefixId,
-    Metadata metadata,
-    std::unique_ptr<CardinalityEstimator> ce,
-    const boost::optional<cost_model::CostModelCoefficients>& costModel,
-    DebugInfo debugInfo,
-    QueryHints queryHints = {});
-
-/**
- * A convenience factory function to create OptPhaseManager for unit tests with CE hints and cost
- * model.
- */
-OptPhaseManager makePhaseManager(
-    OptPhaseManager::PhasesAndRewrites phasesAndRewrites,
-    PrefixId& prefixId,
-    Metadata metadata,
-    const boost::optional<cost_model::CostModelCoefficients>& costModel,
-    DebugInfo debugInfo,
-    QueryHints queryHints = {});
-
-/**
- * A convenience factory function to create OptPhaseManager for unit tests which requires RID.
- */
-OptPhaseManager makePhaseManagerRequireRID(OptPhaseManager::PhaseSet phaseSet,
-                                           PrefixId& prefixId,
-                                           Metadata metadata,
-                                           DebugInfo debugInfo,
-                                           QueryHints queryHints = {});
 
 /**
  * Compares plans to allow sorting plans in a deterministic way.

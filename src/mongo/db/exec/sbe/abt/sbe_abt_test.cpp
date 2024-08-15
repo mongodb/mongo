@@ -56,7 +56,6 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/pipeline/abt/document_source_visitor.h"
 #include "mongo/db/pipeline/abt/utils.h"
-#include "mongo/db/query/ce/sampling_estimator.h"
 #include "mongo/db/query/collation/collator_interface.h"
 #include "mongo/db/query/collation/collator_interface_mock.h"
 #include "mongo/db/query/cost_model/cost_model_gen.h"
