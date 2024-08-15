@@ -2,14 +2,16 @@
 Import("env")
 env = env.Clone()
 
-wtbin = env.BazelProgram(
-    target='wt',
-    source=Glob('src/utilities/*.c'),
-    LIBDEPS=[
-        'wiredtiger',
-    ],
-    AIB_COMPONENT='wiredtiger',
-    AIB_COMPONENTS_EXTRA=[
-        'dist-test',
-    ],
-)
+# TODO remove conditional with SERVER-80640
+if "-flto=thin" not in env["CCFLAGS"]:
+    wtbin = env.BazelProgram(
+        target='wt',
+        source=Glob('src/utilities/*.c'),
+        LIBDEPS=[
+            'wiredtiger',
+        ],
+        AIB_COMPONENT='wiredtiger',
+        AIB_COMPONENTS_EXTRA=[
+            'dist-test',
+        ],
+    )
