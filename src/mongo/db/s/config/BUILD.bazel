@@ -1,3 +1,5 @@
+load("//bazel:mongo_src_rules.bzl", "idl_generator", "mongo_cc_library")
+
 package(default_visibility = ["//visibility:public"])
 
 exports_files(
@@ -5,4 +7,33 @@ exports_files(
         "*.h",
         "*.cpp",
     ]),
+)
+
+idl_generator(
+    name = "set_cluster_parameter_coordinator_document_gen",
+    src = "set_cluster_parameter_coordinator_document.idl",
+    deps = [
+        ":configsvr_coordinator_gen",
+        "//src/mongo/db:basic_types_gen",
+        "//src/mongo/s/request_types:sharded_ddl_commands_gen",
+    ],
+)
+
+idl_generator(
+    name = "set_user_write_block_mode_coordinator_document_gen",
+    src = "set_user_write_block_mode_coordinator_document.idl",
+    deps = [
+        ":configsvr_coordinator_gen",
+        "//src/mongo/db:basic_types_gen",
+        "//src/mongo/s/request_types:sharded_ddl_commands_gen",
+    ],
+)
+
+idl_generator(
+    name = "configsvr_coordinator_gen",
+    src = "configsvr_coordinator.idl",
+    deps = [
+        "//src/mongo/db:basic_types_gen",
+        "//src/mongo/db/session:logical_session_id_gen",
+    ],
 )

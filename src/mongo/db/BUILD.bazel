@@ -1,4 +1,6 @@
 load("//bazel:mongo_src_rules.bzl", "idl_generator", "mongo_cc_library")
+load("//bazel/config:render_template.bzl", "render_template")
+load("@poetry//:dependencies.bzl", "dependency")
 
 package(default_visibility = ["//visibility:public"])
 
@@ -7,6 +9,47 @@ exports_files(
         "*.h",
         "*.cpp",
     ]),
+)
+
+render_template(
+    name = "feature_flag_test_tpl",
+    srcs = [
+        "feature_flag_test.idl.tpl",
+        "//buildscripts:cheetah_source_generator.py",
+        "//src/mongo/util/version:releases.yml",
+    ],
+    cmd = [
+        "$(location //buildscripts:cheetah_source_generator.py)",
+        "-o",
+        "$(location feature_flag_test.idl)",
+        "$(location feature_flag_test.idl.tpl)",
+        "$(location //src/mongo/util/version:releases.yml)",
+        "$(MONGO_VERSION)",
+    ],
+    output = "feature_flag_test.idl",
+    python_libs = [
+        dependency(
+            "cheetah3",
+            group = "compile",
+        ),
+        dependency(
+            "pyyaml",
+            group = "core",
+        ),
+        dependency(
+            "packaging",
+            group = "compile",
+        ),
+    ],
+)
+
+idl_generator(
+    name = "feature_flag_test_gen",
+    src = ":feature_flag_test_tpl",
+    deps = [
+        ":basic_types_gen",
+        "//src/mongo/idl:cluster_server_parameter_gen",
+    ],
 )
 
 idl_generator(

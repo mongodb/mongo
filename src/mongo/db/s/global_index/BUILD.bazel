@@ -1,3 +1,5 @@
+load("//bazel:mongo_src_rules.bzl", "idl_generator", "mongo_cc_library")
+
 package(default_visibility = ["//visibility:public"])
 
 exports_files(
@@ -5,4 +7,33 @@ exports_files(
         "*.h",
         "*.cpp",
     ]),
+)
+
+idl_generator(
+    name = "common_types_gen",
+    src = "common_types.idl",
+    deps = [
+        "//src/mongo/db:basic_types_gen",
+        "//src/mongo/db:create_indexes_gen",
+        "//src/mongo/db:keypattern_gen",
+        "//src/mongo/s:sharding_types_gen",
+    ],
+)
+
+idl_generator(
+    name = "global_index_cloner_gen",
+    src = "global_index_cloner.idl",
+    deps = [
+        ":common_types_gen",
+        "//src/mongo/db:basic_types_gen",
+        "//src/mongo/db/pipeline:value_gen",
+    ],
+)
+
+idl_generator(
+    name = "global_index_server_parameters_gen",
+    src = "global_index_server_parameters.idl",
+    deps = [
+        "//src/mongo/db:basic_types_gen",
+    ],
 )

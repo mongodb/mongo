@@ -1,0 +1,19 @@
+load("//bazel:mongo_src_rules.bzl", "idl_generator")
+
+package(default_visibility = ["//visibility:public"])
+
+idl_generator(
+    name = "migration_blocking_operation_cluster_parameters_gen",
+    src = "migration_blocking_operation_cluster_parameters.idl",
+    deps = [
+        "//src/mongo/idl:cluster_server_parameter_gen",
+    ],
+)
+
+idl_generator(
+    name = "migration_blocking_operation_feature_flags_gen",
+    src = "migration_blocking_operation_feature_flags.idl",
+    deps = [
+        "//src/mongo/db:basic_types_gen",
+    ],
+)

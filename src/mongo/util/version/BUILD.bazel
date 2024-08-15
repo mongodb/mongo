@@ -34,3 +34,5 @@ render_template(
         ),
     ],
 )
+
+exports_files(["releases.yml"])

@@ -1,3 +1,5 @@
+load("//bazel:mongo_src_rules.bzl", "idl_generator", "mongo_cc_library")
+
 package(default_visibility = ["//visibility:public"])
 
 exports_files(
@@ -5,4 +7,39 @@ exports_files(
         "*.h",
         "*.cpp",
     ]),
+)
+
+idl_generator(
+    name = "common_types_gen",
+    src = "common_types.idl",
+    deps = [
+        "//src/mongo/db:basic_types_gen",
+        "//src/mongo/db:keypattern_gen",
+        "//src/mongo/s:sharding_types_gen",
+    ],
+)
+
+idl_generator(
+    name = "type_collection_fields_gen",
+    src = "type_collection_fields.idl",
+    deps = [
+        ":common_types_gen",
+        "//src/mongo/db:keypattern_gen",
+    ],
+)
+
+idl_generator(
+    name = "resharding_feature_flag_gen",
+    src = "resharding_feature_flag.idl",
+    deps = [
+        "//src/mongo/db:basic_types_gen",
+    ],
+)
+
+idl_generator(
+    name = "resume_token_gen",
+    src = "resume_token.idl",
+    deps = [
+        "//src/mongo/db:basic_types_gen",
+    ],
 )

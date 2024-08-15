@@ -304,27 +304,10 @@ env.Library(
     ],
 )
 
-env.Command(
-    target=[
-        "feature_flag_test.idl",
-    ],
-    source=[
-        "#buildscripts/cheetah_source_generator.py",
-        "feature_flag_test.idl.tpl",
-        "$BUILD_DIR/mongo/util/version/releases.yml",
-    ],
-    action=[
-        "$PYTHON ${SOURCES[0]} -o ${TARGETS[0]} ${SOURCES[1]} ${SOURCES[2]} ${MONGO_VERSION}",
-    ],
-    # Ensure that that SCons is used to produce this file rather than Ninja, to avoid spurious
-    # dependency cycles due to how we manage generated sources with Ninja.
-    NINJA_TEMPLATE=True,
-)
-
 env.Library(
     target="server_feature_flags",
     source=[
-        "feature_flag_test.idl",
+        "feature_flag_test_gen.cpp",
         "server_feature_flags_gen.cpp",
     ],
     LIBDEPS_PRIVATE=[

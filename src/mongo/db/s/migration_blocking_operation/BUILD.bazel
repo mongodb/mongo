@@ -1,3 +1,5 @@
+load("//bazel:mongo_src_rules.bzl", "idl_generator", "mongo_cc_library")
+
 package(default_visibility = ["//visibility:public"])
 
 exports_files(
@@ -5,4 +7,32 @@ exports_files(
         "*.h",
         "*.cpp",
     ]),
+)
+
+idl_generator(
+    name = "migration_blocking_operation_coordinator_gen",
+    src = "migration_blocking_operation_coordinator.idl",
+    deps = [
+        "//src/mongo/db:basic_types_gen",
+        "//src/mongo/db/s:sharding_ddl_coordinator_gen",
+    ],
+)
+
+idl_generator(
+    name = "multi_update_coordinator_gen",
+    src = "multi_update_coordinator.idl",
+    deps = [
+        "//src/mongo/db:basic_types_gen",
+        "//src/mongo/db/session:logical_session_id_gen",
+        "//src/mongo/s:database_version_gen",
+        "//src/mongo/s:error_status_gen",
+    ],
+)
+
+idl_generator(
+    name = "multi_update_coordinator_server_parameters_gen",
+    src = "multi_update_coordinator_server_parameters.idl",
+    deps = [
+        "//src/mongo/db:basic_types_gen",
+    ],
 )

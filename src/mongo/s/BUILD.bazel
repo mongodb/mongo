@@ -197,3 +197,11 @@ idl_generator(
         "//src/mongo/db:basic_types_gen",
     ],
 )
+
+idl_generator(
+    name = "chunk_range_gen",
+    src = "chunk_range.idl",
+    deps = [
+        "//src/mongo/db:basic_types_gen",
+    ],
+)
