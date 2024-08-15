@@ -863,6 +863,31 @@ constexpr auto kOpInsert = "i"_sd;
 constexpr auto kOpUpdate = "u"_sd;
 constexpr auto kOpDelete = "d"_sd;
 
+using InvalidateFn = std::function<void(AuthorizationManager*)>;
+
+/**
+ * When we are currently in a WriteUnitOfWork, invalidation of the user cache must wait until
+ * after the operation causing the invalidation commits. This is because if in a different thread,
+ * the cache is read after invalidation but before the related commit occurs, the cache will be
+ * populated with stale data until the next invalidation.
+ */
+void invalidateUserCacheOnCommit(OperationContext* opCtx, InvalidateFn invalidate) {
+    auto unit = shard_role_details::getRecoveryUnit(opCtx);
+    if (unit && unit->inUnitOfWork()) {
+        LOGV2_DEBUG(9349700,
+                    5,
+                    "In WriteUnitOfWork, deferring user cache invalidation to onCommit handler");
+        unit->onCommit([invalidate = std::move(invalidate)](OperationContext* opCtx,
+                                                            boost::optional<Timestamp>) {
+            LOGV2_DEBUG(9349701, 3, "Invalidating user cache in onCommit handler");
+            invalidate(AuthorizationManager::get(opCtx->getService()));
+        });
+    } else {
+        LOGV2_DEBUG(9349702, 3, "Not in WriteUnitOfWork, invalidating user cache immediately");
+        invalidate(AuthorizationManager::get(opCtx->getService()));
+    }
+}
+
 void _invalidateUserCache(OperationContext* opCtx,
                           AuthorizationManagerImpl* authzManager,
                           StringData op,
@@ -883,15 +908,20 @@ void _invalidateUserCache(OperationContext* opCtx,
                                      str::stream() << "_id entries for user documents must be of "
                                                       "the form <dbname>.<username>.  Found: "
                                                    << id));
-            AuthorizationManager::get(opCtx->getService())->invalidateUserCache();
+
+            invalidateUserCacheOnCommit(opCtx, [](auto* am) { am->invalidateUserCache(); });
             return;
         }
         UserName userName(id.substr(splitPoint + 1), id.substr(0, splitPoint), coll.tenantId());
-        AuthorizationManager::get(opCtx->getService())->invalidateUserByName(userName);
+        invalidateUserCacheOnCommit(opCtx, [userName = std::move(userName)](auto* am) {
+            am->invalidateUserByName(userName);
+        });
     } else if (const auto& tenant = coll.tenantId()) {
-        AuthorizationManager::get(opCtx->getService())->invalidateUsersByTenant(tenant.value());
+        invalidateUserCacheOnCommit(opCtx, [tenantId = tenant.value()](auto* am) {
+            am->invalidateUsersByTenant(tenantId);
+        });
     } else {
-        AuthorizationManager::get(opCtx->getService())->invalidateUserCache();
+        invalidateUserCacheOnCommit(opCtx, [](auto* am) { am->invalidateUserCache(); });
     }
 }
 }  // namespace
