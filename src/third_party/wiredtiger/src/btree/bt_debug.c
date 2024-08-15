@@ -1282,6 +1282,7 @@ __debug_page_metadata(WT_DBG *ds, WT_REF *ref)
             WT_RET(ds->f(ds, "replaced"));
             break;
         case 0:
+            WT_RET(ds->f(ds, "none"));
             break;
         default:
             return (__wt_illegal_value(session, mod->rec_result));
