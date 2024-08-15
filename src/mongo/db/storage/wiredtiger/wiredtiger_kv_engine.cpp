@@ -143,11 +143,8 @@ namespace mongo {
 namespace {
 
 MONGO_FAIL_POINT_DEFINE(WTDropEBUSY);
-MONGO_FAIL_POINT_DEFINE(WTPauseStableTimestamp);
 MONGO_FAIL_POINT_DEFINE(WTPreserveSnapshotHistoryIndefinitely);
 MONGO_FAIL_POINT_DEFINE(WTSetOldestTSToStableTS);
-MONGO_FAIL_POINT_DEFINE(WTWriteConflictExceptionForImportCollection);
-MONGO_FAIL_POINT_DEFINE(WTWriteConflictExceptionForImportIndex);
 MONGO_FAIL_POINT_DEFINE(WTRollbackToStableReturnOnEBUSY);
 MONGO_FAIL_POINT_DEFINE(hangBeforeUnrecoverableRollbackError);
 MONGO_FAIL_POINT_DEFINE(WTDisableFastShutDown);
@@ -1502,16 +1499,6 @@ Status WiredTigerKVEngine::importRecordStore(OperationContext* opCtx,
     _ensureIdentPath(ident);
     WiredTigerSession session(_conn);
 
-    if (MONGO_unlikely(WTWriteConflictExceptionForImportCollection.shouldFail())) {
-        LOGV2(6177300,
-              "Failpoint WTWriteConflictExceptionForImportCollection enabled. Throwing "
-              "WriteConflictException",
-              "ident"_attr = ident);
-        throwWriteConflictException(
-            str::stream() << "Hit failpoint '"
-                          << WTWriteConflictExceptionForImportCollection.getName() << "'.");
-    }
-
     std::string config = uassertStatusOK(
         WiredTigerUtil::generateImportString(ident, storageMetadata, importOptions));
 
@@ -1706,16 +1693,6 @@ Status WiredTigerKVEngine::importSortedDataInterface(OperationContext* opCtx,
                                                      const BSONObj& storageMetadata,
                                                      const ImportOptions& importOptions) {
     _ensureIdentPath(ident);
-
-    if (MONGO_unlikely(WTWriteConflictExceptionForImportIndex.shouldFail())) {
-        LOGV2(6177301,
-              "Failpoint WTWriteConflictExceptionForImportIndex enabled. Throwing "
-              "WriteConflictException",
-              "ident"_attr = ident);
-        throwWriteConflictException(str::stream()
-                                    << "Hit failpoint '"
-                                    << WTWriteConflictExceptionForImportIndex.getName() << "'.");
-    }
 
     std::string config = uassertStatusOK(
         WiredTigerUtil::generateImportString(ident, storageMetadata, importOptions));
@@ -2204,10 +2181,6 @@ void WiredTigerKVEngine::setJournalListener(JournalListener* jl) {
 }
 
 void WiredTigerKVEngine::setStableTimestamp(Timestamp stableTimestamp, bool force) {
-    if (MONGO_unlikely(WTPauseStableTimestamp.shouldFail())) {
-        return;
-    }
-
     if (stableTimestamp.isNull()) {
         return;
     }

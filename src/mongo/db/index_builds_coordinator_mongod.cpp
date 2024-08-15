@@ -100,7 +100,6 @@ namespace mongo {
 
 namespace {
 
-MONGO_FAIL_POINT_DEFINE(hangAfterAcquiringIndexBuildSlot);
 MONGO_FAIL_POINT_DEFINE(hangAfterRegisteringIndexBuild);
 MONGO_FAIL_POINT_DEFINE(hangBeforeInitializingIndexBuild);
 MONGO_FAIL_POINT_DEFINE(hangIndexBuildAfterSignalPrimaryForCommitReadiness);
@@ -357,11 +356,6 @@ IndexBuildsCoordinatorMongod::_startIndexBuild(OperationContext* opCtx,
         _numActiveIndexBuilds--;
         _indexBuildFinished.notify_one();
     });
-
-    if (MONGO_unlikely(hangAfterAcquiringIndexBuildSlot.shouldFail())) {
-        LOGV2(4886201, "Hanging index build due to failpoint 'hangAfterAcquiringIndexBuildSlot'");
-        hangAfterAcquiringIndexBuildSlot.pauseWhileSet();
-    }
 
     ScopeGuard unregisterUnscheduledIndexBuild([&] {
         auto replIndexBuildState = _getIndexBuild(buildUUID);
