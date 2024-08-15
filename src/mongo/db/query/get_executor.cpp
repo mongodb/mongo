@@ -506,14 +506,23 @@ public:
             return buildSubPlan();
         }
 
-        auto statusWithMultiPlanSolns = QueryPlanner::plan(*_cq, *_plannerParams);
-        if (!statusWithMultiPlanSolns.isOK()) {
-            return statusWithMultiPlanSolns.getStatus().withContext(
-                str::stream() << "error processing query: " << _cq->toStringForErrorMsg()
-                              << " planner returned error");
+        std::vector<std::unique_ptr<QuerySolution>> solutions;
+        if (planRankerMode.load()) {
+            auto statusWithCBRSolns = QueryPlanner::planWithCostBasedRanking(*_cq, *_plannerParams);
+            if (!statusWithCBRSolns.isOK()) {
+                return statusWithCBRSolns.getStatus();
+            }
+            solutions = std::move(statusWithCBRSolns.getValue().solutions);
+        } else {
+            auto statusWithMultiPlanSolns = QueryPlanner::plan(*_cq, *_plannerParams);
+            if (!statusWithMultiPlanSolns.isOK()) {
+                return statusWithMultiPlanSolns.getStatus().withContext(
+                    str::stream() << "error processing query: " << _cq->toStringForErrorMsg()
+                                  << " planner returned error");
+            }
+            solutions = std::move(statusWithMultiPlanSolns.getValue());
         }
 
-        auto solutions = std::move(statusWithMultiPlanSolns.getValue());
         // The planner should have returned an error status if there are no solutions.
         invariant(solutions.size() > 0);
 

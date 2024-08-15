@@ -1706,6 +1706,16 @@ server_parameters:
     default: false
     redact: false
 
+  planRankerMode:
+    description: "Enable cost-based ranking of query plans."
+    set_at: [ startup, runtime ]
+    cpp_varname: planRankerMode
+    # TODO SERVER-92587: change to an enum
+    cpp_vartype: AtomicWord<bool>
+    default: false
+    redact: false
+    on_update: plan_cache_util::clearSbeCacheOnParameterChange
+
 # Note for adding additional query knobs:
 #
 # When adding a new query knob, you should consider whether or not you need to add an 'on_update'

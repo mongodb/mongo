@@ -1875,6 +1875,22 @@ StatusWith<std::vector<std::unique_ptr<QuerySolution>>> QueryPlanner::plan(
     return {std::move(out)};
 }  // QueryPlanner::plan
 
+StatusWith<QueryPlanner::CostBasedRankerResult> QueryPlanner::planWithCostBasedRanking(
+    const CanonicalQuery& query, const QueryPlannerParams& params) {
+    auto statusWithMultiPlanSolns = QueryPlanner::plan(query, params);
+    if (!statusWithMultiPlanSolns.isOK()) {
+        return statusWithMultiPlanSolns.getStatus();
+    }
+    // This is a temporary stub implementation of CBR which arbitrarily picks the last of the
+    // enumerated plans.
+    std::vector<std::unique_ptr<QuerySolution>> soln;
+    soln.push_back(std::move(statusWithMultiPlanSolns.getValue().back()));
+    return QueryPlanner::CostBasedRankerResult{
+        .solutions = std::move(soln),
+        .rejectedPlans = {},
+    };
+}
+
 /**
  * If 'query.cqPipeline()' is non-empty, it contains a prefix of the aggregation pipeline that can
  * be pushed down to SBE. For now, we plan this separately here and attach the agg portion of the

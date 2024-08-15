@@ -55,6 +55,7 @@ const paramList = [
     {name: "internalCascadesOptimizerMaxIndexEqPrefixes", value: 2},
     {name: "internalQuerySlotBasedExecutionDisableTimeSeriesPushdown", value: true},
     {name: "internalQueryDisablePlanCache", value: true},
+    {name: "planRankerMode", value: true},
 ];
 
 const conn = MongoRunner.runMongod();
