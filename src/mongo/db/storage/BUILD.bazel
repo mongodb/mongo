@@ -23,3 +23,32 @@ idl_generator(
     name = "two_phase_index_build_knobs_gen",
     src = "two_phase_index_build_knobs.idl",
 )
+
+mongo_cc_library(
+    name = "storage_file_util",
+    srcs = [
+        "storage_file_util.cpp",
+    ],
+    hdrs = [
+        "storage_file_util.h",
+    ],
+    deps = [
+        "//src/mongo:base",
+    ],
+)
+
+mongo_cc_library(
+    name = "duplicate_key_error_info",
+    srcs = [
+        "duplicate_key_error_info.cpp",
+    ],
+    hdrs = [
+        "duplicate_key_error_info.h",
+    ],
+    header_deps = [
+        "//src/mongo/db/concurrency:flow_control_ticketholder",
+    ],
+    deps = [
+        "//src/mongo:base",
+    ],
+)

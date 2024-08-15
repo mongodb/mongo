@@ -42,16 +42,6 @@ env.Library(
 )
 
 env.Library(
-    target="bucket_compression_failure",
-    source=[
-        "bucket_compression_failure.cpp",
-    ],
-    LIBDEPS_PRIVATE=[
-        "$BUILD_DIR/mongo/base",
-    ],
-)
-
-env.Library(
     target="catalog_helper",
     source=[
         "catalog_helper.cpp",
@@ -141,16 +131,6 @@ env.Library(
         "$BUILD_DIR/mongo/base",
         "$BUILD_DIR/mongo/db/catalog/index_catalog",
         "timeseries_options",
-    ],
-)
-
-env.Library(
-    target="timeseries_metadata",
-    source=[
-        "metadata.cpp",
-    ],
-    LIBDEPS_PRIVATE=[
-        "$BUILD_DIR/mongo/base",
     ],
 )
 

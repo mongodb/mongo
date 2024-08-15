@@ -16,3 +16,29 @@ idl_generator(
         "//src/mongo/db:basic_types_gen",
     ],
 )
+
+mongo_cc_library(
+    name = "timeseries_metadata",
+    srcs = [
+        "metadata.cpp",
+    ],
+    hdrs = [
+        "metadata.h",
+    ],
+    deps = [
+        "//src/mongo:base",
+    ],
+)
+
+mongo_cc_library(
+    name = "bucket_compression_failure",
+    srcs = [
+        "bucket_compression_failure.cpp",
+    ],
+    hdrs = [
+        "bucket_compression_failure.h",
+    ],
+    deps = [
+        "//src/mongo:base",
+    ],
+)

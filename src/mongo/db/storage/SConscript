@@ -41,16 +41,6 @@ env.Library(
 )
 
 env.Library(
-    target="duplicate_key_error_info",
-    source=[
-        "duplicate_key_error_info.cpp",
-    ],
-    LIBDEPS=[
-        "$BUILD_DIR/mongo/base",
-    ],
-)
-
-env.Library(
     target="recovery_unit_base",
     source=[
         "recovery_unit.cpp",
@@ -416,16 +406,6 @@ env.Library(
         "$BUILD_DIR/mongo/bson/bson_validate",
         "$BUILD_DIR/mongo/db/query/bson/dotted_path_support",
         "$BUILD_DIR/mongo/db/server_base",
-    ],
-)
-
-env.Library(
-    target="storage_file_util",
-    source=[
-        "storage_file_util.cpp",
-    ],
-    LIBDEPS_PRIVATE=[
-        "$BUILD_DIR/mongo/base",
     ],
 )
 
