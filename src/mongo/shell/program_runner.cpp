@@ -420,29 +420,20 @@ ProgramRunner::ProgramRunner(BSONObj args, BSONObj env, bool isMongo, ProgramReg
     bool isMongosProgram = isMongo &&
         (string("mongos") == programName ||
          programName.string().compare(0, prefix.size(), prefix) == 0);
-    prefix = "mongoqd-";
-    bool isMongoqProgram = isMongo &&
-        (string("mongoqd") == programName ||
-         programName.string().compare(0, prefix.size(), prefix) == 0);
     prefix = "mongotmock-";
     bool isMongotMockProgram = isMongo &&
         (string("mongotmock") == programName ||
          programName.string().compare(0, prefix.size(), prefix) == 0);
 
-    parseName(isMongo,
-              isMongodProgram,
-              isMongosProgram,
-              isMongoqProgram,
-              isMongotMockProgram,
-              programName);
+    parseName(isMongo, isMongodProgram, isMongosProgram, isMongotMockProgram, programName);
 
     _argv.push_back(programPath.string());
 
     parseArgs(args, isMongo, isMongodProgram);
     loadEnvironmentVariables(env);
 
-    bool needsPort = isMongo &&
-        (isMongodProgram || isMongosProgram || isMongoqProgram || (programName == "mongobridge"));
+    bool needsPort =
+        isMongo && (isMongodProgram || isMongosProgram || (programName == "mongobridge"));
     if (!needsPort) {
         _port = -1;
     }
@@ -852,7 +843,6 @@ void ProgramRunner::loadEnvironmentVariables(BSONObj env) {
 void ProgramRunner::parseName(bool isMongo,
                               bool isMongodProgram,
                               bool isMongosProgram,
-                              bool isMongoqProgram,
                               bool isMongotMockProgram,
                               const boost::filesystem::path& programName) {
     if (!isMongo) {
@@ -861,8 +851,6 @@ void ProgramRunner::parseName(bool isMongo,
         _name = "d";
     } else if (isMongosProgram) {
         _name = "s";
-    } else if (isMongoqProgram) {
-        _name = "q";
     } else if (isMongotMockProgram) {
         _name = "tm";
     } else if (programName == "mongobridge") {

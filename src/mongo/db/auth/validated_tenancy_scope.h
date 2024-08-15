@@ -168,7 +168,7 @@ private:
 
     explicit ValidatedTenancyScope(std::string token) : _originalToken(std::move(token)) {}
 
-    // Preserve original token for serializing from MongoQ.
+    // Preserve original token for serializing.
     std::string _originalToken;
 
     // Expiration time if any.

@@ -6,7 +6,6 @@ Import("get_option")
 env = env.Clone()
 
 # These commands are registered with both the router and shard command registries.
-# This library is currently also linked into mongoqd
 env.Library(
     target="sharded_cluster_sharding_commands",
     source=[
@@ -26,7 +25,6 @@ env.Library(
 )
 
 # These commands are registered only with the router-role.
-# They are also available on mongoqd.
 env.Library(
     target="cluster_commands",
     source=[
@@ -229,8 +227,6 @@ env.Library(
 )
 
 # These commands are registered with the router role only.
-# This library is currently also linked into mongoqd, but contains
-# commands that should not be used in serverless mode.
 env.Library(
     target="sharded_cluster_commands",
     source=[

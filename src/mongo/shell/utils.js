@@ -450,7 +450,6 @@ jsTestOptions = function() {
             maxPort: TestData.maxPort,
             // Note: does not support the array version
             mongosBinVersion: TestData.mongosBinVersion || "",
-            mongoqBinVersion: TestData.mongoqBinVersion || "",
             shardMixedBinVersions: TestData.shardMixedBinVersions || false,
             mixedBinVersions: TestData.mixedBinVersions || false,
             networkMessageCompressors: TestData.networkMessageCompressors,
