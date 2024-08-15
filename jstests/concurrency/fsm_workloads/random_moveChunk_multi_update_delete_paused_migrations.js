@@ -7,6 +7,7 @@
  * concurrency_simultaneous, since this would potentially interfere with other tests.
  *
  * @tags: [
+ * resource_intensive,
  * requires_sharding,
  * assumes_balancer_off,
  * incompatible_with_concurrency_simultaneous,

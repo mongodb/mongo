@@ -5,6 +5,7 @@
  *
  * @tags: [
  *  requires_fcv_60,
+ *  resource_intensive,
  *  requires_sharding,
  *  uses_transactions,
  *  antithesis_incompatible,

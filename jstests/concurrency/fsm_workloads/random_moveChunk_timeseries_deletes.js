@@ -3,6 +3,7 @@
  * presence of concurrent insert and moveChunk commands.
  * @tags: [
  *  requires_sharding,
+ *  resource_intensive,
  *  assumes_balancer_off,
  *  requires_non_retryable_writes,
  *  does_not_support_transactions,

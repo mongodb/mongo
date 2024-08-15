@@ -7,6 +7,7 @@
  *
  * @tags: [
  *   assumes_balancer_off,
+ *   resource_intensive,
  *   # The init() state function populates each document owned by a particular thread with a
  *   # "groupId" value. Doing so may take longer than the configured stepdown interval. It is
  *   # therefore unsafe to automatically run inside a multi-statement transaction because its

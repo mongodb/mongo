@@ -3,6 +3,7 @@
  * and verifies that indexes are not left in an inconsistent state.
  *
  * @tags: [
+ *  resource_intensive,
  *  requires_sharding,
  *  assumes_balancer_off,
  * ]

@@ -736,7 +736,7 @@ class TestRunnerEvg(TestRunner):
         suites = []
 
         for suite in TestRunner._get_suites(self):
-            if suite.test_kind != "js_test":
+            if suite.test_kind not in ("js_test", "fsm_workload_test"):
                 # Tags are only support for JavaScript tests, so we leave the test suite alone when
                 # running any other kind of test.
                 suites.append(suite)

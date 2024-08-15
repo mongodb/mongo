@@ -4,6 +4,7 @@
  *
  * @tags: [
  *  requires_sharding,
+ *  resource_intensive,
  *  assumes_balancer_off,
  *  requires_non_retryable_writes,
  *  uses_transactions,

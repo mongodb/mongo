@@ -5,6 +5,7 @@
  *
  * @tags: [
  *  requires_sharding,
+ *  resource_intensive,
  *  assumes_balancer_off,
  *  uses_transactions,
  * ]

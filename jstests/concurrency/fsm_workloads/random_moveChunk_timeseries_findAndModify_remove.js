@@ -3,6 +3,7 @@
  * deletes in the presence of concurrent insert and moveChunk commands.
  * @tags: [
  *  requires_sharding,
+ *  resource_intensive,
  *  assumes_balancer_off,
  *  # Time-series findAndModify does not support retryable writes.
  *  requires_non_retryable_writes,

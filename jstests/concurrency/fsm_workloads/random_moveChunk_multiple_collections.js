@@ -2,6 +2,7 @@
  * Perform continuous moveChunk on multiple collections/databases.
  *
  * @tags: [
+ *  resource_intensive,
  *  requires_sharding,
  *  assumes_balancer_off,
  *  does_not_support_add_remove_shards,

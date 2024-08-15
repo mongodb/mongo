@@ -3,6 +3,7 @@
  * includes multi=true deletes and multi=false deletes with exact _id queries.
  *
  * @tags: [
+ *  resource_intensive,
  *  requires_sharding,
  *  assumes_balancer_off,
  *  requires_non_retryable_writes,
