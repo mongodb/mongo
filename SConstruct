@@ -945,7 +945,6 @@ def variable_tools_converter(val):
     return tool_list + [
         "distsrc",
         "gziptool",
-        "idl_tool",
         "jsheader",
         "mongo_test_execution",
         "mongo_test_list",
@@ -2309,7 +2308,6 @@ env["BUILDERS"]["SharedArchive"] = SCons.Builder.Builder(
 
 # Teach object builders how to build underlying generated types
 for builder in ["SharedObject", "StaticObject"]:
-    env["BUILDERS"][builder].add_src_builder("Idlc")
     env["BUILDERS"][builder].add_src_builder("Protoc")
 
 
@@ -5677,32 +5675,6 @@ if get_option("ninja") != "disabled":
         base_emitter = builder.emitter
         new_emitter = SCons.Builder.ListEmitter([base_emitter, winlink_workaround_emitter])
         builder.emitter = new_emitter
-
-    # idlc.py has the ability to print its implicit dependencies
-    # while generating. Ninja can consume these prints using the
-    # deps=msvc method.
-    env.AppendUnique(
-        IDLCFLAGS=[
-            "--write-dependencies-inline",
-        ]
-    )
-    env.NinjaRule(
-        rule="IDLC",
-        command="cmd /c $cmd" if env.TargetOSIs("windows") else "$cmd",
-        description="Generated $out",
-        deps="msvc",
-        pool="local_pool",
-    )
-
-    def get_idlc_command(env, node, action, targets, sources, executor=None):
-        _, variables, _ = env.NinjaGetGenericShellCommand(
-            node, action, targets, sources, executor=executor
-        )
-        variables["msvc_deps_prefix"] = "import file:"
-        return "IDLC", variables, env.subst(env["IDLC"]).split()
-
-    env.NinjaRuleMapping("$IDLCCOM", get_idlc_command)
-    env.NinjaRuleMapping(env["IDLCCOM"], get_idlc_command)
 
     # We can create empty files for FAKELIB in Ninja because it
     # does not care about content signatures. We have to
