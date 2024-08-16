@@ -265,14 +265,33 @@ void ShardRegistry::startupPeriodicReloader(OperationContext* opCtx) {
     _executor->startup();
 
     AsyncTry([this] {
-        LOGV2_DEBUG(22726, 1, "Reloading shardRegistry");
-        return _reloadAsync();
+        ThreadClient tc("Periodic ShardRegistry pinger", getGlobalServiceContext()->getService());
+        auto opCtx = cc().makeOperationContext();
+
+        LOGV2_DEBUG(9112100, 2, "Periodic ping to CSRS for ShardRegistry topology time update");
+        uassertStatusOK(_pingForNewTopologyTime(opCtx.get()));
+
+        const auto time = VectorClock::get(opCtx.get())->getTime();
+        LOGV2_DEBUG(9112101,
+                    2,
+                    "VectorClock after periodic ShardRegistry ping",
+                    "clusterTime"_attr = time.clusterTime(),
+                    "configTime"_attr = time.configTime(),
+                    "topologyTime"_attr = time.topologyTime());
+
+        // Schedule a lookup if the topologyTime has been advanced. This is only necessary because
+        // the "connPoolStats" command depends on replica set monitors being instantiated. Even if
+        // a node becomes aware of a newer topologyTime, if there are no calls to ShardRegistry
+        // functions no lookup is done, and the RSMs are not instantiated. There are some tests
+        // which hang due to this, so presumably some users might already be relying on this
+        // behaviour.
+        _scheduleLookupIfRequired();
     })
-        .until([](auto&& sw) {
-            if (!sw.isOK()) {
+        .until([](auto&& status) {
+            if (!status.isOK()) {
                 LOGV2(22727,
                       "Error running periodic reload of shard registry",
-                      "error"_attr = redact(sw.getStatus()),
+                      "error"_attr = redact(status),
                       "shardRegistryReloadInterval"_attr = kRefreshPeriod);
             }
             // Continue until the _executor will shutdown
@@ -280,11 +299,11 @@ void ShardRegistry::startupPeriodicReloader(OperationContext* opCtx) {
         })
         .withDelayBetweenIterations(kRefreshPeriod)  // This call is optional.
         .on(_executor, CancellationToken::uncancelable())
-        .getAsync([](auto&& sw) {
+        .getAsync([](auto&& status) {
             LOGV2_DEBUG(22725,
                         1,
                         "Exiting periodic shard registry reloader",
-                        "reason"_attr = redact(sw.getStatus()));
+                        "reason"_attr = redact(status));
         });
 }
 
@@ -491,6 +510,16 @@ void ShardRegistry::reload(OperationContext* opCtx) {
 SharedSemiFuture<ShardRegistry::Cache::ValueHandle> ShardRegistry::_reloadAsync() {
     _updateTimeInStore(/*forceReload=*/true);
     return _getDataAsyncCommon();
+}
+
+Status ShardRegistry::_pingForNewTopologyTime(OperationContext* opCtx) {
+    return getConfigShard()
+        ->runCommand(opCtx,
+                     ReadPreferenceSetting(ReadPreference::PrimaryPreferred),
+                     DatabaseName::kAdmin,
+                     BSON("ping" << 1),
+                     Shard::RetryPolicy::kNoRetry)
+        .getStatus();
 }
 
 void ShardRegistry::scheduleReplicaSetUpdateOnConfigServerIfNeeded(

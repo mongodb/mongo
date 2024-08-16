@@ -523,6 +523,8 @@ private:
 
     SharedSemiFuture<Cache::ValueHandle> _reloadAsync();
 
+    Status _pingForNewTopologyTime(OperationContext* opCtx);
+
     ServiceContext* _service{nullptr};
 
     /**

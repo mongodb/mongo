@@ -304,7 +304,7 @@ TEST_F(ShardRegistryTest, GetDataWithNewTopologyTimeAfterEmptyLookup) {
     future.default_timed_get();
 }
 
-TEST_F(ShardRegistryTest, PeriodicReloaderForcesRefresh) {
+TEST_F(ShardRegistryTest, PeriodicReloaderUpdatesTopologyTime) {
     // Add a shard and make the topologyTime known to this node.
     addShard({"0"}, kDoNotAdvanceTopologyTime);
 
@@ -314,10 +314,12 @@ TEST_F(ShardRegistryTest, PeriodicReloaderForcesRefresh) {
 
     shardRegistry()->startupPeriodicReloader(operationContext());
 
-    expectCSRSLookup();
+    expectPing();
 
     auto topologyTimeAfter = getLastKnownTopologyTime();
     ASSERT_EQ(topologyTimeAfter.asTimestamp(), configsvrTopologyTime);
+
+    expectCSRSLookup();
 }
 
 DEATH_TEST_F(ShardRegistryTest, TopologyTimeMonotonicityViolation, "Tripwire assertion") {
