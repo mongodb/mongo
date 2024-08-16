@@ -88,16 +88,6 @@ env.Library(
 )
 
 env.Library(
-    target="resource_yielders",
-    source=[
-        "resource_yielders.cpp",
-    ],
-    LIBDEPS_PRIVATE=[
-        "$BUILD_DIR/mongo/base",
-    ],
-)
-
-env.Library(
     target="sharding_router_api",
     source=[
         "cluster_commands_helpers.cpp",
