@@ -241,32 +241,35 @@ class ProjFileGenerator(object):
 
     def parse_line(self, line):
         """Parse a build line."""
-        if line.startswith("cl"):
-            self.__parse_cl_line(line[3:])
+        cl_exe_end = line.lower().find('cl.exe" ')
+        cl_len = len('cl.exe" ')
+        if cl_exe_end:
+            self.__parse_cl_line(line[cl_exe_end + cl_len :])
 
     def __parse_cl_line(self, line):
         """Parse a compiler line."""
         # Get the file we are compilong
-        file_name = re.search(r"/c ([\w\\.-]+) ", line).group(1)
+        file_name = re.search(r"/c ([\w\\.-]+)", line).group(1)
 
         # Skip files made by scons for configure testing
         if "sconf_temp" in file_name:
             return
 
-        self.files.add(file_name)
+        if file_name not in self.files:
+            self.files.add(file_name)
 
-        args = line.split(" ")
+            args = line.split(" ")
 
-        file_defines = set()
-        for arg in get_defines(args):
-            if arg not in self.common_defines:
-                file_defines.add(arg)
-        self.all_defines = self.all_defines.union(file_defines)
+            file_defines = set()
+            for arg in get_defines(args):
+                if arg not in self.common_defines:
+                    file_defines.add(arg)
+            self.all_defines = self.all_defines.union(file_defines)
 
-        for arg in get_includes(args):
-            self.includes.add(arg)
+            for arg in get_includes(args):
+                self.includes.add(arg)
 
-        self.compiles.append({"file": file_name, "defines": file_defines})
+            self.compiles.append({"file": file_name, "defines": file_defines})
 
     @staticmethod
     def __is_header(name):

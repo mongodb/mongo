@@ -61,9 +61,24 @@ def main(
             bazel_compdb_adjusted = []
             for entry in bazel_compdb_list:
                 output_file = find_output_file(entry["arguments"])
+
+                quoted_args = []
+                for arg in entry["arguments"]:
+                    if arg.startswith('"') and arg.endswith('"'):
+                        quoted_args.append(arg)
+                        continue
+                    if arg.startswith("'") and arg.endswith("'"):
+                        quoted_args.append(arg)
+                        continue
+                    if " " in arg:
+                        arg = '"' + arg + '"'
+                        quoted_args.append(arg)
+                    else:
+                        quoted_args.append(arg)
+
                 new_entry = {
                     "file": entry["file"],
-                    "command": " ".join(entry["arguments"]),
+                    "command": " ".join(quoted_args),
                     "directory": entry["directory"],
                     "output": output_file,
                 }
