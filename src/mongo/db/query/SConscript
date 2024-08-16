@@ -367,16 +367,6 @@ env.Library(
 )
 
 env.Library(
-    target="str_trim_utils",
-    source=[
-        "str_trim_utils.cpp",
-    ],
-    LIBDEPS=[
-        "$BUILD_DIR/mongo/base",
-    ],
-)
-
-env.Library(
     target="plan_yield_policy",
     source=[
         "plan_yield_policy.cpp",

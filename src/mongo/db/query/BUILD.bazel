@@ -150,3 +150,16 @@ mongo_cc_library(
         "//src/mongo:base",
     ],
 )
+
+mongo_cc_library(
+    name = "str_trim_utils",
+    srcs = [
+        "str_trim_utils.cpp",
+    ],
+    hdrs = [
+        "//src/mongo/db/query:str_trim_utils.h",
+    ],
+    deps = [
+        "//src/mongo:base",
+    ],
+)
