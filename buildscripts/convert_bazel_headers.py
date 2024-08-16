@@ -95,7 +95,6 @@ def main(
 
                     if not silent:
                         print(f"compiling {line}")
-                        print(command["command"] + header_arg)
 
                     p = subprocess.run(
                         shlex.split((command["command"].replace("\\", "/") + header_arg)),
@@ -146,16 +145,24 @@ def main(
             print(traceback.format_exc(), file=sys.stderr)
             raise exc
 
+    sources = []
     with open(target_library + ".obj_files") as f:
+        lines = f.readlines()
+        for line in lines:
+            line = line.strip()
+            line = line.replace("build/opt", "//src")
+            line = line[: line.find(".")] + ".cpp"
+            line = ":".join(line.rsplit("/", 1))
+            if line.endswith("_gen.cpp"):
+                line = line[:-4]
+            sources.append(line)
         if platform.system() == "Linux":
             cpu_count = len(os.sched_getaffinity(0)) + 4
         else:
             cpu_count = os.cpu_count() + 4
 
         with concurrent.futures.ThreadPoolExecutor(max_workers=cpu_count) as executor:
-            jobs = {
-                executor.submit(get_headers, line.strip()): line.strip() for line in f.readlines()
-            }
+            jobs = {executor.submit(get_headers, line.strip()): line.strip() for line in lines}
             for completed_job in concurrent.futures.as_completed(jobs):
                 if not silent:
                     print(f"finished {jobs[completed_job]}")
@@ -183,17 +190,15 @@ def main(
             bazel_header = "//" + hdr.replace("\\", "/")
             bazel_header = ":".join(bazel_header.rsplit("/", 1))
             if bazel_header.startswith("//src/third_party/SafeInt"):
-                reverse_header_map[bazel_header] = "//src/third_party/SafeInt:headers"
+                reverse_header_map[bazel_header] = ["//src/third_party/SafeInt:headers"]
             elif bazel_header.startswith("//src/third_party/immer"):
-                reverse_header_map[bazel_header] = "//src/third_party/immer:headers"
+                reverse_header_map[bazel_header] = ["//src/third_party/immer:headers"]
             elif bazel_header in reverse_header_map:
                 if bazel_header.startswith("//src/third_party/"):
                     continue
-                print(
-                    f"Redundent header found: {bazel_header} already in map, existing: {reverse_header_map[bazel_header]}, new {k}"
-                )
+                reverse_header_map[bazel_header].append(k)
             else:
-                reverse_header_map[bazel_header] = k
+                reverse_header_map[bazel_header] = [k]
 
     for k, v in gen_header_map.items():
         for hdr in v:
@@ -202,44 +207,64 @@ def main(
             bazel_header = "//" + hdr.replace("\\", "/")
             bazel_header = ":".join(bazel_header.rsplit("/", 1))
             if bazel_header not in reverse_header_map:
-                reverse_header_map[bazel_header] = k
+                reverse_header_map[bazel_header] = [k]
+            else:
+                reverse_header_map[bazel_header].append(k)
 
     recommended_deps = set()
     minimal_headers = set()
     for header in headers:
         if header in reverse_header_map:
-            if reverse_header_map[header] in gen_header_map:
-                minimal_headers.add(reverse_header_map[header])
-            else:
-                recommended_deps.add(reverse_header_map[header])
+            found = False
+            for lib in reverse_header_map[header]:
+                if lib in gen_header_map:
+                    minimal_headers.add(lib)
+                    found = True
+                    break
+            if not found:
+                for lib in reverse_header_map[header]:
+                    recommended_deps.add(lib)
         else:
             if not header.endswith(global_headers):
                 minimal_headers.add(header)
 
-    working_deps = recommended_deps.copy()
+    deps_order_by_height = []
+    deps_queries = {}
     for dep in recommended_deps:
+        p = subprocess.run(
+            [bazel_exec, "cquery"] + bazel_config + [f'kind("extract_debuginfo", deps("@{dep}"))'],
+            capture_output=True,
+            text=True,
+        )
+        deps_queries[dep] = [
+            line.split(" ")[0] for line in p.stdout.splitlines() if line.startswith("//")
+        ]
+        deps_order_by_height.append((dep, len(deps_queries[dep])))
+
+    deps_order_by_height.sort(key=lambda x: x[1])
+
+    deps_order_by_height = [dep[0] for dep in deps_order_by_height]
+    optimal_header_deps = set()
+    for header in headers:
+        if header in minimal_headers:
+            continue
+
+        path_header = "/".join(header.rsplit(":", 1))
+        path_header = path_header[2:]
+        for dep in deps_order_by_height:
+            if path_header in header_map[dep]:
+                optimal_header_deps.add(dep)
+                break
+    optimal_header_deps = list(optimal_header_deps)
+
+    working_deps = optimal_header_deps.copy()
+    for dep in optimal_header_deps:
         if dep in working_deps:
-            p = subprocess.run(
-                [bazel_exec, "cquery"]
-                + bazel_config
-                + [f'kind("extract_debuginfo", deps("@{dep}"))'],
-                capture_output=True,
-                text=True,
-            )
-            dep_text = "\n".join([line for line in p.stdout.splitlines() if line.startswith("//")])
-            for test_dep in recommended_deps:
+            for test_dep in optimal_header_deps:
                 if test_dep == dep:
                     continue
-                if test_dep in working_deps and test_dep in dep_text:
+                if test_dep in working_deps and test_dep in deps_queries[dep]:
                     working_deps.remove(test_dep)
-
-    uniq_dirs = dict()
-    for header in minimal_headers:
-        normal_header = "/".join(header[2:].rsplit(":", 1))
-        dir_name = os.path.dirname(normal_header)
-        if dir_name not in uniq_dirs:
-            uniq_dirs[dir_name] = []
-        uniq_dirs[dir_name].append(normal_header)
 
     with open(target_library + ".bazel_deps") as f:
         original_deps = f.readlines()
@@ -252,31 +277,34 @@ def main(
         else:
             header_deps.append(dep)
 
-    print(f"header list for {target_library}")
-    print("  header utilization per directory:")
-    for uniq_dir in sorted(uniq_dirs):
-        total_headers = (
-            glob.glob(os.path.join(uniq_dir, "*.h"))
-            + glob.glob(os.path.join(uniq_dir, "*.ipp"))
-            + glob.glob(os.path.join(uniq_dir, "*.hpp"))
-        )
-        if len(total_headers) != 0:
-            print(
-                f"    dir: {uniq_dir}, utilization: {len(uniq_dirs[uniq_dir])/len(total_headers):.2%}"
-            )
-        else:
-            print(
-                f"found no headers in dir {uniq_dir}, but had headers listed: {uniq_dirs[uniq_dir]}"
-            )
-    print(" recommend deps list:")
-    for dep in sorted(link_deps):
-        print(f'    "{dep.strip()}",')
-    print(" recommend header_deps list:")
-    for dep in sorted(header_deps):
-        print(f'    "{dep.strip()}",')
-    print("  header list:")
-    for header in sorted(minimal_headers):
-        print(f'    "{header}",')
+    target_name = os.path.splitext(os.path.basename(target_library))[0]
+    if target_name.startswith("lib"):
+        target_name = target_name[3:]
+
+    local_bazel_path = os.path.dirname(target_library.replace("build/opt", "//src")) + ":"
+    print("mongo_cc_library(")
+    print(f'    name = "{target_name}",')
+    if sources:
+        print(f"    srcs = [")
+        for src in sources:
+            print(f'        "{src.replace(local_bazel_path, "")}",')
+        print("    ],")
+    if minimal_headers:
+        print("    hdrs = [")
+        for header in sorted(minimal_headers):
+            print(f'        "{header.replace(local_bazel_path, "")}",')
+        print("    ],")
+    if header_deps:
+        print("    header_deps = [")
+        for dep in sorted(header_deps):
+            print(f'        "{dep.strip().replace(local_bazel_path, "")}",')
+        print("    ],")
+    if link_deps:
+        print("    deps = [")
+        for dep in sorted(link_deps):
+            print(f'        "{dep.strip().replace(local_bazel_path, "")}",')
+        print("    ],")
+    print(")")
 
 
 if __name__ == "__main__":
