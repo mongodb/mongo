@@ -14,6 +14,9 @@ import {
     assertChangeStreamPreAndPostImagesCollectionOptionIsEnabled,
     preImagesForOps,
 } from "jstests/libs/change_stream_util.js";
+import {
+    ClusteredCollectionUtil
+} from "jstests/libs/clustered_collections/clustered_collection_util.js";
 import {assertDropAndRecreateCollection} from "jstests/libs/collection_drop_recreate.js";
 import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 
@@ -148,7 +151,10 @@ function testPreImageRecordingInNonCappedCollection(
         updateDocFunc(collWithNoPreImages);
         replaceDocFunc(collWithNoPreImages);
         assert.eq(collWithNoPreImages.find().itcount(), 1);
-        removeDocFunc(collWithNoPreImages);
+
+        if (removeDocFunc) {
+            removeDocFunc(collWithNoPreImages);
+        }
     });
 
     // Verify that no pre-image is recorded, when performing an insert command into the collection,
@@ -172,12 +178,14 @@ function testPreImageRecordingInNonCappedCollection(
         replaceDocFunc(collWithPreImages);
     }, [updatedDoc]);
 
-    // Verify that one pre-image is recorded, when performing a delete command on the collection,
-    // that has 'changeStreamPreAndPostImages' enabled.
-    assertPreImagesWrittenForOps(testDB, function() {
-        // Perform a document removal.
-        removeDocFunc(collWithPreImages);
-    }, [replacedDoc]);
+    if (removeDocFunc) {
+        // Verify that one pre-image is recorded, when performing a delete command on the
+        // collection, that has 'changeStreamPreAndPostImages' enabled.
+        assertPreImagesWrittenForOps(testDB, function() {
+            // Perform a document removal.
+            removeDocFunc(collWithPreImages);
+        }, [replacedDoc]);
+    }
 }
 
 // Tests that pre-images are recorded correctly for both capped and non-capped collections.
@@ -226,4 +234,53 @@ testPreImageRecording({
     removeDocFunc: function(coll) {
         assert.eq(coll.findAndModify({remove: true}), replacedDoc);
     }
+});
+
+// If the test script is run in a passthrough that enforces creation of
+// clustered collections, skip the $merge aggregation stage testing since
+// the stage requires a unique index on _id field which is not available
+// on the clustered collections.
+if (ClusteredCollectionUtil.areAllCollectionsClustered(db.getMongo())) {
+    quit();
+}
+
+// Pre-images must be recorded for "aggregate" commands, when a document is updated/replaced using
+// $merge aggregation stage.
+testPreImageRecording({
+    updateDocFunc: function(coll) {
+        db.aggregate([
+            {$documents: [updatedDoc]},
+            {
+                $merge: {
+                    into: {db: coll.getDB().getName(), coll: coll.getName()},
+                    on: "_id",
+                    whenMatched: "merge",
+                    whenNotMatched: "fail"
+                }
+            }
+        ]);
+
+        // Check post condition.
+        assert.docEq(
+            [updatedDoc], coll.find().toArray(), "$merge stage did not update the document");
+    },
+    replaceDocFunc: function(coll) {
+        db.aggregate([
+            {$documents: [replacedDoc]},
+            {
+                $merge: {
+                    into: {db: coll.getDB().getName(), coll: coll.getName()},
+                    on: "_id",
+                    whenMatched: "replace",
+                    whenNotMatched: "fail"
+                }
+            }
+        ]);
+
+        // Check post condition.
+        assert.docEq(
+            [replacedDoc], coll.find().toArray(), "$merge stage did not replace the document");
+    },
+    // Removals cannot be tested in aggregation as aggregation can't remove documents.
+    removeDocFunc: null,
 });
