@@ -36,7 +36,7 @@ gcovr \
   --exclude build/debug/mongo/idl/ \
   --exclude src/mongo/db/modules/enterprise/src/streams/third_party/ \
   --exclude src/third_party/ \
-  --gcov-ignore-errors no_working_dir_found \
+  --gcov-ignore-errors source_not_found \
   --gcov-ignore-parse-errors negative_hits.warn \
   --gcov-exclude-directories build/debug/mongo/db/modules/enterprise/src/streams/third_party \
   --gcov-exclude-directories build/debug/mongo/idl/ \
