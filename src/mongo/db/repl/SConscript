@@ -2071,29 +2071,6 @@ env.Library(
 )
 
 env.Library(
-    target="election_reason_counter",
-    source=[
-        "election_reason_counter.cpp",
-        "election_reason_counter_gen.cpp",
-    ],
-    LIBDEPS=[
-        "$BUILD_DIR/mongo/base",
-        "$BUILD_DIR/mongo/idl/idl_parser",
-    ],
-)
-
-env.Library(
-    target="election_reason_counter_parser",
-    source=[
-        "election_reason_counter_parser.cpp",
-    ],
-    LIBDEPS=[
-        "$BUILD_DIR/mongo/base",
-        "election_reason_counter",
-    ],
-)
-
-env.Library(
     target="topology_version_observer",
     source=[
         "topology_version_observer.cpp",

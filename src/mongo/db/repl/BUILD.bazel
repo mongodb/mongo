@@ -214,3 +214,42 @@ idl_generator(
         "//src/mongo/util/net:hostandport_gen",
     ],
 )
+
+mongo_cc_library(
+    name = "election_reason_counter",
+    srcs = [
+        "election_reason_counter.cpp",
+        "election_reason_counter_gen",
+    ],
+    hdrs = [
+        "election_reason_counter.h",
+        "election_reason_counter_gen",
+        "//src/mongo/base:error_codes_header",
+        "//src/mongo/db:basic_types_gen",
+        "//src/mongo/db/query:explain_verbosity_gen",
+        "//src/mongo/util/version:releases_header",
+    ],
+    deps = [
+        "//src/mongo:base",
+        "//src/mongo/idl:idl_parser",
+    ],
+)
+
+mongo_cc_library(
+    name = "election_reason_counter_parser",
+    srcs = [
+        "election_reason_counter_parser.cpp",
+    ],
+    hdrs = [
+        "election_reason_counter_gen",
+        "election_reason_counter_parser.h",
+        "//src/mongo/base:error_codes_header",
+        "//src/mongo/db:basic_types_gen",
+        "//src/mongo/db/query:explain_verbosity_gen",
+        "//src/mongo/util/version:releases_header",
+    ],
+    deps = [
+        "election_reason_counter",
+        "//src/mongo:base",
+    ],
+)

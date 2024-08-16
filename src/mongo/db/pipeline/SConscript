@@ -15,17 +15,6 @@ env.SConscript(
 )
 
 env.Library(
-    target="change_stream_pre_and_post_images_options",
-    source=[
-        "change_stream_pre_and_post_images_options_gen.cpp",
-    ],
-    LIBDEPS=[
-        "$BUILD_DIR/mongo/base",
-        "$BUILD_DIR/mongo/idl/idl_parser",
-    ],
-)
-
-env.Library(
     target="change_stream_preimage",
     source=[
         "change_stream_preimage_gen.cpp",
@@ -257,16 +246,6 @@ env.Library(
         "pipeline",
         "pipeline_visitor",
     ],
-)
-
-env.Library(
-    target="docs_needed_bounds",
-    source=[
-        "visitors/docs_needed_bounds.cpp",
-        "visitors/docs_needed_bounds_util.cpp",
-        "visitors/docs_needed_bounds_gen.cpp",
-    ],
-    LIBDEPS=["$BUILD_DIR/mongo/base", "$BUILD_DIR/mongo/idl/idl_parser"],
 )
 
 env.Library(
@@ -524,16 +503,6 @@ env.Library(
         "$BUILD_DIR/mongo/s/query/exec/router_exec_stage",
         "change_stream_helpers",
         "change_stream_preimage",
-    ],
-)
-
-env.Library(
-    target="runtime_constants_idl",
-    source=[
-        "legacy_runtime_constants_gen.cpp",
-    ],
-    LIBDEPS=[
-        "$BUILD_DIR/mongo/idl/idl_parser",
     ],
 )
 

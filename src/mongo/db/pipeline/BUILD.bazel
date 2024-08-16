@@ -332,3 +332,60 @@ mongo_cc_library(
         "//src/mongo:base",
     ],
 )
+
+mongo_cc_library(
+    name = "change_stream_pre_and_post_images_options",
+    srcs = [
+        "change_stream_pre_and_post_images_options_gen",
+    ],
+    hdrs = [
+        "change_stream_pre_and_post_images_options_gen",
+        "//src/mongo/base:error_codes_header",
+        "//src/mongo/db:basic_types_gen",
+        "//src/mongo/db/query:explain_verbosity_gen",
+        "//src/mongo/util/version:releases_header",
+    ],
+    deps = [
+        "//src/mongo:base",
+        "//src/mongo/idl:idl_parser",
+    ],
+)
+
+mongo_cc_library(
+    name = "docs_needed_bounds",
+    srcs = [
+        "//src/mongo/db/pipeline/visitors:docs_needed_bounds.cpp",
+        "//src/mongo/db/pipeline/visitors:docs_needed_bounds_gen",
+        "//src/mongo/db/pipeline/visitors:docs_needed_bounds_util.cpp",
+    ],
+    hdrs = [
+        "//src/mongo/base:error_codes_header",
+        "//src/mongo/db:basic_types_gen",
+        "//src/mongo/db/pipeline/visitors:docs_needed_bounds.h",
+        "//src/mongo/db/pipeline/visitors:docs_needed_bounds_gen",
+        "//src/mongo/db/pipeline/visitors:docs_needed_bounds_util.h",
+        "//src/mongo/db/query:explain_verbosity_gen",
+        "//src/mongo/util/version:releases_header",
+    ],
+    deps = [
+        "//src/mongo:base",
+        "//src/mongo/idl:idl_parser",
+    ],
+)
+
+mongo_cc_library(
+    name = "runtime_constants_idl",
+    srcs = [
+        "legacy_runtime_constants_gen",
+    ],
+    hdrs = [
+        "legacy_runtime_constants_gen",
+        "//src/mongo/base:error_codes_header",
+        "//src/mongo/db:basic_types_gen",
+        "//src/mongo/db/query:explain_verbosity_gen",
+        "//src/mongo/util/version:releases_header",
+    ],
+    deps = [
+        "//src/mongo/idl:idl_parser",
+    ],
+)
