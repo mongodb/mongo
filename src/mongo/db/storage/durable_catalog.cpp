@@ -298,7 +298,8 @@ NamespaceString DurableCatalog::getNSSFromCatalog(OperationContext* opCtx,
     }
 
     // Re-read the catalog at the provided timestamp in case the collection was dropped.
-    BSONObj obj = _findEntry(opCtx, catalogId);
+    auto cursor = _rs->getCursor(opCtx);
+    BSONObj obj = _findEntry(*cursor, catalogId);
     if (!obj.isEmpty()) {
         return NamespaceStringUtil::parseFromStringExpectTenantIdInMultitenancyMode(
             obj["ns"].String());
@@ -377,7 +378,8 @@ StatusWith<DurableCatalog::EntryIdentifier> DurableCatalog::_importEntry(Operati
 std::string DurableCatalog::getIndexIdent(OperationContext* opCtx,
                                           const RecordId& catalogId,
                                           StringData idxName) const {
-    BSONObj obj = _findEntry(opCtx, catalogId);
+    auto cursor = _rs->getCursor(opCtx);
+    BSONObj obj = _findEntry(*cursor, catalogId);
     BSONObj idxIdent = obj["idxIdent"].Obj();
     return idxIdent[idxName].String();
 }
@@ -386,7 +388,8 @@ std::vector<std::string> DurableCatalog::getIndexIdents(OperationContext* opCtx,
                                                         const RecordId& catalogId) const {
     std::vector<std::string> idents;
 
-    BSONObj obj = _findEntry(opCtx, catalogId);
+    auto cursor = _rs->getCursor(opCtx);
+    BSONObj obj = _findEntry(*cursor, catalogId);
     if (obj["idxIdent"].eoo()) {
         // No index entries for this catalog entry.
         return idents;
@@ -403,19 +406,20 @@ std::vector<std::string> DurableCatalog::getIndexIdents(OperationContext* opCtx,
     return idents;
 }
 
-BSONObj DurableCatalog::_findEntry(OperationContext* opCtx, const RecordId& catalogId) const {
+BSONObj DurableCatalog::_findEntry(SeekableRecordCursor& cursor, const RecordId& catalogId) const {
     LOGV2_DEBUG(22208, 3, "looking up metadata for: {catalogId}", "catalogId"_attr = catalogId);
-    RecordData data;
-    if (!_rs->findRecord(opCtx, catalogId, &data)) {
+    auto record = cursor.seekExact(catalogId);
+    if (!record) {
         return BSONObj();
     }
 
-    return data.releaseToBson().getOwned();
+    return record->data.releaseToBson();
 }
 
 boost::optional<DurableCatalogEntry> DurableCatalog::getParsedCatalogEntry(
     OperationContext* opCtx, const RecordId& catalogId) const {
-    BSONObj obj = _findEntry(opCtx, catalogId);
+    auto cursor = _rs->getCursor(opCtx);
+    BSONObj obj = _findEntry(*cursor, catalogId);
     return parseCatalogEntry(catalogId, obj);
 }
 
@@ -434,17 +438,18 @@ void DurableCatalog::putMetaData(OperationContext* opCtx,
                                  const RecordId& catalogId,
                                  BSONCollectionCatalogEntry::MetaData& md) {
     NamespaceString nss(md.nss);
-    BSONObj obj = _findEntry(opCtx, catalogId);
+    BSONObj obj = [&] {
+        auto cursor = _rs->getCursor(opCtx);
+        auto entryObj = _findEntry(*cursor, catalogId);
 
-    {
         // rebuilt doc
         BSONObjBuilder b;
         b.append("md", md.toBSON());
 
         BSONObjBuilder newIdentMap;
         BSONObj oldIdentMap;
-        if (obj["idxIdent"].isABSONObj())
-            oldIdentMap = obj["idxIdent"].Obj();
+        if (entryObj["idxIdent"].isABSONObj())
+            oldIdentMap = entryObj["idxIdent"].Obj();
 
         for (size_t i = 0; i < md.indexes.size(); i++) {
             const auto& index = md.indexes[i];
@@ -469,9 +474,9 @@ void DurableCatalog::putMetaData(OperationContext* opCtx,
         b.append("idxIdent", newIdentMap.obj());
 
         // add whatever is left
-        b.appendElementsUnique(obj);
-        obj = b.obj();
-    }
+        b.appendElementsUnique(entryObj);
+        return b.obj();
+    }();
 
     LOGV2_DEBUG(22211, 3, "recording new metadata: {obj}", "obj"_attr = obj);
     Status status = _rs->updateRecord(opCtx, catalogId, obj.objdata(), obj.objsize());
@@ -733,8 +738,9 @@ Status DurableCatalog::renameCollection(OperationContext* opCtx,
                                         const RecordId& catalogId,
                                         const NamespaceString& toNss,
                                         BSONCollectionCatalogEntry::MetaData& md) {
-    BSONObj old = _findEntry(opCtx, catalogId).getOwned();
     {
+        auto cursor = _rs->getCursor(opCtx);
+        BSONObj old = _findEntry(*cursor, catalogId);
         BSONObjBuilder b;
 
         b.append("ns", NamespaceStringUtil::serializeForCatalog(toNss));

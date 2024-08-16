@@ -180,7 +180,8 @@ public:
      * Get a raw catalog entry for catalogId as BSON.
      */
     BSONObj getCatalogEntry(OperationContext* opCtx, const RecordId& catalogId) const {
-        return _findEntry(opCtx, catalogId);
+        auto cursor = _rs->getCursor(opCtx);
+        return _findEntry(*cursor, catalogId).getOwned();
     }
 
     /**
@@ -356,7 +357,11 @@ private:
     friend class DurableCatalogTest;
     friend class StorageEngineTest;
 
-    BSONObj _findEntry(OperationContext* opCtx, const RecordId& catalogId) const;
+    /**
+     * Finds the durable catalog entry using the provided RecordStore cursor.
+     * The returned BSONObj is unowned and is only valid while the cursor is positioned.
+     */
+    BSONObj _findEntry(SeekableRecordCursor& cursor, const RecordId& catalogId) const;
     StatusWith<EntryIdentifier> _addEntry(OperationContext* opCtx,
                                           NamespaceString nss,
                                           const CollectionOptions& options);
