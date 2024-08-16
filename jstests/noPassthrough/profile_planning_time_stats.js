@@ -33,6 +33,8 @@ function testProfileEntryContainsPlanningTime(
     assert.commandWorked(primaryDb.setProfilingLevel(2));
     assert.commandWorked(
         primaryDb.adminCommand({setParameter: 1, internalQueryDisablePlanCache: true}));
+    assert.commandWorked(primaryDb.adminCommand(
+        {setParameter: 1, logComponentVerbosity: {command: 5, replication: 5, query: 5}}));
 
     runWithFailpoint(db, testCase.failpointName, testCase.failpointOpts, () => {
         if (testCase.command.bulkWrite) {
