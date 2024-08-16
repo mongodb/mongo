@@ -4,8 +4,8 @@
  */
 
 import {DiscoverTopology, Topology} from "jstests/libs/discover_topology.js";
+import {MagicRestoreTest} from "jstests/libs/magic_restore_test.js";
 import {ReplSetTest} from "jstests/libs/replsettest.js";
-import {MagicRestoreUtils} from "jstests/libs/magic_restore_test.js";
 
 // Starts up a new node on dbpath where a backup cursor has already been written from sourceConn.
 // sourceConn must also contain a timestamp in `test.magic_restore_checkpointTimestamp` of when the
@@ -69,7 +69,7 @@ function performRestore(sourceConn, expectedConfig, nodeType, dbpath, name, opti
                 jsTestLog("Magic Restore: Writing " + currentBatchSize.toString() +
                           " bytes to pipe.");
 
-                MagicRestoreUtils.writeObjsToMagicRestorePipe(
+                MagicRestoreTest.writeObjsToMagicRestorePipe(
                     MongoRunner.dataDir + "/" + name, currentBatch, true /* persistPipe */);
 
                 currentBatch = [];
@@ -87,7 +87,7 @@ function performRestore(sourceConn, expectedConfig, nodeType, dbpath, name, opti
 
         // If non-empty batch remains push it into batches.
         if (currentBatch.length != 0) {
-            MagicRestoreUtils.writeObjsToMagicRestorePipe(
+            MagicRestoreTest.writeObjsToMagicRestorePipe(
                 MongoRunner.dataDir + "/" + name, currentBatch, true /* persistPipe */);
         }
     } else {
@@ -97,10 +97,10 @@ function performRestore(sourceConn, expectedConfig, nodeType, dbpath, name, opti
             "maxCheckpointTs": checkpointTimestamp,
         }];
         jsTestLog("Restore configuration: " + tojson(objs[0]));
-        MagicRestoreUtils.writeObjsToMagicRestorePipe(MongoRunner.dataDir + "/" + name, objs);
+        MagicRestoreTest.writeObjsToMagicRestorePipe(MongoRunner.dataDir + "/" + name, objs);
     }
 
-    MagicRestoreUtils.runMagicRestoreNode(MongoRunner.dataDir + "/" + name, dbpath, options);
+    MagicRestoreTest.runMagicRestoreNode(MongoRunner.dataDir + "/" + name, dbpath, options);
     return consistencyTs;
 }
 
