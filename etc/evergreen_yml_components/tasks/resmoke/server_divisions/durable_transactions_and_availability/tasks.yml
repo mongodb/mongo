@@ -178,14 +178,6 @@ tasks:
           use_large_distro: "true"
 
   - <<: *gen_task_template
-    name: bulk_write_sharded_causally_consistent_jscore_passthrough_gen
-    tags: ["assigned_to_jira_team_server_repl", "default", "bulk_write"]
-    commands:
-      - func: "generate resmoke tasks"
-        vars:
-          use_large_distro: "true"
-
-  - <<: *gen_task_template
     name: bulk_write_sharded_collections_jscore_passthrough_gen
     tags: ["assigned_to_jira_team_server_repl", "default", "bulk_write"]
     commands:
@@ -229,15 +221,6 @@ tasks:
     commands:
       - func: "generate resmoke tasks"
         vars:
-          resmoke_jobs_max: 1
-
-  - <<: *gen_task_template
-    name: concurrency_sharded_replication_bulk_write_gen
-    tags: ["assigned_to_jira_team_server_repl", "default", "bulk_write"]
-    commands:
-      - func: "generate resmoke tasks"
-        vars:
-          use_large_distro: "true"
           resmoke_jobs_max: 1
 
   - <<: *gen_task_template
