@@ -4,7 +4,7 @@ Import("env")
 
 env = env.Clone()
 
-env.SConscript(dirs=["mongotmock"], exports=["env"])
+env.SConscript(must_exist=1, dirs=["mongotmock"], exports=["env"])
 
 env.Library(
     target="mongot_cursor",

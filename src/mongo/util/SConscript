@@ -82,6 +82,7 @@ if env.TargetOSIs("windows"):
     env.Alias("generated-sources", generatedResourceConstantFile)
 
 env.SConscript(
+    must_exist=1,
     dirs=[
         "cmdline_utils",
         "concurrency",

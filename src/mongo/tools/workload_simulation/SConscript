@@ -4,6 +4,7 @@ Import("get_option")
 env = env.Clone()
 
 env.SConscript(
+    must_exist=1,
     dirs=[
         "throughput_probing",
     ],

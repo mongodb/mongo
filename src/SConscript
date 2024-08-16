@@ -28,7 +28,7 @@ env.AppendUnique(
 
 # NOTE: We must do third_party first as it adds methods to the environment
 # that we need in the mongo sconscript
-env.SConscript("third_party/SConscript", exports=["env"])
+env.SConscript("third_party/SConscript", must_exist=1, exports=["env"])
 
 # Ensure our subsequent modifications are not shared with the
 # third_party env. Normally that SConscript would have done a clone,
@@ -68,7 +68,7 @@ elif env.ToolchainIs("clang"):
     env.AddToCCFLAGSIfSupported("-Wimplicit-fallthrough")
 
 # Run the core mongodb SConscript.
-env.SConscript("mongo/SConscript", exports=["env"])
+env.SConscript("mongo/SConscript", must_exist=1, exports=["env"])
 
 # Run SConscripts for any modules in play
-env.SConscript(module_sconscripts, exports=["env"])
+env.SConscript(module_sconscripts, must_exist=1, exports=["env"])

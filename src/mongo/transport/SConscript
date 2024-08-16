@@ -11,6 +11,7 @@ def shouldBuildGRPC(myEnv):
 
 if shouldBuildGRPC(env):
     env.SConscript(
+        must_exist=1,
         dirs=[
             "grpc",
         ],

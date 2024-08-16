@@ -6544,6 +6544,7 @@ if get_option("bazel-includes-info"):
     env.Tool("bazel_includes_info")
 
 env.SConscript(
+    must_exist=1,
     dirs=[
         "src",
     ],
@@ -6557,6 +6558,7 @@ env.SConscript(
 # TODO: find a way to consolidate SConscript calls to one call in
 # SConstruct so they all use variant_dir
 env.SConscript(
+    must_exist=1,
     dirs=[
         "jstests",
     ],

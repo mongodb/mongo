@@ -18,6 +18,7 @@ import winreg
 env = env.Clone()
 
 env.SConscript(
+    must_exist=1,
     dirs=[
         "ca",
     ],

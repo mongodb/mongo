@@ -25,6 +25,7 @@ env.AppendUnique(
 )
 
 env.SConscript(
+    must_exist=1,
     dirs=[
         "base",
         "bson",

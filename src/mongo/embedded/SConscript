@@ -40,6 +40,7 @@ if get_option("link-model") == "dynamic-sdk":
     sdkEnv["MONGO_EXPORT_FILE_SHLINKFLAGS"] = mongo_export_file_generator
 
 env.SConscript(
+    must_exist=1,
     dirs=[
         "stitch_support",
     ],

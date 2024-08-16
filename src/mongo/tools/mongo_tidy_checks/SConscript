@@ -167,4 +167,6 @@ mongo_tidy_module = env.GetAutoInstalledFiles(mongo_custom_check[0])[0]
 # loading the module, we add the module to the compiledb alias.
 env.Alias("compiledb", mongo_tidy_module)
 
-env.SConscript("tests/SConscript", exports=["env", "mongo_tidy_module", "base_toolchain_bin"])
+env.SConscript(
+    "tests/SConscript", must_exist=1, exports=["env", "mongo_tidy_module", "base_toolchain_bin"]
+)

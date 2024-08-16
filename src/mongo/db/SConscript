@@ -27,6 +27,7 @@ def shouldBuildGRPC(myEnv):
 
 
 env.SConscript(
+    must_exist=1,
     dirs=[
         "admission",
         "auth",
