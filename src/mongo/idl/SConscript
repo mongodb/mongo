@@ -106,6 +106,7 @@ env.CppUnitTest(
         "cluster_server_parameter_server_status_test.cpp",
         "cluster_server_parameter_test_util.cpp",
         "cluster_server_parameter_test_gen.cpp",
+        "cluster_parameter_synchronization_helpers_test.cpp",
     ],
     LIBDEPS=[
         "$BUILD_DIR/mongo/db/auth/authmocks",
