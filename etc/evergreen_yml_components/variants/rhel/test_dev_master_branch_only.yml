@@ -778,8 +778,6 @@ buildvariants:
     stepback: false
     expansions:
       <<: *enterprise-rhel-8-64-bit-dynamic-expansions
-      jstestfuzz_num_generated_files: 20
-      jstestfuzz_concurrent_num_files: 5
       target_resmoke_time: 30
       max_sub_suites: 3
       test_flags: >-
@@ -794,11 +792,9 @@ buildvariants:
         # Without this we are adding extra dependencies on evergreen and it is causing strain
         omit_generated_tasks: true
     tasks:
-      - name: .aggfuzzer !.sbe_only
       - name: .aggregation !.sbe_only
       - name: .auth
       - name: .causally_consistent !.sharding
-      - name: .change_stream_fuzzer
       - name: .change_streams
       - name: .concurrency !.large !.no_txns !.compute_mode !.feature_flag_guarded
       - name: .concurrency .large !.no_txns !.compute_mode !.feature_flag_guarded
@@ -806,10 +802,8 @@ buildvariants:
           - rhel8.8-medium
       - name: .encrypt
       - name: .jscore .common !jsCore !.sbe_only
-      - name: .jstestfuzz !.feature_flag_guarded
       - name: .misc_js
       - name: .multi_shard
-      - name: .query_fuzzer
       - name: query_golden_classic
       - name: .random_multiversion_ds
       - name: .read_only
@@ -820,14 +814,12 @@ buildvariants:
       - name: .replica_sets !.encrypt !.auth
         distros:
           - rhel8.8-xlarge
-      - name: .rollbackfuzzer
-      - name: .sharding .common !.feature_flag_guarded
+      - name: .sharding .common !.feature_flag_guarded !.jstestfuzz
       - name: .sharding .jscore !.wo_snapshot !.multi_stmt !.feature_flag_guarded
       - name: .sharding .txns
       - name: .serverless
         distros:
           - rhel8.8-xlarge
-      - name: .updatefuzzer
       - name: aggregation_repeat_queries_multiplan_single_solutions
       - name: audit
       - name: burn_in_tests_gen
@@ -840,7 +832,6 @@ buildvariants:
       - name: check_feature_flag_tags
       - name: check_for_todos
       - name: disk_wiredtiger
-      - name: initial_sync_fuzzer_gen
       - name: fcv_upgrade_downgrade_replica_sets_jscore_passthrough_gen
       - name: fcv_upgrade_downgrade_sharding_jscore_passthrough_gen
       - name: fcv_upgrade_downgrade_sharded_collections_jscore_passthrough_gen
