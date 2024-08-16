@@ -35,3 +35,20 @@ idl_generator(
     name = "operation_resource_consumption_gen",
     src = "operation_resource_consumption.idl",
 )
+
+mongo_cc_library(
+    name = "timer_stats",
+    srcs = [
+        "timer_stats.cpp",
+    ],
+    hdrs = [
+        "//src/mongo/base:error_codes_header",
+        "//src/mongo/db/stats:timer_stats.h",
+    ],
+    header_deps = [
+        "//src/mongo/db/fts:fts_query_noop",
+    ],
+    deps = [
+        "//src/mongo:base",
+    ],
+)

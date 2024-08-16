@@ -5,16 +5,6 @@ Import("env")
 env = env.Clone()
 
 env.Library(
-    target="timer_stats",
-    source=[
-        "timer_stats.cpp",
-    ],
-    LIBDEPS_PRIVATE=[
-        "$BUILD_DIR/mongo/base",
-    ],
-)
-
-env.Library(
     target="top",
     source=[
         "top.cpp",
