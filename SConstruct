@@ -4696,7 +4696,7 @@ def doConfigure(myenv):
             ) or not myenv.AddToLINKFLAGSIfSupported("-flto=thin"):
                 myenv.ConfError("Failed to enable thin LTO")
 
-        if linker_ld != "gold" and not env.TargetOSIs("darwin", "macOS") and not optBuild:
+        if linker_ld != "gold" and not env.TargetOSIs("darwin", "macOS") and optBuild != "off":
             if has_option("pgo"):
                 print("WARNING: skipping symbol ordering as pgo is enabled")
             else:
