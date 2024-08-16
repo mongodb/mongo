@@ -1,7 +1,7 @@
 # Common mongo-specific bazel build rules intended to be used in individual BUILD files in the "src/" subtree.
 load("@poetry//:dependencies.bzl", "dependency")
 load("//bazel:separate_debug.bzl", "CC_SHARED_LIBRARY_SUFFIX", "SHARED_ARCHIVE_SUFFIX", "WITH_DEBUG_SUFFIX", "extract_debuginfo", "extract_debuginfo_binary")
-load("//bazel:header_deps.bzl", "HEADER_DEP_SUFFIX", "create_header_dep")
+load("//bazel:header_deps.bzl", "HEADER_DEP_SUFFIX", "LINK_DEP_SUFFIX", "create_header_dep", "create_link_deps")
 
 # https://learn.microsoft.com/en-us/cpp/build/reference/md-mt-ld-use-run-time-library?view=msvc-170
 #   /MD defines _MT and _DLL and links in MSVCRT.lib into each .obj file
@@ -1292,6 +1292,15 @@ def mongo_cc_library(
         header_deps = header_deps,
     )
 
+    create_link_deps(
+        name = name + LINK_DEP_SUFFIX,
+        link_deps = [name] + deps,
+        target_compatible_with = select({
+            "//bazel/config:scons_query_enabled": [],
+            "//conditions:default": ["@platforms//:incompatible"],
+        }) + target_compatible_with,
+    )
+
     # Create a cc_library entry to generate a shared archive of the target.
     native.cc_library(
         name = name + SHARED_ARCHIVE_SUFFIX,
@@ -1365,6 +1374,7 @@ def mongo_cc_library(
         name = name,
         binary_with_debug = ":" + name + WITH_DEBUG_SUFFIX,
         type = "library",
+        tags = tags,
         enabled = SEPARATE_DEBUG_ENABLED,
         cc_shared_library = select({
             "//bazel/config:linkstatic_disabled": ":" + name + CC_SHARED_LIBRARY_SUFFIX + WITH_DEBUG_SUFFIX,
@@ -1482,6 +1492,7 @@ def mongo_cc_binary(
         name = name,
         binary_with_debug = ":" + name + WITH_DEBUG_SUFFIX,
         type = "program",
+        tags = tags,
         enabled = SEPARATE_DEBUG_ENABLED,
         deps = all_deps,
     )

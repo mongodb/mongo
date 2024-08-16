@@ -1217,8 +1217,9 @@ def get_digest(file_path):
 
 
 def handle_bazel_lib_link_flags(env, libext, libs):
+    global EMITTING_SHARED
     if env.TargetOSIs("linux", "freebsd", "openbsd"):
-        if libext == env.subst("$SHLIBSUFFIX"):
+        if libext == env.subst("$SHLIBSUFFIX") and not EMITTING_SHARED == "dynamic-sdk":
             return [env["LINK_AS_NEEDED_LIB_END"]] + libs
         else:
             return (
@@ -1226,7 +1227,7 @@ def handle_bazel_lib_link_flags(env, libext, libs):
             )
 
     elif env.TargetOSIs("darwin"):
-        if libext != env.subst("$SHLIBSUFFIX"):
+        if libext != env.subst("$SHLIBSUFFIX") or EMITTING_SHARED == "dynamic-sdk":
             return env.Flatten([[env["LINK_WHOLE_ARCHIVE_LIB_START"], lib] for lib in libs])
         else:
             return env.Flatten([[env["LINK_AS_NEEDED_LIB_START"], lib] for lib in libs])
@@ -1246,6 +1247,7 @@ def add_bazel_libdep(env, libdep, bazel_libdeps):
 
 
 def query_for_results(env, bazel_target, libdeps_ext, bazel_targets_checked):
+    global EMITTING_SHARED
     # first check if the deps query is in the cache
     results = env.CheckBazelDepsCache(bazel_target)
     if results is None:
@@ -1253,7 +1255,12 @@ def query_for_results(env, bazel_target, libdeps_ext, bazel_targets_checked):
         bazel_query = (
             ["cquery"]
             + env["BAZEL_FLAGS_STR"]
-            + [f'kind("extract_debuginfo", deps("@{bazel_target}"))', "--output", "files"]
+            + [
+                f'"@{bazel_target}_link_dep"',
+                "--output",
+                "files",
+                "--//bazel/config:scons_query=True",
+            ]
         )
         results = env.RunBazelQuery(bazel_query, "getting bazel libdeps")
         if results.returncode != 0:
@@ -1265,6 +1272,7 @@ def query_for_results(env, bazel_target, libdeps_ext, bazel_targets_checked):
     # now we have some hidden deps to process, if they are the correct
     # ext we want to link with, make scons node, verify its a ThinTarget, and then add
     # to the results
+
     libs_to_cache = []
     for line in results.stdout.splitlines():
         if line.endswith(libdeps_ext):
@@ -1273,6 +1281,9 @@ def query_for_results(env, bazel_target, libdeps_ext, bazel_targets_checked):
             )
             if scons_node.has_builder():
                 if scons_node.get_builder().get_name(env) == "ThinTarget":
+                    if EMITTING_SHARED == "dynamic-sdk":
+                        basefile = os.path.splitext(line)[0]
+                        line = basefile + env.subst("$SHLIBSUFFIX") + env.subst("$LIBSUFFIX")
                     libs_to_cache.append(line)
                     # Since the deps from the query are transitive we can look for other targets that will be
                     # covered by that transitive tree for the given link command. This allow us to skip doing
@@ -1348,7 +1359,10 @@ def expand_libdeps_for_link(source, target, env, for_signature):
     if EMITTING_SHARED == "dynamic":
         libdeps_ext = env.subst("$SHLIBSUFFIX")
     elif EMITTING_SHARED == "dynamic-sdk":
-        libdeps_ext = env.subst("$SHLIBSUFFIX") + env.subst("$LIBSUFFIX")
+        if env.TargetOSIs("windows"):
+            libdeps_ext = env.subst("$LIBSUFFIX")
+        else:
+            libdeps_ext = env.subst("$SHLIBSUFFIX")
     else:
         libdeps_ext = env.subst("$LIBSUFFIX")
 

@@ -5540,7 +5540,14 @@ if get_option("ninja") != "disabled":
         dependencies = env.Flatten(
             [
                 "SConstruct",
+                "WORKSPACE.bazel",
+                "BUILD.bazel",
+                ".bazelrc",
+                ".bazelignore",
                 glob(os.path.join("src", "**", "SConscript"), recursive=True),
+                glob(os.path.join("src", "**", "BUILD.bazel"), recursive=True),
+                glob(os.path.join("buildscripts", "**", "*.py"), recursive=True),
+                glob(os.path.join("bazel", "**", "*.bzl"), recursive=True),
                 glob(os.path.join(os.path.expanduser("~/.scons/"), "**", "*.py"), recursive=True),
                 glob(os.path.join("site_scons", "**", "*.py"), recursive=True),
                 glob(os.path.join("buildscripts", "**", "*.py"), recursive=True),

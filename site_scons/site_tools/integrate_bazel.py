@@ -666,7 +666,7 @@ def auto_install_bazel(env, libdep, shlib_suffix):
 
         bazel_node = env.File(f"#/{line}")
         auto_install_mapping = env["AIB_SUFFIX_MAP"].get(shlib_suffix)
-        bazel_debug(f"Bazel AutoInstalling {bazel_node}")
+
         new_installed_files = env.AutoInstall(
             auto_install_mapping.directory,
             bazel_node,
@@ -677,6 +677,8 @@ def auto_install_bazel(env, libdep, shlib_suffix):
 
         if not new_installed_files:
             new_installed_files = getattr(bazel_node.attributes, "AIB_INSTALLED_FILES", [])
+        else:
+            bazel_debug(f"Bazel AutoInstalling {bazel_node}")
         installed_files = getattr(bazel_libdep.attributes, "AIB_INSTALLED_FILES", [])
         setattr(
             bazel_libdep.attributes, "AIB_INSTALLED_FILES", new_installed_files + installed_files
