@@ -121,7 +121,6 @@ env.Library(
         # We do not depend on the entire pipeline target.
         "$BUILD_DIR/mongo/db/pipeline/abt_utils",
         "$BUILD_DIR/mongo/db/query/bson/dotted_path_support",
-        "$BUILD_DIR/mongo/db/query/cost_model/query_cost_model",
         "$BUILD_DIR/mongo/db/query/optimizer/optimizer",
         "$BUILD_DIR/mongo/unittest/unittest",
     ],

@@ -32,7 +32,6 @@ imports:
 global:
   cpp_namespace: "mongo"
   cpp_includes:
-    - "mongo/db/query/cost_model/cost_model_on_update.h"
     - "mongo/db/query/ce_mode_parameter.h"
     - "mongo/db/query/explain_version_validator.h"
     - "mongo/db/query/plan_cache/sbe_plan_cache_on_parameter_change.h"
@@ -1277,14 +1276,6 @@ server_parameters:
     cpp_vartype: AtomicWord<bool>
     default:
         expr: false
-    redact: false
-
-  internalCostModelCoefficients:
-    description: "Cost Model Coefficients Override"
-    set_at: [ startup, runtime ]
-    cpp_varname: "internalCostModelCoefficients"
-    cpp_vartype: synchronized_value<std::string>
-    on_update: cost_model::updateCostCoefficientsOnUpdate
     redact: false
 
   # TODO SERVER-68341 Remove this query knob after tenancy is supported in the sharded cluster.

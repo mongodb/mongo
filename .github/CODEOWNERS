@@ -534,9 +534,6 @@ WORKSPACE.bazel @10gen/devprod-build
 # The following patterns are parsed from ./src/mongo/db/query/collation/OWNERS.yml
 /src/mongo/db/query/collation/**/* @10gen/query-execution
 
-# The following patterns are parsed from ./src/mongo/db/query/cost_model/OWNERS.yml
-/src/mongo/db/query/cost_model/**/* @10gen/query-optimization
-
 # The following patterns are parsed from ./src/mongo/db/query/datetime/OWNERS.yml
 /src/mongo/db/query/datetime/**/* @10gen/query-execution
 

@@ -15,7 +15,6 @@ env.SConscript(
         "bson",
         "ce",
         "collation",
-        "cost_model",
         "datetime",
         "optimizer",
         "plan_cache",
@@ -300,7 +299,6 @@ env.Library(
     target="query_knobs",
     source=[
         "ce_mode_parameter.cpp",
-        "cost_model/cost_model_on_update.cpp",
         "explain_version_validator.cpp",
         "framework_control.cpp",
         "query_feature_flags_gen.cpp",

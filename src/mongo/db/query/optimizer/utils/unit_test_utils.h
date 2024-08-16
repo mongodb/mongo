@@ -35,7 +35,6 @@
 #include <vector>
 
 #include "mongo/db/query/bson/dotted_path_support.h"
-#include "mongo/db/query/cost_model/cost_model_gen.h"
 #include "mongo/db/query/optimizer/cascades/interfaces.h"
 #include "mongo/db/query/optimizer/defs.h"
 #include "mongo/db/query/optimizer/explain.h"
@@ -174,11 +173,6 @@ IndexDefinition makeIndexDefinition(FieldNameType fieldName,
                                     bool isMultiKey = true);
 IndexDefinition makeCompositeIndexDefinition(std::vector<TestIndexField> indexFields,
                                              bool isMultiKey = true);
-
-/**
- * Return default CostModel used in unit tests.
- */
-cost_model::CostModelCoefficients getTestCostModel();
 
 /**
  * Compares plans to allow sorting plans in a deterministic way.

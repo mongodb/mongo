@@ -111,7 +111,6 @@ mongo_cc_library(
         "//src/mongo/db/query:partitioned_cache.h",
         "//src/mongo/db/query:query_knob_expressions.h",
         "//src/mongo/db/query:query_knobs_gen",
-        "//src/mongo/db/query/cost_model:cost_model_on_update.h",
         "//src/mongo/db/query/plan_cache:sbe_plan_cache_on_parameter_change.h",
         "//src/mongo/db/query/query_settings:index_hints_serialization.h",
         "//src/mongo/db/query/query_settings:query_framework_serialization.h",

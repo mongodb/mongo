@@ -38,8 +38,6 @@
 #include <boost/optional/optional.hpp>
 
 #include "mongo/db/pipeline/abt/utils.h"
-#include "mongo/db/query/cost_model/cost_estimator_impl.h"
-#include "mongo/db/query/cost_model/cost_model_manager.h"
 #include "mongo/db/query/optimizer/cascades/memo.h"
 #include "mongo/db/query/optimizer/explain.h"
 #include "mongo/db/query/optimizer/metadata.h"
@@ -108,10 +106,6 @@ IndexDefinition makeCompositeIndexDefinition(std::vector<TestIndexField> indexFi
                                  idxField.op);
     }
     return IndexDefinition{std::move(idxCollSpec), isMultiKey};
-}
-
-cost_model::CostModelCoefficients getTestCostModel() {
-    return cost_model::CostModelManager::getDefaultCoefficients();
 }
 
 bool planComparator(const PlanAndProps& e1, const PlanAndProps& e2) {
