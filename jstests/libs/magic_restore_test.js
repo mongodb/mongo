@@ -291,6 +291,8 @@ export class MagicRestoreUtils {
         this.rst.nodes.forEach((node) => {
             const pre = this.preRestoreDbHashes;
             const post = this._getDbHashes(node);
+            // Check that all databases and collections hashed before the restore are the same on
+            // the restored node.
             for (const dbName in pre) {
                 jsTestLog(`Checking dbhashes for ${dbName} db`);
                 assert(post.hasOwnProperty(dbName),
@@ -310,6 +312,24 @@ export class MagicRestoreUtils {
                         postDb[collName],
                         `Dbhash values are not equal for ${dbName}.${collName}. pre-restore hash: ${
                             preDb[collName]}, post-restore hash: ${postDb[collName]}`);
+                }
+            }
+
+            jsTestLog(`Checking post-restore dbhashes for extra databases or collections`);
+            // Check that the restored node does not have extra databases or collections.
+            for (const dbName in post) {
+                assert(pre.hasOwnProperty(dbName),
+                       `Restored node has extra db ${dbName} in post-restore hashes`);
+                const preDb = pre[dbName];
+                const postDb = post[dbName];
+
+                for (let collName in postDb) {
+                    if (excludedCollections.includes(collName)) {
+                        continue;
+                    }
+                    assert(preDb.hasOwnProperty(collName),
+                           `Restored node has extra collection ${dbName}.${
+                               collName} in post-restore hashes`);
                 }
             }
         });
