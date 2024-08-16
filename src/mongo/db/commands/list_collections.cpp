@@ -391,12 +391,6 @@ public:
 
                 auto ws = std::make_unique<WorkingSet>();
                 auto root = std::make_unique<QueuedDataStage>(expCtx.get(), ws.get());
-                auto readTimestamp =
-                    shard_role_details::getRecoveryUnit(opCtx)->getPointInTimeReadTimestamp(opCtx);
-                tassert(9089302,
-                        "point in time catalog lookup for a collection list is not supported",
-                        RecoveryUnit::ReadSource::kNoTimestamp ==
-                            shard_role_details::getRecoveryUnit(opCtx)->getTimestampReadSource());
 
                 if (DatabaseHolder::get(opCtx)->dbExists(opCtx, dbName)) {
                     if (auto collNames = _getExactNameMatches(matcher.get())) {
@@ -411,21 +405,26 @@ public:
                                 continue;
                             }
 
+                            // In case lock-free reads are disabled, we must be able to take a
+                            // collection lock.
+                            boost::optional<Lock::CollectionLock> clk;
+                            if (!opCtx->isLockFreeReadsOp()) {
+                                clk.emplace(opCtx, nss, MODE_IS);
+                            }
+
                             auto collBson = [&] {
-                                const Collection* collection =
-                                    catalog->establishConsistentCollection(
-                                        opCtx, nss, readTimestamp);
-                                if (collection != nullptr) {
+                                if (auto collection =
+                                        CollectionCatalog::get(opCtx)->lookupCollectionByNamespace(
+                                            opCtx, nss)) {
                                     return buildCollectionBson(
                                         opCtx, collection, includePendingDrops, nameOnly);
                                 }
 
-                                std::shared_ptr<const ViewDefinition> view =
-                                    catalog->lookupView(opCtx, nss);
+                                auto view = catalog->lookupViewWithoutValidatingDurable(opCtx, nss);
                                 if (view && view->timeseries()) {
-                                    if (auto bucketsCollection =
-                                            catalog->establishConsistentCollection(
-                                                opCtx, view->viewOn(), readTimestamp)) {
+                                    if (auto bucketsCollection = CollectionCatalog::get(opCtx)
+                                                                     ->lookupCollectionByNamespace(
+                                                                         opCtx, view->viewOn())) {
                                         return buildTimeseriesBson(bucketsCollection, nameOnly);
                                     } else {
                                         // The buckets collection does not exist, so the time-series
@@ -444,7 +443,7 @@ public:
                         }
                     } else {
                         auto perCollectionWork = [&](const Collection* collection) {
-                            if (collection->getTimeseriesOptions() &&
+                            if (collection && collection->getTimeseriesOptions() &&
                                 !collection->ns().isDropPendingNamespace()) {
                                 auto viewNss = collection->ns().getTimeseriesViewNamespace();
                                 auto view =
@@ -479,10 +478,17 @@ public:
                             return true;
                         };
 
-                        std::vector<const Collection*> collections =
-                            catalog->establishConsistentCollections(opCtx, dbName, readTimestamp);
-                        for (const auto& collection : collections) {
-                            perCollectionWork(collection);
+                        // If we are lock-free we can just iterate over our collection catalog
+                        // without
+                        // needing to yield as we don't take any locks.
+                        if (opCtx->isLockFreeReadsOp()) {
+                            auto collectionCatalog = CollectionCatalog::get(opCtx);
+                            for (auto&& coll : collectionCatalog->range(dbName)) {
+                                perCollectionWork(coll);
+                            }
+                        } else {
+                            mongo::catalog::forEachCollectionFromDb(
+                                opCtx, dbName, MODE_IS, perCollectionWork);
                         }
                     }
 
