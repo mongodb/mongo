@@ -482,7 +482,7 @@ void logMongodStartupTimeElapsedStatistics(ServiceContext* serviceContext,
 // File Copy Based Initial Sync will restart the storage subsystem and may need to repeat some
 // of the initialization steps within.  If you add or change any of these steps, make sure
 // any necessary changes are also made to File Copy Based Initial Sync.
-ExitCode _initAndListen(ServiceContext* serviceContext, int listenPort) {
+ExitCode _initAndListen(ServiceContext* serviceContext) {
     Client::initThread("initandlisten", serviceContext->getService(ClusterRole::ShardServer));
 
     // TODO(SERVER-74659): Please revisit if this thread could be made killable.
@@ -1226,9 +1226,9 @@ ExitCode _initAndListen(ServiceContext* serviceContext, int listenPort) {
     return waitForShutdown();
 }
 
-ExitCode initAndListen(ServiceContext* service, int listenPort) {
+ExitCode initAndListen(ServiceContext* service) {
     try {
-        return _initAndListen(service, listenPort);
+        return _initAndListen(service);
     } catch (DBException& e) {
         LOGV2_ERROR(
             20557, "DBException in initAndListen, terminating", "error"_attr = e.toString());
@@ -1247,7 +1247,7 @@ ExitCode initAndListen(ServiceContext* service, int listenPort) {
 
 #if defined(_WIN32)
 ExitCode initService() {
-    return initAndListen(getGlobalServiceContext(), serverGlobalParams.port);
+    return initAndListen(getGlobalServiceContext());
 }
 #endif
 
@@ -2231,7 +2231,7 @@ int mongod_main(int argc, char* argv[]) {
         7091600, {LogComponent::kTenantMigration}, "Starting TenantMigrationAccessBlockerRegistry");
     TenantMigrationAccessBlockerRegistry::get(service).startup();
 
-    ExitCode exitCode = initAndListen(service, serverGlobalParams.port);
+    ExitCode exitCode = initAndListen(service);
     exitCleanly(exitCode);
     return 0;
 }
