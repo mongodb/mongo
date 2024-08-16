@@ -779,6 +779,18 @@ bool SessionCatalogMigrationSource::_fetchNextNewWriteOplog(OperationContext* op
                     return handleRetryableApplyOps();
                 }
 
+                // If a non-retryable write is executed using the same opCtx as a retryable
+                // write/txn, the MigrationChunkClonerSource will notify the
+                // SessionCatalogMigrationSource of the op's opTime, because the
+                // MigrationChunkClonerSource decides which oplog entries need to have their session
+                // info migrated using state on the opCtx. If this oplog entry does not have any
+                // session info, we should skip migrating it here.
+                if (!nextNewWriteOplog.getSessionId()) {
+                    _newWriteOpTimeList.pop_front();
+                    lk.unlock();
+                    return _fetchNextNewWriteOplog(opCtx);
+                }
+
                 _unprocessedNewWriteOplogBuffer.emplace_back(nextNewWriteOplog);
                 _newWriteOpTimeList.pop_front();
                 _sessionOplogEntriesToBeMigratedSoFar.addAndFetch(1);

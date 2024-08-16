@@ -3152,5 +3152,25 @@ TEST_F(SessionCatalogMigrationSourceTest, ExtractShardKeyFromOplogNonCRUD) {
         BSONObj());
 }
 
+TEST_F(SessionCatalogMigrationSourceTest, DiscardOplogEntryForNonRetryableWrite) {
+    SessionCatalogMigrationSource migrationSource(opCtx(), kNs, kChunkRange, kShardKey);
+    migrationSource.init(opCtx(), kMigrationLsid);
+    ASSERT_FALSE(migrationSource.fetchNextOplog(opCtx()));
+
+    auto updateOplog = makeOplogEntry(repl::OpTime(Timestamp(70, 10), 1),  // optime
+                                      repl::OpTypeEnum::kUpdate,           // op type
+                                      BSON("_id" << 3),                    // o
+                                      BSON("_id" << 3 << "a" << 7));       // o2
+    insertOplogEntry(updateOplog);
+
+    migrationSource.notifyNewWriteOpTime(
+        updateOplog.getOpTime(), SessionCatalogMigrationSource::EntryAtOpTimeType::kRetryableWrite);
+
+    ASSERT_TRUE(migrationSource.hasMoreOplog());
+    ASSERT_FALSE(migrationSource.fetchNextOplog(opCtx()));
+    ASSERT(!migrationSource.getLastFetchedOplog().oplog);
+    ASSERT_EQ(migrationSource.getSessionOplogEntriesToBeMigratedSoFar(), 0);
+}
+
 }  // namespace
 }  // namespace mongo
