@@ -6,13 +6,17 @@ Welcome to MongoDB!
 
 - `mongod` - The database server.
 - `mongos` - Sharding router.
-- `mongo` - The database shell (uses interactive javascript).
 
 ## Download MongoDB
 
 - https://www.mongodb.com/try/download/community
 - Using homebrew `brew tap mongodb/brew`
 - Using docker image `docker pull mongo`
+
+## Download the MongoDB Shell
+
+- https://www.mongodb.com/try/download/shell
+- Using homebrew `brew install mongosh`
 
 ## Building
 
@@ -32,9 +36,9 @@ To run a single server database:
 $ sudo mkdir -p /data/db
 $ ./mongod
 $
-$ # The mongo javascript shell connects to localhost and test database by default:
-$ ./mongo
-> help
+$ # The mongosh shell connects to localhost and test database by default:
+$ ./mongosh
+test> help
 ```
 
 ## Installing Compass
@@ -51,8 +55,7 @@ and install it.
 ## Drivers
 
 Client drivers for most programming languages are available at
-https://docs.mongodb.com/manual/applications/drivers/. Use the shell
-(`mongo`) for administrative tasks.
+https://docs.mongodb.com/manual/applications/drivers/.
 
 ## Bug Reports
 
