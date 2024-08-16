@@ -8,8 +8,8 @@
  * ]
  */
 
-import {MagicRestoreUtils} from "jstests/libs/magic_restore_test.js";
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";
+import {MagicRestoreTest} from "jstests/libs/magic_restore_test.js";
 import {
     checkHealthLog,
     logEveryBatch,
@@ -57,10 +57,10 @@ jsTestLog("Deleting docs");
 assert.commandWorked(sourceColl.deleteMany({}));
 assert.eq(sourceColl.find({}).count(), 0);
 
-const magicRestoreUtils = new MagicRestoreUtils(
+const magicRestoreTest = new magicRestoreTest(
     {backupSource: sourcePrimary, pipeDir: MongoRunner.dataDir, insertHigherTermOplogEntry: true});
 
-magicRestoreUtils.takeCheckpointAndOpenBackup();
+magicRestoreTest.takeCheckpointAndOpenBackup();
 
 // Start dbcheck after the backup cursor was opened. The dbcheck oplog entries will be passed to
 // magic restore to perform a PIT restore.
@@ -80,10 +80,10 @@ checkHealthLog(sourcePrimaryHealthLog, logQueries.recordNotFoundQuery, nDocs);
 // Check that there are no other errors/warnings on the primary.
 checkHealthLog(sourcePrimaryHealthLog, logQueries.allErrorsOrWarningsQuery, nDocs);
 
-const checkpointTimestamp = magicRestoreUtils.getCheckpointTimestamp();
-let {lastOplogEntryTs, entriesAfterBackup} = magicRestoreUtils.getEntriesAfterBackup(sourcePrimary);
+const checkpointTimestamp = magicRestoreTest.getCheckpointTimestamp();
+let {lastOplogEntryTs, entriesAfterBackup} = magicRestoreTest.getEntriesAfterBackup(sourcePrimary);
 
-magicRestoreUtils.copyFilesAndCloseBackup();
+magicRestoreTest.copyFilesAndCloseBackup();
 
 let expectedConfig = assert.commandWorked(sourcePrimary.adminCommand({replSetGetConfig: 1})).config;
 // The new node will be allocated a new port by the test fixture.
@@ -95,17 +95,16 @@ let restoreConfiguration = {
     // Restore to the timestamp of the last oplog entry on the source cluster.
     "pointInTimeTimestamp": lastOplogEntryTs
 };
-restoreConfiguration =
-    magicRestoreUtils.appendRestoreToHigherTermThanIfNeeded(restoreConfiguration);
+restoreConfiguration = magicRestoreTest.appendRestoreToHigherTermThanIfNeeded(restoreConfiguration);
 
-magicRestoreUtils.writeObjsAndRunMagicRestore(restoreConfiguration, entriesAfterBackup, {
+magicRestoreTest.writeObjsAndRunMagicRestore(restoreConfiguration, entriesAfterBackup, {
     "replSet": jsTestName(),
     setParameter: {"failpoint.sleepToWaitForHealthLogWrite": "{'mode': 'alwaysOn'}"}
 });
 
 // Start a new replica set fixture on the dbpath.
 const destinationCluster = new ReplSetTest({nodes: 1});
-destinationCluster.startSet({dbpath: magicRestoreUtils.getBackupDbPath(), noCleanData: true});
+destinationCluster.startSet({dbpath: magicRestoreTest.getBackupDbPath(), noCleanData: true});
 
 let destPrimary = destinationCluster.getPrimary();
 const destPrimaryHealthLog = destPrimary.getDB("local").system.healthlog;

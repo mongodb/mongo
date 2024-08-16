@@ -6,7 +6,7 @@
  */
 import * as backupUtils from "jstests/libs/backup_utils.js";
 
-export class MagicRestoreUtils {
+export class MagicRestoreTest {
     constructor({rst, pipeDir, insertHigherTermOplogEntry}) {
         this.rst = rst;
         this.pipeDir = pipeDir;
@@ -84,7 +84,7 @@ export class MagicRestoreUtils {
      * magic restore completes. Parameterizes the dbpath to allow for multi-node clusters.
      */
     getBackupDbPath() {
-        return MagicRestoreUtils.parameterizeDbpath(this.restoreDbPaths[0]);
+        return MagicRestoreTest.parameterizeDbpath(this.restoreDbPaths[0]);
     }
 
     /**
@@ -158,7 +158,7 @@ export class MagicRestoreUtils {
         this.backupCursor.close();
         this.restoreDbPaths.forEach((restoreDbPath) => {
             resetDbpath(restoreDbPath);
-            MagicRestoreUtils.copyBackupFilesToDir(this.backupDbPath, restoreDbPath);
+            MagicRestoreTest.copyBackupFilesToDir(this.backupDbPath, restoreDbPath);
         });
     }
 
@@ -175,7 +175,7 @@ export class MagicRestoreUtils {
         this.backupCursor.close();
         this.restoreDbPaths.forEach((restoreDbPath) => {
             resetDbpath(restoreDbPath);
-            MagicRestoreUtils.copyBackupFilesToDir(this.backupDbPath, restoreDbPath);
+            MagicRestoreTest.copyBackupFilesToDir(this.backupDbPath, restoreDbPath);
         });
     }
 
@@ -209,7 +209,7 @@ export class MagicRestoreUtils {
      * as well.
      */
     static writeObjsToMagicRestorePipe(pipeDir, objs, persistPipe = false) {
-        const {pipeName, pipePath} = MagicRestoreUtils._generateMagicRestorePipePath(pipeDir);
+        const {pipeName, pipePath} = MagicRestoreTest._generateMagicRestorePipePath(pipeDir);
         _writeTestPipeObjects(pipeName, objs.length, objs, pipeDir + "/tmp/", persistPipe);
         // Creating the named pipe is async, so we should wait until the file exists.
         assert.soon(() => fileExists(pipePath));
@@ -220,7 +220,7 @@ export class MagicRestoreUtils {
      * to exit cleanly. The function is static as it is used in passthrough testing as well.
      */
     static runMagicRestoreNode(pipeDir, backupDbPath, options = {}) {
-        const {pipePath} = MagicRestoreUtils._generateMagicRestorePipePath(pipeDir);
+        const {pipePath} = MagicRestoreTest._generateMagicRestorePipePath(pipeDir);
         // Magic restore will exit the mongod process cleanly. 'runMongod' may acquire a connection
         // to mongod before it exits, and so we wait for the process to exit in the 'assert.soon'
         // below. If mongod exits before we acquire a connection, 'conn' will be null. In this case,
@@ -433,9 +433,9 @@ export class MagicRestoreUtils {
         // Restore each node in serial.
         this.rst.nodes.forEach((node, idx) => {
             jsTestLog(`Restoring node ${node.host}`);
-            MagicRestoreUtils.writeObjsToMagicRestorePipe(
+            MagicRestoreTest.writeObjsToMagicRestorePipe(
                 this.pipeDir, [restoreConfiguration, ...entriesAfterBackup]);
-            MagicRestoreUtils.runMagicRestoreNode(this.pipeDir, this.restoreDbPaths[idx], options);
+            MagicRestoreTest.runMagicRestoreNode(this.pipeDir, this.restoreDbPaths[idx], options);
         });
     }
 
@@ -567,7 +567,7 @@ export class MagicRestoreUtils {
 
 /**
  * This class implements helpers for testing the magic restore process with a sharded cluster. It
- * wraps a ShardingTest object and maintains a MagicRestoreUtils object per replica set. It handles
+ * wraps a ShardingTest object and maintains a MagicRestoreTest object per replica set. It handles
  * the logic to extend backup cursors as well as running restore on each replica set in the shard.
  */
 export class ShardedMagicRestoreTest {
@@ -578,27 +578,27 @@ export class ShardedMagicRestoreTest {
         this.numShards = this.st._rs.length;
         this.clusterId = st.s.getCollection('config.version').findOne().clusterId;
 
-        jsTestLog("Creating MagicRestoreUtil fixture for config replica set");
+        jsTestLog("Creating MagicRestoreTest fixture for config replica set");
         let configDir = `${MongoRunner.dataDir}/config`;
         this.mkdirAndResetPath(configDir);
-        this.configRestoreTest = new MagicRestoreUtils({
+        this.configRestoreTest = new MagicRestoreTest({
             rst: this.st.configRS,
             pipeDir: configDir,
             insertHigherTermOplogEntry: insertHigherTermOplogEntry
         });
         this.shardRestoreTests = [];
         for (let i = 0; i < this.numShards; i++) {
-            jsTestLog(`Creating MagicRestoreUtil fixture for shard replica set ${i}`);
+            jsTestLog(`Creating MagicRestoreTest fixture for shard replica set ${i}`);
             let shardDir = `${MongoRunner.dataDir}/shard${i}`;
             this.mkdirAndResetPath(shardDir);
-            const magicRestoreUtil = new MagicRestoreUtils({
+            const magicRestoreTest = new MagicRestoreTest({
                 rst: this.st["rs" + i],
                 pipeDir: shardDir,
                 insertHigherTermOplogEntry: insertHigherTermOplogEntry
             });
-            this.shardRestoreTests.push(magicRestoreUtil);
+            this.shardRestoreTests.push(magicRestoreTest);
         }
-        this.magicRestoreUtils = [this.configRestoreTest, ...this.shardRestoreTests];
+        this.magicRestoreTests = [this.configRestoreTest, ...this.shardRestoreTests];
         // shardingRename is a list of objects.
         this.shardingRename = undefined;
         this.shardIdentityDocuments = undefined;
@@ -612,8 +612,8 @@ export class ShardedMagicRestoreTest {
     }
 
     takeCheckpointsAndOpenBackups() {
-        this.magicRestoreUtils.forEach((magicRestoreUtil) => {
-            magicRestoreUtil.takeCheckpointAndOpenBackup();
+        this.magicRestoreTests.forEach((magicRestoreTest) => {
+            magicRestoreTest.takeCheckpointAndOpenBackup();
         });
     }
 
@@ -627,9 +627,9 @@ export class ShardedMagicRestoreTest {
 
     findMaxCheckpointTsAndExtendBackupCursors() {
         this.maxCheckpointTs = Timestamp(0, 0);
-        this.magicRestoreUtils.forEach((magicRestoreUtil) => {
-            magicRestoreUtil.copyFiles();
-            const ts = magicRestoreUtil.getCheckpointTimestamp();
+        this.magicRestoreTests.forEach((magicRestoreTest) => {
+            magicRestoreTest.copyFiles();
+            const ts = magicRestoreTest.getCheckpointTimestamp();
             if (timestampCmp(ts, this.maxCheckpointTs) > 0) {
                 this.maxCheckpointTs = ts;
             }
@@ -638,19 +638,19 @@ export class ShardedMagicRestoreTest {
         jsTestLog("Computed maxCheckpointTs: " + tojson(this.maxCheckpointTs));
 
         jsTestLog("Extending backup cursors");
-        this.magicRestoreUtils.forEach((magicRestoreUtil) => {
-            magicRestoreUtil.extendAndCloseBackup(magicRestoreUtil.backupSource,
+        this.magicRestoreTests.forEach((magicRestoreTest) => {
+            magicRestoreTest.extendAndCloseBackup(magicRestoreTest.backupSource,
                                                   this.maxCheckpointTs);
         });
     }
 
     setPointInTimeTimestamp() {
         this.pointInTimeTimestamp = Timestamp(0, 0);
-        this.magicRestoreUtils.forEach((magicRestoreUtil) => {
-            let {lastOplogEntryTs} = magicRestoreUtil.getEntriesAfterBackup();
+        this.magicRestoreTests.forEach((magicRestoreTest) => {
+            let {lastOplogEntryTs} = magicRestoreTest.getEntriesAfterBackup();
             // Store the last oplog entry for each replica set. This is used to check the stable
             // timestamp at the end of restore.
-            magicRestoreUtil.expectedStableTimestamp = lastOplogEntryTs;
+            magicRestoreTest.expectedStableTimestamp = lastOplogEntryTs;
             if (timestampCmp(lastOplogEntryTs, this.pointInTimeTimestamp) > 0) {
                 this.pointInTimeTimestamp = lastOplogEntryTs;
             }
@@ -660,10 +660,10 @@ export class ShardedMagicRestoreTest {
     }
 
     runMagicRestore() {
-        this.magicRestoreUtils.forEach((magicRestoreUtil, idx) => {
+        this.magicRestoreTests.forEach((magicRestoreTest, idx) => {
             let restoreConfiguration = {
                 "nodeType": idx > 0 ? "shard" : "configServer",
-                "replicaSetConfig": magicRestoreUtil.getExpectedConfig(),
+                "replicaSetConfig": magicRestoreTest.getExpectedConfig(),
                 "maxCheckpointTs": this.maxCheckpointTs
             };
 
@@ -677,24 +677,24 @@ export class ShardedMagicRestoreTest {
                 restoreConfiguration.shardIdentityDocument = this.shardIdentityDocuments[idx];
             }
             restoreConfiguration =
-                magicRestoreUtil.appendRestoreToHigherTermThanIfNeeded(restoreConfiguration);
+                magicRestoreTest.appendRestoreToHigherTermThanIfNeeded(restoreConfiguration);
 
-            magicRestoreUtil.writeObjsAndRunMagicRestore(restoreConfiguration,
-                                                         magicRestoreUtil.entriesAfterBackup,
-                                                         {"replSet": magicRestoreUtil.rst.name});
+            magicRestoreTest.writeObjsAndRunMagicRestore(restoreConfiguration,
+                                                         magicRestoreTest.entriesAfterBackup,
+                                                         {"replSet": magicRestoreTest.rst.name});
         });
     }
 
     storePreRestoreDbHashes() {
-        this.magicRestoreUtils.forEach((magicRestoreUtil) => {
-            magicRestoreUtil.storePreRestoreDbHashes();
+        this.magicRestoreTests.forEach((magicRestoreTest) => {
+            magicRestoreTest.storePreRestoreDbHashes();
         });
     }
 
     checkPostRestoreDbHashes(excludedCollections) {
         jsTestLog("Running dbhash checks for sharded cluster magic restore test");
-        this.magicRestoreUtils.forEach((magicRestoreUtil) => {
-            magicRestoreUtil.checkPostRestoreDbHashes(excludedCollections);
+        this.magicRestoreTests.forEach((magicRestoreTest) => {
+            magicRestoreTest.checkPostRestoreDbHashes(excludedCollections);
         });
     }
 
