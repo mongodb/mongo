@@ -44,6 +44,9 @@ selector:
     # could fail with FailedToSatisfyReadPreference
     - jstests/concurrency/fsm_workloads/agg_unionWith_interrupt_cleanup.js
 
+    # This workload can cause dbcheck running in the background to time out.
+    - jstests/concurrency/fsm_workloads/compact.js
+
   exclude_with_any_tags:
     - requires_sharding
 
