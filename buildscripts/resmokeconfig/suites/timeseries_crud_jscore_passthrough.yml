@@ -271,6 +271,8 @@ selector:
     - jstests/core/write/bypass_empty_ts_replacement_timeseries.js
     # Assumes collection options do not change
     - jstests/core/rename_system_buckets_collections.js
+    # Inserts documents that are too large for a timeseries collection.
+    - jstests/core/query/bson_size_limit.js
 
   exclude_with_any_tags:
     - requires_sharding
