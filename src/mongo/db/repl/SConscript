@@ -17,16 +17,6 @@ env.Library(
 )
 
 env.Library(
-    target="tenant_migration_decoration",
-    source=[
-        "tenant_migration_decoration.cpp",
-    ],
-    LIBDEPS_PRIVATE=[
-        "$BUILD_DIR/mongo/base",
-    ],
-)
-
-env.Library(
     target="apply_ops_command_info",
     source=[
         "apply_ops_command_info.cpp",
@@ -50,16 +40,6 @@ env.Library(
         "$BUILD_DIR/mongo/db/pipeline/change_stream_helpers",
         "oplog",
         "oplog_entry",
-    ],
-)
-
-env.Library(
-    target="oplog_constraint_violation_logger",
-    source=[
-        "oplog_constraint_violation_logger.cpp",
-    ],
-    LIBDEPS_PRIVATE=[
-        "$BUILD_DIR/mongo/base",
     ],
 )
 
@@ -390,26 +370,6 @@ env.Library(
 )
 
 env.Library(
-    target="oplog_buffer_batched_queue",
-    source=[
-        "oplog_buffer_batched_queue.cpp",
-    ],
-    LIBDEPS=[
-        "$BUILD_DIR/mongo/base",
-    ],
-)
-
-env.Library(
-    target="oplog_buffer_blocking_queue",
-    source=[
-        "oplog_buffer_blocking_queue.cpp",
-    ],
-    LIBDEPS=[
-        "$BUILD_DIR/mongo/base",
-    ],
-)
-
-env.Library(
     target="oplog_buffer_collection",
     source=[
         "oplog_buffer_collection.cpp",
@@ -424,16 +384,6 @@ env.Library(
     LIBDEPS_PRIVATE=[
         "$BUILD_DIR/mongo/db/catalog/document_validation",
         "$BUILD_DIR/mongo/db/ops/write_ops_exec",
-    ],
-)
-
-env.Library(
-    target="oplog_buffer_proxy",
-    source=[
-        "oplog_buffer_proxy.cpp",
-    ],
-    LIBDEPS=[
-        "$BUILD_DIR/mongo/base",
     ],
 )
 
@@ -1258,18 +1208,6 @@ env.Library(
 )
 
 env.Library(
-    target="repl_sync_shared_data",
-    source=[
-        "repl_sync_shared_data.cpp",
-        "initial_sync_shared_data.cpp",
-        "tenant_migration_shared_data.cpp",
-    ],
-    LIBDEPS=[
-        "$BUILD_DIR/mongo/base",
-    ],
-)
-
-env.Library(
     target="base_cloner",
     source=[
         "base_cloner.cpp",
@@ -1403,16 +1341,6 @@ env.Library(
         "primary_only_service",
         "replication_auth",
         "split_horizon",
-    ],
-)
-
-env.Library(
-    target="tenant_migration_errors",
-    source=[
-        "tenant_migration_conflict_info.cpp",
-    ],
-    LIBDEPS=[
-        "$BUILD_DIR/mongo/base",
     ],
 )
 
