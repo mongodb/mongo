@@ -13,3 +13,19 @@ idl_generator(
     name = "deadline_monitor_gen",
     src = "deadline_monitor.idl",
 )
+
+mongo_cc_library(
+    name = "bson_template_evaluator",
+    srcs = [
+        "bson_template_evaluator.cpp",
+    ],
+    hdrs = [
+        "bson_template_evaluator.h",
+    ],
+    header_deps = [
+        "//src/mongo/db/fts:fts_query_noop",
+    ],
+    deps = [
+        "//src/mongo:base",
+    ],
+)

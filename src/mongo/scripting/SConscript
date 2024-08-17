@@ -42,16 +42,6 @@ scripting_common_env.Library(
 )
 
 env.Library(
-    target="bson_template_evaluator",
-    source=[
-        "bson_template_evaluator.cpp",
-    ],
-    LIBDEPS=[
-        "$BUILD_DIR/mongo/base",
-    ],
-)
-
-env.Library(
     target="scripting_none",
     source=[
         "engine_none.cpp",
