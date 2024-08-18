@@ -17,3 +17,48 @@ filegroup(
         "ticketholder.h",
     ],
 )
+
+mongo_cc_library(
+    name = "spin_lock",
+    srcs = [
+        "spin_lock.cpp",
+    ],
+    hdrs = [
+        "spin_lock.h",
+        "//src/mongo/platform:pause.h",
+    ],
+    deps = [
+        "//src/mongo:base",
+    ],
+)
+
+mongo_cc_library(
+    name = "admission_context",
+    srcs = [
+        "admission_context.cpp",
+    ],
+    hdrs = [
+        "admission_context.h",
+    ],
+    header_deps = [
+        "//src/mongo/db/concurrency:flow_control_ticketholder",
+    ],
+    deps = [
+        ":spin_lock",
+        "//src/mongo:base",
+    ],
+)
+
+mongo_cc_library(
+    name = "thread_pool",
+    srcs = [
+        "thread_pool.cpp",
+    ],
+    hdrs = [
+        "thread_pool.h",
+        "//src/mongo/util/concurrency:thread_pool_interface.h",
+    ],
+    deps = [
+        "//src/mongo:base",
+    ],
+)

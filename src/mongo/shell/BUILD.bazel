@@ -45,3 +45,19 @@ idl_generator(
         "//src/mongo/db:basic_types_gen",
     ],
 )
+
+mongo_cc_library(
+    name = "linenoise",
+    srcs = [
+        "linenoise.cpp",
+        "mk_wcwidth.cpp",
+    ],
+    hdrs = [
+        "linenoise.h",
+        "mk_wcwidth.h",
+    ],
+    deps = [
+        ":linenoise_utf8",
+        "//src/mongo:base",
+    ],
+)

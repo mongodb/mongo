@@ -13,3 +13,27 @@ idl_generator(
     name = "transform_algorithm_gen",
     src = "transform_algorithm.idl",
 )
+
+mongo_cc_library(
+    name = "rate_limiting",
+    srcs = [
+        "rate_limiting.cpp",
+    ],
+    hdrs = [
+        "rate_limiting.h",
+    ],
+    deps = [
+        "//src/mongo:base",
+        "//src/mongo/util:clock_sources",
+    ],
+)
+
+mongo_cc_library(
+    name = "query_stats_parse",
+    srcs = [
+        ":transform_algorithm_gen",
+    ],
+    deps = [
+        "//src/mongo/db:server_base",
+    ],
+)

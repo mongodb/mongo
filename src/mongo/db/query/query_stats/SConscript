@@ -10,27 +10,6 @@ Import(
 env = env.Clone()
 
 env.Library(
-    target="rate_limiting",
-    source=[
-        "rate_limiting.cpp",
-    ],
-    LIBDEPS=[
-        "$BUILD_DIR/mongo/base",
-        "$BUILD_DIR/mongo/util/clock_sources",
-    ],
-)
-
-env.Library(
-    target="query_stats_parse",
-    source=[
-        "transform_algorithm_gen.cpp",
-    ],
-    LIBDEPS=[
-        "$BUILD_DIR/mongo/db/server_base",
-    ],
-)
-
-env.Library(
     target="query_stats",
     source=[
         "aggregated_metric.cpp",

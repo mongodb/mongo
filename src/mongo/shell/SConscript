@@ -266,20 +266,6 @@ if get_option("ssl") == "on":
             ],
         )
 
-env.Library(
-    target="linenoise",
-    source=[
-        "linenoise.cpp",
-        "mk_wcwidth.cpp",
-    ],
-    LIBDEPS=[
-        "$BUILD_DIR/mongo/base",
-    ],
-    LIBDEPS_PRIVATE=[
-        "linenoise_utf8",
-    ],
-)
-
 if not has_option("noshell") and jsEngine:
     env.Library(
         target="mongo_initializers",

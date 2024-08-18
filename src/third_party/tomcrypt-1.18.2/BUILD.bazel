@@ -21,9 +21,10 @@ mongo_cc_library(
     hdrs = glob([
         "src/headers/*.h",
     ]),
-    copts = [
-        "-Isrc/third_party/tomcrypt-1.18.2/src/headers",
-    ] + NO_WARN_COPTS,
+    copts = NO_WARN_COPTS,
+    includes = [
+        "src/headers",
+    ],
 )
 
 mongo_cc_library(
@@ -63,9 +64,10 @@ mongo_cc_library(
     ] + glob([
         "src/headers/*.h",
     ]),
-    copts = [
-        "-Isrc/third_party/tomcrypt-1.18.2/src/headers",
-    ] + NO_WARN_COPTS,
+    copts = NO_WARN_COPTS,
+    includes = [
+        "src/headers",
+    ],
     local_defines = [
         "LTC_NO_PROTOTYPES",
     ],
@@ -82,9 +84,10 @@ mongo_cc_library(
     hdrs = glob([
         "src/headers/*.h",
     ]),
-    copts = [
-        "-Isrc/third_party/tomcrypt-1.18.2/src/headers",
-    ] + NO_WARN_COPTS,
+    copts = NO_WARN_COPTS,
+    includes = [
+        "src/headers",
+    ],
     deps = [
         ":tomcrypt_deps",
     ],

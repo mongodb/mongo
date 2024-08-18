@@ -1764,6 +1764,14 @@ selects.config_setting_group(
     ],
 )
 
+selects.config_setting_group(
+    name = "ssl_disabled_linux",
+    match_all = [
+        "@platforms//os:linux",
+        ":ssl_disabled",
+    ],
+)
+
 # --------------------------------------
 # thin_lto
 # --------------------------------------

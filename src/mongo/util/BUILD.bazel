@@ -1,4 +1,5 @@
 load("//bazel:mongo_src_rules.bzl", "idl_generator", "mongo_cc_library")
+load("//bazel/config:render_template.bzl", "render_template")
 
 package(default_visibility = ["//visibility:public"])
 
@@ -100,6 +101,225 @@ mongo_cc_library(
     ],
     hdrs = [
         "secure_compare_memory.h",
+    ],
+    deps = [
+        "//src/mongo:base",
+    ],
+)
+
+mongo_cc_library(
+    name = "secure_zero_memory",
+    srcs = [
+        "secure_zero_memory.cpp",
+    ],
+    hdrs = [
+        "secure_zero_memory.h",
+    ],
+    deps = [
+        "//src/mongo:base",
+    ],
+)
+
+mongo_cc_library(
+    name = "background_job",
+    srcs = [
+        "background.cpp",
+    ],
+    hdrs = [
+        "background.h",
+    ],
+    deps = [
+        "//src/mongo:base",
+        "//src/mongo/util/concurrency:spin_lock",
+    ],
+)
+
+mongo_cc_library(
+    name = "clock_sources",
+    srcs = [
+        "background_thread_clock_source.cpp",
+        "clock_source.cpp",
+        "fast_clock_source_factory.cpp",
+    ],
+    hdrs = [
+        "background_thread_clock_source.h",
+        "clock_source.h",
+        "fast_clock_source_factory.h",
+    ],
+    deps = [
+        "//src/mongo:base",
+    ],
+)
+
+mongo_cc_library(
+    name = "alarm",
+    srcs = [
+        "alarm.cpp",
+        "alarm_runner_background_thread.cpp",
+    ],
+    hdrs = [
+        "alarm.h",
+        "alarm_runner_background_thread.h",
+    ],
+    deps = [
+        ":clock_sources",
+        "//src/mongo:base",
+    ],
+)
+
+mongo_cc_library(
+    name = "executor_stats",
+    srcs = [
+        "executor_stats.cpp",
+    ],
+    hdrs = [
+        "executor_stats.h",
+    ],
+    deps = [
+        "//src/mongo:base",
+    ],
+)
+
+mongo_cc_library(
+    name = "field_set",
+    srcs = [
+        "field_set.cpp",
+    ],
+    hdrs = [
+        "field_set.h",
+    ],
+    deps = [
+        "//src/mongo:base",
+    ],
+)
+
+mongo_cc_library(
+    name = "string_listset",
+    srcs = [
+        "string_listset.cpp",
+    ],
+    hdrs = [
+        "string_listset.h",
+    ],
+    deps = [
+        "//src/mongo:base",
+    ],
+)
+
+render_template(
+    name = "icu_init_cpp",
+    srcs = [
+        "generate_icu_init_cpp.py",
+    ] + select({
+        "@platforms//cpu:s390x": ["//src/third_party/icu4c-57.1/source:mongo_sources/icudt57b.dat"],
+        "//conditions:default": ["//src/third_party/icu4c-57.1/source:mongo_sources/icudt57l.dat"],
+    }),
+    cmd = [
+        "$(location generate_icu_init_cpp.py)",
+        "-o",
+        "$(location icu_init.cpp)",
+        "-i",
+    ] + select({
+        "@platforms//cpu:s390x": ["$(location //src/third_party/icu4c-57.1/source:mongo_sources/icudt57b.dat)"],
+        "//conditions:default": ["$(location //src/third_party/icu4c-57.1/source:mongo_sources/icudt57l.dat)"],
+    }),
+    output = "icu_init.cpp",
+)
+
+# When using ICU from third_party, icu_init.cpp will load a subset of
+# ICU's data files using udata_setCommonData() in an initializer.
+mongo_cc_library(
+    name = "icu_init",
+    srcs = [
+        ":icu_init_cpp",
+    ],
+    deps = [
+        "//src/mongo:base",
+        "//src/third_party/icu4c-57.1/source:icu_i18n",
+    ],
+)
+
+mongo_cc_library(
+    name = "icu",
+    srcs = [
+        "icu.cpp",
+        "//src/third_party/node:icu_get_string_width.cpp",
+    ],
+    hdrs = [
+        "icu.h",
+    ],
+    deps = [
+        ":icu_init",
+        "//src/mongo:base",
+        "//src/third_party/icu4c-57.1/source:icu_i18n",
+    ],
+)
+
+mongo_cc_library(
+    name = "log_and_backoff",
+    srcs = [
+        "log_and_backoff.cpp",
+    ],
+    hdrs = [
+        "log_and_backoff.h",
+    ],
+    deps = [
+        "//src/mongo:base",
+    ],
+)
+
+mongo_cc_library(
+    name = "summation",
+    srcs = [
+        "summation.cpp",
+    ],
+    hdrs = [
+        "summation.h",
+    ],
+    deps = [
+        "//src/mongo:base",
+    ],
+)
+
+mongo_cc_library(
+    name = "progress_meter",
+    srcs = [
+        "progress_meter.cpp",
+    ],
+    hdrs = [
+        "progress_meter.h",
+    ],
+    header_deps = [
+        "//src/mongo/db/concurrency:flow_control_ticketholder",
+    ],
+    deps = [
+        "//src/mongo:base",
+    ],
+)
+
+mongo_cc_library(
+    name = "periodic_runner",
+    srcs = [
+        "periodic_runner.cpp",
+    ],
+    hdrs = [
+        "periodic_runner.h",
+    ],
+    deps = [
+        "//src/mongo:base",
+    ],
+)
+
+mongo_cc_library(
+    name = "safe_num",
+    srcs = [
+        "safe_num.cpp",
+    ],
+    hdrs = [
+        "safe_num.h",
+    ],
+    header_deps = [
+        "//src/mongo/db/concurrency:flow_control_ticketholder",
     ],
     deps = [
         "//src/mongo:base",

@@ -55,3 +55,22 @@ idl_generator(
         "//src/mongo/db/repl:replication_types_gen",
     ],
 )
+
+mongo_cc_library(
+    name = "logical_session_id",
+    srcs = [
+        "logical_session_id.cpp",
+        ":logical_session_id_gen",
+    ],
+    deps = [
+        "//src/mongo:base",
+        "//src/mongo/crypto:sha256_block",
+        "//src/mongo/idl:idl_parser",
+    ] + select({
+        "//bazel/config:ssl_enabled_linux": ["//src/mongo/crypto:sha_block_openssl"],
+        "//bazel/config:ssl_disabled_linux": ["//src/mongo/crypto:sha_block_tom"],
+        "@platforms//os:macos": ["//src/mongo/crypto:sha_block_apple"],
+        "@platforms//os:windows": ["//src/mongo/crypto:sha_block_windows"],
+        "//conditions:default": [],
+    }),
+)

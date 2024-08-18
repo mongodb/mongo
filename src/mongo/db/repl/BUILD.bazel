@@ -722,3 +722,59 @@ mongo_cc_library(
         "//src/mongo:base",
     ],
 )
+
+mongo_cc_library(
+    name = "optime",
+    srcs = [
+        "bson_extract_optime.cpp",
+        "optime.cpp",
+        ":optime_base_gen",
+    ],
+    hdrs = [
+        "bson_extract_optime.h",
+        "optime.h",
+    ],
+    deps = [
+        "//src/mongo:base",
+        "//src/mongo/bson/util:bson_extract",
+        "//src/mongo/idl:idl_parser",
+    ],
+)
+
+mongo_cc_library(
+    name = "replication_consistency_markers_idl",
+    srcs = [
+        ":replication_consistency_markers_gen",
+    ],
+    deps = [
+        ":optime",
+        "//src/mongo:base",
+        "//src/mongo/idl:idl_parser",
+    ],
+)
+
+mongo_cc_library(
+    name = "rollback_idl",
+    srcs = [
+        ":rollback_gen",
+    ],
+    deps = [
+        ":optime",
+        "//src/mongo:base",
+        "//src/mongo/idl:idl_parser",
+    ],
+)
+
+mongo_cc_library(
+    name = "speculative_majority_read_info",
+    srcs = [
+        "speculative_majority_read_info.cpp",
+    ],
+    hdrs = [
+        "speculative_majority_read_info.h",
+    ],
+    deps = [
+        ":optime",
+        "//src/mongo:base",
+    ],
+)

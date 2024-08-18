@@ -23,20 +23,6 @@ env.Library(
 )
 
 env.Library(
-    target="logical_session_id",
-    source=[
-        "logical_session_id.cpp",
-        "logical_session_id_gen.cpp",
-    ],
-    LIBDEPS=[
-        "$BUILD_DIR/mongo/base",
-        "$BUILD_DIR/mongo/crypto/sha256_block",
-        "$BUILD_DIR/mongo/crypto/sha_block_${MONGO_CRYPTO}",
-        "$BUILD_DIR/mongo/idl/idl_parser",
-    ],
-)
-
-env.Library(
     target="logical_session_id_helpers",
     source=[
         "internal_session_pool.cpp",

@@ -78,3 +78,133 @@ idl_generator(
         "//src/mongo/db:basic_types_gen",
     ],
 )
+
+mongo_cc_library(
+    name = "sha1_block",
+    srcs = [
+        "sha1_block.cpp",
+    ],
+    hdrs = [
+        "sha1_block.h",
+    ],
+    header_deps = [
+        "//src/mongo/db/exec/sbe:query_sbe_plan_stats",
+    ],
+    deps = [
+        "//src/mongo:base",
+        "//src/mongo/util:secure_compare_memory",
+    ],
+)
+
+mongo_cc_library(
+    name = "sha256_block",
+    srcs = [
+        "sha256_block.cpp",
+    ],
+    hdrs = [
+        "sha256_block.h",
+    ],
+    header_deps = [
+        "//src/mongo/db/exec/sbe:query_sbe_plan_stats",
+    ],
+    deps = [
+        "//src/mongo:base",
+        "//src/mongo/util:secure_compare_memory",
+    ],
+)
+
+# TODO(SERVER-93722): Refactor these libraries into a loop after initial Bazel migration.
+mongo_cc_library(
+    name = "sha_block_windows",
+    srcs = [
+        "sha_block_windows.cpp",
+    ],
+    hdrs = [
+        "hash_block.h",
+        "sha512_block.h",
+    ],
+    header_deps = [
+        "//src/mongo/db/concurrency:flow_control_ticketholder",
+    ],
+    target_compatible_with = select({
+        "@platforms//os:windows": [],
+        "//conditions:default": ["@platforms//:incompatible"],
+    }),
+    deps = [
+        ":sha1_block",
+        ":sha256_block",
+        "//src/mongo:base",
+    ],
+)
+
+mongo_cc_library(
+    name = "sha_block_apple",
+    srcs = [
+        "sha_block_apple.cpp",
+    ],
+    hdrs = [
+        "hash_block.h",
+        "sha512_block.h",
+    ],
+    header_deps = [
+        "//src/mongo/db/concurrency:flow_control_ticketholder",
+    ],
+    target_compatible_with = select({
+        "@platforms//os:macos": [],
+        "//conditions:default": ["@platforms//:incompatible"],
+    }),
+    deps = [
+        ":sha1_block",
+        ":sha256_block",
+        "//src/mongo:base",
+    ],
+)
+
+mongo_cc_library(
+    name = "sha_block_openssl",
+    srcs = [
+        "sha_block_openssl.cpp",
+    ],
+    hdrs = [
+        "hash_block.h",
+        "sha512_block.h",
+    ],
+    header_deps = [
+        "//src/mongo/db/concurrency:flow_control_ticketholder",
+    ],
+    target_compatible_with = select({
+        "//bazel/config:ssl_enabled_linux": [],
+        "//conditions:default": ["@platforms//:incompatible"],
+    }),
+    deps = [
+        ":sha1_block",
+        ":sha256_block",
+        "//src/mongo:base",
+    ],
+)
+
+mongo_cc_library(
+    name = "sha_block_tom",
+    srcs = [
+        "sha_block_tom.cpp",
+    ],
+    hdrs = [
+        "hash_block.h",
+        "sha512_block.h",
+    ],
+    header_deps = [
+        "//src/mongo/db/concurrency:flow_control_ticketholder",
+    ],
+    local_defines = [
+        "LTC_NO_PROTOTYPES",
+    ],
+    target_compatible_with = select({
+        "//bazel/config:ssl_disabled_linux": [],
+        "//conditions:default": ["@platforms//:incompatible"],
+    }),
+    deps = [
+        ":sha1_block",
+        ":sha256_block",
+        "//src/mongo:base",
+    ],
+)

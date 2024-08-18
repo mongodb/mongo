@@ -20,7 +20,6 @@ mongo_cc_library(
         "flow_control_ticketholder.cpp",
     ],
     hdrs = [
-        # TODO(SERVER-93270): Try adding server_base as a dependency once converted to Bazel
         "//src/mongo/bson:bson_duration.h",
         "//src/mongo/bson:bson_time_support.h",
         "//src/mongo/bson/mutable:api.h",

@@ -5,16 +5,6 @@ Import("env")
 env = env.Clone()
 
 env.Library(
-    target="thread_pool",
-    source=[
-        "thread_pool.cpp",
-    ],
-    LIBDEPS=[
-        "$BUILD_DIR/mongo/base",
-    ],
-)
-
-env.Library(
     target="thread_pool_test_fixture",
     source=["thread_pool_test_common.cpp", "thread_pool_test_fixture.cpp"],
     LIBDEPS_PRIVATE=[
@@ -41,27 +31,6 @@ env.Library(
         "$BUILD_DIR/third_party/boost/boost_log",
         "$BUILD_DIR/third_party/boost/boost_program_options",
         "$BUILD_DIR/third_party/boost/boost_system",
-    ],
-)
-
-env.Library(
-    target="admission_context",
-    source=[
-        "admission_context.cpp",
-    ],
-    LIBDEPS=[
-        "$BUILD_DIR/mongo/base",
-        "spin_lock",
-    ],
-)
-
-env.Library(
-    target="spin_lock",
-    source=[
-        "spin_lock.cpp",
-    ],
-    LIBDEPS=[
-        "$BUILD_DIR/mongo/base",
     ],
 )
 
