@@ -78,7 +78,7 @@ function assertIndexScan(isTieBreakingHeuristicEnabled, filter, expectedIndexKey
     assert.eq(expectedIndexKeyPatterns.length, indexScans.length);
 
     for (let i = 0; i < expectedIndexKeyPatterns.length; ++i) {
-        assert.eq(indexScans[i]['keyPattern'], expectedIndexKeyPatterns[i]);
+        assert.eq(indexScans[i]['keyPattern'], expectedIndexKeyPatterns[i], tojson(explain));
     }
 }
 
