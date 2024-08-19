@@ -58,7 +58,7 @@ src/checksum/software/checksum.c
 src/checksum/x86/crc32-x86-alt.c                X86_HOST
 src/checksum/x86/crc32-x86.c                    X86_HOST
 src/checksum/zseries/crc32-s390x.c              ZSERIES_HOST
-src/checksum/zseries/crc32le-vx.sx              ZSERIES_HOST
+src/checksum/zseries/crc32le-vx.S               ZSERIES_HOST
 src/conf/conf_bind.c
 src/conf/conf_compile.c
 src/conf/conf_get.c

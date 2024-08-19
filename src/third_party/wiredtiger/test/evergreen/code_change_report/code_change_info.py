@@ -30,7 +30,7 @@
 import argparse
 import json
 import logging
-from pygit2 import discover_repository, Repository, Diff
+from pygit2 import discover_repository, Repository, Diff, GitError
 from pygit2 import GIT_SORT_NONE
 from code_change_helpers import is_useful_line, diff_to_change_list, read_complexity_data, preprocess_complexity_data
 
@@ -322,11 +322,9 @@ def main():
         data = file.read()
         try:
             diff = Diff.parse_diff(data)
-        except KeyError as e:
-            # No patch found because the diff is empty, fall back to get_git_diff().
-            logging.error(e)
-            logging.warning("Falling back to get_git_diff()")
-            diff = get_git_diff(git_working_tree_dir=git_working_tree_dir)
+        except (GitError, KeyError) as e:
+            logging.error("Unable to parse the diff file, using an empty diff instead. The exception from PyGit2 is '{}'".format(str(e)))
+            diff = {}
 
     change_list = diff_to_change_list(diff=diff)
     report_info = create_report_info(change_list=change_list,

@@ -50,6 +50,9 @@ class compact_util(wttest.WiredTigerTestCase):
     def get_bytes_recovered(self):
         return self.get_stat(stat.conn.background_compact_bytes_recovered)
 
+    def get_bytes_avail_for_reuse(self, uri):
+        return self.get_stat(stat.dsrc.block_reuse_bytes, uri)
+
     # Return stats that track the progress of compaction for a given file.
     def get_compact_progress_stats(self, uri):
         cstat = self.session.open_cursor('statistics:' + uri, None, 'statistics=(all)')

@@ -207,7 +207,7 @@ WT_FILELIST_RISCV64_HOST = ['src/checksum/riscv64/crc32-riscv64.c']
 
 WT_FILELIST_X86_HOST = ['src/checksum/x86/crc32-x86-alt.c', 'src/checksum/x86/crc32-x86.c']
 
-WT_FILELIST_ZSERIES_HOST = ['src/checksum/zseries/crc32-s390x.c', 'src/checksum/zseries/crc32le-vx.sx']
+WT_FILELIST_ZSERIES_HOST = ['src/checksum/zseries/crc32-s390x.c', 'src/checksum/zseries/crc32le-vx.S']
 
 WT_FILELIST_DARWIN_HOST = ['src/os_darwin/os_futex.c']
 
