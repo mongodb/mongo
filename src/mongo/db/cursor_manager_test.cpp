@@ -830,5 +830,43 @@ TEST_F(CursorManagerTestCustomOpCtx,
     ASSERT_EQUALS(cursorsForNamespace.size(), 0ull);
 }
 
+TEST_F(CursorManagerTestBase, CursorLifespanHistogramCorrectlyUpdated) {
+    Date_t present = Date_t::now();
+
+    auto expectedCount = cursorStats().lifespanLessThan1Second.get() + 1;
+    incrementCursorLifespanMetric(present, present + Milliseconds(500));
+    ASSERT_EQUALS(expectedCount, cursorStats().lifespanLessThan1Second.get());
+    auto countForLt1Second = cursorStats().lifespanLessThan1Second.get();
+
+    expectedCount = cursorStats().lifespanLessThan5Seconds.get() + 1;
+    incrementCursorLifespanMetric(present, present + Seconds(2));
+    ASSERT_EQUALS(expectedCount, cursorStats().lifespanLessThan5Seconds.get());
+
+    expectedCount = cursorStats().lifespanLessThan15Seconds.get() + 1;
+    incrementCursorLifespanMetric(present, present + Seconds(10));
+    ASSERT_EQUALS(expectedCount, cursorStats().lifespanLessThan15Seconds.get());
+
+    expectedCount = cursorStats().lifespanLessThan30Seconds.get() + 1;
+    incrementCursorLifespanMetric(present, present + Seconds(20));
+    ASSERT_EQUALS(expectedCount, cursorStats().lifespanLessThan30Seconds.get());
+
+    expectedCount = cursorStats().lifespanLessThan1Minute.get() + 2;
+    // We'll just do the 30s - 60s twice to make it a little different.
+    incrementCursorLifespanMetric(present, present + Seconds(40));
+    incrementCursorLifespanMetric(present, present + Seconds(40));
+    ASSERT_EQUALS(expectedCount, cursorStats().lifespanLessThan1Minute.get());
+
+    expectedCount = cursorStats().lifespanLessThan10Minutes.get() + 1;
+    incrementCursorLifespanMetric(present, present + Minutes(2));
+    ASSERT_EQUALS(expectedCount, cursorStats().lifespanLessThan10Minutes.get());
+
+    expectedCount = cursorStats().lifespanGreaterThanOrEqual10Minutes.get() + 1;
+    incrementCursorLifespanMetric(present, present + Minutes(12));
+    ASSERT_EQUALS(expectedCount, cursorStats().lifespanGreaterThanOrEqual10Minutes.get());
+
+    // Just make sure the smallest bucket counter is unchanged.
+    ASSERT_EQUALS(countForLt1Second, cursorStats().lifespanLessThan1Second.get());
+}
+
 }  // namespace
 }  // namespace mongo

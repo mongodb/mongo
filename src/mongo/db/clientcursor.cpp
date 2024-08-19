@@ -66,62 +66,18 @@ namespace {
 
 using namespace fmt::literals;
 
-class CursorStats {
-public:
-    CursorStats() = default;
-    /** Doesn't move, copy or die. */
-    ~CursorStats() = delete;
-    CursorStats(const CursorStats&) = delete;
-    CursorStats& operator=(const CursorStats&) = delete;
-    CursorStats(CursorStats&&) = delete;
-    CursorStats& operator=(CursorStats&&) = delete;
-
-    /** Resets all data members that are commented as "resettable". */
-    void reset() {
-        auto zero = [](auto& m) {
-            m.decrement(m.get());
-        };
-        zero(open);
-        zero(openPinned);
-        zero(multiTarget);
-        zero(singleTarget);
-        zero(queuedData);
-        zero(timedOut);
-    }
-
-    Counter64& open{_makeStat("open.total")};         // resettable
-    Counter64& openPinned{_makeStat("open.pinned")};  // resettable
-    Counter64& openNoTimeout{_makeStat("open.noTimeout")};
-    Counter64& timedOut{_makeStat("timedOut")};  // resettable
-    Counter64& totalOpened{_makeStat("totalOpened")};
-    Counter64& moreThanOneBatch{_makeStat("moreThanOneBatch")};
-
-    Counter64& multiTarget{_makeStat("open.multiTarget")};    // resettable
-    Counter64& singleTarget{_makeStat("open.singleTarget")};  // resettable
-    Counter64& queuedData{_makeStat("open.queuedData")};      // resettable
-
-    Counter64& lifespanLessThan1Second{_makeStat("lifespan.lessThan1Second")};
-    Counter64& lifespanLessThan5Seconds{_makeStat("lifespan.lessThan5Seconds")};
-    Counter64& lifespanLessThan15Seconds{_makeStat("lifespan.lessThan15Seconds")};
-    Counter64& lifespanLessThan30Seconds{_makeStat("lifespan.lessThan30Seconds")};
-    Counter64& lifespanLessThan1Minute{_makeStat("lifespan.lessThan1Minute")};
-    Counter64& lifespanLessThan10Minutes{_makeStat("lifespan.lessThan10Minutes")};
-    Counter64& lifespanGreaterThanOrEqual10Minutes{
-        _makeStat("lifespan.greaterThanOrEqual10Minutes")};
-
-private:
-    static Counter64& _makeStat(StringData name) {
-        static constexpr auto prefix = "cursor"_sd;
-        return *MetricBuilder<Counter64>("{}.{}"_format(prefix, name))
-                    .setRole(ClusterRole::ShardServer);
-    }
-};
 auto& gCursorStats = *new CursorStats{};
+}  // namespace
+
+Counter64& CursorStats::_makeStat(StringData name) {
+    static constexpr auto prefix = "cursor"_sd;
+    return *MetricBuilder<Counter64>("{}.{}"_format(prefix, name))
+                .setRole(ClusterRole::ShardServer);
+}
 
 CursorStats& cursorStats() {
     return gCursorStats;
 }
-}  // namespace
 
 void incrementCursorLifespanMetric(Date_t birth, Date_t death) {
     auto elapsed = death - birth;
