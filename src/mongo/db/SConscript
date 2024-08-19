@@ -74,31 +74,6 @@ env.CppUnitTest(
     ],
 )
 
-#
-# The db/'common' lib has the abstractions that are shared by components of the
-# server. Ideally, many of the object in 'coredb' should be moved here when their dependencies
-# get resolved.
-#
-
-env.Library(
-    target="common",
-    source=[
-        "database_name.cpp",
-        "field_ref.cpp",
-        "field_ref_set.cpp",
-        "field_parser.cpp",
-        "txn_retry_counter_too_old_info.cpp",
-    ],
-    LIBDEPS=[
-        "catalog/cannot_convert_index_to_unique_info",
-        "repl/tenant_migration_errors",
-    ],
-    LIBDEPS_PRIVATE=[
-        "catalog/collection_uuid_mismatch_info",
-        "server_base",
-    ],
-)
-
 env.Library(
     target="global_index",
     source=[
@@ -217,18 +192,6 @@ env.Library(
     ],
     LIBDEPS=[
         "common",
-    ],
-)
-
-env.Library(
-    target="collection_index_usage_tracker",
-    source=[
-        "aggregated_index_usage_tracker.cpp",
-        "collection_index_usage_tracker.cpp",
-    ],
-    LIBDEPS_PRIVATE=[
-        "commands/server_status_core",
-        "server_base",
     ],
 )
 
@@ -455,16 +418,6 @@ env.Library(
         "change_stream_serverless_helpers",
         "repl/repl_coordinator_interface",
         "repl/repl_settings",
-        "server_base",
-    ],
-)
-
-env.Library(
-    target="change_stream_state",
-    source=[
-        "change_stream_state_gen.cpp",
-    ],
-    LIBDEPS_PRIVATE=[
         "server_base",
     ],
 )
@@ -1937,17 +1890,6 @@ env.Library(
     ],
     LIBDEPS_PRIVATE=[
         "$BUILD_DIR/mongo/util/concurrency/spin_lock",
-    ],
-)
-
-env.Library(
-    target="api_parameters",
-    source=[
-        "api_parameters.cpp",
-        "api_parameters_gen.cpp",
-    ],
-    LIBDEPS_PRIVATE=[
-        "server_base",
     ],
 )
 

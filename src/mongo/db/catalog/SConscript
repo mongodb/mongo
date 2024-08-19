@@ -50,28 +50,6 @@ env.Library(
 )
 
 env.Library(
-    target="commit_quorum_options",
-    source=[
-        "commit_quorum_gen.cpp",
-        "commit_quorum_options.cpp",
-    ],
-    LIBDEPS_PRIVATE=[
-        "$BUILD_DIR/mongo/bson/util/bson_extract",
-        "$BUILD_DIR/mongo/db/server_base",
-    ],
-)
-
-env.Library(
-    target="validate_idl",
-    source=[
-        "validate_gen.cpp",
-    ],
-    LIBDEPS_PRIVATE=[
-        "$BUILD_DIR/mongo/db/server_base",
-    ],
-)
-
-env.Library(
     target="index_build_entry_idl",
     source=[
         "index_build_entry_gen.cpp",
@@ -603,16 +581,6 @@ env.Library(
 )
 
 env.Library(
-    target="import_collection_oplog_entry",
-    source=[
-        "import_collection_oplog_entry_gen.cpp",
-    ],
-    LIBDEPS_PRIVATE=[
-        "$BUILD_DIR/mongo/db/server_base",
-    ],
-)
-
-env.Library(
     target="catalog_test_fixture",
     source=[
         "catalog_test_fixture.cpp",
@@ -625,17 +593,6 @@ env.Library(
         "$BUILD_DIR/mongo/db/server_base",
         "$BUILD_DIR/mongo/db/service_context_d_test_fixture",
         "catalog_helpers",
-    ],
-)
-
-env.Library(
-    target="collection_uuid_mismatch_info",
-    source=[
-        "collection_uuid_mismatch_info.cpp",
-    ],
-    LIBDEPS_PRIVATE=[
-        "$BUILD_DIR/mongo/base",
-        "$BUILD_DIR/mongo/db/server_base",
     ],
 )
 

@@ -66,3 +66,22 @@ idl_generator(
         "//src/mongo/idl:generic_argument_gen",
     ],
 )
+
+mongo_cc_library(
+    name = "map_reduce_parser",
+    srcs = [
+        "map_reduce_out_options.cpp",
+        ":map_reduce_gen",
+    ],
+    hdrs = [
+        "map_reduce_global_variable_scope.h",
+        "map_reduce_javascript_code.h",
+        "map_reduce_out_options.h",
+    ],
+    header_deps = [
+        "//src/mongo/db/commands:set_user_write_block_mode_idl",
+    ],
+    deps = [
+        "//src/mongo/db:server_base",
+    ],
+)

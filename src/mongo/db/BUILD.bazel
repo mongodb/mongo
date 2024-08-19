@@ -617,3 +617,73 @@ mongo_cc_library(
         "//src/mongo/idl:idl_parser",
     ],
 )
+
+mongo_cc_library(
+    name = "api_parameters",
+    srcs = [
+        "api_parameters.cpp",
+        ":api_parameters_gen",
+    ],
+    hdrs = [
+        "api_parameters.h",
+    ],
+    deps = [
+        ":server_base",
+    ],
+)
+
+mongo_cc_library(
+    name = "change_stream_state",
+    srcs = [
+        ":change_stream_state_gen",
+    ],
+    hdrs = [
+        "//src/mongo/db/auth:authorization_contract.h",
+    ],
+    deps = [
+        ":server_base",
+    ],
+)
+
+mongo_cc_library(
+    name = "collection_index_usage_tracker",
+    srcs = [
+        "aggregated_index_usage_tracker.cpp",
+        "collection_index_usage_tracker.cpp",
+    ],
+    hdrs = [
+        "aggregated_index_usage_tracker.h",
+        "collection_index_usage_tracker.h",
+    ],
+    deps = [
+        ":server_base",
+        "//src/mongo/db/commands:server_status_core",
+    ],
+)
+
+# The db/'common' lib has the abstractions that are shared by components of the
+# server. Ideally, many of the object in 'coredb' should be moved here when their dependencies
+# get resolved.
+mongo_cc_library(
+    name = "common",
+    srcs = [
+        "database_name.cpp",
+        "field_parser.cpp",
+        "field_ref.cpp",
+        "field_ref_set.cpp",
+        "txn_retry_counter_too_old_info.cpp",
+    ],
+    hdrs = [
+        "database_name.h",
+        "field_parser.h",
+        "field_ref.h",
+        "field_ref_set.h",
+        "txn_retry_counter_too_old_info.h",
+    ],
+    deps = [
+        ":server_base",
+        "//src/mongo/db/catalog:cannot_convert_index_to_unique_info",
+        "//src/mongo/db/catalog:collection_uuid_mismatch_info",
+        "//src/mongo/db/repl:tenant_migration_errors",
+    ],
+)

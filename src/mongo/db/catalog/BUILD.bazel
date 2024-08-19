@@ -81,3 +81,51 @@ idl_generator(
         "//src/mongo/db:basic_types_gen",
     ],
 )
+
+mongo_cc_library(
+    name = "collection_uuid_mismatch_info",
+    srcs = [
+        "collection_uuid_mismatch_info.cpp",
+    ],
+    hdrs = [
+        "collection_uuid_mismatch_info.h",
+    ],
+    deps = [
+        "//src/mongo/db:server_base",
+    ],
+)
+
+mongo_cc_library(
+    name = "commit_quorum_options",
+    srcs = [
+        "commit_quorum_options.cpp",
+        ":commit_quorum_gen",
+    ],
+    hdrs = [
+        "commit_quorum_options.h",
+    ],
+    deps = [
+        "//src/mongo/bson/util:bson_extract",
+        "//src/mongo/db:server_base",
+    ],
+)
+
+mongo_cc_library(
+    name = "validate_idl",
+    srcs = [
+        ":validate_gen",
+    ],
+    deps = [
+        "//src/mongo/db:server_base",
+    ],
+)
+
+mongo_cc_library(
+    name = "import_collection_oplog_entry",
+    srcs = [
+        ":import_collection_oplog_entry_gen",
+    ],
+    deps = [
+        "//src/mongo/db:server_base",
+    ],
+)

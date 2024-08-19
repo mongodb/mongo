@@ -138,16 +138,6 @@ env.Library(
 )
 
 env.Library(
-    target="auth_options",
-    source=[
-        "auth_options_gen.cpp",
-    ],
-    LIBDEPS_PRIVATE=[
-        "$BUILD_DIR/mongo/db/server_base",
-    ],
-)
-
-env.Library(
     target="auth_impl_internal",
     source=[
         "authorization_manager_impl.cpp",

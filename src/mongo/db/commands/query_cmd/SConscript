@@ -152,17 +152,6 @@ env.Library(
 )
 
 env.Library(
-    target="map_reduce_parser",
-    source=[
-        "map_reduce_out_options.cpp",
-        "map_reduce_gen.cpp",
-    ],
-    LIBDEPS_PRIVATE=[
-        "$BUILD_DIR/mongo/db/server_base",
-    ],
-)
-
-env.Library(
     target="map_reduce_agg",
     source=[
         "map_reduce_agg.cpp",

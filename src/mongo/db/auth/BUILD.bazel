@@ -140,3 +140,13 @@ idl_generator(
         "//src/mongo/db:basic_types_gen",
     ],
 )
+
+mongo_cc_library(
+    name = "auth_options",
+    srcs = [
+        ":auth_options_gen",
+    ],
+    deps = [
+        "//src/mongo/db:server_base",
+    ],
+)

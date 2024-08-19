@@ -28,20 +28,6 @@ env.Library(
 )
 
 env.Library(
-    target="server_status_core",
-    source=[
-        "server_status.cpp",
-        "server_status_metric.cpp",
-    ],
-    LIBDEPS=[
-        "$BUILD_DIR/mongo/db/server_base",
-    ],
-    LIBDEPS_PRIVATE=[
-        "$BUILD_DIR/mongo/base",
-    ],
-)
-
-env.Library(
     target="server_status_servers",
     source=[
         "server_status_servers.cpp",
@@ -313,16 +299,6 @@ env.Library(
 )
 
 env.Library(
-    target="validate_db_metadata_command",
-    source=[
-        "validate_db_metadata_gen.cpp",
-    ],
-    LIBDEPS_PRIVATE=[
-        "$BUILD_DIR/mongo/db/server_base",
-    ],
-)
-
-env.Library(
     target="cluster_server_parameter_cmds_idl",
     source=[
         "cluster_server_parameter_cmds_gen.cpp",
@@ -482,16 +458,6 @@ env.Library(
 )
 
 env.Library(
-    target="notify_sharding_event_idl",
-    source=[
-        "notify_sharding_event_gen.cpp",
-    ],
-    LIBDEPS_PRIVATE=[
-        "$BUILD_DIR/mongo/db/server_base",
-    ],
-)
-
-env.Library(
     target="set_index_commit_quorum_idl",
     source=[
         "set_index_commit_quorum_gen.cpp",
@@ -500,36 +466,6 @@ env.Library(
         "$BUILD_DIR/mongo/db/catalog/commit_quorum_options",
         "$BUILD_DIR/mongo/db/rw_concern_d",
         "$BUILD_DIR/mongo/idl/idl_parser",
-    ],
-)
-
-env.Library(
-    target="set_user_write_block_mode_idl",
-    source=[
-        "set_user_write_block_mode_gen.cpp",
-    ],
-    LIBDEPS_PRIVATE=[
-        "$BUILD_DIR/mongo/db/server_base",
-    ],
-)
-
-env.Library(
-    target="rename_collection_idl",
-    source=[
-        "rename_collection_gen.cpp",
-    ],
-    LIBDEPS_PRIVATE=[
-        "$BUILD_DIR/mongo/db/server_base",
-    ],
-)
-
-env.Library(
-    target="set_feature_compatibility_version_idl",
-    source=[
-        "set_feature_compatibility_version_gen.cpp",
-    ],
-    LIBDEPS_PRIVATE=[
-        "$BUILD_DIR/mongo/db/server_base",
     ],
 )
 
