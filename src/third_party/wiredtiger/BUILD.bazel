@@ -124,11 +124,7 @@ mongo_cc_library(
         "ext/compressors/zstd/zstd_compress.c",
     ] + select({
         "//bazel/config:posix": WT_FILELIST_POSIX_HOST,
-        "@platforms//os:windows": WT_FILELIST_WINDOWS_HOST,
-    }) + select({
-        "@platforms//os:macos": WT_FILELIST_DARWIN_HOST,
-        "@platforms//os:linux": WT_FILELIST_LINUX_HOST,
-        "//conditions:default": [],
+        "@platforms//os:windows": [file for file in WT_FILELIST_WINDOWS_HOST if file != "src/os_win/os_futex.c"],
     }) + glob(["**/*.h"]) + ["wt_config_header"],
     hdrs = WT_PUBLIC_HEADERS,
     copts = WT_CCFLAGS,
