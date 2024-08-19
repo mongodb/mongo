@@ -79,3 +79,10 @@ race:mongo::AuthorizationManager::get
 
 # TODO SERVER-91877 inversion b/w SSL manager and some crypto mutex
 deadlock:mongo::(anonymous namespace)::SSLManagerOpenSSL::SSLManagerOpenSSL
+
+# TODO SERVER-93363
+race:S2Loop::FindVertex
+
+# TODO SERVER-93364
+race:mongo::Client::setService
+race:mongo::Client::getService

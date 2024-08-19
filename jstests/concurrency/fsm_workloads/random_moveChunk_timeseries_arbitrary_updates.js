@@ -7,6 +7,8 @@
  *  requires_non_retryable_writes,
  *  does_not_support_transactions,
  *  featureFlagTimeseriesUpdatesSupport,
+ *  # TODO SERVER-93382 investigate excessive resource usage under TSAN.
+ *  tsan_incompatible,
  * ]
  */
 import {extendWorkload} from "jstests/concurrency/fsm_libs/extend_workload.js";

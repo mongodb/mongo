@@ -1,5 +1,9 @@
 /**
  * Tests to validate limits for $regexFind, $regexFindAll and $regexMatch aggregation expressions.
+ * @tags: [
+ *   # TODO SERVER-93378 investigate why this test is significantly slower with TSAN.
+ *   tsan_incompatible,
+ * ]
  */
 import "jstests/libs/sbe_assert_error_override.js";
 

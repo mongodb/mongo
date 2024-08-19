@@ -170,6 +170,72 @@ variables:
     multiversion_edition: enterprise
     gcov_tool: /opt/mongodbtoolchain/v4/bin/gcov
 
+  # THIS HAS COPIES IN
+  # - etc/evergreen_yml_components/variants/sanitizer/test_dev.yml
+  # - etc/evergreen_yml_components/variants/sanitizer/test_dev_master_branch_only.yml
+  # ANY MODIFICATIONS HERE SHOULD ALSO BE MADE IN THOSE FILES
+  - &enterprise-rhel8-debug-tsan-compile-dependency
+    depends_on:
+      - name: archive_dist_test_debug
+        variant: &enterprise-rhel8-debug-tsan-compile enterprise-rhel8-debug-tsan-compile
+      - name: archive_jstestshell
+        variant: *enterprise-rhel8-debug-tsan-compile
+      - name: version_gen
+        variant: generate-tasks-for-version
+        # This is added because of EVG-18211.
+        # Without this we are adding extra dependencies on evergreen and it is causing strain
+        omit_generated_tasks: true
+
+  # THIS HAS COPIES IN
+  # - etc/evergreen_yml_components/variants/sanitizer/test_dev.yml
+  # - etc/evergreen_yml_components/variants/sanitizer/test_dev_master_branch_only.yml
+  # ANY MODIFICATIONS HERE SHOULD ALSO BE MADE IN THOSE FILES
+  - &enterprise-rhel8-debug-tsan-expansions-template
+    additional_package_targets: >-
+      archive-mongocryptd
+      archive-mongocryptd-debug
+    lang_environment: LANG=C
+    toolchain_version: stable
+    compile_variant: *enterprise-rhel8-debug-tsan-compile
+    # If you add anything to san_options, make sure the appropriate
+    # changes are also made to SConstruct.
+    #
+    # TODO SERVER-49121: die_after_fork=0 is a temporary setting to
+    # allow tests to continue while we figure out why we're running
+    # afoul of it.
+    #
+    # TODO SERVER-65936: report_thread_leaks=0 suppresses reporting
+    # thread leaks, which we have because we don't do a clean shutdown
+    # of the ServiceContext.
+    #
+    # Run TSAN with diagnostic latches off, as our diagnostics reduce
+    # TSAN's visibility - see SERVER-88159.
+    #
+    san_options: TSAN_OPTIONS="abort_on_error=1:disable_coredump=0:handle_abort=1:halt_on_error=1:report_thread_leaks=0:die_after_fork=0:history_size=4:suppressions=etc/tsan.suppressions:external_symbolizer_path=/opt/mongodbtoolchain/v4/bin/llvm-symbolizer"
+    build_mongot: true
+    download_mongot_release: true
+    compile_flags: >-
+      --variables-files=etc/scons/mongodbtoolchain_${toolchain_version}_clang.vars
+      --dbg=on
+      --opt=on
+      --allocator=system
+      --sanitize=thread
+      --ssl
+      --use-libunwind=off
+      --link-model=dynamic
+      -j$(grep -c ^processor /proc/cpuinfo)
+      --use-diagnostic-latches=off
+    # Avoid starting too many mongod's under TSAN build.
+    resmoke_jobs_factor: 0.3
+    scons_cache_scope: shared
+    separate_debug: off
+    large_distro_name: &enterprise-rhel8-debug-tsan-large-distro-name rhel8.8-xlarge
+    xlarge_distro_name: rhel8.8-xxlarge
+    core_analyzer_distro_name: rhel8.8-xxlarge
+    multiversion_platform: rhel80
+    multiversion_platform_50_or_later: rhel8
+    multiversion_edition: enterprise
+
 buildvariants:
   - <<: *generic_linux_compile_params
     name: &linux-x86-dynamic-debug-compile-required linux-x86-dynamic-debug-compile-required # TODO: replace with Sanitizer.
@@ -415,62 +481,15 @@ buildvariants:
     tasks:
       - name: compile_archive_and_run_libfuzzertests_TG
 
-  - &enterprise-rhel8-debug-tsan-template
-    name: &enterprise-rhel8-debug-tsan-compile enterprise-rhel8-debug-tsan-compile
+  - name: &enterprise-rhel8-debug-tsan-compile enterprise-rhel8-debug-tsan-compile
     display_name: "* TSAN Enterprise RHEL 8 DEBUG Compile"
     tags: ["suggested"]
     cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
     run_on:
       - rhel8.8-large
     stepback: false
-    expansions: &enterprise-rhel8-debug-tsan-expansions-template
-      additional_package_targets: >-
-        archive-mongocryptd
-        archive-mongocryptd-debug
-      lang_environment: LANG=C
-      toolchain_version: stable
-      compile_variant: *enterprise-rhel8-debug-tsan-compile
-      # If you add anything to san_options, make sure the appropriate
-      # changes are also made to SConstruct.
-      #
-      # TODO SERVER-49121: die_after_fork=0 is a temporary setting to
-      # allow tests to continue while we figure out why we're running
-      # afoul of it.
-      #
-      # TODO SERVER-65936: report_thread_leaks=0 suppresses reporting
-      # thread leaks, which we have because we don't do a clean shutdown
-      # of the ServiceContext.
-      #
-      # Run TSAN with diagnostic latches off, as our diagnostics reduce
-      # TSAN's visibility - see SERVER-88159.
-      #
-      san_options: TSAN_OPTIONS="abort_on_error=1:disable_coredump=0:handle_abort=1:halt_on_error=1:report_thread_leaks=0:die_after_fork=0:history_size=4:suppressions=etc/tsan.suppressions:external_symbolizer_path=/opt/mongodbtoolchain/v4/bin/llvm-symbolizer"
-      build_mongot: true
-      download_mongot_release: true
-      compile_flags: >-
-        --variables-files=etc/scons/mongodbtoolchain_${toolchain_version}_clang.vars
-        --dbg=on
-        --opt=on
-        --allocator=system
-        --sanitize=thread
-        --ssl
-        --use-libunwind=off
-        --link-model=dynamic
-        -j$(grep -c ^processor /proc/cpuinfo)
-        --use-diagnostic-latches=off
-      # Avoid starting too many mongod's under TSAN build.
-      resmoke_jobs_factor: 0.3
-      scons_cache_scope: shared
-      separate_debug: off
-      large_distro_name: &enterprise-rhel8-debug-tsan-large-distro-name rhel8.8-xlarge
-      xlarge_distro_name: rhel8.8-xxlarge
-      core_analyzer_distro_name: rhel8.8-xxlarge
-      multiversion_platform: rhel80
-      multiversion_platform_50_or_later: rhel8
-      multiversion_edition: enterprise
-      test_flags: >-
-        --mongodSetParameters="{internalQueryEnableAggressiveSpillsInGroup: true, receiveChunkWaitForRangeDeleterTimeoutMS: 180000}"
-        --excludeWithAnyTags=tsan_incompatible,requires_latch_analyzer
+    expansions:
+      <<: *enterprise-rhel8-debug-tsan-expansions-template
     tasks:
       - name: search_end_to_end_sharded_cluster
       - name: search_end_to_end_single_node
@@ -488,21 +507,19 @@ buildvariants:
         distros:
           - rhel8.8-xlarge
 
-  - <<: *enterprise-rhel8-debug-tsan-template
+  - <<: *enterprise-rhel8-debug-tsan-compile-dependency
     name: &enterprise-rhel8-debug-tsan enterprise-rhel8-debug-tsan
     display_name: "* TSAN Enterprise RHEL 8 DEBUG"
     tags: ["suggested"]
-    cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
-    depends_on:
-      - name: archive_dist_test_debug
-        variant: *enterprise-rhel8-debug-tsan-compile
-      - name: archive_jstestshell
-        variant: *enterprise-rhel8-debug-tsan-compile
-      - name: version_gen
-        variant: generate-tasks-for-version
-        # This is added because of EVG-18211.
-        # Without this we are adding extra dependencies on evergreen and it is causing strain
-        omit_generated_tasks: true
+    cron: "0 4 1-31/2 * *" # For cost reasons, we run this variant every other day.
+    run_on:
+      - rhel8.8-large
+    stepback: false
+    expansions:
+      <<: *enterprise-rhel8-debug-tsan-expansions-template
+      test_flags: >-
+        --mongodSetParameters="{internalQueryEnableAggressiveSpillsInGroup: true, receiveChunkWaitForRangeDeleterTimeoutMS: 180000}"
+        --excludeWithAnyTags=tsan_incompatible,requires_latch_analyzer
     tasks:
       - name: .development_critical !.requires_large_host !.requires_compile_variant !.requires_large_host_tsan !.incompatible_development_variant !.incompatible_tsan !.incompatible_system_allocator !.requires_all_feature_flags
       - name: .development_critical .requires_large_host !.requires_compile_variant !.incompatible_development_variant !.incompatible_tsan !.incompatible_system_allocator !.requires_all_feature_flags
