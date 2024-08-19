@@ -11,7 +11,7 @@
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";
 import {Thread} from "jstests/libs/parallelTester.js";
 
-const customTransactionLifetimeLimitSeconds = 5;
+const customTransactionLifetimeLimitSeconds = 10;
 
 /**
  * Checks that aborted transaction count was incremented for mongos and each participating shard.
@@ -264,7 +264,7 @@ const allParticipants = [st.shard0, st.shard1, st.shard2];
 /* Test case 3 */
 {
     jsTest.log(
-        "Testing that an additional participant not reported to mongos is not included in abort" +
+        "Testing that an additional participant not reported to mongos is not included in abort " +
         "protocol and the additional participant is reaped after transactionLifetimeLimitSeconds.");
     dropCollections(st);
 
