@@ -38,6 +38,7 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/pipeline/accumulator.h"
 #include "mongo/db/pipeline/document_source.h"
+#include "mongo/db/pipeline/document_source_lookup.h"
 #include "mongo/db/pipeline/document_source_match.h"
 #include "mongo/db/pipeline/document_source_merge.h"
 #include "mongo/db/pipeline/document_source_out.h"
@@ -109,6 +110,19 @@ void validateTopLevelPipeline(const Pipeline& pipeline) {
             }
         }
     }
+}
+
+/**
+ * Convert a vector of Values to BSONObjs.
+ */
+std::vector<BSONObj> convertToBson(const std::vector<Value>& stages) {
+    std::vector<BSONObj> asBson;
+    asBson.reserve(stages.size());
+    for (const auto& stage : stages) {
+        invariant(stage.getType() == BSONType::Object);
+        asBson.push_back(stage.getDocument().toBson());
+    }
+    return asBson;
 }
 
 }  // namespace
@@ -422,13 +436,20 @@ vector<Value> Pipeline::serialize() const {
 
 vector<BSONObj> Pipeline::serializeToBson() const {
     const auto serialized = serialize();
-    std::vector<BSONObj> asBson;
-    asBson.reserve(serialized.size());
-    for (auto&& stage : serialized) {
-        invariant(stage.getType() == BSONType::Object);
-        asBson.push_back(stage.getDocument().toBson());
+    return convertToBson(serialized);
+}
+
+std::vector<BSONObj> Pipeline::serializeForQueryAnalysis() const {
+    std::vector<Value> serializedSources;
+    for (auto&& source : _sources) {
+        // $lookup has a separate serialization path for query analysis.
+        if (auto* lookup = dynamic_cast<DocumentSourceLookUp*>(source.get())) {
+            lookup->serializeToArrayForQueryAnalysis(serializedSources);
+        } else {
+            source->serializeToArray(serializedSources);
+        }
     }
-    return asBson;
+    return convertToBson(serializedSources);
 }
 
 void Pipeline::stitch() {

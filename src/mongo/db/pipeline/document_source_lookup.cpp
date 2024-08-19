@@ -184,10 +184,14 @@ DocumentSourceLookUp::DocumentSourceLookUp(
     // We append an additional BSONObj to '_resolvedPipeline' as a placeholder for the $match stage
     // we'll eventually construct from the input document.
     _resolvedPipeline.reserve(_resolvedPipeline.size() + 1);
+
+    // Initialize the introspection pipeline before we insert the $match. This is okay because we do
+    // not use the introspection pipeline during/after query execution, which is when the $match is
+    // necessary.
+    initializeResolvedIntrospectionPipeline();
+
     _resolvedPipeline.push_back(BSON("$match" << BSONObj()));
     _fieldMatchPipelineIdx = _resolvedPipeline.size() - 1;
-
-    initializeResolvedIntrospectionPipeline();
 }
 
 DocumentSourceLookUp::DocumentSourceLookUp(
@@ -209,8 +213,9 @@ DocumentSourceLookUp::DocumentSourceLookUp(
         // Append a BSONObj to '_resolvedPipeline' as a placeholder for the stage corresponding to
         // the local/foreignField $match.
         _resolvedPipeline.reserve(_resolvedPipeline.size() + 1);
-        _resolvedPipeline.push_back(BSON("$match" << BSONObj()));
-        _fieldMatchPipelineIdx = _resolvedPipeline.size() - 1;
+        // Save the correct position of the $match, but wait to insert it until we have finished
+        // constructing the pipeline and created the introspection pipeline below.
+        _fieldMatchPipelineIdx = _resolvedPipeline.size();
     } else {
         // When local/foreignFields are included, we cannot enable the cache because the $match
         // is a correlated prefix that will not be detected. Here, local/foreignFields are absent,
@@ -232,7 +237,20 @@ DocumentSourceLookUp::DocumentSourceLookUp(
             _variablesParseState.defineVariable(varName));
     }
 
+    // Initialize the introspection pipeline before we insert the $match (if applicable). This is
+    // okay because we only use the introspection pipeline for reference while doing query analysis
+    // and analyzing involved dependencies/variables/collections/constraints. We do not use the
+    // introspection pipeline during/after query execution, which is when the $match is necessary.
+    // It wouldn't hurt anything to include the $match in this pipeline, but we also use the
+    // introspection pipeline in serialization, so it would be a bit odd to include an extra empty
+    // $match.
     initializeResolvedIntrospectionPipeline();
+
+    // Finally, insert the $match placeholder if we need it.
+    if (_fieldMatchPipelineIdx) {
+        _resolvedPipeline.insert(_resolvedPipeline.begin() + *_fieldMatchPipelineIdx,
+                                 BSON("$match" << BSONObj()));
+    }
 }
 
 std::unique_ptr<DocumentSourceLookUp::LiteParsed> DocumentSourceLookUp::LiteParsed::parse(
@@ -871,7 +889,9 @@ void DocumentSourceLookUp::appendSpecificExecStats(MutableDocument& doc) const {
 }
 
 void DocumentSourceLookUp::serializeToArrayWithBothSyntaxes(
-    std::vector<Value>& array, boost::optional<ExplainOptions::Verbosity> explain) const {
+    std::vector<Value>& array,
+    boost::optional<ExplainOptions::Verbosity> explain,
+    bool serializeForQueryAnalysis) const {
 
     // Support alternative $lookup from config.cache.chunks* namespaces.
     auto fromValue = (pExpCtx->ns.db() == _fromNs.db())
@@ -888,7 +908,14 @@ void DocumentSourceLookUp::serializeToArrayWithBothSyntaxes(
 
     // Add a pipeline field if only-pipeline syntax was used (to ensure the output is valid $lookup
     // syntax) or if a $match was absorbed.
-    auto pipeline = _userPipeline.get_value_or(std::vector<BSONObj>());
+    auto pipeline = [&]() -> std::vector<BSONObj> {
+        if (serializeForQueryAnalysis) {
+            // If we are in query analysis, encrypted fields will have been marked in the
+            // introspection pipeline, so we need to serialize that here.
+            return _resolvedIntrospectionPipeline->serializeForQueryAnalysis();
+        }
+        return _userPipeline.get_value_or(std::vector<BSONObj>());
+    }();
     if (_additionalFilter) {
         pipeline.emplace_back(BSON("$match" << *_additionalFilter));
     }
@@ -928,6 +955,11 @@ void DocumentSourceLookUp::serializeToArrayWithBothSyntaxes(
             _unwindSrc->serializeToArray(array);
         }
     }
+}
+
+void DocumentSourceLookUp::serializeToArrayForQueryAnalysis(std::vector<Value>& array) const {
+    return serializeToArrayWithBothSyntaxes(
+        array, boost::none /* explain */, true /* serializeForQueryAnalysis */);
 }
 
 void DocumentSourceLookUp::serializeToArray(

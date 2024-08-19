@@ -275,6 +275,10 @@ public:
      */
     std::vector<Value> serialize() const;
     std::vector<BSONObj> serializeToBson() const;
+    /**
+     * Serialize the pipeline accounting for changes from query analysis.
+     */
+    std::vector<BSONObj> serializeForQueryAnalysis() const;
 
     // The initial source is special since it varies between mongos and mongod.
     void addInitialSource(boost::intrusive_ptr<DocumentSource> source);

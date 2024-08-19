@@ -113,7 +113,13 @@ public:
      */
     void serializeToArrayWithBothSyntaxes(
         std::vector<Value>& array,
-        boost::optional<ExplainOptions::Verbosity> explain = boost::none) const;
+        boost::optional<ExplainOptions::Verbosity> explain = boost::none,
+        bool serializeForQueryAnalysis = false) const;
+
+    /**
+     * Serialize the $lookup stage for query analysis using the introspection sub-pipeline.
+     */
+    void serializeToArrayForQueryAnalysis(std::vector<Value>& array) const;
 
     /**
      * Returns the 'as' path, and possibly fields modified by an absorbed $unwind.
