@@ -110,7 +110,8 @@ config_fuzzer_params = {
             "choices": ["throughputProbing", "fixedConcurrentTransactions"],
         },
         "storageEngineConcurrencyAdjustmentIntervalMillis": {"min": 10, "max": 1000},
-        "throughputProbingStepMultiple": {"min": 0.1, "max": 0.5, "isUniform": True},
+        # throughputProbingConcurrencyMovingAverageWeight is 1 - rng.random(), so the min is NOT inclusive.
+        "throughputProbingConcurrencyMovingAverageWeight": {"min": 0.0, "max": 1.0},
         "throughputProbingInitialConcurrency": {"min": 4, "max": 128},
         "throughputProbingMinConcurrency": {"min": 4, "max": "throughputProbingInitialConcurrency"},
         "throughputProbingMaxConcurrency": {
@@ -118,15 +119,14 @@ config_fuzzer_params = {
             "max": 128,
         },
         "throughputProbingReadWriteRatio": {"min": 0, "max": 1, "isUniform": True},
-        # throughputProbingConcurrencyMovingAverage is 1 - rng.random(), so the min is NOT inclusive.
-        "throughputProbingConcurrencyMovingAverageWeight": {"min": 0.0, "max": 1.0},
+        "throughputProbingStepMultiple": {"min": 0.1, "max": 0.5, "isUniform": True},
         "wiredTigerStressConfig": {
             "choices": [True, False],
         },
         "wiredTigerCursorCacheSize": {"min": -100, "max": 100},
         "wiredTigerSessionCloseIdleTimeSecs": {"min": 0, "max": 300},
-        "wiredTigerConcurrentWriteTransactions": {"min": 5, "max": 32},
         "wiredTigerConcurrentReadTransactions": {"min": 5, "max": 32},
+        "wiredTigerConcurrentWriteTransactions": {"min": 5, "max": 32},
         "wiredTigerSizeStorerPeriodicSyncHits": {"min": 1, "max": 100000},
         "wiredTigerSizeStorerPeriodicSyncPeriodMillis": {"min": 1, "max": 60000},
         "queryAnalysisWriterMaxMemoryUsageBytes": {"min": 1024 * 1024, "max": 1024 * 1024 * 100},

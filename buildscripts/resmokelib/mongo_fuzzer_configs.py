@@ -244,23 +244,50 @@ def generate_normal_mongo_parameters(rng, value):
 
 def generate_special_mongod_parameters(rng, ret, fuzzer_stress_mode, params):
     """Returns the value assigned the mongod parameter based on the fields of the parameters in config_fuzzer_limits.py for special parameters (parameters with different assignment behaviors)."""
+    ret["storageEngineConcurrencyAdjustmentAlgorithm"] = rng.choices(
+        params["storageEngineConcurrencyAdjustmentAlgorithm"]["choices"], weights=[10, 1]
+    )[0]
 
-    # We assign "throughputProbing[...]" first because we want to ensure that ret["throughputProbingInitialConcurrency"] has a value before we assign the value of
-    # ret["throughputProbingMinConcurrency"] and ret["throughputProbingMaxConcurrency"]
-    ret["throughputProbingInitialConcurrency"] = rng.randint(
-        params["throughputProbingInitialConcurrency"]["min"],
-        params["throughputProbingInitialConcurrency"]["max"],
-    )
-    ret["throughputProbingMinConcurrency"] = rng.randint(
-        params["throughputProbingMinConcurrency"]["min"], ret["throughputProbingInitialConcurrency"]
-    )
-    ret["throughputProbingMaxConcurrency"] = rng.randint(
-        ret["throughputProbingInitialConcurrency"], params["throughputProbingMaxConcurrency"]["max"]
-    )
+    # We assign the wiredTigerConcurrent(Read/Write)Transactions only if the storageEngineConcurrencyAdjustmentAlgorithm is fixedConcurrentTransactions.
+    # Otherwise, we will disable throughput probing.
+    if ret["storageEngineConcurrencyAdjustmentAlgorithm"] == "fixedConcurrentTransactions":
+        ret["wiredTigerConcurrentReadTransactions"] = rng.randint(
+            params["wiredTigerConcurrentReadTransactions"]["min"],
+            params["wiredTigerConcurrentReadTransactions"]["max"],
+        )
+        ret["wiredTigerConcurrentWriteTransactions"] = rng.randint(
+            params["wiredTigerConcurrentWriteTransactions"]["min"],
+            params["wiredTigerConcurrentWriteTransactions"]["max"],
+        )
+    # We assign the throughputProbing* parameters only if the storageEngineConcurrencyAdjustmentAlgorithm is throughputProbing.
+    else:
+        # throughputProbingConcurrencyMovingAverageWeight is the only parameter that uses rng.random().
+        ret["throughputProbingConcurrencyMovingAverageWeight"] = 1 - rng.random()
 
-    # "mirrorReads" and "throughputProbingConcurrencyMovingAverageWeight" both are the only parameters that use rng.random().
+        # We assign throughputProbingInitialConcurrency first because throughputProbingMinConcurrency and throughputProbingMaxConcurrency depend on it.
+        ret["throughputProbingInitialConcurrency"] = rng.randint(
+            params["throughputProbingInitialConcurrency"]["min"],
+            params["throughputProbingInitialConcurrency"]["max"],
+        )
+        ret["throughputProbingMinConcurrency"] = rng.randint(
+            params["throughputProbingMinConcurrency"]["min"],
+            ret["throughputProbingInitialConcurrency"],
+        )
+        ret["throughputProbingMaxConcurrency"] = rng.randint(
+            ret["throughputProbingInitialConcurrency"],
+            params["throughputProbingMaxConcurrency"]["max"],
+        )
+        ret["throughputProbingReadWriteRatio"] = rng.uniform(
+            params["throughputProbingReadWriteRatio"]["min"],
+            params["throughputProbingReadWriteRatio"]["max"],
+        )
+        ret["throughputProbingStepMultiple"] = rng.uniform(
+            params["throughputProbingStepMultiple"]["min"],
+            params["throughputProbingStepMultiple"]["max"],
+        )
+
+    # mirrorReads sets a nested samplingRate field.
     ret["mirrorReads"] = {"samplingRate": rng.choice(params["mirrorReads"]["choices"])}
-    ret["throughputProbingConcurrencyMovingAverageWeight"] = 1 - rng.random()
 
     # Deal with other special cases of parameters (having to add other sources of randomization, depending on another variable, etc.).
     ret["internalQueryExecYieldIterations"] = rng.choices(
@@ -276,9 +303,7 @@ def generate_special_mongod_parameters(rng, ret, fuzzer_stress_mode, params):
     ret["maxNumberOfTransactionOperationsInSingleOplogEntry"] = rng.randint(1, 10) * rng.choice(
         params["maxNumberOfTransactionOperationsInSingleOplogEntry"]["choices"]
     )
-    ret["storageEngineConcurrencyAdjustmentAlgorithm"] = rng.choices(
-        params["storageEngineConcurrencyAdjustmentAlgorithm"]["choices"], weights=[10, 1]
-    )[0]
+
     ret["wiredTigerStressConfig"] = (
         False
         if fuzzer_stress_mode != "stress"
@@ -330,10 +355,14 @@ def generate_mongod_parameters(rng, fuzzer_stress_mode):
         "maxNumberOfTransactionOperationsInSingleOplogEntry",
         "mirrorReads",
         "storageEngineConcurrencyAdjustmentAlgorithm",
+        "throughputProbingConcurrencyMovingAverageWeight",
         "throughputProbingInitialConcurrency",
         "throughputProbingMinConcurrency",
         "throughputProbingMaxConcurrency",
-        "throughputProbingConcurrencyMovingAverageWeight",
+        "throughputProbingReadWriteRatio",
+        "throughputProbingStepMultiple",
+        "wiredTigerConcurrentReadTransactions",
+        "wiredTigerConcurrentWriteTransactions",
         "wiredTigerStressConfig",
     ]
     # TODO (SERVER-75632): Remove/comment out the below line to enable passthrough testing.
