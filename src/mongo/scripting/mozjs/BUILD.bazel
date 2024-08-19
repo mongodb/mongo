@@ -1,4 +1,5 @@
 load("//bazel:mongo_src_rules.bzl", "idl_generator", "mongo_cc_library")
+load("//bazel/config:render_template.bzl", "render_template")
 
 package(default_visibility = ["//visibility:public"])
 
@@ -20,4 +21,18 @@ idl_generator(
     deps = [
         "//src/mongo/db:basic_types_gen",
     ],
+)
+
+render_template(
+    name = "mongohelpers_js_cpp",
+    srcs = [
+        "mongohelpers.js",
+        "//site_scons/site_tools:jstoh.py",
+    ],
+    cmd = [
+        "$(location //site_scons/site_tools:jstoh.py)",
+        "$(location mongohelpers_js.cpp)",
+        "$(location mongohelpers.js)",
+    ],
+    output = "mongohelpers_js.cpp",
 )

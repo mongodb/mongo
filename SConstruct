@@ -945,7 +945,6 @@ def variable_tools_converter(val):
     return tool_list + [
         "distsrc",
         "gziptool",
-        "jsheader",
         "mongo_test_execution",
         "mongo_test_list",
         "mongo_benchmark",

@@ -72,13 +72,6 @@ if jsEngine:
     )
     scriptingEnv.InjectMozJS()
 
-    scriptingEnv.JSHeader(
-        target="mozjs/mongohelpers_js.cpp",
-        source=["mozjs/mongohelpers.js"],
-    )
-
-    env.Alias("generated-sources", "mozjs/mongohelpers_js.cpp")
-
     scriptingEnv.Library(
         target="scripting",
         source=[

@@ -1,4 +1,6 @@
 load("//bazel:mongo_src_rules.bzl", "idl_generator", "mongo_cc_library")
+load("//bazel/config:render_template.bzl", "render_template")
+load("@poetry//:dependencies.bzl", "dependency")
 
 package(default_visibility = ["//visibility:public"])
 
@@ -58,6 +60,105 @@ mongo_cc_library(
     ],
     deps = [
         ":linenoise_utf8",
+    ],
+)
+
+# Files added here need to be added in scripting/engine.cpp and buildscripts/vcxproj.header as well.
+render_template(
+    name = "error_codes_js",
+    srcs = [
+        "error_codes.tpl.js",
+        "//src/mongo/base:error_codes.yml",
+        "//src/mongo/base:generate_error_codes.py",
+    ],
+    cmd = [
+        "$(location //src/mongo/base:generate_error_codes.py)",
+        "$(location //src/mongo/base:error_codes.yml)",
+        "$(location error_codes.tpl.js)",
+        "$(location error_codes.js)",
+    ],
+    output = "error_codes.js",
+    python_libs = [
+        dependency(
+            "cheetah3",
+            group = "compile",
+        ),
+        dependency(
+            "pyyaml",
+            group = "core",
+        ),
+    ],
+)
+
+MONGOJS_CPP_JSFILES = [
+    "assert.js",
+    "bulk_api.js",
+    "check_log.js",
+    "collection.js",
+    "crud_api.js",
+    "db.js",
+    "explain_query.js",
+    "explainable.js",
+    "mongo.js",
+    "query.js",
+    "session.js",
+    "types.js",
+    "utils.js",
+    "utils_auth.js",
+    "utils_sh.js",
+    ":error_codes_js",
+]
+
+render_template(
+    name = "mongojs_cpp",
+    srcs = [
+        "//site_scons/site_tools:jstoh.py",
+    ] + MONGOJS_CPP_JSFILES,
+    cmd = [
+        "$(location //site_scons/site_tools:jstoh.py)",
+        "$(location mongojs.cpp)",
+    ] + [
+        "$(location {})".format(file)
+        for file in MONGOJS_CPP_JSFILES
+    ],
+    output = "mongojs.cpp",
+)
+
+MONGO_SERVER_CPP_JS_FILES = [
+    "bridge.js",
+    "data_consistency_checker.js",
+    "feature_compatibility_version.js",
+    "keyvault.js",
+    "replsettest.js",
+    "servers.js",
+    "servers_misc.js",
+    "shardingtest.js",
+]
+
+render_template(
+    name = "mongo_server_cpp",
+    srcs = [
+        "//site_scons/site_tools:jstoh.py",
+    ] + MONGO_SERVER_CPP_JS_FILES,
+    cmd = [
+        "$(location //site_scons/site_tools:jstoh.py)",
+        "$(location mongo-server.cpp)",
+    ] + [
+        "$(location {})".format(file)
+        for file in MONGO_SERVER_CPP_JS_FILES
+    ],
+    output = "mongo-server.cpp",
+)
+
+mongo_cc_library(
+    name = "mongojs",
+    srcs = [
+        "mongojs.cpp",
+    ],
+    header_deps = [
+        "//src/mongo/db/op_observer:op_observer",
+    ],
+    deps = [
         "//src/mongo:base",
     ],
 )
