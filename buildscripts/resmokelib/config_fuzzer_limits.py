@@ -172,6 +172,9 @@ config_fuzzer_params = {
         "initialServiceExecutorUseDedicatedThread": {"choices": [True, False]},
         "internalQueryFindCommandBatchSize": {"min": 1, "max": 500},
         "opportunisticSecondaryTargeting": {"choices": [True, False]},
+        "ShardingTaskExecutorPoolReplicaSetMatching": {
+            "choices": ["disabled", "matchBusiestNode", "matchPrimaryNode"]
+        },
     },
 }
 
