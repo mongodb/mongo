@@ -81,10 +81,18 @@ Value DocumentSourceVectorSearch::serialize(const SerializationOptions& opts) co
         return Value(Document{{kStageName, _originalSpec}});
     }
 
-    BSONObj explainInfo = _explainResponse.isEmpty()
-        ? search_helpers::getVectorSearchExplainResponse(
-              pExpCtx, _originalSpec, _taskExecutor.get())
-        : _explainResponse;
+    // If the query is an explain that executed the query, we obtain the explain object from the
+    // TaskExecutorCursor. Otherwise, we need to obtain the explain
+    // object now.
+    boost::optional<BSONObj> explainResponse = boost::none;
+    if (_cursor) {
+        explainResponse = _cursor->getCursorExplain();
+    }
+
+    BSONObj explainInfo = explainResponse.value_or_eval([&] {
+        return search_helpers::getVectorSearchExplainResponse(
+            pExpCtx, _originalSpec, _taskExecutor.get());
+    });
 
     auto explainObj =
         _originalSpec.addFields(BSON("explain" << opts.serializeLiteral(explainInfo)));
@@ -145,9 +153,9 @@ DocumentSource::GetNextResult DocumentSourceVectorSearch::doGetNext() {
         return DocumentSource::GetNextResult::makeEOF();
     }
 
-    if (pExpCtx->explain) {
-        _explainResponse = search_helpers::getVectorSearchExplainResponse(
-            pExpCtx, _originalSpec, _taskExecutor.get());
+    if (pExpCtx->explain &&
+        !feature_flags::gFeatureFlagSearchExplainExecutionStats.isEnabled(
+            serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
         return DocumentSource::GetNextResult::makeEOF();
     }
 

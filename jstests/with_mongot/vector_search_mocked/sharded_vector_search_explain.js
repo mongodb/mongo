@@ -2,6 +2,7 @@
  * Sharding tests for using "explain" with the $vectorSearch aggregation stage.
  * @tags: [
  *  featureFlagVectorSearchPublicPreview,
+ *  featureFlagSearchExplainExecutionStats_incompatible
  * ]
  */
 import {getAggPlanStages} from "jstests/libs/analyze_plan.js";

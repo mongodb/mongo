@@ -456,7 +456,9 @@ export function getShardedSearchStagesAndVerifyExplainOutput(
                   expectedNumStages + " in the result: " + tojson(result));
 }
 
-const searchStages = ["$_internalSearchMongotRemote", "$searchMeta", "$_internalSearchIdLookup"];
+const searchStages =
+    ["$_internalSearchMongotRemote", "$searchMeta", "$_internalSearchIdLookup", "$vectorSearch"];
+
 /**
  * This function checks that a search stage from an explain output contains the information that
  * it should.
@@ -483,7 +485,7 @@ export function verifySearchStageExplainOutput(
         assert(stage.hasOwnProperty("executionTimeMillisEstimate"));
     }
 
-    if (stageType === "$_internalSearchMongotRemote" || stageType === "$searchMeta") {
+    if (stageType != "$_internalSearchIdLookup") {
         assert(explain, "Explain is null but needs to be provided for initial search stage.");
     }
     if (explain != null) {

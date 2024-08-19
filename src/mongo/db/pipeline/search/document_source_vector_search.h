@@ -104,10 +104,6 @@ private:
 
     DocumentSource::GetNextResult getNextAfterSetup();
 
-    // If this is an explain of a $vectorSearch at execution-level verbosity, then the explain
-    // results are held here. Otherwise, this is an empty object.
-    BSONObj _explainResponse;
-
     const std::unique_ptr<MatchExpression> _filterExpr;
 
     std::shared_ptr<executor::TaskExecutor> _taskExecutor;
