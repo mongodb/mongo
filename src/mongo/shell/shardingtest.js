@@ -544,6 +544,12 @@ var ShardingTest = function ShardingTest(params) {
 
         this.stopAllMongos(opts);
 
+        if (TestData.runningWithConfigStepdowns && isConfigShardMode) {
+            // In case of a cluster with a config shard, the config server replica set is stopped
+            // via stopAllShards, which doesn't stop the continuous stepdown stop.
+            this.configRS.stopContinuousFailover();
+        }
+
         let startTime = new Date();  // Measure the execution time of shutting down shards.
         this.stopAllShards(opts);
         print("ShardingTest stopped all shards, took " + (new Date() - startTime) + "ms for " +

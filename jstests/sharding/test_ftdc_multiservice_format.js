@@ -3,8 +3,6 @@
  *
  * @tags: [
  *  requires_fcv_80,
- *  # TODO (SERVER-87187): the mongo shell crashes with stepdowns. Investigate why.
- *  does_not_support_stepdowns,
  * ]
  */
 
