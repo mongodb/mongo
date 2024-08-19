@@ -74,8 +74,8 @@ selector:
     - jstests/core/collation.js
     - jstests/core/ddl/capped_convertToCapped1.js
     - jstests/core/replicate_record_ids/disallow_capped.js
-    # TODO (SERVER-84329): renameCollection command against a collection with invalid views fails on
-    # sharded cluster but succeeds on replica set
+    # A renameCollection command against a collection with invalid views fails on sharded cluster
+    # but succeeds on replica set.
     - jstests/core/views/invalid_system_views.js
     # TODO (SERVER-86364): Secondary reads assertion fails.
     - jstests/core/clustered/clustered_collection_creation.js

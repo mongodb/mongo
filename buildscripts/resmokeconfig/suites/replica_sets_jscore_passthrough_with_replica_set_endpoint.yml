@@ -91,8 +91,8 @@ selector:
     - jstests/core/replicate_record_ids/disallow_capped.js
     # TODO (SERVER-84243): Separate Shard-Role Catalog Cache and Loader.
     - jstests/core/txns/speculative_snapshot_includes_all_writes.js
-    # TODO (SERVER-84329): renameCollection command against a collection with invalid views fails on
-    # sharded cluster but succeeds on replica set
+    # A renameCollection command against a collection with invalid views fails on sharded cluster
+    # but succeeds on replica set.
     - jstests/core/views/invalid_system_views.js
     # The following test requires query settings / cluster parameter modification.
     - jstests/core/query/query_settings/query_settings_size_limits.js
