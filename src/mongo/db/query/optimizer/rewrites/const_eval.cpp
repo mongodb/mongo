@@ -92,8 +92,7 @@ bool ConstEval::optimize(ABT& n) {
 }
 
 void ConstEval::constFold(ABT& n) {
-    VariableEnvironment env =
-        VariableEnvironment::build(n, nullptr /*memoInterface*/, false /*computeLastRefs*/);
+    VariableEnvironment env = VariableEnvironment::build(n, false /*computeLastRefs*/);
     ConstEval instance(env);
     instance.optimize(n);
 }

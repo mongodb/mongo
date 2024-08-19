@@ -42,35 +42,6 @@ env.Library(
     ],
 )
 
-# Memo, and related utilities.
-env.Library(
-    target="optimizer_memo",
-    source=[
-        "cascades/memo.cpp",
-        "cascades/memo_defs.cpp",
-        "cascades/rewrite_queues.cpp",
-        "utils/memo_utils.cpp",
-    ],
-    LIBDEPS=[
-        "optimizer_base",
-    ],
-)
-
-# Cascades rewrites.
-env.Library(
-    target="optimizer_cascades",
-    source=[
-        "cascades/enforcers.cpp",
-        "cascades/logical_props_derivation.cpp",
-        "cascades/implementers.cpp",
-        "cascades/logical_rewriter.cpp",
-        "cascades/physical_rewriter.cpp",
-    ],
-    LIBDEPS=[
-        "optimizer_memo",
-    ],
-)
-
 # Rewrites which manipulate the ABT directly.
 env.Library(
     target="optimizer_rewrites",
@@ -107,7 +78,6 @@ env.Library(
         "metadata_factory.cpp",
     ],
     LIBDEPS=[
-        "optimizer_cascades",
         "optimizer_rewrites",
     ],
 )

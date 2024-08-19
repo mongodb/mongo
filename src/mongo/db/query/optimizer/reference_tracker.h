@@ -35,7 +35,6 @@
 #include <memory>
 
 #include "mongo/db/query/optimizer/algebra/polyvalue.h"
-#include "mongo/db/query/optimizer/cascades/memo_group_binder_interface.h"
 #include "mongo/db/query/optimizer/defs.h"
 #include "mongo/db/query/optimizer/node.h"  // IWYU pragma: keep
 #include "mongo/db/query/optimizer/syntax/expr.h"
@@ -81,8 +80,7 @@ using LastRefsSet = opt::unordered_set<const Variable*>;
 class VariableEnvironment {
     VariableEnvironment(std::unique_ptr<CollectedInfo> info,
                         boost::optional<LastRefsSet> lastRefs,
-                        std::unique_ptr<ResolvedVariablesMap> resVarMap,
-                        const cascades::MemoGroupBinderInterface* memoInterface);
+                        std::unique_ptr<ResolvedVariablesMap> resVarMap);
 
 public:
     /**
@@ -90,15 +88,10 @@ public:
      * does not change. More specifically, if a variable defining node is removed from the tree then
      * the environment becomes stale and has to be rebuilt.
      *
-     * 'memoInterface' is required if the ABT has any delegator nodes.
-     *
      * Passing 'computeLastRefs=false' lets us skip some analysis, on both build() and rebuild(),
      * but 'isLastRef()' will conservatively return false.
      */
-    static VariableEnvironment build(
-        const ABT& root,
-        const cascades::MemoGroupBinderInterface* memoInterface = nullptr,
-        bool computeLastRefs = true);
+    static VariableEnvironment build(const ABT& root, bool computeLastRefs = true);
     void rebuild(const ABT& root);
 
     /**
@@ -166,10 +159,6 @@ private:
     // A searchable map of Variables that is used by VariableEnvironment in order to
     // answer efficiently optimizer queries about Variables.
     std::unique_ptr<ResolvedVariablesMap> _resolvedVariablesMap;
-
-    // '_memoInterface' is required to track references in an ABT containing
-    // MemoLogicalDelegatorNodes.
-    const cascades::MemoGroupBinderInterface* _memoInterface{nullptr};
 };
 
 }  // namespace mongo::optimizer

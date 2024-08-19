@@ -35,7 +35,6 @@
 #include <vector>
 
 #include "mongo/db/query/bson/dotted_path_support.h"
-#include "mongo/db/query/optimizer/cascades/interfaces.h"
 #include "mongo/db/query/optimizer/defs.h"
 #include "mongo/db/query/optimizer/explain.h"
 #include "mongo/db/query/optimizer/metadata.h"

@@ -34,7 +34,6 @@
 
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/exec/sbe/values/value.h"
-#include "mongo/db/query/optimizer/cascades/memo_explain_interface.h"
 #include "mongo/db/query/optimizer/defs.h"
 #include "mongo/db/query/optimizer/explain_interface.h"
 #include "mongo/db/query/optimizer/index_bounds.h"
@@ -309,53 +308,39 @@ public:
     // whenever memo delegators are printed.
     static std::string explain(ABT::reference_type node,
                                bool displayProperties = false,
-                               const cascades::MemoExplainInterface* memoInterface = nullptr,
                                const NodeToGroupPropsMap& nodeMap = {});
 
     // Optionally display logical and physical properties using the memo.
     // whenever memo delegators are printed.
     static std::string explainV2(ABT::reference_type node,
                                  bool displayProperties = false,
-                                 const cascades::MemoExplainInterface* memoInterface = nullptr,
                                  const NodeToGroupPropsMap& nodeMap = {});
 
     // Optionally display logical and physical properties using the memo.
     // whenever memo delegators are printed.
-    static std::string explainV2Compact(
-        ABT::reference_type node,
-        bool displayProperties = false,
-        const cascades::MemoExplainInterface* memoInterface = nullptr,
-        const NodeToGroupPropsMap& nodeMap = {});
+    static std::string explainV2Compact(ABT::reference_type node,
+                                        bool displayProperties = false,
+                                        const NodeToGroupPropsMap& nodeMap = {});
 
     static std::string explainNode(ABT::reference_type node);
 
     static std::pair<sbe::value::TypeTags, sbe::value::Value> explainBSON(
         ABT::reference_type node,
         bool displayProperties = false,
-        const cascades::MemoExplainInterface* memoInterface = nullptr,
         const NodeToGroupPropsMap& nodeMap = {});
 
     static BSONObj explainBSONObj(ABT::reference_type node,
                                   bool displayProperties = false,
-                                  const cascades::MemoExplainInterface* memoInterface = nullptr,
                                   const NodeToGroupPropsMap& nodeMap = {});
 
     static std::string explainBSONStr(ABT::reference_type node,
                                       bool displayProperties = false,
-                                      const cascades::MemoExplainInterface* memoInterface = nullptr,
                                       const NodeToGroupPropsMap& nodeMap = {});
 
     static std::string explainLogicalProps(const std::string& description,
                                            const properties::LogicalProps& props);
     static std::string explainPhysProps(const std::string& description,
                                         const properties::PhysProps& props);
-
-    static std::string explainMemo(const cascades::MemoExplainInterface& memoInterface);
-
-    static std::pair<sbe::value::TypeTags, sbe::value::Value> explainMemoBSON(
-        const cascades::MemoExplainInterface& memoInterface);
-
-    static BSONObj explainMemoBSONObj(const cascades::MemoExplainInterface& memoInterface);
 
     static std::string explainPartialSchemaReqExpr(const PSRExpr::Node& reqs);
 
