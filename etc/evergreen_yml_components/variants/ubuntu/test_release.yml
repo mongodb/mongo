@@ -299,9 +299,6 @@ buildvariants:
       - name: test_packages
         distros:
           - ubuntu2204-large
-      - name: test_packages_release
-        distros:
-          - ubuntu2204-large
       - name: .development_critical !.requires_large_host
       - name: .development_critical .requires_large_host
         distros:
@@ -470,9 +467,6 @@ buildvariants:
       - name: test_packages
         distros:
           - ubuntu2204-arm64-large
-      - name: test_packages_release
-        distros:
-          - ubuntu2204-arm64-large
       - name: .development_critical !.requires_large_host
       - name: .development_critical .requires_large_host
         distros:
@@ -572,7 +566,7 @@ buildvariants:
           - ubuntu2404-large
       - name: test_packages_release
         distros:
-          - ubuntu2404-large
+          - rhel94-large-packagetest
       - name: .development_critical !.requires_large_host !.incompatible_oscrypto
       - name: .development_critical .requires_large_host !.incompatible_oscrypto
         distros:
@@ -665,7 +659,7 @@ buildvariants:
           - ubuntu2404-arm64-large
       - name: test_packages_release
         distros:
-          - ubuntu2404-arm64-large
+          - rhel94-arm64-large-packagetest
       - name: .development_critical !.requires_large_host !.incompatible_oscrypto
       - name: .development_critical .requires_large_host !.incompatible_oscrypto
         distros:

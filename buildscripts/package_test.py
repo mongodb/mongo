@@ -114,25 +114,25 @@ OS_DOCKER_LOOKUP = {
     "rhel57": None,
     "rhel62": None,
     "rhel70": (
-        "centos:7",
+        "registry.access.redhat.com/ubi7/ubi",
         "yum",
         frozenset(["rh-python38.x86_64", "wget", "pkgconfig", "systemd", "procps", "file"]),
         "/opt/rh/rh-python38/root/usr/bin/python3",
     ),
     "rhel71": (
-        "centos:7",
+        "registry.access.redhat.com/ubi7/ubi",
         "yum",
         frozenset(["rh-python38.x86_64", "wget", "pkgconfig", "systemd", "procps", "file"]),
         "/opt/rh/rh-python38/root/usr/bin/python3",
     ),
     "rhel72": (
-        "centos:7",
+        "registry.access.redhat.com/ubi7/ubi",
         "yum",
         frozenset(["rh-python38.x86_64", "wget", "pkgconfig", "systemd", "procps", "file"]),
         "/opt/rh/rh-python38/root/usr/bin/python3",
     ),
     "rhel79": (
-        "centos:7",
+        "registry.access.redhat.com/ubi7/ubi",
         "yum",
         frozenset(["rh-python38.x86_64", "wget", "pkgconfig", "systemd", "procps", "file"]),
         "/opt/rh/rh-python38/root/usr/bin/python3",
@@ -345,12 +345,6 @@ def run_test(test: Test, client: DockerClient) -> Result:
     commands: List[str] = ["export PYTHONIOENCODING=UTF-8"]
 
     if test.os_name.startswith("rhel"):
-        if test.os_name.startswith("rhel7"):
-            # RHEL 7 needs the SCL installed for Python 3
-            commands += [
-                "yum -y install centos-release-scl",
-                "yum-config-manager --enable centos-sclo-rh",
-            ]
         # RHEL distros need EPEL for Compass dependencies
         commands += [
             "yum -y install yum-utils epel-release",
@@ -393,7 +387,13 @@ def run_test(test: Test, client: DockerClient) -> Result:
             command=f'bash -c "{join_commands(commands)}"',
             auto_remove=True,
             detach=True,
-            volumes=[f"{test_external_root}:{test_docker_root}"],
+            volumes=[
+                f"{test_external_root}:{test_docker_root}",
+                "/etc/pki/entitlement/:/run/secrets/etc-pki-entitlement",
+                "/etc/rhsm:/run/secrets/rhsm",
+                "/etc/yum.repos.d/redhat.repo:/run/secrets/redhat.repo",
+                "/etc/yum.repos.d/redhat-rhsm.repo:/run/secrets/redhat-rhsm.repo",
+            ],
         )
         for log in container.logs(stream=True):
             result["log_raw"] += log.decode("UTF-8")
