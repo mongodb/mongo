@@ -285,17 +285,6 @@ tracked_set<Key> make_tracked_set(TrackingContext& trackingContext) {
     return tracked_set<Key>(trackingContext.makeAllocator<Key>());
 }
 
-template <class Key,
-          class Hash = absl::container_internal::hash_default_hash<Key>,
-          class Eq = absl::container_internal::hash_default_eq<Key>>
-using tracked_flat_hash_set =
-    absl::flat_hash_set<Key, Hash, Eq, std::scoped_allocator_adaptor<TrackingAllocator<Key>>>;
-
-template <class Key>
-tracked_flat_hash_set<Key> make_tracked_flat_hash_set(TrackingContext& trackingContext) {
-    return tracked_flat_hash_set<Key>(trackingContext.makeAllocator<Key>());
-}
-
 template <class T, std::size_t N>
 using tracked_inlined_vector =
     absl::InlinedVector<T, N, std::scoped_allocator_adaptor<TrackingAllocator<T>>>;
