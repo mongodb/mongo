@@ -57,7 +57,7 @@ env.Library(
     ],
     LIBDEPS=[
         "$BUILD_DIR/mongo/crypto/encrypted_field_config",
-        "$BUILD_DIR/mongo/db/cst/cst",
+        "$BUILD_DIR/mongo/db/pipeline/pipeline",
         "$BUILD_DIR/mongo/db/query_expressions",
         "canonical_distinct",
         "collation/collator_factory_interface",
@@ -490,6 +490,7 @@ env.CppUnitTest(
         "$BUILD_DIR/mongo/db/pipeline/abt_translation",
         "$BUILD_DIR/mongo/db/pipeline/aggregation_request_helper",
         "$BUILD_DIR/mongo/db/pipeline/document_source_mock",
+        "$BUILD_DIR/mongo/db/pipeline/pipeline",
         "$BUILD_DIR/mongo/db/query/plan_cache/plan_cache_test_util",
         "$BUILD_DIR/mongo/db/query_exec",
         "$BUILD_DIR/mongo/db/record_id_helpers",

@@ -41,7 +41,6 @@
 #include "mongo/base/status_with.h"
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
-#include "mongo/db/cst/c_node.h"
 #include "mongo/db/exec/document_value/document_metadata_fields.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/matcher/expression.h"
