@@ -248,7 +248,7 @@ if (ClusteredCollectionUtil.areAllCollectionsClustered(db.getMongo())) {
 // $merge aggregation stage.
 testPreImageRecording({
     updateDocFunc: function(coll) {
-        db.aggregate([
+        testDB.aggregate([
             {$documents: [updatedDoc]},
             {
                 $merge: {
@@ -265,7 +265,7 @@ testPreImageRecording({
             [updatedDoc], coll.find().toArray(), "$merge stage did not update the document");
     },
     replaceDocFunc: function(coll) {
-        db.aggregate([
+        testDB.aggregate([
             {$documents: [replacedDoc]},
             {
                 $merge: {
