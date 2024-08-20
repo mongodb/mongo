@@ -204,6 +204,43 @@ std::unique_ptr<FindCommandRequest> createFindCommand(
 }
 
 /**
+ * Searches for indexes of a given geo type in 'collection' for use in $geoNear. Ignores hidden
+ * collections, and throws if there are more than one relevant non-hidden indexes.
+ *
+ * Returns the field name of a geo-indexed field, or boost::none if none were found.
+ */
+boost::optional<StringData> extractGeoNearFieldFromIndexesByType(OperationContext* opCtx,
+                                                                 const CollectionPtr& collection,
+                                                                 const string indexType) {
+    std::vector<const IndexDescriptor*> idxs;
+    const IndexDescriptor* idxToUse = nullptr;
+    collection->getIndexCatalog()->findIndexByType(opCtx, indexType, idxs);
+    for (auto it = idxs.begin(); it != idxs.end(); it++) {
+        // Ignore hidden indexes, which are indexes that users have explicitly marked as should be
+        // ignored/hidden from the query planner.
+        if (!(*it)->hidden()) {
+            uassert(ErrorCodes::IndexNotFound,
+                    str::stream() << "There is more than one " << indexType << " index on "
+                                  << collection->ns().toStringForErrorMsg()
+                                  << "; unsure which to use for $geoNear",
+                    !idxToUse);
+            idxToUse = *it;
+        }
+    }
+
+    if (idxToUse) {
+        for (auto&& elem : idxToUse->keyPattern()) {
+            if (elem.type() == BSONType::String && elem.valueStringData() == indexType) {
+                return elem.fieldNameStringData();
+            }
+        }
+        MONGO_UNREACHABLE;
+    }
+
+    return boost::none;
+}
+
+/**
  * Examines the indexes in 'collection' and returns the field name of a geo-indexed field suitable
  * for use in $geoNear. 2d indexes are given priority over 2dsphere indexes.
  *
@@ -213,41 +250,17 @@ StringData extractGeoNearFieldFromIndexes(OperationContext* opCtx,
                                           const CollectionPtr& collection) {
     invariant(collection);
 
-    std::vector<const IndexDescriptor*> idxs;
-    collection->getIndexCatalog()->findIndexByType(opCtx, IndexNames::GEO_2D, idxs);
-    uassert(ErrorCodes::IndexNotFound,
-            str::stream() << "There is more than one 2d index on "
-                          << collection->ns().toStringForErrorMsg()
-                          << "; unsure which to use for $geoNear",
-            idxs.size() <= 1U);
-    if (idxs.size() == 1U) {
-        for (auto&& elem : idxs.front()->keyPattern()) {
-            if (elem.type() == BSONType::String && elem.valueStringData() == IndexNames::GEO_2D) {
-                return elem.fieldNameStringData();
-            }
-        }
-        MONGO_UNREACHABLE;
+    // Look for relevant 2d index first. If none, look for relevant 2dsphere index.
+    auto geoNearField = extractGeoNearFieldFromIndexesByType(opCtx, collection, IndexNames::GEO_2D);
+    if (!geoNearField) {
+        geoNearField =
+            extractGeoNearFieldFromIndexesByType(opCtx, collection, IndexNames::GEO_2DSPHERE);
     }
-
-    // If there are no 2d indexes, look for a 2dsphere index.
-    idxs.clear();
-    collection->getIndexCatalog()->findIndexByType(opCtx, IndexNames::GEO_2DSPHERE, idxs);
     uassert(ErrorCodes::IndexNotFound,
             "$geoNear requires a 2d or 2dsphere index, but none were found",
-            !idxs.empty());
-    uassert(ErrorCodes::IndexNotFound,
-            str::stream() << "There is more than one 2dsphere index on "
-                          << collection->ns().toStringForErrorMsg()
-                          << "; unsure which to use for $geoNear",
-            idxs.size() <= 1U);
+            geoNearField);
 
-    invariant(idxs.size() == 1U);
-    for (auto&& elem : idxs.front()->keyPattern()) {
-        if (elem.type() == BSONType::String && elem.valueStringData() == IndexNames::GEO_2DSPHERE) {
-            return elem.fieldNameStringData();
-        }
-    }
-    MONGO_UNREACHABLE;
+    return *geoNearField;
 }
 
 /**

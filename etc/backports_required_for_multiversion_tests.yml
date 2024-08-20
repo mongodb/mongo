@@ -235,6 +235,8 @@ last-continuous:
       ticket: SERVER-93099
     - test_file: jstests/core/index/index_creation_on_different_collations.js
       ticket: SERVER-93112
+    - test_file: jstests/core/index/geo/geonear_key.js
+      ticket: SERVER-92843
     - test_file: jstests/core/query/plan_cache/elem_match_index_diff_types.js
       ticket: SERVER-92806
   suites: null
@@ -486,6 +488,8 @@ last-lts:
       ticket: SERVER-93112
     - test_file: jstests/sharding/write_with_movePartition.js
       ticket: SERVER-92690
+    - test_file: jstests/core/index/geo/geonear_key.js
+      ticket: SERVER-92843
     - test_file: jstests/core/query/plan_cache/elem_match_index_diff_types.js
       ticket: SERVER-92806
   suites: null

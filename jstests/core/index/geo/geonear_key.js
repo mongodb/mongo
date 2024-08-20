@@ -1,5 +1,7 @@
 /**
- * Tests for the 'key' field accepted by the $geoNear aggregation stage.
+ * Tests proper behavior of the 'key' field accepted by the $geoNear aggregation stage. That
+ * includes testing that if the 'key' field is omitted, $geoNear appropriately deduces which index
+ * to use or throws an error to indicate it cannot deduce which index to use.
  */
 const coll = db.jstests_geonear_key;
 coll.drop();
@@ -81,6 +83,32 @@ assertGeoNearSucceedsAndReturnsIds({near: [0, 0], spherical: true, key: "a"}, [0
 assertGeoNearSucceedsAndReturnsIds({near: {type: "Point", coordinates: [0, 0]}, key: "a"}, [0, 1]);
 assertGeoNearSucceedsAndReturnsIds(
     {near: {type: "Point", coordinates: [0, 0]}, spherical: true, key: "a"}, [0, 1]);
+
+// Hide all the indexes.
+assert.commandWorked(coll.hideIndex({a: "2d"}));
+assert.commandWorked(coll.hideIndex({a: "2dsphere"}));
+assert.commandWorked(coll.hideIndex({"b.c": "2d"}));
+assert.commandWorked(coll.hideIndex({"b.d": "2dsphere"}));
+
+// Verify that $geoNear fails when all eligible indexes are hidden.
+assertGeoNearFails({near: [0, 0]}, ErrorCodes.IndexNotFound);
+
+// Unhide one 2dsphere index.
+assert.commandWorked(coll.unhideIndex({"b.d": "2dsphere"}));
+
+// Verify that $geoNear ignores hidden indexes when identifying the key field.
+assertGeoNearSucceedsAndReturnsIds({near: {type: "Point", coordinates: [0, 0]}}, [4, 5]);
+assertGeoNearSucceedsAndReturnsIds({near: [0, 0], spherical: true}, [4, 5]);
+
+// Unhide more indexes so that one 2d index is unhidden.
+assert.commandWorked(coll.unhideIndex({"b.c": "2d"}));
+assert.commandWorked(coll.unhideIndex({a: "2dsphere"}));
+
+// Verify that after hiding/unhiding indexes, the sole 2d index key field is correctly chosen.
+assertGeoNearSucceedsAndReturnsIds({near: [0, 0], spherical: true}, [2, 3]);
+
+// Unhide remaining hidden index.
+assert.commandWorked(coll.unhideIndex({a: "2d"}));
 
 // Verify that $geoNear fails when a GeoJSON point is used with a 'key' path that only has a 2d
 // index. GeoJSON points can only be used for spherical geometry.
