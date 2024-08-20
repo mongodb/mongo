@@ -8,8 +8,7 @@ assert.commandWorked(coll.insert({_id: 4, text: "cantaloupe", words: 1}));
 
 assert.commandWorked(coll.createIndex({text: "text"}));
 
-// TODO SERVER-93521 This should fail.
-assert.doesNotThrow(() => coll.aggregate([
+assert.throws(() => coll.aggregate([
     {$match: {$text: {$search: 'apple banana'}}},
     {$sort: {textScore: {$meta: 'searchScore'}}}
 ]));

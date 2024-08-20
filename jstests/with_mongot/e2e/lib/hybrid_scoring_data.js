@@ -3417,6 +3417,7 @@ const plotEmbeddings = [
         -0.025295658,    0.0043481006,   0.004518486,    -0.00052057614, -0.009489148,
         -0.0072872466
     ],
+    // null, ^^
     [
         0.0035295584,   -0.026654368,    0.0008388148,   -0.014802023,     0.004954119,
         0.0393648,      -0.0091373,      0.001012276,    -0.0005346292,    -0.02584991,
@@ -5125,33 +5126,6 @@ export function getMovieDataWithTie() {
             "Yor, an extremely blond prehistoric warrior, comes to question his origins, particularly with regard to a mysterious medallion he wears. When he learns of a desert goddess who supposedly wears the same medallion, Yor decides that he must find her and learn his true identity. Along the way, he encounters ape-men, dinosaurs, and a strange futuristic society."
     });
     return data;
-}
-
-export function makeVectorQuery({queryVector, limit}) {
-    return {
-        $vectorSearch: {
-            queryVector: queryVector,
-            path: "plot_embedding",
-            exact: true,
-            index: "vector_search_movie_block",
-            limit: limit,
-        }
-    };
-}
-
-export function getVectorSearchIndexSpec() {
-    return {
-        name: "vector_search_movie_block",
-        type: "vectorSearch",
-        definition: {
-            "fields": [{
-                "type": "vector",
-                "numDimensions": 1536,
-                "path": "plot_embedding",
-                "similarity": "euclidean"
-            }]
-        }
-    };
 }
 
 /**

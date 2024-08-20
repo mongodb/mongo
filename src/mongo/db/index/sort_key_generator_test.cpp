@@ -42,7 +42,6 @@
 #include "mongo/db/pipeline/expression_context_for_test.h"
 #include "mongo/db/query/collation/collator_interface_mock.h"
 #include "mongo/db/storage/snapshot.h"
-#include "mongo/idl/server_parameter_test_util.h"
 #include "mongo/unittest/assert.h"
 #include "mongo/unittest/death_test.h"
 #include "mongo/unittest/framework.h"
@@ -217,13 +216,22 @@ TEST(SortKeyGeneratorTest, SortPatternComponentWithNonStringMetaKeywordUasserts)
                                 "Illegal $meta sort: $meta: 0.1");
 }
 
+TEST(SortKeyGeneratorTest, SortPatternComponentWithSearchScoreMetaKeywordUasserts) {
+    ASSERT_THROWS_CODE_AND_WHAT(makeSortKeyGen(BSON("a" << BSON("$meta"
+                                                                << "searchScore")),
+                                               nullptr),
+                                AssertionException,
+                                31218,
+                                "$meta sort by 'searchScore' metadata is not supported");
+}
+
 TEST(SortKeyGeneratorTest, SortPatternComponentWithSearchHighlightsMetaKeywordUasserts) {
     ASSERT_THROWS_CODE_AND_WHAT(makeSortKeyGen(BSON("a" << BSON("$meta"
                                                                 << "searchHighlights")),
                                                nullptr),
                                 AssertionException,
-                                31138,
-                                "Illegal $meta sort: $meta: \"searchHighlights\"");
+                                31219,
+                                "$meta sort by 'searchHighlights' metadata is not supported");
 }
 
 TEST(SortKeyGeneratorTest, SortPatternComponentWithSearchScoreDetailsMetaKeywordUasserts) {
@@ -251,37 +259,6 @@ TEST(SortKeyGeneratorTest, CanGenerateKeysForRandValMetaSort) {
     auto sortKey = sortKeyGen->computeSortKeyFromDocument(
         Document::fromBsonWithMetaData(BSON(Document::metaFieldRandVal << 0.3)));
     ASSERT_VALUE_EQ(sortKey, Value{0.3});
-}
-
-TEST(SortKeyGeneratorTest, CanGenerateKeysForGeoDistanceSort) {
-    auto sortKeyGen = makeSortKeyGen(BSON("a" << BSON("$meta"
-                                                      << "geoNearDistance")),
-                                     nullptr);
-    auto sortKey = sortKeyGen->computeSortKeyFromDocument(
-        Document::fromBsonWithMetaData(BSON(Document::metaFieldGeoNearDistance << 10.3)));
-    ASSERT_VALUE_EQ(sortKey, Value{10.3});
-}
-
-TEST(SortKeyGeneratorTest, CanGenerateKeysForSearchScoreSort) {
-    RAIIServerParameterControllerForTest featureFlagController(
-        "featureFlagSearchHybridScoringPrerequisites", true);
-    auto sortKeyGen = makeSortKeyGen(BSON("a" << BSON("$meta"
-                                                      << "searchScore")),
-                                     nullptr);
-    auto sortKey = sortKeyGen->computeSortKeyFromDocument(
-        Document::fromBsonWithMetaData(BSON(Document::metaFieldSearchScore << 10.3)));
-    ASSERT_VALUE_EQ(sortKey, Value{10.3});
-}
-
-TEST(SortKeyGeneratorTest, CanGenerateKeysForVectorSearchScoreSort) {
-    RAIIServerParameterControllerForTest featureFlagController(
-        "featureFlagSearchHybridScoringPrerequisites", true);
-    auto sortKeyGen = makeSortKeyGen(BSON("a" << BSON("$meta"
-                                                      << "vectorSearchScore")),
-                                     nullptr);
-    auto sortKey = sortKeyGen->computeSortKeyFromDocument(
-        Document::fromBsonWithMetaData(BSON(Document::metaFieldVectorSearchScore << 10.3)));
-    ASSERT_VALUE_EQ(sortKey, Value{10.3});
 }
 
 TEST(SortKeyGeneratorTest, CanGenerateKeysForCompoundMetaSort) {

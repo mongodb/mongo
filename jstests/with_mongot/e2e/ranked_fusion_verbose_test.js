@@ -6,8 +6,7 @@
 import {
     buildExpectedResults,
     getMovieData,
-    getPlotEmbeddingById,
-    getVectorSearchIndexSpec
+    getPlotEmbeddingById
 } from "jstests/with_mongot/e2e/lib/hybrid_scoring_data.js";
 import {assertDocArrExpectedFuzzy} from "jstests/with_mongot/e2e/lib/search_e2e_utils.js";
 
@@ -21,7 +20,19 @@ assert.commandWorked(coll.insertMany(getMovieData()));
 coll.createSearchIndex({name: "search_movie_block", definition: {"mappings": {"dynamic": true}}});
 
 // Create vector search index on movie plot embeddings.
-coll.createSearchIndex(getVectorSearchIndexSpec());
+const vectorIndex = {
+    name: "vector_search_movie_block",
+    type: "vectorSearch",
+    definition: {
+        "fields": [{
+            "type": "vector",
+            "numDimensions": 1536,
+            "path": "plot_embedding",
+            "similarity": "euclidean"
+        }]
+    }
+};
+coll.createSearchIndex(vectorIndex);
 
 const limit = 20;
 // Multiplication factor of limit for numCandidates in $vectorSearch.

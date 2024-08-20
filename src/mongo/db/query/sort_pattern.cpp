@@ -49,54 +49,42 @@
 #include "mongo/db/storage/storage_parameters_gen.h"
 
 namespace mongo {
-
-namespace {
-
-static const StringDataSet kValidMetaSorts{
-    "textScore"_sd, "randVal"_sd, "geoNearDistance"_sd, "searchScore"_sd, "vectorSearchScore"_sd};
-
-bool isSupportedMetaSort(const boost::intrusive_ptr<ExpressionContext>& expCtx, StringData name) {
-    if (name == "searchScore"_sd || name == "vectorSearchScore"_sd) {
-        expCtx->throwIfFeatureFlagIsNotEnabledOnFCV(
-            "sorting by searchScore or vectorSearchScore",
-            feature_flags::gFeatureFlagSearchHybridScoringPrerequisites);
-    }
-    return kValidMetaSorts.contains(name);
-}
-
-boost::intrusive_ptr<ExpressionMeta> parseMetaExpression(
-    const BSONObj& metaDoc, const boost::intrusive_ptr<ExpressionContext>& expCtx) {
-    BSONElement metaElem = metaDoc.firstElement();
-    // This restriction is due to needing to figure out sort direction. We assume for scored results
-    // that users want the most relevant results first.
-    uassert(17312,
-            "$meta is the only expression supported by $sort right now",
-            metaElem.fieldNameStringData() == "$meta");
-
-    uassert(ErrorCodes::FailedToParse,
-            "Cannot have additional keys in a $meta sort specification",
-            metaDoc.nFields() == 1);
-
-    const auto metaName = metaElem.valueStringDataSafe();
-
-    if (!isSupportedMetaSort(expCtx, metaName)) {
-        uasserted(31138, str::stream() << "Illegal $meta sort: " << metaElem);
-    }
-
-    VariablesParseState vps = expCtx->variablesParseState;
-    return static_cast<ExpressionMeta*>(ExpressionMeta::parse(expCtx.get(), metaElem, vps).get());
-}
-}  // namespace
-
 SortPattern::SortPattern(const BSONObj& obj,
-                         const boost::intrusive_ptr<ExpressionContext>& expCtx) {
+                         const boost::intrusive_ptr<ExpressionContext>& pExpCtx) {
     for (auto&& keyField : obj) {
         auto fieldName = keyField.fieldNameStringData();
 
         SortPatternPart patternPart;
 
-        if (keyField.type() == BSONType::Object) {
-            patternPart.expression = parseMetaExpression(keyField.Obj(), expCtx);
+        if (keyField.type() == Object) {
+            BSONObj metaDoc = keyField.Obj();
+            // this restriction is due to needing to figure out sort direction
+            uassert(17312,
+                    "$meta is the only expression supported by $sort right now",
+                    metaDoc.firstElement().fieldNameStringData() == "$meta");
+
+            uassert(ErrorCodes::FailedToParse,
+                    "Cannot have additional keys in a $meta sort specification",
+                    metaDoc.nFields() == 1);
+
+            VariablesParseState vps = pExpCtx->variablesParseState;
+            BSONElement metaElem = metaDoc.firstElement();
+
+            if (metaElem.valueStringDataSafe() == "textScore"_sd) {
+                // Valid meta sort. Just fall through.
+            } else if (metaElem.valueStringDataSafe() == "randVal"_sd) {
+                // Valid meta sort. Just fall through.
+            } else if (metaElem.valueStringDataSafe() == "geoNearDistance"_sd) {
+                // Valid meta sort. Just fall through.
+            } else if (metaElem.valueStringDataSafe() == "searchScore"_sd) {
+                uasserted(31218, "$meta sort by 'searchScore' metadata is not supported");
+            } else if (metaElem.valueStringDataSafe() == "searchHighlights"_sd) {
+                uasserted(31219, "$meta sort by 'searchHighlights' metadata is not supported");
+            } else {
+                uasserted(31138, str::stream() << "Illegal $meta sort: " << metaElem);
+            }
+            patternPart.expression = static_cast<ExpressionMeta*>(
+                ExpressionMeta::parse(pExpCtx.get(), metaElem, vps).get());
 
             // If sorting by textScore, sort highest scores first. If sorting by randVal, order
             // doesn't matter, so just always use descending.

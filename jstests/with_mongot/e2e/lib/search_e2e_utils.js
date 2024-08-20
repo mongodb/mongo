@@ -222,25 +222,3 @@ export function assertDocArrExpectedFuzzy(expectedDocArr,
     // All assertions passed.
     // Expected and actual arrays have the same documents in a "close enough" ordering.
 }
-
-/**
- * Blocks the execution of this thread until we can see the document with the given _id in the
- * result set for the given query. It is expected that the caller has already inserted this document
- * into the colleciton. This is expected to be used if you want to alter the data in any $search or
- * $vectorSearch index, since they are eventaully consistent.
- *
- * It is important to see the doc with the given ID _via_ some specific $search or $vectorSearch
- * query of interest, since we want the document to be visible in that search's specific index -
- * which is replicated on its own schedule.
- *
- * @param {*} docId The target "_id" value for the document you want to see replicated.
- * @param {Collection} coll The Collection object that should hold this document. It is expected
- *     that the collection already has this document, but it may not yet be replicated to a search
- *     index.
- * @param {Object[]} queryPipeline A pipeline with a $search or $vectorSearch stage which we want to
- *     later use to examine this document.
- */
-export function waitUntilDocIsVisibleByQuery({docId, coll, queryPipeline}) {
-    assert.soon(() =>
-                    coll.aggregate(queryPipeline.concat([{$match: {_id: docId}}])).itcount() === 1);
-}
