@@ -10,6 +10,9 @@ mkdir extract/js
 # copy ICU
 cp -R mozilla-release/intl extract/
 
+# remove unnecessary hyphenation files
+rm -rf extract/intl/locales
+
 cd mozilla-release/js/src
 
 echo "Run autoconf2.13"
@@ -49,7 +52,7 @@ CFLAGS="$CFLAGS -D__STDC_FORMAT_MACROS" \
 # we have to run make to generate a byte code version of the self hosted js and
 # a switch table
 echo "Run make"
-make
+make -j$(grep -c ^processor /proc/cpuinfo)
 
 cd ../../../..
 
