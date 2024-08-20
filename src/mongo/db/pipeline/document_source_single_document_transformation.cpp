@@ -35,6 +35,7 @@
 #include "mongo/db/exec/document_value/value.h"
 #include "mongo/db/exec/exclusion_projection_executor.h"
 #include "mongo/db/pipeline/document_source_project.h"
+#include "mongo/db/pipeline/document_source_replace_root.h"
 #include "mongo/db/pipeline/document_source_single_document_transformation.h"
 #include "mongo/db/pipeline/document_source_skip.h"
 #include "mongo/db/query/explain_options.h"
@@ -80,6 +81,12 @@ DocumentSource::GetNextResult DocumentSourceSingleDocumentTransformation::doGetN
 intrusive_ptr<DocumentSource> DocumentSourceSingleDocumentTransformation::optimize() {
     if (_transformationProcessor) {
         _transformationProcessor->getTransformer().optimize();
+
+        // Note: This comes after the first call to optimize() to make sure the expression is
+        // optimized so we can check if it's a no-op after things like constant folding.
+        if (_transformationProcessor->getTransformer().isNoop()) {
+            return nullptr;
+        }
     }
     return this;
 }

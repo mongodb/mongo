@@ -91,6 +91,15 @@ public:
         _sbeCompatibility = _expCtx->sbeCompatibility;
     }
 
+    // Used by optimize() to optimize out the $replaceRoot stage if it is a no-op.
+    // In particular, the stage {$replaceRoot: {newRoot: '$$ROOT'}} would get optimized out.
+    // Since $$ROOT is a reference to the top-level document currently being processed in
+    // the pipeline, the root would remain the same.
+    bool isNoop() const final {
+        auto fieldPath = dynamic_cast<ExpressionFieldPath*>(_newRoot.get());
+        return fieldPath && fieldPath->isROOT();
+    }
+
     Document serializeTransformation(boost::optional<ExplainOptions::Verbosity> explain,
                                      const SerializationOptions& options = {}) const final {
         return Document{{"newRoot", _newRoot->serialize(options)}};

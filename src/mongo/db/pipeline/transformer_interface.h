@@ -65,6 +65,13 @@ public:
     virtual DocumentSource::GetModPathsReturn getModifiedPaths() const = 0;
 
     /**
+     * Method used by optimize() to check if stage is a no-op.
+     */
+    virtual bool isNoop() const {
+        return false;
+    }
+
+    /**
      * Returns a document describing this transformation. For example, this function will return
      * {_id: 0, x: 1} for the stage parsed from {$project: {_id: 0, x: 1}}.
      */
