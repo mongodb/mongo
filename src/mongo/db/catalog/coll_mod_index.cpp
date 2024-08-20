@@ -352,6 +352,7 @@ std::vector<std::vector<RecordId>> scanIndexForDuplicates(OperationContext* opCt
     std::vector<std::vector<RecordId>> allDuplicateRecords;
     std::vector<RecordId> recordsWithDuplicateKeys;
 
+    size_t indexEntryCount = 0;
     for (auto indexEntry = indexCursor->nextKeyString(); indexEntry;
          indexEntry = indexCursor->nextKeyString()) {
         if (prevIndexEntry &&
@@ -371,6 +372,14 @@ std::vector<std::vector<RecordId>> scanIndexForDuplicates(OperationContext* opCt
             }
         }
         prevIndexEntry = indexEntry;
+        indexEntryCount += 1;
+
+        // This was a rough heuristic that was found that 300 values with the index cursor would
+        // take ~200 milliseconds with calling checkForInterrupt(). We made the checkForInterrupt()
+        // occur after 150 index entries to be conservative.
+        if (!(indexEntryCount % 150)) {
+            opCtx->checkForInterrupt();
+        }
     }
     if (!recordsWithDuplicateKeys.empty()) {
         allDuplicateRecords.push_back(std::move(recordsWithDuplicateKeys));
