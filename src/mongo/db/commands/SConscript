@@ -272,6 +272,7 @@ env.Library(
         "list_databases_for_all_tenants.cpp",
         "list_indexes.cpp",
         "lock_info.cpp",
+        "query_cmd/aggregation_execution_state.cpp",
         "query_cmd/analyze_cmd.cpp",
         "query_cmd/count_cmd.cpp",
         "query_cmd/current_op.cpp",
