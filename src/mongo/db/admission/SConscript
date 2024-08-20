@@ -49,16 +49,6 @@ env.CppUnitTest(
 )
 
 env.Library(
-    target="execution_control_feature_flags",
-    source=[
-        "execution_control_feature_flags_gen.cpp",
-    ],
-    LIBDEPS_PRIVATE=[
-        "$BUILD_DIR/mongo/db/server_base",
-    ],
-)
-
-env.Library(
     target="execution_admission_context",
     source=[
         "execution_admission_context.cpp",

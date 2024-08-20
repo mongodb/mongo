@@ -28,3 +28,17 @@ idl_generator(
     name = "throughput_probing_gen",
     src = "throughput_probing.idl",
 )
+
+mongo_cc_library(
+    name = "execution_control_feature_flags",
+    srcs = [
+        ":execution_control_feature_flags_gen",
+    ],
+    hdrs = [
+        "//src/mongo/base:error_codes_header",
+        "//src/mongo/util/version:releases_header",
+    ],
+    header_deps = [
+        "//src/mongo/db/pipeline/process_interface:mongo_process_interface",
+    ],
+)
