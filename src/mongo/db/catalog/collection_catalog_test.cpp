@@ -1011,6 +1011,19 @@ public:
             expectedNumIndexes);
     }
 
+    void concurrentCreateAndRunCatalogOperations(
+        OperationContext* opCtx,
+        const NamespaceString& nss,
+        boost::optional<UUID> uuid,
+        Timestamp timestamp,
+        std::function<void(OperationContext* opCtx)> catalogOperations) {
+        _concurrentDDLOperationAndCatalogQueries(
+            opCtx,
+            timestamp,
+            [this, &nss, &uuid](OperationContext* opCtx) { _createCollection(opCtx, nss, uuid); },
+            catalogOperations);
+    }
+
     void concurrentDropCollectionAndEstablishConsistentCollection(
         OperationContext* opCtx,
         const NamespaceString& nss,
@@ -1029,6 +1042,20 @@ public:
             openSnapshotBeforeCommit,
             expectedExistence,
             expectedNumIndexes);
+    }
+
+    void concurrentDropAndRunCatalogOperations(
+        OperationContext* opCtx,
+        const NamespaceString& nss,
+        Timestamp timestamp,
+        std::function<void(OperationContext* opCtx)> catalogOperations) {
+        _concurrentDDLOperationAndCatalogQueries(
+            opCtx,
+            timestamp,
+            [this, &nss, &timestamp](OperationContext* opCtx) {
+                _dropCollection(opCtx, nss, timestamp);
+            },
+            catalogOperations);
     }
 
     void concurrentRenameCollectionAndEstablishConsistentCollection(
@@ -1052,6 +1079,21 @@ public:
             expectedExistence,
             expectedNumIndexes,
             std::move(verifyStateCallback));
+    }
+
+    void concurrentRenameAndRunCatalogOperations(
+        OperationContext* opCtx,
+        const NamespaceString& from,
+        const NamespaceString& to,
+        Timestamp timestamp,
+        std::function<void(OperationContext* opCtx)> catalogOperations) {
+        _concurrentDDLOperationAndCatalogQueries(
+            opCtx,
+            timestamp,
+            [this, &from, &to, &timestamp](OperationContext* opCtx) {
+                _renameCollection(opCtx, from, to, timestamp);
+            },
+            catalogOperations);
     }
 
     void concurrentCreateIndexAndEstablishConsistentCollection(
@@ -1233,6 +1275,83 @@ private:
 
         // This also adds the index ident to the drop-pending reaper.
         ASSERT_OK(indexCatalog->dropIndexEntry(opCtx, writableCollection, writableEntry));
+    }
+
+    /**
+     * Simulates performing a given ddlOperation concurrently with some passed in calls to the
+     * collection catalog.
+     *
+     * The ddl operation willl stall right after writing to the durable catalog but before
+     * updating the in-memory catalog.
+     */
+    template <typename Callable>
+    void _concurrentDDLOperationAndCatalogQueries(
+        OperationContext* opCtx,
+        Timestamp timestamp,
+        Callable&& ddlOperation,
+        std::function<void(OperationContext* opCtx)> catalogOperations) {
+        mongo::Mutex mutex;
+        stdx::condition_variable cv;
+        int numCalls = 0;
+
+        stdx::thread t([&, svcCtx = getServiceContext()] {
+            ThreadClient client(svcCtx->getService());
+            auto newOpCtx = client->makeOperationContext();
+            _setupDDLOperation(newOpCtx.get(), timestamp);
+
+            WriteUnitOfWork wuow(newOpCtx.get());
+
+            // Register a hook either preCommit or onCommit that will block until the
+            // main thread has finished its openCollection lookup.
+            auto commitHandler = [&]() {
+                stdx::unique_lock lock(mutex);
+
+                // Let the main thread know we have committed to the storage engine.
+                numCalls = 1;
+                cv.notify_all();
+
+                // Wait until the main thread has finished its openCollection lookup.
+                cv.wait(lock, [&numCalls]() { return numCalls == 2; });
+            };
+
+            class ChangeForCatalogVisibility : public RecoveryUnit::Change {
+            public:
+                ChangeForCatalogVisibility(std::function<void()> commitHandler)
+                    : callback(std::move(commitHandler)) {}
+
+                void commit(OperationContext* opCtx, boost::optional<Timestamp>) final {
+                    callback();
+                }
+
+                void rollback(OperationContext* opCtx) final {}
+
+                std::function<void()> callback;
+            };
+
+            shard_role_details::getRecoveryUnit(newOpCtx.get())
+                ->registerChangeForCatalogVisibility(
+                    std::make_unique<ChangeForCatalogVisibility>(commitHandler));
+
+            ddlOperation(newOpCtx.get());
+
+            wuow.commit();
+        });
+
+        // Wait for the thread above to start its commit of the DDL operation.
+        {
+            stdx::unique_lock lock(mutex);
+            cv.wait(lock, [&numCalls]() { return numCalls == 1; });
+        }
+
+        catalogOperations(opCtx);
+
+        // Notify the thread that our openCollection lookup is done.
+        {
+            stdx::unique_lock lock(mutex);
+            numCalls = 2;
+            cv.notify_all();
+        }
+        t.join();
     }
 
     /**
@@ -2305,6 +2424,22 @@ TEST_F(CollectionCatalogTimestampTest,
         opCtx.get(), nss, uuid, createCollectionTs, false, true, 0);
 }
 
+TEST_F(CollectionCatalogTimestampTest, UUIDLookupWhileCommitPendingCreate) {
+    const NamespaceString nss = NamespaceString::createNamespaceString_forTest("a.b");
+    const Timestamp createCollectionTs = Timestamp(10, 10);
+    UUID uuid = UUID::gen();
+
+    concurrentCreateAndRunCatalogOperations(
+        opCtx.get(), nss, uuid, createCollectionTs, [this, &nss, &uuid](OperationContext* opCtx) {
+            auto catalog = CollectionCatalog::get(opCtx);
+            ASSERT_THROWS(catalog->resolveNamespaceStringOrUUID(opCtx, {nss.dbName(), uuid}),
+                          ExceptionFor<ErrorCodes::NamespaceNotFound>);
+            ASSERT_EQ(catalog->resolveNamespaceStringOrUUIDWithCommitPendingEntries_UNSAFE(
+                          opCtx, {nss.dbName(), uuid}),
+                      nss);
+        });
+}
+
 TEST_F(CollectionCatalogTimestampTest, ConcurrentDropCollectionAndOpenCollectionBeforeCommit) {
     const NamespaceString nss = NamespaceString::createNamespaceString_forTest("a.b");
     const Timestamp createCollectionTs = Timestamp(10, 10);
@@ -2362,6 +2497,25 @@ TEST_F(CollectionCatalogTimestampTest, ConcurrentDropCollectionAndOpenCollection
     // collection instance should be returned.
     concurrentDropCollectionAndEstablishConsistentCollection(
         opCtx.get(), nss, uuidWithDbName, dropCollectionTs, false, false, 0);
+}
+
+TEST_F(CollectionCatalogTimestampTest, UUIDLookupWhileCommitPendingDrop) {
+    const NamespaceString nss = NamespaceString::createNamespaceString_forTest("a.b");
+    const Timestamp createCollectionTs = Timestamp(10, 10);
+    const Timestamp dropCollectionTs = Timestamp(20, 20);
+
+    createCollection(opCtx.get(), nss, createCollectionTs);
+    UUID uuid =
+        CollectionCatalog::get(opCtx.get())->lookupCollectionByNamespace(opCtx.get(), nss)->uuid();
+
+    concurrentDropAndRunCatalogOperations(
+        opCtx.get(), nss, dropCollectionTs, [this, &nss, &uuid](OperationContext* opCtx) {
+            auto catalog = CollectionCatalog::get(opCtx);
+            ASSERT_EQ(catalog->resolveNamespaceStringOrUUID(opCtx, {nss.dbName(), uuid}), nss);
+            ASSERT_EQ(catalog->resolveNamespaceStringOrUUIDWithCommitPendingEntries_UNSAFE(
+                          opCtx, {nss.dbName(), uuid}),
+                      nss);
+        });
 }
 
 TEST_F(CollectionCatalogTimestampTest,
@@ -2751,6 +2905,32 @@ TEST_F(CollectionCatalogTimestampTest,
                             ->lookupCollectionByNamespace(opCtx.get(), targetNss);
             ASSERT(coll);
             ASSERT_EQ(coll->uuid(), originalUUID);
+        });
+}
+
+TEST_F(CollectionCatalogTimestampTest, UUIDLookupWhileCommitPendingRename) {
+    const NamespaceString originalNss = NamespaceString::createNamespaceString_forTest("a.b");
+    const NamespaceString newNss = NamespaceString::createNamespaceString_forTest("a.c");
+    const Timestamp createCollectionTs = Timestamp(10, 10);
+    const Timestamp renameCollectionTs = Timestamp(20, 20);
+
+    createCollection(opCtx.get(), originalNss, createCollectionTs);
+    UUID uuid = CollectionCatalog::get(opCtx.get())
+                    ->lookupCollectionByNamespace(opCtx.get(), originalNss)
+                    ->uuid();
+
+    concurrentRenameAndRunCatalogOperations(
+        opCtx.get(),
+        originalNss,
+        newNss,
+        renameCollectionTs,
+        [this, &originalNss, &newNss, &uuid](OperationContext* opCtx) {
+            auto catalog = CollectionCatalog::get(opCtx);
+            ASSERT_EQ(catalog->resolveNamespaceStringOrUUID(opCtx, {originalNss.dbName(), uuid}),
+                      originalNss);
+            ASSERT_EQ(catalog->resolveNamespaceStringOrUUIDWithCommitPendingEntries_UNSAFE(
+                          opCtx, {originalNss.dbName(), uuid}),
+                      newNss);
         });
 }
 

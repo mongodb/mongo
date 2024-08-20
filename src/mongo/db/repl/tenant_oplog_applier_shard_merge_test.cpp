@@ -650,7 +650,6 @@ TEST_F(TenantOplogApplierMergeTest, ApplyCRUD_WrongUUID) {
     auto error = opAppliedFuture.getNoThrow().getStatus();
 
     ASSERT_EQ(error, ErrorCodes::NamespaceNotFound);
-    ASSERT_STRING_CONTAINS(error.reason(), "Database name mismatch for");
     ASSERT_FALSE(onInsertsCalled);
 }
 

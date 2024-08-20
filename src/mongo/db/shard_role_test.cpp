@@ -1096,6 +1096,159 @@ TEST_F(ShardRoleTest, AcquireCollectionByWrongUUID) {
                        ErrorCodes::NamespaceNotFound);
 }
 
+TEST_F(ShardRoleTest, AcquireCollectionByUUIDInCommitPendingCollection) {
+    NamespaceString nss(NamespaceString::createNamespaceString_forTest(dbNameTestDb, "TestColl"));
+    const auto uuid = UUID::gen();
+
+    unsigned int numCalls = 0;
+    stdx::condition_variable cv;
+    Mutex mutex;
+
+    stdx::thread parallelThread([&] {
+        ThreadClient client(operationContext()->getService());
+        auto newOpCtx = client->makeOperationContext();
+
+        WriteUnitOfWork wuow(newOpCtx.get());
+
+        // Register a hook that will block until the main thread has finished its openCollection
+        // lookup.
+        auto commitHandler = [&]() {
+            stdx::unique_lock lock(mutex);
+
+            // Let the main thread know we have committed to the storage engine.
+            numCalls = 1;
+            cv.notify_all();
+
+            // Wait until the main thread has finished its openCollection lookup.
+            cv.wait(lock, [&numCalls]() { return numCalls == 2; });
+        };
+
+        const auto acquisition =
+            acquireCollection(newOpCtx.get(),
+                              CollectionAcquisitionRequest::fromOpCtx(
+                                  newOpCtx.get(), nss, AcquisitionPrerequisites::kWrite),
+                              MODE_IX);
+
+        // Create the collection
+        OperationShardingState::ScopedAllowImplicitCollectionCreate_UNSAFE unsafeCreateCollection(
+            newOpCtx.get());
+        CollectionOptions collectionOptions;
+        collectionOptions.uuid = uuid;
+        auto db = DatabaseHolder::get(newOpCtx.get())->openDb(newOpCtx.get(), nss.dbName());
+        db->createCollection(newOpCtx.get(), nss, collectionOptions);
+
+        // The preCommit handler must be registered after the DDL operation so it's executed
+        // after any preCommit hooks set up in the operation.
+        shard_role_details::getRecoveryUnit(newOpCtx.get())
+            ->registerPreCommitHook([&commitHandler](OperationContext* opCtx) { commitHandler(); });
+
+        wuow.commit();
+    });
+
+    // Wait for the thread above to start its commit of the DDL operation.
+    {
+        stdx::unique_lock lock(mutex);
+        cv.wait(lock, [&numCalls]() { return numCalls == 1; });
+    }
+
+    const NamespaceStringOrUUID nssOrUUID{dbNameTestDb, uuid};
+    ASSERT_EQUALS(CollectionCatalog::get(operationContext())
+                      ->resolveNamespaceStringOrUUIDWithCommitPendingEntries_UNSAFE(
+                          operationContext(), nssOrUUID),
+                  nss);
+
+    ASSERT_THROWS_CODE(
+        acquireCollection(
+            operationContext(),
+            {nssOrUUID, {}, repl::ReadConcernArgs(), AcquisitionPrerequisites::kWrite},
+            MODE_IX),
+        DBException,
+        ErrorCodes::NamespaceNotFound);
+
+    {
+        stdx::unique_lock lock(mutex);
+        numCalls = 2;
+        cv.notify_all();
+    }
+
+    parallelThread.join();
+}
+
+TEST_F(ShardRoleTest, AcquireCollectionByUUIDInCommitPendingCollectionAfterDurableCommit) {
+    NamespaceString nss(NamespaceString::createNamespaceString_forTest(dbNameTestDb, "TestColl"));
+    const auto uuid = UUID::gen();
+
+    unsigned int numCalls = 0;
+    stdx::condition_variable cv;
+    Mutex mutex;
+
+    stdx::thread parallelThread([&] {
+        ThreadClient client(operationContext()->getService());
+        auto newOpCtx = client->makeOperationContext();
+
+        WriteUnitOfWork wuow(newOpCtx.get());
+
+        // Register a hook either that will block until the main thread has finished its
+        // openCollection lookup.
+        auto commitHandler = [&]() {
+            stdx::unique_lock lock(mutex);
+
+            // Let the main thread know we have committed to the storage engine.
+            numCalls = 1;
+            cv.notify_all();
+
+            // Wait until the main thread has finished its openCollection lookup.
+            cv.wait(lock, [&numCalls]() { return numCalls == 2; });
+        };
+
+        const auto acquisition =
+            acquireCollection(newOpCtx.get(),
+                              CollectionAcquisitionRequest::fromOpCtx(
+                                  newOpCtx.get(), nss, AcquisitionPrerequisites::kWrite),
+                              MODE_IX);
+
+
+        shard_role_details::getRecoveryUnit(newOpCtx.get())
+            ->onCommit([&commitHandler](OperationContext* opCtx, const auto&) { commitHandler(); });
+
+        // Create the collection
+        OperationShardingState::ScopedAllowImplicitCollectionCreate_UNSAFE unsafeCreateCollection(
+            newOpCtx.get());
+        CollectionOptions collectionOptions;
+        collectionOptions.uuid = uuid;
+        auto db = DatabaseHolder::get(newOpCtx.get())->openDb(newOpCtx.get(), nss.dbName());
+        db->createCollection(newOpCtx.get(), nss, collectionOptions);
+
+        wuow.commit();
+    });
+
+    // Wait for the thread above to start its commit of the DDL operation.
+    {
+        stdx::unique_lock lock(mutex);
+        cv.wait(lock, [&numCalls]() { return numCalls == 1; });
+    }
+
+    const NamespaceStringOrUUID nssOrUUID{dbNameTestDb, uuid};
+    ASSERT_EQUALS(CollectionCatalog::get(operationContext())
+                      ->resolveNamespaceStringOrUUIDWithCommitPendingEntries_UNSAFE(
+                          operationContext(), nssOrUUID),
+                  nss);
+
+    ASSERT(acquireCollection(
+               operationContext(),
+               {nssOrUUID, {}, repl::ReadConcernArgs(), AcquisitionPrerequisites::kWrite},
+               MODE_IX)
+               .exists());
+
+    {
+        stdx::unique_lock lock(mutex);
+        numCalls = 2;
+        cv.notify_all();
+    }
+
+    parallelThread.join();
+}
+
 TEST_F(ShardRoleTest, AcquireCollectionByUUIDWithShardVersionAttachedThrows) {
     const auto uuid = getCollectionUUID(operationContext(), nssShardedCollection1);
     const auto dbVersion = boost::none;

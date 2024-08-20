@@ -246,7 +246,8 @@ CollectionNamespaceOrUUIDLock::CollectionNamespaceOrUUIDLock(OperationContext* o
           }
 
           auto resolveNs = [opCtx, &nsOrUUID] {
-              return CollectionCatalog::get(opCtx)->resolveNamespaceStringOrUUID(opCtx, nsOrUUID);
+              return CollectionCatalog::get(opCtx)
+                  ->resolveNamespaceStringOrUUIDWithCommitPendingEntries_UNSAFE(opCtx, nsOrUUID);
           };
 
           // We cannot be sure that the namespace we lock matches the UUID given because we resolve
@@ -302,25 +303,20 @@ AutoGetCollection::AutoGetCollection(OperationContext* opCtx,
                                 << toStringForLogging(nsOrUUID));
     }
 
-    // Acquire the collection locks. If there's only one lock, then it can simply be taken. If
-    // there are many, however, the locks must be taken in _ascending_ ResourceId order to avoid
-    // deadlocks across threads.
-    if (secondaryNssOrUUIDsBegin == secondaryNssOrUUIDsEnd) {
-        uassert(ErrorCodes::InvalidNamespace,
-                fmt::format("Namespace {} is not a valid collection name",
-                            nsOrUUID.toStringForErrorMsg()),
-                nsOrUUID.isUUID() || (nsOrUUID.isNamespaceString() && nsOrUUID.nss().isValid()));
+    // Acquire the collection locks, this will also ensure that the CollectionCatalog has been
+    // correctly mapped to the given collections.
+    uassert(
+        ErrorCodes::InvalidNamespace,
+        fmt::format("Namespace {} is not a valid collection name", nsOrUUID.toStringForErrorMsg()),
+        nsOrUUID.isUUID() || (nsOrUUID.isNamespaceString() && nsOrUUID.nss().isValid()));
 
-        _collLocks.emplace_back(opCtx, nsOrUUID, modeColl, deadline);
-    } else {
-        catalog_helper::acquireCollectionLocksInResourceIdOrder(opCtx,
-                                                                nsOrUUID,
-                                                                modeColl,
-                                                                deadline,
-                                                                secondaryNssOrUUIDsBegin,
-                                                                secondaryNssOrUUIDsEnd,
-                                                                &_collLocks);
-    }
+    catalog_helper::acquireCollectionLocksInResourceIdOrder(opCtx,
+                                                            nsOrUUID,
+                                                            modeColl,
+                                                            deadline,
+                                                            secondaryNssOrUUIDsBegin,
+                                                            secondaryNssOrUUIDsEnd,
+                                                            &_collLocks);
 
     // Wait for a configured amount of time after acquiring locks if the failpoint is enabled
     catalog_helper::setAutoGetCollectionWaitFailpointExecute(
@@ -330,6 +326,11 @@ AutoGetCollection::AutoGetCollection(OperationContext* opCtx,
     auto databaseHolder = DatabaseHolder::get(opCtx);
 
     // Check that the collections are all safe to use.
+    //
+    // Note that unlike the other AutoGet methods we do not look at commit pending entries here.
+    // This is correct because we do not establish a consistent collection and must anyway get the
+    // fully committed entry. As a result, if the UUID->NSS mappping was incorrect we'd detect it as
+    // part of this NSS resolution.
     _resolvedNss = catalog->resolveNamespaceStringOrUUID(opCtx, nsOrUUID);
     _coll = CollectionPtr(catalog->lookupCollectionByNamespace(opCtx, _resolvedNss));
     _coll.makeYieldable(opCtx, LockedCollectionYieldRestore{opCtx, _coll});
