@@ -311,11 +311,15 @@ def _impl(ctx):
 
     verbose_feature = feature(
         name = "verbose",
-        enabled = True,
+        enabled = False,
         flag_sets = [
             flag_set(
                 actions = all_compile_actions,
                 flag_groups = [flag_group(flags = ["--verbose"])],
+            ),
+            flag_set(
+                actions = all_link_actions,
+                flag_groups = [flag_group(flags = ["-Wl,--verbose"])],
             ),
         ] if ctx.attr.verbose else [],
     )
