@@ -226,7 +226,7 @@ TEST_F(TrialRunTrackerTest, DisablingTrackingForChildDoesNotInhibitTrackingForPa
     ON_BLOCK_EXIT([&]() { rootSortStage->detachFromTrialRunTracker(); });
 
     auto attachResult = rootSortStage->attachToTrialRunTracker(tracker.get(), PlanNodeId{1});
-    ASSERT_EQ(attachResult, PlanStage::TrialRunTrackingType::NoTracking);
+    ASSERT_EQ(attachResult, PlanStage::TrialRunTrackingType::TrackResults);
 }
 
 TEST_F(TrialRunTrackerTest, DisablingTrackingForAChildStagePreventsEarlyExit) {

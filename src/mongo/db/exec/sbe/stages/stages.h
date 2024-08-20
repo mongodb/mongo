@@ -571,6 +571,10 @@ private:
             _tracker = tracker;
             result |= TrialRunTrackingType::TrackReads;
         }
+        if (_trackingType & TrialRunTrackingType::TrackResults) {
+            _tracker = tracker;
+            result |= TrialRunTrackingType::TrackResults;
+        }
         return result;
     }
 
