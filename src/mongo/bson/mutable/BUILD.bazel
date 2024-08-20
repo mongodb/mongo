@@ -8,3 +8,21 @@ exports_files(
         "*.cpp",
     ]),
 )
+
+mongo_cc_library(
+    name = "mutable_bson",
+    srcs = [
+        "document.cpp",
+        "element.cpp",
+    ],
+    hdrs = [
+        "const_element.h",
+        "document.h",
+        "element.h",
+    ],
+    mongo_api_name = "mutable_bson",
+    deps = [
+        "//src/mongo:base",
+        "//src/mongo/util:safe_num",
+    ],
+)

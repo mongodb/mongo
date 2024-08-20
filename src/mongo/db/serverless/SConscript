@@ -4,16 +4,6 @@ Import("env")
 env = env.Clone()
 
 env.Library(
-    target="serverless_types_idl",
-    source=[
-        "serverless_types_gen.cpp",
-    ],
-    LIBDEPS=[
-        "$BUILD_DIR/mongo/db/server_base",
-    ],
-)
-
-env.Library(
     target="shard_split_state_machine",
     source=[
         "shard_split_state_machine_gen.cpp",

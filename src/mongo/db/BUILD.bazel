@@ -687,3 +687,128 @@ mongo_cc_library(
         "//src/mongo/db/repl:tenant_migration_errors",
     ],
 )
+
+mongo_cc_library(
+    name = "cursor_server_params",
+    srcs = [
+        "cursor_server_params.cpp",
+        ":cursor_server_params_gen",
+    ],
+    hdrs = [
+        "cursor_server_params.h",
+    ],
+    deps = [
+        ":server_base",
+    ],
+)
+
+mongo_cc_library(
+    name = "feature_compatibility_version_metrics",
+    srcs = [
+        "feature_compatibility_version_metrics.cpp",
+    ],
+    deps = [
+        ":server_base",
+        "//src/mongo/db/commands:server_status_core",
+    ],
+)
+
+mongo_cc_library(
+    name = "index_commands_idl",
+    srcs = [
+        ":create_indexes_gen",
+        ":drop_indexes_gen",
+    ],
+    hdrs = [
+        "//src/mongo/db/auth:authorization_contract.h",
+    ],
+    header_deps = [
+        "//src/mongo/db/repl:oplog_buffer_batched_queue",
+    ],
+    deps = [
+        ":server_base",
+        "//src/mongo/db/auth:authprivilege",
+        "//src/mongo/db/catalog:commit_quorum_options",
+    ],
+)
+
+mongo_cc_library(
+    name = "internal_transactions_feature_flag",
+    srcs = [
+        ":internal_transactions_feature_flag_gen",
+    ],
+    header_deps = [
+        ":index_commands_idl",
+    ],
+    deps = [
+        ":server_base",
+    ],
+)
+
+mongo_cc_library(
+    name = "keys_collection_document",
+    srcs = [
+        ":keys_collection_document_gen",
+    ],
+    deps = [
+        ":server_base",
+    ],
+)
+
+mongo_cc_library(
+    name = "metadata_consistency_types_idl",
+    srcs = [
+        ":metadata_consistency_types_gen",
+    ],
+    deps = [
+        ":server_base",
+    ],
+)
+
+mongo_cc_library(
+    name = "namespace_spec",
+    srcs = [
+        ":namespace_spec_gen",
+    ],
+    deps = [
+        ":server_base",
+    ],
+)
+
+mongo_cc_library(
+    name = "signed_logical_time",
+    srcs = [
+        "signed_logical_time.cpp",
+    ],
+    hdrs = [
+        "signed_logical_time.h",
+        "time_proof_service.h",
+    ],
+    deps = [
+        ":server_base",
+        "//src/mongo/crypto:sha1_block",
+    ],
+)
+
+mongo_cc_library(
+    name = "snapshot_window_options",
+    srcs = [
+        ":snapshot_window_options_gen",
+    ],
+    deps = [
+        ":server_base",
+    ],
+)
+
+mongo_cc_library(
+    name = "update_index_data",
+    srcs = [
+        "update_index_data.cpp",
+    ],
+    hdrs = [
+        "update_index_data.h",
+    ],
+    deps = [
+        ":common",
+    ],
+)

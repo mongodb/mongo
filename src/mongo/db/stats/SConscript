@@ -31,20 +31,6 @@ env.Library(
 )
 
 env.Library(
-    target="counters",
-    source=[
-        "counters.cpp",
-    ],
-    LIBDEPS=[
-        "$BUILD_DIR/mongo/db/commands/server_status_core",
-    ],
-    LIBDEPS_PRIVATE=[
-        "$BUILD_DIR/mongo/base",
-        "$BUILD_DIR/mongo/util/concurrency/spin_lock",
-    ],
-)
-
-env.Library(
     target="server_read_concern_write_concern_metrics",
     source=[
         "server_read_concern_metrics.cpp",

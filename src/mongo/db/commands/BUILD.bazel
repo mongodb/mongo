@@ -685,3 +685,48 @@ mongo_cc_library(
         "//src/mongo/db:server_base",
     ],
 )
+
+mongo_cc_library(
+    name = "list_databases_command",
+    srcs = [
+        ":list_databases_gen",
+    ],
+    deps = [
+        "//src/mongo/db:server_base",
+        "//src/mongo/db/auth:authprivilege",
+    ],
+)
+
+mongo_cc_library(
+    name = "list_databases_for_all_tenants_command",
+    srcs = [
+        ":list_databases_for_all_tenants_gen",
+    ],
+    deps = [
+        "//src/mongo/db:server_base",
+        "//src/mongo/db/auth:authprivilege",
+    ],
+)
+
+mongo_cc_library(
+    name = "lock_info_command",
+    srcs = [
+        ":lock_info_gen",
+    ],
+    deps = [
+        "//src/mongo/db:server_base",
+        "//src/mongo/db/auth:authprivilege",
+    ],
+)
+
+mongo_cc_library(
+    name = "txn_cmd_request",
+    srcs = [
+        ":txn_cmds_gen",
+        ":txn_two_phase_commit_cmds_gen",
+    ],
+    deps = [
+        "//src/mongo/db:server_base",
+        "//src/mongo/db/auth:authprivilege",
+    ],
+)

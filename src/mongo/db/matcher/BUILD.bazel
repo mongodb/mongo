@@ -8,3 +8,19 @@ exports_files(
         "*.cpp",
     ]),
 )
+
+mongo_cc_library(
+    name = "path",
+    srcs = [
+        "path.cpp",
+        "path_internal.cpp",
+    ],
+    hdrs = [
+        "path.h",
+        "path_internal.h",
+    ],
+    deps = [
+        "//src/mongo:base",
+        "//src/mongo/db:common",
+    ],
+)

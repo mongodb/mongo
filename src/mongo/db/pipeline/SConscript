@@ -16,16 +16,6 @@ env.SConscript(
 )
 
 env.Library(
-    target="change_stream_preimage",
-    source=[
-        "change_stream_preimage_gen.cpp",
-    ],
-    LIBDEPS_PRIVATE=[
-        "$BUILD_DIR/mongo/db/server_base",
-    ],
-)
-
-env.Library(
     target="aggregation",
     source=[
         "aggregation.cpp",

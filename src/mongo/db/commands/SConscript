@@ -250,39 +250,6 @@ env.Library(
 )
 
 env.Library(
-    target="list_databases_command",
-    source=[
-        "list_databases_gen.cpp",
-    ],
-    LIBDEPS_PRIVATE=[
-        "$BUILD_DIR/mongo/db/auth/authprivilege",
-        "$BUILD_DIR/mongo/db/server_base",
-    ],
-)
-
-env.Library(
-    target="list_databases_for_all_tenants_command",
-    source=[
-        "list_databases_for_all_tenants_gen.cpp",
-    ],
-    LIBDEPS_PRIVATE=[
-        "$BUILD_DIR/mongo/db/auth/authprivilege",
-        "$BUILD_DIR/mongo/db/server_base",
-    ],
-)
-
-env.Library(
-    target="lock_info_command",
-    source=[
-        "lock_info_gen.cpp",
-    ],
-    LIBDEPS_PRIVATE=[
-        "$BUILD_DIR/mongo/db/auth/authprivilege",
-        "$BUILD_DIR/mongo/db/server_base",
-    ],
-)
-
-env.Library(
     target="create_command",
     source=[
         "create_gen.cpp",
@@ -674,17 +641,6 @@ env.Library(
         "$BUILD_DIR/mongo/db/server_base",
         "$BUILD_DIR/mongo/db/serverless/serverless_types_idl",
         "$BUILD_DIR/mongo/idl/idl_parser",
-    ],
-)
-env.Library(
-    target="txn_cmd_request",
-    source=[
-        "txn_cmds_gen.cpp",
-        "txn_two_phase_commit_cmds_gen.cpp",
-    ],
-    LIBDEPS_PRIVATE=[
-        "$BUILD_DIR/mongo/db/auth/authprivilege",
-        "$BUILD_DIR/mongo/db/server_base",
     ],
 )
 

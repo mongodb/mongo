@@ -36,17 +36,6 @@ env.Benchmark(
     ],
 )
 
-sorterEnv.Library(
-    target="sorter_stats",
-    source=[
-        "sorter_stats.cpp",
-    ],
-    LIBDEPS_PRIVATE=[
-        "$BUILD_DIR/mongo/base",
-        "$BUILD_DIR/mongo/db/commands/server_status_core",
-    ],
-)
-
 sorterBaseEnv = env.Clone()
 if wiredtiger:
     sorterBaseEnv.InjectThirdParty(libraries=["wiredtiger"])

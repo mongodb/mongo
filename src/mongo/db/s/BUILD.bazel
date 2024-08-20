@@ -388,3 +388,9 @@ idl_generator(
         "//src/mongo/s/request_types:sharded_ddl_commands_gen",
     ],
 )
+
+mongo_cc_library(
+    name = "resharding_server_parameters_idl",
+    srcs = ["//src/mongo/db/s/resharding:resharding_server_parameters_gen"],
+    deps = ["//src/mongo/db:server_base"],
+)

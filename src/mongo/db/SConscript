@@ -186,16 +186,6 @@ env.Library(
 )
 
 env.Library(
-    target="update_index_data",
-    source=[
-        "update_index_data.cpp",
-    ],
-    LIBDEPS=[
-        "common",
-    ],
-)
-
-env.Library(
     target="server_feature_flags",
     source=[
         "feature_flag_test_gen.cpp",
@@ -306,16 +296,6 @@ env.Library(
     ],
     LIBDEPS_PRIVATE=[
         "$BUILD_DIR/mongo/util/options_parser/options_parser",
-        "server_base",
-    ],
-)
-
-env.Library(
-    target="namespace_spec",
-    source=[
-        "namespace_spec_gen.cpp",
-    ],
-    LIBDEPS_PRIVATE=[
         "server_base",
     ],
 )
@@ -764,16 +744,6 @@ env.Library(
 )
 
 env.Library(
-    target="metadata_consistency_types_idl",
-    source=[
-        "metadata_consistency_types_gen.cpp",
-    ],
-    LIBDEPS_PRIVATE=[
-        "server_base",
-    ],
-)
-
-env.Library(
     target="commands",
     source=[
         "coll_mod_reply_validation.cpp",
@@ -947,16 +917,6 @@ env.CppUnitTest(
         "s/sharding_catalog_manager",
         "service_context_d_test_fixture",
         "shard_role_api",
-    ],
-)
-
-env.Library(
-    target="internal_transactions_feature_flag",
-    source=[
-        "internal_transactions_feature_flag_gen.cpp",
-    ],
-    LIBDEPS_PRIVATE=[
-        "server_base",
     ],
 )
 
@@ -1849,19 +1809,6 @@ env.Library(
 )
 
 env.Library(
-    target="index_commands_idl",
-    source=[
-        "create_indexes_gen.cpp",
-        "drop_indexes_gen.cpp",
-    ],
-    LIBDEPS_PRIVATE=[
-        "$BUILD_DIR/mongo/db/auth/authprivilege",
-        "$BUILD_DIR/mongo/db/catalog/commit_quorum_options",
-        "server_base",
-    ],
-)
-
-env.Library(
     target="error_labels",
     source=[
         "error_labels.cpp",
@@ -1944,27 +1891,6 @@ env.Library(
 )
 
 env.Library(
-    target="snapshot_window_options",
-    source=[
-        "snapshot_window_options_gen.cpp",
-    ],
-    LIBDEPS_PRIVATE=[
-        "server_base",
-    ],
-)
-
-env.Library(
-    target="signed_logical_time",
-    source=[
-        "signed_logical_time.cpp",
-    ],
-    LIBDEPS_PRIVATE=[
-        "$BUILD_DIR/mongo/crypto/sha1_block",
-        "server_base",
-    ],
-)
-
-env.Library(
     target="rs_local_client",
     source=[
         "rs_local_client.cpp",
@@ -1974,16 +1900,6 @@ env.Library(
         "dbdirectclient",
         "repl/repl_coordinator_interface",
         "rw_concern_d",
-    ],
-)
-
-env.Library(
-    target="keys_collection_document",
-    source=[
-        "keys_collection_document_gen.cpp",
-    ],
-    LIBDEPS_PRIVATE=[
-        "server_base",
     ],
 )
 
@@ -2109,17 +2025,6 @@ env.Library(
     ],
 )
 
-env.Library(
-    target="feature_compatibility_version_metrics",
-    source=[
-        "feature_compatibility_version_metrics.cpp",
-    ],
-    LIBDEPS_PRIVATE=[
-        "$BUILD_DIR/mongo/db/commands/server_status_core",
-        "server_base",
-    ],
-)
-
 # This library is the base class for tests which require the presence of ServiceContext. However it
 # does not perform any default initialisation of the relevant services, such as lockers and
 # transaction resources, so any test which directly references it must perform its own
@@ -2185,17 +2090,6 @@ env.Library(
         "repl/repl_coordinator_interface",
         "repl/repl_settings",
         "repl/replica_set_messages",
-    ],
-)
-
-env.Library(
-    target="cursor_server_params",
-    source=[
-        "cursor_server_params.cpp",
-        "cursor_server_params_gen.cpp",
-    ],
-    LIBDEPS_PRIVATE=[
-        "server_base",
     ],
 )
 

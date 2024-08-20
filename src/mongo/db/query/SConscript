@@ -151,17 +151,6 @@ env.Library(
 )
 
 env.Library(
-    target="index_hint",
-    source=[
-        "index_hint_gen.cpp",
-        "index_hint.cpp",
-    ],
-    LIBDEPS_PRIVATE=[
-        "$BUILD_DIR/mongo/db/server_base",
-    ],
-)
-
-env.Library(
     target="bucket_predicate_generator",
     source=[
         "timeseries/bucket_spec.cpp",
@@ -215,27 +204,6 @@ env.Library(
         "$BUILD_DIR/mongo/db/server_base",
         "$BUILD_DIR/mongo/db/service_context",
         "$BUILD_DIR/mongo/transport/transport_layer_common",
-    ],
-)
-
-env.Library(
-    target="map_reduce_output_format",
-    source=[
-        "map_reduce_output_format.cpp",
-    ],
-    LIBDEPS_PRIVATE=[
-        "$BUILD_DIR/mongo/db/server_base",
-    ],
-)
-
-env.Library(
-    target="cursor_response_idl",
-    source=[
-        "cursor_idl_validator.cpp",
-        "cursor_response_gen.cpp",
-    ],
-    LIBDEPS_PRIVATE=[
-        "$BUILD_DIR/mongo/db/server_base",
     ],
 )
 

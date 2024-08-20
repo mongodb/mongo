@@ -280,27 +280,6 @@ env.Library(
 )
 
 env.Library(
-    target="authprivilege",
-    source=[
-        "access_checks_gen.cpp",
-        "action_set.cpp",
-        "action_type.cpp",
-        "action_type_gen.cpp",
-        "authorization_contract.cpp",
-        "parsed_privilege_gen.cpp",
-        "privilege.cpp",
-        "resource_pattern.cpp",
-    ],
-    LIBDEPS_PRIVATE=[
-        "$BUILD_DIR/mongo/base",
-        "$BUILD_DIR/mongo/bson/mutable/mutable_bson",
-        "$BUILD_DIR/mongo/db/common",
-        "$BUILD_DIR/mongo/db/server_base",
-        "$BUILD_DIR/mongo/idl/idl_parser",
-    ],
-)
-
-env.Library(
     target="auth_umc",
     source=[
         "impersonation_session.cpp",

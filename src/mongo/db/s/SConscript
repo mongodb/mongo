@@ -729,12 +729,6 @@ env.Library(
     ],
 )
 
-env.Library(
-    target="resharding_server_parameters_idl",
-    source=["resharding/resharding_server_parameters_gen.cpp"],
-    LIBDEPS_PRIVATE=["$BUILD_DIR/mongo/db/server_base"],
-)
-
 env.CppUnitTest(
     target="shard_server_op_observer_test",
     source=[

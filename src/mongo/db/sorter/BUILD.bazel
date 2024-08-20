@@ -16,3 +16,17 @@ idl_generator(
         "//src/mongo/db:basic_types_gen",
     ],
 )
+
+mongo_cc_library(
+    name = "sorter_stats",
+    srcs = [
+        "sorter_stats.cpp",
+    ],
+    hdrs = [
+        "sorter_stats.h",
+    ],
+    deps = [
+        "//src/mongo:base",
+        "//src/mongo/db/commands:server_status_core",
+    ],
+)

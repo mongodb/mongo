@@ -389,3 +389,13 @@ mongo_cc_library(
         "//src/mongo/idl:idl_parser",
     ],
 )
+
+mongo_cc_library(
+    name = "change_stream_preimage",
+    srcs = [
+        ":change_stream_preimage_gen",
+    ],
+    deps = [
+        "//src/mongo/db:server_base",
+    ],
+)

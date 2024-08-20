@@ -35,3 +35,13 @@ idl_generator(
         "//src/mongo/idl:generic_argument_gen",
     ],
 )
+
+mongo_cc_library(
+    name = "serverless_types_idl",
+    srcs = [
+        ":serverless_types_gen",
+    ],
+    deps = [
+        "//src/mongo/db:server_base",
+    ],
+)

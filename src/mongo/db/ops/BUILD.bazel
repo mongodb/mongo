@@ -42,3 +42,18 @@ idl_generator(
         "//src/mongo/db/session:logical_session_id_gen",
     ],
 )
+
+mongo_cc_library(
+    name = "delete_request_idl",
+    srcs = [
+        ":delete_request_gen",
+    ],
+    header_deps = [
+        "//src/mongo/db/repl:oplog_buffer_batched_queue",
+        "//src/mongo/db/commands:server_status_core",
+    ],
+    deps = [
+        "//src/mongo/db:server_base",
+        "//src/mongo/db/pipeline:runtime_constants_idl",
+    ],
+)

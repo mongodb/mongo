@@ -163,3 +163,41 @@ mongo_cc_library(
         "//src/mongo:base",
     ],
 )
+
+mongo_cc_library(
+    name = "cursor_response_idl",
+    srcs = [
+        "cursor_idl_validator.cpp",
+        "cursor_response_gen",
+    ],
+    deps = [
+        "//src/mongo/db:server_base",
+    ],
+)
+
+mongo_cc_library(
+    name = "index_hint",
+    srcs = [
+        "index_hint.cpp",
+        ":index_hint_gen",
+    ],
+    header_deps = [
+        "//src/mongo/db/repl:oplog_buffer_batched_queue",
+    ],
+    deps = [
+        "//src/mongo/db:server_base",
+    ],
+)
+
+mongo_cc_library(
+    name = "map_reduce_output_format",
+    srcs = [
+        "map_reduce_output_format.cpp",
+    ],
+    hdrs = [
+        "map_reduce_output_format.h",
+    ],
+    deps = [
+        "//src/mongo/db:server_base",
+    ],
+)

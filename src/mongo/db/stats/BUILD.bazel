@@ -52,3 +52,15 @@ mongo_cc_library(
         "//src/mongo:base",
     ],
 )
+
+mongo_cc_library(
+    name = "counters",
+    srcs = [
+        "counters.cpp",
+    ],
+    deps = [
+        "//src/mongo:base",
+        "//src/mongo/db/commands:server_status_core",
+        "//src/mongo/util/concurrency:spin_lock",
+    ],
+)
