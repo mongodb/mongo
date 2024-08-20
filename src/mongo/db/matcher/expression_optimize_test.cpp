@@ -522,6 +522,34 @@ TEST(ExpressionOptimizeTest, PartialOrToInRewriteDoesNotGenerateDirectlyNestedOr
     }
 }
 
+TEST(ExpressionOptimizeTest, NorAlwaysTrueOptimizesToAlwaysFalse) {
+    BSONObj obj = fromjson("{$nor: [{$alwaysTrue: 1}]}");
+    std::unique_ptr<MatchExpression> matchExpression(parseMatchExpression(obj));
+    auto optimizedMatchExpression = MatchExpression::optimize(std::move(matchExpression));
+    ASSERT_BSONOBJ_EQ(optimizedMatchExpression->serialize(), fromjson("{$alwaysFalse: 1}"));
+}
+
+TEST(ExpressionOptimizeTest, NorAlwaysFalseOptimizesToEmptyExpression) {
+    BSONObj obj = fromjson("{$nor: [{$alwaysFalse: 1}]}");
+    std::unique_ptr<MatchExpression> matchExpression(parseMatchExpression(obj));
+    auto optimizedMatchExpression = MatchExpression::optimize(std::move(matchExpression));
+    ASSERT_BSONOBJ_EQ(optimizedMatchExpression->serialize(), fromjson("{}"));
+}
+
+TEST(ExpressionOptimizeTest, NorNorAlwaysTrueOptimizesToEmptyExpression) {
+    BSONObj obj = fromjson("{$nor: [{$nor: [{$alwaysTrue: 1}]}]}");
+    std::unique_ptr<MatchExpression> matchExpression(parseMatchExpression(obj));
+    auto optimizedMatchExpression = MatchExpression::optimize(std::move(matchExpression));
+    ASSERT_BSONOBJ_EQ(optimizedMatchExpression->serialize(), fromjson("{}"));
+}
+
+TEST(ExpressionOptimizeTest, NorNorAlwaysFalseOptimizesToAlwaysTrue) {
+    BSONObj obj = fromjson("{$nor: [{$nor: [{$alwaysFalse: 1}]}]}");
+    std::unique_ptr<MatchExpression> matchExpression(parseMatchExpression(obj));
+    auto optimizedMatchExpression = MatchExpression::optimize(std::move(matchExpression));
+    ASSERT_BSONOBJ_EQ(optimizedMatchExpression->serialize(), fromjson("{$alwaysFalse: 1}"));
+}
+
 TEST(ExpressionOptimizeTest, NorRemovesAlwaysFalseChildren) {
     BSONObj obj = fromjson("{$nor: [{a: 1}, {$alwaysFalse: 1}]}");
     std::unique_ptr<MatchExpression> matchExpression(parseMatchExpression(obj));

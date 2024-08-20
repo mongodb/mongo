@@ -1,7 +1,7 @@
 /**
  * Tests for optimizations applied to trivially false predicates in aggregate pipelines.
  * @tags: [
- *   requires_fcv_73,
+ *   requires_fcv_81,
  *   # Tests run here require explaining plans on aggregate commands that could be incomplete
  *   # during stepdown
  *   does_not_support_stepdowns,
@@ -175,3 +175,79 @@ queryResults.forEach(
         outputRecord.side,
         "local",
         `All expected documents should be from ${localCollName} collection (have side = local)`));
+
+jsTestLog(
+    "Testing $nor+$alwaysTrue optimization with $lookup stages. Always false local branch. Inequality lookup condition");
+
+query = [
+    { $match: { $nor: [ { $alwaysTrue: 1 } ] } },
+    { $lookup: {
+        from: foreignCollName,
+        let: { a: "$a" },
+        pipeline: [
+            { $match:
+                { $expr:
+                    { $and:
+                        [ { $eq: [ "$b", "$$a" ] } ]
+                    }
+                }
+            }
+        ],
+        as: "foreignSide"
+    }}
+];
+explain = localColl.explain().aggregate(query);
+assert(isEofPlan(db, getWinningPlanFromExplain(explain)));
+
+queryResults = localColl.aggregate(query).toArray();
+assert.eq(queryResults.length, 0, "Expected empty resultset");
+
+jsTestLog(
+    "Testing $nor+{$nor+$alwaysFalse} optimization with $lookup stages. Always false local branch.Inequality lookup condition ");
+
+query = [
+    { $match: { $nor: [ {$nor: [{$alwaysFalse: 1}]}] }},
+    { $lookup: {
+        from: foreignCollName,
+        let: { a: "$a" },
+        pipeline: [
+            { $match:
+                { $expr:
+                    { $and:
+                        [ { $eq: [ "$b", "$$a" ] } ]
+                    }
+                }
+            }
+        ],
+        as: "foreignSide"
+    }}
+];
+explain = localColl.explain().aggregate(query);
+assert(isEofPlan(db, getWinningPlanFromExplain(explain)));
+
+queryResults = localColl.aggregate(query).toArray();
+assert.eq(queryResults.length, 0, "Expected empty resultset");
+
+jsTestLog("Testing $nor+$alwaysFalse optimization with $lookup stages.");
+
+query = [
+    { $match: { $nor: [ { $alwaysFalse: 1 } ] } },
+    { $lookup: {
+        from: foreignCollName,
+        let: { a: "$a" },
+        pipeline: [
+            { $match:
+                { $expr:
+                    { $and:
+                        [ { $eq: [ "$b", "$$a" ] } ]
+                    }
+                }
+            }
+        ],
+        as: "foreignSide"
+    }}
+];
+explain = localColl.explain().aggregate(query);
+let winningPlan = getWinningPlanFromExplain(explain);
+assert(!isEofPlan(db, winningPlan));
+assert(!winningPlan.filter || bsonWoCompare(winningPlan.filter, {}) == 0);

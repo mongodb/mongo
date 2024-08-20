@@ -7,7 +7,12 @@
  * ]
  */
 
-import {getPlanStages, getWinningPlanFromExplain, isEofPlan} from "jstests/libs/analyze_plan.js";
+import {
+    assertNoFetchFilter,
+    getPlanStages,
+    getWinningPlanFromExplain,
+    isEofPlan
+} from "jstests/libs/analyze_plan.js";
 import {assertDropAndRecreateCollection} from "jstests/libs/collection_drop_recreate.js";
 
 const collName = "jstests_explain_find_trivially_false_predicates";
@@ -36,4 +41,17 @@ const collName = "jstests_explain_find_trivially_false_predicates";
     assert(isEofPlan(db, winningPlan));
     eofStages = getPlanStages(winningPlan, "EOF");
     eofStages.forEach(stage => assert.eq(stage.type, "predicateEvalsToFalse"));
+
+    explain = coll.find({$nor: [{$alwaysTrue: 1}]}).explain();
+    winningPlan = getWinningPlanFromExplain(explain);
+    assert(isEofPlan(db, winningPlan));
+
+    explain = coll.find({$nor: [{$nor: [{$alwaysFalse: 1}]}]}).explain();
+    winningPlan = getWinningPlanFromExplain(explain);
+    assert(isEofPlan(db, winningPlan));
+
+    explain = coll.find({$nor: [{$alwaysFalse: 1}]}).explain();
+    winningPlan = getWinningPlanFromExplain(explain);
+    assert(!isEofPlan(db, winningPlan));
+    assert(!winningPlan.filter || bsonWoCompare(winningPlan.filter, {}) == 0);
 });

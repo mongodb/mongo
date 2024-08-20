@@ -502,6 +502,14 @@ TEST(ExpressionSimplifierTests, NorAlwaysBoolean) {
     assertSimplification(*parse(query), alwaysFalse);
     query = fromjson("{$nor: [{$alwaysFalse: 1}, {$alwaysTrue: 1}]}");
     assertSimplification(*parse(query), alwaysFalse);
+    query = fromjson("{$nor: [{$nor: [{$alwaysTrue:1}]}]}");
+    assertSimplification(*parse(query), alwaysTrue);
+    query = fromjson("{$nor: [{$nor: [{$alwaysFalse:1}]}]}");
+    assertSimplification(*parse(query), alwaysFalse);
+    query = fromjson("{$and: [{$alwaysTrue:1}, {$nor: [{$alwaysTrue : 1}]}]}");
+    assertSimplification(*parse(query), alwaysFalse);
+    query = fromjson("{$or: [{$nor: [{$nor: [{$nor: [{$alwaysTrue : 1}]}]}]}, {$alwaysFalse: 1}]}");
+    assertSimplification(*parse(query), alwaysFalse);
 }
 
 }  // namespace

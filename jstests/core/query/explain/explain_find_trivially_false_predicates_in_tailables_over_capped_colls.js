@@ -26,6 +26,14 @@ assert(isEofPlan(db, explain));
 let eofStages = getPlanStages(winningPlan, "EOF");
 eofStages.forEach(stage => assert.eq(stage.type, "predicateEvalsToFalse"));
 
+explain = coll.find({$nor: [{$alwaysTrue: 1}]}).tailable({awaitData: true}).explain();
+winningPlan = getWinningPlanFromExplain(explain);
+assert(isEofPlan(db, explain));
+
+explain = coll.find({$nor: [{$nor: [{$alwaysFalse: 1}]}]}).tailable({awaitData: true}).explain();
+winningPlan = getWinningPlanFromExplain(explain);
+assert(isEofPlan(db, explain));
+
 // It also uses EOF for queries including projection, sorting, limit and skip arguments.
 explain = coll.find({$alwaysFalse: 1}, {_id: 0, a: 1})
               .skip(1)
@@ -36,3 +44,28 @@ winningPlan = getWinningPlanFromExplain(explain);
 assert(isEofPlan(db, winningPlan));
 eofStages = getPlanStages(winningPlan, "EOF");
 eofStages.forEach(stage => assert.eq(stage.type, "predicateEvalsToFalse"));
+
+explain = coll.find({$nor: [{$alwaysTrue: 1}]}, {_id: 0, a: 1})
+              .skip(1)
+              .limit(2)
+              .tailable({awaitData: true})
+              .explain();
+winningPlan = getWinningPlanFromExplain(explain);
+assert(isEofPlan(db, winningPlan));
+
+explain = coll.find({$nor: [{$nor: [{$alwaysFalse: 1}]}]}, {_id: 0, a: 1})
+              .skip(1)
+              .limit(2)
+              .tailable({awaitData: true})
+              .explain();
+winningPlan = getWinningPlanFromExplain(explain);
+assert(isEofPlan(db, winningPlan));
+
+explain = coll.find({$nor: [{$alwaysFalse: 1}]}, {_id: 0, a: 1})
+              .skip(1)
+              .limit(2)
+              .tailable({awaitData: true})
+              .explain();
+winningPlan = getWinningPlanFromExplain(explain);
+assert(!isEofPlan(db, winningPlan));
+assert(!winningPlan.filter || bsonWoCompare(winningPlan.filter, {}) == 0);

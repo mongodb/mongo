@@ -239,8 +239,14 @@ MatchExpression::ExpressionOptimizerFunc ListOfMatchExpression::getOptimizer() c
                 auto simplifiedExpression = std::move(children.front());
                 children.clear();
                 return simplifiedExpression;
-            } else if (matchType == NOR) {
-                // Simplify NOR of exactly one operand to NOT of that operand.
+            } else if (matchType == NOR && !children.front()->isTriviallyTrue()) {
+                // All children of NOR that are $alwaysFalse are removed above. NOR containing an
+                // expression that is $alwaysTrue is simplified to $alwaysFalse below. There is no
+                // need to deal with these cases separately.
+                // The else if statement above helps avoid invalid conversion from $nor+$alwaysTrue
+                // to $not+$alwaysTrue.
+
+                // Simplify NOR of exactly one operand to NOT of that operand in all other cases.
                 auto simplifiedExpression =
                     std::make_unique<NotMatchExpression>(std::move(children.front()));
                 children.clear();
