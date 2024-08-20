@@ -1518,9 +1518,10 @@ def idl_generator_impl(ctx):
     # path so all modules can be found by the toolchain.
     python_path = []
     for py_dep in ctx.attr.py_deps:
-        for dep in py_dep[PyInfo].transitive_sources.to_list():
-            if dep.path not in python_path:
-                python_path.append(dep.path)
+        for path in py_dep[PyInfo].imports.to_list():
+            if path not in python_path:
+                python_path.append(ctx.expand_make_variables("python_library_imports", "$(BINDIR)/external/" + path, ctx.var))
+
     py_depsets = [py_dep[PyInfo].transitive_sources for py_dep in ctx.attr.py_deps]
 
     inputs = depset(transitive = [

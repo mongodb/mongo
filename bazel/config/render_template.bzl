@@ -4,9 +4,9 @@ def render_template_impl(ctx):
 
     python_path = []
     for py_dep in ctx.attr.python_libs:
-        for dep in py_dep[PyInfo].transitive_sources.to_list():
-            if dep.path not in python_path:
-                python_path.append(dep.path)
+        for path in py_dep[PyInfo].imports.to_list():
+            if path not in python_path:
+                python_path.append(ctx.expand_make_variables("python_library_imports", "$(BINDIR)/external/" + path, ctx.var))
 
     expanded_args = [
         ctx.expand_make_variables("render_template_expand", ctx.expand_location(arg, ctx.attr.srcs), ctx.var)
