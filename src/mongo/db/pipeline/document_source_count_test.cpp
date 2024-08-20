@@ -144,5 +144,12 @@ TEST_F(InvalidCountSpec, PeriodInStringSpec) {
                         << "test.string");
     ASSERT_THROWS_CODE(createCount(spec), AssertionException, 40160);
 }
+
+TEST_F(InvalidCountSpec, IDAsStringSpec) {
+    BSONObj spec = BSON("$count"
+                        << "_id");
+    ASSERT_THROWS_CODE(createCount(spec), AssertionException, 9039800);
+}
+
 }  // namespace
 }  // namespace mongo

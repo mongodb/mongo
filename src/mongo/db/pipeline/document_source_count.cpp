@@ -79,6 +79,8 @@ list<intrusive_ptr<DocumentSource>> DocumentSourceCount::createFromBson(
             str::stream() << "the count field cannot contain '.'",
             elemString.find('.') == string::npos);
 
+    uassert(9039800, str::stream() << "the count field cannot be '_id'", elemString != "_id");
+
     BSONObj groupObj = BSON("$group" << BSON("_id" << BSONNULL << elemString << BSON("$sum" << 1)));
     BSONObj projectObj = BSON("$project" << BSON("_id" << 0 << elemString << 1));
 
