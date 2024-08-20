@@ -5,6 +5,7 @@
 [jsTest] ----
 
 {  "a" : "" }
+{  "a" : "A somewhat large string" }
 {  "a" : "A" }
 {  "a" : "a" }
 {  "a" : "😀" }
@@ -67,6 +68,7 @@
 {  "a" : UUID("167c25c0-4f45-488a-960a-3171ec07726b") }
 {  "a" : UUID("326d92af-2d76-452b-a03f-69f05ab98416") }
 {  "a" : [ "" ] }
+{  "a" : [ "A somewhat large string" ] }
 {  "a" : [ "A" ] }
 {  "a" : [ "a" ] }
 {  "a" : [ "😀" ] }
@@ -149,6 +151,7 @@
 {  "a" : undefined }
 {  "a" : {   } }
 {  "a" : {  "x" : "" } }
+{  "a" : {  "x" : "A somewhat large string" } }
 {  "a" : {  "x" : "A" } }
 {  "a" : {  "x" : "a" } }
 {  "a" : {  "x" : "😀" } }
@@ -223,7 +226,7 @@
 {  "a" : {  "x" : { "$minKey" : 1 } } }
 {  "a" : { "$maxKey" : 1 } }
 {  "a" : { "$minKey" : 1 } }
-Collection count: 213
+Collection count: 216
 
 
 [jsTest] ----
@@ -428,6 +431,14 @@ Collection count: 213
 
 {  "a" : "😀" }
 {  "a" : [ "😀" ] }
+
+
+[jsTest] ----
+[jsTest] Query: {  "find" : "query_golden_eq",  "filter" : {  "a" : {  "$eq" : "A somewhat large string" } },  "projection" : {  "_id" : 0 } }
+[jsTest] ----
+
+{  "a" : "A somewhat large string" }
+{  "a" : [ "A somewhat large string" ] }
 
 
 [jsTest] ----

@@ -30,8 +30,7 @@ assert.commandWorked(bpDb.createCollection(bpColl.getName(), {
 
 // 'bsonVals' is an array containing all types of BSON values, including extreme values per type.
 let bsonVals = leafs();
-// leafs() does not return any long strings.
-bsonVals.push("A somewhat long string.");
+// leafs() only returns small and medium length strings
 bsonVals.push("A much longer string..............................................................");
 const numBsonVals = bsonVals.length;
 // We want 'numBsonVals' to be a prime number to avoid harmonics in the test case generation.

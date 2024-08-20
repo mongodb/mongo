@@ -3,6 +3,7 @@
 
 // Generates interesting "leaf" values: values that don't contain other values.
 // This includes [] and {}.
+// Exception: generates a large string that creates a value on the heap.
 export function leafs() {
     // See bsontypes.h or https://bsonspec.org/ for a complete list of BSON types.
     // Not every type is represented here.
@@ -33,6 +34,7 @@ export function leafs() {
         "a",
         "A",
         "\u{1f600}",  // A code point that doesn't fit in a 16-bit unit. (A smiley emoji.)
+        "A somewhat large string",  // a 'large' string that creates a value on the heap
 
         // Object
         {},
