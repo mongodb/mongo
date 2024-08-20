@@ -43,7 +43,6 @@
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/expression_context_for_test.h"
 #include "mongo/db/pipeline/pipeline.h"
-#include "mongo/db/query/cqf_command_utils.h"
 #include "mongo/db/query/optimizer/defs.h"
 #include "mongo/db/query/optimizer/metadata.h"
 #include "mongo/db/query/optimizer/node.h"  // IWYU pragma: keep
@@ -88,13 +87,6 @@ public:
             Pipeline::parse(pipeline, expCtx);
         parsedPipeline->optimizePipeline();
         QueryParameterMap queryParameters;
-
-        if (!isEligibleForBonsai_forTesting(testServiceContext.getServiceContext(),
-                                            *parsedPipeline.get())
-                 .isFullyEligible()) {
-            state.SkipWithError("Pipeline is not supported by CQF");
-            return;
-        }
 
         // This is where recording starts.
         for (auto keepRunning : state) {

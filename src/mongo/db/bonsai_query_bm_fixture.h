@@ -78,124 +78,94 @@ public:
     void benchmarkOneStage(benchmark::State& state);
     void benchmarkTwoStages(benchmark::State& state);
     void benchmarkTwentyStages(benchmark::State& state);
-
-    void benchmarkMatchBitsAllClear(benchmark::State& state);
-    void benchmarkMatchManyEqualitiesThenBitsAllClear(benchmark::State& state);
-    void benchmarkProjectRound(benchmark::State& state);
-    void benchmarkProjectManyInclusionsThenRound(benchmark::State& state);
-
-    void benchmarkSampleStage(benchmark::State& state);
-    void benchmarkManyStagesThenSample(benchmark::State& state);
-    void benchmarkSampleThenManyStages(benchmark::State& state);
 };
 
 // These benchmarks cover some simple queries which are currently CQF-eligible. As more support
 // is added to CQF, more benchmarks may be added here as needed.
-#define BENCHMARK_MQL_TRANSLATION(Fixture)                                                \
-                                                                                          \
-    BENCHMARK_F(Fixture, Match)(benchmark::State & state) {                               \
-        benchmarkMatch(state);                                                            \
-    }                                                                                     \
-    BENCHMARK_F(Fixture, MatchTwoFields)(benchmark::State & state) {                      \
-        benchmarkMatchTwoFields(state);                                                   \
-    }                                                                                     \
-    BENCHMARK_F(Fixture, MatchTwentyFields)(benchmark::State & state) {                   \
-        benchmarkMatchTwentyFields(state);                                                \
-    }                                                                                     \
-    BENCHMARK_F(Fixture, MatchDepthTwo)(benchmark::State & state) {                       \
-        benchmarkMatchDepthTwo(state);                                                    \
-    }                                                                                     \
-    BENCHMARK_F(Fixture, MatchDepthTwenty)(benchmark::State & state) {                    \
-        benchmarkMatchDepthTwenty(state);                                                 \
-    }                                                                                     \
-    BENCHMARK_F(Fixture, MatchGtLt)(benchmark::State & state) {                           \
-        benchmarkMatchGtLt(state);                                                        \
-    }                                                                                     \
-    BENCHMARK_F(Fixture, MatchIn)(benchmark::State & state) {                             \
-        benchmarkMatchIn(state);                                                          \
-    }                                                                                     \
-    BENCHMARK_F(Fixture, MatchInLarge)(benchmark::State & state) {                        \
-        benchmarkMatchInLarge(state);                                                     \
-    }                                                                                     \
-    BENCHMARK_F(Fixture, MatchSize)(benchmark::State & state) {                           \
-        benchmarkMatchSize(state);                                                        \
-    }                                                                                     \
-    BENCHMARK_F(Fixture, MatchElemMatch)(benchmark::State & state) {                      \
-        benchmarkMatchElemMatch(state);                                                   \
-    }                                                                                     \
-    BENCHMARK_F(Fixture, MatchComplex)(benchmark::State & state) {                        \
-        benchmarkMatchComplex(state);                                                     \
-    }                                                                                     \
-    BENCHMARK_F(Fixture, ProjectExclude)(benchmark::State & state) {                      \
-        benchmarkProjectExclude(state);                                                   \
-    }                                                                                     \
-    BENCHMARK_F(Fixture, ProjectInclude)(benchmark::State & state) {                      \
-        benchmarkProjectInclude(state);                                                   \
-    }                                                                                     \
-    BENCHMARK_F(Fixture, ProjectIncludeTwoFields)(benchmark::State & state) {             \
-        benchmarkProjectIncludeTwoFields(state);                                          \
-    }                                                                                     \
-    BENCHMARK_F(Fixture, ProjectIncludeTwentyFields)(benchmark::State & state) {          \
-        benchmarkProjectIncludeTwentyFields(state);                                       \
-    }                                                                                     \
-    BENCHMARK_F(Fixture, ProjectIncludeDepthTwo)(benchmark::State & state) {              \
-        benchmarkProjectIncludeDepthTwo(state);                                           \
-    }                                                                                     \
-    BENCHMARK_F(Fixture, ProjectIncludeDepthTwenty)(benchmark::State & state) {           \
-        benchmarkProjectIncludeDepthTwenty(state);                                        \
-    }                                                                                     \
-    BENCHMARK_F(Fixture, MatchProjectExclude)(benchmark::State & state) {                 \
-        benchmarkMatchProjectExclude(state);                                              \
-    }                                                                                     \
-    BENCHMARK_F(Fixture, MatchProjectInclude)(benchmark::State & state) {                 \
-        benchmarkMatchProjectInclude(state);                                              \
-    }                                                                                     \
-    BENCHMARK_F(Fixture, MatchProjectIncludeTwoFields)(benchmark::State & state) {        \
-        benchmarkMatchProjectIncludeTwoFields(state);                                     \
-    }                                                                                     \
-    BENCHMARK_F(Fixture, MatchProjectIncludeTwentyFields)(benchmark::State & state) {     \
-        benchmarkMatchProjectIncludeTwentyFields(state);                                  \
-    }                                                                                     \
-    BENCHMARK_F(Fixture, MatchProjectIncludeDepthTwo)(benchmark::State & state) {         \
-        benchmarkMatchProjectIncludeDepthTwo(state);                                      \
-    }                                                                                     \
-    BENCHMARK_F(Fixture, MatchProjectIncludeDepthTwenty)(benchmark::State & state) {      \
-        benchmarkMatchProjectIncludeDepthTwenty(state);                                   \
-    }                                                                                     \
-    BENCHMARK_F(Fixture, MatchBitsAllClear)(benchmark::State & state) {                   \
-        benchmarkMatchBitsAllClear(state);                                                \
-    }                                                                                     \
-    BENCHMARK_F(Fixture, MatchManyEqualitiesThenBitsAllClear)(benchmark::State & state) { \
-        benchmarkMatchManyEqualitiesThenBitsAllClear(state);                              \
-    }                                                                                     \
-    BENCHMARK_F(Fixture, ProjectRound)(benchmark::State & state) {                        \
-        benchmarkProjectRound(state);                                                     \
-    }                                                                                     \
-    BENCHMARK_F(Fixture, ProjectManyInclusionsThenRound)(benchmark::State & state) {      \
-        benchmarkProjectManyInclusionsThenRound(state);                                   \
+#define BENCHMARK_MQL_TRANSLATION(Fixture)                                            \
+                                                                                      \
+    BENCHMARK_F(Fixture, Match)(benchmark::State & state) {                           \
+        benchmarkMatch(state);                                                        \
+    }                                                                                 \
+    BENCHMARK_F(Fixture, MatchTwoFields)(benchmark::State & state) {                  \
+        benchmarkMatchTwoFields(state);                                               \
+    }                                                                                 \
+    BENCHMARK_F(Fixture, MatchTwentyFields)(benchmark::State & state) {               \
+        benchmarkMatchTwentyFields(state);                                            \
+    }                                                                                 \
+    BENCHMARK_F(Fixture, MatchDepthTwo)(benchmark::State & state) {                   \
+        benchmarkMatchDepthTwo(state);                                                \
+    }                                                                                 \
+    BENCHMARK_F(Fixture, MatchDepthTwenty)(benchmark::State & state) {                \
+        benchmarkMatchDepthTwenty(state);                                             \
+    }                                                                                 \
+    BENCHMARK_F(Fixture, MatchGtLt)(benchmark::State & state) {                       \
+        benchmarkMatchGtLt(state);                                                    \
+    }                                                                                 \
+    BENCHMARK_F(Fixture, MatchIn)(benchmark::State & state) {                         \
+        benchmarkMatchIn(state);                                                      \
+    }                                                                                 \
+    BENCHMARK_F(Fixture, MatchInLarge)(benchmark::State & state) {                    \
+        benchmarkMatchInLarge(state);                                                 \
+    }                                                                                 \
+    BENCHMARK_F(Fixture, MatchSize)(benchmark::State & state) {                       \
+        benchmarkMatchSize(state);                                                    \
+    }                                                                                 \
+    BENCHMARK_F(Fixture, MatchElemMatch)(benchmark::State & state) {                  \
+        benchmarkMatchElemMatch(state);                                               \
+    }                                                                                 \
+    BENCHMARK_F(Fixture, MatchComplex)(benchmark::State & state) {                    \
+        benchmarkMatchComplex(state);                                                 \
+    }                                                                                 \
+    BENCHMARK_F(Fixture, ProjectExclude)(benchmark::State & state) {                  \
+        benchmarkProjectExclude(state);                                               \
+    }                                                                                 \
+    BENCHMARK_F(Fixture, ProjectInclude)(benchmark::State & state) {                  \
+        benchmarkProjectInclude(state);                                               \
+    }                                                                                 \
+    BENCHMARK_F(Fixture, ProjectIncludeTwoFields)(benchmark::State & state) {         \
+        benchmarkProjectIncludeTwoFields(state);                                      \
+    }                                                                                 \
+    BENCHMARK_F(Fixture, ProjectIncludeTwentyFields)(benchmark::State & state) {      \
+        benchmarkProjectIncludeTwentyFields(state);                                   \
+    }                                                                                 \
+    BENCHMARK_F(Fixture, ProjectIncludeDepthTwo)(benchmark::State & state) {          \
+        benchmarkProjectIncludeDepthTwo(state);                                       \
+    }                                                                                 \
+    BENCHMARK_F(Fixture, ProjectIncludeDepthTwenty)(benchmark::State & state) {       \
+        benchmarkProjectIncludeDepthTwenty(state);                                    \
+    }                                                                                 \
+    BENCHMARK_F(Fixture, MatchProjectExclude)(benchmark::State & state) {             \
+        benchmarkMatchProjectExclude(state);                                          \
+    }                                                                                 \
+    BENCHMARK_F(Fixture, MatchProjectInclude)(benchmark::State & state) {             \
+        benchmarkMatchProjectInclude(state);                                          \
+    }                                                                                 \
+    BENCHMARK_F(Fixture, MatchProjectIncludeTwoFields)(benchmark::State & state) {    \
+        benchmarkMatchProjectIncludeTwoFields(state);                                 \
+    }                                                                                 \
+    BENCHMARK_F(Fixture, MatchProjectIncludeTwentyFields)(benchmark::State & state) { \
+        benchmarkMatchProjectIncludeTwentyFields(state);                              \
+    }                                                                                 \
+    BENCHMARK_F(Fixture, MatchProjectIncludeDepthTwo)(benchmark::State & state) {     \
+        benchmarkMatchProjectIncludeDepthTwo(state);                                  \
+    }                                                                                 \
+    BENCHMARK_F(Fixture, MatchProjectIncludeDepthTwenty)(benchmark::State & state) {  \
+        benchmarkMatchProjectIncludeDepthTwenty(state);                               \
     }
 
 // Queries which are expressed as pipelines should be added here because they cannot go through
 // find translation.
-#define BENCHMARK_MQL_PIPELINE_TRANSLATION(Fixture)                        \
-                                                                           \
-    BENCHMARK_F(Fixture, OneStage)(benchmark::State & state) {             \
-        benchmarkOneStage(state);                                          \
-    }                                                                      \
-    BENCHMARK_F(Fixture, TwoStages)(benchmark::State & state) {            \
-        benchmarkTwoStages(state);                                         \
-    }                                                                      \
-    BENCHMARK_F(Fixture, TwentyStages)(benchmark::State & state) {         \
-        benchmarkTwentyStages(state);                                      \
-    }                                                                      \
-    BENCHMARK_F(Fixture, SampleStage)(benchmark::State & state) {          \
-        benchmarkSampleStage(state);                                       \
-    }                                                                      \
-    BENCHMARK_F(Fixture, ManyStagesThenSample)(benchmark::State & state) { \
-        benchmarkManyStagesThenSample(state);                              \
-    }                                                                      \
-    BENCHMARK_F(Fixture, SampleThenManyStages)(benchmark::State & state) { \
-        benchmarkSampleThenManyStages(state);                              \
+#define BENCHMARK_MQL_PIPELINE_TRANSLATION(Fixture)                \
+                                                                   \
+    BENCHMARK_F(Fixture, OneStage)(benchmark::State & state) {     \
+        benchmarkOneStage(state);                                  \
+    }                                                              \
+    BENCHMARK_F(Fixture, TwoStages)(benchmark::State & state) {    \
+        benchmarkTwoStages(state);                                 \
+    }                                                              \
+    BENCHMARK_F(Fixture, TwentyStages)(benchmark::State & state) { \
+        benchmarkTwentyStages(state);                              \
     }
 
 // These benchmarks cover some simple queries which are eligible for the Bonsai plan cache.

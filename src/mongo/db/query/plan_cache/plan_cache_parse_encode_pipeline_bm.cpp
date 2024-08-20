@@ -37,7 +37,6 @@
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/expression_context_for_test.h"
 #include "mongo/db/pipeline/pipeline.h"
-#include "mongo/db/query/cqf_command_utils.h"
 #include "mongo/db/query/query_test_service_context.h"
 #include "mongo/util/intrusive_counter.h"
 

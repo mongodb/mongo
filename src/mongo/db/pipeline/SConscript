@@ -597,8 +597,6 @@ env.Library(
 env.Benchmark(
     target="abt_translation_bm",
     source=[
-        "abt/abt_fallback_mechanism_cq_bm.cpp",
-        "abt/abt_fallback_mechanism_pipeline_bm.cpp",
         "abt/abt_translate_cq_bm.cpp",
         "abt/abt_translate_pipeline_bm.cpp",
     ],

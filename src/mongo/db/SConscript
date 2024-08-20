@@ -1500,7 +1500,6 @@ execEnv.Library(
         "query/classic_runtime_planner_for_sbe/single_solution_passthrough_planner.cpp",
         "query/classic_runtime_planner_for_sbe/sub_planner.cpp",
         "query/stage_builder/classic_stage_builder.cpp",
-        "query/cqf_command_utils.cpp",
         "query/explain.cpp",
         "query/find.cpp",
         "query/get_executor.cpp",

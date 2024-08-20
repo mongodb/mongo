@@ -238,36 +238,6 @@ void BonsaiQueryBenchmarkFixture::benchmarkMatchProjectIncludeDepthTwenty(benchm
     benchmarkQueryMatchProject(state, match, project);
 }
 
-void BonsaiQueryBenchmarkFixture::benchmarkMatchBitsAllClear(benchmark::State& state) {
-    // $bitsAllClear is an unsupported match expression.
-    auto match = fromjson("{unsupportedExpr: {$bitsAllClear: [1, 5]}}");
-    benchmarkQueryMatchProject(state, match, BSONObj());
-}
-
-void BonsaiQueryBenchmarkFixture::benchmarkMatchManyEqualitiesThenBitsAllClear(
-    benchmark::State& state) {
-    // Build a match expression with simple equalities on several fields, then include one
-    // unsupported match expression ($bitsAllClear).
-    auto match = buildSimpleMatchSpec(20);
-    match = match.addField(fromjson("{unsupportedExpr: {$bitsAllClear: [1, 5]}}").firstElement());
-    benchmarkQueryMatchProject(state, match, BSONObj());
-}
-
-void BonsaiQueryBenchmarkFixture::benchmarkProjectRound(benchmark::State& state) {
-    // $round is an unsupported agg expression.
-    auto project = fromjson("{unsupportedExpr: {$round: ['$value', 1]}}");
-    benchmarkQueryMatchProject(state, BSONObj(), project);
-}
-
-void BonsaiQueryBenchmarkFixture::benchmarkProjectManyInclusionsThenRound(benchmark::State& state) {
-    // Build a projection with simple inclusions on several fields, then include add an unsupported
-    // computed expression ($round).
-    auto project = buildSimpleProjectSpec(20, false /*isExclusion*/);
-    project =
-        project.addField(fromjson("{unsupportedExpr: {$round: ['$value', 1]}}").firstElement());
-    benchmarkQueryMatchProject(state, BSONObj(), project);
-}
-
 void BonsaiQueryBenchmarkFixture::benchmarkOneStage(benchmark::State& state) {
     // Builds a match on a simple field.
     std::vector<BSONObj> pipeline;
@@ -291,40 +261,6 @@ void BonsaiQueryBenchmarkFixture::benchmarkTwentyStages(benchmark::State& state)
         pipeline.push_back(BSON("$match" << buildNestedMatchSpec(3, i)));
         pipeline.push_back(BSON("$project" << buildNestedProjectSpec(3, true /*exclusion*/, i)));
     }
-    benchmarkPipeline(state, pipeline);
-}
-
-void BonsaiQueryBenchmarkFixture::benchmarkSampleStage(benchmark::State& state) {
-    std::vector<BSONObj> pipeline{fromjson("{$sample: {size: 4}}")};
-    benchmarkPipeline(state, pipeline);
-}
-void BonsaiQueryBenchmarkFixture::benchmarkManyStagesThenSample(benchmark::State& state) {
-    // Builds a sequence of alternating $match and $project stages which match on a nested field and
-    // then exclude that field.
-    std::vector<BSONObj> pipeline;
-    for (int i = 0; i < 10; i++) {
-        pipeline.push_back(BSON("$match" << buildNestedMatchSpec(3, i)));
-        pipeline.push_back(BSON("$project" << buildNestedProjectSpec(3, true /*exclusion*/, i)));
-    }
-
-    // Finally, add an unsupported stage.
-    pipeline.push_back(fromjson("{$sample: {size: 4}}"));
-    benchmarkPipeline(state, pipeline);
-}
-
-void BonsaiQueryBenchmarkFixture::benchmarkSampleThenManyStages(benchmark::State& state) {
-    std::vector<BSONObj> pipeline;
-
-    // Add an unsupported stage.
-    pipeline.push_back(fromjson("{$sample: {size: 4}}"));
-
-    // Builds a sequence of alternating $match and $project stages which match on a nested field and
-    // then exclude that field.
-    for (int i = 0; i < 10; i++) {
-        pipeline.push_back(BSON("$match" << buildNestedMatchSpec(3, i)));
-        pipeline.push_back(BSON("$project" << buildNestedProjectSpec(3, true /*exclusion*/, i)));
-    }
-
     benchmarkPipeline(state, pipeline);
 }
 

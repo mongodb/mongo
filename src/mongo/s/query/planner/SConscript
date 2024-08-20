@@ -28,7 +28,6 @@ env.Library(
         "$BUILD_DIR/mongo/db/timeseries/timeseries_options",
         "$BUILD_DIR/mongo/s/query/exec/async_results_merger",
         "$BUILD_DIR/mongo/util/concurrency/spin_lock",
-        "cqf_utils",
     ],
 )
 
@@ -50,16 +49,5 @@ env.Library(
         "$BUILD_DIR/mongo/db/server_base",
         "$BUILD_DIR/mongo/s/sharding_router_api",
         "$BUILD_DIR/mongo/util/concurrency/spin_lock",
-    ],
-)
-
-env.Library(
-    target="cqf_utils",
-    source=[
-        "cqf_utils.cpp",
-    ],
-    LIBDEPS_PRIVATE=[
-        "$BUILD_DIR/mongo/db/pipeline/pipeline",
-        "$BUILD_DIR/mongo/s/query/exec/router_exec_stage",
     ],
 )

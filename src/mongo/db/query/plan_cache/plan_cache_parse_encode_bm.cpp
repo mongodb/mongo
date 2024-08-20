@@ -34,7 +34,6 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/query/canonical_query.h"
 #include "mongo/db/query/canonical_query_encoder.h"
-#include "mongo/db/query/cqf_command_utils.h"
 #include "mongo/db/query/find_command.h"
 #include "mongo/db/query/query_test_service_context.h"
 

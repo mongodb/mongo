@@ -40,7 +40,6 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/pipeline/abt/canonical_query_translation.h"
 #include "mongo/db/query/canonical_query.h"
-#include "mongo/db/query/cqf_command_utils.h"
 #include "mongo/db/query/find_command.h"
 #include "mongo/db/query/optimizer/defs.h"
 #include "mongo/db/query/optimizer/metadata.h"
@@ -81,11 +80,6 @@ public:
             CanonicalQueryParams{.expCtx = makeExpressionContext(opCtx.get(), *findCommand),
                                  .parsedFind = ParsedFindCommandParams{std::move(findCommand)}});
         QueryParameterMap qp;
-
-        if (!isEligibleForBonsai_forTesting(*cq).isFullyEligible()) {
-            state.SkipWithError("CanonicalQuery is not supported by CQF");
-            return;
-        }
 
         // This is where recording starts.
         for (auto keepRunning : state) {

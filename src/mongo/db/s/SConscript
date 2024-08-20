@@ -67,7 +67,6 @@ env.Library(
         "collection_sharding_state_factory_shard.cpp",
         "commit_chunk_migration_gen.cpp",
         "config_server_op_observer.cpp",
-        "cqf_utils.cpp",
         "document_source_analyze_shard_key_read_write_distribution.cpp",
         "document_source_analyze_shard_key_read_write_distribution_gen.cpp",
         "document_source_visitor_docs_needed_bounds.cpp",
