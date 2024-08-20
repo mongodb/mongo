@@ -397,9 +397,7 @@ void TLConnection::setup(Milliseconds timeout, SetupCallback cb, std::string ins
             << "Timed out connecting to " << _peer << " after " << timeout;
         handler->promise.setError(Status(ErrorCodes::HostUnreachable, std::move(reason)));
 
-        if (_client) {
-            _client->cancel();
-        }
+        cancel();
     });
 
 #ifdef MONGO_CONFIG_SSL
@@ -433,7 +431,10 @@ void TLConnection::setup(Milliseconds timeout, SetupCallback cb, std::string ins
         })
         .then([this, helloHook, instanceName = std::move(instanceName)](
                   AsyncDBClient::Handle client) {
-            _client = std::move(client);
+            {
+                stdx::lock_guard lk(_clientMutex);
+                _client = std::move(client);
+            }
             return _client->initWireVersion(instanceName, helloHook.get());
         })
         .then([this, helloHook]() -> Future<bool> {
@@ -547,9 +548,27 @@ Date_t TLConnection::now() {
     return _reactor->now();
 }
 
-void TLConnection::cancelAsync() {
-    if (_client)
-        _client->cancel();
+void TLConnection::cancel(bool endClient) {
+    auto client = [&] {
+        stdx::lock_guard lk(_clientMutex);
+        return _client;
+    }();
+
+    if (!client) {
+        return;
+    }
+
+    if (endClient) {
+        // This prevents any future operations from running, but in-progress ones may continue until
+        // we cancel.
+        _reactor->schedule([client](Status s) {
+            if (!s.isOK()) {
+                return;
+            }
+            client->end();
+        });
+    }
+    client->cancel();
 }
 
 void TLConnection::startConnAcquiredTimer() {

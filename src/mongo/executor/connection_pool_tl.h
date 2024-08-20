@@ -182,7 +182,7 @@ public:
     }
 
     void kill() override {
-        cancelAsync();
+        cancel(/*endClient=*/true);
     }
 
     const HostAndPort& getHostAndPort() const override;
@@ -199,7 +199,7 @@ private:
     void cancelTimeout() override;
     void setup(Milliseconds timeout, SetupCallback cb, std::string instanceName) override;
     void refresh(Milliseconds timeout, RefreshCallback cb) override;
-    void cancelAsync();
+    void cancel(bool endClient = false);
 
 private:
     transport::ReactorHandle _reactor;
@@ -217,7 +217,11 @@ private:
     NetworkConnectionHook* const _onConnectHook;
     // SSL context to use intead of the default one for this pool.
     const std::shared_ptr<const transport::SSLConnectionContext> _transientSSLContext;
-    AsyncDBClient::Handle _client;
+
+    // Guards assignment of the _client pointer.
+    // Do not need to acquire this in contexts where the pointer is known to be valid.
+    Mutex _clientMutex;
+    std::shared_ptr<AsyncDBClient> _client;
     ConnectionMetrics _connMetrics;
 };
 
