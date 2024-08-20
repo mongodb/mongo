@@ -52,7 +52,6 @@ env.Library(
         "rewrites/path_lower.cpp",
         "rewrites/proj_spec_lower.cpp",
         "rewrites/proj_spec_builder.cpp",
-        "rewrites/sampling_const_eval.cpp",
     ],
     LIBDEPS=[
         "optimizer_base",
