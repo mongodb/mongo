@@ -4,6 +4,8 @@
  * @tags: [requires_sharding]
  */
 
+import {ShardingTest} from "jstests/libs/shardingtest.js";
+
 var authzErrorCode = 13;
 var hasAuthzError = function(result) {
     assert(result instanceof WriteCommandError);
@@ -15,8 +17,8 @@ var st = new ShardingTest({
     config: 3,
     mongos: [
         {},
-        {setParameter: "userCacheInvalidationIntervalSecs=5"},
-        {setParameter: "userCacheInvalidationIntervalSecs=600"}
+        {setParameter: {userCacheInvalidationIntervalSecs: 5}},
+        {setParameter: {userCacheInvalidationIntervalSecs: 600}}
     ],
     keyFile: 'jstests/libs/key1'
 });

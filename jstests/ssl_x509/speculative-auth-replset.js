@@ -2,6 +2,8 @@
 // to each other during intra-cluster communication.
 // @tags: [requires_replication]
 
+import {ReplSetTest} from "jstests/libs/replsettest.js";
+
 const x509_options = {
     tlsMode: 'requireTLS',
     tlsCertificateKeyFile: 'jstests/libs/server.pem',

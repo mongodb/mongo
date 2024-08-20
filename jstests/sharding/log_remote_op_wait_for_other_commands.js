@@ -9,6 +9,7 @@
  * ]
  */
 import {iterateMatchingLogLines} from "jstests/libs/log.js";
+import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 const st = new ShardingTest({shards: 2, rs: {nodes: 1}});
 st.stopBalancer();

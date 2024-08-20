@@ -7,6 +7,7 @@
  */
 import {verifyGetDiagnosticData} from "jstests/libs/ftdc.js";
 import {Thread} from "jstests/libs/parallelTester.js";
+import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 function getDiagnosticData(mongos) {
     let db = mongos.getDB('admin');

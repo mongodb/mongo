@@ -1,4 +1,5 @@
 // tests to make sure that tag ranges are added/removed/updated successfully
+import {ShardingTest} from "jstests/libs/shardingtest.js";
 import {findChunksUtil} from "jstests/sharding/libs/find_chunks_util.js";
 
 const st = new ShardingTest({shards: 2, mongos: 1});

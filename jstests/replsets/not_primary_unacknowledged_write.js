@@ -2,6 +2,8 @@
  * Test that a secondary hangs up on an unacknowledged write.
  */
 
+import {ReplSetTest} from "jstests/libs/replsettest.js";
+
 function getNotPrimaryUnackWritesCounter() {
     return assert.commandWorked(primaryDB.adminCommand({serverStatus: 1}))
         .metrics.repl.network.notPrimaryUnacknowledgedWrites;

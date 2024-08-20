@@ -2,6 +2,8 @@
  * Test that chunk operations preserve collection UUID in config.chunks documents
  */
 
+import {ShardingTest} from "jstests/libs/shardingtest.js";
+
 let st = new ShardingTest({mongos: 1, shards: 3});
 
 const dbName = "test";

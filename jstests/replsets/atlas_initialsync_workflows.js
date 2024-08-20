@@ -1,6 +1,7 @@
 /**
  * This test simulates initial sync workflows which are performed by the Atlas automation agent.
  */
+import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {disconnectSecondaries, reconnectSecondaries, waitForState} from "jstests/replsets/rslib.js";
 
 const testName = TestData.testName;

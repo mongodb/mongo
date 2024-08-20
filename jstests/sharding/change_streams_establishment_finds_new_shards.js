@@ -4,6 +4,9 @@
 //   requires_majority_read_concern,
 //   uses_change_streams,
 // ]
+import {ReplSetTest} from "jstests/libs/replsettest.js";
+import {ShardingTest} from "jstests/libs/shardingtest.js";
+
 const rsNodeOptions = {
     // Use a higher frequency for periodic noops to speed up the test.
     setParameter: {periodicNoopIntervalSecs: 1, writePeriodicNoops: true}

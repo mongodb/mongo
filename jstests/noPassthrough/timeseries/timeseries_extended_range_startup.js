@@ -7,6 +7,8 @@
  *   requires_persistence,
  * ]
  */
+import {ReplSetTest} from "jstests/libs/replsettest.js";
+
 const getExtendedRangeCount = (db) => {
     return assert.commandWorked(db.adminCommand({serverStatus: 1}))
         .catalogStats.timeseriesExtendedRange;

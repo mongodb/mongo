@@ -3,6 +3,8 @@
  * @tags: [requires_sharding]
  */
 
+import {ShardingTest} from "jstests/libs/shardingtest.js";
+
 // Verify that system collections are treated correctly
 function runTest(admindb) {
     admindb.createUser({user: "admin", pwd: "pwd", roles: ["userAdminAnyDatabase"]});

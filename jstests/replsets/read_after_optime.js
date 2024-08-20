@@ -1,5 +1,7 @@
 // Test read after opTime functionality with maxTimeMS.
 
+import {ReplSetTest} from "jstests/libs/replsettest.js";
+
 var replTest = new ReplSetTest({nodes: 2});
 replTest.startSet();
 replTest.initiate();

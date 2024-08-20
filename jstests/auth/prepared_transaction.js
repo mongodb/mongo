@@ -5,6 +5,8 @@
  *
  * @tags: [uses_transactions, uses_prepare_transaction]
  */
+import {ReplSetTest} from "jstests/libs/replsettest.js";
+
 const rst = new ReplSetTest({nodes: 2, keyFile: "jstests/libs/key1"});
 rst.startSet();
 rst.initiate();

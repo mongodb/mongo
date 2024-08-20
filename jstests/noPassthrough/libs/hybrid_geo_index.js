@@ -1,4 +1,5 @@
 // Helper functions to test hybrid geo index builds
+import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {IndexBuildTest} from "jstests/noPassthrough/libs/index_build.js";
 
 export const Operation = Object.freeze({REMOVE: 0, UPDATE: 1});

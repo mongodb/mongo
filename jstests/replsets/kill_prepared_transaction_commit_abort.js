@@ -6,6 +6,7 @@
 
 import {PrepareHelpers} from "jstests/core/txns/libs/prepare_helpers.js";
 import {Thread} from "jstests/libs/parallelTester.js";
+import {ReplSetTest} from "jstests/libs/replsettest.js";
 
 const name = "kill_prepared_transaction_commit_abort";
 const rst = new ReplSetTest({

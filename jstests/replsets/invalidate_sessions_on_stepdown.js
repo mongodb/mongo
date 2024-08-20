@@ -3,6 +3,8 @@
  * primary. Mongos does this as an optimization.
  * @tags: [uses_transactions, uses_prepare_transaction]
  */
+import {ReplSetTest} from "jstests/libs/replsettest.js";
+
 const rst = new ReplSetTest({name: "invalidate_sessions_on_stepdown", nodes: 2});
 rst.startSet();
 rst.initiateWithHighElectionTimeout();

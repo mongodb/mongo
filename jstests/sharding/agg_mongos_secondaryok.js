@@ -7,6 +7,7 @@
  *   requires_profiling,
  * ]
  */
+import {ShardingTest} from "jstests/libs/shardingtest.js";
 import {awaitRSClientHosts} from "jstests/replsets/rslib.js";
 
 var NODES = 2;

@@ -1,6 +1,8 @@
 /**
  * Tests that the checkShardingIndex command checks shard version when run on a sharded collection.
  */
+import {ShardingTest} from "jstests/libs/shardingtest.js";
+
 const st = new ShardingTest({shards: 1});
 const dbName = "test";
 const collName = "foo";

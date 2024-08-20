@@ -12,6 +12,7 @@
  */
 
 import {runCommandWithSecurityToken} from "jstests/libs/multitenancy_utils.js";
+import {ReplSetTest} from "jstests/libs/replsettest.js";
 
 const keyFile = "jstests/libs/key1";
 const tenantId1 = ObjectId();

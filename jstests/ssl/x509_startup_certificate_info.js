@@ -1,5 +1,6 @@
 // Test for logging of certificate information
 
+import {ShardingTest} from "jstests/libs/shardingtest.js";
 import {determineSSLProvider} from "jstests/ssl/libs/ssl_helpers.js";
 
 const CA_CERT = "jstests/libs/ca.pem";

@@ -9,6 +9,7 @@ import {
     profilerHasAtLeastOneMatchingEntryOrThrow,
     profilerHasSingleMatchingEntryOrThrow,
 } from "jstests/libs/profiler.js";
+import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 const st = new ShardingTest({
     name: "change_stream_read_pref",

@@ -4,6 +4,8 @@
  *
  * @tags: [requires_replication]
  */
+import {ReplSetTest} from "jstests/libs/replsettest.js";
+
 const name = "server54064";
 const replSet = new ReplSetTest({
     name: name,

@@ -4,6 +4,7 @@
  * cluster `find` will use a higher level API that will retry on retryable error codes.
  */
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";
+import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 // Skip various checks that require talking to shard primaries (a primary is dropped as part
 // of the test).

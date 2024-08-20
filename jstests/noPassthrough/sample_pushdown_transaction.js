@@ -6,6 +6,7 @@
  * @tags: [requires_replication]
  */
 import {aggPlanHasStage} from "jstests/libs/analyze_plan.js";
+import {ReplSetTest} from "jstests/libs/replsettest.js";
 
 // Set up.
 const rst = new ReplSetTest({nodes: 1});

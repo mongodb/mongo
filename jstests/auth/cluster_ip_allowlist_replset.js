@@ -6,6 +6,7 @@
  */
 
 import {Thread} from "jstests/libs/parallelTester.js";
+import {ReplSetTest} from "jstests/libs/replsettest.js";
 
 const kKeyFile = 'jstests/libs/key1';
 const replTest = new ReplSetTest({nodes: 1, nodeOptions: {auth: ""}, keyFile: kKeyFile});

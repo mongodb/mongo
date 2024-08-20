@@ -2,6 +2,8 @@
 //   requires_sharding,
 // ]
 
+import {ShardingTest} from "jstests/libs/shardingtest.js";
+
 function runFixture(Fixture) {
     var fixture = new Fixture();
     var conn = fixture.getConn();

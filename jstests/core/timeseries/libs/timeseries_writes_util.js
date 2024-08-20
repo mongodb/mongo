@@ -3,6 +3,7 @@
  */
 
 import {getExecutionStages, getPlanStage, getQueryPlanner} from "jstests/libs/analyze_plan.js";
+import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 export const timeFieldName = "time";
 export const metaFieldName = "tag";

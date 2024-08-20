@@ -1,6 +1,7 @@
 // Basic $lookup regression tests.
 
 import {arrayEq, assertErrorCode} from "jstests/aggregation/extras/utils.js";
+import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 const st = new ShardingTest({shards: 2, mongos: 1});
 const testName = "lookup_sharded";

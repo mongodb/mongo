@@ -2,6 +2,8 @@
  * Test the balancerCollectionStatus command and its possible outputs
  */
 
+import {ShardingTest} from "jstests/libs/shardingtest.js";
+
 const chunkSizeMB = 1;
 let st = new ShardingTest({
     shards: 3,

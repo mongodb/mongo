@@ -3,6 +3,7 @@
  * except for the query stage.
  */
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";
+import {ReplSetTest} from "jstests/libs/replsettest.js";
 
 const testName = "initial_sync_survives_network_error.js";
 const rst = new ReplSetTest({name: testName, nodes: 1, useBridge: true});

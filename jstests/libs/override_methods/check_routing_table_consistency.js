@@ -1,6 +1,7 @@
 import {
     RoutingTableConsistencyChecker
 } from "jstests/libs/check_routing_table_consistency_helpers.js";
+import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 ShardingTest.prototype.checkRoutingTableConsistency = function() {
     if (jsTest.options().skipCheckRoutingTableConsistency) {

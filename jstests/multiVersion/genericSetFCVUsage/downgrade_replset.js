@@ -1,4 +1,6 @@
 import "jstests/multiVersion/libs/multi_rs.js";
+
+import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {isFinished, startParallelOps} from "jstests/libs/test_background_ops.js";
 import {reconnect} from "jstests/replsets/rslib.js";
 

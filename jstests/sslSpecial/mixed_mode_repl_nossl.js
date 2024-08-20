@@ -3,6 +3,7 @@
  * mixed modes can still function
  */
 
+import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {
     allowTLS,
     disabled,

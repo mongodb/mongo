@@ -1,6 +1,8 @@
 // Runner for checkChangeCollection() that compares change_collection for all tenants on all replica
 // set nodes to ensure all nodes have compatible data without any holes.
 
+import {ReplSetTest} from "jstests/libs/replsettest.js";
+
 const startTime = Date.now();
 assert.neq(typeof db, 'undefined', 'No `db` object, is the shell connected to a mongod?');
 

@@ -22,6 +22,7 @@
 TestData.disableImplicitSessions = true;
 
 import {withPinnedCursor} from "jstests/libs/pin_getmore_cursor.js";
+import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 const refresh = {
     refreshLogicalSessionCacheNow: 1

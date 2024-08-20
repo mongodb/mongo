@@ -4,6 +4,8 @@
  * Always run on a fully upgraded cluster, so that {$meta: "sortKey"} projections use the newest
  * sort key format.
  */
+import {ShardingTest} from "jstests/libs/shardingtest.js";
+
 var cmdRes;
 var cursorId;
 

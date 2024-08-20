@@ -11,6 +11,8 @@
  * @tags: [config_shard_incompatible]
  */
 
+import {ShardingTest} from "jstests/libs/shardingtest.js";
+
 // This test shuts down a shard's node and because of this consistency checking
 // cannot be performed on that node, which causes the consistency checker to fail.
 TestData.skipCheckingUUIDsConsistentAcrossCluster = true;

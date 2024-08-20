@@ -4,6 +4,8 @@
  * @tags: [featureFlagFailOnDirectShardOperations, requires_fcv_73]
  */
 
+import {ShardingTest} from "jstests/libs/shardingtest.js";
+
 const st = new ShardingTest({name: jsTestName(), keyFile: "jstests/libs/key1", shards: 2});
 
 const dbName = 'test';

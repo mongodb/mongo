@@ -2,6 +2,7 @@
 // Also tests tracking of wall clock times in replSetGetStatus
 
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
+import {ReplSetTest} from "jstests/libs/replsettest.js";
 
 function timestampCompare(o1, o2) {
     if (o1.t < o2.t) {

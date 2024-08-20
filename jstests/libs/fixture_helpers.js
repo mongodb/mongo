@@ -3,6 +3,7 @@
  * replica set, a sharded cluster, etc.
  */
 import {isMongos} from "jstests/concurrency/fsm_workload_helpers/server_types.js";
+import {ReplSetTest} from "jstests/libs/replsettest.js";
 
 export var FixtureHelpers = (function() {
     function _getHostStringForReplSet(connectionToNodeInSet) {

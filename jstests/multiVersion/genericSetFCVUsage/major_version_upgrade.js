@@ -15,6 +15,7 @@ import "jstests/multiVersion/libs/multi_rs.js";
 import "jstests/multiVersion/libs/verify_versions.js";
 
 import {IndexCatalogHelpers} from "jstests/libs/index_catalog_helpers.js";
+import {ReplSetTest} from "jstests/libs/replsettest.js";
 
 // Setup the dbpath for this test.
 const dbpath = MongoRunner.dataPath + 'major_version_upgrade';

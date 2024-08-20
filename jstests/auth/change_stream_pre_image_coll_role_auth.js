@@ -9,6 +9,8 @@
  *  requires_replication,
  * ]
  */
+import {ReplSetTest} from "jstests/libs/replsettest.js";
+
 const password = "password";
 const keyFile = "jstests/libs/key1";
 

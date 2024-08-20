@@ -1,6 +1,8 @@
 /**
  * Tests whether new sharding is detected on insert by mongos
  */
+import {ShardingTest} from "jstests/libs/shardingtest.js";
+
 var st = new ShardingTest({shards: 10, mongos: 3});
 
 var mongosA = st.s0;

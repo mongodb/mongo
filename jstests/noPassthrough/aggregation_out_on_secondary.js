@@ -9,6 +9,7 @@
  */
 
 import {anyEq} from "jstests/aggregation/extras/utils.js";
+import {ReplSetTest} from "jstests/libs/replsettest.js";
 
 const nDocs = 100;
 const readCollName = "readColl";

@@ -1,5 +1,7 @@
 // Test that a client can authenicate against the server with roles.
 // Also validates RFC2253
+import {ShardingTest} from "jstests/libs/shardingtest.js";
+
 const SERVER_CERT = "jstests/libs/server.pem";
 const CA_CERT = "jstests/libs/ca.pem";
 const CLIENT_CERT = "jstests/libs/client_roles.pem";
@@ -95,7 +97,7 @@ print("1. Testing x.509 auth to mongod");
 jsTestLog("2. Testing disabling x.509 auth with roles");
 {
     const mongo = MongoRunner.runMongod(Object.merge(
-        x509_options, {auth: "", setParameter: "allowRolesFromX509Certificates=false"}));
+        x509_options, {auth: "", setParameter: {allowRolesFromX509Certificates: false}}));
 
     prepConn(mongo);
 
@@ -126,7 +128,7 @@ print("3. Testing x.509 auth to mongos");
 print("4. Testing x.509 auth to mongos with x509 roles disabled");
 {
     const localOptions =
-        Object.merge(x509_options, {setParameter: "allowRolesFromX509Certificates=false"});
+        Object.merge(x509_options, {setParameter: {allowRolesFromX509Certificates: false}});
     let st = new ShardingTest({
         shards: 1,
         mongos: 1,

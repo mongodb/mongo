@@ -8,6 +8,9 @@
 //   requires_replication,
 // ]
  */
+import {ReplSetTest} from "jstests/libs/replsettest.js";
+import {ShardingTest} from "jstests/libs/shardingtest.js";
+
 function restartAndCheckLogs(conn, primary, replTest, shouldExist) {
     const includesStartupWarning = (line) => line.includes(
         "The default cluster-wide write concern is configured with the 'w' field set to 1 and" +

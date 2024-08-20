@@ -16,6 +16,7 @@
 import {TimeseriesTest} from "jstests/core/timeseries/libs/timeseries.js";
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
+import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 // Asserts that there is no change stream event.
 function assertNoChanges(csCursor) {

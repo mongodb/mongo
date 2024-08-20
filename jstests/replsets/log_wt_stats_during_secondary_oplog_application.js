@@ -6,6 +6,7 @@
  */
 
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";
+import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {setLogVerbosity} from "jstests/replsets/rslib.js";
 
 const name = "log_wt_stats_during_secondary_oplog_application";

@@ -14,6 +14,7 @@
  * Check that it syncs.
  */
 
+import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {reconnect} from "jstests/replsets/rslib.js";
 
 var name = "sync_passive";

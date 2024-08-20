@@ -1,6 +1,7 @@
 // Tests multi-document transactions metrics in the serverStatus output.
 // @tags: [uses_transactions]
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";
+import {ReplSetTest} from "jstests/libs/replsettest.js";
 
 // Verifies that the server status response has the fields that we expect.
 function verifyServerStatusFields(serverStatusResponse) {

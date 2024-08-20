@@ -1,6 +1,7 @@
 // This checks to make sure that sharded regex queries behave the same as unsharded regex queries.
 // Note, when the updateOneWithoutShardKey feature flag is enabled, upsert operations with queries
 // that do not match on the entire shard key are successful.
+import {ShardingTest} from "jstests/libs/shardingtest.js";
 import {
     WriteWithoutShardKeyTestUtil
 } from "jstests/sharding/updateOne_without_shard_key/libs/write_without_shard_key_test_util.js";

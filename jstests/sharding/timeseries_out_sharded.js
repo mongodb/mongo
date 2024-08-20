@@ -15,6 +15,7 @@
  * ]
  */
 import {TimeseriesAggTests} from "jstests/core/timeseries/libs/timeseries_agg_helpers.js";
+import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 const numHosts = 10;
 const splitPoint = numHosts / 2;

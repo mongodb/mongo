@@ -7,6 +7,7 @@
  * ]
  */
 
+import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {TTLUtil} from "jstests/libs/ttl_util.js";
 
 const replTest = new ReplSetTest({nodes: 1, nodeOptions: {setParameter: {ttlMonitorSleepSecs: 1}}});

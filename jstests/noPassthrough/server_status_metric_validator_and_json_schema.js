@@ -3,6 +3,8 @@
  * @tags: [requires_sharding]
  *
  */
+import {ShardingTest} from "jstests/libs/shardingtest.js";
+
 function runCommandAndCheckValidatorCount({cmdToRun, cmdName, countDict, error, notFirst}) {
     let metricsBeforeCommandInvoked = {failed: 0, jsonSchema: 0, total: 0};
     if (notFirst) {

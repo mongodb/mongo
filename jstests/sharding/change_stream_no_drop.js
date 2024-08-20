@@ -7,6 +7,9 @@
  *  uses_change_streams,
  * ]
  */
+import {configureFailPoint} from "jstests/libs/fail_point_util.js";
+import {ShardingTest} from "jstests/libs/shardingtest.js";
+
 function assertNoDrop(changeStream) {
     while (changeStream.hasNext()) {
         assert.neq(changeStream.next().operationType, 'drop');
@@ -20,8 +23,6 @@ function emptyChangeStream(changeStream) {
 }
 
 const dbName = 'db';
-
-import {configureFailPoint} from "jstests/libs/fail_point_util.js";
 
 // Enable explicitly the periodic no-op writer to allow the router to process change stream events
 // coming from all shards. This is enabled for production clusters by default.

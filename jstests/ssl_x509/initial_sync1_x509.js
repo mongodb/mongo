@@ -1,5 +1,7 @@
 // Basic tests for cluster authentication using x509.
 
+import {ReplSetTest} from "jstests/libs/replsettest.js";
+
 var common_options = {
     keyFile: "jstests/libs/key1",
     tlsMode: "requireTLS",

@@ -1,5 +1,7 @@
 // This test verifies readConcern:afterClusterTime behavior on a standalone mongod.
 // @tags: [requires_replication, requires_majority_read_concern]
+import {ReplSetTest} from "jstests/libs/replsettest.js";
+
 var standalone = MongoRunner.runMongod({storageEngine: "wiredTiger"});
 
 var testDB = standalone.getDB("test");

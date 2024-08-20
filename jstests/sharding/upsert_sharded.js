@@ -3,6 +3,7 @@
 // operations with queries that do not match on the entire shard key are successful. NOTE: Generic
 // upsert behavior tests belong in the core suite
 //
+import {ShardingTest} from "jstests/libs/shardingtest.js";
 import {
     WriteWithoutShardKeyTestUtil
 } from "jstests/sharding/updateOne_without_shard_key/libs/write_without_shard_key_test_util.js";

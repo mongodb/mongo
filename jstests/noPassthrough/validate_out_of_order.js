@@ -2,6 +2,8 @@
  * Tests that out-of-order keys are detected by validation during both the collection and index scan
  * phases.
  */
+import {ReplSetTest} from "jstests/libs/replsettest.js";
+
 const rst = new ReplSetTest({nodes: 1});
 rst.startSet();
 rst.initiate();

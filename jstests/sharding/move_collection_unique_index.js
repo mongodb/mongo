@@ -9,6 +9,8 @@
  * ]
  */
 
+import {ShardingTest} from "jstests/libs/shardingtest.js";
+
 (function() {
 const st = new ShardingTest({shards: 2});
 

@@ -1,5 +1,8 @@
 // Test that 'notablescan' parameter does not affect queries internal namespaces.
 // @tags: [uses_transactions]
+import {ReplSetTest} from "jstests/libs/replsettest.js";
+import {ShardingTest} from "jstests/libs/shardingtest.js";
+
 const dbName = "test";
 const collName = "coll";
 

@@ -6,6 +6,8 @@
  * ensures that they succeed and fail appropriately.
  */
 
+import {ReplSetTest} from "jstests/libs/replsettest.js";
+
 var replTest = new ReplSetTest({
     name: 'WCSet',
     // Set priority of secondaries to zero to prevent spurious elections.

@@ -8,6 +8,8 @@
  * ]
  */
 
+import {ShardingTest} from "jstests/libs/shardingtest.js";
+
 function containsDbName(listDatabasesRes, dbName) {
     for (const database of listDatabasesRes.databases) {
         if (database.name == dbName) {

@@ -8,6 +8,8 @@
  *  @tags: [requires_sharding]
  */
 
+import {ShardingTest} from "jstests/libs/shardingtest.js";
+
 // start up a new sharded cluster
 var s = new ShardingTest({shards: 2, mongos: 1});
 

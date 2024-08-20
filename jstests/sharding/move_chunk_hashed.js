@@ -2,6 +2,7 @@
  * Test that moveChunk moves the right chunks and documents and that deleted
  * rangeDeleter delete the right documents from the donor shard.
  */
+import {ShardingTest} from "jstests/libs/shardingtest.js";
 import {chunkBoundsUtil} from "jstests/sharding/libs/chunk_bounds_util.js";
 import {findChunksUtil} from "jstests/sharding/libs/find_chunks_util.js";
 

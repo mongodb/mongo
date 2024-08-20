@@ -2,6 +2,8 @@
  * Test mirrored reads in a multi-tenant environment.
  */
 
+import {ReplSetTest} from "jstests/libs/replsettest.js";
+
 const rst = new ReplSetTest({
     nodes: 2,
     nodeOptions: {

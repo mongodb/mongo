@@ -3,6 +3,8 @@
  * collections.
  */
 
+import {ShardingTest} from "jstests/libs/shardingtest.js";
+
 function runTest(st, badViewDefinition) {
     const mongos = st.s;
     const config = mongos.getDB("config");

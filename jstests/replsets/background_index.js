@@ -4,6 +4,8 @@
  *  is renamed.
  */
 
+import {ReplSetTest} from "jstests/libs/replsettest.js";
+
 // Bring up a 2 node replset.
 var name = "bg_index_rename";
 var rst = new ReplSetTest({name: name, nodes: 3});

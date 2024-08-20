@@ -2,6 +2,7 @@
  * Test of a successfull replica set rollback for basic CRUD operations in multitenancy environment
  * with featureFlagRequireTenantId. This test is modeled from rollback_crud_ops_sequence.js.
  */
+import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {RollbackTest} from "jstests/replsets/libs/rollback_test.js";
 
 const kColl = "bar";

@@ -2,6 +2,8 @@
  * Test that queries will be properly routed after executing a write that does not
  * perform any shard version checks.
  */
+import {ShardingTest} from "jstests/libs/shardingtest.js";
+
 var runTest = function(writeFunc) {
     var st = new ShardingTest({shards: 2, mongos: 2});
 

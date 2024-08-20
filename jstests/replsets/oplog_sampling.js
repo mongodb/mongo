@@ -3,6 +3,8 @@
  * support OplogTruncateMarkers.
  * @tags: [ requires_persistence ]
  */
+import {ReplSetTest} from "jstests/libs/replsettest.js";
+
 // Force oplog sampling to occur on start up for small numbers of oplog inserts.
 const replSet = new ReplSetTest({
     nodes: 1,

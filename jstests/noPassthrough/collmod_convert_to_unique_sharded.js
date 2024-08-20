@@ -7,6 +7,8 @@
  *   requires_sharding,
  * ]
  */
+import {ShardingTest} from "jstests/libs/shardingtest.js";
+
 function countUniqueIndexes(coll, key) {
     const all = coll.getIndexes().filter(function(z) {
         return z.unique && friendlyEqual(z.key, key);

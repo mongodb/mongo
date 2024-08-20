@@ -10,6 +10,7 @@
 
 import {getPlanStages} from "jstests/libs/analyze_plan.js";
 import {profilerHasSingleMatchingEntryOrThrow} from "jstests/libs/profiler.js";
+import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 function testArraySorted(arr, key) {
     for (let i = 0; i < arr.length - 1; i++) {

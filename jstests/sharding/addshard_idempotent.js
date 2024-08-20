@@ -1,4 +1,7 @@
 // Tests that adding an equivalent shard multiple times returns success.
+import {ReplSetTest} from "jstests/libs/replsettest.js";
+import {ShardingTest} from "jstests/libs/shardingtest.js";
+
 const st = new ShardingTest({name: "add_shard_idempotent", shards: 1});
 
 jsTestLog("Testing adding a replica set shard multiple times");

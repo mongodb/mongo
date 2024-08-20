@@ -5,6 +5,8 @@
 //   uses_change_streams,
 // ]
 import {assertErrorCode} from "jstests/aggregation/extras/utils.js";
+import {ReplSetTest} from "jstests/libs/replsettest.js";
+import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 function checkEvents(changeStream, expectedEvents) {
     expectedEvents.forEach((event) => {

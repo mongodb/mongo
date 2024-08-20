@@ -1,5 +1,7 @@
 import "jstests/multiVersion/libs/multi_rs.js";
 
+import {ReplSetTest} from "jstests/libs/replsettest.js";
+
 function runTest(downgradeVersion) {
     jsTestLog("Running test with 'downgradeVersion': " + downgradeVersion);
     const rst = new ReplSetTest({

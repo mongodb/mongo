@@ -8,6 +8,8 @@
  * ]
  */
 
+import {ReplSetTest} from "jstests/libs/replsettest.js";
+
 // A testing exemption was made to allow transactions on shard server even if
 // writeConcernMajorityJournalDefault = false. So we need to disable the exemption in this test
 // in order to test the behavior.

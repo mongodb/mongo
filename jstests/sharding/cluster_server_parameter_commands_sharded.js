@@ -14,6 +14,7 @@ import {
     testInvalidClusterParameterCommands,
     testValidClusterParameterCommands,
 } from "jstests/libs/cluster_server_parameter_utils.js";
+import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 // Tests that set/getClusterParameter works on all nodes of a sharded cluster.
 const options = {

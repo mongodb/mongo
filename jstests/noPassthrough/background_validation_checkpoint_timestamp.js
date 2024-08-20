@@ -5,6 +5,8 @@
  * @tags: [requires_wiredtiger, requires_persistence]
  */
 
+import {ReplSetTest} from "jstests/libs/replsettest.js";
+
 // Disable the checkpoint thread and increase log verbosity of WT checkpoints.
 const rst = new ReplSetTest({
     nodes: 1,

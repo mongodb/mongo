@@ -1,4 +1,6 @@
 // init with one shard with one node rs
+import {ShardingTest} from "jstests/libs/shardingtest.js";
+
 var st = new ShardingTest({shards: 1, rs: {nodes: 1}, mongos: 1});
 var mongos = st.s;
 const rs = st.rs0;

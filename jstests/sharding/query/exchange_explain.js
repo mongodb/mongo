@@ -4,6 +4,7 @@
  * @tags: [requires_sharding]
  */
 import {assertErrorCode} from "jstests/aggregation/extras/utils.js";
+import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 const st = new ShardingTest({shards: 2, rs: {nodes: 1}});
 

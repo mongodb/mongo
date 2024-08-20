@@ -137,6 +137,10 @@ WORKSPACE.bazel @10gen/devprod-build
 # The following patterns are parsed from ./jstests/httpinterface/OWNERS.yml
 /jstests/httpinterface/**/network_options.js @10gen/server-service-architecture
 
+# The following patterns are parsed from ./jstests/libs/OWNERS.yml
+/jstests/libs/**/replsettest.js @10gen/server-replication
+/jstests/libs/**/shardingtest.js @10gen/server-cluster-scalability
+
 # The following patterns are parsed from ./jstests/multiVersion/OWNERS.yml
 /jstests/multiVersion/**/migration* @10gen/server-cluster-scalability
 /jstests/multiVersion/**/rs_endpoint* @10gen/server-cluster-scalability
@@ -884,8 +888,6 @@ WORKSPACE.bazel @10gen/devprod-build
 /src/mongo/shell/**/kms_* @10gen/server-security
 /src/mongo/shell/**/encrypted* @10gen/server-security
 /src/mongo/shell/**/keyvault.js @10gen/server-security
-/src/mongo/shell/**/replsettest.js @10gen/server-replication
-/src/mongo/shell/**/shardingtest.js @10gen/server-cluster-scalability
 /src/mongo/shell/**/assert.js @10gen/devprod-correctness
 /src/mongo/shell/**/bench* @10gen/devprod-correctness
 /src/mongo/shell/**/bridge.js @10gen/devprod-correctness

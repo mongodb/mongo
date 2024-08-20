@@ -2,6 +2,7 @@
  * Verifies that the mongos errors when starting a new transaction at shutdown.
  */
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";
+import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 let st = new ShardingTest({shards: 1, mongos: 1});
 

@@ -30,6 +30,7 @@ import {
     kPreImagesCollectionName
 } from "jstests/libs/change_stream_util.js";
 import {assertDropAndRecreateCollection} from "jstests/libs/collection_drop_recreate.js";
+import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {getFirstOplogEntry, getLatestOp} from "jstests/replsets/rslib.js";
 
 export class PreImageTruncateAfterShutdownTest {

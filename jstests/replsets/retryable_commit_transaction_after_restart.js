@@ -1,5 +1,6 @@
 // Test committed transaction state is restored after restart.
 // @tags: [uses_transactions, requires_persistence]
+import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {reconnect} from "jstests/replsets/rslib.js";
 
 const dbName = "test";

@@ -2,6 +2,8 @@
  * Test that moving a chunk into a shard that already has the collection with a different UUID
  * causes the recipient to fail the migration.
  */
+import {ShardingTest} from "jstests/libs/shardingtest.js";
+
 const dbName = "test";
 const collName = "inputColl";
 const ns = dbName + "." + collName;

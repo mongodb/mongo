@@ -2,6 +2,8 @@
 // When the chunks of this collection get migrated to the other shard,
 // the other shard should create the collection with the same options.
 
+import {ShardingTest} from "jstests/libs/shardingtest.js";
+
 var st = new ShardingTest({shards: 2});
 
 var db = st.s.getDB("test");

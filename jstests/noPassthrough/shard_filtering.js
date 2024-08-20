@@ -7,6 +7,7 @@
  * ]
  */
 import {getOptimizer, isIndexOnly, isIxscan, planHasStage} from "jstests/libs/analyze_plan.js";
+import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 // Deliberately inserts orphans outside of migration.
 TestData.skipCheckOrphans = true;

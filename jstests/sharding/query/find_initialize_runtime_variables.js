@@ -9,6 +9,8 @@
  * ]
  *
  */
+import {ShardingTest} from "jstests/libs/shardingtest.js";
+
 const numIterations = 5;
 
 const st = new ShardingTest({shards: 5});

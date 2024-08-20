@@ -3,6 +3,8 @@
  * set on the session.
  * @tags: [requires_fcv_71]
  */
+import {ShardingTest} from "jstests/libs/shardingtest.js";
+
 const st = new ShardingTest({shards: 2, rs: {nodes: 1}});
 
 const mongosDB = st.s0.getDB("merge_nondefault_read_concern");

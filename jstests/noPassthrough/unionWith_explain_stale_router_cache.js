@@ -1,6 +1,8 @@
 /*
  * Ensures that $unionWith stage explain code properly refreshes all the intermediary shards cache.
  */
+import {ShardingTest} from "jstests/libs/shardingtest.js";
+
 const st = new ShardingTest({shards: 3});
 
 // Create unsharded untracked collections in shard0.

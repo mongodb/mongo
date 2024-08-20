@@ -1,3 +1,4 @@
+import {ShardingTest} from "jstests/libs/shardingtest.js";
 import {findChunksUtil} from "jstests/sharding/libs/find_chunks_util.js";
 
 var s1 = new ShardingTest({name: "count2", shards: 2, mongos: 2});

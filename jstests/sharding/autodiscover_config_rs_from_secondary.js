@@ -1,6 +1,8 @@
 // Tests that mongos can autodiscover a config server replica set when the only node it knows about
 // is not the primary.
 
+import {ReplSetTest} from "jstests/libs/replsettest.js";
+
 var rst = new ReplSetTest(
     {name: "configRS", nodes: 3, nodeOptions: {configsvr: "", storageEngine: "wiredTiger"}});
 rst.startSet();

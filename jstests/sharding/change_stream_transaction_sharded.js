@@ -5,6 +5,8 @@
 //   uses_multi_shard_transaction,
 //   uses_transactions,
 // ]
+import {ShardingTest} from "jstests/libs/shardingtest.js";
+
 const dbName = "test";
 const collName = "change_stream_transaction_sharded";
 const namespace = dbName + "." + collName;

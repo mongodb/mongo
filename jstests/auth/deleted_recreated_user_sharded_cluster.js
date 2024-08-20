@@ -3,6 +3,7 @@
  * @tags: [requires_sharding]
  */
 import {kInvalidationIntervalSecs, runTest} from "jstests/auth/deleted_recreated_user_base.js";
+import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 const st = new ShardingTest({
     shards: 1,
@@ -11,7 +12,7 @@ const st = new ShardingTest({
     other: {
         keyFile: 'jstests/libs/key1',
         mongosOptions: {
-            setParameter: 'userCacheInvalidationIntervalSecs=' + kInvalidationIntervalSecs,
+            setParameter: {userCacheInvalidationIntervalSecs: kInvalidationIntervalSecs},
         },
     },
 });

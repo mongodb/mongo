@@ -5,6 +5,7 @@
  */
 import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 import {findMatchingLogLine} from "jstests/libs/log.js";
+import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 function runTest(conn) {
     const db = conn.getDB("test");
@@ -166,7 +167,7 @@ function runTest(conn) {
 
 {
     jsTest.log('Test mongos');
-    const st = ShardingTest({shards: 1, rs: {nodes: 1}, config: 1});
+    const st = new ShardingTest({shards: 1, rs: {nodes: 1}, config: 1});
     runTest(st);
     st.stop();
 }

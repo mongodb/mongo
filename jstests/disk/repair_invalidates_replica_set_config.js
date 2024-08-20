@@ -13,6 +13,7 @@ import {
     assertStartInReplSet,
     getUriForColl,
 } from "jstests/disk/libs/wt_file_helper.js";
+import {ReplSetTest} from "jstests/libs/replsettest.js";
 
 // This test triggers an unclean shutdown (an fassert), which may cause inaccurate fast counts.
 TestData.skipEnforceFastCountOnValidate = true;

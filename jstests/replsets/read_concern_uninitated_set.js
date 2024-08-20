@@ -4,6 +4,8 @@
  *
  * @tags: [requires_persistence, requires_majority_read_concern]
  */
+import {ReplSetTest} from "jstests/libs/replsettest.js";
+
 const rst = new ReplSetTest({nodes: 1});
 rst.startSet();
 const localDB = rst.nodes[0].getDB('local');

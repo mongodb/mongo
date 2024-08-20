@@ -1,6 +1,8 @@
 /**
  * Builds an index with many large keys and ensures that we stay below the memory limit.
  */
+import {ReplSetTest} from "jstests/libs/replsettest.js";
+
 const maxMemUsageMB = 50;
 const replSet = new ReplSetTest({
     nodes: 1,

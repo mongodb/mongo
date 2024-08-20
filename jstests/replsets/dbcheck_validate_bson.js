@@ -7,6 +7,7 @@
  * ]
  */
 
+import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {
     checkHealthLog,
     clearHealthLog,

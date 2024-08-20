@@ -4,6 +4,8 @@
  *
  * @tags: [requires_sharding]
  */
+import {ShardingTest} from "jstests/libs/shardingtest.js";
+
 Random.setRandomSeed();
 
 const st = new ShardingTest({shards: 2, rs: {nodes: 1}});

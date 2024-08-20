@@ -9,6 +9,7 @@ import {
     getQueryStats,
     getQueryStatsFindCmd
 } from "jstests/libs/query_stats_utils.js";
+import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 const st = new ShardingTest({
     mongos: 1,

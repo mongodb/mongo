@@ -6,6 +6,8 @@
  * ]
  */
 
+import {ShardingTest} from "jstests/libs/shardingtest.js";
+
 const runTest = testDB => {
     // Test command in V2 but not V1.
     assert.commandWorked(testDB.runCommand({testVersion2: 1, apiVersion: "2", apiStrict: true}));

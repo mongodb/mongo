@@ -3,6 +3,8 @@
 //
 // @tags: [uses_change_streams, requires_replication]
 
+import {ShardingTest} from "jstests/libs/shardingtest.js";
+
 // Checking UUID consistency uses cached connections, which are not valid across restarts or
 // stepdowns.
 TestData.skipCheckingUUIDsConsistentAcrossCluster = true;

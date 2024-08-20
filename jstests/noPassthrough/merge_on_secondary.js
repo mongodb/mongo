@@ -7,6 +7,7 @@
  * ]
  */
 import {withEachMergeMode} from "jstests/aggregation/extras/merge_helpers.js";
+import {ReplSetTest} from "jstests/libs/replsettest.js";
 
 const replTest = new ReplSetTest({nodes: 2});
 replTest.startSet();

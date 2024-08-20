@@ -4,6 +4,8 @@
  *   expects_explicit_underscore_id_index,
  * ]
  */
+import {ShardingTest} from "jstests/libs/shardingtest.js";
+
 const dbName = "test";
 const collName = "scaled_collection_stats";
 const ns = dbName + "." + collName;

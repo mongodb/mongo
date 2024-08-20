@@ -5,6 +5,8 @@
  * killed by a stepdown before any attempt can finish on slower variants.
  * @tags: [does_not_support_stepdowns]
  */
+import {ReplSetTest} from "jstests/libs/replsettest.js";
+
 const replTest = new ReplSetTest({nodes: 3});
 replTest.startSet();
 replTest.initiate();

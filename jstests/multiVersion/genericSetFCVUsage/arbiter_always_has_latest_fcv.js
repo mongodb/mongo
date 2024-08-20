@@ -1,6 +1,8 @@
 /*
  * Tests that an arbiter will always be on the latest FCV regardless of the FCV of the replica set.
  */
+import {ReplSetTest} from "jstests/libs/replsettest.js";
+
 function runTest(FCV) {
     let rst = new ReplSetTest({nodes: [{}, {rsConfig: {arbiterOnly: true}}]});
     rst.startSet();

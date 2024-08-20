@@ -4,6 +4,8 @@
  *
  * @tags: [uses_transactions]
  */
+import {ReplSetTest} from "jstests/libs/replsettest.js";
+
 const dbName = "test";
 const collName = "transactions_on_secondaries_not_allowed";
 

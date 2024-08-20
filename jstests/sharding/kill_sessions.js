@@ -3,6 +3,7 @@
  */
 
 import {KillSessionsTestHelper} from "jstests/libs/kill_sessions.js";
+import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 // This test involves killing all sessions, which will not work as expected if the kill command is
 // sent with an implicit session.

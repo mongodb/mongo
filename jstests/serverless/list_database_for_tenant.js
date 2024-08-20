@@ -1,3 +1,5 @@
+import {ReplSetTest} from "jstests/libs/replsettest.js";
+
 function setupReplSet() {
     const rst = new ReplSetTest({
         nodes: 1,

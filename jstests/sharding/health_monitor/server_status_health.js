@@ -7,6 +7,8 @@
  *   embedded_router_incompatible,
  * ]
  */
+import {ShardingTest} from "jstests/libs/shardingtest.js";
+
 function changeObserverIntensity(observer, intensity) {
     let paramValue = {"values": [{"type": observer, "intensity": intensity}]};
     assert.commandWorked(

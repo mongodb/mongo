@@ -7,6 +7,8 @@
  *   uses_transactions,
  * ]
  */
+import {ShardingTest} from "jstests/libs/shardingtest.js";
+
 // This test manually simulates a session, which is not compatible with implicit sessions.
 TestData.disableImplicitSessions = true;
 

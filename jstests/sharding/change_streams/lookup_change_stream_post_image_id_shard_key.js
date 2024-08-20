@@ -4,6 +4,8 @@
 //   requires_majority_read_concern,
 //   uses_change_streams,
 // ]
+import {ShardingTest} from "jstests/libs/shardingtest.js";
+
 const st = new ShardingTest({
     shards: 2,
     rs: {

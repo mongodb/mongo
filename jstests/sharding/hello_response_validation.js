@@ -2,6 +2,8 @@
  * This test ensures that the hello command and its aliases, ismaster and isMaster, are all
  * accepted by mongos.
  */
+import {ShardingTest} from "jstests/libs/shardingtest.js";
+
 var st = new ShardingTest({shards: 1, mongos: 1});
 
 function checkResponseFields(commandString) {

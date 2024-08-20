@@ -2,6 +2,8 @@
  * Tests that the __system user can auth using SCRAM-SHA-256
  * @tags: [requires_replication]
  */
+import {ReplSetTest} from "jstests/libs/replsettest.js";
+
 const keyfile = 'jstests/libs/key1';
 const keyfileContents = cat(keyfile).replace(/[\011-\015\040]/g, '');
 const rs = new ReplSetTest({nodes: 3, keyFile: keyfile});

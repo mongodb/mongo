@@ -6,6 +6,7 @@
  */
 
 import {getNoopWriteCommands} from "jstests/libs/noop_write_commands.js";
+import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {assertWriteConcernError} from "jstests/libs/write_concern_util.js";
 
 var name = 'noop_writes_wait_for_write_concern';

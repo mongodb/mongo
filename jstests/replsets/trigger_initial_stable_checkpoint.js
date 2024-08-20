@@ -4,6 +4,8 @@
  * We don't support unclean shutdowns with restarts into a last-lts binary.
  * @tags: [requires_persistence, multiversion_incompatible]
  */
+import {ReplSetTest} from "jstests/libs/replsettest.js";
+
 const rst = new ReplSetTest({
     nodes: 1,
     nodeOptions: {

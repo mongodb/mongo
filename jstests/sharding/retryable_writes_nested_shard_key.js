@@ -3,6 +3,7 @@
  * key to ensure that each operation is not re-executed when run after chunk migration.
  */
 
+import {ShardingTest} from "jstests/libs/shardingtest.js";
 import {CreateShardedCollectionUtil} from "jstests/sharding/libs/create_sharded_collection_util.js";
 
 const st = new ShardingTest({mongos: 1, config: 1, shards: 2, rs: {nodes: 1}});

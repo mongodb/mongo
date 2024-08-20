@@ -4,6 +4,8 @@
 // *only* mongos-specific tests.
 //
 
+import {ShardingTest} from "jstests/libs/shardingtest.js";
+
 // Checking UUID and index consistency involves talking to the config server primary, but there is
 // no config server primary by the end of this test.
 TestData.skipCheckingUUIDsConsistentAcrossCluster = true;

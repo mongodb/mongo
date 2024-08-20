@@ -6,6 +6,7 @@
 // More specifically, we expect to only log 1 out of 128 events.
 
 import {iterateMatchingLogLines} from "jstests/libs/log.js";
+import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 const dbName = 'testDB';
 const collName = 'testColl';

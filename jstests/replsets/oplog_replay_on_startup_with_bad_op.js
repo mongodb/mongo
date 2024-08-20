@@ -6,6 +6,8 @@
 //   requires_persistence,
 //   incompatible_with_windows_tls,
 // ]
+import {ReplSetTest} from "jstests/libs/replsettest.js";
+
 var rst = new ReplSetTest({
     nodes: 1,
 });

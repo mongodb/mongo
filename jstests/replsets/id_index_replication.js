@@ -3,6 +3,7 @@
  * created on the secondary when the index spec is not included in the oplog.
  */
 import {IndexCatalogHelpers} from "jstests/libs/index_catalog_helpers.js";
+import {ReplSetTest} from "jstests/libs/replsettest.js";
 
 var rst = new ReplSetTest({nodes: 2});
 rst.startSet();

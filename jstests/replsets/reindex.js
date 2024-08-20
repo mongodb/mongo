@@ -7,6 +7,8 @@
  * ]
  */
 
+import {ReplSetTest} from "jstests/libs/replsettest.js";
+
 jsTestLog("Testing that the reindex command cannot be run on a primary or secondary");
 
 const replTest = new ReplSetTest({name: 'reindexTest', nodes: 2});

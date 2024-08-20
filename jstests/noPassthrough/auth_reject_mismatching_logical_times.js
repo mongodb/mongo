@@ -6,6 +6,9 @@
  *   requires_sharding,
  * ]
  */
+import {ReplSetTest} from "jstests/libs/replsettest.js";
+import {ShardingTest} from "jstests/libs/shardingtest.js";
+
 // Given a valid cluster time object, returns one with the same signature, but a mismatching
 // cluster time.
 function mismatchingLogicalTime(lt) {

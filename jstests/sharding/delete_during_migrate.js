@@ -8,6 +8,8 @@
  * @tags: [resource_intensive]
  */
 
+import {ShardingTest} from "jstests/libs/shardingtest.js";
+
 var st = new ShardingTest({
     shards: 2,
     mongos: 1,

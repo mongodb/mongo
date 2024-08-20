@@ -25,6 +25,7 @@ import "jstests/libs/override_methods/implicitly_retry_on_database_drop_pending.
 
 import {backupData} from "jstests/libs/backup_utils.js";
 import {getPython3Binary} from "jstests/libs/python.js";
+import {ReplSetTest} from "jstests/libs/replsettest.js";
 
 export const BackupRestoreTest = function(options) {
     if (!(this instanceof BackupRestoreTest)) {

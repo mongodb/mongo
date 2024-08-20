@@ -1,6 +1,9 @@
 /**
  * Test that a new primary that gets elected will properly perform shard initialization.
  */
+import {ReplSetTest} from "jstests/libs/replsettest.js";
+import {ShardingTest} from "jstests/libs/shardingtest.js";
+
 var st = new ShardingTest({shards: 1});
 
 // Setting CWWC for addShard to work, as implicitDefaultWC is set to w:1.

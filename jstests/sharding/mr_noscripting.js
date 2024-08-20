@@ -1,4 +1,6 @@
 // Tests that running mapReduce does not crash anything if the shards have scripting disabled.
+import {ShardingTest} from "jstests/libs/shardingtest.js";
+
 const shardOpts = [
     {noscripting: ''},
     {}  // just use default params

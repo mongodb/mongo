@@ -2,6 +2,8 @@
  * Testing that config.tags are correctly updated after resharding hashed shard key with zones.
  */
 
+import {ShardingTest} from "jstests/libs/shardingtest.js";
+
 const st = new ShardingTest({
     shard: 2,
     configOptions:

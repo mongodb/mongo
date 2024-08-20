@@ -6,6 +6,8 @@
  * ]
  */
 
+import {ShardingTest} from "jstests/libs/shardingtest.js";
+
 function runTestOnConnection(conn) {
     const admin = conn.getDB("admin");
     const db = conn.getDB("test");

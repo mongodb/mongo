@@ -11,6 +11,7 @@ if (_isWindows()) {
     quit();
 }
 import {ProxyProtocolServer} from "jstests/sharding/libs/proxy_protocol.js";
+import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 // Test that you can connect to the load balancer port over a proxy.
 function testProxyProtocolConnect(ingressPort, egressPort, version) {

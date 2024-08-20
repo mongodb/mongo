@@ -2,6 +2,7 @@
  * Tests that readPref applies on an explain for an aggregation command.
  */
 import {profilerHasAtLeastOneMatchingEntryOrThrow} from "jstests/libs/profiler.js";
+import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 const st = new ShardingTest({
     name: "agg_explain_readPref",

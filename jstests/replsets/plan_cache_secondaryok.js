@@ -1,6 +1,8 @@
 // Verify that the plan cache and index filter commands can be run on secondaries, but only
 // if secondaryOk is explicitly set.
 
+import {ReplSetTest} from "jstests/libs/replsettest.js";
+
 var name = "plan_cache_secondaryok";
 
 function assertPlanCacheCommandsSucceed(db) {

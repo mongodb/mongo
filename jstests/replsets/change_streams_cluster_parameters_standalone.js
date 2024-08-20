@@ -10,6 +10,7 @@
  * ]
  */
 
+import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {
     ChangeStreamMultitenantReplicaSetTest
 } from "jstests/serverless/libs/change_collection_util.js";

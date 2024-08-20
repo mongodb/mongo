@@ -3,6 +3,7 @@
 // writeConcern majority.
 //
 // @tags: [uses_transactions, requires_majority_read_concern]
+import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {
     assertWriteConcernError,
     restartReplSetReplication,

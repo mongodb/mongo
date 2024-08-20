@@ -5,6 +5,8 @@
  * @tags: [requires_sharding]
  */
 
+import {ShardingTest} from "jstests/libs/shardingtest.js";
+
 function runTest(conn) {
     conn.getDB('admin').createUser({user: 'admin', pwd: 'pwd', roles: ['root']});
 

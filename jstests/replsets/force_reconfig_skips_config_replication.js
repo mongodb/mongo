@@ -4,6 +4,8 @@
  * committed across a majority of nodes.
  */
 
+import {ReplSetTest} from "jstests/libs/replsettest.js";
+
 const replTest = new ReplSetTest({nodes: 2, useBridge: true});
 const nodes = replTest.startSet();
 // Initiating with a high election timeout prevents unnecessary elections and also prevents

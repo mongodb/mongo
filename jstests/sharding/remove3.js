@@ -1,4 +1,5 @@
 // Validates the remove/drain shard functionality when there is data on the shard being removed
+import {ShardingTest} from "jstests/libs/shardingtest.js";
 import {moveOutSessionChunks, removeShard} from "jstests/sharding/libs/remove_shard_util.js";
 
 // TODO SERVER-50144 Remove this and allow orphan checking.

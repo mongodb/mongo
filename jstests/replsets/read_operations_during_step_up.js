@@ -4,6 +4,7 @@
  */
 import {waitForCurOpByFailPoint} from "jstests/libs/curop_helpers.js";
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";
+import {ReplSetTest} from "jstests/libs/replsettest.js";
 
 const testName = jsTestName();
 const dbName = "test";

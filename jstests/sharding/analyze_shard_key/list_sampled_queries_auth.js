@@ -4,6 +4,9 @@
  * @tags: [requires_fcv_70]
  */
 
+import {ReplSetTest} from "jstests/libs/replsettest.js";
+import {ShardingTest} from "jstests/libs/shardingtest.js";
+
 function runTest(conn) {
     const dbName = "testDb";
     const collName0 = "testColl0";

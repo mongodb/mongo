@@ -7,6 +7,7 @@
  *     dropTarget: <if true, creates target collection that will be dropped. Default: false>,
  * }
  */
+import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {reconfig} from "jstests/replsets/rslib.js";
 
 export var RenameAcrossDatabasesTest = function(options) {

@@ -3,6 +3,8 @@
  * This does not test cluster time propagation via the shell as there are many back channels
  * where the cluster time metadata can propagated, making it inherently racy.
  */
+import {ShardingTest} from "jstests/libs/shardingtest.js";
+
 function assertHasClusterTimeAndOperationTime(res) {
     assert.hasFields(res, ['$clusterTime']);
     assert.hasFields(res.$clusterTime, ['clusterTime', 'signature']);

@@ -7,6 +7,8 @@
 // disabled when lowering the FCV, causing an incompatibility.
 // @tags: [all_feature_flags_incompatible]
 
+import {ReplSetTest} from "jstests/libs/replsettest.js";
+
 // Ignore test parameters because they are not required to be consistent across versions.
 const ignoredParams = [
     "testBoolClusterParameter",

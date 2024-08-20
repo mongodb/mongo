@@ -2,6 +2,8 @@
  * Runs initial sync on a node with many databases.
  */
 
+import {ReplSetTest} from "jstests/libs/replsettest.js";
+
 var name = 'initial_sync_many_dbs';
 var num_dbs = 32;
 var max_colls = 32;

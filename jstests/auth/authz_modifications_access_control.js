@@ -3,6 +3,8 @@
  * @tags: [requires_sharding]
  */
 
+import {ShardingTest} from "jstests/libs/shardingtest.js";
+
 function runTest(conn) {
     var authzErrorCode = 13;
 

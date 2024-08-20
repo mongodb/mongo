@@ -1,5 +1,6 @@
 // Tests that a stale mongos would route writes correctly to the right shard after
 // an unsharded collection was moved to another shard.
+import {ShardingTest} from "jstests/libs/shardingtest.js";
 import {
     moveDatabaseAndUnshardedColls
 } from "jstests/sharding/libs/move_database_and_unsharded_coll_helper.js";

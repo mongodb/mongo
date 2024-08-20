@@ -1,4 +1,6 @@
+import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {ShardTransitionUtil} from "jstests/libs/shard_transition_util.js";
+import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 var s = new ShardingTest({shards: 2, other: {enableBalancer: true}});
 var config = s.s0.getDB('config');

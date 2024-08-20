@@ -1,3 +1,4 @@
+import {ShardingTest} from "jstests/libs/shardingtest.js";
 function rotate(conn, path, rotateCount) {
     sleep(2000);
     for (let i = 1; i <= rotateCount; ++i) {

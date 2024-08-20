@@ -7,6 +7,8 @@
  * ]
  */
 
+import {ReplSetTest} from "jstests/libs/replsettest.js";
+
 const testCases = [
     // [requireApiVersion server parameter, expect success, command, API parameters]
     [false, true, {ping: 1}, {}],

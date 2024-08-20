@@ -5,6 +5,8 @@
  *    embedded_router_incompatible,
  * ]
  */
+import {ShardingTest} from "jstests/libs/shardingtest.js";
+
 // If the server has been compiled with the code coverage flag, then the splitChunk command can take
 // significantly longer than the 8-second interval for the continuous stepdown thread. This causes
 // the test to fail because retrying the interrupted splitChunk command won't ever succeed. To check

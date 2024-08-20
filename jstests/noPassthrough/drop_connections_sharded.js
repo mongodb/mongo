@@ -6,6 +6,8 @@
  * ]
  */
 
+import {ShardingTest} from "jstests/libs/shardingtest.js";
+
 const st = new ShardingTest({
     config: {nodes: 1},
     shards: 1,

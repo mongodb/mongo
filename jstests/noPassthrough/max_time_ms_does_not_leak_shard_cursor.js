@@ -4,6 +4,7 @@
 // @tags: []
 
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";
+import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 const st = new ShardingTest({shards: 1, mongos: 1, config: 1});
 

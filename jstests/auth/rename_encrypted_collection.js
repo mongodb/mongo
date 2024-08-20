@@ -6,6 +6,9 @@
  * requires_fcv_61,
  * ]
  */
+import {ReplSetTest} from "jstests/libs/replsettest.js";
+import {ShardingTest} from "jstests/libs/shardingtest.js";
+
 function runTestWithAuth(conn, allowsRename, verifyFunction) {
     const db = conn.getDB("test");
     const srcDbName = 'rename_encrypted_collection_src_db';

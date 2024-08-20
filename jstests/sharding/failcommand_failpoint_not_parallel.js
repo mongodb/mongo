@@ -1,3 +1,5 @@
+import {ShardingTest} from "jstests/libs/shardingtest.js";
+
 const st = new ShardingTest({shards: 3, mongos: 1});
 const db = st.s.getDB("test_failcommand_noparallel");
 

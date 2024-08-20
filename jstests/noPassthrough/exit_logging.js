@@ -6,6 +6,8 @@
  * ]
  */
 
+import {ShardingTest} from "jstests/libs/shardingtest.js";
+
 function makeShutdownByCrashFn(crashHow) {
     return function(conn) {
         var admin = conn.getDB("admin");

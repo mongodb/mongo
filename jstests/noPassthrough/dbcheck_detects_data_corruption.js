@@ -2,6 +2,8 @@
  * This tests that errors are logged when dbCheck finds evidence of corruption, but does not cause
  * the operation to fail.
  */
+import {ReplSetTest} from "jstests/libs/replsettest.js";
+
 const replSet = new ReplSetTest({nodes: 2});
 replSet.startSet();
 replSet.initiate();

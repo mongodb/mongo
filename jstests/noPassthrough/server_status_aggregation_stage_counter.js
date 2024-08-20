@@ -4,6 +4,8 @@
  *   requires_sharding,
  * ]
  */
+import {ShardingTest} from "jstests/libs/shardingtest.js";
+
 // In memory map of stage names to their counters. Used to verify that serverStatus is
 // incrementing the appropriate stages correctly across multiple pipelines.
 let countersWeExpectToIncreaseMap = {};

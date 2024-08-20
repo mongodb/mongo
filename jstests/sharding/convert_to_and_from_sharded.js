@@ -4,6 +4,9 @@
  * @tags: [requires_persistence]
  */
 /* global retryOnRetryableError */
+import {Thread} from "jstests/libs/parallelTester.js";
+import {ReplSetTest} from "jstests/libs/replsettest.js";
+import {ShardingTest} from "jstests/libs/shardingtest.js";
 import {removeShard} from "jstests/sharding/libs/remove_shard_util.js";
 
 if (jsTestOptions().useAutoBootstrapProcedure) {  // TODO: SERVER-80318 Delete test

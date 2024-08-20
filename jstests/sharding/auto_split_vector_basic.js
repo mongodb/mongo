@@ -8,6 +8,8 @@
  * ]
  */
 
+import {ShardingTest} from "jstests/libs/shardingtest.js";
+
 var st = new ShardingTest({shards: 2, mongos: 2});
 
 var mongos0 = st.s0;

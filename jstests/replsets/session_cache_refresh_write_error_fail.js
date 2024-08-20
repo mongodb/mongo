@@ -2,6 +2,7 @@
  * Test that write errors resulting as part of refreshing logical session do not kill open cursors.
  */
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";
+import {ReplSetTest} from "jstests/libs/replsettest.js";
 
 const rst = new ReplSetTest({nodes: 1});
 

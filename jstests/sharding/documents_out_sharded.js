@@ -4,6 +4,8 @@
  */
 
 import {assertArrayEq} from "jstests/aggregation/extras/utils.js";
+import {ShardingTest} from "jstests/libs/shardingtest.js";
+
 let st = new ShardingTest({shards: 2});
 
 const db = st.s.getDB("sharded_documents_stage");

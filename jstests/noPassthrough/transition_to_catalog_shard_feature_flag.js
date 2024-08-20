@@ -4,6 +4,8 @@
  *
  * @tags: [requires_fcv_80]
  */
+import {ShardingTest} from "jstests/libs/shardingtest.js";
+
 delete TestData.setParameters.featureFlagTransitionToCatalogShard;
 delete TestData.setParametersMongos.featureFlagTransitionToCatalogShard;
 

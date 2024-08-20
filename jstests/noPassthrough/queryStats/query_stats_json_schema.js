@@ -4,6 +4,7 @@
  * @tags: [requires_fcv_81]
  */
 import {getQueryStatsAggCmd, kShellApplicationName} from "jstests/libs/query_stats_utils.js";
+import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 const kHashedDbName = "iDlS7h5jf5HHxWPJpeHRbA+jLTNNZaqxVVkplrEkfko=";
 const kHashedCollName = "w6Ax20mVkbJu4wQWAMjL8Sl+DfXAr2Zqdc3kJRB7Oo0=";

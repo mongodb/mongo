@@ -5,6 +5,7 @@
 import {getPreImages, getPreImagesCollection} from "jstests/libs/change_stream_util.js";
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {verifyGetDiagnosticData} from "jstests/libs/ftdc.js";
+import {ReplSetTest} from "jstests/libs/replsettest.js";
 
 const getPreImagesCollStats = function(conn) {
     return getPreImagesCollection(conn)

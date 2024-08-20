@@ -6,6 +6,7 @@
 import "jstests/multiVersion/libs/multi_cluster.js";
 
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
+import {ShardingTest} from "jstests/libs/shardingtest.js";
 import {checkClusterParameter} from "jstests/sharding/libs/cluster_cardinality_parameter_util.js";
 import {removeShard} from "jstests/sharding/libs/remove_shard_util.js";
 

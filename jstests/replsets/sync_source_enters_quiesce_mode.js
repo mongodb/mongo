@@ -3,6 +3,7 @@
  * enters quiesce mode.
  */
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";
+import {ReplSetTest} from "jstests/libs/replsettest.js";
 
 // Set the oplog fetcher batch size to 1, in order to test fetching multiple batches while the sync
 // source is in quiesce mode.

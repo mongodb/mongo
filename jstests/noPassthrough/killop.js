@@ -4,6 +4,8 @@
 //   requires_sharding,
 // ]
 
+import {ShardingTest} from "jstests/libs/shardingtest.js";
+
 const dbName = "killop";
 const collName = "test";
 

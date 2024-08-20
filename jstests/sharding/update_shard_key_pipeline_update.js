@@ -6,6 +6,8 @@
  * ]
  */
 
+import {ReplSetTest} from "jstests/libs/replsettest.js";
+import {ShardingTest} from "jstests/libs/shardingtest.js";
 import {
     enableCoordinateCommitReturnImmediatelyAfterPersistingDecision
 } from "jstests/sharding/libs/sharded_transactions_helpers.js";

@@ -2,6 +2,7 @@
 // then switching the binary.
 import {checkUniqueIndexFormatVersion} from "jstests/libs/check_unique_indexes.js";
 import {checkCollectionUUIDs} from "jstests/libs/check_uuids.js";
+import {ReplSetTest} from "jstests/libs/replsettest.js";
 
 const latestBinary = "latest";
 

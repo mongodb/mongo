@@ -10,6 +10,7 @@ import {
 } from "jstests/libs/auto_retry_transaction_in_sharding.js";
 import {assertDropCollection} from "jstests/libs/collection_drop_recreate.js";
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
+import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 const dbNameShard0 = "test";
 const dbNameShard2 = "testOther";

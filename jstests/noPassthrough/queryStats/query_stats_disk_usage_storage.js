@@ -8,12 +8,12 @@
  */
 
 import {
-    assertAggregatedMetricsSingleExec,
     clearPlanCacheAndQueryStatsStore,
     exhaustCursorAndGetQueryStats,
     getFindQueryStatsKey,
-    runForEachDeployment,
 } from "jstests/libs/query_stats_utils.js";
+import {ReplSetTest} from "jstests/libs/replsettest.js";
+import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 function makeUnshardedCollection(conn) {
     const coll = conn.getDB("test")[jsTestName()];

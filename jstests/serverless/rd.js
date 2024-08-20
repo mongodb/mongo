@@ -2,6 +2,8 @@
  * Set up a mocked Rd which supports to add and remove entries from config.shards.
  */
 
+import {ReplSetTest} from "jstests/libs/replsettest.js";
+
 class Rd {
     constructor() {
         jsTest.log("Going to create and start Rd.");

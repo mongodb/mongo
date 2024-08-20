@@ -37,6 +37,7 @@ const conn = db.getMongo();
 const topology = DiscoverTopology.findConnectedNodes(conn);
 
 async function checkReplDbhashBackgroundThread(hosts) {
+    const {ReplSetTest} = await import("jstests/libs/replsettest.js");
     const {RetryableWritesUtil} = await import("jstests/libs/retryable_writes_util.js");
 
     let debugInfo = [];

@@ -1,5 +1,7 @@
 // Tests that merging chunks does not prevent cluster from doing other metadata ops
 
+import {ShardingTest} from "jstests/libs/shardingtest.js";
+
 var st = new ShardingTest({shards: 2});
 
 var mongos = st.s0;

@@ -2,6 +2,8 @@
  * Utilities for testing that internal transactions for retryable writes can be retried.
  */
 
+import {ReplSetTest} from "jstests/libs/replsettest.js";
+import {ShardingTest} from "jstests/libs/shardingtest.js";
 import {runTxnRetryOnTransientError} from "jstests/sharding/internal_txns/libs/fixture_helpers.js";
 import {
     getImageEntriesForTxn,

@@ -2,6 +2,8 @@
 //
 // @tags: [requires_replication, requires_sharding]
 
+import {ShardingTest} from "jstests/libs/shardingtest.js";
+
 const st = new ShardingTest({shards: 1, mongos: 1});
 const mongosDB = st.s0.getDB("admin");
 const shardDB = st.shard0.getDB("admin");

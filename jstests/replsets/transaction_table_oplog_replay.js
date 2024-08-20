@@ -1,6 +1,7 @@
 /**
  * Tests that the transaction table is properly updated on secondaries through oplog replay.
  */
+import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {RetryableWritesUtil} from "jstests/libs/retryable_writes_util.js";
 
 /**

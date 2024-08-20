@@ -5,6 +5,8 @@
  *
  * @tags: [requires_fcv_60, uses_transactions]
  */
+import {ReplSetTest} from "jstests/libs/replsettest.js";
+import {ShardingTest} from "jstests/libs/shardingtest.js";
 import {
     makeAbortTransactionCmdObj,
     makeCommitTransactionCmdObj,

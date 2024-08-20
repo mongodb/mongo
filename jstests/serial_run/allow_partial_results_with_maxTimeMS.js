@@ -12,6 +12,8 @@
  *   requires_fcv_62,
  *  ]
  */
+import {ShardingTest} from "jstests/libs/shardingtest.js";
+
 function getMillis() {
     const d = new Date();
     return d.getTime();

@@ -5,6 +5,8 @@
  * @tags: [requires_fcv_80]
  */
 
+import {ShardingTest} from "jstests/libs/shardingtest.js";
+
 var st = new ShardingTest({mongos: 1, shards: 1, config: 1, configShard: true});
 // TODO (SERVER-88675): DDL commands against config and admin database are not allowed via a router
 // but are allowed via a direct connection to the config server or shard.

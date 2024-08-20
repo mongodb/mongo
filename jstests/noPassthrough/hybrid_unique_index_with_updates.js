@@ -7,6 +7,8 @@
  *   requires_replication,
  * ]
  */
+import {ReplSetTest} from "jstests/libs/replsettest.js";
+
 let replSetTest = new ReplSetTest({name: "hybrid_updates", nodes: 2});
 replSetTest.startSet();
 replSetTest.initiate();

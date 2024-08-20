@@ -4,6 +4,7 @@
 //
 
 import {getChunkSkipsFromShard, getOptimizer} from "jstests/libs/analyze_plan.js";
+import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 const st = new ShardingTest({shards: 1});
 const coll = st.s0.getCollection("foo.bar");

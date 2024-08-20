@@ -21,6 +21,7 @@
 TestData.disableImplicitSessions = true;
 
 import {reconnect, waitForState} from "jstests/replsets/rslib.js";
+import {ReplSetTest} from "jstests/libs/replsettest.js";
 
 function assertSameRecordOnBothConnections(primary, secondary, lsid) {
     let primaryRecord = primary.getDB("config").transactions.findOne({"_id.id": lsid.id});

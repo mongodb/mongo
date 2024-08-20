@@ -2,6 +2,8 @@
  * Tests that split horizon reconfig results in unknown ServerDescription in
  * StreamableReplicaSetMonitor.
  */
+import {ShardingTest} from "jstests/libs/shardingtest.js";
+
 const st = new ShardingTest(
     {mongos: [{setParameter: {replicaSetMonitorProtocol: "streamable"}}], config: 1, shards: 0});
 const configRSPrimary = st.configRS.getPrimary();

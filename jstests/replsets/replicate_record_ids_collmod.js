@@ -8,6 +8,8 @@
  *   featureFlagRecordIdsReplicated,
  * ]
  */
+import {ReplSetTest} from "jstests/libs/replsettest.js";
+
 const replSet = new ReplSetTest({nodes: [{}, {rsConfig: {votes: 0, priority: 0}}]});
 replSet.startSet();
 replSet.initiate();

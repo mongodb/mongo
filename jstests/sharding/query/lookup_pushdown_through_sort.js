@@ -7,6 +7,8 @@
  *   requires_fcv_53,
  * ]
  */
+import {ShardingTest} from "jstests/libs/shardingtest.js";
+
 // Create a cluster with 2 shards.
 const numShards = 2;
 const st = new ShardingTest({shards: numShards});

@@ -1,3 +1,4 @@
+import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {
     verifyServerStatusElectionReasonCounterValue
 } from "jstests/replsets/libs/election_metrics.js";

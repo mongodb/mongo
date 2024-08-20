@@ -10,6 +10,8 @@
  *
  */
 
+import {ShardingTest} from "jstests/libs/shardingtest.js";
+
 const st = new ShardingTest({shards: 2, nodes: 1, config: 1});
 const mongos = st.s;
 

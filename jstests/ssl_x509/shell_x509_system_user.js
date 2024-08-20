@@ -1,6 +1,8 @@
 // Check that the shell can authenticate as the __system user using X509, which is a use case for
 // our auth performance tests (through the dbhash hook).
 
+import {ReplSetTest} from "jstests/libs/replsettest.js";
+
 const x509Options = {
     clusterAuthMode: 'x509',
     tlsMode: 'requireTLS',

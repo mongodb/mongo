@@ -1,6 +1,8 @@
 // Tests that member functions setSecondaryOk()/getSecondaryOk() and their
 // aliases, setSlaveOk()/getSlaveOk(), produce the same results.
 
+import {ReplSetTest} from "jstests/libs/replsettest.js";
+
 const dbName = "test";
 const collName = "coll";
 const rst = new ReplSetTest({nodes: 2});

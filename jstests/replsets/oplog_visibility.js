@@ -4,6 +4,7 @@
  * verifies a later scan over the range returns the same values.
  */
 import {Thread} from "jstests/libs/parallelTester.js";
+import {ReplSetTest} from "jstests/libs/replsettest.js";
 
 const replTest = new ReplSetTest({
     name: "oplog_visibility",

@@ -20,6 +20,7 @@ TestData.disableImplicitSessions = true;
 
 import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 import {withPinnedCursor} from "jstests/libs/pin_getmore_cursor.js";
+import {ShardingTest} from "jstests/libs/shardingtest.js";
 const st = new ShardingTest({shards: 2});
 
 // Enables the specified 'failPointName', executes 'runGetMoreFunc' function in a parallel

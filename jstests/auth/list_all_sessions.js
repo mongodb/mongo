@@ -2,6 +2,7 @@
 // @tags: [requires_sharding, requires_auth]
 
 import {assertErrorCode} from "jstests/aggregation/extras/utils.js";
+import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 // This test makes assertions about the number of sessions, which are not compatible with
 // implicit sessions.

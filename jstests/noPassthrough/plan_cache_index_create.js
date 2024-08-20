@@ -6,6 +6,7 @@
  * ]
  */
 import {getCachedPlan} from "jstests/libs/analyze_plan.js";
+import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {checkSbeFullyEnabled} from "jstests/libs/sbe_util.js";
 
 const dbName = "test";

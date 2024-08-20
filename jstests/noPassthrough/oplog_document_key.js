@@ -8,6 +8,8 @@
  *    uses_transactions,
  *  ]
  */
+import {ShardingTest} from "jstests/libs/shardingtest.js";
+
 const st = new ShardingTest({shards: 1, rs: {nodes: 1}});
 
 const mongos = st.s;

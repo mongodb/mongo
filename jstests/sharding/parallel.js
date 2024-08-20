@@ -1,4 +1,6 @@
 // This test fails when run with authentication because benchRun with auth is broken: SERVER-6388
+import {ShardingTest} from "jstests/libs/shardingtest.js";
+
 var numShards = 3;
 var s = new ShardingTest({name: "parallel", shards: numShards, mongos: 2});
 

@@ -8,6 +8,8 @@
 // @tags: [multiversion_incompatible]
 //
 
+import {ReplSetTest} from "jstests/libs/replsettest.js";
+
 var configRS = new ReplSetTest({name: "configRS", nodes: 3, useHostName: true});
 configRS.startSet({configsvr: '', storageEngine: 'wiredTiger'});
 var replConfig = configRS.getReplSetConfig();

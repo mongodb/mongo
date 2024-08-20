@@ -1,6 +1,8 @@
 // Verifies refining a shard key checks for the presence of a compatible shard key index on a shard
 // with chunks, not the primary shard.
 
+import {ShardingTest} from "jstests/libs/shardingtest.js";
+
 // Cannot run the filtering metadata check on tests that run refineCollectionShardKey.
 TestData.skipCheckShardFilteringMetadata = true;
 

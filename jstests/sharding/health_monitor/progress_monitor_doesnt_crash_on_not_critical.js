@@ -5,6 +5,8 @@
  *     embedded_router_incompatible,
  * ]
  */
+import {ShardingTest} from "jstests/libs/shardingtest.js";
+
 const PROGRESS_TIMEOUT_SECONDS = 3;
 
 const params = {

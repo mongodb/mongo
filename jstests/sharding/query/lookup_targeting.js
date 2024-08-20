@@ -25,6 +25,7 @@ import {configureFailPoint} from "jstests/libs/fail_point_util.js";
 import {funWithArgs} from "jstests/libs/parallel_shell_helpers.js";
 import {checkSbeRestrictedOrFullyEnabled} from "jstests/libs/sbe_util.js";
 import {ShardTargetingTest} from "jstests/libs/shard_targeting_util.js";
+import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 const kDbName = "lookup_targeting";
 const st = new ShardingTest({shards: 3, mongos: 2});

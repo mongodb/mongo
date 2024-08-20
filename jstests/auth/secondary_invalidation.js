@@ -4,6 +4,8 @@
  * @tags: [requires_replication]
  */
 
+import {ReplSetTest} from "jstests/libs/replsettest.js";
+
 var NUM_NODES = 3;
 var rsTest = new ReplSetTest({nodes: NUM_NODES});
 rsTest.startSet({oplogSize: 10, keyFile: 'jstests/libs/key1'});

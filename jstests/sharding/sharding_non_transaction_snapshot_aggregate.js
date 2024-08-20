@@ -9,6 +9,7 @@
  */
 
 import {SnapshotReadsTest} from "jstests/libs/global_snapshot_reads_util.js";
+import {ShardingTest} from "jstests/libs/shardingtest.js";
 import {findChunksUtil} from "jstests/sharding/libs/find_chunks_util.js";
 import {
     flushRoutersAndRefreshShardMetadata

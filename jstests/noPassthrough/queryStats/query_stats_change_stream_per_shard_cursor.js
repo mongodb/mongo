@@ -10,6 +10,7 @@ import {
     getLatestQueryStatsEntry,
     getNumberOfGetMoresUntilNextDocForChangeStream,
 } from "jstests/libs/query_stats_utils.js";
+import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 const dbName = jsTestName();
 

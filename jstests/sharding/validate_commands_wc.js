@@ -1,6 +1,8 @@
 /**
  * Tests whether mongos correctly validates write concerns.
  */
+import {ShardingTest} from "jstests/libs/shardingtest.js";
+
 var st = new ShardingTest({mongos: 1, shards: 1});
 var mongos = st.s0;
 

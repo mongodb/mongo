@@ -14,6 +14,7 @@ import {
     getRidForDoc,
     validateShowRecordIdReplicatesAcrossNodes,
 } from "jstests/libs/replicated_record_ids_utils.js";
+import {ReplSetTest} from "jstests/libs/replsettest.js";
 
 const replSet = new ReplSetTest({nodes: 2});
 replSet.startSet();

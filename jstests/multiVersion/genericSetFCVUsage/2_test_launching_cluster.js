@@ -1,5 +1,7 @@
 import "jstests/multiVersion/libs/verify_versions.js";
 
+import {ShardingTest} from "jstests/libs/shardingtest.js";
+
 function checkEquivalent(testConfig, st) {
     var expectedVersions = [testConfig.other.mongosOptions.binVersion];
     var expectedNodes = [...testConfig.shards.rs0.nodes, ...testConfig.shards.rs1.nodes];

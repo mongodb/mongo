@@ -2,6 +2,7 @@
  * Tests that stepdown terminates writes, but does not disconnect connections.
  */
 import {waitForCurOpByFailPointNoNS} from "jstests/libs/curop_helpers.js";
+import {ReplSetTest} from "jstests/libs/replsettest.js";
 
 const rst = new ReplSetTest({
     nodes: [{}, {rsConfig: {priority: 0}}],

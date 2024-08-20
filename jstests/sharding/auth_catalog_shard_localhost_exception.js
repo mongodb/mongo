@@ -6,6 +6,8 @@
  *
  * @tags: [requires_fcv_80]
  */
+import {ShardingTest} from "jstests/libs/shardingtest.js";
+
 // Test that we can't create a shard specific user on the config shard if we already created a
 // cluster wide user using the localhost exception.
 var st = new ShardingTest({

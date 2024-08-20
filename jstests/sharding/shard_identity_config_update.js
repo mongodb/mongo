@@ -8,6 +8,7 @@
 TestData.skipCheckingUUIDsConsistentAcrossCluster = true;
 
 import {reconfig} from "jstests/replsets/rslib.js";
+import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 var st = new ShardingTest({shards: {rs0: {nodes: 2}}});
 

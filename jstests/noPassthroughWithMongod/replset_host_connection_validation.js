@@ -1,5 +1,7 @@
 // Test --host with a replica set.
 // @tags: [requires_replication]
+import {ReplSetTest} from "jstests/libs/replsettest.js";
+
 if (_isWindows()) {
     // Windows is prone to slow DNS resolution issues, which causes this test to fail
     // even if the shell should eventually connect to the server. Since we are testing

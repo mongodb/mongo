@@ -1,7 +1,3 @@
-import {
-    getReplicaSetURL,
-} from "jstests/noPassthrough/rs_endpoint/lib/util.js";
-
 /*
  * Utilities for starting a replica set with --configsvr, promoting it to a sharded cluster, and
  * then scaling the cluster up and down.
@@ -20,6 +16,11 @@ import {
  * 5. tearDown
  *      This shuts down the sharded cluster.
  */
+import {ReplSetTest} from "jstests/libs/replsettest.js";
+import {
+    getReplicaSetURL,
+} from "jstests/noPassthrough/rs_endpoint/lib/util.js";
+
 export var ReplicaSetEndpointTest = class {
     constructor(hasDirectShardOperationPrivilege) {
         jsTest.log("Testing with " + tojson({hasDirectShardOperationPrivilege}));

@@ -6,6 +6,8 @@
  * ]
  */
 
+import {ReplSetTest} from "jstests/libs/replsettest.js";
+
 const dbName = "test";
 const collName = "empty_ts_repl_bulk_write";
 

@@ -5,6 +5,7 @@
  * Public variables:
  * 'st' - Access the underlying ShardingTest
  */
+import {ShardingTest} from "jstests/libs/shardingtest.js";
 import {MongotMock} from "jstests/with_mongot/mongotmock/lib/mongotmock.js";
 
 export class ShardingTestWithMongotMock {

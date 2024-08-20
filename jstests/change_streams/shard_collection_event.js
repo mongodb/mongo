@@ -16,6 +16,7 @@ import {
     assertDropAndRecreateCollection,
     assertDropCollection
 } from "jstests/libs/collection_drop_recreate.js";
+import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 jsTestLog("creating sharding test");
 var st = new ShardingTest({

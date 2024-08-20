@@ -13,6 +13,9 @@
  * ]
  */
 
+import {ReplSetTest} from "jstests/libs/replsettest.js";
+import {ShardingTest} from "jstests/libs/shardingtest.js";
+
 // Skip metadata consistency checks since the sharded cluster is started with 0 shards
 TestData.skipCheckMetadataConsistency = true;
 TestData.skipCheckRoutingTableConsistency = true;

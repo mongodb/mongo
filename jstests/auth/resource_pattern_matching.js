@@ -3,6 +3,9 @@
  * @tags: [requires_replication, requires_sharding]
  */
 
+import {ReplSetTest} from "jstests/libs/replsettest.js";
+import {ShardingTest} from "jstests/libs/shardingtest.js";
+
 // This test logs in users on the admin database, but doesn't log them out, which can fail with
 // implicit sessions and ReplSetTest when the fixture attempts to verify data hashes at shutdown by
 // authenticating as the __system user.

@@ -1,6 +1,8 @@
 /**
  * Test ClusterFindCmd with UUID for collection name fails (but does not crash)
  */
+import {ShardingTest} from "jstests/libs/shardingtest.js";
+
 var cmdRes;
 var cursorId;
 

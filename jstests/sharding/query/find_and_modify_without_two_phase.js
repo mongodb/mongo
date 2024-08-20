@@ -3,6 +3,7 @@
  * single shard work without having to use the two phase protocol.
  */
 
+import {ShardingTest} from "jstests/libs/shardingtest.js";
 import {
     assertExplainTargetsCorrectShard,
     splitAndMoveChunks

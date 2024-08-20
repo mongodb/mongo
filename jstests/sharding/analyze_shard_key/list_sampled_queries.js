@@ -11,6 +11,8 @@
  */
 
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
+import {ReplSetTest} from "jstests/libs/replsettest.js";
+import {ShardingTest} from "jstests/libs/shardingtest.js";
 import {
     AnalyzeShardKeyUtil
 } from "jstests/sharding/analyze_shard_key/libs/analyze_shard_key_util.js";

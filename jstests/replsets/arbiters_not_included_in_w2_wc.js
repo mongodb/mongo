@@ -11,6 +11,8 @@
  * @tags: [requires_fcv_53]
  */
 
+import {ReplSetTest} from "jstests/libs/replsettest.js";
+
 const name = "arbiters_not_included_in_w2_wc";
 const rst = new ReplSetTest({name: name, nodes: 5});
 const nodes = rst.nodeList();

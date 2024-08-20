@@ -5,6 +5,8 @@
  * @tags: [multiversion_incompatible, featureFlagGlobalIndexesShardingCatalog, requires_fcv_70]
  */
 
+import {ShardingTest} from "jstests/libs/shardingtest.js";
+
 const st = new ShardingTest({shards: 1});
 
 const csrsIndexesCollection = 'csrs.indexes';

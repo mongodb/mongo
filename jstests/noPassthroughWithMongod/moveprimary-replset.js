@@ -2,6 +2,7 @@
 // as a shard.  Then it makes sure that we can move the primary for this unsharded database to
 // another shard that we add later, and after the move the data is still accessible.
 // @tags: [requires_replication, requires_sharding]
+import {ShardingTest} from "jstests/libs/shardingtest.js";
 import {
     moveDatabaseAndUnshardedColls
 } from "jstests/sharding/libs/move_database_and_unsharded_coll_helper.js";

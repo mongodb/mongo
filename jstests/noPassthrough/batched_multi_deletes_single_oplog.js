@@ -5,6 +5,8 @@
  *   requires_replication,
  * ]
  */
+import {ReplSetTest} from "jstests/libs/replsettest.js";
+
 const dbName = jsTestName();
 const collName = "test";
 const collCount = 10;

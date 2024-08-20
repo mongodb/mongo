@@ -6,6 +6,8 @@
 //   # TODO (SERVER-88127): Re-enable this test or add an explanation why it is incompatible.
 //   embedded_router_incompatible,
 // ]
+import {ShardingTest} from "jstests/libs/shardingtest.js";
+
 const tzGoodInfoFat = "jstests/libs/config_files/good_timezone_info_fat";
 const tzGoodInfoSlim = "jstests/libs/config_files/good_timezone_info_slim";
 const tzBadInfo = "jstests/libs/config_files/bad_timezone_info";

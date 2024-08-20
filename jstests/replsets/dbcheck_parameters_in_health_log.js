@@ -6,6 +6,7 @@
  * ]
  */
 
+import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {getUUIDFromListCollections} from "jstests/libs/uuid_util.js";
 import {checkHealthLog, resetAndInsert, runDbCheck} from "jstests/replsets/libs/dbcheck_utils.js";
 

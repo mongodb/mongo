@@ -4,6 +4,7 @@
  */
 
 import {arrayEq} from "jstests/aggregation/extras/utils.js";
+import {ReplSetTest} from "jstests/libs/replsettest.js";
 
 // In production, we will upgrade to start using multitenancySupport before enabling this feature
 // flag, and this test is meant to exercise that upgrade behavior, so don't run if the feature flag

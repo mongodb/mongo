@@ -5,6 +5,8 @@
  *  requires_replication,
  * ]
  */
+import {ReplSetTest} from "jstests/libs/replsettest.js";
+
 const kConfigSessionsNs = "config.system.sessions";
 
 const refreshCmd = {

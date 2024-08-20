@@ -25,6 +25,7 @@ class WaitForReplication(interface.Hook):
         start_time = time.time()
         client_conn = self.fixture.get_driver_connection_url()
         js_cmds = """
+            const {ReplSetTest} = await import("jstests/libs/replsettest.js");
             const conn = '{}';
             try {{
                 const rst = new ReplSetTest(conn);

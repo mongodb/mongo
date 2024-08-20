@@ -7,6 +7,7 @@
  * ]
  */
 
+import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {waitForState} from "jstests/replsets/rslib.js";
 
 const rst = new ReplSetTest({

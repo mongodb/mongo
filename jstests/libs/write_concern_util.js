@@ -3,6 +3,7 @@
  */
 
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";
+import {ReplSetTest} from "jstests/libs/replsettest.js";
 
 // Shards a collection with 'numDocs' documents and creates 2 chunks, one on each of two shards.
 export function shardCollectionWithChunks(st, coll, numDocs) {

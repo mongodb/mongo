@@ -4,6 +4,7 @@
 // ]
 
 import {FSMShardingTest} from "jstests/concurrency/fsm_libs/shard_fixture.js";
+import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 const rsTestOriginal = new ShardingTest({shards: 2, mongos: 2, config: 2});
 

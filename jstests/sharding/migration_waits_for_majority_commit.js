@@ -13,6 +13,7 @@ import {
     unpauseMigrateAtStep,
     waitForMigrateStep,
 } from "jstests/libs/chunk_manipulation_util.js";
+import {ShardingTest} from "jstests/libs/shardingtest.js";
 import {restartServerReplication, stopServerReplication} from "jstests/libs/write_concern_util.js";
 
 // Set up a sharded cluster with two shards, two chunks, and one document in one of the chunks.

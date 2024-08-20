@@ -10,6 +10,7 @@
 // 8. Ensure the ops in queue are applied and that the PRIMARY begins to accept writes as usual.
 
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
+import {ReplSetTest} from "jstests/libs/replsettest.js";
 
 var replSet = new ReplSetTest({name: 'testSet', nodes: 3});
 var nodes = replSet.nodeList();

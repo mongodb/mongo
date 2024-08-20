@@ -3,6 +3,7 @@
  * for a collection on each node, converging when the size difference becomes small.
  */
 
+import {ShardingTest} from "jstests/libs/shardingtest.js";
 import {findChunksUtil} from "jstests/sharding/libs/find_chunks_util.js";
 
 const maxChunkSizeMB = 1;

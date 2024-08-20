@@ -8,6 +8,7 @@
  * ]
  */
 import {assertDropCollection} from "jstests/libs/collection_drop_recreate.js";
+import {ShardingTest} from "jstests/libs/shardingtest.js";
 import {
     disableStaleVersionAndSnapshotRetriesWithinTransactions,
     enableCoordinateCommitReturnImmediatelyAfterPersistingDecision,

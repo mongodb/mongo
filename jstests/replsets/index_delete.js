@@ -5,6 +5,8 @@
  * @tags: [multiversion_incompatible]
  */
 
+import {ReplSetTest} from "jstests/libs/replsettest.js";
+
 function indexBuildInProgress(checkDB) {
     var inprog = checkDB.currentOp().inprog;
     var indexOps = inprog.filter(function(op) {

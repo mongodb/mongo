@@ -9,6 +9,7 @@
 // Now the primary is most-up-to-date and another node is more up-to-date than others.
 // Make a lagged node the next primary.
 // Confirm that the most up-to-date node becomes primary.
+import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {restartServerReplication, stopServerReplication} from "jstests/libs/write_concern_util.js";
 import {
     verifyCatchUpConclusionReason,

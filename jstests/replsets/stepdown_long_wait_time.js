@@ -6,6 +6,7 @@
 // 5. Restart replication on the SECONDARY.
 // 6. Wait for PRIMARY to StepDown.
 
+import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {restartServerReplication, stopServerReplication} from "jstests/libs/write_concern_util.js";
 
 var name = "stepDownWithLongWait";

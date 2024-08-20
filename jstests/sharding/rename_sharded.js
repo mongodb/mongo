@@ -2,6 +2,7 @@
  * Test all the possible succeed/fail cases around sharded collections renaming.
  */
 
+import {ShardingTest} from "jstests/libs/shardingtest.js";
 import {getUUIDFromConfigCollections} from "jstests/libs/uuid_util.js";
 import {
     moveDatabaseAndUnshardedColls

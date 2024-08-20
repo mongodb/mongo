@@ -3,6 +3,8 @@
  * parameters. Also includes unit tests to test new deepMerge helper function.
  */
 
+import {ShardingTest} from "jstests/libs/shardingtest.js";
+
 // Basic test to ensure both parameters are appended in config options instead of replaced.
 let st = new ShardingTest({
     configOptions: {

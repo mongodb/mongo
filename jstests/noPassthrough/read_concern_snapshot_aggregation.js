@@ -5,6 +5,8 @@
  *   uses_transactions,
  * ]
  */
+import {ReplSetTest} from "jstests/libs/replsettest.js";
+
 const kAdminDB = "admin";
 const kCollName = "coll";
 const kConfigDB = "config";

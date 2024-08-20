@@ -1,6 +1,8 @@
 // Check that inserts to capped collections have the same order on primary and secondary.
 // See SERVER-21483.
 
+import {ReplSetTest} from "jstests/libs/replsettest.js";
+
 var replTest = new ReplSetTest({name: 'capped_insert_order', nodes: 2});
 replTest.startSet();
 replTest.initiate();

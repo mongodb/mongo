@@ -8,6 +8,7 @@
  * ]
  */
 import {PrepareHelpers} from "jstests/core/txns/libs/prepare_helpers.js";
+import {ReplSetTest} from "jstests/libs/replsettest.js";
 
 const dbName = "test";
 const collName = "change_stream_transaction";

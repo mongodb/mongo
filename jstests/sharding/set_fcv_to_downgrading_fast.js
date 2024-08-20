@@ -11,6 +11,8 @@
  * ]
  */
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";
+import {ReplSetTest} from "jstests/libs/replsettest.js";
+import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 const latest = "latest";
 // The FCV downgrade should be < 1 second but we added a buffer for slow machines.

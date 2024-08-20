@@ -1,5 +1,6 @@
 // Tests changing the zones on a shard at runtime results in a correct distribution of chunks across
 // the cluster
+import {ShardingTest} from "jstests/libs/shardingtest.js";
 import {findChunksUtil} from "jstests/sharding/libs/find_chunks_util.js";
 
 const st = new ShardingTest({shards: 3, mongos: 1, other: {chunkSize: 1}});

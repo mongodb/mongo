@@ -3,6 +3,8 @@
  * 'enableOverrideClusterChainingSetting' will allow the node to chain anyway.
  */
 
+import {ReplSetTest} from "jstests/libs/replsettest.js";
+
 let rst = new ReplSetTest({
     nodes: {
         n0: {},

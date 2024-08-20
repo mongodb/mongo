@@ -4,6 +4,7 @@
  */
 
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";
+import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {isConfigCommitted} from "jstests/replsets/rslib.js";
 
 var replTest = new ReplSetTest({nodes: 2, useBridge: true});

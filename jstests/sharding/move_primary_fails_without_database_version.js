@@ -1,5 +1,7 @@
 // Tests that a movePrimary will fail if the database doesn't have a version in config.databases.
 
+import {ShardingTest} from "jstests/libs/shardingtest.js";
+
 // Do not check metadata consistency as the database version is missing for testing purposes.
 TestData.skipCheckMetadataConsistency = true;
 TestData.skipCheckRoutingTableConsistency = true;

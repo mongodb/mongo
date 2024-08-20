@@ -5,6 +5,8 @@
  *
  * @tags: [requires_fsync, requires_wiredtiger, requires_persistence]
  */
+import {ReplSetTest} from "jstests/libs/replsettest.js";
+
 // To prevent the checkpoint thread from running during this test, change its frequency to the
 // largest possible value using the 'syncdelay' parameter.
 const kMaxSyncDelaySecs = 3600;

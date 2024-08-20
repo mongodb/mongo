@@ -9,6 +9,8 @@
  * @tags: [uses_transactions, uses_multi_shard_transaction]
  */
 
+import {ReplSetTest} from "jstests/libs/replsettest.js";
+import {ShardingTest} from "jstests/libs/shardingtest.js";
 import {
     assertWriteConcernError,
     checkWriteConcernTimedOut,

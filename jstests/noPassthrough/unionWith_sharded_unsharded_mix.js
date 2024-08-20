@@ -10,6 +10,7 @@
  */
 
 import {arrayEq} from "jstests/aggregation/extras/utils.js";
+import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 function getDocsFromCollection(collObj) {
     return collObj.find().toArray();

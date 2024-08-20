@@ -17,6 +17,7 @@
  */
 
 import {GeoNearRandomTest} from "jstests/libs/geo_near_random.js";
+import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 const st = new ShardingTest({shards: 2, mongos: 1});
 

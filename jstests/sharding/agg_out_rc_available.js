@@ -3,6 +3,7 @@
  * doesn't fail.
  */
 import {resultsEq} from "jstests/aggregation/extras/utils.js";
+import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 const st = new ShardingTest({shards: {rs0: {nodes: 1}}});
 const dbName = "test";

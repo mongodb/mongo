@@ -7,6 +7,7 @@
  * ]
  */
 
+import {ShardingTest} from "jstests/libs/shardingtest.js";
 import {testMoveChunkWithSession} from "jstests/sharding/move_chunk_with_session_helper.js";
 
 const st = new ShardingTest({

@@ -10,6 +10,7 @@
  */
 import {getFailPointName} from "jstests/libs/fail_point_util.js";
 import {ingressHandshakeMetricsTest} from "jstests/libs/ingress_handshake_metrics_helpers.js";
+import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 let runTest = (connectionHealthLoggingOn) => {
     let st = new ShardingTest({shards: TestData.configShard ? 1 : 0, other: {auth: ''}});

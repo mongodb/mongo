@@ -14,6 +14,7 @@ import {configureFailPoint} from "jstests/libs/fail_point_util.js";
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {funWithArgs} from "jstests/libs/parallel_shell_helpers.js";
 import {ShardTargetingTest} from "jstests/libs/shard_targeting_util.js";
+import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 const kDbName = "agg_write_targeting";
 

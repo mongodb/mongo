@@ -7,6 +7,8 @@
  *   requires_persistence,
  * ]
  */
+import {ReplSetTest} from "jstests/libs/replsettest.js";
+
 const dbToDropName = jsTestName() + "_drop";
 const dbToKeepName = jsTestName() + "_keep";
 

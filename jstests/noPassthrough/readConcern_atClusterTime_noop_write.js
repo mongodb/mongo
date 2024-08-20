@@ -6,6 +6,7 @@
 //   uses_atclustertime,
 //   uses_transactions,
 // ]
+import {ShardingTest} from "jstests/libs/shardingtest.js";
 import {getLastOpTime} from "jstests/replsets/rslib.js";
 
 function toNs(dbName, collName) {

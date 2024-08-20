@@ -8,6 +8,8 @@
  *   requires_sharding,
  * ]
  */
+import {ShardingTest} from "jstests/libs/shardingtest.js";
+
 const st = new ShardingTest({name: jsTestName(), mongos: 1, shards: 2, rs: {nodes: 1}});
 
 const db = st.s.getDB(jsTestName());

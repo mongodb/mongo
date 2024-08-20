@@ -1,3 +1,4 @@
+import {ShardingTest} from "jstests/libs/shardingtest.js";
 import {findChunksUtil} from "jstests/sharding/libs/find_chunks_util.js";
 
 // Values have to be sorted - you must have exactly 6 values in each array

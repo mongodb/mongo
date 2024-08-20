@@ -7,6 +7,8 @@
  * ]
  */
 
+import {ShardingTest} from "jstests/libs/shardingtest.js";
+
 function assertIndexExists(coll, indexKey, options, connections) {
     connections.forEach((conn) => {
         const db = conn.getDB(coll.getDB().getName());

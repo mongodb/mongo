@@ -4,6 +4,8 @@
  * @tags: [
  * ]
  */
+import {ReplSetTest} from "jstests/libs/replsettest.js";
+
 jsTestLog("Test PSS configuration will set defaultWC to majority.");
 let replTest = new ReplSetTest({name: 'default_wc_majority', nodes: 3});
 replTest.startSet();

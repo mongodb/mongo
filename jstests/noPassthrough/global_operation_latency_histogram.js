@@ -3,6 +3,8 @@
 //   requires_replication,
 // ]
 
+import {ShardingTest} from "jstests/libs/shardingtest.js";
+
 // Get the current opLatencies histograms from testDB.
 function getLatencyHistogramStats(testDB) {
     return testDB.serverStatus({opLatencies: {histograms: 1}}).opLatencies;

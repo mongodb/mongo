@@ -8,6 +8,8 @@
  *   requires_fcv_71,
  * ]
  */
+import {ShardingTest} from "jstests/libs/shardingtest.js";
+
 let st = new ShardingTest({shards: 2, rs: {nodes: 1}});
 let dbName = "test";
 let shardedCollNameSingleShard = "shardedCollSingleShard";

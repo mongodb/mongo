@@ -6,6 +6,7 @@
  * @tags: [requires_replication]
  */
 import {aggPlanHasStage} from "jstests/libs/analyze_plan.js";
+import {ReplSetTest} from "jstests/libs/replsettest.js";
 
 const numDocs = 1000;
 const sampleSize = numDocs * .06;

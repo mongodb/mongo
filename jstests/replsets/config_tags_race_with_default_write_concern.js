@@ -4,6 +4,7 @@
  */
 
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";
+import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {reconfig} from "jstests/replsets/rslib.js";
 
 const name = jsTestName();

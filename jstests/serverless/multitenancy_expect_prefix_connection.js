@@ -2,6 +2,8 @@
 // is marked as being from atlas proxy it may never unset that property
 // @tags: [featureFlagSecurityToken]
 
+import {ReplSetTest} from "jstests/libs/replsettest.js";
+
 const tenantID = ObjectId();
 const kVTSKey = 'secret';
 const kDbName = 'myDb';

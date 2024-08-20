@@ -25,6 +25,7 @@
  * ]
  */
 
+import {ShardingTest} from "jstests/libs/shardingtest.js";
 import {shardCollectionWithChunks} from "jstests/libs/write_concern_util.js";
 import {reconfig} from "jstests/replsets/rslib.js";
 

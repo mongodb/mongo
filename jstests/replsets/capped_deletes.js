@@ -1,6 +1,8 @@
 /**
  * Tests user deletes on capped collections.
  */
+import {ReplSetTest} from "jstests/libs/replsettest.js";
+
 let replTest = new ReplSetTest({name: "capped_deletes", nodes: 2});
 replTest.startSet();
 replTest.initiate();

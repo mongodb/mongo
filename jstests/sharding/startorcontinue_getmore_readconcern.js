@@ -8,6 +8,8 @@
  *      uses_transactions,
  * ]
  */
+import {ShardingTest} from "jstests/libs/shardingtest.js";
+
 const st = new ShardingTest({mongos: 1, shard: 1});
 
 let dbName = 'test';

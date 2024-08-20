@@ -7,6 +7,7 @@
  * @param adminDB {DB} the admin database database object
  */
 import {kDefaultWaitForFailPointTimeout} from "jstests/libs/fail_point_util.js";
+import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 function runBasicTest(adminDB) {
     function expectFailPointState(fpState, expectedMode, expectedData) {

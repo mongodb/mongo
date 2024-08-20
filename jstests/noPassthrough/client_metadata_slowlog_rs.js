@@ -5,6 +5,8 @@
  *   requires_replication,
  * ]
  */
+import {ReplSetTest} from "jstests/libs/replsettest.js";
+
 const numNodes = 2;
 const rst = new ReplSetTest({nodes: numNodes});
 

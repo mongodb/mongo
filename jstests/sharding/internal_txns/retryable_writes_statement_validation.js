@@ -6,6 +6,7 @@
  * @tags: [requires_fcv_60, uses_transactions]
  */
 import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
+import {ShardingTest} from "jstests/libs/shardingtest.js";
 import {
     getOplogEntriesForTxn,
     getTxnEntriesForSession,

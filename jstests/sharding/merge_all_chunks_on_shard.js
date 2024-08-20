@@ -6,6 +6,7 @@
  * ]
  */
 import {configureFailPointForRS} from "jstests/libs/fail_point_util.js";
+import {ShardingTest} from "jstests/libs/shardingtest.js";
 import {findChunksUtil} from "jstests/sharding/libs/find_chunks_util.js";
 
 /* Create new sharded collection on testDB */

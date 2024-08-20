@@ -8,6 +8,7 @@
 // ]
 
 import {assertDropAndRecreateCollection} from "jstests/libs/collection_drop_recreate.js";
+import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {
     ChangeStreamMultitenantReplicaSetTest
 } from "jstests/serverless/libs/change_collection_util.js";

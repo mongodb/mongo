@@ -4,6 +4,8 @@
  * @tags: [requires_sharding]
  */
 
+import {ShardingTest} from "jstests/libs/shardingtest.js";
+
 function runTest(conn) {
     var db = conn.getDB('test');
     var admin = conn.getDB('admin');

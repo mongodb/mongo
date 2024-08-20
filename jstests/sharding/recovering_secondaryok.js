@@ -12,6 +12,8 @@
 TestData.skipCheckingUUIDsConsistentAcrossCluster = true;
 
 import {awaitRSClientHosts} from "jstests/replsets/rslib.js";
+import {ReplSetTest} from "jstests/libs/replsettest.js";
+import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 var shardTest =
     new ShardingTest({name: "recovering_secondaryok", shards: 2, mongos: 2, other: {rs: true}});

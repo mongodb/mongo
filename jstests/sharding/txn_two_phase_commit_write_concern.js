@@ -4,6 +4,7 @@
  * @tags: [uses_transactions, uses_multi_shard_transaction]
  */
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";
+import {ShardingTest} from "jstests/libs/shardingtest.js";
 import {restartServerReplication, stopServerReplication} from "jstests/libs/write_concern_util.js";
 import {
     enableCoordinateCommitReturnImmediatelyAfterPersistingDecision

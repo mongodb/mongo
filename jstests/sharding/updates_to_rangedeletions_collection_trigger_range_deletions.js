@@ -3,6 +3,7 @@
  * config.rangeDeletions collection.
  */
 
+import {ShardingTest} from "jstests/libs/shardingtest.js";
 import {getUUIDFromConfigCollections} from "jstests/libs/uuid_util.js";
 
 const dbName = "test";

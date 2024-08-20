@@ -2,6 +2,8 @@
  * Test that the keys on config server are rotated according to the KeysRotationIntervalSec value
  */
 
+import {ShardingTest} from "jstests/libs/shardingtest.js";
+
 const kRotationInterval = 30;
 let st = new ShardingTest({
     mongos: 1,

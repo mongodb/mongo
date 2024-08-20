@@ -8,6 +8,8 @@
  * ]
  */
 
+import {ShardingTest} from "jstests/libs/shardingtest.js";
+
 // Checking UUID and index consistency involves talking to a shard node, which in this
 // test is shutdown.
 TestData.skipCheckingUUIDsConsistentAcrossCluster = true;

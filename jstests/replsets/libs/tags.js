@@ -3,6 +3,7 @@
  *
  * https://docs.mongodb.com/v3.0/tutorial/configure-replica-set-tag-sets/
  */
+import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {reconfig} from "jstests/replsets/rslib.js";
 
 export var TagsTest = function(options) {

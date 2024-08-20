@@ -6,6 +6,7 @@
  * ssl test suite. This test cannot use ssl communication
  * and therefore cannot test modes that only allow ssl.
  */
+import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {CA_CERT, CLIENT_CERT, SERVER_CERT} from "jstests/ssl/libs/ssl_helpers.js";
 
 var rst = new ReplSetTest({

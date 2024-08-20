@@ -7,6 +7,8 @@
  * ]
  */
 
+import {ShardingTest} from "jstests/libs/shardingtest.js";
+
 // This test looks for exact matches in log output, which does not account for implicit sessions.
 TestData.disableImplicitSessions = true;
 

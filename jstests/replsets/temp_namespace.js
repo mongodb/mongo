@@ -2,6 +2,8 @@
 // This is to make sure that temp collections get cleaned up on promotion to primary
 // @tags: [requires_replication]
 
+import {ReplSetTest} from "jstests/libs/replsettest.js";
+
 var replTest = new ReplSetTest({name: 'testSet', nodes: 3});
 var nodes = replTest.nodeList();
 printjson(nodes);

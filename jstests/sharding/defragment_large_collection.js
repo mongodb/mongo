@@ -1,3 +1,4 @@
+import {ShardingTest} from "jstests/libs/shardingtest.js";
 import {defragmentationUtil} from "jstests/sharding/libs/defragmentation_util.js";
 import {findChunksUtil} from "jstests/sharding/libs/find_chunks_util.js";
 

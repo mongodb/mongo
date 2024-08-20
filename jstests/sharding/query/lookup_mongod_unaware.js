@@ -13,6 +13,8 @@
  * ]
  *
  */
+import {ShardingTest} from "jstests/libs/shardingtest.js";
+
 // Restarts the primary shard and ensures that it believes both collections are unsharded.
 function restartPrimaryShard(rs, ...expectedCollections) {
     // Returns true if the shard is aware that the collection is sharded.

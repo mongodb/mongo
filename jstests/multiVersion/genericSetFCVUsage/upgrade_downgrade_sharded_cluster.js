@@ -10,7 +10,9 @@
  *   6. Verify the data consistency after the downgrade procedure
  */
 import "jstests/multiVersion/libs/multi_cluster.js";
+
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
+import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 const dbName = jsTestName();
 

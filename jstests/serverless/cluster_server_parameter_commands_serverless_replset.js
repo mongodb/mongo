@@ -15,6 +15,7 @@ import {
     testInvalidClusterParameterCommands,
     testValidServerlessClusterParameterCommands,
 } from "jstests/libs/cluster_server_parameter_utils.js";
+import {ReplSetTest} from "jstests/libs/replsettest.js";
 
 // Tests that set/getClusterParameter works on a non-sharded replica set.
 const rst = new ReplSetTest({

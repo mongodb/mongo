@@ -14,6 +14,8 @@
  * config server to still satisfy majority write concern, which can't be true for a config shard.
  * @tags: [resource_intensive, config_shard_incompatible]
  */
+import {ReplSetTest} from "jstests/libs/replsettest.js";
+import {ShardingTest} from "jstests/libs/shardingtest.js";
 import {
     assertWriteConcernError,
     restartReplicationOnAllShards,

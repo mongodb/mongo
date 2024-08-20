@@ -7,12 +7,12 @@
  *   requires_fcv_80,
  * ]
  */
-
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";
 import {funWithArgs} from "jstests/libs/parallel_shell_helpers.js";
+import {ShardingTest} from "jstests/libs/shardingtest.js";
 import {waitForCommand} from "jstests/libs/wait_for_command.js";
 
-let st = ShardingTest({shards: 2, enableBalancer: true});
+let st = new ShardingTest({shards: 2, enableBalancer: true});
 
 const dbName = "test";
 

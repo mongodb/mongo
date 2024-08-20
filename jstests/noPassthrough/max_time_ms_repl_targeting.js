@@ -2,6 +2,8 @@
 // @tags: [
 //   requires_replication,
 // ]
+import {ShardingTest} from "jstests/libs/shardingtest.js";
+
 var st = new ShardingTest({mongos: 1, shards: 1, rs: {nodes: 2}});
 var kDbName = 'test';
 var ns = 'test.foo';

@@ -3,6 +3,7 @@
  * config via reconfig. See SERVER-48179.
  */
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";
+import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {restartServerReplication, stopServerReplication} from "jstests/libs/write_concern_util.js";
 import {RollbackTest} from "jstests/replsets/libs/rollback_test.js";
 

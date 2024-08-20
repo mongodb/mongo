@@ -19,6 +19,7 @@
  * 14. Assert that original primary is now a secondary
  *
  */
+import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {
     restartReplSetReplication,
     restartServerReplication,

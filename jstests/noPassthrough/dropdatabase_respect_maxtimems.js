@@ -3,9 +3,10 @@
  * @tags: [requires_replication, uses_transactions]
  */
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";
+import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {waitForCommand} from "jstests/libs/wait_for_command.js";
 
-const rst = ReplSetTest({nodes: 1});
+const rst = new ReplSetTest({nodes: 1});
 rst.startSet();
 rst.initiate();
 

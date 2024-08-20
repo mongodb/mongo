@@ -17,6 +17,7 @@ TestData.skipEnforceFastCountOnValidate = true;
 
 import {PrepareHelpers} from "jstests/core/txns/libs/prepare_helpers.js";
 import {Thread} from "jstests/libs/parallelTester.js";
+import {ReplSetTest} from "jstests/libs/replsettest.js";
 
 const kSeparator = "/";
 const copyDataFiles = function(src, dest) {

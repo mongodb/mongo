@@ -1,4 +1,6 @@
 // This test makes assertions about the number of logical session records.
+import {ReplSetTest} from "jstests/libs/replsettest.js";
+
 TestData.disableImplicitSessions = true;
 
 var refresh = {refreshLogicalSessionCacheNow: 1};

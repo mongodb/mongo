@@ -7,6 +7,8 @@
  * Heavily modified from jstest/noPassthrough/set_step_params.js
  */
 
+import {ShardingTest} from "jstests/libs/shardingtest.js";
+
 const poolSizeLogId = 6265600;
 
 const rsMin = 10;

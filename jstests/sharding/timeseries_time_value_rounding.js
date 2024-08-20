@@ -6,6 +6,8 @@
  * ]
  */
 
+import {ShardingTest} from "jstests/libs/shardingtest.js";
+
 Random.setRandomSeed();
 
 const dbName = 'testDB';

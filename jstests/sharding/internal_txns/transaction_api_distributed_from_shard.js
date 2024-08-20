@@ -7,6 +7,8 @@
  *    embedded_router_incompatible,
  * ]
  */
+import {ShardingTest} from "jstests/libs/shardingtest.js";
+
 // The test command is meant to test the "no session" transaction API case.
 TestData.disableImplicitSessions = true;
 

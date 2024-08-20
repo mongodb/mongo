@@ -1,3 +1,5 @@
+import {ReplSetTest} from "jstests/libs/replsettest.js";
+
 var SERVER_CERT = "jstests/libs/server.pem";
 var CLIENT_CERT = "jstests/libs/client.pem";
 var CLIENT_USER = "C=US,ST=New York,L=New York City,O=MongoDB,OU=KernelUser,CN=client";

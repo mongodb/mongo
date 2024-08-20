@@ -1,6 +1,8 @@
 // Verify that a user with read access to database "test" cannot access database "test2" via a where
 // clause.
 
+import {ShardingTest} from "jstests/libs/shardingtest.js";
+
 //
 // User document declarations.  All users in this test are added to the admin database.
 //

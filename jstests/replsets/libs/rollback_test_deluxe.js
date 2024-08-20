@@ -36,6 +36,7 @@
  */
 
 import {CollectionValidator} from "jstests/hooks/validate_collections.js";
+import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {TwoPhaseDropCollectionTest} from "jstests/replsets/libs/two_phase_drops.js";
 import {waitForState} from "jstests/replsets/rslib.js";
 

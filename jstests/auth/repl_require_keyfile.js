@@ -1,4 +1,6 @@
 // Validate that starting a replica set with auth enabled requires a keyfile
+import {ReplSetTest} from "jstests/libs/replsettest.js";
+
 const rsTest = new ReplSetTest({nodes: 1});
 
 clearRawMongoProgramOutput();

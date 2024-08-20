@@ -6,6 +6,8 @@
  * ]
  */
 
+import {ReplSetTest} from "jstests/libs/replsettest.js";
+
 // Declaring all variables up top so each test can be individually run
 let srcNsRegex, opEntries, applyOpsOpEntries, db, db2, coll1, primary, numNewDocs, testDescription,
     largeNumberOfDocsToExceedBatchCountLimit, srcDb, dstDb, srcColl, testNum, numDocsToInsert;

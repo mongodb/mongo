@@ -5,6 +5,7 @@
  * not yield any writeConcern errors.
  */
 
+import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {assertWriteConcernError, runCommandCheckAdmin} from "jstests/libs/write_concern_util.js";
 
 // Multiple users cannot be authenticated on one connection within a session.

@@ -6,6 +6,8 @@
  *   requires_sharding,
  * ]
  */
+import {ShardingTest} from "jstests/libs/shardingtest.js";
+
 // maxAcceptableLogicalClockDriftSecs cannot be negative, zero, or a non-number.
 assert.throws(() => MongoRunner.runMongod({setParameter: {maxAcceptableLogicalClockDriftSecs: -1}}),
               [],

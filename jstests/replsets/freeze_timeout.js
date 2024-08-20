@@ -2,6 +2,7 @@
  * Tests that the freezeTimeout election reason counter in serverStatus is incremented in a single
  * node replica set both after a freeze timeout and after a stepdown timeout expires.
  */
+import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {
     verifyServerStatusElectionReasonCounterChange
 } from "jstests/replsets/libs/election_metrics.js";

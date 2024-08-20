@@ -4,6 +4,8 @@
 // field values match the values specified in the 'expected*' arguments. This function also
 // updates the 'totals' object which holds accumulated values for certain fields from each
 // shard.
+import {ShardingTest} from "jstests/libs/shardingtest.js";
+
 function verifyExecStatsOnShard({
     explain,
     expectedShardName,

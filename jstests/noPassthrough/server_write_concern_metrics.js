@@ -4,6 +4,8 @@
 //   requires_replication,
 // ]
 // Verifies that the server status response has the fields that we expect.
+import {ReplSetTest} from "jstests/libs/replsettest.js";
+
 export function verifyServerStatusFields(serverStatusResponse) {
     assert(serverStatusResponse.hasOwnProperty("opWriteConcernCounters"),
            "Expected the serverStatus response to have a 'opWriteConcernCounters' field\n" +

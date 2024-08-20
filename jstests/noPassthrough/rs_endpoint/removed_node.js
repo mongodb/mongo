@@ -8,6 +8,7 @@
  * ]
  */
 
+import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {waitForAutoBootstrap} from "jstests/noPassthrough/rs_endpoint/lib/util.js";
 import {waitForState} from "jstests/replsets/rslib.js";
 

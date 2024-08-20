@@ -1,5 +1,7 @@
 // Test that secondaryOk is implicitly allowed for queries on a secondary with a read preference
 // other than 'primary', and that queries which do have 'primary' read preference fail.
+import {ReplSetTest} from "jstests/libs/replsettest.js";
+
 const readPrefs =
     [undefined, "primary", "secondary", "primaryPreferred", "secondaryPreferred", "nearest"];
 

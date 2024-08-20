@@ -6,6 +6,7 @@
 
 import {getAllPlanStages} from "jstests/libs/analyze_plan.js";
 import {assertDropAndRecreateCollection} from "jstests/libs/collection_drop_recreate.js";
+import {ReplSetTest} from "jstests/libs/replsettest.js";
 
 function runExplain(coll, filter, proj, sort) {
     const isProjEmpty = Object.keys(proj).length === 0;

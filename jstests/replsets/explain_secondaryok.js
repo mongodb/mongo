@@ -6,6 +6,8 @@
 //     --fail on secondaries, even if secondaryOk is set,
 //     --succeed on primary without applying any writes.
 
+import {ReplSetTest} from "jstests/libs/replsettest.js";
+
 var name = "explain_secondaryok";
 
 print("Start replica set with two nodes");

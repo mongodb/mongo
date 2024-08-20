@@ -1,6 +1,8 @@
 // @tags: [
 //   requires_persistence,
 // ]
+import {ReplSetTest} from "jstests/libs/replsettest.js";
+
 const dbName = "test";
 const collName = "query_yields_catch_index_corruption";
 

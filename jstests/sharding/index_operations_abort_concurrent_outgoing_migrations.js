@@ -9,6 +9,7 @@ import {
 } from "jstests/libs/chunk_manipulation_util.js";
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {Thread} from "jstests/libs/parallelTester.js";
+import {ShardingTest} from "jstests/libs/shardingtest.js";
 import {findChunksUtil} from "jstests/sharding/libs/find_chunks_util.js";
 import {ShardedIndexUtil} from "jstests/sharding/libs/sharded_index_util.js";
 

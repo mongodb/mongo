@@ -9,6 +9,8 @@
  * ]
  */
 
+import {ReplSetTest} from "jstests/libs/replsettest.js";
+
 jsTestLog("Start a replica set with execution control enabled by default");
 let replTest = new ReplSetTest({
     name: jsTestName(),

@@ -1,6 +1,8 @@
 // Test that dropping the replset oplog, the local database, and the admin database are all
 // prohibited in a replset.
 
+import {ReplSetTest} from "jstests/libs/replsettest.js";
+
 let rt = new ReplSetTest({name: "drop_oplog", nodes: 1, oplogSize: 30});
 
 let nodes = rt.startSet();

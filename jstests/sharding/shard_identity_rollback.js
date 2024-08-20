@@ -8,6 +8,8 @@
 TestData.skipEnforceFastCountOnValidate = true;
 
 import {stopServerReplication, restartServerReplication} from "jstests/libs/write_concern_util.js";
+import {ReplSetTest} from "jstests/libs/replsettest.js";
+import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 var st = new ShardingTest({shards: 1});
 

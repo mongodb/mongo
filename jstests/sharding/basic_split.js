@@ -1,6 +1,7 @@
 /**
  * Perform basic tests for the split command against mongos.
  */
+import {ShardingTest} from "jstests/libs/shardingtest.js";
 import {findChunksUtil} from "jstests/sharding/libs/find_chunks_util.js";
 
 var st = new ShardingTest({mongos: 2, shards: 2, other: {chunkSize: 1}});

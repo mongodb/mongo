@@ -6,6 +6,8 @@
  */
 
 import {testReadCommittedLookup} from "jstests/libs/read_committed_lib.js";
+import {ReplSetTest} from "jstests/libs/replsettest.js";
+import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 // Manually create a shard.
 const replSetName = "lookup_read_majority";

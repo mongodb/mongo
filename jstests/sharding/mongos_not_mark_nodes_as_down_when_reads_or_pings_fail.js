@@ -2,6 +2,7 @@
  * Tests that mongos does not mark nodes as down when reads or pings fail.
  */
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";
+import {ShardingTest} from "jstests/libs/shardingtest.js";
 import {awaitRSClientHosts} from "jstests/replsets/rslib.js";
 
 /*

@@ -8,6 +8,8 @@
  *
  * @tags: [requires_replication, requires_persistence]
  */
+import {ReplSetTest} from "jstests/libs/replsettest.js";
+
 // Verify that the oplog cap maintainer thread is running under normal circumstances.
 jsTestLog("Testing single node replica set mode");
 const rst = new ReplSetTest(

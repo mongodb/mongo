@@ -11,7 +11,7 @@ import {
     insertInvalidUTF8,
     startMongodOnExistingPath,
 } from "jstests/disk/libs/wt_file_helper.js";
-
+import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {clearHealthLog, runDbCheck} from "jstests/replsets/libs/dbcheck_utils.js";
 
 const BSONWarningQuery = {
@@ -35,7 +35,7 @@ const numDocs = 1;
 insertInvalidUTF8(testColl, uri, mongod, numDocs);
 
 // Create a replica set from standalone node and add a secondary.
-const replSet = ReplSetTest({name: jsTestName(), nodes: 2});
+const replSet = new ReplSetTest({name: jsTestName(), nodes: 2});
 replSet.start(0, {dbpath: dbpath, noCleanData: true});
 replSet.start(1);
 replSet.initiateWithHighElectionTimeout();

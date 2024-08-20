@@ -6,6 +6,7 @@
  * @tags: [requires_majority_read_concern, requires_fcv_53]
  */
 
+import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {restartServerReplication, stopServerReplication} from "jstests/libs/write_concern_util.js";
 
 function doCommittedRead(coll) {

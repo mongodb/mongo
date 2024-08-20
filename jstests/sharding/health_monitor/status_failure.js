@@ -7,6 +7,8 @@
  *   embedded_router_incompatible,
  * ]
  */
+import {ShardingTest} from "jstests/libs/shardingtest.js";
+
 const kWaitForCompletedChecksCount = 12;
 const kWaitForPassedChecksCount = 8;
 

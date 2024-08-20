@@ -4,6 +4,8 @@
 // @tags: [
 // ]
 
+import {ShardingTest} from "jstests/libs/shardingtest.js";
+
 // TODO (SERVER-88675): DDL commands against config and admin database are not allowed via a router
 // but are allowed via a direct connection to the config server or shard.
 TestData.replicaSetEndpointIncompatible = true;

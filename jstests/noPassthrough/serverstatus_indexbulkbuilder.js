@@ -7,6 +7,7 @@
  *   requires_replication,
  * ]
  */
+import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {extractUUIDFromObject} from "jstests/libs/uuid_util.js";
 import {IndexBuildTest, ResumableIndexBuildTest} from "jstests/noPassthrough/libs/index_build.js";
 
@@ -220,7 +221,7 @@ expectedSpilledRanges += 1;
 maxMemUsagePerIndexBytes = maxMemUsageMegabytes * 1024 * 1024 / 3;
 maxDataMemUsagePerIndexBytes =
     maxMemUsagePerIndexBytes - 1024 * 1024;  // There is enough memory to reserve 1MB for the file
-                                             // iterators needed for each index.
+// iterators needed for each index.
 
 memAllocNum =
     Math.trunc((maxDataMemUsagePerIndexBytes + memPoolMemoryUsage - 1) / memPoolMemoryUsage);

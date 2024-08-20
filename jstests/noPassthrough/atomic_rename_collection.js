@@ -2,6 +2,8 @@
 // SERVER-28285 When renameCollection drops the target collection, it should just generate
 // a single oplog entry, so we cannot end up in a state where the drop has succeeded, but
 // the rename didn't.
+import {ReplSetTest} from "jstests/libs/replsettest.js";
+
 let rs = new ReplSetTest({nodes: 1});
 rs.startSet();
 rs.initiate();

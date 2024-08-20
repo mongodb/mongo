@@ -2,6 +2,8 @@
 // Tests that a migration does not overwrite duplicate _ids on data transfer
 //
 
+import {ShardingTest} from "jstests/libs/shardingtest.js";
+
 var st = new ShardingTest({shards: 2, mongos: 1});
 st.stopBalancer();
 

@@ -1,6 +1,8 @@
 /**
  * Verify that a query requiring shard filtering handles missing shard keys properly.
  */
+import {ShardingTest} from "jstests/libs/shardingtest.js";
+
 const st = new ShardingTest({
     shards: 1,
 });

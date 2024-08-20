@@ -5,6 +5,8 @@
  * We cannot test each phase of the initial sync directly but by providing constant writes we can
  * assume that each individual phase will have data to work with, and therefore be tested.
  */
+import {ReplSetTest} from "jstests/libs/replsettest.js";
+
 var testName = "initialsync_with_write_load";
 var replTest = new ReplSetTest({name: testName, nodes: 3, oplogSize: 100});
 var nodes = replTest.nodeList();

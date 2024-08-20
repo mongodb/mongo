@@ -5,6 +5,9 @@
 //   uses_change_streams,
 // ]
 // TODO WT-3864: Re-enable test for LSM once transaction visibility bug in LSM is resolved.
+import {ReplSetTest} from "jstests/libs/replsettest.js";
+import {ShardingTest} from "jstests/libs/shardingtest.js";
+
 if (jsTest.options().wiredTigerCollectionConfigString === "type=lsm") {
     jsTestLog("Skipping test because we're running with WiredTiger's LSM tree.");
     quit();

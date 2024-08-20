@@ -1,6 +1,7 @@
 // Check that OCSP verification works
 // @tags: [requires_http_client, requires_ocsp_stapling]
 
+import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {FAULT_REVOKED, MockOCSPServer} from "jstests/ocsp/lib/mock_ocsp.js";
 import {OCSP_CA_PEM, OCSP_SERVER_CERT, supportsStapling} from "jstests/ocsp/lib/ocsp_helpers.js";
 

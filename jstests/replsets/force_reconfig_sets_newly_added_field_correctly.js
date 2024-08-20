@@ -6,6 +6,7 @@
  */
 
 import {kDefaultWaitForFailPointTimeout} from "jstests/libs/fail_point_util.js";
+import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {assertVoteCount, isMemberNewlyAdded} from "jstests/replsets/rslib.js";
 
 const rst = new ReplSetTest({name: jsTestName(), nodes: 1});

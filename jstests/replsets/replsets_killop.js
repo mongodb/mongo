@@ -2,6 +2,7 @@
 // using killop.  SERVER-7952
 
 import {funWithArgs} from "jstests/libs/parallel_shell_helpers.js";
+import {ReplSetTest} from "jstests/libs/replsettest.js";
 
 let numDocs = 1e5;
 

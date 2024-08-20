@@ -1,4 +1,6 @@
 // This tests that we can successfully profile queries on secondaries.
+import {ReplSetTest} from "jstests/libs/replsettest.js";
+
 var rst = new ReplSetTest({nodes: 2});
 rst.startSet();
 rst.initiate();

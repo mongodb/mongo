@@ -1,5 +1,7 @@
 // Check if this build supports the authenticationMechanisms startup parameter.
 
+import {ShardingTest} from "jstests/libs/shardingtest.js";
+
 const SERVER_CERT = "jstests/libs/server.pem";
 const CA_CERT = "jstests/libs/ca.pem";
 

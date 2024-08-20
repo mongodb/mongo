@@ -1,5 +1,8 @@
 // Test for SERVER-31953 where secondaries crash when replicating an oplog entry where the document
 // identifier in the oplog entry contains a shard key value that contains an undefined value.
+import {ReplSetTest} from "jstests/libs/replsettest.js";
+import {ShardingTest} from "jstests/libs/shardingtest.js";
+
 const st = new ShardingTest({mongos: 1, shard: 1, rs: {nodes: 2}});
 const mongosDB = st.s.getDB("test");
 const mongosColl = mongosDB.mycoll;

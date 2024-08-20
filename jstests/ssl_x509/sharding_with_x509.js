@@ -4,6 +4,7 @@
 //   disables_test_commands,
 // ]
 import {findMatchingLogLine} from "jstests/libs/log.js";
+import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 const x509_options = {
     tlsMode: "requireTLS",

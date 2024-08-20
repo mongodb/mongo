@@ -4,6 +4,7 @@
  *
  * @tags: [requires_fcv_70]
  */
+import {ShardingTest} from "jstests/libs/shardingtest.js";
 import {QuerySamplingUtil} from "jstests/sharding/analyze_shard_key/libs/query_sampling_util.js";
 import {
     innerAggTestCases,

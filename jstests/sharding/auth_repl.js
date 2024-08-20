@@ -1,4 +1,6 @@
 // Multiple users cannot be authenticated on one connection within a session.
+import {ReplSetTest} from "jstests/libs/replsettest.js";
+
 TestData.disableImplicitSessions = true;
 
 var replTest = new ReplSetTest({nodes: 3, useHostName: false, keyFile: 'jstests/libs/key1'});

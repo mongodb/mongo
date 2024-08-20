@@ -5,6 +5,7 @@
  * @tags: [uses_transactions, uses_prepare_transaction, multiversion_incompatible]
  */
 import {PrepareHelpers} from "jstests/core/txns/libs/prepare_helpers.js";
+import {ReplSetTest} from "jstests/libs/replsettest.js";
 
 function runTest(downgradeFCV) {
     const rst = new ReplSetTest({nodes: [{binVersion: "latest"}]});

@@ -11,6 +11,7 @@
  * 7.  Try to create a new connection to the shut down primary and expect an error
  *
  */
+import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {
     restartReplicationOnSecondaries,
     stopReplicationOnSecondaries

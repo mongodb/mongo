@@ -4,6 +4,8 @@
 // there are.
 // @tags: [requires_sharding]
 
+import {ShardingTest} from "jstests/libs/shardingtest.js";
+
 // The config servers are not reachable at shutdown.
 TestData.skipCheckingIndexesConsistentAcrossCluster = true;
 TestData.skipCheckOrphans = true;

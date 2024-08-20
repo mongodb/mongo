@@ -2,6 +2,7 @@
  * Tests that the cluster is balanced in parallel in one balancer round (standalone).
  */
 
+import {ShardingTest} from "jstests/libs/shardingtest.js";
 import {findChunksUtil} from "jstests/sharding/libs/find_chunks_util.js";
 
 const st = new ShardingTest({shards: 4, other: {chunkSize: 1}});

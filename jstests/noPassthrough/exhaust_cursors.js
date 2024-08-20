@@ -4,6 +4,8 @@
  * 'ShardingTest' requires replication.
  * @tags: [requires_replication]
  */
+import {ShardingTest} from "jstests/libs/shardingtest.js";
+
 const docs = [{a: 1}, {a: 2}, {a: 3}, {a: 4}, {a: 5}, {a: 6}, {a: 7}, {a: 8}];
 const kBatchSize = 3;
 const kNoOfDocs = docs.length;

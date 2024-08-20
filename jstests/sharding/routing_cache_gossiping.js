@@ -7,6 +7,7 @@
  * ]
  */
 
+import {ShardingTest} from "jstests/libs/shardingtest.js";
 import {ShardVersioningUtil} from "jstests/sharding/libs/shard_versioning_util.js";
 
 // This test requires running commands directly against the shard since 'requestGossipRoutingCache'

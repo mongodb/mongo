@@ -6,6 +6,9 @@
  *   embedded_router_incompatible,
  * ]
  */
+import {ReplSetTest} from "jstests/libs/replsettest.js";
+import {ShardingTest} from "jstests/libs/shardingtest.js";
+
 var addShardRes;
 
 // Note: this method expects that the failure is *not* that the specified shardName is already

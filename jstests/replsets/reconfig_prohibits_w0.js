@@ -3,6 +3,8 @@
  * SERVER-13055.
  */
 
+import {ReplSetTest} from "jstests/libs/replsettest.js";
+
 var replTest = new ReplSetTest({name: 'prohibit_w0', nodes: 1});
 var nodes = replTest.nodeList();
 var conns = replTest.startSet();

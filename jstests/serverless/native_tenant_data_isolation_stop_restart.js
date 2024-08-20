@@ -2,6 +2,7 @@
 // environment.
 
 import {arrayEq} from "jstests/aggregation/extras/utils.js";
+import {ReplSetTest} from "jstests/libs/replsettest.js";
 
 const rst =
     new ReplSetTest({nodes: 3, nodeOptions: {auth: '', setParameter: {multitenancySupport: true}}});

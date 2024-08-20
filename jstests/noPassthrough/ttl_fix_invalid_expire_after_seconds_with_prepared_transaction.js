@@ -3,6 +3,8 @@
  * even if there's a prepared transaction on the collection.
  */
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";
+import {ReplSetTest} from "jstests/libs/replsettest.js";
+import {ShardingTest} from "jstests/libs/shardingtest.js";
 import {
     makeCommitTransactionCmdObj,
     makePrepareTransactionCmdObj,

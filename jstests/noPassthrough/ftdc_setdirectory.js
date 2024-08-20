@@ -5,6 +5,7 @@
  * ]
  */
 import {verifyCommonFTDCParameters, verifyGetDiagnosticData} from "jstests/libs/ftdc.js";
+import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 let testPath1 = MongoRunner.toRealPath('ftdc_setdir1');
 let testPath2 = MongoRunner.toRealPath('ftdc_setdir2');

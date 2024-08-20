@@ -1,4 +1,5 @@
 // Tests tracing where a document was inserted
+import {ShardingTest} from "jstests/libs/shardingtest.js";
 import {traceMissingDoc} from "jstests/libs/trace_missing_docs.js";
 
 var testDocMissing = function(useReplicaSet) {

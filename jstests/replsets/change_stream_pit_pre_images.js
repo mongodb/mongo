@@ -14,6 +14,7 @@
 import {PrepareHelpers} from "jstests/core/txns/libs/prepare_helpers.js";
 import {getPreImages, getPreImagesCollection} from "jstests/libs/change_stream_util.js";
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";
+import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {TransactionsUtil} from "jstests/libs/transactions_util.js";
 
 const testName = jsTestName();

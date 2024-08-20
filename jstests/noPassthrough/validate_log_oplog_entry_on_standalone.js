@@ -8,6 +8,8 @@
  * ]
  */
 
+import {ReplSetTest} from "jstests/libs/replsettest.js";
+
 const dbName = "test";
 const collName = "validate_log_oplog_entry_on_standalone";
 

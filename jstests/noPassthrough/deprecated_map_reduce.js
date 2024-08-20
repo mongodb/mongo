@@ -6,6 +6,7 @@
 // More specifically, we expect to only log 1/127 of mapReduce() events.
 
 import {iterateMatchingLogLines} from "jstests/libs/log.js";
+import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 jsTest.log('Test standalone');
 const caseInsensitive = {

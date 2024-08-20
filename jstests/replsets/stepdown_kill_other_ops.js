@@ -1,6 +1,7 @@
 // SERVER-15310 Ensure that stepDown kills all other running operations
 
 import {funWithArgs} from "jstests/libs/parallel_shell_helpers.js";
+import {ReplSetTest} from "jstests/libs/replsettest.js";
 
 const replSet = new ReplSetTest({name: TestData.name, nodes: 2});
 const nodes = replSet.nodeList();

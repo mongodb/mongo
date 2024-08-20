@@ -1,6 +1,7 @@
 // Various tests of the ability to establish a cursor on each mongod in a sharded cluster.
 
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
+import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 function listMongodStats(db) {
     return db.getSiblingDB("admin").aggregate([{$_internalShardServerInfo: {}}]).toArray();

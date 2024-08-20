@@ -1,5 +1,7 @@
 // Test SSL server certificate hostname validation
 // for client-server and server-server connections
+import {ReplSetTest} from "jstests/libs/replsettest.js";
+
 var CA_CERT = "jstests/libs/ca.pem";
 var SERVER_CERT = "jstests/libs/server.pem";
 var CN_CERT = "jstests/libs/localhostnameCN.pem";

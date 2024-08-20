@@ -2,6 +2,8 @@
 // Basic tests for refineCollectionShardKey.
 //
 
+import {ShardingTest} from "jstests/libs/shardingtest.js";
+
 // Cannot run the filtering metadata check on tests that run refineCollectionShardKey.
 TestData.skipCheckShardFilteringMetadata = true;
 

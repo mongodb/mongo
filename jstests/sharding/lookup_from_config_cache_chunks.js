@@ -13,6 +13,7 @@
  */
 import {assertErrorCode} from "jstests/aggregation/extras/utils.js";
 import {DiscoverTopology} from "jstests/libs/discover_topology.js";
+import {ShardingTest} from "jstests/libs/shardingtest.js";
 import {
     flushRoutersAndRefreshShardMetadata
 } from "jstests/sharding/libs/sharded_transactions_helpers.js";

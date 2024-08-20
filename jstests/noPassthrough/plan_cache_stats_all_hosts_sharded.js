@@ -4,6 +4,7 @@
 //   assumes_read_concern_unchanged,
 //   assumes_read_preference_unchanged,
 // ]
+import {ShardingTest} from "jstests/libs/shardingtest.js";
 import {CreateShardedCollectionUtil} from "jstests/sharding/libs/create_sharded_collection_util.js";
 
 for (let shardCount = 1; shardCount <= 2; shardCount++) {

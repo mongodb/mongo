@@ -7,6 +7,8 @@
 //   embedded_router_incompatible,
 // ]
 
+import {ShardingTest} from "jstests/libs/shardingtest.js";
+
 const MONGOS_COUNT = 2;
 
 var st = new ShardingTest({shards: 1, mongos: MONGOS_COUNT});

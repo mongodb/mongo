@@ -4,6 +4,8 @@
  * write concern actually exists on the shards.
  */
 
+import {ShardingTest} from "jstests/libs/shardingtest.js";
+
 // Define the custom write concern multiRegion, only in the shard.
 const st = new ShardingTest({
     name: "dont_check_custom_write_concern",

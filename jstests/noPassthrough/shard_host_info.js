@@ -5,6 +5,8 @@
  *   requires_sharding,
  * ]
  */
+import {ShardingTest} from "jstests/libs/shardingtest.js";
+
 const conn = MongoRunner.runMongod();
 let testDB = conn.getDB(jsTestName());
 let testColl = testDB.test;

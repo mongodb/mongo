@@ -11,6 +11,8 @@
  *   embedded_router_incompatible,
  * ]
  */
+import {ShardingTest} from "jstests/libs/shardingtest.js";
+
 const st = new ShardingTest({shards: 0});
 
 const adminDB = st.s.getDB("admin");

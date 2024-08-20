@@ -2,6 +2,8 @@
  * Tests that buildInfo command will fail if the connection is not authenticated.
  */
 
+import {ShardingTest} from "jstests/libs/shardingtest.js";
+
 function runTest(conn) {
     const db = conn.getDB('admin');
 

@@ -4,6 +4,7 @@
  *
  * @tags: [multiversion_incompatible]
  */
+import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {runWriteConcernRetryabilityTest} from "jstests/libs/write_concern_util.js";
 
 const kNodes = 2;

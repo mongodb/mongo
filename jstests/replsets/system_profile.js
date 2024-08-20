@@ -1,6 +1,8 @@
 // This tests that metadata commands run against the system.profile collection are not replicated
 // to the secondary.
 
+import {ReplSetTest} from "jstests/libs/replsettest.js";
+
 var rst = new ReplSetTest({nodes: 2});
 rst.startSet();
 rst.initiate();

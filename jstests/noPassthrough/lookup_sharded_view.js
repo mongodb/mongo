@@ -2,6 +2,7 @@
 // @tags: [requires_sharding, requires_fcv_51]
 import {assertArrayEq} from "jstests/aggregation/extras/utils.js";
 import {profilerHasSingleMatchingEntryOrThrow} from "jstests/libs/profiler.js";
+import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 const sharded = new ShardingTest({
     mongos: 1,

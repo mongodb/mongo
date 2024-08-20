@@ -114,7 +114,7 @@ startParallelShell = function(jsCode, port, noConnect, ...optionArgs) {
     var shellPath = MongoRunner.getMongoShellPath();
     var args = [shellPath];
 
-    if (typeof globalThis.db == "object") {
+    if (typeof globalThis.db === "object") {
         if (!port) {
             // If no port override specified, just passthrough connect string.
             args.push("--host", globalThis.db.getMongo().host);

@@ -7,6 +7,8 @@
  * ]
  */
 
+import {ReplSetTest} from "jstests/libs/replsettest.js";
+import {ShardingTest} from "jstests/libs/shardingtest.js";
 import {
     enableCoordinateCommitReturnImmediatelyAfterPersistingDecision,
     isUpdateDocumentShardKeyUsingTransactionApiEnabled,

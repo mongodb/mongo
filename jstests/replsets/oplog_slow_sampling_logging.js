@@ -6,6 +6,8 @@
  *   multiversion_incompatible,
  * ]
  */
+import {ReplSetTest} from "jstests/libs/replsettest.js";
+
 const kOplogDocs = 47500;
 // kNumOplogSamples is derived from the number of oplog entries above.
 // Formula is kRandomSamplesPerMarker * numRecords / estimatedRecordsPerMarker, where

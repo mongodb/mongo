@@ -4,6 +4,8 @@
 // Also checks that the collection version on a source shard updates correctly after a migration.
 //
 
+import {ShardingTest} from "jstests/libs/shardingtest.js";
+
 function waitAndGetShardVersion(conn, collNs) {
     var shardVersion = undefined;
     assert.soon(() => {

@@ -1,4 +1,6 @@
 // Tests that the sort specification is obeyed when the query contains $near/$nearSphere.
+import {ShardingTest} from "jstests/libs/shardingtest.js";
+
 const st = new ShardingTest({shards: 2});
 const db = st.getDB("test");
 const coll = db.geo_near_sort;

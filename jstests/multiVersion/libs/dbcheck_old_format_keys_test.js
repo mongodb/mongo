@@ -5,6 +5,7 @@ import "jstests/multiVersion/libs/multi_rs.js";
 import "jstests/multiVersion/libs/verify_versions.js";
 
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";
+import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {forEachNonArbiterNode} from "jstests/replsets/libs/dbcheck_utils.js";
 
 export const defaultNumDocs = 20;

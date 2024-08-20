@@ -7,17 +7,17 @@
  * ]
  */
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
+import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 import {
     checkCascadesOptimizerEnabled,
     checkExperimentalCascadesOptimizerEnabled
 } from "jstests/libs/optimizer_utils.js";
 import {checkSbeFullyEnabled} from "jstests/libs/sbe_util.js";
+import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 // This test runs manual getMores using different connections, which will not inherit the
 // implicit session of the cursor establishing command.
 TestData.disableImplicitSessions = true;
-
-import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 
 // Set up a 2-shard cluster. Configure 'internalQueryExecYieldIterations' on both shards such
 // that operations will yield on each PlanExecuter iteration.

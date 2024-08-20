@@ -6,6 +6,9 @@
  * ]
  */
 
+import {ReplSetTest} from "jstests/libs/replsettest.js";
+import {ShardingTest} from "jstests/libs/shardingtest.js";
+
 function testShardedDataAggregationStage() {
     // Get all expected results in obj format
     const fooResults = fooColl.aggregate([{$collStats: {storageStats: {}}}]).toArray();

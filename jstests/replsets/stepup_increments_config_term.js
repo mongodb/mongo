@@ -1,6 +1,7 @@
 /**
  * Test that step-up increments the config term via reconfig.
  */
+import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {isConfigCommitted} from "jstests/replsets/rslib.js";
 
 var name = 'stepup_increments_config_term';

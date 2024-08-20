@@ -4,6 +4,8 @@
  * @tags: [requires_wiredtiger, requires_replication, requires_persistence]
  */
 
+import {ReplSetTest} from "jstests/libs/replsettest.js";
+
 const initOpt = {
     wiredTigerEngineConfigString: 'log=(compressor=snappy)'
 };

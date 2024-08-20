@@ -15,6 +15,7 @@
  * 10. Try to step down primary and expect success
  *
  */
+import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {
     restartReplSetReplication,
     restartServerReplication,

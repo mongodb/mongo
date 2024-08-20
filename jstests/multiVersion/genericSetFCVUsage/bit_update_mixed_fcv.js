@@ -3,6 +3,8 @@
  * updates lexicographically for array indexes.
  */
 
+import {ReplSetTest} from "jstests/libs/replsettest.js";
+
 const rst = new ReplSetTest({
     nodes: 2,
     nodeOptions: {binVersion: "latest"},

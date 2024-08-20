@@ -9,6 +9,7 @@
  * ]
  */
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";
+import {ReplSetTest} from "jstests/libs/replsettest.js";
 
 const kDBName = "out_merge_on_secondary_db";
 

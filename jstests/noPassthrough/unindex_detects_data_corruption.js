@@ -2,6 +2,8 @@
  * This tests that errors are logged when unindexing _id finds evidence of corruption, the server
  * does not crash, and the appropriate error is returned.
  */
+import {ReplSetTest} from "jstests/libs/replsettest.js";
+
 const replSet = new ReplSetTest({nodes: 1});
 replSet.startSet();
 replSet.initiate();

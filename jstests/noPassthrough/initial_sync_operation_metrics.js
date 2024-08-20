@@ -8,6 +8,8 @@
  * ]
  */
 
+import {ReplSetTest} from "jstests/libs/replsettest.js";
+
 const assertMetricsExist = function(metrics) {
     try {
         assert.neq(metrics, undefined);

@@ -6,6 +6,7 @@
  * ]
  */
 import {isLinux} from "jstests/libs/os_helpers.js";
+import {ReplSetTest} from "jstests/libs/replsettest.js";
 
 var rst = new ReplSetTest({
     nodes: 2,

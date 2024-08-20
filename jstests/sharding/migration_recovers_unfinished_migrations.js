@@ -14,6 +14,7 @@
  */
 import {moveChunkParallel} from "jstests/libs/chunk_manipulation_util.js";
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";
+import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 // Disable checking for index consistency to ensure that the config server doesn't trigger a
 // StaleShardVersion exception on the shards and cause them to refresh their sharding metadata. That

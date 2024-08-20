@@ -4,6 +4,7 @@
  * (eventually).
  */
 
+import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {assertSyncSourceChangesTo} from "jstests/replsets/libs/sync_source.js";
 import {reconfig} from "jstests/replsets/rslib.js";
 

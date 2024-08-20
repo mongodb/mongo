@@ -1,5 +1,7 @@
 
 
+import {ReplSetTest} from "jstests/libs/replsettest.js";
+
 var replTest = new ReplSetTest({name: 'unicomplex', nodes: 2});
 var conns = replTest.startSet({verbose: 1});
 var config = replTest.getReplSetConfig();

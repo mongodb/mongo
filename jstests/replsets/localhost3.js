@@ -1,6 +1,8 @@
 // Test ReplSet default initiate with localhost-only binding
 // @tags: [multiversion_incompatible]
 
+import {ReplSetTest} from "jstests/libs/replsettest.js";
+
 // Select localhost when binding to localhost
 const rt = new ReplSetTest({name: "rsLocal", nodes: 1});
 const primary = rt.startSet({bind_ip: undefined})[0];

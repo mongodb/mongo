@@ -3,6 +3,8 @@
  * @tags: [requires_sharding]
  */
 
+import {ShardingTest} from "jstests/libs/shardingtest.js";
+
 function assertUsersAndRolesHaveRole(admin, role) {
     admin.system.users.find().forEach(function(doc) {
         assert.eq(1, doc.roles.length);

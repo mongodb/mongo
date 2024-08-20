@@ -8,6 +8,8 @@
  *    embedded_router_incompatible,
  * ]
  */
+import {ShardingTest} from "jstests/libs/shardingtest.js";
+
 function getConnAcquiredToWireMicros(conn) {
     return conn.adminCommand({serverStatus: 1})
         .metrics.network.totalTimeForEgressConnectionAcquiredToWireMicros;

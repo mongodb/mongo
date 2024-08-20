@@ -10,6 +10,7 @@
  * ]
  */
 import {ChangeStreamTest} from "jstests/libs/change_stream_util.js";
+import {ReplSetTest} from "jstests/libs/replsettest.js";
 
 const rst = new ReplSetTest({nodes: [{}, {rsConfig: {priority: 0, votes: 0}}]});
 rst.startSet();

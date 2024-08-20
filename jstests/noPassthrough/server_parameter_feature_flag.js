@@ -3,6 +3,8 @@
 // If it is, then we expect the serverParameter to be available and settable.
 // If it is not, then we expect no such serverParameter.
 
+import {ShardingTest} from "jstests/libs/shardingtest.js";
+
 function runTestForSP(conn) {
     const kFF = 'featureFlagToaster';
     const kSP = 'spTestNeedsFeatureFlagToaster';

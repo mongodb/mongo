@@ -34,6 +34,7 @@ TestData.skipEnforceFastCountOnValidate = true;
 
 import {PrepareHelpers} from "jstests/core/txns/libs/prepare_helpers.js";
 import {arrayEq} from "jstests/aggregation/extras/utils.js";
+import {ReplSetTest} from "jstests/libs/replsettest.js";
 
 function incTs(ts) {
     return Timestamp(ts.t, ts.i + 1);

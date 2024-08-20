@@ -6,6 +6,9 @@
  *   requires_sharding,
  * ]
  */
+import {ReplSetTest} from "jstests/libs/replsettest.js";
+import {ShardingTest} from "jstests/libs/shardingtest.js";
+
 const dbName = jsTestName();
 const collName = "test";
 
@@ -22,7 +25,7 @@ function getShardCount(counts, shardName) {
  * on the i-th shard or no chunks assigned to that shard if shardDistribution[i] is null.
  */
 function runShardingTestExists(shardDistribution) {
-    const st = ShardingTest({shards: shardDistribution.length});
+    const st = new ShardingTest({shards: shardDistribution.length});
 
     const mongos = st.s0;
     const admin = mongos.getDB("admin");
@@ -79,7 +82,7 @@ function runShardingTestExists(shardDistribution) {
 }
 
 function runUnshardedCollectionShardTestExists(shardNum, docsNum) {
-    const st = ShardingTest({shards: shardNum});
+    const st = new ShardingTest({shards: shardNum});
 
     const mongos = st.s0;
     const admin = mongos.getDB("admin");
@@ -104,7 +107,7 @@ function runUnshardedCollectionShardTestExists(shardNum, docsNum) {
 
 function runReplicaSetTestExists(nodesNum, docsNum) {
     const namespace = dbName + '.' + collName;
-    const rst = ReplSetTest({nodes: nodesNum});
+    const rst = new ReplSetTest({nodes: nodesNum});
 
     rst.startSet();
     rst.initiate();
@@ -159,7 +162,7 @@ runUnshardedCollectionShardTestExists(2, 3);
 const doesNotExistName = "dne";
 
 /* Test that if a collection does not exist that the database throws NamespaceNotFound. */
-const st = ShardingTest({shards: 3});
+const st = new ShardingTest({shards: 3});
 const mongos = st.s0;
 const stDb = mongos.getDB(dbName);
 
@@ -182,7 +185,7 @@ assert.commandFailedWithCode(stDb.runCommand({
 
 st.stop();
 
-const rst = ReplSetTest({nodes: 3});
+const rst = new ReplSetTest({nodes: 3});
 rst.startSet();
 rst.initiate();
 const rstDb = rst.getPrimary().getDB(dbName);

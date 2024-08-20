@@ -4,6 +4,9 @@
 // ]
 // This test makes assertions about the number of sessions, which are not compatible with
 // implicit sessions.
+import {ReplSetTest} from "jstests/libs/replsettest.js";
+import {ShardingTest} from "jstests/libs/shardingtest.js";
+
 TestData.disableImplicitSessions = true;
 
 function Repl(lifetime) {

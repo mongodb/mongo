@@ -12,6 +12,7 @@
  * ]
  */
 import {TimeseriesTest} from "jstests/core/timeseries/libs/timeseries.js";
+import {ReplSetTest} from "jstests/libs/replsettest.js";
 
 const defaultBucketMaxSize = 128000;                                           //  125 KB
 const minWiredTigerCacheSizeGB = 0.256;                                        //  256 MB

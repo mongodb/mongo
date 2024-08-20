@@ -2,6 +2,8 @@
  * Test initial sync with views present.
  */
 
+import {ReplSetTest} from "jstests/libs/replsettest.js";
+
 let testName = "initial_sync_views";
 let hostName = getHostName();
 

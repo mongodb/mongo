@@ -1,3 +1,4 @@
+import {ShardingTest} from "jstests/libs/shardingtest.js";
 export var StandaloneFixture, ShardedFixture, runReadOnlyTest, zip2, cycleN;
 
 (function() {

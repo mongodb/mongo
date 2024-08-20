@@ -6,6 +6,7 @@
  * @tags: [requires_fcv_60, uses_transactions, requires_persistence]
  */
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";
+import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 // This test requires running transactions directly against the shard.
 TestData.replicaSetEndpointIncompatible = true;

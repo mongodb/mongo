@@ -11,6 +11,8 @@
 // (connection connected after shard change).
 //
 
+import {ShardingTest} from "jstests/libs/shardingtest.js";
+
 // The following checks involves talking to shard primaries, but by the end of this test, one shard
 // does not have a primary.
 TestData.skipCheckingUUIDsConsistentAcrossCluster = true;

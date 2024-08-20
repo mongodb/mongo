@@ -5,6 +5,7 @@ TestData.skipCheckRoutingTableConsistency = true;
 TestData.skipCheckMetadataConsistency = true;
 
 import {awaitRSClientHosts} from "jstests/replsets/rslib.js";
+import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 jsTest.log("Testing write concern (2)");
 

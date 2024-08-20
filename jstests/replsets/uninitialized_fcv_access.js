@@ -5,6 +5,8 @@
  * This tests behavior dependent on a specific FCV.
  * @tags: [multiversion_incompatible]
  */
+import {ReplSetTest} from "jstests/libs/replsettest.js";
+
 let rst = new ReplSetTest({nodes: 2});
 rst.startSet();
 let node = rst.nodes[0];

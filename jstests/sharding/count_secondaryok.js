@@ -11,6 +11,7 @@ TestData.skipCheckOrphans = true;
 TestData.skipCheckShardFilteringMetadata = true;
 
 import {awaitRSClientHosts} from "jstests/replsets/rslib.js";
+import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 var st = new ShardingTest({shards: 1, mongos: 1, other: {rs: true, rs0: {nodes: 2}}});
 var rst = st.rs0;

@@ -7,6 +7,9 @@
  *   requires_sharding,
  * ]
  */
+import {ReplSetTest} from "jstests/libs/replsettest.js";
+import {ShardingTest} from "jstests/libs/shardingtest.js";
+
 function expectState(rst, state) {
     assert.soon(function() {
         var status = rst.status();

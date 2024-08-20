@@ -7,6 +7,8 @@
  *   requires_replication,
  * ]
  */
+import {ReplSetTest} from "jstests/libs/replsettest.js";
+
 function setupReplicaSet() {
     var rst = new ReplSetTest({
         nodes: 2,

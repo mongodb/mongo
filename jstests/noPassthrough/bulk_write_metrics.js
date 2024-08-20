@@ -5,6 +5,8 @@
  */
 
 import {BulkWriteMetricChecker} from "jstests/libs/bulk_write_utils.js";
+import {ReplSetTest} from "jstests/libs/replsettest.js";
+import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 function runTest(isMongos, cluster, bulkWrite, retryCount, timeseries) {
     // We are ok with the randomness here since we clearly log the state.

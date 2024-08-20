@@ -10,6 +10,7 @@
  * update operation.
  */
 
+import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {
     finishAndValidate,
     reInitiateSetWithSecondary,

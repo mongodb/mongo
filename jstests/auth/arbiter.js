@@ -2,6 +2,8 @@
 // any other nodes in the replset.
 // @tags: [requires_replication]
 
+import {ReplSetTest} from "jstests/libs/replsettest.js";
+
 const name = "arbiter_localhost_test";
 const key = "jstests/libs/key1";
 const replTest = new ReplSetTest({name: name, nodes: 2, keyFile: key});

@@ -2,6 +2,8 @@
  * Tests for the $$NOW and $$CLUSTER_TIME system variable on a replica set.
  */
 
+import {ReplSetTest} from "jstests/libs/replsettest.js";
+
 if (jsTestOptions().useAutoBootstrapProcedure) {  // TODO: SERVER-80318 Delete test
     quit();
 }

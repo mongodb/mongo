@@ -6,6 +6,8 @@
  * ]
  */
 
+import {ShardingTest} from "jstests/libs/shardingtest.js";
+
 const st = new ShardingTest({shards: {rs0: {nodes: 2}}});
 
 // Test index gets created with an empty range deletions collection

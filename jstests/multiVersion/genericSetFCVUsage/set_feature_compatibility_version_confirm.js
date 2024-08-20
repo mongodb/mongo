@@ -2,6 +2,9 @@
  * Tests the 'confirm: true' parameter in setFeatureCompatibilityVersion.
  */
 
+import {ReplSetTest} from "jstests/libs/replsettest.js";
+import {ShardingTest} from "jstests/libs/shardingtest.js";
+
 let dbpath = MongoRunner.dataPath + "feature_compatibility_version_confirm";
 resetDbpath(dbpath);
 

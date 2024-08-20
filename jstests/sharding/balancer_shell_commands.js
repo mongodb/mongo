@@ -4,11 +4,13 @@
  *  sh.getBalancerState
  */
 
-var db;
+import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 var shardingTest =
     new ShardingTest({name: "shell_commands", shards: 1, mongos: 1, other: {enableBalancer: true}});
-db = shardingTest.getDB("test");
+
+// `sh` test runner commands assume the presence of a global `db` object
+globalThis.db = shardingTest.getDB("test");
 
 assert(sh.getBalancerState(), "Balancer should have been enabled during cluster setup");
 

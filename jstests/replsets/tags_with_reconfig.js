@@ -3,6 +3,8 @@
 // time.  This would cause us to update stale items in the cache when secondaries
 // reported their progress to a primary.
 
+import {ReplSetTest} from "jstests/libs/replsettest.js";
+
 // Start a replica set with 3 nodes
 var host = getHostName();
 var replTest = new ReplSetTest({nodes: 3});

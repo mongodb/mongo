@@ -2,6 +2,7 @@
  * Simple test to ensure that an invalid reconfig fails, a valid one succeeds, and a reconfig won't
  * succeed without force if force is needed.
  */
+import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {isConfigCommitted} from "jstests/replsets/rslib.js";
 
 // Skip db hash check because secondary is left with a different config.

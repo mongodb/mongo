@@ -4,6 +4,8 @@
  * and local reads and writes return the last applied optime's timestamp.
  * @tags: [requires_majority_read_concern]
  */
+import {ReplSetTest} from "jstests/libs/replsettest.js";
+
 function assertCorrectOperationTime(operationTime, expectedTimestamp, opTimeType) {
     assert.eq(0,
               timestampCmp(operationTime, expectedTimestamp),

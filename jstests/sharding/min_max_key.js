@@ -2,6 +2,8 @@
  * Test writing and targeting of Max/Min key values
  */
 
+import {ShardingTest} from "jstests/libs/shardingtest.js";
+
 const st = new ShardingTest({});
 const coll = st.s.getDB(jsTestName())['coll'];
 

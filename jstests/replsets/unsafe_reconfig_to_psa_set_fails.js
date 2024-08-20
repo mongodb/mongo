@@ -12,6 +12,7 @@
  * The second reconfig should then increase its priority to the desired level.
  */
 
+import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {
     assertVoteCount,
     waitForNewlyAddedRemovalForNodeToBeCommitted

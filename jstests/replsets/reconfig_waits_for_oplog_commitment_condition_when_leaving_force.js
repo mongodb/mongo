@@ -3,6 +3,7 @@
  * previous config to be committed in the current config even if we are exiting a config that was
  * installed via a 'force' reconfig.
  */
+import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {restartServerReplication, stopServerReplication} from "jstests/libs/write_concern_util.js";
 import {isConfigCommitted, reconnect} from "jstests/replsets/rslib.js";
 

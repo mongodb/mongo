@@ -1,5 +1,7 @@
 // Tests that users can only use transactions that they created.
 // @tags: [uses_transactions]
+import {ReplSetTest} from "jstests/libs/replsettest.js";
+
 const rst = new ReplSetTest({nodes: 1, keyFile: "jstests/libs/key1"});
 rst.startSet();
 rst.initiate();

@@ -4,6 +4,9 @@
  * mongod receives a request with $readPreference attached, it will record the correct metrics.
  */
 
+import {ReplSetTest} from "jstests/libs/replsettest.js";
+import {ShardingTest} from "jstests/libs/shardingtest.js";
+
 const dbName = "dbName";
 const collName = "collName";
 

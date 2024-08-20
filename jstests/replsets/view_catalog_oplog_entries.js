@@ -3,6 +3,8 @@
  * that both entries include a UUID for the "system.views" collection.
  */
 
+import {ReplSetTest} from "jstests/libs/replsettest.js";
+
 const dbName = "view_catalog_oplog_entries";
 const collName = "test_coll";
 const viewName = "test_view";

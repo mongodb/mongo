@@ -20,6 +20,7 @@
 import {PrepareHelpers} from "jstests/core/txns/libs/prepare_helpers.js";
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";
 import {funWithArgs} from "jstests/libs/parallel_shell_helpers.js";
+import {ReplSetTest} from "jstests/libs/replsettest.js";
 
 // Verify that the documents updated in the transaction are found or not, depending on expectOld.
 const checkDocuments = function(docCount, testColl, expectOld, readConcern = null) {

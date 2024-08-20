@@ -3,6 +3,8 @@
  * environment. This file covers all types of operations except commands.
  */
 
+import {ShardingTest} from "jstests/libs/shardingtest.js";
+
 /**
  * Data structure that contains all the users that are going to be used in the tests.
  * The structure is as follows:

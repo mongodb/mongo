@@ -1,4 +1,6 @@
 import {assertDropCollection} from "jstests/libs/collection_drop_recreate.js";
+import {ReplSetTest} from "jstests/libs/replsettest.js";
+import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 // Tests renaming the system.buckets collection.
 // Set up the test database.

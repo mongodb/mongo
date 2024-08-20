@@ -5,6 +5,7 @@ import {
     CheckShardFilteringMetadataHelpers
 } from "jstests/libs/check_shard_filtering_metadata_helpers.js";
 import {DiscoverTopology, Topology} from "jstests/libs/discover_topology.js";
+import {ReplSetTest} from "jstests/libs/replsettest.js";
 
 assert.neq(typeof db, 'undefined', 'No `db` object, is the shell connected to a server?');
 

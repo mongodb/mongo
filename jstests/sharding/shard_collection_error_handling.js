@@ -10,6 +10,7 @@
 
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";
 import {funWithArgs} from "jstests/libs/parallel_shell_helpers.js";
+import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 // Configure initial sharding cluster
 const st = new ShardingTest({shards: {rs0: {nodes: 3}, rs1: {nodes: 3}}});

@@ -8,6 +8,8 @@
  * ]
  */
 import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
+import {ReplSetTest} from "jstests/libs/replsettest.js";
+import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 // Function to run the test against a test fixture. Accepts an object that contains the following
 // fields:

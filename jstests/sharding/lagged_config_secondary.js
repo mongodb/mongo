@@ -8,6 +8,7 @@
  * ]
  */
 
+import {ShardingTest} from "jstests/libs/shardingtest.js";
 import {restartServerReplication, stopServerReplication} from "jstests/libs/write_concern_util.js";
 
 // The following checks involve reading from the config server, but this test is designed to make

@@ -2,6 +2,7 @@
  * Test error conditions for the `$search` aggregation pipeline stages.
  */
 
+import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {
     MongotMock,
 } from "jstests/with_mongot/mongotmock/lib/mongotmock.js";

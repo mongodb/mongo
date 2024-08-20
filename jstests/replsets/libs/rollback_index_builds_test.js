@@ -2,6 +2,7 @@
  * Fixture to test rollback permutations with index builds.
  */
 
+import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {IndexBuildTest} from "jstests/noPassthrough/libs/index_build.js";
 import {RollbackTest} from "jstests/replsets/libs/rollback_test.js";
 

@@ -2,6 +2,7 @@
  * Tests that mongoS rejects 'aggregate' commands which explicitly set any of the
  * parameters that mongoS uses internally when communicating with the shards.
  */
+import {ShardingTest} from "jstests/libs/shardingtest.js";
 import {
     WriteWithoutShardKeyTestUtil
 } from "jstests/sharding/updateOne_without_shard_key/libs/write_without_shard_key_test_util.js";

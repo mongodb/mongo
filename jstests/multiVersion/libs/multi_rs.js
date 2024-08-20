@@ -1,6 +1,7 @@
 //
 // Utility functions for multi-version replica sets
 //
+import {ReplSetTest} from "jstests/libs/replsettest.js";
 
 ReplSetTest.prototype._stablePrimaryOnRestarts = function() {
     // In a 2-node replica set the secondary can step up after a restart. In fact while the

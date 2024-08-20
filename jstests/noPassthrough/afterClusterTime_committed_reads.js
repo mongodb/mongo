@@ -4,6 +4,7 @@
 //   requires_majority_read_concern,
 //   uses_transactions,
 // ]
+import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {
     restartReplicationOnSecondaries,
     stopReplicationOnSecondaries

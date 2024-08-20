@@ -4,6 +4,8 @@
  * updated after the write operations.
  */
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
+import {ReplSetTest} from "jstests/libs/replsettest.js";
+import {ShardingTest} from "jstests/libs/shardingtest.js";
 const kNodes = 2;
 
 var checkOplog = function(oplog, lsid, uid, txnNum, stmtId, prevTs, prevTerm) {

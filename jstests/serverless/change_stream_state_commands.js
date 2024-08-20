@@ -5,6 +5,7 @@
 // ]
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";
 import {funWithArgs} from "jstests/libs/parallel_shell_helpers.js";
+import {ReplSetTest} from "jstests/libs/replsettest.js";
 
 // Disable implicit sessions since dropping "config" database for a tenant must be done not in a
 // session.

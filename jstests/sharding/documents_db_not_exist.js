@@ -4,6 +4,8 @@
  *
  */
 
+import {ShardingTest} from "jstests/libs/shardingtest.js";
+
 let st = new ShardingTest({shards: 3});
 
 function listDatabases(options) {

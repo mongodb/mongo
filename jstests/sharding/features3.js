@@ -8,7 +8,8 @@
 // @tags: [
 //   expects_explicit_underscore_id_index,
 // ]
-import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
+
+import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 var s = new ShardingTest({shards: 2, mongos: 1});
 var dbForTest = s.getDB("test");

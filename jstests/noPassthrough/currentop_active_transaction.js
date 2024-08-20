@@ -5,6 +5,7 @@
  */
 
 import {funWithArgs} from "jstests/libs/parallel_shell_helpers.js";
+import {ReplSetTest} from "jstests/libs/replsettest.js";
 
 async function transactionFn(isPrepared) {
     const collName = 'currentop_active_transaction';

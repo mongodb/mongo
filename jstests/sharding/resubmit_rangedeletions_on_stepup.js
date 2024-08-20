@@ -2,6 +2,7 @@
  * Ensure that orphaned documents are submitted for deletion on step up.
  */
 
+import {ShardingTest} from "jstests/libs/shardingtest.js";
 import {getUUIDFromConfigCollections} from "jstests/libs/uuid_util.js";
 
 TestData.skipCheckingUUIDsConsistentAcrossCluster = true;

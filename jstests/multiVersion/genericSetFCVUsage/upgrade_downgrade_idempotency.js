@@ -10,6 +10,7 @@
  *    to finish upgrading/downgrading.
  */
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";
+import {ReplSetTest} from "jstests/libs/replsettest.js";
 
 function runTest(downgradeVersion) {
     const downgradeFCV = binVersionToFCV(downgradeVersion);

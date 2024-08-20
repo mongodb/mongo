@@ -8,6 +8,8 @@
 // second so that each shard is continually advancing its optime, allowing the
 // AsyncResultsMerger to return sorted results even if some shards have not yet produced any
 // data.
+import {ShardingTest} from "jstests/libs/shardingtest.js";
+
 const st = new ShardingTest({
     shards: 3,
     rs: {nodes: 1, setParameter: {writePeriodicNoops: true, periodicNoopIntervalSecs: 1}}

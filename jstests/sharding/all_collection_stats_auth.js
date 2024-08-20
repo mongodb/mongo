@@ -6,6 +6,8 @@
  * ]
  */
 
+import {ShardingTest} from "jstests/libs/shardingtest.js";
+
 // Test privileges
 function testPrivileges() {
     // Create new role with the exact privileges to execute $allCollectionStats

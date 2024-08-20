@@ -6,6 +6,7 @@
  * ]
  */
 import {ShardTransitionUtil} from "jstests/libs/shard_transition_util.js";
+import {ShardingTest} from "jstests/libs/shardingtest.js";
 import {
     moveDatabaseAndUnshardedColls
 } from "jstests/sharding/libs/move_database_and_unsharded_coll_helper.js";

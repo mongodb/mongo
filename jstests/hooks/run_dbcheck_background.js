@@ -3,6 +3,7 @@
  */
 import {DiscoverTopology, Topology} from "jstests/libs/discover_topology.js";
 import {Thread} from "jstests/libs/parallelTester.js";
+import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {
     assertForDbCheckErrorsForAllNodes,
     runDbCheckForDatabase

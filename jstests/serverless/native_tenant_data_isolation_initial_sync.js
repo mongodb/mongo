@@ -4,6 +4,7 @@
 
 import {arrayEq} from "jstests/aggregation/extras/utils.js";
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
+import {ReplSetTest} from "jstests/libs/replsettest.js";
 
 const kVTSKey = 'secret';
 const rst = new ReplSetTest({

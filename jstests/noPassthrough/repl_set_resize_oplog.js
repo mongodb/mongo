@@ -5,6 +5,8 @@
  *   requires_replication,
  * ]
  */
+import {ReplSetTest} from "jstests/libs/replsettest.js";
+
 let replSet = new ReplSetTest({nodes: 2, oplogSize: 50});
 replSet.startSet();
 replSet.initiate();

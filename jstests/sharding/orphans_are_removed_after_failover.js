@@ -9,6 +9,8 @@
  *    from the chunk that was migrated away
  */
 
+import {ShardingTest} from "jstests/libs/shardingtest.js";
+
 TestData.skipCheckingUUIDsConsistentAcrossCluster = true;
 
 const dbName = "test";

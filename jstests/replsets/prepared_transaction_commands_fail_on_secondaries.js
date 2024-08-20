@@ -6,6 +6,7 @@
  */
 
 import {PrepareHelpers} from "jstests/core/txns/libs/prepare_helpers.js";
+import {ReplSetTest} from "jstests/libs/replsettest.js";
 
 const name = "prepared_transaction_commands_fail_on_secondaries";
 const rst = new ReplSetTest({

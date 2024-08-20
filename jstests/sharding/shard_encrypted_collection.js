@@ -1,5 +1,7 @@
 // Verify valid and invalid scenarios for sharding an encrypted collection
 
+import {ShardingTest} from "jstests/libs/shardingtest.js";
+
 /**
  * @tags: [
  *  requires_fcv_60,

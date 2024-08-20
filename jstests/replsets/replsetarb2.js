@@ -1,5 +1,7 @@
 // Election when primary fails and remaining nodes are an arbiter and a secondary.
 
+import {ReplSetTest} from "jstests/libs/replsettest.js";
+
 var replTest = new ReplSetTest({name: 'unicomplex', nodes: 3});
 var nodes = replTest.nodeList();
 

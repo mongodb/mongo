@@ -2,6 +2,7 @@
 import {
     ReadWriteConcernDefaultsPropagation
 } from "jstests/libs/read_write_concern_defaults_propagation_common.js";
+import {ReplSetTest} from "jstests/libs/replsettest.js";
 
 const rst = new ReplSetTest({nodes: 3});
 rst.startSet();

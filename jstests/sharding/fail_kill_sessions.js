@@ -4,6 +4,7 @@
  * fails, and verify the log output.
  */
 
+import {ShardingTest} from "jstests/libs/shardingtest.js";
 import {
     setFailCommandOnShards,
     unsetFailCommandOnEachShard,

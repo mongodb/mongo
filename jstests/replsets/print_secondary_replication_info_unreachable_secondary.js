@@ -1,5 +1,7 @@
 // Tests the output of db.printSecondaryReplicationInfo() for unreachable secondaries.
 
+import {ReplSetTest} from "jstests/libs/replsettest.js";
+
 const name = "printSecondaryReplicationInfo";
 const replSet = new ReplSetTest({name: name, nodes: 2});
 replSet.startSet();

@@ -1,6 +1,7 @@
 // SERVER-34954 This test ensures a node started with --shardsvr and added to a replica set has
 // the correct version of unique indexes upon re-initiation.
 import {checkUniqueIndexFormatVersion} from "jstests/libs/check_unique_indexes.js";
+import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 let st = new ShardingTest({shards: 1, rs: {nodes: 1}, mongos: 1});
 let mongos = st.s;

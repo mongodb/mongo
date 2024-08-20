@@ -7,6 +7,7 @@
  */
 import {waitForCurOpByFailPoint} from "jstests/libs/curop_helpers.js";
 import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
+import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 const st = new ShardingTest({shards: 2});
 const testDB = st.s.getDB(jsTestName());

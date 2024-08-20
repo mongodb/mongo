@@ -1,3 +1,5 @@
+import {ReplSetTest} from "jstests/libs/replsettest.js";
+
 var rst = new ReplSetTest({name: 'dbhash_system_collections', nodes: 2});
 rst.startSet();
 rst.initiate();

@@ -2,6 +2,8 @@
 // standalone mongod and a sharded cluster).
 // @tags: [requires_fcv_70]
 
+import {ShardingTest} from "jstests/libs/shardingtest.js";
+
 const dbName = "test";
 const collName = "accounts";
 

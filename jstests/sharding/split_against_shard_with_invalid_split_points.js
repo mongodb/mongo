@@ -1,5 +1,7 @@
 // Tests that executing splitChunk directly against a shard, with an invalid split point will not
 // corrupt the chunks metadata
+import {ShardingTest} from "jstests/libs/shardingtest.js";
+
 var st = new ShardingTest({shards: 1});
 
 var testDB = st.s.getDB('TestSplitDB');

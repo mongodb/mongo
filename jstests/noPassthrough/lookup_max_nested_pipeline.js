@@ -4,6 +4,7 @@
 
 import {assertErrorCode} from "jstests/aggregation/extras/utils.js";
 import {assertDropCollection} from "jstests/libs/collection_drop_recreate.js";
+import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 function generateNestedPipeline(foreignCollName, numLevels) {
     let pipeline = [{"$lookup": {pipeline: [], from: foreignCollName, as: "same"}}];

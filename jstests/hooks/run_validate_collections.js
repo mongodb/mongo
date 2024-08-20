@@ -2,6 +2,7 @@
 // the mongo shell.
 import {CollectionValidator} from "jstests/hooks/validate_collections.js";
 import {DiscoverTopology, Topology} from "jstests/libs/discover_topology.js";
+import {ReplSetTest} from "jstests/libs/replsettest.js";
 
 assert.eq(typeof db, 'object', 'Invalid `db` object, is the shell connected to a mongod?');
 const topology = DiscoverTopology.findConnectedNodes(db.getMongo());

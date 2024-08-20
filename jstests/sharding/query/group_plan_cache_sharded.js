@@ -15,6 +15,8 @@
  *   featureFlagSbeFull,
  * ]
  */
+import {ShardingTest} from "jstests/libs/shardingtest.js";
+
 const st = new ShardingTest({shards: 2, rs: {nodes: 1}});
 const mongosDB = st.s.getDB(jsTestName());
 const collName = jsTestName();

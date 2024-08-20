@@ -4,6 +4,9 @@
  * @tags: [requires_fcv_70]
  */
 
+import {ReplSetTest} from "jstests/libs/replsettest.js";
+import {ShardingTest} from "jstests/libs/shardingtest.js";
+
 const latest = "latest";
 const testName = "fcv_upgrade_fails_during_is_cleaning_server_metadata";
 const dbpath = MongoRunner.dataPath + testName;

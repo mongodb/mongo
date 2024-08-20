@@ -3,6 +3,7 @@
 // @tags: [requires_replication, serverless, featureFlagSecurityToken]
 
 import {runCommandWithSecurityToken} from "jstests/libs/multitenancy_utils.js";
+import {ReplSetTest} from "jstests/libs/replsettest.js";
 
 const tenantId1 = ObjectId();
 const tenantId2 = ObjectId();

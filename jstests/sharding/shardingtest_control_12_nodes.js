@@ -10,5 +10,7 @@
  * limit for ShardingTest. We expect the large majority of tests will never use more than that
  * number of nodes, and so we're not particularly worried about scaling beyond that point.
  */
+import {ShardingTest} from "jstests/libs/shardingtest.js";
+
 const st = new ShardingTest({shards: 4, rs: {nodes: 3}, mongos: 1});
 st.stop();

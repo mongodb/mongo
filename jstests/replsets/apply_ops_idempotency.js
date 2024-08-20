@@ -1,3 +1,5 @@
+import {ReplSetTest} from "jstests/libs/replsettest.js";
+
 const debug = 0;
 
 let rst = new ReplSetTest({name: "applyOpsIdempotency", nodes: 1});

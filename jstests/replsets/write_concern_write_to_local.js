@@ -2,6 +2,7 @@
  * Tests that we are silently ignoring writeConcern when we write to local db.
  */
 
+import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {
     restartReplicationOnSecondaries,
     stopReplicationOnSecondaries

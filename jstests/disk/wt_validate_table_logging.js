@@ -6,6 +6,7 @@
  * ]
  */
 import {setUpServerForColumnStoreIndexTest} from "jstests/libs/columnstore_util.js";
+import {ReplSetTest} from "jstests/libs/replsettest.js";
 
 let conn = MongoRunner.runMongod();
 

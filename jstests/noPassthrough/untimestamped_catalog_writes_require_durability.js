@@ -7,6 +7,8 @@
  *    requires_wiredtiger,
  * ]
  */
+import {ReplSetTest} from "jstests/libs/replsettest.js";
+
 // Disable the checkpoint thread since we want to perform the checkpoint at a later stage.
 const rst = new ReplSetTest({
     name: "correct",

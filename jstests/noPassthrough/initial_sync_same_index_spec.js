@@ -3,6 +3,7 @@
  * recreated.
  */
 import {kDefaultWaitForFailPointTimeout} from "jstests/libs/fail_point_util.js";
+import {ReplSetTest} from "jstests/libs/replsettest.js";
 
 const testName = "initial_sync_same_index_spec";
 const dbName = testName;

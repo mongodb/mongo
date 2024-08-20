@@ -11,6 +11,7 @@ import {
     profilerHasSingleMatchingEntryOrThrow,
     profilerHasZeroMatchingEntriesOrThrow,
 } from "jstests/libs/profiler.js";
+import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 const conn = MongoRunner.runMongod();
 const testDB = conn.getDB("profile_agg");

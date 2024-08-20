@@ -1,4 +1,6 @@
 // SERVER-28179 Test the startup of in-memory storage engine using --inMemoryEngineConfigString
+import {ReplSetTest} from "jstests/libs/replsettest.js";
+
 if (jsTest.options().storageEngine !== "inMemory") {
     jsTestLog("Skipping test because storageEngine is not inMemory");
     quit();

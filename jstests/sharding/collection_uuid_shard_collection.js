@@ -5,6 +5,8 @@
  *   requires_fcv_60,
  * ]
  */
+import {ShardingTest} from "jstests/libs/shardingtest.js";
+
 const st = new ShardingTest({shards: 2});
 const mongos = st.s0;
 

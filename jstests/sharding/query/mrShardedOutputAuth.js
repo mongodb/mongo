@@ -2,6 +2,8 @@
  * Test that a mapReduce job can write sharded output to a database
  * from a separate input database while authenticated to both.
  */
+import {ShardingTest} from "jstests/libs/shardingtest.js";
+
 // Multiple users cannot be authenticated on one connection within a session.
 TestData.disableImplicitSessions = true;
 const st = new ShardingTest(

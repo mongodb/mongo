@@ -7,6 +7,7 @@
 
 import {PrepareHelpers} from "jstests/core/txns/libs/prepare_helpers.js";
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";
+import {ReplSetTest} from "jstests/libs/replsettest.js";
 
 const rst = new ReplSetTest({nodes: 2});
 rst.startSet();

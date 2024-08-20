@@ -6,6 +6,7 @@
  * ]
  */
 import {profilerHasSingleMatchingEntryOrThrow} from "jstests/libs/profiler.js";
+import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 // Set the secondaries to priority 0 and votes 0 to prevent the primaries from stepping down.
 let rsOpts = {nodes: [{}, {rsConfig: {priority: 0}}]};

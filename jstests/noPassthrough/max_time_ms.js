@@ -7,6 +7,7 @@
  * ]
  */
 import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
+import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 function executeTest(db, isMongos) {
     let cursor;
@@ -473,7 +474,7 @@ function executeTest(db, isMongos) {
 }
 
 const enableTestCmd = {
-    setParameter: "enableTestCommands=1"
+    setParameter: {enableTestCommands: 1}
 };
 (function runOnStandalone() {
     const conn = MongoRunner.runMongod(enableTestCmd);
@@ -486,7 +487,7 @@ const enableTestCmd = {
 })();
 
 (function runSharded() {
-    const enableTestCmd = {setParameter: "enableTestCommands=1"};
+    const enableTestCmd = {setParameter: {enableTestCommands: 1}};
     const st = new ShardingTest(
         {shards: 2, other: {shardOptions: enableTestCmd, mongosOptions: enableTestCmd}});
     try {

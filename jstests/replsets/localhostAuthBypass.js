@@ -9,6 +9,7 @@ var username = "foo";
 var password = "bar";
 
 import {get_ipaddr} from "jstests/libs/host_ipaddr.js";
+import {ReplSetTest} from "jstests/libs/replsettest.js";
 
 var createUser = function(mongo) {
     print("============ adding a user.");

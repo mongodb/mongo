@@ -5,6 +5,7 @@
  * @tags: [uses_transactions, uses_prepare_transaction, uses_multi_shard_transaction]
  */
 
+import {ShardingTest} from "jstests/libs/shardingtest.js";
 import {
     flushRoutersAndRefreshShardMetadata
 } from "jstests/sharding/libs/sharded_transactions_helpers.js";

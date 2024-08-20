@@ -2,6 +2,8 @@
  * Tests that the analyzeShardKey command supports analyzing the characteristics of the shard
  * key and/or the read and write distribution.
  */
+import {ReplSetTest} from "jstests/libs/replsettest.js";
+import {ShardingTest} from "jstests/libs/shardingtest.js";
 import {
     AnalyzeShardKeyUtil
 } from "jstests/sharding/analyze_shard_key/libs/analyze_shard_key_util.js";

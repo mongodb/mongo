@@ -3,6 +3,7 @@
  * entries from the previous config in the current config.
  */
 
+import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {restartServerReplication, stopServerReplication} from "jstests/libs/write_concern_util.js";
 
 // Start a 3 node replica set with two non-voting nodes. In this case, only one node is

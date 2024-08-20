@@ -6,6 +6,7 @@
 //   security add-trusted-cert -d jstests/libs/trusted-ca.pem
 
 import {getPython3Binary} from "jstests/libs/python.js";
+import {ReplSetTest} from "jstests/libs/replsettest.js";
 
 const HOST_TYPE = getBuildInfo().buildEnvironment.target_os;
 jsTest.log("HOST_TYPE = " + HOST_TYPE);

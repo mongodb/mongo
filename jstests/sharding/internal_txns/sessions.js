@@ -8,6 +8,8 @@
  *   uses_transactions,
  * ]
  */
+import {ShardingTest} from "jstests/libs/shardingtest.js";
+
 TestData.disableImplicitSessions = true;
 
 const st = new ShardingTest({

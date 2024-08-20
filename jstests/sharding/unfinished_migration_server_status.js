@@ -9,6 +9,7 @@ import {
     unpauseMoveChunkAtStep,
     waitForMoveChunkStep,
 } from "jstests/libs/chunk_manipulation_util.js";
+import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 // Test calls step down on primaries.
 TestData.skipCheckingUUIDsConsistentAcrossCluster = true;

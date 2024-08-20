@@ -1,4 +1,6 @@
 // SERVER-2326 - make sure that sharding only works with unique indices
+import {ShardingTest} from "jstests/libs/shardingtest.js";
+
 var s = new ShardingTest({name: "shard_index", shards: 2, mongos: 1});
 
 // Regenerate fully because of SERVER-2782

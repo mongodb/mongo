@@ -6,6 +6,7 @@
  *
  * @tags: [requires_fcv_70, resource_intensive]
  */
+import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {
     testAnalyzeShardKeysUnshardedCollection,
 } from "jstests/sharding/analyze_shard_key/libs/monotonicity_common.js";

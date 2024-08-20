@@ -8,6 +8,7 @@
 
 import {ChangeStreamTest} from "jstests/libs/change_stream_util.js";
 import {assertDropAndRecreateCollection} from "jstests/libs/collection_drop_recreate.js";
+import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 // Create a new sharded cluster. For this test, in addition to testing 'delete' events within a
 // multi-document transaction, we only test the 'documentKey' field contains the shard key in a

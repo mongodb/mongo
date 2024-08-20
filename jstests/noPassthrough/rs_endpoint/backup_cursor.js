@@ -7,6 +7,10 @@
  * ]
  */
 
+import {Thread} from "jstests/libs/parallelTester.js";
+import {ReplSetTest} from "jstests/libs/replsettest.js";
+import {ShardingTest} from "jstests/libs/shardingtest.js";
+
 if (!(buildInfo().modules.includes("enterprise"))) {
     jsTest.log("Skipping test as it requires the enterprise module");
     quit();

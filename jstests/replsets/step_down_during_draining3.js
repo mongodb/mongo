@@ -1,6 +1,7 @@
 // Test that the stepdown command can be run successfully during drain mode
 
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
+import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {reconnect} from "jstests/replsets/rslib.js";
 
 var replSet = new ReplSetTest({name: 'testSet', nodes: 3});

@@ -16,6 +16,7 @@ import {
     unpauseMigrateAtStep,
     waitForMigrateStep,
 } from "jstests/libs/chunk_manipulation_util.js";
+import {ShardingTest} from "jstests/libs/shardingtest.js";
 import {findChunksUtil} from "jstests/sharding/libs/find_chunks_util.js";
 
 // For startParallelOps to write its state

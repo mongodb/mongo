@@ -3,6 +3,8 @@
  * when causal consistency is enabled.
  * @tags: [requires_replication]
  */
+import {ReplSetTest} from "jstests/libs/replsettest.js";
+
 // This test makes assertions on commands run without logical session ids.
 TestData.disableImplicitSessions = true;
 

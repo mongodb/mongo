@@ -3,6 +3,7 @@
  * aggregation against the underlying collection.
  */
 import {profilerHasSingleMatchingEntryOrThrow} from "jstests/libs/profiler.js";
+import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 const st = new ShardingTest({
     name: "view_rewrite",

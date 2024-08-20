@@ -4,6 +4,8 @@
  * compatible with the way mongos handles load-balanced clients.
  * See `src/mongo/s/load_balancing_support.h`.
  */
+import {ShardingTest} from "jstests/libs/shardingtest.js";
+
 (() => {
     /**
      * The whole ShardingTest is restarted just to get a fresh connection.

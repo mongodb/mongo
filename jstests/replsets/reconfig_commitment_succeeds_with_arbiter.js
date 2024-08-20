@@ -2,6 +2,8 @@
  * Verify that a non force replica set reconfig can be committed by a primary and arbiter, with a
  * secondary down.
  */
+import {ReplSetTest} from "jstests/libs/replsettest.js";
+
 // Make the secondary unelectable.
 let rst =
     new ReplSetTest({nodes: [{}, {rsConfig: {priority: 0}}, {rsConfig: {arbiterOnly: true}}]});

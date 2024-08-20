@@ -9,6 +9,7 @@
  */
 
 import {getRidForDoc, mapFieldToMatchingDocRid} from "jstests/libs/replicated_record_ids_utils.js";
+import {ShardingTest} from "jstests/libs/shardingtest.js";
 import {
     moveDatabaseAndUnshardedColls
 } from "jstests/sharding/libs/move_database_and_unsharded_coll_helper.js";

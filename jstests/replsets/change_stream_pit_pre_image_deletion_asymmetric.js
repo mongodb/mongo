@@ -8,6 +8,7 @@
  * ]
  */
 import {getPreImages} from "jstests/libs/change_stream_util.js";
+import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {getFirstOplogEntry, getLatestOp} from "jstests/replsets/rslib.js";
 
 const oplogSizeMB = 1;

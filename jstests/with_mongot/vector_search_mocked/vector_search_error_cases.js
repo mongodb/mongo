@@ -5,6 +5,7 @@
  * ]
  */
 
+import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {
     MongotMock,
 } from "jstests/with_mongot/mongotmock/lib/mongotmock.js";

@@ -1,6 +1,8 @@
 /**
  * Tests for validating that optimization stats are included in explain output.
  */
+import {ReplSetTest} from "jstests/libs/replsettest.js";
+import {ShardingTest} from "jstests/libs/shardingtest.js";
 import {
     runWithFailpoint,
     setupCollectionAndGetExplainTestCases

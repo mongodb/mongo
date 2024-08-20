@@ -6,6 +6,8 @@
  */
 import "jstests/libs/override_methods/set_read_preference_secondary.js";
 
+import {ShardingTest} from "jstests/libs/shardingtest.js";
+
 const st = new ShardingTest({shards: 1});
 
 // We should never override any read preference that was explicitly set.

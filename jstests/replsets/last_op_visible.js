@@ -4,6 +4,8 @@
 // We then confirm that a writeConcern majority write will be seen as the lastVisibleOp by a
 // majority read.
 // @tags: [requires_majority_read_concern]
+import {ReplSetTest} from "jstests/libs/replsettest.js";
+
 var name = 'lastOpVisible';
 var replTest = new ReplSetTest({name: name, nodes: 3, waitForKeys: true});
 replTest.startSet();

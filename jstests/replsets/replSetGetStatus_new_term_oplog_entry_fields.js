@@ -3,6 +3,7 @@
  * replSetGetStatus 'electionCandidateMetrics' section are present only when they should be.
  */
 
+import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {restartReplSetReplication, stopServerReplication} from "jstests/libs/write_concern_util.js";
 
 const name = jsTestName();

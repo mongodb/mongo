@@ -10,8 +10,8 @@
  *     requires_replication,
  * ]
  */
-
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";
+import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {IndexBuildTest} from "jstests/noPassthrough/libs/index_build.js";
 
 /**
@@ -116,7 +116,7 @@ function assertListIndexesOutputsMatch(
     }
 }
 
-const rst = ReplSetTest({nodes: [{}, {rsConfig: {votes: 0, priority: 0}}]});
+const rst = new ReplSetTest({nodes: [{}, {rsConfig: {votes: 0, priority: 0}}]});
 rst.startSet();
 rst.initiate();
 

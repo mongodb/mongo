@@ -1,4 +1,5 @@
 // Term counter should be present in oplog entries under protocol version 1.
+import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {getLatestOp} from "jstests/replsets/rslib.js";
 
 var name = 'oplog_term';

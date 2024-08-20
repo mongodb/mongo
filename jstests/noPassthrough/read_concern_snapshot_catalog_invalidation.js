@@ -2,6 +2,7 @@
 // for the snapshot's point in time.
 // @tags: [uses_transactions]
 import {waitForCurOpByFailPointNoNS} from "jstests/libs/curop_helpers.js";
+import {ReplSetTest} from "jstests/libs/replsettest.js";
 
 const kDbName = "test";
 const kCollName = "coll";

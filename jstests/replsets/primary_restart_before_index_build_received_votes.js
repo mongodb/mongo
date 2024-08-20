@@ -2,6 +2,7 @@
  * Tests that primary retains commit quorum provided to createIndexes across restarts.
  * @tags: [requires_persistence]
  */
+import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {IndexBuildTest} from "jstests/noPassthrough/libs/index_build.js";
 
 const rst = new ReplSetTest({nodes: [{}, {rsConfig: {priority: 0}}]});

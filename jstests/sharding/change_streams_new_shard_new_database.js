@@ -7,6 +7,9 @@
  *   uses_change_streams,
  * ]
  */
+import {ReplSetTest} from "jstests/libs/replsettest.js";
+import {ShardingTest} from "jstests/libs/shardingtest.js";
+
 const rsNodeOptions = {
     setParameter: {writePeriodicNoops: true, periodicNoopIntervalSecs: 1}
 };

@@ -3,6 +3,7 @@
 // while a tailable awaitData query is running. See SERVER-35239. This also tests that when the
 // client's lastKnownCommittedOpTime is behind the node's lastCommittedOpTime, getMore returns early
 // with an empty batch.
+import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {restartServerReplication, stopServerReplication} from "jstests/libs/write_concern_util.js";
 
 const name = 'awaitdata_getmore_new_last_committed_optime';
@@ -46,6 +47,7 @@ jsTestLog('Starting parallel shell');
 // Start a parallel shell because we'll be enabling a failpoint that will make the thread hang.
 let waitForGetMoreToFinish = startParallelShell(async () => {
     const {getLastOpTime} = await import("jstests/replsets/rslib.js");
+    const {ReplSetTest} = await import("jstests/libs/replsettest.js");
 
     const secondary = db.getMongo();
     secondary.setSecondaryOk();

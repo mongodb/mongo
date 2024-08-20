@@ -1,6 +1,7 @@
 //
 // Tests what happens when a replica set primary goes down with pooled connections.
 //
+import {ShardingTest} from "jstests/libs/shardingtest.js";
 import {awaitRSClientHosts} from "jstests/replsets/rslib.js";
 
 var st = new ShardingTest({shards: {rs0: {nodes: 2}}, mongos: 1});

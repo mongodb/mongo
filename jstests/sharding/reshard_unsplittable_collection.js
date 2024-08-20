@@ -8,6 +8,8 @@
  * ]
  */
 
+import {ShardingTest} from "jstests/libs/shardingtest.js";
+
 const kDbName = "test";
 
 const st = new ShardingTest({shards: 2});

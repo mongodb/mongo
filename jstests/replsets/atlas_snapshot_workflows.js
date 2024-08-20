@@ -15,6 +15,7 @@ if (!buildInfo()["modules"].includes("enterprise")) {
 }
 
 import {backupData} from "jstests/libs/backup_utils.js";
+import {ReplSetTest} from "jstests/libs/replsettest.js";
 
 const testName = TestData.testName;
 const rst = new ReplSetTest({

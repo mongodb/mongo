@@ -21,6 +21,7 @@
  */
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";
 import {IndexCatalogHelpers} from "jstests/libs/index_catalog_helpers.js";
+import {ReplSetTest} from "jstests/libs/replsettest.js";
 
 var rst = new ReplSetTest({name: "initial_sync_move_forward", nodes: 1});
 rst.startSet();

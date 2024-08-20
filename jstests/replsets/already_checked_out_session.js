@@ -5,6 +5,7 @@
  * @tags: [uses_transactions]
  */
 import {Thread} from "jstests/libs/parallelTester.js";
+import {ReplSetTest} from "jstests/libs/replsettest.js";
 
 const rst = new ReplSetTest({nodes: 1});
 rst.startSet();

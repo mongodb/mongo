@@ -8,6 +8,7 @@ TestData.skipCheckShardFilteringMetadata = true;
 
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";
 import {findChunksUtil} from "jstests/sharding/libs/find_chunks_util.js";
+import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 const st = new ShardingTest({shards: 1});
 const mongos = st.s0;

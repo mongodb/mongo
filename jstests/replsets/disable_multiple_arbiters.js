@@ -4,6 +4,8 @@
  * @tags: [requires_fcv_53]
  */
 
+import {ReplSetTest} from "jstests/libs/replsettest.js";
+
 function multiple_arbiters(multiple_arbiters_allowed) {
     jsTestLog("multiple_arbiters(" + multiple_arbiters_allowed + ")");
 

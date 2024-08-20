@@ -3,6 +3,8 @@
  * config.chunks entries
  */
 
+import {ShardingTest} from "jstests/libs/shardingtest.js";
+
 Random.setRandomSeed();
 
 /* Perform up to 'maxNumSplits' random chunk splits */

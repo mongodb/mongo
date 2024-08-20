@@ -4,6 +4,7 @@
  * @tags: [requires_fcv_60]
  */
 
+import {ShardingTest} from "jstests/libs/shardingtest.js";
 import {shardCollectionWithChunks} from "jstests/libs/write_concern_util.js";
 
 const validateErrorResponse = function(

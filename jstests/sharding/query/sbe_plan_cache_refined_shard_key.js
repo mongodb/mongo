@@ -10,6 +10,7 @@
  */
 
 import {getPlanCacheKeyFromPipeline} from "jstests/libs/analyze_plan.js";
+import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 const dbName = "testdb";
 const collName = "sbe_plan_cache_refined_shard_key";

@@ -3,6 +3,9 @@
  *
  * @tags: [requires_fcv_70]
  */
+import {ReplSetTest} from "jstests/libs/replsettest.js";
+import {ShardingTest} from "jstests/libs/shardingtest.js";
+
 function testUnshardedCollection(conn) {
     const dbName = "testUnshardedCollectionDb";
     const collName = "testCollUnsharded";

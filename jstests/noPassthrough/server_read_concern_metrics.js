@@ -5,6 +5,8 @@
 //   uses_transactions,
 // ]
 // Verifies that the server status response has the fields that we expect.
+import {ReplSetTest} from "jstests/libs/replsettest.js";
+
 function verifyServerStatusFields(serverStatusResponse) {
     assert(serverStatusResponse.hasOwnProperty("readConcernCounters"),
            "Missing 'readConcernCounters' from serverStatus\n" + tojson(serverStatusResponse));

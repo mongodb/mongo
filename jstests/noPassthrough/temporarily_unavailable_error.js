@@ -9,6 +9,8 @@
  *   requires_wiredtiger,
  * ]
  */
+import {ReplSetTest} from "jstests/libs/replsettest.js";
+
 const replSet = new ReplSetTest({
     nodes: 1,
     nodeOptions: {

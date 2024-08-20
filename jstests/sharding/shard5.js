@@ -1,4 +1,6 @@
 // Tests write passthrough
+import {ShardingTest} from "jstests/libs/shardingtest.js";
+
 var s = new ShardingTest({shards: 2, mongos: 2});
 var s2 = s.s1;
 

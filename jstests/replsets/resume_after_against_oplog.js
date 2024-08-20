@@ -6,6 +6,8 @@
  * ]
  */
 
+import {ReplSetTest} from "jstests/libs/replsettest.js";
+
 const rst = new ReplSetTest({
     nodes: 1,
     nodeOptions: {setParameter: {logComponentVerbosity: tojson({command: 2, query: 5})}}

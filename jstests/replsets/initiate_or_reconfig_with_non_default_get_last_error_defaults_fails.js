@@ -4,6 +4,8 @@
  * @tags: [
  * ]
  */
+import {ReplSetTest} from "jstests/libs/replsettest.js";
+
 function testInitiate(gleDefaults) {
     const replTest = new ReplSetTest({name: jsTestName(), nodes: 1});
     clearRawMongoProgramOutput();

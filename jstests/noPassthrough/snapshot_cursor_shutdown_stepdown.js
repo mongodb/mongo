@@ -2,6 +2,8 @@
 // @tags: [
 //   uses_transactions,
 // ]
+import {ReplSetTest} from "jstests/libs/replsettest.js";
+
 const dbName = "test";
 const collName = "coll";
 

@@ -9,6 +9,7 @@ import {
     flushRoutersAndRefreshShardMetadata
 } from "jstests/sharding/libs/sharded_transactions_helpers.js";
 import {findChunksUtil} from "jstests/sharding/libs/find_chunks_util.js";
+import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 const dbName = "test";
 const shardedCollName = "shardedColl";

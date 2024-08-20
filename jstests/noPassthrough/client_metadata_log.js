@@ -5,6 +5,8 @@
  * ]
  */
 
+import {ShardingTest} from "jstests/libs/shardingtest.js";
+
 let checkLogForMetadata = function(mongo, options) {
     const normalizedOptions = JSON.parse(JSON.stringify(options));
     if (!normalizedOptions.networkMessageCompressors)

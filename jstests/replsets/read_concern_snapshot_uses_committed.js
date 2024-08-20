@@ -10,6 +10,7 @@
  *   requires_persistence,
  * ]
  */
+import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {
     restartReplicationOnSecondaries,
     stopReplicationOnSecondaries

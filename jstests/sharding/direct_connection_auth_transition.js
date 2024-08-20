@@ -7,6 +7,10 @@
  * ]
  */
 
+import {Thread} from "jstests/libs/parallelTester.js";
+import {ReplSetTest} from "jstests/libs/replsettest.js";
+import {ShardingTest} from "jstests/libs/shardingtest.js";
+
 const st = new ShardingTest({name: jsTestName(), keyFile: "jstests/libs/key1", shards: 1});
 
 const dbName = 'test';

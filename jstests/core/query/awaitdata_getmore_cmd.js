@@ -15,6 +15,7 @@
 
 import {DiscoverTopology, Topology} from "jstests/libs/discover_topology.js";
 import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
+import {ReplSetTest} from "jstests/libs/replsettest.js";
 
 let collName = 'await_data_non_capped';
 let coll = db[collName];

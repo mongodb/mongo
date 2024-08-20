@@ -1,6 +1,7 @@
 // Tests that an aggregation error which occurs on a sharded collection will send an error message
 // containing the host and port of the shard where the error occurred.
 import {assertErrCodeAndErrMsgContains} from "jstests/aggregation/extras/utils.js";
+import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 const st = new ShardingTest({shards: 2});
 

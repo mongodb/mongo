@@ -1,5 +1,7 @@
 // Tests various cases of dropping and recreating collections in the same namespace with multiple
 // mongoses
+import {ShardingTest} from "jstests/libs/shardingtest.js";
+
 var st = new ShardingTest({shards: 3, mongos: 3, causallyConsistent: true});
 
 var config = st.s0.getDB("config");

@@ -1,5 +1,6 @@
 // ensure removing a chained node does not break reporting of replication progress (SERVER-15849)
 
+import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {syncFrom} from "jstests/replsets/rslib.js";
 
 var numNodes = 5;

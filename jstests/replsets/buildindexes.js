@@ -1,5 +1,7 @@
 // Check that buildIndexes config option is working
 
+import {ReplSetTest} from "jstests/libs/replsettest.js";
+
 // Skip db hash check because secondary will have different number of indexes due to
 // buildIndexes=false on the secondary.
 TestData.skipCheckDBHashes = true;

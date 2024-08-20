@@ -5,6 +5,8 @@
  *
  * @tags: [requires_sharding]
  */
+import {ShardingTest} from "jstests/libs/shardingtest.js";
+
 function setup(conn) {
     const adminDB = conn.getDB('admin');
 

@@ -11,6 +11,8 @@
  * ]
  */
 
+import {ShardingTest} from "jstests/libs/shardingtest.js";
+
 (function() {
 'use strict';
 

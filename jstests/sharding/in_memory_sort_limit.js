@@ -1,6 +1,8 @@
 // Test SERVER-14306.  Do a query directly against a mongod with an in-memory sort and a limit that
 // doesn't cause the in-memory sort limit to be reached, then make sure the same limit also doesn't
 // cause the in-memory sort limit to be reached when running through a mongos.
+import {ShardingTest} from "jstests/libs/shardingtest.js";
+
 var st = new ShardingTest({
     shards: 2,
     other: {

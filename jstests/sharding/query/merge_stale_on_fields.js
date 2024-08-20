@@ -1,6 +1,7 @@
 // Tests that an $merge stage is able to default the "on" fields to the correct value - even if one
 // or more of the involved nodes has a stale cache of the routing information.
 import {withEachMergeMode} from "jstests/aggregation/extras/merge_helpers.js";
+import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 const st = new ShardingTest({shards: 2, mongos: 2});
 

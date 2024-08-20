@@ -4,6 +4,7 @@
  * @tags: [requires_fcv_70]
  */
 
+import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {QuerySamplingUtil} from "jstests/sharding/analyze_shard_key/libs/query_sampling_util.js";
 import {
     assertCurrentOpAndServerStatusMongod,

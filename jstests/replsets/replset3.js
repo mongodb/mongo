@@ -1,3 +1,5 @@
+import {ReplSetTest} from "jstests/libs/replsettest.js";
+
 var doTest = function(signal) {
     // Test replica set step down
 

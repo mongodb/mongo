@@ -3,6 +3,8 @@
 // @tags: [
 //   requires_fcv_63,
 // ]
+import {ShardingTest} from "jstests/libs/shardingtest.js";
+
 const shardingTest = new ShardingTest({
     shards: 2,
     other: {configOptions: {setParameter: {featureFlagServerlessChangeStreams: true}}}

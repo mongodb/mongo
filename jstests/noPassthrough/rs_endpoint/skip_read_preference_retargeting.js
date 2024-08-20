@@ -8,6 +8,7 @@
  * ]
  */
 
+import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {extractUUIDFromObject} from "jstests/libs/uuid_util.js";
 import {restartServerReplication, stopServerReplication} from "jstests/libs/write_concern_util.js";
 import {waitForAutoBootstrap} from "jstests/noPassthrough/rs_endpoint/lib/util.js";

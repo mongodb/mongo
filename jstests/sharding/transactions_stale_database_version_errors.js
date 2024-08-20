@@ -2,6 +2,7 @@
 //
 // @tags: [requires_sharding, uses_transactions, uses_multi_shard_transaction]
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
+import {ShardingTest} from "jstests/libs/shardingtest.js";
 import {
     assertNoSuchTransactionOnAllShards,
     disableStaleVersionAndSnapshotRetriesWithinTransactions,

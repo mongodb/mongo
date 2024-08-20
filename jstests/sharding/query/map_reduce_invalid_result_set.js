@@ -5,6 +5,8 @@
 //   embedded_router_incompatible,
 //   uses_map_reduce_with_temp_collections,
 // ]
+import {ShardingTest} from "jstests/libs/shardingtest.js";
+
 const st = new ShardingTest({shards: 2});
 const testDB = st.getDB("test");
 const coll = "map_reduce_invalid_result_set";

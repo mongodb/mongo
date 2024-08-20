@@ -2,6 +2,7 @@
  * Tests that the recipient shard uses the UUID obtained from the donor shard when creating the
  * collection on itself as part of a migration.
  */
+import {ShardingTest} from "jstests/libs/shardingtest.js";
 import {getUUIDFromConfigCollections, getUUIDFromListCollections} from "jstests/libs/uuid_util.js";
 
 let db = "test";

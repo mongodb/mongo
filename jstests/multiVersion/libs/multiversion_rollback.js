@@ -4,6 +4,7 @@
  * the rollback node and the sync source during rollback.
  */
 
+import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {restartServerReplication} from "jstests/libs/write_concern_util.js";
 import {RollbackTest} from "jstests/replsets/libs/rollback_test.js";
 import {reconfig, waitForState} from "jstests/replsets/rslib.js";

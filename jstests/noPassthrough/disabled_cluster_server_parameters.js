@@ -16,6 +16,8 @@ import {
     testDisabledClusterParameters
 } from "jstests/libs/cluster_server_parameter_utils.js";
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
+import {ReplSetTest} from "jstests/libs/replsettest.js";
+import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 // Verifies that test-only parameters are disabled and excluded when enableTestCommands is false.
 TestData.enableTestCommands = false;

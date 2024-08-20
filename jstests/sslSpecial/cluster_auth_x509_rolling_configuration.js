@@ -6,6 +6,7 @@
  * @tags: [requires_persistence, requires_replication, requires_fcv_70]
  */
 
+import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {determineSSLProvider} from "jstests/ssl/libs/ssl_helpers.js";
 
 if (determineSSLProvider() !== "openssl") {

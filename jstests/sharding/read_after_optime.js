@@ -5,6 +5,8 @@
 //   embedded_router_incompatible,
 // ]
 
+import {ShardingTest} from "jstests/libs/shardingtest.js";
+
 var shardingTest = new ShardingTest({shards: TestData.configShard ? 1 : 0});
 
 assert(shardingTest.configRS, 'this test requires config servers to run in CSRS mode');

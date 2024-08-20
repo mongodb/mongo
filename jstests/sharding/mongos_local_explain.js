@@ -6,6 +6,8 @@
  *    embedded_router_incompatible,
  * ]
  */
+import {ShardingTest} from "jstests/libs/shardingtest.js";
+
 const st = new ShardingTest({name: "mongos_comment_test", mongos: 1, shards: 1});
 const mongosConn = st.s;
 

@@ -3,6 +3,8 @@
 //   # TODO (SERVER-88127): Re-enable this test or add an explanation why it is incompatible.
 //   embedded_router_incompatible,
 // ]
+import {ShardingTest} from "jstests/libs/shardingtest.js";
+
 var s = new ShardingTest({
     shards: 2,
     other: {

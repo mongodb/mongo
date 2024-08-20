@@ -6,6 +6,8 @@
  *
  * @tags: [uses_transactions, requires_majority_read_concern]
  */
+import {ReplSetTest} from "jstests/libs/replsettest.js";
+
 const name = "change_stream_speculative_majority";
 const replTest = new ReplSetTest({name: name, nodes: [{}, {rsConfig: {priority: 0}}]});
 replTest.startSet();

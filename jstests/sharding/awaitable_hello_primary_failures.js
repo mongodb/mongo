@@ -17,6 +17,7 @@ TestData.skipCheckShardFilteringMetadata = true;
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";
 import {awaitRSClientHosts} from "jstests/replsets/rslib.js";
 import {getFailPointName} from "jstests/libs/fail_point_util.js";
+import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 let st = new ShardingTest({shards: {rs0: {nodes: 1}}});
 let mongos = st.s;

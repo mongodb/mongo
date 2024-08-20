@@ -155,9 +155,7 @@ boost::filesystem::path mongo::shell_utils::getHistoryFilePath() {
 namespace mongo {
 namespace JSFiles {
 extern const JSFile servers;
-extern const JSFile shardingtest;
 extern const JSFile servers_misc;
-extern const JSFile replsettest;
 extern const JSFile data_consistency_checker;
 extern const JSFile bridge;
 extern const JSFile feature_compatibility_version;
@@ -938,9 +936,7 @@ void initScope(Scope& scope) {
     scope.externalSetup();
     mongo::shell_utils::installShellUtils(scope);
     scope.execSetup(JSFiles::servers);
-    scope.execSetup(JSFiles::shardingtest);
     scope.execSetup(JSFiles::servers_misc);
-    scope.execSetup(JSFiles::replsettest);
     scope.execSetup(JSFiles::data_consistency_checker);
     scope.execSetup(JSFiles::bridge);
     scope.execSetup(JSFiles::feature_compatibility_version);

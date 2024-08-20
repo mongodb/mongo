@@ -6,12 +6,14 @@
  * ]
  */
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";
+import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {
     checkHealthLog,
     clearHealthLog,
     resetAndInsert,
     runDbCheck
 } from "jstests/replsets/libs/dbcheck_utils.js";
+
 (function() {
 "use strict";
 

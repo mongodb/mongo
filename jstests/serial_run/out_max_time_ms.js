@@ -6,6 +6,7 @@
  * ]
  */
 import {waitForCurOpByFailPointNoNS} from "jstests/libs/curop_helpers.js";
+import {ReplSetTest} from "jstests/libs/replsettest.js";
 
 const kDBName = "test";
 const kSourceCollName = "out_max_time_ms_source";

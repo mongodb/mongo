@@ -11,6 +11,8 @@
  */
 
 import {runCommandWithSecurityToken} from "jstests/libs/multitenancy_utils.js";
+import {ReplSetTest} from "jstests/libs/replsettest.js";
+import {ShardingTest} from "jstests/libs/shardingtest.js";
 import {extractUUIDFromObject} from "jstests/libs/uuid_util.js";
 import {
     getReplicaSetURL,

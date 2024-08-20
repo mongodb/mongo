@@ -3,6 +3,7 @@
 
 import {waitForCurOpByFailPointNoNS} from "jstests/libs/curop_helpers.js";
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";
+import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 const st = new ShardingTest({shards: 2});
 const conn = st.s;

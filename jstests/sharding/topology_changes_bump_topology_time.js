@@ -4,6 +4,8 @@
 3) remove shard
 4) topology time must increase
 */
+import {ReplSetTest} from "jstests/libs/replsettest.js";
+import {ShardingTest} from "jstests/libs/shardingtest.js";
 import {removeShard} from "jstests/sharding/libs/remove_shard_util.js";
 
 function assertTopologyGt(topologyTime1, topologyTime2, msg) {

@@ -6,6 +6,8 @@
  *   uses_change_streams,
  * ]
  */
+import {ShardingTest} from "jstests/libs/shardingtest.js";
+
 // Skip cross-cluster consistency checks, since this test prematurely shuts down a shard.
 TestData.skipCheckingUUIDsConsistentAcrossCluster = true;
 TestData.skipCheckingIndexesConsistentAcrossCluster = true;

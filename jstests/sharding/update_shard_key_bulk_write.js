@@ -12,6 +12,8 @@ import {
     cursorSizeValidator,
     summaryFieldsValidator
 } from "jstests/libs/bulk_write_utils.js";
+import {ReplSetTest} from "jstests/libs/replsettest.js";
+import {ShardingTest} from "jstests/libs/shardingtest.js";
 import {
     shardCollectionMoveChunks,
 } from "jstests/sharding/libs/update_shard_key_helpers.js";

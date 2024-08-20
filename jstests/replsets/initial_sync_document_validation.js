@@ -2,6 +2,8 @@
  * Tests that initial sync does not fail if it inserts documents which don't validate.
  */
 
+import {ReplSetTest} from "jstests/libs/replsettest.js";
+
 var name = 'initial_sync_document_validation';
 var replSet = new ReplSetTest({
     name: name,

@@ -2,6 +2,8 @@
  * Tests that reads through the shell uses the correct read concern.
  * @tags: [requires_replication, uses_transactions, requires_majority_read_concern]
  */
+import {ReplSetTest} from "jstests/libs/replsettest.js";
+
 const rst = new ReplSetTest({nodes: 2});
 rst.startSet();
 rst.initiate();

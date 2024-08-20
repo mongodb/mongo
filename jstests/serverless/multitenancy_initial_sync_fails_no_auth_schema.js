@@ -3,6 +3,7 @@
  * admin database, but a user exists in a tenant's user collection.
  */
 
+import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {reInitiateWithoutThrowingOnAbortedMember} from "jstests/replsets/rslib.js";
 
 const kVTSKey = 'secret';

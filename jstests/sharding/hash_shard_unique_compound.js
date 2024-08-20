@@ -4,6 +4,8 @@
  * 1. shard collection on hashed "a", ensure unique index {a:1, b:1}
  * 2. reverse order
  */
+import {ShardingTest} from "jstests/libs/shardingtest.js";
+
 var s = new ShardingTest({shards: 1, mongos: 1});
 var dbName = "test";
 var collName = "foo";

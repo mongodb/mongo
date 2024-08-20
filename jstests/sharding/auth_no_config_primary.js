@@ -8,6 +8,8 @@
  * ]
  */
 
+import {ShardingTest} from "jstests/libs/shardingtest.js";
+
 // The following checks involve talking to the config server primary, which is shut down in this
 // test
 TestData.skipCheckingUUIDsConsistentAcrossCluster = true;

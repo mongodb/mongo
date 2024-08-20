@@ -1,5 +1,7 @@
 // should check that election happens in priority order
 
+import {ReplSetTest} from "jstests/libs/replsettest.js";
+
 var replTest = new ReplSetTest({name: 'testSet', nodes: 3});
 var nodenames = replTest.nodeList();
 

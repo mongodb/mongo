@@ -1,5 +1,7 @@
 // Tests that commands that should not be runnable on sharded collections cannot be run on sharded
 // collections.
+import {ShardingTest} from "jstests/libs/shardingtest.js";
+
 const st = new ShardingTest({shards: 2, mongos: 2});
 
 const dbName = 'test';

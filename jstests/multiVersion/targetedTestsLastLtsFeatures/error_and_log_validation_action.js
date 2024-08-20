@@ -3,6 +3,8 @@
  */
 import "jstests/multiVersion/libs/multi_rs.js";
 
+import {ReplSetTest} from "jstests/libs/replsettest.js";
+
 // TODO SERVER-88921 Remove this test
 
 const rst = new ReplSetTest({nodes: 2, nodeOptions: {binVersion: 'latest'}});

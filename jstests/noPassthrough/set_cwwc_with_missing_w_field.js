@@ -5,6 +5,9 @@
 //   requires_replication,
 // ]
  */
+import {ReplSetTest} from "jstests/libs/replsettest.js";
+import {ShardingTest} from "jstests/libs/shardingtest.js";
+
 function runTest(conn) {
     let checkDefaultWC = (wc) => {
         let res = conn.adminCommand({getDefaultRWConcern: 1});

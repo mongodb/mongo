@@ -19,6 +19,8 @@ TestData.skipCheckMetadataConsistency = true;
 
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";
 import {Thread} from "jstests/libs/parallelTester.js";
+import {ShardingTest} from "jstests/libs/shardingtest.js";
+
 const st = new ShardingTest({
     mongos: 1,
     config: 1,

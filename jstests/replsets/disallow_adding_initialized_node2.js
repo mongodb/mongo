@@ -6,6 +6,8 @@
 // Start B_0.
 // B_0 should show up in A's replica set status as DOWN.
 
+import {ReplSetTest} from "jstests/libs/replsettest.js";
+
 // This test requires users to persist across a restart.
 // @tags: [requires_persistence]
 

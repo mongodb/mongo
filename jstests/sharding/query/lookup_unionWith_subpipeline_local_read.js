@@ -21,6 +21,7 @@ import {
     profilerHasAtLeastOneMatchingEntryOrThrow,
     profilerHasZeroMatchingEntriesOrThrow
 } from "jstests/libs/profiler.js";
+import {ShardingTest} from "jstests/libs/shardingtest.js";
 import {
     moveDatabaseAndUnshardedColls
 } from "jstests/sharding/libs/move_database_and_unsharded_coll_helper.js";

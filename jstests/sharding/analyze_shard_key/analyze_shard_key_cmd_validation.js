@@ -5,6 +5,8 @@
  */
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";
 import {Thread} from "jstests/libs/parallelTester.js";
+import {ReplSetTest} from "jstests/libs/replsettest.js";
+import {ShardingTest} from "jstests/libs/shardingtest.js";
 import {ValidationTest} from "jstests/sharding/analyze_shard_key/libs/validation_common.js";
 
 const analyzeShardKeyNumRanges = 10;

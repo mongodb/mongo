@@ -32,6 +32,7 @@ import {
     profilerHasSingleMatchingEntryOrThrow,
     profilerHasZeroMatchingEntriesOrThrow,
 } from "jstests/libs/profiler.js";
+import {ShardingTest} from "jstests/libs/shardingtest.js";
 import {
     commandsRemovedFromMongosSinceLastLTS
 } from "jstests/sharding/libs/last_lts_mongos_commands.js";

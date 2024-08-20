@@ -10,6 +10,8 @@
  * ]
  */
 
+import {ShardingTest} from "jstests/libs/shardingtest.js";
+
 // 2 shards single node, 1 mongos, 1 config server 3-node.
 const st = new ShardingTest({});
 const dbName = "testDb";

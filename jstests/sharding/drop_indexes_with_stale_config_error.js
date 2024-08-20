@@ -3,6 +3,7 @@
 // successfully complete upon the mongos' command retry.
 //
 
+import {ShardingTest} from "jstests/libs/shardingtest.js";
 import {ShardVersioningUtil} from "jstests/sharding/libs/shard_versioning_util.js";
 import {
     flushRoutersAndRefreshShardMetadata

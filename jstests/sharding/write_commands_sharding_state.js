@@ -6,6 +6,8 @@
 //   embedded_router_incompatible,
 // ]
 
+import {ShardingTest} from "jstests/libs/shardingtest.js";
+
 var st = new ShardingTest({name: "write_commands", mongos: 2, shards: 2});
 
 var dbTestName = 'WriteCommandsTestDB';

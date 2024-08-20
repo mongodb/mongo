@@ -12,6 +12,7 @@
 //]
 // TODO (SERVER-39704): Remove the following load after SERVER-39704 is completed
 import {retryOnceOnTransientOnMongos} from "jstests/libs/auto_retry_transaction_in_sharding.js";
+import {ReplSetTest} from "jstests/libs/replsettest.js";
 
 const dbName = "test";
 const collName = "finished_transaction_error_handling";

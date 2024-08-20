@@ -1,4 +1,6 @@
 // Verifies that mongos correctly handles empty documents when all fields are projected out
+import {ShardingTest} from "jstests/libs/shardingtest.js";
+
 var st = new ShardingTest({shards: 2});
 
 var mongos = st.s0;

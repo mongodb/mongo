@@ -6,6 +6,7 @@
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";
 import {iterateMatchingLogLines} from "jstests/libs/log.js";
 import {funWithArgs} from "jstests/libs/parallel_shell_helpers.js";
+import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 function hasNonNegativeAttr(entry, attrName) {
     return entry.attr.hasOwnProperty(attrName) && entry.attr[attrName] >= 0;

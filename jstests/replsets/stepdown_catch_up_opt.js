@@ -3,6 +3,7 @@
  * correctly, and will affect the delay appropriately.
  */
 
+import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {restartServerReplication, stopServerReplication} from "jstests/libs/write_concern_util.js";
 
 var name = 'stepdown_catch_up_opt';

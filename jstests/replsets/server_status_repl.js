@@ -1,3 +1,5 @@
+import {ReplSetTest} from "jstests/libs/replsettest.js";
+
 var rt = new ReplSetTest({name: "server_status_repl", nodes: 2});
 rt.startSet();
 rt.initiate();

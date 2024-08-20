@@ -6,6 +6,8 @@
  * opening a connection to the database.
  */
 
+import {ReplSetTest} from "jstests/libs/replsettest.js";
+
 const dbName = "test";
 const collName = "not_primary_errors_returned_if_client_sends_helloOk";
 const rst = new ReplSetTest({nodes: 2});

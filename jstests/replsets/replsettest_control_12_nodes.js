@@ -16,6 +16,8 @@
  * @tags: [resource_intensive, incompatible_with_windows_tls]
  *
  */
+import {ReplSetTest} from "jstests/libs/replsettest.js";
+
 // Add replication-level logging.
 TestData.setParameters = TestData.setParameters || {};
 TestData.setParameters.logComponentVerbosity = TestData.setParameters.logComponentVerbosity || {};

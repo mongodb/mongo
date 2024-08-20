@@ -1,5 +1,6 @@
 
 // Test replication of collection renaming
+import {ReplSetTest} from "jstests/libs/replsettest.js";
 
 let baseName = "jstests_replsets_replset6";
 

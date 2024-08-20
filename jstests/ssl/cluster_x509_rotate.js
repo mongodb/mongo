@@ -1,5 +1,6 @@
 // Check that rotation works for the cluster certificate
 
+import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {copyCertificateFile} from "jstests/ssl/libs/ssl_helpers.js";
 
 const dbPath = MongoRunner.toRealDir("$dataDir/cluster_x509_rotate_test/");

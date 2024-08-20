@@ -1,6 +1,8 @@
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {funWithArgs} from "jstests/libs/parallel_shell_helpers.js";
+import {ReplSetTest} from "jstests/libs/replsettest.js";
+import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 export const UserWriteBlockHelpers = (function() {
     const WriteBlockState = {UNKNOWN: 0, DISABLED: 1, ENABLED: 2};

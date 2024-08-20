@@ -3,6 +3,7 @@
 // Wait for replica set to stabilize with higher priority node as primary.
 // Step down high priority node. Wait for the lower priority electable node to become primary.
 // Eventually high priority node will run a priority takeover election to become primary.
+import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {
     verifyServerStatusElectionReasonCounterChange
 } from "jstests/replsets/libs/election_metrics.js";

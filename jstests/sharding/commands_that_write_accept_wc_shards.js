@@ -11,6 +11,7 @@
  *   resource_intensive,
  * ]
  */
+import {ShardingTest} from "jstests/libs/shardingtest.js";
 import {
     assertWriteConcernError,
     runCommandCheckAdmin,

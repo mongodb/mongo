@@ -13,6 +13,7 @@ import {
     waitForMoveChunkStep,
 } from "jstests/libs/chunk_manipulation_util.js";
 import {Thread} from "jstests/libs/parallelTester.js";
+import {ShardingTest} from "jstests/libs/shardingtest.js";
 import {waitForCommand} from "jstests/libs/wait_for_command.js";
 
 // Documents inserted in this test are in the shape {_id: int} so the size is 18 bytes

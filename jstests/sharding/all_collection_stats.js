@@ -6,6 +6,8 @@
  * ]
  */
 
+import {ShardingTest} from "jstests/libs/shardingtest.js";
+
 function checkResults(aggregationPipeline, checksToDo) {
     assert.soon(() => {
         const results = adminDb.aggregate(aggregationPipeline).toArray();

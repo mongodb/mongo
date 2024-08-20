@@ -35,6 +35,7 @@
  * @tags: [requires_replication]
  */
 
+import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {setLogVerbosity} from "jstests/replsets/rslib.js";
 
 var name = 'user_defined_roles_on_secondaries';

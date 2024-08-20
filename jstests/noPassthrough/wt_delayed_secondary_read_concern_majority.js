@@ -9,6 +9,8 @@
  *   resource_intensive,
  * ]
  */
+import {ReplSetTest} from "jstests/libs/replsettest.js";
+
 // Skip db hash check because delayed secondary will not catch up to primary.
 TestData.skipCheckDBHashes = true;
 

@@ -27,6 +27,8 @@
  *
  * @tags: [requires_replication, uses_transactions]
  */
+import {ReplSetTest} from "jstests/libs/replsettest.js";
+
 // Commands not to override since they can log excessively.
 const runCommandOverrideDenylistedCommands =
     ["getCmdLineOpts", "serverStatus", "configureFailPoint"];

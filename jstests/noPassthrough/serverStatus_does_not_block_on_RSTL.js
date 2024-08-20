@@ -9,6 +9,7 @@
  *   requires_replication,
  * ]
  */
+import {ShardingTest} from "jstests/libs/shardingtest.js";
 import {waitForCommand} from "jstests/libs/wait_for_command.js";
 
 // Use a sharding environment in order to exercise the sharding specific serverStatus sections.

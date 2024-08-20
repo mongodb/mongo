@@ -1,6 +1,7 @@
 // Check that OCSP verification may be used with invalid certificates
 // @tags: [requires_http_client, requires_ocsp_stapling]
 
+import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {
     FAULT_REVOKED,
     MockOCSPServer,
@@ -52,7 +53,7 @@ const ocsp_options = {
     },
 };
 
-const rstest = ReplSetTest({
+const rstest = new ReplSetTest({
     name: "OCSP Servers Test",
     nodes: 2,
     nodeOptions: ocsp_options,

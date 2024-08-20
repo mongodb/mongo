@@ -1,3 +1,5 @@
+import {ReplSetTest} from "jstests/libs/replsettest.js";
+
 const tenant = '636d957b2646ddfaf9b5e13f';
 const kVTSKey = 'secret';
 

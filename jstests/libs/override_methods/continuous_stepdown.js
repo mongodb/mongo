@@ -26,6 +26,8 @@
  */
 
 import {Thread} from "jstests/libs/parallelTester.js";
+import {ReplSetTest} from "jstests/libs/replsettest.js";
+import {ShardingTest} from "jstests/libs/shardingtest.js";
 import {reconfig, reconnect} from "jstests/replsets/rslib.js";
 
 export class ContinuousStepdown {

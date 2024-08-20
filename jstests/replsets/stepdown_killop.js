@@ -7,6 +7,7 @@
 // 5. Kill the stepDown operation.
 // 6. Writes should become allowed again and the primary should stay primary.
 
+import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {restartServerReplication, stopServerReplication} from "jstests/libs/write_concern_util.js";
 
 var name = "interruptStepDown";

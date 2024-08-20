@@ -4,6 +4,7 @@
 //   requires_persistence,
 // ]
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
+import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {getLatestOp, reconfig} from "jstests/replsets/rslib.js";
 
 // Skip db hash check since secondary has slave delay.

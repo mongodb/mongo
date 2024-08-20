@@ -8,6 +8,8 @@
  *   uses_transactions,
  * ]
  */
+import {ShardingTest} from "jstests/libs/shardingtest.js";
+
 // Asserts that the expected operation type and documentKey are found on the change stream
 // cursor. Returns the change stream document.
 function assertWriteVisible({cursor, opType, docKey}) {

@@ -4,6 +4,7 @@
 //   requires_replication,
 //   resource_intensive,
 // ]
+import {ReplSetTest} from "jstests/libs/replsettest.js";
 
 const numLocations = 300;
 let locObj = [];
@@ -51,7 +52,7 @@ function test(conn, index) {
     }
 }
 
-const rst = ReplSetTest({nodes: 1});
+const rst = new ReplSetTest({nodes: 1});
 rst.startSet();
 rst.initiate();
 

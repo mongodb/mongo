@@ -24,6 +24,8 @@
  * ]
  */
 
+import {ReplSetTest} from "jstests/libs/replsettest.js";
+
 function incTs(ts) {
     return Timestamp(ts.t, ts.i + 1);
 }

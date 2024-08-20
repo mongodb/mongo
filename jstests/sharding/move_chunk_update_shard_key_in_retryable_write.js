@@ -20,6 +20,8 @@ import {
     unpauseMoveChunkAtStep,
     waitForMoveChunkStep,
 } from "jstests/libs/chunk_manipulation_util.js";
+import {ReplSetTest} from "jstests/libs/replsettest.js";
+import {ShardingTest} from "jstests/libs/shardingtest.js";
 import {
     flushRoutersAndRefreshShardMetadata,
     isUpdateDocumentShardKeyUsingTransactionApiEnabled,

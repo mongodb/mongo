@@ -15,6 +15,7 @@ import {
     waitForMoveChunkStep,
 } from "jstests/libs/chunk_manipulation_util.js";
 import {configureFailPointForRS} from "jstests/libs/fail_point_util.js";
+import {ShardingTest} from "jstests/libs/shardingtest.js";
 import {moveOutSessionChunks, removeShard} from "jstests/sharding/libs/remove_shard_util.js";
 
 // TODO SERVER-50144 Remove this and allow orphan checking.

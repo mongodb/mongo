@@ -7,6 +7,8 @@
  * @tags: [requires_replication]
  */
 
+import {ReplSetTest} from "jstests/libs/replsettest.js";
+
 /**
  * Starts a replica set with arbiter, builds an index in background,
  * run through drop indexes, drop collection, drop database.

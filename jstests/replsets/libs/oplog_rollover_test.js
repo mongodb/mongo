@@ -3,6 +3,7 @@
  * maximum, with parameters for setting the initial sync method and the storage engine.
  */
 import {kDefaultWaitForFailPointTimeout} from "jstests/libs/fail_point_util.js";
+import {ReplSetTest} from "jstests/libs/replsettest.js";
 
 function numInsertOplogEntry(oplog) {
     print(`Oplog times for ${oplog.getMongo().host}: ${

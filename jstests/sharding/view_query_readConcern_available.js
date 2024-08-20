@@ -2,6 +2,8 @@
  * Tests queries on views on sharded collections work correctly with readConcern 'available'.
  */
 
+import {ShardingTest} from "jstests/libs/shardingtest.js";
+
 const st = new ShardingTest({
     shards: 2,
 });

@@ -1,5 +1,6 @@
 // Check that rotation works for the cluster certificate in a sharded cluster
 
+import {ShardingTest} from "jstests/libs/shardingtest.js";
 import {copyCertificateFile} from "jstests/ssl/libs/ssl_helpers.js";
 
 (function() {

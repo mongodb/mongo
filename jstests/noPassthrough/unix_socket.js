@@ -8,6 +8,8 @@
  *    cause the server to exit with an error (socket names with whitespace are now supported)
  * 4) That the default unix socket doesn't get created if --nounixsocket is specified
  */
+import {ShardingTest} from "jstests/libs/shardingtest.js";
+
 // @tags: [
 //   requires_sharding,
 // ]

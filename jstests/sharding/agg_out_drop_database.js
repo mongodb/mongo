@@ -9,6 +9,7 @@
 
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";
 import {funWithArgs} from "jstests/libs/parallel_shell_helpers.js";
+import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 let st = new ShardingTest({shards: {rs0: {nodes: 1}}});
 const dbName = "test";

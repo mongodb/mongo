@@ -7,6 +7,7 @@
  */
 
 import {verifyGetDiagnosticData} from "jstests/libs/ftdc.js";
+import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 const setFeatureFlag = {
     setParameter: {featureFlagRouterPort: true}

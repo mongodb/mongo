@@ -1,4 +1,6 @@
 // This test makes assumptions about the number of logical sessions.
+import {ShardingTest} from "jstests/libs/shardingtest.js";
+
 TestData.disableImplicitSessions = true;
 
 var sessionsDb = "config";

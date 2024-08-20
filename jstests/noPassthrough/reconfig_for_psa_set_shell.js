@@ -5,6 +5,7 @@
  * @tags: [requires_replication]
  */
 
+import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {isConfigCommitted} from "jstests/replsets/rslib.js";
 
 // Start up a PSA set with the secondary having 'votes: 0' and 'priority: 0'.

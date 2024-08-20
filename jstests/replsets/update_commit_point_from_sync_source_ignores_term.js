@@ -3,6 +3,7 @@
  * lastApplied, the node can update its own lastOpCommitted to its lastApplied.
  * @tags: [requires_majority_read_concern]
  */
+import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {restartServerReplication, stopServerReplication} from "jstests/libs/write_concern_util.js";
 
 const dbName = "test";

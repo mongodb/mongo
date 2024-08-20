@@ -10,6 +10,8 @@
  * 9: check we get a new primary within 30 seconds
  */
 
+import {ReplSetTest} from "jstests/libs/replsettest.js";
+
 var w = 0;
 var wait = function(f) {
     w++;

@@ -4,6 +4,8 @@
 // requires_persistence because it restarts a shard.
 // @tags: [requires_persistence]
 
+import {ShardingTest} from "jstests/libs/shardingtest.js";
+
 // This test restarts a shard.
 TestData.skipCheckingUUIDsConsistentAcrossCluster = true;
 

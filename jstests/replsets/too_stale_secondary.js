@@ -30,6 +30,7 @@
  *
  */
 
+import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {rollOver1MBOplog} from "jstests/replsets/libs/oplog_rollover_test.js";
 import {getFirstOplogEntry} from "jstests/replsets/rslib.js";
 

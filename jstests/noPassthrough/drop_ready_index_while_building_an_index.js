@@ -4,9 +4,10 @@
  *
  * @tags: [requires_replication]
  */
+import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {IndexBuildTest} from "jstests/noPassthrough/libs/index_build.js";
 
-const rst = ReplSetTest({nodes: 3});
+const rst = new ReplSetTest({nodes: 3});
 rst.startSet();
 rst.initiate();
 

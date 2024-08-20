@@ -10,6 +10,8 @@
  */
 
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";
+import {ReplSetTest} from "jstests/libs/replsettest.js";
+import {ShardingTest} from "jstests/libs/shardingtest.js";
 import {getLatestOp} from "jstests/replsets/rslib.js";
 import {ShardingStateTest} from "jstests/sharding/libs/sharding_state_test.js";
 

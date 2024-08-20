@@ -1,4 +1,6 @@
 // tests for the traffic_recording commands.
+import {ShardingTest} from "jstests/libs/shardingtest.js";
+
 function getDB(client) {
     let db = client.getDB("admin");
     db.auth("admin", "pass");

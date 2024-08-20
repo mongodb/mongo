@@ -4,6 +4,8 @@
  */
 import {configureFailPoint, kDefaultWaitForFailPointTimeout} from "jstests/libs/fail_point_util.js";
 import {funWithArgs} from "jstests/libs/parallel_shell_helpers.js";
+import {ReplSetTest} from "jstests/libs/replsettest.js";
+import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 function runAwaitCmd(cmd, maxAwaitTimeMS) {
     const res = assert.commandWorked(db.runCommand({[cmd]: 1}));

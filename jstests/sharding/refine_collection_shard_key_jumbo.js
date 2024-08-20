@@ -6,6 +6,7 @@
 TestData.skipCheckShardFilteringMetadata = true;
 
 import {findChunksUtil} from "jstests/sharding/libs/find_chunks_util.js";
+import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 const st = new ShardingTest({mongos: 1, shards: 2, other: {chunkSize: 1}});
 const primaryShard = st.shard0.shardName;

@@ -4,6 +4,8 @@
  *
  * @tags: [requires_majority_read_concern, requires_fcv_53]
  */
+import {ReplSetTest} from "jstests/libs/replsettest.js";
+
 function log(arg) {
     jsTest.log(tojson(arg));
 }

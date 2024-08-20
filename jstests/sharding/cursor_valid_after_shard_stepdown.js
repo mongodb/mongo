@@ -1,3 +1,5 @@
+import {ShardingTest} from "jstests/libs/shardingtest.js";
+
 var st = new ShardingTest({shards: 1, rs: {nodes: 2}});
 
 assert.commandWorked(st.s0.adminCommand({enablesharding: 'TestDB'}));

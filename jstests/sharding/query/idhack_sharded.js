@@ -1,4 +1,6 @@
 // Remove operations leave orphaned documents.
+import {ShardingTest} from "jstests/libs/shardingtest.js";
+
 TestData.skipCheckOrphans = true;
 
 // Test that idhack queries with projections obey the sharding filter.  SERVER-14032, SERVER-14034.

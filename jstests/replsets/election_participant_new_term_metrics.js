@@ -4,9 +4,10 @@
  * replica set by successfully stepping up one of the secondaries, then failing to step up the
  * original primary. We check that the metrics are appropriately set or unset after each election.
  */
+import {ReplSetTest} from "jstests/libs/replsettest.js";
 
 const testName = jsTestName();
-const rst = ReplSetTest({name: testName, nodes: [{}, {}, {rsConfig: {priority: 0}}]});
+const rst = new ReplSetTest({name: testName, nodes: [{}, {}, {rsConfig: {priority: 0}}]});
 rst.startSet();
 
 // Make sure there are no election timeouts firing for the duration of the test. This helps

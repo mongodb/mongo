@@ -5,6 +5,7 @@
  * @tags: [requires_persistence]
  */
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";
+import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 // This test intentionally disables the resumable range deleter.
 TestData.skipCheckOrphans = true;

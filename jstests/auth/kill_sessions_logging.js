@@ -2,6 +2,8 @@
 //
 // @tags: [requires_sharding]
 
+import {ShardingTest} from "jstests/libs/shardingtest.js";
+
 function testFixtureSimple(name) {
     this.name = name + " (simple)";
     jsTest.log("Starting test: " + this.name);

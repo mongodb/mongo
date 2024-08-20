@@ -4,6 +4,7 @@
  *
  * TODO SERVER-78399: Remove this test once feature flag is removed.
  */
+import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {
     assertForDbCheckErrorsForAllNodes,
     checkHealthLog,

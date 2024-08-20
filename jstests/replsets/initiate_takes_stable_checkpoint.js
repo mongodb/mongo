@@ -6,10 +6,10 @@
  *  multiversion_incompatible,
  * ]
  */
-
+import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {restartServerReplication, stopServerReplication} from "jstests/libs/write_concern_util.js";
 
-const rst = ReplSetTest({
+const rst = new ReplSetTest({
     name: jsTestName(),
     nodes: [
         {

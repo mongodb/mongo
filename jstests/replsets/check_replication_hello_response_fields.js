@@ -6,6 +6,8 @@
  * ]
  */
 
+import {ReplSetTest} from "jstests/libs/replsettest.js";
+
 // Skip db hash check because node 2 is slave delayed and may time out on awaitReplication.
 TestData.skipCheckDBHashes = true;
 

@@ -1,5 +1,7 @@
 // Tests that dropping and re-adding a shard with the same name to a cluster doesn't mess up
 // migrations
+import {ReplSetTest} from "jstests/libs/replsettest.js";
+import {ShardingTest} from "jstests/libs/shardingtest.js";
 import {removeShard} from "jstests/sharding/libs/remove_shard_util.js";
 
 // TODO SERVER-50144 Remove this and allow orphan checking.

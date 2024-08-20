@@ -3,6 +3,8 @@
  *
  * @tags: [requires_fcv_60]
  */
+import {ShardingTest} from "jstests/libs/shardingtest.js";
+
 // The range deleter is disabled for this test, hence orphans are not cleared up
 TestData.skipCheckOrphans = true;
 

@@ -6,6 +6,8 @@
  * In practice, drivers will send "helloOk: true" in the initial handshake when
  * opening a connection to the database.
  */
+import {ShardingTest} from "jstests/libs/shardingtest.js";
+
 const st = new ShardingTest({shards: 1, mongos: 1});
 const mongos = st.s;
 

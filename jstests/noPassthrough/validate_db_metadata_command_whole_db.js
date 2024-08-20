@@ -5,6 +5,7 @@
  * ]
  */
 import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
+import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 const dbName = jsTestName();
 const collName = "coll1";

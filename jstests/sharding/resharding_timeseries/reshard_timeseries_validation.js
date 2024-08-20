@@ -5,6 +5,8 @@
 // ]
 //
 
+import {ShardingTest} from "jstests/libs/shardingtest.js";
+
 const st = new ShardingTest({mongos: 1, shards: 2});
 const kDbName = 'db';
 const kCollName = 'foo';

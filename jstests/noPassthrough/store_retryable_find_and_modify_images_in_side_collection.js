@@ -4,6 +4,9 @@
  *
  * @tags: [requires_replication]
  */
+import {ReplSetTest} from "jstests/libs/replsettest.js";
+import {ShardingTest} from "jstests/libs/shardingtest.js";
+
 const numNodes = 2;
 
 function checkOplogEntry(entry, lsid, txnNum, stmtId, prevTs, retryImageArgs) {

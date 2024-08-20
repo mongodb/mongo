@@ -5,6 +5,8 @@
  *     embedded_router_incompatible,
  * ]
  */
+import {ShardingTest} from "jstests/libs/shardingtest.js";
+
 const setCommandToFail = (nodeConnection, command, namespace) => {
     return nodeConnection.adminCommand({
         configureFailPoint: 'failCommand',

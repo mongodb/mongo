@@ -8,6 +8,8 @@
 //    database and splitting it across the shards. See SERVER-22588 for details.
 // 4. The previous scenario, but with validation legitimately failing on one of the shards.
 
+import {ShardingTest} from "jstests/libs/shardingtest.js";
+
 const NUM_SHARDS = 3;
 assert(NUM_SHARDS >= 3);
 

@@ -1,6 +1,8 @@
 /**
  * Tests for serverStatus metrics about change streams.
  */
+import {ReplSetTest} from "jstests/libs/replsettest.js";
+
 function getChangeStreamMetrics(db) {
     const metrics = db.serverStatus().metrics;
     return {

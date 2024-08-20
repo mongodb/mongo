@@ -11,6 +11,7 @@
 
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";
 import {Thread} from "jstests/libs/parallelTester.js";
+import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 /*
  * Runs moveChunk on the host to move the chunk to the given shard.

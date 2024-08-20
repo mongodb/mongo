@@ -1,6 +1,8 @@
 /**
  * Sets up a test for WriteConflictException handling in applyOps with an insert workload.
  */
+import {ReplSetTest} from "jstests/libs/replsettest.js";
+
 export var ApplyOpsInsertWriteConflictTest = function(options) {
     // Skip db hash check because this test may throw write conflicts and collmod fails.
     TestData.skipCheckDBHashes = true;

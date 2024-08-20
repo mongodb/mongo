@@ -8,6 +8,8 @@
 // ]
 // The edge case we are testing occurs on an unsharded collection in a sharded cluster. We
 // create a cluster with just one shard to ensure the test never blocks for another shard.
+import {ShardingTest} from "jstests/libs/shardingtest.js";
+
 const st = new ShardingTest(
     {shards: 1, mongos: 1, rs: {nodes: 1, setParameter: {writePeriodicNoops: false}}});
 

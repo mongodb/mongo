@@ -3,6 +3,8 @@
  * holding global lock) when it iterates system.js collection using DBDirectClient.
  */
 
+import {ReplSetTest} from "jstests/libs/replsettest.js";
+
 const rst = new ReplSetTest({name: jsTestName(), nodes: 2});
 rst.startSet();
 rst.initiate();

@@ -7,6 +7,7 @@
  *     requires_replication,
  * ]
  */
+import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {extractUUIDFromObject} from "jstests/libs/uuid_util.js";
 
 function verifyCollectionExists(node, globalIndexUUID, namespace) {

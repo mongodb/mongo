@@ -6,6 +6,8 @@
 // @tags: [config_shard_incompatible]
 //
 
+import {ShardingTest} from "jstests/libs/shardingtest.js";
+
 // Checking UUID and index consistency involves talking to shards, but this test shuts down shards.
 TestData.skipCheckingUUIDsConsistentAcrossCluster = true;
 TestData.skipCheckingIndexesConsistentAcrossCluster = true;

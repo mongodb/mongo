@@ -5,6 +5,8 @@
  * @tags: [requires_sharding, uses_transactions, uses_prepare_transaction]
  */
 
+import {ShardingTest} from "jstests/libs/shardingtest.js";
+
 // This test requires running transactions directly against the shard.
 TestData.replicaSetEndpointIncompatible = true;
 

@@ -17,6 +17,8 @@ TestData.skipCheckOrphans = true;
 TestData.skipCheckShardFilteringMetadata = true;
 
 import {awaitRSClientHosts} from "jstests/replsets/rslib.js";
+import {ReplSetTest} from "jstests/libs/replsettest.js";
+import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 let overrideMaxAwaitTimeMS = {'mode': 'alwaysOn', 'data': {maxAwaitTimeMS: 5 * 60 * 1000}};
 let st = new ShardingTest({

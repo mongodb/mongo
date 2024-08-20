@@ -8,6 +8,8 @@
  * ]
  */
 
+import {ShardingTest} from "jstests/libs/shardingtest.js";
+
 // mongobridge depends on test commands being enabled. Also EVERY repl/sharding
 // test depends on this. Think twice if you're thinking of changing the default.
 assert.eq(jsTest.options().enableTestCommands, true);

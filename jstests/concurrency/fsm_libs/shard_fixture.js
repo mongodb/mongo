@@ -1,4 +1,5 @@
 import {DiscoverTopology, Topology} from "jstests/libs/discover_topology.js";
+import {ReplSetTest} from "jstests/libs/replsettest.js";
 
 export var FSMShardingTest = class {
     constructor(connStr) {

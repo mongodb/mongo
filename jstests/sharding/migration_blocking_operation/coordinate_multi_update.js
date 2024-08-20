@@ -5,6 +5,9 @@
  * ]
  */
 
+import {ReplSetTest} from "jstests/libs/replsettest.js";
+import {ShardingTest} from "jstests/libs/shardingtest.js";
+
 const st = new ShardingTest({shards: {rs0: {nodes: 3}}});
 const replicaSet = new ReplSetTest({nodes: 1});
 replicaSet.startSet();

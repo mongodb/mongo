@@ -18,6 +18,8 @@ import {
     profilerHasSingleMatchingEntryOrThrow,
     profilerHasZeroMatchingEntriesOrThrow,
 } from "jstests/libs/profiler.js";
+import {ReplSetTest} from "jstests/libs/replsettest.js";
+import {ShardingTest} from "jstests/libs/shardingtest.js";
 import {stopServerReplication} from "jstests/libs/write_concern_util.js";
 import {awaitRSClientHosts, reconfig} from "jstests/replsets/rslib.js";
 

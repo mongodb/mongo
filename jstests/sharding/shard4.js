@@ -1,3 +1,5 @@
+import {ShardingTest} from "jstests/libs/shardingtest.js";
+
 let s = new ShardingTest({shards: 2, mongos: 2});
 let s2 = s.s1;
 

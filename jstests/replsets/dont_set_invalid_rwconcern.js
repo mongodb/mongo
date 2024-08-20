@@ -3,6 +3,8 @@
  * with a writeConcern set will succeed and fail on the same values of writeConcern.
  */
 
+import {ReplSetTest} from "jstests/libs/replsettest.js";
+
 // Define repl set with custom write concern multiRegion which assures that writes are propagated to
 // two different regions (specified in node tags).
 const rst = new ReplSetTest({

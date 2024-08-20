@@ -8,6 +8,7 @@
  * ]
  */
 import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
+import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 // Asserts that the expected operation type and documentKey are found on the change stream
 // cursor. Returns the change stream document.

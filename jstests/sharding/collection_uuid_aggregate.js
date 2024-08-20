@@ -6,6 +6,8 @@
  *   requires_fcv_60,
  * ]
  */
+import {ShardingTest} from "jstests/libs/shardingtest.js";
+
 const st = new ShardingTest({shards: 3});
 
 const db = st.s.getDB(jsTestName());

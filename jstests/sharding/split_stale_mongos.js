@@ -2,6 +2,8 @@
 // Tests that stale mongoses can properly split chunks.
 //
 
+import {ShardingTest} from "jstests/libs/shardingtest.js";
+
 var st = new ShardingTest({shards: 2, mongos: 2});
 var admin = st.s0.getDB('admin');
 var testDb = 'test';

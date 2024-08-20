@@ -6,6 +6,8 @@
  * ]
  */
 
+import {ShardingTest} from "jstests/libs/shardingtest.js";
+
 // Default value of the featureFlagGlobalIndexes is false
 const st = new ShardingTest({
     mongos: 1,

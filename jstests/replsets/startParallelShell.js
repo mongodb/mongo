@@ -1,6 +1,6 @@
 // Test startParallelShell() in a replica set.
 
-var db;
+import {ReplSetTest} from "jstests/libs/replsettest.js";
 
 const setName = 'rs0';
 const replSet = new ReplSetTest({name: setName, nodes: 3});
@@ -11,7 +11,7 @@ replSet.initiate();
 const url = replSet.getURL();
 print("* Connecting to " + url);
 const mongo = new Mongo(url);
-db = mongo.getDB('admin');
+globalThis.db = mongo.getDB('admin');  // `startParallelShell` has custom logic for `globalThis.db`
 assert.eq(url, mongo.host, "replSet.getURL() should match active connection string");
 
 print("* Starting parallel shell on --host " + db.getMongo().host);

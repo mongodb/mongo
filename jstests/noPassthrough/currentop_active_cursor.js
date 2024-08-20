@@ -4,6 +4,7 @@
 //   requires_sharding,
 // ]
 import {withPinnedCursor} from "jstests/libs/pin_getmore_cursor.js";
+import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 function runTest(cursorId, coll) {
     const db = coll.getDB();

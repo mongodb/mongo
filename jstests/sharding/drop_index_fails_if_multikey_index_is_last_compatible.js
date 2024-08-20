@@ -3,6 +3,8 @@
  * compatible index is multikey
  */
 
+import {ShardingTest} from "jstests/libs/shardingtest.js";
+
 const st = new ShardingTest({mongos: 1, config: 1, shards: 1, rs: {nodes: 1}});
 
 assert.commandWorked(st.s.adminCommand({enableSharding: "test"}));

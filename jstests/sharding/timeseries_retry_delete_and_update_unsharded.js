@@ -11,6 +11,7 @@
  * ]
  */
 
+import {ShardingTest} from "jstests/libs/shardingtest.js";
 import {
     runTimeseriesRetryDeleteAndUpdateTest
 } from "jstests/libs/timeseries_retry_delete_and_update.js";

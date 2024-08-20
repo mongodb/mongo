@@ -5,6 +5,8 @@
  *   requires_fcv_73,
  * ]
  */
+import {ShardingTest} from "jstests/libs/shardingtest.js";
+
 const dbName = 'testDB';
 const collName = 'testColl';
 const bucketsCollName = 'system.buckets.' + collName;

@@ -7,6 +7,7 @@
  * collection the "aggregate" command was performed on.
  */
 import {arrayEq} from "jstests/aggregation/extras/utils.js";
+import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 function runTests(withDefaultCollationColl, withoutDefaultCollationColl, collation) {
     // Test that the $lookup stage respects the inherited collation.

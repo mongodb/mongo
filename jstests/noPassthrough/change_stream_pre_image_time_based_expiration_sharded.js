@@ -2,6 +2,7 @@
 // @tags: [
 //  requires_sharding,
 // ]
+import {ShardingTest} from "jstests/libs/shardingtest.js";
 import {
     testTimeBasedPreImageRetentionPolicy
 } from "jstests/noPassthrough/libs/change_stream_pre_image_time_based_expiration_utils.js";

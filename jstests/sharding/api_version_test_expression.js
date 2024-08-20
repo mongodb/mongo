@@ -5,6 +5,8 @@
  *   uses_api_parameters,
  * ]
  */
+import {ShardingTest} from "jstests/libs/shardingtest.js";
+
 const dbName = jsTestName();
 const collName = "test";
 const collForeignName = collName + "_foreign";

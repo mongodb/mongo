@@ -5,6 +5,8 @@
 //
 import "jstests/multiVersion/libs/verify_versions.js";
 
+import {ShardingTest} from "jstests/libs/shardingtest.js";
+
 // Checking UUID consistency involves talking to a shard node, which in this test is shutdown
 TestData.skipCheckingUUIDsConsistentAcrossCluster = true;
 

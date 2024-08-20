@@ -3,6 +3,7 @@
  * source if it isn't already syncing from the primary.
  */
 
+import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {isConfigCommitted, reconfig, syncFrom} from "jstests/replsets/rslib.js";
 
 const replSet = new ReplSetTest({

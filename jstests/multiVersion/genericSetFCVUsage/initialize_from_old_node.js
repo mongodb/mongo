@@ -3,6 +3,8 @@
  * prior version nodes can be initialized from the prior version node.
  */
 
+import {ReplSetTest} from "jstests/libs/replsettest.js";
+
 var name = "initialize_from_old";
 // Test old version with both "last-lts" and "last-continuous".
 for (let oldVersion of ["last-lts", "last-continuous"]) {

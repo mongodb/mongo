@@ -3,7 +3,9 @@
  */
 
 import "jstests/multiVersion/libs/multi_rs.js";
+
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
+import {ReplSetTest} from "jstests/libs/replsettest.js";
 
 // Start up a replica set with the last-lts binary version.
 const nodeOption = {

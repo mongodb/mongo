@@ -4,6 +4,8 @@
  *
  * @tags: [requires_persistence]
  */
+import {ReplSetTest} from "jstests/libs/replsettest.js";
+
 const testName = "buildindexes_false_with_system_indexes";
 
 let rst = new ReplSetTest({

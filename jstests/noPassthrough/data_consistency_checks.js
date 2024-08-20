@@ -8,6 +8,9 @@
  * ]
  */
 
+import {ReplSetTest} from "jstests/libs/replsettest.js";
+import {ShardingTest} from "jstests/libs/shardingtest.js";
+
 // We skip doing the data consistency checks while terminating the cluster because they conflict
 // with the counts of the number of times the "dbhash" and "validate" commands are run.
 TestData.skipCollectionAndIndexValidation = true;

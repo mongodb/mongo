@@ -4,6 +4,8 @@
  *   requires_sharding,
  * ]
  */
+import {ReplSetTest} from "jstests/libs/replsettest.js";
+import {ShardingTest} from "jstests/libs/shardingtest.js";
 import {
     checkServerStatusNumCollsWithInconsistentIndexes
 } from "jstests/noPassthrough/libs/sharded_index_consistency_metrics_helpers.js";
@@ -170,7 +172,7 @@ const standaloneMongod = MongoRunner.runMongod();
 assertServerStatusNotContainIndexMetrics(standaloneMongod);
 MongoRunner.stopMongod(standaloneMongod);
 
-const rst = ReplSetTest({nodes: 1});
+const rst = new ReplSetTest({nodes: 1});
 rst.startSet();
 rst.initiate();
 assertServerStatusNotContainIndexMetrics(rst.getPrimary());

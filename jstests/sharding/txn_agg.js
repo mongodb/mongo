@@ -6,6 +6,8 @@
  *   requires_fcv_80,
  * ]
  */
+import {ShardingTest} from "jstests/libs/shardingtest.js";
+
 const st = new ShardingTest({shards: 2});
 
 assert.commandWorked(

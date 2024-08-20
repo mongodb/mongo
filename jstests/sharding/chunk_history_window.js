@@ -15,6 +15,7 @@
  * - Read at insertTS and assert failure with StaleChunkHistory.
  * - Read at T2 - 1 sec, assert success.
  */
+import {ShardingTest} from "jstests/libs/shardingtest.js";
 import {
     flushRoutersAndRefreshShardMetadata
 } from "jstests/sharding/libs/sharded_transactions_helpers.js";

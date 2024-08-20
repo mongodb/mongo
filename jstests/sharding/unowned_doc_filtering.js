@@ -15,6 +15,7 @@ TestData.skipCheckOrphans = true;
 
 import {chunkBoundsUtil} from "jstests/sharding/libs/chunk_bounds_util.js";
 import {findChunksUtil} from "jstests/sharding/libs/find_chunks_util.js";
+import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 /*
  * Asserts that find and count command filter out unowned documents.

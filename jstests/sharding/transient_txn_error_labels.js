@@ -6,6 +6,7 @@
  */
 
 import {Thread} from "jstests/libs/parallelTester.js";
+import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 const dbName = "test";
 const collName = "no_error_labels_outside_txn";

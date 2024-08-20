@@ -8,6 +8,8 @@
 //   embedded_router_incompatible,
 // ]
 
+import {ShardingTest} from "jstests/libs/shardingtest.js";
+
 // Helper function to check the matching policy of a node, given the output of the connPoolStats
 // command run against the node and the expected policy.
 function checkSTEPReplicaSetMatchingPolicy(connPoolStats, expectedPolicy) {

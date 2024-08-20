@@ -3,6 +3,7 @@
  */
 
 import {GeoNearRandomTest} from "jstests/libs/geo_near_random.js";
+import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 var testName = "geo_near_random2";
 var s = new ShardingTest({shards: 3});

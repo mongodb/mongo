@@ -4,6 +4,8 @@
  *
  * @tags: [requires_fcv_60, uses_transactions]
  */
+import {ReplSetTest} from "jstests/libs/replsettest.js";
+
 const logicalSessionRefreshMillis = 1000;
 const rst = new ReplSetTest({
     nodes: 2,

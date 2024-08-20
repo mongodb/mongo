@@ -11,6 +11,8 @@
  *   embedded_router_incompatible,
  * ]
  */
+import {ReplSetTest} from "jstests/libs/replsettest.js";
+import {ShardingTest} from "jstests/libs/shardingtest.js";
 import {traceMissingDoc} from "jstests/libs/trace_missing_docs.js";
 import {awaitRSClientHosts} from "jstests/replsets/rslib.js";
 

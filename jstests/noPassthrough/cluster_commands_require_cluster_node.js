@@ -7,6 +7,9 @@
  * ]
  */
 
+import {ReplSetTest} from "jstests/libs/replsettest.js";
+import {ShardingTest} from "jstests/libs/shardingtest.js";
+
 const kDBName = "foo";
 const kCollName = "bar";
 

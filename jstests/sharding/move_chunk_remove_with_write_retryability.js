@@ -1,3 +1,4 @@
+import {ShardingTest} from "jstests/libs/shardingtest.js";
 import {testMoveChunkWithSession} from "jstests/sharding/move_chunk_with_session_helper.js";
 
 // Prevent unnecessary elections in the first shard replica set. Shard 'rs1' shard will need its

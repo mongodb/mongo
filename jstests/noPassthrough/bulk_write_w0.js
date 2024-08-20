@@ -7,6 +7,8 @@
  *   requires_fcv_80,
  * ]
  */
+import {ReplSetTest} from "jstests/libs/replsettest.js";
+import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 function runTest(conn) {
     const db = conn.getDB("admin");
@@ -36,7 +38,7 @@ function runTest(conn) {
 
 (function testReplSet() {
     jsTestLog("Running test against a replica set");
-    const rst = ReplSetTest({nodes: 1});
+    const rst = new ReplSetTest({nodes: 1});
     rst.startSet();
     rst.initiate();
     const primary = rst.getPrimary();

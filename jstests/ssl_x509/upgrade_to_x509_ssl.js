@@ -9,6 +9,7 @@
  * This test requires users to persist across a restart.
  * @tags: [requires_persistence]
  */
+import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {CA_CERT, KEYFILE, SERVER_CERT} from "jstests/ssl/libs/ssl_helpers.js";
 
 function authAllNodes() {

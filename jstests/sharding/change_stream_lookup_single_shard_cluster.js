@@ -8,6 +8,8 @@
 //   uses_change_streams,
 // ]
 // Create a cluster with only 1 shard.
+import {ShardingTest} from "jstests/libs/shardingtest.js";
+
 const st = new ShardingTest({
     shards: 1,
     rs: {nodes: 1, setParameter: {periodicNoopIntervalSecs: 1, writePeriodicNoops: true}}

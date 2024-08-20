@@ -1,6 +1,8 @@
 // Change a write concern mode from 2 to 3 servers
 // @tags: [multiversion_incompatible]
 
+import {ReplSetTest} from "jstests/libs/replsettest.js";
+
 var host = getHostName();
 var replTest = new ReplSetTest({nodes: 4});
 var nodes = replTest.startSet();

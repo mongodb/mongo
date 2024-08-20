@@ -4,6 +4,8 @@
 //
 // @tags: [uses_transactions, uses_multi_shard_transaction]
 
+import {ShardingTest} from "jstests/libs/shardingtest.js";
+
 let st = new ShardingTest({shards: 2});
 
 assert.commandWorked(st.s.adminCommand({enableSharding: 'test', primaryShard: st.shard0.name}));

@@ -6,8 +6,10 @@
  *  requires_fcv_70,
  * ]
  */
+import {ReplSetTest} from "jstests/libs/replsettest.js";
+
 const name = jsTestName();
-const rst = ReplSetTest({name: name, nodes: 2});
+const rst = new ReplSetTest({name: name, nodes: 2});
 rst.startSet();
 
 const nodes = rst.nodeList();

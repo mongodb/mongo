@@ -10,6 +10,7 @@ TestData.skipCheckOrphans = true;
 TestData.skipCheckShardFilteringMetadata = true;
 
 import {awaitRSClientHosts} from "jstests/replsets/rslib.js";
+import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 var PRI_TAG = {dc: 'ny'};
 var SEC_TAGS = [{dc: 'sf', s: "1"}, {dc: 'ma', s: "2"}, {dc: 'eu', s: "3"}, {dc: 'jp', s: "4"}];

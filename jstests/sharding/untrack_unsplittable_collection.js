@@ -5,6 +5,8 @@
  * ]
  */
 
+import {ShardingTest} from "jstests/libs/shardingtest.js";
+
 const kDbName = 'db';
 const kCollName = 'coll';
 const kNss = kDbName + '.' + kCollName;

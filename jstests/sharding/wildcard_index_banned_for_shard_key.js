@@ -2,6 +2,8 @@
 // Confirms that a wildcard index cannot be used to support a shard key.
 //
 
+import {ShardingTest} from "jstests/libs/shardingtest.js";
+
 const st = new ShardingTest({mongos: 1, shards: 2});
 const kDbName = 'wildcard_index_banned_for_shard_key';
 const mongos = st.s0;

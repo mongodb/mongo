@@ -1,6 +1,8 @@
 // Performs an aggregation that will execute JavaScript on mongos. This is a sanity check to confirm
 // that JavaScript is available on mongos.
 
+import {ShardingTest} from "jstests/libs/shardingtest.js";
+
 const st = new ShardingTest({shards: 2});
 const mongos = st.s;
 

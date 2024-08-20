@@ -6,6 +6,8 @@
  * monotonically increasing.
  */
 
+import {ShardingTest} from "jstests/libs/shardingtest.js";
+
 const numConnections = 10;
 const st = new ShardingTest({shards: 1, mongos: 1});
 const admin = st.s.getDB("admin");

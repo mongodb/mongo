@@ -2,6 +2,8 @@
  * Test shard targeting for queries on a collection with a non-simple collation and a hashed shard
  * key.
  */
+import {ShardingTest} from "jstests/libs/shardingtest.js";
+
 const st = new ShardingTest({mongos: 1, config: 1, shards: 2, rs: {nodes: 1}});
 
 function shardCollectionWithSplitsAndMoves(

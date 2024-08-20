@@ -11,6 +11,7 @@
  *   requires_persistence,
  * ]
  */
+import {ShardingTest} from "jstests/libs/shardingtest.js";
 import {awaitRSClientHosts} from "jstests/replsets/rslib.js";
 
 // Replica set nodes started with --shardsvr do not enable key generation until they are added

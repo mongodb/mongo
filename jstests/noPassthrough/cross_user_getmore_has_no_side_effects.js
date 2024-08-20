@@ -3,6 +3,8 @@
 // will work.
 // @tags: [requires_sharding]
 
+import {ShardingTest} from "jstests/libs/shardingtest.js";
+
 const st = new ShardingTest({shards: 2, config: 1, other: {keyFile: "jstests/libs/key1"}});
 const kDBName = "test";
 const adminDB = st.s.getDB('admin');

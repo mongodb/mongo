@@ -6,6 +6,8 @@
  * ]
  */
 
+import {ShardingTest} from "jstests/libs/shardingtest.js";
+
 const dbName = jsTest.name() + "_db";
 const normalCollName = "normalColl";
 const timeseriesCollName = "timeseriesColl";

@@ -4,6 +4,7 @@
  */
 
 import {getPreImagesCollection} from "jstests/libs/change_stream_util.js";
+import {ShardingTest} from "jstests/libs/shardingtest.js";
 import {
     ChangeStreamMultitenantReplicaSetTest
 } from "jstests/serverless/libs/change_collection_util.js";

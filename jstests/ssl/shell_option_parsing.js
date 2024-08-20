@@ -1,4 +1,6 @@
 // Test mongo shell connect strings.
+import {ReplSetTest} from "jstests/libs/replsettest.js";
+
 const SERVER_CERT = "jstests/libs/server.pem";
 const CAFILE = "jstests/libs/ca.pem";
 

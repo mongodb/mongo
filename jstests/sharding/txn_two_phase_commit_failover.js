@@ -16,6 +16,8 @@ import {
     flushRoutersAndRefreshShardMetadata,
 } from "jstests/sharding/libs/sharded_transactions_helpers.js";
 import {funWithArgs} from "jstests/libs/parallel_shell_helpers.js";
+import {ReplSetTest} from "jstests/libs/replsettest.js";
+import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 const dbName = "test";
 const collName = "foo";

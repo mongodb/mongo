@@ -4,6 +4,8 @@
  * @tags: [multiversion_incompatible]
  */
 
+import {ReplSetTest} from "jstests/libs/replsettest.js";
+
 var InvalidReplicaSetConfig = 93;
 
 var replTest = new ReplSetTest({name: 'prohibit_w0', nodes: 1});

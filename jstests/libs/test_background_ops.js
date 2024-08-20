@@ -2,6 +2,8 @@
 // Utilities related to background operations while other operations are working
 //
 
+import {ShardingTest} from "jstests/libs/shardingtest.js";
+
 /**
  * Allows synchronization between background ops and the test operations
  */

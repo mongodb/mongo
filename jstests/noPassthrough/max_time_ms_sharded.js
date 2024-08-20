@@ -4,6 +4,8 @@
 // @tags: [
 //   requires_replication,
 // ]
+import {ShardingTest} from "jstests/libs/shardingtest.js";
+
 var st = new ShardingTest({
     mongos: 1,
     config: 1,

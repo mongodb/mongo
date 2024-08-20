@@ -3,6 +3,9 @@
  * commands since a timeseries collection is a view (of a bucket collection) and the analyzeShardKey
  * and configureQueryAnalyzer commands cannot be run against a view.
  */
+import {ReplSetTest} from "jstests/libs/replsettest.js";
+import {ShardingTest} from "jstests/libs/shardingtest.js";
+
 const numNodesPerRS = 2;
 
 function runTest(conn, {isShardedColl, st}) {

@@ -8,6 +8,8 @@
  * ]
  */
 
+import {ShardingTest} from "jstests/libs/shardingtest.js";
+
 function registerIndex(rs, nss, pattern, name, uuid) {
     rs.getPrimary().adminCommand({
         _shardsvrRegisterIndex: nss,

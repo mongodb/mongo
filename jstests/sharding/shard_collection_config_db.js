@@ -1,5 +1,7 @@
 // Requires no shards.
 // @tags: [config_shard_incompatible]
+import {ShardingTest} from "jstests/libs/shardingtest.js";
+
 var st = new ShardingTest({shards: 2});
 var config = st.s.getDB('config');
 var admin = st.s.getDB('admin');

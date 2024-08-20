@@ -9,9 +9,9 @@
  *   featureFlagRouterPort,
  * ]
  */
-
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";
 import {Thread} from "jstests/libs/parallelTester.js";
+import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 /*
  * Returns the string representation of the given opId. Removes the 'config:' prefix if exists.
@@ -40,7 +40,7 @@ function dropCollection(host, dbName, collName) {
     return conn.getDB(dbName).runCommand({drop: collName});
 }
 
-const st = ShardingTest({
+const st = new ShardingTest({
     shards: 1,
     rs: {nodes: 1},
     configShard: true,

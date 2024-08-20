@@ -10,6 +10,8 @@
  *    embedded_router_incompatible,
  * ]
  */
+import {ShardingTest} from "jstests/libs/shardingtest.js";
+
 // This test uses authentication and runs commands without authenticating, which is not
 // compatible with implicit sessions.
 TestData.disableImplicitSessions = true;

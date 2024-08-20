@@ -7,6 +7,7 @@
 //   requires_persistence,
 //   requires_majority_read_concern,
 // ]
+import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {restartServerReplication, stopServerReplication} from "jstests/libs/write_concern_util.js";
 
 // Skip db hash check because secondary restarted as standalone.

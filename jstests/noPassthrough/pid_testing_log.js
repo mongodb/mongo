@@ -6,6 +6,8 @@
  *
  */
 
+import {ShardingTest} from "jstests/libs/shardingtest.js";
+
 const rsMin = 10;
 const rsMax = 20;
 

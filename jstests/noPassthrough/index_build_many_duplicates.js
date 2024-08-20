@@ -8,6 +8,8 @@
  *   requires_replication,
  * ]
  */
+import {ReplSetTest} from "jstests/libs/replsettest.js";
+
 const maxMemUsageMB = 50;
 const replSet = new ReplSetTest({
     nodes: 1,

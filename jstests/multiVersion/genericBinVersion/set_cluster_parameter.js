@@ -3,6 +3,8 @@
  * meet the minimum FCV needed on a cluster parameter.
  */
 
+import {ShardingTest} from "jstests/libs/shardingtest.js";
+
 // Test sharding cluster with multiple versions should fail since the FCV will be last-lts and the
 // command needs the latest.
 {

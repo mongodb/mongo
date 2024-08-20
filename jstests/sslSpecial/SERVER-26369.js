@@ -7,6 +7,7 @@
 TestData.skipCheckingUUIDsConsistentAcrossCluster = true;
 
 import {requireSSLProvider} from "jstests/ssl/libs/ssl_helpers.js";
+import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 const st = new ShardingTest({shards: {rs0: {nodes: 1}}});
 let opts = {

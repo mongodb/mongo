@@ -10,6 +10,7 @@
  */
 
 import {runAllCommandsBuiltinRoles} from "jstests/auth/lib/commands_builtin_roles.js";
+import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 const dbPath = MongoRunner.toRealDir("$dataDir/commands_built_in_roles_sharded/");
 mkdir(dbPath);

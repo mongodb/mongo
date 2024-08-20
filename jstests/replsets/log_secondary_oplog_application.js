@@ -4,12 +4,12 @@
  * We intentionally target CRUD ops in this test, since we know we should be the only ones
  * issuing them. See below for details on how we simulate quickness and slowness.
  */
-
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";
+import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {setLogVerbosity} from "jstests/replsets/rslib.js";
 
 let name = "log_secondary_oplog_application";
-let rst = ReplSetTest({name: name, nodes: 2});
+let rst = new ReplSetTest({name: name, nodes: 2});
 rst.startSet();
 
 let nodes = rst.nodeList();

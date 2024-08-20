@@ -1,3 +1,5 @@
+import {ShardingTest} from "jstests/libs/shardingtest.js";
+
 var s = new ShardingTest({shards: 2});
 
 assert.eq(2, s.config.shards.count(), "server count wrong");

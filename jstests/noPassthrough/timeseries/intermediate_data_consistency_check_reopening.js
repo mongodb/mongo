@@ -10,6 +10,8 @@
  * ]
  */
 
+import {ReplSetTest} from "jstests/libs/replsettest.js";
+
 // Turn off the TestingProctor, since the data integrity check will invariant in testing
 // but not in production.
 TestData.testingDiagnosticsEnabled = false;

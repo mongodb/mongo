@@ -1,5 +1,6 @@
 // Test that getMore for a majority read on a secondary only reads committed data.
 // @tags: [requires_majority_read_concern]
+import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {restartReplSetReplication, stopServerReplication} from "jstests/libs/write_concern_util.js";
 
 const name = "read_concern_majority_getmore_secondaries";

@@ -2,6 +2,8 @@
  * Test that the server rejects extremely large values for write concern wtimeout.
  */
 
+import {ReplSetTest} from "jstests/libs/replsettest.js";
+
 const rst = new ReplSetTest({name: jsTestName(), nodes: 2});
 rst.startSet();
 rst.initiateWithHighElectionTimeout();

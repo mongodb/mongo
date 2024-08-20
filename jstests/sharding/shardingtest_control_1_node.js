@@ -5,5 +5,7 @@
  * a single node against the performance with many nodes, to see how the fixture scales. See the
  * 'shardingtest_control_12_nodes.js' test.
  */
+import {ShardingTest} from "jstests/libs/shardingtest.js";
+
 const st = new ShardingTest({shards: 1, rs: {nodes: 1}, mongos: 1});
 st.stop();

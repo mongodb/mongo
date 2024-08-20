@@ -26,6 +26,8 @@ import {
     makeUnsignedSecurityToken,
     runCommandWithSecurityToken
 } from "jstests/libs/multitenancy_utils.js";
+import {ReplSetTest} from "jstests/libs/replsettest.js";
+import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 export const kNonTestOnlyClusterParameters = {
     changeStreamOptions: {

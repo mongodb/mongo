@@ -8,6 +8,7 @@
  * Make sure both nodes are either primary or secondary
  */
 
+import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {reconnect} from "jstests/replsets/rslib.js";
 
 var name = "removeNodes";

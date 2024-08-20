@@ -12,6 +12,7 @@ import {
     runGetClusterParameterReplicaSet,
     runSetClusterParameter,
 } from "jstests/libs/cluster_server_parameter_utils.js";
+import {ReplSetTest} from "jstests/libs/replsettest.js";
 
 // Checks that up-to-date cluster parameters are transferred over to newly-added replica set nodes
 // as part of initial sync.

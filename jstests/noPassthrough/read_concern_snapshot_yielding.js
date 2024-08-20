@@ -5,6 +5,7 @@
 //   uses_transactions,
 // ]
 import {waitForCurOpByFailPoint} from "jstests/libs/curop_helpers.js";
+import {ReplSetTest} from "jstests/libs/replsettest.js";
 
 const dbName = "test";
 const collName = "coll";

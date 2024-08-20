@@ -4,6 +4,7 @@
  * @tags: [requires_fcv_70]
  */
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";
+import {ShardingTest} from "jstests/libs/shardingtest.js";
 import {extractUUIDFromObject} from "jstests/libs/uuid_util.js";
 import {
     AnalyzeShardKeyUtil

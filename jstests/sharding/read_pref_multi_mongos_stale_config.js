@@ -1,4 +1,6 @@
 // Tests that a mongos will correctly retry a stale shard version when read preference is used
+import {ShardingTest} from "jstests/libs/shardingtest.js";
+
 var st = new ShardingTest({
     shards: {rs0: {quiet: ''}, rs1: {quiet: ''}},
     mongos: 2,

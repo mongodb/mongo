@@ -1,6 +1,8 @@
 /**
  * Test that verifies durationMillis and workingMillis are accepted profile filter fields.
  */
+import {ReplSetTest} from "jstests/libs/replsettest.js";
+
 const rst = new ReplSetTest({
     nodes: 1,
     nodeOptions: {

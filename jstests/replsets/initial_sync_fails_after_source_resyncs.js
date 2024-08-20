@@ -3,6 +3,7 @@
  * sync during cloning (i.e. the source is resynced during an outage).
  */
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";
+import {ReplSetTest} from "jstests/libs/replsettest.js";
 
 const testName = "initial_sync_fails_after_source_resyncs";
 const rst = new ReplSetTest(

@@ -4,6 +4,7 @@
  *
  * @tags: [requires_fcv_60, uses_transactions]
  */
+import {ShardingTest} from "jstests/libs/shardingtest.js";
 import {
     makeCommitTransactionCmdObj,
     makePrepareTransactionCmdObj

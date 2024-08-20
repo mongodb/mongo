@@ -1,6 +1,8 @@
 //
 // Tests splitVector locations with force : true, for small collections
 //
+import {ShardingTest} from "jstests/libs/shardingtest.js";
+
 var st = new ShardingTest({shards: 1, mongos: 1, other: {chunkSize: 1}});
 
 var mongos = st.s0;

@@ -2,6 +2,9 @@
  * This test stresses sharded $lookup using two threads. One moves chunks on a sharded collection,
  * the other issues $lookups from a local unsharded collection to the foreign sharded collection.
  */
+import {Thread} from "jstests/libs/parallelTester.js";
+import {ShardingTest} from "jstests/libs/shardingtest.js";
+
 (function() {
 "use strict";
 const dbName = "testDb";

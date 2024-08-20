@@ -7,6 +7,9 @@
  *
  * Expects logicalTime to come in the command body from both a mongos and a mongod.
  */
+import {ReplSetTest} from "jstests/libs/replsettest.js";
+import {ShardingTest} from "jstests/libs/shardingtest.js";
+
 // Returns true if the given object contains a logicalTime BSON object in the following format:
 // $clusterTime: {
 //     clusterTime: <Timestamp>

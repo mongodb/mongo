@@ -15,6 +15,7 @@ import {
     runGetClusterParameterReplicaSet,
     runSetClusterParameter,
 } from "jstests/libs/cluster_server_parameter_utils.js";
+import {ReplSetTest} from "jstests/libs/replsettest.js";
 
 const tenantId = ObjectId();
 

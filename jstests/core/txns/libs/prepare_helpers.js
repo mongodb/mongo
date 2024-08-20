@@ -2,6 +2,8 @@
  * Helper functions for testing prepared transactions.
  */
 
+import {ReplSetTest} from "jstests/libs/replsettest.js";
+
 export const PrepareHelpers = (function() {
     /**
      * Prepares the active transaction on the session. This expects the 'prepareTransaction' command

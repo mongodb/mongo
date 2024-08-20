@@ -5,6 +5,8 @@
  * ]
  */
 
+import {ShardingTest} from "jstests/libs/shardingtest.js";
+
 const dbName = jsTestName();
 const setupShardedCluster = (shards = 1) => {
     const st = new ShardingTest(

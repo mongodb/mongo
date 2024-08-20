@@ -1,3 +1,4 @@
+import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {validateSessionsCollection} from "jstests/libs/sessions_collection.js";
 
 // This test makes assertions about the number of sessions, which are not compatible with

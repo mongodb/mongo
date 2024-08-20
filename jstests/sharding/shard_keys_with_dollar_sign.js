@@ -3,6 +3,8 @@
  * that has a field name that starts with '$' or contains parts that start with '$' unless the part
  * is a DBRef (i.e. is equal to '$id', '$db' or '$ref').
  */
+import {ShardingTest} from "jstests/libs/shardingtest.js";
+
 const criticalSectionTimeoutMS = 24 * 60 * 60 * 1000;  // 1 day
 const st = new ShardingTest({
     shards: 1,

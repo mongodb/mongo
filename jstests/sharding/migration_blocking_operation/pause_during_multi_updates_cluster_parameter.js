@@ -5,6 +5,8 @@
  * ]
  */
 
+import {ShardingTest} from "jstests/libs/shardingtest.js";
+
 const numShards = 1;
 const st = new ShardingTest({shards: numShards});
 const allRs = [st.configRS];

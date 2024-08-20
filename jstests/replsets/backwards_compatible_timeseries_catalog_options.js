@@ -4,6 +4,7 @@
  * the format introduced under SERVER-91195 (relying on storageEngine.wiredTiger.configString).
  */
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
+import {ReplSetTest} from "jstests/libs/replsettest.js";
 
 const dbName = "testdb";
 const collName = "testcoll";

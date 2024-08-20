@@ -7,6 +7,7 @@
  * ]
  */
 import {SnapshotReadsTest} from "jstests/libs/global_snapshot_reads_util.js";
+import {ReplSetTest} from "jstests/libs/replsettest.js";
 
 const options = {
     // Set a large snapshot window of 10 minutes for the test.

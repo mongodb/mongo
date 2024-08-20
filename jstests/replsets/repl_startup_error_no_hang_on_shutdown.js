@@ -5,6 +5,8 @@
  * @tags: [requires_persistence, requires_fcv_60]
  */
 
+import {ReplSetTest} from "jstests/libs/replsettest.js";
+
 const rst = new ReplSetTest({
     name: jsTestName(),
     nodes: [{

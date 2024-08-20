@@ -2,6 +2,9 @@
  * Test basic retryable write without errors by checking that the resulting collection after the
  * retry is as expected and it does not create additional oplog entries.
  */
+import {ReplSetTest} from "jstests/libs/replsettest.js";
+import {ShardingTest} from "jstests/libs/shardingtest.js";
+
 function checkFindAndModifyResult(expected, toCheck) {
     assert.eq(expected.ok, toCheck.ok);
     assert.eq(expected.value, toCheck.value);

@@ -2,6 +2,8 @@
 // each role is a member of the next, creating a large chain.
 // @tags: [requires_sharding]
 
+import {ShardingTest} from "jstests/libs/shardingtest.js";
+
 function runTest(conn) {
     var testdb = conn.getDB("rolechain");
     testdb.runCommand({dropAllRolesFromDatabase: 1});

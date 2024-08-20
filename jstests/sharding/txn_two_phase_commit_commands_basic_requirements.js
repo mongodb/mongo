@@ -4,6 +4,9 @@
  * @tags: [uses_transactions]
  */
 
+import {ReplSetTest} from "jstests/libs/replsettest.js";
+import {ShardingTest} from "jstests/libs/shardingtest.js";
+
 // This test requires running transactions directly against the shard.
 TestData.replicaSetEndpointIncompatible = true;
 

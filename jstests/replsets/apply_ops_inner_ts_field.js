@@ -6,6 +6,8 @@
  * This is a regression test for SERVER-44938.
  */
 
+import {ReplSetTest} from "jstests/libs/replsettest.js";
+
 const dbName = "test";
 const collName = "coll";
 

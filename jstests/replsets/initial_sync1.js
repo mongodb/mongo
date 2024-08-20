@@ -15,6 +15,7 @@
  * This test assumes a 'newlyAdded' removal.
  */
 
+import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {reconnect} from "jstests/replsets/rslib.js";
 
 var basename = "jstests_initsync1";

@@ -1,6 +1,8 @@
 /**
  * Verifies cluster time metadata is not gossiped or processed by nodes in an unreadable state.
  */
+import {ReplSetTest} from "jstests/libs/replsettest.js";
+
 function setUpUsers(rst) {
     const primaryAdminDB = rst.getPrimary().getDB("admin");
     assert.commandWorked(

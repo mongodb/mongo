@@ -3,6 +3,7 @@
  */
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";
 import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
+import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 // TODO SERVER-87501 Review all usages of ErrorCodes.MovePrimaryInProgress in this file once v8.0
 // branches out

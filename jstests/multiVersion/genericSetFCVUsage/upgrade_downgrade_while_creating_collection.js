@@ -2,6 +2,7 @@
  * Tests that upgrade/downgrade works correctly even while creating a new collection.
  */
 import {funWithArgs} from "jstests/libs/parallel_shell_helpers.js";
+import {ReplSetTest} from "jstests/libs/replsettest.js";
 
 function runTest(downgradeFCV) {
     jsTestLog("Running test with downgradeFCV: " + downgradeFCV);

@@ -1,4 +1,6 @@
 // Test aggregating a sharded collection while using $graphLookup on an unsharded collection.
+import {ShardingTest} from "jstests/libs/shardingtest.js";
+
 const st = new ShardingTest({shards: 2, rs: {nodes: 1}});
 
 assert.commandWorked(st.s0.adminCommand({enablesharding: "test"}));

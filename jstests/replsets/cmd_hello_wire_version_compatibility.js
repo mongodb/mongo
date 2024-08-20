@@ -3,6 +3,8 @@
 // @tags: [
 // ]
 
+import {ReplSetTest} from "jstests/libs/replsettest.js";
+
 // See wire_version.h
 const RELEASE_2_4_AND_BEFORE = NumberLong(0);
 const WIRE_VERSION_49 = NumberLong(12);

@@ -7,6 +7,7 @@
  */
 
 import {documentEq} from "jstests/aggregation/extras/utils.js";
+import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 // This test deliberately creates indexes in an inconsistent state.
 TestData.skipCheckingIndexesConsistentAcrossCluster = true;

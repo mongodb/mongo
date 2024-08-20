@@ -4,9 +4,10 @@
  */
 
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";
+import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {ElectionHandoffTest} from "jstests/replsets/libs/election_handoff.js";
 
-const rst = ReplSetTest({nodes: 2});
+const rst = new ReplSetTest({nodes: 2});
 const nodes = rst.startSet();
 const config = rst.getReplSetConfig();
 // Prevent elections and set heartbeat timeout >> electionHangsBeforeUpdateMemberState.

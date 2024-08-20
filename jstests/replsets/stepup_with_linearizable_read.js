@@ -5,6 +5,8 @@
  * write -- linearizable does a read then no-op write
  */
 
+import {ReplSetTest} from "jstests/libs/replsettest.js";
+
 var sendLinearizableReadOnFailpoint = function() {
     // Linearizable read concern is not allowed on secondaries. But set this flag so we can start
     // the operation during the transition from secondary to primary. The read sent at this state

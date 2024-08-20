@@ -22,6 +22,7 @@
  *    witness as an increase in the count of documents stored on the secondary.
  */
 // Load utility methods for replica set tests
+import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {waitForAllMembers} from "jstests/replsets/rslib.js";
 
 var replTest = new ReplSetTest({name: 'testSet', nodes: 2, oplogSize: 5});

@@ -14,9 +14,9 @@
  */
 
 import {arrayEq} from "jstests/aggregation/extras/utils.js";
-import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {enableLocalReadLogs, getLocalReadCount} from "jstests/libs/local_reads.js";
 import {profilerHasNumMatchingEntriesOrThrow} from "jstests/libs/profiler.js";
+import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 const st = new ShardingTest({shards: 2, mongos: 1});
 

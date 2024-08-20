@@ -8,6 +8,7 @@
  */
 
 import {getPlanStage} from "jstests/libs/analyze_plan.js";
+import {ReplSetTest} from "jstests/libs/replsettest.js";
 
 function validateBatchedDeletes(conn) {
     const db = conn.getDB("test");

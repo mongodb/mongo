@@ -8,6 +8,7 @@
  */
 
 import {line, outputDistinctPlanAndResults} from "jstests/libs/pretty_md.js";
+import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 TestData.skipCheckOrphans = true;  // Deliberately inserts orphans.
 const shardingTest = new ShardingTest({shards: 2});

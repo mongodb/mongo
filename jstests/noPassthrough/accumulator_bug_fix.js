@@ -5,6 +5,8 @@
  *  requires_sharding,
  * ]
  */
+import {ShardingTest} from "jstests/libs/shardingtest.js";
+
 (function testAccumulatorWhenSpillingOnClassicEngine() {
     const verifyAccumulatorSpillingResult = (testDesc, accSpec) => {
         const conn = MongoRunner.runMongod();
@@ -53,7 +55,7 @@
 
     verifyAccumulatorSpillingResult("Verifying $avg spilling bug is fixed on the classic engine",
                                     {$avg: "$n"});
-}());
+})();
 
 (function testOverTheWireDataFormatOnBothEngines() {
     const conn = MongoRunner.runMongod();

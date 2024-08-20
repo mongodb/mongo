@@ -3,6 +3,7 @@
  *
  * @tags: [requires_fcv_70]
  */
+import {ShardingTest} from "jstests/libs/shardingtest.js";
 import {QuerySamplingUtil} from "jstests/sharding/analyze_shard_key/libs/query_sampling_util.js";
 
 // Make the periodic jobs for refreshing sample rates and writing sampled queries and diffs have a

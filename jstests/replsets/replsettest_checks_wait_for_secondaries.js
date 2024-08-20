@@ -3,6 +3,7 @@
  * to have fully transitioned to SECONDARY state before attempting data reads.
  */
 import {kDefaultWaitForFailPointTimeout} from "jstests/libs/fail_point_util.js";
+import {ReplSetTest} from "jstests/libs/replsettest.js";
 
 const testName = jsTestName();
 const dbName = "testdb";

@@ -1,5 +1,7 @@
 // Attempt to shut the server down as it is initializing replication, and confirm it doesn't crash.
 //
+import {ReplSetTest} from "jstests/libs/replsettest.js";
+
 let ns = "test.coll";
 
 let rst = new ReplSetTest({

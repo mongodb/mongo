@@ -3,6 +3,7 @@
  * work on both mongos and mongod on a sharded cluster with more than 1 shard.
  */
 import {assertErrCodeAndErrMsgContains} from "jstests/aggregation/extras/utils.js";
+import {ShardingTest} from "jstests/libs/shardingtest.js";
 import {MongotMock} from "jstests/with_mongot/mongotmock/lib/mongotmock.js";
 import {prepCollection} from "jstests/with_mongot/mongotmock/lib/utils.js";
 

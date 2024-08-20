@@ -5,6 +5,8 @@
  *   disables_test_commands,
  * ]
  */
+import {ReplSetTest} from "jstests/libs/replsettest.js";
+
 function assertStartupSucceeds(conn) {
     assert.commandWorked(conn.adminCommand({hello: 1}));
 }

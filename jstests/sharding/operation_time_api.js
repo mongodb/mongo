@@ -5,6 +5,9 @@
  *   - mongod from a non-sharded replica set
  *   - standalone mongod
  */
+import {ReplSetTest} from "jstests/libs/replsettest.js";
+import {ShardingTest} from "jstests/libs/shardingtest.js";
+
 function responseContainsTimestampOperationTime(res) {
     return res.operationTime !== undefined && isTimestamp(res.operationTime);
 }

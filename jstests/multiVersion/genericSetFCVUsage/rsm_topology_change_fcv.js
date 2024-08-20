@@ -2,6 +2,8 @@
  * Tests that the minWireVersion and maxWireVersion in StreamableReplicaSetMonitor's
  * TopologyDescription are correct before and after FCV changes.
  */
+import {ShardingTest} from "jstests/libs/shardingtest.js";
+
 /*
  * Returns a regex for the topology change log message for the given replica set where
  * all nodes have the given minWireVersion and maxWireVersion.

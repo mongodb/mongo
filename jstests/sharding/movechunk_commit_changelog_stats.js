@@ -2,6 +2,7 @@
 // Tests that the changelog entry for moveChunk.commit contains stats on the migration.
 //
 
+import {ShardingTest} from "jstests/libs/shardingtest.js";
 import {findChunksUtil} from "jstests/sharding/libs/find_chunks_util.js";
 
 var st = new ShardingTest({mongos: 1, shards: 2});

@@ -1,6 +1,7 @@
 import {
     CheckShardFilteringMetadataHelpers
 } from "jstests/libs/check_shard_filtering_metadata_helpers.js";
+import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 ShardingTest.prototype.checkShardFilteringMetadata = function() {
     if (jsTest.options().skipCheckShardFilteringMetadata) {

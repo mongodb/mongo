@@ -1,3 +1,4 @@
+import {ShardingTest} from "jstests/libs/shardingtest.js";
 import {CLUSTER_CERT, requireTLS} from "jstests/ssl/libs/ssl_helpers.js";
 
 const x509_options =

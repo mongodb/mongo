@@ -6,6 +6,8 @@
  *   uses_change_streams,
  * ]
  */
+import {ReplSetTest} from "jstests/libs/replsettest.js";
+
 // Create a two-node replica set so that we can issue a request to the Secondary.
 const rst = new ReplSetTest({nodes: 2});
 rst.startSet();

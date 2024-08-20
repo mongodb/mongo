@@ -12,7 +12,7 @@
  */
 
 import {configureFailPoint, kDefaultWaitForFailPointTimeout} from "jstests/libs/fail_point_util.js";
-import {storageEngineIsWiredTigerOrInMemory} from "jstests/libs/storage_engine_utils.js";
+import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {restartServerReplication, stopServerReplication} from "jstests/libs/write_concern_util.js";
 
 TestData.skipCheckDBHashes = true;  // the set is not consistent when we shutdown the test

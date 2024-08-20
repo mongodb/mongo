@@ -3,6 +3,8 @@
 // with a compound shard key.
 //
 
+import {ShardingTest} from "jstests/libs/shardingtest.js";
+
 var getShardVersion = function() {
     var res = st.shard0.adminCommand({getShardVersion: coll + ""});
     assert.commandWorked(res);

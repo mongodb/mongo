@@ -2,6 +2,7 @@
 // UUIDs upon re-initiation.
 // @tags: [multiversion_incompatible]
 import {checkCollectionUUIDs} from "jstests/libs/check_uuids.js";
+import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 let st = new ShardingTest({shards: 1, rs: {nodes: 1}, mongos: 1});
 let mongos = st.s;

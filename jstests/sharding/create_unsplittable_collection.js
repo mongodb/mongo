@@ -10,6 +10,8 @@
  * ]
  */
 
+import {ShardingTest} from "jstests/libs/shardingtest.js";
+
 const kDbName = "test";
 const kTimeseriesColl = 'timeseriesColl';
 const kTimeseriesColl2 = 'timeseriesColl2';

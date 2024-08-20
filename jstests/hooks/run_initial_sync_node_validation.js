@@ -1,5 +1,7 @@
 // Runner that runs full validation on all collections of the initial sync node and checks the
 // dbhashes of all of the nodes including the initial sync node.
+import {ReplSetTest} from "jstests/libs/replsettest.js";
+
 var startTime = Date.now();
 
 var primaryInfo = db.isMaster();

@@ -1,5 +1,7 @@
 // try reconfiguring with space at the end of the host:port
 
+import {ReplSetTest} from "jstests/libs/replsettest.js";
+
 var replTest = new ReplSetTest({name: 'testSet', nodes: 1});
 var nodes = replTest.startSet();
 replTest.initiate();

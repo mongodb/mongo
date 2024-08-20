@@ -9,6 +9,7 @@
  * @tags: [requires_persistence]
  */
 
+import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {allowTLS} from "jstests/ssl/libs/ssl_helpers.js";
 
 var dbName = 'upgradeToX509';

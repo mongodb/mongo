@@ -3,6 +3,8 @@
  * errors for commands run under a session.
  * @tags: [requires_replication]
  */
+import {ReplSetTest} from "jstests/libs/replsettest.js";
+
 TestData.networkErrorAndTxnOverrideConfig = {
     retryOnNetworkErrors: true
 };

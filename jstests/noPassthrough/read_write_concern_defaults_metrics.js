@@ -2,6 +2,8 @@
 //
 // @tags: [requires_sharding]
 import {verifyGetDiagnosticData} from "jstests/libs/ftdc.js";
+import {ReplSetTest} from "jstests/libs/replsettest.js";
+import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 const Topology = {
     Shard: "shard",

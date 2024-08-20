@@ -19,6 +19,7 @@
  */
 
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";
+import {ReplSetTest} from "jstests/libs/replsettest.js";
 
 var name = "interruptStepDown";
 // Set the fassert timeout to shorter than the default to avoid having a long-running test.

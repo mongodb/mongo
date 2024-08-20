@@ -1,5 +1,7 @@
 // Tests that the sort order is obeyed when an aggregation requests sorted results that are
 // scattered across multiple shards.
+import {ShardingTest} from "jstests/libs/shardingtest.js";
+
 const shardingTest = new ShardingTest({shards: 2});
 
 const db = shardingTest.getDB("test");

@@ -5,6 +5,8 @@
  * entries.
  */
 
+import {ReplSetTest} from "jstests/libs/replsettest.js";
+
 const testName = "rollback_time_limit_param";
 
 // Make sure that we reject non-positive values for this parameter set on startup.

@@ -3,6 +3,8 @@
 //   uses_transactions,
 //   disables_test_commands,
 // ]
+import {ReplSetTest} from "jstests/libs/replsettest.js";
+
 TestData.enableTestCommands = false;
 TestData.authenticationDatabase = "local";
 

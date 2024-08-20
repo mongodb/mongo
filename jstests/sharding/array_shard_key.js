@@ -3,6 +3,8 @@
 //   uses_multi_shard_transaction,
 //   uses_transactions,
 // ]
+import {ShardingTest} from "jstests/libs/shardingtest.js";
+
 var st = new ShardingTest({shards: 3});
 
 var mongos = st.s0;

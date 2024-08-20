@@ -3,6 +3,8 @@
  * functionality, so we'll just check that it succeeds and fails when it's supposed to.
  */
 
+import {ReplSetTest} from "jstests/libs/replsettest.js";
+
 var name = "getstatus";
 var numNodes = 4;
 var replTest = new ReplSetTest({name: name, nodes: numNodes});

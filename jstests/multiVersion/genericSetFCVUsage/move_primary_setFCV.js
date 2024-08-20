@@ -1,6 +1,8 @@
 /**
  * Test that `movePrimary` works for databases created under a different FCV
  */
+import {ShardingTest} from "jstests/libs/shardingtest.js";
+
 let st = new ShardingTest({shards: 2, mongos: 1, rs: {nodes: 1}});
 
 const mongos = st.s;

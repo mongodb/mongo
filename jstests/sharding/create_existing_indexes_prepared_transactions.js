@@ -7,6 +7,8 @@
 //   uses_multi_shard_transaction,
 //   uses_transactions,
 // ]
+import {ShardingTest} from "jstests/libs/shardingtest.js";
+
 const dbName = "TestDB";
 const collName = "foo";
 const ns = dbName + '.' + collName;

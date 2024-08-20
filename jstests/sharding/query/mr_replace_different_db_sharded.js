@@ -1,4 +1,6 @@
 // Test MapReduce output option replace into different db in a sharded environment.
+import {ShardingTest} from "jstests/libs/shardingtest.js";
+
 const st = new ShardingTest({shards: 2, mongos: 1});
 
 const sourceDB = st.s.getDB("mr_source_db");

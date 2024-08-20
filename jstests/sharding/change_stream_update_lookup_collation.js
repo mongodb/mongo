@@ -7,6 +7,8 @@
 //   uses_change_streams,
 // ]
 // Shard key index has collation, which is not compatible with $min/$max
+import {ShardingTest} from "jstests/libs/shardingtest.js";
+
 TestData.skipCheckOrphans = true;
 
 const st = new ShardingTest({

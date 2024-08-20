@@ -5,6 +5,8 @@
 //    disables_test_commands,
 //    requires_sharding,
 // ]
+import {ShardingTest} from "jstests/libs/shardingtest.js";
+
 const dbName = "test";
 const collName = "coll";
 

@@ -2,6 +2,7 @@
  * Confirms that the aggregate command accepts writeConcern and that a read-only aggregation will
  * not wait for the writeConcern specified to be satisfied.
  */
+import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {
     restartReplicationOnSecondaries,
     stopReplicationOnSecondaries

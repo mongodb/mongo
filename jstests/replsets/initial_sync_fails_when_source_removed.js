@@ -3,6 +3,7 @@
  * This test will timeout if the attempt is not aborted.
  */
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";
+import {ReplSetTest} from "jstests/libs/replsettest.js";
 
 const testName = "initial_sync_fails_when_source_removed";
 const rst = new ReplSetTest({name: testName, nodes: [{}, {rsConfig: {priority: 0}}]});

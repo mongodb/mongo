@@ -5,6 +5,8 @@
  * various paths that must all be checked.
  */
 
+import {ShardingTest} from "jstests/libs/shardingtest.js";
+
 function validateDocumentKeyInOplogForRemove(ns, _id, docKey) {
     const deleteEntry = oplog.findOne({ns: ns, op: 'd', 'o._id': _id});
     const o = docKey ? {_id: _id, x: docKey} : {_id: _id};

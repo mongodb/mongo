@@ -1,0 +1,8 @@
+version: 1.0.0
+filters:
+  - "replsettest.js":
+    approvers:
+      - 10gen/server-replication
+  - "shardingtest.js":
+    approvers:
+      - 10gen/server-cluster-scalability

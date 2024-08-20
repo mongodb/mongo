@@ -6,6 +6,8 @@
  */
 import "jstests/multiVersion/libs/verify_versions.js";
 
+import {ShardingTest} from "jstests/libs/shardingtest.js";
+
 function runSharding() {
     let fcvDoc;
     let shard0PrimaryAdminDB;

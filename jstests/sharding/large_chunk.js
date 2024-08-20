@@ -7,6 +7,7 @@
  *  resource_intensive,
  * ]
  */
+import {ShardingTest} from "jstests/libs/shardingtest.js";
 import {findChunksUtil} from "jstests/sharding/libs/find_chunks_util.js";
 
 // Starts a new sharding environment limiting the chunk size to 1GB (highest value allowed).

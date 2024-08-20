@@ -1,4 +1,6 @@
 // Tests that the correct number of results are returned when $limit is coalesced with $sort.
+import {ShardingTest} from "jstests/libs/shardingtest.js";
+
 const shardingTest = new ShardingTest({shards: 2});
 const db = shardingTest.getDB("project_limit");
 const coll = db.project_limit_pipe_split;

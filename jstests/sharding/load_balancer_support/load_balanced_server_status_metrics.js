@@ -17,6 +17,7 @@ if (_isWindows()) {
     quit();
 }
 import {ProxyProtocolServer} from "jstests/sharding/libs/proxy_protocol.js";
+import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 (() => {
     const numConnections = 10;

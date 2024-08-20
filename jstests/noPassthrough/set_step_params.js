@@ -4,6 +4,7 @@
 
 import {assertHasConnPoolStats, launchFinds} from "jstests/libs/conn_pool_helpers.js";
 import {configureFailPointForRS, getFailPointName} from "jstests/libs/fail_point_util.js";
+import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 const kDbName = 'test';
 

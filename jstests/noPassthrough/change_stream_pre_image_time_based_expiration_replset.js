@@ -2,6 +2,7 @@
 // @tags: [
 //  requires_replication,
 // ]
+import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {
     testTimeBasedPreImageRetentionPolicy
 } from "jstests/noPassthrough/libs/change_stream_pre_image_time_based_expiration_utils.js";

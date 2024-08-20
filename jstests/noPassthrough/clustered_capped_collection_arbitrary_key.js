@@ -8,6 +8,7 @@
  * ]
  */
 import {ClusteredCappedUtils} from "jstests/libs/clustered_collections/clustered_capped_utils.js";
+import {ReplSetTest} from "jstests/libs/replsettest.js";
 
 const replSet = new ReplSetTest({name: "clustered_capped_collections", nodes: 1});
 replSet.startSet({setParameter: {ttlMonitorSleepSecs: 1, supportArbitraryClusterKeyIndex: true}});

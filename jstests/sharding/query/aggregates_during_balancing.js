@@ -1,5 +1,7 @@
 // Inserts some interesting data into a sharded collection, enables the balancer, and tests that
 // various kinds of aggregations return the expected results.
+import {ShardingTest} from "jstests/libs/shardingtest.js";
+
 const shardedAggTest = new ShardingTest({shards: 2, mongos: 1});
 
 assert.commandWorked(shardedAggTest.s0.adminCommand(

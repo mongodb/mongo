@@ -3,6 +3,7 @@
 //   requires_replication,
 //   requires_majority_read_concern,
 // ]
+import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {getFirstOplogEntry, getLatestOp} from "jstests/replsets/rslib.js";
 
 const oplogSize = 1;  // size in MB

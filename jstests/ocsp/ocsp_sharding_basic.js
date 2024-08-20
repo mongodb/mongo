@@ -1,6 +1,7 @@
 // Check that OCSP verification works
 // @tags: [requires_http_client]
 
+import {ShardingTest} from "jstests/libs/shardingtest.js";
 import {FAULT_REVOKED, MockOCSPServer} from "jstests/ocsp/lib/mock_ocsp.js";
 import {clearOCSPCache, OCSP_CA_CERT, OCSP_SERVER_CERT} from "jstests/ocsp/lib/ocsp_helpers.js";
 import {determineSSLProvider} from "jstests/ssl/libs/ssl_helpers.js";

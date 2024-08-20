@@ -8,6 +8,8 @@
  * ]
  */
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";
+import {ShardingTest} from "jstests/libs/shardingtest.js";
+
 (function() {
 "use strict";
 const dbName = "test";

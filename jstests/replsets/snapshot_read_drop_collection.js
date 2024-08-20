@@ -13,6 +13,8 @@
  * ]
  */
 
+import {ReplSetTest} from "jstests/libs/replsettest.js";
+
 // Skip this test if not running with the "wiredTiger" storage engine.
 const storageEngine = jsTest.options().storageEngine || "wiredTiger";
 if (storageEngine !== "wiredTiger") {

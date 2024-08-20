@@ -12,7 +12,9 @@
  * thread after finding the issued noop. The secondary thread should throw
  * an exception and exit.
  */
+import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {getLatestOp} from "jstests/replsets/rslib.js";
+
 var send_linearizable_read = function() {
     // The primary will step down and throw an exception, which is expected.
     var coll = db.getSiblingDB("test").foo;

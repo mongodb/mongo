@@ -8,6 +8,7 @@
  *   requires_mongobridge,
  * ]
  */
+import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {reconnect} from "jstests/replsets/rslib.js";
 
 const rst = new ReplSetTest({

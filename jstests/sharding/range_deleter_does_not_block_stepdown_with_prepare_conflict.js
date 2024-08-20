@@ -14,6 +14,7 @@
  *
  * @tags: [uses_transactions, uses_multi_shard_transaction]
  */
+import {ShardingTest} from "jstests/libs/shardingtest.js";
 import {waitForFailpoint} from "jstests/sharding/libs/sharded_transactions_helpers.js";
 
 TestData.skipCheckingUUIDsConsistentAcrossCluster = true;

@@ -2,6 +2,8 @@
  * Basic test to demonstrate that the range deleter section in shardingStatistics is displayed
  * correctly.
  */
+import {ShardingTest} from "jstests/libs/shardingtest.js";
+
 let st = new ShardingTest({shards: 2});
 
 assert.commandWorked(

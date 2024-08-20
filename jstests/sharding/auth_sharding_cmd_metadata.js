@@ -2,6 +2,8 @@
  * Tests that only the internal user will be able to advance the config server opTime.
  */
 
+import {ShardingTest} from "jstests/libs/shardingtest.js";
+
 // The index consistency checker doesn't take into account that
 // authentication is needed for contacting shard0 of this cluster
 TestData.skipCheckingIndexesConsistentAcrossCluster = true;

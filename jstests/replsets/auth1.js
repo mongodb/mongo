@@ -3,6 +3,7 @@
 // This test requires users to persist across a restart.
 // @tags: [requires_persistence, multiversion_incompatible]
 
+import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {wait} from "jstests/replsets/rslib.js";
 
 // Multiple users cannot be authenticated on one connection within a session.

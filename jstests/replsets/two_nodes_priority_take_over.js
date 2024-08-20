@@ -2,6 +2,7 @@
 // because of stepping down. In a two node replset, this rejection will prevent
 // smooth priority takeover.
 
+import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {setLogVerbosity} from "jstests/replsets/rslib.js";
 
 var name = "two_nodes_priority_take_over";

@@ -1,5 +1,6 @@
 // Test that shardCollection uses existing zone info to validate
 // shard keys and do initial chunk splits.
+import {ShardingTest} from "jstests/libs/shardingtest.js";
 import {findChunksUtil} from "jstests/sharding/libs/find_chunks_util.js";
 
 var st = new ShardingTest({shards: 3});

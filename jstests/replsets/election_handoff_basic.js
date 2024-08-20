@@ -3,12 +3,12 @@
  * down sends a ReplSetStepUp request to an eligible candidate. It uses a two-node replica set,
  * so there is only one secondary that can take over.
  */
-
+import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {ElectionHandoffTest} from "jstests/replsets/libs/election_handoff.js";
 
 const testName = "election_handoff_vanilla";
 const numNodes = 2;
-const rst = ReplSetTest({name: testName, nodes: numNodes});
+const rst = new ReplSetTest({name: testName, nodes: numNodes});
 const nodes = rst.nodeList();
 rst.startSet();
 

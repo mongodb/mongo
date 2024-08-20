@@ -3,6 +3,7 @@
 // data (member3), then puts 50 more ops in member3's buffer and makes sure that member3 doesn't try
 // to sync from member2.
 
+import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {restartServerReplication, stopServerReplication} from "jstests/libs/write_concern_util.js";
 import {syncFrom} from "jstests/replsets/rslib.js";
 

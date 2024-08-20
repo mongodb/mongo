@@ -7,6 +7,7 @@
  * @tags: [uses_transactions, uses_prepare_transaction]
  */
 import {PrepareHelpers} from "jstests/core/txns/libs/prepare_helpers.js";
+import {ReplSetTest} from "jstests/libs/replsettest.js";
 
 const replTest = new ReplSetTest({name: 'multikey_write_avoids_prepare_conflict', nodes: 2});
 replTest.startSet();

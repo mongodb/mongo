@@ -1,6 +1,8 @@
 // Checks that the global histogram counter for transactions are updated as we expect.
 // @tags: [requires_replication, uses_transactions]
 // Set up the replica set.
+import {ReplSetTest} from "jstests/libs/replsettest.js";
+
 const rst = new ReplSetTest({nodes: 1});
 rst.startSet();
 rst.initiate();

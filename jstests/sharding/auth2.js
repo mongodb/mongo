@@ -1,3 +1,5 @@
+import {ShardingTest} from "jstests/libs/shardingtest.js";
+
 var st = new ShardingTest({
     shards: 2,
     other: {chunkSize: 1, useHostname: true, keyFile: 'jstests/libs/key1'},

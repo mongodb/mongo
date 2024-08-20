@@ -3,6 +3,7 @@
  * across restarts.
  */
 import {getQueryStatsFindCmd, getQueryStatsKeyHashes} from "jstests/libs/query_stats_utils.js";
+import {ReplSetTest} from "jstests/libs/replsettest.js";
 
 const replTest = new ReplSetTest({name: 'queryStatsKeyHashTest', nodes: 2});
 

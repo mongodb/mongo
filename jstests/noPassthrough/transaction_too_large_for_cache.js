@@ -9,6 +9,7 @@
  * ]
  */
 
+import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {TransactionsUtil} from "jstests/libs/transactions_util.js";
 
 const replSet = new ReplSetTest({nodes: 1});

@@ -5,6 +5,8 @@
  * infrastructure is ready to support at least two routers.
  */
 
+import {ShardingTest} from "jstests/libs/shardingtest.js";
+
 const st = new ShardingTest({mongos: 2, shards: 2, rs: {nodes: 2}});
 
 const s0 = st.s0;

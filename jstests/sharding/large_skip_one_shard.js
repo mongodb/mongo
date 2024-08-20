@@ -1,6 +1,8 @@
 /**
  * Tests that a sharded query targeted to a single shard will use passed-in skip.
  */
+import {ShardingTest} from "jstests/libs/shardingtest.js";
+
 var st = new ShardingTest({shards: 2, mongos: 1});
 
 var mongos = st.s0;

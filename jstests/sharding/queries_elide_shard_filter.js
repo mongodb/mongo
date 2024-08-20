@@ -6,6 +6,7 @@
 // ]
 
 import {getOptimizer, getPlanStage} from "jstests/libs/analyze_plan.js";
+import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 function assertShardFilter(explain) {
     switch (getOptimizer(explain)) {

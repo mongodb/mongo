@@ -1,5 +1,6 @@
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
+import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 function collectionExists(shard, dbName, collName) {
     return Array.contains(shard.getDB(dbName).getCollectionNames(), collName);

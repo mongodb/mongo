@@ -1,6 +1,8 @@
 
 import "jstests/multiVersion/libs/multi_rs.js";
 
+import {ReplSetTest} from "jstests/libs/replsettest.js";
+
 /**
  * Test that starts up a replica set with 2 nodes of version 'replSetVersion', inserts some data,
  * then adds a new node to the replica set with version 'newNodeVersion' and waits for initial sync

@@ -3,6 +3,8 @@
  * @tags: [requires_sharding, requires_replication]
  */
 import {get_ipaddr} from "jstests/libs/host_ipaddr.js";
+import {ReplSetTest} from "jstests/libs/replsettest.js";
+import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 // Multiple users cannot be authenticated on one connection within a session.
 TestData.disableImplicitSessions = true;

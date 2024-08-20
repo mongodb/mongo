@@ -11,7 +11,9 @@
  */
 
 import {waitForCurOpByFailPointNoNS} from "jstests/libs/curop_helpers.js";
+import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
+import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 function runTest(st, testDb, portNum) {
     // TODO SERVER-80853 add 'hangWhileBuildingDocumentSourceOutBatch' to this list
@@ -65,7 +67,6 @@ runTest(null, conn.getDB("out_drop_temp"), conn.port);
 MongoRunner.stopMongod(conn);
 const st = new ShardingTest({shards: 2, mongos: 1, config: 1});
 // TODO SERVER-87422 enable this test with this feature flag.
-import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 if (FeatureFlagUtil.isPresentAndEnabled(st.s, "TrackUnshardedCollectionsUponMoveCollection") ||
     FeatureFlagUtil.isPresentAndEnabled(st.s, "TrackUnshardedCollectionsUponCreation")) {
     st.stop();

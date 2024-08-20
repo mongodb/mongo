@@ -5,6 +5,7 @@
 
 import {DiscoverTopology, Topology} from "jstests/libs/discover_topology.js";
 import {OverrideHelpers} from "jstests/libs/override_methods/override_helpers.js";
+import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {TransactionsUtil} from "jstests/libs/transactions_util.js";
 
 // If the collection is being dropped, do not enable profiling since doing so would cause the

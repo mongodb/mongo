@@ -3,6 +3,8 @@
  *   expects_explicit_underscore_id_index,
  * ]
  */
+import {ShardingTest} from "jstests/libs/shardingtest.js";
+
 var s = new ShardingTest({name: "stats", shards: 2, mongos: 1});
 
 s.adminCommand({enablesharding: "test", primaryShard: s.shard1.shardName});

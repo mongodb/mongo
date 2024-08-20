@@ -3,6 +3,8 @@
  * both mongos and the shard.
  */
 
+import {ShardingTest} from "jstests/libs/shardingtest.js";
+
 var st = new ShardingTest({shards: 1});
 
 var testDB = st.s.getDB('test');

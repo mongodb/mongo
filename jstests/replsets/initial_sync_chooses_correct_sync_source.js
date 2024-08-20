@@ -6,6 +6,7 @@
  * ]
  */
 import {kDefaultWaitForFailPointTimeout} from "jstests/libs/fail_point_util.js";
+import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {assertSyncSourceMatchesSoon} from "jstests/replsets/libs/sync_source.js";
 
 const waitForHeartbeats = initialSyncNode => {

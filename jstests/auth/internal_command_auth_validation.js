@@ -2,11 +2,9 @@
 // proper authorization.
 // @tags: [requires_profiling]
 
-import {assertErrorCode} from "jstests/aggregation/extras/utils.js";
 import {testOnlyCommands} from "jstests/auth/test_only_commands_list.js";
 import {AllCommandsTest} from "jstests/libs/all_commands_test.js";
-import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
-import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
+import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 // Multiple users cannot be authenticated on one connection within a session.
 TestData.disableImplicitSessions = true;

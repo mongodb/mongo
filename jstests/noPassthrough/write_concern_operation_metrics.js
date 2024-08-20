@@ -48,6 +48,7 @@
 // the latest timestamp that the current client has read.
 
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";
+import {ReplSetTest} from "jstests/libs/replsettest.js";
 
 // Returns metrics aggregated by database name.
 const getDBMetrics = (adminDB) => {

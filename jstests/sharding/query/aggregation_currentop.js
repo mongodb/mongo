@@ -31,6 +31,7 @@ TestData.skipCheckShardFilteringMetadata = true;
 
 import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 import {getCollectionNameFromFullNamespace} from "jstests/libs/namespace_utils.js";
+import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 // Replica set nodes started with --shardsvr do not enable key generation until they are added
 // to a sharded cluster and reject commands with gossiped clusterTime from users without the

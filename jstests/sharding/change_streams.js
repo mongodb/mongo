@@ -8,6 +8,7 @@ import {
     assertChangeStreamEventEq,
     canonicalizeEventForTesting
 } from "jstests/libs/change_stream_util.js";
+import {ShardingTest} from "jstests/libs/shardingtest.js";
 import {TwoPhaseDropCollectionTest} from "jstests/replsets/libs/two_phase_drops.js";
 
 function runTest(collName, shardKey) {

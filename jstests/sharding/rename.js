@@ -1,3 +1,5 @@
+import {ShardingTest} from "jstests/libs/shardingtest.js";
+
 var s = new ShardingTest({});
 var db = s.getDB("test");
 assert.commandWorked(s.s0.adminCommand({enablesharding: 'test', primaryShard: s.shard0.shardName}));

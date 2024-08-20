@@ -4,6 +4,8 @@
  *
  * @tags: [uses_transactions, requires_persistence]
  */
+import {ShardingTest} from "jstests/libs/shardingtest.js";
+
 // This test involves writing directly to the config.transactions collection which is not allowed
 // in a session.
 TestData.disableImplicitSessions = true;

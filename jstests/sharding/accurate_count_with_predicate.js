@@ -6,6 +6,8 @@
  * of the shards. It then runs a count() and ensures that the orphan documents are not counted
  * twice.
  */
+import {ShardingTest} from "jstests/libs/shardingtest.js";
+
 // Deliberately inserts orphans outside of migration.
 TestData.skipCheckOrphans = true;
 

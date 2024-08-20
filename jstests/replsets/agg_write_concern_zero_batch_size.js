@@ -1,6 +1,7 @@
 // Tests that an aggregate sent with batchSize: 0 will still obey the write concern sent on the
 // original request, even though the writes happen in the getMore.
 import {withEachKindOfWriteStage} from "jstests/aggregation/extras/merge_helpers.js";
+import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {restartServerReplication, stopServerReplication} from "jstests/libs/write_concern_util.js";
 
 // Start a replica set with two nodes: one with the default configuration and one with priority

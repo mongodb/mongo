@@ -16,6 +16,7 @@
  */
 import {assertMergeFailsForAllModesWithCode} from "jstests/aggregation/extras/merge_helpers.js";
 import {assertErrorCode} from "jstests/aggregation/extras/utils.js";
+import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 const kFailPointName = "waitAfterPinningCursorBeforeGetMoreBatch";
 const kFailpointOptions = {

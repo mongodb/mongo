@@ -5,6 +5,8 @@
  * @tags: [config_shard_incompatible]
  */
 
+import {ShardingTest} from "jstests/libs/shardingtest.js";
+
 let st = new ShardingTest({
     shards: {
         rs0: {

@@ -7,6 +7,7 @@
  * ]
  */
 import {verifyGetDiagnosticData} from "jstests/libs/ftdc.js";
+import {ReplSetTest} from "jstests/libs/replsettest.js";
 
 const kDbName = "mirrored_reads_ftdc_test";
 const kCollName = "test";

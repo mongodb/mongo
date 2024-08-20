@@ -6,6 +6,9 @@
  *   requires_sharding,
  * ]
  */
+import {ReplSetTest} from "jstests/libs/replsettest.js";
+import {ShardingTest} from "jstests/libs/shardingtest.js";
+
 const kDbName = "cluster_explain_commands";
 const kCollName = "bar";
 

@@ -11,6 +11,9 @@
  * ]
  */
 
+import {ReplSetTest} from "jstests/libs/replsettest.js";
+import {ShardingTest} from "jstests/libs/shardingtest.js";
+
 const latest = "latest";
 const SetFCVStatus = Object.freeze({called: 1, transitioning: 2, successful: 3});
 

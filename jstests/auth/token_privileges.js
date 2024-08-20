@@ -2,6 +2,7 @@
 // @tags: [requires_replication, featureFlagSecurityToken]
 
 import {runCommandWithSecurityToken} from "jstests/libs/multitenancy_utils.js";
+import {ReplSetTest} from "jstests/libs/replsettest.js";
 
 const tenantID = ObjectId();
 const kVTSKey = 'secret';

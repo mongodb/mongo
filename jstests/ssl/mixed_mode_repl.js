@@ -1,6 +1,7 @@
 // This test is related to mixed_mode_repl_nossl.js in
 // the sslSpecial test set. This test must be run with --use-ssl
 
+import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {
     allowTLS,
     preferTLS,

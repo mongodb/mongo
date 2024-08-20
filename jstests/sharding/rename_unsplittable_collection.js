@@ -8,6 +8,8 @@
  * ]
  */
 
+import {ShardingTest} from "jstests/libs/shardingtest.js";
+
 function checkRenameSucceeded(configDb, nssFrom, nssTo, expectedUuid, shard) {
     const collEntryFrom = configDb.collections.findOne({_id: nssFrom});
     assert(collEntryFrom === null) << tojson(collEntryFrom);

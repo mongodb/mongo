@@ -5,6 +5,8 @@
  *
  * @tags: [requires_majority_read_concern]
  */
+import {ReplSetTest} from "jstests/libs/replsettest.js";
+
 function printStatus() {
     var primaryStatus;
     replTest.nodes.forEach((n) => {

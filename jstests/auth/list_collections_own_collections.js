@@ -6,6 +6,8 @@
  * ]
  */
 
+import {ShardingTest} from "jstests/libs/shardingtest.js";
+
 const dbName = "list_collections_own_collections";
 
 const nameSort = (a, b) => a.name > b.name;

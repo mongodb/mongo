@@ -5,6 +5,8 @@
  *   uses_change_streams,
  * ]
  */
+import {ShardingTest} from "jstests/libs/shardingtest.js";
+
 // Start a new sharded cluster and obtain references to the test DB and collection.
 const st = new ShardingTest({
     shards: 1,

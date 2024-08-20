@@ -1,6 +1,7 @@
 /**
  * Tests for the create_sharded_collection_util.js module.
  */
+import {ShardingTest} from "jstests/libs/shardingtest.js";
 import {CreateShardedCollectionUtil} from "jstests/sharding/libs/create_sharded_collection_util.js";
 import {findChunksUtil} from "jstests/sharding/libs/find_chunks_util.js";
 

@@ -9,6 +9,9 @@
  *   requires_mongobridge,
  * ]
  */
+import {ReplSetTest} from "jstests/libs/replsettest.js";
+import {ShardingTest} from "jstests/libs/shardingtest.js";
+
 function checkBridgeOffset(node, processType) {
     const bridgePort = node.port;
     const serverPort = assert.commandWorked(node.adminCommand({getCmdLineOpts: 1})).parsed.net.port;

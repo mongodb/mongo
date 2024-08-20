@@ -6,6 +6,7 @@
  * ]
  */
 import {assertDropAndRecreateCollection} from "jstests/libs/collection_drop_recreate.js";
+import {ReplSetTest} from "jstests/libs/replsettest.js";
 
 // Create a new single-node replica set, and ensure that it can support $changeStream.
 const rst = new ReplSetTest({nodes: 1});

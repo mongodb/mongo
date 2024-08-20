@@ -3,6 +3,8 @@
  */
 import "jstests/multiVersion/libs/multi_rs.js";
 
+import {ReplSetTest} from "jstests/libs/replsettest.js";
+
 const lastLTSVersion = "last-lts";
 const latestVersion = "latest";
 

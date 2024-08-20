@@ -13,6 +13,8 @@ import {documentEq} from "jstests/aggregation/extras/utils.js";
 import {assertFailsValidation} from "jstests/libs/doc_validation_utils.js";
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
+import {ReplSetTest} from "jstests/libs/replsettest.js";
+import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 const collName = jsTestName();
 const warnLogId = 20294;

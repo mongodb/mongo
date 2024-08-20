@@ -1,5 +1,7 @@
 // Test that authorization information gets propogated correctly to secondaries.
 
+import {ReplSetTest} from "jstests/libs/replsettest.js";
+
 var baseName = "jstests_auth_repl";
 var rsName = baseName + "_rs";
 var mongoOptions = {auth: null, keyFile: "jstests/libs/key1"};

@@ -6,6 +6,8 @@
  *    embedded_router_incompatible,
  * ]
  */
+import {ShardingTest} from "jstests/libs/shardingtest.js";
+
 // Setup 2 mongos processes with mongobridge.
 let st = new ShardingTest({shards: 1, mongos: 2, useBridge: true});
 

@@ -4,6 +4,8 @@
  *
  * @tags: [requires_wiredtiger, requires_persistence]
  */
+import {ReplSetTest} from "jstests/libs/replsettest.js";
+
 const rst = new ReplSetTest({
     nodes: 1,
     nodeOptions: {

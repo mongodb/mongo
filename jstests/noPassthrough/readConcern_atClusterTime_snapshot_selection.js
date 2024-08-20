@@ -6,6 +6,7 @@
 //   requires_majority_read_concern,
 //   uses_transactions,
 // ]
+import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {restartServerReplication, stopServerReplication} from "jstests/libs/write_concern_util.js";
 
 const dbName = "test";

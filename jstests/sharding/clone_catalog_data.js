@@ -1,6 +1,7 @@
 // Test that the 'cloneCatalogData' command works correctly.
 // Eventually, _shardsvrMovePrimary will use this command.
 import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
+import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 // Do not check metadata consistency as unsharded collections are cloned to non-primary shards for
 // testing purposes.

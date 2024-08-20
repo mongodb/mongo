@@ -1,4 +1,6 @@
 // Test that you can still authenticate a replset connection to a RS with no primary (SERVER-6665).
+import {ReplSetTest} from "jstests/libs/replsettest.js";
+
 var NODE_COUNT = 3;
 const rs = new ReplSetTest({"nodes": NODE_COUNT, keyFile: "jstests/libs/key1"});
 var nodes = rs.startSet();

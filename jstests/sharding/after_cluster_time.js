@@ -2,6 +2,9 @@
  * Tests readConcern: afterClusterTime behavior in a sharded cluster.
  * @tags: [requires_majority_read_concern]
  */
+import {ReplSetTest} from "jstests/libs/replsettest.js";
+import {ShardingTest} from "jstests/libs/shardingtest.js";
+
 function assertAfterClusterTimeReadFailsWithCode(db, readConcernObj, errorCode) {
     return assert.commandFailedWithCode(
         db.runCommand({find: "foo", readConcern: readConcernObj}),

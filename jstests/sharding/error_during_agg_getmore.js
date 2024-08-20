@@ -4,6 +4,8 @@
 //   # TODO (SERVER-88129): Re-enable this test or add an explanation why it is incompatible.
 //   embedded_router_incompatible,
 // ]
+import {ShardingTest} from "jstests/libs/shardingtest.js";
+
 const st = new ShardingTest({shards: 2, useBridge: true});
 
 const mongosDB = st.s0.getDB(jsTestName());

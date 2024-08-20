@@ -5,6 +5,7 @@
  */
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";
 import {Thread} from "jstests/libs/parallelTester.js";
+import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 function assertEqualObj(lhs, rhs, keysToIgnore) {
     assert.eq(Object.keys(lhs).length, Object.keys(lhs).length, {lhs, rhs});

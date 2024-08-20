@@ -5,6 +5,7 @@
  * comment to the find command fails.
  */
 import {profilerHasSingleMatchingEntryOrThrow} from "jstests/libs/profiler.js";
+import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 const st = new ShardingTest({name: "mongos_comment_test", mongos: 1, shards: 1});
 

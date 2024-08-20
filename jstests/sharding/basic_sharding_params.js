@@ -7,6 +7,8 @@
  * ]
  */
 
+import {ShardingTest} from "jstests/libs/shardingtest.js";
+
 function shardingTestUsingObjects() {
     var st = new ShardingTest({
         mongos: {s0: {verbose: 6}, s1: {verbose: 5}},

@@ -1,3 +1,5 @@
+import {ShardingTest} from "jstests/libs/shardingtest.js";
+
 export function removeShard(shardingTestOrConn, shardName, timeout) {
     if (timeout == undefined) {
         timeout = 10 * 60 * 1000;  // 10 minutes

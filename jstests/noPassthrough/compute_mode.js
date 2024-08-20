@@ -1,6 +1,8 @@
 // Tests compute mode.
 //
 // @tags: [requires_sharding]
+import {ReplSetTest} from "jstests/libs/replsettest.js";
+
 const mongodOption = {
     setParameter: "enableComputeMode=true"
 };

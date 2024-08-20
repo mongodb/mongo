@@ -8,6 +8,7 @@
  *    embedded_router_incompatible,
  * ]
  */
+import {ShardingTest} from "jstests/libs/shardingtest.js";
 import {reconfig} from "jstests/replsets/rslib.js";
 
 const kActiveFaultDurationSec = 12;

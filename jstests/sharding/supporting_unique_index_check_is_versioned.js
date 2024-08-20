@@ -2,6 +2,7 @@
 // version.
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {profilerHasAtLeastOneMatchingEntryOrThrow} from "jstests/libs/profiler.js";
+import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 function prepareProfilerOnShards(st, dbName) {
     st._rs.forEach(rs => {

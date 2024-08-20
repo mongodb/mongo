@@ -7,6 +7,7 @@
  */
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";
 import {funWithArgs} from "jstests/libs/parallel_shell_helpers.js";
+import {ShardingTest} from "jstests/libs/shardingtest.js";
 import {ShardedIndexUtil} from "jstests/sharding/libs/sharded_index_util.js";
 
 // Skip db hash check because secondary is left with a different config.

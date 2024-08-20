@@ -14,6 +14,7 @@
  * 7. The contents of A and B are compared to ensure the rollback results in consistent nodes,
  *    and have the expected collections and views..
  */
+import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {awaitOpTime} from "jstests/replsets/rslib.js";
 
 // Run a command, return the result if it worked, or assert with a message otherwise.

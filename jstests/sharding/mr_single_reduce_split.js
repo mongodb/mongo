@@ -5,6 +5,8 @@
  *  backport_required_multiversion,
  * ]
  */
+import {ShardingTest} from "jstests/libs/shardingtest.js";
+
 const st = new ShardingTest({
     shards: 2,
     mongos: 1,

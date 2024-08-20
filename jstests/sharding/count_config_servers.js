@@ -8,6 +8,8 @@
  * ]
  */
 
+import {ShardingTest} from "jstests/libs/shardingtest.js";
+
 // Checking UUID and index consistency requires querying the config primary, but this test
 // shuts down 2 out of the 3 config servers. Therefore, we cannot do the check on this test.
 TestData.skipCheckingUUIDsConsistentAcrossCluster = true;

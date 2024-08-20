@@ -7,6 +7,8 @@
  */
 import {withEachMergeMode} from "jstests/aggregation/extras/merge_helpers.js";
 import {waitForCurOpByFailPointNoNS} from "jstests/libs/curop_helpers.js";
+import {ReplSetTest} from "jstests/libs/replsettest.js";
+import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 const kDBName = "test";
 const kSourceCollName = "merge_max_time_ms_source";

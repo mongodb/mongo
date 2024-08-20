@@ -2,6 +2,7 @@
  * Tests that election handoff will not attempt to step up a node that is unelectable.
  */
 
+import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {ElectionHandoffTest} from "jstests/replsets/libs/election_handoff.js";
 
 const rst = new ReplSetTest({name: jsTestName(), nodes: 3});

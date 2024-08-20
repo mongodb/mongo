@@ -8,6 +8,7 @@
  */
 
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";
+import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 function checkOplogEntry(actualOplogEntry) {
     const {op, o} = actualOplogEntry;

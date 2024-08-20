@@ -2,6 +2,7 @@
  * Tests that SNI names are advertised if and only if they are a URL, and NOT an IP address.
  */
 
+import {ShardingTest} from "jstests/libs/shardingtest.js";
 import {determineSSLProvider} from "jstests/ssl/libs/ssl_helpers.js";
 
 // Checking index consistency involves reconnecting to the mongos.

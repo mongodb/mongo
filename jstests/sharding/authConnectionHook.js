@@ -9,6 +9,8 @@
  * @tags: [requires_persistence]
  */
 
+import {ShardingTest} from "jstests/libs/shardingtest.js";
+
 // The UUID consistency check uses connections to shards cached on the ShardingTest object, but this
 // test restarts a shard, so the cached connection is not usable.
 TestData.skipCheckingUUIDsConsistentAcrossCluster = true;

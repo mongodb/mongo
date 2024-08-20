@@ -7,6 +7,7 @@
 // sharded collection with one chunk on both shards.
 //
 // @tags: [requires_sharding, uses_transactions, uses_multi_shard_transaction]
+import {ShardingTest} from "jstests/libs/shardingtest.js";
 import {findChunksUtil} from "jstests/sharding/libs/find_chunks_util.js";
 import {
     assertNoSuchTransactionOnAllShards,

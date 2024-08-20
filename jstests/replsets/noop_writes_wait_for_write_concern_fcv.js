@@ -4,6 +4,7 @@
  * This tests behavior on both latest and last-lts FCVs.
  * @tags: [multiversion_incompatible]
  */
+import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {assertWriteConcernError} from "jstests/libs/write_concern_util.js";
 import {reconfig} from "jstests/replsets/rslib.js";
 

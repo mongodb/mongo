@@ -1,6 +1,8 @@
 // Test that doing secondaryOk reads from secondaries hits all the secondaries evenly
 // @tags: [requires_sharding]
 
+import {ShardingTest} from "jstests/libs/shardingtest.js";
+
 function testReadLoadBalancing(numReplicas) {
     var s =
         new ShardingTest({shards: {rs0: {nodes: numReplicas}}, verbose: 2, other: {chunkSize: 1}});

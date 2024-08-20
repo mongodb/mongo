@@ -1,6 +1,8 @@
 // Test that ClusterServerParameterOpObserver fires appropriately.
 // @tags: [requires_replication, requires_fcv_71]
 
+import {ReplSetTest} from "jstests/libs/replsettest.js";
+
 function runTest(conn) {
     const config = conn.getDB('config');
     const res =

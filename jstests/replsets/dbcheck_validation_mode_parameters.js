@@ -7,6 +7,7 @@
  */
 
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
+import {ReplSetTest} from "jstests/libs/replsettest.js";
 
 const dbName = "dbCheckValidationModeParameters";
 const colName = "dbCheckValidationModeParameters-collection";

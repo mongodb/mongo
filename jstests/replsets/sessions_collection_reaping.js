@@ -3,6 +3,8 @@
  * session, and that arbiters never try to a reap session.
  */
 
+import {ReplSetTest} from "jstests/libs/replsettest.js";
+
 // This test makes assertions about the number of sessions, which are not compatible with
 // implicit sessions.
 TestData.disableImplicitSessions = true;

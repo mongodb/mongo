@@ -9,6 +9,8 @@
 import "jstests/multiVersion/libs/multi_rs.js";
 import "jstests/multiVersion/libs/multi_cluster.js";
 
+import {ShardingTest} from "jstests/libs/shardingtest.js";
+
 function assertContainsValidLogicalTime(res, check) {
     assert.hasFields(res, ["$clusterTime"]);
     assert.hasFields(res.$clusterTime, ["signature", "clusterTime"]);

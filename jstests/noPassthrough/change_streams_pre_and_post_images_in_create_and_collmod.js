@@ -11,6 +11,7 @@ import {
     assertChangeStreamPreAndPostImagesCollectionOptionIsAbsent,
     assertChangeStreamPreAndPostImagesCollectionOptionIsEnabled,
 } from "jstests/libs/change_stream_util.js";
+import {ReplSetTest} from "jstests/libs/replsettest.js";
 
 const rsTest = new ReplSetTest({name: jsTestName(), nodes: 1});
 rsTest.startSet();

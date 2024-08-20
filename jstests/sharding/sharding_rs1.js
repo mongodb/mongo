@@ -1,6 +1,8 @@
 /**
  * tests sharding with replica sets
  */
+import {ShardingTest} from "jstests/libs/shardingtest.js";
+
 var s = new ShardingTest({shards: 3, other: {rs: true, chunkSize: 2, enableBalancer: true}});
 
 s.adminCommand({enablesharding: "test", primaryShard: s.shard0.shardName});

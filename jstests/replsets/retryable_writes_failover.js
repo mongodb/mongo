@@ -2,6 +2,8 @@
  * Tests that a retryable write started on one primary can be continued on a different node after
  * failover.
  */
+import {ReplSetTest} from "jstests/libs/replsettest.js";
+
 function stepDownPrimary(replTest) {
     assert.commandWorked(replTest.getPrimary().adminCommand({replSetStepDown: 10, force: true}));
 }

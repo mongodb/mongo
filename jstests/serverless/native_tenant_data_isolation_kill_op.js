@@ -3,6 +3,7 @@
 
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";
 import {funWithArgs} from "jstests/libs/parallel_shell_helpers.js";
+import {ReplSetTest} from "jstests/libs/replsettest.js";
 
 function killCurrentOpTest() {
     function operationToKillFunc(securityToken, dbName, colName) {

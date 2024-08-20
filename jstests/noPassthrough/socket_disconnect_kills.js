@@ -13,8 +13,8 @@
 // due to client disconnect.
 //
 // @tags: [requires_sharding]
-
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";
+import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 const kTestName = jsTestName();
 
@@ -231,7 +231,7 @@ const numThatShouldCloseEarly = 9;
 }
 
 {
-    let st = ShardingTest({mongo: 1, config: 1, shards: 1});
+    let st = new ShardingTest({mongo: 1, config: 1, shards: 1});
     let admin = st.s0.getDB("admin");
     let beforeServerStatusMetrics = admin.runCommand({serverStatus: 1}).metrics;
     runTests(st.s0);

@@ -7,6 +7,7 @@
  *      these nodes should include null lastApplied and lastDurable optimes in heartbeat responses
  */
 import {kDefaultWaitForFailPointTimeout} from "jstests/libs/fail_point_util.js";
+import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {checkWriteConcernTimedOut} from "jstests/libs/write_concern_util.js";
 import {reconfig} from "jstests/replsets/rslib.js";
 

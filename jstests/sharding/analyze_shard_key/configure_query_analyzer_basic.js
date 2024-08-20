@@ -4,6 +4,9 @@
  * @tags: [requires_fcv_70]
  */
 
+import {ReplSetTest} from "jstests/libs/replsettest.js";
+import {ShardingTest} from "jstests/libs/shardingtest.js";
+
 // This test requires running commands directly against the shard.
 TestData.replicaSetEndpointIncompatible = true;
 

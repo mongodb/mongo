@@ -4,6 +4,8 @@
  * @tags: [requires_replication]
  */
 
+import {ReplSetTest} from "jstests/libs/replsettest.js";
+
 const kReallyShortTimeoutMS = 500;
 
 const replTest = new ReplSetTest({nodes: 1});

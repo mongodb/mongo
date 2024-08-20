@@ -1,5 +1,7 @@
 // Test that oplog application on the secondary happens correctly when the collection has a default
 // collation and operations by _id which must respect the collation are issued.
+import {ReplSetTest} from "jstests/libs/replsettest.js";
+
 Random.setRandomSeed();
 
 // Return a string whose character at index 'i' in 'str' is replaced by 'character'.

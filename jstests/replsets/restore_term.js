@@ -7,6 +7,7 @@
 // so cannot elect a primary. This test induces such a scenario, so cannot be run on ephemeral
 // storage engines.
 // @tags: [requires_persistence]
+import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {getLatestOp} from "jstests/replsets/rslib.js";
 
 function getCurrentTerm(primary) {

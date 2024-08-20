@@ -9,6 +9,7 @@
  *   requires_replication
  * ]
  */
+import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {checkSbeRestrictedOrFullyEnabled} from "jstests/libs/sbe_util.js";
 
 const memoryLimitMb = 1;

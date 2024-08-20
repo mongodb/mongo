@@ -12,6 +12,7 @@
  * more than one runTest() call.
  */
 import {runCommandDuringTransferMods} from "jstests/libs/chunk_manipulation_util.js";
+import {ShardingTest} from "jstests/libs/shardingtest.js";
 import {runTxnRetryOnTransientError} from "jstests/sharding/internal_txns/libs/fixture_helpers.js";
 import {
     getTxnEntriesForSession,

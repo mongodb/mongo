@@ -5,6 +5,8 @@
 //   # TODO (SERVER-88127): Re-enable this test or add an explanation why it is incompatible.
 //   embedded_router_incompatible,
 // ]
+import {ShardingTest} from "jstests/libs/shardingtest.js";
+
 /**
  * Test the correctness of queries with sort and batchSize on a sharded cluster,
  * running the queries against collection 'coll'.

@@ -9,6 +9,7 @@
  */
 
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";
+import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {checkHealthLog, clearHealthLog, runDbCheck} from "jstests/replsets/libs/dbcheck_utils.js";
 
 // Skipping data consistency checks because data is inserted into primary and secondary separately.

@@ -1,5 +1,7 @@
 // Tests that an empty shard can't be the cause of a chunk reset
 
+import {ShardingTest} from "jstests/libs/shardingtest.js";
+
 var st = new ShardingTest({shards: 2, mongos: 2});
 
 var coll = st.s.getCollection(jsTestName() + ".coll");

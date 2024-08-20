@@ -8,6 +8,8 @@
  */
 import "jstests/multiVersion/libs/multi_rs.js";
 
+import {ReplSetTest} from "jstests/libs/replsettest.js";
+
 const timeFieldName = "time";
 
 // Note that this list will need to be kept up to date as versions are added/dropped.

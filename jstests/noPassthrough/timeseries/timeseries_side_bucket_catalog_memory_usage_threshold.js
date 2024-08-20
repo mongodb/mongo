@@ -6,6 +6,8 @@
  *  featureFlagTimeseriesUpdatesSupport,
  * ]
  */
+import {ReplSetTest} from "jstests/libs/replsettest.js";
+
 const timeFieldName = 'time';
 const metaFieldName = 'metafield';
 const valueFieldName = 'value';

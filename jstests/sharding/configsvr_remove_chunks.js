@@ -5,6 +5,7 @@
  */
 
 import {RetryableWritesUtil} from "jstests/libs/retryable_writes_util.js";
+import {ShardingTest} from "jstests/libs/shardingtest.js";
 import {findChunksUtil} from "jstests/sharding/libs/find_chunks_util.js";
 
 function runConfigsvrRemoveChunksWithRetries(conn, uuid, lsid, txnNumber) {

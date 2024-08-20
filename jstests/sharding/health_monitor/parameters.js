@@ -6,6 +6,8 @@
  * ]
  */
 
+import {ShardingTest} from "jstests/libs/shardingtest.js";
+
 let CUSTOM_INTERVAL = 1337;
 let CUSTOM_DEADLINE = 5;
 

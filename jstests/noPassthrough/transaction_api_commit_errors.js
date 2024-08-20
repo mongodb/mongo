@@ -2,6 +2,7 @@
  * Tests that the transaction API handles commit errors correctly.
  */
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";
+import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 const kDbName = "testDb";
 const kCollName = "testColl";

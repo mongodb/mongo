@@ -9,6 +9,8 @@
  *   requires_fcv_80,
  * ]
  */
+import {ReplSetTest} from "jstests/libs/replsettest.js";
+
 // Skip this test when running with storage engines other than inMemory, as the test relies on
 // journaling not being active.
 if (jsTest.options().storageEngine !== "inMemory") {

@@ -4,6 +4,7 @@
  */
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";
 import {funWithArgs} from "jstests/libs/parallel_shell_helpers.js";
+import {ReplSetTest} from "jstests/libs/replsettest.js";
 
 // Never retry on network error, because this test needs to detect the network error.
 TestData.skipRetryOnNetworkError = true;

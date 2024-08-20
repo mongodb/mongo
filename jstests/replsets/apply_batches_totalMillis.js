@@ -6,6 +6,8 @@
  * machines and test runs.
  */
 
+import {ReplSetTest} from "jstests/libs/replsettest.js";
+
 // Gets the value of metrics.repl.apply.batches.totalMillis.
 function getTotalMillis(node) {
     return assert.commandWorked(node.adminCommand({serverStatus: 1}))

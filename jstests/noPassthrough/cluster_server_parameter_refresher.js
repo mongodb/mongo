@@ -14,6 +14,7 @@ import {
     kAllClusterParameterSetInternallyNames,
     runGetClusterParameterSharded
 } from "jstests/libs/cluster_server_parameter_utils.js";
+import {ShardingTest} from "jstests/libs/shardingtest.js";
 import {TwoPhaseDropCollectionTest} from "jstests/replsets/libs/two_phase_drops.js";
 
 function runTest(st, startupRefreshIntervalMS) {

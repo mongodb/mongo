@@ -2,6 +2,7 @@
 //
 // This test requires the fsync command to ensure members experience a delay.
 // @tags: [requires_fsync]
+import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {syncFrom} from "jstests/replsets/rslib.js";
 
 var name = "maxSyncSourceLagSecs";

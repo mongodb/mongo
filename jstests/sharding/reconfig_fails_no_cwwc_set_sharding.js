@@ -15,6 +15,8 @@
 TestData.skipCheckShardFilteringMetadata = TestData.configShard;
 
 import {reconfig, safeReconfigShouldFail, isConfigCommitted} from "jstests/replsets/rslib.js";
+import {ReplSetTest} from "jstests/libs/replsettest.js";
+import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 const configurationIncompatibleMsg =
     "config that would change the implicit default write concern on the shard to {w: 1}.";

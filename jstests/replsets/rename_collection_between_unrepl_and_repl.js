@@ -5,6 +5,8 @@
  * 'local' database for unreplicated namespaces.
  */
 
+import {ReplSetTest} from "jstests/libs/replsettest.js";
+
 const name = "rename_collection_between_unrepl_and_repl";
 const rst = new ReplSetTest({"name": name, "nodes": 1});
 rst.startSet();

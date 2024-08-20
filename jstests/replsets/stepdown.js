@@ -9,6 +9,7 @@
  * @tags: [requires_fsync]
  */
 
+import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {verifyServerStatusChange} from "jstests/replsets/libs/election_metrics.js";
 
 // We are bypassing collection validation because this test runs "shutdown" command so the server is

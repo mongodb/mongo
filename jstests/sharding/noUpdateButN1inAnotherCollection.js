@@ -1,4 +1,6 @@
 
+import {ShardingTest} from "jstests/libs/shardingtest.js";
+
 function debug(str) {
     print("---\n" + str + "\n-----");
 }

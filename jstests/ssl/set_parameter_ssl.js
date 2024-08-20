@@ -1,5 +1,7 @@
 // Test changing the --sslMode and --clusterAuthMode parameters using setParameter
 
+import {ReplSetTest} from "jstests/libs/replsettest.js";
+
 var SERVER_CERT = "jstests/libs/server.pem";
 var CA_CERT = "jstests/libs/ca.pem";
 

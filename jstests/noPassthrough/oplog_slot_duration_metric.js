@@ -7,6 +7,7 @@
 
 import {findMatchingLogLine} from "jstests/libs/log.js";
 import {profilerHasAtLeastOneMatchingEntryOrThrow} from "jstests/libs/profiler.js";
+import {ReplSetTest} from "jstests/libs/replsettest.js";
 
 const dbName = "testDB";
 const collName = jsTestName();

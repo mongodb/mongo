@@ -17,6 +17,9 @@
  * ]
  */
 
+import {ReplSetTest} from "jstests/libs/replsettest.js";
+import {ShardingTest} from "jstests/libs/shardingtest.js";
+
 function testCRUD(conn) {
     const db = conn.getDB('apple');
     assert.commandWorked(db.foo.insert({x: 1}));

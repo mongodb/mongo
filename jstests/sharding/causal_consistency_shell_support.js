@@ -5,6 +5,9 @@
  *
  * @tags: [requires_majority_read_concern]
  */
+import {ReplSetTest} from "jstests/libs/replsettest.js";
+import {ShardingTest} from "jstests/libs/shardingtest.js";
+
 // Verifies the command works and properly updates operation or cluster time.
 function runCommandAndCheckLogicalTimes(cmdObj, db, shouldAdvance) {
     const session = db.getSession();

@@ -11,6 +11,7 @@
  */
 import {TimeseriesTest} from "jstests/core/timeseries/libs/timeseries.js";
 import {isLinux} from "jstests/libs/os_helpers.js";
+import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {checkSbeRestrictedOrFullyEnabled} from "jstests/libs/sbe_util.js";
 
 const dbName = jsTestName();

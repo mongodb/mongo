@@ -2,6 +2,8 @@
 // to each other during intra-cluster communication.
 // @tags: [requires_replication]
 
+import {ReplSetTest} from "jstests/libs/replsettest.js";
+
 const kAuthenticationSuccessfulLogId = 5286306;
 const kAuthenticationFailedLogId = 5286307;
 

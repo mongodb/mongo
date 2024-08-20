@@ -3,6 +3,8 @@
  *
  * @tags: [requires_replication]
  */
+import {ReplSetTest} from "jstests/libs/replsettest.js";
+
 function checkWriteConcern(testFn, checkFn) {
     const mongoRunCommandOriginal = Mongo.prototype.runCommand;
 

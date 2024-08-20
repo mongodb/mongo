@@ -13,6 +13,7 @@ TestData.disableImplicitSessions = true;
 
 import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 import {findMatchingLogLine} from "jstests/libs/log.js";
+import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 // Prevent the mongo shell from gossiping its cluster time, since this will increase the amount
 // of data logged for each op. For some of the testcases below, including the cluster time would

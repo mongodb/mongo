@@ -2,6 +2,8 @@
  * Tests that cursors opened before a chunk is moved will not see the effects of the chunk
  * migration.
  */
+import {ShardingTest} from "jstests/libs/shardingtest.js";
+
 const dbName = "test";
 const collName = jsTest.name();
 const testNs = dbName + "." + collName;

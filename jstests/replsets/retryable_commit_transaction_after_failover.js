@@ -1,5 +1,6 @@
 // Test committed transaction state is restored after failover.
 // @tags: [uses_transactions]
+import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {reconnect} from "jstests/replsets/rslib.js";
 
 const dbName = "test";

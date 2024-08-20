@@ -1,6 +1,8 @@
 // This test was designed to reproduce SERVER-77430. There was a mistaken assertion in a parser that
 // we are interested in proving will not fail here.
 // @tags: [requires_fcv_71]
+import {ShardingTest} from "jstests/libs/shardingtest.js";
+
 const st = new ShardingTest({
     mongos: 1,
     shards: 1,

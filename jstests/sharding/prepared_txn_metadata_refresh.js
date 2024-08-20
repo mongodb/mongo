@@ -4,6 +4,8 @@
  * @tags: [uses_transactions, uses_multi_shard_transaction]
  */
 
+import {ShardingTest} from "jstests/libs/shardingtest.js";
+
 var staticMongod = MongoRunner.runMongod({});
 
 let st = new ShardingTest({shards: 2, other: {shardOptions: {verbose: 1}}});

@@ -2,6 +2,7 @@
  * Tests that single-write-shard commit is not used for updates that cause WCOS errors thereby
  * preserving the safety of retryable writes.
  */
+import {ShardingTest} from "jstests/libs/shardingtest.js";
 import {CreateShardedCollectionUtil} from "jstests/sharding/libs/create_sharded_collection_util.js";
 import {ShardingStateTest} from "jstests/sharding/libs/sharding_state_test.js";
 

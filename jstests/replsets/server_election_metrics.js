@@ -1,6 +1,8 @@
 /**
  * Tests the format of 'electionMetrics' serverStatus section.
  */
+import {ReplSetTest} from "jstests/libs/replsettest.js";
+
 // Verifies that the 'electionMetrics' serverStatus section has the given field.
 function verifyElectionMetricsField(serverStatusResponse, fieldName) {
     assert(serverStatusResponse.electionMetrics.hasOwnProperty(fieldName),

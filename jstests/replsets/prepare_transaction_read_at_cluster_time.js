@@ -11,6 +11,7 @@
  */
 import {PrepareHelpers} from "jstests/core/txns/libs/prepare_helpers.js";
 import {Thread} from "jstests/libs/parallelTester.js";
+import {ReplSetTest} from "jstests/libs/replsettest.js";
 
 const runDBHashFn = (host, dbName, clusterTime) => {
     const conn = new Mongo(host);

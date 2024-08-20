@@ -3,6 +3,7 @@
  */
 import {FSMShardingTest} from "jstests/concurrency/fsm_libs/shard_fixture.js";
 import {validateCollections} from "jstests/hooks/validate_collections.js";
+import {ReplSetTest} from "jstests/libs/replsettest.js";
 
 export const Cluster = function(clusterOptions, sessionOptions) {
     if (!(this instanceof Cluster)) {

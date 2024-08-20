@@ -2,6 +2,8 @@
  * @tags: [requires_replication, requires_persistence]
  */
 
+import {ReplSetTest} from "jstests/libs/replsettest.js";
+
 const keyfile = 'jstests/libs/key1';
 const keyfileContents = cat(keyfile).replace(/[\011-\015\040]/g, '');
 

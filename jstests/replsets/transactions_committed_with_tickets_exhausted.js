@@ -10,6 +10,7 @@
  */
 import {PrepareHelpers} from "jstests/core/txns/libs/prepare_helpers.js";
 import {Thread} from "jstests/libs/parallelTester.js";
+import {ReplSetTest} from "jstests/libs/replsettest.js";
 
 // We set the number of write tickets to be a small value in order to avoid needing to spawn a
 // large number of threads to exhaust all of the available ones.

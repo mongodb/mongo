@@ -4,6 +4,8 @@
  * @tags: [uses_transactions, requires_db_locking]
  */
 
+import {ReplSetTest} from "jstests/libs/replsettest.js";
+
 let rst = new ReplSetTest({nodes: 1});
 rst.startSet();
 rst.initiate();

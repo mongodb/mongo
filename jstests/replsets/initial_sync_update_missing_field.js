@@ -11,6 +11,7 @@
  * operation has replaced the field, so the target is free to ignore the failed update operation.
  */
 
+import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {
     finishAndValidate,
     reInitiateSetWithSecondary

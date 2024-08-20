@@ -4,6 +4,7 @@
  *
  * @tags: [uses_transactions]
  */
+import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {RetryableWritesUtil} from "jstests/libs/retryable_writes_util.js";
 
 const replTest = new ReplSetTest({nodes: [{}, {rsConfig: {priority: 0}}, {arbiter: true}]});

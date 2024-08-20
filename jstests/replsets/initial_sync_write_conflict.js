@@ -4,6 +4,8 @@
  *  thrown while inserting documents into collections.
  */
 
+import {ReplSetTest} from "jstests/libs/replsettest.js";
+
 const testName = "write_conflict_exception";
 
 // Start a 2 node replica set.

@@ -5,6 +5,8 @@
  * secondary.
  */
 
+import {ReplSetTest} from "jstests/libs/replsettest.js";
+
 const testName = "opcounters_repl";
 const dbName = testName;
 const rst = new ReplSetTest({name: testName, nodes: 2});

@@ -7,6 +7,7 @@
  * ]
  */
 import {EncryptedClient, isEnterpriseShell} from "jstests/fle2/libs/encrypted_client_util.js";
+import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 if (!isEnterpriseShell()) {
     jsTestLog("Skipping test as it requires the enterprise module");

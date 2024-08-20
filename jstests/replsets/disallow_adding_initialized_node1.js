@@ -7,6 +7,8 @@
  * ]
  */
 
+import {ReplSetTest} from "jstests/libs/replsettest.js";
+
 const name = jsTestName();
 const replSetA = new ReplSetTest({
     name,

@@ -18,6 +18,7 @@
  * ]
  */
 
+import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {checkWriteConcernTimedOut} from "jstests/libs/write_concern_util.js";
 import {assertVoteCount} from "jstests/replsets/rslib.js";
 

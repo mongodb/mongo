@@ -1,6 +1,8 @@
 /**
  * Test that protocolVersion defaults to 1 even during a replSetReconfig.
  */
+import {ReplSetTest} from "jstests/libs/replsettest.js";
+
 var rst = new ReplSetTest({nodes: 2});
 rst.startSet();
 rst.initiate();

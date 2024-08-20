@@ -2,6 +2,8 @@
 // Basic tests for enableSharding command.
 //
 
+import {ShardingTest} from "jstests/libs/shardingtest.js";
+
 var st = new ShardingTest({shards: 2});
 
 jsTest.log('enableSharding can run only against the admin database');

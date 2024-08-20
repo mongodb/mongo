@@ -3,6 +3,9 @@
 // This test is to ensure that localhost authentication works correctly against a sharded
 // cluster whether they are hosted with "localhost" or a hostname.
 
+import {ReplSetTest} from "jstests/libs/replsettest.js";
+import {ShardingTest} from "jstests/libs/shardingtest.js";
+
 // The following checks, which occurs on ShardingTest.stop, involve using a mongos to read data on
 // the config server, but this test uses a special shutdown function which stops the mongoses before
 // calling ShardingTest.stop.

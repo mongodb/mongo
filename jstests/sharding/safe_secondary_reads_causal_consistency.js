@@ -14,6 +14,7 @@ import {
     waitForMoveChunkStep,
 } from "jstests/libs/chunk_manipulation_util.js";
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";
+import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 /**
  * @summary This function executes a count command with read preference "secondary" and returns the

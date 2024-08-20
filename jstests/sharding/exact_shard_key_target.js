@@ -4,6 +4,8 @@
 // SERVER-14138
 //
 
+import {ShardingTest} from "jstests/libs/shardingtest.js";
+
 var st = new ShardingTest({shards: 2, verbose: 4});
 
 var mongos = st.s0;

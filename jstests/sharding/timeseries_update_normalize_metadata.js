@@ -10,6 +10,8 @@
  * ]
  */
 
+import {ShardingTest} from "jstests/libs/shardingtest.js";
+
 const st = new ShardingTest({shards: 2});
 
 const db = st.s0.getDB(jsTestName());

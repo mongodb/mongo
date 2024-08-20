@@ -7,6 +7,7 @@ TestData.skipCheckingUUIDsConsistentAcrossCluster = true;
 TestData.skipCheckShardFilteringMetadata = true;
 
 import {awaitRSClientHosts} from "jstests/replsets/rslib.js";
+import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 var s = new ShardingTest({
     shards: {rs0: {nodes: [{}, {}, {rsConfig: {priority: 0}}]}},

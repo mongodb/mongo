@@ -6,6 +6,8 @@
  *   uses_transactions,
  * ]
  */
+import {ReplSetTest} from "jstests/libs/replsettest.js";
+
 const rst = new ReplSetTest({nodes: 2});
 rst.startSet();
 

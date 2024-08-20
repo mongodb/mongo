@@ -1,6 +1,9 @@
 /**
  * This tests the basic cases for implicit database creation in a sharded cluster.
  */
+import {ReplSetTest} from "jstests/libs/replsettest.js";
+import {ShardingTest} from "jstests/libs/shardingtest.js";
+
 const st = new ShardingTest({shards: 2});
 const configDB = st.s.getDB('config');
 

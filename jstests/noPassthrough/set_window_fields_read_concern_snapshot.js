@@ -10,6 +10,7 @@
 import {assertArrayEq} from "jstests/aggregation/extras/utils.js";
 import {DiscoverTopology} from "jstests/libs/discover_topology.js";
 import {getLatestProfilerEntry} from "jstests/libs/profiler.js";
+import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {setParameterOnAllHosts} from "jstests/noPassthrough/libs/server_parameter_helpers.js";
 
 const rst = new ReplSetTest({nodes: 2});

@@ -8,6 +8,7 @@
  * get the vote from node2 which has a lower config, and finish the catchup takeover.
  */
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";
+import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {
     verifyServerStatusElectionReasonCounterChange
 } from "jstests/replsets/libs/election_metrics.js";

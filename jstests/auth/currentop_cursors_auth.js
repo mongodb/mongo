@@ -4,6 +4,7 @@
  * @tags: [assumes_read_concern_unchanged, requires_auth, requires_replication]
  */
 import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
+import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 // Create a new sharded cluster for testing and enable auth.
 const key = "jstests/libs/key1";

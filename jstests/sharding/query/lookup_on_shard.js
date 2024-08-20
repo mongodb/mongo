@@ -1,4 +1,6 @@
 // Test that a pipeline with a $lookup stage on a sharded foreign collection may be run on a mongod.
+import {ShardingTest} from "jstests/libs/shardingtest.js";
+
 const sharded = new ShardingTest({mongos: 1, shards: 2});
 
 assert.commandWorked(

@@ -1,5 +1,7 @@
 // Validates the expected behaviour of direct writes against the `config.transactions` collection
 // Direct writes to config.transactions cannot be part of a session.
+import {ReplSetTest} from "jstests/libs/replsettest.js";
+
 TestData.disableImplicitSessions = true;
 
 var replTest = new ReplSetTest({nodes: 2});

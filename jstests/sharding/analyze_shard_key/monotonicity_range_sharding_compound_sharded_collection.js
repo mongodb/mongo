@@ -4,6 +4,7 @@
  *
  * @tags: [requires_fcv_70, resource_intensive]
  */
+import {ShardingTest} from "jstests/libs/shardingtest.js";
 import {
     testAnalyzeShardKeysShardedCollection,
 } from "jstests/sharding/analyze_shard_key/libs/monotonicity_common.js";

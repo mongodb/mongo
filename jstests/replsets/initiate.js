@@ -3,6 +3,8 @@
  * configs, so this is just seeing if it fails when it's supposed to.
  * @tags: [multiversion_incompatible]
  */
+import {ReplSetTest} from "jstests/libs/replsettest.js";
+
 var replTest = new ReplSetTest({name: 'testSet2', nodes: 1});
 var nodes = replTest.startSet();
 

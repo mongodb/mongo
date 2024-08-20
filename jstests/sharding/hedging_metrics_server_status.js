@@ -9,6 +9,7 @@
  * ]
  */
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";
+import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 /*
  * Verifies that the server status response has the hegingMetrics fields that we expect.

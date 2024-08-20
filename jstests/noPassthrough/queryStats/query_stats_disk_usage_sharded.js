@@ -11,6 +11,7 @@ import {
     exhaustCursorAndGetQueryStats,
     getAggregateQueryStatsKey,
 } from "jstests/libs/query_stats_utils.js";
+import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 let collId = 0;
 function getNewCollectionName() {

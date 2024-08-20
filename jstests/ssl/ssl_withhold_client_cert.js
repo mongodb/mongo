@@ -1,5 +1,7 @@
 // Test setParameter tlsWithholdClientCertificate
 
+import {ReplSetTest} from "jstests/libs/replsettest.js";
+
 function testRS(opts, expectWarning) {
     const rsOpts = {
         nodes: {node0: opts, node1: opts},

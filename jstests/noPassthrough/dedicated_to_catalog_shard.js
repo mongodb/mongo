@@ -6,6 +6,8 @@
  * ]
  */
 
+import {ShardingTest} from "jstests/libs/shardingtest.js";
+
 const dbName = "foo";
 const collName = "bar";
 const ns = dbName + "." + collName;

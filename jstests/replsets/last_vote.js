@@ -12,6 +12,7 @@
 //   requires_persistence,
 // ]
 
+import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {getLatestOp, reconfig} from "jstests/replsets/rslib.js";
 
 var name = "last_vote";

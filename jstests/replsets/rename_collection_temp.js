@@ -3,6 +3,8 @@
 // correctly propagated.
 // @tags: [requires_replication]
 
+import {ReplSetTest} from "jstests/libs/replsettest.js";
+
 function checkCollectionTemp(db, collName, expectedTempValue) {
     var collectionInformation = db.getCollectionInfos();
 

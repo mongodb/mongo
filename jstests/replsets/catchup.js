@@ -1,5 +1,6 @@
 // Test the catch-up behavior of new primaries.
 
+import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {restartServerReplication} from "jstests/libs/write_concern_util.js";
 import {
     verifyCatchUpConclusionReason,

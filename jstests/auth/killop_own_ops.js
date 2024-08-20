@@ -9,6 +9,7 @@
 
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";
 import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
+import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 function runTest(m, failPointName, altFailPointName) {
     var db = m.getDB("foo");

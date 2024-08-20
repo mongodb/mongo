@@ -1,4 +1,5 @@
 // Contains functions for testing the change collections.
+import {ReplSetTest} from "jstests/libs/replsettest.js";
 
 // Verifies that the oplog and change collection entries are the same for the provided tenant
 // 'tenantId' for the specified timestamp window:- (startOplogTimestamp, endOplogTimestamp].

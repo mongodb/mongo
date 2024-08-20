@@ -1,6 +1,8 @@
 /**
  * Test to make sure that the createIndex command gets sent to shards that own chunks.
  */
+import {ShardingTest} from "jstests/libs/shardingtest.js";
+
 var st = new ShardingTest({shards: 2});
 assert.commandWorked(
     st.s.adminCommand({enablesharding: 'test', primaryShard: st.shard1.shardName}));

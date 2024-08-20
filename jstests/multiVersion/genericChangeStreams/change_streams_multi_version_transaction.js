@@ -1,5 +1,7 @@
 import "jstests/multiVersion/libs/multi_rs.js";
 
+import {ReplSetTest} from "jstests/libs/replsettest.js";
+
 const dbName = jsTestName();
 const watchedCollName = "change_stream_watched";
 const unwatchedCollName = "change_stream_unwatched";

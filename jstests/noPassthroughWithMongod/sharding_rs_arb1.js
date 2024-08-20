@@ -1,5 +1,8 @@
 // @tags: [requires_replication, requires_sharding]
 
+import {ReplSetTest} from "jstests/libs/replsettest.js";
+import {ShardingTest} from "jstests/libs/shardingtest.js";
+
 var name = "sharding_rs_arb1";
 var replTest = new ReplSetTest({name: name, nodes: 3, nodeOptions: {shardsvr: ""}});
 replTest.startSet();

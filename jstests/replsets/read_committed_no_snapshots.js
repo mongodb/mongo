@@ -7,6 +7,7 @@
  * @tags: [requires_majority_read_concern]
  */
 
+import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {reconfig} from "jstests/replsets/rslib.js";
 
 // Set up a set and grab things for later.

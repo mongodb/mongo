@@ -2,6 +2,7 @@
  * Test that initial sync works without error when the sync source has an oplog hole.
  */
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";
+import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {waitForState} from "jstests/replsets/rslib.js";
 
 // Set up replica set. Disallow chaining so nodes always sync from primary.

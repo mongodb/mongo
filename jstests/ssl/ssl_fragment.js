@@ -1,6 +1,8 @@
 /**
  * Test that a large request and response works correctly.
  */
+import {ShardingTest} from "jstests/libs/shardingtest.js";
+
 function runTest(conn) {
     // SSL packets have a max size of ~16 kb so to test packet fragmentation support, create a
     // string larger then 16kb.

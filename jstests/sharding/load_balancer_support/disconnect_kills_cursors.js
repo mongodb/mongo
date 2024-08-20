@@ -6,6 +6,7 @@
  * ]
  */
 import {Thread} from "jstests/libs/parallelTester.js";
+import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 function setupShardedCollection(st, dbName, collName) {
     const fullNss = dbName + "." + collName;

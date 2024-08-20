@@ -3,6 +3,7 @@
  * primary to incorrectly acknowledge a w:majority write that's about to be rolled back.
  */
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";
+import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {restartServerReplication, stopServerReplication} from "jstests/libs/write_concern_util.js";
 
 var name = "writeConcernStepDownAndBackUp";

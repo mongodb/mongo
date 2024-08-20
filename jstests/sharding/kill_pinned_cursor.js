@@ -9,6 +9,7 @@
  */
 
 import {waitForCurOpByFailPoint} from "jstests/libs/curop_helpers.js";
+import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 // This test manually simulates a session, which is not compatible with implicit sessions.
 TestData.disableImplicitSessions = true;

@@ -1,5 +1,7 @@
 import "jstests/libs/sbe_assert_error_override.js";
 
+import {ShardingTest} from "jstests/libs/shardingtest.js";
+
 var st = new ShardingTest({mongos: 1, shards: 1, rs: {nodes: 3}});
 
 var db = st.getDB('test');

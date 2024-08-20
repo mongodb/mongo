@@ -5,6 +5,8 @@
  * @tags: [uses_transactions, uses_prepare_transaction]
  */
 
+import {ReplSetTest} from "jstests/libs/replsettest.js";
+
 const name = "prepare_transaction_fails_with_arbiters";
 const rst = new ReplSetTest({name: name, nodes: 2});
 const nodes = rst.nodeList();

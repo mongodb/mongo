@@ -6,6 +6,8 @@
  * # Restarting as a standalone is not supported in multiversion tests.
  * multiversion_incompatible]
  */
+import {ReplSetTest} from "jstests/libs/replsettest.js";
+
 var rst = new ReplSetTest({nodes: 2});
 rst.startSet();
 

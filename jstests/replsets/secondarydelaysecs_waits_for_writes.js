@@ -10,6 +10,7 @@
 //
 // @tags: [
 // ]
+import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {reconfig, waitForAllMembers} from "jstests/replsets/rslib.js";
 
 let doTest = function(signal) {

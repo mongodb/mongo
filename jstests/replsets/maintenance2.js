@@ -1,5 +1,7 @@
 // Test that certain operations fail in recovery mode.
 
+import {ReplSetTest} from "jstests/libs/replsettest.js";
+
 // Replica set testing API
 // Create a new replica set test. Specify set name and the number of nodes you want.
 var replTest = new ReplSetTest({name: 'testSet', nodes: 3});

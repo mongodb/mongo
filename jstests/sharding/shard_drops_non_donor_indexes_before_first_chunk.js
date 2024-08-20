@@ -5,6 +5,8 @@
  *   expects_explicit_underscore_id_index,
  * ]
  */
+import {ShardingTest} from "jstests/libs/shardingtest.js";
+
 const st = new ShardingTest({shards: 2});
 const dbName = 'test';
 const testDB = st.s.getDB('test');

@@ -20,6 +20,8 @@ import {
     makeCommitTransactionCmdObj,
     makePrepareTransactionCmdObj,
 } from "jstests/sharding/libs/sharded_transactions_helpers.js";
+import {ReplSetTest} from "jstests/libs/replsettest.js";
+import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 function runTest(st, stepDownShard0PrimaryFunc, testOpts) {
     jsTest.log("Testing with options " + tojson(testOpts));

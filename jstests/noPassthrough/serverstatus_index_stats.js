@@ -9,6 +9,7 @@
  */
 
 import {safeToCreateColumnStoreIndex} from "jstests/libs/columnstore_util.js";
+import {ReplSetTest} from "jstests/libs/replsettest.js";
 
 const assertStats = (db, assertFn) => {
     const stats = db.serverStatus().indexStats;

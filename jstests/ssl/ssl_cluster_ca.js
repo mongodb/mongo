@@ -1,6 +1,8 @@
 // Verify certificates and CAs between intra-cluster
 // and client->server communication using different CAs.
 
+import {ReplSetTest} from "jstests/libs/replsettest.js";
+
 function testRS(opts, succeed) {
     const origSkipCheck = TestData.skipCheckDBHashes;
     const rsOpts = {

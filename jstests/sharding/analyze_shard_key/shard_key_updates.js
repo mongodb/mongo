@@ -4,6 +4,7 @@
  * @tags: [requires_fcv_70]
  */
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
+import {ShardingTest} from "jstests/libs/shardingtest.js";
 import {extractUUIDFromObject} from "jstests/libs/uuid_util.js";
 import {
     AnalyzeShardKeyUtil

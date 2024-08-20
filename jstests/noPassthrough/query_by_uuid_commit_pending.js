@@ -2,6 +2,7 @@
  * Test query by namespace and uuid while collection changes are in the commit pending state.
  */
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";
+import {ReplSetTest} from "jstests/libs/replsettest.js";
 
 const afterWTCommitFP = "hangBeforePublishingCatalogUpdates";
 const beforeWTCommitFP = "hangAfterPreCommittingCatalogUpdates";

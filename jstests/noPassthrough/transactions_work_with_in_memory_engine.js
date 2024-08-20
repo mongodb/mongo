@@ -5,6 +5,8 @@
  * TODO: remove this test when general transaction testing is turned on with the inMemory storage
  * engine (SERVER-36023).
  */
+import {ReplSetTest} from "jstests/libs/replsettest.js";
+
 if (jsTest.options().storageEngine !== "inMemory") {
     jsTestLog("Skipping test because storageEngine is not inMemory");
     quit();

@@ -9,6 +9,8 @@
 //   embedded_router_incompatible,
 // ]
 
+import {ShardingTest} from "jstests/libs/shardingtest.js";
+
 var st = new ShardingTest({shards: 2, mongos: 5, verbose: 1});
 // Balancer is by default stopped, thus it will not interfere
 

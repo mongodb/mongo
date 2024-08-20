@@ -6,6 +6,8 @@
  *   does_not_support_stepdowns,
  * ]
  */
+import {ShardingTest} from "jstests/libs/shardingtest.js";
+
 (function() {
 'use strict';
 

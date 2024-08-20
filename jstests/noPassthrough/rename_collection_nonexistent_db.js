@@ -11,6 +11,7 @@
 
 import {waitForCurOpByFailPointNoNS} from "jstests/libs/curop_helpers.js";
 import {funWithArgs} from "jstests/libs/parallel_shell_helpers.js";
+import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 function runTestRenameCollectionOnEvent(st, eventFunction, expectedErrorCode) {
     let testDb = st.s.getDB("sourceDb");

@@ -5,6 +5,8 @@
  *   requires_replication,
  * ]
  */
+import {ReplSetTest} from "jstests/libs/replsettest.js";
+
 // Set the refresh period to 10 min to rule out races
 _setShellFailPoint({
     configureFailPoint: "modifyReplicaSetMonitorDefaultRefreshPeriod",

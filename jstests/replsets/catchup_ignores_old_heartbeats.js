@@ -1,6 +1,7 @@
 // Makes sure an old heartbeat that is being processed when primary catchup starts does not cause
 // primary catchup to think we're already caught up.
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";
+import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {syncFrom} from "jstests/replsets/rslib.js";
 
 var name = TestData.testName;

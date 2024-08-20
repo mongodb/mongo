@@ -2,6 +2,8 @@
  *  @tags: [requires_fcv_53]
  */
 
+import {ShardingTest} from "jstests/libs/shardingtest.js";
+
 const params = {
     healthMonitoringIntensities: tojson({
         values: [

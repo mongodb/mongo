@@ -5,6 +5,7 @@
  *   requires_replication,
  * ]
  */
+import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {assertSameConfigContent, reconfig} from "jstests/replsets/rslib.js";
 
 // Make secondaries unelectable.

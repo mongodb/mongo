@@ -5,9 +5,11 @@
  *   requires_fcv_62
  * ]
  */
+import {ReplSetTest} from "jstests/libs/replsettest.js";
+
 // Create a replica set with multi-tenancy enabled.
 const kVTSKey = 'secret';
-const replSetTest = ReplSetTest({nodes: 1});
+const replSetTest = new ReplSetTest({nodes: 1});
 replSetTest.startSet({
     setParameter: {
         multitenancySupport: true,

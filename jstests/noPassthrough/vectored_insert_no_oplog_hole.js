@@ -6,6 +6,8 @@
  */
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";
 import {Thread} from "jstests/libs/parallelTester.js";
+import {ReplSetTest} from "jstests/libs/replsettest.js";
+
 const testName = TestData.testName;
 const dbName = testName;
 // Set up a two-node replica set

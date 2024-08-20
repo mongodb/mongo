@@ -5,6 +5,8 @@
  * ]
  */
 
+import {ShardingTest} from "jstests/libs/shardingtest.js";
+
 const st = new ShardingTest({nodes: 2});
 
 const dbName = 'testDb';

@@ -9,6 +9,8 @@
 TestData.skipCheckShardFilteringMetadata = TestData.configShard;
 
 import {reconfig, isConfigCommitted} from "jstests/replsets/rslib.js";
+import {ReplSetTest} from "jstests/libs/replsettest.js";
+import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 function addNonArbiterNode(nodeId, rst) {
     const config = rst.getReplSetConfigFromNode();

@@ -5,6 +5,8 @@
  * @tags: [uses_testing_only_commands]
  */
 
+import {ReplSetTest} from "jstests/libs/replsettest.js";
+
 // Skip DB hash check in stopSet() since we expect it to fail in this test.
 TestData.skipCheckDBHashes = true;
 

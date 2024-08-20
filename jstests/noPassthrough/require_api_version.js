@@ -10,6 +10,9 @@
  * ]
  */
 
+import {ReplSetTest} from "jstests/libs/replsettest.js";
+import {ShardingTest} from "jstests/libs/shardingtest.js";
+
 function runTest(db, supportsTransactions, writeConcern = {}, secondaries = []) {
     assert.commandWorked(db.runCommand({setParameter: 1, requireApiVersion: true}));
     for (const secondary of secondaries) {

@@ -4,6 +4,8 @@
  *
  * @tags: [requires_fcv_60, uses_transactions, requires_persistence]
  */
+import {ReplSetTest} from "jstests/libs/replsettest.js";
+import {ShardingTest} from "jstests/libs/shardingtest.js";
 import {TransactionsUtil} from "jstests/libs/transactions_util.js";
 import {awaitRSClientHosts} from "jstests/replsets/rslib.js";
 import {makeCommitTransactionCmdObj} from "jstests/sharding/libs/sharded_transactions_helpers.js";

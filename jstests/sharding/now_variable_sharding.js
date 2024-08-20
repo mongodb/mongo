@@ -2,6 +2,8 @@
  * Tests for the $$NOW and $$CLUSTER_TIME system variable on a sharded cluster.
  */
 
+import {ShardingTest} from "jstests/libs/shardingtest.js";
+
 var st = new ShardingTest({mongos: 1, shards: 2});
 
 // Enable sharding on the test DB and ensure its primary is st.shard0.shardName.

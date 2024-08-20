@@ -4,6 +4,8 @@
  * so we allow initial sync to retry 3 times.
  */
 
+import {ReplSetTest} from "jstests/libs/replsettest.js";
+
 var name = 'initial_sync_fail_insert_once';
 var replSet = new ReplSetTest(
     {name: name, nodes: 2, nodeOptions: {setParameter: "numInitialSyncAttempts=3"}});

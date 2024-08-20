@@ -5,6 +5,7 @@
  * @tags: [requires_sharding, requires_fcv_53]
  */
 import {verifyGetDiagnosticData} from "jstests/libs/ftdc.js";
+import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 const testPath = MongoRunner.toRealPath('ftdc_dir');
 const st = new ShardingTest({

@@ -4,6 +4,8 @@
  * @tags: [requires_replication]
  */
 
+import {ReplSetTest} from "jstests/libs/replsettest.js";
+
 const rsTest = new ReplSetTest({nodes: 3});
 rsTest.startSet({
     oplogSize: 10,

@@ -2,6 +2,7 @@
  * Tests that the election metric for average number of catchup ops is being set correctly. We test
  * this by electing a node to be primary twice and forcing it to catch up each time.
  */
+import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {restartServerReplication} from "jstests/libs/write_concern_util.js";
 import {stopReplicationAndEnforceNewPrimaryToCatchUp} from "jstests/replsets/rslib.js";
 

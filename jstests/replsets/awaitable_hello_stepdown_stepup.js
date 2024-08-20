@@ -3,6 +3,7 @@
  */
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";
 import {funWithArgs} from "jstests/libs/parallel_shell_helpers.js";
+import {ReplSetTest} from "jstests/libs/replsettest.js";
 
 // Test hello paramaters on a single node replica set.
 const replSetName = "awaitable_hello_stepup";

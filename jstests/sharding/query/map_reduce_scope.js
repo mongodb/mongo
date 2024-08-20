@@ -2,6 +2,8 @@
  * Test to verify 'scope' parameter of mapReduce command. This test verfies that 'map', 'reduce' and
  * 'finalize' functions can use 'scope' variable passed in the input.
  */
+import {ShardingTest} from "jstests/libs/shardingtest.js";
+
 const st = new ShardingTest({shards: 2});
 const dbName = jsTest.name();
 const coll = st.s.getDB(dbName).coll;

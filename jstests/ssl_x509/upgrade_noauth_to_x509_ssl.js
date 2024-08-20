@@ -10,6 +10,7 @@
  * @tags: [requires_persistence]
  */
 
+import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {allowTLS, requireTLS} from "jstests/ssl/libs/ssl_helpers.js";
 
 TestData.disableImplicitSessions = true;

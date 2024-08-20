@@ -4,6 +4,8 @@
  * @tags: [requires_replication]
  */
 
+import {ReplSetTest} from "jstests/libs/replsettest.js";
+
 const rs = new ReplSetTest({nodes: 2});
 rs.startSet();
 rs.initiate();

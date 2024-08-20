@@ -1,4 +1,12 @@
 import {ContinuousStepdown} from "jstests/libs/override_methods/continuous_stepdown.js";
+import {
+    kOverrideConstructor as kOverrideConstructorForRST,
+    ReplSetTest
+} from "jstests/libs/replsettest.js";
+import {
+    kOverrideConstructor as kOverrideConstructorForST,
+    ShardingTest
+} from "jstests/libs/shardingtest.js";
 
 const {ReplSetTestWithContinuousPrimaryStepdown, ShardingTestWithContinuousPrimaryStepdown} =
     ContinuousStepdown.configure({
@@ -16,8 +24,8 @@ const {ReplSetTestWithContinuousPrimaryStepdown, ShardingTestWithContinuousPrima
                                      }
                                  });
 
-globalThis.ReplSetTest = ReplSetTestWithContinuousPrimaryStepdown;
-globalThis.ShardingTest =
+ReplSetTest[kOverrideConstructorForRST] = ReplSetTestWithContinuousPrimaryStepdown;
+ShardingTest[kOverrideConstructorForST] =
     class ShardingTestWithContinuousFailover extends ShardingTestWithContinuousPrimaryStepdown {
     constructor(params) {
         super(params);

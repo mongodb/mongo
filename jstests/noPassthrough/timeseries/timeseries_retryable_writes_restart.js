@@ -7,6 +7,8 @@
  *     requires_persistence,
  * ]
  */
+import {ReplSetTest} from "jstests/libs/replsettest.js";
+
 function testRetryableRestart(ordered) {
     const replTest = new ReplSetTest({nodes: 1});
     replTest.startSet();

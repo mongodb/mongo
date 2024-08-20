@@ -21,6 +21,7 @@ TestData.skipCheckShardFilteringMetadata = true;
 
 import {funWithArgs} from "jstests/libs/parallel_shell_helpers.js";
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";
+import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 function getNewNs(dbName) {
     if (typeof getNewNs.counter == 'undefined') {

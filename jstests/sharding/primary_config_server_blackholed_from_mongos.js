@@ -10,6 +10,7 @@
  */
 
 import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
+import {ShardingTest} from "jstests/libs/shardingtest.js";
 import {reconfig} from "jstests/replsets/rslib.js";
 
 // Checking index consistency involves talking to the primary config server which is blackholed from

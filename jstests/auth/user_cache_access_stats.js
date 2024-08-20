@@ -7,6 +7,8 @@
  * ]
  */
 
+import {ShardingTest} from "jstests/libs/shardingtest.js";
+
 function hasCommandLogEntry(conn, id, command, attributes, count) {
     let expectedLog = {command: command};
     if (Object.keys(attributes).length > 0) {

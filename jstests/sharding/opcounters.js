@@ -9,6 +9,8 @@
  * ]
  */
 
+import {ShardingTest} from "jstests/libs/shardingtest.js";
+
 const st = new ShardingTest({mongos: 2, shards: 1});
 
 function getOpCounters(conn) {

@@ -3,6 +3,9 @@
  * FCV is still in downgrading state and we can change FCV to upgraded state.
  */
 
+import {ReplSetTest} from "jstests/libs/replsettest.js";
+import {ShardingTest} from "jstests/libs/shardingtest.js";
+
 const latest = "latest";
 const testName = "restart_during_downgrading_fcv";
 const dbpath = MongoRunner.dataPath + testName;

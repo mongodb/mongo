@@ -7,6 +7,8 @@
  *   requires_sharding,
  * ]
  */
+import {ShardingTest} from "jstests/libs/shardingtest.js";
+
 function runTest(conn) {
     const logId = 5626600;
     const logAttr = {};

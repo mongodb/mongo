@@ -5,6 +5,7 @@
 //   embedded_router_incompatible,
 // ]
 import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
+import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 var st = new ShardingTest({name: "mongos_no_detect_sharding", shards: 1, mongos: 2});
 

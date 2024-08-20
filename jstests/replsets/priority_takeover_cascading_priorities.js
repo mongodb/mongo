@@ -3,6 +3,7 @@
 // Start replica set. Ensure that highest priority node becomes primary eventually.
 // Shut down the primary and confirm that the next highest priority node becomes primary.
 // Repeat until 3 nodes are left standing.
+import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {waitUntilAllNodesCaughtUp} from "jstests/replsets/rslib.js";
 
 var name = 'priority_takeover_cascading_priorities';

@@ -15,6 +15,7 @@ import {
     verifyChangeStreamOnWholeCluster
 } from "jstests/libs/change_stream_rewrite_util.js";
 import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
+import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 const dbName = "change_stream_match_pushdown_documentKey_rewrite";
 const collName = "change_stream_match_pushdown_documentKey_rewrite";

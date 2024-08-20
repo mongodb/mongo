@@ -6,6 +6,8 @@
  *   requires_sharding,
  * ]
  */
+import {ShardingTest} from "jstests/libs/shardingtest.js";
+
 const st = new ShardingTest({mongos: 1, shards: 0, keyFile: "jstests/libs/key1"});
 
 assert.commandFailedWithCode(st.s.adminCommand({

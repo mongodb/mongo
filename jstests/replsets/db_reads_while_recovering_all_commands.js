@@ -8,6 +8,7 @@
 
 // This will verify the completeness of our map and run all tests.
 import {AllCommandsTest} from "jstests/libs/all_commands_test.js";
+import {ReplSetTest} from "jstests/libs/replsettest.js";
 
 const name = jsTestName();
 const dbName = "alltestsdb";

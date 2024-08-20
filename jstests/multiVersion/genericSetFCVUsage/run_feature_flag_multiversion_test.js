@@ -7,6 +7,8 @@
  * @tags: [featureFlagToaster, featureFlagSpoon]
  */
 
+import {ReplSetTest} from "jstests/libs/replsettest.js";
+
 let numLastLTSRuns = 0;
 let numLastContRuns = 0;
 

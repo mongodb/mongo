@@ -2,6 +2,7 @@
 // different, non-primary shards.
 // @tags: [requires_sharding, requires_fcv_50]
 import {assertArrayEq} from "jstests/aggregation/extras/utils.js";
+import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 const sharded = new ShardingTest({mongos: 1, shards: 4, config: 1});
 

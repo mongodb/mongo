@@ -4,6 +4,8 @@
 // @tags: [
 // requires_fcv_71,
 // ]
+import {ShardingTest} from "jstests/libs/shardingtest.js";
+
 const shardCount = 2;
 const rsNodesPerShardCount = 2;
 const st = new ShardingTest({shards: shardCount, rs: {nodes: rsNodesPerShardCount}});

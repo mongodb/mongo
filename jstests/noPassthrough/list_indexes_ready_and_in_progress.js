@@ -2,6 +2,7 @@
  * Tests that the listIndexes command shows ready and in-progress indexes.
  * @tags: [requires_replication]
  */
+import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {IndexBuildTest} from "jstests/noPassthrough/libs/index_build.js";
 
 const rst = new ReplSetTest({nodes: 1});

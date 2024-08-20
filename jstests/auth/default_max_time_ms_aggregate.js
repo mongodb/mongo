@@ -11,6 +11,9 @@
  * ]
  */
 
+import {ReplSetTest} from "jstests/libs/replsettest.js";
+import {ShardingTest} from "jstests/libs/shardingtest.js";
+
 function setDefaultReadMaxTimeMS(db, newValue) {
     assert.commandWorked(
         db.runCommand({setClusterParameter: {defaultMaxTimeMS: {readOperations: newValue}}}));

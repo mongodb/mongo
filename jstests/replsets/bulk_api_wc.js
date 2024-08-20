@@ -1,4 +1,6 @@
 // Tests write-concern-related bulk api functionality
+import {ReplSetTest} from "jstests/libs/replsettest.js";
+
 jsTest.log("Starting bulk api write concern tests...");
 
 // Skip this test when running with storage engines other than inMemory, as the test relies on

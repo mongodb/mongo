@@ -8,6 +8,8 @@
  *     multiversion_incompatible,
  * ]
  */
+import {ReplSetTest} from "jstests/libs/replsettest.js";
+
 const replTest = new ReplSetTest({name: 'test', nodes: 3});
 replTest.startSet();
 const nodes = replTest.nodeList();

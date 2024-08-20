@@ -11,6 +11,7 @@
  */
 import {getPlanCacheKeyFromShape} from "jstests/libs/analyze_plan.js";
 import {checkSbeFullyEnabled} from "jstests/libs/sbe_util.js";
+import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 const dbName = "test";
 const collName = "sbe_plan_cache_does_not_block_range_deletion";

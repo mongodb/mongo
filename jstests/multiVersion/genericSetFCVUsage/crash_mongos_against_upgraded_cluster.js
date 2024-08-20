@@ -5,6 +5,8 @@
 // setFCV(upgrade), leaving the still downgraded mongos unable to communicate. Rather than the
 // mongos logging incompatible server version errors endlessly, we've chosen to crash it.
 
+import {ShardingTest} from "jstests/libs/shardingtest.js";
+
 TestData.skipCheckingUUIDsConsistentAcrossCluster = true;
 
 function runTest(downgradeVersion) {

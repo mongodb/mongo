@@ -7,6 +7,8 @@
  * to test with a config shard.
  * @tags: [assumes_read_preference_unchanged, config_shard_incompatible]
  */
+import {ShardingTest} from "jstests/libs/shardingtest.js";
+
 const numShards = 2;
 
 const st = new ShardingTest({

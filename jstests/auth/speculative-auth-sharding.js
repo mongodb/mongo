@@ -1,6 +1,8 @@
 // Verify that clients can speculatively authenticate to mongos.
 // @tags: [requires_sharding]
 
+import {ShardingTest} from "jstests/libs/shardingtest.js";
+
 const fallbackMech = 'SCRAM-SHA-256';
 const keyfile = 'jstests/libs/key1';
 const st = new ShardingTest({

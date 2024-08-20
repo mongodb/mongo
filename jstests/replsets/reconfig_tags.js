@@ -1,5 +1,7 @@
 // test that reconfigging only tag changes is properly reflected in hello
 
+import {ReplSetTest} from "jstests/libs/replsettest.js";
+
 var replTest = new ReplSetTest({nodes: 2});
 replTest.startSet({oplogSize: 10});
 replTest.initiate();

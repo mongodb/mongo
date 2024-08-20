@@ -14,6 +14,8 @@ import {
     getLatestQueryStatsEntry,
     getNumberOfGetMoresUntilNextDocForChangeStream
 } from "jstests/libs/query_stats_utils.js";
+import {ReplSetTest} from "jstests/libs/replsettest.js";
+import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 function testCollectionChangeStream(conn) {
     const db = conn.getDB("test");

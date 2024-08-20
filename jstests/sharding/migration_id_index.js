@@ -1,6 +1,7 @@
 // This tests that when a chunk migration occurs, all replica set members of the destination shard
 // get the correct _id index version for the collection.
 import {IndexCatalogHelpers} from "jstests/libs/index_catalog_helpers.js";
+import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 var st = new ShardingTest({shards: 2, rs: {nodes: 2}});
 var testDB = st.s.getDB("test");

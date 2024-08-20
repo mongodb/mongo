@@ -7,6 +7,7 @@
  * and therefore cannot test modes that do not allow ssl.
  */
 
+import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {SERVER_CERT} from "jstests/ssl/libs/ssl_helpers.js";
 
 // "tlsAllowInvalidCertificates" is enabled to avoid hostname conflicts with our testing certs

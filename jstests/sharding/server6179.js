@@ -3,6 +3,8 @@
 //   requires_sharding,
 //   requires_spawning_own_processes,
 // ]
+import {ShardingTest} from "jstests/libs/shardingtest.js";
+
 var s = new ShardingTest({shards: 2});
 
 assert.commandWorked(s.s0.adminCommand({enablesharding: "test", primaryShard: s.shard1.shardName}));

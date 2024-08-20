@@ -1,6 +1,8 @@
 // Tests that the "failCommand" failpoint ignores commands from internal clients: SERVER-34943.
 // @tags: [requires_replication]
 // Prevent elections.
+import {ReplSetTest} from "jstests/libs/replsettest.js";
+
 const replTest = new ReplSetTest({nodes: [{}, {rsConfig: {votes: 0, priority: 0}}]});
 replTest.startSet();
 replTest.initiate();

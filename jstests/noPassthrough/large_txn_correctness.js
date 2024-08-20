@@ -4,6 +4,8 @@
  *
  * @tags: [requires_replication]
  */
+import {ReplSetTest} from "jstests/libs/replsettest.js";
+
 // Declare constants.
 const DB_NAME = "db_large_txn_correctness";
 const COLL_NAME = "db_large_txn_correctness";

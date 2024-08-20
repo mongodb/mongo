@@ -4,6 +4,9 @@
  *
  * @tags: [uses_$out, assumes_read_preference_unchanged]
  */
+import {ReplSetTest} from "jstests/libs/replsettest.js";
+import {ShardingTest} from "jstests/libs/shardingtest.js";
+
 const dbName = "db";
 const collName = "movies";
 const targetCollName = "movies2";

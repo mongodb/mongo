@@ -10,6 +10,7 @@
  */
 
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";
+import {ReplSetTest} from "jstests/libs/replsettest.js";
 
 var name = 'initial_sync_applier_error';
 var replSet = new ReplSetTest({

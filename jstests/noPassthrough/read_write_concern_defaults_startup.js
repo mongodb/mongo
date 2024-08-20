@@ -7,6 +7,8 @@
 //   requires_replication,
 //   requires_sharding,
 // ]
+import {ReplSetTest} from "jstests/libs/replsettest.js";
+import {ShardingTest} from "jstests/libs/shardingtest.js";
 import {reconnect} from "jstests/replsets/rslib.js";
 
 function runTest(conn, failPointConn, restartFn) {

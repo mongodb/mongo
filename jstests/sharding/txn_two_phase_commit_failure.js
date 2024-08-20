@@ -4,6 +4,7 @@
  * @tags: [uses_transactions, uses_multi_shard_transaction, multiversion_incompatible]
  */
 
+import {ShardingTest} from "jstests/libs/shardingtest.js";
 import {
     flushRoutersAndRefreshShardMetadata,
     getCoordinatorFailpoints

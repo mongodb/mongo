@@ -4,6 +4,8 @@
  * @tags: [requires_fcv_60]
  */
 
+import {ReplSetTest} from "jstests/libs/replsettest.js";
+
 const rst = new ReplSetTest({nodes: 1, name: jsTestName()});
 rst.startSet();
 rst.initiate();

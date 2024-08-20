@@ -1,6 +1,7 @@
 // Tests that the $merge aggregation stage is resilient to drop shard in both the source and
 // output collection during execution.
 import {withEachMergeMode} from "jstests/aggregation/extras/merge_helpers.js";
+import {ShardingTest} from "jstests/libs/shardingtest.js";
 import {removeShard} from "jstests/sharding/libs/remove_shard_util.js";
 
 // TODO SERVER-50144 Remove this and allow orphan checking.

@@ -7,6 +7,8 @@
  * ]
  */
 
+import {ReplSetTest} from "jstests/libs/replsettest.js";
+
 // Verifies that batches replicate as applyOps entries.
 function validateBatchedDeletesOplogDocsPerBatch(conn) {
     const db = conn.getDB("test");

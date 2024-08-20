@@ -3,6 +3,9 @@
  * for a replica set and a sharded cluster.
  */
 
+import {ReplSetTest} from "jstests/libs/replsettest.js";
+import {ShardingTest} from "jstests/libs/shardingtest.js";
+
 function assertServerStatus(expectedServerStatusMetrics, externalConn, internalConn) {
     const externalServerStatus = assert.commandWorked(externalConn.adminCommand({serverStatus: 1}));
     assert.eq(expectedServerStatusMetrics['external']['internalRetryableWriteCount'],

@@ -3,6 +3,7 @@
  * hashed shard key.
  */
 import {assertStagesForExplainOfCommand} from "jstests/libs/analyze_plan.js";
+import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 const st = new ShardingTest({shards: 2});
 const kDbName = jsTestName();

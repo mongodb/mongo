@@ -3,6 +3,8 @@
  * writing sampled queries and diffs are configurable in runtime.
  */
 
+import {ReplSetTest} from "jstests/libs/replsettest.js";
+import {ShardingTest} from "jstests/libs/shardingtest.js";
 import {QuerySamplingUtil} from "jstests/sharding/analyze_shard_key/libs/query_sampling_util.js";
 
 const numNodesPerRS = 2;

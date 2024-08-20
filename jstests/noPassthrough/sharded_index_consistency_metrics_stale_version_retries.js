@@ -5,6 +5,7 @@
  *   requires_sharding,
  * ]
  */
+import {ShardingTest} from "jstests/libs/shardingtest.js";
 import {
     checkServerStatusNumCollsWithInconsistentIndexes,
     getServerStatusNumCollsWithInconsistentIndexes,

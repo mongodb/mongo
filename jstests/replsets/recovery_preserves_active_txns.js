@@ -11,6 +11,7 @@
  */
 
 import {PrepareHelpers} from "jstests/core/txns/libs/prepare_helpers.js";
+import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {getOldestRequiredTimestampForCrashRecovery} from "jstests/libs/storage_helpers.js";
 
 // A new replica set for both the commit and abort tests to ensure the same clean state.

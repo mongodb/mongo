@@ -5,6 +5,8 @@
  * @tags: [multiversion_incompatible]
  */
 
+import {ReplSetTest} from "jstests/libs/replsettest.js";
+
 var NewReplicaSetConfigurationIncompatible = 103;
 var InvalidReplicaSetConfig = 93;
 

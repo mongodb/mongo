@@ -6,6 +6,7 @@
  * requires_sharding]
  */
 import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
+import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 // Set up a 2-shard cluster. Configure 'internalQueryExecYieldIterations' on both shards such
 // that operations will yield on each PlanExecuter iteration.

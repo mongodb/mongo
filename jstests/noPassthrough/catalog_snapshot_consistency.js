@@ -2,7 +2,8 @@
  * Test local catalog for commands like listDatabases, focusing on consistency with the durable
  * storage snapshot.
  */
-import {configureFailPoint, kDefaultWaitForFailPointTimeout} from "jstests/libs/fail_point_util.js";
+import {configureFailPoint} from "jstests/libs/fail_point_util.js";
+import {ReplSetTest} from "jstests/libs/replsettest.js";
 
 let replTest = new ReplSetTest({
     name: jsTestName(),

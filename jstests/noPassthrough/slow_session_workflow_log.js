@@ -7,6 +7,7 @@
  */
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";
 import {iterateMatchingLogLines} from "jstests/libs/log.js";
+import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 const expectedLogId = 6983000;
 const sleepMillisInSendResponse = 200;

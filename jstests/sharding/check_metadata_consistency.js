@@ -6,6 +6,8 @@
  * ]
  */
 
+import {ShardingTest} from "jstests/libs/shardingtest.js";
+
 // Configure initial sharding cluster
 const st = new ShardingTest({});
 const mongos = st.s;

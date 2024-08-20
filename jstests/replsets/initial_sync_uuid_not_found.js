@@ -5,6 +5,7 @@
  * results in an empty result or zero count.
  */
 import {kDefaultWaitForFailPointTimeout} from "jstests/libs/fail_point_util.js";
+import {ReplSetTest} from "jstests/libs/replsettest.js";
 
 const basename = 'initial_sync_rename_collection';
 

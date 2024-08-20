@@ -4,6 +4,7 @@
 //  ]
 
 import {getNoopWriteCommands} from "jstests/libs/noop_write_commands.js";
+import {ShardingTest} from "jstests/libs/shardingtest.js";
 import {assertWriteConcernError} from "jstests/libs/write_concern_util.js";
 
 // Create a shard with 3 nodes and stop one of the secondaries. This will allow majority write

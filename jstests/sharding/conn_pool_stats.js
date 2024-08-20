@@ -12,6 +12,7 @@
  */
 import {assertHasConnPoolStats, launchFinds} from "jstests/libs/conn_pool_helpers.js";
 import {configureFailPoint, configureFailPointForRS} from "jstests/libs/fail_point_util.js";
+import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 let st = new ShardingTest({shards: 1});
 

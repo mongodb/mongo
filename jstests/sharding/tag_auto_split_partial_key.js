@@ -1,4 +1,5 @@
 // Test to make sure that tag ranges get split when partial keys are used for the tag ranges
+import {ShardingTest} from "jstests/libs/shardingtest.js";
 import {findChunksUtil} from "jstests/sharding/libs/find_chunks_util.js";
 
 var s = new ShardingTest({shards: 2, mongos: 1});

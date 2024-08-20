@@ -12,6 +12,8 @@
  * ]
  */
 
+import {ReplSetTest} from "jstests/libs/replsettest.js";
+
 const rst = new ReplSetTest({nodes: 3, keyFile: "jstests/libs/key1"});
 rst.startSet();
 rst.initiate();

@@ -10,6 +10,7 @@
 import {
     validateShowRecordIdReplicatesAcrossNodes
 } from "jstests/libs/replicated_record_ids_utils.js";
+import {ReplSetTest} from "jstests/libs/replsettest.js";
 
 const testName = jsTestName();
 const replTest = new ReplSetTest({name: testName, nodes: 1});

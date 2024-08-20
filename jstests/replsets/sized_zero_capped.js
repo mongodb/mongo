@@ -1,6 +1,8 @@
 // Ensure replicating a createCollection command with capped:true and size:0 does not cause a
 // SECONDARY to crash. (see SERVER-18792)
 
+import {ReplSetTest} from "jstests/libs/replsettest.js";
+
 var name = "sized_zero_capped";
 var replTest = new ReplSetTest({name: name, nodes: 3});
 var nodes = replTest.nodeList();

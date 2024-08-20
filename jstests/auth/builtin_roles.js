@@ -6,6 +6,8 @@
  * ]
  */
 
+import {ShardingTest} from "jstests/libs/shardingtest.js";
+
 function assertIsBuiltinRole(def, name, expectPrivs = false, expectAuthRest = false) {
     jsTest.log(tojson(def));
     assert.eq(def.db, name.db);

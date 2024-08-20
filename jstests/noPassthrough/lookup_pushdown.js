@@ -11,7 +11,9 @@ import {
     planHasStage,
 } from "jstests/libs/analyze_plan.js";
 import {assertEngine} from "jstests/libs/analyze_plan.js";
+import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {checkSbeRestrictedOrFullyEnabled} from "jstests/libs/sbe_util.js";
+import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 const JoinAlgorithm = {
     Classic: 0,

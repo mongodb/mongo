@@ -1,6 +1,8 @@
 // Tests multi-document transactions metrics are still correct after 'killSessions'.
 // @tags: [uses_transactions]
 // Verifies that the given value of the transaction metrics is incremented in the way we expect.
+import {ReplSetTest} from "jstests/libs/replsettest.js";
+
 function verifyMetricsChange(initialStats, newStats, valueName, expectedIncrement) {
     assert.eq(initialStats[valueName] + expectedIncrement,
               newStats[valueName],

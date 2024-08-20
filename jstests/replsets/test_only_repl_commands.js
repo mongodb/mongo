@@ -8,6 +8,8 @@
  * ]
  */
 
+import {ReplSetTest} from "jstests/libs/replsettest.js";
+
 const cmdList = [
     {'replSetGetConfig': 1, '$_internalIncludeNewlyAdded': true},
     {'replSetGetConfig': 1, '$_internalIncludeNewlyAdded': false}

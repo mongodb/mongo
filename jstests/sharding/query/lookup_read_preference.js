@@ -5,6 +5,7 @@ import {
     profilerHasAtLeastOneMatchingEntryOrThrow,
     profilerHasZeroMatchingEntriesOrThrow,
 } from "jstests/libs/profiler.js";
+import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 const st = new ShardingTest({name: 'lookup_read_preference', mongos: 1, shards: 2, rs: {nodes: 2}});
 

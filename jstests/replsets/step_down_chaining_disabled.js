@@ -3,6 +3,8 @@
  * the new primary.
  */
 
+import {ReplSetTest} from "jstests/libs/replsettest.js";
+
 const replSet = new ReplSetTest({
     nodes: 3,
     settings: {chainingAllowed: false},

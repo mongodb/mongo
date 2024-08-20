@@ -1,6 +1,7 @@
 // come up with random priorities and make sure that the right member gets
 // elected. then kill that member and make sure the next one gets elected.
 
+import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {isConfigCommitted, occasionally, reconnect} from "jstests/replsets/rslib.js";
 
 const rs = new ReplSetTest({name: 'testSet', nodes: 3, nodeOptions: {verbose: 2}});

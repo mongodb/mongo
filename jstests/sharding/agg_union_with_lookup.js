@@ -1,6 +1,8 @@
 // SERVER-88439 - when run against a sharded collection, this query caused a use after free
 // when running getMore against the returned cursor.
 
+import {ShardingTest} from "jstests/libs/shardingtest.js";
+
 function insertDocs(coll) {
     assert.commandWorked(coll.insert([
         {v: 1, y: -3},

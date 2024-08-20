@@ -1,5 +1,6 @@
 // Hash sharding on a non empty collection should not pre-split.
 
+import {ShardingTest} from "jstests/libs/shardingtest.js";
 import {findChunksUtil} from "jstests/sharding/libs/find_chunks_util.js";
 
 var s = new ShardingTest({name: jsTestName(), shards: 3, mongos: 1, verbose: 1});

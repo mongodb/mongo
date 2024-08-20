@@ -4,6 +4,8 @@
  *
  * @tags: [requires_persistence, requires_replication]
  */
+import {ReplSetTest} from "jstests/libs/replsettest.js";
+
 const rst = new ReplSetTest({
     name: "recoveryAfterCleanShutdown",
     nodes: 2,

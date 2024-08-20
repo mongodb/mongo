@@ -13,6 +13,7 @@
  *   assumes_balancer_off
  * ]
  */
+import {ShardingTest} from "jstests/libs/shardingtest.js";
 import {getUUIDFromListCollections} from "jstests/libs/uuid_util.js";
 
 const st = new ShardingTest({

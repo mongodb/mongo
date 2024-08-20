@@ -6,6 +6,8 @@
  * @tags: [requires_persistence]
  */
 
+import {ShardingTest} from "jstests/libs/shardingtest.js";
+
 const dbName = "test";
 
 function getNewNs(dbName) {

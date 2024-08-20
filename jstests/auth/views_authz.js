@@ -3,6 +3,8 @@
  * operations on views even if the user has an explicit privilege on that view.
  * @tags: [requires_sharding]
  */
+import {ShardingTest} from "jstests/libs/shardingtest.js";
+
 // Multiple users cannot be authenticated on one connection within a session.
 TestData.disableImplicitSessions = true;
 

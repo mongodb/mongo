@@ -4,6 +4,7 @@
  *
  * @tags: [multiversion_incompatible, uses_transactions, uses_prepare_transaction]
  */
+import {ShardingTest} from "jstests/libs/shardingtest.js";
 import {extractUUIDFromObject, getUUIDFromListCollections} from "jstests/libs/uuid_util.js";
 
 const st = new ShardingTest({

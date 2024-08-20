@@ -6,6 +6,7 @@
  */
 
 import {IndexCatalogHelpers} from "jstests/libs/index_catalog_helpers.js";
+import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 // Test to validate the correct behaviour of hiding an index in a sharded cluster with a shard key.
 function validateHiddenIndexBehaviour() {

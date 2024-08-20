@@ -12,6 +12,7 @@
  * ]
  */
 import {TimeseriesTest} from "jstests/core/timeseries/libs/timeseries.js";
+import {ReplSetTest} from "jstests/libs/replsettest.js";
 
 const minWiredTigerCacheSizeGB = 0.256;
 const cacheSize = minWiredTigerCacheSizeGB * 1000 * 1000 * 1000;  // 256 MB

@@ -1,6 +1,7 @@
 // Tests that an aggregate with an $out cannot output to a sharded collection, even if the
 // collection becomes sharded during the aggregation.
 import {assertErrorCode} from "jstests/aggregation/extras/utils.js";
+import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 const st = new ShardingTest({shards: 2});
 

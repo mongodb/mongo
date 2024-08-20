@@ -1,4 +1,5 @@
 // oplog should contain the field "wt" with wallClock timestamps.
+import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {getLatestOp} from "jstests/replsets/rslib.js";
 
 var assertLastOplogHasWT = function(primary, msg) {

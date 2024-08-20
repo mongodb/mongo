@@ -13,6 +13,9 @@
 //   requires_fsync,
 // ]
 
+import {ReplSetTest} from "jstests/libs/replsettest.js";
+import {ShardingTest} from "jstests/libs/shardingtest.js";
+
 // The mongod secondaries are set to priority 0 to prevent the primaries from stepping down during
 // migrations on slow evergreen builders.
 var s = new ShardingTest({

@@ -14,6 +14,8 @@
  * ]
  */
 
+import {ReplSetTest} from "jstests/libs/replsettest.js";
+
 let replTest = new ReplSetTest({
     name: "use_history_after_restart",
     nodes: 1,

@@ -8,6 +8,7 @@
  *    uses_multi_shard_transaction,
  * ]
  */
+import {ShardingTest} from "jstests/libs/shardingtest.js";
 import {
     isUpdateDocumentShardKeyUsingTransactionApiEnabled
 } from "jstests/sharding/libs/sharded_transactions_helpers.js";

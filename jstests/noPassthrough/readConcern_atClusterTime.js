@@ -7,6 +7,8 @@
 //   uses_transactions,
 // ]
 
+import {ReplSetTest} from "jstests/libs/replsettest.js";
+
 function _getClusterTime(rst) {
     const pingRes = assert.commandWorked(rst.getPrimary().adminCommand({ping: 1}));
     assert(pingRes.hasOwnProperty("$clusterTime"), tojson(pingRes));

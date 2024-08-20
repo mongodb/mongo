@@ -4,13 +4,13 @@
  * checking the 'electionCandidateMetrics' and 'electionParticipantMetrics' fields of replSetStatus
  * after each handoff.
  */
-
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
+import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {ElectionHandoffTest} from "jstests/replsets/libs/election_handoff.js";
 
 const testName = jsTestName();
 const numNodes = 2;
-const rst = ReplSetTest({name: testName, nodes: numNodes});
+const rst = new ReplSetTest({name: testName, nodes: numNodes});
 rst.startSet();
 
 // Make sure there are no election timeouts firing for the duration of the test. This helps

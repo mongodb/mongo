@@ -12,6 +12,7 @@
 import {assertDropCollection} from "jstests/libs/collection_drop_recreate.js";
 import {kDefaultWaitForFailPointTimeout} from "jstests/libs/fail_point_util.js";
 import {funWithArgs} from "jstests/libs/parallel_shell_helpers.js";
+import {ReplSetTest} from "jstests/libs/replsettest.js";
 
 const replSet = new ReplSetTest({name: "clustered_capped_concurrency", nodes: 1});
 replSet.startSet();

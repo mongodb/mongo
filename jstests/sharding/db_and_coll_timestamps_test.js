@@ -8,6 +8,8 @@
  * collection, dropping and creating a collection, or refining the sharding key.
  */
 
+import {ShardingTest} from "jstests/libs/shardingtest.js";
+
 // Cannot run the filtering metadata check on tests that run refineCollectionShardKey.
 TestData.skipCheckShardFilteringMetadata = true;
 

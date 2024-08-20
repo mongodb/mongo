@@ -4,6 +4,8 @@
  * @param mongo {Mongo} connection object.
  * @tags: [requires_sharding]
  */
+import {ShardingTest} from "jstests/libs/shardingtest.js";
+
 var doTest = function(mongo, callSetParam) {
     var TEST_USER = 'foo';
     var TEST_PWD = 'bar';

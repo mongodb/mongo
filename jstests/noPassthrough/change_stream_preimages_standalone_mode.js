@@ -17,6 +17,7 @@ import {
     assertChangeStreamPreAndPostImagesCollectionOptionIsEnabled
 } from "jstests/libs/change_stream_util.js";
 import {assertDropAndRecreateCollection} from "jstests/libs/collection_drop_recreate.js";
+import {ReplSetTest} from "jstests/libs/replsettest.js";
 
 /**
  * Tests the pre-image recording behavior when the server transitions to and from the stand-alone

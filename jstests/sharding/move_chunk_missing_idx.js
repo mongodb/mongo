@@ -3,6 +3,8 @@
  * have the index and is not empty.
  */
 
+import {ShardingTest} from "jstests/libs/shardingtest.js";
+
 // This test runs dropIndex on one of the shards.
 TestData.skipCheckingIndexesConsistentAcrossCluster = true;
 

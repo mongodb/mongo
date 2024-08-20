@@ -1,5 +1,7 @@
 // Tests that a client may discover a user's supported SASL mechanisms via hello.
 // @tags: [requires_sharding]
+import {ShardingTest} from "jstests/libs/shardingtest.js";
+
 function runTest(conn) {
     const db = conn.getDB("admin");
     const externalDB = conn.getDB("$external");
@@ -70,7 +72,7 @@ function runTest(conn) {
 // Test standalone.
 var m = MongoRunner.runMongod({
     keyFile: 'jstests/libs/key1',
-    setParameter: "authenticationMechanisms=SCRAM-SHA-1,SCRAM-SHA-256,PLAIN"
+    setParameter: {authenticationMechanisms: "SCRAM-SHA-1,SCRAM-SHA-256,PLAIN"}
 });
 runTest(m);
 MongoRunner.stopMongod(m);
@@ -83,8 +85,9 @@ if (TestData.configShard) {
 var st = new ShardingTest({
     keyFile: 'jstests/libs/key1',
     shards: 0,
-    other:
-        {mongosOptions: {setParameter: "authenticationMechanisms=PLAIN,SCRAM-SHA-256,SCRAM-SHA-1"}}
+    other: {
+        mongosOptions: {setParameter: {authenticationMechanisms: "PLAIN,SCRAM-SHA-256,SCRAM-SHA-1"}}
+    }
 });
 runTest(st.s0);
 st.stop();

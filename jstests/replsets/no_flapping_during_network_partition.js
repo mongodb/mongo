@@ -10,6 +10,8 @@
  * 6.  Verify the primary and secondary did not change and are in the initial term.
  */
 
+import {ReplSetTest} from "jstests/libs/replsettest.js";
+
 var name = "no_flapping_during_network_partition";
 
 var replTest = new ReplSetTest({name: name, nodes: 3, useBridge: true});

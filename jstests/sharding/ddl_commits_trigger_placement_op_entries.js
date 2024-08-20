@@ -8,6 +8,8 @@
  * ]
  */
 import {DiscoverTopology} from "jstests/libs/discover_topology.js";
+import {ReplSetTest} from "jstests/libs/replsettest.js";
+import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 const st = new ShardingTest({shards: 3, chunkSize: 1});
 const configDB = st.s.getDB('config');

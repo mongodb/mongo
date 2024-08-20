@@ -5,6 +5,7 @@
 // ]
 
 import {Thread} from "jstests/libs/parallelTester.js";
+import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 const kDbName = "kill_operations";
 const kCollName = "test";

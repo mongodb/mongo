@@ -1,6 +1,7 @@
 import "jstests/multiVersion/libs/multi_rs.js";
 
 import {isDebian, isRHEL8, isUbuntu, isUbuntu2004} from "jstests/libs/os_helpers.js";
+import {ShardingTest} from "jstests/libs/shardingtest.js";
 import {basicReplsetTest} from "jstests/replsets/libs/basic_replset_test.js";
 
 // Do not fail if this test leaves unterminated processes because this file expects replset1.js to

@@ -75,13 +75,23 @@
  *  nodes {Array.<Mongo>} - connection to replica set members
  */
 
+import {Thread} from "jstests/libs/parallelTester.js";
+
 /* global retryOnRetryableError */
 
-var ReplSetTest = function ReplSetTest(opts) {
+// Symbol used to override the constructor. Please do not use this, it's only meant to aid
+// in migrating the jstest corpus to proper module usage.
+export const kOverrideConstructor = Symbol('overrideConstructor');
+
+export var ReplSetTest = function ReplSetTest(opts) {
     'use strict';
 
     if (!(this instanceof ReplSetTest)) {
         return new ReplSetTest(opts);
+    }
+
+    if (this.constructor === ReplSetTest && this.constructor[kOverrideConstructor]) {
+        return new this.constructor[kOverrideConstructor][kOverrideConstructor](opts);
     }
 
     // Replica set health states
@@ -93,24 +103,6 @@ var ReplSetTest = function ReplSetTest(opts) {
     const kOplogName = 'oplog.rs';
 
     // Publicly exposed variables
-
-    /**
-     * Tries to load the 'jstests/libs/legacyThreadSupport.js' dependency. Returns true if the file
-     * is loaded successfully, and false otherwise.
-     */
-    function tryLoadParallelTester() {
-        if (typeof globalThis.Thread !== 'undefined') {
-            return true;
-        }
-
-        try {
-            /* eslint-disable-next-line no-restricted-syntax */
-            load("jstests/libs/legacyThreadSupport.js");  // For Thread.
-            return true;
-        } catch (e) {
-            return false;
-        }
-    }
 
     /**
      * Returns the config document reported from the specified connection.
@@ -2107,7 +2099,7 @@ var ReplSetTest = function ReplSetTest(opts) {
                 '--authenticationMechanism=MONGODB-X509',
                 primary.host,
                 '--eval',
-                `(${fn.toString()})();`
+                `import {ReplSetTest} from "jstests/libs/replsettest.js"; (${fn.toString()})();`
             ];
 
             const retVal = _runMongoProgram(...subShellArgs);
@@ -2893,7 +2885,7 @@ var ReplSetTest = function ReplSetTest(opts) {
                 .noCursorTimeout()
                 .readConcern("local")
                 .limit(limit / 2);  // We print up to half of the limit in the before part so that
-                                    // the timestamp is centered.
+        // the timestamp is centered.
         const beforeEntries = beforeCursor.toArray().reverse();
 
         let log = `${msgPrefix} -- Dumping a window of ${
@@ -3040,7 +3032,7 @@ var ReplSetTest = function ReplSetTest(opts) {
                 .noCursorTimeout()
                 .readConcern("local")
                 .limit(limit / 2);  // We print up to half of the limit in the before part so that
-                                    // the timestamp is centered.
+        // the timestamp is centered.
         const beforeEntries = beforeCursor.toArray().reverse();
 
         let log = `${msgPrefix} -- Dumping a window of ${limit} entries for ${
@@ -3769,20 +3761,16 @@ var ReplSetTest = function ReplSetTest(opts) {
 
         let startTime = new Date();  // Measure the execution time of shutting down nodes.
 
-        // Optionally validate collections on all nodes. Parallel validation depends on use of the
-        // 'Thread' object, so we check for and load that dependency here. If the dependency is not
-        // met, we validate each node serially on shutdown.
-        const parallelValidate = tryLoadParallelTester();
         if (opts.skipValidation) {
             print("ReplSetTest stopSet skipping validation before stopping nodes.");
-        } else if (parallelValidate) {
+        } else {
             print("ReplSetTest stopSet validating all replica set nodes before stopping them.");
             this._validateNodes(this.ports);
         }
 
         // Stop all nodes without waiting for them to terminate. We can skip validation on shutdown
-        // if we have already done it above.
-        opts = Object.merge(opts, {skipValidation: (parallelValidate || opts.skipValidation)});
+        // since we have already done it above (or validation was explicitly skipped).
+        opts = Object.merge(opts, {skipValidation: true});
         for (let i = 0; i < this.ports.length; i++) {
             this.stop(i, signal, opts, {waitpid: false});
         }
@@ -3863,6 +3851,26 @@ var ReplSetTest = function ReplSetTest(opts) {
     //
     // ReplSetTest constructors
     //
+
+    /**
+     * Recursively merge the target and source object.
+     */
+    function _deepObjectMerge(target, source) {
+        if (!(target instanceof Object)) {
+            return (source === undefined || source === null) ? target : source;
+        }
+
+        if (!(source instanceof Object)) {
+            return target;
+        }
+
+        let res = Object.assign({}, target);
+        Object.keys(source).forEach(k => {
+            res[k] = _deepObjectMerge(target[k], source[k]);
+        });
+
+        return res;
+    }
 
     /**
      * Constructor, which initializes the ReplSetTest object by starting new instances.
@@ -4066,26 +4074,6 @@ var ReplSetTest = function ReplSetTest(opts) {
         _constructFromExistingNodes(this, Object.extend({}, opts.rstArgs, true));
     } else {
         _constructStartNewInstances(this, Object.extend({}, opts, true));
-    }
-
-    /**
-     * Recursively merge the target and source object.
-     */
-    function _deepObjectMerge(target, source) {
-        if (!(target instanceof Object)) {
-            return (source === undefined || source === null) ? target : source;
-        }
-
-        if (!(source instanceof Object)) {
-            return target;
-        }
-
-        let res = Object.assign({}, target);
-        Object.keys(source).forEach(k => {
-            res[k] = _deepObjectMerge(target[k], source[k]);
-        });
-
-        return res;
     }
 };
 

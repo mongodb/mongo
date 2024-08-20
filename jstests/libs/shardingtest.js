@@ -1,3 +1,10 @@
+import {Thread} from "jstests/libs/parallelTester.js";
+import {ReplSetTest} from "jstests/libs/replsettest.js";
+
+// Symbol used to override the constructor. Please do not use this, it's only meant to aid
+// in migrating the jstest corpus to proper module usage.
+export const kOverrideConstructor = Symbol('overrideConstructor');
+
 /**
  * Starts up a sharded cluster with the given specifications. The cluster will be fully operational
  * after the execution of this constructor function.
@@ -106,9 +113,13 @@
  * c0, c1, ... {Mongo} - same as config0, config1, ...
  * configRS - the config ReplSetTest object
  */
-var ShardingTest = function ShardingTest(params) {
+export var ShardingTest = function ShardingTest(params) {
     if (!(this instanceof ShardingTest)) {
         return new ShardingTest(params);
+    }
+
+    if (this.constructor === ReplSetTest && this.constructor[kOverrideConstructor]) {
+        return new this.constructor[kOverrideConstructor];
     }
 
     // Used for counting the test duration
@@ -125,24 +136,6 @@ var ShardingTest = function ShardingTest(params) {
     params = Object.extend({}, params, true);
 
     // Publicly exposed variables
-
-    /**
-     * Tries to load the 'jstests/libs/legacyThreadSupport.js' dependency. Returns true if the file
-     * is loaded successfully, and false otherwise.
-     */
-    function tryLoadParallelTester() {
-        if (typeof globalThis.Thread !== 'undefined') {
-            return true;
-        }
-
-        try {
-            /* eslint-disable-next-line no-restricted-syntax */
-            load("jstests/libs/legacyThreadSupport.js");  // For Thread.
-            return true;
-        } catch (e) {
-            return false;
-        }
-    }
 
     /**
      * Constructs a human-readable string representing a chunk's range.
@@ -356,10 +349,6 @@ var ShardingTest = function ShardingTest(params) {
      * Returns boolean for whether the sharding test is compatible to shutdown in parallel.
      */
     function isShutdownParallelSupported(st, opts = {}) {
-        if (!tryLoadParallelTester()) {
-            return false;
-        }
-
         if (st._useBridge) {
             // Keep the current behavior of shutting down each replica set shard and the
             // CSRS individually when otherParams.useBridge === true. There appear to only
@@ -453,7 +442,7 @@ var ShardingTest = function ShardingTest(params) {
                         nodeOptions: rst.nodeOptions,
                         // Mixed-mode SSL tests may specify a keyFile per replica set rather
                         // than one for the whole cluster.
-                        keyFile: rst.keyFile ? rst.keyFile : this.keyFile,
+                        keyFile: rst.keyFile ? rst.keyFile : st.keyFile,
                         host: st._otherParams.useHostname ? hostName : "localhost",
                         waitForKeys: false,
                         pidValue: pidValues
@@ -469,7 +458,8 @@ var ShardingTest = function ShardingTest(params) {
             const threads = [];
             try {
                 for (let {rstArgs} of replicaSetsToTerminate(this, this._rs)) {
-                    const thread = new Thread((rstArgs, signal, forRestart, opts) => {
+                    const thread = new Thread(async (rstArgs, signal, forRestart, opts) => {
+                        const {ReplSetTest} = await import("jstests/libs/replsettest.js");
                         try {
                             const rst = new ReplSetTest({rstArgs});
                             rst.stopSet(signal, forRestart, opts);
@@ -1845,10 +1835,6 @@ var ShardingTest = function ShardingTest(params) {
         };
 
         const isParallelSupported = (() => {
-            if (!tryLoadParallelTester()) {
-                return false;
-            }
-
             for (let {rst} of replicaSetsToInitiate) {
                 if (rst.startOptions && rst.startOptions.clusterAuthMode === "x509") {
                     // The mongo shell performing X.509 authentication as a cluster member requires
@@ -1875,7 +1861,8 @@ var ShardingTest = function ShardingTest(params) {
             const threads = [];
             try {
                 for (let {rstArgs, rstConfig} of replicaSetsToInitiate) {
-                    const thread = new Thread((rstArgs, rstConfig, initiateReplicaSet) => {
+                    const thread = new Thread(async (rstArgs, rstConfig, initiateReplicaSet) => {
+                        const {ReplSetTest} = await import("jstests/libs/replsettest.js");
                         try {
                             const rst = new ReplSetTest({rstArgs});
                             initiateReplicaSet(rst, rstConfig);

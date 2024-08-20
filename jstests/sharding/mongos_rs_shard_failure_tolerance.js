@@ -10,6 +10,9 @@
 // sequence), idle (connection is connected but not used before a shard change), and new
 // (connection connected after shard change).
 
+import {ReplSetTest} from "jstests/libs/replsettest.js";
+import {ShardingTest} from "jstests/libs/shardingtest.js";
+
 // The following checks involve talking to shard primaries, as by the end of this test, one shard
 // does not have a primary.
 TestData.skipCheckingUUIDsConsistentAcrossCluster = true;

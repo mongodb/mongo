@@ -6,6 +6,7 @@ import {
     getShardsWithAndWithoutChunk,
     validateSessionsCollection
 } from "jstests/libs/sessions_collection.js";
+import {ShardingTest} from "jstests/libs/shardingtest.js";
 import {ShardVersioningUtil} from "jstests/sharding/libs/shard_versioning_util.js";
 
 let st = new ShardingTest({shards: 2});

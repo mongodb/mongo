@@ -3,6 +3,7 @@
  * its sync source is left unset.
  */
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";
+import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {assertSyncSourceChangesTo} from "jstests/replsets/libs/sync_source.js";
 
 // Start RST with only one node.

@@ -1,6 +1,8 @@
 // Test the impact of having too many roles
 // @tags: [requires_sharding]
 
+import {ShardingTest} from "jstests/libs/shardingtest.js";
+
 // Use a relatively small record size to more reliably hit a tipping point where the write batching
 // logic thinks we have more space available for metadata than we really do. Note also that by using
 // small records, we are verifying that the batching logic is accounting for the overhead required

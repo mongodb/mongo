@@ -1,4 +1,5 @@
 import {CheckOrphansAreDeletedHelpers} from "jstests/libs/check_orphans_are_deleted_helpers.js";
+import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 /**
  * Asserts that all shards in the sharded cluster doesn't own any orphan documents.

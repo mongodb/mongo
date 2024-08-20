@@ -13,6 +13,8 @@
  * ]
  */
 
+import {ReplSetTest} from "jstests/libs/replsettest.js";
+
 function getPreImage(collectionIndex, ts) {
     const farOffDate = ISODate("2100-01-01");
     const epochSeconds = farOffDate.valueOf() / 1000;

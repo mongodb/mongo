@@ -6,6 +6,8 @@
  *
  * @tags: [requires_fcv_51]
  */
+import {ShardingTest} from "jstests/libs/shardingtest.js";
+
 const testName = "lookup_stale_mongos";
 const st = new ShardingTest({
     shards: 2,

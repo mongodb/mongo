@@ -12,6 +12,7 @@
 // Confirm that the most up-to-date node becomes primary.
 // Let the highest priority node catchup and then confirm
 // that it becomes primary.
+import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {restartServerReplication, stopServerReplication} from "jstests/libs/write_concern_util.js";
 
 var name = 'catchup_takeover_one_high_priority';

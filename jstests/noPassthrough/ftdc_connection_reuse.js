@@ -8,6 +8,7 @@
 import {configureFailPointForRS} from "jstests/libs/fail_point_util.js";
 import {verifyGetDiagnosticData} from "jstests/libs/ftdc.js";
 import {Thread} from "jstests/libs/parallelTester.js";
+import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 const ftdcPath = MongoRunner.toRealPath('ftdc');
 const st = new ShardingTest({

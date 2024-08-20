@@ -4,6 +4,7 @@
 import {waitForCurOpByFailPointNoNS} from "jstests/libs/curop_helpers.js";
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";
 import {Thread} from "jstests/libs/parallelTester.js";
+import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 function verifyCurrentOpFields(res, isActive) {
     // Verify top level fields relevant to transactions. Note this does not include every field, so

@@ -8,6 +8,8 @@
  *   requires_replication,
  * ]
  */
+import {ReplSetTest} from "jstests/libs/replsettest.js";
+
 const rst = new ReplSetTest({name: jsTestName(), nodes: 1});
 rst.startSet();
 rst.initiate();

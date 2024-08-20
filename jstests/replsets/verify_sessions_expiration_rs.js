@@ -17,6 +17,7 @@
 TestData.disableImplicitSessions = true;
 
 import {withPinnedCursor} from "jstests/libs/pin_getmore_cursor.js";
+import {ReplSetTest} from "jstests/libs/replsettest.js";
 
 const refresh = {
     refreshLogicalSessionCacheNow: 1

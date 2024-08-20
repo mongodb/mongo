@@ -7,6 +7,9 @@
  *   does_not_support_stepdowns,
  * ]
  */
+import {ReplSetTest} from "jstests/libs/replsettest.js";
+import {ShardingTest} from "jstests/libs/shardingtest.js";
+
 const st = new ShardingTest({shards: 2, configShard: true});
 const rs = new ReplSetTest({name: "new-shard-rs", nodes: 1, nodeOptions: {shardsvr: ""}});
 

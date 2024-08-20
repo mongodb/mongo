@@ -7,6 +7,8 @@
  * @tags: [resource_intensive]
  */
 
+import {ShardingTest} from "jstests/libs/shardingtest.js";
+
 var st = new ShardingTest({
     shards: 4,
     chunkSize: 1,

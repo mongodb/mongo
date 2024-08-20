@@ -14,6 +14,7 @@ import {
     waitForMoveChunkStep,
 } from "jstests/libs/chunk_manipulation_util.js";
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";
+import {ShardingTest} from "jstests/libs/shardingtest.js";
 import {CreateShardedCollectionUtil} from "jstests/sharding/libs/create_sharded_collection_util.js";
 
 const staticMongod = MongoRunner.runMongod({});  // Mongod used for startParallelOps().

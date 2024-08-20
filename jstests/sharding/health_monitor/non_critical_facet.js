@@ -7,6 +7,8 @@
  *    embedded_router_incompatible,
  * ]
  */
+import {ShardingTest} from "jstests/libs/shardingtest.js";
+
 const ACTIVE_FAULT_DURATION_SECS = 1;
 
 const params = {

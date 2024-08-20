@@ -4,9 +4,11 @@ import "jstests/libs/override_methods/implicitly_retry_on_background_op_in_progr
 
 import {DiscoverTopology, Topology} from "jstests/libs/discover_topology.js";
 import {Thread} from "jstests/libs/parallelTester.js";
+import {ReplSetTest} from "jstests/libs/replsettest.js";
 
 (function() {
-function checkReplicatedDataHashesThread(hosts) {
+async function checkReplicatedDataHashesThread(hosts) {
+    const {ReplSetTest} = await import("jstests/libs/replsettest.js");
     try {
         const excludedDBs = jsTest.options().excludedDBsFromDBHash;
         const rst = new ReplSetTest(hosts[0]);

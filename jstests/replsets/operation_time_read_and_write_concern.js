@@ -10,6 +10,7 @@ import {
     stopReplicationOnSecondaries,
     restartReplicationOnSecondaries
 } from "jstests/libs/write_concern_util.js";
+import {ReplSetTest} from "jstests/libs/replsettest.js";
 
 var name = "operation_time_read_and_write_concern";
 

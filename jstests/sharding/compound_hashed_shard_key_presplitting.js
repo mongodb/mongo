@@ -3,6 +3,7 @@
  * prefix field is hashed, and where the hashed field is not the prefix.
  */
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
+import {ShardingTest} from "jstests/libs/shardingtest.js";
 import {findChunksUtil} from "jstests/sharding/libs/find_chunks_util.js";
 
 const st = new ShardingTest({name: jsTestName(), shards: 3});

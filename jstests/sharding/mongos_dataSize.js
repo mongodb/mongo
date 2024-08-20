@@ -2,6 +2,8 @@
  * Tests the dataSize command on mongos.
  * @tags: [requires_fcv_61]
  */
+import {ShardingTest} from "jstests/libs/shardingtest.js";
+
 const kDbName = "foo";
 const kCollName = "bar";
 const kNs = kDbName + "." + kCollName;

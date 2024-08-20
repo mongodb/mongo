@@ -11,6 +11,7 @@ TestData.skipCheckingUUIDsConsistentAcrossCluster = true;
 import {
     runMoveChunkMakeDonorStepDownAfterFailpoint
 } from "jstests/sharding/migration_coordinator_failover_include.js";
+import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 const dbName = "test";
 

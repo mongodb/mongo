@@ -1,4 +1,6 @@
 // Basic test that the two-phase commit coordinator metrics fields appear in serverStatus output.
+import {ShardingTest} from "jstests/libs/shardingtest.js";
+
 const st = new ShardingTest({shards: 1});
 
 const res = assert.commandWorked(st.shard0.adminCommand({serverStatus: 1}));

@@ -9,6 +9,9 @@
  * ]
  */
 
+import {ReplSetTest} from "jstests/libs/replsettest.js";
+import {ShardingTest} from "jstests/libs/shardingtest.js";
+
 function runAnalyzerDocTest(conn) {
     const configColl = conn.getCollection("config.queryAnalyzers");
     const dbName = "testDb";

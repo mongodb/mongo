@@ -9,6 +9,8 @@
 // run on ephemeral storage engines.
 // @tags: [requires_persistence]
 
+import {ReplSetTest} from "jstests/libs/replsettest.js";
+
 function runRollbackDirectoryTest(shouldCreateRollbackFiles) {
     jsTestLog("Testing createRollbackDataFiles = " + shouldCreateRollbackFiles);
     var testName = "rollback_creates_rollback_directory";

@@ -1,6 +1,8 @@
 // Test that queries with a sort on text metadata return results in the correct order in a sharded
 // collection.
 
+import {ShardingTest} from "jstests/libs/shardingtest.js";
+
 var st = new ShardingTest({shards: 2});
 st.stopBalancer();
 var mongos = st.s0;

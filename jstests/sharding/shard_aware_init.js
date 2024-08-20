@@ -6,6 +6,9 @@
  * @tags: [requires_persistence]
  */
 
+import {ReplSetTest} from "jstests/libs/replsettest.js";
+import {ShardingTest} from "jstests/libs/shardingtest.js";
+
 var waitForPrimary = function(conn) {
     assert.soon(function() {
         var res = conn.getDB('admin').runCommand({hello: 1});
@@ -159,7 +162,7 @@ var runTest = function(mongodConn, configConnStr, awaitVersionUpdate) {
 var st = new ShardingTest({shards: 1});
 
 {
-    var replTest = new ReplSetTest({nodes: 1});
+    const replTest = new ReplSetTest({nodes: 1});
     replTest.startSet({shardsvr: ''});
     replTest.initiate();
     runTest(replTest.getPrimary(), st.configRS.getURL(), function() {

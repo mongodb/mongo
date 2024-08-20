@@ -8,6 +8,7 @@ import {
     isIndexOnly,
     planHasStage
 } from "jstests/libs/analyze_plan.js";
+import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 const st = new ShardingTest({shards: 1, rs: {nodes: 1}, config: 1});
 const db = st.s.getDB("test");

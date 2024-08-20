@@ -2,6 +2,8 @@
 // Tests of cleanupOrphaned command permissions.
 //
 
+import {ShardingTest} from "jstests/libs/shardingtest.js";
+
 // Multiple users cannot be authenticated on one connection within a session.
 TestData.disableImplicitSessions = true;
 

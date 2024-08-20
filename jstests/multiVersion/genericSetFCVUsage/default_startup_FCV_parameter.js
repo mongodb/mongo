@@ -2,6 +2,9 @@
  * Tests the defaultStartupFCV startup parameter.
  */
 
+import {ReplSetTest} from "jstests/libs/replsettest.js";
+import {ShardingTest} from "jstests/libs/shardingtest.js";
+
 TestData.setParameters = TestData.setParameters || {};
 TestData.setParameters.disableTransitionFromLatestToLastContinuous = true;
 

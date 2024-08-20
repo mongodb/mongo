@@ -9,12 +9,6 @@ filters:
   - "keyvault.js":
     approvers:
       - 10gen/server-security
-  - "replsettest.js":
-    approvers:
-      - 10gen/server-replication
-  - "shardingtest.js":
-    approvers:
-      - 10gen/server-cluster-scalability
   - "assert.js":
     approvers:
       - 10gen/devprod-correctness

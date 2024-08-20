@@ -4,6 +4,7 @@
 
 import "jstests/multiVersion/libs/multi_rs.js";
 
+import {ShardingTest} from "jstests/libs/shardingtest.js";
 import {awaitRSClientHosts} from "jstests/replsets/rslib.js";
 
 /**

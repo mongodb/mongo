@@ -2,6 +2,8 @@
 // direct connection to a shard without failing, and $sample behaves as if we sampled an unsharded
 // collection.
 // @tags: [requires_fcv_51]
+import {ShardingTest} from "jstests/libs/shardingtest.js";
+
 let st = new ShardingTest({shards: 1});
 
 assert.commandWorked(st.s.adminCommand({enableSharding: 'test'}));

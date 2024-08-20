@@ -19,6 +19,8 @@
  *     Fully qualified namespace of second set of CRUD operations. This may be the same namespace as
  *     ns1. As with ns1, only insert operations will be used.
  */
+import {ReplSetTest} from "jstests/libs/replsettest.js";
+
 export var ApplyOpsConcurrentTest = function(options) {
     if (!(this instanceof ApplyOpsConcurrentTest)) {
         return new ApplyOpsConcurrentTest(options);

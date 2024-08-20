@@ -11,6 +11,8 @@
 // partial aggregation results in a special format to the mongos.
 //
 // @tags: [requires_sharding]
+import {ShardingTest} from "jstests/libs/shardingtest.js";
+
 const st = new ShardingTest({config: 1, shards: 1});
 
 // This database name can provide multiple similar test cases with a good separate namespace and

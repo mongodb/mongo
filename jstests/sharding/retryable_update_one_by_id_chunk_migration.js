@@ -10,6 +10,7 @@
  * @tags: [requires_fcv_80]
  */
 
+import {ShardingTest} from "jstests/libs/shardingtest.js";
 import {CreateShardedCollectionUtil} from "jstests/sharding/libs/create_sharded_collection_util.js";
 
 (function() {

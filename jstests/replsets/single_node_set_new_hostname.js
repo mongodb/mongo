@@ -6,6 +6,7 @@
  *     requires_persistence,
  * ]
  */
+import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {waitForState} from "jstests/replsets/rslib.js";
 
 const replTest = new ReplSetTest({nodes: 1});

@@ -3,6 +3,7 @@
 // This test stresses behavior that is only true of the mapReduce implementation using aggregation,
 // so it cannot be run in mixed-version suites.
 import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
+import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 const st = new ShardingTest({shards: 2, other: {chunkSize: 1}});
 

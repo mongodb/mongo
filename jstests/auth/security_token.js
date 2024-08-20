@@ -2,6 +2,7 @@
 // @tags: [requires_replication, requires_sharding]
 
 import {runCommandWithSecurityToken} from "jstests/libs/multitenancy_utils.js";
+import {ReplSetTest} from "jstests/libs/replsettest.js";
 
 const tenantID = ObjectId();
 const kLogLevelForToken = 5;

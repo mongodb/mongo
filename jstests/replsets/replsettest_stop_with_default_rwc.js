@@ -2,6 +2,8 @@
  * Tests that none of the operations in the ReplSetTest consistency checks are affected by
  * changing the default read or write concern during the test itself.
  */
+import {ReplSetTest} from "jstests/libs/replsettest.js";
+
 const name = jsTestName();
 
 // We need to have at least 2 nodes to run the data consistency checks.

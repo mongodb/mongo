@@ -13,6 +13,8 @@
  * ]
  */
 
+import {ShardingTest} from "jstests/libs/shardingtest.js";
+
 const st = new ShardingTest({shards: 1});
 const mongosSession = st.s.startSession();
 const shardSession = st.shard0.getDB("test").getMongo().startSession();

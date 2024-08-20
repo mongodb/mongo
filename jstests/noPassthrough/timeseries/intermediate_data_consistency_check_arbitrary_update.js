@@ -8,6 +8,8 @@
  *   requires_fcv_80,
  * ]
  */
+import {ReplSetTest} from "jstests/libs/replsettest.js";
+
 TestData.testingDiagnosticsEnabled = false;
 
 const rst = new ReplSetTest({nodes: 1});

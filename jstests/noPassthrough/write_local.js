@@ -1,6 +1,8 @@
 // SERVER-22011: Deadlock in ticket distribution
 // @tags: [requires_replication, requires_capped]
 // Limit concurrent WiredTiger transactions to maximize locking issues, harmless for other SEs.
+import {ReplSetTest} from "jstests/libs/replsettest.js";
+
 var options = {verbose: 1};
 
 // Create a new single node replicaSet

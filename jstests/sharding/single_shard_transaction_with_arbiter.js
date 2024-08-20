@@ -8,6 +8,8 @@
  * ]
  */
 
+import {ShardingTest} from "jstests/libs/shardingtest.js";
+
 const name = "single_shard_transaction_with_arbiter";
 const dbName = "test";
 const collName = name;

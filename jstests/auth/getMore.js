@@ -1,6 +1,8 @@
 // Tests that a user can only run a getMore on a cursor that they created.
 // @tags: [requires_sharding]
 // Multiple users cannot be authenticated on one connection within a session.
+import {ShardingTest} from "jstests/libs/shardingtest.js";
+
 TestData.disableImplicitSessions = true;
 
 function runTest(conn) {

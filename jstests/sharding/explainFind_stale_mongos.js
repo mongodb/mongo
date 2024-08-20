@@ -2,6 +2,8 @@
  * Tests that a stale mongos does not return a stale shardVersion error to the client for explain
  * of a find command.
  */
+import {ShardingTest} from "jstests/libs/shardingtest.js";
+
 const dbName = "test";
 const collName = "foo";
 const ns = dbName + "." + collName;

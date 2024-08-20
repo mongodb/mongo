@@ -3,6 +3,8 @@
 // be in standalone mode, and the document must not exceed the 16mb + 16kb internal maximum size.
 // @tags: [requires_persistence, requires_replication]
 
+import {ReplSetTest} from "jstests/libs/replsettest.js";
+
 (function() {
 "use strict";
 const rst = new ReplSetTest({name: jsTestName(), nodes: 1});

@@ -1,5 +1,6 @@
 // Test update modifier uassert during initial sync. SERVER-4781
 
+import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {reconnect, wait} from "jstests/replsets/rslib.js";
 
 var basename = "jstests_initsync4";

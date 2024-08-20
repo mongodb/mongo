@@ -6,6 +6,7 @@
  */
 
 import {profilerHasSingleMatchingEntryOrThrow} from "jstests/libs/profiler.js";
+import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 // Legal values for the verifyExplainResult() 'optimizedAwayPipeline' argument.
 const kOptFalse = 0;

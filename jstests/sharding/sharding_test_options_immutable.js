@@ -2,6 +2,8 @@
  * Ensure options object passed to ShardingTest is not mutated.
  */
 
+import {ShardingTest} from "jstests/libs/shardingtest.js";
+
 const opts = {
     setParameter: {},
 };

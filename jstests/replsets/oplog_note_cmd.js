@@ -1,5 +1,7 @@
 // Test that the "appendOplogNote" command works properly
 
+import {ReplSetTest} from "jstests/libs/replsettest.js";
+
 const rs = new ReplSetTest({name: "oplogNoteTest", nodes: 1});
 rs.startSet();
 rs.initiate();

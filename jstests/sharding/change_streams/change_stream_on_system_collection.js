@@ -11,6 +11,7 @@
  */
 import {assertChangeStreamEventEq} from "jstests/libs/change_stream_util.js";
 import {assertDropAndRecreateCollection} from "jstests/libs/collection_drop_recreate.js";
+import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 // This test involves opening change stream on the internal collection, which is not allowed through
 // a router.

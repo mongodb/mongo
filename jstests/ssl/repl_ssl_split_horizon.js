@@ -1,6 +1,8 @@
 // Create a temporary host file that creates two aliases for localhost that are in the
 // splithorizon certificate.
 // The aliases are 'splithorizon1' and 'splithorizon2'
+import {ReplSetTest} from "jstests/libs/replsettest.js";
+
 const hostsFile = MongoRunner.dataPath + 'split-horizon-hosts';
 writeFile(hostsFile, "splithorizon1 localhost\nsplithorizon2 localhost\n");
 

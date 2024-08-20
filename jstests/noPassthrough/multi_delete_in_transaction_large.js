@@ -1,6 +1,7 @@
 // Tests large multi-deletes in a transaction to trigger multi-applyOps transaction commit path.
 // @tags: [requires_replication]
 import {withTxnAndAutoRetryOnMongos} from "jstests/libs/auto_retry_transaction_in_sharding.js";
+import {ReplSetTest} from "jstests/libs/replsettest.js";
 
 const rst = new ReplSetTest({
     nodes: 1,

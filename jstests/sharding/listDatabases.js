@@ -1,3 +1,5 @@
+import {ShardingTest} from "jstests/libs/shardingtest.js";
+
 var test = new ShardingTest({shards: 1, mongos: 1, other: {chunkSize: 1}});
 
 var mongos = test.s0;

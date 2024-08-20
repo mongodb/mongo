@@ -1,6 +1,7 @@
 // Tests whether the noBalance flag disables balancing for collections
 // @tags: [requires_sharding]
 
+import {ShardingTest} from "jstests/libs/shardingtest.js";
 import {findChunksUtil} from "jstests/sharding/libs/find_chunks_util.js";
 
 const st = new ShardingTest({shards: 2, mongos: 1, other: {chunkSize: 1}});

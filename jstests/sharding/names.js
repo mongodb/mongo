@@ -4,6 +4,9 @@
 //   # Test doesn't start enough mongods to have num_mongos routers
 //   embedded_router_incompatible,
 // ]
+import {ReplSetTest} from "jstests/libs/replsettest.js";
+import {ShardingTest} from "jstests/libs/shardingtest.js";
+
 var st = new ShardingTest({shards: TestData.configShard ? 1 : 0, mongos: 1});
 
 var rsA = new ReplSetTest({nodes: 2, name: "rsA", nodeOptions: {shardsvr: ""}});

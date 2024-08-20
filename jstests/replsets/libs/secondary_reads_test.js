@@ -2,6 +2,8 @@
  * This is a library for testing secondary reads against a replica set
  */
 
+import {ReplSetTest} from "jstests/libs/replsettest.js";
+
 export function SecondaryReadsTest(name = "secondary_reads_test") {
     let rst = performStandardSetup();
     let dbName = name;

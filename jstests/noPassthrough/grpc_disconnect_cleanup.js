@@ -5,6 +5,7 @@
 
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {Thread} from "jstests/libs/parallelTester.js";
+import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 const kThisFile = "jstests/noPassthrough/grpc_disconnect_cleanup.js";
 const kTestName = "grpc_disconnect_cleanup";

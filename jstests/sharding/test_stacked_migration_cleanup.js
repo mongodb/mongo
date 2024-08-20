@@ -2,6 +2,8 @@
 // changes
 // @tags: [assumes_balancer_off]
 
+import {ShardingTest} from "jstests/libs/shardingtest.js";
+
 // start up a new sharded cluster
 var st = new ShardingTest({shards: 2, mongos: 1, other: {enableBalancer: false}});
 

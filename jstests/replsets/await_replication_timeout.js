@@ -1,5 +1,6 @@
 // Tests timeout behavior of waiting for write concern as well as its interaction with maxTimeMs
 
+import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {restartServerReplication, stopServerReplication} from "jstests/libs/write_concern_util.js";
 
 var replTest = new ReplSetTest({nodes: 3});

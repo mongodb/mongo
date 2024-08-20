@@ -12,6 +12,8 @@
  *
  */
 
+import {ReplSetTest} from "jstests/libs/replsettest.js";
+
 /**
  * This fixture allows the user to optionally pass in a custom ReplSetTest to be used for the test.
  * The underlying replica set must have exactly two nodes: a primary, and a secondary.

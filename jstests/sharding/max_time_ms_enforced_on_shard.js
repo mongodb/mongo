@@ -3,6 +3,8 @@
 // not just on the mongos.
 //
 
+import {ShardingTest} from "jstests/libs/shardingtest.js";
+
 const dbName = "test";
 const collName = "coll";
 

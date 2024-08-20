@@ -9,6 +9,7 @@
  * It finally stops replication at another secondary and confirms that applyOps commands fail.
  */
 
+import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {
     restartReplicationOnSecondaries,
     stopServerReplication

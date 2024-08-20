@@ -10,6 +10,7 @@
  */
 /* global retryOnRetryableError */
 import {Thread} from "jstests/libs/parallelTester.js";
+import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {removeShard} from "jstests/sharding/libs/remove_shard_util.js";
 
 // TODO: SERVER-89292 Re-enable test.

@@ -2,6 +2,7 @@
  * Tests that the shardCollection command obtains the collection's UUID from the primary shard and
  * persists it in config.collections.
  */
+import {ShardingTest} from "jstests/libs/shardingtest.js";
 import {getUUIDFromConfigCollections, getUUIDFromListCollections} from "jstests/libs/uuid_util.js";
 
 let db = "test";

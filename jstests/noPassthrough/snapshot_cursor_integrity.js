@@ -2,6 +2,8 @@
 // transaction/session. Specifically tests this in the context of snapshot cursors.
 // @tags: [uses_transactions]
 // This test makes assertions on commands run without logical session ids.
+import {ReplSetTest} from "jstests/libs/replsettest.js";
+
 TestData.disableImplicitSessions = true;
 
 const dbName = "test";

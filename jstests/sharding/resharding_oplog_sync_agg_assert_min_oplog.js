@@ -4,6 +4,8 @@
  * @tags: [
  * ]
  */
+import {ReplSetTest} from "jstests/libs/replsettest.js";
+
 const rst = new ReplSetTest({
     // Set the syncdelay to 1s to speed up checkpointing.
     nodeOptions: {syncdelay: 1},

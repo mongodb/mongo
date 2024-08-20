@@ -1,6 +1,8 @@
 // Tests that $$USER_ROLES is able to be used in an "update" and "findAndModify" commands.
 // @tags: [requires_fcv_70]
 
+import {ShardingTest} from "jstests/libs/shardingtest.js";
+
 const dbName = "test";
 const collName = "coll";
 

@@ -10,6 +10,7 @@
  * @tags: [requires_persistence]
  */
 
+import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {CA_CERT, CLIENT_CERT, KEYFILE, SERVER_CERT} from "jstests/ssl/libs/ssl_helpers.js";
 
 // The mongo shell cannot authenticate as the internal __system user in tests that use x509 for

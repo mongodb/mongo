@@ -3,6 +3,8 @@
  * Induces queueing for ticket by exhausting read tickets.
  */
 
+import {ReplSetTest} from "jstests/libs/replsettest.js";
+
 // Set the number of tickets to a small value to force ticket exhaustion.
 const kNumReadTickets = 5;
 const kNumDocs = 1000;

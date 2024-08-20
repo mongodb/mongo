@@ -1,6 +1,7 @@
 // Tests that $unionWith can successfully read from a view that is backed by a sharded collection.
 
 import {resultsEq} from "jstests/aggregation/extras/utils.js";
+import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 const st = new ShardingTest({shards: 2});
 

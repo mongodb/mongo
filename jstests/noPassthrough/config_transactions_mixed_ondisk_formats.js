@@ -13,6 +13,9 @@ TestData.disableImplicitSessions = true;
 import {
     ClusteredCollectionUtil
 } from "jstests/libs/clustered_collections/clustered_collection_util.js";
+import {ReplSetTest} from "jstests/libs/replsettest.js";
+import {ShardingTest} from "jstests/libs/shardingtest.js";
+
 const storageEngine = jsTest.options().storageEngine || 'wiredTiger';
 
 // Verifies that config.transactions is of the format specified in options on all nodes. Only valid

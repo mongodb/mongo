@@ -9,6 +9,8 @@
  * This means that secondary should be replicating a newer refresh after that line
  * above and hit the condition described in the ticket to hit the bug.
  */
+import {ShardingTest} from "jstests/libs/shardingtest.js";
+
 let rsOptions = {nodes: 2};
 let st = new ShardingTest({shards: {rs0: rsOptions, rs1: rsOptions}});
 

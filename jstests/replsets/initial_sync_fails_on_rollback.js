@@ -4,8 +4,8 @@
  * This test depends on 4.4 features.
  * @tags: [multiversion_incompatible]
  */
-
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";
+import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {RollbackTest} from "jstests/replsets/libs/rollback_test.js";
 
 const testName = "initial_sync_fails_on_rollback";

@@ -2,6 +2,8 @@
  * Integration test for read preference with hedging mode. The more comprehensive unit test can be
  * found in dbtests/read_preference_test.cpp and s/hedge_options_util_test.cpp.
  */
+import {ShardingTest} from "jstests/libs/shardingtest.js";
+
 const st = new ShardingTest({shards: 2});
 const dbName = "foo";
 const collName = "bar";

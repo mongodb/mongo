@@ -1,5 +1,7 @@
 import "jstests/multiVersion/libs/multi_rs.js";
 
+import {ReplSetTest} from "jstests/libs/replsettest.js";
+
 var oldVersion = "last-lts";
 
 var nodes = {

@@ -10,6 +10,7 @@
  * multiversion_incompatible]
  */
 
+import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {reconnect} from "jstests/replsets/rslib.js";
 
 const name = jsTestName();
