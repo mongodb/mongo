@@ -225,10 +225,6 @@ public:
         return {};
     }
 
-    BSONObj getOptimizerDebugInfo() const override {
-        return {};
-    }
-
 private:
     const mongo::CommonStats* _stats;
     const express::PlanStats* _planStats;

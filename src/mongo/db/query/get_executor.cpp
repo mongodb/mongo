@@ -1357,16 +1357,13 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getSearchMetada
         opCtx, cq, metadataCursorId, remoteCursors.get(), sbeYieldPolicy.get());
     return plan_executor_factory::make(opCtx,
                                        nullptr /* cq */,
-                                       nullptr /*pipeline*/,
                                        nullptr /* solution */,
                                        std::move(root),
-                                       nullptr /* optimizerData */,
                                        {} /* plannerOptions */,
                                        cq.nss(),
                                        std::move(sbeYieldPolicy),
                                        false /* planIsFromCache */,
                                        boost::none /* cachedPlanHash */,
-                                       false /* generatedByBonsai */,
                                        {} /* optCounterInfo */,
                                        std::move(remoteCursors));
 }

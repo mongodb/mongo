@@ -142,16 +142,13 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> make(
 StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> make(
     OperationContext* opCtx,
     std::unique_ptr<CanonicalQuery> cq,
-    std::unique_ptr<Pipeline, PipelineDeleter> pipeline,
     std::unique_ptr<QuerySolution> solution,
     std::pair<std::unique_ptr<sbe::PlanStage>, stage_builder::PlanStageData> root,
-    std::unique_ptr<optimizer::AbstractABTPrinter> optimizerData,
     size_t plannerOptions,
     NamespaceString nss,
     std::unique_ptr<PlanYieldPolicySBE> yieldPolicy,
     bool planIsFromCache,
     boost::optional<size_t> cachedPlanHash,
-    bool generatedByBonsai,
     OptimizerCounterInfo optCounterInfo,
     std::unique_ptr<RemoteCursorMap> remoteCursors,
     std::unique_ptr<RemoteExplainVector> remoteExplains,
@@ -166,8 +163,6 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> make(
     return {{new PlanExecutorSBE(
                  opCtx,
                  std::move(cq),
-                 std::move(pipeline),
-                 std::move(optimizerData),
                  {makeVector<sbe::plan_ranker::CandidatePlan>(sbe::plan_ranker::CandidatePlan{
                       std::move(solution),
                       std::move(rootStage),
@@ -180,7 +175,6 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> make(
                  std::move(nss),
                  false /*isOpen*/,
                  std::move(yieldPolicy),
-                 generatedByBonsai,
                  cachedPlanHash,
                  std::move(optCounterInfo),
                  std::move(remoteCursors),
@@ -208,14 +202,11 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> make(
 
     return {{new PlanExecutorSBE(opCtx,
                                  std::move(cq),
-                                 nullptr /*pipeline*/,
-                                 {},
                                  std::move(candidates),
                                  plannerOptions & QueryPlannerParams::RETURN_OWNED_DATA,
                                  std::move(nss),
                                  true, /*isOpen*/
                                  std::move(yieldPolicy),
-                                 false /*generatedByBonsai*/,
                                  cachedPlanHash,
                                  {} /* optCounterInfo */,
                                  std::move(remoteCursors),

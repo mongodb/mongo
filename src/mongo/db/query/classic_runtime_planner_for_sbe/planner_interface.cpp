@@ -63,23 +63,19 @@ std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> PlannerBase::prepareSbePlan
     tassert(8551900,
             "Solution must be present if cachedPlanHash is present",
             solution != nullptr || !cachedPlanHash.has_value());
-    return uassertStatusOK(
-        plan_executor_factory::make(opCtx(),
-                                    std::move(canonicalQuery),
-                                    nullptr /* pipeline - It is not nullptr only in Bonsai */,
-                                    std::move(solution),
-                                    std::move(sbePlanAndData),
-                                    nullptr /* optimizerData - used for Bonsai */,
-                                    plannerOptions(),
-                                    std::move(nss),
-                                    extractSbeYieldPolicy(),
-                                    isFromPlanCache,
-                                    cachedPlanHash,
-                                    false /* generatedByBonsai */,
-                                    OptimizerCounterInfo{} /* used for Bonsai */,
-                                    std::move(remoteCursors),
-                                    std::move(remoteExplains),
-                                    std::move(classicRuntimePlannerStage)));
+    return uassertStatusOK(plan_executor_factory::make(opCtx(),
+                                                       std::move(canonicalQuery),
+                                                       std::move(solution),
+                                                       std::move(sbePlanAndData),
+                                                       plannerOptions(),
+                                                       std::move(nss),
+                                                       extractSbeYieldPolicy(),
+                                                       isFromPlanCache,
+                                                       cachedPlanHash,
+                                                       OptimizerCounterInfo{} /* used for Bonsai */,
+                                                       std::move(remoteCursors),
+                                                       std::move(remoteExplains),
+                                                       std::move(classicRuntimePlannerStage)));
 }
 
 std::unique_ptr<QuerySolution> PlannerBase::extendSolutionWithPipeline(

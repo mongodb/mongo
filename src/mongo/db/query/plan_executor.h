@@ -539,9 +539,7 @@ public:
         // The entirety of this plan was exectued in SBE via stage builders.
         kSBEOnly,
         // A portion of this plan was executed in SBE via stage builders.
-        kSBEHybrid,
-        // The entirely of this plan was executed using CQF. Hybrid CQF plans are not possible.
-        kCQF
+        kSBEHybrid
     };
 
     /**

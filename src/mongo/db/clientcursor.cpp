@@ -453,7 +453,6 @@ void collectQueryStatsMongod(OperationContext* opCtx,
             case PlanExecutor::QueryFramework::kSBEHybrid:
                 metricType = query_stats::SupplementalMetricType::SBE;
                 break;
-            case PlanExecutor::QueryFramework::kCQF:
             case PlanExecutor::QueryFramework::kUnknown:
                 break;
         }

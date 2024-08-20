@@ -49,13 +49,12 @@ std::unique_ptr<PlanExplainer> make(PlanStage* root, const PlanEnumeratorExplain
 std::unique_ptr<PlanExplainer> make(sbe::PlanStage* root,
                                     const stage_builder::PlanStageData* data,
                                     const QuerySolution* solution) {
-    return make(root, data, solution, {}, {}, false);
+    return make(root, data, solution, {}, false);
 }
 
 std::unique_ptr<PlanExplainer> make(sbe::PlanStage* root,
                                     const stage_builder::PlanStageData* data,
                                     const QuerySolution* solution,
-                                    std::unique_ptr<optimizer::AbstractABTPrinter> optimizerData,
                                     std::vector<sbe::plan_ranker::CandidatePlan> rejectedCandidates,
                                     bool isMultiPlan) {
     // Pre-compute Debugging info for explain use.
@@ -64,7 +63,6 @@ std::unique_ptr<PlanExplainer> make(sbe::PlanStage* root,
     return std::make_unique<PlanExplainerSBE>(root,
                                               data,
                                               solution,
-                                              std::move(optimizerData),
                                               std::move(rejectedCandidates),
                                               isMultiPlan,
                                               false,       /* isCachedPlan */
@@ -76,7 +74,6 @@ std::unique_ptr<PlanExplainer> make(
     sbe::PlanStage* root,
     const stage_builder::PlanStageData* data,
     const QuerySolution* solution,
-    std::unique_ptr<optimizer::AbstractABTPrinter> optimizerData,
     std::vector<sbe::plan_ranker::CandidatePlan> rejectedCandidates,
     bool isMultiPlan,
     bool isFromPlanCache,
@@ -91,7 +88,6 @@ std::unique_ptr<PlanExplainer> make(
     return std::make_unique<PlanExplainerSBE>(root,
                                               data,
                                               solution,
-                                              std::move(optimizerData),
                                               std::move(rejectedCandidates),
                                               isMultiPlan,
                                               isFromPlanCache,

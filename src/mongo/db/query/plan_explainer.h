@@ -117,12 +117,6 @@ public:
     virtual PlanStatsDetails getWinningPlanStats(ExplainOptions::Verbosity verbosity) const = 0;
 
     /**
-     * Returns the a BSONObj containing the resulting plans from Bonsai optimization phases. For
-     * classic optimizer it returns an empty BSONObj.
-     */
-    virtual BSONObj getOptimizerDebugInfo() const = 0;
-
-    /**
      * Returns statistics for the trial period of the winning plan selected by the multi-planner.
      */
     virtual PlanStatsDetails getWinningPlanTrialStats() const = 0;

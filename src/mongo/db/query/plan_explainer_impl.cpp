@@ -866,10 +866,6 @@ PlanExplainer::PlanStatsDetails PlanExplainerImpl::getWinningPlanStats(
     return {bob.obj(), std::move(summary)};
 }
 
-BSONObj PlanExplainerImpl::getOptimizerDebugInfo() const {
-    return {};
-}
-
 PlanExplainer::PlanStatsDetails PlanExplainerImpl::getWinningPlanTrialStats() const {
     return getWinningPlanStats(ExplainOptions::Verbosity::kExecAllPlans);
 }

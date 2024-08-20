@@ -85,10 +85,6 @@ PlanExplainer::PlanStatsDetails PlanExplainerPipeline::getWinningPlanStats(
     return {};
 }
 
-BSONObj PlanExplainerPipeline::getOptimizerDebugInfo() const {
-    return {};
-}
-
 PlanExplainer::PlanStatsDetails PlanExplainerPipeline::getWinningPlanTrialStats() const {
     // We are not supposed to call this method on a pipeline explainer.
     MONGO_UNREACHABLE;

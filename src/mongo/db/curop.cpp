@@ -920,9 +920,6 @@ void CurOp::reportState(BSONObjBuilder* builder,
         case PlanExecutor::QueryFramework::kSBEHybrid:
             builder->append("queryFramework", "sbe");
             break;
-        case PlanExecutor::QueryFramework::kCQF:
-            builder->append("queryFramework", "cqf");
-            break;
         case PlanExecutor::QueryFramework::kUnknown:
             break;
     }
@@ -1254,9 +1251,6 @@ void OpDebug::report(OperationContext* opCtx,
         case PlanExecutor::QueryFramework::kSBEHybrid:
             pAttrs->add("queryFramework", "sbe");
             break;
-        case PlanExecutor::QueryFramework::kCQF:
-            pAttrs->add("queryFramework", "cqf");
-            break;
         case PlanExecutor::QueryFramework::kUnknown:
             break;
     }
@@ -1495,9 +1489,6 @@ void OpDebug::append(OperationContext* opCtx,
         case PlanExecutor::QueryFramework::kSBEOnly:
         case PlanExecutor::QueryFramework::kSBEHybrid:
             b.append("queryFramework", "sbe");
-            break;
-        case PlanExecutor::QueryFramework::kCQF:
-            b.append("queryFramework", "cqf");
             break;
         case PlanExecutor::QueryFramework::kUnknown:
             break;
@@ -1810,9 +1801,6 @@ std::function<BSONObj(ProfileFilter::Args)> OpDebug::appendStaged(StringSet requ
             case PlanExecutor::QueryFramework::kSBEOnly:
             case PlanExecutor::QueryFramework::kSBEHybrid:
                 b.append("queryFramework", "sbe");
-                break;
-            case PlanExecutor::QueryFramework::kCQF:
-                b.append("queryFramework", "cqf");
                 break;
             case PlanExecutor::QueryFramework::kUnknown:
                 break;

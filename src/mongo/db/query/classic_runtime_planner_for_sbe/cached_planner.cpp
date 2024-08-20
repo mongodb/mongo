@@ -216,7 +216,6 @@ std::unique_ptr<PlannerInterface> attemptToUsePlan(
     auto explainer = plan_explainer_factory::make(candidate.root.get(),
                                                   &candidate.data.stageData,
                                                   candidate.solution.get(),
-                                                  {},    /* optimizedData */
                                                   {},    /* rejectedCandidates */
                                                   false, /* isMultiPlan */
                                                   true /* isFromPlanCache */,

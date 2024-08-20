@@ -369,9 +369,6 @@ public:
                 case PlanExecutor::QueryFramework::kSBEOnly:
                     sbeFindQueryCounter.incrementRelaxed();
                     break;
-                case PlanExecutor::QueryFramework::kCQF:
-                    cqfFindQueryCounter.incrementRelaxed();
-                    break;
                 default:
                     break;
             }
@@ -389,26 +386,22 @@ public:
                 case PlanExecutor::QueryFramework::kSBEHybrid:
                     sbeHybridAggregationCounter.incrementRelaxed();
                     break;
-                case PlanExecutor::QueryFramework::kCQF:
-                    cqfAggregationQueryCounter.incrementRelaxed();
-                    break;
                 case PlanExecutor::QueryFramework::kUnknown:
                     break;
             }
         }
     }
 
-    // Query counters that record whether a find query was fully or partially executed in SBE, fully
-    // executed using the classic engine, or fully executed using the common query framework (CQF).
-    // One of these will always be incremented during a query.
+    // Query counters that record whether a find query was fully or partially executed in SBE, or
+    // fully executed using the classic engine. One of these will always be incremented during a
+    // query.
     Counter64& sbeFindQueryCounter = *MetricBuilder<Counter64>{"query.queryFramework.find.sbe"};
     Counter64& classicFindQueryCounter =
         *MetricBuilder<Counter64>{"query.queryFramework.find.classic"};
-    Counter64& cqfFindQueryCounter = *MetricBuilder<Counter64>{"query.queryFramework.find.cqf"};
 
     // Aggregation query counters that record whether an aggregation was fully or partially executed
-    // in DocumentSource (an sbe/classic hybrid plan), fully pushed down to the sbe/classic layer,
-    // or executed using CQF. These are only incremented during aggregations.
+    // in DocumentSource (an sbe/classic hybrid plan), or fully pushed down to the sbe/classic
+    // layer. These are only incremented during aggregations.
     Counter64& sbeOnlyAggregationCounter =
         *MetricBuilder<Counter64>{"query.queryFramework.aggregate.sbeOnly"};
     Counter64& classicOnlyAggregationCounter =
@@ -417,8 +410,6 @@ public:
         *MetricBuilder<Counter64>{"query.queryFramework.aggregate.sbeHybrid"};
     Counter64& classicHybridAggregationCounter =
         *MetricBuilder<Counter64>{"query.queryFramework.aggregate.classicHybrid"};
-    Counter64& cqfAggregationQueryCounter =
-        *MetricBuilder<Counter64>{"query.queryFramework.aggregate.cqf"};
 };
 extern QueryFrameworkCounters queryFrameworkCounters;
 

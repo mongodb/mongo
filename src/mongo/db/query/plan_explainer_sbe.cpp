@@ -50,7 +50,6 @@
 #include "mongo/db/query/eof_node_type.h"
 #include "mongo/db/query/index_bounds.h"
 #include "mongo/db/query/index_entry.h"
-#include "mongo/db/query/optimizer/explain_interface.h"
 #include "mongo/db/query/plan_explainer_factory.h"
 #include "mongo/db/query/plan_explainer_impl.h"
 #include "mongo/db/query/plan_explainer_sbe.h"
@@ -487,7 +486,6 @@ PlanExplainer::PlanStatsDetails buildPlanStatsDetails(
     const QuerySolution* solution,
     const sbe::PlanStageStats& stats,
     const boost::optional<BSONObj>& execPlanDebugInfo,
-    const boost::optional<BSONObj>& optimizerExplain,
     const boost::optional<std::string>& planSummary,
     const boost::optional<BSONObj>& queryParams,
     const boost::optional<BSONArray>& remotePlanInfo,
@@ -520,14 +518,8 @@ PlanExplainer::PlanStatsDetails buildPlanStatsDetails(
         plan.append("planSummary", *planSummary);
     }
 
-    if (optimizerExplain) {
-        // TODO SERVER-84429 Implement "isCached" field for Bonsai.
-        plan.append("queryPlan", *optimizerExplain);
-        plan.append("queryParameters", *queryParams);
-    } else {
-        plan.append("isCached", isCached);
-        plan.append("queryPlan", bob.obj());
-    }
+    plan.append("isCached", isCached);
+    plan.append("queryPlan", bob.obj());
 
     plan.append("slotBasedPlan", *execPlanDebugInfo);
     if (remotePlanInfo && !remotePlanInfo->isEmpty()) {
@@ -541,7 +533,6 @@ PlanExplainerSBEBase::PlanExplainerSBEBase(
     const sbe::PlanStage* root,
     const stage_builder::PlanStageData* data,
     const QuerySolution* solution,
-    std::unique_ptr<optimizer::AbstractABTPrinter> optimizerData,
     bool isMultiPlan,
     bool isCachedPlan,
     boost::optional<size_t> cachedPlanHash,
@@ -551,7 +542,6 @@ PlanExplainerSBEBase::PlanExplainerSBEBase(
     : PlanExplainer{solution, boost::optional<OptimizerCounterInfo>(std::move(optCounterInfo))},
       _root{root},
       _rootData{data},
-      _optimizerData(std::move(optimizerData)),
       _isMultiPlan{isMultiPlan},
       _isFromPlanCache{isCachedPlan},
       _cachedPlanHash{cachedPlanHash},
@@ -561,10 +551,6 @@ PlanExplainerSBEBase::PlanExplainerSBEBase(
 };
 
 const PlanExplainer::ExplainVersion& PlanExplainerSBEBase::getVersion() const {
-    if (_optimizerData) {
-        static const ExplainVersion kExplainVersionForCQF = "3";
-        return kExplainVersionForCQF;
-    }
     static const ExplainVersion kExplainVersionForStageBuilders = "2";
     return kExplainVersionForStageBuilders;
 }
@@ -574,11 +560,7 @@ bool PlanExplainerSBEBase::matchesCachedPlan() const {
 };
 
 std::string PlanExplainerSBEBase::getPlanSummary() const {
-    if (_optimizerData) {
-        return _optimizerData->getPlanSummary();
-    } else {
-        return _debugInfo->planSummary;
-    }
+    return _debugInfo->planSummary;
 }
 
 void PlanExplainerSBEBase::getSummaryStats(PlanSummaryStats* statsOut) const {
@@ -634,36 +616,14 @@ PlanExplainer::PlanStatsDetails PlanExplainerSBEBase::getWinningPlanStats(
     auto stats = _root->getStats(true /* includeDebugInfo  */);
     invariant(stats);
 
-    // Append a planSummary only for CQF plans.
-    auto planSummary = _optimizerData ? boost::make_optional(getPlanSummary()) : boost::none;
-
-    // Append the query parameters map only for CQF plans.
-    auto queryParams =
-        _optimizerData ? boost::make_optional(_optimizerData->getQueryParameters()) : boost::none;
-
     return buildPlanStatsDetails(_solution,
                                  *stats,
                                  buildExecPlanDebugInfo(_root, _rootData),
-                                 buildCascadesPlan(),
-                                 planSummary,
-                                 queryParams,
+                                 boost::none /* planSummary */,
+                                 boost::none /* queryParams */,
                                  buildRemotePlanInfo(),
                                  verbosity,
                                  matchesCachedPlan());
-}
-
-BSONObj PlanExplainerSBEBase::getOptimizerDebugInfo() const {
-    if (_optimizerData) {
-        return _optimizerData->explainQueryPlannerDebug();
-    }
-    return {};
-}
-
-boost::optional<BSONObj> PlanExplainerSBEBase::buildCascadesPlan() const {
-    if (_optimizerData) {
-        return _optimizerData->explainBSON();
-    }
-    return {};
 }
 
 boost::optional<BSONArray> PlanExplainerSBEBase::buildRemotePlanInfo() const {
@@ -681,7 +641,6 @@ PlanExplainerSBE::PlanExplainerSBE(
     const sbe::PlanStage* root,
     const stage_builder::PlanStageData* data,
     const QuerySolution* solution,
-    std::unique_ptr<optimizer::AbstractABTPrinter> optimizerData,
     std::vector<sbe::plan_ranker::CandidatePlan> rejectedCandidates,
     bool isMultiPlan,
     bool isCachedPlan,
@@ -692,7 +651,6 @@ PlanExplainerSBE::PlanExplainerSBE(
     : PlanExplainerSBEBase{root,
                            data,
                            solution,
-                           std::move(optimizerData),
                            isMultiPlan,
                            isCachedPlan,
                            cachedPlanHash,
@@ -711,7 +669,6 @@ PlanExplainer::PlanStatsDetails PlanExplainerSBE::getWinningPlanTrialStats() con
             // This parameter is not used in `buildPlanStatsDetails` if the last parameter is
             // `ExplainOptions::Verbosity::kExecAllPlans`, as is the case here.
             boost::none /* execPlanDebugInfo */,
-            boost::none /* optimizerExplain */,
             boost::none, /* planSummary */
             boost::none, /* queryParams */
             boost::none /* remotePlanInfo */,
@@ -742,7 +699,6 @@ std::vector<PlanExplainer::PlanStatsDetails> PlanExplainerSBE::getRejectedPlansS
         res.push_back(buildPlanStatsDetails(candidate.solution.get(),
                                             *stats,
                                             execPlanDebugInfo,
-                                            boost::none /* optimizerExplain */,
                                             boost::none, /* planSummary */
                                             boost::none /* queryParams */,
                                             boost::none /* remotePlanInfo */,
@@ -765,7 +721,6 @@ PlanExplainerClassicRuntimePlannerForSBE::PlanExplainerClassicRuntimePlannerForS
     : PlanExplainerSBEBase{root,
                            data,
                            solution,
-                           nullptr /*optimizerData*/,
                            isMultiPlan,
                            isCachedPlan,
                            cachedPlanHash,
