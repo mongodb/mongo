@@ -859,6 +859,7 @@ makeLoopJoinForFetch(std::unique_ptr<sbe::PlanStage> inputStage,
     // Create a limit-1/scan subtree to perform the seek.
     auto seekStage = sbe::makeS<sbe::LimitSkipStage>(
         sbe::makeS<sbe::ScanStage>(collToFetch->uuid(),
+                                   collToFetch->ns().dbName(),
                                    resultSlot.getId(),
                                    recordIdSlot.getId(),
                                    snapshotIdSlot.getId(),

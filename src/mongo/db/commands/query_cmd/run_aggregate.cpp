@@ -1636,20 +1636,6 @@ Status _runAggregate(OperationContext* opCtx,
         // For an optimized away pipeline, signal the cache that a query operation has completed.
         // For normal pipelines this is done in DocumentSourceCursor.
         if (ctx) {
-            // Due to yielding, the collection pointers saved in MultipleCollectionAccessor might
-            // have become invalid. We will need to refresh them here.
-
-            // Stash the old value of 'isAnySecondaryNamespaceAViewOrNotFullyLocal' before
-            // refreshing. This is ok because we expect that our view of the collection should not
-            // have changed while holding 'ctx'.
-            auto isAnySecondaryNamespaceAViewOrNotFullyLocal =
-                collections.isAnySecondaryNamespaceAViewOrNotFullyLocal();
-            collections = MultipleCollectionAccessor(opCtx,
-                                                     &ctx->getCollection(),
-                                                     ctx->getNss(),
-                                                     isAnySecondaryNamespaceAViewOrNotFullyLocal,
-                                                     secondaryExecNssList);
-
             auto exec =
                 maybePinnedCursor ? maybePinnedCursor->getCursor()->getExecutor() : execs[0].get();
             const auto& planExplainer = exec->getPlanExplainer();

@@ -73,6 +73,7 @@ using TrialRunTrackerTest = PlanStageTestFixture;
 TEST_F(TrialRunTrackerTest, TrackerAttachesToStreamingStage) {
     auto collUuid = UUID::parse("00000000-0000-0000-0000-000000000000").getValue();
     auto scanStage = makeS<sbe::ScanStage>(collUuid,
+                                           DatabaseName(),
                                            generateSlotId() /* recordSlot */,
                                            generateSlotId() /* recordIdSlot */,
                                            generateSlotId() /* snapshotIdSlot */,
@@ -122,6 +123,7 @@ TEST_F(TrialRunTrackerTest, TrackerAttachesToBlockingStage) {
 TEST_F(TrialRunTrackerTest, TrackerAttachesToBothBlockingAndStreamingStages) {
     auto collUuid = UUID::parse("00000000-0000-0000-0000-000000000000").getValue();
     auto scanStage = makeS<sbe::ScanStage>(collUuid,
+                                           DatabaseName(),
                                            generateSlotId() /* recordSlot */,
                                            generateSlotId() /* recordIdSlot */,
                                            generateSlotId() /* snapshotIdSlot */,
@@ -161,6 +163,7 @@ TEST_F(TrialRunTrackerTest, TrackerAttachesToBothBlockingAndStreamingStages) {
 TEST_F(TrialRunTrackerTest, TrialRunTrackingCanBeDisabled) {
     auto scanStage =
         makeS<sbe::ScanStage>(UUID::parse("00000000-0000-0000-0000-000000000000").getValue(),
+                              DatabaseName(),
                               generateSlotId() /* recordSlot */,
                               generateSlotId() /* recordIdSlot */,
                               generateSlotId() /* snapshotIdSlot */,
@@ -187,6 +190,7 @@ TEST_F(TrialRunTrackerTest, TrialRunTrackingCanBeDisabled) {
 TEST_F(TrialRunTrackerTest, DisablingTrackingForChildDoesNotInhibitTrackingForParent) {
     auto scanStage =
         makeS<sbe::ScanStage>(UUID::parse("00000000-0000-0000-0000-000000000000").getValue(),
+                              DatabaseName(),
                               generateSlotId() /* recordSlot */,
                               generateSlotId() /* recordIdSlot */,
                               generateSlotId() /* snapshotIdSlot */,
