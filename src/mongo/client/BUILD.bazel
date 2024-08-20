@@ -95,3 +95,17 @@ idl_generator(
         "//src/mongo/db:basic_types_gen",
     ],
 )
+
+mongo_cc_library(
+    name = "sasl_aws_common",
+    srcs = [
+        ":sasl_aws_protocol_common_gen",
+    ],
+    hdrs = [
+        "//src/mongo/db:basic_types_gen",
+        "//src/mongo/db/query:explain_verbosity_gen",
+    ],
+    deps = [
+        "//src/mongo/db:server_base",
+    ],
+)
