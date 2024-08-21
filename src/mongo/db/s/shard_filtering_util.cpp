@@ -45,7 +45,7 @@ void waitForFutureToComplete(OperationContext* opCtx, SharedSemiFuture<void> fut
     // the transaction will eventually get aborted.
     if (opCtx->inMultiDocumentTransaction()) {
         opCtx->runWithDeadline(opCtx->getServiceContext()->getFastClockSource()->now() +
-                                   Milliseconds(metadataRefreshInTransactionMaxWait.load()),
+                                   Milliseconds(metadataRefreshInTransactionMaxWaitMs.load()),
                                ErrorCodes::ExceededTimeLimit,
                                [&] { future.get(opCtx); });
     } else {
