@@ -556,6 +556,9 @@ GCC_OR_CLANG_GENERAL_COPTS = select({
         # Enable strong by default, this may need to be softened to
         # -fstack-protector-all if we run into compatibility issues.
         "-fstack-protector-strong",
+
+        # Disable TBAA optimization
+        "-fno-strict-aliasing",
     ],
     "//conditions:default": [],
 })
@@ -1028,9 +1031,6 @@ GCC_OR_CLANG_LINKFLAGS = select({
 
         # If possible with the current linker, mark relocations as read-only.
         "-Wl,-z,relro",
-
-        # Disable TBAA optimization
-        "-fno-strict-aliasing",
     ],
     "//conditions:default": [],
 })
