@@ -86,7 +86,6 @@
 #include "mongo/db/matcher/schema/expression_internal_schema_xor.h"
 #include "mongo/db/query/bson_typemask.h"
 #include "mongo/db/query/optimizer/syntax/expr.h"
-#include "mongo/db/query/sbe_shared_helpers.h"
 #include "mongo/db/query/stage_builder/sbe/abt_holder_impl.h"
 #include "mongo/db/query/stage_builder/sbe/builder.h"
 #include "mongo/db/query/stage_builder/sbe/gen_abt_helpers.h"
@@ -1326,6 +1325,91 @@ std::pair<sbe::value::TypeTags, sbe::value::Value> convertBitTestBitPositions(
     return {bitPosTag, bitPosVal};
 }
 
+namespace {
+template <typename ExpressionType>
+using ValueExpressionFn = std::function<ExpressionType(sbe::value::TypeTags, sbe::value::Value)>;
+
+/*
+ * Converts SBE comparison operation and value to an expression.
+ */
+template <typename BuilderType, typename ExpressionType>
+ExpressionType generateComparisonExpr(BuilderType& b,
+                                      sbe::value::TypeTags tag,
+                                      sbe::value::Value val,
+                                      sbe::EPrimBinary::Op binaryOp,
+                                      ExpressionType inputExpr,
+                                      ValueExpressionFn<ExpressionType> makeValExpr) {
+    // Most commonly the comparison does not do any kind of type conversions (i.e. 12 > "10" does
+    // not evaluate to true as we do not try to convert a string to a number). Internally, SBE
+    // returns Nothing for mismatched types. However, there is a wrinkle with MQL (and there always
+    // is one). We can compare any type to MinKey or MaxKey type and expect a true/false answer.
+    if (tag == sbe::value::TypeTags::MinKey) {
+        switch (binaryOp) {
+            case sbe::EPrimBinary::eq:
+            case sbe::EPrimBinary::neq:
+                break;
+            case sbe::EPrimBinary::greater:
+                return b.makeFillEmptyFalse(
+                    b.makeNot(b.makeFunction("isMinKey", std::move(inputExpr))));
+            case sbe::EPrimBinary::greaterEq:
+                return b.makeFunction("exists", std::move(inputExpr));
+            case sbe::EPrimBinary::less:
+                return b.makeBoolConstant(false);
+            case sbe::EPrimBinary::lessEq:
+                return b.makeFillEmptyFalse(b.makeFunction("isMinKey", std::move(inputExpr)));
+            default:
+                MONGO_UNREACHABLE_TASSERT(8217105);
+        }
+    } else if (tag == sbe::value::TypeTags::MaxKey) {
+        switch (binaryOp) {
+            case sbe::EPrimBinary::eq:
+            case sbe::EPrimBinary::neq:
+                break;
+            case sbe::EPrimBinary::greater:
+                return b.makeBoolConstant(false);
+            case sbe::EPrimBinary::greaterEq:
+                return b.makeFillEmptyFalse(b.makeFunction("isMaxKey", std::move(inputExpr)));
+            case sbe::EPrimBinary::less:
+                return b.makeFillEmptyFalse(
+                    b.makeNot(b.makeFunction("isMaxKey", std::move(inputExpr))));
+            case sbe::EPrimBinary::lessEq:
+                return b.makeFunction("exists", std::move(inputExpr));
+            default:
+                MONGO_UNREACHABLE_TASSERT(8217101);
+        }
+    } else if (tag == sbe::value::TypeTags::Null) {
+        // When comparing to null we have to consider missing.
+        inputExpr = b.buildMultiBranchConditional(
+            typename BuilderType::CaseValuePair{b.generateNullOrMissing(b.cloneExpr(inputExpr)),
+                                                b.makeNullConstant()},
+            b.cloneExpr(inputExpr));
+
+        return b.makeFillEmptyFalse(
+            b.makeBinaryOpWithCollation(binaryOp, std::move(inputExpr), b.makeNullConstant()));
+    } else if (sbe::value::isNaN(tag, val)) {
+        // Construct an expression to perform a NaN check.
+        switch (binaryOp) {
+            case sbe::EPrimBinary::eq:
+            case sbe::EPrimBinary::greaterEq:
+            case sbe::EPrimBinary::lessEq:
+                // If 'rhs' is NaN, then return whether the lhs is NaN.
+                return b.makeFillEmptyFalse(b.makeFunction("isNaN", std::move(inputExpr)));
+            case sbe::EPrimBinary::less:
+            case sbe::EPrimBinary::greater:
+                // Always return false for non-equality operators.
+                return b.makeBoolConstant(false);
+            default:
+                tasserted(5449400,
+                          str::stream()
+                              << "Could not construct expression for comparison op " << binaryOp);
+        }
+    }
+
+    return b.makeFillEmptyFalse(
+        b.makeBinaryOpWithCollation(binaryOp, std::move(inputExpr), makeValExpr(tag, val)));
+}
+}  // namespace
+
 SbExpr generateComparisonExpr(StageBuilderState& state,
                               const ComparisonMatchExpression* expr,
                               sbe::EPrimBinary::Op binaryOp,
@@ -1336,8 +1420,7 @@ SbExpr generateComparisonExpr(StageBuilderState& state,
     auto [tagView, valView] = sbe::bson::convertFrom<true>(
         rhs.rawdata(), rhs.rawdata() + rhs.size(), rhs.fieldNameSize() - 1);
 
-    sbe_helper::ValueExpressionFn<SbExpr> makeValExpr = [&](sbe::value::TypeTags tag,
-                                                            sbe::value::Value val) {
+    ValueExpressionFn<SbExpr> makeValExpr = [&](sbe::value::TypeTags tag, sbe::value::Value val) {
         if (auto inputParam = expr->getInputParamId()) {
             return b.makeVariable(state.registerInputParamSlot(*inputParam));
         }
@@ -1345,7 +1428,7 @@ SbExpr generateComparisonExpr(StageBuilderState& state,
         return b.makeConstant(copyTag, copyVal);
     };
 
-    return sbe_helper::generateComparisonExpr(
+    return generateComparisonExpr(
         b, tagView, valView, binaryOp, std::move(inputExpr), std::move(makeValExpr));
 }
 

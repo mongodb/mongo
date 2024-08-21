@@ -353,3 +353,18 @@ env.Benchmark(
         "query_sbe",
     ],
 )
+
+env.Benchmark(
+    target="sbe_expression_bm",
+    source=[
+        "expressions/sbe_expression_bm.cpp",
+    ],
+    LIBDEPS=[
+        "$BUILD_DIR/mongo/db/auth/authmocks",
+        "$BUILD_DIR/mongo/db/pipeline/expression_bm_fixture",
+        "$BUILD_DIR/mongo/db/query/query_test_service_context",
+        "$BUILD_DIR/mongo/db/query_exec",
+        "$BUILD_DIR/mongo/db/service_context_non_d",
+        "query_sbe_stages",
+    ],
+)
