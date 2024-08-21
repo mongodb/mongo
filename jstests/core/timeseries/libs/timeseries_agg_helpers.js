@@ -147,12 +147,4 @@ export var TimeseriesAggTests = class {
             assert.eq(actualResults[i], expectedResults[i], actualResults);
         }
     }
-
-    static generateOutPipeline(collName, dbName, options, aggStage = null) {
-        let outStage = {$out: {db: dbName, coll: collName, timeseries: options}};
-        if (aggStage) {
-            return [aggStage, outStage];
-        }
-        return [outStage];
-    }
 };
