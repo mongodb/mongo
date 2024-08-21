@@ -883,6 +883,7 @@ connection_runtime_config = [
             'configuration',
             'error_returns',
             'evict',
+            'eviction',
             'evict_stuck',
             'evictserver',
             'fileops',

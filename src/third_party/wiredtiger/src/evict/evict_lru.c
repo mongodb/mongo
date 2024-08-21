@@ -260,14 +260,14 @@ __wt_evict_server_wake(WT_SESSION_IMPL *session)
     conn = S2C(session);
     cache = conn->cache;
 
-    if (WT_VERBOSE_LEVEL_ISSET(session, WT_VERB_EVICTSERVER, WT_VERBOSE_DEBUG_2)) {
+    if (WT_VERBOSE_LEVEL_ISSET(session, WT_VERB_EVICTION, WT_VERBOSE_DEBUG_2)) {
         uint64_t bytes_dirty, bytes_inuse, bytes_max, bytes_updates;
 
         bytes_inuse = __wt_cache_bytes_inuse(cache);
         bytes_max = conn->cache_size;
         bytes_dirty = __wt_cache_dirty_inuse(cache);
         bytes_updates = __wt_cache_bytes_updates(cache);
-        __wt_verbose_debug2(session, WT_VERB_EVICTSERVER,
+        __wt_verbose_debug2(session, WT_VERB_EVICTION,
           "waking, bytes inuse %s max (%" PRIu64 "MB %s %" PRIu64 "MB), bytes dirty %" PRIu64
           "(bytes), bytes updates %" PRIu64 "(bytes)",
           bytes_inuse <= bytes_max ? "<=" : ">", bytes_inuse / WT_MEGABYTE,
@@ -338,11 +338,11 @@ __evict_thread_run(WT_SESSION_IMPL *session, WT_THREAD *thread)
               F_ISSET(conn, WT_CONN_EVICTION_RUN) && F_ISSET(thread, WT_THREAD_RUN))
                 __wt_yield();
         else {
-            __wt_verbose_debug2(session, WT_VERB_EVICTSERVER, "%s", "sleeping");
+            __wt_verbose_debug2(session, WT_VERB_EVICTION, "%s", "sleeping");
 
             /* Don't rely on signals: check periodically. */
             __wt_cond_auto_wait(session, cache->evict_cond, did_work, NULL);
-            __wt_verbose_debug2(session, WT_VERB_EVICTSERVER, "%s", "waking");
+            __wt_verbose_debug2(session, WT_VERB_EVICTION, "%s", "waking");
         }
     } else
         WT_ERR(__evict_lru_pages(session, false));
@@ -413,7 +413,7 @@ __evict_thread_stop(WT_SESSION_IMPL *session, WT_THREAD *thread)
     /* Clear the eviction thread session flag. */
     F_CLR(session, WT_SESSION_EVICTION);
 
-    __wt_verbose(session, WT_VERB_EVICTSERVER, "%s", "cache eviction thread exiting");
+    __wt_verbose(session, WT_VERB_EVICTION, "%s", "cache eviction thread exiting");
 
     if (0) {
 err:
@@ -515,6 +515,7 @@ __evict_server(WT_SESSION_IMPL *session, bool *did_work)
         if (cache->cache_stuck_timeout_ms < 20 ||
           (time_diff_ms > cache->cache_stuck_timeout_ms - 20)) {
             WT_SET_VERBOSE_LEVEL(session, WT_VERB_EVICT, WT_VERBOSE_DEBUG_1);
+            WT_SET_VERBOSE_LEVEL(session, WT_VERB_EVICTION, WT_VERBOSE_DEBUG_1);
             WT_SET_VERBOSE_LEVEL(session, WT_VERB_EVICTSERVER, WT_VERBOSE_DEBUG_1);
             WT_SET_VERBOSE_LEVEL(session, WT_VERB_EVICT_STUCK, WT_VERBOSE_DEBUG_1);
         }
@@ -576,7 +577,7 @@ __wt_evict_create(WT_SESSION_IMPL *session)
  */
 #if !defined(HAVE_DIAGNOSTIC)
     /* Need verbose check only if not in diagnostic build */
-    if (WT_VERBOSE_ISSET(session, WT_VERB_EVICTSERVER))
+    if (WT_VERBOSE_ISSET(session, WT_VERB_EVICTION))
 #endif
         __wt_epoch(session, &conn->cache->stuck_time);
 
@@ -613,7 +614,7 @@ __wt_evict_destroy(WT_SESSION_IMPL *session)
     __wt_atomic_storebool(&conn->evict_server_running, false);
     __wt_evict_server_wake(session);
 
-    __wt_verbose(session, WT_VERB_EVICTSERVER, "%s", "waiting for helper threads");
+    __wt_verbose(session, WT_VERB_EVICTION, "%s", "waiting for helper threads");
 
     /*
      * We call the destroy function still holding the write lock. It assumes it is called locked.
@@ -784,7 +785,7 @@ __evict_pass(WT_SESSION_IMPL *session)
         if (!__evict_update_work(session))
             break;
 
-        __wt_verbose_debug2(session, WT_VERB_EVICTSERVER,
+        __wt_verbose_debug2(session, WT_VERB_EVICTION,
           "Eviction pass with: Max: %" PRIu64 " In use: %" PRIu64 " Dirty: %" PRIu64
           " Updates: %" PRIu64,
           conn->cache_size, __wt_atomic_load64(&cache->bytes_inmem),
@@ -852,7 +853,7 @@ __evict_pass(WT_SESSION_IMPL *session)
             }
 
             WT_STAT_CONN_INCR(session, cache_eviction_slow);
-            __wt_verbose(session, WT_VERB_EVICTSERVER, "%s", "unable to reach eviction goal");
+            __wt_verbose(session, WT_VERB_EVICTION, "%s", "unable to reach eviction goal");
             break;
         }
         if (__wt_atomic_load32(&cache->evict_aggressive_score) > 0)
@@ -1199,7 +1200,7 @@ __evict_tune_workers(WT_SESSION_IMPL *session)
         for (i = cur_threads; i < target_threads; ++i) {
             __wt_thread_group_start_one(session, &conn->evict_threads, false);
             WT_STAT_CONN_INCR(session, cache_eviction_worker_created);
-            __wt_verbose(session, WT_VERB_EVICTSERVER, "%s", "added worker thread");
+            __wt_verbose(session, WT_VERB_EVICTION, "%s", "added worker thread");
         }
         cache->evict_tune_last_action_time = current_time;
     }
@@ -2185,7 +2186,7 @@ fast:
         return;
 
     *queuedp = true;
-    __wt_verbose(session, WT_VERB_EVICTSERVER, "walk select: %p, size %" WT_SIZET_FMT, (void *)page,
+    __wt_verbose(session, WT_VERB_EVICTION, "walk select: %p, size %" WT_SIZET_FMT, (void *)page,
       __wt_atomic_loadsize(&page->memory_footprint));
 
     return;
@@ -2322,7 +2323,7 @@ __evict_walk_tree(WT_SESSION_IMPL *session, WT_EVICT_QUEUE *queue, u_int max_ent
     *slotp += (u_int)(evict - start);
     WT_STAT_CONN_INCRV(session, cache_eviction_pages_queued, (u_int)(evict - start));
 
-    __wt_verbose_debug2(session, WT_VERB_EVICTSERVER, "%s walk: seen %" PRIu64 ", queued %" PRIu64,
+    __wt_verbose_debug2(session, WT_VERB_EVICTION, "%s walk: seen %" PRIu64 ", queued %" PRIu64,
       session->dhandle->name, pages_seen, pages_queued);
 
     /* If we couldn't find the number of pages we were looking for, skip the tree next time. */

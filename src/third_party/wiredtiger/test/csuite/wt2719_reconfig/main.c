@@ -88,13 +88,14 @@ static const char *const list[] = {",cache_overhead=13", ",cache_overhead=27", "
   ",statistics_log=(wait=37)", ",statistics_log=(wait=0)",
 
   ",verbose=(\"api\")", ",verbose=(\"block\")", ",verbose=(\"checkpoint\")",
-  ",verbose=(\"compact\")", ",verbose=(\"evict\")", ",verbose=(\"evictserver\")",
-  ",verbose=(\"fileops\")", ",verbose=(\"handleops\")", ",verbose=(\"log\")", ",verbose=(\"lsm\")",
-  ",verbose=(\"lsm_manager\")", ",verbose=(\"metadata\")", ",verbose=(\"mutex\")",
-  ",verbose=(\"overflow\")", ",verbose=(\"read\")", ",verbose=(\"reconcile\")",
-  ",verbose=(\"recovery\")", ",verbose=(\"salvage\")", ",verbose=(\"shared_cache\")",
-  ",verbose=(\"split\")", ",verbose=(\"transaction\")", ",verbose=(\"verify\")",
-  ",verbose=(\"version\")", ",verbose=(\"write\")", ",verbose=()"};
+  ",verbose=(\"compact\")", ",verbose=(\"evict\")", ",verbose=(\"eviction\")",
+  ",verbose=(\"evictserver\")", ",verbose=(\"fileops\")", ",verbose=(\"handleops\")",
+  ",verbose=(\"log\")", ",verbose=(\"lsm\")", ",verbose=(\"lsm_manager\")",
+  ",verbose=(\"metadata\")", ",verbose=(\"mutex\")", ",verbose=(\"overflow\")",
+  ",verbose=(\"read\")", ",verbose=(\"reconcile\")", ",verbose=(\"recovery\")",
+  ",verbose=(\"salvage\")", ",verbose=(\"shared_cache\")", ",verbose=(\"split\")",
+  ",verbose=(\"transaction\")", ",verbose=(\"verify\")", ",verbose=(\"version\")",
+  ",verbose=(\"write\")", ",verbose=()"};
 
 /*
  * handle_message --

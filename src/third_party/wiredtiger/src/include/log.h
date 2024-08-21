@@ -410,21 +410,3 @@ struct __wt_txn_printlog_args {
                                       /* AUTOMATIC FLAG VALUE GENERATION STOP 32 */
     uint32_t flags;
 };
-
-/*
- * WT_LOG_REC_DESC --
- *	A descriptor for a log record type.
- */
-struct __wt_log_rec_desc {
-    const char *fmt;
-    int (*print)(WT_SESSION_IMPL *session, uint8_t **pp, uint8_t *end);
-};
-
-/*
- * WT_LOG_OP_DESC --
- *	A descriptor for a log operation type.
- */
-struct __wt_log_op_desc {
-    const char *fmt;
-    int (*print)(WT_SESSION_IMPL *session, uint8_t **pp, uint8_t *end);
-};

@@ -64,6 +64,7 @@ class test_verbose04(test_verbose_base):
       'WT_VERB_CONFIGURATION',
       'WT_VERB_ERROR_RETURNS',
       'WT_VERB_EVICT',
+      'WT_VERB_EVICTION',
       'WT_VERB_EVICT_STUCK',
       'WT_VERB_EVICTSERVER',
       'WT_VERB_FILEOPS',

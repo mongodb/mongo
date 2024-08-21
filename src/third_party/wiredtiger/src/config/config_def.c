@@ -547,6 +547,7 @@ const char __WT_CONFIG_CHOICE_compact_progress[] = "compact_progress";
 const char __WT_CONFIG_CHOICE_configuration[] = "configuration";
 const char __WT_CONFIG_CHOICE_error_returns[] = "error_returns";
 const char __WT_CONFIG_CHOICE_evict[] = "evict";
+const char __WT_CONFIG_CHOICE_eviction[] = "eviction";
 const char __WT_CONFIG_CHOICE_evict_stuck[] = "evict_stuck";
 const char __WT_CONFIG_CHOICE_evictserver[] = "evictserver";
 const char __WT_CONFIG_CHOICE_fileops[] = "fileops";
@@ -583,9 +584,9 @@ static const char *confchk_verbose_choices[] = {__WT_CONFIG_CHOICE_all, __WT_CON
   __WT_CONFIG_CHOICE_checkpoint, __WT_CONFIG_CHOICE_checkpoint_cleanup,
   __WT_CONFIG_CHOICE_checkpoint_progress, __WT_CONFIG_CHOICE_chunkcache, __WT_CONFIG_CHOICE_compact,
   __WT_CONFIG_CHOICE_compact_progress, __WT_CONFIG_CHOICE_configuration,
-  __WT_CONFIG_CHOICE_error_returns, __WT_CONFIG_CHOICE_evict, __WT_CONFIG_CHOICE_evict_stuck,
-  __WT_CONFIG_CHOICE_evictserver, __WT_CONFIG_CHOICE_fileops, __WT_CONFIG_CHOICE_generation,
-  __WT_CONFIG_CHOICE_handleops, __WT_CONFIG_CHOICE_history_store,
+  __WT_CONFIG_CHOICE_error_returns, __WT_CONFIG_CHOICE_evict, __WT_CONFIG_CHOICE_eviction,
+  __WT_CONFIG_CHOICE_evict_stuck, __WT_CONFIG_CHOICE_evictserver, __WT_CONFIG_CHOICE_fileops,
+  __WT_CONFIG_CHOICE_generation, __WT_CONFIG_CHOICE_handleops, __WT_CONFIG_CHOICE_history_store,
   __WT_CONFIG_CHOICE_history_store_activity, __WT_CONFIG_CHOICE_log, __WT_CONFIG_CHOICE_lsm,
   __WT_CONFIG_CHOICE_lsm_manager, __WT_CONFIG_CHOICE_metadata, __WT_CONFIG_CHOICE_mutex,
   __WT_CONFIG_CHOICE_out_of_order, __WT_CONFIG_CHOICE_overflow, __WT_CONFIG_CHOICE_prefetch,
@@ -717,8 +718,8 @@ static const WT_CONFIG_CHECK confchk_WT_CONNECTION_reconfigure[] = {
     "\"block_cache\",\"checkpoint\",\"checkpoint_cleanup\","
     "\"checkpoint_progress\",\"chunkcache\",\"compact\","
     "\"compact_progress\",\"configuration\",\"error_returns\","
-    "\"evict\",\"evict_stuck\",\"evictserver\",\"fileops\","
-    "\"generation\",\"handleops\",\"history_store\","
+    "\"evict\",\"eviction\",\"evict_stuck\",\"evictserver\","
+    "\"fileops\",\"generation\",\"handleops\",\"history_store\","
     "\"history_store_activity\",\"log\",\"lsm\",\"lsm_manager\","
     "\"metadata\",\"mutex\",\"out_of_order\",\"overflow\","
     "\"prefetch\",\"read\",\"reconcile\",\"recovery\","
@@ -2765,9 +2766,9 @@ static const char *confchk_verbose13_choices[] = {__WT_CONFIG_CHOICE_all, __WT_C
   __WT_CONFIG_CHOICE_checkpoint, __WT_CONFIG_CHOICE_checkpoint_cleanup,
   __WT_CONFIG_CHOICE_checkpoint_progress, __WT_CONFIG_CHOICE_chunkcache, __WT_CONFIG_CHOICE_compact,
   __WT_CONFIG_CHOICE_compact_progress, __WT_CONFIG_CHOICE_configuration,
-  __WT_CONFIG_CHOICE_error_returns, __WT_CONFIG_CHOICE_evict, __WT_CONFIG_CHOICE_evict_stuck,
-  __WT_CONFIG_CHOICE_evictserver, __WT_CONFIG_CHOICE_fileops, __WT_CONFIG_CHOICE_generation,
-  __WT_CONFIG_CHOICE_handleops, __WT_CONFIG_CHOICE_history_store,
+  __WT_CONFIG_CHOICE_error_returns, __WT_CONFIG_CHOICE_evict, __WT_CONFIG_CHOICE_eviction,
+  __WT_CONFIG_CHOICE_evict_stuck, __WT_CONFIG_CHOICE_evictserver, __WT_CONFIG_CHOICE_fileops,
+  __WT_CONFIG_CHOICE_generation, __WT_CONFIG_CHOICE_handleops, __WT_CONFIG_CHOICE_history_store,
   __WT_CONFIG_CHOICE_history_store_activity, __WT_CONFIG_CHOICE_log, __WT_CONFIG_CHOICE_lsm,
   __WT_CONFIG_CHOICE_lsm_manager, __WT_CONFIG_CHOICE_metadata, __WT_CONFIG_CHOICE_mutex,
   __WT_CONFIG_CHOICE_out_of_order, __WT_CONFIG_CHOICE_overflow, __WT_CONFIG_CHOICE_prefetch,
@@ -2959,8 +2960,8 @@ static const WT_CONFIG_CHECK confchk_wiredtiger_open[] = {
     "\"block_cache\",\"checkpoint\",\"checkpoint_cleanup\","
     "\"checkpoint_progress\",\"chunkcache\",\"compact\","
     "\"compact_progress\",\"configuration\",\"error_returns\","
-    "\"evict\",\"evict_stuck\",\"evictserver\",\"fileops\","
-    "\"generation\",\"handleops\",\"history_store\","
+    "\"evict\",\"eviction\",\"evict_stuck\",\"evictserver\","
+    "\"fileops\",\"generation\",\"handleops\",\"history_store\","
     "\"history_store_activity\",\"log\",\"lsm\",\"lsm_manager\","
     "\"metadata\",\"mutex\",\"out_of_order\",\"overflow\","
     "\"prefetch\",\"read\",\"reconcile\",\"recovery\","
@@ -3024,9 +3025,9 @@ static const char *confchk_verbose14_choices[] = {__WT_CONFIG_CHOICE_all, __WT_C
   __WT_CONFIG_CHOICE_checkpoint, __WT_CONFIG_CHOICE_checkpoint_cleanup,
   __WT_CONFIG_CHOICE_checkpoint_progress, __WT_CONFIG_CHOICE_chunkcache, __WT_CONFIG_CHOICE_compact,
   __WT_CONFIG_CHOICE_compact_progress, __WT_CONFIG_CHOICE_configuration,
-  __WT_CONFIG_CHOICE_error_returns, __WT_CONFIG_CHOICE_evict, __WT_CONFIG_CHOICE_evict_stuck,
-  __WT_CONFIG_CHOICE_evictserver, __WT_CONFIG_CHOICE_fileops, __WT_CONFIG_CHOICE_generation,
-  __WT_CONFIG_CHOICE_handleops, __WT_CONFIG_CHOICE_history_store,
+  __WT_CONFIG_CHOICE_error_returns, __WT_CONFIG_CHOICE_evict, __WT_CONFIG_CHOICE_eviction,
+  __WT_CONFIG_CHOICE_evict_stuck, __WT_CONFIG_CHOICE_evictserver, __WT_CONFIG_CHOICE_fileops,
+  __WT_CONFIG_CHOICE_generation, __WT_CONFIG_CHOICE_handleops, __WT_CONFIG_CHOICE_history_store,
   __WT_CONFIG_CHOICE_history_store_activity, __WT_CONFIG_CHOICE_log, __WT_CONFIG_CHOICE_lsm,
   __WT_CONFIG_CHOICE_lsm_manager, __WT_CONFIG_CHOICE_metadata, __WT_CONFIG_CHOICE_mutex,
   __WT_CONFIG_CHOICE_out_of_order, __WT_CONFIG_CHOICE_overflow, __WT_CONFIG_CHOICE_prefetch,
@@ -3218,8 +3219,8 @@ static const WT_CONFIG_CHECK confchk_wiredtiger_open_all[] = {
     "\"block_cache\",\"checkpoint\",\"checkpoint_cleanup\","
     "\"checkpoint_progress\",\"chunkcache\",\"compact\","
     "\"compact_progress\",\"configuration\",\"error_returns\","
-    "\"evict\",\"evict_stuck\",\"evictserver\",\"fileops\","
-    "\"generation\",\"handleops\",\"history_store\","
+    "\"evict\",\"eviction\",\"evict_stuck\",\"evictserver\","
+    "\"fileops\",\"generation\",\"handleops\",\"history_store\","
     "\"history_store_activity\",\"log\",\"lsm\",\"lsm_manager\","
     "\"metadata\",\"mutex\",\"out_of_order\",\"overflow\","
     "\"prefetch\",\"read\",\"reconcile\",\"recovery\","
@@ -3286,9 +3287,9 @@ static const char *confchk_verbose15_choices[] = {__WT_CONFIG_CHOICE_all, __WT_C
   __WT_CONFIG_CHOICE_checkpoint, __WT_CONFIG_CHOICE_checkpoint_cleanup,
   __WT_CONFIG_CHOICE_checkpoint_progress, __WT_CONFIG_CHOICE_chunkcache, __WT_CONFIG_CHOICE_compact,
   __WT_CONFIG_CHOICE_compact_progress, __WT_CONFIG_CHOICE_configuration,
-  __WT_CONFIG_CHOICE_error_returns, __WT_CONFIG_CHOICE_evict, __WT_CONFIG_CHOICE_evict_stuck,
-  __WT_CONFIG_CHOICE_evictserver, __WT_CONFIG_CHOICE_fileops, __WT_CONFIG_CHOICE_generation,
-  __WT_CONFIG_CHOICE_handleops, __WT_CONFIG_CHOICE_history_store,
+  __WT_CONFIG_CHOICE_error_returns, __WT_CONFIG_CHOICE_evict, __WT_CONFIG_CHOICE_eviction,
+  __WT_CONFIG_CHOICE_evict_stuck, __WT_CONFIG_CHOICE_evictserver, __WT_CONFIG_CHOICE_fileops,
+  __WT_CONFIG_CHOICE_generation, __WT_CONFIG_CHOICE_handleops, __WT_CONFIG_CHOICE_history_store,
   __WT_CONFIG_CHOICE_history_store_activity, __WT_CONFIG_CHOICE_log, __WT_CONFIG_CHOICE_lsm,
   __WT_CONFIG_CHOICE_lsm_manager, __WT_CONFIG_CHOICE_metadata, __WT_CONFIG_CHOICE_mutex,
   __WT_CONFIG_CHOICE_out_of_order, __WT_CONFIG_CHOICE_overflow, __WT_CONFIG_CHOICE_prefetch,
@@ -3468,8 +3469,8 @@ static const WT_CONFIG_CHECK confchk_wiredtiger_open_basecfg[] = {
     "\"block_cache\",\"checkpoint\",\"checkpoint_cleanup\","
     "\"checkpoint_progress\",\"chunkcache\",\"compact\","
     "\"compact_progress\",\"configuration\",\"error_returns\","
-    "\"evict\",\"evict_stuck\",\"evictserver\",\"fileops\","
-    "\"generation\",\"handleops\",\"history_store\","
+    "\"evict\",\"eviction\",\"evict_stuck\",\"evictserver\","
+    "\"fileops\",\"generation\",\"handleops\",\"history_store\","
     "\"history_store_activity\",\"log\",\"lsm\",\"lsm_manager\","
     "\"metadata\",\"mutex\",\"out_of_order\",\"overflow\","
     "\"prefetch\",\"read\",\"reconcile\",\"recovery\","
@@ -3536,9 +3537,9 @@ static const char *confchk_verbose16_choices[] = {__WT_CONFIG_CHOICE_all, __WT_C
   __WT_CONFIG_CHOICE_checkpoint, __WT_CONFIG_CHOICE_checkpoint_cleanup,
   __WT_CONFIG_CHOICE_checkpoint_progress, __WT_CONFIG_CHOICE_chunkcache, __WT_CONFIG_CHOICE_compact,
   __WT_CONFIG_CHOICE_compact_progress, __WT_CONFIG_CHOICE_configuration,
-  __WT_CONFIG_CHOICE_error_returns, __WT_CONFIG_CHOICE_evict, __WT_CONFIG_CHOICE_evict_stuck,
-  __WT_CONFIG_CHOICE_evictserver, __WT_CONFIG_CHOICE_fileops, __WT_CONFIG_CHOICE_generation,
-  __WT_CONFIG_CHOICE_handleops, __WT_CONFIG_CHOICE_history_store,
+  __WT_CONFIG_CHOICE_error_returns, __WT_CONFIG_CHOICE_evict, __WT_CONFIG_CHOICE_eviction,
+  __WT_CONFIG_CHOICE_evict_stuck, __WT_CONFIG_CHOICE_evictserver, __WT_CONFIG_CHOICE_fileops,
+  __WT_CONFIG_CHOICE_generation, __WT_CONFIG_CHOICE_handleops, __WT_CONFIG_CHOICE_history_store,
   __WT_CONFIG_CHOICE_history_store_activity, __WT_CONFIG_CHOICE_log, __WT_CONFIG_CHOICE_lsm,
   __WT_CONFIG_CHOICE_lsm_manager, __WT_CONFIG_CHOICE_metadata, __WT_CONFIG_CHOICE_mutex,
   __WT_CONFIG_CHOICE_out_of_order, __WT_CONFIG_CHOICE_overflow, __WT_CONFIG_CHOICE_prefetch,
@@ -3718,8 +3719,8 @@ static const WT_CONFIG_CHECK confchk_wiredtiger_open_usercfg[] = {
     "\"block_cache\",\"checkpoint\",\"checkpoint_cleanup\","
     "\"checkpoint_progress\",\"chunkcache\",\"compact\","
     "\"compact_progress\",\"configuration\",\"error_returns\","
-    "\"evict\",\"evict_stuck\",\"evictserver\",\"fileops\","
-    "\"generation\",\"handleops\",\"history_store\","
+    "\"evict\",\"eviction\",\"evict_stuck\",\"evictserver\","
+    "\"fileops\",\"generation\",\"handleops\",\"history_store\","
     "\"history_store_activity\",\"log\",\"lsm\",\"lsm_manager\","
     "\"metadata\",\"mutex\",\"out_of_order\",\"overflow\","
     "\"prefetch\",\"read\",\"reconcile\",\"recovery\","

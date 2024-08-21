@@ -142,6 +142,7 @@ __gen_drain_callback(
             if (cookie->verbose_timeout_flags == true) {
                 if (cookie->base.which == WT_GEN_EVICT) {
                     WT_VERBOSE_RESTORE(session, verbose_orig_level, WT_VERB_EVICT);
+                    WT_VERBOSE_RESTORE(session, verbose_orig_level, WT_VERB_EVICTION);
                     WT_VERBOSE_RESTORE(session, verbose_orig_level, WT_VERB_EVICTSERVER);
                     WT_VERBOSE_RESTORE(session, verbose_orig_level, WT_VERB_EVICT_STUCK);
                 } else if (cookie->base.which == WT_GEN_CHECKPOINT) {
@@ -199,6 +200,8 @@ __gen_drain_callback(
                 if (cookie->base.which == WT_GEN_EVICT) {
                     WT_VERBOSE_SET_AND_SAVE(
                       session, verbose_orig_level, WT_VERB_EVICT, WT_VERBOSE_DEBUG_1);
+                    WT_VERBOSE_SET_AND_SAVE(
+                      session, verbose_orig_level, WT_VERB_EVICTION, WT_VERBOSE_DEBUG_1);
                     WT_VERBOSE_SET_AND_SAVE(
                       session, verbose_orig_level, WT_VERB_EVICTSERVER, WT_VERBOSE_DEBUG_1);
                     WT_VERBOSE_SET_AND_SAVE(

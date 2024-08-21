@@ -728,9 +728,10 @@ __wti_background_compact_server_create(WT_SESSION_IMPL *session)
 
     /*
      * Compaction does enough I/O it may be called upon to perform slow operations for the block
-     * manager.
+     * manager. Don't let the background compaction thread be pulled into eviction to limit
+     * performance impacts.
      */
-    session_flags = WT_SESSION_CAN_WAIT;
+    session_flags = WT_SESSION_CAN_WAIT | WT_SESSION_IGNORE_CACHE_SIZE;
     WT_RET(__wt_open_internal_session(
       conn, "compact-server", true, session_flags, 0, &conn->background_compact.session));
     session = conn->background_compact.session;

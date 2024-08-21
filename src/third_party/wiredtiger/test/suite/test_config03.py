@@ -59,7 +59,7 @@ class test_config03(test_base03.test_base03):
     # a way to redirect verbose output to a file in Python.
     #
     #verbose_scenarios = wtscenario.quick_scenarios('s_verbose',
-    #    ['block', 'evict,evictserver', 'fileops,hazard,mutex',
+    #    ['block', 'eviction', 'fileops,hazard,mutex',
     #     'read,readserver,reconcile,salvage','verify,write',''], None)
     verbose_scenarios = wtscenario.quick_scenarios('s_verbose', [None], None)
 
