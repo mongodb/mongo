@@ -1047,7 +1047,7 @@ buildvariants:
   - name: .stitch
   - name: test_packages
     distros:
-    - ubuntu2004-package
+    - rhel94-large-packagetest
   - name: selinux_rhel7_org
   - name: .publish
   - name: generate_buildid_to_debug_symbols_mapping
