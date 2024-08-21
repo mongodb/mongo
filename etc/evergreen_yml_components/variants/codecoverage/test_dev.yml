@@ -6,7 +6,7 @@ buildvariants:
     display_name: "~ AL2023.3 Arm64 Code Coverage"
     run_on:
       - amazon2023.3-arm64-large
-    cron: "0 4 * * 0" # From the ${project_weekly_cron} parameter
+    cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
     stepback: false
     expansions:
       test_flags: --excludeWithAnyTags=resource_intensive,incompatible_with_gcov
@@ -47,7 +47,7 @@ buildvariants:
     display_name: "~ RHEL 9.3 Code Coverage"
     run_on:
       - rhel93-medium
-    cron: "0 4 * * 0" # From the ${project_weekly_cron} parameter
+    cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
     stepback: false
     expansions:
       test_flags: --excludeWithAnyTags=resource_intensive,incompatible_with_gcov
