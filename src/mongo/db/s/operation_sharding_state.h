@@ -165,17 +165,6 @@ public:
     boost::optional<DatabaseVersion> getDbVersion(const DatabaseName& dbName) const;
 
     /**
-     * This method implements a best-effort attempt to wait for the critical section to complete
-     * before returning to the router at the previous step in order to prevent it from busy spinning
-     * while the critical section is in progress.
-     *
-     * All waits for migration critical section should go through this code path, because it also
-     * accounts for transactions and locking.
-     */
-    static Status waitForCriticalSectionToComplete(OperationContext* opCtx,
-                                                   SharedSemiFuture<void> critSecSignal) noexcept;
-
-    /**
      * Stores the failed status in _shardingOperationFailedStatus.
      *
      * This method may only be called once when a rerouting exception occurs. The caller

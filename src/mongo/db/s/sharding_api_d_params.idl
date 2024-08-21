@@ -29,13 +29,14 @@ global:
     cpp_namespace: mongo
 
 server_parameters:
-    metadataRefreshInTransactionMaxWaitBehindCritSecMS:
+    metadataRefreshInTransactionMaxWait:
         description: >-
-          Maximum time in milliseconds to wait behind the critical section when refreshing the
-          filtering metadata within a transaction.
+          Maximum time in milliseconds to wait on a blocking operation when refreshing the filtering 
+          metadata within a transaction.
         set_at: [startup, runtime]
         cpp_vartype: AtomicWord<int>
-        cpp_varname: metadataRefreshInTransactionMaxWaitBehindCritSecMS
+        cpp_varname: metadataRefreshInTransactionMaxWait
+        deprecated_name: metadataRefreshInTransactionMaxWaitBehindCritSecMS
         validator:
           gte: 0
         default: 500

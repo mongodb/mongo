@@ -62,6 +62,7 @@
 #include "mongo/db/query/projection.h"
 #include "mongo/db/query/query_planner_params.h"
 #include "mongo/db/s/scoped_collection_metadata.h"
+#include "mongo/db/s/shard_filtering_util.h"
 #include "mongo/db/session/logical_session_id.h"
 #include "mongo/db/shard_role.h"
 #include "mongo/db/stats/counters.h"
@@ -458,8 +459,7 @@ void PlanExecutorExpress<Plan>::readyPlanExecution(express::WaitingForCondition 
                                                    size_t& numUnavailabilityYieldsSinceLastSuccess,
                                                    size_t& numWriteConflictYieldsSinceLastSuccess) {
     _plan.temporarilyReleaseResourcesAndYield(_opCtx, [this, &result]() {
-        OperationShardingState::waitForCriticalSectionToComplete(this->_opCtx, result.waitSignal())
-            .ignore();
+        refresh_util::waitForCriticalSectionToComplete(this->_opCtx, result.waitSignal()).ignore();
     });
 }
 
