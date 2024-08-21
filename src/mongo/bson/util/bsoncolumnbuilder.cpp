@@ -1419,6 +1419,13 @@ BSONColumnBuilder<Allocator>& BSONColumnBuilder<Allocator>::_appendObj(Element e
     // Different types on root is not allowed
     if (type != interleaved->referenceSubObjType) {
         _flushSubObjMode();
+
+        if (!containsScalars) {
+            std::get<typename InternalState::Regular>(_is.state).append(
+                elem, _bufBuilder, NoopControlBlockWriter{}, _is.allocator);
+            return *this;
+        }
+
         _startDetermineSubObjReference(obj, type);
         return *this;
     }
