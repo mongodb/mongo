@@ -20,6 +20,18 @@ idl_generator(
     src = "test_commands_enabled.idl",
 )
 
+mongo_cc_library(
+    name = "test_commands_enabled",
+    srcs = [
+        "test_commands_enabled.cpp",
+        "test_commands_enabled.h",
+        ":test_commands_enabled_gen",
+    ],
+    deps = [
+        "//src/mongo/db:server_base",
+    ],
+)
+
 idl_generator(
     name = "set_feature_compatibility_version_gen",
     src = "set_feature_compatibility_version.idl",
@@ -233,6 +245,20 @@ idl_generator(
     deps = [
         "//src/mongo/db:basic_types_gen",
         "//src/mongo/idl:generic_argument_gen",
+    ],
+)
+
+mongo_cc_library(
+    name = "cluster_server_parameter_cmds_idl",
+    srcs = [
+        "cluster_server_parameter_cmds_gen",
+    ],
+    deps = [
+        "//src/mongo:base",
+        "//src/mongo/bson:bson_validate",
+        "//src/mongo/db:server_base",
+        "//src/mongo/db/auth:authprivilege",
+        "//src/mongo/idl:cluster_server_parameter",
     ],
 )
 

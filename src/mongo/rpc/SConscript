@@ -6,22 +6,6 @@ Import("get_option")
 
 env = env.Clone()
 
-env.Library(
-    target=[
-        "command_status",
-    ],
-    source=[
-        "get_status_from_command_result.cpp",
-        "write_concern_error_detail.cpp",
-        "write_concern_error_gen.cpp",
-    ],
-    LIBDEPS=[
-        "$BUILD_DIR/mongo/bson/util/bson_extract",
-        "$BUILD_DIR/mongo/db/common",
-        "$BUILD_DIR/mongo/db/server_base",
-    ],
-)
-
 protoEnv = env.Clone()
 if wiredtiger:
     protoEnv.InjectThirdParty(libraries=["wiredtiger"])

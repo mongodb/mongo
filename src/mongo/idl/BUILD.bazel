@@ -17,6 +17,16 @@ idl_generator(
     ],
 )
 
+mongo_cc_library(
+    name = "cluster_server_parameter",
+    srcs = [
+        "cluster_server_parameter_gen",
+    ],
+    deps = [
+        "//src/mongo/db:server_base",
+    ],
+)
+
 idl_generator(
     name = "generic_argument_gen",
     src = "generic_argument.idl",
@@ -56,6 +66,18 @@ idl_generator(
 idl_generator(
     name = "config_option_no_init_test_gen",
     src = "config_option_no_init_test.idl",
+)
+
+mongo_cc_library(
+    name = "cluster_server_parameter_server_status",
+    srcs = [
+        "cluster_server_parameter_server_status.cpp",
+        "cluster_server_parameter_server_status.h",
+    ],
+    deps = [
+        "//src/mongo/bson:bson_validate",
+        "//src/mongo/db:server_base",
+    ],
 )
 
 idl_generator(

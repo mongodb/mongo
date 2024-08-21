@@ -17,17 +17,6 @@ env.SConscript(
 )
 
 env.Library(
-    target="test_commands_enabled",
-    source=[
-        "test_commands_enabled.cpp",
-        "test_commands_enabled_gen.cpp",
-    ],
-    LIBDEPS_PRIVATE=[
-        "$BUILD_DIR/mongo/db/server_base",
-    ],
-)
-
-env.Library(
     target="server_status_servers",
     source=[
         "server_status_servers.cpp",
@@ -262,17 +251,6 @@ env.Library(
         "$BUILD_DIR/mongo/db/server_base",
         "$BUILD_DIR/mongo/db/server_options",
         "$BUILD_DIR/mongo/db/timeseries/timeseries_options",
-    ],
-)
-
-env.Library(
-    target="cluster_server_parameter_cmds_idl",
-    source=[
-        "cluster_server_parameter_cmds_gen.cpp",
-    ],
-    LIBDEPS=[
-        "$BUILD_DIR/mongo/db/server_base",
-        "$BUILD_DIR/mongo/idl/cluster_server_parameter",
     ],
 )
 

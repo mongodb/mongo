@@ -185,18 +185,6 @@ env.Library(
 )
 
 env.Library(
-    target="server_feature_flags",
-    source=[
-        "feature_flag_test_gen.cpp",
-        "server_feature_flags_gen.cpp",
-    ],
-    LIBDEPS_PRIVATE=[
-        "$BUILD_DIR/mongo/idl/cluster_server_parameter",
-        "server_base",
-    ],
-)
-
-env.Library(
     target="server_options",
     source=[
         "server_options_helpers.cpp",
@@ -356,17 +344,6 @@ env.Library(
         "query/query_request",
         "server_base",
         "server_feature_flags",
-    ],
-)
-
-env.Library(
-    target="change_stream_options",
-    source=[
-        "change_stream_options_gen.cpp",
-    ],
-    LIBDEPS_PRIVATE=[
-        "$BUILD_DIR/mongo/idl/cluster_server_parameter",
-        "server_base",
     ],
 )
 

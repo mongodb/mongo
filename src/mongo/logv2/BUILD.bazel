@@ -13,3 +13,16 @@ idl_generator(
         "//src/mongo/db:basic_types_gen",
     ],
 )
+
+mongo_cc_library(
+    name = "logv2_options",
+    srcs = [
+        "logv2_options.cpp",
+        "logv2_options_gen",
+    ],
+    deps = [
+        "//src/mongo:base",
+        "//src/mongo/bson:bson_validate",
+        "//src/mongo/db:server_base",
+    ],
+)

@@ -105,6 +105,20 @@ idl_generator(
     src = "server_feature_flags.idl",
 )
 
+mongo_cc_library(
+    name = "server_feature_flags",
+    srcs = [
+        ":feature_flag_test_gen",
+        ":server_feature_flags_gen",
+        "//src/mongo/db:change_streams_cluster_parameter.h",
+    ],
+    deps = [
+        "//src/mongo:base",
+        "//src/mongo/db:server_base",
+        "//src/mongo/idl:cluster_server_parameter",
+    ],
+)
+
 idl_generator(
     name = "server_options_helpers_gen",
     src = "server_options_helpers.idl",
@@ -217,6 +231,19 @@ idl_generator(
     deps = [
         ":basic_types_gen",
         "//src/mongo/idl:cluster_server_parameter_gen",
+    ],
+)
+
+mongo_cc_library(
+    name = "change_stream_options",
+    srcs = [
+        "change_stream_options_gen",
+    ],
+    deps = [
+        "//src/mongo:base",
+        "//src/mongo/bson:bson_validate",
+        "//src/mongo/db:server_base",
+        "//src/mongo/idl:cluster_server_parameter",
     ],
 )
 

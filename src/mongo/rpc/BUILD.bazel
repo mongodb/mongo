@@ -34,3 +34,18 @@ idl_generator(
     name = "rewrite_state_change_errors_server_parameter_gen",
     src = "rewrite_state_change_errors_server_parameter.idl",
 )
+
+mongo_cc_library(
+    name = "command_status",
+    srcs = [
+        "get_status_from_command_result.cpp",
+        "write_concern_error_detail.cpp",
+        "write_concern_error_detail.h",
+        "write_concern_error_gen",
+    ],
+    deps = [
+        "//src/mongo/bson/util:bson_extract",
+        "//src/mongo/db:common",
+        "//src/mongo/db:server_base",
+    ],
+)

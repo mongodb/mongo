@@ -29,14 +29,3 @@ env.Benchmark(
         "$BUILD_DIR/mongo/base",
     ],
 )
-
-env.Library(
-    target="logv2_options",
-    source=[
-        "logv2_options.cpp",
-        "logv2_options_gen.cpp",
-    ],
-    LIBDEPS_PRIVATE=[
-        "$BUILD_DIR/mongo/db/server_base",
-    ],
-)
