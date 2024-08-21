@@ -999,9 +999,6 @@ TEST(OpMsgRequestBuilder, WithVTSAndSerializationContextExpPrefixDefault) {
         vts, DatabaseName::createDatabaseName_forTest(tenantId, dbString), body);
     ASSERT(msg.validatedTenancyScope);
     ASSERT_EQ(msg.validatedTenancyScope->tenantId(), tenantId);
-
-    // Missing expectPrefix in the request body.
-    ASSERT_EQ(msg.body.getField("expectPrefix").eoo(), true);
     ASSERT_EQ(msg.parseDbName().toString_forTest(), dbString);
 }
 

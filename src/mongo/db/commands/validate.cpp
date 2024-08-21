@@ -241,15 +241,8 @@ public:
         }
 
         SerializationContext reqSerializationCtx = SerializationContext::stateCommandRequest();
-        if (auto const expectPrefix = cmdObj.getField("expectPrefix")) {
-            reqSerializationCtx.setPrefixState(expectPrefix.boolean());
-        }
         if (auto vts = auth::ValidatedTenancyScope::get(opCtx)) {
-            // TODO SERVER-82320 we should no longer need to check here once expectPrefix only comes
-            // from the unsigned security token.
-            if (reqSerializationCtx.getPrefix() == SerializationContext::Prefix::ExcludePrefix) {
-                reqSerializationCtx.setPrefixState(vts->isFromAtlasProxy());
-            }
+            reqSerializationCtx.setPrefixState(vts->isFromAtlasProxy());
         }
         const NamespaceString nss(CommandHelpers::parseNsCollectionRequired(dbName, cmdObj));
         bool background = cmdObj["background"].trueValue();

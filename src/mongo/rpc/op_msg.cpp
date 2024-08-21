@@ -283,10 +283,7 @@ SerializationContext OpMsgRequest::getSerializationContext() const {
         return SerializationContext::stateDefault();
     }
     auto serializationCtx = SerializationContext::stateCommandRequest();
-
-    if (auto const expectPrefix = body.getField("expectPrefix")) {
-        serializationCtx.setPrefixState(expectPrefix.boolean());
-    } else if (validatedTenancyScope) {
+    if (validatedTenancyScope) {
         serializationCtx.setPrefixState(validatedTenancyScope->isFromAtlasProxy());
     }
     return serializationCtx;
