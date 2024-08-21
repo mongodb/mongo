@@ -1,0 +1,15 @@
+# Replacement for generate-tasks-for-version from evergreen_yml_components.
+#
+# This is similar to generate-tasks-for-version in evergreen_yml_components,
+# but doesn't include actual task generation, which does nothing
+# for sys-perf, and breaks when it tries to process the sys-perf project.
+#
+
+buildvariants:
+  - name: generate-tasks-for-version
+    display_name: "! Generate tasks for evergreen version"
+    activate: true
+    run_on:
+      - rhel8.8-medium
+    tasks:
+      - name: version_expansions_gen
