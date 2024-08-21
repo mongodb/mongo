@@ -94,6 +94,7 @@ mongo_cc_library(
         "//src/mongo/db/query/collation:collator_factory_interface.h",
         "//src/mongo/db/query/util:deferred.h",
         "//src/mongo/db/query/util:make_data_structure.h",
+        "//src/mongo/db/query/util:named_enum.h",
         "//src/mongo/db/repl:rollback.h",
         "//src/mongo/db/storage:bson_collection_catalog_entry.h",
         "//src/mongo/db/storage:duplicate_key_error_info.h",

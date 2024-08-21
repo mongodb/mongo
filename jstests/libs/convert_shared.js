@@ -2,9 +2,10 @@
  * A helper class to execute different kinds of test scenarios for $convert.
  */
 class ConvertTest {
-    constructor({coll, requiresFCV80}) {
+    constructor({coll, requiresFCV80, requiresFCV81}) {
         this.coll = coll;
         this.requiresFCV80 = requiresFCV80;
+        this.requiresFCV81 = requiresFCV81;
     }
 
     populateCollection(docs) {
@@ -17,7 +18,13 @@ class ConvertTest {
     getFormatField() {
         // The "format" field is not supported in FCVs prior to 8.0. Hence the we must not use it in
         // the pipelines unless the workload is guaranteed to not run on older FCVs.
-        return this.requiresFCV80 ? {format: "$format"} : {};
+        return this.requiresFCV80 || this.requiresFCV81 ? {format: "$format"} : {};
+    }
+
+    getByteOrderField() {
+        // The "byteOrder" field is not supported in FCVs prior to 8.1. Hence the we must not use it
+        // in the pipelines unless the workload is guaranteed to not run on older FCVs.
+        return this.requiresFCV81 ? {byteOrder: "$byteOrder"} : {};
     }
 
     runValidConversionTest({conversionTestDocs}) {
@@ -25,13 +32,17 @@ class ConvertTest {
 
         const coll = this.coll;
         const formatField = this.getFormatField();
+        const byteOrderField = this.getByteOrderField();
 
         {
             // Test $convert on each document.
             const pipeline = [
                 {
                     $project: {
-                        output: {$convert: {to: "$target", input: "$input", ...formatField}},
+                        output: {
+                            $convert:
+                                {to: "$target", input: "$input", ...formatField, ...byteOrderField}
+                        },
                         target: {$ifNull: ["$target.type", "$target"]},
                         expected: "$expected"
                     }
@@ -43,9 +54,9 @@ class ConvertTest {
             assert.eq(aggResult.length, conversionTestDocs.length);
 
             aggResult.forEach(doc => {
-                assert.eq(doc.output, doc.expected, "Unexpected conversion: _id = " + doc._id);
                 assert.eq(
                     doc.outputType, doc.target, "Conversion to incorrect type: _id = " + doc._id);
+                assert.eq(doc.output, doc.expected, "Unexpected conversion: _id = " + doc._id);
             });
         }
 
@@ -56,12 +67,48 @@ class ConvertTest {
                 then: {$toUUID: "$input"},
             };
 
+            // We may be converting from BinData to numeric, and the shorthand conversions always
+            // uses little endian, so we only run the conversions which specified little endian.
+            const toIntBinDataCase = {
+                case: {$in: ["$target", ["int", {type: "int"}]]},
+                then: {
+                    $cond: {
+                        if: {$eq: ["$byteOrder", "little"]},
+                        then: {$toInt: "$input"},
+                        else: {$convert: {to: "$target", input: "$input", ...byteOrderField}}
+                    }
+                },
+            };
+
+            const toLongBinDataCase = {
+                case: {$in: ["$target", ["long", {type: "long"}]]},
+                then: {
+                    $cond: {
+                        if: {$eq: ["$byteOrder", "little"]},
+                        then: {$toLong: "$input"},
+                        else: {$convert: {to: "$target", input: "$input", ...byteOrderField}}
+                    }
+                },
+            };
+
+            const toDoubleBinDataCase = {
+                case: {$in: ["$target", ["double", {type: "double"}]]},
+                then: {
+                    $cond: {
+                        if: {$eq: ["$byteOrder", "little"]},
+                        then: {$toDouble: "$input"},
+                        else: {$convert: {to: "$target", input: "$input", ...byteOrderField}}
+                    }
+                },
+            };
+
             const pipeline = [
                 {
                     $project: {
                         output: {
                             $switch: {
                                 branches: [
+                                    ...(this.requiresFCV81 ? [toDoubleBinDataCase] : []),
                                     {
                                         case: {$in: ["$target", ["double", {type: "double"}]]},
                                         then: {$toDouble: "$input"}
@@ -78,6 +125,10 @@ class ConvertTest {
                                         case: {$in: ["$target", ["date", {type: "date"}]]},
                                         then: {$toDate: "$input"}
                                     },
+                                    // $toInt and $toLong with BinData are not supported in FCVs
+                                    // prior to v8.1.
+                                    ...(this.requiresFCV81 ? [toIntBinDataCase] : []),
+                                    ...(this.requiresFCV81 ? [toLongBinDataCase] : []),
                                     {
                                         case: {$in: ["$target", ["int", {type: "int"}]]},
                                         then: {$toInt: "$input"}
@@ -104,8 +155,14 @@ class ConvertTest {
                                     // $toUUID is not supported in FCVs prior to v8.0.
                                     ...(this.requiresFCV80 ? [toUUIDCase] : []),
                                 ],
-                                default:
-                                    {$convert: {to: "$target", input: "$input", ...formatField}}
+                                default: {
+                                    $convert: {
+                                        to: "$target",
+                                        input: "$input",
+                                        ...formatField,
+                                        ...byteOrderField
+                                    }
+                                }
                             }
                         },
                         target: {$ifNull: ["$target.type", "$target"]},
@@ -119,9 +176,9 @@ class ConvertTest {
             assert.eq(aggResult.length, conversionTestDocs.length);
 
             aggResult.forEach(doc => {
-                assert.eq(doc.output, doc.expected, "Unexpected conversion: _id = " + doc._id);
                 assert.eq(
                     doc.outputType, doc.target, "Conversion to incorrect type: _id = " + doc._id);
+                assert.eq(doc.output, doc.expected, "Unexpected conversion: _id = " + doc._id);
             });
         }
     }
@@ -140,12 +197,20 @@ class ConvertTest {
 
         const coll = this.coll;
         const formatField = this.getFormatField();
+        const byteOrderField = this.getByteOrderField();
 
         // Test each document to ensure that the conversion throws an error.
         illegalConversionTestDocs.forEach(doc => {
             const pipeline = [
                 {$match: {_id: doc._id}},
-                {$project: {output: {$convert: {to: "$target", input: "$input", ...formatField}}}}
+                {
+                    $project: {
+                        output: {
+                            $convert:
+                                {to: "$target", input: "$input", ...formatField, ...byteOrderField}
+                        }
+                    }
+                }
             ];
 
             assert.throws(function() {
@@ -160,8 +225,13 @@ class ConvertTest {
                 {
                     $project: {
                         output: {
-                            $convert:
-                                {to: "$target", input: "$input", ...formatField, onError: "ERROR"}
+                            $convert: {
+                                to: "$target",
+                                input: "$input",
+                                ...formatField,
+                                ...byteOrderField,
+                                onError: "ERROR"
+                            }
                         }
                     }
                 },
@@ -186,6 +256,7 @@ class ConvertTest {
                                 to: "$target",
                                 input: "$input",
                                 ...formatField,
+                                ...byteOrderField,
                                 onError: "$$REMOVE"
                             }
                         }
@@ -241,6 +312,7 @@ class ConvertTest {
 
         const coll = this.coll;
         const formatField = this.getFormatField();
+        const byteOrderField = this.getByteOrderField();
 
         // Test that $convert returns a parsing error for invalid 'to' arguments.
         invalidTargetTypeDocs.forEach(doc => {
@@ -251,8 +323,13 @@ class ConvertTest {
                     {
                         $project: {
                             output: {
-                                $convert:
-                                    {to: "$target", input: "$input", ...formatField, ...onError}
+                                $convert: {
+                                    to: "$target",
+                                    input: "$input",
+                                    ...formatField,
+                                    ...byteOrderField,
+                                    ...onError
+                                }
                             }
                         }
                     },
@@ -272,6 +349,7 @@ class ConvertTest {
  * Runs different scenarios that test the $convert aggregation operator.
  * @param {coll} the collection to use for running the tests.
  * @param {requiresFCV80} whether the test is guaranteed to run on at least FCV 8.0.
+ * @param {requiresFCV81} whether the test is guaranteed to run on at least FCV 8.1.
  * @param {conversionTestDocs} valid conversions and their expected results.
  * @param {illegalConversionTestDocs} unsupported but syntactically valid conversions that can be
  *     suppressed by specifying onError.
@@ -281,12 +359,13 @@ class ConvertTest {
 export function runConvertTests({
     coll,
     requiresFCV80 = false,
+    requiresFCV81 = false,
     conversionTestDocs = [],
     illegalConversionTestDocs = [],
     nullTestDocs = [],
     invalidTargetTypeDocs = [],
 }) {
-    const testRunner = new ConvertTest({coll, requiresFCV80});
+    const testRunner = new ConvertTest({coll, requiresFCV80, requiresFCV81});
 
     if (conversionTestDocs.length) {
         testRunner.runValidConversionTest({conversionTestDocs});

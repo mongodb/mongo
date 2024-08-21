@@ -452,6 +452,7 @@ mongo_cc_library(
         "//src/mongo/db/query/util:deferred.h",
         "//src/mongo/db/query/util:make_data_structure.h",
         "//src/mongo/db/query/util:memory_util.h",
+        "//src/mongo/db/query/util:named_enum.h",
         "//src/mongo/db/session:internal_session_pool.h",
         "//src/mongo/db/session:logical_session_cache_gen",
         "//src/mongo/db/storage:backup_block.h",

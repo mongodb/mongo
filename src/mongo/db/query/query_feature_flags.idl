@@ -132,6 +132,13 @@ feature_flags:
       default: false
       shouldBeFCVGated: true
 
+    featureFlagBinDataConvertNumeric:
+      description: "Feature flag to enable extended BinData support for int, double and long in $convert."
+      cpp_varname: gFeatureFlagBinDataConvertNumeric
+      default: true
+      version: 8.1
+      shouldBeFCVGated: true
+
     featureFlagSearchHybridScoringPrerequisites:
       description: "Feature flag to introduce $sigmoid and $minMaxScaler helpers, as well as permit
                     $vectorSearch within $union and $lookup stages. (M1 and M2 of Vector search

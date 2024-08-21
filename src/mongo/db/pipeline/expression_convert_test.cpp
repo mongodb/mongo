@@ -27,6 +27,7 @@
  *    it in the license file.
  */
 
+#include "mongo/idl/server_parameter_test_util.h"
 #include <cmath>
 #include <cstdint>
 #include <limits>
@@ -53,6 +54,7 @@
 #include "mongo/db/pipeline/aggregation_context_fixture.h"
 #include "mongo/db/pipeline/expression.h"
 #include "mongo/db/pipeline/expression_context_for_test.h"
+#include "mongo/idl/server_parameter_test_util.h"
 #include "mongo/platform/decimal128.h"
 #include "mongo/unittest/assert.h"
 #include "mongo/unittest/framework.h"
@@ -509,12 +511,6 @@ TEST_F(ExpressionConvertTest, UnsupportedConversionShouldThrowUnlessOnErrorProvi
         {Value(1.0), Value("javascriptWithScope"_sd)},
         {Value(1.0), Value("timestamp"_sd)},
         {Value(1.0), Value("maxKey"_sd)},
-        // Conversions to binData will fail with 'ErrorCodes::FailedToParse' unless subtype is
-        // specified.
-        {Value(1.0),
-         Value(BSON("type"
-                    << "binData"
-                    << "subtype" << static_cast<int>(BinDataGeneral)))},
     };
 
     // Attempt all of the unsupported conversions listed above.
@@ -3722,6 +3718,491 @@ TEST_F(ExpressionConvertTest, FormatDecimal) {
         convertExp->evaluate(negativeNaNInput, &expCtx->variables), "NaN"_sd, BSONType::String);
 }
 
+Value runConvertBinDataToNumeric(boost::intrusive_ptr<ExpressionContextForTest> expCtx,
+                                 BSONObj spec,
+                                 std::vector<unsigned char> valueBytes) {
+    auto convertExp = Expression::parseExpression(expCtx.get(), spec, expCtx->variablesParseState);
+    BSONBinData inputBinData{
+        valueBytes.data(), static_cast<int>(valueBytes.size()), BinDataGeneral};
+    return convertExp->evaluate({{"path1", Value(inputBinData)}}, &expCtx->variables);
+}
+
+template <typename T>
+void testConvertNumericToBinData(boost::intrusive_ptr<ExpressionContextForTest> expCtx,
+                                 BSONObj spec,
+                                 std::vector<unsigned char> valueBytes,
+                                 T inputVal) {
+    auto convertExp = Expression::parseExpression(expCtx.get(), spec, expCtx->variablesParseState);
+    BSONBinData expectedBinData{
+        valueBytes.data(), static_cast<int>(valueBytes.size()), BinDataGeneral};
+    auto result = convertExp->evaluate({{"path1", Value(inputVal)}}, &expCtx->variables);
+    ASSERT_VALUE_CONTENTS_AND_TYPE(result, expectedBinData, BSONType::BinData);
+}
+
+
+TEST_F(ExpressionConvertTest, ConvertBinDataToIntFourBytesBigEndian) {
+    auto expCtx = getExpCtx();
+    auto result = runConvertBinDataToNumeric(
+        expCtx,
+        fromjson("{$convert: {input: '$path1', to: 'int', byteOrder: 'big'}}"),
+        {0b00000000, 0b00000000, 0b00000000, 0b00000010});
+    ASSERT_VALUE_CONTENTS_AND_TYPE(result, 2, BSONType::NumberInt);
+}
+
+TEST_F(ExpressionConvertTest, ConvertBinDataToIntHexBigEndian) {
+    auto expCtx = getExpCtx();
+    auto result = runConvertBinDataToNumeric(
+        expCtx,
+        fromjson("{$convert: {input: '$path1', to: 'int', byteOrder: 'big'}}"),
+        {0x00, 0x01, 0x00, 0x00});
+    ASSERT_VALUE_CONTENTS_AND_TYPE(result, 65536, BSONType::NumberInt);
+}
+
+TEST_F(ExpressionConvertTest, ConvertBinDataToIntOneByteBigEndian) {
+    auto expCtx = getExpCtx();
+    auto result = runConvertBinDataToNumeric(
+        expCtx,
+        fromjson("{$convert: {input: '$path1', to: 'int', byteOrder: 'big'}}"),
+        {0b00000010});
+    ASSERT_VALUE_CONTENTS_AND_TYPE(result, 2, BSONType::NumberInt);
+}
+
+TEST_F(ExpressionConvertTest, ConvertBinDataToIntTwoByteLittleEndian) {
+    auto expCtx = getExpCtx();
+    auto result = runConvertBinDataToNumeric(
+        expCtx,
+        fromjson("{$convert: {input: '$path1', to: 'int', byteOrder: 'little'}}"),
+        {0b00000001, 0b00000000});
+    ASSERT_VALUE_CONTENTS_AND_TYPE(result, 1, BSONType::NumberInt);
+}
+
+TEST_F(ExpressionConvertTest, ConvertBinDataToIntTwoByteDefaultEndianness) {
+    auto expCtx = getExpCtx();
+    auto result = runConvertBinDataToNumeric(
+        expCtx, fromjson("{$convert: {input: '$path1', to: 'int'}}"), {0b00000001, 0b00000000});
+    ASSERT_VALUE_CONTENTS_AND_TYPE(result, 1, BSONType::NumberInt);
+}
+
+TEST_F(ExpressionConvertTest, ConvertBinDataToIntWrongByteLength) {
+    auto expCtx = getExpCtx();
+
+    auto spec = fromjson("{$convert: {input: '$path1', to: 'int', byteOrder: 'big'}}");
+    auto convertExp = Expression::parseExpression(expCtx.get(), spec, expCtx->variablesParseState);
+
+    std::vector<int8_t> intBytes = {0b00000010, 0b00000010, 0b00000010};
+    BSONBinData inputBinData{intBytes.data(), static_cast<int>(intBytes.size()), BinDataGeneral};
+
+    ASSERT_THROWS_CODE(convertExp->evaluate({{"path1", Value(inputBinData)}}, &expCtx->variables),
+                       AssertionException,
+                       ErrorCodes::ConversionFailure);
+}
+
+TEST_F(ExpressionConvertTest, ConvertBinDataToIntFeatureFlagOffFails) {
+    RAIIServerParameterControllerForTest featureFlagController("featureFlagBinDataConvertNumeric",
+                                                               false);
+
+    auto expCtx = getExpCtx();
+
+    auto spec = fromjson("{$convert: {input: '$path1', to: 'int', byteOrder: 'little'}}");
+
+    ASSERT_THROWS_CODE(Expression::parseExpression(expCtx.get(), spec, expCtx->variablesParseState),
+                       AssertionException,
+                       ErrorCodes::FailedToParse);
+}
+
+TEST_F(ExpressionConvertTest, ConvertIntToBinLargeNegative) {
+    auto expCtx = getExpCtx();
+    int intVal = -300;
+    testConvertNumericToBinData(
+        expCtx,
+        fromjson("{$convert: {input: '$path1', to: 'binData', byteOrder: 'big'}}"),
+        {0b11111111, 0b11111111, 0b11111110, 0b11010100},
+        intVal);
+}
+
+TEST_F(ExpressionConvertTest, ConvertToBinDataFromToIntInput) {
+    auto expCtx = getExpCtx();
+    std::string input = "1";
+    testConvertNumericToBinData(
+        expCtx,
+        fromjson("{$convert: {input: {$toInt: '$path1'}, to: 'binData', byteOrder: 'big'}}"),
+        {0x00, 0x00, 0x00, 0x01},
+        input);
+}
+
+TEST_F(ExpressionConvertTest, ConvertIntToBinDataLittleEndian) {
+    auto expCtx = getExpCtx();
+    int intVal = -2;
+    testConvertNumericToBinData(
+        expCtx,
+        fromjson("{$convert: {input: '$path1', to: 'binData', byteOrder: 'little'}}"),
+        {0b11111110, 0b11111111, 0b11111111, 0b11111111},
+        intVal);
+}
+
+TEST_F(ExpressionConvertTest, ConvertIntToBindataFeatureFlagOffFails) {
+    RAIIServerParameterControllerForTest featureFlagController("featureFlagBinDataConvertNumeric",
+                                                               false);
+    auto expCtx = getExpCtx();
+
+    auto spec = fromjson("{$convert: {input: '$path1', to: 'binData', byteOrder: 'little'}}");
+
+    ASSERT_THROWS_CODE(Expression::parseExpression(expCtx.get(), spec, expCtx->variablesParseState),
+                       AssertionException,
+                       ErrorCodes::FailedToParse);
+}
+
+TEST_F(ExpressionConvertTest, ConvertIntToBinDataNoDefaultFails) {
+    auto expCtx = getExpCtx();
+
+    auto spec = fromjson("{$convert: {input: '$path1', to: 'binData'}}");
+    auto convertExp = Expression::parseExpression(expCtx.get(), spec, expCtx->variablesParseState);
+
+    std::vector<unsigned char> longBytes = {0b11001101,
+                                            0b00000000,
+                                            0b00000000,
+                                            0b00000000,
+                                            0b00000000,
+                                            0b00000000,
+                                            0b00000000,
+                                            0b00000000};
+    BSONBinData expectedBinData{
+        longBytes.data(), static_cast<int>(longBytes.size()), BinDataGeneral};
+    long long longVal = 205;
+
+    auto result = convertExp->evaluate({{"path1", Value(longVal)}}, &expCtx->variables);
+    ASSERT_VALUE_CONTENTS_AND_TYPE(result, expectedBinData, BSONType::BinData);
+}
+
+TEST_F(ExpressionConvertTest, ConvertBinDataToLongLittleEndian) {
+    auto expCtx = getExpCtx();
+    auto result = runConvertBinDataToNumeric(
+        expCtx,
+        fromjson("{$convert: {input: '$path1', to: 'long', byteOrder: 'little'}}"),
+        {0b01000000, 0b00000000, 0b00000000, 0b00000000});
+    ASSERT_VALUE_CONTENTS_AND_TYPE(result, 64, BSONType::NumberLong);
+}
+
+TEST_F(ExpressionConvertTest, ConvertBinDataToLongBigEndian) {
+    auto expCtx = getExpCtx();
+    auto result = runConvertBinDataToNumeric(
+        expCtx,
+        fromjson("{$convert: {input: '$path1', to: 'long', byteOrder: 'big'}}"),
+        {0b01000000, 0b00000000});
+    ASSERT_VALUE_CONTENTS_AND_TYPE(result, 16384, BSONType::NumberLong);
+}
+
+TEST_F(ExpressionConvertTest, ConvertBinDataToLongFeatureFlagOffFails) {
+    RAIIServerParameterControllerForTest featureFlagController("featureFlagBinDataConvertNumeric",
+                                                               false);
+    auto expCtx = getExpCtx();
+
+    auto spec = fromjson("{$convert: {input: '$path1', to: 'long', byteOrder: 'little'}}");
+
+    ASSERT_THROWS_CODE(Expression::parseExpression(expCtx.get(), spec, expCtx->variablesParseState),
+                       AssertionException,
+                       ErrorCodes::FailedToParse);
+}
+
+TEST_F(ExpressionConvertTest, ConvertLongToBinDataBigEndian) {
+    auto expCtx = getExpCtx();
+    long long longVal = 205;
+    testConvertNumericToBinData(
+        expCtx,
+        fromjson("{$convert: {input: '$path1', to: 'binData', byteOrder: 'big'}}"),
+        {0b00000000,
+         0b00000000,
+         0b00000000,
+         0b00000000,
+         0b00000000,
+         0b00000000,
+         0b00000000,
+         0b11001101},
+        longVal);
+}
+
+TEST_F(ExpressionConvertTest, ConvertToBinDataFromToLongInput) {
+    auto expCtx = getExpCtx();
+    std::string input = "75";
+    testConvertNumericToBinData(
+        expCtx,
+        fromjson("{$convert: {input: {$toLong: '$path1'}, to: 'binData', byteOrder: 'big'}}"),
+        {0b00000000,
+         0b00000000,
+         0b00000000,
+         0b00000000,
+         0b00000000,
+         0b00000000,
+         0b00000000,
+         0b1001011},
+        input);
+}
+
+TEST_F(ExpressionConvertTest, ConvertLongToBinDataFeatureFlagOffFails) {
+    RAIIServerParameterControllerForTest featureFlagController("featureFlagBinDataConvertNumeric",
+                                                               false);
+    auto expCtx = getExpCtx();
+
+    auto spec = fromjson("{$convert: {input: '$path1', to: 'binData', byteOrder: 'big'}}");
+
+    ASSERT_THROWS_CODE(Expression::parseExpression(expCtx.get(), spec, expCtx->variablesParseState),
+                       AssertionException,
+                       ErrorCodes::FailedToParse);
+}
+
+TEST_F(ExpressionConvertTest, ConvertLongToBinDataBadByteOrderFails) {
+    auto expCtx = getExpCtx();
+
+    auto spec = fromjson("{$convert: {input: '$path1', to: 'binData', byteOrder: 'weird'}}");
+
+    auto convertExp = Expression::parseExpression(expCtx.get(), spec, expCtx->variablesParseState);
+    int val = 0;
+
+    ASSERT_THROWS_CODE(convertExp->evaluate({{"path1", Value(val)}}, &expCtx->variables),
+                       AssertionException,
+                       9130002);
+}
+
+TEST_F(ExpressionConvertTest, ConvertBinDataToDoubleBigEndianSinglePrecision) {
+    auto expCtx = getExpCtx();
+    auto result = runConvertBinDataToNumeric(
+        expCtx,
+        fromjson("{$convert: {input: '$path1', to: 'double', byteOrder: 'big'}}"),
+        {0b01000001, 0b01010011, 0b00110011, 0b00110011});
+    ASSERT_EQ(result.getType(), BSONType::NumberDouble);
+    ASSERT_APPROX_EQUAL(result.getDouble(), 13.2, 0.001);
+}
+
+TEST_F(ExpressionConvertTest, ConvertBinDataToDoubleLittleEndianSinglePrecision) {
+    auto expCtx = getExpCtx();
+    auto result = runConvertBinDataToNumeric(
+        expCtx,
+        fromjson("{$convert: {input: '$path1', to: 'double', byteOrder: 'little'}}"),
+        {0x66, 0xe6, 0x40, 0xc6});
+    ASSERT_EQ(result.getType(), BSONType::NumberDouble);
+    ASSERT_APPROX_EQUAL(result.getDouble(), -12345.6, 0.001);
+}
+
+TEST_F(ExpressionConvertTest, ConvertBinDataToDoubleBigEndianDoublePrecision) {
+    auto expCtx = getExpCtx();
+    auto result = runConvertBinDataToNumeric(
+        expCtx,
+        fromjson("{$convert: {input: '$path1', to: 'double', byteOrder: 'big'}}"),
+        {0x40, 0x6B, 0xC7, 0x0A, 0x3D, 0x70, 0xA3, 0xD7});
+    ASSERT_EQ(result.getType(), BSONType::NumberDouble);
+    ASSERT_APPROX_EQUAL(result.getDouble(), 222.22, 0.001);
+}
+
+TEST_F(ExpressionConvertTest, ConvertBinDataToDoubleLittleEndianDoublePrecision) {
+    auto expCtx = getExpCtx();
+    auto result = runConvertBinDataToNumeric(
+        expCtx,
+        fromjson("{$convert: {input: '$path1', to: 'double', byteOrder: 'little'}}"),
+        {0b00000000,
+         0b00000000,
+         0b00000000,
+         0b00000000,
+         0b00000000,
+         0b00000000,
+         0b11100000,
+         0b10111111});
+    ASSERT_EQ(result.getType(), BSONType::NumberDouble);
+    ASSERT_APPROX_EQUAL(result.getDouble(), -0.5, 0.001);
+}
+
+TEST_F(ExpressionConvertTest, ConvertDoubleToBinDataBigEndian) {
+    auto expCtx = getExpCtx();
+    double doubleVal = -2.5;
+    testConvertNumericToBinData(
+        expCtx,
+        fromjson("{$convert: {input: '$path1', to: 'binData', byteOrder: 'big'}}"),
+        {0b11000000,
+         0b00000100,
+         0b00000000,
+         0b00000000,
+         0b00000000,
+         0b00000000,
+         0b00000000,
+         0b00000000},
+        doubleVal);
+}
+
+TEST_F(ExpressionConvertTest, ConvertDoubleToBinDataLittleEndian) {
+    auto expCtx = getExpCtx();
+    double doubleVal = 178.0;
+    testConvertNumericToBinData(
+        expCtx,
+        fromjson("{$convert: {input: '$path1', to: 'binData', byteOrder: 'little'}}"),
+        {0b00000000,
+         0b00000000,
+         0b00000000,
+         0b00000000,
+         0b00000000,
+         0b01000000,
+         0b01100110,
+         0b01000000},
+        doubleVal);
+}
+
+TEST_F(ExpressionConvertTest, ConvertDoubleToBinDataBigEndianNegativeInf) {
+    auto expCtx = getExpCtx();
+    testConvertNumericToBinData(
+        expCtx,
+        fromjson("{$convert: {input: '$path1', to: 'binData', byteOrder: 'big'}}"),
+        {0xFF, 0xF0, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00},
+        -std::numeric_limits<double>::infinity());
+}
+
+TEST_F(ExpressionConvertTest, ConvertDoubleToBinDataLittleEndianInf) {
+    auto expCtx = getExpCtx();
+    testConvertNumericToBinData(
+        expCtx,
+        fromjson("{$convert: {input: '$path1', to: 'binData', byteOrder: 'little'}}"),
+        {0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xF0, 0x7F},
+        std::numeric_limits<double>::infinity());
+}
+
+TEST_F(ExpressionConvertTest, ConvertBinDataToDoubleBigEndianSinglePrecisionInf) {
+    auto expCtx = getExpCtx();
+    auto result = runConvertBinDataToNumeric(
+        expCtx,
+        fromjson("{$convert: {input: '$path1', to: 'double', byteOrder: 'big'}}"),
+        {0x7F, 0x80, 0x00, 0x00});
+    ASSERT_VALUE_CONTENTS_AND_TYPE(
+        result, std::numeric_limits<double>::infinity(), BSONType::NumberDouble);
+}
+
+TEST_F(ExpressionConvertTest, ConvertBinDataToDoubleBigEndianDoublePrecisionInf) {
+    auto expCtx = getExpCtx();
+    auto result = runConvertBinDataToNumeric(
+        expCtx,
+        fromjson("{$convert: {input: '$path1', to: 'double', byteOrder: 'big'}}"),
+        {0x7F, 0xF0, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00});
+    ASSERT_VALUE_CONTENTS_AND_TYPE(
+        result, std::numeric_limits<double>::infinity(), BSONType::NumberDouble);
+}
+
+TEST_F(ExpressionConvertTest, ConvertBinDataToDoubleLittleEndianSinglePrecisionNegativeInf) {
+    auto expCtx = getExpCtx();
+    auto result = runConvertBinDataToNumeric(
+        expCtx,
+        fromjson("{$convert: {input: '$path1', to: 'double', byteOrder: 'little'}}"),
+        {0x00, 0x00, 0x80, 0xFF});
+    ASSERT_VALUE_CONTENTS_AND_TYPE(
+        result, -std::numeric_limits<double>::infinity(), BSONType::NumberDouble);
+}
+
+TEST_F(ExpressionConvertTest, ConvertBinDataToDoubleLittleEndianDoublePrecisionNegativeInf) {
+    auto expCtx = getExpCtx();
+    auto result = runConvertBinDataToNumeric(
+        expCtx,
+        fromjson("{$convert: {input: '$path1', to: 'double', byteOrder: 'little'}}"),
+        {0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xF0, 0xFF});
+    ASSERT_VALUE_CONTENTS_AND_TYPE(
+        result, -std::numeric_limits<double>::infinity(), BSONType::NumberDouble);
+}
+
+TEST_F(ExpressionConvertTest, ConvertBinDataToDoubleBigEndianSinglePrecisionQuietNan) {
+    auto expCtx = getExpCtx();
+    auto result = runConvertBinDataToNumeric(
+        expCtx,
+        fromjson("{$convert: {input: '$path1', to: 'double', byteOrder: 'big'}}"),
+        {0x7F, 0x80, 0x00, 0x02});
+    ASSERT_VALUE_CONTENTS_AND_TYPE(
+        result, std::numeric_limits<double>::quiet_NaN(), BSONType::NumberDouble);
+}
+
+TEST_F(ExpressionConvertTest, ConvertBinDataToDoubleBigEndianSinglePrecisionSignalingNan) {
+    auto expCtx = getExpCtx();
+    auto result = runConvertBinDataToNumeric(
+        expCtx,
+        fromjson("{$convert: {input: '$path1', to: 'double', byteOrder: 'little'}}"),
+        {0x05, 0x00, 0x80, 0x7F});
+    ASSERT_VALUE_CONTENTS_AND_TYPE(
+        result, std::numeric_limits<double>::signaling_NaN(), BSONType::NumberDouble);
+}
+
+TEST_F(ExpressionConvertTest, ConvertBinDataToDoubleFeatureFlagOffFails) {
+    RAIIServerParameterControllerForTest featureFlagController("featureFlagBinDataConvertNumeric",
+                                                               false);
+    auto expCtx = getExpCtx();
+
+    auto spec = fromjson("{$convert: {input: '$path1', to: 'double', byteOrder: 'little'}}");
+
+    ASSERT_THROWS_CODE(Expression::parseExpression(expCtx.get(), spec, expCtx->variablesParseState),
+                       AssertionException,
+                       ErrorCodes::FailedToParse);
+}
+
+TEST_F(ExpressionConvertTest, ConvertBinDataToDoubleWrongLengthFails) {
+    auto expCtx = getExpCtx();
+
+    auto spec = fromjson("{$convert: {input: '$path1', to: 'double', byteOrder: 'little'}}");
+    auto convertExp = Expression::parseExpression(expCtx.get(), spec, expCtx->variablesParseState);
+    std::vector<unsigned char> doubleBytes = {0x05, 0x00, 0x80};
+    BSONBinData inputBinData{
+        doubleBytes.data(), static_cast<int>(doubleBytes.size()), BinDataGeneral};
+
+    Document binDataInfinity{{"path1", inputBinData}};
+
+    ASSERT_THROWS_CODE(convertExp->evaluate(binDataInfinity, &expCtx->variables),
+                       AssertionException,
+                       ErrorCodes::ConversionFailure);
+}
+
+void assertBinaryInRange(BSONBinData actual,
+                         std::vector<unsigned char> lowerBound0,
+                         std::vector<unsigned char> upperBound0,
+                         std::vector<unsigned char> lowerBound1,
+                         std::vector<unsigned char> upperBound1) {
+    ASSERT_EQ(actual.length, lowerBound0.size());
+    ASSERT_EQ(actual.length, upperBound0.size());
+    ASSERT_EQ(actual.length, lowerBound1.size());
+    ASSERT_EQ(actual.length, upperBound1.size());
+
+    bool firstRange = (memcmp(lowerBound0.data(), actual.data, actual.length) <= 0) &&
+        (memcmp(actual.data, upperBound0.data(), actual.length) <= 0);
+    bool secondRange = (memcmp(lowerBound1.data(), actual.data, actual.length) <= 0) &&
+        (memcmp(actual.data, upperBound1.data(), actual.length) <= 0);
+
+    ASSERT(firstRange || secondRange);
+}
+
+// For signaling and quiet NaNs there is a range the binary can fall within. The following tests
+// confirm that the resulting BinData is within that range.
+TEST_F(ExpressionConvertTest, ConvertDoubleToBinDataSignalingNan) {
+    auto expCtx = getExpCtx();
+    auto convertExp = Expression::parseExpression(
+        expCtx.get(),
+        fromjson("{$convert: {input: '$path1', to: 'binData', byteOrder: 'big'}}"),
+        expCtx->variablesParseState);
+    auto result = convertExp->evaluate(
+        {{"path1", Value(std::numeric_limits<double>::signaling_NaN())}}, &expCtx->variables);
+    ASSERT_EQ(result.getType(), BSONType::BinData);
+    assertBinaryInRange(result.getBinData(),
+                        {0x7F, 0xF0, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01},
+                        {0x7F, 0xF7, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF},
+                        {0xFF, 0xF0, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01},
+                        {0xFF, 0xF7, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF});
+}
+
+TEST_F(ExpressionConvertTest, ConvertDoubleToBinDataQuietNan) {
+    auto expCtx = getExpCtx();
+    auto convertExp = Expression::parseExpression(
+        expCtx.get(),
+        fromjson("{$convert: {input: '$path1', to: 'binData', byteOrder: 'big'}}"),
+        expCtx->variablesParseState);
+    auto result = convertExp->evaluate({{"path1", Value(std::numeric_limits<double>::quiet_NaN())}},
+                                       &expCtx->variables);
+    ASSERT_EQ(result.getType(), BSONType::BinData);
+    assertBinaryInRange(result.getBinData(),
+                        {0x7F, 0xF8, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00},
+                        {0x7F, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF},
+                        {0xFF, 0xF8, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00},
+                        {0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF});
+}
+
+
 }  // namespace ExpressionConvertTest
 
 namespace ExpressionConvertShortcutsTest {
@@ -3790,6 +4271,59 @@ TEST_F(ExpressionConvertShortcutsTest, ConvertsToInts) {
     ASSERT_TRUE(dynamic_cast<ExpressionConvert*>(convert.get()));
     ASSERT_VALUE_CONTENTS_AND_TYPE(
         convert->evaluate({}, &expCtx->variables), Value(1), BSONType::NumberInt);
+}
+
+TEST_F(ExpressionConvertShortcutsTest, ConvertsBinDataToInts) {
+    auto expCtx = getExpCtx();
+
+    BSONObj spec = BSON("$toInt"
+                        << "$path1");
+    auto convertExp = Expression::parseExpression(expCtx.get(), spec, expCtx->variablesParseState);
+    ASSERT_TRUE(dynamic_cast<ExpressionConvert*>(convertExp.get()));
+
+    std::vector<int8_t> intBytes = {0b00000001, 0b00000000};
+    BSONBinData inputBinData{intBytes.data(), static_cast<int>(intBytes.size()), bdtUUID};
+
+    auto result = convertExp->evaluate({{"path1", Value(inputBinData)}}, &expCtx->variables);
+    ASSERT_VALUE_CONTENTS_AND_TYPE(result, 1, BSONType::NumberInt);
+}
+
+TEST_F(ExpressionConvertShortcutsTest, ConvertsBinDataToLongs) {
+    auto expCtx = getExpCtx();
+
+    BSONObj spec = BSON("$toLong"
+                        << "$path1");
+    auto convertExp = Expression::parseExpression(expCtx.get(), spec, expCtx->variablesParseState);
+    ASSERT_TRUE(dynamic_cast<ExpressionConvert*>(convertExp.get()));
+
+    std::vector<int8_t> intBytes = {0b00000001, 0b00000000};
+    BSONBinData inputBinData{intBytes.data(), static_cast<int>(intBytes.size()), BinDataGeneral};
+
+    auto result = convertExp->evaluate({{"path1", Value(inputBinData)}}, &expCtx->variables);
+    ASSERT_VALUE_CONTENTS_AND_TYPE(result, 1, BSONType::NumberLong);
+}
+
+TEST_F(ExpressionConvertShortcutsTest, ConvertsBinDataToDoubles) {
+    auto expCtx = getExpCtx();
+
+    BSONObj spec = BSON("$toDouble"
+                        << "$path1");
+    auto convertExp = Expression::parseExpression(expCtx.get(), spec, expCtx->variablesParseState);
+    ASSERT_TRUE(dynamic_cast<ExpressionConvert*>(convertExp.get()));
+
+    std::vector<unsigned char> intBytes = {0b00000000,
+                                           0b00000000,
+                                           0b00000000,
+                                           0b00000000,
+                                           0b00000000,
+                                           0b00000000,
+                                           0b11100000,
+                                           0b10111111};
+    BSONBinData inputBinData{intBytes.data(), static_cast<int>(intBytes.size()), BinDataGeneral};
+
+    auto result = convertExp->evaluate({{"path1", Value(inputBinData)}}, &expCtx->variables);
+    ASSERT_EQ(result.getType(), BSONType::NumberDouble);
+    ASSERT_APPROX_EQUAL(result.getDouble(), -0.5, 0.001);
 }
 
 TEST_F(ExpressionConvertShortcutsTest, ConvertsToLongs) {

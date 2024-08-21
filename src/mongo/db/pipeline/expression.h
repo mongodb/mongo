@@ -83,6 +83,7 @@
 #include "mongo/db/query/query_feature_flags_gen.h"
 #include "mongo/db/query/query_shape/serialization_options.h"
 #include "mongo/db/query/sort_pattern.h"
+#include "mongo/db/query/util/named_enum.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/update/pattern_cmp.h"
 #include "mongo/platform/basic.h"
@@ -3928,6 +3929,16 @@ static StringData toStringData(BinDataFormat type) {
     }
 }
 
+/**
+ * Used in $convert when converting between BinData and numeric types. Represents the endianness in
+ * which we interpret or write the BinData.
+ */
+#define CONVERT_BYTE_ORDER_TYPE(F) \
+    F(little)                      \
+    F(big)
+QUERY_UTIL_NAMED_ENUM_DEFINE(ConvertByteOrderType, CONVERT_BYTE_ORDER_TYPE);
+#undef CONVERT_BYTE_ORDER_TYPE
+
 class ExpressionConvert final : public Expression {
 public:
     struct ConvertTargetTypeInfo {
@@ -3943,7 +3954,9 @@ public:
                       boost::intrusive_ptr<Expression> format,
                       boost::intrusive_ptr<Expression> onError,
                       boost::intrusive_ptr<Expression> onNull,
-                      bool allowBinDataConvert);
+                      boost::intrusive_ptr<Expression> byteOrder,
+                      bool allowBinDataConvert,
+                      bool allowBinDataConvertNumeric);
     /**
      * Creates a $convert expression converting from 'input' to the type given by 'toType'. Leaves
      * 'onNull' and 'onError' unspecified.
@@ -3953,7 +3966,8 @@ public:
         boost::intrusive_ptr<Expression> input,
         BSONType toType,
         boost::optional<BinDataFormat> format = boost::none,
-        boost::optional<BinDataType> toSubtype = boost::none);
+        boost::optional<BinDataType> toSubtype = boost::none,
+        boost::optional<ConvertByteOrderType> byteOrder = boost::none);
 
     static boost::intrusive_ptr<Expression> parse(ExpressionContext* expCtx,
                                                   BSONElement expr,
@@ -3972,22 +3986,29 @@ public:
     }
 
     static bool checkBinDataConvertAllowed();
+    static bool checkBinDataConvertNumericAllowed();
+
+    bool requestingConvertBinDataNumeric(ConvertTargetTypeInfo targetTypeInfo,
+                                         BSONType inputType) const;
 
 private:
     static BSONType computeTargetType(Value typeName);
     Value performConversion(ConvertTargetTypeInfo targetTypeInfo,
                             Value inputValue,
-                            boost::optional<BinDataFormat> format) const;
+                            boost::optional<BinDataFormat> format,
+                            boost::optional<ConvertByteOrderType> byteOrder) const;
 
-    // Support for BinData $convert is FCV gated. The feature flag is checked once during
+    // Support for BinData $convert is FCV gated. These feature flags are checked once during
     // parsing to avoid having to acquire FCV snapshot for every document during evaluation.
     const bool _allowBinDataConvert;
+    const bool _allowBinDataConvertNumeric;
 
     static constexpr size_t _kInput = 0;
     static constexpr size_t _kTo = 1;
     static constexpr size_t _kFormat = 2;
     static constexpr size_t _kOnError = 3;
     static constexpr size_t _kOnNull = 4;
+    static constexpr size_t _kByteOrder = 5;
 };
 
 class ExpressionRegex : public Expression {

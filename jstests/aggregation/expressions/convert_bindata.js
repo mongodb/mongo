@@ -171,8 +171,6 @@ const conversionTestDocs = [
 //
 const illegalConversionTestDocs = [
     // Can only convert string (or BinData) to BinData.
-    {_id: 1, input: 1.9, target: {type: "binData", subtype: kUUIDSubtype}},
-    {_id: 2, input: 1.9, target: {type: "binData", subtype: kNonUUIDSubtype}},
     {
         _id: 3,
         input: ObjectId("0123456789abcdef01234567"),
