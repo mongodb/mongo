@@ -31,6 +31,18 @@ idl_generator(
     src = "fail_point_server_parameter.idl",
 )
 
+mongo_cc_library(
+    name = "fail_point",
+    srcs = [
+        "fail_point.cpp",
+        "fail_point_server_parameter_gen",
+    ],
+    deps = [
+        "//src/mongo/bson/util:bson_extract",
+        "//src/mongo/db:server_base",
+    ],
+)
+
 idl_generator(
     name = "testing_options_gen",
     src = "testing_options.idl",

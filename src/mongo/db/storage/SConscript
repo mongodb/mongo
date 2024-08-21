@@ -30,18 +30,6 @@ env.Library(
 )
 
 env.Library(
-    target="recovery_unit_base",
-    source=[
-        "recovery_unit.cpp",
-        "recovery_unit_noop.cpp",
-    ],
-    LIBDEPS_PRIVATE=[
-        "$BUILD_DIR/mongo/db/server_base",
-        "$BUILD_DIR/mongo/util/fail_point",
-    ],
-)
-
-env.Library(
     target="record_store_base",
     source=[
         "collection_truncate_markers.cpp",
@@ -350,18 +338,6 @@ env.Library(
         "$BUILD_DIR/mongo/db/storage/storage_options",
         "$BUILD_DIR/mongo/util/fail_point",
         "recovery_unit_base",
-    ],
-)
-
-env.Library(
-    target="disk_space_util",
-    source=[
-        "disk_space_util.cpp",
-    ],
-    LIBDEPS_PRIVATE=[
-        "$BUILD_DIR/mongo/base",
-        "$BUILD_DIR/mongo/util/fail_point",
-        "storage_options",
     ],
 )
 

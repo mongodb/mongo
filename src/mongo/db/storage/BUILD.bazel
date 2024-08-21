@@ -9,6 +9,21 @@ exports_files(
     ]),
 )
 
+mongo_cc_library(
+    name = "recovery_unit_base",
+    srcs = [
+        "recovery_unit.cpp",
+        "recovery_unit.h",
+        "recovery_unit_noop.cpp",
+        "recovery_unit_noop.h",
+    ],
+    deps = [
+        "//src/mongo:base",
+        "//src/mongo/db:server_base",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/util:fail_point",
+    ],
+)
+
 idl_generator(
     name = "storage_parameters_gen",
     src = "storage_parameters.idl",
@@ -216,5 +231,18 @@ mongo_cc_library(
     ],
     deps = [
         "//src/mongo/db:server_base",
+    ],
+)
+
+mongo_cc_library(
+    name = "disk_space_util",
+    srcs = [
+        "disk_space_util.cpp",
+        "disk_space_util.h",
+    ],
+    deps = [
+        ":storage_options",  # TODO(SERVER-93876): Remove.
+        "//src/mongo:base",
+        "//src/mongo/util:fail_point",
     ],
 )

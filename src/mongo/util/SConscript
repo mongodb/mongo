@@ -145,18 +145,6 @@ env.Library(
     ],
 )
 
-env.Library(
-    target="fail_point",
-    source=[
-        "fail_point.cpp",
-        "fail_point_server_parameter_gen.cpp",
-    ],
-    LIBDEPS_PRIVATE=[
-        "$BUILD_DIR/mongo/bson/util/bson_extract",
-        "$BUILD_DIR/mongo/db/server_base",
-    ],
-)
-
 env.Benchmark(
     target="fail_point_bm",
     source=[
