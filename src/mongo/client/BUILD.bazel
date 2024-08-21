@@ -109,3 +109,17 @@ mongo_cc_library(
         "//src/mongo/db:server_base",
     ],
 )
+
+mongo_cc_library(
+    name = "replica_set_monitor_server_parameters",
+    srcs = [
+        "replica_set_monitor_server_parameters.cpp",
+        ":replica_set_monitor_server_parameters_gen",
+    ],
+    hdrs = [
+        "replica_set_monitor_server_parameters.h",
+    ],
+    deps = [
+        "//src/mongo/db:server_base",
+    ],
+)

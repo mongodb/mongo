@@ -262,17 +262,6 @@ clientDriverEnv.Library(
 )
 
 env.Library(
-    target="replica_set_monitor_server_parameters",
-    source=[
-        "replica_set_monitor_server_parameters.cpp",
-        "replica_set_monitor_server_parameters_gen.cpp",
-    ],
-    LIBDEPS_PRIVATE=[
-        "$BUILD_DIR/mongo/db/server_base",
-    ],
-)
-
-env.Library(
     target="async_client",
     source=[
         "async_client.cpp",
