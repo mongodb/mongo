@@ -5,11 +5,12 @@ filters:
       - IamXander
       - dhly-etc
       - kaloianm
-      - visemet
       - anna-wawrzyniak
       - mbroadst
       - markbenvenuto
       - dstorch
+    emeritus_approvers:
+      - visemet # TODO: add back to approvers once project work is finished
   - ".bazelignore":
     approvers:
       - 10gen/devprod-build
