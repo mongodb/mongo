@@ -70,20 +70,6 @@ env.CppLibfuzzerTest(
     ],
 )
 
-env.Library(
-    target="bson_validate",
-    source=[
-        "bson_validate.cpp",
-        "bson_validate_gen.cpp",
-    ],
-    LIBDEPS_PRIVATE=[
-        "$BUILD_DIR/mongo/base",
-        "$BUILD_DIR/mongo/bson/util/bson_column",
-        "$BUILD_DIR/mongo/db/server_base",
-        "$BUILD_DIR/mongo/idl/idl_parser",
-    ],
-)
-
 asioEnv = env.Clone()
 asioEnv.InjectThirdParty("asio")
 

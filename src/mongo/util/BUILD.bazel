@@ -325,3 +325,20 @@ mongo_cc_library(
         "//src/mongo:base",
     ],
 )
+
+mongo_cc_library(
+    name = "dns_query",
+    srcs = [
+        "dns_query.cpp",
+    ],
+    hdrs = [
+        "dns_query.h",
+    ] + select({
+        "@platforms//os:windows": ["dns_query_windows-impl.h"],
+        "//bazel/config:posix": ["dns_query_posix-impl.h"],
+        "//conditions:default": [],
+    }),
+    deps = [
+        "//src/mongo:base",
+    ],
+)

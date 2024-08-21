@@ -32,3 +32,13 @@ idl_generator(
         "//src/mongo/db:basic_types_gen",
     ],
 )
+
+mongo_cc_library(
+    name = "query_shape_hash",
+    srcs = [
+        ":query_shape_hash_gen",
+    ],
+    deps = [
+        "//src/mongo/crypto:sha256_block",
+    ],
+)

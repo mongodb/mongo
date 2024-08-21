@@ -16,3 +16,25 @@ idl_generator(
         "//src/mongo/db:basic_types_gen",
     ],
 )
+
+mongo_cc_library(
+    name = "bson_validate",
+    srcs = [
+        "bson_validate.cpp",
+        ":bson_validate_gen",
+    ],
+    hdrs = [
+        "bson_validate.h",
+        "//src/mongo/crypto:encryption_fields_util.h",
+        "//src/mongo/crypto:fle_field_schema_gen",
+    ],
+    header_deps = [
+        "//src/mongo/db/pipeline/process_interface:mongo_process_interface",
+    ],
+    deps = [
+        "//src/mongo:base",
+        "//src/mongo/bson/util:bson_column",
+        "//src/mongo/db:server_base",
+        "//src/mongo/idl:idl_parser",
+    ],
+)
