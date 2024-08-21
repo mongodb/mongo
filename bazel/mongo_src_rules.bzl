@@ -1119,6 +1119,23 @@ THIN_LTO_FLAGS = select({
     "//conditions:default": [],
 })
 
+SYMBOL_ORDER_COPTS = select({
+    "//bazel/config:symbol_ordering_file_enabled": ["-ffunction-sections"],
+    "//conditions:default": [],
+})
+
+SYMBOL_ORDER_LINKFLAGS = select({
+    "//bazel/config:symbol_ordering_file_enabled": [
+        "-Wl,--symbol-ordering-file=$(location //:symbols.orderfile)",
+        "-Wl,--no-warn-symbol-ordering",
+    ],
+    "//conditions:default": [],
+})
+
+SYMBOL_ORDER_FILES = [
+    "//:symbols.orderfile",
+]
+
 MONGO_GLOBAL_INCLUDE_DIRECTORIES = [
     "-Isrc",
     "-I$(GENDIR)/src",
@@ -1183,7 +1200,8 @@ MONGO_GLOBAL_COPTS = (
     MTUNE_MARCH_COPTS +
     DISABLE_SOURCE_WARNING_AS_ERRORS_COPTS +
     FSIZED_DEALLOCATION_COPT +
-    THIN_LTO_FLAGS
+    THIN_LTO_FLAGS +
+    SYMBOL_ORDER_COPTS
 )
 
 MONGO_GLOBAL_LINKFLAGS = (
@@ -1207,8 +1225,11 @@ MONGO_GLOBAL_LINKFLAGS = (
     DEDUPE_SYMBOL_LINKFLAGS +
     DEBUG_TYPES_SECTION_FLAGS +
     DISABLE_SOURCE_WARNING_AS_ERRORS_LINKFLAGS +
-    THIN_LTO_FLAGS
+    THIN_LTO_FLAGS +
+    SYMBOL_ORDER_LINKFLAGS
 )
+
+MONGO_GLOBAL_ADDITIONAL_LINKER_INPUTS = SYMBOL_ORDER_FILES
 
 MONGO_GLOBAL_FEATURES = GDWARF_FEATURES + DWARF_VERSION_FEATURES
 
@@ -1449,7 +1470,7 @@ def mongo_cc_library(
             "//bazel/config:shared_archive_enabled": [],
             "//conditions:default": ["@platforms//:incompatible"],
         }) + target_compatible_with,
-        additional_linker_inputs = additional_linker_inputs,
+        additional_linker_inputs = additional_linker_inputs + MONGO_GLOBAL_ADDITIONAL_LINKER_INPUTS,
     )
     cc_library(
         name = name + WITH_DEBUG_SUFFIX,
@@ -1472,7 +1493,7 @@ def mongo_cc_library(
             "//conditions:default": ["pie"],
         }) + features,
         target_compatible_with = target_compatible_with,
-        additional_linker_inputs = additional_linker_inputs,
+        additional_linker_inputs = additional_linker_inputs + MONGO_GLOBAL_ADDITIONAL_LINKER_INPUTS,
     )
 
     # Creates a shared library version of our target only if
@@ -1494,7 +1515,7 @@ def mongo_cc_library(
             "@platforms//os:windows": ["generate_pdb_file"],
             "//conditions:default": [],
         }),
-        additional_linker_inputs = additional_linker_inputs,
+        additional_linker_inputs = additional_linker_inputs + MONGO_GLOBAL_ADDITIONAL_LINKER_INPUTS,
     )
 
     extract_debuginfo(
@@ -1620,7 +1641,7 @@ def mongo_cc_binary(
             "//conditions:default": [],
         }),
         target_compatible_with = target_compatible_with,
-        additional_linker_inputs = additional_linker_inputs,
+        additional_linker_inputs = additional_linker_inputs + MONGO_GLOBAL_ADDITIONAL_LINKER_INPUTS,
     )
 
     extract_debuginfo_binary(

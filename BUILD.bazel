@@ -6,6 +6,7 @@ package(default_visibility = ["//visibility:public"])
 exports_files([
     "pyproject.toml",
     "poetry.lock",
+    "symbols.orderfile",
 ])
 
 npm_link_all_packages(name = "node_modules")

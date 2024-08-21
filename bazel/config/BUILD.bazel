@@ -1861,3 +1861,16 @@ selects.config_setting_group(
         ":ssl_disabled_linux",
     ],
 )
+
+# --------------------------------------
+# symbol reordering options
+# --------------------------------------
+
+selects.config_setting_group(
+    name = "symbol_ordering_file_enabled",
+    match_all = [
+        "@platforms//os:linux",
+        ":opt_any",
+        ":linker_lld",
+    ],
+)
