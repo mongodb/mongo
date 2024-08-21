@@ -853,3 +853,23 @@ mongo_cc_library(
         "//src/mongo/db/storage:key_string",
     ],
 )
+
+mongo_cc_library(
+    name = "keys_collection_client_sharded",
+    srcs = [
+        "keys_collection_client_sharded.cpp",
+    ],
+    hdrs = [
+        "keys_collection_client.h",
+        "keys_collection_client_sharded.h",
+    ],
+    header_deps = [
+        "//src/mongo/bson/mutable:mutable_bson",
+        "//src/mongo/db/commands:server_status_core",
+    ],
+    deps = [
+        "keys_collection_document",
+        "server_base",
+        "//src/mongo/s/catalog:sharding_catalog_client",
+    ],
+)

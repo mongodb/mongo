@@ -160,3 +160,13 @@ mongo_cc_library(
         "//src/mongo:base",
     ],
 )
+
+mongo_cc_library(
+    name = "kms_idl",
+    srcs = [
+        ":kms_gen",
+    ],
+    deps = [
+        "//src/mongo/db:server_base",
+    ],
+)

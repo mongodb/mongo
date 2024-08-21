@@ -64,3 +64,39 @@ idl_generator(
         "//src/mongo/db:basic_types_gen",
     ],
 )
+
+mongo_cc_library(
+    name = "sharding_catalog_client",
+    srcs = [
+        "sharding_catalog_client.cpp",
+    ],
+    hdrs = [
+        "sharding_catalog_client.h",
+        "type_namespace_placement_gen",
+        "type_shard.h",
+        "type_tags.h",
+        "//src/mongo/db/commands/query_cmd:bulk_write_crud_op.h",
+        "//src/mongo/db/commands/query_cmd:bulk_write_gen",
+        "//src/mongo/db/commands/query_cmd:bulk_write_parser.h",
+        "//src/mongo/db/pipeline:aggregation_request_helper.h",
+        "//src/mongo/db/pipeline:plan_executor_pipeline.h",
+        "//src/mongo/db/pipeline:plan_explainer_pipeline.h",
+        "//src/mongo/db/query:count_request.h",
+        "//src/mongo/db/repl:optime_with.h",
+        "//src/mongo/rpc:write_concern_error_detail.h",
+        "//src/mongo/s/client:shard.h",
+        "//src/mongo/s/client:shard_gen",
+        "//src/mongo/s/request_types:placement_history_commands_gen",
+        "//src/mongo/s/write_ops:batched_command_request.h",
+        "//src/mongo/s/write_ops:batched_command_response.h",
+        "//src/mongo/s/write_ops:batched_upsert_detail.h",
+    ],
+    header_deps = [
+        "//src/mongo/bson/mutable:mutable_bson",
+        "//src/mongo/db/commands:server_status_core",
+    ],
+    deps = [
+        "//src/mongo/db:keys_collection_document",
+        "//src/mongo/db:server_base",
+    ],
+)

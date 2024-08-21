@@ -391,17 +391,6 @@ env.Library(
 )
 
 env.Library(
-    target="mongos_server_parameters",
-    source=[
-        "mongos_server_parameters.cpp",
-        "mongos_server_parameters_gen.cpp",
-    ],
-    LIBDEPS_PRIVATE=[
-        "$BUILD_DIR/mongo/db/server_base",
-    ],
-)
-
-env.Library(
     target="sessions_collection_sharded",
     source=[
         "sessions_collection_sharded.cpp",

@@ -5,17 +5,6 @@ Import("env")
 env = env.Clone()
 
 env.Library(
-    target="sharding_catalog_client",
-    source=[
-        "sharding_catalog_client.cpp",
-    ],
-    LIBDEPS=[
-        "$BUILD_DIR/mongo/db/keys_collection_document",
-        "$BUILD_DIR/mongo/db/server_base",
-    ],
-)
-
-env.Library(
     target="sharding_catalog_client_impl",
     source=[
         "sharding_catalog_client_impl.cpp",

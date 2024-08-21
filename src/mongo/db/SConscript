@@ -1898,18 +1898,6 @@ env.Library(
 )
 
 env.Library(
-    target="keys_collection_client_sharded",
-    source=[
-        "keys_collection_client_sharded.cpp",
-    ],
-    LIBDEPS=[
-        "$BUILD_DIR/mongo/s/catalog/sharding_catalog_client",
-        "keys_collection_document",
-        "server_base",
-    ],
-)
-
-env.Library(
     target="vector_clock",
     source=[
         "key_generator.cpp",

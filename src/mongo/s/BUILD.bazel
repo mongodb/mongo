@@ -225,3 +225,17 @@ mongo_cc_library(
         "//src/mongo:base",
     ],
 )
+
+mongo_cc_library(
+    name = "mongos_server_parameters",
+    srcs = [
+        "mongos_server_parameters.cpp",
+        ":mongos_server_parameters_gen",
+    ],
+    hdrs = [
+        "mongos_server_parameters.h",
+    ],
+    deps = [
+        "//src/mongo/db:server_base",
+    ],
+)

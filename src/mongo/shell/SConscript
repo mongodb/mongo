@@ -122,16 +122,6 @@ env.Library(
     ],
 )
 
-env.Library(
-    target="kms_idl",
-    source=[
-        "kms_gen.cpp",
-    ],
-    LIBDEPS_PRIVATE=[
-        "$BUILD_DIR/mongo/db/server_base",
-    ],
-)
-
 if get_option("ssl") == "on":
     kmsEnv = env.Clone()
 
