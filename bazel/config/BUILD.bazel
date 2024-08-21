@@ -1831,3 +1831,33 @@ config_setting(
         "//bazel/config:scons_query": "True",
     },
 )
+
+# --------------------------------------
+# crypto options
+# --------------------------------------
+
+# Note: This intentionally matches regardless of SSL setting.
+config_setting(
+    name = "mongo_crypto_windows",
+    constraint_values = ["@platforms//os:windows"],
+)
+
+# Note: This intentionally matches regardless of SSL setting.
+config_setting(
+    name = "mongo_crypto_apple",
+    constraint_values = ["@platforms//os:macos"],
+)
+
+selects.config_setting_group(
+    name = "mongo_crypto_openssl",
+    match_all = [
+        ":ssl_enabled_linux",
+    ],
+)
+
+selects.config_setting_group(
+    name = "mongo_crypto_tom",
+    match_all = [
+        ":ssl_disabled_linux",
+    ],
+)

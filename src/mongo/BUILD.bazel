@@ -368,6 +368,10 @@ mongo_cc_library(
         "//src/mongo/util/concurrency:thread_name.h",
         "//src/mongo/util/concurrency:with_lock.h",
     ],
+    linkopts = select({
+        "//bazel/config:ssl_enabled_linux": ["-lcrypto"],
+        "//conditions:default": [],
+    }),
     local_defines = select({
         "//bazel/config:gcov_enabled": ["MONGO_GCOV"],
         "//conditions:default": [],
