@@ -153,6 +153,7 @@ globals:
 
   # likely could be replaced with `path`
   _copyFileRange: true
+  appendFile: true
   copyFile: true
   writeFile: true
   fileExists: true

@@ -475,6 +475,68 @@ BSONObj writeBsonArrayToFile(const BSONObj& args, void* data) {
     return undefinedReturn;
 }
 
+BSONObj appendFile(const BSONObj& args, void* data) {
+    // Parse the arguments.
+
+    uassert(9380001,
+            "appendFile requires at least 2 arguments: appendFile(filePath, content, "
+            "[useBinaryMode])",
+            args.nFields() >= 2);
+
+    BSONObjIterator it(args);
+
+    auto filePathElem = it.next();
+    uassert(9380002,
+            "the first argument to appendFile() must be a string containing the path to the file",
+            filePathElem.type() == mongo::String);
+
+    auto fileContentElem = it.next();
+    uassert(9380003,
+            "the second argument to appendFile() must be a string to append to the file",
+            fileContentElem.type() == mongo::String);
+
+    // Limit the capability to appending to only existing files.
+
+    const boost::filesystem::path originalFilePath{filePathElem.String()};
+    const boost::filesystem::path normalizedFilePath{originalFilePath.lexically_normal()};
+    const boost::filesystem::path absoluteFilePath{boost::filesystem::absolute(normalizedFilePath)};
+
+    uassert(9380004,
+            "appendFile() can onlyappend to a file in a directory that already exists",
+            boost::filesystem::exists(absoluteFilePath.parent_path()));
+    uassert(9380005,
+            "appendFile() can only append to a file that does not yet exist",
+            boost::filesystem::exists(absoluteFilePath));
+    uassert(9380006,
+            "the file name must be compatible with POSIX and Windows",
+            boost::filesystem::portable_name(absoluteFilePath.filename().string()));
+
+    std::ios::openmode mode = std::ios::out;
+
+    auto useBinary = it.next();
+    if (!useBinary.eoo()) {
+        uassert(9380007,
+                "the third argument to appendFile(), must be a boolean indicating whether "
+                "or not to read the file in binary mode. If omitted, the default is 'false'.",
+                useBinary.type() == mongo::Bool);
+
+        if (useBinary.Bool())
+            mode |= std::ios::binary;
+    }
+
+    boost::filesystem::ofstream ofs{absoluteFilePath, mode | std::ios::app};
+    uassert(9380008,
+            str::stream() << "failed to open file " << absoluteFilePath.string()
+                          << " for appending",
+            ofs);
+
+    ofs << fileContentElem.String();
+    uassert(
+        9380009, str::stream() << "failed to append to file " << absoluteFilePath.string(), ofs);
+
+    return undefinedReturn;
+}
+
 BSONObj getHostName(const BSONObj& a, void* data) {
     uassert(13411, "getHostName accepts no arguments", a.nFields() == 0);
     char buf[260];  // HOST_NAME_MAX is usually 255
@@ -648,6 +710,7 @@ void installShellUtilsExtended(Scope& scope) {
     scope.injectNative("getHostName", getHostName);
     scope.injectNative("removeFile", removeFile);
     scope.injectNative("copyFile", copyFile);
+    scope.injectNative("appendFile", appendFile);
     scope.injectNative("writeFile", writeFile);
     scope.injectNative("listFiles", listFiles);
     scope.injectNative("ls", ls);
