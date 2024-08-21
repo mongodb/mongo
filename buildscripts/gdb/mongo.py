@@ -18,7 +18,8 @@ if not gdb:
 
 
 def detect_toolchain(progspace):
-    readelf_bin = "/opt/mongodbtoolchain/v4/bin/readelf"
+    # LLVM's readelf is significantly faster than GNU's.
+    readelf_bin = "/opt/mongodbtoolchain/v4/bin/llvm-readelf"
     if not os.path.exists(readelf_bin):
         readelf_bin = "readelf"
 
