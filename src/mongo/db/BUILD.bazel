@@ -812,3 +812,17 @@ mongo_cc_library(
         ":common",
     ],
 )
+
+mongo_cc_library(
+    name = "multi_key_path_tracker",
+    srcs = [
+        "multi_key_path_tracker.cpp",
+    ],
+    hdrs = [
+        "multi_key_path_tracker.h",
+    ],
+    deps = [
+        "//src/mongo:base",
+        "//src/mongo/db/storage:key_string",
+    ],
+)

@@ -16,18 +16,6 @@ env.SConscript(
 )
 
 env.Library(
-    target="index_entry_comparison",
-    source=[
-        "index_entry_comparison.cpp",
-    ],
-    LIBDEPS=[
-        "$BUILD_DIR/mongo/db/server_base",
-        "duplicate_key_error_info",
-        "key_string",
-    ],
-)
-
-env.Library(
     target="snapshot_helper",
     source=[
         "snapshot_helper.cpp",
@@ -72,17 +60,6 @@ env.Library(
     ],
 )
 
-env.Library(
-    target="key_string",
-    source=[
-        "key_string.cpp",
-    ],
-    LIBDEPS=[
-        "$BUILD_DIR/mongo/base",
-        "$BUILD_DIR/mongo/bson/bson_validate",
-    ],
-)
-
 ksdecode = env.Program(
     target="ksdecode",
     source=[
@@ -96,17 +73,6 @@ ksdecode = env.Program(
     AIB_COMPONENT="ksdecode",
     AIB_COMPONENTS_EXTRA=[
         "dist-test",
-    ],
-)
-
-env.Library(
-    target="execution_context",
-    source=[
-        "execution_context.cpp",
-    ],
-    LIBDEPS_PRIVATE=[
-        "$BUILD_DIR/mongo/base",
-        "key_string",
     ],
 )
 
@@ -190,17 +156,6 @@ env.Library(
         "$BUILD_DIR/mongo/util/concurrency/spin_lock",
         "$BUILD_DIR/mongo/util/fail_point",
         "storage_options",
-    ],
-)
-
-env.Library(
-    target="storage_options",
-    source=[
-        "storage_options.cpp",
-        "storage_parameters_gen.cpp",
-    ],
-    LIBDEPS_PRIVATE=[
-        "$BUILD_DIR/mongo/db/server_base",
     ],
 )
 
@@ -395,18 +350,6 @@ env.Library(
         "$BUILD_DIR/mongo/db/storage/storage_options",
         "$BUILD_DIR/mongo/util/fail_point",
         "recovery_unit_base",
-    ],
-)
-
-env.Library(
-    target="storage_engine_metadata",
-    source=[
-        "storage_engine_metadata.cpp",
-    ],
-    LIBDEPS=[
-        "$BUILD_DIR/mongo/bson/bson_validate",
-        "$BUILD_DIR/mongo/db/query/bson/dotted_path_support",
-        "$BUILD_DIR/mongo/db/server_base",
     ],
 )
 
@@ -608,16 +551,6 @@ env.Library(
         "$BUILD_DIR/mongo/util/concurrency/spin_lock",
         "$BUILD_DIR/mongo/util/fail_point",
         "storage_options",
-    ],
-)
-
-env.Library(
-    target="two_phase_index_build_knobs_idl",
-    source=[
-        "two_phase_index_build_knobs_gen.cpp",
-    ],
-    LIBDEPS_PRIVATE=[
-        "$BUILD_DIR/mongo/db/server_base",
     ],
 )
 

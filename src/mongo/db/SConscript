@@ -618,17 +618,6 @@ env.Library(
 )
 
 env.Library(
-    target="multi_key_path_tracker",
-    source=[
-        "multi_key_path_tracker.cpp",
-    ],
-    LIBDEPS_PRIVATE=[
-        "$BUILD_DIR/mongo/base",
-        "$BUILD_DIR/mongo/db/storage/key_string",
-    ],
-)
-
-env.Library(
     target="not_primary_error_tracker",
     source=[
         "not_primary_error_tracker.cpp",
