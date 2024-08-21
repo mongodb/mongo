@@ -75,8 +75,6 @@ class ValueScanNode;
 class CoScanNode;
 class IndexScanNode;
 class SeekNode;
-class MemoLogicalDelegatorNode;
-class MemoPhysicalDelegatorNode;
 class FilterNode;
 class EvaluationNode;
 class SargableNode;

@@ -325,15 +325,6 @@ struct Collector {
     }
 
     CollectedInfo transport(const ABT& n,
-                            const MemoLogicalDelegatorNode& memoLogicalDelegatorNode) {
-        tasserted(9366401, "Should not be seeing memo logical delegator in this context");
-    }
-
-    CollectedInfo transport(const ABT& n, const MemoPhysicalDelegatorNode& node) {
-        tasserted(7088004, "Should not be seeing memo physical delegator in this context");
-    }
-
-    CollectedInfo transport(const ABT& n,
                             const FilterNode& filterNode,
                             CollectedInfo childResult,
                             CollectedInfo exprResult) {

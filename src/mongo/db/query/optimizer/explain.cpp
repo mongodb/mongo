@@ -904,8 +904,7 @@ public:
                 !(_displayProperties && _nodeCEMap));
         // Only allow in V2 and V3 explain. No point in printing CE when we have a delegator
         // node.
-        if (!_nodeCEMap || version == ExplainVersion::V1 || n.is<MemoLogicalDelegatorNode>() ||
-            n.is<MemoPhysicalDelegatorNode>()) {
+        if (!_nodeCEMap || version == ExplainVersion::V1) {
             return;
         }
         auto it = _nodeCEMap->find(&node);
@@ -1546,29 +1545,6 @@ public:
             .fieldName("references", ExplainVersion::V3)
             .print(refsResult);
 
-        return printer;
-    }
-
-    ExplainPrinter transport(const ABT::reference_type n, const MemoLogicalDelegatorNode& node) {
-        ExplainPrinter printer("MemoLogicalDelegator");
-        maybePrintProps(printer, node);
-        printer.separator(" [").fieldName("groupId").print(node.getGroupId()).separator("]");
-        nodeCEPropsPrint(printer, n, node);
-        return printer;
-    }
-
-    ExplainPrinter transport(const ABT::reference_type /*n*/,
-                             const MemoPhysicalDelegatorNode& node) {
-        const auto id = node.getNodeId();
-
-        ExplainPrinter printer("MemoPhysicalDelegator");
-        printer.separator(" [")
-            .fieldName("groupId")
-            .print(id._groupId)
-            .separator(", ")
-            .fieldName("index")
-            .print(id._index)
-            .separator("]");
         return printer;
     }
 

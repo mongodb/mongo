@@ -312,43 +312,6 @@ private:
     const std::string _scanDefName;
 };
 
-
-/**
- * Logical group delegator node: scan from a given group.
- * Used in conjunction with memo.
- */
-class MemoLogicalDelegatorNode final : public ABTOpFixedArity<0>, public ExclusivelyLogicalNode {
-    using Base = ABTOpFixedArity<0>;
-
-public:
-    MemoLogicalDelegatorNode(GroupIdType groupId);
-
-    bool operator==(const MemoLogicalDelegatorNode& other) const;
-
-    GroupIdType getGroupId() const;
-
-private:
-    const GroupIdType _groupId;
-};
-
-/**
- * Physical group delegator node: refer to a physical node in a memo group.
- * Used in conjunction with memo.
- */
-class MemoPhysicalDelegatorNode final : public ABTOpFixedArity<0>, public ExclusivelyPhysicalNode {
-    using Base = ABTOpFixedArity<0>;
-
-public:
-    MemoPhysicalDelegatorNode(MemoPhysicalNodeId nodeId);
-
-    bool operator==(const MemoPhysicalDelegatorNode& other) const;
-
-    MemoPhysicalNodeId getNodeId() const;
-
-private:
-    const MemoPhysicalNodeId _nodeId;
-};
-
 /**
  * Filter node.
  * It applies a filter over its input.

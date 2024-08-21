@@ -682,30 +682,6 @@ class SeekNodePrinter(FixedArityNodePrinter):
         )
 
 
-class MemoLogicalDelegatorNodePrinter(FixedArityNodePrinter):
-    """Pretty-printer for MemoLogicalDelegatorNode."""
-
-    def __init__(self, val):
-        """Initialize MemoLogicalDelegatorNodePrinter."""
-        super().__init__(val, 0, "MemoLogicalDelegator")
-
-    def to_string(self):
-        return "MemoLogicalDelegator[{}]".format(self.val["_groupId"])
-
-
-class MemoPhysicalDelegatorNodePrinter(FixedArityNodePrinter):
-    """Pretty-printer for MemoPhysicalDelegatorNode."""
-
-    def __init__(self, val):
-        """Initialize MemoPhysicalDelegatorNodePrinter."""
-        super().__init__(val, 0, "MemoPhysicalDelegator")
-
-    def to_string(self):
-        return "MemoPhysicalDelegator[group: {}, index: {}]".format(
-            self.val["_nodeId"]["_groupId"], self.val["_nodeId"]["_index"]
-        )
-
-
 class ResidualRequirementPrinter(object):
     """Pretty-printer for ResidualRequirement."""
 
@@ -1247,8 +1223,6 @@ def register_optimizer_printers(pp):
         "CoScanNode",
         "IndexScanNode",
         "SeekNode",
-        "MemoLogicalDelegatorNode",
-        "MemoPhysicalDelegatorNode",
         "FilterNode",
         "EvaluationNode",
         "SargableNode",

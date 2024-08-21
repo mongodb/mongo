@@ -200,10 +200,6 @@ public:
                                   bindResult);
     }
 
-    size_t transport(const MemoLogicalDelegatorNode& node) {
-        return computeHashSeq<4>(std::hash<GroupIdType>()(node.getGroupId()));
-    }
-
     size_t transport(const FilterNode& node, size_t childResult, size_t filterResult) {
         return computeHashSeq<5>(filterResult, childResult);
     }

@@ -269,28 +269,6 @@ const ProjectionName& SeekNode::getRIDProjectionName() const {
     return get<1>().cast<References>()->nodes()[0].cast<Variable>()->name();
 }
 
-MemoLogicalDelegatorNode::MemoLogicalDelegatorNode(const GroupIdType groupId)
-    : Base(), _groupId(groupId) {}
-
-GroupIdType MemoLogicalDelegatorNode::getGroupId() const {
-    return _groupId;
-}
-
-bool MemoLogicalDelegatorNode::operator==(const MemoLogicalDelegatorNode& other) const {
-    return _groupId == other._groupId;
-}
-
-MemoPhysicalDelegatorNode::MemoPhysicalDelegatorNode(const MemoPhysicalNodeId nodeId)
-    : Base(), _nodeId(nodeId) {}
-
-bool MemoPhysicalDelegatorNode::operator==(const MemoPhysicalDelegatorNode& other) const {
-    return _nodeId == other._nodeId;
-}
-
-MemoPhysicalNodeId MemoPhysicalDelegatorNode::getNodeId() const {
-    return _nodeId;
-}
-
 FilterNode::FilterNode(FilterType filter, ABT child) : Base(std::move(child), std::move(filter)) {
     assertExprSort(getFilter());
     assertNodeSort(getChild());

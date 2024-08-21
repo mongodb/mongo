@@ -213,9 +213,7 @@ public:
                                          SlotVarMap& slotMap,
                                          boost::optional<sbe::value::SlotId>& ridSlot,
                                          Ts&&...) {
-        // We should not be seeing a physical delegator node here.
-        static_assert(!canBePhysicalNode<T>() || std::is_same_v<MemoPhysicalDelegatorNode, T>,
-                      "Physical nodes need to implement lowering");
+        static_assert(!canBePhysicalNode<T>(), "Physical nodes need to implement lowering");
 
         uasserted(6624238, "Unexpected node type.");
         return nullptr;

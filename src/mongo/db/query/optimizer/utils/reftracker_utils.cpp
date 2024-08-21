@@ -78,14 +78,6 @@ public:
         return extractFromABT(refs);
     }
 
-    ProjectionNameSet walk(const MemoLogicalDelegatorNode& /*node*/) {
-        return {};
-    }
-
-    ProjectionNameSet walk(const MemoPhysicalDelegatorNode& /*node*/) {
-        return {};
-    }
-
     ProjectionNameSet walk(const FilterNode& /*node*/, const ABT& /*child*/, const ABT& expr) {
         return extractFromABT(expr);
     }
