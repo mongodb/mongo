@@ -100,13 +100,10 @@ public:
      * The status will be Status::OK() if we have processed the last batch of operations from the
      * cursor.
      *
-     * rbid will be set to the rollback id of the oplog query metadata for the first batch fetched
-     * from the sync source.
-     *
      * This function will be called 0 times if startup() fails and at most once after startup()
      * returns success.
      */
-    using OnShutdownCallbackFn = std::function<void(const Status& shutdownStatus, int rbid)>;
+    using OnShutdownCallbackFn = std::function<void(const Status& shutdownStatus)>;
 
     /**
      * Container for BSON documents extracted from cursor results.
@@ -188,7 +185,6 @@ public:
         Config(OpTime initialLastFetchedIn,
                HostAndPort sourceIn,
                ReplSetConfig replSetConfigIn,
-               int requiredRBIDIn,
                int batchSizeIn,
                RequireFresherSyncSource requireFresherSyncSourceIn =
                    RequireFresherSyncSource::kRequireFresherSyncSource,
@@ -196,7 +192,6 @@ public:
             : initialLastFetched(initialLastFetchedIn),
               source(sourceIn),
               replSetConfig(replSetConfigIn),
-              requiredRBID(requiredRBIDIn),
               batchSize(batchSizeIn),
               requireFresherSyncSource(requireFresherSyncSourceIn),
               forTenantMigration(forTenantMigrationIn) {}
@@ -210,10 +205,6 @@ public:
         HostAndPort source;
 
         ReplSetConfig replSetConfig;
-
-        // Rollback ID that the sync source is required to have after the first batch. If the value
-        // is uninitialized, the oplog fetcher has not contacted the sync source yet.
-        int requiredRBID;
 
         int batchSize;
 
@@ -450,14 +441,12 @@ private:
      * Checks the first batch of results from query.
      * 'documents' are the first batch of results returned from tailing the remote oplog.
      * 'remoteLastOpApplied' is the last OpTime applied on the sync source.
-     * 'remoteRBID' is a RollbackId for the sync source returned in this oplog query.
      *
      * Returns TooStaleToSyncFromSource if we are too stale to sync from our source.
      * Returns OplogStartMissing if we should go into rollback.
      */
     Status _checkRemoteOplogStart(const OplogFetcher::Documents& documents,
-                                  OpTime remoteLastOpApplied,
-                                  int remoteRBID);
+                                  OpTime remoteLastOpApplied);
 
     /**
      * Distinguishes between needing to rollback and being too stale to sync from our sync source.
@@ -471,10 +460,6 @@ private:
 
     // Namespace of the oplog to read.
     const NamespaceString _nss = NamespaceString::kRsOplogNamespace;
-
-    // Rollback ID that the sync source had after the first batch. Initialized from
-    // the requiredRBID in the OplogFetcher::Config and passed to the onShutdown callback.
-    int _receivedRBID;
 
     // Indicates whether the current batch is the first received via this cursor.
     bool _firstBatch = true;

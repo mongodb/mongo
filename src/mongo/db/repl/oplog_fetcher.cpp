@@ -237,7 +237,6 @@ OplogFetcher::OplogFetcher(executor::TaskExecutor* executor,
                            OnShutdownCallbackFn onShutdownCallbackFn,
                            Config config)
     : AbstractAsyncComponent(executor, config.name),
-      _receivedRBID(config.requiredRBID),
       _oplogFetcherRestartDecision(std::move(oplogFetcherRestartDecision)),
       _onShutdownCallbackFn(onShutdownCallbackFn),
       _lastFetched(config.initialLastFetched),
@@ -372,7 +371,7 @@ void OplogFetcher::_finishCallback(Status status) {
                         str::stream() << "Got error: \"" << status.toString()
                                       << "\" while oplog fetcher is shutting down");
     }
-    _onShutdownCallbackFn(status, _receivedRBID);
+    _onShutdownCallbackFn(status);
 
     decltype(_onShutdownCallbackFn) onShutdownCallbackFn;
     decltype(_oplogFetcherRestartDecision) oplogFetcherRestartDecision;
@@ -876,8 +875,7 @@ Status OplogFetcher::_onSuccessfulBatch(const Documents& documents) {
     const auto& oqMetadata = oqMetadataResult.getValue();
 
     if (_firstBatch) {
-        auto status =
-            _checkRemoteOplogStart(documents, oqMetadata.getLastOpApplied(), oqMetadata.getRBID());
+        auto status = _checkRemoteOplogStart(documents, oqMetadata.getLastOpApplied());
         if (!status.isOK()) {
             // Stop oplog fetcher and execute rollback if necessary.
             return status;
@@ -1013,23 +1011,8 @@ Status OplogFetcher::_onSuccessfulBatch(const Documents& documents) {
 }
 
 Status OplogFetcher::_checkRemoteOplogStart(const OplogFetcher::Documents& documents,
-                                            OpTime remoteLastOpApplied,
-                                            int remoteRBID) {
+                                            OpTime remoteLastOpApplied) {
     using namespace fmt::literals;
-
-    // Once we establish our cursor, if we use rollback-via-refetch, we need to ensure that our
-    // upstream node hasn't rolled back since that could cause it to not have our required minValid
-    // point. The cursor will be killed if the upstream node rolls back so we don't need to keep
-    // checking once the cursor is established. If we do not use rollback-via-refetch, this check is
-    // not necessary, and _config.requiredRBID will be set to kUninitializedRollbackId in that case.
-    if (_config.requiredRBID != ReplicationProcess::kUninitializedRollbackId &&
-        remoteRBID != _config.requiredRBID) {
-        return Status(ErrorCodes::InvalidSyncSource,
-                      "Upstream node rolled back after choosing it as a sync source. Choosing "
-                      "new sync source.");
-    }
-    // Set _receivedRBID to remoteRBID so that it can be returned when the oplog fetcher shuts down.
-    _receivedRBID = remoteRBID;
 
     // Sometimes our remoteLastOpApplied may be stale; if we received a document with an
     // opTime later than remoteLastApplied, we can assume the remote is at least up to that
@@ -1045,8 +1028,8 @@ Status OplogFetcher::_checkRemoteOplogStart(const OplogFetcher::Documents& docum
 
     // The sync source could be behind us if it rolled back after we selected it. We could have
     // failed to detect the rollback if it occurred between sync source selection (when we check the
-    // candidate is ahead of us) and sync source resolution (when we got '_receivedRBID'). If the
-    // sync source is now behind us, choose a new sync source to prevent going into rollback.
+    // candidate is ahead of us) and sync source resolution. If the sync source is now behind us,
+    // choose a new sync source to prevent going into rollback.
     if (remoteLastOpApplied < lastFetched) {
         return Status(ErrorCodes::InvalidSyncSource,
                       "Sync source's last applied OpTime {} is older than our last fetched OpTime "

@@ -1231,7 +1231,6 @@ void InitialSyncer::_fcvFetcherCallback(const StatusWith<Fetcher::QueryResponse>
         beginFetchingOpTime,
         _syncSource,
         config,
-        _rollbackChecker->getBaseRBID(),
         initialSyncOplogFetcherBatchSize,
         OplogFetcher::RequireFresherSyncSource::kDontRequireFresherSyncSource);
     oplogFetcherConfig.startingPoint = OplogFetcher::StartingPoint::kEnqueueFirstDoc;
@@ -1245,7 +1244,7 @@ void InitialSyncer::_fcvFetcherCallback(const StatusWith<Fetcher::QueryResponse>
                   const OplogFetcher::DocumentsInfo& info) {
             return _enqueueDocuments(first, last, info);
         },
-        [=, this](const Status& s, int rbid) { _oplogFetcherCallback(s, onCompletionGuard); },
+        [=, this](const Status& s) { _oplogFetcherCallback(s, onCompletionGuard); },
         std::move(oplogFetcherConfig));
 
     LOGV2_DEBUG(21178, 2, "Starting OplogFetcher", "oplogFetcher"_attr = _oplogFetcher->toString());

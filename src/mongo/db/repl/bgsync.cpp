@@ -358,7 +358,6 @@ void BackgroundSync::_produce() {
             _replicationCoordinatorExternalState->getTaskExecutor(),
             _replCoord,
             lastOpTimeFetched,
-            OpTime(),
             [&syncSourceResp](const SyncSourceResolverResponse& resp) { syncSourceResp = resp; });
         // It is possible for _syncSourceSelectionDataChanged to become true between when we release
         // the lock at the end of this block and when the syncSourceResolver retrieves the relevant
@@ -511,20 +510,13 @@ void BackgroundSync::_produce() {
 
     // "lastFetched" not used. Already set in _enqueueDocuments.
     Status fetcherReturnStatus = Status::OK();
-    int syncSourceRBID = syncSourceResp.rbid;
 
     DataReplicatorExternalStateBackgroundSync dataReplicatorExternalState(
         _replCoord, _replicationCoordinatorExternalState, this);
     OplogFetcher* oplogFetcher;
     try {
-        auto onOplogFetcherShutdownCallbackFn = [&fetcherReturnStatus,
-                                                 &syncSourceRBID](const Status& status, int rbid) {
+        auto onOplogFetcherShutdownCallbackFn = [&fetcherReturnStatus](const Status& status) {
             fetcherReturnStatus = status;
-            // If the syncSourceResp rbid is uninitialized, syncSourceRBID will be set to the
-            // rbid obtained in the oplog fetcher.
-            if (syncSourceRBID == ReplicationProcess::kUninitializedRollbackId) {
-                syncSourceRBID = rbid;
-            }
         };
         // The construction of OplogFetcher has to be outside bgsync mutex, because it calls
         // replication coordinator.
@@ -538,11 +530,8 @@ void BackgroundSync::_produce() {
                 return this->_enqueueDocuments(a1, a2, a3);
             },
             onOplogFetcherShutdownCallbackFn,
-            OplogFetcher::Config(lastOpTimeFetched,
-                                 source,
-                                 _replCoord->getConfig(),
-                                 syncSourceResp.rbid,
-                                 bgSyncOplogFetcherBatchSize));
+            OplogFetcher::Config(
+                lastOpTimeFetched, source, _replCoord->getConfig(), bgSyncOplogFetcherBatchSize));
         stdx::lock_guard<Latch> lock(_mutex);
         if (_state != ProducerState::Running) {
             return;
@@ -594,7 +583,7 @@ void BackgroundSync::_produce() {
     } else if (fetcherReturnStatus.code() == ErrorCodes::OplogStartMissing) {
         auto opCtx = cc().makeOperationContext();
         auto storageInterface = StorageInterface::get(opCtx.get());
-        _runRollback(opCtx.get(), fetcherReturnStatus, source, syncSourceRBID, storageInterface);
+        _runRollback(opCtx.get(), fetcherReturnStatus, source, storageInterface);
 
         if (bgSyncHangAfterRunRollback.shouldFail()) {
             LOGV2(21095, "bgSyncHangAfterRunRollback failpoint is set");
@@ -698,7 +687,6 @@ Status BackgroundSync::_enqueueDocuments(OplogFetcher::Documents::const_iterator
 void BackgroundSync::_runRollback(OperationContext* opCtx,
                                   const Status& fetcherReturnStatus,
                                   const HostAndPort& source,
-                                  int requiredRBID,
                                   StorageInterface* storageInterface) {
     if (_replCoord->getMemberState().primary()) {
         LOGV2_WARNING(21123,

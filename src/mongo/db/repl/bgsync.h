@@ -176,8 +176,6 @@ private:
     /**
      * Checks current background sync state before pushing operations into blocking queue and
      * updating metrics. If the queue is full, might block.
-     *
-     * requiredRBID is reset to empty after the first call.
      */
     Status _enqueueDocuments(OplogFetcher::Documents::const_iterator begin,
                              OplogFetcher::Documents::const_iterator end,
@@ -189,7 +187,6 @@ private:
     void _runRollback(OperationContext* opCtx,
                       const Status& fetcherReturnStatus,
                       const HostAndPort& source,
-                      int requiredRBID,
                       StorageInterface* storageInterface);
 
     /**

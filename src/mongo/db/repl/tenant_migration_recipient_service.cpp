@@ -1425,8 +1425,6 @@ void TenantMigrationRecipientService::Instance::_startOplogFetcher() {
         ReplSetConfig::parse(BSON("_id"
                                   << "dummy"
                                   << "version" << 1 << "members" << BSONArray(BSONObj()))),
-        // We do not need to check the rollback ID.
-        ReplicationProcess::kUninitializedRollbackId,
         tenantMigrationOplogFetcherBatchSize,
         OplogFetcher::RequireFresherSyncSource::kDontRequireFresherSyncSource,
         true /* forTenantMigration */);
@@ -1451,7 +1449,7 @@ void TenantMigrationRecipientService::Instance::_startOplogFetcher() {
                                           const OplogFetcher::DocumentsInfo& info) {
             return _enqueueDocuments(first, last, info);
         },
-        [this, self = shared_from_this()](const Status& s, int rbid) { _oplogFetcherCallback(s); },
+        [this, self = shared_from_this()](const Status& s) { _oplogFetcherCallback(s); },
         std::move(oplogFetcherConfig));
     _donorOplogFetcher->setConnection(std::move(_oplogFetcherClient));
     uassertStatusOKWithContext(_donorOplogFetcher->startup(),

@@ -312,18 +312,12 @@ public:
     Status getStatus() const;
 
     /**
-     * Returns the rbid at shutdown.
-     */
-    int getRBID() const;
-
-    /**
      * Use this for oplog fetcher shutdown callback.
      */
-    void operator()(const Status& status, int rbid);
+    void operator()(const Status& status);
 
 private:
     Status _status = executor::TaskExecutorTest::getDetectableErrorStatus();
-    int _rbid = ReplicationProcess::kUninitializedRollbackId;
 };
 
 ShutdownState::ShutdownState() = default;
@@ -332,13 +326,8 @@ Status ShutdownState::getStatus() const {
     return _status;
 }
 
-int ShutdownState::getRBID() const {
-    return _rbid;
-}
-
-void ShutdownState::operator()(const Status& status, int rbid) {
+void ShutdownState::operator()(const Status& status) {
     _status = status;
-    _rbid = rbid;
 }
 
 class OplogFetcherTest : public executor::ThreadPoolExecutorTest,
@@ -367,7 +356,6 @@ protected:
         int numRestarts = 0,
         bool requireFresherSyncSource = true,
         OplogFetcher::StartingPoint startingPoint = OplogFetcher::StartingPoint::kSkipFirstDoc,
-        int requiredRBID = ReplicationProcess::kUninitializedRollbackId,
         BSONObj filter = BSONObj(),
         ReadConcernArgs readConcern = ReadConcernArgs(),
         bool requestResumeToken = false);
@@ -376,17 +364,14 @@ protected:
         int numRestarts = 0,
         bool requireFresherSyncSource = true,
         OplogFetcher::StartingPoint startingPoint = OplogFetcher::StartingPoint::kSkipFirstDoc,
-        int requiredRBID = ReplicationProcess::kUninitializedRollbackId,
         BSONObj filter = BSONObj(),
         ReadConcernArgs args = ReadConcernArgs(),
         bool requestResumeToken = false);
 
-    std::unique_ptr<ShutdownState> processSingleBatch(
-        const Message& response,
-        bool shouldShutdown = false,
-        bool requireFresherSyncSource = true,
-        bool lastFetchedShouldAdvance = false,
-        int requiredRBID = ReplicationProcess::kUninitializedRollbackId);
+    std::unique_ptr<ShutdownState> processSingleBatch(const Message& response,
+                                                      bool shouldShutdown = false,
+                                                      bool requireFresherSyncSource = true,
+                                                      bool lastFetchedShouldAdvance = false);
 
     /**
      * Tests checkSyncSource result handling.
@@ -472,7 +457,7 @@ void OplogFetcherTest::setUp() {
 }
 
 std::unique_ptr<OplogFetcher> OplogFetcherTest::makeOplogFetcher() {
-    return makeOplogFetcherWithDifferentExecutor(&getExecutor(), [](Status, int) {});
+    return makeOplogFetcherWithDifferentExecutor(&getExecutor(), [](Status) {});
 }
 
 std::unique_ptr<OplogFetcher> OplogFetcherTest::getOplogFetcherAfterConnectionCreated(
@@ -480,7 +465,6 @@ std::unique_ptr<OplogFetcher> OplogFetcherTest::getOplogFetcherAfterConnectionCr
     int numRestarts,
     bool requireFresherSyncSource,
     OplogFetcher::StartingPoint startingPoint,
-    int requiredRBID,
     BSONObj filter,
     ReadConcernArgs readConcern,
     bool requestResumeToken) {
@@ -489,7 +473,6 @@ std::unique_ptr<OplogFetcher> OplogFetcherTest::getOplogFetcherAfterConnectionCr
                                                               numRestarts,
                                                               requireFresherSyncSource,
                                                               startingPoint,
-                                                              requiredRBID,
                                                               filter,
                                                               readConcern,
                                                               requestResumeToken);
@@ -515,7 +498,6 @@ std::unique_ptr<OplogFetcher> OplogFetcherTest::makeOplogFetcherWithDifferentExe
     int numRestarts,
     bool requireFresherSyncSource,
     OplogFetcher::StartingPoint startingPoint,
-    int requiredRBID,
     BSONObj filter,
     ReadConcernArgs readConcern,
     bool requestResumeToken) {
@@ -523,7 +505,6 @@ std::unique_ptr<OplogFetcher> OplogFetcherTest::makeOplogFetcherWithDifferentExe
         lastFetched,
         source,
         _createConfig(),
-        requiredRBID,
         defaultBatchSize,
         requireFresherSyncSource
             ? OplogFetcher::RequireFresherSyncSource::kRequireFresherSyncSource
@@ -550,8 +531,7 @@ std::unique_ptr<OplogFetcher> OplogFetcherTest::makeOplogFetcherWithDifferentExe
 std::unique_ptr<ShutdownState> OplogFetcherTest::processSingleBatch(const Message& response,
                                                                     bool shouldShutdown,
                                                                     bool requireFresherSyncSource,
-                                                                    bool lastFetchedShouldAdvance,
-                                                                    int requiredRBID) {
+                                                                    bool lastFetchedShouldAdvance) {
     auto shutdownState = std::make_unique<ShutdownState>();
 
     // Create an oplog fetcher with no retries.
@@ -559,8 +539,7 @@ std::unique_ptr<ShutdownState> OplogFetcherTest::processSingleBatch(const Messag
         getOplogFetcherAfterConnectionCreated(std::ref(*shutdownState),
                                               0,
                                               requireFresherSyncSource,
-                                              OplogFetcher::StartingPoint::kSkipFirstDoc,
-                                              requiredRBID);
+                                              OplogFetcher::StartingPoint::kSkipFirstDoc);
 
     // Update lastFetched before it is updated by getting the next batch.
     lastFetched = oplogFetcher->getLastOpTimeFetched_forTest();
@@ -648,8 +627,8 @@ TEST_F(OplogFetcherTest, OplogFetcherReturnsOperationFailedIfExecutorFailsToSche
     };
 
     // The onShutdownFn should not be called because the oplog fetcher should fail during startup.
-    auto oplogFetcher = makeOplogFetcherWithDifferentExecutor(
-        &taskExecutorMock, [](Status, int) { MONGO_UNREACHABLE; });
+    auto oplogFetcher =
+        makeOplogFetcherWithDifferentExecutor(&taskExecutorMock, [](Status) { MONGO_UNREACHABLE; });
 
     // Last optime fetched should match values passed to constructor.
     ASSERT_EQUALS(lastFetched, oplogFetcher->getLastOpTimeFetched_forTest());
@@ -684,7 +663,6 @@ TEST_F(OplogFetcherTest, ShuttingExecutorDownAfterStartupButBeforeRunQuerySchedu
     oplogFetcher->join();
 
     ASSERT_EQUALS(ErrorCodes::CallbackCanceled, shutdownState.getStatus());
-    ASSERT_EQUALS(ReplicationProcess::kUninitializedRollbackId, shutdownState.getRBID());
 }
 
 TEST_F(OplogFetcherTest, OplogFetcherReturnsCallbackCanceledIfShutdownBeforeRunQueryScheduled) {
@@ -709,7 +687,6 @@ TEST_F(OplogFetcherTest, OplogFetcherReturnsCallbackCanceledIfShutdownBeforeRunQ
     oplogFetcher->join();
 
     ASSERT_EQUALS(ErrorCodes::CallbackCanceled, shutdownState.getStatus());
-    ASSERT_EQUALS(ReplicationProcess::kUninitializedRollbackId, shutdownState.getRBID());
 }
 
 TEST_F(OplogFetcherTest, OplogFetcherReturnsCallbackCanceledIfShutdownAfterRunQueryScheduled) {
@@ -725,7 +702,6 @@ TEST_F(OplogFetcherTest, OplogFetcherReturnsCallbackCanceledIfShutdownAfterRunQu
     oplogFetcher->join();
 
     ASSERT_EQUALS(ErrorCodes::CallbackCanceled, shutdownState.getStatus());
-    ASSERT_EQUALS(ReplicationProcess::kUninitializedRollbackId, shutdownState.getRBID());
 }
 
 TEST_F(OplogFetcherTest, OplogFetcherShutsDownConnectionIfShutdownWhileBlockedOnCall) {
@@ -751,7 +727,6 @@ TEST_F(OplogFetcherTest, OplogFetcherShutsDownConnectionIfShutdownWhileBlockedOn
     // network.
     ASSERT_EQUALS(ErrorCodes::CallbackCanceled, shutdownState.getStatus());
     ASSERT_STRING_CONTAINS(shutdownState.getStatus().reason(), "Socket was shut down");
-    ASSERT_EQUALS(ReplicationProcess::kUninitializedRollbackId, shutdownState.getRBID());
 }
 
 TEST_F(OplogFetcherTest,
@@ -794,7 +769,6 @@ TEST_F(OplogFetcherTest,
     oplogFetcher->join();
 
     ASSERT_EQUALS(ErrorCodes::CallbackCanceled, shutdownState.getStatus());
-    ASSERT_EQUALS(ReplicationProcess::kUninitializedRollbackId, shutdownState.getRBID());
 }
 
 AtomicWord<bool> sharedCallbackStateDestroyed{false};
@@ -826,7 +800,7 @@ TEST_F(OplogFetcherTest, OplogFetcherResetsOnShutdownCallbackFnOnCompletion) {
     auto status = getDetectableErrorStatus();
 
     auto oplogFetcher = getOplogFetcherAfterConnectionCreated(
-        [&callbackInvoked, sharedCallbackData, &status](const Status& shutdownStatus, int rbid) {
+        [&callbackInvoked, sharedCallbackData, &status](const Status& shutdownStatus) {
             status = shutdownStatus, callbackInvoked = true;
         });
 
@@ -1004,25 +978,13 @@ TEST_F(OplogFetcherTest, ValidMetadataWithInResponseShouldBeForwardedToProcessMe
 
 TEST_F(OplogFetcherTest, MetadataAndBatchAreNotProcessedWhenSyncSourceRollsBack) {
     CursorId cursorId = 22LL;
-    auto entry = makeNoopOplogEntry(lastFetched);
+    auto entry = makeNoopOplogEntry(staleOpTime);
 
-    rpc::OplogQueryMetadata oplogQueryMetadata({staleOpTime, staleWallTime},
-                                               remoteNewerOpTime,
-                                               remoteNewerOpTime,
-                                               remoteRBID + 1,
-                                               primaryIndex,
-                                               syncSourceIndex,
-                                               syncSourceHost);
-    auto metadataObj = makeOplogBatchMetadata(replSetMetadata, oplogQueryMetadata);
+    auto metadataObj = makeOplogBatchMetadata(replSetMetadata, staleOqMetadata);
 
-    auto shutdownState = processSingleBatch(makeFirstBatch(cursorId, {entry}, metadataObj),
-                                            false /* shouldShutdown */,
-                                            true /* requireFresherSyncSource */,
-                                            false /* lastFetchedShouldAdvance */,
-                                            remoteRBID /* requiredRBID */);
+    auto shutdownState = processSingleBatch(makeFirstBatch(cursorId, {entry}, metadataObj));
 
     ASSERT_EQUALS(ErrorCodes::InvalidSyncSource, shutdownState->getStatus());
-    ASSERT_EQUALS(remoteRBID, shutdownState->getRBID());
 
     ASSERT_FALSE(dataReplicatorExternalState->getMetadataWasProcessed());
     ASSERT(lastEnqueuedDocuments.empty());
@@ -1215,7 +1177,6 @@ TEST_F(OplogFetcherTest, RemoteFirstOplogEntryWithExtraFieldsReturnsOplogStartMi
     // We should have parsed the OpTime correctly and realized that we have not fallen off the sync
     // source's oplog, so we should go into rollback.
     ASSERT_EQUALS(ErrorCodes::OplogStartMissing, shutdownState->getStatus());
-    ASSERT_EQUALS(remoteRBID, shutdownState->getRBID());
 }
 
 TEST_F(OplogFetcherTest, FailingInitialCreateNewCursorNoRetriesShutsDownOplogFetcher) {
@@ -1237,7 +1198,6 @@ TEST_F(OplogFetcherTest, FailingInitialCreateNewCursorWithRetriesShutsDownOplogF
     oplogFetcher->join();
 
     ASSERT_EQUALS(ErrorCodes::InvalidSyncSource, shutdownState.getStatus());
-    ASSERT_EQUALS(ReplicationProcess::kUninitializedRollbackId, shutdownState.getRBID());
 }
 
 TEST_F(OplogFetcherTest,
@@ -1724,7 +1684,6 @@ TEST_F(OplogFetcherTest, OplogFetcherWorksWithoutExhaust) {
     oplogFetcher->join();
 
     ASSERT_EQUALS(ErrorCodes::CallbackCanceled, shutdownState.getStatus());
-    ASSERT_EQUALS(remoteRBID, shutdownState.getRBID());
 }
 
 TEST_F(OplogFetcherTest, CursorIsDeadShutsDownOplogFetcherWithSuccessfulStatus) {
@@ -1756,7 +1715,6 @@ TEST_F(OplogFetcherTest, CursorIsDeadShutsDownOplogFetcherWithSuccessfulStatus) 
         true /* skipFirstDoc */, firstBatch, oplogFetcher->getLastOpTimeFetched_forTest());
 
     ASSERT_OK(shutdownState.getStatus());
-    ASSERT_EQ(remoteRBID, shutdownState.getRBID());
 }
 
 TEST_F(OplogFetcherTest, SkipFirstDocumentIfDoesntMatchFilter) {
@@ -1771,7 +1729,6 @@ TEST_F(OplogFetcherTest, SkipFirstDocumentIfDoesntMatchFilter) {
                                               1,
                                               true, /* requireFresherSyncSource */
                                               OplogFetcher::StartingPoint::kEnqueueFirstDoc,
-                                              ReplicationProcess::kUninitializedRollbackId,
                                               filter);
 
     CursorId cursorId = 0LL;
@@ -1799,7 +1756,6 @@ TEST_F(OplogFetcherTest, SkipFirstDocumentIfDoesntMatchFilter) {
         true /* skipFirstDoc */, firstBatch, oplogFetcher->getLastOpTimeFetched_forTest());
 
     ASSERT_OK(shutdownState.getStatus());
-    ASSERT_EQ(remoteRBID, shutdownState.getRBID());
 }
 
 TEST_F(OplogFetcherTest, DontSkipFirstDocumentIfDoesMatchFilter) {
@@ -1814,7 +1770,6 @@ TEST_F(OplogFetcherTest, DontSkipFirstDocumentIfDoesMatchFilter) {
                                               1,
                                               true, /* requireFresherSyncSource */
                                               OplogFetcher::StartingPoint::kEnqueueFirstDoc,
-                                              ReplicationProcess::kUninitializedRollbackId,
                                               filter);
 
     CursorId cursorId = 0LL;
@@ -1840,7 +1795,6 @@ TEST_F(OplogFetcherTest, DontSkipFirstDocumentIfDoesMatchFilter) {
         false /* skipFirstDoc */, firstBatch, oplogFetcher->getLastOpTimeFetched_forTest());
 
     ASSERT_OK(shutdownState.getStatus());
-    ASSERT_EQ(remoteRBID, shutdownState.getRBID());
 }
 
 TEST_F(OplogFetcherTest, EmptyFirstBatchStopsOplogFetcherWithOplogStartMissingError) {
@@ -2649,7 +2603,6 @@ TEST_F(OplogFetcherTest, CheckFindCommandIncludesFilter) {
                                               0 /* numRestarts */,
                                               true /* requireFresherSyncSourc */,
                                               OplogFetcher::StartingPoint::kSkipFirstDoc,
-                                              ReplicationProcess::kUninitializedRollbackId,
                                               filter);
 
     CursorId cursorId = 22LL;
@@ -2686,7 +2639,6 @@ TEST_F(OplogFetcherTest, CheckFindCommandIncludesCustomReadConcern) {
                                               0 /* numRestarts */,
                                               true /* requireFresherSyncSourc */,
                                               OplogFetcher::StartingPoint::kSkipFirstDoc,
-                                              ReplicationProcess::kUninitializedRollbackId,
                                               BSONObj() /* filter */,
                                               readConcern);
 
@@ -2722,7 +2674,6 @@ TEST_F(OplogFetcherTest, CheckFindCommandIncludesRequestResumeTokenWhenRequested
                                               0 /* numRestarts */,
                                               true /* requireFresherSyncSourc */,
                                               OplogFetcher::StartingPoint::kSkipFirstDoc,
-                                              ReplicationProcess::kUninitializedRollbackId,
                                               BSONObj() /* filter */,
                                               ReadConcernArgs() /* readConcern */,
                                               true /* requestResumeToken */);
