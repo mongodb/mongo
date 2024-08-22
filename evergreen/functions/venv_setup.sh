@@ -120,7 +120,7 @@ cd src
 # By retrying we would like to only see errors that happen consistently
 count=0
 for i in {1..5}; do
-  $POETRY_VENV_PYTHON -m poetry cache clear . --all
+  yes | $POETRY_VENV_PYTHON -m poetry cache clear . --all
   rm -rf $poetry_dir/*
   $POETRY_VENV_PYTHON -m poetry install --no-root --sync && RET=0 && break || RET=$? && sleep 1
   echo "Python failed install required deps with poetry, retrying..."
