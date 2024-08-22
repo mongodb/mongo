@@ -867,6 +867,23 @@ public:
         return _inUnitOfWork();
     }
 
+    /**
+     * Allows callers to indicate when the operation using a RecoveryUnit is holding an exclusive
+     * resource and is not allowed to block indefinitely. If an operation would block, like on a
+     * prepare conflict, a StorageUnavailable exception is thrown.
+     */
+    void setBlockingAllowed(bool canBlock) {
+        _blockingAllowed = canBlock;
+    }
+
+    /**
+     * Returns true if this operation is allowed to block indefinitely for storage engine resources.
+     */
+    bool getBlockingAllowed() const {
+        return _blockingAllowed;
+    }
+
+
 protected:
     RecoveryUnit() = default;
 
@@ -953,6 +970,7 @@ private:
     State _state = State::kInactive;
     OperationContext* _opCtx = nullptr;
     bool _readOnly = false;
+    bool _blockingAllowed = true;
 };
 
 /**

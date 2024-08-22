@@ -202,6 +202,14 @@ public:
     boost::optional<int64_t> getOplogVisibilityTs() override;
     void setOplogVisibilityTs(boost::optional<int64_t> oplogVisibilityTs) override;
 
+    static WiredTigerRecoveryUnit& get(RecoveryUnit& ru) {
+        return checked_cast<WiredTigerRecoveryUnit&>(ru);
+    }
+
+    static WiredTigerRecoveryUnit* get(RecoveryUnit* ru) {
+        return checked_cast<WiredTigerRecoveryUnit*>(ru);
+    }
+
     static WiredTigerRecoveryUnit* get(OperationContext* opCtx) {
         return checked_cast<WiredTigerRecoveryUnit*>(shard_role_details::getRecoveryUnit(opCtx));
     }

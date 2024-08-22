@@ -153,7 +153,8 @@ bool WiredTigerIndexUtil::isEmpty(OperationContext* opCtx,
     WT_CURSOR* c = curwrap.get();
     if (!c)
         return true;
-    int ret = wiredTigerPrepareConflictRetry(opCtx, [&] { return c->next(c); });
+    int ret = wiredTigerPrepareConflictRetry(
+        opCtx, *shard_role_details::getRecoveryUnit(opCtx), [&] { return c->next(c); });
     if (ret == WT_NOTFOUND)
         return true;
     invariantWTOK(ret, c->session);

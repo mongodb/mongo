@@ -546,7 +546,8 @@ boost::optional<RecordId> WiredTigerIndex::_keyExists(OperationContext* opCtx,
 
     // The cursor is bounded to a prefix. Doing a next on the un-positioned cursor will position on
     // the first key that is equal to or more than the prefix.
-    int ret = wiredTigerPrepareConflictRetry(opCtx, [&] { return c->next(c); });
+    int ret = wiredTigerPrepareConflictRetry(
+        opCtx, *shard_role_details::getRecoveryUnit(opCtx), [&] { return c->next(c); });
 
     auto& metricsCollector = ResourceConsumption::MetricsCollector::get(opCtx);
 
@@ -1198,7 +1199,9 @@ protected:
         // Our cursor can only move in one direction, so there's no need to clear the bound after
         // seeking. We also don't want to clear our bounds so that the end bound is maintained.
         int ret = wiredTigerPrepareConflictRetry(
-            _opCtx, [&] { return _forward ? cur->next(cur) : cur->prev(cur); });
+            _opCtx, *shard_role_details::getRecoveryUnit(_opCtx), [&] {
+                return _forward ? cur->next(cur) : cur->prev(cur);
+            });
 
         // Forget the key buffer when repositioning the cursor.
         _kvView.reset();
@@ -1590,7 +1593,8 @@ bool WiredTigerIndexUnique::isDup(OperationContext* opCtx,
     }
 
     // If the next key also matches, this is a duplicate.
-    int ret = wiredTigerPrepareConflictRetry(opCtx, [&] { return c->next(c); });
+    int ret = wiredTigerPrepareConflictRetry(
+        opCtx, *shard_role_details::getRecoveryUnit(opCtx), [&] { return c->next(c); });
 
     WT_ITEM item;
     if (ret == 0) {
@@ -1819,7 +1823,8 @@ void WiredTigerIdIndex::_unindex(OperationContext* opCtx,
     // Duplicates are never actually allowed on _id indexes, however the 'dupsAllowed' convention
     // requires that we check the value of the RecordId in the keyString instead of blindly deleting
     // based on just the first part of the key.
-    int ret = wiredTigerPrepareConflictRetry(opCtx, [&] { return c->search(c); });
+    int ret = wiredTigerPrepareConflictRetry(
+        opCtx, *shard_role_details::getRecoveryUnit(opCtx), [&] { return c->search(c); });
     if (ret == WT_NOTFOUND) {
         return;
     }
@@ -1931,7 +1936,8 @@ void WiredTigerIndexUnique::_unindexTimestampUnsafe(OperationContext* opCtx,
     WiredTigerItem keyItem(keyString.getBuffer(), sizeWithoutRecordId);
     setKey(c, keyItem.Get());
 
-    int ret = wiredTigerPrepareConflictRetry(opCtx, [&] { return c->search(c); });
+    int ret = wiredTigerPrepareConflictRetry(
+        opCtx, *shard_role_details::getRecoveryUnit(opCtx), [&] { return c->search(c); });
     if (ret == WT_NOTFOUND) {
         return;
     }

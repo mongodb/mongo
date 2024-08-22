@@ -394,7 +394,9 @@ private:
 
         int cmp = 0;
         int ret = wiredTigerPrepareConflictRetry(
-            _opCtx, [&] { return exactOnly ? c->search(c) : c->search_near(c, &cmp); });
+            _opCtx, *shard_role_details::getRecoveryUnit(_opCtx), [&] {
+                return exactOnly ? c->search(c) : c->search_near(c, &cmp);
+            });
         if (ret == WT_NOTFOUND) {
             _eof = true;
             return false;

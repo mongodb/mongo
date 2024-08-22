@@ -32,10 +32,9 @@
 #include "mongo/bson/json.h"
 #include "mongo/db/admission/ticketholder_manager.h"
 #include "mongo/db/concurrency/lock_manager.h"
+#include "mongo/db/concurrency/locker.h"
 #include "mongo/db/dump_lock_manager.h"
 #include "mongo/db/operation_context.h"
-#include "mongo/db/storage/recovery_unit.h"
-#include "mongo/db/transaction_resources.h"
 #include "mongo/logv2/log.h"
 #include "mongo/logv2/log_attr.h"
 #include "mongo/logv2/log_component.h"
@@ -210,10 +209,12 @@ void Locker::getFlowControlTicket(OperationContext* opCtx, LockMode lockMode) {
         // tracking whether other resources need to be released.
         _clientState.store(kQueuedWriter);
         ScopeGuard restoreState([&] { _clientState.store(kInactive); });
-        // Acquiring a ticket is a potentially blocking operation. This must not be called after a
-        // transaction timestamp has been set, indicating this transaction has created an oplog
-        // hole.
-        invariant(!shard_role_details::getRecoveryUnit(opCtx)->isTimestamped());
+
+        if (MONGO_unlikely(_assertOnLockAttempt)) {
+            LOGV2_FATAL(9360804,
+                        "Operation attempted to acquire an execution ticket after indicating that "
+                        "it should not");
+        }
         ticketholder->getTicket(opCtx, &_flowControlStats);
     }
 }
@@ -781,15 +782,14 @@ MONGO_TSAN_IGNORE
 LockResult Locker::_lockBegin(OperationContext* opCtx, ResourceId resId, LockMode mode) {
     dassert(!getWaitingResource().isValid());
 
-    // Operations which are holding open an oplog hole cannot block when acquiring locks.
     const ResourceType resType = resId.getType();
-    if (!_shouldAllowLockAcquisitionOnTimestampedUnitOfWork && resType != RESOURCE_METADATA &&
-        resType != RESOURCE_MUTEX && resType != RESOURCE_DDL_DATABASE &&
-        resType != RESOURCE_DDL_COLLECTION) {
-        invariant(!shard_role_details::getRecoveryUnit(opCtx)->isTimestamped(),
-                  str::stream()
-                      << "Operation holding open an oplog hole tried to acquire locks. ResourceId: "
-                      << resId << ", mode: " << modeName(mode));
+    if (MONGO_unlikely(_assertOnLockAttempt && resType != RESOURCE_METADATA &&
+                       resType != RESOURCE_MUTEX && resType != RESOURCE_DDL_DATABASE &&
+                       resType != RESOURCE_DDL_COLLECTION)) {
+        LOGV2_FATAL(9360800,
+                    "Operation attempted to acquire lock after indicating that it should not",
+                    "resourceId"_attr = resId.toString(),
+                    "mode"_attr = modeName(mode));
     }
 
     LockRequest* request;
@@ -875,13 +875,13 @@ void Locker::_lockComplete(OperationContext* opCtx,
     // requests entering this function have been queued up and will be granted the lock as soon as
     // the lock is released, which is a blocking operation.
     const ResourceType resType = resId.getType();
-    if (!_shouldAllowLockAcquisitionOnTimestampedUnitOfWork && resType != RESOURCE_METADATA &&
-        resType != RESOURCE_MUTEX && resType != RESOURCE_DDL_DATABASE &&
-        resType != RESOURCE_DDL_COLLECTION) {
-        invariant(!shard_role_details::getRecoveryUnit(opCtx)->isTimestamped(),
-                  str::stream()
-                      << "Operation holding open an oplog hole tried to acquire locks. ResourceId: "
-                      << resId << ", mode: " << modeName(mode));
+    if (MONGO_unlikely(_assertOnLockAttempt && resType != RESOURCE_METADATA &&
+                       resType != RESOURCE_MUTEX && resType != RESOURCE_DDL_DATABASE &&
+                       resType != RESOURCE_DDL_COLLECTION)) {
+        LOGV2_FATAL(9360801,
+                    "Operation attempted to acquire lock after indicating that it should not",
+                    "resourceId"_attr = resId.toString(),
+                    "mode"_attr = modeName(mode));
     }
 
     // Clean up the state on any failed lock attempts.
@@ -990,10 +990,12 @@ bool Locker::_acquireTicket(OperationContext* opCtx, LockMode mode, Date_t deadl
         // If the ticket wait is interrupted, restore the state of the client.
         ScopeGuard restoreStateOnErrorGuard([&] { _clientState.store(kInactive); });
 
-        // Acquiring a ticket is a potentially blocking operation. This must not be called after a
-        // transaction timestamp has been set, indicating this transaction has created an oplog
-        // hole.
-        invariant(!shard_role_details::getRecoveryUnit(opCtx)->isTimestamped());
+        if (MONGO_unlikely(_assertOnLockAttempt)) {
+            LOGV2_FATAL(9360803,
+                        "Operation attempted to acquire an execution ticket after indicating that "
+                        "it should not",
+                        "mode"_attr = modeName(mode));
+        }
 
         _ticket = [&]() {
             ExecutionAdmissionContext* admCtx = &ExecutionAdmissionContext::get(opCtx);

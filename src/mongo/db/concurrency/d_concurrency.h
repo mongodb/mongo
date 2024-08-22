@@ -344,6 +344,7 @@ public:
 
         // Acquires the tenant lock on behalf of this DB lock.
         boost::optional<TenantLock> _tenantLock;
+        bool _oldBlockingAllowed;
     };
 
     /**
@@ -375,6 +376,7 @@ public:
     private:
         ResourceId _id;
         OperationContext* _opCtx;
+        bool _oldBlockingAllowed;
     };
 };
 

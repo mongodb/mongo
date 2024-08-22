@@ -454,6 +454,17 @@ public:
     }
 
     /**
+     * When true, fatally assert when a lock acquisition or ticket acquisition is attempted.
+     */
+    void setAssertOnLockAttempt(bool assert) {
+        _assertOnLockAttempt = assert;
+    }
+
+    bool getAssertOnLockAttempt() const {
+        return _assertOnLockAttempt;
+    }
+
+    /**
      * Retrieves the mode in which a lock is held or checks whether the lock held for a particular
      * resource covers the specified mode.
      *
@@ -724,10 +735,6 @@ protected:
     // db.currentOp. Complementary to the per-instance locking statistics.
     AtomicLockStats _stats;
 
-    // If set to true, this opts out of a fatal assertion where operations which are holding open an
-    // oplog hole cannot try to acquire subsequent locks.
-    bool _shouldAllowLockAcquisitionOnTimestampedUnitOfWork = false;
-
     /**
      * The number of LockRequests to unlock at the end of this WUOW. This is used for locks
      * participating in two-phase locking.
@@ -769,6 +776,9 @@ protected:
     // If isValid(), the ResourceId of the resource currently waiting for the lock. If not valid,
     // there is no resource currently waiting.
     ResourceId _waitingResource;
+
+    // When true, fatally assert when a lock acquisition or ticket acquisition is attempted.
+    bool _assertOnLockAttempt = false;
 };
 
 /**
@@ -785,9 +795,8 @@ protected:
 class AllowLockAcquisitionOnTimestampedUnitOfWork {
 public:
     explicit AllowLockAcquisitionOnTimestampedUnitOfWork(Locker* locker)
-        : _locker(locker),
-          _originalValue(_locker->_shouldAllowLockAcquisitionOnTimestampedUnitOfWork) {
-        _locker->_shouldAllowLockAcquisitionOnTimestampedUnitOfWork = true;
+        : _locker(locker), _originalValue(_locker->getAssertOnLockAttempt()) {
+        _locker->setAssertOnLockAttempt(false);
     }
 
     AllowLockAcquisitionOnTimestampedUnitOfWork(
@@ -796,7 +805,7 @@ public:
         const AllowLockAcquisitionOnTimestampedUnitOfWork&) = delete;
 
     ~AllowLockAcquisitionOnTimestampedUnitOfWork() {
-        _locker->_shouldAllowLockAcquisitionOnTimestampedUnitOfWork = _originalValue;
+        _locker->setAssertOnLockAttempt(_originalValue);
     }
 
 private:

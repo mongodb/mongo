@@ -489,7 +489,9 @@ public:
 
     boost::optional<Record> next() final {
         int advanceRet =
-            wiredTigerPrepareConflictRetry(_opCtx, [&] { return _cursor->next(_cursor); });
+            wiredTigerPrepareConflictRetry(_opCtx,
+                                           *shard_role_details::getRecoveryUnit(_opCtx),
+                                           [&] { return _cursor->next(_cursor); });
         if (advanceRet == WT_NOTFOUND)
             return {};
         invariantWTOK(advanceRet, _cursor->session);
@@ -904,7 +906,8 @@ void WiredTigerRecordStore::doDeleteRecord(OperationContext* opCtx, const Record
     WT_CURSOR* c = cursor.get();
     CursorKey key = makeCursorKey(id, _keyFormat);
     setKey(c, &key);
-    int ret = wiredTigerPrepareConflictRetry(opCtx, [&] { return c->search(c); });
+    int ret = wiredTigerPrepareConflictRetry(
+        opCtx, *shard_role_details::getRecoveryUnit(opCtx), [&] { return c->search(c); });
     invariantWTOK(ret, c->session);
 
     WT_ITEM old_value;
@@ -961,7 +964,9 @@ void WiredTigerRecordStore::reclaimOplog(OperationContext* opCtx) {
             WT_CURSOR* cursor = cwrap.get();
 
             // The first record in the oplog should be within the truncate range.
-            int ret = wiredTigerPrepareConflictRetry(opCtx, [&] { return cursor->next(cursor); });
+            int ret = wiredTigerPrepareConflictRetry(opCtx,
+                                                     *shard_role_details::getRecoveryUnit(opCtx),
+                                                     [&] { return cursor->next(cursor); });
             invariantWTOK(ret, cursor->session);
             RecordId firstRecord = getKey(cursor, _keyFormat);
             if (firstRecord < _oplogTruncateMarkers->firstRecord ||
@@ -980,6 +985,7 @@ void WiredTigerRecordStore::reclaimOplog(OperationContext* opCtx) {
             setKey(cursor, &truncateUpToKey);
             int cmp;
             ret = wiredTigerPrepareConflictRetry(opCtx,
+                                                 *shard_role_details::getRecoveryUnit(opCtx),
                                                  [&] { return cursor->search_near(cursor, &cmp); });
             invariantWTOK(ret, cursor->session);
 
@@ -992,7 +998,9 @@ void WiredTigerRecordStore::reclaimOplog(OperationContext* opCtx) {
             // landed on a prior record, then we have records that are not in truncation range of
             // any truncate marker. This will have been logged as a warning, above.
             if (cmp <= 0) {
-                ret = wiredTigerPrepareConflictRetry(opCtx, [&] { return cursor->next(cursor); });
+                ret = wiredTigerPrepareConflictRetry(opCtx,
+                                                     *shard_role_details::getRecoveryUnit(opCtx),
+                                                     [&] { return cursor->next(cursor); });
                 if (ret == WT_NOTFOUND) {
                     LOGV2_DEBUG(5140900, 0, "Will not truncate entire oplog");
                     getNextMarker = false;
@@ -1313,7 +1321,8 @@ Status WiredTigerRecordStore::doUpdateRecord(OperationContext* opCtx,
     invariant(c);
     CursorKey key = makeCursorKey(id, _keyFormat);
     setKey(c, &key);
-    int ret = wiredTigerPrepareConflictRetry(opCtx, [&] { return c->search(c); });
+    int ret = wiredTigerPrepareConflictRetry(
+        opCtx, *shard_role_details::getRecoveryUnit(opCtx), [&] { return c->search(c); });
 
     invariantWTOK(ret,
                   c->session,
@@ -1528,7 +1537,8 @@ std::unique_ptr<RecordCursor> WiredTigerRecordStore::getRandomCursor(
 Status WiredTigerRecordStore::doTruncate(OperationContext* opCtx) {
     WiredTigerCursor startWrap(*WiredTigerRecoveryUnit::get(opCtx), _uri, _tableId, true);
     WT_CURSOR* start = startWrap.get();
-    int ret = wiredTigerPrepareConflictRetry(opCtx, [&] { return start->next(start); });
+    int ret = wiredTigerPrepareConflictRetry(
+        opCtx, *shard_role_details::getRecoveryUnit(opCtx), [&] { return start->next(start); });
     // Empty collections don't have anything to truncate.
     if (ret == WT_NOTFOUND) {
         return Status::OK();
@@ -1554,7 +1564,8 @@ Status WiredTigerRecordStore::doRangeTruncate(OperationContext* opCtx,
                                               int64_t hintNumRecordsDiff) {
     WiredTigerCursor startWrap(*WiredTigerRecoveryUnit::get(opCtx), _uri, _tableId, true);
     WT_CURSOR* start = startWrap.get();
-    int ret = wiredTigerPrepareConflictRetry(opCtx, [&] { return start->next(start); });
+    int ret = wiredTigerPrepareConflictRetry(
+        opCtx, *shard_role_details::getRecoveryUnit(opCtx), [&] { return start->next(start); });
     // Empty collections don't have anything to truncate.
     if (ret == WT_NOTFOUND) {
         return Status::OK();
@@ -2065,8 +2076,10 @@ RecordId WiredTigerRecordStoreCursor::nextIdCommon() {
         // Nothing after the next line can throw WCEs.
         // Note that an unpositioned (or eof) WT_CURSOR returns the first/last entry in the
         // table when you call next/prev.
-        int advanceRet = wiredTigerPrepareConflictRetry(
-            _opCtx, [&] { return _forward ? c->next(c) : c->prev(c); });
+        int advanceRet =
+            wiredTigerPrepareConflictRetry(_opCtx,
+                                           *shard_role_details::getRecoveryUnit(_opCtx),
+                                           [&] { return _forward ? c->next(c) : c->prev(c); });
         if (advanceRet == WT_NOTFOUND) {
             _eof = true;
             _positioned = false;
@@ -2193,8 +2206,9 @@ RecordId WiredTigerRecordStoreCursor::seekIdCommon(const RecordId& start,
     invariantWTOK(c->bound(c, config.getConfig(session)), c->session);
     _boundSet = true;
 
-    int ret =
-        wiredTigerPrepareConflictRetry(_opCtx, [&] { return _forward ? c->next(c) : c->prev(c); });
+    int ret = wiredTigerPrepareConflictRetry(_opCtx,
+                                             *shard_role_details::getRecoveryUnit(_opCtx),
+                                             [&] { return _forward ? c->next(c) : c->prev(c); });
     if (ret == WT_NOTFOUND) {
         _eof = true;
         return {};
@@ -2230,7 +2244,8 @@ boost::optional<Record> WiredTigerRecordStoreCursor::seekExactCommon(const Recor
     auto key = makeCursorKey(id, _keyFormat);
     setKey(c, &key);
     // Nothing after the next line can throw WCEs.
-    int seekRet = wiredTigerPrepareConflictRetry(_opCtx, [&] { return c->search(c); });
+    int seekRet = wiredTigerPrepareConflictRetry(
+        _opCtx, *shard_role_details::getRecoveryUnit(_opCtx), [&] { return c->search(c); });
     if (seekRet == WT_NOTFOUND) {
         _eof = true;
         return {};
@@ -2490,7 +2505,10 @@ boost::optional<Record> WiredTigerOplogCursor::next() {
     // natural order collection scan.
     if (_readTimestampForOplog && !_forward) {
         while (id.getLong() > *_readTimestampForOplog) {
-            int advanceRet = wiredTigerPrepareConflictRetry(_opCtx, [&] { return cur->prev(cur); });
+            int advanceRet =
+                wiredTigerPrepareConflictRetry(_opCtx,
+                                               *shard_role_details::getRecoveryUnit(_opCtx),
+                                               [&] { return cur->prev(cur); });
             if (advanceRet == WT_NOTFOUND) {
                 _positioned = false;
                 _eof = true;

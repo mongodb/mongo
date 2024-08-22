@@ -4,9 +4,9 @@ filters:
     approvers:
       - 10gen/server-storage-execution
       - 10gen/server-rss-sydney
-  - "*named_pipe*":
+  - "named_pipe*":
     approvers:
       - 10gen/query-integration
-  - "*column_store*":
+  - "column_store*":
     approvers:
       - 10gen/query-integration

@@ -228,7 +228,11 @@ Lock::DBLock::DBLock(OperationContext* opCtx,
                      Date_t deadline,
                      DBLockSkipOptions options,
                      boost::optional<LockMode> tenantLockMode)
-    : _id(RESOURCE_DATABASE, dbName), _opCtx(opCtx), _result(LOCK_INVALID), _mode(mode) {
+    : _id(RESOURCE_DATABASE, dbName),
+      _opCtx(opCtx),
+      _result(LOCK_INVALID),
+      _mode(mode),
+      _oldBlockingAllowed(shard_role_details::getRecoveryUnit((_opCtx))->getBlockingAllowed()) {
 
     _globalLock.emplace(opCtx,
                         isSharedLockMode(_mode) ? MODE_IS : MODE_IX,
@@ -265,6 +269,19 @@ Lock::DBLock::DBLock(OperationContext* opCtx,
     }
 
     shard_role_details::getLocker(_opCtx)->lock(_opCtx, _id, _mode, deadline);
+
+    // If a user operation on secondaries acquires a lock in MODE_S and then blocks on a prepare
+    // conflict with a prepared transaction, a deadlock will occur at the commit time of the
+    // prepared transaction when it attempts to reacquire (since locks were yielded on
+    // secondaries) an IX lock that conflicts with the MODE_S lock held by the user operation.
+    // User operations that acquire MODE_X locks and block on prepare conflicts could lead to
+    // the same problem. However, user operations on secondaries should never hold MODE_X locks, but
+    // we add it here for completeness. Since prepared transactions reacquire database locks at
+    // commit time, instruct the storage engine that it may not block on prepared transactions.
+    if (mode == MODE_X || mode == MODE_S) {
+        shard_role_details::getRecoveryUnit((_opCtx))->setBlockingAllowed(false);
+    }
+
     _result = LOCK_OK;
 }
 
@@ -274,7 +291,8 @@ Lock::DBLock::DBLock(DBLock&& otherLock)
       _result(otherLock._result),
       _mode(otherLock._mode),
       _globalLock(std::move(otherLock._globalLock)),
-      _tenantLock(std::move(otherLock._tenantLock)) {
+      _tenantLock(std::move(otherLock._tenantLock)),
+      _oldBlockingAllowed(otherLock._oldBlockingAllowed) {
     // Mark as moved so the destructor doesn't invalidate the newly-constructed lock.
     otherLock._result = LOCK_INVALID;
 }
@@ -282,6 +300,7 @@ Lock::DBLock::DBLock(DBLock&& otherLock)
 Lock::DBLock::~DBLock() {
     if (isLocked()) {
         shard_role_details::getLocker(_opCtx)->unlock(_id);
+        shard_role_details::getRecoveryUnit((_opCtx))->setBlockingAllowed(_oldBlockingAllowed);
     }
 }
 
@@ -289,29 +308,48 @@ Lock::CollectionLock::CollectionLock(OperationContext* opCtx,
                                      const NamespaceString& ns,
                                      LockMode mode,
                                      Date_t deadline)
-    : _id(RESOURCE_COLLECTION, ns), _opCtx(opCtx) {
+    : _id(RESOURCE_COLLECTION, ns),
+      _opCtx(opCtx),
+      _oldBlockingAllowed(shard_role_details::getRecoveryUnit((_opCtx))->getBlockingAllowed()) {
     invariant(!ns.coll().empty());
     dassert(shard_role_details::getLocker(_opCtx)->isDbLockedForMode(
         ns.dbName(), isSharedLockMode(mode) ? MODE_IS : MODE_IX));
 
     shard_role_details::getLocker(_opCtx)->lock(_opCtx, _id, mode, deadline);
+
+    // If a user operation on secondaries acquires a lock in MODE_S and then blocks on a prepare
+    // conflict with a prepared transaction, a deadlock will occur at the commit time of the
+    // prepared transaction when it attempts to reacquire (since locks were yielded on
+    // secondaries) an IX lock that conflicts with the MODE_S lock held by the user operation.
+    // User operations that acquire MODE_X locks and block on prepare conflicts could lead to
+    // the same problem. However, user operations on secondaries should never hold MODE_X locks, but
+    // we add it here for completeness. Since prepared transactions reacquire collection locks at
+    // commit time, instruct the storage engine that it may not block on prepared transactions.
+    if (mode == MODE_X || mode == MODE_S) {
+        shard_role_details::getRecoveryUnit((_opCtx))->setBlockingAllowed(false);
+    }
 }
 
 Lock::CollectionLock::CollectionLock(CollectionLock&& otherLock)
-    : _id(otherLock._id), _opCtx(otherLock._opCtx) {
+    : _id(otherLock._id),
+      _opCtx(otherLock._opCtx),
+      _oldBlockingAllowed(otherLock._oldBlockingAllowed) {
     otherLock._opCtx = nullptr;
 }
 
 Lock::CollectionLock& Lock::CollectionLock::operator=(CollectionLock&& other) {
     _id = other._id;
     _opCtx = other._opCtx;
+    _oldBlockingAllowed = other._oldBlockingAllowed;
     other._opCtx = nullptr;
     return *this;
 }
 
 Lock::CollectionLock::~CollectionLock() {
-    if (_opCtx)
+    if (_opCtx) {
         shard_role_details::getLocker(_opCtx)->unlock(_id);
+        shard_role_details::getRecoveryUnit((_opCtx))->setBlockingAllowed(_oldBlockingAllowed);
+    }
 }
 
 }  // namespace mongo

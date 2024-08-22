@@ -1677,6 +1677,7 @@ if wiredtiger:
             "dbcheck_test.cpp",
             "delayable_timeout_callback_test.cpp",
             "drop_pending_collection_reaper_test.cpp",
+            "get_next_optimes_test.cpp",
             "idempotency_document_structure_test.cpp",
             "initial_syncer_test.cpp",
             "insert_group_test.cpp",

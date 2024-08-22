@@ -73,8 +73,10 @@ protected:
      */
     [[nodiscard]] bool advanceWTCursor() {
         WT_CURSOR* c = _cursor->get();
-        int ret = wiredTigerPrepareConflictRetry(
-            _opCtx, [&] { return _forward ? c->next(c) : c->prev(c); });
+        int ret =
+            wiredTigerPrepareConflictRetry(_opCtx,
+                                           *shard_role_details::getRecoveryUnit(_opCtx),
+                                           [&] { return _forward ? c->next(c) : c->prev(c); });
         if (ret == WT_NOTFOUND) {
             return false;
         }

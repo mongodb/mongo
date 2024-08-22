@@ -41,7 +41,6 @@
 #include "mongo/db/storage/wiredtiger/wiredtiger_recovery_unit.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_session_cache.h"
 #include "mongo/db/storage/write_unit_of_work.h"
-#include "mongo/db/transaction_resources.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/unittest/assert.h"
 #include "mongo/unittest/framework.h"
@@ -79,10 +78,7 @@ public:
         client = serviceContext->getService()->makeClient("myClient");
         opCtx = serviceContext->makeOperationContext(client.get());
         kvEngine = makeKVEngine(serviceContext, home.path(), &cs);
-        shard_role_details::setRecoveryUnit(
-            opCtx.get(),
-            std::unique_ptr<RecoveryUnit>(kvEngine->newRecoveryUnit()),
-            WriteUnitOfWork::RecoveryUnitState::kNotInUnitOfWork);
+        recoveryUnit = std::unique_ptr<RecoveryUnit>(kvEngine->newRecoveryUnit());
     }
 
     unittest::TempDir home{"temp"};
@@ -90,6 +86,7 @@ public:
     std::unique_ptr<WiredTigerKVEngine> kvEngine;
     ServiceContext::UniqueClient client;
     ServiceContext::UniqueOperationContext opCtx;
+    std::unique_ptr<RecoveryUnit> recoveryUnit;
 };
 
 TEST_F(WiredTigerPrepareConflictTest, SuccessWithNoConflict) {
@@ -97,7 +94,8 @@ TEST_F(WiredTigerPrepareConflictTest, SuccessWithNoConflict) {
         return 0;
     };
 
-    ASSERT_EQ(wiredTigerPrepareConflictRetry(opCtx.get(), successOnFirstTry), 0);
+    ASSERT_EQ(wiredTigerPrepareConflictRetry(opCtx.get(), *recoveryUnit.get(), successOnFirstTry),
+              0);
     ASSERT_EQ(CurOp::get(opCtx.get())->debug().additiveMetrics.prepareReadConflicts.load(), 0);
 }
 
@@ -107,15 +105,16 @@ TEST_F(WiredTigerPrepareConflictTest, HandleWTPrepareConflictOnce) {
         return attempt++ < 1 ? WT_PREPARE_CONFLICT : 0;
     };
 
-    ASSERT_EQ(wiredTigerPrepareConflictRetry(opCtx.get(), throwWTPrepareConflictOnce), 0);
+    ASSERT_EQ(wiredTigerPrepareConflictRetry(
+                  opCtx.get(), *recoveryUnit.get(), throwWTPrepareConflictOnce),
+              0);
     ASSERT_EQ(CurOp::get(opCtx.get())->debug().additiveMetrics.prepareReadConflicts.load(), 1);
 }
 
 TEST_F(WiredTigerPrepareConflictTest, HandleWTPrepareConflictMultipleTimes) {
     auto attempt = 0;
-    auto sessionCache =
-        static_cast<WiredTigerRecoveryUnit*>(shard_role_details::getRecoveryUnit(opCtx.get()))
-            ->getSessionCache();
+    auto ru = recoveryUnit.get();
+    auto sessionCache = static_cast<WiredTigerRecoveryUnit*>(ru)->getSessionCache();
 
     auto throwWTPrepareConflictMultipleTimes = [&sessionCache, &attempt]() {
         // Manually increments '_prepareCommitOrAbortCounter' to simulate a unit of work has been
@@ -124,8 +123,22 @@ TEST_F(WiredTigerPrepareConflictTest, HandleWTPrepareConflictMultipleTimes) {
         return attempt++ < 100 ? WT_PREPARE_CONFLICT : 0;
     };
 
-    ASSERT_EQ(wiredTigerPrepareConflictRetry(opCtx.get(), throwWTPrepareConflictMultipleTimes), 0);
+    ASSERT_EQ(wiredTigerPrepareConflictRetry(opCtx.get(), *ru, throwWTPrepareConflictMultipleTimes),
+              0);
     ASSERT_EQ(CurOp::get(opCtx.get())->debug().additiveMetrics.prepareReadConflicts.load(), 100);
+}
+
+TEST_F(WiredTigerPrepareConflictTest, ThrowNonBlocking) {
+    auto alwaysFail = []() {
+        return WT_PREPARE_CONFLICT;
+    };
+    auto ru = recoveryUnit.get();
+    ru->setBlockingAllowed(false);
+
+    ASSERT_THROWS_CODE(wiredTigerPrepareConflictRetry(opCtx.get(), *ru, alwaysFail),
+                       StorageUnavailableException,
+                       ErrorCodes::WriteConflict);
+    ASSERT_EQ(CurOp::get(opCtx.get())->debug().additiveMetrics.prepareReadConflicts.load(), 1);
 }
 
 }  // namespace
