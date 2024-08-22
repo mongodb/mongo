@@ -352,8 +352,6 @@ const internalCommandsMap = {
         command: {_flushRoutingTableCacheUpdatesWithWriteConcern: ns, writeConcern: {w: 2}},
     },
     _getAuditConfigGeneration: {
-        skip: true,  // This command gets dbclient error communicating with server on TSAN
-                     // Enterprise RHEL 8.0 DEBUG and some other platforms.
         testname: "_getAuditConfigGeneration",
         command: {_getAuditConfigGeneration: 1},
     },
