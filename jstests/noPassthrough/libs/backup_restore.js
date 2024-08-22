@@ -304,7 +304,8 @@ export const BackupRestoreTest = function(options) {
         }
 
         // Wait up to 5 minutes until restarted node is in state secondary.
-        rst.waitForState(rst.getSecondaries(), ReplSetTest.State.SECONDARY);
+        rst.getSecondaries().forEach(secondary =>
+                                         rst.waitForState(secondary, ReplSetTest.State.SECONDARY));
 
         jsTestLog('Stopping CRUD and FSM clients');
 

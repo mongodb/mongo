@@ -425,7 +425,7 @@ replShard.nodes.forEach(function(node) {
     delete node.fullOptions.shardsvr;
 });
 
-replShard.restart(replShard.nodes);
+replShard.nodes.forEach(node => replShard.restart(node));
 replShard.awaitNodesAgreeOnPrimary();
 
 priConn = replShard.getPrimary();

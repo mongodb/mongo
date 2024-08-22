@@ -30,7 +30,7 @@ const ocsp_options = {
     },
 };
 
-const rstest = ReplSetTest({
+const rstest = new ReplSetTest({
     name: "OCSP Servers Test",
     nodes: 2,
     nodeOptions: ocsp_options,

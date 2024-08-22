@@ -107,7 +107,8 @@ rs.awaitReplication();
 // used for the
 // count command before being fully replicated
 jsTest.log("Awaiting secondary status of all nodes");
-rs.waitForState(rs.getSecondaries(), ReplSetTest.State.SECONDARY, 180 * 1000);
+rs.getSecondaries().forEach(
+    secondary => rs.waitForState(secondary, ReplSetTest.State.SECONDARY, 180 * 1000));
 
 // -------------------------------------------------------------------------------------------
 // ---------- test routing to secondaries ----------------

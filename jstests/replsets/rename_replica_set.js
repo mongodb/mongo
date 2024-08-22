@@ -26,7 +26,7 @@ const newReplSetName = "newTestSet";
 assert.commandWorked(coll.insert({a: 1}, {"writeConcern": {"w": 2, "j": true}}));
 
 // Restart all nodes in the set as standalones.
-nodes = replTest.restart(nodes, {noReplSet: true});
+nodes.forEach(node => replTest.restart(node, {noReplSet: true}));
 
 // Change each node's config to have the new replica set name.
 replTest.nodes.forEach(function(node) {

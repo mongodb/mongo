@@ -42,14 +42,16 @@ function convertShardToRS() {
         delete node.fullOptions.shardsvr;
     });
 
-    shardServer.restart(shardServer.nodes, {skipValidation: true});
+    shardServer.nodes.forEach(node => shardServer.restart(node, {skipValidation: true}));
     jsTest.log("Coversion shard -> RS took: " + (new Date() - start));
 }
 
 function convertRSToShard() {
     let start = new Date();
     jsTestLog("Converting replicaSet server to shardServer.");
-    shardServer.restart(shardServer.nodes, {shardsvr: "", skipValidation: true});
+    shardServer.nodes.forEach(node =>
+                                  shardServer.restart(node, {shardsvr: "", skipValidation: true}));
+
     jsTest.log("Coversion RS -> Shard took: " + (new Date() - start));
 }
 
