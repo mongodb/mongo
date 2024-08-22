@@ -1046,44 +1046,13 @@ DB.prototype.serverBuildInfo = function() {
         this.getSiblingDB("admin")._runCommandWithoutApiStrict({buildinfo: 1}));
 };
 
-// Used to trim entries from the metrics.commands that have never been executed
-getActiveCommands = function(tree) {
-    var result = {};
-    for (var i in tree) {
-        if (!tree.hasOwnProperty(i))
-            continue;
-        if (tree[i].hasOwnProperty("total")) {
-            if (tree[i].total > 0) {
-                result[i] = tree[i];
-            }
-            continue;
-        }
-        if (i == "<UNKNOWN>") {
-            if (tree[i] > 0) {
-                result[i] = tree[i];
-            }
-            continue;
-        }
-        // Handles nested commands
-        var subStatus = getActiveCommands(tree[i]);
-        if (Object.keys(subStatus).length > 0) {
-            result[i] = tree[i];
-        }
-    }
-    return result;
-};
-
 DB.prototype.serverStatus = function(options) {
     var cmd = {serverStatus: 1};
     if (options) {
         Object.extend(cmd, options);
     }
-    var res = this._adminCommand(cmd);
-    // Only prune if we have a metrics tree with commands.
-    if (res.metrics && res.metrics.commands) {
-        res.metrics.commands = getActiveCommands(res.metrics.commands);
-    }
-    return res;
+
+    return this._adminCommand(cmd);
 };
 
 DB.prototype.hostInfo = function() {

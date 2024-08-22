@@ -184,7 +184,6 @@ globals:
   shellPrintHelper: true
   shellAutocomplete: true
   __autocomplete__: true
-  getActiveCommands: true
   defaultPrompt: true
   ___it___: true
   __promptWrapper__: true
