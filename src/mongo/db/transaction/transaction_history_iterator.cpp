@@ -70,20 +70,16 @@ namespace mongo {
 namespace {
 
 /**
- * Finds the oplog entry with the given timestamp in the oplog, or in the tenant's change collection
- * if this is being used in a serverless context.
+ * Finds the oplog entry with the given timestamp in the oplog.
  */
 BSONObj findOneOplogEntry(OperationContext* opCtx,
                           const repl::OpTime& opTime,
                           bool permitYield,
                           bool prevOpOnly = false) {
-    auto tenantId = CurOp::get(opCtx)->getNSS().tenantId();
     BSONObj oplogBSON;
     invariant(!opTime.isNull());
-    NamespaceString nss = tenantId ? NamespaceString::makeChangeCollectionNSS(tenantId)
-                                   : NamespaceString::kRsOplogNamespace;
 
-    auto findCommand = std::make_unique<FindCommandRequest>(nss);
+    auto findCommand = std::make_unique<FindCommandRequest>(NamespaceString::kRsOplogNamespace);
     findCommand->setFilter(opTime.asQuery());
 
     if (prevOpOnly) {
@@ -97,31 +93,22 @@ BSONObj findOneOplogEntry(OperationContext* opCtx,
                                               .allowedFeatures =
                                                   MatchExpressionParser::kBanAllSpecialFeatures},
     });
-    boost::optional<AutoGetCollectionForReadMaybeLockFree> oplogRead;
-    boost::optional<AutoGetChangeCollection> changeCollectionRead;
-    const CollectionPtr* collPtr;
-    if (tenantId) {
-        changeCollectionRead.emplace(opCtx, AutoGetChangeCollection::AccessMode::kRead, *tenantId);
-        collPtr = &**changeCollectionRead;
-    } else {
-        oplogRead.emplace(opCtx, NamespaceString::kRsOplogNamespace);
-        collPtr = &oplogRead->getCollection();
-    }
+    AutoGetCollectionForReadMaybeLockFree oplogRead(opCtx, NamespaceString::kRsOplogNamespace);
 
-    const auto dbName = nss.dbName();
-    const auto localDb = DatabaseHolder::get(opCtx)->getDb(opCtx, dbName);
+    const auto localDb = DatabaseHolder::get(opCtx)->getDb(opCtx, DatabaseName::kLocal);
     invariant(localDb);
-    AutoStatsTracker statsTracker(opCtx,
-                                  nss,
-                                  Top::LockType::ReadLocked,
-                                  AutoStatsTracker::LogMode::kUpdateTop,
-                                  CollectionCatalog::get(opCtx)->getDatabaseProfileLevel(dbName),
-                                  Date_t::max());
+    AutoStatsTracker statsTracker(
+        opCtx,
+        NamespaceString::kRsOplogNamespace,
+        Top::LockType::ReadLocked,
+        AutoStatsTracker::LogMode::kUpdateTop,
+        CollectionCatalog::get(opCtx)->getDatabaseProfileLevel(DatabaseName::kLocal),
+        Date_t::max());
 
     const auto yieldPolicy = permitYield ? PlanYieldPolicy::YieldPolicy::YIELD_AUTO
                                          : PlanYieldPolicy::YieldPolicy::INTERRUPT_ONLY;
-    auto exec = uassertStatusOK(
-        getExecutorFind(opCtx, MultipleCollectionAccessor{collPtr}, std::move(cq), yieldPolicy));
+    auto exec = uassertStatusOK(getExecutorFind(
+        opCtx, MultipleCollectionAccessor{&oplogRead.getCollection()}, std::move(cq), yieldPolicy));
 
     PlanExecutor::ExecState getNextResult;
     try {
