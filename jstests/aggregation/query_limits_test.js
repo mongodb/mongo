@@ -149,28 +149,6 @@ function testDeeplyNestedPath() {
     runAgg([{$match: deepQuery}]);
 }
 
-/**
- * TODO SERVER-83927: When Bonsai is enabled, Filter -> Sargable conversion is disabled, and
- * pipeline optimization is also disabled, we should avoid generating 1000 match expressions. This
- * is because we don't call optimize() on the pipeline when the failpoint is enabled; this means
- * that instead of a single DocumentSourceMatch with 1000 Match expressions in it, ABT translation
- * recieves 1000 DocumentSourceMatches. It directly translates each one to a FilterNode. Without
- * converting them to SargableNodes, they never get merged. This in turn stresses the optimizer,
- * which can cause a stack overflow.
- */
-function skipMatchCase() {
-    const isSargableWhenNoIndexesDisabled =
-        db.adminCommand({getParameter: 1, internalCascadesOptimizerDisableSargableWhenNoIndexes: 1})
-            .internalCascadesOptimizerDisableSargableWhenNoIndexes;
-    const isPipelineOptimizationFailpointEnabled = db.adminCommand({
-                                                         getParameter: 1,
-                                                         "failpoint.disablePipelineOptimization": 1
-                                                     })["failpoint.disablePipelineOptimization"]
-                                                       .mode;
-    return isBonsaiEnabled && isSargableWhenNoIndexesDisabled &&
-        isPipelineOptimizationFailpointEnabled;
-}
-
 // Test pipeline length.
 function testPipelineLimits() {
     jsTestLog("Testing large agg pipelines");
@@ -187,13 +165,8 @@ function testPipelineLimits() {
         {$addFields: {c: {$add: ["$c", "$d"]}}},
         {$addFields: {a: 5}},
         {$project: {a: 1}},
+        {$match: {a: 1}},
     ];
-    if (!skipMatchCase()) {
-        stages.push({$match: {a: 1}});
-    } else {
-        jsTestLog(
-            "Skipping $match case when 'tryBonsai' + pipeline optimization disabled + Filter -> Sargable conversion disabled.");
-    }
 
     for (const stage of stages) {
         const pipeline = range(pipelineLimit).map(_ => stage);
