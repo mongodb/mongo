@@ -39,10 +39,6 @@ build:windows --//bazel/config:compiler_type=msvc
 build:macos --cxxopt=-std=c++20
 build:windows --cxxopt=/std:c++20
 
-# EngFlow remote execution is not available on MacOS and Windows, default to local execution.
-common:macos --config=local
-common:windows --config=local
-
 # Set the windows version to win10 by default
 # TODO(SERVER-87654): We may want to add support for other Windows versions in the future.
 build:windows --cxxopt=-D_WIN32_WINNT=0x0A00
@@ -55,7 +51,7 @@ build:windows --cxxopt=-UCOMPILER_MSVC
 # remote execution is the default, but only mongodb employees will be able to access
 # the engflow cluster. External builders should use the local option below
 # remote execution configs
-build --remote_executor=grpcs://sodalite.cluster.engflow.com
+build:linux --remote_executor=grpcs://sodalite.cluster.engflow.com
 build --remote_cache=grpcs://sodalite.cluster.engflow.com
 build --bes_backend=grpcs://sodalite.cluster.engflow.com
 build --bes_results_url=https://sodalite.cluster.engflow.com/invocation/

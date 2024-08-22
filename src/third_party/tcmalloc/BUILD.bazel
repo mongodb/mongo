@@ -136,6 +136,7 @@ COPTS = [
         "-Wno-deprecated-volatile",
         "-Wno-implicit-int-float-conversion",
     ],
+    "//conditions:default": [],
 })
 
 # The kernel supported logic is split into 2 select statements to avoid an "ambiguous match" error.
@@ -149,6 +150,8 @@ KERNEL_SUPPORTED = select({
 }) + select({
     "//bazel/config:linux_s390x": ["@platforms//:incompatible"],
     "//bazel/config:linux_ppc64le": ["@platforms//:incompatible"],
+    "@platforms//os:macos": ["@platforms//:incompatible"],
+    "@platforms//os:windows": ["@platforms//:incompatible"],
     "//conditions:default": [],
 })
 
@@ -320,6 +323,7 @@ mongo_cc_library(
     hdrs = TCMALLOC_HEADERS + select({
         "@//bazel/config:linux_aarch64": ["dist/tcmalloc/internal/percpu_rseq_aarch64.S"],
         "@//bazel/config:linux_x86_64": ["dist/tcmalloc/internal/percpu_rseq_x86_64.S"],
+        "//conditions:default": [],
     }),
     copts = COPTS,
     includes = INCLUDES,

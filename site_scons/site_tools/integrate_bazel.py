@@ -426,6 +426,15 @@ def create_program_builder(env: SCons.Environment.Environment) -> None:
     env["BUILDERS"]["BazelProgram"] = create_bazel_builder(env["BUILDERS"]["Program"])
 
 
+def get_default_cert_dir():
+    if platform.system() == "Windows":
+        return f"C:/cygwin/home/{getpass.getuser()}/.engflow"
+    elif platform.system() == "Linux":
+        return f"/home/{getpass.getuser()}/.engflow"
+    elif platform.system() == "Darwin":
+        return f"{os.path.expanduser('~')}/.engflow"
+
+
 def validate_remote_execution_certs(env: SCons.Environment.Environment) -> bool:
     running_in_evergreen = os.environ.get("CI")
 
@@ -435,8 +444,15 @@ def validate_remote_execution_certs(env: SCons.Environment.Environment) -> bool:
         )
         return False
 
+    if os.name == "nt" and not os.path.exists(f"{os.path.expanduser('~')}/.bazelrc"):
+        with open(f"{os.path.expanduser('~')}/.bazelrc", "a") as bazelrc:
+            bazelrc.write(
+                f"build --tls_client_certificate={get_default_cert_dir()}/creds/engflow.crt\n"
+            )
+            bazelrc.write(f"build --tls_client_key={get_default_cert_dir()}/creds/engflow.key\n")
+
     if not running_in_evergreen and not os.path.exists(
-        f"/home/{getpass.getuser()}/.engflow/creds/engflow.crt"
+        f"{get_default_cert_dir()}/creds/engflow.crt"
     ):
         # Temporary logic to copy over the credentials for users that ran the installation steps using the old directory (/engflow/).
         if os.path.exists("/engflow/creds/engflow.crt") and os.path.exists(
@@ -446,21 +462,21 @@ def validate_remote_execution_certs(env: SCons.Environment.Environment) -> bool:
                 "Moving EngFlow credentials from the legacy directory (/engflow/) to the new directory (~/.engflow/)."
             )
             try:
-                os.makedirs(f"/home/{getpass.getuser()}/.engflow/creds/", exist_ok=True)
+                os.makedirs(f"{get_default_cert_dir()}/creds/", exist_ok=True)
                 shutil.move(
                     "/engflow/creds/engflow.crt",
-                    f"/home/{getpass.getuser()}/.engflow/creds/engflow.crt",
+                    f"{get_default_cert_dir()}/creds/engflow.crt",
                 )
                 shutil.move(
                     "/engflow/creds/engflow.key",
-                    f"/home/{getpass.getuser()}/.engflow/creds/engflow.key",
+                    f"{get_default_cert_dir()}/creds/engflow.key",
                 )
-                with open(f"/home/{getpass.getuser()}/.bazelrc", "a") as bazelrc:
+                with open(f"{get_default_cert_dir()}/.bazelrc", "a") as bazelrc:
                     bazelrc.write(
-                        f"build --tls_client_certificate=/home/{getpass.getuser()}/.engflow/creds/engflow.crt\n"
+                        f"build --tls_client_certificate={get_default_cert_dir()}/creds/engflow.crt\n"
                     )
                     bazelrc.write(
-                        f"build --tls_client_key=/home/{getpass.getuser()}/.engflow/creds/engflow.key\n"
+                        f"build --tls_client_key={get_default_cert_dir()}/creds/engflow.key\n"
                     )
             except OSError as exc:
                 print(exc)
@@ -481,11 +497,11 @@ def validate_remote_execution_certs(env: SCons.Environment.Environment) -> bool:
         if status_code == 200:
             public_hostname = response.text
         else:
-            public_hostname = "{{REPLACE_WITH_WORKSTATION_HOST_NAME}}"
+            public_hostname = "localhost"
         print(
-            f"""\nERROR: ~/.engflow/creds/engflow.crt not found. Please reach out to #ask-devprod-build if you need help with the steps below.
+            f"""\nERROR: {get_default_cert_dir()}/creds/engflow.crt not found. Please reach out to #ask-devprod-build if you need help with the steps below.
 
-(If the below steps are not working, remote execution can be disabled by passing BAZEL_FLAGS=--config=local at the end of your scons.py invocation)
+(If the below steps are not working or you are an external person to MongoDB, remote execution can be disabled by passing BAZEL_FLAGS=--config=local at the end of your scons.py invocation)
 
 Please complete the following steps to generate a certificate:
 - (If not in the Engineering org) Request access to the MANA group https://mana.corp.mongodbgov.com/resources/659ec4b9bccf3819e5608712
@@ -498,23 +514,23 @@ ZIP_FILE=~/Downloads/engflow-mTLS.zip
 
 curl https://raw.githubusercontent.com/mongodb/mongo/master/buildscripts/setup_engflow_creds.sh -o setup_engflow_creds.sh
 chmod +x ./setup_engflow_creds.sh
-./setup_engflow_creds.sh {getpass.getuser()} {public_hostname} $ZIP_FILE\n"""
+./setup_engflow_creds.sh {getpass.getuser()} {public_hostname} $ZIP_FILE {"local" if public_hostname == "localhost" else ""}\n"""
         )
         return False
 
     if not running_in_evergreen and (
-        not os.access(f"/home/{getpass.getuser()}/.engflow/creds/engflow.crt", os.R_OK)
-        or not os.access(f"/home/{getpass.getuser()}/.engflow/creds/engflow.key", os.R_OK)
+        not os.access(f"{get_default_cert_dir()}/creds/engflow.crt", os.R_OK)
+        or not os.access(f"{get_default_cert_dir()}/creds/engflow.key", os.R_OK)
     ):
         print(
-            "Invalid permissions set on ~/.engflow/creds/engflow.crt or ~/.engflow/creds/engflow.key"
+            f"Invalid permissions set on {get_default_cert_dir()}/creds/engflow.crt or {get_default_cert_dir()}/creds/engflow.key"
         )
         print("Please run the following command to fix the permissions:\n")
         print(
-            f"sudo chown {getpass.getuser()}:{getpass.getuser()} /home/{getpass.getuser()}/.engflow/creds/engflow.crt /home/{getpass.getuser()}/.engflow/creds/engflow.key"
+            f"sudo chown {getpass.getuser()}:{getpass.getuser()} {get_default_cert_dir()}/creds/engflow.crt {get_default_cert_dir()}/creds/engflow.key"
         )
         print(
-            f"sudo chmod 600 /home/{getpass.getuser()}/.engflow/creds/engflow.crt /home/{getpass.getuser()}/.engflow/creds/engflow.key"
+            f"sudo chmod 600 {get_default_cert_dir()}/creds/engflow.crt {get_default_cert_dir()}/creds/engflow.key"
         )
         return False
     return True
@@ -851,13 +867,7 @@ def generate(env: SCons.Environment.Environment) -> None:
         formatted_options = [f"--//bazel/config:{_SANITIZER_MAP[opt]}=True" for opt in options]
         bazel_internal_flags.extend(formatted_options)
 
-    # Disable RE for external developers and when executing on non-linux amd64/arm64 platforms
-    is_external_developer = not os.path.exists("/opt/mongodbtoolchain")
-    if (
-        normalized_os != "linux"
-        or normalized_arch not in ["arm64", "amd64"]
-        or is_external_developer
-    ):
+    if normalized_arch not in ["arm64", "amd64"]:
         bazel_internal_flags.append("--config=local")
 
     # Disable remote execution for public release builds.
