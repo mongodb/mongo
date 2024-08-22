@@ -354,3 +354,32 @@ mongo_cc_library(
         "//src/mongo:base",
     ],
 )
+
+mongo_cc_library(
+    name = "password",
+    srcs = [
+        "password.cpp",
+        ":password_params_gen",
+    ],
+    hdrs = [
+        "password.h",
+    ],
+    deps = [
+        "//src/mongo/db:server_base",
+    ],
+)
+
+mongo_cc_library(
+    name = "pin_code_segments",
+    srcs = [
+        "pin_code_segments.cpp",
+        ":pin_code_segments_params_gen",
+    ],
+    target_compatible_with = select({
+        "@platforms//os:linux": [],
+        "//conditions:default": ["@platforms//:incompatible"],
+    }),
+    deps = [
+        "//src/mongo/db:server_base",
+    ],
+)

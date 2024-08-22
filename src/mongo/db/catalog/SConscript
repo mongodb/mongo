@@ -456,17 +456,6 @@ env.Library(
 )
 
 env.Library(
-    target="capped_visibility",
-    source=[
-        "capped_visibility.cpp",
-    ],
-    LIBDEPS=[
-        "$BUILD_DIR/mongo/base",
-        "$BUILD_DIR/mongo/db/storage/recovery_unit_base",
-    ],
-)
-
-env.Library(
     target="local_oplog_info",
     source=[
         "local_oplog_info.cpp",

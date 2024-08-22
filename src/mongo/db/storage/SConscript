@@ -329,19 +329,6 @@ env.Library(
 )
 
 env.Library(
-    target="write_unit_of_work",
-    source=[
-        "write_unit_of_work.cpp",
-    ],
-    LIBDEPS_PRIVATE=[
-        "$BUILD_DIR/mongo/base",
-        "$BUILD_DIR/mongo/db/storage/storage_options",
-        "$BUILD_DIR/mongo/util/fail_point",
-        "recovery_unit_base",
-    ],
-)
-
-env.Library(
     target="storage_repair_observer",
     source=[
         "storage_repair_observer.cpp",

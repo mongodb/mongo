@@ -207,3 +207,21 @@ mongo_cc_library(
         "//src/mongo/db/storage:storage_options",
     ],
 )
+
+mongo_cc_library(
+    name = "capped_visibility",
+    srcs = [
+        "capped_visibility.cpp",
+    ],
+    hdrs = [
+        "capped_visibility.cpp",
+    ],
+    header_deps = [
+        "//src/mongo/bson/mutable:mutable_bson",
+        "//src/mongo/db/commands:server_status_core",
+    ],
+    deps = [
+        "//src/mongo:base",
+        "//src/mongo/db/storage:recovery_unit_base",
+    ],
+)

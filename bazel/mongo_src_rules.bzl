@@ -515,7 +515,11 @@ CLANG_WARNINGS_COPTS = select({
 
 GCC_WARNINGS_COPTS = select({
     "//bazel/config:compiler_type_gcc": [
+        # Disable warning about variables that may not be initialized
+        # Failures are triggered in the case of boost::optional
+        "-Wno-maybe-uninitialized",
     ],
+    "//conditions:default": [],
 })
 
 CLANG_FNO_LIMIT_DEBUG_INFO = select({
@@ -1201,7 +1205,8 @@ MONGO_GLOBAL_COPTS = (
     DISABLE_SOURCE_WARNING_AS_ERRORS_COPTS +
     FSIZED_DEALLOCATION_COPT +
     THIN_LTO_FLAGS +
-    SYMBOL_ORDER_COPTS
+    SYMBOL_ORDER_COPTS +
+    GCC_WARNINGS_COPTS
 )
 
 MONGO_GLOBAL_LINKFLAGS = (

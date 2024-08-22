@@ -455,18 +455,6 @@ env.Library(
     ],
 )
 
-env.Library(
-    target="password",
-    source=[
-        "password.cpp",
-        "password_params_gen.cpp",
-    ],
-    LIBDEPS_PRIVATE=[
-        "$BUILD_DIR/mongo/db/server_base",
-    ],
-)
-
-
 env.CppUnitTest(
     target="executor_stats_test",
     source=[
@@ -519,18 +507,6 @@ env.Library(
         "$BUILD_DIR/mongo/executor/task_executor_interface",
     ],
 )
-
-if env.TargetOSIs("linux"):
-    env.Library(
-        target="pin_code_segments",
-        source=[
-            "pin_code_segments.cpp",
-            "pin_code_segments_params_gen.cpp",
-        ],
-        LIBDEPS_PRIVATE=[
-            "$BUILD_DIR/mongo/db/server_base",
-        ],
-    )
 
 pcre_env = env.Clone()
 pcre_env.InjectThirdParty(libraries=["pcre2"])

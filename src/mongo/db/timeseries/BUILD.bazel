@@ -42,3 +42,45 @@ mongo_cc_library(
         "//src/mongo:base",
     ],
 )
+
+mongo_cc_library(
+    name = "bucket_compression",
+    srcs = [
+        "bucket_compression.cpp",
+    ],
+    hdrs = [
+        "bucket_compression.h",
+        "timeseries_constants.h",
+        "timeseries_index_schema_conversion_functions.h",
+        "timeseries_options.h",
+        "timeseries_write_util.h",
+        "//src/mongo/bson:unordered_fields_bsonobj_comparator.h",
+        "//src/mongo/db/commands:create_command_validation.h",
+        # TODO(SERVER-93876): move these headers under a timeseries bucket catalog target once one is added
+        "//src/mongo/db/timeseries/bucket_catalog:bucket.h",
+        "//src/mongo/db/timeseries/bucket_catalog:bucket_catalog.h",
+        "//src/mongo/db/timeseries/bucket_catalog:bucket_identifiers.h",
+        "//src/mongo/db/timeseries/bucket_catalog:bucket_metadata.h",
+        "//src/mongo/db/timeseries/bucket_catalog:bucket_state_registry.h",
+        "//src/mongo/db/timeseries/bucket_catalog:closed_bucket.h",
+        "//src/mongo/db/timeseries/bucket_catalog:execution_stats.h",
+        "//src/mongo/db/timeseries/bucket_catalog:flat_bson.h",
+        "//src/mongo/db/timeseries/bucket_catalog:measurement_map.h",
+        "//src/mongo/db/timeseries/bucket_catalog:reopening.h",
+        "//src/mongo/db/timeseries/bucket_catalog:rollover.h",
+        "//src/mongo/db/timeseries/bucket_catalog:tracking_contexts.h",
+        "//src/mongo/db/timeseries/bucket_catalog:write_batch.h",
+        "//src/mongo/util:tracked_types.h",
+        "//src/mongo/util:tracking_context.h",
+    ],
+    header_deps = [
+        "//src/mongo/bson/mutable:mutable_bson",
+        "//src/mongo/db/commands:server_status_core",
+    ],
+    deps = [
+        "//src/mongo/bson/util:bson_column",
+        "//src/mongo/db:server_base",
+        "//src/mongo/db/storage:storage_options",
+        "//src/mongo/util:fail_point",
+    ],
+)
