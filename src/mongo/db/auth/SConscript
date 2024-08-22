@@ -471,20 +471,6 @@ env.Library(
 )
 
 env.Library(
-    target="oidc_protocol",
-    source=[
-        "oauth_authorization_server_metadata_gen.cpp",
-        "oauth_discovery_factory.cpp",
-        "oidc_protocol_gen.cpp",
-    ],
-    LIBDEPS_PRIVATE=[
-        "$BUILD_DIR/mongo/base",
-        "$BUILD_DIR/mongo/idl/idl_parser",
-        "$BUILD_DIR/mongo/util/net/http_client",
-    ],
-)
-
-env.Library(
     target="authorization_session_test_fixture",
     source=[
         "authorization_session_for_test.cpp",

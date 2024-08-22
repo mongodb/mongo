@@ -50,18 +50,6 @@ env.Library(
 )
 
 env.Library(
-    target="index_build_entry_idl",
-    source=[
-        "index_build_entry_gen.cpp",
-    ],
-    LIBDEPS_PRIVATE=[
-        "$BUILD_DIR/mongo/db/server_base",
-        "$BUILD_DIR/mongo/util/net/network",
-        "commit_quorum_options",
-    ],
-)
-
-env.Library(
     target="health_log_interface",
     source=[
         "health_log_gen.cpp",

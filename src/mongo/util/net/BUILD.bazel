@@ -61,3 +61,53 @@ idl_generator(
     name = "http_client_options_gen",
     src = "http_client_options.idl",
 )
+
+mongo_cc_library(
+    name = "http_client",
+    srcs = [
+        "http_client.cpp",
+        "//src/mongo/base:data_builder.h",
+    ],
+    hdrs = [
+        "http_client.h",
+    ],
+    deps = [
+        "//src/mongo:base",
+        "//src/mongo/db/commands:test_commands_enabled",
+    ],
+)
+
+mongo_cc_library(
+    name = "network",
+    srcs = [
+        "cidr.cpp",
+        "hostandport.cpp",
+        "hostname_canonicalization.cpp",
+        "hostname_canonicalization.h",
+        "sockaddr.cpp",
+        "socket_exception.cpp",
+        "socket_exception.h",
+        "socket_utils.cpp",
+        "socket_utils.h",
+        ":hostandport_gen",
+        "//src/mongo/util/concurrency:value.h",
+    ],
+    deps = [
+        "//src/mongo/db:server_base",
+        "//src/mongo/util:winutil",
+        "//src/mongo/util/concurrency:spin_lock",
+    ],
+)
+
+mongo_cc_library(
+    name = "ssl_util",
+    srcs = [
+        "ssl_util.cpp",
+    ],
+    hdrs = [
+        "ssl_util.h",
+    ],
+    deps = [
+        "//src/mongo:base",
+    ],
+)

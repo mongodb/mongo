@@ -110,27 +110,6 @@ env.Library(
 )
 
 env.Library(
-    target="md5",
-    source=[
-        "md5.cpp",
-        "password_digest.cpp",
-    ],
-    LIBDEPS_PRIVATE=[
-        "$BUILD_DIR/third_party/tomcrypt-1.18.2/tomcrypt_md5",
-    ],
-)
-
-env.Library(
-    target="clock_source_mock",
-    source=[
-        "clock_source_mock.cpp",
-    ],
-    LIBDEPS=[
-        "$BUILD_DIR/mongo/base",
-    ],
-)
-
-env.Library(
     target="processinfo",
     source=[
         "processinfo.cpp",
@@ -152,17 +131,6 @@ env.Benchmark(
     ],
     LIBDEPS=[
         "fail_point",
-    ],
-)
-
-env.Library(
-    target="testing_options",
-    source=[
-        "testing_options.cpp",
-        "testing_options_gen.cpp",
-    ],
-    LIBDEPS_PRIVATE=[
-        "$BUILD_DIR/mongo/db/server_base",
     ],
 )
 
@@ -204,19 +172,6 @@ env.Library(
 )
 
 env.Library(
-    target="mock_periodic_runner",
-    source=[
-        "mock_periodic_runner.cpp",
-    ],
-    LIBDEPS=[
-        "periodic_runner",
-    ],
-    LIBDEPS_PRIVATE=[
-        "$BUILD_DIR/mongo/base",
-    ],
-)
-
-env.Library(
     target="caching",
     source=[
         "read_through_cache.cpp",
@@ -225,16 +180,6 @@ env.Library(
         "$BUILD_DIR/mongo/base",
         "$BUILD_DIR/mongo/db/service_context",
         "concurrency/spin_lock",
-    ],
-)
-
-env.Library(
-    target="tracing_support",
-    source=[
-        "tracing_support.cpp",
-    ],
-    LIBDEPS=[
-        "$BUILD_DIR/mongo/base",
     ],
 )
 
@@ -415,27 +360,6 @@ env.Benchmark(
     LIBDEPS=[
         "clock_sources",
         "processinfo",
-    ],
-)
-
-env.Library(
-    target="elapsed_tracker",
-    source=[
-        "elapsed_tracker.cpp",
-    ],
-    LIBDEPS=[
-        "$BUILD_DIR/mongo/base",
-        "net/network",  # this is for using listener to check elapsed time
-    ],
-)
-
-env.Library(
-    target="system_perf",
-    source=[
-        "sysprofile.cpp",
-    ],
-    LIBDEPS=[
-        "$BUILD_DIR/mongo/base",
     ],
 )
 

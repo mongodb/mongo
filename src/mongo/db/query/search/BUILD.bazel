@@ -45,3 +45,33 @@ idl_generator(
         "//src/mongo/db:basic_types_gen",
     ],
 )
+
+mongo_cc_library(
+    name = "mongot_options",
+    srcs = [
+        "mongot_options.cpp",
+        ":mongot_options_gen",
+    ],
+    hdrs = [
+        "mongot_options.h",
+    ],
+    deps = [
+        "//src/mongo/db:server_base",
+        "//src/mongo/util/net:network",
+    ],
+)
+
+mongo_cc_library(
+    name = "search_index_options",
+    srcs = [
+        "search_index_options.cpp",
+        ":search_index_options_gen",
+    ],
+    hdrs = [
+        "search_index_options.h",
+    ],
+    deps = [
+        "//src/mongo/db:server_base",
+        "//src/mongo/util/net:network",
+    ],
+)

@@ -39,18 +39,6 @@ env.CppUnitTest(
 )
 
 env.Library(
-    target="mongot_options",
-    source=[
-        "mongot_options.cpp",
-        "mongot_options_gen.cpp",
-    ],
-    LIBDEPS_PRIVATE=[
-        "$BUILD_DIR/mongo/db/server_base",
-        "$BUILD_DIR/mongo/util/net/network",
-    ],
-)
-
-env.Library(
     target="search_task_executors",
     source=[
         "search_task_executors.cpp",
@@ -93,18 +81,6 @@ env.CppUnitTest(
         "$BUILD_DIR/mongo/db/auth/auth_checks",
         "$BUILD_DIR/mongo/db/auth/authorization_session_test_fixture",
         "$BUILD_DIR/mongo/db/pipeline/pipeline",
-    ],
-)
-
-env.Library(
-    target="search_index_options",
-    source=[
-        "search_index_options.cpp",
-        "search_index_options_gen.cpp",
-    ],
-    LIBDEPS_PRIVATE=[
-        "$BUILD_DIR/mongo/db/server_base",
-        "$BUILD_DIR/mongo/util/net/network",
     ],
 )
 

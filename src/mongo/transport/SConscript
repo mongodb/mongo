@@ -54,19 +54,6 @@ env.Library(
 )
 
 env.Library(
-    target="session_util",
-    source=[
-        "session_util.cpp",
-    ],
-    LIBDEPS=[
-        "$BUILD_DIR/mongo/base",
-    ],
-    LIBDEPS_PRIVATE=[
-        "$BUILD_DIR/mongo/util/net/network",
-    ],
-)
-
-env.Library(
     target="transport_layer_mock",
     source=[
         "transport_layer_mock.cpp",

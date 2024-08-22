@@ -33,3 +33,17 @@ idl_generator(
     name = "message_compressor_options_server_gen",
     src = "message_compressor_options_server.idl",
 )
+
+mongo_cc_library(
+    name = "session_util",
+    srcs = [
+        "session_util.cpp",
+    ],
+    hdrs = [
+        "session_util.h",
+    ],
+    deps = [
+        "//src/mongo:base",
+        "//src/mongo/util/net:network",
+    ],
+)

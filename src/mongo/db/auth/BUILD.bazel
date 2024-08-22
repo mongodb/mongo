@@ -182,3 +182,21 @@ mongo_cc_library(
         "//src/mongo/idl:idl_parser",
     ],
 )
+
+mongo_cc_library(
+    name = "oidc_protocol",
+    srcs = [
+        "oauth_authorization_server_metadata_gen",
+        "oauth_discovery_factory.cpp",
+        "oidc_protocol_gen",
+    ],
+    hdrs = [
+        "oauth_discovery_factory.h",
+        "//src/mongo/db/query:explain_verbosity_gen",
+    ],
+    deps = [
+        "//src/mongo:base",
+        "//src/mongo/idl:idl_parser",
+        "//src/mongo/util/net:http_client",
+    ],
+)

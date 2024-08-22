@@ -8,24 +8,6 @@ Import("ssl_provider")
 env = env.Clone()
 
 env.Library(
-    target="network",
-    source=[
-        "cidr.cpp",
-        "hostandport.cpp",
-        "hostandport_gen.cpp",
-        "hostname_canonicalization.cpp",
-        "sockaddr.cpp",
-        "socket_exception.cpp",
-        "socket_utils.cpp",
-    ],
-    LIBDEPS_PRIVATE=[
-        "$BUILD_DIR/mongo/db/server_base",
-        "$BUILD_DIR/mongo/util/concurrency/spin_lock",
-        "$BUILD_DIR/mongo/util/winutil",
-    ],
-)
-
-env.Library(
     target="ssl_options",
     source=[
         "ssl_options.cpp",
@@ -94,16 +76,6 @@ if not get_option("ssl") == "off":
                 "$BUILD_DIR/mongo/crypto/symmetric_crypto",
             ],
         )
-
-    env.Library(
-        target="ssl_util",
-        source=[
-            "ssl_util.cpp",
-        ],
-        LIBDEPS_PRIVATE=[
-            "$BUILD_DIR/mongo/base",
-        ],
-    )
 
     env.Library(
         target="ssl_manager",
@@ -186,17 +158,6 @@ else:
             "$BUILD_DIR/mongo/base",
         ],
     )
-
-env.Library(
-    target="http_client",
-    source=[
-        "http_client.cpp",
-    ],
-    LIBDEPS_PRIVATE=[
-        "$BUILD_DIR/mongo/base",
-        "$BUILD_DIR/mongo/db/commands/test_commands_enabled",
-    ],
-)
 
 if http_client == "off":
     env.Library(

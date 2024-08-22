@@ -65,11 +65,11 @@ mongo_cc_library(
         "src/headers/*.h",
     ]),
     copts = NO_WARN_COPTS,
+    defines = [
+        "LTC_NO_PROTOTYPES",
+    ],
     includes = [
         "src/headers",
-    ],
-    local_defines = [
-        "LTC_NO_PROTOTYPES",
     ],
     deps = [
         ":tomcrypt_deps",

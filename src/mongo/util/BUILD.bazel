@@ -383,3 +383,98 @@ mongo_cc_library(
         "//src/mongo/db:server_base",
     ],
 )
+
+mongo_cc_library(
+    name = "system_perf",
+    srcs = [
+        "sysprofile.cpp",
+    ],
+    hdrs = [
+        "sysprofile.h",
+    ],
+    deps = [
+        "//src/mongo:base",
+    ],
+)
+
+mongo_cc_library(
+    name = "testing_options",
+    srcs = [
+        "testing_options.cpp",
+        ":testing_options_gen",
+    ],
+    deps = [
+        "//src/mongo/db:server_base",
+    ],
+)
+
+mongo_cc_library(
+    name = "md5",
+    srcs = [
+        "md5.cpp",
+        "password_digest.cpp",
+    ],
+    hdrs = [
+        "md5.h",
+        "password_digest.h",
+    ],
+    deps = [
+        "//src/mongo:base",
+        "//src/third_party/tomcrypt-1.18.2:tomcrypt_md5",
+    ],
+)
+
+mongo_cc_library(
+    name = "clock_source_mock",
+    srcs = [
+        "clock_source_mock.cpp",
+    ],
+    hdrs = [
+        "clock_source_mock.h",
+    ],
+    deps = [
+        "//src/mongo:base",
+    ],
+)
+
+mongo_cc_library(
+    name = "mock_periodic_runner",
+    srcs = [
+        "mock_periodic_runner.cpp",
+    ],
+    hdrs = [
+        "mock_periodic_runner.h",
+        "tick_source_mock.h",
+    ],
+    deps = [
+        "periodic_runner",
+        "//src/mongo:base",
+    ],
+)
+
+mongo_cc_library(
+    name = "tracing_support",
+    srcs = [
+        "tracing_support.cpp",
+    ],
+    hdrs = [
+        "tracing_support.h",
+    ],
+    deps = [
+        "//src/mongo:base",
+    ],
+)
+
+mongo_cc_library(
+    name = "elapsed_tracker",
+    srcs = [
+        "elapsed_tracker.cpp",
+    ],
+    hdrs = [
+        "elapsed_tracker.h",
+    ],
+    deps = [
+        "//src/mongo:base",
+        "//src/mongo/util/net:network",  # this is for using listener to check elapsed time
+    ],
+)

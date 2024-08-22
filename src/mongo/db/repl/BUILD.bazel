@@ -779,3 +779,18 @@ mongo_cc_library(
         "//src/mongo:base",
     ],
 )
+
+mongo_cc_library(
+    name = "split_horizon",
+    srcs = [
+        "split_horizon.cpp",
+    ],
+    hdrs = [
+        "split_horizon.h",
+    ],
+    deps = [
+        "//src/mongo/db:server_base",
+        "//src/mongo/util/concurrency:spin_lock",
+        "//src/mongo/util/net:network",
+    ],
+)

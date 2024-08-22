@@ -153,3 +153,21 @@ mongo_cc_library(
         "//src/mongo:base",
     ],
 )
+
+mongo_cc_library(
+    name = "connection_pool_stats",
+    srcs = [
+        "connection_pool_stats.cpp",
+    ],
+    hdrs = [
+        "connection_pool_stats.h",
+    ],
+    header_deps = [
+        "//src/mongo/db/commands:server_status_core",
+    ],
+    deps = [
+        "//src/mongo/db:server_base",
+        "//src/mongo/db:server_feature_flags",
+        "//src/mongo/util/net:network",
+    ],
+)

@@ -225,3 +225,15 @@ mongo_cc_library(
         "//src/mongo/db/storage:recovery_unit_base",
     ],
 )
+
+mongo_cc_library(
+    name = "index_build_entry_idl",
+    srcs = [
+        ":index_build_entry_gen",
+    ],
+    deps = [
+        ":commit_quorum_options",
+        "//src/mongo/db:server_base",
+        "//src/mongo/util/net:network",
+    ],
+)
