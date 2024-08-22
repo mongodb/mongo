@@ -194,6 +194,7 @@ mongo_cc_library(
     target_compatible_with = KERNEL_SUPPORTED,
     deps = [
         "tcmalloc_internal_logging",
+        "tcmalloc_internal_sysinfo",
         "tcmalloc_internal_util",
         "//src/third_party/abseil-cpp:absl_base",
         "//src/third_party/abseil-cpp:absl_strings",
@@ -226,9 +227,11 @@ mongo_cc_library(
     skip_global_deps = TCMALLOC_SKIP_GLOBAL_DEPS,
     target_compatible_with = KERNEL_SUPPORTED,
     deps = [
+        "tcmalloc_internal_environment",
         "tcmalloc_malloc_extension",
         "//src/third_party/abseil-cpp:absl_base",
         "//src/third_party/abseil-cpp:absl_stacktrace",
+        "//src/third_party/abseil-cpp:absl_str_format_internal",
         "//src/third_party/abseil-cpp:absl_strings",
         "//src/third_party/abseil-cpp:absl_time",
     ],
@@ -325,6 +328,7 @@ mongo_cc_library(
     target_compatible_with = KERNEL_SUPPORTED,
     deps = [
         "tcmalloc_internal_logging",
+        "tcmalloc_internal_sysinfo",
         "tcmalloc_internal_util",
         "//src/third_party/abseil-cpp:absl_base",
     ],
@@ -360,7 +364,9 @@ mongo_cc_library(
     skip_global_deps = TCMALLOC_SKIP_GLOBAL_DEPS,
     target_compatible_with = KERNEL_SUPPORTED,
     deps = [
-        ":tcmalloc_internal_sysinfo",
+        "tcmalloc_internal_mincore",
+        "tcmalloc_internal_percpu",
+        "tcmalloc_internal_sysinfo",
         "//src/third_party/abseil-cpp:absl_base",
     ],
 )
@@ -377,6 +383,7 @@ mongo_cc_library(
     skip_global_deps = TCMALLOC_SKIP_GLOBAL_DEPS,
     target_compatible_with = KERNEL_SUPPORTED,
     deps = [
+        "tcmalloc_internal_util",
         "//src/third_party/abseil-cpp:absl_base",
         "//src/third_party/abseil-cpp:absl_strings",
     ],
@@ -452,7 +459,7 @@ mongo_cc_library(
         "tcmalloc_internal_mincore",
         "tcmalloc_internal_numa",
         "tcmalloc_internal_page_size",
-        "tcmalloc_internal_percpu",
+        "tcmalloc_internal_percpu_tcmalloc",
         "tcmalloc_internal_util",
         "tcmalloc_malloc_extension",
         "tcmalloc_malloc_tracing_extension",
