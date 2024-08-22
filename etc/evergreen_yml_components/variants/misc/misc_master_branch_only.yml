@@ -25,4 +25,4 @@ buildvariants:
       - name: daily_task_scanner
       - name: monitor_build_status
         distros:
-          - rhel8.8-large
+          - ubuntu2404-large
