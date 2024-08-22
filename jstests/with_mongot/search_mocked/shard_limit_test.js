@@ -1,6 +1,7 @@
 /**
  * Test that a $limit gets pushed to the shards.
  */
+import {getAggPlanStages} from "jstests/libs/analyze_plan.js";
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {checkSbeRestrictedOrFullyEnabled} from "jstests/libs/sbe_util.js";
 import {getUUIDFromListCollections} from "jstests/libs/uuid_util.js";
@@ -35,10 +36,12 @@ const testDB = mongos.getDB(dbName);
 const testColl = testDB.getCollection(collName);
 let protocolVersion = null;
 
+const searchInSbe = checkSbeRestrictedOrFullyEnabled(testDB) &&
+    FeatureFlagUtil.isPresentAndEnabled(testDB.getMongo(), 'SearchInSbe');
+
 // TODO SERVER-85637 Remove check for SearchExplainExecutionStats after the feature flag is removed.
 if (FeatureFlagUtil.isPresentAndEnabled(testDB.getMongo(), 'SearchExplainExecutionStats') &&
-    !(checkSbeRestrictedOrFullyEnabled(testDB) &&
-      FeatureFlagUtil.isPresentAndEnabled(testDB.getMongo(), 'SearchInSbe'))) {
+    !searchInSbe) {
     protocolVersion = getDefaultProtocolVersionForPlanShardedSearch();
 }
 
@@ -84,25 +87,28 @@ function runTestOnPrimaries(testFn, cursorId) {
 }
 
 function assertLimitAbsorbed(explainRes, query) {
-    let shardsArray = explainRes["shards"];
+    if (searchInSbe) {
+        let limitStages = getAggPlanStages(explainRes, "LIMIT");
+        for (let [_, limitObj] of Object.entries(limitStages)) {
+            assert.eq(7, limitObj["limitAmount"], explainRes);
+        }
 
-    for (let [_, individualShardObj] of Object.entries(shardsArray)) {
-        // TODO: See SERVER-84511 Explain seems to be broken with search. Currently, "stages" is not
-        // found in the bsonObj in the loop below.
-        if (individualShardObj["stages"] === undefined) {
-            continue;
+    } else {
+        let shardsArray = explainRes["shards"];
+
+        for (let [_, individualShardObj] of Object.entries(shardsArray)) {
+            let stages = individualShardObj["stages"];
+            // Assert limit was pushed down to shards.
+            if ("returnStoredSource" in query) {
+                assert.eq(stages[0]["$_internalSearchMongotRemote"].limit, 7, explainRes);
+            } else {
+                assert.eq(stages[1]["$_internalSearchIdLookup"].limit, 7, explainRes);
+            }
+            // Assert limit and skip were pushed down to mongot in the form of
+            // 'mongotRequestedDocs'. Both need to be pushed down so that after mongos skips first
+            // documents in sort order, the limit can then be applied.
+            assert.eq(7, stages[0]["$_internalSearchMongotRemote"].mongotDocsRequested, explainRes);
         }
-        let stages = individualShardObj["stages"];
-        // Assert limit was pushed down to shards.
-        if ("returnStoredSource" in query) {
-            assert.eq(stages[0]["$_internalSearchMongotRemote"].limit, 7, explainRes);
-        } else {
-            assert.eq(stages[1]["$_internalSearchIdLookup"].limit, 7, explainRes);
-        }
-        // Assert limit and skip were pushed down to mongot in the form of 'mongotRequestedDocs'.
-        // Both need to be pushed down so that after mongos skips first documents in sort order, the
-        // limit can then be applied.
-        assert.eq(7, stages[0]["$_internalSearchMongotRemote"].mongotDocsRequested, explainRes);
     }
 }
 
