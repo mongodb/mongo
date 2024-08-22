@@ -200,3 +200,28 @@ mongo_cc_library(
         "//src/mongo/util/net:http_client",
     ],
 )
+
+mongo_cc_library(
+    name = "sasl_options",
+    srcs = [
+        "sasl_options.cpp",
+    ],
+    hdrs = [
+        "sasl_options.h",
+        "//src/mongo/db/auth:sasl_options_gen",
+        "//src/mongo/util/options_parser:constraints.h",
+        "//src/mongo/util/options_parser:environment.h",
+        "//src/mongo/util/options_parser:option_description.h",
+        "//src/mongo/util/options_parser:option_section.h",
+        "//src/mongo/util/options_parser:startup_option_init.h",
+        "//src/mongo/util/options_parser:startup_options.h",
+        "//src/mongo/util/options_parser:value.h",
+    ],
+    header_deps = [
+        "//src/mongo/db/commands:server_status_core",
+    ],
+    deps = [
+        "//src/mongo/db:server_base",
+        "//src/mongo/db/stats:counters",
+    ],
+)

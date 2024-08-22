@@ -374,17 +374,6 @@ yamlEnv.Library(
 )
 
 env.Library(
-    target="sasl_options",
-    source=[
-        "sasl_options.cpp",
-    ],
-    LIBDEPS=[
-        "$BUILD_DIR/mongo/db/server_base",
-        "$BUILD_DIR/mongo/db/stats/counters",
-    ],
-)
-
-env.Library(
     target="sasl_options_init",
     source=[
         "sasl_options_init.cpp",
