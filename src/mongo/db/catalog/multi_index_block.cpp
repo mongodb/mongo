@@ -355,20 +355,6 @@ StatusWith<std::vector<BSONObj>> MultiIndexBlock::init(
                         opCtx, collection.get(), info, resumeInfo);
                 Status status = statusWithInfo.getStatus();
                 if (!status.isOK()) {
-                    // If we were given two identical indexes to build, we will run into an error
-                    // trying to set up the same index a second time in this for-loop. This is the
-                    // only way to encounter this error because callers filter out ready/in-progress
-                    // indexes and start the build while holding a lock throughout.
-                    if (status == ErrorCodes::IndexBuildAlreadyInProgress) {
-                        invariant(indexSpecs.size() > 1,
-                                  str::stream()
-                                      << "Collection: " << collection->ns().toStringForErrorMsg()
-                                      << " (" << _collectionUUID
-                                      << "), Index spec: " << indexSpecs.front());
-                        return {ErrorCodes::OperationFailed,
-                                "Cannot build two identical indexes. Try again without duplicate "
-                                "indexes."};
-                    }
                     return status;
                 }
                 info = statusWithInfo.getValue();
