@@ -86,13 +86,6 @@ public:
         return extractFromABT(expr);
     }
 
-    ProjectionNameSet walk(const SargableNode& /*node*/,
-                           const ABT& /*child*/,
-                           const ABT& /*binds*/,
-                           const ABT& refs) {
-        return extractFromABT(refs);
-    }
-
     ProjectionNameSet walk(const RIDIntersectNode& /*node*/,
                            const ABT& /*leftChild*/,
                            const ABT& /*rightChild*/) {

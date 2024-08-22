@@ -208,17 +208,6 @@ public:
         return computeHashSeq<6>(projectionResult, childResult);
     }
 
-    size_t transport(const SargableNode& node,
-                     size_t childResult,
-                     size_t /*bindResult*/,
-                     size_t /*refResult*/) {
-        // Specifically not hashing the candidate indexes and ScanParams. Those are derivative of
-        // the requirements, and can have temp projection names.
-        return computeHashSeq<44>(ABTHashGenerator::generate(node.getReqMap()),
-                                  std::hash<IndexReqTarget>()(node.getTarget()),
-                                  childResult);
-    }
-
     size_t transport(const RIDIntersectNode& node,
                      size_t leftChildResult,
                      size_t rightChildResult) {

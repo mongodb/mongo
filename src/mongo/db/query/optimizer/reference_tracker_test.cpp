@@ -220,45 +220,15 @@ TEST(ReferenceTrackerTest, GetDefinitionsForRIDUnion) {
     const ProjectionName scanProjectionName = "p0";
     const ProjectionName boundProjectionName = "pBound";
 
-    ABT path = make<PathGet>("a", make<PathIdentity>());
-    IntervalReqExpr::Node interval =
-        *BoolExprBuilder<IntervalRequirement>{}
-             .pushDisj()
-             .pushConj()
-             .atom({{true, Constant::int64(10)}, {true, Constant::int64(20)}})
-             .finish();
-
-    PartialSchemaKey partialSchemaKey{scanProjectionName, path};
-
-    PSRExpr::Node leftNode =
-        *PSRExprBuilder{}
-             .pushDisj()
-             .pushConj()
-             .atom({partialSchemaKey, {boundProjectionName, interval, false /*isPerfOnly*/}})
-             .atom({{scanProjectionName, make<PathGet>("b", make<PathIdentity>())},
-                    {boost::none /*boundProjectionName*/, interval, false /*isPerfOnly*/}})
-             .finish();
-    PSRExpr::Node leftReqs(std::move(leftNode));
-    ABT leftChild = make<SargableNode>(std::move(leftReqs),
-                                       std::vector<CandidateIndexEntry>{} /*candidateIndexes*/,
-                                       boost::none /*scanParams*/,
-                                       IndexReqTarget::Index,
-                                       make<ScanNode>("p0", "test1"));
-
-    PSRExpr::Node rightNode =
-        *PSRExprBuilder{}
-             .pushDisj()
-             .pushConj()
-             .atom({partialSchemaKey, {boundProjectionName, interval, false /*isPerfOnly*/}})
-             .atom({{scanProjectionName, make<PathGet>("b", make<PathIdentity>())},
-                    {ProjectionName{"pRightOnly"}, interval, false /*isPerfOnly*/}})
-             .finish();
-    PSRExpr::Node rightReqs(std::move(rightNode));
-    ABT rightChild = make<SargableNode>(std::move(rightReqs),
-                                        std::vector<CandidateIndexEntry>{} /*candidateIndexes*/,
-                                        boost::none /*scanParams*/,
-                                        IndexReqTarget::Seek,
-                                        make<ScanNode>("p0", "test1"));
+    // Left child of Union has p0 and pBound variables
+    ABT leftChild = make<EvaluationNode>(
+        boundProjectionName, Constant::int64(0), make<ScanNode>(scanProjectionName, "test"));
+    // Right chlid of Union has p0, pBound and pRightOnly variables
+    ABT rightChild = make<EvaluationNode>(
+        "pRightOnly",
+        Constant::int64(0),
+        make<EvaluationNode>(
+            boundProjectionName, Constant::int64(0), make<ScanNode>(scanProjectionName, "test")));
 
     ABT unionNode = make<RIDUnionNode>(scanProjectionName,
                                        ProjectionNameVector{"p0", "pBound"},

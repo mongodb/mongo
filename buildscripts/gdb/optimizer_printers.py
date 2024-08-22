@@ -726,36 +726,6 @@ class ScanParamsPrinter(object):
         return res
 
 
-class SargableNodePrinter(FixedArityNodePrinter):
-    """Pretty-printer for SargableNode."""
-
-    def __init__(self, val):
-        """Initialize SargableNodePrinter."""
-        # Although Sargable technically has 3 children, avoid printing the refs (child1) and bind block (child2).
-        super().__init__(val, 1, "Sargable")
-
-        # Add children for requirements, candidateIndex, and scan_params.
-        self.add_child(str(self.val["_reqMap"]).replace("\n", ""))
-        self.add_child(self.print_candidate_indexes())
-
-        scan_params = get_boost_optional(self.val["_scanParams"])
-        if scan_params is not None:
-            self.add_child(scan_params)
-
-    def print_candidate_indexes(self):
-        res = "candidateIndexes: ["
-        indexes = Vector(self.val["_candidateIndexes"])
-        for i in range(indexes.count()):
-            if i > 0:
-                res += ", "
-            res += "<id: " + str(i) + ", " + str(indexes.get(i)).replace("\n", "") + ">"
-        res += "]"
-        return res
-
-    def to_string(self):
-        return "Sargable [" + strip_namespace(str(self.val["_target"])) + "]"
-
-
 class RIDIntersectNodePrinter(FixedArityNodePrinter):
     """Pretty-printer for RIDIntersectNode."""
 
@@ -1225,7 +1195,6 @@ def register_optimizer_printers(pp):
         "SeekNode",
         "FilterNode",
         "EvaluationNode",
-        "SargableNode",
         "RIDIntersectNode",
         "RIDUnionNode",
         "BinaryJoinNode",

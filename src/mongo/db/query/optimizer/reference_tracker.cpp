@@ -358,27 +358,6 @@ struct Collector {
     }
 
     CollectedInfo transport(const ABT& n,
-                            const SargableNode& node,
-                            CollectedInfo childResult,
-                            CollectedInfo bindResult,
-                            CollectedInfo /*refResult*/) {
-        CollectedInfo result{collectorState};
-
-        result.merge(std::move(childResult));
-        result.mergeNoDefs(std::move(bindResult));
-
-        const auto& projectionNames = node.binder().names();
-        const auto& projections = node.binder().exprs();
-        for (size_t i = 0; i < projectionNames.size(); i++) {
-            result.defs[projectionNames.at(i)] = Definition{n.ref(), projections[i].ref()};
-        }
-
-        result.nodeDefs[&node] = result.defs;
-
-        return result;
-    }
-
-    CollectedInfo transport(const ABT& n,
                             const RIDIntersectNode& node,
                             CollectedInfo leftChildResult,
                             CollectedInfo rightChildResult) {
