@@ -55,7 +55,7 @@ function getPreImages(node) {
 function oplogIsRolledOver(lastOplogEntryTsToBeRemoved) {
     return [primaryNode, rst.getSecondary()].every(
         (node) => timestampCmp(lastOplogEntryTsToBeRemoved,
-                               getFirstOplogEntry(node, {readConcern: "majority"}).ts) <= 0);
+                               getFirstOplogEntry(node, {readConcern: "majority"}).ts) < 0);
 }
 
 // Invokes function 'func()' and returns the invocation result. Retries the action if 'func()'
@@ -137,7 +137,7 @@ function retryOnCappedPositionLostError(func, message) {
         const allPreImagesHaveBiggerTimestamp = preImages.every(
             preImage => timestampCmp(preImage._id.ts, lastOplogEntryToBeRemoved.ts) == 1);
         return onlyTwoPreImagesLeft && allPreImagesHaveBiggerTimestamp;
-    });
+    }, "Existing pre-images: " + tojson(getPreImages(primaryNode)));
 
     // If the feature flag is on, then batched deletes will not be used for deletion. Additionally,
     // since truncates are not replicated, the number of pre-images on the primary may differ from
