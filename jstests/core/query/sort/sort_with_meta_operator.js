@@ -1,4 +1,8 @@
 // Tests to validate the input for sort on '$meta' operator.
+// Note that sorting with 'searchScore' and 'vectorSearchScore' are separated out to use an
+// end_to_end mongot test.
+// This test was adjusted as we start to allow sorting by "searchScore".
+// @tags: [featureFlagSearchHybridScoringPrerequisites]
 const coll = db.sort_with_meta_operator;
 coll.drop();
 
@@ -10,9 +14,7 @@ assert.commandFailedWithCode(db.runCommand({find: coll.getName(), sort: {_id: {$
 assert.commandFailedWithCode(db.runCommand({find: coll.getName(), sort: {_id: {$meta: -1}}}),
                              31138);
 assert.commandFailedWithCode(
-    db.runCommand({find: coll.getName(), sort: {_id: {$meta: 'searchScore'}}}), 31218);
-assert.commandFailedWithCode(
-    db.runCommand({find: coll.getName(), sort: {_id: {$meta: 'searchHighlights'}}}), 31219);
+    db.runCommand({find: coll.getName(), sort: {_id: {$meta: 'searchHighlights'}}}), 31138);
 assert.commandFailedWithCode(db.runCommand({find: coll.getName(), sort: {_id: {$meta: '1'}}}),
                              31138);
 
@@ -34,15 +36,9 @@ assert.commandFailedWithCode(
 assert.commandFailedWithCode(db.runCommand({
     aggregate: coll.getName(),
     cursor: {},
-    pipeline: [{$sort: {_id: {$meta: 'searchScore'}}}]
-}),
-                             31218);
-assert.commandFailedWithCode(db.runCommand({
-    aggregate: coll.getName(),
-    cursor: {},
     pipeline: [{$sort: {_id: {$meta: 'searchHighlights'}}}]
 }),
-                             31219);
+                             31138);
 assert.commandFailedWithCode(
     db.runCommand(
         {aggregate: coll.getName(), cursor: {}, pipeline: [{$sort: {_id: {$meta: '1'}}}]}),
