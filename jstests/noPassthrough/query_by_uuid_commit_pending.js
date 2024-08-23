@@ -45,9 +45,11 @@ function runTestCase(dbName, collName, parallelShellCommand, getUUIDBeforeComman
     failPoint.wait();
 
     if (!getUUIDBeforeCommand) {
-        uuid = assert.commandWorked(db.runCommand({listCollections: 1, filter: {name: collName}}))
-                   .cursor.firstBatch[0]
-                   ?.info?.uuid;
+        let res =
+            assert.commandWorked(db.runCommand({listCollections: 1, filter: {name: collName}}));
+        if (res.cursor.firstBatch[0] && res.cursor.firstBatch[0].info) {
+            uuid = res.cursor.firstBatch[0].info.uuid;
+        }
     }
 
     return {uuid: uuid, fp: failPoint, awaitResult: awaitResult};
