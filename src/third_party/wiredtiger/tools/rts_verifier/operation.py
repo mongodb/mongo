@@ -59,7 +59,7 @@ class Operation:
         self.line = line
 
         # Extract the RTS message type, e.g. 'PAGE_ROLLBACK'.
-        matches = re.search('\[WT_VERB_RTS\]\[DEBUG_\d+\]: \[(\w+)\]', line)
+        matches = re.search('\[WT_VERB_RTS\]\[(?:INFO|DEBUG_\d+)\]: \[(\w+)\]', line)
         if matches is None or matches.group(1) is None:
             raise Exception("Checker got a verbose RTS message in a format it didn't understand: {}"
                             .format(line))

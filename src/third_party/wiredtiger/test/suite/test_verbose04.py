@@ -119,9 +119,9 @@ class test_verbose04(test_verbose_base):
             session.compact(uri)
             session.close()
 
-        # At this time, no verbose messages should be generated with the following set of operations and the verbosity level
-        # WT_VERBOSE_INFO (0), hence we don't expect any output.
-        with self.expect_verbose(['all:0'], self.all_verbose_categories, self.is_json, False) as conn:
+        # At this time, only INFO verbose messages should be generated with the following set of
+        # operations and the verbosity level WT_VERBOSE_INFO (0).
+        with self.expect_verbose(['all:0'], self.all_verbose_categories, self.is_json) as conn:
             uri = 'table:test_verbose04_all'
             session = conn.open_session()
             session.create(uri, self.collection_cfg)
