@@ -788,45 +788,148 @@ BSONObj _fnvHashToHexString(const BSONObj& args, void*) {
     return BSON("" << fmt::format("{0:x}", hashed));
 }
 
-void sortBSONObjectInternallyHelper(const BSONObj& input, BSONObjBuilder& bob);
+// Comparison function for sorting BSON elements in an array.
+bool cmpBSONElements(const BSONElement& lhs, const BSONElement& rhs) {
+    // Use the woCompare method with no bits set, so field names are ignored. This is helpful for
+    // comparing elements in an array without considering their initial ordering/id.
+    BSONObj lhsObj = lhs.wrap();
+    BSONObj rhsObj = rhs.wrap();
+    return lhsObj.woCompare(rhsObj, BSONObj(), false, nullptr) < 0;
+}
+
+void sortBSONObjectInternallyHelper(const BSONObj& input,
+                                    BSONObjBuilder& bob,
+                                    NormalizationOptsSet opts);
 
 // Helper for `sortBSONObjectInternally`, handles a BSONElement for different recursion cases.
-void sortBSONElementInternally(const BSONElement& el, BSONObjBuilder& bob) {
+void sortBSONElementInternally(const BSONElement& el,
+                               BSONObjBuilder& bob,
+                               NormalizationOptsSet opts) {
     if (el.type() == BSONType::Array) {
-        BSONObjBuilder sub(bob.subarrayStart(el.fieldNameStringData()));
-        for (const auto& child : el.Array()) {
-            sortBSONElementInternally(child, sub);
+        std::vector<BSONElement> arr = el.Array();
+
+        if (isSet(opts, NormalizationOpts::kSortArrays)) {
+            // Sort each individual BSONElement in the array internally.
+            std::vector<BSONObj> sortedObjs;
+            for (const auto& child : arr) {
+                BSONObjBuilder tmp;
+                sortBSONElementInternally(child, tmp, opts);
+                sortedObjs.push_back(tmp.obj());
+            }
+
+            // Sort the top-level elements in the array among each other. The elements have already
+            // been sorted individually.
+            std::sort(
+                sortedObjs.begin(), sortedObjs.end(), [&](const BSONObj& lhs, const BSONObj& rhs) {
+                    return cmpBSONElements(lhs.firstElement(), rhs.firstElement());
+                });
+
+            // Append the elements back to the top-level BSONObjBuilder.
+            BSONArrayBuilder sub(bob.subarrayStart(el.fieldNameStringData()));
+            for (const auto& child : sortedObjs) {
+                sub.append(child.firstElement());
+            }
+            sub.doneFast();
+        } else {
+            BSONObjBuilder sub(bob.subarrayStart(el.fieldNameStringData()));
+            for (const auto& child : arr) {
+                sortBSONElementInternally(child, sub, opts);
+            }
+            sub.doneFast();
         }
-        sub.doneFast();
     } else if (el.type() == BSONType::Object) {
         BSONObjBuilder sub(bob.subobjStart(el.fieldNameStringData()));
-        sortBSONObjectInternallyHelper(el.Obj(), sub);
+        sortBSONObjectInternallyHelper(el.Obj(), sub, opts);
         sub.doneFast();
     } else {
         bob.append(el);
     }
 }
 
-void sortBSONObjectInternallyHelper(const BSONObj& input, BSONObjBuilder& bob) {
+void sortBSONObjectInternallyHelper(const BSONObj& input,
+                                    BSONObjBuilder& bob,
+                                    NormalizationOptsSet opts) {
     BSONObjIteratorSorted it(input);
     while (it.more()) {
-        sortBSONElementInternally(it.next(), bob);
+        sortBSONElementInternally(it.next(), bob, opts);
     }
 }
 
-// Returns a new BSON with the same field/value pairings, but is recursively sorted by the fields.
-// Arrays are not changed.
-BSONObj sortBSONObjectInternally(const BSONObj& input) {
+/**
+ * Returns a new BSON with the same field/value pairings, but is recursively sorted by the fields.
+ * By default, arrays are not sorted unless NormalizationOptsSet has the kSortArrays bit set.
+ */
+BSONObj sortBSONObjectInternally(const BSONObj& input,
+                                 NormalizationOptsSet opts = NormalizationOpts::kSortBSON) {
     BSONObjBuilder bob(input.objsize());
-    sortBSONObjectInternallyHelper(input, bob);
+    sortBSONObjectInternallyHelper(input, bob, opts);
     return bob.obj();
 }
 
-// Sorts a vector of BSON objects by their fields as they appear in the BSON.
 void sortQueryResults(std::vector<BSONObj>& input) {
     std::sort(input.begin(), input.end(), [&](const BSONObj& lhs, const BSONObj& rhs) {
         return SimpleBSONObjComparator::kInstance.evaluate(lhs < rhs);
     });
+}
+
+void normalizeNumericElementsHelper(const BSONObj& input, BSONObjBuilder& bob);
+
+void normalizeNumericElements(const BSONElement& el, BSONObjBuilder& bob) {
+    switch (el.type()) {
+        case NumberInt:
+        case NumberLong:
+        case NumberDouble:
+        case NumberDecimal: {
+            bob.append(el.fieldName(), el.numberDecimal().normalize());
+            break;
+        }
+        case Array: {
+            BSONObjBuilder sub(bob.subarrayStart(el.fieldNameStringData()));
+            for (const auto& child : el.Array()) {
+                normalizeNumericElements(child, sub);
+            }
+            sub.doneFast();
+            break;
+        }
+        case Object: {
+            BSONObjBuilder sub(bob.subobjStart(el.fieldNameStringData()));
+            normalizeNumericElementsHelper(el.Obj(), sub);
+            sub.doneFast();
+            break;
+        }
+        default:
+            bob.append(el);
+            break;
+    }
+}
+
+void normalizeNumericElementsHelper(const BSONObj& input, BSONObjBuilder& bob) {
+    BSONObjIterator it(input);
+    while (it.more()) {
+        normalizeNumericElements(it.next(), bob);
+    }
+}
+
+/**
+ * Returns a new BSONObj with the same field/value pairings, but with numeric types converted into
+ * Decimal128 and normalized to maximum precision. For example, NumberInt(1), NumberLong(1), 1.0,
+ * and NumberDecimal('1.0000') would be normalized into the same number.
+ */
+BSONObj normalizeNumerics(const BSONObj& input) {
+    BSONObjBuilder bob(input.objsize());
+    normalizeNumericElementsHelper(input, bob);
+    return bob.obj();
+}
+
+BSONObj normalizeBSONObj(const BSONObj& input, NormalizationOptsSet opts) {
+    BSONObj result = input;
+    if (isSet(opts, NormalizationOpts::kNormalizeNumerics)) {
+        result = normalizeNumerics(input);
+    }
+    if (isSet(opts, NormalizationOpts::kSortBSON)) {
+        result = sortBSONObjectInternally(result, opts);
+    }
+    return result;
 }
 
 /*

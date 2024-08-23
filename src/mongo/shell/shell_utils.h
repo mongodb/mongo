@@ -114,5 +114,45 @@ struct GoldenTestContextShellFailure {
     void diff() const;
 };
 
+enum class NormalizationOpts : uint32_t {
+    kResults = 0,
+    // Set this bit to sort an array of results. Used in QueryTester.
+    kSortResults = 1 << 0,
+    // Set this bit to sort fields in the BSONObj.
+    kSortBSON = 1 << 1,
+    // Set this bit to sort arrays in the BSONObj.
+    kSortArrays = 1 << 2,
+    // Set this bit to normalize numerics.
+    kNormalizeNumerics = 1 << 3
+};
+using NormalizationOptsSet = NormalizationOpts;
+
+inline NormalizationOpts operator&(NormalizationOpts lhs, NormalizationOpts rhs) {
+    return static_cast<NormalizationOpts>(static_cast<uint32_t>(lhs) & static_cast<uint32_t>(rhs));
+}
+
+inline NormalizationOpts operator|(NormalizationOpts lhs, NormalizationOpts rhs) {
+    return static_cast<NormalizationOpts>(static_cast<uint32_t>(lhs) | static_cast<uint32_t>(rhs));
+}
+
+inline bool isSet(NormalizationOpts opts, NormalizationOpts flag) {
+    return (opts & flag) != NormalizationOpts::kResults;
+}
+
+// Sorts a vector of BSON objects by their fields as they appear in the BSON.
+void sortQueryResults(std::vector<BSONObj>& input);
+
+/**
+ * Normalizes a BSONObj for more flexible results comparison. By default, this will return the
+ * BSONObj with no changes.
+ *
+ * If the kSortBSON bit, this method will return a new BSON with the same field/value
+ * pairings, but recursively sorted by the fields. If the kSortArrays bit is set, this method will
+ * also recursively sort the BSONObj's arrays. If the kNormalizeNumerics bit is set, this method
+ * will normalize numerics by casting them to the widest type, Decimal128, and normalizing them to
+ * the maximum precision.
+ */
+BSONObj normalizeBSONObj(const BSONObj& input,
+                         NormalizationOptsSet opts = NormalizationOpts::kResults);
 }  // namespace shell_utils
 }  // namespace mongo
