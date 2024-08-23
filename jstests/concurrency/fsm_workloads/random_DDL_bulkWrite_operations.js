@@ -344,13 +344,31 @@ export const $config = (function() {
         }
     };
 
+    let initialReshardingMinimumOperationDurationMillis = null;
+
     let setup = function(db, collName, cluster) {
         for (let tid = 0; tid < this.threadCount; ++tid) {
             db[data.BulkWriteMutex].insert({tid: tid, mutex: 0});
         }
+        // This test can time out on AUBSAN debug builds because sharding does not wait long enough
+        // for other operations like retryable writes that started just after the resharding to
+        // complete. Therefore, we force sharding to wait 15 seconds.
+        cluster.executeOnConfigNodes((db) => {
+            const res = assert.commandWorked(db.adminCommand(
+                {setParameter: 1, reshardingMinimumOperationDurationMillis: 15000}));
+            initialReshardingMinimumOperationDurationMillis = res.was;
+        });
     };
 
-    let teardown = function(db, collName, cluster) {};
+    let teardown = function(db, collName, cluster) {
+        cluster.executeOnConfigNodes((db) => {
+            const res = assert.commandWorked(db.adminCommand({
+                setParameter: 1,
+                reshardingMinimumOperationDurationMillis:
+                    initialReshardingMinimumOperationDurationMillis
+            }));
+        });
+    };
 
     return {
         threadCount: 10,
