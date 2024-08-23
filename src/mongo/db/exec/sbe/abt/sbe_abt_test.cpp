@@ -61,8 +61,6 @@
 #include "mongo/db/query/optimizer/algebra/operator.h"
 #include "mongo/db/query/optimizer/comparison_op.h"
 #include "mongo/db/query/optimizer/defs.h"
-#include "mongo/db/query/optimizer/metadata.h"
-#include "mongo/db/query/optimizer/metadata_factory.h"
 #include "mongo/db/query/optimizer/node.h"  // IWYU pragma: keep
 #include "mongo/db/query/optimizer/node_defs.h"
 #include "mongo/db/query/optimizer/props.h"
@@ -118,9 +116,13 @@ public:
         }
 
         sbe::InputParamToSlotMap inputParamToSlotMap;
-        auto expr =
-            SBEExpressionLowering{env, map, *runtimeEnv(), slotIdGenerator(), inputParamToSlotMap}
-                .optimize(tree);
+        auto expr = SBEExpressionLowering{env,
+                                          map,
+                                          *runtimeEnv(),
+                                          slotIdGenerator(),
+                                          inputParamToSlotMap,
+                                          nullptr /* scanDefs */}
+                        .optimize(tree);
 
         auto compiledExpr = compileExpression(*expr);
         return runCompiledExpression(compiledExpr.get());
@@ -141,7 +143,8 @@ TEST_F(AbtToSbeExpression, Lower1) {
     SlotVarMap map;
     sbe::InputParamToSlotMap inputParamToSlotMap;
     auto expr =
-        SBEExpressionLowering{env, map, *runtimeEnv(), slotIdGenerator(), inputParamToSlotMap}
+        SBEExpressionLowering{
+            env, map, *runtimeEnv(), slotIdGenerator(), inputParamToSlotMap, nullptr}
             .optimize(tree);
 
     ASSERT(expr);
@@ -162,7 +165,8 @@ TEST_F(AbtToSbeExpression, Lower2) {
     SlotVarMap map;
     sbe::InputParamToSlotMap inputParamToSlotMap;
     auto expr =
-        SBEExpressionLowering{env, map, *runtimeEnv(), slotIdGenerator(), inputParamToSlotMap}
+        SBEExpressionLowering{
+            env, map, *runtimeEnv(), slotIdGenerator(), inputParamToSlotMap, nullptr}
             .optimize(tree);
 
     ASSERT(expr);
@@ -180,7 +184,8 @@ TEST_F(AbtToSbeExpression, Lower3) {
     SlotVarMap map;
     sbe::InputParamToSlotMap inputParamToSlotMap;
     auto expr =
-        SBEExpressionLowering{env, map, *runtimeEnv(), slotIdGenerator(), inputParamToSlotMap}
+        SBEExpressionLowering{
+            env, map, *runtimeEnv(), slotIdGenerator(), inputParamToSlotMap, nullptr}
             .optimize(tree);
 
     ASSERT(expr);
@@ -213,7 +218,8 @@ TEST_F(AbtToSbeExpression, Lower4) {
     SlotVarMap map;
     sbe::InputParamToSlotMap inputParamToSlotMap;
     auto expr =
-        SBEExpressionLowering{env, map, *runtimeEnv(), slotIdGenerator(), inputParamToSlotMap}
+        SBEExpressionLowering{
+            env, map, *runtimeEnv(), slotIdGenerator(), inputParamToSlotMap, nullptr}
             .optimize(tree);
 
     ASSERT(expr);
@@ -232,7 +238,8 @@ TEST_F(AbtToSbeExpression, Lower5) {
     SlotVarMap map;
     sbe::InputParamToSlotMap inputParamToSlotMap;
     auto expr =
-        SBEExpressionLowering{env, map, *runtimeEnv(), slotIdGenerator(), inputParamToSlotMap}
+        SBEExpressionLowering{
+            env, map, *runtimeEnv(), slotIdGenerator(), inputParamToSlotMap, nullptr}
             .optimize(tree);
 
     ASSERT(expr);
@@ -286,7 +293,8 @@ TEST_F(AbtToSbeExpression, Lower6) {
 
     sbe::InputParamToSlotMap inputParamToSlotMap;
     auto expr =
-        SBEExpressionLowering{env, map, *runtimeEnv(), slotIdGenerator(), inputParamToSlotMap}
+        SBEExpressionLowering{
+            env, map, *runtimeEnv(), slotIdGenerator(), inputParamToSlotMap, nullptr}
             .optimize(tree);
 
     ASSERT(expr);
@@ -339,7 +347,8 @@ TEST_F(AbtToSbeExpression, Lower7) {
 
     sbe::InputParamToSlotMap inputParamToSlotMap;
     auto expr =
-        SBEExpressionLowering{env, map, *runtimeEnv(), slotIdGenerator(), inputParamToSlotMap}
+        SBEExpressionLowering{
+            env, map, *runtimeEnv(), slotIdGenerator(), inputParamToSlotMap, nullptr}
             .optimize(tree);
 
     ASSERT(expr);
@@ -360,7 +369,8 @@ TEST_F(AbtToSbeExpression, LowerFunctionCallFail) {
     SlotVarMap map;
     sbe::InputParamToSlotMap inputParamToSlotMap;
     auto expr =
-        SBEExpressionLowering{env, map, *runtimeEnv(), slotIdGenerator(), inputParamToSlotMap}
+        SBEExpressionLowering{
+            env, map, *runtimeEnv(), slotIdGenerator(), inputParamToSlotMap, nullptr}
             .optimize(tree);
     ASSERT(expr);
 
@@ -392,7 +402,8 @@ TEST_F(AbtToSbeExpression, LowerFunctionCallConvert) {
     auto env = VariableEnvironment::build(tree);
     sbe::InputParamToSlotMap inputParamToSlotMap;
     auto expr =
-        SBEExpressionLowering{env, map, *runtimeEnv(), slotIdGenerator(), inputParamToSlotMap}
+        SBEExpressionLowering{
+            env, map, *runtimeEnv(), slotIdGenerator(), inputParamToSlotMap, nullptr}
             .optimize(tree);
     ASSERT(expr);
 
@@ -434,7 +445,8 @@ TEST_F(AbtToSbeExpression, LowerFunctionCallTypeMatch) {
     auto env = VariableEnvironment::build(tree);
     sbe::InputParamToSlotMap inputParamToSlotMap;
     auto expr =
-        SBEExpressionLowering{env, map, *runtimeEnv(), slotIdGenerator(), inputParamToSlotMap}
+        SBEExpressionLowering{
+            env, map, *runtimeEnv(), slotIdGenerator(), inputParamToSlotMap, nullptr}
             .optimize(tree);
     ASSERT(expr);
 
@@ -475,7 +487,8 @@ TEST_F(AbtToSbeExpression, LowerComparisonCollation) {
     auto tree = make<BinaryOp>(Operations::Cmp3w, make<Variable>("lhs"), make<Variable>("rhs"));
     auto env = VariableEnvironment::build(tree);
     auto expr =
-        SBEExpressionLowering{env, map, *runtimeEnv(), slotIdGenerator(), inputParamToSlotMap}
+        SBEExpressionLowering{
+            env, map, *runtimeEnv(), slotIdGenerator(), inputParamToSlotMap, nullptr}
             .optimize(tree);
 
     ASSERT(expr);
@@ -615,28 +628,24 @@ TEST_F(AbtToSbeExpression, NullableLhsAndTrueConstFold) {
 }
 
 /**
- * This transport is used to populate default values into the NodeToGroupProps map to get around the
- * fact that the plan was not obtained from the memo. At this point we are interested only in the
- * planNodeIds being distinct.
+ * This transport is used to populate default values into the LoweringNodeToGroupProps map to get
+ * around the fact that the plan was not obtained from the memo. At this point we are interested
+ * only in the planNodeIds being distinct.
  */
 class PropsTransport {
 public:
     template <typename T, typename... Ts>
-    void transport(const T& node, NodeToGroupPropsMap& propMap, Ts&&...) {
+    void transport(const T& node, LoweringNodeToGroupPropsMap& propMap, Ts&&...) {
         if constexpr (std::is_base_of_v<Node, T>) {
             propMap.emplace(&node,
-                            NodeProps{_planNodeId++,
-                                      {-1, 0} /*groupId*/,
-                                      {} /*logicalProps*/,
-                                      {} /*physicalProps*/,
-                                      boost::none /*ridProjName*/,
-                                      CostType::kZero /*cost*/,
-                                      CostType::kZero /*localCost*/,
-                                      0.0 /*adjustedCE*/});
+                            LoweringNodeProps{_planNodeId++,
+                                              {} /*logicalProps*/,
+                                              {} /*physicalProps*/,
+                                              boost::none /*ridProjName*/});
         }
     }
 
-    void updatePropsMap(const ABT& n, NodeToGroupPropsMap& propMap) {
+    void updatePropsMap(const ABT& n, LoweringNodeToGroupPropsMap& propMap) {
         algebra::transport<false>(n, *this, propMap);
     }
 
@@ -650,7 +659,6 @@ TEST_F(NodeSBE, SpoolFibonacci) {
     using namespace unit_test_abt_literals;
 
     auto prefixId = PrefixId::createForTests();
-    Metadata metadata{{}};
 
     // Construct a spool-based recursive plan to compute the first 10 Fibonacci numbers. The main
     // plan (first child of the union) sets up the initial conditions (val = 1, prev = 0, and it =
@@ -700,7 +708,7 @@ TEST_F(NodeSBE, SpoolFibonacci) {
         "CoScan []\n",
         tree);
 
-    NodeToGroupPropsMap props;
+    LoweringNodeToGroupPropsMap props;
     PropsTransport{}.updatePropsMap(tree, props);
 
     auto env = VariableEnvironment::build(tree);
@@ -709,7 +717,7 @@ TEST_F(NodeSBE, SpoolFibonacci) {
     boost::optional<sbe::value::SlotId> ridSlot;
     sbe::value::SlotIdGenerator ids;
     sbe::InputParamToSlotMap inputParamToSlotMap;
-    SBENodeLowering g{env, *runtimeEnv, ids, inputParamToSlotMap, metadata, props};
+    SBENodeLowering g{env, *runtimeEnv, ids, inputParamToSlotMap, {}, props, 1, nullptr};
     auto sbePlan = g.optimize(tree, map, ridSlot);
     ASSERT_EQ(1, map.size());
 

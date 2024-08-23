@@ -67,7 +67,7 @@ namespace {
 class ABTNodeLoweringFixture : public benchmark::Fixture {
 protected:
     ProjectionName scanLabel = ProjectionName{"scan0"_sd};
-    NodeToGroupPropsMap _nodeMap;
+    LoweringNodeToGroupPropsMap _nodeMap;
     // This can be modified by tests that need other labels.
     FieldProjectionMap _fieldProjMap{{}, {scanLabel}, {}};
     int lastNodeGenerated = 0;
@@ -76,14 +76,7 @@ protected:
     }
 
     auto makeNodeProp() {
-        NodeProps n{getNextNodeID(),
-                    {},
-                    {},
-                    {},
-                    boost::none,
-                    CostType::fromDouble(0),
-                    CostType::fromDouble(0),
-                    CEType{0.0}};
+        LoweringNodeProps n{getNextNodeID(), {}, {}, boost::none};
         properties::setPropertyOverwrite(n._physicalProps, properties::ProjectionRequirement({}));
         return n;
     }
@@ -93,12 +86,17 @@ protected:
     }
     void benchmarkLowering(benchmark::State& state, const ABT& n) {
         for (auto keepRunning : state) {
-            auto m = Metadata(
-                {{"collName",
-                  createScanDef(
-                      {{"type", "mongod"}, {"database", "test"}, {"uuid", UUID::gen().toString()}},
-                      {{"idx", makeIndexDefinition("a", CollationOp::Ascending)}})}});
-
+            LoweringScanDefinition::ScanDefOptions opts = {{"type", "mongod"},
+                                                           {"database", "test"}};
+            stdx::unordered_map<std::string, LoweringScanDefinition> scanDefs = {
+                {"collName",
+                 LoweringScanDefinition{
+                     DatabaseNameUtil::deserialize(
+                         boost::none, "test", SerializationContext::stateDefault()),
+                     std::move(opts),
+                     UUID::gen(),
+                     true /* exists */,
+                     {} /* shardKey */}}};
             auto env = VariableEnvironment::build(n);
             SlotVarMap map;
             sbe::RuntimeEnvironment runtimeEnv;
@@ -106,9 +104,15 @@ protected:
             sbe::value::SlotIdGenerator ids;
             sbe::InputParamToSlotMap inputParamToSlotMap;
 
-            benchmark::DoNotOptimize(
-                SBENodeLowering{env, runtimeEnv, ids, inputParamToSlotMap, m, _nodeMap}.optimize(
-                    n, map, ridSlot));
+            benchmark::DoNotOptimize(SBENodeLowering{env,
+                                                     runtimeEnv,
+                                                     ids,
+                                                     inputParamToSlotMap,
+                                                     std::move(scanDefs),
+                                                     _nodeMap,
+                                                     1,
+                                                     nullptr}
+                                         .optimize(n, map, ridSlot));
             benchmark::ClobberMemory();
         }
     }
@@ -283,7 +287,7 @@ void BM_LowerABTLetExpr(benchmark::State& state) {
         sbe::value::SlotIdGenerator ids;
         sbe::InputParamToSlotMap inputParamToSlotMap;
         benchmark::DoNotOptimize(
-            SBEExpressionLowering{env, map, runtimeEnv, ids, inputParamToSlotMap}.optimize(n));
+            SBEExpressionLowering{env, map, runtimeEnv, ids, inputParamToSlotMap, {}}.optimize(n));
         benchmark::ClobberMemory();
     }
 }

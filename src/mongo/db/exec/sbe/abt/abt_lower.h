@@ -43,9 +43,8 @@
 #include "mongo/db/exec/sbe/values/value.h"
 #include "mongo/db/query/optimizer/defs.h"
 #include "mongo/db/query/optimizer/index_bounds.h"
-#include "mongo/db/query/optimizer/metadata.h"
 #include "mongo/db/query/optimizer/node.h"  // IWYU pragma: keep
-#include "mongo/db/query/optimizer/node_defs.h"
+#include "mongo/db/query/optimizer/props.h"
 #include "mongo/db/query/optimizer/reference_tracker.h"
 #include "mongo/db/query/optimizer/syntax/expr.h"
 #include "mongo/db/query/optimizer/syntax/syntax.h"
@@ -54,6 +53,61 @@
 
 namespace mongo::optimizer {
 constexpr mongo::StringData kshardFiltererSlotName = "shardFilterer"_sd;
+
+/**
+ * Structure to represent index field component and its associated collation. The _path field
+ * contains the path to the field component, restricted to Get, Traverse, and Id elements.
+ * For example, if we have an index on {a.b, c} that contains arrays, the _path for the first entry
+ * would be Get "a" Traverse Get "b" Traverse Id, and the _path for the second entry would be
+ * Get "c" Traverse Id.
+ * Implicitly contains multikey info through Traverse element or lack of Traverse element.
+ */
+struct LoweringIndexCollationEntry {
+    ABT _path;
+    CollationOp _op;
+};
+
+/**
+ * Parameters to a scan node, including collection UUID and other scan definition options.
+ */
+struct LoweringScanDefinition {
+    using ScanDefOptions = stdx::unordered_map<std::string, std::string>;
+
+    // All indexes are treated as version 1 and ordering bits set to 0.
+    static constexpr int64_t kIndexVersion = 1;
+    static constexpr uint32_t kIndexOrderingBits = 0;
+
+    DatabaseName _dbName;
+    ScanDefOptions _options;
+    boost::optional<UUID> _uuid;
+
+    // True if the collection exists.
+    bool _exists;
+
+    // Shard key of the collection. This is stored as an index entry because the shard key
+    // is conceptually an index to the shard which contains a particular key. The only collation ops
+    // that are allowed are Ascending and Clustered.
+    // Note: Clustered collation op is intended to represent a hashed shard key; however, if two
+    // keys hash to the same value, it is possible that an index scan of the hashed index will
+    // produce a stream of keys which are not clustered. Hashed indexes are implemented with a
+    // B-tree using the hashed value as a key, which makes it sensitive to insertion order.
+    std::vector<LoweringIndexCollationEntry> _shardKey;
+};
+
+struct LoweringNodeProps {
+    // Used to tie to a corresponding SBE stage.
+    int32_t _planNodeId;
+
+    properties::LogicalProps _logicalProps;
+    properties::PhysProps _physicalProps;
+
+    // // Set if we have an RID projection name.
+    boost::optional<ProjectionName> _ridProjName;
+};
+
+// Map from node to various properties, including logical and physical. Used to determine for
+// example which of the available projections are used for exchanges.
+using LoweringNodeToGroupPropsMap = stdx::unordered_map<const Node*, LoweringNodeProps>;
 
 class VarResolver {
 public:
@@ -99,8 +153,8 @@ public:
         SlotsProvider& providedSlots,
         sbe::value::SlotIdGenerator& ids,
         sbe::InputParamToSlotMap& inputParamToSlotMap,
-        const Metadata* metadata = nullptr,
-        const NodeProps* np = nullptr,
+        stdx::unordered_map<std::string, LoweringScanDefinition>* scanDefs,
+        const LoweringNodeProps* np = nullptr,
         ComparisonOpSemantics compOpSemantics = ComparisonOpSemantics::kTotalOrder,
         sbe::value::FrameIdGenerator* frameIdGenerator = nullptr)
         : _env(env),
@@ -108,7 +162,7 @@ public:
           _providedSlots(providedSlots),
           _slotIdGenerator(ids),
           _inputParamToSlotMap(inputParamToSlotMap),
-          _metadata(metadata),
+          _scanDefs(scanDefs),
           _np(np),
           _frameIdGenerator(frameIdGenerator),
           _comparisonOpSemantics(compOpSemantics) {}
@@ -172,8 +226,8 @@ private:
     // Map to record newly allocated slots and the parameter ids they were generated from.
     // For more details see PlanStageStaticData::inputParamToSlotMap
     sbe::InputParamToSlotMap& _inputParamToSlotMap;
-    const Metadata* _metadata;
-    const NodeProps* _np;
+    stdx::unordered_map<std::string, LoweringScanDefinition>* _scanDefs;
+    const LoweringNodeProps* _np;
 
     // If '_frameIdGenerator' is not null then we use it to generate frame IDs, otherwise we
     // use '_localFrameIdGenerator' to generate frame IDs.
@@ -195,14 +249,16 @@ public:
                     SlotsProvider& providedSlots,
                     sbe::value::SlotIdGenerator& ids,
                     sbe::InputParamToSlotMap& inputParamToSlotMap,
-                    const Metadata& metadata,
-                    const NodeToGroupPropsMap& nodeToGroupPropsMap,
-                    PlanYieldPolicy* yieldPolicy = nullptr)
+                    stdx::unordered_map<std::string, LoweringScanDefinition> scanDefs,
+                    const LoweringNodeToGroupPropsMap& nodeToGroupPropsMap,
+                    size_t numberOfPartitions,
+                    PlanYieldPolicy* yieldPolicy)
         : _env(env),
           _providedSlots(providedSlots),
           _slotIdGenerator(ids),
           _inputParamToSlotMap(inputParamToSlotMap),
-          _metadata(metadata),
+          _scanDefs(std::move(scanDefs)),
+          _numberOfPartitions(numberOfPartitions),
           _nodeToGroupPropsMap(nodeToGroupPropsMap),
           _yieldPolicy(yieldPolicy) {}
 
@@ -393,7 +449,7 @@ private:
      */
     sbe::value::SlotVector convertRequiredProjectionsToSlots(
         const SlotVarMap& slotMap,
-        const NodeProps& props,
+        const LoweringNodeProps& props,
         const sbe::value::SlotVector& toExclude = {}) const;
 
     /**
@@ -405,7 +461,6 @@ private:
     std::unique_ptr<sbe::EExpression> convertBoundsToExpr(SlotVarMap& slotMap,
                                                           bool isLower,
                                                           bool reversed,
-                                                          const IndexDefinition& indexDef,
                                                           const CompoundBoundRequirement& bound);
 
     std::unique_ptr<sbe::PlanStage> generateInternal(const ABT& n,
@@ -431,14 +486,14 @@ private:
      * Instantiate an expression lowering transporter for use in node lowering.
      */
     SBEExpressionLowering getExpressionLowering(SlotVarMap& slotMap,
-                                                const NodeProps* np = nullptr) {
+                                                const LoweringNodeProps* np = nullptr) {
         return SBEExpressionLowering{
-            _env, slotMap, _providedSlots, _slotIdGenerator, _inputParamToSlotMap, &_metadata, np};
+            _env, slotMap, _providedSlots, _slotIdGenerator, _inputParamToSlotMap, &_scanDefs, np};
     }
 
     std::unique_ptr<sbe::EExpression> lowerExpression(const ABT& e,
                                                       SlotVarMap& slotMap,
-                                                      const NodeProps* np = nullptr) {
+                                                      const LoweringNodeProps* np = nullptr) {
         return getExpressionLowering(slotMap, np).optimize(e);
     }
 
@@ -453,8 +508,9 @@ private:
 
     sbe::InputParamToSlotMap& _inputParamToSlotMap;
 
-    const Metadata& _metadata;
-    const NodeToGroupPropsMap& _nodeToGroupPropsMap;
+    stdx::unordered_map<std::string, LoweringScanDefinition> _scanDefs;
+    size_t _numberOfPartitions;
+    const LoweringNodeToGroupPropsMap& _nodeToGroupPropsMap;
 
     // Specifies the yielding policy to initialize the corresponding PlanStages with.
     PlanYieldPolicy* _yieldPolicy;

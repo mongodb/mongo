@@ -299,7 +299,7 @@ EExpr SbExpr::extractExpr(StageBuilderState& state, const VariableTypes* slotInf
         runtimeEnv,
         *state.slotIdGenerator,
         staticData->inputParamToSlotMap,
-        nullptr /* metadata */,
+        {} /* scanDefs */,
         nullptr /* nodeProps */,
         // SBE stage builders assume that binary comparison operations in ABT are type bracketed and
         // must specify this to the class responsible for lowering to SBE.
