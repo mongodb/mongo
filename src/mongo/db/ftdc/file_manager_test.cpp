@@ -63,7 +63,10 @@
 
 namespace mongo {
 
-class FTDCFileManagerTest : public ServiceContextTest {};
+class FTDCFileManagerTest : public ServiceContextTest {
+protected:
+    void testPeriodicCollection(bool multiservice);
+};
 
 // Test a full buffer
 TEST_F(FTDCFileManagerTest, TestFull) {
@@ -364,22 +367,7 @@ TEST_F(FTDCFileManagerTest, TestNormalCrashInterim) {
     ValidateDocumentList(files[1], docs2, FTDCValidationMode::kStrict);
 }
 
-TEST_F(FTDCFileManagerTest, TestPeriodicMetadataCollection) {
-#define TEST_BEGIN auto runTest = [this](bool multiservice) { \
-    std::cout << "Running " << _testInfo.testName() <<" with multiservice=" << \
-    multiservice << std::endl
-
-#define TEST_END                          \
-    }                                     \
-    ;                                     \
-    do {                                  \
-        for (auto mode : {true, false}) { \
-            runTest(mode);                \
-        }                                 \
-    } while (0)
-
-    TEST_BEGIN;
-
+void FTDCFileManagerTest::testPeriodicCollection(bool multiservice) {
     Client* client = &cc();
     FTDCConfig c;
     c.maxFileSizeBytes = 1024;
@@ -470,10 +458,14 @@ TEST_F(FTDCFileManagerTest, TestPeriodicMetadataCollection) {
     verifyDeltaDocuments(pmSamplesBeforeRotate / 2);
 
     mgr->close().transitional_ignore();
+}
 
-    TEST_END;
-#undef TEST_BEGIN
-#undef TEST_END
+TEST_F(FTDCFileManagerTest, PeriodicMetadataCollection) {
+    testPeriodicCollection(false);
+}
+
+TEST_F(FTDCFileManagerTest, MultiservicePeriodicMetadataCollection) {
+    testPeriodicCollection(true);
 }
 
 }  // namespace mongo
