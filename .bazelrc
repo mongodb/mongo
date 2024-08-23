@@ -21,6 +21,9 @@ build --experimental_inprocess_symlink_creation
 # dynamically.
 build --experimental_cc_shared_library
 
+# Reuse sandboxes to save sandbox execution and deletion times.
+build --experimental_reuse_sandbox_directories
+
 # Disable the default compiler flags to avoid certain flags that conflict with flags we setup.
 build:windows --features=-smaller_binary
 build:windows --features=-frame_pointer
