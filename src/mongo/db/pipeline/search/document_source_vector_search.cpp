@@ -66,13 +66,49 @@ DocumentSourceVectorSearch::DocumentSourceVectorSearch(
         uassert(7912700, "Expected limit to be positive", *_limit > 0);
     }
     if (auto filterElem = originalSpec.getField(kFilterFieldName)) {
-        uassertStatusOK(MatchExpressionParser::parse(filterElem.Obj(), expCtx));
+        _filterExpr = uassertStatusOK(MatchExpressionParser::parse(filterElem.Obj(), expCtx));
     }
+
+    initializeOpDebugVectorSearchMetrics();
+}
+
+void DocumentSourceVectorSearch::initializeOpDebugVectorSearchMetrics() {
+    auto& opDebug = CurOp::get(pExpCtx->opCtx)->debug();
+    double numCandidatesLimitRatio = [&] {
+        if (!_limit.has_value()) {
+            return 0.0;
+        }
+
+        auto numCandidatesElem = _originalSpec.getField(kNumCandidatesFieldName);
+        if (!numCandidatesElem.isNumber()) {
+            return 0.0;
+        }
+
+        return numCandidatesElem.safeNumberLong() / static_cast<double>(*_limit);
+    }();
+    opDebug.vectorSearchMetrics =
+        OpDebug::VectorSearchMetrics{.limit = static_cast<long>(_limit.value_or(0LL)),
+                                     .numCandidatesLimitRatio = numCandidatesLimitRatio};
 }
 
 Value DocumentSourceVectorSearch::serialize(const SerializationOptions& opts) const {
     if (opts.literalPolicy != LiteralSerializationPolicy::kUnchanged) {
-        return Value(Document{{kStageName, opts.serializeLiteral(_originalSpec)}});
+        BSONObjBuilder builder;
+
+        // For the query shape we only care about the filter expression and 'index' field. We treat
+        // the rest of the input as a black box that we do not introspect. This allows flexibility
+        // on the mongot side to change or add parameters. Note that this may make this query shape
+        // become outdated, but will not cause server errors.
+        if (_filterExpr) {
+            builder.append(kFilterFieldName, _filterExpr->serialize(opts));
+        }
+
+        if (auto indexElem = _originalSpec.getField(kIndexFieldName)) {
+            builder.append(kIndexFieldName,
+                           opts.serializeIdentifier(indexElem.valueStringDataSafe()));
+        }
+
+        return Value(Document{{kStageName, builder.obj()}});
     }
 
     // We don't want mongos to make a remote call to mongot even though it can generate explain

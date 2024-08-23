@@ -52,6 +52,7 @@
 #include "mongo/db/query/query_stats/optimizer_metrics_stats_entry.h"
 #include "mongo/db/query/query_stats/query_stats.h"
 #include "mongo/db/query/query_stats/supplemental_metrics_stats.h"
+#include "mongo/db/query/query_stats/vector_search_stats_entry.h"
 #include "mongo/db/storage/write_unit_of_work.h"
 #include "mongo/db/transaction_resources.h"
 #include "mongo/util/background.h"
@@ -398,6 +399,60 @@ public:
 };
 
 auto getClientCursorMonitor = ServiceContext::declareDecoration<ClientCursorMonitor>();
+
+void maybeAddOptimizerMetrics(
+    const OpDebug& opDebug,
+    const boost::intrusive_ptr<ExpressionContext>& expCtx,
+    std::vector<std::unique_ptr<query_stats::SupplementalStatsEntry>>& supplementalMetrics) {
+    if (internalQueryCollectOptimizerMetrics.load()) {
+        auto metricType(query_stats::SupplementalMetricType::Unknown);
+
+        switch (opDebug.queryFramework) {
+            case PlanExecutor::QueryFramework::kClassicOnly:
+            case PlanExecutor::QueryFramework::kClassicHybrid:
+                metricType = query_stats::SupplementalMetricType::Classic;
+                break;
+            case PlanExecutor::QueryFramework::kSBEOnly:
+            case PlanExecutor::QueryFramework::kSBEHybrid:
+                metricType = query_stats::SupplementalMetricType::SBE;
+                break;
+            case PlanExecutor::QueryFramework::kUnknown:
+                break;
+        }
+
+        if (metricType != query_stats::SupplementalMetricType::Unknown) {
+            if (opDebug.estimatedCost && opDebug.estimatedCardinality) {
+                supplementalMetrics.emplace_back(
+                    std::make_unique<query_stats::OptimizerMetricsBonsaiStatsEntry>(
+                        opDebug.planningTime.count(),
+                        *opDebug.estimatedCost,
+                        *opDebug.estimatedCardinality,
+                        metricType));
+            } else {
+                supplementalMetrics.emplace_back(
+                    std::make_unique<query_stats::OptimizerMetricsClassicStatsEntry>(
+                        opDebug.planningTime.count(), metricType));
+            }
+        }
+    }
+}
+
+void maybeAddVectorSearchMetrics(
+    const OpDebug& opDebug,
+    std::vector<std::unique_ptr<query_stats::SupplementalStatsEntry>>& supplementalMetrics) {
+    if (const auto& metrics = opDebug.vectorSearchMetrics) {
+        supplementalMetrics.emplace_back(std::make_unique<query_stats::VectorSearchStatsEntry>(
+            metrics->limit, metrics->numCandidatesLimitRatio));
+    }
+}
+
+std::vector<std::unique_ptr<query_stats::SupplementalStatsEntry>> computeSupplementalQueryMetrics(
+    const OpDebug& opDebug, const boost::intrusive_ptr<ExpressionContext>& expCtx) {
+    std::vector<std::unique_ptr<query_stats::SupplementalStatsEntry>> supplementalMetrics;
+    maybeAddOptimizerMetrics(opDebug, expCtx, supplementalMetrics);
+    maybeAddVectorSearchMetrics(opDebug, supplementalMetrics);
+    return supplementalMetrics;
+}
 }  // namespace
 
 void startClientCursorMonitor() {
@@ -422,7 +477,7 @@ void collectQueryStatsMongod(OperationContext* opCtx, ClientCursorPin& pinnedCur
                                      opDebug.queryStatsInfo.keyHash,
                                      pinnedCursor->takeKey(),
                                      snapshot,
-                                     nullptr,
+                                     {} /* supplementalMetrics */,
                                      pinnedCursor->getQueryStatsWillNeverExhaust());
     }
 }
@@ -439,45 +494,11 @@ void collectQueryStatsMongod(OperationContext* opCtx,
         query_stats::microsecondsToUint64(opDebug.additiveMetrics.executionTime),
         opDebug.additiveMetrics);
 
-    std::unique_ptr<query_stats::SupplementalStatsEntry> supplementalMetrics(nullptr);
-
-    if (internalQueryCollectOptimizerMetrics.load()) {
-        auto metricType(query_stats::SupplementalMetricType::Unknown);
-
-        switch (opDebug.queryFramework) {
-            case PlanExecutor::QueryFramework::kClassicOnly:
-            case PlanExecutor::QueryFramework::kClassicHybrid:
-                metricType = query_stats::SupplementalMetricType::Classic;
-                break;
-            case PlanExecutor::QueryFramework::kSBEOnly:
-            case PlanExecutor::QueryFramework::kSBEHybrid:
-                metricType = query_stats::SupplementalMetricType::SBE;
-                break;
-            case PlanExecutor::QueryFramework::kUnknown:
-                break;
-        }
-
-        if (metricType != query_stats::SupplementalMetricType::Unknown) {
-            if (opDebug.estimatedCost && opDebug.estimatedCardinality) {
-                supplementalMetrics =
-                    std::make_unique<query_stats::OptimizerMetricsBonsaiStatsEntry>(
-                        opDebug.planningTime.count(),
-                        *opDebug.estimatedCost,
-                        *opDebug.estimatedCardinality,
-                        metricType);
-            } else {
-                supplementalMetrics =
-                    std::make_unique<query_stats::OptimizerMetricsClassicStatsEntry>(
-                        opDebug.planningTime.count(), metricType);
-            }
-        }
-    }
-
     query_stats::writeQueryStats(opCtx,
                                  opDebug.queryStatsInfo.keyHash,
                                  std::move(key),
                                  snapshot,
-                                 std::move(supplementalMetrics));
+                                 computeSupplementalQueryMetrics(opDebug, expCtx));
 }
 
 }  // namespace mongo

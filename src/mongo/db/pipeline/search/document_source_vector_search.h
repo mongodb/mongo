@@ -44,6 +44,8 @@ public:
     static constexpr StringData kStageName = "$vectorSearch"_sd;
     static constexpr StringData kLimitFieldName = "limit"_sd;
     static constexpr StringData kFilterFieldName = "filter"_sd;
+    static constexpr StringData kIndexFieldName = "index"_sd;
+    static constexpr StringData kNumCandidatesFieldName = "numCandidates"_sd;
 
     DocumentSourceVectorSearch(const boost::intrusive_ptr<ExpressionContext>& expCtx,
                                std::shared_ptr<executor::TaskExecutor> taskExecutor,
@@ -104,7 +106,10 @@ private:
 
     DocumentSource::GetNextResult getNextAfterSetup();
 
-    const std::unique_ptr<MatchExpression> _filterExpr;
+    // Initialize metrics related to the $vectorSearch stage on the OpDebug object.
+    void initializeOpDebugVectorSearchMetrics();
+
+    std::unique_ptr<MatchExpression> _filterExpr;
 
     std::shared_ptr<executor::TaskExecutor> _taskExecutor;
 

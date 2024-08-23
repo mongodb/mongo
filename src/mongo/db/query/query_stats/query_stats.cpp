@@ -236,7 +236,7 @@ bool shouldCollect(const ServiceContext* serviceCtx) {
 void updateStatistics(const QueryStatsStore::Partition& proofOfLock,
                       QueryStatsEntry& toUpdate,
                       const QueryStatsSnapshot& snapshot,
-                      std::unique_ptr<SupplementalStatsEntry> supplementalStatsEntry) {
+                      std::vector<std::unique_ptr<SupplementalStatsEntry>> supplementalStats) {
     toUpdate.latestSeenTimestamp = Date_t::now();
     toUpdate.lastExecutionMicros = snapshot.queryExecMicros;
     toUpdate.execCount++;
@@ -254,15 +254,18 @@ void updateStatistics(const QueryStatsStore::Partition& proofOfLock,
     toUpdate.fromMultiPlanner.aggregate(snapshot.fromMultiPlanner);
     toUpdate.fromPlanCache.aggregate(snapshot.fromPlanCache);
 
-    toUpdate.addSupplementalStats(std::move(supplementalStatsEntry));
+    for (auto& supplementalStatsEntry : supplementalStats) {
+        toUpdate.addSupplementalStats(std::move(supplementalStatsEntry));
+    }
 }
 
-void insertQueryStatsEntry(QueryStatsStore::Partition& proofOfLock,
-                           QueryStatsStore& queryStatsStore,
-                           boost::optional<size_t> queryStatsKeyHash,
-                           std::unique_ptr<Key> key,
-                           const QueryStatsSnapshot& snapshot,
-                           std::unique_ptr<SupplementalStatsEntry> supplementalMetrics) {
+void insertQueryStatsEntry(
+    QueryStatsStore::Partition& proofOfLock,
+    QueryStatsStore& queryStatsStore,
+    boost::optional<size_t> queryStatsKeyHash,
+    std::unique_ptr<Key> key,
+    const QueryStatsSnapshot& snapshot,
+    std::vector<std::unique_ptr<SupplementalStatsEntry>> supplementalMetrics) {
     tassert(7315200,
             "key cannot be null when writing a new entry to the queryStats store",
             key != nullptr);
@@ -401,7 +404,7 @@ void writeQueryStats(OperationContext* opCtx,
                      boost::optional<size_t> queryStatsKeyHash,
                      std::unique_ptr<Key> key,
                      const QueryStatsSnapshot& snapshot,
-                     std::unique_ptr<SupplementalStatsEntry> supplementalMetrics,
+                     std::vector<std::unique_ptr<SupplementalStatsEntry>> supplementalMetrics,
                      bool willNeverExhaust) {
 
     // Generally we expect a 'key' to write query stats. However, for a change stream query, we
@@ -486,7 +489,7 @@ void writeQueryStatsOnCursorDisposeOrKill(OperationContext* opCtx,
             opCtx, query_stats::microsecondsToUint64(boost::none), OpDebug::AdditiveMetrics());
 
         query_stats::writeQueryStats(
-            opCtx, queryStatsKeyHash, nullptr, snapshot, nullptr, willNeverExhaust);
+            opCtx, queryStatsKeyHash, nullptr, snapshot, {}, willNeverExhaust);
     }
 }
 

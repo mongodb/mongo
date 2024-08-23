@@ -233,7 +233,54 @@ TEST_F(DocumentSourceVectorSearchTest, RedactsCorrectly) {
 
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
         R"({
-            "$vectorSearch":"?object"
+            "$vectorSearch": {
+                "filter": {
+                    "HASH<x>": {
+                        "$gt": "?number"
+                    }
+                },
+                "index": "HASH<x_index>"
+            }
+        })",
+        redact(*(vectorStage.front())));
+}
+
+TEST_F(DocumentSourceVectorSearchTest, EmptyStageRedactsCorrectly) {
+    // Mongod's contract with mongot is that we will not validate the existence (or lack thereof) of
+    // any arguments. Make sure that redaction won't choke on an empty stage.
+    auto spec = fromjson(R"({
+        $vectorSearch: {
+        }
+    })");
+
+    auto vectorStage = DocumentSourceVectorSearch::createFromBson(spec.firstElement(), getExpCtx());
+
+    ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
+        R"({
+            "$vectorSearch": {
+            }
+        })",
+        redact(*(vectorStage.front())));
+}
+
+TEST_F(DocumentSourceVectorSearchTest, BadInputsRedactCorrectly) {
+    // Mongod also should not validate types or values for most parameters.
+    auto spec = fromjson(R"({
+        $vectorSearch: {
+            numCandidates: "a string",
+            index: 1000,
+            queryVector: 1.0,
+            path: 10
+        }
+    })");
+
+    auto vectorStage = DocumentSourceVectorSearch::createFromBson(spec.firstElement(), getExpCtx());
+
+    ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
+        R"({
+            "$vectorSearch": {
+                "index":"HASH<>"
+            }
         })",
         redact(*(vectorStage.front())));
 }

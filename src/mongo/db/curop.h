@@ -356,6 +356,13 @@ public:
     BSONObj mongotCountVal = BSONObj();
     BSONObj mongotSlowQueryLog = BSONObj();
 
+    // Vector search statistics captured for reporting by query stats.
+    struct VectorSearchMetrics {
+        long limit = 0;
+        double numCandidatesLimitRatio = 0.0;
+    };
+    boost::optional<VectorSearchMetrics> vectorSearchMetrics = boost::none;
+
     long long sortSpills{0};      // The total number of spills from sort stages
     long long sortSpillBytes{0};  // The total number of bytes spilled from sort stages.
     // The spilled storage size after compression might be different from the bytes spilled.

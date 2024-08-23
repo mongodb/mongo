@@ -46,6 +46,7 @@
 #include "mongo/db/curop.h"
 #include "mongo/db/query/query_knobs_gen.h"
 #include "mongo/db/query/query_stats/query_stats.h"
+#include "mongo/db/query/query_stats/vector_search_stats_entry.h"
 #include "mongo/db/session/kill_sessions_common.h"
 #include "mongo/db/session/logical_session_cache.h"
 #include "mongo/logv2/log.h"
@@ -77,6 +78,22 @@ Status cursorNotFoundStatus(CursorId cursorId) {
 Status cursorInUseStatus(CursorId cursorId) {
     return {ErrorCodes::CursorInUse,
             str::stream() << "Cursor already in use (id: " << cursorId << ")."};
+}
+
+void maybeAddVectorSearchMetrics(
+    const OpDebug& opDebug,
+    std::vector<std::unique_ptr<query_stats::SupplementalStatsEntry>>& supplementalMetrics) {
+    if (const auto& metrics = opDebug.vectorSearchMetrics) {
+        supplementalMetrics.emplace_back(std::make_unique<query_stats::VectorSearchStatsEntry>(
+            metrics->limit, metrics->numCandidatesLimitRatio));
+    }
+}
+
+std::vector<std::unique_ptr<query_stats::SupplementalStatsEntry>> computeSupplementalQueryMetrics(
+    const OpDebug& opDebug) {
+    std::vector<std::unique_ptr<query_stats::SupplementalStatsEntry>> supplementalMetrics;
+    maybeAddVectorSearchMetrics(opDebug, supplementalMetrics);
+    return supplementalMetrics;
 }
 
 }  // namespace
@@ -613,7 +630,11 @@ void collectQueryStatsMongos(OperationContext* opCtx, std::unique_ptr<query_stat
         query_stats::microsecondsToUint64(opDebug.additiveMetrics.executionTime),
         opDebug.additiveMetrics);
 
-    query_stats::writeQueryStats(opCtx, opDebug.queryStatsInfo.keyHash, std::move(key), snapshot);
+    query_stats::writeQueryStats(opCtx,
+                                 opDebug.queryStatsInfo.keyHash,
+                                 std::move(key),
+                                 snapshot,
+                                 computeSupplementalQueryMetrics(opDebug));
 }
 
 void collectQueryStatsMongos(OperationContext* opCtx, ClusterClientCursorGuard& cursor) {
@@ -636,7 +657,7 @@ void collectQueryStatsMongos(OperationContext* opCtx, ClusterClientCursorGuard& 
                                      opDebug.queryStatsInfo.keyHash,
                                      cursor->takeKey(),
                                      snapshot,
-                                     nullptr,
+                                     {} /* supplementalMetrics */,
                                      cursor->getQueryStatsWillNeverExhaust());
     }
 }
@@ -661,7 +682,7 @@ void collectQueryStatsMongos(OperationContext* opCtx, ClusterCursorManager::Pinn
                                      opDebug.queryStatsInfo.keyHash,
                                      nullptr,
                                      snapshot,
-                                     nullptr,
+                                     {} /* supplementalMetrics */,
                                      cursor->getQueryStatsWillNeverExhaust());
     }
 }
