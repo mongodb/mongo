@@ -6,6 +6,7 @@
  *   requires_sharding,
  * ]
  */
+import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 const st = new ShardingTest({mongos: 1, shards: 1, config: 1});
 const conn = st.rs0.getPrimary();
