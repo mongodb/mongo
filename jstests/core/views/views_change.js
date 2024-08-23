@@ -27,7 +27,7 @@ let resetCollectionAndViews = function() {
 let assertFindResultEq = function(collName, expected) {
     let res = viewDB.runCommand({find: collName, filter: {}, projection: {_id: 0, a: 1, b: 1}});
     assert.commandWorked(res);
-    let arr = new DBCommandCursor(db, res).toArray();
+    let arr = new DBCommandCursor(viewDB, res).toArray();
     let errmsg = tojson({expected: expected, got: arr});
     assert(arrayEq(arr, expected), errmsg);
 };
