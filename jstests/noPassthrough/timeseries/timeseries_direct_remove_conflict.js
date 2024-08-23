@@ -2,6 +2,8 @@
  * Tests that direct removal in a timeseries bucket collection close the relevant bucket, preventing
  * further inserts from landing in that bucket, including the case where a concurrent catalog write
  * causes a write conflict.
+ *
+ * TODO SERVER-93419: Investigate replacing this test's coverage with an FSM workload.
  */
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";
 import {funWithArgs} from "jstests/libs/parallel_shell_helpers.js";
@@ -41,6 +43,7 @@ let buckets = bucketsColl.find().sort({_id: 1}).toArray();
 assert.eq(buckets.length, 1);
 assert.eq(buckets[0].control.min[timeFieldName], times[0]);
 assert.eq(buckets[0].control.max[timeFieldName], times[0]);
+const originalBucketId = bucketsColl.find({}).toArray()[0]._id;
 
 const fpInsert = configureFailPoint(conn, "hangTimeseriesInsertBeforeWrite");
 const awaitInsert = startParallelShell(
@@ -58,27 +61,29 @@ const awaitRemove = startParallelShell(
     }, dbName, coll.getName(), buckets[0]._id), conn.port);
 fpRemove.wait();
 
-fpRemove.off();
 fpInsert.off();
+fpRemove.off();
 awaitRemove();
 awaitInsert();
 
-// The expected ordering is that the insert finished, then the remove deleted the bucket document,
-// so there should be no documents left.
+// The possible outcomes are that the inserts land in the same bucket and are deleted together, or
+// that the delete happens before the insert and the insert lands in a new bucket. In the first
+// case, there will be no documents in the collection, and in the second case, there will be a new
+// bucket with a different id.
+if (0 != coll.find().sort({_id: 1}).toArray().length) {
+    assert.neq(originalBucketId, bucketsColl.find({}).toArray()[0]._id);
+} else {
+    buckets = bucketsColl.find().sort({_id: 1}).toArray();
+    assert.eq(buckets.length, 0);
 
-assert.docEq(0, coll.find().sort({_id: 1}).toArray().length);
+    // Now another insert should generate a new bucket.
 
-buckets = bucketsColl.find().sort({_id: 1}).toArray();
-assert.eq(buckets.length, 0);
+    assert.commandWorked(coll.insert(docs[2]));
+    assert.docEq(docs.slice(2, 3), coll.find().sort({_id: 1}).toArray());
 
-// Now another insert should generate a new bucket.
-
-assert.commandWorked(coll.insert(docs[2]));
-assert.docEq(docs.slice(2, 3), coll.find().sort({_id: 1}).toArray());
-
-buckets = bucketsColl.find().sort({_id: 1}).toArray();
-assert.eq(buckets.length, 1);
-assert.eq(buckets[0].control.min[timeFieldName], times[2]);
-assert.eq(buckets[0].control.max[timeFieldName], times[2]);
-
+    buckets = bucketsColl.find().sort({_id: 1}).toArray();
+    assert.eq(buckets.length, 1);
+    assert.eq(buckets[0].control.min[timeFieldName], times[2]);
+    assert.eq(buckets[0].control.max[timeFieldName], times[2]);
+}
 MongoRunner.stopMongod(conn);

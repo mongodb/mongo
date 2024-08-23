@@ -55,6 +55,7 @@ public:
                   const CollectionPtr& coll,
                   StmtId stmtId,
                   const BSONObj& doc,
+                  const DocumentKey& documentKey,
                   const OplogDeleteEntryArgs& args,
                   OpStateAccumulator* opAccumulator = nullptr) final;
 

@@ -44,9 +44,6 @@
 
 namespace mongo {
 
-const OplogDeleteEntryArgs::Decoration<boost::optional<DocumentKey>> documentKeyDecoration =
-    OplogDeleteEntryArgs::declareDecoration<boost::optional<DocumentKey>>();
-
 const OpStateAccumulator::Decoration<std::unique_ptr<ShardingWriteRouter>>
     shardingWriteRouterOpStateAccumulatorDecoration =
         OpStateAccumulator::declareDecoration<std::unique_ptr<ShardingWriteRouter>>();

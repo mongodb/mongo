@@ -503,6 +503,7 @@ env.CppUnitTest(
         "$BUILD_DIR/mongo/client/native_sasl_client",
         "$BUILD_DIR/mongo/db/common",
         "$BUILD_DIR/mongo/db/concurrency/exception_util",
+        "$BUILD_DIR/mongo/db/op_observer/op_observer_util",
         "$BUILD_DIR/mongo/db/pipeline/pipeline",
         "$BUILD_DIR/mongo/db/repl/oplog",
         "$BUILD_DIR/mongo/db/repl/oplog_interface_local",

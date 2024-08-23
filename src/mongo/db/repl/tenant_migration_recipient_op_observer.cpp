@@ -212,11 +212,13 @@ void TenantMigrationRecipientOpObserver::onUpdate(OperationContext* opCtx,
     }
 }
 
-void TenantMigrationRecipientOpObserver::aboutToDelete(OperationContext* opCtx,
-                                                       const CollectionPtr& coll,
-                                                       BSONObj const& doc,
-                                                       OplogDeleteEntryArgs* args,
-                                                       OpStateAccumulator* opAccumulator) {
+void TenantMigrationRecipientOpObserver::onDelete(OperationContext* opCtx,
+                                                  const CollectionPtr& coll,
+                                                  StmtId stmtId,
+                                                  const BSONObj& doc,
+                                                  const DocumentKey& documentKey,
+                                                  const OplogDeleteEntryArgs& args,
+                                                  OpStateAccumulator* opAccumulator) {
     if (coll->ns() == NamespaceString::kTenantMigrationRecipientsNamespace &&
         !tenant_migration_access_blocker::inRecoveryMode(opCtx)) {
         auto recipientStateDoc =
@@ -232,20 +234,7 @@ void TenantMigrationRecipientOpObserver::aboutToDelete(OperationContext* opCtx,
         // kDone in order to avoid creating an unnecessary TenantMigrationRecipientAccessBlocker.
         // In this case, the TenantMigrationRecipientAccessBlocker will not exist for a given
         // tenant.
-        tenantMigrationInfo(opCtx) =
-            boost::make_optional(TenantMigrationInfo(recipientStateDoc.getId()));
-    }
-}
-
-void TenantMigrationRecipientOpObserver::onDelete(OperationContext* opCtx,
-                                                  const CollectionPtr& coll,
-                                                  StmtId stmtId,
-                                                  const BSONObj& doc,
-                                                  const OplogDeleteEntryArgs& args,
-                                                  OpStateAccumulator* opAccumulator) {
-    if (coll->ns() == NamespaceString::kTenantMigrationRecipientsNamespace &&
-        !tenant_migration_access_blocker::inRecoveryMode(opCtx)) {
-        auto tmi = tenantMigrationInfo(opCtx);
+        auto tmi = boost::make_optional(TenantMigrationInfo(recipientStateDoc.getId()));
         if (!tmi) {
             return;
         }

@@ -51,6 +51,7 @@
 #include "mongo/db/commands/create_gen.h"
 #include "mongo/db/concurrency/lock_manager_defs.h"
 #include "mongo/db/logical_time.h"
+#include "mongo/db/op_observer/op_observer_util.h"
 #include "mongo/db/server_parameter.h"
 #include "mongo/db/server_parameter_with_storage.h"
 #include "mongo/db/storage/write_unit_of_work.h"
@@ -138,8 +139,9 @@ public:
         auto opCtx = cc().makeOperationContext();
         WriteUnitOfWork wuow(opCtx.get());
         AutoGetCollection autoColl(opCtx.get(), nss, MODE_IX);
+        const auto& documentKey = getDocumentKey(*autoColl, deletedDoc);
         OplogDeleteEntryArgs args;
-        observer.onDelete(opCtx.get(), *autoColl, /*StmtId=*/1, deletedDoc, args);
+        observer.onDelete(opCtx.get(), *autoColl, /*StmtId=*/1, deletedDoc, documentKey, args);
         if (commit)
             wuow.commit();
     }

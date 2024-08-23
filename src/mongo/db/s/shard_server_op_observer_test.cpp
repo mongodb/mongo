@@ -33,6 +33,7 @@
 #include "mongo/db/auth/authz_manager_external_state_mock.h"
 #include "mongo/db/concurrency/exception_util.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/db/op_observer/op_observer_util.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/repl/replication_coordinator_mock.h"
 #include "mongo/db/repl/storage_interface_impl.h"
@@ -153,9 +154,10 @@ protected:
         WriteUnitOfWork wuow(opCtx);
         AutoGetCollection coll(opCtx, nss, MODE_IX);
 
+        const auto& documentKey = getDocumentKey(*coll, doc);
+
         OplogDeleteEntryArgs args;
-        opObserver.aboutToDelete(opCtx, *coll, doc, &args);
-        opObserver.onDelete(opCtx, *coll, kUninitializedStmtId, doc, args);
+        opObserver.onDelete(opCtx, *coll, kUninitializedStmtId, doc, documentKey, args);
 
         wuow.commit();
     }

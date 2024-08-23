@@ -61,6 +61,7 @@
 #include "mongo/db/exec/write_stage_common.h"
 #include "mongo/db/feature_flag.h"
 #include "mongo/db/op_observer/op_observer.h"
+#include "mongo/db/op_observer/op_observer_util.h"
 #include "mongo/db/record_id_helpers.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/s/operation_sharding_state.h"
@@ -875,10 +876,6 @@ void deleteDocument(OperationContext* opCtx,
         deleteArgs.replicatedRecordId = loc;
     }
 
-    // TODO(SERVER-80956): remove this call.
-    opCtx->getServiceContext()->getOpObserver()->aboutToDelete(
-        opCtx, collection, doc.value(), &deleteArgs);
-
     invariant(doc.value().isOwned(),
               str::stream() << "Document to delete is not owned: snapshot id: " << doc.snapshotId()
                             << " document: " << doc.value());
@@ -909,8 +906,9 @@ void deleteDocument(OperationContext* opCtx,
         collection->getRecordStore()->deleteRecord(opCtx, loc);
     }
 
+    const auto& documentKey = getDocumentKey(collection, doc.value());
     opCtx->getServiceContext()->getOpObserver()->onDelete(
-        opCtx, collection, stmtId, doc.value(), deleteArgs);
+        opCtx, collection, stmtId, doc.value(), documentKey, deleteArgs);
 
     if (opDebug) {
         opDebug->additiveMetrics.incrementKeysDeleted(keysDeleted);

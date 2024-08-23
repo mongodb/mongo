@@ -99,11 +99,13 @@ static const Milliseconds targetBatchTimeMS = Milliseconds(5);
  */
 class ClockAdvancingOpObserver : public OpObserverNoop {
 public:
-    void aboutToDelete(OperationContext* opCtx,
-                       const CollectionPtr& coll,
-                       const BSONObj& doc,
-                       OplogDeleteEntryArgs* args,
-                       OpStateAccumulator* opAccumulator = nullptr) override {
+    void onDelete(OperationContext* opCtx,
+                  const CollectionPtr& coll,
+                  StmtId stmtId,
+                  const BSONObj& doc,
+                  const DocumentKey& documentKey,
+                  const OplogDeleteEntryArgs& args,
+                  OpStateAccumulator* opAccumulator = nullptr) override {
 
         if (docDurationMap.find(doc) != docDurationMap.end()) {
             tickSource->advance(docDurationMap.find(doc)->second);

@@ -86,20 +86,14 @@ void AuthOpObserver::onUpdate(OperationContext* opCtx,
         ->logOp(opCtx, "u", args.coll->ns(), args.updateArgs->update, &args.updateArgs->criteria);
 }
 
-void AuthOpObserver::aboutToDelete(OperationContext* opCtx,
-                                   const CollectionPtr& coll,
-                                   BSONObj const& doc,
-                                   OplogDeleteEntryArgs* args,
-                                   OpStateAccumulator* opAccumulator) {
-    audit::logRemoveOperation(opCtx->getClient(), coll->ns(), doc);
-}
-
 void AuthOpObserver::onDelete(OperationContext* opCtx,
                               const CollectionPtr& coll,
                               StmtId stmtId,
                               const BSONObj& doc,
+                              const DocumentKey& documentKey,
                               const OplogDeleteEntryArgs& args,
                               OpStateAccumulator* opAccumulator) {
+    audit::logRemoveOperation(opCtx->getClient(), coll->ns(), doc);
     // Extract the _id field from the document. If it does not have an _id, use the
     // document itself as the _id.
     auto documentId = doc["_id"] ? doc["_id"].wrap() : doc;

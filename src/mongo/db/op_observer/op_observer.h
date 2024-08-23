@@ -67,6 +67,7 @@
 
 namespace mongo {
 
+class DocumentKey;
 struct InsertStatement;
 
 struct OpTimeBundle {
@@ -126,10 +127,6 @@ struct OplogUpdateEntryArgs {
 /**
  * Holds supplementary information required for OpObserver::onDelete() to write out an
  * oplog entry for deleting a single document from a collection.
- *
- * This struct is also passed to OpObserver::aboutToDelete() so that OpObserver
- * implementations may include additional information (via decorations) to be shared with
- * the onDelete() method within the same implementation.
  */
 struct OplogDeleteEntryArgs : Decorable<OplogDeleteEntryArgs> {
     // "fromMigrate" indicates whether the delete was induced by a chunk migration, and so
@@ -178,7 +175,7 @@ public:
     using ApplyOpsOplogSlotAndOperationAssignment = TransactionOperations::ApplyOpsInfo;
 
     /**
-     * Used by CRUD ops: onInserts, onUpdate, aboutToDelete, and onDelete.
+     * Used by CRUD ops: onInserts, onUpdate, and onDelete.
      */
     enum class NamespaceFilter {
         kConfig,           // config database (i.e. config.*)
@@ -192,7 +189,7 @@ public:
     // Each OpObserver declares which events it cares about with this.
     struct NamespaceFilters {
         NamespaceFilter updateFilter;  // onInserts, onUpdate
-        NamespaceFilter deleteFilter;  // aboutToDelete, onDelete
+        NamespaceFilter deleteFilter;  // onDelete
     };
 
     enum class CollectionDropType {
@@ -304,12 +301,6 @@ public:
                           const OplogUpdateEntryArgs& args,
                           OpStateAccumulator* opAccumulator = nullptr) = 0;
 
-    virtual void aboutToDelete(OperationContext* opCtx,
-                               const CollectionPtr& coll,
-                               const BSONObj& doc,
-                               OplogDeleteEntryArgs* args,
-                               OpStateAccumulator* opAccumulator = nullptr) = 0;
-
     /**
      * Handles logging before document is deleted.
      *
@@ -318,13 +309,13 @@ public:
      * "doc" holds the pre-image of the document to be deleted.
      *
      * "args" is a reference to information detailing whether the pre-image of the doc should be
-     * preserved with deletion. OpObserverImpl::aboutToDelete() initializes the documentKey as a
-     * decoration on OplogDeleteEntryArgs.
+     * preserved with deletion.
      */
     virtual void onDelete(OperationContext* opCtx,
                           const CollectionPtr& coll,
                           StmtId stmtId,
                           const BSONObj& doc,
+                          const DocumentKey& documentKey,
                           const OplogDeleteEntryArgs& args,
                           OpStateAccumulator* opAccumulator = nullptr) = 0;
 

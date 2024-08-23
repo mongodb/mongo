@@ -65,8 +65,6 @@ struct SplitCleanupDetails {
     UUID migrationId;
     bool shouldReleaseLock;
 };
-const auto splitCleanupDetails =
-    OperationContext::declareDecoration<boost::optional<SplitCleanupDetails>>();
 
 ShardSplitDonorDocument parseAndValidateDonorDocument(const BSONObj& doc) {
     auto donorStateDoc = ShardSplitDonorDocument::parse(IDLParserContext("donorStateDoc"), doc);
@@ -400,11 +398,14 @@ void ShardSplitDonorOpObserver::onUpdate(OperationContext* opCtx,
     }
 }
 
-void ShardSplitDonorOpObserver::aboutToDelete(OperationContext* opCtx,
-                                              const CollectionPtr& coll,
-                                              BSONObj const& doc,
-                                              OplogDeleteEntryArgs* args,
-                                              OpStateAccumulator* opAccumulator) {
+void ShardSplitDonorOpObserver::onDelete(OperationContext* opCtx,
+                                         const CollectionPtr& coll,
+                                         StmtId stmtId,
+                                         const BSONObj& doc,
+                                         const DocumentKey& documentKey,
+                                         const OplogDeleteEntryArgs& args,
+                                         OpStateAccumulator* opAccumulator) {
+
     if (coll->ns() != NamespaceString::kShardSplitDonorsNamespace ||
         tenant_migration_access_blocker::inRecoveryMode(opCtx)) {
         return;
@@ -419,49 +420,39 @@ void ShardSplitDonorOpObserver::aboutToDelete(OperationContext* opCtx,
                           << " recipient garbage collectable.",
             donorStateDoc.getExpireAt() || shouldRemoveOnRecipient);
 
+    SplitCleanupDetails splitCleanupDetails = {donorStateDoc.getId(), false};
+
     // To support back-to-back split retries, when a split is aborted, we remove its
     // TenantMigrationDonorAccessBlockers as soon as its donor state doc is marked as garbage
     // collectable. So onDelete should skip removing the TenantMigrationDonorAccessBlockers for
     // aborted splits.
-    if (donorStateDoc.getState() != ShardSplitDonorStateEnum::kAborted) {
-        splitCleanupDetails(opCtx) =
-            boost::make_optional(SplitCleanupDetails{donorStateDoc.getId(), false});
-    }
-
-    if (shouldRemoveOnRecipient) {
-        splitCleanupDetails(opCtx) =
-            boost::make_optional(SplitCleanupDetails{donorStateDoc.getId(), true});
-    }
-}
-
-void ShardSplitDonorOpObserver::onDelete(OperationContext* opCtx,
-                                         const CollectionPtr& coll,
-                                         StmtId stmtId,
-                                         const BSONObj& doc,
-                                         const OplogDeleteEntryArgs& args,
-                                         OpStateAccumulator* opAccumulator) {
-    if (coll->ns() != NamespaceString::kShardSplitDonorsNamespace || !splitCleanupDetails(opCtx) ||
-        tenant_migration_access_blocker::inRecoveryMode(opCtx)) {
+    if (donorStateDoc.getState() == ShardSplitDonorStateEnum::kAborted &&
+        !shouldRemoveOnRecipient) {
         return;
     }
 
-    shard_role_details::getRecoveryUnit(opCtx)->onCommit([](OperationContext* opCtx,
-                                                            boost::optional<Timestamp>) {
-        // Donor access blockers are removed from donor nodes via the shard split op observer.
-        // Donor access blockers are removed from recipient nodes when the node applies the
-        // recipient config. When the recipient primary steps up it will delete its state
-        // document, the call to remove access blockers there will be a no-op.
+    if (shouldRemoveOnRecipient) {
+        splitCleanupDetails.shouldReleaseLock = true;
+    }
 
-        const auto migrationId = splitCleanupDetails(opCtx)->migrationId;
-        auto& registry = TenantMigrationAccessBlockerRegistry::get(opCtx->getServiceContext());
-        registry.removeAccessBlockersForMigration(
-            migrationId, TenantMigrationAccessBlocker::BlockerType::kDonor);
+    shard_role_details::getRecoveryUnit(opCtx)->onCommit(
+        [splitCleanupDetails](OperationContext* opCtx, boost::optional<Timestamp>) {
+            // Donor access blockers are removed from donor nodes via the shard split op observer.
+            // Donor access blockers are removed from recipient nodes when the node applies the
+            // recipient config. When the recipient primary steps up it will delete its state
+            // document, the call to remove access blockers there will be a no-op.
 
-        if (splitCleanupDetails(opCtx)->shouldReleaseLock) {
-            ServerlessOperationLockRegistry::get(opCtx->getServiceContext())
-                .releaseLock(ServerlessOperationLockRegistry::LockType::kShardSplit, migrationId);
-        }
-    });
+            const auto migrationId = splitCleanupDetails.migrationId;
+            auto& registry = TenantMigrationAccessBlockerRegistry::get(opCtx->getServiceContext());
+            registry.removeAccessBlockersForMigration(
+                migrationId, TenantMigrationAccessBlocker::BlockerType::kDonor);
+
+            if (splitCleanupDetails.shouldReleaseLock) {
+                ServerlessOperationLockRegistry::get(opCtx->getServiceContext())
+                    .releaseLock(ServerlessOperationLockRegistry::LockType::kShardSplit,
+                                 migrationId);
+            }
+        });
 }
 
 repl::OpTime ShardSplitDonorOpObserver::onDropCollection(OperationContext* opCtx,

@@ -1121,13 +1121,11 @@ TEST_F(OpObserverTest, SingleStatementDeleteTestIncludesTenantId) {
     OpObserverRegistry opObserver;
     opObserver.addObserver(
         std::make_unique<OpObserverImpl>(std::make_unique<OperationLoggerImpl>()));
-    // This test does not call `OpObserver::aboutToDelete`. That method has the side-effect
-    // of setting of `documentKey` on the delete for sharding purposes.
-    // `OpObserverImpl::onDelete` asserts its existence.
     OplogDeleteEntryArgs deleteEntryArgs;
     auto doc = BSON("_id" << 0);
-    documentKeyDecoration(deleteEntryArgs).emplace(doc, boost::none);
-    opObserver.onDelete(opCtx.get(), *locks, kUninitializedStmtId, doc, deleteEntryArgs);
+    const auto& documentKey = getDocumentKey(*locks, doc);
+    opObserver.onDelete(
+        opCtx.get(), *locks, kUninitializedStmtId, doc, documentKey, deleteEntryArgs);
     wuow.commit();
 
     auto oplogEntryObj = getSingleOplogEntry(opCtx.get());
@@ -1224,38 +1222,16 @@ TEST_F(OpObserverSessionCatalogRollbackTest,
     }
 }
 
-TEST_F(OpObserverTest, MultipleAboutToDeleteAndOnDelete) {
+TEST_F(OpObserverTest, MultipleOnDelete) {
     OpObserverImpl opObserver(std::make_unique<OperationLoggerImpl>());
     auto opCtx = cc().makeOperationContext();
     AutoGetCollection autoColl(opCtx.get(), nss3, MODE_X);
     WriteUnitOfWork wunit(opCtx.get());
     OplogDeleteEntryArgs args;
     auto doc = BSON("_id" << 1);
-    opObserver.aboutToDelete(opCtx.get(), *autoColl, doc, &args);
-    opObserver.onDelete(opCtx.get(), *autoColl, kUninitializedStmtId, doc, args);
-    opObserver.aboutToDelete(opCtx.get(), *autoColl, doc, &args);
-    opObserver.onDelete(opCtx.get(), *autoColl, kUninitializedStmtId, doc, args);
-}
-
-DEATH_TEST_REGEX_F(OpObserverTest,
-                   AboutToDeleteMustPreceedOnDelete,
-                   "Invariant failure.*optDocKey") {
-    OpObserverImpl opObserver(std::make_unique<OperationLoggerImpl>());
-    auto opCtx = cc().makeOperationContext();
-    AutoGetCollection autoColl(opCtx.get(), nss3, MODE_IX);
-    OplogDeleteEntryArgs args;
-    auto doc = BSON("_id" << 1);
-    opObserver.onDelete(opCtx.get(), *autoColl, kUninitializedStmtId, doc, args);
-}
-
-DEATH_TEST_REGEX_F(OpObserverTest,
-                   AboutToDeleteRequiresIdField,
-                   "Invariant failure.*!id.isEmpty()") {
-    OpObserverImpl opObserver(std::make_unique<OperationLoggerImpl>());
-    auto opCtx = cc().makeOperationContext();
-    AutoGetCollection autoColl(opCtx.get(), nss3, MODE_IX);
-    OplogDeleteEntryArgs args;
-    opObserver.aboutToDelete(opCtx.get(), *autoColl, /*doc=*/{}, &args);
+    const auto& documentKey = getDocumentKey(*autoColl, doc);
+    opObserver.onDelete(opCtx.get(), *autoColl, kUninitializedStmtId, doc, documentKey, args);
+    opObserver.onDelete(opCtx.get(), *autoColl, kUninitializedStmtId, doc, documentKey, args);
 }
 
 DEATH_TEST_REGEX_F(OpObserverTest,
@@ -1495,8 +1471,8 @@ TEST_F(OpObserverTransactionTest, TransactionalPrepareTest) {
     OplogDeleteEntryArgs args;
     auto docToDelete = BSON("_id" << 0 << "data"
                                   << "x");
-    opObserver().aboutToDelete(opCtx(), *autoColl1, docToDelete, &args);
-    opObserver().onDelete(opCtx(), *autoColl1, 0, docToDelete, args);
+    const auto& documentKey = getDocumentKey(*autoColl1, docToDelete);
+    opObserver().onDelete(opCtx(), *autoColl1, 0, docToDelete, documentKey, args);
 
     auto reservedSlots = prepareTransaction();
     auto prepareOpTime = reservedSlots.back();
@@ -2168,13 +2144,13 @@ TEST_F(OpObserverTransactionTest, TransactionalDeleteTest) {
 
     auto doc1 = BSON("_id" << 0 << "data"
                            << "x");
-    opObserver().aboutToDelete(opCtx(), *autoColl1, doc1, &args);
-    opObserver().onDelete(opCtx(), *autoColl1, 0, doc1, args);
+    const auto& documentKeyX = getDocumentKey(*autoColl1, doc1);
+    opObserver().onDelete(opCtx(), *autoColl1, 0, doc1, documentKeyX, args);
 
     auto doc2 = BSON("_id" << 1 << "data"
                            << "y");
-    opObserver().aboutToDelete(opCtx(), *autoColl2, doc2, &args);
-    opObserver().onDelete(opCtx(), *autoColl2, 0, doc2, args);
+    const auto& documentKeyY = getDocumentKey(*autoColl2, doc2);
+    opObserver().onDelete(opCtx(), *autoColl2, 0, doc2, documentKeyY, args);
     auto txnOps = txnParticipant.retrieveCompletedTransactionOperations(opCtx());
     ASSERT_EQUALS(txnOps->getNumberOfPrePostImagesToWrite(), 0);
     commitUnpreparedTransaction<OpObserverImpl>(opCtx(), opObserver());
@@ -2209,13 +2185,13 @@ TEST_F(OpObserverTransactionTest, TransactionalDeleteTestIncludesTenantId) {
 
     auto doc1 = BSON("_id" << 0 << "data"
                            << "x");
-    opObserver().aboutToDelete(opCtx(), *autoColl1, doc1, &args);
-    opObserver().onDelete(opCtx(), *autoColl1, 0, doc1, args);
+    const auto& documentKeyX = getDocumentKey(*autoColl1, doc1);
+    opObserver().onDelete(opCtx(), *autoColl1, 0, doc1, documentKeyX, args);
 
     auto doc2 = BSON("_id" << 1 << "data"
                            << "y");
-    opObserver().aboutToDelete(opCtx(), *autoColl2, doc2, &args);
-    opObserver().onDelete(opCtx(), *autoColl2, 0, doc2, args);
+    const auto& documentKeyY = getDocumentKey(*autoColl2, doc2);
+    opObserver().onDelete(opCtx(), *autoColl2, 0, doc2, documentKeyY, args);
 
     auto txnOps = txnParticipant.retrieveCompletedTransactionOperations(opCtx());
     ASSERT_EQUALS(txnOps->getNumberOfPrePostImagesToWrite(), 0);
@@ -2376,11 +2352,10 @@ protected:
         AutoGetCollection autoColl(opCtx(), nss, MODE_IX);
         const auto deletedDoc = BSON("_id" << 0 << "data"
                                            << "x");
+        const auto& documentKey = getDocumentKey(*autoColl, deletedDoc);
         OplogDeleteEntryArgs args;
         args.retryableFindAndModifyLocation = RetryableFindAndModifyLocation::kSideCollection;
-
-        opObserver().aboutToDelete(opCtx(), *autoColl, deletedDoc, &args);
-        opObserver().onDelete(opCtx(), *autoColl, 0, deletedDoc, args);
+        opObserver().onDelete(opCtx(), *autoColl, 0, deletedDoc, documentKey, args);
         commit();
 
         // Asserts that only a single oplog entry was created. In essence, we did not create any
@@ -3000,13 +2975,10 @@ TEST_F(BatchedWriteOutputsTest, TestApplyOpsGrouping) {
         AutoGetCollection autoColl(opCtx, _nss, MODE_IX);
 
         for (size_t doc = 0; doc < docsToBeBatched; doc++) {
-            // This test does not call `OpObserver::aboutToDelete`. That method has the
-            // side-effect of setting of `documentKey` on the delete for sharding purposes.
-            // `OpObserverImpl::onDelete` asserts its existence.
+            const auto& documentKey = getDocumentKey(*autoColl, docsToDelete[doc]);
             OplogDeleteEntryArgs args;
-            documentKeyDecoration(args).emplace(docsToDelete[doc]["_id"].wrap(), boost::none);
             opCtx->getServiceContext()->getOpObserver()->onDelete(
-                opCtx, *autoColl, kUninitializedStmtId, docsToDelete[doc], args);
+                opCtx, *autoColl, kUninitializedStmtId, docsToDelete[doc], documentKey, args);
         }
 
         wuow.commit();
@@ -3073,9 +3045,9 @@ TEST_F(BatchedWriteOutputsTest, TestApplyOpsInsertDeleteUpdate) {
     {
         OplogDeleteEntryArgs args;
         auto doc = BSON("_id" << 1);
-        documentKeyDecoration(args).emplace(doc, boost::none);
+        const auto& documentKey = getDocumentKey(*autoColl, doc);
         opCtx->getServiceContext()->getOpObserver()->onDelete(
-            opCtx, *autoColl, kUninitializedStmtId, doc, args);
+            opCtx, *autoColl, kUninitializedStmtId, doc, documentKey, args);
     }
     // (2) Update
     {
@@ -3169,9 +3141,9 @@ TEST_F(BatchedWriteOutputsTest, TestApplyOpsInsertDeleteUpdateIncludesTenantId) 
     {
         OplogDeleteEntryArgs args;
         auto doc = BSON("_id" << 1);
-        documentKeyDecoration(args).emplace(doc, boost::none);
+        const auto& documentKey = getDocumentKey(*autoColl, doc);
         opCtx->getServiceContext()->getOpObserver()->onDelete(
-            opCtx, *autoColl, kUninitializedStmtId, doc, args);
+            opCtx, *autoColl, kUninitializedStmtId, doc, documentKey, args);
     }
     // (2) Update
     {
@@ -3271,14 +3243,11 @@ TEST_F(BatchedWriteOutputsTest, testWUOWLarge) {
     // Delete BatchedWriteOutputsTest::maxDeleteOpsInBatch documents in a single batch, which is the
     // maximum number of docs that can be batched while staying within 16MB of applyOps.
     for (int docId = 0; docId < BatchedWriteOutputsTest::maxDeleteOpsInBatch; docId++) {
-        // This test does not call `OpObserver::aboutToDelete`. That method has the side-effect
-        // of setting of `documentKey` on the delete for sharding purposes.
-        // `OpObserverImpl::onDelete` asserts its existence.
         OplogDeleteEntryArgs args;
         auto doc = BSON("_id" << docId);
-        documentKeyDecoration(args).emplace(doc, boost::none);
+        const auto& documentKey = getDocumentKey(*autoColl, doc);
         opCtx->getServiceContext()->getOpObserver()->onDelete(
-            opCtx, *autoColl, kUninitializedStmtId, doc, args);
+            opCtx, *autoColl, kUninitializedStmtId, doc, documentKey, args);
     }
     wuow.commit();
 
@@ -3325,14 +3294,11 @@ TEST_F(BatchedWriteOutputsTest, testWUOWTooLarge) {
     for (int docId = 0; docId < BatchedWriteOutputsTest::maxDeleteOpsInBatch +
              approximateDifferenceBetweenBSONObjMaxUserAndInternalSize + 1;
          docId++) {
-        // This test does not call `OpObserver::aboutToDelete`. That method has the side-effect
-        // of setting of `documentKey` on the delete for sharding purposes.
-        // `OpObserverImpl::onDelete` asserts its existence.
         OplogDeleteEntryArgs args;
         auto doc = BSON("_id" << docId);
-        documentKeyDecoration(args).emplace(doc, boost::none);
+        const auto& documentKey = getDocumentKey(*autoColl, doc);
         opCtx->getServiceContext()->getOpObserver()->onDelete(
-            opCtx, *autoColl, kUninitializedStmtId, doc, args);
+            opCtx, *autoColl, kUninitializedStmtId, doc, documentKey, args);
     }
 
     // This test used to rely on the BSONObjBuilder in packTransactionStatementsForApplyOps()
@@ -3955,14 +3921,12 @@ TEST_F(OnDeleteOutputsTest, TestNonTransactionFundamentalOnDeleteOutputs) {
 
         WriteUnitOfWork wuow(opCtx);
         AutoGetCollection locks(opCtx, _nss, MODE_IX);
-        // This test does not call `OpObserver::aboutToDelete`. That method has the side-effect
-        // of setting of `documentKey` on the delete for sharding purposes.
-        // `OpObserverImpl::onDelete` asserts its existence.
-        documentKeyDecoration(deleteEntryArgs).emplace(_deletedDoc["_id"].wrap(), boost::none);
+        const auto& documentKey = getDocumentKey(*locks, _deletedDoc);
         opObserver.onDelete(opCtx,
                             *locks,
                             testCase.isRetryable() ? 1 : kUninitializedStmtId,
                             _deletedDoc,
+                            documentKey,
                             deleteEntryArgs);
         wuow.commit();
 
@@ -4013,11 +3977,8 @@ TEST_F(OnDeleteOutputsTest, TestTransactionFundamentalOnDeleteOutputs) {
 
         WriteUnitOfWork wuow(opCtx);
         AutoGetCollection locks(opCtx, _nss, MODE_IX);
-        // This test does not call `OpObserver::aboutToDelete`. That method has the side-effect
-        // of setting of `documentKey` on the delete for sharding purposes.
-        // `OpObserverImpl::onDelete` asserts its existence.
-        documentKeyDecoration(deleteEntryArgs).emplace(_deletedDoc["_id"].wrap(), boost::none);
-        opObserver.onDelete(opCtx, *locks, stmtId, _deletedDoc, deleteEntryArgs);
+        const auto& documentKey = getDocumentKey(*locks, _deletedDoc);
+        opObserver.onDelete(opCtx, *locks, stmtId, _deletedDoc, documentKey, deleteEntryArgs);
         commitUnpreparedTransaction<OpObserverRegistry>(opCtx, opObserver);
         wuow.commit();
 
@@ -4244,13 +4205,13 @@ TEST_F(OpObserverMultiEntryTransactionTest, TransactionalDeleteTest) {
 
     auto doc1 = BSON("_id" << 0 << "data"
                            << "x");
-    opObserver().aboutToDelete(opCtx(), *autoColl1, doc1, &args);
-    opObserver().onDelete(opCtx(), *autoColl1, 0, doc1, args);
+    const auto& documentKeyX = getDocumentKey(*autoColl1, doc1);
+    opObserver().onDelete(opCtx(), *autoColl1, 0, doc1, documentKeyX, args);
 
     auto doc2 = BSON("_id" << 1 << "data"
                            << "y");
-    opObserver().aboutToDelete(opCtx(), *autoColl2, doc2, &args);
-    opObserver().onDelete(opCtx(), *autoColl2, 0, doc2, args);
+    const auto& documentKeyY = getDocumentKey(*autoColl2, doc2);
+    opObserver().onDelete(opCtx(), *autoColl2, 0, doc2, documentKeyY, args);
     auto txnOps = txnParticipant.retrieveCompletedTransactionOperations(opCtx());
     ASSERT_EQUALS(txnOps->getNumberOfPrePostImagesToWrite(), 0);
     commitUnpreparedTransaction<OpObserverImpl>(opCtx(), opObserver());
@@ -4459,13 +4420,13 @@ TEST_F(OpObserverMultiEntryTransactionTest, TransactionalDeletePrepareTest) {
 
     auto doc1 = BSON("_id" << 0 << "data"
                            << "x");
-    opObserver().aboutToDelete(opCtx(), *autoColl1, doc1, &args);
-    opObserver().onDelete(opCtx(), *autoColl1, 0, doc1, args);
+    const auto& documentKeyX = getDocumentKey(*autoColl1, doc1);
+    opObserver().onDelete(opCtx(), *autoColl1, 0, doc1, documentKeyX, args);
 
     auto doc2 = BSON("_id" << 1 << "data"
                            << "y");
-    opObserver().aboutToDelete(opCtx(), *autoColl2, doc2, &args);
-    opObserver().onDelete(opCtx(), *autoColl2, 0, doc2, args);
+    const auto& documentKeyY = getDocumentKey(*autoColl2, doc2);
+    opObserver().onDelete(opCtx(), *autoColl2, 0, doc2, documentKeyY, args);
 
     auto reservedSlots = prepareTransaction();
     auto prepareOpTime = reservedSlots.back();

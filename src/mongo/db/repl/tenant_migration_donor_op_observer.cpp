@@ -320,54 +320,46 @@ void TenantMigrationDonorOpObserver::onUpdate(OperationContext* opCtx,
     }
 }
 
-void TenantMigrationDonorOpObserver::aboutToDelete(OperationContext* opCtx,
-                                                   const CollectionPtr& coll,
-                                                   BSONObj const& doc,
-                                                   OplogDeleteEntryArgs* args,
-                                                   OpStateAccumulator* opAccumulator) {
-    if (coll->ns() == NamespaceString::kTenantMigrationDonorsNamespace &&
-        !tenant_migration_access_blocker::inRecoveryMode(opCtx)) {
-        auto donorStateDoc = tenant_migration_access_blocker::parseDonorStateDocument(doc);
-        uassert(ErrorCodes::IllegalOperation,
-                str::stream() << "cannot delete a donor's state document " << doc
-                              << " since it has not been marked as garbage collectable",
-                donorStateDoc.getExpireAt());
-
-        // To support back-to-back migration retries, when a migration is aborted, we remove its
-        // TenantMigrationDonorAccessBlocker as soon as its donor state doc is marked as garbage
-        // collectable. So onDelete should skip removing the TenantMigrationDonorAccessBlocker for
-        // aborted migrations.
-        tenantMigrationInfo(opCtx) =
-            donorStateDoc.getState() == TenantMigrationDonorStateEnum::kAborted
-            ? boost::none
-            : boost::make_optional(TenantMigrationInfo(donorStateDoc.getId()));
-    }
-}
-
 void TenantMigrationDonorOpObserver::onDelete(OperationContext* opCtx,
                                               const CollectionPtr& coll,
                                               StmtId stmtId,
                                               const BSONObj& doc,
+                                              const DocumentKey& documentKey,
                                               const OplogDeleteEntryArgs& args,
                                               OpStateAccumulator* opAccumulator) {
-    if (coll->ns() == NamespaceString::kTenantMigrationDonorsNamespace &&
-        !tenant_migration_access_blocker::inRecoveryMode(opCtx)) {
-        auto tmi = tenantMigrationInfo(opCtx);
-        if (!tmi) {
-            return;
-        }
 
-        auto migrationId = tmi->uuid;
-        shard_role_details::getRecoveryUnit(opCtx)->onCommit(
-            [migrationId](OperationContext* opCtx, boost::optional<Timestamp>) {
-                LOGV2_INFO(6461601,
-                           "Removing expired migration access blocker",
-                           "migrationId"_attr = migrationId);
-                TenantMigrationAccessBlockerRegistry::get(opCtx->getServiceContext())
-                    .removeAccessBlockersForMigration(
-                        migrationId, TenantMigrationAccessBlocker::BlockerType::kDonor);
-            });
+    if (coll->ns() != NamespaceString::kTenantMigrationDonorsNamespace ||
+        tenant_migration_access_blocker::inRecoveryMode(opCtx)) {
+        return;
     }
+
+    auto donorStateDoc = tenant_migration_access_blocker::parseDonorStateDocument(doc);
+    uassert(ErrorCodes::IllegalOperation,
+            str::stream() << "cannot delete a donor's state document " << doc
+                          << " since it has not been marked as garbage collectable",
+            donorStateDoc.getExpireAt());
+
+    auto tmi = donorStateDoc.getState() == TenantMigrationDonorStateEnum::kAborted
+        ? boost::none
+        : boost::make_optional(TenantMigrationInfo(donorStateDoc.getId()));
+
+    // To support back-to-back migration retries, when a migration is aborted, we remove its
+    // TenantMigrationDonorAccessBlocker as soon as its donor state doc is marked as garbage
+    // collectable. So onDelete should skip removing the TenantMigrationDonorAccessBlocker for
+    // aborted migrations.
+    if (!tmi) {
+        return;
+    }
+
+    auto migrationId = tmi->uuid;
+    shard_role_details::getRecoveryUnit(opCtx)->onCommit([migrationId](OperationContext* opCtx,
+                                                                       boost::optional<Timestamp>) {
+        LOGV2_INFO(
+            6461601, "Removing expired migration access blocker", "migrationId"_attr = migrationId);
+        TenantMigrationAccessBlockerRegistry::get(opCtx->getServiceContext())
+            .removeAccessBlockersForMigration(migrationId,
+                                              TenantMigrationAccessBlocker::BlockerType::kDonor);
+    });
 }
 
 repl::OpTime TenantMigrationDonorOpObserver::onDropCollection(OperationContext* opCtx,

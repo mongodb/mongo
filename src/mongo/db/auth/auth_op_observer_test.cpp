@@ -46,6 +46,7 @@
 #include "mongo/db/client.h"
 #include "mongo/db/concurrency/exception_util.h"
 #include "mongo/db/concurrency/lock_manager_defs.h"
+#include "mongo/db/op_observer/op_observer_util.h"
 #include "mongo/db/repl/member_state.h"
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/oplog_entry.h"
@@ -153,7 +154,7 @@ TEST_F(AuthOpObserverTest, OnRollbackDoesntInvalidateAuthCacheWhenNoAuthNamespac
     ASSERT_EQ(newCacheGen, initCacheGen);
 }
 
-TEST_F(AuthOpObserverTest, MultipleAboutToDeleteAndOnDelete) {
+TEST_F(AuthOpObserverTest, MultipleOnDelete) {
     AuthOpObserver opObserver;
     auto opCtx = cc().makeOperationContext();
     NamespaceString nss = NamespaceString::createNamespaceString_forTest("test", "coll");
@@ -161,31 +162,9 @@ TEST_F(AuthOpObserverTest, MultipleAboutToDeleteAndOnDelete) {
     AutoGetCollection autoColl(opCtx.get(), nss, MODE_IX);
     OplogDeleteEntryArgs args;
     auto doc = BSON("_id" << 1);
-    opObserver.aboutToDelete(opCtx.get(), *autoColl, doc, &args);
-    opObserver.onDelete(opCtx.get(), *autoColl, {}, doc, args);
-    opObserver.aboutToDelete(opCtx.get(), *autoColl, BSON("_id" << 1), &args);
-    opObserver.onDelete(opCtx.get(), *autoColl, {}, doc, args);
-}
-
-DEATH_TEST_F(AuthOpObserverTest, AboutToDeleteMustPreceedOnDelete, "invariant") {
-    AuthOpObserver opObserver;
-    auto opCtx = cc().makeOperationContext();
-    NamespaceString nss = NamespaceString::createNamespaceString_forTest("test", "coll");
-    AutoGetCollection autoColl(opCtx.get(), nss, MODE_IX);
-    OplogDeleteEntryArgs args;
-    BSONObj doc;
-    opObserver.onDelete(opCtx.get(), *autoColl, {}, doc, args);
-}
-
-DEATH_TEST_F(AuthOpObserverTest, EachOnDeleteRequiresAboutToDelete, "invariant") {
-    AuthOpObserver opObserver;
-    auto opCtx = cc().makeOperationContext();
-    AutoGetCollection autoColl(opCtx.get(), _nss, MODE_IX);
-    OplogDeleteEntryArgs args;
-    BSONObj doc;
-    opObserver.aboutToDelete(opCtx.get(), *autoColl, doc, &args);
-    opObserver.onDelete(opCtx.get(), *autoColl, {}, doc, args);
-    opObserver.onDelete(opCtx.get(), *autoColl, {}, doc, args);
+    const auto& documentKey = getDocumentKey(*autoColl, doc);
+    opObserver.onDelete(opCtx.get(), *autoColl, {}, doc, documentKey, args);
+    opObserver.onDelete(opCtx.get(), *autoColl, {}, doc, documentKey, args);
 }
 
 }  // namespace

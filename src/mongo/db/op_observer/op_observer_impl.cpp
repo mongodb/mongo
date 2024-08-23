@@ -109,9 +109,6 @@ namespace mongo {
 using repl::MutableOplogEntry;
 using ChangeStreamPreImageRecordingMode = repl::ReplOperation::ChangeStreamPreImageRecordingMode;
 
-const auto destinedRecipientDecoration =
-    OplogDeleteEntryArgs::declareDecoration<boost::optional<ShardId>>();
-
 namespace {
 
 MONGO_FAIL_POINT_DEFINE(failCollectionUpdates);
@@ -1063,32 +1060,22 @@ void OpObserverImpl::onUpdate(OperationContext* opCtx,
     }
 }
 
-void OpObserverImpl::aboutToDelete(OperationContext* opCtx,
-                                   const CollectionPtr& coll,
-                                   BSONObj const& doc,
-                                   OplogDeleteEntryArgs* args,
-                                   OpStateAccumulator* opAccumulator) {
-    const auto& nss = coll->ns();
-    documentKeyDecoration(args).emplace(getDocumentKey(coll, doc));
-
-    // No need to create ShardingWriteRouter if isOplogDisabledFor is true.
-    if (!repl::ReplicationCoordinator::get(opCtx)->isOplogDisabledFor(opCtx, nss)) {
-        ShardingWriteRouter shardingWriteRouter(opCtx, nss);
-        destinedRecipientDecoration(args) = shardingWriteRouter.getReshardingDestinedRecipient(doc);
-    }
-}
-
 void OpObserverImpl::onDelete(OperationContext* opCtx,
                               const CollectionPtr& coll,
                               StmtId stmtId,
                               const BSONObj& doc,
+                              const DocumentKey& documentKey,
                               const OplogDeleteEntryArgs& args,
                               OpStateAccumulator* opAccumulator) {
     const auto& nss = coll->ns();
+    boost::optional<ShardId> destinedRecipient = boost::none;
+    // No need to create ShardingWriteRouter if isOplogDisabledFor is true.
+    if (!repl::ReplicationCoordinator::get(opCtx)->isOplogDisabledFor(opCtx, nss)) {
+        ShardingWriteRouter shardingWriteRouter(opCtx, nss);
+        destinedRecipient = shardingWriteRouter.getReshardingDestinedRecipient(doc);
+    }
+
     const auto uuid = coll->uuid();
-    auto optDocKey = documentKeyDecoration(args);
-    invariant(optDocKey, nss.toStringForErrorMsg());
-    auto& documentKey = optDocKey.value();
     auto replCoord = repl::ReplicationCoordinator::get(opCtx);
     const bool isOplogDisabled = replCoord->isOplogDisabledFor(opCtx, nss);
     auto txnParticipant = TransactionParticipant::get(opCtx);
@@ -1105,7 +1092,7 @@ void OpObserverImpl::onDelete(OperationContext* opCtx,
     if (inBatchedWrite) {
         auto operation =
             MutableOplogEntry::makeDeleteOperation(nss, uuid, documentKey.getShardKeyAndId());
-        operation.setDestinedRecipient(destinedRecipientDecoration(args));
+        operation.setDestinedRecipient(destinedRecipient);
         operation.setFromMigrateIfTrue(args.fromMigrate);
 
         if (!args.replicatedRecordId.isNull()) {
@@ -1151,7 +1138,7 @@ void OpObserverImpl::onDelete(OperationContext* opCtx,
                 ChangeStreamPreImageRecordingMode::kPreImagesCollection);
         }
 
-        operation.setDestinedRecipient(destinedRecipientDecoration(args));
+        operation.setDestinedRecipient(destinedRecipient);
         operation.setFromMigrateIfTrue(args.fromMigrate);
         txnParticipant.addTransactionOperation(opCtx, operation);
     } else {
@@ -1180,7 +1167,7 @@ void OpObserverImpl::onDelete(OperationContext* opCtx,
                                stmtId,
                                args.fromMigrate,
                                documentKey,
-                               destinedRecipientDecoration(args),
+                               destinedRecipient,
                                _operationLogger.get());
         if (opAccumulator) {
             opAccumulator->opTime.writeOpTime = opTime.writeOpTime;

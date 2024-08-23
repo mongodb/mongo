@@ -137,11 +137,14 @@ void TimeSeriesOpObserver::onUpdate(OperationContext* opCtx,
     }
 }
 
-void TimeSeriesOpObserver::aboutToDelete(OperationContext* opCtx,
-                                         const CollectionPtr& coll,
-                                         const BSONObj& doc,
-                                         OplogDeleteEntryArgs* args,
-                                         OpStateAccumulator* opAccumulator) {
+void TimeSeriesOpObserver::onDelete(OperationContext* opCtx,
+                                    const CollectionPtr& coll,
+                                    StmtId stmtId,
+                                    const BSONObj& doc,
+                                    const DocumentKey& documentKey,
+                                    const OplogDeleteEntryArgs& args,
+                                    OpStateAccumulator* opAccumulator) {
+
     auto options = coll->getTimeseriesOptions();
     if (!options.has_value()) {
         return;

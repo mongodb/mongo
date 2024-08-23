@@ -91,6 +91,7 @@ void QueryAnalysisOpObserverConfigSvr::onDelete(OperationContext* opCtx,
                                                 const CollectionPtr& coll,
                                                 StmtId stmtId,
                                                 const BSONObj& doc,
+                                                const DocumentKey& documentKey,
                                                 const OplogDeleteEntryArgs& args,
                                                 OpStateAccumulator* opAccumulator) {
     const auto& ns = coll->ns();

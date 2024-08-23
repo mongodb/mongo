@@ -143,15 +143,11 @@ public:
     void onUpdate(OperationContext* opCtx,
                   const OplogUpdateEntryArgs& args,
                   OpStateAccumulator* opAccumulator = nullptr) final;
-    void aboutToDelete(OperationContext* opCtx,
-                       const CollectionPtr& coll,
-                       const BSONObj& doc,
-                       OplogDeleteEntryArgs* args,
-                       OpStateAccumulator* opAccumulator = nullptr) final;
     void onDelete(OperationContext* opCtx,
                   const CollectionPtr& coll,
                   StmtId stmtId,
                   const BSONObj& doc,
+                  const DocumentKey& documentKey,
                   const OplogDeleteEntryArgs& args,
                   OpStateAccumulator* opAccumulator = nullptr) final;
     void onInternalOpMessage(OperationContext* opCtx,

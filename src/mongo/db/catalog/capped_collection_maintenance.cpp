@@ -44,6 +44,7 @@
 #include "mongo/db/concurrency/lock_manager_defs.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/op_observer/op_observer.h"
+#include "mongo/db/op_observer/op_observer_util.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/session/logical_session_id.h"
 #include "mongo/db/storage/capped_snapshots.h"
@@ -219,10 +220,8 @@ void cappedDeleteUntilBelowConfiguredMaximum(OperationContext* opCtx,
         if (nss.isReplicated()) {
             OpObserver* opObserver = opCtx->getServiceContext()->getOpObserver();
 
+            const auto& documentKey = getDocumentKey(collection, doc);
             OplogDeleteEntryArgs args;
-
-            // TODO(SERVER-80956): remove this call.
-            opObserver->aboutToDelete(opCtx, collection, doc, &args);
 
             // If collection has change stream pre-/post-images enabled, pass the 'deletedDoc' for
             // writing it in the pre-images collection.
@@ -231,7 +230,7 @@ void cappedDeleteUntilBelowConfiguredMaximum(OperationContext* opCtx,
             }
 
             // Reserves an optime for the deletion and sets the timestamp for future writes.
-            opObserver->onDelete(opCtx, collection, kUninitializedStmtId, doc, args);
+            opObserver->onDelete(opCtx, collection, kUninitializedStmtId, doc, documentKey, args);
         }
 
         int64_t unusedKeysDeleted = 0;

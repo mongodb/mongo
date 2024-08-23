@@ -28,6 +28,7 @@ env.Benchmark(
         "find_and_modify_images_op_observer",
         "op_observer",
         "op_observer_impl",
+        "op_observer_util",
         "operation_logger_impl",
         "operation_logger_transaction_proxy",
         "user_write_block_mode_op_observer",

@@ -49,6 +49,7 @@
 #include "mongo/db/client.h"
 #include "mongo/db/commands/create_gen.h"
 #include "mongo/db/concurrency/lock_manager_defs.h"
+#include "mongo/db/op_observer/op_observer_util.h"
 #include "mongo/db/repl/member_state.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/repl/replication_coordinator_mock.h"
@@ -530,10 +531,10 @@ TEST_F(ShardSplitDonorOpObserverTest, DeleteAbortedDocumentDoesNotRemoveBlockers
 
     WriteUnitOfWork wuow(_opCtx.get());
     AutoGetCollection autoColl(_opCtx.get(), NamespaceString::kShardSplitDonorsNamespace, MODE_IX);
+    const auto& documentKey = getDocumentKey(*autoColl, bsonDoc);
     OplogDeleteEntryArgs deleteArgs;
-    _observer->aboutToDelete(_opCtx.get(), *autoColl, bsonDoc, &deleteArgs);
 
-    _observer->onDelete(_opCtx.get(), *autoColl, 0 /*stmtId=*/, bsonDoc, deleteArgs);
+    _observer->onDelete(_opCtx.get(), *autoColl, 0 /*stmtId=*/, bsonDoc, documentKey, deleteArgs);
     wuow.commit();
 
     // Verify blockers have not been removed
@@ -568,10 +569,10 @@ TEST_F(ShardSplitDonorOpObserverTest, DeleteCommittedDocumentRemovesBlockers) {
 
     WriteUnitOfWork wuow(_opCtx.get());
     AutoGetCollection autoColl(_opCtx.get(), NamespaceString::kShardSplitDonorsNamespace, MODE_IX);
+    const auto& documentKey = getDocumentKey(*autoColl, bsonDoc);
     OplogDeleteEntryArgs deleteArgs;
-    _observer->aboutToDelete(_opCtx.get(), *autoColl, bsonDoc, &deleteArgs);
 
-    _observer->onDelete(_opCtx.get(), *autoColl, 0 /*stmtId=*/, bsonDoc, deleteArgs);
+    _observer->onDelete(_opCtx.get(), *autoColl, 0 /*stmtId=*/, bsonDoc, documentKey, deleteArgs);
     wuow.commit();
 
     // Verify blockers have been removed

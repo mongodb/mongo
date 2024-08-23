@@ -269,6 +269,7 @@ void MigrationChunkClonerSourceOpObserver::onDelete(OperationContext* opCtx,
                                                     const CollectionPtr& coll,
                                                     StmtId stmtId,
                                                     const BSONObj& doc,
+                                                    const DocumentKey& documentKey,
                                                     const OplogDeleteEntryArgs& args,
                                                     OpStateAccumulator* opAccumulator) {
     if (args.fromMigrate) {
@@ -292,9 +293,7 @@ void MigrationChunkClonerSourceOpObserver::onDelete(OperationContext* opCtx,
         return;
     }
 
-    auto optDocKey = documentKeyDecoration(args);
-    invariant(optDocKey, nss.toStringForErrorMsg());
-    auto shardKeyAndId = optDocKey.value().getShardKeyAndId();
+    auto shardKeyAndId = documentKey.getShardKeyAndId();
 
     auto txnParticipant = TransactionParticipant::get(opCtx);
     const bool inMultiDocumentTransaction =
@@ -313,7 +312,7 @@ void MigrationChunkClonerSourceOpObserver::onDelete(OperationContext* opCtx,
 
     shard_role_details::getRecoveryUnit(opCtx)->registerChange(
         std::make_unique<LogDeleteForShardingHandler>(
-            nss, *optDocKey, opAccumulator->opTime.writeOpTime));
+            nss, documentKey, opAccumulator->opTime.writeOpTime));
 }
 
 void MigrationChunkClonerSourceOpObserver::postTransactionPrepare(

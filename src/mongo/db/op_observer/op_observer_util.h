@@ -85,11 +85,6 @@ DocumentKey getDocumentKey(const CollectionPtr& coll, BSONObj const& doc);
 DocumentKey getDocumentKey(const ShardKeyPattern& shardKeyPattern, BSONObj const& doc);
 
 /**
- * Provides access to the DocumentKey attached to this OperationContext.
- */
-extern const OplogDeleteEntryArgs::Decoration<boost::optional<DocumentKey>> documentKeyDecoration;
-
-/**
  * Provides access to the ShardingWriteRouter attached to the op accumulator.
  * The ShardingWriteRouter instance is created in OpObserverImpl and subsequently
  * destroyed in MigrationChunkClonerSourceOpObserver.

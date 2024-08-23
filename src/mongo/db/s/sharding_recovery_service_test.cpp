@@ -46,6 +46,7 @@
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/op_observer/op_observer.h"
+#include "mongo/db/op_observer/op_observer_util.h"
 #include "mongo/db/query/find_command.h"
 #include "mongo/db/repl/member_state.h"
 #include "mongo/db/repl/oplog.h"
@@ -656,6 +657,7 @@ TEST_F(ShardingRecoveryServiceTestOnSecondary, BlockAndUnblockOperationsOnDataba
     // is what a secondary node would receive when the primary node enters the catch-up phase of the
     // critical section.
     auto doc = CollectionCriticalSectionDocument(dbName, dbOpReason, false);
+    const auto& documentKey = getDocumentKey(criticalSectionColl(), doc.toBSON());
     {
         std::vector<InsertStatement> inserts;
         inserts.emplace_back(doc.toBSON());
@@ -708,9 +710,12 @@ TEST_F(ShardingRecoveryServiceTestOnSecondary, BlockAndUnblockOperationsOnDataba
         WriteUnitOfWork wuow(operationContext());
         AutoGetDb db(operationContext(), dbName.dbName(), MODE_IX);
         OplogDeleteEntryArgs args;
-        opObserver().aboutToDelete(operationContext(), criticalSectionColl(), doc.toBSON(), &args);
-        opObserver().onDelete(
-            operationContext(), criticalSectionColl(), kUninitializedStmtId, doc.toBSON(), args);
+        opObserver().onDelete(operationContext(),
+                              criticalSectionColl(),
+                              kUninitializedStmtId,
+                              doc.toBSON(),
+                              documentKey,
+                              args);
         wuow.commit();
     }
 
@@ -727,6 +732,7 @@ TEST_F(ShardingRecoveryServiceTestOnSecondary, BlockAndUnblockOperationsOnCollec
     // is what a secondary node would receive when the primary node enters the catch-up phase of the
     // critical section.
     auto doc = CollectionCriticalSectionDocument(collNss, collOpReason, false);
+    const auto& documentKey = getDocumentKey(criticalSectionColl(), doc.toBSON());
     auto preImageDoc = doc.toBSON();
     {
         std::vector<InsertStatement> inserts;
@@ -779,9 +785,12 @@ TEST_F(ShardingRecoveryServiceTestOnSecondary, BlockAndUnblockOperationsOnCollec
         WriteUnitOfWork wuow(operationContext());
         AutoGetCollection coll(operationContext(), collNss, MODE_IX);
         OplogDeleteEntryArgs args;
-        opObserver().aboutToDelete(operationContext(), criticalSectionColl(), doc.toBSON(), &args);
-        opObserver().onDelete(
-            operationContext(), criticalSectionColl(), kUninitializedStmtId, doc.toBSON(), args);
+        opObserver().onDelete(operationContext(),
+                              criticalSectionColl(),
+                              kUninitializedStmtId,
+                              doc.toBSON(),
+                              documentKey,
+                              args);
         wuow.commit();
     }
 

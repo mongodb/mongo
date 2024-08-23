@@ -121,7 +121,7 @@ std::vector<BSONObj> generateReopeningPipeline(OperationContext* opCtx,
 /**
  * Notify the BucketCatalog of a direct write to a given bucket document.
  *
- * To be called from an OpObserver, e.g. in aboutToDelete and onUpdate.
+ * To be called from an OpObserver, e.g. in onDelete and onUpdate.
  */
 void handleDirectWrite(OperationContext* opCtx,
                        const TimeseriesOptions& options,

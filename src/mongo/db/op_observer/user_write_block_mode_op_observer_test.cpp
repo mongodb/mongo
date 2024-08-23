@@ -46,6 +46,7 @@
 #include "mongo/db/commands/create_gen.h"
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/concurrency/lock_manager_defs.h"
+#include "mongo/db/op_observer/op_observer_util.h"
 #include "mongo/db/op_observer/user_write_block_mode_op_observer.h"
 #include "mongo/db/repl/member_state.h"
 #include "mongo/db/repl/repl_settings.h"
@@ -122,6 +123,7 @@ protected:
         std::vector<InsertStatement> inserts;
         const auto criteria = BSON("_id" << 0);
         const auto preImageDoc = criteria;
+        const auto& documentKey = getDocumentKey(*autoColl, preImageDoc);
         CollectionUpdateArgs collectionUpdateArgs{preImageDoc};
         collectionUpdateArgs.criteria = criteria;
         collectionUpdateArgs.source =
@@ -139,7 +141,8 @@ protected:
                                      /*fromMigrate=*/std::vector<bool>(inserts.size(), fromMigrate),
                                      /*defaultFromMigrate=*/fromMigrate);
                 opObserver.onUpdate(opCtx, updateArgs);
-                opObserver.onDelete(opCtx, *autoColl, StmtId(), preImageDoc, deleteArgs);
+                opObserver.onDelete(
+                    opCtx, *autoColl, StmtId(), preImageDoc, documentKey, deleteArgs);
             } catch (...) {
                 // Make it easier to see that this is where we failed.
                 ASSERT_OK(exceptionToStatus());
@@ -155,7 +158,8 @@ protected:
                                      /*defaultFromMigrate=*/fromMigrate),
                 AssertionException);
             ASSERT_THROWS(opObserver.onUpdate(opCtx, updateArgs), AssertionException);
-            ASSERT_THROWS(opObserver.onDelete(opCtx, *autoColl, StmtId(), preImageDoc, deleteArgs),
+            ASSERT_THROWS(opObserver.onDelete(
+                              opCtx, *autoColl, StmtId(), preImageDoc, documentKey, deleteArgs),
                           AssertionException);
         }
     }

@@ -292,32 +292,11 @@ public:
             o->onUpdate(opCtx, args, &opStateAccumulator);
     }
 
-    void aboutToDelete(OperationContext* const opCtx,
-                       const CollectionPtr& coll,
-                       const BSONObj& doc,
-                       OplogDeleteEntryArgs* args,
-                       OpStateAccumulator* opAccumulator = nullptr) override {
-        ReservedTimes times{opCtx};
-        OpStateAccumulator opStateAccumulator;
-
-        const auto& nss = coll->ns();
-        std::vector<OpObserver*>* observerQueue;
-        if (nss.isConfigDB()) {
-            observerQueue = &_onDeleteConfigObservers;
-        } else if (nss.isSystem()) {
-            observerQueue = &_onDeleteSystemObservers;
-        } else {
-            observerQueue = &_onDeleteUserObservers;
-        }
-
-        for (auto& o : *observerQueue)
-            o->aboutToDelete(opCtx, coll, doc, args, &opStateAccumulator);
-    }
-
     void onDelete(OperationContext* const opCtx,
                   const CollectionPtr& coll,
                   StmtId stmtId,
                   const BSONObj& doc,
+                  const DocumentKey& documentKey,
                   const OplogDeleteEntryArgs& args,
                   OpStateAccumulator* opAccumulator = nullptr) override {
         ReservedTimes times{opCtx};
@@ -334,7 +313,7 @@ public:
         }
 
         for (auto& o : *observerQueue)
-            o->onDelete(opCtx, coll, stmtId, doc, args, &opStateAccumulator);
+            o->onDelete(opCtx, coll, stmtId, doc, documentKey, args, &opStateAccumulator);
     }
 
     void onInternalOpMessage(OperationContext* const opCtx,

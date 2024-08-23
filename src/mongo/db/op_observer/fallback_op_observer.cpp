@@ -163,14 +163,11 @@ void FallbackOpObserver::onDelete(OperationContext* opCtx,
                                   const CollectionPtr& coll,
                                   StmtId stmtId,
                                   const BSONObj& doc,
+                                  const DocumentKey& documentKey,
                                   const OplogDeleteEntryArgs& args,
                                   OpStateAccumulator* opAccumulator) {
     const auto& nss = coll->ns();
     const bool inBatchedWrite = BatchedWriteContext::get(opCtx).writesAreBatched();
-
-    auto optDocKey = documentKeyDecoration(args);
-    invariant(optDocKey, nss.toStringForErrorMsg());
-    auto& documentKey = optDocKey.value();
 
     if (nss.isSystemDotJavascript()) {
         Scope::storedFuncMod(opCtx);

@@ -38,6 +38,7 @@
 #include "mongo/db/op_observer/find_and_modify_images_op_observer.h"
 #include "mongo/db/op_observer/op_observer_impl.h"
 #include "mongo/db/op_observer/op_observer_registry.h"
+#include "mongo/db/op_observer/op_observer_util.h"
 #include "mongo/db/op_observer/operation_logger_impl.h"
 #include "mongo/db/op_observer/operation_logger_transaction_proxy.h"
 #include "mongo/db/op_observer/user_write_block_mode_op_observer.h"
@@ -246,13 +247,14 @@ BENCHMARK(BM_OnInserts_ConfigTransactions)->MinTime(10.0);
 BENCHMARK(BM_OnInserts_User)->MinTime(10.0);
 BENCHMARK(BM_OnInserts_System)->MinTime(10.0);
 
-void BM_aboutAndOnDelete(benchmark::State& state, const char* nss) {
+void BM_onDelete(benchmark::State& state, const char* nss) {
     CollectionMock coll(NamespaceString::createNamespaceString_forTest(nss));
     CollectionPtr collptr(&coll);
     BSONObj const doc = BSON("_id"
                              << "whatever"
                              << "key"
                              << "value");
+    const auto& documentKey = getDocumentKey(collptr, doc);
     OplogDeleteEntryArgs deleteArgs;
     OpObserverRegistry registry;
     auto* serviceContext = setupServiceContext();
@@ -268,26 +270,26 @@ void BM_aboutAndOnDelete(benchmark::State& state, const char* nss) {
 
     setUpObservers(serviceContext, &registry, ClusterRole::None, false /* not serverless */);
     for (auto _ : state) {
-        registry.aboutToDelete(opCtx.get(), collptr, doc, &deleteArgs, nullptr);
-        registry.onDelete(opCtx.get(), collptr, kUninitializedStmtId, doc, deleteArgs, nullptr);
+        registry.onDelete(
+            opCtx.get(), collptr, kUninitializedStmtId, doc, documentKey, deleteArgs, nullptr);
     }
 }
 
-void BM_aboutAndOnDelete_ConfigTransactions(benchmark::State& state) {
-    BM_aboutAndOnDelete(state, "config.transactions");
+void BM_onDelete_ConfigTransactions(benchmark::State& state) {
+    BM_onDelete(state, "config.transactions");
 }
 
-void BM_aboutAndOnDelete_User(benchmark::State& state) {
-    BM_aboutAndOnDelete(state, "test.coll1");
+void BM_onDelete_User(benchmark::State& state) {
+    BM_onDelete(state, "test.coll1");
 }
 
-void BM_aboutAndOnDelete_System(benchmark::State& state) {
-    BM_aboutAndOnDelete(state, "test.system.special");
+void BM_onDelete_System(benchmark::State& state) {
+    BM_onDelete(state, "test.system.special");
 }
 
-BENCHMARK(BM_aboutAndOnDelete_ConfigTransactions)->MinTime(10.0);
-BENCHMARK(BM_aboutAndOnDelete_User)->MinTime(10.0);
-BENCHMARK(BM_aboutAndOnDelete_System)->MinTime(10.0);
+BENCHMARK(BM_onDelete_ConfigTransactions)->MinTime(10.0);
+BENCHMARK(BM_onDelete_User)->MinTime(10.0);
+BENCHMARK(BM_onDelete_System)->MinTime(10.0);
 
 }  // namespace
 }  // namespace mongo

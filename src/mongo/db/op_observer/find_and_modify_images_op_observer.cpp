@@ -108,6 +108,7 @@ void FindAndModifyImagesOpObserver::onDelete(OperationContext* opCtx,
                                              const CollectionPtr& coll,
                                              StmtId stmtId,
                                              const BSONObj& doc,
+                                             const DocumentKey& documentKey,
                                              const OplogDeleteEntryArgs& args,
                                              OpStateAccumulator* opAccumulator) {
     writeToImageCollection(opCtx, opAccumulator);

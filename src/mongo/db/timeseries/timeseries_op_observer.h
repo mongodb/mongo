@@ -74,11 +74,13 @@ public:
                   const OplogUpdateEntryArgs& args,
                   OpStateAccumulator* opAccumulator = nullptr) final;
 
-    void aboutToDelete(OperationContext* opCtx,
-                       const CollectionPtr& coll,
-                       const BSONObj& doc,
-                       OplogDeleteEntryArgs* args,
-                       OpStateAccumulator* opAccumulator = nullptr) final;
+    void onDelete(OperationContext* opCtx,
+                  const CollectionPtr& coll,
+                  StmtId stmtId,
+                  const BSONObj& doc,
+                  const DocumentKey& documentKey,
+                  const OplogDeleteEntryArgs& args,
+                  OpStateAccumulator* opAccumulator = nullptr) final;
 
     repl::OpTime onDropCollection(OperationContext* opCtx,
                                   const NamespaceString& collectionName,

@@ -496,11 +496,13 @@ void ShardMergeRecipientOpObserver::onUpdate(OperationContext* opCtx,
     }
 }
 
-void ShardMergeRecipientOpObserver::aboutToDelete(OperationContext* opCtx,
-                                                  const CollectionPtr& coll,
-                                                  BSONObj const& doc,
-                                                  OplogDeleteEntryArgs* args,
-                                                  OpStateAccumulator* opAccumulator) {
+void ShardMergeRecipientOpObserver::onDelete(OperationContext* opCtx,
+                                             const CollectionPtr& coll,
+                                             StmtId stmtId,
+                                             const BSONObj& doc,
+                                             const DocumentKey& documentKey,
+                                             const OplogDeleteEntryArgs& args,
+                                             OpStateAccumulator* opAccumulator) {
     if (coll->ns() != NamespaceString::kShardMergeRecipientsNamespace ||
         tenant_migration_access_blocker::inRecoveryMode(opCtx)) {
         return;
@@ -523,31 +525,16 @@ void ShardMergeRecipientOpObserver::aboutToDelete(OperationContext* opCtx,
                           << tenant_migration_util::redactStateDoc(recipientStateDoc.toBSON()),
             isDocMarkedGarbageCollectable);
 
-    tenantMigrationInfo(opCtx) = TenantMigrationInfo(recipientStateDoc.getId());
-}
+    TenantMigrationInfo migrationInfo(recipientStateDoc.getId());
 
-void ShardMergeRecipientOpObserver::onDelete(OperationContext* opCtx,
-                                             const CollectionPtr& coll,
-                                             StmtId stmtId,
-                                             const BSONObj& doc,
-                                             const OplogDeleteEntryArgs& args,
-                                             OpStateAccumulator* opAccumulator) {
-    if (coll->ns() != NamespaceString::kShardMergeRecipientsNamespace ||
-        tenant_migration_access_blocker::inRecoveryMode(opCtx)) {
-        return;
-    }
-
-    if (auto tmi = tenantMigrationInfo(opCtx)) {
-        shard_role_details::getRecoveryUnit(opCtx)->onCommit(
-            [migrationId = tmi->uuid](OperationContext* opCtx, auto _) {
-                LOGV2_INFO(7339765,
-                           "Removing expired recipient access blocker",
-                           "migrationId"_attr = migrationId);
-                TenantMigrationAccessBlockerRegistry::get(opCtx->getServiceContext())
-                    .removeAccessBlockersForMigration(
-                        migrationId, TenantMigrationAccessBlocker::BlockerType::kRecipient);
-            });
-    }
+    shard_role_details::getRecoveryUnit(opCtx)->onCommit([migrationId = migrationInfo.uuid](
+                                                             OperationContext* opCtx, auto _) {
+        LOGV2_INFO(
+            7339765, "Removing expired recipient access blocker", "migrationId"_attr = migrationId);
+        TenantMigrationAccessBlockerRegistry::get(opCtx->getServiceContext())
+            .removeAccessBlockersForMigration(
+                migrationId, TenantMigrationAccessBlocker::BlockerType::kRecipient);
+    });
 }
 
 repl::OpTime ShardMergeRecipientOpObserver::onDropCollection(OperationContext* opCtx,
