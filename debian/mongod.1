@@ -1854,18 +1854,6 @@ through a restart, update the value of
 \fB\-\-oplogMinRetentionHours\f1\f1\&.
 .RE
 .PP
-\fBmongod \-\-enableMajorityReadConcern\f1
-.RS
-.PP
-\fIDefault\f1: true
-.PP
-Configures support for \fB"majority"\f1\f1 read concern.
-.PP
-Starting in MongoDB 5.0,
-\fB\-\-enableMajorityReadConcern\f1\f1 cannot be changed
-and is always set to \fBtrue\f1\&. In earlier versions of MongoDB,
-\fB\-\-enableMajorityReadConcern\f1\f1 was configurable.
-.PP
 If you are using a three\-member primary\-secondary\-arbiter (PSA)
 architecture, consider the following:
 .RS

@@ -523,18 +523,6 @@ export class ReplSetTest {
             this.awaitSecondaryNodes(timeout, secondaries, retryIntervalMS);
             MongoRunner.runHangAnalyzer.enable();
         } catch (originalEx) {
-            // There is a special case where we expect the (rare) possibility of unrecoverable
-            // rollbacks with EMRC:false in rollback suites with unclean shutdowns.
-            jsTestLog("Exception in 'awaitSecondaryNodes', checking for unrecoverable rollback");
-            if (connToCheckForUnrecoverableRollback) {
-                const conn = connToCheckForUnrecoverableRollback;
-
-                const statusRes = assert.commandWorked(conn.adminCommand({replSetGetStatus: 1}));
-                const isRecovering = (statusRes.myState === ReplSetTest.State.RECOVERING);
-                const hasNoSyncSource = (statusRes.syncSourceId === -1);
-
-                const cmdLineOptsRes = assert.commandWorked(conn.adminCommand("getCmdLineOpts"));
-            }
             // Re-throw the original exception in all cases.
             MongoRunner.runHangAnalyzer.enable();
             throw originalEx;

@@ -1223,8 +1223,6 @@ StatusWith<RollBackLocalOperations::RollbackCommonPoint> RollbackImpl::_findComm
     // Rollback common point should be >= the stable timestamp.
     invariant(stableTimestamp);
     if (commonPointOpTime.getTimestamp() < *stableTimestamp) {
-        // This is an fassert rather than an invariant, since it can happen if the server was
-        // recently upgraded to enableMajorityReadConcern=true.
         LOGV2_FATAL_NOTRACE(51121,
                             "Common point must be at least stable timestamp",
                             "commonPoint"_attr = commonPointOpTime.getTimestamp(),
