@@ -43,7 +43,7 @@
  * failure, which allows us to avoid performing unncecessary calculations on the hot path.
  */
 
-namespace mongo::query_diagnostics {
+namespace mongo::command_diagnostics {
 
 struct Printer {
     auto format(auto& fc) const {
@@ -73,17 +73,17 @@ private:
     }
 };
 
-}  // namespace mongo::query_diagnostics
+}  // namespace mongo::command_diagnostics
 
 namespace fmt {
 
 template <>
-struct formatter<mongo::query_diagnostics::Printer> {
+struct formatter<mongo::command_diagnostics::Printer> {
     constexpr auto parse(auto& ctx) {
         return ctx.begin();
     }
 
-    auto format(const mongo::query_diagnostics::Printer& obj, auto& ctx) {
+    auto format(const mongo::command_diagnostics::Printer& obj, auto& ctx) {
         return obj.format(ctx);
     }
 };
