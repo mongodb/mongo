@@ -2,7 +2,9 @@
  * Verifies that BinData $convert behaves correctly in FCV upgrade/downgrade scenarios.
  */
 import "jstests/multiVersion/libs/multi_rs.js";
+
 import {assertDropAndRecreateCollection} from "jstests/libs/collection_drop_recreate.js";
+import {ReplSetTest} from "jstests/libs/replsettest.js";
 
 const lastLTSVersion = {
     binVersion: "last-lts"

@@ -537,7 +537,7 @@ class _InitialSyncThread(threading.Thread):
         client_conn = fixture.get_driver_connection_url()
         # maxTimeMS: 0 below means don't time out.
         js_cmds = """
-            const {ReplSetTest} = await import("jstests/libs/replsettest.js");
+            const {{ReplSetTest}} = await import("jstests/libs/replsettest.js");
             const timeoutMs = 10 * 60 * 1000; // 10 minutes
             const retryIntervalMs = 10 * 1000; // 10 seconds
             const conn = '{}';
