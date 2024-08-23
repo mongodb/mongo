@@ -11,10 +11,6 @@ selector:
     # TODO SERVER-86996: Apply QuerySettings for queries involving timeseries collections.
     - jstests/core/timeseries/**/*.js
 
-    # TODO SERVER-88977: Apply QuerySettings for queries involving columnstore indexes.
-    - jstests/core/columnstore/**/*.js
-    - jstests/core/query/project/projection_semantics.js
-
     # TODO SERVER-89207: Ensure that the fallback mechanism works for '$_requestResumeToken'
     # queries.
     - jstests/core/find_with_resume_after_param.js

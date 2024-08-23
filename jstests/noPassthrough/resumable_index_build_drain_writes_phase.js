@@ -8,7 +8,7 @@
  *   requires_replication,
  * ]
  */
-import {setUpServerForColumnStoreIndexTest} from "jstests/libs/columnstore_util.js";
+
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {ResumableIndexBuildTest} from "jstests/noPassthrough/libs/index_build.js";
 
@@ -18,7 +18,6 @@ const rst = new ReplSetTest({nodes: 1});
 rst.startSet();
 rst.initiate();
 
-const columnstoreEnabled = setUpServerForColumnStoreIndexTest(rst.getPrimary().getDB(dbName));
 const runTests = function(docs, indexSpecsFlat, sideWrites, collNameSuffix) {
     const coll = rst.getPrimary().getDB(dbName).getCollection(jsTestName() + collNameSuffix);
     assert.commandWorked(coll.insert(docs));
@@ -53,32 +52,5 @@ runTests({a: 1},
          [{"$**": 1}, {h: 1}],
          [{a: [1, 2], b: {c: [3, 4]}, d: ""}, {e: "", f: [[]], g: null, h: 8}],
          "_wildcard");
-if (columnstoreEnabled) {
-    runTests({a: 1},
-             [{"$**": "columnstore"}, {h: 1}],
-             (function(collection) {
-                 assert.commandWorked(collection.insert([{a: [{c: 2}], b: 2}, {a: 3, b: 3}]));
-                 assert.commandWorked(collection.update({a: 3}, {a: 4, b: 3}));
-                 assert.commandWorked(collection.remove({"a.c": 2}));
-                 assert.commandWorked(collection.insert({a: 4, b: 4}));
-                 assert.commandWorked(collection.remove({b: 3}));
-                 assert.commandWorked(collection.update({a: 4}, {a: 2}));
-             }),
-             "_columnstore");
-    runTests({a: {b: 1}, c: 1},
-             [{"a.$**": "columnstore"}, {h: 1}],
-             (function(collection) {
-                 assert.commandWorked(collection.insert({a: 1}));
-                 assert.commandWorked(collection.insert({a: {b: 2}}));
 
-                 // Updates that leave the indexed columns unmodified.
-                 assert.commandWorked(collection.update({"a.b": 1}, {a: {b: 1}, c: 10}));
-                 assert.commandWorked(collection.update({"a.b": 2}, {a: {b: 2}, c: 10}));
-
-                 // Insert and delete that do not involve any indexed columns.
-                 assert.commandWorked(collection.insert({c: 20}));
-                 assert.commandWorked(collection.deleteOne({c: 20}));
-             }),
-             "_subdocument_columnstore");
-}
 rst.stopSet();

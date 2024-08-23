@@ -40,7 +40,7 @@ selector:
     - jstests/core/query/internal_hash_eq/**/*.js
     - jstests/core/query/project/projection_with_hashed_index.js
     - jstests/core/single_field_hashed_index.js
-    # Column store indexes.
+    # Indexed measurement field contains an array value
     - jstests/core/query/project/projection_semantics.js
     # findAndModify sort.
     - jstests/core/query/natural_validation.js

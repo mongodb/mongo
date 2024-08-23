@@ -8,7 +8,7 @@
  *   requires_replication,
  * ]
  */
-import {setUpServerForColumnStoreIndexTest} from "jstests/libs/columnstore_util.js";
+
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {ResumableIndexBuildTest} from "jstests/noPassthrough/libs/index_build.js";
 
@@ -17,8 +17,6 @@ const dbName = "test";
 const rst = new ReplSetTest({nodes: 1});
 rst.startSet();
 rst.initiate();
-
-const columnstoreEnabled = setUpServerForColumnStoreIndexTest(rst.getPrimary().getDB(dbName));
 
 const runTest = function(docs, indexSpecs, failPoints, resumePhases, resumeChecks, collNameSuffix) {
     const coll = rst.getPrimary().getDB(dbName).getCollection(
@@ -57,15 +55,6 @@ const runTests = function(failPoints, resumePhases, resumeChecks) {
             resumePhases,
             resumeChecks,
             "_wildcard");
-
-    if (columnstoreEnabled) {
-        runTest([{a: 1, b: 1}, {a: 2, b: 2}, {a: 3, b: 3}],
-                [[{"$**": "columnstore"}], [{b: 1}]],
-                failPoints,
-                resumePhases,
-                resumeChecks,
-                "_columnstore");
-    }
 };
 
 runTests(

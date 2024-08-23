@@ -436,7 +436,6 @@ env.CppUnitTest(
         "projection_test.cpp",
         "query_planner_array_test.cpp",
         "query_planner_collation_test.cpp",
-        "query_planner_columnar_test.cpp",
         "query_planner_distinct_test.cpp",
         "query_planner_geo_test.cpp",
         "query_planner_hashed_index_test.cpp",

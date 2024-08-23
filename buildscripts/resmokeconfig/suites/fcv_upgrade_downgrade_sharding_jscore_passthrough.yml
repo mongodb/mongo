@@ -56,11 +56,6 @@ selector:
     - jstests/core/timeseries/timeseries_collation.js
     - jstests/core/timeseries/bucket_timestamp_rounding.js
 
-    # These use "columnstore indexes are under development and cannot be used without enabling the feature flag"
-    - jstests/core/query/null_query_semantics.js
-    - jstests/core/query/project/projection_semantics.js
-    - jstests/core/index/hidden_index.js
-
     # TODO: Remove after fixing SERVER-78201: the following received command without explicit readConcern.
     - jstests/aggregation/sources/densify/internal_parse.js
     - jstests/aggregation/api_version_stage_allowance_checks.js
@@ -125,8 +120,6 @@ selector:
     - assumes_against_mongod_not_mongos
     # system.profile collection doesn't exist on mongos.
     - requires_profiling
-    # columnstore indexes are under development and cannot be used without enabling the feature flag
-    - featureFlagColumnstoreIndexes
     - featureFlagFLE2CleanupCommand
     # TODO SERVER-71537: Remove Feature Flag for PM-412.
     - featureFlagQuerySettings

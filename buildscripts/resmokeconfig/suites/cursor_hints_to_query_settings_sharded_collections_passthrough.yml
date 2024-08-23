@@ -116,8 +116,6 @@ selector:
     - jstests/core/index/indext.js
     - jstests/core/index/sparse_index_internal_expr.js
     - jstests/core/query/exists/existsa.js
-    # Similar to the above, column store and timeseries indexes cannot be forced using query settings.
-    - jstests/core/columnstore/columnstore_index_correctness.js
 
     - jstests/core/query/query_settings/**/*.js
     - jstests/core/txns/**/*.js

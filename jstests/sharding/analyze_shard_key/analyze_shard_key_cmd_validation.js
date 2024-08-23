@@ -1,7 +1,7 @@
 /**
  * Tests that basic validation within the analyzeShardKey command.
  *
- * @tags: [requires_fcv_70, featureFlagColumnstoreIndexes]
+ * @tags: [requires_fcv_70]
  */
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";
 import {Thread} from "jstests/libs/parallelTester.js";

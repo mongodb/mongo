@@ -76,10 +76,6 @@ selector:
     - jstests/core/**/bucket_unpacking_with_sort_extended_range.js
     # View tests aren't expected to work when collections are implicitly sharded.
     - jstests/core/txns/view_reads_in_transaction.js
-    # The following test runs commands directly against shardsvr mongods. This causes the implicit
-    # configure query sampling logic to fail since the configureQueryAnalyzer command is not supported
-    # on shardsvr mongods.
-    - jstests/core/**/column_store_index_compression.js
 
     # The following test expects collections that have not been explicitly created to not exist so the
     # implicit shard accessed collection logic causes it to fail.

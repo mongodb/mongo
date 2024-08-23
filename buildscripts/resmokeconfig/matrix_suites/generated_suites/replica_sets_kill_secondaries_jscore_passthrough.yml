@@ -51,7 +51,6 @@ selector:
   - jstests/core/**/sortb.js
   - jstests/core/**/sortg.js
   - jstests/core/**/sortj.js
-  - jstests/core/**/column_store_index_compression.js
   exclude_with_any_tags:
   - assumes_standalone_mongod
   - requires_profiling

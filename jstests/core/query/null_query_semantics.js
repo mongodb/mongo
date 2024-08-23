@@ -1,18 +1,11 @@
 // Tests the behavior of queries with a {$eq: null} or {$ne: null} predicate.
 // @tags: [
-//   # Columnstore tests set server parameters to disable columnstore query planning heuristics -
-//   # 1) server parameters are stored in-memory only so are not transferred onto the recipient,
-//   # 2) server parameters may not be set in stepdown passthroughs because it is a command that may
-//   #      return different values after a failover
-//   tenant_migration_incompatible,
-//   does_not_support_stepdowns,
 //   not_allowed_with_signed_security_token,
 //   # In 8.0, we changed behavior for equality to null.
 //   requires_fcv_80,
 // ]
 //
 import {resultsEq} from "jstests/aggregation/extras/utils.js";
-import {setUpServerForColumnStoreIndexTest} from "jstests/libs/columnstore_util.js";
 
 function extractAValues(results) {
     return results.map(function(res) {
@@ -822,11 +815,6 @@ const keyPatterns = [
     {keyPattern: {"$**": 1}},
     {keyPattern: {"a.$**": 1}}
 ];
-
-// Include Columnstore Index only if FF is enabled and collection is not clustered.
-if (setUpServerForColumnStoreIndexTest(db)) {
-    keyPatterns.push({keyPattern: {"$**": "columnstore"}});
-}
 
 // Test with a variety of other indexes.
 for (let indexSpec of keyPatterns) {

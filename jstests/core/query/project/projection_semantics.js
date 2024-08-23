@@ -6,20 +6,10 @@
  *   # We could potentially need to resume an index build in the event of a stepdown, which is not
  *   # yet implemented.
  *   does_not_support_stepdowns,
- *   # Columnstore indexes were first enabled by default on 6.3.
- *   requires_fcv_63,
- *   # Columnstore tests set server parameters to disable columnstore query planning heuristics -
- *   # server parameters are stored in-memory only so are not transferred onto the recipient.
- *   tenant_migration_incompatible,
  *   not_allowed_with_signed_security_token,
  *   featureFlagSbeFull,
  * ]
  */
-import {setUpServerForColumnStoreIndexTest} from "jstests/libs/columnstore_util.js";
-
-if (!setUpServerForColumnStoreIndexTest(db)) {
-    quit();
-}
 
 const coll = db.projection_semantics;
 coll.drop();
@@ -62,7 +52,7 @@ function testInputOutput({input, projection, expectedOutput, interestingIndexes 
         input: input,
         projection: {a: 1},
         expectedOutput: output,
-        interestingIndexes: [{_id: 1, a: 1}, {a: 1, _id: 1}, {"$**": "columnstore"}]
+        interestingIndexes: [{_id: 1, a: 1}, {a: 1, _id: 1}]
     });
 
     // Test some basic "normal" cases.
@@ -75,19 +65,18 @@ function testInputOutput({input, projection, expectedOutput, interestingIndexes 
 
     // Test including "a" when "a" is missing/not present.
     // TODO SERVER-23229 this will return different results if there is a covering index, so here
-    // but not elsewhere we don't use any "interestingIndexes." Column store indexes are excepted
-    // since their unique storage format means they are unimpacted by SERVER-23229.
+    // but not elsewhere we don't use any "interestingIndexes."
     testInputOutput({
         input: {_id: ++globalIdCounter, b: "other", x: "extra"},
         projection: {a: 1},
         expectedOutput: {_id: globalIdCounter},
-        interestingIndexes: [{"$**": "columnstore"}]
+        interestingIndexes: []
     });
     testInputOutput({
         input: {_id: ++globalIdCounter},
         projection: {a: 1},
         expectedOutput: {_id: globalIdCounter},
-        interestingIndexes: [{"$**": "columnstore"}]
+        interestingIndexes: []
     });
 
     // Test a range of interesting values for "a". We expect everything to be preserved unmodified.
@@ -95,7 +84,7 @@ function testInputOutput({input, projection, expectedOutput, interestingIndexes 
         input: input,
         projection: {a: 1},
         expectedOutput: input,
-        interestingIndexes: [{_id: 1, a: 1}, {a: 1, _id: 1}, {"$**": "columnstore"}]
+        interestingIndexes: [{_id: 1, a: 1}, {a: 1, _id: 1}]
     });
     testIdentityInclusionA({_id: ++globalIdCounter, a: null});
     testIdentityInclusionA({_id: ++globalIdCounter, a: undefined});
@@ -120,7 +109,7 @@ function testInputOutput({input, projection, expectedOutput, interestingIndexes 
         // Can't use {a: "hashed"} here because it doesn't support array values.
         // Could use {a: "$**"}, but it can't be hinted without a query predicate so we'll leave
         // that coverage for elsewhere rather than add complexity to get a valid query predicate.
-        interestingIndexes: [{a: 1}, {a: -1}, {"$**": "columnstore"}]
+        interestingIndexes: [{a: 1}, {a: -1}]
     });
 
     // The "basics" again.
@@ -131,19 +120,18 @@ function testInputOutput({input, projection, expectedOutput, interestingIndexes 
 
     // Missing 'a' value again.
     // TODO SERVER-23229 this will return different results if there is a covering index, so here
-    // but not elsewhere we don't use any "interestingIndexes". Column store indexes are excepted
-    // since their unique storage format means they are unimpacted by SERVER-23229.
+    // but not elsewhere we don't use any "interestingIndexes".
     testInputOutput({
         input: {_id: ++globalIdCounter, b: "other", x: "extra"},
         projection: {a: 1, _id: 0},
         expectedOutput: {},
-        interestingIndexes: [{"$**": "columnstore"}]
+        interestingIndexes: []
     });
     testInputOutput({
         input: {_id: ++globalIdCounter},
         projection: {a: 1, _id: 0},
         expectedOutput: {},
-        interestingIndexes: [{"$**": "columnstore"}]
+        interestingIndexes: []
     });
 
     // Just a couple of the cases above to confirm the same behavior just without the _id.
@@ -162,7 +150,7 @@ function testInputOutput({input, projection, expectedOutput, interestingIndexes 
         input: input,
         projection: {'a.b': 1},
         expectedOutput: output,
-        interestingIndexes: [{_id: 1, 'a.b': 1}, {'a.b': 1, _id: 1}, {"$**": "columnstore"}]
+        interestingIndexes: [{_id: 1, 'a.b': 1}, {'a.b': 1, _id: 1}]
     });
 
     // Test some basic "normal" cases.
@@ -194,14 +182,8 @@ function testInputOutput({input, projection, expectedOutput, interestingIndexes 
     // we will need to add a fetch to reconstruct the array anyway and will figure out the correct
     // answer in the process.
     //
-    // Column store indexes are excepted since their unique storage format means they are unimpacted
-    // by SERVER-23229.
-    const testADotBNoIndexes = (input, output) => testInputOutput({
-        input: input,
-        projection: {'a.b': 1},
-        expectedOutput: output,
-        interestingIndexes: [{"$**": "columnstore"}]
-    });
+    const testADotBNoIndexes = (input, output) => testInputOutput(
+        {input: input, projection: {'a.b': 1}, expectedOutput: output, interestingIndexes: []});
 
     testADotBNoIndexes({_id: ++globalIdCounter, b: "other", x: "extra"}, {_id: globalIdCounter});
     testADotBNoIndexes({_id: ++globalIdCounter}, {_id: globalIdCounter});
@@ -212,7 +194,7 @@ function testInputOutput({input, projection, expectedOutput, interestingIndexes 
         input: input,
         projection: {'a.b': 1, _id: 0},
         expectedOutput: output,
-        interestingIndexes: [{'a.b': 1}, {'a.b': -1}, {"$**": "columnstore"}]
+        interestingIndexes: [{'a.b': 1}, {'a.b': -1}]
     });
 
     // The "basics" again - no _id this time.
@@ -276,7 +258,6 @@ function testInputOutput({input, projection, expectedOutput, interestingIndexes 
             {'a.c': 1},
             {'a.b': 1, 'a.c': 1},
             {'a.b': 1, 'a.c': -1},
-            {"$**": "columnstore"}
         ]
     });
     testIncludeOnlyADotBAndADotC(
@@ -298,13 +279,12 @@ function testInputOutput({input, projection, expectedOutput, interestingIndexes 
     // Non-array cases where one or both of the paths don't exist.
     //
     // TODO SERVER-23229: This will return different results if there is a covering index, so here
-    // but not elsewhere we don't use any "interestingIndexes" in test cases. Column store indexes
-    // are excepted since their unique storage format means they are unimpacted by SERVER-23229.
+    // but not elsewhere we don't use any "interestingIndexes" in test cases.
     const testIncludeADotBAndCNoIndexes = (input, output) => testInputOutput({
         input: input,
         projection: {'a.b': 1, 'a.c': 1, _id: 0},
         expectedOutput: output,
-        interestingIndexes: [{"$**": "columnstore"}]
+        interestingIndexes: []
     });
 
     testIncludeADotBAndCNoIndexes({_id: ++globalIdCounter, a: {b: "scalar", d: "extra"}},
@@ -321,7 +301,7 @@ function testInputOutput({input, projection, expectedOutput, interestingIndexes 
         input: input,
         projection: {'a.b.c': 1, _id: 0},
         expectedOutput: output,
-        interestingIndexes: [{'a.b.c': 1}, {'a.b.c': -1}, {"$**": "columnstore"}]
+        interestingIndexes: [{'a.b.c': 1}, {'a.b.c': -1}]
     });
 
     // Test some basic "normal" cases.
@@ -382,13 +362,11 @@ function testInputOutput({input, projection, expectedOutput, interestingIndexes 
     // array), since we will need to add a fetch to reconstruct the array anyway and will figure out
     // the correct answer in the process.
     //
-    // Column store indexes are excepted since their unique storage format means they are unimpacted
-    // by SERVER-23229.
     const testADotBDotCNoIndexes = (input, output) => testInputOutput({
         input: input,
         projection: {'a.b.c': 1, _id: 0},
         expectedOutput: output,
-        interestingIndexes: [{"$**": "columnstore"}]
+        interestingIndexes: []
     });
 
     testADotBDotCNoIndexes({}, {});
@@ -404,7 +382,7 @@ function testInputOutput({input, projection, expectedOutput, interestingIndexes 
         input: input,
         projection: {'a.b.c': 1, _id: 0},
         expectedOutput: output,
-        interestingIndexes: [{'a.b.c': 1}, {'a.b.c': -1}, {"$**": "columnstore"}]
+        interestingIndexes: [{'a.b.c': 1}, {'a.b.c': -1}]
     });
 
     // More cases where 'a.b.c' doesn't exist - but with arrays this time.
@@ -506,29 +484,20 @@ function testInputOutput({input, projection, expectedOutput, interestingIndexes 
 // Now test the exclusion semantics. This part is a lot smaller since a lot of the behaviors mirror
 // inclusion projection.
 (function testExclusionSemantics() {
-    // Need a new helper to exclude column store coverage, since column store indexes cannot be used
-    // for exclusion projections.
-    const testInputOutputExclusion = ({input, projection, expectedOutput}) => testInputOutput({
-        input: input,
-        projection: projection,
-        expectedOutput: expectedOutput,
-        excludeColumnStore: true
-    });
-
     // Test some basic top-level flat examples.
-    testInputOutputExclusion({
+    testInputOutput({
         input: {_id: ++globalIdCounter, a: 1, b: 1, c: 1},
         projection: {a: 0},
         expectedOutput: {_id: globalIdCounter, b: 1, c: 1}
     });
-    testInputOutputExclusion({
+    testInputOutput({
         input: {_id: ++globalIdCounter, a: 1, b: 1, c: 1},
         projection: {a: 0, b: 0},
         expectedOutput: {_id: globalIdCounter, c: 1}
     });
 
     // Test some dotted examples.
-    testInputOutputExclusion({
+    testInputOutput({
         input: {_id: ++globalIdCounter, a: {b: 1, c: 1, d: 1}, x: {y: 1, z: 1}},
         projection: {"a.b": 0},
         expectedOutput: {_id: globalIdCounter, a: {c: 1, d: 1}, x: {y: 1, z: 1}}
@@ -536,27 +505,27 @@ function testInputOutput({input, projection, expectedOutput, interestingIndexes 
     // One notable difference between inclusion and exclusion projections is that parent's scalar
     // values remain untouched during an exclusion projection. The "scalar" here remains. In an
     // inclusion projection, these would disappear.
-    testInputOutputExclusion({
+    testInputOutput({
         input: {_id: ++globalIdCounter, a: ["scalar", {b: 1, c: 1, d: 1}, {b: 2, c: 2}, {b: 3}]},
         projection: {"a.b": 0},
         expectedOutput: {_id: globalIdCounter, a: ["scalar", {c: 1, d: 1}, {c: 2}, {}]}
     });
-    testInputOutputExclusion({
+    testInputOutput({
         input: {_id: ++globalIdCounter, a: [{b: 1, c: 1, d: 1}, {b: 2, c: 2}, {b: 3}]},
         projection: {"a.b": 0, "a.c": 0},
         expectedOutput: {_id: globalIdCounter, a: [{d: 1}, {}, {}]}
     });
-    testInputOutputExclusion({
+    testInputOutput({
         input: {_id: ++globalIdCounter, a: [{b: 1, c: 1, d: 1}, {b: 2, c: 2}, {b: 3}]},
         projection: {"a.b": 0, "a.c": 0},
         expectedOutput: {_id: globalIdCounter, a: [{d: 1}, {}, {}]}
     });
-    testInputOutputExclusion({
+    testInputOutput({
         input: {_id: ++globalIdCounter, a: []},
         projection: {"a.b": 0},
         expectedOutput: {_id: globalIdCounter, a: []}
     });
-    testInputOutputExclusion({
+    testInputOutput({
         input: {_id: ++globalIdCounter, a: [[], [{b: [[1, 2], {c: 1, d: 1}]}]]},
         projection: {"a.b.c": 0},
         expectedOutput: {_id: globalIdCounter, a: [[], [{b: [[1, 2], {d: 1}]}]]}
@@ -640,7 +609,7 @@ function testInputOutput({input, projection, expectedOutput, interestingIndexes 
 // have the $slice operator for that functionality.
 (function testNumericPathComponentsTreatedOnlyAsObjectKeyNames() {
     const kProjection = {_id: 0, "a.2": 1};
-    const kIndexes = [{a: 1}, {"$**": "columnstore"}];
+    const kIndexes = [{a: 1}];
     testInputOutput({
         input: {a: {"2": 99}, b: 1},
         projection: kProjection,
@@ -677,7 +646,7 @@ function testInputOutput({input, projection, expectedOutput, interestingIndexes 
         input: {_id: ++globalIdCounter},
         projection: {_id: 1},
         expectedOutput: {_id: globalIdCounter},
-        interestingIndexes: [{_id: 1}, {"$**": "columnstore"}]
+        interestingIndexes: [{_id: 1}]
     });
     testInputOutput({
         input: {_id: ++globalIdCounter},
@@ -696,15 +665,13 @@ function testInputOutput({input, projection, expectedOutput, interestingIndexes 
         input: {measurements: {temperature: 20, pressure: 0.7, humidity: 0.4, time: new Date()}},
         projection: {'measurements.temperature': 1, 'measurements.pressure': 1, _id: 0},
         expectedOutput: {measurements: {temperature: 20, pressure: 0.7}},
-        interestingIndexes:
-            [{'measurements.temperature': 1, 'measurements.pressure': 1}, {"$**": "columnstore"}]
+        interestingIndexes: [{'measurements.temperature': 1, 'measurements.pressure': 1}]
     });
     testInputOutput({
         input: {measurements: {temperature: 20, pressure: 0.7, humidity: 0.4, time: new Date()}},
         projection: {measurements: {temperature: 1, pressure: 1}, _id: 0},
         expectedOutput: {measurements: {temperature: 20, pressure: 0.7}},
-        interestingIndexes:
-            [{'measurements.temperature': 1, 'measurements.pressure': 1}, {"$**": "columnstore"}]
+        interestingIndexes: [{'measurements.temperature': 1, 'measurements.pressure': 1}]
     });
     // Now with an exclusion projection.
     testInputOutput({

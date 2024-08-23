@@ -1367,42 +1367,6 @@ tasks:
   ################################################
   #           Query Integration tasks            #
   ################################################
-
-  - <<: *task_template
-    name: aggregation_column_store_index_passthrough
-    # TODO SERVER-75026 Remove the 'feature_flag_guarded' tag and ensure this suite is run on all
-    # variants.
-    tags:
-      [
-        "assigned_to_jira_team_server_query_integration",
-        "default",
-        "requires_all_feature_flags",
-        "aggregation",
-        "sbe_only",
-        "feature_flag_guarded",
-      ]
-    depends_on:
-      - name: aggregation
-    commands:
-      - func: "do setup"
-      - func: "run tests"
-
-  # Disabled under SERVER-81088
-  # ## Standalone fuzzer for checking columnstore index correctness ##
-  # - <<: *jstestfuzz_template
-  #   name: aggregation_columnstore_fuzzer_gen
-  #   tags: ["assigned_to_jira_team_server_query_integration", "non_deterministic", "requires_all_feature_flags", "aggfuzzer", "common", "columnstore", "require_npm", "random_name", "sbe_only", "feature_flag_guarded"]
-  #   commands:
-  #   - func: "generate resmoke tasks"
-  #     vars:
-  #       <<: *jstestfuzz_config_vars
-  #       num_files: 20
-  #       num_tasks: 20
-  #       jstestfuzz_vars: --diffTestingMode columnstore
-  #       npm_command: agg-fuzzer
-  #       suite: generational_fuzzer
-  #       resmoke_args: "--mongodSetParameters='{logComponentVerbosity: {command: 2}}'"
-
   - <<: *benchmark_template
     name: benchmarks_query
     tags:
@@ -1417,27 +1381,6 @@ tasks:
         vars:
           suite: benchmarks_query
           resmoke_jobs_max: 1
-
-  - <<: *task_template
-    name: jsCore_column_store_indexes
-    # TODO SERVER-75026 Remove the 'feature_flag_guarded' tag and ensure this suite is run on all
-    # variants.
-    depends_on:
-      - name: jsCore
-    tags:
-      [
-        "assigned_to_jira_team_server_query_integration",
-        "default",
-        "requires_all_feature_flags",
-        "jscore",
-        "sbe_only",
-        "feature_flag_guarded",
-      ]
-    commands:
-      - func: "do setup"
-      - func: "run tests"
-        vars:
-          suite: core_column_store_indexes
 
   - <<: *task_template
     name: query_stats_aggregation_passthrough

@@ -181,8 +181,6 @@ env.Library(
 env.CppUnitTest(
     target="db_sbe_test",
     source=[
-        "column_store_encoder_test.cpp",
-        "columnar_test.cpp",
         "expressions/sbe_block_expr_test.cpp",
         "expressions/sbe_block_top_bottom_test.cpp",
         "expressions/sbe_bson_size_test.cpp",

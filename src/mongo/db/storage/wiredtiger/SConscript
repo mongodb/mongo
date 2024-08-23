@@ -210,7 +210,6 @@ wtEnv.CppUnitTest(
     target="storage_wiredtiger_record_store_and_index_test",
     source=[
         "wiredtiger_record_store_test.cpp",
-        "wiredtiger_column_store_test.cpp",
         "wiredtiger_index_test.cpp",
         "wiredtiger_standard_index_test.cpp",
         "wiredtiger_standard_record_store_test.cpp",

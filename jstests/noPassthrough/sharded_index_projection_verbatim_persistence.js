@@ -9,7 +9,7 @@
  * ]
 
  */
-import {setUpServerForColumnStoreIndexTest} from "jstests/libs/columnstore_util.js";
+
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 const st = new ShardingTest({shards: 3, rs: {nodes: 1}});
@@ -48,29 +48,4 @@ for (const catEntry of shardCatalogs) {
     assert.eq(catEntry.wildcardProjection, kProjectionDoc, shardCatalogs);
 }
 
-if (setUpServerForColumnStoreIndexTest(st.s.getDB(dbName))) {
-    // Creates a columnstore index with a columnstoreProjection that normalization would change
-    // and verifies the persisted projection doc on each shard matches the original,
-    // unnormalized version.
-    const kColumnstoreIndexName = "cs_index";
-    st.s.getCollection(ns).createIndex(
-        {"$**": "columnstore"},
-        {name: kColumnstoreIndexName, columnstoreProjection: kProjectionDoc});
-    shardCatalogs =
-        st.s.getCollection(ns)
-            .aggregate([
-                {$listCatalog: {}},
-                {$unwind: "$md.indexes"},
-                {$match: {"md.indexes.spec.name": kColumnstoreIndexName}},
-                {
-                    $project:
-                        {shard: 1, columnstoreProjection: "$md.indexes.spec.columnstoreProjection"}
-                }
-            ])
-            .toArray();
-    assert.eq(shardCatalogs.length, 3, shardCatalogs);
-    for (const catEntry of shardCatalogs) {
-        assert.eq(catEntry.columnstoreProjection, kProjectionDoc, shardCatalogs);
-    }
-}
 st.stop();

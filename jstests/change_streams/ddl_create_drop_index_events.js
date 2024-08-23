@@ -8,7 +8,6 @@
  * ]
  */
 import {ChangeStreamTest} from "jstests/libs/change_stream_util.js";
-import {safeToCreateColumnStoreIndex} from "jstests/libs/columnstore_util.js";
 
 const testDB = db.getSiblingDB(jsTestName());
 
@@ -97,13 +96,6 @@ function runTest(startChangeStream, insertDataBeforeCreateIndex) {
     // followed by dropIndex().
     options = {name: "wi", wildcardProjection: {a: true, b: true, _id: false}};
     testCreateIndexAndDropIndex({"$**": 1}, options);
-
-    // Test createIndex() for a column store index on all fields with the columnstoreProjection
-    // option, followed by dropIndex().
-    if (safeToCreateColumnStoreIndex(db)) {
-        options = {columnstoreProjection: {a: true, b: true, _id: false}};
-        testCreateIndexAndDropIndex({"$**": "columnstore"}, options);
-    }
 
     // Test createIndex() for a text index with various options, followed by dropIndex().
     options = {

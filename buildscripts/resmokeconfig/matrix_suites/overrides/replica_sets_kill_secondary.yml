@@ -75,6 +75,3 @@
       - jstests/core/**/sortb.js
       - jstests/core/**/sortg.js
       - jstests/core/**/sortj.js
-      # The following test tries to directly query secondaries, which fails if the secondary has been
-      # killed.
-      - jstests/core/**/column_store_index_compression.js

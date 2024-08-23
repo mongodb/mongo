@@ -349,7 +349,6 @@ buildvariants:
     tasks:
       - name: jsCore
       - name: jsCore_txns
-      - name: jsCore_column_store_indexes
       - name: jsCore_wildcard_indexes
 
   - <<: *linux_debug_aubsan_compile_variant_dependency

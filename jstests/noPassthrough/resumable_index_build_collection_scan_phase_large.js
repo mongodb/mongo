@@ -9,7 +9,7 @@
  *   requires_replication,
  * ]
  */
-import {setUpServerForColumnStoreIndexTest} from "jstests/libs/columnstore_util.js";
+
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {ResumableIndexBuildTest} from "jstests/noPassthrough/libs/index_build.js";
 
@@ -29,8 +29,6 @@ rst.initiate();
 const primary = rst.getPrimary();
 const coll = primary.getDB(dbName).getCollection(jsTestName());
 
-const columnstoreEnabled = setUpServerForColumnStoreIndexTest(primary.getDB(dbName));
-
 const bulk = coll.initializeUnorderedBulkOp();
 for (let i = 0; i < numDocuments; i++) {
     // Each document is at least 1 MB.
@@ -49,20 +47,4 @@ ResumableIndexBuildTest.run(
     ["collection scan"],
     [{numScannedAfterResume: numDocuments - maxIndexBuildMemoryUsageMB}]);
 
-if (columnstoreEnabled) {
-    ResumableIndexBuildTest.run(
-        rst,
-        dbName,
-        coll.getName(),
-        [[{"$**": "columnstore"}]],
-        [{
-            name: "hangIndexBuildDuringCollectionScanPhaseBeforeInsertion",
-            logIdWithBuildUUID: 20386
-        }],
-        // Each document is at least 1 MB, so the index build must have spilled to disk by this
-        // point.
-        maxIndexBuildMemoryUsageMB,
-        ["collection scan"],
-        [{numScannedAfterResume: numDocuments - maxIndexBuildMemoryUsageMB}]);
-}
 rst.stopSet();

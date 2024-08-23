@@ -6,16 +6,11 @@
  * @tags: [
  *   uses_api_parameters,
  *   assumes_read_concern_local,
- *   # the following tags are needed for the columnstore tests
- *   requires_fcv_63,
- *   tenant_migration_incompatible,
- *   does_not_support_stepdowns,
  *   not_allowed_with_signed_security_token
  * ]
  */
 
 import {getQueryPlanner, getWinningPlan, planHasStage} from "jstests/libs/analyze_plan.js";
-import {setUpServerForColumnStoreIndexTest} from "jstests/libs/columnstore_util.js";
 import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 
 const testDb = db.getSiblingDB(jsTestName());
@@ -63,37 +58,4 @@ if (!FixtureHelpers.isMongos(testDb) && !TestData.testingReplicaSetEndpoint) {
         {explain: {"find": collName, "filter": {views: 50}, "hint": {views: 1}}}));
     assert.eq(
         getWinningPlan(getQueryPlanner(explainRes)).inputStage.indexName, "views_1", explainRes);
-}
-
-if (setUpServerForColumnStoreIndexTest(testDb)) {
-    // Column store indexes cannot be created with apiStrict: true.
-    assert.commandFailedWithCode(testDb.runCommand({
-        createIndexes: coll.getName(),
-        indexes: [{key: {"$**": "columnstore"}, name: "$**_columnstore"}],
-        apiVersion: "1",
-        apiStrict: true
-    }),
-                                 ErrorCodes.APIStrictError);
-
-    // Column store indexes cannot be used for query planning with apiStrict: true.
-    coll.createIndex({"$**": "columnstore"});
-
-    const projection = {_id: 0, x: 1};
-
-    // Sanity check that this query can use column scan.
-    assert(planHasStage(testDb, coll.find({}, projection).explain(), "COLUMN_SCAN"));
-
-    // No hint should work (but redirect to coll scan).
-    assert.commandWorked(testDb.runCommand(
-        {find: coll.getName(), projection: {_id: 0, x: 1}, apiVersion: "1", apiStrict: true}));
-
-    // Hint should fail.
-    assert.commandFailedWithCode(testDb.runCommand({
-        find: coll.getName(),
-        projection: projection,
-        hint: {"$**": "columnstore"},
-        apiVersion: "1",
-        apiStrict: true
-    }),
-                                 ErrorCodes.BadValue);
 }

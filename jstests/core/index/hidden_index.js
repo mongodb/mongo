@@ -5,38 +5,21 @@
  * @tags: [
  *   # CollMod is not retryable.
  *   requires_non_retryable_commands,
- *   # Columnstore tests set server parameters to disable columnstore query planning heuristics -
- *   # 1) server parameters are stored in-memory only so are not transferred onto the recipient,
- *   # 2) server parameters may not be set in stepdown passthroughs because it is a command that may
- *   #      return different values after a failover
- *   tenant_migration_incompatible,
- *   does_not_support_stepdowns,
- *   does_not_support_transactions,
  *   not_allowed_with_signed_security_token,
  *   requires_capped,
  * ]
  */
 
-import {
-    getNumberOfColumnScans,
-    getNumberOfIndexScans,
-    getOptimizer
-} from "jstests/libs/analyze_plan.js";
+import {getNumberOfIndexScans, getOptimizer} from "jstests/libs/analyze_plan.js";
 import {assertDropAndRecreateCollection} from "jstests/libs/collection_drop_recreate.js";
-import {setUpServerForColumnStoreIndexTest} from "jstests/libs/columnstore_util.js";
 import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 import {IndexCatalogHelpers} from "jstests/libs/index_catalog_helpers.js";
-
-const columnstoreEnabled = setUpServerForColumnStoreIndexTest(db);
 
 const collName = "hidden_index";
 let coll = assertDropAndRecreateCollection(db, collName);
 
 function numOfUsedIndexes(explain) {
-    let numberOfIndexScans = getNumberOfIndexScans(explain);
-    let numberOfColumnScans = getNumberOfColumnScans(explain);
-
-    return numberOfIndexScans + numberOfColumnScans;
+    return getNumberOfIndexScans(explain);
 }
 
 function validateHiddenIndexBehaviour(
@@ -44,15 +27,11 @@ function validateHiddenIndexBehaviour(
     let index_name;
     if (wildcard)
         index_name = "a.$**_" + index_type;
-    else if (index_type === 'columnstore')
-        index_name = "$**_" + index_type;
     else
         index_name = "a_" + index_type;
 
     if (wildcard)
         assert.commandWorked(coll.createIndex({"a.$**": index_type}));
-    else if (index_type === 'columnstore')
-        assert.commandWorked(coll.createIndex({"$**": index_type}));
     else
         assert.commandWorked(coll.createIndex({"a": index_type}));
 
@@ -110,8 +89,6 @@ function validateHiddenIndexBehaviour(
 
     if (wildcard)
         assert.commandWorked(coll.createIndex({"a.$**": index_type}, {hidden: true}));
-    else if (index_type === 'columnstore')
-        assert.commandWorked(coll.createIndex({"$**": index_type}, {hidden: true}));
     else
         assert.commandWorked(coll.createIndex({"a": index_type}, {hidden: true}));
 
@@ -122,9 +99,6 @@ function validateHiddenIndexBehaviour(
 
     if (wildcard)
         assert.commandFailedWithCode(coll.createIndex({"a.$**": index_type}, {hidden: false}),
-                                     ErrorCodes.IndexOptionsConflict);
-    else if (index_type === 'columnstore')
-        assert.commandFailedWithCode(coll.createIndex({"$**": index_type}, {hidden: false}),
                                      ErrorCodes.IndexOptionsConflict);
     else
         assert.commandFailedWithCode(coll.createIndex({"a": index_type}, {hidden: false}),
@@ -155,14 +129,6 @@ validateHiddenIndexBehaviour({query: {$text: {$search: "java"}}, index_type: "te
 
 // Wildcard index.
 validateHiddenIndexBehaviour({query: {"a.f": 1}, index_type: 1, wildcard: true});
-
-// Column Store Index.
-if (columnstoreEnabled) {
-    validateHiddenIndexBehaviour({projection: {a: 1}, index_type: "columnstore"});
-} else {
-    jsTestLog(
-        "Skipping columnstore hidden index validation test since the feature flag is not enabled.");
-}
 
 // Hidden index on capped collection.
 if (!FixtureHelpers.isMongos(db) && !TestData.testingReplicaSetEndpoint) {

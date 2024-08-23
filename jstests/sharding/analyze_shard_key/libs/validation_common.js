@@ -86,7 +86,6 @@ export function ValidationTest(conn) {
         // Cannot analyze a shard key with a field that is neither "hashed" or 1.
         {a: "2d"},
         {a: "2dsphere"},
-        {a: "columnstore"},
         {a: 0},
         // Cannot analyze a shard key with more than one "hashed" field.
         {a: "hashed", b: "hashed"},
@@ -125,11 +124,6 @@ export function ValidationTest(conn) {
             shardKey: {a: 1},
         },
     ];
-    // Note that clustered collections do not support columnstore indexes.
-    if (!isClusteredColl) {
-        noCompatibleIndexTestCases.push(
-            {indexOptions: {key: {"$**": "columnstore"}, name: "columnstore"}, shardKey: {a: 1}});
-    }
 
     return {
         dbName,

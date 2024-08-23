@@ -12,7 +12,6 @@ selector:
     - jstests/core/index/hidden_index.js
     - jstests/core/index/index_partial_read_ops.js
     - jstests/core/index/index_stats.js
-    - jstests/core/columnstore/*.js
     - jstests/core/query/explain/explain_winning_plan.js
     - jstests/core/query/expr/expr_index_use.js
     - jstests/core/query/sort/sort_merge.js

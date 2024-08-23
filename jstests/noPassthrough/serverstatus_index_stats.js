@@ -8,7 +8,6 @@
  * ]
  */
 
-import {safeToCreateColumnStoreIndex} from "jstests/libs/columnstore_util.js";
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 
 const assertStats = (db, assertFn) => {
@@ -203,21 +202,6 @@ assertStats(db, (stats) => {
     assertFeatureAccessIncrease(lastStats, stats, 'single', 1);
     assertFeatureAccessIncrease(lastStats, stats, '2dsphere_bucket', 1);
 });
-
-lastStats = db.serverStatus().indexStats;
-
-const columnstoreIndexesEnabled = safeToCreateColumnStoreIndex(db);
-if (columnstoreIndexesEnabled) {
-    // TODO SERVER-61644 (or sooner) should support accessing/using index and seeing that reflected.
-    assert.commandWorked(db.testColl.createIndex({'$**': 'columnstore'}));
-    assertStats(db, (stats) => {
-        assertCountIncrease(lastStats, stats, 1);
-        assertFeatureCountIncrease(lastStats, stats, 'columnstore', 1);
-
-        assertFeatureAccessIncrease(lastStats, stats, 'id', 0);
-        assertFeatureAccessIncrease(lastStats, stats, 'columnstore', 0);
-    });
-}
 
 lastStats = db.serverStatus().indexStats;
 

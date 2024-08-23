@@ -79,7 +79,6 @@ selector:
   - jstests/core/**/sortb.js
   - jstests/core/**/sortg.js
   - jstests/core/**/sortj.js
-  - jstests/core/**/column_store_index_compression.js
   - jstests/core/query/explain/explain_agg_write_concern.js
   - jstests/core/administrative/builtin_roles_external.js
   exclude_with_any_tags:

@@ -8,7 +8,6 @@
  * ]
  */
 
-import {setUpServerForColumnStoreIndexTest} from "jstests/libs/columnstore_util.js";
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {ResumableIndexBuildTest} from "jstests/noPassthrough/libs/index_build.js";
 
@@ -34,13 +33,7 @@ for (let initialFeatureFlagValue of [false, true]) {
     rst.startSet();
     rst.initiate();
 
-    const columnstoreEnabled = setUpServerForColumnStoreIndexTest(rst.getPrimary().getDB(dbName));
-
     const indexSpecs = [[{a: 1}]];
-    if (columnstoreEnabled) {
-        indexSpecs.push([{"$**": "columnstore"}]);
-    }
-
     const coll = rst.getPrimary().getDB(dbName).getCollection(jsTestName());
     assert.commandWorked(coll.insertMany(docs));
 

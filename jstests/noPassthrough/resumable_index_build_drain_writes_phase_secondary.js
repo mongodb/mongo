@@ -12,7 +12,7 @@
  *   requires_replication,
  * ]
  */
-import {setUpServerForColumnStoreIndexTest} from "jstests/libs/columnstore_util.js";
+
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {ResumableIndexBuildTest} from "jstests/noPassthrough/libs/index_build.js";
 
@@ -30,8 +30,6 @@ rst.initiateWithHighElectionTimeout();
 
 let primary = rst.getPrimary();
 let coll = primary.getDB(dbName).getCollection(collName);
-
-const columnstoreEnabled = setUpServerForColumnStoreIndexTest(primary.getDB(dbName));
 
 assert.commandWorked(coll.insert({a: 1}));
 
@@ -80,84 +78,5 @@ ResumableIndexBuildTest.runOnSecondary(rst,
                                        "hangIndexBuildBeforeCommit",
                                        [{a: 14}, {a: 15}],
                                        [{a: 16}, {a: 17}]);
-
-if (columnstoreEnabled) {
-    jsTestLog("Testing when secondary shuts down in the middle of the first drain");
-    ResumableIndexBuildTest.runOnSecondary(
-        rst,
-        dbName,
-        collName,
-        {"$**": "columnstore"},
-        "hangIndexBuildDuringDrainWritesPhase",
-        0,
-        undefined, /* primaryFailPointName */
-        (function(collection) {
-            assert.commandWorked(collection.insert([{a: [{b: 10}]}, {a: 11}]));
-            assert.commandWorked(collection.update({a: 1}, {a: 2}));
-            assert.commandWorked(collection.remove({"a.b": 10}));
-            assert.commandWorked(collection.insert({a: 1}));
-            assert.commandWorked(collection.remove({a: 1}));
-            assert.commandWorked(collection.update({a: 11}, {a: 1}));
-        }),
-        [{a: 12}, {a: 13}]);
-    ResumableIndexBuildTest.runOnSecondary(
-        rst,
-        dbName,
-        collName,
-        {"$**": "columnstore"},
-        "hangIndexBuildDuringDrainWritesPhase",
-        1,
-        undefined, /* primaryFailPointName */
-        (function(collection) {
-            assert.commandWorked(collection.insert([{a: [{b: 14}]}, {a: 15}]));
-            assert.commandWorked(collection.update({a: 1}, {a: 2}));
-            assert.commandWorked(collection.remove({"a.b": 14}));
-            assert.commandWorked(collection.insert({a: 1}));
-            assert.commandWorked(collection.remove({a: 1}));
-            assert.commandWorked(collection.update({a: 15}, {a: 1}));
-        }),
-        [{a: 16}, {a: 17}]);
-
-    jsTestLog("Testing when secondary shuts down before voting");
-
-    ResumableIndexBuildTest.runOnSecondary(
-        rst,
-        dbName,
-        collName,
-        {"$**": "columnstore"},
-        "hangAfterIndexBuildFirstDrain",
-        {},
-        undefined, /* primaryFailPointName */
-        (function(collection) {
-            assert.commandWorked(collection.insert([{a: [{b: 18}]}, {a: 19}]));
-            assert.commandWorked(collection.update({a: 1}, {a: 2}));
-            assert.commandWorked(collection.remove({"a.b": 18}));
-            assert.commandWorked(collection.insert({a: 1}));
-            assert.commandWorked(collection.remove({a: 1}));
-            assert.commandWorked(collection.update({a: 19}, {a: 1}));
-        }),
-        [{a: 20}, {a: 21}]);
-
-    jsTestLog(
-        "Testing when secondary shuts down after commit quorum satisfied, but before replicating commitIndexBuild oplog entry");
-
-    ResumableIndexBuildTest.runOnSecondary(
-        rst,
-        dbName,
-        collName,
-        {"$**": "columnstore"},
-        "hangIndexBuildAfterSignalPrimaryForCommitReadiness",
-        {},
-        "hangIndexBuildBeforeCommit",
-        (function(collection) {
-            assert.commandWorked(collection.insert([{a: [{b: 26}]}, {a: 27}]));
-            assert.commandWorked(collection.update({a: 1}, {a: 2}));
-            assert.commandWorked(collection.remove({"a.b": 26}));
-            assert.commandWorked(collection.insert({a: 1}));
-            assert.commandWorked(collection.remove({a: 1}));
-            assert.commandWorked(collection.update({a: 27}, {a: 1}));
-        }),
-        [{a: 28}, {a: 29}]);
-}
 
 rst.stopSet();
