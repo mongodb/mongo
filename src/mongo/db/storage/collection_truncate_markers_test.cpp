@@ -576,4 +576,57 @@ TEST_F(CollectionMarkersTest, SamplingAutoYieldingWorks) {
                   kNumElementsToSample / internalQueryExecYieldIterations.load());
     }
 }
+
+// Test that Oplog sampling progress is logged.
+TEST_F(CollectionMarkersTest, OplogSamplingLogging) {
+    static constexpr auto kNumRounds = 200;
+    static constexpr auto kElementSize = 15;
+
+    int totalBytes = 0;
+    int totalRecords = 0;
+    auto collNs = NamespaceString::createNamespaceString_forTest("test", "coll");
+
+    // Create a collection and insert records into it.
+    {
+        auto opCtx = getClient()->makeOperationContext();
+        ASSERT_OK(createCollection(opCtx.get(), collNs));
+        // Add documents of various sizes
+        for (int round = 0; round < kNumRounds; round++) {
+            for (int numBytes = kElementSize; numBytes < kElementSize * 2; numBytes++) {
+                insertElements(opCtx.get(), collNs, numBytes, 1, Timestamp(1, 0));
+                totalRecords++;
+                totalBytes += numBytes;
+            }
+        }
+    }
+
+    auto opCtx = getClient()->makeOperationContext();
+    AutoGetCollection coll(opCtx.get(), collNs, MODE_IS);
+    UnyieldableCollectionIterator iterator(opCtx.get(), coll->getRecordStore());
+
+    static constexpr auto kNumMarkers = 15;
+    auto kMinBytesPerMarker = totalBytes / kNumMarkers;
+    long long numRecords = iterator.numRecords(opCtx.get());
+    long long dataSize = iterator.dataSize(opCtx.get());
+    double avgRecordSize = double(dataSize) / double(numRecords);
+    double estimatedRecordsPerMarker = std::ceil(kMinBytesPerMarker / avgRecordSize);
+    double estimatedBytesPerMarker = estimatedRecordsPerMarker * avgRecordSize;
+
+    TickSourceMock mockTickSource;
+    mockTickSource.setAdvanceOnRead(Milliseconds{500});
+    startCapturingLogMessages();
+    CollectionTruncateMarkers::createMarkersBySampling(
+        opCtx.get(),
+        iterator,
+        collNs,
+        estimatedRecordsPerMarker,
+        estimatedBytesPerMarker,
+        [](const Record& record) {
+            return CollectionTruncateMarkers::RecordIdAndWallTime{record.id, Date_t::now()};
+        },
+        &mockTickSource);
+    stopCapturingLogMessages();
+    ASSERT_GT(countTextFormatLogLinesContaining("Collection sampling progress"), 0);
+    ASSERT_EQUALS(countTextFormatLogLinesContaining("Collection sampling complete"), 1);
+}
 }  // namespace mongo

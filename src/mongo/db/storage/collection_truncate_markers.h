@@ -253,7 +253,8 @@ public:
         const NamespaceString& ns,
         int64_t estimatedRecordsPerMarker,
         int64_t estimatedBytesPerMarker,
-        std::function<RecordIdAndWallTime(const Record&)> getRecordIdAndWallTime);
+        std::function<RecordIdAndWallTime(const Record&)> getRecordIdAndWallTime,
+        TickSource* tickSource = globalSystemTickSource());
 
     void setMinBytesPerMarker(int64_t size);
 

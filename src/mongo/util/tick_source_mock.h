@@ -39,14 +39,17 @@ namespace mongo {
  * Mock tick source that can be parameterized on a duration type.
  *
  * Its internal tick count will be tracked in the unit of the duration type parameter. For example,
- * for TickSourceMock<Milliseconds>, 1 tick = 1 millisecond. It gives a fixed tick count until the
- * advance method is called.
+ * for TickSourceMock<Milliseconds>, 1 tick = 1 millisecond. It advances its tick by a duration that
+ * can be set, but that defaults to 0 milliseconds; by default it will only advance when advance()
+ * is called.
  */
 template <typename D = Milliseconds>
 class TickSourceMock final : public TickSource {
 public:
     TickSource::Tick getTicks() override {
-        return _currentTicks.load();
+        auto currentTicks = _currentTicks.load();
+        advance(_durationToAdvanceBy);
+        return currentTicks;
     };
 
     TickSource::Tick getTicksPerSecond() override {
@@ -69,8 +72,16 @@ public:
         _currentTicks.store(std::move(tick));
     }
 
+    /**
+     * Set the amount that we want the tick source to advance by each time we read it.
+     */
+    void setAdvanceOnRead(const D& durationToAdvanceBy) {
+        _durationToAdvanceBy = durationToAdvanceBy;
+    }
+
 private:
     AtomicWord<TickSource::Tick> _currentTicks{0};
+    D _durationToAdvanceBy = D{0};
 };
 
 template <typename Context, typename D = Milliseconds>
