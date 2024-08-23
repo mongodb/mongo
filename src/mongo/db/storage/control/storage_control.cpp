@@ -79,8 +79,8 @@ void startStorageControls(ServiceContext* serviceContext, bool forTestOnly) {
         std::unique_ptr<JournalFlusher> journalFlusher = std::make_unique<JournalFlusher>(
             /*disablePeriodicFlushes*/ forTestOnly ||
             (!storageEngine->isDurable() && !storageEngine->isEphemeral()));
-        journalFlusher->go();
         JournalFlusher::set(serviceContext, std::move(journalFlusher));
+        JournalFlusher::get(serviceContext)->go();
     }
 
     if (!storageEngine->isEphemeral() && !storageGlobalParams.readOnly) {
