@@ -59,7 +59,7 @@ build --experimental_remote_cache_compression=true
 build --grpc_keepalive_time=30s
 build --nolegacy_important_outputs
 build --bes_keywords=repo:mongo
-build --jobs=400
+build --jobs=200
 common --remote_upload_local_results=False
 
 # Settings specific for clang-tidy
