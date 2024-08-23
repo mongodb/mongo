@@ -90,6 +90,7 @@
 #include "mongo/db/query/canonical_query.h"
 #include "mongo/db/query/collation/collator_factory_interface.h"
 #include "mongo/db/query/collation/collator_interface.h"
+#include "mongo/db/query/command_diagnostic_printer.h"
 #include "mongo/db/query/cursor_response.h"
 #include "mongo/db/query/explain.h"
 #include "mongo/db/query/explain_options.h"
@@ -100,7 +101,6 @@
 #include "mongo/db/query/parsed_find_command.h"
 #include "mongo/db/query/plan_executor.h"
 #include "mongo/db/query/plan_explainer.h"
-#include "mongo/db/query/query_diagnostic_printer.h"
 #include "mongo/db/query/query_request_helper.h"
 #include "mongo/db/query/query_settings/query_settings_utils.h"
 #include "mongo/db/query/query_shape/query_shape.h"
@@ -568,8 +568,8 @@ public:
             // these diagnostics is done lazily during failure handling. This line just creates an
             // RAII object which holds references to objects on this stack frame, which will be used
             // to print diagnostics in the event of a tassert or invariant.
-            ScopedDebugInfo findCmdDiagnostics("queryDiagnostics",
-                                               query_diagnostics::Printer{opCtx});
+            ScopedDebugInfo findCmdDiagnostics("commandDiagnostics",
+                                               command_diagnostics::Printer{opCtx});
 
             // Parse the command BSON to a FindCommandRequest. Pass in the parsedNss in case cmdObj
             // does not have a UUID.

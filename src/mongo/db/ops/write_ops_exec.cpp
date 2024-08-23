@@ -607,7 +607,10 @@ bool insertBatchAndHandleErrors(OperationContext* opCtx,
         },
         nss);
 
-    if (MONGO_unlikely(failAllInserts.shouldFail())) {
+    if (auto scoped = failAllInserts.scoped(); MONGO_unlikely(scoped.isActive())) {
+        tassert(9276700,
+                "failAllInserts failpoint active!",
+                !scoped.getData().hasField("tassert") || !scoped.getData().getBoolField("tassert"));
         uasserted(ErrorCodes::InternalError, "failAllInserts failpoint active!");
     }
 
@@ -787,7 +790,10 @@ UpdateResult performUpdate(OperationContext* opCtx,
         },
         nss);
 
-    if (MONGO_unlikely(failAllUpdates.shouldFail())) {
+    if (auto scoped = failAllUpdates.scoped(); MONGO_unlikely(scoped.isActive())) {
+        tassert(9276701,
+                "failAllUpdates failpoint active!",
+                !scoped.getData().hasField("tassert") || !scoped.getData().getBoolField("tassert"));
         uasserted(ErrorCodes::InternalError, "failAllUpdates failpoint active!");
     }
 
@@ -938,7 +944,10 @@ long long performDelete(OperationContext* opCtx,
                   "Batch remove - hangDuringBatchRemove fail point enabled. Blocking until fail "
                   "point is disabled");
         });
-    if (MONGO_unlikely(failAllRemoves.shouldFail())) {
+    if (auto scoped = failAllRemoves.scoped(); MONGO_unlikely(scoped.isActive())) {
+        tassert(9276703,
+                "failAllRemoves failpoint active!",
+                !scoped.getData().hasField("tassert") || !scoped.getData().getBoolField("tassert"));
         uasserted(ErrorCodes::InternalError, "failAllRemoves failpoint active!");
     }
 
@@ -1329,7 +1338,10 @@ static SingleWriteResult performSingleUpdateOp(OperationContext* opCtx,
         },
         ns);
 
-    if (MONGO_unlikely(failAllUpdates.shouldFail())) {
+    if (auto scoped = failAllUpdates.scoped(); MONGO_unlikely(scoped.isActive())) {
+        tassert(9276702,
+                "failAllUpdates failpoint active!",
+                !scoped.getData().hasField("tassert") || !scoped.getData().getBoolField("tassert"));
         uasserted(ErrorCodes::InternalError, "failAllUpdates failpoint active!");
     }
 
@@ -1816,7 +1828,10 @@ static SingleWriteResult performSingleDeleteOp(OperationContext* opCtx,
                   "Batch remove - hangDuringBatchRemove fail point enabled. Blocking until fail "
                   "point is disabled");
         });
-    if (MONGO_unlikely(failAllRemoves.shouldFail())) {
+    if (auto scoped = failAllRemoves.scoped(); MONGO_unlikely(scoped.isActive())) {
+        tassert(9276704,
+                "failAllRemoves failpoint active!",
+                !scoped.getData().hasField("tassert") || !scoped.getData().getBoolField("tassert"));
         uasserted(ErrorCodes::InternalError, "failAllRemoves failpoint active!");
     }
 

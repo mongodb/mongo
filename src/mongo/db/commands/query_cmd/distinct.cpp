@@ -76,6 +76,7 @@
 #include "mongo/db/query/canonical_query.h"
 #include "mongo/db/query/collation/collator_interface.h"
 #include "mongo/db/query/collection_query_info.h"
+#include "mongo/db/query/command_diagnostic_printer.h"
 #include "mongo/db/query/explain.h"
 #include "mongo/db/query/explain_options.h"
 #include "mongo/db/query/find_command.h"
@@ -375,6 +376,15 @@ public:
                              const BSONObj& cmdObj,
                              rpc::ReplyBuilderInterface* replyBuilder) override {
         CommandHelpers::handleMarkKillOnClientDisconnect(opCtx);
+
+        // Capture diagnostics for tassert and invariant failures that may occur during query
+        // parsing, planning or execution. No work is done on the hot-path, all computation of
+        // these diagnostics is done lazily during failure handling. This line just creates an
+        // RAII object which holds references to objects on this stack frame, which will be used
+        // to print diagnostics in the event of a tassert or invariant.
+        ScopedDebugInfo distinctCmdDiagnostics("commandDiagnostics",
+                                               command_diagnostics::Printer{opCtx});
+
         // Acquire locks and resolve possible UUID. The RAII object is optional, because in the case
         // of a view, the locks need to be released.
 
