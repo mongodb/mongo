@@ -450,11 +450,7 @@ def generate_config_header(
     CompilerSettings.compiler_args = compiler_args
     CompilerSettings.env_vars = {
         **json.loads(env_vars),
-        **(
-            {"DEVELOPER_DIR": "/Applications/Xcode13.app", "SDKROOT": macos_get_sdk_path()}
-            if platform.system() == "Darwin"
-            else {}
-        ),
+        **({"SDKROOT": macos_get_sdk_path()} if platform.system() == "Darwin" else {}),
     }
     logfile_path = logpath
 

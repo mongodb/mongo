@@ -541,3 +541,17 @@ pgo_profile = rule(
     implementation = lambda ctx: pgo_profile_provider(enabled = ctx.build_setting_value),
     build_setting = config.bool(flag = True),
 )
+
+# =============
+# xcode developer dir
+# =============
+
+developer_dir_provider = provider(
+    doc = "The path for which xcode sdk to use, e.g. DEVELOPER_DIR=/Applications/Xcode13.app",
+    fields = {"path": "Path to developer dir.]"},
+)
+
+developer_dir = rule(
+    implementation = lambda ctx: developer_dir_provider(path = ctx.build_setting_value),
+    build_setting = config.string(flag = True),
+)

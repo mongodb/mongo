@@ -9,6 +9,7 @@ load(
     "compiler_type",
     "dbg",
     "detect_odr_violations",
+    "developer_dir",
     "disable_warnings_as_errors",
     "dwarf_version",
     "fsan",
@@ -1873,4 +1874,13 @@ selects.config_setting_group(
         ":opt_any",
         ":linker_lld",
     ],
+)
+
+# --------------------------------------
+# developer dir
+# --------------------------------------
+
+developer_dir(
+    name = "developer_dir",
+    build_setting_default = "/Applications/Xcode.app",
 )

@@ -6,7 +6,9 @@ package(default_visibility = ["//visibility:public"])
 generate_config_header(
     name = "mongo_config_header",
     checks = "mongo_config_header.py",
-    extra_definitions = {} | select({
+    extra_definitions = {
+        "DEVELOPER_DIR": "$(location //bazel/config:developer_dir)",
+    } | select({
         "//bazel/config:use_wiredtiger_enabled": {
             "MONGO_CONFIG_WIREDTIGER_ENABLED": "1",
         },
