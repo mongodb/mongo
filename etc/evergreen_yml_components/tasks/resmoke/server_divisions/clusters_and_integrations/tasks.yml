@@ -1421,7 +1421,7 @@ tasks:
           num_files: 10
           num_tasks: 5
           npm_command: resharding-fuzzer
-          jstestfuzz_vars: --opType moveCollection --electionMech stepup --electionRole donor --electionRole recipient --useEsModules
+          jstestfuzz_vars: --opType moveCollection --electionMech stepup --electionRole donor --electionRole recipient
           suite: resharding_fuzzer
 
   - <<: *gen_task_template
@@ -1544,7 +1544,7 @@ tasks:
           num_files: 10
           num_tasks: 5
           npm_command: resharding-fuzzer
-          jstestfuzz_vars: --numDonors 3 --numRecipients 3 --inPlace no --useEsModules
+          jstestfuzz_vars: --numDonors 3 --numRecipients 3 --inPlace no
           suite: resharding_fuzzer_idempotency
 
   - <<: *jstestfuzz_template
@@ -1564,7 +1564,7 @@ tasks:
           num_files: 10
           num_tasks: 5
           npm_command: resharding-fuzzer
-          jstestfuzz_vars: --numDonors 2 --numRecipients 2 --inPlace yes --useEsModules
+          jstestfuzz_vars: --numDonors 2 --numRecipients 2 --inPlace yes
           suite: resharding_fuzzer
 
   - <<: *jstestfuzz_template
@@ -1584,7 +1584,7 @@ tasks:
           num_files: 10
           num_tasks: 5
           npm_command: resharding-fuzzer
-          jstestfuzz_vars: --numDonors 2 --numRecipients 1 --inPlace no --useEsModules
+          jstestfuzz_vars: --numDonors 2 --numRecipients 1 --inPlace no
           suite: resharding_fuzzer
 
   - <<: *jstestfuzz_template
@@ -1604,7 +1604,7 @@ tasks:
           num_files: 10
           num_tasks: 5
           npm_command: resharding-fuzzer
-          jstestfuzz_vars: --numDonors 3 --numRecipients 3 --inPlace no --useEsModules
+          jstestfuzz_vars: --numDonors 3 --numRecipients 3 --inPlace no
           suite: resharding_fuzzer
 
   - <<: *jstestfuzz_template
@@ -1624,7 +1624,7 @@ tasks:
           num_files: 10
           num_tasks: 5
           npm_command: resharding-fuzzer
-          jstestfuzz_vars: --numDonors 1 --numRecipients 2 --inPlace no --useEsModules
+          jstestfuzz_vars: --numDonors 1 --numRecipients 2 --inPlace no
           suite: resharding_fuzzer
 
   - <<: *jstestfuzz_template
@@ -1647,7 +1647,6 @@ tasks:
           jstestfuzz_vars: >-
             --numDonors 3 --numRecipients 3 --inPlace yes
             --electionMech stepup --electionRole donor --electionRole recipient
-            --useEsModules
           suite: resharding_fuzzer
 
   - <<: *task_template
@@ -2048,7 +2047,7 @@ tasks:
           num_files: 10
           num_tasks: 5
           npm_command: resharding-fuzzer
-          jstestfuzz_vars: --opType unshardCollection --inPlace yes --numDonors 3 --electionMech stepup --electionRole donor --electionRole recipient --useEsModules
+          jstestfuzz_vars: --opType unshardCollection --inPlace yes --numDonors 3 --electionMech stepup --electionRole donor --electionRole recipient
           suite: resharding_fuzzer
 
   - <<: *jstestfuzz_template
@@ -2072,7 +2071,6 @@ tasks:
           jstestfuzz_vars: >-
             --opType timeseriesReshardCollection --numDonors 3 --numRecipients 3 --inPlace yes
             --electionMech stepup --electionRole donor --electionRole recipient
-            --useEsModules
           suite: resharding_fuzzer_idempotency
 
   ################################################

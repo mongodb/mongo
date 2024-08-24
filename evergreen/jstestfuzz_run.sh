@@ -14,4 +14,10 @@ if [[ "${is_patch}" = "true" ]]; then
   esac
 fi
 
-./src/scripts/npm_run.sh ${npm_command} -- ${jstestfuzz_vars} ${in_patch_build_flag} --branch ${branch_name}
+# TODO(DEVPROD-10137): Remove this conditional logic once `--useEsModule` is a top-level supported flag of jstestfuzz.
+maybe_use_es_modules=""
+if [[ "${npm_command}" != "jstestfuzz" ]]; then
+  maybe_use_es_modules="--useEsModules"
+fi
+
+./src/scripts/npm_run.sh ${npm_command} -- ${jstestfuzz_vars} ${in_patch_build_flag} ${maybe_use_es_modules} --branch ${branch_name}

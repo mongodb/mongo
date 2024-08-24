@@ -1064,7 +1064,6 @@ tasks:
           <<: *jstestfuzz_config_vars
           num_files: 10
           num_tasks: 40
-          jstestfuzz_vars: --useEsModules
           npm_command: update-fuzzer
           resmoke_args: "--mongodSetParameters='{logComponentVerbosity: {command: 2}}'"
           run_no_feature_flag_tests: "true"
@@ -1094,7 +1093,6 @@ tasks:
           <<: *jstestfuzz_config_vars
           num_files: 10
           num_tasks: 40
-          jstestfuzz_vars: --useEsModules
           npm_command: update-fuzzer
           resmoke_args: "--mongodSetParameters='{logComponentVerbosity: {command: 2}}'"
           run_no_feature_flag_tests: "true"
@@ -1117,7 +1115,7 @@ tasks:
           <<: *jstestfuzz_config_vars
           num_files: 10
           num_tasks: 40
-          jstestfuzz_vars: --diffTestingMode timeseries --useEsModules
+          jstestfuzz_vars: --diffTestingMode timeseries
           npm_command: update-fuzzer
           suite: generational_fuzzer
           resmoke_args: "--mongodSetParameters='{logComponentVerbosity: {command: 2}}'"
