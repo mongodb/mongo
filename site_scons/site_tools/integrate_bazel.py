@@ -833,7 +833,7 @@ def generate(env: SCons.Environment.Environment) -> None:
         f'--//bazel/config:linker={env.GetOption("linker")}',
         f'--//bazel/config:streams_release_build={env.GetOption("streams-release-build")}',
         f'--//bazel/config:release={env.GetOption("release") == "on"}',
-        f'--//bazel/config:build_enterprise={"enterprise" in env["MONGO_MODULES"]}',
+        f'--//bazel/config:build_enterprise={env.GetOption("modules") == "enterprise"}',
         f'--//bazel/config:visibility_support={env.GetOption("visibility-support")}',
         f'--//bazel/config:disable_warnings_as_errors={env.GetOption("disable-warnings-as-errors") == "source"}',
         f'--//bazel/config:gcov={env.GetOption("gcov") is not None}',
