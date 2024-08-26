@@ -35,7 +35,7 @@
       "properties": [
         {
           "name": "internal:team_responsible",
-          "value": "Service Arch"
+          "value": "Server Programmability"
         },
         {
           "name": "emits_persisted_data",
@@ -117,7 +117,7 @@
       "properties": [
         {
           "name": "internal:team_responsible",
-          "value": "Service Arch"
+          "value": "Networking & Observability"
         },
         {
           "name": "emits_persisted_data",
@@ -160,7 +160,7 @@
       "properties": [
         {
           "name": "internal:team_responsible",
-          "value": "Service Arch"
+          "value": "Server Programmability"
         },
         {
           "name": "emits_persisted_data",
@@ -203,7 +203,7 @@
       "properties": [
         {
           "name": "internal:team_responsible",
-          "value": "Service Arch"
+          "value": "Server Programmability"
         },
         {
           "name": "emits_persisted_data",
@@ -246,7 +246,7 @@
       "properties": [
         {
           "name": "internal:team_responsible",
-          "value": "Service Arch"
+          "value": "Networking & Observability"
         },
         {
           "name": "emits_persisted_data",
@@ -352,7 +352,7 @@
       "properties": [
         {
           "name": "internal:team_responsible",
-          "value": "Service Arch"
+          "value": "Server Programmability"
         },
         {
           "name": "emits_persisted_data",
@@ -516,7 +516,7 @@
       "properties": [
         {
           "name": "internal:team_responsible",
-          "value": "Service Arch"
+          "value": "Server Programmability"
         },
         {
           "name": "emits_persisted_data",
@@ -598,7 +598,7 @@
       "properties": [
         {
           "name": "internal:team_responsible",
-          "value": "Service Arch"
+          "value": "Networking & Observability"
         },
         {
           "name": "emits_persisted_data",
@@ -641,7 +641,7 @@
       "properties": [
         {
           "name": "internal:team_responsible",
-          "value": "Service Arch"
+          "value": "Workload Scheduling"
         },
         {
           "name": "emits_persisted_data",
@@ -684,7 +684,7 @@
       "properties": [
         {
           "name": "internal:team_responsible",
-          "value": "Service Arch"
+          "value": "Networking & Observability"
         },
         {
           "name": "emits_persisted_data",
@@ -1075,7 +1075,7 @@
       "properties": [
         {
           "name": "internal:team_responsible",
-          "value": "Service Arch"
+          "value": "Server Programmability"
         },
         {
           "name": "emits_persisted_data",
@@ -1438,7 +1438,7 @@
       "properties": [
         {
           "name": "internal:team_responsible",
-          "value": "Service Arch"
+          "value": "Networking & Observability"
         },
         {
           "name": "emits_persisted_data",
@@ -1747,7 +1747,7 @@
       "properties": [
         {
           "name": "internal:team_responsible",
-          "value": "Service Arch"
+          "value": "Workload Scheduling"
         },
         {
           "name": "emits_persisted_data",
@@ -1978,7 +1978,7 @@
       "properties": [
         {
           "name": "internal:team_responsible",
-          "value": "Service Arch"
+          "value": "Networking & Observability"
         },
         {
           "name": "emits_persisted_data",
@@ -2026,7 +2026,7 @@
       "properties": [
         {
           "name": "internal:team_responsible",
-          "value": "Service Arch"
+          "value": "Networking & Observability"
         },
         {
           "name": "emits_persisted_data",
