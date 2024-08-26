@@ -85,7 +85,10 @@ export class QuerySettingsIndexHintsTests {
             // together with plan cache clear.
             !willRetryOnNetworkErrors &&
             // If read concern is explicitly set, avoid plan cache checks.
-            !defaultReadConcernLevel;
+            !defaultReadConcernLevel &&
+            // If the test is performing initial sync it may affect the plan cache by generating an
+            // additional entry.
+            !TestData.isRunningInitialSync;
 
         if (!shouldCheckPlanCache) {
             return;
