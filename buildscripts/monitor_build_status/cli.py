@@ -5,7 +5,7 @@ import sys
 from datetime import datetime, timedelta, timezone
 from enum import Enum
 from statistics import median
-from typing import Dict, Iterable, List, Optional, Tuple
+from typing import Dict, Iterable, List, Tuple
 
 import structlog
 import typer
@@ -161,7 +161,7 @@ class MonitorBuildStatusOrchestrator:
         bfs_report: BFsReport, code_lockdown_config: CodeLockdownConfig
     ) -> Tuple[str, Dict[str, List[float]]]:
         now = datetime.utcnow().replace(tzinfo=timezone.utc)
-        scope_percentages: Dict[str, List[float]] = {}
+        percentages: Dict[str, List[float]] = {}
 
         status_message = "`[STATUS]` The current BF count"
         headers = ["Scope", "Hot BFs", "Cold BFs", "Perf BFs"]
@@ -173,6 +173,7 @@ class MonitorBuildStatusOrchestrator:
             cold_bf_count: int,
             perf_bf_count: int,
             thresholds: BfCountThresholds,
+            slack_tags: List[str],
         ) -> None:
             if all(count == 0 for count in [hot_bf_count, cold_bf_count, perf_bf_count]):
                 return
@@ -181,7 +182,8 @@ class MonitorBuildStatusOrchestrator:
             cold_bf_percentage = cold_bf_count / thresholds.cold_bf_count * 100
             perf_bf_percentage = perf_bf_count / thresholds.perf_bf_count * 100
 
-            scope_percentages[scope] = [hot_bf_percentage, cold_bf_percentage, perf_bf_percentage]
+            label = f"{scope} {' '.join(slack_tags)}"
+            percentages[label] = [hot_bf_percentage, cold_bf_percentage, perf_bf_percentage]
 
             table_data.append(
                 [
@@ -192,32 +194,39 @@ class MonitorBuildStatusOrchestrator:
                 ]
             )
 
+        overall_thresholds = code_lockdown_config.get_overall_thresholds()
+        overall_slack_tags = code_lockdown_config.get_overall_slack_tags()
         overall_older_than_time = now - timedelta(
-            hours=code_lockdown_config.overall_thresholds.include_bfs_older_than_hours
+            hours=overall_thresholds.include_bfs_older_than_hours
         )
         _process_thresholds(
             "[Org] Overall",
             bfs_report.get_bf_count(BfCategory.HOT, overall_older_than_time),
             bfs_report.get_bf_count(BfCategory.COLD, overall_older_than_time),
             bfs_report.get_bf_count(BfCategory.PERF, overall_older_than_time),
-            code_lockdown_config.overall_thresholds,
+            overall_thresholds,
+            overall_slack_tags,
         )
 
-        for group in code_lockdown_config.team_groups or []:
-            group_thresholds = code_lockdown_config.get_thresholds(group.name)
+        for group_name in code_lockdown_config.get_all_group_names():
+            group_teams = code_lockdown_config.get_group_teams(group_name)
+            group_thresholds = code_lockdown_config.get_group_thresholds(group_name)
+            group_slack_tags = code_lockdown_config.get_group_slack_tags(group_name)
             group_older_than_time = now - timedelta(
                 hours=group_thresholds.include_bfs_older_than_hours
             )
             _process_thresholds(
-                f"[Group] {group.name}",
-                bfs_report.get_bf_count(BfCategory.HOT, group_older_than_time, group.teams),
-                bfs_report.get_bf_count(BfCategory.COLD, group_older_than_time, group.teams),
-                bfs_report.get_bf_count(BfCategory.PERF, group_older_than_time, group.teams),
+                f"[Group] {group_name}",
+                bfs_report.get_bf_count(BfCategory.HOT, group_older_than_time, group_teams),
+                bfs_report.get_bf_count(BfCategory.COLD, group_older_than_time, group_teams),
+                bfs_report.get_bf_count(BfCategory.PERF, group_older_than_time, group_teams),
                 group_thresholds,
+                group_slack_tags,
             )
 
         for assigned_team in sorted(list(bfs_report.team_reports.keys())):
-            team_thresholds = code_lockdown_config.get_thresholds(assigned_team)
+            team_thresholds = code_lockdown_config.get_team_thresholds(assigned_team)
+            team_slack_tags = code_lockdown_config.get_team_slack_tags(assigned_team)
             team_older_than_time = now - timedelta(
                 hours=team_thresholds.include_bfs_older_than_hours
             )
@@ -227,6 +236,7 @@ class MonitorBuildStatusOrchestrator:
                 bfs_report.get_bf_count(BfCategory.COLD, team_older_than_time, [assigned_team]),
                 bfs_report.get_bf_count(BfCategory.PERF, team_older_than_time, [assigned_team]),
                 team_thresholds,
+                team_slack_tags,
             )
 
         table_str = tabulate(
@@ -234,7 +244,7 @@ class MonitorBuildStatusOrchestrator:
         )
         status_message = f"{status_message}\n```\n{table_str}\n```"
 
-        return status_message, scope_percentages
+        return status_message, percentages
 
     def _make_waterfall_report(
         self, evg_project_names: List[str], window_end: datetime

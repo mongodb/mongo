@@ -1,63 +1,181 @@
-overall_thresholds:
-  hot_bf_count: 30
-  cold_bf_count: 100
-  perf_bf_count: 30
-  include_bfs_older_than_hours: 168 # 7 days
+defaults:
+  overall:
+    thresholds:
+      hot_bf_count: 30
+      cold_bf_count: 100
+      perf_bf_count: 30
+      include_bfs_older_than_hours: 168 # 7 days
+    slack_tags:
+      - "<!here>"
+  group:
+    thresholds:
+      hot_bf_count: 15
+      cold_bf_count: 50
+      perf_bf_count: 15
+      include_bfs_older_than_hours: 168 # 7 days
+    slack_tags: []
+  team:
+    thresholds:
+      hot_bf_count: 3
+      cold_bf_count: 10
+      perf_bf_count: 5
+      include_bfs_older_than_hours: 48
+    slack_tags: []
 
-team_default_thresholds:
-  hot_bf_count: 3
-  cold_bf_count: 10
-  perf_bf_count: 5
-  include_bfs_older_than_hours: 48
-
-team_groups:
-  ######################################################################
-  #                  Team group configuration example                  #
-  ######################################################################
-  # - name: Group Name
+groups:
+  #######################################################################
+  #                     Group configuration example                     #
+  #######################################################################
+  # - name: "Group Name"
   #   teams:
-  #     - Team Name 1 # Should exactly match "Assigned Teams" Jira BF field value
-  #     - Team Name 2
-  #     - Team Name 3
-  #   thresholds:
+  #     - "Team Name 1"  # Should exactly match "Assigned Teams" Jira BF field value
+  #     - "Team Name 2"
+  #     - "Team Name 3"
+  #   thresholds:  # Optional, group default thresholds will be used if absent
+  #     hot_bf_count: 15
+  #     cold_bf_count: 50
+  #     perf_bf_count: 15
+  #     include_bfs_older_than_hours: 168 # 7 days
+  #   slack_tags:  # Optional, group default slack_tags will be used if absent
+  #     - "<!here>" # This is equivalent to "@here"
+  #     - "<@{slack-member-id}>" # How to find Slack member ID: https://forums.slackcommunity.com/s/question/0D5Hq00009mZfnuKAC/hello-i-am-a-slack-newbie-how-do-i-find-my-slack-id?language=en_US
+  #######################################################################
+
+  # Core Server Team VP orgs as described on https://wiki.corp.mongodb.com/pages/viewpage.action?spaceKey=KERNEL&title=Server+Home
+  - name: "Clusters & Integrations"
+    teams:
+      - "Server Security"
+      - "Networking & Observability"
+      - "Workload Scheduling"
+      - "Server Programmability"
+      - "Cluster Scalability"
+      - "Catalog and Routing"
+    slack_tags:
+      - "<@U03J9P66LRW>" # tyler.brock@mongodb.com - VP
+      - "<@U23L5FVFH>" # ryan.chipman@mongodb.com - Director
+      - "<@U0V2RMB1N>" # judah.schvimer@mongodb.com - Director
+      - "<@U01ALSK50HH>" # sergi.mateo-bellido@mongodb.com - Director
+  - name: "Durable Transactions & Availability"
+    teams:
+      - "Replication"
+      - "Storage Execution"
+      - "RSS Sydney"
+      - "Storage Engines"
+    slack_tags:
+      - "<@U032DKCUWQ4>" # mick.graham@mongodb.com - VP
+      - "<@U0XPWJ72R>" # geert.bosch@mongodb.com - Director
+      - "<@U06QP4BJRD2>" # jonas.bergler@mongodb.com - Director
+  - name: "Query"
+    teams:
+      - "Query Execution"
+      - "Query Optimization"
+      - "Query Integration"
+    slack_tags:
+      - "<@U067K23N0RL>" # thomas.chang@mongodb.com - VP
+      - "<@U01KLN6C8V8>" # kyle.suarez@mongodb.com - Director
+      - "<@U0X6DK154>" # bernard.gorman@mongodb.com - Director
+      - "<@U02QV8TTGG0>" # steve.tarzia@mongodb.com - Director
+      - "<@U0294T002>" # james.wahlin@mongodb.com - Director
+
+teams:
+  #######################################################################
+  #                     Team configuration example                      #
+  #######################################################################
+  # - name: "Team Name"  # Should exactly match "Assigned Teams" Jira BF field value
+  #   thresholds:  # Optional, team default thresholds will be used if absent
   #     hot_bf_count: 3
   #     cold_bf_count: 10
   #     perf_bf_count: 5
-  #     include_bfs_older_than_hours: 168 # 7 days
-  ######################################################################
+  #     include_bfs_older_than_hours: 48
+  #   slack_tags:  # Optional, team default slack_tags will be used if absent
+  #     - "<!here>" # This is equivalent to "@here"
+  #     - "<@{slack-member-id}>" # How to find Slack member ID: https://forums.slackcommunity.com/s/question/0D5Hq00009mZfnuKAC/hello-i-am-a-slack-newbie-how-do-i-find-my-slack-id?language=en_US
+  #######################################################################
 
-  # Core Server Team VP orgs as described in https://wiki.corp.mongodb.com/pages/viewpage.action?spaceKey=KERNEL&title=Server+Home
-  - name: "Clusters & Integrations"
-    teams:
-      - Server Security
-      - Networking & Observability
-      - Workload Scheduling
-      - Server Programmability
-      - Cluster Scalability
-      - Catalog and Routing
-    thresholds:
-      hot_bf_count: 15
-      cold_bf_count: 50
-      perf_bf_count: 15
-      include_bfs_older_than_hours: 168 # 7 days
-  - name: "Durable Transactions & Availability"
-    teams:
-      - Replication
-      - Storage Execution
-      - RSS Sydney
-      - Storage Engines
-    thresholds:
-      hot_bf_count: 15
-      cold_bf_count: 50
-      perf_bf_count: 15
-      include_bfs_older_than_hours: 168 # 7 days
-  - name: "Query"
-    teams:
-      - Query Execution
-      - Query Optimization
-      - Query Integration
-    thresholds:
-      hot_bf_count: 15
-      cold_bf_count: 50
-      perf_bf_count: 15
-      include_bfs_older_than_hours: 168 # 7 days
+  # Core Server Teams as described on https://wiki.corp.mongodb.com/pages/viewpage.action?spaceKey=KERNEL&title=Server+Home
+  - name: "Server Security"
+    slack_tags:
+      - "<@U23L5FVFH>" # ryan.chipman@mongodb.com - Director
+  - name: "Networking & Observability"
+    slack_tags:
+      - "<@U23L5FVFH>" # ryan.chipman@mongodb.com - Director
+  - name: "Workload Scheduling"
+    slack_tags:
+      - "<@U23L5FVFH>" # ryan.chipman@mongodb.com - Director
+  - name: "Server Programmability"
+    slack_tags:
+      - "<@U0V2RMB1N>" # judah.schvimer@mongodb.com - Director
+  - name: "Cluster Scalability"
+    slack_tags:
+      - "<@U0V2RMB1N>" # judah.schvimer@mongodb.com - Director
+  - name: "Catalog and Routing"
+    slack_tags:
+      - "<@U01ALSK50HH>" # sergi.mateo-bellido@mongodb.com - Director
+  - name: "Replication"
+    slack_tags:
+      - "<@U0XPWJ72R>" # geert.bosch@mongodb.com - Director
+  - name: "Storage Execution"
+    slack_tags:
+      - "<@U0XPWJ72R>" # geert.bosch@mongodb.com - Director
+  - name: "RSS Sydney"
+    slack_tags:
+      - "<@U0XPWJ72R>" # geert.bosch@mongodb.com - Director
+  - name: "Storage Engines"
+    slack_tags:
+      - "<@U06QP4BJRD2>" # jonas.bergler@mongodb.com - Director
+      - "<@S05UGLCB76U>" # @leads-storage-engines - leads alias
+  - name: "Query Execution"
+    slack_tags:
+      - "<@U01KLN6C8V8>" # kyle.suarez@mongodb.com - Director
+      - "<@U0X6DK154>" # bernard.gorman@mongodb.com - Director
+  - name: "Query Optimization"
+    slack_tags:
+      - "<@U0X6DK154>" # bernard.gorman@mongodb.com - Director
+      - "<@U02QV8TTGG0>" # steve.tarzia@mongodb.com - Director
+  - name: "Query Integration"
+    slack_tags:
+      - "<@U0294T002>" # james.wahlin@mongodb.com - Director
+  - name: "Server Triage"
+    slack_tags:
+      - "<@U0V9XLF8R>" # kelsey.schubert@mongodb.com - Director
+  - name: "Product Performance"
+    slack_tags:
+      - "<@U0V9XLF8R>" # kelsey.schubert@mongodb.com - Director
+  - name: "Build Baron"
+    slack_tags:
+      - "<@U0V9XLF8R>" # kelsey.schubert@mongodb.com - Director
+  - name: "Server Release"
+    slack_tags:
+      - "<@U0V9XLF8R>" # kelsey.schubert@mongodb.com - Director
+
+  # R&D Productivity Teams as described on https://wiki.corp.mongodb.com/pages/viewpage.action?pageId=88587938
+  - name: "Evergreen UI"
+    slack_tags:
+      - "<@U05RNJZ9212>" # byron.hood@mongodb.com - Director
+  - name: "Evergreen App"
+    slack_tags:
+      - "<@U05RNJZ9212>" # byron.hood@mongodb.com - Director
+  - name: "Services & Integrations"
+    slack_tags:
+      - "<@U05RNJZ9212>" # byron.hood@mongodb.com - Director
+  - name: "Runtime Environments"
+    slack_tags:
+      - "<@U064RTDGS2W>" # stacey.kingpoling@mongodb.com - Director
+  - name: "DevProd Infrastructure"
+    slack_tags:
+      - "<@U064RTDGS2W>" # stacey.kingpoling@mongodb.com - Director
+  - name: "Release Infrastructure"
+    slack_tags:
+      - "<@U064RTDGS2W>" # stacey.kingpoling@mongodb.com - Director
+  - name: "Performance Infrastructure"
+    slack_tags:
+      - "<@U03D3JHNB1C>" # alex.neben@mongodb.com - Director
+  - name: "Performance Analysis"
+    slack_tags:
+      - "<@U03D3JHNB1C>" # alex.neben@mongodb.com - Director
+  - name: "Build"
+    slack_tags:
+      - "<@U03D3JHNB1C>" # alex.neben@mongodb.com - Director
+  - name: "Correctness"
+    slack_tags:
+      - "<@U03D3JHNB1C>" # alex.neben@mongodb.com - Director
