@@ -15,6 +15,35 @@ re-written, they are written to new locations in the file. The size of a block
 is a multiple of the allocation size which is set during creation of the
 associated WiredTiger data file see: WT_SESSION::create.
 
+@plantuml_start{block.png }
+@startuml{block.png}
+
+title Block Layout
+node {
+ json "Block" as J {
+    "Page Header [00-27]": {
+      "recno (column store)": "00-07",
+      "write_gen": "08-15",
+      "mem_size": "16-19",
+      "entries (or datalen for overflow pages)": "20-23",
+      "type": "24",
+      "flags": "25",
+      "unused (padding)": "26",
+      "version": "27"
+    },
+    "Block Header [28-40]": {
+      "disk_size": "00-03",
+      "checksum": "04-07",
+      "flags": "08",
+      "unused (padding)": "09-11"
+    },
+    "Data [disk_size]": "page"
+ }
+}
+
+@enduml
+@plantuml_end
+
 @subsection block_address_cookie Address Cookies
 
 Once a block is written an address cookie is returned. This address cookie is

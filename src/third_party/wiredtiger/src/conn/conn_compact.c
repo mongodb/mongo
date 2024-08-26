@@ -566,7 +566,9 @@ __background_compact_server(void *arg)
                 full_iteration = false;
                 WT_ERR(__wt_buf_set(session, uri, WT_BACKGROUND_COMPACT_URI_PREFIX,
                   strlen(WT_BACKGROUND_COMPACT_URI_PREFIX) + 1));
-                __background_compact_list_cleanup(session, BACKGROUND_COMPACT_CLEANUP_STALE_STAT);
+                __background_compact_list_cleanup(session,
+                  conn->background_compact.run_once ? BACKGROUND_COMPACT_CLEANUP_OFF :
+                                                      BACKGROUND_COMPACT_CLEANUP_STALE_STAT);
             }
 
             if (cache_pressure) {
