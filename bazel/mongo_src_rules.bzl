@@ -1397,6 +1397,14 @@ def mongo_cc_library(
         if name != "boost_assert_shim":
             deps += MONGO_GLOBAL_SRC_DEPS
 
+    if "modules/enterprise" in native.package_name():
+        enterprise_compatible = select({
+            "//bazel/config:build_enterprise_enabled": [],
+            "//conditions:default": ["@platforms//:incompatible"],
+        })
+    else:
+        enterprise_compatible = []
+
     fincludes_copt = force_includes_copt(native.package_name(), name)
     fincludes_hdr = force_includes_hdr(native.package_name(), name)
     package_specific_copts = package_specific_copt(native.package_name())
@@ -1451,7 +1459,7 @@ def mongo_cc_library(
         target_compatible_with = select({
             "//bazel/config:scons_query_enabled": [],
             "//conditions:default": ["@platforms//:incompatible"],
-        }) + target_compatible_with,
+        }) + target_compatible_with + enterprise_compatible,
     )
 
     # Create a cc_library entry to generate a shared archive of the target.
@@ -1474,7 +1482,7 @@ def mongo_cc_library(
         target_compatible_with = select({
             "//bazel/config:shared_archive_enabled": [],
             "//conditions:default": ["@platforms//:incompatible"],
-        }) + target_compatible_with,
+        }) + target_compatible_with + enterprise_compatible,
         additional_linker_inputs = additional_linker_inputs + MONGO_GLOBAL_ADDITIONAL_LINKER_INPUTS,
     )
     cc_library(
@@ -1497,7 +1505,7 @@ def mongo_cc_library(
             "//bazel/config:shared_archive_enabled": ["supports_pic", "pic"],
             "//conditions:default": ["pie"],
         }) + features,
-        target_compatible_with = target_compatible_with,
+        target_compatible_with = target_compatible_with + enterprise_compatible,
         additional_linker_inputs = additional_linker_inputs + MONGO_GLOBAL_ADDITIONAL_LINKER_INPUTS,
     )
 
@@ -1514,7 +1522,7 @@ def mongo_cc_library(
         target_compatible_with = select({
             "//bazel/config:linkstatic_disabled": [],
             "//conditions:default": ["@platforms//:incompatible"],
-        }) + target_compatible_with,
+        }) + target_compatible_with + enterprise_compatible,
         dynamic_deps = deps,
         features = select({
             "@platforms//os:windows": ["generate_pdb_file"],
@@ -1537,6 +1545,7 @@ def mongo_cc_library(
             "//bazel/config:shared_archive_enabled": ":" + name + SHARED_ARCHIVE_SUFFIX,
             "//conditions:default": None,
         }),
+        visibility = visibility,
         deps = deps + [name + HEADER_DEP_SUFFIX],
     )
 
@@ -1595,6 +1604,14 @@ def mongo_cc_binary(
         srcs = srcs + ["//src/mongo:mongo_config_header"]
         deps += MONGO_GLOBAL_SRC_DEPS
 
+    if "modules/enterprise" in native.package_name():
+        enterprise_compatible = select({
+            "//bazel/config:build_enterprise_enabled": [],
+            "//conditions:default": ["@platforms//:incompatible"],
+        })
+    else:
+        enterprise_compatible = []
+
     fincludes_copt = force_includes_copt(native.package_name(), name)
     fincludes_hdr = force_includes_hdr(native.package_name(), name)
     package_specific_copts = package_specific_copt(native.package_name())
@@ -1645,7 +1662,7 @@ def mongo_cc_binary(
             "//bazel/config:linkstatic_disabled": deps,
             "//conditions:default": [],
         }),
-        target_compatible_with = target_compatible_with,
+        target_compatible_with = target_compatible_with + enterprise_compatible,
         additional_linker_inputs = additional_linker_inputs + MONGO_GLOBAL_ADDITIONAL_LINKER_INPUTS,
     )
 
@@ -1656,6 +1673,7 @@ def mongo_cc_binary(
         tags = tags,
         enabled = SEPARATE_DEBUG_ENABLED,
         deps = all_deps,
+        visibility = visibility,
     )
 
 IdlInfo = provider(
