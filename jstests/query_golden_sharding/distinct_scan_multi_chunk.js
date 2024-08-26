@@ -4,6 +4,8 @@
  *
  * @tags: [
  *   featureFlagShardFilteringDistinctScan,
+ *   # TODO SERVER-92458: Remove this tag once we are filtering out orphans.
+ *   tsan_incompatible
  * ]
  */
 
