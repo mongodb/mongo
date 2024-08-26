@@ -14,6 +14,7 @@ OWNERS.yml @IamXander @anna-wawrzyniak @dhly-etc @dstorch @kaloianm @markbenvenu
 .clang-format @10gen/devprod-build
 .eslintignore @10gen/devprod-correctness
 .eslintrc.yml @10gen/devprod-correctness
+.gitignore @10gen/devprod-build
 .mypy.ini @10gen/devprod-build @10gen/devprod-correctness
 .prettierignore @10gen/devprod-correctness
 .prettierrc @10gen/devprod-correctness

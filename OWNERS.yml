@@ -29,6 +29,9 @@ filters:
   - ".eslintrc.yml":
     approvers:
       - 10gen/devprod-correctness
+  - ".gitignore":
+    approvers:
+      - 10gen/devprod-build
   - ".mypy.ini":
     approvers:
       - 10gen/devprod-correctness
