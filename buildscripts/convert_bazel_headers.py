@@ -8,61 +8,12 @@ import concurrent.futures
 import glob
 import traceback
 import shutil
-from typing import Annotated
+from typing import Annotated, List
 
 import typer
 
 
-def main(
-    target_library: Annotated[str, typer.Option()],
-    silent: Annotated[bool, typer.Option()] = False,
-    skip_scons: Annotated[bool, typer.Option()] = False,
-):
-    extra_args = []
-    if os.name == "nt":
-        extra_args += [
-            "CPPPATH=C:\sasl\include",
-            "LIBPATH=C:\sasl\lib",
-        ]
-        target_library = os.path.join(
-            os.path.dirname(target_library), os.path.basename(target_library)[3:-2] + "lib"
-        )
-
-    if platform.system() == "Darwin":
-        target_library = target_library[:-2] + "a"
-
-    path = shutil.which("icecc")
-    if path is None:
-        extra_args += ["ICECC="]
-
-    cmd = [
-        sys.executable,
-        "buildscripts/scons.py",
-        "--build-profile=opt",
-        f"--bazel-includes-info={target_library}",
-        "--libdeps-linting=off",
-        "--ninja=disabled",
-        "compiledb",
-    ] + extra_args
-
-    if not skip_scons:
-        p = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
-
-        while True:
-            line = p.stdout.readline()
-            if not line:
-                break
-            print(line.strip(), file=sys.stderr)
-
-        _, _ = p.communicate()
-
-        if p.returncode != 0:
-            print(f"SCons build failed, exit code {p.returncode}", file=sys.stderr)
-            sys.exit(1)
-
-    with open("compile_commands.json") as f:
-        cc = json.load(f)
-
+def work(target_library: str, silent: bool, cpu_count: int, cc: List[str]):
     headers = set()
     original_headers = set()
 
@@ -156,10 +107,6 @@ def main(
             if line.endswith("_gen.cpp"):
                 line = line[:-4]
             sources.append(line)
-        if platform.system() == "Linux":
-            cpu_count = len(os.sched_getaffinity(0)) + 4
-        else:
-            cpu_count = os.cpu_count() + 4
 
         with concurrent.futures.ThreadPoolExecutor(max_workers=cpu_count) as executor:
             jobs = {executor.submit(get_headers, line.strip()): line.strip() for line in lines}
@@ -282,29 +229,106 @@ def main(
         target_name = target_name[3:]
 
     local_bazel_path = os.path.dirname(target_library.replace("build/opt", "//src")) + ":"
-    print("mongo_cc_library(")
-    print(f'    name = "{target_name}",')
+    bazel_target = "mongo_cc_library(\n"
+    bazel_target += f'    name = "{target_name}",\n'
     if sources:
-        print(f"    srcs = [")
+        bazel_target += "    srcs = [\n"
         for src in sources:
-            print(f'        "{src.replace(local_bazel_path, "")}",')
-        print("    ],")
+            bazel_target += f'        "{src.replace(local_bazel_path, "")}",\n'
+        bazel_target += "    ],\n"
     if minimal_headers:
-        print("    hdrs = [")
+        bazel_target += "    hdrs = [\n"
         for header in sorted(minimal_headers):
-            print(f'        "{header.replace(local_bazel_path, "")}",')
-        print("    ],")
+            bazel_target += f'        "{header.replace(local_bazel_path, "")}",\n'
+        bazel_target += "    ],\n"
     if header_deps:
-        print("    header_deps = [")
+        bazel_target += "    header_deps = [\n"
         for dep in sorted(header_deps):
-            print(f'        "{dep.strip().replace(local_bazel_path, "")}",')
-        print("    ],")
+            bazel_target += f'        "{dep.strip().replace(local_bazel_path, "")}",\n'
+        bazel_target += "    ],\n"
     if link_deps:
-        print("    deps = [")
+        bazel_target += "    deps = [\n"
         for dep in sorted(link_deps):
-            print(f'        "{dep.strip().replace(local_bazel_path, "")}",')
-        print("    ],")
-    print(")")
+            bazel_target += f'        "{dep.strip().replace(local_bazel_path, "")}",\n'
+        bazel_target += "    ],\n"
+    bazel_target += ")\n"
+    return bazel_target
+
+
+def main(
+    target_libraries: Annotated[List[str], typer.Argument()],
+    silent: Annotated[bool, typer.Option()] = False,
+    skip_scons: Annotated[bool, typer.Option()] = False,
+):
+    extra_args = []
+    if os.name == "nt":
+        extra_args += [
+            "CPPPATH=C:\sasl\include",
+            "LIBPATH=C:\sasl\lib",
+        ]
+        target_library = os.path.join(
+            os.path.dirname(target_library), os.path.basename(target_library)[3:-2] + "lib"
+        )
+
+    path = shutil.which("icecc")
+    if path is None:
+        extra_args += ["ICECC="]
+
+    if os.name == "nt":
+        target_fmt = lambda target_library: os.path.join(
+            os.path.dirname(target_library), os.path.basename(target_library)[3:-2] + "lib"
+        )
+    elif platform.system() == "Darwin":
+        target_fmt = lambda target_library: target_library[:-2] + "a"
+    else:
+        target_fmt = lambda x: None
+
+    map(target_fmt, target_libraries)
+
+    cmd = [
+        sys.executable,
+        "buildscripts/scons.py",
+        "--build-profile=opt",
+        " ".join(
+            [f"--bazel-includes-info={target_library}" for target_library in target_libraries]
+        ),
+        "--libdeps-linting=off",
+        "--ninja=disabled",
+        "compiledb",
+    ] + extra_args
+
+    if not skip_scons:
+        p = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
+
+        while True:
+            line = p.stdout.readline()
+            if not line:
+                break
+            print(line.strip(), file=sys.stderr)
+
+        _, _ = p.communicate()
+
+        if p.returncode != 0:
+            print(f"SCons build failed, exit code {p.returncode}", file=sys.stderr)
+            sys.exit(1)
+
+    with open("compile_commands.json") as f:
+        cc = json.load(f)
+
+    if platform.system() == "Linux":
+        cpu_count = len(os.sched_getaffinity(0)) + 4
+    else:
+        cpu_count = os.cpu_count() + 4
+
+    with concurrent.futures.ProcessPoolExecutor(max_workers=cpu_count) as executor:
+        jobs = {
+            executor.submit(work, target_library, silent, cpu_count, cc): target_library
+            for target_library in target_libraries
+        }
+        bazel_targets = [job.result() for job in concurrent.futures.as_completed(jobs)]
+
+    print("====== Bazel Targets ======\n")
+    print("\n".join(bazel_targets))
 
 
 if __name__ == "__main__":

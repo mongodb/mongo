@@ -6,6 +6,7 @@ from pathlib import Path
 
 import SCons
 import libdeps_tool
+from functools import partial
 
 
 def exists(env):
@@ -154,13 +155,12 @@ def add_headers_from_gen_code(env, header_map):
         ]
 
 
-def bazel_includes_emitter(target, source, env):
-    target_library = env.GetOption("bazel-includes-info").replace("\\", "/")
+def bazel_includes_emitter(target_libraries, target, source, env):
     rel_target = os.path.relpath(str(target[0].abspath), start=env.Dir("#").abspath).replace(
         "\\", "/"
     )
 
-    if rel_target == target_library:
+    if rel_target in target_libraries:
         objsuffix = (
             env.subst("$OBJSUFFIX") if not env.TargetOSIs("linux") else env.subst("$SHOBJSUFFIX")
         )
@@ -236,6 +236,10 @@ def generate(env):
     add_headers_from_all_libraries(env, header_map)
     gen_header_map = {}
     add_headers_from_gen_code(env, gen_header_map)
+    target_libraries = {
+        target_library.split("=")[-1].replace("\\", "/")
+        for target_library in env.GetOption("bazel-includes-info")[0].split()
+    }
 
     bazel_include_info = {
         "header_map": header_map,
@@ -250,5 +254,7 @@ def generate(env):
     for builder_name in ["SharedLibrary", "StaticLibrary", "Program"]:
         builder = env["BUILDERS"][builder_name]
         base_emitter = builder.emitter
-        new_emitter = SCons.Builder.ListEmitter([base_emitter, bazel_includes_emitter])
+        new_emitter = SCons.Builder.ListEmitter(
+            [base_emitter, partial(bazel_includes_emitter, target_libraries)]
+        )
         builder.emitter = new_emitter

@@ -198,8 +198,9 @@ add_option(
 
 add_option(
     "bazel-includes-info",
+    action="append",
     help="write included headers in bazel label format to put files ([library].bazel_includes)",
-    default="",
+    default=[],
 )
 
 add_option(
