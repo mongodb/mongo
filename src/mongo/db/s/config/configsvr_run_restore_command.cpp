@@ -310,6 +310,12 @@ public:
                                 "docUUID"_attr = docUUID);
                 }
 
+                // Time-series bucket collection namespaces are reported using the view namespace in
+                // $backupCursor.
+                if (docNss && docNss->isTimeseriesBucketsCollection()) {
+                    docNss = docNss->getTimeseriesViewNamespace();
+                }
+
                 ShouldRestoreDocument shouldRestore = shouldRestoreDocument(opCtx, docNss, docUUID);
 
                 LOGV2_DEBUG(6261302,
