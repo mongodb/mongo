@@ -93,5 +93,17 @@ TEST_F(ClusterDeleteTest, SnapshotReadConcernWithAfterClusterTime) {
     testSnapshotReadConcernWithAfterClusterTime(kDeleteCmdTargeted, kDeleteCmdScatterGather);
 }
 
+TEST_F(ClusterDeleteTest, CorrectMetrics) {
+    BSONObjBuilder b;
+    b.append("insert", 0);
+    b.append("query", 0);
+    b.append("update", 0);
+    b.append("delete", 1);
+    b.append("getmore", 0);
+    b.append("command", 0);
+
+    testOpcountersAreCorrect(kDeleteCmdTargeted, /* expectedValue */ b.obj());
+}
+
 }  // namespace
 }  // namespace mongo

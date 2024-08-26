@@ -41,6 +41,7 @@
 #include "mongo/db/logical_time.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/read_write_concern_defaults_cache_lookup_mock.h"
+#include "mongo/db/stats/counters.h"
 #include "mongo/executor/remote_command_request.h"
 #include "mongo/platform/basic.h"
 #include "mongo/s/catalog_cache_test_fixture.h"
@@ -116,6 +117,11 @@ protected:
      * Verifies that includeQueryStatsMetrics is added or not added as needed.
      */
     void testIncludeQueryStatsMetrics(BSONObj cmd, bool isTargeted);
+
+    /**
+     * Verifies that the opcounters match the expected values after a command is run.
+     */
+    void testOpcountersAreCorrect(BSONObj cmd, BSONObj expectedMetrics);
 
     /**
      * Appends the metadata shards return on responses to transaction statements, such as the

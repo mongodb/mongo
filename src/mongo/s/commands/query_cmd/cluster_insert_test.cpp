@@ -92,5 +92,32 @@ TEST_F(ClusterInsertTest, SnapshotReadConcernWithAfterClusterTime) {
     testSnapshotReadConcernWithAfterClusterTime(kInsertCmdTargeted, kInsertCmdScatterGather);
 }
 
+TEST_F(ClusterInsertTest, CorrectMetricsSingleInsert) {
+    BSONObjBuilder b;
+    b.append("insert", 1);
+    b.append("query", 0);
+    b.append("update", 0);
+    b.append("delete", 0);
+    b.append("getmore", 0);
+    b.append("command", 0);
+
+    testOpcountersAreCorrect(kInsertCmdTargeted, /* expectedValue */ b.obj());
+}
+
+TEST_F(ClusterInsertTest, CorrectMetricsBulkInsert) {
+    BSONObjBuilder b;
+    b.append("insert", 2);
+    b.append("query", 0);
+    b.append("update", 0);
+    b.append("delete", 0);
+    b.append("getmore", 0);
+    b.append("command", 0);
+
+    const BSONObj bulkInsertCmd{
+        fromjson("{insert: 'coll', documents: [{'_id': -1}, {'_id': -2}]}")};
+
+    testOpcountersAreCorrect(bulkInsertCmd, /* expectedValue */ b.obj());
+}
+
 }  // namespace
 }  // namespace mongo

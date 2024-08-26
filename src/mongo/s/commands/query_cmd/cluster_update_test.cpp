@@ -97,5 +97,17 @@ TEST_F(ClusterUpdateTest, SnapshotReadConcernWithAfterClusterTime) {
     testSnapshotReadConcernWithAfterClusterTime(kUpdateCmdTargeted, kUpdateCmdScatterGather);
 }
 
+TEST_F(ClusterUpdateTest, CorrectMetrics) {
+    BSONObjBuilder b;
+    b.append("insert", 0);
+    b.append("query", 0);
+    b.append("update", 1);
+    b.append("delete", 0);
+    b.append("getmore", 0);
+    b.append("command", 0);
+
+    testOpcountersAreCorrect(kUpdateCmdTargeted, /* expectedValue */ b.obj());
+}
+
 }  // namespace
 }  // namespace mongo

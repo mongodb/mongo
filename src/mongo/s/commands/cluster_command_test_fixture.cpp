@@ -418,6 +418,12 @@ void ClusterCommandTestFixture::testIncludeQueryStatsMetrics(BSONObj cmd, bool i
     }
 }
 
+void ClusterCommandTestFixture::testOpcountersAreCorrect(BSONObj cmd, BSONObj expectedMetrics) {
+    globalOpCounters.resetForTest();
+    testNoErrors(cmd);
+    ASSERT_BSONOBJ_EQ(globalOpCounters.getObj(), expectedMetrics);
+}
+
 void ClusterCommandTestFixture::appendTxnResponseMetadata(BSONObjBuilder& bob) {
     // Set readOnly to false to avoid opting in to the read-only optimization.
     bob.append(TxnResponseMetadata::kReadOnlyFieldName, false);
