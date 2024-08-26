@@ -47,7 +47,7 @@ venv
 *.eslintcache
 *#
 .#*
-.core*
+*.core
 iwyu.dat
 
 /src/mongo/*/*Debug*/
