@@ -3,6 +3,7 @@
 // end_to_end mongot test.
 // This test was adjusted as we start to allow sorting by "searchScore".
 // @tags: [featureFlagSearchHybridScoringPrerequisites]
+
 const coll = db.sort_with_meta_operator;
 coll.drop();
 

@@ -1,6 +1,7 @@
 // Test that the $sort stage properly errors on invalid $meta.
 // This test was adjusted as we start to allow sorting by "searchScore".
 // @tags: [featureFlagSearchHybridScoringPrerequisites]
+
 var coll = db.sort_with_metadata;
 coll.drop();
 assert.commandWorked(coll.insert({_id: 1, text: "apple", words: 1}));

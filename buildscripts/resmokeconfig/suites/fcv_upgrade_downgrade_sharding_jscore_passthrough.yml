@@ -128,6 +128,9 @@ selector:
     - featureFlagTimeseriesUpdatesSupport_incompatible
     # TODO: SERVER-78068 Remove Feature Flag for PM-2983
     - featureFlagRecordIdsReplicated
+    # TODO: SERVER-85426 Remove Feature Flag for SPM-3541
+    - featureFlagSearchHybridScoring
+    - featureFlagSearchHybridScoringPrerequisites
     # Transactions are aborted upon fcv upgrade or downgrade.
     - uses_transactions
     # Exclude tests that require a specific fcv.
