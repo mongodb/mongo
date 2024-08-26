@@ -7,6 +7,7 @@
  *  requires_sharding,
  *  uses_transactions,
  *  assumes_balancer_off,
+ *  operations_longer_than_stepdown_interval_in_txns,
  * ]
  */
 import "jstests/libs/parallelTester.js";
