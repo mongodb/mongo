@@ -30,6 +30,7 @@
 
 #include "mongo/db/catalog/coll_mod_index.h"
 
+#include "mongo/util/time_support.h"
 #include <boost/move/utility_core.hpp>
 #include <boost/optional.hpp>
 #include <boost/optional/optional.hpp>
@@ -353,6 +354,7 @@ std::vector<std::vector<RecordId>> scanIndexForDuplicates(OperationContext* opCt
     std::vector<RecordId> recordsWithDuplicateKeys;
 
     size_t indexEntryCount = 0;
+    Date_t lastLogTime = Date_t::now();
     for (auto indexEntry = indexCursor->nextKeyString(); indexEntry;
          indexEntry = indexCursor->nextKeyString()) {
         if (prevIndexEntry &&
@@ -379,6 +381,14 @@ std::vector<std::vector<RecordId>> scanIndexForDuplicates(OperationContext* opCt
         // occur after 150 index entries to be conservative.
         if (!(indexEntryCount % 150)) {
             opCtx->checkForInterrupt();
+        }
+
+        Date_t now = Date_t::now();
+        if (now - lastLogTime >= Seconds(1)) {
+            LOGV2(9335700,
+                  "Number of keys scanned for duplicates in unique index conversion",
+                  "numKeysIterated"_attr = indexEntryCount);
+            lastLogTime = now;
         }
     }
     if (!recordsWithDuplicateKeys.empty()) {
