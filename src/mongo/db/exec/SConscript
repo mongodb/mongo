@@ -30,17 +30,6 @@ env.Library(
 )
 
 env.Library(
-    target="scoped_timer",
-    source=[
-        "scoped_timer.cpp",
-    ],
-    LIBDEPS=[
-        "$BUILD_DIR/mongo/db/service_context",
-        "$BUILD_DIR/mongo/util/net/network",
-    ],
-)
-
-env.Library(
     target="js_function",
     source=[
         "js_function.cpp",

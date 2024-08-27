@@ -123,3 +123,42 @@ mongo_cc_library(
         "//src/mongo/db:server_base",
     ],
 )
+
+mongo_cc_library(
+    name = "sasl_aws_client",
+    srcs = [
+        "sasl_aws_client_protocol.cpp",
+        "sasl_aws_client_protocol_gen",
+    ],
+    hdrs = [
+        "sasl_aws_client_protocol.h",
+        "sasl_aws_protocol_common.h",
+        "sasl_aws_protocol_common_gen",
+        "//src/mongo/bson:bson_validate_gen",
+        "//src/mongo/util:kms_message_support.h",
+    ],
+    header_deps = [
+        "//src/mongo/db/repl:oplog_buffer_batched_queue",
+    ],
+    target_compatible_with = select({
+        "//bazel/config:ssl_enabled": [],
+        "//conditions:default": ["@platforms//:incompatible"],
+    }),
+    deps = [
+        "sasl_aws_common",
+        "//src/mongo/bson:bson_validate",
+        "//src/mongo/db:server_base",
+        "//src/third_party/libmongocrypt:mongocrypt",
+    ],
+)
+
+mongo_cc_library(
+    name = "read_preference",
+    srcs = [
+        "read_preference_decoration.cpp",
+    ],
+    deps = [
+        "//src/mongo/db:server_base",
+        "//src/mongo/db:service_context",
+    ],
+)

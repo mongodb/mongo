@@ -34,40 +34,6 @@ env.Library(
     ],
 )
 
-env.Library(
-    target=[
-        "read_preference",
-    ],
-    source=[
-        "read_preference_decoration.cpp",
-    ],
-    LIBDEPS=[
-        "$BUILD_DIR/mongo/db/server_base",
-        "$BUILD_DIR/mongo/db/service_context",
-    ],
-)
-
-if get_option("ssl") == "on":
-    kmsEnv = env.Clone()
-
-    kmsEnv.InjectThirdParty(libraries=["libmongocrypt"])
-
-    kmsEnv.Library(
-        target=[
-            "sasl_aws_client",
-        ],
-        source=[
-            "sasl_aws_client_protocol.cpp",
-            "sasl_aws_client_protocol_gen.cpp",
-        ],
-        LIBDEPS_PRIVATE=[
-            "$BUILD_DIR/mongo/bson/bson_validate",
-            "$BUILD_DIR/mongo/db/server_base",
-            "$BUILD_DIR/third_party/shim_libmongocrypt",
-            "sasl_aws_common",
-        ],
-    )
-
 # Client-side SASL source necessary for native client SASL session.
 # Includes base types and OIDC, PLAIN, SCRAM, and AWS (only if TLS configured)
 # client mechs.

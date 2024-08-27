@@ -40,28 +40,6 @@ env.Library(
 )
 
 env.Library(
-    target="document_validation",
-    source=[
-        "document_validation.cpp",
-    ],
-    LIBDEPS_PRIVATE=[
-        "$BUILD_DIR/mongo/db/service_context",
-    ],
-)
-
-env.Library(
-    target="health_log_interface",
-    source=[
-        "health_log_gen.cpp",
-        "health_log_interface.cpp",
-    ],
-    LIBDEPS_PRIVATE=[
-        "$BUILD_DIR/mongo/db/server_base",
-        "$BUILD_DIR/mongo/db/service_context",
-    ],
-)
-
-env.Library(
     target="health_log",
     source=[
         "health_log.cpp",
@@ -183,17 +161,6 @@ env.Library(
         "$BUILD_DIR/mongo/util/fail_point",
         "document_validation",
         "local_oplog_info",
-    ],
-)
-
-env.Library(
-    target="database_holder",
-    source=[
-        "database_holder.cpp",
-    ],
-    LIBDEPS_PRIVATE=[
-        "$BUILD_DIR/mongo/base",
-        "$BUILD_DIR/mongo/db/service_context",
     ],
 )
 

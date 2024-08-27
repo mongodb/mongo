@@ -415,20 +415,6 @@ env.Library(
     ],
 )
 
-env.Library(
-    target="shutdown_idl",
-    source=[
-        "shutdown.cpp",
-        "shutdown_gen.cpp",
-    ],
-    LIBDEPS_PRIVATE=[
-        "$BUILD_DIR/mongo/bson/bson_validate",
-        "$BUILD_DIR/mongo/db/server_base",
-        "$BUILD_DIR/mongo/db/service_context",
-        "$BUILD_DIR/mongo/util/fail_point",
-    ],
-)
-
 # Commands that should only be present in mongod
 env.Library(
     target="mongod",

@@ -237,3 +237,45 @@ mongo_cc_library(
         "//src/mongo/util/net:network",
     ],
 )
+
+mongo_cc_library(
+    name = "database_holder",
+    srcs = [
+        "database_holder.cpp",
+    ],
+    hdrs = [
+        "database_holder.h",
+    ],
+    deps = [
+        "//src/mongo:base",
+        "//src/mongo/db:service_context",
+    ],
+)
+
+mongo_cc_library(
+    name = "document_validation",
+    srcs = [
+        "document_validation.cpp",
+    ],
+    hdrs = [
+        "document_validation.h",
+    ],
+    deps = [
+        "//src/mongo/db:service_context",
+    ],
+)
+
+mongo_cc_library(
+    name = "health_log_interface",
+    srcs = [
+        "health_log_gen",
+        "health_log_interface.cpp",
+    ],
+    hdrs = [
+        "health_log_interface.h",
+    ],
+    deps = [
+        "//src/mongo/db:server_base",
+        "//src/mongo/db:service_context",
+    ],
+)

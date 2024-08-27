@@ -756,3 +756,22 @@ mongo_cc_library(
         "//src/mongo/db/auth:authprivilege",
     ],
 )
+
+mongo_cc_library(
+    name = "shutdown_idl",
+    srcs = [
+        "shutdown.cpp",
+        "shutdown_gen",
+    ],
+    hdrs = [
+        "shutdown.h",
+        "//src/mongo/db/auth:authorization_contract.h",
+        "//src/mongo/util:ntservice.h",
+    ],
+    deps = [
+        "//src/mongo/bson:bson_validate",
+        "//src/mongo/db:server_base",
+        "//src/mongo/db:service_context",
+        "//src/mongo/util:fail_point",
+    ],
+)

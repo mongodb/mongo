@@ -535,40 +535,6 @@ env.Library(
     ],
 )
 
-env.Library(
-    target="service_context",
-    source=[
-        "baton.cpp",
-        "cancelable_operation_context.cpp",
-        "client.cpp",
-        "client_strand.cpp",
-        "default_baton.cpp",
-        "operation_context.cpp",
-        "operation_context_group.cpp",
-        "operation_cpu_timer.cpp",
-        "operation_id.cpp",
-        "operation_key_manager.cpp",
-        "service_context.cpp",
-        "server_recovery.cpp",
-        "repl_set_member_in_standalone_mode.cpp",
-    ],
-    LIBDEPS=[
-        "$BUILD_DIR/mongo/util/clock_sources",
-        "$BUILD_DIR/mongo/util/concurrency/spin_lock",
-        "$BUILD_DIR/mongo/util/fail_point",
-        "$BUILD_DIR/mongo/util/net/network",
-        "$BUILD_DIR/mongo/util/periodic_runner",
-        "multi_key_path_tracker",
-        "session/logical_session_id",
-        "storage/recovery_unit_base",
-    ],
-    LIBDEPS_PRIVATE=[
-        "$BUILD_DIR/mongo/util/processinfo",
-        "server_base",
-        "storage/write_unit_of_work",
-    ],
-)
-
 env.CppUnitTest(
     target="default_baton_test",
     source=[

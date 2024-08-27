@@ -88,3 +88,19 @@ mongo_cc_library(
         "//src/mongo:base",
     ],
 )
+
+mongo_cc_library(
+    name = "secure_allocator",
+    srcs = [
+        "secure_allocator.cpp",
+    ],
+    hdrs = [
+        "secure_allocator.h",
+    ],
+    deps = [
+        "//src/mongo:base",
+        "//src/mongo/bson:bson_validate",
+        "//src/mongo/util:processinfo",
+        "//src/mongo/util:secure_zero_memory",
+    ],
+)

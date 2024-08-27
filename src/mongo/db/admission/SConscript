@@ -23,19 +23,6 @@ env.Library(
     ],
 )
 
-env.Library(
-    target="ingress_admission_context",
-    source=[
-        "ingress_admission_context.cpp",
-    ],
-    LIBDEPS=[
-        "$BUILD_DIR/mongo/util/concurrency/admission_context",
-    ],
-    LIBDEPS_PRIVATE=[
-        "$BUILD_DIR/mongo/db/service_context",
-    ],
-)
-
 env.CppUnitTest(
     target="ingress_admission_control_test",
     source=[
@@ -45,19 +32,6 @@ env.CppUnitTest(
         "$BUILD_DIR/mongo/db/service_context_test_fixture",
         "$BUILD_DIR/mongo/unittest/unittest",
         "ingress_admission_control",
-    ],
-)
-
-env.Library(
-    target="execution_admission_context",
-    source=[
-        "execution_admission_context.cpp",
-    ],
-    LIBDEPS=[
-        "$BUILD_DIR/mongo/util/concurrency/admission_context",
-    ],
-    LIBDEPS_PRIVATE=[
-        "$BUILD_DIR/mongo/db/service_context",
     ],
 )
 

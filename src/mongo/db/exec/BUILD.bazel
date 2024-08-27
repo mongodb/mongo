@@ -21,3 +21,17 @@ idl_generator(
     name = "disk_use_options_gen",
     src = "disk_use_options.idl",
 )
+
+mongo_cc_library(
+    name = "scoped_timer",
+    srcs = [
+        "scoped_timer.cpp",
+    ],
+    hdrs = [
+        "scoped_timer.h",
+    ],
+    deps = [
+        "//src/mongo/db:service_context",
+        "//src/mongo/util/net:network",
+    ],
+)

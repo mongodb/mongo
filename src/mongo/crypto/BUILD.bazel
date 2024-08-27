@@ -144,3 +144,38 @@ mongo_cc_library(
         "tom",
     ]
 ]
+
+mongo_cc_library(
+    name = "symmetric_crypto",
+    srcs = [
+        "symmetric_crypto.cpp",
+        "symmetric_key.cpp",
+    ] + select({
+        "//bazel/config:mongo_crypto_{}".format(mongo_crypto): ["symmetric_crypto_{}.cpp".format(mongo_crypto)]
+        for mongo_crypto in [
+            "windows",
+            "apple",
+            "openssl",
+            "tom",
+        ]
+    } | {
+        "//conditions:default": [],
+    }),
+    hdrs = [
+        "block_packer.h",
+        "symmetric_crypto.h",
+        "symmetric_key.h",
+    ],
+    deps = [
+        "//src/mongo/base:secure_allocator",
+        "//src/mongo/util:secure_zero_memory",
+    ],
+)
+
+mongo_cc_library(
+    name = "jwt_types",
+    srcs = ["jwt_types_gen"],
+    deps = [
+        "//src/mongo/db:server_base",
+    ],
+)

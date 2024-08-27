@@ -42,3 +42,31 @@ mongo_cc_library(
         "//src/mongo/db/pipeline/process_interface:mongo_process_interface",
     ],
 )
+
+mongo_cc_library(
+    name = "execution_admission_context",
+    srcs = [
+        "execution_admission_context.cpp",
+    ],
+    hdrs = [
+        "execution_admission_context.h",
+    ],
+    deps = [
+        "//src/mongo/db:service_context",
+        "//src/mongo/util/concurrency:admission_context",
+    ],
+)
+
+mongo_cc_library(
+    name = "ingress_admission_context",
+    srcs = [
+        "ingress_admission_context.cpp",
+    ],
+    hdrs = [
+        "ingress_admission_context.h",
+    ],
+    deps = [
+        "//src/mongo/db:service_context",
+        "//src/mongo/util/concurrency:admission_context",
+    ],
+)

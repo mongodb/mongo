@@ -1,4 +1,6 @@
 load("//bazel:mongo_src_rules.bzl", "idl_generator", "mongo_cc_library")
+load("//bazel/config:render_template.bzl", "render_template")
+load("@poetry//:dependencies.bzl", "dependency")
 
 package(default_visibility = ["//visibility:public"])
 
@@ -240,5 +242,168 @@ mongo_cc_library(
     deps = [
         "//src/mongo/db:server_base",
         "//src/mongo/db/stats:counters",
+    ],
+)
+
+render_template(
+    name = "builtin_roles_cpp",
+    srcs = [
+        "builtin_roles.tpl.cpp",
+        "builtin_roles.yml",
+        "builtin_roles_gen.py",
+    ],
+    cmd = [
+        "$(location builtin_roles_gen.py)",
+        "$(location builtin_roles.yml)",
+        "$(location builtin_roles.tpl.cpp)",
+        "$(location builtin_roles.cpp)",
+    ],
+    output = "builtin_roles.cpp",
+    python_libs = [
+        dependency(
+            "cheetah3",
+            group = "compile",
+        ),
+        dependency(
+            "pyyaml",
+            group = "core",
+        ),
+    ],
+)
+
+# The Auth library should consist only of the shimmed API for Auth usage and the implementations of
+# the data structures used in that API.  No actual Auth subsystem implementation should exist in
+# this library.
+mongo_cc_library(
+    name = "auth",
+    srcs = [
+        "auth_decorations.cpp",
+        "authorization_manager.cpp",
+        "authorization_manager_factory.cpp",
+        "authorization_session.cpp",
+        "role_name_or_string.cpp",
+    ],
+    hdrs = [
+        "authorization_manager_factory.h",
+        "//src/mongo/db/commands:authentication_commands.h",
+        "//src/mongo/util:sequence_util.h",
+    ],
+    deps = [
+        "auth_options",
+        "cluster_auth_mode",
+        "sasl_options",
+        "//src/mongo/db:server_base",
+        "//src/mongo/db:service_context",
+    ],
+)
+
+mongo_cc_library(
+    name = "builtin_roles",
+    srcs = [
+        "builtin_roles.cpp",
+    ],
+    hdrs = [
+        "builtin_roles.h",
+    ],
+    deps = [
+        "auth",
+        "auth_options",
+        "authprivilege",
+        "//src/mongo/db:server_base",
+    ],
+)
+
+mongo_cc_library(
+    name = "security_token",
+    srcs = [
+        "validated_tenancy_scope_decoration.cpp",
+        "validated_tenancy_scope_gen",
+    ],
+    deps = [
+        "//src/mongo/db:server_base",
+        "//src/mongo/db:service_context",
+    ],
+)
+
+mongo_cc_library(
+    name = "security_token_auth",
+    srcs = [
+        "security_token_authentication_guard.cpp",
+        "validated_tenancy_scope_factory.cpp",
+    ],
+    hdrs = [
+        "security_token_authentication_guard.h",
+        "validated_tenancy_scope_factory.h",
+    ],
+    deps = [
+        "authprivilege",
+        "security_token",
+        "//src/mongo/crypto:jwt_types",
+        "//src/mongo/db:server_base",
+        "//src/mongo/db:server_feature_flags",
+        "//src/mongo/db:service_context",
+        "//src/mongo/db/auth",
+    ],
+)
+
+mongo_cc_library(
+    name = "user",
+    srcs = [
+        "user.cpp",
+    ],
+    hdrs = [
+        "user.h",
+    ],
+    deps = [
+        "auth",
+        "authprivilege",
+        "//src/mongo/db:server_base",
+    ] + select({
+        "//bazel/config:mongo_crypto_{}".format(mongo_crypto): ["//src/mongo/crypto:sha_block_{}".format(mongo_crypto)]
+        for mongo_crypto in [
+            "windows",
+            "apple",
+            "openssl",
+            "tom",
+        ]
+    } | {
+        "//conditions:default": [],
+    }),
+)
+
+mongo_cc_library(
+    name = "user_acquisition_stats",
+    srcs = [
+        "ldap_cumulative_operation_stats.cpp",
+        "ldap_operation_stats.cpp",
+        "user_cache_access_stats.cpp",
+    ],
+    hdrs = [
+        "ldap_cumulative_operation_stats.h",
+        "ldap_operation_stats.h",
+        "user_cache_access_stats.h",
+    ],
+    deps = [
+        "auth",
+        "//src/mongo/db:server_base",
+        "//src/mongo/db:service_context",
+    ],
+)
+
+mongo_cc_library(
+    name = "user_document_parser",
+    srcs = [
+        "user_document_parser.cpp",
+    ],
+    hdrs = [
+        "user_document_parser.h",
+    ],
+    deps = [
+        "address_restriction",
+        "auth",
+        "authprivilege",
+        "user",
+        "//src/mongo:base",
+        "//src/mongo/bson/util:bson_extract",
     ],
 )

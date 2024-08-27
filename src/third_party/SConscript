@@ -376,20 +376,6 @@ if wiredtiger:
 
     wiredtigerEnv.ShimLibrary(name="wiredtiger")
 
-mcEnv = env.Clone()
-if use_system_version_of_library("libmongocrypt"):
-    mcEnv = mcEnv.Clone(SYSLIBDEPS=[
-        env['LIBDEPS_LIBMONGOCRYPT_SYSLIBDEP'],
-    ])
-else:
-    mcEnv = mcEnv.Clone()
-    mcEnv.InjectThirdParty(libraries=['libmongocrypt'])
-    mcEnv = mcEnv.Clone(LIBDEPS_INTERFACE=[
-        'libmongocrypt/mongocrypt',
-    ])
-
-mcEnv.ShimLibrary(name="libmongocrypt", )
-
 if env.TargetOSIs('linux') and env['ENABLE_GRPC_BUILD']:
 
     protobufEnv = env.Clone(NINJA_GENSOURCE_INDEPENDENT=True)

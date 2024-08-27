@@ -5,58 +5,6 @@ Import("env")
 env = env.Clone()
 
 env.Library(
-    target="security_token",
-    source=[
-        "validated_tenancy_scope_gen.cpp",
-        "validated_tenancy_scope_decoration.cpp",
-    ],
-    LIBDEPS=[
-        "$BUILD_DIR/mongo/db/server_base",
-        "$BUILD_DIR/mongo/db/service_context",
-    ],
-)
-
-env.Library(
-    target="security_token_auth",
-    source=[
-        "security_token_authentication_guard.cpp",
-        "validated_tenancy_scope_factory.cpp",
-    ],
-    LIBDEPS_PRIVATE=[
-        "$BUILD_DIR/mongo/crypto/jwt_types",
-        "$BUILD_DIR/mongo/db/auth/auth",
-        "$BUILD_DIR/mongo/db/server_base",
-        "$BUILD_DIR/mongo/db/server_feature_flags",
-        "$BUILD_DIR/mongo/db/service_context",
-        "authprivilege",
-        "security_token",
-    ],
-)
-
-# The Auth library should consist only of the shimmed API for Auth usage and the implementations of
-# the data structures used in that API.  No actual Auth subsystem implementation should exist in
-# this library.
-env.Library(
-    target="auth",
-    source=[
-        "auth_decorations.cpp",
-        "authorization_manager.cpp",
-        "authorization_manager_factory.cpp",
-        "authorization_session.cpp",
-        "role_name_or_string.cpp",
-    ],
-    LIBDEPS=[
-        "$BUILD_DIR/mongo/db/server_base",
-    ],
-    LIBDEPS_PRIVATE=[
-        "$BUILD_DIR/mongo/db/service_context",
-        "auth_options",
-        "cluster_auth_mode",
-        "sasl_options",
-    ],
-)
-
-env.Library(
     target="authentication_session",
     source=[
         "authentication_session.cpp",
@@ -70,70 +18,6 @@ env.Library(
         "$BUILD_DIR/mongo/db/connection_health_metrics_parameter",
         "$BUILD_DIR/mongo/db/service_context",
         "$BUILD_DIR/mongo/db/stats/counters",
-    ],
-)
-
-env.Library(
-    target="user",
-    source=[
-        "user.cpp",
-    ],
-    LIBDEPS_PRIVATE=[
-        "$BUILD_DIR/mongo/crypto/sha_block_${MONGO_CRYPTO}",
-        "$BUILD_DIR/mongo/db/server_base",
-        "auth",
-        "authprivilege",
-    ],
-)
-
-# This needs to use its own env to tell scons to suppress scanning the .tpl.cpp input
-# for #includes since they aren't directly preprocessed. Scons will still scan the generated files
-# to produce the correct implicit dependencies when they are compiled.
-env_for_builtin_roles = env.Clone()
-env_for_builtin_roles["SCANNERS"] = []
-generateBuiltinRoles = env_for_builtin_roles.Command(
-    target=[
-        "builtin_roles.cpp",
-    ],
-    source=[
-        "builtin_roles_gen.py",
-        "builtin_roles.yml",
-        "builtin_roles.tpl.cpp",
-    ],
-    action=[
-        "$PYTHON ${SOURCES[0]} ${SOURCES[1]} ${SOURCES[2]} ${TARGETS[0]}",
-    ],
-)
-
-env.Alias("generated-sources", generateBuiltinRoles)
-
-env.Library(
-    target="builtin_roles",
-    source=[
-        "builtin_roles.cpp",
-    ],
-    LIBDEPS=[
-        "$BUILD_DIR/mongo/db/server_base",
-        "auth",
-        "auth_options",
-        "authprivilege",
-    ],
-)
-
-env.Library(
-    target="user_document_parser",
-    source=[
-        "user_document_parser.cpp",
-    ],
-    LIBDEPS=[
-        "$BUILD_DIR/mongo/base",
-        "$BUILD_DIR/mongo/bson/util/bson_extract",
-        "auth",
-        "user",
-    ],
-    LIBDEPS_PRIVATE=[
-        "address_restriction",
-        "authprivilege",
     ],
 )
 
@@ -429,20 +313,6 @@ env.Library(
         "auth",
         "auth_impl_internal",
         "auth_impl_internal_local",
-    ],
-)
-
-env.Library(
-    target="user_acquisition_stats",
-    source=[
-        "ldap_operation_stats.cpp",
-        "ldap_cumulative_operation_stats.cpp",
-        "user_cache_access_stats.cpp",
-    ],
-    LIBDEPS_PRIVATE=[
-        "$BUILD_DIR/mongo/db/server_base",
-        "$BUILD_DIR/mongo/db/service_context",
-        "auth",
     ],
 )
 
