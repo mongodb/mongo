@@ -9,17 +9,6 @@
 #include "wt_internal.h"
 
 /*
- * Per session handle cached block manager information.
- */
-typedef struct {
-    WT_EXT *ext_cache;   /* List of WT_EXT handles */
-    u_int ext_cache_cnt; /* Count */
-
-    WT_SIZE *sz_cache;  /* List of WT_SIZE handles */
-    u_int sz_cache_cnt; /* Count */
-} WT_BLOCK_MGR_SESSION;
-
-/*
  * __block_ext_alloc --
  *     Allocate a new WT_EXT structure.
  */
@@ -297,3 +286,23 @@ __wti_block_ext_discard(WT_SESSION_IMPL *session, u_int max)
     WT_RET(__block_size_discard(session, max));
     return (0);
 }
+
+#ifdef HAVE_UNITTEST
+int
+__ut_block_ext_alloc(WT_SESSION_IMPL *session, WT_EXT **extp)
+{
+    return (__block_ext_alloc(session, extp));
+}
+
+int
+__ut_block_ext_prealloc(WT_SESSION_IMPL *session, u_int max)
+{
+    return (__block_ext_prealloc(session, max));
+}
+
+int
+__ut_block_ext_discard(WT_SESSION_IMPL *session, u_int max)
+{
+    return (__block_ext_discard(session, max));
+}
+#endif

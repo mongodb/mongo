@@ -105,6 +105,17 @@ struct __wt_size {
 };
 
 /*
+ * Per session handle cached block manager information.
+ */
+typedef struct {
+    WT_EXT *ext_cache;   /* List of WT_EXT handles */
+    u_int ext_cache_cnt; /* Count */
+
+    WT_SIZE *sz_cache;  /* List of WT_SIZE handles */
+    u_int sz_cache_cnt; /* Count */
+} WT_BLOCK_MGR_SESSION;
+
+/*
  * WT_EXT_FOREACH --
  *	Walk a block manager skiplist.
  * WT_EXT_FOREACH_OFF --

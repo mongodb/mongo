@@ -55,6 +55,7 @@ public:
         return _messages.back();
     }
     static std::shared_ptr<MockSession> buildTestMockSession();
+    WT_BLOCK_MGR_SESSION *setupBlockManagerSession();
 
 private:
     explicit MockSession(
