@@ -102,8 +102,8 @@ private:
  */
 class TaskExecutorWithFailureInScheduleRemoteCommand : public unittest::TaskExecutorProxy {
 public:
-    TaskExecutorWithFailureInScheduleRemoteCommand(executor::TaskExecutor* executor)
-        : unittest::TaskExecutorProxy(executor) {}
+    using unittest::TaskExecutorProxy::TaskExecutorProxy;
+
     StatusWith<executor::TaskExecutor::CallbackHandle> scheduleRemoteCommandOnAny(
         const executor::RemoteCommandRequestOnAny& request,
         const RemoteCommandOnAnyCallbackFn& cb,
@@ -450,16 +450,17 @@ TEST_F(RemoteCommandRetrySchedulerTest,
     auto policy = RemoteCommandRetryScheduler::makeRetryPolicy<ErrorCategory::RetriableError>(
         3U, executor::RemoteCommandRequest::kNoTimeout);
     auto request = makeRemoteCommandRequest();
-    TaskExecutorWithFailureInScheduleRemoteCommand badExecutor(&getExecutor());
+    auto badExecutor =
+        std::make_shared<TaskExecutorWithFailureInScheduleRemoteCommand>(&getExecutor());
     RemoteCommandRetryScheduler scheduler(
-        &badExecutor, request, std::ref(callback), std::move(policy));
+        badExecutor.get(), request, std::ref(callback), std::move(policy));
     start(&scheduler);
 
     processNetworkResponse({ErrorCodes::HostNotFound, "first", Milliseconds(0)});
 
     // scheduleRemoteCommand() will fail with ErrorCodes::ShutdownInProgress when trying to send
     // third remote command request after processing second failed response.
-    badExecutor.scheduleRemoteCommandFailPoint = true;
+    badExecutor->scheduleRemoteCommandFailPoint = true;
     processNetworkResponse({ErrorCodes::HostNotFound, "second", Milliseconds(0)});
 
     checkCompletionStatus(
@@ -538,9 +539,10 @@ TEST_F(RemoteCommandRetrySchedulerTest,
     auto policy = std::make_unique<ShutdownSchedulerRetryPolicy>();
     auto policyPtr = policy.get();
     auto request = makeRemoteCommandRequest();
-    TaskExecutorWithFailureInScheduleRemoteCommand badExecutor(&getExecutor());
+    auto badExecutor =
+        std::make_shared<TaskExecutorWithFailureInScheduleRemoteCommand>(&getExecutor());
     RemoteCommandRetryScheduler scheduler(
-        &badExecutor, request, std::ref(callback), std::move(policy));
+        badExecutor.get(), request, std::ref(callback), std::move(policy));
     policyPtr->scheduler = &scheduler;
     start(&scheduler);
 

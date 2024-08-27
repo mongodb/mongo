@@ -82,7 +82,7 @@ public:
         _ni = makeNetworkInterface("TaskExecutorCursorTest");
         auto tp = std::make_unique<NetworkInterfaceThreadPool>(_ni.get());
 
-        _executor = std::make_shared<ThreadPoolTaskExecutor>(std::move(tp), _ni);
+        _executor = ThreadPoolTaskExecutor::create(std::move(tp), _ni);
         _executor->startup();
     };
 

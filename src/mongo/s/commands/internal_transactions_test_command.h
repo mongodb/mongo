@@ -187,7 +187,7 @@ public:
                 options.poolName = "InternalTransaction";
                 options.minThreads = 0;
                 options.maxThreads = 4;
-                executor = std::make_shared<executor::ThreadPoolTaskExecutor>(
+                executor = executor::ThreadPoolTaskExecutor::create(
                     std::make_unique<ThreadPool>(std::move(options)),
                     executor::makeNetworkInterface("InternalTransactionNetwork"));
                 executor->startup();

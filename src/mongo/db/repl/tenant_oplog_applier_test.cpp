@@ -176,7 +176,7 @@ public:
         thread_pool_options.onCreateThread = [] {
             Client::initThread("TenantOplogApplier", getGlobalServiceContext()->getService());
         };
-        _executor = makeSharedThreadPoolTestExecutor(std::move(network), thread_pool_options);
+        _executor = makeThreadPoolTestExecutor(std::move(network), thread_pool_options);
         _executor->startup();
         _oplogBuffer.startup(nullptr);
 

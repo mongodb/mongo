@@ -65,8 +65,7 @@ void StreamableReplicaSetMonitorForTesting::setup(const MongoURI& uri) {
 
     auto pool = std::make_unique<executor::NetworkInterfaceThreadPool>(networkInterface.get());
 
-    _taskExecutor =
-        std::make_shared<executor::ThreadPoolTaskExecutor>(std::move(pool), networkInterface);
+    _taskExecutor = executor::ThreadPoolTaskExecutor::create(std::move(pool), networkInterface);
     _taskExecutor->startup();
 
     _replSetMonitor = std::make_shared<StreamableReplicaSetMonitor>(

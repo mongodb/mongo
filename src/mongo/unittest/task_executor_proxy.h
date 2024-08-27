@@ -56,15 +56,15 @@ namespace unittest {
  * - dropConnections()
  */
 class TaskExecutorProxy : public executor::TaskExecutor {
-    TaskExecutorProxy(const TaskExecutorProxy&) = delete;
-    TaskExecutorProxy& operator=(const TaskExecutorProxy&) = delete;
-
 public:
     /**
      * Does not own target executor.
      */
-    TaskExecutorProxy(executor::TaskExecutor* executor);
+    explicit TaskExecutorProxy(executor::TaskExecutor* executor);
     ~TaskExecutorProxy() override;
+
+    TaskExecutorProxy(const TaskExecutorProxy&) = delete;
+    TaskExecutorProxy& operator=(const TaskExecutorProxy&) = delete;
 
     executor::TaskExecutor* getExecutor() const;
     void setExecutor(executor::TaskExecutor* executor);

@@ -48,7 +48,7 @@ public:
                                getGlobalServiceContext()->getService());
         };
 
-        _executor = makeSharedThreadPoolTestExecutor(std::move(network), thread_pool_options);
+        _executor = makeThreadPoolTestExecutor(std::move(network), thread_pool_options);
         _executor->startup();
 
         _scopedExecutor = std::make_shared<executor::ScopedTaskExecutor>(_executor);

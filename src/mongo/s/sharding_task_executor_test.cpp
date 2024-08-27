@@ -101,15 +101,15 @@ protected:
 
     executor::NetworkInterfaceMock* _network{nullptr};
 
-    std::unique_ptr<executor::ThreadPoolTaskExecutor> _threadPool;
+    std::shared_ptr<executor::ThreadPoolTaskExecutor> _threadPool;
 };
 
 TEST_F(ShardingTaskExecutorTest, MissingLsidAddsLsidInCommand) {
     operationContext()->setLogicalSessionId(constructFullLsid());
     ASSERT(operationContext()->getLogicalSessionId());
 
-    executor::ShardingTaskExecutor executor(std::move(_threadPool));
-    executor.startup();
+    auto executor = executor::ShardingTaskExecutor::create(std::move(_threadPool));
+    executor->startup();
 
     NetworkInterfaceMock::InNetworkGuard ing(_network);
 
@@ -120,7 +120,7 @@ TEST_F(ShardingTaskExecutorTest, MissingLsidAddsLsidInCommand) {
                                             << "doc"),
                                        operationContext());
 
-    TaskExecutor::CallbackHandle cbHandle = unittest::assertGet(executor.scheduleRemoteCommand(
+    TaskExecutor::CallbackHandle cbHandle = unittest::assertGet(executor->scheduleRemoteCommand(
         request, [=](const executor::TaskExecutor::RemoteCommandCallbackArgs) -> void {}, nullptr));
 
     ASSERT(_network->hasReadyRequests());
@@ -134,8 +134,8 @@ TEST_F(ShardingTaskExecutorTest, IncompleteLsidAddsLsidInCommand) {
     operationContext()->setLogicalSessionId(constructFullLsid());
     ASSERT(operationContext()->getLogicalSessionId());
 
-    executor::ShardingTaskExecutor executor(std::move(_threadPool));
-    executor.startup();
+    auto executor = executor::ShardingTaskExecutor::create(std::move(_threadPool));
+    executor->startup();
     NetworkInterfaceMock::InNetworkGuard ing(_network);
 
     BSONObjBuilder bob;
@@ -152,7 +152,7 @@ TEST_F(ShardingTaskExecutorTest, IncompleteLsidAddsLsidInCommand) {
         bob.obj(),
         operationContext());
 
-    TaskExecutor::CallbackHandle cbHandle = unittest::assertGet(executor.scheduleRemoteCommand(
+    TaskExecutor::CallbackHandle cbHandle = unittest::assertGet(executor->scheduleRemoteCommand(
         request, [=](const executor::TaskExecutor::RemoteCommandCallbackArgs) -> void {}, nullptr));
 
     ASSERT(_network->hasReadyRequests());

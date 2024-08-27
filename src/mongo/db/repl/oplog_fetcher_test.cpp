@@ -621,8 +621,9 @@ TEST_F(OplogFetcherTest, ShuttingExecutorDownShouldPreventOplogFetcherFromStarti
 }
 
 TEST_F(OplogFetcherTest, OplogFetcherReturnsOperationFailedIfExecutorFailsToScheduleRunQuery) {
-    TaskExecutorMock taskExecutorMock(&getExecutor());
-    taskExecutorMock.shouldFailScheduleWorkRequest = []() {
+    auto execAnchor = std::make_shared<TaskExecutorMock>(&getExecutor());
+    auto& taskExecutorMock = *execAnchor;
+    taskExecutorMock.shouldFailScheduleWorkRequest = [] {
         return true;
     };
 
@@ -646,7 +647,8 @@ TEST_F(OplogFetcherTest, ShuttingExecutorDownAfterStartupButBeforeRunQuerySchedu
 
     // Defer scheduling work so that the executor's shutdown happens before startup's work is
     // scheduled.
-    TaskExecutorMock taskExecutorMock(&getExecutor());
+    auto execAnchor = std::make_shared<TaskExecutorMock>(&getExecutor());
+    auto& taskExecutorMock = *execAnchor;
     taskExecutorMock.shouldDeferScheduleWorkRequestByOneSecond = []() {
         return true;
     };
@@ -670,7 +672,8 @@ TEST_F(OplogFetcherTest, OplogFetcherReturnsCallbackCanceledIfShutdownBeforeRunQ
 
     // Defer scheduling work so that the oplog fetcher's shutdown happens before startup's work is
     // scheduled.
-    TaskExecutorMock taskExecutorMock(&getExecutor());
+    auto execAnchor = std::make_shared<TaskExecutorMock>(&getExecutor());
+    auto& taskExecutorMock = *execAnchor;
     taskExecutorMock.shouldDeferScheduleWorkRequestByOneSecond = []() {
         return true;
     };

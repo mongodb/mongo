@@ -304,7 +304,7 @@ public:
         dbThreadPoolOptions.onCreateThread = []() {
             Client::initThread("FetchMockTaskExecutor", getGlobalServiceContext()->getService());
         };
-        _threadPoolExecutor = makeSharedThreadPoolTestExecutor(std::move(net), dbThreadPoolOptions);
+        _threadPoolExecutor = makeThreadPoolTestExecutor(std::move(net), dbThreadPoolOptions);
         _threadPoolExecutor->startup();
         _threadPoolExecutorMock = std::make_shared<TaskExecutorMock>(_threadPoolExecutor.get());
 

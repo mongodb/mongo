@@ -213,7 +213,7 @@ auto makeTaskExecutor(ServiceContext* service,
     auto hookList = std::make_unique<rpc::EgressMetadataHookList>();
     hookList->addHook(std::make_unique<rpc::VectorClockMetadataHook>(service));
     auto networkName = threadName + "Network";
-    return std::make_unique<executor::ThreadPoolTaskExecutor>(
+    return executor::ThreadPoolTaskExecutor::create(
         makeThreadPool(poolName, threadName),
         executor::makeNetworkInterface(networkName, nullptr, std::move(hookList)));
 }

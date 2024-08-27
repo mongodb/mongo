@@ -109,7 +109,7 @@ public:
         net = makeNetworkInterface("ReplicaSetMonintorTest");
 
         auto tp = std::make_unique<NetworkInterfaceThreadPool>(net.get());
-        executor = std::make_shared<ThreadPoolTaskExecutor>(std::move(tp), net);
+        executor = ThreadPoolTaskExecutor::create(std::move(tp), net);
         executor->startup();
 
         connectionManager = std::make_unique<ReplicaSetMonitorConnectionManager>(net);

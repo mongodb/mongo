@@ -115,7 +115,7 @@ public:
             hookList->addHook(
                 std::make_unique<rpc::VectorClockMetadataHook>(opCtx->getServiceContext()));
 
-            auto executor = std::make_shared<executor::ThreadPoolTaskExecutor>(
+            auto executor = executor::ThreadPoolTaskExecutor::create(
                 std::make_unique<ThreadPool>(std::move(threadPoolOptions)),
                 executor::makeNetworkInterface(
                     "TestReshardCloneCollectionNetwork", nullptr, std::move(hookList)));

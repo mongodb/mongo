@@ -61,7 +61,7 @@ public:
     void setUp() override {
         auto net = std::make_unique<NetworkInterfaceMock>();
         _net = net.get();
-        _tpte = std::make_shared<ThreadPoolTaskExecutor>(
+        _tpte = executor::ThreadPoolTaskExecutor::create(
             std::make_unique<ThreadPoolMock>(_net, 1, ThreadPoolMock::Options{}), std::move(net));
         _tpte->startup();
         _executor.emplace(_tpte);

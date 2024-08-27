@@ -70,8 +70,8 @@ struct State {
             makeNetworkInterface("MongotExecutor", nullptr, nullptr, makeMongotConnPoolOptions());
         auto mongotThreadPool =
             std::make_unique<NetworkInterfaceThreadPool>(mongotExecutorNetworkInterface.get());
-        mongotExecutor = std::make_shared<ThreadPoolTaskExecutor>(
-            std::move(mongotThreadPool), std::move(mongotExecutorNetworkInterface));
+        mongotExecutor = ThreadPoolTaskExecutor::create(std::move(mongotThreadPool),
+                                                        std::move(mongotExecutorNetworkInterface));
 
         // Make a separate searchIndexMgmtExecutor that's independently configurable.
         ConnectionPool::Options searchIndexPoolOptions;
@@ -81,8 +81,8 @@ struct State {
             "SearchIndexMgmtExecutor", nullptr, nullptr, std::move(searchIndexPoolOptions));
         auto searchIndexThreadPool =
             std::make_unique<NetworkInterfaceThreadPool>(searchIdxNI.get());
-        searchIndexMgmtExecutor = std::make_shared<ThreadPoolTaskExecutor>(
-            std::move(searchIndexThreadPool), std::move(searchIdxNI));
+        searchIndexMgmtExecutor = ThreadPoolTaskExecutor::create(std::move(searchIndexThreadPool),
+                                                                 std::move(searchIdxNI));
     }
 
     auto getMongotExecutorPtr() {

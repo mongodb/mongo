@@ -361,7 +361,7 @@ void startFLECrud(ServiceContext* serviceContext) {
         return;
     }
 
-    _fleCrudExecutor = std::make_shared<executor::ThreadPoolTaskExecutor>(
+    _fleCrudExecutor = executor::ThreadPoolTaskExecutor::create(
         std::make_unique<ThreadPool>(getThreadPoolOptions()),
         executor::makeNetworkInterface("FLECrudNetwork"));
 

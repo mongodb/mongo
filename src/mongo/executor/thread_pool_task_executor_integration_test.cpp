@@ -78,7 +78,7 @@ public:
         std::shared_ptr<NetworkInterface> net = makeNetworkInterface("TaskExecutorTest");
         auto tp = std::make_unique<NetworkInterfaceThreadPool>(net.get());
 
-        _executor = std::make_unique<ThreadPoolTaskExecutor>(std::move(tp), std::move(net));
+        _executor = ThreadPoolTaskExecutor::create(std::move(tp), std::move(net));
         _executor->startup();
     };
 

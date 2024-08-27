@@ -43,11 +43,7 @@ namespace executor {
 /**
  * Makes a new ThreadPoolTaskExecutor for use in unit tests.
  */
-std::unique_ptr<ThreadPoolTaskExecutor> makeThreadPoolTestExecutor(
-    std::unique_ptr<NetworkInterfaceMock> net,
-    executor::ThreadPoolMock::Options options = executor::ThreadPoolMock::Options());
-
-std::shared_ptr<ThreadPoolTaskExecutor> makeSharedThreadPoolTestExecutor(
+std::shared_ptr<ThreadPoolTaskExecutor> makeThreadPoolTestExecutor(
     std::unique_ptr<NetworkInterfaceMock> net,
     executor::ThreadPoolMock::Options options = executor::ThreadPoolMock::Options());
 

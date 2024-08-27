@@ -93,16 +93,27 @@ namespace mongo::executor {
  * Exhaust commands are not supported at this time.
  */
 class PinnedConnectionTaskExecutor final : public TaskExecutor {
-    PinnedConnectionTaskExecutor(const PinnedConnectionTaskExecutor&) = delete;
-    PinnedConnectionTaskExecutor& operator=(const PinnedConnectionTaskExecutor&) = delete;
+    struct Passkey {
+        explicit Passkey() = default;
+    };
 
 public:
+    static std::shared_ptr<PinnedConnectionTaskExecutor> create(
+        std::shared_ptr<TaskExecutor> executor, NetworkInterface* net) {
+        return std::make_shared<PinnedConnectionTaskExecutor>(Passkey{}, std::move(executor), net);
+    }
+
     // The provided NetworkInterface should be owned by the provided TaskExecutor, and
     // must outlive this type.
-    PinnedConnectionTaskExecutor(const std::shared_ptr<TaskExecutor>& executor,
+    PinnedConnectionTaskExecutor(Passkey,
+                                 const std::shared_ptr<TaskExecutor>& executor,
                                  NetworkInterface* net);
 
     ~PinnedConnectionTaskExecutor() override;
+
+    PinnedConnectionTaskExecutor(const PinnedConnectionTaskExecutor&) = delete;
+    PinnedConnectionTaskExecutor& operator=(const PinnedConnectionTaskExecutor&) = delete;
+
     // Startup is illegal to call, as the provided executor should already be started-up.
     void startup() override;
     void shutdown() override;

@@ -553,7 +553,7 @@ void MirrorMaestroImpl::init(ServiceContext* serviceContext) noexcept {
         options.maxThreads = kMirrorMaestroThreadPoolMaxThreads;
         return std::make_unique<ThreadPool>(std::move(options));
     };
-    _executor = std::make_shared<executor::ThreadPoolTaskExecutor>(makePool(), makeNet());
+    _executor = executor::ThreadPoolTaskExecutor::create(makePool(), makeNet());
 
     _executor->startup();
     _topologyVersionObserver.init(serviceContext);

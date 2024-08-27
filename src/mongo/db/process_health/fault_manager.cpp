@@ -95,7 +95,7 @@ ServiceContext::ConstructorActionRegisterer faultManagerRegisterer{
         threadPoolOptions.poolName = "FaultManagerThreadPool";
         auto pool = std::make_unique<ThreadPool>(threadPoolOptions);
         auto taskExecutor =
-            std::make_shared<executor::ThreadPoolTaskExecutor>(std::move(pool), networkInterface);
+            executor::ThreadPoolTaskExecutor::create(std::move(pool), networkInterface);
 
         auto faultManager = std::make_unique<FaultManager>(
             svcCtx, taskExecutor, std::make_unique<FaultManagerConfig>());

@@ -366,8 +366,7 @@ void RangeDeleterService::onStepUpComplete(OperationContext* opCtx, long long te
     const std::string kExecName("RangeDeleterServiceExecutor");
     auto net = executor::makeNetworkInterface(kExecName);
     auto pool = std::make_unique<executor::NetworkInterfaceThreadPool>(net.get());
-    auto taskExecutor =
-        std::make_shared<executor::ThreadPoolTaskExecutor>(std::move(pool), std::move(net));
+    auto taskExecutor = executor::ThreadPoolTaskExecutor::create(std::move(pool), std::move(net));
     _executor = std::move(taskExecutor);
     _executor->startup();
 

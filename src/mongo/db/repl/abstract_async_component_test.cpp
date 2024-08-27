@@ -366,10 +366,10 @@ TEST_F(AbstractAsyncComponentTest,
 
 TEST_F(AbstractAsyncComponentTest,
        ScheduleWorkAndSaveHandlePassesThroughErrorFromTaskExecutorScheduleWork) {
-    TaskExecutorMock taskExecutorMock(&getExecutor());
-    MockAsyncComponent component(&taskExecutorMock);
+    auto taskExecutorMock = std::make_shared<TaskExecutorMock>(&getExecutor());
+    MockAsyncComponent component(taskExecutorMock.get());
 
-    taskExecutorMock.shouldFailScheduleWorkRequest = []() {
+    taskExecutorMock->shouldFailScheduleWorkRequest = []() {
         return true;
     };
 
@@ -413,10 +413,10 @@ TEST_F(AbstractAsyncComponentTest,
 
 TEST_F(AbstractAsyncComponentTest,
        ScheduleWorkAtAndSaveHandlePassesThroughErrorFromTaskExecutorScheduleWork) {
-    TaskExecutorMock taskExecutorMock(&getExecutor());
-    MockAsyncComponent component(&taskExecutorMock);
+    auto taskExecutorMock = std::make_shared<TaskExecutorMock>(&getExecutor());
+    MockAsyncComponent component(taskExecutorMock.get());
 
-    taskExecutorMock.shouldFailScheduleWorkAtRequest = []() {
+    taskExecutorMock->shouldFailScheduleWorkAtRequest = []() {
         return true;
     };
 

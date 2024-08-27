@@ -403,7 +403,7 @@ public:
         // setup mock networking for split acceptance
         auto network = std::make_unique<executor::NetworkInterfaceMock>();
         _net = network.get();
-        _executor = std::make_shared<executor::ThreadPoolTaskExecutor>(
+        _executor = executor::ThreadPoolTaskExecutor::create(
             std::make_unique<executor::ThreadPoolMock>(
                 _net, 1, executor::ThreadPoolMock::Options{}),
             std::move(network));

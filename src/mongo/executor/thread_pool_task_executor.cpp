@@ -151,7 +151,13 @@ public:
     WorkQueue waiters;
 };
 
-ThreadPoolTaskExecutor::ThreadPoolTaskExecutor(std::unique_ptr<ThreadPoolInterface> pool,
+std::shared_ptr<ThreadPoolTaskExecutor> ThreadPoolTaskExecutor::create(
+    std::unique_ptr<ThreadPoolInterface> pool, std::shared_ptr<NetworkInterface> net) {
+    return std::make_shared<ThreadPoolTaskExecutor>(Passkey{}, std::move(pool), std::move(net));
+}
+
+ThreadPoolTaskExecutor::ThreadPoolTaskExecutor(Passkey,
+                                               std::unique_ptr<ThreadPoolInterface> pool,
                                                std::shared_ptr<NetworkInterface> net)
     : _net(std::move(net)), _pool(std::move(pool)) {}
 

@@ -56,11 +56,21 @@ class ThreadPoolTaskExecutor;
  * override methods if needed.
  */
 class ShardingTaskExecutor final : public TaskExecutor {
+    struct Passkey {
+        explicit Passkey() = default;
+    };
+
+public:
+    ShardingTaskExecutor(Passkey, std::shared_ptr<ThreadPoolTaskExecutor> executor);
+
+    static std::shared_ptr<ShardingTaskExecutor> create(
+        std::shared_ptr<ThreadPoolTaskExecutor> executor) {
+        return std::make_shared<ShardingTaskExecutor>(Passkey{}, std::move(executor));
+    }
+
     ShardingTaskExecutor(const ShardingTaskExecutor&) = delete;
     ShardingTaskExecutor& operator=(const ShardingTaskExecutor&) = delete;
 
-public:
-    ShardingTaskExecutor(std::unique_ptr<ThreadPoolTaskExecutor> executor);
 
     void startup() override;
     void shutdown() override;
@@ -97,7 +107,7 @@ public:
     void dropConnections(const HostAndPort& hostAndPort) override;
 
 private:
-    std::unique_ptr<ThreadPoolTaskExecutor> _executor;
+    std::shared_ptr<ThreadPoolTaskExecutor> _executor;
 };
 
 }  // namespace executor

@@ -434,7 +434,7 @@ protected:
         options.minThreads = 1;
         options.maxThreads = 1;
 
-        _executor = std::make_shared<executor::ThreadPoolTaskExecutor>(
+        _executor = executor::ThreadPoolTaskExecutor::create(
             std::make_unique<ThreadPool>(std::move(options)),
             executor::makeNetworkInterface("TxnAPITestNetwork"));
 
@@ -2645,7 +2645,7 @@ TEST_F(TxnAPITest, WaitsForBestEffortAbortOnNonTransientErrorIfNotCancelled) {
     options.poolName = "TxnAPITest-WaitsForBestEffortAbortOnNonTransientErrorIfNotCancelled";
     options.minThreads = 1;
     options.maxThreads = 8;
-    auto executor = std::make_shared<executor::ThreadPoolTaskExecutor>(
+    auto executor = executor::ThreadPoolTaskExecutor::create(
         std::make_unique<ThreadPool>(std::move(options)),
         executor::makeNetworkInterface("TxnAPITestNetwork"));
     executor->startup();
@@ -2704,7 +2704,7 @@ TEST_F(TxnAPITest, WaitsForBestEffortAbortOnTransientError) {
     options.poolName = "TxnAPITest-WaitsForBestEffortAbortOnTransientError";
     options.minThreads = 1;
     options.maxThreads = 8;
-    auto executor = std::make_shared<executor::ThreadPoolTaskExecutor>(
+    auto executor = executor::ThreadPoolTaskExecutor::create(
         std::make_unique<ThreadPool>(std::move(options)),
         executor::makeNetworkInterface("TxnAPITestNetwork"));
     executor->startup();

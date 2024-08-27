@@ -98,7 +98,7 @@ public:
         ServiceContextTest::setUp();
         _net = std::make_shared<NetworkInterfaceMock>();
         ThreadPoolMock::Options opts{};
-        _executor = std::make_shared<ThreadPoolTaskExecutor>(
+        _executor = ThreadPoolTaskExecutor::create(
             std::make_unique<ThreadPoolMock>(_net.get(), 1, std::move(opts)), _net);
         _executor->startup();
 

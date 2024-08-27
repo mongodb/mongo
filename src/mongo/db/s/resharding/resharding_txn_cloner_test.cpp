@@ -615,7 +615,7 @@ private:
         auto hookList = std::make_unique<rpc::EgressMetadataHookList>();
         hookList->addHook(std::make_unique<rpc::VectorClockMetadataHook>(getServiceContext()));
 
-        auto executor = std::make_shared<executor::ThreadPoolTaskExecutor>(
+        auto executor = executor::ThreadPoolTaskExecutor::create(
             std::make_unique<ThreadPool>(std::move(threadPoolOptions)),
             executor::makeNetworkInterface(
                 "TestReshardCloneConfigTransactionsNetwork", nullptr, std::move(hookList)));

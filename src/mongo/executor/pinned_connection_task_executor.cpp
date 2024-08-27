@@ -130,7 +130,7 @@ public:
 };
 
 PinnedConnectionTaskExecutor::PinnedConnectionTaskExecutor(
-    const std::shared_ptr<TaskExecutor>& executor, NetworkInterface* net)
+    Passkey, const std::shared_ptr<TaskExecutor>& executor, NetworkInterface* net)
     : _executor(executor), _net(net), _cancellationExecutor(executor) {}
 
 PinnedConnectionTaskExecutor::~PinnedConnectionTaskExecutor() {

@@ -61,7 +61,7 @@ protected:
 
         auto network = std::make_unique<executor::NetworkInterfaceMock>();
         _net = network.get();
-        _executor = makeSharedThreadPoolTestExecutor(std::move(network));
+        _executor = makeThreadPoolTestExecutor(std::move(network));
         _executor->startup();
         _eventsPublisher = std::make_shared<sdam::TopologyEventsPublisher>(_executor);
     }

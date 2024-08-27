@@ -64,10 +64,8 @@
 #include "mongo/util/time_support.h"
 #include "mongo/util/uuid.h"
 
+namespace mongo::repl {
 namespace {
-
-using namespace mongo;
-using namespace mongo::repl;
 
 class TaskExecutorWithFailureInScheduleRemoteCommand : public unittest::TaskExecutorProxy {
 public:
@@ -98,7 +96,7 @@ public:
 protected:
     std::unique_ptr<SyncSourceResolver> _makeResolver(const OpTime& lastOpTimeFetched);
     TaskExecutorWithFailureInScheduleRemoteCommand::ShouldFailRequestFn _shouldFailRequest;
-    std::unique_ptr<TaskExecutorWithFailureInScheduleRemoteCommand> _executorProxy;
+    std::shared_ptr<TaskExecutorWithFailureInScheduleRemoteCommand> _executorProxy;
 
     SyncSourceResolverResponse _response;
     SyncSourceResolver::OnCompletionFn _onCompletion;
@@ -115,7 +113,7 @@ void SyncSourceResolverTest::setUp() {
     _shouldFailRequest = [](const executor::RemoteCommandRequest&) {
         return false;
     };
-    _executorProxy = std::make_unique<TaskExecutorWithFailureInScheduleRemoteCommand>(
+    _executorProxy = std::make_shared<TaskExecutorWithFailureInScheduleRemoteCommand>(
         &getExecutor(), [this](const executor::RemoteCommandRequest& request) {
             return _shouldFailRequest(request);
         });
@@ -639,3 +637,4 @@ TEST_F(SyncSourceResolverTest, SyncSourceResolverWillSucceedWithExtraFields) {
 }
 
 }  // namespace
+}  // namespace mongo::repl

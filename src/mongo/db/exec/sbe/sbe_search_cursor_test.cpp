@@ -109,7 +109,7 @@ std::unique_ptr<executor::TaskExecutorCursor> mockTaskExecutorCursor(OperationCo
                                                                      CursorId cursorId,
                                                                      const BSONArray& firstBatch) {
     auto networkInterface = std::make_unique<executor::NetworkInterfaceMock>();
-    auto testExecutor = executor::makeSharedThreadPoolTestExecutor(std::move(networkInterface));
+    auto testExecutor = executor::makeThreadPoolTestExecutor(std::move(networkInterface));
     executor::RemoteCommandRequest req = executor::RemoteCommandRequest();
     req.opCtx = opCtx;
 

@@ -108,7 +108,6 @@ const NamespaceString kTestNss =
 
 class DocumentSourceExchangeTest : public AggregationContextFixture {
 protected:
-    std::unique_ptr<executor::TaskExecutor> _executor;
     void setUp() override {
         getExpCtx()->mongoProcessInterface = std::make_shared<StubMongoProcessInterface>();
 
@@ -117,8 +116,7 @@ protected:
         ThreadPool::Options options;
         auto pool = std::make_unique<ThreadPool>(options);
 
-        _executor =
-            std::make_unique<executor::ThreadPoolTaskExecutor>(std::move(pool), std::move(net));
+        _executor = executor::ThreadPoolTaskExecutor::create(std::move(pool), std::move(net));
         _executor->startup();
     }
 
@@ -177,6 +175,8 @@ protected:
         }
         return threads;
     }
+
+    std::shared_ptr<executor::TaskExecutor> _executor;
 };
 
 TEST_F(DocumentSourceExchangeTest, SimpleExchange1Consumer) {

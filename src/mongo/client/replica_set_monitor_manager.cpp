@@ -165,7 +165,7 @@ void ReplicaSetMonitorManager::_setupTaskExecutorAndStatsInLock() {
 
     auto pool = std::make_unique<NetworkInterfaceThreadPool>(networkInterface.get());
 
-    _taskExecutor = std::make_shared<ThreadPoolTaskExecutor>(std::move(pool), networkInterface);
+    _taskExecutor = ThreadPoolTaskExecutor::create(std::move(pool), networkInterface);
     _taskExecutor->startup();
 }
 

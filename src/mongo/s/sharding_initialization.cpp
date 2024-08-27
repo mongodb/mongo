@@ -111,17 +111,14 @@ static constexpr auto kRetryInterval = Seconds{2};
 
 std::shared_ptr<executor::TaskExecutor> makeShardingFixedTaskExecutor(
     std::unique_ptr<NetworkInterface> net) {
-    auto executor =
-        std::make_unique<ThreadPoolTaskExecutor>(std::make_unique<ThreadPool>([] {
-                                                     ThreadPool::Options opts;
-                                                     opts.poolName = "Sharding-Fixed";
-                                                     opts.maxThreads =
-                                                         ThreadPool::Options::kUnlimited;
-                                                     return opts;
-                                                 }()),
-                                                 std::move(net));
-
-    return std::make_shared<executor::ShardingTaskExecutor>(std::move(executor));
+    return executor::ShardingTaskExecutor::create(
+        ThreadPoolTaskExecutor::create(std::make_unique<ThreadPool>([] {
+                                           ThreadPool::Options opts;
+                                           opts.poolName = "Sharding-Fixed";
+                                           opts.maxThreads = ThreadPool::Options::kUnlimited;
+                                           return opts;
+                                       }()),
+                                       std::move(net)));
 }
 
 std::unique_ptr<TaskExecutorPool> makeShardingTaskExecutorPool(
@@ -173,13 +170,11 @@ void preWarmConnections(OperationContext* opCtx, std::vector<HostAndPort> allHos
 
 }  // namespace
 
-std::unique_ptr<executor::TaskExecutor> makeShardingTaskExecutor(
+std::shared_ptr<executor::TaskExecutor> makeShardingTaskExecutor(
     std::unique_ptr<NetworkInterface> net) {
     auto netPtr = net.get();
-    auto executor = std::make_unique<ThreadPoolTaskExecutor>(
-        std::make_unique<NetworkInterfaceThreadPool>(netPtr), std::move(net));
-
-    return std::make_unique<executor::ShardingTaskExecutor>(std::move(executor));
+    return executor::ShardingTaskExecutor::create(ThreadPoolTaskExecutor::create(
+        std::make_unique<NetworkInterfaceThreadPool>(netPtr), std::move(net)));
 }
 
 std::unique_ptr<rpc::EgressMetadataHookList> makeShardingEgressHooksList(ServiceContext* service) {

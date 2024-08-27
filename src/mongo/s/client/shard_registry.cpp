@@ -259,7 +259,7 @@ void ShardRegistry::startupPeriodicReloader(OperationContext* opCtx) {
     // construct task executor
     auto net = executor::makeNetworkInterface("ShardRegistryUpdater", nullptr, std::move(hookList));
     auto netPtr = net.get();
-    _executor = std::make_shared<executor::ThreadPoolTaskExecutor>(
+    _executor = executor::ThreadPoolTaskExecutor::create(
         std::make_unique<executor::NetworkInterfaceThreadPool>(netPtr), std::move(net));
     LOGV2_DEBUG(22724, 1, "Starting up task executor for periodic reloading of ShardRegistry");
     _executor->startup();

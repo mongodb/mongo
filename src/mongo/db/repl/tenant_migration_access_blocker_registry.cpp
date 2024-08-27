@@ -99,7 +99,7 @@ TenantMigrationAccessBlockerRegistry::TenantMigrationAccessBlockerRegistry() {
         stdx::lock_guard<Client> lk(cc());
         cc().setSystemOperationUnkillableByStepdown(lk);
     };
-    _asyncBlockingOperationsExecutor = std::make_shared<executor::ThreadPoolTaskExecutor>(
+    _asyncBlockingOperationsExecutor = executor::ThreadPoolTaskExecutor::create(
         std::make_unique<ThreadPool>(threadPoolOptions),
         executor::makeNetworkInterface("TenantMigrationBlockerNet"));
 }

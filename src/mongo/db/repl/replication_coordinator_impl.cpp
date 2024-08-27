@@ -504,7 +504,7 @@ ReplicationCoordinatorImpl::ReplicationCoordinatorImpl(
     ServiceContext* service,
     const ReplSettings& settings,
     std::unique_ptr<ReplicationCoordinatorExternalState> externalState,
-    std::unique_ptr<executor::TaskExecutor> executor,
+    std::shared_ptr<executor::TaskExecutor> executor,
     std::unique_ptr<TopologyCoordinator> topCoord,
     ReplicationProcess* replicationProcess,
     StorageInterface* storage,

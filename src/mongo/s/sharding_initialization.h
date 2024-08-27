@@ -66,7 +66,7 @@ using ShardingEgressMetadataHookBuilder = std::function<std::unique_ptr<EgressMe
 /**
  * Constructs a TaskExecutor which contains the required configuration for the sharding subsystem.
  */
-std::unique_ptr<executor::TaskExecutor> makeShardingTaskExecutor(
+std::shared_ptr<executor::TaskExecutor> makeShardingTaskExecutor(
     std::unique_ptr<executor::NetworkInterface> net);
 
 std::unique_ptr<rpc::EgressMetadataHookList> makeShardingEgressHooksList(ServiceContext* service);

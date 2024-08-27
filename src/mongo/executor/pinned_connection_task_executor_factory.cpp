@@ -41,7 +41,7 @@ namespace executor {
 
 std::shared_ptr<TaskExecutor> makePinnedConnectionTaskExecutor(std::shared_ptr<TaskExecutor> exec,
                                                                NetworkInterface* net) {
-    return std::make_shared<PinnedConnectionTaskExecutor>(std::move(exec), net);
+    return PinnedConnectionTaskExecutor::create(std::move(exec), net);
 }
 
 std::shared_ptr<TaskExecutor> makePinnedConnectionTaskExecutor(std::shared_ptr<TaskExecutor> exec) {
@@ -49,7 +49,7 @@ std::shared_ptr<TaskExecutor> makePinnedConnectionTaskExecutor(std::shared_ptr<T
     invariant(tpte,
               "Connection-pinning task executors can only be constructed from "
               "ThreadPoolTaskExecutor unless an explicit NetworkInterface is provided.");
-    return makePinnedConnectionTaskExecutor(std::move(exec), tpte->_net.get());
+    return makePinnedConnectionTaskExecutor(std::move(exec), tpte->getNetworkInterface().get());
 }
 
 }  // namespace executor

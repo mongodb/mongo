@@ -383,7 +383,7 @@ public:
         };
 
         auto hookList = std::make_unique<rpc::EgressMetadataHookList>();
-        auto executor = std::make_shared<executor::ThreadPoolTaskExecutor>(
+        auto executor = executor::ThreadPoolTaskExecutor::create(
             std::make_unique<ThreadPool>(threadPoolOptions),
             executor::makeNetworkInterface(
                 "PrimaryOnlyServiceTestNetwork", nullptr, std::move(hookList)));

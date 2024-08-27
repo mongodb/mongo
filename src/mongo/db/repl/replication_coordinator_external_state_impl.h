@@ -254,12 +254,12 @@ private:
 
     // Thread running oplog write.
     // Note: Only initialized and used when featureFlagReduceMajorityWriteLatency is enabled.
-    std::unique_ptr<executor::TaskExecutor> _oplogWriterTaskExecutor;
+    std::shared_ptr<executor::TaskExecutor> _oplogWriterTaskExecutor;
     std::unique_ptr<OplogWriter> _oplogWriter;
     Future<void> _oplogWriterShutdownFuture;
 
     // Thread running oplog application.
-    std::unique_ptr<executor::TaskExecutor> _oplogApplierTaskExecutor;
+    std::shared_ptr<executor::TaskExecutor> _oplogApplierTaskExecutor;
     std::unique_ptr<OplogApplier> _oplogApplier;
     Future<void> _oplogApplierShutdownFuture;
 

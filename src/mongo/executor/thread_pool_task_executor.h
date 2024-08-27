@@ -64,21 +64,27 @@ class NetworkInterface;
  * Implementation of a TaskExecutor that uses a pool of threads to execute work items.
  */
 class ThreadPoolTaskExecutor final : public TaskExecutor {
-    ThreadPoolTaskExecutor(const ThreadPoolTaskExecutor&) = delete;
-    ThreadPoolTaskExecutor& operator=(const ThreadPoolTaskExecutor&) = delete;
+    /** Protects the constructor from outside use. */
+    struct Passkey {
+        explicit Passkey() = default;
+    };
 
 public:
     /**
-     * Constructs an instance of ThreadPoolTaskExecutor that runs tasks in "pool" and uses "net"
-     * for network operations.
+     * Creates an instance that runs tasks in `pool` and uses `net` for network
+     * operations, exclusively owned by the returned `shared_ptr`.
      */
-    ThreadPoolTaskExecutor(std::unique_ptr<ThreadPoolInterface> pool,
+    static std::shared_ptr<ThreadPoolTaskExecutor> create(std::unique_ptr<ThreadPoolInterface> pool,
+                                                          std::shared_ptr<NetworkInterface> net);
+
+    ThreadPoolTaskExecutor(Passkey,
+                           std::unique_ptr<ThreadPoolInterface> pool,
                            std::shared_ptr<NetworkInterface> net);
 
-    /**
-     * Destroys a ThreadPoolTaskExecutor.
-     */
     ~ThreadPoolTaskExecutor() override;
+
+    ThreadPoolTaskExecutor(const ThreadPoolTaskExecutor&) = delete;
+    ThreadPoolTaskExecutor& operator=(const ThreadPoolTaskExecutor&) = delete;
 
     void startup() override;
     void shutdown() override;
@@ -119,6 +125,11 @@ public:
      * or _sleepersQueue.
      */
     bool hasTasks() override;
+
+    /** The network interface used for remote command execution and waiting. */
+    const std::shared_ptr<NetworkInterface>& getNetworkInterface() const {
+        return _net;
+    }
 
 private:
     class CallbackState;
@@ -242,9 +253,6 @@ private:
     // Lifecycle state of this executor.
     stdx::condition_variable _stateChange;
     State _state = preStart;
-
-    friend std::shared_ptr<TaskExecutor> makePinnedConnectionTaskExecutor(
-        std::shared_ptr<TaskExecutor>);
 };
 
 }  // namespace executor

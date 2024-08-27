@@ -184,7 +184,7 @@ public:
     ReplicationCoordinatorImpl(ServiceContext* serviceContext,
                                const ReplSettings& settings,
                                std::unique_ptr<ReplicationCoordinatorExternalState> externalState,
-                               std::unique_ptr<executor::TaskExecutor> executor,
+                               std::shared_ptr<executor::TaskExecutor> executor,
                                std::unique_ptr<TopologyCoordinator> topoCoord,
                                ReplicationProcess* replicationProcess,
                                StorageInterface* storage,
@@ -1942,7 +1942,7 @@ private:
     std::unique_ptr<TopologyCoordinator> _topCoord;  // (M)
 
     // Executor that drives the topology coordinator.
-    std::unique_ptr<executor::TaskExecutor> _replExecutor;  // (S)
+    std::shared_ptr<executor::TaskExecutor> _replExecutor;  // (S)
 
     // Pointer to the ReplicationCoordinatorExternalState owned by this ReplicationCoordinator.
     std::unique_ptr<ReplicationCoordinatorExternalState> _externalState;  // (PS)

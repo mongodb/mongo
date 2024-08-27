@@ -584,16 +584,16 @@ TEST_F(ReporterTestNoTriggerAtSetUp,
        FailingToSchedulePrepareCommandTaskShouldMakeReporterInactive) {
     class TaskExecutorWithFailureInScheduleWork : public unittest::TaskExecutorProxy {
     public:
-        TaskExecutorWithFailureInScheduleWork(executor::TaskExecutor* executor)
-            : unittest::TaskExecutorProxy(executor) {}
+        using unittest::TaskExecutorProxy::TaskExecutorProxy;
+
         StatusWith<executor::TaskExecutor::CallbackHandle> scheduleWork(
             CallbackFn&& override) override {
             return Status(ErrorCodes::OperationFailed, "failed to schedule work");
         }
     };
 
-    TaskExecutorWithFailureInScheduleWork badExecutor(&getExecutor());
-    _executorProxy->setExecutor(&badExecutor);
+    auto badExecutor = std::make_shared<TaskExecutorWithFailureInScheduleWork>(&getExecutor());
+    _executorProxy->setExecutor(badExecutor.get());
 
     auto status = reporter->trigger();
 
@@ -607,8 +607,8 @@ TEST_F(ReporterTestNoTriggerAtSetUp,
 TEST_F(ReporterTestNoTriggerAtSetUp, FailingToScheduleRemoteCommandTaskShouldMakeReporterInactive) {
     class TaskExecutorWithFailureInScheduleRemoteCommand : public unittest::TaskExecutorProxy {
     public:
-        TaskExecutorWithFailureInScheduleRemoteCommand(executor::TaskExecutor* executor)
-            : unittest::TaskExecutorProxy(executor) {}
+        using unittest::TaskExecutorProxy::TaskExecutorProxy;
+
         StatusWith<executor::TaskExecutor::CallbackHandle> scheduleRemoteCommandOnAny(
             const executor::RemoteCommandRequestOnAny& request,
             const RemoteCommandOnAnyCallbackFn& cb,
@@ -619,8 +619,9 @@ TEST_F(ReporterTestNoTriggerAtSetUp, FailingToScheduleRemoteCommandTaskShouldMak
         }
     };
 
-    TaskExecutorWithFailureInScheduleRemoteCommand badExecutor(&getExecutor());
-    _executorProxy->setExecutor(&badExecutor);
+    auto badExecutor =
+        std::make_shared<TaskExecutorWithFailureInScheduleRemoteCommand>(&getExecutor());
+    _executorProxy->setExecutor(badExecutor.get());
 
     ASSERT_OK(reporter->trigger());
 
@@ -636,16 +637,16 @@ TEST_F(ReporterTestNoTriggerAtSetUp, FailingToScheduleRemoteCommandTaskShouldMak
 TEST_F(ReporterTest, FailingToScheduleTimeoutShouldMakeReporterInactive) {
     class TaskExecutorWithFailureInScheduleWorkAt : public unittest::TaskExecutorProxy {
     public:
-        TaskExecutorWithFailureInScheduleWorkAt(executor::TaskExecutor* executor)
-            : unittest::TaskExecutorProxy(executor) {}
+        using unittest::TaskExecutorProxy::TaskExecutorProxy;
+
         StatusWith<executor::TaskExecutor::CallbackHandle> scheduleWorkAt(Date_t when,
                                                                           CallbackFn&&) override {
             return Status(ErrorCodes::OperationFailed, "failed to schedule work");
         }
     };
 
-    TaskExecutorWithFailureInScheduleWorkAt badExecutor(&getExecutor());
-    _executorProxy->setExecutor(&badExecutor);
+    auto badExecutor = std::make_shared<TaskExecutorWithFailureInScheduleWorkAt>(&getExecutor());
+    _executorProxy->setExecutor(badExecutor.get());
 
     processNetworkResponse(BSON("ok" << 1));
 

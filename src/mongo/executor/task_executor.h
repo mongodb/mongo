@@ -455,6 +455,11 @@ protected:
     // Sets the given EventHandle to point to the given event.
     static void setEventForHandle(EventHandle* eventHandle, std::shared_ptr<EventState> event);
 
+    /**
+     * `TaskExecutor` is an `enable_shared_from_this` class, and parts of its
+     * implementation assume that it is managed with a `std::shared_ptr`.
+     * Derived classes are responsible for enforcing this.
+     */
     TaskExecutor();
 };
 

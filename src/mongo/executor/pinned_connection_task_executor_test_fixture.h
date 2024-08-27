@@ -138,7 +138,7 @@ public:
     }
 
     std::shared_ptr<PinnedConnectionTaskExecutor> makePinnedConnTaskExecutor() {
-        return std::make_shared<PinnedConnectionTaskExecutor>(getExecutorPtr(), getNet());
+        return PinnedConnectionTaskExecutor::create(getExecutorPtr(), getNet());
     }
 
 private:

@@ -85,7 +85,7 @@ protected:
     void setUp() override {
         auto network = std::make_unique<executor::NetworkInterfaceMock>();
         _net = network.get();
-        _executor = makeSharedThreadPoolTestExecutor(std::move(network));
+        _executor = makeThreadPoolTestExecutor(std::move(network));
         _executor->startup();
         _startDate = _net->now();
         _topologyListener.reset(new sdam::TopologyListenerMock());

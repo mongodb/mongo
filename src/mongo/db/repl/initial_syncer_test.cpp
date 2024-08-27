@@ -447,7 +447,7 @@ protected:
             std::make_unique<ReplicationConsistencyMarkersMock>(),
             std::make_unique<ReplicationRecoveryMock>());
 
-        _executorProxy = std::make_unique<TaskExecutorMock>(&getExecutor());
+        _executorProxy = std::make_shared<TaskExecutorMock>(&getExecutor());
 
         _myLastOpTime = OpTime({3, 0}, 1);
 

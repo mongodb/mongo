@@ -144,7 +144,7 @@ const WriteConcernOptions kMajorityWriteConcern(WriteConcernOptions::kMajority,
 class MigrationUtilExecutor {
 public:
     MigrationUtilExecutor()
-        : _executor(std::make_shared<executor::ThreadPoolTaskExecutor>(
+        : _executor(executor::ThreadPoolTaskExecutor::create(
               _makePool(), executor::makeNetworkInterface("MigrationUtil-TaskExecutor"))) {}
 
     void shutDownAndJoin() {

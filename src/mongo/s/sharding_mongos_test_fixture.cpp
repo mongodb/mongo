@@ -103,17 +103,14 @@
 
 namespace mongo {
 
-using executor::NetworkInterfaceMock;
 using executor::NetworkTestEnv;
 using executor::RemoteCommandRequest;
-using executor::ShardingTaskExecutor;
 
 namespace {
 
-std::unique_ptr<ShardingTaskExecutor> makeShardingTestExecutor(
-    std::unique_ptr<NetworkInterfaceMock> net) {
-    auto testExecutor = makeThreadPoolTestExecutor(std::move(net));
-    return std::make_unique<ShardingTaskExecutor>(std::move(testExecutor));
+std::shared_ptr<executor::ShardingTaskExecutor> makeShardingTestExecutor(
+    std::unique_ptr<executor::NetworkInterfaceMock> net) {
+    return executor::ShardingTaskExecutor::create(makeThreadPoolTestExecutor(std::move(net)));
 }
 
 }  // namespace

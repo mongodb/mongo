@@ -69,7 +69,8 @@ namespace {
 const std::string kOperationTimeField = "operationTime";
 }
 
-ShardingTaskExecutor::ShardingTaskExecutor(std::unique_ptr<ThreadPoolTaskExecutor> executor)
+ShardingTaskExecutor::ShardingTaskExecutor(Passkey,
+                                           std::shared_ptr<ThreadPoolTaskExecutor> executor)
     : _executor(std::move(executor)) {}
 
 void ShardingTaskExecutor::startup() {

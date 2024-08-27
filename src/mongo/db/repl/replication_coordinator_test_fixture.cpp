@@ -187,8 +187,7 @@ void ReplCoordTest::init() {
         cc().setSystemOperationUnkillableByStepdown(lk);
     };
     auto pool = std::make_unique<executor::ThreadPoolMock>(_net, seed, tpOptions);
-    auto replExec =
-        std::make_unique<executor::ThreadPoolTaskExecutor>(std::move(pool), std::move(net));
+    auto replExec = executor::ThreadPoolTaskExecutor::create(std::move(pool), std::move(net));
     _replExec = replExec.get();
     _repl = std::make_unique<ReplicationCoordinatorImpl>(service,
                                                          _settings,

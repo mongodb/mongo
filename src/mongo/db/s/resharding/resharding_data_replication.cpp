@@ -177,7 +177,7 @@ std::shared_ptr<executor::TaskExecutor> ReshardingDataReplication::_makeOplogFet
     threadPoolOptions.threadNamePrefix = prefix + "-";
     threadPoolOptions.poolName = prefix + "ThreadPool";
 
-    auto executor = std::make_shared<executor::ThreadPoolTaskExecutor>(
+    auto executor = executor::ThreadPoolTaskExecutor::create(
         std::make_unique<ThreadPool>(std::move(threadPoolOptions)),
         executor::makeNetworkInterface(prefix + "Network"));
 
@@ -204,7 +204,7 @@ std::shared_ptr<executor::TaskExecutor> ReshardingDataReplication::_makeCollecti
         AuthorizationSession::get(*client)->grantInternalAuthorization(client);
     };
 
-    auto executor = std::make_shared<executor::ThreadPoolTaskExecutor>(
+    auto executor = executor::ThreadPoolTaskExecutor::create(
         std::make_unique<ThreadPool>(std::move(threadPoolOptions)),
         executor::makeNetworkInterface(prefix + "Network"));
 

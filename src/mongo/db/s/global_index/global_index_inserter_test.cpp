@@ -139,7 +139,7 @@ private:
         threadPoolOptions.threadNamePrefix = "TestGlobalIndexCloner-";
         threadPoolOptions.poolName = "TestGlobalIndexClonerThreadPool";
 
-        auto executor = std::make_shared<executor::ThreadPoolTaskExecutor>(
+        auto executor = executor::ThreadPoolTaskExecutor::create(
             std::make_unique<ThreadPool>(std::move(threadPoolOptions)),
             executor::makeNetworkInterface("TestGlobalIndexClonerNetwork", nullptr, nullptr));
         executor->startup();

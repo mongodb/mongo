@@ -560,7 +560,7 @@ std::shared_ptr<executor::TaskExecutor> ServerDiscoveryMonitor::_setupExecutor(
     auto net = executor::makeNetworkInterface(
         "ServerDiscoveryMonitor-TaskExecutor", nullptr, std::move(hookList));
     auto pool = std::make_unique<executor::NetworkInterfaceThreadPool>(net.get());
-    auto result = std::make_shared<ThreadPoolTaskExecutor>(std::move(pool), std::move(net));
+    auto result = ThreadPoolTaskExecutor::create(std::move(pool), std::move(net));
     result->startup();
     return result;
 }

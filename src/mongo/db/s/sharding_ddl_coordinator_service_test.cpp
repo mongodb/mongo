@@ -106,7 +106,7 @@ public:
             Client::initThread(threadName.c_str(), getGlobalServiceContext()->getService());
         };
 
-        auto executor = std::make_shared<executor::ThreadPoolTaskExecutor>(
+        auto executor = executor::ThreadPoolTaskExecutor::create(
             std::make_unique<ThreadPool>(threadPoolOptions),
             executor::makeNetworkInterface(
                 "ShardingDDLCoordinatorServiceTestNetwork", nullptr, nullptr));

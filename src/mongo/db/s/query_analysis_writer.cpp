@@ -403,7 +403,7 @@ void QueryAnalysisWriter::onStartup(OperationContext* opCtx) {
                                             opCtx->getService()](const std::string& threadName) {
         Client::initThread(threadName.c_str(), service);
     };
-    _executor = std::make_shared<executor::ThreadPoolTaskExecutor>(
+    _executor = executor::ThreadPoolTaskExecutor::create(
         std::make_unique<ThreadPool>(threadPoolOptions),
         executor::makeNetworkInterface("QueryAnalysisWriterNetwork"));
     _executor->startup();

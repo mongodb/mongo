@@ -60,7 +60,7 @@ public:
         auto network = std::make_unique<executor::NetworkInterfaceMock>();
         _network = network.get();
 
-        _executor = makeSharedThreadPoolTestExecutor(std::move(network));
+        _executor = makeThreadPoolTestExecutor(std::move(network));
         _executor->startup();
     }
 

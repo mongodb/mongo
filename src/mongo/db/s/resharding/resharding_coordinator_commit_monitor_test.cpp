@@ -152,7 +152,7 @@ auto makeExecutor() {
         Client::initThread("executor", getGlobalServiceContext()->getService());
     };
     auto net = std::make_unique<executor::NetworkInterfaceMock>();
-    return executor::makeSharedThreadPoolTestExecutor(std::move(net), std::move(options));
+    return executor::makeThreadPoolTestExecutor(std::move(net), std::move(options));
 }
 
 void CoordinatorCommitMonitorTest::setUp() {
