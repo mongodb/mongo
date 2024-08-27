@@ -96,6 +96,18 @@ env.CppLibfuzzerTest(
 )
 
 env.CppLibfuzzerTest(
+    target="bsoncolumn_builder_fuzzer",
+    source=[
+        "bsoncolumn_builder_fuzzer.cpp",
+    ],
+    LIBDEPS=[
+        "$BUILD_DIR/mongo/base",
+        "$BUILD_DIR/mongo/bson/bson_validate",
+        "bson_column",
+    ],
+)
+
+env.CppLibfuzzerTest(
     target="bsoncolumn_decompress_paths_fuzzer",
     source=[
         "bsoncolumn_decompress_paths_fuzzer.cpp",
