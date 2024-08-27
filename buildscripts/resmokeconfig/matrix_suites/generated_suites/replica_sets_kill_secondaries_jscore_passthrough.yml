@@ -9,8 +9,8 @@
 executor:
   archive:
     hooks:
-    - LagOplogApplicationInBackground
-    - PeriodicKillSecondaries
+      - LagOplogApplicationInBackground
+      - PeriodicKillSecondaries
     tests: true
   config:
     shell_options:
@@ -34,26 +34,26 @@ executor:
         electionTimeoutMillis: 5000
     voting_secondaries: false
   hooks:
-  - class: LagOplogApplicationInBackground
-    shell_options:
-      nodb: ''
-  - class: PeriodicKillSecondaries
+    - class: LagOplogApplicationInBackground
+      shell_options:
+        nodb: ""
+    - class: PeriodicKillSecondaries
 matrix_suite: true
 selector:
   exclude_files:
-  - jstests/core/**/geo_update_btree.js
-  - jstests/core/**/max_doc_size.js
-  - jstests/core/**/mr_bigobject.js
-  - jstests/core/**/capped_large_docs.js
-  - jstests/core/**/capped_resize.js
-  - jstests/core/**/exhaust.js
-  - jstests/core/**/explain_execution_error.js
-  - jstests/core/**/sortb.js
-  - jstests/core/**/sortg.js
-  - jstests/core/**/sortj.js
+    - jstests/core/**/geo_update_btree.js
+    - jstests/core/**/max_doc_size.js
+    - jstests/core/**/mr_bigobject.js
+    - jstests/core/**/capped_large_docs.js
+    - jstests/core/**/capped_resize.js
+    - jstests/core/**/exhaust.js
+    - jstests/core/**/explain_execution_error.js
+    - jstests/core/**/sortb.js
+    - jstests/core/**/sortg.js
+    - jstests/core/**/sortj.js
   exclude_with_any_tags:
-  - assumes_standalone_mongod
-  - requires_profiling
+    - assumes_standalone_mongod
+    - requires_profiling
   roots:
-  - jstests/core/**/*.js
+    - jstests/core/**/*.js
 test_kind: js_test

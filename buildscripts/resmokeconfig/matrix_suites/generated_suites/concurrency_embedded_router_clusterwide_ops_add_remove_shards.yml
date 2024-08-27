@@ -9,10 +9,10 @@
 executor:
   archive:
     hooks:
-    - CheckReplDBHashInBackground
-    - CheckReplDBHash
-    - CheckMetadataConsistencyInBackground
-    - ValidateCollections
+      - CheckReplDBHashInBackground
+      - CheckReplDBHash
+      - CheckMetadataConsistencyInBackground
+      - ValidateCollections
     tests: true
   config: {}
   fixture:
@@ -33,21 +33,21 @@ executor:
       mongod_options:
         oplogSize: 1024
   hooks:
-  - class: CheckShardFilteringMetadata
-  - class: CheckReplDBHashInBackground
-  - class: CheckReplDBHash
-  - class: CheckMetadataConsistencyInBackground
-  - class: CheckOrphansDeleted
-  - class: CheckRoutingTableConsistency
-  - class: ValidateCollections
-  - class: CleanupConcurrencyWorkloads
+    - class: CheckShardFilteringMetadata
+    - class: CheckReplDBHashInBackground
+    - class: CheckReplDBHash
+    - class: CheckMetadataConsistencyInBackground
+    - class: CheckOrphansDeleted
+    - class: CheckRoutingTableConsistency
+    - class: ValidateCollections
+    - class: CleanupConcurrencyWorkloads
 matrix_suite: true
 selector:
   exclude_with_any_tags:
-  - requires_replication
-  - requires_profiling
-  - does_not_support_add_remove_shards
-  - temp_disabled_embedded_router_uncategorized
+    - requires_replication
+    - requires_profiling
+    - does_not_support_add_remove_shards
+    - temp_disabled_embedded_router_uncategorized
   roots:
-  - jstests/concurrency/fsm_workloads_add_remove_shards/**/*.js
+    - jstests/concurrency/fsm_workloads_add_remove_shards/**/*.js
 test_kind: fsm_workload_test

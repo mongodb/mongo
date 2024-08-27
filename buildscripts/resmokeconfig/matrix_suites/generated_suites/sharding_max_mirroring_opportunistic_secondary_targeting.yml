@@ -6,7 +6,8 @@
 # matrix suite mapping file: buildscripts/resmokeconfig/matrix_suites/mappings/sharding_max_mirroring_opportunistic_secondary_targeting.yml
 # regenerate matrix suites: buildscripts/resmoke.py generate-matrix-suites
 ##########################################################
-description: This suite is a combination of sharding_max_mirroring, and sharding_opportunistic_secondary_targeting.
+description:
+  This suite is a combination of sharding_max_mirroring, and sharding_opportunistic_secondary_targeting.
   You can run any of these tests individually to debug any issues that might arrise.
 executor:
   config:
@@ -15,16 +16,16 @@ executor:
         TestData:
           setParameters:
             defaultConfigCommandTimeoutMS: 90000
-            mirrorReads: '{samplingRate: 1.0}'
+            mirrorReads: "{samplingRate: 1.0}"
           setParametersMongos:
             defaultConfigCommandTimeoutMS: 90000
             opportunisticSecondaryTargeting: true
-      nodb: ''
+      nodb: ""
 matrix_suite: true
 selector:
   exclude_files:
-  - jstests/sharding/**/libs/**/*.js
-  - jstests/sharding/query/mrShardedOutput.js
+    - jstests/sharding/**/libs/**/*.js
+    - jstests/sharding/query/mrShardedOutput.js
   roots:
-  - jstests/sharding/**/*.js
+    - jstests/sharding/**/*.js
 test_kind: js_test

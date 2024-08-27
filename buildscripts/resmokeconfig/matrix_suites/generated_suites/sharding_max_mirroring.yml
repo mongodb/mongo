@@ -13,15 +13,15 @@ executor:
         TestData:
           setParameters:
             defaultConfigCommandTimeoutMS: 90000
-            mirrorReads: '{samplingRate: 1.0}'
+            mirrorReads: "{samplingRate: 1.0}"
           setParametersMongos:
             defaultConfigCommandTimeoutMS: 90000
-      nodb: ''
+      nodb: ""
 matrix_suite: true
 selector:
   exclude_files:
-  - jstests/sharding/**/libs/**/*.js
-  - jstests/sharding/query/mrShardedOutput.js
+    - jstests/sharding/**/libs/**/*.js
+    - jstests/sharding/query/mrShardedOutput.js
   roots:
-  - jstests/sharding/**/*.js
+    - jstests/sharding/**/*.js
 test_kind: js_test

@@ -15,12 +15,12 @@ executor:
         TestData:
           setParameters:
             maxNumberOfTransactionOperationsInSingleOplogEntry: 1
-      nodb: ''
+      nodb: ""
 matrix_suite: true
 selector:
   exclude_files: []
   exclude_with_any_tags:
-  - requires_capped
+    - requires_capped
   roots:
-  - jstests/replsets/*.js
+    - jstests/replsets/*.js
 test_kind: js_test

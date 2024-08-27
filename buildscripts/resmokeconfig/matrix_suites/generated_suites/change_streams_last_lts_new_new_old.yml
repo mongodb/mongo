@@ -9,12 +9,13 @@
 executor:
   archive:
     hooks:
-    - CheckReplDBHash
-    - CheckReplOplogs
-    - ValidateCollections
+      - CheckReplDBHash
+      - CheckReplOplogs
+      - ValidateCollections
   config:
     shell_options:
-      eval: globalThis.testingReplication = true; await import('jstests/libs/override_methods/set_read_and_write_concerns.js');
+      eval:
+        globalThis.testingReplication = true; await import('jstests/libs/override_methods/set_read_and_write_concerns.js');
         await import('jstests/libs/override_methods/enable_causal_consistency_without_read_pref.js');
       global_vars:
         TestData:
@@ -24,22 +25,22 @@ executor:
     class: ReplicaSetFixture
     mixed_bin_versions: new_new_old
     mongod_options:
-      bind_ip_all: ''
+      bind_ip_all: ""
       set_parameters:
         enableTestCommands: 1
     num_nodes: 3
     old_bin_version: last_lts
   hooks:
-  - class: CheckReplOplogs
-  - class: CheckReplDBHash
-  - class: RunQueryStats
-  - class: ValidateCollections
-  - class: CleanEveryN
-    n: 20
+    - class: CheckReplOplogs
+    - class: CheckReplDBHash
+    - class: RunQueryStats
+    - class: ValidateCollections
+    - class: CleanEveryN
+      n: 20
 matrix_suite: true
 selector:
   exclude_with_any_tags:
-  - assumes_write_concern_unchanged
+    - assumes_write_concern_unchanged
   roots:
-  - jstests/change_streams/**/*.js
+    - jstests/change_streams/**/*.js
 test_kind: js_test

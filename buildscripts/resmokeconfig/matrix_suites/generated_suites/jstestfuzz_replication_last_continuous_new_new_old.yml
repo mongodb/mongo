@@ -9,17 +9,17 @@
 executor:
   archive:
     hooks:
-    - CheckReplDBHash
-    - CheckReplOplogs
-    - ValidateCollections
+      - CheckReplDBHash
+      - CheckReplOplogs
+      - ValidateCollections
   config:
     shell_options:
-      crashOnInvalidBSONError: ''
+      crashOnInvalidBSONError: ""
       global_vars:
         TestData:
           disableImplicitSessions: true
           nonClusteredConfigTransactions: true
-      objcheck: ''
+      objcheck: ""
   fixture:
     class: ReplicaSetFixture
     mixed_bin_versions: new_new_old
@@ -31,27 +31,27 @@ executor:
         internalQueryStatsRateLimit: -1
         transactionLifetimeLimitSeconds: 1
         writePeriodicNoops: 1
-      verbose: ''
+      verbose: ""
     num_nodes: 3
     old_bin_version: last_continuous
   hooks:
-  - class: FuzzerRestoreSettings
-  - class: LagOplogApplicationInBackground
-    shell_options:
-      nodb: ''
-  - class: CheckReplOplogs
-  - class: CheckReplDBHash
-    shell_options:
-      global_vars:
-        TestData:
-          skipValidationOnInvalidViewDefinitions: true
-  - class: ValidateCollections
-    shell_options:
-      global_vars:
-        TestData:
-          skipValidationOnInvalidViewDefinitions: true
+    - class: FuzzerRestoreSettings
+    - class: LagOplogApplicationInBackground
+      shell_options:
+        nodb: ""
+    - class: CheckReplOplogs
+    - class: CheckReplDBHash
+      shell_options:
+        global_vars:
+          TestData:
+            skipValidationOnInvalidViewDefinitions: true
+    - class: ValidateCollections
+      shell_options:
+        global_vars:
+          TestData:
+            skipValidationOnInvalidViewDefinitions: true
 matrix_suite: true
 selector:
   roots:
-  - jstestfuzz/out/*.js
+    - jstestfuzz/out/*.js
 test_kind: js_test

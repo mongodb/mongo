@@ -6,24 +6,26 @@
 # matrix suite mapping file: buildscripts/resmokeconfig/matrix_suites/mappings/change_streams_change_collection_replica_sets_stepdown_primary_jscore_passthrough.yml
 # regenerate matrix suites: buildscripts/resmoke.py generate-matrix-suites
 ##########################################################
-description: 'Run test suites with a replica set and multitenancy enabled. Simulate
+description:
+  "Run test suites with a replica set and multitenancy enabled. Simulate
   Atlas Proxy behavior
 
   by overriding and injecting unsigned security token and tenant prefix.
 
-  '
+  "
 executor:
   archive:
     hooks:
-    - CheckReplDBHash
-    - CheckReplOplogs
-    - CheckReplPreImagesConsistency
-    - CheckReplChangeCollectionConsistency
-    - ValidateCollections
+      - CheckReplDBHash
+      - CheckReplOplogs
+      - CheckReplPreImagesConsistency
+      - CheckReplChangeCollectionConsistency
+      - ValidateCollections
     tests: true
   config:
     shell_options:
-      eval: globalThis.testingReplication = true; await import('jstests/libs/override_methods/network_error_and_txn_override.js');
+      eval:
+        globalThis.testingReplication = true; await import('jstests/libs/override_methods/network_error_and_txn_override.js');
         globalThis.db = connect(TestData.connectionString); await import("jstests/libs/override_methods/enable_sessions.js");
         await import("jstests/libs/override_methods/set_read_and_write_concerns.js");
         await import("jstests/libs/override_methods/fail_unclean_shutdown_incompatible_commands.js");
@@ -49,13 +51,13 @@ executor:
           tenantId: 636d957b2646ddfaf9b5e13f
           useResponsePrefixChecking: true
           useSecurityToken: true
-      nodb: ''
+      nodb: ""
   fixture:
     all_nodes_electable: true
     class: ReplicaSetFixture
     mongod_options:
-      bind_ip_all: ''
-      noscripting: ''
+      bind_ip_all: ""
+      noscripting: ""
       serverless: true
       set_parameters:
         changeCollectionExpiredDocumentsRemoverJobSleepSeconds: 1
@@ -82,84 +84,84 @@ executor:
         catchUpTimeoutMillis: 0
     replset_name: ChangeStreamMultitenantReplSet
   hooks:
-  - class: EnableChangeStream
-    tenant_id: 636d957b2646ddfaf9b5e13f
-  - class: ContinuousStepdown
-    kill: false
-    terminate: false
-  - class: CheckReplOplogs
-  - class: CheckReplPreImagesConsistency
-  - class: CheckReplChangeCollectionConsistency
-  - class: CheckReplDBHash
-  - class: ValidateCollections
-    shell_options:
-      global_vars:
-        TestData:
-          skipEnforceFastCountOnValidate: true
-  - class: CleanEveryN
-    n: 20
+    - class: EnableChangeStream
+      tenant_id: 636d957b2646ddfaf9b5e13f
+    - class: ContinuousStepdown
+      kill: false
+      terminate: false
+    - class: CheckReplOplogs
+    - class: CheckReplPreImagesConsistency
+    - class: CheckReplChangeCollectionConsistency
+    - class: CheckReplDBHash
+    - class: ValidateCollections
+      shell_options:
+        global_vars:
+          TestData:
+            skipEnforceFastCountOnValidate: true
+    - class: CleanEveryN
+      n: 20
 matrix_suite: true
 selector:
   exclude_files:
-  - jstests/core/query/explain/explain_agg_write_concern.js
-  - jstests/aggregation/sources/out/replace_collection.js
-  - jstests/aggregation/explain_writing_aggs.js
-  - jstests/core/administrative/builtin_roles_external.js
-  - jstests/aggregation/sources/lookup/lookup_query_stats.js
-  - jstests/aggregation/view_resolution_namespace_collision.js
-  - jstests/core/txns/**/*.js
-  - jstests/core/**/operation_latency_histogram.js
-  - jstests/core/**/profile2.js
-  - jstests/core/**/profile3.js
-  - jstests/core/**/profile_findandmodify.js
-  - jstests/core/**/top.js
-  - jstests/core/views/views_stats.js
-  - jstests/core/**/crud_api.js
-  - jstests/core/**/find_and_modify.js
-  - jstests/core/**/find_and_modify2.js
-  - jstests/core/**/find_and_modify_server6865.js
-  - jstests/core/**/project_with_collation.js
-  - jstests/core/**/currentop.js
-  - jstests/core/**/fsync.js
-  - jstests/core/**/explain_upsert.js
-  - jstests/core/**/indexes_multiple_commands.js
-  - jstests/core/**/create_indexes.js
-  - jstests/core/**/objid5.js
-  - jstests/core/**/coveredIndex1.js
-  - jstests/core/**/sortc.js
-  - jstests/core/**/bench_test*.js
-  - jstests/core/**/benchrun_pipeline_updates.js
-  - jstests/core/**/connection_string_validation.js
-  - jstests/core/**/explain_large_bounds.js
-  - jstests/core/**/list_collections_filter.js
-  - jstests/core/**/startup_log.js
-  - jstests/core/**/shell_connection_strings.js
-  - jstests/core/**/geo_s2ordering.js
-  - jstests/core/mixed_version_replica_set.js
-  - jstests/aggregation/**/*.js
+    - jstests/core/query/explain/explain_agg_write_concern.js
+    - jstests/aggregation/sources/out/replace_collection.js
+    - jstests/aggregation/explain_writing_aggs.js
+    - jstests/core/administrative/builtin_roles_external.js
+    - jstests/aggregation/sources/lookup/lookup_query_stats.js
+    - jstests/aggregation/view_resolution_namespace_collision.js
+    - jstests/core/txns/**/*.js
+    - jstests/core/**/operation_latency_histogram.js
+    - jstests/core/**/profile2.js
+    - jstests/core/**/profile3.js
+    - jstests/core/**/profile_findandmodify.js
+    - jstests/core/**/top.js
+    - jstests/core/views/views_stats.js
+    - jstests/core/**/crud_api.js
+    - jstests/core/**/find_and_modify.js
+    - jstests/core/**/find_and_modify2.js
+    - jstests/core/**/find_and_modify_server6865.js
+    - jstests/core/**/project_with_collation.js
+    - jstests/core/**/currentop.js
+    - jstests/core/**/fsync.js
+    - jstests/core/**/explain_upsert.js
+    - jstests/core/**/indexes_multiple_commands.js
+    - jstests/core/**/create_indexes.js
+    - jstests/core/**/objid5.js
+    - jstests/core/**/coveredIndex1.js
+    - jstests/core/**/sortc.js
+    - jstests/core/**/bench_test*.js
+    - jstests/core/**/benchrun_pipeline_updates.js
+    - jstests/core/**/connection_string_validation.js
+    - jstests/core/**/explain_large_bounds.js
+    - jstests/core/**/list_collections_filter.js
+    - jstests/core/**/startup_log.js
+    - jstests/core/**/shell_connection_strings.js
+    - jstests/core/**/geo_s2ordering.js
+    - jstests/core/mixed_version_replica_set.js
+    - jstests/aggregation/**/*.js
   exclude_with_any_tags:
-  - simulate_atlas_proxy_incompatible
-  - not_allowed_with_signed_security_token
-  - command_not_supported_in_serverless
-  - assumes_standalone_mongod
-  - requires_capped
-  - requires_scripting
-  - requires_profiling
-  - requires_auth
-  - uses_transactions
-  - assumes_standalone_mongod
-  - requires_getmore
-  - requires_non_retryable_writes
-  - requires_non_retryable_commands
-  - does_not_support_stepdowns
-  - assumes_read_concern_unchanged
-  - assumes_write_concern_unchanged
-  - requires_fastcount
-  - requires_dbstats
-  - requires_collstats
-  - operations_longer_than_stepdown_interval
-  - uses_parallel_shell
+    - simulate_atlas_proxy_incompatible
+    - not_allowed_with_signed_security_token
+    - command_not_supported_in_serverless
+    - assumes_standalone_mongod
+    - requires_capped
+    - requires_scripting
+    - requires_profiling
+    - requires_auth
+    - uses_transactions
+    - assumes_standalone_mongod
+    - requires_getmore
+    - requires_non_retryable_writes
+    - requires_non_retryable_commands
+    - does_not_support_stepdowns
+    - assumes_read_concern_unchanged
+    - assumes_write_concern_unchanged
+    - requires_fastcount
+    - requires_dbstats
+    - requires_collstats
+    - operations_longer_than_stepdown_interval
+    - uses_parallel_shell
   roots:
-  - jstests/core/**/*.js
-  - jstests/aggregation/**/*.js
+    - jstests/core/**/*.js
+    - jstests/aggregation/**/*.js
 test_kind: js_test

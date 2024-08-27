@@ -7,8 +7,8 @@
 # regenerate matrix suites: buildscripts/resmoke.py generate-matrix-suites
 ##########################################################
 config_variables:
-- jstests/libs/authTestsKey
-- Thiskeyisonlyforrunningthesuitewithauthenticationdontuseitinanytestsdirectly
+  - jstests/libs/authTestsKey
+  - Thiskeyisonlyforrunningthesuitewithauthenticationdontuseitinanytestsdirectly
 executor:
   config:
     shell_options:
@@ -22,18 +22,18 @@ executor:
           setParameters:
             bsonTestValidationVersion: 1
           skipEnforceTimeseriesBucketsAreAlwaysCompressedOnValidate: true
-      nodb: ''
+      nodb: ""
       password: Thiskeyisonlyforrunningthesuitewithauthenticationdontuseitinanytestsdirectly
       username: __system
 matrix_suite: true
 selector:
   exclude_files:
-  - jstests/multiVersion/libs/*.js
-  - jstests/multiVersion/genericBinVersion/minor_version_tags_new_old_new.js
-  - jstests/multiVersion/genericSetFCVUsage/crash_mongos_against_upgraded_cluster.js
-  - jstests/multiVersion/genericBinVersion/load_keys_on_upgrade.js
+    - jstests/multiVersion/libs/*.js
+    - jstests/multiVersion/genericBinVersion/minor_version_tags_new_old_new.js
+    - jstests/multiVersion/genericSetFCVUsage/crash_mongos_against_upgraded_cluster.js
+    - jstests/multiVersion/genericBinVersion/load_keys_on_upgrade.js
   exclude_with_any_tags:
-  - DISABLED_TEMPORARILY_DUE_TO_FCV_UPGRADE
+    - DISABLED_TEMPORARILY_DUE_TO_FCV_UPGRADE
   roots:
-  - jstests/multiVersion/**/*.js
+    - jstests/multiVersion/**/*.js
 test_kind: js_test

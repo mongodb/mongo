@@ -6,17 +6,19 @@
 # matrix suite mapping file: buildscripts/resmokeconfig/matrix_suites/mappings/change_streams_secondary_reads_sharded_collections.yml
 # regenerate matrix suites: buildscripts/resmoke.py generate-matrix-suites
 ##########################################################
-description: This suite is a combination of change_streams_mongos_passthrough, change_streams_secondary_reads,
+description:
+  This suite is a combination of change_streams_mongos_passthrough, change_streams_secondary_reads,
   and change_streams_sharded_collections_passthrough. You can run any of these tests
   individually to debug any issues that might arrise.
 executor:
   archive:
     hooks:
-    - CheckReplDBHash
-    - ValidateCollections
+      - CheckReplDBHash
+      - ValidateCollections
   config:
     shell_options:
-      eval: globalThis.testingReplication = true; await import('jstests/libs/override_methods/set_read_and_write_concerns.js');;
+      eval:
+        globalThis.testingReplication = true; await import('jstests/libs/override_methods/set_read_and_write_concerns.js');;
         await import('jstests/libs/override_methods/set_read_preference_secondary.js');;
         await import('jstests/libs/override_methods/implicitly_shard_accessed_collections.js');
       global_vars:
@@ -25,7 +27,7 @@ executor:
   fixture:
     class: ShardedClusterFixture
     mongod_options:
-      bind_ip_all: ''
+      bind_ip_all: ""
       set_parameters:
         coordinateCommitReturnImmediatelyAfterPersistingDecision: true
         enableTestCommands: 1
@@ -37,7 +39,7 @@ executor:
         periodicNoopIntervalSecs: 1
         writePeriodicNoops: true
     mongos_options:
-      bind_ip_all: ''
+      bind_ip_all: ""
       set_parameters:
         enableTestCommands: 1
         logComponentVerbosity:
@@ -48,20 +50,20 @@ executor:
           verbosity: 0
     num_rs_nodes_per_shard: 2
   hooks:
-  - class: CheckReplDBHash
-  - class: ValidateCollections
-  - class: CleanEveryN
-    n: 20
+    - class: CheckReplDBHash
+    - class: ValidateCollections
+    - class: CleanEveryN
+      n: 20
 matrix_suite: true
 selector:
   exclude_files:
-  - jstests/change_streams/only_wake_getmore_for_relevant_changes.js
+    - jstests/change_streams/only_wake_getmore_for_relevant_changes.js
   exclude_with_any_tags:
-  - assumes_write_concern_unchanged
-  - assumes_against_mongod_not_mongos
-  - assumes_unsharded_collection
-  - assumes_no_implicit_collection_creation_on_get_collection
-  - assumes_read_preference_unchanged
+    - assumes_write_concern_unchanged
+    - assumes_against_mongod_not_mongos
+    - assumes_unsharded_collection
+    - assumes_no_implicit_collection_creation_on_get_collection
+    - assumes_read_preference_unchanged
   roots:
-  - jstests/change_streams/**/*.js
+    - jstests/change_streams/**/*.js
 test_kind: js_test

@@ -9,36 +9,37 @@
 executor:
   archive:
     hooks:
-    - ValidateCollections
+      - ValidateCollections
   config:
     shell_options:
-      crashOnInvalidBSONError: ''
-      eval: await import("jstests/libs/override_methods/detect_spawning_own_mongod.js");;
+      crashOnInvalidBSONError: ""
+      eval:
+        await import("jstests/libs/override_methods/detect_spawning_own_mongod.js");;
         await import("jstests/libs/override_methods/rerun_queries.js");
-      objcheck: ''
+      objcheck: ""
   fixture:
     class: MongoDFixture
     mongod_options:
       set_parameters:
         enableTestCommands: 1
   hooks:
-  - class: ValidateCollections
-    shell_options:
-      global_vars:
-        TestData:
-          skipValidationOnNamespaceNotFound: false
-  - class: CleanEveryN
-    n: 20
+    - class: ValidateCollections
+      shell_options:
+        global_vars:
+          TestData:
+            skipValidationOnNamespaceNotFound: false
+    - class: CleanEveryN
+      n: 20
 matrix_suite: true
 selector:
   exclude_files:
-  - jstests/core/txns/**/*.js
-  - jstests/core/queryable_encryption/**/*.js
-  - jstests/core/query/query_settings/**/*.js
+    - jstests/core/txns/**/*.js
+    - jstests/core/queryable_encryption/**/*.js
+    - jstests/core/query/query_settings/**/*.js
   exclude_with_any_tags:
-  - does_not_support_repeated_reads
-  - requires_profiling
+    - does_not_support_repeated_reads
+    - requires_profiling
   roots:
-  - jstests/core/**/*.js
-  - jstests/core_standalone/**/*.js
+    - jstests/core/**/*.js
+    - jstests/core_standalone/**/*.js
 test_kind: js_test

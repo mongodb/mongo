@@ -12,11 +12,11 @@ executor:
       global_vars:
         TestData:
           setParameters:
-            mirrorReads: '{samplingRate: 1.0}'
-      nodb: ''
+            mirrorReads: "{samplingRate: 1.0}"
+      nodb: ""
 matrix_suite: true
 selector:
   exclude_files: null
   roots:
-  - jstests/replsets/*.js
+    - jstests/replsets/*.js
 test_kind: js_test

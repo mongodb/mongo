@@ -16,11 +16,11 @@ executor:
           setParametersMongos:
             defaultConfigCommandTimeoutMS: 90000
             opportunisticSecondaryTargeting: true
-      nodb: ''
+      nodb: ""
 matrix_suite: true
 selector:
   exclude_files:
-  - jstests/sharding/**/libs/**/*.js
+    - jstests/sharding/**/libs/**/*.js
   roots:
-  - jstests/sharding/**/*.js
+    - jstests/sharding/**/*.js
 test_kind: js_test

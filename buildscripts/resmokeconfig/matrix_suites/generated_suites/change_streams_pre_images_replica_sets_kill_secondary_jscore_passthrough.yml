@@ -9,7 +9,7 @@
 executor:
   archive:
     hooks:
-    - PeriodicKillSecondaries
+      - PeriodicKillSecondaries
     tests: true
   config:
     shell_options:
@@ -20,8 +20,8 @@ executor:
       set_parameters:
         enableTestCommands: 1
         expiredChangeStreamPreImageRemovalJobSleepSecs: 1
-        failpoint.preImagesEnabledOnAllCollectionsByDefault: '{mode: ''alwaysOn''}'
-        failpoint.preImagesTruncateOnlyOnSecondaries: '{mode: ''alwaysOn''}'
+        failpoint.preImagesEnabledOnAllCollectionsByDefault: "{mode: 'alwaysOn'}"
+        failpoint.preImagesTruncateOnlyOnSecondaries: "{mode: 'alwaysOn'}"
         logComponentVerbosity:
           replication:
             heartbeats: 2
@@ -38,29 +38,29 @@ executor:
         electionTimeoutMillis: 5000
     voting_secondaries: false
   hooks:
-  - class: PeriodicKillSecondaries
-  - class: ClusterParameter
-    key: changeStreamOptions
-    value:
-      preAndPostImages:
-        expireAfterSeconds: 10
+    - class: PeriodicKillSecondaries
+    - class: ClusterParameter
+      key: changeStreamOptions
+      value:
+        preAndPostImages:
+          expireAfterSeconds: 10
 matrix_suite: true
 selector:
   exclude_files:
-  - jstests/core/**/geo_update_btree.js
-  - jstests/core/**/max_doc_size.js
-  - jstests/core/**/mr_bigobject.js
-  - jstests/core/**/capped_large_docs.js
-  - jstests/core/**/capped_resize.js
-  - jstests/core/**/exhaust.js
-  - jstests/core/**/explain_execution_error.js
-  - jstests/core/**/sortb.js
-  - jstests/core/**/sortg.js
-  - jstests/core/**/sortj.js
+    - jstests/core/**/geo_update_btree.js
+    - jstests/core/**/max_doc_size.js
+    - jstests/core/**/mr_bigobject.js
+    - jstests/core/**/capped_large_docs.js
+    - jstests/core/**/capped_resize.js
+    - jstests/core/**/exhaust.js
+    - jstests/core/**/explain_execution_error.js
+    - jstests/core/**/sortb.js
+    - jstests/core/**/sortg.js
+    - jstests/core/**/sortj.js
   exclude_with_any_tags:
-  - assumes_standalone_mongod
-  - requires_profiling
-  - incompatible_with_preimages_by_default
+    - assumes_standalone_mongod
+    - requires_profiling
+    - incompatible_with_preimages_by_default
   roots:
-  - jstests/core/**/*.js
+    - jstests/core/**/*.js
 test_kind: js_test

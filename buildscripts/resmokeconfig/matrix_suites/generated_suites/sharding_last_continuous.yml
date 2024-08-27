@@ -9,7 +9,7 @@
 executor:
   archive:
     tests:
-    - jstests/sharding/*reshard*.js
+      - jstests/sharding/*reshard*.js
   config:
     shell_options:
       global_vars:
@@ -21,20 +21,20 @@ executor:
           setParametersMongos:
             defaultConfigCommandTimeoutMS: 90000
           useRandomBinVersionsWithinReplicaSet: last-continuous
-      nodb: ''
+      nodb: ""
 matrix_suite: true
 selector:
   exclude_files:
-  - jstests/sharding/**/libs/**/*.js
-  - jstests/sharding/query/merge_command_options.js
-  - jstests/sharding/max_time_ms_enforced_on_shard.js
-  - jstests/sharding/drop_indexes_with_stale_config_error.js
-  - jstests/sharding/query/merge_write_concern.js
+    - jstests/sharding/**/libs/**/*.js
+    - jstests/sharding/query/merge_command_options.js
+    - jstests/sharding/max_time_ms_enforced_on_shard.js
+    - jstests/sharding/drop_indexes_with_stale_config_error.js
+    - jstests/sharding/query/merge_write_concern.js
   exclude_with_any_tags:
-  - multiversion_incompatible
-  - backport_required_multiversion
-  - replica_sets_multiversion_backport_required_multiversion
-  - DISABLED_TEMPORARILY_DUE_TO_FCV_UPGRADE
+    - multiversion_incompatible
+    - backport_required_multiversion
+    - replica_sets_multiversion_backport_required_multiversion
+    - DISABLED_TEMPORARILY_DUE_TO_FCV_UPGRADE
   roots:
-  - jstests/sharding/**/*.js
+    - jstests/sharding/**/*.js
 test_kind: js_test

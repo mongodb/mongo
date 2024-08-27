@@ -9,12 +9,12 @@
 executor:
   archive:
     hooks:
-    - ValidateCollections
+      - ValidateCollections
   config:
     shell_options:
-      crashOnInvalidBSONError: ''
+      crashOnInvalidBSONError: ""
       eval: await import("jstests/libs/override_methods/detect_spawning_own_mongod.js");
-      objcheck: ''
+      objcheck: ""
   fixture:
     class: MongoDFixture
     mongod_options:
@@ -22,23 +22,23 @@ executor:
         enableTestCommands: 1
         internalQueryFindCommandBatchSize: 2
   hooks:
-  - class: ValidateCollections
-    shell_options:
-      global_vars:
-        TestData:
-          skipValidationOnNamespaceNotFound: false
-  - class: CleanEveryN
-    n: 20
+    - class: ValidateCollections
+      shell_options:
+        global_vars:
+          TestData:
+            skipValidationOnNamespaceNotFound: false
+    - class: CleanEveryN
+      n: 20
 matrix_suite: true
 selector:
   exclude_files:
-  - jstests/core/txns/**/*.js
-  - jstests/core/queryable_encryption/**/*.js
-  - jstests/core/query/query_settings/**/*.js
-  - jstests/core/**/express.js
-  - jstests/core/query/sort/sortk.js
-  - jstests/core/query/sort/sorth.js
+    - jstests/core/txns/**/*.js
+    - jstests/core/queryable_encryption/**/*.js
+    - jstests/core/query/query_settings/**/*.js
+    - jstests/core/**/express.js
+    - jstests/core/query/sort/sortk.js
+    - jstests/core/query/sort/sorth.js
   roots:
-  - jstests/core/**/*.js
-  - jstests/core_standalone/**/*.js
+    - jstests/core/**/*.js
+    - jstests/core_standalone/**/*.js
 test_kind: js_test

@@ -9,11 +9,12 @@
 executor:
   archive:
     hooks:
-    - CheckReplDBHash
-    - ValidateCollections
+      - CheckReplDBHash
+      - ValidateCollections
   config:
     shell_options:
-      eval: globalThis.testingReplication = true; await import('jstests/libs/override_methods/set_read_and_write_concerns.js');;
+      eval:
+        globalThis.testingReplication = true; await import('jstests/libs/override_methods/set_read_and_write_concerns.js');;
         await import('jstests/libs/override_methods/implicit_whole_cluster_changestreams.js');;
         await import('jstests/libs/override_methods/enable_causal_consistency_without_read_pref.js');
       global_vars:
@@ -22,27 +23,27 @@ executor:
   fixture:
     class: ShardedClusterFixture
     mongod_options:
-      bind_ip_all: ''
+      bind_ip_all: ""
       set_parameters:
         enableTestCommands: 1
         periodicNoopIntervalSecs: 1
         writePeriodicNoops: true
     mongos_options:
-      bind_ip_all: ''
+      bind_ip_all: ""
       set_parameters:
         enableTestCommands: 1
     num_shards: 2
   hooks:
-  - class: CheckReplDBHash
-  - class: ValidateCollections
-  - class: CleanEveryN
-    n: 20
+    - class: CheckReplDBHash
+    - class: ValidateCollections
+    - class: CleanEveryN
+      n: 20
 matrix_suite: true
 selector:
   exclude_with_any_tags:
-  - assumes_write_concern_unchanged
-  - do_not_run_in_whole_cluster_passthrough
-  - assumes_against_mongod_not_mongos
+    - assumes_write_concern_unchanged
+    - do_not_run_in_whole_cluster_passthrough
+    - assumes_against_mongod_not_mongos
   roots:
-  - jstests/change_streams/**/*.js
+    - jstests/change_streams/**/*.js
 test_kind: js_test

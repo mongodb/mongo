@@ -72,7 +72,7 @@ directory. These files may be edited for local testing but must remain consisten
 files. There is a task in the commit queue that enforces this. To generate a new version of these
 matrix suites, you may run `python3 ./buildscripts/resmoke.py generate-matrix-suites`. This commands
 will overwrite the current generated matrix suites on disk so make sure you do not have any unsaved
-changes to these files.
+changes to these files. Finally, run `bazel run //:format` to ensure consistent formatting.
 
 ## Validating matrix suites
 

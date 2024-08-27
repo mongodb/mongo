@@ -9,10 +9,10 @@
 executor:
   archive:
     hooks:
-    - CheckReplDBHashInBackground
-    - CheckReplDBHash
-    - CheckMetadataConsistencyInBackground
-    - ValidateCollections
+      - CheckReplDBHashInBackground
+      - CheckReplDBHash
+      - CheckMetadataConsistencyInBackground
+      - ValidateCollections
     tests: true
   config:
     shell_options:
@@ -52,57 +52,57 @@ executor:
       mongod_options:
         oplogSize: 1024
   hooks:
-  - class: CheckShardFilteringMetadata
-  - class: CheckReplDBHashInBackground
-  - class: CheckReplDBHash
-  - class: CheckMetadataConsistencyInBackground
-  - class: CheckOrphansDeleted
-  - class: CheckRoutingTableConsistency
-  - class: ValidateCollections
-  - class: CleanupConcurrencyWorkloads
+    - class: CheckShardFilteringMetadata
+    - class: CheckReplDBHashInBackground
+    - class: CheckReplDBHash
+    - class: CheckMetadataConsistencyInBackground
+    - class: CheckOrphansDeleted
+    - class: CheckRoutingTableConsistency
+    - class: ValidateCollections
+    - class: CleanupConcurrencyWorkloads
 matrix_suite: true
 selector:
   exclude_files:
-  - jstests/concurrency/fsm_workloads/auth_create_role.js
-  - jstests/concurrency/fsm_workloads/auth_create_user.js
-  - jstests/concurrency/fsm_workloads/auth_drop_role.js
-  - jstests/concurrency/fsm_workloads/auth_drop_user.js
-  - jstests/concurrency/fsm_workloads/agg_group_external.js
-  - jstests/concurrency/fsm_workloads/agg_sort_external.js
-  - jstests/concurrency/fsm_workloads/compact.js
-  - jstests/concurrency/fsm_workloads/compact_while_creating_indexes.js
-  - jstests/concurrency/fsm_workloads/findAndModify_update_grow.js
-  - jstests/concurrency/fsm_workloads/plan_cache_drop_database.js
-  - jstests/concurrency/fsm_workloads/reindex.js
-  - jstests/concurrency/fsm_workloads/reindex_background.js
-  - jstests/concurrency/fsm_workloads/reindex_writeconflict.js
-  - jstests/concurrency/fsm_workloads/collmod_writeconflict.js
-  - jstests/concurrency/fsm_workloads/agg_out_interrupt_cleanup.js
-  - jstests/concurrency/fsm_workloads/timeseries_agg_out_interrupt_cleanup.js
-  - jstests/concurrency/fsm_workloads/multi_statement_transaction_atomicity_isolation_metrics_test.js
-  - jstests/concurrency/fsm_workloads/multi_statement_transaction_all_commands_same_session.js
-  - jstests/concurrency/fsm_workloads/drop_index_during_replan.js
-  - jstests/concurrency/fsm_workloads/drop_index_during_lookup.js
-  - jstests/concurrency/fsm_workloads/create_index_background.js
-  - jstests/concurrency/fsm_workloads/create_index_background_partial_filter.js
-  - jstests/concurrency/fsm_workloads/create_index_background_wildcard.js
-  - jstests/concurrency/fsm_workloads/update_rename.js
-  - jstests/concurrency/fsm_workloads/update_rename_noindex.js
-  - jstests/concurrency/fsm_workloads/timeseries_insert_idle_bucket_expiration.js
-  - jstests/concurrency/fsm_workloads/collection_defragmentation.js
+    - jstests/concurrency/fsm_workloads/auth_create_role.js
+    - jstests/concurrency/fsm_workloads/auth_create_user.js
+    - jstests/concurrency/fsm_workloads/auth_drop_role.js
+    - jstests/concurrency/fsm_workloads/auth_drop_user.js
+    - jstests/concurrency/fsm_workloads/agg_group_external.js
+    - jstests/concurrency/fsm_workloads/agg_sort_external.js
+    - jstests/concurrency/fsm_workloads/compact.js
+    - jstests/concurrency/fsm_workloads/compact_while_creating_indexes.js
+    - jstests/concurrency/fsm_workloads/findAndModify_update_grow.js
+    - jstests/concurrency/fsm_workloads/plan_cache_drop_database.js
+    - jstests/concurrency/fsm_workloads/reindex.js
+    - jstests/concurrency/fsm_workloads/reindex_background.js
+    - jstests/concurrency/fsm_workloads/reindex_writeconflict.js
+    - jstests/concurrency/fsm_workloads/collmod_writeconflict.js
+    - jstests/concurrency/fsm_workloads/agg_out_interrupt_cleanup.js
+    - jstests/concurrency/fsm_workloads/timeseries_agg_out_interrupt_cleanup.js
+    - jstests/concurrency/fsm_workloads/multi_statement_transaction_atomicity_isolation_metrics_test.js
+    - jstests/concurrency/fsm_workloads/multi_statement_transaction_all_commands_same_session.js
+    - jstests/concurrency/fsm_workloads/drop_index_during_replan.js
+    - jstests/concurrency/fsm_workloads/drop_index_during_lookup.js
+    - jstests/concurrency/fsm_workloads/create_index_background.js
+    - jstests/concurrency/fsm_workloads/create_index_background_partial_filter.js
+    - jstests/concurrency/fsm_workloads/create_index_background_wildcard.js
+    - jstests/concurrency/fsm_workloads/update_rename.js
+    - jstests/concurrency/fsm_workloads/update_rename_noindex.js
+    - jstests/concurrency/fsm_workloads/timeseries_insert_idle_bucket_expiration.js
+    - jstests/concurrency/fsm_workloads/collection_defragmentation.js
   exclude_with_any_tags:
-  - assumes_balancer_off
-  - assumes_against_mongod_not_mongos
-  - does_not_support_causal_consistency
-  - requires_replication
-  - state_functions_share_cursor
-  - state_functions_share_transaction
-  - assumes_snapshot_transactions
-  - catches_command_failures
-  - requires_profiling
-  - does_not_support_transactions
-  - assumes_unsharded_collection
-  - temp_disabled_embedded_router_uncategorized
+    - assumes_balancer_off
+    - assumes_against_mongod_not_mongos
+    - does_not_support_causal_consistency
+    - requires_replication
+    - state_functions_share_cursor
+    - state_functions_share_transaction
+    - assumes_snapshot_transactions
+    - catches_command_failures
+    - requires_profiling
+    - does_not_support_transactions
+    - assumes_unsharded_collection
+    - temp_disabled_embedded_router_uncategorized
   roots:
-  - jstests/concurrency/fsm_workloads/**/*.js
+    - jstests/concurrency/fsm_workloads/**/*.js
 test_kind: fsm_workload_test

@@ -9,15 +9,16 @@
 executor:
   archive:
     hooks:
-    - RunDBCheckInBackground
-    - CheckReplDBHashInBackground
-    - ValidateCollectionsInBackground
-    - CheckReplDBHash
-    - CheckReplOplogs
-    - ValidateCollections
+      - RunDBCheckInBackground
+      - CheckReplDBHashInBackground
+      - ValidateCollectionsInBackground
+      - CheckReplDBHash
+      - CheckReplOplogs
+      - ValidateCollections
   config:
     shell_options:
-      eval: globalThis.testingReplication = true;; await import('jstests/libs/override_methods/single_crud_op_as_bulk_write.js');;
+      eval:
+        globalThis.testingReplication = true;; await import('jstests/libs/override_methods/single_crud_op_as_bulk_write.js');;
         await import('jstests/libs/override_methods/enable_causal_consistency.js');
   fixture:
     class: ReplicaSetFixture
@@ -26,56 +27,56 @@ executor:
         enableTestCommands: 1
     num_nodes: 2
   hooks:
-  - class: RunDBCheckInBackground
-  - class: CheckReplDBHashInBackground
-  - class: ValidateCollectionsInBackground
-  - class: CheckReplOplogs
-  - class: CheckReplDBHash
-  - class: ValidateCollections
-  - class: CleanEveryN
-    n: 20
+    - class: RunDBCheckInBackground
+    - class: CheckReplDBHashInBackground
+    - class: ValidateCollectionsInBackground
+    - class: CheckReplOplogs
+    - class: CheckReplDBHash
+    - class: ValidateCollections
+    - class: CleanEveryN
+      n: 20
 matrix_suite: true
 selector:
   exclude_files:
-  - jstests/core/txns/abort_expired_transaction.js
-  - jstests/core/txns/abort_transaction_thread_does_not_block_on_locks.js
-  - jstests/core/txns/kill_op_on_txn_expiry.js
-  - jstests/core/**/set_param1.js
-  - jstests/core/query/awaitdata_getmore_cmd.js
-  - jstests/core/administrative/current_op/currentop.js
-  - jstests/core/fsync.js
-  - jstests/core/txns/prepare_conflict.js
-  - jstests/core/txns/prepare_conflict_aggregation_behavior.js
-  - jstests/core/timeseries/timeseries_delete_hint.js
-  - jstests/core/**/set_param1.js
-  - jstests/core/**/profile*.js
-  - jstests/core/comment_field.js
-  - jstests/core/fsync.js
-  - jstests/core/write/insert/batch_write_command_insert.js
-  - jstests/core/write/update/batch_write_command_update.js
-  - jstests/core/write/delete/batch_write_command_delete.js
-  - jstests/core/failcommand_failpoint.js
-  - jstests/core/write/write_commands_reject_unknown_fields.js
-  - jstests/core/query/explain/explain_uuid.js
-  - jstests/core/query/explain/explain_includes_command.js
-  - jstests/core/txns/transactions_profiling.js
-  - jstests/core/txns/currentop_blocked_operations.js
-  - jstests/core/txns/transactions_profiling_with_drops.js
-  - jstests/core/txns/multi_statement_transaction_write_error.js
-  - src/mongo/db/modules/enterprise/jstests/fle2/basic_update.js
-  - src/mongo/db/modules/enterprise/jstests/fle2/basic_delete.js
-  - src/mongo/db/modules/enterprise/jstests/fle2/query/explain*.js
+    - jstests/core/txns/abort_expired_transaction.js
+    - jstests/core/txns/abort_transaction_thread_does_not_block_on_locks.js
+    - jstests/core/txns/kill_op_on_txn_expiry.js
+    - jstests/core/**/set_param1.js
+    - jstests/core/query/awaitdata_getmore_cmd.js
+    - jstests/core/administrative/current_op/currentop.js
+    - jstests/core/fsync.js
+    - jstests/core/txns/prepare_conflict.js
+    - jstests/core/txns/prepare_conflict_aggregation_behavior.js
+    - jstests/core/timeseries/timeseries_delete_hint.js
+    - jstests/core/**/set_param1.js
+    - jstests/core/**/profile*.js
+    - jstests/core/comment_field.js
+    - jstests/core/fsync.js
+    - jstests/core/write/insert/batch_write_command_insert.js
+    - jstests/core/write/update/batch_write_command_update.js
+    - jstests/core/write/delete/batch_write_command_delete.js
+    - jstests/core/failcommand_failpoint.js
+    - jstests/core/write/write_commands_reject_unknown_fields.js
+    - jstests/core/query/explain/explain_uuid.js
+    - jstests/core/query/explain/explain_includes_command.js
+    - jstests/core/txns/transactions_profiling.js
+    - jstests/core/txns/currentop_blocked_operations.js
+    - jstests/core/txns/transactions_profiling_with_drops.js
+    - jstests/core/txns/multi_statement_transaction_write_error.js
+    - src/mongo/db/modules/enterprise/jstests/fle2/basic_update.js
+    - src/mongo/db/modules/enterprise/jstests/fle2/basic_delete.js
+    - src/mongo/db/modules/enterprise/jstests/fle2/query/explain*.js
   exclude_with_any_tags:
-  - assumes_standalone_mongod
-  - requires_profiling
-  - assumes_read_preference_unchanged
-  - does_not_support_causal_consistency
-  - requires_collstats
-  - uses_transactions
-  - requires_profiling
-  - uses_parallel_shell
+    - assumes_standalone_mongod
+    - requires_profiling
+    - assumes_read_preference_unchanged
+    - does_not_support_causal_consistency
+    - requires_collstats
+    - uses_transactions
+    - requires_profiling
+    - uses_parallel_shell
   roots:
-  - jstests/core/**/*.js
-  - jstests/fle2/**/*.js
-  - src/mongo/db/modules/*/jstests/fle2/**/*.js
+    - jstests/core/**/*.js
+    - jstests/fle2/**/*.js
+    - src/mongo/db/modules/*/jstests/fle2/**/*.js
 test_kind: js_test

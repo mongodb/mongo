@@ -9,9 +9,9 @@
 executor:
   archive:
     hooks:
-    - CheckReplDBHash
-    - CheckMetadataConsistencyInBackground
-    - ValidateCollections
+      - CheckReplDBHash
+      - CheckMetadataConsistencyInBackground
+      - ValidateCollections
   config:
     shell_options:
       global_vars:
@@ -30,41 +30,41 @@ executor:
     num_shards: 2
     old_bin_version: last_continuous
   hooks:
-  - class: CheckReplDBHash
-  - class: CheckMetadataConsistencyInBackground
-  - class: ValidateCollections
-  - class: CheckOrphansDeleted
-  - class: CleanEveryN
-    n: 20
+    - class: CheckReplDBHash
+    - class: CheckMetadataConsistencyInBackground
+    - class: ValidateCollections
+    - class: CheckOrphansDeleted
+    - class: CleanEveryN
+      n: 20
 matrix_suite: true
 selector:
   exclude_files:
-  - jstests/core/txns/**/*.js
-  - jstests/core/**/apitest_db.js
-  - jstests/core/**/check_shard_index.js
-  - jstests/core/**/compact_keeps_indexes.js
-  - jstests/core/**/currentop.js
-  - jstests/core/**/dbhash.js
-  - jstests/core/**/fsync.js
-  - jstests/core/**/geo_s2cursorlimitskip.js
-  - jstests/core/**/geo_update_btree2.js
-  - jstests/core/**/index9.js
-  - jstests/core/**/queryoptimizera.js
-  - jstests/core/**/stages*.js
-  - jstests/core/**/startup_log.js
-  - jstests/core/**/top.js
-  - jstests/core/**/geo_2d_explain.js
-  - jstests/core/**/geo_s2explain.js
-  - jstests/core/**/geo_s2sparse.js
-  - jstests/core/**/operation_latency_histogram.js
-  - jstests/core/**/explain_upsert.js
+    - jstests/core/txns/**/*.js
+    - jstests/core/**/apitest_db.js
+    - jstests/core/**/check_shard_index.js
+    - jstests/core/**/compact_keeps_indexes.js
+    - jstests/core/**/currentop.js
+    - jstests/core/**/dbhash.js
+    - jstests/core/**/fsync.js
+    - jstests/core/**/geo_s2cursorlimitskip.js
+    - jstests/core/**/geo_update_btree2.js
+    - jstests/core/**/index9.js
+    - jstests/core/**/queryoptimizera.js
+    - jstests/core/**/stages*.js
+    - jstests/core/**/startup_log.js
+    - jstests/core/**/top.js
+    - jstests/core/**/geo_2d_explain.js
+    - jstests/core/**/geo_s2explain.js
+    - jstests/core/**/geo_s2sparse.js
+    - jstests/core/**/operation_latency_histogram.js
+    - jstests/core/**/explain_upsert.js
   exclude_with_any_tags:
-  - assumes_standalone_mongod
-  - assumes_against_mongod_not_mongos
-  - requires_profiling
+    - assumes_standalone_mongod
+    - assumes_against_mongod_not_mongos
+    - requires_profiling
   roots:
-  - jstests/core/**/*.js
-  - jstests/core_sharding/**/*.js
-  - jstests/fle2/**/*.js
-  - src/mongo/db/modules/*/jstests/fle2/**/*.js
+    - jstests/core/**/*.js
+    - jstests/core_sharding/**/*.js
+    - jstests/fle2/**/*.js
+    - src/mongo/db/modules/*/jstests/fle2/**/*.js
 test_kind: js_test

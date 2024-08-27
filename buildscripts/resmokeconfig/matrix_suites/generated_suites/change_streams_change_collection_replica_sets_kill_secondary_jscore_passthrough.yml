@@ -6,16 +6,17 @@
 # matrix suite mapping file: buildscripts/resmokeconfig/matrix_suites/mappings/change_streams_change_collection_replica_sets_kill_secondary_jscore_passthrough.yml
 # regenerate matrix suites: buildscripts/resmoke.py generate-matrix-suites
 ##########################################################
-description: 'Run test suites with a replica set and multitenancy enabled. Simulate
+description:
+  "Run test suites with a replica set and multitenancy enabled. Simulate
   Atlas Proxy behavior
 
   by overriding and injecting unsigned security token and tenant prefix.
 
-  '
+  "
 executor:
   archive:
     hooks:
-    - PeriodicKillSecondaries
+      - PeriodicKillSecondaries
     tests: true
   config:
     shell_options:
@@ -34,14 +35,14 @@ executor:
   fixture:
     class: ReplicaSetFixture
     mongod_options:
-      bind_ip_all: ''
-      noscripting: ''
+      bind_ip_all: ""
+      noscripting: ""
       serverless: true
       set_parameters:
         changeCollectionExpiredDocumentsRemoverJobSleepSeconds: 1
         changeCollectionTruncateMarkersMinBytes: 4096
         enableTestCommands: 1
-        failpoint.changeCollectionTruncateOnlyOnSecondaries: '{mode: ''alwaysOn''}'
+        failpoint.changeCollectionTruncateOnlyOnSecondaries: "{mode: 'alwaysOn'}"
         featureFlagRequireTenantID: true
         featureFlagSecurityToken: true
         featureFlagServerlessChangeStreams: true
@@ -63,34 +64,34 @@ executor:
     replset_name: ChangeStreamMultitenantReplSet
     voting_secondaries: false
   hooks:
-  - class: PeriodicKillSecondaries
-  - class: EnableChangeStream
-    tenant_id: 636d957b2646ddfaf9b5e13f
+    - class: PeriodicKillSecondaries
+    - class: EnableChangeStream
+      tenant_id: 636d957b2646ddfaf9b5e13f
 matrix_suite: true
 selector:
   exclude_files:
-  - jstests/core/**/geo_update_btree.js
-  - jstests/core/**/max_doc_size.js
-  - jstests/core/**/mr_bigobject.js
-  - jstests/core/**/capped_large_docs.js
-  - jstests/core/**/capped_resize.js
-  - jstests/core/**/exhaust.js
-  - jstests/core/**/explain_execution_error.js
-  - jstests/core/**/sortb.js
-  - jstests/core/**/sortg.js
-  - jstests/core/**/sortj.js
-  - jstests/core/query/explain/explain_agg_write_concern.js
-  - jstests/core/administrative/builtin_roles_external.js
+    - jstests/core/**/geo_update_btree.js
+    - jstests/core/**/max_doc_size.js
+    - jstests/core/**/mr_bigobject.js
+    - jstests/core/**/capped_large_docs.js
+    - jstests/core/**/capped_resize.js
+    - jstests/core/**/exhaust.js
+    - jstests/core/**/explain_execution_error.js
+    - jstests/core/**/sortb.js
+    - jstests/core/**/sortg.js
+    - jstests/core/**/sortj.js
+    - jstests/core/query/explain/explain_agg_write_concern.js
+    - jstests/core/administrative/builtin_roles_external.js
   exclude_with_any_tags:
-  - simulate_atlas_proxy_incompatible
-  - not_allowed_with_signed_security_token
-  - command_not_supported_in_serverless
-  - assumes_standalone_mongod
-  - requires_capped
-  - requires_scripting
-  - requires_profiling
-  - requires_auth
-  - uses_transactions
+    - simulate_atlas_proxy_incompatible
+    - not_allowed_with_signed_security_token
+    - command_not_supported_in_serverless
+    - assumes_standalone_mongod
+    - requires_capped
+    - requires_scripting
+    - requires_profiling
+    - requires_auth
+    - uses_transactions
   roots:
-  - jstests/core/**/*.js
+    - jstests/core/**/*.js
 test_kind: js_test

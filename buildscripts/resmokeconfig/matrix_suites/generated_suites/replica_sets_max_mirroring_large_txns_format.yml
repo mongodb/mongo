@@ -6,7 +6,8 @@
 # matrix suite mapping file: buildscripts/resmokeconfig/matrix_suites/mappings/replica_sets_max_mirroring_large_txns_format.yml
 # regenerate matrix suites: buildscripts/resmoke.py generate-matrix-suites
 ##########################################################
-description: This suite is a combination of replica_sets_max_mirroring and replica_sets_large_txns_format.
+description:
+  This suite is a combination of replica_sets_max_mirroring and replica_sets_large_txns_format.
   You can run any of these tests individually to debug any issues that might arrise.
 executor:
   archive:
@@ -17,13 +18,13 @@ executor:
         TestData:
           setParameters:
             maxNumberOfTransactionOperationsInSingleOplogEntry: 1
-            mirrorReads: '{samplingRate: 1.0}'
-      nodb: ''
+            mirrorReads: "{samplingRate: 1.0}"
+      nodb: ""
 matrix_suite: true
 selector:
   exclude_files: []
   exclude_with_any_tags:
-  - requires_capped
+    - requires_capped
   roots:
-  - jstests/replsets/*.js
+    - jstests/replsets/*.js
 test_kind: js_test

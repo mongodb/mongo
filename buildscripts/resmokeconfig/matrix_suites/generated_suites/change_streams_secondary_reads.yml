@@ -9,11 +9,12 @@
 executor:
   archive:
     hooks:
-    - CheckReplDBHash
-    - ValidateCollections
+      - CheckReplDBHash
+      - ValidateCollections
   config:
     shell_options:
-      eval: globalThis.testingReplication = true; await import('jstests/libs/override_methods/set_read_and_write_concerns.js');;
+      eval:
+        globalThis.testingReplication = true; await import('jstests/libs/override_methods/set_read_and_write_concerns.js');;
         await import('jstests/libs/override_methods/set_read_preference_secondary.js');
       global_vars:
         TestData:
@@ -21,7 +22,7 @@ executor:
   fixture:
     class: ShardedClusterFixture
     mongod_options:
-      bind_ip_all: ''
+      bind_ip_all: ""
       set_parameters:
         enableTestCommands: 1
         logComponentVerbosity:
@@ -30,7 +31,7 @@ executor:
           replication: 3
           verbosity: 0
     mongos_options:
-      bind_ip_all: ''
+      bind_ip_all: ""
       set_parameters:
         enableTestCommands: 1
         logComponentVerbosity:
@@ -41,18 +42,18 @@ executor:
           verbosity: 0
     num_rs_nodes_per_shard: 2
   hooks:
-  - class: CheckReplDBHash
-  - class: ValidateCollections
-  - class: CleanEveryN
-    n: 20
+    - class: CheckReplDBHash
+    - class: ValidateCollections
+    - class: CleanEveryN
+      n: 20
 matrix_suite: true
 selector:
   exclude_files:
-  - jstests/change_streams/only_wake_getmore_for_relevant_changes.js
+    - jstests/change_streams/only_wake_getmore_for_relevant_changes.js
   exclude_with_any_tags:
-  - assumes_write_concern_unchanged
-  - assumes_against_mongod_not_mongos
-  - assumes_read_preference_unchanged
+    - assumes_write_concern_unchanged
+    - assumes_against_mongod_not_mongos
+    - assumes_read_preference_unchanged
   roots:
-  - jstests/change_streams/**/*.js
+    - jstests/change_streams/**/*.js
 test_kind: js_test

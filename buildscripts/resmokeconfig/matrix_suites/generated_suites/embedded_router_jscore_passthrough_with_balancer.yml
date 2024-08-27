@@ -9,9 +9,9 @@
 executor:
   archive:
     hooks:
-    - CheckReplDBHash
-    - CheckMetadataConsistencyInBackground
-    - ValidateCollections
+      - CheckReplDBHash
+      - CheckMetadataConsistencyInBackground
+      - ValidateCollections
   config:
     shell_options:
       eval: await import("jstests/libs/override_methods/implicitly_retry_on_migration_in_progress.js");
@@ -41,52 +41,52 @@ executor:
       value:
         enabled: true
   hooks:
-  - class: CheckReplDBHash
-  - class: CheckMetadataConsistencyInBackground
-  - class: ValidateCollections
-  - class: CheckOrphansDeleted
-  - class: CleanEveryN
-    n: 20
+    - class: CheckReplDBHash
+    - class: CheckMetadataConsistencyInBackground
+    - class: ValidateCollections
+    - class: CheckOrphansDeleted
+    - class: CleanEveryN
+      n: 20
 matrix_suite: true
 selector:
   exclude_files:
-  - jstests/core/txns/**/*.js
-  - jstests/core/query/mr/*.js
-  - jstests/core/**/apitest_db.js
-  - jstests/core/**/check_shard_index.js
-  - jstests/core/**/compact_keeps_indexes.js
-  - jstests/core/**/currentop.js
-  - jstests/core/**/dbhash.js
-  - jstests/core/**/fsync.js
-  - jstests/core/**/geo_s2cursorlimitskip.js
-  - jstests/core/**/geo_update_btree2.js
-  - jstests/core/**/index9.js
-  - jstests/core/**/queryoptimizera.js
-  - jstests/core/**/stages*.js
-  - jstests/core/**/startup_log.js
-  - jstests/core/**/top.js
-  - jstests/core/**/geo_2d_explain.js
-  - jstests/core/**/geo_s2explain.js
-  - jstests/core/**/geo_s2sparse.js
-  - jstests/core/**/operation_latency_histogram.js
-  - jstests/core/**/explain_upsert.js
-  - jstests/core/**/bench_test1.js
-  - jstests/core/index/index_partial_write_ops.js
-  - jstests/core/index/index_stats.js
-  - jstests/core/timeseries/timeseries_predicates.js
-  - jstests/core/index/geo/geo_update_btree.js
-  - jstests/core/**/*[aA]uth*.js
+    - jstests/core/txns/**/*.js
+    - jstests/core/query/mr/*.js
+    - jstests/core/**/apitest_db.js
+    - jstests/core/**/check_shard_index.js
+    - jstests/core/**/compact_keeps_indexes.js
+    - jstests/core/**/currentop.js
+    - jstests/core/**/dbhash.js
+    - jstests/core/**/fsync.js
+    - jstests/core/**/geo_s2cursorlimitskip.js
+    - jstests/core/**/geo_update_btree2.js
+    - jstests/core/**/index9.js
+    - jstests/core/**/queryoptimizera.js
+    - jstests/core/**/stages*.js
+    - jstests/core/**/startup_log.js
+    - jstests/core/**/top.js
+    - jstests/core/**/geo_2d_explain.js
+    - jstests/core/**/geo_s2explain.js
+    - jstests/core/**/geo_s2sparse.js
+    - jstests/core/**/operation_latency_histogram.js
+    - jstests/core/**/explain_upsert.js
+    - jstests/core/**/bench_test1.js
+    - jstests/core/index/index_partial_write_ops.js
+    - jstests/core/index/index_stats.js
+    - jstests/core/timeseries/timeseries_predicates.js
+    - jstests/core/index/geo/geo_update_btree.js
+    - jstests/core/**/*[aA]uth*.js
   exclude_with_any_tags:
-  - assumes_standalone_mongod
-  - assumes_against_mongod_not_mongos
-  - requires_profiling
-  - assumes_balancer_off
-  - requires_fsync
-  - assumes_stable_collection_uuid
-  - requires_getmore
+    - assumes_standalone_mongod
+    - assumes_against_mongod_not_mongos
+    - requires_profiling
+    - assumes_balancer_off
+    - requires_fsync
+    - assumes_stable_collection_uuid
+    - requires_getmore
   roots:
-  - jstests/core/**/*.js
-  - jstests/core_sharding/**/*.js
-  - jstests/fle2/**/*.js
-  - src/mongo/db/modules/*/jstests/fle2/**/*.js
+    - jstests/core/**/*.js
+    - jstests/core_sharding/**/*.js
+    - jstests/fle2/**/*.js
+    - src/mongo/db/modules/*/jstests/fle2/**/*.js
 test_kind: js_test

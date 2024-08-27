@@ -9,12 +9,12 @@
 executor:
   archive:
     hooks:
-    - RunDBCheckInBackground
-    - CheckReplDBHashInBackground
-    - ValidateCollectionsInBackground
-    - CheckReplDBHash
-    - CheckReplOplogs
-    - ValidateCollections
+      - RunDBCheckInBackground
+      - CheckReplDBHashInBackground
+      - ValidateCollectionsInBackground
+      - CheckReplDBHash
+      - CheckReplOplogs
+      - ValidateCollections
   config:
     shell_options:
       eval: globalThis.testingReplication = true;; await import('jstests/libs/override_methods/set_recordids_replicated.js');
@@ -25,65 +25,65 @@ executor:
         enableTestCommands: 1
     num_nodes: 2
   hooks:
-  - class: RunDBCheckInBackground
-  - class: CheckReplDBHashInBackground
-  - class: ValidateCollectionsInBackground
-  - class: CheckReplOplogs
-  - class: CheckReplDBHash
-  - class: ValidateCollections
-  - class: CleanEveryN
-    n: 20
+    - class: RunDBCheckInBackground
+    - class: CheckReplDBHashInBackground
+    - class: ValidateCollectionsInBackground
+    - class: CheckReplOplogs
+    - class: CheckReplDBHash
+    - class: ValidateCollections
+    - class: CleanEveryN
+      n: 20
 matrix_suite: true
 selector:
   exclude_files:
-  - jstests/core/txns/abort_expired_transaction.js
-  - jstests/core/txns/abort_transaction_thread_does_not_block_on_locks.js
-  - jstests/core/txns/kill_op_on_txn_expiry.js
-  - jstests/core/**/set_param1.js
-  - jstests/core/query/awaitdata_getmore_cmd.js
-  - jstests/core/administrative/current_op/currentop.js
-  - jstests/core/fsync.js
-  - jstests/core/txns/prepare_conflict.js
-  - jstests/core/txns/prepare_conflict_aggregation_behavior.js
-  - jstests/core/timeseries/*.js
-  - jstests/core/txns/timeseries/*.js
-  - jstests/core/administrative/validate_db_metadata_command.js
-  - jstests/core/catalog/list_catalog.js
-  - jstests/core/write/bulk/bulk_write_timeseries_basic.js
-  - jstests/core/ddl/convert_to_capped.js
-  - jstests/core/rename_system_buckets_collections.js
-  - jstests/core/write/bypass_empty_ts_replacement_timeseries.js
-  - jstests/core/version_api_v1_command_coverage.js
-  - jstests/core/api/*.js
-  - jstests/core/query/distinct/*.js
-  - jstests/core/query/cursor/cursora.js
-  - jstests/core/write/delete/removeb.js
-  - jstests/core/write/delete/removec.js
-  - jstests/core/index/geo/geo_update_btree.js
-  - jstests/core/write/find_and_modify/find_and_modify_concurrent_update.js
-  - jstests/core/administrative/compact_keeps_indexes.js
-  - jstests/core/write/update/updatef.js
-  - jstests/core/loadserverscripts.js
-  - jstests/core/shell/shellstartparallel.js
-  - jstests/core/txns/*.js
-  - jstests/core/latch_analyzer.js
-  - jstests/core/administrative/current_op/currentop_waiting_for_latch.js
-  - jstests/core/query/mr/mr_killop.js
-  - jstests/core/query/count/count_plan_summary.js
-  - jstests/core/write/crud_ops_do_not_throw_locktimeout.js
-  - jstests/core/administrative/current_op/currentop_shell.js
-  - jstests/core/query/count/count10.js
-  - jstests/core/catalog/list_collections_filter.js
-  - jstests/core/query/internal_rename_if_options_and_indexes_match.js
-  - jstests/core/shell/shell_connection_strings.js
-  - jstests/core/query/query_settings/query_settings_lost_update.js
-  - jstests/core/**/create_indexes.js
+    - jstests/core/txns/abort_expired_transaction.js
+    - jstests/core/txns/abort_transaction_thread_does_not_block_on_locks.js
+    - jstests/core/txns/kill_op_on_txn_expiry.js
+    - jstests/core/**/set_param1.js
+    - jstests/core/query/awaitdata_getmore_cmd.js
+    - jstests/core/administrative/current_op/currentop.js
+    - jstests/core/fsync.js
+    - jstests/core/txns/prepare_conflict.js
+    - jstests/core/txns/prepare_conflict_aggregation_behavior.js
+    - jstests/core/timeseries/*.js
+    - jstests/core/txns/timeseries/*.js
+    - jstests/core/administrative/validate_db_metadata_command.js
+    - jstests/core/catalog/list_catalog.js
+    - jstests/core/write/bulk/bulk_write_timeseries_basic.js
+    - jstests/core/ddl/convert_to_capped.js
+    - jstests/core/rename_system_buckets_collections.js
+    - jstests/core/write/bypass_empty_ts_replacement_timeseries.js
+    - jstests/core/version_api_v1_command_coverage.js
+    - jstests/core/api/*.js
+    - jstests/core/query/distinct/*.js
+    - jstests/core/query/cursor/cursora.js
+    - jstests/core/write/delete/removeb.js
+    - jstests/core/write/delete/removec.js
+    - jstests/core/index/geo/geo_update_btree.js
+    - jstests/core/write/find_and_modify/find_and_modify_concurrent_update.js
+    - jstests/core/administrative/compact_keeps_indexes.js
+    - jstests/core/write/update/updatef.js
+    - jstests/core/loadserverscripts.js
+    - jstests/core/shell/shellstartparallel.js
+    - jstests/core/txns/*.js
+    - jstests/core/latch_analyzer.js
+    - jstests/core/administrative/current_op/currentop_waiting_for_latch.js
+    - jstests/core/query/mr/mr_killop.js
+    - jstests/core/query/count/count_plan_summary.js
+    - jstests/core/write/crud_ops_do_not_throw_locktimeout.js
+    - jstests/core/administrative/current_op/currentop_shell.js
+    - jstests/core/query/count/count10.js
+    - jstests/core/catalog/list_collections_filter.js
+    - jstests/core/query/internal_rename_if_options_and_indexes_match.js
+    - jstests/core/shell/shell_connection_strings.js
+    - jstests/core/query/query_settings/query_settings_lost_update.js
+    - jstests/core/**/create_indexes.js
   exclude_with_any_tags:
-  - assumes_standalone_mongod
-  - requires_profiling
-  - requires_capped
+    - assumes_standalone_mongod
+    - requires_profiling
+    - requires_capped
   roots:
-  - jstests/core/**/*.js
-  - jstests/fle2/**/*.js
-  - src/mongo/db/modules/*/jstests/fle2/**/*.js
+    - jstests/core/**/*.js
+    - jstests/fle2/**/*.js
+    - src/mongo/db/modules/*/jstests/fle2/**/*.js
 test_kind: js_test

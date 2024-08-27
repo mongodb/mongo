@@ -9,10 +9,10 @@
 executor:
   archive:
     hooks:
-    - CheckReplDBHashInBackground
-    - CheckReplDBHash
-    - CheckMetadataConsistencyInBackground
-    - ValidateCollections
+      - CheckReplDBHashInBackground
+      - CheckReplDBHash
+      - CheckMetadataConsistencyInBackground
+      - ValidateCollections
     tests: true
   config:
     shell_options:
@@ -44,43 +44,43 @@ executor:
       mongod_options:
         oplogSize: 1024
   hooks:
-  - class: CheckShardFilteringMetadata
-  - class: CheckReplDBHashInBackground
-  - class: CheckReplDBHash
-  - class: CheckMetadataConsistencyInBackground
-  - class: CheckOrphansDeleted
-  - class: CheckRoutingTableConsistency
-  - class: ValidateCollections
-  - class: CleanupConcurrencyWorkloads
+    - class: CheckShardFilteringMetadata
+    - class: CheckReplDBHashInBackground
+    - class: CheckReplDBHash
+    - class: CheckMetadataConsistencyInBackground
+    - class: CheckOrphansDeleted
+    - class: CheckRoutingTableConsistency
+    - class: ValidateCollections
+    - class: CleanupConcurrencyWorkloads
 matrix_suite: true
 selector:
   exclude_files:
-  - jstests/concurrency/fsm_workloads/auth_create_role.js
-  - jstests/concurrency/fsm_workloads/auth_create_user.js
-  - jstests/concurrency/fsm_workloads/auth_drop_role.js
-  - jstests/concurrency/fsm_workloads/auth_drop_user.js
-  - jstests/concurrency/fsm_workloads/agg_group_external.js
-  - jstests/concurrency/fsm_workloads/agg_sort_external.js
-  - jstests/concurrency/fsm_workloads/compact.js
-  - jstests/concurrency/fsm_workloads/compact_while_creating_indexes.js
-  - jstests/concurrency/fsm_workloads/findAndModify_update_grow.js
-  - jstests/concurrency/fsm_workloads/plan_cache_drop_database.js
-  - jstests/concurrency/fsm_workloads/reindex.js
-  - jstests/concurrency/fsm_workloads/reindex_background.js
-  - jstests/concurrency/fsm_workloads/reindex_writeconflict.js
-  - jstests/concurrency/fsm_workloads/collmod_writeconflict.js
-  - jstests/concurrency/fsm_workloads/agg_out_interrupt_cleanup.js
-  - jstests/concurrency/fsm_workloads/timeseries_agg_out_interrupt_cleanup.js
-  - jstests/concurrency/fsm_workloads/multi_statement_transaction_atomicity_isolation_metrics_test.js
-  - jstests/concurrency/fsm_workloads/multi_statement_transaction_all_commands_same_session.js
-  - jstests/concurrency/fsm_workloads/map_reduce_drop.js
+    - jstests/concurrency/fsm_workloads/auth_create_role.js
+    - jstests/concurrency/fsm_workloads/auth_create_user.js
+    - jstests/concurrency/fsm_workloads/auth_drop_role.js
+    - jstests/concurrency/fsm_workloads/auth_drop_user.js
+    - jstests/concurrency/fsm_workloads/agg_group_external.js
+    - jstests/concurrency/fsm_workloads/agg_sort_external.js
+    - jstests/concurrency/fsm_workloads/compact.js
+    - jstests/concurrency/fsm_workloads/compact_while_creating_indexes.js
+    - jstests/concurrency/fsm_workloads/findAndModify_update_grow.js
+    - jstests/concurrency/fsm_workloads/plan_cache_drop_database.js
+    - jstests/concurrency/fsm_workloads/reindex.js
+    - jstests/concurrency/fsm_workloads/reindex_background.js
+    - jstests/concurrency/fsm_workloads/reindex_writeconflict.js
+    - jstests/concurrency/fsm_workloads/collmod_writeconflict.js
+    - jstests/concurrency/fsm_workloads/agg_out_interrupt_cleanup.js
+    - jstests/concurrency/fsm_workloads/timeseries_agg_out_interrupt_cleanup.js
+    - jstests/concurrency/fsm_workloads/multi_statement_transaction_atomicity_isolation_metrics_test.js
+    - jstests/concurrency/fsm_workloads/multi_statement_transaction_all_commands_same_session.js
+    - jstests/concurrency/fsm_workloads/map_reduce_drop.js
   exclude_with_any_tags:
-  - requires_replication
-  - assumes_against_mongod_not_mongos
-  - assumes_balancer_on
-  - requires_profiling
-  - assumes_unsharded_collection
+    - requires_replication
+    - assumes_against_mongod_not_mongos
+    - assumes_balancer_on
+    - requires_profiling
+    - assumes_unsharded_collection
   roots:
-  - jstests/concurrency/fsm_workloads/**/*.js
-  - src/mongo/db/modules/*/jstests/concurrency/fsm_workloads/*.js
+    - jstests/concurrency/fsm_workloads/**/*.js
+    - src/mongo/db/modules/*/jstests/concurrency/fsm_workloads/*.js
 test_kind: fsm_workload_test

@@ -22,9 +22,6 @@ jstests/*golden*/expected_output/*
 # Ignore .yy files since prettier seems to think these are json files
 **/*.yy
 
-# Ignored generated resmoke suites
-buildscripts/resmokeconfig/matrix_suites/generated_suites/*.yml
-
 # Ignore generated pnpm lock file
 pnpm-lock.yaml
 

@@ -5,7 +5,7 @@ import copy
 import os
 import pathlib
 from threading import Lock
-from typing import Any, Dict, List
+from typing import Dict, List
 
 import yaml
 from buildscripts.resmokelib.utils.external_suite import make_external
@@ -255,20 +255,23 @@ class MatrixSuiteConfig(SuiteConfigInterface):
         if not os.path.exists(generated_path):
             raise errors.InvalidMatrixSuiteError(
                 f"No generated suite file was found for {suite_name}"
-                + "To (re)generate the matrix suite files use `python3 buildscripts/resmoke.py generate-matrix-suites`"
+                + "To (re)generate the matrix suite files use `python3 buildscripts/resmoke.py generate-matrix-suites && bazel run //:format`"
             )
 
         new_text = cls.generate_matrix_suite_text(suite_name)
+        new_yaml = yaml.safe_load(new_text)
+
         with open(generated_path, "r") as file:
             old_text = file.read()
-            if new_text != old_text:
+            old_yaml = yaml.safe_load(old_text)
+            if new_yaml != old_yaml:
                 loggers.ROOT_EXECUTOR_LOGGER.error("Generated file on disk:")
                 loggers.ROOT_EXECUTOR_LOGGER.error(old_text)
                 loggers.ROOT_EXECUTOR_LOGGER.error("Generated text from mapping file:")
                 loggers.ROOT_EXECUTOR_LOGGER.error(new_text)
                 raise errors.InvalidMatrixSuiteError(
                     f"The generated file found on disk did not match the mapping file for {suite_name}. "
-                    + "To (re)generate the matrix suite files use `python3 buildscripts/resmoke.py generate-matrix-suites`"
+                    + "To (re)generate the matrix suite files use `python3 buildscripts/resmoke.py generate-matrix-suites && bazel run //:format`"
                 )
 
         return config
@@ -457,7 +460,7 @@ class MatrixSuiteConfig(SuiteConfigInterface):
             "# AND REGENERATE THE MATRIX SUITES.",
             "#",
             f"# matrix suite mapping file: {mapping_path.as_posix()}",
-            "# regenerate matrix suites: buildscripts/resmoke.py generate-matrix-suites",
+            "# regenerate matrix suites: buildscripts/resmoke.py generate-matrix-suites && bazel run //:format",
             "##########################################################",
         ]
 

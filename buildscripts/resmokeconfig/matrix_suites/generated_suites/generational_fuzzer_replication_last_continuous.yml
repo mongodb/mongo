@@ -16,9 +16,9 @@ executor:
           clusterType: replset
           nonClusteredConfigTransactions: true
           useRandomBinVersionsWithinReplicaSet: last-continuous
-      nodb: ''
+      nodb: ""
 matrix_suite: true
 selector:
   roots:
-  - jstestfuzz/out/*.js
+    - jstestfuzz/out/*.js
 test_kind: js_test

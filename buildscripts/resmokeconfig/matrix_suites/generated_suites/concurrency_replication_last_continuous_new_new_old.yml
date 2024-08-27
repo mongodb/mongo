@@ -9,11 +9,11 @@
 executor:
   archive:
     hooks:
-    - RunDBCheckInBackground
-    - CheckReplDBHashInBackground
-    - ValidateCollectionsInBackground
-    - CheckReplDBHash
-    - ValidateCollections
+      - RunDBCheckInBackground
+      - CheckReplDBHashInBackground
+      - ValidateCollectionsInBackground
+      - CheckReplDBHash
+      - ValidateCollections
     tests: true
   config:
     shell_options:
@@ -33,25 +33,25 @@ executor:
     num_nodes: 3
     old_bin_version: last_continuous
   hooks:
-  - class: RunDBCheckInBackground
-  - class: CheckReplDBHashInBackground
-  - class: ValidateCollectionsInBackground
-  - class: CheckReplDBHash
-  - class: ValidateCollections
-  - class: CleanupConcurrencyWorkloads
+    - class: RunDBCheckInBackground
+    - class: CheckReplDBHashInBackground
+    - class: ValidateCollectionsInBackground
+    - class: CheckReplDBHash
+    - class: ValidateCollections
+    - class: CleanupConcurrencyWorkloads
 matrix_suite: true
 selector:
   exclude_files:
-  - jstests/concurrency/fsm_workloads/agg_group_external.js
-  - jstests/concurrency/fsm_workloads/agg_sort_external.js
-  - jstests/concurrency/fsm_workloads/findAndModify_update_grow.js
-  - jstests/concurrency/fsm_workloads/schema_validator_with_expr_variables.js
-  - jstests/concurrency/fsm_workloads/reindex.js
-  - jstests/concurrency/fsm_workloads/reindex_background.js
-  - jstests/concurrency/fsm_workloads/reindex_writeconflict.js
+    - jstests/concurrency/fsm_workloads/agg_group_external.js
+    - jstests/concurrency/fsm_workloads/agg_sort_external.js
+    - jstests/concurrency/fsm_workloads/findAndModify_update_grow.js
+    - jstests/concurrency/fsm_workloads/schema_validator_with_expr_variables.js
+    - jstests/concurrency/fsm_workloads/reindex.js
+    - jstests/concurrency/fsm_workloads/reindex_background.js
+    - jstests/concurrency/fsm_workloads/reindex_writeconflict.js
   exclude_with_any_tags:
-  - requires_sharding
+    - requires_sharding
   roots:
-  - jstests/concurrency/fsm_workloads/**/*.js
-  - src/mongo/db/modules/*/jstests/concurrency/fsm_workloads/*.js
+    - jstests/concurrency/fsm_workloads/**/*.js
+    - src/mongo/db/modules/*/jstests/concurrency/fsm_workloads/*.js
 test_kind: fsm_workload_test
