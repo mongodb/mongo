@@ -193,7 +193,7 @@ if not use_system_version_of_library('stemmer'):
 # the source directory.
 if wiredtiger and not use_system_version_of_library('wiredtiger'):
     thirdPartyEnvironmentModifications['wiredtiger'] = {
-        'CPPPATH': ['$BUILD_DIR/third_party/wiredtiger'],
+        'CPPPATH': ['$BUILD_DIR/third_party/wiredtiger', "#$BAZEL_OUT_DIR/src/third_party/wiredtiger"],
     }
 
 if not use_system_version_of_library('yaml'):
