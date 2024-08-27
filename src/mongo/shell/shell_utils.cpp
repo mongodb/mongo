@@ -75,6 +75,7 @@
 #include "mongo/db/auth/validated_tenancy_scope_factory.h"
 #include "mongo/db/database_name.h"
 #include "mongo/db/hasher.h"
+#include "mongo/db/query/collation/collator_factory_icu.h"
 #include "mongo/platform/decimal128.h"
 #include "mongo/platform/mutex.h"
 #include "mongo/platform/random.h"
@@ -993,6 +994,36 @@ BSONObj _resultSetsEqualUnordered(const BSONObj& input, void*) {
     return BSON("" << true);
 }
 
+/*
+ * Takes two strings and a valid collation document and returns the comparison result (a number < 0
+ * if 'left' is less than 'right', a number > 0 if 'left' is greater than 'right', and 0 if 'left'
+ * and 'right' are equal) with respect to the collation
+ * Refer to https://www.mongodb.com/docs/manual/reference/collation and
+ * https://unicode-org.github.io/icu/userguide/collation for the expected behaviour when collation
+ * is specified
+ */
+BSONObj _compareStringsWithCollation(const BSONObj& input, void*) {
+    BSONObjIterator i(input);
+
+    uassert(9367800, "Expected left argument", i.more());
+    auto left = i.next();
+    uassert(9367801, "Left argument should be a string", left.type() == BSONType::String);
+
+    uassert(9367802, "Expected right argument", i.more());
+    auto right = i.next();
+    uassert(9367803, "Right argument should be string", right.type() == BSONType::String);
+
+    uassert(9367804, "Expected collation argument", i.more());
+    auto collatorSpec = i.next();
+    uassert(9367805, "Expected a collation object", collatorSpec.type() == BSONType::Object);
+
+    CollatorFactoryICU collationFactory;
+    auto collator = uassertStatusOK(collationFactory.makeFromBSON(collatorSpec.Obj()));
+
+    int cmp = collator->compare(left.valueStringData(), right.valueStringData());
+    return BSON("" << cmp);
+}
+
 void installShellUtils(Scope& scope) {
     scope.injectNative("getMemInfo", JSGetMemInfo);
     scope.injectNative("_createSecurityToken", _createSecurityToken);
@@ -1016,6 +1047,7 @@ void installShellUtils(Scope& scope) {
     scope.injectNative("_buildBsonObj", _buildBsonObj);
     scope.injectNative("_fnvHashToHexString", _fnvHashToHexString);
     scope.injectNative("_resultSetsEqualUnordered", _resultSetsEqualUnordered);
+    scope.injectNative("_compareStringsWithCollation", _compareStringsWithCollation);
 
     installShellUtilsLauncher(scope);
     installShellUtilsExtended(scope);

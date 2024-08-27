@@ -150,6 +150,7 @@ globals:
   _fnvHashToHexString: true
   _resultSetsEqualUnordered: true
   getStringWidth: true
+  _compareStringsWithCollation: true
 
   # likely could be replaced with `path`
   _copyFileRange: true
