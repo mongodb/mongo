@@ -127,6 +127,17 @@ env.Library(
 )
 
 env.Library(
+    target="jparse_util",
+    source=[
+        "util/jparse_util.cpp",
+    ],
+    LIBDEPS=[
+        "$BUILD_DIR/mongo/base",
+        "datetime/date_time_support",
+    ],
+)
+
+env.Library(
     target="memory_util",
     source=[
         "util/memory_util.cpp",
@@ -475,6 +486,7 @@ env.CppUnitTest(
         "util/cartesian_product_test.cpp",
         "util/deferred_test.cpp",
         "util/hash_roaring_set_test.cpp",
+        "util/jparse_util_test.cpp",
         "util/memory_util_test.cpp",
         "view_response_formatter_test.cpp",
     ],
@@ -507,6 +519,7 @@ env.CppUnitTest(
         "common_query_enums_and_helpers",
         "hint_parser",
         "index_hint",
+        "jparse_util",
         "map_reduce_output_format",
         "optimizer/unit_test_utils",
         "query_common",

@@ -97,12 +97,16 @@ std::string tojson(const BSONObj& obj,
                    JsonStringFormat format = ExtendedCanonicalV2_0_0,
                    bool pretty = false);
 
+class JParseUtil;
+
 /**
  * Parser class.  A BSONObj is constructed incrementally by passing a
  * BSONObjBuilder to the recursive parsing methods.  The grammar for the
  * element parsed is described before each function.
  */
 class JParse {
+    friend class JParseUtil;
+
 public:
     explicit JParse(StringData str);
 
