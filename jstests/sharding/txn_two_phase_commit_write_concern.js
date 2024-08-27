@@ -190,6 +190,7 @@ function testCommitDecisionWriteConcern(writeConcern) {
     if (nodesToStopReplication.length > 0) {
         restartServerReplication(nodesToStopReplication);
     }
+    st.rs0.awaitReplication();
     deleteCoordDocFailPoint.wait();
     assertDecisionMajorityCommitted(st.rs0);
     deleteCoordDocFailPoint.off();
