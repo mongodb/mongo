@@ -183,6 +183,38 @@ boost::optional<DatabaseVersion> OperationShardingState::getDbVersion(
     return boost::none;
 }
 
+Status OperationShardingState::waitForCriticalSectionToComplete(
+    OperationContext* opCtx, SharedSemiFuture<void> critSecSignal) noexcept {
+    // Must not block while holding a lock
+    invariant(!shard_role_details::getLocker(opCtx)->isLocked());
+
+    // If we are in a transaction, limit the time we can wait behind the critical section. This is
+    // needed in order to prevent distributed deadlocks in situations where a DDL operation needs to
+    // acquire the critical section on several shards.
+    //
+    // In such cases, shard running a transaction could be waiting for the critical section to be
+    // exited, while on another shard the transaction has already executed some statement and
+    // stashed locks which prevent the critical section from being acquired in that node. Limiting
+    // the wait behind the critical section will ensure that the transaction will eventually get
+    // aborted.
+    if (opCtx->inMultiDocumentTransaction()) {
+        try {
+            opCtx->runWithDeadline(
+                opCtx->getServiceContext()->getFastClockSource()->now() +
+                    Milliseconds(metadataRefreshInTransactionMaxWaitBehindCritSecMS.load()),
+                ErrorCodes::ExceededTimeLimit,
+                [&] { critSecSignal.wait(opCtx); });
+            return Status::OK();
+        } catch (const DBException& ex) {
+            // This is a best-effort attempt to wait for the critical section to complete, so no
+            // need to handle any exceptions
+            return ex.toStatus();
+        }
+    } else {
+        return critSecSignal.waitNoThrow(opCtx);
+    }
+}
+
 void OperationShardingState::setShardingOperationFailedStatus(const Status& status) {
     invariant(!_shardingOperationFailedStatus);
     _shardingOperationFailedStatus = status;

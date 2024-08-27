@@ -61,7 +61,6 @@
 #include "mongo/db/s/collection_sharding_state.h"
 #include "mongo/db/s/database_sharding_state.h"
 #include "mongo/db/s/operation_sharding_state.h"
-#include "mongo/db/s/shard_filtering_util.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/storage/capped_snapshots.h"
 #include "mongo/db/storage/recovery_unit.h"
@@ -1587,8 +1586,8 @@ void restoreTransactionResourcesToOperationContext(
                     transactionResources.yielded.emplace(
                         TransactionResources::YieldedStateHolder{std::move(lockSnapshot)});
                     // Wait for the critical section to finish.
-                    refresh_util::waitForCriticalSectionToComplete(opCtx,
-                                                                   *ex->getCriticalSectionSignal())
+                    OperationShardingState::waitForCriticalSectionToComplete(
+                        opCtx, *ex->getCriticalSectionSignal())
                         .ignore();
                     // Try again to restore.
                     continue;

@@ -811,7 +811,6 @@ env.Library(
         "s/range_arithmetic.cpp",
         "s/replica_set_endpoint_feature_flag.cpp",
         "s/scoped_collection_metadata.cpp",
-        "s/shard_filtering_util.cpp",
         "s/shard_key_index_util.cpp",
         "s/sharding_api_d_params_gen.cpp",
         "s/sharding_migration_critical_section.cpp",
