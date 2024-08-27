@@ -279,9 +279,10 @@ void PeriodicShardedIndexConsistencyChecker::_launchOrResumeShardedTimeseriesSha
             try {
                 uassertStatusOK(
                     ShardingCatalogManager::get(opCtx)->checkTimeseriesShardKeys(opCtx));
-            } catch (const ExceptionForCat<ErrorCategory::CancellationError>&) {
-                // The job is shutting down.
-                return;
+            } catch (const DBException& ex) {
+                LOGV2(9406000,
+                      "Error while checking timeseries sharded index consistency",
+                      "error"_attr = ex.toStatus());
             }
         },
         Milliseconds(shardedTimeseriesShardkeyCheckIntervalMS),
