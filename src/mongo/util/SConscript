@@ -109,21 +109,6 @@ env.Library(
     ],
 )
 
-env.Library(
-    target="processinfo",
-    source=[
-        "processinfo.cpp",
-        "processinfo_${TARGET_OS}.cpp",
-    ],
-    LIBDEPS=[
-        "procparser" if env.TargetOSIs("linux") else [],
-    ],
-    LIBDEPS_PRIVATE=[
-        "$BUILD_DIR/mongo/base",
-        "pcre_wrapper",
-    ],
-)
-
 env.Benchmark(
     target="fail_point_bm",
     source=[
@@ -434,33 +419,6 @@ env.Library(
 
 pcre_env = env.Clone()
 pcre_env.InjectThirdParty(libraries=["pcre2"])
-pcre_env.Library(
-    target=[
-        "pcre_wrapper",
-    ],
-    source=[
-        "pcre.cpp",
-    ],
-    LIBDEPS=[
-        "$BUILD_DIR/mongo/base",
-    ],
-    LIBDEPS_PRIVATE=[
-        "$BUILD_DIR/third_party/pcre2/pcre2",
-    ],
-)
-
-env.Library(
-    target="pcre_util",
-    source=[
-        "pcre_util.cpp",
-    ],
-    LIBDEPS=[
-        "$BUILD_DIR/mongo/base",
-        "pcre_wrapper",
-    ],
-)
-
-
 env.Benchmark(
     target="tracking_allocator_bm",
     source=[
@@ -484,18 +442,6 @@ env.Benchmark(
     source="hash_table_bm.cpp",
     LIBDEPS=[],
 )
-
-if env.TargetOSIs("linux"):
-    env.Library(
-        target="procparser",
-        source=[
-            "procparser.cpp",
-        ],
-        LIBDEPS_PRIVATE=[
-            "$BUILD_DIR/mongo/base",
-            "pcre_wrapper",
-        ],
-    )
 
 if env.TargetOSIs("windows"):
     env.Library(

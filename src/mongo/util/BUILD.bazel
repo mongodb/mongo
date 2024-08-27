@@ -478,3 +478,70 @@ mongo_cc_library(
         "//src/mongo/util/net:network",  # this is for using listener to check elapsed time
     ],
 )
+
+mongo_cc_library(
+    name = "pcre_wrapper",
+    srcs = [
+        "pcre.cpp",
+        "pcre.h",
+    ],
+    deps = [
+        "//src/mongo:base",
+        "//src/third_party/pcre2",
+    ],
+)
+
+mongo_cc_library(
+    name = "pcre_util",
+    srcs = [
+        "pcre_util.cpp",
+        "pcre_util.h",
+    ],
+    deps = [
+        ":pcre_wrapper",
+        "//src/mongo:base",
+    ],
+)
+
+mongo_cc_library(
+    name = "procparser",
+    srcs = [
+        "procparser.cpp",
+        "procparser.h",
+    ],
+    target_compatible_with = select({
+        "@platforms//os:linux": [],
+        "//conditions:default": ["@platforms//:incompatible"],
+    }),
+    deps = [
+        ":pcre_wrapper",
+        "//src/mongo:base",
+    ],
+)
+
+mongo_cc_library(
+    name = "processinfo",
+    srcs = [
+        "processinfo.cpp",
+        "processinfo.h",
+        "//src/mongo/db:jsobj.h",
+    ] + select({
+        "@platforms//os:{}".format(os): ["processinfo_{}.cpp".format(os)]
+        for os in [
+            "freebsd",
+            "linux",
+            "openbsd",
+            "osx",
+            "windows",
+        ]
+    } | {
+        "//conditions:default": ["processinfo_unknown.cpp"],
+    }),
+    deps = [
+        ":pcre_wrapper",
+        "//src/mongo:base",
+    ] + select({
+        "@platforms//os:linux": ["procparser"],
+        "//conditions:default": [],
+    }),
+)

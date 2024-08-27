@@ -60,6 +60,23 @@ idl_generator(
     ],
 )
 
+mongo_cc_library(
+    name = "address_restriction",
+    srcs = [
+        "address_restriction.cpp",
+        "address_restriction.h",
+        "restriction.h",
+        "restriction_environment.h",
+        "restriction_set.h",
+        ":address_restriction_gen",
+    ],
+    deps = [
+        "//src/mongo:base",
+        "//src/mongo/idl:idl_parser",  # TODO(SERVER-98376): Remove.
+        "//src/mongo/util/net:network",
+    ],
+)
+
 idl_generator(
     name = "user_management_commands_parser_gen",
     src = "user_management_commands_parser.idl",

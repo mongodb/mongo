@@ -433,19 +433,6 @@ env.Library(
 )
 
 env.Library(
-    target="address_restriction",
-    source=[
-        "address_restriction.cpp",
-        "address_restriction_gen.cpp",
-    ],
-    LIBDEPS_PRIVATE=[
-        "$BUILD_DIR/mongo/base",
-        "$BUILD_DIR/mongo/idl/idl_parser",
-        "$BUILD_DIR/mongo/util/net/network",
-    ],
-)
-
-env.Library(
     target="user_acquisition_stats",
     source=[
         "ldap_operation_stats.cpp",
