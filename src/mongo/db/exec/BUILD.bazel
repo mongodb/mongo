@@ -20,6 +20,23 @@ filegroup(
     ],
 )
 
+# WorkingSet target and associated test
+mongo_cc_library(
+    name = "working_set",
+    srcs = [
+        "working_set.cpp",
+    ],
+    hdrs = [
+        "working_set.h",
+    ],
+    deps = [
+        "//src/mongo:base",
+        "//src/mongo/db:service_context",  # TODO(SERVER-98376): Remove.
+        "//src/mongo/db/exec/document_value",
+        "//src/mongo/db/query/bson:dotted_path_support",
+    ],
+)
+
 idl_generator(
     name = "batched_delete_stage_gen",
     src = "batched_delete_stage.idl",

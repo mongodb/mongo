@@ -1,4 +1,5 @@
 load("//bazel:mongo_src_rules.bzl", "mongo_cc_library")
+load("@bazel_skylib//lib:selects.bzl", "selects")
 
 package(default_visibility = ["//visibility:public"])
 
@@ -7,4 +8,69 @@ exports_files(
         "*.h",
         "*.cpp",
     ]),
+)
+
+# TODO BUILD-16566
+# This warning cause false positives with the v4 toolchain gcc on Ubuntu 2022
+# ARM64 platforms, in short term we will disable the warning until we can figure
+# out what the underlying issue is. Once the toolchain is updated, the
+# workaround below should be removed.
+selects.config_setting_group(
+    name = "options_parser_needs_no_missing_indentation_flag",
+    match_all = [
+        "@platforms//cpu:aarch64",
+        "//bazel/config:compiler_type_gcc",
+    ],
+)
+
+mongo_cc_library(
+    name = "options_parser",
+    srcs = [
+        "constraints.cpp",
+        "environment.cpp",
+        "option_description.cpp",
+        "option_section.cpp",
+        "options_parser.cpp",
+        "startup_option_init.cpp",
+        "startup_options.cpp",
+        "value.cpp",
+    ],
+    hdrs = [
+        "constraints.h",
+        "environment.h",
+        "option_description.h",
+        "option_section.h",
+        "options_parser.h",
+        "startup_option_init.h",
+        "startup_options.h",
+        "value.h",
+    ],
+    copts = select({
+        ":options_parser_needs_no_missing_indentation_flag": [
+            "-Wno-misleading-indentation",
+        ],
+        "//conditions:default": [],
+    }),
+    deps = [
+        "//src/mongo:base",
+        "//src/mongo/util/net:http_client",
+        "//src/mongo/util/net:network",
+        "//src/third_party/boost:boost_filesystem",  # TODO(SERVER-98376): Remove.
+        "//src/third_party/boost:boost_iostreams",  # TODO(SERVER-98376): Remove.
+        "//src/third_party/boost:boost_log",  # TODO(SERVER-98376): Remove.
+        "//src/third_party/boost:boost_program_options",  # TODO(SERVER-98376): Remove.
+        "//src/third_party/yaml-cpp:yaml",
+    ] + select({
+        "//bazel/config:mongo_crypto_{}".format(mongo_crypto): [
+            "//src/mongo/crypto:sha_block_{}".format(mongo_crypto),  # TODO(SERVER-98376): Remove.
+        ]
+        for mongo_crypto in [
+            "windows",
+            "apple",
+            "openssl",
+            "tom",
+        ]
+    } | {
+        "//conditions:default": [],
+    }),
 )

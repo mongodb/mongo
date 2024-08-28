@@ -38,6 +38,8 @@ mongo_cc_library(
         "sorter_gen",
     ],
     hdrs = [
+        "sorter.cpp",  # Intentionally in hdrs.
+        "sorter.h",
         "sorter_checksum_calculator.h",
     ],
     deps = [

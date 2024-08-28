@@ -4,16 +4,16 @@ load("//bazel/toolchains:mongo_toolchain.bzl", "toolchain_download")
 
 http_archive(
     name = "bazel_clang_tidy",
-    sha256 = "2d4a9c91fe6694205c0de0990ef4b276ef4346dc441ee4046faff1947d97a29f",
-    strip_prefix = "bazel_clang_tidy-1.4",
+    sha256 = "7845416626a6d715a314aa28d716274fe66f3e7169ae700a3d01ed8064a7d752",
+    strip_prefix = "bazel_clang_tidy-f3614c7d33235257e9f8e53591364c139344caf2",
     urls = [
         # Implements retry by relisting each url multiple times to be used as a failover.
         # TODO(SERVER-86719): Re-implement http_archive to allow sleeping between retries
-        "https://github.com/mongodb-forks/bazel_clang_tidy/archive/refs/tags/v1.4.tar.gz",
-        "https://github.com/mongodb-forks/bazel_clang_tidy/archive/refs/tags/v1.4.tar.gz",
-        "https://github.com/mongodb-forks/bazel_clang_tidy/archive/refs/tags/v1.4.tar.gz",
-        "https://github.com/mongodb-forks/bazel_clang_tidy/archive/refs/tags/v1.4.tar.gz",
-        "https://github.com/mongodb-forks/bazel_clang_tidy/archive/refs/tags/v1.4.tar.gz",
+        "https://github.com/mongodb-forks/bazel_clang_tidy/archive/f3614c7d33235257e9f8e53591364c139344caf2.tar.gz",
+        "https://github.com/mongodb-forks/bazel_clang_tidy/archive/f3614c7d33235257e9f8e53591364c139344caf2.tar.gz",
+        "https://github.com/mongodb-forks/bazel_clang_tidy/archive/f3614c7d33235257e9f8e53591364c139344caf2.tar.gz",
+        "https://github.com/mongodb-forks/bazel_clang_tidy/archive/f3614c7d33235257e9f8e53591364c139344caf2.tar.gz",
+        "https://github.com/mongodb-forks/bazel_clang_tidy/archive/f3614c7d33235257e9f8e53591364c139344caf2.tar.gz",
     ],
 )
 

@@ -28,19 +28,6 @@ env.Library(
 )
 
 env.Library(
-    target="field_path",
-    source=[
-        "field_path.cpp",
-    ],
-    LIBDEPS=[
-        "$BUILD_DIR/mongo/base",
-        "$BUILD_DIR/mongo/db/query/query_knobs",
-        "$BUILD_DIR/mongo/db/server_base",
-        "$BUILD_DIR/mongo/db/server_options",
-    ],
-)
-
-env.Library(
     target="aggregation_request_helper",
     source=[
         "aggregate_command_gen.cpp",
@@ -63,17 +50,6 @@ env.Library(
     LIBDEPS_PRIVATE=[
         "$BUILD_DIR/mongo/db/server_base",
         "$BUILD_DIR/mongo/db/storage/storage_options",
-    ],
-)
-
-env.Library(
-    target="dependencies",
-    source=[
-        "dependencies.cpp",
-    ],
-    LIBDEPS=[
-        "$BUILD_DIR/mongo/db/exec/document_value/document_value",
-        "field_path",
     ],
 )
 
@@ -185,17 +161,6 @@ env.Library(
         "$BUILD_DIR/mongo/db/query/common_query_enums_and_helpers",
         "$BUILD_DIR/mongo/db/stats/counters",
         "aggregation_request_helper",
-    ],
-)
-
-env.Library(
-    target="document_path_support",
-    source=[
-        "document_path_support.cpp",
-    ],
-    LIBDEPS=[
-        "$BUILD_DIR/mongo/db/common",
-        "$BUILD_DIR/mongo/db/exec/document_value/document_value",
     ],
 )
 
@@ -549,17 +514,6 @@ env.Library(
         "docs_needed_bounds",
         "runtime_constants_idl",
         "value_idl",
-    ],
-)
-
-env.Library(
-    target="value_idl",
-    source=[
-        "value_gen.cpp",
-    ],
-    LIBDEPS=[
-        "$BUILD_DIR/mongo/db/exec/document_value/document_value",
-        "$BUILD_DIR/mongo/idl/idl_parser",
     ],
 )
 

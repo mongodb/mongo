@@ -9,6 +9,50 @@ exports_files(
     ]),
 )
 
+mongo_cc_library(
+    name = "field_path",
+    srcs = [
+        "field_path.cpp",
+    ],
+    hdrs = [
+        "field_path.h",
+    ],
+    deps = [
+        "//src/mongo:base",
+        "//src/mongo/db:server_base",
+        "//src/mongo/db:server_options",  # TODO(SERVER-98376): Remove.
+        "//src/mongo/db/query:query_knobs",  # TODO(SERVER-98376): Remove.
+    ],
+)
+
+mongo_cc_library(
+    name = "dependencies",
+    srcs = [
+        "dependencies.cpp",
+    ],
+    hdrs = [
+        "dependencies.h",
+    ],
+    deps = [
+        ":field_path",
+        "//src/mongo/db/exec/document_value",  # TODO(SERVER-98376): Remove.
+    ],
+)
+
+mongo_cc_library(
+    name = "document_path_support",
+    srcs = [
+        "document_path_support.cpp",
+    ],
+    hdrs = [
+        "document_path_support.h",
+    ],
+    deps = [
+        "//src/mongo/db:common",
+        "//src/mongo/db/exec/document_value",  # TODO(SERVER-98376): Remove.
+    ],
+)
+
 idl_generator(
     name = "change_stream_pre_and_post_images_options_gen",
     src = "change_stream_pre_and_post_images_options.idl",
@@ -53,6 +97,17 @@ idl_generator(
 idl_generator(
     name = "value_gen",
     src = "value.idl",
+)
+
+mongo_cc_library(
+    name = "value_idl",
+    srcs = [
+        "value_gen",
+    ],
+    deps = [
+        "//src/mongo/db/exec/document_value",  # TODO(SERVER-98376): Remove.
+        "//src/mongo/idl:idl_parser",
+    ],
 )
 
 idl_generator(

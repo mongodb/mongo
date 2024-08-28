@@ -239,22 +239,6 @@ env.Library(
     ],
 )
 
-env.Library(
-    target="create_command",
-    source=[
-        "create_gen.cpp",
-    ],
-    LIBDEPS_PRIVATE=[
-        "$BUILD_DIR/mongo/crypto/encrypted_field_config",
-        "$BUILD_DIR/mongo/db/auth/authprivilege",
-        "$BUILD_DIR/mongo/db/catalog/collection_options",
-        "$BUILD_DIR/mongo/db/query/query_knobs",
-        "$BUILD_DIR/mongo/db/server_base",
-        "$BUILD_DIR/mongo/db/server_options",
-        "$BUILD_DIR/mongo/db/timeseries/timeseries_options",
-    ],
-)
-
 # Commands that are present in both mongod and embedded
 env.Library(
     target="standalone",

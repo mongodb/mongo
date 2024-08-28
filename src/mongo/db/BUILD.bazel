@@ -153,9 +153,48 @@ idl_generator(
     src = "server_options_helpers.idl",
 )
 
+mongo_cc_library(
+    name = "server_options",
+    srcs = [
+        "server_options_helpers.cpp",
+        "server_options_helpers_gen",
+    ],
+    hdrs = [
+        "server_options_helpers.h",
+    ],
+    deps = [
+        ":server_base",
+        "//src/mongo/util:fail_point",  #  TODO(SERVER-98376): Remove.
+        "//src/mongo/util/cmdline_utils",
+    ],
+)
+
 idl_generator(
     name = "windows_options_gen",
     src = "windows_options.idl",
+)
+
+mongo_cc_library(
+    name = "server_options_base",
+    srcs = [
+        "cluster_auth_mode_option_gen",
+        "keyfile_option_gen",
+        "mongod_options_general.h",
+        "server_options_base.cpp",
+        "server_options_base_gen",
+        "server_options_general_gen",
+        "server_options_nongeneral_gen",
+        "server_options_upgrade_downgrade_gen",
+    ],
+    hdrs = [
+        "server_options_base.h",
+    ],
+    deps = [
+        ":connection_health_metrics_parameter",  # TODO(SERVER-98376): Remove.
+        ":server_base",
+        "//src/mongo/db/auth:cluster_auth_mode",
+        "//src/mongo/util/options_parser",
+    ],
 )
 
 idl_generator(
@@ -196,6 +235,17 @@ idl_generator(
 idl_generator(
     name = "connection_health_metrics_parameter_gen",
     src = "connection_health_metrics_parameter.idl",
+)
+
+mongo_cc_library(
+    name = "connection_health_metrics_parameter",
+    srcs = [
+        "connection_health_metrics_parameter_gen",
+    ],
+    deps = [
+        ":server_base",
+        "//src/mongo/util/options_parser",  # TODO(SERVER-98376): Remove.
+    ],
 )
 
 idl_generator(
@@ -394,6 +444,19 @@ idl_generator(
     ],
 )
 
+mongo_cc_library(
+    name = "coll_mod_command_idl",
+    srcs = [
+        "coll_mod_gen",
+    ],
+    deps = [
+        ":server_base",
+        "//src/mongo/db/auth:authprivilege",
+        "//src/mongo/db/catalog:collection_options",
+        "//src/mongo/db/timeseries:timeseries_options",  # TODO(SERVER-98376): Remove.
+    ],
+)
+
 idl_generator(
     name = "dbcommands_gen",
     src = "dbcommands.idl",
@@ -497,6 +560,18 @@ idl_generator(
     ],
 )
 
+mongo_cc_library(
+    name = "resumable_index_builds_idl",
+    srcs = [
+        "resumable_index_builds_gen",
+    ],
+    deps = [
+        "//src/mongo:base",
+        "//src/mongo/db/sorter:sorter_base",
+        "//src/mongo/idl:idl_parser",
+    ],
+)
+
 idl_generator(
     name = "cloner_gen",
     src = "cloner.idl",
@@ -510,6 +585,23 @@ idl_generator(
 idl_generator(
     name = "ttl_gen",
     src = "ttl.idl",
+)
+
+mongo_cc_library(
+    name = "record_id_helpers",
+    srcs = [
+        "record_id_helpers.cpp",
+    ],
+    hdrs = [
+        "record_id_helpers.h",
+    ],
+    deps = [
+        ":server_base",
+        "//src/mongo/bson:bson_validate",
+        "//src/mongo/db/catalog:collection_options",
+        "//src/mongo/db/query/collation:collator_interface",  # TODO(SERVER-98376): Remove.
+        "//src/mongo/db/storage:key_string",  # TODO(SERVER-98376): Remove.
+    ],
 )
 
 idl_generator(

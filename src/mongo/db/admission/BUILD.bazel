@@ -82,6 +82,10 @@ mongo_cc_library(
     header_deps = [
         "//src/mongo/db/pipeline/process_interface:mongo_process_interface",
     ],
+    deps = [
+        "//src/mongo:base",
+        "//src/mongo/db:server_base",
+    ],
 )
 
 mongo_cc_library(
