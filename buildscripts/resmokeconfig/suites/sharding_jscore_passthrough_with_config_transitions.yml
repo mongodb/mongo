@@ -53,24 +53,6 @@ selector:
     # longer be active and the test will fail.
     - jstests/core/failcommand_failpoint.js
 
-    # Uses getmores. This suite executes random moveCollections in the background that cause open
-    # cursors on the collection to be killed.
-    - jstests/core/administrative/current_op/currentop_cursors.js
-    - jstests/core/administrative/list_all_local_sessions.js
-    - jstests/core/index/wildcard/wildcard_index_covered_queries.js
-    - jstests/core/timeseries/bucket_unpacking_with_compound_sort_on_point_queries.js
-    - jstests/core/timeseries/bucket_unpacking_with_match_fixed_buckets.js
-    - jstests/core/timeseries/bucket_unpacking_with_sort_extended_range.js
-    - jstests/core/timeseries/bucket_unpacking_with_sort_negative.js
-    - jstests/core/timeseries/bucket_unpacking_with_sort_on_multiple_fields_point_queries.js
-    - jstests/core/timeseries/bucket_unpacking_with_sort_on_single_field_point_queries.js
-    - jstests/core/timeseries/bucket_unpacking_with_sort.js
-    - jstests/core/timeseries/timeseries_internal_bounded_sort_compound_mixed_types.js
-    - jstests/core/timeseries/timeseries_update_normalize_metadata.js
-    - jstests/core/write/crud_api.js
-    - jstests/core/write/delete/remove8.js
-    - src/mongo/db/modules/enterprise/jstests/fle2/collection_coll_stats.js
-
     # TODO (SERVER-90646): Re-enable background_unique_indexes.js in config transition suites.
     - jstests/core/ddl/background_unique_indexes.js
 

@@ -9,6 +9,7 @@
  *   does_not_support_stepdowns,
  *   # We need a timeseries collection.
  *   requires_timeseries,
+ *   requires_getmore,
  * ]
  */
 import {getAggPlanStage} from "jstests/libs/analyze_plan.js";

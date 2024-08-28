@@ -4,6 +4,9 @@
  * Intersperse queries which use a rooted OR stage with updates and deletes of documents they may
  * match.
  * Other workloads that need an index on c and d can inherit from this.
+ * @tags: [
+ *   requires_getmore
+ * ]
  */
 import {extendWorkload} from "jstests/concurrency/fsm_libs/extend_workload.js";
 import {$config as $baseConfig} from "jstests/concurrency/fsm_workloads/yield.js";

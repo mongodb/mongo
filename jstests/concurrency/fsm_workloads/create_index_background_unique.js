@@ -11,6 +11,7 @@
  *     creates_background_indexes,
  *     requires_persistence,
  *     assumes_balancer_off,
+ *     requires_getmore
  * ]
  */
 import {

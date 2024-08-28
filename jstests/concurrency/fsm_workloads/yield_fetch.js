@@ -3,6 +3,9 @@
  *
  * Intersperse queries which use the FETCH stage with updates and deletes of documents they may
  * match.
+ * @tags: [
+ *   requires_getmore
+ * ]
  */
 import {extendWorkload} from "jstests/concurrency/fsm_libs/extend_workload.js";
 import {$config as $baseConfig} from "jstests/concurrency/fsm_workloads/yield_rooted_or.js";

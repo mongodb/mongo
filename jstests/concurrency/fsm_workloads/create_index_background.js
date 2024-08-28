@@ -8,7 +8,8 @@
  *
  * @tags: [
  *   assumes_balancer_off,
- *   creates_background_indexes
+ *   creates_background_indexes,
+ *   requires_getmore
  * ]
  */
 import {isMongos} from "jstests/concurrency/fsm_workload_helpers/server_types.js";

@@ -6,6 +6,7 @@
  *   requires_timeseries,
  *   requires_non_retryable_writes,
  *   featureFlagTimeseriesUpdatesSupport,
+ *   requires_getmore,
  * ]
  */
 

@@ -2,6 +2,9 @@
  * indexed_insert_text.js
  *
  * Inserts some documents into a collection with a text index.
+ * @tags: [
+ *   requires_getmore
+ * ]
  */
 export const $config = (function() {
     var states = {

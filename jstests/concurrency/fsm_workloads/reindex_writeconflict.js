@@ -2,6 +2,9 @@
  * reindex_writeconflict.js
  *
  * Ensures reIndex successfully handles WriteConflictExceptions.
+ * @tags: [
+ *   requires_getmore
+ * ]
  */
 export const $config = (function() {
     var states = {

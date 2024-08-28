@@ -3,6 +3,9 @@
  *
  * Base workload for aggregation. Inserts a bunch of documents in its setup,
  * then each thread does an aggregation with an empty $match.
+ * @tags: [
+ *   requires_getmore
+ * ]
  */
 
 export const $config = (function() {

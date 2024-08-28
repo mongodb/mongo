@@ -8,7 +8,7 @@
  * When the balancer is enabled, the nRemoved result may be inaccurate as
  * a chunk migration may be active, causing the count function to assert.
  *
- * @tags: [assumes_balancer_off]
+ * @tags: [assumes_balancer_off, requires_getmore]
  */
 export const $config = (function() {
     var states = {

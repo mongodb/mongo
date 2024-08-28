@@ -17,6 +17,7 @@
  * @tags: [
  *   # PM-1632 was delivered in 7.1, resolving the issue about assumes_unsharded_collection.
  *   requires_fcv_81,
+ *   requires_getmore,
  * ]
  */
 import {isMongod} from "jstests/concurrency/fsm_workload_helpers/server_types.js";

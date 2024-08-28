@@ -6,6 +6,9 @@
  * operation occurs.
  *
  * This workload was designed to reproduce SERVER-25039.
+ * @tags: [
+ *   requires_getmore
+ * ]
  */
 
 import {extendWorkload} from "jstests/concurrency/fsm_libs/extend_workload.js";

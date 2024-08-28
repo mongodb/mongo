@@ -6,6 +6,7 @@
  * @tags: [
  *  # Uses $where operator
  *  requires_scripting,
+ *  requires_getmore,
  * ]
  */
 

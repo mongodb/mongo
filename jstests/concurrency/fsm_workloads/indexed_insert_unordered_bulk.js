@@ -5,6 +5,9 @@
  * documents appear in both a collection scan and an index scan.
  *
  * Uses an unordered, bulk operation to perform the inserts.
+ * @tags: [
+ *   requires_getmore
+ * ]
  */
 import {extendWorkload} from "jstests/concurrency/fsm_libs/extend_workload.js";
 import {$config as $baseConfig} from "jstests/concurrency/fsm_workloads/indexed_insert_base.js";

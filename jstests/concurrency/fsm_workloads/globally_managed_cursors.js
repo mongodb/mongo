@@ -3,7 +3,12 @@
  * designed to reproduce SERVER-33959.
  *
  * The "grandparent test," invalidated_cursors.js, uses $currentOp.
- * @tags: [uses_curop_agg_stage, state_functions_share_cursor, assumes_balancer_off]
+ * @tags: [
+ *   uses_curop_agg_stage,
+ *   state_functions_share_cursor,
+ *   assumes_balancer_off,
+ *   requires_getmore
+ * ]
  */
 import {extendWorkload} from "jstests/concurrency/fsm_libs/extend_workload.js";
 import {

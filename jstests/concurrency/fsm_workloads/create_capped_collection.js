@@ -4,7 +4,7 @@
  * Repeatedly creates a capped collection. Also verifies that truncation
  * occurs once the collection reaches a certain size.
  *
- * @tags: [requires_capped]
+ * @tags: [requires_capped, requires_getmore]
  */
 export const $config = (function() {
     // Returns a document of the form { _id: ObjectId(...), field: '...' }

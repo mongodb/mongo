@@ -3,7 +3,8 @@
  *
  * @tags: [
  *   assumes_balancer_off,
- *   creates_background_indexes
+ *   creates_background_indexes,
+ *   requires_getmore
  * ]
  */
 import {extendWorkload} from "jstests/concurrency/fsm_libs/extend_workload.js";

@@ -8,6 +8,7 @@
 //   # This test writes with {w: 0} which doesn't wait for the storage transaction writing the
 //   # document and the oplog entry to commit so the TenantMigrationConflict will not be caught.
 //   tenant_migration_incompatible,
+//   requires_getmore,
 // ]
 
 import {arrayEq} from "jstests/aggregation/extras/utils.js";

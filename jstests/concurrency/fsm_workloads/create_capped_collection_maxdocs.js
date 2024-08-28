@@ -10,7 +10,7 @@
  * This makes it possible for the capped collection to exceed its capped limit temporarily until
  * the next insert is performed successfully without rolling back.
  *
- * @tags: [does_not_support_stepdowns, requires_capped]
+ * @tags: [does_not_support_stepdowns, requires_capped, requires_getmore]
  */
 import {extendWorkload} from "jstests/concurrency/fsm_libs/extend_workload.js";
 import {

@@ -3,7 +3,8 @@
  * opened on behalf of the $unionWith are killed when interrupted.
  *
  * @tags: [
- *   uses_curop_agg_stage
+ *   uses_curop_agg_stage,
+ *   requires_getmore
  * ]
  */
 import {interruptedQueryErrors} from "jstests/concurrency/fsm_libs/assert.js";

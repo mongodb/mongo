@@ -5,6 +5,9 @@
  * may match.
  *
  * Other workloads that need an index { a: 1, b: 1 } can extend this.
+ * @tags: [
+ *   requires_getmore
+ * ]
  */
 import {extendWorkload} from "jstests/concurrency/fsm_libs/extend_workload.js";
 import {$config as $baseConfig} from "jstests/concurrency/fsm_workloads/yield.js";

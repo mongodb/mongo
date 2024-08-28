@@ -1,5 +1,8 @@
 /**
  * Executes query operations that can yield while the source collection is dropped and recreated.
+ * @tags: [
+ *   requires_getmore
+ * ]
  */
 
 export const $config = (function() {

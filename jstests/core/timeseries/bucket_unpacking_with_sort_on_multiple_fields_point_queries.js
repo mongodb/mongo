@@ -16,6 +16,7 @@
  *     # TODO (SERVER-88539) the timeseries setup runs a migration. Remove the upgrade-downgrade
  *     # incompatible tag once migrations  work during downgrade.
  *     cannot_run_during_upgrade_downgrade,
+ *     requires_getmore,
  * ]
  */
 import {
