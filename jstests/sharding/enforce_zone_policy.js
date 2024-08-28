@@ -37,7 +37,10 @@ function assertBalanceCompleteAndStable(checkFunc, stepName) {
 
     assert.soon(checkFunc, 'Balance at step ' + stepName + ' did not happen', 3 * 60 * 1000, 2000);
 
-    st.awaitBalancerRound();
+    // When running with CSRS stepdowns, the balancer round might take longer to complete
+    const balancerRoundTimeout = TestData.runningWithConfigStepdowns ? 3 * 60 * 1000 : 60 * 1000;
+    st.awaitBalancerRound(balancerRoundTimeout);
+
     st.printShardingStatus(true);
     assert(checkFunc());
 
