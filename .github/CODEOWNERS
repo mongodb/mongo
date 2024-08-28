@@ -218,7 +218,7 @@ WORKSPACE.bazel @10gen/devprod-build
 /src/mongo/base/**/secure_allocator* @10gen/server-security
 
 # The following patterns are parsed from ./src/mongo/bson/OWNERS.yml
-/src/mongo/bson/**/* @10gen/server-storage-execution
+/src/mongo/bson/**/* @10gen/server-programmability
 
 # The following patterns are parsed from ./src/mongo/client/OWNERS.yml
 /src/mongo/client/**/* @10gen/server-networking-and-observability
