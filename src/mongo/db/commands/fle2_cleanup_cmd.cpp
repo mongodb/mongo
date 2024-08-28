@@ -290,7 +290,7 @@ CleanupStats cleanupEncryptedCollection(OperationContext* opCtx,
         cleanupESCNonAnchors(
             opCtx, namespaces.escNss, escDeleteSet, tagsPerDelete, &stats.getEsc());
 
-        // Delete the entries in esc.deletes collection from the ESC
+        // Delete the entries in the priority queue of ESC anchors from the ESC
         cleanupESCAnchors(opCtx, namespaces.escNss, pq, tagsPerDelete, &stats.getEsc());
     }
 

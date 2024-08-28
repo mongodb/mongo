@@ -155,7 +155,9 @@ CompactStats compactEncryptedCompactionCollection(OperationContext* opCtx,
         LOGV2(6548306, "Skipping compaction as there is no ECOC collection to compact");
         return stats;
     } else if (ecoc && !ecocRename) {
-        // load the random set of ESC non-anchor entries to be deleted post-compact
+        // load the random set of ESC non-anchor entries to be deleted post-compact.
+        // This must be done before renaming the ECOC because if not, we can end up with
+        // ESC entries that have no corresponding ECOC entry in the renamed ECOC.
         auto memoryLimit =
             ServerParameterSet::getClusterParameterSet()
                 ->get<ClusterParameterWithStorage<FLECompactionOptions>>("fleCompactionOptions")
