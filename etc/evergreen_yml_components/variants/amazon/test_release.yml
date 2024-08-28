@@ -422,7 +422,7 @@ buildvariants:
         # This is added because of EVG-18211.
         # Without this we are adding extra dependencies on evergreen and it is causing strain
         omit_generated_tasks: true
-      - name: archive_dist_test_debug
+      - name: archive_dist_test
         variant: enterprise-amazon2023-arm64
     tasks:
       - name: .aggfuzzer !.multiversion

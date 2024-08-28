@@ -11,7 +11,7 @@ variables:
   # ANY MODIFICATIONS HERE SHOULD ALSO BE MADE IN THOSE FILES
   - &windows_compile_variant_dependency
     depends_on:
-      - name: archive_dist_test_debug
+      - name: archive_dist_test
         variant: &windows_compile_variant_name windows-compile-required
       - name: version_gen
         variant: generate-tasks-for-version
@@ -122,7 +122,7 @@ buildvariants:
       #   - name: version_burn_in_gen
       #     variant: generate-tasks-for-version
       #     omit_generated_tasks: true
-      #   - name: archive_dist_test_debug
+      #   - name: archive_dist_test
       #     variant: *windows_compile_variant_name
       - name: .development_critical !.requires_large_host !.requires_compile_variant !.incompatible_development_variant !.incompatible_windows !.incompatible_all_feature_flags .requires_execution_on_windows_patch_build
       - name: .development_critical .requires_large_host !.requires_compile_variant !.incompatible_development_variant !.incompatible_windows !.incompatible_all_feature_flags .requires_execution_on_windows_patch_build
@@ -172,7 +172,7 @@ buildvariants:
       #   - name: version_burn_in_gen
       #     variant: generate-tasks-for-version
       #     omit_generated_tasks: true
-      #   - name: archive_dist_test_debug
+      #   - name: archive_dist_test
       #     variant: *windows_compile_variant_name
       - name: .development_critical !.requires_large_host !.requires_compile_variant !.incompatible_development_variant !.incompatible_windows !.incompatible_all_feature_flags
       - name: .development_critical .requires_large_host !.requires_compile_variant !.incompatible_development_variant !.incompatible_windows !.incompatible_all_feature_flags

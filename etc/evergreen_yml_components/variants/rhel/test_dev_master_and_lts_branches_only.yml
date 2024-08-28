@@ -14,7 +14,7 @@ variables:
   # ANY MODIFICATIONS HERE SHOULD ALSO BE MADE IN THOSE FILES
   - &linux_x86_dynamic_compile_variant_dependency
     depends_on:
-      - name: archive_dist_test_debug
+      - name: archive_dist_test
         variant: &linux_x86_dynamic_compile_variant_name linux-x86-dynamic-compile
       - name: version_gen
         variant: generate-tasks-for-version

@@ -72,7 +72,7 @@ def get_setup_commands() -> Tuple[List[FunctionCall], Set[TaskDependency]]:
     """Return setup commands."""
     return [
         FunctionCall("do setup"),
-    ], {TaskDependency("archive_dist_test_debug")}
+    ], {TaskDependency("archive_dist_test")}
 
 
 def get_skip_compile_setup_commands() -> Tuple[List[FunctionCall], set]:

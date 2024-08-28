@@ -70,7 +70,7 @@ buildvariants:
     modules:
       - wtdevelop
     depends_on:
-      - name: archive_dist_test_debug
+      - name: archive_dist_test
         variant: &linux_x86_dynamic_debug_wtdevelop_compile_variant_name linux-x86-dynamic-debug-wtdevelop-compile
       - name: version_gen
         variant: generate-tasks-for-version
@@ -176,7 +176,7 @@ buildvariants:
           - name: version_burn_in_gen
             variant: generate-tasks-for-version
             omit_generated_tasks: true
-          - name: archive_dist_test_debug
+          - name: archive_dist_test
       - name: .aggfuzzer .common !.feature_flag_guarded
       - name: audit
       - name: auth_audit_gen

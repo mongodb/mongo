@@ -40,7 +40,7 @@ variables:
   # ANY MODIFICATIONS HERE SHOULD ALSO BE MADE IN THOSE FILES
   - &linux_x86_dynamic_compile_variant_dependency
     depends_on:
-      - name: archive_dist_test_debug
+      - name: archive_dist_test
         variant: &linux_x86_dynamic_compile_variant_name linux-x86-dynamic-compile
       - name: version_gen
         variant: generate-tasks-for-version
@@ -104,7 +104,7 @@ variables:
 
   - &linux_x86_dynamic_debug_compile_variant_dependency
     depends_on:
-      - name: archive_dist_test_debug
+      - name: archive_dist_test
         variant: &linux_x86_dynamic_debug_compile_variant_name linux-x86-dynamic-debug-compile-required
       - name: version_gen
         variant: generate-tasks-for-version
@@ -120,7 +120,7 @@ variables:
   # ANY MODIFICATIONS HERE SHOULD ALSO BE MADE IN THOSE FILES
   - &linux_debug_aubsan_compile_variant_dependency
     depends_on:
-      - name: archive_dist_test_debug
+      - name: archive_dist_test
         variant: &linux_debug_aubsan_compile_variant_name linux-debug-aubsan-compile-required
       - name: archive_jstestshell
         variant: *linux_debug_aubsan_compile_variant_name
@@ -176,7 +176,7 @@ variables:
   # ANY MODIFICATIONS HERE SHOULD ALSO BE MADE IN THOSE FILES
   - &enterprise-rhel8-debug-tsan-compile-dependency
     depends_on:
-      - name: archive_dist_test_debug
+      - name: archive_dist_test
         variant: &enterprise-rhel8-debug-tsan-compile enterprise-rhel8-debug-tsan-compile
       - name: archive_jstestshell
         variant: *enterprise-rhel8-debug-tsan-compile

@@ -109,7 +109,7 @@ buildvariants:
     display_name: Enterprise Windows Server 2022 Security
     tags: []
     depends_on:
-      - name: archive_dist_test_debug
+      - name: archive_dist_test
         variant: *enterprise-windows
     tasks:
       - name: external_auth_windows

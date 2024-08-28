@@ -22,10 +22,10 @@ buildvariants:
         enterprise-rhel-8-64-bit-inmem
         enterprise-rhel-8-64-bit-multiversion
         amazon-linux2-arm64-try-sbe-engine
-      burn_in_tag_compile_task_dependency: archive_dist_test_debug
+      burn_in_tag_compile_task_dependency: archive_dist_test
       compile_variant: &amazon_linux2_arm64_dynamic_compile_variant_name amazon-linux2-arm64-dynamic-compile
     depends_on:
-      - name: archive_dist_test_debug
+      - name: archive_dist_test
         variant: *amazon_linux2_arm64_dynamic_compile_variant_name
       - name: version_gen
         variant: generate-tasks-for-version

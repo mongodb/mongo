@@ -35,7 +35,7 @@ variables:
   - &run_jepsen_template
     name: run_jepsen_template
     depends_on:
-      - name: archive_dist_test_debug
+      - name: archive_dist_test
     commands:
       - func: "do setup"
       - func: "do jepsen setup"
@@ -1135,7 +1135,7 @@ tasks:
       ]
     exec_timeout_secs: 7200 # 2 hour timeout for the task overall
     depends_on:
-      - name: archive_dist_test_debug
+      - name: archive_dist_test
     commands:
       - func: "do setup"
       - func: "set up remote credentials"
@@ -1175,7 +1175,7 @@ tasks:
       ]
     exec_timeout_secs: 7200 # 2 hour timeout for the task overall
     depends_on:
-      - name: archive_dist_test_debug
+      - name: archive_dist_test
     commands:
       - func: "do setup"
       - func: "set up remote credentials"
@@ -1198,7 +1198,7 @@ tasks:
       ]
     exec_timeout_secs: 7200 # 2 hour timeout for the task overall
     depends_on:
-      - name: archive_dist_test_debug
+      - name: archive_dist_test
     commands:
       - func: "do setup"
       - func: "set up remote credentials"
@@ -1221,7 +1221,7 @@ tasks:
       ]
     exec_timeout_secs: 7200 # 2 hour timeout for the task overall
     depends_on:
-      - name: archive_dist_test_debug
+      - name: archive_dist_test
     commands:
       - func: "do setup"
       - func: "set up remote credentials"
@@ -1244,7 +1244,7 @@ tasks:
       ]
     exec_timeout_secs: 7200 # 2 hour timeout for the task overall
     depends_on:
-      - name: archive_dist_test_debug
+      - name: archive_dist_test
     commands:
       - func: "do setup"
       - func: "set up remote credentials"
@@ -1280,7 +1280,7 @@ tasks:
       ]
     exec_timeout_secs: 7200 # 2 hour timeout for the task overall
     depends_on:
-      - name: archive_dist_test_debug
+      - name: archive_dist_test
     commands:
       - func: "do setup"
       - func: "set up remote credentials"
@@ -1321,7 +1321,7 @@ tasks:
       ]
     exec_timeout_secs: 7200 # 2 hour timeout for the task overall
     depends_on:
-      - name: archive_dist_test_debug
+      - name: archive_dist_test
     commands:
       - func: "do setup"
       - func: "set up remote credentials"
@@ -1344,7 +1344,7 @@ tasks:
       ]
     exec_timeout_secs: 7200 # 2 hour timeout for the task overall
     depends_on:
-      - name: archive_dist_test_debug
+      - name: archive_dist_test
     commands:
       - func: "do setup"
       - func: "set up remote credentials"

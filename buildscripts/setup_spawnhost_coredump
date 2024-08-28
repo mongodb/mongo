@@ -12,11 +12,37 @@ esac
 
 TOOLCHAIN_ROOT=/opt/mongodbtoolchain/v4
 
+SRC_DIR=$(ls -d /data/mci/source-* 2>/dev/null)
+ln -s $SRC_DIR src
+
+echo "# This is a fake expansions file to allow our setup scripts to function correctly." > "/data/mci/expansions.yml"
+echo "spawn_host: \"true\"" >> "/data/mci/expansions.yml"
+
+HOME_DIR=$(pwd)
+
+# needed for the python install to be successful on windows
+if [[ "${machine}" = "Cygwin" ]]; then
+    export USERPROFILE=$(cygpath -w ~)
+    HOME_DIR=$(cygpath -u $USERPROFILE)
+fi
+
+bash $HOME_DIR/src/evergreen/functions/venv_setup.sh
+. $HOME_DIR/src/evergreen/prelude.sh
+activate_venv
+
+# download archive_dist_test_debug if evergreen did not do so automatically.
+# Evergreen will not automatically download artifacts if it is not in the dep chain
+DOWNLOAD_SCRIPT="${SRC_DIR}/evergreen/spawnhost/download_archive_dist_test_debug.py"
+if [ -f $FILE ]; then
+    $python $DOWNLOAD_SCRIPT
+fi
+
 archive_fail() {
     echo "Error: archive [${1}] not found." >&2
 }
 
 if [[ "${machine}" = "Cygwin" ]]; then
+    echo "source $(pwd)/venv/Scripts/activate" >> ~/.bashrc
     out_dir="/cygdrive/c/setup_script_output.txt"
     desktop_dir="/cygdrive/c/Users/Administrator/Desktop"
 
@@ -112,6 +138,7 @@ if [[ "${machine}" = "Cygwin" ]]; then
 else
     # Communicate to users that logged in before the script started that nothing is ready.
     wall "The setup_spawnhost_coredump script has just started setting up the debugging environment."
+    echo "source $(pwd)/venv/bin/activate" >> ~/.bashrc
 
     # Write this file that gets cat'ed on login to communicate to users logging in if this setup script is still running.
     echo '+-----------------------------------------------------------------------------------+' > ~/.setup_spawnhost_coredump_progress
@@ -205,17 +232,6 @@ fi' >> .bash_profile
         ln -s ${SRC_DIR}/.gdbinit .
         ln -s ${SRC_DIR}/src src
         ln -s ${SRC_DIR}/buildscripts buildscripts
-
-        # Install pymongo to get the bson library for pretty-printers.
-        # This is copied from evergreen/functions/venv_setup.sh
-        if [ "Windows_NT" = "$OS" ]; then
-           ${TOOLCHAIN_ROOT}/bin/python3 -m pip install "poetry==1.8.3" "charset-normalizer==2.0.12"
-        else
-           ${TOOLCHAIN_ROOT}/bin/python3 -m pip install "poetry==1.8.3"
-        fi
-        pushd ${SRC_DIR}
-        ${TOOLCHAIN_ROOT}/bin/python3 -m poetry install --no-root --sync &
-        popd
     else
         archive_fail "src"
     fi

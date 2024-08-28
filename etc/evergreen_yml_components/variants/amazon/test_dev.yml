@@ -52,7 +52,7 @@ variables:
   # ANY MODIFICATIONS HERE SHOULD ALSO BE MADE IN THOSE FILES
   - &amazon_linux2_arm64_dynamic_compile_variant_dependency
     depends_on:
-      - name: archive_dist_test_debug
+      - name: archive_dist_test
         variant: &amazon_linux2_arm64_dynamic_compile_variant_name amazon-linux2-arm64-dynamic-compile
       - name: archive_jstestshell
         variant: *amazon_linux2_arm64_dynamic_compile_variant_name
@@ -250,7 +250,7 @@ buildvariants:
           - name: version_burn_in_gen
             variant: generate-tasks-for-version
             omit_generated_tasks: true
-          - name: archive_dist_test_debug
+          - name: archive_dist_test
             variant: *amazon_linux2_arm64_dynamic_compile_variant_name
       - name: multiversion_gen
       - name: .multiversion_sanity_check

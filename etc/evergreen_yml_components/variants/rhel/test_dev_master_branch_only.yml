@@ -66,7 +66,7 @@ variables:
   # ANY MODIFICATIONS HERE SHOULD ALSO BE MADE IN THOSE FILES
   - &linux_x86_dynamic_compile_variant_dependency
     depends_on:
-      - name: archive_dist_test_debug
+      - name: archive_dist_test
         variant: &linux_x86_dynamic_compile_variant_name linux-x86-dynamic-compile
       - name: version_gen
         variant: generate-tasks-for-version
@@ -299,7 +299,7 @@ buildvariants:
       # run too long and hit execution timeouts.
       # burn_in_task_name: jsCore
     depends_on:
-      - name: archive_dist_test_debug
+      - name: archive_dist_test
         variant: *linux_x86_dynamic_compile_variant_name
       - name: version_gen
         variant: generate-tasks-for-version
@@ -312,7 +312,7 @@ buildvariants:
       #   - name: version_burn_in_gen
       #     variant: generate-tasks-for-version
       #     omit_generated_tasks: true
-      #   - name: archive_dist_test_debug
+      #   - name: archive_dist_test
       #     variant: *linux_x86_dynamic_compile_variant_name
       - name: .development_critical !.requires_large_host !.requires_compile_variant !.incompatible_development_variant !.incompatible_all_feature_flags
       - name: .development_critical .requires_large_host !.requires_compile_variant !.incompatible_development_variant !.incompatible_all_feature_flags
@@ -449,7 +449,7 @@ buildvariants:
         omit_generated_tasks: true
       - name: archive_dist_test_debug_future_git_tag_multiversion
         variant: *linux-x86-dynamic-compile-future-tag-multiversion-latest
-      - name: archive_dist_test_debug
+      - name: archive_dist_test
         variant: *linux-x86-dynamic-compile-future-tag-multiversion-last-continuous
     tasks:
       - name: .multiversion !.future_git_tag_incompatible
@@ -646,7 +646,7 @@ buildvariants:
         --mongodSetParameters="{internalQueryFrameworkControl: forceClassicEngine}"
         --excludeWithAnyTags=resource_intensive,featureFlagSbeFull
     depends_on:
-      - name: archive_dist_test_debug
+      - name: archive_dist_test
         variant: *linux_x86_dynamic_compile_variant_name
       - name: version_gen
         variant: generate-tasks-for-version
@@ -690,7 +690,7 @@ buildvariants:
           - name: version_burn_in_gen
             variant: generate-tasks-for-version
             omit_generated_tasks: true
-          - name: archive_dist_test_debug
+          - name: archive_dist_test
             variant: *linux_x86_dynamic_compile_variant_name
       - name: check_feature_flag_tags
       - name: check_for_todos
@@ -800,7 +800,7 @@ buildvariants:
           - name: version_burn_in_gen
             variant: generate-tasks-for-version
             omit_generated_tasks: true
-          - name: archive_dist_test_debug
+          - name: archive_dist_test
             variant: *linux_x86_dynamic_compile_variant_name
       - name: .audit .patch_build
       - name: .encrypt .patch_build

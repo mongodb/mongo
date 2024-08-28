@@ -40,7 +40,7 @@ variables:
   # ANY MODIFICATIONS HERE SHOULD ALSO BE MADE IN THOSE FILES
   - &linux_x86_dynamic_compile_variant_dependency
     depends_on:
-      - name: archive_dist_test_debug
+      - name: archive_dist_test
         variant: &linux_x86_dynamic_compile_variant_name linux-x86-dynamic-compile
       - name: version_gen
         variant: generate-tasks-for-version
@@ -120,7 +120,7 @@ buildvariants:
     expansions:
       <<: *enterprise-rhel-8-64-bit-dynamic-expansions
     depends_on:
-      - name: archive_dist_test_debug
+      - name: archive_dist_test
         variant: *linux_x86_dynamic_compile_variant_name
       - name: version_gen
         variant: generate-tasks-for-version
@@ -214,7 +214,7 @@ buildvariants:
         --excludeWithAnyTags=featureFlagSbeFull
       large_distro_name: rhel8.8-medium
     depends_on:
-      - name: archive_dist_test_debug
+      - name: archive_dist_test
         variant: *linux_x86_dynamic_compile_variant_name
       - name: version_gen
         variant: generate-tasks-for-version
@@ -264,7 +264,7 @@ buildvariants:
           - name: version_burn_in_gen
             variant: generate-tasks-for-version
             omit_generated_tasks: true
-          - name: archive_dist_test_debug
+          - name: archive_dist_test
             variant: *linux_x86_dynamic_compile_variant_name
       - name: check_feature_flag_tags
       - name: check_for_todos

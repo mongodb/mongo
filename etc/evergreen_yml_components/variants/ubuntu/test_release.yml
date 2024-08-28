@@ -83,7 +83,7 @@ buildvariants:
     display_name: Ubuntu 22.04 Powercycle
     tags: []
     depends_on:
-      - name: archive_dist_test_debug
+      - name: archive_dist_test
         variant: *ubuntu2204
     tasks:
       - name: .powercycle
@@ -140,7 +140,7 @@ buildvariants:
     display_name: Ubuntu 24.04 Powercycle
     tags: []
     depends_on:
-      - name: archive_dist_test_debug
+      - name: archive_dist_test
         variant: *ubuntu2404
     tasks:
       - name: .powercycle
@@ -248,7 +248,7 @@ buildvariants:
     display_name: Enterprise Ubuntu 20.04 Security
     tags: []
     depends_on:
-      - name: archive_dist_test_debug
+      - name: archive_dist_test
         variant: *enterprise-ubuntu2004-64
     tasks:
       - name: external_auth_oidc

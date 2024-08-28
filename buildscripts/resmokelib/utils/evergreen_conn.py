@@ -306,6 +306,10 @@ def _filter_successful_tasks(
             and compile_task is None
         ):
             compile_task = evg_task.get_execution_or_self(0)
+            # archive_dist_test_debug might not be in the dep chain
+            # it should always be in the same build variant as the compile task
+            evg_tasks.extend(evg_api.tasks_by_build(compile_task.build_id))
+
         elif evg_task.display_name == "push":
             push_task = evg_task.get_execution_or_self(0)
         elif (

@@ -142,6 +142,9 @@ tasks:
     depends_on:
       - name: compile_dist_test
     commands:
+      - func: "activate task"
+        vars:
+          task_to_activate: archive_dist_test_debug
       - func: "scons compile"
         vars:
           targets: >-

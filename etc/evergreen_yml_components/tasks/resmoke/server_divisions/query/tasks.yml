@@ -14,7 +14,7 @@ variables:
   - &task_template
     name: template
     depends_on:
-      - name: archive_dist_test_debug
+      - name: archive_dist_test
     commands:
       - func: "do setup"
       - func: "run tests"
@@ -36,7 +36,7 @@ variables:
         # This is added because of EVG-18211.
         # Without this we are adding extra dependencies on evergreen and it is causing strain
         omit_generated_tasks: true
-      - name: archive_dist_test_debug
+      - name: archive_dist_test
     commands:
       - func: "generate resmoke tasks"
         vars:
@@ -99,7 +99,7 @@ variables:
         # This is added because of EVG-18211.
         # Without this we are adding extra dependencies on evergreen and it is causing strain
         omit_generated_tasks: true
-      - archive_dist_test_debug
+      - archive_dist_test
     commands:
       - func: "generate resmoke tasks"
 
