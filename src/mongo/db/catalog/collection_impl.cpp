@@ -1001,6 +1001,9 @@ Status CollectionImpl::updateCappedSize(OperationContext* opCtx,
                                         boost::optional<long long> newCappedSize,
                                         boost::optional<long long> newCappedMax) {
     invariant(shard_role_details::getLocker(opCtx)->isCollectionLockedForMode(ns(), MODE_X));
+    invariant(newCappedSize || newCappedMax,
+              "Expected newCappedSize or newCappedMax to be non-empty");
+
 
     if (!_shared->_isCapped) {
         return Status(ErrorCodes::InvalidNamespace,
@@ -1015,14 +1018,35 @@ Status CollectionImpl::updateCappedSize(OperationContext* opCtx,
         }
     }
 
+    boost::optional<long long> oldCappedSize, oldCappedMax;
+    bool shouldLog = false;
+
     _writeMetadata(opCtx, [&](BSONCollectionCatalogEntry::MetaData& md) {
+        oldCappedSize = md.options.cappedSize;
+        oldCappedMax = md.options.cappedMaxDocs;
+
         if (newCappedSize) {
+            shouldLog = md.options.cappedSize != newCappedSize;
             md.options.cappedSize = *newCappedSize;
         }
         if (newCappedMax) {
+            shouldLog = shouldLog || (md.options.cappedMaxDocs != newCappedMax);
             md.options.cappedMaxDocs = *newCappedMax;
         }
     });
+
+    if (shouldLog) {
+        LOGV2_INFO(9220900,
+                   "Updating capped size limit",
+                   logAttrs(ns()),
+                   "oldCappedSize"_attr = oldCappedSize.get_value_or(0),
+                   "newCappedSize"_attr = newCappedSize.get_value_or(0),
+                   "oldCappedMax"_attr = oldCappedMax.get_value_or(0),
+                   "newCappedMax"_attr = newCappedMax.get_value_or(0),
+                   "dataSize"_attr = dataSize(opCtx),
+                   "numRecords"_attr = numRecords(opCtx));
+    }
+
     return Status::OK();
 }
 
