@@ -184,6 +184,12 @@ IGNORE_UNSTABLE_LIST: List[str] = [
     # The 'runtimeConstants' field is a legacy field for internal use only and is not documented to
     # users.
     'delete-param-runtimeConstants',
+    # The 'bypassEmptyTsReplacement' field is used by mongorestore and mongosync and is not
+    # documented to users.
+    'insert-param-bypassEmptyTsReplacement',
+    'update-param-bypassEmptyTsReplacement',
+    'delete-param-bypassEmptyTsReplacement',
+    'findAndModify-param-bypassEmptyTsReplacement',
 ]
 
 SKIPPED_FILES = [
