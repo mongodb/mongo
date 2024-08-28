@@ -27,6 +27,8 @@
  *    it in the license file.
  */
 
+#include "mongo/util/assert_util.h"
+#include "mongo/util/str.h"
 #include <boost/move/utility_core.hpp>
 #include <utility>
 #include <vector>
@@ -66,7 +68,11 @@ Status ViewResponseFormatter::appendAsCountResponse(BSONObjBuilder* resultBuilde
     } else {
         invariant(cursorFirstBatch.size() == 1);
         auto countObj = cursorFirstBatch.back();
-        resultBuilder->append(kCountField, countObj["count"].Int());
+        auto countElem = countObj["count"];
+        tassert(9384400,
+                str::stream() << "the 'count' should be of number type, but found " << countElem,
+                countElem.isNumber());
+        resultBuilder->appendAs(countElem, kCountField);
     }
     resultBuilder->append(kOkField, 1);
     return Status::OK();
