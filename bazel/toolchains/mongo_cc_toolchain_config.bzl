@@ -25,6 +25,17 @@ all_compile_actions = [
     ACTION_NAMES.lto_backend,
 ]
 
+all_non_assembly_compile_actions = [
+    ACTION_NAMES.c_compile,
+    ACTION_NAMES.cpp_compile,
+    ACTION_NAMES.linkstamp_compile,
+    ACTION_NAMES.cpp_header_parsing,
+    ACTION_NAMES.cpp_module_compile,
+    ACTION_NAMES.cpp_module_codegen,
+    ACTION_NAMES.clif_match,
+    ACTION_NAMES.lto_backend,
+]
+
 all_cpp_compile_actions = [
     ACTION_NAMES.cpp_compile,
     ACTION_NAMES.linkstamp_compile,
@@ -478,7 +489,7 @@ def _impl(ctx):
             flag_set(
                 # This needs to only be set in the cpp compile actions to avoid generating debug info when
                 # building assembly files since the assembler doesn't support gdwarf64.
-                actions = all_cpp_compile_actions,
+                actions = all_non_assembly_compile_actions,
                 flag_groups = [
                     flag_group(
                         flags = [
@@ -497,7 +508,7 @@ def _impl(ctx):
             flag_set(
                 # This needs to only be set in the cpp compile actions to avoid generating debug info when
                 # building assembly files since the assembler doesn't support gdwarf64.
-                actions = all_cpp_compile_actions,
+                actions = all_non_assembly_compile_actions,
                 flag_groups = [flag_group(flags = ["-gdwarf-4"])],
             ),
         ],
@@ -510,7 +521,7 @@ def _impl(ctx):
             flag_set(
                 # This needs to only be set in the cpp compile actions to avoid generating debug info when
                 # building assembly files since the assembler doesn't support gdwarf64.
-                actions = all_cpp_compile_actions,
+                actions = all_non_assembly_compile_actions,
                 flag_groups = [flag_group(flags = ["-gdwarf-5"])],
             ),
         ],
@@ -523,7 +534,7 @@ def _impl(ctx):
             flag_set(
                 # This needs to only be set in the cpp compile actions to avoid generating debug info when
                 # building assembly files since the assembler doesn't support gdwarf64.
-                actions = all_cpp_compile_actions,
+                actions = all_non_assembly_compile_actions,
                 flag_groups = [flag_group(flags = ["-gdwarf32"])],
             ),
             flag_set(
@@ -538,7 +549,7 @@ def _impl(ctx):
         enabled = False,
         flag_sets = [
             flag_set(
-                actions = all_cpp_compile_actions,
+                actions = all_non_assembly_compile_actions,
                 flag_groups = [flag_group(flags = ["-gdwarf64"])],
             ),
             flag_set(
