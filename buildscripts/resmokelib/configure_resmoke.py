@@ -181,6 +181,9 @@ def _find_resmoke_wrappers():
     # We assume that users who fall under either case will explicitly pass the
     # --installDir argument.
     candidate_installs = glob.glob("**/bin/resmoke.py", recursive=True)
+    candidate_installs = [
+        wrapper for wrapper in candidate_installs if not wrapper.startswith("bazel-mongo/")
+    ]
     return list(candidate_installs)
 
 
