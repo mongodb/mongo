@@ -71,6 +71,7 @@ mongo_cc_library(
         "//src/mongo/db/matcher/schema:encrypt_schema_types.h",
         "//src/mongo/db/matcher/schema:expression_internal_schema_allowed_properties.h",
         "//src/mongo/db/matcher/schema:json_pointer.h",
+        "//src/mongo/db/pipeline:accumulator_percentile_enum_gen",
         "//src/mongo/db/pipeline:document_path_support.h",
         "//src/mongo/db/pipeline:document_source_change_stream_gen",
         "//src/mongo/db/pipeline:expression.h",

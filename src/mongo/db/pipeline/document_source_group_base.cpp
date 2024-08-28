@@ -533,7 +533,7 @@ DocumentSourceGroupBase::distributedPlanLogic() {
             tassert(9158201,
                     "casting AccumulatorState* to AccumulatorPercentile* failed",
                     accumPercentile);
-            if (accumPercentile->getMethod() != PercentileMethod::Approximate) {
+            if (accumPercentile->getMethod() != PercentileMethodEnum::kApproximate) {
                 return DistributedPlanLogic{nullptr, this, boost::none};
             }
         }

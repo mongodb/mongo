@@ -107,6 +107,14 @@ idl_generator(
 )
 
 idl_generator(
+    name = "accumulator_percentile_enum_gen",
+    src = "accumulator_percentile_enum.idl",
+    deps = [
+        "//src/mongo/db:basic_types_gen",
+    ],
+)
+
+idl_generator(
     name = "map_reduce_options_gen",
     src = "map_reduce_options.idl",
 )

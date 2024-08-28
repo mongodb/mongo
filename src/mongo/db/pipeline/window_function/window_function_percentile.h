@@ -70,7 +70,7 @@ public:
 
 protected:
     explicit WindowFunctionPercentileCommon(ExpressionContext* const expCtx,
-                                            PercentileMethod method)
+                                            PercentileMethodEnum method)
         : WindowFunctionState(expCtx),
           _values(boost::container::flat_multiset<double>()),
           _method(method) {}
@@ -95,19 +95,19 @@ protected:
     // as a binary search tree. Thus, using a boost::container::flat_multiset significantly improved
     // performance.
     boost::container::flat_multiset<double> _values;
-    PercentileMethod _method;
+    PercentileMethodEnum _method;
 };
 
 class WindowFunctionPercentile : public WindowFunctionPercentileCommon {
 public:
     static std::unique_ptr<WindowFunctionState> create(ExpressionContext* const expCtx,
-                                                       PercentileMethod method,
+                                                       PercentileMethodEnum method,
                                                        const std::vector<double>& ps) {
         return std::make_unique<WindowFunctionPercentile>(expCtx, method, ps);
     }
 
     explicit WindowFunctionPercentile(ExpressionContext* const expCtx,
-                                      PercentileMethod method,
+                                      PercentileMethodEnum method,
                                       const std::vector<double>& ps)
         : WindowFunctionPercentileCommon(expCtx, method), _ps(ps) {
         _memUsageTracker.set(sizeof(*this) + _ps.capacity() * sizeof(double));
@@ -141,11 +141,11 @@ private:
 class WindowFunctionMedian : public WindowFunctionPercentileCommon {
 public:
     static std::unique_ptr<WindowFunctionState> create(ExpressionContext* const expCtx,
-                                                       PercentileMethod method) {
+                                                       PercentileMethodEnum method) {
         return std::make_unique<WindowFunctionMedian>(expCtx, method);
     }
 
-    explicit WindowFunctionMedian(ExpressionContext* const expCtx, PercentileMethod method)
+    explicit WindowFunctionMedian(ExpressionContext* const expCtx, PercentileMethodEnum method)
         : WindowFunctionPercentileCommon(expCtx, method) {
         _memUsageTracker.set(sizeof(*this));
     }

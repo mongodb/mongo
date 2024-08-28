@@ -398,7 +398,7 @@ boost::intrusive_ptr<Expression> ExpressionQuantile<AccumulatorTType>::parse(
     BSONObj obj, const boost::optional<SortPattern>& sortBy, ExpressionContext* expCtx) {
 
     std::vector<double> ps;
-    PercentileMethod method = PercentileMethod::Approximate;
+    PercentileMethodEnum method = PercentileMethodEnum::kApproximate;
     boost::intrusive_ptr<::mongo::Expression> outputExpr;
     boost::intrusive_ptr<::mongo::Expression> initializeExpr;  // need for serializer.
     boost::optional<WindowBounds> bounds = WindowBounds::defaultBounds();

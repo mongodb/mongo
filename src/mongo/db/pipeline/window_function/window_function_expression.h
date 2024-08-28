@@ -1022,7 +1022,7 @@ public:
                        boost::intrusive_ptr<::mongo::Expression> initializeExpr,
                        WindowBounds bounds,
                        std::vector<double> ps,
-                       PercentileMethod method)
+                       PercentileMethodEnum method)
         : Expression(expCtx, std::move(accumulatorName), std::move(input), std::move(bounds)),
           _ps(std::move(ps)),
           _method(method),
@@ -1038,7 +1038,7 @@ public:
 
 private:
     std::vector<double> _ps;
-    PercentileMethod _method;
+    PercentileMethodEnum _method;
     boost::intrusive_ptr<::mongo::Expression> _intializeExpr;
 };
 

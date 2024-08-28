@@ -35,12 +35,6 @@
 
 namespace mongo {
 
-enum class PercentileMethod : int8_t {
-    Approximate = 0,
-    Discrete,
-    Continuous,
-};
-
 /**
  * Eventually we'll be supporting multiple types of percentiles (discrete, continuous, approximate)
  * and potentially multiple different algorithms for computing the approximate ones.

@@ -544,6 +544,7 @@ mongo_cc_library(
         "//src/mongo/db/ops:write_ops_exec_util.h",
         "//src/mongo/db/ops:write_ops_gen",
         "//src/mongo/db/ops:write_ops_parsers.h",
+        "//src/mongo/db/pipeline:accumulator_percentile_enum_gen",
         "//src/mongo/db/pipeline:change_stream_pre_and_post_images_options_gen",
         "//src/mongo/db/pipeline:dependencies.h",
         "//src/mongo/db/pipeline:document_path_support.h",

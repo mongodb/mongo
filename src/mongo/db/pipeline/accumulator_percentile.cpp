@@ -77,27 +77,27 @@ Status AccumulatorPercentile::validatePercentileMethod(StringData method) {
 }
 
 namespace {
-PercentileMethod methodNameToEnum(StringData method) {
+PercentileMethodEnum methodNameToEnum(StringData method) {
     if (method == AccumulatorPercentile::kApproximate) {
-        return PercentileMethod::Approximate;
+        return PercentileMethodEnum::kApproximate;
     }
     if (method == AccumulatorPercentile::kDiscrete) {
-        return PercentileMethod::Discrete;
+        return PercentileMethodEnum::kDiscrete;
     }
     if (method == AccumulatorPercentile::kContinuous) {
-        return PercentileMethod::Continuous;
+        return PercentileMethodEnum::kContinuous;
     }
     // The idl should have validated the input string (see 'validatePercentileMethod()').
     uasserted(7766600, "Currently only approximate percentiles are supported");
 }
 
-StringData percentileMethodEnumToString(PercentileMethod method) {
+StringData percentileMethodEnumToString(PercentileMethodEnum method) {
     switch (method) {
-        case PercentileMethod::Approximate:
+        case PercentileMethodEnum::kApproximate:
             return AccumulatorPercentile::kApproximate;
-        case PercentileMethod::Discrete:
+        case PercentileMethodEnum::kDiscrete:
             return AccumulatorPercentile::kDiscrete;
-        case PercentileMethod::Continuous:
+        case PercentileMethodEnum::kContinuous:
             return AccumulatorPercentile::kContinuous;
     }
     MONGO_UNREACHABLE;
@@ -155,7 +155,7 @@ AccumulationExpression AccumulatorPercentile::parseArgs(ExpressionContext* const
 
     std::vector<double> ps = parseP(expCtx, spec.getP().getElement(), vps);
 
-    const PercentileMethod method = methodNameToEnum(spec.getMethod());
+    const PercentileMethodEnum method = methodNameToEnum(spec.getMethod());
 
     auto factory = [expCtx, ps, method] {
         return AccumulatorPercentile::create(expCtx, ps, method);
@@ -167,7 +167,7 @@ AccumulationExpression AccumulatorPercentile::parseArgs(ExpressionContext* const
             "$percentile"_sd /*name*/};
 }
 
-std::pair<std::vector<double> /*ps*/, PercentileMethod>
+std::pair<std::vector<double> /*ps*/, PercentileMethodEnum>
 AccumulatorPercentile::parsePercentileAndMethod(ExpressionContext* expCtx,
                                                 BSONElement elem,
                                                 VariablesParseState vps) {
@@ -188,7 +188,7 @@ boost::intrusive_ptr<Expression> AccumulatorPercentile::parseExpression(
     boost::intrusive_ptr<Expression> input =
         Expression::parseOperand(expCtx, spec.getInput().getElement(), vps);
     std::vector<double> ps = parseP(expCtx, spec.getP().getElement(), vps);
-    const PercentileMethod method = methodNameToEnum(spec.getMethod());
+    const PercentileMethodEnum method = methodNameToEnum(spec.getMethod());
 
     return make_intrusive<ExpressionFromAccumulatorQuantile<AccumulatorPercentile>>(
         expCtx, ps, input, method);
@@ -241,13 +241,13 @@ Value AccumulatorPercentile::getValue(bool toBeMerged) {
 }
 
 namespace {
-std::unique_ptr<PercentileAlgorithm> createPercentileAlgorithm(PercentileMethod method) {
+std::unique_ptr<PercentileAlgorithm> createPercentileAlgorithm(PercentileMethodEnum method) {
     switch (method) {
-        case PercentileMethod::Approximate:
+        case PercentileMethodEnum::kApproximate:
             return createTDigestDistributedClassic();
-        case PercentileMethod::Discrete:
+        case PercentileMethodEnum::kDiscrete:
             return createDiscretePercentile();
-        case PercentileMethod::Continuous:
+        case PercentileMethodEnum::kContinuous:
             return createContinuousPercentile();
         default:
             uasserted(
@@ -261,7 +261,7 @@ std::unique_ptr<PercentileAlgorithm> createPercentileAlgorithm(PercentileMethod 
 
 AccumulatorPercentile::AccumulatorPercentile(ExpressionContext* const expCtx,
                                              const std::vector<double>& ps,
-                                             PercentileMethod method,
+                                             PercentileMethodEnum method,
                                              boost::optional<int> maxMemoryUsageBytes)
     : AccumulatorState(
           expCtx, maxMemoryUsageBytes.value_or(internalQueryMaxPercentileAccumulatorBytes.load())),
@@ -292,7 +292,7 @@ Document AccumulatorPercentile::serialize(boost::intrusive_ptr<Expression> initi
 void AccumulatorPercentile::serializeHelper(const boost::intrusive_ptr<Expression>& argument,
                                             const SerializationOptions& options,
                                             std::vector<double> percentiles,
-                                            PercentileMethod method,
+                                            PercentileMethodEnum method,
                                             MutableDocument& md) {
     md.addField(AccumulatorPercentileSpec::kInputFieldName, Value(argument->serialize(options)));
     md.addField(AccumulatorPercentileSpec::kPFieldName,
@@ -303,7 +303,7 @@ void AccumulatorPercentile::serializeHelper(const boost::intrusive_ptr<Expressio
 
 intrusive_ptr<AccumulatorState> AccumulatorPercentile::create(ExpressionContext* const expCtx,
                                                               const std::vector<double>& ps,
-                                                              PercentileMethod method) {
+                                                              PercentileMethodEnum method) {
     return new AccumulatorPercentile(expCtx, ps, method);
 }
 
@@ -320,7 +320,7 @@ AccumulationExpression AccumulatorMedian::parseArgs(ExpressionContext* const exp
     boost::intrusive_ptr<Expression> input =
         Expression::parseOperand(expCtx, spec.getInput().getElement(), vps);
 
-    const PercentileMethod method = methodNameToEnum(spec.getMethod());
+    const PercentileMethodEnum method = methodNameToEnum(spec.getMethod());
 
     auto factory = [expCtx, method] {
         return AccumulatorMedian::create(expCtx, {} /* unused */, method);
@@ -332,8 +332,10 @@ AccumulationExpression AccumulatorMedian::parseArgs(ExpressionContext* const exp
             "$median"_sd /*name*/};
 }
 
-std::pair<std::vector<double> /*ps*/, PercentileMethod> AccumulatorMedian::parsePercentileAndMethod(
-    ExpressionContext* /*expCtx*/, BSONElement elem, VariablesParseState /*vps*/) {
+std::pair<std::vector<double> /*ps*/, PercentileMethodEnum>
+AccumulatorMedian::parsePercentileAndMethod(ExpressionContext* /*expCtx*/,
+                                            BSONElement elem,
+                                            VariablesParseState /*vps*/) {
     auto spec = AccumulatorMedianSpec::parse(IDLParserContext(kName), elem.Obj());
     return std::make_pair(std::vector<double>({0.5}), methodNameToEnum(spec.getMethod()));
 }
@@ -353,7 +355,7 @@ boost::intrusive_ptr<Expression> AccumulatorMedian::parseExpression(ExpressionCo
 
     std::vector<double> p = {0.5};
 
-    const PercentileMethod method = methodNameToEnum(spec.getMethod());
+    const PercentileMethodEnum method = methodNameToEnum(spec.getMethod());
 
     return make_intrusive<ExpressionFromAccumulatorQuantile<AccumulatorMedian>>(
         expCtx, p, input, method);
@@ -361,7 +363,7 @@ boost::intrusive_ptr<Expression> AccumulatorMedian::parseExpression(ExpressionCo
 
 AccumulatorMedian::AccumulatorMedian(ExpressionContext* expCtx,
                                      const std::vector<double>& /* unused */,
-                                     PercentileMethod method,
+                                     PercentileMethodEnum method,
                                      boost::optional<int> maxMemoryUsageBytes)
     : AccumulatorPercentile(
           expCtx,
@@ -371,7 +373,7 @@ AccumulatorMedian::AccumulatorMedian(ExpressionContext* expCtx,
 
 intrusive_ptr<AccumulatorState> AccumulatorMedian::create(ExpressionContext* expCtx,
                                                           const std::vector<double>& /* unused */,
-                                                          PercentileMethod method) {
+                                                          PercentileMethodEnum method) {
     return new AccumulatorMedian(expCtx, {} /* unused */, method);
 }
 
@@ -413,7 +415,7 @@ Document AccumulatorMedian::serialize(boost::intrusive_ptr<Expression> initializ
 void AccumulatorMedian::serializeHelper(const boost::intrusive_ptr<Expression>& argument,
                                         const SerializationOptions& options,
                                         std::vector<double> percentiles,
-                                        PercentileMethod method,
+                                        PercentileMethodEnum method,
                                         MutableDocument& md) {
     md.addField(AccumulatorPercentileSpec::kInputFieldName, Value(argument->serialize(options)));
     md.addField(AccumulatorPercentileSpec::kMethodFieldName,

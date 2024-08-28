@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 #pragma once
-#include "mongo/db/pipeline/percentile_algo.h"
+#include "mongo/db/pipeline/accumulator_percentile_enum_gen.h"
 #include <benchmark/benchmark.h>
 #include <vector>
 
@@ -39,44 +39,44 @@ namespace mongo {
 class WindowFunctionPercentileBenchmarkFixture : public benchmark::Fixture {
 public:
     void removable_unbounded_percentile(benchmark::State& state,
-                                        PercentileMethod method,
+                                        PercentileMethodEnum method,
                                         std::vector<double> ps);
     void removable_bounded_percentile(benchmark::State& state,
-                                      PercentileMethod method,
+                                      PercentileMethodEnum method,
                                       std::vector<double> ps);
 
     static constexpr int dataSizeLarge = 100'000;
 };
 
-#define BENCHMARK_WINDOW_PERCENTILE(Fixture)                                             \
-                                                                                         \
-    BENCHMARK_F(Fixture, percentile_unbounded_low_p)(benchmark::State & state) {         \
-        removable_unbounded_percentile(state, PercentileMethod::Approximate, {0.001});   \
-    }                                                                                    \
-    BENCHMARK_F(Fixture, percentile_unbounded_high_p)(benchmark::State & state) {        \
-        removable_unbounded_percentile(state, PercentileMethod::Approximate, {.999});    \
-    }                                                                                    \
-    BENCHMARK_F(Fixture, percentile_unbounded_mid_p)(benchmark::State & state) {         \
-        removable_unbounded_percentile(state, PercentileMethod::Approximate, {.55});     \
-    }                                                                                    \
-    BENCHMARK_F(Fixture, percentile_unbounded_multi_p)(benchmark::State & state) {       \
-        removable_unbounded_percentile(state,                                            \
-                                       PercentileMethod::Approximate,                    \
-                                       {.1, .47, .88, .05, .33, .999, .2, .59, .9, .7}); \
-    }                                                                                    \
-    BENCHMARK_F(Fixture, percentile_bounded_low_p)(benchmark::State & state) {           \
-        removable_bounded_percentile(state, PercentileMethod::Approximate, {.001});      \
-    }                                                                                    \
-    BENCHMARK_F(Fixture, percentile_bounded_high_p)(benchmark::State & state) {          \
-        removable_bounded_percentile(state, PercentileMethod::Approximate, {.999});      \
-    }                                                                                    \
-    BENCHMARK_F(Fixture, percentile_bounded_mid_p)(benchmark::State & state) {           \
-        removable_bounded_percentile(state, PercentileMethod::Approximate, {.55});       \
-    }                                                                                    \
-    BENCHMARK_F(Fixture, percentile_bounded_multi_p)(benchmark::State & state) {         \
-        removable_bounded_percentile(state,                                              \
-                                     PercentileMethod::Approximate,                      \
-                                     {.1, .47, .88, .05, .33, .999, .2, .59, .9, .7});   \
+#define BENCHMARK_WINDOW_PERCENTILE(Fixture)                                                \
+                                                                                            \
+    BENCHMARK_F(Fixture, percentile_unbounded_low_p)(benchmark::State & state) {            \
+        removable_unbounded_percentile(state, PercentileMethodEnum::kApproximate, {0.001}); \
+    }                                                                                       \
+    BENCHMARK_F(Fixture, percentile_unbounded_high_p)(benchmark::State & state) {           \
+        removable_unbounded_percentile(state, PercentileMethodEnum::kApproximate, {.999});  \
+    }                                                                                       \
+    BENCHMARK_F(Fixture, percentile_unbounded_mid_p)(benchmark::State & state) {            \
+        removable_unbounded_percentile(state, PercentileMethodEnum::kApproximate, {.55});   \
+    }                                                                                       \
+    BENCHMARK_F(Fixture, percentile_unbounded_multi_p)(benchmark::State & state) {          \
+        removable_unbounded_percentile(state,                                               \
+                                       PercentileMethodEnum::kApproximate,                  \
+                                       {.1, .47, .88, .05, .33, .999, .2, .59, .9, .7});    \
+    }                                                                                       \
+    BENCHMARK_F(Fixture, percentile_bounded_low_p)(benchmark::State & state) {              \
+        removable_bounded_percentile(state, PercentileMethodEnum::kApproximate, {.001});    \
+    }                                                                                       \
+    BENCHMARK_F(Fixture, percentile_bounded_high_p)(benchmark::State & state) {             \
+        removable_bounded_percentile(state, PercentileMethodEnum::kApproximate, {.999});    \
+    }                                                                                       \
+    BENCHMARK_F(Fixture, percentile_bounded_mid_p)(benchmark::State & state) {              \
+        removable_bounded_percentile(state, PercentileMethodEnum::kApproximate, {.55});     \
+    }                                                                                       \
+    BENCHMARK_F(Fixture, percentile_bounded_multi_p)(benchmark::State & state) {            \
+        removable_bounded_percentile(state,                                                 \
+                                     PercentileMethodEnum::kApproximate,                    \
+                                     {.1, .47, .88, .05, .33, .999, .2, .59, .9, .7});      \
     }
 
 }  // namespace mongo

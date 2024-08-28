@@ -58,7 +58,7 @@ public:
     explicit ExpressionFromAccumulatorQuantile(ExpressionContext* const expCtx,
                                                std::vector<double>& ps,
                                                boost::intrusive_ptr<Expression> input,
-                                               PercentileMethod method)
+                                               PercentileMethodEnum method)
         : Expression(expCtx, {input}), _ps(ps), _input(input), _method(method) {
         expCtx->sbeCompatibility = SbeCompatibility::notCompatible;
     }
@@ -82,7 +82,7 @@ public:
         }
 
         if (input.isArray() && input.getArrayLength() > 0) {
-            if (_method != PercentileMethod::Continuous) {
+            if (_method != PercentileMethodEnum::kContinuous) {
                 // On small datasets, which are likely to be the inputs for the expression, creating
                 // t-digests is inefficient, so instead we use DiscretePercentile algo directly for
                 // both "discrete" and "approximate" methods.
@@ -125,7 +125,7 @@ public:
 private:
     std::vector<double> _ps;
     boost::intrusive_ptr<Expression> _input;
-    PercentileMethod _method;
+    PercentileMethodEnum _method;
 
     template <typename H>
     friend class ExpressionHashVisitor;

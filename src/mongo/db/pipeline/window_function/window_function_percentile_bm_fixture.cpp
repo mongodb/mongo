@@ -65,7 +65,7 @@ vector<double> generateNormalData(size_t n) {
 // function. Then for each following window, the element before the current element will be removed
 // and the percentile will be recalculated.
 void WindowFunctionPercentileBenchmarkFixture::removable_unbounded_percentile(
-    benchmark::State& state, PercentileMethod method, std::vector<double> ps) {
+    benchmark::State& state, PercentileMethodEnum method, std::vector<double> ps) {
     // Generate the data.
     const vector<double> inputs = generateNormalData(dataSizeLarge);
     auto expCtx = make_intrusive<ExpressionContextForTest>();
@@ -100,7 +100,7 @@ void WindowFunctionPercentileBenchmarkFixture::removable_unbounded_percentile(
 // Then the percentile will be recalculated. We will not add any elements if the index is out of
 // bounds, resulting in smaller windows towards the end of 'inputs'.
 void WindowFunctionPercentileBenchmarkFixture::removable_bounded_percentile(
-    benchmark::State& state, PercentileMethod method, std::vector<double> ps) {
+    benchmark::State& state, PercentileMethodEnum method, std::vector<double> ps) {
     // Generate the data.
     const vector<double> inputs = generateNormalData(dataSizeLarge);
     auto expCtx = make_intrusive<ExpressionContextForTest>();

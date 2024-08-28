@@ -41,7 +41,7 @@
 #include "mongo/db/exec/document_value/value.h"
 #include "mongo/db/pipeline/accumulation_statement.h"
 #include "mongo/db/pipeline/accumulator.h"
-#include "mongo/db/pipeline/accumulator_percentile_gen.h"
+#include "mongo/db/pipeline/accumulator_percentile_enum_gen.h"
 #include "mongo/db/pipeline/expression.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/percentile_algo.h"
@@ -81,12 +81,12 @@ public:
 
     static boost::intrusive_ptr<AccumulatorState> create(ExpressionContext* expCtx,
                                                          const std::vector<double>& ps,
-                                                         PercentileMethod method);
+                                                         PercentileMethodEnum method);
 
     /**
      * Necessary for supporting $percentile as window functions and/or as expression.
      */
-    static std::pair<std::vector<double> /*ps*/, PercentileMethod> parsePercentileAndMethod(
+    static std::pair<std::vector<double> /*ps*/, PercentileMethodEnum> parsePercentileAndMethod(
         ExpressionContext* expCtx, BSONElement elem, VariablesParseState vps);
     static Value formatFinalValue(int nPercentiles, const std::vector<double>& pctls);
 
@@ -97,7 +97,7 @@ public:
      */
     AccumulatorPercentile(ExpressionContext* expCtx,
                           const std::vector<double>& ps,
-                          PercentileMethod method,
+                          PercentileMethodEnum method,
                           boost::optional<int> maxMemoryUsageBytes = boost::none);
 
     /**
@@ -136,20 +136,20 @@ public:
     static void serializeHelper(const boost::intrusive_ptr<Expression>& argument,
                                 const SerializationOptions& options,
                                 std::vector<double> percentiles,
-                                PercentileMethod method,
+                                PercentileMethodEnum method,
                                 MutableDocument& md);
 
     /**
      * Getter for method
      */
-    PercentileMethod getMethod() const {
+    PercentileMethodEnum getMethod() const {
         return _method;
     }
 
 protected:
     std::vector<double> _percentiles;
     std::unique_ptr<PercentileAlgorithm> _algo;
-    const PercentileMethod _method;
+    const PercentileMethodEnum _method;
 };
 
 /*
@@ -176,7 +176,7 @@ public:
 
     static boost::intrusive_ptr<AccumulatorState> create(ExpressionContext* expCtx,
                                                          const std::vector<double>& unused,
-                                                         PercentileMethod method);
+                                                         PercentileMethodEnum method);
 
     /**
      * We are matching the signature of the AccumulatorPercentile for the purpose of using
@@ -189,13 +189,13 @@ public:
      */
     AccumulatorMedian(ExpressionContext* expCtx,
                       const std::vector<double>& unused,
-                      PercentileMethod method,
+                      PercentileMethodEnum method,
                       boost::optional<int> maxMemoryUsageBytes = boost::none);
 
     /**
      * Necessary for supporting $median as window functions and/or as expression.
      */
-    static std::pair<std::vector<double> /*ps*/, PercentileMethod> parsePercentileAndMethod(
+    static std::pair<std::vector<double> /*ps*/, PercentileMethodEnum> parsePercentileAndMethod(
         ExpressionContext* expCtx, BSONElement elem, VariablesParseState vps);
     static Value formatFinalValue(int nPercentiles, const std::vector<double>& pctls);
 
@@ -216,7 +216,7 @@ public:
     static void serializeHelper(const boost::intrusive_ptr<Expression>& argument,
                                 const SerializationOptions& options,
                                 std::vector<double> percentiles,
-                                PercentileMethod method,
+                                PercentileMethodEnum method,
                                 MutableDocument& md);
 };
 }  // namespace mongo
