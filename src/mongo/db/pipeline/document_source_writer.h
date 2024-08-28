@@ -67,7 +67,7 @@ public:
             // Storage engine operations require at least Global IS.
             Lock::GlobalLock lk(_opCtx, MODE_IS);
             _originalTimestamp =
-                *shard_role_details::getRecoveryUnit(_opCtx)->getPointInTimeReadTimestamp(_opCtx);
+                *shard_role_details::getRecoveryUnit(_opCtx)->getPointInTimeReadTimestamp();
         }
 
         repl::ReadConcernArgs::get(_opCtx) = repl::ReadConcernArgs();

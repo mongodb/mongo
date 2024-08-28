@@ -343,8 +343,8 @@ TEST_F(DBRAIITestFixture, AutoGetCollectionForReadLastAppliedUnavailable) {
 
     ASSERT_EQ(shard_role_details::getRecoveryUnit(client1.second.get())->getTimestampReadSource(),
               RecoveryUnit::ReadSource::kLastApplied);
-    ASSERT_FALSE(shard_role_details::getRecoveryUnit(client1.second.get())
-                     ->getPointInTimeReadTimestamp(client1.second.get()));
+    ASSERT_FALSE(
+        shard_role_details::getRecoveryUnit(client1.second.get())->getPointInTimeReadTimestamp());
 }
 
 TEST_F(DBRAIITestFixture, AutoGetCollectionForReadOplogOnSecondary) {

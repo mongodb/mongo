@@ -129,8 +129,7 @@ void JournalFlusher::run() {
     while (true) {
         pauseJournalFlusherBeforeFlush.pauseWhileSet();
         try {
-            shard_role_details::getRecoveryUnit(_uniqueCtx->get())
-                ->waitUntilDurable(_uniqueCtx->get());
+            tc->getServiceContext()->getStorageEngine()->waitUntilDurable(_uniqueCtx->get());
 
             // Signal the waiters that a round completed.
             _currentSharedPromise->emplaceValue();

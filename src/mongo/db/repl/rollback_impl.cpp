@@ -615,7 +615,7 @@ void RollbackImpl::_restoreTxnsTableEntryFromRetryableWrites(OperationContext* o
     // persisted to disk before truncating the oplog. If we were to take an unstable checkpoint, we
     // would have to update replication metadata like 'minValid.appliedThrough' to be consistent
     // with the oplog.
-    shard_role_details::getRecoveryUnit(opCtx)->waitUntilUnjournaledWritesDurable(
+    opCtx->getServiceContext()->getStorageEngine()->waitUntilUnjournaledWritesDurable(
         opCtx,
         /*stableCheckpoint=*/true);
 }

@@ -676,8 +676,9 @@ void ReplicationRecoveryImpl::_recoverFromUnstableCheckpoint(OperationContext* o
     // timestamp to determine where to play oplog forward from. As this method shows, when a
     // recovery timestamp does not exist, the applied through is used to determine where to start
     // playing oplog entries from.
-    shard_role_details::getRecoveryUnit(opCtx)->waitUntilUnjournaledWritesDurable(
-        opCtx, /*stableCheckpoint*/ true);
+    opCtx->getServiceContext()->getStorageEngine()->waitUntilUnjournaledWritesDurable(
+        opCtx,
+        /*stableCheckpoint*/ true);
 
     // Now that we have set the initial data timestamp and taken an unstable checkpoint with the
     // appliedThrough being the topOfOplog, it is safe to clear the appliedThrough. This minValid

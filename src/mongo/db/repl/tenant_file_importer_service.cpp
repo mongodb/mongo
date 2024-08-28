@@ -531,7 +531,7 @@ void TenantFileImporterService::_handleEvents(const UUID& migrationId) {
                 createImportDoneMarkerLocalCollection(opCtx, migrationId);
                 // Take a stable checkpoint to persist both the imported donor collections and the
                 // marker collection to disk.
-                shard_role_details::getRecoveryUnit(opCtx)->waitUntilUnjournaledWritesDurable(
+                opCtx->getServiceContext()->getStorageEngine()->waitUntilUnjournaledWritesDurable(
                     opCtx,
                     /*stableCheckpoint*/ true);
                 _voteImportedFiles(opCtx, migrationId);
@@ -630,7 +630,7 @@ void TenantFileImporterService::_waitUntilStartMigrationTimestampIsCheckpointed(
 
         // Sleep a bit so we do not keep hammering the system.
         opCtx->sleepFor(Milliseconds(100));
-        shard_role_details::getRecoveryUnit(opCtx)->waitUntilUnjournaledWritesDurable(
+        opCtx->getServiceContext()->getStorageEngine()->waitUntilUnjournaledWritesDurable(
             opCtx,
             /*stableCheckpoint*/ true);
     }

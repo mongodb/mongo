@@ -392,7 +392,7 @@ public:
                 auto ws = std::make_unique<WorkingSet>();
                 auto root = std::make_unique<QueuedDataStage>(expCtx.get(), ws.get());
                 auto readTimestamp =
-                    shard_role_details::getRecoveryUnit(opCtx)->getPointInTimeReadTimestamp(opCtx);
+                    shard_role_details::getRecoveryUnit(opCtx)->getPointInTimeReadTimestamp();
                 tassert(9089302,
                         "point in time catalog lookup for a collection list is not supported",
                         RecoveryUnit::ReadSource::kNoTimestamp ==

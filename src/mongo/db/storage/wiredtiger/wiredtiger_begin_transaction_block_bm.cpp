@@ -37,9 +37,6 @@
 #include "mongo/base/status.h"
 #include "mongo/base/string_data.h"
 #include "mongo/bson/timestamp.h"
-#include "mongo/db/client.h"
-#include "mongo/db/operation_context.h"
-#include "mongo/db/service_context.h"
 #include "mongo/db/service_context_test_fixture.h"
 #include "mongo/db/storage/recovery_unit.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_begin_transaction_block.h"
@@ -47,7 +44,6 @@
 #include "mongo/db/storage/wiredtiger/wiredtiger_recovery_unit.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_session_cache.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_util.h"
-#include "mongo/db/storage/write_unit_of_work.h"
 #include "mongo/unittest/assert.h"
 #include "mongo/unittest/temp_dir.h"
 #include "mongo/util/assert_util_core.h"
@@ -79,19 +75,13 @@ private:
 
 class WiredTigerTestHelper : public ScopedGlobalServiceContextForTest {
 public:
-    WiredTigerTestHelper()
-        : _threadClient(getServiceContext()->getService()),
-          _opCtxHolder(_threadClient->makeOperationContext()) {
-        shard_role_details::setRecoveryUnit(
-            _opCtxHolder.get(),
-            std::make_unique<WiredTigerRecoveryUnit>(&_sessionCache, &_oplogManager),
-            WriteUnitOfWork::RecoveryUnitState::kNotInUnitOfWork);
-        auto ru = WiredTigerRecoveryUnit::get(_opCtxHolder.get());
-        _session = ru->getSession();
+    WiredTigerTestHelper() {
+        _ru = std::make_unique<WiredTigerRecoveryUnit>(&_sessionCache, &_oplogManager);
+        _session = _ru->getSession();
         auto wt_session = _session->getSession();
         invariant(
             wtRCToStatus(wt_session->create(wt_session, "table:mytable", nullptr), wt_session));
-        ru->abandonSnapshot();
+        _ru->abandonSnapshot();
     }
 
     WiredTigerSession* session() const {
@@ -104,9 +94,7 @@ private:
     ClockSourceMock _clockSource;
     WiredTigerSessionCache _sessionCache{_connection.getConnection(), &_clockSource};
     WiredTigerOplogManager _oplogManager;
-
-    ThreadClient _threadClient;
-    ServiceContext::UniqueOperationContext _opCtxHolder;
+    std::unique_ptr<WiredTigerRecoveryUnit> _ru;
 
     WiredTigerSession* _session;
 };

@@ -1474,7 +1474,7 @@ void ShardingCatalogManager::initializePlacementHistory(OperationContext* opCtx)
         boost::optional<Timestamp> originalReadTimestamp;
         if (originalReadSource == RecoveryUnit::ReadSource::kProvided) {
             originalReadTimestamp =
-                shard_role_details::getRecoveryUnit(opCtx)->getPointInTimeReadTimestamp(opCtx);
+                shard_role_details::getRecoveryUnit(opCtx)->getPointInTimeReadTimestamp();
         }
 
         ScopeGuard resetopCtxStateGuard([&] {

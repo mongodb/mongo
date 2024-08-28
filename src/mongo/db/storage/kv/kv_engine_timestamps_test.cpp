@@ -257,7 +257,7 @@ TEST_F(SnapshotManagerTests, ConsistentIfNotSupported) {
     auto ru = shard_role_details::getRecoveryUnit(op.get());
     auto readSource = ru->getTimestampReadSource();
     ASSERT(readSource != RecoveryUnit::ReadSource::kMajorityCommitted);
-    ASSERT(!ru->getPointInTimeReadTimestamp(op));
+    ASSERT(!ru->getPointInTimeReadTimestamp());
 }
 
 TEST_F(SnapshotManagerTests, FailsWithNoCommittedSnapshot) {

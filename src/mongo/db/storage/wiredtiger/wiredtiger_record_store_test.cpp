@@ -1293,7 +1293,7 @@ TEST(WiredTigerRecordStoreTest, CursorInActiveTxnAfterNext) {
         ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
         Lock::GlobalLock globalLock(opCtx.get(), MODE_X);
 
-        auto ru = WiredTigerRecoveryUnit::get(opCtx.get());
+        auto ru = WiredTigerRecoveryUnit::get(shard_role_details::getRecoveryUnit(opCtx.get()));
 
         auto cursor = rs->getCursor(opCtx.get());
         ASSERT(cursor->next());
@@ -1337,7 +1337,7 @@ TEST(WiredTigerRecordStoreTest, CursorInActiveTxnAfterSeek) {
         ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
         Lock::GlobalLock globalLock(opCtx.get(), MODE_X);
 
-        auto ru = WiredTigerRecoveryUnit::get(opCtx.get());
+        auto ru = WiredTigerRecoveryUnit::get(shard_role_details::getRecoveryUnit(opCtx.get()));
 
         auto cursor = rs->getCursor(opCtx.get());
         ASSERT(cursor->seekExact(rid1));

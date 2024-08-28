@@ -38,7 +38,6 @@
 #include <wiredtiger.h>
 
 #include "mongo/db/operation_context.h"
-#include "mongo/db/storage/journal_listener.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_compiled_configuration.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_snapshot_manager.h"
 #include "mongo/platform/atomic_word.h"
@@ -252,27 +251,6 @@ public:
         void operator()(WiredTigerSession* session) const;
     };
 
-    /**
-     * Specifies what data will get flushed to disk in a WiredTigerSessionCache::waitUntilDurable()
-     * call.
-     */
-    enum class Fsync {
-        // Flushes only the journal (oplog) to disk.
-        // If journaling is disabled, checkpoints all of the data.
-        kJournal,
-        // Checkpoints data up to the stable timestamp.
-        // If journaling is disabled, checkpoints all of the data.
-        kCheckpointStableTimestamp,
-        // Checkpoints all of the data.
-        kCheckpointAll,
-    };
-
-    /**
-     * Controls whether or not WiredTigerSessionCache::waitUntilDurable() updates the
-     * JournalListener.
-     */
-    enum class UseJournalListener { kUpdate, kSkip };
-
     // RAII type to block and unblock the WiredTigerSessionCache to shut down.
     class BlockShutdown {
     public:
@@ -342,30 +320,6 @@ public:
     bool isEphemeral();
 
     /**
-     * Waits until all commits that happened before this call are made durable.
-     *
-     * Specifying Fsync::kJournal will flush only the (oplog) journal to disk. Callers are
-     * serialized by a mutex and will return early if it is discovered that another thread started
-     * and completed a flush while they slept.
-     *
-     * Specifying Fsync::kCheckpointStableTimestamp will take a checkpoint up to and including the
-     * stable timestamp.
-     *
-     * Specifying Fsync::kCheckpointAll, or if journaling is disabled with kJournal or
-     * kCheckpointStableTimestamp, causes a checkpoint to be taken of all of the data.
-     *
-     * Taking a checkpoint has the benefit of persisting unjournaled writes.
-     *
-     * 'useListener' controls whether or not the JournalListener is updated with the last durable
-     * value of the timestamp that it tracks. The JournalListener's token is fetched before writing
-     * out to disk and set afterwards to update the repl layer durable timestamp. The
-     * JournalListener operations can throw write interruption errors.
-     *
-     * Uses a temporary session. Safe to call without any locks, even during shutdown.
-     */
-    void waitUntilDurable(OperationContext* opCtx, Fsync syncType, UseJournalListener useListener);
-
-    /**
      * Waits until a prepared unit of work has ended (either been commited or aborted). This
      * should be used when encountering WT_PREPARE_CONFLICT errors. The caller is required to retry
      * the conflicting WiredTiger API operation. A return from this function does not guarantee that
@@ -397,8 +351,6 @@ public:
         return _snapshotManager;
     }
 
-    void setJournalListener(JournalListener* jl);
-
     WiredTigerKVEngine* getKVEngine() const {
         return _engine;
     }
@@ -412,14 +364,6 @@ public:
     }
 
 private:
-    /**
-     * Looks up the journal listener under a mutex along.
-     * Returns JournalListener along with an optional token if requested
-     * by the UseJournalListener value.
-     */
-    std::pair<JournalListener*, boost::optional<JournalListener::Token>>
-    _getJournalListenerWithToken(OperationContext* opCtx, UseJournalListener useListener);
-
     WT_CONNECTION* _conn;             // not owned
     ClockSource* const _clockSource;  // not owned
     WiredTigerKVEngine* _engine;      // not owned, might be NULL
@@ -439,31 +383,11 @@ private:
     // Bumped when all open sessions need to be closed
     AtomicWord<unsigned long long> _epoch;  // atomic so we can check it outside of the lock
 
-    // Counter and critical section mutex for waitUntilDurable
-    AtomicWord<unsigned> _lastSyncTime;
-    Mutex _lastSyncMutex = MONGO_MAKE_LATCH("WiredTigerSessionCache::_lastSyncMutex");
-
     // Mutex and cond var for waiting on prepare commit or abort.
     Mutex _prepareCommittedOrAbortedMutex =
         MONGO_MAKE_LATCH("WiredTigerSessionCache::_prepareCommittedOrAbortedMutex");
     stdx::condition_variable _prepareCommittedOrAbortedCond;
     AtomicWord<std::uint64_t> _prepareCommitOrAbortCounter{0};
-
-    // Protects getting and setting the _journalListener below.
-    Mutex _journalListenerMutex = MONGO_MAKE_LATCH("WiredTigerSessionCache::_journalListenerMutex");
-
-    // Notified when we commit to the journal.
-    //
-    // This variable should be accessed under the _journalListenerMutex above and saved in a local
-    // variable before use. That way, we can avoid holding a mutex across calls on the object. It is
-    // only allowed to be set once, in order to ensure the memory to which a copy of the pointer
-    // points is always valid.
-    JournalListener* _journalListener = nullptr;
-
-    WT_SESSION* _waitUntilDurableSession = nullptr;  // owned, and never explicitly closed
-                                                     // (uses connection close to clean up)
-    // Tracks the time since the last _waitUntilDurableSession reset().
-    Timer _timeSinceLastDurabilitySessionReset;
 
     /**
      * Returns a session to the cache for later reuse. If closeAll was called between getting this

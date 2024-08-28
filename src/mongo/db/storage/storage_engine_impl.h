@@ -401,6 +401,10 @@ public:
     void waitForAllEarlierOplogWritesToBeVisible(OperationContext* opCtx,
                                                  RecordStore* oplogRecordStore) const override;
 
+    bool waitUntilDurable(OperationContext* opCtx) override;
+
+    bool waitUntilUnjournaledWritesDurable(OperationContext* opCtx, bool stableCheckpoint) override;
+
     BSONObj getSanitizedStorageOptionsForSecondaryReplication(
         const BSONObj& options) const override;
 

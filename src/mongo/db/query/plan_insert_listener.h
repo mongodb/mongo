@@ -109,8 +109,7 @@ public:
 
     // Computes the OpTime to wait on by incrementing the current read timestamp.
     void prepareForWait(OperationContext* opCtx) final {
-        auto readTs =
-            shard_role_details::getRecoveryUnit(opCtx)->getPointInTimeReadTimestamp(opCtx);
+        auto readTs = shard_role_details::getRecoveryUnit(opCtx)->getPointInTimeReadTimestamp();
         invariant(readTs);
         _opTimeToBeMajorityCommitted =
             repl::OpTime(*readTs + 1, repl::ReplicationCoordinator::get(opCtx)->getTerm());

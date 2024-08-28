@@ -208,6 +208,14 @@ public:
         return Status::OK();
     }
 
+    bool waitUntilDurable(OperationContext* opCtx) override {
+        return true;
+    }
+
+    bool waitUntilUnjournaledWritesDurable(OperationContext* opCtx, bool) override {
+        return true;
+    }
+
     void dump() const override {}
 
     // This sets the results of the backup cursor for unit tests.

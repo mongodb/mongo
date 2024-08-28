@@ -407,6 +407,22 @@ public:
 
     bool supportsOplogTruncateMarkers() const final;
 
+    Status oplogDiskLocRegister(OperationContext* opCtx,
+                                RecordStore* oplogRecordStore,
+                                const Timestamp& opTime,
+                                bool orderedCommit) override;
+
+    void waitForAllEarlierOplogWritesToBeVisible(OperationContext* opCtx,
+                                                 RecordStore* oplogRecordStore) const override;
+
+    bool waitUntilDurable(OperationContext* opCtx) override;
+
+    bool waitUntilUnjournaledWritesDurable(OperationContext* opCtx, bool stableCheckpoint) override;
+
+    Timestamp getStableTimestamp() const override;
+    Timestamp getOldestTimestamp() const override;
+    Timestamp getCheckpointTimestamp() const override;
+
     // wiredtiger specific
     // Calls WT_CONNECTION::reconfigure on the underlying WT_CONNECTION
     // held by this class
@@ -443,17 +459,50 @@ public:
         return _oplogManager.get();
     }
 
-    Status oplogDiskLocRegister(OperationContext* opCtx,
-                                RecordStore* oplogRecordStore,
-                                const Timestamp& opTime,
-                                bool orderedCommit) override;
+    /**
+     * Specifies what data will get flushed to disk in a WiredTigerSessionCache::waitUntilDurable()
+     * call.
+     */
+    enum class Fsync {
+        // Flushes only the journal (oplog) to disk.
+        // If journaling is disabled, checkpoints all of the data.
+        kJournal,
+        // Checkpoints data up to the stable timestamp.
+        // If journaling is disabled, checkpoints all of the data.
+        kCheckpointStableTimestamp,
+        // Checkpoints all of the data.
+        kCheckpointAll,
+    };
 
-    void waitForAllEarlierOplogWritesToBeVisible(OperationContext* opCtx,
-                                                 RecordStore* oplogRecordStore) const override;
+    /**
+     * Controls whether or not WiredTigerSessionCache::waitUntilDurable() updates the
+     * JournalListener.
+     */
+    enum class UseJournalListener { kUpdate, kSkip };
 
-    Timestamp getStableTimestamp() const override;
-    Timestamp getOldestTimestamp() const override;
-    Timestamp getCheckpointTimestamp() const override;
+    /**
+     * Waits until all commits that happened before this call are made durable.
+     *
+     * Specifying Fsync::kJournal will flush only the (oplog) journal to disk. Callers are
+     * serialized by a mutex and will return early if it is discovered that another thread started
+     * and completed a flush while they slept.
+     *
+     * Specifying Fsync::kCheckpointStableTimestamp will take a checkpoint up to and including the
+     * stable timestamp.
+     *
+     * Specifying Fsync::kCheckpointAll, or if journaling is disabled with kJournal or
+     * kCheckpointStableTimestamp, causes a checkpoint to be taken of all of the data.
+     *
+     * Taking a checkpoint has the benefit of persisting unjournaled writes.
+     *
+     * 'useListener' controls whether or not the JournalListener is updated with the last durable
+     * value of the timestamp that it tracks. The JournalListener's token is fetched before writing
+     * out to disk and set afterwards to update the repl layer durable timestamp. The
+     * JournalListener operations can throw write interruption errors.
+     *
+     * Uses a temporary session. Safe to call without any locks, even during shutdown.
+     */
+    void waitUntilDurable(OperationContext* opCtx, Fsync syncType, UseJournalListener useListener);
 
     /**
      * Returns the data file path associated with an ident on disk. Returns boost::none if the data
@@ -656,6 +705,14 @@ private:
 
     std::uint64_t _getCheckpointTimestamp() const;
 
+    /**
+     * Looks up the journal listener under a mutex along.
+     * Returns JournalListener along with an optional token if requested
+     * by the UseJournalListener value.
+     */
+    std::pair<JournalListener*, boost::optional<JournalListener::Token>>
+    _getJournalListenerWithToken(OperationContext* opCtx, UseJournalListener useListener);
+
     mutable Mutex _oldestActiveTransactionTimestampCallbackMutex =
         MONGO_MAKE_LATCH("::_oldestActiveTransactionTimestampCallbackMutex");
     StorageEngine::OldestActiveTransactionTimestampCallback
@@ -731,5 +788,26 @@ private:
     // This is valid because durability is a state all operations will converge to eventually.
     AtomicWord<std::uint64_t> _currentCheckpointIteration{0};
     AtomicWord<std::uint64_t> _finishedCheckpointIteration{0};
+
+    // Protects getting and setting the _journalListener below.
+    Mutex _journalListenerMutex = MONGO_MAKE_LATCH("WiredTigerSessionCache::_journalListenerMutex");
+
+    // Notified when we commit to the journal.
+    //
+    // This variable should be accessed under the _journalListenerMutex above and saved in a local
+    // variable before use. That way, we can avoid holding a mutex across calls on the object. It is
+    // only allowed to be set once, in order to ensure the memory to which a copy of the pointer
+    // points is always valid.
+    JournalListener* _journalListener = nullptr;
+
+    // Counter and critical section mutex for waitUntilDurable
+    AtomicWord<unsigned> _lastSyncTime;
+    Mutex _lastSyncMutex = MONGO_MAKE_LATCH("WiredTigerSessionCache::_lastSyncMutex");
+
+    // owned, and never explicitly closed (uses connection close to clean up)
+    WT_SESSION* _waitUntilDurableSession = nullptr;
+
+    // Tracks the time since the last _waitUntilDurableSession reset().
+    Timer _timeSinceLastDurabilitySessionReset;
 };
 }  // namespace mongo

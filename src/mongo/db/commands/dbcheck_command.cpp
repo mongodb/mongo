@@ -995,7 +995,7 @@ Status DbChecker::_runHashExtraKeyCheck(OperationContext* opCtx,
         const CollectionPtr& collection = acquisitionSW.getValue()->coll.getCollectionPtr();
 
         auto readTimestamp =
-            shard_role_details::getRecoveryUnit(opCtx)->getPointInTimeReadTimestamp(opCtx);
+            shard_role_details::getRecoveryUnit(opCtx)->getPointInTimeReadTimestamp();
         uassert(ErrorCodes::SnapshotUnavailable,
                 "No snapshot available yet for dbCheck extra index keys check",
                 readTimestamp);
@@ -1935,7 +1935,7 @@ StatusWith<DbCheckCollectionBatchStats> DbChecker::_runBatch(OperationContext* o
         }
 
         auto readTimestamp =
-            shard_role_details::getRecoveryUnit(opCtx)->getPointInTimeReadTimestamp(opCtx);
+            shard_role_details::getRecoveryUnit(opCtx)->getPointInTimeReadTimestamp();
         uassert(ErrorCodes::SnapshotUnavailable,
                 "No snapshot available yet for dbCheck",
                 readTimestamp);

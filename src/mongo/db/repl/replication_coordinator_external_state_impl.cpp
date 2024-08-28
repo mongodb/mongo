@@ -584,7 +584,7 @@ Status ReplicationCoordinatorExternalStateImpl::initializeReplSetStorage(Operati
         _storageInterface->waitForAllEarlierOplogWritesToBeVisible(opCtx);
 
         // Take an unstable checkpoint to ensure that the FCV document is persisted to disk.
-        shard_role_details::getRecoveryUnit(opCtx)->waitUntilUnjournaledWritesDurable(
+        _service->getStorageEngine()->waitUntilUnjournaledWritesDurable(
             opCtx, false /* stableCheckpoint */);
     } catch (const DBException& ex) {
         return ex.toStatus();

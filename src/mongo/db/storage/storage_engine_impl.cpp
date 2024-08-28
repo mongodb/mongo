@@ -1457,6 +1457,15 @@ void StorageEngineImpl::waitForAllEarlierOplogWritesToBeVisible(
     _engine->waitForAllEarlierOplogWritesToBeVisible(opCtx, oplogRecordStore);
 }
 
+bool StorageEngineImpl::waitUntilDurable(OperationContext* opCtx) {
+    return _engine->waitUntilDurable(opCtx);
+}
+
+bool StorageEngineImpl::waitUntilUnjournaledWritesDurable(OperationContext* opCtx,
+                                                          bool stableCheckpoint) {
+    return _engine->waitUntilUnjournaledWritesDurable(opCtx, stableCheckpoint);
+}
+
 DurableCatalog* StorageEngineImpl::getCatalog() {
     return _catalog.get();
 }

@@ -4901,9 +4901,8 @@ Status ReplicationCoordinatorImpl::_runReplSetInitiate(const BSONObj& configObj,
         // Will call _setStableTimestampForStorage() on success.
         _advanceCommitPoint(
             lk, lastAppliedOpTimeAndWallTime, false /* fromSyncSource */, true /* forInitiate */);
-        shard_role_details::getRecoveryUnit(opCtx)->waitUntilUnjournaledWritesDurable(
-            opCtx,
-            /*stableCheckpoint*/ true);
+        _service->getStorageEngine()->waitUntilUnjournaledWritesDurable(opCtx,
+                                                                        /*stableCheckpoint*/ true);
     }
 
     // Initial consistent (though empty) data is available after replSetInitiate.

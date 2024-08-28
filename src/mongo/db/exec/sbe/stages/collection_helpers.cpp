@@ -45,7 +45,7 @@ namespace mongo::sbe {
 void CollectionRef::getConsistentCollection(OperationContext* opCtx,
                                             const DatabaseName& dbName,
                                             const UUID& collUuid) {
-    auto timestamp = shard_role_details::getRecoveryUnit(opCtx)->getPointInTimeReadTimestamp(opCtx);
+    auto timestamp = shard_role_details::getRecoveryUnit(opCtx)->getPointInTimeReadTimestamp();
     _collPtr.emplace(CollectionCatalog::get(opCtx)->establishConsistentCollection(
         opCtx, NamespaceStringOrUUID{dbName, collUuid}, timestamp));
 }

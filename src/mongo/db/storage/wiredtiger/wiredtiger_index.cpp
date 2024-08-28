@@ -264,7 +264,10 @@ Status WiredTigerIndex::create(OperationContext* opCtx,
                                const std::string& uri,
                                const std::string& config) {
     // Don't use the session from the recovery unit: create should not be used in a transaction
-    WiredTigerSession session(WiredTigerRecoveryUnit::get(opCtx)->getSessionCache()->conn());
+    WiredTigerSession session(
+        WiredTigerRecoveryUnit::get(shard_role_details::getRecoveryUnit(opCtx))
+            ->getSessionCache()
+            ->conn());
     WT_SESSION* s = session.getSession();
     LOGV2_DEBUG(
         51780, 1, "create uri: {uri} config: {config}", "uri"_attr = uri, "config"_attr = config);
@@ -272,7 +275,10 @@ Status WiredTigerIndex::create(OperationContext* opCtx,
 }
 
 Status WiredTigerIndex::Drop(OperationContext* opCtx, const std::string& uri) {
-    WiredTigerSession session(WiredTigerRecoveryUnit::get(opCtx)->getSessionCache()->conn());
+    WiredTigerSession session(
+        WiredTigerRecoveryUnit::get(shard_role_details::getRecoveryUnit(opCtx))
+            ->getSessionCache()
+            ->conn());
     WT_SESSION* s = session.getSession();
 
     return wtRCToStatus(s->drop(s, uri.c_str(), nullptr), s);
@@ -334,7 +340,11 @@ Status WiredTigerIndex::insert(OperationContext* opCtx,
 
     LOGV2_TRACE_INDEX(20093, "KeyString: {keyString}", "keyString"_attr = keyString);
 
-    WiredTigerCursor curwrap(*WiredTigerRecoveryUnit::get(opCtx), _uri, _tableId, false);
+    WiredTigerCursor curwrap(
+        *WiredTigerRecoveryUnit::get(shard_role_details::getRecoveryUnit(opCtx)),
+        _uri,
+        _tableId,
+        false);
     curwrap.assertInActiveTxn();
     WT_CURSOR* c = curwrap.get();
 
@@ -350,7 +360,11 @@ void WiredTigerIndex::unindex(OperationContext* opCtx,
     dassert(shard_role_details::getLocker(opCtx)->isLocked());
     dassertRecordIdAtEnd(keyString, _rsKeyFormat);
 
-    WiredTigerCursor curwrap(*WiredTigerRecoveryUnit::get(opCtx), _uri, _tableId, false);
+    WiredTigerCursor curwrap(
+        *WiredTigerRecoveryUnit::get(shard_role_details::getRecoveryUnit(opCtx)),
+        _uri,
+        _tableId,
+        false);
     curwrap.assertInActiveTxn();
     WT_CURSOR* c = curwrap.get();
     invariant(c);
@@ -367,19 +381,21 @@ IndexValidateResults WiredTigerIndex::validate(OperationContext* opCtx, bool ful
     dassert(shard_role_details::getLocker(opCtx)->isReadLocked());
 
     IndexValidateResults results;
-    WiredTigerUtil::validateTableLogging(*WiredTigerRecoveryUnit::get(opCtx),
-                                         _uri,
-                                         _isLogged,
-                                         StringData{_indexName},
-                                         results.valid,
-                                         results.errors,
-                                         results.warnings);
+    WiredTigerUtil::validateTableLogging(
+        *WiredTigerRecoveryUnit::get(shard_role_details::getRecoveryUnit(opCtx)),
+        _uri,
+        _isLogged,
+        StringData{_indexName},
+        results.valid,
+        results.errors,
+        results.warnings);
 
     if (!full) {
         return results;
     }
 
-    WiredTigerIndexUtil::validateStructure(*WiredTigerRecoveryUnit::get(opCtx), _uri, results);
+    WiredTigerIndexUtil::validateStructure(
+        *WiredTigerRecoveryUnit::get(shard_role_details::getRecoveryUnit(opCtx)), _uri, results);
 
     return results;
 }
@@ -404,7 +420,10 @@ bool WiredTigerIndex::appendCustomStats(OperationContext* opCtx,
                                         BSONObjBuilder* output,
                                         double scale) const {
     return WiredTigerIndexUtil::appendCustomStats(
-        *WiredTigerRecoveryUnit::get(opCtx), output, scale, _uri);
+        *WiredTigerRecoveryUnit::get(shard_role_details::getRecoveryUnit(opCtx)),
+        output,
+        scale,
+        _uri);
 }
 
 Status WiredTigerIndex::dupKeyCheck(OperationContext* opCtx, const key_string::Value& key) {
@@ -412,7 +431,11 @@ Status WiredTigerIndex::dupKeyCheck(OperationContext* opCtx, const key_string::V
 
     // Allow overwrite because it's faster and this is a read-only cursor.
     constexpr bool allowOverwrite = true;
-    WiredTigerCursor curwrap(*WiredTigerRecoveryUnit::get(opCtx), _uri, _tableId, allowOverwrite);
+    WiredTigerCursor curwrap(
+        *WiredTigerRecoveryUnit::get(shard_role_details::getRecoveryUnit(opCtx)),
+        _uri,
+        _tableId,
+        allowOverwrite);
     WT_CURSOR* c = curwrap.get();
 
     if (isDup(opCtx, c, curwrap.getSession(), key)) {
@@ -432,7 +455,10 @@ void WiredTigerIndex::printIndexEntryMetadata(OperationContext* opCtx,
     // there are open history store cursors in the session. We also need to make sure that the
     // existing session has not written data to avoid potential deadlocks.
     invariant(!shard_role_details::getLocker(opCtx)->inAWriteUnitOfWork());
-    WiredTigerSession session(WiredTigerRecoveryUnit::get(opCtx)->getSessionCache()->conn());
+    WiredTigerSession session(
+        WiredTigerRecoveryUnit::get(shard_role_details::getRecoveryUnit(opCtx))
+            ->getSessionCache()
+            ->conn());
 
     // Per the version cursor API:
     // - A version cursor can only be called with the read timestamp as the oldest timestamp.
@@ -496,7 +522,7 @@ void WiredTigerIndex::printIndexEntryMetadata(OperationContext* opCtx,
 
 long long WiredTigerIndex::getSpaceUsedBytes(OperationContext* opCtx) const {
     dassert(shard_role_details::getLocker(opCtx)->isReadLocked());
-    auto ru = WiredTigerRecoveryUnit::get(opCtx);
+    auto ru = WiredTigerRecoveryUnit::get(shard_role_details::getRecoveryUnit(opCtx));
     WT_SESSION* s = ru->getSession()->getSession();
 
     if (ru->getSessionCache()->isEphemeral()) {
@@ -507,7 +533,7 @@ long long WiredTigerIndex::getSpaceUsedBytes(OperationContext* opCtx) const {
 
 long long WiredTigerIndex::getFreeStorageBytes(OperationContext* opCtx) const {
     dassert(shard_role_details::getLocker(opCtx)->isReadLocked());
-    auto ru = WiredTigerRecoveryUnit::get(opCtx);
+    auto ru = WiredTigerRecoveryUnit::get(shard_role_details::getRecoveryUnit(opCtx));
     WiredTigerSession* session = ru->getSessionNoTxn();
 
     return static_cast<long long>(WiredTigerUtil::getIdentReuseSize(session->getSession(), _uri));
@@ -520,7 +546,11 @@ Status WiredTigerIndex::initAsEmpty(OperationContext* opCtx) {
 
 StatusWith<int64_t> WiredTigerIndex::compact(OperationContext* opCtx,
                                              const CompactOptions& options) {
-    return WiredTigerIndexUtil::compact(*opCtx, *WiredTigerRecoveryUnit::get(opCtx), _uri, options);
+    return WiredTigerIndexUtil::compact(
+        *opCtx,
+        *WiredTigerRecoveryUnit::get(shard_role_details::getRecoveryUnit(opCtx)),
+        _uri,
+        options);
 }
 
 boost::optional<RecordId> WiredTigerIndex::_keyExists(OperationContext* opCtx,
@@ -599,7 +629,8 @@ StatusWith<bool> WiredTigerIndex::_checkDups(OperationContext* opCtx,
     // First phase inserts the prefix key to prohibit concurrent insertions of same key
     setKey(c, prefixKeyItem.Get());
     c->set_value(c, emptyItem.Get());
-    ret = WT_OP_CHECK(wiredTigerCursorInsert(*WiredTigerRecoveryUnit::get(opCtx), c));
+    ret = WT_OP_CHECK(wiredTigerCursorInsert(
+        *WiredTigerRecoveryUnit::get(shard_role_details::getRecoveryUnit(opCtx)), c));
 
     // An entry with prefix key already exists. This can happen only during rolling upgrade when
     // both timestamp unsafe and timestamp safe index format keys could be present.
@@ -617,7 +648,8 @@ StatusWith<bool> WiredTigerIndex::_checkDups(OperationContext* opCtx,
     // transactions, but will not conflict with any transaction that begins after this
     // operation commits.
     setKey(c, prefixKeyItem.Get());
-    ret = WT_OP_CHECK(wiredTigerCursorRemove(*WiredTigerRecoveryUnit::get(opCtx), c));
+    ret = WT_OP_CHECK(wiredTigerCursorRemove(
+        *WiredTigerRecoveryUnit::get(shard_role_details::getRecoveryUnit(opCtx)), c));
     invariantWTOK(ret,
                   c->session,
                   fmt::format("WiredTigerIndex::_insert: remove: {}; uri: {}", _indexName, _uri));
@@ -672,12 +704,13 @@ void WiredTigerIndex::_repairDataFormatVersion(OperationContext* opCtx,
             opCtx, ident, desc, /* isForceUpdateMetadata */ false);
         auto prevVersion = _dataFormatVersion;
         // The updated data format is guaranteed to be within the supported version range.
-        _dataFormatVersion = WiredTigerUtil::checkApplicationMetadataFormatVersion(
-                                 *WiredTigerRecoveryUnit::get(opCtx),
-                                 uri,
-                                 kMinimumIndexVersion,
-                                 kMaximumIndexVersion)
-                                 .getValue();
+        _dataFormatVersion =
+            WiredTigerUtil::checkApplicationMetadataFormatVersion(
+                *WiredTigerRecoveryUnit::get(shard_role_details::getRecoveryUnit(opCtx)),
+                uri,
+                kMinimumIndexVersion,
+                kMaximumIndexVersion)
+                .getValue();
         LOGV2_WARNING(6818600,
                       "Fixing index metadata data format version",
                       logAttrs(desc->getEntry()->getNSSFromCatalog(opCtx)),
@@ -693,7 +726,10 @@ key_string::Version WiredTigerIndex::_handleVersionInfo(OperationContext* ctx,
                                                         const IndexDescriptor* desc,
                                                         bool isLogged) {
     auto version = WiredTigerUtil::checkApplicationMetadataFormatVersion(
-        *WiredTigerRecoveryUnit::get(ctx), uri, kMinimumIndexVersion, kMaximumIndexVersion);
+        *WiredTigerRecoveryUnit::get(shard_role_details::getRecoveryUnit(ctx)),
+        uri,
+        kMinimumIndexVersion,
+        kMaximumIndexVersion);
     if (!version.isOK()) {
         auto collectionNamespace = desc->getEntry()->getNSSFromCatalog(ctx);
         Status versionStatus = version.getStatus();
@@ -720,8 +756,8 @@ key_string::Version WiredTigerIndex::_handleVersionInfo(OperationContext* ctx,
         fassertFailedWithStatusNoTrace(31179, versionStatus);
     }
 
-    uassertStatusOK(
-        WiredTigerUtil::setTableLogging(*WiredTigerRecoveryUnit::get(ctx), uri, isLogged));
+    uassertStatusOK(WiredTigerUtil::setTableLogging(
+        *WiredTigerRecoveryUnit::get(shard_role_details::getRecoveryUnit(ctx)), uri, isLogged));
 
     /*
      * Index data format 6, 11, and 13 correspond to KeyString version V0 and data format 8, 12, and
@@ -755,7 +791,8 @@ public:
         : _ordering(idx->_ordering),
           _opCtx(opCtx),
           _metrics(ResourceConsumption::MetricsCollector::get(opCtx)),
-          _cursor(*WiredTigerRecoveryUnit::get(_opCtx), idx->uri()) {}
+          _cursor(*WiredTigerRecoveryUnit::get(shard_role_details::getRecoveryUnit(_opCtx)),
+                  idx->uri()) {}
 
 protected:
     void setKey(WT_CURSOR* cursor, const WT_ITEM* item) {
@@ -791,7 +828,9 @@ public:
 
         _cursor->set_value(_cursor.get(), valueItem.Get());
 
-        invariantWTOK(wiredTigerCursorInsert(*WiredTigerRecoveryUnit::get(_opCtx), _cursor.get()),
+        invariantWTOK(wiredTigerCursorInsert(
+                          *WiredTigerRecoveryUnit::get(shard_role_details::getRecoveryUnit(_opCtx)),
+                          _cursor.get()),
                       _cursor->session);
 
         _metrics.incrementOneIdxEntryWritten(_idx->uri(), item.size);
@@ -857,7 +896,9 @@ public:
 
         _cursor->set_value(_cursor.get(), valueItem.Get());
 
-        invariantWTOK(wiredTigerCursorInsert(*WiredTigerRecoveryUnit::get(_opCtx), _cursor.get()),
+        invariantWTOK(wiredTigerCursorInsert(
+                          *WiredTigerRecoveryUnit::get(shard_role_details::getRecoveryUnit(_opCtx)),
+                          _cursor.get()),
                       _cursor->session);
 
         _metrics.incrementOneIdxEntryWritten(_idx->uri(), keyItem.size);
@@ -908,7 +949,9 @@ public:
         setKey(_cursor.get(), keyItem.Get());
         _cursor->set_value(_cursor.get(), valueItem.Get());
 
-        invariantWTOK(wiredTigerCursorInsert(*WiredTigerRecoveryUnit::get(_opCtx), _cursor.get()),
+        invariantWTOK(wiredTigerCursorInsert(
+                          *WiredTigerRecoveryUnit::get(shard_role_details::getRecoveryUnit(_opCtx)),
+                          _cursor.get()),
                       _cursor->session);
 
         _metrics.incrementOneIdxEntryWritten(_idx->uri(), keyItem.size);
@@ -952,7 +995,10 @@ public:
           _key(idx.getKeyStringVersion()) {
         // Allow overwrite because it's faster and this is a read-only cursor.
         constexpr bool allowOverwrite = true;
-        _cursor.emplace(*WiredTigerRecoveryUnit::get(_opCtx), _uri, _tableId, allowOverwrite);
+        _cursor.emplace(*WiredTigerRecoveryUnit::get(shard_role_details::getRecoveryUnit(_opCtx)),
+                        _uri,
+                        _tableId,
+                        allowOverwrite);
     }
 
     boost::optional<IndexKeyEntry> next(KeyInclusion keyInclusion) override {
@@ -1061,11 +1107,16 @@ public:
         if (!_cursor) {
             // Allow overwrite because it's faster and this is a read-only cursor.
             constexpr bool allowOverwrite = true;
-            _cursor.emplace(*WiredTigerRecoveryUnit::get(_opCtx), _uri, _tableId, allowOverwrite);
+            _cursor.emplace(
+                *WiredTigerRecoveryUnit::get(shard_role_details::getRecoveryUnit(_opCtx)),
+                _uri,
+                _tableId,
+                allowOverwrite);
         }
 
         // Ensure an active session exists, so any restored cursors will bind to it
-        invariant(WiredTigerRecoveryUnit::get(_opCtx)->getSession() == _cursor->getSession());
+        invariant(WiredTigerRecoveryUnit::get(shard_role_details::getRecoveryUnit(_opCtx))
+                      ->getSession() == _cursor->getSession());
 
         if (!_key.isEmpty()) {
             const WiredTigerItem searchKey(_key.getBuffer(), _key.getSize());
@@ -1150,7 +1201,7 @@ protected:
     // query, direction dependent.
     [[nodiscard]] bool seekWTCursor(StringData query) {
         // Ensure an active transaction is open.
-        WiredTigerRecoveryUnit::get(_opCtx)->getSession();
+        WiredTigerRecoveryUnit::get(shard_role_details::getRecoveryUnit(_opCtx))->getSession();
 
         // We must unposition our cursor by resetting so that we can set new bounds.
         if (_cursor) {
@@ -1298,7 +1349,7 @@ protected:
         }
 
         // Ensure an active transaction is open.
-        WiredTigerRecoveryUnit::get(_opCtx)->getSession();
+        WiredTigerRecoveryUnit::get(shard_role_details::getRecoveryUnit(_opCtx))->getSession();
 
         if (!_lastMoveSkippedKey)
             _eof = !advanceWTCursor();
@@ -1652,7 +1703,8 @@ Status WiredTigerIdIndex::_insert(OperationContext* opCtx,
     WiredTigerItem valueItem(value.getBuffer(), value.getSize());
     setKey(c, keyItem.Get());
     c->set_value(c, valueItem.Get());
-    int ret = WT_OP_CHECK(wiredTigerCursorInsert(*WiredTigerRecoveryUnit::get(opCtx), c));
+    int ret = WT_OP_CHECK(wiredTigerCursorInsert(
+        *WiredTigerRecoveryUnit::get(shard_role_details::getRecoveryUnit(opCtx)), c));
 
     auto& metricsCollector = ResourceConsumption::MetricsCollector::get(opCtx);
     metricsCollector.incrementOneIdxEntryWritten(_uri, keyItem.size);
@@ -1714,7 +1766,8 @@ Status WiredTigerIndexUnique::_insertOldFormatKey(OperationContext* opCtx,
     WiredTigerItem valueItem(value.getBuffer(), value.getSize());
     setKey(c, keyItem.Get());
     c->set_value(c, valueItem.Get());
-    int ret = WT_OP_CHECK(wiredTigerCursorInsert(*WiredTigerRecoveryUnit::get(opCtx), c));
+    int ret = WT_OP_CHECK(wiredTigerCursorInsert(
+        *WiredTigerRecoveryUnit::get(shard_role_details::getRecoveryUnit(opCtx)), c));
 
     auto& metricsCollector = ResourceConsumption::MetricsCollector::get(opCtx);
     metricsCollector.incrementOneIdxEntryWritten(c->uri, keyItem.size);
@@ -1772,7 +1825,8 @@ Status WiredTigerIndexUnique::_insert(OperationContext* opCtx,
         : WiredTigerItem(typeBits.getBuffer(), typeBits.getSize());
     setKey(c, keyItem.Get());
     c->set_value(c, valueItem.Get());
-    ret = WT_OP_CHECK(wiredTigerCursorInsert(*WiredTigerRecoveryUnit::get(opCtx), c));
+    ret = WT_OP_CHECK(wiredTigerCursorInsert(
+        *WiredTigerRecoveryUnit::get(shard_role_details::getRecoveryUnit(opCtx)), c));
 
     // Account for the actual key insertion, but do not attempt account for the complexity of any
     // previous duplicate key detection, which may perform writes.
@@ -1809,7 +1863,8 @@ void WiredTigerIdIndex::_unindex(OperationContext* opCtx,
     // On the _id index, the RecordId is stored in the value of the index entry. If the dupsAllowed
     // flag is not set, we blindly delete using only the key without checking the RecordId.
     if (!dupsAllowed && MONGO_likely(!failWithDataCorruptionForTest)) {
-        int ret = WT_OP_CHECK(wiredTigerCursorRemove(*WiredTigerRecoveryUnit::get(opCtx), c));
+        int ret = WT_OP_CHECK(wiredTigerCursorRemove(
+            *WiredTigerRecoveryUnit::get(shard_role_details::getRecoveryUnit(opCtx)), c));
         if (ret == WT_NOTFOUND) {
             return;
         }
@@ -1864,8 +1919,10 @@ void WiredTigerIdIndex::_unindex(OperationContext* opCtx,
     // The RecordId matches, so remove the entry.
     if (id == idInIndex) {
         auto& metricsCollector = ResourceConsumption::MetricsCollector::get(opCtx);
-        invariantWTOK(WT_OP_CHECK(wiredTigerCursorRemove(*WiredTigerRecoveryUnit::get(opCtx), c)),
-                      c->session);
+        invariantWTOK(
+            WT_OP_CHECK(wiredTigerCursorRemove(
+                *WiredTigerRecoveryUnit::get(shard_role_details::getRecoveryUnit(opCtx)), c)),
+            c->session);
         metricsCollector.incrementOneIdxEntryWritten(_uri, keyItem.size);
         return;
     }
@@ -1888,7 +1945,8 @@ void WiredTigerIndexUnique::_unindex(OperationContext* opCtx,
     // behavior by default.
     WiredTigerItem item(keyString.getBuffer(), keyString.getSize());
     setKey(c, item.Get());
-    int ret = WT_OP_CHECK(wiredTigerCursorRemove(*WiredTigerRecoveryUnit::get(opCtx), c));
+    int ret = WT_OP_CHECK(wiredTigerCursorRemove(
+        *WiredTigerRecoveryUnit::get(shard_role_details::getRecoveryUnit(opCtx)), c));
 
     // Account for the first removal attempt, but do not attempt to account for the complexity of
     // any subsequent removals and insertions when the index's keys are not fully-upgraded.
@@ -1969,7 +2027,8 @@ void WiredTigerIndexUnique::_unindexTimestampUnsafe(OperationContext* opCtx,
         return;
     }
 
-    ret = WT_OP_CHECK(wiredTigerCursorRemove(*WiredTigerRecoveryUnit::get(opCtx), c));
+    ret = WT_OP_CHECK(wiredTigerCursorRemove(
+        *WiredTigerRecoveryUnit::get(shard_role_details::getRecoveryUnit(opCtx)), c));
     if (ret == WT_NOTFOUND) {
         return;
     }
@@ -2025,7 +2084,8 @@ Status WiredTigerIndexStandard::_insert(OperationContext* opCtx,
 
     setKey(c, keyItem.Get());
     c->set_value(c, valueItem.Get());
-    ret = WT_OP_CHECK(wiredTigerCursorInsert(*WiredTigerRecoveryUnit::get(opCtx), c));
+    ret = WT_OP_CHECK(wiredTigerCursorInsert(
+        *WiredTigerRecoveryUnit::get(shard_role_details::getRecoveryUnit(opCtx)), c));
 
     auto& metricsCollector = ResourceConsumption::MetricsCollector::get(opCtx);
     metricsCollector.incrementOneIdxEntryWritten(_uri, keyItem.size);
@@ -2049,7 +2109,8 @@ void WiredTigerIndexStandard::_unindex(OperationContext* opCtx,
     invariant(dupsAllowed);
     WiredTigerItem item(keyString.getBuffer(), keyString.getSize());
     setKey(c, item.Get());
-    int ret = WT_OP_CHECK(wiredTigerCursorRemove(*WiredTigerRecoveryUnit::get(opCtx), c));
+    int ret = WT_OP_CHECK(wiredTigerCursorRemove(
+        *WiredTigerRecoveryUnit::get(shard_role_details::getRecoveryUnit(opCtx)), c));
 
     if (ret == WT_NOTFOUND) {
         return;

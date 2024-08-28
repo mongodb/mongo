@@ -71,6 +71,7 @@
 #include "mongo/logv2/log_severity.h"
 #include "mongo/platform/atomic_proxy.h"
 #include "mongo/unittest/assert.h"
+#include "mongo/unittest/death_test.h"
 #include "mongo/unittest/framework.h"
 #include "mongo/unittest/log_test.h"
 #include "mongo/unittest/temp_dir.h"
@@ -733,7 +734,9 @@ TEST_F(WiredTigerKVEngineTest, RollbackToStableEBUSY) {
     _helper.getWiredTigerKVEngine()->setStableTimestamp(Timestamp(1, 1), false);
 
     // Get a session. This will open a transaction.
-    WiredTigerSession* session = WiredTigerRecoveryUnit::get(opCtxPtr.get())->getSession();
+    WiredTigerSession* session =
+        WiredTigerRecoveryUnit::get(shard_role_details::getRecoveryUnit(opCtxPtr.get()))
+            ->getSession();
     invariant(session);
 
     // WT will return EBUSY due to the open transaction.
@@ -745,7 +748,8 @@ TEST_F(WiredTigerKVEngineTest, RollbackToStableEBUSY) {
                   .code());
 
     // Close the open transaction.
-    WiredTigerRecoveryUnit::get(opCtxPtr.get())->abandonSnapshot();
+    WiredTigerRecoveryUnit::get(shard_role_details::getRecoveryUnit(opCtxPtr.get()))
+        ->abandonSnapshot();
 
     // WT will no longer return EBUSY.
     ASSERT_OK(_helper.getWiredTigerKVEngine()->recoverToStableTimestamp(opCtxPtr.get()));
@@ -868,5 +872,12 @@ TEST_F(WiredTigerKVEngineTest, TestHandlerCleanShutdownBeforeActivityReleaseRAII
     ASSERT_EQ(engine->getActiveSections(), 0);
     ASSERT(!engine->getWtConnReadyStatus_UNSAFE());
 }
+
+DEATH_TEST_F(WiredTigerKVEngineTest, WaitUntilDurableMustBeOutOfUnitOfWork, "invariant") {
+    auto opCtx = _makeOperationContext();
+    shard_role_details::getRecoveryUnit(opCtx.get())->beginUnitOfWork(opCtx->readOnly());
+    opCtx->getServiceContext()->getStorageEngine()->waitUntilDurable(opCtx.get());
+}
+
 }  // namespace
 }  // namespace mongo

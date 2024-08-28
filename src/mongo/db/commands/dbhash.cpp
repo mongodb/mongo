@@ -315,8 +315,7 @@ public:
                 collection = coll;
 
                 if (auto readTimestamp =
-                        shard_role_details::getRecoveryUnit(opCtx)->getPointInTimeReadTimestamp(
-                            opCtx)) {
+                        shard_role_details::getRecoveryUnit(opCtx)->getPointInTimeReadTimestamp()) {
                     auto minSnapshot = coll->getMinimumValidSnapshot();
                     uassert(ErrorCodes::SnapshotUnavailable,
                             str::stream()
@@ -331,7 +330,7 @@ public:
                 collection = catalog->establishConsistentCollection(
                     opCtx,
                     {dbName, uuid},
-                    shard_role_details::getRecoveryUnit(opCtx)->getPointInTimeReadTimestamp(opCtx));
+                    shard_role_details::getRecoveryUnit(opCtx)->getPointInTimeReadTimestamp());
 
                 if (!collection) {
                     // The collection did not exist at the read timestamp with the given UUID.

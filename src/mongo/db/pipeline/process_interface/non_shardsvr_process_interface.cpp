@@ -120,8 +120,8 @@ boost::optional<Document> NonShardServerProcessInterface::lookupSingleDocument(
         Lock::GlobalLock lk(expCtx->opCtx, MODE_IS);
         invariant(shard_role_details::getRecoveryUnit(expCtx->opCtx)->getTimestampReadSource() ==
                   RecoveryUnit::ReadSource::kNoOverlap);
-        boost::optional<Timestamp> readTs = shard_role_details::getRecoveryUnit(expCtx->opCtx)
-                                                ->getPointInTimeReadTimestamp(expCtx->opCtx);
+        boost::optional<Timestamp> readTs =
+            shard_role_details::getRecoveryUnit(expCtx->opCtx)->getPointInTimeReadTimestamp();
         invariant(readTs);
         speculativeMajorityReadInfo.setSpeculativeReadTimestampForward(*readTs);
     }

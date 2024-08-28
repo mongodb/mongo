@@ -39,13 +39,9 @@
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
-#include "mongo/db/global_settings.h"
-#include "mongo/db/repl/repl_settings.h"
-#include "mongo/db/storage/journal_listener.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_kv_engine.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_parameters_gen.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_session_cache.h"
-#include "mongo/db/storage/wiredtiger/wiredtiger_session_data.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_util.h"
 #include "mongo/logv2/log.h"
 #include "mongo/logv2/log_attr.h"
@@ -268,100 +264,6 @@ bool WiredTigerSessionCache::isShuttingDown() {
     return _shuttingDown.load() & kShuttingDownMask;
 }
 
-void WiredTigerSessionCache::waitUntilDurable(OperationContext* opCtx,
-                                              Fsync syncType,
-                                              UseJournalListener useListener) {
-    // For inMemory storage engines, the data is "as durable as it's going to get".
-    // That is, a restart is equivalent to a complete node failure.
-    if (isEphemeral()) {
-        auto [journalListener, token] = _getJournalListenerWithToken(opCtx, useListener);
-        if (token) {
-            journalListener->onDurable(token.value());
-        }
-        return;
-    }
-
-    BlockShutdown blockShutdown(this);
-
-    uassert(ErrorCodes::ShutdownInProgress,
-            "Cannot wait for durability because a shutdown is in progress",
-            !isShuttingDown());
-
-    // Stable checkpoints are only meaningful in a replica set. Replication sets the "stable
-    // timestamp". If the stable timestamp is unset, WiredTiger takes a full checkpoint, which is
-    // incidentally what we want. A "true" stable checkpoint (a stable timestamp was set on the
-    // WT_CONNECTION, i.e: replication is on) requires `forceCheckpoint` to be true and journaling
-    // to be enabled.
-    if (syncType == Fsync::kCheckpointStableTimestamp && getGlobalReplSettings().isReplSet()) {
-        invariant(!isEphemeral());
-    }
-
-    // When forcing a checkpoint with journaling enabled, don't synchronize with other
-    // waiters, as a log flush is much cheaper than a full checkpoint.
-    if ((syncType == Fsync::kCheckpointStableTimestamp || syncType == Fsync::kCheckpointAll) &&
-        !isEphemeral()) {
-        auto [journalListener, token] = _getJournalListenerWithToken(opCtx, useListener);
-
-        getKVEngine()->forceCheckpoint(syncType == Fsync::kCheckpointStableTimestamp);
-
-        if (token) {
-            journalListener->onDurable(token.value());
-        }
-
-        LOGV2_DEBUG(22418, 4, "created checkpoint (forced)");
-        return;
-    }
-
-    auto [journalListener, token] = _getJournalListenerWithToken(opCtx, useListener);
-
-    uint32_t start = _lastSyncTime.load();
-    // Do the remainder in a critical section that ensures only a single thread at a time
-    // will attempt to synchronize.
-    stdx::unique_lock<Latch> lk(_lastSyncMutex);
-    uint32_t current = _lastSyncTime.loadRelaxed();  // synchronized with writes through mutex
-    if (current != start) {
-        // Someone else synced already since we read lastSyncTime, so we're done!
-
-        // Unconditionally unlock mutex here to run operations that do not require synchronization.
-        // The JournalListener is the only operation that meets this criteria currently.
-        lk.unlock();
-        if (token) {
-            journalListener->onDurable(token.value());
-        }
-
-        return;
-    }
-    _lastSyncTime.store(current + 1);
-
-    // Nobody has synched yet, so we have to sync ourselves.
-
-    // Initialize on first use.
-    if (!_waitUntilDurableSession) {
-        invariantWTOK(
-            _conn->open_session(_conn, nullptr, "isolation=snapshot", &_waitUntilDurableSession),
-            nullptr);
-    }
-
-    // Flush the journal.
-    invariantWTOK(_waitUntilDurableSession->log_flush(_waitUntilDurableSession, "sync=on"),
-                  _waitUntilDurableSession);
-    LOGV2_DEBUG(22419, 4, "flushed journal");
-
-    // The session is reset periodically so that WT doesn't consider it a rogue session and log
-    // about it. The session doesn't actually pin any resources that need to be released.
-    if (_timeSinceLastDurabilitySessionReset.millis() > (5 * 60 * 1000 /* 5 minutes */)) {
-        _waitUntilDurableSession->reset(_waitUntilDurableSession);
-        _timeSinceLastDurabilitySessionReset.reset();
-    }
-
-    // Unconditionally unlock mutex here to run operations that do not require synchronization.
-    // The JournalListener is the only operation that meets this criteria currently.
-    lk.unlock();
-    if (token) {
-        journalListener->onDurable(token.value());
-    }
-}
-
 void WiredTigerSessionCache::waitUntilPreparedUnitOfWorkCommitsOrAborts(
     Interruptible& interruptible, std::uint64_t lastCount) {
     // It is possible for a prepared transaction to block on bonus eviction inside WiredTiger after
@@ -531,17 +433,6 @@ void WiredTigerSessionCache::releaseSession(WiredTigerSession* session) {
     }
 }
 
-
-void WiredTigerSessionCache::setJournalListener(JournalListener* jl) {
-    stdx::unique_lock<Latch> lk(_journalListenerMutex);
-
-    // A JournalListener can only be set once. Otherwise, accessing a copy of the _journalListener
-    // pointer without a mutex would be unsafe.
-    invariant(!_journalListener);
-
-    _journalListener = jl;
-}
-
 bool WiredTigerSessionCache::isEngineCachingCursors() {
     return gWiredTigerCursorCacheSize.load() <= 0;
 }
@@ -549,27 +440,6 @@ bool WiredTigerSessionCache::isEngineCachingCursors() {
 void WiredTigerSessionCache::WiredTigerSessionDeleter::operator()(
     WiredTigerSession* session) const {
     session->_cache->releaseSession(session);
-}
-
-std::pair<JournalListener*, boost::optional<JournalListener::Token>>
-WiredTigerSessionCache::_getJournalListenerWithToken(OperationContext* opCtx,
-                                                     UseJournalListener useListener) {
-    auto journalListener = [&]() -> JournalListener* {
-        // The JournalListener may not be set immediately, so we must check under a mutex so
-        // as not to access the variable while setting a JournalListener. A JournalListener
-        // is only allowed to be set once, so using the pointer outside of a mutex is safe.
-        stdx::unique_lock<Latch> lk(_journalListenerMutex);
-        return _journalListener;
-    }();
-    boost::optional<JournalListener::Token> token;
-    if (journalListener && useListener == UseJournalListener::kUpdate) {
-        // Update a persisted value with the latest write timestamp that is safe across
-        // startup recovery in the repl layer. Then report that timestamp as durable to the
-        // repl layer below after we have flushed in-memory data to disk.
-        // Note: only does a write if primary, otherwise just fetches the timestamp.
-        token = journalListener->getToken(opCtx);
-    }
-    return std::make_pair(journalListener, token);
 }
 
 }  // namespace mongo

@@ -1341,9 +1341,8 @@ TenantMigrationDonorService::Instance::_waitUntilStartMigrationDonorTimestampIsC
                auto opCtx = opCtxHolder.get();
                auto storageEngine = opCtx->getServiceContext()->getStorageEngine();
                if (storageEngine->getLastStableRecoveryTimestamp() < startMigrationDonorTimestamp) {
-                   shard_role_details::getRecoveryUnit(opCtx)->waitUntilUnjournaledWritesDurable(
-                       opCtx,
-                       /*stableCheckpoint*/ true);
+                   storageEngine->waitUntilUnjournaledWritesDurable(opCtx,
+                                                                    /*stableCheckpoint*/ true);
                }
            })
         .until([this, self = shared_from_this(), startMigrationDonorTimestamp](Status status) {

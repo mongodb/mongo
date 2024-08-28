@@ -51,7 +51,6 @@
 #include "mongo/db/storage/wiredtiger/wiredtiger_session_cache.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_snapshot_manager.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_stats.h"
-#include "mongo/db/transaction_resources.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/util/assert_util_core.h"
 #include "mongo/util/timer.h"
@@ -79,15 +78,11 @@ public:
 
     void prepareUnitOfWork() override;
 
-    bool waitUntilDurable(OperationContext* opCtx) override;
-
-    bool waitUntilUnjournaledWritesDurable(OperationContext* opCtx, bool stableCheckpoint) override;
-
     void preallocateSnapshot() override;
 
     Status majorityCommittedSnapshotAvailable() const override;
 
-    boost::optional<Timestamp> getPointInTimeReadTimestamp(OperationContext* opCtx) override;
+    boost::optional<Timestamp> getPointInTimeReadTimestamp() override;
 
     Status setTimestamp(Timestamp timestamp) override;
 
@@ -208,10 +203,6 @@ public:
 
     static WiredTigerRecoveryUnit* get(RecoveryUnit* ru) {
         return checked_cast<WiredTigerRecoveryUnit*>(ru);
-    }
-
-    static WiredTigerRecoveryUnit* get(OperationContext* opCtx) {
-        return checked_cast<WiredTigerRecoveryUnit*>(shard_role_details::getRecoveryUnit(opCtx));
     }
 
     bool gatherWriteContextForDebugging() const;

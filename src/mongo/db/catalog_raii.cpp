@@ -110,7 +110,7 @@ void verifyDbAndCollection(OperationContext* opCtx,
         }
         if (shard_role_details::getRecoveryUnit(opCtx)->isActive()) {
             const auto mySnapshot =
-                shard_role_details::getRecoveryUnit(opCtx)->getPointInTimeReadTimestamp(opCtx);
+                shard_role_details::getRecoveryUnit(opCtx)->getPointInTimeReadTimestamp();
             if (mySnapshot && *mySnapshot < coll->getMinimumValidSnapshot()) {
                 throwWriteConflictException(str::stream()
                                             << "Unable to write to collection '"
@@ -624,7 +624,7 @@ ReadSourceScope::ReadSourceScope(OperationContext* opCtx,
 
     if (_originalReadSource == RecoveryUnit::ReadSource::kProvided) {
         _originalReadTimestamp =
-            *shard_role_details::getRecoveryUnit(_opCtx)->getPointInTimeReadTimestamp(_opCtx);
+            *shard_role_details::getRecoveryUnit(_opCtx)->getPointInTimeReadTimestamp();
     }
 
     shard_role_details::getRecoveryUnit(_opCtx)->abandonSnapshot();

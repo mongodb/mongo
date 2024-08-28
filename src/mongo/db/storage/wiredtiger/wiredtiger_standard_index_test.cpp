@@ -80,7 +80,7 @@ TEST(WiredTigerStandardIndexText, CursorInActiveTxnAfterNext) {
         ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
         Lock::GlobalLock globalLock(opCtx.get(), MODE_X);
 
-        auto ru = WiredTigerRecoveryUnit::get(opCtx.get());
+        auto ru = WiredTigerRecoveryUnit::get(shard_role_details::getRecoveryUnit(opCtx.get()));
 
         auto cursor = sdi->newCursor(opCtx.get());
         auto res = cursor->seek(
@@ -129,7 +129,7 @@ TEST(WiredTigerStandardIndexText, CursorInActiveTxnAfterSeek) {
         ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
         Lock::GlobalLock globalLock(opCtx.get(), MODE_X);
 
-        auto ru = WiredTigerRecoveryUnit::get(opCtx.get());
+        auto ru = WiredTigerRecoveryUnit::get(shard_role_details::getRecoveryUnit(opCtx.get()));
 
         auto cursor = sdi->newCursor(opCtx.get());
 

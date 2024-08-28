@@ -428,7 +428,7 @@ public:
     ReadSource getTimestampReadSource() const override {
         return _source;
     };
-    boost::optional<Timestamp> getPointInTimeReadTimestamp(OperationContext* opCtx) override {
+    boost::optional<Timestamp> getPointInTimeReadTimestamp() override {
         return _timestamp;
     }
 
@@ -461,7 +461,7 @@ TEST_F(ReadSourceScopeTest, RestoreReadSource) {
                                                                          Timestamp(1, 2));
     ASSERT_EQ(shard_role_details::getRecoveryUnit(opCtx())->getTimestampReadSource(),
               ReadSource::kProvided);
-    ASSERT_EQ(shard_role_details::getRecoveryUnit(opCtx())->getPointInTimeReadTimestamp(opCtx()),
+    ASSERT_EQ(shard_role_details::getRecoveryUnit(opCtx())->getPointInTimeReadTimestamp(),
               Timestamp(1, 2));
     {
         ReadSourceScope scope(opCtx(), ReadSource::kNoTimestamp);
@@ -472,13 +472,12 @@ TEST_F(ReadSourceScopeTest, RestoreReadSource) {
             ReadSource::kNoOverlap);
         ASSERT_EQ(shard_role_details::getRecoveryUnit(opCtx())->getTimestampReadSource(),
                   ReadSource::kNoOverlap);
-        ASSERT_EQ(
-            shard_role_details::getRecoveryUnit(opCtx())->getPointInTimeReadTimestamp(opCtx()),
-            boost::none);
+        ASSERT_EQ(shard_role_details::getRecoveryUnit(opCtx())->getPointInTimeReadTimestamp(),
+                  boost::none);
     }
     ASSERT_EQ(shard_role_details::getRecoveryUnit(opCtx())->getTimestampReadSource(),
               ReadSource::kProvided);
-    ASSERT_EQ(shard_role_details::getRecoveryUnit(opCtx())->getPointInTimeReadTimestamp(opCtx()),
+    ASSERT_EQ(shard_role_details::getRecoveryUnit(opCtx())->getPointInTimeReadTimestamp(),
               Timestamp(1, 2));
 }
 

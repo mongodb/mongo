@@ -261,29 +261,6 @@ public:
     }
 
     /**
-     * Waits until all commits that happened before this call are durable in the journal. Returns
-     * true, unless the storage engine cannot guarantee durability, which should never happen when
-     * the engine is non-ephemeral. This cannot be called from inside a unit of work, and should
-     * fail if it is. This method invariants if the caller holds any locks, except for repair.
-     *
-     * Can throw write interruption errors from the JournalListener.
-     */
-    virtual bool waitUntilDurable(OperationContext* opCtx) = 0;
-
-    /**
-     * Unlike `waitUntilDurable`, this method takes a stable checkpoint, making durable any writes
-     * on unjournaled tables that are behind the current stable timestamp. If the storage engine
-     * is starting from an "unstable" checkpoint or 'stableCheckpoint'=false, this method call will
-     * turn into an unstable checkpoint.
-     *
-     * This must not be called by a system taking user writes until after a stable timestamp is
-     * passed to the storage engine.
-     */
-    virtual bool waitUntilUnjournaledWritesDurable(OperationContext* opCtx, bool stableCheckpoint) {
-        return waitUntilDurable(opCtx);
-    }
-
-    /**
      * If there is an open transaction, it is closed. If the current AbandonSnapshotMode is
      * 'kAbort', the transaction is aborted. If the mode is 'kCommit' the transaction is committed,
      * and all data currently pointed to by cursors remains pinned until the cursors are
@@ -345,7 +322,7 @@ public:
      *
      * This may passively start a storage engine transaction to establish a read timestamp.
      */
-    virtual boost::optional<Timestamp> getPointInTimeReadTimestamp(OperationContext* opCtx) {
+    virtual boost::optional<Timestamp> getPointInTimeReadTimestamp() {
         return boost::none;
     }
 

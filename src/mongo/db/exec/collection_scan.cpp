@@ -409,7 +409,7 @@ void CollectionScan::setLatestOplogEntryTimestampToReadTimestamp() {
     }
 
     const auto readTimestamp =
-        shard_role_details::getRecoveryUnit(opCtx())->getPointInTimeReadTimestamp(opCtx());
+        shard_role_details::getRecoveryUnit(opCtx())->getPointInTimeReadTimestamp();
 
     // If we don't have a read timestamp, we take no action here.
     if (!readTimestamp) {

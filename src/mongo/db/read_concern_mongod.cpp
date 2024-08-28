@@ -636,7 +636,7 @@ Status waitForSpeculativeMajorityReadConcernImpl(
         // Storage engine operations require at least Global IS.
         Lock::GlobalLock lk(opCtx, MODE_IS);
         boost::optional<Timestamp> readTs =
-            shard_role_details::getRecoveryUnit(opCtx)->getPointInTimeReadTimestamp(opCtx);
+            shard_role_details::getRecoveryUnit(opCtx)->getPointInTimeReadTimestamp();
         invariant(readTs);
         waitTs = *readTs;
     }

@@ -113,7 +113,10 @@ Status WiredTigerColumnStore::create(OperationContext* opCtx,
                                      const std::string& uri,
                                      const std::string& config) {
     // Don't use the session from the recovery unit: create should not be used in a transaction
-    WiredTigerSession session(WiredTigerRecoveryUnit::get(opCtx)->getSessionCache()->conn());
+    WiredTigerSession session(
+        WiredTigerRecoveryUnit::get(shard_role_details::getRecoveryUnit(opCtx))
+            ->getSessionCache()
+            ->conn());
     WT_SESSION* s = session.getSession();
     LOGV2_DEBUG(
         6510201, 1, "create uri: {uri} config: {config}", "uri"_attr = uri, "config"_attr = config);
@@ -152,7 +155,10 @@ class WiredTigerColumnStore::WriteCursor final : public ColumnStore::WriteCursor
 public:
     WriteCursor(OperationContext* opCtx, const std::string& uri, uint64_t tableId)
         : _opCtx(opCtx),
-          _curwrap(*WiredTigerRecoveryUnit::get(opCtx), uri, tableId, true /* allow overwrite */) {
+          _curwrap(*WiredTigerRecoveryUnit::get(shard_role_details::getRecoveryUnit(opCtx)),
+                   uri,
+                   tableId,
+                   true /* allow overwrite */) {
         _curwrap.assertInActiveTxn();
     }
 
@@ -191,7 +197,8 @@ void WiredTigerColumnStore::WriteCursor::insert(PathView path, RowId rid, CellVi
 
     c()->set_key(c(), keyItem.Get());
     c()->set_value(c(), valueItem.Get());
-    int ret = WT_OP_CHECK(wiredTigerCursorInsert(*WiredTigerRecoveryUnit::get(_opCtx), c()));
+    int ret = WT_OP_CHECK(wiredTigerCursorInsert(
+        *WiredTigerRecoveryUnit::get(shard_role_details::getRecoveryUnit(_opCtx)), c()));
 
     auto& metricsCollector = ResourceConsumption::MetricsCollector::get(_opCtx);
     metricsCollector.incrementOneIdxEntryWritten(c()->uri, keyItem.size);
@@ -212,7 +219,8 @@ void WiredTigerColumnStore::WriteCursor::remove(PathView path, RowId rid) {
     auto key = makeKey(path, rid);
     auto keyItem = WiredTigerItem(key);
     c()->set_key(c(), keyItem.Get());
-    int ret = WT_OP_CHECK(wiredTigerCursorRemove(*WiredTigerRecoveryUnit::get(_opCtx), c()));
+    int ret = WT_OP_CHECK(wiredTigerCursorRemove(
+        *WiredTigerRecoveryUnit::get(shard_role_details::getRecoveryUnit(_opCtx)), c()));
     if (ret == WT_NOTFOUND) {
         return;
     }
@@ -238,7 +246,8 @@ void WiredTigerColumnStore::WriteCursor::update(PathView path, RowId rid, CellVi
 
     c()->set_key(c(), keyItem.Get());
     c()->set_value(c(), valueItem.Get());
-    int ret = WT_OP_CHECK(wiredTigerCursorUpdate(*WiredTigerRecoveryUnit::get(_opCtx), c()));
+    int ret = WT_OP_CHECK(wiredTigerCursorUpdate(
+        *WiredTigerRecoveryUnit::get(shard_role_details::getRecoveryUnit(_opCtx)), c()));
 
     auto& metricsCollector = ResourceConsumption::MetricsCollector::get(_opCtx);
     metricsCollector.incrementOneIdxEntryWritten(c()->uri, keyItem.size);
@@ -252,19 +261,21 @@ IndexValidateResults WiredTigerColumnStore::validate(OperationContext* opCtx, bo
 
     IndexValidateResults results;
 
-    WiredTigerUtil::validateTableLogging(*WiredTigerRecoveryUnit::get(opCtx),
-                                         _uri,
-                                         _isLogged,
-                                         StringData{_indexName},
-                                         results.valid,
-                                         results.errors,
-                                         results.warnings);
+    WiredTigerUtil::validateTableLogging(
+        *WiredTigerRecoveryUnit::get(shard_role_details::getRecoveryUnit(opCtx)),
+        _uri,
+        _isLogged,
+        StringData{_indexName},
+        results.valid,
+        results.errors,
+        results.warnings);
 
     if (!full) {
         return results;
     }
 
-    WiredTigerIndexUtil::validateStructure(*WiredTigerRecoveryUnit::get(opCtx), _uri, results);
+    WiredTigerIndexUtil::validateStructure(
+        *WiredTigerRecoveryUnit::get(shard_role_details::getRecoveryUnit(opCtx)), _uri, results);
 
     return results;
 }
@@ -288,7 +299,10 @@ public:
           _uri(idx->uri()),
           _tableId(idx->_tableId),
           _indexName(idx->indexName()) {
-        _cursor.emplace(*WiredTigerRecoveryUnit::get(_opCtx), _uri, _tableId, false);
+        _cursor.emplace(*WiredTigerRecoveryUnit::get(shard_role_details::getRecoveryUnit(_opCtx)),
+                        _uri,
+                        _tableId,
+                        false);
     }
 
     boost::optional<FullCellView> next() override {
@@ -340,11 +354,16 @@ public:
 
     void restore() override {
         if (!_cursor) {
-            _cursor.emplace(*WiredTigerRecoveryUnit::get(_opCtx), _uri, _tableId, false);
+            _cursor.emplace(
+                *WiredTigerRecoveryUnit::get(shard_role_details::getRecoveryUnit(_opCtx)),
+                _uri,
+                _tableId,
+                false);
         }
 
         // Ensure an active session exists, so any restored cursors will bind to it
-        invariant(WiredTigerRecoveryUnit::get(_opCtx)->getSession() == _cursor->getSession());
+        invariant(WiredTigerRecoveryUnit::get(shard_role_details::getRecoveryUnit(_opCtx))
+                      ->getSession() == _cursor->getSession());
 
         if (!_eof) {
             // Check if the exact search key stashed in _buffer was not found.
@@ -381,7 +400,7 @@ private:
      */
     bool seekWTCursorAtOrPast(const std::string& searchKey, bool exactOnly = false) {
         // Ensure an active transaction is open.
-        WiredTigerRecoveryUnit::get(_opCtx)->getSession();
+        WiredTigerRecoveryUnit::get(shard_role_details::getRecoveryUnit(_opCtx))->getSession();
 
         WT_CURSOR* c = _cursor->get();
 
@@ -511,7 +530,9 @@ std::unique_ptr<ColumnStore::Cursor> WiredTigerColumnStore::newCursor(
 class WiredTigerColumnStore::BulkBuilder final : public ColumnStore::BulkBuilder {
 public:
     BulkBuilder(WiredTigerColumnStore* idx, OperationContext* opCtx)
-        : _opCtx(opCtx), _cursor(*WiredTigerRecoveryUnit::get(opCtx), idx->uri()) {}
+        : _opCtx(opCtx),
+          _cursor(*WiredTigerRecoveryUnit::get(shard_role_details::getRecoveryUnit(opCtx)),
+                  idx->uri()) {}
 
     void addCell(PathView path, RowId rid, CellView cell) override {
         const std::string& key = makeKeyInBuffer(_buffer, path, rid);
@@ -521,7 +542,9 @@ public:
         WiredTigerItem cellItem(cell.rawData(), cell.size());
         _cursor->set_value(_cursor.get(), cellItem.Get());
 
-        invariantWTOK(wiredTigerCursorInsert(*WiredTigerRecoveryUnit::get(_opCtx), _cursor.get()),
+        invariantWTOK(wiredTigerCursorInsert(
+                          *WiredTigerRecoveryUnit::get(shard_role_details::getRecoveryUnit(_opCtx)),
+                          _cursor.get()),
                       _cursor->session);
 
         ResourceConsumption::MetricsCollector::get(_opCtx).incrementOneIdxEntryWritten(
@@ -545,7 +568,7 @@ bool WiredTigerColumnStore::isEmpty(OperationContext* opCtx) {
 
 long long WiredTigerColumnStore::getSpaceUsedBytes(OperationContext* opCtx) const {
     dassert(shard_role_details::getLocker(opCtx)->isReadLocked());
-    auto ru = WiredTigerRecoveryUnit::get(opCtx);
+    auto ru = WiredTigerRecoveryUnit::get(shard_role_details::getRecoveryUnit(opCtx));
     WT_SESSION* s = ru->getSession()->getSession();
 
     if (ru->getSessionCache()->isEphemeral()) {
@@ -556,7 +579,7 @@ long long WiredTigerColumnStore::getSpaceUsedBytes(OperationContext* opCtx) cons
 
 long long WiredTigerColumnStore::getFreeStorageBytes(OperationContext* opCtx) const {
     dassert(shard_role_details::getLocker(opCtx)->isReadLocked());
-    auto ru = WiredTigerRecoveryUnit::get(opCtx);
+    auto ru = WiredTigerRecoveryUnit::get(shard_role_details::getRecoveryUnit(opCtx));
     WiredTigerSession* session = ru->getSession();
 
     return static_cast<long long>(WiredTigerUtil::getIdentReuseSize(session->getSession(), _uri));
@@ -564,14 +587,21 @@ long long WiredTigerColumnStore::getFreeStorageBytes(OperationContext* opCtx) co
 
 StatusWith<int64_t> WiredTigerColumnStore::compact(OperationContext* opCtx,
                                                    const CompactOptions& options) {
-    return WiredTigerIndexUtil::compact(*opCtx, *WiredTigerRecoveryUnit::get(opCtx), _uri, options);
+    return WiredTigerIndexUtil::compact(
+        *opCtx,
+        *WiredTigerRecoveryUnit::get(shard_role_details::getRecoveryUnit(opCtx)),
+        _uri,
+        options);
 }
 
 bool WiredTigerColumnStore::appendCustomStats(OperationContext* opCtx,
                                               BSONObjBuilder* output,
                                               double scale) const {
     return WiredTigerIndexUtil::appendCustomStats(
-        *WiredTigerRecoveryUnit::get(opCtx), output, scale, _uri);
+        *WiredTigerRecoveryUnit::get(shard_role_details::getRecoveryUnit(opCtx)),
+        output,
+        scale,
+        _uri);
 }
 
 }  // namespace mongo

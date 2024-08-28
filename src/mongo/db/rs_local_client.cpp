@@ -132,7 +132,7 @@ StatusWith<Shard::QueryResponse> RSLocalClient::queryOnce(
         boost::optional<Timestamp> originalReadTimestamp;
         if (originalReadSource == RecoveryUnit::ReadSource::kProvided) {
             originalReadTimestamp =
-                shard_role_details::getRecoveryUnit(opCtx)->getPointInTimeReadTimestamp(opCtx);
+                shard_role_details::getRecoveryUnit(opCtx)->getPointInTimeReadTimestamp();
         }
         readSourceGuard.emplace([opCtx, originalReadSource, originalReadTimestamp] {
             if (originalReadSource == RecoveryUnit::ReadSource::kProvided) {
@@ -249,7 +249,7 @@ Status RSLocalClient::runAggregation(
     boost::optional<Timestamp> originalReadTimestamp;
     if (originalReadSource == RecoveryUnit::ReadSource::kProvided)
         originalReadTimestamp =
-            shard_role_details::getRecoveryUnit(opCtx)->getPointInTimeReadTimestamp(opCtx);
+            shard_role_details::getRecoveryUnit(opCtx)->getPointInTimeReadTimestamp();
 
     ON_BLOCK_EXIT([&]() {
         repl::ReadConcernArgs::get(opCtx) = originalRCA;

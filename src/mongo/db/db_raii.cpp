@@ -338,7 +338,7 @@ AutoGetCollectionForRead::AutoGetCollectionForRead(OperationContext* opCtx,
     // Update readSource in case it was updated.
     const auto readSource = shard_role_details::getRecoveryUnit(opCtx)->getTimestampReadSource();
     const auto readTimestamp =
-        shard_role_details::getRecoveryUnit(opCtx)->getPointInTimeReadTimestamp(opCtx);
+        shard_role_details::getRecoveryUnit(opCtx)->getPointInTimeReadTimestamp();
 
     // Check that the collections are all safe to use. First acquire collection from our catalog
     // compatible with the specified 'readTimestamp'. Creates and places a compatible PIT collection
@@ -628,7 +628,7 @@ ConsistentCatalogAndSnapshot getConsistentCatalogAndSnapshot(
         const auto readSource =
             shard_role_details::getRecoveryUnit(opCtx)->getTimestampReadSource();
         const auto readTimestamp =
-            shard_role_details::getRecoveryUnit(opCtx)->getPointInTimeReadTimestamp(opCtx);
+            shard_role_details::getRecoveryUnit(opCtx)->getPointInTimeReadTimestamp();
 
         checkInvariantsForReadOptions(nss,
                                       readConcernArgs.getArgsAfterClusterTime(),
@@ -885,7 +885,7 @@ AutoGetCollectionForReadLockFree::AutoGetCollectionForReadLockFree(
         auto [resolvedNss, collection, view] = getCollectionForLockFreeRead(
             opCtx,
             catalog,
-            shard_role_details::getRecoveryUnit(opCtx)->getPointInTimeReadTimestamp(opCtx),
+            shard_role_details::getRecoveryUnit(opCtx)->getPointInTimeReadTimestamp(),
             nsOrUUID,
             _options);
         _resolvedNss = resolvedNss;

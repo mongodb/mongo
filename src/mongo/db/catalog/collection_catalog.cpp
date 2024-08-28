@@ -2096,8 +2096,7 @@ std::vector<DatabaseName> CollectionCatalog::getAllConsistentDbNamesForTenant(
 
     // Now iterate over uncommitted list and validate against the storage snapshot.
     // Only consider databases we have not seen so far.
-    auto readTimestamp =
-        shard_role_details::getRecoveryUnit(opCtx)->getPointInTimeReadTimestamp(opCtx);
+    auto readTimestamp = shard_role_details::getRecoveryUnit(opCtx)->getPointInTimeReadTimestamp();
     tassert(9089301,
             "point in time catalog lookup for a database list is not supported",
             RecoveryUnit::ReadSource::kNoTimestamp ==

@@ -207,14 +207,14 @@ bool changeReadSourceIfNeeded(OperationContext* opCtx,
                     2,
                     "Changed ReadSource to kLastApplied",
                     "namespace"_attr = nss,
-                    "ts"_attr = ru->getPointInTimeReadTimestamp(opCtx));
+                    "ts"_attr = ru->getPointInTimeReadTimestamp());
     } else if (originalReadSource == RecoveryUnit::ReadSource::kLastApplied &&
                currentReadSource == RecoveryUnit::ReadSource::kLastApplied) {
         LOGV2_DEBUG(6730500,
                     2,
                     "ReadSource kLastApplied updated timestamp",
                     "namespace"_attr = nss,
-                    "ts"_attr = ru->getPointInTimeReadTimestamp(opCtx));
+                    "ts"_attr = ru->getPointInTimeReadTimestamp());
     } else if (originalReadSource == RecoveryUnit::ReadSource::kLastApplied &&
                currentReadSource == RecoveryUnit::ReadSource::kNoTimestamp) {
         LOGV2_DEBUG(4452902,

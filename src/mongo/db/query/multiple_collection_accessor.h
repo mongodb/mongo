@@ -59,7 +59,7 @@ public:
         auto catalog = CollectionCatalog::get(opCtx);
         for (const auto& secondaryNssOrUuid : secondaryExecNssList) {
             auto readTimestamp =
-                shard_role_details::getRecoveryUnit(opCtx)->getPointInTimeReadTimestamp(opCtx);
+                shard_role_details::getRecoveryUnit(opCtx)->getPointInTimeReadTimestamp();
             // We ignore the collection pointer returned as we don't need it.
             catalog->establishConsistentCollection(opCtx, secondaryNssOrUuid, readTimestamp);
             auto secondaryNss = catalog->resolveNamespaceStringOrUUID(opCtx, secondaryNssOrUuid);
@@ -90,14 +90,13 @@ public:
     std::map<NamespaceString, CollectionPtr> getSecondaryCollections() const {
         std::map<NamespaceString, CollectionPtr> collMap;
         for (const auto& [nss, uuid] : _secondaryColls) {
-            collMap.emplace(
-                nss,
-                uuid ? CollectionCatalog::get(_opCtx)->establishConsistentCollection(
-                           _opCtx,
-                           NamespaceStringOrUUID{nss.dbName(), *uuid},
-                           shard_role_details::getRecoveryUnit(_opCtx)->getPointInTimeReadTimestamp(
-                               _opCtx))
-                     : nullptr);
+            collMap.emplace(nss,
+                            uuid ? CollectionCatalog::get(_opCtx)->establishConsistentCollection(
+                                       _opCtx,
+                                       NamespaceStringOrUUID{nss.dbName(), *uuid},
+                                       shard_role_details::getRecoveryUnit(_opCtx)
+                                           ->getPointInTimeReadTimestamp())
+                                 : nullptr);
         }
         return collMap;
     }
@@ -127,7 +126,7 @@ public:
         } else if (auto itr = _secondaryColls.find(nss);
                    itr != _secondaryColls.end() && itr->second) {
             auto timestamp =
-                shard_role_details::getRecoveryUnit(_opCtx)->getPointInTimeReadTimestamp(_opCtx);
+                shard_role_details::getRecoveryUnit(_opCtx)->getPointInTimeReadTimestamp();
             return CollectionPtr{CollectionCatalog::get(_opCtx)->establishConsistentCollection(
                 _opCtx, NamespaceStringOrUUID{nss.dbName(), *itr->second}, timestamp)};
         }

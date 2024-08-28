@@ -55,7 +55,6 @@
 #include "mongo/db/storage/wiredtiger/wiredtiger_session_cache.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_stats.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_util.h"
-#include "mongo/db/transaction_resources.h"
 #include "mongo/logv2/log.h"
 #include "mongo/logv2/log_attr.h"
 #include "mongo/logv2/log_component.h"
@@ -196,38 +195,6 @@ void WiredTigerRecoveryUnit::setPrefetching(bool enable) {
     StringBuilder config;
     config << "prefetch=(enabled=" << (enable ? "true" : "false") << ")";
     session->reconfigure(config.str(), "prefetch=(enabled=false)");
-}
-
-bool WiredTigerRecoveryUnit::waitUntilDurable(OperationContext* opCtx) {
-    invariant(!_inUnitOfWork(), toString(_getState()));
-    invariant(!shard_role_details::getLocker(opCtx)->isLocked() || storageGlobalParams.repair);
-
-    // Flushes the journal log to disk. Checkpoints all data if journaling is disabled.
-    _sessionCache->waitUntilDurable(opCtx,
-                                    WiredTigerSessionCache::Fsync::kJournal,
-                                    WiredTigerSessionCache::UseJournalListener::kUpdate);
-
-    return true;
-}
-
-bool WiredTigerRecoveryUnit::waitUntilUnjournaledWritesDurable(OperationContext* opCtx,
-                                                               bool stableCheckpoint) {
-    invariant(!_inUnitOfWork(), toString(_getState()));
-    invariant(!shard_role_details::getLocker(opCtx)->isLocked() || storageGlobalParams.repair);
-
-    // Take a checkpoint, rather than only flush the (oplog) journal, in order to lock in stable
-    // writes to unjournaled tables.
-    //
-    // If 'stableCheckpoint' is set, then we will only checkpoint data up to and including the
-    // stable_timestamp set on WT at the time of the checkpoint. Otherwise, we will checkpoint all
-    // of the data.
-    WiredTigerSessionCache::Fsync fsyncType = stableCheckpoint
-        ? WiredTigerSessionCache::Fsync::kCheckpointStableTimestamp
-        : WiredTigerSessionCache::Fsync::kCheckpointAll;
-    _sessionCache->waitUntilDurable(
-        opCtx, fsyncType, WiredTigerSessionCache::UseJournalListener::kUpdate);
-
-    return true;
 }
 
 void WiredTigerRecoveryUnit::assertInActiveTxn() const {
@@ -437,8 +404,7 @@ Status WiredTigerRecoveryUnit::majorityCommittedSnapshotAvailable() const {
     return Status::OK();
 }
 
-boost::optional<Timestamp> WiredTigerRecoveryUnit::getPointInTimeReadTimestamp(
-    OperationContext* opCtx) {
+boost::optional<Timestamp> WiredTigerRecoveryUnit::getPointInTimeReadTimestamp() {
     // After a ReadSource has been set on this RecoveryUnit, callers expect that this method returns
     // the read timestamp that will be used for current or future transactions. Because callers use
     // this timestamp to inform visibility of operations, it is therefore necessary to open a
@@ -467,8 +433,7 @@ boost::optional<Timestamp> WiredTigerRecoveryUnit::getPointInTimeReadTimestamp(
             break;
     }
 
-    // Ensure a transaction is opened. Storage engine operations require the global lock.
-    invariant(shard_role_details::getLocker(opCtx)->isLocked());
+    // Ensure a transaction is opened.
     getSession();
 
     switch (_timestampReadSource) {

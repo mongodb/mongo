@@ -262,7 +262,7 @@ void verifyDbAndCollection(OperationContext* opCtx,
         }
         if (shard_role_details::getRecoveryUnit(opCtx)->isActive()) {
             const auto mySnapshot =
-                shard_role_details::getRecoveryUnit(opCtx)->getPointInTimeReadTimestamp(opCtx);
+                shard_role_details::getRecoveryUnit(opCtx)->getPointInTimeReadTimestamp();
             if (mySnapshot && *mySnapshot < coll->getMinimumValidSnapshot()) {
                 throwWriteConflictException(str::stream()
                                             << "Unable to write to collection '"
@@ -298,8 +298,7 @@ std::variant<CollectionPtr, std::shared_ptr<const ViewDefinition>> acquireLocalC
     const AcquisitionPrerequisites& prerequisites) {
     const auto& nss = prerequisites.nss;
 
-    auto readTimestamp =
-        shard_role_details::getRecoveryUnit(opCtx)->getPointInTimeReadTimestamp(opCtx);
+    auto readTimestamp = shard_role_details::getRecoveryUnit(opCtx)->getPointInTimeReadTimestamp();
     auto coll = CollectionPtr(
         catalog.establishConsistentCollection(opCtx, NamespaceStringOrUUID(nss), readTimestamp));
     checkCollectionUUIDMismatch(opCtx, catalog, nss, coll, prerequisites.uuid);
@@ -1038,8 +1037,7 @@ ResolvedNamespaceOrViewAcquisitionRequests generateSortedAcquisitionRequests(
         lockFreeReadsResources) {
     ResolvedNamespaceOrViewAcquisitionRequests resolvedAcquisitionRequests;
 
-    auto readTimestamp =
-        shard_role_details::getRecoveryUnit(opCtx)->getPointInTimeReadTimestamp(opCtx);
+    auto readTimestamp = shard_role_details::getRecoveryUnit(opCtx)->getPointInTimeReadTimestamp();
 
     int counter = 0;
     for (const auto& ar : acquisitionRequests) {
