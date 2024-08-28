@@ -76,7 +76,7 @@ WORKSPACE.bazel @10gen/devprod-build
 /docs/owners/** @10gen/devprod-correctness
 
 # The following patterns are parsed from ./etc/OWNERS.yml
-/etc/**/yamllint_config.yml @10gen/devprod-services-integrations
+/etc/**/yamllint_config.yml @10gen/devprod-services-integrations @svc-auto-approve-bot
 /etc/**/third_party_components.yml @10gen/server-security
 
 # The following patterns are parsed from ./etc/evergreen_yml_components/tasks/resmoke/server_divisions/query/OWNERS.yml
