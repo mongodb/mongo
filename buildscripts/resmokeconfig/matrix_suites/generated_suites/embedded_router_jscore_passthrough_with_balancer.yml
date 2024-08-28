@@ -28,10 +28,6 @@ executor:
         featureFlagRouterPort: 1
         internalQueryExecYieldIterations: 1000000
         internalQueryExecYieldPeriodMS: 6000
-        logComponentVerbosity:
-          storage:
-            wt:
-              wtCheckpoint: 1
         reshardingMinimumOperationDurationMillis: 0
     num_rs_nodes_per_shard: 1
     num_shards: 2

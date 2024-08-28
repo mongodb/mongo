@@ -94,11 +94,6 @@ executor:
     mongod_options:
       set_parameters:
         enableTestCommands: 1
-        # TODO (BF-33500) Remove once we determine the cause of the missing collections in BF-33500
-        logComponentVerbosity:
-          storage:
-            wt:
-              wtCheckpoint: 1
         reshardingMinimumOperationDurationMillis: 0
         # Increment the query yield period as a best effort to avoid getting a QueryPlanKilled error
         # when a query and a moveCollection run concurrently (more info on SERVER-88275)
