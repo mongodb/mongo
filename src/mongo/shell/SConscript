@@ -194,7 +194,16 @@ if not has_option("noshell") and jsEngine:
             # please add that library here, as a private library dependency.
             "$BUILD_DIR/mongo/client/clientdriver_network",
             "$BUILD_DIR/mongo/client/connection_string",
+            "$BUILD_DIR/mongo/client/cyrus_sasl_client" if env["MONGO_BUILD_SASL_CLIENT"] else "",
             "$BUILD_DIR/mongo/db/catalog/index_key_validate",
+            "$BUILD_DIR/mongo/db/modules/enterprise/src/fips/fips_mode_client"
+            if "fle" in env.get("MONGO_ENTERPRISE_FEATURES", [])
+            and get_option("js-engine") != "none"
+            else "",
+            "$BUILD_DIR/mongo/db/modules/enterprise/src/fle/shell/implicit_encrypted_dbclient"
+            if "fle" in env.get("MONGO_ENTERPRISE_FEATURES", [])
+            and get_option("js-engine") != "none"
+            else "",
             "$BUILD_DIR/mongo/db/mongohasher",
             "$BUILD_DIR/mongo/db/pipeline/change_stream_error_extra_info",
             "$BUILD_DIR/mongo/db/query/command_request_response",

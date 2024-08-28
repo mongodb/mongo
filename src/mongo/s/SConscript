@@ -4,6 +4,7 @@ Import(
     [
         "env",
         "get_option",
+        "have_sasl_lib",
         "version_extra",
         "version_parts",
     ]
@@ -408,7 +409,42 @@ env.Library(
         "$BUILD_DIR/mongo/db/dbdirectclient",
         "$BUILD_DIR/mongo/db/default_max_time_ms_cluster_parameter",
         "$BUILD_DIR/mongo/db/logical_time_metadata_hook",
+        "$BUILD_DIR/mongo/db/modules/enterprise/kmip_configuration"
+        if "MONGO_ENTERPRISE_FEATURES" in env
+        and (
+            "encryptdb" in env["MONGO_ENTERPRISE_FEATURES"]
+            or "audit" in env["MONGO_ENTERPRISE_FEATURES"]
+        )
+        else "",
+        "$BUILD_DIR/mongo/db/modules/enterprise/src/audit/audit_configuration"
+        if "audit" in env.get("MONGO_ENTERPRISE_FEATURES", [])
+        else "",
+        "$BUILD_DIR/mongo/db/modules/enterprise/src/audit/audit_mongos"
+        if "audit" in env.get("MONGO_ENTERPRISE_FEATURES", [])
+        else "",
+        "$BUILD_DIR/mongo/db/modules/enterprise/src/encryptdb/log_redact_options"
+        if "encryptdb" in env.get("MONGO_ENTERPRISE_FEATURES", [])
+        else "",
+        "$BUILD_DIR/mongo/db/modules/enterprise/src/fips/fips_mode_server"
+        if "fips" in env.get("MONGO_ENTERPRISE_FEATURES", [])
+        else "",
+        "$BUILD_DIR/mongo/db/modules/enterprise/src/ldap/ldap_health_observer"
+        if "ldap" in env.get("MONGO_ENTERPRISE_FEATURES", [])
+        else "",
+        "$BUILD_DIR/mongo/db/modules/enterprise/src/ldap/ldap_manager_init"
+        if "ldap" in env.get("MONGO_ENTERPRISE_FEATURES", [])
+        else "",
+        "$BUILD_DIR/mongo/db/modules/enterprise/src/sasl/auth_delay"
+        if "sasl" in env.get("MONGO_ENTERPRISE_FEATURES", []) and have_sasl_lib
+        else "",
+        "$BUILD_DIR/mongo/db/modules/enterprise/src/sasl/authz_manager_factory_external"
+        if "sasl" in env.get("MONGO_ENTERPRISE_FEATURES", []) and have_sasl_lib
+        else "",
+        "$BUILD_DIR/mongo/db/modules/enterprise/src/sasl/mongosaslservercommon"
+        if "sasl" in env.get("MONGO_ENTERPRISE_FEATURES", []) and have_sasl_lib
+        else "",
         "$BUILD_DIR/mongo/db/pipeline/process_interface/mongos_process_interface_factory",
+        "$BUILD_DIR/mongo/db/process_health/config_server_health_observer",
         "$BUILD_DIR/mongo/db/process_health/fault_manager",
         "$BUILD_DIR/mongo/db/query/plan_executor",
         "$BUILD_DIR/mongo/db/query/query_stats/query_stats",
@@ -441,6 +477,9 @@ env.Library(
         "$BUILD_DIR/mongo/util/ntservice",
         "$BUILD_DIR/mongo/util/options_parser/options_parser",
         "$BUILD_DIR/mongo/util/options_parser/options_parser_init",
+        "$BUILD_DIR/mongo/util/tcmalloc_set_parameter"
+        if env["MONGO_ALLOCATOR"] in ["tcmalloc-google", "tcmalloc-gperf"]
+        else "",
         "$BUILD_DIR/mongo/util/testing_options",
         "$BUILD_DIR/mongo/util/tracing_profiler/tracing_profiler"
         if get_option("use-tracing-profiler") == "on"
@@ -460,6 +499,14 @@ env.Library(
         # NOTE: This list must remain empty. Please only add to LIBDEPS_PRIVATE
     ],
 )
+
+
+def abc():
+    import pdb
+
+    pdb.set_trace()
+    return False
+
 
 env.Library(
     target="mongos_main",
@@ -486,6 +533,9 @@ env.Library(
         "$BUILD_DIR/mongo/db/commands/rwc_defaults_commands",
         "$BUILD_DIR/mongo/db/exec/scoped_timer",
         "$BUILD_DIR/mongo/db/ftdc/ftdc_mongos",
+        "$BUILD_DIR/mongo/db/modules/enterprise/src/audit/audit_enterprise"
+        if "audit" in env.get("MONGO_ENTERPRISE_FEATURES", [])
+        else "",
         "$BUILD_DIR/mongo/db/process_health/fault_manager",
         "$BUILD_DIR/mongo/db/query/query_settings/manager",
         "$BUILD_DIR/mongo/db/read_write_concern_defaults",

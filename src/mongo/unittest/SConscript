@@ -57,6 +57,9 @@ env.Library(
         "$BUILD_DIR/mongo/db/commands/test_commands_enabled",
         "$BUILD_DIR/mongo/db/wire_version",
         "$BUILD_DIR/mongo/util/options_parser/options_parser",
+        "$BUILD_DIR/mongo/util/tcmalloc_set_parameter"
+        if env["MONGO_ALLOCATOR"] in ["tcmalloc-google", "tcmalloc-gperf"]
+        else "",
     ],
     AIB_COMPONENT="unittests",
 )

@@ -5379,6 +5379,18 @@ def doConfigure(myenv):
 
 
 env = doConfigure(env)
+saslconf = Configure(env)
+
+have_sasl_lib = saslconf.CheckLibWithHeader(
+    "sasl2",
+    ["stddef.h", "sasl/sasl.h"],
+    "C",
+    "sasl_version_info(0, 0, 0, 0, 0, 0);",
+    autoadd=False,
+)
+
+saslconf.Finish()
+
 env["NINJA_SYNTAX"] = "#site_scons/third_party/ninja_syntax.py"
 
 if env.ToolchainIs("clang"):
@@ -6258,6 +6270,7 @@ Export(
         "debugBuild",
         "endian",
         "get_option",
+        "have_sasl_lib",
         "has_option",
         "http_client",
         "jsEngine",

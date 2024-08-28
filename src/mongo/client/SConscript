@@ -105,9 +105,6 @@ if env["MONGO_BUILD_SASL_CLIENT"]:
             "native_sasl_client",
         ],
         SYSLIBDEPS=saslLibs,
-        LIBDEPS_DEPENDENTS=[
-            "$BUILD_DIR/mongo/shell/mongo_initializers",
-        ],
         LIBDEPS_TAGS=[
             "lint-allow-nonprivate-on-deps-dependents",
             "lint-allow-bidirectional-edges",

@@ -100,9 +100,6 @@ wtEnv.Library(
         "$BUILD_DIR/mongo/db/storage/storage_options",
         "$BUILD_DIR/mongo/util/options_parser/options_parser",
     ],
-    LIBDEPS_DEPENDENTS=[
-        "$BUILD_DIR/mongo/db/mongod_initializers",
-    ],
     PROGDEPS_DEPENDENTS=[
         "$BUILD_DIR/mongo/dbtests/dbtest",
     ],

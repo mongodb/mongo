@@ -487,6 +487,18 @@ env.Library(
         "$BUILD_DIR/mongo/db/index_builds_coordinator_interface",
         "$BUILD_DIR/mongo/db/index_commands_idl",
         "$BUILD_DIR/mongo/db/introspect",
+        "$BUILD_DIR/mongo/db/modules/enterprise/src/audit/audit_command"
+        if "audit" in env.get("MONGO_ENTERPRISE_FEATURES", [])
+        else "",
+        "$BUILD_DIR/mongo/db/modules/enterprise/src/live_import/commands/export_collection_command"
+        if "live_import" in env.get("MONGO_ENTERPRISE_FEATURES", [])
+        else "",
+        "$BUILD_DIR/mongo/db/modules/enterprise/src/live_import/commands/import_collection_command"
+        if "live_import" in env.get("MONGO_ENTERPRISE_FEATURES", [])
+        else "",
+        "$BUILD_DIR/mongo/db/modules/enterprise/src/live_import/commands/vote_commit_import_collection_command"
+        if "live_import" in env.get("MONGO_ENTERPRISE_FEATURES", [])
+        else "",
         "$BUILD_DIR/mongo/db/multitenancy",
         "$BUILD_DIR/mongo/db/pipeline/pipeline",
         "$BUILD_DIR/mongo/db/pipeline/process_interface/mongo_process_interface",

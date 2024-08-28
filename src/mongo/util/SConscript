@@ -210,11 +210,6 @@ if tcmallocAttrs:
             "$BUILD_DIR/mongo/db/server_base",
             "processinfo",
         ],
-        LIBDEPS_DEPENDENTS=[
-            "$BUILD_DIR/mongo/db/mongod_initializers",
-            "$BUILD_DIR/mongo/s/mongos_initializers",
-            "$BUILD_DIR/mongo/unittest/unittest_main",
-        ],
         LIBDEPS_TAGS=[
             "lint-allow-bidirectional-edges",
             "lint-allow-nonprivate-on-deps-dependents",

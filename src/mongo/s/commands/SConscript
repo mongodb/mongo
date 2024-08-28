@@ -153,6 +153,12 @@ env.Library(
         "$BUILD_DIR/mongo/db/index_commands_idl",
         "$BUILD_DIR/mongo/db/internal_transactions_feature_flag",
         "$BUILD_DIR/mongo/db/matcher/expressions_mongod_only",
+        "$BUILD_DIR/mongo/db/modules/enterprise/src/audit/audit_command"
+        if "audit" in env.get("MONGO_ENTERPRISE_FEATURES", [])
+        else "",
+        "$BUILD_DIR/mongo/db/modules/enterprise/src/audit/audit_mongos"
+        if "audit" in env.get("MONGO_ENTERPRISE_FEATURES", [])
+        else "",
         "$BUILD_DIR/mongo/db/ops/parsed_update",
         "$BUILD_DIR/mongo/db/query/command_request_response",
         "$BUILD_DIR/mongo/db/query/cursor_response_idl",
