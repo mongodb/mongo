@@ -28,6 +28,7 @@ wtEnv.Library(
         "wiredtiger_index_util.cpp",
         "wiredtiger_kv_engine.cpp",
         "wiredtiger_stats.cpp",
+        "wiredtiger_oplog_data.cpp",
         "wiredtiger_oplog_manager.cpp",
         "wiredtiger_oplog_truncate_markers.cpp",
         "wiredtiger_parameters.cpp",
