@@ -66,7 +66,6 @@
 #include "mongo/db/matcher/extensions_callback_noop.h"
 #include "mongo/db/matcher/extensions_callback_real.h"
 #include "mongo/db/ops/delete_request_gen.h"
-#include "mongo/db/pipeline/document_source_group.h"
 #include "mongo/db/pipeline/document_source_lookup.h"
 #include "mongo/db/query/bind_input_params.h"
 #include "mongo/db/query/canonical_query.h"
@@ -1391,49 +1390,12 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutor(
         if (extractAndAttachPipelineStages) {
             extractAndAttachPipelineStages(canonicalQuery.get());
         }
-
         // Use SBE if we find any $group/$lookup stages eligible for execution in SBE or if SBE
         // is fully enabled. Otherwise, fallback to the classic engine.
         if (canonicalQuery->pipeline().empty() &&
             !feature_flags::gFeatureFlagSbeFull.isEnabledAndIgnoreFCV()) {
             canonicalQuery->setSbeCompatible(false);
-        }
-
-        if (canonicalQuery->isSbeCompatible()) {
-            // The SBE stage builder is prone to generate very deep SBE plan trees for queries that
-            // contain many hundreds or thousands of expressions and subexpressions, which can lead
-            // to stack overflow during query execution. Thus, we want to fallback to the classic
-            // engine if the query has too many expressions.
-            //
-            // Currently we don't have an existing mechanism that counts the total number of
-            // expressions in the query, so instead we use 'queryBsonSize' (the total number of
-            // bytes in the relevant portions of command BSON object) as a proxy. If 'queryBsonSize'
-            // exceeds 30000, then we call 'setSbeCompatible(false)' and fallback to the classic
-            // engine.
-            constexpr size_t bsonSizeThreshold = 30000;
-            const auto& findRequest = canonicalQuery->getFindCommandRequest();
-
-            size_t queryBsonSize = findRequest.getFilter().objsize() +
-                findRequest.getProjection().objsize() + findRequest.getSort().objsize();
-
-            for (auto& stage : canonicalQuery->pipeline()) {
-                auto groupStage = dynamic_cast<DocumentSourceGroup*>(stage->documentSource());
-                if (groupStage) {
-                    queryBsonSize += groupStage->getOriginalBsonSize();
-                } else {
-                    auto lookupStage = dynamic_cast<DocumentSourceLookUp*>(stage->documentSource());
-                    if (lookupStage) {
-                        queryBsonSize += lookupStage->getOriginalBsonSize();
-                    }
-                }
-            }
-
-            if (queryBsonSize > bsonSizeThreshold) {
-                canonicalQuery->setSbeCompatible(false);
-            }
-        }
-
-        if (canonicalQuery->isSbeCompatible()) {
+        } else {
             return getSlotBasedExecutor(
                 opCtx, collections, std::move(canonicalQuery), yieldPolicy, plannerParams);
         }

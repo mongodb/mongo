@@ -254,10 +254,6 @@ public:
         return _sbeCompatible;
     }
 
-    int getOriginalBsonSize() const {
-        return _originalBsonSize;
-    }
-
     const NamespaceString& getFromNs() {
         return _fromNs;
     }
@@ -413,8 +409,6 @@ private:
 
     // Can this $lookup be pushed down into SBE?
     bool _sbeCompatible = false;
-
-    int _originalBsonSize = 0;
 
     // The aggregation pipeline to perform against the '_resolvedNs' namespace. Referenced view
     // namespaces have been resolved.

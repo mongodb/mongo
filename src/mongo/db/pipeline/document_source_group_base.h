@@ -158,10 +158,6 @@ public:
         return _sbeCompatible;
     }
 
-    int getOriginalBsonSize() const {
-        return _originalBsonSize;
-    }
-
 protected:
     DocumentSourceGroupBase(StringData stageName,
                             const boost::intrusive_ptr<ExpressionContext>& expCtx,
@@ -269,8 +265,6 @@ private:
     Accumulators _currentAccumulators;
 
     bool _sbeCompatible;
-
-    int _originalBsonSize;
 };
 
 }  // namespace mongo
