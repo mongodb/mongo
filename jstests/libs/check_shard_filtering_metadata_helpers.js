@@ -89,8 +89,7 @@ export var CheckShardFilteringMetadataHelpers = (function() {
             }
 
             // TODO BACKPORT-15533: re-enable the following checks in multiversion suites
-            const isMultiversion = jsTest.options().shardMixedBinVersions ||
-                jsTest.options().useRandomBinVersionsWithinReplicaSet;
+            const isMultiversion = Boolean(jsTest.options().useRandomBinVersionsWithinReplicaSet);
             if (isMultiversion ||
                 (shardId != getPrimaryShardForDB(dbName) && !highestChunkOnShard)) {
                 // The shard is neither primary for database nor owns some chunks for this

@@ -122,8 +122,7 @@ if (isShardSvrRst) {
     }, tmpTestData);
 }
 
-const isMultiversion =
-    jsTest.options().shardMixedBinVersions || jsTest.options().useRandomBinVersionsWithinReplicaSet;
+const isMultiversion = Boolean(jsTest.options().useRandomBinVersionsWithinReplicaSet);
 
 for (let session of sessions) {
     // Reconnect and re-authenticate after the network connection was closed due to restart.

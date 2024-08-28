@@ -917,8 +917,9 @@ export class ShardingTest {
      * and returns 'oldestBinVersion' as 'latest'.
      *
      * Checks for bin versions via:
-     *     jsTestOptions().shardMixedBinVersions, jsTestOptions().mongosBinVersion,
-     *     otherParams.configOptions.binVersion, otherParams.shardOptions.binVersion,
+     *     jsTestOptions().mongosBinVersion,
+     *     otherParams.configOptions.binVersion,
+     *     otherParams.shardOptions.binVersion,
      *     otherParams.mongosOptions.binVersion
      */
     getClusterVersionInfo() {
@@ -1353,23 +1354,6 @@ export class ShardingTest {
                     rsDefaults = Object.merge(rsDefaults, otherParams.rsOptions);
                     rsDefaults.nodes = rsDefaults.nodes || otherParams.numReplicas;
                 } else {
-                    // Our documented upgrade/downgrade paths let us assume config server nodes will
-                    // always be fully upgraded before shard nodes, so skip a config shard.
-                    if (jsTestOptions().shardMixedBinVersions && !setIsConfigSvr) {
-                        if (!otherParams.shardOptions) {
-                            otherParams.shardOptions = {};
-                        }
-                        // If the test doesn't depend on specific shard binVersions, create a mixed
-                        // version
-                        // shard cluster that randomly assigns shard binVersions, half "latest" and
-                        // half "last-continuous" or "last-lts". shardMixedBinVersions.
-                        if (!otherParams.shardOptions.binVersion) {
-                            Random.setRandomSeed();
-                            otherParams.shardOptions.binVersion = MongoRunner.versionIterator(
-                                ["latest", jsTestOptions().shardMixedBinVersions], true);
-                        }
-                    }
-
                     if (otherParams.shardOptions && otherParams.shardOptions.binVersion) {
                         otherParams.shardOptions.binVersion =
                             MongoRunner.versionIterator(otherParams.shardOptions.binVersion);
@@ -2264,14 +2248,9 @@ function clusterHasBinVersion(st, version) {
                                               MongoRunner.getBinVersionFor(params.binVersion));
     };
 
-    // Must check shardMixedBinVersion because it causes shardOptions.binVersion to be an
-    // object (versionIterator) rather than a version string. Must check mongosBinVersion,
-    // as well, because it does not update mongosOptions.binVersion. Also check
-    // useRandomBinVersionsWithinReplicaSet, as it may cause some nodes within a replica set
-    // to be downgraded.
-    const isMixedVersionShard = jsTestOptions().shardMixedBinVersions &&
-        MongoRunner.areBinVersionsTheSame(binVersion, jsTestOptions().shardMixedBinVersions);
-
+    // Must check mongosBinVersion because it does not update mongosOptions.binVersion. Also check
+    // useRandomBinVersionsWithinReplicaSet, as it may cause some nodes within a replica set to be
+    // downgraded.
     const isMixedVersionMongos = jsTestOptions().mongosBinVersion &&
         MongoRunner.areBinVersionsTheSame(binVersion, jsTestOptions().mongosBinVersion);
 
@@ -2279,7 +2258,7 @@ function clusterHasBinVersion(st, version) {
         MongoRunner.areBinVersionsTheSame(binVersion,
                                           jsTestOptions().useRandomBinVersionsWithinReplicaSet);
 
-    if (isMixedVersionShard || isMixedVersionMongos || isMixedVersionReplicaSet) {
+    if (isMixedVersionMongos || isMixedVersionReplicaSet) {
         return true;
     }
 

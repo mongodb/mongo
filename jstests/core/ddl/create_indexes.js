@@ -46,8 +46,7 @@ const extractResult = function(obj) {
 
 // TODO SERVER-88069: remove check once createdCollectionAutomatically is removed.
 const checkImplicitCreate = function(admin, createIndexResult) {
-    const isMultiversion = jsTest.options().shardMixedBinVersions ||
-        jsTest.options().useRandomBinVersionsWithinReplicaSet;
+    const isMultiversion = Boolean(jsTest.options().useRandomBinVersionsWithinReplicaSet);
     if (!isMultiversion &&
         !FeatureFlagUtil.isPresentAndEnabled(admin, "80CollectionCreationPath")) {
         assert.eq(true, createIndexResult.createdCollectionAutomatically);

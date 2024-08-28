@@ -327,8 +327,7 @@ let testConnReadPreference = function(
                 pipeline: [isRouter ? {$project: {_id: true, x: true}} : {$project: {x: 1}}]
             }));
 
-    const isMultiversion = jsTest.options().shardMixedBinVersions ||
-        jsTest.options().useRandomBinVersionsWithinReplicaSet;
+    const isMultiversion = Boolean(jsTest.options().useRandomBinVersionsWithinReplicaSet);
 
     const isValidMongos =
         !isMongos || MongoRunner.compareBinVersions(conn.fullOptions.binVersion, "7.1") >= 0;

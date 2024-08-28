@@ -15,8 +15,7 @@ import {TimeseriesAggTests} from "jstests/core/timeseries/libs/timeseries_agg_he
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 
 // TODO (SERVER-82066): Re-enable after handling direct connections correctly.
-const isMultiversion =
-    jsTest.options().shardMixedBinVersions || jsTest.options().useRandomBinVersionsWithinReplicaSet;
+const isMultiversion = Boolean(jsTest.options().useRandomBinVersionsWithinReplicaSet);
 if (isMultiversion ||
     FeatureFlagUtil.isPresentAndEnabled(db, "TrackUnshardedCollectionsUponCreation")) {
     jsTest.log("Skipping test since featureFlagTrackUnshardedCollectionsUponCreation is enabled");

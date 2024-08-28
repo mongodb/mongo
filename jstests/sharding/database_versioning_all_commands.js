@@ -843,8 +843,7 @@ for (let command of Object.keys(listCommandsRes.commands)) {
     print(command);
 }
 
-const isMultiversion =
-    jsTest.options().shardMixedBinVersions || jsTest.options().useRandomBinVersionsWithinReplicaSet;
+const isMultiversion = Boolean(jsTest.options().useRandomBinVersionsWithinReplicaSet);
 
 (() => {
     // Validate test cases for all commands.

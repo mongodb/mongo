@@ -1993,25 +1993,6 @@ tasks:
           use_large_distro: "true"
 
   - <<: *gen_task_template
-    name: sharding_mongos_and_mixed_shards_gen
-    tags:
-      [
-        "assigned_to_jira_team_server_cluster_scalability",
-        "default",
-        "sharding",
-        "common",
-        "multiversion",
-      ]
-    commands:
-      - func: "initialize multiversion tasks"
-        vars:
-          sharding_last_lts_mongos_and_mixed_shards: last_lts
-      - func: "generate resmoke tasks"
-        vars:
-          use_large_distro: "true"
-          run_no_feature_flag_tests: "true"
-
-  - <<: *gen_task_template
     name: sharding_multiversion_gen
     tags:
       [

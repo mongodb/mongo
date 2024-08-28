@@ -969,8 +969,7 @@ function runScenario(
             return;
         }
 
-        const isMultiversion = jsTest.options().shardMixedBinVersions ||
-            jsTest.options().useRandomBinVersionsWithinReplicaSet;
+        const isMultiversion = Boolean(jsTest.options().useRandomBinVersionsWithinReplicaSet);
         if (isMultiversion && test.skipMultiversion) {
             print("skipping " + cmdName + " since we are in a multiversion suite.");
             return;
