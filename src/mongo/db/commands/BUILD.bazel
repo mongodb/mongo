@@ -263,6 +263,15 @@ mongo_cc_library(
 )
 
 idl_generator(
+    name = "fsync_gen",
+    src = "fsync.idl",
+    deps = [
+        "//src/mongo/db:basic_types_gen",
+        "//src/mongo/idl:generic_argument_gen",
+    ],
+)
+
+idl_generator(
     name = "http_client_gen",
     src = "http_client.idl",
     deps = [

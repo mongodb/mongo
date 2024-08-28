@@ -47,6 +47,7 @@
 #include "mongo/db/client.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/commands/fsync.h"
+#include "mongo/db/commands/fsync_gen.h"
 #include "mongo/db/commands/fsync_locked.h"
 #include "mongo/db/commands/test_commands_enabled.h"
 #include "mongo/db/concurrency/d_concurrency.h"
@@ -120,19 +121,20 @@ public:
         }
     }
 
-    bool runFsyncCommand(OperationContext* opCtx, const BSONObj& cmdObj, BSONObjBuilder& result) {
+    void runFsyncCommand(OperationContext* opCtx,
+                         const FSyncRequest& request,
+                         BSONObjBuilder& result) {
         uassert(ErrorCodes::IllegalOperation,
                 "fsync: Cannot execute fsync command from contexts that hold a data lock",
                 !shard_role_details::getLocker(opCtx)->isLocked());
 
-        const bool lock = cmdObj["lock"].trueValue();
-        const bool forBackup = cmdObj["forBackup"].trueValue();
+        const bool lock = request.getLock();
+        const bool forBackup = request.getForBackup();
         LOGV2(20461, "CMD fsync", "lock"_attr = lock, "forBackup"_attr = forBackup);
 
         // fsync + lock is sometimes used to block writes out of the system and does not care if
         // the `BackupCursorService::fsyncLock` call succeeds.
-        const bool allowFsyncFailure =
-            getTestCommandsEnabled() && cmdObj["allowFsyncFailure"].trueValue();
+        const bool allowFsyncFailure = getTestCommandsEnabled() && request.getAllowFsyncFailure();
 
         if (!lock) {
             // Take a global IS lock to ensure the storage engine is not shutdown
@@ -143,7 +145,7 @@ public:
             // This field has had a dummy value since MMAP went away. It is undocumented.
             // Maintaining it so as not to cause unnecessary user pain across upgrades.
             result.append("numFiles", 1);
-            return true;
+            return;
         }
 
         Lock::ExclusiveLock lk(opCtx, fsyncSingleCommandExclusionMutex);
@@ -161,15 +163,8 @@ public:
                 threadStarted = false;
                 Milliseconds deadline = Milliseconds::max();
                 if (forBackup) {
-                    // Set a default deadline of 90s for the fsyncLock to be acquired.
-                    deadline = Milliseconds(90000);
-                    // Parse the cmdObj and update the deadline if
-                    // "fsyncLockAcquisitionTimeoutMillis" exists.
-                    for (const auto& elem : cmdObj) {
-                        if (elem.fieldNameStringData() == "fsyncLockAcquisitionTimeoutMillis") {
-                            deadline = Milliseconds{elem.exactNumberLong()};
-                        }
-                    }
+                    // Defaults to 90s (90,000 ms), see fsync.idl.
+                    deadline = Milliseconds{request.getFsyncLockAcquisitionTimeoutMillis()};
                 }
                 globalFsyncLockThread = std::make_unique<FSyncLockThread>(
                     opCtx->getServiceContext(), allowFsyncFailure, deadline);
@@ -206,7 +201,7 @@ public:
         result.append("lockCount", getLockCount());
         result.append("seeAlso", url());
 
-        return true;
+        return;
     }
 
     bool runFsyncUnlockCommand(OperationContext* opCtx,
@@ -293,13 +288,53 @@ private:
 };
 FSyncCore fsyncCore;
 
-class FSyncCommand : public BasicCommand {
+class FSyncCommand : public TypedCommand<FSyncCommand> {
 public:
-    FSyncCommand() : BasicCommand("fsync") {}
+    using Request = FSyncRequest;
 
-    bool supportsWriteConcern(const BSONObj& cmd) const override {
-        return false;
-    }
+    /**
+     * Intermediate wrapper to interface with ReplyBuilderInterface.
+     */
+    class Response {
+    public:
+        explicit Response(BSONObj obj) : _obj(std::move(obj)) {}
+
+        void serialize(BSONObjBuilder* builder) const {
+            builder->appendElements(_obj);
+        }
+
+    private:
+        const BSONObj _obj;
+    };
+
+    class Invocation final : public InvocationBase {
+    public:
+        using InvocationBase::InvocationBase;
+
+        Response typedRun(OperationContext* opCtx) {
+            BSONObjBuilder result;
+            fsyncCore.runFsyncCommand(opCtx, this->request(), result);
+            return Response{result.obj()};
+        }
+
+    private:
+        bool supportsWriteConcern() const override {
+            return false;
+        }
+
+        NamespaceString ns() const override {
+            return {};
+        }
+
+        void doCheckAuthorization(OperationContext* opCtx) const override {
+            auto* as = AuthorizationSession::get(opCtx->getClient());
+            uassert(
+                ErrorCodes::Unauthorized,
+                "unauthorized",
+                as->isAuthorizedForActionsOnResource(
+                    ResourcePattern::forClusterResource(as->getUserTenantId()), ActionType::fsync));
+        }
+    };
 
     AllowedOnSecondary secondaryAllowed(ServiceContext*) const override {
         return AllowedOnSecondary::kAlways;
@@ -311,25 +346,6 @@ public:
 
     std::string help() const override {
         return FSyncCore::url();
-    }
-
-    Status checkAuthForOperation(OperationContext* opCtx,
-                                 const DatabaseName& dbName,
-                                 const BSONObj& cmdObj) const override {
-        auto* as = AuthorizationSession::get(opCtx->getClient());
-        if (!as->isAuthorizedForActionsOnResource(
-                ResourcePattern::forClusterResource(dbName.tenantId()), ActionType::fsync)) {
-            return {ErrorCodes::Unauthorized, "unauthorized"};
-        }
-
-        return Status::OK();
-    }
-
-    bool run(OperationContext* opCtx,
-             const DatabaseName&,
-             const BSONObj& cmdObj,
-             BSONObjBuilder& result) override {
-        return fsyncCore.runFsyncCommand(opCtx, cmdObj, result);
     }
 };
 MONGO_REGISTER_COMMAND(FSyncCommand).forShard();

@@ -203,6 +203,7 @@ env.Library(
     target="mongod_fsync",
     source=[
         "fsync.cpp",
+        "fsync_gen.cpp",
     ],
     LIBDEPS_PRIVATE=[
         "$BUILD_DIR/mongo/db/auth/auth",

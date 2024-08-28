@@ -62,6 +62,11 @@ assert.commandWorked(fsyncLockDB.coll.insert({x: 1}));
 var resFail = fsyncLockDB.runCommand({fsync: 1, lock: 1});
 assert(!resFail.ok, "fsyncLock command succeeded against DB other than admin.");
 
+// Ensure that fsync (and fsyncLock) are strict, see HELP-58426
+assert.commandFailed(db.adminCommand({fsync: 1, unlock: true}));
+assert.commandFailed(db.adminCommand({fsync: 1, unlock: false}));
+assert.commandFailed(db.adminCommand({fsync: 1, lock: "not_valid_boolean"}));
+
 // Uses admin automatically and locks the server for writes.
 var fsyncLockRes = db.fsyncLock();
 assert(fsyncLockRes.ok, "fsyncLock command failed against admin DB");
