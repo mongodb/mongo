@@ -550,7 +550,7 @@ bool StorageEngineImpl::_handleInternalIdent(OperationContext* opCtx,
                                              const std::string& ident,
                                              LastShutdownState lastShutdownState,
                                              ReconcileResult* reconcileResult,
-                                             std::set<std::string>* internalIdentsToDrop,
+                                             std::set<std::string>* internalIdentsToKeep,
                                              std::set<std::string>* allInternalIdents) {
     if (!DurableCatalog::isInternalIdent(ident)) {
         return false;
@@ -561,7 +561,6 @@ bool StorageEngineImpl::_handleInternalIdent(OperationContext* opCtx,
     // When starting up after an unclean shutdown, we do not attempt to recover any state from the
     // internal idents. Thus, we drop them in this case.
     if (lastShutdownState == LastShutdownState::kUnclean) {
-        internalIdentsToDrop->insert(ident);
         return true;
     }
 
@@ -594,14 +593,8 @@ bool StorageEngineImpl::_handleInternalIdent(OperationContext* opCtx,
 
             // Ignore the error so that we can restart the index build instead of resume it. We
             // should drop the internal ident if we failed to parse.
-            internalIdentsToDrop->insert(ident);
             return true;
         }
-
-        reconcileResult->indexBuildsToResume.push_back(resumeInfo);
-
-        // Once we have parsed the resume info, we can safely drop the internal ident.
-        internalIdentsToDrop->insert(ident);
 
         LOGV2(4916301,
               "Found unfinished index build to resume",
@@ -609,9 +602,22 @@ bool StorageEngineImpl::_handleInternalIdent(OperationContext* opCtx,
               "collectionUUID"_attr = resumeInfo.getCollectionUUID(),
               "phase"_attr = IndexBuildPhase_serializer(resumeInfo.getPhase()));
 
+        // Keep the tables that are needed to rebuild this index.
+        // Note: the table that stores the rebuild metadata itself (i.e. |ident|) isn't kept.
+        for (const mongo::IndexStateInfo& idx : resumeInfo.getIndexes()) {
+            internalIdentsToKeep->insert(idx.getSideWritesTable().toString());
+            if (idx.getDuplicateKeyTrackerTable()) {
+                internalIdentsToKeep->insert(idx.getDuplicateKeyTrackerTable()->toString());
+            }
+            if (idx.getSkippedRecordTrackerTable()) {
+                internalIdentsToKeep->insert(idx.getSkippedRecordTrackerTable()->toString());
+            }
+        }
+
+        reconcileResult->indexBuildsToResume.push_back(std::move(resumeInfo));
+
         return true;
     }
-
     return false;
 }
 
@@ -655,7 +661,7 @@ StatusWith<StorageEngine::ReconcileResult> StorageEngineImpl::reconcileCatalogAn
         std::vector<std::string> vec = _catalog->getAllIdents(opCtx);
         catalogIdents.insert(vec.begin(), vec.end());
     }
-    std::set<std::string> internalIdentsToDrop;
+    std::set<std::string> internalIdentsToKeep;
     std::set<std::string> allInternalIdents;
 
     auto dropPendingIdents = _dropPendingIdentReaper.getAllIdentNames();
@@ -672,7 +678,7 @@ StatusWith<StorageEngine::ReconcileResult> StorageEngineImpl::reconcileCatalogAn
                                  it,
                                  lastShutdownState,
                                  &reconcileResult,
-                                 &internalIdentsToDrop,
+                                 &internalIdentsToKeep,
                                  &allInternalIdents)) {
             continue;
         }
@@ -865,12 +871,11 @@ StatusWith<StorageEngine::ReconcileResult> StorageEngineImpl::reconcileCatalogAn
         }
     }
 
-    // If there are no index builds to resume, we should drop all internal idents.
-    if (reconcileResult.indexBuildsToResume.empty()) {
-        internalIdentsToDrop.swap(allInternalIdents);
-    }
-
-    for (auto&& temp : internalIdentsToDrop) {
+    // Drop any internal ident that we won't need.
+    for (auto&& temp : allInternalIdents) {
+        if (internalIdentsToKeep.contains(temp)) {
+            continue;
+        }
         LOGV2(22257, "Dropping internal ident", "ident"_attr = temp);
         WriteUnitOfWork wuow(opCtx);
         Status status = _engine->dropIdent(shard_role_details::getRecoveryUnit(opCtx), temp);

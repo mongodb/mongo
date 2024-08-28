@@ -431,6 +431,7 @@ env.CppUnitTest(
         "$BUILD_DIR/mongo/db/multitenancy",
         "$BUILD_DIR/mongo/db/repl/replmocks",
         "$BUILD_DIR/mongo/db/repl/topology_coordinator",
+        "$BUILD_DIR/mongo/db/resumable_index_builds_idl",
         "$BUILD_DIR/mongo/db/server_base",
         "$BUILD_DIR/mongo/db/service_context_d_test_fixture",
         "$BUILD_DIR/mongo/db/shard_role",

@@ -183,45 +183,92 @@ TEST_F(StorageEngineTest, TemporaryRecordStoreClustered) {
     ASSERT_EQ(0, memcmp(data, rd.data(), strlen(data)));
 }
 
-TEST_F(StorageEngineTest, ReconcileDropsTemporary) {
-    auto opCtx = cc().makeOperationContext();
-
-    std::unique_ptr<TemporaryRecordStore> rs;
-    {
-        Lock::GlobalLock lk(&*opCtx, MODE_IS);
-        rs = makeTemporary(opCtx.get());
-        ASSERT(rs.get());
+class StorageEngineReconcileTest : public StorageEngineTest {
+protected:
+    // Makes an empty internal table.
+    std::unique_ptr<TemporaryRecordStore> makeInternalTable(OperationContext* opCtx) {
+        std::unique_ptr<TemporaryRecordStore> ret;
+        {
+            Lock::GlobalLock lk(opCtx, MODE_IS);
+            ret = makeTemporary(opCtx);
+        }
+        ASSERT_TRUE(identExists(opCtx, ret->rs()->getIdent()));
+        return ret;
     }
 
-    ASSERT(identExists(opCtx.get(), rs->rs()->getIdent()));
+    // Makes an internal table that contains index-resume metadata, where |pretendSideTable| is an
+    // internal table used for that resume.
+    std::unique_ptr<TemporaryRecordStore> makeIndexBuildResumeTable(
+        OperationContext* opCtx, const TemporaryRecordStore& pretendSideTable) {
+        std::unique_ptr<TemporaryRecordStore> ret;
+        {
+            Lock::GlobalLock lk(opCtx, MODE_IX);
+            ret = _storageEngine->makeTemporaryRecordStoreForResumableIndexBuild(opCtx,
+                                                                                 KeyFormat::Long);
+            BSONObj resInfo = makePretendResumeInfo(pretendSideTable);
+            WriteUnitOfWork wuow(opCtx);
+            ASSERT_OK(
+                ret->rs()->insertRecord(opCtx, resInfo.objdata(), resInfo.objsize(), Timestamp()));
+            wuow.commit();
+        }
+        ASSERT_TRUE(identExists(opCtx, ret->rs()->getIdent()));
+        return ret;
+    }
 
-    // Reconcile will only drop temporary idents when starting up after an unclean shutdown.
+    // Returns index-resume metadata which would use the given |pretendSideTable| in the index's
+    // build.
+    BSONObj makePretendResumeInfo(const TemporaryRecordStore& pretendSideTable) {
+        IndexStateInfo indexInfo;
+        indexInfo.setSpec({});
+        indexInfo.setIsMultikey({});
+        indexInfo.setMultikeyPaths({});
+        indexInfo.setSideWritesTable(pretendSideTable.rs()->getIdent());
+        ResumeIndexInfo resumeInfo;
+        resumeInfo.setBuildUUID(UUID::gen());
+        resumeInfo.setCollectionUUID(UUID::gen());
+        resumeInfo.setPhase({});
+        resumeInfo.setIndexes(std::vector<IndexStateInfo>{std::move(indexInfo)});
+        return resumeInfo.toBSON();
+    }
+};
+
+TEST_F(StorageEngineReconcileTest, ReconcileDropsAllIdentsForUncleanShutdown) {
+    auto opCtx = cc().makeOperationContext();
+
+    std::unique_ptr<TemporaryRecordStore> irrelevantRs = makeInternalTable(opCtx.get());
+    std::unique_ptr<TemporaryRecordStore> necessaryRs = makeInternalTable(opCtx.get());
+    std::unique_ptr<TemporaryRecordStore> resumableIndexRs =
+        makeIndexBuildResumeTable(opCtx.get(), *necessaryRs);
+
+    // Reconcile will drop all temporary idents when starting up after an unclean shutdown.
     auto reconcileResult = unittest::assertGet(reconcileAfterUncleanShutdown(opCtx.get()));
+
     ASSERT_EQUALS(0UL, reconcileResult.indexesToRebuild.size());
     ASSERT_EQUALS(0UL, reconcileResult.indexBuildsToRestart.size());
     ASSERT_EQUALS(0UL, reconcileResult.indexBuildsToResume.size());
-
-    // The storage engine is responsible for dropping its temporary idents.
-    ASSERT(!identExists(opCtx.get(), rs->rs()->getIdent()));
+    ASSERT_FALSE(identExists(opCtx.get(), irrelevantRs->rs()->getIdent()));
+    ASSERT_FALSE(identExists(opCtx.get(), resumableIndexRs->rs()->getIdent()));
+    ASSERT_FALSE(identExists(opCtx.get(), necessaryRs->rs()->getIdent()));
 }
 
-TEST_F(StorageEngineTest, ReconcileKeepsTemporary) {
+TEST_F(StorageEngineReconcileTest, ReconcileOnlyKeepsNecessaryIdentsForCleanShutdown) {
     auto opCtx = cc().makeOperationContext();
 
-    std::unique_ptr<TemporaryRecordStore> rs;
-    {
-        Lock::GlobalLock lk(&*opCtx, MODE_IS);
-        rs = makeTemporary(opCtx.get());
-        ASSERT(rs.get());
-    }
-
-    ASSERT(identExists(opCtx.get(), rs->rs()->getIdent()));
+    std::unique_ptr<TemporaryRecordStore> irrelevantRs = makeInternalTable(opCtx.get());
+    std::unique_ptr<TemporaryRecordStore> necessaryRs = makeInternalTable(opCtx.get());
+    std::unique_ptr<TemporaryRecordStore> resumableIndexRs =
+        makeIndexBuildResumeTable(opCtx.get(), *necessaryRs);
 
     auto reconcileResult = unittest::assertGet(reconcile(opCtx.get()));
+
+    // After clean shutdown, an internal ident should be kept if-and-only-if it is needed to resume
+    // an index build.
     ASSERT_EQUALS(0UL, reconcileResult.indexesToRebuild.size());
     ASSERT_EQUALS(0UL, reconcileResult.indexBuildsToRestart.size());
-
-    ASSERT_FALSE(identExists(opCtx.get(), rs->rs()->getIdent()));
+    ASSERT_EQUALS(1UL, reconcileResult.indexBuildsToResume.size());
+    ASSERT_FALSE(identExists(opCtx.get(), irrelevantRs->rs()->getIdent()));
+    ASSERT_FALSE(identExists(opCtx.get(), resumableIndexRs->rs()->getIdent()));
+    ASSERT_TRUE(identExists(opCtx.get(), necessaryRs->rs()->getIdent()));
 }
 
 TEST_F(StorageEngineTest, TemporaryRecordStoreDoesNotTrackSizeAdjustments) {
