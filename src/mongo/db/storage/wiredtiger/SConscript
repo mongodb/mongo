@@ -29,6 +29,7 @@ wtEnv.Library(
         "wiredtiger_kv_engine.cpp",
         "wiredtiger_stats.cpp",
         "wiredtiger_oplog_manager.cpp",
+        "wiredtiger_oplog_truncate_markers.cpp",
         "wiredtiger_parameters.cpp",
         "wiredtiger_prepare_conflict.cpp",
         "wiredtiger_record_store.cpp",

@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2024-present MongoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
@@ -30,6 +30,7 @@
 #pragma once
 
 #include <boost/optional.hpp>
+#include <deque>
 
 #include "mongo/db/operation_context.h"
 #include "mongo/db/record_id.h"
@@ -42,15 +43,15 @@ namespace mongo {
 
 // Keep "milestones" against the oplog to efficiently remove the old records when the collection
 // grows beyond its desired maximum size.
-class WiredTigerRecordStore::OplogTruncateMarkers final : public CollectionTruncateMarkers {
+class WiredTigerOplogTruncateMarkers final : public CollectionTruncateMarkers {
 public:
-    OplogTruncateMarkers(std::deque<CollectionTruncateMarkers::Marker> markers,
-                         int64_t partialMarkerRecords,
-                         int64_t partialMarkerBytes,
-                         int64_t minBytesPerMarker,
-                         Microseconds totalTimeSpentBuilding,
-                         CollectionTruncateMarkers::MarkersCreationMethod creationMethod,
-                         WiredTigerRecordStore* rs);
+    WiredTigerOplogTruncateMarkers(std::deque<CollectionTruncateMarkers::Marker> markers,
+                                   int64_t partialMarkerRecords,
+                                   int64_t partialMarkerBytes,
+                                   int64_t minBytesPerMarker,
+                                   Microseconds totalTimeSpentBuilding,
+                                   CollectionTruncateMarkers::MarkersCreationMethod creationMethod,
+                                   WiredTigerRecordStore* rs);
 
     /**
      * Whether the instance is going to get destroyed.
@@ -91,7 +92,7 @@ public:
     // efficiently truncate records with WiredTiger by skipping over tombstones, etc.
     RecordId firstRecord;
 
-    static std::shared_ptr<WiredTigerRecordStore::OplogTruncateMarkers> createOplogTruncateMarkers(
+    static std::shared_ptr<WiredTigerOplogTruncateMarkers> createOplogTruncateMarkers(
         OperationContext* opCtx, WiredTigerRecordStore* rs, const NamespaceString& ns);
     //
     // The following methods are public only for use in tests.
@@ -108,7 +109,7 @@ private:
         _reclaimCv.notify_all();
     }
 
-    Mutex _reclaimMutex = MONGO_MAKE_LATCH("OplogTruncateMarkers::_reclaimMutex");
+    Mutex _reclaimMutex = MONGO_MAKE_LATCH("WiredTigerOplogTruncateMarkers::_reclaimMutex");
     stdx::condition_variable _reclaimCv;
 
     // True if '_rs' has been destroyed, e.g. due to repairDatabase being called on the collection's

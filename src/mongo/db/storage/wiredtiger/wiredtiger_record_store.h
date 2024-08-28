@@ -90,6 +90,7 @@ namespace mongo {
 class RecoveryUnit;
 class WiredTigerSessionCache;
 class WiredTigerSizeStorer;
+class WiredTigerOplogTruncateMarkers;
 
 class WiredTigerRecordStore : public RecordStore {
 public:
@@ -252,6 +253,8 @@ public:
 
     Timestamp getPinnedOplog() const;
 
+    int64_t getOplogMaxSize() const;
+
     // Pass in NamespaceString, it is not possible to resolve the UUID to NamespaceString yet.
     void postConstructorInit(OperationContext* opCtx, const NamespaceString& ns);
 
@@ -278,10 +281,8 @@ public:
 
     bool isOpHidden_forTest(const RecordId& id) const;
 
-    class OplogTruncateMarkers;
-
     // Exposed only for testing.
-    OplogTruncateMarkers* oplogTruncateMarkers() {
+    WiredTigerOplogTruncateMarkers* oplogTruncateMarkers() {
         return _oplogTruncateMarkers.get();
     };
 
@@ -373,7 +374,7 @@ private:
     WiredTigerKVEngine* _kvEngine;  // not owned.
 
     // Non-null if this record store is underlying the active oplog.
-    std::shared_ptr<OplogTruncateMarkers> _oplogTruncateMarkers;
+    std::shared_ptr<WiredTigerOplogTruncateMarkers> _oplogTruncateMarkers;
 
     AtomicWord<int64_t>
         _totalTimeTruncating;            // Cumulative amount of time spent truncating the oplog.
