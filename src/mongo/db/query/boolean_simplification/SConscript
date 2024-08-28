@@ -2,19 +2,6 @@
 
 Import("env")
 
-env.Library(
-    target="boolean_simplification",
-    source=[
-        "bitset_algebra.cpp",
-        "bitset_tree.cpp",
-        "petrick.cpp",
-        "quine_mccluskey.cpp",
-    ],
-    LIBDEPS=[
-        "$BUILD_DIR/mongo/db/mongohasher",
-    ],
-)
-
 env.CppUnitTest(
     target="boolean_simplification_test",
     source=[

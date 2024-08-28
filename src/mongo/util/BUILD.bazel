@@ -48,9 +48,64 @@ idl_generator(
     src = "testing_options.idl",
 )
 
+mongo_cc_library(
+    name = "caching",
+    srcs = [
+        "read_through_cache.cpp",
+    ],
+    hdrs = [
+        "read_through_cache.h",
+    ],
+    deps = [
+        "//src/mongo:base",
+        "//src/mongo/db:service_context",
+        "//src/mongo/util/concurrency:spin_lock",  # TODO(SERVER-98376): Remove.
+    ],
+)
+
 idl_generator(
     name = "tcmalloc_parameters_gen",
     src = "tcmalloc_parameters.idl",
+)
+
+mongo_cc_library(
+    name = "diagnostic_info",
+    srcs = [
+        "diagnostic_info.cpp",
+    ],
+    hdrs = [
+        "diagnostic_info.h",
+    ],
+    target_compatible_with = select({
+        "//bazel/config:use_diagnostic_latches_enabled": [],
+        "//conditions:default": ["@platforms//:incompatible"],
+    }),
+    deps = [
+        ":fail_point",  # TODO(SERVER-98376): Remove.
+        "//src/mongo:base",
+        "//src/mongo/db:service_context",
+        "//src/mongo/util/concurrency:spin_lock",  # TODO(SERVER-98376): Remove.
+    ],
+)
+
+mongo_cc_library(
+    name = "latch_analyzer",
+    srcs = [
+        "latch_analyzer.cpp",
+    ],
+    hdrs = [
+        "latch_analyzer.h",
+    ],
+    target_compatible_with = select({
+        "//bazel/config:use_diagnostic_latches_enabled": [],
+        "//conditions:default": ["@platforms//:incompatible"],
+    }),
+    deps = [
+        ":fail_point",  # TODO(SERVER-98376): Remove.
+        "//src/mongo:base",
+        "//src/mongo/db:service_context",
+        "//src/mongo/db/commands:server_status_core",  # TODO(SERVER-98376): Remove.
+    ],
 )
 
 idl_generator(
@@ -319,6 +374,37 @@ mongo_cc_library(
     ],
     deps = [
         "//src/mongo:base",
+    ],
+)
+
+mongo_cc_library(
+    name = "periodic_runner_impl",
+    srcs = [
+        "periodic_runner_impl.cpp",
+    ],
+    hdrs = [
+        "periodic_runner_impl.h",
+    ],
+    deps = [
+        ":periodic_runner",  # TODO(SERVER-98376): Remove.
+        "//src/mongo:base",
+        "//src/mongo/db:service_context",
+        "//src/mongo/util/concurrency:spin_lock",  # TODO(SERVER-98376): Remove.
+    ],
+)
+
+mongo_cc_library(
+    name = "periodic_runner_factory",
+    srcs = [
+        "periodic_runner_factory.cpp",
+    ],
+    hdrs = [
+        "periodic_runner_factory.h",
+    ],
+    deps = [
+        ":periodic_runner_impl",
+        "//src/mongo:base",  # TODO(SERVER-98376): Remove.
+        "//src/mongo/db:service_context",  # TODO(SERVER-98376): Remove.
     ],
 )
 

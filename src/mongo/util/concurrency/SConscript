@@ -12,28 +12,6 @@ env.Library(
     ],
 )
 
-env.Library(
-    target="ticketholder",
-    source=[
-        "priority_ticketholder.cpp" if env.TargetOSIs("linux") else [],
-        "semaphore_ticketholder.cpp",
-        "ticket_pool.cpp" if env.TargetOSIs("linux") else [],
-        "ticketholder.cpp",
-    ],
-    LIBDEPS=[
-        "admission_context",
-    ],
-    LIBDEPS_PRIVATE=[
-        "$BUILD_DIR/mongo/db/server_base",
-        "$BUILD_DIR/mongo/db/service_context",
-        "$BUILD_DIR/third_party/boost/boost_filesystem",
-        "$BUILD_DIR/third_party/boost/boost_iostreams",
-        "$BUILD_DIR/third_party/boost/boost_log",
-        "$BUILD_DIR/third_party/boost/boost_program_options",
-        "$BUILD_DIR/third_party/boost/boost_system",
-    ],
-)
-
 env.CppUnitTest(
     target="util_concurrency_test",
     source=[

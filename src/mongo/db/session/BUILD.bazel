@@ -9,6 +9,20 @@ exports_files(
     ]),
 )
 
+mongo_cc_library(
+    name = "logical_session_id_helpers",
+    srcs = [
+        "internal_session_pool.cpp",
+        "logical_session_id_helpers.cpp",
+    ],
+    deps = [
+        ":logical_session_cache",
+        ":logical_session_id",  # TODO(SERVER-98376): Remove.
+        "//src/mongo/db/auth",
+        "//src/mongo/db/auth:authprivilege",
+    ],
+)
+
 idl_generator(
     name = "logical_session_id_gen",
     src = "logical_session_id.idl",
@@ -28,6 +42,23 @@ idl_generator(
     src = "logical_session_cache_stats.idl",
     deps = [
         "//src/mongo/db:basic_types_gen",
+    ],
+)
+
+mongo_cc_library(
+    name = "logical_session_cache",
+    srcs = [
+        "logical_session_cache.cpp",
+        ":logical_session_cache_gen",
+        ":logical_session_cache_stats_gen",
+    ],
+    hdrs = [
+        "logical_session_cache.h",
+    ],
+    deps = [
+        ":logical_session_id",  # TODO(SERVER-98376): Remove.
+        "//src/mongo/db:server_base",
+        "//src/mongo/db:service_context",  # TODO(SERVER-98376): Remove.
     ],
 )
 

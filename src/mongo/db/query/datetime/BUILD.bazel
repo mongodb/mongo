@@ -8,3 +8,29 @@ exports_files(
         "*.cpp",
     ]),
 )
+
+mongo_cc_library(
+    name = "date_time_support",
+    srcs = [
+        "date_time_support.cpp",
+    ],
+    hdrs = [
+        "date_time_support.h",
+    ],
+    deps = [
+        "//src/mongo/db:service_context",
+        "//src/third_party/timelib",
+    ],
+)
+
+mongo_cc_library(
+    name = "init_timezone_data",
+    srcs = [
+        "init_timezone_data.cpp",
+    ],
+    deps = [
+        ":date_time_support",  # TODO(SERVER-98376): Remove.
+        "//src/mongo/db:server_base",
+        "//src/third_party/timelib",
+    ],
+)

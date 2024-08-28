@@ -14,6 +14,47 @@ idl_generator(
     src = "ingress_admission_control.idl",
 )
 
+mongo_cc_library(
+    name = "ticketholder_manager",
+    srcs = [
+        "ticketholder_manager.cpp",
+    ],
+    hdrs = [
+        "ticketholder_manager.h",
+    ],
+    deps = [
+        ":execution_control_feature_flags",  # TODO(SERVER-98376): Remove.
+        "//src/mongo/db:server_base",
+        "//src/mongo/db:service_context",  # TODO(SERVER-98376): Remove.
+        "//src/mongo/db/commands:test_commands_enabled",
+        "//src/mongo/util/concurrency:ticketholder",
+    ],
+)
+
+mongo_cc_library(
+    name = "execution_control",
+    srcs = [
+        "concurrency_adjustment_validator.cpp",
+        "execution_control_init.cpp",
+        "execution_control_parameters_gen",
+        "throughput_probing.cpp",
+        "throughput_probing_gen",
+    ],
+    hdrs = [
+        "concurrency_adjustment_validator.h",
+        "execution_control_init.h",
+        "throughput_probing.h",
+    ],
+    deps = [
+        "ticketholder_manager",
+        "//src/mongo/db:server_base",  # TODO(SERVER-98376): Remove.
+        "//src/mongo/db:service_context",  # TODO(SERVER-98376): Remove.
+        "//src/mongo/db/commands:server_status_core",  # TODO(SERVER-98376): Remove.
+        "//src/mongo/util:processinfo",  # TODO(SERVER-98376): Remove.
+        "//src/mongo/util/concurrency:ticketholder",  # TODO(SERVER-98376): Remove.
+    ],
+)
+
 idl_generator(
     name = "execution_control_parameters_gen",
     src = "execution_control_parameters.idl",

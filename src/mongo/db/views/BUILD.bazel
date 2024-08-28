@@ -8,3 +8,21 @@ exports_files(
         "*.cpp",
     ]),
 )
+
+mongo_cc_library(
+    name = "views",
+    srcs = [
+        "util.cpp",
+        "view.cpp",
+        "view_graph.cpp",
+    ],
+    hdrs = [
+        "util.h",
+        "view.h",
+        "view_graph.h",
+    ],
+    deps = [
+        "//src/mongo/db:server_base",
+        "//src/mongo/db/query/collation:collator_factory_interface",  # TODO(SERVER-98376): Remove.
+    ],
+)

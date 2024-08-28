@@ -9,6 +9,20 @@ exports_files(
     ]),
 )
 
+mongo_cc_library(
+    name = "timestamp_block",
+    srcs = [
+        "timestamp_block.cpp",
+    ],
+    hdrs = [
+        "timestamp_block.h",
+    ],
+    deps = [
+        "//src/mongo/db:service_context",
+        "//src/mongo/db/storage:storage_options",  # TODO(SERVER-98376): Remove.
+    ],
+)
+
 idl_generator(
     name = "dbcheck_gen",
     src = "dbcheck.idl",
@@ -18,6 +32,17 @@ idl_generator(
         "//src/mongo/db:basic_types_gen",
         "//src/mongo/db:record_id_gen",
         "//src/mongo/db:write_concern_options_gen",
+    ],
+)
+
+mongo_cc_library(
+    name = "repl_settings",
+    srcs = [
+        "repl_settings.cpp",
+    ],
+    deps = [
+        ":repl_server_parameters",  # TODO(SERVER-98376): Remove.
+        "//src/mongo/db:server_base",  # TODO(SERVER-98376): Remove.
     ],
 )
 
@@ -36,6 +61,36 @@ idl_generator(
     deps = [
         ":replication_types_gen",
         "//src/mongo/db:basic_types_gen",
+    ],
+)
+
+mongo_cc_library(
+    name = "storage_interface",
+    srcs = [
+        "storage_interface.cpp",
+    ],
+    hdrs = [
+        "storage_interface.h",
+    ],
+    deps = [
+        ":optime",  # TODO(SERVER-98376): Remove.
+        "//src/mongo/db:service_context",
+    ],
+)
+
+mongo_cc_library(
+    name = "drop_pending_collection_reaper",
+    srcs = [
+        "drop_pending_collection_reaper.cpp",
+    ],
+    hdrs = [
+        "drop_pending_collection_reaper.h",
+    ],
+    deps = [
+        ":optime",  # TODO(SERVER-98376): Remove.
+        ":storage_interface",  # TODO(SERVER-98376): Remove.
+        "//src/mongo/db:server_base",
+        "//src/mongo/db:service_context",
     ],
 )
 
@@ -86,6 +141,22 @@ idl_generator(
     ],
 )
 
+mongo_cc_library(
+    name = "task_runner",
+    srcs = [
+        "task_runner.cpp",
+    ],
+    hdrs = [
+        "task_runner.h",
+    ],
+    deps = [
+        "//src/mongo/db:server_base",
+        "//src/mongo/db:service_context",  # TODO(SERVER-98376): Remove.
+        "//src/mongo/db/auth",
+        "//src/mongo/util/concurrency:thread_pool",
+    ],
+)
+
 idl_generator(
     name = "database_cloner_gen",
     src = "database_cloner.idl",
@@ -115,6 +186,22 @@ idl_generator(
         "//src/mongo/client:read_preference_setting_gen",
         "//src/mongo/db:basic_types_gen",
         "//src/mongo/db/serverless:serverless_types_gen",
+    ],
+)
+
+mongo_cc_library(
+    name = "tenant_migration_statistics",
+    srcs = [
+        "tenant_migration_server_status_section.cpp",
+        "tenant_migration_statistics.cpp",
+    ],
+    hdrs = [
+        "tenant_migration_statistics.h",
+    ],
+    deps = [
+        ":repl_server_parameters",  # TODO(SERVER-98376): Remove.
+        "//src/mongo:base",
+        "//src/mongo/db/commands:server_status_core",
     ],
 )
 
@@ -172,6 +259,21 @@ idl_generator(
     ],
 )
 
+mongo_cc_library(
+    name = "read_concern_args",
+    srcs = [
+        "read_concern_args_decoration.cpp",
+    ],
+    hdrs = [
+        "read_concern_args.h",
+    ],
+    deps = [
+        ":optime",  # TODO(SERVER-98376): Remove.
+        "//src/mongo/db:server_base",
+        "//src/mongo/db:service_context",  # TODO(SERVER-98376): Remove.
+    ],
+)
+
 idl_generator(
     name = "member_config_gen",
     src = "member_config.idl",
@@ -180,11 +282,49 @@ idl_generator(
     ],
 )
 
+mongo_cc_library(
+    name = "repl_coordinator_interface",
+    srcs = [
+        "always_allow_non_local_writes.cpp",
+        "repl_client_info.cpp",
+        "replication_coordinator.cpp",
+        "replication_coordinator_noop.cpp",
+    ],
+    hdrs = [
+        "always_allow_non_local_writes.h",
+        "repl_client_info.h",
+        "replication_coordinator.h",
+        "replication_coordinator_noop.h",
+    ],
+    deps = [
+        ":optime",  # TODO(SERVER-98376): Remove.
+        ":repl_server_parameters",
+        ":repl_settings",
+        ":replication_process",  # TODO(SERVER-98376): Remove.
+        ":split_prepare_session_manager",  # TODO(SERVER-98376): Remove.
+        "//src/mongo/db:server_base",
+        "//src/mongo/db:service_context",  # TODO(SERVER-98376): Remove.
+        "//src/mongo/db/storage:storage_options",  # TODO(SERVER-98376): Remove.
+        "//src/mongo/util/net:network",  # TODO(SERVER-98376): Remove.
+    ],
+)
+
 idl_generator(
     name = "repl_server_parameters_gen",
     src = "repl_server_parameters.idl",
     deps = [
         "//src/mongo/db:basic_types_gen",
+    ],
+)
+
+mongo_cc_library(
+    name = "repl_server_parameters",
+    srcs = [
+        ":repl_server_parameters_gen",
+    ],
+    deps = [
+        "//src/mongo/client:read_preference",
+        "//src/mongo/db:server_base",  # TODO(SERVER-98376): Remove.
     ],
 )
 
@@ -769,6 +909,25 @@ mongo_cc_library(
 )
 
 mongo_cc_library(
+    name = "replication_process",
+    srcs = [
+        "replication_consistency_markers.cpp",
+        "replication_process.cpp",
+        "replication_recovery.h",
+    ],
+    hdrs = [
+        "replication_consistency_markers.h",
+        "replication_process.h",
+    ],
+    deps = [
+        ":optime",  # TODO(SERVER-98376): Remove.
+        ":rollback_idl",  # TODO(SERVER-98376): Remove.
+        ":storage_interface",  # TODO(SERVER-98376): Remove.
+        "//src/mongo/db:service_context",
+    ],
+)
+
+mongo_cc_library(
     name = "speculative_majority_read_info",
     srcs = [
         "speculative_majority_read_info.cpp",
@@ -794,5 +953,20 @@ mongo_cc_library(
         "//src/mongo/db:server_base",
         "//src/mongo/util/concurrency:spin_lock",
         "//src/mongo/util/net:network",
+    ],
+)
+
+mongo_cc_library(
+    name = "split_prepare_session_manager",
+    srcs = [
+        "split_prepare_session_manager.cpp",
+    ],
+    hdrs = [
+        "split_prepare_session_manager.h",
+    ],
+    deps = [
+        "//src/mongo:base",  # TODO(SERVER-98376): Remove.
+        "//src/mongo/db/session:logical_session_id",  #  TODO(SERVER-98376): Remove.
+        "//src/mongo/db/session:logical_session_id_helpers",
     ],
 )

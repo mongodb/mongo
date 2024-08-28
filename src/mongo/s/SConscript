@@ -180,38 +180,6 @@ env.Library(
 )
 
 env.Library(
-    target="load_balancer_support",
-    source=[
-        "load_balancer_support.cpp",
-    ],
-    LIBDEPS_PRIVATE=[
-        "$BUILD_DIR/mongo/db/server_base",
-        "$BUILD_DIR/mongo/db/service_context",
-        "$BUILD_DIR/mongo/util/fail_point",
-        "mongos_server_parameters",
-    ],
-)
-
-env.Library(
-    target="analyze_shard_key_common",
-    source=[
-        "analyze_shard_key_common.cpp",
-        "analyze_shard_key_common_gen.cpp",
-        "analyze_shard_key_documents_gen.cpp",
-        "analyze_shard_key_server_parameters_gen.cpp",
-        "analyze_shard_key_role.cpp",
-        "query_analysis_sample_tracker.cpp",
-    ],
-    LIBDEPS_PRIVATE=[
-        "$BUILD_DIR/mongo/db/pipeline/runtime_constants_idl",
-        "$BUILD_DIR/mongo/db/repl/read_concern_args",
-        "$BUILD_DIR/mongo/db/repl/repl_coordinator_interface",
-        "$BUILD_DIR/mongo/db/repl/repl_settings",
-        "$BUILD_DIR/mongo/db/server_base",
-    ],
-)
-
-env.Library(
     target="common_s",
     source=[
         "analyze_shard_key_cmd_gen.cpp",

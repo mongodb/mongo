@@ -21,6 +21,26 @@ idl_generator(
     ],
 )
 
+mongo_cc_library(
+    name = "query_settings",
+    srcs = [
+        "index_hints_serialization.cpp",
+        "query_framework_serialization.cpp",
+        ":query_settings_gen",
+    ],
+    hdrs = [
+        "index_hints_serialization.h",
+        "query_framework_serialization.h",
+    ],
+    deps = [
+        "//src/mongo/db:namespace_spec",
+        "//src/mongo/db:server_base",
+        "//src/mongo/db/query:index_hint",
+        "//src/mongo/db/query:query_knobs",  # TODO(SERVER-98376): Remove.
+        "//src/mongo/db/query/query_shape:query_shape_hash",  # TODO(SERVER-98376): Remove.
+    ],
+)
+
 idl_generator(
     name = "query_settings_cluster_parameter_gen",
     src = "query_settings_cluster_parameter.idl",

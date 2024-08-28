@@ -129,45 +129,6 @@ env.CppUnitTest(
     ],
 )
 
-env.Library(
-    target="periodic_runner_impl",
-    source=[
-        "periodic_runner_impl.cpp",
-    ],
-    LIBDEPS=[
-        "periodic_runner",
-    ],
-    LIBDEPS_PRIVATE=[
-        "$BUILD_DIR/mongo/base",
-        "$BUILD_DIR/mongo/db/service_context",
-        "concurrency/spin_lock",
-    ],
-)
-
-env.Library(
-    target="periodic_runner_factory",
-    source=[
-        "periodic_runner_factory.cpp",
-    ],
-    LIBDEPS_PRIVATE=[
-        "$BUILD_DIR/mongo/base",
-        "$BUILD_DIR/mongo/db/service_context",
-        "periodic_runner_impl",
-    ],
-)
-
-env.Library(
-    target="caching",
-    source=[
-        "read_through_cache.cpp",
-    ],
-    LIBDEPS_PRIVATE=[
-        "$BUILD_DIR/mongo/base",
-        "$BUILD_DIR/mongo/db/service_context",
-        "concurrency/spin_lock",
-    ],
-)
-
 env.CppUnitTest(
     target="tracing_support_test",
     source=[
@@ -309,33 +270,6 @@ env.Library(
         "signal_handlers",
     ],
 )
-
-if get_option("use-diagnostic-latches") == "on":
-    env.Library(
-        target="diagnostic_info",
-        source=[
-            "diagnostic_info.cpp",
-        ],
-        LIBDEPS_PRIVATE=[
-            "$BUILD_DIR/mongo/base",
-            "$BUILD_DIR/mongo/db/service_context",
-            "concurrency/spin_lock",
-            "fail_point",
-        ],
-    )
-
-    env.Library(
-        target="latch_analyzer",
-        source=[
-            "latch_analyzer.cpp",
-        ],
-        LIBDEPS_PRIVATE=[
-            "$BUILD_DIR/mongo/base",
-            "$BUILD_DIR/mongo/db/commands/server_status_core",
-            "$BUILD_DIR/mongo/db/service_context",
-            "fail_point",
-        ],
-    )
 
 env.Benchmark(
     target="clock_source_bm",

@@ -9,6 +9,20 @@ exports_files(
     ]),
 )
 
+mongo_cc_library(
+    name = "memory_util",
+    srcs = [
+        "//src/mongo/db/query/util:memory_util.cpp",
+    ],
+    hdrs = [
+        "//src/mongo/db/query/util:memory_util.h",
+    ],
+    deps = [
+        "//src/mongo/util:pcre_wrapper",  # TODO(SERVER-98376): Remove.
+        "//src/mongo/util:processinfo",
+    ],
+)
+
 idl_generator(
     name = "explain_verbosity_gen",
     src = "explain_verbosity.idl",
@@ -69,6 +83,48 @@ idl_generator(
 idl_generator(
     name = "query_feature_flags_gen",
     src = "query_feature_flags.idl",
+)
+
+mongo_cc_library(
+    name = "query_knobs",
+    srcs = [
+        "ce_mode_parameter.cpp",
+        "explain_version_validator.cpp",
+        "framework_control.cpp",
+        "query_feature_flags_gen",
+        "query_knobs_gen",
+        "//src/mongo/db/query/plan_cache:sbe_plan_cache_on_parameter_change.cpp",
+        "//src/mongo/db/query/query_stats:query_stats_on_parameter_change.cpp",
+    ],
+    hdrs = [
+        "ce_mode_parameter.h",
+        "explain_version_validator.h",
+        "//src/mongo/db/query/plan_cache:sbe_plan_cache_on_parameter_change.h",
+        "//src/mongo/db/query/query_stats:query_stats_on_parameter_change.h",
+    ],
+    deps = [
+        ":memory_util",
+        "//src/mongo/db:server_base",
+        "//src/mongo/db:service_context",
+        "//src/mongo/db/commands:test_commands_enabled",  # TODO(SERVER-98376): Remove.
+        "//src/mongo/idl:cluster_server_parameter",
+        "//src/mongo/util:pcre_wrapper",  # TODO(SERVER-98376): Remove.
+    ],
+)
+
+mongo_cc_library(
+    name = "query_knob_configuration",
+    srcs = [
+        "query_knob_configuration.cpp",
+    ],
+    hdrs = [
+        "query_knob_configuration.h",
+    ],
+    deps = [
+        ":query_knobs",
+        "//src/mongo/db:mongohasher",  # TODO(SERVER-98376): Remove.
+        "//src/mongo/db:server_base",  # TODO(SERVER-98376): Remove.
+    ],
 )
 
 idl_generator(

@@ -143,16 +143,6 @@ env.Library(
 )
 
 env.Library(
-    target="egress_connection_closer_manager",
-    source=[
-        "egress_connection_closer_manager.cpp",
-    ],
-    LIBDEPS_PRIVATE=[
-        "$BUILD_DIR/mongo/db/service_context",
-    ],
-)
-
-env.Library(
     target="network_interface_tl",
     source=[
         "connection_pool_tl.cpp",
@@ -250,19 +240,6 @@ env.Library(
 )
 
 env.Library(
-    target="hedge_options_util",
-    source=[
-        "hedge_options_util.cpp",
-    ],
-    LIBDEPS=[
-        "$BUILD_DIR/mongo/base",
-        "$BUILD_DIR/mongo/client/read_preference",
-        "$BUILD_DIR/mongo/s/mongos_server_parameters",
-        "$BUILD_DIR/mongo/util/fail_point",
-    ],
-)
-
-env.Library(
     target="async_rpc",
     source=[
         "async_rpc.cpp",
@@ -320,19 +297,6 @@ env.Library(
     LIBDEPS_PRIVATE=[
         "$BUILD_DIR/mongo/db/query/plan_yield_policy",
         "pinned_connection_task_executor_factory",
-    ],
-)
-
-env.Library(
-    target="async_request_executor",
-    source=[
-        "async_request_executor.cpp",
-    ],
-    LIBDEPS=[
-        "$BUILD_DIR/mongo/base",
-        "$BUILD_DIR/mongo/db/service_context",
-        "$BUILD_DIR/mongo/util/concurrency/thread_pool",
-        "$BUILD_DIR/mongo/util/fail_point",
     ],
 )
 

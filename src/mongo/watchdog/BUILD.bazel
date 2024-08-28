@@ -9,9 +9,19 @@ exports_files(
     ]),
 )
 
-idl_generator(
-    name = "watchdog_mongod_gen",
-    src = "watchdog_mongod.idl",
+mongo_cc_library(
+    name = "watchdog",
+    srcs = [
+        "watchdog.cpp",
+    ],
+    hdrs = [
+        "watchdog.h",
+    ],
+    deps = [
+        "//src/mongo/db:server_base",
+        "//src/mongo/db:service_context",  # TODO(SERVER-98376): Remove.
+        "//src/mongo/util/concurrency:spin_lock",  # TODO(SERVER-98376): Remove.
+    ],
 )
 
 mongo_cc_library(
@@ -24,5 +34,29 @@ mongo_cc_library(
     ],
     deps = [
         "//src/mongo:base",
+    ],
+)
+
+idl_generator(
+    name = "watchdog_mongod_gen",
+    src = "watchdog_mongod.idl",
+)
+
+mongo_cc_library(
+    name = "watchdog_mongod",
+    srcs = [
+        "watchdog_mongod.cpp",
+        "watchdog_mongod_gen",
+    ],
+    hdrs = [
+        "watchdog_mongod.h",
+    ],
+    deps = [
+        ":watchdog",
+        ":watchdog_register",
+        "//src/mongo/db:server_base",
+        "//src/mongo/db:service_context",  # TODO(SERVER-98376): Remove.
+        "//src/mongo/db/commands:server_status_core",
+        "//src/mongo/db/storage:storage_options",  # TODO(SERVER-98376): Remove.
     ],
 )

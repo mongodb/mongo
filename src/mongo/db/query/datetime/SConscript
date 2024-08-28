@@ -6,29 +6,6 @@ env = env.Clone()
 
 timeZoneEnv = env.Clone()
 timeZoneEnv.InjectThirdParty(libraries=["timelib"])
-timeZoneEnv.Library(
-    target="date_time_support",
-    source=[
-        "date_time_support.cpp",
-    ],
-    LIBDEPS=[
-        "$BUILD_DIR/mongo/db/service_context",
-        "$BUILD_DIR/third_party/timelib/timelib",
-    ],
-)
-
-timeZoneEnv.Library(
-    target="init_timezone_data",
-    source=[
-        "init_timezone_data.cpp",
-    ],
-    LIBDEPS=[
-        "$BUILD_DIR/mongo/db/server_base",
-        "$BUILD_DIR/third_party/timelib/timelib",
-        "date_time_support",
-    ],
-)
-
 timeZoneEnv.CppUnitTest(
     target="date_time_support_test",
     source=[

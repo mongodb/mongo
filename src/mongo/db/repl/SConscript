@@ -6,17 +6,6 @@ Import("wiredtiger")
 env = env.Clone()
 
 env.Library(
-    target="repl_server_parameters",
-    source=[
-        "repl_server_parameters_gen.cpp",
-    ],
-    LIBDEPS_PRIVATE=[
-        "$BUILD_DIR/mongo/client/read_preference",
-        "$BUILD_DIR/mongo/db/server_base",
-    ],
-)
-
-env.Library(
     target="apply_ops_command_info",
     source=[
         "apply_ops_command_info.cpp",
@@ -112,17 +101,6 @@ env.Library(
 )
 
 env.Library(
-    target="timestamp_block",
-    source=[
-        "timestamp_block.cpp",
-    ],
-    LIBDEPS_PRIVATE=[
-        "$BUILD_DIR/mongo/db/service_context",
-        "$BUILD_DIR/mongo/db/storage/storage_options",
-    ],
-)
-
-env.Library(
     target="rollback_source_impl",
     source=[
         "rollback_source_impl.cpp",
@@ -175,17 +153,6 @@ env.Library(
 )
 
 env.Library(
-    target="repl_settings",
-    source=[
-        "repl_settings.cpp",
-    ],
-    LIBDEPS_PRIVATE=[
-        "$BUILD_DIR/mongo/db/server_base",
-        "repl_server_parameters",
-    ],
-)
-
-env.Library(
     target="abstract_async_component",
     source=[
         "abstract_async_component.cpp",
@@ -219,17 +186,6 @@ env.Library(
         "$BUILD_DIR/mongo/db/repl/repl_server_parameters",
         "$BUILD_DIR/mongo/db/server_base",
         "$BUILD_DIR/mongo/util/md5",
-    ],
-)
-
-env.Library(
-    target="storage_interface",
-    source=[
-        "storage_interface.cpp",
-    ],
-    LIBDEPS=[
-        "$BUILD_DIR/mongo/db/service_context",
-        "optime",
     ],
 )
 
@@ -304,33 +260,6 @@ env.Library(
         "oplog_interface_local",
         "repl_server_parameters",
         "replica_set_aware_service",
-    ],
-)
-
-env.Library(
-    target="replication_process",
-    source=[
-        "replication_consistency_markers.cpp",
-        "replication_process.cpp",
-    ],
-    LIBDEPS=[
-        "$BUILD_DIR/mongo/db/service_context",
-        "optime",
-        "rollback_idl",
-        "storage_interface",
-    ],
-)
-
-env.Library(
-    target="drop_pending_collection_reaper",
-    source=[
-        "drop_pending_collection_reaper.cpp",
-    ],
-    LIBDEPS=[
-        "$BUILD_DIR/mongo/db/server_base",
-        "$BUILD_DIR/mongo/db/service_context",
-        "optime",
-        "storage_interface",
     ],
 )
 
@@ -785,29 +714,6 @@ env.Library(
 )
 
 env.Library(
-    target="repl_coordinator_interface",
-    source=[
-        "always_allow_non_local_writes.cpp",
-        "repl_client_info.cpp",
-        "replication_coordinator.cpp",
-        "replication_coordinator_noop.cpp",
-    ],
-    LIBDEPS=[
-        "$BUILD_DIR/mongo/db/server_base",
-        "$BUILD_DIR/mongo/db/service_context",
-        "$BUILD_DIR/mongo/util/net/network",
-        "optime",
-        "replication_process",
-        "split_prepare_session_manager",
-    ],
-    LIBDEPS_PRIVATE=[
-        "$BUILD_DIR/mongo/db/storage/storage_options",
-        "repl_server_parameters",
-        "repl_settings",
-    ],
-)
-
-env.Library(
     target="replica_set_aware_service",
     source=[
         "replica_set_aware_service.cpp",
@@ -838,20 +744,6 @@ env.Library(
         "replica_set_aware_service",
         "replica_set_messages",
         "storage_interface",
-    ],
-)
-
-env.Library(
-    "read_concern_args",
-    source=[
-        "read_concern_args_decoration.cpp",
-    ],
-    LIBDEPS=[
-        "$BUILD_DIR/mongo/db/server_base",
-        "optime",
-    ],
-    LIBDEPS_PRIVATE=[
-        "$BUILD_DIR/mongo/db/service_context",
     ],
 )
 
@@ -1088,19 +980,6 @@ env.Library(
 )
 
 env.Library(
-    target="task_runner",
-    source=[
-        "task_runner.cpp",
-    ],
-    LIBDEPS=[
-        "$BUILD_DIR/mongo/db/auth/auth",
-        "$BUILD_DIR/mongo/db/server_base",
-        "$BUILD_DIR/mongo/db/service_context",
-        "$BUILD_DIR/mongo/util/concurrency/thread_pool",
-    ],
-)
-
-env.Library(
     target="data_replicator_external_state_impl",
     source=[
         "data_replicator_external_state_impl.cpp",
@@ -1297,21 +1176,6 @@ env.Library(
         "$BUILD_DIR/mongo/util/net/ssl_manager",
         "optime",
         "repl_coordinator_interface",
-    ],
-)
-
-env.Library(
-    target="tenant_migration_statistics",
-    source=[
-        "tenant_migration_statistics.cpp",
-        "tenant_migration_server_status_section.cpp",
-    ],
-    LIBDEPS=[
-        "repl_server_parameters",
-    ],
-    LIBDEPS_PRIVATE=[
-        "$BUILD_DIR/mongo/base",
-        "$BUILD_DIR/mongo/db/commands/server_status_core",
     ],
 )
 
@@ -2064,18 +1928,6 @@ env.Library(
     LIBDEPS=[
         "$BUILD_DIR/mongo/base",
         "$BUILD_DIR/mongo/executor/task_executor_interface",
-    ],
-)
-
-env.Library(
-    target="split_prepare_session_manager",
-    source=[
-        "split_prepare_session_manager.cpp",
-    ],
-    LIBDEPS=[
-        "$BUILD_DIR/mongo/base",
-        "$BUILD_DIR/mongo/db/session/logical_session_id",
-        "$BUILD_DIR/mongo/db/session/logical_session_id_helpers",
     ],
 )
 

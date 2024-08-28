@@ -8,3 +8,47 @@ exports_files(
         "*.cpp",
     ]),
 )
+
+# Core geometry shape libraries
+mongo_cc_library(
+    name = "geometry",
+    srcs = [
+        "big_polygon.cpp",
+        "hash.cpp",
+        "r2_region_coverer.cpp",
+        "shapes.cpp",
+        "//src/mongo/util/transitional_tools_do_not_use:vector_spooling.h",
+    ],
+    hdrs = [
+        "big_polygon.h",
+        "hash.h",
+        "r2_region_coverer.h",
+        "shapes.h",
+    ],
+    deps = [
+        "//src/mongo:base",  # TODO(SERVER-98376): Remove.
+        "//src/mongo/db:common",
+        "//src/mongo/db/storage:key_string",  # TODO(SERVER-98376): Remove.
+        "//src/third_party/s2",
+    ],
+)
+
+# Geometry / BSON parsing and wrapping
+mongo_cc_library(
+    name = "geoparser",
+    srcs = [
+        "geometry_container.cpp",
+        "geoparser.cpp",
+    ],
+    hdrs = [
+        "geoconstants.h",
+        "geometry_container.h",
+        "geoparser.h",
+    ],
+    deps = [
+        ":geometry",
+        "//src/mongo:base",  # TODO(SERVER-98376): Remove.
+        "//src/mongo/db/query/bson:dotted_path_support",
+        "//src/third_party/s2",
+    ],
+)

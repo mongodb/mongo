@@ -9,14 +9,60 @@ exports_files(
     ]),
 )
 
+mongo_cc_library(
+    name = "egress_connection_closer_manager",
+    srcs = [
+        "egress_connection_closer_manager.cpp",
+    ],
+    hdrs = [
+        "egress_connection_closer_manager.h",
+    ],
+    deps = [
+        "//src/mongo/db:service_context",
+    ],
+)
+
 idl_generator(
     name = "network_interface_tl_gen",
     src = "network_interface_tl.idl",
 )
 
+mongo_cc_library(
+    name = "hedge_options_util",
+    srcs = [
+        "hedge_options_util.cpp",
+        "//src/mongo/util:sort.h",  # Only usage. Might want to move it here.
+    ],
+    hdrs = [
+        "hedge_options_util.h",
+    ],
+    deps = [
+        "//src/mongo:base",
+        "//src/mongo/client:read_preference",
+        "//src/mongo/s:mongos_server_parameters",
+        "//src/mongo/util:fail_point",  # TODO(SERVER-98376): Remove.
+    ],
+)
+
 idl_generator(
     name = "task_executor_pool_parameters_gen",
     src = "task_executor_pool_parameters.idl",
+)
+
+mongo_cc_library(
+    name = "async_request_executor",
+    srcs = [
+        "async_request_executor.cpp",
+    ],
+    hdrs = [
+        "async_request_executor.h",
+    ],
+    deps = [
+        "//src/mongo:base",
+        "//src/mongo/db:service_context",
+        "//src/mongo/util:fail_point",  # TODO(SERVER-98376): Remove.
+        "//src/mongo/util/concurrency:thread_pool",
+    ],
 )
 
 idl_generator(

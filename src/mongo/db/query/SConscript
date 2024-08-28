@@ -32,18 +32,6 @@ env.SConscript(
 )
 
 env.Library(
-    target="query_knob_configuration",
-    source=[
-        "query_knob_configuration.cpp",
-    ],
-    LIBDEPS_PRIVATE=[
-        "$BUILD_DIR/mongo/db/mongohasher",
-        "$BUILD_DIR/mongo/db/server_base",
-        "query_knobs",
-    ],
-)
-
-env.Library(
     target="canonical_query",
     source=[
         "canonical_query.cpp",
@@ -134,17 +122,6 @@ env.Library(
     LIBDEPS=[
         "$BUILD_DIR/mongo/base",
         "datetime/date_time_support",
-    ],
-)
-
-env.Library(
-    target="memory_util",
-    source=[
-        "util/memory_util.cpp",
-    ],
-    LIBDEPS=[
-        "$BUILD_DIR/mongo/util/pcre_wrapper",
-        "$BUILD_DIR/mongo/util/processinfo",
     ],
 )
 
@@ -287,27 +264,6 @@ env.Library(
         "$BUILD_DIR/mongo/db/server_base",
         "cursor_response_idl",
         "query_settings/query_settings",
-    ],
-)
-
-env.Library(
-    target="query_knobs",
-    source=[
-        "ce_mode_parameter.cpp",
-        "explain_version_validator.cpp",
-        "framework_control.cpp",
-        "query_feature_flags_gen.cpp",
-        "query_knobs_gen.cpp",
-        "query_stats/query_stats_on_parameter_change.cpp",
-        "plan_cache/sbe_plan_cache_on_parameter_change.cpp",
-    ],
-    LIBDEPS_PRIVATE=[
-        "$BUILD_DIR/mongo/db/commands/test_commands_enabled",
-        "$BUILD_DIR/mongo/db/server_base",
-        "$BUILD_DIR/mongo/db/service_context",
-        "$BUILD_DIR/mongo/idl/cluster_server_parameter",
-        "$BUILD_DIR/mongo/util/pcre_wrapper",
-        "memory_util",
     ],
 )
 

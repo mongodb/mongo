@@ -8,3 +8,92 @@ exports_files(
         "*.cpp",
     ]),
 )
+
+mongo_cc_library(
+    name = "collator_interface",
+    srcs = [
+        "collation_index_key.cpp",
+        "collator_interface.cpp",
+    ],
+    hdrs = [
+        "collation_index_key.h",
+        "collation_spec.h",
+        "collator_interface.h",
+    ],
+    deps = [
+        "//src/mongo/db:server_base",
+        "//src/mongo/db:service_context",  # TODO(SERVER-98376): Remove.
+    ],
+)
+
+mongo_cc_library(
+    name = "collator_interface_mock",
+    srcs = [
+        "collator_interface_mock.cpp",
+    ],
+    hdrs = [
+        "collator_interface_mock.h",
+    ],
+    deps = [
+        ":collator_interface",
+        "//src/mongo/db:server_base",  # TODO(SERVER-98376): Remove.
+    ],
+)
+
+mongo_cc_library(
+    name = "collator_factory_interface",
+    srcs = [
+        "collator_factory_interface.cpp",
+    ],
+    hdrs = [
+        "collator_factory_interface.h",
+    ],
+    deps = [
+        ":collator_interface",  # TODO(SERVER-98376): Remove.
+        "//src/mongo/db:service_context",
+    ],
+)
+
+mongo_cc_library(
+    name = "collator_factory_mock",
+    srcs = [
+        "collator_factory_mock.cpp",
+    ],
+    hdrs = [
+        "collator_factory_mock.h",
+    ],
+    deps = [
+        ":collator_factory_interface",  # TODO(SERVER-98376): Remove.
+        ":collator_interface_mock",
+    ],
+)
+
+mongo_cc_library(
+    name = "collator_icu",
+    srcs = [
+        "collator_factory_icu.cpp",
+        "collator_interface_icu.cpp",
+    ],
+    hdrs = [
+        "collator_factory_icu.h",
+        "collator_interface_icu.h",
+    ],
+    deps = [
+        ":collator_factory_interface",
+        "//src/mongo:base",  # TODO(SERVER-98376): Remove.
+        "//src/mongo/bson/util:bson_extract",  # TODO(SERVER-98376): Remove.
+        "//src/mongo/db:server_base",  # TODO(SERVER-98376): Remove.
+        "//src/mongo/util:icu_init",  # TODO(SERVER-98376): Remove.
+        "//src/third_party/icu4c-57.1/source:icu_i18n",
+    ],
+)
+
+mongo_cc_library(
+    name = "collator_factory_icu",
+    srcs = [
+        "collator_factory_icu_decoration.cpp",
+    ],
+    deps = [
+        ":collator_icu",
+    ],
+)

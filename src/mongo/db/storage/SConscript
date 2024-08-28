@@ -15,39 +15,6 @@ env.SConscript(
     ],
 )
 
-env.Library(
-    target="snapshot_helper",
-    source=[
-        "snapshot_helper.cpp",
-    ],
-    LIBDEPS_PRIVATE=[
-        "$BUILD_DIR/mongo/db/concurrency/lock_manager",
-        "$BUILD_DIR/mongo/db/repl/read_concern_args",
-        "$BUILD_DIR/mongo/db/repl/repl_coordinator_interface",
-        "$BUILD_DIR/mongo/db/server_base",
-        "recovery_unit_base",
-    ],
-)
-
-env.Library(
-    target="record_store_base",
-    source=[
-        "collection_truncate_markers.cpp",
-        "external_record_store.cpp",
-        "multi_bson_stream_cursor.cpp",
-        "named_pipe_posix.cpp" if not env.TargetOSIs("windows") else [],
-        "named_pipe_windows.cpp" if env.TargetOSIs("windows") else [],
-        "record_store.cpp",
-    ],
-    LIBDEPS_PRIVATE=[
-        "$BUILD_DIR/mongo/db/query/query_knobs" if not env.TargetOSIs("windows") else [],
-        "$BUILD_DIR/mongo/db/server_base",
-        "$BUILD_DIR/mongo/db/service_context",
-        "$BUILD_DIR/mongo/util/fail_point",
-        "storage_options",
-    ],
-)
-
 ksdecode = env.Program(
     target="ksdecode",
     source=[
@@ -61,18 +28,6 @@ ksdecode = env.Program(
     AIB_COMPONENT="ksdecode",
     AIB_COMPONENTS_EXTRA=[
         "dist-test",
-    ],
-)
-
-env.Library(
-    target="capped_snapshots",
-    source=[
-        "capped_snapshots.cpp",
-    ],
-    LIBDEPS_PRIVATE=[
-        "$BUILD_DIR/mongo/base",
-        "$BUILD_DIR/mongo/db/concurrency/lock_manager",
-        "recovery_unit_base",
     ],
 )
 
@@ -94,24 +49,6 @@ env.Library(
 )
 
 env.Library(
-    target="storage_control",
-    source=[
-        "control/storage_control.cpp",
-        "durable_history_pin.cpp",
-    ],
-    LIBDEPS=[
-        "checkpointer",
-        "journal_flusher",
-    ],
-    LIBDEPS_PRIVATE=[
-        "$BUILD_DIR/mongo/base",
-        "$BUILD_DIR/mongo/db/commands/test_commands_enabled",
-        "$BUILD_DIR/mongo/db/service_context",
-        "storage_options",
-    ],
-)
-
-env.Library(
     target="oplog_cap_maintainer_thread",
     source=[
         "oplog_cap_maintainer_thread.cpp",
@@ -126,46 +63,6 @@ env.Library(
         "$BUILD_DIR/mongo/db/shard_role",
         "$BUILD_DIR/mongo/util/background_job",
         "$BUILD_DIR/mongo/util/concurrency/spin_lock",
-    ],
-)
-
-env.Library(
-    target="journal_flusher",
-    source=[
-        "control/journal_flusher.cpp",
-    ],
-    LIBDEPS=[
-        "$BUILD_DIR/mongo/util/background_job",
-    ],
-    LIBDEPS_PRIVATE=[
-        "$BUILD_DIR/mongo/db/admission/execution_admission_context",
-        "$BUILD_DIR/mongo/db/server_base",
-        "$BUILD_DIR/mongo/db/service_context",
-        "$BUILD_DIR/mongo/util/concurrency/spin_lock",
-        "$BUILD_DIR/mongo/util/fail_point",
-        "storage_options",
-    ],
-)
-
-env.Library(
-    target="encryption_hooks",
-    source=[
-        "encryption_hooks.cpp",
-    ],
-    LIBDEPS=[
-        "$BUILD_DIR/mongo/base",
-        "$BUILD_DIR/mongo/db/service_context",
-    ],
-)
-
-env.Library(
-    target="backup_cursor_hooks",
-    source=[
-        "backup_cursor_hooks.cpp",
-    ],
-    LIBDEPS=[
-        "$BUILD_DIR/mongo/base",
-        "$BUILD_DIR/mongo/db/service_context",
     ],
 )
 
@@ -286,18 +183,6 @@ env.Library(
 )
 
 env.Library(
-    target="storage_engine_lock_file",
-    source=[
-        "storage_engine_lock_file.cpp",
-        "storage_engine_lock_file_${TARGET_OS_FAMILY}.cpp",
-    ],
-    LIBDEPS=[
-        "$BUILD_DIR/mongo/base",
-        "$BUILD_DIR/mongo/db/service_context",
-    ],
-)
-
-env.Library(
     target="storage_engine_common",
     source=[
         "storage_engine_init.cpp",
@@ -313,18 +198,6 @@ env.Library(
         "storage_engine_metadata",
         "storage_options",
         "storage_repair_observer",
-    ],
-)
-
-env.Library(
-    target="storage_init_d",
-    source=[
-        "storage_init.cpp",
-    ],
-    LIBDEPS_PRIVATE=[
-        "$BUILD_DIR/mongo/db/commands/server_status_core",
-        "backup_cursor_hooks",
-        "storage_options",
     ],
 )
 
@@ -363,18 +236,6 @@ env.Benchmark(
         "$BUILD_DIR/mongo/db/concurrency/lock_manager",
         "$BUILD_DIR/mongo/db/record_id_helpers",
         "$BUILD_DIR/mongo/db/server_base",
-    ],
-)
-
-env.Library(
-    target="remove_saver",
-    source=[
-        "remove_saver.cpp",
-    ],
-    LIBDEPS_PRIVATE=[
-        "$BUILD_DIR/mongo/db/server_base",
-        "encryption_hooks",
-        "storage_options",
     ],
 )
 
@@ -485,35 +346,6 @@ env.Library(
         "$BUILD_DIR/mongo/db/multitenancy",
         "durable_catalog",
         "kv/kv_drop_pending_ident_reaper",
-        "storage_options",
-    ],
-)
-
-env.Library(
-    target="disk_space_monitor",
-    source=[
-        "disk_space_monitor.cpp",
-    ],
-    LIBDEPS_PRIVATE=[
-        "$BUILD_DIR/mongo/db/commands/server_status_core",
-        "$BUILD_DIR/mongo/db/server_base",
-        "$BUILD_DIR/mongo/db/service_context",
-        "disk_space_util",
-        "storage_options",
-    ],
-)
-
-env.Library(
-    target="checkpointer",
-    source=[
-        "checkpointer.cpp",
-    ],
-    LIBDEPS_PRIVATE=[
-        "$BUILD_DIR/mongo/db/server_base",
-        "$BUILD_DIR/mongo/db/service_context",
-        "$BUILD_DIR/mongo/util/background_job",
-        "$BUILD_DIR/mongo/util/concurrency/spin_lock",
-        "$BUILD_DIR/mongo/util/fail_point",
         "storage_options",
     ],
 )

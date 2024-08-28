@@ -80,18 +80,6 @@ env.Library(
 )
 
 env.Library(
-    target="program_runner",
-    source=[
-        "program_runner.cpp",
-    ],
-    LIBDEPS_PRIVATE=[
-        "$BUILD_DIR/mongo/base",
-        "$BUILD_DIR/mongo/base/environment_buffer",
-        "$BUILD_DIR/mongo/db/service_context",
-    ],
-)
-
-env.Library(
     target="shell_utils",
     source=[
         "mongo-server.cpp",

@@ -8,3 +8,25 @@ exports_files(
         "*.cpp",
     ]),
 )
+
+mongo_cc_library(
+    name = "boolean_simplification",
+    srcs = [
+        "bitset_algebra.cpp",
+        "bitset_tree.cpp",
+        "petrick.cpp",
+        "quine_mccluskey.cpp",
+        "//src/mongo/util:dynamic_bitset.h",
+        "//src/mongo/util:inlined_storage.h",
+        "//src/mongo/util:stream_utils.h",
+    ],
+    hdrs = [
+        "bitset_algebra.h",
+        "bitset_tree.h",
+        "petrick.h",
+        "quine_mccluskey.h",
+    ],
+    deps = [
+        "//src/mongo/db:mongohasher",
+    ],
+)

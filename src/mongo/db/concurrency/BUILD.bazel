@@ -15,6 +15,44 @@ idl_generator(
 )
 
 mongo_cc_library(
+    name = "lock_manager",
+    srcs = [
+        "cond_var_lock_grant_notification.cpp",
+        "d_concurrency.cpp",
+        "fill_locker_info.cpp",
+        "lock_manager.cpp",
+        "lock_manager_defs.cpp",
+        "lock_request_list.h",
+        "lock_stats.cpp",
+        "locker.cpp",
+        "replication_state_transition_lock_guard.cpp",
+        "resource_catalog.cpp",
+    ],
+    hdrs = [
+        "cond_var_lock_grant_notification.h",
+        "d_concurrency.h",
+        "fill_locker_info.h",
+        "lock_manager.h",
+        "lock_manager_defs.h",
+        "lock_stats.h",
+        "locker.h",
+        "replication_state_transition_lock_guard.h",
+        "resource_catalog.h",
+    ],
+    deps = [
+        "//src/mongo/db:server_base",
+        "//src/mongo/db:service_context",  # TODO(SERVER-98376): Remove.
+        "//src/mongo/db/admission:execution_admission_context",  # TODO(SERVER-98376): Remove.
+        "//src/mongo/db/admission:ticketholder_manager",
+        "//src/mongo/db/concurrency:flow_control_ticketholder",  # TODO(SERVER-98376): Remove.
+        "//src/mongo/util:background_job",  # TODO(SERVER-98376): Remove.
+        "//src/mongo/util:fail_point",  # TODO(SERVER-98376): Remove.
+        "//src/mongo/util/concurrency:spin_lock",  # TODO(SERVER-98376): Remove.
+        "//src/mongo/util/concurrency:ticketholder",  # TODO(SERVER-98376): Remove.
+    ],
+)
+
+mongo_cc_library(
     name = "flow_control_ticketholder",
     srcs = [
         "flow_control_ticketholder.cpp",

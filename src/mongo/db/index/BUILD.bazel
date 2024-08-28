@@ -9,6 +9,29 @@ exports_files(
     ]),
 )
 
+mongo_cc_library(
+    name = "expression_params",
+    srcs = [
+        "2d_common.h",
+        "expression_params.cpp",
+        "s2_common.cpp",
+    ],
+    hdrs = [
+        "expression_params.h",
+        "s2_common.h",
+    ],
+    deps = [
+        "//src/mongo/bson/util:bson_extract",  # TODO(SERVER-98376): Remove.
+        "//src/mongo/db:mongohasher",
+        "//src/mongo/db:server_base",
+        "//src/mongo/db/geo:geometry",  # TODO(SERVER-98376): Remove.
+        "//src/mongo/db/geo:geoparser",
+        "//src/mongo/db/query/collation:collator_interface",  # TODO(SERVER-98376): Remove.
+        "//src/mongo/db/storage:key_string",  # TODO(SERVER-98376): Remove.
+        "//src/third_party/s2",
+    ],
+)
+
 idl_generator(
     name = "index_build_interceptor_gen",
     src = "index_build_interceptor.idl",

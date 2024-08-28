@@ -9,6 +9,22 @@ exports_files(
     ]),
 )
 
+mongo_cc_library(
+    name = "storage_wiredtiger_customization_hooks",
+    srcs = [
+        "wiredtiger_customization_hooks.cpp",
+        "wiredtiger_extensions.cpp",
+    ],
+    hdrs = [
+        "wiredtiger_customization_hooks.h",
+        "wiredtiger_extensions.h",
+    ],
+    deps = [
+        "//src/mongo:base",
+        "//src/mongo/db:service_context",
+    ],
+)
+
 idl_generator(
     name = "oplog_truncate_marker_parameters_gen",
     src = "oplog_truncate_marker_parameters.idl",

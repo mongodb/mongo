@@ -36,43 +36,6 @@ env.CppUnitTest(
 )
 
 env.Library(
-    target="ticketholder_manager",
-    source=[
-        "ticketholder_manager.cpp",
-    ],
-    LIBDEPS=[
-        "execution_control_feature_flags",
-    ],
-    LIBDEPS_PRIVATE=[
-        "$BUILD_DIR/mongo/db/commands/test_commands_enabled",
-        "$BUILD_DIR/mongo/db/server_base",
-        "$BUILD_DIR/mongo/db/service_context",
-        "$BUILD_DIR/mongo/util/concurrency/ticketholder",
-    ],
-)
-
-env.Library(
-    target="execution_control",
-    source=[
-        "concurrency_adjustment_validator.cpp",
-        "execution_control_parameters_gen.cpp",
-        "execution_control_init.cpp",
-        "throughput_probing.cpp",
-        "throughput_probing_gen.cpp",
-    ],
-    LIBDEPS=[
-        "ticketholder_manager",
-    ],
-    LIBDEPS_PRIVATE=[
-        "$BUILD_DIR/mongo/db/commands/server_status_core",
-        "$BUILD_DIR/mongo/db/server_base",
-        "$BUILD_DIR/mongo/db/service_context",
-        "$BUILD_DIR/mongo/util/concurrency/ticketholder",
-        "$BUILD_DIR/mongo/util/processinfo",
-    ],
-)
-
-env.Library(
     target="queues_server_status_section",
     source=[
         "queues_server_status_section.cpp",

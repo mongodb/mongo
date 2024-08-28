@@ -81,6 +81,54 @@ idl_generator(
     ],
 )
 
+mongo_cc_library(
+    name = "load_balancer_support",
+    srcs = [
+        "load_balancer_support.cpp",
+    ],
+    hdrs = [
+        "load_balancer_support.h",
+    ],
+    deps = [
+        ":mongos_server_parameters",
+        "//src/mongo/db:server_base",
+        "//src/mongo/db:service_context",
+        "//src/mongo/util:fail_point",  # TODO(SERVER-98376): Remove.
+    ],
+)
+
+mongo_cc_library(
+    name = "analyze_shard_key_common",
+    srcs = [
+        "analyze_shard_key_common.cpp",
+        "analyze_shard_key_role.cpp",
+        "query_analysis_sample_tracker.cpp",
+        "query_analysis_sampler.h",
+        ":analyze_shard_key_common_gen",
+        ":analyze_shard_key_documents_gen",
+        ":analyze_shard_key_server_parameters_gen",
+        "//src/mongo/db/commands/query_cmd:bulk_write_crud_op.h",
+        "//src/mongo/db/commands/query_cmd:bulk_write_parser.h",
+        "//src/mongo/db/repl:replica_set_aware_service.h",
+        "//src/mongo/db/s:query_analysis_writer.h",
+        "//src/mongo/idl:mutable_observer_registry.h",
+        "//src/mongo/s/write_ops:batched_command_request.h",
+    ],
+    hdrs = [
+        "analyze_shard_key_common.h",
+        "analyze_shard_key_role.h",
+        "query_analysis_sample_tracker.h",
+        "//src/mongo/db/commands/query_cmd:bulk_write_gen",
+    ],
+    deps = [
+        "//src/mongo/db:server_base",
+        "//src/mongo/db/pipeline:runtime_constants_idl",  # TODO(SERVER-98376): Remove.
+        "//src/mongo/db/repl:read_concern_args",  # TODO(SERVER-98376): Remove.
+        "//src/mongo/db/repl:repl_coordinator_interface",
+        "//src/mongo/db/repl:repl_settings",
+    ],
+)
+
 idl_generator(
     name = "analyze_shard_key_cmd_gen",
     src = "analyze_shard_key_cmd.idl",

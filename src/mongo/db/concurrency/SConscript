@@ -37,32 +37,6 @@ env.Library(
     ],
 )
 
-env.Library(
-    target="lock_manager",
-    source=[
-        "cond_var_lock_grant_notification.cpp",
-        "d_concurrency.cpp",
-        "fill_locker_info.cpp",
-        "lock_manager.cpp",
-        "lock_manager_defs.cpp",
-        "lock_stats.cpp",
-        "locker.cpp",
-        "replication_state_transition_lock_guard.cpp",
-        "resource_catalog.cpp",
-    ],
-    LIBDEPS_PRIVATE=[
-        "$BUILD_DIR/mongo/db/admission/execution_admission_context",
-        "$BUILD_DIR/mongo/db/admission/ticketholder_manager",
-        "$BUILD_DIR/mongo/db/concurrency/flow_control_ticketholder",
-        "$BUILD_DIR/mongo/db/server_base",
-        "$BUILD_DIR/mongo/db/service_context",
-        "$BUILD_DIR/mongo/util/background_job",
-        "$BUILD_DIR/mongo/util/concurrency/spin_lock",
-        "$BUILD_DIR/mongo/util/concurrency/ticketholder",
-        "$BUILD_DIR/mongo/util/fail_point",
-    ],
-)
-
 env.CppUnitTest(
     target="lock_manager_test",
     source=[

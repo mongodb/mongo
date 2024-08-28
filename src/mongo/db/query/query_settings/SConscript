@@ -5,22 +5,6 @@ Import("env")
 env = env.Clone()
 
 env.Library(
-    target="query_settings",
-    source=[
-        "index_hints_serialization.cpp",
-        "query_framework_serialization.cpp",
-        "query_settings_gen.cpp",
-    ],
-    LIBDEPS=[
-        "$BUILD_DIR/mongo/db/namespace_spec",
-        "$BUILD_DIR/mongo/db/query/index_hint",
-        "$BUILD_DIR/mongo/db/query/query_knobs",
-        "$BUILD_DIR/mongo/db/query/query_shape/query_shape_hash",
-        "$BUILD_DIR/mongo/db/server_base",
-    ],
-)
-
-env.Library(
     target="manager",
     source=[
         "query_settings_cluster_parameter_gen.cpp",

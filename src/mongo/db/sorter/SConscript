@@ -39,20 +39,3 @@ env.Benchmark(
 sorterBaseEnv = env.Clone()
 if wiredtiger:
     sorterBaseEnv.InjectThirdParty(libraries=["wiredtiger"])
-
-sorterBaseEnv.Library(
-    target="sorter_base",
-    source=[
-        "sorter_gen.cpp",
-        "sorter_checksum_calculator.cpp",
-    ],
-    LIBDEPS=[
-        "$BUILD_DIR/mongo/db/server_feature_flags",
-        "$BUILD_DIR/mongo/db/stats/counters",
-        "sorter_stats",
-    ],
-    LIBDEPS_PRIVATE=[
-        "$BUILD_DIR/mongo/db/server_base",
-        "$BUILD_DIR/third_party/wiredtiger/wiredtiger_checksum" if wiredtiger else [],
-    ],
-)

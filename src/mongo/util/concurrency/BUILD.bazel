@@ -50,6 +50,35 @@ mongo_cc_library(
 )
 
 mongo_cc_library(
+    name = "ticketholder",
+    srcs = [
+        "semaphore_ticketholder.cpp",
+        "ticketholder.cpp",
+    ] + select({
+        "@platforms//os:linux": [
+            "priority_ticketholder.cpp",
+            "ticket_pool.cpp",
+        ],
+        "//conditions:default": [],
+    }),
+    hdrs = [
+        "priority_ticketholder.h",
+        "semaphore_ticketholder.h",
+        "ticket_pool.h",
+        "ticketholder.h",
+    ],
+    deps = [
+        ":admission_context",  # TODO(SERVER-98376): Remove.
+        "//src/mongo/db:server_base",
+        "//src/mongo/db:service_context",  # TODO(SERVER-98376): Remove.
+        "//src/third_party/boost:boost_filesystem",  # TODO(SERVER-98376): Remove.
+        "//src/third_party/boost:boost_iostreams",  # TODO(SERVER-98376): Remove.
+        "//src/third_party/boost:boost_log",  # TODO(SERVER-98376): Remove.
+        "//src/third_party/boost:boost_program_options",  # TODO(SERVER-98376): Remove.
+    ],
+)
+
+mongo_cc_library(
     name = "thread_pool",
     srcs = [
         "thread_pool.cpp",

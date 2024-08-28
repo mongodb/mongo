@@ -9,6 +9,17 @@ exports_files(
     ]),
 )
 
+filegroup(
+    name = "headers",
+    srcs = [
+        "batched_delete_stage.h",
+        "batched_delete_stage_buffer.h",
+        "delete_stage.h",
+        "requires_collection_stage.h",
+        "write_stage_common.h",
+    ],
+)
+
 idl_generator(
     name = "batched_delete_stage_gen",
     src = "batched_delete_stage.idl",

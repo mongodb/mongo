@@ -30,3 +30,25 @@ mongo_cc_library(
         "//src/mongo/db/commands:server_status_core",
     ],
 )
+
+mongo_cc_library(
+    name = "sorter_base",
+    srcs = [
+        "sorter_checksum_calculator.cpp",
+        "sorter_gen",
+    ],
+    hdrs = [
+        "sorter_checksum_calculator.h",
+    ],
+    deps = [
+        ":sorter_stats",  # TODO(SERVER-98376): Remove.
+        "//src/mongo/db:server_base",
+        "//src/mongo/db:server_feature_flags",  # TODO(SERVER-98376): Remove.
+        "//src/mongo/db/stats:counters",  # TODO(SERVER-98376): Remove.
+    ] + select({
+        "//bazel/config:use_wiredtiger_enabled": [
+            "//src/third_party/wiredtiger:wiredtiger_checksum",
+        ],
+        "//conditions:default": [],
+    }),
+)

@@ -12,6 +12,21 @@ exports_files(
 )
 
 mongo_cc_library(
+    name = "program_runner",
+    srcs = [
+        "program_runner.cpp",
+    ],
+    hdrs = [
+        "program_runner.h",
+    ],
+    deps = [
+        "//src/mongo:base",
+        "//src/mongo/base:environment_buffer",
+        "//src/mongo/db:service_context",
+    ],
+)
+
+mongo_cc_library(
     name = "linenoise_utf8",
     srcs = [
         "linenoise_utf8.cpp",

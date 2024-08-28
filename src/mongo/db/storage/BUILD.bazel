@@ -24,9 +24,140 @@ mongo_cc_library(
     ],
 )
 
+mongo_cc_library(
+    name = "record_store_base",
+    srcs = [
+        "collection_truncate_markers.cpp",
+        "external_record_store.cpp",
+        "input_object.h",
+        "io_error_message.h",
+        "multi_bson_stream_cursor.cpp",
+        "record_store.cpp",
+        "//src/mongo/db/exec:headers",
+        "//src/mongo/db/query:internal_plans.h",
+        "//src/mongo/db/s:shard_key_index_util.h",
+    ] + select({
+        "@platforms//os:windows": ["named_pipe_windows.cpp"],
+        "//conditions:default": ["named_pipe_posix.cpp"],
+    }),
+    hdrs = [
+        "collection_truncate_markers.h",
+        "external_record_store.h",
+        "input_stream.h",
+        "multi_bson_stream_cursor.h",
+        "named_pipe.h",
+        "record_store.h",
+        "//src/mongo/db/exec:batched_delete_stage_gen",
+    ],
+    deps = [
+        ":storage_options",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/db:server_base",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/db:service_context",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/util:fail_point",  # TODO(SERVER-93876): Remove.
+    ] + select({
+        "@platforms//os:windows": [],
+        "//conditions:default": ["//src/mongo/db/query:query_knobs"],
+    }),
+)
+
+mongo_cc_library(
+    name = "remove_saver",
+    srcs = [
+        "remove_saver.cpp",
+    ],
+    hdrs = [
+        "remove_saver.h",
+    ],
+    deps = [
+        ":encryption_hooks",
+        ":storage_options",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/db:server_base",
+    ],
+)
+
+mongo_cc_library(
+    name = "journal_flusher",
+    srcs = [
+        "//src/mongo/db/storage/control:journal_flusher.cpp",
+    ],
+    hdrs = [
+        "//src/mongo/db/storage/control:journal_flusher.h",
+    ],
+    deps = [
+        ":storage_options",
+        "//src/mongo/db:server_base",
+        "//src/mongo/db:service_context",
+        "//src/mongo/db/admission:execution_admission_context",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/util:background_job",
+        "//src/mongo/util:fail_point",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/util/concurrency:spin_lock",  # TODO(SERVER-93876): Remove.
+    ],
+)
+
+mongo_cc_library(
+    name = "encryption_hooks",
+    srcs = [
+        "encryption_hooks.cpp",
+    ],
+    hdrs = [
+        "data_protector.h",
+        "encryption_hooks.h",
+    ],
+    deps = [
+        "//src/mongo:base",
+        "//src/mongo/db:service_context",
+    ],
+)
+
+mongo_cc_library(
+    name = "backup_cursor_hooks",
+    srcs = [
+        "backup_cursor_hooks.cpp",
+    ],
+    hdrs = [
+        "backup_cursor_hooks.h",
+    ],
+    deps = [
+        "//src/mongo:base",
+        "//src/mongo/db:service_context",
+    ],
+)
+
 idl_generator(
     name = "storage_parameters_gen",
     src = "storage_parameters.idl",
+)
+
+mongo_cc_library(
+    name = "capped_snapshots",
+    srcs = [
+        "capped_snapshots.cpp",
+    ],
+    hdrs = [
+        "capped_snapshots.h",
+    ],
+    deps = [
+        ":recovery_unit_base",  # TODO(SERVER-93876): Remove.
+        "//src/mongo:base",
+        "//src/mongo/db/concurrency:lock_manager",
+    ],
+)
+
+mongo_cc_library(
+    name = "snapshot_helper",
+    srcs = [
+        "snapshot_helper.cpp",
+    ],
+    hdrs = [
+        "snapshot_helper.h",
+    ],
+    deps = [
+        ":recovery_unit_base",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/db:server_base",
+        "//src/mongo/db/concurrency:lock_manager",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/db/repl:read_concern_args",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/db/repl:repl_coordinator_interface",
+    ],
 )
 
 idl_generator(
@@ -211,6 +342,23 @@ mongo_cc_library(
 )
 
 mongo_cc_library(
+    name = "storage_engine_lock_file",
+    srcs = [
+        "storage_engine_lock_file.cpp",
+    ] + select({
+        "@platforms//os:windows": ["storage_engine_lock_file_windows.cpp"],
+        "//conditions:default": ["storage_engine_lock_file_posix.cpp"],
+    }),
+    hdrs = [
+        "storage_engine_lock_file.h",
+    ],
+    deps = [
+        "//src/mongo:base",
+        "//src/mongo/db:service_context",
+    ],
+)
+
+mongo_cc_library(
     name = "storage_options",
     srcs = [
         "storage_options.cpp",
@@ -221,6 +369,18 @@ mongo_cc_library(
     ],
     deps = [
         "//src/mongo/db:server_base",
+    ],
+)
+
+mongo_cc_library(
+    name = "storage_init_d",
+    srcs = [
+        "storage_init.cpp",
+    ],
+    deps = [
+        ":backup_cursor_hooks",  # TODO(SERVER-93876): Remove.
+        ":storage_options",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/db/commands:server_status_core",
     ],
 )
 
@@ -244,6 +404,61 @@ mongo_cc_library(
         ":storage_options",  # TODO(SERVER-93876): Remove.
         "//src/mongo:base",
         "//src/mongo/util:fail_point",
+    ],
+)
+
+mongo_cc_library(
+    name = "disk_space_monitor",
+    srcs = [
+        "disk_space_monitor.cpp",
+    ],
+    hdrs = [
+        "disk_space_monitor.h",
+    ],
+    deps = [
+        ":disk_space_util",
+        ":storage_options",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/db:server_base",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/db:service_context",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/db/commands:server_status_core",
+    ],
+)
+
+mongo_cc_library(
+    name = "checkpointer",
+    srcs = [
+        "checkpointer.cpp",
+    ],
+    hdrs = [
+        "checkpointer.h",
+    ],
+    deps = [
+        ":storage_options",
+        "//src/mongo/db:server_base",
+        "//src/mongo/db:service_context",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/util:background_job",
+        "//src/mongo/util:fail_point",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/util/concurrency:spin_lock",  # TODO(SERVER-93876): Remove.
+    ],
+)
+
+mongo_cc_library(
+    name = "storage_control",
+    srcs = [
+        "durable_history_pin.cpp",
+        "//src/mongo/db/storage/control:storage_control.cpp",
+    ],
+    hdrs = [
+        "durable_history_pin.h",
+        "//src/mongo/db/storage/control:storage_control.h",
+    ],
+    deps = [
+        ":checkpointer",
+        ":journal_flusher",
+        ":storage_options",  # TODO(SERVER-93876): Remove.
+        "//src/mongo:base",
+        "//src/mongo/db:service_context",
+        "//src/mongo/db/commands:test_commands_enabled",  # TODO(SERVER-93876): Remove.
     ],
 )
 

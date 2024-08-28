@@ -94,20 +94,6 @@ env.Library(
 )
 
 env.Library(
-    target="multitenancy",
-    source=[
-        "multitenancy.cpp",
-    ],
-    LIBDEPS=[
-        "server_base",
-    ],
-    LIBDEPS_PRIVATE=[
-        "auth/auth",
-        "auth/security_token",
-    ],
-)
-
-env.Library(
     target="dbmessage",
     source=[
         "dbmessage.cpp",
@@ -170,17 +156,6 @@ env.Library(
     ],
     LIBDEPS_PRIVATE=[
         "$BUILD_DIR/mongo/util/concurrency/spin_lock",
-    ],
-)
-
-env.Library(
-    target="mongohasher",
-    source=[
-        "hasher.cpp",
-    ],
-    LIBDEPS=[
-        "$BUILD_DIR/mongo/base",
-        "$BUILD_DIR/mongo/util/md5",
     ],
 )
 
@@ -514,18 +489,6 @@ env.CppUnitTest(
 )
 
 env.Library(
-    target="write_block_bypass",
-    source=[
-        "write_block_bypass.cpp",
-    ],
-    LIBDEPS_PRIVATE=[
-        "auth/auth",
-        "auth/authprivilege",
-        "service_context",
-    ],
-)
-
-env.Library(
     target="read_write_concern_defaults_mock",
     source=[
         "read_write_concern_defaults_cache_lookup_mock.cpp",
@@ -546,49 +509,6 @@ env.CppUnitTest(
         "$BUILD_DIR/mongo/util/clock_source_mock",
         "service_context",
         "service_context_test_fixture",
-    ],
-)
-
-env.Library(
-    target="prepare_conflict_tracker",
-    source=[
-        "prepare_conflict_tracker.cpp",
-    ],
-    LIBDEPS=[
-        "$BUILD_DIR/mongo/base",
-        "$BUILD_DIR/mongo/db/service_context",
-    ],
-)
-
-env.Library(
-    target="not_primary_error_tracker",
-    source=[
-        "not_primary_error_tracker.cpp",
-    ],
-    LIBDEPS=[
-        "service_context",
-    ],
-)
-
-env.Clone().InjectModule("enterprise").Library(
-    target="audit",
-    source=[
-        "audit.cpp",
-    ],
-    LIBDEPS=[
-        "$BUILD_DIR/mongo/base",
-        "service_context",
-    ],
-)
-
-env.Library(
-    target="client_out_of_line_executor",
-    source=[
-        "client_out_of_line_executor.cpp",
-    ],
-    LIBDEPS=[
-        "$BUILD_DIR/mongo/base",
-        "$BUILD_DIR/mongo/db/service_context",
     ],
 )
 
@@ -728,20 +648,6 @@ env.Library(
         "stats/resource_consumption_metrics",
         "stats/timer_stats",
         "timeseries/timeseries_options",
-    ],
-)
-
-env.Library(
-    target="command_can_run_here",
-    source=[
-        "command_can_run_here.cpp",
-    ],
-    LIBDEPS=[
-        "$BUILD_DIR/mongo/base",
-        "$BUILD_DIR/mongo/client/read_preference",
-        "$BUILD_DIR/mongo/db/repl/repl_coordinator_interface",
-        "commands/test_commands_enabled",
-        "service_context",
     ],
 )
 
@@ -1552,17 +1458,6 @@ execEnv.Library(
 )
 
 env.Library(
-    target="disk_use_options_idl",
-    source=[
-        "exec/disk_use_options_gen.cpp",
-    ],
-    LIBDEPS_PRIVATE=[
-        "query/query_knobs",
-        "server_base",
-    ],
-)
-
-env.Library(
     target="sbe_values",
     source=[
         "exec/sbe/values/arith_common.cpp",
@@ -1783,32 +1678,6 @@ env.Library(
 )
 
 env.Library(
-    target="operation_time_tracker",
-    source=[
-        "operation_time_tracker.cpp",
-    ],
-    LIBDEPS_PRIVATE=[
-        "server_base",
-        "service_context",
-    ],
-)
-
-env.Library(
-    target="operation_killer",
-    source=[
-        "operation_killer.cpp",
-    ],
-    LIBDEPS=[
-        "service_context",
-    ],
-    LIBDEPS_PRIVATE=[
-        "$BUILD_DIR/mongo/db/auth/auth",
-        "$BUILD_DIR/mongo/db/auth/authprivilege",
-        "server_base",
-    ],
-)
-
-env.Library(
     target="periodic_runner_job_abort_expired_transactions",
     source=[
         "periodic_runner_job_abort_expired_transactions.cpp",
@@ -2008,32 +1877,6 @@ env.Library(
         "repl/repl_coordinator_interface",
         "repl/repl_settings",
         "repl/replica_set_messages",
-    ],
-)
-
-env.Library(
-    target="generic_cursor",
-    source=[
-        "allocate_cursor_id.cpp",
-        "generic_cursor_gen.cpp",
-    ],
-    LIBDEPS=[
-        "repl/optime",
-        "service_context",
-    ],
-    LIBDEPS_PRIVATE=[
-        "server_base",
-    ],
-)
-
-env.Library(
-    target="ttl_collection_cache",
-    source=[
-        "ttl_collection_cache.cpp",
-    ],
-    LIBDEPS=[
-        "$BUILD_DIR/mongo/base",
-        "$BUILD_DIR/mongo/db/service_context",
     ],
 )
 

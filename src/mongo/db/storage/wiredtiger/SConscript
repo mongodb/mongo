@@ -7,18 +7,6 @@ if not wiredtiger:
 
 env = env.Clone()
 
-env.Library(
-    target="storage_wiredtiger_customization_hooks",
-    source=[
-        "wiredtiger_customization_hooks.cpp",
-        "wiredtiger_extensions.cpp",
-    ],
-    LIBDEPS=[
-        "$BUILD_DIR/mongo/base",
-        "$BUILD_DIR/mongo/db/service_context",
-    ],
-)
-
 wtEnv = env.Clone()
 wtEnv.InjectThirdParty(libraries=["wiredtiger"])
 wtEnv.InjectThirdParty(libraries=["zlib"])

@@ -22,6 +22,25 @@ idl_generator(
     src = "server_write_concern_metrics.idl",
 )
 
+mongo_cc_library(
+    name = "server_read_concern_write_concern_metrics",
+    srcs = [
+        "server_read_concern_metrics.cpp",
+        "server_write_concern_metrics.cpp",
+        ":read_concern_stats_gen",
+        ":server_write_concern_metrics_gen",
+    ],
+    hdrs = [
+        "server_read_concern_metrics.h",
+        "server_write_concern_metrics.h",
+    ],
+    deps = [
+        "//src/mongo/db:server_base",
+        "//src/mongo/db/commands:server_status_core",
+        "//src/mongo/db/repl:read_concern_args",  # TODO(SERVER-98376): Remove.
+    ],
+)
+
 idl_generator(
     name = "read_preference_metrics_gen",
     src = "read_preference_metrics.idl",
@@ -31,9 +50,57 @@ idl_generator(
     ],
 )
 
+mongo_cc_library(
+    name = "read_preference_metrics",
+    srcs = [
+        "read_preference_metrics.cpp",
+        ":read_preference_metrics_gen",
+    ],
+    hdrs = [
+        "read_preference_metrics.h",
+    ],
+    deps = [
+        "//src/mongo/client:read_preference",
+        "//src/mongo/db:server_base",  # TODO(SERVER-98376): Remove.
+        "//src/mongo/db/commands:server_status_core",  # TODO(SERVER-98376): Remove.
+        "//src/mongo/db/repl:repl_coordinator_interface",  # TODO(SERVER-98376): Remove.
+        "//src/mongo/db/repl:repl_settings",  # TODO(SERVER-98376): Remove.
+    ],
+)
+
 idl_generator(
     name = "operation_resource_consumption_gen",
     src = "operation_resource_consumption.idl",
+)
+
+mongo_cc_library(
+    name = "resource_consumption_metrics",
+    srcs = [
+        "resource_consumption_metrics.cpp",
+        ":operation_resource_consumption_gen",
+    ],
+    hdrs = [
+        "resource_consumption_metrics.h",
+    ],
+    deps = [
+        "//src/mongo/db:server_base",
+        "//src/mongo/db/commands:server_status_core",
+        "//src/mongo/db/repl:repl_coordinator_interface",  # TODO(SERVER-98376): Remove.
+    ],
+)
+
+mongo_cc_library(
+    name = "transaction_stats",
+    srcs = [
+        "single_transaction_stats.cpp",
+    ],
+    hdrs = [
+        "single_transaction_stats.h",
+    ],
+    deps = [
+        "//src/mongo/db:server_base",
+        "//src/mongo/db/repl:read_concern_args",
+    ],
 )
 
 mongo_cc_library(

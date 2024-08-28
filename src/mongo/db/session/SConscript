@@ -23,20 +23,6 @@ env.Library(
 )
 
 env.Library(
-    target="logical_session_id_helpers",
-    source=[
-        "internal_session_pool.cpp",
-        "logical_session_id_helpers.cpp",
-    ],
-    LIBDEPS=[
-        "$BUILD_DIR/mongo/db/auth/auth",
-        "$BUILD_DIR/mongo/db/auth/authprivilege",
-        "logical_session_cache",
-        "logical_session_id",
-    ],
-)
-
-env.Library(
     target="sessions_collection",
     source=[
         "sessions_collection.cpp",
@@ -101,22 +87,6 @@ env.Library(
         "$BUILD_DIR/mongo/s/query/exec/cluster_cursor_manager",
         "$BUILD_DIR/mongo/util/clock_sources",
         "$BUILD_DIR/mongo/util/periodic_runner",
-    ],
-)
-
-env.Library(
-    target="logical_session_cache",
-    source=[
-        "logical_session_cache.cpp",
-        "logical_session_cache_stats_gen.cpp",
-        "logical_session_cache_gen.cpp",
-    ],
-    LIBDEPS=[
-        "logical_session_id",
-    ],
-    LIBDEPS_PRIVATE=[
-        "$BUILD_DIR/mongo/db/server_base",
-        "$BUILD_DIR/mongo/db/service_context",
     ],
 )
 

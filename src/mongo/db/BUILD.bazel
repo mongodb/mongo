@@ -52,6 +52,21 @@ idl_generator(
     ],
 )
 
+mongo_cc_library(
+    name = "multitenancy",
+    srcs = [
+        "multitenancy.cpp",
+    ],
+    hdrs = [
+        "multitenancy.h",
+    ],
+    deps = [
+        ":server_base",  # TODO(SERVER-98376): Remove.
+        "//src/mongo/db/auth",  # TODO(SERVER-98376): Remove.
+        "//src/mongo/db/auth:security_token",
+    ],
+)
+
 idl_generator(
     name = "basic_types_gen",
     src = "basic_types.idl",
@@ -116,6 +131,20 @@ mongo_cc_library(
         "//src/mongo:base",
         "//src/mongo/db:server_base",
         "//src/mongo/idl:cluster_server_parameter",
+    ],
+)
+
+mongo_cc_library(
+    name = "mongohasher",
+    srcs = [
+        "hasher.cpp",
+    ],
+    hdrs = [
+        "hasher.h",
+    ],
+    deps = [
+        "//src/mongo:base",
+        "//src/mongo/util:md5",
     ],
 )
 
@@ -279,6 +308,70 @@ idl_generator(
     ],
 )
 
+mongo_cc_library(
+    name = "audit",
+    srcs = [
+        "audit.cpp",
+    ],
+    hdrs = [
+        "audit.h",
+        "audit_format.h",
+        "audit_interface.h",
+    ],
+    local_defines = select({
+        "//bazel/config:build_enterprise_enabled": [
+            "MONGO_ENTERPRISE_AUDIT=1",
+        ],
+        "//conditions:default": [],
+    }),
+    deps = [
+        ":service_context",
+        "//src/mongo:base",
+    ],
+)
+
+mongo_cc_library(
+    name = "client_out_of_line_executor",
+    srcs = [
+        "client_out_of_line_executor.cpp",
+        "//src/mongo/util:producer_consumer_queue.h",
+    ],
+    hdrs = [
+        "client_out_of_line_executor.h",
+    ],
+    deps = [
+        ":service_context",
+        "//src/mongo:base",
+    ],
+)
+
+mongo_cc_library(
+    name = "not_primary_error_tracker",
+    srcs = [
+        "not_primary_error_tracker.cpp",
+    ],
+    hdrs = [
+        "not_primary_error_tracker.h",
+    ],
+    deps = [
+        ":service_context",
+    ],
+)
+
+mongo_cc_library(
+    name = "prepare_conflict_tracker",
+    srcs = [
+        "prepare_conflict_tracker.cpp",
+    ],
+    hdrs = [
+        "prepare_conflict_tracker.h",
+    ],
+    deps = [
+        ":service_context",
+        "//src/mongo:base",  # TODO(SERVER-98376): Remove.
+    ],
+)
+
 idl_generator(
     name = "mirror_maestro_gen",
     src = "mirror_maestro.idl",
@@ -328,6 +421,23 @@ idl_generator(
         ":basic_types_gen",
         "//src/mongo/db/auth:action_type_gen",
         "//src/mongo/idl:generic_argument_gen",
+    ],
+)
+
+mongo_cc_library(
+    name = "command_can_run_here",
+    srcs = [
+        "command_can_run_here.cpp",
+    ],
+    hdrs = [
+        "command_can_run_here.h",
+    ],
+    deps = [
+        ":service_context",  # TODO(SERVER-98376): Remove.
+        "//src/mongo:base",  # TODO(SERVER-98376): Remove.
+        "//src/mongo/client:read_preference",  # TODO(SERVER-98376): Remove.
+        "//src/mongo/db/commands:test_commands_enabled",  # TODO(SERVER-98376): Remove.
+        "//src/mongo/db/repl:repl_coordinator_interface",
     ],
 )
 
@@ -448,6 +558,47 @@ idl_generator(
     ],
 )
 
+mongo_cc_library(
+    name = "operation_killer",
+    srcs = [
+        "operation_killer.cpp",
+    ],
+    hdrs = [
+        "operation_killer.h",
+    ],
+    deps = [
+        ":server_base",  # TODO(SERVER-98376): Remove.
+        ":service_context",  # TODO(SERVER-98376): Remove.
+        "//src/mongo/db/auth",
+        "//src/mongo/db/auth:authprivilege",
+    ],
+)
+
+mongo_cc_library(
+    name = "operation_time_tracker",
+    srcs = [
+        "operation_time_tracker.cpp",
+    ],
+    hdrs = [
+        "operation_time_tracker.h",
+    ],
+    deps = [
+        ":server_base",
+        ":service_context",  # TODO(SERVER-98376): Remove.
+    ],
+)
+
+mongo_cc_library(
+    name = "disk_use_options_idl",
+    srcs = [
+        "//src/mongo/db/exec:disk_use_options_gen",
+    ],
+    deps = [
+        ":server_base",  # TODO(SERVER-98376): Remove.
+        "//src/mongo/db/query:query_knobs",
+    ],
+)
+
 idl_generator(
     name = "keys_collection_manager_gen",
     src = "keys_collection_manager.idl",
@@ -476,6 +627,37 @@ idl_generator(
         ":basic_types_gen",
         "//src/mongo/db/repl:replication_types_gen",
         "//src/mongo/db/session:logical_session_id_gen",
+    ],
+)
+
+mongo_cc_library(
+    name = "generic_cursor",
+    srcs = [
+        "allocate_cursor_id.cpp",
+        ":generic_cursor_gen",
+    ],
+    hdrs = [
+        "allocate_cursor_id.h",
+        "cursor_id.h",
+    ],
+    deps = [
+        ":server_base",
+        ":service_context",  # TODO(SERVER-98376): Remove.
+        "//src/mongo/db/repl:optime",  # TODO(SERVER-98376): Remove.
+    ],
+)
+
+mongo_cc_library(
+    name = "ttl_collection_cache",
+    srcs = [
+        "ttl_collection_cache.cpp",
+    ],
+    hdrs = [
+        "ttl_collection_cache.h",
+    ],
+    deps = [
+        ":service_context",
+        "//src/mongo:base",  # TODO(SERVER-98376): Remove.
     ],
 )
 
@@ -669,6 +851,21 @@ mongo_cc_library(
     ],
     deps = [
         ":server_base",
+    ],
+)
+
+mongo_cc_library(
+    name = "write_block_bypass",
+    srcs = [
+        "write_block_bypass.cpp",
+    ],
+    hdrs = [
+        "write_block_bypass.h",
+    ],
+    deps = [
+        ":service_context",  # TODO(SERVER-98376): Remove.
+        "//src/mongo/db/auth",
+        "//src/mongo/db/auth:authprivilege",
     ],
 )
 
@@ -899,6 +1096,7 @@ mongo_cc_library(
         "cancelable_operation_context.h",
         "client_strand.h",
         "default_baton.h",
+        "operation_context.h",
         "operation_context_group.h",
         "operation_key_manager.h",
         "repl_set_member_in_standalone_mode.h",
