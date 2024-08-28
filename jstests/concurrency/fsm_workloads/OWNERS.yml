@@ -5,10 +5,10 @@ filters:
       - 10gen/server-cluster-scalability
   - "server_status.js":
     approvers:
-      - 10gen/server-service-architecture
+      - 10gen/server-networking-and-observability
   - "server_status_with_time_out_cursors.js":
     approvers:
-      - 10gen/server-service-architecture
+      - 10gen/server-networking-and-observability
   - "*transaction*":
     approvers:
       - 10gen/server-cluster-scalability

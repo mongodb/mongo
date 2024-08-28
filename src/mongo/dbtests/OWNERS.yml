@@ -2,7 +2,7 @@ version: 1.0.0
 filters:
   - "mock_dbclient_conn_test.cpp":
     approvers:
-      - 10gen/server-service-architecture
+      - 10gen/server-networking-and-observability
   - "indexupdatetests.cpp":
     approvers:
       - 10gen/server-storage-execution

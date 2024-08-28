@@ -2,7 +2,7 @@ version: 1.0.0
 filters:
   - "*":
     approvers:
-      - 10gen/server-service-architecture
+      - 10gen/server-programmability
   - "error_codes.yml":
     approvers:
       - NOOWNERS-DO-NOT-USE-DEPRECATED-2024-07-01

@@ -66,6 +66,9 @@ filters:
   - "routing_*":
     approvers:
       - 10gen/server-catalog-and-routing
+  - "service_entry_point*":
+    approvers:
+      - 10gen/server-programmability
   - "shard_cannot_refresh_due_to_locks_held_exception*":
     approvers:
       - 10gen/server-catalog-and-routing

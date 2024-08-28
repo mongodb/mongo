@@ -2,22 +2,19 @@ version: 1.0.0
 filters:
   - "connection_string_validation.js":
     approvers:
-      - 10gen/server-service-architecture
-  - "failcommand_failpoint.js":
-    approvers:
-      - 10gen/server-service-architecture
+      - 10gen/server-networking-and-observability
   - "hostinfo.js":
     approvers:
-      - 10gen/server-service-architecture
-  - "latch_analyzer.js":
-    approvers:
-      - 10gen/server-service-architecture
+      - 10gen/server-networking-and-observability
   - "diagdata.js":
     approvers:
-      - 10gen/server-service-architecture
-  - "hostinfo.js":
+      - 10gen/server-networking-and-observability
+  - "failcommand_failpoint.js":
     approvers:
-      - 10gen/server-service-architecture
+      - 10gen/server-programmability
+  - "latch_analyzer.js":
+    approvers:
+      - 10gen/server-programmability
   - "capped/*":
     approvers:
       - 10gen/server-storage-execution

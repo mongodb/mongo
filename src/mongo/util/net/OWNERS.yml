@@ -5,4 +5,4 @@ filters:
       - 10gen/server-security
   - "*":
     approvers:
-      - 10gen/server-service-architecture
+      - 10gen/server-networking-and-observability

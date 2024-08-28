@@ -2,10 +2,10 @@ version: 1.0.0
 filters:
   - "mock_conn_registry.*":
     approvers:
-      - 10gen/server-service-architecture
+      - 10gen/server-networking-and-observability
   - "mock_dbclient_connection.*":
     approvers:
-      - 10gen/server-service-architecture
+      - 10gen/server-networking-and-observability
   - "mock_remote_db_server.*":
     approvers:
-      - 10gen/server-service-architecture
+      - 10gen/server-networking-and-observability

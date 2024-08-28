@@ -6,6 +6,18 @@ filters:
   - "*index_build*":
     approvers:
       - 10gen/server-storage-execution
+  - "client.*":
+    approvers:
+      - 10gen/server-programmability
+  - "client_context_test.*":
+    approvers:
+      - 10gen/server-programmability
+  - "client_out_of_line_executor*":
+    approvers:
+      - 10gen/server-programmability
+  - "client_strand*":
+    approvers:
+      - 10gen/server-programmability
   - "keys_collection*":
     approvers:
       - 10gen/server-cluster-scalability
@@ -31,9 +43,12 @@ filters:
   - "ttl*":
     approvers:
       - 10gen/server-storage-execution
-  - "service_entry_point_shard_role*":
+  - "dbdirectclient*":
     approvers:
-      - 10gen/server-service-architecture
+      - 10gen/server-programmability
+  - "service_entry_point*":
+    approvers:
+      - 10gen/server-programmability
   - "fle*":
     approvers:
       - 10gen/server-security

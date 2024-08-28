@@ -47,7 +47,7 @@ WORKSPACE.bazel @10gen/devprod-build
 /buildscripts/cost_model/**/* @10gen/query-optimization
 
 # The following patterns are parsed from ./buildscripts/idl/OWNERS.yml
-/buildscripts/idl/**/* @10gen/server-service-architecture
+/buildscripts/idl/**/* @10gen/server-programmability
 /buildscripts/idl/**/*.bazel @10gen/devprod-build
 
 # The following patterns are parsed from ./buildscripts/resmokeconfig/matrix_suites/OWNERS.yml
@@ -105,8 +105,8 @@ WORKSPACE.bazel @10gen/devprod-build
 
 # The following patterns are parsed from ./jstests/concurrency/fsm_workloads/OWNERS.yml
 /jstests/concurrency/fsm_workloads/**/*global*index* @10gen/server-cluster-scalability
-/jstests/concurrency/fsm_workloads/**/server_status.js @10gen/server-service-architecture
-/jstests/concurrency/fsm_workloads/**/server_status_with_time_out_cursors.js @10gen/server-service-architecture
+/jstests/concurrency/fsm_workloads/**/server_status.js @10gen/server-networking-and-observability
+/jstests/concurrency/fsm_workloads/**/server_status_with_time_out_cursors.js @10gen/server-networking-and-observability
 /jstests/concurrency/fsm_workloads/**/*transaction* @10gen/server-cluster-scalability
 /jstests/concurrency/fsm_workloads/**/*txn* @10gen/server-cluster-scalability
 /jstests/concurrency/fsm_workloads/**/*write_without_shard_key* @10gen/server-cluster-scalability
@@ -116,12 +116,11 @@ WORKSPACE.bazel @10gen/devprod-build
 /jstests/concurrency/fsm_workloads/**/CRUD_clustered_collection.js @10gen/server-storage-execution
 
 # The following patterns are parsed from ./jstests/core/OWNERS.yml
-/jstests/core/**/connection_string_validation.js @10gen/server-service-architecture
-/jstests/core/**/failcommand_failpoint.js @10gen/server-service-architecture
-/jstests/core/**/hostinfo.js @10gen/server-service-architecture
-/jstests/core/**/latch_analyzer.js @10gen/server-service-architecture
-/jstests/core/**/diagdata.js @10gen/server-service-architecture
-/jstests/core/**/hostinfo.js @10gen/server-service-architecture
+/jstests/core/**/connection_string_validation.js @10gen/server-networking-and-observability
+/jstests/core/**/hostinfo.js @10gen/server-networking-and-observability
+/jstests/core/**/diagdata.js @10gen/server-networking-and-observability
+/jstests/core/**/failcommand_failpoint.js @10gen/server-programmability
+/jstests/core/**/latch_analyzer.js @10gen/server-programmability
 /jstests/core/capped/* @10gen/server-storage-execution
 /jstests/core/clustered/* @10gen/server-storage-execution
 /jstests/core/timeseries/* @10gen/server-storage-execution
@@ -130,13 +129,13 @@ WORKSPACE.bazel @10gen/devprod-build
 /jstests/core/txns/**/* @10gen/server-replication
 
 # The following patterns are parsed from ./jstests/fail_point/OWNERS.yml
-/jstests/fail_point/**/* @10gen/server-service-architecture
+/jstests/fail_point/**/* @10gen/server-programmability
 
 # The following patterns are parsed from ./jstests/hooks/OWNERS.yml
 /jstests/hooks/**/run_analyze_shard_key_background.js @10gen/server-cluster-scalability
 
 # The following patterns are parsed from ./jstests/httpinterface/OWNERS.yml
-/jstests/httpinterface/**/network_options.js @10gen/server-service-architecture
+/jstests/httpinterface/**/network_options.js @10gen/server-networking-and-observability
 
 # The following patterns are parsed from ./jstests/libs/OWNERS.yml
 /jstests/libs/**/replsettest.js @10gen/server-replication
@@ -147,7 +146,7 @@ WORKSPACE.bazel @10gen/devprod-build
 /jstests/multiVersion/**/rs_endpoint* @10gen/server-cluster-scalability
 
 # The following patterns are parsed from ./jstests/noPassthrough/admission/OWNERS.yml
-/jstests/noPassthrough/admission/**/* @10gen/server-service-architecture
+/jstests/noPassthrough/admission/**/* @10gen/server-workload-scheduling
 
 # The following patterns are parsed from ./jstests/noPassthrough/queryStats/OWNERS.yml
 /jstests/noPassthrough/queryStats/**/* @10gen/query-integration
@@ -159,14 +158,14 @@ WORKSPACE.bazel @10gen/devprod-build
 /jstests/noPassthrough/timeseries/**/* @10gen/server-storage-execution
 
 # The following patterns are parsed from ./jstests/noPassthroughWithMongod/OWNERS.yml
-/jstests/noPassthroughWithMongod/**/connections_opened.js @10gen/server-service-architecture
-/jstests/noPassthroughWithMongod/**/host_connection_string_validation.js @10gen/server-service-architecture
-/jstests/noPassthroughWithMongod/**/ingress_handshake_and_auth_metrics.js @10gen/server-service-architecture
-/jstests/noPassthroughWithMongod/**/ipv6_connection_string_validation.js @10gen/server-service-architecture
-/jstests/noPassthroughWithMongod/**/replset_host_connection_validation.js @10gen/server-service-architecture
-/jstests/noPassthroughWithMongod/**/tcmalloc.js @10gen/server-service-architecture
-/jstests/noPassthroughWithMongod/**/ftdc_params.js @10gen/server-service-architecture
-/jstests/noPassthroughWithMongod/**/log_component_helpers.js @10gen/server-service-architecture
+/jstests/noPassthroughWithMongod/**/connections_opened.js @10gen/server-networking-and-observability
+/jstests/noPassthroughWithMongod/**/host_connection_string_validation.js @10gen/server-networking-and-observability
+/jstests/noPassthroughWithMongod/**/ingress_handshake_and_auth_metrics.js @10gen/server-networking-and-observability
+/jstests/noPassthroughWithMongod/**/ipv6_connection_string_validation.js @10gen/server-networking-and-observability
+/jstests/noPassthroughWithMongod/**/replset_host_connection_validation.js @10gen/server-networking-and-observability
+/jstests/noPassthroughWithMongod/**/tcmalloc.js @10gen/server-workload-scheduling
+/jstests/noPassthroughWithMongod/**/ftdc_params.js @10gen/server-networking-and-observability
+/jstests/noPassthroughWithMongod/**/log_component_helpers.js @10gen/server-networking-and-observability
 
 # The following patterns are parsed from ./jstests/replsets/OWNERS.yml
 /jstests/replsets/**/* @10gen/server-replication
@@ -196,7 +195,7 @@ WORKSPACE.bazel @10gen/devprod-build
 /jstests/sharding/libs/**/zone_changes_util.js @10gen/server-cluster-scalability
 
 # The following patterns are parsed from ./jstests/sharding/load_balancer_support/OWNERS.yml
-/jstests/sharding/load_balancer_support/**/* @10gen/server-service-architecture
+/jstests/sharding/load_balancer_support/**/* @10gen/server-networking-and-observability
 
 # The following patterns are parsed from ./jstests/sharding/migration_blocking_operation/OWNERS.yml
 /jstests/sharding/migration_blocking_operation/**/* @10gen/server-cluster-scalability
@@ -208,13 +207,13 @@ WORKSPACE.bazel @10gen/devprod-build
 /jstests/sharding/updateOne_without_shard_key/**/* @10gen/server-cluster-scalability
 
 # The following patterns are parsed from ./jstests/watchdog/OWNERS.yml
-/jstests/watchdog/**/* @10gen/server-service-architecture
+/jstests/watchdog/**/* @10gen/server-networking-and-observability
 
 # The following patterns are parsed from ./site_scons/OWNERS.yml
 /site_scons/**/* @10gen/devprod-build
 
 # The following patterns are parsed from ./src/mongo/base/OWNERS.yml
-/src/mongo/base/**/* @10gen/server-service-architecture
+/src/mongo/base/**/* @10gen/server-programmability
 /src/mongo/base/**/error_codes.yml
 /src/mongo/base/**/secure_allocator* @10gen/server-security
 
@@ -222,7 +221,7 @@ WORKSPACE.bazel @10gen/devprod-build
 /src/mongo/bson/**/* @10gen/server-storage-execution
 
 # The following patterns are parsed from ./src/mongo/client/OWNERS.yml
-/src/mongo/client/**/* @10gen/server-service-architecture
+/src/mongo/client/**/* @10gen/server-networking-and-observability
 /src/mongo/client/**/authenticate* @10gen/server-security
 /src/mongo/client/**/cyrus_sasl_client_session.* @10gen/server-security
 /src/mongo/client/**/internal_auth* @10gen/server-security
@@ -238,6 +237,10 @@ WORKSPACE.bazel @10gen/devprod-build
 # The following patterns are parsed from ./src/mongo/db/OWNERS.yml
 /src/mongo/db/**/*global_index* @10gen/server-cluster-scalability
 /src/mongo/db/**/*index_build* @10gen/server-storage-execution
+/src/mongo/db/**/client.* @10gen/server-programmability
+/src/mongo/db/**/client_context_test.* @10gen/server-programmability
+/src/mongo/db/**/client_out_of_line_executor* @10gen/server-programmability
+/src/mongo/db/**/client_strand* @10gen/server-programmability
 /src/mongo/db/**/keys_collection* @10gen/server-cluster-scalability
 /src/mongo/db/**/profile_* @10gen/query-integration
 /src/mongo/db/**/record_id* @10gen/server-storage-execution
@@ -246,7 +249,8 @@ WORKSPACE.bazel @10gen/devprod-build
 /src/mongo/db/**/*transaction* @10gen/server-cluster-scalability
 /src/mongo/db/**/*txn* @10gen/server-cluster-scalability
 /src/mongo/db/**/ttl* @10gen/server-storage-execution
-/src/mongo/db/**/service_entry_point_shard_role* @10gen/server-service-architecture
+/src/mongo/db/**/dbdirectclient* @10gen/server-programmability
+/src/mongo/db/**/service_entry_point* @10gen/server-programmability
 /src/mongo/db/**/fle* @10gen/query-integration @10gen/server-security
 /src/mongo/db/**/server_options* @10gen/server-security
 /src/mongo/db/**/server_parameter* @10gen/server-security
@@ -325,7 +329,8 @@ WORKSPACE.bazel @10gen/devprod-build
 /src/mongo/db/commands/query_cmd/**/search_index_commands.* @10gen/query-integration
 
 # The following patterns are parsed from ./src/mongo/db/concurrency/OWNERS.yml
-/src/mongo/db/concurrency/**/exception_util* @10gen/server-service-architecture
+/src/mongo/db/concurrency/**/exception_util* @10gen/server-programmability
+/src/mongo/db/concurrency/**/flow_control_ticketholder* @10gen/server-workload-scheduling
 
 # The following patterns are parsed from ./src/mongo/db/exec/OWNERS.yml
 /src/mongo/db/exec/**/* @10gen/query-execution
@@ -345,7 +350,7 @@ WORKSPACE.bazel @10gen/devprod-build
 /src/mongo/db/exec/sbe/**/*column_store* @10gen/query-integration
 
 # The following patterns are parsed from ./src/mongo/db/ftdc/OWNERS.yml
-/src/mongo/db/ftdc/**/* @10gen/server-service-architecture @markbenvenuto
+/src/mongo/db/ftdc/**/* @10gen/server-networking-and-observability @markbenvenuto
 
 # The following patterns are parsed from ./src/mongo/db/fts/OWNERS.yml
 /src/mongo/db/fts/**/* @10gen/query-integration
@@ -500,7 +505,7 @@ WORKSPACE.bazel @10gen/devprod-build
 /src/mongo/db/pipeline/window_function/**/* @10gen/query-integration
 
 # The following patterns are parsed from ./src/mongo/db/process_health/OWNERS.yml
-/src/mongo/db/process_health/**/* @10gen/server-service-architecture
+/src/mongo/db/process_health/**/* @10gen/server-networking-and-observability
 
 # The following patterns are parsed from ./src/mongo/db/query/OWNERS.yml
 /src/mongo/db/query/**/* @10gen/query
@@ -727,7 +732,7 @@ WORKSPACE.bazel @10gen/devprod-build
 /src/mongo/db/views/**/* @10gen/query-optimization
 
 # The following patterns are parsed from ./src/mongo/dbtests/OWNERS.yml
-/src/mongo/dbtests/**/mock_dbclient_conn_test.cpp @10gen/server-service-architecture
+/src/mongo/dbtests/**/mock_dbclient_conn_test.cpp @10gen/server-networking-and-observability
 /src/mongo/dbtests/**/indexupdatetests.cpp @10gen/server-storage-execution
 /src/mongo/dbtests/**/insert_test.cpp @10gen/server-storage-execution
 /src/mongo/dbtests/**/jsobjtests.cpp @10gen/server-storage-execution
@@ -741,29 +746,34 @@ WORKSPACE.bazel @10gen/devprod-build
 /src/mongo/dbtests/**/query_stage_multiplan.cpp @10gen/query-optimization
 
 # The following patterns are parsed from ./src/mongo/dbtests/mock/OWNERS.yml
-/src/mongo/dbtests/mock/**/mock_conn_registry.* @10gen/server-service-architecture
-/src/mongo/dbtests/mock/**/mock_dbclient_connection.* @10gen/server-service-architecture
-/src/mongo/dbtests/mock/**/mock_remote_db_server.* @10gen/server-service-architecture
+/src/mongo/dbtests/mock/**/mock_conn_registry.* @10gen/server-networking-and-observability
+/src/mongo/dbtests/mock/**/mock_dbclient_connection.* @10gen/server-networking-and-observability
+/src/mongo/dbtests/mock/**/mock_remote_db_server.* @10gen/server-networking-and-observability
 
 # The following patterns are parsed from ./src/mongo/executor/OWNERS.yml
-/src/mongo/executor/**/* @10gen/server-service-architecture
+/src/mongo/executor/**/* @10gen/server-networking-and-observability
+/src/mongo/executor/**/cancelable_executor* @10gen/server-programmability
+/src/mongo/executor/**/inline_executor* @10gen/server-programmability
+/src/mongo/executor/**/scoped_task_executor* @10gen/server-programmability
+/src/mongo/executor/**/task_executor* @10gen/server-programmability
+/src/mongo/executor/**/thread_pool* @10gen/server-programmability
 
 # The following patterns are parsed from ./src/mongo/idl/OWNERS.yml
-/src/mongo/idl/**/idl_parser* @10gen/server-service-architecture
-/src/mongo/idl/**/idl_test* @10gen/server-service-architecture
-/src/mongo/idl/**/mutable_observer_registry.* @10gen/server-service-architecture
-/src/mongo/idl/**/unittest* @10gen/server-service-architecture
+/src/mongo/idl/**/idl_parser* @10gen/server-programmability
+/src/mongo/idl/**/idl_test* @10gen/server-programmability
+/src/mongo/idl/**/mutable_observer_registry.* @10gen/server-programmability
+/src/mongo/idl/**/unittest* @10gen/server-programmability
 /src/mongo/idl/**/server_parameter* @10gen/server-security
 
 # The following patterns are parsed from ./src/mongo/logv2/OWNERS.yml
-/src/mongo/logv2/**/* @10gen/server-service-architecture
+/src/mongo/logv2/**/* @10gen/server-networking-and-observability
 /src/mongo/logv2/**/*redaction* @10gen/server-security
 
 # The following patterns are parsed from ./src/mongo/platform/OWNERS.yml
-/src/mongo/platform/**/* @10gen/server-service-architecture
+/src/mongo/platform/**/* @10gen/server-programmability
 
 # The following patterns are parsed from ./src/mongo/rpc/OWNERS.yml
-/src/mongo/rpc/**/* @10gen/server-service-architecture
+/src/mongo/rpc/**/* @10gen/server-networking-and-observability
 
 # The following patterns are parsed from ./src/mongo/s/OWNERS.yml
 /src/mongo/s/**/*analyze_shard_key* @10gen/server-cluster-scalability
@@ -788,6 +798,7 @@ WORKSPACE.bazel @10gen/devprod-build
 /src/mongo/s/**/resource_yielders* @10gen/server-catalog-and-routing
 /src/mongo/s/**/router_role* @10gen/server-catalog-and-routing
 /src/mongo/s/**/routing_* @10gen/server-catalog-and-routing
+/src/mongo/s/**/service_entry_point* @10gen/server-programmability
 /src/mongo/s/**/shard_cannot_refresh_due_to_locks_held_exception* @10gen/server-catalog-and-routing
 /src/mongo/s/**/shard_key_pattern* @10gen/server-catalog-and-routing
 /src/mongo/s/**/shard_version* @10gen/server-catalog-and-routing
@@ -881,8 +892,8 @@ WORKSPACE.bazel @10gen/devprod-build
 /src/mongo/s/write_ops/**/write_without_shard_key* @10gen/server-cluster-scalability
 
 # The following patterns are parsed from ./src/mongo/scripting/OWNERS.yml
-/src/mongo/scripting/**/dbdirectclient_factory.* @10gen/server-service-architecture
-/src/mongo/scripting/**/deadline_monitor* @10gen/server-service-architecture
+/src/mongo/scripting/**/dbdirectclient_factory.* @10gen/server-programmability
+/src/mongo/scripting/**/deadline_monitor* @10gen/server-programmability
 /src/mongo/scripting/**/mozjs @10gen/query-integration
 
 # The following patterns are parsed from ./src/mongo/shell/OWNERS.yml
@@ -906,17 +917,17 @@ WORKSPACE.bazel @10gen/devprod-build
 /src/mongo/shell/**/utils* @10gen/devprod-correctness
 
 # The following patterns are parsed from ./src/mongo/stdx/OWNERS.yml
-/src/mongo/stdx/**/* @10gen/server-service-architecture
+/src/mongo/stdx/**/* @10gen/server-programmability
 
 # The following patterns are parsed from ./src/mongo/tools/mongobridge_tool/OWNERS.yml
-/src/mongo/tools/mongobridge_tool/**/* @10gen/server-service-architecture
+/src/mongo/tools/mongobridge_tool/**/* @10gen/server-networking-and-observability
 
 # The following patterns are parsed from ./src/mongo/transport/OWNERS.yml
-/src/mongo/transport/**/* @10gen/server-service-architecture
+/src/mongo/transport/**/* @10gen/server-networking-and-observability
 /src/mongo/transport/**/ssl_connection_context.h
 
 # The following patterns are parsed from ./src/mongo/unittest/OWNERS.yml
-/src/mongo/unittest/**/* @10gen/server-service-architecture
+/src/mongo/unittest/**/* @10gen/server-programmability
 
 # The following patterns are parsed from ./src/mongo/util/OWNERS.yml
 /src/mongo/util/**/md5* @10gen/server-security
@@ -930,22 +941,22 @@ WORKSPACE.bazel @10gen/devprod-build
 /src/mongo/util/cmdline_utils/**/* @10gen/server-security
 
 # The following patterns are parsed from ./src/mongo/util/concurrency/OWNERS.yml
-/src/mongo/util/concurrency/**/idle_thread_block.* @10gen/server-service-architecture
-/src/mongo/util/concurrency/**/mutex.* @10gen/server-service-architecture
-/src/mongo/util/concurrency/**/notification.* @10gen/server-service-architecture
-/src/mongo/util/concurrency/**/spin_lock* @10gen/server-service-architecture
-/src/mongo/util/concurrency/**/thread_name.* @10gen/server-service-architecture
-/src/mongo/util/concurrency/**/thread_pool* @10gen/server-service-architecture
-/src/mongo/util/concurrency/**/ticketholder.* @10gen/server-service-architecture
-/src/mongo/util/concurrency/**/*ticketholder.* @10gen/server-service-architecture
-/src/mongo/util/concurrency/**/admission_context.* @10gen/server-service-architecture
+/src/mongo/util/concurrency/**/idle_thread_block.* @10gen/server-programmability
+/src/mongo/util/concurrency/**/mutex.* @10gen/server-programmability
+/src/mongo/util/concurrency/**/notification.* @10gen/server-programmability
+/src/mongo/util/concurrency/**/spin_lock* @10gen/server-programmability
+/src/mongo/util/concurrency/**/thread_name.* @10gen/server-programmability
+/src/mongo/util/concurrency/**/thread_pool* @10gen/server-programmability
+/src/mongo/util/concurrency/**/ticketholder.* @10gen/server-workload-scheduling
+/src/mongo/util/concurrency/**/*ticketholder.* @10gen/server-workload-scheduling
+/src/mongo/util/concurrency/**/admission_context.* @10gen/server-workload-scheduling
 
 # The following patterns are parsed from ./src/mongo/util/cryptd/OWNERS.yml
 /src/mongo/util/cryptd/**/* @10gen/server-security
 
 # The following patterns are parsed from ./src/mongo/util/net/OWNERS.yml
 /src/mongo/util/net/**/ssl* @10gen/server-security
-/src/mongo/util/net/**/* @10gen/server-service-architecture
+/src/mongo/util/net/**/* @10gen/server-networking-and-observability
 
 # The following patterns are parsed from ./src/mongo/util/net/ocsp/OWNERS.yml
 /src/mongo/util/net/ocsp/**/* @10gen/server-security
@@ -963,7 +974,7 @@ WORKSPACE.bazel @10gen/devprod-build
 /src/mongo/util/tracing_profiler/**/* @10gen/query
 
 # The following patterns are parsed from ./src/mongo/watchdog/OWNERS.yml
-/src/mongo/watchdog/**/* @10gen/server-service-architecture
+/src/mongo/watchdog/**/* @10gen/server-networking-and-observability
 
 # The following patterns are parsed from ./src/third_party/OWNERS.yml
 /src/third_party/**/* @10gen/server-security
