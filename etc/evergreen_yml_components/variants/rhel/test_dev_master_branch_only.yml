@@ -195,6 +195,7 @@ buildvariants:
       <<: *linux-x86-dynamic-enterprise-compile-expansions
       bv_future_git_tag: r100.0.0-9999
       compile_variant: *linux-x86-dynamic-compile-future-tag-multiversion-latest
+      archive_dist_test_debug_task_name: archive_dist_test_debug_future_git_tag_multiversion
     tasks:
       - name: version_expansions_future_git_tag_multiversion_gen
       - name: compile_test_serial_future_git_tag_multiversion_TG

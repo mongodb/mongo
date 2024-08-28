@@ -144,7 +144,7 @@ tasks:
     commands:
       - func: "activate task"
         vars:
-          task_to_activate: archive_dist_test_debug
+          task_to_activate: ${archive_dist_test_debug_task_name|archive_dist_test_debug}
       - func: "scons compile"
         vars:
           targets: >-
