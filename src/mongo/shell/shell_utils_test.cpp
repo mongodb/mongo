@@ -328,6 +328,38 @@ TEST(NormalizationOpts, SortBSON) {
     ASSERT_EQ(normalizeBSONObj(bson, opts).toString(), expected);
 }
 
+TEST(NormalizationOpts, ConflateNullAndMissing) {
+    BSONObj bson = fromjson("{a: null}");
+    NormalizationOptsSet opts = NormalizationOpts::kConflateNullAndMissing;
+
+    std::string expected = "{}";
+    ASSERT_EQ(normalizeBSONObj(bson, opts).toString(), expected);
+}
+
+TEST(NormalizationOpts, ConflateNullAndMissingNested) {
+    BSONObj bson = fromjson("{a: {b: null}}");
+    NormalizationOptsSet opts = NormalizationOpts::kConflateNullAndMissing;
+
+    std::string expected = "{ a: {} }";
+    ASSERT_EQ(normalizeBSONObj(bson, opts).toString(), expected);
+}
+
+TEST(NormalizationOpts, ConflateNullAndMissingNestedObjAndArray) {
+    BSONObj bson = fromjson("{a: {c: null, b: [undefined, null, 5]}}");
+    NormalizationOptsSet opts = NormalizationOpts::kConflateNullAndMissing;
+
+    std::string expected = "{ a: { b: [ 5 ] } }";
+    ASSERT_EQ(normalizeBSONObj(bson, opts).toString(), expected);
+}
+
+TEST(NormalizationOpts, ConflateNullAndMissingNestedObjInArray) {
+    BSONObj bson = fromjson("{a: {b: [null, undefined, {d: null}]}}");
+    NormalizationOptsSet opts = NormalizationOpts::kConflateNullAndMissing;
+
+    std::string expected = "{ a: { b: [ {} ] } }";
+    ASSERT_EQ(normalizeBSONObj(bson, opts).toString(), expected);
+}
+
 TEST(NormalizationOpts, SortBSONSortArrays) {
     BSONObj bson = fromjson("{a: {c: 1, b: [2, 1]}}");
     NormalizationOptsSet opts = NormalizationOpts::kSortBSON | NormalizationOpts::kSortArrays;
@@ -355,6 +387,18 @@ TEST(NormalizationOpts, NormalizeFull) {
     std::string expected =
         "{ a: { b: [ undefined, null, 1.000000000000000000000000000000000, "
         "2.000000000000000000000000000000000 ], "
+        "c: 1.000000000000000000000000000000000 } }";
+    ASSERT_EQ(normalizeBSONObj(bson, opts).toString(), expected);
+}
+
+TEST(NormalizationOpts, NormalizeFullConflateNullAndMissing) {
+    BSONObj bson = fromjson("{a: {c: 1, b: [2, null, 1, undefined]}}");
+    NormalizationOptsSet opts = NormalizationOpts::kNormalizeNumerics |
+        NormalizationOpts::kSortBSON | NormalizationOpts::kSortArrays |
+        NormalizationOpts::kConflateNullAndMissing;
+
+    std::string expected =
+        "{ a: { b: [ 1.000000000000000000000000000000000, 2.000000000000000000000000000000000 ], "
         "c: 1.000000000000000000000000000000000 } }";
     ASSERT_EQ(normalizeBSONObj(bson, opts).toString(), expected);
 }

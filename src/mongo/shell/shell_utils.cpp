@@ -922,10 +922,75 @@ BSONObj normalizeNumerics(const BSONObj& input) {
     return bob.obj();
 }
 
+void removeNullAndUndefinedElementsHelper(const BSONObj& input, BSONObjBuilder& bob);
+
+template <typename Builder>
+void removeNullAndUndefinedElements(const BSONElement& el, Builder& bob) {
+    switch (el.type()) {
+        case Undefined:
+        case jstNULL:
+            // Don't append the element if it's null or undefined.
+            break;
+        case Array: {
+            auto appendArrayElements = [&](auto& sub) {
+                for (const auto& child : el.Array()) {
+                    removeNullAndUndefinedElements(child, sub);
+                }
+                sub.doneFast();
+            };
+
+            if constexpr (std::is_same_v<Builder, BSONObjBuilder>) {
+                BSONArrayBuilder sub(bob.subarrayStart(el.fieldNameStringData()));
+                appendArrayElements(sub);
+            } else if constexpr (std::is_same_v<Builder, BSONArrayBuilder>) {
+                BSONArrayBuilder sub(bob.subarrayStart());
+                appendArrayElements(sub);
+            }
+            break;
+        }
+        case Object: {
+            if constexpr (std::is_same_v<Builder, BSONObjBuilder>) {
+                BSONObjBuilder sub(bob.subobjStart(el.fieldNameStringData()));
+                removeNullAndUndefinedElementsHelper(el.Obj(), sub);
+                sub.doneFast();
+            } else if constexpr (std::is_same_v<Builder, BSONArrayBuilder>) {
+                BSONObjBuilder sub(bob.subobjStart());
+                removeNullAndUndefinedElementsHelper(el.Obj(), sub);
+                sub.doneFast();
+            }
+            break;
+        }
+        default:
+            bob.append(el);
+            break;
+    }
+}
+
+void removeNullAndUndefinedElementsHelper(const BSONObj& input, BSONObjBuilder& bob) {
+    BSONObjIterator it(input);
+    while (it.more()) {
+        removeNullAndUndefinedElements(it.next(), bob);
+    }
+}
+
+/**
+ * Returns a new BSONObj with null and undefined elements removed. This will make result sets with
+ * missing elements match those with null or defined field/array values. For instance, {a: null},
+ * {a: undefined}, and {} will be considered equal.
+ */
+BSONObj removeNullAndUndefined(const BSONObj& input) {
+    BSONObjBuilder bob(input.objsize());
+    removeNullAndUndefinedElementsHelper(input, bob);
+    return bob.obj();
+}
+
 BSONObj normalizeBSONObj(const BSONObj& input, NormalizationOptsSet opts) {
     BSONObj result = input;
+    if (isSet(opts, NormalizationOpts::kConflateNullAndMissing)) {
+        result = removeNullAndUndefined(result);
+    }
     if (isSet(opts, NormalizationOpts::kNormalizeNumerics)) {
-        result = normalizeNumerics(input);
+        result = normalizeNumerics(result);
     }
     if (isSet(opts, NormalizationOpts::kSortBSON)) {
         result = sortBSONObjectInternally(result, opts);

@@ -123,7 +123,9 @@ enum class NormalizationOpts : uint32_t {
     // Set this bit to sort arrays in the BSONObj.
     kSortArrays = 1 << 2,
     // Set this bit to normalize numerics.
-    kNormalizeNumerics = 1 << 3
+    kNormalizeNumerics = 1 << 3,
+    // Set this bit to treat null and missing as the same value.
+    kConflateNullAndMissing = 1 << 4,
 };
 using NormalizationOptsSet = NormalizationOpts;
 
@@ -150,7 +152,8 @@ void sortQueryResults(std::vector<BSONObj>& input);
  * pairings, but recursively sorted by the fields. If the kSortArrays bit is set, this method will
  * also recursively sort the BSONObj's arrays. If the kNormalizeNumerics bit is set, this method
  * will normalize numerics by casting them to the widest type, Decimal128, and normalizing them to
- * the maximum precision.
+ * the maximum precision. If the kConflateNullAndMissing bit is set, this method will treat null,
+ * undefined, and missing fields as the same by removing null and undefined values.
  */
 BSONObj normalizeBSONObj(const BSONObj& input,
                          NormalizationOptsSet opts = NormalizationOpts::kResults);
