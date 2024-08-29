@@ -12,10 +12,10 @@ var explain;
 explain = db.runCommand(
     {explain: {update: t.getName(), updates: [{q: {a: 1}, u: {a: 1}, upsert: true}]}});
 if (TestData.testingReplicaSetEndpoint) {
-    // TODO (SERVER-75857): Unify behavior between mongod and mongos when running explain on a
-    // nonexistent database.
     assert.commandWorkedOrFailedWithCode(explain, ErrorCodes.NamespaceNotFound);
 } else {
+    // TODO(SERVER-18047): Make an explain against a non-existent database fail in an unsharded
+    // environment.
     assert.commandWorked(explain);
 }
 

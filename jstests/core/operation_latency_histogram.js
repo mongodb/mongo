@@ -38,9 +38,12 @@ var testDB = db.getSiblingDB(dbName);
 var testColl = testDB[collName];
 
 testColl.drop();
-// TODO (SERVER-75859): Unify behavior between mongod and mongos when running $collStats on a
-// nonexistent database.
-assert.commandWorked(testDB.createCollection(collName));
+
+// Running a $collStats aggregation on a non-existent database will error on mongos but return
+// bassic information on monogod.
+if (FixtureHelpers.isMongos(db) || TestData.testingReplicaSetEndpoint) {
+    assert.commandWorked(testDB.createCollection(collName));
+}
 
 // Test aggregation command output format.
 var commandResult = testDB.runCommand(

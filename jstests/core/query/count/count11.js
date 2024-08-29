@@ -11,8 +11,8 @@ var t = db.count11;
 
 t.drop();
 
-// TODO SERVER-82096 remove creation of database once
-// count behavior will be the same in both standalone/replicaset and sharded cluster
+// On a sharded cluster if the database doesn't exist, count will return an empty result instead
+// of a error.
 if (FixtureHelpers.isMongos(db) || TestData.testingReplicaSetEndpoint) {
     // Create database
     assert.commandWorked(db.adminCommand({'enableSharding': db.getName()}));

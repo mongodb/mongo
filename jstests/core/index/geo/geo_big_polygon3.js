@@ -25,8 +25,8 @@
 
 import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 
-// TODO SERVER-82096 remove creation of database once
-// count behavior will be the same in both standalone/replicaset and sharded cluster
+// On a sharded cluster a count command with an invalid query issued against a non-existent db will
+// return an empty result but it will error on a replica set.
 if (FixtureHelpers.isMongos(db) || TestData.testingReplicaSetEndpoint) {
     // Create database
     assert.commandWorked(db.adminCommand({'enableSharding': db.getName()}));
@@ -39,9 +39,6 @@ var strictCRS = {type: "name", properties: {name: "urn:x-mongodb:crs:strictwindi
 const collName = "geo_bigpoly_edgecases";
 var coll = db[collName];
 coll.drop();
-// TODO (SERVER-75857): Unify behavior between mongod and mongos when running explain on a
-// nonexistent database.
-assert.commandWorked(db.createCollection(collName));
 
 // Edge cases producing error
 // These non-polygon objects cannot be queried because they are strictCRS

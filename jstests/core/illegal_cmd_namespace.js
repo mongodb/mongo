@@ -9,8 +9,8 @@
 
 import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 
-// TODO SERVER-82107 remove creation of database once
-// find behavior will be the same in both standalone/replicaset and sharded cluster
+// On a sharded cluster we need to create the database to throw the expected error instead of just
+// returning an empty batch.
 if (FixtureHelpers.isMongos(db) || TestData.testingReplicaSetEndpoint) {
     // Create database
     assert.commandWorked(db.adminCommand({'enableSharding': db.getName()}));

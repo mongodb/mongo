@@ -59,8 +59,8 @@ function checkIndexedCountWithPred(db, explain, keyName, bounds) {
     }
 }
 
-// TODO SERVER-82095 remove creation of database once
-// explain behavior will be equal in both standalone and sharded cluster
+// TODO(SERVER-18047): Remove database creation once explain behavior is unified between replica
+// sets and sharded clusters.
 if (FixtureHelpers.isMongos(db) || TestData.testingReplicaSetEndpoint) {
     // Create database
     assert.commandWorked(db.adminCommand({'enableSharding': db.getName()}));

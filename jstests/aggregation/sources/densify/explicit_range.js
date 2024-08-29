@@ -16,8 +16,8 @@ import {
 } from "jstests/aggregation/sources/densify/libs/densify_in_js.js";
 import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 
-// TODO SERVER-82462 remove creation of database once
-// $densify behavior will be equal in both standalone and sharded cluster
+// On a sharded cluster if the database doesn't exist, densify will return an empty result instead
+// of a error.
 if (FixtureHelpers.isMongos(db)) {
     // Create database
     assert.commandWorked(db.adminCommand({'enableSharding': db.getName()}));

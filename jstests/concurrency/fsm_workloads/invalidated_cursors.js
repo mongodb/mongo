@@ -64,7 +64,9 @@ export const $config = (function() {
                 ErrorCodes.IndexBuildAborted,
                 ErrorCodes.NoMatchingDocument,
             ];
-            if (TestData.testingReplicaSetEndpoint) {
+            // TODO(SERVER-18047): Unify error codes once an explain against a non-existent database
+            // fails in an unsharded environment.
+            if (isMongos(db) || TestData.testingReplicaSetEndpoint) {
                 errorCodesNonTxn.push(ErrorCodes.NamespaceNotFound);
             }
             this.indexSpecs.forEach(indexSpec => {
@@ -202,15 +204,6 @@ export const $config = (function() {
          * 'this.involvedCollections' by repopulating them with data and indexes.
          */
         dropDatabase: function dropDatabase(unusedDB, unusedCollName) {
-            if (isMongos(unusedDB)) {
-                // This workload can sometimes triggers an 'unable to target write op for
-                // collection ... caused by ... database not found' error. Further investigation
-                // still needs to be done, but these failures may be due to SERVER-17397 'drops in
-                // a sharded cluster may not fully succeed' because it drops and reuses the same
-                // namespaces. For now, we avoid dropping the database on a sharded cluster.
-                return;
-            }
-
             let myDB = unusedDB.getSiblingDB(this.uniqueDBName);
             myDB.dropDatabase();
 
@@ -225,15 +218,6 @@ export const $config = (function() {
          * collection is then re-created with data and indexes.
          */
         dropCollection: function dropCollection(unusedDB, unusedCollName) {
-            if (isMongos(unusedDB)) {
-                // This workload can sometimes triggers an 'unable to target write op for
-                // collection ... caused by ... database not found' error. Further investigation
-                // still needs to be done, but these failures may be due to SERVER-17397 'drops in
-                // a sharded cluster may not fully succeed' because it drops and reuses the same
-                // namespaces. For now, we avoid dropping the collection on a sharded cluster.
-                return;
-            }
-
             let myDB = unusedDB.getSiblingDB(this.uniqueDBName);
             let targetColl = this.chooseRandomlyFrom(this.involvedCollections);
 
@@ -263,7 +247,9 @@ export const $config = (function() {
                 ErrorCodes.IndexBuildAborted,
                 ErrorCodes.NoMatchingDocument,
             ];
-            if (TestData.testingReplicaSetEndpoint) {
+            // TODO(SERVER-18047): Unify error codes once an explain against a non-existent database
+            // fails in an unsharded environment.
+            if (isMongos(unusedDB) || TestData.testingReplicaSetEndpoint) {
                 expectedErrorCodes.push(ErrorCodes.NamespaceNotFound);
             }
             assert.commandWorkedOrFailedWithCode(myDB[targetColl].createIndex(indexSpec),
