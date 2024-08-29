@@ -67,13 +67,6 @@ static size_t computeCollationHash(const properties::CollationRequirement& prop)
     return collationHash;
 }
 
-static size_t computeLimitSkipHash(const properties::LimitSkipRequirement& prop) {
-    size_t limitSkipHash = 17;
-    updateHash(limitSkipHash, std::hash<int64_t>()(prop.getLimit()));
-    updateHash(limitSkipHash, std::hash<int64_t>()(prop.getSkip()));
-    return limitSkipHash;
-}
-
 static size_t computePropertyProjectionsHash(const ProjectionNameVector& projections) {
     size_t resultHash = 17;
     for (const ProjectionName& projection : projections) {
@@ -272,7 +265,10 @@ public:
     }
 
     size_t transport(const LimitSkipNode& node, size_t childResult) {
-        return computeHashSeq<14>(computeLimitSkipHash(node.getProperty()), childResult);
+        size_t limitSkipHash = 17;
+        updateHash(limitSkipHash, std::hash<int64_t>()(node.getLimit()));
+        updateHash(limitSkipHash, std::hash<int64_t>()(node.getSkip()));
+        return computeHashSeq<14>(limitSkipHash, childResult);
     }
 
     size_t transport(const ExchangeNode& node, size_t childResult, size_t /*refsResult*/) {
@@ -442,11 +438,6 @@ public:
     size_t operator()(const properties::PhysProperty&,
                       const properties::CollationRequirement& prop) {
         return computeHashSeq<1>(computeCollationHash(prop));
-    }
-
-    size_t operator()(const properties::PhysProperty&,
-                      const properties::LimitSkipRequirement& prop) {
-        return computeHashSeq<2>(computeLimitSkipHash(prop));
     }
 
     size_t operator()(const properties::PhysProperty&,

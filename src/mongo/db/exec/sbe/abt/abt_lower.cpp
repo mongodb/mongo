@@ -54,7 +54,6 @@
 #include "mongo/db/exec/sbe/abt/slots_provider.h"
 #include "mongo/db/exec/sbe/expressions/expression.h"
 #include "mongo/db/exec/sbe/stages/co_scan.h"
-#include "mongo/db/exec/sbe/stages/exchange.h"
 #include "mongo/db/exec/sbe/stages/filter.h"
 #include "mongo/db/exec/sbe/stages/hash_agg.h"
 #include "mongo/db/exec/sbe/stages/hash_join.h"
@@ -76,7 +75,6 @@
 #include "mongo/db/query/optimizer/algebra/polyvalue.h"
 #include "mongo/db/query/optimizer/comparison_op.h"
 #include "mongo/db/query/optimizer/containers.h"
-#include "mongo/db/query/optimizer/props.h"
 #include "mongo/db/query/optimizer/utils/path_utils.h"
 #include "mongo/db/query/optimizer/utils/reftracker_utils.h"
 #include "mongo/db/query/optimizer/utils/strong_alias.h"
@@ -291,9 +289,7 @@ std::unique_ptr<sbe::EExpression> SBEExpressionLowering::handleShardFilterFuncti
     tassert(7814401, "NodeProps must not be nullptr in shardFilter lowering", _np);
 
     // First, get the paths to the shard key fields.
-    auto indexingAvailabilityProp =
-        getPropertyConst<properties::IndexingAvailability>(_np->_logicalProps);
-    const std::string& scanDefName = indexingAvailabilityProp.getScanDefName();
+    const std::string& scanDefName = *(_np->_indexScanDefName);
     tassert(7814403,
             "The metadata must contain the scan definition specified by the "
             "IndexingAvailability property in order to perform shard filtering",
@@ -472,7 +468,6 @@ sbe::value::SlotVector SBENodeLowering::convertRequiredProjectionsToSlots(
     const SlotVarMap& slotMap,
     const LoweringNodeProps& props,
     const sbe::value::SlotVector& toExclude) const {
-    using namespace properties;
 
     sbe::value::SlotSet toExcludeSet;
     for (const auto slot : toExclude) {
@@ -484,9 +479,7 @@ sbe::value::SlotVector SBENodeLowering::convertRequiredProjectionsToSlots(
     // projections to the same slot. 'convertProjectionsToSlots' can't dedup because it preserves
     // the order of items in the vector.
     sbe::value::SlotSet seen;
-    const auto& projections =
-        getPropertyConst<ProjectionRequirement>(props._physicalProps).getProjections();
-    for (const auto slot : convertProjectionsToSlots(slotMap, projections.getVector())) {
+    for (const auto slot : convertProjectionsToSlots(slotMap, props._projections->getVector())) {
         if (toExcludeSet.count(slot) == 0 && seen.count(slot) == 0) {
             result.push_back(slot);
             seen.insert(slot);
@@ -530,7 +523,6 @@ std::unique_ptr<sbe::PlanStage> SBENodeLowering::walk(const ABT& abtn,
                                                       boost::optional<sbe::value::SlotId>& ridSlot,
                                                       const ABT& child,
                                                       const ABT& refs) {
-    using namespace properties;
     auto input = generateInternal(child, slotMap, ridSlot);
 
     auto output = refs.cast<References>();
@@ -545,13 +537,10 @@ std::unique_ptr<sbe::PlanStage> SBENodeLowering::walk(const ABT& abtn,
         }
     }
 
-    if (const auto& props = _nodeToGroupPropsMap.at(&n);
-        hasProperty<ProjectionRequirement>(props._physicalProps)) {
+    if (const auto& props = _nodeToGroupPropsMap.at(&n); props._projections.has_value()) {
         if (const auto& ridProjName = props._ridProjName) {
             // If we required rid on the Root node, populate ridSlot.
-            const auto& projections =
-                getPropertyConst<ProjectionRequirement>(props._physicalProps).getProjections();
-            if (projections.find(*ridProjName)) {
+            if (props._projections->find(*ridProjName)) {
                 // Deliver the ridSlot separate from the slotMap.
                 ridSlot = slotMap.at(*ridProjName);
                 finalMap.erase(*ridProjName);
@@ -659,6 +648,18 @@ std::unique_ptr<sbe::PlanStage> SBENodeLowering::walk(const ABT& abtn,
 }
 
 std::unique_ptr<sbe::PlanStage> SBENodeLowering::walk(const ABT& abtn,
+                                                      const ExchangeNode& n,
+                                                      SlotVarMap& slotMap,
+                                                      boost::optional<sbe::value::SlotId>& ridSlot,
+                                                      const ABT& child,
+                                                      const ABT& refs) {
+    uasserted(9382600,
+              "ABT node lowering encountered operator which cannot be directly lowered "
+              "to a SBE.");
+    return nullptr;
+}
+
+std::unique_ptr<sbe::PlanStage> SBENodeLowering::walk(const ABT& abtn,
                                                       const LimitSkipNode& n,
                                                       SlotVarMap& slotMap,
                                                       boost::optional<sbe::value::SlotId>& ridSlot,
@@ -668,89 +669,10 @@ std::unique_ptr<sbe::PlanStage> SBENodeLowering::walk(const ABT& abtn,
     return sbe::makeS<sbe::LimitSkipStage>(
         std::move(input),
         sbe::makeE<sbe::EConstant>(sbe::value::TypeTags::NumberInt64,
-                                   sbe::value::bitcastFrom<int64_t>(n.getProperty().getLimit())),
+                                   sbe::value::bitcastFrom<int64_t>(n.getLimit())),
         sbe::makeE<sbe::EConstant>(sbe::value::TypeTags::NumberInt64,
-                                   sbe::value::bitcastFrom<int64_t>(n.getProperty().getSkip())),
+                                   sbe::value::bitcastFrom<int64_t>(n.getSkip())),
         getPlanNodeId(n));
-}
-
-std::unique_ptr<sbe::PlanStage> SBENodeLowering::walk(const ABT& abtn,
-                                                      const ExchangeNode& n,
-                                                      SlotVarMap& slotMap,
-                                                      boost::optional<sbe::value::SlotId>& ridSlot,
-                                                      const ABT& child,
-                                                      const ABT& refs) {
-    using namespace std::literals;
-    using namespace properties;
-
-    // The DOP is obtained from the child (number of producers).
-    const auto& childProps = _nodeToGroupPropsMap.at(n.getChild().cast<Node>())._physicalProps;
-    const auto& childDistribution = getPropertyConst<DistributionRequirement>(childProps);
-    tassert(6624330,
-            "Parent and child distributions are the same",
-            !(childDistribution == n.getProperty()));
-
-    const size_t localDOP =
-        (childDistribution.getDistributionAndProjections()._type == DistributionType::Centralized)
-        ? 1
-        : _numberOfPartitions;
-    tassert(6624215, "invalid DOP", localDOP >= 1);
-
-    auto input = generateInternal(child, slotMap, ridSlot);
-
-    // Initialized to arbitrary placeholder
-    sbe::ExchangePolicy localPolicy{};
-    std::unique_ptr<sbe::EExpression> partitionExpr;
-
-    const auto& distribAndProjections = n.getProperty().getDistributionAndProjections();
-    switch (distribAndProjections._type) {
-        case DistributionType::Centralized:
-        case DistributionType::Replicated:
-            localPolicy = sbe::ExchangePolicy::broadcast;
-            break;
-
-        case DistributionType::RoundRobin:
-            localPolicy = sbe::ExchangePolicy::roundrobin;
-            break;
-
-        case DistributionType::RangePartitioning:
-            // We set 'localPolicy' to 'ExchangePolicy::rangepartition' here, but there is more
-            // that we need to do to actually support the RangePartitioning distribution.
-            // TODO SERVER-62523: Implement real support for the RangePartitioning distribution
-            // and add some test coverage.
-            localPolicy = sbe::ExchangePolicy::rangepartition;
-            break;
-
-        case DistributionType::HashPartitioning: {
-            localPolicy = sbe::ExchangePolicy::hashpartition;
-            std::vector<std::unique_ptr<sbe::EExpression>> args;
-            for (const ProjectionName& proj : distribAndProjections._projectionNames) {
-                auto it = slotMap.find(proj);
-                tassert(6624216, str::stream() << "undefined var: " << proj, it != slotMap.end());
-
-                args.emplace_back(sbe::makeE<sbe::EVariable>(it->second));
-            }
-            partitionExpr = sbe::makeE<sbe::EFunction>("hash"_sd, toInlinedVector(std::move(args)));
-            break;
-        }
-
-        case DistributionType::UnknownPartitioning:
-            tasserted(6624217, "Cannot partition into unknown distribution");
-
-        default:
-            MONGO_UNREACHABLE;
-    }
-
-    const auto& nodeProps = _nodeToGroupPropsMap.at(&n);
-    auto fields = convertRequiredProjectionsToSlots(slotMap, nodeProps);
-
-    return sbe::makeS<sbe::ExchangeConsumer>(std::move(input),
-                                             localDOP,
-                                             std::move(fields),
-                                             localPolicy,
-                                             std::move(partitionExpr),
-                                             nullptr,
-                                             nodeProps._planNodeId);
 }
 
 static sbe::value::SortDirection collationOpToSBESortDirection(const CollationOp collOp) {
@@ -787,16 +709,12 @@ std::unique_ptr<sbe::PlanStage> SBENodeLowering::walk(const ABT& abtn,
     }
 
     const auto& nodeProps = _nodeToGroupPropsMap.at(&n);
-    const auto& physProps = nodeProps._physicalProps;
 
     std::unique_ptr<sbe::EExpression> limit = nullptr;
-    if (properties::hasProperty<properties::LimitSkipRequirement>(physProps)) {
-        const auto& limitSkipReq =
-            properties::getPropertyConst<properties::LimitSkipRequirement>(physProps);
-        tassert(6624221, "We should not have skip set here", limitSkipReq.getSkip() == 0);
-        limit =
-            sbe::makeE<sbe::EConstant>(sbe::value::TypeTags::NumberInt64,
-                                       sbe::value::bitcastFrom<int64_t>(limitSkipReq.getLimit()));
+    if (nodeProps._hasLimitSkip) {
+        tassert(6624221, "We should not have skip set here", nodeProps._skip == 0);
+        limit = sbe::makeE<sbe::EConstant>(sbe::value::TypeTags::NumberInt64,
+                                           sbe::value::bitcastFrom<int64_t>(nodeProps._limit));
     }
 
     // TODO: obtain defaults for these.

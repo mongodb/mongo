@@ -50,7 +50,6 @@
 #include "mongo/db/query/optimizer/metadata_factory.h"
 #include "mongo/db/query/optimizer/node.h"  // IWYU pragma: keep
 #include "mongo/db/query/optimizer/node_defs.h"
-#include "mongo/db/query/optimizer/props.h"
 #include "mongo/db/query/optimizer/reference_tracker.h"
 #include "mongo/db/query/optimizer/rewrites/const_eval.h"
 #include "mongo/db/query/optimizer/rewrites/path_lower.h"
@@ -76,8 +75,13 @@ protected:
     }
 
     auto makeNodeProp() {
-        LoweringNodeProps n{getNextNodeID(), {}, {}, boost::none};
-        properties::setPropertyOverwrite(n._physicalProps, properties::ProjectionRequirement({}));
+        LoweringNodeProps n{._planNodeId = getNextNodeID(),
+                            ._indexScanDefName = boost::none,
+                            ._projections = ProjectionNameOrderPreservingSet(),
+                            ._hasLimitSkip = false,
+                            ._limit = 0,
+                            ._skip = 0,
+                            ._ridProjName = boost::none};
         return n;
     }
     ABT&& _node(ABT&& tree) {
@@ -180,8 +184,7 @@ BENCHMARK_F(ABTNodeLoweringFixture, BM_LowerIndexScanAndSeek)(benchmark::State& 
                             false));
 
     auto seek = _node(make<LimitSkipNode>(
-        properties::LimitSkipRequirement(1, 0),
-        _node(make<SeekNode>(ProjectionName{"rid"}, _fieldProjMap, "collName"))));
+        1, 0, _node(make<SeekNode>(ProjectionName{"rid"}, _fieldProjMap, "collName"))));
 
     benchmarkLowering(state,
                       _node(make<NestedLoopJoinNode>(JoinType::Inner,

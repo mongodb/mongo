@@ -52,7 +52,6 @@
 #include "mongo/db/query/optimizer/index_bounds.h"
 #include "mongo/db/query/optimizer/node.h"  // IWYU pragma: keep
 #include "mongo/db/query/optimizer/node_defs.h"
-#include "mongo/db/query/optimizer/props.h"
 #include "mongo/db/query/optimizer/rewrites/const_eval.h"
 #include "mongo/db/query/optimizer/rewrites/path_lower.h"
 #include "mongo/db/query/optimizer/syntax/expr.h"
@@ -196,7 +195,6 @@ protected:
     }
 
     LoweringScanDefinition buildLoweringScanDefinition(
-        DistributionAndPaths dnp = DistributionAndPaths(DistributionType::Centralized),
         std::vector<LoweringIndexCollationEntry> shardKey = {}) {
         LoweringScanDefinition::ScanDefOptions opts;
         opts.insert({"type", "mongod"});
@@ -220,10 +218,13 @@ protected:
     }
 
     auto makeNodeProp() {
-        LoweringNodeProps n{getNextNodeID(),
-                            {} /* logicalProps */,
-                            {} /* physicalProps */,
-                            boost::none /* ridProjName */};
+        LoweringNodeProps n{._planNodeId = getNextNodeID(),
+                            ._indexScanDefName = boost::none,
+                            ._projections = boost::none,
+                            ._hasLimitSkip = false,
+                            ._limit = 0,
+                            ._skip = 0,
+                            ._ridProjName = boost::none};
         return n;
     }
     void runPathLowering(ABT& tree) {
@@ -247,10 +248,7 @@ protected:
      */
     ABT&& _node(ABT&& tree, std::initializer_list<ProjectionName> requiredProjections = {}) {
         auto props = makeNodeProp();
-        properties::setPropertyOverwrite(
-            props._physicalProps,
-            properties::ProjectionRequirement(
-                ProjectionNameOrderPreservingSet{requiredProjections}));
+        props._projections = ProjectionNameOrderPreservingSet{requiredProjections};
 
         _nodeMap.insert_or_assign(tree.cast<Node>(), std::move(props));
         return std::move(tree);
@@ -330,25 +328,12 @@ TEST_F(ABTPlanGeneration, LowerShardFiltering) {
             kshardFiltererSlotName, sbe::value::TypeTags::Nothing, 0, false, &ids);
         // Create node properties which allow the lowering to access information about the Shard
         // Key.
-        LoweringNodeProps filterLoweringNodeProps{getNextNodeID() /*_planNodeId*/,
-                                                  {} /*_logicalProps*/,
-                                                  {} /*_physicalProps*/,
-                                                  boost::none /*_ridProjName*/};
-        // The IndexingAvailability logical property will provide information about where to look in
-        // the scanDefs for the Shard Key info.
-        properties::setPropertyOverwrite(
-            filterLoweringNodeProps._logicalProps,
-            properties::IndexingAvailability(10,
-                                             ProjectionName("testProjectionName"),
-                                             shardKeyName,
-                                             false,
-                                             false,
-                                             opt::unordered_set<std::string>()));
+        LoweringNodeProps filterLoweringNodeProps = makeNodeProp();
+        filterLoweringNodeProps._indexScanDefName = shardKeyName;
 
         stdx::unordered_map<std::string, LoweringScanDefinition> scanDefs{std::make_pair(
             shardKeyName,
             buildLoweringScanDefinition(
-                DistributionAndPaths{DistributionType::Centralized},
                 {LoweringIndexCollationEntry{_get("a", _id())._n, CollationOp::Ascending},
                  LoweringIndexCollationEntry{_get("b", _id())._n, CollationOp::Ascending},
                  LoweringIndexCollationEntry{_get("c", _id())._n, CollationOp::Ascending}}))};
@@ -379,25 +364,15 @@ TEST_F(ABTPlanGeneration, LowerShardFiltering) {
         sbe::value::SlotIdGenerator ids = sbe::value::SlotIdGenerator{};
         runtimeEnv.registerSlot(
             kshardFiltererSlotName, sbe::value::TypeTags::Nothing, 0, false, &ids);
-        LoweringNodeProps filterLoweringNodeProps{getNextNodeID() /*_planNodeId*/,
-                                                  {} /*_logicalProps*/,
-                                                  {} /*_physicalProps*/,
-                                                  boost::none /*_ridProjName*/};
-        properties::setPropertyOverwrite(
-            filterLoweringNodeProps._logicalProps,
-            properties::IndexingAvailability(10,
-                                             ProjectionName("testProjectionName"),
-                                             shardKeyName,
-                                             false,
-                                             false,
-                                             opt::unordered_set<std::string>()));
+
+        LoweringNodeProps filterLoweringNodeProps = makeNodeProp();
+        filterLoweringNodeProps._indexScanDefName = shardKeyName;
 
         // "a.b" is the shard Key in this variation of the test.
         auto pathABT = _get("a", _get("b", _id()))._n;
         stdx::unordered_map<std::string, LoweringScanDefinition> scanDefs{
             std::make_pair(shardKeyName,
                            buildLoweringScanDefinition(
-                               DistributionAndPaths{DistributionType::Centralized},
                                {LoweringIndexCollationEntry{pathABT, CollationOp::Ascending}}))};
 
         auto evalPathABT =
@@ -419,23 +394,13 @@ TEST_F(ABTPlanGeneration, LowerShardFiltering) {
         sbe::value::SlotIdGenerator ids = sbe::value::SlotIdGenerator{};
         runtimeEnv.registerSlot(
             kshardFiltererSlotName, sbe::value::TypeTags::Nothing, 0, false, &ids);
-        LoweringNodeProps filterLoweringNodeProps{getNextNodeID() /*_planNodeId*/,
-                                                  {} /*_logicalProps*/,
-                                                  {} /*_physicalProps*/,
-                                                  boost::none /*_ridProjName*/};
-        properties::setPropertyOverwrite(
-            filterLoweringNodeProps._logicalProps,
-            properties::IndexingAvailability(10,
-                                             ProjectionName("testProjectionName"),
-                                             shardKeyName,
-                                             false,
-                                             false,
-                                             opt::unordered_set<std::string>()));
+
+        LoweringNodeProps filterLoweringNodeProps = makeNodeProp();
+        filterLoweringNodeProps._indexScanDefName = shardKeyName;
 
         stdx::unordered_map<std::string, LoweringScanDefinition> scanDefs{std::make_pair(
             shardKeyName,
             buildLoweringScanDefinition(
-                DistributionAndPaths{DistributionType::Centralized},
                 {LoweringIndexCollationEntry{_get("a", _id())._n, CollationOp::Ascending},
                  LoweringIndexCollationEntry{_get("b", _id())._n, CollationOp::Ascending}}))};
 
@@ -481,12 +446,14 @@ TEST_F(ABTPlanGeneration, LowerCollationNode) {
     GoldenTestContext ctx(&goldenTestConfig);
     ctx.printTestHeader(GoldenTestContext::HeaderFormat::Text);
 
-    properties::PhysProps physProps;
-    properties::setPropertyOverwrite<properties::ProjectionRequirement>(
-        physProps,
-        properties::ProjectionRequirement(
-            ProjectionNameOrderPreservingSet({"sortA", "proj0", "proj1"})));
-    LoweringNodeProps collationNodeProp{getNextNodeID(), {}, physProps, boost::none};
+    auto projections1 = ProjectionNameOrderPreservingSet({"sortA", "proj0", "proj1"});
+    LoweringNodeProps collationNodeProp{._planNodeId = getNextNodeID(),
+                                        ._indexScanDefName = boost::none,
+                                        ._projections = std::move(projections1),
+                                        ._hasLimitSkip = false,
+                                        ._limit = 0,
+                                        ._skip = 0,
+                                        ._ridProjName = boost::none};
 
     auto node = _node(
         make<CollationNode>(properties::CollationRequirement({{"sortA", CollationOp::Ascending}}),
@@ -499,12 +466,15 @@ TEST_F(ABTPlanGeneration, LowerCollationNode) {
         _node(make<FilterNode>(makeEquals("proj0", Constant::int32(23)), std::move(node))));
 
     // Sort on multiple fields.
-    properties::PhysProps physProps2;
-    properties::setPropertyOverwrite<properties::ProjectionRequirement>(
-        physProps2,
-        properties::ProjectionRequirement(
-            ProjectionNameOrderPreservingSet({"sortA", "sortB", "proj0"})));
-    LoweringNodeProps collationNodeProp2{getNextNodeID(), {}, physProps2, boost::none};
+    auto projections2 = ProjectionNameOrderPreservingSet({"sortA", "sortB", "proj0"});
+    LoweringNodeProps collationNodeProp2{._planNodeId = getNextNodeID(),
+                                         ._indexScanDefName = boost::none,
+                                         ._projections = std::move(projections2),
+                                         ._hasLimitSkip = false,
+                                         ._limit = 0,
+                                         ._skip = 0,
+                                         ._ridProjName = boost::none};
+
     auto node2 = _node(
         make<CollationNode>(properties::CollationRequirement({{"sortA", CollationOp::Ascending},
                                                               {"sortB", CollationOp::Descending}}),
@@ -528,58 +498,6 @@ TEST_F(ABTPlanGeneration, LowerMultipleEvaluationNodes) {
     runNodeVariation(ctx,
                      "Lower two chained evaluation nodes",
                      createBindings({{"a", "proj0"}, {"b", "proj1"}}));
-}
-
-TEST_F(ABTPlanGeneration, LowerExchangeNode) {
-    GoldenTestContext ctx(&goldenTestConfig);
-    ctx.printTestHeader(GoldenTestContext::HeaderFormat::Text);
-
-    // Exchange doesn't support UnknownPartitioning or RangePartitioning.
-    std::vector<DistributionType> supportedDistributionTypes = {DistributionType::HashPartitioning,
-                                                                DistributionType::Centralized,
-                                                                DistributionType::RoundRobin,
-                                                                DistributionType::Replicated};
-    for (const auto& exchangeType : supportedDistributionTypes) {
-
-        properties::PhysProps physProps;
-        properties::DistributionRequirement distReq{
-            properties::DistributionAndProjections(exchangeType, ProjectionNameVector{"proj0"})};
-
-        properties::setPropertyOverwrite<properties::DistributionRequirement>(physProps, distReq);
-        properties::setPropertyOverwrite(physProps,
-                                         properties::ProjectionRequirement(
-                                             ProjectionNameOrderPreservingSet({"proj0", "proj1"})));
-        LoweringNodeProps exchangeNodeProp{getNextNodeID(), {}, physProps, boost::none};
-
-        properties::PhysProps evalPhysProps;
-        properties::DistributionRequirement evalDistReq{properties::DistributionAndProjections(
-            DistributionType::Centralized, ProjectionNameVector{})};
-        properties::setPropertyOverwrite<properties::DistributionRequirement>(evalPhysProps,
-                                                                              evalDistReq);
-        LoweringNodeProps evalNodeProp{getNextNodeID(), {}, evalPhysProps, boost::none};
-
-
-        ABT evalNode =
-            _node(make<EvaluationNode>(
-                      ProjectionName("proj0"),
-                      _path(make<EvalPath>(make<PathGet>(FieldNameType("a"), make<PathIdentity>()),
-                                           make<Variable>(ProjectionName("scan0")))),
-                      _node(scanForTest())),
-                  evalNodeProp);
-
-        ABT evalNode2 =
-            _node(make<EvaluationNode>(
-                      ProjectionName("proj1"),
-                      _path(make<EvalPath>(make<PathGet>(FieldNameType("a"), make<PathIdentity>()),
-                                           make<Variable>(ProjectionName("scan0")))),
-                      std::move(evalNode)),
-                  evalNodeProp);
-
-        runNodeVariation(
-            ctx,
-            str::stream() << "Lower exchange node of type " << toStringData(exchangeType),
-            _node(make<ExchangeNode>(distReq, std::move(evalNode2)), exchangeNodeProp));
-    }
 }
 
 TEST_F(ABTPlanGeneration, LowerFilterNode) {
@@ -829,22 +747,19 @@ TEST_F(ABTPlanGeneration, LowerLimitSkipNode) {
     ctx.printTestHeader(GoldenTestContext::HeaderFormat::Text);
 
     // Just Limit
-    runNodeVariation(
-        ctx,
-        "Lower single limit without skip",
-        _node(make<LimitSkipNode>(properties::LimitSkipRequirement(5, 0), _node(scanForTest()))));
+    runNodeVariation(ctx,
+                     "Lower single limit without skip",
+                     _node(make<LimitSkipNode>(5, 0, _node(scanForTest()))));
 
     // Just Skip
-    runNodeVariation(
-        ctx,
-        "Lower single skip without limit",
-        _node(make<LimitSkipNode>(properties::LimitSkipRequirement(0, 4), _node(scanForTest()))));
+    runNodeVariation(ctx,
+                     "Lower single skip without limit",
+                     _node(make<LimitSkipNode>(0, 4, _node(scanForTest()))));
 
     // Limit and Skip
-    runNodeVariation(
-        ctx,
-        "Lower LimitSkip node with values for both limit and skip",
-        _node(make<LimitSkipNode>(properties::LimitSkipRequirement(4, 2), _node(scanForTest()))));
+    runNodeVariation(ctx,
+                     "Lower LimitSkip node with values for both limit and skip",
+                     _node(make<LimitSkipNode>(4, 2, _node(scanForTest()))));
 }
 
 TEST_F(ABTPlanGeneration, LowerMergeJoinNode) {
@@ -1015,8 +930,7 @@ TEST_F(ABTPlanGeneration, LowerSeekNode) {
                             false));
 
     auto seek = _node(make<LimitSkipNode>(
-        properties::LimitSkipRequirement(1, 0),
-        _node(make<SeekNode>(ProjectionName{"rid"}, _fieldProjMap, "collName"))));
+        1, 0, _node(make<SeekNode>(ProjectionName{"rid"}, _fieldProjMap, "collName"))));
 
     runNodeVariation(ctx,
                      "index seek",

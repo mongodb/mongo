@@ -893,21 +893,13 @@ ABT& CollationNode::getChild() {
     return get<0>();
 }
 
-LimitSkipNode::LimitSkipNode(properties::LimitSkipRequirement property, ABT child)
-    : Base(std::move(child)), _property(std::move(property)) {
+LimitSkipNode::LimitSkipNode(const int64_t limit, const int64_t skip, ABT child)
+    : Base(std::move(child)), _limit((limit < 0) ? kMaxVal : limit), _skip(skip) {
     assertNodeSort(getChild());
 }
 
-const properties::LimitSkipRequirement& LimitSkipNode::getProperty() const {
-    return _property;
-}
-
-properties::LimitSkipRequirement& LimitSkipNode::getProperty() {
-    return _property;
-}
-
 bool LimitSkipNode::operator==(const LimitSkipNode& other) const {
-    return _property == other._property && getChild() == other.getChild();
+    return _skip == other._skip && _limit == other._limit && getChild() == other.getChild();
 }
 
 const ABT& LimitSkipNode::getChild() const {
@@ -916,6 +908,14 @@ const ABT& LimitSkipNode::getChild() const {
 
 ABT& LimitSkipNode::getChild() {
     return get<0>();
+}
+
+int64_t LimitSkipNode::getLimit() const {
+    return _limit;
+}
+
+int64_t LimitSkipNode::getSkip() const {
+    return _skip;
 }
 
 ExchangeNode::ExchangeNode(properties::DistributionRequirement distribution, ABT child)

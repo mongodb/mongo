@@ -315,7 +315,7 @@ env.CppUnitTest(
 )
 
 env.CppUnitTest(
-    target="abt_lowering_test",
+    target="abt_lower_test",
     source=[
         "abt/abt_lower_test.cpp",
     ],
@@ -328,7 +328,7 @@ env.CppUnitTest(
 )
 
 env.Benchmark(
-    target="abt_lowering_bm",
+    target="abt_lower_bm",
     source=[
         "abt/abt_lower_bm.cpp",
     ],

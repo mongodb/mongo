@@ -367,8 +367,7 @@ TEST(Optimizer, RefExplain) {
 
 TEST(Optimizer, CoScan) {
     ABT coScanNode = make<CoScanNode>();
-    ABT limitNode =
-        make<LimitSkipNode>(properties::LimitSkipRequirement(1, 0), std::move(coScanNode));
+    ABT limitNode = make<LimitSkipNode>(1, 0, std::move(coScanNode));
 
     VariableEnvironment venv = VariableEnvironment::build(limitNode);
     ASSERT_TRUE(!venv.hasFreeVariables());
@@ -618,8 +617,7 @@ TEST(Optimizer, LimitSkip) {
         make<EvalPath>(make<PathConstant>(Constant::int64(2)), make<Variable>("a")),
         std::move(scanNode));
 
-    ABT limitSkipNode =
-        make<LimitSkipNode>(properties::LimitSkipRequirement(10, 20), std::move(evalNode));
+    ABT limitSkipNode = make<LimitSkipNode>(10, 20, std::move(evalNode));
     {
         auto env = VariableEnvironment::build(limitSkipNode);
         ProjectionNameSet projSet = env.topLevelProjections();
@@ -682,27 +680,6 @@ TEST(Properties, Basic) {
     ASSERT_TRUE(hasProperty<CollationRequirement>(props));
     ASSERT_FALSE(setProperty(props, collation2));
     ASSERT_TRUE(collation1 == getProperty<CollationRequirement>(props));
-
-    LimitSkipRequirement ls(10, 20);
-    ASSERT_FALSE(hasProperty<LimitSkipRequirement>(props));
-    ASSERT_TRUE(setProperty(props, ls));
-    ASSERT_TRUE(hasProperty<LimitSkipRequirement>(props));
-    ASSERT_TRUE(ls == getProperty<LimitSkipRequirement>(props));
-
-    LimitSkipRequirement ls1(-1, 10);
-    LimitSkipRequirement ls2(5, 0);
-    {
-        LimitSkipRequirement ls3 = ls2;
-        combineLimitSkipProperties(ls3, ls1);
-        ASSERT_EQ(5, ls3.getLimit());
-        ASSERT_EQ(10, ls3.getSkip());
-    }
-    {
-        LimitSkipRequirement ls3 = ls1;
-        combineLimitSkipProperties(ls3, ls2);
-        ASSERT_EQ(0, ls3.getLimit());
-        ASSERT_EQ(0, ls3.getSkip());
-    }
 }
 
 TEST(Explain, ExplainV2Compact) {

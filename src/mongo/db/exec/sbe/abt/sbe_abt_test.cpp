@@ -63,7 +63,6 @@
 #include "mongo/db/query/optimizer/defs.h"
 #include "mongo/db/query/optimizer/node.h"  // IWYU pragma: keep
 #include "mongo/db/query/optimizer/node_defs.h"
-#include "mongo/db/query/optimizer/props.h"
 #include "mongo/db/query/optimizer/reference_tracker.h"
 #include "mongo/db/query/optimizer/rewrites/const_eval.h"
 #include "mongo/db/query/optimizer/rewrites/path_lower.h"
@@ -638,10 +637,13 @@ public:
     void transport(const T& node, LoweringNodeToGroupPropsMap& propMap, Ts&&...) {
         if constexpr (std::is_base_of_v<Node, T>) {
             propMap.emplace(&node,
-                            LoweringNodeProps{_planNodeId++,
-                                              {} /*logicalProps*/,
-                                              {} /*physicalProps*/,
-                                              boost::none /*ridProjName*/});
+                            LoweringNodeProps{._planNodeId = _planNodeId++,
+                                              ._indexScanDefName = boost::none,
+                                              ._projections = boost::none,
+                                              ._hasLimitSkip = false,
+                                              ._limit = 0,
+                                              ._skip = 0,
+                                              ._ridProjName = boost::none});
         }
     }
 

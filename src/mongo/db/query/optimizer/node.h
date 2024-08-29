@@ -938,19 +938,24 @@ class LimitSkipNode final : public ABTOpFixedArity<1>, public Node {
     using Base = ABTOpFixedArity<1>;
 
 public:
-    LimitSkipNode(properties::LimitSkipRequirement property, ABT child);
+    static constexpr int64_t kMaxVal = std::numeric_limits<int64_t>::max();
+
+    LimitSkipNode(int64_t limit, int64_t skip, ABT child);
 
     bool operator==(const LimitSkipNode& other) const;
 
-    const properties::LimitSkipRequirement& getProperty() const;
-    properties::LimitSkipRequirement& getProperty();
+    int64_t getLimit() const;
+    int64_t getSkip() const;
 
     const ABT& getChild() const;
 
     ABT& getChild();
 
 private:
-    properties::LimitSkipRequirement _property;
+    // Max number of documents to return. Maximum integer value means unlimited.
+    int64_t _limit;
+    // Documents to skip before start returning in result.
+    int64_t _skip;
 };
 
 /**

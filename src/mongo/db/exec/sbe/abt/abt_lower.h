@@ -44,7 +44,6 @@
 #include "mongo/db/query/optimizer/defs.h"
 #include "mongo/db/query/optimizer/index_bounds.h"
 #include "mongo/db/query/optimizer/node.h"  // IWYU pragma: keep
-#include "mongo/db/query/optimizer/props.h"
 #include "mongo/db/query/optimizer/reference_tracker.h"
 #include "mongo/db/query/optimizer/syntax/expr.h"
 #include "mongo/db/query/optimizer/syntax/syntax.h"
@@ -98,15 +97,24 @@ struct LoweringNodeProps {
     // Used to tie to a corresponding SBE stage.
     int32_t _planNodeId;
 
-    properties::LogicalProps _logicalProps;
-    properties::PhysProps _physicalProps;
+    boost::optional<std::string> _indexScanDefName;
 
-    // // Set if we have an RID projection name.
+    // Optional projection requirements.
+    boost::optional<ProjectionNameOrderPreservingSet> _projections;
+
+    // Optional skip/limit requirements.
+    bool _hasLimitSkip;
+    // Max number of documents to return. Maximum integer value means unlimited.
+    int64_t _limit;
+    // Documents to skip before start returning in result.
+    int64_t _skip;
+
+    // Set if we have an RID projection name.
     boost::optional<ProjectionName> _ridProjName;
 };
 
-// Map from node to various properties, including logical and physical. Used to determine for
-// example which of the available projections are used for exchanges.
+// Map from node to various properties. Used to determine for example which of the available
+// projections are used for exchanges.
 using LoweringNodeToGroupPropsMap = stdx::unordered_map<const Node*, LoweringNodeProps>;
 
 class VarResolver {

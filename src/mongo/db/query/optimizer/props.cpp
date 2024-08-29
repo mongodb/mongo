@@ -78,33 +78,6 @@ ProjectionNameSet CollationRequirement::getAffectedProjectionNames() const {
     return result;
 }
 
-LimitSkipRequirement::LimitSkipRequirement(const int64_t limit, const int64_t skip)
-    : _limit((limit < 0) ? kMaxVal : limit), _skip(skip) {}
-
-bool LimitSkipRequirement::operator==(const LimitSkipRequirement& other) const {
-    return _skip == other._skip && _limit == other._limit;
-}
-
-int64_t LimitSkipRequirement::getLimit() const {
-    return _limit;
-}
-
-int64_t LimitSkipRequirement::getSkip() const {
-    return _skip;
-}
-
-int64_t LimitSkipRequirement::getAbsoluteLimit() const {
-    return hasLimit() ? (_skip + _limit) : kMaxVal;
-}
-
-ProjectionNameSet LimitSkipRequirement::getAffectedProjectionNames() const {
-    return {};
-}
-
-bool LimitSkipRequirement::hasLimit() const {
-    return _limit != kMaxVal;
-}
-
 ProjectionRequirement::ProjectionRequirement(ProjectionNameOrderPreservingSet projections)
     : _projections(std::move(projections)) {}
 

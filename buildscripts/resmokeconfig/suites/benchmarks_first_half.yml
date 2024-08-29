@@ -16,7 +16,7 @@ selector:
     - build/install/bin/storage_record_id_bm*
     - build/install/bin/storage_wiredtiger_begin_transaction_block_bm*
     - build/install/bin/commands_bm*
-    - build/install/bin/abt_lowering_bm*
+    - build/install/bin/abt_lower_bm*
     - build/install/bin/logv2_bm*
     - build/install/bin/condition_variable_bm*
     - build/install/bin/document_bm*

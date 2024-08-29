@@ -2086,36 +2086,6 @@ public:
         return printer;
     }
 
-    static void printLimitSkipProperty(ExplainPrinter& propPrinter,
-                                       ExplainPrinter& limitPrinter,
-                                       ExplainPrinter& skipPrinter,
-                                       const properties::LimitSkipRequirement& property) {
-        propPrinter.fieldName("propType", ExplainVersion::V3)
-            .print("limitSkip")
-            .separator(":")
-            .printAppend(limitPrinter)
-            .printAppend(skipPrinter);
-    }
-
-    static void printLimitSkipProperty(ExplainPrinter& parent,
-                                       const properties::LimitSkipRequirement& property,
-                                       const bool directToParent) {
-        ExplainPrinter limitPrinter;
-        limitPrinter.fieldName("limit");
-        if (property.hasLimit()) {
-            limitPrinter.print(property.getLimit());
-        } else {
-            limitPrinter.print("(none)");
-        }
-
-        ExplainPrinter skipPrinter;
-        skipPrinter.fieldName("skip").print(property.getSkip());
-
-        printDirectToParentHelper(directToParent, parent, [&](ExplainPrinter& printer) {
-            printLimitSkipProperty(printer, limitPrinter, skipPrinter, property);
-        });
-    }
-
     ExplainPrinter transport(const ABT::reference_type n,
                              const LimitSkipNode& node,
                              ExplainPrinter childResult) {
@@ -2125,14 +2095,14 @@ public:
 
         // If we have version < V3, inline the limit skip.
         if constexpr (version < ExplainVersion::V3) {
-            const auto& prop = node.getProperty();
             printer.fieldName("limit");
-            if (prop.hasLimit()) {
-                printer.print(prop.getLimit());
-            } else {
+            auto limit = node.getLimit();
+            if (limit == LimitSkipNode::kMaxVal) {
                 printer.print("(none)");
+            } else {
+                printer.print(limit);
             }
-            printer.separator(", ").fieldName("skip").print(prop.getSkip()).separator("]");
+            printer.separator(", ").fieldName("skip").print(node.getSkip()).separator("]");
             nodeCEPropsPrint(printer, n, node);
             // Do not inline LimitSkip, since it's not a path.
             printer.setChildCount(1, true /*noInline*/);
@@ -2140,7 +2110,14 @@ public:
             printer.separator("]");
             nodeCEPropsPrint(printer, n, node);
             printer.setChildCount(2);
-            printLimitSkipProperty(printer, node.getProperty(), false /*directToParent*/);
+            printer.fieldName("limit");
+            auto limit = node.getLimit();
+            if (limit == LimitSkipNode::kMaxVal) {
+                printer.print("(none)");
+            } else {
+                printer.print(limit);
+            }
+            printer.separator(", ").fieldName("skip").print(node.getSkip()).separator("]");
         } else {
             MONGO_UNREACHABLE;
         }
@@ -2370,11 +2347,6 @@ public:
         void operator()(const properties::PhysProperty&,
                         const properties::CollationRequirement& prop) {
             printCollationProperty(_parent, prop, true /*directToParent*/);
-        }
-
-        void operator()(const properties::PhysProperty&,
-                        const properties::LimitSkipRequirement& prop) {
-            printLimitSkipProperty(_parent, prop, true /*directToParent*/);
         }
 
         void operator()(const properties::PhysProperty&,
@@ -3115,7 +3087,7 @@ bool isEOFPlan(const ABT::reference_type node) {
     }
 
     // This is the rest of an EOF plan.
-    ABT eofChild = make<LimitSkipNode>(properties::LimitSkipRequirement{0, 0}, make<CoScanNode>());
+    ABT eofChild = make<LimitSkipNode>(0, 0, make<CoScanNode>());
     return eval->getChild() == eofChild;
 }
 

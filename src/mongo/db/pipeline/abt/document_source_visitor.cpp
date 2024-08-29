@@ -89,9 +89,8 @@ namespace mongo::optimizer {
 void ABTDocumentSourceTranslationVisitorContext::pushLimitSkip(const int64_t limit,
                                                                const int64_t skip) {
     auto entry = algCtx.getNode();
-    algCtx.setNode<LimitSkipNode>(std::move(entry._rootProjection),
-                                  properties::LimitSkipRequirement(limit, skip),
-                                  std::move(entry._node));
+    algCtx.setNode<LimitSkipNode>(
+        std::move(entry._rootProjection), limit, skip, std::move(entry._node));
 }
 
 template <typename T>

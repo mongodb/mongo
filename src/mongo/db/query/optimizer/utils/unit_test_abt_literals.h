@@ -350,8 +350,7 @@ inline auto _union(ProjectionNameVector pns, std::vector<NodeHolder> inputs) {
 }
 
 inline auto _ls(const int64_t limit, const int64_t skip, NodeHolder input) {
-    return NodeHolder{
-        make<LimitSkipNode>(properties::LimitSkipRequirement{limit, skip}, std::move(input._n))};
+    return NodeHolder{make<LimitSkipNode>(limit, skip, std::move(input._n))};
 }
 
 inline auto _spoolp(StringData type,
@@ -772,9 +771,8 @@ public:
     }
 
     std::string transport(const LimitSkipNode& node, std::string childResult) {
-        return str::stream() << ".ls(" << node.getProperty().getLimit() << ", "
-                             << node.getProperty().getSkip() << ")" << _nodeSeparator
-                             << childResult;
+        return str::stream() << ".ls(" << node.getLimit() << ", " << node.getSkip() << ")"
+                             << _nodeSeparator << childResult;
     }
 
     std::string transport(const SpoolProducerNode& node,

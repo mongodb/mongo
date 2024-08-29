@@ -218,9 +218,6 @@ private:
 
 using SpoolIdGenerator = IdGenerator<int64_t>;
 
-void combineLimitSkipProperties(properties::LimitSkipRequirement& aboveProp,
-                                const properties::LimitSkipRequirement& belowProp);
-
 properties::LogicalProps createInitialScanProps(const ProjectionName& projectionName,
                                                 const std::string& scanDefName,
                                                 GroupIdType groupId = -1,

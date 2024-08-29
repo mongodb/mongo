@@ -69,25 +69,6 @@ ABT makeBalancedBooleanOpTree(Operations logicOp, std::vector<ABT> leaves) {
     return makeBalancedTreeImpl(builder, leaves, 0, leaves.size());
 }
 
-void combineLimitSkipProperties(properties::LimitSkipRequirement& aboveProp,
-                                const properties::LimitSkipRequirement& belowProp) {
-    using namespace properties;
-
-    const int64_t newAbsLimit = std::min<int64_t>(
-        aboveProp.hasLimit() ? (belowProp.getSkip() + aboveProp.getAbsoluteLimit())
-                             : LimitSkipRequirement::kMaxVal,
-        std::max<int64_t>(0,
-                          belowProp.hasLimit()
-                              ? (belowProp.getAbsoluteLimit() - aboveProp.getSkip())
-                              : LimitSkipRequirement::kMaxVal));
-
-    const int64_t newLimit = (newAbsLimit == LimitSkipRequirement::kMaxVal)
-        ? LimitSkipRequirement::kMaxVal
-        : (newAbsLimit - belowProp.getSkip());
-    const int64_t newSkip = (newLimit == 0) ? 0 : belowProp.getSkip();
-    aboveProp = {newLimit, newSkip};
-}
-
 properties::LogicalProps createInitialScanProps(const ProjectionName& projectionName,
                                                 const std::string& scanDefName,
                                                 const GroupIdType groupId,
@@ -2264,7 +2245,7 @@ static PhysPlanBuilder generateDistinctScan(const std::string& scanDefName,
         ce, std::move(innerFPM), scanDefName, indexDefName, std::move(innerInterval), reverse);
 
     // Advance to the next unique key.
-    result.make<LimitSkipNode>(ce, properties::LimitSkipRequirement{1, 0}, std::move(result._node));
+    result.make<LimitSkipNode>(ce, 1, 0, std::move(result._node));
 
     PhysPlanBuilder spoolCons;
     spoolCons.make<SpoolConsumerNode>(
@@ -2285,8 +2266,7 @@ static PhysPlanBuilder generateDistinctScan(const std::string& scanDefName,
         ce, std::move(outerFPM), scanDefName, indexDefName, std::move(outerInterval), reverse);
 
     // Limit to one result to seed the distinct scan.
-    outerIndexScan.make<LimitSkipNode>(
-        ce, properties::LimitSkipRequirement{1, 0}, std::move(outerIndexScan._node));
+    outerIndexScan.make<LimitSkipNode>(ce, 1, 0, std::move(outerIndexScan._node));
 
     result.make<UnionNode>(
         ce, outerProjNames, makeSeq(std::move(outerIndexScan._node), std::move(result._node)));
