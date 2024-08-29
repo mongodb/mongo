@@ -1,5 +1,5 @@
 // Test for invalidation of records across invalidation boundaries.
-// @tags: [requires_replication,does_not_support_stepdowns]
+// @tags: [requires_replication,does_not_support_stepdowns,requires_fcv_81]
 
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";
 import {Thread} from "jstests/libs/parallelTester.js";
@@ -9,12 +9,12 @@ const testUser = "user1";
 const testDB = "user_cache_invalidation";
 const testRole = "read";
 
-function authFailureEvent(log) {
+function isAuthFailureEvent(log) {
     const kAuthFailureEventID = 20436;
     return log.id === kAuthFailureEventID;
 }
 
-function resolveRolesDelayEvent(log) {
+function isEndAcquireUserEvent(log) {
     const kResolveRolesDelayID = 5517200;
     if (log.id !== kResolveRolesDelayID) {
         return false;
@@ -23,7 +23,7 @@ function resolveRolesDelayEvent(log) {
     return (user.user === testUser) && (user.db === testDB);
 }
 
-function invalidateUserEvent(log) {
+function isInvalidateUserEvent(log) {
     const kInvalidateUserID = 20235;
     if (log.id !== kInvalidateUserID) {
         return false;
@@ -32,7 +32,7 @@ function invalidateUserEvent(log) {
     return (user.user === testUser) && (user.db === testDB);
 }
 
-function acquireUserEvent(log) {
+function isStartAcquireUserEvent(log) {
     const kAcquireUserID = 20238;
     if (log.id !== kAcquireUserID) {
         return false;
@@ -92,11 +92,8 @@ function assertLacksLog(conn, cond, start, end) {
  * Create a user with read permission and simply
  * auth and read in a parallel shell.
  *
- * We use FailPoint 'authLocalGetUser.resolveUserDelayMS' to
- * give us time to invalidate the user mid-acquisition.
- *
- * We also use pauseBatchApplicationBeforeCompletion with replsets
- * to try to slip the parallel client into the wrong snapshot.
+ * We use FailPoint 'waitForUserCacheInvalidation' to
+ * pause so that we can invalidate the user mid-acquisition.
  *
  * When we call revokeRolesFromUser(), this invalidates the
  * user acquisition in progress and forces it to restart.
@@ -108,13 +105,12 @@ function assertLacksLog(conn, cond, start, end) {
  * If the snapshot is advanced, then our parallel shell user
  * sees testRole successfully revoked, and our query fails.
  */
-function runTest(writeNode, readNode, awaitReplication, lock, unlock) {
+function runTest(writeNode, readNode, awaitReplication) {
     const writeAdmin = writeNode.getDB('admin');
     const readAdmin = readNode.getDB('admin');
 
     writeAdmin.createUser({user: 'admin', pwd: 'pwd', roles: ['root']});
     assert(writeAdmin.auth('admin', 'pwd'));
-
     assert.soon(() => readAdmin.auth('admin', 'pwd'));
     assert.commandWorked(readNode.setLogLevel(3, 'accessControl'));
 
@@ -123,7 +119,6 @@ function runTest(writeNode, readNode, awaitReplication, lock, unlock) {
     assert.writeOK(writeTest.coll.insert({x: 1}));
 
     awaitReplication();
-    lock();
 
     const startTime = Date.now();
     let currentTime = startTime;
@@ -133,17 +128,10 @@ function runTest(writeNode, readNode, awaitReplication, lock, unlock) {
         return entry;
     }
 
-    // Set the failpoint before we start the parallel thread.
+    // Set the failpoint before we start the parallel thread so that findOne blocks before user
+    // acquisition.
     const fp = configureFailPoint(
         readNode, 'waitForUserCacheInvalidation', {userName: {db: testDB, user: testUser}});
-
-    // We need some time to mutate the auth state before the acquisition completes.
-    const kResolveUserDelayMS = 5 * 1000;
-    assert.commandWorked(readAdmin.runCommand({
-        configureFailPoint: 'authLocalGetUser',
-        mode: 'alwaysOn',
-        data: {resolveUserDelayMS: NumberInt(kResolveUserDelayMS)}
-    }));
 
     const thread = new Thread(function(port, testUser, testDB) {
         const mongo = new Mongo('localhost:' + port);
@@ -161,9 +149,11 @@ function runTest(writeNode, readNode, awaitReplication, lock, unlock) {
     thread.start();
 
     // Wait for initial auth to start.
-    jsTest.log('Waiting for initial resolve roles');
+    jsTest.log('Looking for initial user acquisition');
+    assertHasLogAndAdvance(readNode, isStartAcquireUserEvent);
+    jsTest.log('Waiting for initial acquisition to end');
     {
-        const entry = assertHasLogAndAdvance(readNode, resolveRolesDelayEvent);
+        const entry = assertHasLogAndAdvance(readNode, isEndAcquireUserEvent);
 
         // Our initial acquisition has the read role.
         assert.eq(entry.attr.userName.db, testDB);
@@ -172,7 +162,7 @@ function runTest(writeNode, readNode, awaitReplication, lock, unlock) {
         assert.eq(entry.attr.directRoles[0].role, testRole);
         assert.eq(entry.attr.directRoles[0].db, testDB);
     }
-    assertLacksLog(readNode, invalidateUserEvent, startTime, currentTime);
+    assertLacksLog(readNode, isInvalidateUserEvent, startTime, currentTime);
 
     // Wait for our find to hit the fail point.
     fp.wait();
@@ -183,17 +173,17 @@ function runTest(writeNode, readNode, awaitReplication, lock, unlock) {
     writeTest.revokeRolesFromUser(testUser, [testRole], {w: 1});
 
     jsTest.log('Looking for invalidation');
-    assertHasLogAndAdvance(readNode, invalidateUserEvent);
+    assertHasLogAndAdvance(readNode, isInvalidateUserEvent);
 
+    // Once invalidation happens, the parallel thread breaks out from the
+    // waitForUserCacheInvalidation failpoint and proceeds to acquire the user object.
     jsTest.log('Looking for new acquisition');
-    assertHasLogAndAdvance(readNode, acquireUserEvent);
+    assertHasLogAndAdvance(readNode, isStartAcquireUserEvent);
 
-    jsTest.log('Unlocking batch application');
-    unlock();
-
-    jsTest.log('Waiting for second resolve roles');
+    // This should result in getting the newly updated user object without the removed role.
+    jsTest.log('Waiting for reacquisition to end');
     assertHasLogAndAdvance(readNode, function(entry) {
-        if (!resolveRolesDelayEvent(entry)) {
+        if (!isEndAcquireUserEvent(entry)) {
             return false;
         }
 
@@ -202,7 +192,7 @@ function runTest(writeNode, readNode, awaitReplication, lock, unlock) {
     });
 
     jsTest.log('Looking for authZ failure for read after revokeRolesFromUser');
-    assertHasLogAndAdvance(readNode, authFailureEvent);
+    assertHasLogAndAdvance(readNode, isAuthFailureEvent);
 
     fp.off();
     thread.join();
@@ -216,7 +206,7 @@ function runTest(writeNode, readNode, awaitReplication, lock, unlock) {
 {
     // Standalone
     const mongod = MongoRunner.runMongod({auth: ''});
-    runTest(mongod, mongod, () => null, () => null, () => null);
+    runTest(mongod, mongod, () => null);
     MongoRunner.stopMongod(mongod);
 }
 
@@ -239,24 +229,7 @@ function runTest(writeNode, readNode, awaitReplication, lock, unlock) {
     // Now identify the permanent primary and secondary we'll use.
     const primary = rst.getPrimary();
     const secondary = rst.getSecondaries()[0];
-    const secondaryAdmin = secondary.getDB('admin');
 
-    function lockCompletion() {
-        jsTest.log('Enabling pauseBatchApplicationBeforeCompletion on ' + secondary.host);
-        assert.commandWorked(secondaryAdmin.runCommand({
-            configureFailPoint: 'pauseBatchApplicationBeforeCompletion',
-            mode: 'alwaysOn',
-        }));
-    }
-
-    function unlockCompletion() {
-        jsTest.log('Releasing pauseBatchApplicationBeforeCompletion on ' + secondary.host);
-        assert.commandWorked(secondaryAdmin.runCommand({
-            configureFailPoint: 'pauseBatchApplicationBeforeCompletion',
-            mode: 'off',
-        }));
-    }
-
-    runTest(primary, secondary, () => rst.awaitReplication(), lockCompletion, unlockCompletion);
+    runTest(primary, secondary, () => rst.awaitReplication());
     rst.stopSet();
 }
