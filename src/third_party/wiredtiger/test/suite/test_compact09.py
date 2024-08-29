@@ -53,9 +53,8 @@ class test_compact09(compact_util):
 
     # Test the exclude list functionality of the background compaction server.
     def test_compact09(self):
-        # FIXME-WT-11399
         if self.runningHook('tiered'):
-            self.skipTest("this test does not yet work with tiered storage")
+            self.skipTest("Tiered tables do not support compaction")
 
         # Create and populate tables.
         uris = []

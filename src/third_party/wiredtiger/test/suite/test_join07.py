@@ -186,7 +186,7 @@ class Tokenizer:
 
 # test_join07.py
 #    Join interpreter
-@wttest.skip_for_hook("tiered", "FIXME-WT-9809 - Fails for tiered")
+@wttest.skip_for_hook("tiered", "Fails with tiered storage")
 class test_join07(wttest.WiredTigerTestCase):
     reverseop = { '==' : '==', '<=' : '>=', '<' : '>', '>=' : '<=', '>' : '<' }
     compareop = { '==' : 'eq', '<=' : 'le', '<' : 'lt', '>=' : 'ge',

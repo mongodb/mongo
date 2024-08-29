@@ -97,7 +97,7 @@ class test_import_base(TieredConfigMixin, wttest.WiredTigerTestCase):
             self.session.checkpoint()
 
 # test_import11
-@wttest.skip_for_hook("tiered", "FIXME-WT-9809 - Fails for tiered")
+@wttest.skip_for_hook("tiered", "Fails with tiered storage")
 class test_import11(test_import_base):
     uri_a = 'table:test_a'
     uri_b = 'table:test_b'

@@ -36,7 +36,7 @@ from wtscenario import make_scenarios
 #
 # Test reading a checkpoint that contains prepared data.
 
-@wttest.skip_for_hook("tiered", "FIXME-WT-9809 - Fails for tiered")
+@wttest.skip_for_hook("tiered", "Fails with tiered storage")
 class test_checkpoint(wttest.WiredTigerTestCase):
 
     format_values = [

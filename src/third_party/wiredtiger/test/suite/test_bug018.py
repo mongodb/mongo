@@ -36,7 +36,7 @@ import wiredtiger, wttest
 # that were updated within the same transaction could get out of sync with
 # each other.
 @wttest.skip_for_hook("nonstandalone", "fails for nonstandalone")
-@wttest.skip_for_hook("tiered", "FIXME-WT-9809 - fails on tiered")
+@wttest.skip_for_hook("tiered", "Fails with tiered storage")
 class test_bug018(wttest.WiredTigerTestCase, suite_subprocess):
     '''Test closing/reopening/recovering tables when writes fail'''
 

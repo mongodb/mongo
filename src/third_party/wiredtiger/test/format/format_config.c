@@ -1596,10 +1596,6 @@ config_tiered_storage(void)
 
     storage_source = GVS(TIERED_STORAGE_STORAGE_SOURCE);
 
-    /*
-     * FIXME-WT-9934 If we ever allow tiered storage to be run only locally but with switching
-     * objects, then none becomes a valid option with tiered storage enabled.
-     */
     g.tiered_storage_config =
       (strcmp(storage_source, "off") != 0 && strcmp(storage_source, "none") != 0);
     if (g.tiered_storage_config) {
@@ -1611,15 +1607,15 @@ config_tiered_storage(void)
         if (GV(TIERED_STORAGE_FLUSH_FREQUENCY) > 0)
             config_single(NULL, "checkpoint=on", false);
 
-        /* FIXME-PM-2530: Salvage and verify are not yet supported for tiered storage. */
+        /* Salvage and verify are not supported for tiered storage. */
         config_off(NULL, "ops.salvage");
         config_off(NULL, "ops.verify");
 
-        /* FIXME-PM-2532: Backup is not yet supported for tiered tables. */
+        /* Backup is not supported for tiered tables. */
         config_off(NULL, "backup");
         config_off(NULL, "backup.incremental");
 
-        /* FIXME-PM-2538: Compact is not yet supported for tiered tables. */
+        /* Compact is not supported for tiered tables. */
         config_off(NULL, "ops.compaction");
         config_off(NULL, "background_compact");
     } else

@@ -40,7 +40,7 @@ class test_compact14(compact_util):
 
     def test_compact14(self):
         if self.runningHook('tiered'):
-            self.skipTest("this test does not yet work with tiered storage")
+            self.skipTest("Tiered tables do not support compaction")
 
         # Create an table and populate small amount of data.
         uri = "table:test_compact14"

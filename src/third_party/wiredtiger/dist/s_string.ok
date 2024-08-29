@@ -124,7 +124,6 @@ EOF
 ERANGE
 ETIME
 ETIMEDOUT
-EVICTSERVER
 EXTLIST
 EXTSUBPATH
 Encryptor
@@ -344,6 +343,7 @@ Readonly
 Realloc
 RedHat
 Redistributions
+Reify
 Rogerio
 Runtime
 SDK
@@ -745,7 +745,6 @@ ev
 evd
 eventv
 evictable
-evictserver
 exactp
 exe
 existp

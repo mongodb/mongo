@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+
 #
 # Public Domain 2014-present MongoDB, Inc.
 # Public Domain 2008-2014 WiredTiger, Inc.
@@ -34,7 +34,7 @@ from wtscenario import make_scenarios
 
 # test_drop.py
 #    session level drop operation
-@wttest.skip_for_hook("tiered", "FIXME-WT-9809 - Fails for tiered")
+@wttest.skip_for_hook("tiered", "Fails with tiered storage")
 class test_drop(wttest.WiredTigerTestCase):
     name = 'test_drop'
     extra_config = ''

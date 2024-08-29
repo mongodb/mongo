@@ -42,9 +42,8 @@ class test_compact15(wttest.WiredTigerTestCase):
     scenarios = make_scenarios(uris)
 
     def test_compact15(self):
-        # FIXME-WT-11399
         if self.runningHook('tiered'):
-            self.skipTest("this test does not yet work with tiered storage")
+            self.skipTest("Tiered tables do not support compaction")
 
         self.session.create(self.uri)
 

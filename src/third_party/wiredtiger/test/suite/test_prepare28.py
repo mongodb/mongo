@@ -31,7 +31,7 @@ import wttest, threading
 
 # Prior to a bugfix in WiredTiger it was possible to read a partial transaction if the config
 # ignore prepare was provided. This test demonstrates that case.
-@wttest.skip_for_hook("tiered", "FIXME-WT-9809 - Fails for tiered")
+@wttest.skip_for_hook("tiered", "Fails with tiered storage")
 class test_prepare28(wttest.WiredTigerTestCase):
     conn_config= 'timing_stress_for_test=[prepare_resolution_2]'
     uri = 'table:test_prepare28'

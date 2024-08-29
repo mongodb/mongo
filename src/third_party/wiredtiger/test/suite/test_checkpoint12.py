@@ -36,7 +36,7 @@ from wtscenario import make_scenarios
 # checkpoints don't interfere with the blanket ban on doing other operations after
 # preparing.)
 
-@wttest.skip_for_hook("tiered", "FIXME-WT-9809 - Fails for tiered")
+@wttest.skip_for_hook("tiered", "Fails with tiered storage")
 class test_checkpoint(wttest.WiredTigerTestCase):
     conn_config = ''
     session_config = 'isolation=snapshot'

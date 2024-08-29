@@ -40,7 +40,7 @@ import wttest
 # perform this in recovery to ensure that all the in-memory images have
 # the proper write generation number and we don't end up reading stale
 # transaction ID's stored on the page.
-@wttest.skip_for_hook("tiered", "FIXME-WT-9809 - Causes python crash")
+@wttest.skip_for_hook("tiered", "Tiered causes python crash")
 class test_rollback_to_stable28(test_rollback_to_stable_base):
     conn_config = 'statistics=(all),verbose=(rts:5)'
     # Recovery connection config: The debug mode is only effective on high cache pressure as WiredTiger can potentially decide

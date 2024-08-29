@@ -140,12 +140,9 @@ __gen_drain_callback(
              * continue normal operation.
              */
             if (cookie->verbose_timeout_flags == true) {
-                if (cookie->base.which == WT_GEN_EVICT) {
-                    WT_VERBOSE_RESTORE(session, verbose_orig_level, WT_VERB_EVICT);
+                if (cookie->base.which == WT_GEN_EVICT)
                     WT_VERBOSE_RESTORE(session, verbose_orig_level, WT_VERB_EVICTION);
-                    WT_VERBOSE_RESTORE(session, verbose_orig_level, WT_VERB_EVICTSERVER);
-                    WT_VERBOSE_RESTORE(session, verbose_orig_level, WT_VERB_EVICT_STUCK);
-                } else if (cookie->base.which == WT_GEN_CHECKPOINT) {
+                else if (cookie->base.which == WT_GEN_CHECKPOINT) {
                     WT_VERBOSE_RESTORE(session, verbose_orig_level, WT_VERB_CHECKPOINT);
                     WT_VERBOSE_RESTORE(session, verbose_orig_level, WT_VERB_CHECKPOINT_CLEANUP);
                     WT_VERBOSE_RESTORE(session, verbose_orig_level, WT_VERB_CHECKPOINT_PROGRESS);
@@ -197,16 +194,10 @@ __gen_drain_callback(
             if (!cookie->verbose_timeout_flags &&
               (conn->gen_drain_timeout_ms < 20 ||
                 time_diff_ms > (conn->gen_drain_timeout_ms - 20))) {
-                if (cookie->base.which == WT_GEN_EVICT) {
-                    WT_VERBOSE_SET_AND_SAVE(
-                      session, verbose_orig_level, WT_VERB_EVICT, WT_VERBOSE_DEBUG_1);
+                if (cookie->base.which == WT_GEN_EVICT)
                     WT_VERBOSE_SET_AND_SAVE(
                       session, verbose_orig_level, WT_VERB_EVICTION, WT_VERBOSE_DEBUG_1);
-                    WT_VERBOSE_SET_AND_SAVE(
-                      session, verbose_orig_level, WT_VERB_EVICTSERVER, WT_VERBOSE_DEBUG_1);
-                    WT_VERBOSE_SET_AND_SAVE(
-                      session, verbose_orig_level, WT_VERB_EVICT_STUCK, WT_VERBOSE_DEBUG_1);
-                } else if (cookie->base.which == WT_GEN_CHECKPOINT) {
+                else if (cookie->base.which == WT_GEN_CHECKPOINT) {
                     WT_VERBOSE_SET_AND_SAVE(
                       session, verbose_orig_level, WT_VERB_CHECKPOINT, WT_VERBOSE_DEBUG_1);
                     WT_VERBOSE_SET_AND_SAVE(

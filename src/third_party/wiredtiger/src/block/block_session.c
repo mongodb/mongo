@@ -301,8 +301,32 @@ __ut_block_ext_prealloc(WT_SESSION_IMPL *session, u_int max)
 }
 
 int
+__ut_block_size_alloc(WT_SESSION_IMPL *session, WT_SIZE **szp)
+{
+    return (__block_size_alloc(session, szp));
+}
+
+int
+__ut_block_size_prealloc(WT_SESSION_IMPL *session, u_int max)
+{
+    return (__block_size_prealloc(session, max));
+}
+
+int
+__ut_block_manager_session_cleanup(WT_SESSION_IMPL *session)
+{
+    return (__block_manager_session_cleanup(session));
+}
+
+int
 __ut_block_ext_discard(WT_SESSION_IMPL *session, u_int max)
 {
     return (__block_ext_discard(session, max));
+}
+
+int
+__ut_block_size_discard(WT_SESSION_IMPL *session, u_int max)
+{
+    return (__block_size_discard(session, max));
 }
 #endif

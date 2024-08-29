@@ -35,7 +35,7 @@ import fnmatch, os
 from suite_subprocess import suite_subprocess
 import helper, wttest
 
-@wttest.skip_for_hook("tiered", "FIXME-WT-9809 - fails on tiered")
+@wttest.skip_for_hook("tiered", "Fails on tiered storage")
 class test_txn16(wttest.WiredTigerTestCase, suite_subprocess):
     t1 = 'table:test_txn16_1'
     t2 = 'table:test_txn16_2'

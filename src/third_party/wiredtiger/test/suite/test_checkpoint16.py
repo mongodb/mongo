@@ -37,7 +37,7 @@ from wtscenario import make_scenarios
 # Make sure a table that's clean when a checkpointed can still be read in
 # that checkpoint.
 
-@wttest.skip_for_hook("tiered", "FIXME-WT-9809 - Fails for tiered")
+@wttest.skip_for_hook("tiered", "Fails with tiered storage")
 class test_checkpoint(wttest.WiredTigerTestCase):
     session_config = 'isolation=snapshot'
 

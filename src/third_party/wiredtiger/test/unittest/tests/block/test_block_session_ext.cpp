@@ -7,9 +7,9 @@
  */
 
 /*
- * [block_session]: block_session.c
+ * [block_session_ext]: block_session.c
  * The block manager extent list consists of both extent and size type blocks. This unit test
- * suite tests aims to test all of the allocation and frees of the extent and size block functions.
+ * suite tests aims to test all of the allocation and frees of the extent block functions.
  *
  * The block session manages an internal caching mechanism for both block and size blocks that are
  * created or discarded.
@@ -77,7 +77,7 @@ validate_and_free_ext_list(WT_BLOCK_MGR_SESSION *bms, int expected_items)
     free_ext_list(bms);
 }
 
-TEST_CASE("Block session: __block_ext_alloc", "[block_session]")
+TEST_CASE("Block session: __block_ext_alloc", "[block_session_ext]")
 {
     std::shared_ptr<MockSession> session = MockSession::buildTestMockSession();
     __wt_random_init(&session->getWtSessionImpl()->rnd);
@@ -87,7 +87,7 @@ TEST_CASE("Block session: __block_ext_alloc", "[block_session]")
     validate_and_free_ext_block(ext);
 }
 
-TEST_CASE("Block session: __block_ext_prealloc", "[block_session]")
+TEST_CASE("Block session: __block_ext_prealloc", "[block_session_ext]")
 {
     std::shared_ptr<MockSession> session = MockSession::buildTestMockSession();
     WT_BLOCK_MGR_SESSION *bms = session->setupBlockManagerSession();
@@ -126,7 +126,7 @@ TEST_CASE("Block session: __block_ext_prealloc", "[block_session]")
     }
 }
 
-TEST_CASE("Block session: __wti_block_ext_alloc", "[block_session]")
+TEST_CASE("Block session: __wti_block_ext_alloc", "[block_session_ext]")
 {
     std::shared_ptr<MockSession> session = MockSession::buildTestMockSession();
 
@@ -197,7 +197,7 @@ TEST_CASE("Block session: __wti_block_ext_alloc", "[block_session]")
     }
 }
 
-TEST_CASE("Block session: __wti_block_ext_free", "[block_session]")
+TEST_CASE("Block session: __wti_block_ext_free", "[block_session_ext]")
 {
     std::shared_ptr<MockSession> session = MockSession::buildTestMockSession();
     WT_BLOCK_MGR_SESSION *bms = session->setupBlockManagerSession();
@@ -239,7 +239,7 @@ TEST_CASE("Block session: __wti_block_ext_free", "[block_session]")
     }
 }
 
-TEST_CASE("Block session: __block_ext_discard", "[block_session]")
+TEST_CASE("Block session: __block_ext_discard", "[block_session_ext]")
 {
     std::shared_ptr<MockSession> session = MockSession::buildTestMockSession();
     WT_BLOCK_MGR_SESSION *bms = session->setupBlockManagerSession();

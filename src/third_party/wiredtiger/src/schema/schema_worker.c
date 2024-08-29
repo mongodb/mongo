@@ -96,7 +96,7 @@ __wt_schema_worker(WT_SESSION_IMPL *session, const char *uri,
     if (skip)
         return (0);
 
-    /* FIXME-WT-10520 - Let verify process tiered storage related entries once it is supported. */
+    /* Tiered tables do not support verify or salvage operations. */
     is_tiered = WT_PREFIX_MATCH(uri, "object:") || WT_PREFIX_MATCH(uri, "tier:") ||
       WT_PREFIX_MATCH(uri, "tiered:");
     if (is_tiered && (file_func == __wt_salvage || file_func == __wt_verify))
@@ -132,7 +132,7 @@ __wt_schema_worker(WT_SESSION_IMPL *session, const char *uri,
         for (i = 0; i < WT_COLGROUPS(table); i++) {
             colgroup = table->cgroups[i];
 
-            /* FIXME-WT-10520 - Let verify process tiered tables once it is supported. */
+            /* Verify is not implemented for tiered tables. */
             if ((file_func == __wt_salvage || file_func == __wt_verify) &&
               WT_PREFIX_MATCH(colgroup->source, "tiered:"))
                 WT_ERR(ENOTSUP);

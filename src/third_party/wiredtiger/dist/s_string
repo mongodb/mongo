@@ -72,13 +72,13 @@ while :
             replace $f
         done | sort -u > $t
 
-        # Between aspell versions 0.60.7-20110707 and 0.60.8 the following program names have been
+        # Between aspell versions 0.60.7-20110707 and 0.60.8 the following words have been
         # added to the dictionary and are no longer considered spelling errors. This means
         # that building a replacement list of words with the newer version of aspell will omit them
         # from our custom words file, and subsequently running s_string with older aspell version will
         # report spelling errors. Manually whitelist these names to address this.
-        prog_names="AWS AWS's MongoDB MONGODB PostgreSQL sanitizer sanitizers"
-        for name in $prog_names; do
+        whitelist_words="AWS AWS's MongoDB MONGODB PostgreSQL Reify sanitizer sanitizers"
+        for name in $whitelist_words; do
             echo $name >> $t
         done
         sort -u -o $t $t

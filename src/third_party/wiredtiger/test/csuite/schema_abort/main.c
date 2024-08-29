@@ -476,7 +476,7 @@ test_verify(THREAD_DATA *td)
     WT_DECL_RET;
     WT_SESSION *session;
 
-    /* FIXME-WT-10520 Remove this return when tiered storage supports verify. */
+    /* Tiered tables do not support verify. */
     if (opts->tiered_storage)
         return;
     testutil_check(td->conn->open_session(td->conn, NULL, NULL, &session));

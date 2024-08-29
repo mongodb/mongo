@@ -478,6 +478,8 @@ __wt_hs_insert_updates(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_MULTI *mult
                  */
                 if (error_on_ts_ordering) {
                     ret = EBUSY;
+                    __wt_verbose_info(session, WT_VERB_HS, "%s",
+                      "out-of-order timestamp update detected, aborting eviction");
                     WT_STAT_CONN_INCR(session, cache_eviction_fail_checkpoint_no_ts);
                     goto err;
                 }
@@ -994,6 +996,8 @@ __hs_delete_reinsert_from_pos(WT_SESSION_IMPL *session, WT_CURSOR *hs_cursor, ui
      */
     if (error_on_ts_ordering) {
         ret = EBUSY;
+        __wt_verbose_info(
+          session, WT_VERB_HS, "%s", "out-of-order timestamp update detected, aborting eviction");
         WT_STAT_CONN_INCR(session, cache_eviction_fail_checkpoint_no_ts);
         goto err;
     }

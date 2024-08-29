@@ -35,7 +35,7 @@ from wtscenario import make_scenarios
 # General checkpoint test: create an object containing sets of data associated
 # with a set of checkpoints, then confirm the checkpoint's values are correct,
 # including after other checkpoints are dropped.
-@wttest.skip_for_hook("tiered", "FIXME-WT-9809 - Fails for tiered")
+@wttest.skip_for_hook("tiered", "Fails with tiered storage")
 class test_checkpoint(wttest.WiredTigerTestCase):
     scenarios = make_scenarios([
         ('file', dict(uri='file:checkpoint',fmt='S')),
@@ -219,8 +219,7 @@ class test_checkpoint_target(wttest.WiredTigerTestCase):
         self.assertEqual(cursor[ds.key(10)], value)
         cursor.close()
 
-    # FIXME-WT-10836
-    @wttest.skip_for_hook("tiered", "strange interaction with tiered and named checkpoints using target")
+    @wttest.skip_for_hook("tiered", "tiered tables do not support named checkpoints")
     def test_checkpoint_target(self):
         # Create 3 objects, change one record to an easily recognizable string.
         uri = self.uri + '1'

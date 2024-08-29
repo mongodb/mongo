@@ -72,7 +72,7 @@ from wtscenario import make_scenarios
 # This test doesn't use timestamps; it is about transaction-level visibility.
 # There doesn't seem any immediate reason to think timestamps would add anything.
 
-@wttest.skip_for_hook("tiered", "FIXME-WT-9809 - Fails for tiered")
+@wttest.skip_for_hook("tiered", "Fails with tiered storage")
 class test_checkpoint(wttest.WiredTigerTestCase):
 
     format_values = [

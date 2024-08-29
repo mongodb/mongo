@@ -42,9 +42,8 @@ class test_compact16(compact_util):
     table_numkv = 1000 * 1000
 
     def test_compact16(self):
-        # FIXME-WT-11399
         if self.runningHook('tiered'):
-            self.skipTest("this test does not yet work with tiered storage")
+            self.skipTest("Tiered tables do not support compaction")
 
         # Create and populate a table.
         self.session.create(self.uri, self.create_params)

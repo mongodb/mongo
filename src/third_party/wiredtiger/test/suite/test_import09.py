@@ -34,7 +34,7 @@ from test_import01 import test_import_base
 from wtscenario import make_scenarios
 import wttest
 
-@wttest.skip_for_hook("tiered", "FIXME-WT-9809 - Fails for tiered")
+@wttest.skip_for_hook("tiered", "Fails with tiered storage")
 class test_import09(test_import_base):
     nrows = 100
     ntables = 1

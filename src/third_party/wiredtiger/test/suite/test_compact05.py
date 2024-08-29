@@ -60,9 +60,8 @@ class test_compact05(compact_util):
     # Create the table in a way that it creates a mostly empty file.
     def test_compact05(self):
 
-        # FIXME-WT-11399
         if self.runningHook('tiered'):
-            self.skipTest("this test does not yet work with tiered storage")
+            self.skipTest("Tiered tables do not support compaction")
 
         # Create the table and populate it with a lot of data.
         self.session.create(self.table_uri, self.create_params)

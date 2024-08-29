@@ -40,7 +40,7 @@ from wiredtiger import stat, WiredTigerError
 # 6. Checkpoint
 # 7. Repeat steps 5,6 and validate that the page read back into memory should
 #    not be reconciled everytime with the help of btree stat.
-@wttest.skip_for_hook("tiered", "FIXME-WT-9809 - fails on tiered")
+@wttest.skip_for_hook("tiered", "Fails with tiered storage")
 class test_scrub_eviction_prepare(wttest.WiredTigerTestCase):
 
     def conn_config(self):

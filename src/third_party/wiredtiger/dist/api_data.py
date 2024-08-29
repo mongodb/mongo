@@ -867,7 +867,7 @@ connection_runtime_config = [
     Config('verbose', '[]', r'''
         enable messages for various subsystems and operations. Options are given as a list,
         where each message type can optionally define an associated verbosity level, such as
-        <code>"verbose=[evictserver,read:1,rts:0]"</code>. Verbosity levels that can be provided
+        <code>"verbose=[eviction,read:1,rts:0]"</code>. Verbosity levels that can be provided
         include <code>0</code> (INFO) and <code>1</code> through <code>5</code>, corresponding to
         (DEBUG_1) to (DEBUG_5). \c all is a special case that defines the verbosity level for all
         categories not explicitly set in the config string.''',
@@ -885,10 +885,7 @@ connection_runtime_config = [
             'compact_progress',
             'configuration',
             'error_returns',
-            'evict',
             'eviction',
-            'evict_stuck',
-            'evictserver',
             'fileops',
             'generation',
             'handleops',

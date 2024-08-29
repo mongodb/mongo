@@ -66,9 +66,8 @@ class test_compact07(compact_util):
 
     # Test the basic functionality of the background compaction server.
     def test_compact07(self):
-        # FIXME-WT-11399
         if self.runningHook('tiered'):
-            self.skipTest("this test does not yet work with tiered storage")
+            self.skipTest("Tiered tables do not support compaction")
 
         # Create and populate a table.
         uri_small = self.uri_prefix + '_small'

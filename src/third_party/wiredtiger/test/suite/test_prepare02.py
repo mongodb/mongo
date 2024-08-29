@@ -33,7 +33,7 @@
 from suite_subprocess import suite_subprocess
 import wiredtiger, wttest
 
-@wttest.skip_for_hook("tiered", "FIXME-WT-9809 - Fails for tiered")
+@wttest.skip_for_hook("tiered", "Fails with tiered storage")
 class test_prepare02(wttest.WiredTigerTestCase, suite_subprocess):
 
     def test_prepare_session_operations(self):

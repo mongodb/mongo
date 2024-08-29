@@ -70,9 +70,8 @@ class test_compact12(compact_util, test_cc_base):
         c.close()
 
     def test_compact12_truncate(self):
-        # FIXME-WT-11399
         if self.runningHook('tiered'):
-            self.skipTest("this test does not yet work with tiered storage")
+            self.skipTest("Tiered tables do not support compaction")
 
         self.conn.set_timestamp(f'oldest_timestamp={self.timestamp_str(1)}')
 

@@ -37,7 +37,7 @@ import wttest
 import test_salvage01
 
 # Run the regular salvage test, but with encryption on
-@wttest.skip_for_hook("tiered", "FIXME-WT-9809 - Fails for tiered")
+@wttest.skip_for_hook("tiered", "Fails with tiered storage")
 class test_encrypt07(test_salvage01.test_salvage01):
 
     uri='table:test_encrypt07'
@@ -72,14 +72,14 @@ class test_encrypt07(test_salvage01.test_salvage01):
     #    self.damage_inner(tablename, self.rot13(self.unique).encode())
 
     # To apply decorators to parent methods we need to define them in the child class
-    @wttest.skip_for_hook("tiered", "FIXME-WT-9809 - Fails for tiered")
+    @wttest.skip_for_hook("tiered", "Fails with tiered storage")
     def test_salvage_api(self):
         return super(test_encrypt07, self).test_salvage_api()
 
-    @wttest.skip_for_hook("tiered", "FIXME-WT-9809 - Fails for tiered")
+    @wttest.skip_for_hook("tiered", "Fails with tiered storage")
     def test_salvage_api_damaged(self):
         return super(test_encrypt07, self).test_salvage_api_damaged()
 
-    @wttest.skip_for_hook("tiered", "FIXME-WT-9809 - Fails for tiered")
+    @wttest.skip_for_hook("tiered", "Fails with tiered storage")
     def test_salvage_process_damaged(self):
         return super(test_encrypt07, self).test_salvage_process_damaged()

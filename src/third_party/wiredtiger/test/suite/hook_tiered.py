@@ -193,7 +193,7 @@ def connection_close_replace(orig_connection_close, connection_self, config):
 # We add a call to flush_tier during every checkpoint to make sure we are exercising tiered
 # functionality.
 def session_checkpoint_replace(orig_session_checkpoint, session_self, config):
-    # FIXME-WT-10771 We cannot do named checkpoints with tiered storage objects.
+    # Tiered tables do not support named checkpoints.
     # We can't really continue the test without the name, as the name will certainly be used.
     if config == None:
         config = ''
@@ -230,7 +230,8 @@ def session_create_replace(orig_session_create, session_self, uri, config):
     # If the test isn't creating a table (i.e., it's a column store or lsm) create it as a
     # "local only" object.  Otherwise we get tiered storage from the connection defaults.
     # We want readonly connections to do the real call, see comment in testcase_is_readonly.
-    # FIXME-WT-9832 Column store testing should be allowed with this hook.
+    #
+    # Column store testing is disallowed with tiered storage.
     if not uri.startswith("table:") or "key_format=r" in new_config or "type=lsm" in new_config or testcase_is_readonly():
         new_config = new_config + ',tiered_storage=(name=none)'
 

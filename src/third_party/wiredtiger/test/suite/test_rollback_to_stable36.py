@@ -39,7 +39,7 @@ from wtscenario import make_scenarios
 # everything else on the page is.
 
 @wttest.skip_for_hook("nonstandalone", "timestamped truncate not supported for nonstandalone")
-@wttest.skip_for_hook("tiered", "FIXME-WT-9809 - Fails for tiered")
+@wttest.skip_for_hook("tiered", "Fails with tiered storage")
 class test_rollback_to_stable36(wttest.WiredTigerTestCase):
     conn_config = 'statistics=(all),verbose=(rts:5)'
     session_config = 'isolation=snapshot'

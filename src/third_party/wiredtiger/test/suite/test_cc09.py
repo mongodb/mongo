@@ -34,7 +34,7 @@ from wtscenario import make_scenarios
 # test_cc09.py
 # Verify checkpoint cleanup reads pages from the disk to remove any obsolete time window information
 # present on the page.
-@wttest.skip_for_hook("tiered", "FIXME-WT-9809 - Checkpoint cleanup does not support tiered tables")
+@wttest.skip_for_hook("tiered", "Checkpoint cleanup does not support tiered tables")
 class test_cc09(test_cc_base):
     conn_config_common = 'statistics=(all),statistics_log=(json,wait=1,on_close=true),verbose=(checkpoint_cleanup:0)'
 

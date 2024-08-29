@@ -150,7 +150,7 @@ class test_stat01(wttest.WiredTigerTestCase):
         cursor.close()
 
     # Test simple per-checkpoint statistics.
-    @wttest.skip_for_hook("timestamp", "__txn_visible_all_id assertion hit")    # FIXME-WT-9809
+    @wttest.skip_for_hook("timestamp", "__txn_visible_all_id assertion hit")
     def test_checkpoint_stats(self):
         ds = SimpleDataSet(self, self.uri, self.nentries,
             config=self.config, key_format=self.keyfmt)

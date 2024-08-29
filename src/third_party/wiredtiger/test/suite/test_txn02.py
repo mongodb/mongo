@@ -35,7 +35,7 @@ from suite_subprocess import suite_subprocess
 from wtscenario import make_scenarios
 import wttest
 
-@wttest.skip_for_hook("tiered", "FIXME-WT-9809 - Causes python crash")
+@wttest.skip_for_hook("tiered", "Tiered causes python crash")
 class test_txn02(wttest.WiredTigerTestCase, suite_subprocess):
     logmax = "100K"
     tablename = 'test_txn02'

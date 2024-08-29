@@ -234,7 +234,6 @@ class suite_subprocess:
         outfilename=None, errfilename=None, closeconn=True,
         reopensession=True, failure=False):
 
-        # FIXME-WT-9809:
         if 'timestamp' in self.hook_names and args[0] == 'load':
             self.skipTest("the load utility cannot be run when timestamps are already set")
 

@@ -78,7 +78,7 @@ checkpoint(void *arg)
     wt_wrap_open_session(conn, &sap, NULL, NULL, &session);
 
     named_checkpoints = !g.lsm_config;
-    /* FIXME-WT-10771 Named checkpoints are not yet allowed with tiered storage. */
+    /* Tiered tables do not support named checkpoints. */
     if (g.tiered_storage_config)
         named_checkpoints = false;
 
