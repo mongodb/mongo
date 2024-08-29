@@ -287,3 +287,15 @@ if (!res["failpoint.disablePipelineOptimization"].mode) {
     expectedResult = indexedColl.explain("executionStats").aggregate([{$match: {val: {$gt: 2}}}]);
     assertExplainMatch(result, expectedResult);
 }
+
+// Test that $unionWith that has uses variables runs correctly.
+result = collA.explain("executionStats").aggregate([{
+    $unionWith: {
+        coll: collB.getName(),
+        pipeline: [
+            {$match: {b: 2}},
+            {$redact: {$cond: {if: {$eq: ["val", 2]}, then: "$$PRUNE", else: "$$PRUNE"}}}
+        ]
+    }
+}]);
+assert.commandWorked(result);
