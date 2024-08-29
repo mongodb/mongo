@@ -155,3 +155,7 @@ By default, the download will be placed in `build/multiversion_bin/<githash_patc
 Will place the mongot binary in `build/multiversion_bin/my_variant/23b790a2a81767b8edbbc266043a205029867b74/dist_test/bin/mongot-localdev`
 
 General information about the `setup-repro-env` command can be found in its [README](https://github.com/10gen/db-contrib-tool/blob/main/src/db_contrib_tool/setup_repro_env/README.md#setting-up-a-specific-mongodb-version). Note that if you want to download the mongot binary, you'll have to pass in an appropriate `--variant`: if you don't specify, a variant that makes sense for your machine's architecture will be automatically chosen for you, and will very likely will not be one of the variants that compiles mongot.
+
+### Didn't Find What You're Looking For?
+
+Visit [the landing page](https://github.com/10gen/mongo/blob/master/src/mongo/db/query/search/README.md) for all $search/$vectorSearch/$searchMeta related documentation for server contributors.

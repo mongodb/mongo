@@ -58,3 +58,7 @@ Vector indexes are managed through the existing [search index management command
 ### Testing
 
 The `vectorSearch` command is supported by [`mongotmock`](https://github.com/mongodb/mongo/blob/636d0c1ce26d905cc508a73ada598950e16860b5/src/mongo/db/query/search/mongotmock/mongotmock_commands.cpp#L194) for testing.
+
+### Didn't Find What You're Looking For?
+
+Visit [the landing page](https://github.com/10gen/mongo/blob/master/src/mongo/db/query/search/README.md) for all $search/$vectorSearch/$searchMeta related documentation for server contributors.
