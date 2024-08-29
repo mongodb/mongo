@@ -50,6 +50,12 @@ class GenerateFuzzConfig(Subcommand):
             },
         }
         if encryption_config:
+            # Convert empty string to True for config file compatibility.
+            # Resmoke uses an empty string to indicate a flag argument with no value,
+            # but the mongod configuration file expects a boolean for enableEncryption.
+            # https://www.mongodb.com/docs/manual/reference/configuration-options/#security-options
+            if encryption_config.get("enableEncryption") == "":
+                encryption_config["enableEncryption"] = True
             conf["security"] = encryption_config
         if self._template_path is not None:
             try:

@@ -1,6 +1,8 @@
 """Generator functions for all parameters that we fuzz when invoked with --fuzzMongodConfigs."""
 
 import random
+import os
+import stat
 from buildscripts.resmokelib import config, utils
 
 
@@ -213,7 +215,17 @@ def generate_encryption_config(rng: random.Random):
     chance_to_encrypt = 0.33
     if rng.random() < chance_to_encrypt:
         ret["enableEncryption"] = ""
-        ret["encryptionKeyFile"] = "src/mongo/db/modules/enterprise/jstests/encryptdb/libs/ekf2"
+        # Use absolute path to ensure file is found during Jepsen tests
+        encryption_key_file = os.path.abspath(
+            "src/mongo/db/modules/enterprise/jstests/encryptdb/libs/ekf2"
+        )
+
+        # Set file permissions to avoid "too open" error.
+        # MongoDB requires keyfiles to have restricted permissions.
+        # Since git doesn't preserve file permissions across clones,
+        # we need to explicitly set them to a state Mongo accepts.
+        os.chmod(encryption_key_file, stat.S_IRUSR | stat.S_IWUSR)
+        ret["encryptionKeyFile"] = encryption_key_file
 
         chance_to_use_gcm = 0.50
         if rng.random() < chance_to_use_gcm:
