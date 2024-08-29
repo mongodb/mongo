@@ -306,6 +306,9 @@ public:
 
         const BSONObj& cmdObj = request.body;
 
+        auto curOp = CurOp::get(opCtx);
+        curOp->debug().queryStatsInfo.disableForSubqueryExecution = true;
+
         CountCommandRequest countRequest(NamespaceStringOrUUID(NamespaceString{}));
         try {
             countRequest = CountCommandRequest::parse(IDLParserContext("count"), request);

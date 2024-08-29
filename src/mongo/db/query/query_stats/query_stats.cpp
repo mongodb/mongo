@@ -324,18 +324,8 @@ void registerRequest(OperationContext* opCtx,
         return;
     }
 
-    // TODO SERVER-92118: Remove this and the following if statement when removing the
-    // `wasRateLimited` flag.
-    if (opDebug.queryStatsInfo.wasRateLimited) {
-        LOGV2_DEBUG(
-            8288900,
-            4,
-            "Query stats request was previously rate limited. We expect this is a query on a view");
-        return;
-    }
-
     if (!shouldCollect(opCtx->getServiceContext())) {
-        opDebug.queryStatsInfo.wasRateLimited = true;
+        opDebug.queryStatsInfo.disableForSubqueryExecution = true;
         return;
     }
 

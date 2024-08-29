@@ -502,6 +502,8 @@ public:
             if (collectionOrView->isView()) {
                 // Relinquish locks. The aggregation command will re-acquire them.
                 collectionOrView.reset();
+                auto curOp = CurOp::get(opCtx);
+                curOp->debug().queryStatsInfo.disableForSubqueryExecution = true;
                 return runFindOnView(opCtx, *cq, verbosity, replyBuilder);
             }
 

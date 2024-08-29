@@ -183,6 +183,9 @@ public:
                      rpc::ReplyBuilderInterface* result) override {
             Impl::checkCanExplainHere(opCtx);
 
+            auto curOp = CurOp::get(opCtx);
+            curOp->debug().queryStatsInfo.disableForSubqueryExecution = true;
+
             setReadConcern(opCtx);
             doFLERewriteIfNeeded(opCtx);
 

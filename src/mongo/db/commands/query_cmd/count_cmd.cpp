@@ -255,6 +255,9 @@ public:
             // Relinquish locks. The aggregation command will re-acquire them.
             ctx.reset();
 
+            auto curOp = CurOp::get(opCtx);
+            curOp->debug().queryStatsInfo.disableForSubqueryExecution = true;
+
             auto viewAggregation = countCommandAsAggregationCommand(*request, nss);
             if (!viewAggregation.isOK()) {
                 return viewAggregation.getStatus();
