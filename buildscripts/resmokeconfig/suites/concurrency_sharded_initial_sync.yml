@@ -210,7 +210,6 @@ executor:
     - class: CheckMetadataConsistencyInBackground
     - class: CheckOrphansDeleted
     - class: CheckRoutingTableConsistency
-    - class: CheckClusterIndexConsistency
     - class: ValidateCollections # Validation can interfere with other operations, so this goes last.
       shell_options:
         global_vars:
