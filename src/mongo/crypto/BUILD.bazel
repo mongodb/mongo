@@ -9,117 +9,12 @@ exports_files(
     ]),
 )
 
-mongo_cc_library(
-    name = "aead_encryption",
-    srcs = [
-        "aead_encryption.cpp",
-    ],
-    hdrs = [
-        "aead_encryption.h",
-    ],
-    deps = [
-        ":fle_fields",
-        ":symmetric_crypto",  # TODO(SERVER-98376): Remove.
-    ] + select({
-        "//bazel/config:mongo_crypto_{}".format(mongo_crypto): [
-            ":sha_block_{}".format(mongo_crypto),
-        ]
-        for mongo_crypto in [
-            "apple",
-            "openssl",
-            "tom",
-            "windows",
-        ]
-    }),
-)
-
 idl_generator(
     name = "encryption_fields_gen",
     src = "encryption_fields.idl",
     deps = [
         "//src/mongo/db:basic_types_gen",
     ],
-)
-
-mongo_cc_library(
-    name = "encrypted_field_config",
-    srcs = [
-        "encryption_fields_gen",
-        "encryption_fields_validation.cpp",
-        "fle_numeric.cpp",
-    ],
-    hdrs = [
-        "encryption_fields_validation.h",
-        "fle_numeric.h",
-    ],
-    deps = [
-        "//src/mongo/db:common",  # TODO(SERVER-98376): Remove.
-        "//src/mongo/db:server_base",  # TODO(SERVER-98376): Remove.
-        "//src/mongo/db:server_feature_flags",
-        "//src/mongo/db/pipeline:value_idl",
-    ],
-)
-
-mongo_cc_library(
-    name = "fle_fields",
-    srcs = [
-        "fle_field_schema_gen",
-        "fle_fields_util.cpp",
-    ],
-    hdrs = [
-        "fle_fields_util.h",
-    ],
-    deps = [
-        ":encrypted_field_config",
-        "//src/mongo/db:server_base",  # TODO(SERVER-98376): Remove.
-    ],
-)
-
-mongo_cc_library(
-    name = "fle_crypto",
-    srcs = [
-        "encryption_fields_util.cpp",
-        "fle_crypto.cpp",
-        "fle_options_gen",
-        "fle_stats.cpp",
-        "fle_stats_gen",
-        "fle_tags.cpp",
-        "fle_tokens_gen",
-    ],
-    hdrs = [
-        "encryption_fields_util.h",
-        "fle_crypto.h",
-        "fle_stats.h",
-        "fle_tags.h",
-    ],
-    deps = [
-        # TODO(SERVER-98376): Remove many of these.
-        "//src/mongo/base:secure_allocator",
-        "//src/mongo/bson/util:bson_extract",
-        "//src/mongo/db/commands:server_status_core",
-        "//src/mongo/db/exec/document_value",
-        "//src/mongo/db/query:query_knobs",
-        "//src/mongo/db:common",
-        "//src/mongo/db:server_base",
-        "//src/mongo/db:server_feature_flags",
-        "//src/mongo/idl:cluster_server_parameter",
-        "//src/mongo/shell:kms_idl",
-        "//src/mongo/util:testing_options",
-        "//src/third_party/libmongocrypt:mongocrypt",
-        ":aead_encryption",
-        ":encrypted_field_config",
-        ":fle_fields",
-    ] + select({
-        "//bazel/config:mongo_crypto_{}".format(mongo_crypto): [
-            ":sha_block_{}".format(mongo_crypto),
-        ]
-        for mongo_crypto in [
-            "apple",
-            "openssl",
-            "tom",
-            "windows",
-        ]
-    }),
 )
 
 idl_generator(

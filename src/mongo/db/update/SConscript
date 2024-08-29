@@ -5,6 +5,22 @@ Import("env")
 env = env.Clone()
 
 env.Library(
+    target="pattern_cmp",
+    source=[
+        "pattern_cmp.cpp",
+    ],
+    LIBDEPS=[
+        "$BUILD_DIR/mongo/base",
+        "$BUILD_DIR/mongo/bson/mutable/mutable_bson",
+        "$BUILD_DIR/mongo/db/common",
+        "$BUILD_DIR/mongo/db/exec/document_value/document_value",
+    ],
+    LIBDEPS_PRIVATE=[
+        "$BUILD_DIR/mongo/db/query/bson/dotted_path_support",
+    ],
+)
+
+env.Library(
     target="update_common",
     source=[
         "field_checker.cpp",

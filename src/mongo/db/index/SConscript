@@ -82,6 +82,23 @@ iamEnv.Library(
     ],
 )
 
+iamEnv.Library(
+    target="column_store_index",
+    source=[
+        "column_cell.cpp",
+        "column_store_sorter.cpp",
+    ],
+    LIBDEPS_PRIVATE=[
+        "$BUILD_DIR/mongo/base",
+        "$BUILD_DIR/mongo/db/server_base",
+        "$BUILD_DIR/mongo/db/sorter/sorter_base",
+        "$BUILD_DIR/mongo/db/sorter/sorter_stats",
+        "$BUILD_DIR/mongo/db/storage/encryption_hooks",
+        "$BUILD_DIR/mongo/db/storage/storage_options",
+        "$BUILD_DIR/third_party/snappy/snappy",
+    ],
+)
+
 indexTestEnv = env.Clone()
 indexTestEnv.InjectThirdParty(libraries=["snappy"])
 indexTestEnv.CppUnitTest(

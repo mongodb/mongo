@@ -9,54 +9,11 @@ exports_files(
     ]),
 )
 
-mongo_cc_library(
-    name = "message",
-    srcs = [
-        "message.cpp",
-        "op_msg.cpp",
-    ],
-    hdrs = [
-        "message.h",
-        "op_msg.h",
-    ],
-    deps = [
-        "//src/mongo/bson:bson_validate",  # TODO(SERVER-98376): Remove.
-        "//src/mongo/bson/util:bson_extract",  # TODO(SERVER-98376): Remove.
-        "//src/mongo/db:multitenancy",
-        "//src/mongo/db:server_base",
-        "//src/mongo/db:wire_version",  # TODO(SERVER-98376): Remove.
-        "//src/mongo/db/auth:security_token_auth",
-        "//src/mongo/db/query/bson:dotted_path_support",
-    ] + select({
-        "//bazel/config:use_wiredtiger_enabled": [
-            "//src/third_party/wiredtiger:wiredtiger_checksum",
-        ],
-        "//conditions:default": [],
-    }),
-)
-
 idl_generator(
     name = "topology_version_gen",
     src = "topology_version.idl",
     deps = [
         "//src/mongo/db:basic_types_gen",
-    ],
-)
-
-mongo_cc_library(
-    name = "metadata_impersonated_user",
-    srcs = [
-        "//src/mongo/rpc/metadata:impersonated_user_metadata.cpp",
-    ],
-    hdrs = [
-        "//src/mongo/rpc/metadata:impersonated_user_metadata.h",
-    ],
-    deps = [
-        "//src/mongo:base",
-        "//src/mongo/db:server_base",  # TODO(SERVER-98376): Remove.
-        "//src/mongo/db:server_options",  # TODO(SERVER-98376): Remove.
-        "//src/mongo/db:service_context",  # TODO(SERVER-98376): Remove.
-        "//src/mongo/db/auth",
     ],
 )
 
@@ -76,26 +33,6 @@ idl_generator(
 idl_generator(
     name = "rewrite_state_change_errors_server_parameter_gen",
     src = "rewrite_state_change_errors_server_parameter.idl",
-)
-
-mongo_cc_library(
-    name = "rewrite_state_change_errors",
-    srcs = [
-        "rewrite_state_change_errors.cpp",
-        "rewrite_state_change_errors_server_parameter_gen",
-    ],
-    hdrs = [
-        "rewrite_state_change_errors.h",
-    ],
-    deps = [
-        ":message",  # TODO(SERVER-98376): Remove.
-        "//src/mongo:base",  # TODO(SERVER-98376): Remove.
-        "//src/mongo/bson/mutable:mutable_bson",
-        "//src/mongo/bson/util:bson_extract",  # TODO(SERVER-98376): Remove.
-        "//src/mongo/db:server_base",
-        "//src/mongo/db:service_context",  # TODO(SERVER-98376): Remove.
-        "//src/mongo/util:pcre_wrapper",
-    ],
 )
 
 mongo_cc_library(

@@ -9,21 +9,6 @@ exports_files(
     ]),
 )
 
-mongo_cc_library(
-    name = "transaction_operations",
-    srcs = [
-        "transaction_operations.cpp",
-    ],
-    hdrs = [
-        "transaction_operations.h",
-    ],
-    deps = [
-        "//src/mongo:base",
-        "//src/mongo/db/repl:oplog_entry",
-        "//src/mongo/util:fail_point",  #  TODO(SERVER-98376): Remove.
-    ],
-)
-
 idl_generator(
     name = "transaction_participant_gen",
     src = "transaction_participant.idl",

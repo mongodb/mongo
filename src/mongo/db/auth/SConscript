@@ -5,6 +5,23 @@ Import("env")
 env = env.Clone()
 
 env.Library(
+    target="authentication_session",
+    source=[
+        "authentication_session.cpp",
+    ],
+    LIBDEPS=[
+        "auth",
+        "saslauth",
+    ],
+    LIBDEPS_PRIVATE=[
+        "$BUILD_DIR/mongo/db/audit",
+        "$BUILD_DIR/mongo/db/connection_health_metrics_parameter",
+        "$BUILD_DIR/mongo/db/service_context",
+        "$BUILD_DIR/mongo/db/stats/counters",
+    ],
+)
+
+env.Library(
     target="auth_impl_internal",
     source=[
         "authorization_manager_impl.cpp",
@@ -147,6 +164,24 @@ env.Library(
 )
 
 env.Library(
+    target="auth_umc",
+    source=[
+        "impersonation_session.cpp",
+        "user_management_commands_parser.cpp",
+    ],
+    LIBDEPS_PRIVATE=[
+        "$BUILD_DIR/mongo/bson/mutable/mutable_bson",
+        "$BUILD_DIR/mongo/bson/util/bson_extract",
+        "$BUILD_DIR/mongo/db/common",
+        "$BUILD_DIR/mongo/db/server_base",
+        "$BUILD_DIR/mongo/rpc/metadata_impersonated_user",
+        "address_restriction",
+        "auth",
+        "authprivilege",
+    ],
+)
+
+env.Library(
     target="authorization_manager_global",
     source=[
         "authorization_manager_global.cpp",
@@ -204,6 +239,63 @@ env.Library(
         "authentication_session",
         "authorization_manager_global",
         "saslauth",
+    ],
+)
+
+yamlEnv = env.Clone()
+yamlEnv.InjectThirdParty(libraries=["yaml"])
+yamlEnv.Library(
+    target="security_file",
+    source=[
+        "security_file.cpp",
+    ],
+    LIBDEPS=[
+        "$BUILD_DIR/mongo/base",
+    ],
+    LIBDEPS_PRIVATE=[
+        "$BUILD_DIR/third_party/yaml-cpp/yaml",
+    ],
+)
+
+env.Library(
+    target="sasl_options_init",
+    source=[
+        "sasl_options_init.cpp",
+        "sasl_options_gen.cpp",
+    ],
+    LIBDEPS=[
+        "sasl_options",
+    ],
+    LIBDEPS_PRIVATE=[
+        "$BUILD_DIR/mongo/util/net/network",
+        "$BUILD_DIR/mongo/util/options_parser/options_parser",
+    ],
+)
+
+env.Library(
+    target="saslauth",
+    source=[
+        "sasl_mechanism_registry.cpp",
+        "sasl_plain_server_conversation.cpp",
+        "sasl_scram_server_conversation.cpp",
+    ],
+    LIBDEPS=[
+        "$BUILD_DIR/mongo/base/secure_allocator",
+        "$BUILD_DIR/mongo/crypto/sha_block_${MONGO_CRYPTO}",
+        "$BUILD_DIR/mongo/db/commands/test_commands_enabled",
+        "$BUILD_DIR/mongo/util/icu",
+        "$BUILD_DIR/mongo/util/md5",
+        "$BUILD_DIR/mongo/util/net/network",
+        "auth",
+        "authprivilege",
+        "sasl_options",
+        "user",
+    ],
+    LIBDEPS_PRIVATE=[
+        "$BUILD_DIR/mongo/db/connection_health_metrics_parameter",
+        "$BUILD_DIR/mongo/db/server_base",
+        "$BUILD_DIR/mongo/db/service_context",
+        "cluster_auth_mode",
     ],
 )
 

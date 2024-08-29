@@ -17,6 +17,23 @@ def shouldBuildGRPC(myEnv):
     return myEnv.TargetOSIs("linux") and myEnv["ENABLE_GRPC_BUILD"]
 
 
+# Contains only the core ConnectionString functionality, *not* the ability to call connect() and
+# return a DBClientBase* back. For that you need to link against the 'clientdriver_network' library.
+env.Library(
+    target="connection_string",
+    source=[
+        "connection_string.cpp",
+        "mongo_uri.cpp",
+    ],
+    LIBDEPS=[
+        "$BUILD_DIR/mongo/util/net/network",
+    ],
+    LIBDEPS_PRIVATE=[
+        "$BUILD_DIR/mongo/util/dns_query",
+        "$BUILD_DIR/mongo/util/options_parser/options_parser",
+    ],
+)
+
 # Client-side SASL source necessary for native client SASL session.
 # Includes base types and OIDC, PLAIN, SCRAM, and AWS (only if TLS configured)
 # client mechs.
@@ -108,6 +125,21 @@ env.Library(
     LIBDEPS_PRIVATE=[
         "$BUILD_DIR/mongo/db/auth/auth",
         "$BUILD_DIR/mongo/db/server_base",
+        "connection_string",
+    ],
+)
+
+env.Library(
+    target="internal_auth",
+    source=[
+        "internal_auth.cpp",
+    ],
+    LIBDEPS=[
+        "$BUILD_DIR/mongo/bson/util/bson_extract",
+    ],
+    LIBDEPS_PRIVATE=[
+        "$BUILD_DIR/mongo/db/auth/auth",
+        "$BUILD_DIR/mongo/util/md5",
         "connection_string",
     ],
 )

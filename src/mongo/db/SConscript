@@ -160,6 +160,21 @@ env.Library(
     ],
 )
 
+env.Library(
+    target="server_options",
+    source=[
+        "server_options_helpers.cpp",
+        "server_options_helpers_gen.cpp",
+    ],
+    LIBDEPS=[
+        "$BUILD_DIR/mongo/util/cmdline_utils/cmdline_utils",
+    ],
+    LIBDEPS_PRIVATE=[
+        "$BUILD_DIR/mongo/util/fail_point",
+        "server_base",
+    ],
+)
+
 if env.TargetOSIs("windows"):
     env.Library(
         target="windows_options",
@@ -170,6 +185,25 @@ if env.TargetOSIs("windows"):
             "$BUILD_DIR/mongo/util/options_parser/options_parser",
         ],
     )
+
+env.Library(
+    target="server_options_base",
+    source=[
+        "server_options_base.cpp",
+        "cluster_auth_mode_option_gen.cpp",
+        "keyfile_option_gen.cpp",
+        "server_options_base_gen.cpp",
+        "server_options_general_gen.cpp",
+        "server_options_nongeneral_gen.cpp",
+        "server_options_upgrade_downgrade_gen.cpp",
+    ],
+    LIBDEPS_PRIVATE=[
+        "$BUILD_DIR/mongo/util/options_parser/options_parser",
+        "auth/cluster_auth_mode",
+        "connection_health_metrics_parameter",
+        "server_base",
+    ],
+)
 
 env.Clone().InjectModule("enterprise").Library(
     target="server_options_servers",
@@ -215,6 +249,17 @@ env.Library(
         "repl/repl_settings",
         "server_base",
         "service_context",
+    ],
+)
+
+env.Library(
+    target="connection_health_metrics_parameter",
+    source=[
+        "connection_health_metrics_parameter_gen.cpp",
+    ],
+    LIBDEPS_PRIVATE=[
+        "$BUILD_DIR/mongo/util/options_parser/options_parser",
+        "server_base",
     ],
 )
 
@@ -520,6 +565,21 @@ env.CppUnitTest(
         "concurrency/lock_manager",
         "mongod_options",
         "server_base",
+    ],
+)
+
+env.Library(
+    target="coll_mod_command_idl",
+    source=[
+        "coll_mod_gen.cpp",
+    ],
+    LIBDEPS=[
+        "catalog/collection_options",
+    ],
+    LIBDEPS_PRIVATE=[
+        "auth/authprivilege",
+        "server_base",
+        "timeseries/timeseries_options",
     ],
 )
 
@@ -906,6 +966,20 @@ env.Library(
 )
 
 env.Library(
+    target="resumable_index_builds_idl",
+    source=[
+        "resumable_index_builds_gen.cpp",
+    ],
+    LIBDEPS=[
+        "$BUILD_DIR/mongo/base",
+        "$BUILD_DIR/mongo/idl/idl_parser",
+    ],
+    LIBDEPS_PRIVATE=[
+        "sorter/sorter_base",
+    ],
+)
+
+env.Library(
     target="index_builds_coordinator_mongod",
     source=[
         "index_builds_coordinator_mongod.cpp",
@@ -1130,6 +1204,20 @@ env.Library(
         "service_context",
         "shard_role",
         "ttl_collection_cache",
+    ],
+)
+
+env.Library(
+    target="record_id_helpers",
+    source=[
+        "record_id_helpers.cpp",
+    ],
+    LIBDEPS_PRIVATE=[
+        "$BUILD_DIR/mongo/bson/bson_validate",
+        "catalog/collection_options",
+        "query/collation/collator_interface",
+        "server_base",
+        "storage/key_string",
     ],
 )
 

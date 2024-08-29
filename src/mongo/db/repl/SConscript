@@ -6,6 +6,18 @@ Import("wiredtiger")
 env = env.Clone()
 
 env.Library(
+    target="apply_ops_command_info",
+    source=[
+        "apply_ops_command_info.cpp",
+        "apply_ops_gen.cpp",
+    ],
+    LIBDEPS_PRIVATE=[
+        "$BUILD_DIR/mongo/base",
+        "oplog_entry",
+    ],
+)
+
+env.Library(
     target="change_stream_oplog_notification",
     source=[
         "change_stream_oplog_notification.cpp",
@@ -427,6 +439,26 @@ env.Library(
     ],
 )
 
+env.Library(
+    target="oplog_entry",
+    source=[
+        "oplog_entry.cpp",
+        "oplog_entry_serialization.cpp",
+        "oplog_entry_gen.cpp",
+    ],
+    LIBDEPS=[
+        "$BUILD_DIR/mongo/db/auth/security_token_auth",
+        "$BUILD_DIR/mongo/db/catalog/collection_options",
+        "$BUILD_DIR/mongo/db/exec/document_value/document_value",
+        "optime",
+    ],
+    LIBDEPS_PRIVATE=[
+        "$BUILD_DIR/mongo/db/multitenancy",
+        "$BUILD_DIR/mongo/db/server_base",
+        "$BUILD_DIR/mongo/db/server_feature_flags",
+    ],
+)
+
 env.Benchmark(
     target="oplog_entry_bm",
     source=[
@@ -436,6 +468,21 @@ env.Benchmark(
         "$BUILD_DIR/mongo/db/concurrency/lock_manager",
         "apply_ops_command_info",
         "oplog_entry",
+    ],
+)
+
+env.Library(
+    target="oplog_write_interface",
+    source=[
+        "oplog_writer_batcher.cpp",
+        "oplog_writer.cpp",
+    ],
+    LIBDEPS=[
+        "$BUILD_DIR/mongo/db/server_base",
+        "$BUILD_DIR/mongo/db/service_context",
+        "oplog_entry",
+        "repl_coordinator_interface",
+        "repl_server_parameters",
     ],
 )
 
@@ -995,6 +1042,22 @@ env.Library(
 )
 
 env.Library(
+    target="cloner_utils",
+    source=[
+        "cloner_utils.cpp",
+        "database_cloner_common.cpp",
+        "database_cloner_gen.cpp",
+    ],
+    LIBDEPS_PRIVATE=[
+        "$BUILD_DIR/mongo/db/catalog/collection_options",
+        "$BUILD_DIR/mongo/db/multitenancy",
+        "$BUILD_DIR/mongo/db/server_base",
+        "$BUILD_DIR/mongo/db/server_feature_flags",
+        "read_concern_args",
+    ],
+)
+
+env.Library(
     target="initial_syncer",
     source=[
         "initial_syncer.cpp",
@@ -1037,6 +1100,19 @@ env.Library(
     ],
     LIBDEPS=[
         "$BUILD_DIR/mongo/executor/task_executor_interface",
+    ],
+)
+
+env.Library(
+    target="roll_back_local_operations",
+    source=[
+        "roll_back_local_operations.cpp",
+    ],
+    LIBDEPS=[
+        "$BUILD_DIR/mongo/base",
+        "$BUILD_DIR/mongo/util/fail_point",
+        "oplog_entry",
+        "optime",
     ],
 )
 
@@ -1828,6 +1904,19 @@ env.Library(
         "oplog_application",
         "oplog_application_interface",
         "repl_server_parameters",
+    ],
+)
+
+env.Library(
+    target="image_collection_entry",
+    source=[
+        "image_collection_entry_gen.cpp",
+    ],
+    LIBDEPS=[
+        "$BUILD_DIR/mongo/base",
+        "$BUILD_DIR/mongo/db/session/logical_session_id",
+        "$BUILD_DIR/mongo/idl/idl_parser",
+        "oplog_entry",
     ],
 )
 

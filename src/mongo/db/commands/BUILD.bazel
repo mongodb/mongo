@@ -230,25 +230,6 @@ idl_generator(
     ],
 )
 
-mongo_cc_library(
-    name = "create_command",
-    srcs = [
-        "create_gen",
-    ],
-    hdrs = [
-        "create_command_validation.h",
-    ],
-    deps = [
-        "//src/mongo/crypto:encrypted_field_config",
-        "//src/mongo/db:server_base",
-        "//src/mongo/db:server_options",  # TODO(SERVER-98376): Remove.
-        "//src/mongo/db/auth:authprivilege",
-        "//src/mongo/db/catalog:collection_options",
-        "//src/mongo/db/query:query_knobs",  # TODO(SERVER-98376): Remove.
-        "//src/mongo/db/timeseries:timeseries_options",  # TODO(SERVER-98376): Remove.
-    ],
-)
-
 idl_generator(
     name = "validate_db_metadata_gen",
     src = "validate_db_metadata.idl",
