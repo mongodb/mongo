@@ -267,7 +267,7 @@ tasks:
     tags:
       [
         "assigned_to_jira_team_server_servicearch",
-        "default",
+        "experimental",
         "incompatible_debug_mode",
         "serverless",
       ]
@@ -671,7 +671,7 @@ tasks:
     tags:
       [
         "assigned_to_jira_team_server_servicearch",
-        "default",
+        "experimental",
         "incompatible_debug_mode",
         "serverless",
       ]
@@ -686,7 +686,7 @@ tasks:
     tags:
       [
         "assigned_to_jira_team_server_servicearch",
-        "default",
+        "experimental",
         "incompatible_debug_mode",
         "serverless",
       ]
@@ -701,7 +701,7 @@ tasks:
     tags:
       [
         "assigned_to_jira_team_server_servicearch",
-        "default",
+        "experimental",
         "incompatible_debug_mode",
         "serverless",
       ]
@@ -775,7 +775,7 @@ tasks:
     tags:
       [
         "assigned_to_jira_team_server_servicearch",
-        "default",
+        "experimental",
         "incompatible_debug_mode",
         "requires_large_host_debug_mode",
         "requires_large_host_tsan",

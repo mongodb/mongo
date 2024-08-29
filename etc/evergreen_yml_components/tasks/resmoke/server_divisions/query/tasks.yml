@@ -562,14 +562,22 @@ tasks:
 
   - <<: *task_template
     name: change_streams_multitenant_passthrough
-    tags: ["assigned_to_jira_team_server_query_execution", "default"] # TODO SERVER-57866: Add the "change_streams" tag here.
+    tags: [
+        "assigned_to_jira_team_server_query_execution",
+        "experimental",
+        "serverless",
+      ] # TODO SERVER-57866: Add the "change_streams" tag here.
     commands:
       - func: "do setup"
       - func: "run tests"
 
   - <<: *task_template
     name: change_streams_multitenant_sharded_collections_passthrough
-    tags: ["assigned_to_jira_team_server_query_execution", "default"] # TODO SERVER-57866: Add the "change_streams" tag here.
+    tags: [
+        "assigned_to_jira_team_server_query_execution",
+        "experimental",
+        "serverless",
+      ] # TODO SERVER-57866: Add the "change_streams" tag here.
     commands:
       - func: "do setup"
       - func: "run tests"
@@ -1280,7 +1288,8 @@ tasks:
     tags:
       [
         "assigned_to_jira_team_server_query_optimization",
-        "non_deterministic",
+        "experimental",
+        "serverless",
         "change_stream_fuzzer",
         "require_npm",
         "random_name",
@@ -1304,7 +1313,8 @@ tasks:
     tags:
       [
         "assigned_to_jira_team_server_query_optimization",
-        "non_deterministic",
+        "experimental",
+        "serverless",
         "change_stream_fuzzer",
         "require_npm",
         "random_name",

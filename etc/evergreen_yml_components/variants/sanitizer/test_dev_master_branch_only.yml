@@ -540,6 +540,9 @@ buildvariants:
       - name: .multiversion_passthrough
       - name: .random_multiversion_ds
       - name: .watchdog
+      - name: .serverless !.change_stream_fuzzer
+        distros:
+          - rhel8.8-xlarge
 
   - name: &rhel8-debug-aubsan-benchmarks rhel8-debug-aubsan-benchmarks
     display_name: "* {A,UB}SAN Enterprise RHEL 8 DEBUG (Benchmarks)"

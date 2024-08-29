@@ -598,7 +598,6 @@ buildvariants:
       - name: .sharding .jscore !.wo_snapshot !.feature_flag_guarded
       - name: .sharding .common !.csrs !.jstestfuzz !.feature_flag_guarded
       - name: .updatefuzzer
-      - name: .serverless
       - name: unittest_shell_hang_analyzer_gen
       - name: .watchdog
 

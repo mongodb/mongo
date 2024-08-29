@@ -81,7 +81,7 @@ buildvariants:
       - name: .auth !.multiversion
       - name: .causally_consistent !.wo_snapshot !.durable_history
       - name: .change_streams
-      - name: .change_stream_fuzzer
+      - name: .change_stream_fuzzer !.serverless
       - name: .misc_js
       - name: .concurrency !.no_txns !.kill_terminate !.incompatible_inmemory !.feature_flag_guarded
         distros:

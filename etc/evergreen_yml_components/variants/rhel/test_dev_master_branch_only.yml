@@ -681,9 +681,6 @@ buildvariants:
       - name: .sharding .common !.feature_flag_guarded !.jstestfuzz
       - name: .sharding .jscore !.wo_snapshot !.multi_stmt !.feature_flag_guarded
       - name: .sharding .txns
-      - name: .serverless
-        distros:
-          - rhel8.8-xlarge
       - name: aggregation_repeat_queries_multiplan_single_solutions
       - name: audit
       - name: burn_in_tests_gen
@@ -765,7 +762,7 @@ buildvariants:
         --excludeWithAnyTags=resource_intensive,featureFlagSbeFull
     tasks:
       - name: .aggfuzzer
-      - name: .change_stream_fuzzer
+      - name: .change_stream_fuzzer !.serverless
       - name: .query_fuzzer
       - name: .updatefuzzer
       - name: .jstestfuzz
