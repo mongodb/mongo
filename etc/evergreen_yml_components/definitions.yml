@@ -1818,7 +1818,7 @@ functions:
       params:
         provider: ec2
         distro: ${distro_id}
-        timeout_teardown_secs: 604800 # 7 days
+        timeout_teardown_secs: 86400 # 24 hours
         security_group_ids:
           - sg-097bff6dd0d1d31d0
 
