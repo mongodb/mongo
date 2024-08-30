@@ -568,19 +568,19 @@ constexpr Milliseconds kOCSPUnknownStatusRefreshRate = Minutes(5);
 struct OCSPFetchResponse {
     OCSPFetchResponse(Status statusOfResponse,
                       UniqueOCSPResponse response,
-                      boost::optional<Date_t> refreshTime)
-        : statusOfResponse(statusOfResponse),
-          response(std::move(response)),
-          refreshTime(refreshTime.value_or(Date_t::now() + 2 * kOCSPUnknownStatusRefreshRate)),
-          hasNextUpdate(refreshTime) {}
+                      boost::optional<Date_t> refreshTimeOpt)
+        : statusOfResponse{statusOfResponse},
+          response{std::move(response)},
+          refreshTime{_validateRefreshTime(refreshTimeOpt)},
+          _hasNextUpdate{refreshTimeOpt} {}
 
+public:
     Status statusOfResponse;
     UniqueOCSPResponse response;
     Date_t refreshTime;
-    bool hasNextUpdate;
 
     bool cacheable() {
-        return (statusOfResponse == ErrorCodes::OCSPCertificateStatusRevoked) || hasNextUpdate;
+        return (statusOfResponse == ErrorCodes::OCSPCertificateStatusRevoked) || _hasNextUpdate;
     }
 
     Milliseconds fetchNewResponseDuration() {
@@ -602,8 +602,15 @@ struct OCSPFetchResponse {
         return timeBeforeNextUpdate / 2;
     }
 
-    Date_t nextStapleRefresh() {
-        return refreshTime;
+private:
+    bool _hasNextUpdate;
+
+    Date_t _validateRefreshTime(const boost::optional<Date_t>& refreshTime) const {
+        // The upper limit of OCSP Stapling nextUpdateTime
+        static constexpr Milliseconds kOCSPStaplingMaxNextUpdateTime{Days(60)};
+        const Date_t now{Date_t::now()};
+        return std::min(refreshTime.value_or(now + 2 * kOCSPUnknownStatusRefreshRate),
+                        now + kOCSPStaplingMaxNextUpdateTime);
     }
 };
 
@@ -2431,7 +2438,7 @@ Milliseconds SSLManagerOpenSSL::updateOcspStaplingContextWithResponse(
     _fetcherBackoff = OCSPRefreshBackoff();
 
     _ocspStaplingContext = std::make_shared<OCSPStaplingContext>(
-        std::move(swResponse.getValue().response), swResponse.getValue().nextStapleRefresh());
+        std::move(swResponse.getValue().response), swResponse.getValue().refreshTime);
 
     return swResponse.getValue().fetchNewResponseDuration();
 }

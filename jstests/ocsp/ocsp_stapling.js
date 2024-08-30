@@ -108,6 +108,31 @@ function test(serverCert, caCert, responderCertPair, extraOpts) {
     mock_ocsp.stop();
 }
 
+function testSuperLongOCSPResponseNextUpdateTime() {
+    const ocsp_options = {
+        sslMode: "requireSSL",
+        sslPEMKeyFile: OCSP_SERVER_CERT,
+        sslCAFile: OCSP_CA_PEM,
+        sslAllowInvalidHostnames: "",
+        setParameter: {
+            "ocspEnabled": "true",
+        }
+    };
+
+    let conn = null;
+
+    // Converting this to nanoseconds would overflow a 64-bit long long
+    const kSuperLongNextUpdateSeconds = 20000000000;
+    const mock_ocsp = new MockOCSPServer("", kSuperLongNextUpdateSeconds);
+    mock_ocsp.start();
+    assert.doesNotThrow(() => {
+        conn = MongoRunner.runMongod(ocsp_options);
+    });
+
+    mock_ocsp.stop();
+    MongoRunner.stopMongod(conn);
+}
+
 test(OCSP_SERVER_CERT, OCSP_CA_PEM, OCSP_DELEGATE_RESPONDER);
 test(OCSP_SERVER_CERT, OCSP_CA_PEM, OCSP_DELEGATE_RESPONDER, CLUSTER_CA);
 test(OCSP_SERVER_CERT, OCSP_CA_PEM, OCSP_CA_RESPONDER);
@@ -124,3 +149,5 @@ test(OCSP_SERVER_AND_INTERMEDIATE_APPENDED_PEM,
      OCSP_CA_PEM,
      OCSP_INTERMEDIATE_RESPONDER,
      CLUSTER_CA);
+
+testSuperLongOCSPResponseNextUpdateTime();
