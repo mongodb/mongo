@@ -118,19 +118,19 @@ Status NativeSaslClientSession::initialize() {
 
     std::string mechanism = getParameter(parameterMechanism).toString();
     if (mechanism == auth::kMechanismSaslPlain) {
-        _saslConversation.reset(new SaslPLAINClientConversation(this));
+        _saslConversation = std::make_unique<SaslPLAINClientConversation>(this);
     } else if (mechanism == auth::kMechanismScramSha1) {
-        _saslConversation.reset(
-            new SaslSCRAMClientConversationImpl<SHA1Block>(this, scramsha1ClientCache));
+        _saslConversation = std::make_unique<SaslSCRAMClientConversationImpl<SHA1Block>>(
+            this, scramsha1ClientCache);
     } else if (mechanism == auth::kMechanismScramSha256) {
-        _saslConversation.reset(
-            new SaslSCRAMClientConversationImpl<SHA256Block>(this, scramsha256ClientCache));
+        _saslConversation = std::make_unique<SaslSCRAMClientConversationImpl<SHA256Block>>(
+            this, scramsha256ClientCache);
 #ifdef MONGO_CONFIG_SSL
         // AWS depends on kms-message which depends on ssl libraries
     } else if (mechanism == auth::kMechanismMongoAWS) {
-        _saslConversation.reset(new SaslAWSClientConversation(this));
+        _saslConversation = std::make_unique<SaslAWSClientConversation>(this);
     } else if (mechanism == auth::kMechanismMongoX509) {
-        _saslConversation.reset(new SaslX509ClientConversation(this));
+        _saslConversation = std::make_unique<SaslX509ClientConversation>(this);
 #endif
     } else if (mechanism == auth::kMechanismMongoOIDC) {
         auto userName = hasParameter(SaslClientSession::parameterUser)
@@ -140,7 +140,8 @@ Status NativeSaslClientSession::initialize() {
             ? getParameter(SaslClientSession::parameterOIDCAccessToken)
             : ""_sd;
 
-        _saslConversation.reset(new SaslOIDCClientConversation(this, userName, accessToken));
+        _saslConversation =
+            std::make_unique<SaslOIDCClientConversation>(this, userName, accessToken);
     } else {
         return Status(ErrorCodes::BadValue,
                       str::stream() << "SASL mechanism " << mechanism << " is not supported");
