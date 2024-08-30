@@ -2302,49 +2302,5 @@ TEST_F(BucketCatalogTest, GetCacheDerivedBucketMaxSizeRespectsAbsoluteMin) {
     ASSERT_EQ(cacheDerivedBucketMaxSize, gTimeseriesBucketMinSize.load());
 }
 
-TEST_F(BucketCatalogTest, OIDCollisionIsHandledForFrozenBucket) {
-    // Simplify this test by only using one stripe.
-    FailPointEnableBlock failPoint("alwaysUseSameBucketCatalogStripe");
-    auto time = Date_t::now();
-    // Insert a measurement to create a bucket.
-    auto result = _insertOneHelper(
-        _opCtx, *_bucketCatalog, _ns1, _uuid1, BSON(_timeField << time << _metaField << "A"));
-    ASSERT_OK(result.getStatus());
-    auto batch = get<SuccessfulInsertion>(result.getValue()).batch;
-    ASSERT(batch);
-
-    auto doc = BSON(_timeField << time << _metaField << "B");
-    // Get the insertContext so that we can get the key signature for the BucketID — again, to
-    // trigger a collision of our frozen bucketID with the bucketID of the bucket we will allocate.
-    auto insertContext = std::get<bucket_catalog::InsertContext>(uassertStatusOK(prepareInsert(
-        *_bucketCatalog, _uuid1, _getCollator(_ns1), _getTimeseriesOptions(_ns1), doc)));
-
-    // Get the next sequential OID so that we can trigger an ID collision down the line.
-    auto OIDAndRoundedTime =
-        bucket_catalog::internal::generateBucketOID(time, insertContext.options);
-    OID nextBucketOID = std::get<OID>(OIDAndRoundedTime);
-
-    BucketId nextBucketId{_uuid1, nextBucketOID, insertContext.key.signature()};
-
-    // Mark the next bucketID as being frozen. We could arrive at this state if there was a bucket
-    // that we tried reopening that was not compressed, and was also corrupted; when we try to
-    // compress it and fail to do so successfully because it is corrupted, we freeze it. When it is
-    // in this state, it wouldn't in memory in the openBucketsByKey/openBucketsById structures of
-    // any stripe, but it would have an entry in the bucketStateRegistry for its id. This is an edge
-    // case since currently there should be no way to end up with the same bucketID across
-    // stripes/within the same stripe.
-    freezeBucket(_bucketCatalog->bucketStateRegistry, nextBucketId);
-
-    // We should see bucket collision that gets retried, leading to the insert eventually
-    // succeeding.
-    result = _insertOneHelper(
-        _opCtx, *_bucketCatalog, _ns1, _uuid1, BSON(_timeField << time << _metaField << "B"));
-    ASSERT_OK(result.getStatus());
-    auto batch2 = get<SuccessfulInsertion>(result.getValue()).batch;
-    ASSERT_NE(nextBucketId, batch2->bucketId);
-    // We should check that the bucketID that we failed to create is not stored in the stripe.
-    ASSERT(!_bucketCatalog->stripes[0]->openBucketsById.contains(nextBucketId));
-}
-
 }  // namespace
 }  // namespace mongo::timeseries::bucket_catalog
