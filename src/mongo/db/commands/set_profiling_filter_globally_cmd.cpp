@@ -121,4 +121,7 @@ bool SetProfilingFilterGloballyCmd::run(OperationContext* opCtx,
                                         << "none"));
     return true;
 }
+
+MONGO_REGISTER_COMMAND(SetProfilingFilterGloballyCmd).forShard();
+
 }  // namespace mongo

@@ -83,7 +83,6 @@
 #include "mongo/db/feature_flag.h"
 #include "mongo/db/fle_crud.h"
 #include "mongo/db/initialize_operation_session_info.h"
-#include "mongo/db/introspect.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/not_primary_error_tracker.h"
 #include "mongo/db/ops/delete_request_gen.h"

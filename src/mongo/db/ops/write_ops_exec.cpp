@@ -83,7 +83,6 @@
 #include "mongo/db/db_raii.h"
 #include "mongo/db/error_labels.h"
 #include "mongo/db/feature_flag.h"
-#include "mongo/db/introspect.h"
 #include "mongo/db/matcher/expression.h"
 #include "mongo/db/matcher/expression_leaf.h"
 #include "mongo/db/not_primary_error_tracker.h"
@@ -98,6 +97,7 @@
 #include "mongo/db/ops/write_ops_retryability.h"
 #include "mongo/db/pipeline/legacy_runtime_constants_gen.h"
 #include "mongo/db/pipeline/variables.h"
+#include "mongo/db/profile_collection.h"
 #include "mongo/db/query/canonical_query.h"
 #include "mongo/db/query/collection_query_info.h"
 #include "mongo/db/query/explain_options.h"
@@ -1100,7 +1100,7 @@ void logOperationAndProfileIfNeeded(OperationContext* opCtx, CurOp* curOp) {
         // Stash the current transaction so that writes to the profile collection are not
         // done as part of the transaction.
         TransactionParticipant::SideTransactionBlock sideTxn(opCtx);
-        profile(opCtx, CurOp::get(opCtx)->getNetworkOp());
+        profile_collection::profile(opCtx, CurOp::get(opCtx)->getNetworkOp());
     }
 }
 

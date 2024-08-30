@@ -29,7 +29,7 @@ filters:
       - 10gen/query-optimization
   - "document_source_current_op*":
     approvers:
-      - 10gen/query-execution
+      - 10gen/query-integration
   - "document_source_densify*":
     approvers:
       - 10gen/query-integration

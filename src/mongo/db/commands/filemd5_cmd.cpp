@@ -28,18 +28,11 @@
  */
 
 
-#include <boost/optional/optional.hpp>
-#include <cstring>
 #include <memory>
 #include <string>
-#include <utility>
 
-#include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
-#include "mongo/base/string_data.h"
-#include "mongo/bson/bsonelement.h"
-#include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/bsontypes.h"
@@ -47,24 +40,14 @@
 #include "mongo/db/auth/action_type.h"
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/catalog/collection.h"
-#include "mongo/db/catalog/collection_catalog.h"
-#include "mongo/db/catalog/database.h"
-#include "mongo/db/catalog/database_holder.h"
-#include "mongo/db/catalog_raii.h"
-#include "mongo/db/commands.h"
-#include "mongo/db/commands/profile_common.h"
-#include "mongo/db/commands/profile_gen.h"
-#include "mongo/db/commands/set_profiling_filter_globally_cmd.h"
 #include "mongo/db/concurrency/exception_util.h"
-#include "mongo/db/concurrency/lock_manager_defs.h"
 #include "mongo/db/curop_failpoint_helpers.h"
 #include "mongo/db/database_name.h"
 #include "mongo/db/db_raii.h"
 #include "mongo/db/dbdirectclient.h"
-#include "mongo/db/introspect.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
-#include "mongo/db/profile_filter_impl.h"
+#include "mongo/db/profile_collection.h"
 #include "mongo/db/query/canonical_query.h"
 #include "mongo/db/query/find_command.h"
 #include "mongo/db/query/get_executor.h"
@@ -72,121 +55,19 @@
 #include "mongo/db/query/plan_yield_policy.h"
 #include "mongo/db/query/query_planner_params.h"
 #include "mongo/db/service_context.h"
-#include "mongo/db/storage/storage_engine.h"
 #include "mongo/logv2/log.h"
-#include "mongo/logv2/log_attr.h"
-#include "mongo/logv2/log_component.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/fail_point.h"
 #include "mongo/util/md5.h"
 #include "mongo/util/namespace_string_util.h"
-#include "mongo/util/str.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kCommand
-
 
 namespace mongo {
 namespace {
 
 // Failpoint for making filemd5 hang.
 MONGO_FAIL_POINT_DEFINE(waitInFilemd5DuringManualYield);
-
-Status _setProfileSettings(OperationContext* opCtx,
-                           Database* db,
-                           const DatabaseName& dbName,
-                           mongo::CollectionCatalog::ProfileSettings newSettings) {
-    invariant(db);
-
-    auto currSettings = CollectionCatalog::get(opCtx)->getDatabaseProfileSettings(dbName);
-
-    if (currSettings == newSettings) {
-        return Status::OK();
-    }
-
-    if (newSettings.level == 0) {
-        // No need to create the profile collection.
-        CollectionCatalog::write(opCtx, [&](CollectionCatalog& catalog) {
-            catalog.setDatabaseProfileSettings(dbName, newSettings);
-        });
-        return Status::OK();
-    }
-
-    // Can't support profiling without supporting capped collections.
-    if (!opCtx->getServiceContext()->getStorageEngine()->supportsCappedCollections()) {
-        return Status(ErrorCodes::CommandNotSupported,
-                      "the storage engine doesn't support profiling.");
-    }
-
-    Status status = createProfileCollection(opCtx, db);
-    if (!status.isOK()) {
-        return status;
-    }
-
-    CollectionCatalog::write(opCtx, [&](CollectionCatalog& catalog) {
-        catalog.setDatabaseProfileSettings(dbName, newSettings);
-    });
-
-    return Status::OK();
-}
-
-
-/**
- * Sets the profiling level, logging/profiling threshold, and logging/profiling sample rate for the
- * given database.
- */
-class CmdProfile : public ProfileCmdBase {
-public:
-    CmdProfile() = default;
-
-protected:
-    CollectionCatalog::ProfileSettings _applyProfilingLevel(
-        OperationContext* opCtx,
-        const DatabaseName& dbName,
-        const ProfileCmdRequest& request) const final {
-        const auto profilingLevel = request.getCommandParameter();
-
-        // An invalid profiling level (outside the range [0, 2]) represents a request to read the
-        // current profiling level. Similarly, if the request does not include a filter, we only
-        // need to read the current filter, if any. If we're not changing either value, then we can
-        // acquire a shared lock instead of exclusive.
-        const bool readOnly = (profilingLevel < 0 || profilingLevel > 2) && !request.getFilter();
-        const LockMode dbMode = readOnly ? MODE_IS : MODE_IX;
-
-        NamespaceString nss(NamespaceString::makeSystemDotProfileNamespace(dbName));
-        AutoGetCollection ctx(opCtx, nss, dbMode);
-        Database* db = ctx.getDb();
-
-        // Fetches the database profiling level + filter or the server default if the db does not
-        // exist.
-        auto oldSettings = CollectionCatalog::get(opCtx)->getDatabaseProfileSettings(dbName);
-
-        if (!readOnly) {
-            if (!db) {
-                // When setting the profiling level, create the database if it didn't already exist.
-                // When just reading the profiling level, we do not create the database.
-                auto databaseHolder = DatabaseHolder::get(opCtx);
-                db = databaseHolder->openDb(opCtx, dbName);
-            }
-
-            auto newSettings = oldSettings;
-            if (profilingLevel >= 0 && profilingLevel <= 2) {
-                newSettings.level = profilingLevel;
-            }
-            if (auto filterOrUnset = request.getFilter()) {
-                if (auto filter = filterOrUnset->obj) {
-                    // filter: <match expression>
-                    newSettings.filter = std::make_shared<ProfileFilterImpl>(*filter);
-                } else {
-                    // filter: "unset"
-                    newSettings.filter = nullptr;
-                }
-            }
-            uassertStatusOK(_setProfileSettings(opCtx, db, dbName, newSettings));
-        }
-
-        return oldSettings;
-    }
-};
 
 class CmdFileMD5 : public BasicCommand {
 public:
@@ -392,8 +273,6 @@ public:
     }
 };
 
-MONGO_REGISTER_COMMAND(CmdProfile).forShard();
-MONGO_REGISTER_COMMAND(SetProfilingFilterGloballyCmd).forShard();
 MONGO_REGISTER_COMMAND(CmdFileMD5).forShard();
 
 }  // namespace

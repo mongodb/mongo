@@ -256,15 +256,14 @@ WORKSPACE.bazel @10gen/devprod-build
 /src/mongo/db/**/server_parameter* @10gen/server-security
 /src/mongo/db/**/*change_stream* @10gen/query-execution
 /src/mongo/db/**/collection_index_usage_tracker* @10gen/query-execution
-/src/mongo/db/**/curop* @10gen/query-execution
+/src/mongo/db/**/curop* @10gen/query-integration
 /src/mongo/db/**/allocate_cursor_id* @10gen/query-execution
 /src/mongo/db/**/clientcursor* @10gen/query-execution
 /src/mongo/db/**/cursor_id.h @10gen/query-execution
 /src/mongo/db/**/cursor_manager* @10gen/query-execution
 /src/mongo/db/**/cursor_server_params* @10gen/query-execution
-/src/mongo/db/**/exhaust_cursor_currentop_integration_test.cpp @10gen/query-execution
+/src/mongo/db/**/exhaust_cursor_currentop_integration_test.cpp @10gen/query-integration
 /src/mongo/db/**/generic_cursor* @10gen/query-execution
-/src/mongo/db/**/profile_filter* @10gen/query-execution
 /src/mongo/db/**/update_index_data* @10gen/query-execution
 /src/mongo/db/**/create* @10gen/server-catalog-and-routing
 /src/mongo/db/**/drop*idl @10gen/server-catalog-and-routing
@@ -307,12 +306,13 @@ WORKSPACE.bazel @10gen/devprod-build
 /src/mongo/db/commands/**/validate.cpp @10gen/server-rss-sydney @10gen/server-storage-execution
 /src/mongo/db/commands/**/vote*index_build* @10gen/server-storage-execution
 /src/mongo/db/commands/**/rotate_certificates* @10gen/server-security
-/src/mongo/db/commands/**/profile* @10gen/query-execution
 /src/mongo/db/commands/**/create* @10gen/server-catalog-and-routing
 /src/mongo/db/commands/**/list* @10gen/server-catalog-and-routing
 /src/mongo/db/commands/**/rename* @10gen/server-catalog-and-routing
 /src/mongo/db/commands/**/set_cluster* @10gen/server-catalog-and-routing
+/src/mongo/db/commands/**/profile* @10gen/query-integration
 /src/mongo/db/commands/**/set_profiling_filter_globally_cmd* @10gen/query-integration
+/src/mongo/db/commands/**/top_command.cpp @10gen/query-integration
 /src/mongo/db/commands/**/dbcheck* @10gen/server-replication
 /src/mongo/db/commands/**/feature_compatibility* @10gen/server-replication
 /src/mongo/db/commands/**/oplog* @10gen/server-replication
@@ -321,6 +321,7 @@ WORKSPACE.bazel @10gen/devprod-build
 /src/mongo/db/commands/query_cmd/**/* @10gen/query
 /src/mongo/db/commands/query_cmd/**/analyze_cmd* @10gen/query-optimization
 /src/mongo/db/commands/query_cmd/**/change_stream_state_command.cpp @10gen/query-execution
+/src/mongo/db/commands/query_cmd/**/current_op* @10gen/query-integration
 /src/mongo/db/commands/query_cmd/**/index_filter_commands.* @10gen/query-optimization
 /src/mongo/db/commands/query_cmd/**/explain.idl @10gen/query-optimization
 /src/mongo/db/commands/query_cmd/**/explain_test.cpp @10gen/query-optimization
@@ -468,7 +469,7 @@ WORKSPACE.bazel @10gen/devprod-build
 /src/mongo/db/pipeline/**/aggregation_request* @10gen/query-optimization
 /src/mongo/db/pipeline/**/*change_stream* @10gen/query-execution
 /src/mongo/db/pipeline/**/dependencies* @10gen/query-optimization
-/src/mongo/db/pipeline/**/document_source_current_op* @10gen/query-execution
+/src/mongo/db/pipeline/**/document_source_current_op* @10gen/query-integration
 /src/mongo/db/pipeline/**/document_source_densify* @10gen/query-integration
 /src/mongo/db/pipeline/**/document_source_fill* @10gen/query-integration
 /src/mongo/db/pipeline/**/document_source_hybrid_scoring* @10gen/query-integration
@@ -691,7 +692,8 @@ WORKSPACE.bazel @10gen/devprod-build
 # The following patterns are parsed from ./src/mongo/db/stats/OWNERS.yml
 /src/mongo/db/stats/**/storage_stats* @10gen/server-storage-execution
 /src/mongo/db/stats/**/counters* @10gen/query-execution
-/src/mongo/db/stats/**/top* @10gen/query-execution
+/src/mongo/db/stats/**/top* @10gen/query-integration
+/src/mongo/db/stats/**/latency_server_status_section.cpp @10gen/query-integration
 
 # The following patterns are parsed from ./src/mongo/db/storage/OWNERS.yml
 /src/mongo/db/storage/**/* @10gen/server-rss-sydney @10gen/server-storage-execution
@@ -845,6 +847,7 @@ WORKSPACE.bazel @10gen/devprod-build
 # The following patterns are parsed from ./src/mongo/s/commands/query_cmd/OWNERS.yml
 /src/mongo/s/commands/query_cmd/**/* @10gen/query
 /src/mongo/s/commands/query_cmd/**/cluster_analyze_cmd.cpp @10gen/query-optimization
+/src/mongo/s/commands/query_cmd/**/cluster_current_op.cpp @10gen/query-integration
 /src/mongo/s/commands/query_cmd/**/cluster_index_filter_cmd.cpp @10gen/query-optimization
 /src/mongo/s/commands/query_cmd/**/cluster_plan_cache_clear_cmd.cpp @10gen/query-optimization
 /src/mongo/s/commands/query_cmd/**/cluster_profile_cmd.cpp @10gen/query-integration
@@ -936,6 +939,7 @@ WORKSPACE.bazel @10gen/devprod-build
 /src/mongo/util/**/field_set* @10gen/query-execution
 /src/mongo/util/**/pcre* @10gen/query-execution
 /src/mongo/util/**/regex_util* @10gen/query-execution
+/src/mongo/util/**/log_with_sampling* @10gen/query-integration
 
 # The following patterns are parsed from ./src/mongo/util/cmdline_utils/OWNERS.yml
 /src/mongo/util/cmdline_utils/**/* @10gen/server-security

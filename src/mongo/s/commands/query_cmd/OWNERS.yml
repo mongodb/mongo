@@ -8,6 +8,9 @@ filters:
   - "cluster_analyze_cmd.cpp":
     approvers:
       - 10gen/query-optimization
+  - "cluster_current_op.cpp":
+    approvers:
+      - 10gen/query-integration
   - "cluster_index_filter_cmd.cpp":
     approvers:
       - 10gen/query-optimization

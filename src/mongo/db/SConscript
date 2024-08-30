@@ -924,9 +924,9 @@ env.Library(
         "commands/txn_cmd_request",
         "curop_metrics",
         "default_max_time_ms_cluster_parameter",
-        "introspect",
         "multitenancy",
         "not_primary_error_tracker",
+        "profile_collection",
         "read_concern_d_impl",
         "repl/repl_server_parameters",
         "repl/replica_set_messages",
@@ -1113,9 +1113,9 @@ env.Library(
 )
 
 env.Library(
-    target="introspect",
+    target="profile_collection",
     source=[
-        "introspect.cpp",
+        "profile_collection.cpp",
     ],
     LIBDEPS_PRIVATE=[
         "$BUILD_DIR/mongo/util/concurrency/spin_lock",
@@ -2067,7 +2067,6 @@ env.Library(
         "fts/ftsmongod",
         "index/index_access_method",
         "index_builds_coordinator_mongod",
-        "introspect",
         "keys_collection_client_direct",
         "logical_time_metadata_hook",
         "matcher/expressions_mongod_only",
@@ -2077,6 +2076,7 @@ env.Library(
         "periodic_runner_job_abort_expired_transactions",
         "pipeline/aggregation",
         "pipeline/process_interface/mongod_process_interface_factory",
+        "profile_collection",
         "query/bson/dotted_path_support",
         "query_exec",
         "read_concern_d_impl",

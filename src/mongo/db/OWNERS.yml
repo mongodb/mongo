@@ -67,7 +67,7 @@ filters:
       - 10gen/query-execution
   - "curop*":
     approvers:
-      - 10gen/query-execution
+      - 10gen/query-integration
   - "allocate_cursor_id*":
     approvers:
       - 10gen/query-execution
@@ -85,11 +85,8 @@ filters:
       - 10gen/query-execution
   - "exhaust_cursor_currentop_integration_test.cpp":
     approvers:
-      - 10gen/query-execution
+      - 10gen/query-integration
   - "generic_cursor*":
-    approvers:
-      - 10gen/query-execution
-  - "profile_filter*":
     approvers:
       - 10gen/query-execution
   - "update_index_data*":

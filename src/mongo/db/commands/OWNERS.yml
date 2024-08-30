@@ -34,9 +34,6 @@ filters:
   - "rotate_certificates*":
     approvers:
       - 10gen/server-security
-  - "profile*":
-    approvers:
-      - 10gen/query-execution
   - "create*":
     approvers:
       - 10gen/server-catalog-and-routing
@@ -49,7 +46,13 @@ filters:
   - "set_cluster*":
     approvers:
       - 10gen/server-catalog-and-routing
+  - "profile*":
+    approvers:
+      - 10gen/query-integration
   - "set_profiling_filter_globally_cmd*":
+    approvers:
+      - 10gen/query-integration
+  - "top_command.cpp":
     approvers:
       - 10gen/query-integration
   - "dbcheck*":

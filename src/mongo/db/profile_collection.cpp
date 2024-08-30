@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#include "mongo/db/introspect.h"
+#include "mongo/db/profile_collection.h"
 
 #include <memory>
 #include <mutex>
@@ -78,7 +78,7 @@
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kDefault
 
-namespace mongo {
+namespace mongo::profile_collection {
 
 void profile(OperationContext* opCtx, NetworkOp op) {
     // Initialize with 1kb at start in order to avoid realloc later
@@ -234,4 +234,4 @@ Status createProfileCollection(OperationContext* opCtx, Database* db) {
     });
 }
 
-}  // namespace mongo
+}  // namespace mongo::profile_collection
