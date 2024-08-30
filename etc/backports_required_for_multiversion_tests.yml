@@ -239,6 +239,8 @@ last-continuous:
       ticket: SERVER-92843
     - test_file: jstests/core/query/plan_cache/elem_match_index_diff_types.js
       ticket: SERVER-92806
+    - test_file: jstests/replsets/initial_sync_index_conflict_recreate.js
+      ticket: SERVER-93141
     - test_file: jstests/replsets/new_primary_prevents_stale_majority_reads_on_stepup.js
       ticket: SERVER-53813
   suites: null
@@ -494,6 +496,8 @@ last-lts:
       ticket: SERVER-92843
     - test_file: jstests/core/query/plan_cache/elem_match_index_diff_types.js
       ticket: SERVER-92806
+    - test_file: jstests/replsets/initial_sync_index_conflict_recreate.js
+      ticket: SERVER-93141
     - test_file: jstests/replsets/new_primary_prevents_stale_majority_reads_on_stepup.js
       ticket: SERVER-53813
   suites: null
