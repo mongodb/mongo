@@ -65,7 +65,7 @@ def extend_dict_lists(dict1, dict2):
         return dict1
 
     for k in dict2.keys():
-        if not k in dict1:
+        if k not in dict1:
             raise ValueError(f"the {k} field must be present of both dicts")
 
         assert_valid_instance(dict2[k])

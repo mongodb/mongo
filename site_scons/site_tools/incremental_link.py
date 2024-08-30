@@ -44,7 +44,7 @@ def exists(env):
     # By default, the windows linker is incremental, so unless
     # overridden in the environment with /INCREMENTAL:NO, the tool is
     # in play.
-    if env.TargetOSIs("windows") and not "/INCREMENTAL:NO" in env["LINKFLAGS"]:
+    if env.TargetOSIs("windows") and "/INCREMENTAL:NO" not in env["LINKFLAGS"]:
         return True
 
     # On posix platforms, excluding darwin, we may have enabled

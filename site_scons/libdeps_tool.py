@@ -788,7 +788,7 @@ def _get_libdeps(node, debug=False):
         return cache
 
     if debug:
-        print(f"  Edges:")
+        print("  Edges:")
 
     tsorted = []
 
@@ -831,7 +831,7 @@ def update_scanner(env, builder_name=None, debug=False):
     def new_scanner(node, env, path=()):
         if debug:
             print(f"LIBDEPS SCANNER: {str(node)}")
-            print(f"  Declared dependencies:")
+            print("  Declared dependencies:")
             print(f"    global: {env.get(Constants.LibdepsGlobal, None)}")
             print(f"    private: {env.get(Constants.LibdepsPrivate, None)}")
             print(f"    public: {env.get(Constants.Libdeps, None)}")
@@ -844,7 +844,7 @@ def update_scanner(env, builder_name=None, debug=False):
             result = []
         result.extend(_get_libdeps(node, debug=debug))
         if debug:
-            print(f"  Build dependencies:")
+            print("  Build dependencies:")
             print("\n".join(["    * " + str(t) for t in result]))
             print("\n")
         return result
@@ -1127,18 +1127,18 @@ def libdeps_emitter(
 
     if debug and not any("conftest" in str(t) for t in target):
         print(f"LIBDEPS EMITTER: {str(target[0])}")
-        print(f"  Declared dependencies:")
+        print("  Declared dependencies:")
         print(f"    global: {env.get(Constants.LibdepsGlobal, None)}")
         print(f"    private: {env.get(Constants.LibdepsPrivate, None)}")
         print(f"    public: {env.get(Constants.Libdeps, None)}")
         print(f"    interface: {env.get(Constants.LibdepsInterface, None)}")
         print(f"    no_inherit: {env.get(Constants.LibdepsNoInherit, None)}")
-        print(f"  Edges:")
+        print("  Edges:")
 
     libdeps = get_libdeps_nodes(env, target, builder, debug, visibility_map)
 
     if debug and not any("conftest" in str(t) for t in target):
-        print(f"\n")
+        print("\n")
 
     # Lint the libdeps to make sure they are following the rules.
     # This will skip some or all of the checks depending on the options

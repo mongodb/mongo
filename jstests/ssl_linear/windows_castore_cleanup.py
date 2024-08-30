@@ -41,6 +41,6 @@ my_cns = findMongoCertsFromStore("My")
 root_cns = findMongoCertsFromStore("Root")
 
 if my_cns + root_cns:
-    print(f"Unexpected MongoDB certs found on host. Clearing them from the system cert stores.")
+    print("Unexpected MongoDB certs found on host. Clearing them from the system cert stores.")
 deleteCertsByCNFromStore("My", my_cns)
 deleteCertsByCNFromStore("Root", root_cns)

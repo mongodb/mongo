@@ -127,7 +127,7 @@ def generate(env):
         if os.path.isdir(mergemodulepath):
             env["MSVS"]["VCREDISTMERGEMODULEPATH"] = mergemodulepath
 
-    if not "VSINSTALLDIR" in env["MSVS"]:
+    if "VSINSTALLDIR" not in env["MSVS"]:
         # Compute a VS version based on the VC version. VC 14.0 is VS 2015, VC
         # 14.1 is VS 2017. Also compute the next theoretical version by
         # incrementing the major version by 1. Then form a range from this

@@ -93,11 +93,11 @@ class Linter:
 
             # Relax the rule of commenting generic FCV references for files directly related to FCV
             # implementations.
-            if not "feature_compatibility_version" in self.file_name:
+            if "feature_compatibility_version" not in self.file_name:
                 self._check_for_generic_fcv(linenum)
 
             # Don't check feature_flag.h/cpp where the function is defined and test files.
-            if not "feature_flag" in self.file_name and not "test" in self.file_name:
+            if "feature_flag" not in self.file_name and "test" not in self.file_name:
                 self._check_for_feature_flag_ignore_fcv(linenum)
 
         return self._error_count
@@ -129,7 +129,7 @@ class Linter:
                 self.feature_flag_ignore_fcv_check_comments.append(linenum)
 
             if not in_multi_line_comment:
-                if "/*" in clean_line and not "*/" in clean_line:
+                if "/*" in clean_line and "*/" not in clean_line:
                     in_multi_line_comment = True
                     clean_line = ""
 

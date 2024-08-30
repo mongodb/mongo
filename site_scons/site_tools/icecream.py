@@ -61,8 +61,8 @@ def icecc_create_env(env, target, source, for_signature):
             else:
                 raise Exception(
                     f"Found incorrect icecream addfile format: {str(addfile)}"
-                    + f"\ntuple must two elements of the form"
-                    + f"\n('chroot dest path', 'source file path')"
+                    + "\ntuple must two elements of the form"
+                    + "\n('chroot dest path', 'source file path')"
                 )
         else:
             try:
@@ -76,7 +76,7 @@ def icecc_create_env(env, target, source, for_signature):
                 # starting slash of the second file
                 raise Exception(
                     f"Found incorrect icecream addfile format: {type(addfile)}"
-                    + f"\nvalue provided cannot be converted to a file path"
+                    + "\nvalue provided cannot be converted to a file path"
                 )
 
     create_env += " | awk '/^creating .*\\.tar\\.gz/ { print $$2 }')"
@@ -396,7 +396,7 @@ def generate(env):
     for object_builder in SCons.Tool.createObjBuilders(env):
         emitterdict = object_builder.builder.emitter
         for suffix in emitterdict.keys():
-            if not suffix in suffixes:
+            if suffix not in suffixes:
                 continue
             base = emitterdict[suffix]
             emitterdict[suffix] = SCons.Builder.ListEmitter(
@@ -563,7 +563,7 @@ def exists(env):
     else:
         icerun = env.File("$ICECC").File("icerun")
     if not icerun:
-        print(f"Error: the icerun wrapper does not exist which is needed for icecream")
+        print("Error: the icerun wrapper does not exist which is needed for icecream")
         return False
 
     if "ICECC_CREATE_ENV" in env:
@@ -571,7 +571,7 @@ def exists(env):
     else:
         icecc_create_env_bin = env.File("ICECC").File("icecc-create-env")
     if not icecc_create_env_bin:
-        print(f"Error: the icecc-create-env utility does not exist which is needed for icecream")
+        print("Error: the icecc-create-env utility does not exist which is needed for icecream")
         return False
 
     for line in pipe.stdout:

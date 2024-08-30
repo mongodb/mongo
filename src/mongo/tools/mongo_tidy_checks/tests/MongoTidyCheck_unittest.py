@@ -509,7 +509,7 @@ if __name__ == "__main__":
     MongoTidyTests.COMPILE_COMMANDS_FILES = args.test_compiledbs
 
     # We need to validate the toolchain can support the load operation for our module.
-    cmd = [MongoTidyTests.TIDY_BIN, f"-load", MongoTidyTests.TIDY_MODULE, "--list-checks"]
+    cmd = [MongoTidyTests.TIDY_BIN, "-load", MongoTidyTests.TIDY_MODULE, "--list-checks"]
     p = subprocess.run(cmd, capture_output=True)
     if p.returncode != 0:
         print(f"Could not validate toolchain was able to load module {cmd}.")

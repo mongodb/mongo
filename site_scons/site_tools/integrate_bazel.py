@@ -608,7 +608,7 @@ def sha256_file(filename: str) -> str:
 def verify_s3_hash(s3_path: str, local_path: str) -> None:
     if s3_path not in _S3_HASH_MAPPING:
         raise Exception(
-            f"S3 path not found in hash mapping, unable to verify downloaded for s3 path: s3_path"
+            "S3 path not found in hash mapping, unable to verify downloaded for s3 path: s3_path"
         )
 
     hash = sha256_file(local_path)
@@ -859,9 +859,9 @@ def generate(env: SCons.Environment.Environment) -> None:
     http_client_option = env.GetOption("enable-http-client")
     if http_client_option is not None:
         if http_client_option in ["on", "auto"]:
-            bazel_internal_flags.append(f"--//bazel/config:http_client=True")
+            bazel_internal_flags.append("--//bazel/config:http_client=True")
         elif http_client_option == "off":
-            bazel_internal_flags.append(f"--//bazel/config:http_client=False")
+            bazel_internal_flags.append("--//bazel/config:http_client=False")
 
     sanitizer_option = env.GetOption("sanitize")
 

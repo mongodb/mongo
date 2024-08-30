@@ -179,13 +179,13 @@ def set_general_dict_extension(x509, exts, cert, name, typed_values):
     value = []
     for key, val in tags.items():
         if key == "critical":
-            if not val is True:
+            if val is not True:
                 raise ValueError("critical must be precisely equal to TRUE")
 
             critical = True
             continue
 
-        if not key in typed_values:
+        if key not in typed_values:
             raise ValueError("Unknown key for extensions. " + name + ": " + key)
 
         if not isinstance(val, type(typed_values[key])):
@@ -273,12 +273,12 @@ def set_san_extension(x509, exts, cert):
     sans = []
     for typ, vals in san.items():
         if typ == "critical":
-            if not vals is True:
+            if vals is not True:
                 raise ValueError("critical must be precisely equal to TRUE")
             critical = True
             continue
 
-        if not typ in ["IP", "DNS"]:  # Other things can live here, but this is all we use.
+        if typ not in ["IP", "DNS"]:  # Other things can live here, but this is all we use.
             raise ValueError("Fix me? Only IP and DNS SANs are handled")
 
         if not isinstance(vals, list):
@@ -646,7 +646,7 @@ def check_special_case_keys(cert):
 
 
 def check_for_ecdsa_in_tags(cert):
-    if not cert.get("tags") or not "ecdsa" in cert["tags"]:
+    if not cert.get("tags") or "ecdsa" not in cert["tags"]:
         raise ValueError("ECDSA special case certs must contain an ECDSA tag")
 
 
@@ -875,7 +875,7 @@ def process_ecdsa_leaf(cert):
             f.write(extended_key_usage)
             if cert.get("tags"):
                 if "ocsp" in cert["tags"]:
-                    if not "responder" in cert["tags"]:
+                    if "responder" not in cert["tags"]:
                         f.write(
                             "authorityInfoAccess = OCSP;URI:http://localhost:9001/power/level,OCSP;URI:http://localhost:8100/status\n"
                         )
@@ -1007,12 +1007,12 @@ def validate_config():
     ]
     for cert in CONFIG.get("certs", []):
         keys = cert.keys()
-        if not "name" in keys:
+        if "name" not in keys:
             raise ValueError("Name field required for all certificate definitions")
-        if not "description" in keys:
+        if "description" not in keys:
             raise ValueError("description field required for all certificate definitions")
         for key in keys:
-            if not key in permissible:
+            if key not in permissible:
                 raise ValueError("Unknown element '" + key + "' in certificate: " + cert["name"])
 
 
@@ -1062,7 +1062,7 @@ def sort_items(items):
             unmet_prependents = [
                 name
                 for name in cert.get("append_certs", [])
-                if (name in all_names) and (not name in processed_names)
+                if (name in all_names) and (name not in processed_names)
             ]
 
             # Self-signed, signed by someone in ret already, or signed externally

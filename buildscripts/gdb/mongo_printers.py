@@ -1015,7 +1015,7 @@ class SbeCodeFragmentPrinter(object):
             op_addr = cur_op
             op_tag = read_as_integer(op_addr, 1)
 
-            if not op_tag in self.optags_lookup:
+            if op_tag not in self.optags_lookup:
                 yield hex(op_addr), "unknown op tag: {}".format(op_tag)
                 error = True
                 break

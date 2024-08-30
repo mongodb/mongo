@@ -60,7 +60,7 @@ class DictionaryImportResolver(idl.parser.ImportResolverBase):
         # type: (str, str) -> str
         """Return the complete path to an imported file name."""
         # pylint: disable=unused-argument
-        if not imported_file_name in self._import_dict:
+        if imported_file_name not in self._import_dict:
             return None
 
         return "imported_%s" % (imported_file_name)

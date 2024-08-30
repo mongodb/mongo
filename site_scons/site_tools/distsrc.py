@@ -189,7 +189,7 @@ def distsrc_action_generator(source, target, env, for_signature):
         archive_wrapper.close()
 
     target_ext = str(target[0])[-3:]
-    if not target_ext in ["zip", "tar"]:
+    if target_ext not in ["zip", "tar"]:
         print("Invalid file format for distsrc. Must be tar or zip file")
         env.Exit(1)
 

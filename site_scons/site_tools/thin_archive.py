@@ -27,7 +27,7 @@ import subprocess
 
 
 def exists(env):
-    if not "AR" in env:
+    if "AR" not in env:
         return False
 
     ar = env.subst(env["AR"])
@@ -36,7 +36,7 @@ def exists(env):
 
     # If the user has done anything confusing with ARFLAGS, bail out. We want to find
     # an item in ARFLAGS of the exact form 'rc'.
-    if not "rc" in env["ARFLAGS"]:
+    if "rc" not in env["ARFLAGS"]:
         return False
 
     pipe = SCons.Action._subproc(

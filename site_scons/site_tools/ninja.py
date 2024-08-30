@@ -737,7 +737,7 @@ class NinjaState:
         # This is the command that is used to clean a target before building it,
         # excluding precious targets.
         if sys.platform == "win32":
-            rm_cmd = f"cmd.exe /c del /q $rm_outs >nul 2>&1 &"
+            rm_cmd = "cmd.exe /c del /q $rm_outs >nul 2>&1 &"
         else:
             rm_cmd = "rm -f $rm_outs;"
 

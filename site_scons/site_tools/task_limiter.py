@@ -70,7 +70,7 @@ def setup_task_limiter(
             builder = env["BUILDERS"][target_builder]
             emitterdict = builder.builder.emitter
             for suffix in emitterdict.keys():
-                if not suffix in suffixes:
+                if suffix not in suffixes:
                     continue
                 base = emitterdict[suffix]
                 emitterdict[suffix] = SCons.Builder.ListEmitter(

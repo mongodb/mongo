@@ -65,13 +65,13 @@ def _add_scanner(builder):
 
 
 def generate(env, **kwargs):
-    if not "FORCEINCLUDEPREFIX" in env:
+    if "FORCEINCLUDEPREFIX" not in env:
         if "msvc" in env.get("TOOLS", []):
             env["FORCEINCLUDEPREFIX"] = "/FI"
         else:
             env["FORCEINCLUDEPREFIX"] = "-include "
 
-    if not "FORCEINCLUDESUFFIX" in env:
+    if "FORCEINCLUDESUFFIX" not in env:
         env["FORCEINCLUDESUFFIX"] = ""
 
     # Expand FORCEINCLUDES with the indicated prefixes and suffixes.

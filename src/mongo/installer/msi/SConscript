@@ -35,7 +35,7 @@ env["WIXLIGHT"] = r"$WIXPATH\light.exe"
 env["WIXUIEXT"] = r"$WIXPATH\WixUIExtension.dll"
 env["WIXUTILEXT"] = r"$WIXPATH\WixUtilExtension.dll"
 
-if not "VCREDISTMERGEMODULEPATH" in env["MSVS"]:
+if "VCREDISTMERGEMODULEPATH" not in env["MSVS"]:
     print(
         "SCons tool setup did not configure the path to the vcredist merge modules, disabling MSI installer"
     )

@@ -400,7 +400,7 @@ class ParserContext(object):
         if not self._is_node_type(node, node_name, "scalar"):
             return False
 
-        if not node.value in ["true", "false"]:
+        if node.value not in ["true", "false"]:
             self._add_node_error(
                 node,
                 ERROR_ID_IS_NODE_VALID_BOOL,

@@ -103,7 +103,7 @@ class CacheDirValidate(SCons.CacheDir.CacheDir):
         # using os.path.exists here because: https://bugs.python.org/issue35306
         if os.path.exists(str(cls.get_bad_cachefile_path(src))):
             raise InvalidChecksum(
-                cls.get_hash_path(src_file), dst, f"cachefile marked as bad checksum"
+                cls.get_hash_path(src_file), dst, "cachefile marked as bad checksum"
             )
 
         csig = None
@@ -117,7 +117,7 @@ class CacheDirValidate(SCons.CacheDir.CacheDir):
         else:
             if not csig:
                 raise InvalidChecksum(
-                    cls.get_hash_path(src_file), dst, f"no content_hash data found"
+                    cls.get_hash_path(src_file), dst, "no content_hash data found"
                 )
 
         with tempfile.TemporaryDirectory() as tmpdirname:

@@ -199,7 +199,7 @@ def compile_idl(args):
         logging.error("File '%s' not found", args.input_file)
 
     if args.output_source is None:
-        if not "." in args.input_file:
+        if "." not in args.input_file:
             logging.error(
                 "File name '%s' must be end with a filename extension, such as '%s.idl'",
                 args.input_file,

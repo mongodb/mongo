@@ -48,7 +48,7 @@ def validate_and_update_config(parser, args):
 def _validate_options(parser, args):
     """Do preliminary validation on the options and error on any invalid options."""
 
-    if not "shell_port" in args or not "shell_conn_string" in args:
+    if "shell_port" not in args or "shell_conn_string" not in args:
         return
 
     if args.shell_port is not None and args.shell_conn_string is not None:

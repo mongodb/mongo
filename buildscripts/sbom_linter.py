@@ -103,7 +103,7 @@ def strip_extra_prefixes(string_with_prefix: str) -> str:
 
 
 def validate_evidence(component: dict, third_party_libs: set, error_manager: ErrorManager) -> None:
-    if not "evidence" in component or not "occurrences" in component["evidence"]:
+    if "evidence" not in component or "occurrences" not in component["evidence"]:
         error_manager.append_full_error_message(MISSING_EVIDENCE_ERROR)
         return
 
