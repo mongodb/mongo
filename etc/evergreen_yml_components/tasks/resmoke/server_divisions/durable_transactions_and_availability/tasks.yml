@@ -1094,6 +1094,7 @@ tasks:
         "common",
         "san",
         "auth",
+        "suggested_excluding_required__for_devprod_mitigation_only",
       ]
     commands:
       - func: "generate resmoke tasks"
@@ -1326,7 +1327,12 @@ tasks:
 
   - <<: *gen_task_template
     name: replica_sets_max_mirroring_large_txns_format_gen
-    tags: ["assigned_to_jira_team_server_repl", "default"]
+    tags:
+      [
+        "assigned_to_jira_team_server_repl",
+        "default",
+        "suggested_excluding_required__for_devprod_mitigation_only",
+      ]
     commands:
       - func: "generate resmoke tasks"
 
@@ -2245,6 +2251,7 @@ tasks:
         "default",
         "large",
         "clustered_collections",
+        "suggested_excluding_required__for_devprod_mitigation_only",
       ]
     commands:
       - func: "generate resmoke tasks"
