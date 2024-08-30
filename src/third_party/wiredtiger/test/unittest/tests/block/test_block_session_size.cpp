@@ -206,28 +206,25 @@ TEST_CASE("Block session: __wti_block_size_free", "[block_session_size]")
     std::shared_ptr<MockSession> session = MockSession::buildTestMockSession();
     WT_BLOCK_MGR_SESSION *bms = session->setupBlockManagerSession();
 
-    /*
-     * FIXME-WT-13451: Update __wti_block_size_free function to test that block is set to null
-     * SECTION("Free with null block manager session -- needs discussion")
-     * {
-     *   std::shared_ptr<MockSession> session_no_bm = MockSession::buildTestMockSession();
-     *   WT_SIZE *sz;
-     *
-     *   REQUIRE(__ut_block_size_alloc(session_no_bm->getWtSessionImpl(), &sz) == 0);
-     *   REQUIRE(sz != nullptr);
-     *
-     *   __wti_block_size_free(session_no_bm->getWtSessionImpl(), sz);
-     *
-     *   REQUIRE(sz == nullptr);
-     * }
-     */
+    SECTION("Free with null block manager session")
+    {
+        std::shared_ptr<MockSession> session_no_bm = MockSession::buildTestMockSession();
+        WT_SIZE *sz;
+
+        REQUIRE(__ut_block_size_alloc(session_no_bm->getWtSessionImpl(), &sz) == 0);
+        REQUIRE(sz != nullptr);
+
+        __wti_block_size_free(session_no_bm->getWtSessionImpl(), &sz);
+
+        REQUIRE(sz == nullptr);
+    }
 
     SECTION("Calling free with cache")
     {
         WT_SIZE *sz = nullptr;
         REQUIRE(__ut_block_size_alloc(session->getWtSessionImpl(), &sz) == 0);
 
-        __wti_block_size_free(session->getWtSessionImpl(), sz);
+        __wti_block_size_free(session->getWtSessionImpl(), &sz);
 
         REQUIRE(sz != nullptr);
         REQUIRE(bms->sz_cache == sz);
@@ -235,7 +232,7 @@ TEST_CASE("Block session: __wti_block_size_free", "[block_session_size]")
 
         WT_SIZE *sz2 = nullptr;
         REQUIRE(__ut_block_size_alloc(session->getWtSessionImpl(), &sz2) == 0);
-        __wti_block_size_free(session->getWtSessionImpl(), sz2);
+        __wti_block_size_free(session->getWtSessionImpl(), &sz2);
 
         REQUIRE(sz != nullptr);
         REQUIRE(bms->sz_cache == sz2);

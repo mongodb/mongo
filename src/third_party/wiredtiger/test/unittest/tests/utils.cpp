@@ -10,10 +10,18 @@
 #include <string>
 #include <stdexcept>
 
+#include <catch2/catch.hpp>
+
 #include "utils.h"
 
 namespace utils {
 
+/*
+ * throwIfNonZero --
+ *     Test result. Throw if it is non-zero.
+ *
+ * @param result The value to test.
+ */
 void
 throwIfNonZero(int result)
 {
@@ -23,12 +31,24 @@ throwIfNonZero(int result)
     }
 }
 
-int
+/*
+ * remove_wrapper --
+ *     Delete a file or a directory.
+ *
+ * @param path The pathname of the file or directory to delete.
+ */
+static int
 remove_wrapper(std::string const &path)
 {
     return std::remove(path.c_str());
 }
 
+/*
+ * wiredtigerCleanup --
+ *     Delete WiredTiger files in directory home and directory home.
+ *
+ * @param home The directory that contains WiredTiger files.
+ */
 void
 wiredtigerCleanup(std::string const &home)
 {
@@ -46,4 +66,16 @@ wiredtigerCleanup(std::string const &home)
     remove_wrapper(home);
 }
 
-} // namespace utils
+/*
+ * break_here --
+ *     Make it easier to set a breakpoint within a unit test.
+ *
+ * Functions generated for TEST_CASE() have undocumented names. Call break_here via BREAK at the
+ *     start of a TEST_CASE() and then set a gdb breakpoint via "break break_here".
+ */
+void
+break_here(const char *file, const char *func, int line)
+{
+    INFO(">> " << file << " line " << line << ": " << func);
+}
+} // namespace utils.

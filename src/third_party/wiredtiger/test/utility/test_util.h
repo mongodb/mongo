@@ -30,6 +30,10 @@
 
 #include "wt_internal.h"
 
+#if defined(__cplusplus)
+extern "C" {
+#endif
+
 #define BACKUP_BASE "backup."
 #define BACKUP_OLD "OLD." BACKUP_BASE
 #define CHECK_BASE "check."
@@ -587,4 +591,7 @@ WT_THREAD_RET thread_append(void *);
 extern const char *progname;
 const char *testutil_set_progname(char *const *);
 
+#if defined(__cplusplus)
+}
+#endif
 #endif

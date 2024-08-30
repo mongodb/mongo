@@ -88,15 +88,15 @@ __block_ext_prealloc(WT_SESSION_IMPL *session, u_int max)
  *     Add a WT_EXT structure to the cached list.
  */
 void
-__wti_block_ext_free(WT_SESSION_IMPL *session, WT_EXT *ext)
+__wti_block_ext_free(WT_SESSION_IMPL *session, WT_EXT **ext)
 {
     WT_BLOCK_MGR_SESSION *bms;
 
     if ((bms = session->block_manager) == NULL)
-        __wt_free(session, ext);
+        __wt_free(session, *ext);
     else {
-        ext->next[0] = bms->ext_cache;
-        bms->ext_cache = ext;
+        (*ext)->next[0] = bms->ext_cache;
+        bms->ext_cache = *ext;
 
         ++bms->ext_cache_cnt;
     }
@@ -195,15 +195,15 @@ __block_size_prealloc(WT_SESSION_IMPL *session, u_int max)
  *     Add a WT_SIZE structure to the cached list.
  */
 void
-__wti_block_size_free(WT_SESSION_IMPL *session, WT_SIZE *sz)
+__wti_block_size_free(WT_SESSION_IMPL *session, WT_SIZE **sz)
 {
     WT_BLOCK_MGR_SESSION *bms;
 
     if ((bms = session->block_manager) == NULL)
-        __wt_free(session, sz);
+        __wt_free(session, *sz);
     else {
-        sz->next[0] = bms->sz_cache;
-        bms->sz_cache = sz;
+        (*sz)->next[0] = bms->sz_cache;
+        bms->sz_cache = *sz;
 
         ++bms->sz_cache_cnt;
     }

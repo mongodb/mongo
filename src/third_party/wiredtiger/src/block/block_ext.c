@@ -362,7 +362,7 @@ __block_off_remove(
         if (szp->off[0] == NULL) {
             for (i = 0; i < szp->depth; ++i)
                 *sstack[i] = szp->next[i];
-            __wti_block_size_free(session, szp);
+            __wti_block_size_free(session, &szp);
         }
     }
 #ifdef HAVE_DIAGNOSTIC
@@ -380,7 +380,7 @@ __block_off_remove(
 
     /* Return the record if our caller wants it, otherwise free it. */
     if (extp == NULL)
-        __wti_block_ext_free(session, ext);
+        __wti_block_ext_free(session, &ext);
     else
         *extp = ext;
 
@@ -480,7 +480,7 @@ __wti_block_off_remove_overlap(
         }
     }
     if (ext != NULL)
-        __wti_block_ext_free(session, ext);
+        __wti_block_ext_free(session, &ext);
     return (0);
 }
 
@@ -597,7 +597,7 @@ append:
         __wt_verbose(session, WT_VERB_BLOCK, "%s: allocate range %" PRIdMAX "-%" PRIdMAX,
           block->live.avail.name, (intmax_t)ext->off, (intmax_t)(ext->off + ext->size));
 
-        __wti_block_ext_free(session, ext);
+        __wti_block_ext_free(session, &ext);
     }
 
     /* Add the newly allocated extent to the list of allocations. */
@@ -1476,5 +1476,59 @@ void
 __ut_block_size_srch(WT_SIZE **head, wt_off_t size, WT_SIZE ***stack)
 {
     __block_size_srch(head, size, stack);
+}
+
+void
+__ut_block_off_srch_pair(WT_EXTLIST *el, wt_off_t off, WT_EXT **beforep, WT_EXT **afterp)
+{
+    __block_off_srch_pair(el, off, beforep, afterp);
+}
+
+int
+__ut_block_ext_insert(WT_SESSION_IMPL *session, WT_EXTLIST *el, WT_EXT *ext)
+{
+    return (__block_ext_insert(session, el, ext));
+}
+
+int
+__ut_block_off_insert(WT_SESSION_IMPL *session, WT_EXTLIST *el, wt_off_t off, wt_off_t size)
+{
+    return (__block_off_insert(session, el, off, size));
+}
+
+#ifdef HAVE_DIAGNOSTIC
+bool
+__ut_block_off_match(WT_EXTLIST *el, wt_off_t off, wt_off_t size)
+{
+    return (__block_off_match(el, off, size));
+}
+#endif
+
+int
+__ut_block_off_remove(
+  WT_SESSION_IMPL *session, WT_BLOCK *block, WT_EXTLIST *el, wt_off_t off, WT_EXT **extp)
+{
+    return (__block_off_remove(session, block, el, off, extp));
+}
+
+int
+__ut_block_extend(
+  WT_SESSION_IMPL *session, WT_BLOCK *block, WT_EXTLIST *el, wt_off_t *offp, wt_off_t size)
+{
+    return (__block_extend(session, block, el, offp, size));
+}
+
+int
+__ut_block_append(
+  WT_SESSION_IMPL *session, WT_BLOCK *block, WT_EXTLIST *el, wt_off_t off, wt_off_t size)
+{
+    return (__block_append(session, block, el, off, size));
+}
+
+int
+__ut_block_merge(
+  WT_SESSION_IMPL *session, WT_BLOCK *block, WT_EXTLIST *el, wt_off_t off, wt_off_t size)
+{
+    return (__block_merge(session, block, el, off, size));
 }
 #endif

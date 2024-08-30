@@ -6,11 +6,19 @@
  * See the file LICENSE for redistribution information.
  */
 
+/*
+ * block_ext.c: [extent_list] Test extent list search functions: __block_off_srch_last,
+ * __block_off_srch, __block_first_srch, and __block_size_srch.
+ */
+
 #include <memory>
 
 #include <catch2/catch.hpp>
 
+#include "utils_extlist.h"
 #include "wt_internal.h"
+
+using namespace utils;
 
 struct ExtentWrapper {
     ExtentWrapper(WT_EXT *raw) : _raw(raw) {}
@@ -77,28 +85,6 @@ create_new_sz()
     return std::make_unique<SizeWrapper>(raw);
 }
 
-void
-print_list(WT_EXT **head)
-{
-    WT_EXT *extp;
-    int i;
-
-    if (head == nullptr)
-        return;
-
-    for (i = 0; i < WT_SKIP_MAXDEPTH; i++) {
-        printf("L%d: ", i);
-
-        extp = head[i];
-        while (extp != nullptr) {
-            printf("%p -> ", extp);
-            extp = extp->next[i];
-        }
-
-        printf("X\n");
-    }
-}
-
 /*
  * Creates a sane-looking "default" extent list suitable for testing:
  * L0: 1 -> 2 -> 3 -> X
@@ -161,11 +147,7 @@ TEST_CASE("Extent Lists: block_off_srch_last", "[extent_list]")
     {
         std::vector<WT_EXT *> head(WT_SKIP_MAXDEPTH, nullptr);
 
-        REQUIRE(__ut_block_off_srch_last(&head[0], &stack[0]) == nullptr);
-
-        for (int i = 0; i < WT_SKIP_MAXDEPTH; i++) {
-            REQUIRE(stack[i] == &head[i]);
-        }
+        verify_empty_extent_list(&head[0], &stack[0]);
     }
 
     SECTION("list with one element has non-empty final element")

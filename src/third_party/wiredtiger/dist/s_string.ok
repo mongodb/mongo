@@ -125,6 +125,7 @@ ERANGE
 ETIME
 ETIMEDOUT
 EXTLIST
+EXTLIST's
 EXTSUBPATH
 Encryptor
 Encryptors
@@ -251,7 +252,6 @@ Marsaglia
 Marsaglia's
 Mellor
 Mitzenmacher
-MockSession
 MongoDB
 MoveFileExW
 MultiByteToWideChar
@@ -550,7 +550,6 @@ btree's
 btrees
 buf
 bufsz
-buildTestMockSession
 builddir
 builtins
 bursty
@@ -817,7 +816,6 @@ gcc
 gcp
 gdb
 ge
-getWtSessionImpl
 getenv
 getlasterror
 getline
@@ -1064,6 +1062,7 @@ nocase
 noclear
 nocrypto
 noexcept
+noff
 nolock
 nonces
 nonliteral
@@ -1085,6 +1084,7 @@ nullptr
 num
 numbare
 nvram
+objectid
 offpage
 ok
 oldv
@@ -1327,6 +1327,7 @@ tempdir
 testext
 testutil
 th
+throwIfNonZero
 tid
 timespec
 tinfo
@@ -1408,7 +1409,6 @@ userbad
 usercfg
 usleep
 usr
-ut
 utf
 util
 utils
@@ -1449,6 +1449,7 @@ whitespace
 wiredTiger
 wiredTigerTables
 wiredtiger
+wiredtigerCleanup
 workgen
 wrapup
 writeable
