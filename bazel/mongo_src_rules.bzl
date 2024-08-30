@@ -284,6 +284,26 @@ MSVC_OPT_LINKFLAGS = select({
     "//conditions:default": [],
 })
 
+SASL_WINDOWS_COPTS = select({
+    "@platforms//os:windows": ["-Iexternal/windows_sasl/include"],
+    "//conditions:default": [],
+})
+
+SASL_WINDOWS_LINKFLAGS = select({
+    "@platforms//os:windows": ["/LIBPATH:external/windows_sasl/lib"],
+    "//conditions:default": [],
+})
+
+SASL_WINDOWS_LIB_FILES = select({
+    "@platforms//os:windows": ["@windows_sasl//:libraries"],
+    "//conditions:default": [],
+})
+
+SASL_WINDOWS_INCLUDE_FILES = select({
+    "@platforms//os:windows": ["@windows_sasl//:includes"],
+    "//conditions:default": [],
+})
+
 WINDOWS_LINKFLAGS = (
     WINDOWS_DEFAULT_LINKFLAGS +
     WINDOWS_PDB_PAGE_SIZE_LINKOPT +
@@ -1151,7 +1171,7 @@ MONGO_GLOBAL_INCLUDE_DIRECTORIES = [
 MONGO_GLOBAL_ACCESSIBLE_HEADERS = [
     "//src/third_party/immer:headers",
     "//src/third_party/SafeInt:headers",
-]
+] + SASL_WINDOWS_INCLUDE_FILES
 
 MONGO_GLOBAL_SRC_DEPS = [
     "//src/third_party/abseil-cpp:absl_base",
@@ -1206,7 +1226,8 @@ MONGO_GLOBAL_COPTS = (
     FSIZED_DEALLOCATION_COPT +
     THIN_LTO_FLAGS +
     SYMBOL_ORDER_COPTS +
-    GCC_WARNINGS_COPTS
+    GCC_WARNINGS_COPTS +
+    SASL_WINDOWS_COPTS
 )
 
 MONGO_GLOBAL_LINKFLAGS = (
@@ -1231,10 +1252,11 @@ MONGO_GLOBAL_LINKFLAGS = (
     DEBUG_TYPES_SECTION_FLAGS +
     DISABLE_SOURCE_WARNING_AS_ERRORS_LINKFLAGS +
     THIN_LTO_FLAGS +
-    SYMBOL_ORDER_LINKFLAGS
+    SYMBOL_ORDER_LINKFLAGS +
+    SASL_WINDOWS_LINKFLAGS
 )
 
-MONGO_GLOBAL_ADDITIONAL_LINKER_INPUTS = SYMBOL_ORDER_FILES
+MONGO_GLOBAL_ADDITIONAL_LINKER_INPUTS = SYMBOL_ORDER_FILES + SASL_WINDOWS_LIB_FILES
 
 MONGO_GLOBAL_FEATURES = GDWARF_FEATURES + DWARF_VERSION_FEATURES
 

@@ -21,6 +21,31 @@ setup_local_config_platform(name = "local_config_platform")
 
 toolchain_download(name = "mongo_toolchain")
 
+http_archive(
+    name = "windows_sasl",
+    build_file_content = """
+package(default_visibility = ["//visibility:public"])
+
+filegroup(
+    name = "includes",
+    srcs = select({
+        "@platforms//os:windows": glob(["include/**/*.h"]),
+        "//conditions:default": [],
+    }),
+)
+
+filegroup(
+    name = "libraries",
+    srcs = select({
+        "@platforms//os:windows": glob(["lib/**/*"]),
+        "//conditions:default": [],
+    }),
+)
+    """,
+    sha256 = "3e22e2b16f802277123590f64dfda44f1c9c8a2b7e758180cd956d8ab0965817",
+    url = "https://s3.amazonaws.com/boxes.10gen.com/build/windows_cyrus_sasl-2.1.28.zip",
+)
+
 register_toolchains("@mongo_toolchain//:mongo_toolchain")
 
 load("//bazel/toolchains:python_toolchain.bzl", "setup_mongo_python_toolchains")
