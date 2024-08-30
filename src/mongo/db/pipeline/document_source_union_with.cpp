@@ -405,6 +405,8 @@ Value DocumentSourceUnionWith::serialize(const SerializationOptions& opts) const
                       _pushedDownStages.end(),
                       std::back_inserter(recoveredPipeline));
             // We reset the variables to their inital state for another execution.
+            // TODO SERVER-94227 we probably don't need to do any validation as part of this parsing
+            // pass?
             _variables.copyToExpCtx(_variablesParseState, _pipeline->getContext().get());
             pipeCopy = Pipeline::parse(recoveredPipeline, _pipeline->getContext()).release();
         } else {
@@ -467,6 +469,8 @@ Value DocumentSourceUnionWith::serialize(const SerializationOptions& opts) const
         auto serializedPipeline = [&]() -> std::vector<BSONObj> {
             if (opts.transformIdentifiers ||
                 opts.literalPolicy != LiteralSerializationPolicy::kUnchanged) {
+                // TODO SERVER-94227 we don't need to do any validation as part of this parsing
+                // pass.
                 return Pipeline::parse(_userPipeline, _pipeline->getContext())
                     ->serializeToBson(opts);
             }

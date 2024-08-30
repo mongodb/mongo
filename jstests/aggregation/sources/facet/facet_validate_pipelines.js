@@ -58,3 +58,11 @@ assertErrCodeAndErrMsgContains(
     pipeline,
     40600,
     "$facet inside of $unionWith is not allowed to be used within a $facet stage");
+
+pipeline = [{$facet: {"test": [{$lookup: {pipeline: [{$documents: [{"a": 1}]}], as: "foo"}}]}}];
+
+assertErrCodeAndErrMsgContains(
+    coll,
+    pipeline,
+    40600,
+    "$documents inside of $lookup is not allowed to be used within a $facet stage");
