@@ -2352,7 +2352,7 @@ buildvariants:
       --use-diagnostic-latches=off
     crypt_task_compile_flags: SHLINKFLAGS_EXTRA="-Wl,-Bsymbolic -Wl,--no-gnu-unique" CCFLAGS="-fno-gnu-unique"
     test_flags: >-
-      --mongodSetParameters="{featureFlagSbeFull: true}"
+      --mongodSetParameters="{featureFlagSbeFull: true, internalQueryForceClassicEngine: false}"
       --excludeWithAnyTags=resource_intensive,incompatible_with_amazon_linux,sbe_incompatible,requires_latch_analyzer
     has_packages: true
     multiversion_platform: amazon2

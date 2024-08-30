@@ -480,9 +480,9 @@ buildvariants:
     - rhel80-medium
   - name: generate_buildid_to_debug_symbols_mapping
 
-- &enterprise-rhel-8-64-bit-dynamic-classic-engine
-  name: enterprise-rhel-8-64-bit-dynamic-classic-engine
-  display_name: "Shared Library Enterprise RHEL 8 (Classic Engine)"
+- &enterprise-rhel-8-64-bit-dynamic-sbe
+  name: enterprise-rhel-8-64-bit-dynamic-sbe
+  display_name: "Shared Library Enterprise RHEL 8 (SBE)"
   cron: "0 4 * * 0"
   run_on:
   - rhel80-small
@@ -501,7 +501,7 @@ buildvariants:
     large_distro_name: rhel80-medium
     num_scons_link_jobs_available: 0.99
     test_flags: >-
-      --mongodSetParameters="{internalQueryForceClassicEngine: true}"
+      --mongodSetParameters="{internalQueryForceClassicEngine: false}"
       --excludeWithAnyTags=requires_latch_analyzer
   tasks:
   - name: .aggfuzzer

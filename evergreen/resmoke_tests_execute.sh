@@ -24,9 +24,8 @@ if [[ ${disable_unit_tests} = "false" && ! -f ${skip_tests} ]]; then
     tags_build_variant="${build_variant}"
 
     if [[ "${build_variant}" =~ .*"-query-patch-only" ]]; then
-      # Use the RHEL 8 all feature flags variant for the classic engine variant. The original
-      # classic engine variant is not a required builder and therefore not captured in patch
-      # test failure history.
+      # Use the RHEL 8 all feature flags variant for the SBE variant. The original SBE variant is
+      # not a required builder and therefore not captured in patch test failure history.
       tags_build_variant="enterprise-rhel-8-64-bit-dynamic-all-feature-flags-required"
     fi
 

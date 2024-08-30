@@ -55,7 +55,7 @@ overrides:
   - task: update_timeseries_fuzzer
     exec_timeout: 150  # 2.5 hours
 
-  rhel8-debug-ubsan-classic-engine:
+  rhel8-debug-ubsan-sbe-engine:
   - task: update_timeseries_fuzzer
     exec_timeout: 150  # 2.5 hours
 
