@@ -867,6 +867,9 @@ TEST_F(WiredTigerKVEngineTest, TestHandlerCleanShutdownBeforeActivityReleaseRAII
         while (engine->getWtConnReadyStatus_UNSAFE()) {
             stdx::this_thread::yield();
         }
+
+        // Ensure that releasing the permit unblocks the shutdown
+        permit.reset();
         shudownThread.join();
     }
     ASSERT_EQ(engine->getActiveSections(), 0);

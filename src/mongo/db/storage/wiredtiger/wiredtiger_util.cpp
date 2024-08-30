@@ -102,7 +102,7 @@ void WiredTigerEventHandler::setWtConnReadyStatus(bool status) {
     LOGV2(7003100,
           "WiredTiger connection close is waiting for active statistics readers to finish",
           "activeReaders"_attr = _activeSections);
-    _idleCondition.wait(lock, [this]() { return _activeSections != 0; });
+    _idleCondition.wait(lock, [this]() { return _activeSections == 0; });
 }
 
 bool WiredTigerEventHandler::getSectionActivityPermit() {
