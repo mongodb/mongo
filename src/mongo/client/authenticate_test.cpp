@@ -112,31 +112,6 @@ public:
             OpMsgRequestBuilder::create(auth::ValidatedTenancyScope::kNotRequired, dbname, cmd));
     }
 
-    BSONObj loadMongoCRConversation() {
-        // 1. Client sends 'getnonce' command
-        pushRequest(DatabaseName::kAdmin, BSON("getnonce" << 1));
-
-        // 2. Client receives nonce
-        pushResponse(BSON("nonce" << _nonce << "ok" << 1));
-
-        // 3. Client sends 'authenticate' command
-        pushRequest(DatabaseName::kAdmin,
-                    BSON("authenticate" << 1 << "nonce" << _nonce << "user" << _username << "key"
-                                        << _digest));
-
-        // 4. Client receives 'ok'
-        pushResponse(BSON("ok" << 1));
-
-        // Call clientAuthenticate()
-        return BSON("mechanism"
-                    << "MONGODB-CR"
-                    << "db"
-                    << "admin"
-                    << "user" << _username << "pwd" << _password << "digest"
-                    << "true");
-    }
-
-
     BSONObj loadX509Conversation() {
         // 1. Client sends 'authenticate' command
         pushRequest(DatabaseName::kExternal,
@@ -172,23 +147,6 @@ public:
     std::queue<OpMsgRequest> _requests;
     std::queue<BSONObj> _responses;
 };
-
-TEST_F(AuthClientTest, MongoCR) {
-    // This test excludes the MONGODB-CR support found in mongo/shell/mongodbcr.cpp
-    // so it should fail to auth.
-    // jstests exist to ensure MONGODB-CR continues to work from the client.
-    auto params = loadMongoCRConversation();
-    ASSERT_THROWS(auth::authenticateClient(params, HostAndPort(), "", _runCommandCallback).get(),
-                  DBException);
-}
-
-TEST_F(AuthClientTest, asyncMongoCR) {
-    // As with the sync version above, we expect authentication to fail
-    // since this test was built without MONGODB-CR support.
-    auto params = loadMongoCRConversation();
-    ASSERT_NOT_OK(
-        auth::authenticateClient(params, HostAndPort(), "", _runCommandCallback).getNoThrow());
-}
 
 #ifdef MONGO_CONFIG_SSL
 TEST_F(AuthClientTest, X509) {

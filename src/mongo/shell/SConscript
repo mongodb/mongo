@@ -186,7 +186,6 @@ if not has_option("noshell") and jsEngine:
     env.Library(
         target="mongo_initializers",
         source=[
-            "mongodbcr.cpp",
             "shell_options_init.cpp",
         ],
         LIBDEPS_PRIVATE=[

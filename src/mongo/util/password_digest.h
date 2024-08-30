@@ -36,8 +36,7 @@
 namespace mongo {
 
 /**
- * Hashes the password so that it can be stored in a user object or used for MONGODB-CR
- * authentication.
+ * Hashes the password so that it can be used for SCRAM-SHA-1 in MONGODB-CR compatability mode.
  */
 std::string createPasswordDigest(StringData username, StringData clearTextPassword);
 

@@ -661,18 +661,12 @@ boost::optional<BSONObj> MongoURI::makeAuthObjFromOptions(
             it->second == auth::kMechanismMongoOIDC) {
             usernameRequired = false;
         }
-    } else if (!saslMechsForAuth.empty()) {
-        if (std::find(saslMechsForAuth.begin(),
-                      saslMechsForAuth.end(),
-                      auth::kMechanismScramSha256) != saslMechsForAuth.end()) {
-            bob.append(saslCommandMechanismFieldName, auth::kMechanismScramSha256);
-        } else {
-            bob.append(saslCommandMechanismFieldName, auth::kMechanismScramSha1);
-        }
-    } else if (maxWireVersion >= 3) {
-        bob.append(saslCommandMechanismFieldName, auth::kMechanismScramSha1);
+    } else if (std::find(saslMechsForAuth.begin(),
+                         saslMechsForAuth.end(),
+                         auth::kMechanismScramSha256) != saslMechsForAuth.end()) {
+        bob.append(saslCommandMechanismFieldName, auth::kMechanismScramSha256);
     } else {
-        bob.append(saslCommandMechanismFieldName, auth::kMechanismMongoCR);
+        bob.append(saslCommandMechanismFieldName, auth::kMechanismScramSha1);
     }
 
     if (usernameRequired && _user.empty()) {

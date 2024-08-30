@@ -58,15 +58,10 @@ namespace auth {
 
 using RunCommandHook = std::function<Future<BSONObj>(OpMsgRequest request)>;
 
-/* Hook for legacy MONGODB-CR support provided by shell client only */
-using AuthMongoCRHandler = std::function<Future<void>(RunCommandHook, const BSONObj&)>;
-extern AuthMongoCRHandler authMongoCR;
-
 /**
  * Names for supported authentication mechanisms.
  */
 
-constexpr auto kMechanismMongoCR = "MONGODB-CR"_sd;
 constexpr auto kMechanismMongoX509 = "MONGODB-X509"_sd;
 constexpr auto kMechanismSaslPlain = "PLAIN"_sd;
 constexpr auto kMechanismGSSAPI = "GSSAPI"_sd;

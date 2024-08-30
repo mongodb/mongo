@@ -94,15 +94,6 @@ StatusWith<std::string> extractDBField(const BSONObj& params) {
 }
 
 //
-// MONGODB-CR
-//
-
-Future<void> authMongoCRImpl(RunCommandHook cmd, const BSONObj& params) {
-    return Status(ErrorCodes::AuthenticationFailed,
-                  "MONGODB-CR support was removed in MongoDB 4.0");
-}
-
-//
 // X-509
 //
 
@@ -202,9 +193,6 @@ Future<void> authenticateClient(const BSONObj& params,
                       "You cannot specify both 'db' and 'userSource'. Please use only 'db'.");
     }
 
-    if (mechanism == kMechanismMongoCR)
-        return authMongoCR(runCommand, params).onError(errorHandler);
-
 #ifdef MONGO_CONFIG_SSL
     else if (mechanism == kMechanismMongoX509)
         return authX509(runCommand, params, clientName).onError(errorHandler);
@@ -216,8 +204,6 @@ Future<void> authenticateClient(const BSONObj& params,
     return Status(ErrorCodes::AuthenticationFailed,
                   mechanism + " mechanism support not compiled into client library.");
 };
-
-AuthMongoCRHandler authMongoCR = authMongoCRImpl;
 
 Future<std::string> negotiateSaslMechanism(RunCommandHook runCommand,
                                            const UserName& username,
