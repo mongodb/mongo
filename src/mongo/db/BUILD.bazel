@@ -318,12 +318,6 @@ mongo_cc_library(
         "audit_format.h",
         "audit_interface.h",
     ],
-    local_defines = select({
-        "//bazel/config:build_enterprise_enabled": [
-            "MONGO_ENTERPRISE_AUDIT=1",
-        ],
-        "//conditions:default": [],
-    }),
     deps = [
         ":service_context",
         "//src/mongo:base",
