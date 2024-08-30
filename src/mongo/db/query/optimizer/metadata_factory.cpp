@@ -130,23 +130,6 @@ ScanDefinition createScanDef(DatabaseName dbName,
 
     IndexPathOccurrences indexPathOccurrences = createIndexPathOccurrences(indexDefs);
 
-    // Simplify partial filter requirements using the non-multikey paths.
-    for (auto& [indexDefName, indexDef] : indexDefs) {
-        ProjectionRenames projRenames_unused;
-        [[maybe_unused]] const bool hasEmptyInterval =
-            simplifyPartialSchemaReqPaths(boost::none /*scanProjName*/,
-                                          multikeynessTrie,
-                                          indexDef.getPartialReqMap(),
-                                          projRenames_unused,
-                                          constFold,
-                                          pathToInterval);
-        tassert(6624157,
-                "We should not be seeing renames from partial index filters",
-                projRenames_unused.empty());
-
-        // If "hasEmptyInterval" is set, we have a partial filter index with an unsatisfiable
-        // condition, which is thus guaranteed to never contain any documents.
-    }
     return {std::move(dbName),
             std::move(uuid),
             std::move(options),
