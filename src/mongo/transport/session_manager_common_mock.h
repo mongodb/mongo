@@ -27,45 +27,34 @@
  *    it in the license file.
  */
 
-#include <cerrno>
-#include <sys/resource.h>
+#include <fmt/format.h>
+#include <memory>
 
-#include "mongo/db/service_context_test_fixture.h"
+#include "mongo/db/client.h"
+#include "mongo/db/operation_context.h"
+#include "mongo/db/service_context.h"
+#include "mongo/transport/session.h"
+#include "mongo/transport/session_manager.h"
 #include "mongo/transport/session_manager_common.h"
-#include "mongo/transport/session_manager_common_mock.h"
-
-#include "mongo/unittest/unittest.h"
-
-#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
 
 namespace mongo::transport {
-namespace {
 
-class SessionManagerCommonTest : public ServiceContextTest {};
+class MockSessionManagerCommon : public SessionManagerCommon {
+public:
+    using SessionManagerCommon::SessionManagerCommon;
 
-TEST_F(SessionManagerCommonTest, VerifyMaxOpenSessionsBasedOnRlimit) {
-    struct rlimit originalLimit, newLimit;
-    auto rlimitReturnCode = getrlimit(RLIMIT_NOFILE, &originalLimit);
-    const auto savedErrno1 = errno;
-    ASSERT_EQ(rlimitReturnCode, 0) << savedErrno1;
+protected:
+    std::string getClientThreadName(const Session& session) const override {
+        return fmt::format("mock{}", session.id());
+    }
 
-    ASSERT_GTE(originalLimit.rlim_max, 10);
+    void configureServiceExecutorContext(Client* client, bool isPrivilegedSession) const override {
+        auto seCtx = std::make_unique<ServiceExecutorContext>();
+        seCtx->setThreadModel(ServiceExecutorContext::kSynchronous);
+        seCtx->setCanUseReserved(isPrivilegedSession);
+        stdx::lock_guard lk(*client);
+        ServiceExecutorContext::set(client, std::move(seCtx));
+    }
+};
 
-    newLimit = originalLimit;
-    newLimit.rlim_cur = 10;
-    rlimitReturnCode = setrlimit(RLIMIT_NOFILE, &newLimit);
-    const auto savedErrno2 = errno;
-    ASSERT_EQ(rlimitReturnCode, 0) << savedErrno2;
-
-    // 80% of half of 10 is 4, which is the arithmetic we want to verify in the
-    // `getSupportedMax` function via the `maxOpenSessions` getter.
-    MockSessionManagerCommon sm(getServiceContext());
-    ASSERT_EQ(sm.maxOpenSessions(), 4);
-
-    rlimitReturnCode = setrlimit(RLIMIT_NOFILE, &originalLimit);
-    const auto savedErrno3 = errno;
-    ASSERT_EQ(rlimitReturnCode, 0) << savedErrno3;
-}
-
-}  // namespace
 }  // namespace mongo::transport

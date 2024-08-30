@@ -71,6 +71,7 @@
 #include "mongo/transport/service_entry_point.h"
 #include "mongo/transport/service_executor.h"
 #include "mongo/transport/session_manager_common.h"
+#include "mongo/transport/session_manager_common_mock.h"
 #include "mongo/transport/session_workflow.h"
 #include "mongo/transport/session_workflow_test_util.h"
 #include "mongo/transport/test_fixtures.h"
@@ -374,25 +375,6 @@ private:
         };
         return sep;
     }
-
-    class MockSessionManagerCommon : public SessionManagerCommon {
-    public:
-        using SessionManagerCommon::SessionManagerCommon;
-
-    protected:
-        std::string getClientThreadName(const Session& session) const override {
-            return "mock{}"_format(session.id());
-        }
-
-        void configureServiceExecutorContext(Client* client,
-                                             bool isPrivilegedSession) const override {
-            auto seCtx = std::make_unique<ServiceExecutorContext>();
-            seCtx->setThreadModel(ServiceExecutorContext::kSynchronous);
-            seCtx->setCanUseReserved(isPrivilegedSession);
-            stdx::lock_guard lk(*client);
-            ServiceExecutorContext::set(client, std::move(seCtx));
-        }
-    };
 
     class SWTObserver : public ClientTransportObserver {
     public:

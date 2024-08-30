@@ -68,6 +68,10 @@ bool TransportLayerMock::owns(Session::Id id) {
     return _sessions.count(id) > 0;
 }
 
+void TransportLayerMock::deleteSession(Session::Id id) {
+    _sessions.erase(id);
+}
+
 StatusWith<std::shared_ptr<Session>> TransportLayerMock::connect(
     HostAndPort peer,
     ConnectSSLMode sslMode,

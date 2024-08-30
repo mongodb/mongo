@@ -70,6 +70,7 @@ public:
     std::shared_ptr<Session> createSession(bool isFromRouterPort = false);
     std::shared_ptr<Session> get(Session::Id id);
     bool owns(Session::Id id);
+    void deleteSession(Session::Id id);
 
     StatusWith<std::shared_ptr<Session>> connect(
         HostAndPort peer,

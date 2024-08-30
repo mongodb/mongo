@@ -232,6 +232,7 @@ tlEnv.CppUnitTest(
     source=[
         "asio/asio_transport_layer_test.cpp",
         "asio/asio_utils_test.cpp",
+        "hello_metrics_test.cpp",
         "message_compressor_manager_test.cpp",
         "message_compressor_registry_test.cpp",
         "service_executor_test.cpp",
