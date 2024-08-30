@@ -75,7 +75,7 @@ structlog = "^24.4.0"
 passlib = "^1.7.4"
 pyOpenSSL = [
     { version = "19.0.0", markers = "platform_machine == 's390x' or platform_machine == 'ppc64le'" },  # Needed for pinned cryptography package - see SERVER-70845
-    { version = "^24.2.1", markers = "platform_machine != 's390x' and platform_machine != 'ppc64le'" },
+    { version = "22.0.0", markers = "platform_machine != 's390x' and platform_machine != 'ppc64le'" },
 ]
 pyparsing = "^2.4.7"
 service_identity = "^18.1.0"
@@ -114,7 +114,7 @@ pypiwin32 = { version = ">=223", markers = "sys_platform == 'win32'" }
 pywin32 = { version = ">=225", markers = "sys_platform == 'win32'" }
 cryptography = [
     { version = "2.3", markers = "platform_machine == 's390x' or platform_machine == 'ppc64le'" },     # Needed for oauthlib to use RSAAlgorithm # Version locked - see SERVER-36618
-    { version = "^43.0.0", markers = "platform_machine != 's390x' and platform_machine != 'ppc64le'" },
+    { version = "36.0.2", markers = "platform_machine != 's390x' and platform_machine != 'ppc64le'" },
 ]
 mongo-ninja-python = [
     { version = "1.11.1.7", markers = "platform_machine != 's390x' and platform_machine != 'ppc64le'" },
