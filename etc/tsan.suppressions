@@ -58,7 +58,7 @@ deadlock:mongo::repl::TenantMigrationRecipientService::Instance::_interrupt
 
 # TODO SERVER-91827
 deadlock:mongo::executor::EgressConnectionCloserManager::remove
-deadlock:mongo::repl::ReplicationCoordinatorExternalStateImpl::tooStale 
+deadlock:mongo::repl::ReplicationCoordinatorExternalStateImpl::tooStale
 deadlock:mongo::RemoteCommandTargeterFactoryImpl::create
 deadlock:mongo::ShardRegistry::getConfigShard
 deadlock:mongo::executor::ConnectionPool::dropConnections
@@ -80,8 +80,16 @@ race:mongo::AuthorizationManager::get
 # TODO SERVER-91877 inversion b/w SSL manager and some crypto mutex
 deadlock:mongo::(anonymous namespace)::SSLManagerOpenSSL::SSLManagerOpenSSL
 
-# TODO SERVER-93363
+# Each of these functions within the third-party S2 library use a counter field (query_count_,
+# num_find_vertex_calls_, and candidates_created_counter_). The first two counters are used to
+# toggle internal optimizations after reaching a threshold. The consequence of a data race to
+# increment those counters is just slightly delaying when the optimization flips on, so there is
+# no correctness issue. The third counter is just used for logging. We only expect these data races
+# to be possible in the context of a partial index with a geo-related partialFilterExpression, since
+# that's the only scenario when a S2 data structure will be shared across threads.
 race:S2Loop::FindVertex
+race:S2EdgeIndex::IncrementQueryCount
+race:S2RegionCoverer::NewCandidate
 
 # TODO SERVER-93364
 race:mongo::Client::setService

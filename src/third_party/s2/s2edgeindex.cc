@@ -59,8 +59,6 @@ using std::max;
 using std::swap;
 using std::reverse;
 
-#include <atomic>
-
 #include <set>
 using std::set;
 using std::multiset;
@@ -86,7 +84,7 @@ static bool FLAGS_always_recurse_on_children = false;
 void S2EdgeIndex::Reset() {
   minimum_s2_level_used_ = S2CellId::kMaxLevel;
   index_computed_ = false;
-  query_count_.store(0, std::memory_order_relaxed);
+  query_count_ = 0;
   mapping_.clear();
 }
 
@@ -113,7 +111,7 @@ bool S2EdgeIndex::IsIndexComputed() const {
 }
 
 void S2EdgeIndex::IncrementQueryCount() {
-  query_count_.fetch_add(1, std::memory_order_relaxed);
+  query_count_++;
 }
 
 
@@ -144,7 +142,7 @@ void S2EdgeIndex::IncrementQueryCount() {
 // thing to do.
 void S2EdgeIndex::PredictAdditionalCalls(int n) {
   if (index_computed_) return;
-  if (num_edges() > 100 && (query_count_.load(std::memory_order_relaxed) + n) > 30) {
+  if (num_edges() > 100 && (query_count_ + n) > 30) {
     ComputeIndex();
   }
 }

@@ -5,8 +5,6 @@
 #ifndef UTIL_GEOMETRY_S2EDGEINDEX_H_
 #define UTIL_GEOMETRY_S2EDGEINDEX_H_
 
-#include <atomic>
-
 #include <map>
 using std::map;
 using std::multimap;
@@ -227,7 +225,7 @@ class S2EdgeIndex {
   bool index_computed_;
 
   // Number of queries so far
-  std::atomic<int> query_count_;
+  int query_count_;
 
   DISALLOW_COPY_AND_ASSIGN(S2EdgeIndex);
 };
