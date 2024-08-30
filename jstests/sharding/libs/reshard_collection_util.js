@@ -181,9 +181,16 @@ export class ReshardCollectionCmdTest {
         });
     }
 
+    _verifyShardKey(expectedShardKey) {
+        const shardKey = this._mongos.getDB(this._dbName)[this._collName].getShardKey();
+        assert.eq(shardKey, expectedShardKey);
+    }
+
     assertReshardCollOkWithPreset(commandObj, presetReshardedChunks) {
+        const oldShardKey = {oldKey: 1};
         assert.commandWorked(
-            this._mongos.adminCommand({shardCollection: this._ns, key: {oldKey: 1}}));
+            this._mongos.adminCommand({shardCollection: this._ns, key: oldShardKey}));
+        this._verifyShardKey(oldShardKey);
 
         let bulk = this._mongos.getDB(this._dbName)
                        .getCollection(this._collName)
@@ -198,6 +205,8 @@ export class ReshardCollectionCmdTest {
             this._constructTemporaryReshardingCollName(this._dbName, this._collName);
 
         assert.commandWorked(this._mongos.adminCommand(commandObj));
+
+        this._verifyShardKey(commandObj.key);
 
         this._verifyTemporaryReshardingCollectionExistsWithCorrectOptions(
             commandObj.key, this._getAllShardIdsFromExpectedChunks(presetReshardedChunks));
@@ -220,8 +229,10 @@ export class ReshardCollectionCmdTest {
      */
     assertReshardCollOk(
         commandObj, expectedChunkNum, expectedChunks, expectedZones, additionalSetup) {
+        const oldShardKey = {oldKey: 1};
         assert.commandWorked(
-            this._mongos.adminCommand({shardCollection: this._ns, key: {oldKey: 1}}));
+            this._mongos.adminCommand({shardCollection: this._ns, key: oldShardKey}));
+        this._verifyShardKey(oldShardKey);
 
         let bulk = this._mongos.getDB(this._dbName)
                        .getCollection(this._collName)
@@ -239,6 +250,8 @@ export class ReshardCollectionCmdTest {
             this._constructTemporaryReshardingCollName(this._dbName, this._collName);
 
         assert.commandWorked(this._mongos.adminCommand(commandObj));
+
+        this._verifyShardKey(commandObj.key);
 
         if (expectedChunks) {
             this._verifyTemporaryReshardingCollectionExistsWithCorrectOptions(

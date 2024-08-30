@@ -148,6 +148,7 @@ DBCollection.prototype.help = function() {
     print("\tdb." + shortName + ".getShardVersion() - only for use with sharding");
     print("\tdb." + shortName +
           ".getShardDistribution() - prints statistics about data distribution in the cluster");
+    print("\tdb." + shortName + ".getShardKey() - prints the shard key for this collection");
     print(
         "\tdb." + shortName +
         ".getSplitKeysForChunks( <maxChunkSize> ) - calculates split points over all chunks and returns splitter function");
@@ -1225,6 +1226,19 @@ DBCollection.prototype.getShardDistribution = function() {
     }
 
     print("\n");
+};
+
+/**
+ * Prints shard key for this collection
+ */
+DBCollection.prototype.getShardKey = function() {
+    if (!this._isSharded()) {
+        throw Error("Collection " + this + " is not sharded.");
+    }
+
+    var config = this.getDB().getSiblingDB("config");
+    const coll = config.collections.findOne({_id: this._fullName});
+    return coll.key;
 };
 
 /*
