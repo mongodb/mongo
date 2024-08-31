@@ -106,7 +106,7 @@ void BM_WiredTigerBeginTxnBlock(benchmark::State& state) {
     }
 }
 
-template <PrepareConflictBehavior behavior, RoundUpPreparedTimestamps round>
+template <PrepareConflictBehavior behavior, bool round>
 void BM_WiredTigerBeginTxnBlockWithArgs(benchmark::State& state) {
     WiredTigerTestHelper helper;
     for (auto _ : state) {
@@ -127,24 +127,20 @@ void BM_setTimestamp(benchmark::State& state) {
 }
 
 BENCHMARK(BM_WiredTigerBeginTxnBlock);
-BENCHMARK_TEMPLATE(BM_WiredTigerBeginTxnBlockWithArgs,
-                   PrepareConflictBehavior::kEnforce,
-                   RoundUpPreparedTimestamps::kNoRound);
-BENCHMARK_TEMPLATE(BM_WiredTigerBeginTxnBlockWithArgs,
-                   PrepareConflictBehavior::kEnforce,
-                   RoundUpPreparedTimestamps::kRound);
+BENCHMARK_TEMPLATE(BM_WiredTigerBeginTxnBlockWithArgs, PrepareConflictBehavior::kEnforce, false);
+BENCHMARK_TEMPLATE(BM_WiredTigerBeginTxnBlockWithArgs, PrepareConflictBehavior::kEnforce, true);
 BENCHMARK_TEMPLATE(BM_WiredTigerBeginTxnBlockWithArgs,
                    PrepareConflictBehavior::kIgnoreConflicts,
-                   RoundUpPreparedTimestamps::kNoRound);
+                   false);
 BENCHMARK_TEMPLATE(BM_WiredTigerBeginTxnBlockWithArgs,
                    PrepareConflictBehavior::kIgnoreConflicts,
-                   RoundUpPreparedTimestamps::kRound);
+                   true);
 BENCHMARK_TEMPLATE(BM_WiredTigerBeginTxnBlockWithArgs,
                    PrepareConflictBehavior::kIgnoreConflictsAllowWrites,
-                   RoundUpPreparedTimestamps::kNoRound);
+                   false);
 BENCHMARK_TEMPLATE(BM_WiredTigerBeginTxnBlockWithArgs,
                    PrepareConflictBehavior::kIgnoreConflictsAllowWrites,
-                   RoundUpPreparedTimestamps::kRound);
+                   true);
 BENCHMARK(BM_setTimestamp);
 
 }  // namespace

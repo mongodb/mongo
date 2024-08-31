@@ -78,7 +78,8 @@ public:
 
     void prepareUnitOfWork() override;
 
-    void preallocateSnapshot() override;
+    void preallocateSnapshot(
+        const OpenSnapshotOptions& options = kDefaultOpenSnapshotOptions) override;
 
     Status majorityCommittedSnapshotAvailable() const override;
 
@@ -107,10 +108,6 @@ public:
     void setPrepareConflictBehavior(PrepareConflictBehavior behavior) override;
 
     PrepareConflictBehavior getPrepareConflictBehavior() const override;
-
-    void setRoundUpPreparedTimestamps(bool value) override;
-
-    bool getRoundUpPreparedTimestamps() override;
 
     /**
      * Set pre-fetching capabilities for this session. This allows pre-loading of a set of pages
@@ -286,8 +283,6 @@ private:
 
     // The behavior of handling prepare conflicts.
     PrepareConflictBehavior _prepareConflictBehavior{PrepareConflictBehavior::kEnforce};
-    // Dictates whether to round up prepare and commit timestamp of a prepared transaction.
-    RoundUpPreparedTimestamps _roundUpPreparedTimestamps{RoundUpPreparedTimestamps::kNoRound};
     Timestamp _commitTimestamp;
     Timestamp _durableTimestamp;
     Timestamp _prepareTimestamp;
@@ -306,6 +301,9 @@ private:
     WiredTigerStats _sessionStatsAfterLastOperation;
 
     Milliseconds _cacheMaxWaitTimeout{0};
+
+    // Detects any attempt to reconfigure options used by an open transaction.
+    OpenSnapshotOptions _optionsUsedToOpenSnapshot;
 };
 
 }  // namespace mongo

@@ -71,7 +71,7 @@ public:
     Timestamp beginTransactionOnCommittedSnapshot(
         WiredTigerSession* session,
         PrepareConflictBehavior prepareConflictBehavior,
-        RoundUpPreparedTimestamps roundUpPreparedTimestamps,
+        bool roundUpPreparedTimestamps,
         RecoveryUnit::UntimestampedWriteAssertionLevel untimestampedWriteAssertion) const;
 
     /**
