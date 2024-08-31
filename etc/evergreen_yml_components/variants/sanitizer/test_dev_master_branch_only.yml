@@ -283,13 +283,13 @@ buildvariants:
     expansions:
       exe: ".exe"
       content_type: application/zip
+      # TODO(SERVER-94331): add --use-diagnostic-latches=on when deadlock on shutdown is fixed.
       compile_flags: >-
         --dbg=on
         --opt=on
         --win-version-min=win10
         -j$(bc <<< "$(grep -c '^processor' /proc/cpuinfo) / 1.8")
         MONGO_DISTMOD=windows
-        --use-diagnostic-latches=on
         --modules=
       num_scons_link_jobs_available: 0.2
       python: "/cygdrive/c/python/python310/python.exe"
@@ -298,8 +298,10 @@ buildvariants:
       multiversion_platform: windows
       multiversion_edition: enterprise
       large_distro_name: windows-2022-large
+      # TODO(SERVER-94331): remove --excludeWithAnyTags=requires_latch_analyzer when deadlock
+      # on shutdown is fixed.
       test_flags: >-
-        --excludeWithAnyTags=incompatible_with_windows_tls
+        --excludeWithAnyTags=incompatible_with_windows_tls,requires_latch_analyzer
         --enableEnterpriseTests=off
         --mongodSetParameters="{internalQueryEnableAggressiveSpillsInGroup: true}"
       compile_variant: *windows-debug-suggested
