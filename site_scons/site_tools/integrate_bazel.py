@@ -848,11 +848,11 @@ def generate(env: SCons.Environment.Environment) -> None:
 
     # TODO(SERVER-94142): Port --enterprise-features to Bazel
     if "MONGO_ENTERPRISE_VERSION" in env:
-        bazel_internal_flags += ["--define", "MONGO_ENTERPRISE_VERSION=1"]
+        bazel_internal_flags += ["--cxxopt", "-DMONGO_ENTERPRISE_VERSION=1"]
     if "audit" in env.get("MONGO_ENTERPRISE_FEATURES", []):
-        bazel_internal_flags += ["--define", "MONGO_ENTERPRISE_AUDIT=1"]
+        bazel_internal_flags += ["--cxxopt", "-DMONGO_ENTERPRISE_AUDIT=1"]
     if "encryptdb" in env.get("MONGO_ENTERPRISE_FEATURES", []):
-        bazel_internal_flags += ["--define", "MONGO_ENTERPRISE_ENCRYPTDB=1"]
+        bazel_internal_flags += ["--cxxopt", "-DMONGO_ENTERPRISE_ENCRYPTDB=1"]
 
     if env["DWARF_VERSION"]:
         bazel_internal_flags.append(f"--//bazel/config:dwarf_version={env['DWARF_VERSION']}")
