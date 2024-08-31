@@ -68,13 +68,13 @@ mongo_cc_library(
         "ticketholder.h",
     ],
     deps = [
-        ":admission_context",  # TODO(SERVER-98376): Remove.
+        ":admission_context",  # TODO(SERVER-93876): Remove.
         "//src/mongo/db:server_base",
-        "//src/mongo/db:service_context",  # TODO(SERVER-98376): Remove.
-        "//src/third_party/boost:boost_filesystem",  # TODO(SERVER-98376): Remove.
-        "//src/third_party/boost:boost_iostreams",  # TODO(SERVER-98376): Remove.
-        "//src/third_party/boost:boost_log",  # TODO(SERVER-98376): Remove.
-        "//src/third_party/boost:boost_program_options",  # TODO(SERVER-98376): Remove.
+        "//src/mongo/db:service_context",  # TODO(SERVER-93876): Remove.
+        "//src/third_party/boost:boost_filesystem",  # TODO(SERVER-93876): Remove.
+        "//src/third_party/boost:boost_iostreams",  # TODO(SERVER-93876): Remove.
+        "//src/third_party/boost:boost_log",  # TODO(SERVER-93876): Remove.
+        "//src/third_party/boost:boost_program_options",  # TODO(SERVER-93876): Remove.
     ],
 )
 

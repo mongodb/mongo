@@ -37,7 +37,7 @@ mongo_cc_library(
     deps = [
         "//src/mongo/db:server_base",
         "//src/mongo/db/commands:server_status_core",
-        "//src/mongo/db/repl:read_concern_args",  # TODO(SERVER-98376): Remove.
+        "//src/mongo/db/repl:read_concern_args",  # TODO(SERVER-93876): Remove.
     ],
 )
 
@@ -61,10 +61,10 @@ mongo_cc_library(
     ],
     deps = [
         "//src/mongo/client:read_preference",
-        "//src/mongo/db:server_base",  # TODO(SERVER-98376): Remove.
-        "//src/mongo/db/commands:server_status_core",  # TODO(SERVER-98376): Remove.
-        "//src/mongo/db/repl:repl_coordinator_interface",  # TODO(SERVER-98376): Remove.
-        "//src/mongo/db/repl:repl_settings",  # TODO(SERVER-98376): Remove.
+        "//src/mongo/db:server_base",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/db/commands:server_status_core",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/db/repl:repl_coordinator_interface",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/db/repl:repl_settings",  # TODO(SERVER-93876): Remove.
     ],
 )
 
@@ -85,7 +85,7 @@ mongo_cc_library(
     deps = [
         "//src/mongo/db:server_base",
         "//src/mongo/db/commands:server_status_core",
-        "//src/mongo/db/repl:repl_coordinator_interface",  # TODO(SERVER-98376): Remove.
+        "//src/mongo/db/repl:repl_coordinator_interface",  # TODO(SERVER-93876): Remove.
     ],
 )
 

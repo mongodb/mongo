@@ -93,7 +93,7 @@ mongo_cc_library(
         ":mongos_server_parameters",
         "//src/mongo/db:server_base",
         "//src/mongo/db:service_context",
-        "//src/mongo/util:fail_point",  # TODO(SERVER-98376): Remove.
+        "//src/mongo/util:fail_point",  # TODO(SERVER-93876): Remove.
     ],
 )
 
@@ -122,8 +122,8 @@ mongo_cc_library(
     ],
     deps = [
         "//src/mongo/db:server_base",
-        "//src/mongo/db/pipeline:runtime_constants_idl",  # TODO(SERVER-98376): Remove.
-        "//src/mongo/db/repl:read_concern_args",  # TODO(SERVER-98376): Remove.
+        "//src/mongo/db/pipeline:runtime_constants_idl",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/db/repl:read_concern_args",  # TODO(SERVER-93876): Remove.
         "//src/mongo/db/repl:repl_coordinator_interface",
         "//src/mongo/db/repl:repl_settings",
     ],

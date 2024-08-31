@@ -18,7 +18,7 @@ mongo_cc_library(
         "//src/mongo/db/query/util:memory_util.h",
     ],
     deps = [
-        "//src/mongo/util:pcre_wrapper",  # TODO(SERVER-98376): Remove.
+        "//src/mongo/util:pcre_wrapper",  # TODO(SERVER-93876): Remove.
         "//src/mongo/util:processinfo",
     ],
 )
@@ -106,9 +106,9 @@ mongo_cc_library(
         ":memory_util",
         "//src/mongo/db:server_base",
         "//src/mongo/db:service_context",
-        "//src/mongo/db/commands:test_commands_enabled",  # TODO(SERVER-98376): Remove.
+        "//src/mongo/db/commands:test_commands_enabled",  # TODO(SERVER-93876): Remove.
         "//src/mongo/idl:cluster_server_parameter",
-        "//src/mongo/util:pcre_wrapper",  # TODO(SERVER-98376): Remove.
+        "//src/mongo/util:pcre_wrapper",  # TODO(SERVER-93876): Remove.
     ],
 )
 
@@ -122,8 +122,8 @@ mongo_cc_library(
     ],
     deps = [
         ":query_knobs",
-        "//src/mongo/db:mongohasher",  # TODO(SERVER-98376): Remove.
-        "//src/mongo/db:server_base",  # TODO(SERVER-98376): Remove.
+        "//src/mongo/db:mongohasher",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/db:server_base",  # TODO(SERVER-93876): Remove.
     ],
 )
 

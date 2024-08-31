@@ -17,7 +17,7 @@ mongo_cc_library(
     ],
     deps = [
         ":logical_session_cache",
-        ":logical_session_id",  # TODO(SERVER-98376): Remove.
+        ":logical_session_id",  # TODO(SERVER-93876): Remove.
         "//src/mongo/db/auth",
         "//src/mongo/db/auth:authprivilege",
     ],
@@ -56,9 +56,9 @@ mongo_cc_library(
         "logical_session_cache.h",
     ],
     deps = [
-        ":logical_session_id",  # TODO(SERVER-98376): Remove.
+        ":logical_session_id",  # TODO(SERVER-93876): Remove.
         "//src/mongo/db:server_base",
-        "//src/mongo/db:service_context",  # TODO(SERVER-98376): Remove.
+        "//src/mongo/db:service_context",  # TODO(SERVER-93876): Remove.
     ],
 )
 

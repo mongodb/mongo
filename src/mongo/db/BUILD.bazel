@@ -61,8 +61,8 @@ mongo_cc_library(
         "multitenancy.h",
     ],
     deps = [
-        ":server_base",  # TODO(SERVER-98376): Remove.
-        "//src/mongo/db/auth",  # TODO(SERVER-98376): Remove.
+        ":server_base",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/db/auth",  # TODO(SERVER-93876): Remove.
         "//src/mongo/db/auth:security_token",
     ],
 )
@@ -362,7 +362,7 @@ mongo_cc_library(
     ],
     deps = [
         ":service_context",
-        "//src/mongo:base",  # TODO(SERVER-98376): Remove.
+        "//src/mongo:base",  # TODO(SERVER-93876): Remove.
     ],
 )
 
@@ -427,10 +427,10 @@ mongo_cc_library(
         "command_can_run_here.h",
     ],
     deps = [
-        ":service_context",  # TODO(SERVER-98376): Remove.
-        "//src/mongo:base",  # TODO(SERVER-98376): Remove.
-        "//src/mongo/client:read_preference",  # TODO(SERVER-98376): Remove.
-        "//src/mongo/db/commands:test_commands_enabled",  # TODO(SERVER-98376): Remove.
+        ":service_context",  # TODO(SERVER-93876): Remove.
+        "//src/mongo:base",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/client:read_preference",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/db/commands:test_commands_enabled",  # TODO(SERVER-93876): Remove.
         "//src/mongo/db/repl:repl_coordinator_interface",
     ],
 )
@@ -561,8 +561,8 @@ mongo_cc_library(
         "operation_killer.h",
     ],
     deps = [
-        ":server_base",  # TODO(SERVER-98376): Remove.
-        ":service_context",  # TODO(SERVER-98376): Remove.
+        ":server_base",  # TODO(SERVER-93876): Remove.
+        ":service_context",  # TODO(SERVER-93876): Remove.
         "//src/mongo/db/auth",
         "//src/mongo/db/auth:authprivilege",
     ],
@@ -578,7 +578,7 @@ mongo_cc_library(
     ],
     deps = [
         ":server_base",
-        ":service_context",  # TODO(SERVER-98376): Remove.
+        ":service_context",  # TODO(SERVER-93876): Remove.
     ],
 )
 
@@ -588,7 +588,7 @@ mongo_cc_library(
         "//src/mongo/db/exec:disk_use_options_gen",
     ],
     deps = [
-        ":server_base",  # TODO(SERVER-98376): Remove.
+        ":server_base",  # TODO(SERVER-93876): Remove.
         "//src/mongo/db/query:query_knobs",
     ],
 )
@@ -636,8 +636,8 @@ mongo_cc_library(
     ],
     deps = [
         ":server_base",
-        ":service_context",  # TODO(SERVER-98376): Remove.
-        "//src/mongo/db/repl:optime",  # TODO(SERVER-98376): Remove.
+        ":service_context",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/db/repl:optime",  # TODO(SERVER-93876): Remove.
     ],
 )
 
@@ -651,7 +651,7 @@ mongo_cc_library(
     ],
     deps = [
         ":service_context",
-        "//src/mongo:base",  # TODO(SERVER-98376): Remove.
+        "//src/mongo:base",  # TODO(SERVER-93876): Remove.
     ],
 )
 
@@ -857,7 +857,7 @@ mongo_cc_library(
         "write_block_bypass.h",
     ],
     deps = [
-        ":service_context",  # TODO(SERVER-98376): Remove.
+        ":service_context",  # TODO(SERVER-93876): Remove.
         "//src/mongo/db/auth",
         "//src/mongo/db/auth:authprivilege",
     ],

@@ -36,8 +36,8 @@ mongo_cc_library(
         "//src/mongo/db:namespace_spec",
         "//src/mongo/db:server_base",
         "//src/mongo/db/query:index_hint",
-        "//src/mongo/db/query:query_knobs",  # TODO(SERVER-98376): Remove.
-        "//src/mongo/db/query/query_shape:query_shape_hash",  # TODO(SERVER-98376): Remove.
+        "//src/mongo/db/query:query_knobs",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/db/query/query_shape:query_shape_hash",  # TODO(SERVER-93876): Remove.
     ],
 )
 

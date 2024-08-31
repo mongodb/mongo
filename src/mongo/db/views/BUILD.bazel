@@ -23,6 +23,6 @@ mongo_cc_library(
     ],
     deps = [
         "//src/mongo/db:server_base",
-        "//src/mongo/db/query/collation:collator_factory_interface",  # TODO(SERVER-98376): Remove.
+        "//src/mongo/db/query/collation:collator_factory_interface",  # TODO(SERVER-93876): Remove.
     ],
 )

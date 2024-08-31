@@ -21,13 +21,13 @@ mongo_cc_library(
         "s2_common.h",
     ],
     deps = [
-        "//src/mongo/bson/util:bson_extract",  # TODO(SERVER-98376): Remove.
+        "//src/mongo/bson/util:bson_extract",  # TODO(SERVER-93876): Remove.
         "//src/mongo/db:mongohasher",
         "//src/mongo/db:server_base",
-        "//src/mongo/db/geo:geometry",  # TODO(SERVER-98376): Remove.
+        "//src/mongo/db/geo:geometry",  # TODO(SERVER-93876): Remove.
         "//src/mongo/db/geo:geoparser",
-        "//src/mongo/db/query/collation:collator_interface",  # TODO(SERVER-98376): Remove.
-        "//src/mongo/db/storage:key_string",  # TODO(SERVER-98376): Remove.
+        "//src/mongo/db/query/collation:collator_interface",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/db/storage:key_string",  # TODO(SERVER-93876): Remove.
         "//src/third_party/s2",
     ],
 )

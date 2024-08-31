@@ -74,7 +74,7 @@ mongo_cc_library(
     ],
     deps = [
         "//src/mongo:base",
-        "//src/mongo/idl:idl_parser",  # TODO(SERVER-98376): Remove.
+        "//src/mongo/idl:idl_parser",  # TODO(SERVER-93876): Remove.
         "//src/mongo/util/net:network",
     ],
 )

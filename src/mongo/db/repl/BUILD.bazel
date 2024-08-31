@@ -19,7 +19,7 @@ mongo_cc_library(
     ],
     deps = [
         "//src/mongo/db:service_context",
-        "//src/mongo/db/storage:storage_options",  # TODO(SERVER-98376): Remove.
+        "//src/mongo/db/storage:storage_options",  # TODO(SERVER-93876): Remove.
     ],
 )
 
@@ -41,8 +41,8 @@ mongo_cc_library(
         "repl_settings.cpp",
     ],
     deps = [
-        ":repl_server_parameters",  # TODO(SERVER-98376): Remove.
-        "//src/mongo/db:server_base",  # TODO(SERVER-98376): Remove.
+        ":repl_server_parameters",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/db:server_base",  # TODO(SERVER-93876): Remove.
     ],
 )
 
@@ -73,7 +73,7 @@ mongo_cc_library(
         "storage_interface.h",
     ],
     deps = [
-        ":optime",  # TODO(SERVER-98376): Remove.
+        ":optime",  # TODO(SERVER-93876): Remove.
         "//src/mongo/db:service_context",
     ],
 )
@@ -87,8 +87,8 @@ mongo_cc_library(
         "drop_pending_collection_reaper.h",
     ],
     deps = [
-        ":optime",  # TODO(SERVER-98376): Remove.
-        ":storage_interface",  # TODO(SERVER-98376): Remove.
+        ":optime",  # TODO(SERVER-93876): Remove.
+        ":storage_interface",  # TODO(SERVER-93876): Remove.
         "//src/mongo/db:server_base",
         "//src/mongo/db:service_context",
     ],
@@ -151,7 +151,7 @@ mongo_cc_library(
     ],
     deps = [
         "//src/mongo/db:server_base",
-        "//src/mongo/db:service_context",  # TODO(SERVER-98376): Remove.
+        "//src/mongo/db:service_context",  # TODO(SERVER-93876): Remove.
         "//src/mongo/db/auth",
         "//src/mongo/util/concurrency:thread_pool",
     ],
@@ -199,7 +199,7 @@ mongo_cc_library(
         "tenant_migration_statistics.h",
     ],
     deps = [
-        ":repl_server_parameters",  # TODO(SERVER-98376): Remove.
+        ":repl_server_parameters",  # TODO(SERVER-93876): Remove.
         "//src/mongo:base",
         "//src/mongo/db/commands:server_status_core",
     ],
@@ -268,9 +268,9 @@ mongo_cc_library(
         "read_concern_args.h",
     ],
     deps = [
-        ":optime",  # TODO(SERVER-98376): Remove.
+        ":optime",  # TODO(SERVER-93876): Remove.
         "//src/mongo/db:server_base",
-        "//src/mongo/db:service_context",  # TODO(SERVER-98376): Remove.
+        "//src/mongo/db:service_context",  # TODO(SERVER-93876): Remove.
     ],
 )
 
@@ -297,15 +297,15 @@ mongo_cc_library(
         "replication_coordinator_noop.h",
     ],
     deps = [
-        ":optime",  # TODO(SERVER-98376): Remove.
+        ":optime",  # TODO(SERVER-93876): Remove.
         ":repl_server_parameters",
         ":repl_settings",
-        ":replication_process",  # TODO(SERVER-98376): Remove.
-        ":split_prepare_session_manager",  # TODO(SERVER-98376): Remove.
+        ":replication_process",  # TODO(SERVER-93876): Remove.
+        ":split_prepare_session_manager",  # TODO(SERVER-93876): Remove.
         "//src/mongo/db:server_base",
-        "//src/mongo/db:service_context",  # TODO(SERVER-98376): Remove.
-        "//src/mongo/db/storage:storage_options",  # TODO(SERVER-98376): Remove.
-        "//src/mongo/util/net:network",  # TODO(SERVER-98376): Remove.
+        "//src/mongo/db:service_context",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/db/storage:storage_options",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/util/net:network",  # TODO(SERVER-93876): Remove.
     ],
 )
 
@@ -324,7 +324,7 @@ mongo_cc_library(
     ],
     deps = [
         "//src/mongo/client:read_preference",
-        "//src/mongo/db:server_base",  # TODO(SERVER-98376): Remove.
+        "//src/mongo/db:server_base",  # TODO(SERVER-93876): Remove.
     ],
 )
 
@@ -921,9 +921,9 @@ mongo_cc_library(
         "replication_process.h",
     ],
     deps = [
-        ":optime",  # TODO(SERVER-98376): Remove.
-        ":rollback_idl",  # TODO(SERVER-98376): Remove.
-        ":storage_interface",  # TODO(SERVER-98376): Remove.
+        ":optime",  # TODO(SERVER-93876): Remove.
+        ":rollback_idl",  # TODO(SERVER-93876): Remove.
+        ":storage_interface",  # TODO(SERVER-93876): Remove.
         "//src/mongo/db:service_context",
     ],
 )
@@ -966,8 +966,8 @@ mongo_cc_library(
         "split_prepare_session_manager.h",
     ],
     deps = [
-        "//src/mongo:base",  # TODO(SERVER-98376): Remove.
-        "//src/mongo/db/session:logical_session_id",  #  TODO(SERVER-98376): Remove.
+        "//src/mongo:base",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/db/session:logical_session_id",  #  TODO(SERVER-93876): Remove.
         "//src/mongo/db/session:logical_session_id_helpers",
     ],
 )

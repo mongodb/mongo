@@ -29,7 +29,7 @@ mongo_cc_library(
         "init_timezone_data.cpp",
     ],
     deps = [
-        ":date_time_support",  # TODO(SERVER-98376): Remove.
+        ":date_time_support",  # TODO(SERVER-93876): Remove.
         "//src/mongo/db:server_base",
         "//src/third_party/timelib",
     ],

@@ -40,7 +40,7 @@ mongo_cc_library(
         "//src/mongo:base",
         "//src/mongo/client:read_preference",
         "//src/mongo/s:mongos_server_parameters",
-        "//src/mongo/util:fail_point",  # TODO(SERVER-98376): Remove.
+        "//src/mongo/util:fail_point",  # TODO(SERVER-93876): Remove.
     ],
 )
 
@@ -60,7 +60,7 @@ mongo_cc_library(
     deps = [
         "//src/mongo:base",
         "//src/mongo/db:service_context",
-        "//src/mongo/util:fail_point",  # TODO(SERVER-98376): Remove.
+        "//src/mongo/util:fail_point",  # TODO(SERVER-93876): Remove.
         "//src/mongo/util/concurrency:thread_pool",
     ],
 )
