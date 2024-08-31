@@ -75,6 +75,7 @@
 #include "mongo/util/fail_point.h"
 #include "mongo/util/future.h"
 #include "mongo/util/str.h"
+#include "mongo/util/testing_proctor.h"
 #include "mongo/util/time_support.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kAccessControl
@@ -340,6 +341,14 @@ OID AuthorizationManagerImpl::getCacheGeneration() {
 }
 
 void AuthorizationManagerImpl::setAuthEnabled(bool enabled) {
+    if (_authEnabled == enabled) {
+        return;
+    }
+
+    tassert(ErrorCodes::OperationFailed,
+            "Auth may not be disabled once enabled except for unit tests",
+            enabled || TestingProctor::instance().isEnabled());
+
     _authEnabled = enabled;
 }
 

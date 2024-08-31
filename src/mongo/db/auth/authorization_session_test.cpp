@@ -78,7 +78,15 @@ namespace {
 
 class AuthorizationSessionTest : public AuthorizationSessionTestFixture {
 public:
+    using AuthorizationSessionTestFixture::AuthorizationSessionTestFixture;
+
     void testInvalidateUser(std::string mechanismData);
+};
+
+class AuthorizationSessionTestWithoutAuth : public AuthorizationSessionTest {
+public:
+    AuthorizationSessionTestWithoutAuth()
+        : AuthorizationSessionTest(Options{}.setAuthEnabled(false)) {}
 };
 
 const TenantId kTenantId1(OID("12345678901234567890aaaa"));
@@ -1244,8 +1252,9 @@ TEST_F(AuthorizationSessionTest, UnauthorizedSessionIsNotCoauthorizedWithAnybody
     ASSERT_FALSE(authzSession->isCoauthorizedWith(kSpencerTest));
 }
 
-TEST_F(AuthorizationSessionTest, UnauthorizedSessionIsCoauthorizedWithAnybodyWhenAuthIsDisabled) {
-    authzManager->setAuthEnabled(false);
+TEST_F(AuthorizationSessionTestWithoutAuth,
+       UnauthorizedSessionIsCoauthorizedWithAnybodyWhenAuthIsDisabled) {
+    ASSERT_FALSE(authzManager->isAuthEnabled());
     ASSERT_TRUE(authzSession->isCoauthorizedWith(kSpencerTest));
 }
 
@@ -1256,8 +1265,9 @@ TEST_F(AuthorizationSessionTest, AuthorizedSessionIsNotCoauthorizedNobody) {
     authzSession->logoutDatabase(_client.get(), kTestDB, "Kill the test!"_sd);
 }
 
-TEST_F(AuthorizationSessionTest, AuthorizedSessionIsCoauthorizedNobodyWhenAuthIsDisabled) {
-    authzManager->setAuthEnabled(false);
+TEST_F(AuthorizationSessionTestWithoutAuth,
+       AuthorizedSessionIsCoauthorizedNobodyWhenAuthIsDisabled) {
+    ASSERT_FALSE(authzManager->isAuthEnabled());
     ASSERT_OK(createUser(kSpencerTest, {}));
     ASSERT_OK(authzSession->addAndAuthorizeUser(_opCtx.get(), kSpencerTestRequest, boost::none));
     ASSERT_TRUE(authzSession->isCoauthorizedWith(kSpencerTest));
