@@ -54,6 +54,7 @@
 #include "mongo/db/query/query_knobs_gen.h"
 #include "mongo/db/query/query_planner.h"
 #include "mongo/db/query/stage_builder/stage_builder_util.h"
+#include "mongo/db/stats/counters.h"
 #include "mongo/logv2/log.h"
 #include "mongo/logv2/log_attr.h"
 #include "mongo/logv2/log_component.h"
@@ -215,6 +216,7 @@ Status CachedPlanStage::replan(const QueryPlannerParams& plannerParams,
                                PlanYieldPolicy* yieldPolicy,
                                bool shouldCache,
                                std::string reason) {
+    planCacheCounters.incrementClassicReplannedCounter();
     // We're going to start over with a new plan. Clear out info from our old plan.
     {
         std::queue<WorkingSetID> emptyQueue;
