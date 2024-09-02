@@ -15,10 +15,9 @@ export class QuerySettingsUtils {
      * Create a query settings utility class.
      */
     constructor(db, collName) {
-        // TODO SERVER-89927: Prefix private properties with '_'.
-        this.db = db;
-        this.adminDB = this.db.getSiblingDB("admin");
-        this.collName = collName;
+        this._db = db;
+        this._adminDB = this._db.getSiblingDB("admin");
+        this._collName = collName;
     }
 
     /**
@@ -49,14 +48,14 @@ export class QuerySettingsUtils {
      * Makes an query instance of the find command.
      */
     makeFindQueryInstance(findObj) {
-        return {find: this.collName, $db: this.db.getName(), ...findObj};
+        return {find: this._collName, $db: this._db.getName(), ...findObj};
     }
 
     /**
      * Makes a query instance of the distinct command.
      */
     makeDistinctQueryInstance(distinctObj) {
-        return {distinct: this.collName, $db: this.db.getName(), ...distinctObj};
+        return {distinct: this._collName, $db: this._db.getName(), ...distinctObj};
     }
 
     /**
@@ -64,8 +63,8 @@ export class QuerySettingsUtils {
      */
     makeAggregateQueryInstance(aggregateObj, collectionless = false) {
         return {
-            aggregate: collectionless ? 1 : this.collName,
-            $db: this.db.getName(),
+            aggregate: collectionless ? 1 : this._collName,
+            $db: this._db.getName(),
             cursor: {},
             ...aggregateObj
         };
@@ -100,7 +99,7 @@ export class QuerySettingsUtils {
             pipeline.push({$project: {queryShapeHash: 0}});
         }
         pipeline.push({$sort: {representativeQuery: 1}});
-        return this.adminDB.aggregate(pipeline).toArray();
+        return this._adminDB.aggregate(pipeline).toArray();
     }
 
     /**
@@ -121,7 +120,7 @@ export class QuerySettingsUtils {
      * Return the query settings section of the server status.
      */
     getQuerySettingsServerStatus() {
-        return assert.commandWorked(this.db.runCommand({serverStatus: 1})).querySettings;
+        return assert.commandWorked(this._db.runCommand({serverStatus: 1})).querySettings;
     }
 
     /**
@@ -165,7 +164,7 @@ export class QuerySettingsUtils {
         // Pass query without the $db field to explain command, because it injects the $db field
         // inside the query before processing.
         const explainCmd = getExplainCommand(this.withoutDollarDB(query));
-        const explain = assert.commandWorked(this.db.runCommand(explainCmd));
+        const explain = assert.commandWorked(this._db.runCommand(explainCmd));
         if (explain) {
             getQueryPlanners(explain).forEach(queryPlanner => {
                 this.assertEqualSettings(
@@ -182,7 +181,7 @@ export class QuerySettingsUtils {
         while (settingsArray.length > 0) {
             const setting = settingsArray.pop();
             assert.commandWorked(
-                this.adminDB.runCommand({removeQuerySettings: setting.queryShapeHash}));
+                this._adminDB.runCommand({removeQuerySettings: setting.queryShapeHash}));
         }
         // Check that all setting have indeed been removed.
         this.assertQueryShapeConfiguration([]);
@@ -198,13 +197,13 @@ export class QuerySettingsUtils {
         try {
             const setQuerySettingsCmd = {setQuerySettings: representativeQuery, settings: settings};
             queryShapeHash =
-                assert.commandWorked(this.db.adminCommand(setQuerySettingsCmd)).queryShapeHash;
+                assert.commandWorked(this._db.adminCommand(setQuerySettingsCmd)).queryShapeHash;
             assert.soon(() => (this.getQuerySettings({filter: {queryShapeHash}}).length === 1));
             return runTest();
         } finally {
             if (queryShapeHash) {
                 const removeQuerySettingsCmd = {removeQuerySettings: representativeQuery};
-                assert.commandWorked(this.db.adminCommand(removeQuerySettingsCmd));
+                assert.commandWorked(this._db.adminCommand(removeQuerySettingsCmd));
                 assert.soon(() => (this.getQuerySettings({filter: {queryShapeHash}}).length === 0));
             }
         }
@@ -252,7 +251,7 @@ export class QuerySettingsUtils {
         // Apply the provided settings for the query.
         if (settings) {
             assert.commandWorked(
-                this.db.adminCommand({setQuerySettings: query, settings: settings}));
+                this._db.adminCommand({setQuerySettings: query, settings: settings}));
             // Wait until the settings have taken effect.
             const expectedConfiguration = [this.makeQueryShapeConfiguration(settings, query)];
             this.assertQueryShapeConfiguration(expectedConfiguration);
@@ -260,7 +259,7 @@ export class QuerySettingsUtils {
 
         const withoutDollarDB = query.aggregate ? {...this.withoutDollarDB(query), cursor: {}}
                                                 : this.withoutDollarDB(query);
-        const explain = assert.commandWorked(this.db.runCommand({explain: withoutDollarDB}));
+        const explain = assert.commandWorked(this._db.runCommand({explain: withoutDollarDB}));
         const engine = getEngine(explain);
         assert.eq(
             engine, expectedEngine, `Expected engine to be ${expectedEngine} but found ${engine}`);

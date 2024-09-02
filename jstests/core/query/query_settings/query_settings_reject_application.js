@@ -59,19 +59,18 @@ function testRejection({query, queryPrime, unrelatedQuery}) {
 
     // Set reject flag for query under test.
     assert.commandWorked(db.adminCommand(
-        {setQuerySettings: {...query, $db: qsutils.db.getName()}, settings: {reject: true}}));
+        {setQuerySettings: {...query, $db: db.getName()}, settings: {reject: true}}));
 
     // Confirm settings updated.
     qsutils.assertQueryShapeConfiguration(
-        [qsutils.makeQueryShapeConfiguration({reject: true},
-                                             {...query, $db: qsutils.db.getName()})],
+        [qsutils.makeQueryShapeConfiguration({reject: true}, {...query, $db: db.getName()})],
         /* shouldRunExplain */ true);
 
     // Just setting the reject flag should not alter the rejected cmd counter.
     assertRejectedDelta(0);
 
     // Verify other query with same shape has those settings applied too.
-    qsutils.assertExplainQuerySettings({...queryPrime, $db: qsutils.db.getName()}, {reject: true});
+    qsutils.assertExplainQuerySettings({...queryPrime, $db: db.getName()}, {reject: true});
 
     // Explain should not alter the rejected cmd counter.
     assertRejectedDelta(0);
