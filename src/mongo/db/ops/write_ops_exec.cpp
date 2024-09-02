@@ -2257,6 +2257,23 @@ bool shouldRetryDuplicateKeyException(const UpdateRequest& updateRequest,
         return false;
     }
 
+    // Check that collation of the query matches the unique index. To avoid calling
+    // CollatorFactoryInterface when possible, first check the simple collator case.
+    bool queryHasSimpleCollator = CollatorInterface::isSimpleCollator(cq.getCollator());
+    bool indexHasSimpleCollator = errorInfo.getCollation().isEmpty();
+    if (queryHasSimpleCollator != indexHasSimpleCollator) {
+        return false;
+    }
+
+    if (!indexHasSimpleCollator) {
+        auto indexCollator =
+            uassertStatusOK(CollatorFactoryInterface::get(cq.getOpCtx()->getServiceContext())
+                                ->makeFromBSON(errorInfo.getCollation()));
+        if (!CollatorInterface::collatorsMatch(cq.getCollator(), indexCollator.get())) {
+            return false;
+        }
+    }
+
     auto keyValue = errorInfo.getDuplicatedKeyValue();
 
     BSONObjIterator keyPatternIter(keyPattern);
