@@ -225,6 +225,31 @@ testQuerySettingsParameterized({
     aggregate: {querySettingsA: {reject: true}, querySettingsB: {reject: true}}
 });
 
+// Test setting and changing comment.
+const commonSettingsA = {
+    indexHints: {ns, allowedIndexes: [{a: 1, b: 1}, {$natural: 1}]},
+    reject: true,
+};
+const commonSettingsB = {
+    indexHints: {ns, allowedIndexes: [{a: 1, b: 1}]},
+    reject: true,
+};
+testQuerySettingsParameterized({
+    find: {
+        querySettingsA: {...commonSettingsA, comment: "Reject this query, because..."},
+        querySettingsB: {...commonSettingsB, comment: "Please set reject to false, because..."},
+
+    },
+    distinct: {
+        querySettingsA: {...commonSettingsA, comment: "Reject this query, because..."},
+        querySettingsB: {...commonSettingsB, comment: "Please set reject to false, because..."},
+    },
+    aggregate: {
+        querySettingsA: {...commonSettingsA, comment: "Reject this query, because..."},
+        querySettingsB: {...commonSettingsB, comment: "Please set reject to false, because..."},
+    }
+});
+
 // Test changing reject with an unrelated setting present. Additionally test that 'setQuerySettings'
 // with 'reject' is idempotent.
 {

@@ -114,6 +114,7 @@ mongo_cc_library(
         "//src/mongo/db/query/plan_cache:sbe_plan_cache_on_parameter_change.h",
         "//src/mongo/db/query/query_settings:index_hints_serialization.h",
         "//src/mongo/db/query/query_settings:query_framework_serialization.h",
+        "//src/mongo/db/query/query_settings:query_settings_comment.h",
         "//src/mongo/db/query/query_settings:query_settings_gen",
         "//src/mongo/db/query/query_stats:query_stats_on_parameter_change.h",
         "//src/mongo/db/query/util:memory_util.h",

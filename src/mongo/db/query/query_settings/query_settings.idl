@@ -31,6 +31,7 @@ global:
   cpp_includes:
     - "mongo/db/query/query_settings/query_framework_serialization.h"
     - "mongo/db/query/query_settings/index_hints_serialization.h"
+    - "mongo/db/query/query_settings/query_settings_comment.h"
 
 imports:
   - "mongo/db/basic_types.idl"
@@ -56,6 +57,13 @@ types:
     serializer: "::mongo::query_settings::index_hints::serialize"
     deserializer: "::mongo::query_settings::index_hints::parse"
     deserialize_with_tenant: true
+    is_view: false
+  Comment:
+    description: Any type object representing the comment left on a particular instance of query settings.
+    bson_serialization_type: any
+    cpp_type: "query_settings::Comment"
+    serializer: "mongo::query_settings::Comment::serializeToBSON"
+    deserializer: "mongo::query_settings::Comment::parseFromBSON"
     is_view: false
 
 structs:
@@ -87,6 +95,10 @@ structs:
         stability: unstable
       reject:
         type: optionalBool
+        stability: unstable
+      comment:
+        type: Comment
+        optional: true
         stability: unstable
 
   QueryShapeConfiguration:

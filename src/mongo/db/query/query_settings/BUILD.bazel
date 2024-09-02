@@ -26,6 +26,7 @@ mongo_cc_library(
     srcs = [
         "index_hints_serialization.cpp",
         "query_framework_serialization.cpp",
+        "query_settings_comment.cpp",
         ":query_settings_gen",
     ],
     hdrs = [

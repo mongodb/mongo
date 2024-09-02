@@ -155,7 +155,7 @@ TEST_F(PlanCacheKeyInfoTest, EqualityOperator) {
     settingsA1IndexKeyPattern.setIndexHints(
         {{query_settings::IndexHintSpec(nsSpec, {IndexHint(BSON("a" << 1))})}});
     query_settings::QuerySettings settingsA1IndexName;
-    settingsA1IndexKeyPattern.setIndexHints(
+    settingsA1IndexName.setIndexHints(
         {{query_settings::IndexHintSpec(nsSpec, {IndexHint("a_1")})}});
     query_settings::QuerySettings settingsB1IndexKeyPattern;
     settingsB1IndexKeyPattern.setIndexHints(

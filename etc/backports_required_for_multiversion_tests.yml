@@ -187,6 +187,10 @@ last-continuous:
       ticket: SERVER-91465
     - test_file: jstests/aggregation/bugs/add_fields_adds_to_missing_fields.js
       ticket: SERVER-91784
+    - test_file: jstests/core/query/query_settings/query_settings_cmds_validation.js
+      ticket: SERVER-90965
+    - test_file: jstests/core/query/query_settings/query_settings_cmds.js
+      ticket: SERVER-90965
     - test_file: jstests/core/query/index_deduplication.js
       ticket: SERVER-92147
     - test_file: jstests/replsets/backwards_compatible_timeseries_catalog_options.js
@@ -440,6 +444,10 @@ last-lts:
       ticket: SERVER-91465
     - test_file: jstests/aggregation/bugs/add_fields_adds_to_missing_fields.js
       ticket: SERVER-91784
+    - test_file: jstests/core/query/query_settings/query_settings_cmds_validation.js
+      ticket: SERVER-90965
+    - test_file: jstests/core/query/query_settings/query_settings_cmds.js
+      ticket: SERVER-90965
     - test_file: jstests/core/query/index_deduplication.js
       ticket: SERVER-92147
     - test_file: jstests/replsets/backwards_compatible_timeseries_catalog_options.js

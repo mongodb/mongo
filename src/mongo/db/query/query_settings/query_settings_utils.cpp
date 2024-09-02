@@ -513,7 +513,7 @@ bool allowQuerySettingsFromClient(Client* client) {
 
 bool isDefault(const QuerySettings& settings) {
     // The 'serialization_context' field is not significant.
-    static_assert(QuerySettings::fieldNames.size() == 4,
+    static_assert(QuerySettings::fieldNames.size() == 5,
                   "A new field has been added to the QuerySettings structure, isDefault should be "
                   "updated appropriately.");
 
