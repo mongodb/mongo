@@ -506,14 +506,12 @@ bool haveAcquiredConsistentCatalogAndSnapshot(const CollectionCatalog* catalogBe
 }
 
 std::shared_ptr<const CollectionCatalog> getConsistentCatalogAndSnapshot(
-    OperationContext* opCtx,
-    const NamespaceStringOrUUIDRequests& acquisitionRequests,
-    const RecoveryUnit::OpenSnapshotOptions& openSnapshotOptions) {
+    OperationContext* opCtx, const NamespaceStringOrUUIDRequests& acquisitionRequests) {
     while (true) {
         shard_role_details::SnapshotAttempt snapshotAttempt(opCtx, acquisitionRequests);
         snapshotAttempt.snapshotInitialState();
         snapshotAttempt.changeReadSourceForSecondaryReads();
-        snapshotAttempt.openStorageSnapshot(openSnapshotOptions);
+        snapshotAttempt.openStorageSnapshot();
         if (auto catalog = snapshotAttempt.getConsistentCatalog()) {
             return catalog;
         }
@@ -581,11 +579,9 @@ ResolvedNamespaceOrViewAcquisitionRequest::LockFreeReadsResources takeGlobalLock
 }
 
 std::shared_ptr<const CollectionCatalog> stashConsistentCatalog(
-    OperationContext* opCtx,
-    const CollectionOrViewAcquisitionRequests& acquisitionRequests,
-    const RecoveryUnit::OpenSnapshotOptions& openSnapshotOptions) {
+    OperationContext* opCtx, const CollectionOrViewAcquisitionRequests& acquisitionRequests) {
     auto requests = toNamespaceStringOrUUIDs(acquisitionRequests);
-    auto catalog = getConsistentCatalogAndSnapshot(opCtx, requests, openSnapshotOptions);
+    auto catalog = getConsistentCatalogAndSnapshot(opCtx, requests);
     // Stash the catalog, it will be automatically unstashed when the snapshot is released.
     CollectionCatalog::stash(opCtx, catalog);
     return catalog;
@@ -839,13 +835,11 @@ const ViewDefinition& ViewAcquisition::getViewDefinition() const {
     return *_acquiredView->viewDefinition;
 }
 
-CollectionAcquisition acquireCollection(
-    OperationContext* opCtx,
-    CollectionAcquisitionRequest acquisitionRequest,
-    LockMode mode,
-    const RecoveryUnit::OpenSnapshotOptions& openSnapshotOptions) {
+CollectionAcquisition acquireCollection(OperationContext* opCtx,
+                                        CollectionAcquisitionRequest acquisitionRequest,
+                                        LockMode mode) {
     return CollectionAcquisition(
-        acquireCollectionOrView(opCtx, std::move(acquisitionRequest), mode, openSnapshotOptions));
+        acquireCollectionOrView(opCtx, std::move(acquisitionRequest), mode));
 }
 
 CollectionAcquisitions acquireCollections(OperationContext* opCtx,
@@ -887,12 +881,9 @@ CollectionOrViewAcquisitionMap makeAcquisitionMap(CollectionOrViewAcquisitions a
 }
 
 CollectionOrViewAcquisition acquireCollectionOrView(
-    OperationContext* opCtx,
-    CollectionOrViewAcquisitionRequest acquisitionRequest,
-    LockMode mode,
-    const RecoveryUnit::OpenSnapshotOptions& openSnapshotOptions) {
+    OperationContext* opCtx, CollectionOrViewAcquisitionRequest acquisitionRequest, LockMode mode) {
     CollectionOrViewAcquisitionRequests requests{std::move(acquisitionRequest)};
-    auto acquisition = acquireCollectionsOrViews(opCtx, requests, mode, openSnapshotOptions);
+    auto acquisition = acquireCollectionsOrViews(opCtx, requests, mode);
     invariant(acquisition.size() == 1);
     return std::move(acquisition.front());
 }
@@ -974,8 +965,7 @@ void SnapshotAttempt::changeReadSourceForSecondaryReads() {
     }
 }
 
-void SnapshotAttempt::openStorageSnapshot(
-    const RecoveryUnit::OpenSnapshotOptions& openSnapshotOptions) {
+void SnapshotAttempt::openStorageSnapshot() {
     invariant(_shouldReadAtLastApplied);
 
     // If the collection requires capped snapshots (i.e. it is unreplicated, capped, not the
@@ -1008,7 +998,7 @@ void SnapshotAttempt::openStorageSnapshot(
     }
 
     if (!shard_role_details::getRecoveryUnit(_opCtx)->isActive()) {
-        shard_role_details::getRecoveryUnit(_opCtx)->preallocateSnapshot(openSnapshotOptions);
+        shard_role_details::getRecoveryUnit(_opCtx)->preallocateSnapshot();
         _openedSnapshot = true;
     }
 }
@@ -1118,9 +1108,7 @@ CollectionOrViewAcquisitions acquireCollectionsOrViewsLockFree(
 
     // Open a consistent catalog snapshot if needed.
     bool openSnapshot = !shard_role_details::getRecoveryUnit(opCtx)->isActive();
-    auto catalog = openSnapshot ? stashConsistentCatalog(opCtx,
-                                                         acquisitionRequests,
-                                                         RecoveryUnit::kDefaultOpenSnapshotOptions)
+    auto catalog = openSnapshot ? stashConsistentCatalog(opCtx, acquisitionRequests)
                                 : CollectionCatalog::get(opCtx);
 
     try {
@@ -1142,8 +1130,7 @@ CollectionOrViewAcquisitions acquireCollectionsOrViewsLockFree(
 CollectionOrViewAcquisitions acquireCollectionsOrViews(
     OperationContext* opCtx,
     const CollectionOrViewAcquisitionRequests& acquisitionRequests,
-    LockMode mode,
-    const RecoveryUnit::OpenSnapshotOptions& openSnapshotOptions) {
+    LockMode mode) {
     if (acquisitionRequests.empty()) {
         return {};
     }
@@ -1237,9 +1224,8 @@ CollectionOrViewAcquisitions acquireCollectionsOrViews(
 
         // Open a consistent catalog snapshot if needed.
         bool openSnapshot = !shard_role_details::getRecoveryUnit(opCtx)->isActive();
-        auto catalog = openSnapshot
-            ? stashConsistentCatalog(opCtx, acquisitionRequests, openSnapshotOptions)
-            : CollectionCatalog::get(opCtx);
+        auto catalog = openSnapshot ? stashConsistentCatalog(opCtx, acquisitionRequests)
+                                    : CollectionCatalog::get(opCtx);
 
         try {
             return acquireResolvedCollectionsOrViewsWithoutTakingLocks(
@@ -1505,8 +1491,7 @@ void restoreTransactionResourcesToOperationContext(
 
         // Reestablish a consistent catalog snapshot (multi document transactions don't yield).
         auto requests = toNamespaceStringOrUUIDs(transactionResources.acquiredCollections);
-        auto catalog = getConsistentCatalogAndSnapshot(
-            opCtx, requests, RecoveryUnit::kDefaultOpenSnapshotOptions);
+        auto catalog = getConsistentCatalogAndSnapshot(opCtx, requests);
 
         // Reacquire service snapshots. Will throw if placement concern can no longer be met.
         for (auto& acquiredCollection : transactionResources.acquiredCollections) {

@@ -139,7 +139,7 @@ static std::vector<CompiledConfiguration>& compiledBeginTransactions = makeCompi
 WiredTigerBeginTxnBlock::WiredTigerBeginTxnBlock(
     WiredTigerSession* session,
     PrepareConflictBehavior prepareConflictBehavior,
-    bool roundUpPreparedTimestamps,
+    RoundUpPreparedTimestamps roundUpPreparedTimestamps,
     RoundUpReadTimestamp roundUpReadTimestamp,
     RecoveryUnit::UntimestampedWriteAssertionLevel allowUntimestampedWrite)
     : _session(session) {
@@ -153,9 +153,7 @@ WiredTigerBeginTxnBlock::WiredTigerBeginTxnBlock(
     }
 
     int config = getConfigOffset(static_cast<int>(prepareConflictBehavior),
-                                 static_cast<int>(roundUpPreparedTimestamps
-                                                      ? RoundUpPreparedTimestamps::kRound
-                                                      : RoundUpPreparedTimestamps::kNoRound),
+                                 static_cast<int>(roundUpPreparedTimestamps),
                                  static_cast<int>(roundUpReadTimestamp),
                                  static_cast<int>(no_timestamp));
     const char* compiled_config = nullptr;

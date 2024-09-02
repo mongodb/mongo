@@ -2119,7 +2119,7 @@ TEST_F(ShardRoleTest, SnapshotAttemptFailsIfReplTermChanges) {
     shard_role_details::SnapshotAttempt snapshotAttempt(operationContext(), requests);
     snapshotAttempt.snapshotInitialState();
     snapshotAttempt.changeReadSourceForSecondaryReads();
-    snapshotAttempt.openStorageSnapshot(RecoveryUnit::kDefaultOpenSnapshotOptions);
+    snapshotAttempt.openStorageSnapshot();
 
     auto currentTerm = repl::ReplicationCoordinator::get(operationContext())->getTerm();
     ASSERT_OK(repl::ReplicationCoordinator::get(operationContext())
@@ -2137,7 +2137,7 @@ TEST_F(ShardRoleTest, SnapshotAttemptFailsIfCatalogChanges) {
     shard_role_details::SnapshotAttempt snapshotAttempt(operationContext(), requests);
     snapshotAttempt.snapshotInitialState();
     snapshotAttempt.changeReadSourceForSecondaryReads();
-    snapshotAttempt.openStorageSnapshot(RecoveryUnit::kDefaultOpenSnapshotOptions);
+    snapshotAttempt.openStorageSnapshot();
 
     auto nss2 = NamespaceString::createNamespaceString_forTest(dbNameTestDb, "newCollection");
     createTestCollection(operationContext(), nss2);
@@ -2169,7 +2169,7 @@ TEST_F(ShardRoleTest, ReadSourceChangesOnSecondary) {
         RecoveryUnit::ReadSource::kLastApplied,
         shard_role_details::getRecoveryUnit(operationContext())->getTimestampReadSource());
 
-    snapshotAttempt.openStorageSnapshot(RecoveryUnit::kDefaultOpenSnapshotOptions);
+    snapshotAttempt.openStorageSnapshot();
     ASSERT_TRUE(snapshotAttempt.getConsistentCatalog());
 }
 
@@ -2514,32 +2514,6 @@ TEST_F(ShardRoleTest,
 
     testFn(true);   // with locks
     testFn(false);  // lock-free
-}
-
-// ---------------------------------------------------------------------------
-// Test OpenSnapshotOptions when acquiring collections
-TEST_F(ShardRoleTest, RoundUpPreparedTimestamps) {
-    WriteUnitOfWork wuow(operationContext());
-    RecoveryUnit::OpenSnapshotOptions roundUp{.roundUpPreparedTimestamps = true};
-    acquireCollection(operationContext(),
-                      {nssUnshardedCollection1,
-                       PlacementConcern{},
-                       repl::ReadConcernArgs(),
-                       AcquisitionPrerequisites::kWrite},
-                      MODE_IX,
-                      roundUp);
-
-    auto ru = shard_role_details::getRecoveryUnit(operationContext());
-    ru->setDurableTimestamp({4, 1});
-    operationContext()->getServiceContext()->getStorageEngine()->setStableTimestamp({3, 1});
-    // Check setting a prepared transaction timestamp earlier than the
-    // stable timestamp is valid with roundUpPreparedTimestamps option.
-    ru->setPrepareTimestamp({2, 1});
-    wuow.prepare();
-    // Check setting a commit timestamp earlier than the prepared transaction
-    // timestamp is valid with roundUpPreparedTimestamps option.
-    ru->setCommitTimestamp({1, 1});
-    wuow.commit();
 }
 
 }  // namespace

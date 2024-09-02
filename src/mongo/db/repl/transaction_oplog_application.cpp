@@ -180,11 +180,9 @@ boost::optional<std::vector<StmtId>> _getCommittedStmtIds(const LogicalSessionId
 }
 
 // Apply the oplog entries for a prepare or a prepared commit during recovery/initial sync.
-Status _applyOperationsForTransaction(
-    OperationContext* opCtx,
-    const std::vector<OplogEntry>& txnOps,
-    repl::OplogApplication::Mode oplogApplicationMode,
-    const RecoveryUnit::OpenSnapshotOptions& openSnapshotOptions) {
+Status _applyOperationsForTransaction(OperationContext* opCtx,
+                                      const std::vector<OplogEntry>& txnOps,
+                                      repl::OplogApplication::Mode oplogApplicationMode) {
 
     const bool allowCollectionCreatinInPreparedTransactions =
         feature_flags::gCreateCollectionInPreparedTransactions.isEnabled(
@@ -208,8 +206,7 @@ Status _applyOperationsForTransaction(
                                              AcquisitionPrerequisites::kPretendUnsharded,
                                              repl::ReadConcernArgs::get(opCtx),
                                              AcquisitionPrerequisites::kWrite),
-                MODE_IX,
-                openSnapshotOptions);
+                MODE_IX);
             const bool isDataConsistent = true;
             auto status = [&] {
                 if (op.isCommand()) {
@@ -310,10 +307,11 @@ Status _applyTransactionFromOplogChain(OperationContext* opCtx,
             WriteUnitOfWork wunit(opCtx);
 
             // We might replay a prepared transaction behind oldest timestamp.
-            RecoveryUnit::OpenSnapshotOptions openSnapshotOptions{.roundUpPreparedTimestamps =
-                                                                      true};
+            shard_role_details::getRecoveryUnit(opCtx)->setRoundUpPreparedTimestamps(true);
 
-            status = _applyOperationsForTransaction(opCtx, ops, mode, openSnapshotOptions);
+            BSONObjBuilder resultWeDontCareAbout;
+
+            status = _applyOperationsForTransaction(opCtx, ops, mode);
             if (status.isOK()) {
                 // If the transaction was empty then we have no locks, ensure at least Global
                 // IX.
@@ -653,11 +651,9 @@ Status _applyPrepareTransaction(OperationContext* opCtx,
                 PrepareConflictBehavior::kIgnoreConflictsAllowWrites);
 
             // We might replay a prepared transaction behind oldest timestamp.
-            RecoveryUnit::OpenSnapshotOptions openSnapshotOptions =
-                RecoveryUnit::kDefaultOpenSnapshotOptions;
             if (repl::OplogApplication::inRecovering(mode) ||
                 mode == repl::OplogApplication::Mode::kInitialSync) {
-                openSnapshotOptions.roundUpPreparedTimestamps = true;
+                shard_role_details::getRecoveryUnit(opCtx)->setRoundUpPreparedTimestamps(true);
             }
 
             // Release WUOW, transaction lock resources and abort storage transaction
@@ -671,7 +667,7 @@ Status _applyPrepareTransaction(OperationContext* opCtx,
 
             // Starts the WUOW.
             txnParticipant.unstashTransactionResources(
-                opCtx, "prepareTransaction", false /* forUnyield */, openSnapshotOptions);
+                opCtx, "prepareTransaction", repl::OplogApplication::inRecovering(mode));
 
             // Set this in case the application of any ops needs to use the prepare timestamp
             // of this transaction. It should be cleared automatically when the txn finishes.
@@ -680,7 +676,7 @@ Status _applyPrepareTransaction(OperationContext* opCtx,
                 txnParticipant.setPrepareOpTimeForRecovery(opCtx, prepareOp.getOpTime());
             }
 
-            auto status = _applyOperationsForTransaction(opCtx, txnOps, mode, openSnapshotOptions);
+            auto status = _applyOperationsForTransaction(opCtx, txnOps, mode);
 
             // Add committed statement IDs if this is a retryable internal transaction.
             // They are used when this node becomes primary to avoid re-executing
@@ -702,6 +698,14 @@ Status _applyPrepareTransaction(OperationContext* opCtx,
                 LOGV2(21847, "Hit applyOpsHangBeforePreparingTransaction failpoint");
                 applyOpsHangBeforePreparingTransaction.pauseWhileSet(opCtx);
             }
+
+            // If we are in a recovery mode, we should have set roundUpPreparedTimestamps to true
+            // above, and that setting should have persisted after we unstashed the transaction
+            // resources and started the WUOW above. This setting is necessary for the subsequent
+            // call to prepareTransaction to succeed in the case where the prepare timestamp is
+            // older than the stable timestamp.
+            invariant(!repl::OplogApplication::inRecovering(mode) ||
+                      shard_role_details::getRecoveryUnit(opCtx)->getRoundUpPreparedTimestamps());
 
             txnParticipant.prepareTransaction(opCtx, prepareOp.getOpTime());
 

@@ -1247,10 +1247,8 @@ TransactionParticipant::Participant::onConflictingInternalTransactionCompletion(
     return Future<void>::makeReady();
 }
 
-void TransactionParticipant::Participant::_setReadSnapshot(
-    OperationContext* opCtx,
-    repl::ReadConcernArgs readConcernArgs,
-    const RecoveryUnit::OpenSnapshotOptions& openSnapshotOptions) {
+void TransactionParticipant::Participant::_setReadSnapshot(OperationContext* opCtx,
+                                                           repl::ReadConcernArgs readConcernArgs) {
     if (readConcernArgs.getArgsAtClusterTime()) {
         // Read concern code should have already set the timestamp on the recovery unit.
         const auto readTimestamp = readConcernArgs.getArgsAtClusterTime()->asTimestamp();
@@ -1288,7 +1286,7 @@ void TransactionParticipant::Participant::_setReadSnapshot(
     // collection lookups within this transaction are consistent with the snapshot.
     auto catalog = CollectionCatalog::get(opCtx);
     while (true) {
-        shard_role_details::getRecoveryUnit(opCtx)->preallocateSnapshot(openSnapshotOptions);
+        shard_role_details::getRecoveryUnit(opCtx)->preallocateSnapshot();
         auto after = CollectionCatalog::get(opCtx);
         if (catalog == after) {
             // Catalog did not change, break out of the retry loop and use this instance
@@ -1555,7 +1553,9 @@ void TransactionParticipant::Participant::stashTransactionResources(OperationCon
 }
 
 void TransactionParticipant::Participant::_releaseTransactionResourcesToOpCtx(
-    OperationContext* opCtx, MaxLockTimeout maxLockTimeout) {
+    OperationContext* opCtx,
+    MaxLockTimeout maxLockTimeout,
+    bool forRecoveryPreparedTxnApplication) {
     // Transaction resources already exist for this transaction.  Transfer them from the
     // stash to the operation context.
     //
@@ -1582,6 +1582,21 @@ void TransactionParticipant::Participant::_releaseTransactionResourcesToOpCtx(
     auto stashLocker = tempTxnResourceStash->locker();
     invariant(stashLocker);
 
+    if (forRecoveryPreparedTxnApplication) {
+        bool hasRecoveryUnit = tempTxnResourceStash->recoveryUnit() != nullptr;
+        auto roundUpVal = "no recovery unit";
+        if (hasRecoveryUnit) {
+            roundUpVal = tempTxnResourceStash->recoveryUnit()->getRoundUpPreparedTimestamps()
+                ? "true"
+                : "false";
+        }
+        LOGV2(8676302,
+              "Unstashing transaction resources for prepared transaction application during "
+              "recovery",
+              "hasStashedRecoveryUnit"_attr = hasRecoveryUnit,
+              "recoveryUnitRoundUpValue"_attr = roundUpVal);
+    }
+
     if (maxLockTimeout == MaxLockTimeout::kNotAllowed) {
         stashLocker->unsetMaxLockTimeout();
     } else {
@@ -1602,8 +1617,8 @@ void TransactionParticipant::Participant::_releaseTransactionResourcesToOpCtx(
 void TransactionParticipant::Participant::unstashTransactionResources(
     OperationContext* opCtx,
     const std::string& cmdName,
-    bool forUnyield,
-    const RecoveryUnit::OpenSnapshotOptions& openSnapshotOptions) {
+    bool forRecoveryPreparedTxnApplication,
+    bool forUnyield) {
     invariant(!opCtx->getClient()->isInDirectClient());
     invariant(opCtx->getTxnNumber());
 
@@ -1675,7 +1690,8 @@ void TransactionParticipant::Participant::unstashTransactionResources(
             admissionPriority.emplace(opCtx, AdmissionContext::Priority::kExempt);
         }
 
-        _releaseTransactionResourcesToOpCtx(opCtx, maxLockTimeout);
+        _releaseTransactionResourcesToOpCtx(
+            opCtx, maxLockTimeout, forRecoveryPreparedTxnApplication);
         stdx::lock_guard<Client> lg(*opCtx->getClient());
         o(lg).transactionMetricsObserver.onUnstash(ServerTransactionsMetrics::get(opCtx),
                                                    opCtx->getServiceContext()->getTickSource());
@@ -1729,7 +1745,7 @@ void TransactionParticipant::Participant::unstashTransactionResources(
     Lock::GlobalLock globalLock(opCtx, MODE_IX);
 
     // This begins the storage transaction and so we do it after acquiring the global lock.
-    _setReadSnapshot(opCtx, repl::ReadConcernArgs::get(opCtx), openSnapshotOptions);
+    _setReadSnapshot(opCtx, repl::ReadConcernArgs::get(opCtx));
 
     // Stashed transaction resources do not exist for this in-progress multi-document transaction.
     // Set up the transaction resources on the opCtx. Must be done after setting up the read
@@ -1762,7 +1778,7 @@ void TransactionParticipant::Participant::refreshLocksForPreparedTransaction(
 
     ScopedAdmissionPriority<ExecutionAdmissionContext> skipTicketAcquisition(
         opCtx, AdmissionContext::Priority::kExempt);
-    _releaseTransactionResourcesToOpCtx(opCtx, MaxLockTimeout::kNotAllowed);
+    _releaseTransactionResourcesToOpCtx(opCtx, MaxLockTimeout::kNotAllowed, false);
 
     // Transfer the txn resource back from the operation context to the stash.
     auto stashStyle =

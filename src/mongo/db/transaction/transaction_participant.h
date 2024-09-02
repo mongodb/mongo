@@ -614,12 +614,10 @@ public:
          * Transfers management of transaction resources from the Session to the currently
          * checked-out OperationContext.
          */
-        void unstashTransactionResources(
-            OperationContext* opCtx,
-            const std::string& cmdName,
-            bool forUnyield = false,
-            const RecoveryUnit::OpenSnapshotOptions& openSnapshotOptions =
-                RecoveryUnit::kDefaultOpenSnapshotOptions);
+        void unstashTransactionResources(OperationContext* opCtx,
+                                         const std::string& cmdName,
+                                         bool forRecoveryPreparedTxnApplication = false,
+                                         bool forUnyield = false);
 
         /**
          * Puts a transaction into a prepared state and returns the prepareTimestamp and the list of
@@ -909,9 +907,7 @@ public:
         // provided, it is up to the caller to ensure that timestamp is greater than or equal to the
         // all-committed timestamp before calling this method (e.g. by calling
         // ReplCoordinator::waitForOpTimeForRead).
-        void _setReadSnapshot(OperationContext* opCtx,
-                              repl::ReadConcernArgs readConcernArgs,
-                              const RecoveryUnit::OpenSnapshotOptions& openSnapshotOptions);
+        void _setReadSnapshot(OperationContext* opCtx, repl::ReadConcernArgs readConcernArgs);
 
         // Finishes committing the multi-document transaction after the storage-transaction has been
         // committed, the oplog entry has been inserted into the oplog, and the transactions table
@@ -1107,7 +1103,8 @@ public:
          * -----------------------------------------------------------------------------
          */
         void _releaseTransactionResourcesToOpCtx(OperationContext* opCtx,
-                                                 MaxLockTimeout maxLockTimeout);
+                                                 MaxLockTimeout maxLockTimeout,
+                                                 bool forRecoveryPreparedTxnApplication);
 
         TransactionParticipant::PrivateState& p() {
             return _tp->_p;

@@ -366,30 +366,21 @@ CollectionOrViewAcquisitionMap makeAcquisitionMap(CollectionOrViewAcquisitions a
  * This method will acquire and 2-phase hold all the necessary hierarchical locks (Global, DB and
  * Collection).
  */
-CollectionAcquisition acquireCollection(
-    OperationContext* opCtx,
-    CollectionAcquisitionRequest acquisitionRequest,
-    LockMode mode,
-    const RecoveryUnit::OpenSnapshotOptions& openSnapshotOptions =
-        RecoveryUnit::kDefaultOpenSnapshotOptions);
+CollectionAcquisition acquireCollection(OperationContext* opCtx,
+                                        CollectionAcquisitionRequest acquisitionRequest,
+                                        LockMode mode);
 
 CollectionAcquisitions acquireCollections(OperationContext* opCtx,
                                           const CollectionAcquisitionRequests& acquisitionRequests,
                                           LockMode mode);
 
 CollectionOrViewAcquisition acquireCollectionOrView(
-    OperationContext* opCtx,
-    CollectionOrViewAcquisitionRequest acquisitionRequest,
-    LockMode mode,
-    const RecoveryUnit::OpenSnapshotOptions& openSnapshotOptions =
-        RecoveryUnit::kDefaultOpenSnapshotOptions);
+    OperationContext* opCtx, CollectionOrViewAcquisitionRequest acquisitionRequest, LockMode mode);
 
 CollectionOrViewAcquisitions acquireCollectionsOrViews(
     OperationContext* opCtx,
     const CollectionOrViewAcquisitionRequests& acquisitionRequests,
-    LockMode mode,
-    const RecoveryUnit::OpenSnapshotOptions& openSnapshotOptions =
-        RecoveryUnit::kDefaultOpenSnapshotOptions);
+    LockMode mode);
 
 
 /**
@@ -612,7 +603,7 @@ public:
 
     void changeReadSourceForSecondaryReads();
 
-    void openStorageSnapshot(const RecoveryUnit::OpenSnapshotOptions& openSnapshotOptions);
+    void openStorageSnapshot();
 
     [[nodiscard]] std::shared_ptr<const CollectionCatalog> getConsistentCatalog();
 
