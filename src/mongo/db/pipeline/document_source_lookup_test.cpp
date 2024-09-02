@@ -1408,7 +1408,7 @@ TEST_F(DocumentSourceLookUpTest,
     // Verify that the $project is identified as non-correlated and the cache is placed after it.
     auto docSource = DocumentSourceLookUp::createFromBson(
         fromjson("{$lookup: {let: {var1: '$_id'}, pipeline: [{$match: {x: 1}}, {$sort: {x: 1}}, "
-                 "{$project: {projectedField: {$let: {vars: {var1: 'abc'}, in: "
+                 "{$project: {projectedField: {$let: {vars: {var1: '$x'}, in: "
                  "'$$var1'}}, _id: false}}, {$addFields: {varField: {$sum: ['$x', '$$var1']}}}], "
                  "from: 'coll', "
                  "as: 'as'}}")
@@ -1423,7 +1423,7 @@ TEST_F(DocumentSourceLookUpTest,
 
     auto expectedPipe = fromjson(
         str::stream() << "[{$mock: {}}, {$match: {x: {$eq: 1}}}, {$sort: {sortKey: {x: 1}}}, "
-                         "{$project: {projectedField: {$let: {vars: {var1: {$const: 'abc'}}, "
+                         "{$project: {projectedField: {$let: {vars: {var1: '$x'}, "
                          "in: '$$var1'}}, _id: false}},"
                       << sequentialCacheStageObj()
                       << ", {$addFields: {varField: {$sum: ['$x', {$const: 5}]}}}]");

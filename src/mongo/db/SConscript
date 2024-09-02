@@ -1548,6 +1548,7 @@ env.Library(
         "pipeline/expression_dependencies.cpp",
         "pipeline/expression_function.cpp",
         "pipeline/expression_js_emit.cpp",
+        "pipeline/expression_let.cpp",
         "pipeline/expression_parser_gen.cpp",
         "pipeline/expression_test_api_version.cpp",
         "pipeline/expression_trigonometric.cpp",

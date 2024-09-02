@@ -108,6 +108,157 @@ TEST(RedactionTest, ExpressionLet) {
         })",
         expression->serialize(options).getDocument());
 }
+
+TEST(ExpressionLetOptimizeTest, InlineConstants) {
+    auto expCtx = ExpressionContextForTest{};
+
+    auto expression = Expression::parseExpression(&expCtx,
+                                                  fromjson(R"(
+        {$let: {
+            vars: {
+                variable: {$split: ["$data", "\n"]},
+                constant: 3,
+                constantObject: {four: 4}
+            },
+            in: {$and: [
+                {$gte: ["$a", "$$constant"]},
+                {$gte: ["$b", "$$constantObject.four"]},
+                {$eq: ["$firstLine", {$first: "$$variable"}]},
+                {$eq: ["$secondLine", {$last: "$$variable"}]}
+            ]}
+        }}
+    )"),
+
+                                                  expCtx.variablesParseState);
+    expression = expression->optimize();
+    ASSERT_DOCUMENT_EQ_AUTO(  // NOLINT
+        R"(
+            {$let: {
+                vars: {
+                    variable: {$split: ["$data", {$const: "\n"}]}
+                },
+                in: {$and: [
+                    {$gte: ["$a", {$const: 3}]},
+                    {$gte: ["$b", {$const: 4}]},
+                    {$eq: ["$firstLine", {$first: ["$$variable"]}]},
+                    {$eq: ["$secondLine", {$last: ["$$variable"]}]}
+                ]}
+            }}
+        )",
+        expression->serialize().getDocument());
+}
+
+TEST(ExpressionLetOptimizeTest, RemoveUnusedVariables) {
+    auto expCtx = ExpressionContextForTest{};
+
+    auto expression = Expression::parseExpression(&expCtx,
+                                                  fromjson(R"(
+        {$let: {
+            vars: {
+                unused: "unused",
+                variable: {$split: ["$data", "\n"]}
+            },
+            in: {$and: [
+                {$eq: ["$firstLine", {$first: "$$variable"}]},
+                {$eq: ["$secondLine", {$last: "$$variable"}]}
+            ]}
+        }}
+    )"),
+
+                                                  expCtx.variablesParseState);
+    expression = expression->optimize();
+    ASSERT_DOCUMENT_EQ_AUTO(  // NOLINT
+        R"(
+        {$let: {
+            vars: {
+                variable: {$split: ["$data", {$const: "\n"}]}
+            },
+            in: {$and: [
+                {$eq: ["$firstLine", {$first: ["$$variable"]}]},
+                {$eq: ["$secondLine", {$last: ["$$variable"]}]}
+            ]}
+        }}
+
+        )",
+        expression->serialize().getDocument());
+}
+
+TEST(ExpressionLetOptimizeTest, RemoveLetIfAllVariablesAreRemoved) {
+    auto expCtx = ExpressionContextForTest{};
+
+    auto expression = Expression::parseExpression(&expCtx,
+                                                  fromjson(R"(
+        {$let: {
+            vars: {
+                minConstant: 3,
+                maxConstant: 5,
+                unused: "unused"
+            },
+            in: {$and: [
+                {$gte: ["$a", "$$minConstant"]},
+                {$lte: ["$a", "$$maxConstant"]}
+            ]}
+        }}
+    )"),
+
+                                                  expCtx.variablesParseState);
+    expression = expression->optimize();
+    ASSERT_DOCUMENT_EQ_AUTO(  // NOLINT
+        R"(
+        {$and: [
+                {$gte: ["$a", {$const: 3}]},
+                {$lte: ["$a", {$const: 5}]}
+            ]}
+        )",
+        expression->serialize().getDocument());
+}
+
+void buildRecursiveLet(str::stream& stream, size_t iterationsLeft) {
+    stream << "{$let: {\n";
+
+    stream << "  vars: {\n";
+    stream << "    unused" << iterationsLeft << ": "
+           << "\"ununsed string " << iterationsLeft << "\",\n";
+    stream << "    iteration: " << iterationsLeft << "},\n";
+
+    stream << "  in: {$and: [\n";
+    stream << "    {$eq: [\"$field" << iterationsLeft << "\", \"$$iteration\"]}";
+
+    if (iterationsLeft > 0) {
+        stream << ",\n";
+        buildRecursiveLet(stream, iterationsLeft - 1);
+    }
+
+    stream << "  ]}\n";
+    stream << "}}\n";
+}
+
+std::string buildRecursiveLet(size_t depth, bool optimized) {
+    str::stream stream;
+    buildRecursiveLet(stream, depth);
+    return stream;
+}
+
+BSONObj buildOptimizedExpression(size_t depth) {
+    BSONObjBuilder b;
+    BSONArrayBuilder andArray{b.subarrayStart("$and")};
+    for (size_t i = 0; i <= depth; ++i) {
+        int64_t idx = depth - i;
+        std::string fieldName = str::stream() << "$field" << (depth - i);
+        andArray.append(BSON("$eq" << BSON_ARRAY(fieldName << BSON("$const" << idx))));
+    }
+    andArray.done();
+    return b.obj();
+}
+
+TEST(ExpressionLetOptimizeTest, DoesNotCauseExponentialTraversals) {
+    auto expCtx = ExpressionContextForTest{};
+    auto expression = Expression::parseExpression(
+        &expCtx, fromjson(buildRecursiveLet(50, false /*optimized*/)), expCtx.variablesParseState);
+    expression = expression->optimize();
+    ASSERT_BSONOBJ_EQ(buildOptimizedExpression(50), expression->serialize().getDocument().toBson());
+}
+
 }  // namespace
 }  // namespace ExpressionTests
 }  // namespace mongo
