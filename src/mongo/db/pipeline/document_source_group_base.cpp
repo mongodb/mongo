@@ -118,7 +118,7 @@ Value DocumentSourceGroupBase::serialize(const SerializationOptions& opts) const
         for (size_t i = 0; i < accumulatedFields.size(); i++) {
             md[opts.serializeFieldPathFromString(accumulatedFields[i].fieldName)] =
                 opts.serializeLiteral(static_cast<long long>(
-                    memoryTracker[accumulatedFields[i].fieldName].maxMemoryBytes()));
+                    memoryTracker.maxMemoryBytes(accumulatedFields[i].fieldName)));
         }
 
         out["maxAccumulatorMemoryUsageBytes"] = Value(md.freezeToValue());
