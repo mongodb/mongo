@@ -181,6 +181,7 @@ env.Library(
 env.CppUnitTest(
     target="db_sbe_test",
     source=[
+        "expressions/sbe_array_set_conversion_test.cpp",
         "expressions/sbe_block_expr_test.cpp",
         "expressions/sbe_block_top_bottom_test.cpp",
         "expressions/sbe_bson_size_test.cpp",
@@ -236,6 +237,7 @@ env.CppUnitTest(
         "expressions/sbe_trigonometric_expressions_test.cpp",
         "expressions/sbe_trunc_builtin_test.cpp",
         "expressions/sbe_ts_second_ts_increment_test.cpp",
+        "expressions/sbe_unwind_array_builtin_test.cpp",
         "expressions/sbe_variable_test.cpp",
         "expressions/sbe_fill_type_test.cpp",
         "sbe_agg_project_test.cpp",

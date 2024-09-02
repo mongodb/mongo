@@ -6158,6 +6158,105 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinArrayToObject(Ar
     return {true, objTag, objVal};
 }
 
+FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinUnwindArray(ArityType arity) {
+    invariant(arity == 1);
+
+    auto [arrOwned, arrTag, arrVal] = getFromStack(0);
+
+    if (!value::isArray(arrTag)) {
+        return {false, value::TypeTags::Nothing, 0};
+    }
+
+    value::ArrayEnumerator arrayEnumerator(arrTag, arrVal);
+    if (arrayEnumerator.atEnd()) {
+        return {false, value::TypeTags::Nothing, 0};
+    }
+
+    auto [resultTag, resultVal] = value::makeNewArray();
+    value::ValueGuard resultGuard{resultTag, resultVal};
+    value::Array* result = value::getArrayView(resultVal);
+
+    while (!arrayEnumerator.atEnd()) {
+        auto [elemTag, elemVal] = arrayEnumerator.getViewOfValue();
+        if (value::isArray(elemTag)) {
+            value::ArrayEnumerator subArrayEnumerator(elemTag, elemVal);
+            while (!subArrayEnumerator.atEnd()) {
+                auto [subElemTag, subElemVal] = subArrayEnumerator.getViewOfValue();
+                result->push_back(value::copyValue(subElemTag, subElemVal));
+                subArrayEnumerator.advance();
+            }
+        } else {
+            result->push_back(value::copyValue(elemTag, elemVal));
+        }
+        arrayEnumerator.advance();
+    }
+
+    resultGuard.reset();
+    return {true, resultTag, resultVal};
+}
+
+FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinArrayToSet(ArityType arity) {
+    invariant(arity == 1);
+    auto [arrOwned, arrTag, arrVal] = getFromStack(0);
+
+    if (!value::isArray(arrTag)) {
+        return {false, value::TypeTags::Nothing, 0};
+    }
+
+    auto [tag, val] = value::makeNewArraySet();
+    value::ValueGuard guard{tag, val};
+
+    value::ArraySet* arrSet = value::getArraySetView(val);
+
+    auto [sizeOwned, sizeTag, sizeVal] = getArraySize(arrTag, arrVal);
+    invariant(sizeTag == value::TypeTags::NumberInt64);
+    arrSet->reserve(static_cast<int64_t>(sizeVal));
+
+    value::ArrayEnumerator arrayEnumerator(arrTag, arrVal);
+    while (!arrayEnumerator.atEnd()) {
+        auto [elemTag, elemVal] = arrayEnumerator.getViewOfValue();
+        arrSet->push_back(value::copyValue(elemTag, elemVal));
+        arrayEnumerator.advance();
+    }
+
+    guard.reset();
+    return {true, tag, val};
+}
+
+FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinCollArrayToSet(ArityType arity) {
+    invariant(arity == 2);
+
+    auto [_, collTag, collVal] = getFromStack(0);
+    if (collTag != value::TypeTags::collator) {
+        return {false, value::TypeTags::Nothing, 0};
+    }
+
+    auto [arrOwned, arrTag, arrVal] = getFromStack(1);
+
+    if (!value::isArray(arrTag)) {
+        return {false, value::TypeTags::Nothing, 0};
+    }
+
+    auto [tag, val] = value::makeNewArraySet(value::getCollatorView(collVal));
+    value::ValueGuard guard{tag, val};
+
+    value::ArraySet* arrSet = value::getArraySetView(val);
+
+    auto [sizeOwned, sizeTag, sizeVal] = getArraySize(arrTag, arrVal);
+    invariant(sizeTag == value::TypeTags::NumberInt64);
+    arrSet->reserve(static_cast<int64_t>(sizeVal));
+
+    value::ArrayEnumerator arrayEnumerator(arrTag, arrVal);
+    while (!arrayEnumerator.atEnd()) {
+        auto [elemTag, elemVal] = arrayEnumerator.getViewOfValue();
+        arrSet->push_back(value::copyValue(elemTag, elemVal));
+        arrayEnumerator.advance();
+    }
+
+    guard.reset();
+    return {true, tag, val};
+}
+
 ByteCode::MultiAccState ByteCode::getMultiAccState(value::TypeTags stateTag,
                                                    value::Value stateVal) {
     uassert(
@@ -9713,6 +9812,12 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::dispatchBuiltin(Builtin
             return builtinObjectToArray(arity);
         case Builtin::arrayToObject:
             return builtinArrayToObject(arity);
+        case Builtin::unwindArray:
+            return builtinUnwindArray(arity);
+        case Builtin::arrayToSet:
+            return builtinArrayToSet(arity);
+        case Builtin::collArrayToSet:
+            return builtinCollArrayToSet(arity);
         case Builtin::setToArray:
             return builtinSetToArray(arity);
         case Builtin::fillType:
@@ -10256,6 +10361,12 @@ std::string builtinToString(Builtin b) {
             return "objectToArray";
         case Builtin::arrayToObject:
             return "arrayToObject";
+        case Builtin::unwindArray:
+            return "unwindArray";
+        case Builtin::arrayToSet:
+            return "arrayToSet";
+        case Builtin::collArrayToSet:
+            return "collArrayToSet";
         case Builtin::setToArray:
             return "setToArray";
         case Builtin::fillType:

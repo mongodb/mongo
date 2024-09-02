@@ -641,6 +641,9 @@ enum class Builtin : uint16_t {
     objectToArray,
     setToArray,
     arrayToObject,
+    unwindArray,
+    arrayToSet,
+    collArrayToSet,
 
     fillType,
 
@@ -1800,6 +1803,11 @@ private:
     template <bool IsBlockBuiltin = false>
     bool validateDateAddParameters(TimeUnit* unit, int64_t* amount, TimeZone* timezone);
 
+    /**
+     * These functions contain the C++ code implementing the matching builtin function that is
+     * referenced in the function name (e.g. builtinSplit is invoked when Builtin::split is
+     * encountered).
+     */
     FastTuple<bool, value::TypeTags, value::Value> builtinSplit(ArityType arity);
     FastTuple<bool, value::TypeTags, value::Value> builtinDate(ArityType arity);
     FastTuple<bool, value::TypeTags, value::Value> builtinDateWeekYear(ArityType arity);
@@ -1973,6 +1981,29 @@ private:
     FastTuple<bool, value::TypeTags, value::Value> builtinISOWeek(ArityType arity);
     FastTuple<bool, value::TypeTags, value::Value> builtinObjectToArray(ArityType arity);
     FastTuple<bool, value::TypeTags, value::Value> builtinArrayToObject(ArityType arity);
+    /**
+     * Implementation of the builtin function 'unwindArray'. It accepts 1 argument that must be one
+     * of the SBE array types (BSONArray, Array, ArraySet, ArrayMultiSet) and returns an Array
+     * object that contains all the non-array items of the input, plus the items found in all the
+     * array items.
+     * E.g. unwindArray([ 1, ['a', ['b']], 2, [] ]) = [ 1, 'a', ['b'], 2 ]
+     */
+    FastTuple<bool, value::TypeTags, value::Value> builtinUnwindArray(ArityType arity);
+    /**
+     * Implementation of the builtin function 'arrayToSet'. It accepts 1 argument that must be one
+     * of the SBE array types (BSONArray, Array, ArraySet, ArrayMultiSet) and returns an ArraySet
+     * object that contains all the non-duplicate items of the input.
+     * E.g. arrayToSet([ 1, ['a', ['b']], 2, 1]) = [ 1, ['a', ['b']], 2 ]
+     */
+    FastTuple<bool, value::TypeTags, value::Value> builtinArrayToSet(ArityType arity);
+    /**
+     * Implementation of the builtin function 'collArrayToSet'. It accepts 2 arguments; the first
+     * one is the collator object to be used when performing comparisons, the second must be one of
+     * the SBE array types (BSONArray, Array, ArraySet, ArrayMultiSet). It returns an ArraySet
+     * object that contains all the non-duplicate items of the input.
+     * E.g. collArrayToSet(<case-insensitive collator>, ['a', ['a'], 'A']) = ['a', ['a']]
+     */
+    FastTuple<bool, value::TypeTags, value::Value> builtinCollArrayToSet(ArityType arity);
 
     static MultiAccState getMultiAccState(value::TypeTags stateTag, value::Value stateVal);
 

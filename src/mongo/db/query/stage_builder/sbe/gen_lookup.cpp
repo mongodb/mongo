@@ -84,6 +84,7 @@
 #include "mongo/db/query/query_solution.h"
 #include "mongo/db/query/stage_builder/sbe/builder.h"
 #include "mongo/db/query/stage_builder/sbe/gen_helpers.h"
+#include "mongo/db/query/stage_builder/sbe/sbexpr_helpers.h"
 #include "mongo/db/query/stage_types.h"
 #include "mongo/db/query/util/make_data_structure.h"
 #include "mongo/db/storage/key_string.h"
@@ -176,44 +177,73 @@ using namespace sbe::value;
 
 enum class JoinSide { Local = 0, Foreign = 1 };
 
-// Creates stages for traversing path 'fp' in the record from 'inputSlot' that implement MQL
+// Creates an expression for traversing path 'fp' in the record from 'inputSlot' that implement MQL
 // semantics for local collections. The semantics never treat terminal arrays as whole values and
-// match to null per "Matching local records to null" above. Returns one key value at a time.
-// For example, if the record in the 'inputSlot' is:
+// match to null per "Matching local records to null" above. Returns all the key values in a single
+// array. For example, if the record in the 'inputSlot' is:
 //     {a: [{b:[1,[2,3]]}, {b:4}, {b:1}, {b:2}]},
-// the returned values for path "a.b" will be streamed as: 1, [2,3], 4, 1, 2.
+// the returned values for path "a.b" will be packed as: [1, [2,3], 4, 1, 2].
 // Empty arrays and missing are skipped, that is, if the record in the 'inputSlot' is:
 //     {a: [{b:1}, {b:[]}, {no_b:42}, {b:2}]},
-// the returned values for path "a.b" will be streamed as: 1, 2.
-std::pair<SlotId /* keyValueSlot */, std::unique_ptr<sbe::PlanStage>> buildLocalKeysStream(
-    SlotId inputSlot,
-    const FieldPath& fp,
-    const PlanNodeId nodeId,
-    SlotIdGenerator& slotIdGenerator) {
-    const FieldIndex numParts = fp.getPathLength();
+// the returned values for path "a.b" will be packed as: [1, 2].
+SbExpr generateLocalKeyStream(SbExpr inputExpr,
+                              const FieldPath& fp,
+                              size_t level,
+                              StageBuilderState& state,
+                              boost::optional<SbSlot> topLevelFieldSlot = boost::none) {
+    using namespace std::literals;
 
-    std::unique_ptr<sbe::PlanStage> currentStage = makeLimitCoScanTree(nodeId, 1);
-    SlotId keyValueSlot = inputSlot;
-    for (size_t i = 0; i < numParts; i++) {
-        const StringData fieldName = fp.getFieldName(i);
+    SbExprBuilder b(state);
+    invariant(level < fp.getPathLength());
 
-        SlotId getFieldSlot = slotIdGenerator.generate();
-        currentStage = makeProjectStage(
-            std::move(currentStage),
-            nodeId,
-            getFieldSlot,
-            makeFunction("getField"_sd, makeVariable(keyValueSlot), makeStrConstant(fieldName)));
+    tassert(9033500,
+            "Expected an input expression or top level field",
+            !inputExpr.isNull() || topLevelFieldSlot.has_value());
 
-        SlotId unwindOutputSlot = slotIdGenerator.generate();
-        currentStage = makeS<UnwindStage>(std::move(currentStage) /* child stage */,
-                                          getFieldSlot,
-                                          unwindOutputSlot,
-                                          slotIdGenerator.generate() /* outIndex */,
-                                          true /* preserveNullAndEmptyArrays */,
-                                          nodeId);
-        keyValueSlot = unwindOutputSlot;
+    // Generate an expression to read a sub-field at the current nested level.
+    SbExpr fieldName = b.makeStrConstant(fp.getFieldName(level));
+    SbExpr fieldExpr = topLevelFieldSlot
+        ? b.makeVariable(*topLevelFieldSlot)
+        : b.makeFunction("getField"_sd, std::move(inputExpr), std::move(fieldName));
+
+    if (level == fp.getPathLength() - 1) {
+        // The last level doesn't expand leaf arrays.
+        return fieldExpr;
     }
-    return {keyValueSlot, std::move(currentStage)};
+
+    // Generate nested traversal.
+    FrameId lambdaFrameId = state.frameId();
+    SbExpr lambdaParam = b.makeVariable(lambdaFrameId, 0);
+
+    SbExpr resultExpr = generateLocalKeyStream(std::move(lambdaParam), fp, level + 1, state);
+
+    SbExpr lambdaExpr = b.makeLocalLambda(lambdaFrameId, std::move(resultExpr));
+
+    // Generate the traverse stage for the current nested level. If the traversed field is an array,
+    // we know that traverseP will wrap the result into an array, that we need to remove by using
+    // unwindArray.
+    // For example, when processing
+    //     {a: [{b:[1,[2,3]]}, {b:4}, {b:1}, {b:2}]}
+    // the result of getField("a") is an array, and traverseP will return an array
+    //     [ [1,[2,3]], 4, 1, 2 ]
+    // holding the results of the lambda for each item; in order to obtain the list of leaf nodes we
+    // have to extract the content of the first item into the containing array, e.g.
+    //     [ 1, [2,3], 4, 1, 2 ]
+    // When traverseP processes a non-array, the result could still be an array, but it would be the
+    // result of running the lambda on a non-array value, e.g.
+    //     {a: {b:[1, [2]]} }
+    // The result would be [1, [2]] that is already in the correct form and should not be processed
+    // with unwindArray, or the result would be an incorrect [1, 2].
+    FrameId traverseFrameId = state.frameId();
+    return b.makeLet(traverseFrameId,
+                     makeVector(std::move(fieldExpr),
+                                b.makeFunction("traverseP"_sd,
+                                               SbLocalVar{traverseFrameId, 0},
+                                               std::move(lambdaExpr),
+                                               b.makeInt32Constant(1))),
+                     b.makeIf(b.makeFunction("isArray"_sd, SbLocalVar{traverseFrameId, 0}),
+                              b.makeFunction("unwindArray"_sd, SbLocalVar{traverseFrameId, 1}),
+                              SbLocalVar{traverseFrameId, 1}));
 }
 
 // Creates stages for traversing path 'fp' in the record from 'inputSlot' that implement MQL
@@ -357,25 +387,6 @@ std::pair<SlotId /* keyValueSlot */, std::unique_ptr<sbe::PlanStage>> buildForei
     return {keyValueSlot, std::move(currentStage)};
 }
 
-std::pair<SlotId /* keyValuesSetSlot */, std::unique_ptr<sbe::PlanStage>>
-replaceEmptySetWithNullArray(std::unique_ptr<sbe::PlanStage> innerStage,
-                             SlotId innerRecordSlot,
-                             SlotIdGenerator& slotIdGenerator,
-                             const PlanNodeId nodeId) {
-    auto [arrayWithNullTag, arrayWithNullVal] = makeNewArray();
-    auto arrayWithNull = makeConstant(arrayWithNullTag, arrayWithNullVal);
-    value::Array* arrayWithNullView = getArrayView(arrayWithNullVal);
-    arrayWithNullView->push_back(TypeTags::Null, 0);
-    auto nonEmptySetSlot = slotIdGenerator.generate();
-    return {nonEmptySetSlot,
-            makeProject(std::move(innerStage),
-                        nodeId,
-                        nonEmptySetSlot,
-                        makeE<EIf>(makeFunction("isArrayEmpty", makeVariable(innerRecordSlot)),
-                                   std::move(arrayWithNull),
-                                   makeVariable(innerRecordSlot)))};
-}
-
 // Returns the vector of local slots to be used in lookup join, including the record slot and
 // metadata slots produced by local side.
 sbe::value::SlotVector buildLocalSlots(StageBuilderState& state, SlotId localRecordSlot) {
@@ -401,13 +412,46 @@ std::pair<SlotId /* keyValuesSetSlot */, std::unique_ptr<sbe::PlanStage>> buildK
     PlanYieldPolicy* yieldPolicy,
     const PlanNodeId nodeId,
     SlotIdGenerator& slotIdGenerator) {
-    // Create the branch to stream individual key values from every terminal of the path.
-    auto [keyValueSlot, keyValuesStage] = (joinSide == JoinSide::Local)
-        ? buildLocalKeysStream(recordSlot, fp, nodeId, slotIdGenerator)
-        : buildForeignKeysStream(recordSlot, fp, nodeId, slotIdGenerator);
+    if (joinSide == JoinSide::Local) {
+        auto [arrayWithNullTag, arrayWithNullVal] = makeNewArray();
+        value::Array* arrayWithNullView = getArrayView(arrayWithNullVal);
+        arrayWithNullView->push_back(TypeTags::Null, 0);
 
-    // Re-pack the individual key values into a set. We don't cap "addToSet" here because its size
-    // is bounded by the size of the record.
+        SbExprBuilder b(state);
+        FrameId varSlot = state.frameId();
+        // The array returned by the expression generated by generateLocalKeyStream might end up
+        // empty if the localField contained only missing and empty arrays (e.g. path "a.b" in {a:
+        // [{no_b:1}, {b:[]}]}). The semantics of MQL for local keys require these cases to match to
+        // 'null', so we replace the empty array with a constant array that contains a single 'null'
+        // value.
+        SbExpr expr = b.makeLet(
+            varSlot,
+            makeVector(generateLocalKeyStream(SbExpr{recordSlot}, fp, 0, state)),
+            b.makeIf(b.makeFillEmptyFalse(b.makeFunction("isArray"_sd, SbLocalVar{varSlot, 0})),
+                     b.makeIf(b.makeFunction("isArrayEmpty"_sd, SbLocalVar{varSlot, 0}),
+                              b.makeConstant(arrayWithNullTag, arrayWithNullVal),
+                              SbLocalVar{varSlot, 0}),
+                     b.makeFunction("newArray"_sd, b.makeFillEmptyNull(SbLocalVar{varSlot, 0}))));
+        // Convert the array into an ArraySet that has no duplicate keys.
+        if (collatorSlot) {
+            expr =
+                b.makeFunction("collArrayToSet"_sd, makeVariable(*collatorSlot), std::move(expr));
+        } else {
+            expr = b.makeFunction("arrayToSet"_sd, std::move(expr));
+        }
+
+        SlotId keyValueSlot = slotIdGenerator.generate();
+        inputStage =
+            makeProjectStage(std::move(inputStage), nodeId, keyValueSlot, expr.extractExpr(state));
+
+        return {keyValueSlot, std::move(inputStage)};
+    }
+    // Create the branch to stream individual key values from every terminal of the path.
+    auto [keyValueSlot, keyValuesStage] =
+        buildForeignKeysStream(recordSlot, fp, nodeId, slotIdGenerator);
+
+    // Re-pack the individual key values into a set. We don't cap "addToSet" here because its
+    // size is bounded by the size of the record.
     SlotId keyValuesSetSlot = slotIdGenerator.generate();
     SlotId spillSlot = slotIdGenerator.generate();
 
@@ -429,21 +473,7 @@ std::pair<SlotId /* keyValuesSetSlot */, std::unique_ptr<sbe::PlanStage>> buildK
         yieldPolicy,
         nodeId);
 
-    // The set in 'keyValuesSetSlot' might end up empty if the localField contained only missing and
-    // empty arrays (e.g. path "a.b" in {a: [{no_b:1}, {b:[]}]}). The semantics of MQL for local
-    // keys require these cases to match to 'null', so we replace the empty set with a constant set
-    // that contains a single 'null' value. The set of foreign key values also can be empty but it
-    // should produce no matches so we leave it empty.
-    if (joinSide == JoinSide::Local) {
-        std::tie(keyValuesSetSlot, packedKeyValuesStage) = replaceEmptySetWithNullArray(
-            std::move(packedKeyValuesStage),  // NOLINT(bugprone-use-after-move)
-            keyValuesSetSlot,
-            slotIdGenerator,
-            nodeId);
-    }
-
-    auto outerProjects =
-        joinSide == JoinSide::Local ? buildLocalSlots(state, recordSlot) : makeSV(recordSlot);
+    value::SlotVector outerProjects = makeSV(recordSlot);
     // Attach the set of key values to the original local record.
     auto nljLocalWithKeyValuesSet =
         makeS<LoopJoinStage>(std::move(inputStage),
