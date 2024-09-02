@@ -1595,8 +1595,7 @@ DBCollection.prototype.watch = function(pipeline, options) {
     pipeline = pipeline || [];
     assert(pipeline instanceof Array, "'pipeline' argument must be an array");
     const [changeStreamStage, aggOptions] = this.getMongo()._extractChangeStreamOptions(options);
-    pipeline.unshift(changeStreamStage);
-    return this.aggregate(pipeline, aggOptions);
+    return this.aggregate([changeStreamStage, ...pipeline], aggOptions);
 };
 
 DBCollection.prototype.checkMetadataConsistency = function(options = {}) {

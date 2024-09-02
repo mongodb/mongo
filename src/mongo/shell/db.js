@@ -1631,8 +1631,8 @@ DB.prototype.watch = function(pipeline, options) {
     assert(pipeline instanceof Array, "'pipeline' argument must be an array");
 
     const [changeStreamStage, aggOptions] = this.getMongo()._extractChangeStreamOptions(options);
-    pipeline.unshift(changeStreamStage);
-    return this._runAggregate({aggregate: 1, pipeline: pipeline}, aggOptions);
+    return this._runAggregate({aggregate: 1, pipeline: [changeStreamStage, ...pipeline]},
+                              aggOptions);
 };
 
 // Writing `this.hasOwnProperty` would cause DB.prototype.getCollection() to be called since the

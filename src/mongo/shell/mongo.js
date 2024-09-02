@@ -626,6 +626,6 @@ Mongo.prototype.watch = function(pipeline, options) {
 
     const [changeStreamStage, aggOptions] = this._extractChangeStreamOptions(options);
     changeStreamStage.$changeStream.allChangesForCluster = true;
-    pipeline.unshift(changeStreamStage);
-    return this.getDB("admin")._runAggregate({aggregate: 1, pipeline: pipeline}, aggOptions);
+    return this.getDB("admin")._runAggregate(
+        {aggregate: 1, pipeline: [changeStreamStage, ...pipeline]}, aggOptions);
 };
