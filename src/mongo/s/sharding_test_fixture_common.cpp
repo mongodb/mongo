@@ -60,7 +60,9 @@ namespace mongo {
 
 using executor::NetworkTestEnv;
 
-ShardingTestFixtureCommon::ShardingTestFixtureCommon() = default;
+ShardingTestFixtureCommon::ShardingTestFixtureCommon(
+    std::unique_ptr<ScopedGlobalServiceContextForTest> scopedGlobalContext)
+    : ServiceContextTest(std::move(scopedGlobalContext)) {}
 
 ShardingTestFixtureCommon::~ShardingTestFixtureCommon() {
     invariant(!_opCtxHolder,

@@ -537,3 +537,17 @@ env.Benchmark(
         "query_test_service_context",
     ],
 )
+
+env.Benchmark(
+    target="point_query_bm",
+    source=[
+        "point_query_bm.cpp",
+    ],
+    LIBDEPS=[
+        "$BUILD_DIR/mongo/db/catalog/catalog_test_fixture",
+        "$BUILD_DIR/mongo/db/query_exec",
+        "$BUILD_DIR/mongo/db/read_write_concern_defaults_mock",
+        "$BUILD_DIR/mongo/db/repl/storage_interface_impl",
+        "$BUILD_DIR/mongo/db/service_context_d",
+    ],
+)

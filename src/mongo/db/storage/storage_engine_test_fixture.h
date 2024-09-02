@@ -207,8 +207,7 @@ public:
 
 class StorageEngineRepairTest : public StorageEngineTest {
 public:
-    StorageEngineRepairTest()
-        : StorageEngineTest(Options{}.repair(RepairAction::kRepair).ephemeral(false)) {
+    StorageEngineRepairTest() : StorageEngineTest(Options{}.enableRepair().ephemeral(false)) {
         repl::StorageInterface::set(getServiceContext(),
                                     std::make_unique<repl::StorageInterfaceImpl>());
     }

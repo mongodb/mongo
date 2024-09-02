@@ -109,7 +109,7 @@ protected:
     }
 
     JournalListenerWithDurabilityTracking* getJournalListener() {
-        return static_cast<JournalListenerWithDurabilityTracking*>(_journalListener.get());
+        return static_cast<JournalListenerWithDurabilityTracking*>(journalListener());
     }
 
 private:

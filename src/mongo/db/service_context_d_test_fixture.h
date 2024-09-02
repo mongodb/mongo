@@ -33,6 +33,7 @@
 #include <string>
 #include <utility>
 
+#include "mongo/base/checked_cast.h"
 #include "mongo/db/auth/authz_manager_external_state_mock.h"
 #include "mongo/db/index_builds_coordinator.h"
 #include "mongo/db/service_context_test_fixture.h"
@@ -45,24 +46,26 @@
 
 namespace mongo {
 
-class ServiceContextMongoDTest : public virtual ServiceContextTest {
+class MongoDScopedGlobalServiceContextForTest : public ScopedGlobalServiceContextForTest {
 public:
     constexpr static StorageEngineInitFlags kDefaultStorageEngineInitFlags =
         StorageEngineInitFlags::kAllowNoLockFile | StorageEngineInitFlags::kSkipMetadataFile;
 
-protected:
     enum class RepairAction { kNoRepair, kRepair };
 
     class Options {
     public:
-        Options(){};
+        Options() = default;
+
+        Options(Options&&) = default;
+        Options& operator=(Options&&) = default;
 
         Options engine(std::string engine) {
             _engine = std::move(engine);
             return std::move(*this);
         }
-        Options repair(RepairAction repair) {
-            _repair = repair;
+        Options enableRepair() {
+            _repair = RepairAction::kRepair;
             return std::move(*this);
         }
         Options initFlags(StorageEngineInitFlags initFlags) {
@@ -112,12 +115,19 @@ protected:
             return std::move(*this);
         }
 
+        Options setCreateShardingState(bool createShardingState) {
+            _createShardingState = createShardingState;
+            return std::move(*this);
+        }
+
         Options setAuthEnabled(bool enableAuth) {
             _setAuthEnabled = enableAuth;
             return std::move(*this);
         }
 
     private:
+        friend class MongoDScopedGlobalServiceContextForTest;
+
         std::string _engine = "wiredTiger";
         // We use ephemeral instances by default to advise Storage Engines (in particular
         // WiredTiger) not to perform Disk I/O.
@@ -133,23 +143,28 @@ protected:
         std::unique_ptr<AuthzManagerExternalStateMock> _mockAuthzExternalState;
         std::unique_ptr<IndexBuildsCoordinator> _indexBuildsCoordinator;
         bool _forceDisableTableLogging = false;
-
-        friend class ServiceContextMongoDTest;
+        bool _createShardingState = true;
     };
 
-    explicit ServiceContextMongoDTest(Options options = {});
+    explicit MongoDScopedGlobalServiceContextForTest(Options options);
 
-    ~ServiceContextMongoDTest() override;
+    ~MongoDScopedGlobalServiceContextForTest() override;
 
-    void tearDown() override;
+    JournalListener* journalListener() const {
+        return _journalListener.get();
+    }
 
+    AuthzManagerExternalStateMock* authzExternalState() {
+        return _authzExternalState;
+    }
+
+private:
     // The JournalListener must stay alive as long as the storage engine is running.
     std::unique_ptr<JournalListener> _journalListener;
 
     // Raw pointer authorization manager external state if using a mock.
     AuthzManagerExternalStateMock* _authzExternalState = nullptr;
 
-private:
     struct {
         std::string engine;
         bool engineSetByUser;
@@ -157,6 +172,29 @@ private:
     } _stashedStorageParams;
 
     unittest::TempDir _tempDir;
+};
+
+class ServiceContextMongoDTest : public ServiceContextTest {
+public:
+    using Options = MongoDScopedGlobalServiceContextForTest::Options;
+
+    ServiceContextMongoDTest() : ServiceContextMongoDTest{Options{}} {}
+    explicit ServiceContextMongoDTest(Options options)
+        : ServiceContextTest(
+              std::make_unique<MongoDScopedGlobalServiceContextForTest>(std::move(options))) {}
+
+    JournalListener* journalListener() const {
+        return mongoDscopedServiceContext()->journalListener();
+    }
+
+    AuthzManagerExternalStateMock* authzExternalState() {
+        return mongoDscopedServiceContext()->authzExternalState();
+    }
+
+private:
+    MongoDScopedGlobalServiceContextForTest* mongoDscopedServiceContext() const {
+        return checked_cast<MongoDScopedGlobalServiceContextForTest*>(scopedServiceContext());
+    }
 };
 
 }  // namespace mongo

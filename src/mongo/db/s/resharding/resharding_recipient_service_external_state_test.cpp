@@ -84,9 +84,15 @@
 namespace mongo {
 namespace {
 
-class RecipientServiceExternalStateTest : public ShardCatalogCacheTestFixture,
-                                          public ServiceContextMongoDTest {
+class RecipientServiceExternalStateTest : public ShardCatalogCacheTestFixture {
 protected:
+    RecipientServiceExternalStateTest()
+        : ShardCatalogCacheTestFixture(std::make_unique<MongoDScopedGlobalServiceContextForTest>(
+              MongoDScopedGlobalServiceContextForTest::Options{}
+                  .setCreateShardingState(false)
+                  .useMockClock(true)
+                  .useMockTickSource(true))) {}
+
     void setUp() override {
         ShardCatalogCacheTestFixture::setUp();
 

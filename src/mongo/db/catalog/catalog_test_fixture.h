@@ -33,7 +33,6 @@
 
 #include "mongo/db/operation_context.h"
 #include "mongo/db/repl/storage_interface.h"
-#include "mongo/db/repl/storage_interface_impl.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/service_context_d_test_fixture.h"
 
@@ -45,20 +44,29 @@ namespace mongo {
  * Sets up and provides a repl::StorageInterface and OperationContext. Database data are cleared
  * between test runs.
  */
-class CatalogTestFixture : public ServiceContextMongoDTest {
+class CatalogScopedGlobalServiceContextForTest : public MongoDScopedGlobalServiceContextForTest {
 public:
-    explicit CatalogTestFixture(Options options = {})
-        : ServiceContextMongoDTest(std::move(options)) {}
+    explicit CatalogScopedGlobalServiceContextForTest(Options options);
+};
 
-    OperationContext* operationContext();
-    repl::StorageInterface* storageInterface();
+class CatalogTestFixture : public ServiceContextTest {
+public:
+    using Options = MongoDScopedGlobalServiceContextForTest::Options;
 
-protected:
+    CatalogTestFixture() : CatalogTestFixture(Options{}) {}
+
+    explicit CatalogTestFixture(Options options)
+        : ServiceContextTest(
+              std::make_unique<CatalogScopedGlobalServiceContextForTest>(std::move(options))) {}
+
+    OperationContext* operationContext() const;
+
     void setUp() override;
     void tearDown() override;
 
+    repl::StorageInterface* storageInterface() const;
+
 private:
-    repl::StorageInterface* _storage;
     ServiceContext::UniqueOperationContext _opCtx;
 };
 

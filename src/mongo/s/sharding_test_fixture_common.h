@@ -56,7 +56,7 @@ namespace mongo {
 /**
  * Contains common functionality and tools, which apply to both mongos and mongod unit-tests.
  */
-class ShardingTestFixtureCommon : public virtual ServiceContextTest {
+class ShardingTestFixtureCommon : public ServiceContextTest {
 public:
     /**
      * Constructs a standalone RoutingTableHistory object (i.e., not linked to any CatalogCache),
@@ -66,7 +66,8 @@ public:
     static RoutingTableHistoryValueHandle makeStandaloneRoutingTableHistory(RoutingTableHistory rt);
 
 protected:
-    ShardingTestFixtureCommon();
+    explicit ShardingTestFixtureCommon(
+        std::unique_ptr<ScopedGlobalServiceContextForTest> scopedGlobalContext);
     ~ShardingTestFixtureCommon() override;
 
     void setUp() override;

@@ -74,37 +74,53 @@ using RouterRoleOverride = RoleOverride<ServerRoleIndex::router>;
 
 class ScopedGlobalServiceContextForTest {
 public:
+    ScopedGlobalServiceContextForTest();
+    virtual ~ScopedGlobalServiceContextForTest();
+
     /**
      * Returns a service context, which is only valid for this instance of the test.
      */
     ServiceContext* getServiceContext() const;
 
     Service* getService() const;
-
-protected:
-    ScopedGlobalServiceContextForTest();
-    virtual ~ScopedGlobalServiceContextForTest();
 };
 
 /**
  * Test fixture for tests that require a properly initialized global service context.
  */
-class ServiceContextTest : public unittest::Test, public ScopedGlobalServiceContextForTest {
+class ServiceContextTest : public unittest::Test {
 public:
     /**
      * Returns the default Client for this test.
      */
-    Client* getClient();
+    Client* getClient() {
+        return Client::getCurrent();
+    }
 
     ServiceContext::UniqueOperationContext makeOperationContext() {
         return getClient()->makeOperationContext();
     }
 
+    ServiceContext* getServiceContext() const {
+        return _scopedServiceContext->getServiceContext();
+    }
+
+    Service* getService() const {
+        return _scopedServiceContext->getService();
+    }
+
 protected:
     ServiceContextTest();
+    explicit ServiceContextTest(
+        std::unique_ptr<ScopedGlobalServiceContextForTest> scopedServiceContext);
     ~ServiceContextTest() override;
 
+    ScopedGlobalServiceContextForTest* scopedServiceContext() const {
+        return _scopedServiceContext.get();
+    }
+
 private:
+    std::unique_ptr<ScopedGlobalServiceContextForTest> _scopedServiceContext;
     ThreadClient _threadClient;
 };
 

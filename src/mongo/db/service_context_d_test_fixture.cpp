@@ -41,37 +41,29 @@
 #include "mongo/db/global_settings.h"
 #include "mongo/db/index_builds_coordinator.h"
 #include "mongo/db/index_builds_coordinator_mongod.h"
-#include "mongo/db/op_observer/op_observer.h"
 #include "mongo/db/op_observer/op_observer_registry.h"
 #include "mongo/db/repl/repl_settings.h"
 #include "mongo/db/s/collection_sharding_state.h"
 #include "mongo/db/s/collection_sharding_state_factory_shard.h"
-#include "mongo/db/server_options.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/service_entry_point_shard_role.h"
-#include "mongo/db/session_manager_mongod.h"
 #include "mongo/db/storage/control/storage_control.h"
 #include "mongo/db/storage/recovery_unit_noop.h"
 #include "mongo/db/storage/storage_engine.h"
 #include "mongo/db/storage/storage_engine_init.h"
 #include "mongo/db/storage/storage_options.h"
-#include "mongo/logv2/log.h"
-#include "mongo/logv2/log_attr.h"
-#include "mongo/logv2/log_component.h"
 #include "mongo/s/sharding_state.h"
-#include "mongo/transport/service_entry_point.h"
-#include "mongo/util/clock_source.h"
 #include "mongo/util/clock_source_mock.h"
 #include "mongo/util/periodic_runner.h"
 #include "mongo/util/periodic_runner_factory.h"
 
-#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
-
 namespace mongo {
 
-ServiceContextMongoDTest::ServiceContextMongoDTest(Options options)
+MongoDScopedGlobalServiceContextForTest::MongoDScopedGlobalServiceContextForTest(Options options)
     : _journalListener(std::move(options._journalListener)),
       _tempDir("service_context_d_test_fixture") {
+    auto setupClient = getServiceContext()->getService()->makeClient("MongoDSCTestCtor");
+    AlternativeClientRegion acr(setupClient);
 
     if (options._forceDisableTableLogging) {
         storageGlobalParams.forceDisableTableLogging = true;
@@ -109,10 +101,10 @@ ServiceContextMongoDTest::ServiceContextMongoDTest(Options options)
 
     if (options._useMockClock) {
         // Copied from dbtests.cpp. DBTests sets up a controlled mock clock while
-        // ServiceContextMongoDTest uses the system clock. Tests moved from dbtests to unittests may
-        // depend on a deterministic clock. Additionally, if a test chooses to set a non-zero
-        // _autoAdvancingMockClockIncrement, the mock clock will automatically advance by that
-        // increment each time it is read.
+        // this class uses the system clock. Tests moved from dbtests
+        // to unittests may depend on a deterministic clock. Additionally, if a test chooses to set
+        // a non-zero _autoAdvancingMockClockIncrement, the mock clock will automatically advance by
+        // that increment each time it is read.
         auto fastClock = std::make_unique<AutoAdvancingClockSourceMock>(
             options._autoAdvancingMockClockIncrement);
         // Timestamps are split into two 32-bit integers, seconds and "increments". Currently
@@ -163,7 +155,9 @@ ServiceContextMongoDTest::ServiceContextMongoDTest(Options options)
 
     DatabaseHolder::set(serviceContext, std::make_unique<DatabaseHolderImpl>());
     Collection::Factory::set(serviceContext, std::make_unique<CollectionImpl::FactoryImpl>());
-    ShardingState::create_forTest_DO_NOT_USE(serviceContext);
+    if (options._createShardingState) {
+        ShardingState::create(serviceContext);
+    }
     CollectionShardingStateFactory::set(
         serviceContext, std::make_unique<CollectionShardingStateFactoryShard>(serviceContext));
     serviceContext->getStorageEngine()->notifyStorageStartupRecoveryComplete();
@@ -180,20 +174,18 @@ ServiceContextMongoDTest::ServiceContextMongoDTest(Options options)
     }
 }
 
-ServiceContextMongoDTest::~ServiceContextMongoDTest() {
+MongoDScopedGlobalServiceContextForTest::~MongoDScopedGlobalServiceContextForTest() {
+    auto teardownClient = getServiceContext()->getService()->makeClient("MongoDSCTestDtor");
+    AlternativeClientRegion acr(teardownClient);
+    auto opCtx = Client::getCurrent()->makeOperationContext();
+
+    IndexBuildsCoordinator::get(opCtx.get())->shutdown(opCtx.get());
     CollectionShardingStateFactory::clear(getServiceContext());
 
     {
-        ServiceContext::UniqueOperationContext uniqueOpCtx;
-        auto opCtx = getClient()->getOperationContext();
-        if (!opCtx) {
-            uniqueOpCtx = getClient()->makeOperationContext();
-            opCtx = uniqueOpCtx.get();
-        }
-
-        Lock::GlobalLock glk(opCtx, MODE_X);
-        auto databaseHolder = DatabaseHolder::get(opCtx);
-        databaseHolder->closeAll(opCtx);
+        Lock::GlobalLock glk(opCtx.get(), MODE_X);
+        auto databaseHolder = DatabaseHolder::get(opCtx.get());
+        databaseHolder->closeAll(opCtx.get());
     }
 
     shutdownGlobalStorageEngineCleanly(getServiceContext());
@@ -203,21 +195,6 @@ ServiceContextMongoDTest::~ServiceContextMongoDTest() {
     std::swap(storageGlobalParams.repair, _stashedStorageParams.repair);
 
     storageGlobalParams.reset();
-}
-
-void ServiceContextMongoDTest::tearDown() {
-    {
-        // Some tests set the current OperationContext but do not release it until destruction.
-        ServiceContext::UniqueOperationContext uniqueOpCtx;
-        auto opCtx = getClient()->getOperationContext();
-        if (!opCtx) {
-            uniqueOpCtx = getClient()->makeOperationContext();
-            opCtx = uniqueOpCtx.get();
-        }
-        IndexBuildsCoordinator::get(opCtx)->shutdown(opCtx);
-    }
-
-    ServiceContextTest::tearDown();
 }
 
 }  // namespace mongo

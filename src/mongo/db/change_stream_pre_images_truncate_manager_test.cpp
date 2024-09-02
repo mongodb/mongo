@@ -67,8 +67,6 @@ protected:
     const TenantId kTenantIdB = TenantId(OID::gen());
     const boost::optional<TenantId> kNullTenantId{};
 
-    PreImagesTruncateManagerTest() : CatalogTestFixture({}) {}
-
     void setUp() override {
         CatalogTestFixture::setUp();
         ChangeStreamOptionsManager::create(getServiceContext());

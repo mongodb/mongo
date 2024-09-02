@@ -94,8 +94,11 @@ using executor::RemoteCommandRequest;
 using repl::ReplicationCoordinatorMock;
 using repl::ReplSettings;
 
-ShardingMongoDTestFixture::ShardingMongoDTestFixture(Options options, bool setUpMajorityReads)
-    : ServiceContextMongoDTest(std::move(options)), _setUpMajorityReads(setUpMajorityReads) {}
+ShardingMongoDTestFixture::ShardingMongoDTestFixture(
+    MongoDScopedGlobalServiceContextForTest::Options options, bool setUpMajorityReads)
+    : ShardingTestFixtureCommon(
+          std::make_unique<MongoDScopedGlobalServiceContextForTest>(std::move(options))),
+      _setUpMajorityReads(setUpMajorityReads) {}
 
 ShardingMongoDTestFixture::~ShardingMongoDTestFixture() = default;
 
@@ -214,7 +217,6 @@ Status ShardingMongoDTestFixture::initializeGlobalShardingStateForMongodForTest(
 }
 
 void ShardingMongoDTestFixture::setUp() {
-    ServiceContextMongoDTest::setUp();
     ShardingTestFixtureCommon::setUp();
 
     const auto service = getServiceContext();
@@ -294,7 +296,6 @@ void ShardingMongoDTestFixture::tearDown() {
     Grid::get(operationContext())->clearForUnitTests();
 
     ShardingTestFixtureCommon::tearDown();
-    ServiceContextMongoDTest::tearDown();
 }
 
 ShardingCatalogClient* ShardingMongoDTestFixture::catalogClient() const {

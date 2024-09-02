@@ -116,15 +116,28 @@ std::shared_ptr<executor::ShardingTaskExecutor> makeShardingTestExecutor(
 }  // namespace
 
 ShardingTestFixture::ShardingTestFixture()
-    : ShardingTestFixture(false /* withMockCatalogCache */) {}
+    : ShardingTestFixture(false, std::make_unique<ScopedGlobalServiceContextForTest>()) {}
 
-ShardingTestFixture::ShardingTestFixture(bool withMockCatalogCache) {
+ShardingTestFixture::ShardingTestFixture(bool withMockCatalogCache)
+    : ShardingTestFixture(withMockCatalogCache,
+                          std::make_unique<ScopedGlobalServiceContextForTest>()) {}
+
+ShardingTestFixture::ShardingTestFixture(
+    bool withMockCatalogCache,
+    std::unique_ptr<ScopedGlobalServiceContextForTest> scopedServiceContext)
+    : ShardingTestFixtureCommon(std::move(scopedServiceContext)) {
     const auto service = getServiceContext();
 
     // Configure the service context
-    service->setFastClockSource(std::make_unique<ClockSourceMock>());
-    service->setPreciseClockSource(std::make_unique<ClockSourceMock>());
-    service->setTickSource(std::make_unique<TickSourceMock<>>());
+    if (!dynamic_cast<ClockSourceMock*>(service->getFastClockSource())) {
+        service->setFastClockSource(std::make_unique<ClockSourceMock>());
+    }
+    if (!dynamic_cast<ClockSourceMock*>(service->getPreciseClockSource())) {
+        service->setPreciseClockSource(std::make_unique<ClockSourceMock>());
+    }
+    if (!dynamic_cast<TickSourceMock<>*>(service->getTickSource())) {
+        service->setTickSource(std::make_unique<TickSourceMock<>>());
+    }
 
     CollatorFactoryInterface::set(service, std::make_unique<CollatorFactoryMock>());
     ShardingState::create(service);

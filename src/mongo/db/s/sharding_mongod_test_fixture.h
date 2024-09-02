@@ -58,14 +58,11 @@ namespace mongo {
  * by which a real config or shard server does sharding initialization. Provides a set of default
  * components (including a NetworkInterface/TaskExecutor subsystem backed by the NetworkTestEnv),
  * but allows subclasses to replace any component with its real implementation, a mock, or nullptr.
- *
- * The ordering of the base classes here matter because both ShardingTestFixtureCommon and
- * ServiceContextMongoDTest inherit from ServiceContextTest, which overrides the global service
- * context.
  */
-class ShardingMongoDTestFixture : public ShardingTestFixtureCommon,
-                                  public ServiceContextMongoDTest {
+class ShardingMongoDTestFixture : public ShardingTestFixtureCommon {
 protected:
+    using Options = MongoDScopedGlobalServiceContextForTest::Options;
+
     ShardingMongoDTestFixture(Options options = {}, bool allowMajorityReads = true);
     ~ShardingMongoDTestFixture() override;
 

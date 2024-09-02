@@ -41,12 +41,11 @@
 
 namespace mongo {
 
-void CatalogTestFixture::setUp() {
-    // Set up mongod.
-    ServiceContextMongoDTest::setUp();
-
+CatalogScopedGlobalServiceContextForTest::CatalogScopedGlobalServiceContextForTest(Options options)
+    : MongoDScopedGlobalServiceContextForTest(std::move(options)) {
     auto service = getServiceContext();
-    _opCtx = cc().makeOperationContext();
+    auto setupClient = getService()->makeClient("CatalogSCTestCtor");
+    AlternativeClientRegion acr(setupClient);
 
     // Set up ReplicationCoordinator and ensure that we are primary.
     auto replCoord = std::make_unique<repl::ReplicationCoordinatorMock>(service);
@@ -54,28 +53,27 @@ void CatalogTestFixture::setUp() {
     repl::ReplicationCoordinator::set(service, std::move(replCoord));
 
     // Setup ReplicationInterface
-    auto storageInterface = std::make_unique<repl::StorageInterfaceImpl>();
-    _storage = storageInterface.get();
-    repl::StorageInterface::set(service, std::move(storageInterface));
+    repl::StorageInterface::set(service, std::make_unique<repl::StorageInterfaceImpl>());
 
     // Set up oplog collection. If the WT storage engine is used, the oplog collection is expected
     // to exist when fetching the next opTime (LocalOplogInfo::getNextOpTimes) to use for a write.
-    repl::createOplog(operationContext());
+    auto opCtx = cc().makeOperationContext();
+    repl::createOplog(opCtx.get());
 }
 
-void CatalogTestFixture::tearDown() {
-    _opCtx.reset();
-
-    // Tear down mongod.
-    ServiceContextMongoDTest::tearDown();
-}
-
-OperationContext* CatalogTestFixture::operationContext() {
+OperationContext* CatalogTestFixture::operationContext() const {
     return _opCtx.get();
 }
 
-repl::StorageInterface* CatalogTestFixture::storageInterface() {
-    return _storage;
+void CatalogTestFixture::setUp() {
+    _opCtx = getClient()->makeOperationContext();
+}
+void CatalogTestFixture::tearDown() {
+    _opCtx.reset();
+}
+
+repl::StorageInterface* CatalogTestFixture::storageInterface() const {
+    return repl::StorageInterface::get(getServiceContext());
 }
 
 }  // namespace mongo

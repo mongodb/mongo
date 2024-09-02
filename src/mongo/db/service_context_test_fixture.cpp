@@ -79,12 +79,14 @@ Service* ScopedGlobalServiceContextForTest::getService() const {
     MONGO_UNREACHABLE;
 }
 
-ServiceContextTest::ServiceContextTest() : _threadClient{getService()} {}
+ServiceContextTest::ServiceContextTest()
+    : ServiceContextTest{std::make_unique<ScopedGlobalServiceContextForTest>()} {}
+
+ServiceContextTest::ServiceContextTest(
+    std::unique_ptr<ScopedGlobalServiceContextForTest> scopedServiceContext)
+    : _scopedServiceContext(std::move(scopedServiceContext)),
+      _threadClient(_scopedServiceContext->getService()) {}
 
 ServiceContextTest::~ServiceContextTest() = default;
-
-Client* ServiceContextTest::getClient() {
-    return Client::getCurrent();
-}
 
 }  // namespace mongo

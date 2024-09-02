@@ -110,7 +110,7 @@ protected:
     explicit AuthorizationSessionTestFixture(Options options = Options{})
         : ServiceContextMongoDTest(createServiceContextOptions(std::move(options))) {
         managerState =
-            dynamic_cast<FailureCapableAuthzManagerExternalStateMock*>(_authzExternalState);
+            dynamic_cast<FailureCapableAuthzManagerExternalStateMock*>(authzExternalState());
         invariant(managerState);
     }
 

@@ -68,12 +68,6 @@ void ShardingState::create(ServiceContext* serviceContext) {
                           ServerGlobalParams::MaintenanceMode::None);
 }
 
-void ShardingState::create_forTest_DO_NOT_USE(ServiceContext* serviceContext) {
-    auto& shardingState = getShardingState(serviceContext);
-    shardingState.emplace(serverGlobalParams.maintenanceMode !=
-                          ServerGlobalParams::MaintenanceMode::None);
-}
-
 ShardingState* ShardingState::get(ServiceContext* serviceContext) {
     auto& shardingState = getShardingState(serviceContext);
     return shardingState.get_ptr();

@@ -564,10 +564,10 @@ TEST_F(QueryStatsStoreTest, CorrectlyRedactsFindCommandRequestAllFields) {
                 "showRecordId": true,
                 "mirrored": true
             },
-            "$readPreference": { 
-                "mode": "nearest", 
-                "tags": [ { "some": "other tag" }, { "some": "tag" } ], 
-                "hedge": { "enabled": true } 
+            "$readPreference": {
+                "mode": "nearest",
+                "tags": [ { "some": "other tag" }, { "some": "tag" } ],
+                "hedge": { "enabled": true }
             },
             "collectionType": "collection",
             "hint": {
@@ -623,10 +623,10 @@ TEST_F(QueryStatsStoreTest, CorrectlyRedactsFindCommandRequestAllFields) {
                 "showRecordId": true,
                 "mirrored": true
             },
-            "$readPreference": { 
-                "mode": "nearest", 
-                "tags": [ { "some": "other tag" }, { "some": "tag" } ], 
-                "hedge": { "enabled": true } 
+            "$readPreference": {
+                "mode": "nearest",
+                "tags": [ { "some": "other tag" }, { "some": "tag" } ],
+                "hedge": { "enabled": true }
             },
             "collectionType": "collection",
             "hint": {

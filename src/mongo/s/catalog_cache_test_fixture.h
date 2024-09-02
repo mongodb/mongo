@@ -60,6 +60,14 @@ namespace mongo {
  */
 class CoreCatalogCacheTestFixture : public ShardingTestFixture {
 protected:
+    CoreCatalogCacheTestFixture()
+        : CoreCatalogCacheTestFixture(std::make_unique<ScopedGlobalServiceContextForTest>()) {}
+
+    explicit CoreCatalogCacheTestFixture(
+        std::unique_ptr<ScopedGlobalServiceContextForTest> scopedServiceContext)
+        : ShardingTestFixture(false,  // No mock catalog cache
+                              std::move(scopedServiceContext)) {}
+
     void setUp() override;
 
     /**
@@ -183,9 +191,13 @@ protected:
 };
 
 class RouterCatalogCacheTestFixture : public virtual service_context_test::RouterRoleOverride,
-                                      public CoreCatalogCacheTestFixture {};
+                                      public CoreCatalogCacheTestFixture {
+    using CoreCatalogCacheTestFixture::CoreCatalogCacheTestFixture;
+};
 
 class ShardCatalogCacheTestFixture : public virtual service_context_test::ShardRoleOverride,
-                                     public CoreCatalogCacheTestFixture {};
+                                     public CoreCatalogCacheTestFixture {
+    using CoreCatalogCacheTestFixture::CoreCatalogCacheTestFixture;
+};
 
 }  // namespace mongo

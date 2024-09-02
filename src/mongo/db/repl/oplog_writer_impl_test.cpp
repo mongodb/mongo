@@ -173,7 +173,7 @@ ReplicationConsistencyMarkers* OplogWriterImplTest::getConsistencyMarkers() cons
 }
 
 JournalListenerMock* OplogWriterImplTest::getJournalListener() const {
-    return static_cast<JournalListenerMock*>(_journalListener.get());
+    return static_cast<JournalListenerMock*>(journalListener());
 }
 
 DEATH_TEST_F(OplogWriterImplTest, WriteEmptyBatchFails, "!ops.empty()") {

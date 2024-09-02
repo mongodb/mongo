@@ -97,7 +97,7 @@ const auto kExplain = SerializationOptions{
 class ReplDocumentSourceLookUpTest : public DocumentSourceLookUpTest {
 public:
     void setUp() override {
-        Test::setUp();  // Will establish a feature compatibility version.
+        DocumentSourceLookUpTest::setUp();  // Will establish a feature compatibility version.
         auto service = getExpCtx()->opCtx->getServiceContext();
         repl::ReplSettings settings;
 
