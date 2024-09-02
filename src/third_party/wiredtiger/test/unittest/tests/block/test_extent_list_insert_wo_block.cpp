@@ -7,24 +7,25 @@
  */
 
 /*
- * block_ext.c: [extent_list2] Test extent list functions part 2. (More to come.)
+ * [extent_list]: block_ext.c
+ * Test extent list functions part 2.
  *
  * Test insert functions without block: __block_ext_insert, and __block_off_insert.
  */
 
 #include <algorithm>
-#include <catch2/catch.hpp>
 #include <memory>
 
+#include <catch2/catch.hpp>
+#include "wt_internal.h"
+#include "../wrappers/mock_session.h"
 #include "test_util.h"
 #include "../utils.h"
 #include "../utils_extlist.h"
-#include "../wrappers/mock_session.h"
-#include "wt_internal.h"
 
 using namespace utils;
 
-TEST_CASE("Extent Lists: block_ext_insert", "[extent_list2]")
+TEST_CASE("Extent Lists: block_ext_insert", "[extent_list]")
 {
     /* Build Mock session, this will automatically create a mock connection. */
     std::shared_ptr<MockSession> mock_session = MockSession::buildTestMockSession();
@@ -82,17 +83,15 @@ TEST_CASE("Extent Lists: block_ext_insert", "[extent_list2]")
         /* Insert extents and verify. */
         int idx = 0;
         for (const off_size_expected &test : test_list) {
-            WT_EXT *insert_ext = alloc_new_ext(session, test._off_size);
+            WT_EXT *insert_ext = alloc_new_ext(session, test.test_off_size);
             /* Call. */
             REQUIRE(__ut_block_ext_insert(session, &extlist, insert_ext) == 0);
 
-            INFO("After " << idx << ". Insert: {off " << std::showbase << test._off_size._off
-                          << ", size " << test._off_size._size << ", end " << test._off_size.end()
-                          << '}');
+            INFO("After " << idx << ". Insert: " << &test.test_off_size);
             extlist_print_off(extlist);
 
             /* Verify. */
-            verify_off_extent_list(extlist, test._expected_list, true);
+            verify_off_extent_list(extlist, test.expected_list, true);
             ++idx;
         }
 
@@ -101,7 +100,7 @@ TEST_CASE("Extent Lists: block_ext_insert", "[extent_list2]")
     }
 }
 
-TEST_CASE("Extent Lists: block_off_insert", "[extent_list2]")
+TEST_CASE("Extent Lists: block_off_insert", "[extent_list]")
 {
     /* Build Mock session, this will automatically create a mock connection. */
     std::shared_ptr<MockSession> mock_session = MockSession::buildTestMockSession();
@@ -160,15 +159,13 @@ TEST_CASE("Extent Lists: block_off_insert", "[extent_list2]")
         for (const off_size_expected &test : test_list) {
             /* Call. */
             REQUIRE(__ut_block_off_insert(
-                      session, &extlist, test._off_size._off, test._off_size._size) == 0);
+                      session, &extlist, test.test_off_size.off, test.test_off_size.size) == 0);
 
-            INFO("After " << idx << ". Insert: {off " << std::showbase << test._off_size._off
-                          << ", size " << test._off_size._size << ", end " << test._off_size.end()
-                          << '}');
+            INFO("After " << idx << ". Insert: " << &test.test_off_size);
             extlist_print_off(extlist);
 
             /* Verify. */
-            verify_off_extent_list(extlist, test._expected_list, true);
+            verify_off_extent_list(extlist, test.expected_list, true);
             ++idx;
         }
 

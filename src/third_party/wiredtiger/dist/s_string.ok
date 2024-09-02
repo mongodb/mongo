@@ -616,6 +616,7 @@ config
 configs
 conn
 connectionp
+const
 constantp
 consts
 cookiep
@@ -1104,6 +1105,7 @@ optype
 ori
 origstartrecno
 os
+ostream
 oversized
 ovfl
 ownp
@@ -1409,6 +1411,7 @@ userbad
 usercfg
 usleep
 usr
+ut
 utf
 util
 utils

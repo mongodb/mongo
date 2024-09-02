@@ -258,7 +258,7 @@ __wt_block_off_srch_inclusive(WT_EXTLIST *el, wt_off_t off)
         return (after);
 }
 
-#ifdef HAVE_DIAGNOSTIC
+#if defined(HAVE_DIAGNOSTIC) || defined(HAVE_UNITTEST)
 /*
  * __block_off_match --
  *     Return if any part of a specified range appears on a specified extent list.
@@ -267,6 +267,9 @@ static bool
 __block_off_match(WT_EXTLIST *el, wt_off_t off, wt_off_t size)
 {
     WT_EXT *after, *before;
+
+    if (WT_UNLIKELY(size == 0))
+        return (false);
 
     /* Search for before and after entries for the offset. */
     __block_off_srch_pair(el, off, &before, &after);
@@ -379,9 +382,10 @@ __block_off_remove(
     el->bytes -= (uint64_t)ext->size;
 
     /* Return the record if our caller wants it, otherwise free it. */
-    if (extp == NULL)
-        __wti_block_ext_free(session, &ext);
-    else
+    if (extp == NULL) {
+        WT_EXT *ext_to_free = ext;
+        __wti_block_ext_free(session, &ext_to_free);
+    } else
         *extp = ext;
 
     /* Update the cached end-of-list. */
@@ -1496,13 +1500,11 @@ __ut_block_off_insert(WT_SESSION_IMPL *session, WT_EXTLIST *el, wt_off_t off, wt
     return (__block_off_insert(session, el, off, size));
 }
 
-#ifdef HAVE_DIAGNOSTIC
 bool
 __ut_block_off_match(WT_EXTLIST *el, wt_off_t off, wt_off_t size)
 {
     return (__block_off_match(el, off, size));
 }
-#endif
 
 int
 __ut_block_off_remove(

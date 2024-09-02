@@ -8,6 +8,7 @@
 
 #pragma once
 
+#include <ostream>
 #include <string>
 #include <vector>
 
@@ -15,32 +16,32 @@
 
 namespace utils {
 /*!
- * An offset (_off) and a size (_size) of a WT_EXT for two use cases: specifying a test setup or an
+ * An offset (off) and a size (size) of a WT_EXT for two use cases: specifying a test setup or an
  * expected result.
  */
 struct off_size {
-    wt_off_t _off;
-    wt_off_t _size;
+    wt_off_t off;
+    wt_off_t size;
 
-    off_size(wt_off_t off = 0, wt_off_t size = 0) : _off(off), _size(size) {}
+    off_size(wt_off_t off = 0, wt_off_t size = 0) : off(off), size(size) {}
     /*!
      * end --
-     *     Return the end of the closed interval represented by _off and _size.
+     *     Return the end of the closed interval represented by off and size.
      */
     wt_off_t
-    end(void) const
+    end(void) const noexcept
     {
-        return (_off + _size - 1);
+        return (off + size - 1);
     }
 };
 
 /*!
- * A test (_off_size) and the expected value (_expected_list) for operations that need an off_size
+ * A test (off_size) and the expected value (expected_list) for operations that need an off_size
  * to modify a WT_EXTLIST.
  */
 struct off_size_expected {
-    off_size _off_size;
-    std::vector<off_size> _expected_list;
+    off_size test_off_size;
+    std::vector<off_size> expected_list;
 };
 
 void ext_print_list(const WT_EXT *const *head);
@@ -57,3 +58,6 @@ void verify_off_extent_list(
 } // namespace utils.
 
 bool operator<(const utils::off_size &left, const utils::off_size &right);
+std::ostream &operator<<(std::ostream &out, const utils::off_size *os);
+std::ostream &operator<<(std::ostream &out, const WT_EXT *ext);
+std::ostream &operator<<(std::ostream &out, const WT_EXTLIST *extlist);
