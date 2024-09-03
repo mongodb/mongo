@@ -1471,7 +1471,7 @@ ShardingCatalogManager::commitChunkMigration(OperationContext* opCtx,
 
     const CollectionType coll(findCollResponse.docs[0]);
     uassert(ErrorCodes::ConflictingOperationInProgress,
-            "Collection is undergoing changes and chunks cannot be moved",
+            "Can't execute moveChunk because migrations for this collection are disallowed",
             coll.getAllowMigrations() && coll.getPermitMigrations());
 
     if (coll.getUnsplittable()) {
