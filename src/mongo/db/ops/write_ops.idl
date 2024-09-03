@@ -172,6 +172,7 @@ structs:
                               any empty timestamps (Timestamp(0,0)) in 'documents' or 'u' will not
                               be replaced by the current time and instead will be preserved as-is."
                 type: optionalBool
+                unstable: true
 
     UpdateOpEntry:
         description: "Parser for the entries in the 'updates' array of an update command."
@@ -454,3 +455,4 @@ commands:
                               empty timestamps (Timestamp(0, 0)) in the update will not be replaced
                               by the current time and instead will be preserved as-is."
                 type: optionalBool
+                unstable: true

@@ -161,6 +161,16 @@ ALLOW_ANY_TYPE_LIST: List[str] = [
     'explain-param-useNewUpsert'
 ]
 
+# Do not add user visible fields already released in earlier versions.
+IGNORE_UNSTABLE_LIST: List[str] = [
+    # The 'bypassEmptyTsReplacement' field is used by mongorestore and mongosync and is not
+    # documented to users.
+    'insert-param-bypassEmptyTsReplacement',
+    'update-param-bypassEmptyTsReplacement',
+    'delete-param-bypassEmptyTsReplacement',
+    'findAndModify-param-bypassEmptyTsReplacement',
+]
+
 SKIPPED_FILES = ["unittest.idl"]
 
 
@@ -270,7 +280,7 @@ def check_superset(ctxt: IDLCompatibilityContext, cmd_name: str, type_name: str,
 
 def check_reply_field_type_recursive(ctxt: IDLCompatibilityContext,
                                      field_pair: FieldCompatibilityPair) -> None:
-    # pylint: disable=too-many-branches
+    # pylint: disable=too-many-branches,too-many-locals
     """Check compatibility between old and new reply field type if old field type is a syntax.Type instance."""
     old_field = field_pair.old
     new_field = field_pair.new
@@ -305,7 +315,8 @@ def check_reply_field_type_recursive(ctxt: IDLCompatibilityContext,
 
     if "any" in old_field_type.bson_serialization_type:
         # If 'any' is not explicitly allowed as the bson_serialization_type.
-        if allow_name not in ALLOW_ANY_TYPE_LIST:
+        any_allow = allow_name in ALLOW_ANY_TYPE_LIST or old_field_type.name == 'optionalBool'
+        if not any_allow:
             ctxt.add_reply_field_bson_any_not_allowed_error(
                 cmd_name, field_name, old_field_type.name, old_field.idl_file_path)
             return
@@ -457,8 +468,9 @@ def check_reply_field(ctxt: IDLCompatibilityContext, old_field: syntax.Field,
                       new_idl_file_path: str):
     """Check compatibility between old and new reply field."""
     # pylint: disable=too-many-arguments
-    if not old_field.unstable:
-        if new_field.unstable:
+    field_name: str = cmd_name + "-reply-" + new_field.name
+    if not old_field.unstable and field_name not in IGNORE_UNSTABLE_LIST:
+        if new_field.unstable and field_name not in IGNORE_UNSTABLE_LIST:
             ctxt.add_new_reply_field_unstable_error(cmd_name, new_field.name, new_idl_file_path)
         if new_field.optional and not old_field.optional:
             ctxt.add_new_reply_field_optional_error(cmd_name, new_field.name, new_idl_file_path)
@@ -572,7 +584,8 @@ def check_param_or_command_type_recursive(ctxt: IDLCompatibilityContext,
 
     if "any" in old_type.bson_serialization_type:
         # If 'any' is not explicitly allowed as the bson_serialization_type.
-        if allow_name not in ALLOW_ANY_TYPE_LIST:
+        any_allow = allow_name in ALLOW_ANY_TYPE_LIST or old_type.name == 'optionalBool'
+        if not any_allow:
             ctxt.add_command_or_param_type_bson_any_not_allowed_error(
                 cmd_name, old_type.name, old_field.idl_file_path, param_name, is_command_parameter)
             return
@@ -786,7 +799,8 @@ def check_command_param_or_type_struct_field(
         is_command_parameter: bool):
     """Check compatibility between the old and new command parameter or command type struct field."""
     # pylint: disable=too-many-arguments
-    if not old_field.unstable and new_field.unstable:
+    field_name: str = cmd_name + "-param-" + new_field.name
+    if not old_field.unstable and new_field.unstable and field_name not in IGNORE_UNSTABLE_LIST:
         ctxt.add_new_param_or_command_type_field_unstable_error(
             cmd_name, old_field.name, old_idl_file_path, type_name, is_command_parameter)
     # If old field is unstable and new field is stable, the new field should either be optional or
