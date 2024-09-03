@@ -53,6 +53,36 @@
 #include "mongo/s/query/planner/cluster_find.h"
 
 namespace mongo {
+namespace {
+/**
+ * Parses the command object to a FindCommandRequest and validates that no runtime
+ * constants were supplied and that querySettings was not passed into the command.
+ */
+std::unique_ptr<FindCommandRequest> parseCmdObjectToFindCommandRequest(
+    OperationContext* opCtx, const OpMsgRequest& request) {
+    const auto& vts = auth::ValidatedTenancyScope::get(opCtx);
+    auto findCommand = query_request_helper::makeFromFindCommand(
+        request.body,
+        vts,
+        vts.has_value() ? boost::make_optional(vts->tenantId()) : boost::none,
+        SerializationContext::stateDefault());
+
+    uassert(51202,
+            "Cannot specify runtime constants option to a mongos",
+            !findCommand->getLegacyRuntimeConstants());
+
+    // Forbid users from passing 'querySettings' explicitly.
+    uassert(7746900,
+            "BSON field 'querySettings' is an unknown field",
+            !findCommand->getQuerySettings().has_value());
+
+    uassert(ErrorCodes::InvalidNamespace,
+            "Cannot specify UUID to a mongos.",
+            !findCommand->getNamespaceOrUUID().isUUID());
+
+    return findCommand;
+}
+}  // namespace
 
 /**
  * Implements the find command for a router.
@@ -70,9 +100,8 @@ public:
 
     std::unique_ptr<CommandInvocation> parse(OperationContext* opCtx,
                                              const OpMsgRequest& opMsgRequest) override {
-        // TODO: Parse into a QueryRequest here.
-        return std::make_unique<Invocation>(
-            this, auth::ValidatedTenancyScope::get(opCtx), opMsgRequest);
+        auto cmdRequest = parseCmdObjectToFindCommandRequest(opCtx, opMsgRequest);
+        return std::make_unique<Invocation>(this, opMsgRequest, std::move(cmdRequest));
     }
 
     AllowedOnSecondary secondaryAllowed(ServiceContext* context) const override {
@@ -114,17 +143,13 @@ public:
     class Invocation final : public CommandInvocation {
     public:
         Invocation(const ClusterFindCmdBase* definition,
-                   const boost::optional<auth::ValidatedTenancyScope>& vts,
-                   const OpMsgRequest& request)
+                   const OpMsgRequest& request,
+                   std::unique_ptr<FindCommandRequest> cmdRequest)
             : CommandInvocation(definition),
               _request(request),
-              _dbName(request.parseDbName()),
-              _genericArgs(
-                  GenericArguments::parse(IDLParserContext("find",
-                                                           request.validatedTenancyScope,
-                                                           request.getValidatedTenantId(),
-                                                           request.getSerializationContext()),
-                                          _request.body)) {}
+              _ns(cmdRequest->getNamespaceOrUUID().nss()),
+              _genericArgs(cmdRequest->getGenericArguments()),
+              _cmdRequest(std::move(cmdRequest)) {}
 
     private:
         bool supportsWriteConcern() const override {
@@ -137,13 +162,11 @@ public:
         }
 
         NamespaceString ns() const override {
-            // TODO get the ns from the parsed QueryRequest.
-            return NamespaceString(
-                CommandHelpers::parseNsCollectionRequired(_dbName, _request.body));
+            return _ns;
         }
 
         const DatabaseName& db() const override {
-            return _dbName;
+            return _ns.dbName();
         }
 
         /**
@@ -160,11 +183,13 @@ public:
                      rpc::ReplyBuilderInterface* result) override {
             Impl::checkCanExplainHere(opCtx);
 
-            auto findCommand = _parseCmdObjectToFindCommandRequest(opCtx, ns(), _request.body);
-            auto expCtx = makeExpressionContext(opCtx, *findCommand, verbosity);
+            setReadConcern(opCtx);
+            doFLERewriteIfNeeded(opCtx);
+
+            auto expCtx = makeExpressionContext(opCtx, *_cmdRequest, verbosity);
             auto parsedFind = uassertStatusOK(parsed_find_command::parse(
                 expCtx,
-                {.findCommand = std::move(findCommand),
+                {.findCommand = std::move(_cmdRequest),
                  .allowedFeatures = MatchExpressionParser::kAllowAllSpecialFeatures}));
 
             // Update 'findCommand' by setting the looked up query settings, such that they can be
@@ -172,11 +197,11 @@ public:
             auto querySettings =
                 query_settings::lookupQuerySettingsForFind(expCtx, *parsedFind, ns());
             expCtx->setQuerySettingsIfNotPresent(querySettings);
-            findCommand = std::move(parsedFind->findCommandRequest);
+            _cmdRequest = std::move(parsedFind->findCommandRequest);
 
             try {
                 const auto explainCmd = ClusterExplain::wrapAsExplain(
-                    findCommand->toBSON(), verbosity, querySettings.toBSON());
+                    _cmdRequest->toBSON(), verbosity, querySettings.toBSON());
 
                 long long millisElapsed;
                 std::vector<AsyncRequestsSender::Response> shardResponses;
@@ -185,19 +210,19 @@ public:
                 Timer timer;
                 const auto cri =
                     uassertStatusOK(Grid::get(opCtx)->catalogCache()->getCollectionRoutingInfo(
-                        opCtx, findCommand->getNamespaceOrUUID().nss()));
+                        opCtx, _cmdRequest->getNamespaceOrUUID().nss()));
                 shardResponses = scatterGatherVersionedTargetByRoutingTable(
                     opCtx,
-                    findCommand->getNamespaceOrUUID().nss().dbName(),
-                    findCommand->getNamespaceOrUUID().nss(),
+                    _cmdRequest->getNamespaceOrUUID().nss().dbName(),
+                    _cmdRequest->getNamespaceOrUUID().nss(),
                     cri,
                     explainCmd,
                     ReadPreferenceSetting::get(opCtx),
                     Shard::RetryPolicy::kIdempotent,
-                    findCommand->getFilter(),
-                    findCommand->getCollation(),
-                    findCommand->getLet(),
-                    findCommand->getLegacyRuntimeConstants());
+                    _cmdRequest->getFilter(),
+                    _cmdRequest->getCollation(),
+                    _cmdRequest->getLet(),
+                    _cmdRequest->getLegacyRuntimeConstants());
                 millisElapsed = timer.millis();
 
                 const char* mongosStageName =
@@ -214,7 +239,7 @@ public:
             } catch (const ExceptionFor<ErrorCodes::CommandOnShardedViewNotSupportedOnMongod>& ex) {
                 retryOnViewError(opCtx,
                                  result,
-                                 *findCommand,
+                                 *_cmdRequest,
                                  querySettings,
                                  *ex.extraInfo<ResolvedView>(),
                                  // An empty PrivilegeVector is acceptable because these privileges
@@ -224,7 +249,9 @@ public:
 
             } catch (const ExceptionFor<ErrorCodes::NamespaceNotFound>&) {
                 auto bodyBuilder = result->getBodyBuilder();
-                auto findRequest = _parseCmdObjectToFindCommandRequest(opCtx, ns(), _request.body);
+                auto findRequest = parseCmdObjectToFindCommandRequest(opCtx, _request);
+                setReadConcern(opCtx);
+                doFLERewriteIfNeeded(opCtx);
                 auto expCtx = make_intrusive<ExpressionContext>(
                     opCtx, *findRequest, nullptr, true /* mayDbProfile */);
                 auto&& parsedFindResult = uassertStatusOK(parsed_find_command::parse(
@@ -241,14 +268,15 @@ public:
 
         void run(OperationContext* opCtx, rpc::ReplyBuilderInterface* result) override {
             Impl::checkCanRunHere(opCtx);
-
             CommandHelpers::handleMarkKillOnClientDisconnect(opCtx);
 
-            auto findCommand = _parseCmdObjectToFindCommandRequest(opCtx, ns(), _request.body);
-            auto expCtx = makeExpressionContext(opCtx, *findCommand);
+            setReadConcern(opCtx);
+            doFLERewriteIfNeeded(opCtx);
+
+            auto expCtx = makeExpressionContext(opCtx, *_cmdRequest);
             auto parsedFind = uassertStatusOK(parsed_find_command::parse(
                 expCtx,
-                {.findCommand = std::move(findCommand),
+                {.findCommand = std::move(_cmdRequest),
                  .allowedFeatures = MatchExpressionParser::kAllowAllSpecialFeatures}));
 
             registerRequestForQueryStats(expCtx, *parsedFind);
@@ -297,55 +325,6 @@ public:
             return _genericArgs;
         }
 
-    private:
-        /**
-         * Parses the command object to a FindCommandRequest, validates that no runtime
-         * constants were supplied with the command, and sets the constant runtime values that
-         * will be forwarded to each shard.
-         */
-        std::unique_ptr<FindCommandRequest> _parseCmdObjectToFindCommandRequest(
-            OperationContext* opCtx, NamespaceString nss, BSONObj cmdObj) {
-            auto findCommand =
-                query_request_helper::makeFromFindCommand(std::move(cmdObj),
-                                                          auth::ValidatedTenancyScope::get(opCtx),
-                                                          nss.tenantId(),
-                                                          SerializationContext::stateDefault());
-            if (!findCommand->getReadConcern()) {
-                if (opCtx->isStartingMultiDocumentTransaction() ||
-                    !opCtx->inMultiDocumentTransaction()) {
-                    // If there is no explicit readConcern in the cmdObj, and this is either the
-                    // first operation in a transaction, or not running in a transaction, then
-                    // use the readConcern from the opCtx (which may be a cluster-wide default).
-                    const auto& readConcernArgs = repl::ReadConcernArgs::get(opCtx);
-                    findCommand->setReadConcern(readConcernArgs);
-                }
-            }
-            uassert(51202,
-                    "Cannot specify runtime constants option to a mongos",
-                    !findCommand->getLegacyRuntimeConstants());
-
-            // Forbid users from passing 'querySettings' explicitly.
-            uassert(7746900,
-                    "BSON field 'querySettings' is an unknown field",
-                    !findCommand->getQuerySettings().has_value());
-
-            if (shouldDoFLERewrite(findCommand)) {
-                invariant(findCommand->getNamespaceOrUUID().isNamespaceString());
-
-                if (!findCommand->getEncryptionInformation()->getCrudProcessed().value_or(false)) {
-                    processFLEFindS(
-                        opCtx, findCommand->getNamespaceOrUUID().nss(), findCommand.get());
-                    _didDoFLERewrite = true;
-                }
-                {
-                    stdx::lock_guard<Client> lk(*opCtx->getClient());
-                    CurOp::get(opCtx)->setShouldOmitDiagnosticInformation_inlock(lk, true);
-                }
-            }
-
-            return findCommand;
-        }
-
         void registerRequestForQueryStats(const boost::intrusive_ptr<ExpressionContext> expCtx,
                                           const ParsedFindCommand& parsedFind) {
             if (!_didDoFLERewrite) {
@@ -379,10 +358,39 @@ public:
                 opCtx, aggRequestOnView, resolvedView, ns(), privileges, &bodyBuilder));
         }
 
+        void setReadConcern(OperationContext* opCtx) {
+            if (_cmdRequest->getReadConcern() ||
+                (opCtx->inMultiDocumentTransaction() &&
+                 !opCtx->isStartingMultiDocumentTransaction())) {
+                return;
+            }
+
+            // Use the readConcern from the opCtx (which may be a cluster-wide default).
+            const auto& readConcernArgs = repl::ReadConcernArgs::get(opCtx);
+            _cmdRequest->setReadConcern(readConcernArgs);
+        }
+
+        void doFLERewriteIfNeeded(OperationContext* opCtx) {
+            if (!shouldDoFLERewrite(_cmdRequest)) {
+                return;
+            }
+
+            invariant(_cmdRequest->getNamespaceOrUUID().isNamespaceString());
+            if (!_cmdRequest->getEncryptionInformation()->getCrudProcessed().value_or(false)) {
+                processFLEFindS(opCtx, _cmdRequest->getNamespaceOrUUID().nss(), _cmdRequest.get());
+                _didDoFLERewrite = true;
+            }
+            {
+                stdx::lock_guard<Client> lk(*opCtx->getClient());
+                CurOp::get(opCtx)->setShouldOmitDiagnosticInformation_inlock(lk, true);
+            }
+        }
+
         const OpMsgRequest& _request;
-        const DatabaseName _dbName;
+        const NamespaceString _ns;
         bool _didDoFLERewrite{false};
         const GenericArguments _genericArgs;
+        std::unique_ptr<FindCommandRequest> _cmdRequest;
     };
 };
 
