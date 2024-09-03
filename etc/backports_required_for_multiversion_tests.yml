@@ -247,6 +247,8 @@ last-continuous:
       ticket: SERVER-93141
     - test_file: jstests/replsets/new_primary_prevents_stale_majority_reads_on_stepup.js
       ticket: SERVER-53813
+    - test_file: jstests/sharding/resharding_collection_cloner_stale_config_retry.js
+      ticket: SERVER-94151
     - test_file: jstests/core/write/update/upsert_duplicate_key_retry_collation.js
       ticket: SERVER-84089
   suites: null
@@ -510,6 +512,8 @@ last-lts:
       ticket: SERVER-93141
     - test_file: jstests/replsets/new_primary_prevents_stale_majority_reads_on_stepup.js
       ticket: SERVER-53813
+    - test_file: jstests/sharding/resharding_collection_cloner_stale_config_retry.js
+      ticket: SERVER-94151
     - test_file: jstests/core/write/update/upsert_duplicate_key_retry_collation.js
       ticket: SERVER-84089
   suites: null

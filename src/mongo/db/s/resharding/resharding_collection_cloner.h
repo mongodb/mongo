@@ -133,12 +133,11 @@ private:
     sharded_agg_helpers::DispatchShardPipelineResults _queryOnceWithNaturalOrder(
         OperationContext* opCtx, std::shared_ptr<MongoProcessInterface> mongoProcessInterface);
 
-    void _writeOnceWithNaturalOrder(
-        OperationContext* opCtx,
-        std::shared_ptr<executor::TaskExecutor> executor,
-        std::shared_ptr<executor::TaskExecutor> cleanupExecutor,
-        CancellationToken cancelToken,
-        sharded_agg_helpers::DispatchShardPipelineResults& dispatchResults);
+    void _writeOnceWithNaturalOrder(OperationContext* opCtx,
+                                    std::shared_ptr<executor::TaskExecutor> executor,
+                                    std::shared_ptr<executor::TaskExecutor> cleanupExecutor,
+                                    CancellationToken cancelToken,
+                                    std::vector<OwnedRemoteCursor> remoteCursors);
 
     void _runOnceWithNaturalOrder(OperationContext* opCtx,
                                   std::shared_ptr<MongoProcessInterface> mongoProcessInterface,
