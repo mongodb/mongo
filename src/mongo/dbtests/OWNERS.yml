@@ -15,6 +15,7 @@ filters:
   - "storage_debug_util*":
     approvers:
       - 10gen/server-storage-execution
+      - 10gen/server-rss-sydney
   - "validate_tests.cpp":
     approvers:
       - 10gen/server-storage-execution

@@ -27,6 +27,7 @@ filters:
   - "record_id*":
     approvers:
       - 10gen/server-storage-execution
+      - 10gen/server-rss-sydney
   - "replica_set_endpoint*":
     approvers:
       - 10gen/server-cluster-scalability
@@ -101,6 +102,7 @@ filters:
   - "startup_recovery*":
     approvers:
       - 10gen/server-storage-execution
+      - 10gen/server-rss-sydney
   - "field_ref*":
     approvers:
       - 10gen/query
