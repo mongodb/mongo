@@ -40,8 +40,7 @@ class ServiceEntryPointMongos final : public ServiceEntryPointImpl {
 public:
     using ServiceEntryPointImpl::ServiceEntryPointImpl;
 
-    static Future<DbResponse> handleRequestImpl(OperationContext* opCtx,
-                                                const Message& request) noexcept;
+    static Future<DbResponse> handleRequestImpl(OperationContext* opCtx, const Message& request);
 
     Future<DbResponse> handleRequest(OperationContext* opCtx,
                                      const Message& request) noexcept final;
