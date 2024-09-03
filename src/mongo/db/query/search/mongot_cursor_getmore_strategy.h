@@ -86,7 +86,7 @@ public:
         return *_currentBatchSize;
     }
 
-    std::vector<long long> getBatchSizeHistory() const {
+    const std::vector<long long>& getBatchSizeHistory() const {
         return _batchSizeHistory;
     }
 
@@ -116,7 +116,6 @@ private:
     // batchSize requested from mongot.
     DocsNeededBounds _docsNeededBounds;
 
-    // TODO SERVER-86738 Incorporate batchSizeHistory into explain executionStats with $search.
     // Tracks all batchSizes sent to mongot, to be included in the $search explain execution stats.
     std::vector<long long> _batchSizeHistory;
 

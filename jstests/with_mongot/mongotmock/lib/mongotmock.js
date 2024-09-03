@@ -2,6 +2,11 @@
  * Control mongotmock.
  */
 
+import {
+    getDefaultExplainContents,
+    getDefaultLastExplainContents
+} from "jstests/with_mongot/mongotmock/lib/utils.js";
+
 /**
  * Helper to create an expected command for mongot.
  *
@@ -224,7 +229,8 @@ export function mockAllRequestsWithBatchSizes({
     documents,
     expectedBatchSizes,
     cursorId,
-    mongotMockConn
+    mongotMockConn,
+    explainVerbosity = null
 }) {
     const responseOk = 1;
 
@@ -241,8 +247,14 @@ export function mockAllRequestsWithBatchSizes({
         // The first batch will be requested via a normal mongot request; the rest of the batches
         // will be requested via getMores.
         if (i === 0) {
-            expectedCommand = mongotCommandForQuery(
-                {query, collName, db: dbName, collectionUUID, cursorOptions: {batchSize}});
+            expectedCommand = mongotCommandForQuery({
+                query,
+                collName,
+                db: dbName,
+                collectionUUID,
+                cursorOptions: {batchSize},
+                explainVerbosity
+            });
         } else {
             expectedCommand = {getMore: cursorId, collection: collName, cursorOptions: {batchSize}};
         }
@@ -250,13 +262,19 @@ export function mockAllRequestsWithBatchSizes({
         // If this batch exhausts the remaining mongot results, return a response with cursorId = 0
         // to indicate the results have been fully exhausted. Otherwise, return the cursorId.
         if (docIndex + batchSize > documents.length) {
-            response = mongotResponseForBatch(
-                documents.slice(docIndex), NumberLong(0), dbName + "." + collName, responseOk);
+            response =
+                mongotResponseForBatch(documents.slice(docIndex),
+                                       NumberLong(0),
+                                       dbName + "." + collName,
+                                       responseOk,
+                                       explainVerbosity ? getDefaultLastExplainContents() : null);
         } else {
-            response = mongotResponseForBatch(documents.slice(docIndex, docIndex + batchSize),
-                                              cursorId,
-                                              dbName + "." + collName,
-                                              responseOk);
+            response =
+                mongotResponseForBatch(documents.slice(docIndex, docIndex + batchSize),
+                                       cursorId,
+                                       dbName + "." + collName,
+                                       responseOk,
+                                       explainVerbosity ? getDefaultExplainContents() : null);
             docIndex += batchSize;
         }
 

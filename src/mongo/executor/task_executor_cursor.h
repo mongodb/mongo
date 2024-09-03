@@ -169,6 +169,10 @@ public:
         return _batchNum;
     }
 
+    const TaskExecutorCursorOptions& getOptions() const {
+        return _options;
+    }
+
     /**
      * Returns the vector of cursors that were returned alongside this one. Calling this claims
      * ownership of the cursors and will return an empty vector on subsequent calls.

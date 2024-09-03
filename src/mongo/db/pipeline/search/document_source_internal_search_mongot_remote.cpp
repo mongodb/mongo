@@ -40,6 +40,7 @@
 #include "mongo/db/pipeline/search/search_helper.h"
 #include "mongo/db/pipeline/skip_and_limit.h"
 #include "mongo/db/query/search/mongot_cursor.h"
+#include "mongo/db/query/search/mongot_cursor_getmore_strategy.h"
 #include "mongo/db/query/search/mongot_options.h"
 #include "mongo/db/query/search/search_task_executors.h"
 #include "mongo/db/service_context.h"
@@ -106,10 +107,15 @@ Value DocumentSourceInternalSearchMongotRemote::serializeWithoutMergePipeline(
     }
     // If the query is an explain that executed the query, we obtain the explain object from the
     // taskExecutorCursor. Otherwise, we need to obtain the explain
-    // object now.
+    // object now. We also obtain the getMoreStrategy which contains the batchSizeHistory.
     boost::optional<BSONObj> explainResponse = boost::none;
+    std::shared_ptr<executor::MongotTaskExecutorCursorGetMoreStrategy> mongotGetMoreStrategy =
+        nullptr;
     if (_cursor) {
         explainResponse = _cursor->getCursorExplain();
+        mongotGetMoreStrategy =
+            dynamic_pointer_cast<executor::MongotTaskExecutorCursorGetMoreStrategy>(
+                _cursor->getOptions().getMoreStrategy);
     }
 
     BSONObj explainInfo = explainResponse.value_or_eval([&] {
@@ -137,6 +143,20 @@ Value DocumentSourceInternalSearchMongotRemote::serializeWithoutMergePipeline(
     }
     mDoc.addField(InternalSearchMongotRemoteSpec::kRequiresSearchMetaCursorFieldName,
                   opts.serializeLiteral(_spec.getRequiresSearchMetaCursor()));
+
+    if (mongotGetMoreStrategy) {
+        if (const auto& batchSizeHistory = mongotGetMoreStrategy->getBatchSizeHistory();
+            batchSizeHistory.size() > 0) {
+            std::vector<Value> serializedBatchSizeHistory(batchSizeHistory.size());
+            std::transform(
+                batchSizeHistory.begin(),
+                batchSizeHistory.end(),
+                serializedBatchSizeHistory.begin(),
+                [&](auto batchSize) -> Value { return Value(opts.serializeLiteral(batchSize)); });
+            mDoc.addField("internalMongotBatchSizeHistory",
+                          Value(std::move(serializedBatchSizeHistory)));
+        }
+    }
     return mDoc.freezeToValue();
 }
 

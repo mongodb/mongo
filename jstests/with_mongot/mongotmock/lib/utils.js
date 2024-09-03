@@ -113,6 +113,10 @@ const defaultExplainContents = {
     profession: "writer"
 };
 
+export function getDefaultExplainContents() {
+    return defaultExplainContents;
+}
+
 // Explain object used for the last explain returned.
 const defaultLastExplainContents = {
     profession: "teacher"
