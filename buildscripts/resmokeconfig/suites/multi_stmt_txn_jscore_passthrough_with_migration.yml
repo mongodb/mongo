@@ -316,7 +316,7 @@ executor:
         TestData:
           networkErrorAndTxnOverrideConfig:
             wrapCRUDinTransactions: true
-          overrideRetryAttempts: 12
+          txnOverrideRetryAttempts: 12
           sessionOptions:
             # Read your own writes is not guaranteed without causal consistency since the
             # coordinateCommit commmand returns as soon as the decision is made durable, and
