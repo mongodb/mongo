@@ -54,12 +54,16 @@ var s = startParallelShell(function() {
         // Found the count op. Try to kill it.
         assert.commandWorked(db.killOp(countOp.opid));
         return true;
-    }, "Could not find count op after retrying, gave up");
+    }, "Could not find count op after retrying, gave up", undefined, 50);
 });
 
-var res = assert.throws(function() {
-    coll.find("sleep(1000)").count();
-}, [], "Count op completed without being killed");
+let res;
+assert.soon(function() {
+    res = assert.throws(function() {
+        coll.find("sleep(200)").count();
+    }, [], "Count op completed without being killed");
+    return res.code == ErrorCodes.Interrupted;
+}, "Operation was never interrupted by parallel shell.");
 
 jsTest.log("Killed count output start");
 printjson(res);
