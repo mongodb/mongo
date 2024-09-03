@@ -1774,43 +1774,6 @@ tasks:
           use_large_distro: "true"
 
   - <<: *gen_task_template
-    name: concurrency_metrics_gen
-    tags: ["assigned_to_jira_team_server_execution", "default", "concurrency"]
-    commands:
-      - func: "generate resmoke tasks"
-        vars:
-          resmoke_jobs_max: 1
-
-  - <<: *gen_task_template
-    name: concurrency_replication_metrics_gen
-    tags:
-      [
-        "assigned_to_jira_team_server_execution",
-        "default",
-        "concurrency",
-        "repl",
-        "disabled_on_code_coverage",
-      ]
-    commands:
-      - func: "generate resmoke tasks"
-        vars:
-          resmoke_jobs_max: 1
-
-  - <<: *gen_task_template
-    name: concurrency_replication_metrics_with_replica_set_endpoint_gen
-    tags:
-      [
-        "assigned_to_jira_team_server_cluster_scalability",
-        "experimental",
-        "replica_set_endpoint",
-        "requires_all_feature_flags",
-      ]
-    commands:
-      - func: "generate resmoke tasks"
-        vars:
-          resmoke_jobs_max: 1
-
-  - <<: *gen_task_template
     name: concurrency_simultaneous_gen
     tags:
       [
