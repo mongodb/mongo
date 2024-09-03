@@ -3,3 +3,9 @@ filters:
   - "*":
     approvers:
       - 10gen/server-programmability
+  # Although golden testing is a generic unit testing utility that can be used by any team, it was
+  # originally built by the query team and as of this writing is primarily used for query-related
+  # unit tests.
+  - "golden_test*":
+    approvers:
+      - 10gen/query-optimization

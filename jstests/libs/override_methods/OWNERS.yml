@@ -1,7 +1,5 @@
 version: 1.0.0
-options:
-  no_parent_owners: true
 filters:
-  - "query_golden*":
+  - "*golden_overrides.js":
     approvers:
       - 10gen/query-optimization

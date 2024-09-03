@@ -21,3 +21,6 @@ filters:
   - "owners/**":
     approvers:
       - 10gen/devprod-correctness
+  - "golden_data_test_framework.md":
+    approvers:
+      - 10gen/query-optimization

@@ -1,0 +1,8 @@
+version: 1.0.0
+filters:
+  # This directory contains expected output for golden data self-tests. Although golden testing is a
+  # generic unit testing utility that can be used by any team, it was originally built by the query
+  # team and as of this writing is primarily used for query-related unit tests.
+  - "*":
+    approvers:
+      - 10gen/query-optimization

@@ -42,6 +42,7 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 # The following patterns are parsed from ./buildscripts/OWNERS.yml
 /buildscripts/**/* @10gen/devprod-build @10gen/devprod-correctness @svc-auto-approve-bot
 /buildscripts/**/burn_in_tests.py @10gen/devprod-correctness @svc-auto-approve-bot
+/buildscripts/**/golden_test.py @10gen/query-optimization @svc-auto-approve-bot
 
 # The following patterns are parsed from ./buildscripts/cost_model/OWNERS.yml
 /buildscripts/cost_model/**/* @10gen/query-optimization @svc-auto-approve-bot
@@ -55,6 +56,7 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 
 # The following patterns are parsed from ./buildscripts/resmokeconfig/suites/OWNERS.yml
 /buildscripts/resmokeconfig/suites/**/*
+/buildscripts/resmokeconfig/suites/**/query_golden* @10gen/query-optimization @svc-auto-approve-bot
 
 # The following patterns are parsed from ./buildscripts/resmokelib/OWNERS.yml
 /buildscripts/resmokelib/**/* @10gen/devprod-correctness @svc-auto-approve-bot
@@ -74,6 +76,7 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 /docs/**/poetry_execution.md @10gen/devprod-correctness @svc-auto-approve-bot
 /docs/**/linting.md @10gen/devprod-build @svc-auto-approve-bot
 /docs/owners/** @10gen/devprod-correctness @svc-auto-approve-bot
+/docs/**/golden_data_test_framework.md @10gen/query-optimization @svc-auto-approve-bot
 
 # The following patterns are parsed from ./etc/OWNERS.yml
 /etc/**/yamllint_config.yml @10gen/devprod-services-integrations @svc-auto-approve-bot
@@ -140,6 +143,10 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 # The following patterns are parsed from ./jstests/libs/OWNERS.yml
 /jstests/libs/**/replsettest.js @10gen/server-replication @svc-auto-approve-bot
 /jstests/libs/**/shardingtest.js @10gen/server-cluster-scalability @svc-auto-approve-bot
+/jstests/libs/**/*golden_test.js @10gen/query-optimization @svc-auto-approve-bot
+
+# The following patterns are parsed from ./jstests/libs/override_methods/OWNERS.yml
+/jstests/libs/override_methods/**/*golden_overrides.js @10gen/query-optimization @svc-auto-approve-bot
 
 # The following patterns are parsed from ./jstests/multiVersion/OWNERS.yml
 /jstests/multiVersion/**/migration* @10gen/server-cluster-scalability @svc-auto-approve-bot
@@ -166,6 +173,12 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 /jstests/noPassthroughWithMongod/**/tcmalloc.js @10gen/server-workload-scheduling @svc-auto-approve-bot
 /jstests/noPassthroughWithMongod/**/ftdc_params.js @10gen/server-networking-and-observability @svc-auto-approve-bot
 /jstests/noPassthroughWithMongod/**/log_component_helpers.js @10gen/server-networking-and-observability @svc-auto-approve-bot
+
+# The following patterns are parsed from ./jstests/query_golden/OWNERS.yml
+/jstests/query_golden/**/* @10gen/query-optimization @svc-auto-approve-bot
+
+# The following patterns are parsed from ./jstests/query_golden_sharding/OWNERS.yml
+/jstests/query_golden_sharding/**/* @10gen/query-optimization @svc-auto-approve-bot
 
 # The following patterns are parsed from ./jstests/replsets/OWNERS.yml
 /jstests/replsets/**/* @10gen/server-replication @svc-auto-approve-bot
@@ -931,6 +944,10 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 
 # The following patterns are parsed from ./src/mongo/unittest/OWNERS.yml
 /src/mongo/unittest/**/* @10gen/server-programmability @svc-auto-approve-bot
+/src/mongo/unittest/**/golden_test* @10gen/query-optimization @svc-auto-approve-bot
+
+# The following patterns are parsed from ./src/mongo/unittest/expected_output/OWNERS.yml
+/src/mongo/unittest/expected_output/**/* @10gen/query-optimization @svc-auto-approve-bot
 
 # The following patterns are parsed from ./src/mongo/util/OWNERS.yml
 /src/mongo/util/**/md5* @10gen/server-security @svc-auto-approve-bot
