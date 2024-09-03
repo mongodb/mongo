@@ -161,7 +161,6 @@ const allCommands = {
     streams_writeCheckpoint: {skip: isAnInternalCommand},
     streams_sendEvent: {skip: isAnInternalCommand},
     _transferMods: {skip: isAnInternalCommand},
-    _vectorClockPersist: {skip: isAnInternalCommand},
     abortMoveCollection: {
         // Skipping command because it requires testing through a parallel shell.
         skip: requiresParallelShell,

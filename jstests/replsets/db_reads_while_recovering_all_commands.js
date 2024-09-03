@@ -155,7 +155,6 @@ const allCommands = {
     streams_writeCheckpoint: {skip: isAnInternalCommand},
     streams_sendEvent: {skip: "internal command"},
     _transferMods: {skip: isPrimaryOnly},
-    _vectorClockPersist: {skip: isPrimaryOnly},
     abortMoveCollection: {skip: isPrimaryOnly},
     abortReshardCollection: {skip: isPrimaryOnly},
     abortTransaction: {skip: isPrimaryOnly},
