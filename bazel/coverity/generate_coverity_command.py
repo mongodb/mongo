@@ -22,6 +22,27 @@ bazel_executable = install_bazel(bazel_bin_dir)
 sys.stdout = orig_stdout
 sys.stderr = orig_stderr
 
+
+cmd = (
+    [
+        sys.executable,
+        "./buildscripts/scons.py",
+    ]
+    + sys.argv
+    + ["BAZEL_INTEGRATION_DEBUG=1", "\\$BUILD_ROOT/scons/\\$VARIANT_DIR/sconf_temp"]
+)
+
+# Run a lightwieght scons build to generate the bazel command.
+bazel_cmd_args = None
+proc = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+for line in proc.stdout.splitlines():
+    if "BAZEL_COMMAND:" in line:
+        # The script is intended to be have output placed into a bash variable, so we should
+        # only ever print the bazel build command
+        bazel_cmd_args = line.split("BAZEL_COMMAND:")[-1].strip().split()[2:-1]
+        break
+
+
 # coverity requires a single target which has dependencies on all
 # the cc_library and cc_binaries in our build. There is not a good way from
 # within the build to get all those targets, so we will generate the list via query
@@ -30,6 +51,9 @@ proc = subprocess.run(
     [
         bazel_executable,
         "aquery",
+    ]
+    + bazel_cmd_args
+    + [
         "--config=local",
         'mnemonic("CppCompile|LinkCompile", //src/mongo/...)',
     ],
@@ -67,22 +91,8 @@ cov_gen_script(
 )
 """)
 
-cmd = (
-    [
-        sys.executable,
-        "./buildscripts/scons.py",
-    ]
-    + sys.argv
-    + ["BAZEL_INTEGRATION_DEBUG=1", "\\$BUILD_ROOT/scons/\\$VARIANT_DIR/sconf_temp"]
+print(
+    " ".join(
+        [bazel_executable, "build"] + bazel_cmd_args + ["//bazel/coverity/analysis:coverity_build"]
+    )
 )
-
-# Run a lightwieght scons build to generate the bazel command.
-proc = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
-for line in proc.stdout.splitlines():
-    if "BAZEL_COMMAND:" in line:
-        # The script is intended to be have output placed into a bash variable, so we should
-        # only ever print the bazel build command
-        cmd = line.split("BAZEL_COMMAND:")[-1].strip().split()[:-1] + [
-            "//bazel/coverity/analysis:coverity_build"
-        ]
-        print(" ".join(cmd))
