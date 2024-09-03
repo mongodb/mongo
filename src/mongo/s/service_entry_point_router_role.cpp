@@ -99,8 +99,8 @@ struct HandleRequest {
     // Runs on successful execution of `handleRequest`.
     void onSuccess(const DbResponse&);
 
-    // Returns a ready future-chain that handled the request and prepared the response.
-    Future<DbResponse> run();
+    // Handles the request and fully prepares the response.
+    DbResponse run();
 
     static NamespaceString getNamespaceString(const DbMessage& dbmsg) {
         if (!dbmsg.messageShouldHaveNs())
@@ -188,23 +188,25 @@ void HandleRequest::onSuccess(const DbResponse& dbResponse) {
             currentOp->getReadWriteType());
 }
 
-Future<DbResponse> HandleRequest::run() {
-    try {
-        setupEnvironment();
-        auto dbResponse = handleRequest();
-        onSuccess(dbResponse);
-        return dbResponse;
-    } catch (const DBException& ex) {
-        auto status = ex.toStatus();
-        LOGV2(4879803, "Failed to handle request", "error"_attr = redact(status));
-        return status;
-    }
+DbResponse HandleRequest::run() {
+    setupEnvironment();
+    auto dbResponse = handleRequest();
+    onSuccess(dbResponse);
+    return dbResponse;
 }
 
 Future<DbResponse> ServiceEntryPointRouterRole::handleRequestImpl(OperationContext* opCtx,
-                                                                  const Message& message) noexcept {
+                                                                  const Message& message) try {
     auto hr = HandleRequest(opCtx, message);
     return hr.run();
+} catch (const DBException& ex) {
+    auto status = ex.toStatus();
+    LOGV2(4879803, "Failed to handle request", "error"_attr = redact(status));
+    return status;
+} catch (...) {
+    auto error = exceptionToStatus();
+    LOGV2_FATAL(
+        9431601, "Request handling produced unhandled exception", "error"_attr = redact(error));
 }
 
 Future<DbResponse> ServiceEntryPointRouterRole::handleRequest(OperationContext* opCtx,
