@@ -6014,7 +6014,7 @@ extern int wiredtiger_extension_terminate(WT_CONNECTION *connection);
 /*! cache: pages evicted in parallel with checkpoint */
 #define	WT_STAT_CONN_CACHE_EVICTION_PAGES_IN_PARALLEL_WITH_CHECKPOINT	1200
 /*! cache: pages queued for eviction */
-#define	WT_STAT_CONN_CACHE_EVICTION_PAGES_QUEUED	1201
+#define	WT_STAT_CONN_CACHE_EVICTION_PAGES_ORDINARY_QUEUED	1201
 /*! cache: pages queued for eviction post lru sorting */
 #define	WT_STAT_CONN_CACHE_EVICTION_PAGES_QUEUED_POST_LRU	1202
 /*! cache: pages queued for urgent eviction */

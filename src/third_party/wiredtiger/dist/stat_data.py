@@ -298,7 +298,7 @@ conn_stats = [
     CacheStat('cache_eviction_maximum_page_size', 'maximum page size seen at eviction', 'no_clear,no_scale,size'),
     CacheStat('cache_eviction_pages_already_queued', 'pages seen by eviction walk that are already queued'),
     CacheStat('cache_eviction_pages_in_parallel_with_checkpoint', 'pages evicted in parallel with checkpoint'),
-    CacheStat('cache_eviction_pages_queued', 'pages queued for eviction'),
+    CacheStat('cache_eviction_pages_ordinary_queued', 'pages queued for eviction'),
     CacheStat('cache_eviction_pages_queued_oldest', 'pages queued for urgent eviction during walk'),
     CacheStat('cache_eviction_pages_queued_post_lru', 'pages queued for eviction post lru sorting'),
     CacheStat('cache_eviction_pages_queued_urgent', 'pages queued for urgent eviction'),
