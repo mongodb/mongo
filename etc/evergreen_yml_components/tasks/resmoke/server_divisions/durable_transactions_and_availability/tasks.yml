@@ -201,28 +201,6 @@ tasks:
         vars:
           use_large_distro: "true"
 
-  - <<: *gen_task_template
-    name: concurrency_replication_bulk_write_gen
-    tags: ["assigned_to_jira_team_server_repl", "default", "bulk_write"]
-    commands:
-      - func: "generate resmoke tasks"
-        vars:
-          use_large_distro: "true"
-
-  - <<: *gen_task_template
-    name: concurrency_replication_bulk_write_with_replica_set_endpoint_gen
-    tags:
-      [
-        "assigned_to_jira_team_server_cluster_scalability",
-        "experimental",
-        "replica_set_endpoint",
-        "requires_all_feature_flags",
-      ]
-    commands:
-      - func: "generate resmoke tasks"
-        vars:
-          resmoke_jobs_max: 1
-
   # TODO(SERVER-93789): Re-enable magic_restore passthroughs in master
   # - <<: *gen_task_template
   #   name: magic_restore_replica_sets_jscore_passthrough_gen
