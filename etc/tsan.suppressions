@@ -43,10 +43,6 @@ race:_mongoc_handshake_freeze
 # TODO SERVER-84514: remove this suppression once we clarify the synchronization.
 race:mongo::AsyncResultsMerger::_askForNextBatch
 
-# TODO SERVER-91819
-deadlock:mongo::WiredTigerKVEngine::beginNonBlockingBackup
-deadlock:mongo::WiredTigerKVEngine::endNonBlockingBackup
-
 # TODO SERVER-91826
 deadlock:mongo::executor::EgressConnectionCloserManager::add
 deadlock:mongo::executor::EgressConnectionCloserManager::setKeepOpen

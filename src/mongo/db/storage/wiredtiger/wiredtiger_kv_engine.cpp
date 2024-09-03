@@ -1350,13 +1350,13 @@ WiredTigerKVEngine::beginNonBlockingBackup(OperationContext* opCtx,
 
 void WiredTigerKVEngine::endNonBlockingBackup(OperationContext* opCtx) {
     stdx::lock_guard<Latch> backupCursorLk(_wtBackup.wtBackupCursorMutex);
-    stdx::lock_guard<Latch> backupDupCursorLk(_wtBackup.wtBackupDupCursorMutex);
     _backupSession.reset();
     {
         // Oplog truncation thread can now remove the pinned oplog.
         stdx::lock_guard<Latch> lock(_oplogPinnedByBackupMutex);
         _oplogPinnedByBackup = boost::none;
     }
+    stdx::lock_guard<Latch> backupDupCursorLk(_wtBackup.wtBackupDupCursorMutex);
     _wtBackup.cursor = nullptr;
     _wtBackup.dupCursor = nullptr;
     _wtBackup.logFilePathsSeenByExtendBackupCursor = {};
