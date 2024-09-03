@@ -104,6 +104,8 @@
 MONGO_FAIL_POINT_DEFINE(reshardingCollectionClonerAbort);
 
 MONGO_FAIL_POINT_DEFINE(reshardingCollectionClonerPauseBeforeAttempt);
+MONGO_FAIL_POINT_DEFINE(reshardingCollectionClonerShouldFailWithStaleConfig);
+MONGO_FAIL_POINT_DEFINE(reshardingCollectionClonerPauseBeforeWriteNaturalOrder);
 
 namespace mongo {
 namespace {
@@ -304,21 +306,21 @@ public:
     ReshardingCloneFetcher(std::shared_ptr<executor::TaskExecutor> executor,
                            std::shared_ptr<executor::TaskExecutor> cleanupExecutor,
                            CancellationToken cancelToken,
-                           sharded_agg_helpers::DispatchShardPipelineResults dispatchResults,
+                           std::vector<OwnedRemoteCursor> remoteCursors,
                            int batchSizeLimitBytes,
                            int numWriteThreads)
         : _executor(std::move(executor)),
           _cleanupExecutor(std::move(cleanupExecutor)),
           _cancelSource(cancelToken),
           _factory(_cancelSource.token(), _executor),
-          _dispatchResults(std::move(dispatchResults)),
+          _remoteCursors(std::move(remoteCursors)),
           _numWriteThreads(numWriteThreads),
           _queues(_numWriteThreads),
           _activeCursors(0),
           _openConsumers(0) {
         constexpr int kQueueDepthPerDonor = 2;
         MultiProducerSingleConsumerQueue<QueueData>::Options qOptions;
-        qOptions.maxQueueDepth = _dispatchResults.remoteCursors.size() * kQueueDepthPerDonor;
+        qOptions.maxQueueDepth = _remoteCursors.size() * kQueueDepthPerDonor;
         for (auto& queue : _queues) {
             queue.emplace(qOptions);
         }
@@ -431,16 +433,15 @@ public:
     }
 
     void setupReaderThreads(OperationContext* opCtx) {
-        auto& remoteCursors = _dispatchResults.remoteCursors;
         // Network commands can start immediately, so reserve here to avoid the
         // vector being resized while setting up.
-        _shardIds.reserve(remoteCursors.size());
-        for (int i = 0; i < int(remoteCursors.size()); i++) {
+        _shardIds.reserve(_remoteCursors.size());
+        for (int i = 0; i < int(_remoteCursors.size()); i++) {
             {
                 std::lock_guard lk(_mutex);
                 _activeCursors++;
             }
-            auto& cursor = _dispatchResults.remoteCursors[i];
+            auto& cursor = _remoteCursors[i];
             GetMoreCommandRequest getMoreRequest(
                 cursor->getCursorResponse().getCursorId(),
                 cursor->getCursorResponse().getNSS().coll().toString());
@@ -540,7 +541,7 @@ private:
     std::shared_ptr<executor::TaskExecutor> _cleanupExecutor;
     CancellationSource _cancelSource;
     CancelableOperationContextFactory _factory;
-    sharded_agg_helpers::DispatchShardPipelineResults _dispatchResults;
+    std::vector<OwnedRemoteCursor> _remoteCursors;
     int _numWriteThreads;
     std::vector<ExecutorFuture<executor::TaskExecutor::ResponseStatus>> _cmdFutures;
     std::vector<ExecutorFuture<void>> _writerFutures;
@@ -658,20 +659,6 @@ ReshardingCollectionCloner::_queryOnceWithNaturalOrder(
                                                    std::move(resumeTokenMap),
                                                    std::move(shardsToSkip));
 
-    return dispatchResults;
-}
-
-void ReshardingCollectionCloner::_writeOnceWithNaturalOrder(
-    OperationContext* opCtx,
-    std::shared_ptr<executor::TaskExecutor> executor,
-    std::shared_ptr<executor::TaskExecutor> cleanupExecutor,
-    CancellationToken cancelToken,
-    sharded_agg_helpers::DispatchShardPipelineResults& dispatchResults) {
-    // If we don't establish any cursors, there is no work to do. Return.
-    if (dispatchResults.remoteCursors.empty()) {
-        return;
-    }
-
     bool hasSplitPipeline = !!dispatchResults.splitPipeline;
     std::string shardsPipelineStr;
     std::string mergePipelineStr;
@@ -700,13 +687,34 @@ void ReshardingCollectionCloner::_writeOnceWithNaturalOrder(
                 "numProducers"_attr = dispatchResults.numProducers,
                 "hasExchangeSpec"_attr = dispatchResults.exchangeSpec != boost::none);
 
+    return dispatchResults;
+}
+
+void ReshardingCollectionCloner::_writeOnceWithNaturalOrder(
+    OperationContext* opCtx,
+    std::shared_ptr<executor::TaskExecutor> executor,
+    std::shared_ptr<executor::TaskExecutor> cleanupExecutor,
+    CancellationToken cancelToken,
+    std::vector<OwnedRemoteCursor> remoteCursors) {
     ReshardingCloneFetcher reshardingCloneFetcher(
         std::move(executor),
         std::move(cleanupExecutor),
         cancelToken,
-        std::move(dispatchResults),
+        std::move(remoteCursors),
         resharding::gReshardingCollectionClonerBatchSizeInBytes.load(),
         resharding::gReshardingCollectionClonerWriteThreadCount);
+
+    if (reshardingCollectionClonerShouldFailWithStaleConfig.shouldFail()) {
+        uassert(StaleConfigInfo(_sourceNss,
+                                ShardVersionFactory::make(ChunkVersion::IGNORED(),
+                                                          boost::optional<CollectionIndexes>(
+                                                              boost::none)) /* receivedVersion */,
+                                boost::none /* wantedVersion */,
+                                ShardId{"0"}),
+                str::stream() << "Throwing staleConfig for reshardingCollectionCloner failpoint.",
+                false);
+    }
+
     reshardingCloneFetcher
         .run(opCtx,
              [this](OperationContext* opCtx,
@@ -742,15 +750,29 @@ void ReshardingCollectionCloner::_runOnceWithNaturalOrder(
     std::shared_ptr<executor::TaskExecutor> executor,
     std::shared_ptr<executor::TaskExecutor> cleanupExecutor,
     CancellationToken cancelToken) {
-    auto dispatchResults = shardVersionRetry(
-        opCtx,
-        Grid::get(opCtx)->catalogCache(),
-        _sourceNss,
-        "resharding collection cloner fetching with natural order (query stage)"_sd,
-        [&] { return _queryOnceWithNaturalOrder(opCtx, mongoProcessInterface); });
-
+    // We can run into StaleConfig errors when cloning collections. To make it
+    // safe during retry, we retry the whole cloning process and rely on the
+    // resume token to be correct. Note that the remote cursors need to be reestablished during
+    // retry since _writeOnceWithNaturalOrder can partially or completely consume them.
     resharding::data_copy::withOneStaleConfigRetry(opCtx, [&] {
-        _writeOnceWithNaturalOrder(opCtx, executor, cleanupExecutor, cancelToken, dispatchResults);
+        auto dispatchResults = shardVersionRetry(
+            opCtx,
+            Grid::get(opCtx)->catalogCache(),
+            _sourceNss,
+            "resharding collection cloner fetching with natural order (query stage)"_sd,
+            [&] { return _queryOnceWithNaturalOrder(opCtx, mongoProcessInterface); });
+
+        // If we don't establish any cursors, there is no work to do. Return.
+        if (dispatchResults.remoteCursors.empty()) {
+            return;
+        }
+
+        reshardingCollectionClonerPauseBeforeWriteNaturalOrder.pauseWhileSet();
+        _writeOnceWithNaturalOrder(opCtx,
+                                   executor,
+                                   cleanupExecutor,
+                                   cancelToken,
+                                   std::move(dispatchResults.remoteCursors));
     });
 }
 
@@ -890,9 +912,6 @@ SemiFuture<void> ReshardingCollectionCloner::run(
                reshardingCollectionClonerPauseBeforeAttempt.pauseWhileSet();
                if (reshardingImprovementsEnabled) {
                    auto opCtx = factory.makeOperationContext(&cc());
-                   // We can run into StaleConfig errors when cloning collections. To make it
-                   // safer during retry, we retry the whole cloning process and rely on the
-                   // resume token to be correct.
                    _runOnceWithNaturalOrder(opCtx.get(),
                                             MongoProcessInterface::create(opCtx.get()),
                                             executor,
