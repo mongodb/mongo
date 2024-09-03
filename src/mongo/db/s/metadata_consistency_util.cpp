@@ -309,6 +309,14 @@ std::vector<BSONObj> _runExhaustiveAggregation(OperationContext* opCtx,
                                                const NamespaceString& nss,
                                                AggregateCommandRequest& aggRequest,
                                                StringData reason) {
+    const auto logMetadataInconsistency = [](const NamespaceString& nss,
+                                             const DBException& exception) {
+        LOGV2(8739100,
+              "Failed to refresh the routing information due to a potential metadata inconsistency",
+              logAttrs(nss),
+              "error"_attr = redact(exception));
+    };
+
     std::vector<BSONObj> results;
 
     auto catalogCache = Grid::get(opCtx)->catalogCache();
@@ -356,16 +364,15 @@ std::vector<BSONObj> _runExhaustiveAggregation(OperationContext* opCtx,
                 }
             }
         });
-    } catch (const ExceptionFor<ErrorCodes::ConflictingOperationInProgress>& e) {
+    } catch (const ExceptionFor<ErrorCodes::ChunkMetadataInconsistency>& e) {
         // In presence on metadata inconsistency within the config catalog, the refresh of the
         // routing information cache may fail.
         // When this happens, ignore the error: the problem will still be reported to the user
         // thanks  to the consistency checks performed on the config server.
-        LOGV2(8739100,
-              "Failed to refresh the routing information due to a potential metadata "
-              "inconsistency",
-              "nss"_attr = nss,
-              "err"_attr = redact(e));
+        logMetadataInconsistency(nss, e);
+    } catch (const ExceptionFor<ErrorCodes::ConflictingOperationInProgress>& e) {
+        // This is for backward compatibility reasons.
+        logMetadataInconsistency(nss, e);
     }
     return results;
 }

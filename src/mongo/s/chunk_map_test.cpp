@@ -243,7 +243,7 @@ TEST_F(ChunkMapTest, ConstructChunkMapMismatchingTimestamp) {
         ChunkType{uuid(), oldChunk->getRange(), wrongVersion, oldChunk->getShardId()});
 
     ASSERT_THROWS_CODE(
-        makeChunkMap(chunkVector), AssertionException, ErrorCodes::ConflictingOperationInProgress);
+        makeChunkMap(chunkVector), AssertionException, ErrorCodes::ChunkMetadataInconsistency);
 }
 
 TEST_F(ChunkMapTest, UpdateMapNotLeaveSmallVectors) {
@@ -304,7 +304,7 @@ TEST_F(ChunkMapTest, UpdateChunkMapMismatchingTimestamp) {
 
     ASSERT_THROWS_CODE(chunkMap.createMerged({updateChunk}),
                        AssertionException,
-                       ErrorCodes::ConflictingOperationInProgress);
+                       ErrorCodes::ChunkMetadataInconsistency);
 }
 
 /*

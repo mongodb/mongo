@@ -50,6 +50,7 @@
 #include "mongo/bson/util/builder.h"
 #include "mongo/bson/util/builder_fwd.h"
 #include "mongo/db/query/collation/collation_index_key.h"
+#include "mongo/db/server_feature_flags_gen.h"
 #include "mongo/s/mongod_and_mongos_server_parameters_gen.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
@@ -59,8 +60,17 @@
 namespace mongo {
 namespace {
 
+ErrorCodes::Error metadataInconsistencyErrorCode() {
+    if (gDistinguishMetadataInconsistencyFromConflictingOperation
+            .isEnabledUseLastLTSFCVWhenUninitialized(
+                serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
+        return ErrorCodes::ChunkMetadataInconsistency;
+    }
+    return ErrorCodes::ConflictingOperationInProgress;
+}
+
 void checkAllElementsAreOfType(BSONType type, const BSONObj& o) {
-    uassert(ErrorCodes::ConflictingOperationInProgress,
+    uassert(metadataInconsistencyErrorCode(),
             str::stream() << "Not all elements of " << o << " are of type " << typeName(type),
             ChunkMap::allElementsAreOfType(type, o));
 }
@@ -73,12 +83,12 @@ void checkChunksAreContiguous(const ChunkInfo& left, const ChunkInfo& right) {
     }
 
     if (SimpleBSONObjComparator::kInstance.evaluate(left.getMax() < right.getMin())) {
-        uasserted(ErrorCodes::ConflictingOperationInProgress,
+        uasserted(metadataInconsistencyErrorCode(),
                   str::stream() << "Gap exists in the routing table between chunks "
                                 << left.getRange().toString() << " and "
                                 << right.getRange().toString());
     } else {
-        uasserted(ErrorCodes::ConflictingOperationInProgress,
+        uasserted(metadataInconsistencyErrorCode(),
                   str::stream() << "Overlap exists in the routing table between chunks "
                                 << left.getRange().toString() << " and "
                                 << right.getRange().toString());
@@ -370,7 +380,7 @@ ChunkMap ChunkMap::_makeUpdated(ChunkVector&& updateChunks) const {
 
     const auto processUpdateChunk = [&](std::shared_ptr<ChunkInfo>&& nextChunkPtr) {
         newMap._updateShardVersionFromUpdateChunk(*nextChunkPtr, _placementVersions);
-        uassert(ErrorCodes::ConflictingOperationInProgress,
+        uassert(metadataInconsistencyErrorCode(),
                 str::stream() << "Changed chunk " << nextChunkPtr->toString()
                               << " has timestamp different from that of the collection "
                               << _collectionPlacementVersion.getTimestamp(),

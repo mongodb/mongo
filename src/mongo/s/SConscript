@@ -279,6 +279,7 @@ env.Library(
         "$BUILD_DIR/mongo/db/metadata_consistency_types_idl",
         "$BUILD_DIR/mongo/db/mongohasher",
         "$BUILD_DIR/mongo/db/query/query_shape/query_shape",
+        "$BUILD_DIR/mongo/db/server_feature_flags",
         "$BUILD_DIR/mongo/db/storage/key_string",
         "$BUILD_DIR/mongo/db/timeseries/timeseries_options",
         "$BUILD_DIR/mongo/executor/async_rpc_error_info",

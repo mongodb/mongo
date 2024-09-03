@@ -320,7 +320,7 @@ TEST_F(RoutingTableHistoryTest, RandomCreateWithMissingChunkFail) {
     chunks.erase(chunks.begin() + _random.nextInt64(chunks.size()));
 
     // Create a new routing table from the randomly generated chunks
-    ASSERT_THROWS_CODE(makeNewRt(chunks), DBException, ErrorCodes::ConflictingOperationInProgress);
+    ASSERT_THROWS_CODE(makeNewRt(chunks), DBException, ErrorCodes::ChunkMetadataInconsistency);
 }
 
 /*
@@ -344,7 +344,7 @@ TEST_F(RoutingTableHistoryTest, RandomCreateWithChunkGapFail) {
     }
 
     // Create a new routing table from the randomly generated chunks
-    ASSERT_THROWS_CODE(makeNewRt(chunks), DBException, ErrorCodes::ConflictingOperationInProgress);
+    ASSERT_THROWS_CODE(makeNewRt(chunks), DBException, ErrorCodes::ChunkMetadataInconsistency);
 }
 
 /*
@@ -374,7 +374,7 @@ TEST_F(RoutingTableHistoryTest, RandomUpdateWithChunkGapFail) {
 
     ASSERT_THROWS_CODE(makeUpdatedRoutingTable(rt, {shrinkedChunk}),
                        AssertionException,
-                       ErrorCodes::ConflictingOperationInProgress);
+                       ErrorCodes::ChunkMetadataInconsistency);
 }
 
 /*
@@ -413,7 +413,7 @@ TEST_F(RoutingTableHistoryTest, RandomCreateWithChunkOverlapFail) {
     }
 
     // Create a new routing table from the randomly generated chunks
-    ASSERT_THROWS_CODE(makeNewRt(chunks), DBException, ErrorCodes::ConflictingOperationInProgress);
+    ASSERT_THROWS_CODE(makeNewRt(chunks), DBException, ErrorCodes::ChunkMetadataInconsistency);
 }
 
 /*
@@ -451,7 +451,7 @@ TEST_F(RoutingTableHistoryTest, RandomUpdateWithChunkOverlapFail) {
 
     ASSERT_THROWS_CODE(makeUpdatedRoutingTable(rt, {*chunkToExtendIt}),
                        AssertionException,
-                       ErrorCodes::ConflictingOperationInProgress);
+                       ErrorCodes::ChunkMetadataInconsistency);
 }
 
 /*
@@ -463,7 +463,7 @@ TEST_F(RoutingTableHistoryTest, RandomCreateWrongMinFail) {
     chunks.begin()->setMin(BSON("a" << std::numeric_limits<int64_t>::min()));
 
     // Create a new routing table from the randomly generated chunks
-    ASSERT_THROWS_CODE(makeNewRt(chunks), DBException, ErrorCodes::ConflictingOperationInProgress);
+    ASSERT_THROWS_CODE(makeNewRt(chunks), DBException, ErrorCodes::ChunkMetadataInconsistency);
 }
 
 /*
@@ -475,7 +475,7 @@ TEST_F(RoutingTableHistoryTest, RandomCreateWrongMaxFail) {
     chunks.begin()->setMax(BSON("a" << std::numeric_limits<int64_t>::max()));
 
     // Create a new routing table from the randomly generated chunks
-    ASSERT_THROWS_CODE(makeNewRt(chunks), DBException, ErrorCodes::ConflictingOperationInProgress);
+    ASSERT_THROWS_CODE(makeNewRt(chunks), DBException, ErrorCodes::ChunkMetadataInconsistency);
 }
 
 /*
@@ -494,7 +494,7 @@ TEST_F(RoutingTableHistoryTest, RandomCreateMismatchingTimestampFail) {
     chunkIt->setVersion(newVersion);
 
     // Create a new routing table from the randomly generated chunks
-    ASSERT_THROWS_CODE(makeNewRt(chunks), DBException, ErrorCodes::ConflictingOperationInProgress);
+    ASSERT_THROWS_CODE(makeNewRt(chunks), DBException, ErrorCodes::ChunkMetadataInconsistency);
 }
 
 /*
@@ -516,7 +516,7 @@ TEST_F(RoutingTableHistoryTest, RandomUpdateMismatchingTimestampFail) {
 
     ASSERT_THROWS_CODE(makeUpdatedRoutingTable(rt, {*chunkIt}),
                        AssertionException,
-                       ErrorCodes::ConflictingOperationInProgress);
+                       ErrorCodes::ChunkMetadataInconsistency);
 }
 
 

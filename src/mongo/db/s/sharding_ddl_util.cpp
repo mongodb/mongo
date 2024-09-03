@@ -335,6 +335,8 @@ void setAllowMigrations(OperationContext* opCtx,
         // Collection no longer exists
     } catch (const ExceptionFor<ErrorCodes::ConflictingOperationInProgress>&) {
         // Collection metadata was concurrently dropped
+    } catch (const ExceptionFor<ErrorCodes::ChunkMetadataInconsistency>&) {
+        // Collection metadata has inconsistencies
     }
 }
 

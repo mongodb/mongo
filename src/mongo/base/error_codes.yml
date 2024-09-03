@@ -847,6 +847,8 @@ error_codes:
   - {code: 429, name: DbCheckInconsistentHash}
   - {code: 430, name: IndexKeyOrderViolation}
 
+  - {code: 431, name: ChunkMetadataInconsistency}
+
   # Error codes 4000-8999 are reserved.
 
   # Non-sequential error codes for compatibility only)

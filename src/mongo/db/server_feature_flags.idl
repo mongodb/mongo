@@ -165,3 +165,9 @@ feature_flags:
         default: true
         version: 8.1
         shouldBeFCVGated: true
+    featureFlagDistinguishMetadataInconsistencyFromConflictingOperation:
+         description: "Feature flag to distinguish ChunkMetadataInconsistency from ConflictingOperationInProgress error"
+         cpp_varname: gDistinguishMetadataInconsistencyFromConflictingOperation
+         default: true
+         version: 8.1
+         shouldBeFCVGated: true
