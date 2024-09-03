@@ -295,12 +295,7 @@ sh.disableAutoMerger = function(coll) {
         sh._checkMongos();
     }
 
-    return sh.assertRetryableCommandWorkedOrFailedWithCodes(() => {
-        return dbase.getSiblingDB("config").collections.update(
-            {_id: coll + ""},
-            {$set: {"enableAutoMerge": false}},
-            {writeConcern: {w: 'majority', wtimeout: 60000}});
-    }, 'Timed out waiting for disabling auto-merge');
+    return dbase.adminCommand({configureCollectionBalancing: coll + "", enableAutoMerger: false});
 };
 
 sh.enableAutoMerger = function(coll) {
@@ -314,12 +309,7 @@ sh.enableAutoMerger = function(coll) {
         sh._checkMongos();
     }
 
-    return sh.assertRetryableCommandWorkedOrFailedWithCodes(() => {
-        return dbase.getSiblingDB("config").collections.update(
-            {_id: coll + ""},
-            {$unset: {"enableAutoMerge": 1}},
-            {writeConcern: {w: 'majority', wtimeout: 60000}});
-    }, 'Timed out waiting for enabling auto-merge');
+    return dbase.adminCommand({configureCollectionBalancing: coll + "", enableAutoMerger: true});
 };
 
 sh.waitForPingChange = function(activePings, timeout, interval) {

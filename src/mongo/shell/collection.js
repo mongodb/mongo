@@ -163,6 +163,8 @@ DBCollection.prototype.help = function() {
         ".unsetWriteConcern( <write concern doc> ) - unsets the write concern for writes to the collection");
     print("\tdb." + shortName +
           ".latencyStats() - display operation latency histograms for this collection");
+    print("\tdb." + shortName + ".disableAutoMerger() - disable auto-merging on this collection");
+    print("\tdb." + shortName + ".enableAutoMerger() - enable auto-merge on this collection");
     return __magicNoPrint;
 };
 
@@ -1415,6 +1417,22 @@ DBCollection.prototype.getWriteConcern = function() {
 
 DBCollection.prototype.unsetWriteConcern = function() {
     delete this._writeConcern;
+};
+
+/**
+ * disable auto-merging on this collection
+ */
+DBCollection.prototype.disableAutoMerger = function() {
+    return this._db._adminCommand(
+        {configureCollectionBalancing: this._fullName, enableAutoMerger: false});
+};
+
+/**
+ * enable auto-merge on this collection
+ */
+DBCollection.prototype.enableAutoMerger = function() {
+    return this._db._adminCommand(
+        {configureCollectionBalancing: this._fullName, enableAutoMerger: true});
 };
 
 //
