@@ -267,7 +267,7 @@ public:
         // Update the QuerySettingsManager with the 'queryShapeConfigs'.
         auto& manager = QuerySettingsManager::get(opCtx.get());
         manager.setQueryShapeConfigurations(
-            opCtx.get(), std::move(queryShapeConfigs), LogicalTime(Timestamp(1)), tenantId);
+            std::move(queryShapeConfigs), LogicalTime(Timestamp(1)), tenantId);
         benchmark::ClobberMemory();
     }
 
@@ -307,14 +307,12 @@ public:
                 // the lookup.
                 auto& manager = QuerySettingsManager::get(opCtx.get());
                 auto queryShapeConfigurationsWithTimestamp =
-                    manager.getAllQueryShapeConfigurations(opCtx.get(), tid);
+                    manager.getAllQueryShapeConfigurations(tid);
                 auto& queryShapeConfigurations =
                     queryShapeConfigurationsWithTimestamp.queryShapeConfigurations;
                 queryShapeConfigurations.push_back(hitQueryShapeConfiguration);
-                manager.setQueryShapeConfigurations(opCtx.get(),
-                                                    std::move(queryShapeConfigurations),
-                                                    LogicalTime(Timestamp(2)),
-                                                    tid);
+                manager.setQueryShapeConfigurations(
+                    std::move(queryShapeConfigurations), LogicalTime(Timestamp(2)), tid);
             }
 
             return parsedFindRequest;

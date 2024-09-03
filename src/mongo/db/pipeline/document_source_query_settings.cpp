@@ -105,8 +105,7 @@ boost::intrusive_ptr<DocumentSource> DocumentSourceQuerySettings::createFromBson
         auto tenantId = expCtx->ns.tenantId();
         auto& manager = QuerySettingsManager::get(expCtx->opCtx);
         auto settingsArray =
-            std::move(manager.getAllQueryShapeConfigurations(expCtx->opCtx, tenantId)
-                          .queryShapeConfigurations);
+            std::move(manager.getAllQueryShapeConfigurations(tenantId).queryShapeConfigurations);
         std::deque<DocumentSource::GetNextResult> queue;
         std::transform(std::make_move_iterator(settingsArray.begin()),
                        std::make_move_iterator(settingsArray.end()),

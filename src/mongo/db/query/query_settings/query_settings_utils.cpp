@@ -376,8 +376,8 @@ QuerySettings lookupQuerySettingsForFind(const boost::intrusive_ptr<ExpressionCo
 
     // Return the found query settings or an empty one.
     auto& manager = QuerySettingsManager::get(opCtx);
-    auto settings = manager.getQuerySettingsForQueryShapeHash(opCtx, *hash, nss.dbName().tenantId())
-                        .get_value_or({});
+    auto settings =
+        manager.getQuerySettingsForQueryShapeHash(*hash, nss.dbName().tenantId()).get_value_or({});
 
     // Fail the current command, if 'reject: true' flag is present.
     failIfRejectedBySettings(expCtx, settings);
@@ -437,8 +437,8 @@ QuerySettings lookupQuerySettingsForAgg(
 
     // Return the found query settings or an empty one.
     auto& manager = QuerySettingsManager::get(opCtx);
-    auto settings = manager.getQuerySettingsForQueryShapeHash(opCtx, *hash, nss.dbName().tenantId())
-                        .get_value_or({});
+    auto settings =
+        manager.getQuerySettingsForQueryShapeHash(*hash, nss.dbName().tenantId()).get_value_or({});
 
     // Fail the current command, if 'reject: true' flag is present.
     failIfRejectedBySettings(expCtx, pipeline, settings);
@@ -492,8 +492,8 @@ QuerySettings lookupQuerySettingsForDistinct(const boost::intrusive_ptr<Expressi
 
     // Return the found query settings or an empty one.
     auto& manager = QuerySettingsManager::get(opCtx);
-    auto settings = manager.getQuerySettingsForQueryShapeHash(opCtx, *hash, nss.dbName().tenantId())
-                        .get_value_or({});
+    auto settings =
+        manager.getQuerySettingsForQueryShapeHash(*hash, nss.dbName().tenantId()).get_value_or({});
 
     // Fail the current command, if 'reject: true' flag is present.
     failIfRejectedBySettings(expCtx, settings);

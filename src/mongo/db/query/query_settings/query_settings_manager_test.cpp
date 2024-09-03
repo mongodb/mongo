@@ -170,12 +170,12 @@ TEST_F(QuerySettingsManagerTest, QuerySettingsClusterParameterSerialization) {
     auto config = makeQueryShapeConfiguration(settings, query, opCtx(), /* tenantId */ boost::none);
     LogicalTime clusterParameterTime(Timestamp(113, 59));
     manager().setQueryShapeConfigurations(
-        opCtx(), {config}, clusterParameterTime, /* tenantId */ boost::none);
+        {config}, clusterParameterTime, /* tenantId */ boost::none);
 
     // Ensure the serialized parameter value contains 'settingsArray' with 'config' as value as well
     // parameter id and clusterParameterTime.
     BSONObjBuilder bob;
-    manager().appendQuerySettingsClusterParameterValue(opCtx(), &bob, /* tenantId */ boost::none);
+    manager().appendQuerySettingsClusterParameterValue(&bob, /* tenantId */ boost::none);
     ASSERT_BSONOBJ_EQ(
         bob.done(),
         BSON("_id" << QuerySettingsManager::kQuerySettingsClusterParameterName
@@ -194,46 +194,45 @@ TEST_F(QuerySettingsManagerTest, QuerySettingsSetAndReset) {
 
     // Ensure that the maintained in-memory query shape configurations equal to the
     // configurations specified in the parameter for both tenants.
-    manager().setQueryShapeConfigurations(opCtx(), {firstConfig}, firstWriteTime, tenantId);
-    manager().setQueryShapeConfigurations(opCtx(), {firstConfig}, firstWriteTime, otherTenantId);
+    manager().setQueryShapeConfigurations({firstConfig}, firstWriteTime, tenantId);
+    manager().setQueryShapeConfigurations({firstConfig}, firstWriteTime, otherTenantId);
+    assertQueryShapeConfigurationsEquals(
+        {firstConfig}, manager().getAllQueryShapeConfigurations(tenantId).queryShapeConfigurations);
     assertQueryShapeConfigurationsEquals(
         {firstConfig},
-        manager().getAllQueryShapeConfigurations(opCtx(), tenantId).queryShapeConfigurations);
-    assertQueryShapeConfigurationsEquals(
-        {firstConfig},
-        manager().getAllQueryShapeConfigurations(opCtx(), otherTenantId).queryShapeConfigurations);
-    ASSERT_EQ(manager().getClusterParameterTime(opCtx(), tenantId), firstWriteTime);
-    ASSERT_EQ(manager().getClusterParameterTime(opCtx(), otherTenantId), firstWriteTime);
+        manager().getAllQueryShapeConfigurations(otherTenantId).queryShapeConfigurations);
+    ASSERT_EQ(manager().getClusterParameterTime(tenantId), firstWriteTime);
+    ASSERT_EQ(manager().getClusterParameterTime(otherTenantId), firstWriteTime);
 
     // Update query settings for tenant with 'tenantId'. Ensure its query shape configurations and
     // parameter cluster time are updated accordingly.
-    manager().setQueryShapeConfigurations(opCtx(), {secondConfig}, secondWriteTime, tenantId);
+    manager().setQueryShapeConfigurations({secondConfig}, secondWriteTime, tenantId);
     assertQueryShapeConfigurationsEquals(
         {secondConfig},
-        manager().getAllQueryShapeConfigurations(opCtx(), tenantId).queryShapeConfigurations);
+        manager().getAllQueryShapeConfigurations(tenantId).queryShapeConfigurations);
     assertQueryShapeConfigurationsEquals(
         {firstConfig},
-        manager().getAllQueryShapeConfigurations(opCtx(), otherTenantId).queryShapeConfigurations);
-    ASSERT_EQ(manager().getClusterParameterTime(opCtx(), tenantId), secondWriteTime);
-    ASSERT_EQ(manager().getClusterParameterTime(opCtx(), otherTenantId), firstWriteTime);
+        manager().getAllQueryShapeConfigurations(otherTenantId).queryShapeConfigurations);
+    ASSERT_EQ(manager().getClusterParameterTime(tenantId), secondWriteTime);
+    ASSERT_EQ(manager().getClusterParameterTime(otherTenantId), firstWriteTime);
 
     // Reset the parameter value and ensure that the in-memory storage is cleared for tenant with
     // 'tenantId'.
-    manager().removeAllQueryShapeConfigurations(opCtx(), tenantId);
+    manager().removeAllQueryShapeConfigurations(tenantId);
     assertQueryShapeConfigurationsEquals(
-        {}, manager().getAllQueryShapeConfigurations(opCtx(), tenantId).queryShapeConfigurations);
+        {}, manager().getAllQueryShapeConfigurations(tenantId).queryShapeConfigurations);
 
     // Attempt to remove QueryShapeConfigurations for a tenant that does not have any.
-    manager().removeAllQueryShapeConfigurations(opCtx(), tenantId);
+    manager().removeAllQueryShapeConfigurations(tenantId);
     assertQueryShapeConfigurationsEquals(
-        {}, manager().getAllQueryShapeConfigurations(opCtx(), tenantId).queryShapeConfigurations);
+        {}, manager().getAllQueryShapeConfigurations(tenantId).queryShapeConfigurations);
 
     // Verify that QueryShapeConfigurations for tenant with 'otherTenantId' were not be affected.
     assertQueryShapeConfigurationsEquals(
         {firstConfig},
-        manager().getAllQueryShapeConfigurations(opCtx(), otherTenantId).queryShapeConfigurations);
-    ASSERT_EQ(manager().getClusterParameterTime(opCtx(), tenantId), LogicalTime::kUninitialized);
-    ASSERT_EQ(manager().getClusterParameterTime(opCtx(), otherTenantId), firstWriteTime);
+        manager().getAllQueryShapeConfigurations(otherTenantId).queryShapeConfigurations);
+    ASSERT_EQ(manager().getClusterParameterTime(tenantId), LogicalTime::kUninitialized);
+    ASSERT_EQ(manager().getClusterParameterTime(otherTenantId), firstWriteTime);
 }
 
 TEST_F(QuerySettingsManagerTest, QuerySettingsLookup) {
@@ -257,17 +256,17 @@ TEST_F(QuerySettingsManagerTest, QuerySettingsLookup) {
     auto configs = getExampleQueryShapeConfigurations(opCtx(), tenantId);
 
     manager().setQueryShapeConfigurations(
-        opCtx(), std::vector<QueryShapeConfiguration>(configs), LogicalTime(), tenantId);
+        std::vector<QueryShapeConfiguration>(configs), LogicalTime(), tenantId);
 
     // Ensure QuerySettingsManager returns boost::none when QuerySettings are not found.
-    assertResultsEq(manager().getQuerySettingsForQueryShapeHash(
-                        opCtx(), query_shape::QueryShapeHash(), tenantId),
-                    boost::none);
+    assertResultsEq(
+        manager().getQuerySettingsForQueryShapeHash(query_shape::QueryShapeHash(), tenantId),
+        boost::none);
 
     // Ensure QuerySettingsManager returns a valid QuerySettings on lookup.
-    assertResultsEq(manager().getQuerySettingsForQueryShapeHash(
-                        opCtx(), configs[1].getQueryShapeHash(), tenantId),
-                    configs[1].getSettings());
+    assertResultsEq(
+        manager().getQuerySettingsForQueryShapeHash(configs[1].getQueryShapeHash(), tenantId),
+        configs[1].getSettings());
 }
 
 }  // namespace mongo::query_settings

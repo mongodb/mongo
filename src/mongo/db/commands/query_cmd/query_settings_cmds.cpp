@@ -157,7 +157,7 @@ void readModifyWriteQuerySettingsConfigOption(
     // Read the query shape configurations for the tenant from the local copy of the query settings
     // cluster-wide configuration option.
     auto queryShapeConfigurations =
-        querySettingsManager.getAllQueryShapeConfigurations(opCtx, dbName.tenantId());
+        querySettingsManager.getAllQueryShapeConfigurations(dbName.tenantId());
 
     // Block if the operation is on the 'representativeQuery' that matches the
     // "representativeQueryToBlock" field of the fail-point configuration.

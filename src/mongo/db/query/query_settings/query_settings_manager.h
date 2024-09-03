@@ -137,7 +137,6 @@ public:
      * the given tenant.
      */
     boost::optional<QuerySettings> getQuerySettingsForQueryShapeHash(
-        OperationContext* opCtx,
         const query_shape::QueryShapeHash& queryShapeHash,
         const boost::optional<TenantId>& tenantId) const;
 
@@ -146,14 +145,13 @@ public:
      * 'tenantId'.
      */
     QueryShapeConfigurationsWithTimestamp getAllQueryShapeConfigurations(
-        OperationContext* opCtx, const boost::optional<TenantId>& tenantId) const;
+        const boost::optional<TenantId>& tenantId) const;
 
     /**
      * Sets the QueryShapeConfigurations by replacing an existing VersionedQueryShapeConfigurations
      * with the newly built one.
      */
-    void setQueryShapeConfigurations(OperationContext* opCtx,
-                                     std::vector<QueryShapeConfiguration>&& settings,
+    void setQueryShapeConfigurations(std::vector<QueryShapeConfiguration>&& settings,
                                      LogicalTime parameterClusterTime,
                                      const boost::optional<TenantId>& tenantId);
 
@@ -166,30 +164,26 @@ public:
     /**
      * Removes all query settings documents for the given tenant.
      */
-    void removeAllQueryShapeConfigurations(OperationContext* opCtx,
-                                           const boost::optional<TenantId>& tenantId);
+    void removeAllQueryShapeConfigurations(const boost::optional<TenantId>& tenantId);
 
     /**
      * Returns the cluster parameter time of the current QuerySettingsClusterParameter value for the
      * given tenant.
      */
-    LogicalTime getClusterParameterTime(OperationContext* opCtx,
-                                        const boost::optional<TenantId>& tenantId) const;
+    LogicalTime getClusterParameterTime(const boost::optional<TenantId>& tenantId) const;
 
     /**
      * Appends the QuerySettingsClusterParameterValue maintained as
      * VersionedQueryShapeConfigurations for the given tenant.
      */
-    void appendQuerySettingsClusterParameterValue(OperationContext* opCtx,
-                                                  BSONObjBuilder* bob,
+    void appendQuerySettingsClusterParameterValue(BSONObjBuilder* bob,
                                                   const boost::optional<TenantId>& tenantId);
 
 private:
     std::vector<QueryShapeConfiguration> getAllQueryShapeConfigurations_inlock(
-        OperationContext* opCtx, const boost::optional<TenantId>& tenantId) const;
+        const boost::optional<TenantId>& tenantId) const;
 
-    LogicalTime getClusterParameterTime_inlock(OperationContext* opCtx,
-                                               const boost::optional<TenantId>& tenantId) const;
+    LogicalTime getClusterParameterTime_inlock(const boost::optional<TenantId>& tenantId) const;
 
     mutable WriteRarelyRWMutex _mutex;
     absl::flat_hash_map<boost::optional<TenantId>, VersionedQueryShapeConfigurations>

@@ -120,7 +120,6 @@ void QuerySettingsManager::create(
 }
 
 boost::optional<QuerySettings> QuerySettingsManager::getQuerySettingsForQueryShapeHash(
-    OperationContext* opCtx,
     const query_shape::QueryShapeHash& queryShapeHash,
     const boost::optional<TenantId>& tenantId) const {
     auto readLock = _mutex.readLock();
@@ -145,7 +144,6 @@ boost::optional<QuerySettings> QuerySettingsManager::getQuerySettingsForQuerySha
 }
 
 void QuerySettingsManager::setQueryShapeConfigurations(
-    OperationContext* opCtx,
     std::vector<QueryShapeConfiguration>&& settingsArray,
     LogicalTime parameterClusterTime,
     const boost::optional<TenantId>& tenantId) {
@@ -172,14 +170,14 @@ void QuerySettingsManager::setQueryShapeConfigurations(
 }
 
 QueryShapeConfigurationsWithTimestamp QuerySettingsManager::getAllQueryShapeConfigurations(
-    OperationContext* opCtx, const boost::optional<TenantId>& tenantId) const {
+    const boost::optional<TenantId>& tenantId) const {
     auto readLock = _mutex.readLock();
-    return {getAllQueryShapeConfigurations_inlock(opCtx, tenantId),
-            getClusterParameterTime_inlock(opCtx, tenantId)};
+    return {getAllQueryShapeConfigurations_inlock(tenantId),
+            getClusterParameterTime_inlock(tenantId)};
 }
 
 std::vector<QueryShapeConfiguration> QuerySettingsManager::getAllQueryShapeConfigurations_inlock(
-    OperationContext* opCtx, const boost::optional<TenantId>& tenantId) const {
+    const boost::optional<TenantId>& tenantId) const {
     auto versionedQueryShapeConfigurationsIt =
         _tenantIdToVersionedQueryShapeConfigurationsMap.find(tenantId);
     if (versionedQueryShapeConfigurationsIt ==
@@ -206,7 +204,7 @@ void QuerySettingsManager::refreshQueryShapeConfigurations(OperationContext* opC
 }
 
 void QuerySettingsManager::removeAllQueryShapeConfigurations(
-    OperationContext* opCtx, const boost::optional<TenantId>& tenantId) {
+    const boost::optional<TenantId>& tenantId) {
     // Previous query shape configurations for destruction outside the critical section.
     VersionedQueryShapeConfigurations previousQueryShapeConfigurations;
     {
@@ -227,13 +225,13 @@ void QuerySettingsManager::removeAllQueryShapeConfigurations(
 }
 
 LogicalTime QuerySettingsManager::getClusterParameterTime(
-    OperationContext* opCtx, const boost::optional<TenantId>& tenantId) const {
+    const boost::optional<TenantId>& tenantId) const {
     auto readLock = _mutex.readLock();
-    return getClusterParameterTime_inlock(opCtx, tenantId);
+    return getClusterParameterTime_inlock(tenantId);
 }
 
 LogicalTime QuerySettingsManager::getClusterParameterTime_inlock(
-    OperationContext* opCtx, const boost::optional<TenantId>& tenantId) const {
+    const boost::optional<TenantId>& tenantId) const {
     auto versionedQueryShapeConfigurationsIt =
         _tenantIdToVersionedQueryShapeConfigurationsMap.find(tenantId);
     if (versionedQueryShapeConfigurationsIt ==
@@ -244,17 +242,17 @@ LogicalTime QuerySettingsManager::getClusterParameterTime_inlock(
 }
 
 void QuerySettingsManager::appendQuerySettingsClusterParameterValue(
-    OperationContext* opCtx, BSONObjBuilder* bob, const boost::optional<TenantId>& tenantId) {
+    BSONObjBuilder* bob, const boost::optional<TenantId>& tenantId) {
     auto readLock = _mutex.readLock();
     bob->append("_id"_sd, QuerySettingsManager::kQuerySettingsClusterParameterName);
     BSONArrayBuilder arrayBuilder(
         bob->subarrayStart(QuerySettingsClusterParameterValue::kSettingsArrayFieldName));
-    for (auto&& item : getAllQueryShapeConfigurations_inlock(opCtx, tenantId)) {
+    for (auto&& item : getAllQueryShapeConfigurations_inlock(tenantId)) {
         arrayBuilder.append(item.toBSON());
     }
     arrayBuilder.done();
     bob->append(QuerySettingsClusterParameterValue::kClusterParameterTimeFieldName,
-                getClusterParameterTime_inlock(opCtx, tenantId).asTimestamp());
+                getClusterParameterTime_inlock(tenantId).asTimestamp());
 }
 
 void QuerySettingsClusterParameter::append(OperationContext* opCtx,
@@ -262,7 +260,7 @@ void QuerySettingsClusterParameter::append(OperationContext* opCtx,
                                            StringData name,
                                            const boost::optional<TenantId>& tenantId) {
     auto& querySettingsManager = QuerySettingsManager::get(getGlobalServiceContext());
-    querySettingsManager.appendQuerySettingsClusterParameterValue(opCtx, bob, tenantId);
+    querySettingsManager.appendQuerySettingsClusterParameterValue(bob, tenantId);
 }
 
 Status QuerySettingsClusterParameter::set(const BSONElement& newValueElement,
@@ -284,25 +282,21 @@ Status QuerySettingsClusterParameter::set(const BSONElement& newValueElement,
         /* count */ static_cast<int>(newSettings.getSettingsArray().size()),
         /* size */ static_cast<int>(newValueElement.valuesize()),
         /* numSettingsWithReject */ static_cast<int>(rejectCount));
-    querySettingsManager.setQueryShapeConfigurations(Client::getCurrent()->getOperationContext(),
-                                                     std::move(newSettings.getSettingsArray()),
-                                                     newSettings.getClusterParameterTime(),
-                                                     tenantId);
+    querySettingsManager.setQueryShapeConfigurations(
+        std::move(newSettings.getSettingsArray()), newSettings.getClusterParameterTime(), tenantId);
     return Status::OK();
 }
 
 Status QuerySettingsClusterParameter::reset(const boost::optional<TenantId>& tenantId) {
     auto& querySettingsManager = QuerySettingsManager::get(getGlobalServiceContext());
-    querySettingsManager.removeAllQueryShapeConfigurations(
-        Client::getCurrent()->getOperationContext(), tenantId);
+    querySettingsManager.removeAllQueryShapeConfigurations(tenantId);
     return Status::OK();
 }
 
 LogicalTime QuerySettingsClusterParameter::getClusterParameterTime(
     const boost::optional<TenantId>& tenantId) const {
     auto& querySettingsManager = QuerySettingsManager::get(getGlobalServiceContext());
-    return querySettingsManager.getClusterParameterTime(Client::getCurrent()->getOperationContext(),
-                                                        tenantId);
+    return querySettingsManager.getClusterParameterTime(tenantId);
 }
 
 };  // namespace mongo::query_settings
