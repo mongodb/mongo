@@ -29,13 +29,9 @@
 
 #include <boost/move/utility_core.hpp>
 #include <boost/optional/optional.hpp>
-#include <set>
-#include <utility>
 
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/catalog/collection_operation_source.h"
-#include "mongo/db/concurrency/d_concurrency.h"
-#include "mongo/db/concurrency/lock_manager_defs.h"
 #include "mongo/db/op_observer/user_write_block_mode_op_observer.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/s/global_user_write_block_state.h"
@@ -45,7 +41,6 @@
 #include "mongo/db/transaction_resources.h"
 #include "mongo/idl/idl_parser.h"
 #include "mongo/util/assert_util_core.h"
-#include "mongo/util/decorable.h"
 
 namespace mongo {
 namespace {
@@ -81,16 +76,8 @@ void UserWriteBlockModeOpObserver::onInserts(OperationContext* opCtx,
                 IDLParserContext("UserWriteBlockOpObserver"), insertedDoc);
             shard_role_details::getRecoveryUnit(opCtx)->onCommit(
                 [blockShardedDDL = collCSDoc.getBlockNewUserShardedDDL(),
-                 blockWrites = collCSDoc.getBlockUserWrites(),
-                 insertedNss = collCSDoc.getNss()](OperationContext* opCtx,
-                                                   boost::optional<Timestamp>) {
-                    invariant(insertedNss.isEmpty());
-                    boost::optional<Lock::GlobalLock> globalLockIfNotPrimary;
-                    if (!isStandaloneOrPrimary(
-                            opCtx, NamespaceString::kUserWritesCriticalSectionsNamespace)) {
-                        globalLockIfNotPrimary.emplace(opCtx, MODE_IX);
-                    }
-
+                 blockWrites = collCSDoc.getBlockUserWrites()](OperationContext* opCtx,
+                                                               boost::optional<Timestamp>) {
                     if (blockShardedDDL) {
                         GlobalUserWriteBlockState::get(opCtx)->enableUserShardedDDLBlocking(opCtx);
                     }
@@ -119,18 +106,9 @@ void UserWriteBlockModeOpObserver::onUpdate(OperationContext* opCtx,
             IDLParserContext("UserWriteBlockOpObserver"), args.updateArgs->updatedDoc);
 
         shard_role_details::getRecoveryUnit(opCtx)->onCommit(
-            [updatedNss = collCSDoc.getNss(),
-             blockShardedDDL = collCSDoc.getBlockNewUserShardedDDL(),
-             blockWrites = collCSDoc.getBlockUserWrites(),
-             insertedNss = collCSDoc.getNss()](OperationContext* opCtx,
-                                               boost::optional<Timestamp>) {
-                invariant(updatedNss.isEmpty());
-                boost::optional<Lock::GlobalLock> globalLockIfNotPrimary;
-                if (!isStandaloneOrPrimary(opCtx,
-                                           NamespaceString::kUserWritesCriticalSectionsNamespace)) {
-                    globalLockIfNotPrimary.emplace(opCtx, MODE_IX);
-                }
-
+            [blockShardedDDL = collCSDoc.getBlockNewUserShardedDDL(),
+             blockWrites = collCSDoc.getBlockUserWrites()](OperationContext* opCtx,
+                                                           boost::optional<Timestamp>) {
                 if (blockShardedDDL) {
                     GlobalUserWriteBlockState::get(opCtx)->enableUserShardedDDLBlocking(opCtx);
                 } else {
@@ -167,15 +145,7 @@ void UserWriteBlockModeOpObserver::onDelete(OperationContext* opCtx,
             IDLParserContext("UserWriteBlockOpObserver"), deletedDoc);
 
         shard_role_details::getRecoveryUnit(opCtx)->onCommit(
-            [deletedNss = collCSDoc.getNss()](OperationContext* opCtx,
-                                              boost::optional<Timestamp> _) {
-                invariant(deletedNss.isEmpty());
-                boost::optional<Lock::GlobalLock> globalLockIfNotPrimary;
-                if (!isStandaloneOrPrimary(opCtx,
-                                           NamespaceString::kUserWritesCriticalSectionsNamespace)) {
-                    globalLockIfNotPrimary.emplace(opCtx, MODE_IX);
-                }
-
+            [](OperationContext* opCtx, boost::optional<Timestamp> _) {
                 GlobalUserWriteBlockState::get(opCtx)->disableUserShardedDDLBlocking(opCtx);
                 GlobalUserWriteBlockState::get(opCtx)->disableUserWriteBlocking(opCtx);
             });
