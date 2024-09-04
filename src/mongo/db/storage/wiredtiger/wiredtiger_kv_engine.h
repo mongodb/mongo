@@ -145,58 +145,52 @@ struct WiredTigerBackup {
     inline static const std::string kOngoingBackupFile = "ongoingBackup.lock";
 };
 
-class SectionActivityPermit {
+/**
+ * A StatsCollectionPermit attempts to acquire a permit to collect WT statistics. If the WT
+ * connection is ready, conn() returns a non-null WT_CONNECTION that can be used to collect
+ * statistics safely.
+
+ * Statistics can be safely collected while the permit is held, but storage engine shutdown is
+ * blocked while any oustanding permits are held.
+ *
+ * Destruction releases the permit and allows shutdown to proceed.
+ */
+class StatsCollectionPermit {
 public:
-    /**
-     * The default constructor tries to get an Activity Permit. If the section reading acitivities
-     * are permited, _permitActive is set to true.
-     */
-    SectionActivityPermit(WiredTigerEventHandler* eventHandler) : _eventHandler(eventHandler) {
-        if (_eventHandler->getSectionActivityPermit()) {
-            _permitActive = true;
-        }
-    }
+    explicit StatsCollectionPermit(WiredTigerEventHandler* eventHandler)
+        : _eventHandler(eventHandler), _conn(_eventHandler->getStatsCollectionPermit()) {}
 
-    /**
-     * The copy constructor is deleted so that the returned value from tryGetSectionActivityPermit
-     * function is guranteed to use the move constructor.
-     */
-    SectionActivityPermit(const SectionActivityPermit&) = delete;
-
-    /**
-     * The move constructor resets _eventHandler to NULL and _permitActive to false to make the
-     * "other" object stale.
-     */
-    SectionActivityPermit(SectionActivityPermit&& other) noexcept {
+    StatsCollectionPermit(const StatsCollectionPermit&) = delete;
+    StatsCollectionPermit(StatsCollectionPermit&& other) noexcept {
         _eventHandler = other._eventHandler;
-        _permitActive = other._permitActive;
+        _conn = other._conn;
         other._eventHandler = nullptr;
-        other._permitActive = false;
+        other._conn = nullptr;
     }
 
     /**
-     * Returns whether the permit is ready.
+     * Returns the WT connection for this permit, and nullptr if this permit is not valid.
      */
-    bool ready() {
-        return _permitActive;
+    WT_CONNECTION* conn() {
+        return _conn;
     }
 
     /**
      * When the section generation activity for a reader is done, this destructor is called (one of
      * the permits is released). The destructor call releases the section generation activity
      * permit. If it is a _eventHandler is NULL (the object is stale, the permit is tranferred) or
-     * _permitActive is false (no permit was issued), releaseSectionActivityPermit is not called. If
+     * _permitActive is false (no permit was issued), releaseStatsCollectionPermit is not called. If
      * all the permits are released WT connection is allowed to shut down cleanly.
      */
-    ~SectionActivityPermit() {
-        if (_eventHandler && _permitActive) {
-            _eventHandler->releaseSectionActivityPermit();
+    ~StatsCollectionPermit() {
+        if (_eventHandler && _conn) {
+            _eventHandler->releaseStatsCollectionPermit();
         }
     }
 
 private:
     WiredTigerEventHandler* _eventHandler;
-    bool _permitActive{false};
+    WT_CONNECTION* _conn{nullptr};
 };
 
 class WiredTigerKVEngine final : public KVEngine {
@@ -589,58 +583,38 @@ public:
     void sizeStorerPeriodicFlush();
 
     /**
-     * WT WiredTigerServerStatusSection::generateSection activity is permitted if WT connection is
-     * ready and it is not shutting down. In that case, a tryGetSectionActivityPermit call returns a
-     * SectionActivityPermit object indcating that the caller may safely collect metrics and the
-     * storage engine shutdown will be blocked until the caller is done with collection. When the
-     * metrics collection is not allowed, a tryGetSectionActivityPermit call returns boost::none.
-     * ~SectionActivityPermit releases the permit.
+     * WiredTiger statistics cursors can be used if the WT connection is ready and it is not
+     * shutting down or starting up. In that case, a tryGetStatsCollectionPermit call returns a
+     * StatsCollectionPermit object indcating that the caller may safely open statistics cursors,
+     * but the storage engine shutdown will be prevented from invalidating the underlying WT
+     * connection until the caller is done. When the WT connection is not ready, a
+     * tryGetStatsCollectionPermit call returns boost::none. ~StatsCollectionPermit releases the
+     * permit.
      */
-    boost::optional<SectionActivityPermit> tryGetSectionActivityPermit() {
-        SectionActivityPermit permit(&_eventHandler);
-        if (permit.ready()) {
+    boost::optional<StatsCollectionPermit> tryGetStatsCollectionPermit() {
+        StatsCollectionPermit permit(&_eventHandler);
+        if (permit.conn()) {
             return permit;
         }
         return boost::none;
     }
 
     /**
-     * Returns the number of active sections.
+     * Returns the number of active statistics readers that are blocking shutdown.
      */
-    int32_t getActiveSections() {
-        return _eventHandler.getActiveSections();
+    int32_t getActiveStatsReaders() {
+        return _eventHandler.getActiveStatsReaders();
     }
 
     /**
-     * If WT connection is made and WT connection is not closing down, WT Connection Ready Status is
-     * true. This function is unsafe because the connection can close immediately after this check
-     * returns true. By calling tryGetSectionActivityPermit(), a permit for section activity can be
-     * acquired and it can be made sure that the connection is open and will not close until the
-     * permit goes out of scope and the destructor for the permit releases it.
+     * If the WT connection is ready for statistics collection, returns true. This function is
+     * unsafe because the connection can close immediately after this check returns true. By calling
+     * tryGetStatsCollectionPermit(), a permit for statistics collection can be acquired and it can
+     * be made sure that the connection is open and will not close until the permit goes out of
+     * scope and the destructor for the permit releases it.
      */
-    bool getWtConnReadyStatus_UNSAFE() {
-        return _eventHandler.getWtConnReadyStatus();
-    }
-    /**
-     * WT WiredTigerServerStatusSection::generateSection activity is permitted if WT connection is
-     * ready and it is not closing down. Calling tryGetSectionActivityPermit() is the recommended
-     * way to get the permit for section metrics collection because it guarantees the release of the
-     * permit. If getSectionActivityPermit_UNSAFE is used to get a permit, the caller *must* make a
-     * subsequent call to `releaseSectionActivityPermit` to allow the storage engine to shut down.
-
-     */
-    bool getSectionActivityPermit_UNSAFE() {
-        return _eventHandler.getSectionActivityPermit();
-    }
-
-    /**
-     * The releaseSectionActivityPermit_UNSAFE() call releases section generation activity permits.
-     * When no permits are held by the readers, WT connection is allowed to shut down cleanly.
-     * releaseSectionActivityPermit_UNSAFE can only be safely called after a preceding
-     * getSectionActivityPermit_UNSAFE call.
-     */
-    void releaseSectionActivityPermit_UNSAFE() {
-        _eventHandler.releaseSectionActivityPermit();
+    bool isWtConnReadyForStatsCollection_UNSAFE() const {
+        return _eventHandler.isWtConnReadyForStatsCollection();
     }
 
 private:

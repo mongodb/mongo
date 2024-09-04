@@ -93,31 +93,31 @@
     "transaction is too large and will not fit in the storage engine cache"
 namespace mongo {
 
-void WiredTigerEventHandler::setWtConnReadyStatus(bool status) {
+void WiredTigerEventHandler::setWtConnReady(WT_CONNECTION* conn) {
     stdx::unique_lock<mongo::Mutex> lock(_mutex);
-    _wtConnReady = status;
-    if (_activeSections == 0 || _wtConnReady) {
+    _wtConn = conn;
+    if (_activeReaders == 0 || conn) {
         return;
     }
     LOGV2(7003100,
           "WiredTiger connection close is waiting for active statistics readers to finish",
-          "activeReaders"_attr = _activeSections);
-    _idleCondition.wait(lock, [this]() { return _activeSections == 0; });
+          "activeReaders"_attr = _activeReaders);
+    _idleCondition.wait(lock, [this]() { return _activeReaders == 0; });
 }
 
-bool WiredTigerEventHandler::getSectionActivityPermit() {
+WT_CONNECTION* WiredTigerEventHandler::getStatsCollectionPermit() {
     stdx::lock_guard<mongo::Mutex> lock(_mutex);
-    if (_wtConnReady) {
-        _activeSections++;
-        return true;
+    if (_wtConn) {
+        _activeReaders++;
+        return _wtConn;
     }
-    return false;
+    return nullptr;
 }
 
-void WiredTigerEventHandler::releaseSectionActivityPermit() {
+void WiredTigerEventHandler::releaseStatsCollectionPermit() {
     stdx::unique_lock<mongo::Mutex> lock(_mutex);
-    _activeSections--;
-    if (_activeSections == 0 && !_wtConnReady) {
+    _activeReaders--;
+    if (_activeReaders == 0 && !_wtConn) {
         _idleCondition.notify_all();
         return;
     }
@@ -845,9 +845,9 @@ int mdb_handle_general(WT_EVENT_HANDLER* handler,
                        void* arg) {
     WiredTigerEventHandler* wtHandler = reinterpret_cast<WiredTigerEventHandler*>(handler);
     if (type == WT_EVENT_CONN_READY) {
-        wtHandler->setWtConnReadyStatus(true);
+        wtHandler->setWtConnReady(wt_conn);
     } else if (type == WT_EVENT_CONN_CLOSE) {
-        wtHandler->setWtConnReadyStatus(false);
+        wtHandler->setWtConnNotReady();
     }
     if (type != WT_EVENT_COMPACT_CHECK || session == nullptr || session->app_private == nullptr) {
         return 0;
@@ -1082,20 +1082,42 @@ Status WiredTigerUtil::setTableLogging(WiredTigerRecoveryUnit& ru,
     return Status::OK();
 }
 
+bool WiredTigerUtil::collectConnectionStatistics(WiredTigerKVEngine* engine, BSONObjBuilder& bob) {
+    boost::optional<StatsCollectionPermit> permit = engine->tryGetStatsCollectionPermit();
+    if (!permit) {
+        return false;
+    }
+
+    // Bypass the WiredTigerSessionCache to obtain a session that can be used after it shuts down,
+    // potentially before the storage engine itself shuts down.
+    WiredTigerSession session(permit->conn());
+
+    // Filter out unrelevant statistic fields.
+    std::vector<std::string> fieldsToIgnore = {"LSM"};
+
+    Status status = WiredTigerUtil::exportTableToBSON(
+        session.getSession(), "statistics:", "statistics=(fast)", bob, fieldsToIgnore);
+    if (!status.isOK()) {
+        bob.append("error", "unable to retrieve statistics");
+        bob.append("code", static_cast<int>(status.code()));
+        bob.append("reason", status.reason());
+    }
+    return true;
+}
+
 Status WiredTigerUtil::exportTableToBSON(WT_SESSION* session,
                                          const std::string& uri,
                                          const std::string& config,
-                                         BSONObjBuilder* bob) {
+                                         BSONObjBuilder& bob) {
     return exportTableToBSON(session, uri, config, bob, {});
 }
 
 Status WiredTigerUtil::exportTableToBSON(WT_SESSION* session,
                                          const std::string& uri,
                                          const std::string& config,
-                                         BSONObjBuilder* bob,
+                                         BSONObjBuilder& bob,
                                          const std::vector<std::string>& filter) {
     invariant(session);
-    invariant(bob);
     WT_CURSOR* cursor = nullptr;
     const char* cursorConfig = config.empty() ? nullptr : config.c_str();
 
@@ -1106,8 +1128,8 @@ Status WiredTigerUtil::exportTableToBSON(WT_SESSION* session,
                       str::stream() << "unable to open cursor at URI " << uri
                                     << ". reason: " << wiredtiger_strerror(ret));
     }
-    bob->append("uri", uri);
-    bob->append("version", wiredtiger_version(NULL, NULL, NULL));
+    bob.append("uri", uri);
+    bob.append("version", wiredtiger_version(NULL, NULL, NULL));
     invariant(cursor);
     ON_BLOCK_EXIT([&] { cursor->close(cursor); });
 
@@ -1144,7 +1166,7 @@ Status WiredTigerUtil::exportTableToBSON(WT_SESSION* session,
         long long value = castStatisticsValue<long long>(statisticValue);
 
         if (category.size() == 0) {
-            bob->appendNumber(statisticDescription, value);
+            bob.appendNumber(statisticDescription, value);
         } else {
             bool shouldSkipField =
                 std::find(filter.begin(), filter.end(), category) != filter.end();
@@ -1165,7 +1187,7 @@ Status WiredTigerUtil::exportTableToBSON(WT_SESSION* session,
          it != measurementsMappedByCategory.end();
          ++it) {
         const std::string& category = it->first;
-        bob->append(category, it->second->obj());
+        bob.append(category, it->second->obj());
         delete it->second;
     }
     return Status::OK();
@@ -1260,11 +1282,8 @@ bool WiredTigerUtil::willRestoreFromBackup() {
     return boost::filesystem::exists(dbpath / kWiredTigerBackupFile);
 }
 
-void WiredTigerUtil::appendSnapshotWindowSettings(WiredTigerKVEngine* engine,
-                                                  WiredTigerSession* session,
-                                                  BSONObjBuilder* bob) {
+void WiredTigerUtil::appendSnapshotWindowSettings(WiredTigerKVEngine* engine, BSONObjBuilder* bob) {
     invariant(engine);
-    invariant(session);
     invariant(bob);
 
     const Timestamp& stableTimestamp = engine->getStableTimestamp();

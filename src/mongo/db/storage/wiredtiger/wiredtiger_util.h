@@ -167,53 +167,61 @@ public:
     }
 
     /**
-     * If WT is setting _wtConnReady to true or WT is idle (one of the readers is not generating
-     * sections), the following function returns immediately. Otherwise (if WT is active and
-     * WT_CONN_CLOSE event is trying to set it _wtConnReady to false), this function waits until WT
-     * is idle and WT Connection is allowed to be closed.
+     * Updates the current WT connection usable for safe statistics collection, or nullptr if
+     * statistics collection is no longer safe.
+     *
+     * If the WT_CONNECTION is non-null or there are no active statistics readers, the following
+     * function returns immediately. Otherwise, if there are active statistics readers and a
+     * WT_CONN_CLOSE event is setting this connection to be unavailable for statistics collection,
+     * this function waits until all active readers release their collection permits.
      */
-    void setWtConnReadyStatus(bool status);
-
-    /**
-     * If WT connection is ready and it is not shutting down, WT
-     * WiredTigerServerStatusSection::generateSection acitivity is permitted. When this function
-     * returns true, the caller may safely collect metrics, but this blocks storage engine shutdown.
-     * The caller *must* make a subsequent call to `releaseSectionActivityPermit` to allow the
-     * storage engine to shut down.
-     */
-    bool getSectionActivityPermit();
-
-    /**
-     * The following call releases section generation activity permits. When there is no section
-     * generation activity, WT connection is allowed to shut down cleanly.
-     */
-    void releaseSectionActivityPermit();
-
-    /**
-     * Each successful ongoing WiredTigerServerStatusSection::generateSection call is counted as a
-     * single active section. The number of current active sections are returned by this call.
-     */
-    int32_t getActiveSections() {
-        stdx::lock_guard<mongo::Mutex> lock(_mutex);
-        return _activeSections;
+    void setWtConnReady(WT_CONNECTION* conn);
+    void setWtConnNotReady() {
+        setWtConnReady(nullptr);
     }
 
     /**
-     * If WT connection is made and there is no outstanding shutdown, WT Connection Ready Status is
-     * true. This function should only be used for tests.
+     * This function obtains one permit to safely use WiredTiger statistics cursors. When this
+     * function returns a non-null connection pointer, the caller may safely collect metrics using
+     * this connection, but storage engine shutdown is blocked. The caller *must* make a subsequent
+     * call to `releaseStatsCollectionPermit` to allow the storage engine to shut down.
+     *
+     * If this function returns nullptr, statistics collection is not available due to startup or
+     * shutdown.
      */
-    bool getWtConnReadyStatus() {
-        stdx::unique_lock<mongo::Mutex> lock(_mutex);
-        return _wtConnReady;
+    WT_CONNECTION* getStatsCollectionPermit();
+
+    /**
+     * The following call releases one statistics collection permit. When there are no outstanding
+     * permits, the WT connection is allowed to shut down cleanly.
+     */
+    void releaseStatsCollectionPermit();
+
+    /**
+     * Returns the number of outstanding, active statistics collection permits.
+     */
+    int32_t getActiveStatsReaders() const {
+        stdx::lock_guard<mongo::Mutex> lock(_mutex);
+        return _activeReaders;
+    }
+
+    /**
+     * Returns true if the WT connection is ready for statistics cursors to be used. This is unsafe
+     * because the connection can become invalid immediately after returning. To ensure the
+     * connection stays valid, a permit must be obtained with getStatsCollectionPermit().
+     */
+    bool isWtConnReadyForStatsCollection() const {
+        stdx::lock_guard<mongo::Mutex> lock(_mutex);
+        return _wtConn != nullptr;
     }
 
 private:
     bool _startupSuccessful = false;
     bool _wtIncompatible = false;
-    mongo::Mutex _mutex = MONGO_MAKE_LATCH("mongo::WiredTigerEventHandler::_mutex");
-    bool _wtConnReady = false;
+    mutable mongo::Mutex _mutex = MONGO_MAKE_LATCH("mongo::WiredTigerEventHandler::_mutex");
+    WT_CONNECTION* _wtConn = nullptr;
     stdx::condition_variable _idleCondition;
-    int32_t _activeSections{0};
+    int32_t _activeReaders{0};
 };
 
 class WiredTigerUtil {
@@ -235,6 +243,8 @@ public:
                                       std::string* type,
                                       std::string* source);
 
+    static bool collectConnectionStatistics(WiredTigerKVEngine* engine, BSONObjBuilder& bob);
+
     /**
      * Reads the WT database statistics table using the URI and exports all keys to BSON as string
      * elements. Additionally, adds the 'uri' field to output document.
@@ -244,11 +254,11 @@ public:
     static Status exportTableToBSON(WT_SESSION* s,
                                     const std::string& uri,
                                     const std::string& config,
-                                    BSONObjBuilder* bob);
+                                    BSONObjBuilder& bob);
     static Status exportTableToBSON(WT_SESSION* s,
                                     const std::string& uri,
                                     const std::string& config,
-                                    BSONObjBuilder* bob,
+                                    BSONObjBuilder& bob,
                                     const std::vector<std::string>& filter);
 
     /**
@@ -288,9 +298,7 @@ public:
      *      "oldest majority snapshot timestamp available" : <num>
      * }
      */
-    static void appendSnapshotWindowSettings(WiredTigerKVEngine* engine,
-                                             WiredTigerSession* session,
-                                             BSONObjBuilder* bob);
+    static void appendSnapshotWindowSettings(WiredTigerKVEngine* engine, BSONObjBuilder* bob);
 
     /**
      * Gets the creation metadata string for a collection or index at a given URI. Accepts an

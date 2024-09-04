@@ -158,7 +158,7 @@ void checkOplogFormatVersion(OperationContext* opCtx, const std::string& uri) {
 
 void appendNumericStats(WT_SESSION* s, const std::string& uri, BSONObjBuilder& bob) {
     Status status =
-        WiredTigerUtil::exportTableToBSON(s, "statistics:" + uri, "statistics=(fast)", &bob);
+        WiredTigerUtil::exportTableToBSON(s, "statistics:" + uri, "statistics=(fast)", bob);
     if (!status.isOK()) {
         bob.append("error", "unable to retrieve statistics");
         bob.append("code", static_cast<int>(status.code()));

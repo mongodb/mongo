@@ -92,7 +92,7 @@ bool WiredTigerIndexUtil::appendCustomStats(WiredTigerRecoveryUnit& ru,
     WiredTigerSession* session = ru.getSession();
     WT_SESSION* s = session->getSession();
     Status status =
-        WiredTigerUtil::exportTableToBSON(s, "statistics:" + uri, "statistics=(fast)", output);
+        WiredTigerUtil::exportTableToBSON(s, "statistics:" + uri, "statistics=(fast)", *output);
     if (!status.isOK()) {
         output->append("error", "unable to retrieve statistics");
         output->append("code", static_cast<int>(status.code()));

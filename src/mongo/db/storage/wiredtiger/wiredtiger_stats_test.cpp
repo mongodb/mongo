@@ -196,7 +196,7 @@ TEST_F(WiredTigerStatsTest, EmptySession) {
 
     {
         BSONObjBuilder bob;
-        ASSERT_OK(WiredTigerUtil::exportTableToBSON(_session, "statistics:", "", &bob));
+        ASSERT_OK(WiredTigerUtil::exportTableToBSON(_session, "statistics:", "", bob));
         LOGV2(9032000, "Connection statistics", "stats"_attr = bob.obj());
     }
 

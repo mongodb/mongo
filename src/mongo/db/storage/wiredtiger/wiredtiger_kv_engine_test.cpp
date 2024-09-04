@@ -765,106 +765,67 @@ MONGO_INITIALIZER(RegisterKVHarnessFactory)(InitializerContext*) {
 
 TEST_F(WiredTigerKVEngineTest, TestHandlerCleanShutdown) {
     auto* engine = _helper.getWiredTigerKVEngine();
-    ASSERT(engine->getWtConnReadyStatus_UNSAFE());
+    ASSERT(engine->isWtConnReadyForStatsCollection_UNSAFE());
     engine->cleanShutdown();
-    ASSERT(!engine->getWtConnReadyStatus_UNSAFE());
-}
-
-TEST_F(WiredTigerKVEngineTest, TestHandlerSingleActivityBeforeShutdown) {
-    auto* engine = _helper.getWiredTigerKVEngine();
-    ASSERT(engine->getWtConnReadyStatus_UNSAFE());
-    ASSERT(engine->getSectionActivityPermit_UNSAFE());
-    ASSERT(engine->getWtConnReadyStatus_UNSAFE());
-    ASSERT_EQ(engine->getActiveSections(), 1);
-    engine->releaseSectionActivityPermit_UNSAFE();
-    ASSERT_EQ(engine->getActiveSections(), 0);
-    ASSERT(engine->getWtConnReadyStatus_UNSAFE());
-    engine->cleanShutdown();
-    ASSERT(!engine->getWtConnReadyStatus_UNSAFE());
+    ASSERT(!engine->isWtConnReadyForStatsCollection_UNSAFE());
 }
 
 TEST_F(WiredTigerKVEngineTest, TestHandlerSingleActivityBeforeShutdownRAII) {
     auto* engine = _helper.getWiredTigerKVEngine();
-    ASSERT(engine->getWtConnReadyStatus_UNSAFE());
+    ASSERT(engine->isWtConnReadyForStatsCollection_UNSAFE());
     {
-        auto permit = engine->tryGetSectionActivityPermit();
+        auto permit = engine->tryGetStatsCollectionPermit();
         ASSERT(permit);
-        ASSERT(engine->getWtConnReadyStatus_UNSAFE());
-        ASSERT_EQ(engine->getActiveSections(), 1);
+        ASSERT(engine->isWtConnReadyForStatsCollection_UNSAFE());
+        ASSERT_EQ(engine->getActiveStatsReaders(), 1);
     }
-    ASSERT_EQ(engine->getActiveSections(), 0);
-    ASSERT(engine->getWtConnReadyStatus_UNSAFE());
+    ASSERT_EQ(engine->getActiveStatsReaders(), 0);
+    ASSERT(engine->isWtConnReadyForStatsCollection_UNSAFE());
     engine->cleanShutdown();
-    ASSERT(!engine->getWtConnReadyStatus_UNSAFE());
+    ASSERT(!engine->isWtConnReadyForStatsCollection_UNSAFE());
 }
 
 TEST_F(WiredTigerKVEngineTest, TestHandlerMultipleActivitiesBeforeShutdownRAII) {
     auto* engine = _helper.getWiredTigerKVEngine();
-    ASSERT(engine->getWtConnReadyStatus_UNSAFE());
+    ASSERT(engine->isWtConnReadyForStatsCollection_UNSAFE());
     {
-        auto permit1 = engine->tryGetSectionActivityPermit();
+        auto permit1 = engine->tryGetStatsCollectionPermit();
         ASSERT(permit1);
-        ASSERT(engine->getWtConnReadyStatus_UNSAFE());
-        ASSERT_EQ(engine->getActiveSections(), 1);
+        ASSERT(engine->isWtConnReadyForStatsCollection_UNSAFE());
+        ASSERT_EQ(engine->getActiveStatsReaders(), 1);
         {
-            auto permit2 = engine->tryGetSectionActivityPermit();
+            auto permit2 = engine->tryGetStatsCollectionPermit();
             ASSERT(permit2);
-            ASSERT(engine->getWtConnReadyStatus_UNSAFE());
-            ASSERT_EQ(engine->getActiveSections(), 2);
+            ASSERT(engine->isWtConnReadyForStatsCollection_UNSAFE());
+            ASSERT_EQ(engine->getActiveStatsReaders(), 2);
         }
-        ASSERT_EQ(engine->getActiveSections(), 1);
+        ASSERT_EQ(engine->getActiveStatsReaders(), 1);
     }
-    ASSERT_EQ(engine->getActiveSections(), 0);
-    ASSERT(engine->getWtConnReadyStatus_UNSAFE());
+    ASSERT_EQ(engine->getActiveStatsReaders(), 0);
+    ASSERT(engine->isWtConnReadyForStatsCollection_UNSAFE());
     engine->cleanShutdown();
-    ASSERT(!engine->getWtConnReadyStatus_UNSAFE());
+    ASSERT(!engine->isWtConnReadyForStatsCollection_UNSAFE());
 }
 
 TEST_F(WiredTigerKVEngineTest, TestHandlerCleanShutdownBeforeActivity) {
     auto* engine = _helper.getWiredTigerKVEngine();
-    ASSERT(engine->getWtConnReadyStatus_UNSAFE());
+    ASSERT(engine->isWtConnReadyForStatsCollection_UNSAFE());
     engine->cleanShutdown();
-    ASSERT(!engine->tryGetSectionActivityPermit());
-    ASSERT_EQ(engine->getActiveSections(), 0);
-    ASSERT(!engine->getWtConnReadyStatus_UNSAFE());
-}
-
-TEST_F(WiredTigerKVEngineTest, TestHandlerCleanShutdownBeforeActivityRAII) {
-    auto* engine = _helper.getWiredTigerKVEngine();
-    ASSERT(engine->getWtConnReadyStatus_UNSAFE());
-    engine->cleanShutdown();
-    ASSERT(!engine->getSectionActivityPermit_UNSAFE());
-    ASSERT_EQ(engine->getActiveSections(), 0);
-    ASSERT(!engine->getWtConnReadyStatus_UNSAFE());
-}
-
-TEST_F(WiredTigerKVEngineTest, TestHandlerCleanShutdownBeforeActivityRelease) {
-    auto* engine = _helper.getWiredTigerKVEngine();
-    ASSERT(engine->getWtConnReadyStatus_UNSAFE());
-    ASSERT(engine->getSectionActivityPermit_UNSAFE());
-    ASSERT(engine->getWtConnReadyStatus_UNSAFE());
-    ASSERT_EQ(engine->getActiveSections(), 1);
-    stdx::thread shudownThread([&]() { engine->cleanShutdown(); });
-    ASSERT_EQ(engine->getActiveSections(), 1);
-    while (engine->getWtConnReadyStatus_UNSAFE()) {
-        stdx::this_thread::yield();
-    }
-    engine->releaseSectionActivityPermit_UNSAFE();
-    shudownThread.join();
-    ASSERT_EQ(engine->getActiveSections(), 0);
-    ASSERT(!engine->getWtConnReadyStatus_UNSAFE());
+    ASSERT(!engine->tryGetStatsCollectionPermit());
+    ASSERT_EQ(engine->getActiveStatsReaders(), 0);
+    ASSERT(!engine->isWtConnReadyForStatsCollection_UNSAFE());
 }
 
 TEST_F(WiredTigerKVEngineTest, TestHandlerCleanShutdownBeforeActivityReleaseRAII) {
     auto* engine = _helper.getWiredTigerKVEngine();
-    ASSERT(engine->getWtConnReadyStatus_UNSAFE());
+    ASSERT(engine->isWtConnReadyForStatsCollection_UNSAFE());
     {
-        auto permit = engine->tryGetSectionActivityPermit();
-        ASSERT(engine->getWtConnReadyStatus_UNSAFE());
-        ASSERT_EQ(engine->getActiveSections(), 1);
+        auto permit = engine->tryGetStatsCollectionPermit();
+        ASSERT(engine->isWtConnReadyForStatsCollection_UNSAFE());
+        ASSERT_EQ(engine->getActiveStatsReaders(), 1);
         stdx::thread shudownThread([&]() { engine->cleanShutdown(); });
-        ASSERT_EQ(engine->getActiveSections(), 1);
-        while (engine->getWtConnReadyStatus_UNSAFE()) {
+        ASSERT_EQ(engine->getActiveStatsReaders(), 1);
+        while (engine->isWtConnReadyForStatsCollection_UNSAFE()) {
             stdx::this_thread::yield();
         }
 
@@ -872,8 +833,26 @@ TEST_F(WiredTigerKVEngineTest, TestHandlerCleanShutdownBeforeActivityReleaseRAII
         permit.reset();
         shudownThread.join();
     }
-    ASSERT_EQ(engine->getActiveSections(), 0);
-    ASSERT(!engine->getWtConnReadyStatus_UNSAFE());
+    ASSERT_EQ(engine->getActiveStatsReaders(), 0);
+    ASSERT(!engine->isWtConnReadyForStatsCollection_UNSAFE());
+}
+
+TEST_F(WiredTigerKVEngineTest, TestRestartUsesNewConn) {
+    auto* engine = _helper.getWiredTigerKVEngine();
+    ASSERT(engine->isWtConnReadyForStatsCollection_UNSAFE());
+
+    {
+        auto permit = engine->tryGetStatsCollectionPermit();
+        ASSERT(permit);
+        ASSERT_EQ(engine->getConnection(), permit->conn());
+    }
+
+    _helper.restartEngine();
+    engine = _helper.getWiredTigerKVEngine();
+
+    auto permit = engine->tryGetStatsCollectionPermit();
+    ASSERT(permit);
+    ASSERT_EQ(engine->getConnection(), permit->conn());
 }
 
 DEATH_TEST_F(WiredTigerKVEngineTest, WaitUntilDurableMustBeOutOfUnitOfWork, "invariant") {
