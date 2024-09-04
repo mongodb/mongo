@@ -1,5 +1,8 @@
 version: 1.0.0
 filters:
+  - "*column*":
+    approvers:
+      - 10gen/server-storage-execution
   - "*":
     approvers:
       - 10gen/server-programmability
