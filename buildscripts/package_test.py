@@ -9,6 +9,10 @@ import sys
 import time
 import traceback
 import uuid
+import requests
+import shutil
+import tarfile
+import subprocess
 
 from concurrent import futures
 from pathlib import Path
@@ -528,6 +532,12 @@ parser.add_argument(
     default="auto",
 )
 parser.add_argument(
+    "--skip-enterprise-check",
+    action="store_true",
+    help="Skip checking archives debug symbols to make sure enterprise code was correctly used.",
+    default=False,
+)
+parser.add_argument(
     "-r", "--retries", type=int, help="Number of times to retry failed tests", default=3
 )
 subparsers = parser.add_subparsers(dest="command")
@@ -638,6 +648,69 @@ if args.command == "branch":
                 packages_urls=urls,
             )
         )
+
+        if not args.skip_enterprise_check:
+            logging.info(
+                "Checking the source files used to build the binaries, use --skip-enterprise-check to skip this check."
+            )
+
+            if args.edition != "enterprise":
+                exception_msg = "Found enterprise code in non-enterprise binary {binfile}."
+
+                def validate_binaries(sources_text):
+                    return "src/mongo/db/modules/enterprise" not in sources_text
+            else:
+                exception_msg = "Failed to find enterprise code in enterprise binary {binfile}."
+
+                def validate_binaries(sources_text):
+                    return "src/mongo/db/modules/enterprise" in sources_text
+
+            os.makedirs("dist-test", exist_ok=True)
+
+            tar = tarfile.open("mongo-binaries.tgz", "r:gz")
+            for member_info in tar.getmembers():
+                logging.info("- extracting: " + member_info.name)
+                tar.extract(member_info, path="dist-test")
+            tar.close()
+
+            tar = tarfile.open("mongo-debugsymbols.tgz", "r:gz")
+            for member_info in tar.getmembers():
+                logging.info("- extracting: " + member_info.name)
+                tar.extract(member_info, path="dist-test")
+            tar.close()
+
+            bins_to_check = ["mongod", "mongos"]
+            bin_dir = None
+            for dirpath, dirnames, filenames in os.walk("dist-test"):
+                for filename in filenames:
+                    if filename in bins_to_check:
+                        bin_dir = dirpath
+                        break
+                if bin_dir:
+                    break
+
+            with open("gdb_commands.txt", "w") as f:
+                f.write("info sources")
+
+            for binfile in bins_to_check:
+                p = subprocess.run(
+                    [
+                        "/opt/mongodbtoolchain/v4/bin/gdb",
+                        "--batch",
+                        "--nx",
+                        "--command=gdb_commands.txt",
+                        f"{os.path.join(bin_dir, binfile)}",
+                    ],
+                    capture_output=True,
+                    text=True,
+                )
+                output_text = p.stdout + p.stderr
+                logging.info(output_text)
+                if not validate_binaries(output_text):
+                    raise Exception(exception_msg.format(binfile=binfile))
+
+                if p.returncode != 0:
+                    raise Exception("GDB process exited non-zero!")
 
 # If os is None we only want to do the tests specified in the arguments
 if args.command == "release":

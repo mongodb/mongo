@@ -1780,6 +1780,8 @@ functions:
     - *get_version_expansions
     - *apply_version_expansions
     - *f_expansions_write
+    - *fetch_dist_tarball
+    - *fetch_dist_debugsymbols
     - command: subprocess.exec
       display_name: "package test py"
       type: test
