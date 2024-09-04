@@ -11,6 +11,11 @@ selector:
   exclude_files:
   # Skip any tests that run with auth explicitly.
   - src/mongo/db/modules/*/jstests/search/auth_list_search_indexes_agg.js
+  # This test creates a race condition with the network in pinned connections mode: if mongod
+  # is still waiting on a response from mongot following the getMore, mongod must close the
+  # connection because it cannot send the killCursor command to mongot while the getMore
+  # command is on-going.
+  - src/mongo/db/modules/enterprise/jstests/mongot/mongot_kill_cursors.js
 
 executor:
   config:
