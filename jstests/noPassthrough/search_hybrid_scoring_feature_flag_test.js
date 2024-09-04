@@ -15,4 +15,10 @@ assert.commandFailedWithCode(
     testDB.runCommand({aggregate: 1, pipeline: [{$rankFusion: {}}], cursor: {}}),
     ErrorCodes.QueryFeatureNotAllowed);
 
+// Pipeline to run $scoreFusion should fail without feature flag turned on. Specified value of 1
+// for aggregate indicates a collection agnostic command. Specified cursor of default batch size.
+assert.commandFailedWithCode(
+    testDB.runCommand({aggregate: 1, pipeline: [{$scoreFusion: {}}], cursor: {}}),
+    ErrorCodes.QueryFeatureNotAllowed);
+
 MongoRunner.stopMongod(conn);
