@@ -415,12 +415,16 @@ const collNamesIgnoredFromDBCheck = [
 export const runDbCheckForDatabase = (replSet,
                                       db,
                                       awaitCompletion = false,
-                                      awaitCompletionTimeoutMs = null) => {
+                                      awaitCompletionTimeoutMs = null,
+                                      dbCheckParameters = {}) => {
     const secondaryIndexCheckEnabled =
         checkSecondaryIndexChecksInDbCheckFeatureFlagEnabled(replSet.getPrimary());
-    let collDbCheckParameters = {};
+    let collDbCheckParameters = dbCheckParameters;
     if (secondaryIndexCheckEnabled) {
-        collDbCheckParameters = {validateMode: "dataConsistencyAndMissingIndexKeysCheck"};
+        collDbCheckParameters = {
+            ...dbCheckParameters,
+            validateMode: "dataConsistencyAndMissingIndexKeysCheck"
+        };
     }
 
     const allowedErrorCodes = [
@@ -468,6 +472,7 @@ export const runDbCheckForDatabase = (replSet,
 
         getIndexNames(db, collName, allowedErrorCodes).forEach(indexName => {
             let extraIndexDbCheckParameters = {
+                ...dbCheckParameters,
                 validateMode: "extraIndexKeysCheck",
                 secondaryIndex: indexName
             };

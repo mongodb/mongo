@@ -22,8 +22,8 @@ selector:
   - jstests/concurrency/fsm_workloads/reindex_background.js
   - jstests/concurrency/fsm_workloads/reindex_writeconflict.js
 
-    # This workload can cause dbcheck running in the background to time out.
-    - jstests/concurrency/fsm_workloads/compact.js
+  # This workload can cause dbcheck running in the background to time out.
+  - jstests/concurrency/fsm_workloads/compact.js
 
   exclude_with_any_tags:
   - requires_sharding
