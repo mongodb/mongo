@@ -240,34 +240,35 @@ buildvariants:
       - name: compile_upload_benchmarks_TG
       - name: .benchmarks_sep
 
-  # Run all-feature-flags along with recordIdsReplicated:true on all collections.
-  - &enterprise-amazon-linux2-arm64-all-feature-flags-recordIdsReplicated
-    <<: *enterprise-amazon-linux2-arm64-all-feature-flags-template
-    name: enterprise-amazon-linux2-arm64-all-feature-flags-recordIdsReplicated
-    display_name: "Amazon Linux 2 arm64 Enterprise (all feature flags) recordIdsReplicated"
-    tags: []
-    # Run daily once at 4 AM.
-    cron: "0 4 * * *"
-    tasks:
-      - name: .development_critical !.requires_large_host !.requires_compile_variant !.incompatible_development_variant !.incompatible_all_feature_flags !.multiversion !.serverless !.exclude_when_record_ids_replicated
-      - name: .development_critical .requires_large_host !.requires_compile_variant !.incompatible_development_variant !.incompatible_all_feature_flags !.multiversion !.serverless !.exclude_when_record_ids_replicated
-        distros:
-          - amazon2-arm64-atlas-latest-large
-      - name: .release_critical !.requires_large_host !.requires_compile_variant !.incompatible_development_variant !.incompatible_all_feature_flags !.multiversion !.serverless !.exclude_when_record_ids_replicated
-      - name: .release_critical .requires_large_host !.requires_compile_variant !.incompatible_development_variant !.incompatible_all_feature_flags !.multiversion !.serverless !.exclude_when_record_ids_replicated
-        distros:
-          - amazon2-arm64-atlas-latest-large
-      - name: .default !.requires_large_host !.requires_compile_variant !.incompatible_development_variant !.incompatible_all_feature_flags !.multiversion !.serverless !.exclude_when_record_ids_replicated
-      - name: .default .requires_large_host !.requires_compile_variant !.incompatible_development_variant !.incompatible_all_feature_flags !.multiversion !.serverless !.exclude_when_record_ids_replicated
-        distros:
-          - amazon2-arm64-atlas-latest-large
-    expansions:
-      <<: *enterprise-amazon-linux2-arm64-all-feature-flags-expansions
-      # This builder excludes tests tagged with:
-      # 1) exclude_when_record_ids_replicated: indicates that the test is particular about recordIdsReplicated:false
-      # 2) disables_test_commands: this builder uses failpoints, and setting disables_test_commands means that the builder can't use failpoints.
-      # 3) serverless: Retryable writes on the serverless cause problems with recordIdsReplicated:true
-      test_flags: >-
-        --runAllFeatureFlagTests
-        --excludeWithAnyTags=incompatible_with_amazon_linux,requires_external_data_source,exclude_when_record_ids_replicated,disables_test_commands,incompatible_with_atlas_environment,requires_ldap_pool
-        --mongodSetParameters="{'failpoint.overrideRecordIdsReplicatedDefault': {mode: 'alwaysOn'}, 'failpoint.automaticallyCollmodToRecordIdsReplicatedFalse': {mode: 'alwaysOn'}}"
+  # TODO SERVER-94401: Reenable testing this variant.
+  # # Run all-feature-flags along with recordIdsReplicated:true on all collections.
+  # - &enterprise-amazon-linux2-arm64-all-feature-flags-recordIdsReplicated
+  #   <<: *enterprise-amazon-linux2-arm64-all-feature-flags-template
+  #   name: enterprise-amazon-linux2-arm64-all-feature-flags-recordIdsReplicated
+  #   display_name: "Amazon Linux 2 arm64 Enterprise (all feature flags) recordIdsReplicated"
+  #   tags: []
+  #   # Run daily once at 4 AM.
+  #   cron: "0 4 * * *"
+  #   tasks:
+  #     - name: .development_critical !.requires_large_host !.requires_compile_variant !.incompatible_development_variant !.incompatible_all_feature_flags !.multiversion !.serverless !.exclude_when_record_ids_replicated
+  #     - name: .development_critical .requires_large_host !.requires_compile_variant !.incompatible_development_variant !.incompatible_all_feature_flags !.multiversion !.serverless !.exclude_when_record_ids_replicated
+  #       distros:
+  #         - amazon2-arm64-atlas-latest-large
+  #     - name: .release_critical !.requires_large_host !.requires_compile_variant !.incompatible_development_variant !.incompatible_all_feature_flags !.multiversion !.serverless !.exclude_when_record_ids_replicated
+  #     - name: .release_critical .requires_large_host !.requires_compile_variant !.incompatible_development_variant !.incompatible_all_feature_flags !.multiversion !.serverless !.exclude_when_record_ids_replicated
+  #       distros:
+  #         - amazon2-arm64-atlas-latest-large
+  #     - name: .default !.requires_large_host !.requires_compile_variant !.incompatible_development_variant !.incompatible_all_feature_flags !.multiversion !.serverless !.exclude_when_record_ids_replicated
+  #     - name: .default .requires_large_host !.requires_compile_variant !.incompatible_development_variant !.incompatible_all_feature_flags !.multiversion !.serverless !.exclude_when_record_ids_replicated
+  #       distros:
+  #         - amazon2-arm64-atlas-latest-large
+  #   expansions:
+  #     <<: *enterprise-amazon-linux2-arm64-all-feature-flags-expansions
+  #     # This builder excludes tests tagged with:
+  #     # 1) exclude_when_record_ids_replicated: indicates that the test is particular about recordIdsReplicated:false
+  #     # 2) disables_test_commands: this builder uses failpoints, and setting disables_test_commands means that the builder can't use failpoints.
+  #     # 3) serverless: Retryable writes on the serverless cause problems with recordIdsReplicated:true
+  #     test_flags: >-
+  #       --runAllFeatureFlagTests
+  #       --excludeWithAnyTags=incompatible_with_amazon_linux,requires_external_data_source,exclude_when_record_ids_replicated,disables_test_commands,incompatible_with_atlas_environment,requires_ldap_pool
+  #       --mongodSetParameters="{'failpoint.overrideRecordIdsReplicatedDefault': {mode: 'alwaysOn'}, 'failpoint.automaticallyCollmodToRecordIdsReplicatedFalse': {mode: 'alwaysOn'}}"
