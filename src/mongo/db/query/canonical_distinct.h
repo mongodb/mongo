@@ -32,18 +32,12 @@
 #include <boost/move/utility_core.hpp>
 #include <boost/none.hpp>
 #include <boost/optional/optional.hpp>
-#include <memory>
 #include <string>
 #include <utility>
 
-#include "mongo/base/status_with.h"
-#include "mongo/bson/bsonobj.h"
-#include "mongo/db/matcher/extensions_callback.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/query/collation/collator_interface.h"
-#include "mongo/util/assert_util_core.h"
-#include "mongo/util/intrusive_counter.h"
 #include "mongo/util/uuid.h"
 
 namespace mongo {
@@ -67,8 +61,12 @@ public:
 
     CanonicalDistinct(const std::string key,
                       const bool mirrored = false,
-                      const boost::optional<UUID> sampleId = boost::none)
-        : _key(std::move(key)), _mirrored(std::move(mirrored)), _sampleId(std::move(sampleId)) {}
+                      const boost::optional<UUID> sampleId = boost::none,
+                      boost::optional<BSONObj> projSpec = boost::none)
+        : _key(std::move(key)),
+          _mirrored(std::move(mirrored)),
+          _sampleId(std::move(sampleId)),
+          _projSpec(std::move(projSpec)) {}
 
     const std::string& getKey() const {
         return _key;
@@ -80,6 +78,10 @@ public:
 
     bool isMirrored() const {
         return _mirrored;
+    }
+
+    const boost::optional<BSONObj>& getProjectionSpec() const {
+        return _projSpec;
     }
 
     static boost::intrusive_ptr<ExpressionContext> makeExpressionContext(
@@ -98,6 +100,9 @@ private:
 
     // The unique sample id for this operation if it has been chosen for sampling.
     boost::optional<UUID> _sampleId;
+
+    // This is used when we have a covered distinct scan in order to materialize the output.
+    boost::optional<BSONObj> _projSpec;
 };
 
 }  // namespace mongo

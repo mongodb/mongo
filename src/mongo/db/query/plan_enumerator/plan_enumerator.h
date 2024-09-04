@@ -95,6 +95,9 @@ struct PlanEnumeratorParams {
     const projection_ast::Projection* projection;
     const boost::optional<SortPattern>* sort;
     BSONObj shardKey;
+
+    // Whether or not this is a distinct query.
+    bool distinct;
 };
 
 /**
@@ -531,6 +534,9 @@ private:
     const projection_ast::Projection* _projection;
     boost::optional<stdx::unordered_set<std::string>> _sortPatFields;
     BSONObj _shardKey;
+
+    // Whether or not this is a distinct query.
+    const bool _distinct;
 };
 
 }  // namespace plan_enumerator

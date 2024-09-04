@@ -56,11 +56,11 @@ bool isAnyComponentOfPathMultikey(const BSONObj& indexKeyPattern,
  * If the provided solution could be mutated successfully, returns true, otherwise returns
  * false. This conversion is known as the 'distinct hack'.
  */
-bool turnIxscanIntoDistinctIxscan(const CanonicalQuery& canonicalQuery,
-                                  QuerySolution* soln,
-                                  const std::string& field,
-                                  bool strictDistinctOnly,
-                                  bool flipDistinctScanDirection = false);
+bool turnIxscanIntoDistinctScan(const CanonicalQuery& canonicalQuery,
+                                QuerySolution* soln,
+                                const std::string& field,
+                                bool strictDistinctOnly,
+                                bool flipDistinctScanDirection = false);
 
 /**
  * If the canonical query doesn't have a filter and a sort, the query planner won't try to build an

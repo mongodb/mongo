@@ -235,11 +235,11 @@ std::unique_ptr<QuerySolution> createDistinctScanSolution(const CanonicalQuery& 
                                              QueryPlannerParams::STRICT_DISTINCT_ONLY);
 
             for (size_t i = 0; i < solutions.size(); ++i) {
-                if (turnIxscanIntoDistinctIxscan(canonicalQuery,
-                                                 solutions[i].get(),
-                                                 canonicalDistinct.getKey(),
-                                                 strictDistinctOnly,
-                                                 flipDistinctScanDirection)) {
+                if (turnIxscanIntoDistinctScan(canonicalQuery,
+                                               solutions[i].get(),
+                                               canonicalDistinct.getKey(),
+                                               strictDistinctOnly,
+                                               flipDistinctScanDirection)) {
                     // The first suitable distinct scan is as good as any other.
                     return std::move(solutions[i]);
                 }
@@ -278,11 +278,11 @@ bool isAnyComponentOfPathMultikey(const BSONObj& indexKeyPattern,
     return !indexMultikeyInfo[keyPatternFieldIndex].empty();
 }
 
-bool turnIxscanIntoDistinctIxscan(const CanonicalQuery& canonicalQuery,
-                                  QuerySolution* soln,
-                                  const std::string& field,
-                                  bool strictDistinctOnly,
-                                  bool flipDistinctScanDirection) {
+bool turnIxscanIntoDistinctScan(const CanonicalQuery& canonicalQuery,
+                                QuerySolution* soln,
+                                const std::string& field,
+                                bool strictDistinctOnly,
+                                bool flipDistinctScanDirection) {
     auto root = soln->root();
 
     // Temporarily check if the plan already contains a distinct scan. That happens in the

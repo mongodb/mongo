@@ -32,7 +32,6 @@
 #include <boost/smart_ptr.hpp>
 #include <cstddef>
 #include <memory>
-#include <mutex>
 #include <set>
 #include <string>
 #include <utility>
@@ -52,7 +51,6 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/util/builder.h"
 #include "mongo/client/read_preference.h"
-#include "mongo/db/api_parameters.h"
 #include "mongo/db/auth/authorization_checks.h"
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/auth/privilege.h"
@@ -62,7 +60,6 @@
 #include "mongo/db/client.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/commands/query_cmd/run_aggregate.h"
-#include "mongo/db/concurrency/lock_manager_defs.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/database_name.h"
 #include "mongo/db/db_raii.h"
@@ -83,13 +80,9 @@
 #include "mongo/db/query/find_common.h"
 #include "mongo/db/query/get_executor.h"
 #include "mongo/db/query/plan_executor.h"
-#include "mongo/db/query/plan_explainer.h"
 #include "mongo/db/query/plan_summary_stats.h"
 #include "mongo/db/query/query_planner_params.h"
-#include "mongo/db/query/query_settings/query_settings_gen.h"
 #include "mongo/db/query/query_settings/query_settings_utils.h"
-#include "mongo/db/query/query_shape/distinct_cmd_shape.h"
-#include "mongo/db/query/query_shape/query_shape.h"
 #include "mongo/db/query/view_response_formatter.h"
 #include "mongo/db/read_concern_support_result.h"
 #include "mongo/db/repl/read_concern_args.h"
@@ -111,7 +104,6 @@
 #include "mongo/s/analyze_shard_key_common_gen.h"
 #include "mongo/s/query_analysis_sampler_util.h"
 #include "mongo/util/assert_util.h"
-#include "mongo/util/database_name_util.h"
 #include "mongo/util/decorable.h"
 #include "mongo/util/future.h"
 #include "mongo/util/serialization_context.h"
@@ -128,7 +120,8 @@ std::unique_ptr<CanonicalQuery> parseDistinctCmd(
     const BSONObj& cmdObj,
     const ExtensionsCallback& extensionsCallback,
     const CollatorInterface* defaultCollator,
-    boost::optional<ExplainOptions::Verbosity> verbosity) {
+    boost::optional<ExplainOptions::Verbosity> verbosity,
+    bool isDistinctMultiplanningEnabled) {
     const auto vts = auth::ValidatedTenancyScope::get(opCtx);
     const auto serializationContext = vts != boost::none
         ? SerializationContext::stateCommandRequest(vts->hasTenantId(), vts->isFromAtlasProxy())
@@ -162,8 +155,8 @@ std::unique_ptr<CanonicalQuery> parseDistinctCmd(
     // on mongod if present.
     expCtx->setQuerySettingsIfNotPresent(
         query_settings::lookupQuerySettingsForDistinct(expCtx, *parsedDistinct, nss));
-    return parsed_distinct_command::parseCanonicalQuery(std::move(expCtx),
-                                                        std::move(parsedDistinct));
+    return parsed_distinct_command::parseCanonicalQuery(
+        std::move(expCtx), std::move(parsedDistinct), nullptr, isDistinctMultiplanningEnabled);
 }
 
 namespace dps = dotted_path_support;
@@ -174,7 +167,8 @@ namespace {
 std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> createExecutorForDistinctCommand(
     OperationContext* opCtx,
     std::unique_ptr<CanonicalQuery> canonicalQuery,
-    const CollectionAcquisition& coll) {
+    const CollectionAcquisition& coll,
+    bool isDistinctMultiplanningEnabled) {
     const auto yieldPolicy = PlanYieldPolicy::YieldPolicy::YIELD_AUTO;
     const auto& collectionPtr = coll.getCollectionPtr();
     const MultipleCollectionAccessor collections{coll};
@@ -186,10 +180,6 @@ std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> createExecutorForDistinctCo
             getExecutorFind(opCtx, collections, std::move(canonicalQuery), yieldPolicy));
     }
 
-    const auto fcvSnapshot = serverGlobalParams.featureCompatibility.acquireFCVSnapshot();
-    bool isDistinctMultiplanningEnabled = feature_flags::gFeatureFlagShardFilteringDistinctScan
-                                              .isEnabledUseLastLTSFCVWhenUninitialized(fcvSnapshot);
-
     // Try creating a plan that does DISTINCT_SCAN.
     auto swQuerySolution = tryGetQuerySolutionForDistinct(
         collections, QueryPlannerParams::DEFAULT, *canonicalQuery, isDistinctMultiplanningEnabled);
@@ -200,8 +190,6 @@ std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> createExecutorForDistinctCo
                                                    std::move(swQuerySolution.getValue())));
     }
 
-    // TODO SERVER-93059: Investigate whether to keep the projection field of the canonical query
-    // when multiplanning is enabled.
     if (isDistinctMultiplanningEnabled) {
         return uassertStatusOK(
             getExecutorFind(opCtx,
@@ -347,8 +335,18 @@ public:
             ? collectionOrView->getCollectionPtr()->getDefaultCollator()
             : nullptr;
 
-        auto canonicalQuery = parseDistinctCmd(
-            opCtx, nss, cmdObj, ExtensionsCallbackReal(opCtx, &nss), defaultCollator, verbosity);
+        const auto fcvSnapshot = serverGlobalParams.featureCompatibility.acquireFCVSnapshot();
+        bool isDistinctMultiplanningEnabled =
+            feature_flags::gFeatureFlagShardFilteringDistinctScan
+                .isEnabledUseLastLTSFCVWhenUninitialized(fcvSnapshot);
+
+        auto canonicalQuery = parseDistinctCmd(opCtx,
+                                               nss,
+                                               cmdObj,
+                                               ExtensionsCallbackReal(opCtx, &nss),
+                                               defaultCollator,
+                                               verbosity,
+                                               isDistinctMultiplanningEnabled);
 
         if (collectionOrView->isView()) {
             // Relinquish locks. The aggregation command will re-acquire them.
@@ -357,8 +355,10 @@ public:
             return Status::OK();
         }
 
-        auto executor = createExecutorForDistinctCommand(
-            opCtx, std::move(canonicalQuery), collectionOrView->getCollection());
+        auto executor = createExecutorForDistinctCommand(opCtx,
+                                                         std::move(canonicalQuery),
+                                                         collectionOrView->getCollection(),
+                                                         isDistinctMultiplanningEnabled);
         SerializationContext serializationCtx = request.getSerializationContext();
         auto bodyBuilder = replyBuilder->getBodyBuilder();
         Explain::explainStages(executor.get(),
@@ -439,8 +439,18 @@ public:
             ? collectionOrView->getCollectionPtr()->getDefaultCollator()
             : nullptr;
 
-        auto canonicalQuery = parseDistinctCmd(
-            opCtx, nss, cmdObj, ExtensionsCallbackReal(opCtx, &nss), defaultCollation, {});
+        const auto fcvSnapshot = serverGlobalParams.featureCompatibility.acquireFCVSnapshot();
+        bool isDistinctMultiplanningEnabled =
+            feature_flags::gFeatureFlagShardFilteringDistinctScan
+                .isEnabledUseLastLTSFCVWhenUninitialized(fcvSnapshot);
+
+        auto canonicalQuery = parseDistinctCmd(opCtx,
+                                               nss,
+                                               cmdObj,
+                                               ExtensionsCallbackReal(opCtx, &nss),
+                                               defaultCollation,
+                                               {},
+                                               isDistinctMultiplanningEnabled);
         const CanonicalDistinct& canonicalDistinct = *canonicalQuery->getDistinct();
 
         if (canonicalDistinct.isMirrored()) {
@@ -472,8 +482,10 @@ public:
         uassertStatusOK(replCoord->checkCanServeReadsFor(
             opCtx, nss, ReadPreferenceSetting::get(opCtx).canRunOnSecondary()));
 
-        auto executor = createExecutorForDistinctCommand(
-            opCtx, std::move(canonicalQuery), collectionOrView->getCollection());
+        auto executor = createExecutorForDistinctCommand(opCtx,
+                                                         std::move(canonicalQuery),
+                                                         collectionOrView->getCollection(),
+                                                         isDistinctMultiplanningEnabled);
 
         {
             stdx::lock_guard<Client> lk(*opCtx->getClient());

@@ -10,13 +10,6 @@
 	"rejectedPlans" : [
 		[
 			{
-				"stage" : "PROJECTION_SIMPLE",
-				"transformBy" : {
-					"_id" : 0,
-					"x" : 1
-				}
-			},
-			{
 				"stage" : "FETCH"
 			},
 			{
@@ -42,13 +35,6 @@
 		]
 	],
 	"winningPlan" : [
-		{
-			"stage" : "PROJECTION_SIMPLE",
-			"transformBy" : {
-				"_id" : 0,
-				"x" : 1
-			}
-		},
 		{
 			"stage" : "FETCH"
 		},
@@ -220,13 +206,6 @@
 	"rejectedPlans" : [
 		[
 			{
-				"stage" : "PROJECTION_SIMPLE",
-				"transformBy" : {
-					"_id" : 0,
-					"x" : 1
-				}
-			},
-			{
 				"stage" : "FETCH"
 			},
 			{
@@ -251,13 +230,6 @@
 			}
 		],
 		[
-			{
-				"stage" : "PROJECTION_SIMPLE",
-				"transformBy" : {
-					"_id" : 0,
-					"x" : 1
-				}
-			},
 			{
 				"stage" : "FETCH"
 			},
@@ -375,13 +347,6 @@
 		],
 		[
 			{
-				"stage" : "PROJECTION_SIMPLE",
-				"transformBy" : {
-					"_id" : 0,
-					"x" : 1
-				}
-			},
-			{
 				"stage" : "FETCH"
 			},
 			{
@@ -407,13 +372,6 @@
 		]
 	],
 	"winningPlan" : [
-		{
-			"stage" : "PROJECTION_SIMPLE",
-			"transformBy" : {
-				"_id" : 0,
-				"x" : 1
-			}
-		},
 		{
 			"stage" : "FETCH"
 		},

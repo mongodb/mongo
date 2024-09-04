@@ -194,8 +194,12 @@ std::unique_ptr<PlanStage> ClassicStageBuilder::build(const QuerySolutionNode* r
             auto childStage = build(pn->children[0].get());
             return std::make_unique<ProjectionStageDefault>(
                 _cq.getExpCtx(),
-                _cq.getFindCommandRequest().getProjection(),
-                _cq.getProj(),
+                // In case of a "distinct" query, we may add a projection stage without the
+                // canonical query actually explicitly having a projection.
+                _cq.getDistinct() && _cq.getDistinct()->getProjectionSpec()
+                    ? *_cq.getDistinct()->getProjectionSpec()
+                    : _cq.getFindCommandRequest().getProjection(),
+                &pn->proj,
                 _ws,
                 std::move(childStage));
         }
@@ -204,8 +208,12 @@ std::unique_ptr<PlanStage> ClassicStageBuilder::build(const QuerySolutionNode* r
             auto childStage = build(pn->children[0].get());
             return std::make_unique<ProjectionStageCovered>(
                 _cq.getExpCtxRaw(),
-                _cq.getFindCommandRequest().getProjection(),
-                _cq.getProj(),
+                // In case of a "distinct" query, we may add a projection stage without the
+                // canonical query actually explicitly having a projection.
+                _cq.getDistinct() && _cq.getDistinct()->getProjectionSpec()
+                    ? *_cq.getDistinct()->getProjectionSpec()
+                    : _cq.getFindCommandRequest().getProjection(),
+                &pn->proj,
                 _ws,
                 std::move(childStage),
                 pn->coveredKeyObj);

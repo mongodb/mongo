@@ -28,12 +28,11 @@
  */
 
 #include "mongo/db/query/parsed_distinct_command.h"
+
 #include "mongo/db/pipeline/document_source_replace_root.h"
 #include "mongo/db/query/canonical_query.h"
 #include "mongo/db/query/collation/collator_factory_interface.h"
 #include "mongo/db/query/query_request_helper.h"
-
-#include <iostream>
 
 namespace mongo {
 
@@ -97,17 +96,22 @@ void addReplaceRootForDistinct(BSONArrayBuilder* pipelineBuilder, const FieldPat
     }
 }
 
-/**
- * Creates a projection spec for a distinct command from the requested field. In most cases, the
- * projection spec will be {_id: 0, key: 1}.
- * The exceptions are:
- * 1) When the requested field is '_id', the projection spec will {_id: 1}.
- * 2) When the requested field could be an array element (eg. a.0), the projected field will be the
- *    prefix of the field up to the array element. For example, a.b.2 => {_id: 0, 'a.b': 1} Note
- *    that we can't use a $slice projection because the distinct command filters the results from
- *    the executor using the dotted field name. Using $slice will re-order the documents in the
- *    array in the results.
- */
+std::unique_ptr<CollatorInterface> resolveCollator(OperationContext* opCtx,
+                                                   const DistinctCommandRequest& distinct) {
+    auto collation = distinct.getCollation();
+
+    if (!collation || collation->isEmpty()) {
+        return nullptr;
+    }
+    return uassertStatusOKWithContext(
+        CollatorFactoryInterface::get(opCtx->getServiceContext())->makeFromBSON(*collation),
+        "unable to parse collation");
+}
+
+}  // namespace
+
+namespace parsed_distinct_command {
+
 BSONObj getDistinctProjection(const std::string& field) {
     std::string projectedField(field);
 
@@ -124,22 +128,6 @@ BSONObj getDistinctProjection(const std::string& field) {
     bob.append(projectedField, 1);
     return bob.obj();
 }
-
-std::unique_ptr<CollatorInterface> resolveCollator(OperationContext* opCtx,
-                                                   const DistinctCommandRequest& distinct) {
-    auto collation = distinct.getCollation();
-
-    if (!collation || collation->isEmpty()) {
-        return nullptr;
-    }
-    return uassertStatusOKWithContext(
-        CollatorFactoryInterface::get(opCtx->getServiceContext())->makeFromBSON(*collation),
-        "unable to parse collation");
-}
-
-}  // namespace
-
-namespace parsed_distinct_command {
 
 std::unique_ptr<ParsedDistinctCommand> parse(
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
@@ -247,7 +235,8 @@ StatusWith<BSONObj> asAggregation(const CanonicalQuery& query) {
 std::unique_ptr<CanonicalQuery> parseCanonicalQuery(
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
     std::unique_ptr<ParsedDistinctCommand> parsedDistinct,
-    const CollatorInterface* defaultCollator) {
+    const CollatorInterface* defaultCollator,
+    bool isDistinctMultiplanningEnabled) {
     auto& distinctRequest = *parsedDistinct->distinctCommandRequest;
     uassert(31032,
             "Key field cannot contain an embedded null byte",
@@ -257,7 +246,10 @@ std::unique_ptr<CanonicalQuery> parseCanonicalQuery(
     if (auto query = distinctRequest.getQuery()) {
         findRequest->setFilter(query->getOwned());
     }
-    findRequest->setProjection(getDistinctProjection(std::string(distinctRequest.getKey())));
+    auto projection = getDistinctProjection(std::string(distinctRequest.getKey()));
+    if (!isDistinctMultiplanningEnabled) {
+        findRequest->setProjection(projection);
+    }
     findRequest->setHint(distinctRequest.getHint().getOwned());
     if (auto& rc = distinctRequest.getReadConcern()) {
         findRequest->setReadConcern(rc);
@@ -281,9 +273,12 @@ std::unique_ptr<CanonicalQuery> parseCanonicalQuery(
 
     auto cq = std::make_unique<CanonicalQuery>(
         CanonicalQueryParams{.expCtx = expCtx, .parsedFind = std::move(parsedFind)});
-    cq->setDistinct(CanonicalDistinct(distinctRequest.getKey().toString(),
-                                      distinctRequest.getMirrored().value_or(false),
-                                      distinctRequest.getSampleId()));
+
+    cq->setDistinct(CanonicalDistinct(
+        distinctRequest.getKey().toString(),
+        distinctRequest.getMirrored().value_or(false),
+        distinctRequest.getSampleId(),
+        isDistinctMultiplanningEnabled ? boost::make_optional(projection) : boost::none));
 
     if (auto collator = expCtx->getCollator()) {
         cq->setCollator(collator->clone());

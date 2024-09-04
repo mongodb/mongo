@@ -35,14 +35,11 @@
 #include <boost/move/utility_core.hpp>
 #include <boost/none.hpp>
 #include <boost/optional/optional.hpp>
-#include <cstdint>
 #include <cstring>
 #include <s2cellid.h>
 // IWYU pragma: no_include "ext/alloc_traits.h"
 #include <algorithm>
-#include <ostream>
 #include <set>
-#include <type_traits>
 #include <vector>
 
 #include "mongo/base/checked_cast.h"
@@ -51,7 +48,6 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/bsontypes.h"
 #include "mongo/bson/simple_bsonelement_comparator.h"
-#include "mongo/db/basic_types.h"
 #include "mongo/db/exec/document_value/document_metadata_fields.h"
 #include "mongo/db/index/expression_params.h"
 #include "mongo/db/index/multikey_paths.h"
@@ -61,7 +57,6 @@
 #include "mongo/db/matcher/expression_geo.h"
 #include "mongo/db/pipeline/dependencies.h"
 #include "mongo/db/pipeline/field_path.h"
-#include "mongo/db/query/bson/dotted_path_support.h"
 #include "mongo/db/query/distinct_access.h"
 #include "mongo/db/query/find_command.h"
 #include "mongo/db/query/index_bounds.h"
@@ -70,6 +65,7 @@
 #include "mongo/db/query/interval_evaluation_tree.h"
 #include "mongo/db/query/optimizer/algebra/polyvalue.h"
 #include "mongo/db/query/projection.h"
+#include "mongo/db/query/projection_parser.h"
 #include "mongo/db/query/query_knob_configuration.h"
 #include "mongo/db/query/query_planner_common.h"
 #include "mongo/db/query/query_request_helper.h"
@@ -77,11 +73,10 @@
 #include "mongo/db/query/stage_types.h"
 #include "mongo/logv2/log.h"
 #include "mongo/logv2/log_attr.h"
-#include "mongo/logv2/log_component.h"
 #include "mongo/logv2/redaction.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/util/assert_util.h"
-#include "mongo/util/str.h"
+#include "mongo/util/debug_util.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
 
@@ -508,13 +503,27 @@ const ColumnIndexScanNode* treeSourceIsColumnScan(const QuerySolutionNode* root)
 /**
  * When a projection needs to be added to the solution tree, this function chooses between the
  * default implementation and one of the fast paths.
+ *
+ * If 'projectionOverride' is specified, use this instead of a projection set on the canonical
+ * query.
+ *
+ * If 'mayProvideAdditionalFields' is set to false, we will always project exactly the fields in
+ * the specification. If it is set to true, we will set up the plan to do the minimum amount of
+ * work to include the fields in the specification without excluding any additional fields, i.e. the
+ * plan may return fields that are not present in the projection specification.
  */
-std::unique_ptr<QuerySolutionNode> analyzeProjection(const CanonicalQuery& query,
-                                                     std::unique_ptr<QuerySolutionNode> solnRoot,
-                                                     const bool hasSortStage) {
+std::unique_ptr<QuerySolutionNode> analyzeProjection(
+    const CanonicalQuery& query,
+    std::unique_ptr<QuerySolutionNode> solnRoot,
+    const bool hasSortStage,
+    boost::optional<projection_ast::Projection> projectionOverride = boost::none,
+    bool mayProvideAdditionalFields = false) {
     LOGV2_DEBUG(20949, 5, "PROJECTION: Current plan", "plan"_attr = redact(solnRoot->toString()));
 
-    const auto& projection = *query.getProj();
+    const auto& projection = projectionOverride ? *projectionOverride : *query.getProj();
+    tassert(9305901,
+            "Can only permit additional fields when projection is strictly inclusive",
+            !mayProvideAdditionalFields || projection.isInclusionOnly());
 
     // If the projection requires the entire document we add a fetch stage if not present. Otherwise
     // we add a fetch stage if we are not covered.
@@ -524,6 +533,12 @@ std::unique_ptr<QuerySolutionNode> analyzeProjection(const CanonicalQuery& query
         auto fetch = std::make_unique<FetchNode>();
         fetch->children.push_back(std::move(solnRoot));
         solnRoot = std::move(fetch);
+    }
+
+    if (mayProvideAdditionalFields && solnRoot->fetched()) {
+        // If we have a FETCH stage, all fields are provided, so we can return here since we're
+        // guaranteed to provide the fields in the projection.
+        return addSortKeyGeneratorStageIfNeeded(query, hasSortStage, std::move(solnRoot));
     }
 
     // With the previous fetch analysis we know we have all the required fields. We know we have a
@@ -585,6 +600,44 @@ std::unique_ptr<QuerySolutionNode> analyzeProjection(const CanonicalQuery& query
         addSortKeyGeneratorStageIfNeeded(query, hasSortStage, std::move(solnRoot)),
         query.getPrimaryMatchExpression(),
         projection);
+}
+
+/**
+ * Ensure our distinct() plan is able to provide & materialize the fields we require by potentially
+ * adding a FETCH, PROJECTION_COVERED, or PROJECTION_DEFAULT stage.
+ */
+std::unique_ptr<QuerySolutionNode> analyzeDistinct(const CanonicalQuery& query,
+                                                   std::unique_ptr<QuerySolutionNode> solnRoot,
+                                                   const bool hasSortStage) {
+    LOGV2_DEBUG(9305900, 5, "DISTINCT: Current plan", "plan"_attr = redact(solnRoot->toString()));
+    tassert(9305902,
+            "Unexpected projection on canonical query when applying projection optimization to "
+            "distinct",
+            !query.getProj());
+
+    const auto& distinct = *query.getDistinct();
+    auto projectionBSON = distinct.getProjectionSpec();
+    if (!projectionBSON) {
+        // This was likely called from aggregation: add a FETCH stage to make sure we provide all
+        // fields.
+        auto fetch = std::make_unique<FetchNode>();
+        fetch->children.push_back(std::move(solnRoot));
+        solnRoot = std::move(fetch);
+        return addSortKeyGeneratorStageIfNeeded(query, hasSortStage, std::move(solnRoot));
+    }
+
+    auto projection = projection_ast::parseAndAnalyze(query.getExpCtx(),
+                                                      *projectionBSON,
+                                                      ProjectionPolicies::findProjectionPolicies(),
+                                                      true /* shouldOptimize */);
+    // We don't actually have a projection on the query, so we use a projection specification
+    // generated for this distinct() to determine if we need a FETCH or if this query can be
+    // covered.
+    return analyzeProjection(query,
+                             std::move(solnRoot),
+                             hasSortStage,
+                             std::move(projection),
+                             true /* mayProvideAdditionalFields */);
 }
 
 /**
@@ -1412,6 +1465,11 @@ std::unique_ptr<QuerySolution> QueryPlannerAnalysis::analyzeDataAccess(
         solnRoot = std::move(skip);
     }
 
+    const auto fcvSnapshot = serverGlobalParams.featureCompatibility.acquireFCVSnapshot();
+    const bool isDistinctScanMultiplanningEnabled =
+        feature_flags::gFeatureFlagShardFilteringDistinctScan
+            .isEnabledUseLastLTSFCVWhenUninitialized(fcvSnapshot);
+
     // Project the results.
     if (findCommand.getReturnKey()) {
         // We don't need a projection stage if returnKey was requested since the intended behavior
@@ -1423,6 +1481,11 @@ std::unique_ptr<QuerySolution> QueryPlannerAnalysis::analyzeDataAccess(
                 : std::vector<FieldPath>{});
     } else if (query.getProj()) {
         solnRoot = analyzeProjection(query, std::move(solnRoot), hasSortStage);
+    } else if (isDistinctScanMultiplanningEnabled && query.getDistinct()) {
+        // While projections take priority, if we don't have one explicitly on the command, we can
+        // choose to add a projection or a fetch if we know our index can cover the distinct query
+        // but we want to be able to materialize the results as BSON in the executor.
+        solnRoot = analyzeDistinct(query, std::move(solnRoot), hasSortStage);
     } else {
         // Even if there's no projection, the client may want sort key metadata.
         solnRoot = addSortKeyGeneratorStageIfNeeded(query, hasSortStage, std::move(solnRoot));
@@ -1454,17 +1517,14 @@ std::unique_ptr<QuerySolution> QueryPlannerAnalysis::analyzeDataAccess(
     soln->setRoot(std::move(solnRoot));
 
     // Try to convert the query solution to have a DISTINCT_SCAN.
-    const auto fcvSnapshot = serverGlobalParams.featureCompatibility.acquireFCVSnapshot();
-    if (feature_flags::gFeatureFlagShardFilteringDistinctScan
-            .isEnabledUseLastLTSFCVWhenUninitialized(fcvSnapshot) &&
-        query.getDistinct()) {
+    if (isDistinctScanMultiplanningEnabled && query.getDistinct()) {
         const bool strictDistinctOnly =
             (params.mainCollectionInfo.options & QueryPlannerParams::STRICT_DISTINCT_ONLY);
-        turnIxscanIntoDistinctIxscan(query,
-                                     soln.get(),
-                                     query.getDistinct()->getKey(),
-                                     strictDistinctOnly,
-                                     params.flipDistinctScanDirection);
+        turnIxscanIntoDistinctScan(query,
+                                   soln.get(),
+                                   query.getDistinct()->getKey(),
+                                   strictDistinctOnly,
+                                   params.flipDistinctScanDirection);
     }
 
     return soln;

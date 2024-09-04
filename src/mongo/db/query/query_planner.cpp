@@ -1546,6 +1546,7 @@ StatusWith<std::vector<std::unique_ptr<QuerySolution>>> QueryPlanner::plan(
         enumParams.projection = query.getProj();
         enumParams.sort = &query.getSortPattern();
         enumParams.shardKey = params.shardKey;
+        enumParams.distinct = query.getDistinct().has_value();
 
         plan_enumerator::PlanEnumerator planEnumerator(enumParams);
         uassertStatusOKWithContext(planEnumerator.init(), "failed to initialize plan enumerator");
