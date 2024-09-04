@@ -1724,7 +1724,7 @@ envDict = dict(
 if get_option("build-tools") == "next":
     SCons.Tool.DefaultToolpath.insert(0, os.path.abspath("site_scons/site_tools/next"))
 
-env = Environment(variables=env_vars, **envDict)
+env = Environment(variables=env_vars, ENV={'PATH': os.environ['PATH']}, **envDict)
 del envDict
 env.AddMethod(lambda env, name, **kwargs: add_option(name, **kwargs), "AddOption")
 
