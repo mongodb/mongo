@@ -259,6 +259,34 @@ TEST(ExpressionLetOptimizeTest, DoesNotCauseExponentialTraversals) {
     ASSERT_BSONOBJ_EQ(buildOptimizedExpression(50), expression->serialize().getDocument().toBson());
 }
 
+TEST(ExpressionLetOptimizerTest, SupportExpressionsWithNullChildren) {
+    auto expCtx = ExpressionContextForTest{};
+
+    auto expression = Expression::parseExpression(&expCtx,
+                                                  fromjson(R"(
+        {$let: {
+            vars: {
+                format: "%Y-%m-%d"
+            },
+            in: {$dateToString: {
+                date: "$date",
+                format: "$$format"
+            }}
+        }}
+    )"),
+
+                                                  expCtx.variablesParseState);
+    expression = expression->optimize();
+    ASSERT_DOCUMENT_EQ_AUTO(  // NOLINT
+        R"(
+        {$dateToString: {
+                date: "$date",
+                format: {$const: "%Y-%m-%d"}
+        }}
+        )",
+        expression->serialize().getDocument());
+}
+
 }  // namespace
 }  // namespace ExpressionTests
 }  // namespace mongo

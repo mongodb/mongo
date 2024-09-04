@@ -46,6 +46,9 @@ namespace {
     boost::intrusive_ptr<Expression>& root,
     Variables& constantVariables,
     absl::flat_hash_set<Variables::Id>& usedVariables) {
+    if (!root) {
+        return root;
+    }
 
     auto fieldPath = dynamic_cast<const ExpressionFieldPath*>(root.get());
     if (!fieldPath) {
