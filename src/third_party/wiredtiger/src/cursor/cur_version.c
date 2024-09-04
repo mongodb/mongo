@@ -162,6 +162,7 @@ __curversion_next_int(WT_CURSOR *cursor)
     WT_TIME_WINDOW *twp;
     WT_UPDATE *first, *next_upd, *upd;
     wt_timestamp_t durable_start_ts, durable_stop_ts, stop_ts;
+    size_t max_memsize;
     uint64_t hs_upd_type, raw, stop_txn;
     uint8_t *p, version_prepare_state;
     bool upd_found;
@@ -390,6 +391,10 @@ __curversion_next_int(WT_CURSOR *cursor)
          * value.
          */
         if (hs_upd_type == WT_UPDATE_MODIFY) {
+            __wt_modify_max_memsize_format(
+              hs_value->data, file_cursor->value_format, cbt->upd_value->buf.size, &max_memsize);
+            WT_ERR(__wt_buf_set_and_grow(session, &cbt->upd_value->buf, cbt->upd_value->buf.data,
+              cbt->upd_value->buf.size, max_memsize));
             WT_ERR(__wt_modify_apply_item(
               session, file_cursor->value_format, &cbt->upd_value->buf, hs_value->data));
         } else {

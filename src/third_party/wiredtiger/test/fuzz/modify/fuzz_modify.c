@@ -41,6 +41,7 @@ LLVMFuzzerTestOneInput(const uint8_t *data, size_t size)
     WT_ITEM buf;
     WT_MODIFY modify;
     WT_SESSION_IMPL *session_impl;
+    size_t max_memsize;
 
     /* We can't do anything sensible with small inputs. */
     if (size < 10)
@@ -66,6 +67,8 @@ LLVMFuzzerTestOneInput(const uint8_t *data, size_t size)
     testutil_check(
       fuzz_state.session->open_cursor(fuzz_state.session, "metadata:", NULL, NULL, &cursor));
     testutil_check(__wt_modify_pack(cursor, &modify, 1, &packed_modify));
+    __wt_modify_max_memsize_unpacked(modify, 1, cursor->value.size, &max_memsize);
+    testutil_check(__wt_buf_set_and_grow(session, &buf, buf.data, buf.size, max_memsize));
     testutil_check(__wt_modify_apply_item(session_impl, "u", &buf, packed_modify->data));
 
     testutil_check(cursor->close(cursor));

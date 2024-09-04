@@ -579,6 +579,7 @@ typedef uint64_t wt_timestamp_t;
 #include "conf_inline.h"
 #include "cursor_inline.h"
 #include "log_inline.h"
+#include "modify_inline.h"
 #include "os_fhandle_inline.h"
 #include "os_fs_inline.h"
 #include "os_fstream_inline.h"

@@ -306,6 +306,7 @@ __rts_btree_ondisk_fixup_key(WT_SESSION_IMPL *session, WT_REF *ref, WT_ROW *rip,
     WT_TIME_WINDOW *hs_tw, *tw;
     WT_UPDATE *tombstone, *upd;
     wt_timestamp_t hs_durable_ts, hs_start_ts, hs_stop_durable_ts, newer_hs_durable_ts, pinned_ts;
+    size_t max_memsize;
     uint64_t hs_counter, type_full;
     uint32_t hs_btree_id;
     uint8_t *memp, type;
@@ -430,10 +431,14 @@ __rts_btree_ondisk_fixup_key(WT_SESSION_IMPL *session, WT_REF *ref, WT_ROW *rip,
          * any problem.
          */
         if (hs_tw->start_ts <= tw->start_ts || tw->prepare) {
-            if (type == WT_UPDATE_MODIFY)
+            if (type == WT_UPDATE_MODIFY) {
+                __wt_modify_max_memsize_format(
+                  hs_value->data, S2BT(session)->value_format, full_value->size, &max_memsize);
+                WT_ERR(__wt_buf_set_and_grow(
+                  session, full_value, full_value->data, full_value->size, max_memsize));
                 WT_ERR(__wt_modify_apply_item(
                   session, S2BT(session)->value_format, full_value, hs_value->data));
-            else {
+            } else {
                 WT_ASSERT(session, type == WT_UPDATE_STANDARD);
                 WT_ERR(__wt_buf_set(session, full_value, hs_value->data, hs_value->size));
             }
