@@ -56,6 +56,50 @@
 
 namespace mongo {
 
+namespace {
+const FTSAccessMethod* validateFTSIndex(OperationContext* opCtx, const NamespaceString& nss) {
+    auto collection = acquireCollectionOrViewMaybeLockFree(
+        opCtx,
+        CollectionOrViewAcquisitionRequest(
+            nss,
+            // TODO SERVER-93918 We shouldn't need to be careful about passing the right metadata
+            // here, since this is expected to be a recursive lock acquisition in most cases. We are
+            // only trying to safely grab the index metadata. Callers are expected to validate that
+            // we obtain the correct shard version, storage snapshot, etc. with their own lock
+            // acquisitions.
+            AcquisitionPrerequisites::kPretendUnsharded,
+            repl::ReadConcernArgs::get(opCtx),
+            AcquisitionPrerequisites::kRead));
+
+    uassert(ErrorCodes::IndexNotFound,
+            str::stream() << "text index required for $text query (no such collection '"
+                          << nss.toStringForErrorMsg() << "')",
+            collection.isCollection());
+
+    const auto& collectionPtr = collection.getCollectionPtr();
+
+    uassert(ErrorCodes::IndexNotFound,
+            str::stream() << "text index required for $text query (no such collection '"
+                          << nss.toStringForErrorMsg() << "')",
+            collectionPtr);
+
+    std::vector<const IndexDescriptor*> idxMatches;
+    collectionPtr->getIndexCatalog()->findIndexByType(opCtx, IndexNames::TEXT, idxMatches);
+
+    uassert(ErrorCodes::IndexNotFound, "text index required for $text query", !idxMatches.empty());
+    uassert(ErrorCodes::IndexNotFound,
+            "more than one text index found for $text query",
+            idxMatches.size() < 2);
+    invariant(idxMatches.size() == 1);
+
+    const IndexDescriptor* index = idxMatches[0];
+    const FTSAccessMethod* fam = static_cast<const FTSAccessMethod*>(
+        collectionPtr->getIndexCatalog()->getEntry(index)->accessMethod());
+    invariant(fam);
+    return fam;
+}
+}  // namespace
+
 TextMatchExpression::TextMatchExpression(fts::FTSQueryImpl ftsQuery)
     : TextMatchExpressionBase("_fts"), _ftsQuery(ftsQuery) {}
 
@@ -70,38 +114,7 @@ TextMatchExpression::TextMatchExpression(OperationContext* opCtx,
 
     fts::TextIndexVersion version;
     {
-        // Find text index.
-        AutoGetDb autoDb(opCtx, nss.dbName(), MODE_IS);
-        Lock::CollectionLock collLock(opCtx, nss, MODE_IS);
-        Database* db = autoDb.getDb();
-
-        uassert(ErrorCodes::IndexNotFound,
-                str::stream() << "text index required for $text query (no such collection '"
-                              << nss.toStringForErrorMsg() << "')",
-                db);
-
-        CollectionPtr collection(
-            CollectionCatalog::get(opCtx)->lookupCollectionByNamespace(opCtx, nss));
-
-        uassert(ErrorCodes::IndexNotFound,
-                str::stream() << "text index required for $text query (no such collection '"
-                              << nss.toStringForErrorMsg() << "')",
-                collection);
-
-        std::vector<const IndexDescriptor*> idxMatches;
-        collection->getIndexCatalog()->findIndexByType(opCtx, IndexNames::TEXT, idxMatches);
-
-        uassert(
-            ErrorCodes::IndexNotFound, "text index required for $text query", !idxMatches.empty());
-        uassert(ErrorCodes::IndexNotFound,
-                "more than one text index found for $text query",
-                idxMatches.size() < 2);
-        invariant(idxMatches.size() == 1);
-
-        const IndexDescriptor* index = idxMatches[0];
-        const FTSAccessMethod* fam = static_cast<const FTSAccessMethod*>(
-            collection->getIndexCatalog()->getEntry(index)->accessMethod());
-        invariant(fam);
+        const FTSAccessMethod* fam = validateFTSIndex(opCtx, nss);
 
         // Extract version and default language from text index.
         version = fam->getSpec().getTextIndexVersion();
