@@ -131,12 +131,12 @@ PreImagesTruncateMarkersPerNsUUID::createInitialMarkersFromSamples(
     const UUID& nsUUID,
     const std::vector<CollectionTruncateMarkers::RecordIdAndWallTime>& samples,
     int64_t estimatedRecordsPerMarker,
-    int64_t estimatedBytesPerMarker) {
+    int64_t estimatedBytesPerMarker,
+    uint64_t randomSamplesPerMarker) {
     std::deque<CollectionTruncateMarkers::Marker> markers;
     auto numSamples = samples.size();
     invariant(numSamples > 0);
-    for (size_t i = CollectionTruncateMarkers::kRandomSamplesPerMarker - 1; i < numSamples;
-         i = i + CollectionTruncateMarkers::kRandomSamplesPerMarker) {
+    for (size_t i = randomSamplesPerMarker - 1; i < numSamples; i = i + randomSamplesPerMarker) {
         const auto& [id, wallTime] = samples[i];
         LOGV2_DEBUG(7658602,
                     1,

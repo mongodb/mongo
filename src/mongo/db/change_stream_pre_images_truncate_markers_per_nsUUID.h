@@ -87,7 +87,8 @@ public:
         const UUID& nsUUID,
         const std::vector<CollectionTruncateMarkers::RecordIdAndWallTime>& samples,
         int64_t estimatedRecordsPerMarker,
-        int64_t estimatedBytesPerMarker);
+        int64_t estimatedBytesPerMarker,
+        uint64_t randomSamplesPerMarker = CollectionTruncateMarkers::kRandomSamplesPerMarker);
 
     /**
      * Returns an accurate 'InitialSetOfMarkers' corresponding to the segment of the pre-images

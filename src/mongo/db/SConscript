@@ -470,6 +470,7 @@ env.CppUnitTest(
     source=[
         "change_stream_pre_images_remover_test.cpp",
         "change_stream_pre_images_truncate_manager_test.cpp",
+        "change_stream_pre_images_truncate_markers_per_nsUUID_test.cpp",
     ],
     LIBDEPS=[
         "catalog/catalog_test_fixture",
