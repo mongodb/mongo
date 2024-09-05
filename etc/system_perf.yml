@@ -4,8 +4,10 @@ exec_timeout_secs: &exec_timeout_secs 21600
 timeout_secs: &timeout_secs 7200
 
 include:
-  - filename: etc/system_perf_yml_components/tasks.yml
-  - filename: etc/system_perf_yml_components/variants.yml
+  - filename: evergreen/system_perf/6.0/variants.yml
+    module: dsi
+  - filename: evergreen/system_perf/shared_tasks.yml
+    module: dsi
 
 ## Parameters for parameterized builds (see https://github.com/evergreen-ci/evergreen/wiki/Parameterized-Builds)
 parameters:
@@ -128,61 +130,6 @@ timeout:
 
 
 functions:
-  ###
-  # Same in every DSI project
-  f_dsi_pre_run:
-    - command: manifest.load
-  f_dsi_post_run:
-    - command: shell.exec
-      params:
-        script: ./src/dsi/run-dsi post_run
-    - command: perf.send
-      params:
-        file: ./build/CedarReports/cedar_report.json
-        aws_key: ${terraform_key}
-        aws_secret: ${terraform_secret}
-        bucket: genny-metrics
-        region: us-east-1
-        prefix: ${task_id}_${execution}
-    - command: attach.results
-      params:
-        file_location: ./build/EvergreenResultsJson/results.json
-    - command: s3.put
-      params:
-        aws_key: ${aws_key}
-        aws_secret: ${aws_secret}
-        local_file: ./build/Artifacts/DSIArtifacts.tgz
-        remote_file: ${project_dir}/${build_variant}/${revision}/${task_id}/${version_id}/logs/dsi-artifacts-${task_name}-${build_id}-${execution}.tgz
-        bucket: mciuploads
-        permissions: public-read
-        content_type: application/x-gzip
-        display_name: DSI Artifacts - Execution ${execution}
-    - command: s3.put
-      params:
-        aws_key: ${aws_key}
-        aws_secret: ${aws_secret}
-        local_file: ./build/Documentation/index.html
-        remote_file: ${project_dir}/${build_variant}/${revision}/${task_id}/${version_id}/logs/${task_name}-${build_id}-index.html
-        bucket: mciuploads
-        permissions: public-read
-        content_type: text/html
-        display_name: Documentation
-    - command: s3.put
-      params:
-        aws_key: ${aws_key}
-        aws_secret: ${aws_secret}
-        local_file: bootstrap.yml
-        remote_file: ${project_dir}/${build_variant}/${revision}/${task_id}/${version_id}/bootstrap-${task_name}-${build_id}-${execution}.yml
-        bucket: mciuploads
-        permissions: public-read
-        content_type: text/plain
-        display_name: Task Bootstrap Config
-  f_dsi_timeout:
-    - command: shell.exec
-      params:
-        script: ./src/dsi/run-dsi on_timeout
-  ###
-
   f_other_post_ops:
       - command: shell.exec
         params:
@@ -408,14 +355,6 @@ tasks:
       - func: "compile mongodb"
 
 buildvariants:
-  - name: task_generation
-    display_name: Task Generation
-    modules: *modules
-    run_on:
-      - amazon2-build
-    tasks:
-      - name: schedule_global_auto_tasks
-
   - &compile-amazon2
     name: compile-amazon2
     display_name: Compile
