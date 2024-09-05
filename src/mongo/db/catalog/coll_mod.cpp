@@ -1055,7 +1055,7 @@ Status _collModInternal(OperationContext* opCtx,
             writableColl->repairInvalidIndexOptions(opCtx);
         for (const auto& indexWithInvalidOptions : indexesWithInvalidOptions) {
             const IndexDescriptor* desc =
-                coll->getIndexCatalog()->findIndexByName(opCtx, indexWithInvalidOptions);
+                writableColl->getIndexCatalog()->findIndexByName(opCtx, indexWithInvalidOptions);
             invariant(desc);
 
             // Notify the index catalog that the definition of this index changed.
