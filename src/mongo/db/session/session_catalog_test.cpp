@@ -50,6 +50,7 @@
 #include "mongo/util/assert_util.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/fail_point.h"
+#include "mongo/util/time_support.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kDefault
 
@@ -1586,7 +1587,7 @@ TEST_F(SessionCatalogTestWithDefaultOpCtx, KillSessionsThroughScanSessions) {
     }
 }
 
-// Test that session kill will block normal sesion chechout and will be signaled correctly.
+// Test that session kill will block normal sesion checkout and will be signaled correctly.
 // Even if the implementaion has a bug, the test may not always fail depending on thread
 // scheduling, however, this test case still gives us a good coverage.
 TEST_F(SessionCatalogTestWithDefaultOpCtx, ConcurrentCheckOutAndKill) {
@@ -1649,6 +1650,43 @@ TEST_F(SessionCatalogTestWithDefaultOpCtx, ConcurrentCheckOutAndKill) {
         killCheckOutFinish.get();
 
         ASSERT_EQ("session checkout", lastSessionCheckOut);
+    };
+
+    runTest(makeLogicalSessionIdForTest());
+    runTest(makeLogicalSessionIdWithTxnNumberAndUUIDForTest());
+    runTest(makeLogicalSessionIdWithTxnUUIDForTest());
+}
+
+TEST_F(SessionCatalogTest, CheckOutForKillTimeout) {
+    auto runTest = [&](const LogicalSessionId& lsid) {
+        auto client = getServiceContext()->getService()->makeClient("CheckOutForKillTimeout");
+        AlternativeClientRegion acr(client);
+        auto opCtx = cc().makeOperationContext();
+        opCtx->setLogicalSessionId(lsid);
+
+        // Check out the session to block checkOutForKill.
+        OperationContextSession firstCheckOut(opCtx.get());
+
+        stdx::future<void> killCheckOutTimeout = stdx::async(stdx::launch::async, [&] {
+            ThreadClient tc(getServiceContext()->getService());
+            auto sideOpCtx = Client::getCurrent()->makeOperationContext();
+            sideOpCtx->setLogicalSessionId(lsid);
+
+            // Create kill token.
+            std::vector<SessionCatalog::KillToken> killTokens;
+            catalog()->scanSession(lsid, [&killTokens](const ObservableSession& session) {
+                killTokens.emplace_back(session.kill(ErrorCodes::InternalError));
+            });
+            ASSERT_EQ(1U, killTokens.size());
+
+            // Checkout session for kill should time out.
+            auto timeout = Milliseconds(0);
+            ASSERT_THROWS_CODE(catalog()->checkOutSessionForKill(
+                                   sideOpCtx.get(), std::move(killTokens[0]), &timeout),
+                               DBException,
+                               ErrorCodes::ExceededTimeLimit);
+        });
+        killCheckOutTimeout.get();
     };
 
     runTest(makeLogicalSessionIdForTest());
