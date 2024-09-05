@@ -62,7 +62,6 @@
 #include "mongo/db/query/optimizer/comparison_op.h"
 #include "mongo/db/query/optimizer/containers.h"
 #include "mongo/db/query/optimizer/defs.h"
-#include "mongo/db/query/optimizer/metadata.h"
 #include "mongo/db/query/optimizer/node.h"  // IWYU pragma: keep
 #include "mongo/db/query/optimizer/node_defs.h"
 #include "mongo/db/query/optimizer/syntax/expr.h"
@@ -74,22 +73,18 @@
 
 namespace mongo::optimizer {
 
-ABTPrinter::ABTPrinter(Metadata metadata,
-                       PlanAndProps planAndProps,
+ABTPrinter::ABTPrinter(PlanAndProps planAndProps,
                        const ExplainVersion explainVersion,
                        QueryParameterMap qpMap)
-    : _metadata(std::move(metadata)),
-      _planAndProps(std::move(planAndProps)),
+    : _planAndProps(std::move(planAndProps)),
       _explainVersion(explainVersion),
       _queryParameters(std::move(qpMap)) {}
 
-ABTPrinter::ABTPrinter(Metadata metadata,
-                       PlanAndProps planAndProps,
+ABTPrinter::ABTPrinter(PlanAndProps planAndProps,
                        const ExplainVersion explainVersion,
                        QueryParameterMap qpMap,
                        QueryPlannerOptimizationStagesForDebugExplain queryPlannerOptimizationStages)
-    : _metadata(std::move(metadata)),
-      _planAndProps(std::move(planAndProps)),
+    : _planAndProps(std::move(planAndProps)),
       _explainVersion(explainVersion),
       _queryParameters(std::move(qpMap)),
       _queryPlannerOptimizationStages(std::move(queryPlannerOptimizationStages)) {}
@@ -2968,8 +2963,6 @@ std::string ExplainGenerator::explainPhysProps(const std::string& description,
 
 class ShortPlanSummaryTransport {
 public:
-    ShortPlanSummaryTransport(const Metadata& metadata) : _metadata(metadata) {}
-
     void transport(const PhysicalScanNode& node, const ABT&) {
         ss << "COLLSCAN";
     }
@@ -2985,26 +2978,8 @@ public:
     }
 
     std::string getIndexDetails(const IndexScanNode& node) {
-        auto& scanName = node.getScanDefName();
-        auto& idxName = node.getIndexDefName();
-        auto& idxDef = _metadata._scanDefs.at(scanName).getIndexDefs();
-        auto& idxVal = idxDef.at(idxName);
         std::stringstream idxDetails;
-        idxDetails << "IXSCAN { ";
-        bool firstCollationEntry = true;
-        for (const auto& [projName, op] : idxVal.getCollationSpec()) {
-            if (!firstCollationEntry) {
-                idxDetails << ", ";
-            }
-            idxDetails << PathStringify::stringify(projName);
-            if (op == CollationOp::Ascending) {
-                idxDetails << ": 1";
-            } else if (op == CollationOp::Descending) {
-                idxDetails << ": -1";
-            }
-            firstCollationEntry = false;
-        }
-        idxDetails << " }";
+        idxDetails << "IXSCAN { " << node.getIndexDefName() << " }";
         return idxDetails.str();
     }
 
@@ -3024,11 +2999,10 @@ public:
     }
 
     std::stringstream ss;
-    const Metadata& _metadata;
 };
 
 std::string ABTPrinter::getPlanSummary() const {
-    return ShortPlanSummaryTransport(_metadata).getPlanSummary(_planAndProps._node);
+    return ShortPlanSummaryTransport().getPlanSummary(_planAndProps._node);
 }
 
 std::string ExplainGenerator::explainPartialSchemaReqExpr(const PSRExpr::Node& reqs) {

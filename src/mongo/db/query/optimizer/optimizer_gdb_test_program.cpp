@@ -29,8 +29,6 @@
 
 #include "mongo/db/query/optimizer/containers.h"
 #include "mongo/db/query/optimizer/explain.h"
-#include "mongo/db/query/optimizer/metadata.h"
-#include "mongo/db/query/optimizer/metadata_factory.h"
 #include "mongo/db/query/optimizer/node.h"  // IWYU pragma: keep
 #include "mongo/db/query/optimizer/node_defs.h"
 #include "mongo/db/query/optimizer/partial_schema_requirements.h"

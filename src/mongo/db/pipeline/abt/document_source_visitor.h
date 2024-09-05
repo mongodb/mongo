@@ -35,7 +35,6 @@
 #include "mongo/db/pipeline/pipeline.h"
 #include "mongo/db/pipeline/visitors/document_source_visitor_registry.h"
 #include "mongo/db/query/optimizer/defs.h"
-#include "mongo/db/query/optimizer/metadata.h"
 #include "mongo/db/query/optimizer/node.h"  // IWYU pragma: keep
 #include "mongo/db/query/optimizer/syntax/syntax.h"
 #include "mongo/db/query/optimizer/utils/path_utils.h"
@@ -44,10 +43,8 @@
 namespace mongo::optimizer {
 
 struct ABTDocumentSourceTranslationVisitorContext : public DocumentSourceVisitorContextBase {
-    ABTDocumentSourceTranslationVisitorContext(AlgebrizerContext& ctx,
-                                               const Metadata& metadata,
-                                               size_t maxFilterDepth)
-        : algCtx(ctx), metadata(metadata), maxFilterDepth(maxFilterDepth) {}
+    ABTDocumentSourceTranslationVisitorContext(AlgebrizerContext& ctx, size_t maxFilterDepth)
+        : algCtx(ctx), maxFilterDepth(maxFilterDepth) {}
 
     // Prevent copying and moving as this object has reference members.
     ABTDocumentSourceTranslationVisitorContext(const ABTDocumentSourceTranslationVisitorContext&) =
@@ -62,14 +59,12 @@ struct ABTDocumentSourceTranslationVisitorContext : public DocumentSourceVisitor
     void pushLimitSkip(int64_t limit, int64_t skip);
 
     AlgebrizerContext& algCtx;
-    const Metadata& metadata;
 
     // This configures the maximum number of FilterNodes that a single FilterNode may be split into.
     const size_t maxFilterDepth;
 };
 
-ABT translatePipelineToABT(const Metadata& metadata,
-                           const Pipeline& pipeline,
+ABT translatePipelineToABT(const Pipeline& pipeline,
                            ProjectionName scanProjName,
                            ABT initialNode,
                            PrefixId& prefixId,

@@ -261,10 +261,9 @@ void visit(ABTDocumentSourceTranslationVisitorContext* visitorCtx,
     AlgebrizerContext& ctx = visitorCtx->algCtx;
     const ProjectionName& scanProjName = ctx.getNextId("scan");
 
-    ABT pipelineABT = visitorCtx->metadata._scanDefs.at(scanDefName).exists()
-        ? make<ScanNode>(scanProjName, scanDefName)
-        : make<ValueScanNode>(ProjectionNameVector{scanProjName},
-                              createInitialScanProps(scanProjName, scanDefName));
+    // This assumes that the inner collection exists. If this is not the case, we will produce an
+    // invalid SBE plan.
+    ABT pipelineABT = make<ScanNode>(scanProjName, scanDefName);
 
     const ProjectionName& localIdProjName = ctx.getNextId("localId");
     auto entry = ctx.getNode();
@@ -421,14 +420,11 @@ void visit(ABTDocumentSourceTranslationVisitorContext* visitorCtx,
     std::string scanDefName = involvedNss.coll().toString();
     const ProjectionName& scanProjName = ctx.getNextId("scan");
 
-    const Metadata& metadata = visitorCtx->metadata;
-    ABT initialNode = metadata._scanDefs.at(scanDefName).exists()
-        ? make<ScanNode>(scanProjName, scanDefName)
-        : make<ValueScanNode>(ProjectionNameVector{scanProjName},
-                              createInitialScanProps(scanProjName, scanDefName));
+    // This assumes that the second collection in the $unionWith exists. If this is not the case, we
+    // will produce an invalid SBE plan.
+    ABT initialNode = make<ScanNode>(scanProjName, scanDefName);
 
-    ABT pipelineABT = translatePipelineToABT(metadata,
-                                             pipeline,
+    ABT pipelineABT = translatePipelineToABT(pipeline,
                                              scanProjName,
                                              std::move(initialNode),
                                              ctx.getPrefixId(),
@@ -555,15 +551,14 @@ const ServiceContext::ConstructorActionRegisterer abtTranslationRegisterer{
         registerMongodVisitor<ABTDocumentSourceTranslationVisitorContext>(service);
     }};
 
-ABT translatePipelineToABT(const Metadata& metadata,
-                           const Pipeline& pipeline,
+ABT translatePipelineToABT(const Pipeline& pipeline,
                            ProjectionName scanProjName,
                            ABT initialNode,
                            PrefixId& prefixId,
                            QueryParameterMap& queryParameters,
                            size_t maxFilterDepth) {
     AlgebrizerContext ctx(prefixId, {scanProjName, std::move(initialNode)}, queryParameters);
-    ABTDocumentSourceTranslationVisitorContext visitorCtx(ctx, metadata, maxFilterDepth);
+    ABTDocumentSourceTranslationVisitorContext visitorCtx(ctx, maxFilterDepth);
 
     ServiceContext* serviceCtx = pipeline.getContext()->opCtx->getServiceContext();
     auto& reg = getDocumentSourceVisitorRegistry(serviceCtx);

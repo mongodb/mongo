@@ -37,7 +37,6 @@
 #include "mongo/db/query/optimizer/defs.h"
 #include "mongo/db/query/optimizer/explain_interface.h"
 #include "mongo/db/query/optimizer/index_bounds.h"
-#include "mongo/db/query/optimizer/metadata.h"
 #include "mongo/db/query/optimizer/node_defs.h"
 #include "mongo/db/query/optimizer/partial_schema_requirements.h"
 #include "mongo/db/query/optimizer/props.h"
@@ -93,13 +92,9 @@ bool isEOFPlan(ABT::reference_type node);
  */
 class ABTPrinter : public AbstractABTPrinter {
 public:
-    ABTPrinter(Metadata metadata,
-               PlanAndProps planAndProps,
-               ExplainVersion explainVersion,
-               QueryParameterMap qpMap);
+    ABTPrinter(PlanAndProps planAndProps, ExplainVersion explainVersion, QueryParameterMap qpMap);
 
-    ABTPrinter(Metadata metadata,
-               PlanAndProps planAndProps,
+    ABTPrinter(PlanAndProps planAndProps,
                ExplainVersion explainVersion,
                QueryParameterMap qpMap,
                QueryPlannerOptimizationStagesForDebugExplain queryPlannerOptimizationStages);
@@ -110,8 +105,6 @@ public:
     BSONObj getQueryParameters() const final;
 
 private:
-    // Metadata field used to populate index information for index scans in the planSummary field.
-    Metadata _metadata;
     PlanAndProps _planAndProps;
     ExplainVersion _explainVersion;
     QueryParameterMap _queryParameters;

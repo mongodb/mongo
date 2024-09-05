@@ -39,7 +39,6 @@
 
 #include "mongo/db/pipeline/abt/utils.h"
 #include "mongo/db/query/optimizer/explain.h"
-#include "mongo/db/query/optimizer/metadata.h"
 #include "mongo/db/query/optimizer/node.h"  // IWYU pragma: keep
 #include "mongo/db/query/optimizer/rewrites/const_eval.h"
 #include "mongo/db/query/optimizer/syntax/path.h"
@@ -85,26 +84,6 @@ ABT makeIndexPath(FieldNameType fieldName) {
 
 ABT makeNonMultikeyIndexPath(FieldNameType fieldName) {
     return makeIndexPath(FieldPathType{std::move(fieldName)}, false /*isMultiKey*/);
-}
-
-IndexDefinition makeIndexDefinition(FieldNameType fieldName, CollationOp op, bool isMultiKey) {
-    IndexCollationSpec idxCollSpec{
-        IndexCollationEntry((isMultiKey ? makeIndexPath(std::move(fieldName))
-                                        : makeNonMultikeyIndexPath(std::move(fieldName))),
-                            op)};
-    return IndexDefinition{std::move(idxCollSpec), isMultiKey};
-}
-
-IndexDefinition makeCompositeIndexDefinition(std::vector<TestIndexField> indexFields,
-                                             bool isMultiKey) {
-    IndexCollationSpec idxCollSpec;
-    for (auto& idxField : indexFields) {
-        idxCollSpec.emplace_back((idxField.isMultiKey
-                                      ? makeIndexPath(std::move(idxField.fieldName))
-                                      : makeNonMultikeyIndexPath(std::move(idxField.fieldName))),
-                                 idxField.op);
-    }
-    return IndexDefinition{std::move(idxCollSpec), isMultiKey};
 }
 
 bool planComparator(const PlanAndProps& e1, const PlanAndProps& e2) {

@@ -49,8 +49,7 @@
 
 namespace mongo::optimizer {
 
-ABT translateCanonicalQueryToABT(const Metadata& metadata,
-                                 const CanonicalQuery& canonicalQuery,
+ABT translateCanonicalQueryToABT(const CanonicalQuery& canonicalQuery,
                                  ProjectionName scanProjName,
                                  ABT initialNode,
                                  PrefixId& prefixId,

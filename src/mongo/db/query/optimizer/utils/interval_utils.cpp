@@ -805,61 +805,6 @@ bool isSimpleRange(const CompoundIntervalReqExpr::Node& interval) {
     return false;
 }
 
-class CheckMultikeyness {
-public:
-    bool walk(const PathIdentity& identity, const MultikeynessTrie& trie, bool seenParentTraverse) {
-        return trie.isMultiKey;
-    }
-
-    bool walk(const PathTraverse& traverse,
-              const MultikeynessTrie& trie,
-              bool seenParentTraverse,
-              const ABT& child,
-              const ABT& refs) {
-        // If there is a traverse node, we assume that the key is already multikey.
-
-        // If the traverse node is single level, and its immediate parent isn't another traverse
-        // node, then we can check the next node.
-        if (traverse.getMaxDepth() == PathTraverse::kSingleLevel && !seenParentTraverse) {
-            return algebra::walk<false>(child, *this, trie, true /*seenParentTraverse*/);
-        }
-
-        // The multikeynessTrie contains metadata only on consecutively nested fields.
-        // e.g., {a: [[ {b: [5]} ]]} the multikeyness trie would *correctly* respond that path
-        // "Get [a] Traverse [1] Get [b] Id" is non-multikey.
-        // Traverse [1] flattens only one level of nesting, and field "b" is nested in two levels.
-        //
-        // Currently, if the traverse node is multi level (Traverse [N], N > 1), or we have multiple
-        // subsequent traverse nodes, we assume that the path is multikey.
-
-        // We have no information about multikeyness of the child path, i.e., it is multikey.
-        return true;
-    }
-
-    bool walk(const PathGet& get,
-              const MultikeynessTrie& trie,
-              bool seenParentTraverse,
-              const ABT& child) {
-        // If there is no trie node for the PathGet field, then the field is multikey.
-        auto it = trie.children.find(get.name());
-        if (it == trie.children.end()) {
-            return true;
-        }
-
-        return algebra::walk<false>(child, *this, it->second, false /*seenParentTraverse*/);
-    }
-
-    template <class N, class... Ts>
-    bool walk(const N& node, Ts&&...) {
-        return true;
-    }
-
-    static bool checkMultikeyness(const ABT& path, const MultikeynessTrie& multikeynessTrie) {
-        CheckMultikeyness instance;
-        return algebra::walk<false>(path, instance, multikeynessTrie, false);
-    }
-};
-
 static bool requiresArray(const IntervalReqExpr::Node& intervals,
                           const PathToIntervalFn& pathToInterval) {
 
@@ -876,14 +821,6 @@ static bool requiresArray(const IntervalReqExpr::Node& intervals,
     // Comparing the result of the intersection with the array requirement will return
     // true only if the input requirements contain a subset of array requirement.
     return intervals == arrayIntervalDNF;
-}
-
-bool requiresArrayOnNonMultikeyPath(const ABT& path,
-                                    const IntervalReqExpr::Node& intervals,
-                                    const MultikeynessTrie& multikeynessTrie,
-                                    const PathToIntervalFn& pathToInterval) {
-    return requiresArray(intervals, pathToInterval) &&
-        !CheckMultikeyness::checkMultikeyness(path, multikeynessTrie);
 }
 
 bool mayContainNull(const IntervalReqExpr::Atom& node, const ConstFoldFn& constFold) {

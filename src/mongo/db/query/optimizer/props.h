@@ -44,7 +44,6 @@
 #include "mongo/db/query/optimizer/containers.h"
 #include "mongo/db/query/optimizer/defs.h"
 #include "mongo/db/query/optimizer/index_bounds.h"
-#include "mongo/db/query/optimizer/metadata.h"
 #include "mongo/util/assert_util.h"
 
 namespace mongo::optimizer::properties {

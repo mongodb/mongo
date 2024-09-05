@@ -31,6 +31,7 @@
 
 #include <cstddef>
 
+#include "mongo/db/query/optimizer/partial_schema_requirements.h"
 #include "mongo/db/query/optimizer/props.h"
 #include "mongo/db/query/optimizer/syntax/syntax.h"
 

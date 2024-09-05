@@ -39,7 +39,6 @@
 #include "mongo/db/query/optimizer/algebra/operator.h"
 #include "mongo/db/query/optimizer/algebra/polyvalue.h"
 #include "mongo/db/query/optimizer/defs.h"
-#include "mongo/db/query/optimizer/metadata.h"
 #include "mongo/db/query/optimizer/node.h"  // IWYU pragma: keep
 #include "mongo/db/query/optimizer/syntax/expr.h"
 #include "mongo/db/query/optimizer/syntax/path.h"
@@ -211,14 +210,6 @@ public:
 private:
     ABT _suffix;
 };
-
-/**
- * Given a path and a MultikeynessTrie describing the path's input,
- * removes any Traverse nodes that we know will never encounter an array.
- *
- * Returns true if any changes were made to the ABT.
- */
-bool simplifyTraverseNonArray(ABT& path, const MultikeynessTrie& multikeynessTrie);
 
 /**
  * Fuses an index path and a query path to determine a residual path to apply over the index

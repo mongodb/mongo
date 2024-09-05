@@ -42,7 +42,6 @@
 #include "mongo/db/query/canonical_query.h"
 #include "mongo/db/query/find_command.h"
 #include "mongo/db/query/optimizer/defs.h"
-#include "mongo/db/query/optimizer/metadata.h"
 #include "mongo/db/query/optimizer/node.h"  // IWYU pragma: keep
 #include "mongo/db/query/optimizer/syntax/syntax.h"
 #include "mongo/db/query/optimizer/utils/utils.h"
@@ -69,7 +68,6 @@ public:
         auto opCtx = testServiceContext.makeOperationContext();
         auto nss = NamespaceString::createNamespaceString_forTest("test.bm");
 
-        Metadata metadata{{}};
         auto prefixId = PrefixId::createForTests();
         ProjectionName scanProjName{prefixId.getNextId("scan")};
 
@@ -83,13 +81,8 @@ public:
 
         // This is where recording starts.
         for (auto keepRunning : state) {
-            benchmark::DoNotOptimize(
-                translateCanonicalQueryToABT(metadata,
-                                             *cq,
-                                             scanProjName,
-                                             make<ScanNode>(scanProjName, "collection"),
-                                             prefixId,
-                                             qp));
+            benchmark::DoNotOptimize(translateCanonicalQueryToABT(
+                *cq, scanProjName, make<ScanNode>(scanProjName, "collection"), prefixId, qp));
             benchmark::ClobberMemory();
         }
     }

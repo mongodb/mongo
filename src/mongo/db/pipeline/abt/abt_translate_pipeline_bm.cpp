@@ -44,7 +44,6 @@
 #include "mongo/db/pipeline/expression_context_for_test.h"
 #include "mongo/db/pipeline/pipeline.h"
 #include "mongo/db/query/optimizer/defs.h"
-#include "mongo/db/query/optimizer/metadata.h"
 #include "mongo/db/query/optimizer/node.h"  // IWYU pragma: keep
 #include "mongo/db/query/optimizer/syntax/syntax.h"
 #include "mongo/db/query/optimizer/utils/utils.h"
@@ -79,7 +78,6 @@ public:
         auto expCtx = make_intrusive<ExpressionContextForTest>(
             opCtx.get(), NamespaceString::createNamespaceString_forTest("test.bm"));
 
-        Metadata metadata{{}};
         auto prefixId = PrefixId::createForTests();
         ProjectionName scanProjName{prefixId.getNextId("scan")};
 
@@ -91,8 +89,7 @@ public:
         // This is where recording starts.
         for (auto keepRunning : state) {
             benchmark::DoNotOptimize(
-                translatePipelineToABT(metadata,
-                                       *parsedPipeline,
+                translatePipelineToABT(*parsedPipeline,
                                        scanProjName,
                                        make<ScanNode>(scanProjName, "collection"),
                                        prefixId,

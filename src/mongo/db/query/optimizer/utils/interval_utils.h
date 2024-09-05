@@ -138,15 +138,6 @@ bool isSimpleRange(const CompoundIntervalReqExpr::Node& interval);
 bool isIntervalEmpty(const IntervalRequirement& interval);
 
 /**
- * Returns true if (i) the given interval contains a requirement for the path to be an array AND
- * (ii) the multikeyness trie returns that the given path is a non-multikey path.
- */
-bool requiresArrayOnNonMultikeyPath(const ABT& path,
-                                    const IntervalReqExpr::Node& intervals,
-                                    const MultikeynessTrie& multikeynessTrie,
-                                    const PathToIntervalFn& pathToInterval);
-
-/**
  * Returns true if the interval may contain nulls.
  */
 bool mayContainNull(const IntervalReqExpr::Atom& node, const ConstFoldFn& constFold);

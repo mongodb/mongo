@@ -37,7 +37,6 @@
 #include "mongo/db/query/bson/dotted_path_support.h"
 #include "mongo/db/query/optimizer/defs.h"
 #include "mongo/db/query/optimizer/explain.h"
-#include "mongo/db/query/optimizer/metadata.h"
 #include "mongo/db/query/optimizer/syntax/syntax.h"
 #include "mongo/db/query/optimizer/utils/utils.h"
 #include "mongo/platform/source_location.h"
@@ -163,15 +162,6 @@ ABT makeIndexPath(FieldPathType fieldPath, bool isMultiKey = true);
 
 ABT makeIndexPath(FieldNameType fieldName);
 ABT makeNonMultikeyIndexPath(FieldNameType fieldName);
-
-/**
- * Constructs metadata for an an index on a single, non-dotted field.
- */
-IndexDefinition makeIndexDefinition(FieldNameType fieldName,
-                                    CollationOp op,
-                                    bool isMultiKey = true);
-IndexDefinition makeCompositeIndexDefinition(std::vector<TestIndexField> indexFields,
-                                             bool isMultiKey = true);
 
 /**
  * Compares plans to allow sorting plans in a deterministic way.

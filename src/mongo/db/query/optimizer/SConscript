@@ -21,7 +21,6 @@ env.Library(
         "defs.cpp",
         "explain.cpp",
         "index_bounds.cpp",
-        "metadata.cpp",
         "node.cpp",
         "partial_schema_requirements.cpp",
         "props.cpp",
@@ -70,17 +69,6 @@ env.CppUnitTest(
     ],
 )
 
-# Main optimizer target.
-env.Library(
-    target="optimizer",
-    source=[
-        "metadata_factory.cpp",
-    ],
-    LIBDEPS=[
-        "optimizer_rewrites",
-    ],
-)
-
 # Lightweight test utils.
 env.Library(
     target="unit_test_utils",
@@ -91,7 +79,7 @@ env.Library(
         # We do not depend on the entire pipeline target.
         "$BUILD_DIR/mongo/db/pipeline/abt_utils",
         "$BUILD_DIR/mongo/db/query/bson/dotted_path_support",
-        "$BUILD_DIR/mongo/db/query/optimizer/optimizer",
+        "$BUILD_DIR/mongo/db/query/optimizer/optimizer_rewrites",
         "$BUILD_DIR/mongo/unittest/unittest",
     ],
 )
@@ -133,7 +121,7 @@ optimizer_gdb_test_program = env.Program(
     LIBDEPS=[
         "$BUILD_DIR/mongo/db/service_context_non_d",
         "$BUILD_DIR/mongo/db/service_context_test_fixture",
-        "optimizer",
+        "optimizer_rewrites",
         "unit_test_utils",
     ],
     AIB_COMPONENT="pretty-printer-tests",
