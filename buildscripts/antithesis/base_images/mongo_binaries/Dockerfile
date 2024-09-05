@@ -47,4 +47,9 @@ RUN chmod +x /usr/bin/*
 COPY lib/* /usr/lib/
 COPY libvoidstar.so /usr/lib/libvoidstar.so
 
+# copy mongo repo
+COPY src /mongo
+WORKDIR /mongo
+RUN chmod 500 src/mongo/db/modules/enterprise/jstests/encryptdb/libs/ekf2
+
 RUN /usr/bin/mongo --version

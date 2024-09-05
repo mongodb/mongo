@@ -6,7 +6,7 @@ set -o verbose
 set -o errexit
 
 activate_venv
-$python buildscripts/resmoke.py generate-fuzz-config --template ../jepsen/docker/control/mongodb/resources --output ../jepsen/docker/control/mongodb/resources
+$python buildscripts/resmoke.py generate-fuzz-config --template ../jepsen/docker/control/mongodb/resources --output ../jepsen/docker/control/mongodb/resources --disableEncryptionFuzzing
 
 echo "Print config fuzzer generated mongod.conf"
 cat ../jepsen/docker/control/mongodb/resources/mongod.conf

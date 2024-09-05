@@ -215,10 +215,14 @@ def generate_encryption_config(rng: random.Random):
     chance_to_encrypt = 0.33
     if rng.random() < chance_to_encrypt:
         ret["enableEncryption"] = ""
-        # Use absolute path to ensure file is found during Jepsen tests
-        encryption_key_file = os.path.abspath(
-            "src/mongo/db/modules/enterprise/jstests/encryptdb/libs/ekf2"
-        )
+        encryption_key_file = "src/mongo/db/modules/enterprise/jstests/encryptdb/libs/ekf2"
+
+        # Antithesis runs mongo processes in a docker container separate from the resmoke process.
+        # It cannot use the absolute path from the machine that resmoke running on.
+        # Other applications, such as Jepsen, can be run in a different directory than the root
+        # of the mongo directory so we use the absolute path.
+        if not config.NOOP_MONGO_D_S_PROCESSES:
+            encryption_key_file = os.path.abspath(encryption_key_file)
 
         # Set file permissions to avoid "too open" error.
         # MongoDB requires keyfiles to have restricted permissions.

@@ -741,6 +741,10 @@ functions:
       params:
         directory: src/buildscripts/antithesis/base_images/workload/src
         clone_depth: 1000
+    - command: git.get_project
+      params:
+        directory: src/buildscripts/antithesis/base_images/mongo_binaries/src
+        clone_depth: 1000
     - command: subprocess.exec
       display_name: "restore git history and tags"
       params:

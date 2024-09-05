@@ -6,7 +6,7 @@ import shutil
 
 from buildscripts.resmokelib.plugin import PluginInterface, Subcommand
 from buildscripts.resmokelib import mongo_fuzzer_configs
-from buildscripts.resmokelib import utils
+from buildscripts.resmokelib import config, utils
 
 _HELP = """
 Generate a mongod.conf and mongos.conf using config fuzzer.
@@ -145,6 +145,13 @@ class GenerateFuzzConfigPlugin(PluginInterface):
             help="Sets the seed used by mongod and mongos config fuzzers",
         )
 
+        parser.add_argument(
+            "--disableEncryptionFuzzing",
+            dest="disable_encryption_fuzzing",
+            action="store_true",
+            help="Disables the fuzzing that sometimes enables the encrypted storage engine.",
+        )
+
     def parse(self, subcommand, parser, parsed_args, **kwargs):
         """
         Return the GenerateFuzzConfig subcommand for execution.
@@ -159,6 +166,7 @@ class GenerateFuzzConfigPlugin(PluginInterface):
         if subcommand != _COMMAND:
             return None
 
+        config.DISABLE_ENCRYPTION_FUZZING = parsed_args.disable_encryption_fuzzing
         return GenerateFuzzConfig(
             parsed_args.template,
             parsed_args.output,

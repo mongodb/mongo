@@ -300,6 +300,7 @@ class DockerComposeImageBuilder:
         self._fetch_mongodb_binaries()
         self._copy_mongodb_libraries_to_build_context(self.MONGO_BINARIES_BUILD_CONTEXT)
         self._copy_mongodb_binaries_to_build_context(self.MONGO_BINARIES_BUILD_CONTEXT)
+        self._clone_mongo_repo_to_build_context(self.MONGO_BINARIES_BUILD_CONTEXT)
         self._add_libvoidstar_to_build_context(self.MONGO_BINARIES_BUILD_CONTEXT)
         self._copy_config_files_to_build_context(self.MONGO_BINARIES_BUILD_CONTEXT)
 
