@@ -40,6 +40,7 @@
 #include "mongo/db/query/query_shape/distinct_cmd_shape.h"
 #include "mongo/db/query/query_shape/find_cmd_shape.h"
 #include "mongo/db/query/query_utils.h"
+#include "mongo/stdx/unordered_set.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/serialization_context.h"
 
@@ -149,7 +150,7 @@ boost::optional<std::string> getStageExemptedFromRejection(const Pipeline& pipel
 /**
  * Sets query shape hash value 'hash' for the operation defined by 'opCtx' operation context.
  */
-void setQueryShapeHash(OperationContext* opCtx, const QueryShapeHash& hash) {
+void setQueryShapeHash(OperationContext* opCtx, const boost::optional<QueryShapeHash>& hash) {
     // Field 'queryShapeHash' is accessed by other threads therefore write the query shape hash
     // within a critical section.
     stdx::lock_guard<Client> lk(*opCtx->getClient());
@@ -324,72 +325,59 @@ RepresentativeQueryInfo createRepresentativeInfo(OperationContext* opCtx,
 QuerySettings lookupQuerySettingsForFind(const boost::intrusive_ptr<ExpressionContext>& expCtx,
                                          const ParsedFindCommand& parsedFind,
                                          const NamespaceString& nss) {
-    QuerySettings settings = [&]() {
-        try {
-            // No query settings lookup for IDHACK queries.
-            if (isIdHackEligibleQueryWithoutCollator(*parsedFind.findCommandRequest)) {
-                return query_settings::QuerySettings();
-            }
+    // No query settings lookup for IDHACK queries.
+    if (isIdHackEligibleQueryWithoutCollator(*parsedFind.findCommandRequest)) {
+        return query_settings::QuerySettings();
+    }
 
-            // No query settings lookup on internal dbs or system collections in user dbs.
-            if (nss.isOnInternalDb() || nss.isSystem()) {
-                return query_settings::QuerySettings();
-            }
+    // No query settings lookup on internal dbs or system collections in user dbs.
+    if (nss.isOnInternalDb() || nss.isSystem()) {
+        return query_settings::QuerySettings();
+    }
 
-            // No query settings for queries with encryption information.
-            if (parsedFind.findCommandRequest->getEncryptionInformation()) {
-                return query_settings::QuerySettings();
-            }
+    // No query settings for queries with encryption information.
+    if (parsedFind.findCommandRequest->getEncryptionInformation()) {
+        return query_settings::QuerySettings();
+    }
 
-            // If query settings are present as part of the request, use them as opposed to
-            // performing the query settings lookup.
-            if (auto querySettings = parsedFind.findCommandRequest->getQuerySettings()) {
-                return *querySettings;
-            }
+    // If query settings are present as part of the request, use them as opposed to performing the
+    // query settings lookup. In this case, no check for 'reject' setting will be made.
+    if (auto querySettings = parsedFind.findCommandRequest->getQuerySettings()) {
+        return *querySettings;
+    }
 
-            // We need to use isEnabledUseLatestFCVWhenUninitialized instead of isEnabled because
-            // this could run during startup while the FCV is still uninitialized.
-            if (!feature_flags::gFeatureFlagQuerySettings.isEnabledUseLatestFCVWhenUninitialized(
-                    serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
-                return query_settings::QuerySettings();
-            }
+    // We need to use isEnabledUseLatestFCVWhenUninitialized instead of isEnabled because
+    // this could run during startup while the FCV is still uninitialized.
+    if (!feature_flags::gFeatureFlagQuerySettings.isEnabledUseLatestFCVWhenUninitialized(
+            serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
+        return query_settings::QuerySettings();
+    }
 
-            auto* opCtx = expCtx->opCtx;
-            const auto& serializationContext =
-                parsedFind.findCommandRequest->getSerializationContext();
-            auto& opDebug = CurOp::get(opCtx)->debug();
-            auto hash = [&]() {
-                if (opDebug.queryStatsInfo.key) {
-                    return opDebug.queryStatsInfo.key->getQueryShapeHash(opCtx,
-                                                                         serializationContext);
-                }
-
-                return query_shape::FindCmdShape(parsedFind, expCtx)
-                    .sha256Hash(expCtx->opCtx, serializationContext);
-            }();
-            setQueryShapeHash(opCtx, hash);
-
-            // Return the found query settings or an empty one.
-            auto& manager = QuerySettingsManager::get(opCtx);
-            return manager.getQuerySettingsForQueryShapeHash(hash, nss.dbName().tenantId())
-                .get_value_or({});
-        } catch (const DBException& ex) {
-            if constexpr (kDebugBuild) {
-                const Status status = ex.toStatus();
-                tassert(9423800,
-                        "Failed to perform query settings lookup: " + status.toString(),
-                        status.code() == ErrorCodes::BSONObjectTooLarge);
-            }
-
-            LOGV2_WARNING_OPTIONS(9423801,
-                                  {logv2::LogComponent::kQuery},
-                                  "Failed to perform query settings lookup",
-                                  "command"_attr =
-                                      parsedFind.findCommandRequest->toBSON().toString(),
-                                  "error"_attr = ex.toString());
-            return query_settings::QuerySettings();
+    auto* opCtx = expCtx->opCtx;
+    const auto& serializationContext = parsedFind.findCommandRequest->getSerializationContext();
+    auto curOp = CurOp::get(opCtx);
+    auto& opDebug = curOp->debug();
+    auto hash = [&]() -> boost::optional<QueryShapeHash> {
+        if (opDebug.queryStatsInfo.key) {
+            return opDebug.queryStatsInfo.key->getQueryShapeHash(opCtx, serializationContext);
         }
+        boost::optional<query_shape::FindCmdShape> shape;
+        try {
+            shape.emplace(parsedFind, expCtx);
+        } catch (ExceptionFor<ErrorCodes::BSONObjectTooLarge>&) {
+            return boost::none;
+        }
+        return shape->sha256Hash(expCtx->opCtx, serializationContext);
     }();
+    if (!hash) {
+        return query_settings::QuerySettings();
+    }
+    setQueryShapeHash(opCtx, hash);
+
+    // Return the found query settings or an empty one.
+    auto& manager = QuerySettingsManager::get(opCtx);
+    auto settings =
+        manager.getQuerySettingsForQueryShapeHash(*hash, nss.dbName().tenantId()).get_value_or({});
 
     // Fail the current command, if 'reject: true' flag is present.
     failIfRejectedBySettings(expCtx, settings);
@@ -403,67 +391,54 @@ QuerySettings lookupQuerySettingsForAgg(
     const Pipeline& pipeline,
     const stdx::unordered_set<NamespaceString>& involvedNamespaces,
     const NamespaceString& nss) {
-    QuerySettings settings = [&]() {
-        try {
-            // No query settings lookup on internal dbs or system collections in user dbs.
-            if (nss.isOnInternalDb() || nss.isSystem()) {
-                return query_settings::QuerySettings();
-            }
+    // No query settings lookup on internal dbs or system collections in user dbs.
+    if (nss.isOnInternalDb() || nss.isSystem()) {
+        return query_settings::QuerySettings();
+    }
 
-            // No query settings for queries with encryption information.
-            if (aggregateCommandRequest.getEncryptionInformation()) {
-                return query_settings::QuerySettings();
-            }
+    // No query settings for queries with encryption information.
+    if (aggregateCommandRequest.getEncryptionInformation()) {
+        return query_settings::QuerySettings();
+    }
 
-            // If query settings are present as part of the request, use them as opposed to
-            // performing the query settings lookup.
-            if (auto querySettings = aggregateCommandRequest.getQuerySettings()) {
-                return *querySettings;
-            }
+    // If query settings are present as part of the request, use them as opposed to performing the
+    // query settings lookup. In this case, no check for 'reject' setting will be made.
+    if (auto querySettings = aggregateCommandRequest.getQuerySettings()) {
+        return *querySettings;
+    }
 
-            // We need to use isEnabledUseLatestFCVWhenUninitialized instead of isEnabled because
-            // this could run during startup while the FCV is still uninitialized.
-            if (!feature_flags::gFeatureFlagQuerySettings.isEnabledUseLatestFCVWhenUninitialized(
-                    serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
-                return query_settings::QuerySettings();
-            }
+    // We need to use isEnabledUseLatestFCVWhenUninitialized instead of isEnabled because
+    // this could run during startup while the FCV is still uninitialized.
+    if (!feature_flags::gFeatureFlagQuerySettings.isEnabledUseLatestFCVWhenUninitialized(
+            serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
+        return query_settings::QuerySettings();
+    }
 
-            auto* opCtx = expCtx->opCtx;
-            const auto& serializationContext = aggregateCommandRequest.getSerializationContext();
-            auto& opDebug = CurOp::get(opCtx)->debug();
-            auto hash = [&]() {
-                if (opDebug.queryStatsInfo.key) {
-                    return opDebug.queryStatsInfo.key->getQueryShapeHash(opCtx,
-                                                                         serializationContext);
-                }
-
-                return query_shape::AggCmdShape(
-                           aggregateCommandRequest, nss, involvedNamespaces, pipeline, expCtx)
-                    .sha256Hash(opCtx, serializationContext);
-            }();
-            setQueryShapeHash(opCtx, hash);
-
-            // Return the found query settings or an empty one.
-            auto& manager = QuerySettingsManager::get(opCtx);
-            return manager.getQuerySettingsForQueryShapeHash(hash, nss.dbName().tenantId())
-                .get_value_or({});
-        } catch (const DBException& ex) {
-            if constexpr (kDebugBuild) {
-                const Status status = ex.toStatus();
-                tassert(9423802,
-                        "Failed to perform query settings lookup: " + status.toString(),
-                        status.code() == ErrorCodes::BSONObjectTooLarge);
-            }
-
-            LOGV2_WARNING_OPTIONS(9423803,
-                                  {logv2::LogComponent::kQuery},
-                                  "Failed to perform query settings lookup",
-                                  "command"_attr = aggregateCommandRequest.toBSON().toString(),
-                                  "error"_attr = ex.toString());
-
-            return query_settings::QuerySettings();
+    auto* opCtx = expCtx->opCtx;
+    const auto& serializationContext = aggregateCommandRequest.getSerializationContext();
+    auto curOp = CurOp::get(opCtx);
+    auto& opDebug = curOp->debug();
+    auto hash = [&]() -> boost::optional<QueryShapeHash> {
+        if (opDebug.queryStatsInfo.key) {
+            return opDebug.queryStatsInfo.key->getQueryShapeHash(opCtx, serializationContext);
         }
+        boost::optional<query_shape::AggCmdShape> shape;
+        try {
+            shape.emplace(aggregateCommandRequest, nss, involvedNamespaces, pipeline, expCtx);
+        } catch (ExceptionFor<ErrorCodes::BSONObjectTooLarge>&) {
+            return boost::none;
+        }
+        return shape->sha256Hash(opCtx, serializationContext);
     }();
+    if (!hash) {
+        return query_settings::QuerySettings();
+    }
+    setQueryShapeHash(opCtx, hash);
+
+    // Return the found query settings or an empty one.
+    auto& manager = QuerySettingsManager::get(opCtx);
+    auto settings =
+        manager.getQuerySettingsForQueryShapeHash(*hash, nss.dbName().tenantId()).get_value_or({});
 
     // Fail the current command, if 'reject: true' flag is present.
     failIfRejectedBySettings(expCtx, pipeline, settings);
@@ -474,63 +449,51 @@ QuerySettings lookupQuerySettingsForAgg(
 QuerySettings lookupQuerySettingsForDistinct(const boost::intrusive_ptr<ExpressionContext>& expCtx,
                                              const ParsedDistinctCommand& parsedDistinct,
                                              const NamespaceString& nss) {
-    QuerySettings settings = [&]() {
-        try {
-            // No query settings lookup on internal dbs or system collections in user dbs.
-            if (nss.isOnInternalDb() || nss.isSystem()) {
-                return query_settings::QuerySettings();
-            }
+    // No query settings lookup on internal dbs or system collections in user dbs.
+    if (nss.isOnInternalDb() || nss.isSystem()) {
+        return query_settings::QuerySettings();
+    }
 
-            // If query settings are present as part of the request, use them as opposed to
-            // performing the query settings lookup.
-            if (auto querySettings = parsedDistinct.distinctCommandRequest->getQuerySettings()) {
-                return *querySettings;
-            }
+    // If query settings are present as part of the request, use them as opposed to performing the
+    // query settings lookup. In this case, no check for 'reject' setting will be made.
+    if (auto querySettings = parsedDistinct.distinctCommandRequest->getQuerySettings()) {
+        return *querySettings;
+    }
 
-            // We need to use isEnabledUseLatestFCVWhenUninitialized instead of isEnabled because
-            // this could run during startup while the FCV is still uninitialized.
-            if (!feature_flags::gFeatureFlagQuerySettings.isEnabledUseLatestFCVWhenUninitialized(
-                    serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
-                return query_settings::QuerySettings();
-            }
+    // We need to use isEnabledUseLatestFCVWhenUninitialized instead of isEnabled because
+    // this could run during startup while the FCV is still uninitialized.
+    if (!feature_flags::gFeatureFlagQuerySettings.isEnabledUseLatestFCVWhenUninitialized(
+            serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
+        return query_settings::QuerySettings();
+    }
 
-            auto* opCtx = expCtx->opCtx;
-            const auto& serializationContext =
-                parsedDistinct.distinctCommandRequest->getSerializationContext();
-            auto& opDebug = CurOp::get(opCtx)->debug();
-            auto hash = [&]() {
-                if (opDebug.queryStatsInfo.key) {
-                    return opDebug.queryStatsInfo.key->getQueryShapeHash(opCtx,
-                                                                         serializationContext);
-                }
-
-                return query_shape::DistinctCmdShape(parsedDistinct, expCtx)
-                    .sha256Hash(expCtx->opCtx, serializationContext);
-            }();
-            setQueryShapeHash(opCtx, hash);
-
-            // Return the found query settings or an empty one.
-            auto& manager = QuerySettingsManager::get(opCtx);
-            return manager.getQuerySettingsForQueryShapeHash(hash, nss.dbName().tenantId())
-                .get_value_or({});
-        } catch (const DBException& ex) {
-            if constexpr (kDebugBuild) {
-                const Status status = ex.toStatus();
-                tassert(9423804,
-                        "Failed to perform query settings lookup: " + status.toString(),
-                        status.code() == ErrorCodes::BSONObjectTooLarge);
-            }
-
-            LOGV2_WARNING_OPTIONS(9423805,
-                                  {logv2::LogComponent::kQuery},
-                                  "Failed to perform query settings lookup",
-                                  "command"_attr =
-                                      parsedDistinct.distinctCommandRequest->toBSON().toString(),
-                                  "error"_attr = ex.toString());
-
-            return query_settings::QuerySettings();
+    auto* opCtx = expCtx->opCtx;
+    const auto& serializationContext =
+        parsedDistinct.distinctCommandRequest->getSerializationContext();
+    auto curOp = CurOp::get(opCtx);
+    auto& opDebug = curOp->debug();
+    auto hash = [&]() -> boost::optional<QueryShapeHash> {
+        if (opDebug.queryStatsInfo.key) {
+            return opDebug.queryStatsInfo.key->getQueryShapeHash(opCtx, serializationContext);
         }
+        boost::optional<query_shape::DistinctCmdShape> shape;
+        try {
+            shape.emplace(parsedDistinct, expCtx);
+        } catch (ExceptionFor<ErrorCodes::BSONObjectTooLarge>&) {
+            return boost::none;
+        }
+        return shape->sha256Hash(expCtx->opCtx, serializationContext);
     }();
+
+    if (!hash) {
+        return query_settings::QuerySettings();
+    }
+    setQueryShapeHash(opCtx, hash);
+
+    // Return the found query settings or an empty one.
+    auto& manager = QuerySettingsManager::get(opCtx);
+    auto settings =
+        manager.getQuerySettingsForQueryShapeHash(*hash, nss.dbName().tenantId()).get_value_or({});
 
     // Fail the current command, if 'reject: true' flag is present.
     failIfRejectedBySettings(expCtx, settings);
@@ -549,7 +512,7 @@ bool allowQuerySettingsFromClient(Client* client) {
 }
 
 bool isDefault(const QuerySettings& settings) {
-    // The 'serialization_context' and 'comment' fields are not significant.
+    // The 'serialization_context' field is not significant.
     static_assert(QuerySettings::fieldNames.size() == 5,
                   "A new field has been added to the QuerySettings structure, isDefault should be "
                   "updated appropriately.");
