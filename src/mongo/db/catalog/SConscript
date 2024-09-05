@@ -16,30 +16,6 @@ env.SConscript(
 )
 
 env.Library(
-    target="collection_options",
-    source=[
-        "clustered_collection_options_gen.cpp",
-        "clustered_collection_util.cpp",
-        "collection_options.cpp",
-        "collection_options_gen.cpp",
-        "collection_options_validation.cpp",
-    ],
-    LIBDEPS=[
-        "$BUILD_DIR/mongo/crypto/encrypted_field_config",
-        "$BUILD_DIR/mongo/db/pipeline/change_stream_pre_and_post_images_options",
-        "$BUILD_DIR/mongo/db/query/query_shape/query_shape",
-    ],
-    LIBDEPS_PRIVATE=[
-        "$BUILD_DIR/mongo/db/commands/test_commands_enabled",
-        "$BUILD_DIR/mongo/db/common",
-        "$BUILD_DIR/mongo/db/query/collation/collator_interface",
-        "$BUILD_DIR/mongo/db/query/query_knobs",
-        "$BUILD_DIR/mongo/db/server_base",
-        "$BUILD_DIR/mongo/db/timeseries/timeseries_options",
-    ],
-)
-
-env.Library(
     target="health_log",
     source=[
         "health_log.cpp",
@@ -98,20 +74,6 @@ env.Library(
         "$BUILD_DIR/mongo/util/progress_meter",
         "index_repair",
         "multi_index_block",
-    ],
-)
-
-env.Library(
-    target="index_build_oplog_entry",
-    source=[
-        "index_build_oplog_entry.cpp",
-    ],
-    LIBDEPS_PRIVATE=[
-        "$BUILD_DIR/mongo/base",
-        "$BUILD_DIR/mongo/bson/util/bson_extract",
-        "$BUILD_DIR/mongo/db/repl/oplog_entry",
-        "$BUILD_DIR/mongo/rpc/command_status",
-        "commit_quorum_options",
     ],
 )
 

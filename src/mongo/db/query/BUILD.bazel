@@ -28,6 +28,27 @@ idl_generator(
     src = "explain_verbosity.idl",
 )
 
+mongo_cc_library(
+    name = "common_query_enums_and_helpers",
+    srcs = [
+        "allowed_contexts.cpp",
+        "analyze_regex.cpp",
+        "explain_options.cpp",
+        ":explain_verbosity_gen",
+    ],
+    hdrs = [
+        "allowed_contexts.h",
+        "analyze_regex.h",
+        "explain_options.h",
+    ],
+    deps = [
+        "//src/mongo/db:api_parameters",
+        "//src/mongo/db:server_base",
+        "//src/mongo/db:service_context",
+        "//src/mongo/transport:transport_layer_common",  # TODO(SERVER-93876): Remove.
+    ],
+)
+
 idl_generator(
     name = "hint_gen",
     src = "hint.idl",
@@ -178,6 +199,41 @@ idl_generator(
     ],
 )
 
+mongo_cc_library(
+    name = "command_request_response",
+    srcs = [
+        "analyze_command_gen",
+        "count_command_as_aggregation_command.cpp",
+        "count_command_gen",
+        "count_request.cpp",
+        "cursor_request.cpp",
+        "cursor_response.cpp",
+        "kill_cursors_gen",
+        "view_response_formatter.cpp",
+        "//src/mongo/db:clientcursor.h",
+        "//src/mongo/db:cursor_id.h",
+    ],
+    hdrs = [
+        "count_command_as_aggregation_command.h",
+        "count_request.h",
+        "cursor_request.h",
+        "cursor_response.h",
+        "view_response_formatter.h",
+    ],
+    deps = [
+        ":cursor_response_idl",
+        ":query_request",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/bson/util:bson_extract",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/db:common",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/db:server_base",
+        "//src/mongo/db/ops:write_ops_parsers",
+        "//src/mongo/db/query:hint_parser",
+        "//src/mongo/db/repl:optime",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/rpc",
+        "//src/mongo/rpc:command_status",  # TODO(SERVER-93876): Remove.
+    ],
+)
+
 idl_generator(
     name = "getmore_command_gen",
     src = "getmore_command.idl",
@@ -186,6 +242,37 @@ idl_generator(
         "//src/mongo/db:basic_types_gen",
         "//src/mongo/db/repl:replication_types_gen",
         "//src/mongo/idl:generic_argument_gen",
+    ],
+)
+
+mongo_cc_library(
+    name = "query_request",
+    srcs = [
+        "distinct_command_gen",
+        "find_command_gen",
+        "getmore_command_gen",
+        "query_request_helper.cpp",
+        "tailable_mode.cpp",
+        "tailable_mode_gen",
+    ],
+    hdrs = [
+        "query_request_helper.h",
+        "tailable_mode.h",
+    ],
+    deps = [
+        ":cursor_response_idl",
+        ":hint_parser",
+        "//src/mongo/crypto:fle_fields",
+        "//src/mongo/db:api_parameters",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/db:server_base",
+        "//src/mongo/db/auth:authprivilege",
+        "//src/mongo/db/auth:security_token_auth",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/db/commands:test_commands_enabled",
+        "//src/mongo/db/pipeline:runtime_constants_idl",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/db/query/query_settings",
+        "//src/mongo/db/repl:read_concern_args",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/db/repl:repl_coordinator_interface",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/s:common_s",
     ],
 )
 

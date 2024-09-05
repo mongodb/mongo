@@ -9,6 +9,50 @@ exports_files(
     ]),
 )
 
+mongo_cc_library(
+    name = "field_path",
+    srcs = [
+        "field_path.cpp",
+    ],
+    hdrs = [
+        "field_path.h",
+    ],
+    deps = [
+        "//src/mongo:base",
+        "//src/mongo/db:server_base",
+        "//src/mongo/db:server_options",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/db/query:query_knobs",  # TODO(SERVER-93876): Remove.
+    ],
+)
+
+mongo_cc_library(
+    name = "dependencies",
+    srcs = [
+        "dependencies.cpp",
+    ],
+    hdrs = [
+        "dependencies.h",
+    ],
+    deps = [
+        ":field_path",
+        "//src/mongo/db/exec/document_value",  # TODO(SERVER-93876): Remove.
+    ],
+)
+
+mongo_cc_library(
+    name = "document_path_support",
+    srcs = [
+        "document_path_support.cpp",
+    ],
+    hdrs = [
+        "document_path_support.h",
+    ],
+    deps = [
+        "//src/mongo/db:common",
+        "//src/mongo/db/exec/document_value",  # TODO(SERVER-93876): Remove.
+    ],
+)
+
 idl_generator(
     name = "change_stream_pre_and_post_images_options_gen",
     src = "change_stream_pre_and_post_images_options.idl",
@@ -50,9 +94,112 @@ idl_generator(
     ],
 )
 
+mongo_cc_library(
+    name = "document_sources_idl",
+    srcs = [
+        "document_source_change_stream_gen",
+        "document_source_coll_stats_gen",
+        "document_source_current_op_gen",
+        "document_source_densify_gen",
+        "document_source_fill_gen",
+        "document_source_hybrid_scoring_util.cpp",
+        "document_source_internal_all_collection_stats_gen",
+        "document_source_internal_apply_oplog_update_gen",
+        "document_source_internal_projection_gen",
+        "document_source_list_sampled_queries_gen",
+        "document_source_list_sessions_gen",
+        "document_source_merge_gen",
+        "document_source_merge_modes_gen",
+        "document_source_merge_spec.cpp",
+        "document_source_out_gen",
+        "document_source_parsing_validators.cpp",
+        "document_source_query_settings_gen",
+        "document_source_query_stats_gen",
+        "document_source_query_stats_validators.cpp",
+        "document_source_rank_fusion_gen",
+        "document_source_rank_fusion_inputs_gen",
+        "document_source_replace_root_gen",
+        "document_source_set_variable_from_subpipeline_gen",
+        "document_source_set_window_fields_gen",
+        "document_source_union_with_gen",
+        "exchange_spec_gen",
+        "resume_token.cpp",
+        "resume_token_gen",
+        "storage_stats_spec_gen",
+        "//src/mongo/db:catalog_raii.h",
+        "//src/mongo/db:db_raii.h",
+        "//src/mongo/db:read_concern.h",
+        "//src/mongo/db/catalog:local_oplog_info.h",
+        "//src/mongo/db/exec:exclusion_projection_executor.h",
+        "//src/mongo/db/exec:fastpath_projection_node.h",
+        "//src/mongo/db/exec:projection_executor.h",
+        "//src/mongo/db/exec:projection_node.h",
+        "//src/mongo/db/pipeline/search:plan_sharded_search_gen",
+        "//src/mongo/db/stats:operation_latency_histogram.h",
+        "//src/mongo/db/stats:top.h",
+    ],
+    hdrs = [
+        "change_stream_constants.h",
+        "change_stream_helpers.h",
+        "document_source_change_stream.h",
+        "document_source_hybrid_scoring_util.h",
+        "document_source_merge.h",
+        "document_source_merge_spec.h",
+        "document_source_parsing_validators.h",
+        "document_source_query_stats_validators.h",
+        "document_source_single_document_transformation.h",
+        "document_source_writer.h",
+        "lite_parsed_pipeline.h",
+        "merge_processor.h",
+        "resume_token.h",
+        "single_document_transformation_processor.h",
+        "transformer_interface.h",
+    ],
+    deps = [
+        ":docs_needed_bounds",  # TODO(SERVER-93876): Remove.
+        ":runtime_constants_idl",
+        ":value_idl",  # TODO(SERVER-93876): Remove.
+        "//src/mongo:base",
+        "//src/mongo/db:namespace_spec",
+        "//src/mongo/db/auth:security_token_auth",
+        "//src/mongo/db/exec/document_value",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/db/query/query_shape",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/db/query/query_stats:query_stats_parse",
+        "//src/mongo/db/storage:key_string",
+        "//src/mongo/db/timeseries:timeseries_options",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/idl:idl_parser",
+        "//src/mongo/s:common_s",
+    ],
+)
+
+mongo_cc_library(
+    name = "change_stream_helpers",
+    srcs = [
+        "change_stream_helpers.cpp",
+    ],
+    hdrs = [
+        "change_stream_helpers.h",
+    ],
+    deps = [
+        "document_sources_idl",
+        "//src/mongo/db/repl:oplog_entry",
+    ],
+)
+
 idl_generator(
     name = "value_gen",
     src = "value.idl",
+)
+
+mongo_cc_library(
+    name = "value_idl",
+    srcs = [
+        "value_gen",
+    ],
+    deps = [
+        "//src/mongo/db/exec/document_value",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/idl:idl_parser",
+    ],
 )
 
 idl_generator(
@@ -98,6 +245,35 @@ idl_generator(
     ],
 )
 
+mongo_cc_library(
+    name = "aggregation_request_helper",
+    srcs = [
+        "aggregation_request_helper.cpp",
+        "name_expression.h",
+        "name_expression_parser.cpp",
+        "query_request_conversion.cpp",
+        ":aggregate_command_gen",
+        ":external_data_source_option_gen",
+        ":name_expression_gen",
+    ],
+    hdrs = [
+        "aggregation_request_helper.h",
+        "query_request_conversion.h",
+    ],
+    deps = [
+        ":document_sources_idl",
+        "//src/mongo/db:server_base",
+        "//src/mongo/db/auth:security_token",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/db/exec/document_value",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/db/query:command_request_response",
+        "//src/mongo/db/query:common_query_enums_and_helpers",
+        "//src/mongo/db/query:query_request",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/db/query/query_settings",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/db/repl:read_concern_args",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/db/storage:storage_options",  # TODO(SERVER-93876): Remove.
+    ],
+)
+
 idl_generator(
     name = "accumulator_percentile_gen",
     src = "accumulator_percentile.idl",
@@ -117,6 +293,39 @@ idl_generator(
 idl_generator(
     name = "map_reduce_options_gen",
     src = "map_reduce_options.idl",
+)
+
+mongo_cc_library(
+    name = "abt_utils",
+    srcs = [
+        "//src/mongo/db/pipeline/abt:utils.cpp",
+    ],
+    hdrs = [
+        "//src/mongo/db/exec:docval_to_sbeval.h",
+        "//src/mongo/db/pipeline/abt:utils.h",
+    ],
+    deps = [
+        ":field_path",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/db/exec/document_value",
+        "//src/mongo/db/query/optimizer:optimizer_base",
+    ],
+)
+
+mongo_cc_library(
+    name = "lite_parsed_document_source",
+    srcs = [
+        "lite_parsed_document_source.cpp",
+        "lite_parsed_pipeline.cpp",
+    ],
+    hdrs = [
+        "lite_parsed_document_source.h",
+        "lite_parsed_pipeline.h",
+    ],
+    deps = [
+        ":aggregation_request_helper",
+        "//src/mongo/db/query:common_query_enums_and_helpers",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/db/stats:counters",  # TODO(SERVER-93876): Remove.
+    ],
 )
 
 idl_generator(

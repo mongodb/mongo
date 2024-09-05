@@ -14,49 +14,6 @@ env.SConscript(
     ],
 )
 
-# Core definitions: ABT, Logical and physical properties, Metadata, and core utilities.
-env.Library(
-    target="optimizer_base",
-    source=[
-        "defs.cpp",
-        "explain.cpp",
-        "index_bounds.cpp",
-        "node.cpp",
-        "partial_schema_requirements.cpp",
-        "props.cpp",
-        "reference_tracker.cpp",
-        "syntax/expr.cpp",
-        "utils/abt_compare.cpp",
-        "utils/abt_hash.cpp",
-        "utils/ce_math.cpp",
-        "utils/interval_utils.cpp",
-        "utils/path_utils.cpp",
-        "utils/reftracker_utils.cpp",
-        "utils/utils.cpp",
-    ],
-    LIBDEPS=[
-        # We should only depend on SBE for value representation and basic arithmetic for constant folding.
-        "$BUILD_DIR/mongo/db/exec/sbe/query_sbe_makeobj_spec",
-        "$BUILD_DIR/mongo/db/sbe_values",
-    ],
-)
-
-# Rewrites which manipulate the ABT directly.
-env.Library(
-    target="optimizer_rewrites",
-    source=[
-        "rewrites/const_eval.cpp",
-        "rewrites/normalize_projections.cpp",
-        "rewrites/path.cpp",
-        "rewrites/path_lower.cpp",
-        "rewrites/proj_spec_lower.cpp",
-        "rewrites/proj_spec_builder.cpp",
-    ],
-    LIBDEPS=[
-        "optimizer_base",
-    ],
-)
-
 env.CppUnitTest(
     target="optimizer_proj_spec_test",
     source=[

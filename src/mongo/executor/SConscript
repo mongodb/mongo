@@ -16,72 +16,6 @@ env.Library(
 )
 
 env.Library(
-    target="remote_command",
-    source=[
-        "remote_command_request.cpp",
-        "remote_command_response.cpp",
-    ],
-    LIBDEPS=[
-        "$BUILD_DIR/mongo/db/api_parameters",
-        "$BUILD_DIR/mongo/rpc/metadata",
-        "$BUILD_DIR/mongo/s/mongos_server_parameters",
-        "$BUILD_DIR/mongo/util/net/network",
-    ],
-    LIBDEPS_PRIVATE=[
-        "$BUILD_DIR/mongo/db/auth/security_token_auth",
-        "$BUILD_DIR/mongo/util/fail_point",
-    ],
-)
-
-env.Library(
-    target="async_multicaster",
-    source=[
-        "async_multicaster.cpp",
-    ],
-    LIBDEPS=[
-        "$BUILD_DIR/mongo/base",
-        "$BUILD_DIR/mongo/util/net/network",
-        "remote_command",
-        "task_executor_interface",
-    ],
-)
-
-env.Library(
-    target="task_executor_interface",
-    source=[
-        "task_executor.cpp",
-    ],
-    LIBDEPS=[
-        "$BUILD_DIR/mongo/base",
-        "remote_command",
-    ],
-)
-
-env.Library(
-    target="scoped_task_executor",
-    source=[
-        "scoped_task_executor.cpp",
-    ],
-    LIBDEPS=[
-        "$BUILD_DIR/mongo/util/fail_point",
-        "task_executor_interface",
-    ],
-)
-
-env.Library(
-    target="network_interface",
-    source=[
-        "network_interface.cpp",
-    ],
-    LIBDEPS=[
-        "task_executor_interface",
-    ],
-    LIBDEPS_PRIVATE=[
-        "$BUILD_DIR/mongo/util/fail_point",
-    ],
-)
-
-env.Library(
     target="network_interface_mock",
     source=[
         "mock_network_fixture.cpp",
@@ -98,34 +32,6 @@ env.Library(
     ],
     LIBDEPS_PRIVATE=[
         "$BUILD_DIR/mongo/db/query_expressions",
-    ],
-)
-
-env.Library(
-    target="connection_pool_executor",
-    source=[
-        "connection_pool.cpp",
-    ],
-    LIBDEPS=[
-        "$BUILD_DIR/mongo/util/net/network",
-        "connection_pool_stats",
-        "remote_command",
-    ],
-    LIBDEPS_PRIVATE=[
-        "$BUILD_DIR/mongo/db/server_base",
-        "$BUILD_DIR/mongo/db/server_feature_flags",
-        "$BUILD_DIR/mongo/util/fail_point",
-        "egress_connection_closer_manager",
-    ],
-)
-
-env.Library(
-    target="connection_pool_controllers",
-    source=[
-        "connection_pool_controllers.cpp",
-    ],
-    LIBDEPS=[
-        "connection_pool_executor",
     ],
 )
 
@@ -211,35 +117,6 @@ env.Library(
 )
 
 env.Library(
-    target="thread_pool_task_executor",
-    source=[
-        "thread_pool_task_executor.cpp",
-    ],
-    LIBDEPS=[
-        "$BUILD_DIR/mongo/db/service_context",
-        "$BUILD_DIR/mongo/util/fail_point",
-        "task_executor_interface",
-    ],
-    LIBDEPS_PRIVATE=[
-        "network_interface",
-    ],
-)
-
-env.Library(
-    target="pinned_connection_task_executor",
-    source=[
-        "pinned_connection_task_executor.cpp",
-    ],
-    LIBDEPS=[
-        "scoped_task_executor",
-        "task_executor_interface",
-    ],
-    LIBDEPS_PRIVATE=[
-        "$BUILD_DIR/mongo/client/async_client",
-    ],
-)
-
-env.Library(
     target="async_rpc",
     source=[
         "async_rpc.cpp",
@@ -269,21 +146,6 @@ env.Library(
 )
 
 env.Library(
-    target="task_executor_pool",
-    source=[
-        "task_executor_pool.cpp",
-        "task_executor_pool_parameters_gen.cpp",
-    ],
-    LIBDEPS=[
-        "$BUILD_DIR/mongo/util/processinfo",
-        "task_executor_interface",
-    ],
-    LIBDEPS_PRIVATE=[
-        "$BUILD_DIR/mongo/db/server_base",
-    ],
-)
-
-env.Library(
     target="task_executor_cursor",
     source=[
         "task_executor_cursor.cpp",
@@ -297,32 +159,6 @@ env.Library(
     LIBDEPS_PRIVATE=[
         "$BUILD_DIR/mongo/db/query/plan_yield_policy",
         "pinned_connection_task_executor_factory",
-    ],
-)
-
-env.Library(
-    target="pinned_connection_task_executor_factory",
-    source=[
-        "pinned_connection_task_executor_factory.cpp",
-    ],
-    LIBDEPS=[
-        "task_executor_interface",
-    ],
-    LIBDEPS_PRIVATE=[
-        "network_interface",
-        "pinned_connection_task_executor",
-        "thread_pool_task_executor",
-    ],
-)
-
-env.Library(
-    target="inline_executor",
-    source=[
-        "inline_executor.cpp",
-    ],
-    LIBDEPS=[
-        "$BUILD_DIR/mongo/base",
-        "task_executor_interface",
     ],
 )
 

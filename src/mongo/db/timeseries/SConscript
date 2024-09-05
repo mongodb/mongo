@@ -15,21 +15,6 @@ env.SConscript(
 )
 
 env.Library(
-    target="timeseries_options",
-    source=[
-        "timeseries_gen.cpp",
-        "timeseries_global_options.cpp",
-        "timeseries_options.cpp",
-    ],
-    LIBDEPS_PRIVATE=[
-        "$BUILD_DIR/mongo/db/query/query_shape/query_shape",
-        "$BUILD_DIR/mongo/db/server_base",
-        "$BUILD_DIR/mongo/db/storage/storage_options",
-        "$BUILD_DIR/mongo/util/processinfo",
-    ],
-)
-
-env.Library(
     target="catalog_helper",
     source=[
         "catalog_helper.cpp",
@@ -106,18 +91,6 @@ env.Library(
         "bucket_compression",
         "bucket_compression_failure",
         "timeseries_conversion_util",
-        "timeseries_options",
-    ],
-)
-
-env.Library(
-    target="timeseries_extended_range",
-    source=[
-        "timeseries_extended_range.cpp",
-    ],
-    LIBDEPS_PRIVATE=[
-        "$BUILD_DIR/mongo/base",
-        "$BUILD_DIR/mongo/db/catalog/index_catalog",
         "timeseries_options",
     ],
 )

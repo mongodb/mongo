@@ -9,11 +9,6 @@ exports_files(
     ]),
 )
 
-idl_generator(
-    name = "transform_algorithm_gen",
-    src = "transform_algorithm.idl",
-)
-
 mongo_cc_library(
     name = "rate_limiting",
     srcs = [
@@ -26,6 +21,55 @@ mongo_cc_library(
         "//src/mongo:base",
         "//src/mongo/util:clock_sources",
     ],
+)
+
+mongo_cc_library(
+    name = "query_stats",
+    srcs = [
+        "aggregated_metric.cpp",
+        "key.cpp",
+        "optimizer_metrics_stats_entry.cpp",
+        "query_stats.cpp",
+        "query_stats_entry.cpp",
+        "query_stats_helpers.h",
+        "supplemental_metrics_stats.cpp",
+        "vector_search_stats_entry.cpp",
+    ],
+    hdrs = [
+        "aggregated_metric.h",
+        "key.h",
+        "optimizer_metrics_stats_entry.h",
+        "query_stats.h",
+        "query_stats_entry.h",
+        "supplemental_metrics_stats.h",
+        "vector_search_stats_entry.h",
+    ],
+    deps = [
+        ":query_stats_parse",  # TODO(SERVER-93876): Remove.
+        ":rate_limiting",
+        "//src/mongo/bson/mutable:mutable_bson",
+        "//src/mongo/db:commands",
+        "//src/mongo/db:profile_filter",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/db:server_base",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/db:server_options",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/db:service_context",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/db/auth",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/db/query:command_request_response",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/db/query:cursor_response_idl",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/db/query:memory_util",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/db/query:query_knobs",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/db/query/query_shape",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/db/stats:counters",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/rpc:client_metadata",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/util:fail_point",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/util:processinfo",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/util/net:network",  # TODO(SERVER-93876): Remove.
+    ],
+)
+
+idl_generator(
+    name = "transform_algorithm_gen",
+    src = "transform_algorithm.idl",
 )
 
 mongo_cc_library(

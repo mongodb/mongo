@@ -52,18 +52,6 @@ env.Library(
 )
 
 env.Library(
-    target="transaction_operations",
-    source=[
-        "transaction_operations.cpp",
-    ],
-    LIBDEPS_PRIVATE=[
-        "$BUILD_DIR/mongo/base",
-        "$BUILD_DIR/mongo/db/repl/oplog_entry",
-        "$BUILD_DIR/mongo/util/fail_point",
-    ],
-)
-
-env.Library(
     target="transaction_api",
     source=[
         "internal_transaction_metrics.cpp",

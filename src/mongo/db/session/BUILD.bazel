@@ -72,6 +72,32 @@ idl_generator(
     ],
 )
 
+mongo_cc_library(
+    name = "kill_sessions",
+    srcs = [
+        "kill_sessions.cpp",
+        "kill_sessions_common.cpp",
+        "session_killer.cpp",
+        ":kill_sessions_gen",
+    ],
+    hdrs = [
+        "kill_sessions.h",
+        "kill_sessions_common.h",
+        "kill_sessions_util.h",
+        "session_killer.h",
+    ],
+    deps = [
+        ":logical_session_id_helpers",
+        "//src/mongo/db:api_parameters",
+        "//src/mongo/db:server_base",
+        "//src/mongo/db/auth",
+        "//src/mongo/db/auth:authprivilege",
+        "//src/mongo/db/auth:user",
+        "//src/mongo/rpc:client_metadata",
+        "//src/mongo/util/concurrency:spin_lock",  # TODO(SERVER-93876): Remove.
+    ],
+)
+
 idl_generator(
     name = "internal_transactions_reap_service_gen",
     src = "internal_transactions_reap_service.idl",
@@ -96,12 +122,46 @@ mongo_cc_library(
     deps = [
         "//src/mongo:base",
         "//src/mongo/crypto:sha256_block",
+        "//src/mongo/crypto:sha_block",
         "//src/mongo/idl:idl_parser",
-    ] + select({
-        "//bazel/config:ssl_enabled_linux": ["//src/mongo/crypto:sha_block_openssl"],
-        "//bazel/config:ssl_disabled_linux": ["//src/mongo/crypto:sha_block_tom"],
-        "@platforms//os:macos": ["//src/mongo/crypto:sha_block_apple"],
-        "@platforms//os:windows": ["//src/mongo/crypto:sha_block_windows"],
-        "//conditions:default": [],
-    }),
+    ],
+)
+
+mongo_cc_library(
+    name = "session_catalog",
+    srcs = [
+        "session_catalog.cpp",
+    ],
+    hdrs = [
+        "session.h",
+        "session_catalog.h",
+    ],
+    deps = [
+        ":kill_sessions",
+        ":logical_session_id",  # TODO(SERVER-93876): Remove.
+        ":logical_session_id_helpers",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/db:internal_transactions_feature_flag",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/db:service_context",
+        "//src/mongo/db/concurrency:lock_manager",
+        "//src/mongo/util:fail_point",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/util/concurrency:spin_lock",  # TODO(SERVER-93876): Remove.
+    ],
+)
+
+mongo_cc_library(
+    name = "sessions_collection",
+    srcs = [
+        "sessions_collection.cpp",
+    ],
+    hdrs = [
+        "sessions_collection.h",
+    ],
+    deps = [
+        ":logical_session_id",  # TODO(SERVER-93876): Remove.
+        ":logical_session_id_helpers",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/client:clientdriver_minimal",
+        "//src/mongo/db:coll_mod_command_idl",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/db:index_commands_idl",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/db:server_base",
+    ],
 )

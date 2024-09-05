@@ -15,6 +15,26 @@ idl_generator(
 )
 
 mongo_cc_library(
+    name = "ingress_admission_control",
+    srcs = [
+        "ingress_admission_controller.cpp",
+        ":ingress_admission_control_gen",
+    ],
+    hdrs = [
+        "ingress_admission_controller.h",
+    ],
+    deps = [
+        ":ingress_admission_context",
+        "//src/mongo:base",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/db:commands",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/db:server_base",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/db:server_feature_flags",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/db:service_context",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/util/concurrency:ticketholder",
+    ],
+)
+
+mongo_cc_library(
     name = "ticketholder_manager",
     srcs = [
         "ticketholder_manager.cpp",
@@ -28,6 +48,20 @@ mongo_cc_library(
         "//src/mongo/db:service_context",  # TODO(SERVER-93876): Remove.
         "//src/mongo/db/commands:test_commands_enabled",
         "//src/mongo/util/concurrency:ticketholder",
+    ],
+)
+
+mongo_cc_library(
+    name = "queues_server_status_section",
+    srcs = [
+        "queues_server_status_section.cpp",
+    ],
+    deps = [
+        ":ingress_admission_control",
+        ":ticketholder_manager",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/db:server_feature_flags",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/db:service_context",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/db/commands:server_status_core",  # TODO(SERVER-93876): Remove.
     ],
 )
 
@@ -81,6 +115,10 @@ mongo_cc_library(
     ],
     header_deps = [
         "//src/mongo/db/pipeline/process_interface:mongo_process_interface",
+    ],
+    deps = [
+        "//src/mongo:base",
+        "//src/mongo/db:server_base",
     ],
 )
 

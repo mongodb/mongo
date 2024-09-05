@@ -13,3 +13,13 @@ idl_generator(
     name = "cluster_query_knobs_gen",
     src = "cluster_query_knobs.idl",
 )
+
+mongo_cc_library(
+    name = "cluster_query_knobs",
+    srcs = [
+        ":cluster_query_knobs_gen",
+    ],
+    deps = [
+        "//src/mongo/db:server_base",
+    ],
+)

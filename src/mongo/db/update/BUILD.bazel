@@ -10,6 +10,23 @@ exports_files(
 )
 
 mongo_cc_library(
+    name = "pattern_cmp",
+    srcs = [
+        "pattern_cmp.cpp",
+    ],
+    hdrs = [
+        "pattern_cmp.h",
+    ],
+    deps = [
+        "//src/mongo:base",
+        "//src/mongo/bson/mutable:mutable_bson",
+        "//src/mongo/db:common",
+        "//src/mongo/db/exec/document_value",
+        "//src/mongo/db/query/bson:dotted_path_support",
+    ],
+)
+
+mongo_cc_library(
     name = "update_document_diff",
     srcs = [
         "document_diff_applier.cpp",

@@ -16,20 +16,6 @@ env.SConscript(
     ],
 )
 
-env.Library(
-    target="server_status_servers",
-    source=[
-        "server_status_servers.cpp",
-    ],
-    LIBDEPS_PRIVATE=[
-        "$BUILD_DIR/mongo/db/stats/counters",
-        "$BUILD_DIR/mongo/transport/message_compressor",
-        "$BUILD_DIR/mongo/transport/service_executor",
-        "$BUILD_DIR/mongo/util/net/ssl_manager",
-        "server_status_core",
-    ],
-)
-
 # Commands available in every process that executes commands
 env.Library(
     target="core",
@@ -168,17 +154,6 @@ env.Library(
 )
 
 env.Library(
-    target="rwc_defaults_commands",
-    source=[
-        "rwc_defaults_commands_gen.cpp",
-    ],
-    LIBDEPS=[
-        "$BUILD_DIR/mongo/db/read_write_concern_defaults",
-        "$BUILD_DIR/mongo/db/server_base",
-    ],
-)
-
-env.Library(
     target="authentication_commands",
     source=[
         "authentication_commands.cpp",
@@ -237,22 +212,6 @@ env.Library(
         "$BUILD_DIR/mongo/db/server_base",
         "$BUILD_DIR/mongo/db/shard_role",
         "$BUILD_DIR/mongo/db/storage/storage_options",
-    ],
-)
-
-env.Library(
-    target="create_command",
-    source=[
-        "create_gen.cpp",
-    ],
-    LIBDEPS_PRIVATE=[
-        "$BUILD_DIR/mongo/crypto/encrypted_field_config",
-        "$BUILD_DIR/mongo/db/auth/authprivilege",
-        "$BUILD_DIR/mongo/db/catalog/collection_options",
-        "$BUILD_DIR/mongo/db/query/query_knobs",
-        "$BUILD_DIR/mongo/db/server_base",
-        "$BUILD_DIR/mongo/db/server_options",
-        "$BUILD_DIR/mongo/db/timeseries/timeseries_options",
     ],
 )
 

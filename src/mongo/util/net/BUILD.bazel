@@ -22,6 +22,77 @@ filegroup(
     ],
 )
 
+mongo_cc_library(
+    name = "ssl_options",
+    srcs = [
+        "ssl_options.cpp",
+    ],
+    hdrs = [
+        "ssl_options.h",
+    ],
+    deps = [
+        "//src/mongo:base",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/util/options_parser",
+    ],
+)
+
+mongo_cc_library(
+    name = "ssl_types",
+    srcs = [
+        "ssl_types.cpp",
+    ],
+    hdrs = [
+        "ssl_types.h",
+    ],
+    deps = [
+        ":ssl_options",
+        "//src/mongo:base",  # TODO(SERVER-93876): Remove.
+    ],
+)
+
+mongo_cc_library(
+    name = "ssl_parameters_auth",
+    srcs = select({
+        "//bazel/config:ssl_enabled": [
+            "ssl_parameters_auth.cpp",
+            "ssl_parameters_auth_gen",
+        ],
+        "//conditions:default": [
+            "ssl_parameters_auth_none.cpp",
+        ],
+    }),
+    deps = select({
+        "//bazel/config:ssl_enabled": [
+            ":ssl_options",  # TODO(SERVER-93876): Remove.
+            "//src/mongo:base",  # TODO(SERVER-93876): Remove.
+            "//src/mongo/client:authentication",
+            "//src/mongo/db/auth:cluster_auth_mode",  # TODO(SERVER-93876): Remove.
+        ],
+        "//conditions:default": [
+            "//src/mongo:base",  # TODO(SERVER-93876): Remove.
+        ],
+    }),
+)
+
+mongo_cc_library(
+    name = "openssl_init",
+    srcs = [
+        "openssl_init.cpp",
+    ],
+    linkopts = [
+        "-lssl",
+    ],
+    target_compatible_with = select({
+        "//bazel/config:mongo_crypto_openssl": [],
+        "//conditions:default": ["@platforms//:incompatible"],
+    }),
+    deps = [
+        ":ssl_options",
+        "//src/mongo:base",
+        "//src/mongo/crypto:symmetric_crypto",
+    ],
+)
+
 idl_generator(
     name = "hostandport_gen",
     src = "hostandport.idl",
@@ -35,11 +106,42 @@ idl_generator(
     ],
 )
 
+mongo_cc_library(
+    name = "ssl_options_client",
+    srcs = [
+        "ssl_options_client.cpp",
+        "ssl_options_client_gen",
+    ],
+    deps = [
+        ":ssl_options",
+        "//src/mongo:base",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/util/options_parser",  # TODO(SERVER-93876): Remove.
+    ],
+)
+
 idl_generator(
     name = "ssl_options_server_gen",
     src = "ssl_options_server.idl",
     deps = [
         "//src/mongo/db:basic_types_gen",
+    ],
+)
+
+mongo_cc_library(
+    name = "ssl_options_server",
+    srcs = [
+        "ssl_options_server.cpp",
+        "ssl_options_server_gen",
+    ],
+    hdrs = [
+        "//src/mongo/db:server_feature_flags_gen",
+    ],
+    deps = [
+        ":ssl_options",
+        "//src/mongo/db:server_base",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/db/auth:auth_options",
+        "//src/mongo/db/auth:cluster_auth_mode",
+        "//src/mongo/util/options_parser",  # TODO(SERVER-93876): Remove.
     ],
 )
 
@@ -52,9 +154,115 @@ idl_generator(
     ],
 )
 
+# TODO(SERVER-94377): Rework this.
+filegroup(
+    name = "ssl_manager_file",
+    srcs = select({
+        "//bazel/config:ssl_provider_{}".format(ssl_provider): [
+            "ssl_manager_{}.cpp".format(ssl_provider),
+        ]
+        for ssl_provider in [
+            "apple",
+            "openssl",
+            "windows",
+            "none",
+        ]
+    } | {
+        # Intentionally blank.
+        "//conditions:default": [],
+    }),
+)
+
+mongo_cc_library(
+    name = "ssl_manager",
+    srcs = [
+        "sock.cpp",
+    ] + select({
+        "//bazel/config:ssl_enabled": [
+            ":ssl_manager_file",
+            "//src/mongo/util/net/private:ssl_expiration.cpp",
+            "ssl_manager.cpp",
+            "ssl_parameters.cpp",
+            "ssl_stream.cpp",
+            "//src/mongo/util/net/ssl",
+            "ssl_peer_info.cpp",
+            "ssl_parameters_gen",
+            "//src/mongo/util/net/ocsp:ocsp_manager.cpp",
+        ],
+    } | {
+        "//conditions:default": ["ssl_manager_none.cpp"],
+    }),
+    hdrs = [
+        "ssl_manager.h",
+    ] + select({
+        "//bazel/config:ssl_enabled": [
+            "ssl.hpp",
+            "ssl_parameters.h",
+            "ssl_peer_info.h",
+            "//src/mongo/executor:network_interface_factory.h",
+            "//src/mongo/rpc/metadata:metadata_hook.h",
+            "//src/mongo/util/net/ocsp:ocsp_manager.h",
+            "//src/mongo/util/net/private:ssl_expiration.h",
+        ],
+        "//conditions:default": [],
+    }) + select({
+        "//bazel/config:ssl_provider_openssl": [
+            "//src/mongo/util:strong_weak_finish_line.h",
+            "//src/mongo/util/net:dh_openssl.h",
+        ],
+        "//conditions:default": [],
+    }),
+    deps = [
+        "network",
+        "ssl_options",
+        "//src/mongo:base",
+        "//src/mongo/util:background_job",
+        "//src/mongo/util:fail_point",
+    ] + select({
+        "//bazel/config:ssl_enabled": [
+            ":http_client",
+            ":ssl_types",
+            ":ssl_util",
+            "//src/mongo/base:secure_allocator",
+            "//src/mongo/client:internal_auth",
+            "//src/mongo/crypto:sha_block",
+            "//src/mongo/db:connection_health_metrics_parameter",
+            "//src/mongo/db:server_base",
+            "//src/mongo/db:server_feature_flags",
+            "//src/mongo/db:service_context",
+            "//src/mongo/db/auth",
+            "//src/mongo/db/auth:cluster_auth_mode",
+            "//src/mongo/util:caching",
+            "//src/mongo/util:icu",
+            "//src/mongo/util:winutil",
+            "//src/mongo/util/concurrency:thread_pool",
+            "//src/third_party/asio-master:asio",
+        ],
+        "//conditions:default": [],
+    }) + select({
+        "//bazel/config:ssl_provider_openssl": [":openssl_init"],
+        "//conditions:default": [],
+    }),
+)
+
 idl_generator(
     name = "ssl_parameters_auth_gen",
     src = "ssl_parameters_auth.idl",
+)
+
+mongo_cc_library(
+    name = "mock_http_client",
+    srcs = [
+        "http_client_mock.cpp",
+        "//src/mongo/base:data_builder.h",
+    ],
+    hdrs = [
+        "http_client.h",
+        "http_client_mock.h",
+    ],
+    deps = [
+        "//src/mongo:base",
+    ],
 )
 
 idl_generator(

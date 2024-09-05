@@ -32,6 +32,36 @@ idl_generator(
     ],
 )
 
+mongo_cc_library(
+    name = "write_ops_parsers",
+    srcs = [
+        "write_ops.cpp",
+        ":write_ops_gen",
+        "//src/mongo/db/update:update_oplog_entry_serialization.h",
+        "//src/mongo/db/update:update_oplog_entry_version.h",
+    ],
+    hdrs = [
+        "write_ops.h",
+    ],
+    header_deps = [
+        "//src/mongo/s/catalog:sharding_catalog_client",
+    ],
+    deps = [
+        "//src/mongo:base",
+        "//src/mongo/crypto:encrypted_field_config",
+        "//src/mongo/crypto:fle_fields",
+        "//src/mongo/db:dbmessage",
+        "//src/mongo/db:server_base",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/db/auth:authprivilege",
+        "//src/mongo/db/pipeline:runtime_constants_idl",
+        "//src/mongo/db/query:hint_parser",
+        "//src/mongo/db/repl:optime",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/idl:idl_parser",
+        "//src/mongo/rpc:command_status",
+        "//src/mongo/rpc:metadata_impersonated_user",
+    ],
+)
+
 idl_generator(
     name = "delete_request_gen",
     src = "delete_request.idl",
