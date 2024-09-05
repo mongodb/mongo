@@ -140,6 +140,11 @@ structs:
                 type: Provenance
                 description: "The source operation that called this resharding operation."
                 optional: true
+            implicitlyCreateIndex:
+                type: bool
+                description: "Whether to create an index on the shard key pattern if the shard key
+                              does not already have a support index."
+                default: true
 
     AbortReason:
         description: "Not meant to be used directly. Only use internal fields."
@@ -190,7 +195,7 @@ structs:
                 type: long
                 description: "Number of writes during critical section on this donor shard."
                 optional: true
-                
+
     DonorShardFetchTimestamp:
         description: "Used for tracking donor min fetch timestamp"
         strict: false
@@ -287,7 +292,7 @@ structs:
                 type: string
                 description: "The zone name."
             min:
-                type: object_owned 
+                type: object_owned
                 description: "The min key of the chunk range assigned to the zone."
             max:
                 type: object_owned

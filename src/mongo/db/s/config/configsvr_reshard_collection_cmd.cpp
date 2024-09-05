@@ -203,6 +203,8 @@ public:
                 resharding::validateShardDistribution(
                     *shardDistribution, opCtx, ShardKeyPattern(request().getKey()));
             }
+            resharding::validateImplicitlyCreateIndex(request().getImplicitlyCreateIndex(),
+                                                      request().getKey());
 
             // Returns boost::none if there isn't any work to be done by the resharding operation.
             auto instance = ([&]()
@@ -305,6 +307,7 @@ public:
                 coordinatorDoc.setForceRedistribution(request().getForceRedistribution());
                 coordinatorDoc.setUnique(request().getUnique());
                 coordinatorDoc.setCollation(request().getCollation());
+                coordinatorDoc.setImplicitlyCreateIndex(request().getImplicitlyCreateIndex());
                 coordinatorDoc.setRecipientOplogBatchTaskCount(
                     request().getRecipientOplogBatchTaskCount());
 

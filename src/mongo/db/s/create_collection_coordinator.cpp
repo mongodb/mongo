@@ -1210,16 +1210,23 @@ boost::optional<UUID> createCollectionAndIndexes(
             translatedRequestParams->getTimeseries(),
             isUpdatedCoordinatorDoc);
     } else {
-        uassert(6373200,
-                "Must have an index compatible with the proposed shard key",
-                validShardKeyIndexExists(
-                    opCtx,
-                    translatedNss,
-                    shardKeyPattern,
-                    translatedRequestParams->getCollation(),
-                    request.getUnique().value_or(false) &&
-                        request.getEnforceUniquenessCheck().value_or(true),
-                    shardkeyutil::ValidationBehaviorsShardCollection(opCtx, dataShard)));
+        const auto fcvSnapshot = serverGlobalParams.featureCompatibility.acquireFCVSnapshot();
+        const bool isIndexOptional = shardKeyPattern.isHashedPattern() &&
+            fcvSnapshot.isVersionInitialized() &&
+            feature_flags::gFeatureFlagHashedShardKeyIndexOptionalUponShardingCollection.isEnabled(
+                fcvSnapshot);
+        if (!isIndexOptional) {
+            uassert(6373200,
+                    "Must have an index compatible with the proposed shard key",
+                    validShardKeyIndexExists(
+                        opCtx,
+                        translatedNss,
+                        shardKeyPattern,
+                        translatedRequestParams->getCollation(),
+                        request.getUnique().value_or(false) &&
+                            request.getEnforceUniquenessCheck().value_or(true),
+                        shardkeyutil::ValidationBehaviorsShardCollection(opCtx, dataShard)));
+        }
     }
 
     auto replClientInfo = repl::ReplClientInfo::forClient(opCtx->getClient());

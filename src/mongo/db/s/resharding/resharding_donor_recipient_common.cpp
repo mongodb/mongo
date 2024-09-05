@@ -354,6 +354,9 @@ ReshardingRecipientDocument constructRecipientDocumentFromReshardingFields(
                                                    metadata.getShardKeyPattern().toBSON());
     commonMetadata.setStartTime(reshardingFields.getStartTime());
     commonMetadata.setProvenance(reshardingFields.getProvenance());
+    resharding::validateImplicitlyCreateIndex(reshardingFields.getImplicitlyCreateIndex(),
+                                              metadata.getKeyPattern());
+    commonMetadata.setImplicitlyCreateIndex(reshardingFields.getImplicitlyCreateIndex());
 
     ReshardingRecipientMetrics metrics;
     metrics.setApproxDocumentsToCopy(recipientFields->getApproxDocumentsToCopy());

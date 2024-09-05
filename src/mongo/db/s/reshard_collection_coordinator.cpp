@@ -188,6 +188,10 @@ ExecutorFuture<void> ReshardCollectionCoordinator::_runImpl(
             configsvrReshardCollection.setForceRedistribution(_doc.getForceRedistribution());
             configsvrReshardCollection.setReshardingUUID(_doc.getReshardingUUID());
 
+            resharding::validateImplicitlyCreateIndex(_doc.getImplicitlyCreateIndex(),
+                                                      _doc.getKey());
+            configsvrReshardCollection.setImplicitlyCreateIndex(_doc.getImplicitlyCreateIndex());
+
             auto provenance = _doc.getProvenance();
             if (resharding::isMoveCollection(provenance)) {
                 uassert(ErrorCodes::NamespaceNotFound,

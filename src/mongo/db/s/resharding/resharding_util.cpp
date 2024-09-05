@@ -72,6 +72,7 @@
 #include "mongo/s/grid.h"
 #include "mongo/s/resharding/common_types_gen.h"
 #include "mongo/s/shard_key_pattern.h"
+#include "mongo/s/sharding_feature_flags_gen.h"
 #include "mongo/stdx/unordered_set.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
@@ -523,6 +524,26 @@ std::shared_ptr<ThreadPool> makeThreadPoolForMarkKilledExecutor(const std::strin
 boost::optional<Status> coordinatorAbortedError() {
     return Status{ErrorCodes::ReshardCollectionAborted,
                   "Recieved abort from the resharding coordinator"};
+}
+
+void validateImplicitlyCreateIndex(bool implicitlyCreateIndex, const BSONObj& shardKey) {
+    if (!implicitlyCreateIndex) {
+        uassert(
+            ErrorCodes::InvalidOptions,
+            str::stream()
+                << "Can only specify'" << CommonReshardingMetadata::kImplicitlyCreateIndexFieldName
+                << "' when featureFlagHashedShardKeyIndexOptionalUponShardingCollection is "
+                   "enabled",
+            feature_flags::gFeatureFlagHashedShardKeyIndexOptionalUponShardingCollection.isEnabled(
+                serverGlobalParams.featureCompatibility.acquireFCVSnapshot()));
+
+        auto shardKeyPattern = ShardKeyPattern(shardKey);
+        uassert(ErrorCodes::InvalidOptions,
+                str::stream() << "Can only specify '"
+                              << CommonReshardingMetadata::kImplicitlyCreateIndexFieldName
+                              << "' false when resharding on a hashed shard key",
+                shardKeyPattern.isHashedPattern());
+    }
 }
 
 }  // namespace resharding

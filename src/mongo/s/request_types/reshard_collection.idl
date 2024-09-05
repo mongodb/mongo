@@ -86,6 +86,11 @@ commands:
             "A user-provided identifier used to identify this resharding operation for
             retryability purposes."
         optional: true
+      implicitlyCreateIndex:
+        type: bool
+        description: "Whether to create an index on the shard key pattern if the shard key
+                      does not already have a support index."
+        default: true
 
   _configsvrReshardCollection:
     command_name: _configsvrReshardCollection
@@ -119,7 +124,7 @@ commands:
       _presetReshardedChunks:
         type: array<ReshardedChunk>
         description: >-
-          "Mapping of chunk ranges to be used as the initial split output. This is only for 
+          "Mapping of chunk ranges to be used as the initial split output. This is only for
           testing purposes."
         optional: true
       shardDistribution:
@@ -140,6 +145,11 @@ commands:
         type: Provenance
         description: "The source operation that called this resharding operation."
         optional: true
+      implicitlyCreateIndex:
+        type: bool
+        description: "Whether to create an index on the shard key pattern if the shard key
+                      does not already have a support index."
+        default: true
       recipientOplogBatchTaskCount:
         type: long
         description: >-

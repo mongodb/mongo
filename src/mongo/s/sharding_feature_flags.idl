@@ -186,3 +186,9 @@ feature_flags:
     default: true
     version: 8.0
     shouldBeFCVGated: true
+  featureFlagHashedShardKeyIndexOptionalUponShardingCollection:
+    description: "Feature flag to make shardCollection and reshardCollection not require a hashed
+                  shard key to have a supporting index."
+    cpp_varname: feature_flags::gFeatureFlagHashedShardKeyIndexOptionalUponShardingCollection
+    default: false
+    shouldBeFCVGated: true

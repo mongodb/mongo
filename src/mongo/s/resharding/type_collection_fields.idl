@@ -121,3 +121,8 @@ structs:
                 type: Provenance
                 description: "The source operation that called this resharding operation."
                 optional: true
+            implicitlyCreateIndex:
+                type: bool
+                description: "Whether to create an index on the shard key pattern if the shard key
+                              does not already have a support index."
+                default: true
