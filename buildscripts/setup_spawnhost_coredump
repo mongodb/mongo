@@ -26,6 +26,13 @@ if [[ "${machine}" = "Cygwin" ]]; then
     HOME_DIR=$(cygpath -u $USERPROFILE)
 fi
 
+# On some RHEL distros TMPDIR was not being set on the spawnhost.
+# This does not show up during evergreen tasks because evergreen sets this var.
+if [ -z "$TMPDIR" ]; then
+    mkdir -p tmp
+    export TMPDIR=tmp
+fi
+
 bash $HOME_DIR/src/evergreen/functions/venv_setup.sh
 . $HOME_DIR/src/evergreen/prelude.sh
 activate_venv
