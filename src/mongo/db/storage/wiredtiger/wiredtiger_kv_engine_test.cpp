@@ -44,8 +44,6 @@
 #include "mongo/base/initializer.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/db/client.h"
-#include "mongo/db/concurrency/d_concurrency.h"
-#include "mongo/db/concurrency/lock_manager_defs.h"
 #include "mongo/db/global_settings.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/record_id.h"
@@ -236,7 +234,6 @@ TEST_F(WiredTigerKVEngineRepairTest, OrphanedDataFilesCanBeRecovered) {
 
 TEST_F(WiredTigerKVEngineRepairTest, UnrecoverableOrphanedDataFilesAreRebuilt) {
     auto opCtxPtr = _makeOperationContext();
-    Lock::GlobalLock globalLk(opCtxPtr.get(), MODE_X);
 
     NamespaceString nss = NamespaceString::createNamespaceString_forTest("a.b");
     std::string ident = "collection-1234";

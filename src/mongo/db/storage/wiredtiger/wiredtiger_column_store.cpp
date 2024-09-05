@@ -187,10 +187,6 @@ void WiredTigerColumnStore::insert(OperationContext* opCtx,
     WriteCursor(opCtx, _uri, _tableId).insert(path, rid, cell);
 }
 void WiredTigerColumnStore::WriteCursor::insert(PathView path, RowId rid, CellView cell) {
-    // Lock invariant relaxed because index builds apply side writes while holding collection MODE_S
-    // (global MODE_IS).
-    dassert(shard_role_details::getLocker(_opCtx)->isLocked());
-
     auto key = makeKey(path, rid);
     auto keyItem = WiredTigerItem(key);
     auto valueItem = WiredTigerItem(cell.rawData(), cell.size());
@@ -212,10 +208,6 @@ void WiredTigerColumnStore::remove(OperationContext* opCtx, PathView path, RowId
     WriteCursor(opCtx, _uri, _tableId).remove(path, rid);
 }
 void WiredTigerColumnStore::WriteCursor::remove(PathView path, RowId rid) {
-    // Lock invariant relaxed because index builds apply side writes while holding collection MODE_S
-    // (global MODE_IS).
-    dassert(shard_role_details::getLocker(_opCtx)->isLocked());
-
     auto key = makeKey(path, rid);
     auto keyItem = WiredTigerItem(key);
     c()->set_key(c(), keyItem.Get());
@@ -236,10 +228,6 @@ void WiredTigerColumnStore::update(OperationContext* opCtx,
     WriteCursor(opCtx, _uri, _tableId).update(path, rid, cell);
 }
 void WiredTigerColumnStore::WriteCursor::update(PathView path, RowId rid, CellView cell) {
-    // Lock invariant relaxed because index builds apply side writes while holding collection MODE_S
-    // (global MODE_IS).
-    dassert(shard_role_details::getLocker(_opCtx)->isLocked());
-
     auto key = makeKey(path, rid);
     auto keyItem = WiredTigerItem(key);
     auto valueItem = WiredTigerItem(cell.rawData(), cell.size());
@@ -257,8 +245,6 @@ void WiredTigerColumnStore::WriteCursor::update(PathView path, RowId rid, CellVi
 }
 
 IndexValidateResults WiredTigerColumnStore::validate(OperationContext* opCtx, bool full) const {
-    dassert(shard_role_details::getLocker(opCtx)->isReadLocked());
-
     IndexValidateResults results;
 
     WiredTigerUtil::validateTableLogging(
@@ -567,7 +553,6 @@ bool WiredTigerColumnStore::isEmpty(OperationContext* opCtx) {
 }
 
 long long WiredTigerColumnStore::getSpaceUsedBytes(OperationContext* opCtx) const {
-    dassert(shard_role_details::getLocker(opCtx)->isReadLocked());
     auto ru = WiredTigerRecoveryUnit::get(shard_role_details::getRecoveryUnit(opCtx));
     WT_SESSION* s = ru->getSession()->getSession();
 
@@ -578,7 +563,6 @@ long long WiredTigerColumnStore::getSpaceUsedBytes(OperationContext* opCtx) cons
 }
 
 long long WiredTigerColumnStore::getFreeStorageBytes(OperationContext* opCtx) const {
-    dassert(shard_role_details::getLocker(opCtx)->isReadLocked());
     auto ru = WiredTigerRecoveryUnit::get(shard_role_details::getRecoveryUnit(opCtx));
     WiredTigerSession* session = ru->getSession();
 

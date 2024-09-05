@@ -653,16 +653,6 @@ void WiredTigerKVEngine::notifyReplStartupRecoveryComplete(OperationContext* opC
                                /*freeSpaceTargetMB=*/boost::none,
                                /*excludedIdents*/ std::vector<StringData>()};
 
-    // Holding the global lock to prevent racing with storage shutdown. However, no need to hold the
-    // RSTL nor acquire a flow control ticket. This doesn't care about the replica state of the node
-    // and the operation is not replicated.
-    Lock::GlobalLock lk{
-        opCtx,
-        MODE_IS,
-        Date_t::max(),
-        Lock::InterruptBehavior::kThrow,
-        Lock::GlobalLockSkipOptions{.skipFlowControlTicket = true, .skipRSTLLock = true}};
-
     auto status = autoCompact(opCtx, options);
     if (status.isOK()) {
         LOGV2(8704102, "AutoCompact enabled");
@@ -2588,7 +2578,7 @@ StatusWith<Timestamp> WiredTigerKVEngine::pinOldestTimestamp(
         return swPinnedTimestamp;
     }
 
-    if (shard_role_details::getLocker(opCtx)->inAWriteUnitOfWork()) {
+    if (shard_role_details::getRecoveryUnit(opCtx)->inUnitOfWork()) {
         // If we've moved the pin and are in a `WriteUnitOfWork`, assume the caller has a write that
         // should be atomic with this pin request. If the `WriteUnitOfWork` is rolled back, either
         // unpin the oldest timestamp or repin the previous value.
@@ -2691,13 +2681,6 @@ Status WiredTigerKVEngine::oplogDiskLocRegister(OperationContext* opCtx,
                                                 RecordStore* oplogRecordStore,
                                                 const Timestamp& opTime,
                                                 bool orderedCommit) {
-    // Callers should be updating visibility as part of a write operation. We want to ensure that
-    // we never get here while holding an uninterruptible, read-ticketed lock. That would indicate
-    // that we are operating with the wrong global lock semantics, and either hold too weak a lock
-    // (e.g. IS) or that we upgraded in a way we shouldn't (e.g. IS -> IX).
-    invariant(!shard_role_details::getLocker(opCtx)->hasReadTicket() ||
-              !opCtx->uninterruptibleLocksRequested_DO_NOT_USE());  // NOLINT
-
     shard_role_details::getRecoveryUnit(opCtx)->setOrderedCommit(orderedCommit);
 
     if (!orderedCommit) {
@@ -2719,26 +2702,6 @@ Status WiredTigerKVEngine::oplogDiskLocRegister(OperationContext* opCtx,
 
 void WiredTigerKVEngine::waitForAllEarlierOplogWritesToBeVisible(
     OperationContext* opCtx, RecordStore* oplogRecordStore) const {
-    // Callers are waiting for other operations to finish updating visibility. We want to ensure
-    // that we never get here while holding an uninterruptible, write-ticketed lock. That could
-    // indicate we are holding a stronger lock than we need to, and that we could actually
-    // contribute to ticket-exhaustion. That could prevent the write we are waiting on from
-    // acquiring the lock it needs to update the oplog visibility.
-    invariant(!shard_role_details::getLocker(opCtx)->hasWriteTicket() ||
-              !opCtx->uninterruptibleLocksRequested_DO_NOT_USE());  // NOLINT
-
-    // Make sure that callers do not hold an active snapshot so it will be able to see the oplog
-    // entries it waited for afterwards.
-    if (shard_role_details::getRecoveryUnit(opCtx)->isActive()) {
-        shard_role_details::getLocker(opCtx)->dump();
-        invariant(!shard_role_details::getRecoveryUnit(opCtx)->isActive(),
-                  str::stream() << "Unexpected open storage txn. RecoveryUnit state: "
-                                << RecoveryUnit::toString(
-                                       shard_role_details::getRecoveryUnit(opCtx)->getState())
-                                << ", inMultiDocumentTransaction:"
-                                << (opCtx->inMultiDocumentTransaction() ? "true" : "false"));
-    }
-
     auto oplogManager = getOplogManager();
     if (oplogManager->isRunning()) {
         oplogManager->waitForAllEarlierOplogWritesToBeVisible(
@@ -2753,7 +2716,6 @@ bool WiredTigerKVEngine::waitUntilDurable(OperationContext* opCtx) {
                                    shard_role_details::getRecoveryUnit(opCtx)->getState())
                             << ", inMultiDocumentTransaction:"
                             << (opCtx->inMultiDocumentTransaction() ? "true" : "false"));
-    invariant(!shard_role_details::getLocker(opCtx)->isLocked() || storageGlobalParams.repair);
 
     // Flushes the journal log to disk. Checkpoints all data if journaling is disabled.
     waitUntilDurable(opCtx, Fsync::kJournal, UseJournalListener::kUpdate);
@@ -2768,7 +2730,6 @@ bool WiredTigerKVEngine::waitUntilUnjournaledWritesDurable(OperationContext* opC
                                    shard_role_details::getRecoveryUnit(opCtx)->getState())
                             << ", inMultiDocumentTransaction:"
                             << (opCtx->inMultiDocumentTransaction() ? "true" : "false"));
-    invariant(!shard_role_details::getLocker(opCtx)->isLocked() || storageGlobalParams.repair);
 
     // Take a checkpoint, rather than only flush the (oplog) journal, in order to lock in stable
     // writes to unjournaled tables.
@@ -2988,8 +2949,6 @@ void WiredTigerKVEngine::sizeStorerPeriodicFlush() {
 }
 
 Status WiredTigerKVEngine::autoCompact(OperationContext* opCtx, const AutoCompactOptions& options) {
-    dassert(shard_role_details::getLocker(opCtx)->isLocked());
-
     auto status = WiredTigerUtil::canRunAutoCompact(opCtx, isEphemeral());
     if (!status.isOK())
         return status;

@@ -37,8 +37,6 @@
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
-#include "mongo/db/concurrency/d_concurrency.h"
-#include "mongo/db/concurrency/lock_manager_defs.h"
 #include "mongo/db/record_id.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/storage/key_string.h"
@@ -61,7 +59,6 @@ TEST(WiredTigerStandardIndexText, CursorInActiveTxnAfterNext) {
     // Populate data.
     {
         ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
-        Lock::GlobalLock globalLock(opCtx.get(), MODE_X);
 
         WriteUnitOfWork uow(opCtx.get());
         auto ks = makeKeyString(sdi.get(), BSON("" << 1), RecordId(1));
@@ -78,7 +75,6 @@ TEST(WiredTigerStandardIndexText, CursorInActiveTxnAfterNext) {
     // Cursors should always ensure they are in an active transaction when next() is called.
     {
         ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
-        Lock::GlobalLock globalLock(opCtx.get(), MODE_X);
 
         auto ru = WiredTigerRecoveryUnit::get(shard_role_details::getRecoveryUnit(opCtx.get()));
 
@@ -110,7 +106,6 @@ TEST(WiredTigerStandardIndexText, CursorInActiveTxnAfterSeek) {
     // Populate data.
     {
         ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
-        Lock::GlobalLock globalLock(opCtx.get(), MODE_X);
 
         WriteUnitOfWork uow(opCtx.get());
         auto ks = makeKeyString(sdi.get(), BSON("" << 1), RecordId(1));
@@ -127,7 +122,6 @@ TEST(WiredTigerStandardIndexText, CursorInActiveTxnAfterSeek) {
     // Cursors should always ensure they are in an active transaction when seek() is called.
     {
         ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
-        Lock::GlobalLock globalLock(opCtx.get(), MODE_X);
 
         auto ru = WiredTigerRecoveryUnit::get(shard_role_details::getRecoveryUnit(opCtx.get()));
 
@@ -166,7 +160,6 @@ TEST(WiredTigerUniqueIndexTest, OldFormatKeys) {
     {
         FailPointEnableBlock insertOldFormatKeys("WTIndexInsertUniqueKeysInOldFormat");
         ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
-        Lock::GlobalLock globalLock(opCtx.get(), MODE_X);
 
         WriteUnitOfWork uow(opCtx.get());
         auto ks = makeKeyString(sdi.get(), BSON("" << 1), RecordId(1));
@@ -187,7 +180,6 @@ TEST(WiredTigerUniqueIndexTest, OldFormatKeys) {
     // Ensure cursors return the correct data
     {
         ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
-        Lock::GlobalLock globalLock(opCtx.get(), MODE_X);
 
         auto cursor = sdi->newCursor(opCtx.get());
 
@@ -210,7 +202,6 @@ TEST(WiredTigerUniqueIndexTest, OldFormatKeys) {
     // Ensure we can't insert duplicate keys in the new format
     {
         ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
-        Lock::GlobalLock globalLock(opCtx.get(), MODE_X);
 
         WriteUnitOfWork uow(opCtx.get());
         auto ks = makeKeyString(sdi.get(), BSON("" << 1), RecordId(1));
@@ -229,7 +220,6 @@ TEST(WiredTigerUniqueIndexTest, OldFormatKeys) {
     // Ensure that it is not possible to remove a key with a mismatched RecordId.
     {
         ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
-        Lock::GlobalLock globalLock(opCtx.get(), MODE_X);
 
         WriteUnitOfWork uow(opCtx.get());
         // The key "1" exists, but with RecordId 1, so this should not remove anything.
@@ -247,7 +237,6 @@ TEST(WiredTigerUniqueIndexTest, OldFormatKeys) {
     // Ensure we can remove an old format key and replace it with a new one.
     {
         ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
-        Lock::GlobalLock globalLock(opCtx.get(), MODE_X);
 
         WriteUnitOfWork uow(opCtx.get());
         auto ks = makeKeyString(sdi.get(), BSON("" << 1), RecordId(1));

@@ -1449,20 +1449,53 @@ Status StorageEngineImpl::oplogDiskLocRegister(OperationContext* opCtx,
                                                RecordStore* oplogRecordStore,
                                                const Timestamp& opTime,
                                                bool orderedCommit) {
+    // Callers should be updating visibility as part of a write operation. We want to ensure that
+    // we never get here while holding an uninterruptible, read-ticketed lock. That would indicate
+    // that we are operating with the wrong global lock semantics, and either hold too weak a lock
+    // (e.g. IS) or that we upgraded in a way we shouldn't (e.g. IS -> IX).
+    invariant(!shard_role_details::getLocker(opCtx)->hasReadTicket() ||
+              !opCtx->uninterruptibleLocksRequested_DO_NOT_USE());  // NOLINT
+
     return _engine->oplogDiskLocRegister(opCtx, oplogRecordStore, opTime, orderedCommit);
 }
 
 void StorageEngineImpl::waitForAllEarlierOplogWritesToBeVisible(
     OperationContext* opCtx, RecordStore* oplogRecordStore) const {
+    // Callers are waiting for other operations to finish updating visibility. We want to ensure
+    // that we never get here while holding an uninterruptible, write-ticketed lock. That could
+    // indicate we are holding a stronger lock than we need to, and that we could actually
+    // contribute to ticket-exhaustion. That could prevent the write we are waiting on from
+    // acquiring the lock it needs to update the oplog visibility.
+    invariant(!shard_role_details::getLocker(opCtx)->hasWriteTicket() ||
+              !opCtx->uninterruptibleLocksRequested_DO_NOT_USE());  // NOLINT
+
+    // Make sure that callers do not hold an active snapshot so it will be able to see the oplog
+    // entries it waited for afterwards.
+    if (shard_role_details::getRecoveryUnit(opCtx)->isActive()) {
+        shard_role_details::getLocker(opCtx)->dump();
+        invariant(!shard_role_details::getRecoveryUnit(opCtx)->isActive(),
+                  str::stream() << "Unexpected open storage txn. RecoveryUnit state: "
+                                << RecoveryUnit::toString(
+                                       shard_role_details::getRecoveryUnit(opCtx)->getState())
+                                << ", inMultiDocumentTransaction:"
+                                << (opCtx->inMultiDocumentTransaction() ? "true" : "false"));
+    }
+
     _engine->waitForAllEarlierOplogWritesToBeVisible(opCtx, oplogRecordStore);
 }
 
 bool StorageEngineImpl::waitUntilDurable(OperationContext* opCtx) {
+    // Don't block while holding a lock unless we are the only active operation in the system.
+    auto locker = shard_role_details::getLocker(opCtx);
+    invariant(!locker->isLocked() || locker->isW());
     return _engine->waitUntilDurable(opCtx);
 }
 
 bool StorageEngineImpl::waitUntilUnjournaledWritesDurable(OperationContext* opCtx,
                                                           bool stableCheckpoint) {
+    // Don't block while holding a lock unless we are the only active operation in the system.
+    auto locker = shard_role_details::getLocker(opCtx);
+    invariant(!locker->isLocked() || locker->isW());
     return _engine->waitUntilUnjournaledWritesDurable(opCtx, stableCheckpoint);
 }
 

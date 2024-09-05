@@ -133,7 +133,6 @@ std::unique_ptr<RecordStore> WiredTigerHarnessHelper::newRecordStore(
 std::unique_ptr<RecordStore> WiredTigerHarnessHelper::newOplogRecordStore() {
     auto ret = newOplogRecordStoreNoInit();
     ServiceContext::UniqueOperationContext opCtx(newOperationContext());
-    Lock::GlobalLock lk(opCtx.get(), MODE_X);
     dynamic_cast<WiredTigerRecordStore*>(ret.get())->postConstructorInit(
         opCtx.get(), NamespaceString::kRsOplogNamespace);
     return ret;
@@ -141,7 +140,6 @@ std::unique_ptr<RecordStore> WiredTigerHarnessHelper::newOplogRecordStore() {
 
 std::unique_ptr<RecordStore> WiredTigerHarnessHelper::newOplogRecordStoreNoInit() {
     ServiceContext::UniqueOperationContext opCtx(newOperationContext());
-    Lock::GlobalLock lk(opCtx.get(), MODE_X);
     WiredTigerRecoveryUnit* ru =
         checked_cast<WiredTigerRecoveryUnit*>(shard_role_details::getRecoveryUnit(opCtx.get()));
     std::string ident = redactTenant(NamespaceString::kRsOplogNamespace).toString();

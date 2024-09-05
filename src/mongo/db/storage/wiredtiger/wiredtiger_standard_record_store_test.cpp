@@ -39,8 +39,6 @@
 #include "mongo/base/string_data.h"
 #include "mongo/bson/mutable/damage_vector.h"
 #include "mongo/bson/timestamp.h"
-#include "mongo/db/concurrency/d_concurrency.h"
-#include "mongo/db/concurrency/lock_manager_defs.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/record_id.h"
@@ -70,7 +68,6 @@ TEST(WiredTigerRecordStoreTest, StorageSizeStatisticsDisabled) {
     std::unique_ptr<RecordStore> rs(harnessHelper.newRecordStore("a.b"));
 
     ServiceContext::UniqueOperationContext opCtx(harnessHelper.newOperationContext());
-    Lock::GlobalLock globalLock(opCtx.get(), MODE_S);
     ASSERT_THROWS(rs->storageSize(opCtx.get()), AssertionException);
 }
 
@@ -89,7 +86,6 @@ TEST(WiredTigerRecordStoreTest, SizeStorer1) {
 
     {
         ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
-        Lock::GlobalLock globalLock(opCtx.get(), MODE_X);
         {
             WriteUnitOfWork uow(opCtx.get());
             for (int i = 0; i < N; i++) {
@@ -102,7 +98,6 @@ TEST(WiredTigerRecordStoreTest, SizeStorer1) {
 
     {
         ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
-        Lock::GlobalLock globalLock(opCtx.get(), MODE_S);
         ASSERT_EQUALS(N, rs->numRecords(opCtx.get()));
     }
 
@@ -115,7 +110,6 @@ TEST(WiredTigerRecordStoreTest, SizeStorer1) {
 
     {
         ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
-        Lock::GlobalLock globalLock(opCtx.get(), MODE_X);
 
         WiredTigerRecordStore::Params params;
         params.nss = NamespaceString::createNamespaceString_forTest("a.b");
@@ -137,13 +131,11 @@ TEST(WiredTigerRecordStoreTest, SizeStorer1) {
 
     {
         ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
-        Lock::GlobalLock globalLock(opCtx.get(), MODE_S);
         ASSERT_EQUALS(N, rs->numRecords(opCtx.get()));
     }
 
     {
         ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
-        Lock::GlobalLock globalLock(opCtx.get(), MODE_X);
 
         WiredTigerRecoveryUnit* ru =
             checked_cast<WiredTigerRecoveryUnit*>(shard_role_details::getRecoveryUnit(opCtx.get()));
@@ -213,7 +205,6 @@ TEST_F(SizeStorerUpdateTest, Basic) {
 
 TEST_F(SizeStorerUpdateTest, DataSizeModification) {
     ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
-    Lock::GlobalLock globalLock(opCtx.get(), MODE_X);
 
     RecordId recordId;
     {
@@ -270,7 +261,6 @@ TEST_F(SizeStorerUpdateTest, DataSizeModification) {
 // properly flushed to disk.
 TEST_F(SizeStorerUpdateTest, ReloadAfterRollbackAndFlush) {
     ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
-    Lock::GlobalLock globalLock(opCtx.get(), MODE_X);
 
     // Do an op for which the sizeInfo is persisted, for safety so we don't check against 0.
     {

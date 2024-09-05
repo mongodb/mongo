@@ -41,8 +41,6 @@
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/catalog/collection_options.h"
 #include "mongo/db/client.h"
-#include "mongo/db/concurrency/d_concurrency.h"
-#include "mongo/db/concurrency/lock_manager_defs.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/record_id.h"
@@ -237,7 +235,6 @@ TEST(WiredTigerKVEngineNoFixtureTest, Basic) {
     ASSERT(rs) << fmt::format("failed to look up record store with namespace {}",
                               nss.toString_forTest());
     {
-        Lock::GlobalLock globalLock(opCtx.get(), MODE_IX);
         WriteUnitOfWork wuow(opCtx.get());
 
         std::vector<Timestamp> timestamps(nrows, Timestamp(tsSecs, 20U));
@@ -252,7 +249,6 @@ TEST(WiredTigerKVEngineNoFixtureTest, Basic) {
 
     // Read data for 3 keys inserted.
     {
-        Lock::GlobalLock globalLock(opCtx.get(), MODE_IS);
         ASSERT_EQ(toString(rs->dataFor(opCtx.get(), rid1)), valueA);
         ASSERT_EQ(toString(rs->dataFor(opCtx.get(), rid2)), valueA);
         ASSERT_EQ(toString(rs->dataFor(opCtx.get(), rid3)), valueA);
@@ -260,7 +256,6 @@ TEST(WiredTigerKVEngineNoFixtureTest, Basic) {
 
     // Update the first and last keys with another value with a large timestamp.
     {
-        Lock::GlobalLock globalLock(opCtx.get(), MODE_IX);
         WriteUnitOfWork wuow(opCtx.get());
 
         Timestamp updateTimestamp(tsSecs, 1000U);
@@ -283,7 +278,6 @@ TEST(WiredTigerKVEngineNoFixtureTest, Basic) {
 
     // Confirm new values for two updated keys and also check that middle key is unchanged.
     {
-        Lock::GlobalLock globalLock(opCtx.get(), MODE_IS);
         ASSERT_EQ(toString(rs->dataFor(opCtx.get(), rid1)), valueD);
         ASSERT_EQ(toString(rs->dataFor(opCtx.get(), rid2)), valueA);
         ASSERT_EQ(toString(rs->dataFor(opCtx.get(), rid3)), valueD);
@@ -292,7 +286,6 @@ TEST(WiredTigerKVEngineNoFixtureTest, Basic) {
     // Update the middle key with lots of updates to generate more history.
     std::string expectedData2;
     for (unsigned int i = 21; i < 499; ++i) {
-        Lock::GlobalLock globalLock(opCtx.get(), MODE_IX);
         WriteUnitOfWork wuow(opCtx.get());
 
         Timestamp updateTimestamp(tsSecs, i);
@@ -308,7 +301,6 @@ TEST(WiredTigerKVEngineNoFixtureTest, Basic) {
 
     // Check values in table after updating middle key.
     {
-        Lock::GlobalLock globalLock(opCtx.get(), MODE_IS);
         ASSERT_EQ(toString(rs->dataFor(opCtx.get(), rid1)), valueD);
         ASSERT_EQ(toString(rs->dataFor(opCtx.get(), rid2)), expectedData2);
         ASSERT_EQ(toString(rs->dataFor(opCtx.get(), rid3)), valueD);
@@ -333,7 +325,6 @@ TEST(WiredTigerKVEngineNoFixtureTest, Basic) {
 
     // Update the middle key with value C after taking checkpoint.
     {
-        Lock::GlobalLock globalLock(opCtx.get(), MODE_IX);
         WriteUnitOfWork wuow(opCtx.get());
 
         Timestamp updateTimestamp(tsSecs, 500U);
@@ -345,7 +336,6 @@ TEST(WiredTigerKVEngineNoFixtureTest, Basic) {
 
     // Check values in table after taking checkpoint and updating middle key again.
     {
-        Lock::GlobalLock globalLock(opCtx.get(), MODE_IS);
         ASSERT_EQ(toString(rs->dataFor(opCtx.get(), rid1)), valueD);
         ASSERT_EQ(toString(rs->dataFor(opCtx.get(), rid2)), valueC);
         ASSERT_EQ(toString(rs->dataFor(opCtx.get(), rid3)), valueD);
