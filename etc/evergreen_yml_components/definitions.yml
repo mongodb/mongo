@@ -1605,6 +1605,7 @@ functions:
     - command: subprocess.exec
       display_name: "sync repo with copybara"
       type: test
+      patchable: false
       params:
         binary: bash
         args:
