@@ -2982,12 +2982,12 @@ public:
         unsupportedExpression(expr->getOpName());
     }
     void visit(const ExpressionStrLenBytes* expr) final {
-        invariant(expr->getChildren().size() == 1);
+        tassert(5155802, "expected 'expr' to have 1 child", expr->getChildren().size() == 1);
         _context->ensureArity(1);
 
-        auto strName = makeLocalVariableName(_context->state.frameId(), 0);
-        auto strExpression = _context->popABTExpr();
-        auto strVar = makeVariable(strName);
+        optimizer::ProjectionName strName = makeLocalVariableName(_context->state.frameId(), 0);
+        optimizer::ABT strExpression = _context->popABTExpr();
+        optimizer::ABT strVar = makeVariable(strName);
 
         auto strLenBytesExpr = optimizer::make<optimizer::If>(
             makeFillEmptyFalse(makeABTFunction("isString", strVar)),
@@ -3002,7 +3002,20 @@ public:
         unsupportedExpression(expr->getOpName());
     }
     void visit(const ExpressionStrLenCP* expr) final {
-        unsupportedExpression(expr->getOpName());
+        tassert(5155902, "expected 'expr' to have 1 child", expr->getChildren().size() == 1);
+        _context->ensureArity(1);
+
+        optimizer::ProjectionName strName = makeLocalVariableName(_context->state.frameId(), 0);
+        optimizer::ABT strExpression = _context->popABTExpr();
+        optimizer::ABT strVar = makeVariable(strName);
+
+        auto strLenCPExpr = optimizer::make<optimizer::If>(
+            makeFillEmptyFalse(makeABTFunction("isString", strVar)),
+            makeABTFunction("strLenCP", strVar),
+            makeABTFail(ErrorCodes::Error{5155900}, "$strLenCP requires a string argument"));
+
+        pushABT(optimizer::make<optimizer::Let>(
+            std::move(strName), strExpression, std::move(strLenCPExpr)));
     }
     void visit(const ExpressionSubtract* expr) final {
         invariant(expr->getChildren().size() == 2);

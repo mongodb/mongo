@@ -542,7 +542,8 @@ enum class Builtin : uint16_t {
     bitTestMask,      // test bitwise mask & value is mask
     bitTestPosition,  // test BinData with a bit position list
     bsonSize,         // implements $bsonSize
-    strLenBytes,
+    strLenBytes,      // implements $strLenBytes
+    strLenCP,         // implements $strLenCP
     toUpper,
     toLower,
     coerceToBool,
@@ -1887,6 +1888,7 @@ private:
     FastTuple<bool, value::TypeTags, value::Value> builtinBitTestPosition(ArityType arity);
     FastTuple<bool, value::TypeTags, value::Value> builtinBsonSize(ArityType arity);
     FastTuple<bool, value::TypeTags, value::Value> builtinStrLenBytes(ArityType arity);
+    FastTuple<bool, value::TypeTags, value::Value> builtinStrLenCP(ArityType arity);
     FastTuple<bool, value::TypeTags, value::Value> builtinToUpper(ArityType arity);
     FastTuple<bool, value::TypeTags, value::Value> builtinToLower(ArityType arity);
     FastTuple<bool, value::TypeTags, value::Value> builtinCoerceToBool(ArityType arity);
