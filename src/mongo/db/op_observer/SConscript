@@ -36,17 +36,28 @@ env.Benchmark(
 )
 
 env.Library(
+    target="batched_write_context",
+    source=[
+        "batched_write_context.cpp",
+    ],
+    LIBDEPS_PRIVATE=[
+        "$BUILD_DIR/mongo/base",
+        "$BUILD_DIR/mongo/db/shard_role_api",
+        "$BUILD_DIR/mongo/db/transaction/transaction_operations",
+    ],
+)
+
+
+env.Library(
     target="op_observer_util",
     source=[
         "op_observer_util.cpp",
-        "batched_write_context.cpp",
     ],
     LIBDEPS_PRIVATE=[
         "$BUILD_DIR/mongo/base",
         "$BUILD_DIR/mongo/db/catalog/collection_options",
         "$BUILD_DIR/mongo/db/query/bson/dotted_path_support",
         "$BUILD_DIR/mongo/db/shard_role_api",
-        "$BUILD_DIR/mongo/db/transaction/transaction_operations",
     ],
 )
 
@@ -88,6 +99,7 @@ env.Library(
         "$BUILD_DIR/mongo/db/transaction/transaction",
         "$BUILD_DIR/mongo/db/transaction/transaction_operations",
         "$BUILD_DIR/mongo/s/grid",
+        "batched_write_context",
         "op_observer",
         "op_observer_util",
     ],
@@ -190,6 +202,7 @@ env.CppUnitTest(
         "$BUILD_DIR/mongo/db/transaction/transaction",
         "$BUILD_DIR/mongo/db/transaction/transaction_operations",
         "$BUILD_DIR/mongo/db/write_block_bypass",
+        "batched_write_context",
         "change_stream_pre_images_op_observer",
         "find_and_modify_images_op_observer",
         "op_observer",
@@ -216,6 +229,7 @@ env.Library(
         "$BUILD_DIR/mongo/db/transaction/transaction",
         "$BUILD_DIR/mongo/db/vector_clock",
         "$BUILD_DIR/mongo/db/views/view_catalog_helpers",
+        "batched_write_context",
         "op_observer_util",
     ],
 )
