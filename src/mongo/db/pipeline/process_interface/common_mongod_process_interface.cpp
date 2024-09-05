@@ -420,6 +420,24 @@ Status CommonMongodProcessInterface::appendRecordCount(OperationContext* opCtx,
     return appendCollectionRecordCount(opCtx, nss, builder);
 }
 
+void CommonMongodProcessInterface::appendOperationStats(OperationContext* opCtx,
+                                                        const NamespaceString& nss,
+                                                        BSONObjBuilder* builder) const {
+    auto catalog = CollectionCatalog::get(opCtx);
+    auto view = catalog->lookupView(opCtx, nss);
+    if (!view) {
+        AutoGetCollectionForRead collection(opCtx, nss);
+        bool redactForQE =
+            (collection && collection->getCollectionOptions().encryptedFieldConfig) ||
+            nss.isFLE2StateCollection();
+        if (!redactForQE) {
+            Top::get(opCtx->getServiceContext()).appendOperationStats(nss, builder);
+        }
+    } else {
+        Top::get(opCtx->getServiceContext()).appendOperationStats(nss, builder);
+    }
+}
+
 Status CommonMongodProcessInterface::appendQueryExecStats(OperationContext* opCtx,
                                                           const NamespaceString& nss,
                                                           BSONObjBuilder* builder) const {

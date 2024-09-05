@@ -200,6 +200,12 @@ public:
         MONGO_UNREACHABLE;
     }
 
+    void appendOperationStats(OperationContext* opCtx,
+                              const NamespaceString& nss,
+                              BSONObjBuilder* builder) const final {
+        MONGO_UNREACHABLE;
+    }
+
     BSONObj getCollectionOptions(OperationContext* opCtx, const NamespaceString& nss) final {
         MONGO_UNREACHABLE;
     }

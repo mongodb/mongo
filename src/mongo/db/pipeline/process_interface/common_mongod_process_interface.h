@@ -119,6 +119,9 @@ public:
     Status appendQueryExecStats(OperationContext* opCtx,
                                 const NamespaceString& nss,
                                 BSONObjBuilder* builder) const final;
+    void appendOperationStats(OperationContext* opCtx,
+                              const NamespaceString& nss,
+                              BSONObjBuilder* builder) const final;
     BSONObj getCollectionOptions(OperationContext* opCtx, const NamespaceString& nss) override;
     query_shape::CollectionType getCollectionType(OperationContext* opCtx,
                                                   const NamespaceString& nss) override;

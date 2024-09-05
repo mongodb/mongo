@@ -119,16 +119,34 @@ public:
                 bool command,
                 Command::ReadWriteType readWriteType);
 
-    void append(BSONObjBuilder& b);
+    /**
+     * Adds the usage stats (time, count) for "name" to builder object "b".
+     */
+    void appendStatsEntry(BSONObjBuilder& b, StringData name, const UsageData& data);
+
+    /**
+     * Adds usage stats for "coll" onto builder object "result".
+     */
+    void appendUsageStatsForCollection(BSONObjBuilder& result, const CollectionData& coll);
+
+    /**
+     * Appends usage statistics for all collections.
+     */
+    void append(BSONObjBuilder& topStatsBuilder);
 
     void collectionDropped(const NamespaceString& nss);
 
     /**
-     * Appends the collection-level latency statistics
+     * Appends the collection-level latency statistics.
      */
     void appendLatencyStats(const NamespaceString& nss,
                             bool includeHistograms,
                             BSONObjBuilder* builder);
+
+    /**
+     * Append the collection-level usage statistics.
+     */
+    void appendOperationStats(const NamespaceString& nss, BSONObjBuilder* builder);
 
     /**
      * Increments the global histogram only if the operation came from a user.

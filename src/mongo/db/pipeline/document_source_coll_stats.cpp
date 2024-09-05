@@ -89,6 +89,12 @@ intrusive_ptr<DocumentSource> DocumentSourceCollStats::createFromBson(
                          SerializationContext::stateCommandReply(pExpCtx->serializationCtxt)),
         specElem.embeddedObject());
 
+    // targetAllNodes is not allowed on mongod instance.
+    if (spec.getTargetAllNodes().value_or(false)) {
+        uassert(ErrorCodes::FailedToParse,
+                "$collStats supports targetAllNodes parameter only for sharded clusters",
+                pExpCtx->inMongos || pExpCtx->fromMongos);
+    }
     return make_intrusive<DocumentSourceCollStats>(pExpCtx, std::move(spec));
 }
 
@@ -119,6 +125,16 @@ BSONObj DocumentSourceCollStats::makeStatsForNs(
 
     builder.append("host", prettyHostNameAndPort(expCtx->opCtx->getClient()->getLocalPort()));
     builder.appendDate("localTime", jsTime());
+
+    if (spec.getOperationStats()) {
+        // operationStats is only allowed when featureFlagCursorBasedTop is enabled.
+        uassert(ErrorCodes::FailedToParse,
+                "BSON field '$collStats.operationStats' is an unknown field.",
+                mongo::feature_flags::gFeatureFlagCursorBasedTop.isEnabled(
+                    serverGlobalParams.featureCompatibility.acquireFCVSnapshot()));
+
+        expCtx->mongoProcessInterface->appendOperationStats(expCtx->opCtx, nss, &builder);
+    }
 
     if (auto latencyStatsSpec = spec.getLatencyStats()) {
         // getRequestOnTimeseriesView is set to true if collstats is called on the view.

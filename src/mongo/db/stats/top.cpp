@@ -180,17 +180,31 @@ void Top::collectionDropped(const NamespaceString& nss) {
     _usage.erase(nssStr);
 }
 
-void Top::append(BSONObjBuilder& b) {
+void Top::appendStatsEntry(BSONObjBuilder& b, StringData name, const UsageData& data) {
+    BSONObjBuilder bb(b.subobjStart(name));
+    bb.appendNumber("time", data.time);
+    bb.appendNumber("count", data.count);
+    bb.done();
+}
+
+void Top::appendUsageStatsForCollection(BSONObjBuilder& result, const CollectionData& coll) {
+    appendStatsEntry(result, "total", coll.total);
+
+    appendStatsEntry(result, "readLock", coll.readLock);
+    appendStatsEntry(result, "writeLock", coll.writeLock);
+
+    appendStatsEntry(result, "queries", coll.queries);
+    appendStatsEntry(result, "getmore", coll.getmore);
+    appendStatsEntry(result, "insert", coll.insert);
+    appendStatsEntry(result, "update", coll.update);
+    appendStatsEntry(result, "remove", coll.remove);
+    appendStatsEntry(result, "commands", coll.commands);
+}
+
+void Top::append(BSONObjBuilder& topStatsBuilder) {
     stdx::lock_guard lk(_lockUsage);
 
-    auto appendStatsEntry = [&](BSONObjBuilder& b, auto name, const UsageData& data) {
-        BSONObjBuilder bb(b.subobjStart(name));
-        bb.appendNumber("time", data.time);
-        bb.appendNumber("count", data.count);
-        bb.done();
-    };
-
-    // pull all the names into a vector so we can sort them for the user
+    // Pull all the names into a vector so we can sort them for the user.
     std::vector<std::string> names;
     for (UsageMap::const_iterator i = _usage.begin(); i != _usage.end(); ++i) {
         names.push_back(i->first);
@@ -199,23 +213,13 @@ void Top::append(BSONObjBuilder& b) {
     std::sort(names.begin(), names.end());
 
     for (size_t i = 0; i < names.size(); i++) {
-        BSONObjBuilder bb(b.subobjStart(names[i]));
+        BSONObjBuilder bb(topStatsBuilder.subobjStart(names[i]));
 
         const CollectionData& coll = _usage.find(names[i])->second;
         auto pos = names[i].find('.');
         if (coll.isStatsRecordingAllowed &&
             !NamespaceString::isFLE2StateCollection(names[i].substr(pos + 1))) {
-            appendStatsEntry(b, "total", coll.total);
-
-            appendStatsEntry(b, "readLock", coll.readLock);
-            appendStatsEntry(b, "writeLock", coll.writeLock);
-
-            appendStatsEntry(b, "queries", coll.queries);
-            appendStatsEntry(b, "getmore", coll.getmore);
-            appendStatsEntry(b, "insert", coll.insert);
-            appendStatsEntry(b, "update", coll.update);
-            appendStatsEntry(b, "remove", coll.remove);
-            appendStatsEntry(b, "commands", coll.commands);
+            appendUsageStatsForCollection(topStatsBuilder, coll);
         }
         bb.done();
     }
@@ -231,6 +235,25 @@ void Top::appendLatencyStats(const NamespaceString& nss,
     _usage[hashedNs].opLatencyHistogram.append(includeHistograms, false, &latencyStatsBuilder);
     builder->append("ns", nssStr);
     builder->append("latencyStats", latencyStatsBuilder.obj());
+}
+
+void Top::appendOperationStats(const NamespaceString& nss, BSONObjBuilder* builder) {
+    const auto nssStr = NamespaceStringUtil::serialize(nss, SerializationContext::stateDefault());
+    auto hashedNs = UsageMap::hasher().hashed_key(nssStr);
+    stdx::lock_guard lk(_lockUsage);
+    BSONObjBuilder opStatsBuilder;
+
+    // Appends usage statistics to operationStats object.
+    const CollectionData& coll = _usage[hashedNs];
+    auto pos = nssStr.find('.');
+    if (coll.isStatsRecordingAllowed &&
+        !NamespaceString::isFLE2StateCollection(nssStr.substr(pos + 1))) {
+        appendUsageStatsForCollection(opStatsBuilder, coll);
+    }
+
+    // Appends operationStats BSONbuilder object to return output.
+    builder->append("ns", nssStr);
+    builder->append("operationStats", opStatsBuilder.obj());
 }
 
 void Top::incrementGlobalLatencyStats(OperationContext* opCtx,

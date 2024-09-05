@@ -178,6 +178,12 @@ public:
         MONGO_UNREACHABLE;
     }
 
+    void appendOperationStats(OperationContext* opCtx,
+                              const NamespaceString& nss,
+                              BSONObjBuilder* builder) const override {
+        MONGO_UNREACHABLE;
+    }
+
     BSONObj getCollectionOptions(OperationContext* opCtx, const NamespaceString& nss) override {
         MONGO_UNREACHABLE;
     }

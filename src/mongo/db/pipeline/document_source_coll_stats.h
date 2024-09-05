@@ -122,14 +122,18 @@ public:
 
     DocumentSourceCollStats(const boost::intrusive_ptr<ExpressionContext>& pExpCtx,
                             DocumentSourceCollStatsSpec spec)
-        : DocumentSource(kStageName, pExpCtx), _collStatsSpec(std::move(spec)) {}
+        : DocumentSource(kStageName, pExpCtx),
+          _collStatsSpec(std::move(spec)),
+          _targetAllNodes(_collStatsSpec.getTargetAllNodes().value_or(false)) {}
 
     const char* getSourceName() const final;
 
     StageConstraints constraints(Pipeline::SplitState pipeState) const final {
+        HostTypeRequirement hostTypeRequirement =
+            _targetAllNodes ? HostTypeRequirement::kAllShardHosts : HostTypeRequirement::kAnyShard;
         StageConstraints constraints(StreamType::kStreaming,
                                      PositionRequirement::kFirst,
-                                     HostTypeRequirement::kAnyShard,
+                                     hostTypeRequirement,
                                      DiskUseRequirement::kNoDiskUse,
                                      FacetRequirement::kNotAllowed,
                                      TransactionRequirement::kNotAllowed,
@@ -157,6 +161,7 @@ private:
     // The raw object given to $collStats containing user specified options.
     DocumentSourceCollStatsSpec _collStatsSpec;
     bool _finished = false;
+    bool _targetAllNodes;
 };
 
 }  // namespace mongo

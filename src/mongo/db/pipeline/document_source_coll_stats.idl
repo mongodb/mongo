@@ -86,3 +86,12 @@ structs:
         cpp_name: requestOnTimeseriesView
         type: optionalBool
         query_shape: parameter
+      operationStats:
+        description: Adds operationStats to $collStats output.
+        type: object
+        optional: true
+        query_shape: literal
+      targetAllNodes:
+        description: When true, $collStats targets all nodes on each shard. When false, $collStats targets only nodes defined by read preference.
+        type: optionalBool
+        query_shape: parameter

@@ -153,6 +153,12 @@ feature_flags:
       default: false
       shouldBeFCVGated: true
 
+    featureFlagCursorBasedTop:
+      description: "Feature flag to enable cursor-based top command."
+      cpp_varname: gFeatureFlagCursorBasedTop
+      default: false
+      shouldBeFCVGated: true
+
     featureFlagSearchExplainExecutionStats:
       description: "Feature flag to enable executing search queries for explain."
       cpp_varname: gFeatureFlagSearchExplainExecutionStats

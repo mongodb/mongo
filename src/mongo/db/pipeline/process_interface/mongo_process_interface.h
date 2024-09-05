@@ -330,6 +330,12 @@ public:
                                         BSONObjBuilder* builder) const = 0;
 
     /**
+     * Appends the operation stats for "nss" to "builder".
+     */
+    virtual void appendOperationStats(OperationContext* opCtx,
+                                      const NamespaceString& nss,
+                                      BSONObjBuilder* builder) const = 0;
+    /**
      * Gets the collection options for the collection given by 'nss'. If the nss represents a view,
      * we will return the user spec that was used to create the view. Future callers may want to
      * parameterize this behavior.
