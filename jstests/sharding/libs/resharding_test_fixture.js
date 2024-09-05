@@ -251,6 +251,14 @@ export var ReshardingTest = class {
             }
         }
 
+        const buildInfo = assert.commandWorked(this._st.s0.adminCommand({"buildInfo": 1}));
+        const isSanitizerEnabled = buildInfo.buildEnvironment.ccflags.includes('-fsanitize');
+
+        if (isSanitizerEnabled) {
+            assert.commandWorked(
+                this._st.s.adminCommand({setParameter: 1, maxRoundsWithoutProgressParameter: 10}));
+        }
+
         // In order to enable random failovers, initialize Random's seed if it has not already been
         // done.
         if (!Random.isInitialized()) {

@@ -85,3 +85,13 @@ server_parameters:
     cpp_varname: gTestMongosRuntimeParameter
     default: false
     redact: false
+
+  maxRoundsWithoutProgressParameter:
+    description: "Max num rounds without progress"
+    test_only: true
+    set_at: [ startup, runtime ]
+    cpp_vartype: AtomicWord<int>
+    cpp_varname: "gMaxRoundsWithoutProgress"
+    default: 5
+    validator: { gte: 5, lte: 20 }
+    redact: false

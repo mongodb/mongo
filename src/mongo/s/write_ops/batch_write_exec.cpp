@@ -72,6 +72,7 @@
 #include "mongo/s/client/num_hosts_targeted_metrics.h"
 #include "mongo/s/client/shard.h"
 #include "mongo/s/grid.h"
+#include "mongo/s/mongos_server_parameters_gen.h"
 #include "mongo/s/multi_statement_transaction_requests_sender.h"
 #include "mongo/s/request_types/cluster_commands_without_shard_key_gen.h"
 #include "mongo/s/stale_exception.h"
@@ -151,10 +152,6 @@ bool hasTransientTransactionError(const BatchedCommandResponse& response) {
     });
     return iter != errorLabels.end();
 }
-
-// The number of times we'll try to continue a batch op if no progress is being made. This only
-// applies when no writes are occurring and metadata is not changing on reload.
-const int kMaxRoundsWithoutProgress(5);
 
 /*
  * Provides the write concern with which child batches have to be internally submitted.
@@ -762,6 +759,7 @@ void BatchWriteExec::executeBatch(OperationContext* opCtx,
     int numCompletedOps = 0;
     int numRoundsWithoutProgress = 0;
     bool abortBatch = false;
+    int maxRoundsWithoutProgress = gMaxRoundsWithoutProgress.load();
 
     while (!batchOp.isFinished() && !abortBatch) {
         //
@@ -894,13 +892,13 @@ void BatchWriteExec::executeBatch(OperationContext* opCtx,
         }
         numCompletedOps = currCompletedOps;
 
-        if (numRoundsWithoutProgress > kMaxRoundsWithoutProgress) {
+        if (numRoundsWithoutProgress > maxRoundsWithoutProgress) {
             batchOp.abortBatch(write_ops::WriteError(
                 0,
                 {ErrorCodes::NoProgressMade,
                  str::stream() << "no progress was made executing batch write op in "
                                << clientRequest.getNS().toStringForErrorMsg() << " after "
-                               << kMaxRoundsWithoutProgress << " rounds (" << numCompletedOps
+                               << maxRoundsWithoutProgress << " rounds (" << numCompletedOps
                                << " ops completed in " << rounds << " rounds total)"}));
             break;
         }
