@@ -387,10 +387,10 @@ public:
         ASSERT_BSONOBJ_BINARY_EQ(flushLater[0].getObject(), sessionTxnRecord.toBSON());
     }
 
-    void checkStatementExecuted(OperationContext* opCtx,
-                                LogicalSessionId lsid,
-                                TxnNumber txnNumber,
-                                StmtId stmtId) {
+    void checkStatementExecutedAndFetchOplogEntry(OperationContext* opCtx,
+                                                  LogicalSessionId lsid,
+                                                  TxnNumber txnNumber,
+                                                  StmtId stmtId) {
         opCtx->setLogicalSessionId(std::move(lsid));
         opCtx->setTxnNumber(txnNumber);
 
@@ -401,7 +401,7 @@ public:
                                        {txnNumber},
                                        boost::none /* autocommit */,
                                        TransactionParticipant::TransactionActions::kNone);
-        ASSERT_TRUE(bool(txnParticipant.checkStatementExecuted(opCtx, stmtId)));
+        ASSERT_TRUE(bool(txnParticipant.checkStatementExecutedAndFetchOplogEntry(opCtx, stmtId)));
     }
 
     const NamespaceString& oplogBufferNss() {
@@ -450,7 +450,8 @@ TEST_F(ReshardingOplogSessionApplicationTest, IncomingRetryableWriteForNewSessio
 
     {
         auto opCtx = makeOperationContext();
-        checkStatementExecuted(opCtx.get(), lsid, incomingTxnNumber, incomingStmtId);
+        checkStatementExecutedAndFetchOplogEntry(
+            opCtx.get(), lsid, incomingTxnNumber, incomingStmtId);
     }
 }
 
@@ -489,8 +490,10 @@ TEST_F(ReshardingOplogSessionApplicationTest, IncomingRetryableWriteForNewSessio
 
     {
         auto opCtx = makeOperationContext();
-        checkStatementExecuted(opCtx.get(), lsid, incomingTxnNumber, incomingStmtId);
-        checkStatementExecuted(opCtx.get(), lsid, incomingTxnNumber, incomingStmtId + 1);
+        checkStatementExecutedAndFetchOplogEntry(
+            opCtx.get(), lsid, incomingTxnNumber, incomingStmtId);
+        checkStatementExecutedAndFetchOplogEntry(
+            opCtx.get(), lsid, incomingTxnNumber, incomingStmtId + 1);
     }
 }
 
@@ -529,11 +532,12 @@ TEST_F(ReshardingOplogSessionApplicationTest, IncomingRetryableWriteHasHigherTxn
 
     {
         auto opCtx = makeOperationContext();
-        checkStatementExecuted(opCtx.get(), lsid, incomingTxnNumber, incomingStmtId);
-        ASSERT_THROWS_CODE(
-            checkStatementExecuted(opCtx.get(), lsid, existingTxnNumber, existingStmtId),
-            DBException,
-            ErrorCodes::TransactionTooOld);
+        checkStatementExecutedAndFetchOplogEntry(
+            opCtx.get(), lsid, incomingTxnNumber, incomingStmtId);
+        ASSERT_THROWS_CODE(checkStatementExecutedAndFetchOplogEntry(
+                               opCtx.get(), lsid, existingTxnNumber, existingStmtId),
+                           DBException,
+                           ErrorCodes::TransactionTooOld);
     }
 }
 
@@ -573,10 +577,10 @@ TEST_F(ReshardingOplogSessionApplicationTest, IncomingRetryableWriteHasLowerTxnN
 
     {
         auto opCtx = makeOperationContext();
-        ASSERT_THROWS_CODE(
-            checkStatementExecuted(opCtx.get(), lsid, incomingTxnNumber, incomingStmtId),
-            DBException,
-            ErrorCodes::TransactionTooOld);
+        ASSERT_THROWS_CODE(checkStatementExecutedAndFetchOplogEntry(
+                               opCtx.get(), lsid, incomingTxnNumber, incomingStmtId),
+                           DBException,
+                           ErrorCodes::TransactionTooOld);
     }
 }
 
@@ -616,7 +620,7 @@ TEST_F(ReshardingOplogSessionApplicationTest,
 
     {
         auto opCtx = makeOperationContext();
-        checkStatementExecuted(opCtx.get(), lsid, txnNumber, incomingStmtId);
+        checkStatementExecutedAndFetchOplogEntry(opCtx.get(), lsid, txnNumber, incomingStmtId);
     }
 }
 
@@ -902,7 +906,8 @@ TEST_F(ReshardingOplogSessionApplicationTest, IncomingRetryableWriteHasPreImage)
 
     {
         auto opCtx = makeOperationContext();
-        checkStatementExecuted(opCtx.get(), lsid, incomingTxnNumber, incomingStmtId);
+        checkStatementExecutedAndFetchOplogEntry(
+            opCtx.get(), lsid, incomingTxnNumber, incomingStmtId);
     }
 }
 
@@ -948,7 +953,8 @@ DEATH_TEST_REGEX_F(ReshardingOplogSessionApplicationTest,
 
     {
         auto opCtx = makeOperationContext();
-        checkStatementExecuted(opCtx.get(), lsid, incomingTxnNumber, incomingStmtId);
+        checkStatementExecutedAndFetchOplogEntry(
+            opCtx.get(), lsid, incomingTxnNumber, incomingStmtId);
     }
 }
 
@@ -999,7 +1005,8 @@ TEST_F(ReshardingOplogSessionApplicationTest, IncomingRetryableWriteHasPostImage
 
     {
         auto opCtx = makeOperationContext();
-        checkStatementExecuted(opCtx.get(), lsid, incomingTxnNumber, incomingStmtId);
+        checkStatementExecutedAndFetchOplogEntry(
+            opCtx.get(), lsid, incomingTxnNumber, incomingStmtId);
     }
 }
 
@@ -1046,7 +1053,8 @@ DEATH_TEST_REGEX_F(ReshardingOplogSessionApplicationTest,
 
     {
         auto opCtx = makeOperationContext();
-        checkStatementExecuted(opCtx.get(), lsid, incomingTxnNumber, incomingStmtId);
+        checkStatementExecutedAndFetchOplogEntry(
+            opCtx.get(), lsid, incomingTxnNumber, incomingStmtId);
     }
 }
 
@@ -1093,7 +1101,8 @@ TEST_F(ReshardingOplogSessionApplicationTest, IncomingRetryableWriteHasNeedsRetr
 
     {
         auto opCtx = makeOperationContext();
-        checkStatementExecuted(opCtx.get(), lsid, incomingTxnNumber, incomingStmtId);
+        checkStatementExecutedAndFetchOplogEntry(
+            opCtx.get(), lsid, incomingTxnNumber, incomingStmtId);
     }
 }
 

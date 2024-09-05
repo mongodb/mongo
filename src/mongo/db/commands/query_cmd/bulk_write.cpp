@@ -799,8 +799,8 @@ bool handleGroupedInserts(OperationContext* opCtx,
 
         auto stmtId = opCtx->isRetryableWrite() ? bulk_write_common::getStatementId(req, idx)
                                                 : kUninitializedStmtId;
-        const bool wasAlreadyExecuted = opCtx->isRetryableWrite() &&
-            txnParticipant.checkStatementExecutedNoOplogEntryFetch(opCtx, stmtId);
+        const bool wasAlreadyExecuted =
+            opCtx->isRetryableWrite() && txnParticipant.checkStatementExecuted(opCtx, stmtId);
 
         if (!fixedDoc.isOK()) {
             // Handled after we insert anything in the batch to be sure we report errors in the
@@ -1078,7 +1078,7 @@ bool handleDeleteOp(OperationContext* opCtx,
             : kUninitializedStmtId;
         if (opCtx->isRetryableWrite()) {
             const auto txnParticipant = TransactionParticipant::get(opCtx);
-            if (txnParticipant.checkStatementExecutedNoOplogEntryFetch(opCtx, stmtId)) {
+            if (txnParticipant.checkStatementExecuted(opCtx, stmtId)) {
                 RetryableWritesStats::get(opCtx)->incrementRetriedStatementsCount();
                 // Since multi:true is not allowed with retryable writes if the statement was
                 // executed there will always be 1 document deleted.
@@ -1660,7 +1660,8 @@ bool handleUpdateOp(OperationContext* opCtx,
         // Handle retryable non-timeseries updates.
         if (opCtx->isRetryableWrite()) {
             const auto txnParticipant = TransactionParticipant::get(opCtx);
-            if (auto entry = txnParticipant.checkStatementExecuted(opCtx, stmtId)) {
+            if (auto entry =
+                    txnParticipant.checkStatementExecutedAndFetchOplogEntry(opCtx, stmtId)) {
                 RetryableWritesStats::get(opCtx)->incrementRetriedStatementsCount();
 
                 auto [numMatched, numDocsModified, upserted] =

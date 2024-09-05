@@ -653,7 +653,7 @@ void TenantOplogApplier::_writeRetryableWriteEntryNoOp(
                              "twice for transaction "
                           << txnNumber << " statement " << stmtIds.front() << " on session "
                           << sessionId,
-            !txnParticipant.checkStatementExecutedNoOplogEntryFetch(opCtx, stmtIds.front()));
+            !txnParticipant.checkStatementExecuted(opCtx, stmtIds.front()));
 
     // Set sessionId, txnNumber, and statementId for all ops in a retryable write.
     noopEntry.setSessionId(sessionId);

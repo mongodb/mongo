@@ -246,16 +246,15 @@ public:
 
     void checkStatementExecuted(OperationContext* opCtx, TxnNumber txnNumber, StmtId stmtId) {
         auto txnParticipant = TransactionParticipant::get(opCtx);
-        auto oplog = txnParticipant.checkStatementExecuted(opCtx, stmtId);
-        ASSERT_TRUE(oplog);
+        ASSERT(txnParticipant.checkStatementExecuted(opCtx, stmtId));
     }
 
-    void checkStatementExecuted(OperationContext* opCtx,
-                                TxnNumber txnNumber,
-                                StmtId stmtId,
-                                const repl::OplogEntry& expectedOplog) {
+    void checkStatementExecutedAndCheckOplogEntry(OperationContext* opCtx,
+                                                  TxnNumber txnNumber,
+                                                  StmtId stmtId,
+                                                  const repl::OplogEntry& expectedOplog) {
         const auto txnParticipant = TransactionParticipant::get(opCtx);
-        auto oplog = txnParticipant.checkStatementExecuted(opCtx, stmtId);
+        auto oplog = txnParticipant.checkStatementExecutedAndFetchOplogEntry(opCtx, stmtId);
         ASSERT_TRUE(oplog);
         checkOplogWithNestedOplog(expectedOplog, *oplog);
     }
@@ -450,9 +449,9 @@ TEST_F(SessionCatalogMigrationDestinationTest, OplogEntriesWithSameTxn) {
 
     ASSERT_FALSE(historyIter.hasNext());
 
-    checkStatementExecuted(opCtx, 2, 23, oplog1);
-    checkStatementExecuted(opCtx, 2, 45, oplog2);
-    checkStatementExecuted(opCtx, 2, 5, oplog3);
+    checkStatementExecutedAndCheckOplogEntry(opCtx, 2, 23, oplog1);
+    checkStatementExecutedAndCheckOplogEntry(opCtx, 2, 45, oplog2);
+    checkStatementExecutedAndCheckOplogEntry(opCtx, 2, 5, oplog3);
 }
 
 TEST_F(SessionCatalogMigrationDestinationTest, OplogEntriesWithMultiStmtIds) {
@@ -513,12 +512,12 @@ TEST_F(SessionCatalogMigrationDestinationTest, OplogEntriesWithMultiStmtIds) {
 
     ASSERT_FALSE(historyIter.hasNext());
 
-    checkStatementExecuted(opCtx, 2, 23, oplog1);
-    checkStatementExecuted(opCtx, 2, 24, oplog1);
-    checkStatementExecuted(opCtx, 2, 45, oplog2);
-    checkStatementExecuted(opCtx, 2, 46, oplog2);
-    checkStatementExecuted(opCtx, 2, 5, oplog3);
-    checkStatementExecuted(opCtx, 2, 6, oplog3);
+    checkStatementExecutedAndCheckOplogEntry(opCtx, 2, 23, oplog1);
+    checkStatementExecutedAndCheckOplogEntry(opCtx, 2, 24, oplog1);
+    checkStatementExecutedAndCheckOplogEntry(opCtx, 2, 45, oplog2);
+    checkStatementExecutedAndCheckOplogEntry(opCtx, 2, 46, oplog2);
+    checkStatementExecutedAndCheckOplogEntry(opCtx, 2, 5, oplog3);
+    checkStatementExecutedAndCheckOplogEntry(opCtx, 2, 6, oplog3);
 }
 
 TEST_F(SessionCatalogMigrationDestinationTest, ShouldOnlyStoreHistoryOfLatestTxn) {
@@ -576,7 +575,7 @@ TEST_F(SessionCatalogMigrationDestinationTest, ShouldOnlyStoreHistoryOfLatestTxn
     checkOplogWithNestedOplog(oplog3, historyIter.next(opCtx));
     ASSERT_FALSE(historyIter.hasNext());
 
-    checkStatementExecuted(opCtx, txnNum, 5, oplog3);
+    checkStatementExecutedAndCheckOplogEntry(opCtx, txnNum, 5, oplog3);
 }
 
 TEST_F(SessionCatalogMigrationDestinationTest, OplogEntriesWithSameTxnInSeparateBatches) {
@@ -640,9 +639,9 @@ TEST_F(SessionCatalogMigrationDestinationTest, OplogEntriesWithSameTxnInSeparate
 
     ASSERT_FALSE(historyIter.hasNext());
 
-    checkStatementExecuted(opCtx, 2, 23, oplog1);
-    checkStatementExecuted(opCtx, 2, 45, oplog2);
-    checkStatementExecuted(opCtx, 2, 5, oplog3);
+    checkStatementExecutedAndCheckOplogEntry(opCtx, 2, 23, oplog1);
+    checkStatementExecutedAndCheckOplogEntry(opCtx, 2, 45, oplog2);
+    checkStatementExecutedAndCheckOplogEntry(opCtx, 2, 5, oplog3);
 }
 
 TEST_F(SessionCatalogMigrationDestinationTest, OplogEntriesWithDifferentSession) {
@@ -705,7 +704,7 @@ TEST_F(SessionCatalogMigrationDestinationTest, OplogEntriesWithDifferentSession)
         checkOplogWithNestedOplog(oplog1, historyIter.next(opCtx));
         ASSERT_FALSE(historyIter.hasNext());
 
-        checkStatementExecuted(opCtx, 2, 23, oplog1);
+        checkStatementExecutedAndCheckOplogEntry(opCtx, 2, 23, oplog1);
     }
 
     {
@@ -727,8 +726,8 @@ TEST_F(SessionCatalogMigrationDestinationTest, OplogEntriesWithDifferentSession)
 
         ASSERT_FALSE(historyIter.hasNext());
 
-        checkStatementExecuted(opCtx2.get(), 42, 45, oplog2);
-        checkStatementExecuted(opCtx2.get(), 42, 5, oplog3);
+        checkStatementExecutedAndCheckOplogEntry(opCtx2.get(), 42, 45, oplog2);
+        checkStatementExecutedAndCheckOplogEntry(opCtx2.get(), 42, 5, oplog3);
     }
 }
 
@@ -892,7 +891,7 @@ TEST_F(SessionCatalogMigrationDestinationTest, ShouldBeAbleToHandlePreImageFindA
     ASSERT_TRUE(newPreImageOplog.getObject2());
     ASSERT_TRUE(newPreImageOplog.getObject2().value().isEmpty());
 
-    checkStatementExecuted(opCtx, 2, 45, updateOplog);
+    checkStatementExecutedAndCheckOplogEntry(opCtx, 2, 45, updateOplog);
 }
 
 TEST_F(SessionCatalogMigrationDestinationTest, ShouldBeAbleToHandleForgedPreImageFindAndModify) {
@@ -989,7 +988,7 @@ TEST_F(SessionCatalogMigrationDestinationTest, ShouldBeAbleToHandleForgedPreImag
     ASSERT_TRUE(newPreImageOplog.getObject2());
     ASSERT_TRUE(newPreImageOplog.getObject2().value().isEmpty());
 
-    checkStatementExecuted(opCtx, 2, 45, updateOplog);
+    checkStatementExecutedAndCheckOplogEntry(opCtx, 2, 45, updateOplog);
 }
 
 TEST_F(SessionCatalogMigrationDestinationTest, ShouldBeAbleToHandlePostImageFindAndModify) {
@@ -1082,7 +1081,7 @@ TEST_F(SessionCatalogMigrationDestinationTest, ShouldBeAbleToHandlePostImageFind
     ASSERT_TRUE(newPostImageOplog.getObject2());
     ASSERT_TRUE(newPostImageOplog.getObject2().value().isEmpty());
 
-    checkStatementExecuted(opCtx, 2, 45, updateOplog);
+    checkStatementExecutedAndCheckOplogEntry(opCtx, 2, 45, updateOplog);
 }
 
 
@@ -1178,7 +1177,7 @@ TEST_F(SessionCatalogMigrationDestinationTest, ShouldBeAbleToHandleForgedPostIma
     ASSERT_TRUE(newPostImageOplog.getObject2());
     ASSERT_TRUE(newPostImageOplog.getObject2().value().isEmpty());
 
-    checkStatementExecuted(opCtx, 2, 45, updateOplog);
+    checkStatementExecutedAndCheckOplogEntry(opCtx, 2, 45, updateOplog);
 }
 
 TEST_F(SessionCatalogMigrationDestinationTest, ShouldBeAbleToHandleFindAndModifySplitIn2Batches) {
@@ -1275,7 +1274,7 @@ TEST_F(SessionCatalogMigrationDestinationTest, ShouldBeAbleToHandleFindAndModify
     ASSERT_TRUE(newPreImageOplog.getObject2());
     ASSERT_TRUE(newPreImageOplog.getObject2().value().isEmpty());
 
-    checkStatementExecuted(opCtx, 2, 45, updateOplog);
+    checkStatementExecutedAndCheckOplogEntry(opCtx, 2, 45, updateOplog);
 }
 
 TEST_F(SessionCatalogMigrationDestinationTest, OlderTxnShouldBeIgnored) {
@@ -1601,8 +1600,8 @@ TEST_F(SessionCatalogMigrationDestinationTest,
     ASSERT_FALSE(historyIter.hasNext());
 
     checkStatementExecuted(opCtx, 2, 0);
-    checkStatementExecuted(opCtx, 2, 23, oplog1);
-    checkStatementExecuted(opCtx, 2, 45, oplog2);
+    checkStatementExecutedAndCheckOplogEntry(opCtx, 2, 23, oplog1);
+    checkStatementExecutedAndCheckOplogEntry(opCtx, 2, 45, oplog2);
 }
 
 TEST_F(SessionCatalogMigrationDestinationTest, ShouldErrorForConsecutivePreImageOplog) {
@@ -1915,9 +1914,9 @@ TEST_F(SessionCatalogMigrationDestinationTest, ShouldIgnoreAlreadyExecutedStatem
     ASSERT_EQ(1, firstInsertOplog.getStatementIds().size());
     ASSERT_EQ(30, firstInsertOplog.getStatementIds().front());
 
-    checkStatementExecuted(opCtx, 19, 23, oplog1);
+    checkStatementExecutedAndCheckOplogEntry(opCtx, 19, 23, oplog1);
     checkStatementExecuted(opCtx, 19, 30);
-    checkStatementExecuted(opCtx, 19, 45, oplog3);
+    checkStatementExecutedAndCheckOplogEntry(opCtx, 19, 45, oplog3);
 }
 
 TEST_F(SessionCatalogMigrationDestinationTest, OplogEntriesWithIncompleteHistory) {
@@ -2081,8 +2080,8 @@ TEST_F(SessionCatalogMigrationDestinationTest,
 
         ASSERT_FALSE(historyIter.hasNext());
 
-        checkStatementExecuted(opCtx, 15, 56, oplogEntries[1]);
-        checkStatementExecuted(opCtx, 15, 55, oplogEntries[2]);
+        checkStatementExecutedAndCheckOplogEntry(opCtx, 15, 56, oplogEntries[1]);
+        checkStatementExecutedAndCheckOplogEntry(opCtx, 15, 55, oplogEntries[2]);
     }
 }
 

@@ -619,27 +619,27 @@ TEST_F(TransactionParticipantRetryableWritesTest,
                                    boost::none /* autocommit */,
                                    TransactionParticipant::TransactionActions::kNone);
 
+    ASSERT(!txnParticipant.checkStatementExecutedAndFetchOplogEntry(opCtx(), 1000));
     ASSERT(!txnParticipant.checkStatementExecuted(opCtx(), 1000));
-    ASSERT(!txnParticipant.checkStatementExecutedNoOplogEntryFetch(opCtx(), 1000));
     const auto firstOpTime = writeTxnRecord(txnNum, {1000}, {}, boost::none);
+    ASSERT(txnParticipant.checkStatementExecutedAndFetchOplogEntry(opCtx(), 1000));
     ASSERT(txnParticipant.checkStatementExecuted(opCtx(), 1000));
-    ASSERT(txnParticipant.checkStatementExecutedNoOplogEntryFetch(opCtx(), 1000));
 
+    ASSERT(!txnParticipant.checkStatementExecutedAndFetchOplogEntry(opCtx(), 2000));
     ASSERT(!txnParticipant.checkStatementExecuted(opCtx(), 2000));
-    ASSERT(!txnParticipant.checkStatementExecutedNoOplogEntryFetch(opCtx(), 2000));
     writeTxnRecord(txnNum, {2000}, firstOpTime, boost::none);
+    ASSERT(txnParticipant.checkStatementExecutedAndFetchOplogEntry(opCtx(), 2000));
     ASSERT(txnParticipant.checkStatementExecuted(opCtx(), 2000));
-    ASSERT(txnParticipant.checkStatementExecutedNoOplogEntryFetch(opCtx(), 2000));
 
     // Invalidate the session and ensure the statements still check out
     txnParticipant.invalidate(opCtx());
     txnParticipant.refreshFromStorageIfNeeded(opCtx());
 
+    ASSERT(txnParticipant.checkStatementExecutedAndFetchOplogEntry(opCtx(), 1000));
+    ASSERT(txnParticipant.checkStatementExecutedAndFetchOplogEntry(opCtx(), 2000));
+
     ASSERT(txnParticipant.checkStatementExecuted(opCtx(), 1000));
     ASSERT(txnParticipant.checkStatementExecuted(opCtx(), 2000));
-
-    ASSERT(txnParticipant.checkStatementExecutedNoOplogEntryFetch(opCtx(), 1000));
-    ASSERT(txnParticipant.checkStatementExecutedNoOplogEntryFetch(opCtx(), 2000));
 }
 
 TEST_F(ShardTransactionParticipantRetryableWritesTest,
@@ -657,11 +657,11 @@ TEST_F(ShardTransactionParticipantRetryableWritesTest,
                                          {parentTxnNumber},
                                          boost::none /* autocommit */,
                                          TransactionParticipant::TransactionActions::kNone);
+    ASSERT(!parentTxnParticipant.checkStatementExecutedAndFetchOplogEntry(opCtx(), 1000));
     ASSERT(!parentTxnParticipant.checkStatementExecuted(opCtx(), 1000));
-    ASSERT(!parentTxnParticipant.checkStatementExecutedNoOplogEntryFetch(opCtx(), 1000));
     writeTxnRecord(parentTxnNumber, {1000}, {}, boost::none);
+    ASSERT(parentTxnParticipant.checkStatementExecutedAndFetchOplogEntry(opCtx(), 1000));
     ASSERT(parentTxnParticipant.checkStatementExecuted(opCtx(), 1000));
-    ASSERT(parentTxnParticipant.checkStatementExecutedNoOplogEntryFetch(opCtx(), 1000));
 
     opContextSession.reset();
     opCtx()->setLogicalSessionId(childLsid);
@@ -675,17 +675,17 @@ TEST_F(ShardTransactionParticipantRetryableWritesTest,
                                         {childTxnNumber},
                                         boost::none /* autocommit */,
                                         TransactionParticipant::TransactionActions::kNone);
+    ASSERT(!childTxnParticipant.checkStatementExecutedAndFetchOplogEntry(opCtx(), 2000));
     ASSERT(!childTxnParticipant.checkStatementExecuted(opCtx(), 2000));
-    ASSERT(!childTxnParticipant.checkStatementExecutedNoOplogEntryFetch(opCtx(), 2000));
     writeTxnRecord(childTxnNumber, {2000}, {}, DurableTxnStateEnum::kCommitted);
+    ASSERT(childTxnParticipant.checkStatementExecutedAndFetchOplogEntry(opCtx(), 2000));
     ASSERT(childTxnParticipant.checkStatementExecuted(opCtx(), 2000));
-    ASSERT(childTxnParticipant.checkStatementExecutedNoOplogEntryFetch(opCtx(), 2000));
 
     // The transaction history is shared across associated TransactionParticipants.
+    ASSERT(parentTxnParticipant.checkStatementExecutedAndFetchOplogEntry(opCtx(), 2000));
     ASSERT(parentTxnParticipant.checkStatementExecuted(opCtx(), 2000));
-    ASSERT(parentTxnParticipant.checkStatementExecutedNoOplogEntryFetch(opCtx(), 2000));
+    ASSERT(childTxnParticipant.checkStatementExecutedAndFetchOplogEntry(opCtx(), 1000));
     ASSERT(childTxnParticipant.checkStatementExecuted(opCtx(), 1000));
-    ASSERT(childTxnParticipant.checkStatementExecutedNoOplogEntryFetch(opCtx(), 1000));
 
     // Invalidate both sessions. Verify that refreshing only the child session causes both sessions
     // to be refreshed.
@@ -693,15 +693,15 @@ TEST_F(ShardTransactionParticipantRetryableWritesTest,
     parentTxnParticipant.invalidate(opCtx());
     childTxnParticipant.refreshFromStorageIfNeeded(opCtx());
 
+    ASSERT(parentTxnParticipant.checkStatementExecutedAndFetchOplogEntry(opCtx(), 1000));
+    ASSERT(parentTxnParticipant.checkStatementExecutedAndFetchOplogEntry(opCtx(), 2000));
     ASSERT(parentTxnParticipant.checkStatementExecuted(opCtx(), 1000));
     ASSERT(parentTxnParticipant.checkStatementExecuted(opCtx(), 2000));
-    ASSERT(parentTxnParticipant.checkStatementExecutedNoOplogEntryFetch(opCtx(), 1000));
-    ASSERT(parentTxnParticipant.checkStatementExecutedNoOplogEntryFetch(opCtx(), 2000));
 
+    ASSERT(childTxnParticipant.checkStatementExecutedAndFetchOplogEntry(opCtx(), 1000));
+    ASSERT(childTxnParticipant.checkStatementExecutedAndFetchOplogEntry(opCtx(), 2000));
     ASSERT(childTxnParticipant.checkStatementExecuted(opCtx(), 1000));
     ASSERT(childTxnParticipant.checkStatementExecuted(opCtx(), 2000));
-    ASSERT(childTxnParticipant.checkStatementExecutedNoOplogEntryFetch(opCtx(), 1000));
-    ASSERT(childTxnParticipant.checkStatementExecutedNoOplogEntryFetch(opCtx(), 2000));
 }
 
 DEATH_TEST_REGEX_F(TransactionParticipantRetryableWritesTest,
@@ -709,7 +709,7 @@ DEATH_TEST_REGEX_F(TransactionParticipantRetryableWritesTest,
                    R"#(Invariant failure.*retryableWriteTxnParticipantCatalog.isValid)#") {
     auto txnParticipant = TransactionParticipant::get(opCtx());
     txnParticipant.invalidate(opCtx());
-    txnParticipant.checkStatementExecuted(opCtx(), 0);
+    txnParticipant.checkStatementExecutedAndFetchOplogEntry(opCtx(), 0);
 }
 
 DEATH_TEST_REGEX_F(ShardTransactionParticipantRetryableWritesTest,
@@ -734,7 +734,7 @@ DEATH_TEST_REGEX_F(ShardTransactionParticipantRetryableWritesTest,
         opCtx(), {0}, false /* autocommit */, TransactionParticipant::TransactionActions::kStart);
 
     parentTxnParticipant.invalidate(opCtx());
-    childTxnParticipant.checkStatementExecuted(opCtx(), 0);
+    childTxnParticipant.checkStatementExecutedAndFetchOplogEntry(opCtx(), 0);
 }
 
 DEATH_TEST_REGEX_F(ShardTransactionParticipantRetryableWritesTest,
@@ -759,7 +759,7 @@ DEATH_TEST_REGEX_F(ShardTransactionParticipantRetryableWritesTest,
         opCtx(), {0}, false /* autocommit */, TransactionParticipant::TransactionActions::kStart);
 
     childTxnParticipant.invalidate(opCtx());
-    parentTxnParticipant.checkStatementExecuted(opCtx(), 0);
+    parentTxnParticipant.checkStatementExecutedAndFetchOplogEntry(opCtx(), 0);
 }
 
 DEATH_TEST_REGEX_F(
@@ -936,17 +936,17 @@ TEST_F(TransactionParticipantRetryableWritesTest, IncompleteHistoryDueToOpLogTru
     auto txnParticipant = TransactionParticipant::get(opCtx());
     txnParticipant.refreshFromStorageIfNeeded(opCtx());
 
+    ASSERT_THROWS_CODE(txnParticipant.checkStatementExecutedAndFetchOplogEntry(opCtx(), 0),
+                       AssertionException,
+                       ErrorCodes::IncompleteTransactionHistory);
+    ASSERT(txnParticipant.checkStatementExecutedAndFetchOplogEntry(opCtx(), 1));
+    ASSERT(txnParticipant.checkStatementExecutedAndFetchOplogEntry(opCtx(), 2));
+
     ASSERT_THROWS_CODE(txnParticipant.checkStatementExecuted(opCtx(), 0),
                        AssertionException,
                        ErrorCodes::IncompleteTransactionHistory);
     ASSERT(txnParticipant.checkStatementExecuted(opCtx(), 1));
     ASSERT(txnParticipant.checkStatementExecuted(opCtx(), 2));
-
-    ASSERT_THROWS_CODE(txnParticipant.checkStatementExecutedNoOplogEntryFetch(opCtx(), 0),
-                       AssertionException,
-                       ErrorCodes::IncompleteTransactionHistory);
-    ASSERT(txnParticipant.checkStatementExecutedNoOplogEntryFetch(opCtx(), 1));
-    ASSERT(txnParticipant.checkStatementExecutedNoOplogEntryFetch(opCtx(), 2));
 }
 
 TEST_F(TransactionParticipantRetryableWritesTest,
@@ -1005,6 +1005,17 @@ TEST_F(TransactionParticipantRetryableWritesTest,
     auto txnParticipant = TransactionParticipant::get(opCtx());
     txnParticipant.refreshFromStorageIfNeeded(opCtx());
 
+    ASSERT_THROWS_CODE(txnParticipant.checkStatementExecutedAndFetchOplogEntry(opCtx(), 0),
+                       AssertionException,
+                       ErrorCodes::IncompleteTransactionHistory);
+    ASSERT_THROWS_CODE(txnParticipant.checkStatementExecutedAndFetchOplogEntry(opCtx(), 1),
+                       AssertionException,
+                       ErrorCodes::IncompleteTransactionHistory);
+    ASSERT(txnParticipant.checkStatementExecutedAndFetchOplogEntry(opCtx(), 2));
+    ASSERT(txnParticipant.checkStatementExecutedAndFetchOplogEntry(opCtx(), 3));
+    ASSERT(txnParticipant.checkStatementExecutedAndFetchOplogEntry(opCtx(), 4));
+    ASSERT(txnParticipant.checkStatementExecutedAndFetchOplogEntry(opCtx(), 5));
+
     ASSERT_THROWS_CODE(txnParticipant.checkStatementExecuted(opCtx(), 0),
                        AssertionException,
                        ErrorCodes::IncompleteTransactionHistory);
@@ -1015,17 +1026,6 @@ TEST_F(TransactionParticipantRetryableWritesTest,
     ASSERT(txnParticipant.checkStatementExecuted(opCtx(), 3));
     ASSERT(txnParticipant.checkStatementExecuted(opCtx(), 4));
     ASSERT(txnParticipant.checkStatementExecuted(opCtx(), 5));
-
-    ASSERT_THROWS_CODE(txnParticipant.checkStatementExecutedNoOplogEntryFetch(opCtx(), 0),
-                       AssertionException,
-                       ErrorCodes::IncompleteTransactionHistory);
-    ASSERT_THROWS_CODE(txnParticipant.checkStatementExecutedNoOplogEntryFetch(opCtx(), 1),
-                       AssertionException,
-                       ErrorCodes::IncompleteTransactionHistory);
-    ASSERT(txnParticipant.checkStatementExecutedNoOplogEntryFetch(opCtx(), 2));
-    ASSERT(txnParticipant.checkStatementExecutedNoOplogEntryFetch(opCtx(), 3));
-    ASSERT(txnParticipant.checkStatementExecutedNoOplogEntryFetch(opCtx(), 4));
-    ASSERT(txnParticipant.checkStatementExecutedNoOplogEntryFetch(opCtx(), 5));
 }
 
 TEST_F(TransactionParticipantRetryableWritesTest, ErrorOnlyWhenStmtIdBeingCheckedIsNotInCache) {
@@ -1099,24 +1099,26 @@ TEST_F(TransactionParticipantRetryableWritesTest, ErrorOnlyWhenStmtIdBeingChecke
     }
 
     {
-        auto oplog = txnParticipant.checkStatementExecuted(opCtx(), 1);
+        auto oplog = txnParticipant.checkStatementExecutedAndFetchOplogEntry(opCtx(), 1);
         ASSERT_TRUE(oplog);
         ASSERT_EQ(firstOpTime, oplog->getOpTime());
     }
 
-    ASSERT_THROWS(txnParticipant.checkStatementExecuted(opCtx(), 2), AssertionException);
+    ASSERT_THROWS(txnParticipant.checkStatementExecutedAndFetchOplogEntry(opCtx(), 2),
+                  AssertionException);
 
     // Should have the same behavior after loading state from storage.
     txnParticipant.invalidate(opCtx());
     txnParticipant.refreshFromStorageIfNeeded(opCtx());
 
     {
-        auto oplog = txnParticipant.checkStatementExecuted(opCtx(), 1);
+        auto oplog = txnParticipant.checkStatementExecutedAndFetchOplogEntry(opCtx(), 1);
         ASSERT_TRUE(oplog);
         ASSERT_EQ(firstOpTime, oplog->getOpTime());
     }
 
-    ASSERT_THROWS(txnParticipant.checkStatementExecuted(opCtx(), 2), AssertionException);
+    ASSERT_THROWS(txnParticipant.checkStatementExecutedAndFetchOplogEntry(opCtx(), 2),
+                  AssertionException);
 }
 
 TEST_F(TransactionParticipantRetryableWritesTest, SingleRetryableApplyOps) {
@@ -1164,10 +1166,10 @@ TEST_F(TransactionParticipantRetryableWritesTest, SingleRetryableApplyOps) {
     auto txnParticipant = TransactionParticipant::get(opCtx());
     txnParticipant.invalidate(opCtx());
     txnParticipant.refreshFromStorageIfNeeded(opCtx());
-    ASSERT(txnParticipant.checkStatementExecuted(opCtx(), 0));
-    ASSERT(txnParticipant.checkStatementExecuted(opCtx(), 1));
-    ASSERT(txnParticipant.checkStatementExecuted(opCtx(), 2));
-    ASSERT_FALSE(txnParticipant.checkStatementExecuted(opCtx(), 3));
+    ASSERT(txnParticipant.checkStatementExecutedAndFetchOplogEntry(opCtx(), 0));
+    ASSERT(txnParticipant.checkStatementExecutedAndFetchOplogEntry(opCtx(), 1));
+    ASSERT(txnParticipant.checkStatementExecutedAndFetchOplogEntry(opCtx(), 2));
+    ASSERT_FALSE(txnParticipant.checkStatementExecutedAndFetchOplogEntry(opCtx(), 3));
 }
 
 TEST_F(TransactionParticipantRetryableWritesTest, MultipleRetryableApplyOps) {
@@ -1237,15 +1239,15 @@ TEST_F(TransactionParticipantRetryableWritesTest, MultipleRetryableApplyOps) {
     auto txnParticipant = TransactionParticipant::get(opCtx());
     txnParticipant.invalidate(opCtx());
     txnParticipant.refreshFromStorageIfNeeded(opCtx());
-    ASSERT(txnParticipant.checkStatementExecuted(opCtx(), 0));
-    ASSERT(txnParticipant.checkStatementExecuted(opCtx(), 1));
-    ASSERT(txnParticipant.checkStatementExecuted(opCtx(), 2));
+    ASSERT(txnParticipant.checkStatementExecutedAndFetchOplogEntry(opCtx(), 0));
+    ASSERT(txnParticipant.checkStatementExecutedAndFetchOplogEntry(opCtx(), 1));
+    ASSERT(txnParticipant.checkStatementExecutedAndFetchOplogEntry(opCtx(), 2));
     // We skipped 3 above.
-    ASSERT_FALSE(txnParticipant.checkStatementExecuted(opCtx(), 3));
-    ASSERT(txnParticipant.checkStatementExecuted(opCtx(), 4));
-    ASSERT(txnParticipant.checkStatementExecuted(opCtx(), 5));
-    ASSERT(txnParticipant.checkStatementExecuted(opCtx(), 6));
-    ASSERT_FALSE(txnParticipant.checkStatementExecuted(opCtx(), 7));
+    ASSERT_FALSE(txnParticipant.checkStatementExecutedAndFetchOplogEntry(opCtx(), 3));
+    ASSERT(txnParticipant.checkStatementExecutedAndFetchOplogEntry(opCtx(), 4));
+    ASSERT(txnParticipant.checkStatementExecutedAndFetchOplogEntry(opCtx(), 5));
+    ASSERT(txnParticipant.checkStatementExecutedAndFetchOplogEntry(opCtx(), 6));
+    ASSERT_FALSE(txnParticipant.checkStatementExecutedAndFetchOplogEntry(opCtx(), 7));
 }
 
 TEST_F(TransactionParticipantRetryableWritesTest, MixedInsertAndApplyOps) {
@@ -1325,16 +1327,16 @@ TEST_F(TransactionParticipantRetryableWritesTest, MixedInsertAndApplyOps) {
     auto txnParticipant = TransactionParticipant::get(opCtx());
     txnParticipant.invalidate(opCtx());
     txnParticipant.refreshFromStorageIfNeeded(opCtx());
-    ASSERT(txnParticipant.checkStatementExecuted(opCtx(), 0));
-    ASSERT(txnParticipant.checkStatementExecuted(opCtx(), 1));
-    ASSERT(txnParticipant.checkStatementExecuted(opCtx(), 2));
+    ASSERT(txnParticipant.checkStatementExecutedAndFetchOplogEntry(opCtx(), 0));
+    ASSERT(txnParticipant.checkStatementExecutedAndFetchOplogEntry(opCtx(), 1));
+    ASSERT(txnParticipant.checkStatementExecutedAndFetchOplogEntry(opCtx(), 2));
     // We skipped 3 above.
-    ASSERT_FALSE(txnParticipant.checkStatementExecuted(opCtx(), 3));
-    ASSERT(txnParticipant.checkStatementExecuted(opCtx(), 4));
-    ASSERT(txnParticipant.checkStatementExecuted(opCtx(), 5));
-    ASSERT(txnParticipant.checkStatementExecuted(opCtx(), 6));
-    ASSERT(txnParticipant.checkStatementExecuted(opCtx(), 7));
-    ASSERT_FALSE(txnParticipant.checkStatementExecuted(opCtx(), 8));
+    ASSERT_FALSE(txnParticipant.checkStatementExecutedAndFetchOplogEntry(opCtx(), 3));
+    ASSERT(txnParticipant.checkStatementExecutedAndFetchOplogEntry(opCtx(), 4));
+    ASSERT(txnParticipant.checkStatementExecutedAndFetchOplogEntry(opCtx(), 5));
+    ASSERT(txnParticipant.checkStatementExecutedAndFetchOplogEntry(opCtx(), 6));
+    ASSERT(txnParticipant.checkStatementExecutedAndFetchOplogEntry(opCtx(), 7));
+    ASSERT_FALSE(txnParticipant.checkStatementExecutedAndFetchOplogEntry(opCtx(), 8));
 }
 
 TEST_F(TransactionParticipantRetryableWritesTest, RefreshFromStorageAsSecondary) {

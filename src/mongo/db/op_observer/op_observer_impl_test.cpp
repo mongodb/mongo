@@ -1200,7 +1200,7 @@ TEST_F(OpObserverSessionCatalogRollbackTest,
         simulateSessionWrite(opCtx.get(), txnParticipant, nss, txnNum, stmtId);
 
         // Check that the statement executed
-        ASSERT(txnParticipant.checkStatementExecutedNoOplogEntryFetch(opCtx.get(), stmtId));
+        ASSERT(txnParticipant.checkStatementExecuted(opCtx.get(), stmtId));
     }
 
     // Because there are no sessions to rollback, the OpObserver should not invalidate the in-memory
@@ -1218,7 +1218,7 @@ TEST_F(OpObserverSessionCatalogRollbackTest,
         opCtx->setLogicalSessionId(sessionId);
         auto ocs = mongoDSessionCatalog->checkOutSession(opCtx.get());
         auto txnParticipant = TransactionParticipant::get(opCtx.get());
-        ASSERT(txnParticipant.checkStatementExecutedNoOplogEntryFetch(opCtx.get(), stmtId));
+        ASSERT(txnParticipant.checkStatementExecuted(opCtx.get(), stmtId));
     }
 }
 

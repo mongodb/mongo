@@ -3592,7 +3592,8 @@ void TransactionParticipant::Participant::invalidate(OperationContext* opCtx) {
     _resetTransactionStateAndUnlock(&lk, opCtx, TransactionState::kNone);
 }
 
-boost::optional<repl::OplogEntry> TransactionParticipant::Participant::checkStatementExecuted(
+boost::optional<repl::OplogEntry>
+TransactionParticipant::Participant::checkStatementExecutedAndFetchOplogEntry(
     OperationContext* opCtx, StmtId stmtId) const {
     const auto stmtOpTime = _checkStatementExecuted(opCtx, stmtId);
 
@@ -3630,8 +3631,8 @@ boost::optional<repl::OplogEntry> TransactionParticipant::Participant::checkStat
     MONGO_UNREACHABLE;
 }
 
-bool TransactionParticipant::Participant::checkStatementExecutedNoOplogEntryFetch(
-    OperationContext* opCtx, StmtId stmtId) const {
+bool TransactionParticipant::Participant::checkStatementExecuted(OperationContext* opCtx,
+                                                                 StmtId stmtId) const {
     return bool(_checkStatementExecuted(opCtx, stmtId));
 }
 

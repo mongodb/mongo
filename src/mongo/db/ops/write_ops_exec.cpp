@@ -1185,8 +1185,8 @@ WriteResult performInserts(OperationContext* opCtx,
             opCtx, doc, bypassEmptyTsReplacement, &containsDotsAndDollarsField);
 
         const StmtId stmtId = getStmtIdForWriteOp(opCtx, wholeOp, currentOpIndex);
-        const bool wasAlreadyExecuted = opCtx->isRetryableWrite() &&
-            txnParticipant.checkStatementExecutedNoOplogEntryFetch(opCtx, stmtId);
+        const bool wasAlreadyExecuted =
+            opCtx->isRetryableWrite() && txnParticipant.checkStatementExecuted(opCtx, stmtId);
 
         if (!fixedDoc.isOK()) {
             // Handled after we insert anything in the batch to be sure we report errors in the
@@ -1651,7 +1651,8 @@ WriteResult performUpdates(OperationContext* opCtx,
         const auto currentOpIndex = nextOpIndex++;
         const auto stmtId = getStmtIdForWriteOp(opCtx, wholeOp, currentOpIndex);
         if (opCtx->isRetryableWrite()) {
-            if (auto entry = txnParticipant.checkStatementExecuted(opCtx, stmtId)) {
+            if (auto entry =
+                    txnParticipant.checkStatementExecutedAndFetchOplogEntry(opCtx, stmtId)) {
                 // For non-sharded user time-series updates, handles the metrics of the command at
                 // the caller since each statement will run as a command through the internal
                 // transaction API.
@@ -1948,8 +1949,7 @@ WriteResult performDeletes(OperationContext* opCtx,
 
         const auto currentOpIndex = nextOpIndex++;
         const auto stmtId = getStmtIdForWriteOp(opCtx, wholeOp, currentOpIndex);
-        if (opCtx->isRetryableWrite() &&
-            txnParticipant.checkStatementExecutedNoOplogEntryFetch(opCtx, stmtId)) {
+        if (opCtx->isRetryableWrite() && txnParticipant.checkStatementExecuted(opCtx, stmtId)) {
             containsRetry = true;
             RetryableWritesStats::get(opCtx)->incrementRetriedStatementsCount();
             out.results.emplace_back(makeWriteResultForInsertOrDeleteRetry());
@@ -2978,8 +2978,7 @@ insertIntoBucketCatalog(OperationContext* opCtx,
                                            : request.getStmtId().value_or(0) + start + index;
 
         if (isTimeseriesWriteRetryable(opCtx) &&
-            TransactionParticipant::get(opCtx).checkStatementExecutedNoOplogEntryFetch(opCtx,
-                                                                                       stmtId)) {
+            TransactionParticipant::get(opCtx).checkStatementExecuted(opCtx, stmtId)) {
             RetryableWritesStats::get(opCtx)->incrementRetriedStatementsCount();
             *containsRetry = true;
             return true;

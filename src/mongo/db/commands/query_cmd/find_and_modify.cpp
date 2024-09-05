@@ -525,7 +525,7 @@ write_ops::FindAndModifyCommandReply CmdFindAndModify::Invocation::typedRun(
     const auto stmtId = req.getStmtId().value_or(0);
     if (opCtx->isRetryableWrite()) {
         const auto txnParticipant = TransactionParticipant::get(opCtx);
-        if (auto entry = txnParticipant.checkStatementExecuted(opCtx, stmtId)) {
+        if (auto entry = txnParticipant.checkStatementExecutedAndFetchOplogEntry(opCtx, stmtId)) {
             RetryableWritesStats::get(opCtx)->incrementRetriedCommandsCount();
             RetryableWritesStats::get(opCtx)->incrementRetriedStatementsCount();
 
