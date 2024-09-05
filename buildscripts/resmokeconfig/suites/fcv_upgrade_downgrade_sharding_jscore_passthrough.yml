@@ -97,8 +97,6 @@ selector:
     # The tests below depend on internal transactions which are expected to get interrupted during an FCV upgrade or downgrade, but they do not have the 'uses_transactions' tag so are not excluded by default in this suite.
     - jstests/aggregation/sources/lookup/lookup_non_correlated.js
     - jstests/core/ddl/collection_uuid_index_commands.js
-    # TODO (SERVER-83599): remove this.
-    - jstests/core/timeseries/timeseries_out_non_sharded.js
     # Queryable encryption tests create internal transactions which are expected to fail.
     - jstests/core/queryable_encryption/*.js
     # TODO (SERVER-77910): Find out why spill_to_disk.js fails to spill to disk after FCV down.
