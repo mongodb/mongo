@@ -284,8 +284,18 @@ private:
     bool _hasNewWrites(WithLock);
 
     /**
-     * Attempts to fetch the next oplog entry from the new writes that was saved by saveNewWriteTS.
-     * Returns true if there were documents that were retrieved.
+     * Can only be invoked when '_unprocessedNewWriteOplogBuffer' is empty but '_newWriteOpTimeList'
+     * is not. Fetches the oplog entry for the next opTime in '_newWriteOpTimeList'. If the oplog
+     * entry corresponds to a write against the chunk range being migrated, adds the oplog entry or
+     * its inner oplog entries (for applyOps) to '_unprocessedNewWriteOplogBuffer'.
+     */
+    void _tryFetchNextNewWriteOplog(stdx::unique_lock<Latch>& lk, OperationContext* opCtx);
+
+    /**
+     * If there is no stashed '_lastFetchedOplog', looks for the next opTime in
+     * '_newWriteOpTimeList' that corresponds to a write against this chunk range, fetches its oplog
+     * entry and stashes it onto '_lastFetchedOplog' (and '_lastFetchedOplogImage' if applicable).
+     * Returns true if such an oplog entry was found and fetched.
      */
     bool _fetchNextNewWriteOplog(OperationContext* opCtx);
 

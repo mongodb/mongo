@@ -1061,21 +1061,28 @@ TEST_F(SessionCatalogMigrationSourceTest,
 
     const auto sessionId = makeLogicalSessionIdWithTxnNumberAndUUIDForTest();
     const auto txnNumber = TxnNumber{1};
+    int numOps = 0;
 
+    // op with stmtId for the chunk being migrated.
     auto op1 = makeDurableReplOp(
         repl::OpTypeEnum::kUpdate, kNs, BSON("$set" << BSON("_id" << 1)), BSON("x" << 1), {1});
-    // op without stmtId.
+    // op without stmtId for the chunk being migrated.
     auto op2 = makeDurableReplOp(repl::OpTypeEnum::kInsert, kNs, BSON("x" << 2), BSONObj(), {});
     // op for a different ns.
     auto op3 =
         makeDurableReplOp(repl::OpTypeEnum::kInsert, kOtherNs, BSON("x" << 3), BSONObj(), {3});
+    // op with stmtId for the chunk being migrated.
     auto op4 = makeDurableReplOp(repl::OpTypeEnum::kInsert, kNs, BSON("x" << 4), BSONObj(), {4});
     // op that does not touch the chunk being migrated.
-    auto op5 =
-        makeDurableReplOp(repl::OpTypeEnum::kInsert, kOtherNs, BSON("x" << -5), BSONObj(), {5});
-    // WouldChangeOwningShard sentinel op.
+    auto op5 = makeDurableReplOp(repl::OpTypeEnum::kInsert, kNs, BSON("x" << -5), BSONObj(), {5});
+    // WouldChangeOwningShard sentinel op with stmtId for the chunk being migrated.
     auto op6 = makeDurableReplOp(
         repl::OpTypeEnum::kNoop, kNs, kWouldChangeOwningShardSentinel, BSONObj(), {6});
+    // op for a different ns.
+    auto op7 =
+        makeDurableReplOp(repl::OpTypeEnum::kInsert, kOtherNs, BSON("x" << 7), BSONObj(), {7});
+    // op that does not touch the chunk being migrated.
+    auto op8 = makeDurableReplOp(repl::OpTypeEnum::kInsert, kNs, BSON("x" << -8), BSONObj(), {8});
 
     auto applyOpsOpTime1 = repl::OpTime(Timestamp(130, 1), 1);
     auto entry1 = makeApplyOpsOplogEntry(applyOpsOpTime1,
@@ -1086,6 +1093,7 @@ TEST_F(SessionCatalogMigrationSourceTest,
                                          false,  // isPrepare
                                          true);  // isPartial
     insertOplogEntry(entry1);
+    numOps += 3;
 
     auto applyOpsOpTime2 = repl::OpTime(Timestamp(130, 2), 1);
     auto entry2 = makeApplyOpsOplogEntry(applyOpsOpTime2,
@@ -1096,6 +1104,7 @@ TEST_F(SessionCatalogMigrationSourceTest,
                                          false,   // isPrepare
                                          false);  // isPartial
     insertOplogEntry(entry2);
+    numOps += 3;
 
     auto applyOpsOpTime3 = repl::OpTime(Timestamp(130, 3), 1);
     auto entry3 = makeApplyOpsOplogEntry(applyOpsOpTime3,
@@ -1107,8 +1116,20 @@ TEST_F(SessionCatalogMigrationSourceTest,
                                          false);  // isPartial
     insertOplogEntry(entry3);
 
+    auto applyOpsOpTime4 = repl::OpTime(Timestamp(130, 4), 1);
+    auto entry4 = makeApplyOpsOplogEntry(
+        applyOpsOpTime4,
+        entry3.getOpTime(),  // prevOpTime
+        {op7, op8},          // no oplog entries will be buffered from this applyOps oplog entry.
+        sessionId,
+        txnNumber,
+        false,   // isPrepare
+        false);  // isPartial
+    insertOplogEntry(entry4);
+    numOps += 2;
+
     migrationSource.notifyNewWriteOpTime(
-        entry3.getOpTime(), SessionCatalogMigrationSource::EntryAtOpTimeType::kTransaction);
+        entry4.getOpTime(), SessionCatalogMigrationSource::EntryAtOpTimeType::kTransaction);
 
     const auto expectedSessionId = *getParentSessionId(sessionId);
     const auto expectedTxnNumber = *sessionId.getTxnNumber();
@@ -1124,8 +1145,9 @@ TEST_F(SessionCatalogMigrationSourceTest,
     }
 
     ASSERT_FALSE(migrationSource.fetchNextOplog(opCtx()));
-    ASSERT_EQ(migrationSource.getSessionOplogEntriesToBeMigratedSoFar(), 3);
-    ASSERT_EQ(migrationSource.getSessionOplogEntriesSkippedSoFarLowerBound(), 3);
+    ASSERT_EQ(migrationSource.getSessionOplogEntriesToBeMigratedSoFar(), expectedOps.size());
+    ASSERT_EQ(migrationSource.getSessionOplogEntriesSkippedSoFarLowerBound(),
+              numOps - expectedOps.size());
 }
 
 TEST_F(SessionCatalogMigrationSourceTest,
@@ -1136,6 +1158,7 @@ TEST_F(SessionCatalogMigrationSourceTest,
 
     const auto sessionId = makeLogicalSessionIdWithTxnNumberAndUUIDForTest();
     const auto txnNumber = TxnNumber{1};
+    int numOps = 0;
 
     auto preImageOpTimeForOp2 = repl::OpTime(Timestamp(140, 1), 1);
     auto preImageEntryForOp2 = makeOplogEntry(preImageOpTimeForOp2,
@@ -1161,6 +1184,7 @@ TEST_F(SessionCatalogMigrationSourceTest,
                                                {});  // prevOpTime
     insertOplogEntry(postImageEntryForOp4);
 
+    // ops with stmtId for the chunk being migrated.
     auto op1 = makeDurableReplOp(repl::OpTypeEnum::kInsert, kNs, BSON("x" << 1), BSONObj(), {1});
     auto op2 = makeDurableReplOp(repl::OpTypeEnum::kUpdate,
                                  kNs,
@@ -1179,6 +1203,11 @@ TEST_F(SessionCatalogMigrationSourceTest,
                                  boost::none,             // preImageOpTime
                                  postImageOpTimeForOp4);  // postImageOpTime
     auto op5 = makeDurableReplOp(repl::OpTypeEnum::kInsert, kNs, BSON("x" << 5), BSONObj(), {5});
+    // op for a different ns.
+    auto op6 =
+        makeDurableReplOp(repl::OpTypeEnum::kInsert, kOtherNs, BSON("x" << 6), BSONObj(), {6});
+    // op that does not touch the chunk being migrated.
+    auto op7 = makeDurableReplOp(repl::OpTypeEnum::kInsert, kNs, BSON("x" << -7), BSONObj(), {7});
 
     auto applyOpsOpTime1 = repl::OpTime(Timestamp(140, 3), 1);
     auto entry1 = makeApplyOpsOplogEntry(applyOpsOpTime1,
@@ -1189,6 +1218,7 @@ TEST_F(SessionCatalogMigrationSourceTest,
                                          false,  // isPrepare
                                          true);  // isPartial
     insertOplogEntry(entry1);
+    numOps += 4;
 
     auto applyOpsOpTime2 = repl::OpTime(Timestamp(140, 4), 1);
     auto entry2 = makeApplyOpsOplogEntry(applyOpsOpTime2,
@@ -1199,9 +1229,22 @@ TEST_F(SessionCatalogMigrationSourceTest,
                                          false,   // isPrepare
                                          false);  // isPartial
     insertOplogEntry(entry2);
+    numOps += 3;
+
+    auto applyOpsOpTime3 = repl::OpTime(Timestamp(140, 5), 1);
+    auto entry3 = makeApplyOpsOplogEntry(
+        applyOpsOpTime3,
+        entry2.getOpTime(),  // prevOpTime
+        {op6, op7},          // no oplog entries will be buffered from this applyOps oplog entry.
+        sessionId,
+        txnNumber,
+        false,   // isPrepare
+        false);  // isPartial
+    insertOplogEntry(entry3);
+    numOps += 2;
 
     migrationSource.notifyNewWriteOpTime(
-        entry2.getOpTime(), SessionCatalogMigrationSource::EntryAtOpTimeType::kTransaction);
+        entry3.getOpTime(), SessionCatalogMigrationSource::EntryAtOpTimeType::kTransaction);
 
     const auto expectedSessionId = *getParentSessionId(sessionId);
     const auto expectedTxnNumber = *sessionId.getTxnNumber();
@@ -1229,8 +1272,9 @@ TEST_F(SessionCatalogMigrationSourceTest,
     }
 
     ASSERT_FALSE(migrationSource.fetchNextOplog(opCtx()));
-    ASSERT_EQ(migrationSource.getSessionOplogEntriesToBeMigratedSoFar(), 7);
-    ASSERT_EQ(migrationSource.getSessionOplogEntriesSkippedSoFarLowerBound(), 0);
+    ASSERT_EQ(migrationSource.getSessionOplogEntriesToBeMigratedSoFar(), expectedOps.size());
+    ASSERT_EQ(migrationSource.getSessionOplogEntriesSkippedSoFarLowerBound(),
+              numOps - expectedOps.size());
 }
 
 TEST_F(SessionCatalogMigrationSourceTest,
@@ -1239,6 +1283,9 @@ TEST_F(SessionCatalogMigrationSourceTest,
     migrationSource.init(opCtx(), kMigrationLsid);
     ASSERT_FALSE(migrationSource.fetchNextOplog(opCtx()));
 
+    int numOps = 0;
+    int numExpectedOps = 0;
+
     std::vector<repl::RetryImageEnum> cases{repl::RetryImageEnum::kPreImage,
                                             repl::RetryImageEnum::kPostImage};
     auto opTimeSecs = 150;
@@ -1246,6 +1293,7 @@ TEST_F(SessionCatalogMigrationSourceTest,
         const auto sessionId = makeLogicalSessionIdWithTxnNumberAndUUIDForTest();
         const auto txnNumber = TxnNumber{1};
 
+        // ops with stmtId for the chunk being migrated.
         auto op1 =
             makeDurableReplOp(repl::OpTypeEnum::kInsert, kNs, BSON("x" << 1), BSONObj(), {1});
         auto op2 = makeDurableReplOp(repl::OpTypeEnum::kUpdate,
@@ -1256,6 +1304,12 @@ TEST_F(SessionCatalogMigrationSourceTest,
                                      imageType /* needsRetryImage */);
         auto op3 =
             makeDurableReplOp(repl::OpTypeEnum::kInsert, kNs, BSON("x" << 3), BSONObj(), {3});
+        // op for a different ns.
+        auto op4 =
+            makeDurableReplOp(repl::OpTypeEnum::kInsert, kOtherNs, BSON("x" << 4), BSONObj(), {4});
+        // op that does not touch the chunk being migrated.
+        auto op5 =
+            makeDurableReplOp(repl::OpTypeEnum::kInsert, kNs, BSON("x" << -5), BSONObj(), {5});
 
         auto applyOpsOpTime1 = repl::OpTime(Timestamp(opTimeSecs, 2), 1);
         auto entry1 = makeApplyOpsOplogEntry(applyOpsOpTime1,
@@ -1266,6 +1320,7 @@ TEST_F(SessionCatalogMigrationSourceTest,
                                              false,  // isPrepare
                                              true);  // isPartial
         insertOplogEntry(entry1);
+        numOps += 1;
 
         auto applyOpsOpTime2 = repl::OpTime(Timestamp(opTimeSecs, 3), 1);
         auto entry2 = makeApplyOpsOplogEntry(applyOpsOpTime2,
@@ -1276,6 +1331,7 @@ TEST_F(SessionCatalogMigrationSourceTest,
                                              false,   // isPrepare
                                              false);  // isPartial
         insertOplogEntry(entry2);
+        numOps += 2;
 
         repl::ImageEntry imageEntryForOp2;
         imageEntryForOp2.set_id(sessionId);
@@ -1286,9 +1342,22 @@ TEST_F(SessionCatalogMigrationSourceTest,
 
         DBDirectClient client(opCtx());
         client.insert(NamespaceString::kConfigImagesNamespace, imageEntryForOp2.toBSON());
+        numOps += 1;
+
+        auto applyOpsOpTime3 = repl::OpTime(Timestamp(opTimeSecs, 4), 1);
+        auto entry3 = makeApplyOpsOplogEntry(
+            applyOpsOpTime3,
+            entry2.getOpTime(),  // prevOpTime
+            {op4, op5},  // no oplog entries will be buffered from this applyOps oplog entry.
+            sessionId,
+            txnNumber,
+            false,   // isPrepare
+            false);  // isPartial
+        insertOplogEntry(entry3);
+        numOps += 2;
 
         migrationSource.notifyNewWriteOpTime(
-            entry2.getOpTime(), SessionCatalogMigrationSource::EntryAtOpTimeType::kTransaction);
+            entry3.getOpTime(), SessionCatalogMigrationSource::EntryAtOpTimeType::kTransaction);
 
         const auto expectedSessionId = *getParentSessionId(sessionId);
         const auto expectedTxnNumber = *sessionId.getTxnNumber();
@@ -1299,6 +1368,7 @@ TEST_F(SessionCatalogMigrationSourceTest,
                                                              op2.getStatementIds());
         const std::vector<repl::DurableReplOperation> expectedOps{
             op3, expectedImageOpForOp2, op2, op1};
+        numExpectedOps += expectedOps.size();
 
         for (const auto& op : expectedOps) {
             ASSERT_TRUE(migrationSource.fetchNextOplog(opCtx()));
@@ -1319,8 +1389,9 @@ TEST_F(SessionCatalogMigrationSourceTest,
         opTimeSecs++;
     }
 
-    ASSERT_EQ(migrationSource.getSessionOplogEntriesToBeMigratedSoFar(), 8);
-    ASSERT_EQ(migrationSource.getSessionOplogEntriesSkippedSoFarLowerBound(), 0);
+    ASSERT_EQ(migrationSource.getSessionOplogEntriesToBeMigratedSoFar(), numExpectedOps);
+    ASSERT_EQ(migrationSource.getSessionOplogEntriesSkippedSoFarLowerBound(),
+              numOps - numExpectedOps);
 }
 
 TEST_F(SessionCatalogMigrationSourceTest, ShouldBeAbleInsertNewWritesAfterBufferWasDepleted) {
@@ -1613,7 +1684,7 @@ TEST_F(SessionCatalogMigrationSourceTest,
 
         auto op1 = makeDurableReplOp(
             repl::OpTypeEnum::kUpdate, kNs, BSON("$set" << BSON("_id" << 1)), BSON("x" << 1), {1});
-        // op without stmtId.
+        // op without stmtId for the chunk being migrated.
         auto op2 = makeDurableReplOp(repl::OpTypeEnum::kInsert, kNs, BSON("x" << 2), BSONObj(), {});
         // op for a different ns.
         auto op3 =
