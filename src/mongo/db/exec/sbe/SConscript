@@ -53,6 +53,7 @@ sbeEnv.Library(
         "$BUILD_DIR/third_party/snappy/snappy",
     ],
     LIBDEPS_PRIVATE=[
+        "$BUILD_DIR/mongo/db/concurrency/exception_util",
         "$BUILD_DIR/mongo/db/query/bson/dotted_path_support",
         "$BUILD_DIR/mongo/db/query/sort_pattern",
         "$BUILD_DIR/mongo/db/query/str_trim_utils",

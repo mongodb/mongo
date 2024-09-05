@@ -38,6 +38,7 @@
 #include "mongo/base/status_with.h"
 #include "mongo/base/string_data.h"
 #include "mongo/bson/timestamp.h"
+#include "mongo/db/concurrency/exception_util.h"
 #include "mongo/db/query/query_knobs_gen.h"
 #include "mongo/db/storage/record_data.h"
 #include "mongo/db/storage/recovery_unit.h"
@@ -50,6 +51,21 @@
 namespace mongo {
 namespace sbe {
 
+namespace {
+/* We don't need to retry write conflicts in this class but when WiredTiger is low on cache
+ * we do need to retry the StorageUnavailable exceptions.
+ */
+template <typename F>
+static void storageUnavailableRetry(OperationContext* opCtx,
+                                    StringData opStr,
+                                    const NamespaceStringOrUUID& nssOrUUID,
+                                    F&& f,
+                                    boost::optional<size_t> retryLimit = boost::none) {
+    // writeConflictRetry already implements a retryBackoff for storage unavailable.
+    writeConflictRetry(opCtx, opStr, nssOrUUID, f, retryLimit);
+}
+}  // namespace
+
 void assertIgnorePrepareConflictsBehavior(OperationContext* opCtx) {
     tassert(5907502,
             "The operation must be ignoring conflicts and allowing writes or enforcing prepare "
@@ -57,7 +73,6 @@ void assertIgnorePrepareConflictsBehavior(OperationContext* opCtx) {
             shard_role_details::getRecoveryUnit(opCtx)->getPrepareConflictBehavior() !=
                 PrepareConflictBehavior::kIgnoreConflicts);
 }
-
 
 std::pair<RecordId, key_string::TypeBits> encodeKeyString(key_string::Builder& kb,
                                                           const value::MaterializedRow& value) {
@@ -134,16 +149,18 @@ int SpillingStore::upsertToRecordStore(OperationContext* opCtx,
 
     switchToSpilling(opCtx);
     ON_BLOCK_EXIT([&] { switchToOriginal(opCtx); });
-    WriteUnitOfWork wuow(opCtx);
-
     auto result = mongo::Status::OK();
-    if (update) {
-        result = rs()->updateRecord(opCtx, key, buf.buf(), buf.len());
-    } else {
-        auto status = rs()->insertRecord(opCtx, key, buf.buf(), buf.len(), Timestamp{});
-        result = status.getStatus();
-    }
-    wuow.commit();
+
+    storageUnavailableRetry(opCtx, "SpillingStore::upsertToRecordStore", rs()->ns(opCtx), [&] {
+        WriteUnitOfWork wuow(opCtx);
+        if (update) {
+            result = rs()->updateRecord(opCtx, key, buf.buf(), buf.len());
+        } else {
+            auto status = rs()->insertRecord(opCtx, key, buf.buf(), buf.len(), Timestamp{});
+            result = status.getStatus();
+        }
+        wuow.commit();
+    });
 
     if (!result.isOK()) {
         tasserted(5843600, str::stream() << "Failed to write to disk because " << result.reason());
@@ -159,10 +176,13 @@ Status SpillingStore::insertRecords(OperationContext* opCtx,
 
     switchToSpilling(opCtx);
     ON_BLOCK_EXIT([&] { switchToOriginal(opCtx); });
-    WriteUnitOfWork wuow(opCtx);
-    auto status = rs()->insertRecords(opCtx, inOutRecords, timestamps);
-    wuow.commit();
+    auto status = Status::OK();
 
+    storageUnavailableRetry(opCtx, "SpillingStore::insertRecords", rs()->ns(opCtx), [&] {
+        WriteUnitOfWork wuow(opCtx);
+        status = rs()->insertRecords(opCtx, inOutRecords, timestamps);
+        wuow.commit();
+    });
     return status;
 }
 
@@ -172,7 +192,14 @@ boost::optional<value::MaterializedRow> SpillingStore::readFromRecordStore(Opera
     ON_BLOCK_EXIT([&] { switchToOriginal(opCtx); });
 
     RecordData record;
-    if (rs()->findRecord(opCtx, rid, &record)) {
+    bool found;
+    // Because we impose a timeout for storage engine operations, we need to handle errors and retry
+    // reads too.
+    storageUnavailableRetry(opCtx, "SpillingStore::readFromRecordStore", rs()->ns(opCtx), [&] {
+        found = rs()->findRecord(opCtx, rid, &record);
+    });
+
+    if (found) {
         auto valueReader = BufReader(record.data(), record.size());
         return value::MaterializedRow::deserializeForSorter(valueReader, {});
     }
@@ -182,8 +209,13 @@ boost::optional<value::MaterializedRow> SpillingStore::readFromRecordStore(Opera
 bool SpillingStore::findRecord(OperationContext* opCtx, const RecordId& loc, RecordData* out) {
     switchToSpilling(opCtx);
     ON_BLOCK_EXIT([&] { switchToOriginal(opCtx); });
-
-    return rs()->findRecord(opCtx, loc, out);
+    bool found;
+    // Because we impose a timeout for storage engine operations, we need to handle errors and retry
+    // reads too.
+    storageUnavailableRetry(opCtx, "SpillingStore::findRecord", rs()->ns(opCtx), [&] {
+        found = rs()->findRecord(opCtx, loc, out);
+    });
+    return found;
 }
 
 void SpillingStore::switchToSpilling(OperationContext* opCtx) {
