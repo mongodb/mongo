@@ -115,6 +115,7 @@ MONGOJS_CPP_JSFILES = [
     "explain_query.js",
     "explainable.js",
     "mongo.js",
+    "prelude.js",
     "query.js",
     "session.js",
     "types.js",

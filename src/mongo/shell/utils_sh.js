@@ -1,3 +1,5 @@
+/* global ShardingTest */
+
 var sh = function() {
     return "try sh.help();";
 };

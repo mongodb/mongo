@@ -196,6 +196,7 @@ public:
                           int timeoutMs = 0);
 
     void execCoreFiles();
+    void execPrelude();
 
     virtual void loadStored(OperationContext* opCtx, bool ignoreNotConnected = false);
 

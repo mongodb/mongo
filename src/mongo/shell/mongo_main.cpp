@@ -1178,6 +1178,9 @@ int mongo_main(int argc, char* argv[]) {
 
             shellHistoryInit();
 
+            // Only run the prelude in interactive mode
+            scope->execPrelude();
+
             std::string prompt;
             int promptType;
 

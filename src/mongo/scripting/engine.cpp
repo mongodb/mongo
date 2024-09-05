@@ -360,6 +360,7 @@ extern const JSFile db;
 extern const JSFile explain_query;
 extern const JSFile explainable;
 extern const JSFile mongo;
+extern const JSFile prelude;
 extern const JSFile session;
 extern const JSFile query;
 extern const JSFile utils;
@@ -384,6 +385,10 @@ void Scope::execCoreFiles() {
     execSetup(JSFiles::crud_api);
     execSetup(JSFiles::explain_query);
     execSetup(JSFiles::explainable);
+}
+
+void Scope::execPrelude() {
+    execSetup(JSFiles::prelude);
 }
 
 namespace {

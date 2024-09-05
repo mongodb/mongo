@@ -29,10 +29,6 @@ rules:
 
 globals:
   TestData: true
-  # TODO(mbroadst): Remove the next line when ReplSetTest and ShardingTest are converted to modules.
-  Thread: true
-  ReplSetTest: true
-  ShardingTest: true
   WriteError: true
   WriteCommandError: true
   BulkWriteError: true
