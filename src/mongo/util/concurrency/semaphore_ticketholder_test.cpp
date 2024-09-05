@@ -43,8 +43,11 @@
 namespace {
 using namespace mongo;
 
-/** Timeout to use to ensure that waiters get queued and/or receive tickets in reasonable time.*/
-constexpr auto kDefaultTimeout = Milliseconds{100};
+// Timeout to use to ensure that waiters get queued and/or receive tickets.
+// We use this timeout so we can bail-out early and fail with a better diagnostic when we appear to
+// be hanging on such a wait, rather than waiting for the test infrastructure to kill us. Windows
+// test variants are sometimes slow so we have a relatively large timeout here.
+constexpr auto kDefaultTimeout = Minutes{1};
 
 Date_t getNextDeadline() {
     return Date_t::now() + kDefaultTimeout;
