@@ -18,7 +18,8 @@ const fieldArb = fc.constantFrom('t', 'm', 'm.m1', 'm.m2', 'a', 'b', 'array');
 const assignableFieldArb = fc.constantFrom('m', 't', 'a', 'b');
 const dollarFieldArb = fieldArb.map(f => "$" + f);
 const comparisonArb = fc.constantFrom('$eq', '$lt', '$lte', '$gt', '$gte');
-const accumulatorArb = fc.constantFrom('$count', '$min', '$max', '$minN', '$maxN', '$sum');
+const accumulatorArb =
+    fc.constantFrom(undefined, '$count', '$min', '$max', '$minN', '$maxN', '$sum');
 
 // Inclusion/Exclusion projections. {$project: {_id: 1, a: 0}}
 const projectArb = fc.tuple(fieldArb, fc.boolean()).map(function([field, includeField]) {
@@ -84,6 +85,11 @@ const groupArb =
     fc.tuple(
           dollarFieldArb, assignableFieldArb, accumulatorArb, dollarFieldArb, fc.integer({min: 1}))
         .map(function([gbField, outputField, acc, dataField, minMaxNumResults]) {
+            if (acc === undefined) {
+                // Simple $group with no accumulator
+                return {$group: {_id: gbField}};
+            }
+
             let accSpec;
             if (acc === '$count') {
                 accSpec = {[acc]: {}};
