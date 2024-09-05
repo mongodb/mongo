@@ -72,8 +72,38 @@ assertQueryCorrect({a: {$bitsAnyClear: [0, 1, 2, 3, 4, 5, 6, 7]}}, 5);
 // Tests with multiple predicates.
 assertQueryCorrect({a: {$bitsAllSet: 54, $bitsAllClear: 201}}, 1);
 
-// Tests on negative numbers.
+coll.drop();
 
+assert.commandWorked(coll.insert({a: 0}));
+assert.commandWorked(coll.insert({a: 1}));
+assert.commandWorked(coll.insert({a: NumberLong('+9223372036854775807')}));
+assert.commandWorked(coll.insert({a: NumberLong('+6917529027641081856')}));
+assert.commandWorked(coll.insert({a: NumberLong('+2305843009213693952')}));
+assert.commandWorked(coll.createIndex({a: 1}));
+
+// Tests with `NumberLongs` as arguments to bitwise expressions
+assertQueryCorrect({a: {$bitsAllSet: 0}}, 5);
+assertQueryCorrect({a: {$bitsAllSet: 1}}, 2);
+assertQueryCorrect({a: {$bitsAllSet: NumberLong('+9223372036854775807')}}, 1);
+assertQueryCorrect({a: {$bitsAllSet: NumberLong('+6917529027641081856')}}, 2);
+assertQueryCorrect({a: {$bitsAllSet: NumberLong('+2305843009213693952')}}, 3);
+assertQueryCorrect({a: {$bitsAllClear: 0}}, 5);
+assertQueryCorrect({a: {$bitsAllClear: 1}}, 3);
+assertQueryCorrect({a: {$bitsAllClear: NumberLong('+9223372036854775807')}}, 1);
+assertQueryCorrect({a: {$bitsAllClear: NumberLong('+6917529027641081856')}}, 2);
+assertQueryCorrect({a: {$bitsAllClear: NumberLong('+2305843009213693952')}}, 2);
+assertQueryCorrect({a: {$bitsAnySet: 0}}, 0);
+assertQueryCorrect({a: {$bitsAnySet: 1}}, 2);
+assertQueryCorrect({a: {$bitsAnySet: NumberLong('+9223372036854775807')}}, 4);
+assertQueryCorrect({a: {$bitsAnySet: NumberLong('+6917529027641081856')}}, 3);
+assertQueryCorrect({a: {$bitsAnySet: NumberLong('+2305843009213693952')}}, 3);
+assertQueryCorrect({a: {$bitsAnyClear: 0}}, 0);
+assertQueryCorrect({a: {$bitsAnyClear: 1}}, 3);
+assertQueryCorrect({a: {$bitsAnyClear: NumberLong('+9223372036854775807')}}, 4);
+assertQueryCorrect({a: {$bitsAnyClear: NumberLong('+6917529027641081856')}}, 3);
+assertQueryCorrect({a: {$bitsAnyClear: NumberLong('+2305843009213693952')}}, 2);
+
+// Tests on negative numbers.
 coll.drop();
 assert.commandWorked(coll.insert({a: -0}));
 assert.commandWorked(coll.insert({a: -1}));

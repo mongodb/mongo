@@ -127,10 +127,12 @@ std::unique_ptr<PlanStage> ClassicStageBuilder::build(const QuerySolutionNode* r
             invariant(collectionPtr);
             auto descriptor = collectionPtr->getIndexCatalog()->findIndexByName(
                 _opCtx, ixn->index.identifier.catalogName);
-            invariant(descriptor,
-                      str::stream() << "Namespace: " << collectionPtr->ns().toStringForErrorMsg()
-                                    << ", CanonicalQuery: " << _cq.toStringShortForErrorMsg()
-                                    << ", IndexEntry: " << ixn->index.toString());
+            tassert(8862202,
+                    str::stream() << "Index descriptor not found. Namespace: "
+                                  << collectionPtr->ns().toStringForErrorMsg()
+                                  << ", CanonicalQuery: " << _cq.toStringShortForErrorMsg()
+                                  << ", IndexEntry: " << ixn->index.toString(),
+                    descriptor);
 
             // We use the node's internal name, keyPattern and multikey details here. For $**
             // indexes, these may differ from the information recorded in the index's descriptor.
@@ -374,7 +376,7 @@ std::unique_ptr<PlanStage> ClassicStageBuilder::build(const QuerySolutionNode* r
             invariant(collectionPtr);
             auto descriptor = collectionPtr->getIndexCatalog()->findIndexByName(
                 _opCtx, dn->index.identifier.catalogName);
-            invariant(descriptor);
+            tassert(8862201, "Index descriptor cannot be null", descriptor);
 
             // We use the node's internal name, keyPattern and multikey details here. For $**
             // indexes, these may differ from the information recorded in the index's descriptor.
@@ -395,7 +397,7 @@ std::unique_ptr<PlanStage> ClassicStageBuilder::build(const QuerySolutionNode* r
             invariant(collectionPtr);
             auto descriptor = collectionPtr->getIndexCatalog()->findIndexByName(
                 _opCtx, csn->index.identifier.catalogName);
-            invariant(descriptor);
+            tassert(8862200, "Index descriptor cannot be null", descriptor);
 
             // We use the node's internal name, keyPattern and multikey details here. For $**
             // indexes, these may differ from the information recorded in the index's descriptor.
