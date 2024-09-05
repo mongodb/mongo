@@ -3228,7 +3228,32 @@ public:
         generateDateExpressionAcceptingTimeZone("year", expr);
     }
     void visit(const ExpressionFromAccumulator<AccumulatorAvg>* expr) final {
-        unsupportedExpression(expr->getOpName());
+        size_t arity = expr->getChildren().size();
+        _context->ensureArity(arity);
+        if (arity == 0) {
+            pushABT(optimizer::Constant::null());
+        } else if (arity == 1) {
+            optimizer::ABT singleInput = _context->popABTExpr();
+            optimizer::ProjectionName singleInputName =
+                makeLocalVariableName(_context->state.frameId(), 0);
+            auto k = makeVariable(singleInputName);
+
+            optimizer::ABT stdDevSampExpr = buildABTMultiBranchConditional(
+                ABTCaseValuePair{generateABTNullMissingOrUndefined(singleInputName),
+                                 optimizer::Constant::null()},
+                ABTCaseValuePair{makeABTFunction("isArray", makeVariable(singleInputName)),
+                                 makeFillEmptyNull(
+                                     makeABTFunction("avgOfArray", makeVariable(singleInputName)))},
+                optimizer::make<optimizer::If>(
+                    makeABTFunction("isNumber", makeVariable(singleInputName)),
+                    makeVariable(singleInputName),
+                    optimizer::Constant::null()));
+
+            pushABT(optimizer::make<optimizer::Let>(
+                std::move(singleInputName), std::move(singleInput), std::move(stdDevSampExpr)));
+        } else {
+            generateExpressionFromAccumulatorExpression(expr, _context, "avgOfArray");
+        }
     }
     void visit(const ExpressionFromAccumulatorN<AccumulatorFirstN>* expr) final {
         unsupportedExpression(expr->getOpName());
@@ -3237,11 +3262,13 @@ public:
         unsupportedExpression(expr->getOpName());
     }
     void visit(const ExpressionFromAccumulator<AccumulatorMax>* expr) final {
-        unsupportedExpression(expr->getOpName());
+        visitMaxMinFunction(expr, _context, "maxOfArray");
     }
+
     void visit(const ExpressionFromAccumulator<AccumulatorMin>* expr) final {
-        unsupportedExpression(expr->getOpName());
+        visitMaxMinFunction(expr, _context, "minOfArray");
     }
+
     void visit(const ExpressionFromAccumulatorN<AccumulatorMaxN>* expr) final {
         unsupportedExpression(expr->getOpName());
     }
@@ -3255,13 +3282,86 @@ public:
         unsupportedExpression(expr->getOpName());
     }
     void visit(const ExpressionFromAccumulator<AccumulatorStdDevPop>* expr) final {
-        unsupportedExpression(expr->getOpName());
+        size_t arity = expr->getChildren().size();
+        _context->ensureArity(arity);
+
+        if (arity == 0) {
+            pushABT(optimizer::Constant::null());
+        } else if (arity == 1) {
+            optimizer::ABT singleInput = _context->popABTExpr();
+            optimizer::ProjectionName singleInputName =
+                makeLocalVariableName(_context->state.frameId(), 0);
+            optimizer::ABT stdDevPopExpr = buildABTMultiBranchConditional(
+                ABTCaseValuePair{generateABTNullMissingOrUndefined(singleInputName),
+                                 optimizer::Constant::null()},
+                ABTCaseValuePair{
+                    makeABTFunction("isArray", makeVariable(singleInputName)),
+                    makeFillEmptyNull(makeABTFunction("stdDevPop", makeVariable(singleInputName)))},
+                optimizer::make<optimizer::If>(
+                    makeABTFunction("isNumber", makeVariable(singleInputName)),
+                    // Population standard deviation for a single numeric input is always 0.
+                    optimizer::Constant::int32(0),
+                    optimizer::Constant::null()));
+
+            pushABT(optimizer::make<optimizer::Let>(
+                std::move(singleInputName), std::move(singleInput), std::move(stdDevPopExpr)));
+        } else {
+            generateExpressionFromAccumulatorExpression(expr, _context, "stdDevPop");
+        }
     }
     void visit(const ExpressionFromAccumulator<AccumulatorStdDevSamp>* expr) final {
-        unsupportedExpression(expr->getOpName());
+        size_t arity = expr->getChildren().size();
+        _context->ensureArity(arity);
+
+        if (arity == 0) {
+            pushABT(optimizer::Constant::null());
+        } else if (arity == 1) {
+            optimizer::ABT singleInput = _context->popABTExpr();
+            optimizer::ProjectionName singleInputName =
+                makeLocalVariableName(_context->state.frameId(), 0);
+            optimizer::ABT stdDevSampExpr = buildABTMultiBranchConditional(
+                ABTCaseValuePair{generateABTNullMissingOrUndefined(singleInputName),
+                                 optimizer::Constant::null()},
+                ABTCaseValuePair{makeABTFunction("isArray", makeVariable(singleInputName)),
+                                 makeFillEmptyNull(
+                                     makeABTFunction("stdDevSamp", makeVariable(singleInputName)))},
+                // Sample standard deviation is undefined for a single input.
+                optimizer::Constant::null());
+
+            pushABT(optimizer::make<optimizer::Let>(
+                std::move(singleInputName), std::move(singleInput), std::move(stdDevSampExpr)));
+        } else {
+            generateExpressionFromAccumulatorExpression(expr, _context, "stdDevSamp");
+        }
     }
     void visit(const ExpressionFromAccumulator<AccumulatorSum>* expr) final {
-        unsupportedExpression(expr->getOpName());
+        size_t arity = expr->getChildren().size();
+        _context->ensureArity(arity);
+        if (arity == 0) {
+            pushABT(optimizer::Constant::null());
+        } else if (arity == 1) {
+            optimizer::ABT singleInput = _context->popABTExpr();
+            optimizer::ProjectionName singleInputName =
+                makeLocalVariableName(_context->state.frameId(), 0);
+            auto k = makeVariable(singleInputName);
+
+            // $sum returns 0 if the operand is missing, undefined, or non-numeric.
+            optimizer::ABT stdDevSampExpr = buildABTMultiBranchConditional(
+                ABTCaseValuePair{generateABTNullMissingOrUndefined(singleInputName),
+                                 optimizer::Constant::int32(0)},
+                ABTCaseValuePair{makeABTFunction("isArray", makeVariable(singleInputName)),
+                                 makeFillEmptyNull(
+                                     makeABTFunction("sumOfArray", makeVariable(singleInputName)))},
+                optimizer::make<optimizer::If>(
+                    makeABTFunction("isNumber", makeVariable(singleInputName)),
+                    makeVariable(singleInputName),
+                    optimizer::Constant::int32(0)));
+
+            pushABT(optimizer::make<optimizer::Let>(
+                std::move(singleInputName), std::move(singleInput), std::move(stdDevSampExpr)));
+        } else {
+            generateExpressionFromAccumulatorExpression(expr, _context, "sumOfArray");
+        }
     }
     void visit(const ExpressionFromAccumulator<AccumulatorMergeObjects>* expr) final {
         unsupportedExpression(expr->getOpName());
@@ -3855,6 +3955,70 @@ private:
             std::move(strName), std::move(operands[operandIdx++]), std::move(resultExpr));
 
         pushABT(std::move(resultExpr));
+    }
+
+    /*
+     * Generates an EExpression that returns the maximum for $max and minimum for $min.
+     */
+    void visitMaxMinFunction(const Expression* expr,
+                             ExpressionVisitorContext* _context,
+                             const std::string& maxMinFunction) {
+        size_t arity = expr->getChildren().size();
+        _context->ensureArity(arity);
+
+        if (arity == 0) {
+            pushABT(optimizer::Constant::null());
+        } else if (arity == 1) {
+            optimizer::ABT singleInput = _context->popABTExpr();
+            optimizer::ProjectionName singleInputName =
+                makeLocalVariableName(_context->state.frameId(), 0);
+
+            optimizer::ABT maxMinExpr = buildABTMultiBranchConditional(
+                ABTCaseValuePair{generateABTNullMissingOrUndefined(singleInputName),
+                                 optimizer::Constant::null()},
+                ABTCaseValuePair{
+                    makeABTFunction("isArray", makeVariable(singleInputName)),
+                    // In the case of a single argument, if the input is an array, $min or $max
+                    // operates on the elements of array to return a single value.
+                    makeFillEmptyNull(
+                        makeABTFunction(maxMinFunction, makeVariable(singleInputName)))},
+                makeVariable(singleInputName));
+
+            pushABT(optimizer::make<optimizer::Let>(
+                std::move(singleInputName), std::move(singleInput), std::move(maxMinExpr)));
+        } else {
+            generateExpressionFromAccumulatorExpression(expr, _context, maxMinFunction);
+        }
+    }
+
+    /*
+     * Converts n > 1 children into an array and generates an EExpression for
+     * ExpressionFromAccumulator expressions. Accepts an Expression, ExpressionVisitorContext, and
+     * the name of a builtin function.
+     */
+    void generateExpressionFromAccumulatorExpression(const Expression* expr,
+                                                     ExpressionVisitorContext* _context,
+                                                     const std::string& functionCall) {
+        size_t arity = expr->getChildren().size();
+        std::vector<std::pair<optimizer::ProjectionName, optimizer::ABT>> binds;
+        for (size_t idx = 0; idx < arity; ++idx) {
+            binds.emplace_back(makeLocalVariableName(_context->state.frameId(), 0),
+                               _context->popABTExpr());
+        }
+
+        std::reverse(std::begin(binds), std::end(binds));
+        optimizer::ABTVector argVars;
+        for (auto& bind : binds) {
+            argVars.push_back(makeVariable(bind.first));
+        }
+
+        // Take in all arguments and construct an array.
+        auto arrayExpr = optimizer::make<optimizer::FunctionCall>("newArray", std::move(argVars));
+        for (auto it = binds.begin(); it != binds.end(); ++it) {
+            arrayExpr = optimizer::make<optimizer::Let>(
+                it->first, std::move(it->second), std::move(arrayExpr));
+        }
+        pushABT(makeFillEmptyNull(makeABTFunction(functionCall, std::move(arrayExpr))));
     }
 
     /**

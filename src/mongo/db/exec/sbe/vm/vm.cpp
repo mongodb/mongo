@@ -6158,6 +6158,155 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinArrayToObject(Ar
     return {true, objTag, objVal};
 }
 
+FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinAvgOfArray(ArityType arity) {
+    return avgOrSumOfArrayHelper(arity, true);
+}
+
+FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinMaxOfArray(ArityType arity) {
+    return maxMinArrayHelper(arity, true);
+}
+
+FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinMinOfArray(ArityType arity) {
+    return maxMinArrayHelper(arity, false);
+}
+
+FastTuple<bool, value::TypeTags, value::Value> ByteCode::maxMinArrayHelper(ArityType arity,
+                                                                           bool isMax) {
+    invariant(arity == 1);
+
+    auto [arrOwned, arrTag, arrVal] = getFromStack(0);
+
+    if (!value::isArray(arrTag)) {
+        return {false, value::TypeTags::Nothing, 0};
+    }
+    value::TypeTags retTag = value::TypeTags::Nothing;
+    value::Value retVal = 0;
+
+    value::arrayForEach(arrTag, arrVal, [&](value::TypeTags elemTag, value::Value elemVal) {
+        if (elemTag != value::TypeTags::Null && elemTag != value::TypeTags::bsonUndefined) {
+            if (retTag == value::TypeTags::Nothing) {
+                retTag = elemTag;
+                retVal = elemVal;
+            } else {
+                auto [compTag, compVal] = value::compareValue(elemTag, elemVal, retTag, retVal);
+                if (compTag == value::TypeTags::NumberInt32 &&
+                    ((isMax && value::bitcastTo<int32_t>(compVal) == 1) ||
+                     (!isMax && value::bitcastTo<int32_t>(compVal) == -1))) {
+                    retTag = elemTag;
+                    retVal = elemVal;
+                }
+            }
+        }
+    });
+
+    auto [outputTag, outputVal] = value::copyValue(retTag, retVal);
+    return {true, outputTag, outputVal};
+}
+
+FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinStdDevPop(ArityType arity) {
+    return stdDevHelper(arity, false);
+}
+
+FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinStdDevSamp(ArityType arity) {
+    return stdDevHelper(arity, true);
+}
+
+FastTuple<bool, value::TypeTags, value::Value> ByteCode::stdDevHelper(ArityType arity,
+                                                                      bool isSamp) {
+    invariant(arity == 1);
+    auto [arrOwned, arrTag, arrVal] = getFromStack(0);
+    if (!value::isArray(arrTag)) {
+        return {false, value::TypeTags::Nothing, 0};
+    }
+
+    // This is an implementation of Welford's online algorithm.
+    int64_t count = 0;
+    value::TypeTags meanTag = value::TypeTags::NumberInt32;
+    value::Value meanVal = 0;
+    value::TypeTags meanSquaredTag = value::TypeTags::NumberInt32;
+    value::Value meanSquaredVal = 0;
+    value::arrayForEach(arrTag, arrVal, [&](value::TypeTags elemTag, value::Value elemVal) {
+        if (value::isNumber(elemTag)) {
+            count++;
+
+            auto [deltaOwned, deltaTag, deltaVal] = genericSub(elemTag, elemVal, meanTag, meanVal);
+            auto [divOwned, divTag, divVal] =
+                genericDiv(deltaTag, deltaVal, value::TypeTags::NumberInt64, count);
+            auto [newMeanOwned, newMeanTag, newMeanVal] =
+                genericAdd(meanTag, meanVal, divTag, divVal);
+            meanTag = newMeanTag;
+            meanVal = newMeanVal;
+
+            auto [deltaOwned2, deltaTag2, deltaVal2] =
+                genericSub(elemTag, elemVal, meanTag, meanVal);
+            auto [multOwned, multTag, multVal] =
+                genericMul(deltaTag, deltaVal, deltaTag2, deltaVal2);
+            auto [newMeanSquaredOwned, newMeanSquaredTag, newMeanSquaredVal] =
+                genericAdd(meanSquaredTag, meanSquaredVal, multTag, multVal);
+            meanSquaredTag = newMeanSquaredTag;
+            meanSquaredVal = newMeanSquaredVal;
+        }
+    });
+
+    if (count == 0 || (count == 1 && isSamp)) {
+        return {false, value::TypeTags::Nothing, 0};
+    }
+
+    if (count == 1) {
+        return {false, value::TypeTags::NumberInt32, 0};
+    }
+
+    if (isSamp) {
+        auto [resultOwned, resultTag, resultVal] =
+            genericDiv(meanSquaredTag, meanSquaredVal, value::TypeTags::NumberInt64, (count - 1));
+        return genericSqrt(resultTag, resultVal);
+    }
+
+    auto [resultOwned, resultTag, resultVal] =
+        genericDiv(meanSquaredTag, meanSquaredVal, value::TypeTags::NumberInt64, count);
+    return genericSqrt(resultTag, resultVal);
+}
+
+FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinSumOfArray(ArityType arity) {
+    return avgOrSumOfArrayHelper(arity, false);
+}
+
+FastTuple<bool, value::TypeTags, value::Value> ByteCode::avgOrSumOfArrayHelper(ArityType arity,
+                                                                               bool isAvg) {
+    invariant(arity == 1);
+    auto [arrOwned, arrTag, arrVal] = getFromStack(0);
+
+    if (!value::isArray(arrTag)) {
+        return {false, value::TypeTags::Nothing, 0};
+    }
+
+    int64_t count = 0;
+    value::TypeTags sumTag = value::TypeTags::NumberInt32;
+    value::Value sumVal = 0;
+    value::arrayForEach(arrTag, arrVal, [&](value::TypeTags elemTag, value::Value elemVal) {
+        if (value::isNumber(elemTag)) {
+            count++;
+            auto [partialSumOwned, partialSumTag, partialSumVal] =
+                value::genericAdd(sumTag, sumVal, elemTag, elemVal);
+            sumTag = partialSumTag;
+            sumVal = partialSumVal;
+        }
+    });
+
+    if (isAvg) {
+        if (count == 0) {
+            return {false, value::TypeTags::Nothing, 0};
+        }
+        return genericDiv(sumTag, sumVal, value::TypeTags::NumberInt64, count);
+    }
+
+    if (sumTag == value::TypeTags::NumberDecimal) {
+        auto [outputTag, outputVal] = value::copyValue(sumTag, sumVal);
+        return {true, outputTag, outputVal};
+    }
+    return {false, sumTag, sumVal};
+}
+
 FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinUnwindArray(ArityType arity) {
     invariant(arity == 1);
 
@@ -9812,6 +9961,18 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::dispatchBuiltin(Builtin
             return builtinObjectToArray(arity);
         case Builtin::arrayToObject:
             return builtinArrayToObject(arity);
+        case Builtin::avgOfArray:
+            return builtinAvgOfArray(arity);
+        case Builtin::maxOfArray:
+            return builtinMaxOfArray(arity);
+        case Builtin::minOfArray:
+            return builtinMinOfArray(arity);
+        case Builtin::stdDevPop:
+            return builtinStdDevPop(arity);
+        case Builtin::stdDevSamp:
+            return builtinStdDevSamp(arity);
+        case Builtin::sumOfArray:
+            return builtinSumOfArray(arity);
         case Builtin::unwindArray:
             return builtinUnwindArray(arity);
         case Builtin::arrayToSet:
@@ -10361,6 +10522,18 @@ std::string builtinToString(Builtin b) {
             return "objectToArray";
         case Builtin::arrayToObject:
             return "arrayToObject";
+        case Builtin::avgOfArray:
+            return "avgOfArray";
+        case Builtin::maxOfArray:
+            return "maxOfArray";
+        case Builtin::minOfArray:
+            return "minOfArray";
+        case Builtin::stdDevPop:
+            return "stdDevPop";
+        case Builtin::stdDevSamp:
+            return "stdDevSamp";
+        case Builtin::sumOfArray:
+            return "sumOfArray";
         case Builtin::unwindArray:
             return "unwindArray";
         case Builtin::arrayToSet:

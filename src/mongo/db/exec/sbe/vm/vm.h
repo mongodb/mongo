@@ -641,6 +641,12 @@ enum class Builtin : uint16_t {
     objectToArray,
     setToArray,
     arrayToObject,
+    avgOfArray,  // Returns the $avg of an array.
+    maxOfArray,  // Returns the $max element of an array.
+    minOfArray,  // Returns the $min element of an array.
+    stdDevPop,   // Returns the $stdDevPop of an array.
+    stdDevSamp,  // Returns the $stdDevSamp of an array.
+    sumOfArray,  // Returns the $sum of an array
     unwindArray,
     arrayToSet,
     collArrayToSet,
@@ -1981,6 +1987,17 @@ private:
     FastTuple<bool, value::TypeTags, value::Value> builtinISOWeek(ArityType arity);
     FastTuple<bool, value::TypeTags, value::Value> builtinObjectToArray(ArityType arity);
     FastTuple<bool, value::TypeTags, value::Value> builtinArrayToObject(ArityType arity);
+    FastTuple<bool, value::TypeTags, value::Value> builtinAvgOfArray(ArityType arity);
+    FastTuple<bool, value::TypeTags, value::Value> builtinMaxOfArray(ArityType arity);
+    FastTuple<bool, value::TypeTags, value::Value> builtinMinOfArray(ArityType arity);
+    FastTuple<bool, value::TypeTags, value::Value> maxMinArrayHelper(ArityType arity, bool isMax);
+    FastTuple<bool, value::TypeTags, value::Value> builtinStdDevPop(ArityType arity);
+    FastTuple<bool, value::TypeTags, value::Value> builtinStdDevSamp(ArityType arity);
+    FastTuple<bool, value::TypeTags, value::Value> stdDevHelper(ArityType arity, bool isSamp);
+    FastTuple<bool, value::TypeTags, value::Value> builtinSumOfArray(ArityType arity);
+    FastTuple<bool, value::TypeTags, value::Value> avgOrSumOfArrayHelper(ArityType arity,
+                                                                         bool isAvg);
+
     /**
      * Implementation of the builtin function 'unwindArray'. It accepts 1 argument that must be one
      * of the SBE array types (BSONArray, Array, ArraySet, ArrayMultiSet) and returns an Array
