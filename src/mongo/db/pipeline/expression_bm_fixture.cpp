@@ -1679,6 +1679,31 @@ void ExpressionBenchmarkFixture::benchmarkStrLenBytes(benchmark::State& state) {
                         std::vector<Document>(1, {{"data"_sd, "hello world"_sd}}));
 }
 
+void ExpressionBenchmarkFixture::benchmarkStrLenCP(benchmark::State& state) {
+    benchmarkExpression(BSON("$strLenCP"
+                             << "$data"),
+                        state,
+                        std::vector<Document>(1, {{"data"_sd, "hello world"_sd}}));
+}
+
+void ExpressionBenchmarkFixture::benchmarkStrLenCPMultiBytes(benchmark::State& state) {
+    benchmarkExpression(BSON("$strLenCP"
+                             << "$data"),
+                        state,
+                        std::vector<Document>(1, {{"data"_sd, "ψϒϒϒЁϴЁЁ"_sd}}));
+}
+
+void ExpressionBenchmarkFixture::benchmarkStrLenCPLargeString(benchmark::State& state) {
+    benchmarkExpression(
+        BSON("$strLenCP"
+             << "$data"),
+        state,
+        std::vector<Document>(
+            1,
+            {{"data"_sd,
+              "ψhello world, this is a long string that will provide another set of benchmarks"_sd}}));
+}
+
 /**
  * Tests performance of $trim expression against a single string field.
  */
@@ -1699,5 +1724,166 @@ void ExpressionBenchmarkFixture::benchmarkTrunc(benchmark::State& state, int pla
                         std::vector<Document>(1, {{"value"_sd, 123.45}}));
 }
 
+/**
+ * Tests performance of aggregation expression {"$strcasecmp": ["hello", "$value"]}
+ */
+void ExpressionBenchmarkFixture::benchmarkStrcasecmp(benchmark::State& state) {
+    benchmarkExpression(BSON("$strcasecmp" << BSON_ARRAY("hello"
+                                                         << "$value")),
+                        state,
+                        std::vector<Document>(1, {{"value"_sd, "Hello"_sd}}));
+}
+
+void ExpressionBenchmarkFixture::benchmarkStrcasecmpLargeString(benchmark::State& state) {
+    benchmarkExpression(
+        BSON("$strcasecmp" << BSON_ARRAY("hello"
+                                         << "$value")),
+        state,
+        std::vector<Document>(
+            1,
+            {{"value"_sd,
+              "This is a long string that will provide another set of benchmarks"_sd}}));
+}
+
+/**
+ * Tests performance of aggregation expression {"$substrBytes": ["$value", 0, 4]}
+ */
+void ExpressionBenchmarkFixture::benchmarkSubstrBytes(benchmark::State& state) {
+    benchmarkExpression(BSON("$substrBytes" << BSON_ARRAY("$value" << 0 << 4)),
+                        state,
+                        std::vector<Document>(1, {{"value"_sd, "hello world"_sd}}));
+}
+
+void ExpressionBenchmarkFixture::benchmarkSubstrBytesLargeString(benchmark::State& state) {
+    benchmarkExpression(
+        BSON("$substrBytes" << BSON_ARRAY("$value" << 0 << 4)),
+        state,
+        std::vector<Document>(
+            1,
+            {{"value"_sd,
+              "This is a long string that will provide another set of benchmarks"_sd}}));
+}
+
+/**
+ * Tests performance of aggregation expression {"$substrCP": ["$value", 0, 4]}
+ */
+void ExpressionBenchmarkFixture::benchmarkSubstrCP(benchmark::State& state) {
+    benchmarkExpression(BSON("$substrCP" << BSON_ARRAY("$value" << 0 << 4)),
+                        state,
+                        std::vector<Document>(1, {{"value"_sd, "hello world"_sd}}));
+}
+
+void ExpressionBenchmarkFixture::benchmarkSubstrCPMultiBytes(benchmark::State& state) {
+    benchmarkExpression(BSON("$substrCP" << BSON_ARRAY("$value" << 0 << 4)),
+                        state,
+                        std::vector<Document>(1, {{"value"_sd, "ψϒϒϒЁϴЁЁ"_sd}}));
+}
+
+void ExpressionBenchmarkFixture::benchmarkSubstrCPLargeString(benchmark::State& state) {
+    benchmarkExpression(
+        BSON("$substrCP" << BSON_ARRAY("$value" << 0 << 4)),
+        state,
+        std::vector<Document>(
+            1,
+            {{"value"_sd,
+              "This is a long string that will provide another set of benchmarks"_sd}}));
+}
+
+/**
+ * Tests performance of aggregation expression {"$rand":{}}
+ */
+void ExpressionBenchmarkFixture::benchmarkRand(benchmark::State& state) {
+    benchmarkExpression(BSON("$rand" << BSONObj()), state, std::vector<Document>(1));
+}
+
+/**
+ * Tests performance of aggregation expression {"$max": "$value"} against document
+ * {"_id": ObjectId(...), "value": "1"}
+ */
+void ExpressionBenchmarkFixture::benchmarkMaxSingleInput(benchmark::State& state) {
+    benchmarkExpression(
+        BSON("$max" << BSON_ARRAY("$value")), state, std::vector<Document>(1, {{"value"_sd, 1}}));
+}
+
+/**
+ * Tests performance of aggregation expression {"$max": ["a", "$value", "$value"]} against document
+ * {"_id": ObjectId(...), "value": "1"}
+ */
+void ExpressionBenchmarkFixture::benchmarkMaxSingleArrayInput(benchmark::State& state) {
+    benchmarkExpression(BSON("$max" << BSON_ARRAY("a"
+                                                  << "$value"
+                                                  << "$value")),
+                        state,
+                        std::vector<Document>(1, {{"value"_sd, 1}}));
+}
+
+/**
+ * Tests performance of aggregation expression {"$min": "$value"} against document
+ * {"_id": ObjectId(...), "value": "1"}
+ */
+void ExpressionBenchmarkFixture::benchmarkMinSingleInput(benchmark::State& state) {
+    benchmarkExpression(
+        BSON("$min" << BSON_ARRAY("$value")), state, std::vector<Document>(1, {{"value"_sd, 1}}));
+}
+
+/**
+ * Tests performance of aggregation expression {"$min": ["a", "$value", "$value"]} against document
+ * {"_id": ObjectId(...), "value": "1"}
+ */
+void ExpressionBenchmarkFixture::benchmarkMinSingleArrayInput(benchmark::State& state) {
+    benchmarkExpression(BSON("$min" << BSON_ARRAY("a"
+                                                  << "$value"
+                                                  << "$value")),
+                        state,
+                        std::vector<Document>(1, {{"value"_sd, 1}}));
+}
+
+/**
+ * Tests performance of aggregation expression {"$stdDevPop": ["$value", "$value", "$value"]}
+ * against document {"_id": ObjectId(...), "value": "1"}
+ */
+void ExpressionBenchmarkFixture::benchmarkStdDevPop(benchmark::State& state) {
+    benchmarkExpression(BSON("$stdDevPop" << BSON_ARRAY("$value"
+                                                        << "$value"
+                                                        << "$value")),
+                        state,
+                        std::vector<Document>(1, {{"value"_sd, 1}}));
+}
+
+/**
+ * Tests performance of aggregation expression {"$stdDevSamp": ["$value", "$value", "$value"]}
+ * against document {"_id": ObjectId(...), "value": "1"}
+ */
+void ExpressionBenchmarkFixture::benchmarkStdDevSamp(benchmark::State& state) {
+    benchmarkExpression(BSON("$stdDevSamp" << BSON_ARRAY("$value"
+                                                         << "$value"
+                                                         << "$value")),
+                        state,
+                        std::vector<Document>(1, {{"value"_sd, 1}}));
+}
+
+/**
+ * Tests performance of aggregation expression {"$avg": ["$value", "$value", "$value"]} against
+ * document {"_id": ObjectId(...), "value": "1"}
+ */
+void ExpressionBenchmarkFixture::benchmarkAvg(benchmark::State& state) {
+    benchmarkExpression(BSON("$avg" << BSON_ARRAY("$value"
+                                                  << "$value"
+                                                  << "$value")),
+                        state,
+                        std::vector<Document>(1, {{"value"_sd, 1}}));
+}
+
+/**
+ * Tests performance of aggregation expression {"$sum": "$array"]} against document
+ * {"_id": ObjectId(...), "array": ["0", "1", "2", "3", "4", "5", "6", "7", "8","9"]}
+ */
+void ExpressionBenchmarkFixture::benchmarkSum(benchmark::State& state) {
+    BSONArray array = rangeBSONArray(10);
+    benchmarkExpression(BSON("$sum"
+                             << "$array"),
+                        state,
+                        std::vector<Document>(1, {{"array"_sd, array}}));
+}
 
 }  // namespace mongo

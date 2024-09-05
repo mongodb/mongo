@@ -239,10 +239,35 @@ public:
     void benchmarkPowNullAndMissing(benchmark::State& state);
 
     void benchmarkStrLenBytes(benchmark::State& state);
+    void benchmarkStrLenCP(benchmark::State& state);
+    void benchmarkStrLenCPMultiBytes(benchmark::State& state);
+    void benchmarkStrLenCPLargeString(benchmark::State& state);
 
     void benchmarkTrim(benchmark::State& state, std::string chars = "");
 
     void benchmarkTrunc(benchmark::State& state, int place);
+
+    void benchmarkStrcasecmp(benchmark::State& state);
+    void benchmarkStrcasecmpLargeString(benchmark::State& state);
+
+    void benchmarkSubstrBytes(benchmark::State& state);
+    void benchmarkSubstrBytesLargeString(benchmark::State& state);
+
+    void benchmarkSubstrCP(benchmark::State& state);
+    void benchmarkSubstrCPMultiBytes(benchmark::State& state);
+    void benchmarkSubstrCPLargeString(benchmark::State& state);
+
+    void benchmarkRand(benchmark::State& state);
+
+    void benchmarkMaxSingleInput(benchmark::State& state);
+    void benchmarkMaxSingleArrayInput(benchmark::State& state);
+    void benchmarkMinSingleInput(benchmark::State& state);
+    void benchmarkMinSingleArrayInput(benchmark::State& state);
+
+    void benchmarkStdDevPop(benchmark::State& state);
+    void benchmarkStdDevSamp(benchmark::State& state);
+    void benchmarkAvg(benchmark::State& state);
+    void benchmarkSum(benchmark::State& state);
 
 private:
     void testDateDiffExpression(long long startDate,
@@ -898,6 +923,81 @@ private:
     }                                                                                           \
     BENCHMARK_F(Fixture, Trunc_Negative)(benchmark::State & state) {                            \
         benchmarkTrunc(state, -1);                                                              \
+    }                                                                                           \
+    BENCHMARK_F(Fixture, StrLenCP)(benchmark::State & state) {                                  \
+        benchmarkStrLenCP(state);                                                               \
+    }                                                                                           \
+                                                                                                \
+    BENCHMARK_F(Fixture, StrLenCPMultiByteChars)(benchmark::State & state) {                    \
+        benchmarkStrLenCPMultiBytes(state);                                                     \
+    }                                                                                           \
+                                                                                                \
+    BENCHMARK_F(Fixture, StrLenCPLargeString)(benchmark::State & state) {                       \
+        benchmarkStrLenCPLargeString(state);                                                    \
+    }                                                                                           \
+                                                                                                \
+    BENCHMARK_F(Fixture, Strcasecmp)(benchmark::State & state) {                                \
+        benchmarkStrcasecmp(state);                                                             \
+    }                                                                                           \
+                                                                                                \
+    BENCHMARK_F(Fixture, StrcasecmpLargeString)(benchmark::State & state) {                     \
+        benchmarkStrcasecmpLargeString(state);                                                  \
+    }                                                                                           \
+                                                                                                \
+    BENCHMARK_F(Fixture, SubstrBytes)(benchmark::State & state) {                               \
+        benchmarkSubstrBytes(state);                                                            \
+    }                                                                                           \
+                                                                                                \
+    BENCHMARK_F(Fixture, SubstrBytesLargeString)(benchmark::State & state) {                    \
+        benchmarkSubstrBytesLargeString(state);                                                 \
+    }                                                                                           \
+                                                                                                \
+    BENCHMARK_F(Fixture, SubstrCP)(benchmark::State & state) {                                  \
+        benchmarkSubstrCP(state);                                                               \
+    }                                                                                           \
+                                                                                                \
+    BENCHMARK_F(Fixture, SubstrCPMultiBytes)(benchmark::State & state) {                        \
+        benchmarkSubstrCPMultiBytes(state);                                                     \
+    }                                                                                           \
+                                                                                                \
+    BENCHMARK_F(Fixture, SubstrCPLargeString)(benchmark::State & state) {                       \
+        benchmarkSubstrCPLargeString(state);                                                    \
+    }                                                                                           \
+                                                                                                \
+    BENCHMARK_F(Fixture, Rand)(benchmark::State & state) {                                      \
+        benchmarkRand(state);                                                                   \
+    }                                                                                           \
+                                                                                                \
+    BENCHMARK_F(Fixture, MaxSingleInput)(benchmark::State & state) {                            \
+        benchmarkMaxSingleInput(state);                                                         \
+    }                                                                                           \
+                                                                                                \
+    BENCHMARK_F(Fixture, MaxSingleArrayInput)(benchmark::State & state) {                       \
+        benchmarkMaxSingleArrayInput(state);                                                    \
+    }                                                                                           \
+                                                                                                \
+    BENCHMARK_F(Fixture, MinSingleInput)(benchmark::State & state) {                            \
+        benchmarkMinSingleInput(state);                                                         \
+    }                                                                                           \
+                                                                                                \
+    BENCHMARK_F(Fixture, MinSingleArrayInput)(benchmark::State & state) {                       \
+        benchmarkMinSingleArrayInput(state);                                                    \
+    }                                                                                           \
+                                                                                                \
+    BENCHMARK_F(Fixture, StdDevPop)(benchmark::State & state) {                                 \
+        benchmarkStdDevPop(state);                                                              \
+    }                                                                                           \
+                                                                                                \
+    BENCHMARK_F(Fixture, StdDevSamp)(benchmark::State & state) {                                \
+        benchmarkStdDevSamp(state);                                                             \
+    }                                                                                           \
+                                                                                                \
+    BENCHMARK_F(Fixture, Avg)(benchmark::State & state) {                                       \
+        benchmarkAvg(state);                                                                    \
+    }                                                                                           \
+                                                                                                \
+    BENCHMARK_F(Fixture, Sum)(benchmark::State & state) {                                       \
+        benchmarkSum(state);                                                                    \
     }
 
 
