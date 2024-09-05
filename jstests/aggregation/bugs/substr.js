@@ -1,4 +1,6 @@
 // Aggregation $substrBytes tests.
+import "jstests/libs/sbe_assert_error_override.js";
+import {assertErrorCode} from "jstests/aggregation/extras/utils.js";
 
 let t = db.jstests_aggregation_substr;
 t.drop();
@@ -91,25 +93,49 @@ assertException('\u0080\u20ac', 1, 3);
 assertException('\u0080\u20ac', 1, 4);
 assertException('\u0080\u20ac', 0, 3);
 
+assertException('\uD834\uDF06', 1, 4);
+assertException('\uD834\uDF06', 0, 3);
+
 assertSubstring('\u0044\u20ac', '\u0080\u0044\u20ac', 2, 4);
 assertSubstring('\u0044', '\u0080\u0044\u20ac', 2, 1);
 
 // The four byte utf-8 character 𝌆 (have to represent in surrogate halves).
 assertSubstring('\uD834\uDF06', '\uD834\uDF06', 0, 4);
 
-assertException('\uD834\uDF06', '\uD834\uDF06', 1, 4);
-assertException('\uD834\uDF06', '\uD834\uDF06', 0, 3);
-
 // Operands from document.
 t.drop();
-t.save({x: 'a', y: 'abc', z: 'abcde', a: 0, b: 1, c: 2, d: 3, e: 4, f: 5});
+t.save({
+    w: "ó",
+    x: 'a',
+    y: 'abc',
+    z: 'abcde',
+    a: 0,
+    b: 1,
+    c: 2,
+    d: 3,
+    e: 4,
+    f: 5,
+    g: -2,
+    /* Max unsigned int plus one */
+    k: NumberLong(4294967297)
+});
 assertSubstring('a', '$x', '$a', '$b');
+assertSubstring('abcde', '$z', '$a', '$k');
+assertSubstring("", '$x', '$k', '$f');
 assertSubstring('a', '$x', '$a', '$f');
 assertSubstring('b', '$y', '$b', '$b');
 assertSubstring('b', '$z', '$b', '$b');
 assertSubstring('bcd', '$z', '$b', '$d');
 assertSubstring('cde', '$z', '$c', '$f');
 assertSubstring('c', '$y', '$c', '$f');
+assertException("$w", "$b", "$d");
+assertException("$w", "$a", "$c");
+assertException("$w", "$a", "$g");
+assertException("$w", "$g", "$a");
+
+// String coercion fails.
+assertErrorCode(
+    t, [{$project: {a: {$substrCP: [new Map(), '$a', '$b']}}}], 16007, "string coercion failed");
 
 // Computed operands.
 assertSubstring('cde', '$z', {$add: ['$b', '$b']}, {$add: ['$c', '$d']});

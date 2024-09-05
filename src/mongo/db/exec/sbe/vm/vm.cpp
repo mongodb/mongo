@@ -3777,6 +3777,51 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinStrLenCP(ArityTy
     return {false, value::TypeTags::Nothing, 0};
 }
 
+FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinSubstrBytes(ArityType arity) {
+    invariant(arity == 3);
+
+    auto [strOwned, strTag, strVal] = getFromStack(0);
+    auto [startIndexOwned, startIndexTag, startIndexVal] = getFromStack(1);
+    auto [lenOwned, lenTag, lenVal] = getFromStack(2);
+
+    if (!value::isString(strTag) || startIndexTag != value::TypeTags::NumberInt64 ||
+        lenTag != value::TypeTags::NumberInt64) {
+        return {false, value::TypeTags::Nothing, 0};
+    }
+
+    StringData str = value::getStringView(strTag, strVal);
+    int64_t startIndexBytes = value::bitcastTo<int64_t>(startIndexVal);
+    int64_t lenBytes = value::bitcastTo<int64_t>(lenVal);
+
+    // Check start index is positive.
+    if (startIndexBytes < 0) {
+        return {false, value::TypeTags::Nothing, 0};
+    }
+
+    // If passed length is negative, we should return rest of string.
+    const StringData::size_type length =
+        lenBytes < 0 ? str.length() : static_cast<StringData::size_type>(lenBytes);
+
+    // Check 'startIndexBytes' and byte after last char is not continuation byte.
+    uassert(5155604,
+            "Invalid range: starting index is a UTF-8 continuation byte",
+            (startIndexBytes >= value::bitcastTo<int64_t>(str.length()) ||
+             !str::isUTF8ContinuationByte(str[startIndexBytes])));
+    uassert(5155605,
+            "Invalid range: ending index is a UTF-8 continuation character",
+            (startIndexVal + length >= str.length() ||
+             !str::isUTF8ContinuationByte(str[startIndexBytes + length])));
+
+    // If 'startIndexVal' > str.length() then string::substr() will throw out_of_range, so return
+    // empty string if 'startIndexVal' is not a valid string index.
+    if (startIndexBytes >= value::bitcastTo<int64_t>(str.length())) {
+        auto [outTag, outVal] = value::makeNewString("");
+        return {true, outTag, outVal};
+    }
+    auto [outTag, outVal] = value::makeNewString(str.substr(startIndexBytes, lenBytes));
+    return {true, outTag, outVal};
+}
+
 FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinToUpper(ArityType arity) {
     auto [_, operandTag, operandVal] = getFromStack(0);
 
@@ -9799,6 +9844,8 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::dispatchBuiltin(Builtin
             return builtinStrLenBytes(arity);
         case Builtin::strLenCP:
             return builtinStrLenCP(arity);
+        case Builtin::substrBytes:
+            return builtinSubstrBytes(arity);
         case Builtin::toUpper:
             return builtinToUpper(arity);
         case Builtin::toLower:
@@ -10366,6 +10413,8 @@ std::string builtinToString(Builtin b) {
             return "strLenBytes";
         case Builtin::strLenCP:
             return "strLenCP";
+        case Builtin::substrBytes:
+            return "substrBytes";
         case Builtin::toUpper:
             return "toUpper";
         case Builtin::toLower:

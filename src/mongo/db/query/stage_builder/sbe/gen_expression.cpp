@@ -2976,7 +2976,71 @@ public:
             b.makeBinaryOp(optimizer::Operations::Cmp3w, std::move(lhs), std::move(rhs)));
     }
     void visit(const ExpressionSubstrBytes* expr) final {
-        unsupportedExpression(expr->getOpName());
+        invariant(expr->getChildren().size() == 3);
+        _context->ensureArity(3);
+
+        optimizer::ABT byteCount = _context->popABTExpr();
+        optimizer::ABT startIndex = _context->popABTExpr();
+        optimizer::ABT stringExpr = _context->popABTExpr();
+
+        optimizer::ProjectionName stringExprName =
+            makeLocalVariableName(_context->state.frameId(), 0);
+        optimizer::ProjectionName startIndexName =
+            makeLocalVariableName(_context->state.frameId(), 0);
+        optimizer::ProjectionName byteCountName =
+            makeLocalVariableName(_context->state.frameId(), 0);
+
+        optimizer::ABTVector functionArgs;
+
+        optimizer::ABT validStringExpr = buildABTMultiBranchConditional(
+            ABTCaseValuePair{generateABTNullMissingOrUndefined(stringExprName),
+                             makeABTConstant(""_sd)},
+            ABTCaseValuePair{
+                makeFillEmptyTrue(makeABTFunction("coerceToString", makeVariable(stringExprName))),
+                makeABTFail(ErrorCodes::Error(5155608),
+                            "$substrBytes: string expression could not be resolved to a string")},
+            makeABTFunction("coerceToString", makeVariable(stringExprName)));
+        functionArgs.push_back(std::move(validStringExpr));
+
+        optimizer::ABT validStartIndexExpr = optimizer::make<optimizer::If>(
+            optimizer::make<optimizer::BinaryOp>(
+                optimizer::Operations::Or,
+                generateABTNullMissingOrUndefined(startIndexName),
+                optimizer::make<optimizer::BinaryOp>(
+                    optimizer::Operations::Or,
+                    generateABTNonNumericCheck(startIndexName),
+                    optimizer::make<optimizer::BinaryOp>(optimizer::Operations::Lt,
+                                                         makeVariable(startIndexName),
+                                                         optimizer::Constant::int32(0)))),
+            makeABTFail(ErrorCodes::Error{5155603},
+                        "Starting index must be non-negative numeric type"),
+            makeABTFunction("convert",
+                            makeVariable(startIndexName),
+                            optimizer::Constant::int32(
+                                static_cast<int32_t>(sbe::value::TypeTags::NumberInt64))));
+        functionArgs.push_back(std::move(validStartIndexExpr));
+
+        optimizer::ABT validLengthExpr = optimizer::make<optimizer::If>(
+            optimizer::make<optimizer::BinaryOp>(optimizer::Operations::Or,
+                                                 generateABTNullMissingOrUndefined(byteCountName),
+                                                 generateABTNonNumericCheck(byteCountName)),
+            makeABTFail(ErrorCodes::Error{5155602}, "Length must be a numeric type"),
+            makeABTFunction("convert",
+                            makeVariable(byteCountName),
+                            optimizer::Constant::int32(
+                                static_cast<int32_t>(sbe::value::TypeTags::NumberInt64))));
+        functionArgs.push_back(std::move(validLengthExpr));
+
+        auto resultExpr =
+            optimizer::make<optimizer::FunctionCall>("substrBytes", std::move(functionArgs));
+
+        resultExpr = optimizer::make<optimizer::Let>(
+            std::move(byteCountName), std::move(byteCount), std::move(resultExpr));
+        resultExpr = optimizer::make<optimizer::Let>(
+            std::move(startIndexName), std::move(startIndex), std::move(resultExpr));
+        resultExpr = optimizer::make<optimizer::Let>(
+            std::move(stringExprName), std::move(stringExpr), std::move(resultExpr));
+        pushABT(std::move(resultExpr));
     }
     void visit(const ExpressionSubstrCP* expr) final {
         unsupportedExpression(expr->getOpName());

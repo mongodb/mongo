@@ -203,19 +203,37 @@ assertPipelineDoesNotUseAggregation({
     expectedStages: ["IXSCAN"],
     expectedResult: [{x: 20}]
 });
-// However, when the $project is computed, pushing it down into the find() layer would sometimes
-// have the effect of reordering it before the $sort and $limit. This can cause a valid query to
-// throw an error, as in SERVER-54128.
-assertPipelineUsesAggregation({
-    pipeline: [
-        {$match: {x: {$gte: 20}}},
-        {$sort: {x: 1}},
-        {$limit: 1},
-        {$project: {x: {$substr: ["$y", 0, 1]}, _id: 0}}
-    ],
-    expectedStages: ["IXSCAN"],
-    expectedResult: [{x: ""}]
-});
+assertPipelineIfSbeEnabled(
+    function() {
+        // When SBE is fully enabled, all stages will be pushed into the find layer because they are
+        // all fully supported.
+        assertPipelineDoesNotUseAggregation({
+            pipeline: [
+                {$match: {x: {$gte: 20}}},
+                {$sort: {x: 1}},
+                {$limit: 1},
+                {$project: {x: {$substrBytes: ["$y", 0, 1]}, _id: 0}}
+            ],
+            expectedStages: ["LIMIT", "PROJECTION_SIMPLE", "FETCH", "IXSCAN"],
+            expectedResult: [{x: ""}]
+        });
+    },
+    function() {
+        // Otherwise, when the $project is computed, pushing it down into the find() layer would
+        // sometimes have the effect of reordering it before the $sort and $limit. This can cause
+        // a valid query to throw an error, as in SERVER-54128.
+        assertPipelineUsesAggregation({
+            pipeline: [
+                {$match: {x: {$gte: 20}}},
+                {$sort: {x: 1}},
+                {$limit: 1},
+                {$project: {x: {$substr: ["$y", 0, 1]}, _id: 0}}
+            ],
+            expectedStages: ["IXSCAN"],
+            expectedResult: [{x: ""}]
+        });
+    });
+
 assert.commandWorked(coll.dropIndexes());
 
 assert.commandWorked(coll.insert({_id: 4, x: 40, a: {b: "ab1"}}));
@@ -255,7 +273,6 @@ assertPipelineDoesNotUseAggregation({
     expectedStages: ["COLLSCAN", "SKIP"],
     expectedResult: [{_id: 3, x: 30}]
 });
-
 // Pipelines which cannot be optimized away.
 
 assertPipelineIfSbeEnabled(

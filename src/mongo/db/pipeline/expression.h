@@ -3319,9 +3319,7 @@ public:
 class ExpressionSubstrBytes final : public ExpressionFixedArity<ExpressionSubstrBytes, 3> {
 public:
     explicit ExpressionSubstrBytes(ExpressionContext* const expCtx)
-        : ExpressionFixedArity<ExpressionSubstrBytes, 3>(expCtx) {
-        expCtx->sbeCompatibility = SbeCompatibility::notCompatible;
-    }
+        : ExpressionFixedArity<ExpressionSubstrBytes, 3>(expCtx) {}
     ExpressionSubstrBytes(ExpressionContext* const expCtx, ExpressionVector&& children)
         : ExpressionFixedArity<ExpressionSubstrBytes, 3>(expCtx, std::move(children)) {}
 
