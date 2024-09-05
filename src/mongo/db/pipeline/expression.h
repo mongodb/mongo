@@ -3299,9 +3299,7 @@ public:
 class ExpressionStrcasecmp final : public ExpressionFixedArity<ExpressionStrcasecmp, 2> {
 public:
     explicit ExpressionStrcasecmp(ExpressionContext* const expCtx)
-        : ExpressionFixedArity<ExpressionStrcasecmp, 2>(expCtx) {
-        expCtx->sbeCompatibility = SbeCompatibility::notCompatible;
-    }
+        : ExpressionFixedArity<ExpressionStrcasecmp, 2>(expCtx) {}
     ExpressionStrcasecmp(ExpressionContext* const expCtx, ExpressionVector&& children)
         : ExpressionFixedArity<ExpressionStrcasecmp, 2>(expCtx, std::move(children)) {}
 

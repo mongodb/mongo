@@ -2962,7 +2962,18 @@ public:
             std::move(inputName), _context->popABTExpr(), std::move(sqrtExpr)));
     }
     void visit(const ExpressionStrcasecmp* expr) final {
-        unsupportedExpression(expr->getOpName());
+        invariant(expr->getChildren().size() == 2);
+        _context->ensureArity(2);
+
+        SbExprBuilder b(_context->state);
+
+        generateStringCaseConversionExpression(_context, "toUpper");
+        SbExpr rhs = _context->popExpr();
+        generateStringCaseConversionExpression(_context, "toUpper");
+        SbExpr lhs = _context->popExpr();
+
+        _context->pushExpr(
+            b.makeBinaryOp(optimizer::Operations::Cmp3w, std::move(lhs), std::move(rhs)));
     }
     void visit(const ExpressionSubstrBytes* expr) final {
         unsupportedExpression(expr->getOpName());

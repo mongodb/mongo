@@ -36,6 +36,7 @@ assertException(['a', 'b', 'c']);
 
 // Basic tests.
 assertBoth(0, 0, '', '');
+assertBoth(0, 0, null, null);
 assertBoth(-1, -1, '', 'a');
 assertBoth(0, -1, 'A', 'a');
 assertBoth(1, -1, 'Ab', 'a');
@@ -59,6 +60,10 @@ assertException(['abc', /abc/]);
 // Extended characters.
 assertBoth(0, -1, '\u0080D\u20ac', '\u0080d\u20ac');
 assertBoth(1, 1, 'ó', 'Ó');  // Not treated as equal currently.
+
+// String coersion fails
+assertException(['a', ['a']]);
+assertException(['a', new Map()]);
 
 // String from field path.
 t.drop();
