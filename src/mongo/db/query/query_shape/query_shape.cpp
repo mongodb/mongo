@@ -62,6 +62,8 @@
 #include "mongo/util/assert_util.h"
 #include "mongo/util/uuid.h"
 
+MONGO_FAIL_POINT_DEFINE(queryShapeCreationException);
+
 namespace mongo::query_shape {
 
 namespace {
@@ -75,7 +77,11 @@ void appendCmdNs(BSONObjBuilder& bob,
 }  // namespace
 
 Shape::Shape(NamespaceStringOrUUID nssOrUUID_, BSONObj collation_)
-    : nssOrUUID(nssOrUUID_), collation(std::move(collation_)) {}
+    : nssOrUUID(nssOrUUID_), collation(std::move(collation_)) {
+    if (MONGO_unlikely(queryShapeCreationException.shouldFail())) {
+        uasserted(ErrorCodes::InternalError, "Failure creating query shape");
+    }
+}
 
 
 BSONObj Shape::toBson(OperationContext* opCtx,
