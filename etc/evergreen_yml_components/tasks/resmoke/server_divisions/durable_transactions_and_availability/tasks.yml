@@ -1905,6 +1905,7 @@ tasks:
         "default",
         "config_fuzzer",
         "incompatible_inmemory",
+        "incompatible_tsan",
       ]
     commands:
       - func: "do setup"
