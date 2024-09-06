@@ -66,6 +66,10 @@
 		"[starlark]": {
 			"editor.defaultFormatter": "BazelBuild.vscode-bazel"
 		},
+		// Allows clicking on a line to jump to location in a JS stacktrace like the example
+		// following. Usually the '@' character is not recognized as a word boundary.
+		// doassert@src/mongo/shell/assert.js:18:14
+		"terminal.integrated.wordSeparators": " ()[]{}',\"`─‘’@",
 	},
 	"extensions": {
 		"recommendations": [
