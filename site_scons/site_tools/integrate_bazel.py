@@ -697,7 +697,9 @@ def auto_install_bazel(env, libdep, shlib_suffix):
             bazel_debug(f"Bazel AutoInstalling {bazel_node}")
         installed_files = getattr(bazel_libdep.attributes, "AIB_INSTALLED_FILES", [])
         setattr(
-            bazel_libdep.attributes, "AIB_INSTALLED_FILES", new_installed_files + installed_files
+            bazel_libdep.attributes,
+            "AIB_INSTALLED_FILES",
+            list(set(new_installed_files + installed_files)),
         )
 
 

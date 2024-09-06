@@ -275,7 +275,7 @@ buildvariants:
       - name: .lint
       - name: libdeps_graph_linting
         distros:
-          - rhel8.8-large
+          - rhel8.8-xlarge
       - name: .clang_tidy
         distros:
           - rhel8.8-xxlarge
