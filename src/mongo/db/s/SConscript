@@ -301,6 +301,23 @@ env.Library(
 )
 
 env.Library(
+    target="forwardable_operation_metadata",
+    source=[
+        "forwardable_operation_metadata.cpp",
+        "forwardable_operation_metadata_gen.cpp",
+    ],
+    LIBDEPS_PRIVATE=[
+        "$BUILD_DIR/mongo/db/auth/auth",
+        "$BUILD_DIR/mongo/db/auth/security_token",
+        "$BUILD_DIR/mongo/db/auth/security_token_auth",
+        "$BUILD_DIR/mongo/db/server_base",
+        "$BUILD_DIR/mongo/db/write_block_bypass",
+        "$BUILD_DIR/mongo/rpc/metadata_impersonated_user",
+        "$BUILD_DIR/mongo/util/concurrency/spin_lock",
+    ],
+)
+
+env.Library(
     target="sharding_catalog_manager",
     source=[
         "add_shard_cmd_gen.cpp",

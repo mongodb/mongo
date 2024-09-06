@@ -13,6 +13,48 @@ Import(
 
 env = env.Clone()
 
+env.Library(
+    target="benchrun",
+    source=[
+        "bench.cpp",
+    ],
+    LIBDEPS=[
+        "$BUILD_DIR/mongo/base",
+        "$BUILD_DIR/mongo/client/clientdriver_minimal",
+        "$BUILD_DIR/mongo/db/session/logical_session_id",
+        "$BUILD_DIR/mongo/scripting/bson_template_evaluator",
+    ],
+    LIBDEPS_PRIVATE=[
+        "$BUILD_DIR/mongo/util/pcre_util",
+        "$BUILD_DIR/mongo/util/pcre_wrapper",
+    ],
+)
+
+shellEnv = env.Clone()
+if shellEnv.TargetOSIs("windows"):
+    shellEnv.Append(
+        CXXFLAGS=[
+            # See the /Zc:preprocessor comment in third_party/mozjs/SConscript
+            "/Zc:preprocessor",
+            "/wd5104",
+            "/wd5105",
+        ]
+    )
+
+shellEnv.Library(
+    target="shell_options_storage",
+    source=[
+        "shell_options_storage.cpp",
+    ],
+    LIBDEPS=[
+        "$BUILD_DIR/mongo/base",
+    ],
+    LIBDEPS_PRIVATE=[
+        "$BUILD_DIR/mongo/client/connection_string",
+        "$BUILD_DIR/mongo/util/cmdline_utils/cmdline_utils",
+    ],
+)
+
 
 def shouldBuildGRPC(myEnv):
     return myEnv.TargetOSIs("linux") and myEnv["ENABLE_GRPC_BUILD"]
@@ -21,6 +63,21 @@ def shouldBuildGRPC(myEnv):
 if shouldBuildGRPC(env):
     env.InjectThirdParty(libraries=["grpc"])
 
+env.Library(
+    target="shell_options_register",
+    source=[
+        "shell_options_gen.cpp",
+        "shell_options_grpc_gen.cpp" if shouldBuildGRPC(env) else [],
+    ],
+    LIBDEPS=[
+        "$BUILD_DIR/mongo/base",
+        "$BUILD_DIR/mongo/client/native_sasl_client",
+        "shell_options_storage",
+    ],
+    LIBDEPS_PRIVATE=[
+        "$BUILD_DIR/mongo/util/options_parser/options_parser",
+    ],
+)
 
 env.Library(
     target="shell_utils",
@@ -56,6 +113,23 @@ env.Library(
 
 if get_option("ssl") == "on":
     kmsEnv = env.Clone()
+
+    kmsEnv.Library(
+        target="kms",
+        source=[
+            "kms.cpp",
+            "kms_local.cpp",
+        ],
+        LIBDEPS=[
+            "$BUILD_DIR/mongo/base/secure_allocator",
+            "kms_idl",
+        ],
+        LIBDEPS_PRIVATE=[
+            "$BUILD_DIR/mongo/base",
+            "$BUILD_DIR/mongo/crypto/aead_encryption",
+            "$BUILD_DIR/mongo/db/commands/test_commands_enabled",
+        ],
+    )
 
     env.Library(
         target="kms_shell",

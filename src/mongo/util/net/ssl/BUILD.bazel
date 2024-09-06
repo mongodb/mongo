@@ -5,11 +5,3 @@ exports_files(
         "*.hpp",
     ]),
 )
-
-filegroup(
-    name = "ssl",
-    srcs = glob([
-        "**/*.hpp",
-        "**/*.ipp",
-    ]),
-)

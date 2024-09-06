@@ -167,26 +167,6 @@ idl_generator(
     ],
 )
 
-mongo_cc_library(
-    name = "forwardable_operation_metadata",
-    srcs = [
-        "forwardable_operation_metadata.cpp",
-        "forwardable_operation_metadata_gen",
-    ],
-    hdrs = [
-        "forwardable_operation_metadata.h",
-    ],
-    deps = [
-        "//src/mongo/db:server_base",
-        "//src/mongo/db:write_block_bypass",
-        "//src/mongo/db/auth",
-        "//src/mongo/db/auth:security_token",
-        "//src/mongo/db/auth:security_token_auth",
-        "//src/mongo/rpc:metadata_impersonated_user",
-        "//src/mongo/util/concurrency:spin_lock",  # TODO(SERVER-93876): Remove.
-    ],
-)
-
 idl_generator(
     name = "add_shard_cmd_gen",
     src = "add_shard_cmd.idl",

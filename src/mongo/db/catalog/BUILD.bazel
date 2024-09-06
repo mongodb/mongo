@@ -43,35 +43,6 @@ idl_generator(
     ],
 )
 
-mongo_cc_library(
-    name = "collection_options",
-    srcs = [
-        "clustered_collection_options_gen",
-        "clustered_collection_util.cpp",
-        "collection_options.cpp",
-        "collection_options_gen",
-        "collection_options_validation.cpp",
-        "//src/mongo/db/commands:create_command_validation.h",
-    ],
-    hdrs = [
-        "clustered_collection_util.h",
-        "collection_options.h",
-        "collection_options_validation.h",
-    ],
-    deps = [
-        # TODO(SERVER-93876): Technically only requires `//src/mongo/db:common`.
-        "//src/mongo/crypto:encrypted_field_config",
-        "//src/mongo/db/pipeline:change_stream_pre_and_post_images_options",
-        "//src/mongo/db/query/query_shape",
-        "//src/mongo/db/commands:test_commands_enabled",
-        "//src/mongo/db:common",
-        "//src/mongo/db/query/collation:collator_interface",
-        "//src/mongo/db/query:query_knobs",
-        "//src/mongo/db:server_base",
-        "//src/mongo/db/timeseries:timeseries_options",
-    ],
-)
-
 idl_generator(
     name = "validate_gen",
     src = "validate.idl",
@@ -136,23 +107,6 @@ mongo_cc_library(
     deps = [
         "//src/mongo/bson/util:bson_extract",
         "//src/mongo/db:server_base",
-    ],
-)
-
-mongo_cc_library(
-    name = "index_build_oplog_entry",
-    srcs = [
-        "index_build_oplog_entry.cpp",
-    ],
-    hdrs = [
-        "index_build_oplog_entry.h",
-    ],
-    deps = [
-        ":commit_quorum_options",
-        "//src/mongo:base",
-        "//src/mongo/bson/util:bson_extract",
-        "//src/mongo/db/repl:oplog_entry",
-        "//src/mongo/rpc:command_status",  # TODO(SERVER-93876): Remove.
     ],
 )
 

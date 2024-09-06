@@ -9,21 +9,6 @@ exports_files(
     ]),
 )
 
-mongo_cc_library(
-    name = "golden_test_base",
-    srcs = [
-        "golden_test_base.cpp",
-    ],
-    hdrs = [
-        "golden_test_base.h",
-        "test_info.h",
-    ],
-    deps = [
-        "//src/mongo:base",
-        "//src/third_party/yaml-cpp:yaml",
-    ],
-)
-
 idl_generator(
     name = "unittest_options_gen",
     src = "unittest_options.idl",

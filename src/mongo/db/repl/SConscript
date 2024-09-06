@@ -6,6 +6,18 @@ Import("wiredtiger")
 env = env.Clone()
 
 env.Library(
+    target="apply_ops_command_info",
+    source=[
+        "apply_ops_command_info.cpp",
+        "apply_ops_gen.cpp",
+    ],
+    LIBDEPS_PRIVATE=[
+        "$BUILD_DIR/mongo/base",
+        "oplog_entry",
+    ],
+)
+
+env.Library(
     target="change_stream_oplog_notification",
     source=[
         "change_stream_oplog_notification.cpp",
@@ -141,6 +153,20 @@ env.Library(
 )
 
 env.Library(
+    target="abstract_async_component",
+    source=[
+        "abstract_async_component.cpp",
+    ],
+    LIBDEPS=[
+        "$BUILD_DIR/mongo/executor/task_executor_interface",
+    ],
+    LIBDEPS_PRIVATE=[
+        "$BUILD_DIR/mongo/base",
+        "$BUILD_DIR/mongo/util/concurrency/spin_lock",
+    ],
+)
+
+env.Library(
     target="dbcheck",
     source=[
         "dbcheck.cpp",
@@ -234,6 +260,17 @@ env.Library(
         "oplog_interface_local",
         "repl_server_parameters",
         "replica_set_aware_service",
+    ],
+)
+
+env.Library(
+    target="scatter_gather",
+    source=[
+        "scatter_gather_algorithm.cpp",
+        "scatter_gather_runner.cpp",
+    ],
+    LIBDEPS=[
+        "$BUILD_DIR/mongo/executor/task_executor_interface",
     ],
 )
 
@@ -402,6 +439,26 @@ env.Library(
     ],
 )
 
+env.Library(
+    target="oplog_entry",
+    source=[
+        "oplog_entry.cpp",
+        "oplog_entry_serialization.cpp",
+        "oplog_entry_gen.cpp",
+    ],
+    LIBDEPS=[
+        "$BUILD_DIR/mongo/db/auth/security_token_auth",
+        "$BUILD_DIR/mongo/db/catalog/collection_options",
+        "$BUILD_DIR/mongo/db/exec/document_value/document_value",
+        "optime",
+    ],
+    LIBDEPS_PRIVATE=[
+        "$BUILD_DIR/mongo/db/multitenancy",
+        "$BUILD_DIR/mongo/db/server_base",
+        "$BUILD_DIR/mongo/db/server_feature_flags",
+    ],
+)
+
 env.Benchmark(
     target="oplog_entry_bm",
     source=[
@@ -411,6 +468,21 @@ env.Benchmark(
         "$BUILD_DIR/mongo/db/concurrency/lock_manager",
         "apply_ops_command_info",
         "oplog_entry",
+    ],
+)
+
+env.Library(
+    target="oplog_write_interface",
+    source=[
+        "oplog_writer_batcher.cpp",
+        "oplog_writer.cpp",
+    ],
+    LIBDEPS=[
+        "$BUILD_DIR/mongo/db/server_base",
+        "$BUILD_DIR/mongo/db/service_context",
+        "oplog_entry",
+        "repl_coordinator_interface",
+        "repl_server_parameters",
     ],
 )
 
@@ -523,6 +595,16 @@ env.Library(
         "$BUILD_DIR/mongo/base",
         "$BUILD_DIR/mongo/db/common",
         "$BUILD_DIR/mongo/db/exec/document_value/document_value",
+    ],
+)
+
+env.Library(
+    target="member_data",
+    source=[
+        "member_data.cpp",
+    ],
+    LIBDEPS=[
+        "replica_set_messages",
     ],
 )
 
@@ -666,6 +748,44 @@ env.Library(
 )
 
 env.Library(
+    target="replica_set_messages",
+    source=[
+        "hello_response.cpp",
+        "member_config.cpp",
+        "repl_set_config.cpp",
+        "repl_set_config_validators.cpp",
+        "repl_set_heartbeat_args_v1.cpp",
+        "repl_set_heartbeat_response.cpp",
+        "repl_set_request_votes_args.cpp",
+        "repl_set_tag.cpp",
+        "repl_set_write_concern_mode_definitions.cpp",
+        "update_position_args.cpp",
+        "last_vote.cpp",
+        "member_config_gen.cpp",
+        "repl_set_config_gen.cpp",
+        "repl_set_config_params_gen.cpp",
+    ],
+    LIBDEPS=[
+        "$BUILD_DIR/mongo/bson/util/bson_extract",
+        "$BUILD_DIR/mongo/client/connection_string",
+        "$BUILD_DIR/mongo/db/common",
+        "$BUILD_DIR/mongo/rpc/command_status",
+        "$BUILD_DIR/mongo/rpc/metadata",
+        "$BUILD_DIR/mongo/transport/transport_layer_common",
+        "$BUILD_DIR/mongo/util/net/network",
+        "optime",
+        "read_concern_args",
+    ],
+    LIBDEPS_PRIVATE=[
+        "$BUILD_DIR/mongo/db/server_base",
+        "$BUILD_DIR/mongo/db/server_feature_flags",
+        "$BUILD_DIR/mongo/util/fail_point",
+        "repl_server_parameters",
+        "split_horizon",
+    ],
+)
+
+env.Library(
     target="repl_set_status_commands",
     source=[
         "repl_set_command.cpp",
@@ -738,6 +858,38 @@ env.Library(
         "$BUILD_DIR/mongo/db/server_base",
         "repl_server_parameters",
         "replication_auth",
+    ],
+)
+
+env.Library(
+    target="reporter",
+    source=[
+        "reporter.cpp",
+    ],
+    LIBDEPS=[
+        "$BUILD_DIR/mongo/db/commands/server_status_core",
+        "$BUILD_DIR/mongo/db/server_base",
+        "$BUILD_DIR/mongo/executor/remote_command",
+        "$BUILD_DIR/mongo/executor/task_executor_interface",
+        "$BUILD_DIR/mongo/rpc/command_status",
+        "replica_set_messages",
+    ],
+)
+
+env.Library(
+    target="sync_source_resolver",
+    source=[
+        "sync_source_resolver.cpp",
+    ],
+    LIBDEPS=[
+        "$BUILD_DIR/mongo/client/fetcher",
+        "$BUILD_DIR/mongo/db/server_base",
+        "$BUILD_DIR/mongo/executor/task_executor_interface",
+        "$BUILD_DIR/mongo/rpc/metadata",
+        "$BUILD_DIR/mongo/util/net/network",
+        "oplog_entry",
+        "optime",
+        "read_concern_args",
     ],
 )
 
@@ -890,6 +1042,22 @@ env.Library(
 )
 
 env.Library(
+    target="cloner_utils",
+    source=[
+        "cloner_utils.cpp",
+        "database_cloner_common.cpp",
+        "database_cloner_gen.cpp",
+    ],
+    LIBDEPS_PRIVATE=[
+        "$BUILD_DIR/mongo/db/catalog/collection_options",
+        "$BUILD_DIR/mongo/db/multitenancy",
+        "$BUILD_DIR/mongo/db/server_base",
+        "$BUILD_DIR/mongo/db/server_feature_flags",
+        "read_concern_args",
+    ],
+)
+
+env.Library(
     target="initial_syncer",
     source=[
         "initial_syncer.cpp",
@@ -922,6 +1090,43 @@ env.Library(
         "$BUILD_DIR/mongo/executor/scoped_task_executor",
         "$BUILD_DIR/mongo/executor/task_executor_interface",
         "repl_server_parameters",
+    ],
+)
+
+env.Library(
+    target="rollback_checker",
+    source=[
+        "rollback_checker.cpp",
+    ],
+    LIBDEPS=[
+        "$BUILD_DIR/mongo/executor/task_executor_interface",
+    ],
+)
+
+env.Library(
+    target="roll_back_local_operations",
+    source=[
+        "roll_back_local_operations.cpp",
+    ],
+    LIBDEPS=[
+        "$BUILD_DIR/mongo/base",
+        "$BUILD_DIR/mongo/util/fail_point",
+        "oplog_entry",
+        "optime",
+    ],
+)
+
+env.Library(
+    target="hello_command",
+    source=[
+        "hello_gen.cpp",
+    ],
+    LIBDEPS_PRIVATE=[
+        "$BUILD_DIR/mongo/db/auth/auth",
+        "$BUILD_DIR/mongo/db/auth/authprivilege",
+        "$BUILD_DIR/mongo/db/server_base",
+        "$BUILD_DIR/mongo/rpc/metadata",
+        "optime",
     ],
 )
 
@@ -1597,6 +1802,23 @@ env.Library(
 )
 
 env.Library(
+    target="topology_version_observer",
+    source=[
+        "topology_version_observer.cpp",
+    ],
+    LIBDEPS=[
+        "$BUILD_DIR/mongo/db/service_context",
+        "repl_coordinator_interface",
+        "replica_set_messages",
+    ],
+    LIBDEPS_PRIVATE=[
+        "$BUILD_DIR/mongo/db/server_base",
+        "$BUILD_DIR/mongo/util/concurrency/spin_lock",
+        "$BUILD_DIR/mongo/util/fail_point",
+    ],
+)
+
+env.Library(
     target="hello_auth",
     source=[
         "hello_auth.cpp",
@@ -1682,6 +1904,30 @@ env.Library(
         "oplog_application",
         "oplog_application_interface",
         "repl_server_parameters",
+    ],
+)
+
+env.Library(
+    target="image_collection_entry",
+    source=[
+        "image_collection_entry_gen.cpp",
+    ],
+    LIBDEPS=[
+        "$BUILD_DIR/mongo/base",
+        "$BUILD_DIR/mongo/db/session/logical_session_id",
+        "$BUILD_DIR/mongo/idl/idl_parser",
+        "oplog_entry",
+    ],
+)
+
+env.Library(
+    target="delayable_timeout_callback",
+    source=[
+        "delayable_timeout_callback.cpp",
+    ],
+    LIBDEPS=[
+        "$BUILD_DIR/mongo/base",
+        "$BUILD_DIR/mongo/executor/task_executor_interface",
     ],
 )
 

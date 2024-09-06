@@ -34,27 +34,6 @@ idl_generator(
     ],
 )
 
-mongo_cc_library(
-    name = "bulk_write_parser",
-    srcs = [
-        "bulk_write_crud_op.cpp",
-        "bulk_write_parser.cpp",
-        ":bulk_write_gen",
-    ],
-    hdrs = [
-        "bulk_write_crud_op.h",
-        "bulk_write_parser.h",
-    ],
-    deps = [
-        "//src/mongo/crypto:fle_fields",
-        "//src/mongo/db:commands",  # TODO(SERVER-93876): Remove.
-        "//src/mongo/db:server_base",
-        "//src/mongo/db:service_context",  # TODO(SERVER-93876): Remove.
-        "//src/mongo/db/ops:write_ops_parsers",
-        "//src/mongo/s:common_s",
-    ],
-)
-
 idl_generator(
     name = "query_settings_cmds_gen",
     src = "query_settings_cmds.idl",
@@ -65,24 +44,6 @@ idl_generator(
         "//src/mongo/db/query/query_settings:query_settings_gen",
         "//src/mongo/db/query/query_shape:query_shape_hash_gen",
         "//src/mongo/idl:generic_argument_gen",
-    ],
-)
-
-mongo_cc_library(
-    name = "current_op_common",
-    srcs = [
-        "current_op_common.cpp",
-    ],
-    hdrs = [
-        "current_op_common.h",
-    ],
-    deps = [
-        "//src/mongo/db:commands",
-        "//src/mongo/db:server_base",
-        "//src/mongo/db:service_context",  # TODO(SERVER-93876): Remove.
-        "//src/mongo/db/commands:test_commands_enabled",  # TODO(SERVER-93876): Remove.
-        "//src/mongo/db/pipeline:aggregation_request_helper",
-        "//src/mongo/db/query:command_request_response",
     ],
 )
 
@@ -122,36 +83,5 @@ mongo_cc_library(
     ],
     deps = [
         "//src/mongo/db:server_base",
-    ],
-)
-
-mongo_cc_library(
-    name = "update_metrics",
-    srcs = [
-        "update_metrics.cpp",
-    ],
-    hdrs = [
-        "update_metrics.h",
-    ],
-    deps = [
-        "//src/mongo/db/commands:server_status_core",  # TODO(SERVER-93876): Remove.
-        "//src/mongo/db/ops:write_ops_parsers",
-    ],
-)
-
-mongo_cc_library(
-    name = "write_commands_common",
-    srcs = [
-        "write_commands_common.cpp",
-    ],
-    hdrs = [
-        "write_commands_common.h",
-    ],
-    deps = [
-        ":update_metrics",
-        "//src/mongo/db/auth",
-        "//src/mongo/db/auth:authprivilege",  # TODO(SERVER-93876): Remove.
-        "//src/mongo/db/ops:write_ops_parsers",  # TODO(SERVER-93876): Remove.
-        "//src/mongo/db/pipeline:lite_parsed_document_source",
     ],
 )

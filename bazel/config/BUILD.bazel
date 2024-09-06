@@ -15,7 +15,6 @@ load(
     "fsan",
     "gcov",
     "http_client",
-    "js_engine",
     "libunwind",
     "linker",
     "linkstatic",
@@ -1415,29 +1414,6 @@ config_setting(
 )
 
 # --------------------------------------
-# use_tracing_profiler options
-# --------------------------------------
-
-bool_flag(
-    name = "use_tracing_profiler",
-    build_setting_default = False,
-)
-
-config_setting(
-    name = "use_tracing_profiler_enabled",
-    flag_values = {
-        "//bazel/config:use_tracing_profiler": "True",
-    },
-)
-
-config_setting(
-    name = "use_tracing_profiler_disabled",
-    flag_values = {
-        "//bazel/config:use_tracing_profiler": "False",
-    },
-)
-
-# --------------------------------------
 # shared_archive options
 # --------------------------------------
 
@@ -1774,14 +1750,6 @@ selects.config_setting_group(
 )
 
 selects.config_setting_group(
-    name = "ssl_disabled_windows",
-    match_all = [
-        "@platforms//os:windows",
-        ":ssl_enabled",
-    ],
-)
-
-selects.config_setting_group(
     name = "ssl_enabled_macos",
     match_all = [
         "@platforms//os:macos",
@@ -1890,40 +1858,8 @@ selects.config_setting_group(
 
 selects.config_setting_group(
     name = "mongo_crypto_tom",
-    match_any = [
-        ":ssl_disabled_linux",
-    ],
-)
-
-# --------------------------------------
-# ssl_provider options
-# --------------------------------------
-
-# TODO(SERVER-94377): The `mongo_crypto` setting refers to the old
-# `MONGO_CRYPTO` variable in SCons. The `ssl_provider` usually coincides with
-# that, but if ssl is disabled it'll get overridden to `none`. That is,
-# regardless of operating system, you'll get `ssl_provider_none` here if ssl is
-# disabled. We should figure out a more intuitive/robust solution to this.
-
-[
-    selects.config_setting_group(
-        name = "ssl_provider_{}".format(mongo_crypto_value),
-        match_all = [
-            "mongo_crypto_{}".format(mongo_crypto_value),
-            ":ssl_enabled",
-        ],
-    )
-    for mongo_crypto_value in [
-        "apple",
-        "openssl",
-        "windows",
-    ]
-]
-
-selects.config_setting_group(
-    name = "ssl_provider_none",
     match_all = [
-        ":ssl_disabled",
+        ":ssl_disabled_linux",
     ],
 )
 
@@ -1947,27 +1883,4 @@ selects.config_setting_group(
 developer_dir(
     name = "developer_dir",
     build_setting_default = "/Applications/Xcode.app",
-)
-
-# --------------------------------------
-# js_engine options
-# --------------------------------------
-
-js_engine(
-    name = "js_engine",
-    build_setting_default = "mozjs",
-)
-
-config_setting(
-    name = "js_engine_mozjs",
-    flag_values = {
-        "//bazel/config:js_engine": "mozjs",
-    },
-)
-
-config_setting(
-    name = "js_engine_none",
-    flag_values = {
-        "//bazel/config:js_engine": "none",
-    },
 )

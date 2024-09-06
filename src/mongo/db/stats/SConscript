@@ -5,6 +5,32 @@ Import("env")
 env = env.Clone()
 
 env.Library(
+    target="top",
+    source=[
+        "top.cpp",
+        "operation_latency_histogram.cpp",
+    ],
+    LIBDEPS=[
+        "$BUILD_DIR/mongo/db/query/query_stats/query_stats",
+        "$BUILD_DIR/mongo/db/server_base",
+        "$BUILD_DIR/mongo/db/service_context",
+    ],
+)
+
+env.Library(
+    target="api_version_metrics",
+    source=[
+        "api_version_metrics.cpp",
+    ],
+    LIBDEPS_PRIVATE=[
+        "$BUILD_DIR/mongo/base",
+        "$BUILD_DIR/mongo/db/shared_request_handling",
+        "$BUILD_DIR/mongo/db/validate_api_parameters",
+        "$BUILD_DIR/mongo/rpc/client_metadata",
+    ],
+)
+
+env.Library(
     target="change_collection_server_status",
     source=[
         "change_collection_server_status.cpp",

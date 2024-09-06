@@ -16,7 +16,6 @@ filegroup(
         "database_name_util.h",
         "fail_point.h",
         "inline_memory.h",
-        "log_with_sampling.h",
         "make_array_type.h",
         "namespace_string_util.h",
         "overloaded_visitor.h",

@@ -71,13 +71,13 @@ mongo_cc_library(
         ],
         "//conditions:default": [],
     }),
-    defines = select({
+    includes = [
+        "yaml-cpp/include",
+    ],
+    local_defines = select({
         "//bazel/config:compiler_type_msvc": [
             "_SILENCE_CXX17_ITERATOR_BASE_CLASS_DEPRECATION_WARNING",
         ],
         "//conditions:default": [],
     }),
-    includes = [
-        "yaml-cpp/include",
-    ],
 )

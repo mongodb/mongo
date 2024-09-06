@@ -21,6 +21,39 @@ if shouldBuildGRPC(env):
     )
 
 env.Library(
+    target="transport_layer_common",
+    source=[
+        "hello_metrics.cpp",
+        "session.cpp",
+        "transport_layer.cpp",
+    ],
+    LIBDEPS=[
+        "$BUILD_DIR/mongo/base",
+        "$BUILD_DIR/mongo/db/connection_health_metrics_parameter",
+        "$BUILD_DIR/mongo/db/service_context",
+        "$BUILD_DIR/mongo/db/wire_version",
+        "$BUILD_DIR/mongo/util/net/ssl_manager",
+    ],
+)
+
+env.Library(
+    target="ingress_handshake_metrics",
+    source=[
+        "ingress_handshake_metrics.cpp",
+    ],
+    LIBDEPS=[
+        "$BUILD_DIR/mongo/base",
+        "$BUILD_DIR/mongo/db/commands",
+        "$BUILD_DIR/mongo/util/clock_sources",
+        "transport_layer_common",
+    ],
+    LIBDEPS_PRIVATE=[
+        "$BUILD_DIR/mongo/db/commands/server_status_core",
+        "$BUILD_DIR/mongo/db/server_feature_flags",
+    ],
+)
+
+env.Library(
     target="transport_layer_mock",
     source=[
         "transport_layer_mock.cpp",
@@ -100,6 +133,97 @@ env.Library(
     ],
     LIBDEPS_PRIVATE=[
         "transport_layer_manager",
+    ],
+)
+
+tlEnv.Library(
+    target="service_executor",
+    source=[
+        "service_executor.cpp",
+        "service_executor_reserved.cpp",
+        "service_executor_synchronous.cpp",
+        "service_executor_utils.cpp",
+        "service_executor_gen.cpp",
+    ],
+    LIBDEPS=[
+        "$BUILD_DIR/mongo/db/service_context",
+    ],
+    LIBDEPS_PRIVATE=[
+        "$BUILD_DIR/mongo/db/server_base",
+        "$BUILD_DIR/mongo/util/concurrency/thread_pool",
+        "$BUILD_DIR/mongo/util/processinfo",
+        "$BUILD_DIR/third_party/asio-master/asio",
+        "transport_layer_common",
+    ],
+)
+
+env.Library(
+    target="session_manager",
+    source=[
+        "session_manager_common_gen.cpp",
+        "session_manager_common.cpp",
+        "session_workflow.cpp",
+    ],
+    LIBDEPS_PRIVATE=[
+        "$BUILD_DIR/mongo/db/query/command_request_response",
+        "$BUILD_DIR/mongo/db/server_base",
+        "$BUILD_DIR/mongo/db/server_feature_flags",
+        "$BUILD_DIR/mongo/db/service_context",
+        "$BUILD_DIR/mongo/db/stats/counters",
+        "$BUILD_DIR/mongo/db/traffic_recorder",
+        "$BUILD_DIR/mongo/rpc/client_metadata",
+        "$BUILD_DIR/mongo/rpc/message",
+        "$BUILD_DIR/mongo/util/concurrency/spin_lock",
+        "$BUILD_DIR/mongo/util/fail_point",
+        "$BUILD_DIR/mongo/util/net/ssl_manager",
+        "$BUILD_DIR/mongo/util/processinfo",
+        "ingress_handshake_metrics",
+        "message_compressor",
+        "service_executor",
+        "transport_layer_common",
+    ],
+)
+
+zlibEnv = env.Clone()
+zlibEnv.InjectThirdParty(libraries=["zlib", "zstd", "snappy"])
+zlibEnv.Library(
+    target="message_compressor",
+    source=[
+        "message_compressor_manager.cpp",
+        "message_compressor_metrics.cpp",
+        "message_compressor_registry.cpp",
+        "message_compressor_snappy.cpp",
+        "message_compressor_zlib.cpp",
+        "message_compressor_zstd.cpp",
+    ],
+    LIBDEPS=[
+        "$BUILD_DIR/mongo/base",
+        "$BUILD_DIR/mongo/util/options_parser/options_parser",
+        "$BUILD_DIR/third_party/snappy/snappy",
+        "$BUILD_DIR/third_party/zlib/zlib",
+        "$BUILD_DIR/third_party/zstandard/zstd",
+    ],
+)
+
+env.Library(
+    target="message_compressor_options_client",
+    source=[
+        "message_compressor_options_client_gen.cpp",
+    ],
+    LIBDEPS=[
+        "$BUILD_DIR/mongo/base",
+        "message_compressor",
+    ],
+)
+
+env.Library(
+    target="message_compressor_options_server",
+    source=[
+        "message_compressor_options_server_gen.cpp",
+    ],
+    LIBDEPS=[
+        "$BUILD_DIR/mongo/base",
+        "message_compressor",
     ],
 )
 

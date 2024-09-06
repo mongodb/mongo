@@ -4,6 +4,42 @@ Import("env")
 env = env.Clone()
 
 env.Library(
+    target="session_catalog",
+    source=[
+        "session_catalog.cpp",
+    ],
+    LIBDEPS=[
+        "logical_session_id",
+        "logical_session_id_helpers",
+    ],
+    LIBDEPS_PRIVATE=[
+        "$BUILD_DIR/mongo/db/concurrency/lock_manager",
+        "$BUILD_DIR/mongo/db/internal_transactions_feature_flag",
+        "$BUILD_DIR/mongo/db/service_context",
+        "$BUILD_DIR/mongo/util/concurrency/spin_lock",
+        "$BUILD_DIR/mongo/util/fail_point",
+        "kill_sessions",
+    ],
+)
+
+env.Library(
+    target="sessions_collection",
+    source=[
+        "sessions_collection.cpp",
+    ],
+    LIBDEPS=[
+        "$BUILD_DIR/mongo/client/clientdriver_minimal",
+        "logical_session_id",
+        "logical_session_id_helpers",
+    ],
+    LIBDEPS_PRIVATE=[
+        "$BUILD_DIR/mongo/db/coll_mod_command_idl",
+        "$BUILD_DIR/mongo/db/index_commands_idl",
+        "$BUILD_DIR/mongo/db/server_base",
+    ],
+)
+
+env.Library(
     target="sessions_collection_mock",
     source=[
         "sessions_collection_mock.cpp",
@@ -71,6 +107,26 @@ env.Library(
     LIBDEPS_PRIVATE=[
         "$BUILD_DIR/mongo/db/internal_transactions_feature_flag",
         "$BUILD_DIR/mongo/db/shard_role_api",
+    ],
+)
+
+env.Library(
+    target="kill_sessions",
+    source=[
+        "kill_sessions.cpp",
+        "kill_sessions_gen.cpp",
+        "kill_sessions_common.cpp",
+        "session_killer.cpp",
+    ],
+    LIBDEPS_PRIVATE=[
+        "$BUILD_DIR/mongo/db/api_parameters",
+        "$BUILD_DIR/mongo/db/auth/auth",
+        "$BUILD_DIR/mongo/db/auth/authprivilege",
+        "$BUILD_DIR/mongo/db/auth/user",
+        "$BUILD_DIR/mongo/db/server_base",
+        "$BUILD_DIR/mongo/rpc/client_metadata",
+        "$BUILD_DIR/mongo/util/concurrency/spin_lock",
+        "logical_session_id_helpers",
     ],
 )
 

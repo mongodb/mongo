@@ -32,6 +32,23 @@ ksdecode = env.Program(
 )
 
 env.Library(
+    target="bson_collection_catalog_entry",
+    source=[
+        "bson_collection_catalog_entry.cpp",
+    ],
+    LIBDEPS=[
+        "$BUILD_DIR/mongo/db/catalog/collection_options",
+    ],
+    LIBDEPS_PRIVATE=[
+        "$BUILD_DIR/mongo/db/common",
+        "$BUILD_DIR/mongo/db/multitenancy",
+        "$BUILD_DIR/mongo/db/server_base",
+        "$BUILD_DIR/mongo/db/server_options",
+        "$BUILD_DIR/mongo/db/service_context",
+    ],
+)
+
+env.Library(
     target="oplog_cap_maintainer_thread",
     source=[
         "oplog_cap_maintainer_thread.cpp",
@@ -186,6 +203,21 @@ env.Library(
     ],
 )
 
+env.Library(
+    target="storage_repair_observer",
+    source=[
+        "storage_repair_observer.cpp",
+    ],
+    LIBDEPS_PRIVATE=[
+        "$BUILD_DIR/mongo/base",
+        "$BUILD_DIR/mongo/db/repl/replica_set_messages",
+        "$BUILD_DIR/mongo/db/repl/storage_interface",
+        "$BUILD_DIR/mongo/db/service_context",
+        "$BUILD_DIR/mongo/db/storage/journal_flusher",
+        "storage_file_util",
+    ],
+)
+
 env.Benchmark(
     target="storage_key_string_bm",
     source=[
@@ -285,6 +317,23 @@ env.CppUnitTest(
         "storage_engine_common",
         "storage_engine_lock_file",
         "storage_engine_metadata",
+        "storage_options",
+    ],
+)
+
+env.Library(
+    target="durable_catalog",
+    source=[
+        "durable_catalog.cpp",
+    ],
+    LIBDEPS=[
+        "bson_collection_catalog_entry",
+    ],
+    LIBDEPS_PRIVATE=[
+        "$BUILD_DIR/mongo/db/concurrency/lock_manager",
+        "$BUILD_DIR/mongo/db/multitenancy",
+        "$BUILD_DIR/mongo/db/server_base",
+        "record_store_base",
         "storage_options",
     ],
 )

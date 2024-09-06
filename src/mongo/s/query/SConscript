@@ -16,6 +16,15 @@ env.SConscript(
 )
 
 env.Library(
+    target="cluster_query_knobs",
+    source=[
+        "cluster_query_knobs_gen.cpp",
+    ],
+    LIBDEPS=[],
+    LIBDEPS_PRIVATE=["$BUILD_DIR/mongo/db/server_base"],
+)
+
+env.Library(
     target="mongos_docs_needed_bounds",
     source=[
         "document_source_visitor_docs_needed_bounds.cpp",

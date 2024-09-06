@@ -3,6 +3,17 @@
 Import("env")
 
 env = env.Clone()
+env.Library(
+    target="tracing_profiler",
+    source=[
+        "internal/cycleclock.cpp",
+        "internal/profiler_internal.cpp",
+    ],
+    LIBDEPS_PRIVATE=[
+        "$BUILD_DIR/mongo/db/commands/server_status_core",
+    ],
+)
+
 env.CppUnitTest(
     target="tracing_profiler_test",
     source=[

@@ -14,42 +14,6 @@ idl_generator(
     src = "sdam_configuration_parameters.idl",
 )
 
-mongo_cc_library(
-    name = "sdam",
-    srcs = [
-        "sdam_configuration.cpp",
-        "sdam_datatypes.cpp",
-        "server_description.cpp",
-        "server_selector.cpp",
-        "topology_description.cpp",
-        "topology_listener.cpp",
-        "topology_manager.cpp",
-        "topology_state_machine.cpp",
-        ":sdam_configuration_parameters_gen",
-    ],
-    hdrs = [
-        "election_id_set_version_pair.h",
-        "sdam_configuration.h",
-        "sdam_datatypes.h",
-        "server_description.h",
-        "server_selector.h",
-        "topology_description.h",
-        "topology_listener.h",
-        "topology_manager.h",
-        "topology_state_machine.h",
-    ],
-    deps = [
-        "//src/mongo/client:read_preference",  # TODO(SERVER-93876): Remove.
-        "//src/mongo/db:server_base",
-        "//src/mongo/db:wire_version",  # TODO(SERVER-93876): Remove.
-        "//src/mongo/db/repl:optime",  # TODO(SERVER-93876): Remove.
-        "//src/mongo/executor:task_executor_interface",
-        "//src/mongo/rpc:metadata",
-        "//src/mongo/util:clock_sources",  # TODO(SERVER-93876): Remove.
-        "//src/mongo/util:fail_point",  # TODO(SERVER-93876): Remove.
-    ],
-)
-
 idl_generator(
     name = "json_test_runner_cli_options_gen",
     src = "json_test_runner_cli_options.idl",

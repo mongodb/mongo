@@ -9,22 +9,6 @@ exports_files(
     ]),
 )
 
-mongo_cc_library(
-    name = "js_function",
-    srcs = [
-        "js_function.cpp",
-    ],
-    hdrs = [
-        "js_function.h",
-    ],
-    deps = [
-        "//src/mongo/db:service_context",
-        "//src/mongo/db/auth",
-        "//src/mongo/db/query:query_knobs",
-        "//src/mongo/scripting:scripting_common",
-    ],
-)
-
 filegroup(
     name = "headers",
     srcs = [
@@ -33,23 +17,6 @@ filegroup(
         "delete_stage.h",
         "requires_collection_stage.h",
         "write_stage_common.h",
-    ],
-)
-
-# WorkingSet target and associated test
-mongo_cc_library(
-    name = "working_set",
-    srcs = [
-        "working_set.cpp",
-    ],
-    hdrs = [
-        "working_set.h",
-    ],
-    deps = [
-        "//src/mongo:base",
-        "//src/mongo/db:service_context",  # TODO(SERVER-93876): Remove.
-        "//src/mongo/db/exec/document_value",
-        "//src/mongo/db/query/bson:dotted_path_support",
     ],
 )
 

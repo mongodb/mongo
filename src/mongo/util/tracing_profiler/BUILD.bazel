@@ -8,18 +8,3 @@ exports_files(
         "*.cpp",
     ]),
 )
-
-mongo_cc_library(
-    name = "tracing_profiler",
-    srcs = [
-        "//src/mongo/util/tracing_profiler/internal:cycleclock.cpp",
-        "//src/mongo/util/tracing_profiler/internal:profiler_internal.cpp",
-    ],
-    hdrs = [
-        "//src/mongo/util/tracing_profiler/internal:cycleclock.h",
-        "//src/mongo/util/tracing_profiler/internal:profiler_internal.h",
-    ],
-    deps = [
-        "//src/mongo/db/commands:server_status_core",
-    ],
-)

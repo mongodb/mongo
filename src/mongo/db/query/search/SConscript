@@ -107,6 +107,18 @@ env.Library(
 )
 
 env.Library(
+    target="search_index_process_interface",
+    source=[
+        "search_index_process_interface.cpp",
+    ],
+    LIBDEPS_PRIVATE=[
+        "$BUILD_DIR/mongo/db/commands",
+        "$BUILD_DIR/mongo/db/server_base",
+        "$BUILD_DIR/mongo/db/service_context",
+    ],
+)
+
+env.Library(
     target="search_index_process_shard",
     source=[
         "search_index_process_shard.cpp",

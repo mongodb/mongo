@@ -9,44 +9,6 @@ exports_files(
     ]),
 )
 
-# Contains only the core ConnectionString functionality, *not* the ability to
-# call connect() and return a DBClientBase* back. For that you need to link
-# against the 'clientdriver_network' library.
-mongo_cc_library(
-    name = "connection_string",
-    srcs = [
-        "connection_string.cpp",
-        "mongo_uri.cpp",
-        "//src/mongo/db/auth:sasl_command_constants.h",
-        "//src/mongo/util:dns_name.h",
-    ],
-    hdrs = [
-        "connection_string.h",
-        "mongo_uri.h",
-    ],
-    deps = [
-        "//src/mongo/util:dns_query",
-        "//src/mongo/util/net:network",
-        "//src/mongo/util/options_parser",  # TODO(SERVER-93876): Remove.
-    ],
-)
-
-mongo_cc_library(
-    name = "internal_auth",
-    srcs = [
-        "internal_auth.cpp",
-    ],
-    hdrs = [
-        "internal_auth.h",
-    ],
-    deps = [
-        ":connection_string",
-        "//src/mongo/bson/util:bson_extract",
-        "//src/mongo/db/auth",
-        "//src/mongo/util:md5",
-    ],
-)
-
 idl_generator(
     name = "sasl_aws_protocol_common_gen",
     src = "sasl_aws_protocol_common.idl",
@@ -79,116 +41,6 @@ idl_generator(
     ],
 )
 
-# Client-side SASL source necessary for native client SASL session.
-# Includes base types and OIDC, PLAIN, SCRAM, and AWS (only if TLS configured)
-# client mechs.
-mongo_cc_library(
-    name = "native_sasl_client",
-    srcs = [
-        "native_sasl_client_session.cpp",
-        "sasl_client_authenticate.cpp",
-        "sasl_client_authenticate_impl.cpp",
-        "sasl_client_conversation.cpp",
-        "sasl_client_session.cpp",
-        "sasl_oidc_client_conversation.cpp",
-        "sasl_oidc_client_types_gen",
-        "sasl_plain_client_conversation.cpp",
-        "sasl_scram_client_conversation.cpp",
-    ] + select({
-        "//bazel/config:ssl_enabled": [
-            "sasl_aws_client_conversation.cpp",
-            "sasl_aws_client_options_gen",
-            "sasl_x509_client_conversation.cpp",
-        ],
-        "//conditions:default": [],
-    }),
-    hdrs = [
-        "native_sasl_client_session.h",
-        "sasl_aws_client_options.h",
-        "sasl_client_authenticate.h",
-        "sasl_client_conversation.h",
-        "sasl_client_session.h",
-        "sasl_oidc_client_conversation.h",
-        "sasl_oidc_client_params.h",
-        "sasl_plain_client_conversation.h",
-        "sasl_scram_client_conversation.h",
-        "sasl_x509_client_conversation.h",
-        "scram_client_cache.h",
-        "//src/mongo/crypto:mechanism_scram.h",
-    ] + select({
-        "//bazel/config:ssl_enabled": [
-            "sasl_aws_client_conversation.h",
-        ],
-        "//conditions:default": [],
-    }),
-    deps = [
-        ":connection_string",
-        "//src/mongo/base:secure_allocator",  # TODO(SERVER-93876): Remove.
-        "//src/mongo/bson/util:bson_extract",  # TODO(SERVER-93876): Remove.
-        "//src/mongo/db:server_base",
-        "//src/mongo/db/auth:sasl_mechanism_protocol",
-        "//src/mongo/db/commands:server_status_core",
-        "//src/mongo/executor:remote_command",  # TODO(SERVER-93876): Remove.
-        "//src/mongo/rpc:command_status",
-        "//src/mongo/rpc:metadata",  # TODO(SERVER-93876): Remove.
-        "//src/mongo/shell:program_runner",  # TODO(SERVER-93876): Remove.
-        "//src/mongo/util:icu",
-        "//src/mongo/util:md5",
-        "//src/mongo/util/net:http_client",  # TODO(SERVER-93876): Remove.
-        "//src/mongo/util/net:network",  # TODO(SERVER-93876): Remove.
-        "//src/mongo/util/options_parser",
-    ] + select({
-        "//bazel/config:ssl_enabled": [
-            ":sasl_aws_client",
-        ],
-        "//conditions:default": [],
-    }),
-)
-
-mongo_cc_library(
-    name = "authentication",
-    srcs = [
-        "authenticate.cpp",
-    ],
-    hdrs = [
-        "authenticate.h",
-    ],
-    deps = [
-        ":connection_string",  # TODO(SERVER-93876): Remove.
-        ":internal_auth",  # TODO(SERVER-93876): Remove.
-        ":native_sasl_client",
-        "//src/mongo/bson/util:bson_extract",  # TODO(SERVER-93876): Remove.
-        "//src/mongo/db:server_base",
-        "//src/mongo/db/auth",  # TODO(SERVER-93876): Remove.
-        "//src/mongo/executor:remote_command",  # TODO(SERVER-93876): Remove.
-    ],
-)
-
-mongo_cc_library(
-    name = "async_client",
-    srcs = [
-        "async_client.cpp",
-    ],
-    hdrs = [
-        "async_client.h",
-    ],
-    deps = [
-        ":authentication",
-        "//src/mongo/db:connection_health_metrics_parameter",  # TODO(SERVER-93876): Remove.
-        "//src/mongo/db:server_feature_flags",  # TODO(SERVER-93876): Remove.
-        "//src/mongo/db:wire_version",  # TODO(SERVER-93876): Remove.
-        "//src/mongo/db/commands:test_commands_enabled",  # TODO(SERVER-93876): Remove.
-        "//src/mongo/db/stats:counters",  # TODO(SERVER-93876): Remove.
-        "//src/mongo/executor:egress_connection_closer_manager",
-        "//src/mongo/rpc",
-        "//src/mongo/rpc:command_status",  # TODO(SERVER-93876): Remove.
-        "//src/mongo/transport:message_compressor",  # TODO(SERVER-93876): Remove.
-        "//src/mongo/transport:transport_layer_common",  # TODO(SERVER-93876): Remove.
-        "//src/mongo/util:fail_point",  # TODO(SERVER-93876): Remove.
-        "//src/mongo/util/net:ssl_manager",  # TODO(SERVER-93876): Remove.
-    ],
-)
-
 idl_generator(
     name = "sasl_sspi_options_gen",
     src = "sasl_sspi_options.idl",
@@ -202,35 +54,6 @@ idl_generator(
     src = "client_api_version_parameters.idl",
     deps = [
         "//src/mongo/db:basic_types_gen",
-    ],
-)
-
-mongo_cc_library(
-    name = "clientdriver_minimal",
-    srcs = [
-        "client_api_version_parameters_gen",
-        "dbclient_base.cpp",
-        "dbclient_cursor.cpp",
-        "index_spec.cpp",
-    ],
-    hdrs = [
-        "dbclient_base.h",
-        "dbclient_cursor.h",
-        "index_spec.h",
-    ],
-    deps = [
-        ":authentication",
-        ":connection_string",  # TODO(SERVER-93876): Remove.
-        ":read_preference",  # TODO(SERVER-93876): Remove.
-        "//src/mongo/db:dbmessage",
-        "//src/mongo/db:server_base",
-        "//src/mongo/db:wire_version",  # TODO(SERVER-93876): Remove.
-        "//src/mongo/db/pipeline:aggregation_request_helper",
-        "//src/mongo/db/query:command_request_response",  # TODO(SERVER-93876): Remove.
-        "//src/mongo/db/query:query_request",  # TODO(SERVER-93876): Remove.
-        "//src/mongo/rpc",  # TODO(SERVER-93876): Remove.
-        "//src/mongo/rpc:command_status",  # TODO(SERVER-93876): Remove.
-        "//src/mongo/util/net:ssl_manager",
     ],
 )
 
@@ -337,37 +160,5 @@ mongo_cc_library(
     deps = [
         "//src/mongo/db:server_base",
         "//src/mongo/db:service_context",
-    ],
-)
-
-mongo_cc_library(
-    name = "remote_command_retry_scheduler",
-    srcs = [
-        "remote_command_retry_scheduler.cpp",
-    ],
-    hdrs = [
-        "remote_command_retry_scheduler.h",
-    ],
-    deps = [
-        "//src/mongo:base",  # TODO(SERVER-93876): Remove.
-        "//src/mongo/executor:task_executor_interface",
-    ],
-)
-
-mongo_cc_library(
-    name = "fetcher",
-    srcs = [
-        "fetcher.cpp",
-        "//src/mongo/db:clientcursor.h",
-        "//src/mongo/db:cursor_id.h",
-    ],
-    hdrs = [
-        "fetcher.h",
-    ],
-    deps = [
-        ":remote_command_retry_scheduler",
-        "//src/mongo/db:server_base",
-        "//src/mongo/executor:task_executor_interface",  # TODO(SERVER-93876): Remove.
-        "//src/mongo/rpc:command_status",
     ],
 )

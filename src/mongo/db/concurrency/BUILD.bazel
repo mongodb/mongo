@@ -15,26 +15,6 @@ idl_generator(
 )
 
 mongo_cc_library(
-    name = "exception_util",
-    srcs = [
-        "exception_util.cpp",
-        ":exception_util_gen",
-    ],
-    hdrs = [
-        "exception_util.h",
-    ],
-    deps = [
-        "//src/mongo/db:server_base",
-        "//src/mongo/db:server_options_servers",
-        "//src/mongo/db/commands:server_status_core",  # TODO(SERVER-93876): Remove.
-        "//src/mongo/db/query/query_stats",
-        "//src/mongo/db/storage:recovery_unit_base",  # TODO(SERVER-93876): Remove.
-        "//src/mongo/util:fail_point",  # TODO(SERVER-93876): Remove.
-        "//src/mongo/util:log_and_backoff",
-    ],
-)
-
-mongo_cc_library(
     name = "lock_manager",
     srcs = [
         "cond_var_lock_grant_notification.cpp",

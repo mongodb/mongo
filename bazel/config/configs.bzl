@@ -555,17 +555,3 @@ developer_dir = rule(
     implementation = lambda ctx: developer_dir_provider(path = ctx.build_setting_value),
     build_setting = config.string(flag = True),
 )
-
-# =========
-# js_engine
-# =========
-
-js_engine_provider = provider(
-    doc = "JavaScript scripting engine implementation",
-    fields = {"engine": "Javascript scripting engine."},
-)
-
-js_engine = rule(
-    implementation = lambda ctx: js_engine_provider(engine = ctx.build_setting_value),
-    build_setting = config.string(flag = True),
-)

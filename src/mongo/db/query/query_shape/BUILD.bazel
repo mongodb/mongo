@@ -10,61 +10,18 @@ exports_files(
 )
 
 idl_generator(
-    name = "query_shape_gen",
-    src = "query_shape.idl",
-    deps = [
-        "//src/mongo/db:basic_types_gen",
-    ],
-)
-
-mongo_cc_library(
-    name = "query_shape_common",
-    srcs = [
-        "query_shape_gen",
-        "serialization_options.cpp",
-    ],
-    hdrs = [
-        "serialization_options.h",
-    ],
-    deps = [
-        "//src/mongo:base",
-        "//src/mongo/db/exec/document_value",
-        "//src/mongo/db/pipeline:field_path",  # TODO(SERVER-93876): Remove.
-    ],
-)
-
-mongo_cc_library(
-    name = "query_shape",
-    srcs = [
-        "query_shape.cpp",
-        "shape_helpers.cpp",
-        "//src/mongo/db/pipeline:aggregation_request_helper.h",
-        "//src/mongo/db/pipeline:plan_executor_pipeline.h",
-        "//src/mongo/db/pipeline:plan_explainer_pipeline.h",
-        "//src/mongo/db/query:count_request.h",
-        "//src/mongo/db/query:projection_ast_util.h",
-    ],
-    hdrs = [
-        "agg_cmd_shape.h",
-        "cmd_with_let_shape.h",
-        "find_cmd_shape.h",
-        "query_shape.h",
-        "shape_helpers.h",
-    ],
-    deps = [
-        ":query_shape_common",
-        "//src/mongo:base",
-        "//src/mongo/db:server_base",  # TODO(SERVER-93876): Remove.
-        "//src/mongo/db/exec/document_value",  # TODO(SERVER-93876): Remove.
-        "//src/mongo/db/pipeline:field_path",  # TODO(SERVER-93876): Remove.
-    ],
-)
-
-idl_generator(
     name = "query_shape_hash_gen",
     src = "query_shape_hash.idl",
     deps = [
         "//src/mongo/crypto:sha256_block_gen",
+    ],
+)
+
+idl_generator(
+    name = "query_shape_gen",
+    src = "query_shape.idl",
+    deps = [
+        "//src/mongo/db:basic_types_gen",
     ],
 )
 

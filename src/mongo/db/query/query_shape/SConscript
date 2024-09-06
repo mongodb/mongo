@@ -9,6 +9,34 @@ Import(
 
 env = env.Clone()
 
+env.Library(
+    target="query_shape",
+    source=[
+        "query_shape.cpp",
+        "shape_helpers.cpp",
+    ],
+    LIBDEPS=[
+        "$BUILD_DIR/mongo/base",
+        "$BUILD_DIR/mongo/db/exec/document_value/document_value",
+        "$BUILD_DIR/mongo/db/pipeline/field_path",
+        "$BUILD_DIR/mongo/db/server_base",
+        "query_shape_common",
+    ],
+)
+
+env.Library(
+    target="query_shape_common",
+    source=[
+        "query_shape_gen.cpp",
+        "serialization_options.cpp",
+    ],
+    LIBDEPS=[
+        "$BUILD_DIR/mongo/base",
+        "$BUILD_DIR/mongo/db/exec/document_value/document_value",
+        "$BUILD_DIR/mongo/db/pipeline/field_path",
+    ],
+)
+
 env.CppUnitTest(
     target="db_query_query_shape_test",
     source=[

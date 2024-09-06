@@ -9,6 +9,38 @@ Import(
     ]
 )
 
+scripting_common_env = env.Clone()
+# TODO(SERVER-77205): Review and Possibly Remove '-Wno-deprecated' After Mozjs Update
+scripting_common_env.Append(
+    CXXFLAGS=[]
+    if scripting_common_env.TargetOSIs("windows")
+    else [
+        "-Wno-deprecated",
+    ],
+)
+
+scripting_common_env.Library(
+    target="scripting_common",
+    source=[
+        "deadline_monitor.cpp",
+        "deadline_monitor_gen.cpp",
+        "dbdirectclient_factory.cpp",
+        "engine.cpp",
+        "jsexception.cpp",
+        "utils.cpp",
+    ],
+    LIBDEPS=[
+        "$BUILD_DIR/mongo/client/clientdriver_minimal",
+        "$BUILD_DIR/mongo/shell/mongojs",
+        "$BUILD_DIR/mongo/util/md5",
+        "bson_template_evaluator",
+    ],
+    LIBDEPS_PRIVATE=[
+        "$BUILD_DIR/mongo/db/server_base",
+        "$BUILD_DIR/mongo/util/fail_point",
+    ],
+)
+
 env.Library(
     target="scripting_none",
     source=[

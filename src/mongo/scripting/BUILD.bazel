@@ -9,6 +9,11 @@ exports_files(
     ]),
 )
 
+idl_generator(
+    name = "deadline_monitor_gen",
+    src = "deadline_monitor.idl",
+)
+
 mongo_cc_library(
     name = "bson_template_evaluator",
     srcs = [
@@ -22,44 +27,5 @@ mongo_cc_library(
     ],
     deps = [
         "//src/mongo:base",
-    ],
-)
-
-idl_generator(
-    name = "deadline_monitor_gen",
-    src = "deadline_monitor.idl",
-)
-
-mongo_cc_library(
-    name = "scripting_common",
-    srcs = [
-        "dbdirectclient_factory.cpp",
-        "deadline_monitor.cpp",
-        "engine.cpp",
-        "jsexception.cpp",
-        "utils.cpp",
-        ":deadline_monitor_gen",
-    ],
-    hdrs = [
-        "dbdirectclient_factory.h",
-        "deadline_monitor.h",
-        "engine.h",
-        "jsexception.h",
-    ],
-    copts = select({
-        "@platforms//os:windows": [],
-        "//conditions:default": [
-            # TODO(SERVER-77205): Review and Possibly Remove '-Wno-deprecated'
-            #                     After Mozjs Update
-            "-Wno-deprecated",
-        ],
-    }),
-    deps = [
-        ":bson_template_evaluator",  # TODO(SERVER-93876): Remove.
-        "//src/mongo/client:clientdriver_minimal",
-        "//src/mongo/db:server_base",
-        "//src/mongo/shell:mongojs",
-        "//src/mongo/util:fail_point",  # TODO(SERVER-93876): Remove.
-        "//src/mongo/util:md5",  # TODO(SERVER-93876): Remove.
     ],
 )

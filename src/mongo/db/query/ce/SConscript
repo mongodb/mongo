@@ -14,6 +14,29 @@ env.SConscript(
 )
 
 env.Library(
+    target="ce_utils",
+    source=[
+        "bound_utils.cpp",
+        "sel_tree_utils.cpp",
+    ],
+    LIBDEPS=[
+        "$BUILD_DIR/mongo/db/pipeline/abt_utils",
+        "$BUILD_DIR/mongo/db/query/optimizer/optimizer_rewrites",
+    ],
+)
+
+env.Library(
+    target="ce_histogram_estimation",
+    source=[
+        "histogram_predicate_estimation.cpp",
+    ],
+    LIBDEPS=[
+        "$BUILD_DIR/mongo/db/query/stats/stats_histograms",
+        "ce_utils",
+    ],
+)
+
+env.Library(
     target="test_utils",
     source=[
         "test_utils.cpp",

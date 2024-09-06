@@ -8,26 +8,3 @@ exports_files(
         "*.cpp",
     ]),
 )
-
-mongo_cc_library(
-    name = "document_value",
-    srcs = [
-        "document.cpp",
-        "document_comparator.cpp",
-        "document_metadata_fields.cpp",
-        "value.cpp",
-        "value_comparator.cpp",
-    ],
-    hdrs = [
-        "document.h",
-        "document_comparator.h",
-        "document_metadata_fields.h",
-        "value.h",
-        "value_comparator.h",
-    ],
-    deps = [
-        "//src/mongo:base",
-        "//src/mongo/db/pipeline:field_path",
-        "//src/mongo/db/query/datetime:date_time_support",  # TODO(SERVER-93876): Remove.
-    ],
-)

@@ -8,17 +8,3 @@ exports_files(
         "*.cpp",
     ]),
 )
-
-mongo_cc_library(
-    name = "cmdline_utils",
-    srcs = [
-        "censor_cmdline.cpp",
-    ],
-    hdrs = [
-        "censor_cmdline.h",
-    ],
-    deps = [
-        "//src/mongo:base",  # TODO(SERVER-93876): Remove.
-        "//src/mongo/util/options_parser",
-    ],
-)

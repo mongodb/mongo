@@ -9,149 +9,11 @@ exports_files(
     ]),
 )
 
-mongo_cc_library(
-    name = "message",
-    srcs = [
-        "message.cpp",
-        "op_msg.cpp",
-    ],
-    hdrs = [
-        "message.h",
-        "op_msg.h",
-    ],
-    deps = [
-        "//src/mongo/bson:bson_validate",  # TODO(SERVER-93876): Remove.
-        "//src/mongo/bson/util:bson_extract",  # TODO(SERVER-93876): Remove.
-        "//src/mongo/db:multitenancy",
-        "//src/mongo/db:server_base",
-        "//src/mongo/db:wire_version",  # TODO(SERVER-93876): Remove.
-        "//src/mongo/db/auth:security_token_auth",
-        "//src/mongo/db/query/bson:dotted_path_support",
-    ] + select({
-        "//bazel/config:use_wiredtiger_enabled": [
-            "//src/third_party/wiredtiger:wiredtiger_checksum",
-        ],
-        "//conditions:default": [],
-    }),
-)
-
 idl_generator(
     name = "topology_version_gen",
     src = "topology_version.idl",
     deps = [
         "//src/mongo/db:basic_types_gen",
-    ],
-)
-
-mongo_cc_library(
-    name = "client_metadata",
-    srcs = [
-        "//src/mongo/rpc/metadata:client_metadata.cpp",
-        "//src/mongo/rpc/metadata:client_metadata_gen",
-    ],
-    hdrs = [
-        "//src/mongo/rpc/metadata:client_metadata.h",
-    ],
-    deps = [
-        "//src/mongo:base",
-        "//src/mongo/db:server_base",
-        "//src/mongo/db:service_context",
-        "//src/mongo/transport:message_compressor",  # TODO(SERVER-93876): Remove.
-        "//src/mongo/transport:transport_layer_common",  # TODO(SERVER-93876): Remove.
-        "//src/mongo/util:processinfo",  # TODO(SERVER-93876): Remove.
-        "//src/mongo/util/concurrency:spin_lock",  # TODO(SERVER-93876): Remove.
-        "//src/mongo/util/net:network",  # TODO(SERVER-93876): Remove.
-    ],
-)
-
-mongo_cc_library(
-    name = "metadata",
-    srcs = [
-        "metadata.cpp",
-        "topology_version_gen",
-        "//src/mongo/rpc/metadata:egress_metadata_hook_list.cpp",
-        "//src/mongo/rpc/metadata:oplog_query_metadata.cpp",
-        "//src/mongo/rpc/metadata:repl_set_metadata.cpp",
-    ],
-    hdrs = [
-        "metadata.h",
-        "//src/mongo/rpc/metadata:egress_metadata_hook_list.h",
-        "//src/mongo/rpc/metadata:metadata_hook.h",
-        "//src/mongo/rpc/metadata:oplog_query_metadata.h",
-        "//src/mongo/rpc/metadata:repl_set_metadata.h",
-    ],
-    deps = [
-        ":client_metadata",
-        ":message",  # TODO(SERVER-93876): Remove.
-        ":metadata_impersonated_user",
-        "//src/mongo/bson/util:bson_extract",  # TODO(SERVER-93876): Remove.
-        "//src/mongo/client:read_preference",  # TODO(SERVER-93876): Remove.
-        "//src/mongo/db:multitenancy",  # TODO(SERVER-93876): Remove.
-        "//src/mongo/db:server_base",
-        "//src/mongo/db:signed_logical_time",  # TODO(SERVER-93876): Remove.
-        "//src/mongo/db:vector_clock",
-        "//src/mongo/db:write_block_bypass",
-        "//src/mongo/db/auth:security_token",  # TODO(SERVER-93876): Remove.
-        "//src/mongo/db/repl:optime",  # TODO(SERVER-93876): Remove.
-        "//src/mongo/util:fail_point",  # TODO(SERVER-93876): Remove.
-        "//src/mongo/util/concurrency:spin_lock",  # TODO(SERVER-93876): Remove.
-    ],
-)
-
-idl_generator(
-    name = "object_check_gen",
-    src = "object_check.idl",
-)
-
-mongo_cc_library(
-    name = "rpc",
-    srcs = [
-        "check_allowed_op_query_cmd.cpp",
-        "factory.cpp",
-        "legacy_reply.cpp",
-        "legacy_reply_builder.cpp",
-        "legacy_request.cpp",
-        "object_check.cpp",
-        "reply_builder_interface.cpp",
-        ":object_check_gen",
-    ],
-    hdrs = [
-        "check_allowed_op_query_cmd.h",
-        "factory.h",
-        "legacy_reply.h",
-        "legacy_reply_builder.h",
-        "legacy_request.h",
-        "object_check.h",
-        "op_msg_rpc_impls.h",
-        "reply_builder_interface.h",
-    ],
-    deps = [
-        ":message",
-        ":metadata",
-        ":rewrite_state_change_errors",  # TODO(SERVER-93876): Remove.
-        "//src/mongo/db:dbmessage",
-        "//src/mongo/db:server_base",  # TODO(SERVER-93876): Remove.
-        "//src/mongo/db/commands:test_commands_enabled",  # TODO(SERVER-93876): Remove.
-        "//src/mongo/db/stats:counters",  # TODO(SERVER-93876): Remove.
-        "//src/mongo/s:common_s",  # TODO(SERVER-93876): Remove.
-        "//src/mongo/util/net:network",  # TODO(SERVER-93876): Remove.
-    ],
-)
-
-mongo_cc_library(
-    name = "metadata_impersonated_user",
-    srcs = [
-        "//src/mongo/rpc/metadata:impersonated_user_metadata.cpp",
-    ],
-    hdrs = [
-        "//src/mongo/rpc/metadata:impersonated_user_metadata.h",
-    ],
-    deps = [
-        "//src/mongo:base",
-        "//src/mongo/db:server_base",  # TODO(SERVER-93876): Remove.
-        "//src/mongo/db:server_options",  # TODO(SERVER-93876): Remove.
-        "//src/mongo/db:service_context",  # TODO(SERVER-93876): Remove.
-        "//src/mongo/db/auth",
     ],
 )
 
@@ -164,28 +26,13 @@ idl_generator(
 )
 
 idl_generator(
-    name = "rewrite_state_change_errors_server_parameter_gen",
-    src = "rewrite_state_change_errors_server_parameter.idl",
+    name = "object_check_gen",
+    src = "object_check.idl",
 )
 
-mongo_cc_library(
-    name = "rewrite_state_change_errors",
-    srcs = [
-        "rewrite_state_change_errors.cpp",
-        "rewrite_state_change_errors_server_parameter_gen",
-    ],
-    hdrs = [
-        "rewrite_state_change_errors.h",
-    ],
-    deps = [
-        ":message",  # TODO(SERVER-93876): Remove.
-        "//src/mongo:base",  # TODO(SERVER-93876): Remove.
-        "//src/mongo/bson/mutable:mutable_bson",
-        "//src/mongo/bson/util:bson_extract",  # TODO(SERVER-93876): Remove.
-        "//src/mongo/db:server_base",
-        "//src/mongo/db:service_context",  # TODO(SERVER-93876): Remove.
-        "//src/mongo/util:pcre_wrapper",
-    ],
+idl_generator(
+    name = "rewrite_state_change_errors_server_parameter_gen",
+    src = "rewrite_state_change_errors_server_parameter.idl",
 )
 
 mongo_cc_library(
