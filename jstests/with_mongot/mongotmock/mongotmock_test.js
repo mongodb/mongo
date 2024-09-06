@@ -99,8 +99,6 @@ function ensureNoResponses() {
 
     // Reset state associated with cursor id and run a search command which should succeed since it
     // has fields that should be ignored.
-    // TODO SERVER-91092 remove this test when 'batchSize' and 'docsRequested' are removed from
-    // ignored fields.
     assert.commandWorked(
         testDB.runCommand({setMockResponses: 1, cursorId: cursorId, history: history}));
     assert.commandWorked(
