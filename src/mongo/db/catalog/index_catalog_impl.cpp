@@ -1598,6 +1598,7 @@ IndexCatalogEntry* IndexCatalogImpl::_getWritableEntry(const IndexDescriptor* de
 
     auto getWritableEntry = [&](auto& container) -> IndexCatalogEntry* {
         std::shared_ptr<const IndexCatalogEntry> oldEntry = container.release(descriptor);
+        invariant(oldEntry);
 
         // This collection instance already uniquely owns this IndexCatalogEntry, return it.
         if (oldEntry.use_count() == 1) {
