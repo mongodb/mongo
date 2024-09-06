@@ -676,6 +676,7 @@ static stdx::unordered_map<std::string, BuiltinFn> kBuiltinFunctions = {
     {"strLenBytes", BuiltinFn{[](size_t n) { return n == 1; }, vm::Builtin::strLenBytes, false}},
     {"strLenCP", BuiltinFn{[](size_t n) { return n == 1; }, vm::Builtin::strLenCP, false}},
     {"substrBytes", BuiltinFn{[](size_t n) { return n == 3; }, vm::Builtin::substrBytes, false}},
+    {"substrCP", BuiltinFn{[](size_t n) { return n == 3; }, vm::Builtin::substrCP, false}},
     {"toLower", BuiltinFn{[](size_t n) { return n == 1; }, vm::Builtin::toLower, false}},
     {"toUpper", BuiltinFn{[](size_t n) { return n == 1; }, vm::Builtin::toUpper, false}},
     {"trim", BuiltinFn{[](size_t n) { return n == 2; }, vm::Builtin::trim, false}},

@@ -1217,6 +1217,7 @@ env.Library(
         "$BUILD_DIR/mongo/bson/util/bson_extract",
         "$BUILD_DIR/mongo/crypto/fle_crypto",
         "$BUILD_DIR/mongo/db/query/str_trim_utils",
+        "$BUILD_DIR/mongo/db/query/substr_utils",
         "$BUILD_DIR/mongo/scripting/scripting",
         "$BUILD_DIR/mongo/scripting/scripting_common",
         "$BUILD_DIR/mongo/util/pcre_util",

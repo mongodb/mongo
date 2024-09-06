@@ -243,6 +243,16 @@ env.Library(
 )
 
 env.Library(
+    target="substr_utils",
+    source=[
+        "substr_utils.cpp",
+    ],
+    LIBDEPS=[
+        "$BUILD_DIR/mongo/base",
+    ],
+)
+
+env.Library(
     target="plan_yield_policy",
     source=[
         "plan_yield_policy.cpp",

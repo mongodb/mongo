@@ -90,6 +90,7 @@
 #include "mongo/db/query/datetime/date_time_support.h"
 #include "mongo/db/query/query_knobs_gen.h"
 #include "mongo/db/query/str_trim_utils.h"
+#include "mongo/db/query/substr_utils.h"
 #include "mongo/db/storage/column_store.h"
 #include "mongo/db/storage/key_string.h"
 #include "mongo/logv2/log.h"
@@ -3761,22 +3762,6 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinStrLenBytes(Arit
     return {false, value::TypeTags::Nothing, 0};
 }
 
-FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinStrLenCP(ArityType arity) {
-    invariant(arity == 1);
-
-    auto [_, operandTag, operandVal] = getFromStack(0);
-
-    if (value::isString(operandTag)) {
-        StringData str = value::getStringView(operandTag, operandVal);
-        size_t strLenCP = str::lengthInUTF8CodePoints(str);
-        uassert(5155901,
-                "string length could not be represented as an int.",
-                strLenCP <= std::numeric_limits<int>::max());
-        return {false, value::TypeTags::NumberInt32, strLenCP};
-    }
-    return {false, value::TypeTags::Nothing, 0};
-}
-
 FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinSubstrBytes(ArityType arity) {
     invariant(arity == 3);
 
@@ -3819,6 +3804,40 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinSubstrBytes(Arit
         return {true, outTag, outVal};
     }
     auto [outTag, outVal] = value::makeNewString(str.substr(startIndexBytes, lenBytes));
+    return {true, outTag, outVal};
+}
+
+FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinStrLenCP(ArityType arity) {
+    invariant(arity == 1);
+
+    auto [_, operandTag, operandVal] = getFromStack(0);
+
+    if (value::isString(operandTag)) {
+        StringData str = value::getStringView(operandTag, operandVal);
+        size_t strLenCP = str::lengthInUTF8CodePoints(str);
+        uassert(5155901,
+                "string length could not be represented as an int.",
+                strLenCP <= std::numeric_limits<int>::max());
+        return {false, value::TypeTags::NumberInt32, strLenCP};
+    }
+    return {false, value::TypeTags::Nothing, 0};
+}
+
+FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinSubstrCP(ArityType arity) {
+    invariant(arity == 3);
+
+    auto [strOwned, strTag, strVal] = getFromStack(0);
+    auto [startIndexOwned, startIndexTag, startIndexVal] = getFromStack(1);
+    auto [lenOwned, lenTag, lenVal] = getFromStack(2);
+
+    if (!value::isString(strTag) || startIndexTag != value::TypeTags::NumberInt32 ||
+        lenTag != value::TypeTags::NumberInt32 || startIndexVal < 0 || lenVal < 0) {
+        return {false, value::TypeTags::Nothing, 0};
+    }
+
+    StringData str = value::getStringView(strTag, strVal);
+    auto [outTag, outVal] =
+        value::makeNewString(substr_utils::getSubstringCP(str, startIndexVal, lenVal));
     return {true, outTag, outVal};
 }
 
@@ -9846,6 +9865,8 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::dispatchBuiltin(Builtin
             return builtinStrLenCP(arity);
         case Builtin::substrBytes:
             return builtinSubstrBytes(arity);
+        case Builtin::substrCP:
+            return builtinSubstrCP(arity);
         case Builtin::toUpper:
             return builtinToUpper(arity);
         case Builtin::toLower:
@@ -10415,6 +10436,8 @@ std::string builtinToString(Builtin b) {
             return "strLenCP";
         case Builtin::substrBytes:
             return "substrBytes";
+        case Builtin::substrCP:
+            return "substrCP";
         case Builtin::toUpper:
             return "toUpper";
         case Builtin::toLower:

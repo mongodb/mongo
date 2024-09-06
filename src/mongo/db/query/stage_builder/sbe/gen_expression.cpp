@@ -3043,7 +3043,76 @@ public:
         pushABT(std::move(resultExpr));
     }
     void visit(const ExpressionSubstrCP* expr) final {
-        unsupportedExpression(expr->getOpName());
+        invariant(expr->getChildren().size() == 3);
+        _context->ensureArity(3);
+
+        optimizer::ABT len = _context->popABTExpr();
+        optimizer::ABT startIndex = _context->popABTExpr();
+        optimizer::ABT stringExpr = _context->popABTExpr();
+
+        optimizer::ProjectionName stringExprName =
+            makeLocalVariableName(_context->state.frameId(), 0);
+        optimizer::ProjectionName startIndexName =
+            makeLocalVariableName(_context->state.frameId(), 0);
+        optimizer::ProjectionName lenName = makeLocalVariableName(_context->state.frameId(), 0);
+
+        optimizer::ABTVector functionArgs;
+
+        optimizer::ABT validStringExpr = buildABTMultiBranchConditional(
+            ABTCaseValuePair{generateABTNullMissingOrUndefined(stringExprName),
+                             makeABTConstant(""_sd)},
+            ABTCaseValuePair{
+                makeFillEmptyTrue(makeABTFunction("coerceToString", makeVariable(stringExprName))),
+                makeABTFail(ErrorCodes::Error(5155708),
+                            "$substrCP: string expression could not be resolved to a "
+                            "string")},
+            makeABTFunction("coerceToString", makeVariable(stringExprName)));
+        functionArgs.push_back(std::move(validStringExpr));
+
+        optimizer::ABT validStartIndexExpr = buildABTMultiBranchConditional(
+            ABTCaseValuePair{
+                generateABTNullishOrNotRepresentableInt32Check(startIndexName),
+                makeABTFail(ErrorCodes::Error{5155700},
+                            "$substrCP: starting index must be numeric type representable as a "
+                            "32-bit integral value")},
+            ABTCaseValuePair{
+                optimizer::make<optimizer::BinaryOp>(optimizer::Operations::Lt,
+                                                     makeVariable(startIndexName),
+                                                     optimizer::Constant::int32(0)),
+                makeABTFail(ErrorCodes::Error{5155701},
+                            "$substrCP: starting index must be a non-negative integer")},
+            makeABTFunction("convert",
+                            makeVariable(startIndexName),
+                            optimizer::Constant::int32(
+                                static_cast<int32_t>(sbe::value::TypeTags::NumberInt32))));
+        functionArgs.push_back(std::move(validStartIndexExpr));
+
+        optimizer::ABT validLengthExpr = buildABTMultiBranchConditional(
+            ABTCaseValuePair{generateABTNullishOrNotRepresentableInt32Check(lenName),
+                             makeABTFail(ErrorCodes::Error{5155702},
+                                         "$substrCP: length must be numeric type representable as "
+                                         "a 32-bit integral value")},
+            ABTCaseValuePair{optimizer::make<optimizer::BinaryOp>(optimizer::Operations::Lt,
+                                                                  makeVariable(lenName),
+                                                                  optimizer::Constant::int32(0)),
+                             makeABTFail(ErrorCodes::Error{5155703},
+                                         "$substrCP: length must be a non-negative integer")},
+            makeABTFunction("convert",
+                            makeVariable(lenName),
+                            optimizer::Constant::int32(
+                                static_cast<int32_t>(sbe::value::TypeTags::NumberInt32))));
+        functionArgs.push_back(std::move(validLengthExpr));
+
+        auto resultExpr =
+            optimizer::make<optimizer::FunctionCall>("substrCP", std::move(functionArgs));
+
+        resultExpr = optimizer::make<optimizer::Let>(
+            std::move(lenName), std::move(len), std::move(resultExpr));
+        resultExpr = optimizer::make<optimizer::Let>(
+            std::move(startIndexName), std::move(startIndex), std::move(resultExpr));
+        resultExpr = optimizer::make<optimizer::Let>(
+            std::move(stringExprName), std::move(stringExpr), std::move(resultExpr));
+        pushABT(std::move(resultExpr));
     }
     void visit(const ExpressionStrLenBytes* expr) final {
         tassert(5155802, "expected 'expr' to have 1 child", expr->getChildren().size() == 1);
