@@ -1224,7 +1224,9 @@ Status MigrationChunkClonerSource::_checkRecipientCloningStatus(OperationContext
                   "response"_attr = redact(res),
                   "memoryUsedBytes"_attr = _memoryUsed,
                   "docsCloned"_attr = _jumboChunkCloneState->docsCloned,
-                  "untransferredModsSizeBytes"_attr = untransferredModsSizeBytes);
+                  "untransferredModsSizeBytes"_attr = untransferredModsSizeBytes,
+                  "sessionCatalogSourceInCatchupPhase"_attr = sessionCatalogSourceInCatchupPhase,
+                  "estimateUntransferredSessionsSize"_attr = estimateUntransferredSessionsSize);
         } else {
             LOGV2(21993,
                   "moveChunk data transfer progress",
@@ -1232,7 +1234,9 @@ Status MigrationChunkClonerSource::_checkRecipientCloningStatus(OperationContext
                   "memoryUsedBytes"_attr = _memoryUsed,
                   "docsRemainingToClone"_attr =
                       _cloneList.size() - _numRecordsCloned - _numRecordsPassedOver,
-                  "untransferredModsSizeBytes"_attr = untransferredModsSizeBytes);
+                  "untransferredModsSizeBytes"_attr = untransferredModsSizeBytes,
+                  "sessionCatalogSourceInCatchupPhase"_attr = sessionCatalogSourceInCatchupPhase,
+                  "estimateUntransferredSessionsSize"_attr = estimateUntransferredSessionsSize);
         }
 
         if (res["state"].String() == "steady" && sessionCatalogSourceInCatchupPhase &&
