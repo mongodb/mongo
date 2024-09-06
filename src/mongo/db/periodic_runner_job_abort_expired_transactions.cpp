@@ -27,8 +27,6 @@
  *    it in the license file.
  */
 
-
-#include <ratio>
 #include <string>
 
 #include "mongo/base/error_codes.h"
