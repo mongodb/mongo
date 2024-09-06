@@ -42,6 +42,7 @@
 #include "mongo/db/auth/resource_pattern.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/database_name.h"
+#include "mongo/db/generic_argument_util.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/service_context.h"
 #include "mongo/s/client/shard.h"
@@ -99,14 +100,17 @@ public:
 
         auto configShard = Grid::get(opCtx)->shardRegistry()->getConfigShard();
 
+        BSONObjBuilder bob = parsedRequest.toCommandForConfig();
+        bob.appendElementsUnique(CommandInvocation::get(opCtx)->getGenericArguments().toBSON());
+
         // Force a reload of this node's shard list cache at the end of this command.
         auto cmdResponseWithStatus = configShard->runCommandWithFixedRetryAttempts(
             opCtx,
             kPrimaryOnlyReadPreference,
             DatabaseName::kAdmin,
+            // TODO SERVER-91373: Remove appendMajorityWriteConcern
             CommandHelpers::appendMajorityWriteConcern(
-                CommandHelpers::appendGenericCommandArgs(cmdObj,
-                                                         parsedRequest.toCommandForConfig()),
+                CommandHelpers::filterCommandRequestForPassthrough(bob.obj()),
                 opCtx->getWriteConcern()),
             Shard::RetryPolicy::kIdempotent);
 

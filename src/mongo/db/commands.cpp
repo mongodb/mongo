@@ -158,6 +158,21 @@ size_t CommandNameAtomRegistry::lookup(StringData s) {
     return nextIdx;
 }
 
+BSONObj appendWCToObj(const BSONObj& cmdObj, WriteConcernOptions newWC) {
+    // Append all original fields except the writeConcern field to the new command.
+    BSONObjBuilder cmdObjWithWriteConcern;
+    for (const auto& elem : cmdObj) {
+        const auto name = elem.fieldNameStringData();
+        if (name != "writeConcern" && !cmdObjWithWriteConcern.hasField(name)) {
+            cmdObjWithWriteConcern.append(elem);
+        }
+    }
+
+    // Finally, add the new write concern.
+    cmdObjWithWriteConcern.append(kWriteConcernField, newWC.toBSON());
+    return cmdObjWithWriteConcern.obj();
+}
+
 }  // namespace
 
 void CommandInvocationHooks::set(ServiceContext* serviceContext,
@@ -451,19 +466,6 @@ void CommandHelpers::appendCommandWCStatus(BSONObjBuilder& result,
     }
 }
 
-BSONObj CommandHelpers::appendGenericCommandArgs(const BSONObj& cmdObjWithGenericArgs,
-                                                 const BSONObj& request) {
-    BSONObjBuilder b;
-    b.appendElements(request);
-    for (const auto& elem : filterCommandRequestForPassthrough(cmdObjWithGenericArgs)) {
-        const auto name = elem.fieldNameStringData();
-        if (isGenericArgument(name) && !request.hasField(name)) {
-            b.append(elem);
-        }
-    }
-    return b.obj();
-}
-
 void CommandHelpers::appendGenericReplyFields(const BSONObj& replyObjWithGenericReplyFields,
                                               const BSONObj& reply,
                                               BSONObjBuilder* replyBuilder) {
@@ -481,21 +483,6 @@ BSONObj CommandHelpers::appendGenericReplyFields(const BSONObj& replyObjWithGene
     BSONObjBuilder b;
     appendGenericReplyFields(replyObjWithGenericReplyFields, reply, &b);
     return b.obj();
-}
-
-BSONObj CommandHelpers::appendWCToObj(const BSONObj& cmdObj, WriteConcernOptions newWC) {
-    // Append all original fields except the writeConcern field to the new command.
-    BSONObjBuilder cmdObjWithWriteConcern;
-    for (const auto& elem : cmdObj) {
-        const auto name = elem.fieldNameStringData();
-        if (name != "writeConcern" && !cmdObjWithWriteConcern.hasField(name)) {
-            cmdObjWithWriteConcern.append(elem);
-        }
-    }
-
-    // Finally, add the new write concern.
-    cmdObjWithWriteConcern.append(kWriteConcernField, newWC.toBSON());
-    return cmdObjWithWriteConcern.obj();
 }
 
 BSONObj CommandHelpers::appendMajorityWriteConcern(const BSONObj& cmdObj,

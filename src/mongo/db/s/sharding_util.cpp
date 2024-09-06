@@ -52,6 +52,7 @@
 #include "mongo/db/concurrency/exception_util.h"
 #include "mongo/db/concurrency/lock_manager_defs.h"
 #include "mongo/db/database_name.h"
+#include "mongo/db/generic_argument_util.h"
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/index_builds_coordinator.h"
 #include "mongo/db/resource_yielder.h"
@@ -88,8 +89,8 @@ void tellShardsToRefreshCollection(OperationContext* opCtx,
     auto cmd = FlushRoutingTableCacheUpdatesWithWriteConcern(nss);
     cmd.setSyncFromConfig(true);
     cmd.setDbName(nss.dbName());
-    auto cmdObj = CommandHelpers::appendMajorityWriteConcern(cmd.toBSON());
-    sendCommandToShards(opCtx, DatabaseName::kAdmin, cmdObj, shardIds, executor);
+    generic_argument_util::setMajorityWriteConcern(cmd);
+    sendCommandToShards(opCtx, DatabaseName::kAdmin, cmd.toBSON(), shardIds, executor);
 }
 
 void triggerFireAndForgetShardRefreshes(OperationContext* opCtx,

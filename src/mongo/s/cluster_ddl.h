@@ -53,7 +53,7 @@ CachedDatabaseInfo createDatabase(OperationContext* opCtx,
 /**
  * Creates the specified collection.
  */
-void createCollection(OperationContext* opCtx, const ShardsvrCreateCollection& request);
+void createCollection(OperationContext* opCtx, ShardsvrCreateCollection request);
 
 /**
  * Creates a collection with the options specified in `request`. Calls the above createCollection

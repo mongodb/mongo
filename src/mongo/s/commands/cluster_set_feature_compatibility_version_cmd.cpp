@@ -41,6 +41,7 @@
 #include "mongo/db/commands/set_feature_compatibility_version_gen.h"
 #include "mongo/db/database_name.h"
 #include "mongo/db/feature_compatibility_version_documentation.h"
+#include "mongo/db/generic_argument_util.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/service_context.h"
@@ -104,7 +105,8 @@ public:
         using InvocationBase::InvocationBase;
 
         void typedRun(OperationContext* opCtx) {
-            const auto& cmd = request();
+            auto cmd = request();
+            generic_argument_util::setMajorityWriteConcern(cmd, &opCtx->getWriteConcern());
 
             // Forward to config shard, which will forward to all shards.
             auto configShard = Grid::get(opCtx)->shardRegistry()->getConfigShard();
@@ -112,9 +114,7 @@ public:
                 opCtx,
                 ReadPreferenceSetting{ReadPreference::PrimaryOnly},
                 cmd.getDbName(),
-                CommandHelpers::appendMajorityWriteConcern(
-                    CommandHelpers::filterCommandRequestForPassthrough(cmd.toBSON()),
-                    opCtx->getWriteConcern()),
+                CommandHelpers::filterCommandRequestForPassthrough(cmd.toBSON()),
                 Shard::RetryPolicy::kIdempotent));
             uassertStatusOK(response.commandStatus);
         }

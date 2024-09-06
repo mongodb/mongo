@@ -44,6 +44,7 @@
 #include "mongo/db/commands.h"
 #include "mongo/db/database_name.h"
 #include "mongo/db/feature_flag.h"
+#include "mongo/db/generic_argument_util.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/service_context.h"
@@ -105,17 +106,19 @@ public:
         auto configShard = Grid::get(opCtx)->shardRegistry()->getConfigShard();
 
         ConfigsvrTransitionToDedicatedConfig transitionToDedicatedConfigServer;
+        transitionToDedicatedConfigServer.setGenericArguments(
+            CommandInvocation::get(opCtx)->getGenericArguments());
         transitionToDedicatedConfigServer.setDbName(DatabaseName::kAdmin);
+        generic_argument_util::setMajorityWriteConcern(transitionToDedicatedConfigServer,
+                                                       &opCtx->getWriteConcern());
 
         // Force a reload of this node's shard list cache at the end of this command.
         auto cmdResponseWithStatus = configShard->runCommandWithFixedRetryAttempts(
             opCtx,
             kPrimaryOnlyReadPreference,
             DatabaseName::kAdmin,
-            CommandHelpers::appendMajorityWriteConcern(
-                CommandHelpers::appendGenericCommandArgs(
-                    cmdObj, transitionToDedicatedConfigServer.toBSON()),
-                opCtx->getWriteConcern()),
+            CommandHelpers::filterCommandRequestForPassthrough(
+                transitionToDedicatedConfigServer.toBSON()),
             Shard::RetryPolicy::kIdempotent);
 
         Grid::get(opCtx)->shardRegistry()->reload(opCtx);

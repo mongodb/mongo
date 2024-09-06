@@ -152,25 +152,24 @@ void coordinateIndexCatalogModificationAcrossCollectionShards(
     shardsvrBlockWritesRequest.setBlockType(CriticalSectionBlockTypeEnum::kWrites);
     shardsvrBlockWritesRequest.setReason(
         getCriticalSectionReasonForIndexCommit(userCollectionNss, indexName));
+    generic_argument_util::setMajorityWriteConcern(shardsvrBlockWritesRequest);
 
-    sharding_util::sendCommandToShards(
-        opCtx,
-        userCollectionNss.dbName(),
-        CommandHelpers::appendMajorityWriteConcern(shardsvrBlockWritesRequest.toBSON()),
-        shardIdsVec,
-        executor);
+    sharding_util::sendCommandToShards(opCtx,
+                                       userCollectionNss.dbName(),
+                                       shardsvrBlockWritesRequest.toBSON(),
+                                       shardIdsVec,
+                                       executor);
 
     // Perform the index modification.
     callback(shardIdsVec);
 
     // Release the critical section in all the shards.
     shardsvrBlockWritesRequest.setBlockType(CriticalSectionBlockTypeEnum::kUnblock);
-    sharding_util::sendCommandToShards(
-        opCtx,
-        userCollectionNss.dbName(),
-        CommandHelpers::appendMajorityWriteConcern(shardsvrBlockWritesRequest.toBSON()),
-        shardIdsVec,
-        executor);
+    sharding_util::sendCommandToShards(opCtx,
+                                       userCollectionNss.dbName(),
+                                       shardsvrBlockWritesRequest.toBSON(),
+                                       shardIdsVec,
+                                       executor);
 
     // Resume migrations after committing.
     sharding_ddl_util::resumeMigrations(opCtx, userCollectionNss, collectionUUID);

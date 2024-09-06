@@ -51,6 +51,7 @@
 #include "mongo/db/coll_mod_gen.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/concurrency/lock_manager_defs.h"
+#include "mongo/db/generic_argument_util.h"
 #include "mongo/db/s/forwardable_operation_metadata.h"
 #include "mongo/db/s/participant_block_gen.h"
 #include "mongo/db/s/sharding_ddl_coordinator_gen.h"
@@ -373,15 +374,14 @@ ExecutorFuture<void> CollModCoordinator::_runImpl(
                 if (_collInfo->isTracked && _collInfo->timeSeriesOptions &&
                     hasTimeSeriesBucketingUpdate(_request)) {
                     ConfigsvrCollMod request(_collInfo->nsForTargeting, _request);
-                    const auto cmdObj =
-                        CommandHelpers::appendMajorityWriteConcern(request.toBSON());
+                    generic_argument_util::setMajorityWriteConcern(request);
 
                     const auto& configShard = Grid::get(opCtx)->shardRegistry()->getConfigShard();
                     uassertStatusOK(Shard::CommandResponse::getEffectiveStatus(
                         configShard->runCommand(opCtx,
                                                 ReadPreferenceSetting(ReadPreference::PrimaryOnly),
                                                 nss().dbName(),
-                                                cmdObj,
+                                                request.toBSON(),
                                                 Shard::RetryPolicy::kIdempotent)));
                 }
             }))

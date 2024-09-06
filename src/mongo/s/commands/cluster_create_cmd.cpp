@@ -126,7 +126,7 @@ public:
             shardsvrCollCommand.setShardsvrCreateCollectionRequest(request);
             shardsvrCollCommand.setDbName(nss.dbName());
 
-            cluster::createCollection(opCtx, shardsvrCollCommand);
+            cluster::createCollection(opCtx, std::move(shardsvrCollCommand));
             return CreateCommandReply();
         }
     };

@@ -55,6 +55,7 @@
 #include "mongo/db/commands/list_collections_filter.h"
 #include "mongo/db/concurrency/lock_manager_defs.h"
 #include "mongo/db/dbdirectclient.h"
+#include "mongo/db/generic_argument_util.h"
 #include "mongo/db/repl/change_stream_oplog_notification.h"
 #include "mongo/db/repl/read_concern_level.h"
 #include "mongo/db/s/collection_sharding_runtime.h"
@@ -595,7 +596,9 @@ std::vector<NamespaceString> MovePrimaryCoordinator::cloneDataToRecipient(Operat
         if (osi.is_initialized()) {
             commandBuilder.appendElements(osi->toBSON());
         }
-        return CommandHelpers::appendMajorityWriteConcern(commandBuilder.obj());
+        commandBuilder.append(WriteConcernOptions::kWriteConcernField,
+                              generic_argument_util::kMajorityWriteConcern.toBSON());
+        return commandBuilder.obj();
     };
 
     auto clonedCollections = [&](const BSONObj& command) {
@@ -650,8 +653,9 @@ void MovePrimaryCoordinator::commitMetadataToConfig(
     OperationContext* opCtx, const DatabaseVersion& preCommitDbVersion) const {
     const auto commitCommand = [&] {
         ConfigsvrCommitMovePrimary request(_dbName, preCommitDbVersion, _doc.getToShardId());
+        generic_argument_util::setMajorityWriteConcern(request);
         request.setDbName(DatabaseName::kAdmin);
-        return CommandHelpers::appendMajorityWriteConcern(request.toBSON());
+        return request.toBSON();
     }();
 
     const auto config = Grid::get(opCtx)->shardRegistry()->getConfigShard();
@@ -796,9 +800,10 @@ void MovePrimaryCoordinator::enterCriticalSectionOnRecipient(OperationContext* o
         ShardsvrMovePrimaryEnterCriticalSection request(_dbName);
         request.setDbName(DatabaseName::kAdmin);
         request.setReason(_csReason);
+        generic_argument_util::setMajorityWriteConcern(request);
+        generic_argument_util::setOperationSessionInfo(request, getNewSession(opCtx));
 
-        auto command = CommandHelpers::appendMajorityWriteConcern(request.toBSON());
-        return command.addFields(getNewSession(opCtx).toBSON());
+        return request.toBSON();
     }();
 
     const auto& toShardId = _doc.getToShardId();
@@ -826,9 +831,10 @@ void MovePrimaryCoordinator::exitCriticalSectionOnRecipient(OperationContext* op
         ShardsvrMovePrimaryExitCriticalSection request(_dbName);
         request.setDbName(DatabaseName::kAdmin);
         request.setReason(_csReason);
+        generic_argument_util::setMajorityWriteConcern(request);
+        generic_argument_util::setOperationSessionInfo(request, getNewSession(opCtx));
 
-        auto command = CommandHelpers::appendMajorityWriteConcern(request.toBSON());
-        return command.addFields(getNewSession(opCtx).toBSON());
+        return request.toBSON();
     }();
 
     const auto& toShardId = _doc.getToShardId();

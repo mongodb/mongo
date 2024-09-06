@@ -53,6 +53,7 @@
 #include "mongo/db/coll_mod_reply_validation.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/database_name.h"
+#include "mongo/db/generic_argument_util.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/query/explain_verbosity_gen.h"
@@ -151,16 +152,15 @@ public:
 
         ShardsvrCollMod collModCommand(nss);
         collModCommand.setCollModRequest(cmd.getCollModRequest());
-        auto cmdResponse =
-            uassertStatusOK(executeCommandAgainstDatabasePrimary(
-                                opCtx,
-                                dbName,
-                                dbInfo,
-                                CommandHelpers::appendMajorityWriteConcern(
-                                    collModCommand.toBSON(), opCtx->getWriteConcern()),
-                                ReadPreferenceSetting(ReadPreference::PrimaryOnly),
-                                Shard::RetryPolicy::kIdempotent)
-                                .swResponse);
+        generic_argument_util::setMajorityWriteConcern(collModCommand, &opCtx->getWriteConcern());
+        auto cmdResponse = uassertStatusOK(
+            executeCommandAgainstDatabasePrimary(opCtx,
+                                                 dbName,
+                                                 dbInfo,
+                                                 collModCommand.toBSON(),
+                                                 ReadPreferenceSetting(ReadPreference::PrimaryOnly),
+                                                 Shard::RetryPolicy::kIdempotent)
+                .swResponse);
 
         CommandHelpers::filterCommandReplyForPassthrough(cmdResponse.data, &result);
         return cmdResponse.isOK();

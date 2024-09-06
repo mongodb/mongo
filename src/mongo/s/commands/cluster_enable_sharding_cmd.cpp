@@ -40,6 +40,7 @@
 #include "mongo/db/auth/resource_pattern.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/database_name.h"
+#include "mongo/db/generic_argument_util.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/service_context.h"
@@ -97,13 +98,14 @@ public:
                 DatabaseNameUtil::serialize(dbName, request().getSerializationContext())};
             configsvrCreateDatabase.setDbName(DatabaseName::kAdmin);
             configsvrCreateDatabase.setPrimaryShardId(request().getPrimaryShard());
+            generic_argument_util::setMajorityWriteConcern(configsvrCreateDatabase);
 
             auto configShard = Grid::get(opCtx)->shardRegistry()->getConfigShard();
             auto response = uassertStatusOK(configShard->runCommandWithFixedRetryAttempts(
                 opCtx,
                 ReadPreferenceSetting(ReadPreference::PrimaryOnly),
                 DatabaseName::kAdmin,
-                CommandHelpers::appendMajorityWriteConcern(configsvrCreateDatabase.toBSON()),
+                configsvrCreateDatabase.toBSON(),
                 Shard::RetryPolicy::kIdempotent));
 
             uassertStatusOKWithContext(response.commandStatus,

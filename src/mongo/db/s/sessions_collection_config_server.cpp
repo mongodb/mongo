@@ -100,7 +100,7 @@ void SessionsCollectionConfigServer::_shardCollectionIfNeeded(OperationContext* 
     shardsvrCollRequest.setShardsvrCreateCollectionRequest(std::move(requestParamsObj));
     shardsvrCollRequest.setDbName(NamespaceString::kLogicalSessionsNamespace.dbName());
 
-    cluster::createCollection(opCtx, shardsvrCollRequest);
+    cluster::createCollection(opCtx, std::move(shardsvrCollRequest));
 }
 
 void SessionsCollectionConfigServer::_generateIndexesIfNeeded(OperationContext* opCtx) {

@@ -47,6 +47,7 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/api_parameters.h"
 #include "mongo/db/database_name.h"
+#include "mongo/db/generic_argument_util.h"
 #include "mongo/db/keypattern.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
@@ -329,8 +330,9 @@ public:
             getNameSpace(),
             _toShardId,
             ProvenanceEnum::kBalancerMoveCollection);
-        return appendDbVersionIfPresent(
-            CommandHelpers::appendMajorityWriteConcern(moveCollectionRequest.toBSON()), _dbVersion);
+        generic_argument_util::setMajorityWriteConcern(moveCollectionRequest);
+        generic_argument_util::setDbVersionIfPresent(moveCollectionRequest, _dbVersion);
+        return moveCollectionRequest.toBSON();
     }
 
 private:

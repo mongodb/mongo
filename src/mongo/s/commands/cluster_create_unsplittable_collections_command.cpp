@@ -91,7 +91,7 @@ public:
             svrRequest.setIsFromCreateUnsplittableCollectionTestCommand(true);
             shardsvrCollRequest.setDbName(nss.dbName());
             shardsvrCollRequest.setShardsvrCreateCollectionRequest(svrRequest);
-            cluster::createCollection(opCtx, shardsvrCollRequest);
+            cluster::createCollection(opCtx, std::move(shardsvrCollRequest));
         }
 
     private:

@@ -42,6 +42,7 @@
 #include "mongo/client/read_preference.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/database_name.h"
+#include "mongo/db/generic_argument_util.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/executor/remote_command_response.h"
 #include "mongo/idl/idl_parser.h"
@@ -118,6 +119,7 @@ CachedDatabaseInfo createDatabase(OperationContext* opCtx,
         ConfigsvrCreateDatabase request(
             DatabaseNameUtil::serialize(dbName, SerializationContext::stateCommandRequest()));
         request.setDbName(DatabaseName::kAdmin);
+        generic_argument_util::setMajorityWriteConcern(request);
         if (suggestedPrimaryId)
             request.setPrimaryShardId(*suggestedPrimaryId);
 
@@ -136,12 +138,11 @@ CachedDatabaseInfo createDatabase(OperationContext* opCtx,
                 opCtx,
                 ReadPreferenceSetting(ReadPreference::PrimaryOnly),
                 DatabaseName::kAdmin,
-                CommandHelpers::appendMajorityWriteConcern(request.toBSON()),
+                request.toBSON(),
                 Shard::RetryPolicy::kIdempotent));
             return response;
         };
         auto response = runWithYielding(opCtx, txnRouterResourceYielder.get(), sendCommand);
-
         uassertStatusOK(response.writeConcernStatus);
         uassertStatusOKWithContext(response.commandStatus,
                                    str::stream() << "Database " << dbName.toStringForErrorMsg()
@@ -157,7 +158,7 @@ CachedDatabaseInfo createDatabase(OperationContext* opCtx,
     return uassertStatusOK(std::move(dbStatus));
 }
 
-void createCollection(OperationContext* opCtx, const ShardsvrCreateCollection& request) {
+void createCollection(OperationContext* opCtx, ShardsvrCreateCollection request) {
     const auto& nss = request.getNamespace();
     const auto dbInfo = createDatabase(opCtx, nss.dbName());
 
@@ -180,7 +181,7 @@ void createCollection(OperationContext* opCtx, const ShardsvrCreateCollection& r
                     "dataShard"_attr = *requestWithRandomDataShard.getDataShard());
 
         try {
-            createCollection(opCtx, requestWithRandomDataShard);
+            createCollection(opCtx, std::move(requestWithRandomDataShard));
             return;
         } catch (const ExceptionFor<ErrorCodes::AlreadyInitialized>&) {
             // If the collection already exists but we randomly selected a dataShard that turns out
@@ -190,11 +191,7 @@ void createCollection(OperationContext* opCtx, const ShardsvrCreateCollection& r
         }
     }
 
-    BSONObjBuilder builder;
-    request.serialize(&builder);
-
-    auto rc = repl::ReadConcernArgs::get(opCtx);
-    rc.appendInfo(&builder);
+    request.setReadConcern(repl::ReadConcernArgs::get(opCtx));
 
     const bool isSharded = !request.getUnsplittable();
     auto cmdObjWithWc = [&]() {
@@ -202,22 +199,21 @@ void createCollection(OperationContext* opCtx, const ShardsvrCreateCollection& r
         // LTS. This is a special check for config.system.sessions since the request comes from
         // the CSRS which is upgraded first
         if (isSharded && nss.isConfigDB()) {
-            return CommandHelpers::appendMajorityWriteConcern(builder.obj());
+            generic_argument_util::setMajorityWriteConcern(request);
+            return request.toBSON();
         }
         // propagate write concern if asked by the caller otherwise we set
         //  - majority if we are not in a transaction
         //  - default wc in case of transaction (no other wc are allowed).
         if (opCtx->getWriteConcern().getProvenance().isClientSupplied()) {
             auto wc = opCtx->getWriteConcern();
-            return CommandHelpers::appendWCToObj(builder.obj(), wc);
+            request.setWriteConcern(wc);
         } else {
-            if (opCtx->inMultiDocumentTransaction()) {
-                return builder.obj();
-            } else {
-                // TODO SERVER-82859 remove appendMajorityWriteConcern
-                return CommandHelpers::appendMajorityWriteConcern(builder.obj());
+            if (!opCtx->inMultiDocumentTransaction()) {
+                generic_argument_util::setMajorityWriteConcern(request);
             }
         }
+        return request.toBSON();
     }();
     auto cmdResponse = [&]() {
         if (isSharded && nss.isConfigDB())

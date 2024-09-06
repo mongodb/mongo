@@ -29,10 +29,12 @@
 
 #include "mongo/db/s/migration_blocking_operation/multi_update_coordinator_external_state.h"
 #include "mongo/db/catalog_raii.h"
+#include "mongo/db/generic_argument_util.h"
 #include "mongo/db/s/migration_blocking_operation/migration_blocking_operation_coordinator.h"
 #include "mongo/s/cluster_commands_helpers.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/query/planner/cluster_aggregate.h"
+#include "mongo/s/request_types/migration_blocking_operation_gen.h"
 #include "mongo/s/service_entry_point_router_role.h"
 #include "mongo/s/stale_shard_version_helpers.h"
 
@@ -52,7 +54,7 @@ auto runDDLOperationWithRetry(OperationContext* opCtx,
             opCtx,
             DatabaseName::kAdmin,
             dbInfo,
-            CommandHelpers::appendMajorityWriteConcern(command, opCtx->getWriteConcern()),
+            command,
             ReadPreferenceSetting(ReadPreference::PrimaryOnly),
             Shard::RetryPolicy::kIdempotent);
         const auto remoteResponse = uassertStatusOK(response.swResponse);
@@ -74,23 +76,17 @@ Future<DbResponse> MultiUpdateCoordinatorExternalStateImpl::sendClusterUpdateCom
 void MultiUpdateCoordinatorExternalStateImpl::startBlockingMigrations(OperationContext* opCtx,
                                                                       const NamespaceString& nss,
                                                                       const UUID& operationId) {
-    runDDLOperationWithRetry(
-        opCtx,
-        nss,
-        BSON("_shardsvrBeginMigrationBlockingOperation"
-             << NamespaceStringUtil::serialize(nss, SerializationContext::stateCommandRequest())
-             << "operationId" << operationId));
+    ShardsvrBeginMigrationBlockingOperation beginMigrationCmd(nss, operationId);
+    generic_argument_util::setMajorityWriteConcern(beginMigrationCmd, &opCtx->getWriteConcern());
+    runDDLOperationWithRetry(opCtx, nss, beginMigrationCmd.toBSON());
 }
 
 void MultiUpdateCoordinatorExternalStateImpl::stopBlockingMigrations(OperationContext* opCtx,
                                                                      const NamespaceString& nss,
                                                                      const UUID& operationId) {
-    runDDLOperationWithRetry(
-        opCtx,
-        nss,
-        BSON("_shardsvrEndMigrationBlockingOperation"
-             << NamespaceStringUtil::serialize(nss, SerializationContext::stateCommandRequest())
-             << "operationId" << operationId));
+    ShardsvrEndMigrationBlockingOperation endMigrationCmd(nss, operationId);
+    generic_argument_util::setMajorityWriteConcern(endMigrationCmd, &opCtx->getWriteConcern());
+    runDDLOperationWithRetry(opCtx, nss, endMigrationCmd.toBSON());
 }
 
 bool MultiUpdateCoordinatorExternalStateImpl::isUpdatePending(

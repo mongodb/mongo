@@ -48,6 +48,7 @@
 #include "mongo/db/basic_types.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/database_name.h"
+#include "mongo/db/generic_argument_util.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/service_context.h"
@@ -231,14 +232,15 @@ public:
 
             configsvrRequest.setForceJumbo(request().getForceJumbo() ? ForceJumbo::kForceManual
                                                                      : ForceJumbo::kDoNotForce);
+            generic_argument_util::setMajorityWriteConcern(configsvrRequest);
 
             auto configShard = Grid::get(opCtx)->shardRegistry()->getConfigShard();
-            auto commandResponse = configShard->runCommand(
-                opCtx,
-                ReadPreferenceSetting{ReadPreference::PrimaryOnly},
-                DatabaseName::kAdmin,
-                CommandHelpers::appendMajorityWriteConcern(configsvrRequest.toBSON()),
-                Shard::RetryPolicy::kIdempotent);
+            auto commandResponse =
+                configShard->runCommand(opCtx,
+                                        ReadPreferenceSetting{ReadPreference::PrimaryOnly},
+                                        DatabaseName::kAdmin,
+                                        configsvrRequest.toBSON(),
+                                        Shard::RetryPolicy::kIdempotent);
             uassertStatusOK(Shard::CommandResponse::getEffectiveStatus(std::move(commandResponse)));
 
             Grid::get(opCtx)

@@ -386,12 +386,13 @@ void removeQueryAnalyzerMetadataFromConfig(OperationContext* opCtx, const BSONOb
         entry.setMulti(true);
         return entry;
     }()});
+    generic_argument_util::setMajorityWriteConcern(deleteCmd);
 
     const auto deleteResult = configShard->runCommandWithFixedRetryAttempts(
         opCtx,
         ReadPreferenceSetting{ReadPreference::PrimaryOnly},
         DatabaseName::kConfig,
-        CommandHelpers::appendMajorityWriteConcern(deleteCmd.toBSON()),
+        deleteCmd.toBSON(),
         Shard::RetryPolicy::kIdempotent);
 
     uassertStatusOKWithContext(

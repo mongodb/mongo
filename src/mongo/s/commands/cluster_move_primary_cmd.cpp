@@ -38,6 +38,7 @@
 #include "mongo/db/auth/resource_pattern.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/database_name.h"
+#include "mongo/db/generic_argument_util.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/service_context.h"
@@ -84,13 +85,14 @@ public:
             ShardsvrMovePrimary shardsvrRequest{dbNss.dbName()};
             shardsvrRequest.setDbName(DatabaseName::kAdmin);
             shardsvrRequest.getMovePrimaryRequestBase().setTo(toShardId);
+            generic_argument_util::setMajorityWriteConcern(shardsvrRequest,
+                                                           &opCtx->getWriteConcern());
 
             const auto commandResponse = executeCommandAgainstDatabasePrimary(
                 opCtx,
                 DatabaseName::kAdmin,
                 dbInfo,
-                CommandHelpers::appendMajorityWriteConcern(shardsvrRequest.toBSON(),
-                                                           opCtx->getWriteConcern()),
+                shardsvrRequest.toBSON(),
                 ReadPreferenceSetting{ReadPreference::PrimaryOnly},
                 Shard::RetryPolicy::kIdempotent);
 

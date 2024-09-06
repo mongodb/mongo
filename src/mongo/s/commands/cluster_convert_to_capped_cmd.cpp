@@ -38,6 +38,7 @@
 #include "mongo/db/auth/action_type.h"
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/commands.h"
+#include "mongo/db/generic_argument_util.h"
 #include "mongo/executor/remote_command_response.h"
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/s/cluster_commands_helpers.h"
@@ -95,6 +96,8 @@ public:
         ShardsvrConvertToCapped shardSvrConvertToCappedCommand(nss);
         shardSvrConvertToCappedCommand.setDbName(dbName);
         shardSvrConvertToCappedCommand.setShardsvrConvertToCappedRequest(std::move(req));
+        generic_argument_util::setMajorityWriteConcern(shardSvrConvertToCappedCommand,
+                                                       &opCtx->getWriteConcern());
 
         const CachedDatabaseInfo dbInfo =
             uassertStatusOK(Grid::get(opCtx)->catalogCache()->getDatabase(opCtx, nss.dbName()));
@@ -102,8 +105,7 @@ public:
             opCtx,
             dbName,
             dbInfo,
-            CommandHelpers::appendMajorityWriteConcern(shardSvrConvertToCappedCommand.toBSON(),
-                                                       opCtx->getWriteConcern()),
+            shardSvrConvertToCappedCommand.toBSON(),
             ReadPreferenceSetting(ReadPreference::PrimaryOnly),
             Shard::RetryPolicy::kIdempotent);
 

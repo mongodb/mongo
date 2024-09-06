@@ -48,6 +48,7 @@
 #include "mongo/db/commands/rename_collection_common.h"
 #include "mongo/db/commands/rename_collection_gen.h"
 #include "mongo/db/curop_failpoint_helpers.h"
+#include "mongo/db/generic_argument_util.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/service_context.h"
@@ -162,12 +163,12 @@ public:
                           "failpoint");
                 });
 
+            generic_argument_util::setMajorityWriteConcern(renameCollRequest);
             auto cmdResponse = uassertStatusOK(shard->runCommandWithFixedRetryAttempts(
                 opCtx,
                 ReadPreferenceSetting(ReadPreference::PrimaryOnly),
                 fromNss.dbName(),
-                CommandHelpers::appendMajorityWriteConcern(
-                    appendDbVersionIfPresent(renameCollRequest.toBSON(), dbInfo->getVersion())),
+                appendDbVersionIfPresent(renameCollRequest.toBSON(), dbInfo->getVersion()),
                 Shard::RetryPolicy::kNoRetry));
 
             uassertStatusOK(cmdResponse.commandStatus);

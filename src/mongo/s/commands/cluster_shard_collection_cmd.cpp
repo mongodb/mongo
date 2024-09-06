@@ -132,7 +132,7 @@ public:
         shardsvrCollCmd.setShardsvrCreateCollectionRequest(std::move(shardsvrRequest));
         shardsvrCollCmd.setDbName(nss.dbName());
 
-        cluster::createCollection(opCtx, shardsvrCollCmd);
+        cluster::createCollection(opCtx, std::move(shardsvrCollCmd));
 
         // Add only collectionsharded as a response parameter and remove the version to maintain the
         // same format as before.

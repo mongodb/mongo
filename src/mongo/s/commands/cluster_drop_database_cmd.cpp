@@ -39,6 +39,7 @@
 #include "mongo/db/commands.h"
 #include "mongo/db/database_name.h"
 #include "mongo/db/drop_database_gen.h"
+#include "mongo/db/generic_argument_util.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/service_context.h"
@@ -108,13 +109,14 @@ public:
                 // Send it to the primary shard
                 ShardsvrDropDatabase dropDatabaseCommand;
                 dropDatabaseCommand.setDbName(dbName);
+                generic_argument_util::setMajorityWriteConcern(dropDatabaseCommand,
+                                                               &opCtx->getWriteConcern());
 
                 auto cmdResponse = executeCommandAgainstDatabasePrimary(
                     opCtx,
                     dbName,
                     dbInfo,
-                    CommandHelpers::appendMajorityWriteConcern(dropDatabaseCommand.toBSON(),
-                                                               opCtx->getWriteConcern()),
+                    dropDatabaseCommand.toBSON(),
                     ReadPreferenceSetting(ReadPreference::PrimaryOnly),
                     Shard::RetryPolicy::kIdempotent);
 

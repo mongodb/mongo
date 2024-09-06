@@ -45,6 +45,7 @@
 #include "mongo/db/auth/resource_pattern.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/database_name.h"
+#include "mongo/db/generic_argument_util.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/service_context.h"
 #include "mongo/s/client/shard.h"
@@ -112,15 +113,14 @@ public:
         configsvrRequest.setRemoveShardRequestBase(request.getRemoveShardRequestBase());
         configsvrRequest.setDbName(request.getDbName());
         configsvrRequest.setGenericArguments(request.getGenericArguments());
+        generic_argument_util::setMajorityWriteConcern(configsvrRequest, &opCtx->getWriteConcern());
 
         auto configShard = Grid::get(opCtx)->shardRegistry()->getConfigShard();
         auto cmdResponseStatus = uassertStatusOK(configShard->runCommandWithFixedRetryAttempts(
             opCtx,
             ReadPreferenceSetting(ReadPreference::PrimaryOnly),
             DatabaseName::kAdmin,
-            CommandHelpers::filterCommandRequestForPassthrough(
-                CommandHelpers::appendMajorityWriteConcern(configsvrRequest.toBSON(),
-                                                           opCtx->getWriteConcern())),
+            CommandHelpers::filterCommandRequestForPassthrough(configsvrRequest.toBSON()),
             Shard::RetryPolicy::kIdempotent));
         uassertStatusOK(cmdResponseStatus.commandStatus);
 

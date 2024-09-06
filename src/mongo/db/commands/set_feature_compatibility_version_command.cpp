@@ -79,6 +79,7 @@
 #include "mongo/db/drop_gen.h"
 #include "mongo/db/feature_compatibility_version_documentation.h"
 #include "mongo/db/feature_flag.h"
+#include "mongo/db/generic_argument_util.h"
 #include "mongo/db/index_builds_coordinator.h"
 #include "mongo/db/logical_time.h"
 #include "mongo/db/namespace_string.h"
@@ -1102,10 +1103,9 @@ private:
         requestPhase.setFromConfigServer(true);
         requestPhase.setPhase(phase);
         requestPhase.setChangeTimestamp(changeTimestamp);
+        generic_argument_util::setMajorityWriteConcern(requestPhase);
         uassertStatusOK(ShardingCatalogManager::get(opCtx)->setFeatureCompatibilityVersionOnShards(
-            opCtx,
-            CommandHelpers::appendMajorityWriteConcern(
-                CommandHelpers::filterCommandRequestForPassthrough(requestPhase.toBSON()))));
+            opCtx, CommandHelpers::filterCommandRequestForPassthrough(requestPhase.toBSON())));
     }
 
     // This helper function is for any uasserts for users to clean up user collections. Uasserts for

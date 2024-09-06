@@ -40,6 +40,7 @@
 #include "mongo/db/commands.h"
 #include "mongo/db/commands/set_user_write_block_mode_gen.h"
 #include "mongo/db/database_name.h"
+#include "mongo/db/generic_argument_util.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/service_context.h"
@@ -81,14 +82,15 @@ public:
                 request().getSetUserWriteBlockModeRequest());
             configsvrSetUserWriteBlockModeCmd.setSetUserWriteBlockModeRequest(
                 setUserWriteBlockModeRequest);
+            generic_argument_util::setMajorityWriteConcern(configsvrSetUserWriteBlockModeCmd,
+                                                           &opCtx->getWriteConcern());
 
             auto configShard = Grid::get(opCtx)->shardRegistry()->getConfigShard();
             auto cmdResponse = uassertStatusOK(configShard->runCommandWithFixedRetryAttempts(
                 opCtx,
                 ReadPreferenceSetting{ReadPreference::PrimaryOnly},
                 DatabaseName::kAdmin,
-                CommandHelpers::appendMajorityWriteConcern(
-                    configsvrSetUserWriteBlockModeCmd.toBSON(), opCtx->getWriteConcern()),
+                configsvrSetUserWriteBlockModeCmd.toBSON(),
                 Shard::RetryPolicy::kIdempotent));
             uassertStatusOK(cmdResponse.commandStatus);
             uassertStatusOK(cmdResponse.writeConcernStatus);

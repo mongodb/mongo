@@ -51,6 +51,7 @@
 #include "mongo/db/cluster_role.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/database_name.h"
+#include "mongo/db/generic_argument_util.h"
 #include "mongo/db/repl/read_concern_level.h"
 #include "mongo/db/resource_yielder.h"
 #include "mongo/db/s/resharding/resharding_data_copy_util.h"
@@ -282,18 +283,19 @@ void ReshardingCoordinatorCleaner::_dropTemporaryReshardingCollection(
     OperationContext* opCtx, const NamespaceString& tempReshardingNss) {
     ShardsvrDropCollection dropCollectionCommand(tempReshardingNss);
     dropCollectionCommand.setDbName(tempReshardingNss.dbName());
+    generic_argument_util::setMajorityWriteConcern(dropCollectionCommand,
+                                                   &opCtx->getWriteConcern());
 
     const auto dbInfo = uassertStatusOK(
         Grid::get(opCtx)->catalogCache()->getDatabase(opCtx, tempReshardingNss.dbName()));
 
-    auto cmdResponse = executeCommandAgainstDatabasePrimary(
-        opCtx,
-        tempReshardingNss.dbName(),
-        dbInfo,
-        CommandHelpers::appendMajorityWriteConcern(dropCollectionCommand.toBSON(),
-                                                   opCtx->getWriteConcern()),
-        ReadPreferenceSetting(ReadPreference::PrimaryOnly),
-        Shard::RetryPolicy::kIdempotent);
+    auto cmdResponse =
+        executeCommandAgainstDatabasePrimary(opCtx,
+                                             tempReshardingNss.dbName(),
+                                             dbInfo,
+                                             dropCollectionCommand.toBSON(),
+                                             ReadPreferenceSetting(ReadPreference::PrimaryOnly),
+                                             Shard::RetryPolicy::kIdempotent);
 
     assertResponseOK(
         _originalCollectionNss, std::move(cmdResponse.swResponse), std::move(cmdResponse.shardId));

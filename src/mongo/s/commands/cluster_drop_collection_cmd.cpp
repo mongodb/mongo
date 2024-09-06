@@ -47,6 +47,7 @@
 #include "mongo/db/commands.h"
 #include "mongo/db/database_name.h"
 #include "mongo/db/drop_gen.h"
+#include "mongo/db/generic_argument_util.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/service_context.h"
@@ -124,13 +125,14 @@ public:
                 ShardsvrDropCollection dropCollectionCommand(nss);
                 dropCollectionCommand.setDbName(nss.dbName());
                 dropCollectionCommand.setCollectionUUID(request().getCollectionUUID());
+                generic_argument_util::setMajorityWriteConcern(dropCollectionCommand,
+                                                               &opCtx->getWriteConcern());
 
                 auto cmdResponse = executeCommandAgainstDatabasePrimary(
                     opCtx,
                     nss.dbName(),
                     dbInfo,
-                    CommandHelpers::appendMajorityWriteConcern(dropCollectionCommand.toBSON(),
-                                                               opCtx->getWriteConcern()),
+                    dropCollectionCommand.toBSON(),
                     ReadPreferenceSetting(ReadPreference::PrimaryOnly),
                     Shard::RetryPolicy::kIdempotent);
 

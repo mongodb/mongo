@@ -43,6 +43,7 @@
 #include "mongo/db/commands.h"
 #include "mongo/db/database_name.h"
 #include "mongo/db/drop_indexes_gen.h"
+#include "mongo/db/generic_argument_util.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/query/explain_verbosity_gen.h"
@@ -139,18 +140,19 @@ public:
 
         ShardsvrDropIndexes shardsvrDropIndexCmd(nss);
         shardsvrDropIndexCmd.setDropIndexesRequest(requestParser.request().getDropIndexesRequest());
+        generic_argument_util::setMajorityWriteConcern(shardsvrDropIndexCmd,
+                                                       &opCtx->getWriteConcern());
 
         const CachedDatabaseInfo dbInfo =
             uassertStatusOK(Grid::get(opCtx)->catalogCache()->getDatabase(opCtx, dbName));
 
-        auto cmdResponse = executeCommandAgainstDatabasePrimary(
-            opCtx,
-            dbName,
-            dbInfo,
-            CommandHelpers::appendMajorityWriteConcern(shardsvrDropIndexCmd.toBSON(),
-                                                       opCtx->getWriteConcern()),
-            ReadPreferenceSetting(ReadPreference::PrimaryOnly),
-            Shard::RetryPolicy::kNotIdempotent);
+        auto cmdResponse =
+            executeCommandAgainstDatabasePrimary(opCtx,
+                                                 dbName,
+                                                 dbInfo,
+                                                 shardsvrDropIndexCmd.toBSON(),
+                                                 ReadPreferenceSetting(ReadPreference::PrimaryOnly),
+                                                 Shard::RetryPolicy::kNotIdempotent);
 
         const auto remoteResponse = uassertStatusOK(cmdResponse.swResponse);
         CommandHelpers::filterCommandReplyForPassthrough(remoteResponse.data, &output);

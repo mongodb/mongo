@@ -41,6 +41,7 @@
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/auth/resource_pattern.h"
 #include "mongo/db/commands.h"
+#include "mongo/db/generic_argument_util.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/service_context.h"
@@ -94,13 +95,14 @@ public:
             requestParamObj.setEnforceUniquenessCheck(request().getEnforceUniquenessCheck());
             ShardsvrRefineCollectionShardKey refineCollectionShardKeyCommand(nss);
             refineCollectionShardKeyCommand.setRefineCollectionShardKeyRequest(requestParamObj);
+            generic_argument_util::setMajorityWriteConcern(refineCollectionShardKeyCommand,
+                                                           &opCtx->getWriteConcern());
 
             auto cmdResponse = executeCommandAgainstDatabasePrimary(
                 opCtx,
                 nss.dbName(),
                 dbInfo,
-                CommandHelpers::appendMajorityWriteConcern(refineCollectionShardKeyCommand.toBSON(),
-                                                           opCtx->getWriteConcern()),
+                refineCollectionShardKeyCommand.toBSON(),
                 ReadPreferenceSetting(ReadPreference::PrimaryOnly),
                 Shard::RetryPolicy::kIdempotent);
 

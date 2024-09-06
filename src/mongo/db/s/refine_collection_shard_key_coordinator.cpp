@@ -49,6 +49,7 @@
 #include "mongo/db/concurrency/exception_util.h"
 #include "mongo/db/concurrency/lock_manager_defs.h"
 #include "mongo/db/database_name.h"
+#include "mongo/db/generic_argument_util.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/op_observer/op_observer.h"
 #include "mongo/db/s/collection_sharding_runtime.h"
@@ -342,17 +343,17 @@ ExecutorFuture<void> RefineCollectionShardKeyCoordinator::_runImpl(
                                                               *_doc.getOldTimestamp());
                 commitRequest.setDbName(DatabaseName::kAdmin);
                 commitRequest.setCommitRefineCollectionShardKeyRequest(cRCSreq);
+                generic_argument_util::setMajorityWriteConcern(commitRequest);
 
-                auto commitResponse =
-                    Grid::get(opCtx)
-                        ->shardRegistry()
-                        ->getConfigShard()
-                        ->runCommandWithFixedRetryAttempts(
-                            opCtx,
-                            ReadPreferenceSetting{ReadPreference::PrimaryOnly},
-                            DatabaseName::kAdmin,
-                            CommandHelpers::appendMajorityWriteConcern(commitRequest.toBSON()),
-                            Shard::RetryPolicy::kIdempotent);
+                auto commitResponse = Grid::get(opCtx)
+                                          ->shardRegistry()
+                                          ->getConfigShard()
+                                          ->runCommandWithFixedRetryAttempts(
+                                              opCtx,
+                                              ReadPreferenceSetting{ReadPreference::PrimaryOnly},
+                                              DatabaseName::kAdmin,
+                                              commitRequest.toBSON(),
+                                              Shard::RetryPolicy::kIdempotent);
 
                 uassertStatusOK(Shard::CommandResponse::getEffectiveStatus(commitResponse));
 
@@ -503,17 +504,18 @@ ExecutorFuture<void> RefineCollectionShardKeyCoordinatorPre71Compatible::_runImp
                 configsvrRefineCollShardKey.setDbName(nss().dbName());
                 configsvrRefineCollShardKey.setEnforceUniquenessCheck(
                     _request.getEnforceUniquenessCheck());
+                generic_argument_util::setMajorityWriteConcern(configsvrRefineCollShardKey,
+                                                               &opCtx->getWriteConcern());
                 auto configShard = Grid::get(opCtx)->shardRegistry()->getConfigShard();
 
                 sharding_ddl_util::stopMigrations(opCtx, nss(), boost::none);
 
-                const auto cmdResponse = uassertStatusOK(configShard->runCommand(
-                    opCtx,
-                    ReadPreferenceSetting(ReadPreference::PrimaryOnly),
-                    DatabaseName::kAdmin,
-                    CommandHelpers::appendMajorityWriteConcern(configsvrRefineCollShardKey.toBSON(),
-                                                               opCtx->getWriteConcern()),
-                    Shard::RetryPolicy::kIdempotent));
+                const auto cmdResponse = uassertStatusOK(
+                    configShard->runCommand(opCtx,
+                                            ReadPreferenceSetting(ReadPreference::PrimaryOnly),
+                                            DatabaseName::kAdmin,
+                                            configsvrRefineCollShardKey.toBSON(),
+                                            Shard::RetryPolicy::kIdempotent));
 
                 uassertStatusOK(Shard::CommandResponse::getEffectiveStatus(cmdResponse));
             }))

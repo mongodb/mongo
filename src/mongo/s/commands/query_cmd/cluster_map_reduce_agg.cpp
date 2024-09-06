@@ -164,9 +164,7 @@ auto makeExpressionContext(OperationContext* opCtx,
     return expCtx;
 }
 
-Document serializeToCommand(BSONObj originalCmd,
-                            const MapReduceCommandRequest& parsedMr,
-                            Pipeline* pipeline) {
+Document serializeToCommand(const MapReduceCommandRequest& parsedMr, Pipeline* pipeline) {
     MutableDocument translatedCmd;
 
     translatedCmd["aggregate"] = Value(parsedMr.getNamespace().coll());
@@ -179,17 +177,18 @@ Document serializeToCommand(BSONObj originalCmd,
         pipeline->getContext()->variablesParseState.serialize(pipeline->getContext()->variables));
     translatedCmd[AggregateCommandRequest::kIsMapReduceCommandFieldName] = Value(true);
 
-    if (shouldBypassDocumentValidationForCommand(originalCmd)) {
+
+    if (parsedMr.getBypassDocumentValidation().value_or(false)) {
         translatedCmd[bypassDocumentValidationCommandOption()] = Value(true);
     }
 
-    if (originalCmd[AggregateCommandRequest::kCollationFieldName]) {
-        translatedCmd[AggregateCommandRequest::kCollationFieldName] =
-            Value(originalCmd[AggregateCommandRequest::kCollationFieldName]);
+    if (auto collation = parsedMr.getCollation()) {
+        translatedCmd[AggregateCommandRequest::kCollationFieldName] = Value(collation.get());
     }
 
     // Append generic command options.
-    for (const auto& elem : CommandHelpers::appendGenericCommandArgs(originalCmd, BSONObj())) {
+    BSONObjBuilder bob = parsedMr.getGenericArguments().toBSON();
+    for (const auto& elem : CommandHelpers::filterCommandRequestForPassthrough(bob.obj())) {
         translatedCmd[elem.fieldNameStringData()] = Value(elem);
     }
     return translatedCmd.freeze();
@@ -263,7 +262,7 @@ bool runAggregationMapReduce(OperationContext* opCtx,
                     explain_common::generateServerInfo(&result);
                     explain_common::generateServerParameters(expCtx, &result);
                 }
-                auto serialized = serializeToCommand(cmd, parsedMr, targeter.pipeline.get());
+                auto serialized = serializeToCommand(parsedMr, targeter.pipeline.get());
                 // When running explain, we don't explicitly pass the specified verbosity here
                 // because each stage of the constructed pipeline is aware of said verbosity through
                 // a pointer to the constructed ExpressionContext.

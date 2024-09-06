@@ -37,6 +37,7 @@
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/auth/resource_pattern.h"
 #include "mongo/db/commands.h"
+#include "mongo/db/generic_argument_util.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/service_context.h"
@@ -81,6 +82,7 @@ public:
             allowMigrationsRequest.setAllowMigrations(request().getAllowMigrations());
             ShardsvrSetAllowMigrations shardsvrRequest(nss);
             shardsvrRequest.setSetAllowMigrationsRequest(allowMigrationsRequest);
+            generic_argument_util::setMajorityWriteConcern(shardsvrRequest);
 
             auto catalogCache = Grid::get(opCtx)->catalogCache();
             const auto dbInfo = uassertStatusOK(catalogCache->getDatabase(opCtx, nss.dbName()));
@@ -88,7 +90,7 @@ public:
                 opCtx,
                 nss.dbName(),
                 dbInfo,
-                CommandHelpers::appendMajorityWriteConcern(shardsvrRequest.toBSON()),
+                shardsvrRequest.toBSON(),
                 ReadPreferenceSetting(ReadPreference::PrimaryOnly),
                 Shard::RetryPolicy::kIdempotent);
 

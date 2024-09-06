@@ -29,6 +29,7 @@
 
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/commands.h"
+#include "mongo/db/generic_argument_util.h"
 #include "mongo/logv2/log.h"
 #include "mongo/s/cluster_commands_helpers.h"
 #include "mongo/s/grid.h"
@@ -65,6 +66,8 @@ public:
                 request().getToShard(),
                 ProvenanceEnum::kMoveCollection,
                 request().getOplogBatchApplierTaskCount());
+            generic_argument_util::setMajorityWriteConcern(moveCollectionRequest,
+                                                           &opCtx->getWriteConcern());
 
             LOGV2(7973800,
                   "Running a reshard collection command for the move collection request.",
@@ -78,8 +81,7 @@ public:
                 opCtx,
                 DatabaseName::kAdmin,
                 dbInfo,
-                CommandHelpers::appendMajorityWriteConcern(moveCollectionRequest.toBSON(),
-                                                           opCtx->getWriteConcern()),
+                moveCollectionRequest.toBSON(),
                 ReadPreferenceSetting(ReadPreference::PrimaryOnly),
                 Shard::RetryPolicy::kIdempotent);
 

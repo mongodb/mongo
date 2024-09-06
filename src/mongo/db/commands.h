@@ -240,12 +240,6 @@ struct CommandHelpers {
                                       const WriteConcernResult& wcResult = WriteConcernResult());
 
     /**
-     * Forward generic arguments from a client request to shards.
-     */
-    static BSONObj appendGenericCommandArgs(const BSONObj& cmdObjWithGenericArgs,
-                                            const BSONObj& request);
-
-    /**
      * Forward generic reply fields from a shard's reply to the client.
      */
     static void appendGenericReplyFields(const BSONObj& replyObjWithGenericReplyFields,
@@ -253,14 +247,16 @@ struct CommandHelpers {
                                          BSONObjBuilder* replyBuilder);
     static BSONObj appendGenericReplyFields(const BSONObj& replyObjWithGenericReplyFields,
                                             const BSONObj& reply);
-    /*
-     * Appends a generic WriteConcernOptions to a bson object
-     */
-    static BSONObj appendWCToObj(const BSONObj& cmdObj, WriteConcernOptions newWC);
 
     /**
      * Returns a copy of 'cmdObj' with a majority writeConcern appended.  If the command object does
      * not contain a writeConcern, 'defaultWC' will be used instead, if supplied.
+     *
+     * Use generic_argument_util::setMajorityWriteConcern() instead if the BSON is generated from an
+     * IDL-command struct.
+     *
+     * TODO SERVER-91373: Remove this function in favor of
+     * generic_argument_util::setMajorityWriteConcern().
      */
     static BSONObj appendMajorityWriteConcern(
         const BSONObj& cmdObj, WriteConcernOptions defaultWC = WriteConcernOptions());

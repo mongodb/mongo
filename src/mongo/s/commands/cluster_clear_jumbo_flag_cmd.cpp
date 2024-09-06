@@ -41,6 +41,7 @@
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/auth/resource_pattern.h"
 #include "mongo/db/commands.h"
+#include "mongo/db/generic_argument_util.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/service_context.h"
@@ -138,14 +139,14 @@ public:
             ConfigsvrClearJumboFlag configCmd(
                 ns(), cm.getVersion().epoch(), chunk->getMin(), chunk->getMax());
             configCmd.setDbName(request().getDbName());
+            generic_argument_util::setMajorityWriteConcern(configCmd, &opCtx->getWriteConcern());
 
             auto configShard = Grid::get(opCtx)->shardRegistry()->getConfigShard();
             auto cmdResponse = uassertStatusOK(configShard->runCommandWithFixedRetryAttempts(
                 opCtx,
                 ReadPreferenceSetting(ReadPreference::PrimaryOnly),
                 DatabaseName::kAdmin,
-                CommandHelpers::appendMajorityWriteConcern(configCmd.toBSON(),
-                                                           opCtx->getWriteConcern()),
+                configCmd.toBSON(),
                 Shard::RetryPolicy::kIdempotent));
 
             uassertStatusOK(cmdResponse.commandStatus);

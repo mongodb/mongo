@@ -43,6 +43,7 @@
 #include "mongo/db/commands.h"
 #include "mongo/db/commands/internal_rename_if_options_and_indexes_match_gen.h"
 #include "mongo/db/dbdirectclient.h"
+#include "mongo/db/generic_argument_util.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/server_options.h"
@@ -103,12 +104,12 @@ public:
                 shardsvrRenameCollectionRequest.setRenameCollectionRequest(renameCollectionRequest);
 
                 // _shardsvrRenameCollecion requires majority write concern.
-                const auto cmd = CommandHelpers::appendMajorityWriteConcern(
-                    shardsvrRenameCollectionRequest.toBSON());
+                generic_argument_util::setMajorityWriteConcern(shardsvrRenameCollectionRequest);
 
                 DBDirectClient client(opCtx);
                 BSONObj cmdResult;
-                client.runCommand(fromNss.dbName(), cmd, cmdResult);
+                client.runCommand(
+                    fromNss.dbName(), shardsvrRenameCollectionRequest.toBSON(), cmdResult);
                 uassertStatusOK(getStatusFromCommandResult(cmdResult));
             }
         }

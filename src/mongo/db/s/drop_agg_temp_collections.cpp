@@ -30,6 +30,7 @@
 #include "mongo/db/s/drop_agg_temp_collections.h"
 
 #include "mongo/db/dbdirectclient.h"
+#include "mongo/db/generic_argument_util.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/s/cluster_commands_helpers.h"
 #include "mongo/s/grid.h"
@@ -44,26 +45,26 @@ namespace {
 
 void dropTempCollection(OperationContext* opCtx, const NamespaceString& nss) {
     sharding::router::DBPrimaryRouter router(opCtx->getServiceContext(), nss.dbName());
-    router.route(
-        opCtx,
-        "dropAggTempCollections",
-        [&nss](OperationContext* opCtx, const CachedDatabaseInfo& cdb) {
-            // Drop the collection
-            const auto shard = uassertStatusOK(
-                Grid::get(opCtx)->shardRegistry()->getShard(opCtx, cdb->getPrimary()));
+    router.route(opCtx,
+                 "dropAggTempCollections",
+                 [&nss](OperationContext* opCtx, const CachedDatabaseInfo& cdb) {
+                     // Drop the collection
+                     const auto shard = uassertStatusOK(
+                         Grid::get(opCtx)->shardRegistry()->getShard(opCtx, cdb->getPrimary()));
 
-            ShardsvrDropCollection shardsvrDropCollection(nss);
-            const auto cmdResponse = executeCommandAgainstDatabasePrimary(
-                opCtx,
-                nss.dbName(),
-                cdb,
-                CommandHelpers::appendMajorityWriteConcern(shardsvrDropCollection.toBSON()),
-                ReadPreferenceSetting(ReadPreference::PrimaryOnly),
-                Shard::RetryPolicy::kIdempotent);
+                     ShardsvrDropCollection shardsvrDropCollection(nss);
+                     generic_argument_util::setMajorityWriteConcern(shardsvrDropCollection);
+                     const auto cmdResponse = executeCommandAgainstDatabasePrimary(
+                         opCtx,
+                         nss.dbName(),
+                         cdb,
+                         shardsvrDropCollection.toBSON(),
+                         ReadPreferenceSetting(ReadPreference::PrimaryOnly),
+                         Shard::RetryPolicy::kIdempotent);
 
-            const auto remoteResponse = uassertStatusOK(cmdResponse.swResponse);
-            uassertStatusOK(getStatusFromCommandResult(remoteResponse.data));
-        });
+                     const auto remoteResponse = uassertStatusOK(cmdResponse.swResponse);
+                     uassertStatusOK(getStatusFromCommandResult(remoteResponse.data));
+                 });
 }
 
 }  // namespace

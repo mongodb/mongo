@@ -45,6 +45,7 @@
 #include "mongo/db/commands.h"
 #include "mongo/db/commands/fle2_cleanup_gen.h"
 #include "mongo/db/curop.h"
+#include "mongo/db/generic_argument_util.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/service_context.h"
@@ -118,14 +119,17 @@ Cmd::Reply Cmd::Invocation::typedRun(OperationContext* opCtx) {
     const auto dbInfo =
         uassertStatusOK(Grid::get(opCtx)->catalogCache()->getDatabase(opCtx, nss.dbName()));
 
+    auto req = request();
+    generic_argument_util::setMajorityWriteConcern(req, &opCtx->getWriteConcern());
+
     // Rewrite command verb to _shardSvrCleanupStructuredEnccryptionData.
-    auto cmd = request().toBSON();
-    BSONObjBuilder req;
+    auto cmd = req.toBSON();
+    BSONObjBuilder reqBuilder;
     for (const auto& elem : cmd) {
         if (elem.fieldNameStringData() == Request::kCommandName) {
-            req.appendAs(elem, "_shardsvrCleanupStructuredEncryptionData");
+            reqBuilder.appendAs(elem, "_shardsvrCleanupStructuredEncryptionData");
         } else {
-            req.append(elem);
+            reqBuilder.append(elem);
         }
     }
 
@@ -134,9 +138,7 @@ Cmd::Reply Cmd::Invocation::typedRun(OperationContext* opCtx) {
                             opCtx,
                             nss.dbName(),
                             dbInfo,
-                            CommandHelpers::appendMajorityWriteConcern(
-                                CommandHelpers::filterCommandRequestForPassthrough(req.obj()),
-                                opCtx->getWriteConcern()),
+                            CommandHelpers::filterCommandRequestForPassthrough(reqBuilder.obj()),
                             ReadPreferenceSetting(ReadPreference::PrimaryOnly),
                             Shard::RetryPolicy::kIdempotent)
                             .swResponse);

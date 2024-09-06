@@ -51,6 +51,7 @@
 #include "mongo/db/concurrency/lock_manager_defs.h"
 #include "mongo/db/database_name.h"
 #include "mongo/db/dbdirectclient.h"
+#include "mongo/db/generic_argument_util.h"
 #include "mongo/db/logical_time.h"
 #include "mongo/db/ops/write_ops_gen.h"
 #include "mongo/db/persistent_task_store.h"
@@ -409,16 +410,16 @@ ExecutorFuture<void> DropDatabaseCoordinator::_runImpl(
 
                     auto dropDatabaseParticipantCmd = ShardsvrDropDatabaseParticipant();
                     dropDatabaseParticipantCmd.setDbName(_dbName);
-                    const auto cmdObj = CommandHelpers::appendMajorityWriteConcern(
-                        dropDatabaseParticipantCmd.toBSON());
+                    generic_argument_util::setMajorityWriteConcern(dropDatabaseParticipantCmd);
 
                     // The database needs to be dropped first on the db primary shard
                     // because otherwise changestreams won't receive the drop event.
                     {
                         DBDirectClient dbDirectClient(opCtx);
-                        const auto commandResponse =
-                            dbDirectClient.runCommand(OpMsgRequestBuilder::create(
-                                auth::ValidatedTenancyScope::get(opCtx), _dbName, cmdObj));
+                        const auto commandResponse = dbDirectClient.runCommand(
+                            OpMsgRequestBuilder::create(auth::ValidatedTenancyScope::get(opCtx),
+                                                        _dbName,
+                                                        dropDatabaseParticipantCmd.toBSON()));
                         uassertStatusOK(
                             getStatusFromCommandResult(commandResponse->getCommandReply()));
 

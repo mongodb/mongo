@@ -53,6 +53,7 @@
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/database_name.h"
 #include "mongo/db/dbdirectclient.h"
+#include "mongo/db/generic_argument_util.h"
 #include "mongo/db/logical_time.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/persistent_task_store.h"
@@ -167,12 +168,10 @@ void SetClusterParameterCoordinator::_sendSetClusterParameterToAllShards(
                                                     SerializationContext::stateDefault()));
     request.setClusterParameterTime(*_doc.getClusterParameterTime());
     generic_argument_util::setOperationSessionInfo(request, session);
+    generic_argument_util::setMajorityWriteConcern(request);
 
-    sharding_util::sendCommandToShards(opCtx,
-                                       DatabaseName::kAdmin,
-                                       CommandHelpers::appendMajorityWriteConcern(request.toBSON()),
-                                       shards,
-                                       **executor);
+    sharding_util::sendCommandToShards(
+        opCtx, DatabaseName::kAdmin, request.toBSON(), shards, **executor);
 }
 
 void SetClusterParameterCoordinator::_commit(OperationContext* opCtx) {

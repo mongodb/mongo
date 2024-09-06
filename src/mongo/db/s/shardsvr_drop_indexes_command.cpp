@@ -55,6 +55,7 @@
 #include "mongo/db/curop.h"
 #include "mongo/db/database_name.h"
 #include "mongo/db/drop_indexes_gen.h"
+#include "mongo/db/generic_argument_util.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/pipeline/legacy_runtime_constants_gen.h"
@@ -181,6 +182,8 @@ ShardsvrDropIndexesCommand::Invocation::Response ShardsvrDropIndexesCommand::Inv
     DropIndexes dropIdxCmd(ns());
     dropIdxCmd.setDropIndexesRequest(request().getDropIndexesRequest());
 
+    generic_argument_util::setMajorityWriteConcern(dropIdxCmd);
+
     // Acquire the DDL lock to serialize with other DDL operations. It also makes sure that we are
     // targeting the primary shard for this database.
     static constexpr StringData lockReason{"dropIndexes"_sd};
@@ -208,8 +211,7 @@ ShardsvrDropIndexesCommand::Invocation::Response ShardsvrDropIndexesCommand::Inv
             const auto cri = uassertStatusOK(
                 Grid::get(opCtx)->catalogCache()->getCollectionRoutingInfo(opCtx, resolvedNs));
 
-            auto cmdToBeSent = CommandHelpers::filterCommandRequestForPassthrough(
-                CommandHelpers::appendMajorityWriteConcern(dropIdxBSON));
+            auto cmdToBeSent = CommandHelpers::filterCommandRequestForPassthrough(dropIdxBSON);
 
             auto shardResponses =
                 scatterGatherVersionedTargetByRoutingTableNoThrowOnStaleShardVersionErrors(

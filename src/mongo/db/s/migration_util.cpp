@@ -224,6 +224,7 @@ void ensureChunkVersionIsGreaterThan(OperationContext* opCtx,
     ensureChunkVersionIsGreaterThanRequest.setVersion(preMigrationChunkVersion);
     ensureChunkVersionIsGreaterThanRequest.setNss(nss);
     ensureChunkVersionIsGreaterThanRequest.setCollectionUUID(collUUID);
+    generic_argument_util::setMajorityWriteConcern(ensureChunkVersionIsGreaterThanRequest);
     const auto ensureChunkVersionIsGreaterThanRequestBSON =
         ensureChunkVersionIsGreaterThanRequest.toBSON();
 
@@ -234,7 +235,7 @@ void ensureChunkVersionIsGreaterThan(OperationContext* opCtx,
             opCtx,
             ReadPreferenceSetting{ReadPreference::PrimaryOnly},
             DatabaseName::kAdmin,
-            CommandHelpers::appendMajorityWriteConcern(ensureChunkVersionIsGreaterThanRequestBSON),
+            ensureChunkVersionIsGreaterThanRequestBSON,
             Shard::RetryPolicy::kIdempotent);
     const auto ensureChunkVersionIsGreaterThanStatus =
         Shard::CommandResponse::getEffectiveStatus(ensureChunkVersionIsGreaterThanResponse);
@@ -730,7 +731,9 @@ ExecutorFuture<void> launchReleaseCriticalSectionOnRecipientFuture(
         builder.append("_recvChunkReleaseCritSec",
                        NamespaceStringUtil::serialize(nss, SerializationContext::stateDefault()));
         sessionId.append(&builder);
-        const auto commandObj = CommandHelpers::appendMajorityWriteConcern(builder.obj());
+        builder.append(WriteConcernOptions::kWriteConcernField,
+                       generic_argument_util::kMajorityWriteConcern.toBSON());
+        const auto commandObj = builder.obj();
 
         sharding_util::retryIdempotentWorkAsPrimaryUntilSuccessOrStepdown(
             opCtx,

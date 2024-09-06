@@ -37,6 +37,7 @@
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/auth/resource_pattern.h"
 #include "mongo/db/commands.h"
+#include "mongo/db/generic_argument_util.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/service_context.h"
@@ -67,13 +68,14 @@ public:
             LOGV2(5391600, "Beginning commitReshardCollection", logAttrs(ns()));
             ConfigsvrCommitReshardCollection cmd(ns());
             cmd.setDbName(request().getDbName());
+            generic_argument_util::setMajorityWriteConcern(cmd, &opCtx->getWriteConcern());
 
             auto cfg = Grid::get(opCtx)->shardRegistry()->getConfigShard();
             auto response = uassertStatusOK(cfg->runCommandWithFixedRetryAttempts(
                 opCtx,
                 ReadPreferenceSetting(ReadPreference::PrimaryOnly),
                 DatabaseName::kAdmin,
-                CommandHelpers::appendMajorityWriteConcern(cmd.toBSON(), opCtx->getWriteConcern()),
+                cmd.toBSON(),
                 Shard::RetryPolicy::kIdempotent));
             uassertStatusOK(response.commandStatus);
             uassertStatusOK(response.writeConcernStatus);

@@ -28,6 +28,7 @@
  */
 
 #include "mongo/s/write_ops/coordinate_multi_update_util.h"
+#include "mongo/db/generic_argument_util.h"
 #include "mongo/s/cluster_commands_helpers.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/request_types/coordinate_multi_update_gen.h"
@@ -139,14 +140,14 @@ BSONObj executeCoordinateMultiUpdate(OperationContext* opCtx,
     auto catalogCache = Grid::get(opCtx)->catalogCache();
     const auto dbInfo = uassertStatusOK(catalogCache->getDatabase(opCtx, nss.dbName()));
 
-    auto response = executeCommandAgainstDatabasePrimary(
-        opCtx,
-        DatabaseName::kAdmin,
-        dbInfo,
-        CommandHelpers::appendMajorityWriteConcern(coordinateCommand.toBSON(),
-                                                   opCtx->getWriteConcern()),
-        ReadPreferenceSetting(ReadPreference::PrimaryOnly),
-        Shard::RetryPolicy::kIdempotent);
+    generic_argument_util::setMajorityWriteConcern(coordinateCommand, &opCtx->getWriteConcern());
+    auto response =
+        executeCommandAgainstDatabasePrimary(opCtx,
+                                             DatabaseName::kAdmin,
+                                             dbInfo,
+                                             coordinateCommand.toBSON(),
+                                             ReadPreferenceSetting(ReadPreference::PrimaryOnly),
+                                             Shard::RetryPolicy::kIdempotent);
 
     uassertStatusOK(AsyncRequestsSender::Response::getEffectiveStatus(response));
     auto parsed = ShardsvrCoordinateMultiUpdateResponse::parse(

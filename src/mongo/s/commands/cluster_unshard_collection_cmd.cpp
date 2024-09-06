@@ -29,6 +29,7 @@
 
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/commands.h"
+#include "mongo/db/generic_argument_util.h"
 #include "mongo/logv2/log.h"
 #include "mongo/s/cluster_commands_helpers.h"
 #include "mongo/s/grid.h"
@@ -74,12 +75,13 @@ public:
             const auto dbInfo =
                 uassertStatusOK(Grid::get(opCtx)->catalogCache()->getDatabase(opCtx, nss.dbName()));
 
+            generic_argument_util::setMajorityWriteConcern(unshardCollectionRequest,
+                                                           &opCtx->getWriteConcern());
             auto cmdResponse = executeDDLCoordinatorCommandAgainstDatabasePrimary(
                 opCtx,
                 DatabaseName::kAdmin,
                 dbInfo,
-                CommandHelpers::appendMajorityWriteConcern(unshardCollectionRequest.toBSON(),
-                                                           opCtx->getWriteConcern()),
+                unshardCollectionRequest.toBSON(),
                 ReadPreferenceSetting(ReadPreference::PrimaryOnly),
                 Shard::RetryPolicy::kIdempotent);
 
