@@ -371,17 +371,17 @@ env.CppUnitTest(
         "query_shape/find_cmd_shape_test.cpp",
         "query_solution_test.cpp",
         "record_id_range_test.cpp",
-        "sbe_and_hash_test.cpp",
-        "sbe_and_sorted_test.cpp",
-        "sbe_shard_filter_test.cpp",
         "shard_filterer_factory_mock.cpp",
         "sort_pattern_test.cpp",
+        "stage_builder/sbe/and_hash_test.cpp",
+        "stage_builder/sbe/and_sorted_test.cpp",
         "stage_builder/sbe/expression_const_eval_test.cpp",
         "stage_builder/sbe/gen_accumulator_test.cpp",
         "stage_builder/sbe/gen_lookup_test.cpp",
         "stage_builder/sbe/gen_window_function_test.cpp",
         "stage_builder/sbe/sbe_builder_test.cpp",
         "stage_builder/sbe/sbe_builder_test_fixture.cpp",
+        "stage_builder/sbe/shard_filter_test.cpp",
         "stage_builder/sbe/type_checker_test.cpp",
         "stage_builder/sbe/vectorizer_test.cpp",
         "util/cartesian_product_test.cpp",
@@ -444,21 +444,6 @@ env.CppUnitTest(
         "$BUILD_DIR/mongo/db/shard_role",
         "$BUILD_DIR/mongo/db/write_stage_common",
         "query_planner",
-    ],
-)
-
-env.Benchmark(
-    target="sbe_expression_bm",
-    source=[
-        "sbe_expression_bm.cpp",
-    ],
-    LIBDEPS=[
-        "$BUILD_DIR/mongo/db/auth/authmocks",
-        "$BUILD_DIR/mongo/db/exec/sbe/query_sbe_stages",
-        "$BUILD_DIR/mongo/db/pipeline/expression_bm_fixture",
-        "$BUILD_DIR/mongo/db/query_exec",
-        "$BUILD_DIR/mongo/db/service_context_non_d",
-        "query_test_service_context",
     ],
 )
 

@@ -38,11 +38,9 @@
 #include "mongo/db/exec/sbe/values/scalar_mono_cell_block.h"
 #include "mongo/db/exec/sbe/values/ts_block.h"
 #include "mongo/db/exec/sbe/values/value.h"
-#include "mongo/db/query/stage_builder/sbe/sbe_builder_test_fixture.h"
 #include "mongo/idl/server_parameter_test_util.h"
 #include "mongo/unittest/assert.h"
 #include "mongo/unittest/framework.h"
-#include "mongo/util/itoa.h"
 
 namespace mongo::sbe {
 
@@ -50,11 +48,9 @@ using TypeTags = value::TypeTags;
 using Value = value::Value;
 using ColumnOpType = value::ColumnOpType;
 
-class SbeValueTest : public SbeStageBuilderTestFixture {};
-
 // Tests that copyValue() behaves correctly when given a TypeTags::valueBlock. Uses MonoBlock as
 // the concrete block type.
-TEST_F(SbeValueTest, SbeValueBlockTypeIsCopyable) {
+TEST(SbeValueTest, SbeValueBlockTypeIsCopyable) {
     value::MonoBlock block(1, TypeTags::NumberInt32, value::bitcastFrom<int32_t>(123));
 
     auto [cpyTag, cpyValue] =
@@ -69,7 +65,7 @@ TEST_F(SbeValueTest, SbeValueBlockTypeIsCopyable) {
 
 // Tests that copyValue() behaves correctly when given a TypeTags::valueBlock. Uses MonoBlock as
 // the concrete block type.
-TEST_F(SbeValueTest, SbeCellBlockTypeIsCopyable) {
+TEST(SbeValueTest, SbeCellBlockTypeIsCopyable) {
     value::ScalarMonoCellBlock block(1, TypeTags::NumberInt32, value::bitcastFrom<int32_t>(123));
 
     auto [cpyTag, cpyValue] = value::copyValue(

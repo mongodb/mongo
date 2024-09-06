@@ -27,7 +27,6 @@
  *    it in the license file.
  */
 
-#include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/json.h"
 #include "mongo/bson/util/bsoncolumn.h"
@@ -109,7 +108,6 @@ std::unique_ptr<value::TsBlock> makeTsBlockFromBucket(const BSONObj& bucket, Str
                                             min,
                                             max);
 }
-
 
 TEST_F(SbeValueTest, CloneCreatesIndependentCopy) {
     // A TsCellBlockForTopLevelField can be created in an "unowned" state.
