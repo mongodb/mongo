@@ -6,10 +6,7 @@
 //   uses_transactions
 // ]
 
-import {
-    withRetryOnTransientTxnError,
-    withTxnAndAutoRetryOnMongos
-} from "jstests/libs/auto_retry_transaction_in_sharding.js";
+import {withTxnAndAutoRetryOnMongos} from "jstests/libs/auto_retry_transaction_in_sharding.js";
 
 const dbName = "test";
 const collName = "kill_transaction_cursors";

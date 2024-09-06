@@ -9,7 +9,7 @@
  * ]
  */
 import {
-    retryOnceOnTransientAndRestartTxnOnMongos,
+    withAbortAndRetryOnTransientTxnError,
     withTxnAndAutoRetryOnMongos
 } from "jstests/libs/auto_retry_transaction_in_sharding.js";
 import {
@@ -59,20 +59,20 @@ function runCollectionCreateTest(command, explicitCreate) {
     secondSessionColl.drop({writeConcern: {w: "majority"}});
 
     jsTest.log("Testing createCollection in a transaction that aborts");
-    session.startTransaction({writeConcern: {w: "majority"}});
-    retryOnceOnTransientAndRestartTxnOnMongos(session, () => {
+    withAbortAndRetryOnTransientTxnError(session, () => {
+        session.startTransaction({writeConcern: {w: "majority"}});
         createCollAndCRUDInTxn(sessionDB, collName, command, explicitCreate);
-    }, {writeConcern: {w: "majority"}});
+    });
     assert.commandWorked(session.abortTransaction_forTesting());
 
     assert.eq(sessionColl.find({}).itcount(), 0);
 
     jsTest.log("Testing multiple createCollections in a transaction that aborts");
-    session.startTransaction({writeConcern: {w: "majority"}});
-    retryOnceOnTransientAndRestartTxnOnMongos(session, () => {
+    withAbortAndRetryOnTransientTxnError(session, () => {
+        session.startTransaction({writeConcern: {w: "majority"}});
         createCollAndCRUDInTxn(sessionDB, collName, command, explicitCreate);
         createCollAndCRUDInTxn(sessionDB, secondCollName, command, explicitCreate);
-    }, {writeConcern: {w: "majority"}});
+    });
     session.abortTransaction();
     assert.eq(sessionColl.find({}).itcount(), 0);
     assert.eq(secondSessionColl.find({}).itcount(), 0);
@@ -83,10 +83,10 @@ function runCollectionCreateTest(command, explicitCreate) {
     jsTest.log(
         "Testing createCollection on an existing collection in a transaction (SHOULD ABORT)");
     assert.commandWorked(sessionDB.runCommand({create: collName, writeConcern: {w: "majority"}}));
-    session.startTransaction({writeConcern: {w: "majority"}});
-    retryOnceOnTransientAndRestartTxnOnMongos(session, () => {
+    withAbortAndRetryOnTransientTxnError(session, () => {
+        session.startTransaction({writeConcern: {w: "majority"}});
         createCollAndCRUDInTxn(sessionDB, secondCollName, command, explicitCreate);
-    }, {writeConcern: {w: "majority"}});
+    });
 
     assert.commandFailedWithCode(sessionDB.runCommand({create: collName}),
                                  ErrorCodes.NamespaceExists);

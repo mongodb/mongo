@@ -3,9 +3,7 @@
  * servers and shards.
  */
 
-import {
-    retryOnceOnTransientAndRestartTxnOnMongos
-} from "jstests/libs/auto_retry_transaction_in_sharding.js";
+import {withRetryOnTransientTxnError} from "jstests/libs/auto_retry_transaction_in_sharding.js";
 import {Thread} from "jstests/libs/parallelTester.js";
 import {ShardTransitionUtil} from "jstests/libs/shard_transition_util.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
@@ -127,18 +125,22 @@ export let MongosAPIParametersUtil = (function() {
                     // Start a session and transaction.
                     const session = st.s0.startSession();
                     const txnOptions = {autocommit: false};
-                    session.startTransaction(txnOptions);
 
-                    const cmd = {
-                        insert: "collection",
-                        // A doc on each shard in the 2-shard configuration.
-                        documents: [{_id: 1}, {_id: 21}],
-                    };
+                    withRetryOnTransientTxnError(
+                        () => {
+                            session.startTransaction(txnOptions);
 
-                    retryOnceOnTransientAndRestartTxnOnMongos(session, () => {
-                        assert.commandWorked(session.getDatabase("db").runCommand(
-                            Object.assign(cmd, context.apiParameters)));
-                    }, txnOptions);
+                            const cmd = {
+                                insert: "collection",
+                                // A doc on each shard in the 2-shard configuration.
+                                documents: [{_id: 1}, {_id: 21}],
+                            };
+                            assert.commandWorked(session.getDatabase("db").runCommand(
+                                Object.assign(cmd, context.apiParameters)));
+                        },
+                        () => {
+                            session.abortTransaction();
+                        });
 
                     context.session = session;
                 },
@@ -269,18 +271,19 @@ export let MongosAPIParametersUtil = (function() {
                     // Start a session and transaction.
                     const session = st.s0.startSession();
                     const txnOptions = {autocommit: false};
-                    session.startTransaction(txnOptions);
 
-                    const cmd = {
-                        insert: "collection",
-                        // A doc on each shard in the 2-shard configuration.
-                        documents: [{_id: 1}, {_id: 21}],
-                    };
+                    withRetryOnTransientTxnError(() => {
+                        session.startTransaction(txnOptions);
 
-                    retryOnceOnTransientAndRestartTxnOnMongos(session, () => {
+                        const cmd = {
+                            insert: "collection",
+                            // A doc on each shard in the 2-shard configuration.
+                            documents: [{_id: 1}, {_id: 21}],
+                        };
+
                         assert.commandWorked(session.getDatabase("db").runCommand(
                             Object.assign(cmd, context.apiParameters)));
-                    }, txnOptions);
+                    });
 
                     context.session = session;
                 },

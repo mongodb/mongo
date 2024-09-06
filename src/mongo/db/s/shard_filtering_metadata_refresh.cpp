@@ -36,8 +36,6 @@
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 #include <fmt/format.h>
 #include <memory>
-#include <string>
-#include <tuple>
 #include <utility>
 
 #include <boost/optional/optional.hpp>
@@ -61,6 +59,7 @@
 #include "mongo/db/s/migration_util.h"
 #include "mongo/db/s/operation_sharding_state.h"
 #include "mongo/db/s/resharding/resharding_donor_recipient_common.h"
+#include "mongo/db/s/shard_filtering_util.h"
 #include "mongo/db/s/sharding_migration_critical_section.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/tenant_id.h"
@@ -68,7 +67,6 @@
 #include "mongo/executor/task_executor_pool.h"
 #include "mongo/logv2/log.h"
 #include "mongo/logv2/log_attr.h"
-#include "mongo/logv2/log_component.h"
 #include "mongo/logv2/redaction.h"
 #include "mongo/platform/compiler.h"
 #include "mongo/s/catalog/type_database_gen.h"
@@ -80,7 +78,6 @@
 #include "mongo/util/assert_util.h"
 #include "mongo/util/cancellation.h"
 #include "mongo/util/concurrency/admission_context.h"
-#include "mongo/util/database_name_util.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/fail_point.h"
 #include "mongo/util/future.h"
@@ -98,6 +95,24 @@ namespace {
 MONGO_FAIL_POINT_DEFINE(skipDatabaseVersionMetadataRefresh);
 MONGO_FAIL_POINT_DEFINE(skipShardFilteringMetadataRefresh);
 MONGO_FAIL_POINT_DEFINE(hangInRecoverRefreshThread);
+
+/**
+ * Waits for a refresh operation to complete. Returns true if the refresh completed succesfully,
+ * false if it was aborted.
+ *
+ * All waits for metadata refresh operations should go through this code path, because it also
+ * accounts for transactions and locking.
+ */
+bool waitForRefreshToComplete(OperationContext* opCtx, SharedSemiFuture<void> refresh) {
+    try {
+        refresh_util::waitForRefreshToComplete(opCtx, refresh);
+    } catch (const ExceptionFor<ErrorCodes::DatabaseMetadataRefreshCanceled>&) {
+        return false;
+    } catch (const ExceptionFor<ErrorCodes::PlacementVersionRefreshCanceled>&) {
+        return false;
+    }
+    return true;
+}
 
 /**
  * Blocking method, which will wait for any concurrent operations that could change the database
@@ -124,7 +139,7 @@ bool joinDbVersionOperation(OperationContext* opCtx,
         scopedDss->reset();
         dbLock->reset();
 
-        uassertStatusOK(OperationShardingState::waitForCriticalSectionToComplete(opCtx, *critSect));
+        uassertStatusOK(refresh_util::waitForCriticalSectionToComplete(opCtx, *critSect));
         return true;
     }
 
@@ -137,11 +152,7 @@ bool joinDbVersionOperation(OperationContext* opCtx,
         scopedDss->reset();
         dbLock->reset();
 
-        try {
-            refreshVersionFuture->get(opCtx);
-        } catch (const ExceptionFor<ErrorCodes::DatabaseMetadataRefreshCanceled>&) {
-            // The refresh was canceled by another thread that entered the critical section.
-        }
+        waitForRefreshToComplete(opCtx, *refreshVersionFuture);
 
         return true;
     }
@@ -342,11 +353,8 @@ void onDbVersionMismatch(OperationContext* opCtx,
         // No other metadata refresh for this database can run in parallel. If another thread enters
         // the critical section, the ongoing refresh would be interrupted and subsequently
         // re-queued.
-
-        try {
-            dbMetadataRefreshFuture->get(opCtx);
-        } catch (const ExceptionFor<ErrorCodes::DatabaseMetadataRefreshCanceled>&) {
-            // The refresh was canceled by another thread that entered the critical section.
+        if (!waitForRefreshToComplete(opCtx, *dbMetadataRefreshFuture)) {
+            // The refresh was canceled by a 'clearFilteringMetadata'. Retry the refresh.
             continue;
         }
 
@@ -378,8 +386,7 @@ bool joinCollectionPlacementVersionOperation(OperationContext* opCtx,
         collLock->reset();
         dbLock->reset();
 
-        uassertStatusOK(
-            OperationShardingState::waitForCriticalSectionToComplete(opCtx, *critSecSignal));
+        uassertStatusOK(refresh_util::waitForCriticalSectionToComplete(opCtx, *critSecSignal));
 
         return true;
     }
@@ -389,12 +396,7 @@ bool joinCollectionPlacementVersionOperation(OperationContext* opCtx,
         collLock->reset();
         dbLock->reset();
 
-        try {
-            inRecoverOrRefresh->get(opCtx);
-        } catch (const ExceptionFor<ErrorCodes::PlacementVersionRefreshCanceled>&) {
-            // The ongoing refresh has finished, although it was canceled by a
-            // 'clearFilteringMetadata'.
-        }
+        waitForRefreshToComplete(opCtx, *inRecoverOrRefresh);
 
         return true;
     }
@@ -622,13 +624,10 @@ void onCollectionPlacementVersionMismatch(OperationContext* opCtx,
             inRecoverOrRefresh = (*scopedCsr)->getPlacementVersionRecoverRefreshFuture(opCtx);
         }
 
-        try {
-            inRecoverOrRefresh->get(opCtx);
-        } catch (const ExceptionFor<ErrorCodes::PlacementVersionRefreshCanceled>&) {
+        if (!waitForRefreshToComplete(opCtx, *inRecoverOrRefresh)) {
             // The refresh was canceled by a 'clearFilteringMetadata'. Retry the refresh.
             continue;
         }
-
         break;
     }
 }

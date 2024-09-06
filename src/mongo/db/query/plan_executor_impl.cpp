@@ -66,7 +66,7 @@
 #include "mongo/db/query/stage_types.h"
 #include "mongo/db/query/yield_policy_callbacks_impl.h"
 #include "mongo/db/repl/optime.h"
-#include "mongo/db/s/operation_sharding_state.h"
+#include "mongo/db/s/shard_filtering_util.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/shard_role.h"
 #include "mongo/db/transaction_resources.h"
@@ -283,8 +283,7 @@ void doYield(OperationContext* opCtx) {
     // happen, or the very least, locks would be unnecessarily held while waiting.
     const auto& shardingCriticalSection = planExecutorShardingState(opCtx).criticalSectionFuture;
     if (shardingCriticalSection) {
-        OperationShardingState::waitForCriticalSectionToComplete(opCtx, *shardingCriticalSection)
-            .ignore();
+        refresh_util::waitForCriticalSectionToComplete(opCtx, *shardingCriticalSection).ignore();
         planExecutorShardingState(opCtx).criticalSectionFuture.reset();
     }
 }

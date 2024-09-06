@@ -5,6 +5,9 @@
 //   not_allowed_with_signed_security_token,
 //   uses_transactions
 // ]
+import {
+    withAbortAndRetryOnTransientTxnError
+} from "jstests/libs/auto_retry_transaction_in_sharding.js";
 
 const dbName = "test";
 const collName = "transaction_error_handling";
@@ -38,25 +41,28 @@ try {
 
 // Try to start a transaction when the state is 'active'.
 jsTestLog("Test that we cannot start a transaction with one already started or in progress.");
-session.startTransaction();
-try {
+withAbortAndRetryOnTransientTxnError(session, () => {
     session.startTransaction();
-} catch (e) {
-    assert.eq(e.message, "Transaction already in progress on this session.");
-}
+    try {
+        session.startTransaction();
+    } catch (e) {
+        assert.eq(e.message, "Transaction already in progress on this session.");
+    }
 
-// Try starting a transaction after inserting something.
-assert.commandWorked(sessionColl.insert({_id: "insert-1"}));
-// Try to start a transaction when the state is 'active'.
-try {
-    session.startTransaction();
-} catch (e) {
-    assert.eq(e.message, "Transaction already in progress on this session.");
-}
+    // Try starting a transaction after inserting something.
+    assert.commandWorked(sessionColl.insert({_id: "insert-1"}));
+    // Try to start a transaction when the state is 'active'.
+    try {
+        session.startTransaction();
+    } catch (e) {
+        assert.eq(e.message, "Transaction already in progress on this session.");
+    }
 
-// At this point, the transaction is still 'active'. We will commit this transaction and test
-// that calling commitTransaction again should work while calling abortTransaction should not.
-assert.commandWorked(session.commitTransaction_forTesting());
+    // At this point, the transaction is still 'active'. We will commit this transaction and
+    // test that calling commitTransaction again should work while calling abortTransaction
+    // should not.
+    assert.commandWorked(session.commitTransaction_forTesting());
+});
 
 jsTestLog("Test that we can commit a transaction more than once.");
 // The transaction state is 'committed'. We can call commitTransaction again in this state.
@@ -73,8 +79,10 @@ try {
 
 // Start a new transaction that will be aborted. Test that we cannot call commit or
 // abortTransaction on a transaction that is in the 'aborted' state.
-session.startTransaction();
-assert.commandWorked(sessionColl.insert({_id: "insert-2"}));
+withAbortAndRetryOnTransientTxnError(session, () => {
+    session.startTransaction();
+    assert.commandWorked(sessionColl.insert({_id: "insert-2"}));
+});
 assert.commandWorked(session.abortTransaction_forTesting());
 
 jsTestLog("Test that we cannot commit a transaction that has already been aborted.");
@@ -96,10 +104,12 @@ try {
 
 jsTestLog(
     "Test that a normal operation after committing a transaction changes the state to inactive.");
-session.startTransaction();
-assert.commandWorked(sessionColl.insert({_id: "insert-3"}));
-// The transaction state should be changed to 'committed'.
-assert.commandWorked(session.commitTransaction_forTesting());
+withAbortAndRetryOnTransientTxnError(session, () => {
+    session.startTransaction();
+    assert.commandWorked(sessionColl.insert({_id: "insert-3"}));
+    // The transaction state should be changed to 'committed'.
+    assert.commandWorked(session.commitTransaction_forTesting());
+});
 // The transaction state should be changed to 'inactive'.
 assert.commandWorked(sessionColl.insert({_id: "normal-insert"}));
 try {
@@ -110,8 +120,10 @@ try {
 
 jsTestLog(
     "Test that a normal operation after aborting a transaction changes the state to inactive.");
-session.startTransaction();
-assert.commandWorked(sessionColl.insert({_id: "insert-4"}));
+withAbortAndRetryOnTransientTxnError(session, () => {
+    session.startTransaction();
+    assert.commandWorked(sessionColl.insert({_id: "insert-4"}));
+});
 // The transaction state should be changed to 'aborted'.
 assert.commandWorked(session.abortTransaction_forTesting());
 // The transaction state should be changed to 'inactive'.

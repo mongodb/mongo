@@ -5,9 +5,7 @@
 //   uses_multi_shard_transaction,
 //   uses_transactions,
 // ]
-import {
-    retryOnceOnTransientAndRestartTxnOnMongos
-} from "jstests/libs/auto_retry_transaction_in_sharding.js";
+import {withRetryOnTransientTxnError} from "jstests/libs/auto_retry_transaction_in_sharding.js";
 import {assertDropCollection} from "jstests/libs/collection_drop_recreate.js";
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
@@ -53,33 +51,43 @@ jsTest.log("Testing collection creation in a cross-shard write transaction.");
 const txnOptions = {
     writeConcern: {w: "majority"}
 };
-session.startTransaction(txnOptions);
-retryOnceOnTransientAndRestartTxnOnMongos(session, () => {
-    assert.commandWorked(sessionDBShard0.createCollection(newCollName));
-    assert.commandWorked(sessionDBShard2.createCollection(newCollName));
-}, txnOptions);
+withRetryOnTransientTxnError(
+    () => {
+        session.startTransaction(txnOptions);
+        assert.commandWorked(sessionDBShard0.createCollection(newCollName));
+        assert.commandWorked(sessionDBShard2.createCollection(newCollName));
 
-// TODO SERVER-77915: Remove when deleting the feature flag.
-if (FeatureFlagUtil.isPresentAndEnabled(st.s, "CreateCollectionInPreparedTransactions")) {
-    assert.commandWorked(session.commitTransaction_forTesting());
+        // TODO SERVER-77915: Remove when deleting the feature flag.
+        if (FeatureFlagUtil.isPresentAndEnabled(st.s, "CreateCollectionInPreparedTransactions")) {
+            assert.commandWorked(session.commitTransaction_forTesting());
 
-    assertDropCollection(st.s.getDB(dbNameShard0), newCollName);
-    assertDropCollection(st.s.getDB(dbNameShard2), newCollName);
-} else {
-    assert.commandFailedWithCode(session.commitTransaction_forTesting(),
-                                 ErrorCodes.OperationNotSupportedInTransaction);
-}
+            assertDropCollection(st.s.getDB(dbNameShard0), newCollName);
+            assertDropCollection(st.s.getDB(dbNameShard2), newCollName);
+        } else {
+            assert.commandFailedWithCode(session.commitTransaction_forTesting(),
+                                         ErrorCodes.OperationNotSupportedInTransaction);
+        }
+    },
+    () => {
+        session.abortTransaction();
+    });
 
 jsTest.log("Testing collection creation in a single-shard write transaction.");
-session.startTransaction(txnOptions);
-assert.commandWorked(sessionDBShard0.createCollection(newCollName));
-doc2 = sessionDBShard2.getCollection(collName).findOne({_id: 4});
-assert.eq(doc2._id, 4);
-if (!versionSupportsSingleWriteShardCommitOptimization) {
-    assert.commandFailedWithCode(session.commitTransaction_forTesting(),
-                                 ErrorCodes.OperationNotSupportedInTransaction);
-} else {
-    assert.commandWorked(session.commitTransaction_forTesting());
-}
+withRetryOnTransientTxnError(
+    () => {
+        session.startTransaction(txnOptions);
+        assert.commandWorked(sessionDBShard0.createCollection(newCollName));
+        doc2 = sessionDBShard2.getCollection(collName).findOne({_id: 4});
+        assert.eq(doc2._id, 4);
+        if (!versionSupportsSingleWriteShardCommitOptimization) {
+            assert.commandFailedWithCode(session.commitTransaction_forTesting(),
+                                         ErrorCodes.OperationNotSupportedInTransaction);
+        } else {
+            assert.commandWorked(session.commitTransaction_forTesting());
+        }
+    },
+    () => {
+        session.abortTransaction();
+    });
 
 st.stop();

@@ -10,9 +10,8 @@
  *   uses_transactions,
  * ]
  */
-// TODO (SERVER-39704): Remove the following load after SERVER-39704 is completed
 import {
-    retryOnceOnTransientAndRestartTxnOnMongos
+    withAbortAndRetryOnTransientTxnError
 } from "jstests/libs/auto_retry_transaction_in_sharding.js";
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 
@@ -42,57 +41,45 @@ const sessionCollB = sessionDB2[collNameB];
 // A transaction with snapshot read concern cannot write to a collection that has been dropped
 // since the transaction started.
 //
-
-// Ensure collection A and collection B exist.
-assert.commandWorked(sessionCollA.insert({}));
-assert.commandWorked(sessionCollB.insert({}));
-
-// Start the transaction with a write to collection A.
-const txnOptions = {
-    readConcern: {level: "snapshot"}
-};
-session.startTransaction(txnOptions);
-
-// TODO (SERVER-39704): We use the retryOnceOnTransientAndRestartTxnOnMongos
-// function to handle how MongoS will propagate a StaleShardVersion error as a
-// TransientTransactionError. After SERVER-39704 is completed the
-// retryOnceOnTransientAndRestartTxnOnMongos can be removed
-retryOnceOnTransientAndRestartTxnOnMongos(session, () => {
+withAbortAndRetryOnTransientTxnError(session, () => {
+    // Ensure collection A and collection B exist.
     assert.commandWorked(sessionCollA.insert({}));
-}, txnOptions);
+    assert.commandWorked(sessionCollB.insert({}));
 
-// Drop collection B outside of the transaction. Advance the cluster time of the session
-// performing the drop to ensure it happens at a later cluster time than the transaction began.
-sessionOutsideTxn.advanceClusterTime(session.getClusterTime());
-assert.commandWorked(testDB2.runCommand({drop: collNameB, writeConcern: {w: "majority"}}));
+    // Start the transaction with a write to collection A.
+    const txnOptions = {readConcern: {level: "snapshot"}};
+    session.startTransaction(txnOptions);
 
-// This test cause a StaleConfig error on sharding so no command will succeed.
-if (!session.getClient().isMongos() && !TestData.testingReplicaSetEndpoint) {
-    // We can perform reads on the dropped collection as it existed when we started the transaction.
-    assert.commandWorked(sessionDB2.runCommand({find: sessionCollB.getName()}));
+    assert.commandWorked(sessionCollA.insert({}));
 
-    // However, trying to perform a write will cause a write conflict.
-    assert.commandFailedWithCode(
-        sessionDB2.runCommand(
-            {findAndModify: sessionCollB.getName(), update: {a: 1}, upsert: true}),
-        ErrorCodes.WriteConflict);
+    // Drop collection B outside of the transaction. Advance the cluster time of the session
+    // performing the drop to ensure it happens at a later cluster time than the transaction
+    // began.
+    sessionOutsideTxn.advanceClusterTime(session.getClusterTime());
+    assert.commandWorked(testDB2.runCommand({drop: collNameB, writeConcern: {w: "majority"}}));
+
+    // This test cause a StaleConfig error on sharding so no command will succeed.
+    if (!session.getClient().isMongos() && !TestData.testingReplicaSetEndpoint) {
+        // We can perform reads on the dropped collection as it existed when we started the
+        // transaction.
+        assert.commandWorked(sessionDB2.runCommand({find: sessionCollB.getName()}));
+
+        // However, trying to perform a write will cause a write conflict.
+        assert.commandFailedWithCode(
+            sessionDB2.runCommand(
+                {findAndModify: sessionCollB.getName(), update: {a: 1}, upsert: true}),
+            ErrorCodes.WriteConflict);
+    } else {
+        // TODO (SERVER-39704): See if we can match the replicaset behaviour.
+        assert.commandFailedWithCode(
+            sessionDB2.runCommand(
+                {findAndModify: sessionCollB.getName(), update: {a: 1}, upsert: true}),
+            ErrorCodes.StaleConfig);
+    }
 
     assert.commandFailedWithCode(session.abortTransaction_forTesting(),
                                  ErrorCodes.NoSuchTransaction);
-} else {
-    // Ensure the collection drop is visible to the transaction, since our implementation of the in-
-    // memory collection catalog always has the most recent collection metadata. We can detect the
-    // drop by attempting a findAndModify on the dropped collection. Since the collection drop is
-    // visible, the findAndModify will not match any existing documents.
-    // TODO (SERVER-39704): Remove use of retryOnceOnTransientAndRestartTxnOnMongos.
-    retryOnceOnTransientAndRestartTxnOnMongos(session, () => {
-        const res = sessionDB2.runCommand(
-            {findAndModify: sessionCollB.getName(), update: {a: 1}, upsert: true});
-        assert.commandWorked(res);
-        assert.eq(res.value, null);
-    }, txnOptions);
-    assert.commandWorked(session.commitTransaction_forTesting());
-}
+});
 
 //
 // A transaction with snapshot read concern cannot write to a collection that existed at the logical
@@ -104,30 +91,31 @@ if (!session.getClient().isMongos() && !TestData.testingReplicaSetEndpoint) {
 //
 // Skip on causal-consistency suites because we cannot use 'atClusterTime' there.
 if (!db.getMongo().isCausalConsistency()) {
-    sessionCollA.drop();
-    sessionCollB.drop();
+    withAbortAndRetryOnTransientTxnError(session, () => {
+        // Ensure collection A and collection B exist.
+        assert.commandWorked(sessionCollA.insert({}));
+        assert.commandWorked(sessionCollB.insert({}));
+        const txnReadTimestamp = session.getOperationTime();
 
-    // Ensure collection A and collection B exist.
-    assert.commandWorked(sessionCollA.insert({}));
-    assert.commandWorked(sessionCollB.insert({}));
-    const txnReadTimestamp = session.getOperationTime();
+        // Drop collection B outside of the transaction. Advance the cluster time of the session
+        // performing the drop to ensure it happens at a later cluster time than the
+        // transaction's.
+        assert.commandWorked(testDB2.runCommand({drop: collNameB, writeConcern: {w: "majority"}}));
 
-    // Drop collection B outside of the transaction. Advance the cluster time of the session
-    // performing the drop to ensure it happens at a later cluster time than the transaction's.
-    assert.commandWorked(testDB2.runCommand({drop: collNameB, writeConcern: {w: "majority"}}));
+        // Start the transaction with a write to collection A. Use an explicit atClusterTime
+        // with a timestamp at which collectionB existed and contained one document.
+        sessionOutsideTxn.advanceClusterTime(session.getClusterTime());
+        session.startTransaction(
+            {readConcern: {level: "snapshot", atClusterTime: txnReadTimestamp}});
 
-    // Start the transaction with a write to collection A. Use an explicit atClusterTime with a
-    // timestamp at which collectionB existed and contained one document.
-    sessionOutsideTxn.advanceClusterTime(session.getClusterTime());
-    session.startTransaction({readConcern: {level: "snapshot", atClusterTime: txnReadTimestamp}});
-
-    // Expect a conflict to be thrown, because the collection was dropped at a logical timestamp
-    // greater than the one the transaction is reading at.
-    assert.commandFailedWithCode(
-        sessionDB2.runCommand({findAndModify: sessionCollB.getName(), update: {a: 1}}),
-        ErrorCodes.WriteConflict);
-    assert.commandFailedWithCode(session.abortTransaction_forTesting(),
-                                 ErrorCodes.NoSuchTransaction);
+        // Expect a conflict to be thrown, because the collection was dropped at a logical
+        // timestamp greater than the one the transaction is reading at.
+        assert.commandFailedWithCode(
+            sessionDB2.runCommand({findAndModify: sessionCollB.getName(), update: {a: 1}}),
+            ErrorCodes.WriteConflict);
+        assert.commandFailedWithCode(session.abortTransaction_forTesting(),
+                                     ErrorCodes.NoSuchTransaction);
+    });
 }
 
 //
@@ -135,34 +123,36 @@ if (!db.getMongo().isCausalConsistency()) {
 // since the transaction started.
 //
 
-// Ensure collection A exists and collection B does not exist.
-assert.commandWorked(sessionCollA.insert({}));
-testDB2.runCommand({drop: collNameB, writeConcern: {w: "majority"}});
+withAbortAndRetryOnTransientTxnError(session, () => {
+    // Ensure collection A exists and collection B does not exist.
+    assert.commandWorked(sessionCollA.insert({}));
+    testDB2.runCommand({drop: collNameB, writeConcern: {w: "majority"}});
 
-// Start the transaction with a write to collection A.
-session.startTransaction({readConcern: {level: "snapshot"}});
-assert.commandWorked(sessionCollA.insert({}));
+    // Start the transaction with a write to collection A.
+    session.startTransaction({readConcern: {level: "snapshot"}});
+    assert.commandWorked(sessionCollA.insert({}));
 
-// Create collection B outside of the transaction. Advance the cluster time of the session
-// performing the drop to ensure it happens at a later cluster time than the transaction began.
-sessionOutsideTxn.advanceClusterTime(session.getClusterTime());
-assert.commandWorked(testDB2.runCommand({create: collNameB}));
+    // Create collection B outside of the transaction. Advance the cluster time of the session
+    // performing the drop to ensure it happens at a later cluster time than the transaction
+    // began.
+    sessionOutsideTxn.advanceClusterTime(session.getClusterTime());
+    assert.commandWorked(testDB2.runCommand({create: collNameB}));
 
-// We can insert to collection B in the transaction as the transaction does not have a collection on
-// this namespace (even as it exist at latest). A collection will be implicitly created and we will
-// fail to commit this transaction with a WriteConflict error.
-const expectedErrorCodes = [ErrorCodes.WriteConflict];
-if (!FeatureFlagUtil.isPresentAndEnabled(db, "CreateCollectionInPreparedTransactions")) {
-    // If collection A and collection B live on different shards, this transaction would require
-    // two phase commit. And if this feature flag is not enabled, the transaction would fail with
-    // a OperationNotSupportedInTransaction error instead of a WriteConflict error.
-    expectedErrorCodes.push(ErrorCodes.OperationNotSupportedInTransaction);
-}
+    // We can insert to collection B in the transaction as the transaction does not have a
+    // collection on this namespace (even as it exist at latest). A collection will be
+    // implicitly created and we will fail to commit this transaction with a WriteConflict
+    // error.
+    const expectedErrorCodes = [ErrorCodes.WriteConflict];
+    if (!FeatureFlagUtil.isPresentAndEnabled(db, "CreateCollectionInPreparedTransactions")) {
+        // If collection A and collection B live on different shards, this transaction would
+        // require two phase commit. And if this feature flag is not enabled, the transaction
+        // would fail with a OperationNotSupportedInTransaction error instead of a WriteConflict
+        // error.
+        expectedErrorCodes.push(ErrorCodes.OperationNotSupportedInTransaction);
+    }
 
-retryOnceOnTransientAndRestartTxnOnMongos(session, () => {
     assert.commandWorked(sessionCollB.insert({}));
-}, txnOptions);
-
-assert.commandFailedWithCode(session.commitTransaction_forTesting(), expectedErrorCodes);
+    assert.commandFailedWithCode(session.commitTransaction_forTesting(), expectedErrorCodes);
+});
 
 session.endSession();

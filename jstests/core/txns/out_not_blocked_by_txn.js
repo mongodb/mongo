@@ -8,6 +8,8 @@
  *
  * @tags: [uses_transactions, requires_db_locking, assumes_unsharded_collection]
  */
+import {withRetryOnTransientTxnError} from "jstests/libs/auto_retry_transaction_in_sharding.js";
+
 let dbName = jsTestName();
 let mydb = db.getSiblingDB(dbName);
 
@@ -27,18 +29,24 @@ assert.commandWorked(mydb.c.insert({x: 1}));
 const session = mydb.getMongo().startSession();
 const sessionDb = session.getDatabase(dbName);
 
-session.startTransaction();
-// This holds a database IX lock and a collection IX lock on "test.txn".
-sessionDb.t.insert({y: 1});
+withRetryOnTransientTxnError(
+    () => {
+        session.startTransaction();
+        // This holds a database IX lock and a collection IX lock on "test.txn".
+        assert.commandWorked(sessionDb.t.insert({y: 1}));
 
-// $out should now also only require an IX lock.
-// Test the scenario where we rename collection 'a' to collection 'b', which doesn't exist.
-assert.commandWorked(
-    mydb.runCommand({aggregate: "a", pipeline: [{$out: {db: dbName, coll: "b"}}], cursor: {}}));
-// Now test the scenario where we rename collection 'b' to collection 'c', which does exist.
-// This should drop collection 'c'.
-assert.commandWorked(
-    mydb.runCommand({aggregate: "b", pipeline: [{$out: {db: dbName, coll: "c"}}], cursor: {}}));
+        // $out should now also only require an IX lock.
+        // Test the scenario where we rename collection 'a' to collection 'b', which doesn't exist.
+        assert.commandWorked(mydb.runCommand(
+            {aggregate: "a", pipeline: [{$out: {db: dbName, coll: "b"}}], cursor: {}}));
+        // Now test the scenario where we rename collection 'b' to collection 'c', which does exist.
+        // This should drop collection 'c'.
+        assert.commandWorked(mydb.runCommand(
+            {aggregate: "b", pipeline: [{$out: {db: dbName, coll: "c"}}], cursor: {}}));
 
-// Now commit the transaction.
-assert.commandWorked(session.commitTransaction_forTesting());
+        // Now commit the transaction.
+        assert.commandWorked(session.commitTransaction_forTesting());
+    },
+    () => {
+        session.abortTransaction();
+    });
