@@ -145,6 +145,32 @@ protected:
     bool tryToGenerateCommonSortKey(Pipeline::SourceContainer::iterator itr,
                                     Pipeline::SourceContainer* container);
 
+    /**
+     * This optimization desugars a $topN where N == 1 to a single $top followed by a $addFields to
+     * wrap the output in an array. Note that the wrapping in an array needs to happen because $topN
+     * is expected to return an array of results as compared to $top.  Similarly for $bottomN,
+     * $firstN and $lastN. The goal is to hopefully leverage a distinct scan (if a proper index were
+     * to exist). Therefore, all accumulators need to be compatible (e.g. all $first's and
+     * $firstN's) for the optimization to apply.
+     *
+     * {
+     *   $group: {
+     *     _id: ...,
+     *     myField: {$firstN: {input: exprA, n: 1}}
+     *   }
+     * }
+     * ->
+     * {
+     *   $group: {
+     *     _id: ...,
+     *     myField: {$first: exprA}
+     *   }
+     * },
+     * {$addFields: {myField: ["$myField"]}
+     */
+    bool tryToOptimizeAccN(Pipeline::SourceContainer::iterator itr,
+                           Pipeline::SourceContainer* container);
+
 private:
     explicit DocumentSourceGroup(const boost::intrusive_ptr<ExpressionContext>& expCtx,
                                  boost::optional<int64_t> maxMemoryUsageBytes = boost::none);

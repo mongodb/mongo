@@ -45,7 +45,6 @@ namespace {
 class CommonSortKeyOptimizationTest : public AggregationContextFixture {
 protected:
     void verify(const BSONObj& groupSpec, const std::vector<BSONObj>& expectedOptimizedPipeline) {
-        using namespace fmt::literals;
         auto pipeline = Pipeline::parse(makeVector(groupSpec), getExpCtx());
 
         ASSERT_EQ(pipeline->getSources().size(), 1U);
@@ -54,8 +53,8 @@ protected:
 
         auto actualOptimizedPipeline = pipeline->serializeToBson();
         ASSERT_EQ(actualOptimizedPipeline.size(), expectedOptimizedPipeline.size())
-            << "Expected {} stages but got: "_format(expectedOptimizedPipeline.size())
-            << to_string(actualOptimizedPipeline);
+            << "Expected " << expectedOptimizedPipeline.size() << " stages but got the following "
+            << actualOptimizedPipeline.size() << " stages: " << to_string(actualOptimizedPipeline);
 
         for (size_t i = 0; i < actualOptimizedPipeline.size(); ++i) {
             ASSERT_BSONOBJ_EQ_UNORDERED(actualOptimizedPipeline[i], expectedOptimizedPipeline[i]);
@@ -359,7 +358,33 @@ TEST_F(CommonSortKeyOptimizationTest, DifferentAccumulatorsWithSameSortPatternNo
 }
 
 TEST_F(CommonSortKeyOptimizationTest, OneTopAndOneTopNWithSameSortPatternNotOptimized) {
-    // The different accumulator types cannot be optimized though they have the same sort pattern.
+    // The different accumulator types _cannot_ be optimized though they have the same sort pattern.
+    // If N were 1, then it could be optimized (see OneTopAndOneTopNWithSameSortPatternOptimized).
+    const auto groupWithDifferentAccumulatorsWithSameSortPattern = fromjson(R"(
+{
+    $group: {
+        _id: null,
+        t_a: {$top: {output: "$a", sortBy: {time: 1}}},
+        t_b: {$topN: {n: 3, output: "$b", sortBy: {time: 1}}}
+    }
+}
+    )");
+    const auto expectedNotOptimizedGroup = fromjson(R"(
+{
+    $group: {
+        _id: {$const: null},
+        t_a: {$top: {output: "$a", sortBy: {time: 1}}},
+        t_b: {$topN: {n: {$const: 3}, output: "$b", sortBy: {time: 1}}}
+    }
+}
+    )");
+    verify(groupWithDifferentAccumulatorsWithSameSortPattern,
+           makeVector(expectedNotOptimizedGroup));
+}
+
+TEST_F(CommonSortKeyOptimizationTest, OneTopAndOneTopNWithSameSortPatternOptimized) {
+    // The different accumulator types _can_ be optimized by first desugaring the $topN (N == 1) to
+    // a $top, after which the two $top's can be grouped.
     const auto groupWithDifferentAccumulatorsWithSameSortPattern = fromjson(R"(
 {
     $group: {
@@ -369,17 +394,34 @@ TEST_F(CommonSortKeyOptimizationTest, OneTopAndOneTopNWithSameSortPatternNotOpti
     }
 }
     )");
-    const auto expectedNotOptimizedGroup = fromjson(R"(
+    const auto expectedOptimizedGroup = fromjson(R"(
 {
     $group: {
         _id: {$const: null},
-        t_a: {$top: {output: "$a", sortBy: {time: 1}}},
-        t_b: {$topN: {n: {$const: 1}, output: "$b", sortBy: {time: 1}}}
+        ts_0: {$top: {
+            output: {t_a: {$ifNull: ["$a", {$const: null}]}, t_b: {$ifNull: ["$b", {$const: null}]}},
+            sortBy: {time: 1}
+        }}
     }
 }
     )");
-    verify(groupWithDifferentAccumulatorsWithSameSortPattern,
-           makeVector(expectedNotOptimizedGroup));
+    const auto expectedOptimizedProject = fromjson(R"(
+{
+    $project: {
+        _id: true,
+        t_a: "$ts_0.t_a",
+        t_b: "$ts_0.t_b"
+    }
+}
+    )");
+    const auto expectedOptimizedAddFields = fromjson(R"(
+{
+    $addFields: {t_b: ["$t_b"]}
+}
+    )");
+    verify(
+        groupWithDifferentAccumulatorsWithSameSortPattern,
+        makeVector(expectedOptimizedGroup, expectedOptimizedProject, expectedOptimizedAddFields));
 }
 
 TEST_F(CommonSortKeyOptimizationTest, DifferentNsForBottomNsWithSameSortPatternNotOptimized) {

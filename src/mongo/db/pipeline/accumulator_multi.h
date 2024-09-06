@@ -334,6 +334,8 @@ public:
         }
     }
 
+    static constexpr auto kName = getName();
+
     void processInternal(const Value& input, bool merging) final;
 
     Value getValueConst(bool toBeMerged) const;

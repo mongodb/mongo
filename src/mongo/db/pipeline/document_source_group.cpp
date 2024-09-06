@@ -43,6 +43,7 @@
 #include "mongo/db/pipeline/accumulator.h"
 #include "mongo/db/pipeline/accumulator_js_reduce.h"
 #include "mongo/db/pipeline/accumulator_multi.h"
+#include "mongo/db/pipeline/document_source_add_fields.h"
 #include "mongo/db/pipeline/document_source_match.h"
 #include "mongo/db/pipeline/document_source_project.h"
 #include "mongo/db/pipeline/document_source_single_document_transformation.h"
@@ -99,6 +100,10 @@ Pipeline::SourceContainer::iterator DocumentSourceGroup::doOptimizeAt(
     }
 
     if (tryToGenerateCommonSortKey(itr, container)) {
+        return itr;
+    }
+
+    if (tryToOptimizeAccN(itr, container)) {
         return itr;
     }
 
@@ -168,10 +173,10 @@ bool DocumentSourceGroup::pushDotRenamedMatch(Pipeline::SourceContainer::iterato
 
 namespace {
 template <TopBottomSense sense, bool single = true>
-AccumulationStatement makeAccStmtFor(boost::intrusive_ptr<ExpressionContext> pExpCtx,
-                                     const SortPattern& sortPattern,
-                                     StringData fieldName,
-                                     boost::intrusive_ptr<Expression> origExpr) {
+AccumulationStatement makeAccStmtForTopBottom(boost::intrusive_ptr<ExpressionContext> pExpCtx,
+                                              const SortPattern& sortPattern,
+                                              StringData fieldName,
+                                              boost::intrusive_ptr<Expression> origExpr) {
     static_assert(
         single,
         "Neither $topN nor $bottomN are supported yet, kFieldNameN must be added to support them");
@@ -186,7 +191,7 @@ AccumulationStatement makeAccStmtFor(boost::intrusive_ptr<ExpressionContext> pEx
             // This block opens {"$top": {...}} or {"$bottom": {...}}. Converts $first to $top and
             // $last to $bottom.
             BSONObjBuilder accArgsBuilder(
-                accStmtObjBuilder.subobjStart(AccumulatorTopBottomN<sense, single>::getName()));
+                accStmtObjBuilder.subobjStart(AccumulatorTopBottomN<sense, single>::kName));
 
             // {"$top": {"sortBy": ...}}
             // The sort pattern for $top or $bottom accumulators is same as the sort pattern of the
@@ -257,10 +262,10 @@ bool DocumentSourceGroup::tryToAbsorbTopKSort(
 
     for (auto i : firstLastAccumulatorIndices) {
         if (accumulators[i].expr.name == AccumulatorFirst::kName) {
-            accumulators[i] = makeAccStmtFor<TopBottomSense::kTop>(
+            accumulators[i] = makeAccStmtForTopBottom<TopBottomSense::kTop>(
                 pExpCtx, sortPattern, accumulators[i].fieldName, accumulators[i].expr.argument);
         } else if (accumulators[i].expr.name == AccumulatorLast::kName) {
-            accumulators[i] = makeAccStmtFor<TopBottomSense::kBottom>(
+            accumulators[i] = makeAccStmtForTopBottom<TopBottomSense::kBottom>(
                 pExpCtx, sortPattern, accumulators[i].fieldName, accumulators[i].expr.argument);
         }
     }
@@ -382,7 +387,7 @@ AccumulationStatement mergeAccStmtFor(boost::intrusive_ptr<ExpressionContext> pE
         {
             // This block opens {"$top(N)": {...}} or {"$bottom(N)": {...}}.
             BSONObjBuilder accArgsBuilder(
-                accStmtObjBuilder.subobjStart(AccumulatorTopBottomN<sense, single>::getName()));
+                accStmtObjBuilder.subobjStart(AccumulatorTopBottomN<sense, single>::kName));
 
             // {"$topN": {"n": ...}}
             if (!single) {
@@ -430,6 +435,83 @@ AccumulationStatement mergeAccStmtFor(boost::intrusive_ptr<ExpressionContext> pE
     return AccumulationStatement::parseAccumulationStatement(
         pExpCtx.get(), accStmtObj[mergeFieldName], pExpCtx->variablesParseState);
 }
+
+AccumulationStatement makeAccStmtForFirstLast(boost::intrusive_ptr<ExpressionContext> pExpCtx,
+                                              AccumulatorFirstLastN::Sense sense,
+                                              StringData fieldName,
+                                              boost::intrusive_ptr<Expression> origExpr) {
+    const auto accName =
+        sense == AccumulatorFirstLastN::kFirst ? AccumulatorFirst::kName : AccumulatorLast::kName;
+
+    BSONObjBuilder bob;
+    {
+        // This block opens {"fieldName": {...}}.
+        BSONObjBuilder accStmtObjBuilder(bob.subobjStart(fieldName));
+        {
+            // This block opens {"accName": origExpr}
+            origExpr->serialize().addToBsonObj(&accStmtObjBuilder, accName);
+        }
+        accStmtObjBuilder.doneFast();
+    }
+    auto accStmtObj = bob.done();
+
+    return AccumulationStatement::parseAccumulationStatement(
+        pExpCtx.get(), accStmtObj[fieldName], pExpCtx->variablesParseState);
+}
+
+using Sense = std::variant<TopBottomSense, AccumulatorFirstLastN::Sense>;
+using AccConversionFunction = std::function<AccumulationStatement(AccumulationStatement)>;
+
+struct AccumulatorInfo {
+    bool multi;
+    Sense sense;
+};
+
+// Contains info about all allowed accumulators for the tryToOptimizeAccN() optimization. The info
+// is useful to determine whether accumulators can be converted (i.e. are `multi`), and to compare
+// senses of different accumulators.
+const std::map<StringData, AccumulatorInfo> kAccNameToInfoMap{
+    {AccumulatorFirst::kName, {false, AccumulatorFirstLastN::kFirst}},
+    {AccumulatorLast::kName, {false, AccumulatorFirstLastN::kLast}},
+    {AccumulatorFirstN::kName, {true, AccumulatorFirstLastN::kFirst}},
+    {AccumulatorLastN::kName, {true, AccumulatorFirstLastN::kLast}},
+    {AccumulatorTop::kName, {false, TopBottomSense::kTop}},
+    {AccumulatorBottom::kName, {false, TopBottomSense::kBottom}},
+    {AccumulatorTopN::kName, {true, TopBottomSense::kTop}},
+    {AccumulatorBottomN::kName, {true, TopBottomSense::kBottom}}};
+
+AccConversionFunction createAccConversionFunction(boost::intrusive_ptr<ExpressionContext> pExpCtx,
+                                                  Sense sense,
+                                                  boost::optional<SortPattern> sortPattern) {
+    return visit(
+        OverloadedVisitor{
+            [&](const AccumulatorFirstLastN::Sense firstLastSense) -> AccConversionFunction {
+                return [=](AccumulationStatement acc) {
+                    return makeAccStmtForFirstLast(
+                        pExpCtx, firstLastSense, acc.fieldName, acc.expr.argument);
+                };
+            },
+            [&, sortPattern](const TopBottomSense topBottomSense) -> AccConversionFunction {
+                if (topBottomSense == TopBottomSense::kTop) {
+                    return [=](AccumulationStatement acc) {
+                        return makeAccStmtForTopBottom<TopBottomSense::kTop>(
+                            pExpCtx,
+                            *sortPattern,
+                            acc.fieldName,
+                            getOutputArgExpr(acc.expr.argument));
+                    };
+                } else {
+                    return [=](AccumulationStatement acc) {
+                        return makeAccStmtForTopBottom<TopBottomSense::kBottom>(
+                            pExpCtx,
+                            *sortPattern,
+                            acc.fieldName,
+                            getOutputArgExpr(acc.expr.argument));
+                    };
+                }
+            }},
+        sense);
+}
 }  // namespace
 
 bool DocumentSourceGroup::tryToGenerateCommonSortKey(Pipeline::SourceContainer::iterator itr,
@@ -441,10 +523,10 @@ bool DocumentSourceGroup::tryToGenerateCommonSortKey(Pipeline::SourceContainer::
     std::vector<size_t> ineligibleAccIndices;
     bool foundDupSortPattern = false;
     for (size_t accIdx = 0; accIdx < accStmts.size(); ++accIdx) {
-        if (accStmts[accIdx].expr.name != AccumulatorTop::getName() &&
-            accStmts[accIdx].expr.name != AccumulatorBottom::getName() &&
-            accStmts[accIdx].expr.name != AccumulatorTopN::getName() &&
-            accStmts[accIdx].expr.name != AccumulatorBottomN::getName()) {
+        if (accStmts[accIdx].expr.name != AccumulatorTop::kName &&
+            accStmts[accIdx].expr.name != AccumulatorBottom::kName &&
+            accStmts[accIdx].expr.name != AccumulatorTopN::kName &&
+            accStmts[accIdx].expr.name != AccumulatorBottomN::kName) {
             ineligibleAccIndices.push_back(accIdx);
             continue;
         }
@@ -522,6 +604,94 @@ bool DocumentSourceGroup::tryToGenerateCommonSortKey(Pipeline::SourceContainer::
     auto prjStage = DocumentSourceProject::create(
         std::move(prjStageSpec), pExpCtx, DocumentSourceProject::kStageName);
     container->insert(std::next(itr), prjStage);
+
+    return true;
+}
+
+bool DocumentSourceGroup::tryToOptimizeAccN(Pipeline::SourceContainer::iterator itr,
+                                            Pipeline::SourceContainer* container) {
+    auto& accumulators = getMutableAccumulationStatements();
+    if (accumulators.empty()) {
+        return false;
+    }
+
+    const auto firstAcc = accumulators[0];
+    const auto firstAccInfoItr = kAccNameToInfoMap.find(firstAcc.expr.name);
+    if (firstAccInfoItr == kAccNameToInfoMap.end()) {
+        return false;
+    }
+
+    bool foundEligibleMultiAccs = false;
+    boost::optional<SortPattern> sortPattern;
+    if (std::holds_alternative<TopBottomSense>(firstAccInfoItr->second.sense)) {
+        sortPattern = getAccSortPattern(firstAcc.makeAccumulator());
+    }
+
+    for (const auto& acc : accumulators) {
+        const auto currentAccInfoItr = kAccNameToInfoMap.find(acc.expr.name);
+        if (currentAccInfoItr == kAccNameToInfoMap.end()) {
+            return false;
+        }
+
+        // All accumulators should be compatible (e.g. all $top's and $topN's).
+        if (firstAccInfoItr->second.sense != currentAccInfoItr->second.sense) {
+            return false;
+        }
+
+        // Sort patterns must match (in case of $top/$topN/$bottom/$bottomN).
+        if (sortPattern && *sortPattern != getAccSortPattern(acc.makeAccumulator())) {
+            return false;
+        }
+
+        // The remaining logic is only intended for multi accs ($firstN/$lastN/$topN/$bottomN).
+        if (!currentAccInfoItr->second.multi) {
+            continue;
+        }
+
+        // The optimization only applies if N == 1.
+        const auto init = acc.expr.initializer;
+        if (const auto constInit = dynamic_cast<ExpressionConstant*>(init.get()); constInit) {
+            const auto constVal = constInit->getValue();
+            if (!constVal.numeric() || constVal.coerceToLong() != 1) {
+                return false;
+            }
+        } else {
+            return false;
+        }
+
+        foundEligibleMultiAccs = true;
+    }
+
+    // If there are no eligible multi accs present (e.g. there are only $top's), no conversion needs
+    // to happen.
+    if (!foundEligibleMultiAccs) {
+        return false;
+    }
+
+    // Converts $firstN to $first, $lastN to $last, $topN to $top or $bottomN to $bottom.
+    // Also adds an $addFields stage to wrap the output of each accumulator in an array. Note that
+    // this does not add new fields, but merely overwrites the existing field(s). For example:
+    // {$addFields: {myField: ["$myField"]}.
+    const auto convertAccFunc =
+        createAccConversionFunction(pExpCtx, firstAccInfoItr->second.sense, sortPattern);
+    BSONObjBuilder addFieldsArgsBuilder;
+    for (auto& acc : accumulators) {
+        // Non-multi accumulators (e.g. $top) don't need conversion.
+        if (!kAccNameToInfoMap.at(acc.expr.name).multi) {
+            continue;
+        }
+
+        acc = convertAccFunc(acc);
+
+        BSONArrayBuilder arrBuilder;
+        arrBuilder.append("$" + acc.fieldName);
+        addFieldsArgsBuilder.append(acc.fieldName, arrBuilder.arr());
+    }
+
+    auto addFieldsStageSpec = addFieldsArgsBuilder.done();
+    auto addFieldsStage = DocumentSourceAddFields::create(
+        std::move(addFieldsStageSpec), pExpCtx, DocumentSourceAddFields::kStageName);
+    container->insert(std::next(itr), addFieldsStage);
 
     return true;
 }

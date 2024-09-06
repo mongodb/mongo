@@ -41,7 +41,13 @@
  */
 
 import {assertArrayEq} from "jstests/aggregation/extras/utils.js";
-import {getEngine, getPlanStage, getSingleNodeExplain} from "jstests/libs/analyze_plan.js";
+import {
+    getAggPlanStage,
+    getEngine,
+    getPlanStage,
+    getSingleNodeExplain,
+    isAggregationPlan
+} from "jstests/libs/analyze_plan.js";
 
 const coll = db.timeseries_lastpoint;
 const bucketsColl = db.system.buckets.timeseries_lastpoint;
@@ -373,7 +379,8 @@ const casesLastpointWithDistinctScan = [
             }
         } else {
             // The pipeline was executed in SBE. The input to 'UNPACK_TS_BUCKET' cannot be a group.
-            const unpack = getPlanStage(explain, "UNPACK_TS_BUCKET");
+            const unpack = isAggregationPlan(explain) ? getAggPlanStage(explain, "UNPACK_TS_BUCKET")
+                                                      : getPlanStage(explain, "UNPACK_TS_BUCKET");
             assert.neq(
                 "GROUP",
                 unpack.inputStage.stage,
