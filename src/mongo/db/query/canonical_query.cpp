@@ -307,14 +307,20 @@ bool CanonicalQuery::isSimpleIdQuery(const BSONObj& query) {
             hasID = true;
 
             if (elt.type() == Object) {
-                // If the value is an object, it can't have a query operator
-                // (must be a literal object match).
-                if (elt.Obj().firstElementFieldName()[0] == '$') {
-                    return false;
+                // If the value is an object, it can only have one field and that field can only be
+                // a query operator if the operator is $eq.
+                if (elt.Obj().firstElementFieldNameStringData().starts_with('$')) {
+                    if (elt.Obj().nFields() > 1 ||
+                        std::strcmp(elt.Obj().firstElementFieldName(), "$eq") != 0) {
+                        return false;
+                    }
+                    if (!Indexability::isExactBoundsGenerating(elt["$eq"])) {
+                        return false;
+                    }
                 }
             } else if (!Indexability::isExactBoundsGenerating(elt)) {
-                // The _id fild cannot be something like { _id : { $gt : ...
-                // But it can be BinData.
+                // In addition to objects, some other BSON elements are not suitable for exact index
+                // lookup.
                 return false;
             }
         } else {

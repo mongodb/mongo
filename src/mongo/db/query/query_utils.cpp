@@ -67,6 +67,19 @@ bool sortPatternHasPartsWithCommonPrefix(const SortPattern& sortPattern) {
     return false;
 }
 
+bool isMatchIdHackEligible(MatchExpression* me) {
+    if (me) {
+        const auto& cmpMeBase = dynamic_cast<ComparisonMatchExpressionBase*>(me);
+        if (!cmpMeBase) {
+            return false;
+        }
+
+        return me->matchType() == MatchExpression::MatchType::EQ && me->path() == "_id" &&
+            Indexability::isExactBoundsGenerating(cmpMeBase->getData());
+    }
+    return false;
+}
+
 bool isSortSbeCompatible(const SortPattern& sortPattern) {
     // If the sort has meta or numeric path components, we cannot use SBE.
     return std::all_of(sortPattern.begin(), sortPattern.end(), [](auto&& part) {
@@ -84,8 +97,7 @@ bool isQuerySbeCompatible(const CollectionPtr* collection, const CanonicalQuery*
     // If we don't support all expressions used or the query is eligible for IDHack, don't use SBE.
     if (!expCtx || expCtx->sbeCompatibility == SbeCompatibility::notCompatible ||
         expCtx->sbePipelineCompatibility == SbeCompatibility::notCompatible ||
-        (*collection &&
-         isIdHackEligibleQuery(*collection, cq->getFindCommandRequest(), cq->getCollator()))) {
+        (*collection && isIdHackEligibleQuery(*collection, *cq))) {
         return false;
     }
 

@@ -521,8 +521,7 @@ void QueryPlannerParams::fillOutMainCollectionPlannerParams(
 
     // _id queries can skip checking the catalog for indices since they will always use the _id
     // index.
-    if (isIdHackEligibleQuery(
-            mainColl, canonicalQuery.getFindCommandRequest(), canonicalQuery.getCollator())) {
+    if (isIdHackEligibleQuery(mainColl, canonicalQuery)) {
         return;
     }
 

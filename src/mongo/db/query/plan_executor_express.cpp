@@ -517,6 +517,36 @@ std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> makeExpressExecutor(
 }
 }  // namespace
 
+// Returns true if the given query is exactly the shape {_id: <value>}. So, we check if the
+// following conditions are met:
+//      1) the BSON has one field
+//      2) that field is the '_id' field
+//      3) either:
+//             A. the value of the '_id' field is not an object OR
+//             B. the value of the '_id' field is an object but the first field name of the object
+//             is not an operator (i.e. its an exactly object match predicate). Note that we don't
+//             have to check the rest of the field names in the sub-object - during parsing if the
+//             first field name in the sub-object is not an operator, we parse the query as an exact
+//             match query.
+bool isExactMatchOnId(const BSONObj& queryObj) {
+    if (queryObj.nFields() == 1 && queryObj.hasField("_id")) {
+        BSONElement idVal = queryObj["_id"];
+        if (idVal.isABSONObj()) {
+            auto firstSubFieldName = idVal.Obj().firstElementFieldNameStringData();
+            if (firstSubFieldName.starts_with('$')) {
+                // The first field name in the sub-objet 'idVal' is an operator (violates case 3B
+                // above), return false.
+                return false;
+            }
+        }
+        // 'idVal' is NOT an object (case 3A above) or meets case 3B above, return true.
+        return true;
+    }
+    // 'queryObj' either has more than one field (violates case 1 above) or doesn't have the '_id'
+    // field (violates case 2 above), return false.
+    return false;
+}
+
 std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> makeExpressExecutorForFindById(
     OperationContext* opCtx,
     std::unique_ptr<CanonicalQuery> cq,
@@ -525,7 +555,19 @@ std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> makeExpressExecutorForFindB
     bool returnOwnedBson) {
     return std::visit(
         [&](auto collectionAlternative) {
-            const BSONObj& queryFilter = cq->getQueryObj();
+            BSONObj queryFilter;
+            // We can use the original BSON command if the shape of the command was exactly {_id:
+            // <value>}. Note that if the value of the '_id' field was an object with operators, we
+            // will only reach this code if there is one operator and that operator is $eq. (We
+            // check this during IDHACK/EXRESS eligibility checks.)
+            if (isExactMatchOnId(cq->getQueryObj())) {
+                queryFilter = cq->getQueryObj();
+            } else {
+                ComparisonMatchExpressionBase* me =
+                    static_cast<ComparisonMatchExpressionBase*>(cq->getPrimaryMatchExpression());
+                queryFilter = me->getData().wrap("_id");
+            }
+
             return makeExpressExecutor(
                 opCtx,
                 express::IdLookupViaIndex<decltype(collectionAlternative)>(queryFilter),
@@ -546,7 +588,19 @@ std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> makeExpressExecutorForFindB
     bool returnOwnedBson) {
     return std::visit(
         [&](auto collectionAlternative) {
-            const BSONObj& queryFilter = cq->getQueryObj();
+            BSONObj queryFilter;
+            // We can use the original BSON command if the shape of the command was exactly {_id:
+            // <value>}. Note that if the value of the '_id' field was an object with operators, we
+            // will only reach this code if there is one operator and that operator is $eq. (We
+            // check this during IDHACK/EXRESS eligibility checks.)
+            if (isExactMatchOnId(cq->getQueryObj())) {
+                queryFilter = cq->getQueryObj();
+            } else {
+                ComparisonMatchExpressionBase* me =
+                    static_cast<ComparisonMatchExpressionBase*>(cq->getPrimaryMatchExpression());
+                queryFilter = me->getData().wrap("_id");
+            }
+
             return makeExpressExecutor(
                 opCtx,
                 express::IdLookupOnClusteredCollection<decltype(collectionAlternative)>(
@@ -631,13 +685,33 @@ std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> makeExpressExecutorForUpdat
     using Iterator = std::variant<express::IdLookupViaIndex<CollectionAcquisition>,
                                   express::IdLookupOnClusteredCollection<CollectionAcquisition>>;
     auto iterator = [&]() -> Iterator {
+        // We allow queries of the shape {_id: {$eq: <value>}} to use the express path, but we
+        // want to pass in BSON of the shape {_id: <value>} to the executor for consistency and
+        // because a later code path may rely on this shape. Note that we don't have to use
+        // 'isExactMatchOnId' here since we know we haven't reached this code via the eligibilty
+        // check on the CanonicalQuery's MatchExpression (since there was no CanonicalQuery created
+        // for this path). Therefore, we know the incoming query is either exactly of the shape
+        // {_id: <value>} or {_id: {$eq: <value>}}.
+        BSONObj queryFilter;
+        if (request->getQuery()["_id"].isABSONObj() &&
+            request->getQuery()["_id"].Obj().hasField("$eq")) {
+            queryFilter = request->getQuery()["_id"].Obj()["$eq"].wrap("_id");
+        } else {
+            queryFilter = request->getQuery();
+        }
+
+        tassert(9248801,
+                str::stream()
+                    << "Expected the input to be of the shape {_id: <value>}, but the input is "
+                    << queryFilter,
+                isExactMatchOnId(queryFilter));
+
         bool isClusteredOnId =
             clustered_util::isClusteredOnId(collection.getCollectionPtr()->getClusteredInfo());
         if (isClusteredOnId) {
-            return express::IdLookupOnClusteredCollection<CollectionAcquisition>(
-                request->getQuery());
+            return express::IdLookupOnClusteredCollection<CollectionAcquisition>(queryFilter);
         } else {
-            return express::IdLookupViaIndex<CollectionAcquisition>(request->getQuery());
+            return express::IdLookupViaIndex<CollectionAcquisition>(queryFilter);
         }
     }();
 
@@ -684,13 +758,33 @@ std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> makeExpressExecutorForDelet
     using Iterator = std::variant<express::IdLookupViaIndex<CollectionAcquisition>,
                                   express::IdLookupOnClusteredCollection<CollectionAcquisition>>;
     auto iterator = [&]() -> Iterator {
+        // We allow queries of the shape {_id: {$eq: <value>}} to use the express path, but we
+        // want to pass in BSON of the shape {_id: <value>} to the executor for consistency and
+        // because a later code path may rely on this shape. Note that we don't have to use
+        // 'isExactMatchOnId' here since we know we haven't reached this code via the eligibilty
+        // check on the CanonicalQuery's MatchExpression (since there was no CanonicalQuery created
+        // for this path). Therefore, we know the incoming query is either exactly of the shape
+        // {_id: <value>} or {_id: {$eq: <value>}}.
+        BSONObj queryFilter;
+        if (request->getQuery()["_id"].isABSONObj() &&
+            request->getQuery()["_id"].Obj().hasField("$eq")) {
+            queryFilter = request->getQuery()["_id"].Obj()["$eq"].wrap("_id");
+        } else {
+            queryFilter = request->getQuery();
+        }
+
+        tassert(9248804,
+                str::stream()
+                    << "Expected the input to be of the shape {_id: <value>}, but the input is "
+                    << queryFilter,
+                isExactMatchOnId(queryFilter));
+
         bool isClusteredOnId =
             clustered_util::isClusteredOnId(collection.getCollectionPtr()->getClusteredInfo());
         if (isClusteredOnId) {
-            return express::IdLookupOnClusteredCollection<CollectionAcquisition>(
-                request->getQuery());
+            return express::IdLookupOnClusteredCollection<CollectionAcquisition>(queryFilter);
         } else {
-            return express::IdLookupViaIndex<CollectionAcquisition>(request->getQuery());
+            return express::IdLookupViaIndex<CollectionAcquisition>(queryFilter);
         }
     }();
 

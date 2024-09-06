@@ -128,7 +128,20 @@ void produceDocumentForUpsert(OperationContext* opCtx,
             *cq->getPrimaryMatchExpression(), immutablePaths, doc));
     } else {
         fassert(17354, CanonicalQuery::isSimpleIdQuery(request->getQuery()));
-        fassert(17352, doc.root().appendElement(request->getQuery()[idFieldName]));
+        // IDHACK path allows for queries of the shape {_id: 123} and {_id: {$eq: 123}}. Neither
+        // case will have generated a CanonicalQuery earlier, so we have to figure out which value
+        // should be in the created document here, since we cannot insert a document that looks like
+        // {_id: {$eq: 123}}.
+        const BSONElement& idVal = request->getQuery()[idFieldName];
+        if (idVal.isABSONObj() && idVal.Obj().hasField("$eq")) {
+            // We append an element of the shape {_id: 123}.
+            mutablebson::Element newElement =
+                doc.makeElementWithNewFieldName(idFieldName, idVal["$eq"]);
+            fassert(9248800, newElement.ok());
+            fassert(9248803, doc.root().pushBack(newElement));
+        } else {
+            fassert(17352, doc.root().appendElement(idVal));
+        }
     }
 
     // Second: run the appropriate document generation strategy over the document to generate the

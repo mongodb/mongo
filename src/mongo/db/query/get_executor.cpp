@@ -676,8 +676,7 @@ private:
 
     std::unique_ptr<ClassicRuntimePlannerResult> buildIdHackPlan() final {
         const auto& mainCollection = getCollections().getMainCollection();
-        if (!isIdHackEligibleQuery(
-                mainCollection, _cq->getFindCommandRequest(), _cq->getCollator())) {
+        if (!isIdHackEligibleQuery(mainCollection, *_cq)) {
             return nullptr;
         }
 

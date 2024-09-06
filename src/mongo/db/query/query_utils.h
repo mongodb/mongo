@@ -45,25 +45,30 @@ namespace mongo {
 bool sortPatternHasPartsWithCommonPrefix(const SortPattern& sortPattern);
 
 /**
+ * Returns 'true' if the given match expression is of the shape {_id: {$eq: ...}}.
+ */
+bool isMatchIdHackEligible(MatchExpression* me);
+
+/**
  * Returns 'true' if 'query' on the given 'collection' can be answered using a special IDHACK plan,
  * without taking into account the collators.
  */
-inline bool isIdHackEligibleQueryWithoutCollator(const FindCommandRequest& findCommand) {
+inline bool isIdHackEligibleQueryWithoutCollator(const FindCommandRequest& findCommand,
+                                                 MatchExpression* me = nullptr) {
     return !findCommand.getShowRecordId() && findCommand.getHint().isEmpty() &&
         findCommand.getMin().isEmpty() && findCommand.getMax().isEmpty() &&
-        !findCommand.getSkip() && CanonicalQuery::isSimpleIdQuery(findCommand.getFilter()) &&
+        !findCommand.getSkip() &&
+        (CanonicalQuery::isSimpleIdQuery(findCommand.getFilter()) || isMatchIdHackEligible(me)) &&
         !findCommand.getTailable();
 }
 
 /**
  * Returns 'true' if 'query' on the given 'collection' can be answered using a special IDHACK plan.
  */
-inline bool isIdHackEligibleQuery(const CollectionPtr& collection,
-                                  const FindCommandRequest& findCommand,
-                                  const CollatorInterface* queryCollator) {
-
-    return isIdHackEligibleQueryWithoutCollator(findCommand) &&
-        CollatorInterface::collatorsMatch(queryCollator, collection->getDefaultCollator());
+inline bool isIdHackEligibleQuery(const CollectionPtr& collection, const CanonicalQuery& cq) {
+    return isIdHackEligibleQueryWithoutCollator(cq.getFindCommandRequest(),
+                                                cq.getPrimaryMatchExpression()) &&
+        CollatorInterface::collatorsMatch(cq.getCollator(), collection->getDefaultCollator());
 }
 
 /**
@@ -118,8 +123,7 @@ inline ExpressEligibility isExpressEligible(OperationContext* opCtx,
         (cq.getProj() != nullptr && !cq.getProj()->isSimple())) {
         return ExpressEligibility::Ineligible;
     }
-
-    if (isIdHackEligibleQuery(coll, findCommandReq, cq.getExpCtx()->getCollator()) &&
+    if (isIdHackEligibleQuery(coll, cq) &&
         (coll->getIndexCatalog()->haveIdIndex(opCtx) ||
          clustered_util::isClusteredOnId(coll->getClusteredInfo()))) {
         return ExpressEligibility::IdPointQueryEligible;

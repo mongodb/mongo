@@ -62,7 +62,9 @@ IDHackStage::IDHackStage(ExpressionContext* expCtx,
                          const IndexDescriptor* descriptor)
     : RequiresIndexStage(kStageType, expCtx, collection, descriptor, ws),
       _workingSet(ws),
-      _key(query->getQueryObj()["_id"].wrap()) {
+      _key(static_cast<ComparisonMatchExpressionBase*>(query->getPrimaryMatchExpression())
+               ->getData()
+               .wrap("_id")) {
     _specificStats.indexName = descriptor->indexName();
     _addKeyMetadata = query->getFindCommandRequest().getReturnKey();
 }

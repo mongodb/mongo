@@ -511,7 +511,7 @@ private:
         return catalog->getEntry(desc);
     }
 
-    BSONObj _queryFilter;  // Unowned BSON.
+    BSONObj _queryFilter;  // Owned BSON.
 
     typename WrapInOptionalIfNeeded<CollectionType>::type _collection;
     boost::optional<UUID> _collectionUUID;
@@ -609,7 +609,7 @@ public:
     }
 
 private:
-    BSONObj _queryFilter;  // Unowned BSON.
+    BSONObj _queryFilter;  // Owned BSON.
 
     typename WrapInOptionalIfNeeded<CollectionType>::type _collection;
     boost::optional<UUID> _collectionUUID;

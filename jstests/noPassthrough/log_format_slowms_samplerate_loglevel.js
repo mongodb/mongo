@@ -283,7 +283,7 @@ function runLoggingTests({db, slowMs, logLevel, sampleRate, enableQueryStats = f
                                        q: {_id: 100, $comment: logFormatTestComment},
                                        u: {$inc: {b: 1}},
                                        multi: true,
-                                       planSummary: "IXSCAN { _id: 1 }",
+                                       planSummary: "IDHACK",
                                        keysExamined: 0,
                                        docsExamined: 0,
                                        nMatched: 0,
