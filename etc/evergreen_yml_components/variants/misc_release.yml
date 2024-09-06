@@ -2215,7 +2215,7 @@ buildvariants:
   display_name: macOS
   cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
   run_on:
-  - macos-1100
+  - macos-11
   expansions:
     test_flags: --excludeWithAnyTags=incompatible_with_macos,requires_latch_analyzer --enableEnterpriseTests=off
     push_path: osx
@@ -2245,7 +2245,7 @@ buildvariants:
   display_name: macOS arm64
   cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
   run_on:
-  - macos-1100-arm64
+  - macos-11-arm64
   expansions:
     test_flags: --excludeWithAnyTags=incompatible_with_macos,requires_latch_analyzer --enableEnterpriseTests=off
     push_path: osx
@@ -2275,7 +2275,7 @@ buildvariants:
   display_name: Enterprise macOS
   cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
   run_on:
-  - macos-1100
+  - macos-11
   expansions:
     test_flags: --excludeWithAnyTags=incompatible_with_macos,requires_gcm,requires_latch_analyzer
     additional_package_targets: archive-mongocryptd archive-mongocryptd-debug archive-mh archive-mh-debug
@@ -2304,7 +2304,7 @@ buildvariants:
   display_name: Enterprise macOS arm64
   cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
   run_on:
-  - macos-1100-arm64
+  - macos-11-arm64
   expansions:
     test_flags: --excludeWithAnyTags=incompatible_with_macos,requires_gcm,requires_latch_analyzer
     additional_package_targets: archive-mongocryptd archive-mongocryptd-debug archive-mh archive-mh-debug

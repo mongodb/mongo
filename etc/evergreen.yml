@@ -1097,7 +1097,7 @@ buildvariants:
   display_name: "* macOS DEBUG"
   cron: "0 */4 * * *" # From the ${project_required_suggested_cron} parameter
   run_on:
-  - macos-1100
+  - macos-11
   expansions: &macos-debug-expansions
     test_flags: --excludeWithAnyTags=incompatible_with_macos --enableEnterpriseTests=off
     resmoke_jobs_max: 6
@@ -1125,7 +1125,7 @@ buildvariants:
   display_name: "Enterprise macOS Via Rosetta 2"
   cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
   run_on:
-  - macos-1100-arm64
+  - macos-11-arm64
   expansions:
     test_flags: --excludeWithAnyTags=incompatible_with_macos,requires_gcm
     compile_env: DEVELOPER_DIR=/Applications/Xcode13.app
@@ -1151,7 +1151,7 @@ buildvariants:
   display_name: "Enterprise macOS C++20 DEBUG"
   cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
   run_on:
-  - macos-1100
+  - macos-11
   expansions:
     test_flags: --excludeWithAnyTags=incompatible_with_macos,requires_gcm
     compile_env: DEVELOPER_DIR=/Applications/Xcode13.app
@@ -1175,7 +1175,7 @@ buildvariants:
 - name: enterprise-macos-arm64
   display_name: "~ Enterprise macOS arm64"
   run_on:
-  - macos-1100-arm64
+  - macos-11-arm64
   expansions:
     test_flags: --excludeWithAnyTags=incompatible_with_macos,requires_gcm
     compile_env: DEVELOPER_DIR=/Applications/Xcode13.app
@@ -1206,7 +1206,7 @@ buildvariants:
 - name: embedded-sdk-macos
   display_name: "Embedded SDK - macOS"
   run_on:
-  - macos-1100
+  - macos-11
   cron: "0 4 * * 0" # From the ${project_weekly_cron} parameter
   expansions:
     test_flags: --excludeWithAnyTags=uses_transactions,incompatible_with_macos --enableEnterpriseTests=off
