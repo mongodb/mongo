@@ -92,11 +92,12 @@ assert.commandWorked(res);
         assert.commandWorked(renameRes1);
     }
 
-    const dropRes = configSvrConfigDB.runCommand({drop: "shards"});
     if (isReplicaSetEndpointActive) {
+        const dropRes = configSvrConfigDB.runCommand({drop: "shards"});
         assert.commandFailedWithCode(dropRes, ErrorCodes.IllegalOperation);
     } else {
-        assert.commandWorked(dropRes);
+        assert.commandWorked(configSvrConfigDB.createCollection("dummy"));
+        assert.commandWorked(configSvrConfigDB.runCommand({drop: "dummy"}));
     }
 }
 
