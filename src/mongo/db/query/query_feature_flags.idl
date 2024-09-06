@@ -170,3 +170,9 @@ feature_flags:
       cpp_varname: gFeatureFlagShardFilteringDistinctScan
       default: false
       shouldBeFCVGated: true
+    
+    featureFlagArrayAccumulators:
+      description: "Feature flag to enable the $concatArrays and $setUnion accumulators."
+      cpp_varname: gFeatureFlagArrayAccumulators
+      default: false
+      shouldBeFCVGated: true
