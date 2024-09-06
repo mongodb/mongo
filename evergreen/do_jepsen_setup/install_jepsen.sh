@@ -1,10 +1,9 @@
 set -o errexit
 
 cd src
-git clone --branch=jepsen-mongodb-master --depth=1 git@github.com:10gen/jepsen.git jepsen-mongodb
+# "v0.2.0-jepsen-mongodb-master" is the latest jepsen version that works with v5.0,
+# because JS engine on v5.0 does not know the "import" statement, that was added in later jepsen versions
+git clone --branch=v0.2.0-jepsen-mongodb-master --depth=1 git@github.com:10gen/jepsen.git jepsen-mongodb
 cd jepsen-mongodb
-branch=$(git symbolic-ref --short HEAD)
-commit=$(git show -s --pretty=format:"%h - %an, %ar: %s")
-echo "Git branch: $branch, commit: $commit"
 
 lein install
