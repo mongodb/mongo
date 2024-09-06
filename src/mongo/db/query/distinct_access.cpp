@@ -172,9 +172,52 @@ bool getDistinctNodeIndex(const std::vector<IndexEntry>& indices,
 
 }  // namespace
 
+std::unique_ptr<QuerySolution> constructCoveredDistinctScan(
+    const CanonicalQuery& canonicalQuery,
+    const QueryPlannerParams& plannerParams,
+    const CanonicalDistinct& canonicalDistinct) {
+    size_t distinctNodeIndex = 0;
+    auto collator = canonicalQuery.getCollator();
+    if (getDistinctNodeIndex(plannerParams.mainCollectionInfo.indexes,
+                             canonicalDistinct.getKey(),
+                             collator,
+                             &distinctNodeIndex)) {
+        auto dn = std::make_unique<DistinctNode>(
+            plannerParams.mainCollectionInfo.indexes[distinctNodeIndex]);
+        dn->direction = 1;
+        IndexBoundsBuilder::allValuesBounds(
+            dn->index.keyPattern, &dn->bounds, dn->index.collator != nullptr);
+        dn->queryCollator = collator;
+        dn->fieldNo = 0;
+
+        // An index with a non-simple collation requires a FETCH stage.
+        std::unique_ptr<QuerySolutionNode> solnRoot = std::move(dn);
+        if (plannerParams.mainCollectionInfo.indexes[distinctNodeIndex].collator) {
+            if (!solnRoot->fetched()) {
+                auto fetch = std::make_unique<FetchNode>();
+                fetch->children.push_back(std::move(solnRoot));
+                solnRoot = std::move(fetch);
+            }
+        }
+
+        // While on this path there are no sort or filter, the solution still needs to create
+        // the projection and 'analyzeDataAccess()' would do that. NB: whether other aspects of
+        // data access are important, it's hard to say, this code has been like this since long
+        // ago (and it has always passed in new 'QueryPlannerParams').
+        auto soln = QueryPlannerAnalysis::analyzeDataAccess(
+            canonicalQuery,
+            // TODO SERVER-87683 Investigate why empty parameters are used instead of
+            // 'plannerParams'.
+            QueryPlannerParams{QueryPlannerParams::ArgsForTest{}},
+            std::move(solnRoot));
+        uassert(8404000, "Failed to finalize a DISTINCT_SCAN plan", soln);
+        return soln;
+    }
+    return nullptr;
+}
+
 std::unique_ptr<QuerySolution> createDistinctScanSolution(const CanonicalQuery& canonicalQuery,
                                                           const QueryPlannerParams& plannerParams,
-                                                          bool isDistinctMultiplanningEnabled,
                                                           bool flipDistinctScanDirection) {
     const CanonicalDistinct& canonicalDistinct = *canonicalQuery.getDistinct();
     if (canonicalQuery.getFindCommandRequest().getFilter().isEmpty() &&
@@ -183,62 +226,19 @@ std::unique_ptr<QuerySolution> createDistinctScanSolution(const CanonicalQuery& 
         // index for it even if the index could provide the distinct semantics on the key from the
         // 'canonicalDistinct'. So, we create the solution "manually" from a suitable index.
         // The direction of the index doesn't matter in this case.
-        size_t distinctNodeIndex = 0;
-        auto collator = canonicalQuery.getCollator();
-        if (getDistinctNodeIndex(plannerParams.mainCollectionInfo.indexes,
-                                 canonicalDistinct.getKey(),
-                                 collator,
-                                 &distinctNodeIndex)) {
-            auto dn = std::make_unique<DistinctNode>(
-                plannerParams.mainCollectionInfo.indexes[distinctNodeIndex]);
-            dn->direction = 1;
-            IndexBoundsBuilder::allValuesBounds(
-                dn->index.keyPattern, &dn->bounds, dn->index.collator != nullptr);
-            dn->queryCollator = collator;
-            dn->fieldNo = 0;
-
-            // An index with a non-simple collation requires a FETCH stage.
-            std::unique_ptr<QuerySolutionNode> solnRoot = std::move(dn);
-            if (plannerParams.mainCollectionInfo.indexes[distinctNodeIndex].collator) {
-                if (!solnRoot->fetched()) {
-                    auto fetch = std::make_unique<FetchNode>();
-                    fetch->children.push_back(std::move(solnRoot));
-                    solnRoot = std::move(fetch);
-                }
-            }
-
-            // While on this path there are no sort or filter, the solution still needs to create
-            // the projection and 'analyzeDataAccess()' would do that. NB: whether other aspects of
-            // data access are important, it's hard to say, this code has been like this since long
-            // ago (and it has always passed in new 'QueryPlannerParams').
-            auto soln = QueryPlannerAnalysis::analyzeDataAccess(
-                canonicalQuery,
-                // TODO SERVER-87683 Investigate why empty parameters are used instead of
-                // 'plannerParams'.
-                QueryPlannerParams{QueryPlannerParams::ArgsForTest{}},
-                std::move(solnRoot));
-            uassert(8404000, "Failed to finalize a DISTINCT_SCAN plan", soln);
-            return soln;
-        }
-    } else if (!isDistinctMultiplanningEnabled) {
-        // If multiplanning for distinct is disabled, we will keep the old functionality of
-        // returning the first query solution eligible for DISTINCT_SCAN. Otherwise we prefer to
-        // fallback to a find command.
-
+        return constructCoveredDistinctScan(canonicalQuery, plannerParams, canonicalDistinct);
+    } else {
         // Ask the QueryPlanner for a list of solutions that scan one of the indexes from
         // 'plannerParams' (i.e., the indexes that include the distinct field). Then try to convert
         // one of these plans to a DISTINCT_SCAN.
         auto multiPlanSolns = QueryPlanner::plan(canonicalQuery, plannerParams);
         if (multiPlanSolns.isOK()) {
             auto& solutions = multiPlanSolns.getValue();
-            const bool strictDistinctOnly = (plannerParams.mainCollectionInfo.options &
-                                             QueryPlannerParams::STRICT_DISTINCT_ONLY);
-
             for (size_t i = 0; i < solutions.size(); ++i) {
                 if (turnIxscanIntoDistinctScan(canonicalQuery,
+                                               plannerParams,
                                                solutions[i].get(),
                                                canonicalDistinct.getKey(),
-                                               strictDistinctOnly,
                                                flipDistinctScanDirection)) {
                     // The first suitable distinct scan is as good as any other.
                     return std::move(solutions[i]);
@@ -279,20 +279,11 @@ bool isAnyComponentOfPathMultikey(const BSONObj& indexKeyPattern,
 }
 
 bool turnIxscanIntoDistinctScan(const CanonicalQuery& canonicalQuery,
+                                const QueryPlannerParams& plannerParams,
                                 QuerySolution* soln,
                                 const std::string& field,
-                                bool strictDistinctOnly,
                                 bool flipDistinctScanDirection) {
     auto root = soln->root();
-
-    // Temporarily check if the plan already contains a distinct scan. That happens in the
-    // aggregation code path where this function is called twice for a place. The only possible
-    // plans are FETCH + DISTINCT or PROJECT + DISTINCT.
-    //
-    // TODO SERVER-92615: Remove this.
-    if (root->children.size() > 0 && root->children[0]->getType() == STAGE_DISTINCT_SCAN) {
-        return true;
-    }
 
     // We can attempt to convert a plan if it follows one of these patterns (starting from the
     // root):
@@ -330,6 +321,13 @@ bool turnIxscanIntoDistinctScan(const CanonicalQuery& canonicalQuery,
         return false;
     }
 
+    const bool strictDistinctOnly =
+        (plannerParams.mainCollectionInfo.options & QueryPlannerParams::STRICT_DISTINCT_ONLY);
+
+    // If a sort is required to maintain correct query semantics with DISTINCT_SCAN, we need to
+    // ensure it is provided by the index.
+    const bool hasSortRequirement = canonicalQuery.getDistinct()->getSortRequirement().has_value();
+
     // When multiplanning for distinct is enabled, this function is reached from the query planner
     // which is also called by the fallback find path when multiplanning is disabled. In the latter
     // case, we have already filtered out indexes which are ineligible for conversion to
@@ -344,7 +342,7 @@ bool turnIxscanIntoDistinctScan(const CanonicalQuery& canonicalQuery,
             return false;
         }
         if (canonicalQuery.getFindCommandRequest().getFilter().isEmpty() &&
-            !canonicalQuery.getSortPattern() &&
+            !canonicalQuery.getSortPattern() && !hasSortRequirement &&
             isAFullIndexScanPreferable(indexScanNode->index, field, indexScanNode->queryCollator)) {
             return false;
         }
@@ -428,6 +426,29 @@ bool turnIxscanIntoDistinctScan(const CanonicalQuery& canonicalQuery,
             // array component.
             return false;
         }
+    }
+
+    // Multikeyness is currently not taken into account when deciding whether a distinct scan
+    // direction can be reversed in 'analyzeNonBlockingSort()'. This is fine, because multikey
+    // indexes are not allowed with STRICT_DISTINCT_ONLY.
+    tassert(9261503,
+            "Expected a strict distinct scan when the query has a sortRequirement",
+            !hasSortRequirement || strictDistinctOnly);
+
+    // If there are other factors that affect the scan direction, don't attempt to reverse it. Note
+    // that 'flipDistinctScanDirection' is intentionally ignored here, since its purpose is to
+    // implement $last/$bottom with a distinct scan by reversing the sort direction of the query.
+    const bool reverseScanIfNeededToSatisfySortRequirement =
+        !canonicalQuery.getSortPattern() && !plannerParams.traversalPreference;
+
+    if (hasSortRequirement &&
+        !QueryPlannerAnalysis::analyzeNonBlockingSort(
+            plannerParams,
+            canonicalQuery.getDistinct()->getSerializedSortRequirement(),
+            canonicalQuery.getFindCommandRequest().getHint(),
+            reverseScanIfNeededToSatisfySortRequirement,
+            indexScanNode)) {
+        return false;
     }
 
     // Make a new DistinctNode. We will swap this for the ixscan in the provided solution.

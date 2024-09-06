@@ -37,6 +37,7 @@
 
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/pipeline/group_from_first_document_transformation.h"
 #include "mongo/db/query/collation/collator_interface.h"
 #include "mongo/util/uuid.h"
 
@@ -59,14 +60,16 @@ public:
     static const char kUnwoundArrayFieldForViewUnwind[];
     static const char kHintField[];
 
-    CanonicalDistinct(const std::string key,
-                      const bool mirrored = false,
-                      const boost::optional<UUID> sampleId = boost::none,
-                      boost::optional<BSONObj> projSpec = boost::none)
+    CanonicalDistinct(std::string key,
+                      bool mirrored = false,
+                      boost::optional<UUID> sampleId = boost::none,
+                      boost::optional<BSONObj> projSpec = boost::none,
+                      bool flipDistinctScanDirection = false)
         : _key(std::move(key)),
           _mirrored(std::move(mirrored)),
           _sampleId(std::move(sampleId)),
-          _projSpec(std::move(projSpec)) {}
+          _projSpec(std::move(projSpec)),
+          _flipDistinctScanDirection(std::move(flipDistinctScanDirection)) {}
 
     const std::string& getKey() const {
         return _key;
@@ -82,6 +85,36 @@ public:
 
     const boost::optional<BSONObj>& getProjectionSpec() const {
         return _projSpec;
+    }
+
+    bool isDistinctScanDirectionFlipped() const {
+        return _flipDistinctScanDirection;
+    }
+
+    void setRewrittenGroupStage(
+        std::unique_ptr<GroupFromFirstDocumentTransformation> rewrittenGroupStage) {
+        _rewrittenGroupStage = std::move(rewrittenGroupStage);
+    }
+
+    std::unique_ptr<GroupFromFirstDocumentTransformation> releaseRewrittenGroupStage() {
+        return std::move(_rewrittenGroupStage);
+    }
+
+    const boost::optional<SortPattern>& getSortRequirement() const {
+        return _sortRequirement;
+    }
+
+    const BSONObj& getSerializedSortRequirement() const {
+        return _serializedSortRequirement;
+    }
+
+    void setSortRequirement(boost::optional<SortPattern> sortRequirement) {
+        _sortRequirement = std::move(sortRequirement);
+        _serializedSortRequirement = _sortRequirement
+            ? _sortRequirement
+                  ->serialize(SortPattern::SortKeySerialization::kForPipelineSerialization)
+                  .toBson()
+            : BSONObj();
     }
 
     static boost::intrusive_ptr<ExpressionContext> makeExpressionContext(
@@ -103,6 +136,20 @@ private:
 
     // This is used when we have a covered distinct scan in order to materialize the output.
     boost::optional<BSONObj> _projSpec;
+
+    // In certain situations we will need to flip the direction of any generated DISTINCT_SCAN to
+    // preserve the semantics of the query.
+    // TODO SERVER-94369: Remove this and rely entirely on '_sortRequirement'.
+    bool _flipDistinctScanDirection{false};
+
+    // When the aggreation rewriting is successful and the multiplanning generates a DISTINCT_SCAN,
+    // we need to do the last modifications to the pipeline to be compatible with the DISTINCT_SCAN.
+    std::unique_ptr<GroupFromFirstDocumentTransformation> _rewrittenGroupStage;
+
+    // For some queries (e.g. $group with $top/$sortBy), a sort is needed to implement correct
+    // semantics with a DISTINCT_SCAN.
+    boost::optional<SortPattern> _sortRequirement;
+    BSONObj _serializedSortRequirement;
 };
 
 }  // namespace mongo

@@ -347,10 +347,6 @@ struct QueryPlannerParams {
     // Were query settings applied?
     bool querySettingsApplied{false};
 
-    // In certain situations we will need to flip the direction of any generated DISTINCT_SCAN to
-    // preserve the semantics of the query.
-    bool flipDistinctScanDirection{false};
-
 private:
     MONGO_COMPILER_ALWAYS_INLINE
     void fillOutPlannerParamsForExpressQuery(OperationContext* opCtx,

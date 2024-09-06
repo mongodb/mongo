@@ -80,6 +80,7 @@
 #include "mongo/db/query/canonical_query.h"
 #include "mongo/db/query/collation/collation_index_key.h"
 #include "mongo/db/query/collation/collator_interface.h"
+#include "mongo/db/query/distinct_access.h"
 #include "mongo/db/query/eof_node_type.h"
 #include "mongo/db/query/find_command.h"
 #include "mongo/db/query/index_entry.h"
@@ -1531,6 +1532,15 @@ StatusWith<std::vector<std::unique_ptr<QuerySolution>>> QueryPlanner::plan(
                     "tree"_attr = redact(query.getPrimaryMatchExpression()->debugString()));
     }
 
+    const bool isDistinctMultiplanningEnabled =
+        query.getExpCtx()->isFeatureFlagShardFilteringDistinctScanEnabled();
+    const auto& sortPattern = query.getSortPattern();
+    const auto& sortRequirementForDistinct =
+        query.getDistinct() ? query.getDistinct()->getSortRequirement() : boost::none;
+    tassert(9261501,
+            "Expected distinct multiplanning to be enabled when sortRequirementForDistinct is set",
+            !sortRequirementForDistinct || isDistinctMultiplanningEnabled);
+
     std::vector<std::unique_ptr<QuerySolution>> out;
 
     // If we have any relevant indices, we try to create indexed plans.
@@ -1544,7 +1554,9 @@ StatusWith<std::vector<std::unique_ptr<QuerySolution>>> QueryPlanner::plan(
         enumParams.enumerateOrChildrenLockstep =
             params.mainCollectionInfo.options & QueryPlannerParams::ENUMERATE_OR_CHILDREN_LOCKSTEP;
         enumParams.projection = query.getProj();
-        enumParams.sort = &query.getSortPattern();
+        // Ensure we don't prune indexes that could be used to satisfy the sort requirement for
+        // distinct scan.
+        enumParams.sort = sortPattern ? &sortPattern : &sortRequirementForDistinct;
         enumParams.shardKey = params.shardKey;
         enumParams.distinct = query.getDistinct().has_value();
         // TODO SERVER-94155: Enable index pruning for distinct-like queries when feature flag is
@@ -1660,9 +1672,9 @@ StatusWith<std::vector<std::unique_ptr<QuerySolution>>> QueryPlanner::plan(
     }
 
     // If a sort order is requested, there may be an index that provides it, even if that
-    // index is not over any predicates in the query.
-    //
-    if (query.getSortPattern() &&
+    // index is not over any predicates in the query. When planning a distinct scan query, a
+    // sort might be required even when the query doesn't have an actual sort.
+    if ((sortPattern || sortRequirementForDistinct) &&
         !QueryPlannerCommon::hasNode(query.getPrimaryMatchExpression(),
                                      MatchExpression::GEO_NEAR) &&
         !QueryPlannerCommon::hasNode(query.getPrimaryMatchExpression(), MatchExpression::TEXT)) {
@@ -1677,7 +1689,7 @@ StatusWith<std::vector<std::unique_ptr<QuerySolution>>> QueryPlanner::plan(
             }
         }
 
-        if (!usingIndexToSort) {
+        if (!usingIndexToSort || !sortPattern) {
             for (size_t i = 0; i < fullIndexList.size(); ++i) {
                 const IndexEntry& index = fullIndexList[i];
                 // Only a regular index or the non-hashed prefix of a compound hashed index can
@@ -1715,42 +1727,36 @@ StatusWith<std::vector<std::unique_ptr<QuerySolution>>> QueryPlanner::plan(
                     continue;
                 }
 
-                const BSONObj kp = QueryPlannerAnalysis::getSortPattern(index.keyPattern);
-                if (QueryPlannerCommon::providesSort(query, kp)) {
+                auto addPlansWithIndexProvidedSort = [&](const BSONObj& kp, const int direction) {
+                    const bool providesSort =
+                        sortPattern && QueryPlannerCommon::providesSort(query, kp);
+                    if (!providesSort &&
+                        !QueryPlannerCommon::providesSortRequirementForDistinct(query.getDistinct(),
+                                                                                kp)) {
+                        return;
+                    }
+
                     LOGV2_DEBUG(
                         20981, 5, "Planner: outputting soln that uses index to provide sort");
-                    auto soln = buildWholeIXSoln(fullIndexList[i], query, params);
-                    if (soln) {
+                    auto soln = buildWholeIXSoln(fullIndexList[i], query, params, direction);
+                    // If the solution was created to satisfy a sort requirement for distinct scan,
+                    // ensure we have a distinct scan plan.
+                    if (soln && (providesSort || soln->hasNode(STAGE_DISTINCT_SCAN))) {
                         PlanCacheIndexTree* indexTree = new PlanCacheIndexTree();
                         indexTree->setIndexEntry(fullIndexList[i]);
                         SolutionCacheData* scd = new SolutionCacheData();
                         scd->tree.reset(indexTree);
                         scd->solnType = SolutionCacheData::WHOLE_IXSCAN_SOLN;
-                        scd->wholeIXSolnDir = 1;
+                        scd->wholeIXSolnDir = direction;
 
                         soln->cacheData.reset(scd);
                         out.push_back(std::move(soln));
                     }
-                }
-                if (QueryPlannerCommon::providesSort(query,
-                                                     QueryPlannerCommon::reverseSortObj(kp))) {
-                    LOGV2_DEBUG(
-                        20982,
-                        5,
-                        "Planner: outputting soln that uses (reverse) index to provide sort");
-                    auto soln = buildWholeIXSoln(fullIndexList[i], query, params, -1);
-                    if (soln) {
-                        PlanCacheIndexTree* indexTree = new PlanCacheIndexTree();
-                        indexTree->setIndexEntry(fullIndexList[i]);
-                        SolutionCacheData* scd = new SolutionCacheData();
-                        scd->tree.reset(indexTree);
-                        scd->solnType = SolutionCacheData::WHOLE_IXSCAN_SOLN;
-                        scd->wholeIXSolnDir = -1;
+                };
 
-                        soln->cacheData.reset(scd);
-                        out.push_back(std::move(soln));
-                    }
-                }
+                const BSONObj kp = QueryPlannerAnalysis::getSortPattern(index.keyPattern);
+                addPlansWithIndexProvidedSort(kp, 1);
+                addPlansWithIndexProvidedSort(QueryPlannerCommon::reverseSortObj(kp), -1);
             }
         }
     }
@@ -1791,6 +1797,19 @@ StatusWith<std::vector<std::unique_ptr<QuerySolution>>> QueryPlanner::plan(
                 out.push_back(std::move(soln));
                 break;
             }
+        }
+    }
+
+    // Distinct queries can benefit from an index even without a sort or filter present. Without
+    // these, the previous steps don't consider any indexed plans, so we try to generate a covered
+    // distinct scan here. The direction of the index doesn't matter in this case.
+    if (isDistinctMultiplanningEnabled && query.getDistinct() &&
+        query.getFindCommandRequest().getFilter().isEmpty() && !sortPattern &&
+        !sortRequirementForDistinct) {
+
+        auto soln = constructCoveredDistinctScan(query, params, *query.getDistinct());
+        if (soln) {
+            out.push_back(std::move(soln));
         }
     }
 

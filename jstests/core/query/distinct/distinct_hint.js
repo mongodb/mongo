@@ -8,6 +8,7 @@
  */
 
 import {getPlanStage} from "jstests/libs/analyze_plan.js";
+import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 
 var isHintsToQuerySettingsSuite = TestData.isHintsToQuerySettingsSuite || false;
 
@@ -88,11 +89,18 @@ var regex = new RegExp("hint provided does not correspond to an existing index")
 assert(regex.test(cmdRes.errmsg));
 
 // Make sure $natural hints are applied to distinct.
-if (!isHintsToQuerySettingsSuite) {
-    // Query settings for distinct have different semantics. $natural in that case is _only_ a hint
-    // and may not be enforced if there are better query plans available.
+if (!isHintsToQuerySettingsSuite ||
+    FeatureFlagUtil.isPresentAndEnabled(db, "ShardFilteringDistinctScan")) {
+    // Query settings for distinct have different semantics. $natural in that case is _only_ a
+    // hint and may not be enforced if there are better query plans available.
+    //
+    // However, when distinct multiplanning is enabled, we favour the potential solution derived
+    // from the hint against the distinct scan.
     let explain = coll.explain().distinct("a", {}, {hint: {$natural: 1}});
     let scanStage = getPlanStage(explain, "COLLSCAN");
     assert(scanStage, tojson(explain));
-    assert.eq(explain.command.hint, {$natural: 1});
+    // The override removes the hint before sending the command to the server.
+    if (!isHintsToQuerySettingsSuite) {
+        assert.eq(explain.command.hint, {$natural: 1});
+    }
 }

@@ -32,6 +32,7 @@ import {
     removeIndex,
 } from "jstests/aggregation/libs/group_to_distinct_scan_utils.js";
 import {getAggPlanStage, getQueryPlanner} from "jstests/libs/analyze_plan.js";
+import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 
 prepareCollection();
 
@@ -119,12 +120,19 @@ assertPipelineResultsAndExplain({
     //
     // Verify that a $group pipeline with an index filter and $natural hint uses DISTINCT_SCAN.
     //
+    // When distinct multiplanning is enabled, we favour the potential solution derived
+    // from the hint against the distinct scan, so we expect a collection scan.
+    //
     assertPipelineResultsAndExplain({
         pipeline,
         expectedOutput,
         hint: {$natural: 1},
         expectsIndexFilter: !TestData.isHintsToQuerySettingsSuite,
-        validateExplain: (explain) => assertPlanUsesDistinctScan(explain, keyPattern),
+        validateExplain: (explain) =>
+            ((TestData.isHintsToQuerySettingsSuite &&
+              FeatureFlagUtil.isPresentAndEnabled(db, "ShardFilteringDistinctScan"))
+                 ? assertPlanUsesCollScan(explain)
+                 : assertPlanUsesDistinctScan(explain, keyPattern)),
     });
 
     //

@@ -86,7 +86,8 @@ export function outputDistinctPlanAndResults(coll, key, filter = {}) {
 /**
  * Helper function that manually computes the unique values for the given key in the given
  * collection (filtered on `filter`). Useful to compare with the actual output from a distinct()
- * query.
+ * query. Note that this function doesn't perfectly mimic actual MQL distinct semantics. For
+ * example, multikey paths might not be handled properly.
  */
 function getUniqueResults(coll, key, filter) {
     return Array

@@ -45,7 +45,8 @@ public:
     void runDistinctQuery(const std::string& distinctKey,
                           const BSONObj& filter = BSONObj(),
                           const BSONObj& sort = BSONObj(),
-                          const BSONObj& proj = BSONObj()) {
+                          const BSONObj& proj = BSONObj(),
+                          const bool flipDistinctScanDirection = false) {
         auto findCommand = std::make_unique<FindCommandRequest>(nss);
         findCommand->setFilter(filter);
         findCommand->setSort(sort);
@@ -65,7 +66,8 @@ public:
                               boost::none,
                               // In order to replicate what distinct() does, we set up our
                               // projection here for potential use in an optimization.
-                              parsed_distinct_command::getDistinctProjection(distinctKey)));
+                              parsed_distinct_command::getDistinctProjection(distinctKey),
+                              flipDistinctScanDirection));
 
         auto statusWithMultiPlanSolns = QueryPlanner::plan(*cq, params);
         ASSERT_OK(statusWithMultiPlanSolns.getStatus());
@@ -237,8 +239,7 @@ TEST_F(QueryPlannerDistinctTest, FlipDistinctScanDirection) {
     addIndex(fromjson("{x: 1, z: 1}"));
 
     // flag off
-    params.flipDistinctScanDirection = false;
-    runDistinctQuery("x", fromjson("{x: {$gt: 3}}"), fromjson("{x: 1, y: 1}"));
+    runDistinctQuery("x", fromjson("{x: {$gt: 3}}"), fromjson("{x: 1, y: 1}"), BSONObj(), false);
     assertNumSolutions(2);
     assertCandidateExists(
         "{proj: {spec: {_id: 0, x: 1}, node: {distinct: {indexPattern: {x: 1, y: 1}, direction: "
@@ -248,8 +249,7 @@ TEST_F(QueryPlannerDistinctTest, FlipDistinctScanDirection) {
         "{pattern: {x: 1, z: 1}, dir: 1}}}}}}");
 
     // flag on
-    params.flipDistinctScanDirection = true;
-    runDistinctQuery("x", fromjson("{x: {$gt: 3}}"), fromjson("{x: 1, y: 1}"));
+    runDistinctQuery("x", fromjson("{x: {$gt: 3}}"), fromjson("{x: 1, y: 1}"), BSONObj(), true);
     assertNumSolutions(2);
     assertCandidateExists(
         "{proj: {spec: {_id: 0, x: 1}, node: {distinct: {indexPattern: {x: 1, y: 1}, direction: "

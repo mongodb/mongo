@@ -91,6 +91,16 @@ public:
         std::unique_ptr<QuerySolutionNode> solnRoot);
 
     /**
+     * If the query requires a sort, checks if the scan in 'solnRoot' can provide it. May modify
+     * 'solnRoot' by reversing the scan direction if 'reverseScanIfNeeded' is true.
+     */
+    static bool analyzeNonBlockingSort(const QueryPlannerParams& params,
+                                       const BSONObj& sortObj,
+                                       const BSONObj& hintObj,
+                                       bool reverseScanIfNeeded,
+                                       QuerySolutionNode* solnRoot);
+
+    /**
      * Sort the results, if there is a sort required.
      *
      * The mandatory output parameter 'blockingSortOut' indicates if the generated sub-plan contains

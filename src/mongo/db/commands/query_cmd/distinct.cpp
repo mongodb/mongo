@@ -171,34 +171,32 @@ std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> createExecutorForDistinctCo
     const auto& collectionPtr = coll.getCollectionPtr();
     const MultipleCollectionAccessor collections{coll};
 
-    // If the collection doesn't exist 'getExecutor()' should create an EOF plan for it no matter
-    // the query.
-    if (!collectionPtr) {
-        return uassertStatusOK(
-            getExecutorFind(opCtx, collections, std::move(canonicalQuery), yieldPolicy));
-    }
-
-    // Try creating a plan that does DISTINCT_SCAN.
-    const bool isDistinctMultiplanningEnabled =
-        canonicalQuery->getExpCtx()->isFeatureFlagShardFilteringDistinctScanEnabled();
-    auto swQuerySolution = tryGetQuerySolutionForDistinct(
-        collections, QueryPlannerParams::DEFAULT, *canonicalQuery, isDistinctMultiplanningEnabled);
-    if (swQuerySolution.isOK()) {
-        return uassertStatusOK(getExecutorDistinct(collections,
-                                                   QueryPlannerParams::DEFAULT,
-                                                   std::move(canonicalQuery),
-                                                   std::move(swQuerySolution.getValue())));
-    }
-
-    if (isDistinctMultiplanningEnabled) {
+    if (canonicalQuery->getExpCtx()->isFeatureFlagShardFilteringDistinctScanEnabled()) {
         return uassertStatusOK(
             getExecutorFind(opCtx,
                             collections,
                             std::move(canonicalQuery),
                             yieldPolicy,
                             // TODO SERVER-93018: Investigate why we prefer a collection scan
-                            // against a GENERATE_COVERED_IXSCANS when no filter is present.
+                            // against a 'GENERATE_COVERED_IXSCANS' when no filter is present.
                             QueryPlannerParams::DEFAULT));
+    }
+
+    // If the collection doesn't exist 'getExecutor()' should create an EOF plan for it no
+    // matter the query.
+    if (!collectionPtr) {
+        return uassertStatusOK(
+            getExecutorFind(opCtx, collections, std::move(canonicalQuery), yieldPolicy));
+    }
+
+    // Try creating a plan that does DISTINCT_SCAN.
+    auto swQuerySolution =
+        tryGetQuerySolutionForDistinct(collections, QueryPlannerParams::DEFAULT, *canonicalQuery);
+    if (swQuerySolution.isOK()) {
+        return uassertStatusOK(getExecutorDistinct(collections,
+                                                   QueryPlannerParams::DEFAULT,
+                                                   std::move(canonicalQuery),
+                                                   std::move(swQuerySolution.getValue())));
     }
 
     // If there is no DISTINCT_SCAN plan, create whatever non-distinct plan is appropriate, because

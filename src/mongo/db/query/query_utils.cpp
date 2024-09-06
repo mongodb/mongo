@@ -89,8 +89,8 @@ bool isQuerySbeCompatible(const CollectionPtr* collection, const CanonicalQuery*
         return false;
     }
 
-    // Distinct-like queries are not eligible for SBE yet.
-    if (cq->getDistinct()) {
+    // In the context of distinct multiplanning, distinct-like queries are not eligible for SBE yet.
+    if (cq->getExpCtx()->isFeatureFlagShardFilteringDistinctScanEnabled() && cq->getDistinct()) {
         return false;
     }
 

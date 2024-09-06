@@ -214,7 +214,27 @@ public:
 
     bool usesCollectionAcquisitions() const final;
 
+    /**
+     * It is used to detect if the plan excutor obtained after multiplanning is using a distinct
+     * scan stage. That's because in this scenario modifications to the pipeline in the context of
+     * aggregation need to be made.
+     */
+    bool isUsingDistinctScan() const final {
+        auto soln = getQuerySolution();
+        return soln && soln->root()->hasNode(STAGE_DISTINCT_SCAN);
+    }
+
 private:
+    const QuerySolution* getQuerySolution() const {
+        if (_qs) {
+            return _qs.get();
+        }
+        if (const MultiPlanStage* mps = getMultiPlanStage()) {
+            return mps->bestSolution();
+        }
+        return nullptr;
+    }
+
     ExecState _getNextImpl(Snapshotted<Document>* objOut, RecordId* dlOut);
 
     // Helper for handling the NEED_YIELD stage state.

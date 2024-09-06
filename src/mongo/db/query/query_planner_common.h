@@ -131,6 +131,13 @@ public:
             kp, SimpleBSONElementComparator::kInstance);
     }
 
+    static bool providesSortRequirementForDistinct(
+        const boost::optional<CanonicalDistinct>& distinct, const BSONObj& kp) {
+        return distinct && distinct->getSortRequirement() &&
+            distinct->getSerializedSortRequirement().isPrefixOf(
+                kp, SimpleBSONElementComparator::kInstance);
+    }
+
     /**
      * Determine whether this query has a sort that can be provided by the collection's clustering
      * index, if so, which direction the scan should be. If the collection is not clustered, or the

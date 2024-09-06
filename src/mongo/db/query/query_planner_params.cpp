@@ -643,7 +643,6 @@ std::vector<IndexEntry> getIndexEntriesForDistinct(
 
 QueryPlannerParams::QueryPlannerParams(QueryPlannerParams::ArgsForDistinct&& distinctArgs) {
     mainCollectionInfo.options = QueryPlannerParams::NO_TABLE_SCAN | distinctArgs.plannerOptions;
-    flipDistinctScanDirection = distinctArgs.flipDistinctScanDirection;
 
     if (!distinctArgs.collections.hasMainCollection()) {
         return;

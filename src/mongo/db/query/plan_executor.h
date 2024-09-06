@@ -559,6 +559,10 @@ public:
      */
     virtual bool usesCollectionAcquisitions() const = 0;
 
+    virtual bool isUsingDistinctScan() const {
+        return false;
+    }
+
 private:
     // Used by 'executeWrite()'.
     enum class PlanExecWriteType { kUpdate, kDelete, kFindAndModify };

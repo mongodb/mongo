@@ -1956,7 +1956,6 @@ StatusWith<std::unique_ptr<QuerySolution>> tryGetQuerySolutionForDistinct(
     const MultipleCollectionAccessor& collections,
     size_t plannerOptions,
     const CanonicalQuery& canonicalQuery,
-    bool isDistinctMultiplanningEnabled,
     bool flipDistinctScanDirection) {
     tassert(9245500, "Expected distinct property on CanonicalQuery", canonicalQuery.getDistinct());
 
@@ -1982,10 +1981,8 @@ StatusWith<std::unique_ptr<QuerySolution>> tryGetQuerySolutionForDistinct(
         if (plannerParams->mainCollectionInfo.indexes.empty()) {
             return nullptr;
         }
-        return createDistinctScanSolution(canonicalQuery,
-                                          *plannerParams,
-                                          isDistinctMultiplanningEnabled,
-                                          flipDistinctScanDirection);
+        return createDistinctScanSolution(
+            canonicalQuery, *plannerParams, flipDistinctScanDirection);
     };
     auto soln = getQuerySolution(plannerOptions);
     if (!soln) {

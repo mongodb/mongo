@@ -1116,18 +1116,31 @@ tryPrepareDistinctExecutor(const intrusive_ptr<ExpressionContext>& expCtx,
     // 'pipeline' and hence modifies it.
     auto [sortPattern, rewrittenGroupStage] = tryDistinctGroupRewrite(pipeline->getSources());
 
-    auto swCq =
-        createCanonicalQuery(expCtx,
-                             nss,
-                             pipeline,
-                             unavailableMetadata,
-                             queryObj,
-                             leadingMatch,
-                             rewrittenGroupStage ? sortPattern : boost::optional<SortPattern>(),
-                             aggRequest,
-                             matcherFeatures,
-                             timeseriesBoundedSortOptimization,
-                             shouldProduceEmptyDocs);
+    const bool isDistinctMultiplanningEnabled =
+        expCtx->isFeatureFlagShardFilteringDistinctScanEnabled();
+
+    auto sortPatternForCanonicalQuery = (isDistinctMultiplanningEnabled || !rewrittenGroupStage)
+        // If the pipeline has a $sort, the sort pattern for the canonical
+        // query will be pulled from that stage directly. Otherwise sorting is required only when a
+        // distinct scan plan is selected so we attach the sort pattern to the CanonicalDistinct
+        // instead.
+        ? boost::optional<SortPattern>()
+        // If the feature flag is disabled, preserve old behavior by passing the sortPattern to the
+        // canonical query when the distinct scan optimization is applicable. No multiplanning will
+        // be done in this case.
+        : sortPattern;
+
+    auto swCq = createCanonicalQuery(expCtx,
+                                     nss,
+                                     pipeline,
+                                     unavailableMetadata,
+                                     queryObj,
+                                     leadingMatch,
+                                     std::move(sortPatternForCanonicalQuery),
+                                     aggRequest,
+                                     matcherFeatures,
+                                     timeseriesBoundedSortOptimization,
+                                     shouldProduceEmptyDocs);
     if (!swCq.isOK()) {
         // Return an error instead of uasserting, since there are cases where the combination of
         // sort and projection will result in a bad query, but when we try with a different
@@ -1151,8 +1164,6 @@ tryPrepareDistinctExecutor(const intrusive_ptr<ExpressionContext>& expCtx,
         plannerOpts |= QueryPlannerParams::RETURN_OWNED_DATA;
     }
 
-    cq->setDistinct(CanonicalDistinct(rewrittenGroupStage->groupId()));
-
     // If the GroupFromFirst transformation was generated for the $last or $bottom case, we will
     // need to flip the direction of any generated DISTINCT_SCAN to preserve the semantics of
     // the query.
@@ -1161,6 +1172,44 @@ tryPrepareDistinctExecutor(const intrusive_ptr<ExpressionContext>& expCtx,
         return docsNeeded == AccumulatorDocumentsNeeded::kLastInputDocument ||
             docsNeeded == AccumulatorDocumentsNeeded::kLastOutputDocument;
     }();
+
+    cq->setDistinct(CanonicalDistinct(rewrittenGroupStage->groupId(),
+                                      false,
+                                      boost::optional<UUID>(),
+                                      boost::optional<BSONObj>(),
+                                      flipDistinctScanDirection));
+
+    if (isDistinctMultiplanningEnabled) {
+        // In the context of distinct multiplanning, if there are no indexes suitable for distinct
+        // scans, we can omit the distinct part of the canonical query. For example, this will
+        // remove the SBE ineligibilty criteria for queries that have a distinct component.
+        //
+        // TODO SERVER-93694: This initial pruning is just a temporary fix, since we still can end
+        // up with non-distinct scan solutions which otherwise could have been executed with SBE.
+        auto plannerParams =
+            std::make_unique<QueryPlannerParams>(QueryPlannerParams::ArgsForDistinct{
+                cq->getExpCtx()->opCtx,
+                *cq,
+                collections,
+                plannerOpts | QueryPlannerParams::STRICT_DISTINCT_ONLY |
+                    QueryPlannerParams::IGNORE_QUERY_SETTINGS,
+                flipDistinctScanDirection,
+            });
+
+        if (plannerParams->mainCollectionInfo.indexes.empty()) {
+            // Can't generate a distinct scan plan without indexes.
+            cq->resetDistinct();
+        } else {
+            // In some cases, the distinct scan must be able to provide a sort to produce correct
+            // results for a $group query.
+            cq->getDistinct()->setSortRequirement(std::move(sortPattern));
+            // If we have the possibilty of getting a distinct scan, we also want to pass
+            // the `rewrittenGroupStage` to the caller to be able to rewrite the pipeline to
+            // $groupByDistinct in case a distinct scan is generated via multiplanning.
+            cq->getDistinct()->setRewrittenGroupStage(std::move(rewrittenGroupStage));
+        }
+        return std::move(cq);
+    }
 
     // We have to request a "strict" distinct plan because:
     // 1) $group with distinct semantics doesn't de-duplicate the results.
@@ -1171,9 +1220,6 @@ tryPrepareDistinctExecutor(const intrusive_ptr<ExpressionContext>& expCtx,
         tryGetQuerySolutionForDistinct(collections,
                                        plannerOpts | QueryPlannerParams::STRICT_DISTINCT_ONLY,
                                        *cq,
-                                       /* TODO SERVER-92615: Support multiplanning for the distinct
-                                          scan within the aggregation path. */
-                                       false,
                                        flipDistinctScanDirection);
     if (swQuerySolution.isOK()) {
         auto swExecutorGrouped =
@@ -1193,7 +1239,7 @@ tryPrepareDistinctExecutor(const intrusive_ptr<ExpressionContext>& expCtx,
                                                            std::move(rewrittenGroupStage),
                                                            "$groupByDistinctScan",
                                                            false /* independentOfAnyCollection */));
-        pipeline->addInitialSource(groupTransform);
+        pipeline->addInitialSource(std::move(groupTransform));
 
         return StatusWith{std::move(swExecutorGrouped.getValue())};
     }
@@ -1216,13 +1262,6 @@ tryPrepareDistinctExecutor(const intrusive_ptr<ExpressionContext>& expCtx,
     if (sortPattern) {
         cq->resetSortPattern();
     }
-
-    // If the transition to a DISTINCT_SCAN failed for aggregation, we don't want to try it again
-    // for the find fallback, because if we failed to generate a distinct scan earlier, we don't
-    // want to try again, and instead should fall back to a different plan.
-    //
-    // TODO SERVER-92615: Remove this.
-    cq->resetDistinct();
 
     return StatusWith{std::move(cq)};
 }
@@ -1297,19 +1336,41 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> prepareExecutor
     auto collatorStash =
         isChangeStream ? expCtx->temporarilyChangeCollator(std::move(collatorForCursor)) : nullptr;
 
+    auto cq = std::move(std::get<1>(execOrCq));
+    std::unique_ptr<GroupFromFirstDocumentTransformation> rewrittenGroupStage = nullptr;
+    if (cq->getDistinct()) {
+        rewrittenGroupStage = cq->getDistinct()->releaseRewrittenGroupStage();
+        plannerOpts = plannerOpts | QueryPlannerParams::STRICT_DISTINCT_ONLY;
+    }
+
     // For performance, we pass a null callback instead of 'extractAndAttachPipelineStages' when
     // 'pipeline' is empty. The 'extractAndAttachPipelineStages' is a no-op when there are no
     // pipeline stages, so we can save some work by skipping it. The 'getExecutorFind()' function is
     // responsible for checking that the callback is non-null before calling it.
     auto executor = getExecutorFind(expCtx->opCtx,
                                     collections,
-                                    std::move(std::get<1>(execOrCq)),
+                                    std::move(cq),
                                     PlanYieldPolicy::YieldPolicy::YIELD_AUTO,
                                     plannerOpts,
                                     pipeline,
                                     expCtx->needsMerge,
                                     unavailableMetadata,
                                     std::move(traversalPreference));
+
+    if (executor.isOK() && executor.getValue()->isUsingDistinctScan()) {
+        tassert(9261500,
+                "The pipeline of an executor that has a distinct scan needs to have a rewritten "
+                "group stage component.",
+                rewrittenGroupStage);
+        pipeline->popFrontWithName(rewrittenGroupStage->originalStageName());
+
+        auto groupTransform = make_intrusive<DocumentSourceSingleDocumentTransformation>(
+            expCtx,
+            std::move(rewrittenGroupStage),
+            "$groupByDistinctScan",
+            false /* independentOfAnyCollection */);
+        pipeline->addInitialSource(std::move(groupTransform));
+    }
 
     // While constructing the executor, some stages might have been lowered from the 'pipeline' into
     // the executor, so we need to recheck whether the executor's layer can still produce an empty

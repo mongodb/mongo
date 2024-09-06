@@ -171,6 +171,10 @@ public:
         return _distinct;
     }
 
+    CanonicalDistinct* getDistinct() {
+        return _distinct.get_ptr();
+    }
+
     const CollatorInterface* getCollator() const {
         return _expCtx->getCollator();
     }
@@ -239,7 +243,7 @@ public:
     void setCollator(std::unique_ptr<CollatorInterface> collator);
 
     void setDistinct(CanonicalDistinct&& distinct) {
-        _distinct.emplace(distinct);
+        _distinct.emplace(std::move(distinct));
     }
 
     /**

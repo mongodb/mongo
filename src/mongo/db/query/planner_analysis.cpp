@@ -857,15 +857,14 @@ bool isShardedCollScan(QuerySolutionNode* solnRoot) {
 }
 
 bool shouldReverseScanForSort(QuerySolutionNode* solnRoot,
-                              const CanonicalQuery& query,
-                              const QueryPlannerParams& params) {
+                              const QueryPlannerParams& params,
+                              const BSONObj& hintObj,
+                              const BSONObj& sortObj) {
     // We cannot reverse this scan if its direction is specified by a $natural hint.
-    const FindCommandRequest& findCommand = query.getFindCommandRequest();
     const bool isCollscan =
         solnRoot->getType() == StageType::STAGE_COLLSCAN || isShardedCollScan(solnRoot);
     const bool hasNaturalHint =
-        findCommand.getHint()[query_request_helper::kNaturalSortField].ok() &&
-        !params.querySettingsApplied;
+        hintObj[query_request_helper::kNaturalSortField].ok() && !params.querySettingsApplied;
     const bool hasQuerySettingsEnforcedDirection =
         params.mainCollectionInfo.collscanDirection.has_value();
     if (isCollscan && (hasNaturalHint || hasQuerySettingsEnforcedDirection)) {
@@ -874,7 +873,7 @@ bool shouldReverseScanForSort(QuerySolutionNode* solnRoot,
 
     // The only collection scan that includes a sort order in 'providedSorts' is a scan on a
     // clustered collection.
-    const BSONObj reverseSort = QueryPlannerCommon::reverseSortObj(findCommand.getSort());
+    const BSONObj reverseSort = QueryPlannerCommon::reverseSortObj(sortObj);
     return solnRoot->providedSorts().contains(reverseSort);
 }
 }  // namespace
@@ -1263,6 +1262,41 @@ bool sortMatchesTraversalPreference(const TraversalPreference& traversalPreferen
     return true;
 }
 
+bool QueryPlannerAnalysis::analyzeNonBlockingSort(const QueryPlannerParams& params,
+                                                  const BSONObj& sortObj,
+                                                  const BSONObj& hintObj,
+                                                  const bool reverseScanIfNeeded,
+                                                  QuerySolutionNode* solnRoot) {
+    if (sortObj.isEmpty()) {
+        return true;
+    }
+
+    // If the sort is $natural, we ignore it, assuming that the caller has detected that and
+    // outputted a collscan to satisfy the desired order.
+    if (sortObj[query_request_helper::kNaturalSortField]) {
+        return true;
+    }
+
+    // See if solnRoot gives us the sort.  If so, we're done.
+    auto providedSorts = solnRoot->providedSorts();
+    if (providedSorts.contains(sortObj)) {
+        return true;
+    }
+
+    // Sort is not provided.  See if we provide the reverse of our sort pattern.
+    // If so, we can reverse the scan direction(s).
+    if (reverseScanIfNeeded && shouldReverseScanForSort(solnRoot, params, hintObj, sortObj)) {
+        QueryPlannerCommon::reverseScans(solnRoot);
+        LOGV2_DEBUG(20951,
+                    5,
+                    "Reversing ixscan to provide sort",
+                    "newPlan"_attr = redact(solnRoot->toString()));
+        return true;
+    }
+
+    return false;
+}
+
 // static
 std::unique_ptr<QuerySolutionNode> QueryPlannerAnalysis::analyzeSort(
     const CanonicalQuery& query,
@@ -1296,33 +1330,9 @@ std::unique_ptr<QuerySolutionNode> QueryPlannerAnalysis::analyzeSort(
 
     const BSONObj& sortObj = findCommand.getSort();
 
-    if (sortObj.isEmpty()) {
-        return solnRoot;
-    }
-
-    // TODO: We could check sortObj for any projections other than :1 and :-1
-    // and short-cut some of this.
-
-    // If the sort is $natural, we ignore it, assuming that the caller has detected that and
-    // outputted a collscan to satisfy the desired order.
-    if (sortObj[query_request_helper::kNaturalSortField]) {
-        return solnRoot;
-    }
-
     // See if solnRoot gives us the sort.  If so, we're done.
-    auto providedSorts = solnRoot->providedSorts();
-    if (providedSorts.contains(sortObj)) {
-        return solnRoot;
-    }
-
-    // Sort is not provided.  See if we provide the reverse of our sort pattern.
-    // If so, we can reverse the scan direction(s).
-    if (shouldReverseScanForSort(solnRoot.get(), query, params)) {
-        QueryPlannerCommon::reverseScans(solnRoot.get());
-        LOGV2_DEBUG(20951,
-                    5,
-                    "Reversing ixscan to provide sort",
-                    "newPlan"_attr = redact(solnRoot->toString()));
+    if (analyzeNonBlockingSort(
+            params, sortObj, findCommand.getHint(), true /*reverseScanIfNeeded*/, solnRoot.get())) {
         return solnRoot;
     }
 
@@ -1516,13 +1526,11 @@ std::unique_ptr<QuerySolution> QueryPlannerAnalysis::analyzeDataAccess(
 
     // Try to convert the query solution to have a DISTINCT_SCAN.
     if (isDistinctScanMultiplanningEnabled && query.getDistinct()) {
-        const bool strictDistinctOnly =
-            (params.mainCollectionInfo.options & QueryPlannerParams::STRICT_DISTINCT_ONLY);
         turnIxscanIntoDistinctScan(query,
+                                   params,
                                    soln.get(),
                                    query.getDistinct()->getKey(),
-                                   strictDistinctOnly,
-                                   params.flipDistinctScanDirection);
+                                   query.getDistinct()->isDistinctScanDirectionFlipped());
     }
 
     return soln;
