@@ -1272,9 +1272,8 @@ export function assertFetchFilter({coll, predicate, expectedFilter, nReturned}) 
 
 /**
  * Recursively checks if a javascript object contains a nested property key and returns the values.
- * NOTE: only recurses into other objects, array elements are ignored.
  */
-function getNestedProperties(object, key) {
+export function getNestedProperties(object, key) {
     let accumulator = [];
 
     function traverse(object) {

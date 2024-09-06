@@ -94,7 +94,11 @@ function testAggregateQuerySettingsApplicationWithLookupEquiJoin(
       {
         $lookup:
           { from: secondaryCollOrViewName, localField: "a", foreignField: "a", as: "output" }
-      }
+      },
+      // Ensure that the pipeline is only partially pushed down to SBE to verify its 
+      // integrity after the fallback mechanism is engaged.
+      { $_internalInhibitOptimization: {} },
+      { $limit: 1 },
     ]});
 
     // Ensure query settings index application for 'mainNs', 'secondaryNs' and both.
@@ -151,7 +155,7 @@ function testAggregateQuerySettingsApplicationWithLookupPipeline(collOrViewName,
       {
         $lookup:
           { from: secondaryCollOrViewName, pipeline: [{ $match: { a: 1, b: 5 } }], as: "output" }
-      }
+      },
     ]});
 
     // Ensure query settings index application for 'mainNs', 'secondaryNs' and both.

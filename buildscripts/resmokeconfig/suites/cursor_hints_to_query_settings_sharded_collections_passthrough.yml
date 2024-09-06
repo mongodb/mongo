@@ -27,9 +27,6 @@ selector:
     - jstests/core/**/explain_count.js
     - jstests/core/**/explain_server_params.js
 
-    # TODO SERVER-92987: Issue with QuerySettings when featureFlagSbeFull=true.
-    - jstests/aggregation/sources/project/multiple_projects.js
-
     # Test which asserts on the number of execution metrics. The additional commands emitted by
     # this suite might cause the test to fail.
     - jstests/aggregation/sources/geonear/geonear_hint.js

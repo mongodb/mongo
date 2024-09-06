@@ -594,6 +594,9 @@ void attachPipelineStages(const MultipleCollectionAccessor& collections,
                           const Pipeline* pipeline,
                           bool needsMerge,
                           CanonicalQuery* canonicalQuery) {
+    tassert(9298700,
+            "attachPipelineStages() must not be called multiple times on a query",
+            canonicalQuery->cqPipeline().empty());
     if (!pipeline || pipeline->getSources().empty()) {
         return;
     }
