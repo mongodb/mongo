@@ -1,5 +1,9 @@
 /**
  * Test that verifies client metadata is logged as part of slow query logging in MongoD.
+ *
+ *  @tags: [
+ *   requires_scripting
+ * ]
  */
 let conn = MongoRunner.runMongod({useLogFiles: true});
 assert.neq(null, conn, 'mongod was unable to start up');

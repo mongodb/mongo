@@ -1,6 +1,9 @@
 /**
  * Test that a mapReduce job can write sharded output to a database
  * from a separate input database while authenticated to both.
+ * @tags: [
+ *   requires_scripting,
+ * ]
  */
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 

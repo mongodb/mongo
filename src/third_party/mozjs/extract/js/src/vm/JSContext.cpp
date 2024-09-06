@@ -1114,11 +1114,23 @@ void JSContext::setRuntime(JSRuntime* rt) {
   runtime_ = rt;
 }
 
-#if defined(NIGHTLY_BUILD)
+// MONGODB MODIFICATION: This function is required to check for OOM exceptions which are thrown as a
+// JSString instead of JSObject, which makes it difficult to compare against ErrorNumbers directly.
+// Instead, we have to compare the message string obtained from the exception against the expected
+// value. 
 static bool IsOutOfMemoryException(JSContext* cx, const Value& v) {
   return v == StringValue(cx->names().outOfMemory);
 }
-#endif
+
+// MONGODB MODIFICATION:
+// When an OOM exception is thrown by SpiderMonkey (see https://github.com/10gen/mongo/blob/master/src/third_party/mozjs/extract/js/src/vm/JSContext.cpp#L270),
+// the exception status is set to ExceptionStatus::OutOfMemory and the exception is generated as a
+// JSString using the message in ErrorNumbers.msg. By checking for both these conditions, we can
+// detect whether or not the exception we are handling is an out of memory exception thrown by
+// SpiderMonkey.
+bool JSContext::isThrowingOutOfMemoryException(const Value& exc) {
+  return isThrowingOutOfMemory() && IsOutOfMemoryException(this, exc);
+}
 
 void JSContext::setPendingException(HandleValue v, Handle<SavedFrame*> stack) {
 #if defined(NIGHTLY_BUILD)

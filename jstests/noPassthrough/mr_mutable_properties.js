@@ -1,6 +1,7 @@
 // See SERVER-9448
 // Test argument and receiver (aka 'this') objects and their children can be mutated
 // in Map, Reduce and Finalize functions
+// @tags: [requires_scripting]
 import {assertArrayEq} from "jstests/aggregation/extras/utils.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 

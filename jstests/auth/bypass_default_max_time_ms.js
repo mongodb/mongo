@@ -9,6 +9,8 @@
  *   requires_auth,
  *   requires_replication,
  *   requires_sharding,
+ *   # Uses $function
+ *   requires_scripting,
  *   uses_transactions,
  *   featureFlagSecurityToken,
  * ]

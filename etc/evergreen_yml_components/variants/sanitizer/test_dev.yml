@@ -610,8 +610,9 @@ buildvariants:
     expansions:
       <<: *enterprise-rhel-8-64-bit-dynamic-expansions
       # JS_GC_ZEAL modes can be found at https://github.com/mongodb/mongo/blob/r8.0.0-rc9/src/third_party/mozjs/extract/js/src/gc/GC.cpp#L563-L612.
-      # These modes correspond to collecting the nursery (GenerationalGC) every 50 allocations.
-      mozjs_options: JS_GC_ZEAL='7,50'
+      # These modes correspond to a GC policy of generationalGC (mode 7) every 75 allocations, and a
+      # consistency check of the heap after every GC cycle (mode 15).
+      mongo_mozjs_options: "7;15,75"
       compile_flags: >-
         --ssl
         MONGO_DISTMOD=rhel88
@@ -623,6 +624,8 @@ buildvariants:
       compile_variant: enterprise-rhel-8-64-bit-dynamic-spider-monkey-dbg
       exec_timeout_secs: 32400 # 9 hour timeout
       timeout_secs: 18000 # 5 hour idle timeout
+      test_flags: >-
+        --includeWithAnyTags=requires_scripting
     depends_on: []
     tasks:
       - name: compile_test_parallel_core_stream_TG
@@ -630,5 +633,8 @@ buildvariants:
           - rhel8.8-xlarge
       - name: aggregation
       - name: aggregation_mongos_passthrough
+      - name: auth_gen
       - name: concurrency_simultaneous_gen
       - name: jsCore
+      - name: noPassthrough_gen
+      - name: sharding_gen

@@ -1659,6 +1659,13 @@ class RunPlugin(PluginInterface):
         )
 
         mongodb_server_options.add_argument(
+            "--mozjsJsGcZeal",
+            dest="mozjs_js_gc_zeal",
+            action="store",
+            help="sets JS_GC_ZEAL for mozjs.",
+        )
+
+        mongodb_server_options.add_argument(
             "--majorityReadConcern",
             action="store",
             dest="majority_read_concern",

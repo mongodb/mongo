@@ -73,6 +73,9 @@ class _SingleJSTestCase(interface.ProcessTestCase):
         test_data["ignoreUnterminatedProcesses"] = False
         test_data["ignoreChildProcessErrorCode"] = False
 
+        if config.MOZJS_JS_GC_ZEAL:
+            test_data["mozJSGCZeal"] = config.MOZJS_JS_GC_ZEAL
+
         # The tests in 'timeseries' directory need to use a different logic for implicity sharding
         # the collection. Make sure that we consider both unix and windows directory structures.
         # Check if any test being run is a timeseries test

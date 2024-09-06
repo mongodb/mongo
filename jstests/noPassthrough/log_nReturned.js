@@ -1,6 +1,6 @@
 /**
  * This test verifies the correctness of the "nReturned" value output in the slow query logs.
- * @tags: []
+ * @tags: [requires_scripting]
  */
 
 import {findMatchingLogLine} from "jstests/libs/log.js";

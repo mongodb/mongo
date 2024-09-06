@@ -6,7 +6,7 @@
  * The test logic implemented here operates on the test cases defined
  * in jstests/auth/lib/commands_lib.js
  *
- * @tags: [requires_sharding]
+ * @tags: [requires_sharding, requires_scripting]
  */
 
 import {runAllCommandsBuiltinRoles} from "jstests/auth/lib/commands_builtin_roles.js";

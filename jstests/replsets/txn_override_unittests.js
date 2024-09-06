@@ -25,7 +25,7 @@
  * us to keep more tests running now. That said, these should ideally all throw so we do not rely on
  * the test itself calling assert.commandWorked.
  *
- * @tags: [requires_replication, uses_transactions]
+ * @tags: [requires_replication, uses_transactions, requires_scripting]
  */
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 

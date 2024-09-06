@@ -4,6 +4,7 @@
  * Creates a sharded cluster.
  * @tags: [
  *   requires_sharding,
+ *   requires_scripting,
  * ]
  */
 import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";

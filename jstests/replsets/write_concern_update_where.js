@@ -1,6 +1,10 @@
 /**
  * Tests update with $where does not wait for write concern (which would trigger assertion while
  * holding global lock) when it iterates system.js collection using DBDirectClient.
+ *
+ * @tags: [
+ *    requires_scripting
+ * ]
  */
 
 import {ReplSetTest} from "jstests/libs/replsettest.js";

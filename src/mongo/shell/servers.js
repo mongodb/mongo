@@ -1599,6 +1599,14 @@ MongoRunner._startWithArgs = function(argArray, env, waitForConnect) {
     argArray = appendSetParameterArgs(argArray);
     var port = MongoRunner.parsePort.apply(null, argArray);
     var pid = -1;
+
+    if (jsTest.options().mozJSGCZeal) {
+        if (env === undefined) {
+            env = {};
+        }
+        env["JS_GC_ZEAL"] = jsTest.options().mozJSGCZeal;
+    }
+
     if (env === undefined) {
         pid = _startMongoProgram.apply(null, argArray);
     } else {

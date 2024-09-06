@@ -1,6 +1,6 @@
 /**
  * Tests counters for match expressions.
- * @tags: [requires_fcv_50]
+ * @tags: [requires_fcv_50, requires_scripting]
  */
 
 const mongod = MongoRunner.runMongod();

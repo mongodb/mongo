@@ -1,6 +1,6 @@
 /**
  * This tests using DB commands with authentication enabled when sharded.
- * @tags: [multiversion_incompatible]
+ * @tags: [multiversion_incompatible, requires_scripting]
  */
 // Multiple users cannot be authenticated on one connection within a session.
 TestData.disableImplicitSessions = true;

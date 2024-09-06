@@ -6,7 +6,8 @@
  * 'ephemeralForTest' storage engines that do not support queryable backup (read-only) mode.
  * @tags: [
  *   requires_persistence,
- *   requires_replication
+ *   requires_replication,
+ *   requires_scripting
  * ]
  */
 import {ReplSetTest} from "jstests/libs/replsettest.js";

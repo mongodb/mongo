@@ -113,6 +113,7 @@ DEFAULTS = {
     "shell_seed": None,
     "storage_engine": "wiredTiger",
     "storage_engine_cache_size_gb": None,
+    "mozjs_js_gc_zeal": None,
     "suite_files": "with_server",
     "tag_files": [],
     "test_files": [],
@@ -722,3 +723,8 @@ REQUIRES_WORKLOAD_CONTAINER_SETUP = False
 
 # Config fuzzer encryption options, this is only set when the fuzzer is run
 CONFIG_FUZZER_ENCRYPTION_OPTS = None
+
+# If resmoke is running on a build variant that specifies a mongo_mozjs_opts,
+# we need a way to provide the JS_GC_ZEAL setting provided as part of the mongo_mozjs_opts
+# exclusively to mongod/mongos.
+MOZJS_JS_GC_ZEAL = None

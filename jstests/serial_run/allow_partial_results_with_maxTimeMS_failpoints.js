@@ -11,6 +11,7 @@
  *   requires_replication,
  *   requires_getmore,
  *   requires_fcv_62,
+ *   requires_scripting
  *  ]
  */
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";

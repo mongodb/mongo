@@ -3779,6 +3779,12 @@ JS_PUBLIC_API void JS_ClearPendingException(JSContext* cx) {
   cx->clearPendingException();
 }
 
+// MONGODB MODIFICATION: Checks if we are currently throwing an OOM exception and the exception
+// message matches the out of memory exception string. 
+JS_PUBLIC_API bool JS_IsThrowingOutOfMemoryException(JSContext* cx, const JS::Value& exc) {
+  return cx->isThrowingOutOfMemoryException(exc);
+}
+
 JS::AutoSaveExceptionState::AutoSaveExceptionState(JSContext* cx)
     : context(cx), status(cx->status), exceptionValue(cx), exceptionStack(cx) {
   AssertHeapIsIdle();

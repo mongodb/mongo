@@ -3,6 +3,7 @@
  *
  * @tags: [
  *   requires_profiling,
+ *   requires_scripting,
  * ]
  */
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";

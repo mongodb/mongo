@@ -5,6 +5,7 @@
  *   requires_persistence,
  *   requires_replication,
  *   requires_sharding,
+ *   requires_scripting,
  * ]
  */
 

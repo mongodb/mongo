@@ -1,5 +1,6 @@
 // Tests that the mapReduce command works correctly under all combinations of the input and output
 // collections being sharded or unsharded.
+// @tags: [requires_scripting]
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 const st = new ShardingTest({shards: 2, other: {chunkSize: 1}});

@@ -115,11 +115,20 @@ void* wrap_alloc(T&& func, void* ptr, size_t bytes) {
     size_t mb = get_max_bytes();
     size_t tb = get_total_bytes();
 
-    if (mb && (tb + bytes > mb)) {
+    // During a GC cycle, GC::purgeRuntime() is called, which tries to free unused items in the
+    // SharedImmutableStringsCache while holding its corresponding mutex. Our js_free implementation
+    // calls wrap_alloc, with a value of 0 for 'bytes'. Previously, if we were already at the
+    // max_bytes limit when purging the runtime, the call to MozJSImplScope::setOOM() would request
+    // an urgent JS interrupt, which acquires a futex with order 500, while still holding the mutex
+    // for the SharedImmutableStringsCache (order 600). This triggered a failure of a MOZ_ASSERT
+    // which enforces correct lock ordering in the JS engine. For this reason, we avoid checking
+    // for an OOM here if we are requesting zero bytes (i.e freeing memory).
+    if (mb && bytes && (tb + bytes > mb)) {
         auto scope = mongo::mozjs::MozJSImplScope::getThreadScope();
-        if (scope)
+        if (scope) {
             scope->setOOM();
-
+            return nullptr;
+        }
         // We fall through here because we want to let spidermonkey continue
         // with whatever it was doing.  Calling setOOM will fail the top level
         // operation as soon as possible.

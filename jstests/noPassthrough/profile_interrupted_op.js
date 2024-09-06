@@ -4,7 +4,7 @@
  * state, the collection can still be successfully created on the fly.
  *
  * This test restarts the server and requires that data persists across restarts.
- * @tags: [requires_persistence, requires_profiling]
+ * @tags: [requires_persistence, requires_profiling, requires_scripting]
  */
 //
 // Start mongo with profiling disabled, create an empty database, and populate it with a

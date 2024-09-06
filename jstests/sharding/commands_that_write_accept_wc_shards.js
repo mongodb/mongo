@@ -9,6 +9,7 @@
  * of 5MB across all sharding tests in wiredTiger.
  * @tags: [
  *   resource_intensive,
+ *   requires_scripting
  * ]
  */
 import {ShardingTest} from "jstests/libs/shardingtest.js";

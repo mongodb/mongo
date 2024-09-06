@@ -8,6 +8,7 @@
  *   required_auth,
  *   requires_sharding,
  *   uses_transactions,
+ *   requires_scripting,
  * ]
  */
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";

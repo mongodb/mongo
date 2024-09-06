@@ -1,5 +1,6 @@
 // Test partial indexes with commands that don't use explain.  These commands are tested against
 // mongod with the --notablescan flag set, so that they fail if the index is not used.
+// @tags: [requires_scripting]
 import {resultsEq} from "jstests/aggregation/extras/utils.js";
 
 var runner = MongoRunner.runMongod({setParameter: "notablescan=1"});

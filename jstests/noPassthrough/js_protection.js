@@ -8,6 +8,10 @@
  *    server.
  * 3. db.loadServerScripts performs as expected even with the flag is set in
  *    the shell.
+ *
+ * @tags: [
+ *   requires_scripting
+ * ]
  */
 
 var testServer = MongoRunner.runMongod({setParameter: "javascriptProtection=true"});

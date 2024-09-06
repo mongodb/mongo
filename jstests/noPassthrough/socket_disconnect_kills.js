@@ -12,7 +12,8 @@
 // due to client disconnect, and the number of completed operations that couldn't return data
 // due to client disconnect.
 //
-// @tags: [requires_sharding]
+// @tags: [requires_sharding, requires_scripting]
+
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 

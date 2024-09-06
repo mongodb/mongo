@@ -1,4 +1,11 @@
 /**
+ * @tags: [
+ *   # Uses $where operator
+ *   requires_scripting,
+ * ]
+ */
+
+/**
  * Verify that killing an instance of mongod while it is in a long running computation or infinite
  * loop still leads to clean shutdown, and that said shutdown is prompt.
  *

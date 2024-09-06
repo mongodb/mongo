@@ -2,6 +2,7 @@
 // @tags: [
 //    # TODO (SERVER-88122): Re-enable this test or add an explanation why it is incompatible.
 //    embedded_router_incompatible,
+//    requires_scripting,
 // ]
 
 import {ShardingTest} from "jstests/libs/shardingtest.js";

@@ -4,6 +4,7 @@
 //   # TODO (SERVER-88127): Re-enable this test or add an explanation why it is incompatible.
 //   embedded_router_incompatible,
 //   uses_map_reduce_with_temp_collections,
+//   requires_scripting
 // ]
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 

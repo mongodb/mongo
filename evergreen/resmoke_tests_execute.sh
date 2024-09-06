@@ -117,6 +117,11 @@ if [[ ${disable_unit_tests} = "false" && ! -f ${skip_tests} ]]; then
     extra_args="$extra_args --runNoFeatureFlagTests"
   fi
 
+  # Introduce JS_GC_ZEAL to be used specifically under mongod/mongos.
+  if [[ "${build_variant}" = "enterprise-rhel-8-64-bit-dynamic-spider-monkey-dbg" && ! -z "${mongo_mozjs_options}" ]]; then
+    extra_args="$extra_args --mozjsJsGcZeal='${mongo_mozjs_options}'"
+  fi
+
   path_value="$PATH:/data/multiversion"
 
   # Set the suite name to be the task name by default; unless overridden with the `suite` expansion.

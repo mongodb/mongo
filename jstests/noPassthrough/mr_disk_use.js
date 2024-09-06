@@ -1,5 +1,9 @@
-// Test mapReduce use with different values of the allowDiskUseByDefault parameter.
-
+/**
+ * Test mapReduce use with different values of the allowDiskUseByDefault parameter.
+ * @tags: [
+ *   requires_scripting,
+ * ]
+ */
 const conn = MongoRunner.runMongod();
 assert.neq(null, conn, "mongod was unable to start up");
 

@@ -42,6 +42,10 @@ extern JS_PUBLIC_API void JS_SetPendingException(
 
 extern JS_PUBLIC_API void JS_ClearPendingException(JSContext* cx);
 
+// MONGODB MODIFICATION: Checks if we are currently throwing an OOM exception and the exception
+// message matches the out of memory exception string. 
+extern JS_PUBLIC_API bool JS_IsThrowingOutOfMemoryException(JSContext* cx, const JS::Value& exc);
+
 /**
  * If the given object is an exception object, the exception will have (or be
  * able to lazily create) an error report struct, and this function will return

@@ -1,5 +1,8 @@
 /**
  * Tests for the command assertion functions in mongo/shell/assert.js.
+ *  @tags: [
+ *   requires_scripting,
+ * ]
  */
 
 const conn = MongoRunner.runMongod();

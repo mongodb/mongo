@@ -1,3 +1,8 @@
+/**
+ * @tags: [
+ *   requires_scripting
+ * ]
+ */
 var db;
 const conn = MongoRunner.runMongod();
 assert.neq(null, conn, "mongod failed to start.");

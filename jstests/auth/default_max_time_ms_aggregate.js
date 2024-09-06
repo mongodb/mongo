@@ -8,6 +8,7 @@
  *   # Transactions aborted upon fcv upgrade or downgrade; cluster parameters use internal txns.
  *   uses_transactions,
  *   requires_fcv_80,
+ *   requires_scripting,
  * ]
  */
 

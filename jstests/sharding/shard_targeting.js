@@ -3,6 +3,7 @@
 // If the optional query is not given, mongos will wrongly use the command
 // BSONObj itself as the query to target shards, which could return wrong
 // shards if the shard key happens to be one of the fields in the command object.
+// @tags: [requires_scripting]
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 var s = new ShardingTest({shards: 2});

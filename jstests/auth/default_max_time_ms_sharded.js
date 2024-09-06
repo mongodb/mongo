@@ -9,6 +9,7 @@
  *   required_auth,
  *   requires_sharding,
  *   uses_transactions,
+ *   requires_scripting,
  * ]
  */
 

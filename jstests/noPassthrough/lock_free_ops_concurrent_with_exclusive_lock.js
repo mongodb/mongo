@@ -3,6 +3,7 @@
  * listCollection and listIndexes commands can run while a MODE_X collection lock is held.
  *
  * @tags: [
+ *   requires_scripting,
  * ]
  */
 

@@ -1009,6 +1009,15 @@ class MongosLauncher(object):
                 DEFAULT_MONGOS_SHUTDOWN_TIMEOUT_MILLIS
             )
 
+        # If a JS_GC_ZEAL value has been provided in the configuration under MOZJS_JS_GC_ZEAL,
+        # we inject this value directly as an environment variable to be passed to the spawned
+        # mongos process.
+        if self.config.MOZJS_JS_GC_ZEAL:
+            process_kwargs = self.fixturelib.default_if_none(process_kwargs, {}).copy()
+            env_vars = process_kwargs.setdefault("env_vars", {}).copy()
+            env_vars.setdefault("JS_GC_ZEAL", self.config.MOZJS_JS_GC_ZEAL)
+            process_kwargs["env_vars"] = env_vars
+
         _add_testing_set_parameters(suite_set_parameters)
 
         return self.fixturelib.mongos_program(

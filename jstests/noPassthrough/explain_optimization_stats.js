@@ -1,5 +1,8 @@
 /**
  * Tests for validating that optimization stats are included in explain output.
+ * @tags: [
+ *   requires_scripting
+ * ]
  */
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";

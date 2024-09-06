@@ -1,7 +1,7 @@
 // Tests that if a mongoS cursor exceeds the maxTimeMs timeout, the cursors on the shards will be
 // cleaned up. Exercises the fix for the bug described in SERVER-62710.
 //
-// @tags: []
+// @tags: [requires_scripting]
 
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";

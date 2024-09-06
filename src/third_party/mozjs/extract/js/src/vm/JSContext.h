@@ -286,6 +286,10 @@ struct JS_PUBLIC_API JSContext : public JS::RootingContext,
   JS::NativeStackLimit stackLimitForJitCode(JS::StackKind kind);
   size_t gcSystemPageSize() { return js::gc::SystemPageSize(); }
 
+  // MONGODB MODIFICATION: Checks if we are currently throwing an OOM exception and the exception
+  // message matches the out of memory exception string. 
+  bool isThrowingOutOfMemoryException(const JS::Value& exc);
+
   /*
    * "Entering" a realm changes cx->realm (which changes cx->global). Note
    * that this does not push an Activation so it's possible for the caller's

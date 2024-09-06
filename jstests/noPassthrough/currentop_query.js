@@ -4,6 +4,7 @@
  * @tags: [
  *    requires_replication,
  *    requires_sharding,
+ *    requires_scripting,
  * ]
  */
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";

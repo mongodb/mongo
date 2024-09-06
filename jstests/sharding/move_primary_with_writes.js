@@ -1,5 +1,5 @@
 /**
- * @tags: [does_not_support_stepdowns]
+ * @tags: [does_not_support_stepdowns, requires_scripting]
  */
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";
 import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";

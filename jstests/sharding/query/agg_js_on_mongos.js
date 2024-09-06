@@ -1,5 +1,6 @@
 // Performs an aggregation that will execute JavaScript on mongos. This is a sanity check to confirm
 // that JavaScript is available on mongos.
+// @tags: [requires_scripting]
 
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 

@@ -167,6 +167,7 @@ class _FixtureConfig(object):
         self.NO_JOURNAL = config.NO_JOURNAL
         self.STORAGE_ENGINE = config.STORAGE_ENGINE
         self.STORAGE_ENGINE_CACHE_SIZE = config.STORAGE_ENGINE_CACHE_SIZE
+        self.MOZJS_JS_GC_ZEAL = config.MOZJS_JS_GC_ZEAL
         self.WT_COLL_CONFIG = config.WT_COLL_CONFIG
         self.WT_ENGINE_CONFIG = config.WT_ENGINE_CONFIG
         self.WT_INDEX_CONFIG = config.WT_INDEX_CONFIG

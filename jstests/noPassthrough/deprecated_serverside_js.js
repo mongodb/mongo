@@ -4,6 +4,7 @@
 // We want to make sure that the deprecation warning message is only logged twice despite
 // the multiple invocations in an effort to not clutter the dev's console.
 // More specifically, we expect to only log 1 out of 128 events.
+// @tags: [requires_scripting]
 
 import {iterateMatchingLogLines} from "jstests/libs/log.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";

@@ -1,3 +1,8 @@
+/*
+ * @tags: [
+ *   requires_scripting,
+ * ]
+ */
 import {
     testGetCmdLineOptsMongod,
     testGetCmdLineOptsMongos

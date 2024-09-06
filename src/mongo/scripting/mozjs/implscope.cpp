@@ -556,6 +556,12 @@ MozJSImplScope::MozJSImplScope(MozJSScriptEngine* engine, boost::optional<int> j
             _engine->getScopeInitCallback()(*this);
     }
 
+#ifdef MONGO_SPIDERMONKEY_DBG
+    if (const auto* jsGcZealEnv = getenv("JS_GC_ZEAL"); jsGcZealEnv) {
+        LOGV2_INFO(9202400, "Initializing MozJSImplScope", "jsGcZeal"_attr = jsGcZealEnv);
+    }
+
+#endif
     currentJSScope = this;
 }
 
@@ -1167,6 +1173,12 @@ bool MozJSImplScope::_checkErrorState(bool success, bool reportError, bool asser
     if (_status.isOK()) {
         JS::RootedValue excn(_context);
         if (JS_GetPendingException(_context, &excn)) {
+            // It's possible that we have an uncaught exception for OOM, which is reported on the
+            // exception status of the JSContext. We must check for this OOM exception before
+            // clearing the pending exception. This function checks both the status on the JSContext
+            // as well as the message string of the exception being provided.
+            const auto isThrowingOOM = JS_IsThrowingOutOfMemoryException(_context, excn);
+
             // The pending JS exception needs to be cleared before we call ValueWriter below to
             // print the exception. ValueWriter::toStringData() may call back into the Interpret,
             // which asserts that we don't have an exception pending in DEBUG builds.
@@ -1207,10 +1219,15 @@ bool MozJSImplScope::_checkErrorState(bool success, bool reportError, bool asser
             } else {
                 str::stream ss;
                 JSStringWrapper jsstr;
-                ss << "uncaught exception: "
-                   << str::UTF8SafeTruncation(ValueWriter(_context, excn).toStringData(&jsstr),
-                                              kMaxErrorStringSize);
-                _status = Status(ErrorCodes::UnknownError, ss);
+
+                if (isThrowingOOM) {
+                    _status = Status(ErrorCodes::JSInterpreterFailure, "Out of memory");
+                } else {
+                    ss << "uncaught exception: "
+                       << str::UTF8SafeTruncation(ValueWriter(_context, excn).toStringData(&jsstr),
+                                                  kMaxErrorStringSize);
+                    _status = Status(ErrorCodes::UnknownError, ss);
+                }
             }
         } else {
             _status = Status(ErrorCodes::UnknownError, "Unknown Failure from JSInterpreter");
@@ -1255,7 +1272,7 @@ MozJSImplScope* MozJSImplScope::getThreadScope() {
 
 void MozJSImplScope::setOOM() {
     _hasOutOfMemoryException = true;
-    JS_RequestInterruptCallback(_context);
+    JS_RequestInterruptCallbackCanWait(_context);
 }
 
 void MozJSImplScope::setParentStack(std::string parentStack) {

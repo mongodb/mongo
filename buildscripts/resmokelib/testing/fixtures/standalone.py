@@ -475,6 +475,15 @@ class MongodLauncher(object):
         elif self.config.STORAGE_ENGINE == "wiredTiger" or self.config.STORAGE_ENGINE is None:
             shortcut_opts["wiredTigerCacheSizeGB"] = self.config.STORAGE_ENGINE_CACHE_SIZE
 
+        # If a JS_GC_ZEAL value has been provided in the configuration under MOZJS_JS_GC_ZEAL,
+        # we inject this value directly as an environment variable to be passed to the spawned
+        # mongod process.
+        if self.config.MOZJS_JS_GC_ZEAL:
+            process_kwargs = self.fixturelib.default_if_none(process_kwargs, {}).copy()
+            env_vars = process_kwargs.setdefault("env_vars", {}).copy()
+            env_vars.setdefault("JS_GC_ZEAL", self.config.MOZJS_JS_GC_ZEAL)
+            process_kwargs["env_vars"] = env_vars
+
         # These options are just flags, so they should not take a value.
         opts_without_vals = "logappend"
 

@@ -40,6 +40,13 @@ if jsEngine:
     )
     scriptingEnv.InjectMozJS()
 
+    if get_option("spider-monkey-dbg") == "on":
+        scriptingEnv.Prepend(
+            CPPDEFINES=[
+                "MONGO_SPIDERMONKEY_DBG",
+            ]
+        )
+
     scriptingEnv.Library(
         target="scripting",
         source=[

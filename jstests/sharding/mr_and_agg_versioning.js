@@ -1,5 +1,6 @@
 // Test that map reduce and aggregate properly handle shard versioning.
 // Test delibarately inserts orphaned data outside of migrations.
+// @tags: [requires_scripting]
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 TestData.skipCheckOrphans = true;

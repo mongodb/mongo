@@ -7,6 +7,7 @@
 //   - Tests fsync and fsync+lock permissions on sharded db
 // @tags: [
 //   expects_explicit_underscore_id_index,
+//   requires_scripting
 // ]
 
 import {ShardingTest} from "jstests/libs/shardingtest.js";

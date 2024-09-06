@@ -2,6 +2,7 @@
 // flag.
 // This test stresses behavior that is only true of the mapReduce implementation using aggregation,
 // so it cannot be run in mixed-version suites.
+// @tags: [requires_scripting]
 import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 

@@ -1,5 +1,6 @@
 // Test that mapReduce correctly fails if the target collection is not unsharded or sharded by just
 // _id.
+// @tags: [requires_scripting]
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 const st = new ShardingTest({shards: 2, mongos: 2});

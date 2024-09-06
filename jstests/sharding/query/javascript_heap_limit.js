@@ -1,3 +1,9 @@
+/**
+ * @tags: [
+ *   requires_scripting
+ * ]
+ */
+
 // Confirms that JavaScript heap limits are respected in aggregation. Includes testing for mapReduce
 // and $where which use aggregation for execution.
 import {ShardingTest} from "jstests/libs/shardingtest.js";

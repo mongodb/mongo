@@ -1,3 +1,8 @@
+/**
+ * @tags: [
+ *   requires_scripting
+ * ]
+ */
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {waitForAllMembers} from "jstests/replsets/rslib.js";
 

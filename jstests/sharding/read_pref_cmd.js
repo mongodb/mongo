@@ -5,6 +5,7 @@
  *   resource_intensive,
  *    # TODO (SERVER-88127): Re-enable this test or add an explanation why it is incompatible.
  *    embedded_router_incompatible,
+ *    requires_scripting
  * ]
  */
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";

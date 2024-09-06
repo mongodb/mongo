@@ -526,6 +526,7 @@ jsTestOptions = function() {
 
             performTimeseriesCompressionIntermediateDataIntegrityCheckOnInsert: true,
             fuzzMongodConfigs: TestData.fuzzMongodConfigs || false,
+            mozJSGCZeal: TestData.mozJSGCZeal || "",
         });
     }
     return _jsTestOptions;

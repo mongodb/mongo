@@ -1,3 +1,4 @@
+// @tags: [requires_scripting]
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 var s = new ShardingTest({shards: 2, mongos: 1});

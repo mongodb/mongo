@@ -3,6 +3,9 @@
  *
  * Always run on a fully upgraded cluster, so that {$meta: "sortKey"} projections use the newest
  * sort key format.
+ * @tags: [
+ *   requires_scripting,
+ * ]
  */
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 

@@ -3,6 +3,7 @@
  * cluster when there are documents on multiple chunks that need to be merged.
  * @tags: [
  *  backport_required_multiversion,
+ *  requires_scripting
  * ]
  */
 import {ShardingTest} from "jstests/libs/shardingtest.js";

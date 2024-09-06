@@ -6,6 +6,7 @@
 // We verify this requirement by running a map-reduce, examining the logs to find the names of
 // all collections created, and checking the oplog for entries logging the creation of each of those
 // collections.
+// @tags: [requires_scripting]
 
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 

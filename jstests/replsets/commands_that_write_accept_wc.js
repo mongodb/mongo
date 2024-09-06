@@ -4,6 +4,10 @@
  * defines various database commands and what they expect to be true before and after the fact.
  * It then runs the commands with an invalid writeConcern and a valid writeConcern and
  * ensures that they succeed and fail appropriately.
+ *
+ * @tags: [
+ *   requires_scripting,
+ * ]
  */
 
 import {ReplSetTest} from "jstests/libs/replsettest.js";

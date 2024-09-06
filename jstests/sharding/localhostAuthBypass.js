@@ -9,6 +9,7 @@ import {ShardingTest} from "jstests/libs/shardingtest.js";
 // The following checks, which occurs on ShardingTest.stop, involve using a mongos to read data on
 // the config server, but this test uses a special shutdown function which stops the mongoses before
 // calling ShardingTest.stop.
+// @tags : [requires_scripting]
 TestData.skipCheckingUUIDsConsistentAcrossCluster = true;
 TestData.skipCheckingIndexesConsistentAcrossCluster = true;
 TestData.skipCheckOrphans = true;

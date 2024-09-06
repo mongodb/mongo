@@ -2,7 +2,7 @@
 // mode. Other modes require writing to an output collection which is not allowed. SERVER-3345
 //
 // This test requires users to persist across a restart.
-// @tags: [requires_persistence]
+// @tags: [requires_persistence, requires_scripting]
 
 let baseName = "jstests_mr_auth";
 let dbName = "test";

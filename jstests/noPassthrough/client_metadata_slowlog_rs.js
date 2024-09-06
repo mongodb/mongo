@@ -3,6 +3,7 @@
  * set.
  * @tags: [
  *   requires_replication,
+ *   requires_scripting,
  * ]
  */
 import {ReplSetTest} from "jstests/libs/replsettest.js";

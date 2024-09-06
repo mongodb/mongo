@@ -1,6 +1,9 @@
 /**
  * Test to verify 'scope' parameter of mapReduce command. This test verfies that 'map', 'reduce' and
  * 'finalize' functions can use 'scope' variable passed in the input.
+ * @tags: [
+ *   requires_scripting,
+ * ]
  */
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 

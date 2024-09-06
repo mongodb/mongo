@@ -6,6 +6,7 @@
  * cannot support a sharded cluster.
  * @tags: [
  *   requires_sharding,
+ *   requires_scripting
  * ]
  */
 import {ShardingTest} from "jstests/libs/shardingtest.js";

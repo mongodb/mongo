@@ -1,4 +1,5 @@
 // Test shard targeting for queries with collation.
+// @tags: [requires_scripting]
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 import {
     WriteWithoutShardKeyTestUtil
