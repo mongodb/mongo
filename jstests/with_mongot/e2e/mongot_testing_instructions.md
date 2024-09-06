@@ -128,7 +128,7 @@ You can download the mongot binary that a specific evergreen patch or version ut
 
 You can download the mongot binary from any build variant that compiles mongot--i.e., variants which include the expansion `build_mongot: true` ([example](https://github.com/10gen/mongo/blob/848b5264be2d0f93d21ffe2e4058e810f8ea18f2/etc/evergreen_yml_components/variants/amazon/test_dev_master_branch_only.yml#L194)). More specifically, that includes:
 
-- Compile variants that are depended upon by variants which run the search end to end tests, such as the variant `amazon-linux2-arm64-dynamic-compile` _(! Amazon Linux 2 arm64 Enterprise Shared Library Compile & Static Analysis)_, which is depended upon by _! Amazon Linux 2 arm64 Atlas Enterprise (all feature flags)_
+- Compile variants that are depended upon by variants which run the search end to end tests, such as the variant `amazon-linux2-arm64-static-compile` _(! Amazon Linux 2 arm64 Enterprise Shared Library Compile & Static Analysis)_, which is depended upon by _! Amazon Linux 2 arm64 Atlas Enterprise (all feature flags)_
 - Variants that compile mongot **and** run the search end to end tests, such as: `amazon-linux2-arm64-mongot-integration-patchable` _(AL2 arm64 mongot integration tasks)_
   - Note that this will be true of any of the build variants that include `mongot` in the name, such as _Enterprise RHEL 8.0 Mongot Integration_
 
@@ -150,7 +150,7 @@ By default, the download will be placed in `build/multiversion_bin/<githash_patc
 
 ######
 
-    db-contrib-tool setup-repro-env --variant amazon-linux2-arm64-dynamic-compile 23b790a2a81767b8edbbc266043a205029867b74 --installDir=build/multiversion_bin/my_variant
+    db-contrib-tool setup-repro-env --variant amazon-linux2-arm64-static-compile 23b790a2a81767b8edbbc266043a205029867b74 --installDir=build/multiversion_bin/my_variant
 
 Will place the mongot binary in `build/multiversion_bin/my_variant/23b790a2a81767b8edbbc266043a205029867b74/dist_test/bin/mongot-localdev`
 

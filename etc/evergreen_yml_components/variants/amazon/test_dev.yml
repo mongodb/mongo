@@ -15,11 +15,7 @@ variables:
     activate: true # These compile variants run on every commit to reduce latency of the auto-reverter.
     stepback: false
 
-  # THIS HAS COPIES IN:
-  # - etc/evergreen_yml_components/variants/amazon/test_dev_master_branch_only.yml
-  # - etc/evergreen_yml_components/variants/amazon/test_dev.yml
-  # ANY MODIFICATIONS HERE SHOULD ALSO BE MADE IN THOSE FILES
-  - &linux-arm64-dynamic-enterprise-compile-expansions
+  - &linux-arm64-static-enterprise-compile-expansions
     scons_cache_scope: shared
     scons_cache_mode: all
     has_packages: false
@@ -28,8 +24,10 @@ variables:
       MONGO_DISTMOD=amazon2
       -j$(grep -c ^processor /proc/cpuinfo)
       --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
-      --link-model=dynamic
+      --link-model=static
       --use-diagnostic-latches=on
+    unittest_compile_flags: >-
+      --link-model=dynamic
 
   # THIS HAS COPIES IN:
   # - etc/evergreen_yml_components/variants/amazon/test_dev_master_branch_only.yml
@@ -50,19 +48,19 @@ variables:
   # - etc/evergreen_yml_components/variants/amazon/test_dev_master_branch_only.yml
   # - etc/evergreen_yml_components/variants/amazon/test_dev.yml
   # ANY MODIFICATIONS HERE SHOULD ALSO BE MADE IN THOSE FILES
-  - &amazon_linux2_arm64_dynamic_compile_variant_dependency
+  - &amazon_linux2_arm64_static_compile_variant_dependency
     depends_on:
       - name: archive_dist_test
-        variant: &amazon_linux2_arm64_dynamic_compile_variant_name amazon-linux2-arm64-dynamic-compile
+        variant: &amazon_linux2_arm64_static_compile_variant_name amazon-linux2-arm64-static-compile
       - name: archive_jstestshell
-        variant: *amazon_linux2_arm64_dynamic_compile_variant_name
+        variant: *amazon_linux2_arm64_static_compile_variant_name
       - name: version_gen
         variant: generate-tasks-for-version
         # This is added because of EVG-18211.
         # Without this we are adding extra dependencies on evergreen and it is causing strain
         omit_generated_tasks: true
     # - name: generate_buildid_to_debug_symbols_mapping
-    #   variant: amazon-linux2-arm64-dynamic-compile
+    #   variant: amazon-linux2-arm64-static-compile
 
   # THIS HAS COPIES IN:
   # - etc/evergreen_yml_components/variants/amazon/test_dev_master_branch_only.yml
@@ -70,7 +68,7 @@ variables:
   # ANY MODIFICATIONS HERE SHOULD ALSO BE MADE IN THOSE FILES
   - &amazon_linux2_arm64_dynamic_expansions
     <<: *linux_arm64_generic_expansions
-    compile_variant: *amazon_linux2_arm64_dynamic_compile_variant_name
+    compile_variant: *amazon_linux2_arm64_static_compile_variant_name
 
 buildvariants:
   - <<: *linux-arm64-dynamic-compile-params
@@ -78,26 +76,28 @@ buildvariants:
     display_name: "! Amazon Linux 2 arm64 Crypt Compile"
     tags: ["required", "bazel_check"]
     expansions:
-      <<: *linux-arm64-dynamic-enterprise-compile-expansions
+      <<: *linux-arm64-static-enterprise-compile-expansions
       compile_variant: *amazon-linux2-arm64-crypt-compile
     tasks:
       - name: .crypt
       - name: crypt_build_debug_and_test
 
   - <<: *linux-arm64-dynamic-compile-params
-    name: &amazon-linux2-arm64-dynamic-compile amazon-linux2-arm64-dynamic-compile
+    name: &amazon-linux2-arm64-static-compile amazon-linux2-arm64-static-compile
     display_name: "! Amazon Linux 2 arm64 Enterprise Shared Library Compile & Static Analysis"
     tags: ["required", "bazel_check"]
     expansions:
-      <<: *linux-arm64-dynamic-enterprise-compile-expansions
+      <<: *linux-arm64-static-enterprise-compile-expansions
       clang_tidy_toolchain: v4
       build_mongot: true
       download_mongot_release: true
-      compile_variant: *amazon-linux2-arm64-dynamic-compile
+      compile_variant: *amazon-linux2-arm64-static-compile
     tasks:
       - name: compile_ninja_quick_TG
       - name: compile_test_parallel_unittest_stream_TG
       - name: compile_test_parallel_core_stream_TG
+        distros:
+          - amazon2-arm64-latest-nvme
       - name: compile_test_parallel_dbtest_stream_TG
       - name: compile_integration_and_test_parallel_stream_TG
       - name: compile_jstestshell_TG
@@ -115,7 +115,7 @@ buildvariants:
           - amazon2-arm64-latest-xlarge
 
   - &enterprise-amazon-linux2-arm64-template
-    <<: *amazon_linux2_arm64_dynamic_compile_variant_dependency
+    <<: *amazon_linux2_arm64_static_compile_variant_dependency
     name: &enterprise-amazon-linux2-arm64 enterprise-amazon-linux2-arm64
     display_name: "* Amazon Linux 2 arm64 Atlas Enterprise"
     tags: ["suggested"]
@@ -161,7 +161,6 @@ buildvariants:
       <<: *linux_arm64_generic_expansions
       scons_cache_scope: shared
       scons_cache_mode: all
-      commit_queue_alternate_cache: amazon-linux2-arm64-dynamic-compile
       has_packages: false
       compile_flags: >-
         --ssl
@@ -198,7 +197,7 @@ buildvariants:
         distros:
           - amazon2-arm64-latest-large
 
-  - <<: *amazon_linux2_arm64_dynamic_compile_variant_dependency
+  - <<: *amazon_linux2_arm64_static_compile_variant_dependency
     name: amazon-linux2-arm64-try-sbe-engine
     display_name: "Amazon Linux 2 arm64 Atlas Enterprise Query Patch Only (trySbeEngine)"
     tags: []
@@ -251,7 +250,7 @@ buildvariants:
             variant: generate-tasks-for-version
             omit_generated_tasks: true
           - name: archive_dist_test
-            variant: *amazon_linux2_arm64_dynamic_compile_variant_name
+            variant: *amazon_linux2_arm64_static_compile_variant_name
       - name: multiversion_gen
       - name: .multiversion_sanity_check
       - name: concurrency_gen

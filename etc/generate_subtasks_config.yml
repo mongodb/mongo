@@ -1,6 +1,6 @@
 build_variant_large_distro_exceptions:
   - amazon
-  - amazon-linux2-arm64-dynamic-compile
+  - amazon-linux2-arm64-static-compile
   - amazon2023
   - amazon2023-arm64
   - debian12

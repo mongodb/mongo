@@ -855,6 +855,7 @@ tasks:
         vars:
           targets: install-first-quarter-unittests install-first-quarter-unittests-debug
           compiling_for_test: true
+          task_compile_flags: ${unittest_compile_flags}
       - func: "f_expansions_write"
       - func: "run diskstats"
       - func: "f_expansions_write"
@@ -877,6 +878,7 @@ tasks:
         vars:
           targets: install-second-quarter-unittests install-second-quarter-unittests-debug
           compiling_for_test: true
+          task_compile_flags: ${unittest_compile_flags}
       - func: "f_expansions_write"
       - func: "run diskstats"
       - func: "f_expansions_write"
@@ -899,6 +901,7 @@ tasks:
         vars:
           targets: install-third-quarter-unittests install-third-quarter-unittests-debug
           compiling_for_test: true
+          task_compile_flags: ${unittest_compile_flags}
       - func: "f_expansions_write"
       - func: "run diskstats"
       - func: "f_expansions_write"
@@ -921,6 +924,7 @@ tasks:
         vars:
           targets: install-fourth-quarter-unittests install-fourth-quarter-unittests-debug
           compiling_for_test: true
+          task_compile_flags: ${unittest_compile_flags}
       - func: "f_expansions_write"
       - func: "run diskstats"
       - func: "f_expansions_write"

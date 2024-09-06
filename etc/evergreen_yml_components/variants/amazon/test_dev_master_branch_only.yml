@@ -15,10 +15,6 @@ variables:
     activate: true # These compile variants run on every commit to reduce latency of the auto-reverter.
     stepback: false
 
-  # THIS HAS COPIES IN:
-  # - etc/evergreen_yml_components/variants/amazon/test_dev_master_branch_only.yml
-  # - etc/evergreen_yml_components/variants/amazon/test_dev.yml
-  # ANY MODIFICATIONS HERE SHOULD ALSO BE MADE IN THOSE FILES
   - &linux-arm64-dynamic-enterprise-compile-expansions
     scons_cache_scope: shared
     scons_cache_mode: all
@@ -35,19 +31,19 @@ variables:
   # - etc/evergreen_yml_components/variants/amazon/test_dev_master_branch_only.yml
   # - etc/evergreen_yml_components/variants/amazon/test_dev.yml
   # ANY MODIFICATIONS HERE SHOULD ALSO BE MADE IN THOSE FILES
-  - &amazon_linux2_arm64_dynamic_compile_variant_dependency
+  - &amazon_linux2_arm64_static_compile_variant_dependency
     depends_on:
       - name: archive_dist_test
-        variant: &amazon_linux2_arm64_dynamic_compile_variant_name amazon-linux2-arm64-dynamic-compile
+        variant: &amazon_linux2_arm64_static_compile_variant_name amazon-linux2-arm64-static-compile
       - name: archive_jstestshell
-        variant: *amazon_linux2_arm64_dynamic_compile_variant_name
+        variant: *amazon_linux2_arm64_static_compile_variant_name
       - name: version_gen
         variant: generate-tasks-for-version
         # This is added because of EVG-18211.
         # Without this we are adding extra dependencies on evergreen and it is causing strain
         omit_generated_tasks: true
     # - name: generate_buildid_to_debug_symbols_mapping
-    #   variant: amazon-linux2-arm64-dynamic-compile
+    #   variant: amazon-linux2-arm64-static-compile
 
   # THIS HAS COPIES IN:
   # - etc/evergreen_yml_components/variants/amazon/test_dev_master_branch_only.yml
@@ -70,7 +66,7 @@ variables:
   # ANY MODIFICATIONS HERE SHOULD ALSO BE MADE IN THOSE FILES
   - &amazon_linux2_arm64_dynamic_expansions
     <<: *linux_arm64_generic_expansions
-    compile_variant: *amazon_linux2_arm64_dynamic_compile_variant_name
+    compile_variant: *amazon_linux2_arm64_static_compile_variant_name
 
 buildvariants:
   - <<: *linux-arm64-dynamic-compile-params
@@ -172,7 +168,7 @@ buildvariants:
       - name: compile_bazel_TG
 
   - &enterprise-amazon-linux2-arm64-all-feature-flags-template
-    <<: *amazon_linux2_arm64_dynamic_compile_variant_dependency
+    <<: *amazon_linux2_arm64_static_compile_variant_dependency
     name: &enterprise-amazon-linux2-arm64-all-feature-flags enterprise-amazon-linux2-arm64-all-feature-flags
     display_name: "! Amazon Linux 2 arm64 Atlas Enterprise (all feature flags)"
     tags: ["required"]
