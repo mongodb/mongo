@@ -6,7 +6,6 @@
  *     featureFlagGlobalIndexes,
  *     requires_fcv_63,
  *     requires_replication,
- *     __TEMPORARILY_DISABLED__,  # TODO (SERVER-94274): Re-enable this test.
  * ]
  */
 
