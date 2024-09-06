@@ -3543,7 +3543,10 @@ public:
     }
 
     void visit(const ExpressionRandom* expr) final {
-        unsupportedExpression(expr->getOpName());
+        uassert(
+            5155201, "$rand does not currently accept arguments", expr->getChildren().size() == 0);
+        auto expression = makeABTFunction("rand");
+        pushABT(std::move(expression));
     }
 
     void visit(const ExpressionToHashedIndexKey* expr) final {

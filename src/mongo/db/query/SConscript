@@ -292,6 +292,16 @@ env.Library(
     ],
 )
 
+env.Library(
+    target="random_utils",
+    source=[
+        "random_utils.cpp",
+    ],
+    LIBDEPS=[
+        "$BUILD_DIR/mongo/base",
+    ],
+)
+
 env.CppUnitTest(
     target="db_query_test",
     source=[

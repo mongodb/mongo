@@ -89,6 +89,7 @@
 #include "mongo/db/query/collation/collator_interface.h"
 #include "mongo/db/query/datetime/date_time_support.h"
 #include "mongo/db/query/query_knobs_gen.h"
+#include "mongo/db/query/random_utils.h"
 #include "mongo/db/query/str_trim_utils.h"
 #include "mongo/db/query/substr_utils.h"
 #include "mongo/db/storage/column_store.h"
@@ -4109,6 +4110,11 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::scalarRoundTrunc(
 
 FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinTrunc(ArityType arity) {
     return scalarRoundTrunc("$trunc", Decimal128::kRoundTowardZero, arity);
+}
+
+FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinRand(ArityType arity) {
+    double num = random_utils::getRNG().nextCanonicalDouble();
+    return {true, value::TypeTags::NumberDouble, value::bitcastFrom<double>(num)};
 }
 
 FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinRound(ArityType arity) {
@@ -9911,6 +9917,8 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::dispatchBuiltin(Builtin
             return builtinTan(arity);
         case Builtin::tanh:
             return builtinTanh(arity);
+        case Builtin::rand:
+            return builtinRand(arity);
         case Builtin::round:
             return builtinRound(arity);
         case Builtin::concat:
@@ -10496,6 +10504,8 @@ std::string builtinToString(Builtin b) {
             return "tan";
         case Builtin::tanh:
             return "tanh";
+        case Builtin::rand:
+            return "rand";
         case Builtin::round:
             return "round";
         case Builtin::isMember:

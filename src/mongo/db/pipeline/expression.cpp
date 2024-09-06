@@ -81,6 +81,7 @@
 #include "mongo/db/query/collation/collator_interface.h"
 #include "mongo/db/query/datetime/date_time_support.h"
 #include "mongo/db/query/query_knobs_gen.h"
+#include "mongo/db/query/random_utils.h"
 #include "mongo/db/query/sort_pattern.h"
 #include "mongo/db/query/str_trim_utils.h"
 #include "mongo/db/query/substr_utils.h"
@@ -7990,11 +7991,7 @@ Value ExpressionRegexMatch::evaluate(const Document& root, Variables* variables)
 /* -------------------------- ExpressionRandom ------------------------------ */
 REGISTER_STABLE_EXPRESSION(rand, ExpressionRandom::parse);
 
-static thread_local PseudoRandom threadLocalRNG(SecureRandom().nextInt64());
-
-ExpressionRandom::ExpressionRandom(ExpressionContext* const expCtx) : Expression(expCtx) {
-    expCtx->sbeCompatibility = SbeCompatibility::notCompatible;
-}
+ExpressionRandom::ExpressionRandom(ExpressionContext* const expCtx) : Expression(expCtx) {}
 
 intrusive_ptr<Expression> ExpressionRandom::parse(ExpressionContext* const expCtx,
                                                   BSONElement exprElement,
@@ -8013,7 +8010,7 @@ const char* ExpressionRandom::getOpName() const {
 }
 
 double ExpressionRandom::getRandomValue() const {
-    return kMinValue + (kMaxValue - kMinValue) * threadLocalRNG.nextCanonicalDouble();
+    return kMinValue + (kMaxValue - kMinValue) * random_utils::getRNG().nextCanonicalDouble();
 }
 
 Value ExpressionRandom::evaluate(const Document& root, Variables* variables) const {

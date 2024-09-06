@@ -581,6 +581,7 @@ enum class Builtin : uint16_t {
     sinh,
     tan,
     tanh,
+    rand,  // implements $rand
     round,
     isMember,
     collIsMember,
@@ -1912,6 +1913,7 @@ private:
     FastTuple<bool, value::TypeTags, value::Value> builtinSinh(ArityType arity);
     FastTuple<bool, value::TypeTags, value::Value> builtinTan(ArityType arity);
     FastTuple<bool, value::TypeTags, value::Value> builtinTanh(ArityType arity);
+    FastTuple<bool, value::TypeTags, value::Value> builtinRand(ArityType arity);
     FastTuple<bool, value::TypeTags, value::Value> builtinRound(ArityType arity);
     FastTuple<bool, value::TypeTags, value::Value> builtinConcat(ArityType arity);
     FastTuple<bool, value::TypeTags, value::Value> builtinConcatArrays(ArityType arity);
