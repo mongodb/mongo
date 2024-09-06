@@ -99,8 +99,7 @@ StatusWith<BSONObj> asAggregation(const CanonicalQuery& query);
 std::unique_ptr<CanonicalQuery> parseCanonicalQuery(
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
     std::unique_ptr<ParsedDistinctCommand> parsedDistinct,
-    const CollatorInterface* defaultCollator = nullptr,
-    bool isDistinctMultiplanningEnabled = false);
+    const CollatorInterface* defaultCollator = nullptr);
 
 }  // namespace parsed_distinct_command
 }  // namespace mongo

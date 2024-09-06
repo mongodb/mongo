@@ -120,8 +120,7 @@ std::unique_ptr<CanonicalQuery> parseDistinctCmd(
     const BSONObj& cmdObj,
     const ExtensionsCallback& extensionsCallback,
     const CollatorInterface* defaultCollator,
-    boost::optional<ExplainOptions::Verbosity> verbosity,
-    bool isDistinctMultiplanningEnabled) {
+    boost::optional<ExplainOptions::Verbosity> verbosity) {
     const auto vts = auth::ValidatedTenancyScope::get(opCtx);
     const auto serializationContext = vts != boost::none
         ? SerializationContext::stateCommandRequest(vts->hasTenantId(), vts->isFromAtlasProxy())
@@ -156,7 +155,7 @@ std::unique_ptr<CanonicalQuery> parseDistinctCmd(
     expCtx->setQuerySettingsIfNotPresent(
         query_settings::lookupQuerySettingsForDistinct(expCtx, *parsedDistinct, nss));
     return parsed_distinct_command::parseCanonicalQuery(
-        std::move(expCtx), std::move(parsedDistinct), nullptr, isDistinctMultiplanningEnabled);
+        std::move(expCtx), std::move(parsedDistinct), nullptr);
 }
 
 namespace dps = dotted_path_support;
@@ -167,8 +166,7 @@ namespace {
 std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> createExecutorForDistinctCommand(
     OperationContext* opCtx,
     std::unique_ptr<CanonicalQuery> canonicalQuery,
-    const CollectionAcquisition& coll,
-    bool isDistinctMultiplanningEnabled) {
+    const CollectionAcquisition& coll) {
     const auto yieldPolicy = PlanYieldPolicy::YieldPolicy::YIELD_AUTO;
     const auto& collectionPtr = coll.getCollectionPtr();
     const MultipleCollectionAccessor collections{coll};
@@ -181,6 +179,8 @@ std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> createExecutorForDistinctCo
     }
 
     // Try creating a plan that does DISTINCT_SCAN.
+    const bool isDistinctMultiplanningEnabled =
+        canonicalQuery->getExpCtx()->isFeatureFlagShardFilteringDistinctScanEnabled();
     auto swQuerySolution = tryGetQuerySolutionForDistinct(
         collections, QueryPlannerParams::DEFAULT, *canonicalQuery, isDistinctMultiplanningEnabled);
     if (swQuerySolution.isOK()) {
@@ -335,18 +335,8 @@ public:
             ? collectionOrView->getCollectionPtr()->getDefaultCollator()
             : nullptr;
 
-        const auto fcvSnapshot = serverGlobalParams.featureCompatibility.acquireFCVSnapshot();
-        bool isDistinctMultiplanningEnabled =
-            feature_flags::gFeatureFlagShardFilteringDistinctScan
-                .isEnabledUseLastLTSFCVWhenUninitialized(fcvSnapshot);
-
-        auto canonicalQuery = parseDistinctCmd(opCtx,
-                                               nss,
-                                               cmdObj,
-                                               ExtensionsCallbackReal(opCtx, &nss),
-                                               defaultCollator,
-                                               verbosity,
-                                               isDistinctMultiplanningEnabled);
+        auto canonicalQuery = parseDistinctCmd(
+            opCtx, nss, cmdObj, ExtensionsCallbackReal(opCtx, &nss), defaultCollator, verbosity);
 
         if (collectionOrView->isView()) {
             // Relinquish locks. The aggregation command will re-acquire them.
@@ -355,10 +345,8 @@ public:
             return Status::OK();
         }
 
-        auto executor = createExecutorForDistinctCommand(opCtx,
-                                                         std::move(canonicalQuery),
-                                                         collectionOrView->getCollection(),
-                                                         isDistinctMultiplanningEnabled);
+        auto executor = createExecutorForDistinctCommand(
+            opCtx, std::move(canonicalQuery), collectionOrView->getCollection());
         SerializationContext serializationCtx = request.getSerializationContext();
         auto bodyBuilder = replyBuilder->getBodyBuilder();
         Explain::explainStages(executor.get(),
@@ -439,18 +427,8 @@ public:
             ? collectionOrView->getCollectionPtr()->getDefaultCollator()
             : nullptr;
 
-        const auto fcvSnapshot = serverGlobalParams.featureCompatibility.acquireFCVSnapshot();
-        bool isDistinctMultiplanningEnabled =
-            feature_flags::gFeatureFlagShardFilteringDistinctScan
-                .isEnabledUseLastLTSFCVWhenUninitialized(fcvSnapshot);
-
-        auto canonicalQuery = parseDistinctCmd(opCtx,
-                                               nss,
-                                               cmdObj,
-                                               ExtensionsCallbackReal(opCtx, &nss),
-                                               defaultCollation,
-                                               {},
-                                               isDistinctMultiplanningEnabled);
+        auto canonicalQuery = parseDistinctCmd(
+            opCtx, nss, cmdObj, ExtensionsCallbackReal(opCtx, &nss), defaultCollation, {});
         const CanonicalDistinct& canonicalDistinct = *canonicalQuery->getDistinct();
 
         if (canonicalDistinct.isMirrored()) {
@@ -482,10 +460,8 @@ public:
         uassertStatusOK(replCoord->checkCanServeReadsFor(
             opCtx, nss, ReadPreferenceSetting::get(opCtx).canRunOnSecondary()));
 
-        auto executor = createExecutorForDistinctCommand(opCtx,
-                                                         std::move(canonicalQuery),
-                                                         collectionOrView->getCollection(),
-                                                         isDistinctMultiplanningEnabled);
+        auto executor = createExecutorForDistinctCommand(
+            opCtx, std::move(canonicalQuery), collectionOrView->getCollection());
 
         {
             stdx::lock_guard<Client> lk(*opCtx->getClient());

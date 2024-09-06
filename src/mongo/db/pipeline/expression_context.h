@@ -66,6 +66,7 @@
 #include "mongo/db/query/distinct_command_gen.h"
 #include "mongo/db/query/explain_options.h"
 #include "mongo/db/query/find_command.h"
+#include "mongo/db/query/query_feature_flags_gen.h"
 #include "mongo/db/query/query_knob_configuration.h"
 #include "mongo/db/query/query_knobs_gen.h"
 #include "mongo/db/query/query_settings/query_settings_gen.h"
@@ -721,6 +722,10 @@ public:
         return _collator.getIgnore();
     }
 
+    bool isFeatureFlagShardFilteringDistinctScanEnabled() const {
+        return _featureFlagShardFilteringDistinctScan.get();
+    }
+
 protected:
     static const int kInterruptCheckPeriod = 128;
 
@@ -813,6 +818,12 @@ private:
         _queryKnobConfiguration{[](const auto& querySettings) {
             return QueryKnobConfiguration(querySettings);
         }};
+
+    Deferred<bool (*)()> _featureFlagShardFilteringDistinctScan{[] {
+        return feature_flags::gFeatureFlagShardFilteringDistinctScan
+            .isEnabledUseLastLTSFCVWhenUninitialized(
+                serverGlobalParams.featureCompatibility.acquireFCVSnapshot());
+    }};
 };
 
 }  // namespace mongo

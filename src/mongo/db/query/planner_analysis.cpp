@@ -1465,10 +1465,8 @@ std::unique_ptr<QuerySolution> QueryPlannerAnalysis::analyzeDataAccess(
         solnRoot = std::move(skip);
     }
 
-    const auto fcvSnapshot = serverGlobalParams.featureCompatibility.acquireFCVSnapshot();
     const bool isDistinctScanMultiplanningEnabled =
-        feature_flags::gFeatureFlagShardFilteringDistinctScan
-            .isEnabledUseLastLTSFCVWhenUninitialized(fcvSnapshot);
+        query.getExpCtx()->isFeatureFlagShardFilteringDistinctScanEnabled();
 
     // Project the results.
     if (findCommand.getReturnKey()) {

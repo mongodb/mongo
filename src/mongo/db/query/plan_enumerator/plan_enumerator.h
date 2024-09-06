@@ -98,6 +98,9 @@ struct PlanEnumeratorParams {
 
     // Whether or not this is a distinct query.
     bool distinct;
+
+    // TODO SERVER-94155: Enable index pruning for distinct-like queries when feature flag is on.
+    bool shouldPruneDistinct;
 };
 
 /**
@@ -537,6 +540,9 @@ private:
 
     // Whether or not this is a distinct query.
     const bool _distinct;
+
+    // TODO SERVER-94155: Enable index pruning for distinct-like queries when feature flag is on.
+    const bool _shouldPruneDistinct;
 };
 
 }  // namespace plan_enumerator

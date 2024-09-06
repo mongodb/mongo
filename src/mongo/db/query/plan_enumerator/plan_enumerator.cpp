@@ -300,7 +300,8 @@ PlanEnumerator::PlanEnumerator(const PlanEnumeratorParams& params)
       _disableOrPushdown(params.disableOrPushdown),
       _projection(params.projection),
       _shardKey(params.shardKey),
-      _distinct(params.distinct) {
+      _distinct(params.distinct),
+      _shouldPruneDistinct(params.shouldPruneDistinct) {
     if (params.sort && *params.sort) {
         _sortPatFields = stdx::unordered_set<std::string>();
         for (size_t i = 0; i < (*params.sort)->size(); i++) {
@@ -316,11 +317,7 @@ Status PlanEnumerator::init() {
     // Fill out our memo structure from the tagged _root.
     _done = !prepMemo(_root, PrepMemoContext());
     // TODO SERVER-94155: Enable index pruning for distinct-like queries when feature flag is on.
-    const auto fcvSnapshot = serverGlobalParams.featureCompatibility.acquireFCVSnapshot();
-    bool isDistinctMultiplanningEnabled = feature_flags::gFeatureFlagShardFilteringDistinctScan
-                                              .isEnabledUseLastLTSFCVWhenUninitialized(fcvSnapshot);
-    if (internalQueryPlannerEnableIndexPruning.load() &&
-        !(_distinct && isDistinctMultiplanningEnabled)) {
+    if (internalQueryPlannerEnableIndexPruning.load() && (!_distinct || _shouldPruneDistinct)) {
         bool prunedAnyIndexes = pruneMemoOfDupIndexes(
             _memo, QueryPruningInfo{_projection, _sortPatFields, _shardKey, _indices});
         _explainInfo.prunedAnyIndexes = prunedAnyIndexes;

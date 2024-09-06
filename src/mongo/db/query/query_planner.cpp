@@ -1547,6 +1547,10 @@ StatusWith<std::vector<std::unique_ptr<QuerySolution>>> QueryPlanner::plan(
         enumParams.sort = &query.getSortPattern();
         enumParams.shardKey = params.shardKey;
         enumParams.distinct = query.getDistinct().has_value();
+        // TODO SERVER-94155: Enable index pruning for distinct-like queries when feature flag is
+        // on.
+        enumParams.shouldPruneDistinct =
+            !query.getExpCtx()->isFeatureFlagShardFilteringDistinctScanEnabled();
 
         plan_enumerator::PlanEnumerator planEnumerator(enumParams);
         uassertStatusOKWithContext(planEnumerator.init(), "failed to initialize plan enumerator");

@@ -335,11 +335,7 @@ bool turnIxscanIntoDistinctScan(const CanonicalQuery& canonicalQuery,
     // case, we have already filtered out indexes which are ineligible for conversion to
     // DISTINCT_SCAN, for e.g. if the distinct key is not part of the index. In the former case, we
     // have not done this check yet, so we filter out ineligible indexes here.
-    const auto fcvSnapshot = serverGlobalParams.featureCompatibility.acquireFCVSnapshot();
-    const bool isDistinctMultiplanningEnabled =
-        feature_flags::gFeatureFlagShardFilteringDistinctScan
-            .isEnabledUseLastLTSFCVWhenUninitialized(fcvSnapshot);
-    if (isDistinctMultiplanningEnabled) {
+    if (canonicalQuery.getExpCtx()->isFeatureFlagShardFilteringDistinctScanEnabled()) {
         if (!isIndexSuitableForDistinct(canonicalQuery,
                                         indexScanNode->index,
                                         field,
