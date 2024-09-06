@@ -16,6 +16,7 @@ import shlex
 import shutil
 import traceback
 from typing import Dict, Optional
+import subprocess
 
 import pymongo.uri_parser
 import yaml
@@ -462,6 +463,35 @@ or explicitly pass --installDir to the run subcommand of buildscripts/resmoke.py
     _config.MONGOT_EXECUTABLE = _expand_user(config.pop("mongot-localdev/mongot_executable"))
     mongot_set_parameters = config.pop("mongot_set_parameters")
     _config.MONGOT_SET_PARAMETERS = _merge_set_params(mongot_set_parameters)
+
+    # Add future mongot versions to EXCLUDE_WITH_ANY_TAGS.
+    def get_excluded_mongot_versions(mongot_version):
+        mongot_excluded_versions = []
+        value = mongot_version.replace("-", ".").split(".")
+        # Mongot versions are formatted X.Y.Z where X is the API version, Y updates for functionality changes,
+        # and Z updates for patches (bug fixes).
+        mongot_major_version = value[0]
+        mongot_minor_version = value[1]
+        mongot_patch_version = value[2]
+
+        # Excludes tags for the next API version, the next 5 feature releases, and the next 10 patches.
+        mongot_excluded_versions.append(f"requires_mongot_{eval(mongot_major_version) + 1}")
+        for i in range(1, 6):
+            mongot_excluded_versions.append(
+                f"requires_mongot_{mongot_major_version}_{eval(mongot_minor_version) + i}"
+            )
+        for i in range(1, 11):
+            mongot_excluded_versions.append(
+                f"requires_mongot_{mongot_major_version}_{mongot_minor_version}_{eval(mongot_patch_version) + i}"
+            )
+        return mongot_excluded_versions
+
+    if _config.MONGOT_EXECUTABLE and os.path.exists(_config.MONGOT_EXECUTABLE):
+        mongot_version = subprocess.check_output(
+            [_config.MONGOT_EXECUTABLE, "--version"], text=True
+        ).strip()
+        mongot_excluded_versions = get_excluded_mongot_versions(mongot_version)
+        _config.EXCLUDE_WITH_ANY_TAGS.extend(mongot_excluded_versions)
 
     _config.MRLOG = config.pop("mrlog")
     _config.NO_JOURNAL = config.pop("no_journal")
