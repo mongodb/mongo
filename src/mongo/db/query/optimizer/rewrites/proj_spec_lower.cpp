@@ -278,9 +278,6 @@ public:
         ABTVector argStack;
         auto* makeObjSpec = args->build(argStack).release();
 
-        // The third argument will be the boolean "false".
-        argStack.insert(argStack.begin(), Constant::boolean(false));
-
         // The original input to the EvalPath will be the second argument, corresponding to the
         // "root" document.
         argStack.insert(argStack.begin(), n.cast<EvalPath>()->getInput());

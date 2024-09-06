@@ -53,43 +53,32 @@
 
 namespace mongo::sbe::vm {
 
-class MakeObjCursorInputFields;
-
 // MakeObj input cursor for BSON objects.
 class BsonObjCursor {
 public:
-    using InputFields = MakeObjCursorInputFields;
-
-    BsonObjCursor(const StringListSet& fields, const char* be) : _be(be) {
+    BsonObjCursor(const char* be) : _be(be) {
         _last = _be + ConstDataView(_be).read<LittleEndian<uint32_t>>() - 1;
         _be += 4;
         if (_be != _last) {
             // Initialize '_name' and '_nextBe'.
             _name = bson::fieldNameAndLength(_be);
             _nextBe = bson::advance(_be, _name.size());
-            // Look up '_name' in the 'fields' set.
-            _fieldIdx = fields.findPos(_name);
         }
     }
 
     MONGO_COMPILER_ALWAYS_INLINE bool atEnd() const {
         return _be == _last;
     }
-    MONGO_COMPILER_ALWAYS_INLINE void moveNext(const StringListSet& fields) {
+    MONGO_COMPILER_ALWAYS_INLINE void moveNext() {
         _be = _nextBe;
         if (_be != _last) {
             // Update '_name' and '_nextBe'.
             _name = bson::fieldNameAndLength(_be);
             _nextBe = bson::advance(_be, _name.size());
-            // Look up '_name' in the 'fields' set.
-            _fieldIdx = fields.findPos(_name);
         }
     }
     MONGO_COMPILER_ALWAYS_INLINE StringData fieldName() const {
         return _name;
-    }
-    MONGO_COMPILER_ALWAYS_INLINE size_t fieldIdx() const {
-        return _fieldIdx;
     }
     MONGO_COMPILER_ALWAYS_INLINE std::pair<value::TypeTags, value::Value> value() const {
         return bson::convertFrom<true>(bsonElement());
@@ -108,49 +97,38 @@ private:
     const char* _nextBe{nullptr};
     const char* _last{nullptr};
 
-    size_t _fieldIdx{0};
     StringData _name;
 };
 
 // MakeObj input cursor for SBE objects.
 class ObjectCursor {
 public:
-    using InputFields = MakeObjCursorInputFields;
-
-    ObjectCursor(const StringListSet& fields, value::Object* objRoot)
-        : _objRoot(objRoot), _idx(0), _endIdx(_objRoot->size()) {
+    ObjectCursor(value::Object* objRoot) : _objRoot(objRoot), _idx(0), _endIdx(_objRoot->size()) {
         if (_idx != _endIdx) {
             // Initialize '_name'.
             _name = StringData(_objRoot->field(_idx));
-            // Look up '_name' in the 'fields' set.
-            _fieldIdx = fields.findPos(_name);
         }
     }
 
     MONGO_COMPILER_ALWAYS_INLINE bool atEnd() const {
         return _idx == _endIdx;
     }
-    MONGO_COMPILER_ALWAYS_INLINE void moveNext(const StringListSet& fields) {
+    MONGO_COMPILER_ALWAYS_INLINE void moveNext() {
         ++_idx;
         if (_idx != _endIdx) {
             // Update '_name'.
             _name = StringData(_objRoot->field(_idx));
-            // Look up '_name' in the 'fields' set.
-            _fieldIdx = fields.findPos(_name);
         }
     }
     MONGO_COMPILER_ALWAYS_INLINE StringData fieldName() const {
-        return StringData(_objRoot->field(_idx));
-    }
-    MONGO_COMPILER_ALWAYS_INLINE size_t fieldIdx() const {
-        return _fieldIdx;
+        return _name;
     }
     MONGO_COMPILER_ALWAYS_INLINE std::pair<value::TypeTags, value::Value> value() const {
         return _objRoot->getAt(_idx);
     }
     MONGO_COMPILER_ALWAYS_INLINE void appendTo(UniqueBSONObjBuilder& bob) const {
         auto [tag, val] = value();
-        bson::appendValueToBsonObj(bob, fieldName(), tag, val);
+        bson::appendValueToBsonObj(bob, _name, tag, val);
     }
 
 private:
@@ -158,7 +136,6 @@ private:
     size_t _idx{0};
     size_t _endIdx{0};
 
-    size_t _fieldIdx{0};
     StringData _name;
 };
 

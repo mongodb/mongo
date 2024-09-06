@@ -33,7 +33,6 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/exec/sbe/makeobj_spec.h"
 #include "mongo/db/exec/sbe/values/util.h"
-#include "mongo/db/exec/sbe/vm/makeobj_input_fields_cursors.h"
 #include "mongo/db/exec/sbe/vm/vm.h"
 
 namespace mongo::sbe::vm {
@@ -107,7 +106,6 @@ void ByteCode::produceBsonObject(const ProduceObjContext& ctx,
                                  CursorT cursor) {
     using TypeTags = value::TypeTags;
     using Value = value::Value;
-    using InputFields = MakeObjCursorInputFields;
 
     const auto& fields = spec->fields;
     const auto* actions = !spec->actions.empty() ? &spec->actions[0] : nullptr;
@@ -132,9 +130,9 @@ void ByteCode::produceBsonObject(const ProduceObjContext& ctx,
 
     size_t fieldsLeft = spec->numFieldsToSearchFor;
 
-    for (; !cursor.atEnd() && fieldsLeft > 0; cursor.moveNext(fields)) {
+    for (; !cursor.atEnd() && fieldsLeft > 0; cursor.moveNext()) {
         // Get the idx of the current field and the corresponding action.
-        const auto fieldIdx = cursor.fieldIdx();
+        const size_t fieldIdx = fields.findPos(cursor.fieldName());
         auto t = fieldIdx != StringListSet::npos ? actions[fieldIdx].type() : defActionType;
 
         if (t == MakeObjSpec::ActionType::kDrop) {
@@ -178,7 +176,7 @@ void ByteCode::produceBsonObject(const ProduceObjContext& ctx,
     // If 'isClosed' is false and 'cursor' has not reached the end of the input object, copy over
     // the remaining fields from the input object to the output object.
     if (!isClosed) {
-        for (; !cursor.atEnd(); cursor.moveNext(fields)) {
+        for (; !cursor.atEnd(); cursor.moveNext()) {
             cursor.appendTo(bob);
         }
     }
@@ -226,56 +224,5 @@ template void ByteCode::produceBsonObject<ObjectCursor>(const ProduceObjContext&
                                                         const MakeObjSpec* spec,
                                                         UniqueBSONObjBuilder& bob,
                                                         ObjectCursor cursor);
-
-template void ByteCode::produceBsonObject<InputFieldsOnlyCursor>(const ProduceObjContext& ctx,
-                                                                 const MakeObjSpec* spec,
-                                                                 UniqueBSONObjBuilder& bob,
-                                                                 InputFieldsOnlyCursor cursor);
-
-template void ByteCode::produceBsonObject<BsonObjWithInputFieldsCursor>(
-    const ProduceObjContext& ctx,
-    const MakeObjSpec* spec,
-    UniqueBSONObjBuilder& bob,
-    BsonObjWithInputFieldsCursor cursor);
-
-template void ByteCode::produceBsonObject<ObjWithInputFieldsCursor>(
-    const ProduceObjContext& ctx,
-    const MakeObjSpec* spec,
-    UniqueBSONObjBuilder& bob,
-    ObjWithInputFieldsCursor cursor);
-
-void ByteCode::produceBsonObjectWithInputFields(const ProduceObjContext& ctx,
-                                                const MakeObjSpec* spec,
-                                                UniqueBSONObjBuilder& bob,
-                                                value::TypeTags objTag,
-                                                value::Value objVal) {
-    using TypeTags = value::TypeTags;
-    using InputFields = MakeObjCursorInputFields;
-
-    const auto& fields = spec->fields;
-    const size_t numInputFields = spec->numInputFields ? *spec->numInputFields : 0;
-
-    auto inputFields = InputFields(*this, ctx.fieldsStackOffset, numInputFields);
-
-    auto bsonObjCursor = objTag == TypeTags::bsonObject
-        ? boost::make_optional(BsonObjCursor(fields, value::bitcastTo<const char*>(objVal)))
-        : boost::none;
-    auto objCursor = objTag == TypeTags::Object
-        ? boost::make_optional(ObjectCursor(fields, value::getObjectView(objVal)))
-        : boost::none;
-
-    // Invoke the produceBsonObject() lambda with the appropriate cursor type.
-    if (objTag == TypeTags::Null) {
-        produceBsonObject(ctx, spec, bob, InputFieldsOnlyCursor(fields, inputFields));
-    } else if (objTag == TypeTags::bsonObject) {
-        produceBsonObject(
-            ctx, spec, bob, BsonObjWithInputFieldsCursor(fields, inputFields, *bsonObjCursor));
-    } else if (objTag == TypeTags::Object) {
-        produceBsonObject(
-            ctx, spec, bob, ObjWithInputFieldsCursor(fields, inputFields, *objCursor));
-    } else {
-        MONGO_UNREACHABLE_TASSERT(8146602);
-    }
-}
 
 }  // namespace mongo::sbe::vm

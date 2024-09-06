@@ -1698,7 +1698,6 @@ mongo_cc_library(
     ],
     hdrs = [
         "//src/mongo/db/exec:trial_run_tracker.h",
-        "//src/mongo/db/exec/sbe:makeobj_input_plan.h",
         "//src/mongo/db/exec/sbe:makeobj_spec.h",
         "//src/mongo/db/exec/sbe:size_estimator.h",
         "//src/mongo/db/exec/sbe:sort_spec.h",

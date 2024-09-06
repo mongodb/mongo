@@ -58,49 +58,27 @@
 #include "mongo/util/overloaded_visitor.h"  // IWYU pragma: keep
 
 namespace mongo::stage_builder {
+ProjectActionType ProjectAction::type() const {
+    return visit(OverloadedVisitor{[](const Keep&) { return ProjectActionType::kKeep; },
+                                   [](const Drop&) { return ProjectActionType::kDrop; },
+                                   [](const SetArg&) { return ProjectActionType::kSetArg; },
+                                   [](const AddArg&) { return ProjectActionType::kAddArg; },
+                                   [](const LambdaArg&) { return ProjectActionType::kLambdaArg; },
+                                   [](const MakeObj&) {
+                                       return ProjectActionType::kMakeObj;
+                                   }},
+                 _data);
+}
+
+ProjectAction ProjectAction::clone() const {
+    return visit([](const auto& data) { return ProjectAction{data.clone()}; }, _data);
+}
+
+ProjectAction::MakeObj ProjectAction::MakeObj::clone() const {
+    return MakeObj{std::make_unique<ProjectActions>(projActions->clone())};
+}
+
 namespace {
-/**
- * Enum desribing mode in which projection for the field must be evaluated.
- */
-enum class EvalMode {
-    // Include field in output object with no modification.
-    kKeep,
-    // Exclude field from output object.
-    kDrop,
-    // Set field to a given value, preserving the field's original position if it already existed.
-    kSetArg,
-    // Drop any existing field with the same name and add a new field at the end of the object with
-    // a given value.
-    kAddArg,
-    // Invoke a lambda passing in the field, then set field to the lambda's return value.
-    kLambdaArg,
-    // Call makeBsonObj() passing in the field, then set field to makeBsonObj()'s return value.
-    kMakeObj,
-};
-
-/**
- * A 'ProjectEval' contains an EvalMode ('mode') and an SbExpr ('expr'). If 'mode' is equal
- * to 'EvalMode::EvaluateField' then 'expr' will be non-null, otherwise 'expr' will be null.
- */
-struct ProjectEval {
-    ProjectEval(EvalMode mode,
-                std::unique_ptr<sbe::MakeObjSpec> spec = {},
-                std::vector<SbExpr> exprs = {},
-                bool returnsNothingOnMissingInput = true)
-        : mode(mode),
-          spec(std::move(spec)),
-          exprs(std::move(exprs)),
-          returnsNothingOnMissingInput(returnsNothingOnMissingInput) {}
-
-    EvalMode mode;
-    std::unique_ptr<sbe::MakeObjSpec> spec;
-    std::vector<SbExpr> exprs;
-    bool returnsNothingOnMissingInput = true;
-};
-
-/**
- * Stores the necessary context needed while visiting each node in the projection tree.
- */
 struct ProjectionVisitorContext {
     /**
      * Represents current projection level. Created each time visitor encounters path projection.
@@ -109,27 +87,14 @@ struct ProjectionVisitorContext {
         NestedLevel() = default;
 
         // Vector containing operations for the current level. There are 6 types of operations
-        // (see EvalMode enum for details).
-        std::vector<ProjectEval> evals;
+        // (see ProjectActionType enum for details).
+        std::vector<ProjectAction> evals;
 
         // Whether or not any subtree of this level has expressions.
         bool hasExpressions = false;
     };
 
-    ProjectionVisitorContext(StageBuilderState& state,
-                             projection_ast::ProjectType projectType,
-                             SbExpr inputExpr,
-                             const sbe::MakeObjInputPlan* inputPlan,
-                             const PlanStageSlots* slots)
-        : state(state),
-          projectType(projectType),
-          inputExpr(std::move(inputExpr)),
-          inputPlan(inputPlan),
-          slots(slots) {}
-
-    size_t numLevels() const {
-        return levels.size();
-    }
+    ProjectionVisitorContext(projection_ast::ProjectType projectType) : projectType(projectType) {}
 
     bool levelsEmpty() const {
         return levels.empty();
@@ -152,35 +117,42 @@ struct ProjectionVisitorContext {
         }
     }
 
-    std::vector<ProjectEval>& evals() {
+    std::vector<ProjectAction>& evals() {
         return topLevel().evals;
     }
 
-    void pushKeepOrDrop(bool keep) {
-        evals().emplace_back(keep ? EvalMode::kKeep : EvalMode::kDrop);
-    }
-    void pushSetArg(SbExpr expr) {
-        std::vector<SbExpr> exprs;
-        exprs.emplace_back(std::move(expr));
-        evals().emplace_back(ProjectEval(EvalMode::kSetArg, {}, std::move(exprs)));
-    }
-    void pushAddArg(SbExpr expr) {
-        std::vector<SbExpr> exprs;
-        exprs.emplace_back(std::move(expr));
-        evals().emplace_back(ProjectEval(EvalMode::kAddArg, {}, std::move(exprs)));
-    }
-    void pushLambdaArg(SbExpr lambdaExpr, bool returnsNothingOnMissingInput = true) {
-        std::vector<SbExpr> exprs;
-        exprs.emplace_back(std::move(lambdaExpr));
-        evals().emplace_back(
-            ProjectEval(EvalMode::kLambdaArg, {}, std::move(exprs), returnsNothingOnMissingInput));
-    }
-    void pushMakeObj(std::unique_ptr<sbe::MakeObjSpec> spec, std::vector<SbExpr> args) {
-        evals().emplace_back(ProjectEval(EvalMode::kMakeObj, std::move(spec), std::move(args)));
+    std::vector<ProjectAction> extractEvals() {
+        auto evals = std::move(topLevel().evals);
+        topLevel().evals = std::vector<ProjectAction>{};
+        return evals;
     }
 
-    void setResult(SbExpr expr) {
-        resultExpr = std::move(expr);
+    void pushKeepOrDrop(bool keep) {
+        if (keep) {
+            evals().emplace_back(ProjectAction::Keep{});
+        } else {
+            evals().emplace_back(ProjectAction::Drop{});
+        }
+    }
+    void pushSetArg(SbExpr expr) {
+        evals().emplace_back(ProjectAction::SetArg{std::move(expr)});
+    }
+    void pushAddArg(SbExpr expr) {
+        evals().emplace_back(ProjectAction::AddArg{std::move(expr)});
+    }
+    void pushLambdaArg(SbExpr bodyExpr,
+                       sbe::FrameId frameId,
+                       bool returnsNothingOnMissingInput = true) {
+        evals().emplace_back(
+            ProjectAction::LambdaArg{std::move(bodyExpr), frameId, returnsNothingOnMissingInput});
+    }
+    void pushMakeObj(ProjectActions pa) {
+        evals().emplace_back(
+            ProjectAction::MakeObj{std::make_unique<ProjectActions>(std::move(pa))});
+    }
+
+    void setResult(ProjectActions pa) {
+        result = std::move(pa);
     }
 
     void pushLevel() {
@@ -191,105 +163,80 @@ struct ProjectionVisitorContext {
         levels.pop();
     }
 
-    SbExpr done() {
+    ProjectActions done() {
         tassert(7580709, "Expected 'levels' to be empty", levels.empty());
+        tassert(9295201, "Expected 'result' to be set", result.has_value());
 
-        return resultExpr ? std::move(resultExpr) : std::move(inputExpr);
+        return std::move(*result);
     }
 
-    StageBuilderState& state;
     projection_ast::ProjectType projectType{};
-    SbExpr inputExpr;
-    const sbe::MakeObjInputPlan* inputPlan;
-    SbExpr resultExpr;
-    const PlanStageSlots* slots;
-
+    boost::optional<ProjectActions> result;
     bool hasExpressions{false};
-    size_t nextArgIdx{0};
-
     std::stack<NestedLevel> levels;
 };
 
-/**
- * This function takes a flag indicating if we're dealing with an inclusion or exclusion projection
- * ('isInclusion') and two parallel vectors: a vector of field names ('fieldNames') and a vector of
- * ProjectEvals ('evals').
- *
- * This function processes its inputs and returns a tuple containing a vector field names, a vector
- * of Actions, and a vector of SbExprs.
- *
- * The output tuple is intended for to be used with MakeObjSpec and the makeBsonObj() VM function.
- */
-auto prepareFieldEvals(const std::vector<std::string>& fieldNames,
-                       std::vector<ProjectEval>& evals,
-                       bool isInclusion,
-                       size_t* nextArgIdx) {
-    // Ensure that there is eval for each of the field names.
-    tassert(7580712,
-            "Expected 'evals' and 'fieldNames' to be the same size",
-            evals.size() == fieldNames.size());
+std::unique_ptr<sbe::MakeObjSpec> buildMakeObjSpecImpl(StageBuilderState& state,
+                                                       ProjectActions& pa,
+                                                       SbExpr::Vector& args) {
+    using FieldAction = sbe::MakeObjSpec::FieldAction;
 
-    std::vector<std::string> fields;
-    std::vector<sbe::MakeObjSpec::FieldAction> actions;
-    std::vector<SbExpr> setAddAndLambdaArgs;
-    std::vector<SbExpr> args;
+    SbExprBuilder b(state);
 
-    for (size_t i = 0; i < fieldNames.size(); i++) {
-        auto& fieldName = fieldNames[i];
-        auto mode = evals[i].mode;
-        auto& exprs = evals[i].exprs;
-        auto& spec = evals[i].spec;
-        bool returnsNothingOnMissingInput = evals[i].returnsNothingOnMissingInput;
+    std::vector<std::unique_ptr<sbe::MakeObjSpec>> childSpecs;
+    childSpecs.resize(pa.actions.size());
 
-        switch (mode) {
-            case EvalMode::kKeep:
-                if (isInclusion) {
-                    fields.emplace_back(fieldName);
-                    actions.emplace_back(sbe::MakeObjSpec::Keep{});
-                }
-                break;
-            case EvalMode::kDrop:
-                if (!isInclusion) {
-                    fields.emplace_back(fieldName);
-                    actions.emplace_back(sbe::MakeObjSpec::Drop{});
-                }
-                break;
-            case EvalMode::kSetArg:
-                fields.emplace_back(fieldName);
-                actions.emplace_back(sbe::MakeObjSpec::SetArg{*nextArgIdx});
-                setAddAndLambdaArgs.emplace_back(std::move(exprs[0]));
-                ++(*nextArgIdx);
-                break;
-            case EvalMode::kAddArg:
-                fields.emplace_back(fieldName);
-                actions.emplace_back(sbe::MakeObjSpec::AddArg{*nextArgIdx});
-                setAddAndLambdaArgs.emplace_back(std::move(exprs[0]));
-                ++(*nextArgIdx);
-                break;
-            case EvalMode::kLambdaArg:
-                fields.emplace_back(fieldName);
-                actions.emplace_back(
-                    sbe::MakeObjSpec::LambdaArg{*nextArgIdx, returnsNothingOnMissingInput});
-                setAddAndLambdaArgs.emplace_back(std::move(exprs[0]));
-                ++(*nextArgIdx);
-                break;
-            case EvalMode::kMakeObj:
-                fields.emplace_back(fieldName);
-                actions.emplace_back(std::move(spec));
-                if (!exprs.empty()) {
-                    std::move(exprs.begin(), exprs.end(), std::back_inserter(args));
-                }
-                break;
+    for (size_t i = 0; i < pa.actions.size(); ++i) {
+        auto& action = pa.actions[i];
+        if (action.isMakeObj()) {
+            childSpecs[i] = buildMakeObjSpecImpl(state, *action.getMakeObj().projActions, args);
         }
     }
 
-    std::move(setAddAndLambdaArgs.begin(), setAddAndLambdaArgs.end(), std::back_inserter(args));
+    std::vector<FieldAction> actions;
 
-    return std::make_tuple(std::move(fields), std::move(actions), std::move(args));
+    for (size_t i = 0; i < pa.actions.size(); i++) {
+        size_t nextArgIdx = args.size();
+
+        actions.emplace_back(visit(
+            OverloadedVisitor{
+                [&](ProjectAction::Keep&) -> FieldAction { return sbe::MakeObjSpec::Keep{}; },
+                [&](ProjectAction::Drop&) -> FieldAction { return sbe::MakeObjSpec::Drop{}; },
+                [&](ProjectAction::SetArg& sa) -> FieldAction {
+                    args.emplace_back(std::move(sa.arg));
+                    return sbe::MakeObjSpec::SetArg{nextArgIdx};
+                },
+                [&](ProjectAction::AddArg& aa) -> FieldAction {
+                    args.emplace_back(std::move(aa.arg));
+                    return sbe::MakeObjSpec::AddArg{nextArgIdx};
+                },
+                [&](ProjectAction::LambdaArg& la) -> FieldAction {
+                    args.emplace_back(b.makeLocalLambda(la.frameId, std::move(la.bodyExpr)));
+                    return sbe::MakeObjSpec::LambdaArg{nextArgIdx, la.returnsNothingOnMissingInput};
+                },
+                [&](ProjectAction::MakeObj& mo) -> FieldAction {
+                    return sbe::MakeObjSpec::MakeObj{std::move(childSpecs[i])};
+                }},
+            pa.actions[i].getData()));
+    }
+
+    return std::make_unique<sbe::MakeObjSpec>(pa.fieldsScope,
+                                              std::move(pa.fields),
+                                              std::move(actions),
+                                              pa.nonObjInputBehavior,
+                                              pa.traversalDepth);
 }
 
-void preVisitCommon(PathTreeNode<boost::optional<ProjectNode>>* node,
-                    ProjectionVisitorContext& ctx) {
+std::pair<std::unique_ptr<sbe::MakeObjSpec>, SbExpr::Vector> buildMakeObjSpec(
+    StageBuilderState& state, ProjectActions pa) {
+    SbExpr::Vector args;
+
+    auto spec = buildMakeObjSpecImpl(state, pa, args);
+
+    return {std::move(spec), std::move(args)};
+}
+
+void preVisitNode(PathTreeNode<boost::optional<ProjectNode>>* node, ProjectionVisitorContext& ctx) {
     if (node->value) {
         if (node->value->isExpr() || node->value->isSbExpr()) {
             ctx.setHasExpressions(true);
@@ -316,131 +263,163 @@ void preVisitCommon(PathTreeNode<boost::optional<ProjectNode>>* node,
  * If this subtree doesn't contain any value args and we're performing an exclusion projection,
  * then anything that's not an object should be preserved as-is.
  */
-sbe::MakeObjSpec::NonObjInputBehavior getNonObjInputBehavior(bool hasExpressions,
-                                                             bool isInclusion) {
-    using NonObjInputBehavior = sbe::MakeObjSpec::NonObjInputBehavior;
+ProjectActions::NonObjInputBehavior getNonObjInputBehavior(bool hasExpressions, bool isInclusion) {
+    using NonObjInputBehavior = ProjectActions::NonObjInputBehavior;
 
     return hasExpressions
         ? NonObjInputBehavior::kNewObj
         : (isInclusion ? NonObjInputBehavior::kReturnNothing : NonObjInputBehavior::kReturnInput);
 }
 
-void postVisitCommon(PathTreeNode<boost::optional<ProjectNode>>* node,
-                     ProjectionVisitorContext& ctx,
-                     boost::optional<int32_t> traversalDepth = boost::none) {
+void postVisitNonLeafNode(PathTreeNode<boost::optional<ProjectNode>>* node,
+                          ProjectionVisitorContext& ctx,
+                          boost::optional<int32_t> travDepth = boost::none) {
     if (node->value) {
         return;
     }
 
-    std::vector<std::string> childNames;
+    std::vector<std::string> fields;
     for (auto&& child : node->children) {
-        childNames.emplace_back(child->name);
+        fields.emplace_back(child->name);
     }
 
     const bool isInclusion = ctx.projectType == projection_ast::ProjectType::kInclusion;
-
-    auto [fields, actions, args] =
-        prepareFieldEvals(childNames, ctx.evals(), isInclusion, &ctx.nextArgIdx);
-
     const bool hasExpressions = ctx.getHasExpressions();
+    std::vector<ProjectAction> actions = ctx.extractEvals();
 
-    // We've finished extracting what we need from the child level, so pop if off the stack.
+    // We've finished extracting what we need from the child level, so pop if off the stack. Also,
+    // if 'hasExpressions' was set to true on the child level, make sure we propagate it to the
+    // parent level.
     ctx.popLevel();
-
-    // If the child's 'hasExpressions' flag was set, then propagate it to the parent level.
     ctx.setHasExpressions(ctx.getHasExpressions() || hasExpressions);
 
-    // If 'isInclusion' is false and 'fields' is empty for the current sub-tree, check if we
-    // can simply return the input.
-    if (!isInclusion && fields.empty()) {
-        if (!ctx.levelsEmpty()) {
-            // If this isn't the last level, then we can just push a Keep and return.
-            ctx.pushKeepOrDrop(true);
-            return;
-        } else {
-            // If this is the last level, check if we have an input ('inputExpr') and check
-            // if 'ctx.inputPlan' contains any assigns or drops.
-            const auto inputPlan = ctx.inputPlan;
-            bool hasAssignsOrDrops = inputPlan &&
-                (inputPlan->fieldsScopeIsClosed() || !inputPlan->getFieldDict().empty());
-            bool hasInputOrResultBase = !ctx.inputExpr.isNull();
-            if (hasInputOrResultBase && !hasAssignsOrDrops) {
-                // If we have an input and 'ctx.inputPlan' does not contain any assigns or
-                // drops, then we can return without calling setResult(). The done() method
-                // will take care of returning the input.
-                return;
+    auto defaultActionType = isInclusion ? ProjectActionType::kDrop : ProjectActionType::kKeep;
+
+    // Remove actions that are the same as the default action from 'fields' / 'actions'.
+    size_t outIdx = 0;
+    for (size_t idx = 0; idx < actions.size(); idx++) {
+        if (actions[idx].type() != defaultActionType) {
+            if (idx != outIdx) {
+                fields[outIdx] = std::move(fields[idx]);
+                actions[outIdx] = std::move(actions[idx]);
             }
+            ++outIdx;
         }
     }
+    if (outIdx != actions.size()) {
+        fields.resize(outIdx);
+        actions.resize(outIdx);
+    }
+
+    bool isTopLevel = ctx.levelsEmpty();
 
     auto fieldsScope = isInclusion ? FieldListScope::kClosed : FieldListScope::kOpen;
     auto noiBehavior = getNonObjInputBehavior(hasExpressions, isInclusion);
+    travDepth = !isTopLevel ? travDepth : boost::optional<int32_t>{0};
 
-    // Generate a MakeObjSpec for the current nested level.
-    auto specPtr = ctx.levelsEmpty() && ctx.inputPlan != nullptr
-        ? std::make_unique<sbe::MakeObjSpec>(fieldsScope,
-                                             std::move(fields),
-                                             std::move(actions),
-                                             noiBehavior,
-                                             traversalDepth,
-                                             *ctx.inputPlan)
-        : std::make_unique<sbe::MakeObjSpec>(
-              fieldsScope, std::move(fields), std::move(actions), noiBehavior, traversalDepth);
+    ProjectActions pa{fieldsScope, std::move(fields), std::move(actions), noiBehavior, travDepth};
 
-    if (!ctx.levelsEmpty()) {
-        ctx.pushMakeObj(std::move(specPtr), std::move(args));
+    if (isTopLevel) {
+        // If this is the top level, return 'pa' as the result.
+        ctx.setResult(std::move(pa));
+    } else if (pa.isNoop()) {
+        // If this isn't the top level and 'pa' is a no-op, then we can push a "Keep" instead
+        // of "MakeObj".
+        ctx.evals().emplace_back(ProjectAction::Keep{});
     } else {
-        // For the last level, create a 'makeBsonObj(..)' expression to generate the output object.
-        SbExprBuilder b(ctx.state);
-
-        auto spec = specPtr.get();
-        auto specExpr =
-            b.makeConstant(sbe::value::TypeTags::makeObjSpec,
-                           sbe::value::bitcastFrom<sbe::MakeObjSpec*>(specPtr.release()));
-
-        auto makeObjFn = "makeBsonObj"_sd;
-        bool hasInputFields = ctx.inputPlan != nullptr;
-
-        auto funcArgs = hasInputFields
-            ? SbExpr::makeSeq(std::move(specExpr),
-                              (ctx.inputExpr ? std::move(ctx.inputExpr) : b.makeNullConstant()),
-                              b.makeBoolConstant(true))
-            : SbExpr::makeSeq(
-                  std::move(specExpr), std::move(ctx.inputExpr), b.makeBoolConstant(false));
-
-        if (hasInputFields) {
-            size_t n = *spec->numInputFields;
-
-            for (size_t i = 0; i < n; ++i) {
-                auto name = StringData(ctx.inputPlan->getFieldDict()[i]);
-                auto slot = ctx.slots->getIfExists(std::make_pair(PlanStageSlots::kField, name));
-
-                tassert(8900500,
-                        "Expected slot to be defined",
-                        spec->actions[i].isDrop() || spec->actions[i].isSetArg() ||
-                            spec->actions[i].isAddArg() || slot.has_value());
-
-                // If this field is a top-level drop, then we pass Nothing for the input field.
-                bool useSlot = slot.has_value() && !spec->actions[i].isDrop();
-
-                funcArgs.emplace_back(useSlot ? SbExpr{*slot} : b.makeNothingConstant());
-            }
-        }
-
-        std::move(args.begin(), args.end(), std::back_inserter(funcArgs));
-
-        ctx.setResult(b.makeFunction(makeObjFn, std::move(funcArgs)));
+        // Push a "MakeObj" action.
+        ctx.evals().emplace_back(
+            ProjectAction::MakeObj{std::make_unique<ProjectActions>(std::move(pa))});
     }
 }
+}  // namespace
 
-SbExpr evaluateProjection(StageBuilderState& state,
-                          projection_ast::ProjectType type,
-                          std::vector<std::string> paths,  // (possibly dotted) paths to project to
-                          std::vector<ProjectNode> nodes,  // SlotIds w/ values for 'paths'
-                          SbExpr inputExpr,                // SlotId of result doc to project into
-                          const sbe::MakeObjInputPlan* inputPlan,
-                          const PlanStageSlots* slots,
-                          boost::optional<int32_t> traversalDepth) {
+SbExpr generateObjectExpr(StageBuilderState& state, ProjectActions pa, SbExpr expr) {
+    SbExprBuilder b(state);
+
+    expr = expr ? std::move(expr) : b.makeNullConstant();
+
+    // If 'pa' is a no-op, then we can return 'expr' as-is.
+    if (pa.isNoop()) {
+        return expr;
+    }
+
+    // Build a MakeObjSpec ('spec') from 'pa'.
+    auto [spec, args] = buildMakeObjSpec(state, std::move(pa));
+
+    // Generate a makeBsonObj() expression using 'spec' and 'args'.
+    auto specExpr = b.makeConstant(sbe::value::TypeTags::makeObjSpec,
+                                   sbe::value::bitcastFrom<sbe::MakeObjSpec*>(spec.release()));
+
+    constexpr auto makeObjFn = "makeBsonObj"_sd;
+    auto funcArgs = SbExpr::makeSeq(std::move(specExpr), std::move(expr));
+
+    std::move(args.begin(), args.end(), std::back_inserter(funcArgs));
+
+    return b.makeFunction(makeObjFn, std::move(funcArgs));
+}
+
+SbExpr generateSingleFieldExpr(StageBuilderState& state,
+                               ProjectActions pa,
+                               SbExpr expr,
+                               const std::string& singleField) {
+    SbExprBuilder b(state);
+
+    constexpr auto makeObjFn = "makeBsonObj"_sd;
+    const auto defActionType = pa.fieldsScope == FieldListScope::kClosed ? ProjectActionType::kDrop
+                                                                         : ProjectActionType::kKeep;
+
+    ProjectAction* eval = !pa.actions.empty() ? &pa.actions[0] : nullptr;
+    ProjectActionType type = eval ? eval->type() : defActionType;
+
+    expr = expr ? std::move(expr) : b.makeNullConstant();
+
+    switch (type) {
+        case ProjectActionType::kKeep:
+            // Return the input.
+            return expr;
+        case ProjectActionType::kDrop:
+            // Return Nothing.
+            return SbExpr{state.getNothingSlot()};
+        case ProjectActionType::kSetArg:
+            // Return the arg.
+            return std::move(eval->getSetArg().arg);
+        case ProjectActionType::kAddArg:
+            // Return the arg.
+            return std::move(eval->getAddArg().arg);
+        case ProjectActionType::kLambdaArg: {
+            // Apply the lambda to the input and return the resulting expression.
+            auto& la = eval->getLambdaArg();
+
+            return b.makeLet(la.frameId, SbExpr::makeSeq(std::move(expr)), std::move(la.bodyExpr));
+        }
+        case ProjectActionType::kMakeObj: {
+            // Return a 'makeBsonObj()' expression that generates the output field.
+            auto& childPa = *eval->getMakeObj().projActions;
+
+            auto [spec, args] = buildMakeObjSpec(state, std::move(childPa));
+            auto specExpr =
+                b.makeConstant(sbe::value::TypeTags::makeObjSpec,
+                               sbe::value::bitcastFrom<sbe::MakeObjSpec*>(spec.release()));
+
+            auto funcArgs = SbExpr::makeSeq(std::move(specExpr), std::move(expr));
+            std::move(args.begin(), args.end(), std::back_inserter(funcArgs));
+
+            return b.makeFunction(makeObjFn, std::move(funcArgs));
+        }
+        default:
+            MONGO_UNREACHABLE_TASSERT(9295200);
+    };
+}
+
+namespace {
+ProjectActions evaluateProjectOps(
+    StageBuilderState& state,
+    projection_ast::ProjectType projType,
+    std::vector<std::string> paths,  // (possibly dotted) paths to project to
+    std::vector<ProjectNode> nodes,  // SlotIds w/ values for 'paths'
+    const PlanStageSlots* slots,
+    boost::optional<int32_t> traversalDepth) {
     using Node = PathTreeNode<boost::optional<ProjectNode>>;
 
     boost::optional<SbSlot> rootSlot =
@@ -449,22 +428,24 @@ SbExpr evaluateProjection(StageBuilderState& state,
     auto tree = buildPathTree<boost::optional<ProjectNode>>(
         paths, std::move(nodes), BuildPathTreeMode::AssertNoConflictingPaths);
 
-    ProjectionVisitorContext context{state, type, std::move(inputExpr), inputPlan, slots};
+    ProjectionVisitorContext context{projType};
 
     auto preVisit = [&](Node* node) {
-        preVisitCommon(node, context);
+        preVisitNode(node, context);
     };
 
     auto postVisit = [&](Node* node) {
-        if (node->value) {
-            const bool isInclusion = type == projection_ast::ProjectType::kInclusion;
+        if (!node->value) {
+            postVisitNonLeafNode(node, context, traversalDepth);
+        } else {
+            const bool isInclusion = projType == projection_ast::ProjectType::kInclusion;
 
             if (node->value->isBool()) {
                 context.pushKeepOrDrop(node->value->getBool());
             } else if (node->value->isExpr() || node->value->isSbExpr()) {
                 // Get the expression.
                 auto e = node->value->isExpr()
-                    ? generateExpression(state, node->value->getExpr(), rootSlot, *context.slots)
+                    ? generateExpression(state, node->value->getExpr(), rootSlot, *slots)
                     : node->value->extractSbExpr();
                 // For expressions in inclusion projections, we use AddArg. For expressions in
                 // $addFields operations, we use SetArg. We assume that exclusion projections do
@@ -483,26 +464,17 @@ SbExpr evaluateProjection(StageBuilderState& state,
                 MONGO_UNREACHABLE_TASSERT(7103504);
             }
         }
-
-        postVisitCommon(node, context, traversalDepth);
     };
 
     const bool invokeCallbacksForRootNode = true;
     visitPathTreeNodes(tree.get(), preVisit, postVisit, invokeCallbacksForRootNode);
 
-    SbExpr result = context.done();
-
-    tassert(8146603, "Expected 'result' to not be null", !result.isNull());
-
-    return result;
+    return context.done();
 }
 
-// When a projection contains $slice ops, this function is called after evaluateProjection()
-// to deal with evaluating the $slice ops.
-SbExpr evaluateSliceOps(StageBuilderState& state,
-                        std::vector<std::string> paths,
-                        std::vector<ProjectNode> nodes,
-                        SbExpr inputExpr) {
+ProjectActions evaluateSliceOps(StageBuilderState& state,
+                                std::vector<std::string> paths,
+                                std::vector<ProjectNode> nodes) {
     using Node = PathTreeNode<boost::optional<ProjectNode>>;
 
     auto tree = buildPathTree<boost::optional<ProjectNode>>(
@@ -510,43 +482,39 @@ SbExpr evaluateSliceOps(StageBuilderState& state,
 
     // We want to keep the entire input document as-is except for applying the $slice ops, so
     // we use the 'kExclusion' projection type.
-    ProjectionVisitorContext context{state,
-                                     projection_ast::ProjectType::kExclusion,
-                                     std::move(inputExpr),
-                                     nullptr /* inputPlan */,
-                                     nullptr /* slots */};
+    ProjectionVisitorContext context{projection_ast::ProjectType::kExclusion};
 
     auto preVisit = [&](Node* node) {
-        preVisitCommon(node, context);
+        preVisitNode(node, context);
     };
 
     auto postVisit = [&](Node* node) {
-        if (node->value) {
+        if (!node->value) {
+            // When handling $slice, we only go 1 level in depth (unlike other projection operators
+            // which have unlimited depth for the traversal).
+            const int32_t travDepth = 1;
+            postVisitNonLeafNode(node, context, travDepth);
+        } else {
             SbExprBuilder b(state);
 
             // 'nodes' should only contain $slice operators.
             tassert(7103505, "Expected node type to be 'kSlice'", node->value->isSlice());
 
             auto [limit, skip] = node->value->getSlice();
-            auto lambdaFrameId = state.frameId();
-            auto lambdaParam = b.makeVariable(lambdaFrameId, 0);
+            auto frameId = state.frameId();
+            auto var = b.makeVariable(frameId, 0);
 
-            auto args = SbExpr::makeSeq(lambdaParam.clone(), b.makeInt32Constant(limit));
+            auto args = SbExpr::makeSeq(var.clone(), b.makeInt32Constant(limit));
             if (skip) {
                 args.emplace_back(b.makeInt32Constant(*skip));
             }
 
-            auto extractSubArrayExpr = b.makeIf(b.makeFunction("isArray"_sd, lambdaParam.clone()),
+            auto extractSubArrayExpr = b.makeIf(b.makeFunction("isArray"_sd, var.clone()),
                                                 b.makeFunction("extractSubArray", std::move(args)),
-                                                lambdaParam.clone());
+                                                var.clone());
 
-            context.pushLambdaArg(b.makeLocalLambda(lambdaFrameId, std::move(extractSubArrayExpr)));
+            context.pushLambdaArg(std::move(extractSubArrayExpr), frameId);
         }
-
-        // When handling $slice, we only go 1 level in depth (unlike other projection operators
-        // which have unlimited depth for the traversal).
-        const int32_t traversalDepth = 1;
-        postVisitCommon(node, context, traversalDepth);
     };
 
     const bool invokeCallbacksForRootNode = true;
@@ -556,6 +524,64 @@ SbExpr evaluateSliceOps(StageBuilderState& state,
 }
 }  // namespace
 
+std::pair<ProjectActions, boost::optional<ProjectActions>> evaluateProjection(
+    StageBuilderState& state,
+    projection_ast::ProjectType projType,
+    std::vector<std::string> paths,
+    std::vector<ProjectNode> nodes,
+    const PlanStageSlots* slots,
+    boost::optional<int32_t> traversalDepth) {
+    const bool isInclusion = projType == projection_ast::ProjectType::kInclusion;
+
+    std::vector<std::string> projPaths;
+    std::vector<ProjectNode> projNodes;
+    std::vector<std::string> slicePaths;
+    std::vector<ProjectNode> sliceNodes;
+
+    // Check for 'Slice' operators. If 'nodes' doesn't have any $slice operators, we just
+    // return the expression generated by evaluateProjection(). If 'tree' contains one or
+    // more $slice operators, then after evaluateProjection() returns we need to apply a
+    // "post-projection transform" to evaluate the $slice ops. (This mirrors the classic
+    // engine's implementation of $slice, see the 'ExpressionInternalFindSlice' class for
+    // details.)
+    if (std::any_of(nodes.begin(), nodes.end(), [&](auto&& n) { return n.isSlice(); })) {
+        for (size_t i = 0; i < nodes.size(); ++i) {
+            auto& path = paths[i];
+            auto& node = nodes[i];
+            if (!node.isSlice()) {
+                projPaths.emplace_back(std::move(path));
+                projNodes.emplace_back(std::move(node));
+            } else {
+                // If 'node' is a Slice, move it to the 'sliceNodes' vector. If this is an
+                // inclusion projection, then we also need to add a 'Keep' node to 'projNodes'
+                // so that the first pass doesn't drop 'path'.
+                if (isInclusion) {
+                    projPaths.emplace_back(path);
+                    projNodes.emplace_back(ProjectNode::Keep{});
+                }
+                slicePaths.emplace_back(std::move(path));
+                sliceNodes.emplace_back(std::move(node));
+            }
+        }
+    } else {
+        projPaths = std::move(paths);
+        projNodes = std::move(nodes);
+    }
+
+    // Call evaluateProjectOps() to evaluate the standard project ops.
+    ProjectActions pa = evaluateProjectOps(
+        state, projType, std::move(projPaths), std::move(projNodes), slots, traversalDepth);
+
+    // If 'sliceNodes' is not empty, then we need to call evaluateSliceOps() as well to
+    // evaluate the $slice ops.
+    boost::optional<ProjectActions> slicePa;
+    if (!sliceNodes.empty()) {
+        slicePa.emplace(evaluateSliceOps(state, std::move(slicePaths), std::move(sliceNodes)));
+    }
+
+    return {std::move(pa), std::move(slicePa)};
+}
+
 SbExpr generateProjection(StageBuilderState& state,
                           const projection_ast::Projection* projection,
                           SbExpr inputExpr,
@@ -563,7 +589,7 @@ SbExpr generateProjection(StageBuilderState& state,
                           boost::optional<int32_t> traversalDepth) {
     const auto projType = projection->type();
 
-    // Do a DFS on the projection AST and populate 'paths' and 'nodes'.
+    // Do a DFS on the projection AST to populate 'paths' and 'nodes'.
     auto [paths, nodes] = getProjectNodes(*projection);
 
     return generateProjection(state,
@@ -582,153 +608,120 @@ SbExpr generateProjection(StageBuilderState& state,
                           SbExpr inputExpr,
                           const PlanStageSlots* slots,
                           boost::optional<int32_t> traversalDepth) {
-    const bool isInclusion = projType == projection_ast::ProjectType::kInclusion;
+    auto [pa, slicePa] = evaluateProjection(
+        state, projType, std::move(paths), std::move(nodes), slots, traversalDepth);
 
-    // Check for 'Slice' operators. If 'nodes' doesn't have any $slice operators, we just
-    // return the expression generated by evaluateProjection(). If 'tree' contains one or
-    // more $slice operators, then after evaluateProjection() returns we need to apply a
-    // "post-projection transform" to evaluate the $slice ops. (This mirrors the classic
-    // engine's implementation of $slice, see the 'ExpressionInternalFindSlice' class for
-    // details.)
-    std::vector<std::string> slicePaths;
-    std::vector<ProjectNode> sliceNodes;
+    // Apply 'pa', and then apply 'slicePa' if it's set.
+    auto expr = generateObjectExpr(state, std::move(pa), std::move(inputExpr));
 
-    if (std::any_of(nodes.begin(), nodes.end(), [&](auto&& n) { return n.isSlice(); })) {
-        std::vector<std::string> newPaths;
-        std::vector<ProjectNode> newNodes;
-
-        for (size_t i = 0; i < nodes.size(); ++i) {
-            auto& path = paths[i];
-            auto& node = nodes[i];
-            if (!node.isSlice()) {
-                // If 'node' is not a Slice, move it to the 'newNodes' vector.
-                newPaths.emplace_back(std::move(path));
-                newNodes.emplace_back(std::move(node));
-            } else {
-                // If 'node' is a Slice, move it to the 'sliceNodes' vector. If this is an
-                // inclusion projection, then we also need to add a 'Keep' node to 'newNodes' so
-                // that the first pass doesn't drop 'path'.
-                if (isInclusion) {
-                    newPaths.emplace_back(path);
-                    newNodes.emplace_back(ProjectNode::Keep{});
-                }
-                slicePaths.emplace_back(std::move(path));
-                sliceNodes.emplace_back(std::move(node));
-            }
-        }
-
-        paths = std::move(newPaths);
-        nodes = std::move(newNodes);
-    }
-
-    auto expr = std::move(inputExpr);
-
-    // If this is an inclusion projection or if 'nodes' is not empty, call evaluateProjection().
-    if (isInclusion || !nodes.empty()) {
-        expr = evaluateProjection(state,
-                                  projType,
-                                  std::move(paths),
-                                  std::move(nodes),
-                                  std::move(expr),
-                                  nullptr,
-                                  slots,
-                                  traversalDepth);
-    }
-
-    // If 'sliceNodes' is not empty, then we need to call evaluateSliceOps() to evaluate the
-    // $slice ops.
-    if (!sliceNodes.empty()) {
-        expr =
-            evaluateSliceOps(state, std::move(slicePaths), std::move(sliceNodes), std::move(expr));
+    if (slicePa) {
+        expr = generateObjectExpr(state, std::move(*slicePa), std::move(expr));
     }
 
     return expr;
 }
 
-SbExpr generateProjectionWithInputFields(StageBuilderState& state,
-                                         const projection_ast::Projection* projection,
-                                         SbExpr inputExpr,
-                                         const sbe::MakeObjInputPlan& inputPlan,
-                                         const PlanStageSlots* slots,
-                                         boost::optional<int32_t> traversalDepth) {
+SbExpr generateSingleFieldProjection(StageBuilderState& state,
+                                     const projection_ast::Projection* projection,
+                                     SbExpr inputExpr,
+                                     const PlanStageSlots* slots,
+                                     const std::string& singleField,
+                                     boost::optional<int32_t> traversalDepth) {
     const auto projType = projection->type();
 
-    // Do a DFS on the projection AST and populate 'paths' and 'nodes'.
+    // Do a DFS on the projection AST to populate 'paths' and 'nodes'.
     auto [paths, nodes] = getProjectNodes(*projection);
 
-    return generateProjectionWithInputFields(state,
-                                             projType,
-                                             std::move(paths),
-                                             std::move(nodes),
-                                             std::move(inputExpr),
-                                             inputPlan,
-                                             slots,
-                                             traversalDepth);
+    return generateSingleFieldProjection(
+        state, projType, paths, nodes, std::move(inputExpr), slots, singleField, traversalDepth);
 }
 
-SbExpr generateProjectionWithInputFields(StageBuilderState& state,
-                                         projection_ast::ProjectType projType,
-                                         std::vector<std::string> paths,
-                                         std::vector<ProjectNode> nodes,
-                                         SbExpr inputExpr,
-                                         const sbe::MakeObjInputPlan& inputPlan,
-                                         const PlanStageSlots* slots,
-                                         boost::optional<int32_t> traversalDepth) {
-    const bool isInclusion = projType == projection_ast::ProjectType::kInclusion;
-
-    // Check for 'Slice' operators. If 'nodes' doesn't have any $slice operators, we just
-    // return the expression generated by evaluateProjection(). If 'tree' contains one or
-    // more $slice operators, then after evaluateProjection() returns we need to apply a
-    // "post-projection transform" to evaluate the $slice ops. (This mirrors the classic
-    // engine's implementation of $slice, see the 'ExpressionInternalFindSlice' class for
-    // details.)
-    std::vector<std::string> slicePaths;
-    std::vector<ProjectNode> sliceNodes;
-
-    if (std::any_of(nodes.begin(), nodes.end(), [&](auto&& n) { return n.isSlice(); })) {
-        std::vector<std::string> newPaths;
-        std::vector<ProjectNode> newNodes;
-
-        for (size_t i = 0; i < nodes.size(); ++i) {
-            auto& path = paths[i];
-            auto& node = nodes[i];
-            if (!node.isSlice()) {
-                // If 'node' is not a Slice, move it to the 'newNodes' vector.
-                newPaths.emplace_back(std::move(path));
-                newNodes.emplace_back(std::move(node));
-            } else {
-                // If 'node' is a Slice, move it to the 'sliceNodes' vector. If this is an
-                // inclusion projection, then we also need to add a 'Keep' node to 'newNodes' so
-                // that the first pass doesn't drop 'path'.
-                if (isInclusion) {
-                    newPaths.emplace_back(path);
-                    newNodes.emplace_back(ProjectNode::Keep{});
-                }
-                slicePaths.emplace_back(std::move(path));
-                sliceNodes.emplace_back(std::move(node));
-            }
+SbExpr generateSingleFieldProjection(StageBuilderState& state,
+                                     projection_ast::ProjectType projType,
+                                     const std::vector<std::string>& pathsIn,
+                                     const std::vector<ProjectNode>& nodesIn,
+                                     SbExpr inputExpr,
+                                     const PlanStageSlots* slots,
+                                     const std::string& singleField,
+                                     boost::optional<int32_t> traversalDepth) {
+    std::vector<std::string> paths;
+    std::vector<ProjectNode> nodes;
+    for (size_t i = 0; i < pathsIn.size(); ++i) {
+        if (getTopLevelField(pathsIn[i]) == singleField) {
+            paths.emplace_back(pathsIn[i]);
+            nodes.emplace_back(nodesIn[i].clone());
         }
-
-        paths = std::move(newPaths);
-        nodes = std::move(newNodes);
     }
 
-    auto expr = evaluateProjection(state,
-                                   projType,
-                                   std::move(paths),
-                                   std::move(nodes),
-                                   std::move(inputExpr),
-                                   &inputPlan,
-                                   slots,
-                                   traversalDepth);
+    auto [pa, slicePa] = evaluateProjection(
+        state, projType, std::move(paths), std::move(nodes), slots, traversalDepth);
 
-    // If 'sliceNodes' is not empty, then we need to call evaluateSliceOps() to evaluate the
-    // $slice ops.
-    if (!sliceNodes.empty()) {
-        expr =
-            evaluateSliceOps(state, std::move(slicePaths), std::move(sliceNodes), std::move(expr));
+    // Apply 'pa', and then apply 'slicePa' if it's set.
+    auto expr = generateSingleFieldExpr(state, std::move(pa), std::move(inputExpr), singleField);
+
+    if (slicePa) {
+        expr = generateSingleFieldExpr(state, std::move(*slicePa), std::move(expr), singleField);
     }
 
     return expr;
+}
+
+ProjectActions evaluateFieldEffects(StageBuilderState& state,
+                                    const FieldEffects& effects,
+                                    const PlanStageSlots& slots) {
+    const FieldEffect defaultEffect = effects.getDefaultEffect();
+
+    // Populate 'fields' and 'actions' based on the effects in 'effects'.
+    std::vector<std::string> fields;
+    std::vector<ProjectAction> actions;
+
+    for (const auto& field : effects.getFieldList()) {
+        auto effect = effects.get(field);
+
+        // Add a ProjectAction for this field if its effect is not equal to the default effect.
+        if (effect != defaultEffect) {
+            fields.emplace_back(field);
+
+            switch (effect) {
+                case FieldEffect::kKeep:
+                    actions.emplace_back(ProjectAction::Keep{});
+                    break;
+                case FieldEffect::kDrop:
+                    actions.emplace_back(ProjectAction::Drop{});
+                    break;
+                case FieldEffect::kAdd: {
+                    auto expr = SbExpr{slots.get(std::pair(PlanStageSlots::kField, field)).slotId};
+                    actions.emplace_back(ProjectAction::AddArg{std::move(expr)});
+                    break;
+                }
+                case FieldEffect::kModify:
+                case FieldEffect::kSet:
+                case FieldEffect::kGeneric: {
+                    auto expr = SbExpr{slots.get(std::pair(PlanStageSlots::kField, field)).slotId};
+                    actions.emplace_back(ProjectAction::SetArg{std::move(expr)});
+                    break;
+                }
+                default:
+                    MONGO_UNREACHABLE_TASSERT(8323514);
+            }
+        }
+    }
+
+    auto fieldsScope =
+        defaultEffect == FieldEffect::kDrop ? FieldListScope::kClosed : FieldListScope::kOpen;
+    auto noiBehavior = ProjectActions::NonObjInputBehavior::kNewObj;
+    auto travDepth = boost::optional<int32_t>{0};
+
+    // Build a ProjectActions struct ('pa') from 'fields' and 'actions' and return it.
+    return ProjectActions{
+        fieldsScope, std::move(fields), std::move(actions), noiBehavior, travDepth};
+}
+
+SbExpr generateProjectionFromEffects(StageBuilderState& state,
+                                     const FieldEffects& effects,
+                                     SbExpr inputExpr,
+                                     const PlanStageSlots& slots) {
+    ProjectActions pa = evaluateFieldEffects(state, effects, slots);
+    return generateObjectExpr(state, std::move(pa), std::move(inputExpr));
 }
 }  // namespace mongo::stage_builder

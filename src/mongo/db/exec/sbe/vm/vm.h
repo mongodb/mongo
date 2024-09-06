@@ -909,7 +909,6 @@ int32_t updateAndCheckMemUsage(value::Array* state,
 class CodeFragment;
 
 struct ProduceObjContext {
-    int fieldsStackOffset = 0;
     int argsStackOffset = 0;
     const CodeFragment* code;
 };
@@ -1710,28 +1709,20 @@ private:
                                                         value::Value rootVal) {
         using TypeTags = value::TypeTags;
 
-        const auto& fields = spec->fields;
-
         // Invoke produceBsonObject<CursorT>() with the appropriate cursor type. For
         // SBE objects, we use ObjectCursor. For all other types, we use BsonObjCursor.
         if (rootTag == TypeTags::Object) {
             auto obj = value::getObjectView(rootVal);
 
-            produceBsonObject(ctx, spec, bob, ObjectCursor(fields, obj));
+            produceBsonObject(ctx, spec, bob, ObjectCursor(obj));
         } else {
             const char* obj = rootTag == TypeTags::bsonObject
                 ? value::bitcastTo<const char*>(rootVal)
                 : BSONObj::kEmptyObject.objdata();
 
-            produceBsonObject(ctx, spec, bob, BsonObjCursor(fields, obj));
+            produceBsonObject(ctx, spec, bob, BsonObjCursor(obj));
         }
     }
-
-    void produceBsonObjectWithInputFields(const ProduceObjContext& ctx,
-                                          const MakeObjSpec* spec,
-                                          UniqueBSONObjBuilder& bob,
-                                          value::TypeTags objTag,
-                                          value::Value objVal);
 
     template <typename CursorT>
     void produceBsonObject(const ProduceObjContext& ctx,
@@ -2570,32 +2561,9 @@ protected:
     boost::optional<value::ValueGuard> _valueGuard;
 };
 
-class MakeObjCursorInputFields {
-public:
-    MakeObjCursorInputFields(ByteCode& bytecode, int startOffset, size_t numFields)
-        : _getFieldFn(bytecode, startOffset), _numFields(numFields) {}
-
-    size_t size() const {
-        return _numFields;
-    }
-
-    FastTuple<bool, value::TypeTags, value::Value> operator[](size_t idx) const {
-        return _getFieldFn(idx);
-    }
-
-private:
-    ByteCode::GetFromStackFunctor _getFieldFn;
-    size_t _numFields;
-};
-
 std::pair<value::TypeTags, value::Value> initializeDoubleDoubleSumState();
 
-class InputFieldsOnlyCursor;
-class BsonObjWithInputFieldsCursor;
-class ObjWithInputFieldsCursor;
-
-// There are five instantiations of the templated produceBsonObject() method, one for each
-// type of MakeObj input cursor.
+// Instantiations of the templated produceBsonObject() method.
 extern template void ByteCode::produceBsonObject<BsonObjCursor>(const ProduceObjContext& ctx,
                                                                 const MakeObjSpec* spec,
                                                                 UniqueBSONObjBuilder& bob,
@@ -2605,24 +2573,6 @@ extern template void ByteCode::produceBsonObject<ObjectCursor>(const ProduceObjC
                                                                const MakeObjSpec* spec,
                                                                UniqueBSONObjBuilder& bob,
                                                                ObjectCursor cursor);
-
-extern template void ByteCode::produceBsonObject<InputFieldsOnlyCursor>(
-    const ProduceObjContext& ctx,
-    const MakeObjSpec* spec,
-    UniqueBSONObjBuilder& bob,
-    InputFieldsOnlyCursor cursor);
-
-extern template void ByteCode::produceBsonObject<BsonObjWithInputFieldsCursor>(
-    const ProduceObjContext& ctx,
-    const MakeObjSpec* spec,
-    UniqueBSONObjBuilder& bob,
-    BsonObjWithInputFieldsCursor cursor);
-
-extern template void ByteCode::produceBsonObject<ObjWithInputFieldsCursor>(
-    const ProduceObjContext& ctx,
-    const MakeObjSpec* spec,
-    UniqueBSONObjBuilder& bob,
-    ObjWithInputFieldsCursor cursor);
 }  // namespace vm
 }  // namespace sbe
 }  // namespace mongo

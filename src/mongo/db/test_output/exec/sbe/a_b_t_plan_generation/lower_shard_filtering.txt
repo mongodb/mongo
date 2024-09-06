@@ -10,7 +10,7 @@ Filter []
 PhysicalScan [{'<root>': scan0, 'a': proj0, 'b': proj1, 'c': proj2}, collName]
 
 -- OUTPUT:
-[0] filter {shardFilter(s1, makeBsonObj(MakeObjSpec([a = Add(0), b = Add(1), c = Add(2)], Open), Nothing, false, (s3 ?: null), (s4 ?: null), (s5 ?: null)))} 
+[0] filter {shardFilter(s1, makeBsonObj(MakeObjSpec([a = Add(0), b = Add(1), c = Add(2)], Open), Nothing, (s3 ?: null), (s4 ?: null), (s5 ?: null)))} 
 [1] scan s2 none none none none none none none lowPriority [s3 = a, s4 = b, s5 = c] @"<collUUID>" true false 
 
 ==== VARIATION: Shard Filtering with Dotted Field Path ====
@@ -27,7 +27,7 @@ Evaluation [{proj0}]
 PhysicalScan [{'<root>': scan0}, collName]
 
 -- OUTPUT:
-[0] filter {shardFilter(s1, makeBsonObj(MakeObjSpec([a.b = Add(0)], Open), Nothing, false, (s3 ?: null)))} 
+[0] filter {shardFilter(s1, makeBsonObj(MakeObjSpec([a.b = Add(0)], Open), Nothing, (s3 ?: null)))} 
 [2] project [s3 = getField(getField(s2, "a"), "b")] 
 [1] scan s2 none none none none none none none lowPriority [] @"<collUUID>" true false 
 
@@ -42,5 +42,5 @@ Filter []
 PhysicalScan [{'<root>': scan0, 'b': proj_b}, collName]
 
 -- OUTPUT:
-[0] filter {shardFilter(s1, makeBsonObj(MakeObjSpec([a = Add(0), b = Add(1)], Open), Nothing, false, (getField(s2, "a") ?: null), (s3 ?: null)))} 
+[0] filter {shardFilter(s1, makeBsonObj(MakeObjSpec([a = Add(0), b = Add(1)], Open), Nothing, (getField(s2, "a") ?: null), (s3 ?: null)))} 
 [1] scan s2 none none none none none none none lowPriority [s3 = b] @"<collUUID>" true false 

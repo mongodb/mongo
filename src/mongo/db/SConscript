@@ -1045,6 +1045,7 @@ execEnv.Library(
         "query/sbe_trial_runtime_executor.cpp",
         "query/shard_filterer_factory_impl.cpp",
         "query/stage_builder/sbe/abt_holder_impl.cpp",
+        "query/stage_builder/sbe/analysis.cpp",
         "query/stage_builder/sbe/builder.cpp",
         "query/stage_builder/sbe/builder_data.cpp",
         "query/stage_builder/sbe/builder_state.cpp",

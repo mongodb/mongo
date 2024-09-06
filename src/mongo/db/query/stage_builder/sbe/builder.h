@@ -65,6 +65,7 @@
 #include "mongo/db/query/plan_yield_policy_sbe.h"
 #include "mongo/db/query/query_solution.h"
 #include "mongo/db/query/shard_filterer_factory_interface.h"
+#include "mongo/db/query/stage_builder/sbe/analysis.h"
 #include "mongo/db/query/stage_builder/sbe/builder_data.h"
 #include "mongo/db/query/stage_builder/sbe/gen_helpers.h"
 #include "mongo/db/query/stage_builder/sbe/type_signature.h"
@@ -207,7 +208,7 @@ public:
 
         // If this PlanStageSlots has a ResultInfo then 'resultInfoChanges' will hold the recorded
         // changes for the ResultInfo, otherwise it will be set to boost::none.
-        boost::optional<ProjectionEffects> resultInfoChanges;
+        boost::optional<FieldEffects> resultInfoChanges;
     };
 
     static std::unique_ptr<Data> cloneData(const std::unique_ptr<Data>& other) {
@@ -217,22 +218,22 @@ public:
         return {};
     }
 
-    /**
-     * When the build() depth-first traversal backtracks through a merge point in the QSN tree,
-     * this method handles doing the "merge" process.
-     */
-    static PlanStageSlots makeMergedPlanStageSlots(StageBuilderState& state,
-                                                   PlanNodeId nodeId,
-                                                   const PlanStageReqs& reqs,
-                                                   std::vector<PlanStageTree>& stagesAndSlots);
+    // When the build() depth-first traversal backtracks through a merge point in the QSN tree,
+    // this method handles doing the "merge" process.
+    static PlanStageSlots makeMergedPlanStageSlots(
+        StageBuilderState& state,
+        PlanNodeId nodeId,
+        const PlanStageReqs& reqs,
+        std::vector<PlanStageTree>& trees,
+        const std::vector<const FieldSet*>& allowedFieldSets);
 
-    /**
-     * This is a helper function used by makeMergedPlanStageSlots() is called that handles the
-     * case where one or more of the PlanStageOutputs objects have a ResultInfo.
-     */
+    // This is a helper function used by makeMergedPlanStageSlots() is called that handles the
+    // case where one or more of the PlanStageOutputs objects have a ResultInfo.
     static void mergeResultInfos(StageBuilderState& state,
                                  PlanNodeId nodeId,
-                                 std::vector<PlanStageTree>& trees);
+                                 const PlanStageReqs& reqs,
+                                 std::vector<PlanStageTree>& trees,
+                                 const std::vector<const FieldSet*>& allowedFieldSets);
 
     PlanStageSlots() : _data(std::make_unique<Data>()) {}
 
@@ -458,21 +459,17 @@ public:
 
     // Returns the list of changed fields stored in 'resultInfoChanges'. This method will tassert
     // if 'hasResultInfo()' is false.
-    const ProjectionEffects& getResultInfoChanges() const {
+    const FieldEffects& getResultInfoChanges() const {
         tassert(8428002, "Expected ResultInfo to be set", hasResultInfo());
 
         return *_data->resultInfoChanges;
     }
 
-    // Add the fields specified in 'drops' and 'modifys' to the list of changed fields stored
-    // in 'resultInfoChanges'. This method will tassert if 'hasResultInfo()' is false.
-    void addResultInfoChanges(const std::vector<std::string>& drops,
-                              const std::vector<std::string>& modifys) {
-        tassert(8428003, "Expected ResultInfo to be set", hasResultInfo());
-
-        auto& changes = *_data->resultInfoChanges;
-        changes = ProjectionEffects(FieldSet::makeOpenSet(drops), modifys, {}).compose(changes);
-    }
+    // Adds the non-Keep effects from 'newEffects' to 'resultInfoChanges'. This method will tassert
+    // if 'hasResultInfo()' is false.
+    void addEffectsToResultInfo(StageBuilderState& state,
+                                const PlanStageReqs& reqs,
+                                const FieldEffects& newEffectsIn);
 
     // Returns a sorted list of all the names in this PlanStageSlots has that are required by
     // 'reqs', plus any additional names needed by 'reqs' that this PlanStageSlots does not satisfy.
@@ -527,7 +524,8 @@ public:
         // The set of the type-and-names of the slots required as inputs by this plan stage.
         PlanStageSlots::SlotNameSet slotNameSet;
 
-        boost::optional<FieldSet> allowedSet;
+        boost::optional<FieldSet> trackedFieldSet;
+        boost::optional<FieldEffects> resultInfoEffects;
 
         // When we're in the middle of building a special union sub-tree implementing a tailable
         // cursor collection scan, this flag will be set to true. Otherwise this flag will be false.
@@ -711,14 +709,15 @@ public:
     // object or a ResultInfo. To distinguish between these two cases, use the hasResultObj() or
     // hasResultInfo() methods.
     bool hasResult() const {
-        return has(PlanStageSlots::kResult) || _data->allowedSet.has_value();
+        return has(PlanStageSlots::kResult) || _data->resultInfoEffects.has_value();
     }
 
     // This method clears any result object or ResultInfo requirements that this PlanStageReqs may
     // have had, and it also clears any ResultInfo-related state that may have been set. After this
     // method returns, hasResult() and hasResultObject() and hasResultInfo() will all be false.
     PlanStageReqs& clearResult() {
-        _data->allowedSet.reset();
+        _data->trackedFieldSet.reset();
+        _data->resultInfoEffects.reset();
         clear(PlanStageSlots::kResult);
         return *this;
     }
@@ -726,39 +725,49 @@ public:
     // Returns true if this PlanStageReqs requires a materialized result object, otherwise returns
     // false.
     bool hasResultObj() const {
-        return has(PlanStageSlots::kResult) && !_data->allowedSet.has_value();
+        return has(PlanStageSlots::kResult) && !_data->resultInfoEffects.has_value();
     }
 
     // Adds a requirement for a materialized result object, and clears any prior requirement for
     // ResultInfo this PlanStageReqs may have had. This method also clears any ResultInfo-related
     // state that may have been set.
     PlanStageReqs& setResultObj() {
-        _data->allowedSet.reset();
+        _data->trackedFieldSet.reset();
+        _data->resultInfoEffects.reset();
         _data->slotNameSet.emplace(PlanStageSlots::kResult);
         return *this;
     }
 
     // Returns true if this PlanStageReqs requires a ResultInfo, otherwise returns false.
     bool hasResultInfo() const {
-        return _data->allowedSet.has_value();
+        return _data->resultInfoEffects.has_value();
     }
 
     // Returns a FieldSet containing all strings N where result field N is needed to satisfy this
     // PlanStageReqs's ResultInfo requirement. This method will tassert if hasResultInfo() is false.
-    const FieldSet& getResultInfoAllowedSet() const {
+    const FieldSet& getResultInfoTrackedFieldSet() const {
         tassert(8428004, "Expected ResultInfo to be set", hasResultInfo());
-        return *_data->allowedSet;
+        return *_data->trackedFieldSet;
     }
 
-    // This method will add a ResultInfo requirement with the specified "allowed" set. This method
-    // assumes 'hasResultObj()' is false and will tassert if 'hasResultObj()' is true.
+    const FieldEffects& getResultInfoEffects() const {
+        tassert(8323510, "Expected ResultInfo to be set", _data->resultInfoEffects.has_value());
+        return *_data->resultInfoEffects;
+    }
+
+    // This method will add a ResultInfo requirement with the specified "tracked fields" set. This
+    // method assumes 'hasResultObj()' is false and will tassert if 'hasResultObj()' is true.
     //
     // Note: If a PlanStageReqs requires a materialized result object and you want to change it to
     // have a ResultInfo requirement instead, call clearResult() first before calling this method.
-    PlanStageReqs& setResultInfo(const FieldSet& allowedSet) {
+    PlanStageReqs& setResultInfo(const FieldSet& trackedFieldSet, const FieldEffects& effects) {
         tassert(8428005, "Expected result object requirement to not be set", !hasResultObj());
 
-        _data->allowedSet.emplace(allowedSet);
+        _data->trackedFieldSet.emplace(trackedFieldSet);
+
+        _data->resultInfoEffects.emplace(effects);
+        _data->resultInfoEffects->narrow(*_data->trackedFieldSet);
+
         _data->slotNameSet.emplace(PlanStageSlots::kResult);
 
         return *this;
@@ -837,38 +846,19 @@ private:
     std::unique_ptr<Data> _data;
 };  // class PlanStageReqs
 
-struct BuildProjectionPlan {
-    enum Type {
-        kDoNotMakeResult,
-        kUseCoveredProjection,
-        kUseInputPlanWithoutObj,
-        kUseChildResultObj,
-        kUseChildResultInfo
-    };
-
+struct ProjectionPlan {
     PlanStageReqs childReqs;
-    Type type;
+    bool reqResultObj;
     bool reqResultInfo;
-    bool produceResultObj;
+    bool isCoveredProjection;
     bool isInclusion;
     std::vector<std::string> paths;
     std::vector<ProjectNode> nodes;
     std::vector<std::string> nothingPaths;
-    std::vector<std::string> resultPaths;
     std::vector<std::string> updatedPaths;
-    StringMap<Expression*> updatedPathsExprMap;
-    std::vector<std::string> resultInfoDrops;
-    std::vector<std::string> resultInfoModifys;
-    std::vector<std::string> projNothingInputFields;
-    boost::optional<std::vector<std::string>> inputPlanSingleFields;
-};
-
-/**
- * We use one of these structs per node in the QSN tree to store the results of the
- * analyze() phase.
- */
-struct QsnAnalysis {
-    FieldSet allowedFieldSet = FieldSet::makeUniverseSet();
+    std::vector<std::string> resultPaths;
+    StringMap<Expression*> pathExprMap;
+    FieldEffects newEffects;
 };
 
 /**
@@ -914,29 +904,64 @@ public:
     PlanType build(const QuerySolutionNode* root) final;
 
 private:
-    void analyzeTree(const QuerySolutionNode* node);
-
-    QsnAnalysis analyze(const QuerySolutionNode* node);
-
-    inline const QsnAnalysis& getAnalysis(const QuerySolutionNode* node) const {
-        return _analysis.find(node)->second;
-    }
-
-    inline const QsnAnalysis& getAnalysis(const std::unique_ptr<QuerySolutionNode>& node) const {
-        return _analysis.find(node.get())->second;
-    }
-
-    const FieldSet& getAllowedFieldSet(const QuerySolutionNode* node) {
-        analyzeTree(node);
-        return getAnalysis(node).allowedFieldSet;
-    }
-
-    const FieldSet& getAllowedFieldSet(const std::unique_ptr<QuerySolutionNode>& node) {
-        analyzeTree(node.get());
-        return getAnalysis(node).allowedFieldSet;
-    }
-
     std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> buildTree();
+
+    inline void analyzeTree() {
+        _qsnAnalysis.analyzeTree(_root);
+    }
+
+    inline const QsnInfo& getQsnInfo(const QuerySolutionNode* qsNode) const {
+        return _qsnAnalysis.getQsnInfo(qsNode);
+    }
+    inline const QsnInfo& getQsnInfo(const std::unique_ptr<QuerySolutionNode>& qsNode) const {
+        return _qsnAnalysis.getQsnInfo(qsNode.get());
+    }
+
+    const FieldSet& getPostimageAllowedFields(const QuerySolutionNode* qsNode) const {
+        return *getQsnInfo(qsNode).postimageAllowedFields;
+    }
+    const FieldSet& getPostimageAllowedFields(
+        const std::unique_ptr<QuerySolutionNode>& qsNode) const {
+        return getPostimageAllowedFields(qsNode.get());
+    }
+    std::vector<const FieldSet*> getPostimageAllowedFieldSets(
+        const std::vector<const QuerySolutionNode*>& childNodes) const {
+        // Build a vector of "const FieldSet" pointers to the children's allowed field sets
+        // and return it.
+        std::vector<const FieldSet*> allowedFieldSets;
+        allowedFieldSets.reserve(childNodes.size());
+        for (const auto& qsNode : childNodes) {
+            allowedFieldSets.push_back(&getPostimageAllowedFields(qsNode));
+        }
+
+        return allowedFieldSets;
+    }
+    std::vector<const FieldSet*> getPostimageAllowedFieldSets(
+        const std::vector<std::unique_ptr<QuerySolutionNode>>& childNodes) const {
+        // Build a vector of "const FieldSet" pointers to the children's allowed field sets
+        // and return it.
+        std::vector<const FieldSet*> allowedFieldSets;
+        allowedFieldSets.reserve(childNodes.size());
+        for (const auto& nodePtr : childNodes) {
+            allowedFieldSets.push_back(&getPostimageAllowedFields(nodePtr.get()));
+        }
+        return allowedFieldSets;
+    }
+
+    bool hasProjectionInfo(const QuerySolutionNode* qsNode) const {
+        return _qsnAnalysis.hasProjectionInfo(qsNode);
+    }
+    bool hasProjectionInfo(const std::unique_ptr<QuerySolutionNode>& qsNode) const {
+        return _qsnAnalysis.hasProjectionInfo(qsNode);
+    }
+
+    const ProjectionInfo& getProjectionInfo(const QuerySolutionNode* qsNode) const {
+        return _qsnAnalysis.getProjectionInfo(qsNode);
+    }
+    const ProjectionInfo& getProjectionInfo(
+        const std::unique_ptr<QuerySolutionNode>& qsNode) const {
+        return _qsnAnalysis.getProjectionInfo(qsNode);
+    }
 
     /**
      * This method will build an SBE PlanStage tree for QuerySolutionNode 'root' and its
@@ -1074,15 +1099,70 @@ private:
     std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> buildUnpackTsBucket(
         const QuerySolutionNode* root, const PlanStageReqs& reqs);
 
+    /**
+     * This struct is used to record a plan for how to produce a materialized result object.
+     * 'ResultPlan' is used by getResultPlan() and makeResultUsingPlan().
+     */
+    struct ResultPlan {
+        enum Type : unsigned int {
+            kUseResultInfo,
+            kUseFixedPlan,
+        };
+
+        ResultPlan(Type type, PlanStageReqs reqs) : type(type), reqs(std::move(reqs)) {}
+
+        // Indicates whether this ResultPlan is a "ResultInfo"-based plan (kUseResultInfo)
+        // or a "fixed" plan (kUseFixedPlan).
+        Type type;
+
+        // Provides the PlanStageReqs that should be passed in when build() is called on the
+        // QSN node.
+        PlanStageReqs reqs;
+
+        // Provides a list of the kField reqs from the parent that can be satisfied by setting
+        // the corresponding kField slots to "Nothing". 'nothingPaths' is used for both
+        // "ResultInfo"-based plans (kUseResultInfo) or "fixed" plans (kUseFixedPlan).
+        std::vector<std::string> nothingPaths;
+
+        // Lists the names of the fields that are needed for a "fixed" plan. Note that
+        // 'fixedPlanFields' is only used for "fixed" plans (kUseFixedPlan).
+        std::vector<std::string> fixedPlanFields;
+    };
+
+    /**
+     * Prior to building the SBE tree for a given QSN node, if 'reqs' has a result object req the
+     * outer build() method will call this function to check if there is a way to remove the result
+     * object req and replace it with either a ResultInfo req or individual kField reqs.
+     *
+     * If it's possible to replace the result object req with ResultInfo/kField reqs, then this
+     * function will return a ResultPlan object that specifies how the reqs for the buildXXX()
+     * method can be adjusted and what needs to be done to produce the result object after the
+     * buildXXX() method returns. Otherwise, this function returns nullptr.
+     */
+    std::unique_ptr<ResultPlan> getResultPlan(const QuerySolutionNode* qsNode,
+                                              const PlanStageReqs& reqs);
+
+    /**
+     * If the outer build() method called getResultPlan() and got back a non-null ResultPlan, then
+     * the outer build() method will call this function after the buildXXX() method returns. This
+     * function handle updating the SBE tree as appropriate to produce the result object (based on
+     * the specified ResultPlan).
+     */
+    std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> makeResultUsingPlan(
+        std::unique_ptr<sbe::PlanStage> stage,
+        PlanStageSlots outputs,
+        const QuerySolutionNode* qsNode,
+        std::unique_ptr<ResultPlan> plan);
+
     MONGO_COMPILER_NOINLINE
-    std::unique_ptr<BuildProjectionPlan> makeBuildProjectionPlan(const QuerySolutionNode* root,
-                                                                 const PlanStageReqs& reqs);
+    std::unique_ptr<ProjectionPlan> makeProjectionPlan(const QuerySolutionNode* root,
+                                                       const PlanStageReqs& reqs);
 
     MONGO_COMPILER_NOINLINE
     std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> buildProjectionImpl(
         const QuerySolutionNode* root,
         const PlanStageReqs& reqs,
-        std::unique_ptr<BuildProjectionPlan> plan,
+        std::unique_ptr<ProjectionPlan> plan,
         std::unique_ptr<sbe::PlanStage> stage,
         PlanStageSlots outputs);
 
@@ -1144,7 +1224,8 @@ private:
     std::unique_ptr<PlanStageStaticData> _data;
 
     const QuerySolutionNode* _root{nullptr};
-    absl::node_hash_map<const QuerySolutionNode*, QsnAnalysis> _analysis;
+
+    QsnAnalysis _qsnAnalysis;
 
     bool _buildHasStarted{false};
 

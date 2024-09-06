@@ -329,13 +329,11 @@ std::unique_ptr<sbe::EExpression> SBEExpressionLowering::handleShardFilterFuncti
                                        fieldsScope, std::move(fields), std::move(fieldActions))));
 
     auto makeObjRoot = sbe::makeE<sbe::EConstant>(sbe::value::TypeTags::Nothing, 0);
-    auto hasInputFieldsExpr = sbe::makeE<sbe::EConstant>(sbe::value::TypeTags::Boolean,
-                                                         sbe::value::bitcastFrom<bool>(false));
+
     sbe::EExpression::Vector makeObjArgs;
-    makeObjArgs.reserve(3 + projectValues.size());
+    makeObjArgs.reserve(2 + projectValues.size());
     makeObjArgs.push_back(std::move(makeObjSpec));
     makeObjArgs.push_back(std::move(makeObjRoot));
-    makeObjArgs.push_back(std::move(hasInputFieldsExpr));
     std::move(projectValues.begin(), projectValues.end(), std::back_inserter(makeObjArgs));
 
     auto shardKeyBSONObjExpression =

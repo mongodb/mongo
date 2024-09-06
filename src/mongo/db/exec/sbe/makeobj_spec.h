@@ -36,7 +36,6 @@
 
 #include "mongo/bson/util/builder.h"
 #include "mongo/bson/util/builder_fwd.h"
-#include "mongo/db/exec/sbe/makeobj_input_plan.h"
 #include "mongo/db/exec/sbe/values/bson.h"
 #include "mongo/db/exec/sbe/values/value.h"
 #include "mongo/util/field_set.h"
@@ -190,20 +189,6 @@ struct MakeObjSpec {
         init();
     }
 
-    MakeObjSpec(FieldListScope fieldsScope,
-                std::vector<std::string> fields,
-                std::vector<FieldAction> actions,
-                NonObjInputBehavior nonObjInputBehavior,
-                boost::optional<int32_t> traversalDepth,
-                const MakeObjInputPlan& inputPlan)
-        : fieldsScope(fieldsScope),
-          nonObjInputBehavior(nonObjInputBehavior),
-          traversalDepth(traversalDepth),
-          actions(std::move(actions)),
-          fields(buildFieldDict(std::move(fields), inputPlan)) {
-        init();
-    }
-
     MakeObjSpec(const MakeObjSpec& other)
         : fieldsScope(other.fieldsScope),
           nonObjInputBehavior(other.nonObjInputBehavior),
@@ -212,7 +197,6 @@ struct MakeObjSpec {
           numFieldsToSearchFor(other.numFieldsToSearchFor),
           totalNumArgs(other.totalNumArgs),
           mandatoryFields(std::move(other.mandatoryFields)),
-          numInputFields(other.numInputFields),
           displayOrder(other.displayOrder),
           fields(other.fields) {}
 
@@ -224,7 +208,6 @@ struct MakeObjSpec {
           numFieldsToSearchFor(other.numFieldsToSearchFor),
           totalNumArgs(other.totalNumArgs),
           mandatoryFields(std::move(other.mandatoryFields)),
-          numInputFields(other.numInputFields),
           displayOrder(std::move(other.displayOrder)),
           fields(std::move(other.fields)) {}
 
@@ -265,8 +248,6 @@ struct MakeObjSpec {
 
 private:
     StringListSet buildFieldDict(std::vector<std::string> names);
-
-    StringListSet buildFieldDict(std::vector<std::string> names, const MakeObjInputPlan& inputPlan);
 
     void init();
 
@@ -310,8 +291,6 @@ public:
     // of the input object, it will perform the actions in this list in order they appear for each
     // field that wasn't present in the input object.
     std::vector<size_t> mandatoryFields;
-
-    boost::optional<size_t> numInputFields;
 
     std::vector<size_t> displayOrder;
 

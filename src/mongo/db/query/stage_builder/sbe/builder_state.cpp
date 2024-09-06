@@ -186,6 +186,18 @@ bool StageBuilderState::isNothingSlot(sbe::value::SlotId slot) {
     return slot == env->getSlotIfExists(kNothingEnvSlotName);
 }
 
+sbe::value::SlotId StageBuilderState::getEmptyObjSlot() {
+    auto slotId = env->getSlotIfExists("emptyObj"_sd);
+
+    if (!slotId) {
+        auto tag = sbe::value::TypeTags::bsonObject;
+        auto val = sbe::value::bitcastFrom<const char*>(BSONObj::kEmptyObject.objdata());
+        return env->registerSlot("emptyObj"_sd, tag, val, false, slotIdGenerator);
+    }
+
+    return *slotId;
+}
+
 boost::optional<sbe::value::SlotId> StageBuilderState::getTimeZoneDBSlot() {
     auto slotId = env->getSlotIfExists("timeZoneDB"_sd);
 

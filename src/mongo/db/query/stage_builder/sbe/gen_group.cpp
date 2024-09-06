@@ -83,52 +83,34 @@ PlanStageReqs computeChildReqsForGroup(const PlanStageReqs& reqs, const GroupNod
     }
 
     if (!groupNode.needWholeDocument) {
-        // Tracks whether we need to require our child to produce a materialized result object.
-        bool rootDocIsNeeded = false;
+        // Tracks if any sort keys we need to generate depend on the having a materialized
+        // result object.
+
+        // Some accumulators (like $top and $bottom) need to generate sort keys. Here we loop
+        // over 'groupNode.accumulators' to observe what each accumulator's needs are.
         bool sortKeysNeedRootDoc = false;
-        auto referencesRoot = [&](const ExpressionFieldPath* fieldExpr) {
-            rootDocIsNeeded = rootDocIsNeeded || fieldExpr->isROOT();
-        };
-
-        // Walk over all field paths involved in this $group stage.
-        walkAndActOnFieldPaths(groupNode.groupByExpression.get(), referencesRoot);
         for (const auto& accStmt : groupNode.accumulators) {
-            walkAndActOnFieldPaths(accStmt.expr.argument.get(), referencesRoot);
-
             if (auto sortPattern = getSortPattern(accStmt)) {
                 auto plan = makeSortKeysPlan(*sortPattern, allowCallGenCheapSortKey);
 
                 if (!plan.fieldsForSortKeys.empty()) {
+                    // If this accumulator needs specific top-level fields in slots, add the
+                    // appropriate kField reqs to 'childReqs'.
                     childReqs.setFields(std::move(plan.fieldsForSortKeys));
                 }
+
                 if (plan.needsResultObj) {
+                    // If this accumulator needs the whole result object, set 'sortKeysNeedRootDoc'
+                    // to true.
                     sortKeysNeedRootDoc = true;
                 }
             }
         }
 
-        // If any accumulator requires generating sort key, we cannot clear the result requirement
-        // from 'childReqs'.
+        // If no accumulator requires the whole result object for generating sort keys, then we
+        // can clear the result requirement from 'childReqs'.
         if (!sortKeysNeedRootDoc) {
-            const auto& childNode = *groupNode.children[0];
-
-            // If the group node doesn't have any dependency (e.g. $count) or if the dependency can
-            // be satisfied by the child node (e.g. covered index scan), we can clear the result
-            // requirement for the child.
-            if (groupNode.requiredFields.empty() || !rootDocIsNeeded) {
-                childReqs.clearResult();
-            } else if (childNode.getType() == StageType::STAGE_PROJECTION_COVERED) {
-                auto& childPn = static_cast<const ProjectionNodeCovered&>(childNode);
-                std::set<std::string> providedFieldSet;
-                for (auto&& elt : childPn.coveredKeyObj) {
-                    providedFieldSet.emplace(elt.fieldNameStringData());
-                }
-                if (std::all_of(groupNode.requiredFields.begin(),
-                                groupNode.requiredFields.end(),
-                                [&](const std::string& f) { return providedFieldSet.count(f); })) {
-                    childReqs.clearResult();
-                }
-            }
+            childReqs.clearResult();
         }
     }
 
@@ -1253,25 +1235,63 @@ std::pair<SbStage, PlanStageSlots> SlotBasedStageBuilder::buildGroup(const Query
             "slots",
             finalSlots.size() == 1 + accStmts.size());
 
-    auto fieldNamesSet = StringDataSet{fieldNames.begin(), fieldNames.end()};
-    auto [fields, additionalFields] =
-        splitVector(reqs.getFields(), [&](const std::string& s) { return fieldNamesSet.count(s); });
-    auto fieldsSet = StringDataSet{fields.begin(), fields.end()};
-
     for (size_t i = 0; i < fieldNames.size(); ++i) {
-        if (fieldsSet.count(fieldNames[i])) {
-            outputs.set(std::make_pair(PlanStageSlots::kField, fieldNames[i]), finalSlots[i]);
-        }
-    };
+        outputs.set(std::make_pair(PlanStageSlots::kField, fieldNames[i]), finalSlots[i]);
+    }
 
-    // Builds a stage to create a result object out of a group-by slot and gathered accumulator
-    // result slots if the parent node requests so.
-    if (reqs.hasResult() || !additionalFields.empty()) {
+    auto fieldNameSet = StringDataSet{fieldNames.begin(), fieldNames.end()};
+    for (const auto& path : reqs.getFields()) {
+        if (!fieldNameSet.count(getTopLevelField(path))) {
+            auto nothingSlot = SbSlot{_state.getNothingSlot()};
+            outputs.set(std::make_pair(PlanStageSlots::kField, path), nothingSlot);
+        }
+    }
+
+    bool reqResultObj = reqs.hasResultObj();
+    bool reqResultInfo = reqs.hasResultInfo();
+    boost::optional<FieldEffects> effects;
+
+    // If there is a ResultInfo req, check if this $group stage can participate with it.
+    if (reqResultInfo) {
+        const auto& reqTrackedFieldSet = reqs.getResultInfoTrackedFieldSet();
+        const auto& reqEffects = reqs.getResultInfoEffects();
+
+        // Get the effects of this $group stage.
+        effects = getQsnInfo(root).effects;
+
+        bool canParticipate = false;
+        if (effects) {
+            // Narrow 'effects' so that it only has effects applicable to fields in
+            // 'reqTrackedFieldSet'.
+            effects->narrow(reqTrackedFieldSet);
+
+            if (auto composedEffects = composeEffectsForResultInfo(*effects, reqEffects)) {
+                // If this group stage can participate with the result info req, then set
+                // 'canParticipate' to true.
+                canParticipate = true;
+            }
+        }
+
+        if (!canParticipate) {
+            // If this group stage cannot participate with the result info req, then we need to
+            // produce a result object instead.
+            reqResultObj = true;
+            reqResultInfo = false;
+        }
+    }
+
+    if (reqResultObj) {
+        // Create a result object.
         auto [outStage, outSlot] =
             generateGroupResultObject(std::move(stage), _state, groupNode, fieldNames, finalSlots);
         stage = std::move(outStage);
 
         outputs.setResultObj(outSlot);
+    } else if (reqResultInfo) {
+        // Set the result base to be an empty object and add this group stage's effects to
+        // the result info effects.
+        outputs.setResultInfoBaseObj(SbSlot{_state.getEmptyObjSlot()});
+        outputs.addEffectsToResultInfo(_state, reqs, *effects);
     }
 
     return {std::move(stage), std::move(outputs)};

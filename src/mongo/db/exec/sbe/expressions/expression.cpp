@@ -617,7 +617,7 @@ static stdx::unordered_map<std::string, BuiltinFn> kBuiltinFunctions = {
      BuiltinFn{[](size_t n) { return n == 3; }, vm::Builtin::newArrayFromRange, false}},
     {"newObj", BuiltinFn{[](size_t n) { return n % 2 == 0; }, vm::Builtin::newObj, false}},
     {"newBsonObj", BuiltinFn{[](size_t n) { return n % 2 == 0; }, vm::Builtin::newBsonObj, false}},
-    {"makeBsonObj", BuiltinFn{[](size_t n) { return n >= 3; }, vm::Builtin::makeBsonObj, false}},
+    {"makeBsonObj", BuiltinFn{[](size_t n) { return n >= 2; }, vm::Builtin::makeBsonObj, false}},
     {"ksToString", BuiltinFn{[](size_t n) { return n == 1; }, vm::Builtin::ksToString, false}},
     {"ks",
      BuiltinFn{[](size_t n) { return n >= 3 && n <= Ordering::kMaxCompoundIndexKeys + 3; },

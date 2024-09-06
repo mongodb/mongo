@@ -108,9 +108,9 @@ struct StageBuilderState {
     }
 
     sbe::value::SlotId getNothingSlot();
+    sbe::value::SlotId getEmptyObjSlot();
     sbe::value::SlotId getSortSpecSlot(const AccumulationStatement* sortPattern);
     sbe::value::SlotId getSortSpecSlot(const WindowFunctionStatement* sortPattern);
-
     boost::optional<sbe::value::SlotId> getTimeZoneDBSlot();
     boost::optional<sbe::value::SlotId> getCollatorSlot();
     boost::optional<sbe::value::SlotId> getOplogTsSlot();

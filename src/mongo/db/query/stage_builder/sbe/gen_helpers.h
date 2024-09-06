@@ -1121,6 +1121,14 @@ public:
     struct Keep {};
     struct Drop {};
 
+    static std::vector<Type> getNodeTypes(const std::vector<ProjectNode>& nodes) {
+        std::vector<Type> nodeTypes;
+        for (const auto& node : nodes) {
+            nodeTypes.emplace_back(node.type());
+        }
+        return nodeTypes;
+    }
+
     ProjectNode() = default;
 
     ProjectNode(Keep) : _data(Bool{true}) {}
@@ -1208,6 +1216,8 @@ private:
 std::pair<std::vector<std::string>, std::vector<ProjectNode>> getProjectNodes(
     const projection_ast::Projection& projection);
 
+std::vector<ProjectNode> cloneProjectNodes(const std::vector<ProjectNode>& nodes);
+
 /**
  * This method retrieves the values of the specified field paths ('fields') from 'resultSlot'
  * and stores the values into slots.
@@ -1220,7 +1230,7 @@ std::pair<std::vector<std::string>, std::vector<ProjectNode>> getProjectNodes(
 std::pair<std::unique_ptr<sbe::PlanStage>, SbSlotVector> projectFieldsToSlots(
     std::unique_ptr<sbe::PlanStage> stage,
     const std::vector<std::string>& fields,
-    SbSlot resultSlot,
+    boost::optional<SbSlot> resultSlot,
     PlanNodeId nodeId,
     sbe::value::SlotIdGenerator* slotIdGenerator,
     StageBuilderState& state,
@@ -1326,265 +1336,5 @@ makeKeyStringPair(const BSONObj& lowKey,
     return {std::make_unique<key_string::Value>(lowBuilder.getValueCopy()),
             std::make_unique<key_string::Value>(highBuilder.getValueCopy())};
 }
-
-/**
- * The 'ProjectionEffects' class is used to represented the "effects" that a projection (either
- * (a single projection or multiple projections combined together) has on the set of all possible
- * top-level field names.
- *
- * Conceptully, a ProjectionEffects object can be thought of as a field name/Effect map plus
- * a "default" Effect to be applied to all fields that are not present in the map.
- *
- * The four possible Effects modeled by this class are: Keep, Drop, Modify, and Create. The
- * "default" Effect may be set to Keep, Drop, or Modify, but it cannot be set to Create. The
- * names of each kind of Effect are solely for "descriptive" purposes - for the formal definition
- * of each kind of Effect, see the docblock above the 'Effect' enum.
- *
- * A ProjectionEffects object can be constructed from a projection, or it can be constructed
- * using a single FieldSet (a "keep" set), or it can be constructed using 3 FieldSets (a
- * "allowed" set, a "modifiedOrCreated" set, and a "created" set).
- *
- * Two ProjectionEffects objects can also be combined together using the merge() method (to
- * merge two ProjectionEffects) or the compose() method (to "compose" a parent ProjectionEffects
- * and a child ProjectionEffects).
- */
-class ProjectionEffects {
-public:
-    /**
-     * Here is a Venn diagram showing what possible changes to a value are permitted for each
-     * type of Effect:
-     *
-     *   +-----------------------+
-     *   | Create                |
-     *   | +-------------------+ |
-     *   | | Modify            | |
-     *   | | +------+ +------+ | |
-     *   | | | Drop | | Keep | | |
-     *   | | +------+ +------+ | |
-     *   | +-------------------+ |
-     *   +-----------------------+
-     *
-     * The "Keep" Effect is only allowed to return the input unmodified, and the "Drop" Effect is
-     * only allowed to return Nothing. Thus, Keep's set contains only 1 possibility and Drop's set
-     * contains only 1 possibility and the two sets do not overlap.
-     *
-     * The "Modify" Effect is allowed to return the input unmodified, or return Nothing, or make
-     * any change to the input provided that when the input is Nothing it gets returned unmodified.
-     * Modify's set is therefore a superset of Keep's set and Drop's set.
-     *
-     * The "Create" Effect is allowed to make any change to the input without any restrictions.
-     * Specifically, when the input is Nothing, "Create" is allowed to return a non-Nothing value.
-     * Therefore Create's set is a superset of Keep's set, Drop's set, and Modify's set.
-     *
-     * Note that the Keep, Drop, and Modify Effects cannot cause a field's position within the
-     * object to change. (Drop makes the field disappear, but that technically doesn't count as
-     * "changing" the field's position.)
-     *
-     * The Create effect is only Effect that can cause a field's position within the object to
-     * change. (A single projection isn't capable of causinig a field's position within the object
-     * o change, but multiple projections combined together are able to do this.)
-     */
-    enum Effect : int { kKeep, kDrop, kModify, kCreate };
-
-    /**
-     * Creates a ProjectionEffects that has a Keep Effect for all fields.
-     */
-    ProjectionEffects() = default;
-
-    /**
-     * Creates a ProjectionEffects from a projection as specified by 'isInclusion', 'paths',
-     * and 'nodes'. 'isInclusion' indicates whether the projection is an inclusion or an
-     * exclusion. 'paths' and 'nodes' are parallel vectors (one a vector of strings, the
-     * other a vector of ProjectNodes) that specify the actions performed by the projection
-     * on each path.
-     *
-     * The ProjectionEffects class models projections using the following rules:
-     *
-     * 1) For a given top-level field F, if the projection has a "computed" field on a path that
-     *    F is a prefix of (or if $addFields created a field on a path that F is a prefix of),
-     *    then the Effect for field F is 'Create'.
-     * 2) Otherwise, if the projection has at least one keep or drop on a dotted path that is
-     *    a prefix of a given top-level field F, then the Effect for field F is 'Modify'.
-     * 3) Otherwise, if the projection has at least one $slice operation on any path (top-level
-     *    or not) that is a prefix of a given top-level field F, then the Effect for field F
-     *    is 'Modify'.
-     * 4) Otherwise, if the none of the other rules apply for a given top-level field F, then
-     *    the Effect for field F will either be 'Drop' (if 'isInclusion' is true) or 'Keep'
-     *    (if 'isInclusion' is false).
-     */
-    ProjectionEffects(bool isInclusion,
-                      const std::vector<std::string>& paths,
-                      const std::vector<ProjectNode>& nodes);
-
-    /**
-     * Creates a ProjectionEffects representing a projection that has a Keep Effect for all the
-     * fields 'keepFieldSet' and that has a Drop Effect for all other fields.
-     */
-    explicit ProjectionEffects(const FieldSet& keepFieldSet);
-
-    /**
-     * Creates a ProjectionEffects that has a Create Effect for fields in 'createdFieldSet',
-     * that has a Modify Effect for fields in 'modifiedOrCreatedFieldSet' that are not present
-     * in 'createdFieldSet', that has a Keep Effect for fields in 'allowedFieldSet' that are
-     * not present in 'modifiedOrCreatedFieldSet' or 'createdFieldSet', and that has a Drop
-     * Effect for all other fields.
-     *
-     * Note that 'createdFieldSet' must be a "closed" FieldSet.
-     */
-    ProjectionEffects(const FieldSet& allowedFieldSet,
-                      const FieldSet& modifiedOrCreatedFieldSet,
-                      const FieldSet& createdFieldSet = FieldSet::makeEmptySet(),
-                      std::vector<std::string> displayOrder = {});
-
-    /**
-     * Same as 'ProjectionEffects(FieldSet, FieldSet, FieldSet, vector<string>)', except that
-     * the second and third parameters are 'vector<string>' instead of 'FieldSet'.
-     *
-     * Note that the second and third parameters will be treated as "closed" field lists.
-     */
-    ProjectionEffects(const FieldSet& allowedFieldSet,
-                      const std::vector<std::string>& modifiedOrCreatedFields,
-                      const std::vector<std::string>& createdFields = {},
-                      std::vector<std::string> displayOrder = {});
-
-    /**
-     * For each field, merge() will compute the union of the each child's Effect on the field.
-     *
-     * The merge() operation is typically used when a stage has 2 or more children and we want
-     * to compute the combined effect of all of the stage's children together (as if the output
-     * documents coming from the children were all mixed together into a single stream).
-     *
-     * merge() is commutative and associative, and any ProjectionEffects object that is merged with
-     * itself produces itself. The merge() operation does not have a "neutral element" value.
-     */
-    ProjectionEffects& merge(const ProjectionEffects& other);
-
-    /**
-     * The compose() operation models the combined effects you would get if you had one projection
-     * (parent) on top of another (child).
-     *
-     * compose() takes two ProjectionEffects as input that represent the effects in isolation of the
-     * parent projection and the child projection. The output of compose() is computed using the
-     * following table:
-     *
-     *   Parent's Effect | Child's Effect | Composed Effect
-     *   ----------------+----------------+----------------
-     *   Create          | Any effect     | Create
-     *   Drop            | Any effect     | Drop
-     *   Keep or Modify  | Create         | Create
-     *   Keep or Modify  | Drop           | Drop
-     *   Keep or Modify  | Modify         | Modify
-     *   Modify          | Keep           | Modify
-     *   Keep            | Keep           | Keep
-     *
-     * compose() is associative (but not commutative), and any ProjectionEffects object that is
-     * composed with itself produces itself. The default ProjectionEffects object (no effects with
-     * _defaultEffect == kKeep) behaves as the "neutral element" for the compose() operation.
-     *
-     * It's also worth noting that compose() is distributive over merge(), and furthermore that
-     * for any 4 given ProjectionEffects objects (A,B,C,D) the following relationship will always
-     * hold:
-     *    (A*B)+(C*D) == (A+C)*(B+D)                    (where '+' is merge and '*' is compose)
-     */
-    ProjectionEffects& compose(const ProjectionEffects& child);
-
-    /**
-     * Returns the list of fields whose Effect is not equal to the "default" Effect.
-     */
-    const std::vector<std::string>& getFieldList() const {
-        return _fields;
-    }
-
-    /**
-     * Returns the "default" Effect.
-     */
-    Effect getDefaultEffect() const {
-        return _defaultEffect;
-    }
-
-    /**
-     * Returns the Effect for the specified field.
-     */
-    Effect get(StringData field) const {
-        auto it = _effects.find(field);
-        return it != _effects.end() ? it->second : _defaultEffect;
-    }
-
-    inline bool isKeep(StringData field) const {
-        return get(field) == kKeep;
-    }
-    inline bool isDrop(StringData field) const {
-        return get(field) == kDrop;
-    }
-    inline bool isModify(StringData field) const {
-        return get(field) == kModify;
-    }
-    inline bool isCreate(StringData field) const {
-        return get(field) == kCreate;
-    }
-
-    /**
-     * Returns true if 'effect == _defaultEffect' is true or if one of the values in the
-     * '_effects' map is equal to 'effect'. Otherwise, returns false.
-     */
-    bool hasEffect(Effect effect) const {
-        if (effect == _defaultEffect) {
-            return true;
-        }
-        for (auto&& field : _fields) {
-            if (effect == _effects.find(field)->second) {
-                return true;
-            }
-        }
-        return false;
-    }
-
-    /**
-     * Returns a FieldSet containing all the fields whose effect is not kDrop.
-     *
-     * If there are a _finite_ number of fields whose effect is not kDrop, then this function will
-     * return a "closed" FieldSet, otherwise it will return an "open" FieldSet.
-     */
-    FieldSet getAllowedFieldSet() const;
-
-    /**
-     * Returns a FieldSet containing all the fields whose effect is kModify or kCreate.
-     *
-     * If '_defaultEffect' is kKeep or kDrop (which is usually the case), then this function will
-     * return a "closed" FieldSet.
-     *
-     * If '_defaultEffect' is kModify (which can happen if you merge two ProjectionEffects with
-     * different defaultEffects), then this function will return an "open" FieldSet.
-     */
-    FieldSet getModifiedOrCreatedFieldSet() const;
-
-    /**
-     * Returns a FieldSet containing all the fields whose effect is kCreate.
-     *
-     * This function always returns a "closed" FieldSet.
-     */
-    FieldSet getCreatedFieldSet() const;
-
-    std::string toString() const;
-
-private:
-    void removeRedundantEffects();
-
-    std::vector<std::string> _fields;
-    StringMap<Effect> _effects;
-    Effect _defaultEffect = kKeep;
-};
-
-FieldSet makeAllowedFieldSet(bool isInclusion,
-                             const std::vector<std::string>& paths,
-                             const std::vector<ProjectNode>& nodes);
-
-FieldSet makeModifiedOrCreatedFieldSet(bool isInclusion,
-                                       const std::vector<std::string>& paths,
-                                       const std::vector<ProjectNode>& nodes);
-
-FieldSet makeCreatedFieldSet(bool isInclusion,
-                             const std::vector<std::string>& paths,
-                             const std::vector<ProjectNode>& nodes);
 
 }  // namespace mongo::stage_builder

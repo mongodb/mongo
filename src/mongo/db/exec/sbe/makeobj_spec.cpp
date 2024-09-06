@@ -67,96 +67,6 @@ StringListSet MakeObjSpec::buildFieldDict(std::vector<std::string> names) {
     return StringListSet(std::move(names));
 }
 
-StringListSet MakeObjSpec::buildFieldDict(std::vector<std::string> names,
-                                          const MakeObjInputPlan& inputPlan) {
-    bool isClosed = fieldsScopeIsClosed();
-
-    if (actions.empty()) {
-        actions.resize(names.size());
-        for (size_t i = 0; i < names.size(); ++i) {
-            actions[i] = isClosed ? FieldAction{Keep{}} : FieldAction{Drop{}};
-        }
-    } else {
-        tassert(8146600,
-                "Expected 'names' and 'fieldsInfos' to be the same size",
-                names.size() == actions.size());
-    }
-
-    const auto& fieldDict = inputPlan.getFieldDict();
-    size_t n = fieldDict.size();
-    auto newActions = std::vector<sbe::MakeObjSpec::FieldAction>(n);
-
-    for (size_t i = 0; i < n; ++i) {
-        if (!inputPlan.isFieldUsed(fieldDict[i])) {
-            // For each field discarded by 'inputPlan', initialize the corresponding entry in
-            // 'newActions' to "Drop".
-            newActions[i] = Drop{};
-        } else {
-            // For each field not discardard by 'inputPlan', initialize the corresponding entry in
-            // 'newActions' to "Drop" (if isClosed is true) or "Keep" (if isClosed is false).
-            newActions[i] = isClosed ? FieldAction{Drop{}} : FieldAction{Keep{}};
-        }
-    }
-
-    // Copy the contents of 'actions' over to 'newActions' and populate 'mandatoryFields'.
-    for (size_t i = 0; i < actions.size(); ++i) {
-        auto& action = actions[i];
-
-        size_t pos = fieldDict.findPos(names[i]);
-        if (pos == StringListSet::npos) {
-            tassert(8146601,
-                    "Expected non-dropped field from 'names' to be present in 'fieldDict'",
-                    action.isDrop() && inputPlan.fieldsScopeIsClosed());
-            continue;
-        }
-
-        newActions[pos] = action.clone();
-
-        if (action.isMandatory()) {
-            mandatoryFields.push_back(pos);
-        }
-    }
-
-    // Update 'fieldsScope' to match 'inputPlan.getFieldsScope()'.
-    fieldsScope = inputPlan.getFieldsScope();
-
-    // Store the updated Actions vector into 'actions'.
-    actions = std::move(newActions);
-
-    // Initialize 'numInputFields'.
-    numInputFields = inputPlan.numSingleFields();
-
-    // Initialize 'displayOrder'. First we add all the original fields in their original order
-    // and then we add the rest of the fields from the updated Actions vector (skipping any
-    // fields with "default behavior").
-    absl::flat_hash_set<size_t> displayOrderSet;
-
-    for (const auto& name : names) {
-        size_t pos = fieldDict.findPos(name);
-
-        if (pos != StringListSet::npos) {
-            auto& action = actions[pos];
-
-            if (isClosed ? !action.isDrop() : !action.isKeep()) {
-                displayOrderSet.emplace(pos);
-                displayOrder.push_back(pos);
-            }
-        }
-    }
-
-    for (size_t pos = 0; pos < actions.size(); ++pos) {
-        if (!displayOrderSet.count(pos)) {
-            auto& action = actions[pos];
-
-            if (isClosed ? !action.isDrop() : !action.isKeep()) {
-                displayOrder.push_back(pos);
-            }
-        }
-    }
-
-    return fieldDict;
-}
-
 void MakeObjSpec::init() {
     // Initialize 'numFieldsToSearchFor' and 'totalNumArgs'.
     const bool isClosed = fieldsScopeIsClosed();
@@ -230,25 +140,6 @@ std::string MakeObjSpec::toString() const {
     }
 
     builder << "], ";
-
-    if (numInputFields) {
-        size_t n = *numInputFields;
-
-        builder << "[";
-
-        bool first = true;
-        for (size_t i = 0; i < n; ++i) {
-            if (!first) {
-                builder << ", ";
-            } else {
-                first = false;
-            }
-
-            builder << fields[i];
-        }
-
-        builder << "], ";
-    }
 
     builder << (isClosed ? "Closed" : "Open");
 

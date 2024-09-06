@@ -861,7 +861,6 @@ TEST(Path, LowerPathField) {
         "  Const [MakeObjSpec([fieldA = MakeObj([fieldB = Lambda(0, false)], Open)], Open, "
         "NewObj, 0)]\n"
         "  Variable [rootObj]\n"
-        "  Const [false]\n"
         "  LambdaAbstraction [valDefault_0]\n"
         "    If []\n"
         "      FunctionCall [exists]\n"
@@ -901,8 +900,7 @@ TEST(Path, LowerPathDrop) {
     ASSERT_EXPLAIN_AUTO(
         "FunctionCall [makeBsonObj]\n"
         "  Const [MakeObjSpec([a, b], Open, RetInput, 0)]\n"
-        "  Variable [root]\n"
-        "  Const [false]\n",
+        "  Variable [root]\n",
         tree);
 }
 
@@ -919,8 +917,7 @@ TEST(Path, LowerPathKeep) {
     ASSERT_EXPLAIN_AUTO(
         "FunctionCall [makeBsonObj]\n"
         "  Const [MakeObjSpec([a, b], Closed, RetInput, 0)]\n"
-        "  Variable [root]\n"
-        "  Const [false]\n",
+        "  Variable [root]\n",
         tree);
 }
 

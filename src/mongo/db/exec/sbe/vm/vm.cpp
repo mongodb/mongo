@@ -5659,61 +5659,60 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinSortKeyComponent
 
 FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinMakeBsonObj(
     ArityType arity, const CodeFragment* code) {
+    constexpr int64_t maxInt64 = std::numeric_limits<int64_t>::max();
+
     tassert(6897002,
-            str::stream() << "Unsupported number of arguments passed to makeBsonObj(): " << arity,
-            arity >= 3);
+            str::stream() << "Unsupported number of args passed to makeBsonObj(): " << arity,
+            arity >= 2);
 
     auto [specOwned, specTag, specVal] = getFromStack(0);
     auto [objOwned, objTag, objVal] = getFromStack(1);
-    auto [hasInputFieldsOwned, hasInputFieldsTag, hasInputFieldsVal] = getFromStack(2);
 
     if (specTag != value::TypeTags::makeObjSpec) {
         return {false, value::TypeTags::Nothing, 0};
     }
-    if (hasInputFieldsTag != value::TypeTags::Boolean) {
-        return {false, value::TypeTags::Nothing, 0};
-    }
 
     auto spec = value::getMakeObjSpecView(specVal);
-    bool hasInputFields = value::bitcastTo<bool>(hasInputFieldsVal);
+    auto maxDepth = spec->traversalDepth ? *spec->traversalDepth : maxInt64;
 
-    if (hasInputFields && objTag != value::TypeTags::Null && !value::isObject(objTag)) {
-        return {false, value::TypeTags::Nothing, 0};
-    }
-
-    if (!hasInputFields) {
-        if (spec->nonObjInputBehavior != MakeObjSpec::NonObjInputBehavior::kNewObj &&
-            !value::isObject(objTag)) {
-            if (spec->nonObjInputBehavior == MakeObjSpec::NonObjInputBehavior::kReturnNothing) {
-                // If the input is Nothing or not an Object and if 'nonObjInputBehavior' equals
-                // 'kReturnNothing', then return Nothing.
-                return {false, value::TypeTags::Nothing, 0};
-            } else if (spec->nonObjInputBehavior ==
-                       MakeObjSpec::NonObjInputBehavior::kReturnInput) {
-                // If the input is Nothing or not an Object and if 'nonObjInputBehavior' equals
-                // 'kReturnInput', then return the input.
-                topStack(false, value::TypeTags::Nothing, 0);
-                return {objOwned, objTag, objVal};
-            }
+    // If 'obj' is not an object or array, check if there is any applicable "NonObjInputBehavior"
+    // that should be applied.
+    if (spec->nonObjInputBehavior != MakeObjSpec::NonObjInputBehavior::kNewObj &&
+        !value::isObject(objTag) && (!value::isArray(objTag) || maxDepth == 0)) {
+        if (spec->nonObjInputBehavior == MakeObjSpec::NonObjInputBehavior::kReturnNothing) {
+            // If the input is Nothing or not an Object and if 'nonObjInputBehavior' equals
+            // 'kReturnNothing', then return Nothing.
+            return {false, value::TypeTags::Nothing, 0};
+        } else if (spec->nonObjInputBehavior == MakeObjSpec::NonObjInputBehavior::kReturnInput) {
+            // If the input is Nothing or not an Object and if 'nonObjInputBehavior' equals
+            // 'kReturnInput', then return the input.
+            topStack(false, value::TypeTags::Nothing, 0);
+            return {objOwned, objTag, objVal};
         }
     }
 
-    int numInputFields = hasInputFields && spec->numInputFields ? *spec->numInputFields : 0;
-    const int fieldsStackOff = 3;
-    const int argsStackOff = fieldsStackOff + numInputFields;
-    const auto ctx = ProduceObjContext{fieldsStackOff, argsStackOff, code};
+    const int argsStackOff = 2;
+    const auto ctx = ProduceObjContext{argsStackOff, code};
 
-    UniqueBSONObjBuilder bob;
+    // If 'tag' is an array and we have not exceeded the maximum depth yet, traverse the array.
+    if (maxDepth > 0 && value::isArray(objTag)) {
+        UniqueBSONArrayBuilder bab;
 
-    if (!hasInputFields) {
-        produceBsonObject(ctx, spec, bob, objTag, objVal);
+        auto newMaxDepth = maxDepth == maxInt64 ? maxDepth : maxDepth - 1;
+        traverseAndProduceBsonObj({ctx, spec}, objTag, objVal, newMaxDepth, bab);
+
+        bab.doneFast();
+        char* data = bab.bb().release().release();
+        return {true, value::TypeTags::bsonArray, value::bitcastFrom<char*>(data)};
     } else {
-        produceBsonObjectWithInputFields(ctx, spec, bob, objTag, objVal);
-    }
+        UniqueBSONObjBuilder bob;
 
-    bob.doneFast();
-    char* data = bob.bb().release().release();
-    return {true, value::TypeTags::bsonObject, value::bitcastFrom<char*>(data)};
+        produceBsonObject(ctx, spec, bob, objTag, objVal);
+
+        bob.doneFast();
+        char* data = bob.bb().release().release();
+        return {true, value::TypeTags::bsonObject, value::bitcastFrom<char*>(data)};
+    }
 }
 
 FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinReverseArray(ArityType arity) {

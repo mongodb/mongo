@@ -130,8 +130,7 @@ TEST(ProjSpecTest, SimplePathField) {
     ASSERT_TRUE(runPathLower(tree));
     ASSERT_EXPLAIN_V2Compact_AUTO(
         "FunctionCall [makeBsonObj]\n"
-        "|   |   |   Const [42]\n"
-        "|   |   Const [false]\n"
+        "|   |   Const [42]\n"
         "|   Const [{}]\n"
         "Const [MakeObjSpec([a = Set(0)], Open, NewObj, 0)]\n",
         tree);
@@ -150,8 +149,7 @@ TEST(ProjSpecTest, SimpleNestedPathFieldTraverse) {
     ASSERT_TRUE(runPathLower(tree));
     ASSERT_EXPLAIN_V2Compact_AUTO(
         "FunctionCall [makeBsonObj]\n"
-        "|   |   |   Const [42]\n"
-        "|   |   Const [false]\n"
+        "|   |   Const [42]\n"
         "|   Const [{}]\n"
         "Const [MakeObjSpec([a = MakeObj([b = Set(0)], Open, NewObj, 1)], Open, NewObj, 0)]\n",
         tree);
@@ -176,8 +174,7 @@ TEST(ProjSpecTest, SimplePathFieldConsecutiveTraverse) {
         ASSERT_TRUE(runPathLower(tree));
         ASSERT_EXPLAIN_V2Compact_AUTO(
             "FunctionCall [makeBsonObj]\n"
-            "|   |   |   Const [42]\n"
-            "|   |   Const [false]\n"
+            "|   |   Const [42]\n"
             "|   Const [{}]\n"
             "Const [MakeObjSpec([a = MakeObj([b = Set(0)], Open, NewObj, 3)], Open, NewObj, 0)]\n",
             tree);
@@ -200,8 +197,7 @@ TEST(ProjSpecTest, SimplePathFieldConsecutiveTraverse) {
         ASSERT_TRUE(runPathLower(tree));
         ASSERT_EXPLAIN_V2Compact_AUTO(
             "FunctionCall [makeBsonObj]\n"
-            "|   |   |   Const [42]\n"
-            "|   |   Const [false]\n"
+            "|   |   Const [42]\n"
             "|   Const [{}]\n"
             "Const [MakeObjSpec([a = MakeObj([b = Set(0)], Open)], Open, NewObj, 0)]\n",
             tree);
@@ -223,8 +219,7 @@ TEST(ProjSpecTest, SimplePathFieldConsecutiveTraverse) {
         ASSERT_TRUE(runPathLower(tree));
         ASSERT_EXPLAIN_V2Compact_AUTO(
             "FunctionCall [makeBsonObj]\n"
-            "|   |   |   Const [42]\n"
-            "|   |   Const [false]\n"
+            "|   |   Const [42]\n"
             "|   Const [{}]\n"
             "Const [MakeObjSpec([a = MakeObj([b = Set(0)], Open)], Open, NewObj, 0)]\n",
             tree);
@@ -246,8 +241,7 @@ TEST(ProjSpecTest, SimplePathFieldConsecutiveTraverse) {
         ASSERT_TRUE(runPathLower(tree));
         ASSERT_EXPLAIN_V2Compact_AUTO(
             "FunctionCall [makeBsonObj]\n"
-            "|   |   |   Const [42]\n"
-            "|   |   Const [false]\n"
+            "|   |   Const [42]\n"
             "|   Const [{}]\n"
             "Const [MakeObjSpec([a = MakeObj([b = Set(0)], Open)], Open, NewObj, 0)]\n",
             tree);
@@ -272,8 +266,7 @@ TEST(ProjSpecTest, PathFieldTraverse) {
     ASSERT_TRUE(runPathLower(tree));
     ASSERT_EXPLAIN_V2Compact_AUTO(
         "FunctionCall [makeBsonObj]\n"
-        "|   |   |   Const [42]\n"
-        "|   |   Const [false]\n"
+        "|   |   Const [42]\n"
         "|   Variable [foo]\n"
         "Const [MakeObjSpec([c = MakeObj([b = MakeObj([a = MakeObj([d = Set(0)], Open, NewObj, "
         "1)], Open, NewObj, 0)], Open)], Open, NewObj, 0)]\n",
@@ -290,7 +283,6 @@ TEST(ProjSpecTest, SimplePathKeep) {
     ASSERT_TRUE(runPathLower(tree));
     ASSERT_EXPLAIN_V2Compact_AUTO(
         "FunctionCall [makeBsonObj]\n"
-        "|   |   Const [false]\n"
         "|   Variable [foo]\n"
         "Const [MakeObjSpec([a, b, c], Closed, RetInput, 0)]\n",
         tree);
@@ -306,7 +298,6 @@ TEST(ProjSpecTest, SimplePathDrop) {
     ASSERT_TRUE(runPathLower(tree));
     ASSERT_EXPLAIN_V2Compact_AUTO(
         "FunctionCall [makeBsonObj]\n"
-        "|   |   Const [false]\n"
         "|   Variable [foo]\n"
         "Const [MakeObjSpec([a, b, c], Open, RetInput, 0)]\n",
         tree);
@@ -324,7 +315,6 @@ TEST(ProjSpecTest, SimplePathIdentity) {
     ASSERT_TRUE(runPathLower(tree));
     ASSERT_EXPLAIN_V2Compact_AUTO(
         "FunctionCall [makeBsonObj]\n"
-        "|   |   Const [false]\n"
         "|   Variable [foo]\n"
         "Const [MakeObjSpec([a = MakeObj([], Open, RetInput, 0)], Open, RetInput, 0)]\n",
         tree);
@@ -340,7 +330,6 @@ TEST(ProjSpecTest, SimplePathObj) {
     ASSERT_TRUE(runPathLower(tree));
     ASSERT_EXPLAIN_V2Compact_AUTO(
         "FunctionCall [makeBsonObj]\n"
-        "|   |   Const [false]\n"
         "|   Variable [foo]\n"
         "Const [MakeObjSpec([], Open, RetNothing, 0)]\n",
         tree);
@@ -391,8 +380,7 @@ TEST(ProjSpecTest, ComposeConstObj) {
     ASSERT_TRUE(runPathLower(tree));
     ASSERT_EXPLAIN_V2Compact_AUTO(
         "FunctionCall [makeBsonObj]\n"
-        "|   |   |   Const [\"abc\"]\n"
-        "|   |   Const [false]\n"
+        "|   |   Const [\"abc\"]\n"
         "|   Variable [foo]\n"
         "Const [MakeObjSpec([a = Set(0)], Open, NewObj, 0)]\n",
         tree);
@@ -413,9 +401,8 @@ TEST(ProjSpecTest, SimpleComposition) {
         ASSERT_TRUE(runPathLower(tree));
         ASSERT_EXPLAIN_V2Compact_AUTO(
             "FunctionCall [makeBsonObj]\n"
-            "|   |   |   |   Const [{}]\n"
-            "|   |   |   Const [[]]\n"
-            "|   |   Const [false]\n"
+            "|   |   |   Const [{}]\n"
+            "|   |   Const [[]]\n"
             "|   Variable [foo]\n"
             "Const [MakeObjSpec([a = Set(0), b = Set(1)], Open, NewObj, 0)]\n",
             tree);
@@ -432,7 +419,6 @@ TEST(ProjSpecTest, SimpleComposition) {
         ASSERT_TRUE(runPathLower(tree));
         ASSERT_EXPLAIN_V2Compact_AUTO(
             "FunctionCall [makeBsonObj]\n"
-            "|   |   Const [false]\n"
             "|   Variable [foo]\n"
             "Const [MakeObjSpec([a = MakeObj([b = MakeObj([], Open, RetInput, 0)], Open, RetInput, "
             "0), c = MakeObj([b = MakeObj([], Open, RetInput, 0)], Open, RetInput, 0)], Open, "
@@ -457,11 +443,10 @@ TEST(ProjSpecTest, TraversalComposition) {
     ASSERT_TRUE(runPathLower(tree, true /* constFold */));
     ASSERT_EXPLAIN_V2Compact_AUTO(
         "FunctionCall [makeBsonObj]\n"
-        "|   |   |   LambdaAbstraction [inputComposeM_0] If []\n"
-        "|   |   |   |   |   Const [Nothing]\n"
-        "|   |   |   |   Variable [inputComposeM_0]\n"
-        "|   |   |   FunctionCall [isArray] Variable [inputComposeM_0]\n"
-        "|   |   Const [false]\n"
+        "|   |   LambdaAbstraction [inputComposeM_0] If []\n"
+        "|   |   |   |   Const [Nothing]\n"
+        "|   |   |   Variable [inputComposeM_0]\n"
+        "|   |   FunctionCall [isArray] Variable [inputComposeM_0]\n"
         "|   Variable [foo]\n"
         "Const [MakeObjSpec([a = Lambda(0, false)], Open, NewObj, 0)]\n",
         tree);
@@ -487,8 +472,7 @@ TEST(ProjSpecTest, ConstCompose) {
         ASSERT_TRUE(runPathLower(tree));
         ASSERT_EXPLAIN_V2Compact_AUTO(
             "FunctionCall [makeBsonObj]\n"
-            "|   |   |   Const [[]]\n"
-            "|   |   Const [false]\n"
+            "|   |   Const [[]]\n"
             "|   Variable [foo]\n"
             "Const [MakeObjSpec([same = Set(0)], Open, NewObj, 0)]\n",
             tree);
@@ -508,8 +492,7 @@ TEST(ProjSpecTest, ConstCompose) {
         ASSERT_TRUE(runPathLower(tree));
         ASSERT_EXPLAIN_V2Compact_AUTO(
             "FunctionCall [makeBsonObj]\n"
-            "|   |   |   Const [[]]\n"
-            "|   |   Const [false]\n"
+            "|   |   Const [[]]\n"
             "|   Variable [foo]\n"
             "Const [MakeObjSpec([same = Set(0)], Open, NewObj, 0)]\n",
             tree);
@@ -528,8 +511,7 @@ TEST(ProjSpecTest, ConstCompose) {
         ASSERT_TRUE(runPathLower(tree));
         ASSERT_EXPLAIN_V2Compact_AUTO(
             "FunctionCall [makeBsonObj]\n"
-            "|   |   |   Const [[]]\n"
-            "|   |   Const [false]\n"
+            "|   |   Const [[]]\n"
             "|   Variable [foo]\n"
             "Const [MakeObjSpec([same = Set(0)], Open, NewObj, 0)]\n",
             tree);
@@ -550,8 +532,7 @@ TEST(ProjSpecTest, ConstCompose) {
         ASSERT_TRUE(runPathLower(tree));
         ASSERT_EXPLAIN_V2Compact_AUTO(
             "FunctionCall [makeBsonObj]\n"
-            "|   |   |   Const [[]]\n"
-            "|   |   Const [false]\n"
+            "|   |   Const [[]]\n"
             "|   Variable [foo]\n"
             "Const [MakeObjSpec([same = Set(0)], Open, NewObj, 0)]\n",
             tree);
@@ -574,8 +555,7 @@ TEST(ProjSpecTest, ConstCompose) {
         ASSERT_TRUE(runPathLower(tree));
         ASSERT_EXPLAIN_V2Compact_AUTO(
             "FunctionCall [makeBsonObj]\n"
-            "|   |   |   Const [[]]\n"
-            "|   |   Const [false]\n"
+            "|   |   Const [[]]\n"
             "|   Variable [foo]\n"
             "Const [MakeObjSpec([same = Set(0)], Open, NewObj, 0)]\n",
             tree);
@@ -600,8 +580,7 @@ TEST(ProjSpecTest, ConstCompose) {
         ASSERT_TRUE(runPathLower(tree));
         ASSERT_EXPLAIN_V2Compact_AUTO(
             "FunctionCall [makeBsonObj]\n"
-            "|   |   |   Const [[]]\n"
-            "|   |   Const [false]\n"
+            "|   |   Const [[]]\n"
             "|   Variable [foo]\n"
             "Const [MakeObjSpec([same = Set(0)], Closed, NewObj, 0)]\n",
             tree);
@@ -624,8 +603,7 @@ TEST(ProjSpecTest, ConstCompose) {
         ASSERT_TRUE(runPathLower(tree));
         ASSERT_EXPLAIN_V2Compact_AUTO(
             "FunctionCall [makeBsonObj]\n"
-            "|   |   |   Const [[]]\n"
-            "|   |   Const [false]\n"
+            "|   |   Const [[]]\n"
             "|   Variable [foo]\n"
             "Const [MakeObjSpec([same = Set(0)], Open, NewObj, 0)]\n",
             tree);
@@ -671,8 +649,7 @@ TEST(ProjSpecTest, RightLambdaMerge) {
         ASSERT_TRUE(runPathLower(tree, true /* constFold */));
         ASSERT_EXPLAIN_V2Compact_AUTO(
             "FunctionCall [makeBsonObj]\n"
-            "|   |   |   LambdaAbstraction [id] Variable [id]\n"
-            "|   |   Const [false]\n"
+            "|   |   LambdaAbstraction [id] Variable [id]\n"
             "|   Variable [foo]\n"
             "Const [MakeObjSpec([same = Lambda(0, false)], Closed, NewObj, 0)]\n",
             tree);
@@ -708,7 +685,6 @@ TEST(ProjSpecTest, RightMakeObjMerge) {
         ASSERT_TRUE(runPathLower(tree));
         ASSERT_EXPLAIN_V2Compact_AUTO(
             "FunctionCall [makeBsonObj]\n"
-            "|   |   Const [false]\n"
             "|   Variable [foo]\n"
             "Const [MakeObjSpec([same = MakeObj([inner = MakeObj([], Open, RetInput, 0)], Open, "
             "RetInput, 0)], Open, RetInput, 0)]\n",
@@ -728,7 +704,6 @@ TEST(ProjSpecTest, RightMakeObjMerge) {
         ASSERT_TRUE(runPathLower(tree));
         ASSERT_EXPLAIN_V2Compact_AUTO(
             "FunctionCall [makeBsonObj]\n"
-            "|   |   Const [false]\n"
             "|   Variable [foo]\n"
             "Const [MakeObjSpec([same = MakeObj([inner = MakeObj([], Open, RetInput, 0), other], "
             "Closed, RetInput, 0)], Open, RetInput, 0)]\n",
@@ -748,7 +723,6 @@ TEST(ProjSpecTest, RightMakeObjMerge) {
         ASSERT_TRUE(runPathLower(tree));
         ASSERT_EXPLAIN_V2Compact_AUTO(
             "FunctionCall [makeBsonObj]\n"
-            "|   |   Const [false]\n"
             "|   Variable [foo]\n"
             "Const [MakeObjSpec([same = MakeObj([inner = MakeObj([], Open, RetInput, 0)], Open, "
             "RetInput, 0)], Closed, RetInput, 0)]\n",
@@ -793,8 +767,7 @@ TEST(ProjSpecTest, RightKeepMerge) {
         ASSERT_TRUE(runPathLower(tree));
         ASSERT_EXPLAIN_V2Compact_AUTO(
             "FunctionCall [makeBsonObj]\n"
-            "|   |   |   Const [{}]\n"
-            "|   |   Const [false]\n"
+            "|   |   Const [{}]\n"
             "|   Variable [foo]\n"
             "Const [MakeObjSpec([same = Set(0)], Closed, NewObj, 0)]\n",
             tree);
@@ -813,11 +786,10 @@ TEST(ProjSpecTest, RightKeepMerge) {
         ASSERT_TRUE(runPathLower(tree, true /* constFold */));
         ASSERT_EXPLAIN_V2Compact_AUTO(
             "FunctionCall [makeBsonObj]\n"
-            "|   |   |   LambdaAbstraction [valArr_0] If []\n"
-            "|   |   |   |   |   Const [Nothing]\n"
-            "|   |   |   |   Variable [valArr_0]\n"
-            "|   |   |   FunctionCall [isArray] Variable [valArr_0]\n"
-            "|   |   Const [false]\n"
+            "|   |   LambdaAbstraction [valArr_0] If []\n"
+            "|   |   |   |   Const [Nothing]\n"
+            "|   |   |   Variable [valArr_0]\n"
+            "|   |   FunctionCall [isArray] Variable [valArr_0]\n"
             "|   Variable [foo]\n"
             "Const [MakeObjSpec([same = Lambda(0, false)], Closed, NewObj, 0)]\n",
             tree);
@@ -834,11 +806,10 @@ TEST(ProjSpecTest, RightKeepMerge) {
         ASSERT_TRUE(runPathLower(tree, true /* constFold */));
         ASSERT_EXPLAIN_V2Compact_AUTO(
             "FunctionCall [makeBsonObj]\n"
-            "|   |   |   LambdaAbstraction [valDefault_0] If []\n"
-            "|   |   |   |   |   Const [null]\n"
-            "|   |   |   |   Variable [valDefault_0]\n"
-            "|   |   |   FunctionCall [exists] Variable [valDefault_0]\n"
-            "|   |   Const [false]\n"
+            "|   |   LambdaAbstraction [valDefault_0] If []\n"
+            "|   |   |   |   Const [null]\n"
+            "|   |   |   Variable [valDefault_0]\n"
+            "|   |   FunctionCall [exists] Variable [valDefault_0]\n"
             "|   Variable [foo]\n"
             "Const [MakeObjSpec([same = Lambda(0, false)], Closed, NewObj, 0)]\n",
             tree);
@@ -857,7 +828,6 @@ TEST(ProjSpecTest, RightKeepMerge) {
         ASSERT_TRUE(runPathLower(tree));
         ASSERT_EXPLAIN_V2Compact_AUTO(
             "FunctionCall [makeBsonObj]\n"
-            "|   |   Const [false]\n"
             "|   Variable [foo]\n"
             "Const [MakeObjSpec([same = MakeObj([inner = MakeObj([], Open, RetInput, 0)], Open, "
             "RetInput, 0)], Closed, RetInput, 0)]\n",
@@ -875,7 +845,6 @@ TEST(ProjSpecTest, RightKeepMerge) {
         ASSERT_TRUE(runPathLower(tree));
         ASSERT_EXPLAIN_V2Compact_AUTO(
             "FunctionCall [makeBsonObj]\n"
-            "|   |   Const [false]\n"
             "|   Variable [foo]\n"
             "Const [MakeObjSpec([same = MakeObj([], Open, RetInput, 0)], Closed, RetInput, 0)]\n",
             tree);
@@ -896,7 +865,6 @@ TEST(ProjSpecTest, RightKeepMerge) {
         ASSERT_TRUE(runPathLower(tree));
         ASSERT_EXPLAIN_V2Compact_AUTO(
             "FunctionCall [makeBsonObj]\n"
-            "|   |   Const [false]\n"
             "|   Variable [foo]\n"
             "Const [MakeObjSpec([same], Closed, RetInput, 0)]\n",
             tree);
@@ -914,7 +882,6 @@ TEST(ProjSpecTest, RightKeepMerge) {
         ASSERT_TRUE(runPathLower(tree));
         ASSERT_EXPLAIN_V2Compact_AUTO(
             "FunctionCall [makeBsonObj]\n"
-            "|   |   Const [false]\n"
             "|   Variable [foo]\n"
             "Const [MakeObjSpec([same1, same2, same3], Closed, RetInput, 0)]\n",
             tree);
@@ -933,7 +900,6 @@ TEST(ProjSpecTest, RightKeepMerge) {
         ASSERT_TRUE(runPathLower(tree));
         ASSERT_EXPLAIN_V2Compact_AUTO(
             "FunctionCall [makeBsonObj]\n"
-            "|   |   Const [false]\n"
             "|   Variable [foo]\n"
             "Const [MakeObjSpec([same], Closed, RetInput, 0)]\n",
             tree);
@@ -951,7 +917,6 @@ TEST(ProjSpecTest, RightKeepMerge) {
         ASSERT_TRUE(runPathLower(tree));
         ASSERT_EXPLAIN_V2Compact_AUTO(
             "FunctionCall [makeBsonObj]\n"
-            "|   |   Const [false]\n"
             "|   Variable [foo]\n"
             "Const [MakeObjSpec([same2, same3], Closed, RetInput, 0)]\n",
             tree);
@@ -969,7 +934,6 @@ TEST(ProjSpecTest, RightKeepMerge) {
         ASSERT_TRUE(runPathLower(tree));
         ASSERT_EXPLAIN_V2Compact_AUTO(
             "FunctionCall [makeBsonObj]\n"
-            "|   |   Const [false]\n"
             "|   Variable [foo]\n"
             "Const [MakeObjSpec([], Closed, RetInput, 0)]\n",
             tree);
@@ -988,7 +952,6 @@ TEST(ProjSpecTest, RightKeepMerge) {
         ASSERT_TRUE(runPathLower(tree));
         ASSERT_EXPLAIN_V2Compact_AUTO(
             "FunctionCall [makeBsonObj]\n"
-            "|   |   Const [false]\n"
             "|   Variable [foo]\n"
             "Const [MakeObjSpec([], Closed, RetInput, 0)]\n",
             tree);
@@ -1006,7 +969,6 @@ TEST(ProjSpecTest, RightKeepMerge) {
         ASSERT_TRUE(runPathLower(tree));
         ASSERT_EXPLAIN_V2Compact_AUTO(
             "FunctionCall [makeBsonObj]\n"
-            "|   |   Const [false]\n"
             "|   Variable [foo]\n"
             "Const [MakeObjSpec([], Closed, RetInput, 0)]\n",
             tree);
@@ -1026,7 +988,6 @@ TEST(ProjSpecTest, RightKeepMerge) {
         ASSERT_TRUE(runPathLower(tree));
         ASSERT_EXPLAIN_V2Compact_AUTO(
             "FunctionCall [makeBsonObj]\n"
-            "|   |   Const [false]\n"
             "|   Variable [foo]\n"
             "Const [MakeObjSpec([other], Closed, RetInput, 0)]\n",
             tree);
@@ -1044,7 +1005,6 @@ TEST(ProjSpecTest, RightKeepMerge) {
         ASSERT_TRUE(runPathLower(tree));
         ASSERT_EXPLAIN_V2Compact_AUTO(
             "FunctionCall [makeBsonObj]\n"
-            "|   |   Const [false]\n"
             "|   Variable [foo]\n"
             "Const [MakeObjSpec([], Closed, RetInput, 0)]\n",
             tree);
@@ -1073,7 +1033,6 @@ TEST(ProjSpecTest, RightDropMerge) {
         ASSERT_TRUE(runPathLower(tree));
         ASSERT_EXPLAIN_V2Compact_AUTO(
             "FunctionCall [makeBsonObj]\n"
-            "|   |   Const [false]\n"
             "|   Variable [foo]\n"
             "Const [MakeObjSpec([same], Open, NewObj, 0)]\n",
             tree);
@@ -1092,7 +1051,6 @@ TEST(ProjSpecTest, RightDropMerge) {
         ASSERT_TRUE(runPathLower(tree));
         ASSERT_EXPLAIN_V2Compact_AUTO(
             "FunctionCall [makeBsonObj]\n"
-            "|   |   Const [false]\n"
             "|   Variable [foo]\n"
             "Const [MakeObjSpec([same], Open, NewObj, 0)]\n",
             tree);
@@ -1109,7 +1067,6 @@ TEST(ProjSpecTest, RightDropMerge) {
         ASSERT_TRUE(runPathLower(tree));
         ASSERT_EXPLAIN_V2Compact_AUTO(
             "FunctionCall [makeBsonObj]\n"
-            "|   |   Const [false]\n"
             "|   Variable [foo]\n"
             "Const [MakeObjSpec([same], Open, NewObj, 0)]\n",
             tree);
@@ -1128,7 +1085,6 @@ TEST(ProjSpecTest, RightDropMerge) {
         ASSERT_TRUE(runPathLower(tree));
         ASSERT_EXPLAIN_V2Compact_AUTO(
             "FunctionCall [makeBsonObj]\n"
-            "|   |   Const [false]\n"
             "|   Variable [foo]\n"
             "Const [MakeObjSpec([same], Open, RetInput, 0)]\n",
             tree);
@@ -1145,7 +1101,6 @@ TEST(ProjSpecTest, RightDropMerge) {
         ASSERT_TRUE(runPathLower(tree));
         ASSERT_EXPLAIN_V2Compact_AUTO(
             "FunctionCall [makeBsonObj]\n"
-            "|   |   Const [false]\n"
             "|   Variable [foo]\n"
             "Const [MakeObjSpec([same], Open, RetInput, 0)]\n",
             tree);
@@ -1163,7 +1118,6 @@ TEST(ProjSpecTest, RightDropMerge) {
         ASSERT_TRUE(runPathLower(tree));
         ASSERT_EXPLAIN_V2Compact_AUTO(
             "FunctionCall [makeBsonObj]\n"
-            "|   |   Const [false]\n"
             "|   Variable [foo]\n"
             "Const [MakeObjSpec([same], Open, RetInput, 0)]\n",
             tree);
@@ -1181,7 +1135,6 @@ TEST(ProjSpecTest, RightDropMerge) {
         ASSERT_TRUE(runPathLower(tree));
         ASSERT_EXPLAIN_V2Compact_AUTO(
             "FunctionCall [makeBsonObj]\n"
-            "|   |   Const [false]\n"
             "|   Variable [foo]\n"
             "Const [MakeObjSpec([same1, same2, same3], Open, RetInput, 0)]\n",
             tree);
@@ -1199,7 +1152,6 @@ TEST(ProjSpecTest, RightDropMerge) {
         ASSERT_TRUE(runPathLower(tree));
         ASSERT_EXPLAIN_V2Compact_AUTO(
             "FunctionCall [makeBsonObj]\n"
-            "|   |   Const [false]\n"
             "|   Variable [foo]\n"
             "Const [MakeObjSpec([a, b, c, d, e], Open, RetInput, 0)]\n",
             tree);
@@ -1219,7 +1171,6 @@ TEST(ProjSpecTest, RightDropMerge) {
         ASSERT_TRUE(runPathLower(tree));
         ASSERT_EXPLAIN_V2Compact_AUTO(
             "FunctionCall [makeBsonObj]\n"
-            "|   |   Const [false]\n"
             "|   Variable [foo]\n"
             "Const [MakeObjSpec([], Closed, RetInput, 0)]\n",
             tree);
@@ -1238,7 +1189,6 @@ TEST(ProjSpecTest, RightDropMerge) {
         ASSERT_TRUE(runPathLower(tree));
         ASSERT_EXPLAIN_V2Compact_AUTO(
             "FunctionCall [makeBsonObj]\n"
-            "|   |   Const [false]\n"
             "|   Variable [foo]\n"
             "Const [MakeObjSpec([same1], Closed, RetInput, 0)]\n",
             tree);
@@ -1271,7 +1221,6 @@ TEST(ProjSpecTest, ConflictingKeepDropComposition) {
     // Drop the conflicting path.
     ASSERT_EXPLAIN_V2Compact_AUTO(
         "FunctionCall [makeBsonObj]\n"
-        "|   |   Const [false]\n"
         "|   Variable [foo]\n"
         "Const [MakeObjSpec([outer = MakeObj([], Closed, RetNothing, 0), _id], Closed, "
         "RetNothing, 0)]\n",
@@ -1291,7 +1240,6 @@ TEST(ProjSpecTest, NewObj) {
     ASSERT_TRUE(runPathLower(tree));
     ASSERT_EXPLAIN_V2Compact_AUTO(
         "FunctionCall [makeBsonObj]\n"
-        "|   |   Const [false]\n"
         "|   Variable [foo]\n"
         "Const [MakeObjSpec([], Open, NewObj, 0)]\n",
         tree);
@@ -1313,8 +1261,7 @@ TEST(ProjSpecTest, NewObjLeft) {
     ASSERT_TRUE(runPathLower(tree));
     ASSERT_EXPLAIN_V2Compact_AUTO(
         "FunctionCall [makeBsonObj]\n"
-        "|   |   |   Const [\"abc\"]\n"
-        "|   |   Const [false]\n"
+        "|   |   Const [\"abc\"]\n"
         "|   Variable [foo]\n"
         "Const [MakeObjSpec([a = Set(0)], Open, NewObj, 0)]\n",
         tree);
@@ -1344,8 +1291,7 @@ TEST(ProjSpecTest, LClosedROpen) {
     ASSERT_TRUE(runPathLower(tree));
     ASSERT_EXPLAIN_V2Compact_AUTO(
         "FunctionCall [makeBsonObj]\n"
-        "|   |   |   Const [42]\n"
-        "|   |   Const [false]\n"
+        "|   |   Const [42]\n"
         "|   Variable [foo]\n"
         "Const [MakeObjSpec([a = Set(0)], Closed, NewObj, 0)]\n",
         tree);
