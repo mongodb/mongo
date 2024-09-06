@@ -251,6 +251,8 @@ last-continuous:
       ticket: SERVER-94151
     - test_file: jstests/core/write/update/upsert_duplicate_key_retry_collation.js
       ticket: SERVER-84089
+    - test_file: jstests/core/ddl/create_indexes.js
+      ticket: SERVER-90952
   suites: null
 last-lts:
   all:
@@ -516,4 +518,6 @@ last-lts:
       ticket: SERVER-94151
     - test_file: jstests/core/write/update/upsert_duplicate_key_retry_collation.js
       ticket: SERVER-84089
+    - test_file: jstests/core/ddl/create_indexes.js
+      ticket: SERVER-90952
   suites: null

@@ -6,7 +6,6 @@
  *   cannot_run_during_upgrade_downgrade,
  *   # simulate_atlas_proxy.js can't simulate req on config.transaction as tested
  *   simulate_atlas_proxy_incompatible,
- *   multiversion_incompatible,
  * ]
  * fcv49 for the change to error code in createIndexes invalid field reply.
  */
