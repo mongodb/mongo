@@ -1165,6 +1165,7 @@ MONGO_GLOBAL_INCLUDE_DIRECTORIES = [
     "-I$(GENDIR)/src",
     "-Isrc/third_party/immer/dist",
     "-Isrc/third_party/SafeInt",
+    "-I$(GENDIR)/src/mongo/db/modules/enterprise/src",
     "-Isrc/mongo/db/modules/enterprise/src",
 ]
 

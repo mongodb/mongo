@@ -52,3 +52,25 @@ idl_generator(
         "//src/mongo/idl:cluster_server_parameter_gen",
     ],
 )
+
+mongo_cc_library(
+    name = "manager",
+    srcs = [
+        "query_settings_manager.cpp",
+        ":query_settings_cluster_parameter_gen",
+    ],
+    hdrs = [
+        "query_settings_manager.h",
+    ],
+    deps = [
+        ":query_settings",
+        "//src/mongo/crypto:sha256_block",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/db:server_base",
+        "//src/mongo/db:service_context",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/db/commands:server_status_core",
+        "//src/mongo/db/concurrency:exception_util",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/db/concurrency:lock_manager",
+        "//src/mongo/db/query:query_knobs",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/idl:cluster_server_parameter",  # TODO(SERVER-93876): Remove.
+    ],
+)

@@ -5,23 +5,6 @@ Import("env", "get_option")
 env = env.Clone()
 
 env.Library(
-    target="authentication_session",
-    source=[
-        "authentication_session.cpp",
-    ],
-    LIBDEPS=[
-        "auth",
-        "saslauth",
-    ],
-    LIBDEPS_PRIVATE=[
-        "$BUILD_DIR/mongo/db/audit",
-        "$BUILD_DIR/mongo/db/connection_health_metrics_parameter",
-        "$BUILD_DIR/mongo/db/service_context",
-        "$BUILD_DIR/mongo/db/stats/counters",
-    ],
-)
-
-env.Library(
     target="auth_impl_internal",
     source=[
         "authorization_manager_impl.cpp",
@@ -164,66 +147,6 @@ env.Library(
 )
 
 env.Library(
-    target="auth_umc",
-    source=[
-        "impersonation_session.cpp",
-        "user_management_commands_parser.cpp",
-    ],
-    LIBDEPS_PRIVATE=[
-        "$BUILD_DIR/mongo/bson/mutable/mutable_bson",
-        "$BUILD_DIR/mongo/bson/util/bson_extract",
-        "$BUILD_DIR/mongo/db/common",
-        "$BUILD_DIR/mongo/db/server_base",
-        "$BUILD_DIR/mongo/rpc/metadata_impersonated_user",
-        "address_restriction",
-        "auth",
-        "authprivilege",
-    ],
-)
-
-env.Library(
-    target="authorization_manager_global",
-    source=[
-        "authorization_manager_global.cpp",
-        "authorization_manager_global_parameters_gen.cpp",
-    ],
-    LIBDEPS=[
-        "auth",
-    ],
-    LIBDEPS_PRIVATE=[
-        "$BUILD_DIR/mongo/client/authentication",
-        "$BUILD_DIR/mongo/db/server_base",
-        "$BUILD_DIR/mongo/db/service_context",
-        "$BUILD_DIR/mongo/util/net/ssl_manager",
-        "$BUILD_DIR/mongo/util/net/ssl_parameters_auth",
-        "cluster_auth_mode",
-        "security_key",
-    ],
-)
-
-env.Library(
-    target="security_key",
-    source=[
-        "security_key.cpp",
-    ],
-    LIBDEPS=[
-        "$BUILD_DIR/mongo/base",
-    ],
-    LIBDEPS_PRIVATE=[
-        "$BUILD_DIR/mongo/base/secure_allocator",
-        "$BUILD_DIR/mongo/client/authentication",
-        "$BUILD_DIR/mongo/crypto/sha_block_${MONGO_CRYPTO}",
-        "$BUILD_DIR/mongo/util/icu",
-        "$BUILD_DIR/mongo/util/md5",
-        "auth",
-        "cluster_auth_mode",
-        "sasl_options",
-        "security_file",
-        "user",
-    ],
-)
-
-env.Library(
     target="sasl_commands",
     source=[
         "sasl_commands.cpp",
@@ -239,83 +162,6 @@ env.Library(
         "authentication_session",
         "authorization_manager_global",
         "saslauth",
-    ],
-)
-
-yamlEnv = env.Clone()
-yamlEnv.InjectThirdParty(libraries=["yaml"])
-yamlEnv.Library(
-    target="security_file",
-    source=[
-        "security_file.cpp",
-    ],
-    LIBDEPS=[
-        "$BUILD_DIR/mongo/base",
-    ],
-    LIBDEPS_PRIVATE=[
-        "$BUILD_DIR/third_party/yaml-cpp/yaml",
-    ],
-)
-
-env.Library(
-    target="sasl_options_init",
-    source=[
-        "sasl_options_init.cpp",
-        "sasl_options_gen.cpp",
-    ],
-    LIBDEPS=[
-        "sasl_options",
-    ],
-    LIBDEPS_PRIVATE=[
-        "$BUILD_DIR/mongo/util/net/network",
-        "$BUILD_DIR/mongo/util/options_parser/options_parser",
-    ],
-)
-
-env.Library(
-    target="sasl_mechanism_protocol",
-    source=[
-        "oauth_authorization_server_metadata_gen.cpp",
-        "oauth_discovery_factory.cpp",
-        "oidc_protocol_gen.cpp",
-        "x509_protocol_gen.cpp",
-    ],
-    LIBDEPS_PRIVATE=[
-        "$BUILD_DIR/mongo/base",
-        "$BUILD_DIR/mongo/idl/idl_parser",
-        "$BUILD_DIR/mongo/util/net/http_client",
-    ],
-)
-
-env.Library(
-    target="saslauth",
-    source=[
-        "sasl_mechanism_registry.cpp",
-        "sasl_plain_server_conversation.cpp",
-        "sasl_scram_server_conversation.cpp",
-        "sasl_x509_server_conversation.cpp" if get_option("ssl") == "on" else [],
-    ],
-    LIBDEPS=[
-        "$BUILD_DIR/mongo/base/secure_allocator",
-        "$BUILD_DIR/mongo/crypto/sha_block_${MONGO_CRYPTO}",
-        "$BUILD_DIR/mongo/db/commands/test_commands_enabled",
-        "$BUILD_DIR/mongo/util/icu",
-        "$BUILD_DIR/mongo/util/md5",
-        "$BUILD_DIR/mongo/util/net/network",
-        "auth",
-        "auth_options",
-        "authorization_manager_global",
-        "authprivilege",
-        "sasl_mechanism_protocol",
-        "sasl_options",
-        "user",
-    ],
-    LIBDEPS_PRIVATE=[
-        "$BUILD_DIR/mongo/db/connection_health_metrics_parameter",
-        "$BUILD_DIR/mongo/db/server_base",
-        "$BUILD_DIR/mongo/db/service_context",
-        "$BUILD_DIR/mongo/util/net/ssl_manager",
-        "cluster_auth_mode",
     ],
 )
 

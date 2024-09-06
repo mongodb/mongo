@@ -10,9 +10,40 @@ exports_files(
 )
 
 idl_generator(
-    name = "stats_gen",
+    name = "stats_gen_for_histograms",
     src = "stats.idl",
     deps = [
         "//src/mongo/db:basic_types_gen",
+    ],
+)
+
+mongo_cc_library(
+    name = "stats_histograms",
+    srcs = [
+        "array_histogram.cpp",
+        "scalar_histogram.cpp",
+        "value_utils.cpp",
+        ":stats_gen_for_histograms",
+    ],
+    hdrs = [
+        "array_histogram.h",
+        "scalar_histogram.h",
+        "value_utils.h",
+    ],
+    deps = [
+        "//src/mongo/db:sbe_values",
+    ],
+)
+
+mongo_cc_library(
+    name = "stats_gen",
+    srcs = [
+        "max_diff.cpp",
+    ],
+    hdrs = [
+        "max_diff.h",
+    ],
+    deps = [
+        ":stats_histograms",
     ],
 )

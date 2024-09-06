@@ -4,33 +4,6 @@ Import("env")
 
 env = env.Clone()
 
-env.Library(
-    target="sdam",
-    source=[
-        "sdam_configuration.cpp",
-        "sdam_configuration_parameters_gen.cpp",
-        "sdam_datatypes.cpp",
-        "server_description.cpp",
-        "server_selector.cpp",
-        "topology_description.cpp",
-        "topology_listener.cpp",
-        "topology_manager.cpp",
-        "topology_state_machine.cpp",
-    ],
-    LIBDEPS=[
-        "$BUILD_DIR/mongo/client/read_preference",
-        "$BUILD_DIR/mongo/db/repl/optime",
-        "$BUILD_DIR/mongo/db/wire_version",
-        "$BUILD_DIR/mongo/executor/task_executor_interface",
-        "$BUILD_DIR/mongo/rpc/metadata",
-        "$BUILD_DIR/mongo/util/clock_sources",
-    ],
-    LIBDEPS_PRIVATE=[
-        "$BUILD_DIR/mongo/db/server_base",
-        "$BUILD_DIR/mongo/util/fail_point",
-    ],
-)
-
 sdam_json_test = env.Program(
     target="sdam_json_test",
     source=[

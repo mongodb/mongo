@@ -9,11 +9,98 @@ exports_files(
     ]),
 )
 
+mongo_cc_library(
+    name = "aead_encryption",
+    srcs = [
+        "aead_encryption.cpp",
+    ],
+    hdrs = [
+        "aead_encryption.h",
+    ],
+    deps = [
+        ":fle_fields",
+        ":sha_block",
+        ":symmetric_crypto",  # TODO(SERVER-93876): Remove.
+    ],
+)
+
 idl_generator(
     name = "encryption_fields_gen",
     src = "encryption_fields.idl",
     deps = [
         "//src/mongo/db:basic_types_gen",
+    ],
+)
+
+mongo_cc_library(
+    name = "encrypted_field_config",
+    srcs = [
+        "encryption_fields_gen",
+        "encryption_fields_validation.cpp",
+        "fle_numeric.cpp",
+    ],
+    hdrs = [
+        "encryption_fields_validation.h",
+        "fle_numeric.h",
+    ],
+    deps = [
+        "//src/mongo/db:common",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/db:server_base",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/db:server_feature_flags",
+        "//src/mongo/db/pipeline:value_idl",
+    ],
+)
+
+mongo_cc_library(
+    name = "fle_fields",
+    srcs = [
+        "fle_field_schema_gen",
+        "fle_fields_util.cpp",
+    ],
+    hdrs = [
+        "fle_fields_util.h",
+    ],
+    deps = [
+        ":encrypted_field_config",
+        "//src/mongo/db:server_base",  # TODO(SERVER-93876): Remove.
+    ],
+)
+
+mongo_cc_library(
+    name = "fle_crypto",
+    srcs = [
+        "encryption_fields_util.cpp",
+        "fle_crypto.cpp",
+        "fle_options_gen",
+        "fle_stats.cpp",
+        "fle_stats_gen",
+        "fle_tags.cpp",
+        "fle_tokens_gen",
+    ],
+    hdrs = [
+        "encryption_fields_util.h",
+        "fle_crypto.h",
+        "fle_stats.h",
+        "fle_tags.h",
+    ],
+    deps = [
+        # TODO(SERVER-93876): Remove many of these.
+        "//src/mongo/base:secure_allocator",
+        "//src/mongo/bson/util:bson_extract",
+        "//src/mongo/db/commands:server_status_core",
+        "//src/mongo/db/exec/document_value",
+        "//src/mongo/db/query:query_knobs",
+        "//src/mongo/db:common",
+        "//src/mongo/db:server_base",
+        "//src/mongo/db:server_feature_flags",
+        "//src/mongo/idl:cluster_server_parameter",
+        "//src/mongo/shell:kms_idl",
+        "//src/mongo/util:testing_options",
+        "//src/third_party/libmongocrypt:mongocrypt",
+        ":aead_encryption",
+        ":encrypted_field_config",
+        ":fle_fields",
+        ":sha_block",
     ],
 )
 
@@ -113,37 +200,49 @@ mongo_cc_library(
     ],
 )
 
-[
-    mongo_cc_library(
-        name = "sha_block_{}".format(mongo_crypto),
-        srcs = [
+mongo_cc_library(
+    name = "sha_block",
+    srcs = select({
+        "//bazel/config:mongo_crypto_{}".format(mongo_crypto): [
             "sha_block_{}.cpp".format(mongo_crypto),
-        ],
-        hdrs = [
-            "hash_block.h",
-            "sha512_block.h",
-        ],
-        header_deps = [
-            "//src/mongo/db/concurrency:flow_control_ticketholder",
-        ],
-        local_defines = ["LTC_NO_PROTOTYPES"] if mongo_crypto == "tom" else [],
-        target_compatible_with = select({
-            "//bazel/config:mongo_crypto_{}".format(mongo_crypto): [],
-            "//conditions:default": ["@platforms//:incompatible"],
-        }),
-        deps = [
-            ":sha1_block",
-            ":sha256_block",
-            "//src/mongo:base",
-        ],
-    )
-    for mongo_crypto in [
-        "windows",
-        "apple",
-        "openssl",
-        "tom",
-    ]
-]
+        ]
+        for mongo_crypto in [
+            "windows",
+            "apple",
+            "openssl",
+            "tom",
+        ]
+    } | {
+        "//conditions:default": ["@platforms//:incompatible"],
+    }),
+    hdrs = [
+        "hash_block.h",
+        "sha512_block.h",
+    ],
+    header_deps = [
+        "//src/mongo/db/concurrency:flow_control_ticketholder",
+    ],
+    local_defines = select({
+        "//bazel/config:mongo_crypto_tom": ["LTC_NO_PROTOTYPES"],
+        "//conditions:default": [],
+    }),
+    target_compatible_with = select({
+        "//bazel/config:mongo_crypto_{}".format(mongo_crypto): []
+        for mongo_crypto in [
+            "windows",
+            "apple",
+            "openssl",
+            "tom",
+        ]
+    } | {
+        "//conditions:default": ["@platforms//:incompatible"],
+    }),
+    deps = [
+        ":sha1_block",
+        ":sha256_block",
+        "//src/mongo:base",
+    ],
+)
 
 mongo_cc_library(
     name = "symmetric_crypto",

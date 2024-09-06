@@ -5,31 +5,6 @@ Import("env")
 env = env.Clone()
 
 env.Library(
-    target="update_metrics",
-    source=[
-        "update_metrics.cpp",
-    ],
-    LIBDEPS_PRIVATE=[
-        "$BUILD_DIR/mongo/db/commands/server_status_core",
-        "$BUILD_DIR/mongo/db/ops/write_ops_parsers",
-    ],
-)
-
-env.Library(
-    target="write_commands_common",
-    source=[
-        "write_commands_common.cpp",
-    ],
-    LIBDEPS_PRIVATE=[
-        "$BUILD_DIR/mongo/db/auth/auth",
-        "$BUILD_DIR/mongo/db/auth/authprivilege",
-        "$BUILD_DIR/mongo/db/ops/write_ops_parsers",
-        "$BUILD_DIR/mongo/db/pipeline/lite_parsed_document_source",
-        "update_metrics",
-    ],
-)
-
-env.Library(
     target="bulk_write_common",
     source=[
         "bulk_write_common.cpp",
@@ -45,23 +20,6 @@ env.Library(
         "bulk_write_parser",
         "update_metrics",
         "write_commands_common",
-    ],
-)
-
-env.Library(
-    target="bulk_write_parser",
-    source=[
-        "bulk_write_gen.cpp",
-        "bulk_write_parser.cpp",
-        "bulk_write_crud_op.cpp",
-    ],
-    LIBDEPS_PRIVATE=[
-        "$BUILD_DIR/mongo/crypto/fle_fields",
-        "$BUILD_DIR/mongo/db/commands",
-        "$BUILD_DIR/mongo/db/ops/write_ops_parsers",
-        "$BUILD_DIR/mongo/db/server_base",
-        "$BUILD_DIR/mongo/db/service_context",
-        "$BUILD_DIR/mongo/s/common_s",
     ],
 )
 
@@ -131,23 +89,6 @@ env.Library(
         "$BUILD_DIR/mongo/db/query/query_settings/utils",
         "$BUILD_DIR/mongo/db/query/query_shape/query_shape",
         "$BUILD_DIR/mongo/db/repl/repl_settings",
-    ],
-)
-
-env.Library(
-    target="current_op_common",
-    source=[
-        "current_op_common.cpp",
-    ],
-    LIBDEPS=[
-        "$BUILD_DIR/mongo/db/commands",
-    ],
-    LIBDEPS_PRIVATE=[
-        "$BUILD_DIR/mongo/db/commands/test_commands_enabled",
-        "$BUILD_DIR/mongo/db/pipeline/aggregation_request_helper",
-        "$BUILD_DIR/mongo/db/query/command_request_response",
-        "$BUILD_DIR/mongo/db/server_base",
-        "$BUILD_DIR/mongo/db/service_context",
     ],
 )
 

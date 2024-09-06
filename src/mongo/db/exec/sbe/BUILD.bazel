@@ -10,6 +10,23 @@ exports_files(
 )
 
 mongo_cc_library(
+    name = "query_sbe_makeobj_spec",
+    srcs = [
+        "makeobj_spec.cpp",
+        "size_estimator.cpp",
+    ],
+    hdrs = [
+        "makeobj_spec.h",
+        "size_estimator.h",
+    ],
+    deps = [
+        "//src/mongo:base",
+        "//src/mongo/db:sbe_values",
+        "//src/mongo/util:field_set",  # TODO(SERVER-93876): Remove.
+    ],
+)
+
+mongo_cc_library(
     name = "query_sbe_plan_stats",
     srcs = [
         "//src/mongo/db/exec/sbe/stages:plan_stats.cpp",

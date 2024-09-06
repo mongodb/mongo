@@ -39,3 +39,26 @@ idl_generator(
         "//src/mongo/db:basic_types_gen",
     ],
 )
+
+mongo_cc_library(
+    name = "column_store_index",
+    srcs = [
+        "column_cell.cpp",
+        "column_store_sorter.cpp",
+    ],
+    hdrs = [
+        "column_cell.h",
+        "column_key_generator.h",
+        "column_store_sorter.h",
+    ],
+    deps = [
+        "//src/mongo:base",
+        "//src/mongo/db:server_base",
+        "//src/mongo/db/sorter:sorter_base",
+        "//src/mongo/db/sorter:sorter_stats",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/db/storage:encryption_hooks",
+        "//src/mongo/db/storage:execution_context",
+        "//src/mongo/db/storage:storage_options",  # TODO(SERVER-93876): Remove.
+        "//src/third_party/snappy",
+    ],
+)

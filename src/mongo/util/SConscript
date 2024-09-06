@@ -84,7 +84,6 @@ if env.TargetOSIs("windows"):
 env.SConscript(
     must_exist=1,
     dirs=[
-        "cmdline_utils",
         "concurrency",
         "cryptd",
         "immutable",

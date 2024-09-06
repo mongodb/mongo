@@ -17,73 +17,6 @@ def shouldBuildGRPC(myEnv):
     return myEnv.TargetOSIs("linux") and myEnv["ENABLE_GRPC_BUILD"]
 
 
-# Contains only the core ConnectionString functionality, *not* the ability to call connect() and
-# return a DBClientBase* back. For that you need to link against the "clientdriver_network" library.
-env.Library(
-    target="connection_string",
-    source=[
-        "connection_string.cpp",
-        "mongo_uri.cpp",
-    ],
-    LIBDEPS=[
-        "$BUILD_DIR/mongo/util/net/network",
-    ],
-    LIBDEPS_PRIVATE=[
-        "$BUILD_DIR/mongo/util/dns_query",
-        "$BUILD_DIR/mongo/util/options_parser/options_parser",
-    ],
-)
-
-# Client-side SASL source necessary for native client SASL session.
-# Includes base types and OIDC, PLAIN, SCRAM, and AWS (only if TLS configured)
-# client mechs.
-nativeSaslClientEnv = env.Clone()
-nativeSaslClientSource = [
-    "native_sasl_client_session.cpp",
-    "sasl_client_authenticate.cpp",
-    "sasl_client_authenticate_impl.cpp",
-    "sasl_client_conversation.cpp",
-    "sasl_client_session.cpp",
-    "sasl_oidc_client_conversation.cpp",
-    "sasl_oidc_client_types_gen.cpp",
-    "sasl_plain_client_conversation.cpp",
-    "sasl_scram_client_conversation.cpp",
-    "sasl_x509_client_conversation.cpp" if get_option("ssl") == "on" else [],
-]
-
-if get_option("ssl") == "on":
-    nativeSaslClientSource.extend(
-        [
-            "sasl_aws_client_conversation.cpp",
-            "sasl_aws_client_options_gen.cpp",
-        ]
-    )
-
-nativeSaslClientEnv.Library(
-    target="native_sasl_client",
-    source=nativeSaslClientSource,
-    LIBDEPS=[
-        "$BUILD_DIR/mongo/base/secure_allocator",
-        "$BUILD_DIR/mongo/bson/util/bson_extract",
-        "$BUILD_DIR/mongo/executor/remote_command",
-        "$BUILD_DIR/mongo/rpc/command_status",
-        "$BUILD_DIR/mongo/rpc/metadata",
-        "$BUILD_DIR/mongo/util/icu",
-        "$BUILD_DIR/mongo/util/md5",
-        "$BUILD_DIR/mongo/util/net/network",
-        "$BUILD_DIR/mongo/util/options_parser/options_parser",
-        "sasl_aws_client" if get_option("ssl") == "on" else "",
-    ],
-    LIBDEPS_PRIVATE=[
-        "$BUILD_DIR/mongo/db/auth/sasl_mechanism_protocol",
-        "$BUILD_DIR/mongo/db/commands/server_status_core",
-        "$BUILD_DIR/mongo/db/server_base",
-        "$BUILD_DIR/mongo/shell/program_runner",
-        "$BUILD_DIR/mongo/util/net/http_client",
-        "connection_string",
-    ],
-)
-
 if env["MONGO_BUILD_SASL_CLIENT"]:
     # Client-side SASL source necessary for mongo shell.
     # Includes Cyrus SASL, OIDC, PLAIN, and AWS (if TLS support is on)
@@ -112,69 +45,10 @@ if env["MONGO_BUILD_SASL_CLIENT"]:
         ],
     )
 
-env.Library(
-    target="authentication",
-    source=[
-        "authenticate.cpp",
-    ],
-    LIBDEPS=[
-        "$BUILD_DIR/mongo/bson/util/bson_extract",
-        "$BUILD_DIR/mongo/executor/remote_command",
-        "internal_auth",
-        "native_sasl_client",
-    ],
-    LIBDEPS_PRIVATE=[
-        "$BUILD_DIR/mongo/db/auth/auth",
-        "$BUILD_DIR/mongo/db/server_base",
-        "connection_string",
-    ],
-)
-
-env.Library(
-    target="internal_auth",
-    source=[
-        "internal_auth.cpp",
-    ],
-    LIBDEPS=[
-        "$BUILD_DIR/mongo/bson/util/bson_extract",
-    ],
-    LIBDEPS_PRIVATE=[
-        "$BUILD_DIR/mongo/db/auth/auth",
-        "$BUILD_DIR/mongo/util/md5",
-        "connection_string",
-    ],
-)
-
 clientDriverEnv = env.Clone()
 clientDriverEnv.InjectThirdParty("asio")
 if shouldBuildGRPC(env):
     clientDriverEnv.InjectThirdParty(libraries=["grpc"])
-
-clientDriverEnv.Library(
-    target="clientdriver_minimal",
-    source=[
-        "client_api_version_parameters_gen.cpp",
-        "dbclient_base.cpp",
-        "dbclient_cursor.cpp",
-        "index_spec.cpp",
-    ],
-    LIBDEPS=[
-        "$BUILD_DIR/mongo/db/dbmessage",
-        "$BUILD_DIR/mongo/db/pipeline/aggregation_request_helper",
-        "$BUILD_DIR/mongo/db/query/command_request_response",
-        "$BUILD_DIR/mongo/db/query/query_request",
-        "$BUILD_DIR/mongo/db/wire_version",
-        "$BUILD_DIR/mongo/rpc/command_status",
-        "$BUILD_DIR/mongo/rpc/rpc",
-        "authentication",
-        "connection_string",
-        "read_preference",
-    ],
-    LIBDEPS_PRIVATE=[
-        "$BUILD_DIR/mongo/db/server_base",
-        "$BUILD_DIR/mongo/util/net/ssl_manager",
-    ],
-)
 
 clientDriverEnv.Library(
     target="clientdriver_network",
@@ -226,30 +100,6 @@ clientDriverEnv.Library(
 )
 
 env.Library(
-    target="async_client",
-    source=[
-        "async_client.cpp",
-    ],
-    LIBDEPS=[
-        "$BUILD_DIR/mongo/db/wire_version",
-        "$BUILD_DIR/mongo/rpc/command_status",
-        "$BUILD_DIR/mongo/rpc/rpc",
-        "$BUILD_DIR/mongo/transport/transport_layer_common",
-        "$BUILD_DIR/mongo/util/net/ssl_manager",
-        "authentication",
-    ],
-    LIBDEPS_PRIVATE=[
-        "$BUILD_DIR/mongo/db/commands/test_commands_enabled",
-        "$BUILD_DIR/mongo/db/connection_health_metrics_parameter",
-        "$BUILD_DIR/mongo/db/server_feature_flags",
-        "$BUILD_DIR/mongo/db/stats/counters",
-        "$BUILD_DIR/mongo/executor/egress_connection_closer_manager",
-        "$BUILD_DIR/mongo/transport/message_compressor",
-        "$BUILD_DIR/mongo/util/fail_point",
-    ],
-)
-
-env.Library(
     target="remote_command_targeter",
     source=[
         "remote_command_targeter_factory_impl.cpp",
@@ -283,32 +133,6 @@ env.Library(
         "$BUILD_DIR/mongo/client/clientdriver_network",
         "$BUILD_DIR/mongo/client/sdam/sdam_test_util",
         "$BUILD_DIR/mongo/util/net/network",
-    ],
-)
-
-env.Library(
-    target="fetcher",
-    source=[
-        "fetcher.cpp",
-    ],
-    LIBDEPS=[
-        "$BUILD_DIR/mongo/executor/task_executor_interface",
-        "$BUILD_DIR/mongo/rpc/command_status",
-        "remote_command_retry_scheduler",
-    ],
-    LIBDEPS_PRIVATE=[
-        "$BUILD_DIR/mongo/db/server_base",
-    ],
-)
-
-env.Library(
-    target="remote_command_retry_scheduler",
-    source=[
-        "remote_command_retry_scheduler.cpp",
-    ],
-    LIBDEPS=[
-        "$BUILD_DIR/mongo/base",
-        "$BUILD_DIR/mongo/executor/task_executor_interface",
     ],
 )
 

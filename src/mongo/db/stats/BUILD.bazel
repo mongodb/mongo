@@ -9,6 +9,39 @@ exports_files(
     ]),
 )
 
+mongo_cc_library(
+    name = "top",
+    srcs = [
+        "operation_latency_histogram.cpp",
+        "top.cpp",
+    ],
+    hdrs = [
+        "operation_latency_histogram.h",
+        "top.h",
+    ],
+    deps = [
+        "//src/mongo/db:server_base",
+        "//src/mongo/db:service_context",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/db/query/query_stats",
+    ],
+)
+
+mongo_cc_library(
+    name = "api_version_metrics",
+    srcs = [
+        "api_version_metrics.cpp",
+    ],
+    hdrs = [
+        "api_version_metrics.h",
+    ],
+    deps = [
+        "//src/mongo:base",
+        "//src/mongo/db:shared_request_handling",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/db:validate_api_parameters",
+        "//src/mongo/rpc:client_metadata",  # TODO(SERVER-93876): Remove.
+    ],
+)
+
 idl_generator(
     name = "read_concern_stats_gen",
     src = "read_concern_stats.idl",

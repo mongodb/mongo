@@ -16,6 +16,7 @@ mongo_cc_library(
         "element.cpp",
     ],
     hdrs = [
+        "algorithm.h",
         "const_element.h",
         "document.h",
         "element.h",

@@ -20,29 +20,6 @@ env.Library(
     ],
 )
 
-env.Library(
-    target="stats_histograms",
-    source=[
-        "array_histogram.cpp",
-        "scalar_histogram.cpp",
-        "stats_gen.cpp",
-        "value_utils.cpp",
-    ],
-    LIBDEPS=[
-        "$BUILD_DIR/mongo/db/sbe_values",
-    ],
-)
-
-env.Library(
-    target="stats_gen",
-    source=[
-        "max_diff.cpp",
-    ],
-    LIBDEPS=[
-        "stats_histograms",
-    ],
-)
-
 env.CppUnitTest(
     target="stats_cache_loader_test",
     source=[

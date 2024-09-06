@@ -18,6 +18,42 @@ idl_generator(
 )
 
 mongo_cc_library(
+    name = "timeseries_options",
+    srcs = [
+        "timeseries_gen",
+        "timeseries_global_options.cpp",
+        "timeseries_options.cpp",
+    ],
+    hdrs = [
+        "timeseries_global_options.h",
+        "timeseries_options.h",
+    ],
+    deps = [
+        "//src/mongo/db:server_base",
+        "//src/mongo/db/query/query_shape",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/db/storage:storage_options",
+        "//src/mongo/util:processinfo",
+    ],
+)
+
+mongo_cc_library(
+    name = "timeseries_extended_range",
+    srcs = [
+        "timeseries_constants.h",
+        "timeseries_extended_range.cpp",
+        "//src/mongo/db/commands:create_command_validation.h",
+    ],
+    hdrs = [
+        "timeseries_extended_range.h",
+    ],
+    deps = [
+        ":timeseries_options",  # TODO(SERVER-93876): Remove.
+        "//src/mongo:base",
+        "//src/mongo/db/catalog:index_catalog",
+    ],
+)
+
+mongo_cc_library(
     name = "timeseries_metadata",
     srcs = [
         "metadata.cpp",

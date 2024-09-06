@@ -9,42 +9,6 @@ Import(
 
 env = env.Clone()
 
-env.Library(
-    target="query_stats",
-    source=[
-        "aggregated_metric.cpp",
-        "key.cpp",
-        "optimizer_metrics_stats_entry.cpp",
-        "query_stats_entry.cpp",
-        "query_stats.cpp",
-        "supplemental_metrics_stats.cpp",
-        "vector_search_stats_entry.cpp",
-    ],
-    LIBDEPS=[
-        "$BUILD_DIR/mongo/bson/mutable/mutable_bson",
-        "$BUILD_DIR/mongo/db/commands",
-        "$BUILD_DIR/mongo/db/profile_filter",
-        "$BUILD_DIR/mongo/db/query/command_request_response",
-        "$BUILD_DIR/mongo/db/query/cursor_response_idl",
-        "$BUILD_DIR/mongo/db/query/memory_util",
-        "$BUILD_DIR/mongo/db/query/query_knobs",
-        "$BUILD_DIR/mongo/db/query/query_shape/query_shape",
-        "$BUILD_DIR/mongo/db/server_options",
-        "$BUILD_DIR/mongo/db/stats/counters",
-        "$BUILD_DIR/mongo/rpc/client_metadata",
-        "$BUILD_DIR/mongo/util/fail_point",
-        "$BUILD_DIR/mongo/util/net/network",
-        "$BUILD_DIR/mongo/util/processinfo",
-        "query_stats_parse",
-        "rate_limiting",
-    ],
-    LIBDEPS_PRIVATE=[
-        "$BUILD_DIR/mongo/db/auth/auth",
-        "$BUILD_DIR/mongo/db/server_base",
-        "$BUILD_DIR/mongo/db/service_context",
-    ],
-)
-
 env.CppUnitTest(
     target="db_query_query_stats_test",
     source=[

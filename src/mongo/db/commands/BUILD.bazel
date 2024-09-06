@@ -170,6 +170,17 @@ idl_generator(
     ],
 )
 
+mongo_cc_library(
+    name = "rwc_defaults_commands",
+    srcs = [
+        ":rwc_defaults_commands_gen",
+    ],
+    deps = [
+        "//src/mongo/db:read_write_concern_defaults",
+        "//src/mongo/db:server_base",  # TODO(SERVER-93876): Remove.
+    ],
+)
+
 idl_generator(
     name = "authentication_commands_gen",
     src = "authentication_commands.idl",
@@ -227,6 +238,25 @@ idl_generator(
         "//src/mongo/db/pipeline:change_stream_pre_and_post_images_options_gen",
         "//src/mongo/db/timeseries:timeseries_gen",
         "//src/mongo/idl:generic_argument_gen",
+    ],
+)
+
+mongo_cc_library(
+    name = "create_command",
+    srcs = [
+        "create_gen",
+    ],
+    hdrs = [
+        "create_command_validation.h",
+    ],
+    deps = [
+        "//src/mongo/crypto:encrypted_field_config",
+        "//src/mongo/db:server_base",
+        "//src/mongo/db:server_options",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/db/auth:authprivilege",
+        "//src/mongo/db/catalog:collection_options",
+        "//src/mongo/db/query:query_knobs",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/db/timeseries:timeseries_options",  # TODO(SERVER-93876): Remove.
     ],
 )
 
@@ -580,7 +610,7 @@ mongo_cc_library(
         "//src/mongo/db/query/query_shape:shape_helpers.h",
         "//src/mongo/db/query/query_stats:key.h",
         "//src/mongo/db/query/query_stats:transform_algorithm_gen",
-        "//src/mongo/db/query/stats:stats_gen",
+        "//src/mongo/db/query/stats:stats_gen_for_histograms",
         "//src/mongo/db/query/stats:value_utils.h",
         "//src/mongo/db/query/timeseries:bucket_spec.h",
         "//src/mongo/db/query/util:named_enum.h",
@@ -652,6 +682,20 @@ mongo_cc_library(
     }),
     deps = [
         "//src/mongo/db:server_base",
+    ],
+)
+
+mongo_cc_library(
+    name = "server_status_servers",
+    srcs = [
+        "server_status_servers.cpp",
+    ],
+    deps = [
+        ":server_status_core",
+        "//src/mongo/db/stats:counters",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/transport:message_compressor",
+        "//src/mongo/transport:service_executor",
+        "//src/mongo/util/net:ssl_manager",  # TODO(SERVER-93876): Remove.
     ],
 )
 

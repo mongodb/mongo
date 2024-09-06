@@ -176,6 +176,10 @@ mongo_cc_library(
     } | {
         "//conditions:default": ["//conditions:incompatible"],
     }) + CRYPTO_INCLUDES,
+    linkopts = select({
+        "//bazel/config:ssl_enabled_linux": ["-lcrypto"],
+        "//conditions:default": [],
+    }),
     local_defines = [
         "MLIB_USER",
     ] + CRYPTO_LOCAL_DEFINES + select({

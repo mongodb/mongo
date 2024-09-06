@@ -12,6 +12,24 @@ exports_files(
 )
 
 mongo_cc_library(
+    name = "benchrun",
+    srcs = [
+        "bench.cpp",
+    ],
+    hdrs = [
+        "bench.h",
+    ],
+    deps = [
+        "//src/mongo:base",
+        "//src/mongo/client:clientdriver_minimal",
+        "//src/mongo/db/session:logical_session_id",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/scripting:bson_template_evaluator",
+        "//src/mongo/util:pcre_util",
+        "//src/mongo/util:pcre_wrapper",  # TODO(SERVER-93876): Remove.
+    ],
+)
+
+mongo_cc_library(
     name = "program_runner",
     srcs = [
         "program_runner.cpp",
@@ -39,6 +57,30 @@ mongo_cc_library(
     ],
 )
 
+mongo_cc_library(
+    name = "shell_options_storage",
+    srcs = [
+        "shell_options_storage.cpp",
+    ],
+    hdrs = [
+        "shell_options.h",
+    ],
+    copts = select({
+        "@platforms//os:windows": [
+            # See the /Zc:preprocessor comment in third_party/mozjs/SConscript
+            "/Zc:preprocessor",
+            "/wd5104",
+            "/wd5105",
+        ],
+        "//conditions:default": [],
+    }),
+    deps = [
+        "//src/mongo:base",
+        "//src/mongo/client:connection_string",
+        "//src/mongo/util/cmdline_utils",
+    ],
+)
+
 idl_generator(
     name = "shell_options_gen",
     src = "shell_options.idl",
@@ -60,6 +102,34 @@ idl_generator(
     src = "kms.idl",
     deps = [
         "//src/mongo/db:basic_types_gen",
+    ],
+)
+
+mongo_cc_library(
+    name = "kms_idl",
+    srcs = [
+        ":kms_gen",
+    ],
+    deps = [
+        "//src/mongo/db:server_base",
+    ],
+)
+
+mongo_cc_library(
+    name = "kms",
+    srcs = [
+        "kms.cpp",
+        "kms_local.cpp",
+    ],
+    hdrs = [
+        "kms.h",
+    ],
+    deps = [
+        ":kms_idl",
+        "//src/mongo:base",
+        "//src/mongo/base:secure_allocator",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/crypto:aead_encryption",
+        "//src/mongo/db/commands:test_commands_enabled",
     ],
 )
 
@@ -178,11 +248,20 @@ mongo_cc_library(
 )
 
 mongo_cc_library(
-    name = "kms_idl",
+    name = "shell_options_register",
     srcs = [
-        ":kms_gen",
+        "shell_options_gen",
+    ] + select({
+        "//bazel/config:build_grpc_enabled": ["shell_options_grpc_gen"],
+        "//conditions:default": {},
+    }),
+    hdrs = [
+        "shell_utils.h",
     ],
     deps = [
-        "//src/mongo/db:server_base",
+        "shell_options_storage",
+        "//src/mongo:base",
+        "//src/mongo/client:native_sasl_client",
+        "//src/mongo/util/options_parser",
     ],
 )
