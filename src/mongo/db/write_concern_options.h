@@ -120,7 +120,7 @@ public:
     static constexpr StringData kWriteConcernField = "writeConcern"_sd;
     static const char kMajority[];  // = "majority"
 
-    static constexpr Seconds kWriteConcernTimeoutSystem{15};
+    static constexpr Seconds kWriteConcernTimeoutSystem{60};
     static constexpr Seconds kWriteConcernTimeoutMigration{30};
     static constexpr Seconds kWriteConcernTimeoutSharding{60};
     static constexpr Seconds kWriteConcernTimeoutUserCommand{60};
