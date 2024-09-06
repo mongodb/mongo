@@ -1180,6 +1180,7 @@ tasks:
         "multiversion",
         "no_multiversion_generate_tasks",
         "multiversion_future_git_tag",
+        "suggested_excluding_required__for_devprod_mitigation_only",
       ]
     commands:
       - func: "generate resmoke tasks"

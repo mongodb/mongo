@@ -656,7 +656,7 @@ buildvariants:
         omit_generated_tasks: true
     tasks:
       - name: .aggregation !.sbe_only
-      - name: .auth
+      - name: .auth !.suggested_excluding_required__for_devprod_mitigation_only
       - name: .causally_consistent !.sharding
       - name: .change_streams
       - name: .concurrency !.large !.no_txns !.compute_mode !.feature_flag_guarded
@@ -781,6 +781,29 @@ buildvariants:
       test_flags: >-
         --runAllFeatureFlagTests
         --excludeWithAnyTags=resource_intensive
+    tasks:
+      # - name: burn_in_tasks_gen
+      #   depends_on:
+      #   - name: version_burn_in_gen
+      #     variant: generate-tasks-for-version
+      #     omit_generated_tasks: true
+      #   - name: archive_dist_test
+      #     variant: *linux_x86_dynamic_compile_variant_name
+      - name: .development_critical !.requires_large_host !.requires_compile_variant !.incompatible_development_variant !.incompatible_all_feature_flags !.suggested_excluding_required__for_devprod_mitigation_only
+      - name: .development_critical .requires_large_host !.requires_compile_variant !.incompatible_development_variant !.incompatible_all_feature_flags !.suggested_excluding_required__for_devprod_mitigation_only
+        distros:
+          - rhel8.8-medium
+      - name: .release_critical !.requires_large_host !.requires_compile_variant !.incompatible_development_variant !.incompatible_all_feature_flags !.suggested_excluding_required__for_devprod_mitigation_only
+      - name: .release_critical .requires_large_host !.requires_compile_variant !.incompatible_development_variant !.incompatible_all_feature_flags !.suggested_excluding_required__for_devprod_mitigation_only
+        distros:
+          - rhel8.8-medium
+      - name: .default !.requires_large_host !.requires_compile_variant !.incompatible_development_variant !.incompatible_all_feature_flags !.suggested_excluding_required__for_devprod_mitigation_only
+      - name: .default .requires_large_host !.requires_compile_variant !.incompatible_development_variant !.incompatible_all_feature_flags !.suggested_excluding_required__for_devprod_mitigation_only
+        distros:
+          - rhel8.8-medium
+      # TODO(SERVER-90936): Remove this once streams_kafka* tests can work with the "default" tag.
+      - name: streams_kafka
+      - name: streams_kafka_gwproxy
 
   ### Security Patch-Specific Build Variants ###
   - <<: *enterprise-rhel-8-64-bit-dynamic-all-feature-flags-template
