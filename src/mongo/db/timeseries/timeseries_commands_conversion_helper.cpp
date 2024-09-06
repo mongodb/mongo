@@ -281,6 +281,7 @@ CreateIndexesCommand makeTimeseriesCreateIndexesCommand(OperationContext* opCtx,
     cmd.setV(origCmd.getV());
     cmd.setIgnoreUnknownIndexOptions(origCmd.getIgnoreUnknownIndexOptions());
     cmd.setCommitQuorum(origCmd.getCommitQuorum());
+    cmd.setReturnOnStart(origCmd.getReturnOnStart());
 
     return cmd;
 }

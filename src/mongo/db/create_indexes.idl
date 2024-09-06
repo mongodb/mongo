@@ -235,6 +235,11 @@ commands:
                 type: CommitQuorum
                 optional: true
                 stability: stable
+            returnOnStart:
+                description: "For a two-phase index build, whether the command should return upon
+                              the index build starting rather than upon it committing/aborting."
+                type: optionalBool
+                stability: unstable
             isTimeseriesNamespace:
                 description: "This flag is set to true when the command was originally sent to
                               mongos on the time-series view, but got rewritten to target
