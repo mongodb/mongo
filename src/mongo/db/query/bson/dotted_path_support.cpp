@@ -192,11 +192,8 @@ BSONObj extractElementsBasedOnTemplate(const BSONObj& obj,
     // scanandorder.h can make a zillion of these, so we start the allocation very small.
     BSONObjBuilder b(32);
     BSONObjIterator i(pattern);
-    while (i.moreWithEOO()) {
+    while (i.more()) {
         BSONElement e = i.next();
-        if (e.eoo())
-            break;
-
         const auto name = e.fieldNameStringData();
         BSONElement x = extractElementAtPath(obj, name);
         if (!x.eoo())

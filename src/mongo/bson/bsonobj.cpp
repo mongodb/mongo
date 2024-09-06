@@ -464,10 +464,8 @@ bool BSONObj::isFieldNamePrefixOf(const BSONObj& otherObj) const {
 
 void BSONObj::extractFieldsUndotted(BSONObjBuilder* b, const BSONObj& pattern) const {
     BSONObjIterator i(pattern);
-    while (i.moreWithEOO()) {
+    while (i.more()) {
         BSONElement e = i.next();
-        if (e.eoo())
-            break;
         BSONElement x = getField(e.fieldName());
         if (!x.eoo())
             b->appendAs(x, "");
@@ -482,10 +480,8 @@ BSONObj BSONObj::extractFieldsUndotted(const BSONObj& pattern) const {
 
 void BSONObj::filterFieldsUndotted(BSONObjBuilder* b, const BSONObj& filter, bool inFilter) const {
     BSONObjIterator i(*this);
-    while (i.moreWithEOO()) {
+    while (i.more()) {
         BSONElement e = i.next();
-        if (e.eoo())
-            break;
         BSONElement x = filter.getField(e.fieldName());
         if ((x.eoo() && !inFilter) || (!x.eoo() && inFilter))
             b->append(e);
@@ -525,10 +521,8 @@ BSONElement BSONObj::getFieldUsingIndexNames(StringData fieldName, const BSONObj
 bool BSONObj::couldBeArray() const {
     BSONObjIterator i(*this);
     int index = 0;
-    while (i.moreWithEOO()) {
+    while (i.more()) {
         BSONElement e = i.next();
-        if (e.eoo())
-            break;
 
         // TODO:  If actually important, may be able to do int->char* much faster
         if (strcmp(e.fieldName(), static_cast<std::string>(str::stream() << index).c_str()) != 0)
@@ -541,10 +535,8 @@ bool BSONObj::couldBeArray() const {
 BSONObj BSONObj::clientReadable() const {
     BSONObjBuilder b;
     BSONObjIterator i(*this);
-    while (i.moreWithEOO()) {
+    while (i.more()) {
         BSONElement e = i.next();
-        if (e.eoo())
-            break;
         switch (e.type()) {
             case MinKey: {
                 BSONObjBuilder m;
@@ -570,10 +562,8 @@ BSONObj BSONObj::replaceFieldNames(const BSONObj& names) const {
     BSONObjIterator i(*this);
     BSONObjIterator j(names);
     BSONElement f = j.moreWithEOO() ? j.next() : BSONObj().firstElement();
-    while (i.moreWithEOO()) {
+    while (i.more()) {
         BSONElement e = i.next();
-        if (e.eoo())
-            break;
         if (!f.eoo()) {
             b.appendAs(e, f.fieldName());
             f = j.next();
