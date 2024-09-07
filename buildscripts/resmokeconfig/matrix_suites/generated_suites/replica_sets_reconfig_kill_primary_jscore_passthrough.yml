@@ -4,7 +4,7 @@
 # AND REGENERATE THE MATRIX SUITES.
 #
 # matrix suite mapping file: buildscripts/resmokeconfig/matrix_suites/mappings/replica_sets_reconfig_kill_primary_jscore_passthrough.yml
-# regenerate matrix suites: buildscripts/resmoke.py generate-matrix-suites
+# regenerate matrix suites: buildscripts/resmoke.py generate-matrix-suites && bazel run //:format
 ##########################################################
 executor:
   archive:
@@ -77,7 +77,7 @@ selector:
     - jstests/core/**/profile2.js
     - jstests/core/**/profile3.js
     - jstests/core/**/profile_findandmodify.js
-    - jstests/core/**/top.js
+    - jstests/core/**/query/top/top.js
     - jstests/core/views/views_stats.js
     - jstests/core/**/crud_api.js
     - jstests/core/**/find_and_modify.js
@@ -85,8 +85,8 @@ selector:
     - jstests/core/**/find_and_modify_pipeline_update.js
     - jstests/core/**/find_and_modify_server6865.js
     - jstests/core/**/project_with_collation.js
-    - jstests/core/**/comment_field.js
-    - jstests/core/**/exhaust.js
+    - jstests/core/**/query/comment_field.js
+    - jstests/core/**/query/exhaust.js
     - jstests/core/**/currentop.js
     - jstests/core/**/fsync.js
     - jstests/core/**/shell_connection_strings.js
@@ -99,11 +99,11 @@ selector:
     - jstests/core/**/benchrun_pipeline_updates.js
     - jstests/core/**/connection_string_validation.js
     - jstests/core/**/list_collections_filter.js
-    - jstests/core/**/top.js
+    - jstests/core/**/query/top/top.js
     - jstests/core/**/drop3.js
     - jstests/core/**/list_collections_filter.js
     - jstests/core/**/explain_large_bounds.js
-    - jstests/core/**/collation.js
+    - jstests/core/**/query/collation/collation.js
     - jstests/core/**/geo_s2ordering.js
     - jstests/fle2/**/*.js
     - src/mongo/db/modules/*/jstests/fle2/**/*.js

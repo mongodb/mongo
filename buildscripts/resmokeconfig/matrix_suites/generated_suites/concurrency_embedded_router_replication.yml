@@ -4,7 +4,7 @@
 # AND REGENERATE THE MATRIX SUITES.
 #
 # matrix suite mapping file: buildscripts/resmokeconfig/matrix_suites/mappings/concurrency_embedded_router_replication.yml
-# regenerate matrix suites: buildscripts/resmoke.py generate-matrix-suites
+# regenerate matrix suites: buildscripts/resmoke.py generate-matrix-suites && bazel run //:format
 ##########################################################
 executor:
   archive:
@@ -53,21 +53,21 @@ selector:
     - jstests/concurrency/fsm_workloads/auth_create_user.js
     - jstests/concurrency/fsm_workloads/auth_drop_role.js
     - jstests/concurrency/fsm_workloads/auth_drop_user.js
-    - jstests/concurrency/fsm_workloads/agg_group_external.js
-    - jstests/concurrency/fsm_workloads/agg_sort_external.js
+    - jstests/concurrency/fsm_workloads/query/agg/agg_group_external.js
+    - jstests/concurrency/fsm_workloads/query/agg/agg_sort_external.js
     - jstests/concurrency/fsm_workloads/compact.js
     - jstests/concurrency/fsm_workloads/compact_while_creating_indexes.js
-    - jstests/concurrency/fsm_workloads/findAndModify_update_grow.js
-    - jstests/concurrency/fsm_workloads/plan_cache_drop_database.js
+    - jstests/concurrency/fsm_workloads/query/findAndModify/findAndModify_update_grow.js
+    - jstests/concurrency/fsm_workloads/query/plan_cache_drop_database.js
     - jstests/concurrency/fsm_workloads/reindex.js
     - jstests/concurrency/fsm_workloads/reindex_background.js
     - jstests/concurrency/fsm_workloads/reindex_writeconflict.js
     - jstests/concurrency/fsm_workloads/collmod_writeconflict.js
-    - jstests/concurrency/fsm_workloads/agg_out_interrupt_cleanup.js
-    - jstests/concurrency/fsm_workloads/timeseries_agg_out_interrupt_cleanup.js
+    - jstests/concurrency/fsm_workloads/query/agg/agg_out_interrupt_cleanup.js
+    - jstests/concurrency/fsm_workloads/query/timeseries/timeseries_agg_out_interrupt_cleanup.js
     - jstests/concurrency/fsm_workloads/multi_statement_transaction_atomicity_isolation_metrics_test.js
     - jstests/concurrency/fsm_workloads/multi_statement_transaction_all_commands_same_session.js
-    - jstests/concurrency/fsm_workloads/map_reduce_drop.js
+    - jstests/concurrency/fsm_workloads/query/map_reduce/map_reduce_drop.js
   exclude_with_any_tags:
     - requires_replication
     - assumes_against_mongod_not_mongos

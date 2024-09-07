@@ -17,7 +17,7 @@
       - jstests/core/**/set_param1.js
       # BulkWrite profiling and currentOp output format is not the same as normal writes.
       - jstests/core/**/profile*.js
-      - jstests/core/comment_field.js
+      - jstests/core/query/comment_field.js
       - jstests/core/fsync.js
       # Runs an update with illegal format (no 'updates'). We could work around this in the override
       # but it is very annoying.

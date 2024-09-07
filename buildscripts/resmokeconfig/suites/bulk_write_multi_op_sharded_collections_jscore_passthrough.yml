@@ -26,7 +26,7 @@ selector:
     - jstests/core/**/tailable_cursor_invalidation.js # capped collections.
     - jstests/core/**/tailable_getmore_batch_size.js # capped collections.
     - jstests/core/**/tailable_skip_limit.js # capped collections.
-    - jstests/core/**/top.js # top.
+    - jstests/core/**/query/top/top.js # top.
     # The following tests fail because mongos behaves differently from mongod when testing certain
     # functionality. The differences are in a comment next to the failing test.
     - jstests/core/**/geo_2d_explain.js # executionSuccess in different spot in explain().
@@ -43,17 +43,17 @@ selector:
     # TODO: Remove after fixing SERVER-29449. executionStats.nReturned is incorrect for sharded
     # queries with a limit or for distinct commands.
     - jstests/core/**/distinct_index1.js
-    - jstests/core/**/explain1.js
+    - jstests/core/**/explain/explain1.js
     - jstests/core/**/explain4.js
     - jstests/core/**/sortk.js
     # TODO: Remove after fixing SERVER-32563. The implementation of explain for the count command is
     # incorrect on sharded collections.
-    - jstests/core/**/explain_count.js
+    - jstests/core/**/explain/explain_count.js
     - jstests/core/**/explain_server_params.js
     # TODO SERVER-32311: These tests use plan stage helpers which can't handle sharded explain output.
     - jstests/core/**/expr_index_use.js
     - jstests/core/**/index_multikey.js
-    - jstests/core/**/optimized_match_explain.js
+    - jstests/core/**/query/explain/optimized_match_explain.js
     - jstests/core/**/sort_array.js
 
     # ----------------------------------------
@@ -69,8 +69,8 @@ selector:
     - jstests/core/index/index_arr2.js
     - jstests/core/index/index_stats.js
     - jstests/core/ts1.js
-    - jstests/core/compare_timestamps.js
-    - jstests/core/command_let_variables.js
+    - jstests/core/query/compare_timestamps.js
+    - jstests/core/query/command_let_variables.js
     - jstests/core/write/update/update_min_max_examples.js
     - jstests/core/write/update/update_arrayFilters.js
     - jstests/core/index/wildcard/wildcard_index_type.js
@@ -88,7 +88,7 @@ selector:
     - jstests/core/write/bypass_empty_ts_replacement_timeseries.js
 
     # Multiple cluster override does not support QE
-    - jstests/core/queryable_encryption/*.js
+    - jstests/core/query/queryable_encryption/*.js
 
     # Batching causes us to go over BSON max obj size for request
     - jstests/core/query/find/find_getmore_bsonsize.js
@@ -104,15 +104,15 @@ selector:
     # update with $ modifiers can sometimes change field ordering
     - jstests/core/write/update/update5.js
     - jstests/core/write/update/upsert_and.js
-    - jstests/core/server1470.js
+    - jstests/core/query/server1470.js
     - jstests/core/query/rename/rename_operator_missing_source.js
 
     # requires parameter not supported by override
     - jstests/core/write/crud_ops_do_not_throw_locktimeout.js
-    - jstests/core/command_json_schema_field.js
-    - jstests/core/api/api_version_test_expression.js
-    - jstests/core/api/api_version_parameters.js
-    - jstests/core/query/mr/mr_null_arguments.js
+    - jstests/core/query/command_json_schema_field.js
+    - jstests/core/query/api/api_version_test_expression.js
+    - jstests/core/query/api/api_version_parameters.js
+    - jstests/core/query/map_reduce/mr_null_arguments.js
     - jstests/core/txns/prepare_transaction_unique_index_conflict.js
     - jstests/core/txns/no_snapshot_writes_outside_txn.js
 
@@ -121,7 +121,7 @@ selector:
     - jstests/core/bench_test1.js
 
     # parallel processing causes race conditions in these tests
-    - jstests/core/local_tail_capped.js
+    - jstests/core/query/local_tail_capped.js
     - jstests/core/txns/transactions_block_ddl.js
     - jstests/core/txns/kill_op_on_txn_expiry.js
     - jstests/core/txns/write_conflicts_with_non_txns.js
@@ -132,8 +132,8 @@ selector:
     - jstests/core/write/update/updatea.js
 
     # batching can cause planCache to be different than expectations
-    - jstests/core/sbe_plan_cache_duplicate_or_clauses.js
-    - jstests/core/query/sbe_plan_cache_autoparameterize_ixscan.js
+    - jstests/core/query/sbe/sbe_plan_cache_duplicate_or_clauses.js
+    - jstests/core/query/sbe/sbe_plan_cache_autoparameterize_ixscan.js
     - jstests/core/index/index_filter_commands_invalidate_plan_cache_entries.js
     - jstests/core/query/plan_cache/plan_cache_sbe.js
 

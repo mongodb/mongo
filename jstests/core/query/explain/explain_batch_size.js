@@ -1,8 +1,8 @@
 // minimal test to check handling of batch size when explain info is requested
 // expected behavior is to return explain.n = total number of documents matching query
-// batch size is also tested in another smoke test jstest/explain1.js but that test
-// also covers the use of an indexed collection and includes a couple of test cases
-// using limit()
+// batch size is also tested in another smoke test jstest/query/core/explain/explain1.js but that
+// test also covers the use of an indexed collection and includes a couple of test cases using
+// limit()
 //
 // @tags: [
 //   requires_fastcount,

@@ -15,11 +15,11 @@ selector:
     # Disabled due to MongoDB restrictions and/or workload restrictions
     ##
     # These workloads use >100MB of data, which can overwhelm test hosts.
-    - jstests/concurrency/fsm_workloads/agg_group_external.js
-    - jstests/concurrency/fsm_workloads/agg_sort_external.js
+    - jstests/concurrency/fsm_workloads/query/agg/agg_group_external.js
+    - jstests/concurrency/fsm_workloads/query/agg/agg_sort_external.js
 
     # The findAndModify_update_grow.js workload can cause OOM kills on test hosts.
-    - jstests/concurrency/fsm_workloads/findAndModify_update_grow.js
+    - jstests/concurrency/fsm_workloads/query/findAndModify/findAndModify_update_grow.js
 
     # These workloads run the reIndex command, which is only allowed on a standalone node.
     - jstests/concurrency/fsm_workloads/reindex.js
@@ -32,12 +32,12 @@ selector:
     - jstests/concurrency/fsm_workloads/rename_capped_collection_dbname_chain.js
     - jstests/concurrency/fsm_workloads/rename_collection_dbname_chain.js
     # TODO: $exchange is an internal stage that is not supported via a router.
-    - jstests/concurrency/fsm_workloads/exchange_producer.js
+    - jstests/concurrency/fsm_workloads/query/exchange_producer.js
     # TODO (SERVER-91885): Investigate why the invariant in AsyncResultsMerger is hit.
     - jstests/concurrency/fsm_workloads/multi_statement_transaction_all_commands_same_session.js
     # TODO (SERVER-91129): Investigate why the teardown phase in agg_unionWith_interrupt_cleanup.js
     # could fail with FailedToSatisfyReadPreference
-    - jstests/concurrency/fsm_workloads/agg_unionWith_interrupt_cleanup.js
+    - jstests/concurrency/fsm_workloads/query/agg/agg_unionWith_interrupt_cleanup.js
 
   exclude_with_any_tags:
     - does_not_support_causal_consistency

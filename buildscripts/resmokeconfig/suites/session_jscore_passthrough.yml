@@ -8,14 +8,14 @@ selector:
     - jstests/core/txns/**/*.js
 
     # Queryable encryption is not supported on standalone.
-    - jstests/core/queryable_encryption/**/*.js
+    - jstests/core/query/queryable_encryption/**/*.js
 
     # Query settings are not supported on standalone.
     - jstests/core/query/query_settings/**/*.js
 
     # These test run commands using legacy queries, which are not supported on sessions.
-    - jstests/core/**/comment_field.js
-    - jstests/core/**/exhaust.js
+    - jstests/core/**/query/comment_field.js
+    - jstests/core/**/query/exhaust.js
 
     # Unacknowledged writes prohibited in an explicit session.
     - jstests/core/**/crud_api.js

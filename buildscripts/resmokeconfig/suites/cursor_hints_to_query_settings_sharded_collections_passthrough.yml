@@ -18,13 +18,13 @@ selector:
     # TODO SERVER-29449: Re-enable once 'executionStats.nReturned' is correct for sharded queries
     # with a limit or for distinct commands.
     - jstests/core/**/distinct_index1.js
-    - jstests/core/**/explain1.js
+    - jstests/core/**/explain/explain1.js
     - jstests/core/**/explain4.js
     - jstests/core/**/sortk.js
 
     # TODO SERVER-32563: The implementation of explain for the count command is
     # incorrect on sharded collections.
-    - jstests/core/**/explain_count.js
+    - jstests/core/**/explain/explain_count.js
     - jstests/core/**/explain_server_params.js
 
     # Test which asserts on the number of execution metrics. The additional commands emitted by
@@ -36,7 +36,7 @@ selector:
     - jstests/aggregation/match_swapping_renamed_fields.js
     - jstests/core/**/expr_index_use.js
     - jstests/core/**/index_multikey.js
-    - jstests/core/**/optimized_match_explain.js
+    - jstests/core/**/query/explain/optimized_match_explain.js
     - jstests/core/**/sort_array.js
 
     # The following tests fail because a certain command or functionality is not supported by
@@ -58,7 +58,7 @@ selector:
     - jstests/core/**/tailable_cursor_invalidation.js # capped collections.
     - jstests/core/**/tailable_getmore_batch_size.js # capped collections.
     - jstests/core/**/tailable_skip_limit.js # capped collections.
-    - jstests/core/**/top.js # top.
+    - jstests/core/**/query/top/top.js # top.
     - jstests/core/capped/capped_max1.js # capped collections
 
     # The following tests fail because mongos behaves differently from mongod when testing certain
@@ -81,7 +81,7 @@ selector:
     - jstests/core/query/cursor/getmore_invalidated_cursors.js
     - jstests/core/query/explain/explain_shell_helpers.js
     - jstests/core/query/internal_hash_eq/lookup_using_hash_key.js
-    - jstests/core/return_key.js
+    - jstests/core/query/return_key.js
 
     # This suite emits additional explains alongside the tested command. This interferes with the number of
     # expected plan cache entries.

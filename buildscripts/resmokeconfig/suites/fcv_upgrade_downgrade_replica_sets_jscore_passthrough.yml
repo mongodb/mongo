@@ -48,7 +48,7 @@ selector:
     - jstests/core/**/tailable_getmore_batch_size.js
 
     # TODO (SERVER-78220): Investigate failing api version tests in the fcv jscore passthrough suite.
-    - jstests/core/api/api_version_unstable_indexes.js
+    - jstests/core/query/api/api_version_unstable_indexes.js
 
     # These timeseries tests rely on specific bucketing behaviour that is not guaranteed across FCV
     # upgrade/downgrade
@@ -93,11 +93,11 @@ selector:
     - jstests/core/views/views_all_commands.js
 
     # Queryable encryption uses internal transactions (which are aborted on fcv upgrade/downgrade).
-    - jstests/core/queryable_encryption/**/*.js
+    - jstests/core/query/queryable_encryption/**/*.js
 
     # TODO SERVER-80490: The test below requires a precise lock count that can get modified by concurrent
     # setFCV operations. The exclusion can be removed once the linked ticket is fixed.
-    - jstests/core/top.js
+    - jstests/core/query/top/top.js
 
     # Tests that use profiling at level 2 are expecting to profile a specific command or a specific number
     # of commands. If they profile the setFCV command, this could cause the test to fail.

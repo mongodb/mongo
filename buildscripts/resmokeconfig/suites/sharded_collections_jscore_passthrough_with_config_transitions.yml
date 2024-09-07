@@ -27,7 +27,7 @@ selector:
     - jstests/core/**/tailable_cursor_invalidation.js # capped collections.
     - jstests/core/**/tailable_getmore_batch_size.js # capped collections.
     - jstests/core/**/tailable_skip_limit.js # capped collections.
-    - jstests/core/**/top.js # top.
+    - jstests/core/**/query/top/top.js # top.
     # The following tests fail because mongos behaves differently from mongod when testing certain
     # functionality. The differences are in a comment next to the failing test.
     - jstests/core/**/explain_missing_database.js # Behavior with no db different on mongos.
@@ -48,17 +48,17 @@ selector:
     # TODO: Remove after fixing SERVER-29449. executionStats.nReturned is incorrect for sharded
     # queries with a limit or for distinct commands.
     - jstests/core/**/distinct_index1.js
-    - jstests/core/**/explain1.js
+    - jstests/core/**/explain/explain1.js
     - jstests/core/**/explain4.js
     - jstests/core/**/sortk.js
     # TODO: Remove after fixing SERVER-32563. The implementation of explain for the count command is
     # incorrect on sharded collections.
-    - jstests/core/**/explain_count.js
+    - jstests/core/**/explain/explain_count.js
     - jstests/core/**/explain_server_params.js
     # TODO SERVER-32311: These tests use plan stage helpers which can't handle sharded explain output.
     - jstests/core/**/expr_index_use.js
     - jstests/core/**/index_multikey.js
-    - jstests/core/**/optimized_match_explain.js
+    - jstests/core/**/query/explain/optimized_match_explain.js
     - jstests/core/**/sort_array.js
 
     # These tests drop and create indexes throughout their execution. Index creation might fail when
@@ -69,7 +69,7 @@ selector:
     # TransitionTo/FromDedicated runs remove/addShard which implicitly will set a cluster parameter, which
     # will conflict with tests that explicitly set cluster parameters.
     - jstests/core/query/query_settings/**/*.js
-    - jstests/core/queryable_encryption/query_settings_fle.js
+    - jstests/core/query/queryable_encryption/query_settings_fle.js
     # These tests expect index creation to fail on a shard that contains an initial document with
     # parallel arrays. The index creation will succeed on the shard without a document and
     # as we transition to dedicated, the balancer will try an insert the document with a parallel

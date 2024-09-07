@@ -40,13 +40,13 @@ selector:
     - jstests/core/**/ord.js
     - jstests/core/**/tailable_cursor_invalidation.js
     - jstests/core/**/tailable_skip_limit.js
-    - jstests/core/**/collation.js
+    - jstests/core/**/query/collation/collation.js
 
     # The tests below are disabled because of sharding auto-bootstrap and replica set endpoint.
     # Cannot specify "$_requestResumeToken" option to a mongos since it is internal-only.
-    - jstests/core/find_with_resume_after_param.js
-    - jstests/core/resume_query_from_non_existent_record.js
-    - jstests/core/resume_query.js
+    - jstests/core/query/find_with_resume_after_param.js
+    - jstests/core/query/resume_query_from_non_existent_record.js
+    - jstests/core/query/resume_query.js
     - jstests/core/timeseries/timeseries_resume_after.js
     # This test creates collections directly using applyOps commands. So those collections are not
     # tracked by sharding and therefore not discoverable by listCollections commands that go through
@@ -71,7 +71,7 @@ selector:
     - jstests/core/commands_with_uuid.js
     # TODO (SERVER-80416): cloneCollectionAsCapped command stops working after a replica set
     # is bootstrapped as a sharded cluster.
-    - jstests/core/collation.js
+    - jstests/core/query/collation/collation.js
     - jstests/core/ddl/capped_convertToCapped1.js
     - jstests/core/replicate_record_ids/disallow_capped.js
     # A renameCollection command against a collection with invalid views fails on sharded cluster

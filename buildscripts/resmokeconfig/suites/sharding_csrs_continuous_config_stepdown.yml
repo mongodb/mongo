@@ -9,7 +9,7 @@ selector:
       # Auth tests require authentication on the stepdown thread's connection
     - jstests/sharding/*[aA]uth*.js
     - jstests/sharding/analyze_shard_key/*[aA]uth*.js
-    - jstests/sharding/query/*[aA]uth*.js
+    - jstests/sharding/query/**/*[aA]uth*.js
     - jstests/sharding/cluster_time_across_add_shard.js
 
     - jstests/sharding/internal_txns/internal_client_restrictions.js
@@ -22,21 +22,21 @@ selector:
     - jstests/sharding/localhostAuthBypass.js
     - jstests/sharding/kill_sessions.js
     - jstests/sharding/mongos_rs_auth_shard_failure_tolerance.js
-    - jstests/sharding/query/mrShardedOutputAuth.js
-    - jstests/sharding/query/aggregation_currentop.js
+    - jstests/sharding/query/map_reduce/mrShardedOutputAuth.js
+    - jstests/sharding/query/agg/agg_currentop.js
     - jstests/sharding/advance_cluster_time_action_type.js
     - jstests/sharding/mongod_returns_no_cluster_time_without_keys.js
     # Count/write/aggregate commands against the config shard do not support retries yet
     - jstests/sharding/addshard1.js
     - jstests/sharding/addshard2.js
     - jstests/sharding/basic_merge.js
-    - jstests/sharding/count1.js
-    - jstests/sharding/count2.js
+    - jstests/sharding/query/count/count1.js
+    - jstests/sharding/query/count/count2.js
     - jstests/sharding/query/current_op_with_drop_shard.js
-    - jstests/sharding/cursor1.js
+    - jstests/sharding/query/cursor/cursor1.js
     - jstests/sharding/diffservers1.js
-    - jstests/sharding/findandmodify1.js
-    - jstests/sharding/query/geo_near_sharded.js
+    - jstests/sharding/query/find_and_modify/findandmodify1.js
+    - jstests/sharding/query/geo/geo_near_sharded.js
     - jstests/sharding/hash_basic.js
     - jstests/sharding/hash_shard1.js
     - jstests/sharding/hash_shard_non_empty.js
@@ -44,21 +44,21 @@ selector:
     - jstests/sharding/key_many.js
     - jstests/sharding/key_string.js
     - jstests/sharding/large_chunk.js
-    - jstests/sharding/limit_push.js
+    - jstests/sharding/query/limit_push.js
     - jstests/sharding/merge_with_drop_shard.js
     - jstests/sharding/merge_with_move_primary.js
     - jstests/sharding/move_chunk_basic.js
     - jstests/sharding/movePrimary1.js
     - jstests/sharding/names.js
     - jstests/sharding/prefix_shard_key.js
-    - jstests/sharding/query_config.js
+    - jstests/sharding/query/query_config.js
     - jstests/sharding/range_deleter_interacts_correctly_with_refine_shard_key.js
     - jstests/sharding/remove1.js
     - jstests/sharding/rename_across_mongos.js
     - jstests/sharding/shard2.js
     - jstests/sharding/shard3.js
     - jstests/sharding/tag_range.js
-    - jstests/sharding/count_config_servers.js
+    - jstests/sharding/query/count/count_config_servers.js
     - jstests/sharding/split_large_key.js
     - jstests/sharding/balancer_window.js
     - jstests/sharding/zone_changes_compound.js
@@ -66,7 +66,7 @@ selector:
     - jstests/sharding/zone_changes_range.js
     # No retries on direct writes to the config/admin databases on the config servers
     - jstests/sharding/listDatabases.js
-    - jstests/sharding/bulk_insert.js
+    - jstests/sharding/query/bulk_insert.js
     - jstests/sharding/printShardingStatus.js
     - jstests/sharding/refresh_sessions.js
     - jstests/sharding/shard_collection_existing_zones.js
@@ -75,7 +75,7 @@ selector:
     - jstests/sharding/convert_to_and_from_sharded.js
     - jstests/sharding/remove2.js
     - jstests/sharding/features3.js
-    - jstests/sharding/in_memory_sort_limit.js
+    - jstests/sharding/query/in_memory_sort_limit.js
     - jstests/sharding/parallel.js
     - jstests/sharding/migrateBig.js
     - jstests/sharding/sharding_rs1.js
@@ -162,7 +162,7 @@ selector:
     - jstests/sharding/mongos_validate_writes.js
     # Test expects a specific chunk distribution after shardCollection and it can be broken when
     # a step down occurs.
-    - jstests/sharding/regex_targeting.js
+    - jstests/sharding/query/regex_targeting.js
     # Calls movePrimary after data has been inserted into an unsharded collection, so will fail if
     # a stepdown causes the command to be sent again.
     - jstests/sharding/move_primary_clone.js
@@ -189,9 +189,9 @@ selector:
     - jstests/sharding/snapshot_reads_target_at_point_in_time.js
     # Tests that rely on shards becoming aware of collection drops regardless of config stepdowns.
     # (SERVER-34760)
-    - jstests/sharding/merge_requires_unique_index.js
-    - jstests/sharding/query/merge_stale_on_fields.js
-    - jstests/sharding/query/out_fails_to_replace_sharded_collection.js
+    - jstests/sharding/query/out_merge/merge_requires_unique_index.js
+    - jstests/sharding/query/out_merge/merge_stale_on_fields.js
+    - jstests/sharding/query/out_merge/out_fails_to_replace_sharded_collection.js
     # Sets a failpoint on find commands which can lead to a hang when a config steps down.
     - jstests/sharding/sharding_statistics_server_status.js
     # setShardVersion is not robust during config server stepdown.
@@ -252,7 +252,7 @@ selector:
 
     # These tests run command on a config shard and does not shutdown safely upon transitioning to a
     # dedicated config server.
-    - jstests/sharding/change_streams_with_config_transitions.js
+    - jstests/sharding/query/change_streams/change_streams_with_config_transitions.js
     - jstests/sharding/fsync_lock_unlock.js
     - jstests/sharding/fsync_with_prepared_transaction.js
     - jstests/sharding/fsync_lock_fails_with_in_progress_ddl_op.js
@@ -262,7 +262,7 @@ selector:
 
     # TODO (SERVER-64128): Re-enable this test once queries that execute concurrently with
     # shardCollection+moveChunk don't miss documents that get deleted by the range deleter.
-    - jstests/sharding/query/lookup_targeting.js
+    - jstests/sharding/query/lookup/lookup_targeting.js
 
   exclude_with_any_tags:
     - does_not_support_stepdowns

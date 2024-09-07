@@ -4,7 +4,7 @@
 # AND REGENERATE THE MATRIX SUITES.
 #
 # matrix suite mapping file: buildscripts/resmokeconfig/matrix_suites/mappings/embedded_router_jscore_passthrough_with_balancer.yml
-# regenerate matrix suites: buildscripts/resmoke.py generate-matrix-suites
+# regenerate matrix suites: buildscripts/resmoke.py generate-matrix-suites && bazel run //:format
 ##########################################################
 executor:
   archive:
@@ -47,7 +47,7 @@ matrix_suite: true
 selector:
   exclude_files:
     - jstests/core/txns/**/*.js
-    - jstests/core/query/mr/*.js
+    - jstests/core/query/map_reduce/*.js
     - jstests/core/**/apitest_db.js
     - jstests/core/**/check_shard_index.js
     - jstests/core/**/compact_keeps_indexes.js
@@ -60,7 +60,7 @@ selector:
     - jstests/core/**/queryoptimizera.js
     - jstests/core/**/stages*.js
     - jstests/core/**/startup_log.js
-    - jstests/core/**/top.js
+    - jstests/core/**/query/top/top.js
     - jstests/core/**/geo_2d_explain.js
     - jstests/core/**/geo_s2explain.js
     - jstests/core/**/geo_s2sparse.js

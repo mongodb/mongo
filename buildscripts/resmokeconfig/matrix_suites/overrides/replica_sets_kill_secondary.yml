@@ -64,11 +64,11 @@
       - jstests/core/**/geo_update_btree.js
       # The following tests create large oplog entries, which can cause the secondary to fall off the
       # primary's oplog when run as a part of burn_in_tests.
-      - jstests/core/**/max_doc_size.js
+      - jstests/core/**/query/max_doc_size.js
       - jstests/core/**/mr_bigobject.js
       - jstests/core/**/capped_large_docs.js
       - jstests/core/**/capped_resize.js
-      - jstests/core/**/exhaust.js
+      - jstests/core/**/query/exhaust.js
       # The following tests also create large oplog entries due to the maximum blocking sort size being
       # 100 MB.
       - jstests/core/**/explain_execution_error.js

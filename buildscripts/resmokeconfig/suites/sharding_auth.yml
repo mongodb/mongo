@@ -13,10 +13,10 @@ selector:
     # Skip any tests that run with auth explicitly.
     - jstests/sharding/*[aA]uth*.js
     - jstests/sharding/analyze_shard_key/*[aA]uth*.js
-    - jstests/sharding/query/*[aA]uth*.js
+    - jstests/sharding/query/**/*[aA]uth*.js
 
     - jstests/sharding/advance_cluster_time_action_type.js
-    - jstests/sharding/query/aggregation_currentop.js
+    - jstests/sharding/query/agg/agg_currentop.js
     - jstests/sharding/internal_txns/internal_client_restrictions.js
     - jstests/sharding/kill_sessions.js
     # Skip these additional tests when running with auth enabled.

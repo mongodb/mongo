@@ -4,7 +4,7 @@
 # AND REGENERATE THE MATRIX SUITES.
 #
 # matrix suite mapping file: buildscripts/resmokeconfig/matrix_suites/mappings/core_minimum_batch_size.yml
-# regenerate matrix suites: buildscripts/resmoke.py generate-matrix-suites
+# regenerate matrix suites: buildscripts/resmoke.py generate-matrix-suites && bazel run //:format
 ##########################################################
 executor:
   archive:
@@ -33,7 +33,7 @@ matrix_suite: true
 selector:
   exclude_files:
     - jstests/core/txns/**/*.js
-    - jstests/core/queryable_encryption/**/*.js
+    - jstests/core/query/queryable_encryption/**/*.js
     - jstests/core/query/query_settings/**/*.js
     - jstests/core/**/express.js
     - jstests/core/query/sort/sortk.js

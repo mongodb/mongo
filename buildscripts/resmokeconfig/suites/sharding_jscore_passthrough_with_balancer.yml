@@ -10,7 +10,7 @@ selector:
     # These tests are run in sharded_jscore_txns.
     - jstests/core/txns/**/*.js
     # TODO SERVER-87108 re-enable all map reduce tests
-    - jstests/core/query/mr/*.js
+    - jstests/core/query/map_reduce/*.js
     # The following tests fail because a certain command or functionality is not supported on
     # mongos. This command or functionality is placed in a comment next to the failing test.
     - jstests/core/**/apitest_db.js # serverStatus output doesn't have storageEngine.
@@ -25,7 +25,7 @@ selector:
     - jstests/core/**/queryoptimizera.js # "local" database.
     - jstests/core/**/stages*.js # stageDebug.
     - jstests/core/**/startup_log.js # "local" database.
-    - jstests/core/**/top.js # top.
+    - jstests/core/**/query/top/top.js # top.
     # The following tests fail because mongos behaves differently from mongod when testing certain
     # functionality. The differences are in a comment next to the failing test.
     - jstests/core/**/geo_2d_explain.js # executionSuccess in different spot in explain().

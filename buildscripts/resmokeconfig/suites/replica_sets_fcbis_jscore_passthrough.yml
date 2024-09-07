@@ -10,7 +10,7 @@ selector:
     # may insert unexpected operations into the profile collection.
     - jstests/core/**/profile_list_collections.js
     - jstests/core/**/profile_list_indexes.js
-    - jstests/core/**/recursion.js
+    - jstests/core/**/query/recursion.js
     - jstests/core/**/system_profile.js
     # The tests below do not expect concurrent reads against their test collections.
     - jstests/core/**/operation_latency_histogram.js
@@ -30,7 +30,7 @@ selector:
     - jstests/core/**/profile_update.js
     - jstests/core/txns/transactions_profiling.js
     # The downstream syncing node affects the top output.
-    - jstests/core/**/top.js
+    - jstests/core/**/query/top/top.js
     # The following tests use fsyncLock which will fail if FCBIS has a backup cursor open.
     - jstests/core/**/currentop.js
     - jstests/core/**/fsync.js

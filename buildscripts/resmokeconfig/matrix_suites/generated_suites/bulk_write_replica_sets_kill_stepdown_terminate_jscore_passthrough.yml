@@ -4,7 +4,7 @@
 # AND REGENERATE THE MATRIX SUITES.
 #
 # matrix suite mapping file: buildscripts/resmokeconfig/matrix_suites/mappings/bulk_write_replica_sets_kill_stepdown_terminate_jscore_passthrough.yml
-# regenerate matrix suites: buildscripts/resmoke.py generate-matrix-suites
+# regenerate matrix suites: buildscripts/resmoke.py generate-matrix-suites && bazel run //:format
 ##########################################################
 executor:
   archive:
@@ -78,7 +78,7 @@ selector:
     - jstests/core/**/profile2.js
     - jstests/core/**/profile3.js
     - jstests/core/**/profile_findandmodify.js
-    - jstests/core/**/top.js
+    - jstests/core/**/query/top/top.js
     - jstests/core/views/views_stats.js
     - jstests/core/**/crud_api.js
     - jstests/core/**/find_and_modify.js
@@ -105,7 +105,7 @@ selector:
     - jstests/core/timeseries/timeseries_delete_hint.js
     - jstests/core/**/set_param1.js
     - jstests/core/**/profile*.js
-    - jstests/core/comment_field.js
+    - jstests/core/query/comment_field.js
     - jstests/core/fsync.js
     - jstests/core/write/insert/batch_write_command_insert.js
     - jstests/core/write/update/batch_write_command_update.js

@@ -1,7 +1,7 @@
 /**
  * timeseries_findAndModify_updates.js
  *
- * Extends timeseries_updates_and_inserts.js to test findAndModify with updates.
+ * Extends timeseries/timeseries_updates_and_inserts.js to test findAndModify with updates.
  *
  * @tags: [
  *   # We need a timeseries collection.

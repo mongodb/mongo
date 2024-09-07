@@ -1,0 +1,90 @@
+version: 1.0.0
+filters:
+  - "*":
+    approvers:
+      - 10gen/query-optimization
+  - "explain1.js":
+    approvers:
+      - 10gen/query-execution
+  - "explain4.js":
+    approvers:
+      - 10gen/query-execution
+  - "explain5.js":
+    approvers:
+      - 10gen/query-execution
+  - "explain6.js":
+    approvers:
+      - 10gen/query-execution
+  - "explain_all_plans_execution_stats.js":
+    approvers:
+      - 10gen/query-execution
+  - "explain_batch_size.js":
+    approvers:
+      - 10gen/query-execution
+  - "explain_classic_runtime_planner_for_sbe.js":
+    approvers:
+      - 10gen/query-execution
+  - "explain_count.js":
+    approvers:
+      - 10gen/query-execution
+  - "explain_distinct.js":
+    approvers:
+      - 10gen/query-execution
+  - "explain_find.js":
+    approvers:
+      - 10gen/query-execution
+  - "explain_missing_collection.js":
+    approvers:
+      - 10gen/query-execution
+  - "explain_missing_database.js":
+    approvers:
+      - 10gen/query-execution
+  - "explain_multi_plan_count.js":
+    approvers:
+      - 10gen/query-execution
+  - "explain_sample.js":
+    approvers:
+      - 10gen/query-execution
+  - "explain_winning_plan.js":
+    approvers:
+      - 10gen/query-execution
+  - "explain_agg_write_concern.js":
+    approvers:
+      - 10gen/query-optimization
+      - 10gen/query-execution
+  - "explain_execution_error.js":
+    approvers:
+      - 10gen/query-optimization
+      - 10gen/query-execution
+  - "explain_find_and_modify.js":
+    approvers:
+      - 10gen/query-optimization
+      - 10gen/query-execution
+  - "explain_find_trivially_false_predicates_in_agg_pipelines.js":
+    approvers:
+      - 10gen/query-optimization
+      - 10gen/query-execution
+  - "explain_includes_command.js":
+    approvers:
+      - 10gen/query-optimization
+      - 10gen/query-execution
+  - "explain_multi_plan.js":
+    approvers:
+      - 10gen/query-optimization
+      - 10gen/query-execution
+  - "explain_plan_cache.js":
+    approvers:
+      - 10gen/query-optimization
+      - 10gen/query-execution
+  - "explain_plan_scores.js":
+    approvers:
+      - 10gen/query-optimization
+      - 10gen/query-execution
+  - "explain_server_params.js":
+    approvers:
+      - 10gen/query-optimization
+      - 10gen/query-execution
+  - "explain_shell_helpers.js":
+    approvers:
+      - 10gen/query-optimization
+      - 10gen/query-execution

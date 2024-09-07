@@ -7,11 +7,11 @@ selector:
   exclude_files:
     # These workloads implicitly assume that their tid ranges are [0, $config.threadCount). This
     # isn't guaranteed to be true when they are run in parallel with other workloads.
-    - jstests/concurrency/fsm_workloads/findAndModify_inc_pipeline.js
+    - jstests/concurrency/fsm_workloads/query/findAndModify/findAndModify_inc_pipeline.js
     - jstests/concurrency/fsm_workloads/list_indexes.js
-    - jstests/concurrency/fsm_workloads/secondary_reads.js
-    - jstests/concurrency/fsm_workloads/update_inc_capped.js
-    - jstests/concurrency/fsm_workloads/update_inc_pipeline.js
+    - jstests/concurrency/fsm_workloads/query/secondary_reads.js
+    - jstests/concurrency/fsm_workloads/query/update/update_inc_capped.js
+    - jstests/concurrency/fsm_workloads/query/update/update_inc_pipeline.js
     # These workloads implicitly assume that their tid ranges are [0, $config.threadCount), as above,
     # but additionally require multiple threads to run, which also isn't guaranteed here.
     - jstests/concurrency/fsm_workloads/create_index_background_partial_filter.js
@@ -19,10 +19,10 @@ selector:
     - jstests/concurrency/fsm_workloads/create_index_background.js
 
     # These workloads uses >100MB of data, which can overwhelm test hosts.
-    - jstests/concurrency/fsm_workloads/agg_group_external.js
-    - jstests/concurrency/fsm_workloads/agg_sort_external.js
+    - jstests/concurrency/fsm_workloads/query/agg/agg_group_external.js
+    - jstests/concurrency/fsm_workloads/query/agg/agg_sort_external.js
     # The findAndModify_update_grow.js workload can cause OOM kills on test hosts.
-    - jstests/concurrency/fsm_workloads/findAndModify_update_grow.js
+    - jstests/concurrency/fsm_workloads/query/findAndModify/findAndModify_update_grow.js
 
     # This workload kills random cursors which takes a collection lock.
     # TODO: SERVER-39939.

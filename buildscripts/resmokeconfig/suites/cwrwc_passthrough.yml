@@ -13,7 +13,7 @@ selector:
     - jstests/core/query/awaitdata_getmore_cmd.js
     # This test relies on the implicit default write concern of w:majority but this suite sets the
     # default as w:1
-    - jstests/core/find_with_resume_after_param.js
+    - jstests/core/query/find_with_resume_after_param.js
   exclude_with_any_tags:
     - assumes_standalone_mongod
 

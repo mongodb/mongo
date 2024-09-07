@@ -49,9 +49,9 @@ selector:
 
     # The tests below are disabled because of sharding auto-bootstrap and replica set endpoint.
     # Cannot specify "$_requestResumeToken" option to a mongos since it is internal-only.
-    - jstests/core/find_with_resume_after_param.js
-    - jstests/core/resume_query_from_non_existent_record.js
-    - jstests/core/resume_query.js
+    - jstests/core/query/find_with_resume_after_param.js
+    - jstests/core/query/resume_query_from_non_existent_record.js
+    - jstests/core/query/resume_query.js
     - jstests/core/timeseries/timeseries_resume_after.js
     # The tests below expect some commands to run directly against the shard.
     # This test runs the internal _shardsvrInsertGlobalIndexKey command in a transaction.
@@ -86,7 +86,7 @@ selector:
     - jstests/core/commands_with_uuid.js
     # TODO (SERVER-80416): cloneCollectionAsCapped command stops working after a replica set
     # is bootstrapped as a sharded cluster.
-    - jstests/core/collation.js
+    - jstests/core/query/collation/collation.js
     - jstests/core/ddl/capped_convertToCapped1.js
     - jstests/core/replicate_record_ids/disallow_capped.js
     # TODO (SERVER-84243): Separate Shard-Role Catalog Cache and Loader.

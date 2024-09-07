@@ -55,7 +55,7 @@ selector:
     - jstests/core/views/view_with_invalid_dbname.js
     - jstests/core/views/views_creation.js
     - jstests/core/views/views_drop.js
-    - jstests/core/**/disallow_system_views_user_writes.js
+    - jstests/core/**/query/disallow_system_views_user_writes.js
     - jstests/core/timeseries/bucket_granularity.js
 
     # These tests expect listCollections to return system.bucket.* collections, which are filtered

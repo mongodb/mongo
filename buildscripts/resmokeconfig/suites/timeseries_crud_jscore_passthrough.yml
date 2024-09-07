@@ -6,40 +6,50 @@ selector:
     - jstests/core/query/**/*.js
     - jstests/core/write/**/*.js
   exclude_files:
+    # The paths below are excluded from running in this suite because prior to moving under the
+    # 'query' directory, they were not running in this suite.
+    # TODO SERVER-94567 Determine if any of these tests can be enabled.
+    - jstests/core/query/json_schema/**/*.js
+    - jstests/core/query/doc_validation/**/*.js
+    - jstests/core/query/api/**/*.js
+    - jstests/core/query/collstats/**/*.js
+    - jstests/core/query/queryable_encryption/**/*.js
+    - jstests/core/query/sbe/**/*.js
+
     # Time-series collection behavior is already tested within this directory.
     - jstests/core/write/bulk/bulk_write_timeseries_basic.js
     # Time-series collections already have the default clustered index.
-    - jstests/core/find_with_resume_after_param.js
+    - jstests/core/query/find_with_resume_after_param.js
     - jstests/core/query/or_use_clustered_collection.js
     # Unique indexes.
     - jstests/core/uniqueness.js
     - jstests/core/write/bulk/bulk_api_ordered.js
     - jstests/core/write/bulk/bulk_api_unordered.js
     # Time-series is not compatible with viewOn.
-    - jstests/core/collation.js
+    - jstests/core/query/collation/collation.js
     - jstests/core/dbstats.js
-    - jstests/core/disallow_system_views_user_writes.js
+    - jstests/core/query/disallow_system_views_user_writes.js
     - jstests/core/query/agg_hint.js
     - jstests/core/query/collection_uuid_find.js
     - jstests/core/write/collection_uuid_write_commands.js
     # Time-series is not allowed with an explicit validator.
-    - jstests/core/doc_validation_with_now_variable.js
+    - jstests/core/query/doc_validation/doc_validation_with_now_variable.js
     - jstests/core/list_namespaces_invalidation.js
     - jstests/core/write/bulk/bulk_write.js
     - jstests/core/write/bulk/bulk_write_non_transaction.js
     # Sparse indexes.
     - jstests/core/query/distinct/distinct_hint.js
     - jstests/core/query/query_hash_stability.js
-    - jstests/core/sparse_index_supports_ne_null.js
+    - jstests/core/query/sparse_index_supports_ne_null.js
     # Text indexes.
     - jstests/core/query/internal_strip_invalid_assignment.js
     - jstests/core/query/plan_cache/plan_cache_eof.js
     # Hashed indexes.
-    - jstests/core/hashed_partial_and_sparse_index.js
+    - jstests/core/query/hashed_partial_and_sparse_index.js
     - jstests/core/query/distinct/distinct_with_hashed_index.js
     - jstests/core/query/internal_hash_eq/**/*.js
     - jstests/core/query/project/projection_with_hashed_index.js
-    - jstests/core/single_field_hashed_index.js
+    - jstests/core/query/single_field_hashed_index.js
     # Indexed measurement field contains an array value
     - jstests/core/query/project/projection_semantics.js
     # findAndModify sort.
@@ -54,16 +64,16 @@ selector:
     - jstests/core/write/update/updateOne_sort.js
     - jstests/core/write/update/updateOne_sort_sharded.js
     # Incompatible find command option.
-    - jstests/core/min_max_hashed_index.js # min
+    - jstests/core/query/min_max_hashed_index.js # min
     - jstests/core/query/expr/expr.js # divide
-    - jstests/core/show_record_id.js # showRecordId
+    - jstests/core/query/show_record_id.js # showRecordId
     # Explain will return different plan than expected when a collection becomes a time-series
     # collection. Also, query shape will be different.
-    - jstests/core/command_let_variables.js
-    - jstests/core/cover_null_queries.js
-    - jstests/core/covered_query_with_sort.js
-    - jstests/core/field_name_empty.js
-    - jstests/core/partialFilterExpression_with_geoWithin.js
+    - jstests/core/query/command_let_variables.js
+    - jstests/core/query/cover_null_queries.js
+    - jstests/core/query/covered_query_with_sort.js
+    - jstests/core/query/field_name_empty.js
+    - jstests/core/query/partialFilterExpression_with_geoWithin.js
     - jstests/core/query/and/and3.js
     - jstests/core/query/bittest.js
     - jstests/core/query/boolean_expression_simplification.js
@@ -75,13 +85,13 @@ selector:
     - jstests/core/query/expr/expr_index_use.js
     - jstests/core/query/idhack.js
     - jstests/core/query/index_deduplication.js
-    - jstests/core/query/introspect_hidden_index_plan_cache_entries.js
+    - jstests/core/query/plan_cache/introspect_hidden_index_plan_cache_entries.js
     - jstests/core/query/or/or3.js
     - jstests/core/query/or/or_to_in.js
     - jstests/core/query/or/orf.js
     - jstests/core/query/plan_cache/plan_cache_clear.js
     - jstests/core/query/plan_cache/plan_cache_list_plans.js
-    - jstests/core/query/query_settings/*
+    - jstests/core/query/query_settings/**/*.js
     - jstests/core/query/regex/regex.js
     - jstests/core/query/regex/regex3.js
     - jstests/core/query/regex/regex4.js
@@ -89,7 +99,7 @@ selector:
     - jstests/core/query/regex/regex_distinct.js
     - jstests/core/query/sort/sort_array.js
     - jstests/core/query/sort/sort_merge_collation.js
-    - jstests/core/record_store_count.js
+    - jstests/core/query/record_store_count.js
     - jstests/core/write/delete/batched_multi_deletes_a.js
     - jstests/core/write/delete/batched_multi_deletes_id.js
     - jstests/core/write/bulk/bulk_write_profile.js
@@ -109,9 +119,9 @@ selector:
     - jstests/core/query/invalid_db_name.js
     # Time-series collections have different _id properties.
     - jstests/core/dbhash.js
-    - jstests/core/embedded_dollar_prefixed_field_validation.js
+    - jstests/core/query/embedded_dollar_prefixed_field_validation.js
     - jstests/core/failcommand_failpoint.js
-    - jstests/core/field_name_validation.js
+    - jstests/core/query/field_name_validation.js
     - jstests/core/query/regex/regex_not_id.js
     - jstests/core/query/rename/rename_operator.js
     - jstests/core/write/insert/batch_write_command_insert.js
@@ -129,8 +139,8 @@ selector:
     - jstests/core/query/count/count10.js
     - jstests/core/query/count/count_plan_summary.js
     - jstests/core/query/plan_cache/cached_plan_trial_does_not_discard_work.js
-    - jstests/core/top.js
-    - jstests/core/top_drop.js
+    - jstests/core/query/top/top.js
+    - jstests/core/query/top/top_drop.js
     # Buckets collection creates compounded secondary indexes, which is not compatible with wildcard indexes.
     - jstests/core/compound_index_max_fields.js
     - jstests/core/compound_wildcard_index_validation.js
@@ -140,35 +150,35 @@ selector:
     - jstests/core/datasize_validation.js # locking
     - jstests/core/filemd5.js # locking
     - jstests/core/long_index_rename.js # rename
-    - jstests/core/positional_projection_multiple_array_fields.js # $slice
+    - jstests/core/query/project/positional_projection_multiple_array_fields.js # $slice
     - jstests/core/query/elemmatch/**/*.js # $elemMatch
     - jstests/core/query/plan_cache/elem_match_index_diff_types.js # $elemMatch
     - jstests/core/query/plan_cache/match_or_duplicate_predicate_plan_cache.js # locking
     - jstests/core/query/plan_cache/query_solution_hash.js # locking
-    - jstests/core/sbe_plan_cache_autoparameterize_collscan.js # locking
-    - jstests/core/slice1.js # $slice
+    - jstests/core/query/sbe/sbe_plan_cache_autoparameterize_collscan.js # locking
+    - jstests/core/query/project/slice1.js # $slice
     - jstests/core/write/find_and_modify/find_and_modify_server6865.js # $elemMatch
     # Time-series collections are views which don't support map-reduce
     - jstests/core/commands_namespace_parsing.js
     - jstests/core/constructors.js
-    - jstests/core/function_string_representations.js
-    - jstests/core/map_reduce_validation.js
-    - jstests/core/mr_single_reduce.js
-    - jstests/core/query/mr/**/*.js
-    - jstests/core/recursion.js
+    - jstests/core/query/function_string_representations.js
+    - jstests/core/query/map_reduce/map_reduce_validation.js
+    - jstests/core/query/map_reduce/mr_single_reduce.js
+    - jstests/core/query/map_reduce/**/*.js
+    - jstests/core/query/recursion.js
     # Incompatible aggregation operations.
     - jstests/core/benchrun_pipeline_updates.js
-    - jstests/core/command_let_variables_merge_only.js # merge
-    - jstests/core/exhaust.js # singleBatch
-    - jstests/core/kill_cursors.js # noCursorTimeout
-    - jstests/core/min_max_bounds.js # min
+    - jstests/core/query/command_let_variables_merge_only.js # merge
+    - jstests/core/query/exhaust.js # singleBatch
+    - jstests/core/query/kill_cursors.js # noCursorTimeout
+    - jstests/core/query/min_max_bounds.js # min
     - jstests/core/operation_latency_histogram.js
-    - jstests/core/positional_projection.js # Positional projection
+    - jstests/core/query/project/positional_projection.js # Positional projection
     - jstests/core/query/batch_size.js # singleBatch
     - jstests/core/query/dbref/dbref3.js # Positional projection
     # Not first stage in pipeline. The following test uses $planCacheStats, which is required to be the
     # first stage in a pipeline. This will be incomplatible with timeseries.
-    - jstests/core/query/in_expression_plan_cache.js
+    - jstests/core/query/plan_cache/in_expression_plan_cache.js
     - jstests/core/query/find/find_getmore_cmd.js # singleBatch
     - jstests/core/query/find/finda.js # returnKey
     - jstests/core/query/index_key_expression.js # Unclean aggregation result
@@ -181,14 +191,14 @@ selector:
     - jstests/core/query/plan_cache/plan_cache_shell_helpers.js # Not first stage in pipeline
     - jstests/core/query/plan_cache/plan_cache_stats_shard_and_host.js # Not first stage in pipeline
     - jstests/core/query/project/project_with_collation.js # Positional projection
-    - jstests/core/query/sbe_plan_cache_autoparameterize_ixscan.js # Not first stage in pipeline
+    - jstests/core/query/sbe/sbe_plan_cache_autoparameterize_ixscan.js # Not first stage in pipeline
     - jstests/core/query/sort/sorth.js # singleBatch
     - jstests/core/query/sort/sortk.js # singleBatch
-    - jstests/core/return_key.js # returnKey
-    - jstests/core/sbe_plan_cache_duplicate_or_clauses.js # Not first stage in pipeline
-    - jstests/core/server9547.js # max
-    - jstests/core/single_batch.js # singleBatch
-    - jstests/core/testminmax.js # min
+    - jstests/core/query/return_key.js # returnKey
+    - jstests/core/query/sbe/sbe_plan_cache_duplicate_or_clauses.js # Not first stage in pipeline
+    - jstests/core/query/server9547.js # max
+    - jstests/core/query/single_batch.js # singleBatch
+    - jstests/core/query/testminmax.js # min
     # Different field ordering.
     - jstests/core/query/basica.js
     - jstests/core/query/group_lookup_with_canonical_query_prefix.js
@@ -199,7 +209,7 @@ selector:
     - jstests/core/write/update/batch_write_command_update.js
     - jstests/core/write/delete/batch_write_command_delete.js
     # Multikey indexes and array measurement field.
-    - jstests/core/match_numeric_components.js
+    - jstests/core/query/match_numeric_components.js
     - jstests/core/query/array/array1.js
     - jstests/core/query/array/arrayfind10.js
     - jstests/core/query/array/arrayfind8.js
@@ -224,14 +234,14 @@ selector:
     - jstests/core/query/sort/sort8.js
     - jstests/core/write/update/collation_update.js
     # Document size too big in the bucket format.
-    - jstests/core/max_doc_size.js
+    - jstests/core/query/max_doc_size.js
     - jstests/core/query/find/find_getmore_bsonsize.js
     - jstests/core/query/set/set7.js
     # Different error message due to the override.
     - jstests/core/write/update/update_arrayFilters.js
     # TODO(SERVER-84158): Try to include this test(s).
     - jstests/core/depth_limit.js
-    - jstests/core/mod_with_where.js
+    - jstests/core/query/mod/mod_with_where.js
     - jstests/core/query/and/and.js
     - jstests/core/query/cursor/cursora.js
     - jstests/core/query/expressions_matching_whole_array.js
@@ -239,12 +249,12 @@ selector:
     - jstests/core/query/js/**/*.js
     - jstests/core/query/or/ora.js
     - jstests/core/query/where/**/*.js
-    - jstests/core/system_js_access.js
-    - jstests/core/system_js_drop.js
+    - jstests/core/query/system_js_access.js
+    - jstests/core/query/system_js_drop.js
     - jstests/core/write/find_and_modify/find_and_modify_where.js
     # TODO(SERVER-85322): Try to include this test(s).
-    - jstests/core/resume_query.js
-    - jstests/core/resume_query_from_non_existent_record.js
+    - jstests/core/query/resume_query.js
+    - jstests/core/query/resume_query_from_non_existent_record.js
     # TODO(SERVER-82059): Try to include this test(s).
     - jstests/core/ts1.js
     # Cursor manipulation incompatible with count 'applySkipLimit' option.
@@ -255,7 +265,7 @@ selector:
     - jstests/core/query/project/projection_meta_index_key.js
     - jstests/core/query/sort/sortl.js
     # Parallel shell not running through the override.
-    - jstests/core/comment_field.js
+    - jstests/core/query/comment_field.js
     - jstests/core/fsync.js
     # Time-series buckets processing may have different cursor behavior.
     - jstests/core/query/cursor/getmore_invalidated_cursors.js

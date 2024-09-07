@@ -4,7 +4,7 @@
 # AND REGENERATE THE MATRIX SUITES.
 #
 # matrix suite mapping file: buildscripts/resmokeconfig/matrix_suites/mappings/sharding_auth_audit.yml
-# regenerate matrix suites: buildscripts/resmoke.py generate-matrix-suites
+# regenerate matrix suites: buildscripts/resmoke.py generate-matrix-suites && bazel run //:format
 ##########################################################
 config_variables:
   - jstests/libs/authTestsKey
@@ -30,9 +30,9 @@ selector:
     - jstests/sharding/**/libs/**/*.js
     - jstests/sharding/*[aA]uth*.js
     - jstests/sharding/analyze_shard_key/*[aA]uth*.js
-    - jstests/sharding/query/*[aA]uth*.js
+    - jstests/sharding/query/**/*[aA]uth*.js
     - jstests/sharding/advance_cluster_time_action_type.js
-    - jstests/sharding/query/aggregation_currentop.js
+    - jstests/sharding/query/agg/agg_currentop.js
     - jstests/sharding/internal_txns/internal_client_restrictions.js
     - jstests/sharding/kill_sessions.js
     - jstests/sharding/parallel.js

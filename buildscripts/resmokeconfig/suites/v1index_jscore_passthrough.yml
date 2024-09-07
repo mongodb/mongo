@@ -15,7 +15,7 @@ selector:
     # v:1 index does not support wildcard.
     - jstests/core/index/wildcard/**/*.js
     # v:1 index does not support collation.
-    - jstests/core/collation.js
+    - jstests/core/query/collation/collation.js
     - jstests/core/index/index_creation_on_different_collations.js
     - jstests/core/query/expr/expr_index_use.js
     # Timeseries collections are clustered, which use v:2 indexes.

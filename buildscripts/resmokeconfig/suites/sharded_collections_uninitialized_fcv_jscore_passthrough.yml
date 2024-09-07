@@ -14,7 +14,7 @@ selector:
     # may insert unexpected operations into the profile collection.
     - jstests/core/**/profile_list_collections.js
     - jstests/core/**/profile_list_indexes.js
-    - jstests/core/**/recursion.js
+    - jstests/core/**/query/recursion.js
     - jstests/core/**/system_profile.js
     # The following test examines the SBE plan cache, which initial sync may change the contents of.
     - jstests/core/query/plan_cache/plan_cache_sbe.js
@@ -38,7 +38,7 @@ selector:
     - jstests/core/**/profile_update.js
     - jstests/core/txns/transactions_profiling.js
     # The downstream syncing node affects the top output.
-    - jstests/core/**/top.js
+    - jstests/core/**/query/top/top.js
     # Change stream pre-images are not cloned during initial sync.
     - jstests/core/**/write_change_stream_pit_preimage.js
 
@@ -62,7 +62,7 @@ selector:
     - jstests/core/**/tailable_cursor_invalidation.js # capped collections.
     - jstests/core/**/tailable_getmore_batch_size.js # capped collections.
     - jstests/core/**/tailable_skip_limit.js # capped collections.
-    - jstests/core/**/top.js # top.
+    - jstests/core/**/query/top/top.js # top.
     # The following tests fail because mongos behaves differently from mongod when testing certain
     # functionality. The differences are in a comment next to the failing test.
     - jstests/core/**/geo_2d_explain.js # executionSuccess in different spot in explain().
@@ -79,17 +79,17 @@ selector:
     # TODO: Remove after fixing SERVER-29449. executionStats.nReturned is incorrect for sharded
     # queries with a limit or for distinct commands.
     - jstests/core/**/distinct_index1.js
-    - jstests/core/**/explain1.js
+    - jstests/core/**/explain/explain1.js
     - jstests/core/**/explain4.js
     - jstests/core/**/sortk.js
     # TODO: Remove after fixing SERVER-32563. The implementation of explain for the count command is
     # incorrect on sharded collections.
-    - jstests/core/**/explain_count.js
+    - jstests/core/**/explain/explain_count.js
     - jstests/core/**/explain_server_params.js
     # TODO SERVER-32311: These tests use plan stage helpers which can't handle sharded explain output.
     - jstests/core/**/expr_index_use.js
     - jstests/core/**/index_multikey.js
-    - jstests/core/**/optimized_match_explain.js
+    - jstests/core/**/query/explain/optimized_match_explain.js
     - jstests/core/**/sort_array.js
 
     # Will fail all commands including those needed to forward command to initial sync node.

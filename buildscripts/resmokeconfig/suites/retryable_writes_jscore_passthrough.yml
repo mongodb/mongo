@@ -15,13 +15,13 @@ selector:
     - jstests/core/**/profile2.js
     - jstests/core/**/profile3.js
     - jstests/core/**/profile_findandmodify.js
-    - jstests/core/**/top.js
+    - jstests/core/**/query/top/top.js
     - jstests/core/views/views_stats.js
     - jstests/core/write/bulk/bulk_write_profile.js
 
     # These test run commands using legacy queries, which are not supported on sessions.
-    - jstests/core/**/comment_field.js
-    - jstests/core/**/exhaust.js
+    - jstests/core/**/query/comment_field.js
+    - jstests/core/**/query/exhaust.js
 
     # TODO SERVER-31242: findAndModify no-op retry should respect the fields option.
     - jstests/core/**/crud_api.js

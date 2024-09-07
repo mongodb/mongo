@@ -12,7 +12,7 @@ selector:
     - jstests/core/**/set_param1.js
     # BulkWrite profiling and currentOp output format is not the same as normal writes.
     - jstests/core/**/profile*.js
-    - jstests/core/comment_field.js
+    - jstests/core/query/comment_field.js
     - jstests/core/fsync.js
     # Runs an update with illegal format (no 'updates'). We could work around this in the override
     # but it is very annoying.
@@ -43,8 +43,8 @@ selector:
     - jstests/core/index/index_arr2.js
     - jstests/core/index/index_stats.js
     - jstests/core/ts1.js
-    - jstests/core/compare_timestamps.js
-    - jstests/core/command_let_variables.js
+    - jstests/core/query/compare_timestamps.js
+    - jstests/core/query/command_let_variables.js
     - jstests/core/write/update/update_min_max_examples.js
     - jstests/core/write/update/update_arrayFilters.js
     - jstests/core/index/wildcard/wildcard_index_type.js
@@ -62,7 +62,7 @@ selector:
     - jstests/core/write/bypass_empty_ts_replacement_timeseries.js
 
     # Multiple cluster override does not support QE
-    - jstests/core/queryable_encryption/*.js
+    - jstests/core/query/queryable_encryption/*.js
 
     # Batching causes us to go over BSON max obj size for request
     - jstests/core/query/find/find_getmore_bsonsize.js
@@ -78,15 +78,15 @@ selector:
     # update with $ modifiers can sometimes change field ordering
     - jstests/core/write/update/update5.js
     - jstests/core/write/update/upsert_and.js
-    - jstests/core/server1470.js
+    - jstests/core/query/server1470.js
     - jstests/core/query/rename/rename_operator_missing_source.js
 
     # requires parameter not supported by override
     - jstests/core/write/crud_ops_do_not_throw_locktimeout.js
-    - jstests/core/command_json_schema_field.js
-    - jstests/core/api/api_version_test_expression.js
-    - jstests/core/api/api_version_parameters.js
-    - jstests/core/query/mr/mr_null_arguments.js
+    - jstests/core/query/command_json_schema_field.js
+    - jstests/core/query/api/api_version_test_expression.js
+    - jstests/core/query/api/api_version_parameters.js
+    - jstests/core/query/map_reduce/mr_null_arguments.js
     - jstests/core/txns/prepare_transaction_unique_index_conflict.js
     - jstests/core/txns/no_snapshot_writes_outside_txn.js
 
@@ -98,7 +98,7 @@ selector:
     - jstests/core/query/invalid_db_name.js
 
     # parallel processing causes race conditions in these tests
-    - jstests/core/local_tail_capped.js
+    - jstests/core/query/local_tail_capped.js
     - jstests/core/txns/transactions_block_ddl.js
     - jstests/core/txns/kill_op_on_txn_expiry.js
     - jstests/core/txns/write_conflicts_with_non_txns.js
@@ -109,8 +109,8 @@ selector:
     - jstests/core/write/update/updatea.js
 
     # batching can cause planCache to be different than expectations
-    - jstests/core/sbe_plan_cache_duplicate_or_clauses.js
-    - jstests/core/query/sbe_plan_cache_autoparameterize_ixscan.js
+    - jstests/core/query/sbe/sbe_plan_cache_duplicate_or_clauses.js
+    - jstests/core/query/sbe/sbe_plan_cache_autoparameterize_ixscan.js
     - jstests/core/index/index_filter_commands_invalidate_plan_cache_entries.js
     - jstests/core/query/plan_cache/plan_cache_sbe.js
 

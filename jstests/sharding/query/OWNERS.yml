@@ -1,0 +1,14 @@
+version: 1.0.0
+filters:
+  - "*":
+    approvers:
+      - 10gen/query
+  - "*plan_cache*":
+    approvers:
+      - 10gen/query-optimization
+  - "hidden_index.js":
+    approvers:
+      - 10gen/query-optimization
+  - "sharded_profile.js":
+    approvers:
+      - 10gen/query-integration

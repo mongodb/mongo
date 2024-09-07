@@ -8,10 +8,10 @@ selector:
     # Disabled due to MongoDB restrictions and/or workload restrictions
     ##
     # These workloads use >100MB of data, which can overwhelm test hosts.
-    - jstests/concurrency/fsm_workloads/agg_group_external.js
-    - jstests/concurrency/fsm_workloads/agg_sort_external.js
+    - jstests/concurrency/fsm_workloads/query/agg/agg_group_external.js
+    - jstests/concurrency/fsm_workloads/query/agg/agg_sort_external.js
     # The findAndModify_update_grow.js workload can cause OOM kills on test hosts.
-    - jstests/concurrency/fsm_workloads/findAndModify_update_grow.js
+    - jstests/concurrency/fsm_workloads/query/findAndModify/findAndModify_update_grow.js
 
     # Relies on having one thread observe writes from the other threads, which won't become visible
     # once a transaction in the thread is started because it'll keep reading from the same snapshot.
@@ -22,7 +22,7 @@ selector:
     # Expects reads to die with a particular error, but other errors are possible if the read is part
     # of a transaction (e.g. ErrorCodes.LockTimeout).
     - jstests/concurrency/fsm_workloads/drop_index_during_replan.js
-    - jstests/concurrency/fsm_workloads/drop_index_during_lookup.js
+    - jstests/concurrency/fsm_workloads/query/drop_index_during_lookup.js
 
     # Performs direct writes to system.views
     - jstests/concurrency/fsm_workloads/view_catalog_direct_system_writes.js

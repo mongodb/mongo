@@ -21,12 +21,6 @@ filters:
   - "timeseries*":
     approvers:
       - 10gen/server-storage-execution
-  - "timeseries_agg*":
-    approvers:
-      - 10gen/query-integration
-  - "timeseries_deletes_and_inserts.js":
-    approvers:
-      - 10gen/query-integration
   - "CRUD_clustered_collection.js":
     approvers:
       - 10gen/server-storage-execution

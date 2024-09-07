@@ -19,8 +19,8 @@ selector:
     - jstests/core/**/set_param1.js
 
     # These test run commands using legacy queries, which are not supported on sessions.
-    - jstests/core/**/comment_field.js
-    - jstests/core/**/exhaust.js
+    - jstests/core/**/query/comment_field.js
+    - jstests/core/**/query/exhaust.js
 
     # Unacknowledged writes prohibited in an explicit session.
     - jstests/core/**/batch_write_command_w0.js

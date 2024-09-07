@@ -261,11 +261,11 @@
       exclude_files:
         - jstests/sharding/**/libs/**/*.js
         # Enable when 4.6 becomes last stable
-        - jstests/sharding/query/merge_command_options.js
+        - jstests/sharding/query/out_merge/merge_command_options.js
         - jstests/sharding/max_time_ms_enforced_on_shard.js
         # TODO SERVER-46040: Enable when SERVER-46040 is backported
         - jstests/sharding/drop_indexes_with_stale_config_error.js
-        - jstests/sharding/query/merge_write_concern.js
+        - jstests/sharding/query/out_merge/merge_write_concern.js
     executor:
       config:
         shell_options:

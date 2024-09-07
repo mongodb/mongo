@@ -4,7 +4,7 @@
 # AND REGENERATE THE MATRIX SUITES.
 #
 # matrix suite mapping file: buildscripts/resmokeconfig/matrix_suites/mappings/change_streams_change_collection_replica_sets_stepdown_primary_jscore_passthrough.yml
-# regenerate matrix suites: buildscripts/resmoke.py generate-matrix-suites
+# regenerate matrix suites: buildscripts/resmoke.py generate-matrix-suites && bazel run //:format
 ##########################################################
 description:
   "Run test suites with a replica set and multitenancy enabled. Simulate
@@ -114,7 +114,7 @@ selector:
     - jstests/core/**/profile2.js
     - jstests/core/**/profile3.js
     - jstests/core/**/profile_findandmodify.js
-    - jstests/core/**/top.js
+    - jstests/core/**/query/top/top.js
     - jstests/core/views/views_stats.js
     - jstests/core/**/crud_api.js
     - jstests/core/**/find_and_modify.js

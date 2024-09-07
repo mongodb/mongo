@@ -45,7 +45,7 @@ selector:
     - jstests/core/txns/prepare_conflict.js
     # Implicit collection creation not supported for certain commands that are run direct to shard.
     - jstests/core/ddl/capped_convertToCapped1.js
-    - jstests/core/collation.js
+    - jstests/core/query/collation/collation.js
     # Logical session cache for a config server replica set is not usable until there is a shard.
     - jstests/core/administrative/list_all_sessions.js
     - jstests/core/administrative/list_sessions.js
@@ -64,14 +64,14 @@ selector:
     - jstests/core/**/fts_find_and_modify.js
     - jstests/core/**/project_with_collation.js
     # These test run commands using legacy queries, which are not supported on sessions.
-    - jstests/core/**/comment_field.js
-    - jstests/core/**/exhaust.js
+    - jstests/core/**/query/comment_field.js
+    - jstests/core/**/query/exhaust.js
     # No-op retries are not ignored by top, the profiler, or opcount.
     - jstests/core/**/operation_latency_histogram.js
     - jstests/core/**/profile2.js
     - jstests/core/**/profile3.js
     - jstests/core/**/profile_findandmodify.js
-    - jstests/core/**/top.js
+    - jstests/core/**/query/top/top.js
     - jstests/core/views/views_stats.js
     - jstests/core/write/bulk/bulk_write_profile.js
     # This test makes the assumption that a command is run a certain number of times, but

@@ -16,7 +16,7 @@
       - jstests/core/write/bypass_empty_ts_replacement_timeseries.js
       # due to error: "BSON field 'create.recordIdsReplicated' is not allowed with apiStrict:true."
       - jstests/core/version_api_v1_command_coverage.js
-      - jstests/core/api/*.js
+      - jstests/core/query/api/*.js
       # due to error: Error: [0] != [1] are not equal : encountered an error in the parallel shell
       - jstests/core/query/distinct/*.js
       - jstests/core/query/cursor/cursora.js
@@ -38,7 +38,7 @@
       # due to error: "currentOpSpawnsThreadWaitingForLatch not found"
       - jstests/core/administrative/current_op/currentop_waiting_for_latch.js
       # due to error: Error: assert.soon failed (timeout 90000ms)
-      - jstests/core/query/mr/mr_killop.js
+      - jstests/core/query/map_reduce/mr_killop.js
       - jstests/core/query/count/count_plan_summary.js
       - jstests/core/write/crud_ops_do_not_throw_locktimeout.js
       - jstests/core/administrative/current_op/currentop_shell.js

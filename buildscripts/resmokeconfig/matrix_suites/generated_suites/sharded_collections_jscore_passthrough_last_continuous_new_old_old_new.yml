@@ -4,7 +4,7 @@
 # AND REGENERATE THE MATRIX SUITES.
 #
 # matrix suite mapping file: buildscripts/resmokeconfig/matrix_suites/mappings/sharded_collections_jscore_passthrough_last_continuous_new_old_old_new.yml
-# regenerate matrix suites: buildscripts/resmoke.py generate-matrix-suites
+# regenerate matrix suites: buildscripts/resmoke.py generate-matrix-suites && bazel run //:format
 ##########################################################
 executor:
   archive:
@@ -59,7 +59,7 @@ selector:
     - jstests/core/**/tailable_cursor_invalidation.js
     - jstests/core/**/tailable_getmore_batch_size.js
     - jstests/core/**/tailable_skip_limit.js
-    - jstests/core/**/top.js
+    - jstests/core/**/query/top/top.js
     - jstests/core/**/geo_2d_explain.js
     - jstests/core/**/geo_s2explain.js
     - jstests/core/**/geo_s2sparse.js
@@ -70,14 +70,14 @@ selector:
     - jstests/core/**/list_indexes_non_existent_ns.js
     - jstests/core/**/mr_preserve_indexes.js
     - jstests/core/**/distinct_index1.js
-    - jstests/core/**/explain1.js
+    - jstests/core/**/explain/explain1.js
     - jstests/core/**/explain4.js
     - jstests/core/**/sortk.js
-    - jstests/core/**/explain_count.js
+    - jstests/core/**/explain/explain_count.js
     - jstests/core/**/explain_server_params.js
     - jstests/core/**/expr_index_use.js
     - jstests/core/**/index_multikey.js
-    - jstests/core/**/optimized_match_explain.js
+    - jstests/core/**/query/explain/optimized_match_explain.js
     - jstests/core/**/sort_array.js
   exclude_with_any_tags:
     - assumes_standalone_mongod

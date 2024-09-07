@@ -8,11 +8,11 @@ selector:
     # Disabled due to MongoDB restrictions and/or workload restrictions
     ##
     # These workloads use >100MB of data, which can overwhelm test hosts.
-    - jstests/concurrency/fsm_workloads/agg_group_external.js
-    - jstests/concurrency/fsm_workloads/agg_sort_external.js
+    - jstests/concurrency/fsm_workloads/query/agg/agg_group_external.js
+    - jstests/concurrency/fsm_workloads/query/agg/agg_sort_external.js
 
     # The findAndModify_update_grow.js workload can cause OOM kills on test hosts.
-    - jstests/concurrency/fsm_workloads/findAndModify_update_grow.js
+    - jstests/concurrency/fsm_workloads/query/findAndModify/findAndModify_update_grow.js
 
     # These workloads run the reIndex command, which is only allowed on a standalone node.
     - jstests/concurrency/fsm_workloads/reindex.js

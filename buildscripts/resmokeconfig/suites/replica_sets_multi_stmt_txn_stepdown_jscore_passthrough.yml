@@ -35,7 +35,7 @@ selector:
     - jstests/core/**/indexa.js # No explicit check for failed command.
     - jstests/core/**/indexes_multiple_commands.js
     - jstests/core/**/js2.js
-    - jstests/core/json_schema/json_schema.js
+    - jstests/core/query/json_schema/json_schema.js
     - jstests/core/**/mr_bigobject.js
     - jstests/core/**/not2.js
     - jstests/core/**/null_query_semantics.js
@@ -75,11 +75,11 @@ selector:
     # explain (requires read concern local)
     - jstests/core/**/agg_hint.js
     - jstests/core/**/and.js
-    - jstests/core/**/collation.js
+    - jstests/core/**/query/collation/collation.js
     - jstests/core/**/explain_shell_helpers.js
     - jstests/core/**/index_partial_read_ops.js
     - jstests/core/**/explain_server_params.js
-    - jstests/core/**/optimized_match_explain.js
+    - jstests/core/**/query/explain/optimized_match_explain.js
     - jstests/core/**/sort_array.js
     - jstests/core/views/views_collation.js
 
@@ -90,7 +90,7 @@ selector:
 
     # $collStats
     - jstests/core/**/operation_latency_histogram.js
-    - jstests/core/views/views_coll_stats.js
+    - jstests/core/query/collstats/views_coll_stats.js
     - jstests/core/views/views_stats.js
 
     # Errors expected to happen in tests, which can cause transactions to get aborted.
@@ -100,14 +100,14 @@ selector:
     - jstests/core/**/bulk_api_unordered.js
     - jstests/core/**/doc_validation.js
     - jstests/core/**/doc_validation_options.js
-    - jstests/core/**/field_name_validation.js
+    - jstests/core/**/query/field_name_validation.js
     - jstests/core/**/insert_illegal_doc.js
     - jstests/core/**/push_sort.js
     - jstests/core/**/update_arrayFilters.js
     - jstests/core/**/update_dbref.js
     - jstests/core/**/updatel.js
     - jstests/core/**/write_result.js
-    - jstests/core/**/positional_projection.js
+    - jstests/core/**/query/project/positional_projection.js
 
     # Trick for bypassing mongo shell validation in the test doesn't work because txn_override
     # retry logic will hit the shell validation.
@@ -133,7 +133,7 @@ selector:
     ##
 
     # SERVER-34868 Cannot run a legacy query on a session.
-    - jstests/core/**/exhaust.js
+    - jstests/core/**/query/exhaust.js
 
     # SERVER-34772 Tailable Cursors are not allowed with snapshot readconcern.
     - jstests/core/**/awaitdata_getmore_cmd.js
@@ -142,14 +142,14 @@ selector:
     - jstests/core/**/tailable_getmore_batch_size.js
 
     # Wrong count for top info (WriteLock)
-    - jstests/core/**/top.js
+    - jstests/core/**/query/top/top.js
 
     # Expects collection to not have been created
     - jstests/core/**/insert_id_undefined.js
 
     # Creates sessions explicitly, resulting in txns being run through different sessions
     # using a single txnNumber.
-    - jstests/core/json_schema/misc_validation.js
+    - jstests/core/query/json_schema/misc_validation.js
     - jstests/core/views/views_all_commands.js
 
     # Committing a transaction when the server is fsync locked fails.
@@ -164,7 +164,7 @@ selector:
     - jstests/core/**/geo_s2cursorlimitskip.js
     - jstests/core/**/getmore_invalidated_cursors.js
     - jstests/core/**/getmore_invalidated_documents.js
-    - jstests/core/**/kill_cursors.js
+    - jstests/core/**/query/kill_cursors.js
     - jstests/core/**/list_indexes.js
     - jstests/core/**/oro.js
     - jstests/core/**/sort_with_update_between_getmores.js
@@ -217,7 +217,7 @@ selector:
     - jstests/core/**/shell_connection_strings.js
 
     # Does not support tojson of command objects.
-    - jstests/core/**/SERVER-23626.js
+    - jstests/core/**/query/SERVER-23626.js
 
     # Examines _id of upserted document.
     - jstests/core/**/find_and_modify_server7660.js

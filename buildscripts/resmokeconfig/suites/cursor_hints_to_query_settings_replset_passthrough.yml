@@ -20,7 +20,7 @@ selector:
     - jstests/core/query/explain/explain_shell_helpers.js
     - jstests/core/query/index_deduplication.js
     - jstests/core/query/internal_hash_eq/lookup_using_hash_key.js
-    - jstests/core/return_key.js
+    - jstests/core/query/return_key.js
 
     # Test which asserts on the number of execution metrics. The additional commands emitted by
     # this suite might cause the test to fail.

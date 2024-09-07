@@ -58,7 +58,7 @@ selector:
     - jstests/core/**/fts6.js
     - jstests/core/**/fts_projection.js
     # Assumes there is one collection that is not clustered.
-    - jstests/core/find_with_resume_after_param.js
+    - jstests/core/query/find_with_resume_after_param.js
     # Asserts that queries can use the express execution path, which does not support clustered colls.
     - jstests/core/**/express.js
 

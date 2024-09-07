@@ -30,7 +30,7 @@ selector:
     - jstests/core/**/tailable_cursor_invalidation.js # capped collections.
     - jstests/core/**/tailable_getmore_batch_size.js # capped collections.
     - jstests/core/**/tailable_skip_limit.js # capped collections.
-    - jstests/core/**/top.js # top.
+    - jstests/core/**/query/top/top.js # top.
     # The following tests fail because mongos behaves differently from mongod when testing certain
     # functionality. The differences are in a comment next to the failing test.
     - jstests/core/**/geo_2d_explain.js # executionSuccess in different spot in explain().
@@ -47,23 +47,23 @@ selector:
     # TODO: Remove after fixing SERVER-29449. executionStats.nReturned is incorrect for sharded
     # queries with a limit or for distinct commands.
     - jstests/core/**/distinct_index1.js
-    - jstests/core/**/explain1.js
+    - jstests/core/**/explain/explain1.js
     - jstests/core/**/explain4.js
     - jstests/core/**/sortk.js
     # TODO: Remove after fixing SERVER-32563. The implementation of explain for the count command is
     # incorrect on sharded collections.
-    - jstests/core/**/explain_count.js
+    - jstests/core/**/explain/explain_count.js
     - jstests/core/**/explain_server_params.js
     # TODO SERVER-32311: These tests use plan stage helpers which can't handle sharded explain output.
     - jstests/core/**/expr_index_use.js
     - jstests/core/**/index_multikey.js
-    - jstests/core/**/optimized_match_explain.js
+    - jstests/core/**/query/explain/optimized_match_explain.js
     - jstests/core/**/sort_array.js
 
     # Excludes from fcv_upgrade_downgrade_jscore_passthrough.yml
     #
     # TODO (SERVER-78220): Investigate failing api version tests in the fcv jscore passthrough suite.
-    - jstests/core/api/api_version_unstable_indexes.js
+    - jstests/core/query/api/api_version_unstable_indexes.js
 
     # These timeseries tests rely on specific bucketing behaviour that is not guaranteed across FCV
     # upgrade/downgrade
@@ -98,7 +98,7 @@ selector:
     # Test runs an updateOne without shard key which will use an internal transaction
     # that can be aborted by the fcv upgrade downgrade suite.
     - jstests/aggregation/sources/unionWith/unionWith_invalid_usage.js
-    - jstests/core/command_let_variables_expressions.js
+    - jstests/core/query/command_let_variables_expressions.js
     - jstests/core/index/hashed/hashed_index_with_arrays.js
     - jstests/core/write/update/update5.js
     - jstests/core/write/find_and_modify/find_and_modify_server6582.js
@@ -128,7 +128,7 @@ selector:
     - jstests/core/query/set/set_type_change.js
     - jstests/core/query/sort/sort_with_update_between_getmores.js
     - jstests/core/query/unset/unset2.js
-    - jstests/core/server1470.js
+    - jstests/core/query/server1470.js
     - jstests/core/shell/shell_writeconcern.js
     - jstests/core/write/autoid.js
     - jstests/core/write/batch_write_collation_estsize.js
@@ -205,7 +205,7 @@ selector:
     - jstests/aggregation/sources/lookup/lookup_non_correlated.js
     - jstests/core/ddl/collection_uuid_index_commands.js
     # Queryable encryption tests create internal transactions which are expected to fail.
-    - jstests/core/queryable_encryption/*.js
+    - jstests/core/query/queryable_encryption/*.js
     # TODO (SERVER-77910): Find out why spill_to_disk.js fails to spill to disk after FCV down.
     - jstests/aggregation/spill_to_disk.js
     # TODO (SERVER-32311): These tests use getAggPlanStage(), which can't handle sharded explain output.
@@ -222,7 +222,7 @@ selector:
 
     # TODO SERVER-80490: The test below requires a precise lock count that can get modified by concurrent
     # setFCV operations. The exclusion can be removed once the linked ticket is fixed.
-    - jstests/core/top.js
+    - jstests/core/query/top/top.js
 
     # SERVER-85456: this test uses benchRun which does not use runCommand and index creation can fail.
     - jstests/core/bench_test1.js

@@ -28,7 +28,7 @@ selector:
     - jstests/core/**/tailable_cursor_invalidation.js # capped collections.
     - jstests/core/**/tailable_getmore_batch_size.js # capped collections.
     - jstests/core/**/tailable_skip_limit.js # capped collections.
-    - jstests/core/**/top.js # top.
+    - jstests/core/**/query/top/top.js # top.
     # The following tests fail because mongos behaves differently from mongod when testing certain
     # functionality. The differences are in a comment next to the failing test.
     - jstests/core/**/geo_2d_explain.js # executionSuccess in different spot in explain().
@@ -45,17 +45,17 @@ selector:
     # TODO: Remove after fixing SERVER-29449. executionStats.nReturned is incorrect for sharded
     # queries with a limit or for distinct commands.
     - jstests/core/**/distinct_index1.js
-    - jstests/core/**/explain1.js
+    - jstests/core/**/explain/explain1.js
     - jstests/core/**/explain4.js
     - jstests/core/**/sortk.js
     # TODO: Remove after fixing SERVER-32563. The implementation of explain for the count command is
     # incorrect on sharded collections.
-    - jstests/core/**/explain_count.js
+    - jstests/core/**/explain/explain_count.js
     - jstests/core/**/explain_server_params.js
     # TODO SERVER-32311: These tests use plan stage helpers which can't handle sharded explain output.
     - jstests/core/**/expr_index_use.js
     - jstests/core/**/index_multikey.js
-    - jstests/core/**/optimized_match_explain.js
+    - jstests/core/**/query/explain/optimized_match_explain.js
     - jstests/core/**/sort_array.js
 
     # Magic Restore specific exclusions.
@@ -67,10 +67,10 @@ selector:
     # Int types within an array type in BSON get their type changed when passed into a C++ function from Javascript.
     - jstests/core/query/type/type_array.js
     - jstests/core/timeseries/timeseries_internal_bounded_sort_compound_mixed_types.js
-    - jstests/core/json_schema/unique_items.js
+    - jstests/core/query/json_schema/unique_items.js
 
     # Uses documents that are too close to max BSON size for us to support passing to C++ as a BSON array.
-    - jstests/core/max_doc_size.js
+    - jstests/core/query/max_doc_size.js
     - jstests/core/query/find/find_getmore_bsonsize.js
 
     # This test does a very large amount of inserts on a single shard which will trigger the balancer.

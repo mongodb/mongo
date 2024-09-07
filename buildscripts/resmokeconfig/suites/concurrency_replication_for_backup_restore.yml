@@ -12,13 +12,13 @@ selector:
     - jstests/concurrency/fsm_workloads/compact.js
 
     # These workloads use up to 100MB of memory, which can overwhelm test hosts.
-    - jstests/concurrency/fsm_workloads/agg_group_external.js
-    - jstests/concurrency/fsm_workloads/agg_sort.js
-    - jstests/concurrency/fsm_workloads/agg_sort_external.js
-    - jstests/concurrency/fsm_workloads/schema_validator_with_expr_variables.js
+    - jstests/concurrency/fsm_workloads/query/agg/agg_group_external.js
+    - jstests/concurrency/fsm_workloads/query/agg/agg_sort.js
+    - jstests/concurrency/fsm_workloads/query/agg/agg_sort_external.js
+    - jstests/concurrency/fsm_workloads/query/schema_validator_with_expr_variables.js
 
     # The findAndModify_update_grow.js workload can cause OOM kills on test hosts.
-    - jstests/concurrency/fsm_workloads/findAndModify_update_grow.js
+    - jstests/concurrency/fsm_workloads/query/findAndModify/findAndModify_update_grow.js
 
     # These workloads run the reIndex command, which is only allowed on a standalone node.
     - jstests/concurrency/fsm_workloads/reindex.js
@@ -26,9 +26,9 @@ selector:
     - jstests/concurrency/fsm_workloads/reindex_writeconflict.js
 
     # These workloads kill random cursors.
-    - jstests/concurrency/fsm_workloads/kill_multicollection_aggregation.js
-    - jstests/concurrency/fsm_workloads/invalidated_cursors.js
-    - jstests/concurrency/fsm_workloads/globally_managed_cursors.js
+    - jstests/concurrency/fsm_workloads/query/kill_multicollection_aggregation.js
+    - jstests/concurrency/fsm_workloads/query/invalidated_cursors.js
+    - jstests/concurrency/fsm_workloads/query/globally_managed_cursors.js
 
     # These workloads use a verbose log level.
     - jstests/concurrency/fsm_workloads/collection_uuid.js

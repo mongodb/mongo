@@ -1,5 +1,5 @@
 /**
- * timeseries_findAndModify_remove_and_inserts.js
+ * timeseries/timeseries_findAndModify_remove_and_inserts.js
  *
  * Extends timeseries_delete_and_inserts.js to test findAndModify with {remove: true}.
  *
@@ -15,7 +15,7 @@
 import {extendWorkload} from "jstests/concurrency/fsm_libs/extend_workload.js";
 import {
     $config as $baseConfig
-} from 'jstests/concurrency/fsm_workloads/timeseries_deletes_and_inserts.js';
+} from 'jstests/concurrency/fsm_workloads/query/timeseries/timeseries_deletes_and_inserts.js';
 
 export const $config = extendWorkload($baseConfig, function($config, $super) {
     $config.data.logColl = "findAndModify_remove_and_inserts_log";

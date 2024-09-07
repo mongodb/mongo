@@ -10,15 +10,15 @@ selector:
     - jstests/concurrency/fsm_workloads/**/*.js
   exclude_files:
     # Disabled because MapReduce can lose cursors if the primary goes down during the operation.
-    - jstests/concurrency/fsm_workloads/map_reduce_drop.js
-    - jstests/concurrency/fsm_workloads/map_reduce_inline.js
-    - jstests/concurrency/fsm_workloads/map_reduce_interrupt.js
-    - jstests/concurrency/fsm_workloads/map_reduce_merge.js
-    - jstests/concurrency/fsm_workloads/map_reduce_reduce.js
-    - jstests/concurrency/fsm_workloads/map_reduce_replace.js
-    - jstests/concurrency/fsm_workloads/map_reduce_replace_nonexistent.js
-    - jstests/concurrency/fsm_workloads/map_reduce_replace_remove.js
-    - jstests/concurrency/fsm_workloads/map_reduce_with_chunk_migrations.js
+    - jstests/concurrency/fsm_workloads/query/map_reduce/map_reduce_drop.js
+    - jstests/concurrency/fsm_workloads/query/map_reduce/map_reduce_inline.js
+    - jstests/concurrency/fsm_workloads/query/map_reduce/map_reduce_interrupt.js
+    - jstests/concurrency/fsm_workloads/query/map_reduce/map_reduce_merge.js
+    - jstests/concurrency/fsm_workloads/query/map_reduce/map_reduce_reduce.js
+    - jstests/concurrency/fsm_workloads/query/map_reduce/map_reduce_replace.js
+    - jstests/concurrency/fsm_workloads/query/map_reduce/map_reduce_replace_nonexistent.js
+    - jstests/concurrency/fsm_workloads/query/map_reduce/map_reduce_replace_remove.js
+    - jstests/concurrency/fsm_workloads/query/map_reduce/map_reduce_with_chunk_migrations.js
 
     # Disabled due to MongoDB restrictions and/or workload restrictions
 
@@ -31,18 +31,18 @@ selector:
     - jstests/concurrency/fsm_workloads/auth_drop_user.js
 
     # uses >100MB of data, which can overwhelm test hosts
-    - jstests/concurrency/fsm_workloads/agg_group_external.js
-    - jstests/concurrency/fsm_workloads/agg_sort_external.js
+    - jstests/concurrency/fsm_workloads/query/agg/agg_group_external.js
+    - jstests/concurrency/fsm_workloads/query/agg/agg_sort_external.js
 
     # compact can only be run against a standalone mongod
     - jstests/concurrency/fsm_workloads/compact.js
     - jstests/concurrency/fsm_workloads/compact_while_creating_indexes.js
 
     # can cause OOM kills on test hosts
-    - jstests/concurrency/fsm_workloads/findAndModify_update_grow.js
+    - jstests/concurrency/fsm_workloads/query/findAndModify/findAndModify_update_grow.js
 
     # cannot createIndex after dropDatabase without sharding first
-    - jstests/concurrency/fsm_workloads/plan_cache_drop_database.js
+    - jstests/concurrency/fsm_workloads/query/plan_cache_drop_database.js
 
     # reIndex is not supported in mongos.
     - jstests/concurrency/fsm_workloads/reindex.js
@@ -53,8 +53,8 @@ selector:
     - jstests/concurrency/fsm_workloads/reindex_writeconflict.js
 
     # TODO Undenylist (SERVER-38852).
-    - jstests/concurrency/fsm_workloads/agg_out_interrupt_cleanup.js
-    - jstests/concurrency/fsm_workloads/timeseries_agg_out_interrupt_cleanup.js
+    - jstests/concurrency/fsm_workloads/query/agg/agg_out_interrupt_cleanup.js
+    - jstests/concurrency/fsm_workloads/query/timeseries/timeseries_agg_out_interrupt_cleanup.js
 
     # serverStatus does not include transaction metrics on mongos.
     - jstests/concurrency/fsm_workloads/multi_statement_transaction_atomicity_isolation_metrics_test.js
@@ -76,7 +76,7 @@ selector:
     # Expects reads to die with a particular error, but other errors are possible if the read is part
     # of a transaction (e.g. ErrorCodes.LockTimeout).
     - jstests/concurrency/fsm_workloads/drop_index_during_replan.js
-    - jstests/concurrency/fsm_workloads/drop_index_during_lookup.js
+    - jstests/concurrency/fsm_workloads/query/drop_index_during_lookup.js
 
     ##
     # Denylists from concurrency_sharded_multi_stmt_txn
@@ -85,11 +85,11 @@ selector:
     # Use updates that do not contain the shard key, so they are rejected before any commands are
     # sent to participant shards, but these workloads do not fail, so the auto retry transaction logic
     # attempts to commit, which fails because no participants have been contacted.
-    - jstests/concurrency/fsm_workloads/update_rename.js
-    - jstests/concurrency/fsm_workloads/update_rename_noindex.js
+    - jstests/concurrency/fsm_workloads/query/update/update_rename.js
+    - jstests/concurrency/fsm_workloads/query/update/update_rename_noindex.js
 
     # Expects DocumentValidationFailure which causes transaction to abort and retry indefinitely.
-    - jstests/concurrency/fsm_workloads/schema_validator_with_expr_variables.js
+    - jstests/concurrency/fsm_workloads/query/schema_validator_with_expr_variables.js
 
     ##
     # Denylists from concurrency_sharded_with_stepdowns
@@ -102,25 +102,25 @@ selector:
 
     # These workloads frequently time out waiting for the distributed lock to drop a sharded
     # collection.
-    - jstests/concurrency/fsm_workloads/kill_aggregation.js
-    - jstests/concurrency/fsm_workloads/kill_rooted_or.js
+    - jstests/concurrency/fsm_workloads/query/kill_aggregation.js
+    - jstests/concurrency/fsm_workloads/query/kill_rooted_or.js
 
     # Uses non retryable commands.
-    - jstests/concurrency/fsm_workloads/agg_out.js
-    - jstests/concurrency/fsm_workloads/agg_out_interrupt_cleanup.js
-    - jstests/concurrency/fsm_workloads/timeseries_agg_out_interrupt_cleanup.js
-    - jstests/concurrency/fsm_workloads/agg_sort.js
+    - jstests/concurrency/fsm_workloads/query/agg/agg_out.js
+    - jstests/concurrency/fsm_workloads/query/agg/agg_out_interrupt_cleanup.js
+    - jstests/concurrency/fsm_workloads/query/timeseries/timeseries_agg_out_interrupt_cleanup.js
+    - jstests/concurrency/fsm_workloads/query/agg/agg_sort.js
     - jstests/concurrency/fsm_workloads/collmod.js
     - jstests/concurrency/fsm_workloads/collmod_separate_collections.js
-    - jstests/concurrency/fsm_workloads/invalidated_cursors.js
-    - jstests/concurrency/fsm_workloads/kill_multicollection_aggregation.js
+    - jstests/concurrency/fsm_workloads/query/invalidated_cursors.js
+    - jstests/concurrency/fsm_workloads/query/kill_multicollection_aggregation.js
     - jstests/concurrency/fsm_workloads/random_moveChunk_timeseries_meta_updates.js
     - jstests/concurrency/fsm_workloads/random_moveChunk_timeseries_arbitrary_updates.js
     - jstests/concurrency/fsm_workloads/view_catalog.js
     - jstests/concurrency/fsm_workloads/view_catalog_cycle_with_drop.js
     - jstests/concurrency/fsm_workloads/random_moveChunk_timeseries_deletes.js
+    - jstests/concurrency/fsm_workloads/query/timeseries/timeseries_deletes_and_inserts.js
     - jstests/concurrency/fsm_workloads/timeseries_crud_operations_respect_control_closed.js
-    - jstests/concurrency/fsm_workloads/timeseries_deletes_and_inserts.js
     - jstests/concurrency/fsm_workloads/timeseries_findAndModify_remove_and_inserts.js
     - jstests/concurrency/fsm_workloads/timeseries_updates_and_inserts.js
     - jstests/concurrency/fsm_workloads/timeseries_upserts.js
@@ -132,25 +132,25 @@ selector:
     # Uses getMore. If a kill node happens between the time of creation of cursor (usually by calling
     # find or aggregate) and calling getMore(), server will throw CursortNotFound exception.
     # We currently do not retry the transaction on this exception.
-    - jstests/concurrency/fsm_workloads/agg_unionWith_interrupt_cleanup.js
-    - jstests/concurrency/fsm_workloads/agg_union_with_chunk_migrations.js
+    - jstests/concurrency/fsm_workloads/query/agg/agg_unionWith_interrupt_cleanup.js
+    - jstests/concurrency/fsm_workloads/query/agg/agg_union_with_chunk_migrations.js
     - jstests/concurrency/fsm_workloads/create_capped_collection.js
     - jstests/concurrency/fsm_workloads/create_capped_collection_maxdocs.js
     - jstests/concurrency/fsm_workloads/indexed_insert_ordered_bulk.js
     - jstests/concurrency/fsm_workloads/indexed_insert_unordered_bulk.js
     - jstests/concurrency/fsm_workloads/list_indexes.js
-    - jstests/concurrency/fsm_workloads/query_stats_concurrent.js
+    - jstests/concurrency/fsm_workloads/query/query_stats/query_stats_concurrent.js
 
     # Uses non-retryable commands in the same state function as a command not supported in a
     # transaction.
-    - jstests/concurrency/fsm_workloads/agg_merge_when_not_matched_insert.js
-    - jstests/concurrency/fsm_workloads/agg_merge_when_matched_replace_with_new.js
+    - jstests/concurrency/fsm_workloads/query/agg/agg_merge_when_not_matched_insert.js
+    - jstests/concurrency/fsm_workloads/query/agg/agg_merge_when_matched_replace_with_new.js
 
     # JS engine interruptions on mongos return ErrorCodes::Interrupted, which isn't
     # considered a retryable or transient transaction error.
     - jstests/concurrency/fsm_workloads/indexed_insert_where.js
-    - jstests/concurrency/fsm_workloads/remove_where.js
-    - jstests/concurrency/fsm_workloads/update_where.js
+    - jstests/concurrency/fsm_workloads/query/remove/remove_where.js
+    - jstests/concurrency/fsm_workloads/query/update/update_where.js
 
   exclude_with_any_tags:
     - requires_replication

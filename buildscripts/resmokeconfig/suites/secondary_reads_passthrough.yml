@@ -28,7 +28,7 @@ selector:
     - jstests/core/**/ord.js
     - jstests/core/**/tailable_cursor_invalidation.js
     - jstests/core/**/tailable_skip_limit.js
-    - jstests/core/**/collation.js
+    - jstests/core/**/query/collation/collation.js
 
   exclude_with_any_tags:
     - assumes_standalone_mongod

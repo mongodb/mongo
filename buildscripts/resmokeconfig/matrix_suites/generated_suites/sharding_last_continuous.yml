@@ -4,7 +4,7 @@
 # AND REGENERATE THE MATRIX SUITES.
 #
 # matrix suite mapping file: buildscripts/resmokeconfig/matrix_suites/mappings/sharding_last_continuous.yml
-# regenerate matrix suites: buildscripts/resmoke.py generate-matrix-suites
+# regenerate matrix suites: buildscripts/resmoke.py generate-matrix-suites && bazel run //:format
 ##########################################################
 executor:
   archive:
@@ -26,10 +26,10 @@ matrix_suite: true
 selector:
   exclude_files:
     - jstests/sharding/**/libs/**/*.js
-    - jstests/sharding/query/merge_command_options.js
+    - jstests/sharding/query/out_merge/merge_command_options.js
     - jstests/sharding/max_time_ms_enforced_on_shard.js
     - jstests/sharding/drop_indexes_with_stale_config_error.js
-    - jstests/sharding/query/merge_write_concern.js
+    - jstests/sharding/query/out_merge/merge_write_concern.js
   exclude_with_any_tags:
     - multiversion_incompatible
     - backport_required_multiversion

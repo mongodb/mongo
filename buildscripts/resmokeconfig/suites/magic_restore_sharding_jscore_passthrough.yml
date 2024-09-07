@@ -23,7 +23,7 @@ selector:
     - jstests/core/**/queryoptimizera.js # "local" database.
     - jstests/core/**/stages*.js # stageDebug.
     - jstests/core/**/startup_log.js # "local" database.
-    - jstests/core/**/top.js # top.
+    - jstests/core/**/query/top/top.js # top.
     # The following tests fail because mongos behaves differently from mongod when testing certain
     # functionality. The differences are in a comment next to the failing test.
     - jstests/core/**/geo_2d_explain.js # executionSuccess in different spot in explain().
@@ -42,10 +42,10 @@ selector:
     # Int types within an array type in BSON get their type changed when passed into a C++ function from Javascript.
     - jstests/core/query/type/type_array.js
     - jstests/core/timeseries/timeseries_internal_bounded_sort_compound_mixed_types.js
-    - jstests/core/json_schema/unique_items.js
+    - jstests/core/query/json_schema/unique_items.js
 
     # Uses documents that are too close to max BSON size for us to support passing to C++ as a BSON array.
-    - jstests/core/max_doc_size.js
+    - jstests/core/query/max_doc_size.js
     - jstests/core/query/find/find_getmore_bsonsize.js
 
     # This test does a very large amount of inserts on a single shard which will trigger the balancer.

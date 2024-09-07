@@ -34,7 +34,7 @@ selector:
     - jstests/core/**/tailable_cursor_invalidation.js # capped collections.
     - jstests/core/**/tailable_getmore_batch_size.js # capped collections.
     - jstests/core/**/tailable_skip_limit.js # capped collections.
-    - jstests/core/**/top.js # top.
+    - jstests/core/**/query/top/top.js # top.
     - jstests/core/capped/capped_max1.js # capped collections
 
     # The following tests fail because mongos behaves differently from mongod when testing certain
@@ -58,7 +58,7 @@ selector:
     - jstests/core/query/cursor/getmore_invalidated_cursors.js
     - jstests/core/query/explain/explain_shell_helpers.js
     - jstests/core/query/internal_hash_eq/lookup_using_hash_key.js
-    - jstests/core/return_key.js
+    - jstests/core/query/return_key.js
 
     # Test which asserts on the number of execution metrics. The additional commands emitted by
     # this suite might cause the test to fail.
@@ -75,8 +75,8 @@ selector:
 
     # The following tests fail because they count indexes. These counts do not take into account the
     # additional hashed shard key indexes that are automatically added by this passthrough.
-    - jstests/core/query/mr/mr_merge.js
-    - jstests/core/query/mr/mr_preserve_indexes.js
+    - jstests/core/query/map_reduce/mr_merge.js
+    - jstests/core/query/map_reduce/mr_preserve_indexes.js
 
     # Query settings have a higher precedence over index filters.
     - jstests/core/index/index_filter_catalog_independent.js

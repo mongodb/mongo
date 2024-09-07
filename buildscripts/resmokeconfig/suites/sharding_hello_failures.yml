@@ -2,17 +2,17 @@ test_kind: fsm_workload_test
 
 selector:
   roots:
-    - jstests/concurrency/fsm_workloads/update_and_bulk_insert.js
-    - jstests/concurrency/fsm_workloads/update_array.js
-    - jstests/concurrency/fsm_workloads/update_check_index.js
-    - jstests/concurrency/fsm_workloads/update_inc.js
-    - jstests/concurrency/fsm_workloads/update_multifield.js
-    - jstests/concurrency/fsm_workloads/update_ordered_bulk_inc.js
-    - jstests/concurrency/fsm_workloads/update_rename.js
-    - jstests/concurrency/fsm_workloads/update_replace.js
-    - jstests/concurrency/fsm_workloads/update_simple.js
-    - jstests/concurrency/fsm_workloads/update_simple_noindex.js
-    - jstests/concurrency/fsm_workloads/update_where.js
+    - jstests/concurrency/fsm_workloads/query/update/update_and_bulk_insert.js
+    - jstests/concurrency/fsm_workloads/query/update/update_array.js
+    - jstests/concurrency/fsm_workloads/query/update/update_check_index.js
+    - jstests/concurrency/fsm_workloads/query/update/update_inc.js
+    - jstests/concurrency/fsm_workloads/query/update/update_multifield.js
+    - jstests/concurrency/fsm_workloads/query/update/update_ordered_bulk_inc.js
+    - jstests/concurrency/fsm_workloads/query/update/update_rename.js
+    - jstests/concurrency/fsm_workloads/query/update/update_replace.js
+    - jstests/concurrency/fsm_workloads/query/update/update_simple.js
+    - jstests/concurrency/fsm_workloads/query/update/update_simple_noindex.js
+    - jstests/concurrency/fsm_workloads/query/update/update_where.js
 
 executor:
   hooks:

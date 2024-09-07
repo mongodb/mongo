@@ -21,7 +21,7 @@ selector:
     # Commands using UUIDs are not compatible with name-based auth
     - jstests/core/**/commands_with_uuid.js
     # Queryable encryption is not supported on standalone.
-    - jstests/core/queryable_encryption/**/*.js
+    - jstests/core/query/queryable_encryption/**/*.js
     # Query settings are not supported on standalone.
     - jstests/core/query/query_settings/**/*.js
   exclude_with_any_tags:

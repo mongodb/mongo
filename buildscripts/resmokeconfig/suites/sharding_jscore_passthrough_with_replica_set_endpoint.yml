@@ -29,7 +29,7 @@ selector:
     - jstests/core/**/queryoptimizera.js # "local" database.
     - jstests/core/**/stages*.js # stageDebug.
     - jstests/core/**/startup_log.js # "local" database.
-    - jstests/core/**/top.js # top.
+    - jstests/core/**/query/top/top.js # top.
     # The following tests fail because mongos behaves differently from mongod when testing certain
     # functionality. The differences are in a comment next to the failing test.
     - jstests/core/**/geo_2d_explain.js # executionSuccess in different spot in explain().
@@ -49,7 +49,7 @@ selector:
     - jstests/core/commands_with_uuid.js
     # TODO (SERVER-80416): cloneCollectionAsCapped command stops working after a replica set
     # is bootstrapped as a sharded cluster.
-    - jstests/core/collation.js
+    - jstests/core/query/collation/collation.js
     - jstests/core/replicate_record_ids/disallow_capped.js
     # Test expects changes in metrics (rejected command count), but these are
     # per-ClusterRole. This suite changes which role's metrics are updated.

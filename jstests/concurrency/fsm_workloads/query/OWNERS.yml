@@ -1,0 +1,14 @@
+version: 1.0.0
+filters:
+  - "*":
+    approvers:
+      - 10gen/query
+  - "find_flip_sbe_enabled.js":
+    approvers:
+      - 10gen/query-execution
+  - "plan_cache_drop_database.js":
+    approvers:
+      - 10gen/query-optimization
+  - "profile_command.js":
+    approvers:
+      - 10gen/query-integration

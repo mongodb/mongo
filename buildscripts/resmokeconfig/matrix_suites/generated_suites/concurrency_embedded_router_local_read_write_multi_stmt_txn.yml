@@ -4,7 +4,7 @@
 # AND REGENERATE THE MATRIX SUITES.
 #
 # matrix suite mapping file: buildscripts/resmokeconfig/matrix_suites/mappings/concurrency_embedded_router_local_read_write_multi_stmt_txn.yml
-# regenerate matrix suites: buildscripts/resmoke.py generate-matrix-suites
+# regenerate matrix suites: buildscripts/resmoke.py generate-matrix-suites && bazel run //:format
 ##########################################################
 executor:
   archive:
@@ -59,27 +59,27 @@ selector:
     - jstests/concurrency/fsm_workloads/auth_create_user.js
     - jstests/concurrency/fsm_workloads/auth_drop_role.js
     - jstests/concurrency/fsm_workloads/auth_drop_user.js
-    - jstests/concurrency/fsm_workloads/agg_group_external.js
-    - jstests/concurrency/fsm_workloads/agg_sort_external.js
+    - jstests/concurrency/fsm_workloads/query/agg/agg_group_external.js
+    - jstests/concurrency/fsm_workloads/query/agg/agg_sort_external.js
     - jstests/concurrency/fsm_workloads/compact.js
     - jstests/concurrency/fsm_workloads/compact_while_creating_indexes.js
-    - jstests/concurrency/fsm_workloads/findAndModify_update_grow.js
-    - jstests/concurrency/fsm_workloads/plan_cache_drop_database.js
+    - jstests/concurrency/fsm_workloads/query/findAndModify/findAndModify_update_grow.js
+    - jstests/concurrency/fsm_workloads/query/plan_cache_drop_database.js
     - jstests/concurrency/fsm_workloads/reindex.js
     - jstests/concurrency/fsm_workloads/reindex_background.js
     - jstests/concurrency/fsm_workloads/reindex_writeconflict.js
     - jstests/concurrency/fsm_workloads/collmod_writeconflict.js
-    - jstests/concurrency/fsm_workloads/agg_out_interrupt_cleanup.js
-    - jstests/concurrency/fsm_workloads/timeseries_agg_out_interrupt_cleanup.js
+    - jstests/concurrency/fsm_workloads/query/agg/agg_out_interrupt_cleanup.js
+    - jstests/concurrency/fsm_workloads/query/timeseries/timeseries_agg_out_interrupt_cleanup.js
     - jstests/concurrency/fsm_workloads/multi_statement_transaction_atomicity_isolation_metrics_test.js
     - jstests/concurrency/fsm_workloads/multi_statement_transaction_all_commands_same_session.js
     - jstests/concurrency/fsm_workloads/create_index_background.js
     - jstests/concurrency/fsm_workloads/create_index_background_partial_filter.js
     - jstests/concurrency/fsm_workloads/create_index_background_wildcard.js
     - jstests/concurrency/fsm_workloads/drop_index_during_replan.js
-    - jstests/concurrency/fsm_workloads/drop_index_during_lookup.js
-    - jstests/concurrency/fsm_workloads/update_rename.js
-    - jstests/concurrency/fsm_workloads/update_rename_noindex.js
+    - jstests/concurrency/fsm_workloads/query/drop_index_during_lookup.js
+    - jstests/concurrency/fsm_workloads/query/update/update_rename.js
+    - jstests/concurrency/fsm_workloads/query/update/update_rename_noindex.js
   exclude_with_any_tags:
     - assumes_against_mongod_not_mongos
     - does_not_support_causal_consistency

@@ -26,7 +26,7 @@ selector:
     - jstests/core/**/queryoptimizera.js # "local" database.
     - jstests/core/**/stages*.js # stageDebug.
     - jstests/core/**/startup_log.js # "local" database.
-    - jstests/core/**/top.js # top.
+    - jstests/core/**/query/top/top.js # top.
     # The following tests fail because mongos behaves differently from mongod when testing certain
     # functionality. The differences are in a comment next to the failing test.
     - jstests/core/**/geo_2d_explain.js # executionSuccess in different spot in explain().
@@ -54,7 +54,7 @@ selector:
     - jstests/core/timeseries/timeseries_user_system_buckets.js
 
     # TODO SERVER-89286 re-enable this test
-    - src/mongo/db/modules/enterprise/jstests/fle2/query/update_upsert.js
+    - src/mongo/db/modules/enterprise/jstests/fle2/query/query/update/update_upsert.js
 
     # TODO: SERVER-85773 Reenable the following test once `cloneCollectionAsCapped` is supported on any shard
     - jstests/core/ddl/capped_convertToCapped1.js

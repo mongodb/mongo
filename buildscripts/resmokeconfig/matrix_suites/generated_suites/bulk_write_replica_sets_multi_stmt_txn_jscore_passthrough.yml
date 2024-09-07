@@ -4,7 +4,7 @@
 # AND REGENERATE THE MATRIX SUITES.
 #
 # matrix suite mapping file: buildscripts/resmokeconfig/matrix_suites/mappings/bulk_write_replica_sets_multi_stmt_txn_jscore_passthrough.yml
-# regenerate matrix suites: buildscripts/resmoke.py generate-matrix-suites
+# regenerate matrix suites: buildscripts/resmoke.py generate-matrix-suites && bazel run //:format
 ##########################################################
 executor:
   archive:
@@ -66,7 +66,7 @@ selector:
     - jstests/core/**/indexa.js
     - jstests/core/**/indexes_multiple_commands.js
     - jstests/core/**/js2.js
-    - jstests/core/json_schema/json_schema.js
+    - jstests/core/query/json_schema/json_schema.js
     - jstests/core/**/mr_bigobject.js
     - jstests/core/**/not2.js
     - jstests/core/**/null_query_semantics.js
@@ -101,12 +101,12 @@ selector:
     - jstests/core/views/views_drop.js
     - jstests/core/**/agg_hint.js
     - jstests/core/**/and.js
-    - jstests/core/**/collation.js
+    - jstests/core/**/query/collation/collation.js
     - jstests/core/**/distinct_multikey_dotted_path.js
     - jstests/core/**/distinct_with_hashed_index.js
     - jstests/core/**/explain_shell_helpers.js
     - jstests/core/**/index_partial_read_ops.js
-    - jstests/core/**/optimized_match_explain.js
+    - jstests/core/**/query/explain/optimized_match_explain.js
     - jstests/core/**/sort_array.js
     - jstests/core/views/views_collation.js
     - jstests/core/**/wildcard_index_count.js
@@ -117,34 +117,34 @@ selector:
     - jstests/core/**/index_stats.js
     - jstests/core/timeseries/timeseries_index_stats.js
     - jstests/core/**/operation_latency_histogram.js
-    - jstests/core/views/views_coll_stats.js
+    - jstests/core/query/collstats/views_coll_stats.js
     - jstests/core/views/views_stats.js
     - jstests/core/**/bulk_api_ordered.js
     - jstests/core/**/bulk_api_unordered.js
     - jstests/core/**/doc_validation.js
     - jstests/core/**/doc_validation_options.js
-    - jstests/core/**/field_name_validation.js
+    - jstests/core/**/query/field_name_validation.js
     - jstests/core/**/insert_illegal_doc.js
     - jstests/core/**/push_sort.js
     - jstests/core/**/update_arrayFilters.js
     - jstests/core/**/update_dbref.js
     - jstests/core/**/updatel.js
     - jstests/core/**/write_result.js
-    - jstests/core/**/positional_projection.js
+    - jstests/core/**/query/project/positional_projection.js
     - jstests/core/**/invalid_db_name.js
     - jstests/core/**/dbref1.js
     - jstests/core/**/dbref2.js
     - jstests/core/**/ref3.js
     - jstests/core/**/update3.js
     - jstests/core/views/invalid_system_views.js
-    - jstests/core/**/exhaust.js
+    - jstests/core/**/query/exhaust.js
     - jstests/core/**/awaitdata_getmore_cmd.js
     - jstests/core/**/getmore_cmd_maxtimems.js
     - jstests/core/**/tailable_cursor_invalidation.js
     - jstests/core/**/tailable_getmore_batch_size.js
-    - jstests/core/**/top.js
+    - jstests/core/**/query/top/top.js
     - jstests/core/**/insert_id_undefined.js
-    - jstests/core/json_schema/misc_validation.js
+    - jstests/core/query/json_schema/misc_validation.js
     - jstests/core/views/views_all_commands.js
     - jstests/core/**/fsync.js
     - jstests/core/**/constructors.js
@@ -153,7 +153,7 @@ selector:
     - jstests/core/**/geo_s2cursorlimitskip.js
     - jstests/core/**/getmore_invalidated_cursors.js
     - jstests/core/**/getmore_invalidated_documents.js
-    - jstests/core/**/kill_cursors.js
+    - jstests/core/**/query/kill_cursors.js
     - jstests/core/**/list_collections1.js
     - jstests/core/**/list_indexes.js
     - jstests/core/**/list_indexes_invalidation.js
@@ -180,11 +180,11 @@ selector:
     - jstests/core/**/bench_test1.js
     - jstests/core/**/benchrun_pipeline_updates.js
     - jstests/core/**/cursora.js
-    - jstests/core/**/SERVER-23626.js
+    - jstests/core/**/query/SERVER-23626.js
     - jstests/core/timeseries/timeseries_delete_hint.js
     - jstests/core/**/set_param1.js
     - jstests/core/**/profile*.js
-    - jstests/core/comment_field.js
+    - jstests/core/query/comment_field.js
     - jstests/core/fsync.js
     - jstests/core/write/insert/batch_write_command_insert.js
     - jstests/core/write/update/batch_write_command_update.js

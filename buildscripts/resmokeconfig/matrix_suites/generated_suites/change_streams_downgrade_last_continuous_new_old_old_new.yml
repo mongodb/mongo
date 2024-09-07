@@ -4,7 +4,7 @@
 # AND REGENERATE THE MATRIX SUITES.
 #
 # matrix suite mapping file: buildscripts/resmokeconfig/matrix_suites/mappings/change_streams_downgrade_last_continuous_new_old_old_new.yml
-# regenerate matrix suites: buildscripts/resmoke.py generate-matrix-suites
+# regenerate matrix suites: buildscripts/resmoke.py generate-matrix-suites && bazel run //:format
 ##########################################################
 executor:
   archive:
@@ -96,7 +96,7 @@ selector:
     - jstests/core/**/tailable_cursor_invalidation.js
     - jstests/core/**/tailable_getmore_batch_size.js
     - jstests/core/**/tailable_skip_limit.js
-    - jstests/core/**/top.js
+    - jstests/core/**/query/top/top.js
     - jstests/core/**/geo_2d_explain.js
     - jstests/core/**/geo_s2explain.js
     - jstests/core/**/geo_s2sparse.js
@@ -107,14 +107,14 @@ selector:
     - jstests/core/**/list_indexes_non_existent_ns.js
     - jstests/core/**/mr_preserve_indexes.js
     - jstests/core/**/distinct_index1.js
-    - jstests/core/**/explain1.js
+    - jstests/core/**/explain/explain1.js
     - jstests/core/**/explain4.js
     - jstests/core/**/sortk.js
-    - jstests/core/**/explain_count.js
+    - jstests/core/**/explain/explain_count.js
     - jstests/core/**/explain_server_params.js
     - jstests/core/**/expr_index_use.js
     - jstests/core/**/index_multikey.js
-    - jstests/core/**/optimized_match_explain.js
+    - jstests/core/**/query/explain/optimized_match_explain.js
     - jstests/core/**/sort_array.js
     - jstests/core/**/bulk_api_ordered.js
     - jstests/core/**/bulk_api_unordered.js
@@ -136,7 +136,7 @@ selector:
     - jstests/core/**/indexa.js
     - jstests/core/**/indexes_multiple_commands.js
     - jstests/core/**/js2.js
-    - jstests/core/json_schema/json_schema.js
+    - jstests/core/query/json_schema/json_schema.js
     - jstests/core/**/mr_bigobject.js
     - jstests/core/**/not2.js
     - jstests/core/**/null_query_semantics.js
@@ -167,10 +167,10 @@ selector:
     - jstests/core/**/type8.js
     - jstests/core/**/agg_hint.js
     - jstests/core/**/and.js
-    - jstests/core/**/collation.js
+    - jstests/core/**/query/collation/collation.js
     - jstests/core/**/explain_shell_helpers.js
     - jstests/core/**/index_partial_read_ops.js
-    - jstests/core/**/optimized_match_explain.js
+    - jstests/core/**/query/explain/optimized_match_explain.js
     - jstests/core/**/sort_array.js
     - jstests/core/views/views_collation.js
     - jstests/core/**/wildcard_index_count.js
@@ -179,32 +179,32 @@ selector:
     - jstests/core/**/list_all_sessions.js
     - jstests/core/**/list_sessions.js
     - jstests/core/**/operation_latency_histogram.js
-    - jstests/core/views/views_coll_stats.js
+    - jstests/core/query/collstats/views_coll_stats.js
     - jstests/core/views/views_stats.js
     - jstests/core/**/bulk_api_ordered.js
     - jstests/core/**/bulk_api_unordered.js
     - jstests/core/**/doc_validation.js
     - jstests/core/**/doc_validation_options.js
-    - jstests/core/**/field_name_validation.js
+    - jstests/core/**/query/field_name_validation.js
     - jstests/core/**/insert_illegal_doc.js
     - jstests/core/**/push_sort.js
     - jstests/core/**/update_arrayFilters.js
     - jstests/core/**/update_dbref.js
     - jstests/core/**/updatel.js
     - jstests/core/**/write_result.js
-    - jstests/core/**/positional_projection.js
+    - jstests/core/**/query/project/positional_projection.js
     - jstests/core/**/dbref1.js
     - jstests/core/**/dbref2.js
     - jstests/core/**/ref3.js
     - jstests/core/**/update3.js
-    - jstests/core/**/exhaust.js
+    - jstests/core/**/query/exhaust.js
     - jstests/core/**/awaitdata_getmore_cmd.js
     - jstests/core/**/getmore_cmd_maxtimems.js
     - jstests/core/**/tailable_cursor_invalidation.js
     - jstests/core/**/tailable_getmore_batch_size.js
-    - jstests/core/**/top.js
+    - jstests/core/**/query/top/top.js
     - jstests/core/**/insert_id_undefined.js
-    - jstests/core/json_schema/misc_validation.js
+    - jstests/core/query/json_schema/misc_validation.js
     - jstests/core/views/views_all_commands.js
     - jstests/core/**/dropdb.js
     - jstests/core/**/fsync.js
@@ -214,7 +214,7 @@ selector:
     - jstests/core/**/geo_s2cursorlimitskip.js
     - jstests/core/**/getmore_invalidated_cursors.js
     - jstests/core/**/getmore_invalidated_documents.js
-    - jstests/core/**/kill_cursors.js
+    - jstests/core/**/query/kill_cursors.js
     - jstests/core/**/list_indexes.js
     - jstests/core/**/oro.js
     - jstests/core/**/sort_with_update_between_getmores.js
@@ -238,7 +238,7 @@ selector:
     - jstests/core/**/benchrun_pipeline_updates.js
     - jstests/core/**/cursora.js
     - jstests/core/**/connection_string_validation.js
-    - jstests/core/**/SERVER-23626.js
+    - jstests/core/**/query/SERVER-23626.js
     - jstests/core/**/find_and_modify_server7660.js
     - jstests/core/**/upsert_shell.js
     - jstests/core/**/mixed_version_replica_set.js

@@ -14,11 +14,11 @@ selector:
 
     # TODO SERVER-89207: Ensure that the fallback mechanism works for '$_requestResumeToken'
     # queries.
-    - jstests/core/find_with_resume_after_param.js
+    - jstests/core/query/find_with_resume_after_param.js
 
     # TODO SERVER-93622: Stabilise query shape hash for aggregate merge commands with let variables.
     - jstests/aggregation/sources/merge/*.js
-    - jstests/core/command_let_variables_merge_only.js
+    - jstests/core/query/command_let_variables_merge_only.js
 
     # Test which overcomes the imposed 16Mb query settings limit making the 'setQuerySettings' command fail.
     - jstests/aggregation/query_limits_test.js
@@ -29,9 +29,9 @@ selector:
     - jstests/aggregation/sources/lookup/lookup_query_stats.js
     - jstests/aggregation/sources/unionWith/unionWith_query_stats.js
     - jstests/core/administrative/current_op/**/*.js
-    - jstests/core/collation.js
+    - jstests/core/query/collation/collation.js
     - jstests/core/operation_latency_histogram.js
-    - jstests/core/top.js
+    - jstests/core/query/top/top.js
     - jstests/core/views/views_stats.js
 
     # Cannot clear the plan cache due to timeseries lock.
@@ -44,14 +44,14 @@ selector:
     - jstests/core/index/index_stats.js
     - jstests/core/index/wildcard/wildcard_index_cached_plans.js
     - jstests/core/query/explain/explain_plan_cache.js
-    - jstests/core/query/in_expression_plan_cache.js
-    - jstests/core/query/introspect_hidden_index_plan_cache_entries.js
+    - jstests/core/query/plan_cache/in_expression_plan_cache.js
+    - jstests/core/query/plan_cache/introspect_hidden_index_plan_cache_entries.js
     - jstests/core/query/partial_index_logical.js
     - jstests/core/query/plan_cache/**/*.js
-    - jstests/core/query/sbe_plan_cache_autoparameterize_ixscan.js
-    - jstests/core/sbe/plan_cache_sbe_with_or_queries.js
-    - jstests/core/sbe_plan_cache_autoparameterize_collscan.js
-    - jstests/core/sbe_plan_cache_duplicate_or_clauses.js
+    - jstests/core/query/sbe/sbe_plan_cache_autoparameterize_ixscan.js
+    - jstests/core/query/sbe/plan_cache_sbe_with_or_queries.js
+    - jstests/core/query/sbe/sbe_plan_cache_autoparameterize_collscan.js
+    - jstests/core/query/sbe/sbe_plan_cache_duplicate_or_clauses.js
 
     # This test performs an '{_id: <id>}' query with a collator. This will not pass query settings validation. This
     # is a design decision due to mongos lacking collation information.
@@ -65,7 +65,7 @@ selector:
 
     # Query settings application is skipped for queries targeting collections containing encryption information,
     # and as such it's not possible to engage the fallback mechanism.
-    - jstests/core/queryable_encryption/**/*.js
+    - jstests/core/query/queryable_encryption/**/*.js
 
     - jstests/core/txns/**/*.js
   exclude_with_any_tags:

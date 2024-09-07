@@ -6,7 +6,7 @@ selector:
     - src/mongo/db/modules/*/jstests/concurrency/fsm_workloads/*.js
   exclude_files:
     # SERVER-14669 Multi-removes that use $where miscount removed documents
-    - jstests/concurrency/fsm_workloads/remove_where.js
+    - jstests/concurrency/fsm_workloads/query/remove/remove_where.js
 
     # SERVER-30983 background indexes are incompatible with causal consistency
     - jstests/concurrency/fsm_workloads/reindex_background.js
@@ -22,18 +22,18 @@ selector:
     - jstests/concurrency/fsm_workloads/auth_drop_user.js
 
     # uses >100MB of data, which can overwhelm test hosts
-    - jstests/concurrency/fsm_workloads/agg_group_external.js
-    - jstests/concurrency/fsm_workloads/agg_sort_external.js
+    - jstests/concurrency/fsm_workloads/query/agg/agg_group_external.js
+    - jstests/concurrency/fsm_workloads/query/agg/agg_sort_external.js
 
     # compact can only be run against a standalone mongod
     - jstests/concurrency/fsm_workloads/compact.js
     - jstests/concurrency/fsm_workloads/compact_while_creating_indexes.js
 
     # can cause OOM kills on test hosts
-    - jstests/concurrency/fsm_workloads/findAndModify_update_grow.js
+    - jstests/concurrency/fsm_workloads/query/findAndModify/findAndModify_update_grow.js
 
     # cannot createIndex after dropDatabase without sharding first
-    - jstests/concurrency/fsm_workloads/plan_cache_drop_database.js
+    - jstests/concurrency/fsm_workloads/query/plan_cache_drop_database.js
 
     # reIndex is not supported in mongos.
     - jstests/concurrency/fsm_workloads/reindex.js
@@ -43,7 +43,7 @@ selector:
     - jstests/concurrency/fsm_workloads/collmod_writeconflict.js
 
     # SERVER-20361 Improve the behaviour of multi-update/delete against a sharded collection
-    - jstests/concurrency/fsm_workloads/update_where.js
+    - jstests/concurrency/fsm_workloads/query/update/update_where.js
 
     # This test runs a large number of inserts, which can cause moveCollection to take a long time
     # to finish. This can cause the CheckMetadataConsistency hook to hit LockBusy errors.

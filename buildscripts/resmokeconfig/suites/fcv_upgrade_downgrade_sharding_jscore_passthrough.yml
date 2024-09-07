@@ -26,7 +26,7 @@ selector:
     - jstests/core/**/queryoptimizera.js # "local" database.
     - jstests/core/**/stages*.js # stageDebug.
     - jstests/core/**/startup_log.js # "local" database.
-    - jstests/core/**/top.js # top.
+    - jstests/core/**/query/top/top.js # top.
     # The following tests fail because mongos behaves differently from mongod when testing certain
     # functionality. The differences are in a comment next to the failing test.
     - jstests/core/**/geo_2d_explain.js # executionSuccess in different spot in explain().
@@ -42,7 +42,7 @@ selector:
     # Excludes from fcv_upgrade_downgrade_jscore_passthrough.yml
     #
     # TODO (SERVER-78220): Investigate failing api version tests in the fcv jscore passthrough suite.
-    - jstests/core/api/api_version_unstable_indexes.js
+    - jstests/core/query/api/api_version_unstable_indexes.js
 
     # These timeseries tests rely on specific bucketing behaviour that is not guaranteed across FCV
     # upgrade/downgrade
@@ -98,13 +98,13 @@ selector:
     - jstests/aggregation/sources/lookup/lookup_non_correlated.js
     - jstests/core/ddl/collection_uuid_index_commands.js
     # Queryable encryption tests create internal transactions which are expected to fail.
-    - jstests/core/queryable_encryption/*.js
+    - jstests/core/query/queryable_encryption/*.js
     # TODO (SERVER-77910): Find out why spill_to_disk.js fails to spill to disk after FCV down.
     - jstests/aggregation/spill_to_disk.js
 
     # TODO SERVER-80490: The test below requires a precise lock count that can get modified by concurrent
     # setFCV operations. The exclusion can be removed once the linked ticket is fixed.
-    - jstests/core/top.js
+    - jstests/core/query/top/top.js
 
     # SERVER-85456: this test uses benchRun which does not use runCommand and index creation can fail.
     - jstests/core/bench_test1.js

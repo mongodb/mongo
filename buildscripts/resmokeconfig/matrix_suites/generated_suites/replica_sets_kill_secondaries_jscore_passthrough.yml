@@ -4,7 +4,7 @@
 # AND REGENERATE THE MATRIX SUITES.
 #
 # matrix suite mapping file: buildscripts/resmokeconfig/matrix_suites/mappings/replica_sets_kill_secondaries_jscore_passthrough.yml
-# regenerate matrix suites: buildscripts/resmoke.py generate-matrix-suites
+# regenerate matrix suites: buildscripts/resmoke.py generate-matrix-suites && bazel run //:format
 ##########################################################
 executor:
   archive:
@@ -42,11 +42,11 @@ matrix_suite: true
 selector:
   exclude_files:
     - jstests/core/**/geo_update_btree.js
-    - jstests/core/**/max_doc_size.js
+    - jstests/core/**/query/max_doc_size.js
     - jstests/core/**/mr_bigobject.js
     - jstests/core/**/capped_large_docs.js
     - jstests/core/**/capped_resize.js
-    - jstests/core/**/exhaust.js
+    - jstests/core/**/query/exhaust.js
     - jstests/core/**/explain_execution_error.js
     - jstests/core/**/sortb.js
     - jstests/core/**/sortg.js

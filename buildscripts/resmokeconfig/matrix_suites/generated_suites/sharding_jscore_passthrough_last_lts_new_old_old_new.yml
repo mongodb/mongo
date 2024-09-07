@@ -4,7 +4,7 @@
 # AND REGENERATE THE MATRIX SUITES.
 #
 # matrix suite mapping file: buildscripts/resmokeconfig/matrix_suites/mappings/sharding_jscore_passthrough_last_lts_new_old_old_new.yml
-# regenerate matrix suites: buildscripts/resmoke.py generate-matrix-suites
+# regenerate matrix suites: buildscripts/resmoke.py generate-matrix-suites && bazel run //:format
 ##########################################################
 executor:
   archive:
@@ -52,7 +52,7 @@ selector:
     - jstests/core/**/queryoptimizera.js
     - jstests/core/**/stages*.js
     - jstests/core/**/startup_log.js
-    - jstests/core/**/top.js
+    - jstests/core/**/query/top/top.js
     - jstests/core/**/geo_2d_explain.js
     - jstests/core/**/geo_s2explain.js
     - jstests/core/**/geo_s2sparse.js

@@ -2,7 +2,7 @@ test_kind: js_test
 
 selector:
   roots:
-    - jstests/noPassthroughWithMongod/*.js
+    - jstests/noPassthroughWithMongod/**/*.js
 
 executor:
   archive:

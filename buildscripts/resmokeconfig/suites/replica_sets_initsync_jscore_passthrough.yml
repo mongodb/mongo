@@ -10,13 +10,13 @@ selector:
     # may insert unexpected operations into the profile collection.
     - jstests/core/**/profile_list_collections.js
     - jstests/core/**/profile_list_indexes.js
-    - jstests/core/**/recursion.js
+    - jstests/core/**/query/recursion.js
     - jstests/core/**/system_profile.js
     # The following tests examine the SBE plan cache, which initial sync may change the contents of.
     - jstests/core/query/explain/explain_plan_cache.js
     - jstests/core/query/plan_cache/plan_cache_sbe.js
     - jstests/core/query/plan_cache/query_solution_hash.js
-    - jstests/core/query/sbe_plan_cache_autoparameterize_ixscan.js
+    - jstests/core/query/sbe/sbe_plan_cache_autoparameterize_ixscan.js
     - jstests/core/timeseries/bucket_unpacking_with_sort_plan_cache.js
     # The tests below do not expect concurrent reads against their test collections.
     - jstests/core/**/operation_latency_histogram.js
@@ -39,7 +39,7 @@ selector:
     - jstests/core/txns/transactions_profiling.js
     - jstests/core/write/bulk/bulk_write_profile.js
     # The downstream syncing node affects the top output.
-    - jstests/core/**/top.js
+    - jstests/core/**/query/top/top.js
     # Change stream pre-images are not cloned during initial sync.
     - jstests/core/**/write_change_stream_pit_preimage.js
 

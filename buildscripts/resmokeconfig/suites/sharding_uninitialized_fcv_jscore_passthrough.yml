@@ -14,7 +14,7 @@ selector:
     # may insert unexpected operations into the profile collection.
     - jstests/core/**/profile_list_collections.js
     - jstests/core/**/profile_list_indexes.js
-    - jstests/core/**/recursion.js
+    - jstests/core/**/query/recursion.js
     - jstests/core/**/system_profile.js
     # The following test examines the SBE plan cache, which initial sync may change the contents of.
     - jstests/core/query/plan_cache/plan_cache_sbe.js
@@ -38,7 +38,7 @@ selector:
     - jstests/core/**/profile_update.js
     - jstests/core/txns/transactions_profiling.js
     # The downstream syncing node affects the top output.
-    - jstests/core/**/top.js
+    - jstests/core/**/query/top/top.js
     # Change stream pre-images are not cloned during initial sync.
     - jstests/core/**/write_change_stream_pit_preimage.js
 
@@ -57,7 +57,7 @@ selector:
     - jstests/core/**/queryoptimizera.js # "local" database.
     - jstests/core/**/stages*.js # stageDebug.
     - jstests/core/**/startup_log.js # "local" database.
-    - jstests/core/**/top.js # top.
+    - jstests/core/**/query/top/top.js # top.
     # The following tests fail because mongos behaves differently from mongod when testing certain
     # functionality. The differences are in a comment next to the failing test.
     - jstests/core/**/geo_2d_explain.js # executionSuccess in different spot in explain().

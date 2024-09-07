@@ -15,7 +15,7 @@ selector:
     - jstests/core/query/explain/explain_winning_plan.js
     - jstests/core/query/expr/expr_index_use.js
     - jstests/core/query/sort/sort_merge.js
-    - jstests/core/sbe/sbe_explain_rejected_plans.js
+    - jstests/core/query/sbe/sbe_explain_rejected_plans.js
     - jstests/core/timeseries/partialFilterExpression_with_internalBucketGeoWithin.js
     - jstests/core/timeseries/timeseries_index_partial.js
     - jstests/core/timeseries/timeseries_index_use.js
@@ -34,9 +34,9 @@ selector:
     # "IndexOptionsConflict" that generates an unexpected plan.
     - jstests/core/query/or_use_clustered_collection.js
     # Latency histogram statistics are affected by the creation of an implicit index.
-    - jstests/core/top.js
+    - jstests/core/query/top/top.js
     # Creating an implicit index causes the plan cache entry we're expecting to be invalidated.
-    - jstests/core/query/sbe_plan_cache_autoparameterize_ixscan.js
+    - jstests/core/query/sbe/sbe_plan_cache_autoparameterize_ixscan.js
     # Multiplanner does not always choose the same plan when the wildcard indexes are considered.
     - jstests/core/query/or/or_to_in.js
     # The following test fires a large query that takes too long with wildcard indexes.

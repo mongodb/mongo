@@ -9,7 +9,7 @@ selector:
     # 'core' suite. Instead we run them against a 1-node replica set in the 'core_txns' suite.
     - jstests/core/txns/**/*.js
     # Queryable encryption is not supported on standalone.
-    - jstests/core/queryable_encryption/**/*.js
+    - jstests/core/query/queryable_encryption/**/*.js
     # Query settings are not supported on standalone.
     - jstests/core/query/query_settings/**/*.js
 executor:

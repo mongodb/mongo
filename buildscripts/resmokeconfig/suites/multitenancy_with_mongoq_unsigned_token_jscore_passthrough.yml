@@ -26,7 +26,7 @@ selector:
     - featureFlagColumnstoreIndexes
   exclude_files:
     # The "exhaust" function does not use runCommand (required by the simulate_mongoq.js override).
-    - jstests/core/**/exhaust.js
+    - jstests/core/**/query/exhaust.js
     # These following tests use benchRun which does not use runCommand (required by the simulate_mongoq.js override).
     - jstests/core/**/bench_test1.js
     - jstests/core/**/bench_test2.js
@@ -36,7 +36,7 @@ selector:
     # The tenantId is provided in the oplog entries provided to the applyOps command.
     - jstests/core/**/apply_ops*.js
     - jstests/core/**/bypass_doc_validation.js
-    - jstests/core/**/collation.js
+    - jstests/core/**/query/collation/collation.js
     - jstests/core/**/collmod_convert_to_unique_apply_ops.js
     - jstests/core/**/collmod_without_uuid.js
     - jstests/core/**/list_collections1.js
@@ -72,14 +72,14 @@ selector:
     - jstests/core/txns/kill_op_on_txn_expiry.js
     # This test looks for the presence of a log line that contains a db name. Injecting a tenantId in
     # the requests causes the test to fails due to a mismatch.
-    - jstests/core/api//apitest_db_profile_level.js
+    - jstests/core/query/api/apitest_db_profile_level.js
     # Queryable encryption test requires an internal connection for the keyvault that does not
     # inject a security token.
-    - jstests/core/queryable_encryption/**/*.js
+    - jstests/core/query/queryable_encryption/**/*.js
     # Failpoints do not support passing in tenancy information.
     - jstests/core/administrative/profile/profile_hide_index.js
     - jstests/core/failcommand_failpoint.js
-    - jstests/core/comment_field.js
+    - jstests/core/query/comment_field.js
 
 executor:
   archive:

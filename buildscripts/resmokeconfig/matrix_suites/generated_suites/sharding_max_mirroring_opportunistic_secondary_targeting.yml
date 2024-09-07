@@ -4,7 +4,7 @@
 # AND REGENERATE THE MATRIX SUITES.
 #
 # matrix suite mapping file: buildscripts/resmokeconfig/matrix_suites/mappings/sharding_max_mirroring_opportunistic_secondary_targeting.yml
-# regenerate matrix suites: buildscripts/resmoke.py generate-matrix-suites
+# regenerate matrix suites: buildscripts/resmoke.py generate-matrix-suites && bazel run //:format
 ##########################################################
 description:
   This suite is a combination of sharding_max_mirroring, and sharding_opportunistic_secondary_targeting.
@@ -25,7 +25,7 @@ matrix_suite: true
 selector:
   exclude_files:
     - jstests/sharding/**/libs/**/*.js
-    - jstests/sharding/query/mrShardedOutput.js
+    - jstests/sharding/query/map_reduce/mrShardedOutput.js
   roots:
     - jstests/sharding/**/*.js
 test_kind: js_test
