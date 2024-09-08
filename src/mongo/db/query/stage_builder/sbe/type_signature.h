@@ -47,7 +47,8 @@ struct TypeSignature {
 
     // Predefined constants for common types.
     static TypeSignature kAnyType, kBlockType, kCellType, kAnyScalarType, kAnyBSONType, kArrayType,
-        kBooleanType, kDateTimeType, kNothingType, kNumericType, kObjectType, kStringType;
+        kBooleanType, kDateTimeType, kNothingType, kNumericType, kObjectType, kStringType,
+        kCollatableType;
 
     TypeSignature() noexcept = default;
 

@@ -51,6 +51,10 @@ optimizer::ProjectionName getABTVariableName(SbSlot ts) {
     return optimizer::ProjectionName{std::string(varName)};
 }
 
+optimizer::ProjectionName getABTVariableName(sbe::value::SlotId slotId) {
+    return getABTVariableName(SbSlot{slotId});
+}
+
 optimizer::ProjectionName getABTLocalVariableName(FrameId frameId, SlotId slotId) {
     constexpr StringData prefix = "__l"_sd;
     str::stream varName;
@@ -109,6 +113,10 @@ boost::optional<std::pair<FrameId, SlotId>> getSbeLocalVariableInfo(
 
 optimizer::ABT makeABTVariable(SbSlot ts) {
     return optimizer::make<optimizer::Variable>(getABTVariableName(ts));
+}
+
+optimizer::ABT makeABTVariable(sbe::value::SlotId slotId) {
+    return makeABTVariable(SbSlot{slotId});
 }
 
 optimizer::ABT makeABTLocalVariable(FrameId frameId, SlotId slotId) {
@@ -311,23 +319,23 @@ EExpr SbExpr::extractExpr(StageBuilderState& state, const VariableTypes* slotInf
 
 SbExpr SbExpr::clone() const {
     if (holds_alternative<SlotId>(_storage)) {
-        return {get<SlotId>(_storage), _typeSig.get()};
+        return SbExpr{get<SlotId>(_storage), _typeSig.get()};
     }
     if (holds_alternative<LocalVarInfo>(_storage)) {
-        return {get<LocalVarInfo>(_storage), _typeSig.get()};
+        return SbExpr{get<LocalVarInfo>(_storage), _typeSig.get()};
     }
     if (holds_alternative<Abt>(_storage)) {
-        return {Abt{abt::wrap(getAbtInternal()->_value)}, _typeSig.get()};
+        return SbExpr{Abt{abt::wrap(getAbtInternal()->_value)}, _typeSig.get()};
     }
     if (holds_alternative<OptimizedAbt>(_storage)) {
-        return {OptimizedAbt{abt::wrap(getAbtInternal()->_value)}, _typeSig.get()};
+        return SbExpr{OptimizedAbt{abt::wrap(getAbtInternal()->_value)}, _typeSig.get()};
     }
     if (holds_alternative<EExpr>(_storage)) {
         const auto& expr = get<EExpr>(_storage);
-        return {expr->clone(), _typeSig.get()};
+        return SbExpr{expr->clone(), _typeSig.get()};
     }
 
-    return {};
+    return SbExpr{};
 }
 
 bool SbExpr::isConstantExpr() const {

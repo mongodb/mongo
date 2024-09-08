@@ -274,20 +274,6 @@ void generateStringCaseConversionExpression(ExpressionVisitorContext* _context,
         varStr, std::move(str), std::move(totalCaseConversionExpr))));
 }
 
-/**
- * Generate an EExpression representing a Regex function result upon null argument(s) depending on
- * the type of the function: $regexMatch - false, $regexFind - null, $RegexFindAll - [].
- */
-std::unique_ptr<sbe::EExpression> generateRegexNullResponse(StringData exprName) {
-    if (exprName.toString().compare(std::string("regexMatch")) == 0) {
-        return makeBoolConstant(false);
-    } else if (exprName.toString().compare("regexFindAll") == 0) {
-        auto [arrTag, arrVal] = sbe::value::makeNewArray();
-        return makeConstant(arrTag, arrVal);
-    }
-    return makeNullConstant();
-}
-
 class ExpressionPreVisitor final : public ExpressionConstVisitor {
 public:
     ExpressionPreVisitor(ExpressionVisitorContext* context) : _context{context} {}
@@ -3825,18 +3811,6 @@ private:
      * expressionName - a name of an expression the parameter belongs to.
      * parameterName - a name of the parameter corresponding to variable 'dateRef'.
      */
-    static CaseValuePair generateFailIfNotCoercibleToDate(const sbe::EVariable& dateRef,
-                                                          ErrorCodes::Error errorCode,
-                                                          StringData expressionName,
-                                                          StringData parameterName) {
-        return {
-            makeNot(makeFunction("typeMatch", dateRef.clone(), makeInt32Constant(dateTypeMask()))),
-            sbe::makeE<sbe::EFail>(errorCode,
-                                   str::stream()
-                                       << expressionName << " parameter '" << parameterName
-                                       << "' must be coercible to date")};
-    }
-
     static ABTCaseValuePair generateABTFailIfNotCoercibleToDate(const optimizer::ABT& dateVar,
                                                                 ErrorCodes::Error errorCode,
                                                                 StringData expressionName,
@@ -3852,33 +3826,14 @@ private:
      * Creates a CaseValuePair such that Null value is returned if a value of variable denoted by
      * 'variable' is null, missing, or undefined.
      */
-    static CaseValuePair generateReturnNullIfNullMissingOrUndefined(
-        const sbe::EVariable& variable) {
-        return {generateNullMissingOrUndefined(variable), makeNullConstant()};
-    }
-
     static ABTCaseValuePair generateABTReturnNullIfNullMissingOrUndefined(
         const optimizer::ABT& name) {
         return {generateABTNullMissingOrUndefined(name), optimizer::Constant::null()};
     }
 
-    static CaseValuePair generateReturnNullIfNullOrMissingOrUndefined(
-        std::unique_ptr<sbe::EExpression> expr) {
-        return {generateNullMissingOrUndefined(std::move(expr)), makeNullConstant()};
-    }
-
     /**
      * Creates a boolean expression to check if 'variable' is equal to string 'string'.
      */
-    static std::unique_ptr<sbe::EExpression> generateIsEqualToStringCheck(
-        const sbe::EExpression& expr, StringData string) {
-        return sbe::makeE<sbe::EPrimBinary>(sbe::EPrimBinary::logicAnd,
-                                            makeFunction("isString", expr.clone()),
-                                            sbe::makeE<sbe::EPrimBinary>(sbe::EPrimBinary::eq,
-                                                                         expr.clone(),
-                                                                         makeStrConstant(string)));
-    }
-
     static optimizer::ABT generateABTIsEqualToStringCheck(const optimizer::ABT& expr,
                                                           StringData string) {
         return optimizer::make<optimizer::BinaryOp>(

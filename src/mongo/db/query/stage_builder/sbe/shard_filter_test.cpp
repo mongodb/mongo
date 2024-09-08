@@ -246,7 +246,8 @@ public:
         }
 
         auto shardKeyExpression = stage_builder::makeShardKeyFunctionForPersistedDocuments(
-            shardKeyPaths, shardKeyHashed, slots);
+                                      _state, shardKeyPaths, shardKeyHashed, slots)
+                                      .extractExpr(_state);
         auto compiledShardKey = compileExpression(*shardKeyExpression);
 
         ShardKeyPattern shardKeyPattern{shardKeyPatternDefinition};

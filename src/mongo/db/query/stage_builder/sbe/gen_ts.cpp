@@ -285,12 +285,13 @@ SbExpr buildVectorizedExpr(StageBuilderState& state,
     }
 
     if (scalarExpression.canExtractABT()) {
-        Vectorizer vectorizer(state.frameIdGenerator,
-                              forFilterStage ? Vectorizer::Purpose::Filter
-                                             : Vectorizer::Purpose::Project);
+        auto purpose = forFilterStage ? Vectorizer::Purpose::Filter : Vectorizer::Purpose::Project;
+        const bool mayHaveCollation = state.getCollatorSlot().has_value();
+
+        Vectorizer vectorizer(state.frameIdGenerator, purpose, mayHaveCollation);
 
         // If we have an active bitmap, let the vectorizer know.
-        auto bitmapSlot = outputs.getSlotIfExists(PlanStageSlots::kBlockSelectivityBitmap);
+        auto bitmapSlot = outputs.getIfExists(PlanStageSlots::kBlockSelectivityBitmap);
 
         Vectorizer::VariableTypes bindings;
         for (const SbSlot& slot : outputs.getAllSlotsInOrder()) {
@@ -384,7 +385,7 @@ SlotBasedStageBuilder::buildUnpackTsBucket(const QuerySolutionNode* root,
     // The TsBucketToCellBlock stage generates a "default" bitmap of all 1s in to this slot.
     // The bitmap represents which documents are present (1) and which have been filtered (0).
     // This bitmap is carried around until the block_to_row stage.
-    const auto bitmapSlotId = _slotIdGenerator.generate();
+    const auto bitmapSlotId = SbSlot{_slotIdGenerator.generate()};
 
     std::unique_ptr<sbe::PlanStage> stage =
         std::make_unique<sbe::TsBucketToCellBlockStage>(std::move(childStage),
@@ -392,7 +393,7 @@ SlotBasedStageBuilder::buildUnpackTsBucket(const QuerySolutionNode* root,
                                                         allReqs,
                                                         allCellSlots,
                                                         boost::none /* metaField slot*/,
-                                                        bitmapSlotId,
+                                                        bitmapSlotId.getId(),
                                                         unpackNode->bucketSpec.timeField(),
                                                         unpackNode->nodeId());
     outputs.set(PlanStageSlots::kBlockSelectivityBitmap, bitmapSlotId);

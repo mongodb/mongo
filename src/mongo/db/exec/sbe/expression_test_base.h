@@ -40,6 +40,7 @@
 #include "mongo/db/exec/sbe/values/value_printer.h"
 #include "mongo/db/exec/sbe/vm/vm.h"
 #include "mongo/db/exec/sbe/vm/vm_printer.h"
+#include "mongo/db/pipeline/expression_context_for_test.h"
 #include "mongo/db/query/stage_builder/sbe/builder_data.h"
 #include "mongo/db/query/stage_builder/sbe/builder_state.h"
 #include "mongo/unittest/golden_test.h"
@@ -66,7 +67,22 @@ protected:
     EExpressionTestFixture()
         : _env{std::make_unique<sbe::RuntimeEnvironment>()},
           _runtimeEnv{_env.runtimeEnv},
-          _ctx{_env.ctx} {
+          _ctx{_env.ctx},
+          _expCtx{make_intrusive<ExpressionContextForTest>()},
+          _state{nullptr /* opCtx */,
+                 _env,
+                 nullptr /* planStageData */,
+                 _variables,
+                 nullptr /* yieldPolicy */,
+                 &_slotIdGenerator,
+                 &_frameIdGenerator,
+                 nullptr /* spoolIdGenerator */,
+                 nullptr /* inListsMap */,
+                 nullptr /* collatorsMap */,
+                 nullptr /* sortSpecMap */,
+                 _expCtx,
+                 false /* needsMerge */,
+                 false /* allowDiskUse */} {
         _ctx.root = &_emptyStage;
     }
 
@@ -225,6 +241,10 @@ protected:
     CompileCtx& _ctx;
     vm::ByteCode _vm;
     std::vector<std::pair<value::SlotId, value::SlotAccessor*>> boundAccessors;
+    sbe::value::FrameIdGenerator _frameIdGenerator;
+    boost::intrusive_ptr<ExpressionContextForTest> _expCtx;
+    Variables _variables;
+    stage_builder::StageBuilderState _state;
 };
 
 

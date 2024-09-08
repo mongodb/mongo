@@ -2546,7 +2546,7 @@ protected:
     // "turn the crank" this will hold the next partial aggregate to be aggregated into
     // '_aggAccessor'.
     sbe::value::OwnedValueAccessor _inputAccessor;
-    sbe::value::SlotId _inputSlotId;
+    stage_builder::SbSlot _inputSlotId;
 
     // The accessor which holds the final output resulting from combining all partial outputs. We
     // check that the intermediate value is as expected after every turn of the crank.

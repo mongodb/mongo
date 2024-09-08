@@ -1390,8 +1390,8 @@ TEST(VectorizerTest, ConvertBlockIf) {
                              make<Variable>("inputVar"),
                              Constant::boolean(false));
 
-        auto processed =
-            Vectorizer{&generator, Vectorizer::Purpose::Filter}.vectorize(tree, bindings, 100);
+        auto processed = Vectorizer{&generator, Vectorizer::Purpose::Filter}.vectorize(
+            tree, bindings, SbSlot{100});
 
         ASSERT_TRUE(processed.expr.has_value());
         ASSERT_EXPLAIN_BSON_AUTO(
@@ -1508,8 +1508,8 @@ TEST(VectorizerTest, ConvertBlockIf) {
                              make<Variable>("inputVar"),
                              make<Variable>("scalarVar"));
 
-        auto processed =
-            Vectorizer{&generator, Vectorizer::Purpose::Filter}.vectorize(tree, bindings, 100);
+        auto processed = Vectorizer{&generator, Vectorizer::Purpose::Filter}.vectorize(
+            tree, bindings, SbSlot{100});
 
         ASSERT_TRUE(processed.expr.has_value());
         ASSERT_EXPLAIN_BSON_AUTO(
@@ -2984,8 +2984,8 @@ TEST(VectorizerTest, ConvertMixedScalarIf) {
             *processed.expr);
 
         // Test the case when we have a bitmap available
-        auto processed2 =
-            Vectorizer{&generator, Vectorizer::Purpose::Filter}.vectorize(tree, bindings, 10);
+        auto processed2 = Vectorizer{&generator, Vectorizer::Purpose::Filter}.vectorize(
+            tree, bindings, SbSlot{10});
 
         ASSERT_TRUE(processed2.expr.has_value());
         ASSERT_EXPLAIN_BSON_AUTO(
@@ -3148,8 +3148,8 @@ TEST(VectorizerTest, ConvertMixedScalarIf) {
             *processed.expr);
 
         // Test the case when we have a bitmap available
-        auto processed2 =
-            Vectorizer{&generator, Vectorizer::Purpose::Filter}.vectorize(tree, bindings, 10);
+        auto processed2 = Vectorizer{&generator, Vectorizer::Purpose::Filter}.vectorize(
+            tree, bindings, SbSlot{10});
 
         ASSERT_TRUE(processed2.expr.has_value());
         ASSERT_EXPLAIN_BSON_AUTO(

@@ -219,11 +219,21 @@ std::unique_ptr<sbe::EExpression> SBEExpressionLowering::transport(
     sbe::EPrimBinary::Op sbeOp = getEPrimBinaryOp(op.op());
 
     if (sbe::EPrimBinary::isComparisonOp(sbeOp)) {
-        boost::optional<sbe::value::SlotId> collatorSlot =
-            _providedSlots.getSlotIfExists("collator"_sd);
+        auto collatorSlot = _providedSlots.getSlotIfExists("collator"_sd);
+
+        auto hasNonCollatableType = [](const std::unique_ptr<sbe::EExpression>& arg) {
+            auto constExpr = arg->as<sbe::EConstant>();
+            return constExpr && !sbe::value::isCollatableType(constExpr->getConstant().first);
+        };
+
+        // If either arg is a non-collatable type constant, we can always use the native
+        // comparison op even when a collation is set (because the native comparison op
+        // will behave the same as the collation-aware comparison op for such cases).
+        const bool useCollationAwareOp =
+            collatorSlot && !hasNonCollatableType(lhs) && !hasNonCollatableType(rhs);
 
         auto collationExpr = [&]() -> std::unique_ptr<sbe::EExpression> {
-            if (collatorSlot) {
+            if (useCollationAwareOp) {
                 return sbe::makeE<sbe::EVariable>(*collatorSlot);
             }
             return nullptr;
@@ -243,8 +253,7 @@ std::unique_ptr<sbe::EExpression> SBEExpressionLowering::transport(
                     sbeOp,
                     sbe::makeE<sbe::EPrimBinary>(
                         sbe::EPrimBinary::cmp3w, std::move(lhs), std::move(rhs), collationExpr()),
-                    sbe::makeE<sbe::EConstant>(sbe::value::TypeTags::NumberInt64, 0),
-                    collationExpr());
+                    sbe::makeE<sbe::EConstant>(sbe::value::TypeTags::NumberInt64, 0));
         }
     }
 
@@ -271,79 +280,6 @@ std::unique_ptr<sbe::EExpression> makeFillEmptyNull(std::unique_ptr<sbe::EExpres
     return sbe::makeE<sbe::EPrimBinary>(sbe::EPrimBinary::fillEmpty,
                                         std::move(e),
                                         sbe::makeE<sbe::EConstant>(sbe::value::TypeTags::Null, 0));
-}
-
-/*
- * In the ABT, the shard filtering operation is represented by a FunctionCall node with n
- * arguments, in which each argument is a projection of the value of one field of the
- * shard key (which has n fields). In the SBE plan, the shard filtering is represented by a
- * 2-argument function called shardFilter. The first argument is the slotID of a slot that
- * contains a ShardFilterer instance. The second argument to shardFilter is a function
- * (makeBsonObj) that takes a spec for the construction of an object which evaluates to the
- * shard key (e.g. the output of the function is {a:1, b:1, ...}).
- */
-std::unique_ptr<sbe::EExpression> SBEExpressionLowering::handleShardFilterFunctionCall(
-    const FunctionCall& fn,
-    std::vector<std::unique_ptr<sbe::EExpression>>& args,
-    std::string name) {
-    tassert(7814401, "NodeProps must not be nullptr in shardFilter lowering", _np);
-
-    // First, get the paths to the shard key fields.
-    const std::string& scanDefName = *(_np->_indexScanDefName);
-    tassert(7814403,
-            "The metadata must contain the scan definition specified by the "
-            "IndexingAvailability property in order to perform shard filtering",
-            _scanDefs->contains(scanDefName));
-    const auto& shardKeyPaths = _scanDefs->at(scanDefName)._shardKey;
-
-    // Specify a BSONObj which will contain the shard key values.
-    tassert(7814404,
-            "The number of fields passed to shardFilter does not match the number of fields in "
-            "the shard key",
-            fn.nodes().size() == shardKeyPaths.size());
-    std::vector<std::string> fields;
-    std::vector<sbe::MakeObjSpec::FieldAction> fieldActions;
-    sbe::EExpression::Vector projectValues;
-
-    size_t argIdx = 0;
-    for (auto& i : shardKeyPaths) {
-        fields.emplace_back(PathStringify::stringify(i._path));
-        fieldActions.emplace_back(sbe::MakeObjSpec::AddArg{argIdx});
-        ++argIdx;
-    }
-
-    // Each argument corresponds to one component of the shard key. This loop lowers an expression
-    // for each component. The ShardFilterer expects the BSONObj of the shard key to have values for
-    // each component of the shard key; since shard components may be missing, we must wrap the
-    // expression in a fillEmpty to coerce a missing shard key component to an explicit null. For
-    // example, if the shard key is {a: 1, b: 1} and the document is {b: 123}, the object we will
-    // generate is {a: null, b: 123}.
-    for (const ABT& node : fn.nodes()) {
-        projectValues.push_back(makeFillEmptyNull(this->optimize(node)));
-    }
-
-    auto fieldsScope = FieldListScope::kOpen;
-    auto makeObjSpec =
-        sbe::makeE<sbe::EConstant>(sbe::value::TypeTags::makeObjSpec,
-                                   sbe::value::bitcastFrom<sbe::MakeObjSpec*>(new sbe::MakeObjSpec(
-                                       fieldsScope, std::move(fields), std::move(fieldActions))));
-
-    auto makeObjRoot = sbe::makeE<sbe::EConstant>(sbe::value::TypeTags::Nothing, 0);
-
-    sbe::EExpression::Vector makeObjArgs;
-    makeObjArgs.reserve(2 + projectValues.size());
-    makeObjArgs.push_back(std::move(makeObjSpec));
-    makeObjArgs.push_back(std::move(makeObjRoot));
-    std::move(projectValues.begin(), projectValues.end(), std::back_inserter(makeObjArgs));
-
-    auto shardKeyBSONObjExpression =
-        sbe::makeE<sbe::EFunction>("makeBsonObj", std::move(makeObjArgs));
-
-    // Prepare the FunctionCall expression.
-    sbe::EExpression::Vector argVector;
-    argVector.push_back(sbe::makeE<sbe::EVariable>(_providedSlots.getSlot(kshardFiltererSlotName)));
-    argVector.push_back(std::move(shardKeyBSONObjExpression));
-    return sbe::makeE<sbe::EFunction>(name, std::move(argVector));
 }
 
 std::unique_ptr<sbe::EExpression> SBEExpressionLowering::transport(
@@ -399,10 +335,6 @@ std::unique_ptr<sbe::EExpression> SBEExpressionLowering::transport(
                         sbe::makeE<sbe::EConstant>(
                             sbe::value::TypeTags::NumberInt32,
                             sbe::value::bitcastFrom<int32_t>(constPtr->getValueInt32()))));
-    }
-
-    if (name == "shardFilter") {
-        return handleShardFilterFunctionCall(fn, args, name);
     }
 
     if (name == kParameterFunctionName) {

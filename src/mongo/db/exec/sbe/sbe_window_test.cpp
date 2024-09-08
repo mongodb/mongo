@@ -84,19 +84,21 @@ public:
             window.windowExprSlots.push_back(windowSlot);
             window.lowBoundExpr = nullptr;
             if (lowerOffset) {
-                window.lowBoundExpr = makeBinaryOp(EPrimBinary::greaterEq,
-                                                   makeVariable(lowBoundTestingSlot),
-                                                   makeBinaryOp(EPrimBinary::add,
-                                                                makeVariable(lowBoundSlot),
-                                                                makeInt32Constant(*lowerOffset)));
+                window.lowBoundExpr = sbe::makeE<sbe::EPrimBinary>(
+                    EPrimBinary::greaterEq,
+                    makeVariable(lowBoundTestingSlot),
+                    sbe::makeE<sbe::EPrimBinary>(EPrimBinary::add,
+                                                 makeVariable(lowBoundSlot),
+                                                 makeInt32Constant(*lowerOffset)));
             }
             window.highBoundExpr = nullptr;
             if (higherOffset) {
-                window.highBoundExpr = makeBinaryOp(EPrimBinary::lessEq,
-                                                    makeVariable(highBoundTestingSlot),
-                                                    makeBinaryOp(EPrimBinary::add,
-                                                                 makeVariable(highBoundSlot),
-                                                                 makeInt32Constant(*higherOffset)));
+                window.highBoundExpr = sbe::makeE<sbe::EPrimBinary>(
+                    EPrimBinary::lessEq,
+                    makeVariable(highBoundTestingSlot),
+                    sbe::makeE<sbe::EPrimBinary>(EPrimBinary::add,
+                                                 makeVariable(highBoundSlot),
+                                                 makeInt32Constant(*higherOffset)));
             }
             window.initExprs.push_back(nullptr);
             window.addExprs.push_back(makeFunction("aggDoubleDoubleSum", makeVariable(valueSlot)));

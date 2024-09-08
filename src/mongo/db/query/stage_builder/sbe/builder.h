@@ -82,25 +82,14 @@ class PlanStageSlots;
 struct PlanStageData;
 
 /**
- * Returns a vector of the slot IDs corresponding to 'reqs', ordered by slot name. This function
- * is intended for use in situations where a branch or union is being constructed and the contents
- * of multiple PlanStageSlots objects need to be merged together.
- *
- * Note that a given slot ID may appear more than once in the SlotVector returned. This is
- * the intended behavior.
- */
-sbe::value::SlotVector getSlotsOrderedByName(const PlanStageReqs& reqs,
-                                             const PlanStageSlots& outputs);
-
-/**
  * Returns a vector of the unique slot IDs needed by 'reqs', ordered by slot ID, and metadata slots.
  * This function is intended for use in situations where a join or sort or something else is being
  * constructed and a PlanStageSlot's contents need to be "forwarded" through a PlanStage.
  */
-sbe::value::SlotVector getSlotsToForward(StageBuilderState& state,
-                                         const PlanStageReqs& reqs,
-                                         const PlanStageSlots& outputs,
-                                         const sbe::value::SlotVector& exclude = sbe::makeSV());
+SbSlotVector getSlotsToForward(StageBuilderState& state,
+                               const PlanStageReqs& reqs,
+                               const PlanStageSlots& outputs,
+                               const SbSlotVector& exclude = SbSlotVector{});
 
 /**
  * This function prepares the SBE tree for execution, such as attaching the OperationContext,
@@ -161,6 +150,9 @@ public:
     using UnownedSlotName = std::pair<SlotType, StringData>;
     using OwnedSlotName = std::pair<SlotType, std::string>;
 
+    using MakeMergeStageFn = std::function<std::pair<SbStage, SbSlotVector>(
+        sbe::PlanStage::Vector, std::vector<SbSlotVector>)>;
+
     struct NameHasher {
         using is_transparent = void;
         size_t operator()(const UnownedSlotName& p) const noexcept {
@@ -175,8 +167,6 @@ public:
 
     using SlotNameMap = absl::flat_hash_map<OwnedSlotName, SbSlot, NameHasher, NameEq>;
     using SlotNameSet = absl::flat_hash_set<OwnedSlotName, NameHasher, NameEq>;
-
-    using PlanStageTree = std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots>;
 
     static constexpr SlotType kMeta = SlotType::kMeta;
     static constexpr SlotType kField = SlotType::kField;
@@ -218,21 +208,28 @@ public:
         return {};
     }
 
-    // When the build() depth-first traversal backtracks through a merge point in the QSN tree,
-    // this method handles doing the "merge" process.
-    static PlanStageSlots makeMergedPlanStageSlots(
+    /**
+     * When the build() depth-first traversal backtracks through a merge point in the QSN tree, this
+     * method is called. This method merges multiple SbStage/PlanStageSlots pairs ('stagesAndSlots')
+     * into a single SbStage/PlanStageSlots pair, and then it returns the pair.
+     *
+     * The caller must provide a 'makeMergeStageFn' lambda. This lambda is responsible for creating
+     * the appropriate stage for the merge (ex. UnionStage, BranchStage, SortedMergeStage, etc).
+     */
+    static std::pair<SbStage, PlanStageSlots> makeMergedPlanStageSlots(
         StageBuilderState& state,
         PlanNodeId nodeId,
         const PlanStageReqs& reqs,
-        std::vector<PlanStageTree>& trees,
-        const std::vector<const FieldSet*>& allowedFieldSets);
+        std::vector<std::pair<SbStage, PlanStageSlots>> stagesAndSlots,
+        const MakeMergeStageFn& makeMergeStageFn,
+        const std::vector<const FieldSet*>& allowedFieldSets = {});
 
     // This is a helper function used by makeMergedPlanStageSlots() is called that handles the
     // case where one or more of the PlanStageOutputs objects have a ResultInfo.
     static void mergeResultInfos(StageBuilderState& state,
                                  PlanNodeId nodeId,
                                  const PlanStageReqs& reqs,
-                                 std::vector<PlanStageTree>& trees,
+                                 std::vector<std::pair<SbStage, PlanStageSlots>>& trees,
                                  const std::vector<const FieldSet*>& allowedFieldSets);
 
     PlanStageSlots() : _data(std::make_unique<Data>()) {}
@@ -279,21 +276,18 @@ public:
         return boost::none;
     }
 
-    // This method is like getIfExists(), except that it returns 'boost::optional<SlotId>'
-    // instead of 'boost::optional<SbSlot>'.
-    boost::optional<sbe::value::SlotId> getSlotIfExists(const UnownedSlotName& name) const {
-        if (auto it = _data->slotNameToIdMap.find(name); it != _data->slotNameToIdMap.end()) {
-            return it->second.slotId;
-        }
-        return boost::none;
-    }
-
     // Maps 'name' to 'slot' and clears any prior mapping the 'name' may have had.
     void set(const UnownedSlotName& name, SbSlot slot) {
         _data->slotNameToIdMap.insert_or_assign(name, slot);
     }
     void set(OwnedSlotName name, SbSlot slot) {
         _data->slotNameToIdMap.insert_or_assign(std::move(name), slot);
+    }
+    void set(const UnownedSlotName& name, sbe::value::SlotId slotId) {
+        set(name, SbSlot{slotId});
+    }
+    void set(OwnedSlotName name, sbe::value::SlotId slotId) {
+        set(std::move(name), SbSlot{slotId});
     }
 
     // Discards any mapping that this PlanStageSlot may have for 'name'.
@@ -406,21 +400,15 @@ public:
         return boost::none;
     }
 
-    // This method is like getResultObjIfExists(), except that it returns 'boost::optional<SlotId>'
-    // instead of 'boost::optional<SbSlot>'.
-    boost::optional<sbe::value::SlotId> getResultObjSlotIfExists() const {
-        if (hasResultObj()) {
-            return getResultObj().slotId;
-        }
-        return boost::none;
-    }
-
     // Maps kResult to 'slot', designates kResult as being a "materialized result object", and
     // clears any prior mapping or designation that kResult may have had. setResultObj() also
     // clears any ResultInfo-related state that may have been set.
     void setResultObj(SbSlot slot) {
         set(kResult, slot);
         _data->resultInfoChanges.reset();
+    }
+    void setResultObj(sbe::value::SlotId slotId) {
+        setResultObj(SbSlot{slotId});
     }
 
     // Returns true if this PlanStageSlots has "ResultInfo" (kResult mapped to a base object, a list
@@ -471,6 +459,13 @@ public:
                                 const PlanStageReqs& reqs,
                                 const FieldEffects& newEffectsIn);
 
+    // These methods take a vector of slot names and return the corresponding list of slots. The
+    // elements of the vector returned will correspond pair-wise with the elements of the input
+    // vector.
+    SbSlotVector getSlotsByName(const std::vector<PlanStageSlots::UnownedSlotName>& names) const;
+
+    SbSlotVector getSlotsByName(const std::vector<PlanStageSlots::OwnedSlotName>& names) const;
+
     // Returns a sorted list of all the names in this PlanStageSlots has that are required by
     // 'reqs', plus any additional names needed by 'reqs' that this PlanStageSlots does not satisfy.
     std::vector<OwnedSlotName> getRequiredNamesInOrder(const PlanStageReqs& reqs) const;
@@ -501,6 +496,23 @@ public:
     void clearNonRequiredSlots(const PlanStageReqs& reqs, bool saveResultObj = true);
 
 private:
+    template <typename T>
+    SbSlotVector getSlotsByNameImpl(const T& names) const {
+        SbSlotVector result;
+
+        for (const auto& name : names) {
+            auto it = _data->slotNameToIdMap.find(name);
+            tassert(8146615,
+                    str::stream() << "Could not find " << static_cast<int>(name.first) << ":'"
+                                  << name.second << "' in the slot map, expected slot to exist",
+                    it != _data->slotNameToIdMap.end());
+
+            result.emplace_back(it->second);
+        }
+
+        return result;
+    }
+
     std::unique_ptr<Data> _data;
 };  // class PlanStageSlots
 
@@ -1032,8 +1044,8 @@ private:
         const PlanStageReqs& reqs,
         std::unique_ptr<sbe::PlanStage>& stage,
         PlanStageSlots& outputs,
-        sbe::value::SlotId childResultSlot,
-        sbe::value::SlotId getFieldSlot);
+        SbSlot childResultSlot,
+        SbSlot getFieldSlot);
 
     std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> buildReplaceRoot(
         const QuerySolutionNode* root, const PlanStageReqs& reqs);
@@ -1178,12 +1190,11 @@ private:
         PlanStageSlots& outputs,
         PlanNodeId nodeId);
 
-    std::unique_ptr<sbe::EExpression> buildLimitSkipAmountExpression(
-        LimitSkipParameterization canBeParameterized,
-        long long amount,
-        boost::optional<sbe::value::SlotId>& slot);
-    std::unique_ptr<sbe::EExpression> buildLimitSkipSumExpression(
-        LimitSkipParameterization canBeParameterized, size_t limitSkipSum);
+    SbExpr buildLimitSkipAmountExpression(LimitSkipParameterization canBeParameterized,
+                                          long long amount,
+                                          boost::optional<sbe::value::SlotId>& slot);
+    SbExpr buildLimitSkipSumExpression(LimitSkipParameterization canBeParameterized,
+                                       size_t limitSkipSum);
 
     /**
      * Returns a CollectionPtr corresponding to the collection that we are currently building a

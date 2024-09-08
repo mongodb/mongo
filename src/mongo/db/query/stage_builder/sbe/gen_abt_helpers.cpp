@@ -70,7 +70,7 @@ std::unique_ptr<sbe::EExpression> makeBalancedBooleanOpTreeImpl(
         size_t mid = (from + until) / 2;
         auto lhs = makeBalancedBooleanOpTreeImpl(logicOp, leaves, from, mid);
         auto rhs = makeBalancedBooleanOpTreeImpl(logicOp, leaves, mid, until);
-        return makeBinaryOp(logicOp, std::move(lhs), std::move(rhs));
+        return sbe::makeE<sbe::EPrimBinary>(logicOp, std::move(lhs), std::move(rhs));
     }
 }
 

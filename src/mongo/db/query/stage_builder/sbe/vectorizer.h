@@ -34,6 +34,7 @@
 #include "mongo/db/exec/sbe/values/slot.h"
 #include "mongo/db/exec/sbe/values/value.h"
 #include "mongo/db/query/optimizer/node.h"
+#include "mongo/db/query/stage_builder/sbe/sbexpr.h"
 #include "mongo/db/query/stage_builder/sbe/type_signature.h"
 #include "mongo/stdx/unordered_map.h"
 
@@ -81,8 +82,10 @@ public:
     // values will generate a single boolean result, while, in a Project context, all the results
     // will be packed in a new array result.
     enum class Purpose { Filter, Project };
-    Vectorizer(sbe::value::FrameIdGenerator* frameGenerator, Purpose purpose)
-        : _purpose(purpose), _frameGenerator(frameGenerator) {}
+    Vectorizer(sbe::value::FrameIdGenerator* frameGenerator,
+               Purpose purpose,
+               bool mayHaveCollation = false)
+        : _purpose(purpose), _mayHaveCollation(mayHaveCollation), _frameGenerator(frameGenerator) {}
 
     // Recursively convert the provided node into a node suitable for vectorized processing.
     // Return a result with an empty 'expr' inside if the node contains an operation that cannot be
@@ -92,7 +95,7 @@ public:
     // computed a valid selectivity bitmap.
     Tree vectorize(optimizer::ABT& node,
                    const VariableTypes& externalBindings,
-                   boost::optional<sbe::value::SlotId> externalBitmapSlot);
+                   boost::optional<SbSlot> externalBitmapSlot);
 
     // The default visitor for non-supported nodes, returning an empty value to mean "node not
     // supported".
@@ -129,6 +132,9 @@ private:
 
     // The purpose of the operations being vectorized.
     Purpose _purpose;
+
+    // Indicates if the current query may have a non-simple collation.
+    bool _mayHaveCollation;
 
     // Keep track of the active mask.
     std::list<optimizer::ProjectionName> _activeMasks;

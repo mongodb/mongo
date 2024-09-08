@@ -213,11 +213,6 @@ public:
     std::unique_ptr<sbe::EExpression> optimize(const ABT& n);
 
 private:
-    std::unique_ptr<sbe::EExpression> handleShardFilterFunctionCall(
-        const FunctionCall& fn,
-        std::vector<std::unique_ptr<sbe::EExpression>>& args,
-        std::string name);
-
     sbe::FrameId generateFrameId() {
         if (_frameIdGenerator) {
             return _frameIdGenerator->generate();

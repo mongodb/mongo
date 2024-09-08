@@ -237,7 +237,7 @@ SbStage projectFieldPathsToPathExprSlots(
 
     if (!projects.empty()) {
         auto [outStage, outSlots] =
-            b.makeProject(std::move(stage), buildVariableTypes(outputs), std::move(projects));
+            b.makeProject(buildVariableTypes(outputs), std::move(stage), std::move(projects));
         stage = std::move(outStage);
 
         size_t i = 0;
@@ -936,7 +936,7 @@ std::tuple<SbStage, std::vector<std::string>, SbSlotVector, PlanStageSlots> gene
 
     // Project all the aforementioned expressions to slots.
     auto [retStage, finalSlots] = b.makeProject(
-        std::move(groupStage), buildVariableTypes(outputs, individualSlots), std::move(projects));
+        buildVariableTypes(outputs, individualSlots), std::move(groupStage), std::move(projects));
 
     individualSlots.insert(individualSlots.end(), finalSlots.begin(), finalSlots.end());
 
@@ -957,7 +957,6 @@ std::tuple<SbStage, SbSlotVector, SbSlotVector> buildGroupAggregation(
     const PlanStageSlots& childOutputs,
     SbSlotVector individualSlots,
     SbStage stage,
-    bool allowDiskUse,
     SbExpr::Vector groupByExprs,
     std::vector<SbAggExprVector> sbAggExprs,
     std::vector<SbExprSbSlotVector> mergingExprs,
@@ -965,7 +964,6 @@ std::tuple<SbStage, SbSlotVector, SbSlotVector> buildGroupAggregation(
     std::vector<SbExpr::Vector> blockAccExprs,
     boost::optional<SbSlot> bitmapInternalSlot,
     const std::vector<SbSlotVector>& accumulatorDataSlots,
-    PlanYieldPolicy* yieldPolicy,
     PlanNodeId nodeId) {
     constexpr auto kBlockSelectivityBitmap = PlanStageSlots::kBlockSelectivityBitmap;
 
@@ -986,7 +984,7 @@ std::tuple<SbStage, SbSlotVector, SbSlotVector> buildGroupAggregation(
     }
 
     auto [outStage, outSlots] = b.makeProject(
-        std::move(stage), buildVariableTypes(childOutputs, individualSlots), std::move(projects));
+        buildVariableTypes(childOutputs, individualSlots), std::move(stage), std::move(projects));
     stage = std::move(outStage);
 
     SbSlotVector groupBySlots;
@@ -1030,26 +1028,22 @@ std::tuple<SbStage, SbSlotVector, SbSlotVector> buildGroupAggregation(
                     "Expected 'bitmapInternalSlot' to be defined",
                     bitmapInternalSlot.has_value());
 
-            return b.makeBlockHashAgg(std::move(stage),
-                                      buildVariableTypes(childOutputs, individualSlots),
+            return b.makeBlockHashAgg(buildVariableTypes(childOutputs, individualSlots),
+                                      std::move(stage),
                                       groupBySlots,
                                       std::move(flattenedSbAggExprs),
                                       childOutputs.get(kBlockSelectivityBitmap),
                                       flattenedBlockAccArgSlots,
                                       *bitmapInternalSlot,
                                       flattenedAccumulatorDataSlots,
-                                      allowDiskUse,
-                                      std::move(flattenedMergingExprs),
-                                      yieldPolicy);
+                                      std::move(flattenedMergingExprs));
         } else {
-            return b.makeHashAgg(std::move(stage),
-                                 buildVariableTypes(childOutputs, individualSlots),
+            return b.makeHashAgg(buildVariableTypes(childOutputs, individualSlots),
+                                 std::move(stage),
                                  groupBySlots,
                                  std::move(flattenedSbAggExprs),
                                  state.getCollatorSlot(),
-                                 allowDiskUse,
-                                 std::move(flattenedMergingExprs),
-                                 yieldPolicy);
+                                 std::move(flattenedMergingExprs));
         }
     }();
 
@@ -1140,9 +1134,9 @@ std::tuple<SbStage, SbExpr::Vector, SbSlot> generateInitRootSlot(
     // Project 'groupByExpr' to a slot.
     boost::optional<SbSlot> targetSlot = idIsKnownToBeObj ? slotIdForInitRoot : boost::none;
     auto [projectStage, projectOutSlots] =
-        b.makeProject(std::move(stage),
-                      buildVariableTypes(childOutputs),
-                      SbExprOptSbSlotPair{std::move(groupByExpr), targetSlot});
+        b.makeProject(buildVariableTypes(childOutputs),
+                      std::move(stage),
+                      std::pair(std::move(groupByExpr), targetSlot));
     stage = std::move(projectStage);
 
     groupByExpr = SbExpr{projectOutSlots[0]};
@@ -1162,8 +1156,8 @@ std::tuple<SbStage, SbExpr::Vector, SbSlot> generateInitRootSlot(
                                            b.makeConstant(emptyObjTag, emptyObjVal));
 
         auto [outStage, outSlots] =
-            b.makeProject(std::move(stage),
-                          buildVariableTypes(childOutputs, individualSlots),
+            b.makeProject(buildVariableTypes(childOutputs, individualSlots),
+                          std::move(stage),
                           SbExprOptSbSlotPair{std::move(idOrEmptyObjExpr), slotIdForInitRoot});
         stage = std::move(outStage);
 
@@ -1481,7 +1475,7 @@ SlotBasedStageBuilder::buildGroupImpl(SbStage stage,
             }
 
             auto [projectStage, groupBySlots] = b.makeProject(
-                std::move(stage), buildVariableTypes(childOutputs), std::move(projects));
+                buildVariableTypes(childOutputs), std::move(stage), std::move(projects));
 
             auto [outStage, outSlots] = buildBlockToRow(
                 std::move(projectStage), _state, childOutputs, std::move(groupBySlots));
@@ -1557,7 +1551,6 @@ SlotBasedStageBuilder::buildGroupImpl(SbStage stage,
                               childOutputs,
                               std::move(individualSlots),
                               std::move(stage),
-                              _cq.getExpCtx()->allowDiskUse,
                               std::move(groupByExprs),
                               std::move(*sbAggExprs),
                               std::move(mergingExprs),
@@ -1565,7 +1558,6 @@ SlotBasedStageBuilder::buildGroupImpl(SbStage stage,
                               std::move(blockAccExprs),
                               bitmapInternalSlot,
                               accumulatorDataSlots,
-                              _yieldPolicy,
                               nodeId);
     stage = std::move(outStage);
 

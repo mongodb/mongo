@@ -65,7 +65,7 @@ std::string dumpVariables(const Vectorizer::VariableTypes& variableTypes) {
 
 Vectorizer::Tree Vectorizer::vectorize(optimizer::ABT& node,
                                        const VariableTypes& externalBindings,
-                                       boost::optional<sbe::value::SlotId> externalBitmapSlot) {
+                                       boost::optional<SbSlot> externalBitmapSlot) {
     _variableTypes = externalBindings;
     if (externalBitmapSlot) {
         _activeMasks.push_back(getABTVariableName(*externalBitmapSlot));
@@ -190,44 +190,58 @@ Vectorizer::Tree Vectorizer::operator()(const optimizer::ABT& n, const optimizer
             if (!rhs.expr.has_value()) {
                 return rhs;
             }
-            // The right side must be a scalar value.
-            if (!TypeSignature::kBlockType.isSubset(rhs.typeSignature)) {
-                // If the left argument is a block, create a block-generating operation.
-                if (TypeSignature::kBlockType.isSubset(lhs.typeSignature)) {
+
+            auto resultType = getTypeSignature(sbe::value::TypeTags::NumberInt32)
+                                  .include(lhs.typeSignature.include(rhs.typeSignature)
+                                               .intersect(TypeSignature::kNothingType));
+
+            const bool useCollationAwareOp = _mayHaveCollation &&
+                lhs.typeSignature.containsAny(TypeSignature::kCollatableType) &&
+                rhs.typeSignature.containsAny(TypeSignature::kCollatableType);
+
+            auto isBlock = [](const Tree& arg) {
+                return TypeSignature::kBlockType.isSubset(arg.typeSignature);
+            };
+
+            if (!useCollationAwareOp) {
+                if ((isBlock(lhs) && !isBlock(rhs)) || (!isBlock(lhs) && isBlock(rhs))) {
+                    // If one arg is a block and the other arg is scalar -AND- if we don't need to
+                    // perform a collation-aware comparison, then we can create a block-generating
+                    // operation. If needed, flip the op and flip the args so that 'lhs' is a block
+                    // and 'rhs' is a scalar.
+                    bool flipOp = !isBlock(lhs) && isBlock(rhs);
+                    if (flipOp) {
+                        std::swap(lhs, rhs);
+                    }
+
+                    auto resultExpr = makeABTFunction(
+                        "valueBlockCmp3wScalar"_sd, std::move(*lhs.expr), std::move(*rhs.expr));
+
+                    if (flipOp) {
+                        resultExpr =
+                            makeABTFunction("valueBlockSub"_sd,
+                                            generateMaskArg(),
+                                            makeABTConstant(sbe::value::TypeTags::NumberInt32,
+                                                            sbe::value::bitcastFrom<int32_t>(0)),
+                                            std::move(resultExpr));
+                    }
+
                     // Propagate the name of the associated cell variable, this is not the place
                     // to fold (there could be a fillEmpty node on top of this comparison).
-                    return {makeABTFunction("valueBlockCmp3wScalar"_sd,
-                                            std::move(*lhs.expr),
-                                            std::move(*rhs.expr)),
-                            TypeSignature::kBlockType
-                                .include(getTypeSignature(sbe::value::TypeTags::NumberInt32))
-                                .include(lhs.typeSignature.include(rhs.typeSignature)
-                                             .intersect(TypeSignature::kNothingType)),
+                    return {std::move(resultExpr),
+                            TypeSignature::kBlockType.include(resultType),
                             lhs.sourceCell};
-                } else {
-                    // Preserve scalar operation.
-                    return {make<optimizer::BinaryOp>(
-                                op.op(), std::move(*lhs.expr), std::move(*rhs.expr)),
-                            getTypeSignature(sbe::value::TypeTags::NumberInt32)
-                                .include(lhs.typeSignature.include(rhs.typeSignature)
-                                             .intersect(TypeSignature::kNothingType)),
-                            {}};
                 }
-            } else if (!TypeSignature::kBlockType.isSubset(lhs.typeSignature)) {
-                // flip the operation for scalar-vs-block cmp
-                return {makeABTFunction("valueBlockSub"_sd,
-                                        generateMaskArg(),
-                                        makeABTConstant(sbe::value::TypeTags::NumberInt32,
-                                                        sbe::value::bitcastFrom<int32_t>(0)),
-                                        makeABTFunction("valueBlockCmp3wScalar"_sd,
-                                                        std::move(*rhs.expr),
-                                                        std::move(*lhs.expr))),
-                        TypeSignature::kBlockType
-                            .include(getTypeSignature(sbe::value::TypeTags::NumberInt32))
-                            .include(lhs.typeSignature.include(rhs.typeSignature)
-                                         .intersect(TypeSignature::kNothingType)),
-                        rhs.sourceCell};
             }
+
+            if (!isBlock(lhs) && !isBlock(rhs)) {
+                // If both args are scalar, preserve scalar operation.
+                return {
+                    make<optimizer::BinaryOp>(op.op(), std::move(*lhs.expr), std::move(*rhs.expr)),
+                    resultType,
+                    {}};
+            }
+
             break;
         }
         case optimizer::Operations::Gt:
@@ -248,24 +262,32 @@ Vectorizer::Tree Vectorizer::operator()(const optimizer::ABT& n, const optimizer
 
             auto cmpOp = op.op();
 
-            // Flip operation for scalar-vs-vector comparison
-            if (TypeSignature::kBlockType.isSubset(rhs.typeSignature) &&
-                !TypeSignature::kBlockType.isSubset(lhs.typeSignature)) {
-                std::swap(lhs, rhs);
-                cmpOp = optimizer::flipComparisonOp(cmpOp);
-            }
+            // A comparison can return Nothing when the types of the arguments are not
+            // comparable.
+            auto resultType = lhs.typeSignature.canCompareWith(rhs.typeSignature)
+                ? TypeSignature::kBooleanType
+                : TypeSignature::kBooleanType.include(TypeSignature::kNothingType);
 
-            // The right side must be a scalar value.
-            if (!TypeSignature::kBlockType.isSubset(rhs.typeSignature)) {
-                // A comparison can return Nothing when the types of the arguments are not
-                // comparable.
-                TypeSignature resultType = (lhs.typeSignature.canCompareWith(rhs.typeSignature))
-                    ? TypeSignature::kBooleanType
-                    : TypeSignature::kBooleanType.include(TypeSignature::kNothingType);
+            const bool useCollationAwareOp = _mayHaveCollation &&
+                lhs.typeSignature.containsAny(TypeSignature::kCollatableType) &&
+                rhs.typeSignature.containsAny(TypeSignature::kCollatableType);
 
-                // If one of the argument is a block, and the other is a scalar value, create a
-                // block-generating operation.
-                if (TypeSignature::kBlockType.isSubset(lhs.typeSignature)) {
+            auto isBlock = [](const Tree& arg) {
+                return TypeSignature::kBlockType.isSubset(arg.typeSignature);
+            };
+
+            if (!useCollationAwareOp) {
+                if ((isBlock(lhs) && !isBlock(rhs)) || (!isBlock(lhs) && isBlock(rhs))) {
+                    // If one arg is a block and the other arg is scalar -AND- if we don't need to
+                    // perform a collation-aware comparison, then we can create a block-generating
+                    // operation. If needed, flip the op and flip the args so that 'lhs' is a block
+                    // and 'rhs' is a scalar.
+                    bool flipOp = !isBlock(lhs) && isBlock(rhs);
+                    if (flipOp) {
+                        std::swap(lhs, rhs);
+                        cmpOp = optimizer::flipComparisonOp(cmpOp);
+                    }
+
                     StringData fnName = [&]() {
                         switch (cmpOp) {
                             case optimizer::Operations::Gt:
@@ -290,14 +312,17 @@ Vectorizer::Tree Vectorizer::operator()(const optimizer::ABT& n, const optimizer
                             TypeSignature::kBlockType.include(resultType),
                             TypeSignature::kBlockType.isSubset(lhs.typeSignature) ? lhs.sourceCell
                                                                                   : rhs.sourceCell};
-                } else {
-                    // Preserve scalar operation.
-                    return {make<optimizer::BinaryOp>(
-                                op.op(), std::move(*lhs.expr), std::move(*rhs.expr)),
-                            resultType,
-                            {}};
                 }
             }
+
+            if (!isBlock(lhs) && !isBlock(rhs)) {
+                // If both args are scalar, preserve scalar operation.
+                return {
+                    make<optimizer::BinaryOp>(op.op(), std::move(*lhs.expr), std::move(*rhs.expr)),
+                    resultType,
+                    {}};
+            }
+
             break;
         }
         case optimizer::Operations::EqMember: {

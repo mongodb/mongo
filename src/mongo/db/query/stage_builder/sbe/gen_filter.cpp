@@ -1385,7 +1385,7 @@ ExpressionType generateComparisonExpr(BuilderType& b,
             b.cloneExpr(inputExpr));
 
         return b.makeFillEmptyFalse(
-            b.makeBinaryOpWithCollation(binaryOp, std::move(inputExpr), b.makeNullConstant()));
+            b.makeBinaryOp(binaryOp, std::move(inputExpr), b.makeNullConstant()));
     } else if (sbe::value::isNaN(tag, val)) {
         // Construct an expression to perform a NaN check.
         switch (binaryOp) {
@@ -1406,7 +1406,7 @@ ExpressionType generateComparisonExpr(BuilderType& b,
     }
 
     return b.makeFillEmptyFalse(
-        b.makeBinaryOpWithCollation(binaryOp, std::move(inputExpr), makeValExpr(tag, val)));
+        b.makeBinaryOp(binaryOp, std::move(inputExpr), makeValExpr(tag, val)));
 }
 }  // namespace
 

@@ -55,6 +55,8 @@ class SbExpr;
 
 optimizer::ProjectionName getABTVariableName(SbSlot s);
 
+optimizer::ProjectionName getABTVariableName(sbe::value::SlotId slotId);
+
 optimizer::ProjectionName getABTLocalVariableName(sbe::FrameId frameId, sbe::value::SlotId slotId);
 
 boost::optional<sbe::value::SlotId> getSbeVariableInfo(const optimizer::ProjectionName& var);
@@ -63,6 +65,8 @@ boost::optional<std::pair<sbe::FrameId, sbe::value::SlotId>> getSbeLocalVariable
     const optimizer::ProjectionName& var);
 
 optimizer::ABT makeABTVariable(SbSlot s);
+
+optimizer::ABT makeABTVariable(sbe::value::SlotId slotId);
 
 using VariableTypes = stdx::
     unordered_map<optimizer::ProjectionName, TypeSignature, optimizer::ProjectionName::Hasher>;
@@ -94,7 +98,7 @@ struct SbSlot {
 
     SbSlot() = default;
 
-    SbSlot(SlotId slotId, boost::optional<TypeSignature> sig = boost::none)
+    explicit SbSlot(SlotId slotId, boost::optional<TypeSignature> sig = boost::none)
         : slotId(slotId), typeSig(sig) {}
 
     bool isVarExpr() const {
@@ -131,6 +135,11 @@ struct SbSlot {
 };
 
 /**
+ * The SbSlotVector is SbExpr's equivalent of the 'sbe::value::SlotVector' type.
+ */
+using SbSlotVector = absl::InlinedVector<SbSlot, 2>;
+
+/**
  * The SbLocalVar class is used to represent local variables in the SBE stage builder. "SbLocalVar"
  * is short for "stage builder local variable".
  */
@@ -141,7 +150,9 @@ public:
 
     SbLocalVar() = default;
 
-    SbLocalVar(FrameId frameId, SlotId slotId, boost::optional<TypeSignature> sig = boost::none)
+    explicit SbLocalVar(FrameId frameId,
+                        SlotId slotId,
+                        boost::optional<TypeSignature> sig = boost::none)
         : _frameId(frameId), _slotId(slotId), _typeSig(sig) {}
 
     bool isVarExpr() const {
@@ -199,10 +210,12 @@ public:
     using SlotId = sbe::value::SlotId;
     using FrameId = sbe::FrameId;
 
-    SbVar(SlotId slotId, boost::optional<TypeSignature> typeSig = boost::none)
+    explicit SbVar(SlotId slotId, boost::optional<TypeSignature> typeSig = boost::none)
         : _slotId(slotId), _typeSig(typeSig) {}
 
-    SbVar(FrameId frameId, SlotId slotId, boost::optional<TypeSignature> typeSig = boost::none)
+    explicit SbVar(FrameId frameId,
+                   SlotId slotId,
+                   boost::optional<TypeSignature> typeSig = boost::none)
         : _frameId(frameId), _slotId(slotId), _typeSig(typeSig) {}
 
     SbVar(const sbe::EVariable& var, boost::optional<TypeSignature> typeSig = boost::none)
@@ -330,6 +343,13 @@ public:
         return seq;
     }
 
+    template <typename... Args>
+    static SbSlotVector makeSV(Args&&... args) {
+        SbSlotVector sv;
+        (sv.emplace_back(std::forward<Args>(args)), ...);
+        return sv;
+    }
+
     SbExpr() noexcept = default;
 
     SbExpr(SbExpr&& e) noexcept : _storage(std::move(e._storage)), _typeSig(e._typeSig) {
@@ -361,7 +381,7 @@ public:
         }
     }
 
-    SbExpr(SlotId s, boost::optional<TypeSignature> typeSig = boost::none) noexcept
+    explicit SbExpr(SlotId s, boost::optional<TypeSignature> typeSig = boost::none) noexcept
         : _storage(s), _typeSig(typeSig) {}
 
     SbExpr(boost::optional<SbSlot> s) : SbExpr(s ? SbExpr{*s} : SbExpr{}) {}
@@ -430,12 +450,6 @@ public:
         } else {
             set(var.toLocalVar());
         }
-        return *this;
-    }
-
-    SbExpr& operator=(SlotId s) noexcept {
-        _storage = s;
-        _typeSig.reset();
         return *this;
     }
 
@@ -599,13 +613,10 @@ using SbStage = std::unique_ptr<sbe::PlanStage>;
  * For a number of EExpression-related structures, we have corresponding "SbExpr" versions
  * of these structures. Here is a list:
  *    EExpression::Vector -> SbExpr::Vector
- *    SlotVector          -> SbSlotVector
  *    SlotExprPairVector  -> SbExprSbSlotVector or SbExprOptSbSlotVector
  *    AggExprPair         -> SbAggExpr
  *    AggExprVector       -> SbAggExprVector
  */
-using SbSlotVector = absl::InlinedVector<SbSlot, 2>;
-
 using SbExprSbSlotPair = std::pair<SbExpr, SbSlot>;
 using SbExprSbSlotVector = std::vector<SbExprSbSlotPair>;
 

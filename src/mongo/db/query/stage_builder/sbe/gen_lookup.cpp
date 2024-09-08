@@ -84,6 +84,7 @@
 #include "mongo/db/query/query_solution.h"
 #include "mongo/db/query/stage_builder/sbe/builder.h"
 #include "mongo/db/query/stage_builder/sbe/gen_helpers.h"
+#include "mongo/db/query/stage_builder/sbe/gen_projection.h"
 #include "mongo/db/query/stage_builder/sbe/sbexpr_helpers.h"
 #include "mongo/db/query/stage_types.h"
 #include "mongo/db/query/util/make_data_structure.h"
@@ -95,15 +96,12 @@
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
 
-
 namespace mongo::stage_builder {
+
 /**
  * Helpers for building $lookup.
  */
 namespace {
-using namespace sbe;
-using namespace sbe::value;
-
 /**
  * De-facto MQL semantics for matching local or foreign records to 'null' is complex and therefore
  * is causing complex SBE trees to implement it. This comment describes the semantics.
@@ -136,7 +134,7 @@ using namespace sbe::value;
  * 1. there is a terminal with value 'null' or a value of array that contains 'null'. For example,
  *    if localField:"a.b", the following records would match:
  *      {a: {b: null}}
- *      {a: {b: [1, null, 2]}
+ *      {a: {b: [1, null, 2]}}
  *      {a: [{b: [1, null, 2]}, {b: 3}]}
  *
  * 2. all terminals are either missing or have value of an empty array. For example, if
@@ -156,7 +154,7 @@ using namespace sbe::value;
  * 1. (same as when matching local) there is a terminal with value 'null' or a value of array that
  *    contains 'null'. For example, if foreignField:'a.b', the following records would match:
  *      {a: {b: null}}
- *      {a: {b: [1, null, 2]}
+ *      {a: {b: [1, null, 2]}}
  *      {a: [{b: [1, null, 2]}, {b: 3}]}
  *
  * 2. there is a missing terminal, such that the last value on the resolved path to this terminal
@@ -165,7 +163,7 @@ using namespace sbe::value;
  *      {a: {b: {no_c: 1}}} // a.b._ last value {no_c: 1} isn't a scalar
  *      {a: {b: 1}} // a.b._ last value 1 is a scalar but it's not inside an array
  *      {a: [{b: {no_c: 1}}, {b: {c: 2}}]} // a.0.b._ last value {no_c: 1} isn't a scalar
- *      {a: [{b: [{c: 1}, {c: 2}]}, {b: [{c: 3}, {no_c: 4}]]} // a.1.b.1._ last value {no_c: 4}
+ *      {a: [{b: [{c: 1}, {c: 2}]}, {b: [{c: 3}, {no_c: 4}]}]} // a.1.b.1._ last value {no_c: 4}
  *      {a: 1} // a._ last value 1 is a scalar but it's not inside an array
  *      {no_a: 1} // _ last value {no_a: 1} isn't a scalar
  *
@@ -203,7 +201,7 @@ SbExpr generateLocalKeyStream(SbExpr inputExpr,
     // Generate an expression to read a sub-field at the current nested level.
     SbExpr fieldName = b.makeStrConstant(fp.getFieldName(level));
     SbExpr fieldExpr = topLevelFieldSlot
-        ? b.makeVariable(*topLevelFieldSlot)
+        ? SbExpr{*topLevelFieldSlot}
         : b.makeFunction("getField"_sd, std::move(inputExpr), std::move(fieldName));
 
     if (level == fp.getPathLength() - 1) {
@@ -212,10 +210,9 @@ SbExpr generateLocalKeyStream(SbExpr inputExpr,
     }
 
     // Generate nested traversal.
-    FrameId lambdaFrameId = state.frameId();
-    SbExpr lambdaParam = b.makeVariable(lambdaFrameId, 0);
+    sbe::FrameId lambdaFrameId = state.frameId();
 
-    SbExpr resultExpr = generateLocalKeyStream(std::move(lambdaParam), fp, level + 1, state);
+    SbExpr resultExpr = generateLocalKeyStream(SbLocalVar{lambdaFrameId, 0}, fp, level + 1, state);
 
     SbExpr lambdaExpr = b.makeLocalLambda(lambdaFrameId, std::move(resultExpr));
 
@@ -234,7 +231,7 @@ SbExpr generateLocalKeyStream(SbExpr inputExpr,
     //     {a: {b:[1, [2]]} }
     // The result would be [1, [2]] that is already in the correct form and should not be processed
     // with unwindArray, or the result would be an incorrect [1, 2].
-    FrameId traverseFrameId = state.frameId();
+    sbe::FrameId traverseFrameId = state.frameId();
     return b.makeLet(traverseFrameId,
                      makeVector(std::move(fieldExpr),
                                 b.makeFunction("traverseP"_sd,
@@ -258,57 +255,60 @@ SbExpr generateLocalKeyStream(SbExpr inputExpr,
 // Replaces other missing terminals with 'null', that is, if the record in the 'inputSlot' is:
 //     {a: [{b:1}, {b:[]}, {no_b:42}, {b:2}]},
 // the returned values for path "a.b" will be streamed as: 1, [], null, 2.
-std::pair<SlotId /* keyValueSlot */, std::unique_ptr<sbe::PlanStage>> buildForeignKeysStream(
-    SlotId inputSlot,
-    const FieldPath& fp,
-    const PlanNodeId nodeId,
-    SlotIdGenerator& slotIdGenerator) {
+std::pair<SbSlot /* keyValueSlot */, SbStage> buildForeignKeysStream(SbSlot inputSlot,
+                                                                     const FieldPath& fp,
+                                                                     const PlanNodeId nodeId,
+                                                                     StageBuilderState& state) {
+    SbBuilder b(state, nodeId);
+
     const FieldIndex numParts = fp.getPathLength();
 
-    SlotId keyValueSlot = inputSlot;
-    SlotId prevKeyValueSlot = inputSlot;
-    std::unique_ptr<sbe::PlanStage> currentStage = makeLimitCoScanTree(nodeId, 1);
+    SbSlot keyValueSlot = inputSlot;
+    SbSlot prevKeyValueSlot = inputSlot;
+    SbStage currentStage = b.makeLimitOneCoScanTree();
 
     for (size_t i = 0; i < numParts; i++) {
         const StringData fieldName = fp.getFieldName(i);
 
-        std::unique_ptr<EExpression> getFieldFromObject;
+        SbExpr getFieldFromObject;
         if (i == 0) {
             // 'inputSlot' must contain a document and, by definition, it's not inside an array, so
             // can get field unconditionally.
-            getFieldFromObject = makeFillEmptyNull(makeFunction(
-                "getField"_sd, makeVariable(keyValueSlot), makeStrConstant(fieldName)));
+            getFieldFromObject = b.makeFillEmptyNull(
+                b.makeFunction("getField"_sd, keyValueSlot, b.makeStrConstant(fieldName)));
         } else {
             // Don't get field from scalars inside arrays (it would fail but we also don't want to
             // fill with "null" in this case to match the MQL semantics described above.)
-            std::unique_ptr<EExpression> shouldGetField =
-                makeBinaryOp(EPrimBinary::logicOr,
-                             makeFunction("isObject", makeVariable(keyValueSlot)),
-                             makeUnaryOp(EPrimUnary::logicNot,
-                                         makeFunction("isArray", makeVariable(prevKeyValueSlot))));
-            getFieldFromObject = makeE<EIf>(
-                std::move(shouldGetField),
-                makeFillEmptyNull(makeFunction(
-                    "getField"_sd, makeVariable(keyValueSlot), makeStrConstant(fieldName))),
-                makeNothingConstant());
+            SbExpr shouldGetField =
+                b.makeBinaryOp(sbe::EPrimBinary::logicOr,
+                               b.makeFunction("isObject", keyValueSlot),
+                               b.makeUnaryOp(sbe::EPrimUnary::logicNot,
+                                             b.makeFunction("isArray", prevKeyValueSlot)));
+
+            getFieldFromObject =
+                b.makeIf(std::move(shouldGetField),
+                         b.makeFillEmptyNull(b.makeFunction(
+                             "getField"_sd, keyValueSlot, b.makeStrConstant(fieldName))),
+                         b.makeNothingConstant());
         }
 
-        SlotId getFieldSlot = slotIdGenerator.generate();
-        currentStage = makeProjectStage(
-            std::move(currentStage), nodeId, getFieldSlot, std::move(getFieldFromObject));
+        auto [outStage, outSlots] =
+            b.makeProject(std::move(currentStage), std::move(getFieldFromObject));
+        currentStage = std::move(outStage);
+        SbSlot getFieldSlot = outSlots[0];
+
         keyValueSlot = getFieldSlot;
 
         // For the terminal array we will do the extra work of adding the array itself to the stream
         // (see below) but for the non-termial path components we only need to unwind array
         // elements.
         if (i + 1 < numParts) {
-            SlotId unwindOutputSlot = slotIdGenerator.generate();
-            currentStage = makeS<UnwindStage>(std::move(currentStage) /* child stage */,
-                                              keyValueSlot,
-                                              unwindOutputSlot,
-                                              slotIdGenerator.generate() /* outIndex */,
-                                              true /* preserveNullAndEmptyArrays */,
-                                              nodeId);
+            constexpr bool preserveNullAndEmptyArrays = true;
+
+            auto [outStage, unwindOutputSlot, _] =
+                b.makeUnwind(std::move(currentStage), keyValueSlot, preserveNullAndEmptyArrays);
+            currentStage = std::move(outStage);
+
             prevKeyValueSlot = keyValueSlot;
             keyValueSlot = unwindOutputSlot;
         }
@@ -346,42 +346,35 @@ std::pair<SlotId /* keyValueSlot */, std::unique_ptr<sbe::PlanStage>> buildForei
     //           # If s17 isn't an array, don't need to do anything and simply return s17.
     //           [s17] [2] limit 1
     //                 [2] coscan
+    constexpr bool preserveNullAndEmptyArrays = true;
 
-    SlotId terminalUnwindOutputSlot = slotIdGenerator.generate();
-    std::unique_ptr<sbe::PlanStage> terminalUnwind =
-        makeS<UnwindStage>(makeLimitCoScanTree(nodeId, 1) /* child stage */,
-                           keyValueSlot,
-                           terminalUnwindOutputSlot,
-                           slotIdGenerator.generate() /* outIndex */,
-                           true /* preserveNullAndEmptyArrays */,
-                           nodeId);
+    auto [terminalUnwind, terminalUnwindOutputSlot, _] =
+        b.makeUnwind(b.makeLimitOneCoScanTree(), keyValueSlot, preserveNullAndEmptyArrays);
 
-    SlotId unionOutputSlot = slotIdGenerator.generate();
     sbe::PlanStage::Vector terminalStagesToUnion;
     terminalStagesToUnion.push_back(std::move(terminalUnwind));
-    terminalStagesToUnion.emplace_back(makeLimitCoScanTree(nodeId, 1));
+    terminalStagesToUnion.emplace_back(b.makeLimitOneCoScanTree());
 
-    std::unique_ptr<sbe::PlanStage> unionStage =
-        makeS<UnionStage>(std::move(terminalStagesToUnion),
-                          std::vector{makeSV(terminalUnwindOutputSlot), makeSV(keyValueSlot)},
-                          makeSV(unionOutputSlot),
-                          nodeId);
+    auto [unionStage, unionOutputSlots] = b.makeUnion(
+        std::move(terminalStagesToUnion),
+        std::vector{SbExpr::makeSV(terminalUnwindOutputSlot), SbExpr::makeSV(keyValueSlot)});
 
-    SlotId maybeUnionOutputSlot = slotIdGenerator.generate();
-    unionStage = makeS<BranchStage>(std::move(unionStage),
-                                    makeLimitCoScanTree(nodeId, 1),
-                                    makeFunction("isArray", makeVariable(keyValueSlot)),
-                                    SlotVector{unionOutputSlot},
-                                    SlotVector{keyValueSlot},
-                                    SlotVector{maybeUnionOutputSlot},
-                                    nodeId);
+    auto unionOutputSlot = unionOutputSlots[0];
 
-    currentStage = makeS<LoopJoinStage>(std::move(currentStage),
-                                        std::move(unionStage),
-                                        makeSV() /* outerProjects */,
-                                        makeSV(keyValueSlot) /* outerCorrelated */,
-                                        nullptr /* predicate */,
-                                        nodeId);
+    auto maybeUnionOutputSlot = SbSlot{state.slotId()};
+    unionStage =
+        sbe::makeS<sbe::BranchStage>(std::move(unionStage),
+                                     b.makeLimitOneCoScanTree(),
+                                     b.makeFunction("isArray", keyValueSlot).extractExpr(state),
+                                     sbe::makeSV(unionOutputSlot.getId()),
+                                     sbe::makeSV(keyValueSlot.getId()),
+                                     sbe::makeSV(maybeUnionOutputSlot.getId()),
+                                     nodeId);
+
+    currentStage = b.makeLoopJoin(std::move(currentStage),
+                                  std::move(unionStage),
+                                  {} /* outerProjects */,
+                                  SbExpr::makeSV(keyValueSlot) /* outerCorrelated */);
     keyValueSlot = maybeUnionOutputSlot;
 
     return {keyValueSlot, std::move(currentStage)};
@@ -389,9 +382,18 @@ std::pair<SlotId /* keyValueSlot */, std::unique_ptr<sbe::PlanStage>> buildForei
 
 // Returns the vector of local slots to be used in lookup join, including the record slot and
 // metadata slots produced by local side.
-sbe::value::SlotVector buildLocalSlots(StageBuilderState& state, SlotId localRecordSlot) {
-    auto slots = state.data->metadataSlots.getSlotVector();
+SbSlotVector buildLocalSlots(StageBuilderState& state, SbSlot localRecordSlot) {
+    auto metadataSlotIds = state.data->metadataSlots.getSlotVector();
+
+    SbSlotVector slots;
+    slots.reserve(metadataSlotIds.size() + 1);
+
+    for (auto slotId : metadataSlotIds) {
+        slots.push_back(SbSlot{slotId});
+    }
+
     slots.push_back(localRecordSlot);
+
     return slots;
 }
 
@@ -402,160 +404,161 @@ sbe::value::SlotVector buildLocalSlots(StageBuilderState& state, SlotId localRec
 // If the stream produces no values, that is, would result in an empty set, the empty set is
 // replaced with a set that contains a single 'null' value, so that it matches MQL semantics when
 // empty arrays and all missing are matched to 'null'.
-std::pair<SlotId /* keyValuesSetSlot */, std::unique_ptr<sbe::PlanStage>> buildKeySet(
+std::pair<SbSlot /* keyValuesSetSlot */, SbStage> buildKeySet(
     StageBuilderState& state,
     JoinSide joinSide,
-    std::unique_ptr<sbe::PlanStage> inputStage,
-    SlotId recordSlot,
+    SbStage inputStage,
+    SbSlot recordSlot,
     const FieldPath& fp,
-    boost::optional<SlotId> collatorSlot,
-    PlanYieldPolicy* yieldPolicy,
-    const PlanNodeId nodeId,
-    SlotIdGenerator& slotIdGenerator) {
-    if (joinSide == JoinSide::Local) {
-        auto [arrayWithNullTag, arrayWithNullVal] = makeNewArray();
-        value::Array* arrayWithNullView = getArrayView(arrayWithNullVal);
-        arrayWithNullView->push_back(TypeTags::Null, 0);
+    boost::optional<sbe::value::SlotId> collatorSlot,
+    const PlanNodeId nodeId) {
+    SbBuilder b(state, nodeId);
 
-        SbExprBuilder b(state);
-        FrameId varSlot = state.frameId();
+    if (joinSide == JoinSide::Local) {
+        auto [arrayWithNullTag, arrayWithNullVal] = sbe::value::makeNewArray();
+        sbe::value::Array* arrayWithNullView = sbe::value::getArrayView(arrayWithNullVal);
+        arrayWithNullView->push_back(sbe::value::TypeTags::Null, 0);
+
+        sbe::FrameId frameId = state.frameId();
         // The array returned by the expression generated by generateLocalKeyStream might end up
         // empty if the localField contained only missing and empty arrays (e.g. path "a.b" in {a:
         // [{no_b:1}, {b:[]}]}). The semantics of MQL for local keys require these cases to match to
         // 'null', so we replace the empty array with a constant array that contains a single 'null'
         // value.
         SbExpr expr = b.makeLet(
-            varSlot,
+            frameId,
             makeVector(generateLocalKeyStream(SbExpr{recordSlot}, fp, 0, state)),
-            b.makeIf(b.makeFillEmptyFalse(b.makeFunction("isArray"_sd, SbLocalVar{varSlot, 0})),
-                     b.makeIf(b.makeFunction("isArrayEmpty"_sd, SbLocalVar{varSlot, 0}),
+            b.makeIf(b.makeFillEmptyFalse(b.makeFunction("isArray"_sd, SbLocalVar{frameId, 0})),
+                     b.makeIf(b.makeFunction("isArrayEmpty"_sd, SbLocalVar{frameId, 0}),
                               b.makeConstant(arrayWithNullTag, arrayWithNullVal),
-                              SbLocalVar{varSlot, 0}),
-                     b.makeFunction("newArray"_sd, b.makeFillEmptyNull(SbLocalVar{varSlot, 0}))));
+                              SbLocalVar{frameId, 0}),
+                     b.makeFunction("newArray"_sd, b.makeFillEmptyNull(SbLocalVar{frameId, 0}))));
         // Convert the array into an ArraySet that has no duplicate keys.
         if (collatorSlot) {
-            expr =
-                b.makeFunction("collArrayToSet"_sd, makeVariable(*collatorSlot), std::move(expr));
+            expr = b.makeFunction("collArrayToSet"_sd, SbSlot{*collatorSlot}, std::move(expr));
         } else {
             expr = b.makeFunction("arrayToSet"_sd, std::move(expr));
         }
 
-        SlotId keyValueSlot = slotIdGenerator.generate();
-        inputStage =
-            makeProjectStage(std::move(inputStage), nodeId, keyValueSlot, expr.extractExpr(state));
+        auto [outStage, outSlots] = b.makeProject(std::move(inputStage), std::move(expr));
+        inputStage = std::move(outStage);
+
+        auto keyValueSlot = outSlots[0];
 
         return {keyValueSlot, std::move(inputStage)};
     }
     // Create the branch to stream individual key values from every terminal of the path.
-    auto [keyValueSlot, keyValuesStage] =
-        buildForeignKeysStream(recordSlot, fp, nodeId, slotIdGenerator);
+    auto [keyValueSlot, keyValuesStage] = buildForeignKeysStream(recordSlot, fp, nodeId, state);
 
     // Re-pack the individual key values into a set. We don't cap "addToSet" here because its
     // size is bounded by the size of the record.
-    SlotId keyValuesSetSlot = slotIdGenerator.generate();
-    SlotId spillSlot = slotIdGenerator.generate();
+    auto spillSlot = SbSlot{state.slotId()};
 
     auto addToSetExpr = collatorSlot
-        ? makeFunction("collAddToSet"_sd, makeVariable(*collatorSlot), makeVariable(keyValueSlot))
-        : makeFunction("addToSet"_sd, makeVariable(keyValueSlot));
+        ? b.makeFunction("collAddToSet"_sd, SbSlot{*collatorSlot}, keyValueSlot)
+        : b.makeFunction("addToSet"_sd, keyValueSlot);
 
     auto aggSetUnionExpr = collatorSlot
-        ? makeFunction("aggCollSetUnion"_sd, makeVariable(*collatorSlot), makeVariable(spillSlot))
-        : makeFunction("aggSetUnion"_sd, makeVariable(spillSlot));
+        ? b.makeFunction("aggCollSetUnion"_sd, SbSlot{*collatorSlot}, spillSlot)
+        : b.makeFunction("aggSetUnion"_sd, spillSlot);
 
-    auto packedKeyValuesStage = makeHashAgg(
-        std::move(keyValuesStage),
-        makeSV(), /* groupBy slots - "none" means creating a single group */
-        makeAggExprVector(keyValuesSetSlot, nullptr, std::move(addToSetExpr)),
-        boost::none /* we group _all_ key values into a single set, so collator is irrelevant */,
-        state.allowDiskUse,
-        makeSlotExprPairVec(spillSlot, std::move(aggSetUnionExpr)),
-        yieldPolicy,
-        nodeId);
+    SbAggExprVector sbAggExprs;
+    sbAggExprs.emplace_back(
+        SbAggExpr{SbExpr{} /* init */, SbExpr{} /* blockAgg */, std::move(addToSetExpr)},
+        boost::none);
 
-    value::SlotVector outerProjects = makeSV(recordSlot);
+    SbExprSbSlotVector mergingExprs;
+    mergingExprs.emplace_back(std::move(aggSetUnionExpr), spillSlot);
+
+    auto [packedKeyValuesStage, _, aggOutSlots] =
+        b.makeHashAgg(std::move(keyValuesStage),
+                      {}, /* groupBy slots - an empty vector means creating a single group */
+                      std::move(sbAggExprs),
+                      {}, /* We group _all_ key values to a single set so we can ignore collation */
+                      std::move(mergingExprs));
+
+    SbSlot keyValuesSetSlot = aggOutSlots[0];
+
     // Attach the set of key values to the original local record.
     auto nljLocalWithKeyValuesSet =
-        makeS<LoopJoinStage>(std::move(inputStage),
-                             std::move(packedKeyValuesStage),  // NOLINT(bugprone-use-after-move)
-                             outerProjects,
-                             makeSV(recordSlot) /* outerCorrelated */,
-                             nullptr /* predicate */,
-                             nodeId);
+        b.makeLoopJoin(std::move(inputStage),
+                       std::move(packedKeyValuesStage),  // NOLINT(bugprone-use-after-move)
+                       SbExpr::makeSV(recordSlot),
+                       SbExpr::makeSV(recordSlot) /* outerCorrelated */);
 
     return {keyValuesSetSlot, std::move(nljLocalWithKeyValuesSet)};
 }
 
 // Creates stages for grouping matched foreign records into an array. If there's no match, the
 // stages return an empty array instead.
-std::pair<SlotId /* resultSlot */, std::unique_ptr<sbe::PlanStage>> buildForeignMatchedArray(
-    std::unique_ptr<sbe::PlanStage> innerBranch,
-    SlotId foreignRecordSlot,
-    PlanYieldPolicy* yieldPolicy,
-    const PlanNodeId nodeId,
-    SlotIdGenerator& slotIdGenerator,
-    bool allowDiskUse) {
+std::pair<SbSlot /* resultSlot */, SbStage> buildForeignMatchedArray(SbStage innerBranch,
+                                                                     SbSlot foreignRecordSlot,
+                                                                     const PlanNodeId nodeId,
+                                                                     StageBuilderState& state) {
+    SbBuilder b(state, nodeId);
+
     // $lookup's aggregates the matching records into an array. We currently don't have a stage
     // that could do this grouping _after_ Nlj, so we achieve it by having a hash_agg inside the
     // inner branch that aggregates all matched records into a single accumulator. When there
     // are no matches, return an empty array.
     const int sizeCap = internalLookupStageIntermediateDocumentMaxSizeBytes.load();
-    SlotId accumulatorSlot = slotIdGenerator.generate();
-    SlotId spillSlot = slotIdGenerator.generate();
-    innerBranch = makeHashAgg(
-        std::move(innerBranch),
-        makeSV(), /* groupBy slots */
-        makeAggExprVector(accumulatorSlot,
-                          nullptr,
-                          makeFunction("addToArrayCapped"_sd,
-                                       makeVariable(foreignRecordSlot),
-                                       makeInt32Constant(sizeCap))),
-        {} /* collatorSlot, no collation here because we want to return all matches "as is" */,
-        allowDiskUse,
-        makeSlotExprPairVec(spillSlot,
-                            makeFunction("aggConcatArraysCapped",
-                                         makeVariable(spillSlot),
-                                         makeInt32Constant(sizeCap))),
-        yieldPolicy,
-        nodeId);
+    auto spillSlot = SbSlot{state.slotId()};
+
+    auto addToArrayExpr =
+        b.makeFunction("addToArrayCapped"_sd, foreignRecordSlot, b.makeInt32Constant(sizeCap));
+    SbAggExprVector sbAggExprs;
+    sbAggExprs.emplace_back(
+        SbAggExpr{SbExpr{} /* init */, SbExpr{} /* blockAgg */, std::move(addToArrayExpr)},
+        boost::none);
+
+    SbExprSbSlotVector mergingExprs;
+    mergingExprs.emplace_back(
+        b.makeFunction("aggConcatArraysCapped", spillSlot, b.makeInt32Constant(sizeCap)),
+        spillSlot);
+
+    auto [hashAggStage, _, aggOutSlots] = b.makeHashAgg(std::move(innerBranch),
+                                                        {}, /* groupBy slots */
+                                                        std::move(sbAggExprs),
+                                                        {}, /* collatorSlot */
+                                                        std::move(mergingExprs));
+    innerBranch = std::move(hashAggStage);
+    SbSlot accumulatorSlot = aggOutSlots[0];
 
     // 'accumulatorSlot' is either Nothing or contains an array of size two, where the front element
     // is the array of matched records and the back element is their cumulative size (in bytes).
-    SlotId matchedRecordsSlot = slotIdGenerator.generate();
-    innerBranch = makeProject(
+    auto [projectStage, projectOutSlots] = b.makeProject(
         std::move(innerBranch),
-        nodeId,
-        matchedRecordsSlot,
-        makeFunction("getElement",
-                     makeVariable(accumulatorSlot),
-                     makeInt32Constant(static_cast<int>(vm::AggArrayWithSize::kValues))));
+        b.makeFunction("getElement",
+                       accumulatorSlot,
+                       b.makeInt32Constant(static_cast<int>(sbe::vm::AggArrayWithSize::kValues))));
+    innerBranch = std::move(projectStage);
+    SbSlot matchedRecordsSlot = projectOutSlots[0];
 
     // $lookup is an _outer_ left join that returns an empty array for "as" field rather than
     // dropping the unmatched local records. The branch that accumulates the matched records into an
     // array returns either 1 or 0 results, so to return an empty array for no-matches case we union
     // this branch with a const scan that produces an empty array but limit it to 1, so if the given
     // branch does produce a record, only that record is returned.
-    auto [emptyArrayTag, emptyArrayVal] = makeNewArray();
+    auto [emptyArrayTag, emptyArrayVal] = sbe::value::makeNewArray();
     // Immediately take ownership of the new array (we could use a ValueGuard here but we'll
     // need the constant below anyway).
-    std::unique_ptr<EExpression> emptyArrayConst = makeConstant(emptyArrayTag, emptyArrayVal);
+    SbExpr emptyArrayConst = b.makeConstant(emptyArrayTag, emptyArrayVal);
 
-    SlotId emptyArraySlot = slotIdGenerator.generate();
-    std::unique_ptr<sbe::PlanStage> emptyArrayStage = makeProjectStage(
-        makeLimitCoScanTree(nodeId, 1), nodeId, emptyArraySlot, std::move(emptyArrayConst));
+    auto [emptyArrayStage, emptyArrayOutSlots] =
+        b.makeProject(b.makeLimitOneCoScanTree(), std::move(emptyArrayConst));
+    SbSlot emptyArraySlot = emptyArrayOutSlots[0];
 
-    SlotId unionOutputSlot = slotIdGenerator.generate();
+    auto unionInputs =
+        makeVector(SbExpr::makeSV(matchedRecordsSlot), SbExpr::makeSV(emptyArraySlot));
 
-    auto unionStage = sbe::makeS<sbe::UnionStage>(
-        sbe::makeSs(std::move(innerBranch), std::move(emptyArrayStage)),
-        makeVector(makeSV(matchedRecordsSlot), makeSV(emptyArraySlot)) /* inputs */,
-        makeSV(unionOutputSlot),
-        nodeId);
+    auto [unionStage, unionOutputSlots] = b.makeUnion(
+        sbe::makeSs(std::move(innerBranch), std::move(emptyArrayStage)), std::move(unionInputs));
 
-    return std::make_pair(
-        unionOutputSlot,
-        sbe::makeS<sbe::LimitSkipStage>(
-            std::move(unionStage), makeInt64Constant(1) /*limit*/, nullptr /*skip*/, nodeId));
+    auto unionOutputSlot = unionOutputSlots[0];
+
+    auto limitStage = b.makeLimit(std::move(unionStage), b.makeInt64Constant(1));
+
+    return {unionOutputSlot, std::move(limitStage)};
 }  // buildForeignMatchedArray
 
 /**
@@ -601,20 +604,19 @@ std::pair<SlotId /* resultSlot */, std::unique_ptr<sbe::PlanStage>> buildForeign
  * branch1[emptySlot] project [emptySlot = []] limit 1 coscan
  * ]
  */
-std::pair<SlotId /* matched docs */, std::unique_ptr<sbe::PlanStage>> buildForeignMatches(
-    SlotId localKeySlot,
-    std::unique_ptr<sbe::PlanStage> foreignStage,
-    SlotId foreignRecordSlot,
-    const FieldPath& foreignFieldName,
-    PlanYieldPolicy* yieldPolicy,
-    const PlanNodeId nodeId,
-    SlotIdGenerator& slotIdGenerator,
-    FrameIdGenerator& frameIdGenerator,
-    bool allowDiskUse,
-    bool hasUnwindSrc) {
-    auto frameId = frameIdGenerator.generate();
-    auto lambdaArg = makeVariable(frameId, 0);
-    auto filter = makeFunction("isMember"_sd, lambdaArg->clone(), makeVariable(localKeySlot));
+std::pair<SbSlot /* matched docs */, SbStage> buildForeignMatches(SbSlot localKeySlot,
+                                                                  SbStage foreignStage,
+                                                                  SbSlot foreignRecordSlot,
+                                                                  const FieldPath& foreignFieldName,
+                                                                  const PlanNodeId nodeId,
+                                                                  StageBuilderState& state,
+                                                                  bool hasUnwindSrc) {
+    SbBuilder b(state, nodeId);
+
+    auto frameId = state.frameId();
+
+    auto lambdaArg = SbExpr{SbVar{frameId, 0}};
+    auto filter = b.makeFunction("isMember"_sd, lambdaArg.clone(), localKeySlot);
 
     // Recursively create traverseF expressions to iterate elements in 'foreignRecordSlot' with path
     // 'foreignFieldName', and check if key is in set 'localKeySlot'.
@@ -623,80 +625,76 @@ std::pair<SlotId /* matched docs */, std::unique_ptr<sbe::PlanStage>> buildForei
     // the array.
     const int32_t foreignPathLength = foreignFieldName.getPathLength();
     for (int32_t i = foreignPathLength - 1; i >= 0; --i) {
-        auto arrayLambda = makeE<ELocalLambda>(frameId, std::move(filter));
-        frameId = frameIdGenerator.generate();
-        lambdaArg = i == 0 ? makeVariable(foreignRecordSlot) : makeVariable(frameId, 0);
+        auto arrayLambda = b.makeLocalLambda(frameId, std::move(filter));
 
-        auto getFieldOrNull = makeFillEmptyNull(makeFunction(
-            "getField"_sd, lambdaArg->clone(), makeStrConstant(foreignFieldName.getFieldName(i))));
+        frameId = state.frameId();
+        lambdaArg = i == 0 ? SbExpr{foreignRecordSlot} : SbExpr{SbVar{frameId, 0}};
+
+        auto getFieldOrNull = b.makeFillEmptyNull(b.makeFunction(
+            "getField"_sd, lambdaArg.clone(), b.makeStrConstant(foreignFieldName.getFieldName(i))));
 
         // Non object/array field will be converted into Nothing, passing along recursive traverseF
         // and will be treated as null to compared against local key set.
         if (i != foreignPathLength - 1) {
-            getFieldOrNull = makeLocalBind(
-                &frameIdGenerator,
-                [&](sbe::EVariable var) {
-                    return sbe::makeE<sbe::EIf>(
-                        makeFunction("typeMatch"_sd,
-                                     var.clone(),
-                                     makeInt32Constant(getBSONTypeMask(BSONType::Array) |
-                                                       getBSONTypeMask(BSONType::Object))),
-                        var.clone(),
-                        makeNothingConstant());
-                },
-                std::move(getFieldOrNull));
+            auto localBindFrameId = state.frameId();
+
+            auto binds = SbExpr::makeSeq(std::move(getFieldOrNull));
+            SbVar var = SbVar{localBindFrameId, 0};
+
+            auto innerExpr =
+                b.makeIf(b.makeFunction("typeMatch"_sd,
+                                        var,
+                                        b.makeInt32Constant(getBSONTypeMask(BSONType::Array) |
+                                                            getBSONTypeMask(BSONType::Object))),
+                         var,
+                         b.makeNothingConstant());
+
+            getFieldOrNull = b.makeLet(localBindFrameId, std::move(binds), std::move(innerExpr));
         }
 
-        filter = makeFunction("traverseF"_sd,
-                              std::move(getFieldOrNull),
-                              std::move(arrayLambda),
-                              makeBoolConstant(i == foreignPathLength - 1) /*compareArray*/);
+        filter = b.makeFunction("traverseF"_sd,
+                                std::move(getFieldOrNull),
+                                std::move(arrayLambda),
+                                b.makeBoolConstant(i == foreignPathLength - 1) /*compareArray*/);
 
         if (i > 0) {
             // Ignoring the nulls produced by missing field in array.
-            filter =
-                sbe::makeE<sbe::EIf>(makeBinaryOp(sbe::EPrimBinary::fillEmpty,
-                                                  makeFunction("isObject"_sd, lambdaArg->clone()),
-                                                  makeBoolConstant(true)),
-                                     std::move(filter),
-                                     makeBoolConstant(false));
+            filter = b.makeIf(b.makeBinaryOp(sbe::EPrimBinary::fillEmpty,
+                                             b.makeFunction("isObject"_sd, lambdaArg.clone()),
+                                             b.makeBoolConstant(true)),
+                              std::move(filter),
+                              b.makeBoolConstant(false));
         }
     }
 
-    std::unique_ptr<sbe::PlanStage> foreignOutputStage =
-        sbe::makeS<sbe::FilterStage<false>>(std::move(foreignStage), std::move(filter), nodeId);
+    SbStage foreignOutputStage = b.makeFilter(std::move(foreignStage), std::move(filter));
     if (hasUnwindSrc) {
         // $LU [$lookup, $unwind] pattern: The query immediately unwinds the lookup result array. We
         // implement this efficiently by returning a record for each individual foreign match one by
         // one, like a SQL join, instead of accumulating them into an array and then unwinding it.
-        return std::make_pair(foreignRecordSlot, std::move(foreignOutputStage));
+        return {foreignRecordSlot, std::move(foreignOutputStage)};
     } else {
         // Plain $lookup: Assemble the matched foreign documents into an array. This creates a union
         // stage internally so that when there are no matching foreign records, an empty array will
         // be returned.
-        return buildForeignMatchedArray(std::move(foreignOutputStage),
-                                        foreignRecordSlot,
-                                        yieldPolicy,
-                                        nodeId,
-                                        slotIdGenerator,
-                                        allowDiskUse);
+        return buildForeignMatchedArray(
+            std::move(foreignOutputStage), foreignRecordSlot, nodeId, state);
     }
 }  // buildForeignMatches
 
-std::pair<SlotId /* matched docs */, std::unique_ptr<sbe::PlanStage>> buildNljLookupStage(
+std::pair<SbSlot /* matched docs */, SbStage> buildNljLookupStage(
     StageBuilderState& state,
-    std::unique_ptr<sbe::PlanStage> localStage,
-    SlotId localRecordSlot,
+    SbStage localStage,
+    SbSlot localRecordSlot,
     const FieldPath& localFieldName,
-    std::unique_ptr<sbe::PlanStage> foreignStage,
-    SlotId foreignRecordSlot,
+    SbStage foreignStage,
+    SbSlot foreignRecordSlot,
     const FieldPath& foreignFieldName,
-    boost::optional<SlotId> collatorSlot,
-    PlanYieldPolicy* yieldPolicy,
+    boost::optional<sbe::value::SlotId> collatorSlot,
     const PlanNodeId nodeId,
-    SlotIdGenerator& slotIdGenerator,
-    FrameIdGenerator& frameIdGenerator,
     bool hasUnwindSrc) {
+    SbBuilder b(state, nodeId);
+
     CurOp::get(state.opCtx)->debug().nestedLoopJoin += 1;
 
     // Build the outer branch that produces the set of local key values.
@@ -706,9 +704,7 @@ std::pair<SlotId /* matched docs */, std::unique_ptr<sbe::PlanStage>> buildNljLo
                                                       localRecordSlot,
                                                       localFieldName,
                                                       collatorSlot,
-                                                      yieldPolicy,
-                                                      nodeId,
-                                                      slotIdGenerator);
+                                                      nodeId);
 
     // Build the inner branch that will get the foreign key values, compare them to the local key
     // values and accumulate all matching foreign records into an array that is placed into
@@ -717,11 +713,8 @@ std::pair<SlotId /* matched docs */, std::unique_ptr<sbe::PlanStage>> buildNljLo
                                                                     std::move(foreignStage),
                                                                     foreignRecordSlot,
                                                                     foreignFieldName,
-                                                                    yieldPolicy,
                                                                     nodeId,
-                                                                    slotIdGenerator,
-                                                                    frameIdGenerator,
-                                                                    state.allowDiskUse,
+                                                                    state,
                                                                     hasUnwindSrc);
 
     // 'innerRootStage' should not participate in trial run tracking as the number of reads that
@@ -731,13 +724,11 @@ std::pair<SlotId /* matched docs */, std::unique_ptr<sbe::PlanStage>> buildNljLo
     // Connect the two branches with a nested loop join. For each outer record with a corresponding
     // value in the 'localKeySlot', the inner branch will be executed and will place the result into
     // 'matchedRecordsSlot'.
-    std::unique_ptr<sbe::PlanStage> nlj =
-        makeS<LoopJoinStage>(std::move(outerRootStage),
-                             std::move(innerRootStage),
-                             buildLocalSlots(state, localRecordSlot),
-                             makeSV(localKeySlot) /* outerCorrelated */,
-                             nullptr /* predicate */,
-                             nodeId);
+    SbStage nlj = b.makeLoopJoin(std::move(outerRootStage),
+                                 std::move(innerRootStage),
+                                 buildLocalSlots(state, localRecordSlot),
+                                 SbExpr::makeSV(localKeySlot) /* outerCorrelated */);
+
     return {matchedRecordsSlot, std::move(nlj)};
 }
 
@@ -782,20 +773,19 @@ std::pair<SlotId /* matched docs */, std::unique_ptr<sbe::PlanStage>> buildNljLo
  *   // Below is the tree performing path traversal on the 'foreignDocument' and producing value
  *   // into 'foreignValue'.
  */
-std::pair<SlotId, std::unique_ptr<sbe::PlanStage>> buildIndexJoinLookupStage(
+std::pair<SbSlot, SbStage> buildIndexJoinLookupStage(
     StageBuilderState& state,
-    std::unique_ptr<sbe::PlanStage> localStage,
-    SlotId localRecordSlot,
+    SbStage localStage,
+    SbSlot localRecordSlot,
     const FieldPath& localFieldName,
     const FieldPath& foreignFieldName,
     const CollectionPtr& foreignColl,
     const IndexEntry& index,
-    PlanYieldPolicySBE* yieldPolicy,
-    boost::optional<SlotId> collatorSlot,
+    boost::optional<sbe::value::SlotId> collatorSlot,
     const PlanNodeId nodeId,
-    SlotIdGenerator& slotIdGenerator,
-    FrameIdGenerator& frameIdGenerator,
     bool hasUnwindSrc) {
+    SbBuilder b(state, nodeId);
+
     CurOp::get(state.opCtx)->debug().indexedLoopJoin += 1;
 
     const auto foreignCollUUID = foreignColl->uuid();
@@ -819,18 +809,13 @@ std::pair<SlotId, std::unique_ptr<sbe::PlanStage>> buildIndexJoinLookupStage(
                                                              localRecordSlot,
                                                              localFieldName,
                                                              collatorSlot,
-                                                             yieldPolicy,
-                                                             nodeId,
-                                                             slotIdGenerator);
+                                                             nodeId);
 
     // Unwind local keys one by one into 'singleLocalValueSlot'.
-    auto singleLocalValueSlot = slotIdGenerator.generate();
-    auto unwindLocalKeysStage = makeS<UnwindStage>(makeLimitCoScanTree(nodeId, 1),
-                                                   localKeysSetSlot /* inSlot */,
-                                                   singleLocalValueSlot /* outField */,
-                                                   slotIdGenerator.generate() /* outIndex */,
-                                                   true /* preserveNullAndEmptyArrays */,
-                                                   nodeId);
+    constexpr bool preserveNullAndEmptyArrays = true;
+
+    auto [unwindLocalKeysStage, singleLocalValueSlot, _] =
+        b.makeUnwind(b.makeLimitOneCoScanTree(), localKeysSetSlot, preserveNullAndEmptyArrays);
 
     // We need to lookup value in 'singleLocalValueSlot' in the index defined on the foreign
     // collection. To do this, we need to generate set of point intervals corresponding to this
@@ -861,64 +846,53 @@ std::pair<SlotId, std::unique_ptr<sbe::PlanStage>> buildIndexJoinLookupStage(
     //
     // For array values, branches (1) and (2) both produce values. For all other types, only (2)
     // produces a value.
-    auto arrayBranchOutput = slotIdGenerator.generate();
-    auto arrayBranch = makeProjectStage(
-        makeLimitCoScanTree(nodeId, 1),
-        nodeId,
-        arrayBranchOutput,
-        makeBinaryOp(
-            sbe::EPrimBinary::fillEmpty,
-            makeFunction("getElement", makeVariable(singleLocalValueSlot), makeInt32Constant(0)),
-            makeConstant(TypeTags::bsonUndefined, 0)));
-    auto shouldProduceSeekForArray =
-        makeBinaryOp(EPrimBinary::logicAnd,
-                     makeFunction("isArray", makeVariable(singleLocalValueSlot)),
-                     makeUnaryOp(EPrimUnary::logicNot,
-                                 makeFunction("isMember",
-                                              makeVariable(arrayBranchOutput),
-                                              makeVariable(localKeysSetSlot))));
-    arrayBranch = makeS<FilterStage<false /*IsConst*/>>(
-        std::move(arrayBranch), std::move(shouldProduceSeekForArray), nodeId);
+    auto [arrayBranch, arrayBranchOutSlots] = b.makeProject(
+        b.makeLimitOneCoScanTree(),
+        b.makeBinaryOp(sbe::EPrimBinary::fillEmpty,
+                       b.makeFunction("getElement", singleLocalValueSlot, b.makeInt32Constant(0)),
+                       b.makeConstant(sbe::value::TypeTags::bsonUndefined, 0)));
+    SbSlot arrayBranchOutput = arrayBranchOutSlots[0];
 
-    auto valueBranchOutput = slotIdGenerator.generate();
-    auto valueBranch = makeProjectStage(makeLimitCoScanTree(nodeId, 1),
-                                        nodeId,
-                                        valueBranchOutput,
-                                        makeVariable(singleLocalValueSlot));
+    auto shouldProduceSeekForArray = b.makeBinaryOp(
+        sbe::EPrimBinary::logicAnd,
+        b.makeFunction("isArray", singleLocalValueSlot),
+        b.makeUnaryOp(sbe::EPrimUnary::logicNot,
+                      b.makeFunction("isMember", arrayBranchOutput, localKeysSetSlot)));
+    arrayBranch = b.makeFilter(std::move(arrayBranch), std::move(shouldProduceSeekForArray));
 
-    auto valueForIndexBounds = slotIdGenerator.generate();
-    auto valueGeneratorStage =
-        makeS<UnionStage>(makeSs(std::move(arrayBranch), std::move(valueBranch)),
-                          makeVector(makeSV(arrayBranchOutput), makeSV(valueBranchOutput)),
-                          makeSV(valueForIndexBounds),
-                          nodeId);
+    auto [valueBranch, valueBranchOutSlots] = b.makeProject(
+        b.makeLimitOneCoScanTree(), std::pair(SbExpr{singleLocalValueSlot}, state.slotId()));
+    SbSlot valueBranchOutput = valueBranchOutSlots[0];
+
+    auto [valueGeneratorStage, unionOutputSlots] = b.makeUnion(
+        sbe::makeSs(std::move(arrayBranch), std::move(valueBranch)),
+        makeVector(SbExpr::makeSV(arrayBranchOutput), SbExpr::makeSV(valueBranchOutput)));
+
+    auto valueForIndexBounds = unionOutputSlots[0];
 
     if (index.type == INDEX_HASHED) {
         // For hashed indexes, we need to hash the value before computing keystrings iff the
         // lookup's "foreignField" is the hashed field in this index.
         const BSONElement elt = index.keyPattern.getField(foreignFieldName.fullPath());
         if (elt.valueStringDataSafe() == IndexNames::HASHED) {
-            SlotId rawValueSlot = valueForIndexBounds;
-            valueForIndexBounds = slotIdGenerator.generate();
-            SlotId indexValueSlot = rawValueSlot;
+            SbSlot rawValueSlot = valueForIndexBounds;
+            SbSlot indexValueSlot = rawValueSlot;
 
             if (collatorSlot) {
                 // For collated hashed indexes, apply collation before hashing.
-                SlotId collatedValueSlot = slotIdGenerator.generate();
-                valueGeneratorStage = makeProjectStage(std::move(valueGeneratorStage),
-                                                       nodeId,
-                                                       collatedValueSlot,
-                                                       makeFunction("collComparisonKey",
-                                                                    makeVariable(rawValueSlot),
-                                                                    makeVariable(*collatorSlot)));
-                indexValueSlot = collatedValueSlot;
+                auto [outStage, outSlots] = b.makeProject(
+                    std::move(valueGeneratorStage),
+                    b.makeFunction("collComparisonKey", rawValueSlot, SbSlot{*collatorSlot}));
+                valueGeneratorStage = std::move(outStage);
+
+                indexValueSlot = outSlots[0];
             }
 
-            valueGeneratorStage =
-                makeProjectStage(std::move(valueGeneratorStage),
-                                 nodeId,
-                                 valueForIndexBounds,
-                                 makeFunction("shardHash", makeVariable(indexValueSlot)));
+            auto [outStage, outSlots] = b.makeProject(std::move(valueGeneratorStage),
+                                                      b.makeFunction("shardHash", indexValueSlot));
+            valueGeneratorStage = std::move(outStage);
+
+            valueForIndexBounds = outSlots[0];
         }
     }
 
@@ -926,77 +900,75 @@ std::pair<SlotId, std::unique_ptr<sbe::PlanStage>> buildIndexJoinLookupStage(
     // 'lowKeySlot' and 'highKeySlot', respectively. These two slots will be made available in
     // the loop join stage to perform index seek. We also set the 'indexKeyPatternSlot' constant
     // for the seek stage later to perform consistency check.
-    auto lowKeySlot = slotIdGenerator.generate();
-    auto highKeySlot = slotIdGenerator.generate();
-    auto indexKeyPatternSlot = slotIdGenerator.generate();
     auto [indexKeyPaternTag, indexKeyPatternValue] =
-        copyValue(TypeTags::bsonObject, bitcastFrom<const char*>(index.keyPattern.objdata()));
+        sbe::value::copyValue(sbe::value::TypeTags::bsonObject,
+                              sbe::value::bitcastFrom<const char*>(index.keyPattern.objdata()));
 
     auto makeNewKeyStringCall = [&](key_string::Discriminator discriminator) {
         StringData functionName = "ks";
-        EExpression::Vector args;
-        args.emplace_back(makeInt64Constant(static_cast<int64_t>(indexVersion)));
-        args.emplace_back(makeInt32Constant(indexOrdering.getBits()));
-        args.emplace_back(makeVariable(valueForIndexBounds));
-        args.emplace_back(makeInt64Constant(static_cast<int64_t>(discriminator)));
+
+        SbExpr::Vector args =
+            SbExpr::makeSeq(b.makeInt64Constant(static_cast<int64_t>(indexVersion)),
+                            b.makeInt32Constant(indexOrdering.getBits()),
+                            valueForIndexBounds,
+                            b.makeInt64Constant(static_cast<int64_t>(discriminator)));
+
         if (collatorSlot) {
             functionName = "collKs";
-            args.emplace_back(makeVariable(*collatorSlot));
+            args.emplace_back(SbSlot{*collatorSlot});
         }
-        return makeE<EFunction>(functionName, std::move(args));
+
+        return b.makeFunction(functionName, std::move(args));
     };
-    auto indexBoundKeyStage =
-        makeProjectStage(std::move(valueGeneratorStage),
-                         nodeId,
-                         lowKeySlot,
-                         makeNewKeyStringCall(key_string::Discriminator::kExclusiveBefore),
-                         highKeySlot,
-                         makeNewKeyStringCall(key_string::Discriminator::kExclusiveAfter),
-                         indexKeyPatternSlot,
-                         makeConstant(indexKeyPaternTag, indexKeyPatternValue));
+
+    auto [indexBoundKeyStage, outSlots] =
+        b.makeProject(std::move(valueGeneratorStage),
+                      makeNewKeyStringCall(key_string::Discriminator::kExclusiveBefore),
+                      makeNewKeyStringCall(key_string::Discriminator::kExclusiveAfter),
+                      b.makeConstant(indexKeyPaternTag, indexKeyPatternValue));
+    SbSlot lowKeySlot = outSlots[0];
+    SbSlot highKeySlot = outSlots[1];
+    SbSlot indexKeyPatternSlot = outSlots[2];
 
     // To ensure that we compute index bounds for all local values, introduce loop join, where
     // unwinding of local values happens on the right side and index generation happens on the left
     // side.
-    indexBoundKeyStage = makeS<LoopJoinStage>(std::move(unwindLocalKeysStage),
-                                              std::move(indexBoundKeyStage),
-                                              makeSV() /* outerProjects */,
-                                              makeSV(singleLocalValueSlot) /* outerCorrelated */,
-                                              nullptr /* predicate */,
-                                              nodeId);
+    indexBoundKeyStage = b.makeLoopJoin(std::move(unwindLocalKeysStage),
+                                        std::move(indexBoundKeyStage),
+                                        {} /* outerProjects */,
+                                        SbExpr::makeSV(singleLocalValueSlot) /* outerCorrelated */);
 
     // Perform the index seek based on the 'lowKeySlot' and 'highKeySlot' from the outer side.
     // The foreign record id of the seek is stored in 'foreignRecordIdSlot'. We also keep
     // 'indexKeySlot' and 'snapshotIdSlot' for the seek stage later to perform consistency
     // check.
-    auto foreignRecordIdSlot = slotIdGenerator.generate();
-    auto indexKeySlot = slotIdGenerator.generate();
-    auto snapshotIdSlot = slotIdGenerator.generate();
-    auto indexIdentSlot = slotIdGenerator.generate();
-    auto ixScanStage = makeS<SimpleIndexScanStage>(foreignCollUUID,
-                                                   foreignCollDbName,
-                                                   indexName,
-                                                   true /* forward */,
-                                                   indexKeySlot,
-                                                   foreignRecordIdSlot,
-                                                   snapshotIdSlot,
-                                                   indexIdentSlot,
-                                                   IndexKeysInclusionSet{} /* indexKeysToInclude */,
-                                                   makeSV() /* vars */,
-                                                   makeVariable(lowKeySlot),
-                                                   makeVariable(highKeySlot),
-                                                   yieldPolicy,
-                                                   nodeId);
+    auto foreignRecordIdSlot = SbSlot{state.slotId()};
+    auto indexKeySlot = SbSlot{state.slotId()};
+    auto snapshotIdSlot = SbSlot{state.slotId()};
+    auto indexIdentSlot = SbSlot{state.slotId()};
+    auto ixScanStage =
+        sbe::makeS<sbe::SimpleIndexScanStage>(foreignCollUUID,
+                                              foreignCollDbName,
+                                              indexName,
+                                              true /* forward */,
+                                              indexKeySlot.getId(),
+                                              foreignRecordIdSlot.getId(),
+                                              snapshotIdSlot.getId(),
+                                              indexIdentSlot.getId(),
+                                              sbe::IndexKeysInclusionSet{} /* indexKeysToInclude */,
+                                              sbe::makeSV() /* vars */,
+                                              SbExpr{lowKeySlot}.extractExpr(state),
+                                              SbExpr{highKeySlot}.extractExpr(state),
+                                              state.yieldPolicy,
+                                              nodeId);
 
     // Loop join the low key and high key generation with the index seek stage to produce the
     // foreign record id to seek.
     auto ixScanNljStage =
-        makeS<LoopJoinStage>(std::move(indexBoundKeyStage),
-                             std::move(ixScanStage),
-                             makeSV(indexKeyPatternSlot) /* outerProjects */,
-                             makeSV(lowKeySlot, highKeySlot) /* outerCorrelated */,
-                             nullptr /* predicate */,
-                             nodeId);
+        b.makeLoopJoin(std::move(indexBoundKeyStage),
+                       std::move(ixScanStage),
+                       SbExpr::makeSV(indexKeyPatternSlot) /* outerProjects */,
+                       SbExpr::makeSV(lowKeySlot, highKeySlot) /* outerCorrelated */);
 
     // It is possible for the same record to be returned multiple times when the index is multikey
     // (contains arrays). Consider an example where local values set is '(1, 2)' and we have a
@@ -1006,15 +978,14 @@ std::pair<SlotId, std::unique_ptr<sbe::PlanStage>> buildIndexJoinLookupStage(
     // To avoid such situation, we are placing 'unique' stage to prevent repeating records from
     // appearing in the result.
     if (index.multikey) {
-        ixScanNljStage =
-            makeS<UniqueStage>(std::move(ixScanNljStage), makeSV(foreignRecordIdSlot), nodeId);
+        ixScanNljStage = b.makeUnique(std::move(ixScanNljStage), foreignRecordIdSlot);
     }
 
     // Loop join the foreign record id produced by the index seek on the outer side with seek
     // stage on the inner side to get matched foreign documents. The foreign documents are
     // stored in 'foreignRecordSlot'. We also pass in 'snapshotIdSlot', 'indexIdentSlot',
     // 'indexKeySlot' and 'indexKeyPatternSlot' to perform index consistency check during the seek.
-    auto [scanNljStage, foreignRecordSlot, _, __] =
+    auto [scanNljStage, foreignRecordSlot, __, ___] =
         makeLoopJoinForFetch(std::move(ixScanNljStage),
                              std::vector<std::string>{},
                              foreignRecordIdSlot,
@@ -1026,7 +997,7 @@ std::pair<SlotId, std::unique_ptr<sbe::PlanStage>> buildIndexJoinLookupStage(
                              foreignColl,
                              state,
                              nodeId,
-                             makeSV() /* slotsToForward */);
+                             SbSlotVector{} /* slotsToForward */);
 
     // 'buildForeignMatches()' filters the foreign records, returned by the index scan, to match
     // those in 'localKeysSetSlot'. This is necessary because some values are encoded with the same
@@ -1034,13 +1005,10 @@ std::pair<SlotId, std::unique_ptr<sbe::PlanStage>> buildIndexJoinLookupStage(
     // collisions are possible.
     auto [foreignGroupSlot, foreignGroupStage] = buildForeignMatches(localKeysSetSlot,
                                                                      std::move(scanNljStage),
-                                                                     foreignRecordSlot.getId(),
+                                                                     foreignRecordSlot,
                                                                      foreignFieldName,
-                                                                     yieldPolicy,
                                                                      nodeId,
-                                                                     slotIdGenerator,
-                                                                     frameIdGenerator,
-                                                                     state.allowDiskUse,
+                                                                     state,
                                                                      hasUnwindSrc);
 
     // 'foreignGroupStage' should not participate in trial run tracking as the number of reads
@@ -1049,28 +1017,26 @@ std::pair<SlotId, std::unique_ptr<sbe::PlanStage>> buildIndexJoinLookupStage(
 
     // The top level loop join stage that joins each local field with the matched foreign
     // documents.
-    auto nljStage = makeS<LoopJoinStage>(std::move(localKeysSetStage),
-                                         std::move(foreignGroupStage),
-                                         buildLocalSlots(state, localRecordSlot),
-                                         makeSV(localKeysSetSlot) /* outerCorrelated */,
-                                         nullptr,
-                                         nodeId);
+    auto nljStage = b.makeLoopJoin(std::move(localKeysSetStage),
+                                   std::move(foreignGroupStage),
+                                   buildLocalSlots(state, localRecordSlot),
+                                   SbExpr::makeSV(localKeysSetSlot) /* outerCorrelated */);
     return {foreignGroupSlot, std::move(nljStage)};
 }  // buildIndexJoinLookupStage
 
-std::pair<SlotId /*matched docs*/, std::unique_ptr<sbe::PlanStage>> buildHashJoinLookupStage(
+std::pair<SbSlot /*matched docs*/, SbStage> buildHashJoinLookupStage(
     StageBuilderState& state,
-    std::unique_ptr<sbe::PlanStage> localStage,
-    SlotId localRecordSlot,
+    SbStage localStage,
+    SbSlot localRecordSlot,
     const FieldPath& localFieldName,
-    std::unique_ptr<sbe::PlanStage> foreignStage,
-    SlotId foreignRecordSlot,
+    SbStage foreignStage,
+    SbSlot foreignRecordSlot,
     const FieldPath& foreignFieldName,
-    boost::optional<SlotId> collatorSlot,
-    PlanYieldPolicy* yieldPolicy,
+    boost::optional<sbe::value::SlotId> collatorSlot,
     const PlanNodeId nodeId,
-    SlotIdGenerator& slotIdGenerator,
     bool hasUnwindSrc) {
+    SbBuilder b(state, nodeId);
+
     CurOp::get(state.opCtx)->debug().hashLookup += 1;
 
     // Build the outer branch that produces the set of local key values.
@@ -1080,9 +1046,7 @@ std::pair<SlotId /*matched docs*/, std::unique_ptr<sbe::PlanStage>> buildHashJoi
                                                       localRecordSlot,
                                                       localFieldName,
                                                       collatorSlot,
-                                                      yieldPolicy,
-                                                      nodeId,
-                                                      slotIdGenerator);
+                                                      nodeId);
 
     // Build the inner branch that produces the set of foreign key values.
     auto [foreignKeySlot, foreignKeyStage] = buildKeySet(state,
@@ -1091,9 +1055,7 @@ std::pair<SlotId /*matched docs*/, std::unique_ptr<sbe::PlanStage>> buildHashJoi
                                                          foreignRecordSlot,
                                                          foreignFieldName,
                                                          collatorSlot,
-                                                         yieldPolicy,
-                                                         nodeId,
-                                                         slotIdGenerator);
+                                                         nodeId);
 
     // 'foreignKeyStage' should not participate in trial run tracking as the number of
     // reads that it performs should not influence planning decisions for 'outerRootStage'.
@@ -1101,64 +1063,61 @@ std::pair<SlotId /*matched docs*/, std::unique_ptr<sbe::PlanStage>> buildHashJoi
 
     // Build lookup stage that matches the local and foreign rows and aggregates the
     // foreign values in an array.
-    SlotId lookupStageOutputSlot = slotIdGenerator.generate();
+    auto lookupStageOutputSlot = SbSlot{state.slotId()};
     if (hasUnwindSrc) {
         // $LU [$lookup, $unwind] pattern: use HashLookupUnwindStage.
-        std::unique_ptr<sbe::PlanStage> hl =
-            makeS<sbe::HashLookupUnwindStage>(std::move(outerRootStage),
-                                              std::move(foreignKeyStage),
-                                              localKeySlot,
-                                              foreignKeySlot,
-                                              foreignRecordSlot,
-                                              lookupStageOutputSlot,
-                                              collatorSlot,
-                                              nodeId);
+        SbStage hl = sbe::makeS<sbe::HashLookupUnwindStage>(std::move(outerRootStage),
+                                                            std::move(foreignKeyStage),
+                                                            localKeySlot.getId(),
+                                                            foreignKeySlot.getId(),
+                                                            foreignRecordSlot.getId(),
+                                                            lookupStageOutputSlot.getId(),
+                                                            collatorSlot,
+                                                            nodeId);
 
         return {lookupStageOutputSlot, std::move(hl)};
     } else {
         // Plain $lookup without $unwind: use HashLookupStage.
         // Aggregator to assemble the matched foreign documents into an array.
-        SlotExprPair agg = std::make_pair(
-            lookupStageOutputSlot,
-            stage_builder::makeFunction("addToArray", makeVariable(foreignRecordSlot)));
-        std::unique_ptr<sbe::PlanStage> hl = makeS<sbe::HashLookupStage>(std::move(outerRootStage),
-                                                                         std::move(foreignKeyStage),
-                                                                         localKeySlot,
-                                                                         foreignKeySlot,
-                                                                         foreignRecordSlot,
-                                                                         std::move(agg),
-                                                                         collatorSlot,
-                                                                         nodeId);
+        sbe::SlotExprPair agg =
+            std::make_pair(lookupStageOutputSlot.getId(),
+                           b.makeFunction("addToArray", foreignRecordSlot).extractExpr(state));
+
+        SbStage hl = sbe::makeS<sbe::HashLookupStage>(std::move(outerRootStage),
+                                                      std::move(foreignKeyStage),
+                                                      localKeySlot.getId(),
+                                                      foreignKeySlot.getId(),
+                                                      foreignRecordSlot.getId(),
+                                                      std::move(agg),
+                                                      collatorSlot,
+                                                      nodeId);
 
         // Add a projection that returns an empty array in the "as" field if no foreign row matched.
-        SlotId innerResultSlot = slotIdGenerator.generate();
-        auto [emptyArrayTag, emptyArrayVal] = makeNewArray();
-        std::unique_ptr<EExpression> innerResultProjection =
-            makeBinaryOp(sbe::EPrimBinary::fillEmpty,
-                         makeVariable(lookupStageOutputSlot),
-                         makeConstant(emptyArrayTag, emptyArrayVal));
+        auto [emptyArrayTag, emptyArrayVal] = sbe::value::makeNewArray();
+        auto emptyArrayConstant = b.makeConstant(emptyArrayTag, emptyArrayVal);
 
-        std::unique_ptr<sbe::PlanStage> resultStage = makeProjectStage(
-            std::move(hl), nodeId, innerResultSlot, std::move(innerResultProjection));
+        SbExpr innerResultProjection = b.makeBinaryOp(
+            sbe::EPrimBinary::fillEmpty, lookupStageOutputSlot, std::move(emptyArrayConstant));
+
+        auto [resultStage, outSlots] =
+            b.makeProject(std::move(hl), std::move(innerResultProjection));
+        SbSlot innerResultSlot = outSlots[0];
 
         return {innerResultSlot, std::move(resultStage)};
     }
 }  // buildHashJoinLookupStage
 
-std::pair<SlotId /*matched docs*/, std::unique_ptr<sbe::PlanStage>> buildLookupStage(
+std::pair<SbSlot /*matched docs*/, SbStage> buildLookupStage(
     StageBuilderState& state,
     EqLookupNode::LookupStrategy lookupStrategy,
-    std::unique_ptr<sbe::PlanStage> localStage,
-    SlotId localRecordSlot,
+    SbStage localStage,
+    SbSlot localRecordSlot,
     const FieldPath& localFieldName,
-    std::unique_ptr<sbe::PlanStage> foreignStage,
-    SlotId foreignRecordSlot,
+    SbStage foreignStage,
+    SbSlot foreignRecordSlot,
     const FieldPath& foreignFieldName,
-    boost::optional<SlotId> collatorSlot,
-    PlanYieldPolicy* yieldPolicy,
+    boost::optional<sbe::value::SlotId> collatorSlot,
     const PlanNodeId nodeId,
-    SlotIdGenerator& slotIdGenerator,
-    FrameIdGenerator& frameIdGenerator,
     bool hasUnwindSrc) {
     switch (lookupStrategy) {
         case EqLookupNode::LookupStrategy::kNestedLoopJoin:
@@ -1170,10 +1129,7 @@ std::pair<SlotId /*matched docs*/, std::unique_ptr<sbe::PlanStage>> buildLookupS
                                        foreignRecordSlot,
                                        foreignFieldName,
                                        collatorSlot,
-                                       yieldPolicy,
                                        nodeId,
-                                       slotIdGenerator,
-                                       frameIdGenerator,
                                        hasUnwindSrc);
         case EqLookupNode::LookupStrategy::kHashJoin:
             return buildHashJoinLookupStage(state,
@@ -1184,9 +1140,7 @@ std::pair<SlotId /*matched docs*/, std::unique_ptr<sbe::PlanStage>> buildLookupS
                                             foreignRecordSlot,
                                             foreignFieldName,
                                             collatorSlot,
-                                            yieldPolicy,
                                             nodeId,
-                                            slotIdGenerator,
                                             hasUnwindSrc);
         default:
             MONGO_UNREACHABLE_TASSERT(5842606);
@@ -1196,74 +1150,92 @@ std::pair<SlotId /*matched docs*/, std::unique_ptr<sbe::PlanStage>> buildLookupS
 /*
  * Builds a project stage that projects an empty array for each local document.
  */
-std::pair<SlotId, std::unique_ptr<sbe::PlanStage>> buildNonExistentForeignCollLookupStage(
-    std::unique_ptr<sbe::PlanStage> localStage,
-    const PlanNodeId nodeId,
-    SlotIdGenerator& slotIdGenerator) {
-    auto [emptyArrayTag, emptyArrayVal] = makeNewArray();
-    SlotId emptyArraySlot = slotIdGenerator.generate();
-    return {emptyArraySlot,
-            makeProjectStage(std::move(localStage),
-                             nodeId,
-                             emptyArraySlot,
-                             makeConstant(emptyArrayTag, emptyArrayVal))};
+std::pair<SbSlot, SbStage> buildNonExistentForeignCollLookupStage(SbStage localStage,
+                                                                  const PlanNodeId nodeId,
+                                                                  StageBuilderState& state) {
+    SbBuilder b(state, nodeId);
+
+    auto [emptyArrayTag, emptyArrayVal] = sbe::value::makeNewArray();
+    auto emptyArrayConstant = b.makeConstant(emptyArrayTag, emptyArrayVal);
+    auto [outStage, outSlots] = b.makeProject(std::move(localStage), std::move(emptyArrayConstant));
+    SbSlot emptyArraySlot = outSlots[0];
+
+    return {emptyArraySlot, std::move(outStage)};
 }
 
-std::pair<SlotId, std::unique_ptr<sbe::PlanStage>> buildLookupResultObject(
-    std::unique_ptr<sbe::PlanStage> stage,
-    SlotId localDocumentSlot,
-    SlotId resultArraySlot,
-    const FieldPath& fieldPath,
-    const PlanNodeId nodeId,
-    SlotIdGenerator& slotIdGenerator,
-    bool shouldProduceBson) {
+std::pair<SbSlot, SbStage> buildLookupResultObject(SbStage stage,
+                                                   SbSlot localDocSlot,
+                                                   SbSlot resultArraySlot,
+                                                   const FieldPath& fieldPath,
+                                                   const PlanNodeId nodeId,
+                                                   StageBuilderState& state,
+                                                   bool shouldProduceBson) {
+    SbBuilder b(state, nodeId);
+
+    if (shouldProduceBson) {
+        std::vector<std::string> paths;
+        paths.emplace_back(fieldPath.fullPath());
+
+        std::vector<ProjectNode> nodes;
+        nodes.emplace_back(resultArraySlot);
+
+        // We generate a projection with traversalDepth set to 0 to suppress array traversal.
+        constexpr int32_t traversalDepth = 0;
+
+        SbExpr updatedDocExpr = generateProjection(state,
+                                                   projection_ast::ProjectType::kAddition,
+                                                   std::move(paths),
+                                                   std::move(nodes),
+                                                   localDocSlot,
+                                                   nullptr /* slots */,
+                                                   traversalDepth);
+
+        auto [outStage, outSlots] = b.makeProject(std::move(stage), std::move(updatedDocExpr));
+        SbSlot updatedDocSlot = outSlots[0];
+
+        return {updatedDocSlot, std::move(outStage)};
+    }
+
     const int32_t pathLength = fieldPath.getPathLength();
+    SbSlotVector fieldSlots;
 
     // Extract values of all fields along the path except the last one.
-    auto fieldSlots = slotIdGenerator.generateMultiple(pathLength - 1);
     for (int32_t i = 0; i < pathLength - 1; i++) {
-        const auto fieldName = fieldPath.getFieldName(i);
-        const auto inputSlot = i == 0 ? localDocumentSlot : fieldSlots[i - 1];
-        stage = makeProjectStage(
-            std::move(stage),
-            nodeId,
-            fieldSlots[i],
-            makeFunction("getField"_sd, makeVariable(inputSlot), makeStrConstant(fieldName)));
+        StringData fieldName = fieldPath.getFieldName(i);
+        SbSlot inputSlot = i == 0 ? localDocSlot : fieldSlots.back();
+
+        auto [outStage, outSlots] =
+            b.makeProject(std::move(stage),
+                          b.makeFunction("getField"_sd, inputSlot, b.makeStrConstant(fieldName)));
+
+        stage = std::move(outStage);
+        fieldSlots.push_back(outSlots[0]);
     }
 
     // Construct new objects for each path level.
-    auto objectSlots = slotIdGenerator.generateMultiple(pathLength);
+    SbSlot objectSlot = resultArraySlot;
+
     for (int32_t i = pathLength - 1; i >= 0; i--) {
-        const auto rootObjectSlot = i == 0 ? localDocumentSlot : fieldSlots[i - 1];
-        const auto fieldName = fieldPath.getFieldName(i).toString();
-        const auto valueSlot = i == pathLength - 1 ? resultArraySlot : objectSlots[i + 1];
-        if (shouldProduceBson) {
-            stage =
-                makeS<MakeBsonObjStage>(std::move(stage),
-                                        objectSlots[i],                        /* objSlot */
-                                        rootObjectSlot,                        /* rootSlot */
-                                        MakeBsonObjStage::FieldBehavior::drop, /* fieldBehaviour */
-                                        std::vector<std::string>{},            /* fields */
-                                        std::vector<std::string>{fieldName},   /* projectFields */
-                                        SlotVector{valueSlot},                 /* projectVars */
-                                        true,                                  /* forceNewObject */
-                                        false,                                 /* returnOldObject */
-                                        nodeId);
-        } else {
-            stage = makeS<MakeObjStage>(std::move(stage),
-                                        objectSlots[i],                        /* objSlot */
-                                        rootObjectSlot,                        /* rootSlot */
-                                        MakeBsonObjStage::FieldBehavior::drop, /* fieldBehaviour */
-                                        std::vector<std::string>{},            /* fields */
-                                        std::vector<std::string>{fieldName},   /* projectFields */
-                                        SlotVector{valueSlot},                 /* projectVars */
-                                        true,                                  /* forceNewObject */
-                                        false,                                 /* returnOldObject */
-                                        nodeId);
-        }
+        std::string fieldName = fieldPath.getFieldName(i).toString();
+        SbSlot rootObjectSlot = i == 0 ? localDocSlot : fieldSlots[i - 1];
+        SbSlot valueSlot = objectSlot;
+
+        objectSlot = SbSlot{state.slotId()};
+
+        stage = sbe::makeS<sbe::MakeObjStage>(
+            std::move(stage),
+            objectSlot.getId(),                         /* objSlot */
+            rootObjectSlot.getId(),                     /* rootSlot */
+            sbe::MakeBsonObjStage::FieldBehavior::drop, /* fieldBehaviour */
+            std::vector<std::string>{},                 /* fields */
+            std::vector<std::string>{fieldName},        /* projectFields */
+            sbe::value::SlotVector{valueSlot.getId()},  /* projectVars */
+            true,                                       /* forceNewObject */
+            false,                                      /* returnOldObject */
+            nodeId);
     }
 
-    return {objectSlots.front(), std::move(stage)};
+    return {objectSlot, std::move(stage)};
 }
 }  // namespace
 
@@ -1272,8 +1244,10 @@ std::pair<SlotId, std::unique_ptr<sbe::PlanStage>> buildLookupResultObject(
  * where the query returns each local doc with all its foreign matches in an array field. This
  * supports several different lookup strategies.
  */
-std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder::buildEqLookup(
+std::pair<SbStage, PlanStageSlots> SlotBasedStageBuilder::buildEqLookup(
     const QuerySolutionNode* root, const PlanStageReqs& reqs) {
+    SbBuilder b(_state, root->nodeId());
+
     const EqLookupNode* eqLookupNode = static_cast<const EqLookupNode*>(root);
     if (eqLookupNode->lookupStrategy == EqLookupNode::LookupStrategy::kHashJoin) {
         _state.data->foreignHashJoinCollections.emplace(eqLookupNode->foreignCollection);
@@ -1281,10 +1255,10 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
 
     PlanStageReqs childReqs = reqs.copyForChild().setResultObj();
     auto [localStage, localOutputs] = build(eqLookupNode->children[0].get(), childReqs);
-    SlotId localDocumentSlot = localOutputs.getResultObj().slotId;
+    SbSlot localDocSlot = localOutputs.getResultObj();
 
-    auto [matchedDocumentsSlot, foreignStage] = [&, localStage = std::move(localStage)]() mutable
-        -> std::pair<SlotId, std::unique_ptr<sbe::PlanStage>> {
+    auto [matchedDocumentsSlot, foreignStage] =
+        [&, localStage = std::move(localStage)]() mutable -> std::pair<SbSlot, SbStage> {
         NamespaceString foreignNss(eqLookupNode->foreignCollection);
         auto foreignColl = _collections.lookupCollection(foreignNss);
         uassert(ErrorCodes::NamespaceNotFound,
@@ -1295,7 +1269,8 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
                  EqLookupNode::LookupStrategy::kNonExistentForeignCollection) ||
                     (foreignColl && foreignColl->ns() == foreignNss));
 
-        boost::optional<SlotId> collatorSlot = _state.getCollatorSlot();
+        boost::optional<sbe::value::SlotId> collatorSlot = _state.getCollatorSlot();
+
         switch (eqLookupNode->lookupStrategy) {
             // When foreign collection doesn't exist, we create stages that simply append empty
             // arrays to each local document and do not consider the case that foreign collection
@@ -1304,7 +1279,7 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
             // each local document.
             case EqLookupNode::LookupStrategy::kNonExistentForeignCollection: {
                 return buildNonExistentForeignCollLookupStage(
-                    std::move(localStage), eqLookupNode->nodeId(), _slotIdGenerator);
+                    std::move(localStage), eqLookupNode->nodeId(), _state);
             }
             case EqLookupNode::LookupStrategy::kIndexedLoopJoin: {
                 tassert(
@@ -1314,16 +1289,13 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
 
                 return buildIndexJoinLookupStage(_state,
                                                  std::move(localStage),
-                                                 localDocumentSlot,
+                                                 localDocSlot,
                                                  eqLookupNode->joinFieldLocal,
                                                  eqLookupNode->joinFieldForeign,
                                                  foreignColl,
                                                  *eqLookupNode->idxEntry,
-                                                 _yieldPolicy,
                                                  collatorSlot,
                                                  eqLookupNode->nodeId(),
-                                                 _slotIdGenerator,
-                                                 _frameIdGenerator,
                                                  false /* hasUnwindSrc */);
             }
             case EqLookupNode::LookupStrategy::kNestedLoopJoin:
@@ -1331,42 +1303,21 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
                 size_t numChildren = eqLookupNode->children.size();
                 tassert(6355300, "An EqLookupNode can only have one child", numChildren == 1);
 
-                SlotId foreignResultSlot = _slotIdGenerator.generate();
-                SlotId foreignRecordIdSlot = _slotIdGenerator.generate();
-
-                std::unique_ptr<sbe::PlanStage> foreignStage =
-                    makeS<sbe::ScanStage>(foreignColl->uuid(),
-                                          foreignColl->ns().dbName(),
-                                          foreignResultSlot,
-                                          foreignRecordIdSlot,
-                                          boost::none /* snapshotIdSlot */,
-                                          boost::none /* indexIdentSlot */,
-                                          boost::none /* indexKeySlot */,
-                                          boost::none /* indexKeyPatternSlot */,
-                                          boost::none /* oplogTsSlot */,
-                                          std::vector<std::string>{} /* scanFieldNames */,
-                                          makeSV() /* scanFieldSlots */,
-                                          boost::none /* seekRecordIdSlot */,
-                                          boost::none /* minRecordIdSlot */,
-                                          boost::none /* maxRecordIdSlot */,
-                                          isForward(eqLookupNode->scanDirection),
-                                          _yieldPolicy,
-                                          eqLookupNode->nodeId(),
-                                          ScanCallbacks{});
+                auto [foreignStage, foreignResultSlot, foreignRecordIdSlot, _] =
+                    b.makeScan(foreignColl->uuid(),
+                               foreignColl->ns().dbName(),
+                               isForward(eqLookupNode->scanDirection));
 
                 return buildLookupStage(_state,
                                         eqLookupNode->lookupStrategy,
                                         std::move(localStage),
-                                        localDocumentSlot,
+                                        localDocSlot,
                                         eqLookupNode->joinFieldLocal,
                                         std::move(foreignStage),
                                         foreignResultSlot,
                                         eqLookupNode->joinFieldForeign,
                                         collatorSlot,
-                                        _yieldPolicy,
                                         eqLookupNode->nodeId(),
-                                        _slotIdGenerator,
-                                        _frameIdGenerator,
                                         false /* hasUnwindSrc */);
             }
             default:
@@ -1375,11 +1326,11 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
     }();
 
     auto [resultSlot, resultStage] = buildLookupResultObject(std::move(foreignStage),
-                                                             localDocumentSlot,
+                                                             localDocSlot,
                                                              matchedDocumentsSlot,
                                                              eqLookupNode->joinField,
                                                              eqLookupNode->nodeId(),
-                                                             _slotIdGenerator,
+                                                             _state,
                                                              eqLookupNode->shouldProduceBson);
 
     PlanStageSlots outputs;
@@ -1394,19 +1345,20 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
  * immediately returning a doc for each foreign match. This supports several different lookup
  * strategies.
  */
-std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots>
-SlotBasedStageBuilder::buildEqLookupUnwind(const QuerySolutionNode* root,
-                                           const PlanStageReqs& reqs) {
+std::pair<SbStage, PlanStageSlots> SlotBasedStageBuilder::buildEqLookupUnwind(
+    const QuerySolutionNode* root, const PlanStageReqs& reqs) {
+    SbBuilder b(_state, root->nodeId());
+
     const EqLookupUnwindNode* eqLookupUnwindNode = static_cast<const EqLookupUnwindNode*>(root);
 
     // The child must produce all of the slots required by the parent of this EqLookupUnwindNode,
     // plus this node needs to produce the result slot.
     PlanStageReqs childReqs = reqs.copyForChild().setResultObj();
     auto [localStage, localOutputs] = build(eqLookupUnwindNode->children[0].get(), childReqs);
-    SlotId localDocumentSlot = localOutputs.get(PlanStageSlots::kResult).slotId;
+    SbSlot localDocSlot = localOutputs.get(PlanStageSlots::kResult);
 
-    auto [matchedDocumentsSlot, foreignStage] = [&, localStage = std::move(localStage)]() mutable
-        -> std::pair<SlotId, std::unique_ptr<sbe::PlanStage>> {
+    auto [matchedDocumentsSlot, foreignStage] =
+        [&, localStage = std::move(localStage)]() mutable -> std::pair<SbSlot, SbStage> {
         NamespaceString foreignNss(eqLookupUnwindNode->foreignCollection);
         auto foreignColl = _collections.lookupCollection(foreignNss);
         uassert(ErrorCodes::NamespaceNotFound,
@@ -1417,7 +1369,7 @@ SlotBasedStageBuilder::buildEqLookupUnwind(const QuerySolutionNode* root,
                  EqLookupNode::LookupStrategy::kNonExistentForeignCollection) ||
                     (foreignColl && foreignColl->ns() == foreignNss));
 
-        boost::optional<SlotId> collatorSlot = _state.getCollatorSlot();
+        boost::optional<sbe::value::SlotId> collatorSlot = _state.getCollatorSlot();
 
         switch (eqLookupUnwindNode->lookupStrategy) {
             // When foreign collection doesn't exist, we create stages that simply append empty
@@ -1427,7 +1379,7 @@ SlotBasedStageBuilder::buildEqLookupUnwind(const QuerySolutionNode* root,
             // each local document.
             case EqLookupNode::LookupStrategy::kNonExistentForeignCollection: {
                 return buildNonExistentForeignCollLookupStage(
-                    std::move(localStage), eqLookupUnwindNode->nodeId(), _slotIdGenerator);
+                    std::move(localStage), eqLookupUnwindNode->nodeId(), _state);
             }
             case EqLookupNode::LookupStrategy::kIndexedLoopJoin: {
                 tassert(
@@ -1437,16 +1389,13 @@ SlotBasedStageBuilder::buildEqLookupUnwind(const QuerySolutionNode* root,
 
                 return buildIndexJoinLookupStage(_state,
                                                  std::move(localStage),
-                                                 localDocumentSlot,
+                                                 localDocSlot,
                                                  eqLookupUnwindNode->joinFieldLocal,
                                                  eqLookupUnwindNode->joinFieldForeign,
                                                  foreignColl,
                                                  *eqLookupUnwindNode->idxEntry,
-                                                 _yieldPolicy,
                                                  collatorSlot,
                                                  eqLookupUnwindNode->nodeId(),
-                                                 _slotIdGenerator,
-                                                 _frameIdGenerator,
                                                  true /* hasUnwindSrc */);
             }
             case EqLookupNode::LookupStrategy::kNestedLoopJoin:
@@ -1454,42 +1403,21 @@ SlotBasedStageBuilder::buildEqLookupUnwind(const QuerySolutionNode* root,
                 size_t numChildren = eqLookupUnwindNode->children.size();
                 tassert(8229800, "An EqLookupNode can only have one child", numChildren == 1);
 
-                SlotId foreignResultSlot = _slotIdGenerator.generate();
-                SlotId foreignRecordIdSlot = _slotIdGenerator.generate();
-
-                std::unique_ptr<sbe::PlanStage> foreignStage =
-                    makeS<sbe::ScanStage>(foreignColl->uuid(),
-                                          foreignColl->ns().dbName(),
-                                          foreignResultSlot,
-                                          foreignRecordIdSlot,
-                                          boost::none /* snapshotIdSlot */,
-                                          boost::none /* indexIdentSlot */,
-                                          boost::none /* indexKeySlot */,
-                                          boost::none /* indexKeyPatternSlot */,
-                                          boost::none /* oplogTsSlot */,
-                                          std::vector<std::string>{} /* scanFieldNames */,
-                                          makeSV() /* scanFieldSlots */,
-                                          boost::none /* seekRecordIdSlot */,
-                                          boost::none /* minRecordIdSlot */,
-                                          boost::none /* maxRecordIdSlot */,
-                                          isForward(eqLookupUnwindNode->scanDirection),
-                                          _yieldPolicy,
-                                          eqLookupUnwindNode->nodeId(),
-                                          ScanCallbacks{});
+                auto [foreignStage, foreignResultSlot, foreignRecordIdSlot, _] =
+                    b.makeScan(foreignColl->uuid(),
+                               foreignColl->ns().dbName(),
+                               isForward(eqLookupUnwindNode->scanDirection));
 
                 return buildLookupStage(_state,
                                         eqLookupUnwindNode->lookupStrategy,
                                         std::move(localStage),
-                                        localDocumentSlot,
+                                        localDocSlot,
                                         eqLookupUnwindNode->joinFieldLocal,
                                         std::move(foreignStage),
                                         foreignResultSlot,
                                         eqLookupUnwindNode->joinFieldForeign,
                                         collatorSlot,
-                                        _yieldPolicy,
                                         eqLookupUnwindNode->nodeId(),
-                                        _slotIdGenerator,
-                                        _frameIdGenerator,
                                         true /* hasUnwindSrc */);
             }
             default:
@@ -1508,20 +1436,21 @@ SlotBasedStageBuilder::buildEqLookupUnwind(const QuerySolutionNode* root,
                                reqs,
                                foreignStage,
                                localOutputs,
-                               localDocumentSlot,
+                               localDocSlot,
                                matchedDocumentsSlot);
     }
 
     auto [resultSlot, resultStage] = buildLookupResultObject(std::move(foreignStage),
-                                                             localDocumentSlot,
+                                                             localDocSlot,
                                                              matchedDocumentsSlot,
                                                              eqLookupUnwindNode->joinField,
                                                              eqLookupUnwindNode->nodeId(),
-                                                             _slotIdGenerator,
+                                                             _state,
                                                              eqLookupUnwindNode->shouldProduceBson);
 
     PlanStageSlots outputs;
     outputs.set(kResult, resultSlot);
     return {std::move(resultStage), std::move(outputs)};
 }  // buildEqLookupUnwind
+
 }  // namespace mongo::stage_builder

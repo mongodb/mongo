@@ -173,15 +173,6 @@ optimizer::ABT buildABTMultiBranchConditionalFromCaseValuePairs(
 optimizer::ABT makeIfNullExpr(std::vector<optimizer::ABT> values,
                               sbe::value::FrameIdGenerator* frameIdGenerator);
 
-using SlotABTExprPairVector = std::vector<std::pair<sbe::value::SlotId, optimizer::ABT>>;
-
-struct ABTAggExprPair {
-    optimizer::ABT init;
-    optimizer::ABT acc;
-};
-
-using ABTAggExprVector = std::vector<std::pair<sbe::value::SlotId, ABTAggExprPair>>;
-
 optimizer::ABT makeIf(optimizer::ABT condExpr, optimizer::ABT thenExpr, optimizer::ABT elseExpr);
 
 optimizer::ABT makeLet(const optimizer::ProjectionName& name,

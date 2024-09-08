@@ -610,7 +610,8 @@ generateSingleIntervalIndexScanAndSlots(StageBuilderState& state,
             std::move(stage),
             makeBinaryOp(sbe::EPrimBinary::logicAnd,
                          makeFunction("exists", lowKeyExpr->clone()),
-                         makeFunction("exists", highKeyExpr->clone())),
+                         makeFunction("exists", highKeyExpr->clone()),
+                         state),
             planNodeId);
     }
 

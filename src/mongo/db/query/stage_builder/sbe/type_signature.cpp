@@ -96,6 +96,11 @@ TypeSignature TypeSignature::kStringType = getTypeSignature(sbe::value::TypeTags
                                                             sbe::value::TypeTags::StringBig,
                                                             sbe::value::TypeTags::bsonString);
 
+TypeSignature TypeSignature::kCollatableType =
+    TypeSignature::kStringType.include(getTypeSignature(sbe::value::TypeTags::bsonSymbol))
+        .include(TypeSignature::kArrayType)
+        .include(TypeSignature::kObjectType);
+
 std::string TypeSignature::debugString() const {
     if (*this == kAnyType) {
         return "kAnyType";

@@ -112,27 +112,38 @@ std::unique_ptr<sbe::EExpression> makeNot(std::unique_ptr<sbe::EExpression> e) {
 
 std::unique_ptr<sbe::EExpression> makeBinaryOp(sbe::EPrimBinary::Op binaryOp,
                                                std::unique_ptr<sbe::EExpression> lhs,
-                                               std::unique_ptr<sbe::EExpression> rhs) {
-    return sbe::makeE<sbe::EPrimBinary>(binaryOp, std::move(lhs), std::move(rhs));
-}
+                                               std::unique_ptr<sbe::EExpression> rhs,
+                                               StageBuilderState& state) {
+    std::unique_ptr<sbe::EExpression> coll = nullptr;
 
-std::unique_ptr<sbe::EExpression> makeBinaryOpWithCollation(sbe::EPrimBinary::Op binaryOp,
-                                                            std::unique_ptr<sbe::EExpression> lhs,
-                                                            std::unique_ptr<sbe::EExpression> rhs,
-                                                            StageBuilderState& state) {
-    auto collatorSlot = state.getCollatorSlot();
-    auto collatorVar = collatorSlot ? sbe::makeE<sbe::EVariable>(*collatorSlot) : nullptr;
+    if (sbe::EPrimBinary::isComparisonOp(binaryOp)) {
+        auto collatorSlot = state.getCollatorSlot();
 
-    return sbe::makeE<sbe::EPrimBinary>(
-        binaryOp, std::move(lhs), std::move(rhs), std::move(collatorVar));
+        auto hasNonCollatableType = [](const std::unique_ptr<sbe::EExpression>& arg) {
+            auto constExpr = arg->as<sbe::EConstant>();
+            return constExpr && !sbe::value::isCollatableType(constExpr->getConstant().first);
+        };
+
+        // If either arg is a non-collatable type constant, we can always use the native
+        // comparison op even when a collation is set (because the native comparison op
+        // will behave the same as the collation-aware comparison op for such cases).
+        const bool useCollationAwareOp =
+            collatorSlot && !hasNonCollatableType(lhs) && !hasNonCollatableType(rhs);
+
+        if (useCollationAwareOp) {
+            coll = sbe::makeE<sbe::EVariable>(*collatorSlot);
+        }
+    }
+
+    return sbe::makeE<sbe::EPrimBinary>(binaryOp, std::move(lhs), std::move(rhs), std::move(coll));
 }
 
 std::unique_ptr<sbe::EExpression> generateNullOrMissingExpr(const sbe::EExpression& expr) {
-    return makeBinaryOp(sbe::EPrimBinary::fillEmpty,
-                        makeFunction("typeMatch",
-                                     expr.clone(),
-                                     makeInt32Constant(getBSONTypeMask(BSONType::jstNULL))),
-                        makeBoolConstant(true));
+    return sbe::makeE<sbe::EPrimBinary>(
+        sbe::EPrimBinary::fillEmpty,
+        makeFunction(
+            "typeMatch", expr.clone(), makeInt32Constant(getBSONTypeMask(BSONType::jstNULL))),
+        makeBoolConstant(true));
 }
 
 std::unique_ptr<sbe::EExpression> generateNullOrMissing(const sbe::EVariable& var) {
@@ -150,12 +161,13 @@ std::unique_ptr<sbe::EExpression> generateNullOrMissing(std::unique_ptr<sbe::EEx
 }
 
 std::unique_ptr<sbe::EExpression> generateNullMissingOrUndefinedExpr(const sbe::EExpression& expr) {
-    return makeBinaryOp(sbe::EPrimBinary::fillEmpty,
-                        makeFunction("typeMatch",
-                                     expr.clone(),
-                                     makeInt32Constant(getBSONTypeMask(BSONType::jstNULL) |
-                                                       getBSONTypeMask(BSONType::Undefined))),
-                        makeBoolConstant(true));
+    return sbe::makeE<sbe::EPrimBinary>(
+        sbe::EPrimBinary::fillEmpty,
+        makeFunction("typeMatch",
+                     expr.clone(),
+                     makeInt32Constant(getBSONTypeMask(BSONType::jstNULL) |
+                                       getBSONTypeMask(BSONType::Undefined))),
+        makeBoolConstant(true));
 }
 
 
@@ -179,18 +191,15 @@ std::unique_ptr<sbe::EExpression> generateNonNumericCheck(const sbe::EVariable& 
 }
 
 std::unique_ptr<sbe::EExpression> generateLongLongMinCheck(const sbe::EVariable& var) {
-    return makeBinaryOp(
+    return sbe::makeE<sbe::EPrimBinary>(
         sbe::EPrimBinary::logicAnd,
         makeFunction("typeMatch",
                      var.clone(),
                      makeInt32Constant(MatcherTypeSet{BSONType::NumberLong}.getBSONTypeMask())),
-        makeBinaryOp(sbe::EPrimBinary::eq,
-                     var.clone(),
-                     makeInt64Constant(std::numeric_limits<int64_t>::min())));
+        sbe::makeE<sbe::EPrimBinary>(sbe::EPrimBinary::eq,
+                                     var.clone(),
+                                     makeInt64Constant(std::numeric_limits<int64_t>::min())));
 }
-
-std::unique_ptr<sbe::EExpression> makeBalancedBooleanOpTree(
-    sbe::EPrimBinary::Op logicOp, std::vector<std::unique_ptr<sbe::EExpression>> leaves);
 
 std::unique_ptr<sbe::EExpression> generateNaNCheck(const sbe::EVariable& var) {
     return makeFunction("isNaN", var.clone());
@@ -201,15 +210,18 @@ std::unique_ptr<sbe::EExpression> generateInfinityCheck(const sbe::EVariable& va
 }
 
 std::unique_ptr<sbe::EExpression> generateNonPositiveCheck(const sbe::EVariable& var) {
-    return makeBinaryOp(sbe::EPrimBinary::EPrimBinary::lessEq, var.clone(), makeInt32Constant(0));
+    return sbe::makeE<sbe::EPrimBinary>(
+        sbe::EPrimBinary::EPrimBinary::lessEq, var.clone(), makeInt32Constant(0));
 }
 
 std::unique_ptr<sbe::EExpression> generatePositiveCheck(const sbe::EVariable& var) {
-    return makeBinaryOp(sbe::EPrimBinary::EPrimBinary::greater, var.clone(), makeInt32Constant(0));
+    return sbe::makeE<sbe::EPrimBinary>(
+        sbe::EPrimBinary::EPrimBinary::greater, var.clone(), makeInt32Constant(0));
 }
 
 std::unique_ptr<sbe::EExpression> generateNegativeCheck(const sbe::EVariable& var) {
-    return makeBinaryOp(sbe::EPrimBinary::EPrimBinary::less, var.clone(), makeInt32Constant(0));
+    return sbe::makeE<sbe::EPrimBinary>(
+        sbe::EPrimBinary::EPrimBinary::less, var.clone(), makeInt32Constant(0));
 }
 
 std::unique_ptr<sbe::EExpression> generateNonObjectCheck(const sbe::EVariable& var) {
@@ -224,9 +236,10 @@ std::unique_ptr<sbe::EExpression> generateNullishOrNotRepresentableInt32Check(
     const sbe::EVariable& var) {
     auto numericConvert32 =
         sbe::makeE<sbe::ENumericConvert>(var.clone(), sbe::value::TypeTags::NumberInt32);
-    return makeBinaryOp(sbe::EPrimBinary::logicOr,
-                        generateNullMissingOrUndefined(var),
-                        makeNot(makeFunction("exists", std::move(numericConvert32))));
+    return sbe::makeE<sbe::EPrimBinary>(
+        sbe::EPrimBinary::logicOr,
+        generateNullMissingOrUndefined(var),
+        makeNot(makeFunction("exists", std::move(numericConvert32))));
 }
 
 std::unique_ptr<sbe::EExpression> generateNonTimestampCheck(const sbe::EVariable& var) {
@@ -257,19 +270,26 @@ std::unique_ptr<sbe::PlanStage> makeLimitCoScanTree(PlanNodeId planNodeId, long 
 
 std::unique_ptr<sbe::EExpression> makeFillEmpty(std::unique_ptr<sbe::EExpression> expr,
                                                 std::unique_ptr<sbe::EExpression> altExpr) {
-    return makeBinaryOp(sbe::EPrimBinary::fillEmpty, std::move(expr), std::move(altExpr));
+    return sbe::makeE<sbe::EPrimBinary>(
+        sbe::EPrimBinary::fillEmpty, std::move(expr), std::move(altExpr));
 }
 
 std::unique_ptr<sbe::EExpression> makeFillEmptyFalse(std::unique_ptr<sbe::EExpression> e) {
-    return makeBinaryOp(sbe::EPrimBinary::fillEmpty, std::move(e), makeBoolConstant(false));
+    return sbe::makeE<sbe::EPrimBinary>(
+        sbe::EPrimBinary::fillEmpty, std::move(e), makeBoolConstant(false));
 }
 
 std::unique_ptr<sbe::EExpression> makeFillEmptyTrue(std::unique_ptr<sbe::EExpression> e) {
-    return makeBinaryOp(sbe::EPrimBinary::fillEmpty, std::move(e), makeBoolConstant(true));
+    return sbe::makeE<sbe::EPrimBinary>(
+        sbe::EPrimBinary::fillEmpty, std::move(e), makeBoolConstant(true));
 }
 
 std::unique_ptr<sbe::EExpression> makeVariable(SbSlot ts) {
     return sbe::makeE<sbe::EVariable>(ts.slotId);
+}
+
+std::unique_ptr<sbe::EExpression> makeVariable(sbe::value::SlotId slotId) {
+    return sbe::makeE<sbe::EVariable>(slotId);
 }
 
 std::unique_ptr<sbe::EExpression> makeVariable(sbe::FrameId frameId, sbe::value::SlotId slotId) {
@@ -283,18 +303,22 @@ std::unique_ptr<sbe::EExpression> makeMoveVariable(sbe::FrameId frameId,
 
 std::unique_ptr<sbe::EExpression> makeFillEmptyNull(std::unique_ptr<sbe::EExpression> e) {
     using namespace std::literals;
-    return makeBinaryOp(sbe::EPrimBinary::fillEmpty, std::move(e), makeNullConstant());
+    return sbe::makeE<sbe::EPrimBinary>(
+        sbe::EPrimBinary::fillEmpty, std::move(e), makeNullConstant());
 }
 
 std::unique_ptr<sbe::EExpression> makeFillEmptyUndefined(std::unique_ptr<sbe::EExpression> e) {
     using namespace std::literals;
-    return makeBinaryOp(sbe::EPrimBinary::fillEmpty,
-                        std::move(e),
-                        makeConstant(sbe::value::TypeTags::bsonUndefined, 0));
+    return sbe::makeE<sbe::EPrimBinary>(sbe::EPrimBinary::fillEmpty,
+                                        std::move(e),
+                                        makeConstant(sbe::value::TypeTags::bsonUndefined, 0));
 }
 
-std::unique_ptr<sbe::EExpression> makeNewBsonObject(std::vector<std::string> fields,
-                                                    sbe::EExpression::Vector values) {
+SbExpr makeNewBsonObject(StageBuilderState& state,
+                         std::vector<std::string> fields,
+                         SbExpr::Vector values) {
+    SbExprBuilder b(state);
+
     tassert(7103507,
             "Expected 'fields' and 'values' to be the same size",
             fields.size() == values.size());
@@ -305,85 +329,60 @@ std::unique_ptr<sbe::EExpression> makeNewBsonObject(std::vector<std::string> fie
     }
 
     auto makeObjSpec =
-        makeConstant(sbe::value::TypeTags::makeObjSpec,
-                     sbe::value::bitcastFrom<sbe::MakeObjSpec*>(new sbe::MakeObjSpec(
-                         FieldListScope::kOpen, std::move(fields), std::move(fieldActions))));
-    auto makeObjRoot = makeNothingConstant();
-    sbe::EExpression::Vector makeObjArgs;
+        b.makeConstant(sbe::value::TypeTags::makeObjSpec,
+                       sbe::value::bitcastFrom<sbe::MakeObjSpec*>(new sbe::MakeObjSpec(
+                           FieldListScope::kOpen, std::move(fields), std::move(fieldActions))));
+    auto makeObjRoot = b.makeNothingConstant();
+    SbExpr::Vector makeObjArgs;
     makeObjArgs.reserve(2 + values.size());
+
     makeObjArgs.push_back(std::move(makeObjSpec));
     makeObjArgs.push_back(std::move(makeObjRoot));
     std::move(values.begin(), values.end(), std::back_inserter(makeObjArgs));
 
-    return sbe::makeE<sbe::EFunction>("makeBsonObj", std::move(makeObjArgs));
+    return b.makeFunction("makeBsonObj", std::move(makeObjArgs));
 }
 
-std::unique_ptr<sbe::EExpression> makeShardKeyFunctionForPersistedDocuments(
-    const std::vector<sbe::MatchPath>& shardKeyPaths,
-    const std::vector<bool>& shardKeyHashed,
-    const PlanStageSlots& slots) {
+SbExpr makeShardKeyFunctionForPersistedDocuments(StageBuilderState& state,
+                                                 const std::vector<sbe::MatchPath>& shardKeyPaths,
+                                                 const std::vector<bool>& shardKeyHashed,
+                                                 const PlanStageSlots& slots) {
+    SbExprBuilder b(state);
+
     // Build an expression to extract the shard key from the document based on the shard key
     // pattern. To do this, we iterate over the shard key pattern parts and build nested 'getField'
     // expressions. This will handle single-element paths, and dotted paths for each shard key part.
     std::vector<std::string> projectFields;
-    sbe::EExpression::Vector projectValues;
+    SbExpr::Vector projectValues;
 
     projectFields.reserve(shardKeyPaths.size());
     projectValues.reserve(shardKeyPaths.size());
     for (size_t i = 0; i < shardKeyPaths.size(); ++i) {
         const auto& fieldRef = shardKeyPaths[i];
 
-        auto shardKeyBinding = sbe::makeE<sbe::EVariable>(
-            slots.get(std::make_pair(PlanStageSlots::kField, fieldRef.getPart(0))).slotId);
+        SbExpr shardKeyBinding =
+            SbExpr{slots.get(std::make_pair(PlanStageSlots::kField, fieldRef.getPart(0)))};
         if (fieldRef.numParts() > 1) {
             for (size_t level = 1; level < fieldRef.numParts(); ++level) {
-                shardKeyBinding = makeFunction(
-                    "getField", std::move(shardKeyBinding), makeStrConstant(fieldRef[level]));
+                shardKeyBinding = b.makeFunction(
+                    "getField", std::move(shardKeyBinding), b.makeStrConstant(fieldRef[level]));
             }
         }
-        shardKeyBinding = makeFillEmptyNull(std::move(shardKeyBinding));
+        shardKeyBinding = b.makeFillEmptyNull(std::move(shardKeyBinding));
         // If this is a hashed shard key then compute the hash value.
         if (shardKeyHashed[i]) {
-            shardKeyBinding = makeFunction("shardHash"_sd, std::move(shardKeyBinding));
+            shardKeyBinding = b.makeFunction("shardHash"_sd, std::move(shardKeyBinding));
         }
 
         projectFields.push_back(fieldRef.dottedField().toString());
         projectValues.push_back(std::move(shardKeyBinding));
     }
 
-    return makeNewBsonObject(std::move(projectFields), std::move(projectValues));
+    return makeNewBsonObject(state, std::move(projectFields), std::move(projectValues));
 }
 
 SbStage makeProject(SbStage stage, sbe::SlotExprPairVector projects, PlanNodeId nodeId) {
     return sbe::makeS<sbe::ProjectStage>(std::move(stage), std::move(projects), nodeId);
-}
-
-SbStage makeHashAgg(SbStage stage,
-                    const sbe::value::SlotVector& gbs,
-                    sbe::AggExprVector aggs,
-                    boost::optional<sbe::value::SlotId> collatorSlot,
-                    bool allowDiskUse,
-                    sbe::SlotExprPairVector mergingExprs,
-                    PlanYieldPolicy* yieldPolicy,
-                    PlanNodeId planNodeId) {
-    // In debug builds or when we explicitly set the query knob, we artificially force frequent
-    // spilling. This makes sure that our tests exercise the spilling algorithm and the associated
-    // logic for merging partial aggregates which otherwise would require large data sizes to
-    // exercise.
-    const bool forceIncreasedSpilling = allowDiskUse &&
-        (kDebugBuild || internalQuerySlotBasedExecutionHashAggForceIncreasedSpilling.load());
-    return sbe::makeS<sbe::HashAggStage>(std::move(stage),
-                                         gbs,
-                                         std::move(aggs),
-                                         sbe::makeSV(),
-                                         true /* optimized close */,
-                                         collatorSlot,
-                                         allowDiskUse,
-                                         std::move(mergingExprs),
-                                         yieldPolicy,
-                                         planNodeId,
-                                         true /* participateInTrialRunTracking */,
-                                         forceIncreasedSpilling);
 }
 
 std::unique_ptr<sbe::EExpression> makeIf(std::unique_ptr<sbe::EExpression> condExpr,
@@ -822,19 +821,21 @@ bool indexKeyConsistencyCheckCallback(OperationContext* opCtx,
     return true;
 }
 
-std::tuple<std::unique_ptr<sbe::PlanStage>, SbSlot, SbSlot, sbe::value::SlotVector>
-makeLoopJoinForFetch(std::unique_ptr<sbe::PlanStage> inputStage,
-                     std::vector<std::string> fields,
-                     SbSlot seekRecordIdSlot,
-                     SbSlot snapshotIdSlot,
-                     SbSlot indexIdentSlot,
-                     SbSlot indexKeySlot,
-                     SbSlot indexKeyPatternSlot,
-                     boost::optional<SbSlot> prefetchedResultSlot,
-                     const CollectionPtr& collToFetch,
-                     StageBuilderState& state,
-                     PlanNodeId planNodeId,
-                     sbe::value::SlotVector slotsToForward) {
+std::tuple<SbStage, SbSlot, SbSlot, SbSlotVector> makeLoopJoinForFetch(
+    SbStage inputStage,
+    std::vector<std::string> fields,
+    SbSlot seekRecordIdSlot,
+    SbSlot snapshotIdSlot,
+    SbSlot indexIdentSlot,
+    SbSlot indexKeySlot,
+    SbSlot indexKeyPatternSlot,
+    boost::optional<SbSlot> prefetchedResultSlot,
+    const CollectionPtr& collToFetch,
+    StageBuilderState& state,
+    PlanNodeId planNodeId,
+    SbSlotVector slotsToForward) {
+    SbBuilder b(state, planNodeId);
+
     // It is assumed that we are generating a fetch loop join over the main collection. If we are
     // generating a fetch over a secondary collection, it is the responsibility of a parent node
     // in the QSN tree to indicate which collection we are fetching over.
@@ -842,39 +843,23 @@ makeLoopJoinForFetch(std::unique_ptr<sbe::PlanStage> inputStage,
 
     sbe::ScanCallbacks callbacks(indexKeyCorruptionCheckCallback, indexKeyConsistencyCheckCallback);
 
-    // Allocate a new result slot and a new record ID slot.
-    SbSlot resultSlot = state.slotId();
-    SbSlot recordIdSlot = state.slotId();
-
-    // Allocate a new slot for each field in 'fields'.
-    sbe::value::SlotVector fieldSlots;
-    for (size_t i = 0; i < fields.size(); ++i) {
-        fieldSlots.push_back(state.slotId());
-    }
+    SbIndexInfoSlots indexInfoSlots;
+    indexInfoSlots.indexIdentSlot = indexIdentSlot;
+    indexInfoSlots.indexKeySlot = indexKeySlot;
+    indexInfoSlots.indexKeyPatternSlot = indexKeyPatternSlot;
+    indexInfoSlots.snapshotIdSlot = snapshotIdSlot;
 
     // Create a limit-1/scan subtree to perform the seek.
-    auto seekStage = sbe::makeS<sbe::LimitSkipStage>(
-        sbe::makeS<sbe::ScanStage>(collToFetch->uuid(),
-                                   collToFetch->ns().dbName(),
-                                   resultSlot.getId(),
-                                   recordIdSlot.getId(),
-                                   snapshotIdSlot.getId(),
-                                   indexIdentSlot.getId(),
-                                   indexKeySlot.getId(),
-                                   indexKeyPatternSlot.getId(),
-                                   boost::none /* oplogTsSlot */,
-                                   fields,
-                                   fieldSlots,
-                                   seekRecordIdSlot.getId(),
-                                   boost::none /* minRecordIdSlot */,
-                                   boost::none /* maxRecordIdSlot */,
-                                   true /* forward */,
-                                   nullptr /* yieldPolicy */,
-                                   planNodeId,
-                                   std::move(callbacks)),
-        makeInt64Constant(1),
-        nullptr,
-        planNodeId);
+    auto [scanStage, resultSlot, recordIdSlot, fieldSlots] = b.makeScan(collToFetch->uuid(),
+                                                                        collToFetch->ns().dbName(),
+                                                                        true /* forward */,
+                                                                        seekRecordIdSlot,
+                                                                        fields,
+                                                                        {} /* scanBounds */,
+                                                                        std::move(indexInfoSlots),
+                                                                        std::move(callbacks));
+
+    auto seekStage = b.makeLimit(std::move(scanStage), b.makeInt64Constant(1));
 
     if (prefetchedResultSlot) {
         // Prepare to create a BranchStage, with one branch performing retrieving the result object
@@ -895,8 +880,8 @@ makeLoopJoinForFetch(std::unique_ptr<sbe::PlanStage> inputStage,
         // 'thenResultSlot', 'thenRecordIdSlot', and 'thenFieldSlots', respectively.
         SbSlot thenResultSlot = resultSlot;
         SbSlot thenRecordIdSlot = recordIdSlot;
-        sbe::value::SlotVector thenFieldSlots = std::move(fieldSlots);
-        fieldSlots = sbe::value::SlotVector{};
+        SbSlotVector thenFieldSlots = std::move(fieldSlots);
+        fieldSlots = SbSlotVector{};
 
         // Move 'seekStage' into 'thenStage'. We will re-initialize 'seekStage' later.
         auto thenStage = std::move(seekStage);
@@ -904,24 +889,22 @@ makeLoopJoinForFetch(std::unique_ptr<sbe::PlanStage> inputStage,
 
         // Set 'resultSlot' and 'recordIdSlot' to point to newly allocated slots. Also,
         // clear 'fieldSlots' and then fill it with newly allocated slots for each field.
-        resultSlot = state.slotId();
-        recordIdSlot = state.slotId();
+        resultSlot = SbSlot{state.slotId()};
+        recordIdSlot = SbSlot{state.slotId()};
 
         for (size_t i = 0; i < fields.size(); ++i) {
-            fieldSlots.push_back(state.slotId());
+            fieldSlots.push_back(SbSlot{state.slotId()});
         }
 
         // Allocate new slots for the result and record ID produced by the else branch.
-        SbSlot elseResultSlot = state.slotId();
-        SbSlot elseRecordIdSlot = state.slotId();
+        auto elseResultSlot = SbSlot{state.slotId()};
+        auto elseRecordIdSlot = SbSlot{state.slotId()};
 
         // Create a project/limit-1/coscan subtree for the else branch.
-        auto elseStage = sbe::makeProjectStage(makeLimitCoScanTree(planNodeId, 1),
-                                               planNodeId,
-                                               elseResultSlot.getId(),
-                                               makeVariable(*prefetchedResultSlot),
-                                               elseRecordIdSlot.getId(),
-                                               makeVariable(seekRecordIdSlot));
+        auto [elseStage, _] =
+            b.makeProject(b.makeLimitOneCoScanTree(),
+                          std::pair(SbExpr{*prefetchedResultSlot}, elseResultSlot),
+                          std::pair(SbExpr{seekRecordIdSlot}, elseRecordIdSlot));
 
         // Project the fields to slots for the else branch.
         auto [outStage, elseFieldSlots] = projectFieldsToSlots(
@@ -930,45 +913,35 @@ makeLoopJoinForFetch(std::unique_ptr<sbe::PlanStage> inputStage,
 
         auto conditionExpr = makeNot(makeFunction("exists", makeVariable(*prefetchedResultSlot)));
 
-        auto outputSlots = sbe::makeSV(resultSlot.getId(), recordIdSlot.getId());
+        auto outputSlots = SbExpr::makeSV(resultSlot, recordIdSlot);
         outputSlots.insert(outputSlots.end(), fieldSlots.begin(), fieldSlots.end());
 
-        auto thenOutputSlots = sbe::makeSV(thenResultSlot.getId(), thenRecordIdSlot.getId());
+        auto thenOutputSlots = SbExpr::makeSV(thenResultSlot, thenRecordIdSlot);
         thenOutputSlots.insert(thenOutputSlots.end(), thenFieldSlots.begin(), thenFieldSlots.end());
 
-        auto elseOutputSlots = sbe::makeSV(elseResultSlot.getId(), elseRecordIdSlot.getId());
-        for (size_t i = 0; i < elseFieldSlots.size(); ++i) {
-            elseOutputSlots.push_back(elseFieldSlots[i].getId());
-        }
+        auto elseOutputSlots = SbExpr::makeSV(elseResultSlot, elseRecordIdSlot);
+        elseOutputSlots.insert(elseOutputSlots.end(), elseFieldSlots.begin(), elseFieldSlots.end());
 
         // Create a BranchStage that combines 'thenStage' and 'elseStage' and store it in
         // 'seekStage'.
         seekStage = sbe::makeS<sbe::BranchStage>(std::move(thenStage),
                                                  std::move(elseStage),
                                                  std::move(conditionExpr),
-                                                 std::move(thenOutputSlots),
-                                                 std::move(elseOutputSlots),
-                                                 std::move(outputSlots),
+                                                 b.lower(thenOutputSlots),
+                                                 b.lower(elseOutputSlots),
+                                                 b.lower(outputSlots),
                                                  planNodeId);
     }
 
-    auto correlatedSlots = sbe::makeSV(seekRecordIdSlot.getId(),
-                                       snapshotIdSlot.getId(),
-                                       indexIdentSlot.getId(),
-                                       indexKeySlot.getId(),
-                                       indexKeyPatternSlot.getId());
-
+    auto correlatedSlots = SbExpr::makeSV(
+        seekRecordIdSlot, snapshotIdSlot, indexIdentSlot, indexKeySlot, indexKeyPatternSlot);
     if (prefetchedResultSlot) {
-        correlatedSlots.push_back(prefetchedResultSlot->getId());
+        correlatedSlots.emplace_back(*prefetchedResultSlot);
     }
 
     // Create a LoopJoinStage that combines 'inputStage' and 'seekStage'.
-    auto loopJoinStage = sbe::makeS<sbe::LoopJoinStage>(std::move(inputStage),
-                                                        std::move(seekStage),
-                                                        std::move(slotsToForward),
-                                                        std::move(correlatedSlots),
-                                                        nullptr /* predicate */,
-                                                        planNodeId);
+    auto loopJoinStage = b.makeLoopJoin(
+        std::move(inputStage), std::move(seekStage), slotsToForward, correlatedSlots);
 
     return {std::move(loopJoinStage), resultSlot, recordIdSlot, std::move(fieldSlots)};
 }
@@ -1413,13 +1386,13 @@ std::unique_ptr<sbe::SortSpec> makeSortSpecFromSortPattern(
  * this is fine (and actually preferable).
  */
 std::unique_ptr<SlotTreeNode> buildKeyPatternTree(const BSONObj& keyPattern,
-                                                  const sbe::value::SlotVector& slots) {
+                                                  const SbSlotVector& slots) {
     std::vector<StringData> paths;
     for (auto&& elem : keyPattern) {
         paths.emplace_back(elem.fieldNameStringData());
     }
 
-    return buildPathTree<boost::optional<sbe::value::SlotId>>(
+    return buildPathTree<boost::optional<SbSlot>>(
         paths, slots.begin(), slots.end(), BuildPathTreeMode::RemoveConflictingPaths);
 }
 
@@ -1430,24 +1403,25 @@ std::unique_ptr<SlotTreeNode> buildKeyPatternTree(const BSONObj& keyPattern,
  * Example: Given the key pattern {a.b: 1, x: 1, a.c: 1} and the index key {"": 1, "": 2, "": 3},
  * the SBE expression returned by this function would produce the object {a: {b: 1, c: 3}, x: 2}.
  */
-std::unique_ptr<sbe::EExpression> buildNewObjExpr(const SlotTreeNode* kpTree) {
-    sbe::EExpression::Vector args;
+SbExpr buildNewObjExpr(StageBuilderState& state, const SlotTreeNode* kpTree) {
+    SbExprBuilder b(state);
 
+    SbExpr::Vector args;
     for (auto&& node : kpTree->children) {
         auto& fieldName = node->name;
 
-        args.emplace_back(makeStrConstant(fieldName));
+        args.emplace_back(b.makeStrConstant(fieldName));
         if (node->value) {
-            args.emplace_back(makeVariable(*node->value));
+            args.emplace_back(*node->value);
         } else {
             // The reason this is in an else branch is that in the case where we have an index key
             // like {a.b: ..., a: ...}, we've already made the logic for reconstructing the 'a'
             // portion, so the 'a.b' subtree can be skipped.
-            args.push_back(buildNewObjExpr(node.get()));
+            args.push_back(buildNewObjExpr(state, node.get()));
         }
     }
 
-    return sbe::makeE<sbe::EFunction>("newObj", std::move(args));
+    return b.makeFunction("newObj", std::move(args));
 }
 
 /**
@@ -1455,15 +1429,11 @@ std::unique_ptr<sbe::EExpression> buildNewObjExpr(const SlotTreeNode* kpTree) {
  * add a ProjectStage to the tree which rehydrates the index key and stores the result in
  * 'resultSlot.'
  */
-std::unique_ptr<sbe::PlanStage> rehydrateIndexKey(std::unique_ptr<sbe::PlanStage> stage,
-                                                  const BSONObj& indexKeyPattern,
-                                                  PlanNodeId nodeId,
-                                                  const sbe::value::SlotVector& indexKeySlots,
-                                                  sbe::value::SlotId resultSlot) {
+SbExpr rehydrateIndexKey(StageBuilderState& state,
+                         const BSONObj& indexKeyPattern,
+                         const SbSlotVector& indexKeySlots) {
     auto kpTree = buildKeyPatternTree(indexKeyPattern, indexKeySlots);
-    auto keyExpr = buildNewObjExpr(kpTree.get());
-
-    return sbe::makeProjectStage(std::move(stage), nodeId, resultSlot, std::move(keyExpr));
+    return buildNewObjExpr(state, kpTree.get());
 }
 
 namespace {
@@ -1546,14 +1516,15 @@ struct ProjectFieldsNodeValue {
     bool incrementedDepth{false};
 };
 
-std::pair<std::unique_ptr<sbe::PlanStage>, SbSlotVector> projectFieldsToSlots(
-    std::unique_ptr<sbe::PlanStage> stage,
-    const std::vector<std::string>& fields,
-    boost::optional<SbSlot> resultSlot,
-    PlanNodeId nodeId,
-    sbe::value::SlotIdGenerator* slotIdGenerator,
-    StageBuilderState& state,
-    const PlanStageSlots* slots) {
+std::pair<SbStage, SbSlotVector> projectFieldsToSlots(SbStage stage,
+                                                      const std::vector<std::string>& fields,
+                                                      boost::optional<SbSlot> resultSlot,
+                                                      PlanNodeId nodeId,
+                                                      sbe::value::SlotIdGenerator* slotIdGenerator,
+                                                      StageBuilderState& state,
+                                                      const PlanStageSlots* slots) {
+    SbBuilder b(state, nodeId);
+
     // 'outputSlots' will match the order of 'fields'. Bail out early if 'fields' is empty.
     SbSlotVector outputSlots;
     if (fields.empty()) {
@@ -1565,29 +1536,25 @@ std::pair<std::unique_ptr<sbe::PlanStage>, SbSlotVector> projectFieldsToSlots(
         fields.begin(), fields.end(), [](auto&& s) { return s.find('.') == std::string::npos; });
 
     if (topLevelFieldsOnly) {
-        sbe::SlotExprPairVector projects;
+        SbExprOptSbSlotVector projects;
+
         for (size_t i = 0; i < fields.size(); ++i) {
             auto name = std::make_pair(PlanStageSlots::kField, StringData(fields[i]));
             auto fieldSlot = slots ? slots->getIfExists(name) : boost::none;
             if (fieldSlot) {
-                outputSlots.emplace_back(*fieldSlot);
+                projects.emplace_back(*fieldSlot, boost::none);
             } else {
-                tassert(8323512,
+                tassert(9380405,
                         "Expected result slot or kField slot to be defined",
                         resultSlot.has_value());
 
-                auto slot = slotIdGenerator->generate();
-                auto getFieldExpr = makeFunction(
-                    "getField"_sd, makeVariable(*resultSlot), makeStrConstant(fields[i]));
-                outputSlots.emplace_back(slot);
-                projects.emplace_back(slot, std::move(getFieldExpr));
+                auto getFieldExpr = b.makeFunction(
+                    "getField"_sd, SbExpr{*resultSlot}, b.makeStrConstant(fields[i]));
+                projects.emplace_back(std::move(getFieldExpr), boost::none);
             }
         }
-        if (!projects.empty()) {
-            stage = sbe::makeS<sbe::ProjectStage>(std::move(stage), std::move(projects), nodeId);
-        }
 
-        return {std::move(stage), std::move(outputSlots)};
+        return b.makeProject(std::move(stage), std::move(projects));
     }
 
     // Handle the case where 'fields' contains at least one dotted path. We begin by creating a
@@ -1637,7 +1604,7 @@ std::pair<std::unique_ptr<sbe::PlanStage>, SbSlotVector> projectFieldsToSlots(
         visitPathTreeNodes(treeRoot.get(), preVisit, postVisit);
     }
 
-    std::vector<sbe::SlotExprPairVector> stackOfProjects;
+    std::vector<SbExprOptSbSlotVector> stackOfProjects;
     using DfsState = std::vector<std::pair<Node*, size_t>>;
     size_t depth = 0;
 
@@ -1656,12 +1623,12 @@ std::pair<std::unique_ptr<sbe::PlanStage>, SbSlotVector> projectFieldsToSlots(
                 tassert(7182002, "Expected DfsState to have at least 2 entries", dfs.size() >= 2);
 
                 auto parent = dfs[dfs.size() - 2].first;
-                tassert(8323513,
+                tassert(9380406,
                         "Expected parent's expression to be set",
                         !parent->value.expr.isNull());
 
-                auto getFieldExpr = makeFunction(
-                    "getField"_sd, parent->value.expr.getExpr(state), makeStrConstant(node->name));
+                auto getFieldExpr = b.makeFunction(
+                    "getField"_sd, parent->value.expr.clone(), b.makeStrConstant(node->name));
 
                 auto hasOneChildToVisit = [&] {
                     size_t count = 0;
@@ -1682,7 +1649,7 @@ std::pair<std::unique_ptr<sbe::PlanStage>, SbSlotVector> projectFieldsToSlots(
                 }
 
                 // We need to project 'getFieldExpr' to a slot.
-                auto slot = slotIdGenerator->generate();
+                auto slot = SbSlot{slotIdGenerator->generate()};
                 node->value.expr = slot;
                 node->value.visited = true;
                 // Grow 'stackOfProjects' if needed so that 'stackOfProjects[depth]' is valid.
@@ -1691,7 +1658,7 @@ std::pair<std::unique_ptr<sbe::PlanStage>, SbSlotVector> projectFieldsToSlots(
                 }
                 // Add the projection to the appropriate level of 'stackOfProjects'.
                 auto& projects = stackOfProjects[depth];
-                projects.emplace_back(slot, std::move(getFieldExpr));
+                projects.emplace_back(std::move(getFieldExpr), slot);
                 // Increment the depth while we visit node's descendents.
                 ++depth;
                 node->value.incrementedDepth = true;
@@ -1710,9 +1677,8 @@ std::pair<std::unique_ptr<sbe::PlanStage>, SbSlotVector> projectFieldsToSlots(
 
     // Generate a ProjectStage for each level of 'stackOfProjects'.
     for (auto&& projects : stackOfProjects) {
-        if (!projects.empty()) {
-            stage = sbe::makeS<sbe::ProjectStage>(std::move(stage), std::move(projects), nodeId);
-        }
+        auto [outStage, _] = b.makeProject(std::move(stage), std::move(projects));
+        stage = std::move(outStage);
     }
 
     for (auto* node : fieldNodes) {
