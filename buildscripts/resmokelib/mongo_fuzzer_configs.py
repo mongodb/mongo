@@ -332,6 +332,30 @@ def generate_special_mongod_parameters(rng, ret, fuzzer_stress_mode, params):
         ret["logicalSessionRefreshMillis"] = rng.choice(
             params["logicalSessionRefreshMillis"]["choices"]
         )
+    if rng.random() >= 0.1:
+        ret["failpoint.hangAfterPreCommittingCatalogUpdates"] = {"mode": "off"}
+        ret["failpoint.hangBeforePublishingCatalogUpdates"] = {"mode": "off"}
+    else:
+        waitMillisMax = params["failpoint.hangAfterPreCommittingCatalogUpdates"][
+            "pauseEntireCommitMillis"
+        ]["max"]
+        waitMillisMin = params["failpoint.hangAfterPreCommittingCatalogUpdates"][
+            "pauseEntireCommitMillis"
+        ]["min"]
+        ret["failpoint.hangAfterPreCommittingCatalogUpdates"] = {
+            "mode": {"activationProbability": random.uniform(0, 0.5)},
+            "data": {"pauseEntireCommitMillis": rng.randint(waitMillisMin, waitMillisMax)},
+        }
+        waitMillisMax = params["failpoint.hangBeforePublishingCatalogUpdates"][
+            "pauseEntireCommitMillis"
+        ]["max"]
+        waitMillisMin = params["failpoint.hangBeforePublishingCatalogUpdates"][
+            "pauseEntireCommitMillis"
+        ]["min"]
+        ret["failpoint.hangBeforePublishingCatalogUpdates"] = {
+            "mode": {"activationProbability": random.uniform(0, 0.5)},
+            "data": {"pauseEntireCommitMillis": rng.randint(waitMillisMin, waitMillisMax)},
+        }
     return ret
 
 
@@ -380,6 +404,8 @@ def generate_mongod_parameters(rng, fuzzer_stress_mode):
         "wiredTigerConcurrentReadTransactions",
         "wiredTigerConcurrentWriteTransactions",
         "wiredTigerStressConfig",
+        "failpoint.hangAfterPreCommittingCatalogUpdates",
+        "failpoint.hangBeforePublishingCatalogUpdates",
     ]
     # TODO (SERVER-75632): Remove/comment out the below line to enable passthrough testing.
     excluded_normal_params.append("lockCodeSegmentsInMemory")

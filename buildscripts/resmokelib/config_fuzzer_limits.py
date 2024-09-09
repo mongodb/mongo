@@ -165,6 +165,14 @@ config_fuzzer_params = {
         "ShardingTaskExecutorPoolMaxConnecting": {"min": 1, "max": 2},
         "warmMinConnectionsInShardingTaskExecutorPoolOnStartup": {"choices": [True, False]},
         "oplogBatchDelayMillis": {"min": 0, "max": 50},
+        # Test hanging a random amount of time during DDL commits. This widens the window of
+        # potential failure to have inconsistent CollectionCatalog instances with the WT snapshot.
+        "failpoint.hangAfterPreCommittingCatalogUpdates": {
+            "pauseEntireCommitMillis": {"min": 10, "max": 100},
+        },
+        "failpoint.hangBeforePublishingCatalogUpdates": {
+            "pauseEntireCommitMillis": {"min": 10, "max": 100},
+        },
     },
     "mongos": {
         # We need a higher timeout to account for test slowness

@@ -94,6 +94,7 @@ namespace mongo {
 // Failpoint which causes catalog updates to hang right before performing a durable commit of them.
 // This causes updates to have been precommitted.
 MONGO_FAIL_POINT_DEFINE(hangAfterPreCommittingCatalogUpdates);
+static constexpr auto kDelayEntireCommitFailpointField = "pauseEntireCommitMillis"_sd;
 
 // Failpoint which causes to hang after wuow commits, before publishing the catalog updates on a
 // given namespace.
@@ -368,7 +369,17 @@ public:
             // up for other transactions.
             uncommittedCatalogUpdates.markPrecommitted();
         });
-        hangAfterPreCommittingCatalogUpdates.pauseWhileSet();
+        hangAfterPreCommittingCatalogUpdates.execute([&](const BSONObj& data) {
+            const auto& millis = data.getField(kDelayEntireCommitFailpointField);
+            if (millis.ok()) {
+                LOGV2(9369501,
+                      "hangAfterPreCommittingCatalogUpdates causing a preCommit handler delay",
+                      "millis"_attr = millis.numberInt());
+                sleepFor(Milliseconds{millis.numberInt()});
+            } else {
+                hangAfterPreCommittingCatalogUpdates.pauseWhileSet();
+            }
+        });
     }
 
     void commit(OperationContext* opCtx, boost::optional<Timestamp> commitTime) override {
@@ -377,6 +388,17 @@ public:
 
         // Create catalog write jobs for all updates registered in this WriteUnitOfWork
         auto entries = _uncommittedCatalogUpdates.releaseEntries();
+        hangBeforePublishingCatalogUpdates.executeIf(
+            [&](const BSONObj& data) {
+                const auto millis = data.getField(kDelayEntireCommitFailpointField).numberInt();
+                LOGV2(9369500,
+                      "hangBeforePublishingCatalogUpdates causing a commit handler delay",
+                      "millis"_attr = millis);
+                sleepFor(Milliseconds{millis});
+            },
+            [&](const BSONObj& data) {
+                return data.getField(kDelayEntireCommitFailpointField).ok();
+            });
         for (auto&& entry : entries) {
             hangBeforePublishingCatalogUpdates.executeIf(
                 [&](const BSONObj& data) {
@@ -385,6 +407,10 @@ public:
                     hangBeforePublishingCatalogUpdates.pauseWhileSet();
                 },
                 [&](const BSONObj& data) {
+                    // We've already paused before, no need to pause again.
+                    if (data.getField(kDelayEntireCommitFailpointField).ok())
+                        return false;
+
                     const auto tenantField = data.getField("tenant");
                     const auto tenantId = tenantField.ok()
                         ? boost::optional<TenantId>(TenantId::parseFromBSON(tenantField))
