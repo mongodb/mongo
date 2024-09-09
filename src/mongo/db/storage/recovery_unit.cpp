@@ -57,7 +57,6 @@ namespace {
 // determine if documents changed, but a different recovery unit may be used across a getMore,
 // so there is a chance the snapshot ID will be reused.
 AtomicWord<unsigned long long> nextSnapshotId{1};
-MONGO_FAIL_POINT_DEFINE(widenWUOWChangesWindow);
 
 SnapshotId getNextSnapshotId() {
     return SnapshotId(nextSnapshotId.fetchAndAdd(1));
@@ -100,9 +99,6 @@ void RecoveryUnit::commitRegisteredChanges(boost::optional<Timestamp> commitTime
     // Getting to this method implies `runPreCommitHooks` completed successfully, resulting in
     // having its contents cleared.
     invariant(_preCommitHooks.empty());
-    if (MONGO_unlikely(widenWUOWChangesWindow.shouldFail())) {
-        sleepmillis(1000);
-    }
     _executeCommitHandlers(commitTimestamp);
 }
 
@@ -206,9 +202,6 @@ void RecoveryUnit::_executeCommitHandlers(boost::optional<Timestamp> commitTimes
 
 void RecoveryUnit::abortRegisteredChanges() {
     _preCommitHooks.clear();
-    if (MONGO_unlikely(widenWUOWChangesWindow.shouldFail())) {
-        sleepmillis(1000);
-    }
     _executeRollbackHandlers();
 }
 void RecoveryUnit::_executeRollbackHandlers() {
