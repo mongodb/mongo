@@ -70,6 +70,15 @@ const validateCollectionsBackgroundThread = function validateCollectionsBackgrou
         return {ok: 1};
     }
 
+    // Skip fast count validation on nodes using FCBIS since FCBIS can result in inaccurate fast
+    // counts.
+    if (conn.adminCommand({getParameter: 1, initialSyncMethod: 1}).initialSyncMethod ===
+        "fileCopyBased") {
+        print("Skipping fast count validation against test node: " + host +
+              " because it uses FCBIS and fast count is expected to be incorrect.");
+        TestData.skipEnforceFastCountOnValidate = true;
+    }
+
     print("Running background validation on all collections on test node: " + host);
 
     // Save a map of namespace to validate cmd results for any cmds that fail so that we can return
