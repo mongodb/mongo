@@ -40,6 +40,7 @@
 #include "mongo/bson/json.h"
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/client.h"
+#include "mongo/db/index/index_constants.h"
 #include "mongo/db/op_observer/op_observer.h"
 #include "mongo/db/op_observer/op_observer_noop.h"
 #include "mongo/db/op_observer/op_observer_registry.h"
@@ -221,8 +222,8 @@ protected:
     CollectionOptions _options;
 
     UUID _collUuid = UUID::gen();
-    BSONObj _idIndexSpec = BSON("v" << 1 << "key" << BSON("_id" << 1) << "name"
-                                    << "_id_");
+    BSONObj _idIndexSpec =
+        BSON("v" << 1 << "key" << BSON("_id" << 1) << "name" << IndexConstants::kIdIndexName);
 
     std::vector<BSONObj> _secondaryIndexSpecs{BSON("v" << 1 << "key" << BSON("a" << 1) << "name"
                                                        << "a_1"),
@@ -518,8 +519,8 @@ TEST_F(TenantCollectionClonerTest, InsertDocumentsFailed) {
 
 TEST_F(TenantCollectionClonerTest, QueryFailure) {
     // Set up data for preliminary stages
-    auto idIndexSpec = BSON("v" << 1 << "key" << BSON("_id" << 1) << "name"
-                                << "_id_");
+    auto idIndexSpec =
+        BSON("v" << 1 << "key" << BSON("_id" << 1) << "name" << IndexConstants::kIdIndexName);
     _mockServer->setCommandReply("count", createCountResponse(3));
     _mockServer->setCommandReply("listIndexes",
                                  createCursorResponse(_nss.ns_forTest(), BSON_ARRAY(idIndexSpec)));

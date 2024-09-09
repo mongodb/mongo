@@ -42,6 +42,7 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/catalog/collection_mock.h"
+#include "mongo/db/index/index_constants.h"
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/storage/key_format.h"
@@ -86,8 +87,7 @@ public:
         auto opCtxHolder{newOperationContext()};
         auto* const opCtx{opCtxHolder.get()};
 
-        BSONObj spec = BSON("key" << BSON("_id" << 1) << "name"
-                                  << "_id_"
+        BSONObj spec = BSON("key" << BSON("_id" << 1) << "name" << IndexConstants::kIdIndexName
                                   << "v" << static_cast<int>(IndexDescriptor::kLatestIndexVersion)
                                   << "unique" << true);
 

@@ -37,6 +37,7 @@
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/dbdirectclient.h"
+#include "mongo/db/index/index_constants.h"
 #include "mongo/db/s/config/config_server_test_fixture.h"
 #include "mongo/db/s/config/index_on_config.h"
 #include "mongo/db/s/config/sharding_catalog_manager.h"
@@ -61,8 +62,7 @@ TEST_F(ConfigIndexTest, CompatibleIndexAlreadyExists) {
                   ->initializeConfigDatabaseIfNeeded(operationContext()));
 
     auto expectedShardsIndexes = std::vector<BSONObj>{
-        BSON("v" << 2 << "key" << BSON("_id" << 1) << "name"
-                 << "_id_"),
+        BSON("v" << 2 << "key" << BSON("_id" << 1) << "name" << IndexConstants::kIdIndexName),
         BSON("v" << 2 << "unique" << true << "key" << BSON("host" << 1) << "name"
                  << "host_1")};
 

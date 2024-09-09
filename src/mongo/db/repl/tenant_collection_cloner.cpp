@@ -54,6 +54,7 @@
 #include "mongo/db/database_name.h"
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/dbmessage.h"
+#include "mongo/db/index/index_constants.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/ops/single_write_result_gen.h"
 #include "mongo/db/ops/write_ops_exec.h"
@@ -295,7 +296,7 @@ BaseCloner::AfterStageBehavior TenantCollectionCloner::listIndexesStage() {
                       "tenantId"_attr = _tenantId);
     }
     for (auto&& spec : indexSpecs) {
-        if (spec.hasField("name") && spec.getStringField("name") == "_id_"_sd) {
+        if (spec.hasField("name") && spec.getStringField("name") == IndexConstants::kIdIndexName) {
             _idIndexSpec = spec.getOwned();
         } else {
             _readyIndexSpecs.push_back(spec.getOwned());

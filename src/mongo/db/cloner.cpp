@@ -67,6 +67,7 @@
 #include "mongo/db/concurrency/lock_manager_defs.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/database_name.h"
+#include "mongo/db/index/index_constants.h"
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/index_builds_coordinator.h"
 #include "mongo/db/namespace_string.h"
@@ -112,7 +113,7 @@ BSONObj DefaultClonerImpl::_getIdIndexSpec(const std::list<BSONObj>& indexSpecs)
         BSONElement indexName;
         uassertStatusOK(bsonExtractTypedField(
             indexSpec, IndexDescriptor::kIndexNameFieldName, String, &indexName));
-        if (indexName.valueStringData() == "_id_"_sd) {
+        if (indexName.valueStringData() == IndexConstants::kIdIndexName) {
             return indexSpec;
         }
     }

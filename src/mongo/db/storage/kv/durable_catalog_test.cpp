@@ -68,6 +68,7 @@
 #include "mongo/db/client.h"
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/concurrency/lock_manager_defs.h"
+#include "mongo/db/index/index_constants.h"
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/index/multikey_paths.h"
 #include "mongo/db/index_names.h"
@@ -275,7 +276,8 @@ protected:
         IndexDescriptor descriptor{"",
                                    BSON(IndexDescriptor::kKeyPatternFieldName
                                         << BSON("_id" << 1) << IndexDescriptor::kIndexNameFieldName
-                                        << "_id_" << IndexDescriptor::kIndexVersionFieldName << 2)};
+                                        << IndexConstants::kIdIndexName
+                                        << IndexDescriptor::kIndexVersionFieldName << 2)};
 
         BSONCollectionCatalogEntry::IndexMetaData imd;
         imd.spec = descriptor.infoObj();
@@ -803,7 +805,7 @@ TEST_F(ImportCollectionTest, ImportCollection) {
 
     md->options.uuid = UUID::gen();
     auto mdObj = md->toBSON();
-    auto idxIdentObj = BSON("_id_" << idxIdent);
+    auto idxIdentObj = BSON(IndexConstants::kIdIndexName << idxIdent);
 
     // Import should fail with missing "md" field.
     ASSERT_THROWS_CODE(
@@ -837,7 +839,8 @@ TEST_F(ImportCollectionTest, ImportCollection) {
     auto entry = getCatalog()->getEntry(importResult.catalogId);
     ASSERT_EQ(entry.nss, nss);
     ASSERT_EQ(entry.ident, ident);
-    ASSERT_EQ(getCatalog()->getIndexIdent(operationContext(), importResult.catalogId, "_id_"),
+    ASSERT_EQ(getCatalog()->getIndexIdent(
+                  operationContext(), importResult.catalogId, IndexConstants::kIdIndexName),
               idxIdent);
 
     // Test that a collection UUID is generated for import.
@@ -882,8 +885,9 @@ TEST_F(ImportCollectionTest, ImportCollectionRandConflict) {
     {
         auto swImportResult =
             importCollectionTest(nss,
-                                 BSON("md" << md->toBSON() << "idxIdent" << BSON("_id_" << idxIdent)
-                                           << "ns" << nss.ns_forTest() << "ident" << ident),
+                                 BSON("md" << md->toBSON() << "idxIdent"
+                                           << BSON(IndexConstants::kIdIndexName << idxIdent) << "ns"
+                                           << nss.ns_forTest() << "ident" << ident),
                                  storageMetadata);
         ASSERT_OK(swImportResult.getStatus());
     }

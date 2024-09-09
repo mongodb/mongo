@@ -48,6 +48,7 @@
 #include "mongo/db/client.h"
 #include "mongo/db/dbmessage.h"
 #include "mongo/db/feature_flag.h"
+#include "mongo/db/index/index_constants.h"
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/index_builds_coordinator.h"
 #include "mongo/db/multitenancy_gen.h"
@@ -306,7 +307,8 @@ BaseCloner::AfterStageBehavior CollectionCloner::listIndexesStage() {
             // Skip if the spec is for the collection's clusteredIndex.
         } else if (spec.hasField("buildUUID")) {
             _unfinishedIndexSpecs.push_back(spec.getOwned());
-        } else if (spec.hasField("name") && spec.getStringField("name") == "_id_"_sd) {
+        } else if (spec.hasField("name") &&
+                   spec.getStringField("name") == IndexConstants::kIdIndexName) {
             _idIndexSpec = spec.getOwned();
         } else {
             _readyIndexSpecs.push_back(spec.getOwned());

@@ -59,6 +59,7 @@
 #include "mongo/db/field_ref.h"
 #include "mongo/db/index/column_key_generator.h"
 #include "mongo/db/index/columns_access_method.h"
+#include "mongo/db/index/index_constants.h"
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/index/wildcard_key_generator.h"
 #include "mongo/db/index/wildcard_validation.h"
@@ -1062,7 +1063,7 @@ bool isIndexAllowedInAPIVersion1(const IndexDescriptor& indexDesc) {
 }
 
 BSONObj parseAndValidateIndexSpecs(OperationContext* opCtx, const BSONObj& indexSpecObj) {
-    constexpr auto k_id_ = "_id_"_sd;
+    constexpr auto k_id_ = IndexConstants::kIdIndexName;
     constexpr auto kStar = "*"_sd;
 
     BSONObj parsedIndexSpec = indexSpecObj;

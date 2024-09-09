@@ -52,6 +52,7 @@
 #include "mongo/db/database_name.h"
 #include "mongo/db/exec/document_value/value.h"
 #include "mongo/db/feature_compatibility_version_document_gen.h"
+#include "mongo/db/index/index_constants.h"
 #include "mongo/db/index_builds_coordinator.h"
 #include "mongo/db/index_builds_coordinator_mongod.h"
 #include "mongo/db/namespace_string.h"
@@ -3675,8 +3676,7 @@ TEST_F(InitialSyncerTest, LastOpTimeShouldBeSetEvenIfNoOperationsAreAppliedAfter
                 0LL,
                 NamespaceString(nss.getCommandNS()),
                 {BSON("v" << OplogEntry::kOplogVersion << "key" << BSON("_id" << 1) << "name"
-                          << "_id_"
-                          << "ns" << nss.ns_forTest())})
+                          << IndexConstants::kIdIndexName << "ns" << nss.ns_forTest())})
                 .data);
 
         {
@@ -4377,8 +4377,7 @@ TEST_F(InitialSyncerTest,
                 0LL,
                 NamespaceString(nss.getCommandNS()),
                 {BSON("v" << OplogEntry::kOplogVersion << "key" << BSON("_id" << 1) << "name"
-                          << "_id_"
-                          << "ns" << nss.ns_forTest())})
+                          << IndexConstants::kIdIndexName << "ns" << nss.ns_forTest())})
                 .data);
 
         {
@@ -4589,8 +4588,7 @@ TEST_F(InitialSyncerTest, TestRemainingInitialSyncEstimatedMillisMetric) {
                 0LL,
                 NamespaceString(nss.getCommandNS()),
                 {BSON("v" << OplogEntry::kOplogVersion << "key" << BSON("_id" << 1) << "name"
-                          << "_id_"
-                          << "ns" << nss.ns_forTest())})
+                          << IndexConstants::kIdIndexName << "ns" << nss.ns_forTest())})
                 .data);
         // Release the 'hangBeforeCloningFailPoint' to continue the cloning phase.
     }
@@ -4835,8 +4833,7 @@ TEST_F(InitialSyncerTest, GetInitialSyncProgressReturnsCorrectProgress) {
                 0LL,
                 NamespaceString(nss.getCommandNS()),
                 {BSON("v" << OplogEntry::kOplogVersion << "key" << BSON("_id" << 1) << "name"
-                          << "_id_"
-                          << "ns" << nss.ns_forTest())})
+                          << IndexConstants::kIdIndexName << "ns" << nss.ns_forTest())})
                 .data);
 
         // Play all but last of the successful round of responses.
@@ -5216,8 +5213,7 @@ TEST_F(InitialSyncerTest, GetInitialSyncProgressOmitsClonerStatsIfClonerStatsExc
                     0LL,
                     NamespaceString(nss.getCommandNS()),
                     {BSON("v" << OplogEntry::kOplogVersion << "key" << BSON("_id" << 1) << "name"
-                              << "_id_"
-                              << "ns" << nss.ns_forTest())})
+                              << IndexConstants::kIdIndexName << "ns" << nss.ns_forTest())})
                     .data);
 
             // Feature Compatibility Version.

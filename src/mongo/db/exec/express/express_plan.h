@@ -48,6 +48,7 @@
 #include "mongo/db/exec/update_stage.h"
 #include "mongo/db/exec/write_stage_common.h"
 #include "mongo/db/index/index_access_method.h"
+#include "mongo/db/index/index_constants.h"
 #include "mongo/db/internal_transactions_feature_flag_gen.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
@@ -418,7 +419,7 @@ public:
 
         _stats = stats;
         _stats->setStageName("EXPRESS_IXSCAN"_sd);
-        _stats->setIndexName("_id_"_sd);
+        _stats->setIndexName(IndexConstants::kIdIndexName);
         _stats->setIndexKeyPattern("{ _id: 1 }"_sd);
     }
 

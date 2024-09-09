@@ -58,6 +58,7 @@
 #include "mongo/db/concurrency/lock_manager_defs.h"
 #include "mongo/db/db_raii.h"
 #include "mongo/db/index/index_access_method.h"
+#include "mongo/db/index/index_constants.h"
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
@@ -89,10 +90,8 @@ namespace {
 const auto kIndexVersion = IndexDescriptor::IndexVersion::kV2;
 
 BSONObj makeIdIndexSpec(const NamespaceString& nss) {
-    return BSON("name"
-                << "_id_"
-                << "key" << BSON("_id" << 1) << "unique" << true << "v"
-                << static_cast<int>(kIndexVersion));
+    return BSON("name" << IndexConstants::kIdIndexName << "key" << BSON("_id" << 1) << "unique"
+                       << true << "v" << static_cast<int>(kIndexVersion));
 }
 
 /**
@@ -894,7 +893,7 @@ TEST_F(StorageInterfaceImplTest, FindDocumentsReturnsInvalidNamespaceIfCollectio
     auto opCtx = getOperationContext();
     StorageInterfaceImpl storage;
     auto nss = makeNamespace(_agent);
-    auto indexName = "_id_"_sd;
+    auto indexName = IndexConstants::kIdIndexName;
     ASSERT_EQUALS(ErrorCodes::NamespaceNotFound,
                   storage
                       .findDocuments(opCtx,
@@ -958,7 +957,7 @@ TEST_F(StorageInterfaceImplTest, FindDocumentsReturnsEmptyVectorIfCollectionIsEm
     auto opCtx = getOperationContext();
     StorageInterfaceImpl storage;
     auto nss = makeNamespace(_agent);
-    auto indexName = "_id_"_sd;
+    auto indexName = IndexConstants::kIdIndexName;
     ASSERT_OK(storage.createCollection(opCtx, nss, generateOptionsWithUuid()));
     ASSERT_TRUE(unittest::assertGet(storage.findDocuments(opCtx,
                                                           nss,
@@ -1016,7 +1015,7 @@ TEST_F(StorageInterfaceImplTest,
     auto opCtx = getOperationContext();
     StorageInterfaceImpl storage;
     auto nss = makeNamespace(_agent);
-    auto indexName = "_id_"_sd;
+    auto indexName = IndexConstants::kIdIndexName;
     ASSERT_OK(storage.createCollection(opCtx, nss, generateOptionsWithUuid()));
     ASSERT_OK(storage.insertDocuments(
         opCtx,
@@ -1153,7 +1152,7 @@ TEST_F(StorageInterfaceImplTest,
     auto opCtx = getOperationContext();
     StorageInterfaceImpl storage;
     auto nss = makeNamespace(_agent);
-    auto indexName = "_id_"_sd;
+    auto indexName = IndexConstants::kIdIndexName;
     ASSERT_OK(storage.createCollection(opCtx, nss, generateOptionsWithUuid()));
     ASSERT_OK(
         storage.insertDocuments(opCtx,
@@ -1369,7 +1368,7 @@ TEST_F(StorageInterfaceImplTest, DeleteDocumentsReturnsInvalidNamespaceIfCollect
     auto opCtx = getOperationContext();
     StorageInterfaceImpl storage;
     auto nss = makeNamespace(_agent);
-    auto indexName = "_id_"_sd;
+    auto indexName = IndexConstants::kIdIndexName;
     ASSERT_EQUALS(ErrorCodes::NamespaceNotFound,
                   storage
                       .deleteDocuments(opCtx,
@@ -1404,7 +1403,7 @@ TEST_F(StorageInterfaceImplTest, DeleteDocumentsReturnsEmptyVectorIfCollectionIs
     auto opCtx = getOperationContext();
     StorageInterfaceImpl storage;
     auto nss = makeNamespace(_agent);
-    auto indexName = "_id_"_sd;
+    auto indexName = IndexConstants::kIdIndexName;
     ASSERT_OK(storage.createCollection(opCtx, nss, generateOptionsWithUuid()));
     ASSERT_TRUE(
         unittest::assertGet(storage.deleteDocuments(opCtx,
@@ -1422,7 +1421,7 @@ TEST_F(StorageInterfaceImplTest,
     auto opCtx = getOperationContext();
     StorageInterfaceImpl storage;
     auto nss = makeNamespace(_agent);
-    auto indexName = "_id_"_sd;
+    auto indexName = IndexConstants::kIdIndexName;
     ASSERT_OK(storage.createCollection(opCtx, nss, generateOptionsWithUuid()));
     ASSERT_OK(
         storage.insertDocuments(opCtx,
@@ -1533,7 +1532,7 @@ TEST_F(StorageInterfaceImplTest,
     auto opCtx = getOperationContext();
     StorageInterfaceImpl storage;
     auto nss = makeNamespace(_agent);
-    auto indexName = "_id_"_sd;
+    auto indexName = IndexConstants::kIdIndexName;
     ASSERT_OK(storage.createCollection(opCtx, nss, generateOptionsWithUuid()));
     ASSERT_OK(
         storage.insertDocuments(opCtx,
@@ -1741,7 +1740,7 @@ TEST_F(StorageInterfaceImplTest,
     auto opCtx = getOperationContext();
     StorageInterfaceImpl storage;
     auto nss = makeNamespace(_agent);
-    auto indexName = "_id_"_sd;
+    auto indexName = IndexConstants::kIdIndexName;
     ASSERT_OK(storage.createCollection(opCtx, nss, generateOptionsWithUuidClustered()));
     ASSERT_OK(storage.insertDocuments(
         opCtx,
@@ -1878,7 +1877,7 @@ TEST_F(StorageInterfaceImplTest,
     auto opCtx = getOperationContext();
     StorageInterfaceImpl storage;
     auto nss = makeNamespace(_agent);
-    auto indexName = "_id_"_sd;
+    auto indexName = IndexConstants::kIdIndexName;
     ASSERT_OK(storage.createCollection(opCtx, nss, generateOptionsWithUuidClustered()));
     ASSERT_OK(
         storage.insertDocuments(opCtx,
@@ -2043,7 +2042,7 @@ TEST_F(StorageInterfaceImplTest,
     auto opCtx = getOperationContext();
     StorageInterfaceImpl storage;
     auto nss = makeNamespace(_agent);
-    auto indexName = "_id_"_sd;
+    auto indexName = IndexConstants::kIdIndexName;
     ASSERT_EQUALS(ErrorCodes::NamespaceNotFound,
                   storage
                       .deleteDocuments(opCtx,
@@ -2078,7 +2077,7 @@ TEST_F(StorageInterfaceImplTest, ClusteredDeleteDocumentsReturnsEmptyVectorIfCol
     auto opCtx = getOperationContext();
     StorageInterfaceImpl storage;
     auto nss = makeNamespace(_agent);
-    auto indexName = "_id_"_sd;
+    auto indexName = IndexConstants::kIdIndexName;
     ASSERT_OK(storage.createCollection(opCtx, nss, generateOptionsWithUuidClustered()));
     ASSERT_TRUE(
         unittest::assertGet(storage.deleteDocuments(opCtx,
@@ -2096,7 +2095,7 @@ TEST_F(StorageInterfaceImplTest,
     auto opCtx = getOperationContext();
     StorageInterfaceImpl storage;
     auto nss = makeNamespace(_agent);
-    auto indexName = "_id_"_sd;
+    auto indexName = IndexConstants::kIdIndexName;
     ASSERT_OK(storage.createCollection(opCtx, nss, generateOptionsWithUuidClustered()));
     ASSERT_OK(
         storage.insertDocuments(opCtx,
@@ -2207,7 +2206,7 @@ TEST_F(StorageInterfaceImplTest,
     auto opCtx = getOperationContext();
     StorageInterfaceImpl storage;
     auto nss = makeNamespace(_agent);
-    auto indexName = "_id_"_sd;
+    auto indexName = IndexConstants::kIdIndexName;
     ASSERT_OK(storage.createCollection(opCtx, nss, generateOptionsWithUuidClustered()));
     ASSERT_OK(
         storage.insertDocuments(opCtx,

@@ -47,6 +47,7 @@
 #include "mongo/db/auth/authorization_manager.h"
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/curop.h"
+#include "mongo/db/index/index_constants.h"
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/pipeline/aggregate_command_gen.h"
 #include "mongo/db/pipeline/document_source_merge.h"
@@ -115,7 +116,8 @@ bool supportsUniqueKey(const boost::intrusive_ptr<ExpressionContext>& expCtx,
                                : CollationSpec::kSimpleSpec));
 
     // SERVER-5335: The _id index does not report to be unique, but in fact is unique.
-    auto isIdIndex = index[IndexDescriptor::kIndexNameFieldName].String() == "_id_";
+    auto isIdIndex =
+        index[IndexDescriptor::kIndexNameFieldName].String() == IndexConstants::kIdIndexName;
     return (isIdIndex || index.getBoolField(IndexDescriptor::kUniqueFieldName)) &&
         !index.hasField(IndexDescriptor::kPartialFilterExprFieldName) &&
         CommonProcessInterface::keyPatternNamesExactPaths(

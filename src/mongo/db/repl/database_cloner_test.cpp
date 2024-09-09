@@ -41,6 +41,7 @@
 #include "mongo/bson/oid.h"
 #include "mongo/db/client.h"
 #include "mongo/db/cursor_id.h"
+#include "mongo/db/index/index_constants.h"
 #include "mongo/db/repl/database_cloner.h"
 #include "mongo/db/repl/initial_sync_cloner_test_fixture.h"
 #include "mongo/db/repl/storage_interface_mock.h"
@@ -336,8 +337,8 @@ TEST_F(DatabaseClonerTest, ListCollectionsFailsOnInvalidCollectionOptions) {
 TEST_F(DatabaseClonerTest, FirstCollectionListIndexesFailed) {
     auto uuid1 = UUID::gen();
     auto uuid2 = UUID::gen();
-    const BSONObj idIndexSpec = BSON("v" << 1 << "key" << BSON("_id" << 1) << "name"
-                                         << "_id_");
+    const BSONObj idIndexSpec =
+        BSON("v" << 1 << "key" << BSON("_id" << 1) << "name" << IndexConstants::kIdIndexName);
     const std::vector<BSONObj> sourceInfos = {BSON("name"
                                                    << "a"
                                                    << "type"
@@ -374,8 +375,8 @@ TEST_F(DatabaseClonerTest, FirstCollectionListIndexesFailed) {
 TEST_F(DatabaseClonerTest, CreateCollections) {
     auto uuid1 = UUID::gen();
     auto uuid2 = UUID::gen();
-    const BSONObj idIndexSpec = BSON("v" << 1 << "key" << BSON("_id" << 1) << "name"
-                                         << "_id_");
+    const BSONObj idIndexSpec =
+        BSON("v" << 1 << "key" << BSON("_id" << 1) << "name" << IndexConstants::kIdIndexName);
     const std::vector<BSONObj> sourceInfos = {BSON("name"
                                                    << "a"
                                                    << "type"
@@ -419,8 +420,8 @@ TEST_F(DatabaseClonerTest, CreateCollections) {
 TEST_F(DatabaseClonerTest, DatabaseAndCollectionStats) {
     auto uuid1 = UUID::gen();
     auto uuid2 = UUID::gen();
-    const BSONObj idIndexSpec = BSON("v" << 1 << "key" << BSON("_id" << 1) << "name"
-                                         << "_id_");
+    const BSONObj idIndexSpec =
+        BSON("v" << 1 << "key" << BSON("_id" << 1) << "name" << IndexConstants::kIdIndexName);
     const BSONObj extraIndexSpec = BSON("v" << 1 << "key" << BSON("x" << 1) << "name"
                                             << "_extra_");
     const std::vector<BSONObj> sourceInfos = {BSON("name"

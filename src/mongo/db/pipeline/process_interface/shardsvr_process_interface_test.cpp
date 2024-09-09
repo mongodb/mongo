@@ -37,6 +37,7 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/client.h"
 #include "mongo/db/cursor_id.h"
+#include "mongo/db/index/index_constants.h"
 #include "mongo/db/pipeline/document_source.h"
 #include "mongo/db/pipeline/document_source_out.h"
 #include "mongo/db/pipeline/document_source_queue.h"
@@ -130,9 +131,9 @@ TEST_F(ShardsvrProcessInterfaceTest, TestInsert) {
 
     // Mock the response to $out's "listIndexes" request.
     const BSONObj indexBSON = BSON("_id" << 1);
-    const BSONObj listIndexesResponse = BSON("v" << 1 << "key" << indexBSON << "name"
-                                                 << "_id_"
-                                                 << "ns" << kOutNss.toString_forTest());
+    const BSONObj listIndexesResponse =
+        BSON("v" << 1 << "key" << indexBSON << "name" << IndexConstants::kIdIndexName << "ns"
+                 << kOutNss.toString_forTest());
     onCommand([&](const executor::RemoteCommandRequest& request) {
         ASSERT_EQ("listIndexes", request.cmdObj.firstElement().fieldNameStringData());
         ASSERT_EQ(kOutNss.dbName(), request.dbname);

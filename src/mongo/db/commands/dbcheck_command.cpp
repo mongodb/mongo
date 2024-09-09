@@ -73,6 +73,7 @@
 #include "mongo/db/dbhelpers.h"
 #include "mongo/db/feature_flag.h"
 #include "mongo/db/index/index_access_method.h"
+#include "mongo/db/index/index_constants.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/read_write_concern_defaults.h"
@@ -131,8 +132,6 @@ std::deque<boost::optional<DbCheckCollectionInfo>> _dbChecksInProgress;
 // This is waited upon if there is found to already be a dbcheck command running, as
 // _dbchecksInProgress would indicate. This is signaled when a dbcheck command finishes.
 stdx::condition_variable _dbCheckNotifier;
-
-const auto kIdIndexName = "_id_"_sd;
 }  // namespace
 
 // The optional `tenantIdForStartStop` is used for dbCheckStart/dbCheckStop oplog entries so that
@@ -2076,7 +2075,7 @@ StatusWith<std::unique_ptr<DbCheckAcquisition>> DbChecker::_acquireDBCheckLocks(
 StatusWith<const IndexDescriptor*> DbChecker::_acquireIndex(OperationContext* opCtx,
                                                             const CollectionPtr& collection,
                                                             StringData indexName) {
-    if (indexName == kIdIndexName && collection->isClustered()) {
+    if (indexName == IndexConstants::kIdIndexName && collection->isClustered()) {
         Status status = Status(ErrorCodes::DbCheckAttemptOnClusteredCollectionIdIndex,
                                str::stream() << "Clustered collection doesn't have an _id index.");
         return status;

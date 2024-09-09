@@ -39,6 +39,7 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/catalog/index_key_validate.h"
+#include "mongo/db/index/index_constants.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/query/collation/collator_factory_mock.h"
 #include "mongo/db/query/collation/collator_interface.h"
@@ -412,12 +413,10 @@ class IdIndexSpecValidateTest : public ServiceContextMongoDTest {};
 TEST_F(IdIndexSpecValidateTest, ReturnsAnErrorIfKeyPatternIsIncorrectForIdIndex) {
     ASSERT_EQ(ErrorCodes::BadValue,
               validateIdIndexSpec(BSON("key" << BSON("_id" << -1) << "name"
-                                             << "_id_"
-                                             << "v" << 2)));
+                                             << IndexConstants::kIdIndexName << "v" << 2)));
     ASSERT_EQ(ErrorCodes::BadValue,
               validateIdIndexSpec(BSON("key" << BSON("a" << 1) << "name"
-                                             << "_id_"
-                                             << "v" << 2)));
+                                             << IndexConstants::kIdIndexName << "v" << 2)));
 }
 
 TEST_F(IdIndexSpecValidateTest, ReturnsOKStatusIfKeyPatternCorrectForIdIndex) {
@@ -427,39 +426,38 @@ TEST_F(IdIndexSpecValidateTest, ReturnsOKStatusIfKeyPatternCorrectForIdIndex) {
 }
 
 TEST_F(IdIndexSpecValidateTest, ReturnsAnErrorIfFieldNotAllowedForIdIndex) {
+    ASSERT_EQ(
+        ErrorCodes::InvalidIndexSpecificationOption,
+        validateIdIndexSpec(BSON("key" << BSON("_id" << 1) << "name" << IndexConstants::kIdIndexName
+                                       << "v" << 2 << "background" << false)));
+    ASSERT_EQ(
+        ErrorCodes::InvalidIndexSpecificationOption,
+        validateIdIndexSpec(BSON("key" << BSON("_id" << 1) << "name" << IndexConstants::kIdIndexName
+                                       << "v" << 2 << "unique" << true)));
     ASSERT_EQ(ErrorCodes::InvalidIndexSpecificationOption,
               validateIdIndexSpec(BSON("key" << BSON("_id" << 1) << "name"
-                                             << "_id_"
-                                             << "v" << 2 << "background" << false)));
-    ASSERT_EQ(ErrorCodes::InvalidIndexSpecificationOption,
-              validateIdIndexSpec(BSON("key" << BSON("_id" << 1) << "name"
-                                             << "_id_"
-                                             << "v" << 2 << "unique" << true)));
-    ASSERT_EQ(ErrorCodes::InvalidIndexSpecificationOption,
-              validateIdIndexSpec(BSON("key" << BSON("_id" << 1) << "name"
-                                             << "_id_"
-                                             << "v" << 2 << "partialFilterExpression"
-                                             << BSON("a" << 5))));
-    ASSERT_EQ(ErrorCodes::InvalidIndexSpecificationOption,
-              validateIdIndexSpec(BSON("key" << BSON("_id" << 1) << "name"
-                                             << "_id_"
-                                             << "v" << 2 << "sparse" << false)));
-    ASSERT_EQ(ErrorCodes::InvalidIndexSpecificationOption,
-              validateIdIndexSpec(BSON("key" << BSON("_id" << 1) << "name"
-                                             << "_id_"
-                                             << "v" << 2 << "expireAfterSeconds" << 3600)));
-    ASSERT_EQ(ErrorCodes::InvalidIndexSpecificationOption,
-              validateIdIndexSpec(BSON("key" << BSON("_id" << 1) << "name"
-                                             << "_id_"
-                                             << "v" << 2 << "storageEngine" << BSONObj())));
+                                             << IndexConstants::kIdIndexName << "v" << 2
+                                             << "partialFilterExpression" << BSON("a" << 5))));
+    ASSERT_EQ(
+        ErrorCodes::InvalidIndexSpecificationOption,
+        validateIdIndexSpec(BSON("key" << BSON("_id" << 1) << "name" << IndexConstants::kIdIndexName
+                                       << "v" << 2 << "sparse" << false)));
+    ASSERT_EQ(
+        ErrorCodes::InvalidIndexSpecificationOption,
+        validateIdIndexSpec(BSON("key" << BSON("_id" << 1) << "name" << IndexConstants::kIdIndexName
+                                       << "v" << 2 << "expireAfterSeconds" << 3600)));
+    ASSERT_EQ(
+        ErrorCodes::InvalidIndexSpecificationOption,
+        validateIdIndexSpec(BSON("key" << BSON("_id" << 1) << "name" << IndexConstants::kIdIndexName
+                                       << "v" << 2 << "storageEngine" << BSONObj())));
 }
 
 TEST_F(IdIndexSpecValidateTest, ReturnsOKStatusIfAllFieldsAllowedForIdIndex) {
-    ASSERT_OK(validateIdIndexSpec(BSON("key" << BSON("_id" << 1) << "name"
-                                             << "_id_"
-                                             << "v" << 2 << "collation"
-                                             << BSON("locale"
-                                                     << "simple"))));
+    ASSERT_OK(
+        validateIdIndexSpec(BSON("key" << BSON("_id" << 1) << "name" << IndexConstants::kIdIndexName
+                                       << "v" << 2 << "collation"
+                                       << BSON("locale"
+                                               << "simple"))));
 }
 
 }  // namespace id_index_spec_validate_test

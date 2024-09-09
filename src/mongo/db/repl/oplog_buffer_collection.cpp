@@ -52,6 +52,7 @@
 #include "mongo/db/catalog_raii.h"
 #include "mongo/db/concurrency/lock_manager_defs.h"
 #include "mongo/db/dbdirectclient.h"
+#include "mongo/db/index/index_constants.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/ops/single_write_result_gen.h"
 #include "mongo/db/ops/write_ops_exec.h"
@@ -73,7 +74,7 @@ namespace {
 const StringData kOplogEntryFieldName = "entry"_sd;
 const StringData kIdFieldName = "_id"_sd;
 const StringData kTimestampFieldName = "ts"_sd;
-const StringData kIdIdxName = "_id_"_sd;
+const StringData kIdIdxName = IndexConstants::kIdIndexName;
 
 const Timestamp kInvalidLastPushedTimestamp(0, 1);
 }  // namespace

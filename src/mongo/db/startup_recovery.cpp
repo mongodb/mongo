@@ -72,6 +72,7 @@
 #include "mongo/db/dbhelpers.h"
 #include "mongo/db/feature_compatibility_version_document_gen.h"
 #include "mongo/db/feature_compatibility_version_documentation.h"
+#include "mongo/db/index/index_constants.h"
 #include "mongo/db/index_builds_coordinator.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
@@ -211,7 +212,7 @@ bool checkIdIndexExists(OperationContext* opCtx, const Collection* coll) {
     coll->getAllIndexes(&indexNames);
 
     for (const auto& name : indexNames) {
-        if (name == "_id_") {
+        if (name == IndexConstants::kIdIndexName) {
             return true;
         }
     }

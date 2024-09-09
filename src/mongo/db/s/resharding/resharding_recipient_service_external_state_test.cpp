@@ -50,6 +50,7 @@
 #include "mongo/db/catalog_raii.h"
 #include "mongo/db/concurrency/lock_manager_defs.h"
 #include "mongo/db/dbdirectclient.h"
+#include "mongo/db/index/index_constants.h"
 #include "mongo/db/keypattern.h"
 #include "mongo/db/repl/member_state.h"
 #include "mongo/db/repl/oplog.h"
@@ -355,17 +356,16 @@ TEST_F(RecipientServiceExternalStateTest, CreateLocalReshardingCollectionBasic) 
                                                    kReshardingEpoch,
                                                    kReshardingTimestamp);
 
-    const std::vector<BSONObj> indexes = {BSON("v" << 2 << "key" << BSON("_id" << 1) << "name"
-                                                   << "_id_"),
-                                          BSON("v" << 2 << "key"
-                                                   << BSON("a" << 1 << "b"
-                                                               << "hashed")
-                                                   << "name"
-                                                   << "indexOne")};
+    const std::vector<BSONObj> indexes = {
+        BSON("v" << 2 << "key" << BSON("_id" << 1) << "name" << IndexConstants::kIdIndexName),
+        BSON("v" << 2 << "key"
+                 << BSON("a" << 1 << "b"
+                             << "hashed")
+                 << "name"
+                 << "indexOne")};
     // When creating collection, only _id index should be created.
-    const std::vector<BSONObj> expectedIndexes = {BSON("v" << 2 << "key" << BSON("_id" << 1)
-                                                           << "name"
-                                                           << "_id_")};
+    const std::vector<BSONObj> expectedIndexes = {
+        BSON("v" << 2 << "key" << BSON("_id" << 1) << "name" << IndexConstants::kIdIndexName)};
     auto future = launchAsync([&] {
         expectRefreshReturnForOriginalColl(
             kOrigNss, kShardKey, kOrigUUID, kOrigEpoch, kOrigTimestamp);
@@ -375,7 +375,7 @@ TEST_F(RecipientServiceExternalStateTest, CreateLocalReshardingCollectionBasic) 
             {BSON("name" << kOrigNss.coll() << "options" << BSONObj() << "info"
                          << BSON("readOnly" << false << "uuid" << kOrigUUID) << "idIndex"
                          << BSON("v" << 2 << "key" << BSON("_id" << 1) << "name"
-                                     << "_id_"))},
+                                     << IndexConstants::kIdIndexName))},
             HostAndPort(shards[1].getHost()));
         expectListIndexes(kOrigNss, kOrigUUID, indexes, HostAndPort(shards[0].getHost()));
         expectCollectionAndIndexesAggregation(kReshardingNss,
@@ -421,17 +421,16 @@ TEST_F(RecipientServiceExternalStateTest,
                                                    kReshardingEpoch,
                                                    kReshardingTimestamp);
 
-    const std::vector<BSONObj> indexes = {BSON("v" << 2 << "key" << BSON("_id" << 1) << "name"
-                                                   << "_id_"),
-                                          BSON("v" << 2 << "key"
-                                                   << BSON("a" << 1 << "b"
-                                                               << "hashed")
-                                                   << "name"
-                                                   << "indexOne")};
+    const std::vector<BSONObj> indexes = {
+        BSON("v" << 2 << "key" << BSON("_id" << 1) << "name" << IndexConstants::kIdIndexName),
+        BSON("v" << 2 << "key"
+                 << BSON("a" << 1 << "b"
+                             << "hashed")
+                 << "name"
+                 << "indexOne")};
     // When creating collection, only _id index should be created.
-    const std::vector<BSONObj> expectedIndexes = {BSON("v" << 2 << "key" << BSON("_id" << 1)
-                                                           << "name"
-                                                           << "_id_")};
+    const std::vector<BSONObj> expectedIndexes = {
+        BSON("v" << 2 << "key" << BSON("_id" << 1) << "name" << IndexConstants::kIdIndexName)};
 
     auto future = launchAsync([&] {
         expectRefreshReturnForOriginalColl(
@@ -444,7 +443,7 @@ TEST_F(RecipientServiceExternalStateTest,
             {BSON("name" << kOrigNss.coll() << "options" << BSONObj() << "info"
                          << BSON("readOnly" << false << "uuid" << kOrigUUID) << "idIndex"
                          << BSON("v" << 2 << "key" << BSON("_id" << 1) << "name"
-                                     << "_id_"))},
+                                     << IndexConstants::kIdIndexName))},
             HostAndPort(shards[1].getHost()));
 
         expectStaleEpochError(kOrigNss, "listIndexes");
@@ -494,17 +493,16 @@ TEST_F(RecipientServiceExternalStateTest,
                                                    kReshardingEpoch,
                                                    kReshardingTimestamp);
 
-    const std::vector<BSONObj> indexes = {BSON("v" << 2 << "key" << BSON("_id" << 1) << "name"
-                                                   << "_id_"),
-                                          BSON("v" << 2 << "key"
-                                                   << BSON("a" << 1 << "b"
-                                                               << "hashed")
-                                                   << "name"
-                                                   << "indexOne")};
+    const std::vector<BSONObj> indexes = {
+        BSON("v" << 2 << "key" << BSON("_id" << 1) << "name" << IndexConstants::kIdIndexName),
+        BSON("v" << 2 << "key"
+                 << BSON("a" << 1 << "b"
+                             << "hashed")
+                 << "name"
+                 << "indexOne")};
     // When creating collection, only _id index should be created.
-    const std::vector<BSONObj> expectedIndexes = {BSON("v" << 2 << "key" << BSON("_id" << 1)
-                                                           << "name"
-                                                           << "_id_")};
+    const std::vector<BSONObj> expectedIndexes = {
+        BSON("v" << 2 << "key" << BSON("_id" << 1) << "name" << IndexConstants::kIdIndexName)};
     // Create the collection and indexes to simulate retrying after a failover. Only include the id
     // index, because it is needed to create the collection.
     CollectionOptionsAndIndexes optionsAndIndexes = {
@@ -528,7 +526,7 @@ TEST_F(RecipientServiceExternalStateTest,
             {BSON("name" << kOrigNss.coll() << "options" << BSONObj() << "info"
                          << BSON("readOnly" << false << "uuid" << kOrigUUID) << "idIndex"
                          << BSON("v" << 2 << "key" << BSON("_id" << 1) << "name"
-                                     << "_id_"))},
+                                     << IndexConstants::kIdIndexName))},
             HostAndPort(shards[1].getHost()));
         expectListIndexes(kOrigNss, kOrigUUID, indexes, HostAndPort(shards[0].getHost()));
         expectCollectionAndIndexesAggregation(kReshardingNss,
@@ -574,20 +572,19 @@ TEST_F(RecipientServiceExternalStateTest,
                                                    kReshardingEpoch,
                                                    kReshardingTimestamp);
 
-    const std::vector<BSONObj> indexes = {BSON("v" << 2 << "key" << BSON("_id" << 1) << "name"
-                                                   << "_id_"),
-                                          BSON("v" << 2 << "key"
-                                                   << BSON("a" << 1 << "b"
-                                                               << "hashed")
-                                                   << "name"
-                                                   << "indexOne"),
-                                          BSON("v" << 2 << "key" << BSON("c.d" << 1) << "name"
-                                                   << "nested")};
+    const std::vector<BSONObj> indexes = {
+        BSON("v" << 2 << "key" << BSON("_id" << 1) << "name" << IndexConstants::kIdIndexName),
+        BSON("v" << 2 << "key"
+                 << BSON("a" << 1 << "b"
+                             << "hashed")
+                 << "name"
+                 << "indexOne"),
+        BSON("v" << 2 << "key" << BSON("c.d" << 1) << "name"
+                 << "nested")};
     // When creating collection, only _id index should be created, the other index is cloned
     // manually.
     const std::vector<BSONObj> expectedIndexes = {
-        BSON("v" << 2 << "key" << BSON("_id" << 1) << "name"
-                 << "_id_"),
+        BSON("v" << 2 << "key" << BSON("_id" << 1) << "name" << IndexConstants::kIdIndexName),
         BSON("v" << 2 << "key" << BSON("c.d" << 1) << "name"
                  << "nested")};
 
@@ -614,7 +611,7 @@ TEST_F(RecipientServiceExternalStateTest,
             {BSON("name" << kOrigNss.coll() << "options" << BSONObj() << "info"
                          << BSON("readOnly" << false << "uuid" << kOrigUUID) << "idIndex"
                          << BSON("v" << 2 << "key" << BSON("_id" << 1) << "name"
-                                     << "_id_"))},
+                                     << IndexConstants::kIdIndexName))},
             HostAndPort(shards[1].getHost()));
         expectListIndexes(kOrigNss, kOrigUUID, indexes, HostAndPort(shards[0].getHost()));
         expectCollectionAndIndexesAggregation(kReshardingNss,
@@ -660,13 +657,13 @@ TEST_F(RecipientServiceExternalStateTest,
                                                    kReshardingEpoch,
                                                    kReshardingTimestamp);
 
-    const std::vector<BSONObj> indexes = {BSON("v" << 2 << "key" << BSON("_id" << 1) << "name"
-                                                   << "_id_"),
-                                          BSON("v" << 2 << "key"
-                                                   << BSON("a" << 1 << "b"
-                                                               << "hashed")
-                                                   << "name"
-                                                   << "indexOne")};
+    const std::vector<BSONObj> indexes = {
+        BSON("v" << 2 << "key" << BSON("_id" << 1) << "name" << IndexConstants::kIdIndexName),
+        BSON("v" << 2 << "key"
+                 << BSON("a" << 1 << "b"
+                             << "hashed")
+                 << "name"
+                 << "indexOne")};
 
     // Create the collection and indexes to simulate retrying after a failover.
     CollectionOptionsAndIndexes optionsAndIndexes = {
@@ -683,7 +680,7 @@ TEST_F(RecipientServiceExternalStateTest,
             {BSON("name" << kOrigNss.coll() << "options" << BSONObj() << "info"
                          << BSON("readOnly" << false << "uuid" << kOrigUUID) << "idIndex"
                          << BSON("v" << 2 << "key" << BSON("_id" << 1) << "name"
-                                     << "_id_"))},
+                                     << IndexConstants::kIdIndexName))},
             HostAndPort(shards[1].getHost()));
         expectListIndexes(kOrigNss, kOrigUUID, indexes, HostAndPort(shards[0].getHost()));
         expectCollectionAndIndexesAggregation(kReshardingNss,

@@ -94,6 +94,7 @@
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/dbhelpers.h"
 #include "mongo/db/global_index.h"
+#include "mongo/db/index/index_constants.h"
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/index_builds_coordinator.h"
 #include "mongo/db/namespace_string.h"
@@ -883,7 +884,8 @@ const StringMap<ApplyOpMetadata> kOpsMap = {
           BSONObjBuilder idIndexSpecBuilder;
           idIndexSpecBuilder.append(IndexDescriptor::kIndexVersionFieldName,
                                     static_cast<int>(IndexVersion::kV1));
-          idIndexSpecBuilder.append(IndexDescriptor::kIndexNameFieldName, "_id_");
+          idIndexSpecBuilder.append(IndexDescriptor::kIndexNameFieldName,
+                                    IndexConstants::kIdIndexName);
           idIndexSpecBuilder.append(IndexDescriptor::kKeyPatternFieldName, BSON("_id" << 1));
           return createCollectionForApplyOps(
               opCtx, nss.dbName(), ui, cmd, allowRenameOutOfTheWay, idIndexSpecBuilder.done());

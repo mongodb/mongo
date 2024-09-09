@@ -40,6 +40,7 @@
 #include "mongo/bson/json.h"
 #include "mongo/bson/oid.h"
 #include "mongo/db/client.h"
+#include "mongo/db/index/index_constants.h"
 #include "mongo/db/repl/collection_cloner.h"
 #include "mongo/db/repl/initial_sync_cloner_test_fixture.h"
 #include "mongo/db/repl/repl_server_parameters_gen.h"
@@ -146,8 +147,8 @@ protected:
 
     NamespaceString _nss;
     UUID _collUuid = UUID::gen();
-    BSONObj _idIndexSpec = BSON("v" << 1 << "key" << BSON("_id" << 1) << "name"
-                                    << "_id_");
+    BSONObj _idIndexSpec =
+        BSON("v" << 1 << "key" << BSON("_id" << 1) << "name" << IndexConstants::kIdIndexName);
 
     std::vector<BSONObj> _secondaryIndexSpecs{BSON("v" << 1 << "key" << BSON("a" << 1) << "name"
                                                        << "a_1"),
@@ -596,8 +597,8 @@ TEST_F(CollectionClonerTestResumable, ResumableQueryFailTransientlyBeforeFirstBa
     _mockServer->setCommandReply("replSetGetRBID", fromjson("{ok:1, rbid:1}"));
 
     // Set up data for preliminary stages
-    auto idIndexSpec = BSON("v" << 1 << "key" << BSON("_id" << 1) << "name"
-                                << "_id_");
+    auto idIndexSpec =
+        BSON("v" << 1 << "key" << BSON("_id" << 1) << "name" << IndexConstants::kIdIndexName);
     // The collection cloner pre-stage makes a remote call to collStats to store in-progress
     // metrics.
     _mockServer->setCommandReply("collStats", BSON("size" << 10));
@@ -661,8 +662,8 @@ TEST_F(CollectionClonerTestResumable, ResumableQueryFailTransientlyAfterFirstBat
     _mockServer->setCommandReply("replSetGetRBID", fromjson("{ok:1, rbid:1}"));
 
     // Set up data for preliminary stages
-    auto idIndexSpec = BSON("v" << 1 << "key" << BSON("_id" << 1) << "name"
-                                << "_id_");
+    auto idIndexSpec =
+        BSON("v" << 1 << "key" << BSON("_id" << 1) << "name" << IndexConstants::kIdIndexName);
     setMockServerReplies(BSON("size" << 10),
                          createCountResponse(5),
                          createCursorResponse(_nss.ns_forTest(), BSON_ARRAY(idIndexSpec)));
@@ -717,8 +718,8 @@ TEST_F(CollectionClonerTestResumable, ResumableQueryNonRetriableError) {
     _mockServer->setCommandReply("replSetGetRBID", fromjson("{ok:1, rbid:1}"));
 
     // Set up data for preliminary stages
-    auto idIndexSpec = BSON("v" << 1 << "key" << BSON("_id" << 1) << "name"
-                                << "_id_");
+    auto idIndexSpec =
+        BSON("v" << 1 << "key" << BSON("_id" << 1) << "name" << IndexConstants::kIdIndexName);
     setMockServerReplies(BSON("size" << 10),
                          createCountResponse(3),
                          createCursorResponse(_nss.ns_forTest(), BSON_ARRAY(idIndexSpec)));
@@ -762,8 +763,8 @@ TEST_F(CollectionClonerTestResumable,
     _mockServer->setCommandReply("replSetGetRBID", fromjson("{ok:1, rbid:1}"));
 
     // Set up data for preliminary stages
-    auto idIndexSpec = BSON("v" << 1 << "key" << BSON("_id" << 1) << "name"
-                                << "_id_");
+    auto idIndexSpec =
+        BSON("v" << 1 << "key" << BSON("_id" << 1) << "name" << IndexConstants::kIdIndexName);
     setMockServerReplies(BSON("size" << 10),
                          createCountResponse(3),
                          createCursorResponse(_nss.ns_forTest(), BSON_ARRAY(idIndexSpec)));
@@ -807,8 +808,8 @@ TEST_F(CollectionClonerTestResumable, ResumableQueryNonTransientErrorAtRetry) {
     _mockServer->setCommandReply("replSetGetRBID", fromjson("{ok:1, rbid:1}"));
 
     // Set up data for preliminary stages
-    auto idIndexSpec = BSON("v" << 1 << "key" << BSON("_id" << 1) << "name"
-                                << "_id_");
+    auto idIndexSpec =
+        BSON("v" << 1 << "key" << BSON("_id" << 1) << "name" << IndexConstants::kIdIndexName);
     setMockServerReplies(BSON("size" << 10),
                          createCountResponse(5),
                          createCursorResponse(_nss.ns_forTest(), BSON_ARRAY(idIndexSpec)));
@@ -868,8 +869,8 @@ TEST_F(CollectionClonerTestResumable, ResumableQueryNonTransientErrorAfterPastRe
     _mockServer->setCommandReply("replSetGetRBID", fromjson("{ok:1, rbid:1}"));
 
     // Set up data for preliminary stages
-    auto idIndexSpec = BSON("v" << 1 << "key" << BSON("_id" << 1) << "name"
-                                << "_id_");
+    auto idIndexSpec =
+        BSON("v" << 1 << "key" << BSON("_id" << 1) << "name" << IndexConstants::kIdIndexName);
     setMockServerReplies(BSON("size" << 10),
                          createCountResponse(5),
                          createCursorResponse(_nss.ns_forTest(), BSON_ARRAY(idIndexSpec)));
@@ -945,8 +946,8 @@ TEST_F(CollectionClonerTestResumable, ResumableQueryTwoResumes) {
     _mockServer->setCommandReply("replSetGetRBID", fromjson("{ok:1, rbid:1}"));
 
     // Set up data for preliminary stages
-    auto idIndexSpec = BSON("v" << 1 << "key" << BSON("_id" << 1) << "name"
-                                << "_id_");
+    auto idIndexSpec =
+        BSON("v" << 1 << "key" << BSON("_id" << 1) << "name" << IndexConstants::kIdIndexName);
     setMockServerReplies(BSON("size" << 10),
                          createCountResponse(5),
                          createCursorResponse(_nss.ns_forTest(), BSON_ARRAY(idIndexSpec)));

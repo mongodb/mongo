@@ -57,6 +57,7 @@ mongo_cc_library(
         "clustered_collection_util.h",
         "collection_options.h",
         "collection_options_validation.h",
+        "//src/mongo/db/index:index_constants.h",
     ],
     deps = [
         # TODO(SERVER-93876): Technically only requires `//src/mongo/db:common`.

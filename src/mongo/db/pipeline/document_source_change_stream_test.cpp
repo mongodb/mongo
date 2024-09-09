@@ -58,6 +58,7 @@
 #include "mongo/db/exec/document_value/document_value_test_util.h"
 #include "mongo/db/exec/document_value/value.h"
 #include "mongo/db/feature_flag.h"
+#include "mongo/db/index/index_constants.h"
 #include "mongo/db/matcher/matcher.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/pipeline/aggregation_context_fixture.h"
@@ -1204,11 +1205,10 @@ TEST_F(ChangeStreamStageTest, TransformDropShowExpandedEvents) {
 }
 
 TEST_F(ChangeStreamStageTest, TransformCreate) {
-    OplogEntry create =
-        createCommand(BSON("create" << nss.coll() << "idIndex"
-                                    << BSON("v" << 2 << "key" << BSON("id" << 1)) << "name"
-                                    << "_id_"),
-                      testUuid());
+    OplogEntry create = createCommand(BSON("create" << nss.coll() << "idIndex"
+                                                    << BSON("v" << 2 << "key" << BSON("id" << 1))
+                                                    << "name" << IndexConstants::kIdIndexName),
+                                      testUuid());
 
     const auto expectedOpDescription =
         fromjson("{idIndex: {v: 2, key: {id: 1}}, name: '_id_', type: 'collection'}");
@@ -2466,8 +2466,9 @@ TEST_F(ChangeStreamStageTest, ClusterTimeMatchesOplogEntry) {
 }
 
 TEST_F(ChangeStreamStageTest, MatchFiltersCreateCollectionWhenShowExpandedEventsOff) {
-    auto collSpec = D{{"create", "foo"_sd},
-                      {"idIndex", D{{"v", 2}, {"key", D{{"_id", 1}}}, {"name", "_id_"_sd}}}};
+    auto collSpec =
+        D{{"create", "foo"_sd},
+          {"idIndex", D{{"v", 2}, {"key", D{{"_id", 1}}}, {"name", IndexConstants::kIdIndexName}}}};
     OplogEntry createColl = createCommand(collSpec.toBson(), testUuid());
     checkTransformation(createColl, boost::none);
 }

@@ -55,6 +55,7 @@
 #include "mongo/db/concurrency/exception_util.h"
 #include "mongo/db/concurrency/lock_manager_defs.h"
 #include "mongo/db/dbdirectclient.h"
+#include "mongo/db/index/index_constants.h"
 #include "mongo/db/keypattern.h"
 #include "mongo/db/logical_time.h"
 #include "mongo/db/namespace_string.h"
@@ -322,8 +323,7 @@ TEST_F(ConfigInitializationTest, BuildsNecessaryIndexes) {
                   ->initializeConfigDatabaseIfNeeded(operationContext()));
 
     std::vector<BSONObj> expectedChunksIndexes = std::vector<BSONObj>{
-        BSON("v" << 2 << "key" << BSON("_id" << 1) << "name"
-                 << "_id_"),
+        BSON("v" << 2 << "key" << BSON("_id" << 1) << "name" << IndexConstants::kIdIndexName),
         BSON("v" << 2 << "key" << BSON("uuid" << 1 << "min" << 1) << "name"
                  << "uuid_1_min_1"
                  << "unique" << true),
@@ -338,13 +338,11 @@ TEST_F(ConfigInitializationTest, BuildsNecessaryIndexes) {
                  << "uuid_1_shard_1_onCurrentShardSince_1")};
 
     auto expectedShardsIndexes = std::vector<BSONObj>{
-        BSON("v" << 2 << "key" << BSON("_id" << 1) << "name"
-                 << "_id_"),
+        BSON("v" << 2 << "key" << BSON("_id" << 1) << "name" << IndexConstants::kIdIndexName),
         BSON("v" << 2 << "unique" << true << "key" << BSON("host" << 1) << "name"
                  << "host_1")};
     auto expectedTagsIndexes = std::vector<BSONObj>{
-        BSON("v" << 2 << "key" << BSON("_id" << 1) << "name"
-                 << "_id_"),
+        BSON("v" << 2 << "key" << BSON("_id" << 1) << "name" << IndexConstants::kIdIndexName),
         BSON("v" << 2 << "unique" << true << "key" << BSON("ns" << 1 << "min" << 1) << "name"
                  << "ns_1_min_1"),
         BSON("v" << 2 << "key" << BSON("ns" << 1 << "tag" << 1) << "name"
@@ -361,12 +359,11 @@ TEST_F(ConfigInitializationTest, BuildsNecessaryIndexes) {
     assertBSONObjsSame(expectedTagsIndexes, foundTagsIndexes);
 
 
-    auto expectedPlacementHistoryIndexes =
-        std::vector<BSONObj>{BSON("v" << 2 << "key" << BSON("_id" << 1) << "name"
-                                      << "_id_"),
-                             BSON("v" << 2 << "unique" << true << "key"
-                                      << BSON("nss" << 1 << "timestamp" << -1) << "name"
-                                      << "nss_1_timestamp_-1")};
+    auto expectedPlacementHistoryIndexes = std::vector<BSONObj>{
+        BSON("v" << 2 << "key" << BSON("_id" << 1) << "name" << IndexConstants::kIdIndexName),
+        BSON("v" << 2 << "unique" << true << "key" << BSON("nss" << 1 << "timestamp" << -1)
+                 << "name"
+                 << "nss_1_timestamp_-1")};
     auto foundlacementHistoryIndexes = assertGet(
         getIndexes(operationContext(), NamespaceString::kConfigsvrPlacementHistoryNamespace));
     assertBSONObjsSame(expectedPlacementHistoryIndexes, foundlacementHistoryIndexes);

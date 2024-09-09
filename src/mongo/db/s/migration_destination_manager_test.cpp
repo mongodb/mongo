@@ -36,6 +36,7 @@
 #include "mongo/base/error_codes.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonmisc.h"
+#include "mongo/db/index/index_constants.h"
 #include "mongo/db/s/migration_destination_manager.h"
 #include "mongo/db/s/shard_server_test_fixture.h"
 #include "mongo/executor/network_test_env.h"
@@ -208,7 +209,7 @@ TEST_F(MigrationDestinationManagerNetworkTest,
                 BSON("name" << nss.coll() << "options" << BSONObj() << "info"
                             << BSON("readOnly" << false << "uuid" << UUID::gen()) << "idIndex"
                             << BSON("v" << 2 << "key" << BSON("_id" << 1) << "name"
-                                        << "_id_"))};
+                                        << IndexConstants::kIdIndexName))};
 
             std::string listCollectionsNs = str::stream()
                 << nss.db_forTest() << "$cmd.listCollections";
@@ -230,9 +231,8 @@ TEST_F(MigrationDestinationManagerNetworkTest,
             ASSERT_FALSE(request.cmdObj.hasField("readConcern"));
             ASSERT_FALSE(request.cmdObj.hasField("shardVersion"));
 
-            const std::vector<BSONObj> indexes = {BSON("v" << 2 << "key" << BSON("_id" << 1)
-                                                           << "name"
-                                                           << "_id_")};
+            const std::vector<BSONObj> indexes = {BSON(
+                "v" << 2 << "key" << BSON("_id" << 1) << "name" << IndexConstants::kIdIndexName)};
             return BSON(
                 "ok" << 1 << "cursor"
                      << BSON("id" << 0LL << "ns" << nss.ns_forTest() << "firstBatch" << indexes));

@@ -65,6 +65,7 @@
 #include "mongo/db/exec/collection_scan_common.h"
 #include "mongo/db/exec/delete_stage.h"
 #include "mongo/db/exec/update_stage.h"
+#include "mongo/db/index/index_constants.h"
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/index_builds_coordinator.h"
 #include "mongo/db/keypattern.h"
@@ -125,7 +126,7 @@ const char StorageInterfaceImpl::kRollbackIdDocumentId[] = "rollbackId";
 namespace {
 using UniqueLock = stdx::unique_lock<Latch>;
 
-const auto kIdIndexName = "_id_"_sd;
+const auto kIdIndexName = IndexConstants::kIdIndexName;
 
 }  // namespace
 

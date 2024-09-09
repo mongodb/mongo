@@ -39,6 +39,7 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/bsontypes.h"
 #include "mongo/db/catalog/clustered_collection_util.h"
+#include "mongo/db/index/index_constants.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/idl/idl_parser.h"
 #include "mongo/util/assert_util.h"
@@ -49,13 +50,11 @@
 namespace mongo {
 namespace clustered_util {
 
-static constexpr StringData kDefaultClusteredIndexName = "_id_"_sd;
-
 void ensureClusteredIndexName(ClusteredIndexSpec& indexSpec) {
     if (!indexSpec.getName()) {
         auto clusterKey = indexSpec.getKey().firstElement().fieldNameStringData();
         if (clusterKey == "_id") {
-            indexSpec.setName(kDefaultClusteredIndexName);
+            indexSpec.setName(IndexConstants::kIdIndexName);
         } else {
             indexSpec.setName(StringData(clusterKey + "_1"));
         }
@@ -64,13 +63,13 @@ void ensureClusteredIndexName(ClusteredIndexSpec& indexSpec) {
 
 ClusteredCollectionInfo makeCanonicalClusteredInfoForLegacyFormat() {
     auto indexSpec = ClusteredIndexSpec{BSON("_id" << 1), true /* unique */};
-    indexSpec.setName(kDefaultClusteredIndexName);
+    indexSpec.setName(IndexConstants::kIdIndexName);
     return ClusteredCollectionInfo(std::move(indexSpec), true /* legacy */);
 }
 
 ClusteredCollectionInfo makeDefaultClusteredIdIndex() {
     auto indexSpec = ClusteredIndexSpec{BSON("_id" << 1), true /* unique */};
-    indexSpec.setName(kDefaultClusteredIndexName);
+    indexSpec.setName(IndexConstants::kIdIndexName);
     return makeCanonicalClusteredInfo(indexSpec);
 }
 

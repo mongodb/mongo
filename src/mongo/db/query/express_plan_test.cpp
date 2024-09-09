@@ -42,6 +42,7 @@
 #include "mongo/db/concurrency/lock_manager_defs.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/exec/express/express_plan.h"
+#include "mongo/db/index/index_constants.h"
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
@@ -166,7 +167,7 @@ TEST_F(ExpressPlanTest, TestIdLookupViaIndexWithMatchingQuery) {
     ASSERT_EQ(iteratorStats.stageName(), "EXPRESS_IXSCAN");
     ASSERT_EQ(iteratorStats.numKeysExamined(), 1);
     ASSERT_EQ(iteratorStats.numDocumentsFetched(), 1);
-    ASSERT_EQ(iteratorStats.indexName(), "_id_");
+    ASSERT_EQ(iteratorStats.indexName(), IndexConstants::kIdIndexName);
     ASSERT_EQ(iteratorStats.indexKeyPattern(), "{ _id: 1 }");
 }
 
@@ -189,7 +190,7 @@ TEST_F(ExpressPlanTest, TestIdLookupViaIndexWithNonMatchingQuery) {
     ASSERT_EQ(iteratorStats.stageName(), "EXPRESS_IXSCAN");
     ASSERT_EQ(iteratorStats.numKeysExamined(), 0);
     ASSERT_EQ(iteratorStats.numDocumentsFetched(), 0);
-    ASSERT_EQ(iteratorStats.indexName(), "_id_");
+    ASSERT_EQ(iteratorStats.indexName(), IndexConstants::kIdIndexName);
     ASSERT_EQ(iteratorStats.indexKeyPattern(), "{ _id: 1 }");
 }
 

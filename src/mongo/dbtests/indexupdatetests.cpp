@@ -59,6 +59,7 @@
 #include "mongo/db/curop.h"
 #include "mongo/db/database_name.h"
 #include "mongo/db/dbdirectclient.h"
+#include "mongo/db/index/index_constants.h"
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
@@ -349,9 +350,9 @@ public:
             wunit.commit();
             // Request an interrupt.
             getGlobalServiceContext()->setKillAllOperations();
-            BSONObj indexInfo = BSON("key" << BSON("_id" << 1) << "name"
-                                           << "_id_"
-                                           << "v" << static_cast<int>(kIndexVersion));
+            BSONObj indexInfo =
+                BSON("key" << BSON("_id" << 1) << "name" << IndexConstants::kIdIndexName << "v"
+                           << static_cast<int>(kIndexVersion));
             ASSERT_TRUE(buildIndexInterrupted(indexInfo));
             // only want to interrupt the index build
             getGlobalServiceContext()->unsetKillAllOperations();
@@ -360,7 +361,8 @@ public:
         AutoGetCollection autoColl(_opCtx, _nss, LockMode::MODE_IX);
 
         // The new index is not listed in the index catalog because the index build failed.
-        ASSERT(!collection().get()->getIndexCatalog()->findIndexByName(_opCtx, "_id_"));
+        ASSERT(!collection().get()->getIndexCatalog()->findIndexByName(
+            _opCtx, IndexConstants::kIdIndexName));
     }
 };  // namespace IndexUpdateTests
 

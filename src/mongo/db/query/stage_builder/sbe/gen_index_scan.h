@@ -44,6 +44,7 @@
 #include "mongo/db/exec/sbe/stages/stages.h"
 #include "mongo/db/exec/sbe/values/slot.h"
 #include "mongo/db/exec/sbe/values/value.h"
+#include "mongo/db/index/index_constants.h"
 #include "mongo/db/query/index_bounds.h"
 #include "mongo/db/query/plan_yield_policy.h"
 #include "mongo/db/query/query_solution.h"
@@ -56,7 +57,7 @@ namespace mongo::stage_builder {
 class PlanStageReqs;
 class PlanStageSlots;
 
-constexpr StringData kIdIndexName = "_id_"_sd;
+constexpr StringData kIdIndexName = IndexConstants::kIdIndexName;
 
 /**
  * A list of low and high key values representing ranges over a particular index.

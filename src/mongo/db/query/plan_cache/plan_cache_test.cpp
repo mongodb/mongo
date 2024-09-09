@@ -50,6 +50,7 @@
 #include "mongo/db/exec/index_path_projection.h"
 #include "mongo/db/exec/plan_cache_util.h"
 #include "mongo/db/field_ref.h"
+#include "mongo/db/index/index_constants.h"
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/index/wildcard_key_generator.h"
 #include "mongo/db/index_names.h"
@@ -938,7 +939,7 @@ class CachePlanSelectionTest : public unittest::Test {
 protected:
     void setUp() override {
         params.mainCollectionInfo.options = QueryPlannerParams::INCLUDE_COLLSCAN;
-        addIndex(BSON("_id" << 1), "_id_");
+        addIndex(BSON("_id" << 1), IndexConstants::kIdIndexName.toString());
     }
 
     void addIndex(BSONObj keyPattern, const std::string& indexName, bool multikey = false) {

@@ -79,6 +79,7 @@
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/dbhelpers.h"
 #include "mongo/db/exec/document_value/value.h"
+#include "mongo/db/index/index_constants.h"
 #include "mongo/db/multi_key_path_tracker.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/op_observer/op_observer.h"
@@ -4305,11 +4306,10 @@ TEST_F(IdempotencyTest, CreateCollectionWithCollation) {
                                   << "punct"
                                   << "normalization" << false << "backwards" << false << "version"
                                   << "57.1");
-        auto options = BSON("collation" << collationOpts << "uuid" << uuid << "idIndex"
-                                        << BSON("collation" << collationOpts << "key"
-                                                            << BSON("_id" << 1) << "name"
-                                                            << "_id_"
-                                                            << "v" << 2));
+        auto options = BSON(
+            "collation" << collationOpts << "uuid" << uuid << "idIndex"
+                        << BSON("collation" << collationOpts << "key" << BSON("_id" << 1) << "name"
+                                            << IndexConstants::kIdIndexName << "v" << 2));
         auto createColl = makeCreateCollectionOplogEntry(nextOpTime(), _nss, options);
         auto insertOp1 = insert(fromjson("{ _id: 'foo' }"));
         auto updateOp1 = update("foo",

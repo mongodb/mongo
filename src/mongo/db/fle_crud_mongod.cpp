@@ -57,6 +57,7 @@
 #include "mongo/db/db_raii.h"
 #include "mongo/db/fle_crud.h"
 #include "mongo/db/index/index_access_method.h"
+#include "mongo/db/index/index_constants.h"
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
@@ -339,8 +340,6 @@ private:
     SeekableRecordCursor* _cursor;
     mutable ECStats _stats;
 };
-
-const auto kIdIndexName = "_id_"_sd;
 }  // namespace
 
 std::shared_ptr<txn_api::SyncTransactionWithRetries> getTransactionWithRetriesForMongoD(
@@ -544,18 +543,18 @@ std::vector<std::vector<FLEEdgeCountInfo>> getTagsFromStorage(
             auto indexCatalog = collection->getIndexCatalog();
 
             const IndexDescriptor* indexDescriptor = indexCatalog->findIndexByName(
-                opCtx, kIdIndexName, IndexCatalog::InclusionPolicy::kReady);
+                opCtx, IndexConstants::kIdIndexName, IndexCatalog::InclusionPolicy::kReady);
             if (!indexDescriptor) {
                 uasserted(ErrorCodes::IndexNotFound,
                           str::stream() << "Index not found, ns:" << toStringForLogging(nsOrUUID)
-                                        << ", index: " << kIdIndexName);
+                                        << ", index: " << IndexConstants::kIdIndexName);
             }
 
             if (indexDescriptor->isPartial()) {
                 uasserted(ErrorCodes::IndexOptionsConflict,
-                          str::stream()
-                              << "Partial index is not allowed for this operation, ns:"
-                              << toStringForLogging(nsOrUUID) << ", index: " << kIdIndexName);
+                          str::stream() << "Partial index is not allowed for this operation, ns:"
+                                        << toStringForLogging(nsOrUUID)
+                                        << ", index: " << IndexConstants::kIdIndexName);
             }
 
             auto indexCatalogEntry = indexDescriptor->getEntry()->shared_from_this();
