@@ -8,7 +8,11 @@ This is loosely based on [kubernetes](https://www.kubernetes.dev/docs/guide/owne
 
 `aliases` point to yaml files files that list aliases that can be used in this OWNERS.yml file.
 
-`filters` are a list of globs that match [gitignore syntax](https://git-scm.com/docs/gitignore#_pattern_format). The filter must match at least once file and be unique to the file. Each filter must have a list of `approvers`. An approval from any single approver will allow the code to be merged. Each filter may have a list of `emeritus_approvers`. `emeritus_approvers` are folks that used to be approvers that no longer have approver privileges. This allows us to keep track of folks who built up a knowledge base of this code that might need to be consulted in a critical situation. Both `approvers` and `emeritus_approvers` should be either github usernames, emails, or aliases.
+`filters` are a list of globs that match [gitignore syntax](https://git-scm.com/docs/gitignore#_pattern_format). The filter must match at least once file and be unique to the file. Each filter must have a list of `approvers`. An approval from any single approver will allow the code to be merged. Each filter can optionally have a `metadata` tag. Inside that tag a user can put whatever tags they want. We have reserved two meaningful tags `emeritus_approvers` and `owning_team`. This is not an exhaustive list and more documented and undocumented options can be added later. There is no linting done on the metadata tag.
+
+`emeritus_approvers` are folks that used to be approvers that no longer have approver privileges. This allows us to keep track of folks who built up a knowledge base of this code that might need to be consulted in a critical situation. Both `approvers` and `emeritus_approvers` should be either github usernames, emails, or aliases.
+
+`owning_team` is a team that owns the files, however this team does not have approval privileges. Instead this team should be looked to for asking questions. This metadata can also be used programmatically to, for example, generate a report of all the files owned by a particular team, even though that team has nominated specific engineers as approvers.
 
 `options` are not required and are various options about how to use this OWNERS.yml file. Currently there is only a single option `no_parent_owners` which is defaulted to false. If this option is set to true it will stop upwards OWNERS resolution.
 
@@ -25,8 +29,10 @@ filters: # List of all filters
       - devprod-correctness # alias for a group of users
       - IamXander # github username
       - user.name@mongodb.com # email address
-    emeritus_approvers: # This list is just for historical reference
-      - userB
+    metadata:
+      emeritus_approvers: # This list is just for historical reference
+        - userB
+      owning_team: "10gen/devprod-correctness" # The team which owns the matching files. These folks are not required approvers that will block a PR.
   - "*.md":
     approvers:
       - markdown-approvers

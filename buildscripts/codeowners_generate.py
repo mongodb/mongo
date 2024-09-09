@@ -103,8 +103,8 @@ def process_owners_file(output_lines: list[str], directory: str) -> None:
                 ), f"Filter in {owners_file_path} does not have approvers."
                 approvers = _filter["approvers"]
                 del _filter["approvers"]
-                if "emeritus_approvers" in _filter:
-                    del _filter["emeritus_approvers"]
+                if "metadata" in _filter:
+                    del _filter["metadata"]
 
                 # the last key remaining should be the pattern for the filter
                 assert len(_filter) == 1, f"Filter in {owners_file_path} has incorrect values."
