@@ -68,8 +68,7 @@ public:
                                     size_t myStashIdx,
                                     ShardId donorShardId,
                                     ChunkManager sourceChunkMgr,
-                                    ReshardingOplogApplierMetrics* applierMetrics,
-                                    bool isCapped = false);
+                                    ReshardingOplogApplierMetrics* applierMetrics);
 
     const NamespaceString& getOutputNss() const {
         return _outputNss;
@@ -130,8 +129,6 @@ private:
     const ChunkManager _sourceChunkMgr;
 
     ReshardingOplogApplierMetrics* _applierMetrics;
-
-    const bool _isCapped;
 };
 
 }  // namespace mongo
