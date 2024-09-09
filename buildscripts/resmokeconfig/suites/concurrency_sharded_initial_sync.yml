@@ -150,6 +150,7 @@ selector:
     - jstests/concurrency/fsm_workloads/create_capped_collection.js
     - jstests/concurrency/fsm_workloads/rename_capped_collection_droptarget.js
     - jstests/concurrency/fsm_workloads/query/agg/agg_graph_lookup.js
+    - jstests/concurrency/fsm_workloads/timeseries_insert_idle_bucket_expiration.js
 
     # Applying operation on feature compatibility version document not supported in initial sync
     - jstests/concurrency/fsm_workloads/drop_database_sharded_setFCV.js
