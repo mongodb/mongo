@@ -232,6 +232,9 @@ public:
     // The target namespace of a rename operation.
     static constexpr StringData kRenameTargetNssField = "to"_sd;
 
+    // The collection type created by a create operation.
+    static constexpr StringData kCollectionTypeField = "type"_sd;
+
     // Wall time of the corresponding oplog entry.
     static constexpr StringData kWallTimeField = "wallTime"_sd;
 

@@ -58,7 +58,6 @@
 #include "mongo/util/assert_util.h"
 #include "mongo/util/namespace_string_util.h"
 #include "mongo/util/str.h"
-#include "mongo/util/uuid.h"
 
 namespace mongo {
 namespace {
@@ -75,6 +74,46 @@ const StringDataSet kOpsWithoutUUID = {
 const StringDataSet kOpsWithoutNs = {
     DocumentSourceChangeStream::kEndOfTransactionOpType,
 };
+
+// Possible collection types, for the "type" field returned by collection / view create events.
+enum class CollectionType {
+    kCollection,
+    kView,
+    kTimeseries,
+};
+
+// Stringification for CollectionType.
+StringData toString(CollectionType type) {
+    switch (type) {
+        case CollectionType::kCollection:
+            return "collection"_sd;
+        case CollectionType::kView:
+            return "view"_sd;
+        case CollectionType::kTimeseries:
+            return "timeseries"_sd;
+    }
+    MONGO_UNREACHABLE_TASSERT(8814200);
+}
+
+// Determine type of collection / view created, based on oplog entry payload.
+// Defaults to 'kCollection', and is changed to kView if "viewOn" field is set, except if "viewOn"
+// indicates that it is a timeseries collection. In the latter case kTimeseries is returned.
+CollectionType determineCollectionType(const Document& data, const DatabaseName& dbName) {
+    Value viewOn = data.getField("viewOn");
+    tassert(8814203,
+            "'viewOn' should either be missing or a non-empty string",
+            viewOn.missing() || viewOn.getType() == BSONType::String);
+    if (viewOn.missing()) {
+        return CollectionType::kCollection;
+    }
+    StringData viewOnNss = viewOn.getStringData();
+    tassert(8814204, "'viewOn' should be a non-empty string", !viewOnNss.empty());
+    if (NamespaceString nss = NamespaceStringUtil::deserialize(dbName, viewOnNss);
+        nss.isTimeseriesBucketsCollection()) {
+        return CollectionType::kTimeseries;
+    }
+    return CollectionType::kView;
+}
 
 Document copyDocExceptFields(const Document& source, const std::set<StringData>& fieldNames) {
     MutableDocument doc(source);
@@ -316,9 +355,20 @@ Document ChangeStreamDefaultEventTransformation::applyTransformation(const Docum
                 // empty.
                 nss = NamespaceString(nss.dbName());
             } else if (auto nssField = oField.getField("create"); !nssField.missing()) {
+                auto collectionType = determineCollectionType(oField, nss.dbName());
                 operationType = DocumentSourceChangeStream::kCreateOpType;
                 nss = NamespaceStringUtil::deserialize(nss.dbName(), nssField.getStringData());
-                operationDescription = Value(copyDocExceptFields(oField, {"create"_sd}));
+
+                tassert(8814201,
+                        "'operationDescription.type' should always resolve to 'collection' for "
+                        "collection create events",
+                        collectionType == CollectionType::kCollection);
+
+                // Include full details of the create in 'operationDescription'.
+                MutableDocument opDescBuilder(copyDocExceptFields(oField, {"create"_sd}));
+                opDescBuilder.setField(DocumentSourceChangeStream::kCollectionTypeField,
+                                       Value(toString(collectionType)));
+                operationDescription = opDescBuilder.freezeToValue();
             } else if (auto nssField = oField.getField("createIndexes"); !nssField.missing()) {
                 operationType = DocumentSourceChangeStream::kCreateIndexesOpType;
                 nss = NamespaceStringUtil::deserialize(nss.dbName(), nssField.getStringData());
@@ -533,11 +583,31 @@ Document ChangeStreamViewDefinitionEventTransformation::applyTransformation(
     StringData operationType;
     Value operationDescription;
 
+    // For views, we are transforming the DML operation on the system.views
+    // collection into a DDL event as follows:
+    // - insert into system.views is turned into a create (collection) event.
+    // - update in system.views is turned into a (collection) modify event.
+    // - delete in system.views is turned into a drop (collection) event.
     Document oField = input[repl::OplogEntry::kObjectFieldName].getDocument();
+
+    // The 'o._id' is the full namespace string of the view.
+    const auto nss = createNamespaceStringFromOplogEntry(tenantId, oField["_id"].getStringData());
+
     switch (opType) {
         case repl::OpTypeEnum::kInsert: {
+            auto collectionType = determineCollectionType(oField, nss.dbName());
+            tassert(8814202,
+                    "'operationDescription.type' should always resolve to 'view' or 'timeseries' "
+                    "for view creation event",
+                    collectionType == CollectionType::kView ||
+                        collectionType == CollectionType::kTimeseries);
+
             operationType = DocumentSourceChangeStream::kCreateOpType;
-            operationDescription = Value(copyDocExceptFields(oField, {"_id"_sd}));
+            // Include full details of the create in 'operationDescription'.
+            MutableDocument opDescBuilder(copyDocExceptFields(oField, {"_id"_sd}));
+            opDescBuilder.setField(DocumentSourceChangeStream::kCollectionTypeField,
+                                   Value(toString(collectionType)));
+            operationDescription = opDescBuilder.freezeToValue();
             break;
         }
         case repl::OpTypeEnum::kUpdate: {
@@ -573,8 +643,6 @@ Document ChangeStreamViewDefinitionEventTransformation::applyTransformation(
     doc.addField(DocumentSourceChangeStream::kWallTimeField,
                  input[repl::OplogEntry::kWallClockTimeFieldName]);
 
-    // The 'o._id' is the full namespace string of the view.
-    const auto nss = createNamespaceStringFromOplogEntry(tenantId, oField["_id"].getStringData());
     doc.addField(DocumentSourceChangeStream::kNamespaceField, makeChangeStreamNsField(nss));
     doc.addField(DocumentSourceChangeStream::kOperationDescriptionField, operationDescription);
 

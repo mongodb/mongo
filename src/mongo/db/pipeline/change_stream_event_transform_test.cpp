@@ -109,6 +109,37 @@ TEST(ChangeStreamEventTransformTest, TestDefaultUpdateTransform) {
     ASSERT_DOCUMENT_EQ(applyTransformation(updateField), expectedUpdateField);
 }
 
+TEST(ChangeStreamEventTransformTest, TestCreateCollectionTransform) {
+    const NamespaceString nss =
+        NamespaceString::createNamespaceString_forTest(boost::none, "testDB.coll.name");
+    // Namespace for the command, i.e. "testDB.$cmd".
+    const NamespaceString commandNss = NamespaceString::makeCommandNamespace(nss.dbName());
+    const auto opDescription =
+        Value(fromjson("{idIndex: {v: 2, key: {_id: 1}, name: '_id_'}, type: 'collection'}"));
+    const auto idIndex = Value(fromjson("{v: 2, key: {_id: 1}, name: '_id_'}"));
+    auto oplogEntry = makeOplogEntry(repl::OpTypeEnum::kCommand,  // op type
+                                     commandNss,                  // namespace
+                                     BSON("create" << nss.coll() << "idIndex" << idIndex),  // o
+                                     testUuid(),                                            // uuid
+                                     boost::none,   // fromMigrate
+                                     boost::none);  // o2
+
+    Document expectedDoc{
+        {DocumentSourceChangeStream::kIdField,
+         makeResumeToken(
+             kDefaultTs, testUuid(), opDescription, DocumentSourceChangeStream::kCreateOpType)},
+        {DocumentSourceChangeStream::kOperationTypeField,
+         DocumentSourceChangeStream::kCreateOpType},
+        {DocumentSourceChangeStream::kClusterTimeField, kDefaultTs},
+        {DocumentSourceChangeStream::kCollectionUuidField, testUuid()},
+        {DocumentSourceChangeStream::kWallTimeField, Date_t()},
+        {DocumentSourceChangeStream::kNamespaceField,
+         Document{{"db", nss.db_forTest()}, {"coll", nss.coll()}}},
+        {DocumentSourceChangeStream::kOperationDescriptionField, opDescription}};
+
+    ASSERT_DOCUMENT_EQ(applyTransformation(oplogEntry), expectedDoc);
+}
+
 TEST(ChangeStreamEventTransformTest, TestCreateViewTransform) {
     const NamespaceString systemViewNss = NamespaceString::makeSystemDotViewsNamespace(
         DatabaseName::createDatabaseName_forTest(boost::none, "viewDB"));
@@ -116,7 +147,8 @@ TEST(ChangeStreamEventTransformTest, TestCreateViewTransform) {
         NamespaceString::createNamespaceString_forTest(boost::none, "viewDB.view.name");
     const auto viewPipeline =
         Value(fromjson("[{$match: {field: 'value'}}, {$project: {field: 1}}]"));
-    const auto opDescription = Document{{"viewOn", "baseColl"_sd}, {"pipeline", viewPipeline}};
+    const auto opDescription =
+        Document{{"viewOn", "baseColl"_sd}, {"pipeline", viewPipeline}, {"type", "view"_sd}};
     auto oplogEntry = makeOplogEntry(repl::OpTypeEnum::kInsert,  // op type
                                      systemViewNss,              // namespace
                                      BSON("_id" << viewNss.toString_forTest() << "viewOn"
@@ -143,6 +175,45 @@ TEST(ChangeStreamEventTransformTest, TestCreateViewTransform) {
                             NamespaceString::makeCollectionlessAggregateNSS(
                                 DatabaseName::createDatabaseName_forTest(boost::none, "viewDB"))),
         expectedDoc);
+}
+
+TEST(ChangeStreamEventTransformTest, TestCreateTimeseriesTransform) {
+    const NamespaceString systemViewNss = NamespaceString::makeSystemDotViewsNamespace(
+        DatabaseName::createDatabaseName_forTest(boost::none, "timeseriesDB"));
+    const NamespaceString collNss =
+        NamespaceString::createNamespaceString_forTest("timeseriesDB"_sd, "timeseriesColl"_sd);
+    const NamespaceString viewNss = collNss.makeTimeseriesBucketsNamespace();
+    const auto viewPipeline = Value(
+        fromjson("[{_internalUnpackBucket: {timeField: 'time', bucketMaxSpanSeconds: 3600}}]"));
+    const auto opDescription =
+        Document{{"viewOn", viewNss.coll()}, {"pipeline", viewPipeline}, {"type", "timeseries"_sd}};
+    auto oplogEntry = makeOplogEntry(
+        repl::OpTypeEnum::kInsert,  // op type
+        NamespaceString::makeSystemDotViewsNamespace(
+            DatabaseName::createDatabaseName_forTest(boost::none, "timeseriesDB"_sd)),  // namespace
+        BSON("_id" << collNss.toString_forTest() << "viewOn" << viewNss.coll() << "pipeline"
+                   << viewPipeline),  // o
+        testUuid(),                   // uuid
+        boost::none,                  // fromMigrate
+        BSON("_id" << collNss.toString_forTest()));
+
+    Document expectedDoc{
+        {DocumentSourceChangeStream::kIdField,
+         makeResumeToken(
+             kDefaultTs, testUuid(), opDescription, DocumentSourceChangeStream::kCreateOpType)},
+        {DocumentSourceChangeStream::kOperationTypeField,
+         DocumentSourceChangeStream::kCreateOpType},
+        {DocumentSourceChangeStream::kClusterTimeField, kDefaultTs},
+        {DocumentSourceChangeStream::kWallTimeField, Date_t()},
+        {DocumentSourceChangeStream::kNamespaceField,
+         Document{{"db", viewNss.db_forTest()}, {"coll", collNss.coll()}}},
+        {DocumentSourceChangeStream::kOperationDescriptionField, opDescription}};
+
+    ASSERT_DOCUMENT_EQ(applyTransformation(oplogEntry,
+                                           NamespaceString::makeCollectionlessAggregateNSS(
+                                               DatabaseName::createDatabaseName_forTest(
+                                                   boost::none, "timeseriesDB"))),
+                       expectedDoc);
 }
 
 TEST(ChangeStreamEventTransformTest, TestCreateViewOnSingleCollection) {

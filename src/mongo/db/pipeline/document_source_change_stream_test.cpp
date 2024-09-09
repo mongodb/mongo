@@ -1210,7 +1210,8 @@ TEST_F(ChangeStreamStageTest, TransformCreate) {
                                     << "_id_"),
                       testUuid());
 
-    const auto expectedOpDescription = fromjson("{idIndex: {v: 2, key: {id: 1}}, name: '_id_'}");
+    const auto expectedOpDescription =
+        fromjson("{idIndex: {v: 2, key: {id: 1}}, name: '_id_', type: 'collection'}");
     Document expectedCreate{
         {DSChangeStream::kIdField,
          makeResumeToken(
@@ -2374,7 +2375,7 @@ TEST_F(ChangeStreamStageTest, TransformApplyOpsWithCreateOperation) {
     ASSERT_EQ(nextDoc[DSChangeStream::kOperationTypeField].getString(),
               DSChangeStream::kCreateOpType);
     ASSERT_VALUE_EQ(nextDoc[DSChangeStream::kOperationDescriptionField],
-                    Value(Document{{"idIndex", idIndexDef}}));
+                    Value(Document{{"idIndex", idIndexDef}, {"type", "collection"_sd}}));
     ASSERT_EQ(nextDoc["lsid"].getDocument().toBson().woCompare(lsid.toBSON()), 0);
     ASSERT_EQ(ResumeToken::parse(nextDoc["_id"].getDocument()).getData().txnOpIndex, 0);
 

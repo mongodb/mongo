@@ -21,6 +21,16 @@
 #
 last-continuous:
   all:
+    - test_file: jstests/change_streams/ddl_create_event.js
+      ticket: SERVER-88142
+    - test_file: jstests/change_streams/ddl_view_events.js
+      ticket: SERVER-88142
+    - test_file: jstests/change_streams/resume_expanded_events.js
+      ticket: SERVER-88142
+    - test_file: jstests/change_streams/show_expanded_events.js
+      ticket: SERVER-88142
+    - test_file: jstests/change_streams/timeseries.js
+      ticket: SERVER-88142
     - test_file: jstests/aggregation/bugs/lookup_using_hashed_index.js
       ticket: SERVER-92668
     - test_file: jstests/core/query/query_settings/query_settings_strictness.js
@@ -258,6 +268,16 @@ last-continuous:
   suites: null
 last-lts:
   all:
+    - test_file: jstests/change_streams/ddl_create_event.js
+      ticket: SERVER-88142
+    - test_file: jstests/change_streams/ddl_view_events.js
+      ticket: SERVER-88142
+    - test_file: jstests/change_streams/resume_expanded_events.js
+      ticket: SERVER-88142
+    - test_file: jstests/change_streams/show_expanded_events.js
+      ticket: SERVER-88142
+    - test_file: jstests/change_streams/timeseries.js
+      ticket: SERVER-88142
     - test_file: jstests/aggregation/bugs/lookup_using_hashed_index.js
       ticket: SERVER-92668
     - test_file: jstests/core/query/query_settings/query_settings_strictness.js
