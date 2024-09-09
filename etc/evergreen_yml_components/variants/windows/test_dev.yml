@@ -65,7 +65,6 @@ buildvariants:
         MONGO_DISTMOD=windows
         -j$(bc <<< "$(grep -c '^processor' /proc/cpuinfo) / 1.5")
         --win-version-min=win10
-        --use-diagnostic-latches=on
       num_scons_link_jobs_available: 0.1
       python: "/cygdrive/c/python/python310/python.exe"
       scons_cache_scope: shared
