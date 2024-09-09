@@ -130,7 +130,7 @@ public:
                                     std::vector<BSONObj>* result) override;
 
     StatusWith<UserHandle> acquireUser(OperationContext* opCtx,
-                                       const UserRequest& userRequest) override;
+                                       std::unique_ptr<UserRequest> userRequest) override;
     StatusWith<UserHandle> reacquireUser(OperationContext* opCtx, const UserHandle& user) override;
 
     /**
@@ -225,8 +225,9 @@ private:
         // values, the contract of the authorization manager is that it should throw an exception if
         // the value can not be loaded, so if it returns, the value will always be set.
         LookupResult _lookup(OperationContext* opCtx,
-                             const UserRequest& user,
+                             const UserRequest::UserRequestCacheKey& userReqCacheKey,
                              const UserHandle& unusedCachedUser,
+                             const UserRequest& userReq,
                              const SharedUserAcquisitionStats& userAcquisitionStats);
 
         Mutex _mutex = MONGO_MAKE_LATCH("AuthorizationManagerImpl::UserDistCacheImpl::_mutex");

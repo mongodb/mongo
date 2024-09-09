@@ -328,7 +328,7 @@ public:
      * The returned user may be invalid by the time the caller gets access to it.
      */
     virtual StatusWith<UserHandle> acquireUser(OperationContext* opCtx,
-                                               const UserRequest& userRequest) = 0;
+                                               std::unique_ptr<UserRequest> userRequest) = 0;
 
     /**
      * Validate the ID associated with a known user while refreshing session cache.

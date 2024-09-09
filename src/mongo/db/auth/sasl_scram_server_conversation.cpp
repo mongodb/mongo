@@ -236,7 +236,8 @@ StatusWith<std::tuple<bool, std::string>> SaslSCRAMServerMechanism<Policy>::_fir
             });
         }
 
-        return authManager->acquireUser(opCtx, UserRequest(user, boost::none));
+        return authManager->acquireUser(opCtx,
+                                        std::make_unique<UserRequestGeneral>(user, boost::none));
     }();
 
     if (!swUser.isOK()) {

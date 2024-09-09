@@ -167,6 +167,7 @@ env.Library(
         "$BUILD_DIR/mongo/db/auth/authorization_manager_global",
         "$BUILD_DIR/mongo/db/auth/cluster_auth_mode",
         "$BUILD_DIR/mongo/db/auth/sasl_commands",
+        "$BUILD_DIR/mongo/db/auth/user_request_x509" if get_option("ssl") == "on" else [],
         "$BUILD_DIR/mongo/db/commands",
         "$BUILD_DIR/mongo/db/server_base",
         "$BUILD_DIR/mongo/rpc/client_metadata",

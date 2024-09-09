@@ -52,6 +52,7 @@
 #include "mongo/db/auth/authorization_manager.h"
 #include "mongo/db/auth/authorization_session_test_fixture.h"
 #include "mongo/db/auth/role_name.h"
+#include "mongo/db/auth/user_request_x509.h"
 #include "mongo/db/auth/validated_tenancy_scope.h"
 #include "mongo/db/client.h"
 #include "mongo/db/database_name.h"
@@ -80,7 +81,7 @@ class AuthorizationSessionTest : public AuthorizationSessionTestFixture {
 public:
     using AuthorizationSessionTestFixture::AuthorizationSessionTestFixture;
 
-    void testInvalidateUser(std::string mechanismData);
+    void testInvalidateUser();
 };
 
 class AuthorizationSessionTestWithoutAuth : public AuthorizationSessionTest {
@@ -127,18 +128,26 @@ const ResourcePattern otherProfileCollResource(ResourcePattern::forExactNamespac
     NamespaceString::createNamespaceString_forTest("other.system.profile")));
 
 const UserName kUser1Test("user1"_sd, "test"_sd);
-const UserRequest kUser1TestRequest(kUser1Test, boost::none);
+const std::unique_ptr<UserRequest> kUser1TestRequest =
+    std::make_unique<UserRequestGeneral>(kUser1Test, boost::none);
 const UserName kUser2Test("user2"_sd, "test"_sd);
-const UserRequest kUser2TestRequest(kUser2Test, boost::none);
+const std::unique_ptr<UserRequest> kUser2TestRequest =
+    std::make_unique<UserRequestGeneral>(kUser2Test, boost::none);
 const UserName kTenant1UserTest("userTenant1"_sd, "test"_sd, kTenantId1);
-const UserRequest kTenant1UserTestRequest(kTenant1UserTest, boost::none);
+const std::unique_ptr<UserRequest> kTenant1UserTestRequest =
+    std::make_unique<UserRequestGeneral>(kTenant1UserTest, boost::none);
 const UserName kTenant2UserTest("userTenant2"_sd, "test"_sd, kTenantId2);
-const UserRequest kTenant2UserTestRequest(kTenant2UserTest, boost::none);
+const std::unique_ptr<UserRequest> kTenant2UserTestRequest =
+    std::make_unique<UserRequestGeneral>(kTenant2UserTest, boost::none);
+
+const transport::TransportLayerMock transportLayer;
 
 TEST_F(AuthorizationSessionTest, MultiAuthSameUserAllowed) {
     ASSERT_OK(createUser(kUser1Test, {}));
-    ASSERT_OK(authzSession->addAndAuthorizeUser(_opCtx.get(), kUser1TestRequest, boost::none));
-    ASSERT_OK(authzSession->addAndAuthorizeUser(_opCtx.get(), kUser1TestRequest, boost::none));
+    ASSERT_OK(
+        authzSession->addAndAuthorizeUser(_opCtx.get(), kUser1TestRequest->clone(), boost::none));
+    ASSERT_OK(
+        authzSession->addAndAuthorizeUser(_opCtx.get(), kUser1TestRequest->clone(), boost::none));
     authzSession->logoutAllDatabases(_client.get(), "Test finished");
 }
 
@@ -146,8 +155,10 @@ TEST_F(AuthorizationSessionTest, MultiAuthSameDBDisallowed) {
     ASSERT_OK(createUser(kUser1Test, {}));
     ASSERT_OK(createUser(kUser2Test, {}));
 
-    ASSERT_OK(authzSession->addAndAuthorizeUser(_opCtx.get(), kUser1TestRequest, boost::none));
-    ASSERT_NOT_OK(authzSession->addAndAuthorizeUser(_opCtx.get(), kUser2TestRequest, boost::none));
+    ASSERT_OK(
+        authzSession->addAndAuthorizeUser(_opCtx.get(), kUser1TestRequest->clone(), boost::none));
+    ASSERT_NOT_OK(
+        authzSession->addAndAuthorizeUser(_opCtx.get(), kUser2TestRequest->clone(), boost::none));
     authzSession->logoutAllDatabases(_client.get(), "Test finished");
 }
 
@@ -155,8 +166,10 @@ TEST_F(AuthorizationSessionTest, MultiAuthMultiDBDisallowed) {
     ASSERT_OK(createUser(kUser1Test, {}));
     ASSERT_OK(createUser(kUser2Test, {}));
 
-    ASSERT_OK(authzSession->addAndAuthorizeUser(_opCtx.get(), kUser1TestRequest, boost::none));
-    ASSERT_NOT_OK(authzSession->addAndAuthorizeUser(_opCtx.get(), kUser2TestRequest, boost::none));
+    ASSERT_OK(
+        authzSession->addAndAuthorizeUser(_opCtx.get(), kUser1TestRequest->clone(), boost::none));
+    ASSERT_NOT_OK(
+        authzSession->addAndAuthorizeUser(_opCtx.get(), kUser2TestRequest->clone(), boost::none));
     authzSession->logoutAllDatabases(_client.get(), "Test finished");
 }
 
@@ -164,10 +177,12 @@ const auto kTestDB = DatabaseName::createDatabaseName_forTest(boost::none, "test
 const auto kAdminDB = DatabaseName::createDatabaseName_forTest(boost::none, "admin"_sd);
 
 const UserName kSpencerTest("spencer"_sd, kTestDB);
-const UserRequest kSpencerTestRequest(kSpencerTest, boost::none);
+const std::unique_ptr<UserRequest> kSpencerTestRequest =
+    std::make_unique<UserRequestGeneral>(kSpencerTest, boost::none);
 
 const UserName kAdminAdmin("admin"_sd, kAdminDB);
-const UserRequest kAdminAdminRequest(kAdminAdmin, boost::none);
+const std::unique_ptr<UserRequest> kAdminAdminRequest =
+    std::make_unique<UserRequestGeneral>(kAdminAdmin, boost::none);
 
 TEST_F(AuthorizationSessionTest, AddUserAndCheckAuthorization) {
     // Check that disabling auth checks works
@@ -183,11 +198,12 @@ TEST_F(AuthorizationSessionTest, AddUserAndCheckAuthorization) {
     // Check that you can't authorize a user that doesn't exist.
     ASSERT_EQUALS(
         ErrorCodes::UserNotFound,
-        authzSession->addAndAuthorizeUser(_opCtx.get(), kSpencerTestRequest, boost::none));
+        authzSession->addAndAuthorizeUser(_opCtx.get(), kSpencerTestRequest->clone(), boost::none));
 
     // Add a user with readWrite and dbAdmin on the test DB
     ASSERT_OK(createUser({"spencer", "test"}, {{"readWrite", "test"}, {"dbAdmin", "test"}}));
-    ASSERT_OK(authzSession->addAndAuthorizeUser(_opCtx.get(), kSpencerTestRequest, boost::none));
+    ASSERT_OK(
+        authzSession->addAndAuthorizeUser(_opCtx.get(), kSpencerTestRequest->clone(), boost::none));
 
     ASSERT_TRUE(
         authzSession->isAuthorizedForActionsOnResource(testFooCollResource, ActionType::insert));
@@ -199,7 +215,8 @@ TEST_F(AuthorizationSessionTest, AddUserAndCheckAuthorization) {
 
     // Add an admin user with readWriteAnyDatabase
     ASSERT_OK(createUser({"admin", "admin"}, {{"readWriteAnyDatabase", "admin"}}));
-    ASSERT_OK(authzSession->addAndAuthorizeUser(_opCtx.get(), kAdminAdminRequest, boost::none));
+    ASSERT_OK(
+        authzSession->addAndAuthorizeUser(_opCtx.get(), kAdminAdminRequest->clone(), boost::none));
 
     ASSERT_TRUE(authzSession->isAuthorizedForActionsOnResource(
         ResourcePattern::forExactNamespace(
@@ -255,7 +272,8 @@ TEST_F(AuthorizationSessionTest, DuplicateRolesOK) {
     // Add a user with doubled-up readWrite and single dbAdmin on the test DB
     ASSERT_OK(createUser(kSpencerTest,
                          {{"readWrite", "test"}, {"dbAdmin", "test"}, {"readWrite", "test"}}));
-    ASSERT_OK(authzSession->addAndAuthorizeUser(_opCtx.get(), kSpencerTestRequest, boost::none));
+    ASSERT_OK(
+        authzSession->addAndAuthorizeUser(_opCtx.get(), kSpencerTestRequest->clone(), boost::none));
 
     ASSERT_TRUE(
         authzSession->isAuthorizedForActionsOnResource(testFooCollResource, ActionType::insert));
@@ -271,10 +289,14 @@ const UserName kUserAdminTest("useradmin"_sd, "test"_sd);
 const UserName kRWAnyTest("rwany"_sd, "test"_sd);
 const UserName kUserAdminAnyTest("useradminany"_sd, "test"_sd);
 
-const UserRequest kRWTestRequest(kRWTest, boost::none);
-const UserRequest kUserAdminTestRequest(kUserAdminTest, boost::none);
-const UserRequest kRWAnyTestRequest(kRWAnyTest, boost::none);
-const UserRequest kUserAdminAnyTestRequest(kUserAdminAnyTest, boost::none);
+const std::unique_ptr<UserRequest> kRWTestRequest =
+    std::make_unique<UserRequestGeneral>(kRWTest, boost::none);
+const std::unique_ptr<UserRequest> kUserAdminTestRequest =
+    std::make_unique<UserRequestGeneral>(kUserAdminTest, boost::none);
+const std::unique_ptr<UserRequest> kRWAnyTestRequest =
+    std::make_unique<UserRequestGeneral>(kRWAnyTest, boost::none);
+const std::unique_ptr<UserRequest> kUserAdminAnyTestRequest =
+    std::make_unique<UserRequestGeneral>(kUserAdminAnyTest, boost::none);
 
 TEST_F(AuthorizationSessionTest, SystemCollectionsAccessControl) {
     ASSERT_OK(createUser(kRWTest, {{"readWrite", "test"}, {"dbAdmin", "test"}}));
@@ -283,7 +305,8 @@ TEST_F(AuthorizationSessionTest, SystemCollectionsAccessControl) {
                          {{"readWriteAnyDatabase", "admin"}, {"dbAdminAnyDatabase", "admin"}}));
     ASSERT_OK(createUser(kUserAdminAnyTest, {{"userAdminAnyDatabase", "admin"}}));
 
-    ASSERT_OK(authzSession->addAndAuthorizeUser(_opCtx.get(), kRWAnyTestRequest, boost::none));
+    ASSERT_OK(
+        authzSession->addAndAuthorizeUser(_opCtx.get(), kRWAnyTestRequest->clone(), boost::none));
 
     ASSERT_FALSE(
         authzSession->isAuthorizedForActionsOnResource(testUsersCollResource, ActionType::insert));
@@ -296,26 +319,27 @@ TEST_F(AuthorizationSessionTest, SystemCollectionsAccessControl) {
     ASSERT_TRUE(
         authzSession->isAuthorizedForActionsOnResource(testProfileCollResource, ActionType::find));
     ASSERT_TRUE(
+        authzSession->isAuthorizedForActionsOnResource(otherProfileCollResource, ActionType::find));
+    authzSession->logoutDatabase(_client.get(), kTestDB, "Kill the test!"_sd);
+
+    ASSERT_OK(authzSession->addAndAuthorizeUser(
+        _opCtx.get(), kUserAdminAnyTestRequest->clone(), boost::none));
+    ASSERT_FALSE(
+        authzSession->isAuthorizedForActionsOnResource(testUsersCollResource, ActionType::insert));
+    ASSERT_TRUE(
+        authzSession->isAuthorizedForActionsOnResource(testUsersCollResource, ActionType::find));
+    ASSERT_FALSE(
+        authzSession->isAuthorizedForActionsOnResource(otherUsersCollResource, ActionType::insert));
+    ASSERT_TRUE(
+        authzSession->isAuthorizedForActionsOnResource(otherUsersCollResource, ActionType::find));
+    ASSERT_FALSE(
+        authzSession->isAuthorizedForActionsOnResource(testProfileCollResource, ActionType::find));
+    ASSERT_FALSE(
         authzSession->isAuthorizedForActionsOnResource(otherProfileCollResource, ActionType::find));
     authzSession->logoutDatabase(_client.get(), kTestDB, "Kill the test!"_sd);
 
     ASSERT_OK(
-        authzSession->addAndAuthorizeUser(_opCtx.get(), kUserAdminAnyTestRequest, boost::none));
-    ASSERT_FALSE(
-        authzSession->isAuthorizedForActionsOnResource(testUsersCollResource, ActionType::insert));
-    ASSERT_TRUE(
-        authzSession->isAuthorizedForActionsOnResource(testUsersCollResource, ActionType::find));
-    ASSERT_FALSE(
-        authzSession->isAuthorizedForActionsOnResource(otherUsersCollResource, ActionType::insert));
-    ASSERT_TRUE(
-        authzSession->isAuthorizedForActionsOnResource(otherUsersCollResource, ActionType::find));
-    ASSERT_FALSE(
-        authzSession->isAuthorizedForActionsOnResource(testProfileCollResource, ActionType::find));
-    ASSERT_FALSE(
-        authzSession->isAuthorizedForActionsOnResource(otherProfileCollResource, ActionType::find));
-    authzSession->logoutDatabase(_client.get(), kTestDB, "Kill the test!"_sd);
-
-    ASSERT_OK(authzSession->addAndAuthorizeUser(_opCtx.get(), kRWTestRequest, boost::none));
+        authzSession->addAndAuthorizeUser(_opCtx.get(), kRWTestRequest->clone(), boost::none));
 
     ASSERT_FALSE(
         authzSession->isAuthorizedForActionsOnResource(testUsersCollResource, ActionType::insert));
@@ -331,7 +355,8 @@ TEST_F(AuthorizationSessionTest, SystemCollectionsAccessControl) {
         authzSession->isAuthorizedForActionsOnResource(otherProfileCollResource, ActionType::find));
     authzSession->logoutDatabase(_client.get(), kTestDB, "Kill the test!"_sd);
 
-    ASSERT_OK(authzSession->addAndAuthorizeUser(_opCtx.get(), kUserAdminTestRequest, boost::none));
+    ASSERT_OK(authzSession->addAndAuthorizeUser(
+        _opCtx.get(), kUserAdminTestRequest->clone(), boost::none));
     ASSERT_FALSE(
         authzSession->isAuthorizedForActionsOnResource(testUsersCollResource, ActionType::insert));
     ASSERT_FALSE(
@@ -347,13 +372,17 @@ TEST_F(AuthorizationSessionTest, SystemCollectionsAccessControl) {
     authzSession->logoutDatabase(_client.get(), kTestDB, "Kill the test!"_sd);
 }
 
-void AuthorizationSessionTest::testInvalidateUser(std::string mechanismData) {
-    UserRequest userRequest(kSpencerTest, boost::none);
-    userRequest.mechanismData = std::move(mechanismData);
+void AuthorizationSessionTest::testInvalidateUser() {
+    const std::shared_ptr<transport::Session> session =
+        transport::MockSession::create(&transportLayer);
+    const auto& sslPeerInfo = SSLPeerInfo::forSession(session);
+
+    std::unique_ptr<UserRequest> userRequest =
+        std::make_unique<UserRequestX509>(kSpencerTest, boost::none, sslPeerInfo);
 
     // Add a readWrite user
     ASSERT_OK(createUser(kSpencerTest, {{"readWrite", "test"}}));
-    ASSERT_OK(authzSession->addAndAuthorizeUser(_opCtx.get(), userRequest, boost::none));
+    ASSERT_OK(authzSession->addAndAuthorizeUser(_opCtx.get(), std::move(userRequest), boost::none));
 
     ASSERT_TRUE(
         authzSession->isAuthorizedForActionsOnResource(testFooCollResource, ActionType::find));
@@ -395,21 +424,15 @@ void AuthorizationSessionTest::testInvalidateUser(std::string mechanismData) {
 }
 
 TEST_F(AuthorizationSessionTest, InvalidateUserByName) {
-    // Basic test with no roles or mechanism data.
-    std::string mechanismData{};
-    testInvalidateUser(std::move(mechanismData));
-}
-
-TEST_F(AuthorizationSessionTest, InvalidateUserByNameWithMechanismData) {
-    // Attach cache-key breaking mechanism data to validate cache invalidation.
-    std::string mechanismData("mechdata");
-    testInvalidateUser(std::move(mechanismData));
+    // Basic test with SSLPeerInformation.
+    testInvalidateUser();
 }
 
 TEST_F(AuthorizationSessionTest, UseOldUserInfoInFaceOfConnectivityProblems) {
     // Add a readWrite user
     ASSERT_OK(createUser({"spencer", "test"}, {{"readWrite", "test"}}));
-    ASSERT_OK(authzSession->addAndAuthorizeUser(_opCtx.get(), kSpencerTestRequest, boost::none));
+    ASSERT_OK(
+        authzSession->addAndAuthorizeUser(_opCtx.get(), kSpencerTestRequest->clone(), boost::none));
 
     ASSERT_TRUE(
         authzSession->isAuthorizedForActionsOnResource(testFooCollResource, ActionType::find));
@@ -480,7 +503,8 @@ TEST_F(AuthorizationSessionTest, AcquireUserObtainsAndValidatesAuthenticationRes
             nullptr);
         auto client = getServiceContext()->getService()->makeClient("testClient", mock_session);
         auto opCtx = client->makeOperationContext();
-        ASSERT_OK(authzSession->addAndAuthorizeUser(opCtx.get(), kSpencerTestRequest, boost::none));
+        ASSERT_OK(authzSession->addAndAuthorizeUser(
+            opCtx.get(), kSpencerTestRequest->clone(), boost::none));
         authzSession->logoutDatabase(client.get(), kTestDB, "Kill the test!"_sd);
     };
 
@@ -492,13 +516,13 @@ TEST_F(AuthorizationSessionTest, AcquireUserObtainsAndValidatesAuthenticationRes
             nullptr);
         auto client = getServiceContext()->getService()->makeClient("testClient", mock_session);
         auto opCtx = client->makeOperationContext();
-        ASSERT_NOT_OK(
-            authzSession->addAndAuthorizeUser(opCtx.get(), kSpencerTestRequest, boost::none));
+        ASSERT_NOT_OK(authzSession->addAndAuthorizeUser(
+            opCtx.get(), kSpencerTestRequest->clone(), boost::none));
     };
 
     // The empty RestrictionEnvironment will cause addAndAuthorizeUser to fail.
     ASSERT_NOT_OK(
-        authzSession->addAndAuthorizeUser(_opCtx.get(), kSpencerTestRequest, boost::none));
+        authzSession->addAndAuthorizeUser(_opCtx.get(), kSpencerTestRequest->clone(), boost::none));
 
     // A clientSource from the 192.168.0.0/24 block will succeed in connecting to a server
     // listening on 192.168.0.2.
@@ -1260,7 +1284,8 @@ TEST_F(AuthorizationSessionTestWithoutAuth,
 
 TEST_F(AuthorizationSessionTest, AuthorizedSessionIsNotCoauthorizedNobody) {
     ASSERT_OK(createUser(kSpencerTest, {}));
-    ASSERT_OK(authzSession->addAndAuthorizeUser(_opCtx.get(), kSpencerTestRequest, boost::none));
+    ASSERT_OK(
+        authzSession->addAndAuthorizeUser(_opCtx.get(), kSpencerTestRequest->clone(), boost::none));
     ASSERT_FALSE(authzSession->isCoauthorizedWith(boost::none));
     authzSession->logoutDatabase(_client.get(), kTestDB, "Kill the test!"_sd);
 }
@@ -1269,7 +1294,8 @@ TEST_F(AuthorizationSessionTestWithoutAuth,
        AuthorizedSessionIsCoauthorizedNobodyWhenAuthIsDisabled) {
     ASSERT_FALSE(authzManager->isAuthEnabled());
     ASSERT_OK(createUser(kSpencerTest, {}));
-    ASSERT_OK(authzSession->addAndAuthorizeUser(_opCtx.get(), kSpencerTestRequest, boost::none));
+    ASSERT_OK(
+        authzSession->addAndAuthorizeUser(_opCtx.get(), kSpencerTestRequest->clone(), boost::none));
     ASSERT_TRUE(authzSession->isCoauthorizedWith(kSpencerTest));
     authzSession->logoutDatabase(_client.get(), kTestDB, "Kill the test!"_sd);
 }
@@ -1388,7 +1414,8 @@ TEST_F(AuthorizationSessionTest, CanUseUUIDNamespacesWithPrivilege) {
 }
 
 const UserName kGMarksAdmin("gmarks", "admin");
-const UserRequest kGMarksAdminRequest(kGMarksAdmin, boost::none);
+const std::unique_ptr<UserRequest> kGMarksAdminRequest =
+    std::make_unique<UserRequestGeneral>(kGMarksAdmin, boost::none);
 
 TEST_F(AuthorizationSessionTest, MayBypassWriteBlockingModeIsSetCorrectly) {
     ASSERT_FALSE(authzSession->mayBypassWriteBlockingMode());
@@ -1405,7 +1432,8 @@ TEST_F(AuthorizationSessionTest, MayBypassWriteBlockingModeIsSetCorrectly) {
                                                                             << "db"
                                                                             << "test"))),
                                                     BSONObj()));
-    ASSERT_OK(authzSession->addAndAuthorizeUser(_opCtx.get(), kSpencerTestRequest, boost::none));
+    ASSERT_OK(
+        authzSession->addAndAuthorizeUser(_opCtx.get(), kSpencerTestRequest->clone(), boost::none));
     ASSERT_FALSE(authzSession->mayBypassWriteBlockingMode());
 
     // Add a user with restore role on admin db and ensure we can bypass
@@ -1422,7 +1450,8 @@ TEST_F(AuthorizationSessionTest, MayBypassWriteBlockingModeIsSetCorrectly) {
                                                     BSONObj()));
     authzSession->logoutDatabase(_client.get(), kTestDB, "End of test"_sd);
 
-    ASSERT_OK(authzSession->addAndAuthorizeUser(_opCtx.get(), kGMarksAdminRequest, boost::none));
+    ASSERT_OK(
+        authzSession->addAndAuthorizeUser(_opCtx.get(), kGMarksAdminRequest->clone(), boost::none));
     ASSERT_TRUE(authzSession->mayBypassWriteBlockingMode());
 
     // Remove that user by logging out of the admin db and ensure we can't bypass anymore
@@ -1444,7 +1473,8 @@ TEST_F(AuthorizationSessionTest, MayBypassWriteBlockingModeIsSetCorrectly) {
                                                     BSONObj()));
     authzSession->logoutDatabase(_client.get(), kAdminDB, ""_sd);
 
-    ASSERT_OK(authzSession->addAndAuthorizeUser(_opCtx.get(), kAdminAdminRequest, boost::none));
+    ASSERT_OK(
+        authzSession->addAndAuthorizeUser(_opCtx.get(), kAdminAdminRequest->clone(), boost::none));
     ASSERT_TRUE(authzSession->mayBypassWriteBlockingMode());
 
     // Remove non-privileged user by logging out of test db and ensure we can still bypass
@@ -1460,14 +1490,15 @@ TEST_F(AuthorizationSessionTest, InvalidExpirationTime) {
     // Create and authorize valid user with invalid expiration.
     Date_t expirationTime = clockSource()->now() - Hours(1);
     ASSERT_OK(createUser({"spencer", "test"}, {{"readWrite", "test"}, {"dbAdmin", "test"}}));
-    ASSERT_NOT_OK(
-        authzSession->addAndAuthorizeUser(_opCtx.get(), kSpencerTestRequest, expirationTime));
+    ASSERT_NOT_OK(authzSession->addAndAuthorizeUser(
+        _opCtx.get(), kSpencerTestRequest->clone(), expirationTime));
 }
 
 TEST_F(AuthorizationSessionTest, NoExpirationTime) {
     // Create and authorize valid user with no expiration.
     ASSERT_OK(createUser({"spencer", "test"}, {{"readWrite", "test"}, {"dbAdmin", "test"}}));
-    ASSERT_OK(authzSession->addAndAuthorizeUser(_opCtx.get(), kSpencerTestRequest, boost::none));
+    ASSERT_OK(
+        authzSession->addAndAuthorizeUser(_opCtx.get(), kSpencerTestRequest->clone(), boost::none));
     assertActive(testFooCollResource, ActionType::insert);
 
     // Assert that moving the clock forward has no impact on a session without expiration time.
@@ -1482,11 +1513,14 @@ TEST_F(AuthorizationSessionTest, NoExpirationTime) {
 
 TEST_F(AuthorizationSessionTest, TenantSeparation) {
     const UserName readWriteAnyDBUser = {"rwanyuser", "test"};
-    const UserRequest readWriteAnyDBUserRequest{readWriteAnyDBUser, boost::none};
+    std::unique_ptr<UserRequest> readWriteAnyDBUserRequest =
+        std::make_unique<UserRequestGeneral>(readWriteAnyDBUser, boost::none);
     const UserName tenant2SystemUser = {"gmarks", "test", kTenantId2};
-    const UserRequest tenant2SystemUserRequest{tenant2SystemUser, boost::none};
+    std::unique_ptr<UserRequest> tenant2SystemUserRequest =
+        std::make_unique<UserRequestGeneral>(tenant2SystemUser, boost::none);
     const UserName systemUser = {"spencer", "test"};
-    const UserRequest systemUserRequest(systemUser, boost::none);
+    std::unique_ptr<UserRequest> systemUserRequest =
+        std::make_unique<UserRequestGeneral>(systemUser, boost::none);
 
     auto testSystemRolesResource = ResourcePattern::forExactNamespace(
         NamespaceString::createNamespaceString_forTest("test", "system.roles"));
@@ -1503,8 +1537,8 @@ TEST_F(AuthorizationSessionTest, TenantSeparation) {
 
     // User with tenant ID #1 with basic read/write privileges on "test" should be able to write to
     // tenant ID #1's test collection, and no others.
-    ASSERT_OK(
-        authzSession->addAndAuthorizeUser(_opCtx.get(), kTenant1UserTestRequest, boost::none));
+    ASSERT_OK(authzSession->addAndAuthorizeUser(
+        _opCtx.get(), kTenant1UserTestRequest->clone(), boost::none));
     assertActive(testTenant1FooCollResource, ActionType::insert);
     assertNotAuthorized(testFooCollResource, ActionType::insert);
     assertNotAuthorized(testTenant2FooCollResource, ActionType::insert);
@@ -1512,14 +1546,14 @@ TEST_F(AuthorizationSessionTest, TenantSeparation) {
     assertNotAuthorized(testSystemRolesTenant2Resource, ActionType::insert);
 
     authzSession->logoutDatabase(_client.get(),
-                                 kTenant1UserTestRequest.name.getDatabaseName(),
+                                 kTenant1UserTestRequest->getUserName().getDatabaseName(),
                                  "Log out tenant 1 for test"_sd);
     assertLogout(testTenant1FooCollResource, ActionType::insert);
 
     // User with tenant ID #2 with readWriteAny should be able to write to any of tenant ID #2's
     // normal collections, and no others.
-    ASSERT_OK(
-        authzSession->addAndAuthorizeUser(_opCtx.get(), kTenant2UserTestRequest, boost::none));
+    ASSERT_OK(authzSession->addAndAuthorizeUser(
+        _opCtx.get(), kTenant2UserTestRequest->clone(), boost::none));
     assertActive(testTenant2FooCollResource, ActionType::insert);
     assertNotAuthorized(testFooCollResource, ActionType::insert);
     assertNotAuthorized(testTenant1FooCollResource, ActionType::insert);
@@ -1527,13 +1561,14 @@ TEST_F(AuthorizationSessionTest, TenantSeparation) {
     assertNotAuthorized(testSystemRolesTenant2Resource, ActionType::insert);
 
     authzSession->logoutDatabase(_client.get(),
-                                 kTenant2UserTestRequest.name.getDatabaseName(),
+                                 kTenant2UserTestRequest->getUserName().getDatabaseName(),
                                  "Log out tenant 2 for test"_sd);
     assertLogout(testTenant2FooCollResource, ActionType::insert);
 
     // User with no tenant ID with basic read/write privileges on "test" should be able to write to
     // the no-tenant test collection, and no others.
-    ASSERT_OK(authzSession->addAndAuthorizeUser(_opCtx.get(), kUser1TestRequest, boost::none));
+    ASSERT_OK(
+        authzSession->addAndAuthorizeUser(_opCtx.get(), kUser1TestRequest->clone(), boost::none));
     assertActive(testFooCollResource, ActionType::insert);
     assertNotAuthorized(testTenant1FooCollResource, ActionType::insert);
     assertNotAuthorized(testTenant2FooCollResource, ActionType::insert);
@@ -1546,7 +1581,8 @@ TEST_F(AuthorizationSessionTest, TenantSeparation) {
     // User with no tenant ID with root should be able to write to any tenant's normal
     // collections, because boost::none acts as "any tenant" for privileges which don't specify a
     // namespace/DB, and root has the useTenant privilege.
-    ASSERT_OK(authzSession->addAndAuthorizeUser(_opCtx.get(), kUser2TestRequest, boost::none));
+    ASSERT_OK(
+        authzSession->addAndAuthorizeUser(_opCtx.get(), kUser2TestRequest->clone(), boost::none));
     assertActive(testFooCollResource, ActionType::insert);
     assertActive(testTenant1FooCollResource, ActionType::insert);
     assertActive(testTenant2FooCollResource, ActionType::insert);
@@ -1559,8 +1595,8 @@ TEST_F(AuthorizationSessionTest, TenantSeparation) {
     // User with no tenant ID with readWriteAnyDatabase should be able to write to normal
     // collections with no tenant ID, because readWriteAnyDatabase lacks the useTenant privilege and
     // thus can't read/write to other tenants' databases.
-    ASSERT_OK(
-        authzSession->addAndAuthorizeUser(_opCtx.get(), readWriteAnyDBUserRequest, boost::none));
+    ASSERT_OK(authzSession->addAndAuthorizeUser(
+        _opCtx.get(), std::move(readWriteAnyDBUserRequest), boost::none));
     assertActive(testFooCollResource, ActionType::insert);
     assertNotAuthorized(testTenant1FooCollResource, ActionType::insert);
     assertNotAuthorized(testTenant2FooCollResource, ActionType::insert);
@@ -1573,8 +1609,8 @@ TEST_F(AuthorizationSessionTest, TenantSeparation) {
 
     // User with tenant ID 2 with __system privileges should be able to write to any of tenant 2's
     // collections, including system collections.
-    ASSERT_OK(
-        authzSession->addAndAuthorizeUser(_opCtx.get(), tenant2SystemUserRequest, boost::none));
+    ASSERT_OK(authzSession->addAndAuthorizeUser(
+        _opCtx.get(), tenant2SystemUserRequest->clone(), boost::none));
     assertActive(testTenant2FooCollResource, ActionType::insert);
     assertNotAuthorized(testFooCollResource, ActionType::insert);
     assertNotAuthorized(testTenant1FooCollResource, ActionType::insert);
@@ -1582,13 +1618,14 @@ TEST_F(AuthorizationSessionTest, TenantSeparation) {
     assertActive(testSystemRolesTenant2Resource, ActionType::insert);
 
     authzSession->logoutDatabase(_client.get(),
-                                 tenant2SystemUserRequest.name.getDatabaseName(),
+                                 tenant2SystemUserRequest->getUserName().getDatabaseName(),
                                  "Log out tenant 2 system user for test"_sd);
     assertLogout(testTenant2FooCollResource, ActionType::insert);
 
     // User with no tenant ID with __system privileges should be able to write to any tenant's
     // collections.
-    ASSERT_OK(authzSession->addAndAuthorizeUser(_opCtx.get(), systemUserRequest, boost::none));
+    ASSERT_OK(
+        authzSession->addAndAuthorizeUser(_opCtx.get(), std::move(systemUserRequest), boost::none));
     assertActive(testFooCollResource, ActionType::insert);
     assertActive(testTenant1FooCollResource, ActionType::insert);
     assertActive(testTenant2FooCollResource, ActionType::insert);
@@ -1607,7 +1644,8 @@ TEST_F(AuthorizationSessionTest, ExpiredSessionWithReauth) {
     Date_t expirationTime = clockSource()->now() + Hours(1);
     ASSERT_OK(createUser({"spencer", "test"}, {{"readWrite", "test"}, {"dbAdmin", "test"}}));
     ASSERT_OK(createUser({"admin", "admin"}, {{"readWriteAnyDatabase", "admin"}}));
-    ASSERT_OK(authzSession->addAndAuthorizeUser(_opCtx.get(), kSpencerTestRequest, expirationTime));
+    ASSERT_OK(authzSession->addAndAuthorizeUser(
+        _opCtx.get(), kSpencerTestRequest->clone(), expirationTime));
 
     // Assert that advancing the clock by 30 minutes does not trigger expiration.
     auto clock = clockSource();
@@ -1625,7 +1663,8 @@ TEST_F(AuthorizationSessionTest, ExpiredSessionWithReauth) {
 
     // Authorize the same user again to simulate re-login.
     expirationTime += Hours(2);
-    ASSERT_OK(authzSession->addAndAuthorizeUser(_opCtx.get(), kSpencerTestRequest, expirationTime));
+    ASSERT_OK(authzSession->addAndAuthorizeUser(
+        _opCtx.get(), kSpencerTestRequest->clone(), expirationTime));
     assertActive(testFooCollResource, ActionType::insert);
 
     // Expire the user again, this time by setting clock to the exact expiration time boundary.
@@ -1634,7 +1673,8 @@ TEST_F(AuthorizationSessionTest, ExpiredSessionWithReauth) {
     assertExpired(testFooCollResource, ActionType::insert);
 
     // Assert that a different user cannot log in on the expired connection.
-    ASSERT_NOT_OK(authzSession->addAndAuthorizeUser(_opCtx.get(), kAdminAdminRequest, boost::none));
+    ASSERT_NOT_OK(
+        authzSession->addAndAuthorizeUser(_opCtx.get(), kAdminAdminRequest->clone(), boost::none));
     assertExpired(testFooCollResource, ActionType::insert);
 
     // Check that explicit logout from an expired connection works as expected.
@@ -1672,8 +1712,8 @@ TEST_F(AuthorizationSessionTest, ExpirationWithSecurityTokenNOK) {
         const auto checkExpiration = [&](const boost::optional<Date_t>& expire,
                                          const Date_t& expect) {
             auth::ValidatedTenancyScope::set(_opCtx.get(), validatedTenancyScope);
-            ASSERT_OK(
-                authzSession->addAndAuthorizeUser(_opCtx.get(), kTenant1UserTestRequest, expire));
+            ASSERT_OK(authzSession->addAndAuthorizeUser(
+                _opCtx.get(), kTenant1UserTestRequest->clone(), expire));
             ASSERT_EQ(authzSession->getExpiration(), expect);
 
             // Reset for next test.
@@ -1697,8 +1737,8 @@ TEST_F(AuthorizationSessionTest, ExpirationWithSecurityTokenNOK) {
 
         // Perform authentication checks.
         auth::ValidatedTenancyScope::set(_opCtx.get(), validatedTenancyScope);
-        ASSERT_OK(
-            authzSession->addAndAuthorizeUser(_opCtx.get(), kTenant1UserTestRequest, boost::none));
+        ASSERT_OK(authzSession->addAndAuthorizeUser(
+            _opCtx.get(), kTenant1UserTestRequest->clone(), boost::none));
 
         // Assert that the session is authenticated and authorized as expected.
         assertSecurityToken(testTenant1FooCollResource, ActionType::insert);
@@ -1708,8 +1748,8 @@ TEST_F(AuthorizationSessionTest, ExpirationWithSecurityTokenNOK) {
         assertNotAuthorized(testTenant2FooCollResource, ActionType::insert);
 
         // Assert that another user can't be authorized while the security token is auth'd.
-        ASSERT_NOT_OK(
-            authzSession->addAndAuthorizeUser(_opCtx.get(), kUser1TestRequest, boost::none));
+        ASSERT_NOT_OK(authzSession->addAndAuthorizeUser(
+            _opCtx.get(), kUser1TestRequest->clone(), boost::none));
 
         // Check that starting a new request without the security token decoration results in token
         // user logout.
@@ -1723,7 +1763,7 @@ TEST_F(AuthorizationSessionTest, ExpirationWithSecurityTokenNOK) {
             boost::none, "anydb"_sd, "somecollection"_sd);
         const auto kSomeCollRsrc = ResourcePattern::forExactNamespace(kSomeCollNss);
         ASSERT_OK(authzSession->addAndAuthorizeUser(
-            _opCtx.get(), kUser1TestRequest, Date_t() + Hours{1}));
+            _opCtx.get(), kUser1TestRequest->clone(), Date_t() + Hours{1}));
         assertActive(kSomeCollRsrc, ActionType::insert);
 
         // Check that logout proceeds normally.
@@ -1743,8 +1783,8 @@ TEST_F(AuthorizationSessionTest, ExpirationWithSecurityTokenNOK) {
         auth::ValidatedTenancyScope::set(_opCtx.get(), validatedTenancyScope);
         auth::ValidatedTenancyScope::set(_opCtx.get(), validatedTenancyScope);
 
-        ASSERT_OK(
-            authzSession->addAndAuthorizeUser(_opCtx.get(), kTenant2UserTestRequest, boost::none));
+        ASSERT_OK(authzSession->addAndAuthorizeUser(
+            _opCtx.get(), kTenant2UserTestRequest->clone(), boost::none));
 
         // Ensure that even though it has the readWriteAny role, this user only has privileges on
         // collections with matching tenant ID.

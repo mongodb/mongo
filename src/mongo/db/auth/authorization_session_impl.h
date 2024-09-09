@@ -94,7 +94,7 @@ public:
     void startContractTracking() override;
 
     Status addAndAuthorizeUser(OperationContext* opCtx,
-                               const UserRequest& userRequest,
+                               std::unique_ptr<UserRequest> userRequest,
                                boost::optional<Date_t> expirationTime) override;
 
     User* lookupUser(const UserName& name) override;

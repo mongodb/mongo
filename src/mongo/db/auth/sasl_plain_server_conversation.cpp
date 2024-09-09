@@ -150,7 +150,7 @@ StatusWith<std::tuple<bool, std::string>> SASLPlainServerMechanism::stepImpl(
             });
         }
 
-        return authManager->acquireUser(opCtx, getUserRequest());
+        return authManager->acquireUser(opCtx, makeUserRequest());
     }();
 
     if (!swUser.isOK()) {

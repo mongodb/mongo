@@ -36,6 +36,7 @@
 #include "mongo/db/auth/authorization_manager_global_parameters_gen.h"
 #include "mongo/db/auth/cluster_auth_mode.h"
 #include "mongo/db/auth/sasl_options.h"
+#include "mongo/db/auth/user_request_x509.h"
 #include "mongo/db/auth/x509_protocol_gen.h"
 #include "mongo/db/database_name.h"
 #include "mongo/db/server_feature_flags_gen.h"
@@ -98,8 +99,9 @@ std::string getUserName(Client* client, StringData inputData, const SSLPeerInfo&
 
 }  // namespace
 
-UserRequest SaslX509ServerMechanism::getUserRequest() const {
-    UserRequest request(UserName(getPrincipalName(), getAuthenticationDatabase()), boost::none);
+std::unique_ptr<UserRequest> SaslX509ServerMechanism::makeUserRequest() const {
+    std::unique_ptr<UserRequest> request = std::make_unique<UserRequestGeneral>(
+        UserName(getPrincipalName(), getAuthenticationDatabase()), boost::none);
 
     if (!haveClient()) {
         return request;
@@ -115,7 +117,8 @@ UserRequest SaslX509ServerMechanism::getUserRequest() const {
     }
 
     if (isClusterMember(opCtx->getClient())) {
-        return UserRequest((*internalSecurity.getUser())->getName(), boost::none);
+        return std::make_unique<UserRequestGeneral>((*internalSecurity.getUser())->getName(),
+                                                    boost::none);
     }
 
     if (!allowRolesFromX509Certificates || !session) {
@@ -124,15 +127,19 @@ UserRequest SaslX509ServerMechanism::getUserRequest() const {
 
     const auto& sslPeerInfo = SSLPeerInfo::forSession(session);
     auto&& peerRoles = sslPeerInfo.roles();
-    if (peerRoles.empty() || (sslPeerInfo.subjectName().toString() != request.name.getUser())) {
+    if (peerRoles.empty() ||
+        (sslPeerInfo.subjectName().toString() != request->getUserName().getUser())) {
         return request;
     }
 
-    // In order to be hashable, the role names must be converted from unordered_set to a set.
-    request.roles = std::set<RoleName>();
+    std::set<RoleName> requestRoles;
     std::copy(
-        peerRoles.begin(), peerRoles.end(), std::inserter(*request.roles, request.roles->begin()));
-    return request;
+        peerRoles.begin(), peerRoles.end(), std::inserter(requestRoles, requestRoles.begin()));
+
+    return std::make_unique<UserRequestX509>(
+        UserName(getPrincipalName(), getAuthenticationDatabase()),
+        std::move(requestRoles),
+        sslPeerInfo);
 }
 
 bool SaslX509ServerMechanism::isClusterMember(Client* client) const {
@@ -196,11 +203,9 @@ StatusWith<std::tuple<bool, std::string>> SaslX509ServerMechanism::stepImpl(
     const auto& sslPeerInfo = SSLPeerInfo::forSession(client->session());
     ServerMechanismBase::_principalName = getUserName(client, inputData, sslPeerInfo);
 
-    const auto& dbname = ServerMechanismBase::getAuthenticationDatabase();
-
     uassert(ErrorCodes::BadValue,
             "MONGODB-X509 is only available on the '$external' database.",
-            dbname == "$external");
+            ServerMechanismBase::getAuthenticationDatabase() == "$external");
 
     if (!isClusterMember(opCtx->getClient())) {
         return std::make_tuple(true, std::string());

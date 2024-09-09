@@ -133,7 +133,7 @@ StatusWith<User> AuthzManagerExternalStateMongos::getUserObject(
         return status;
     }
 
-    User user(userReq);
+    User user(userReq.clone());
     V2UserDocumentParser dp;
     dp.setTenantId(getActiveTenant(opCtx));
     status = dp.initializeUserFromUserDocument(userDoc, &user);
@@ -146,11 +146,11 @@ StatusWith<User> AuthzManagerExternalStateMongos::getUserObject(
 
 Status AuthzManagerExternalStateMongos::getUserDescription(
     OperationContext* opCtx,
-    const UserRequest& user,
+    const UserRequest& userReq,
     BSONObj* result,
     const SharedUserAcquisitionStats& userAcquisitionStats) {
-    const UserName& userName = user.name;
-    if (!user.roles) {
+    const UserName& userName = userReq.getUserName();
+    if (!userReq.getRoles()) {
         BSONObj usersInfoCmd = BSON("usersInfo" << userName.toBSON(true /* serialize tenant */)
                                                 << "showPrivileges" << true << "showCredentials"
                                                 << true << "showAuthenticationRestrictions" << true
@@ -181,7 +181,7 @@ Status AuthzManagerExternalStateMongos::getUserDescription(
         // Obtain privilege information from the config servers for all roles acquired from the X509
         // certificate.
         BSONArrayBuilder userRolesBuilder;
-        for (const RoleName& role : *user.roles) {
+        for (const RoleName& role : *userReq.getRoles()) {
             userRolesBuilder.append(BSON(
                 AuthorizationManager::ROLE_NAME_FIELD_NAME
                 << role.getRole() << AuthorizationManager::ROLE_DB_FIELD_NAME << role.getDB()));

@@ -124,13 +124,13 @@ struct ReadThroughCacheLookup {
                                       const Key&,
                                       const Value& cachedValue,
                                       const Time& timeInStore,
-                                      const LookupArgs&... lookupArgs)>;
+                                      const LookupArgs... lookupArgs)>;
 };
 
 template <typename Result, typename Key, typename Value, typename... LookupArgs>
 struct ReadThroughCacheLookup<Result, Key, Value, CacheNotCausallyConsistent, LookupArgs...> {
     using Fn = unique_function<Result(
-        OperationContext*, const Key&, const Value& cachedValue, const LookupArgs&... lookupArgs)>;
+        OperationContext*, const Key&, const Value& cachedValue, const LookupArgs... lookupArgs)>;
 };
 
 /**
@@ -738,7 +738,7 @@ public:
                     if constexpr (std::is_same_v<Time, CacheNotCausallyConsistent>) {
                         return std::apply(_cache._lookupFn,
                                           std::tuple_cat(std::make_tuple(opCtx, _key, _cachedValue),
-                                                         std::move(_lookupArgs)));
+                                                         _lookupArgs));
                     } else {
                         auto minTimeInStore = [&] {
                             stdx::lock_guard lg(_cache._mutex);
@@ -748,7 +748,7 @@ public:
                             _cache._lookupFn,
                             std::tuple_cat(
                                 std::make_tuple(opCtx, _key, _cachedValue, minTimeInStore),
-                                std::move(_lookupArgs)));
+                                _lookupArgs));
                     }
                 });
             }));

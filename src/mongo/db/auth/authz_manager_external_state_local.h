@@ -76,7 +76,7 @@ public:
                                    const UserRequest& userReq,
                                    const SharedUserAcquisitionStats& userAcquisitionStats) override;
     Status getUserDescription(OperationContext* opCtx,
-                              const UserRequest& user,
+                              const UserRequest& userReq,
                               BSONObj* result,
                               const SharedUserAcquisitionStats& userAcquisitionStats) override;
     Status rolesExist(OperationContext* opCtx, const std::vector<RoleName>& roleNames) override;

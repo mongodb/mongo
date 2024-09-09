@@ -60,47 +60,115 @@
 #include "mongo/util/base64.h"
 #include "mongo/util/read_through_cache.h"
 
+
 namespace mongo {
 
 /**
  * Represents the properties required to request a UserHandle.
- * This type is hashable and may be used as a key describing requests
+ * It contains a UserRequestCacheKey which is hashable and can be
+ * used as a cache key.
  */
-struct UserRequest {
-    UserRequest(UserName name, boost::optional<std::set<RoleName>> roles)
+class UserRequest {
+public:
+    virtual ~UserRequest() = default;
+
+    class UserRequestCacheKey {
+    public:
+        UserRequestCacheKey(const UserName& userName, const std::vector<std::string>& hashElements)
+            : _hashElements(std::move(hashElements)), _userName(userName) {}
+
+        const UserName& getUserName() const {
+            return _userName;
+        }
+
+        template <typename H>
+        friend H AbslHashValue(H h, const UserRequestCacheKey& key) {
+            for (const auto& elem : key.getHashElements()) {
+                h = H::combine(std::move(h), elem);
+            }
+            return h;
+        }
+
+        bool operator==(const UserRequestCacheKey& key) const {
+            return getHashElements() == key.getHashElements();
+        }
+
+        bool operator<(const UserRequestCacheKey& key) const {
+            return getHashElements() < key.getHashElements();
+        }
+
+        bool operator>(const UserRequestCacheKey& k) const {
+            return k < *this;
+        }
+
+        bool operator>=(const UserRequestCacheKey& k) const {
+            return !(*this < k);
+        }
+
+        bool operator<=(const UserRequestCacheKey& k) const {
+            return !(k < *this);
+        }
+
+    private:
+        const std::vector<std::string>& getHashElements() const {
+            return _hashElements;
+        }
+
+        const std::vector<std::string> _hashElements;
+
+        // We store the userName here for userCacheInfo.
+        const UserName _userName;
+    };
+
+    enum class UserRequestType { General, X509, OIDC };
+
+    virtual const UserName& getUserName() const = 0;
+    virtual const boost::optional<std::set<RoleName>>& getRoles() const = 0;
+    virtual UserRequestType getType() const = 0;
+    virtual void setRoles(boost::optional<std::set<RoleName>> roles) = 0;
+    virtual std::unique_ptr<UserRequest> clone() const = 0;
+    virtual UserRequestCacheKey generateUserRequestCacheKey() const = 0;
+
+    static std::vector<std::string> getUserNameAndRolesVector(
+        const UserName& userName, const boost::optional<std::set<RoleName>>& roles);
+};
+
+/**
+ * This is a version of the UserRequest that is used for all authentication types
+ * that are not X509 and OIDC.
+ */
+class UserRequestGeneral : public UserRequest {
+public:
+    UserRequestGeneral(UserName name, boost::optional<std::set<RoleName>> roles)
         : name(std::move(name)), roles(std::move(roles)) {}
 
-
-    template <typename H>
-    friend H AbslHashValue(H h, const UserRequest& key) {
-        auto state = H::combine(std::move(h), key.name, key.mechanismData);
-        if (key.roles) {
-            for (const auto& role : *key.roles) {
-                state = H::combine(std::move(state), role);
-            }
-        }
-        return state;
+    const UserName& getUserName() const final {
+        return name;
     }
 
-    auto equalityLens() const {
-        return std::tie(name, roles, mechanismData);
+    const boost::optional<std::set<RoleName>>& getRoles() const final {
+        return roles;
     }
 
-    bool operator==(const UserRequest& key) const {
-        return equalityLens() == key.equalityLens();
+    UserRequestType getType() const override {
+        return UserRequestType::General;
     }
 
-    bool operator!=(const UserRequest& key) const {
-        return equalityLens() != key.equalityLens();
+    void setRoles(boost::optional<std::set<RoleName>> roles) final {
+        this->roles = std::move(roles);
     }
 
+    std::unique_ptr<UserRequest> clone() const override {
+        return std::make_unique<UserRequestGeneral>(getUserName(), getRoles());
+    }
+
+    UserRequestCacheKey generateUserRequestCacheKey() const override;
+
+protected:
     // The name of the requested user
     UserName name;
     // Any authorization grants which should override and be used in favor of roles acquisition.
     boost::optional<std::set<RoleName>> roles;
-
-    // Mechanism specific metadata which may be used during User acquisition.
-    std::string mechanismData;
 };
 
 /**
@@ -215,7 +283,7 @@ public:
 
     using ResourcePrivilegeMap = stdx::unordered_map<ResourcePattern, Privilege>;
 
-    explicit User(UserRequest request);
+    explicit User(std::unique_ptr<UserRequest> request);
     User(User&&) = default;
     User& operator=(User&&) = default;
 
@@ -227,15 +295,15 @@ public:
         _id = std::move(id);
     }
 
-    const UserRequest& getUserRequest() const {
-        return _request;
+    const UserRequest* getUserRequest() const {
+        return _request.get();
     }
 
     /**
      * Returns the user name for this user.
      */
     const UserName& getName() const {
-        return _request.name;
+        return _request->getUserName();
     }
 
     /**
@@ -388,7 +456,7 @@ private:
     UserId _id;
 
     // The original UserRequest which resolved into this user
-    UserRequest _request;
+    std::unique_ptr<UserRequest> _request;
 
     // User was explicitly invalidated
     bool _isInvalidated;
@@ -415,8 +483,11 @@ private:
     RestrictionDocuments _indirectRestrictions;
 };
 
-using UserCache =
-    ReadThroughCache<UserRequest, User, CacheNotCausallyConsistent, SharedUserAcquisitionStats>;
+using UserCache = ReadThroughCache<UserRequest::UserRequestCacheKey,
+                                   User,
+                                   CacheNotCausallyConsistent,
+                                   std::shared_ptr<UserRequest>,
+                                   SharedUserAcquisitionStats>;
 using UserHandle = UserCache::ValueHandle;
 
 }  // namespace mongo

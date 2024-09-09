@@ -221,20 +221,18 @@ void AuthorizationSessionImpl::startContractTracking() {
 }
 
 Status AuthorizationSessionImpl::addAndAuthorizeUser(OperationContext* opCtx,
-                                                     const UserRequest& userRequest,
+                                                     std::unique_ptr<UserRequest> userRequest,
                                                      boost::optional<Date_t> expirationTime) try {
-    const auto& userName = userRequest.name;
-
     // Check before we start to reveal as little as possible. Note that we do not need the lock
     // because only the Client thread can mutate _authenticatedUser.
     if (_authenticatedUser) {
         // Already logged in.
         auto previousUser = _authenticatedUser.value()->getName();
-        if (previousUser == userName) {
+        if (previousUser == userRequest->getUserName()) {
             // Allow reauthenticating as the same user, but warn.
             LOGV2_WARNING(5626700,
                           "Client has attempted to reauthenticate as a single user",
-                          "user"_attr = userName);
+                          "user"_attr = userRequest->getUserName());
 
             // Strict API requires no reauth, even as same user, unless FP is enabled.
             const bool hasStrictAPI = APIParameters::get(opCtx).getAPIStrict().value_or(false);
@@ -247,7 +245,7 @@ Status AuthorizationSessionImpl::addAndAuthorizeUser(OperationContext* opCtx,
             uassert(5626701,
                     str::stream() << "Each client connection may only be authenticated once. "
                                   << "Previously authenticated as: " << previousUser,
-                    previousUser.getDB() == userName.getDB());
+                    previousUser.getDB() == userRequest->getUserName().getDB());
             uasserted(5626702,
                       str::stream() << "Client has attempted to authenticate on multiple databases."
                                     << "Already authenticated as: " << previousUser);
@@ -261,12 +259,14 @@ Status AuthorizationSessionImpl::addAndAuthorizeUser(OperationContext* opCtx,
                     str::stream() << "Only same user is permitted to re-auth to an expired "
                                      "session. Expired user is "
                                   << _expiredUserName.value(),
-                    _expiredUserName == userName);
+                    _expiredUserName == userRequest->getUserName());
         }
     }
 
     AuthorizationManager* authzManager = AuthorizationManager::get(opCtx->getService());
-    auto user = uassertStatusOK(authzManager->acquireUser(opCtx, userRequest));
+    auto user = uassertStatusOK(authzManager->acquireUser(opCtx, std::move(userRequest)));
+
+    const auto& userName = user->getName();
 
     auto restrictionStatus = user->validateRestrictions(opCtx);
     if (!restrictionStatus.isOK()) {

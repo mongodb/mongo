@@ -432,6 +432,7 @@ mongo_cc_library(
     deps = [
         "authprivilege",
         "security_token",
+        "user",
         "//src/mongo/crypto:jwt_types",
         "//src/mongo/db:server_base",
         "//src/mongo/db:server_feature_flags",
@@ -520,6 +521,25 @@ mongo_cc_library(
 )
 
 mongo_cc_library(
+    name = "user_request_x509",
+    srcs = [
+        "user_request_x509.cpp",
+    ],
+    hdrs = [
+        "user_request_x509.h",
+    ],
+    deps = [
+        ":auth",
+        ":user",
+    ] + select({
+        "//bazel/config:ssl_enabled": [
+            "//src/mongo/util/net:ssl_manager",
+        ],
+        "//conditions:default": [],
+    }),
+)
+
+mongo_cc_library(
     name = "saslauth",
     srcs = [
         "sasl_mechanism_registry.cpp",
@@ -566,7 +586,12 @@ mongo_cc_library(
         "//src/mongo/util/net:ssl_manager",
         ":cluster_auth_mode",
         "//src/mongo/crypto:sha_block",
-    ],
+    ] + select({
+        "//bazel/config:ssl_enabled": [
+            ":user_request_x509",
+        ],
+        "//conditions:default": [],
+    }),
 )
 
 mongo_cc_library(

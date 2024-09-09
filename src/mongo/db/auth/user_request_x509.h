@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2024-present MongoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
@@ -27,33 +27,44 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#pragma once
+
+#include "mongo/db/auth/user.h"
+
+#include <boost/optional.hpp>
+#include <boost/optional/optional.hpp>
 
 #include "mongo/util/net/ssl_peer_info.h"
 
 namespace mongo {
-namespace {
-const transport::Session::Decoration<SSLPeerInfo> peerInfoForSession =
-    transport::Session::declareDecoration<SSLPeerInfo>();
-}
 
-SSLPeerInfo& SSLPeerInfo::forSession(const std::shared_ptr<transport::Session>& session) {
-    return peerInfoForSession(session.get());
-}
+#ifdef MONGO_CONFIG_SSL
 
-const SSLPeerInfo& SSLPeerInfo::forSession(
-    const std::shared_ptr<const transport::Session>& session) {
-    return peerInfoForSession(session.get());
-}
-
-void SSLPeerInfo::appendPeerInfoToVector(std::vector<std::string>& elements) const {
-    elements.push_back(_subjectName.toString());
-    if (_sniName) {
-        elements.push_back(*_sniName);
+/**
+ * This is the version of UserRequest that is used by X509. It provides
+ * a way to store X509 metadata for retrieving roles.
+ */
+class UserRequestX509 : public UserRequestGeneral {
+public:
+    UserRequestX509(UserName name,
+                    boost::optional<std::set<RoleName>> roles,
+                    const SSLPeerInfo& peerInfo)
+        : UserRequestGeneral(std::move(name), std::move(roles)), _peerInfo(peerInfo) {}
+    UserRequestType getType() const final {
+        return UserRequestType::X509;
     }
-    if (_clusterMembership) {
-        elements.push_back(*_clusterMembership);
+    const SSLPeerInfo& getPeerInfo() const {
+        return _peerInfo;
     }
-}
+    std::unique_ptr<UserRequest> clone() const final {
+        return std::make_unique<UserRequestX509>(getUserName(), getRoles(), getPeerInfo());
+    }
+    UserRequestCacheKey generateUserRequestCacheKey() const final;
+
+private:
+    const SSLPeerInfo& _peerInfo;
+};
+
+#endif  // MONGO_CONFIG_SSL
 
 }  // namespace mongo

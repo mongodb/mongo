@@ -375,12 +375,14 @@ protected:
 };
 
 const UserName kVarunTest("varun", "test");
-const UserRequest kVarunTestRequest(kVarunTest, boost::none);
 
 TEST_F(TypedCommandTest, runTyped) {
     {
         auto opCtx = _client->makeOperationContext();
-        ASSERT_OK(_authzSession->addAndAuthorizeUser(opCtx.get(), kVarunTestRequest, boost::none));
+        ASSERT_OK(_authzSession->addAndAuthorizeUser(
+            opCtx.get(),
+            std::make_unique<UserRequestGeneral>(kVarunTest, boost::none),
+            boost::none));
         _authzSession->startRequest(opCtx.get());
     }
 
@@ -393,7 +395,10 @@ TEST_F(TypedCommandTest, runTyped) {
 TEST_F(TypedCommandTest, runMinimal) {
     {
         auto opCtx = _client->makeOperationContext();
-        ASSERT_OK(_authzSession->addAndAuthorizeUser(opCtx.get(), kVarunTestRequest, boost::none));
+        ASSERT_OK(_authzSession->addAndAuthorizeUser(
+            opCtx.get(),
+            std::make_unique<UserRequestGeneral>(kVarunTest, boost::none),
+            boost::none));
         _authzSession->startRequest(opCtx.get());
     }
 
@@ -406,7 +411,10 @@ TEST_F(TypedCommandTest, runMinimal) {
 TEST_F(TypedCommandTest, runVoid) {
     {
         auto opCtx = _client->makeOperationContext();
-        ASSERT_OK(_authzSession->addAndAuthorizeUser(opCtx.get(), kVarunTestRequest, boost::none));
+        ASSERT_OK(_authzSession->addAndAuthorizeUser(
+            opCtx.get(),
+            std::make_unique<UserRequestGeneral>(kVarunTest, boost::none),
+            boost::none));
         _authzSession->startRequest(opCtx.get());
     }
 
@@ -419,7 +427,10 @@ TEST_F(TypedCommandTest, runVoid) {
 TEST_F(TypedCommandTest, runThrowStatus) {
     {
         auto opCtx = _client->makeOperationContext();
-        ASSERT_OK(_authzSession->addAndAuthorizeUser(opCtx.get(), kVarunTestRequest, boost::none));
+        ASSERT_OK(_authzSession->addAndAuthorizeUser(
+            opCtx.get(),
+            std::make_unique<UserRequestGeneral>(kVarunTest, boost::none),
+            boost::none));
         _authzSession->startRequest(opCtx.get());
     }
 
@@ -440,7 +451,10 @@ TEST_F(TypedCommandTest, runThrowStatus) {
 TEST_F(TypedCommandTest, runThrowDoCheckAuthorization) {
     {
         auto opCtx = _client->makeOperationContext();
-        ASSERT_OK(_authzSession->addAndAuthorizeUser(opCtx.get(), kVarunTestRequest, boost::none));
+        ASSERT_OK(_authzSession->addAndAuthorizeUser(
+            opCtx.get(),
+            std::make_unique<UserRequestGeneral>(kVarunTest, boost::none),
+            boost::none));
         _authzSession->startRequest(opCtx.get());
     }
 
@@ -478,8 +492,10 @@ TEST_F(TypedCommandTest, runThrowAuthzSessionExpired) {
         // Load user into the authorization session and then expire it.
         auto opCtx = _client->makeOperationContext();
         auto expirationTime = clockSource()->now() + Hours{1};
-        ASSERT_OK(
-            _authzSession->addAndAuthorizeUser(opCtx.get(), kVarunTestRequest, expirationTime));
+        ASSERT_OK(_authzSession->addAndAuthorizeUser(
+            opCtx.get(),
+            std::make_unique<UserRequestGeneral>(kVarunTest, boost::none),
+            expirationTime));
 
         // Fast-forward time before starting a new request.
         clockSource()->advance(Hours(2));

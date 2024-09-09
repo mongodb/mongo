@@ -331,13 +331,15 @@ StatusWith<User> AuthzManagerExternalStateLocal::getUserObject(
     OperationContext* opCtx,
     const UserRequest& userReq,
     const SharedUserAcquisitionStats& userAcquisitionStats) try {
-    const UserName& userName = userReq.name;
     std::vector<RoleName> directRoles;
-    User user(userReq);
+    User user(userReq.clone());
+
+    const UserRequest* request = user.getUserRequest();
+    const UserName& userName = request->getUserName();
 
     auto rolesLock = _lockRoles(opCtx, userName.tenantId());
 
-    if (!userReq.roles) {
+    if (!request->getRoles()) {
         // Normal path: Acquire a user from the local store by UserName.
         BSONObj userDoc;
         auto status =
@@ -352,7 +354,7 @@ StatusWith<User> AuthzManagerExternalStateLocal::getUserObject(
         }
 
         V2UserDocumentParser userDocParser;
-        userDocParser.setTenantId(userReq.name.tenantId());
+        userDocParser.setTenantId(request->getUserName().tenantId());
         uassertStatusOK(userDocParser.initializeUserFromUserDocument(userDoc, &user));
         for (auto iter = user.getRoles(); iter.more();) {
             directRoles.push_back(iter.next());
@@ -362,7 +364,9 @@ StatusWith<User> AuthzManagerExternalStateLocal::getUserObject(
         // a base user definition with a set of immediate roles.
         // We're being asked to use the local roles collection to derive privileges,
         // subordinate roles, and authentication restrictions.
-        directRoles = std::vector<RoleName>(userReq.roles->cbegin(), userReq.roles->cend());
+        const auto& requestRoles = *request->getRoles();
+        directRoles.assign(requestRoles.begin(), requestRoles.end());
+
         User::CredentialData credentials;
         credentials.isExternal = true;
         user.setCredentials(credentials);
@@ -400,13 +404,14 @@ Status AuthzManagerExternalStateLocal::getUserDescription(
     const UserRequest& userReq,
     BSONObj* result,
     const SharedUserAcquisitionStats& userAcquisitionStats) try {
-    const UserName& userName = userReq.name;
+
+    const UserName& userName = userReq.getUserName();
     std::vector<RoleName> directRoles;
     BSONObjBuilder resultBuilder;
 
     auto rolesLock = _lockRoles(opCtx, userName.tenantId());
 
-    if (!userReq.roles) {
+    if (!userReq.getRoles()) {
         BSONObj userDoc;
         auto status =
             findOne(opCtx, getUsersCollection(userName.tenantId()), userName.toBSON(), &userDoc);
@@ -432,7 +437,8 @@ Status AuthzManagerExternalStateLocal::getUserDescription(
         resultBuilder.append("db", userName.getDB());
         resultBuilder.append("credentials", BSON("external" << true));
 
-        directRoles = std::vector<RoleName>(userReq.roles->cbegin(), userReq.roles->cend());
+        directRoles =
+            std::vector<RoleName>(userReq.getRoles()->cbegin(), userReq.getRoles()->cend());
         BSONArrayBuilder rolesBuilder(resultBuilder.subarrayStart("roles"));
         for (const RoleName& role : directRoles) {
             rolesBuilder.append(role.toBSON());

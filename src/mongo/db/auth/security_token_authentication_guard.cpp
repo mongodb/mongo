@@ -53,10 +53,11 @@ namespace auth {
 SecurityTokenAuthenticationGuard::SecurityTokenAuthenticationGuard(
     OperationContext* opCtx, const ValidatedTenancyScope& token) {
     if (token.hasAuthenticatedUser()) {
-        UserRequest request(token.authenticatedUser(), boost::none);
+        std::unique_ptr<UserRequest> request =
+            std::make_unique<UserRequestGeneral>(token.authenticatedUser(), boost::none);
         auto* client = opCtx->getClient();
-        uassertStatusOK(
-            AuthorizationSession::get(client)->addAndAuthorizeUser(opCtx, request, boost::none));
+        uassertStatusOK(AuthorizationSession::get(client)->addAndAuthorizeUser(
+            opCtx, std::move(request), boost::none));
         _client = client;
 
         LOGV2_DEBUG(5838100,

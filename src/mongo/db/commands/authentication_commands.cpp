@@ -56,6 +56,7 @@
 #include "mongo/db/auth/sasl_options.h"
 #include "mongo/db/auth/sasl_payload.h"
 #include "mongo/db/auth/user_name.h"
+#include "mongo/db/auth/user_request_x509.h"
 #include "mongo/db/auth/x509_protocol_gen.h"
 #include "mongo/db/client.h"
 #include "mongo/db/commands.h"
@@ -154,27 +155,26 @@ MONGO_REGISTER_COMMAND(CmdLogout).forRouter().forShard();
 
 #ifdef MONGO_CONFIG_SSL
 
-UserRequest getX509UserRequest(OperationContext* opCtx, UserRequest request) {
+std::unique_ptr<UserRequest> getX509UserRequest(OperationContext* opCtx, const UserName& username) {
     std::shared_ptr<transport::Session> session;
     if (opCtx && opCtx->getClient()) {
         session = opCtx->getClient()->session();
     }
 
-    if (!allowRolesFromX509Certificates || !session || request.roles) {
-        return request;
+    if (!allowRolesFromX509Certificates || !session) {
+        return std::make_unique<UserRequestGeneral>(username, boost::none);
     }
 
     auto& sslPeerInfo = SSLPeerInfo::forSession(session);
     auto&& peerRoles = sslPeerInfo.roles();
-    if (peerRoles.empty() || (sslPeerInfo.subjectName().toString() != request.name.getUser())) {
-        return request;
+    if (peerRoles.empty() || (sslPeerInfo.subjectName().toString() != username.getUser())) {
+        return std::make_unique<UserRequestGeneral>(username, boost::none);
     }
 
-    // In order to be hashable, the role names must be converted from unordered_set to a set.
-    request.roles = std::set<RoleName>();
-    std::copy(
-        peerRoles.begin(), peerRoles.end(), std::inserter(*request.roles, request.roles->begin()));
-    return request;
+    auto roles = std::set<RoleName>();
+    std::copy(peerRoles.begin(), peerRoles.end(), std::inserter(roles, roles.begin()));
+
+    return std::make_unique<UserRequestX509>(username, roles, sslPeerInfo);
 }
 
 constexpr auto kX509AuthenticationDisabledMessage = "x.509 authentication is disabled."_sd;
@@ -228,14 +228,15 @@ void _authenticateX509(OperationContext* opCtx, AuthenticationSession* session) 
 
     const auto clusterAuthMode = ClusterAuthMode::get(opCtx->getServiceContext());
 
-    auto request = getX509UserRequest(opCtx, UserRequest(userName, boost::none));
+    auto request = getX509UserRequest(opCtx, userName);
 
     auto authorizeExternalUser = [&] {
         uassert(ErrorCodes::BadValue,
                 kX509AuthenticationDisabledMessage,
                 sequenceContains(saslGlobalParams.authenticationMechanisms, kX509AuthMechanism));
 
-        uassertStatusOK(authorizationSession->addAndAuthorizeUser(opCtx, request, boost::none));
+        uassertStatusOK(
+            authorizationSession->addAndAuthorizeUser(opCtx, std::move(request), boost::none));
     };
 
     if (sslConfiguration.isClusterMember(clientName, sslPeerInfo.getClusterMembership())) {
@@ -260,7 +261,7 @@ void _authenticateX509(OperationContext* opCtx, AuthenticationSession* session) 
                 auto* am = AuthorizationManager::get(opCtx->getService());
                 BSONObj ignored;
                 const bool userExists =
-                    am->getUserDescription(opCtx, request.name, &ignored).isOK();
+                    am->getUserDescription(opCtx, request->getUserName(), &ignored).isOK();
                 uassert(ErrorCodes::AuthenticationFailed,
                         "The provided certificate represents both a cluster member and an "
                         "explicit user which exists in the authzn database. "

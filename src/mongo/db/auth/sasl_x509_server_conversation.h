@@ -54,7 +54,7 @@ public:
 
     bool isClusterMember(Client* client) const override;
 
-    UserRequest getUserRequest() const override;
+    std::unique_ptr<UserRequest> makeUserRequest() const override;
 
 private:
     static constexpr unsigned int kMaxStep = 1;

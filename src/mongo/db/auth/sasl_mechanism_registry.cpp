@@ -109,7 +109,8 @@ void SASLServerMechanismRegistry::advertiseMechanismNamesForUser(OperationContex
     }
 
     AuthorizationManager* authManager = AuthorizationManager::get(opCtx->getService());
-    const auto swUser = authManager->acquireUser(opCtx, UserRequest(userName, boost::none));
+    const auto swUser = authManager->acquireUser(
+        opCtx, std::make_unique<UserRequestGeneral>(userName, boost::none));
 
     if (!swUser.isOK()) {
         auto& status = swUser.getStatus();

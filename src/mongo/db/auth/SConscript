@@ -34,6 +34,7 @@ env.Library(
         "user",
         "user_acquisition_stats",
         "user_document_parser",
+        "user_request_x509" if get_option("ssl") == "on" else [],
     ],
     LIBDEPS_PRIVATE=[
         "$BUILD_DIR/mongo/db/api_parameters",
@@ -246,5 +247,6 @@ env.CppUnitTest(
         "security_key",
         "security_token_auth",
         "user",
+        "user_request_x509" if get_option("ssl") == "on" else [],
     ],
 )

@@ -119,7 +119,8 @@ KillAllSessionsByPatternItem makeKillAllSessionsByPattern(OperationContext* opCt
                                                           const KillAllSessionsUser& kasu) {
     KillAllSessionsByPatternItem item = makeKillAllSessionsByPattern(opCtx);
 
-    User user(UserRequest(UserName(kasu.getUser(), kasu.getDb()), boost::none));
+    User user(
+        std::make_unique<UserRequestGeneral>(UserName(kasu.getUser(), kasu.getDb()), boost::none));
     item.pattern.setUid(user.getDigest());
     return item;
 }

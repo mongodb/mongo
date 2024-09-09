@@ -33,6 +33,7 @@
 #include <absl/container/node_hash_set.h>
 #include <absl/meta/type_traits.h>
 #include <cstddef>
+#include <memory>
 #include <vector>
 
 
@@ -75,8 +76,28 @@ SHA256Block computeDigest(const UserName& name) {
 
 }  // namespace
 
-User::User(UserRequest request)
-    : _request(std::move(request)), _isInvalidated(false), _digest(computeDigest(_request.name)) {}
+std::vector<std::string> UserRequest::getUserNameAndRolesVector(
+    const UserName& userName, const boost::optional<std::set<RoleName>>& roles) {
+    std::vector<std::string> hashElements;
+    hashElements.push_back(userName.getUnambiguousName());
+
+    if (roles) {
+        for (auto& role : *roles) {
+            hashElements.push_back(role.getRole());
+        }
+    }
+
+    return hashElements;
+}
+
+UserRequest::UserRequestCacheKey UserRequestGeneral::generateUserRequestCacheKey() const {
+    return UserRequestCacheKey(getUserName(), getUserNameAndRolesVector(getUserName(), getRoles()));
+}
+
+User::User(std::unique_ptr<UserRequest> request)
+    : _request(std::move(request)),
+      _isInvalidated(false),
+      _digest(computeDigest(_request->getUserName())) {}
 
 template <>
 User::SCRAMCredentials<SHA1Block>& User::CredentialData::scram<SHA1Block>() {

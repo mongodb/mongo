@@ -85,6 +85,10 @@ public:
         return _body;
     };
 
+    const std::string& getOriginalToken() const {
+        return _originalToken;
+    }
+
 private:
     BSONObj _headerBSON;
     JWSHeader _header;

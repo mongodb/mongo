@@ -50,8 +50,9 @@ void AuthorizationSessionForTest::assumePrivilegesForDB(Privilege privilege,
 
 void AuthorizationSessionForTest::assumePrivilegesForDB(PrivilegeVector privileges,
                                                         const DatabaseName& dbName) {
-    UserRequest request(UserName("authorizationSessionForTestUser"_sd, dbName), boost::none);
-    _authenticatedUser = UserHandle(User(request));
+    std::unique_ptr<UserRequest> request = std::make_unique<UserRequestGeneral>(
+        UserName("authorizationSessionForTestUser"_sd, dbName), boost::none);
+    _authenticatedUser = UserHandle(User(std::move(request)));
     _authenticatedUser.value()->addPrivileges(privileges);
     _authenticationMode = AuthorizationSession::AuthenticationMode::kConnection;
     _updateInternalAuthorizationState();

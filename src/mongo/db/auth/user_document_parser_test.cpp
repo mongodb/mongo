@@ -78,8 +78,10 @@ public:
     BSONObj sha1_creds, sha256_creds;
 
     void setUp() override {
-        user.reset(new User(UserRequest(UserName("spencer", "test"), boost::none)));
-        adminUser.reset(new User(UserRequest(UserName("admin", "admin"), boost::none)));
+        user = std::make_unique<User>(
+            std::make_unique<UserRequestGeneral>(UserName("spencer", "test"), boost::none));
+        adminUser = std::make_unique<User>(
+            std::make_unique<UserRequestGeneral>(UserName("admin", "admin"), boost::none));
 
         sha1_creds = scram::Secrets<SHA1Block>::generateCredentials(
             "a", saslGlobalParams.scramSHA1IterationCount.load());

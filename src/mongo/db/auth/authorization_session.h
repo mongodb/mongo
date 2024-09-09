@@ -164,7 +164,7 @@ public:
      * for it in the process.
      */
     virtual Status addAndAuthorizeUser(OperationContext* opCtx,
-                                       const UserRequest& userRequest,
+                                       std::unique_ptr<UserRequest> userRequest,
                                        boost::optional<Date_t> expirationTime) = 0;
 
     // Returns the authenticated user with the given name.  Returns NULL

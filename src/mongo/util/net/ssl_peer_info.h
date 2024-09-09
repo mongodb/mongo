@@ -80,6 +80,8 @@ public:
         _clusterMembership = std::move(clusterMembership);
     }
 
+    void appendPeerInfoToVector(std::vector<std::string>& elements) const;
+
 private:
     /**
      * This flag is used to indicate if the underlying socket is using TLS or not. A default

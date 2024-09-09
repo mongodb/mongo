@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2024-present MongoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
@@ -27,33 +27,20 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include "mongo/db/auth/user_request_x509.h"
 
 #include "mongo/util/net/ssl_peer_info.h"
 
 namespace mongo {
-namespace {
-const transport::Session::Decoration<SSLPeerInfo> peerInfoForSession =
-    transport::Session::declareDecoration<SSLPeerInfo>();
+
+#ifdef MONGO_CONFIG_SSL
+
+UserRequest::UserRequestCacheKey UserRequestX509::generateUserRequestCacheKey() const {
+    auto hashElements = getUserNameAndRolesVector(getUserName(), getRoles());
+    getPeerInfo().appendPeerInfoToVector(hashElements);
+    return UserRequestCacheKey(getUserName(), hashElements);
 }
 
-SSLPeerInfo& SSLPeerInfo::forSession(const std::shared_ptr<transport::Session>& session) {
-    return peerInfoForSession(session.get());
-}
-
-const SSLPeerInfo& SSLPeerInfo::forSession(
-    const std::shared_ptr<const transport::Session>& session) {
-    return peerInfoForSession(session.get());
-}
-
-void SSLPeerInfo::appendPeerInfoToVector(std::vector<std::string>& elements) const {
-    elements.push_back(_subjectName.toString());
-    if (_sniName) {
-        elements.push_back(*_sniName);
-    }
-    if (_clusterMembership) {
-        elements.push_back(*_clusterMembership);
-    }
-}
+#endif  // MONGO_CONFIG_SSL
 
 }  // namespace mongo

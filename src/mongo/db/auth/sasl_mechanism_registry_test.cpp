@@ -246,8 +246,9 @@ public:
                                                         << "roles" << BSONArray()),
                                                    BSONObj()));
 
-        UserRequest systemLocal(UserName("__system"_sd, "local"_sd), boost::none);
-        internalSecurity.setUser(std::make_shared<UserHandle>(User(systemLocal)));
+        std::unique_ptr<UserRequest> systemLocal =
+            std::make_unique<UserRequestGeneral>(UserName("__system"_sd, "local"_sd), boost::none);
+        internalSecurity.setUser(std::make_shared<UserHandle>(User(std::move(systemLocal))));
     }
 
     BSONObj getMechsFor(const UserName user) {

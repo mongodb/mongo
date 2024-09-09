@@ -256,7 +256,8 @@ TEST_F(AuthorizationManagerTest, testAcquireV2User) {
                                                                              << "admin"))),
                                                      BSONObj()));
 
-    auto swu = authzManager->acquireUser(opCtx.get(), {{"v2read", "test"}, boost::none});
+    auto swu = authzManager->acquireUser(
+        opCtx.get(), std::make_unique<UserRequestGeneral>(UserName("v2read", "test"), boost::none));
     ASSERT_OK(swu.getStatus());
     auto v2read = std::move(swu.getValue());
     ASSERT_EQUALS(UserName("v2read", "test"), v2read->getName());
@@ -269,7 +270,9 @@ TEST_F(AuthorizationManagerTest, testAcquireV2User) {
     ASSERT(testDBPrivilege.getActions().contains(ActionType::find));
     // Make sure user's refCount is 0 at the end of the test to avoid an assertion failure
 
-    swu = authzManager->acquireUser(opCtx.get(), {{"v2cluster", "admin"}, boost::none});
+    swu = authzManager->acquireUser(
+        opCtx.get(),
+        std::make_unique<UserRequestGeneral>(UserName("v2cluster", "admin"), boost::none));
     ASSERT_OK(swu.getStatus());
     auto v2cluster = std::move(swu.getValue());
     ASSERT_EQUALS(UserName("v2cluster", "admin"), v2cluster->getName());
@@ -286,9 +289,10 @@ TEST_F(AuthorizationManagerTest, testAcquireV2User) {
 #ifdef MONGO_CONFIG_SSL
 TEST_F(AuthorizationManagerTest, testLocalX509Authorization) {
     std::set<RoleName> roles({{"read", "test"}, {"readWrite", "test"}});
-    UserRequest request(UserName("CN=mongodb.com", "$external"), roles);
+    std::unique_ptr<UserRequest> request =
+        std::make_unique<UserRequestGeneral>(UserName("CN=mongodb.com", "$external"), roles);
 
-    auto swu = authzManager->acquireUser(opCtx.get(), request);
+    auto swu = authzManager->acquireUser(opCtx.get(), std::move(request));
     ASSERT_OK(swu.getStatus());
     auto x509User = std::move(swu.getValue());
     ASSERT(x509User.isValid());
@@ -312,17 +316,21 @@ TEST_F(AuthorizationManagerTest, testLocalX509AuthorizationInvalidUser) {
                                 boost::none,
                                 {RoleName("read", "test"), RoleName("write", "test")}));
 
-    ASSERT_NOT_OK(
-        authzManager->acquireUser(opCtx.get(), {{"CN=10gen.com", "$external"}, boost::none})
-            .getStatus());
+    ASSERT_NOT_OK(authzManager
+                      ->acquireUser(opCtx.get(),
+                                    std::make_unique<UserRequestGeneral>(
+                                        UserName("CN=10gen.com", "$external"), boost::none))
+                      .getStatus());
 }
 
 TEST_F(AuthorizationManagerTest, testLocalX509AuthenticationNoAuthorization) {
     setX509PeerInfo(session, {});
 
-    ASSERT_NOT_OK(
-        authzManager->acquireUser(opCtx.get(), {{"CN=mongodb.com", "$external"}, boost::none})
-            .getStatus());
+    ASSERT_NOT_OK(authzManager
+                      ->acquireUser(opCtx.get(),
+                                    std::make_unique<UserRequestGeneral>(
+                                        UserName("CN=mongodb.com", "$external"), boost::none))
+                      .getStatus());
 }
 
 #endif
@@ -353,7 +361,8 @@ TEST_F(AuthorizationManagerTest, testAcquireV2UserWithUnrecognizedActions) {
                                                          << "insert")))),
         BSONObj()));
 
-    auto swu = authzManager->acquireUser(opCtx.get(), {{"myUser", "test"}, boost::none});
+    auto swu = authzManager->acquireUser(
+        opCtx.get(), std::make_unique<UserRequestGeneral>(UserName("myUser", "test"), boost::none));
     ASSERT_OK(swu.getStatus());
     auto myUser = std::move(swu.getValue());
     ASSERT_EQUALS(UserName("myUser", "test"), myUser->getName());
@@ -432,7 +441,8 @@ TEST_F(AuthorizationManagerTest, testRefreshExternalV2User) {
     for (const auto& userDoc : userDocs) {
         const UserName userName(userDoc.getStringField(kUserFieldName),
                                 userDoc.getStringField(kDbFieldName));
-        auto swUser = authzManager->acquireUser(opCtx.get(), {userName, boost::none});
+        auto swUser = authzManager->acquireUser(
+            opCtx.get(), std::make_unique<UserRequestGeneral>(userName, boost::none));
         ASSERT_OK(swUser.getStatus());
         auto user = std::move(swUser.getValue());
         ASSERT_EQUALS(userName, user->getName());
@@ -477,7 +487,8 @@ TEST_F(AuthorizationManagerTest, testRefreshExternalV2User) {
     for (const auto& userDoc : userDocs) {
         const UserName userName(userDoc.getStringField(kUserFieldName),
                                 userDoc.getStringField(kDbFieldName));
-        auto swUser = authzManager->acquireUser(opCtx.get(), {userName, boost::none});
+        auto swUser = authzManager->acquireUser(
+            opCtx.get(), std::make_unique<UserRequestGeneral>(userName, boost::none));
         ASSERT_OK(swUser.getStatus());
         auto user = std::move(swUser.getValue());
         ASSERT_EQUALS(userName, user->getName());

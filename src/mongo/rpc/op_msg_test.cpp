@@ -91,7 +91,8 @@ public:
      * Synthesize a user with the useTenant privilege and add them to the authorization session.
      */
     static void grantUseTenant(Client& client) {
-        User user(UserRequest(UserName("useTenant", "admin"), boost::none));
+        User user(
+            std::make_unique<UserRequestGeneral>(UserName("useTenant", "admin"), boost::none));
         user.setPrivileges(
             {Privilege(ResourcePattern::forClusterResource(boost::none), ActionType::useTenant)});
         auto* as = dynamic_cast<AuthorizationSessionImpl*>(AuthorizationSession::get(client));
