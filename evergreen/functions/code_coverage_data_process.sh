@@ -29,18 +29,24 @@ activate_venv
 pipx install "gcovr==7.2" || exit 1
 
 # Process code coverage files (.gcno/.gcda) directly into coveralls format
+# https://gcovr.com/en/stable/index.html
 gcovr \
   --output gcovr-coveralls.json \
   --coveralls-pretty \
   --exclude 'build/debug/.*_gen\.(h|hpp|cpp)' \
   --exclude build/debug/mongo/db/cst/grammar.yy \
   --exclude build/debug/mongo/idl/ \
+  --exclude 'src/mongo/.*_test\.(h|hpp|cpp)' \
   --exclude src/mongo/db/modules/enterprise/src/streams/third_party/ \
+  --exclude src/mongo/dbtests/ \
+  --exclude src/mongo/unittest/ \
   --exclude src/third_party/ \
   --gcov-ignore-errors source_not_found \
   --gcov-ignore-parse-errors negative_hits.warn \
   --gcov-exclude-directories build/debug/mongo/db/modules/enterprise/src/streams/third_party \
+  --gcov-exclude-directories build/debug/mongo/dbtests/ \
   --gcov-exclude-directories build/debug/mongo/idl/ \
+  --gcov-exclude-directories build/debug/mongo/unittest/ \
   --gcov-exclude-directories build/debug/third_party/ \
   --gcov-executable ${GCOV_TOOL[@]} \
   build/debug
