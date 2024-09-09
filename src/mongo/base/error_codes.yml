@@ -816,7 +816,7 @@ error_codes:
   - {
       code: 421,
       name: StreamProcessorAtlasConnectionError,
-      categories: [StreamProcessorUserError, StreamProcessorRetryableError],
+      categories: [StreamProcessorRetryableError],
     }
   - {
       code: 422,
