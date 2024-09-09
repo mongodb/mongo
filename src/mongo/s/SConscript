@@ -493,6 +493,9 @@ env.Program(
         "integration-tests",
         "servers",
     ],
+    SYSLIBDEPS="Wldap32"
+    if env.TargetOSIs("windows") and "ldap" in env.get("MONGO_ENTERPRISE_FEATURES", [])
+    else "",
 )
 
 env.Library(

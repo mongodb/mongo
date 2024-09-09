@@ -9,8 +9,10 @@ set -o verbose
 # Use the Evergreen temp directory to avoid filling up the disk.
 mkdir -p $TMPDIR
 if [[ "$OSTYPE" == "cygwin" ]] || [[ "$OSTYPE" == "win32" ]]; then
+  # Z:/ path is necessary to avoid running into MSVC's file length limit,
+  # see https://jira.mongodb.org/browse/DEVPROD-11126
   abs_path=$(cygpath -w "$TMPDIR" | tr '\\' '/')
-  echo "startup --output_user_root=${abs_path}/bazel-output-root" > .bazelrc.evergreen
+  echo "startup --output_user_root=Z:/bazel_tmp" > .bazelrc.evergreen
   echo "BAZELISK_HOME=${abs_path}/bazelisk_home" >> .bazeliskrc
 else
   echo "startup --output_user_root=${TMPDIR}/bazel-output-root" > .bazelrc.evergreen

@@ -974,6 +974,10 @@ def generate(env: SCons.Environment.Environment) -> None:
         emitter=SCons.Builder.ListEmitter([bazel_target_emitter]),
     )
 
+    # TODO(SERVER-94605): remove when Windows temp directory is cleared between task runs
+    if normalized_os == "windows" and os.environ.get("CI"):
+        subprocess.run(["bazel", "clean", "--expunge"])
+
     cmd = (
         ["aquery"]
         + env["BAZEL_FLAGS_STR"]
