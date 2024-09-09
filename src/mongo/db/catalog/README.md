@@ -1051,7 +1051,8 @@ have the following procedure:
   Catalog](#durable-catalog).
 - Downgrade to a collection IX lock.
 - Scan all documents on the collection to be indexed
-  - Generate [KeyString](#keystring) keys for the indexed fields for each document
+  - Generate [KeyString](https://github.com/mongodb/mongo/tree/master/src/mongo/db/storage/keystring_README.md)
+    keys for the indexed fields for each document
   - Periodically yield locks and storage engine snapshots
   - Insert the generated keys into the [external sorter](#the-external-sorter)
 - Read the sorted keys from the external sorter and [bulk
@@ -1277,88 +1278,6 @@ builds, the `createIndexes` oplog entry is always applied synchronously on secon
 application.
 
 See [createIndexForApplyOps](https://github.com/mongodb/mongo/blob/6ea7d1923619b600ea0f16d7ea6e82369f288fd4/src/mongo/db/repl/oplog.cpp#L176-L183).
-
-# KeyString
-
-The `KeyString` format is an alternative serialization format for `BSON`. In the text below,
-`KeyString` may refer to values in this format or the format itself, while `key_string` refers to the C++ namespace.
-Indexes sort keys based on their BSON sorting order. In this order all numerical values compare
-according to their mathematical value. Given a BSON document `{ x: 42.0, y : "hello"}`
-and an index with the compound key `{ x : 1, y : 1}`, the document is sorted as the BSON document
-`{"" : 42.0, "": "hello" }`, with the actual comparison as defined by [`BSONObj::woCompare`][] and
-[`BSONElement::compareElements`][]. However, these comparison rules are complicated and can be
-computationally expensive, especially for numeric types as the comparisons may require conversions
-and there are lots of edge cases related to range and precision. Finding a key in a tree containing
-thousands or millions of key-value pairs requires dozens of such comparisons.
-
-To make these comparisons fast, there exists a 1:1 mapping between `BSONObj` and `KeyString`, where
-`KeyString` is [binary comparable](#glossary). So, for a transformation function `t` converting
-`BSONObj` to `KeyString` and two `BSONObj` values `x` and `y`, the following holds:
-
-- `x < y` ⇔ `memcmp(t(x),t(y)) < 0`
-- `x > y` ⇔ `memcmp(t(x),t(y)) > 0`
-- `x = y` ⇔ `memcmp(t(x),t(y)) = 0`
-
-## Ordering
-
-Index keys with reverse sort order (like `{ x : -1}`) have all their `KeyString` bytes negated to
-ensure correct `memcmp` comparison. As a compound index can have up to 64 keys, for decoding a
-`KeyString` it is necessary to know which components need to have their bytes negated again to get
-the original value. The [`Ordering`] class encodes the direction of each component in a 32-bit
-unsigned integer.
-
-## TypeBits
-
-As the integer `42`, `NumberLong(42)`, double precision `42.0` and `NumberDecimal(42.00)` all
-compare equal, for conversion back from `KeyString` to `BSONObj` additional information is necessary
-in the form of `TypeBits`. When decoding a `KeyString`, typebits are consumed as values with
-ambiguous types are encountered.
-
-## Use in WiredTiger indexes
-
-For indexes other than `_id` , the `RecordId` is appended to the end of the `KeyString` to ensure
-uniqueness. In older versions of MongoDB we didn't do that, but that lead to problems during
-secondary oplog application and [initial sync][] where the uniqueness constraint may be violated
-temporarily. Indexes store key value pairs where the key is the `KeyString`. Current WiredTiger
-secondary unique indexes may have a mix of the old and new representations described below.
-
-| Index type                                                      | (Key, Value)                                                                                                                                          | Data Format Version            |
-| --------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------ |
-| `_id` index                                                     | (`KeyString` without `RecordId`, `RecordId` and optionally `TypeBits`)                                                                                | index V1: 6<br />index V2: 8   |
-| non-unique index                                                | (`KeyString` with `RecordId`, optionally `TypeBits`)                                                                                                  | index V1: 6<br />index V2: 8   |
-| unique secondary index created before 4.2                       | (`KeyString` without `RecordId`, `RecordId` and optionally `TypeBits`)                                                                                | index V1: 6<br />index V2: 8   |
-| unique secondary index created in 4.2 OR after upgrading to 4.2 | New keys: (`KeyString` with `RecordId`, optionally `TypeBits`) <br /> Old keys:(`KeyString` without `RecordId`, `RecordId` and optionally `TypeBits`) | index V1: 11<br />index V2: 12 |
-| unique secondary index created in 6.0 or later                  | (`KeyString` with `RecordId`, optionally `TypeBits`)                                                                                                  | index V1: 13<br />index V2: 14 |
-
-The reason for the change in index format is that the secondary key uniqueness property can be
-temporarily violated during oplog application (because operations may be applied out of order).
-With prepared transactions, out-of-order commits would conflict with prepared transactions.
-Instead of forcing users to rebuild secondary unique indexes, new keys are inserted in the new
-format and old keys stay in the old format.
-
-For `_id` indexes and non-unique indexes, the index data formats will be 6 and 8 for index version
-V1 and V2, respectively. For unique secondary indexes, if they are of formats 13 or 14, it is
-guaranteed that the indexes only store keys of `KeyString` with `RecordId`. If they are of formats
-11 or 12, they may have a mix of the keys with and without `RecordId`. Users can run a `full`
-validation to check if there are keys in the old format in unique secondary indexes.
-
-## Building KeyString values and passing them around
-
-There are three kinds of builders for constructing `KeyString` values:
-
-- `key_string::Builder`: starts building using a small allocation on the stack, and
-  dynamically switches to allocating memory from the heap. This is generally preferable if the value
-  is only needed in the scope where it was created.
-- `key_string::HeapBuilder`: always builds using dynamic memory allocation. This has advantage that
-  calling the `release` method can transfer ownership of the memory without copying.
-- `key_string::PooledBuilder`: This class allow building many `KeyString` values tightly packed into
-  larger blocks. The advantage is fewer, larger memory allocations and no wasted space due to
-  internal fragmentation. This is a good approach when a large number of values is needed, such as
-  for index building. However, memory for a block is only released after _no_ references to that
-  block remain.
-
-The `key_string::Value` class holds a reference to a `SharedBufferFragment` with the `KeyString` and
-its `TypeBits` if any and can be used for passing around values.
 
 # The External Sorter
 
@@ -2438,11 +2357,6 @@ right-to-left over up to 4 bytes, using the lower 7 bits of a byte, the high bit
 continuation bit.
 
 # Glossary
-
-**binary comparable**: Two values are binary comparable if the lexicographical order over their byte
-representation, from lower memory addresses to higher addresses, is the same as the defined ordering
-for that type. For example, ASCII strings are binary comparable, but double precision floating point
-numbers and little-endian integers are not.
 
 **DDL**: Acronym for Data Description Language or Data Definition Language used generally in the
 context of relational databases. DDL operations in the MongoDB context include index and collection
