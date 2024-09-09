@@ -21,15 +21,22 @@ export function removeShard(shardingTestOrConn, shardName, timeout) {
         } else {
             res = s.adminCommand({removeShard: shardName});
         }
-        if (!res.ok && res.code === ErrorCodes.ShardNotFound) {
-            // TODO SERVER-32553: Clarify whether we should handle this scenario in tests or mongos
-            // If the config server primary steps down right after removing the config.shards doc
-            // for the shard but before responding with "state": "completed", the mongos would retry
-            // the _configsvrRemoveShard command against the new config server primary, which would
-            // not find the removed shard in its ShardRegistry if it has done a ShardRegistry reload
-            // after the config.shards doc for the shard was removed. This would cause the command
-            // to fail with ShardNotFound.
-            return true;
+        if (!res.ok) {
+            if (res.code === ErrorCodes.ShardNotFound) {
+                // TODO SERVER-32553: Clarify whether we should handle this scenario in tests or
+                // mongos If the config server primary steps down right after removing the
+                // config.shards doc for the shard but before responding with "state": "completed",
+                // the mongos would retry the _configsvrRemoveShard command against the new config
+                // server primary, which would not find the removed shard in its ShardRegistry if it
+                // has done a ShardRegistry reload after the config.shards doc for the shard was
+                // removed. This would cause the command to fail with ShardNotFound.
+                return true;
+            }
+            if (res.code === ErrorCodes.HostUnreachable && TestData.runningWithConfigStepdowns) {
+                // The mongos may exhaust its retries due to having consecutive config stepdowns. In
+                // this case, the mongos will return a HostUnreachable error.
+                return true;
+            }
         }
         assert.commandWorked(res);
         return res.state == 'completed';
