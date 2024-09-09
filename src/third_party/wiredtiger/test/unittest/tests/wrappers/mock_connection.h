@@ -33,6 +33,9 @@ public:
 
     static std::shared_ptr<MockConnection> buildTestMockConnection();
     int setupChunkCache(WT_SESSION_IMPL *, uint64_t, size_t, WT_CHUNKCACHE *&);
+    // Initialize the data structures, in-memory file system and variables used for file handles and
+    // blocks. The block manager requires both to perform file type operations.
+    int setupBlockManager(WT_SESSION_IMPL *);
 
 private:
     explicit MockConnection(WT_CONNECTION_IMPL *connectionImpl);

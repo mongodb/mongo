@@ -2978,6 +2978,11 @@ tasks:
           remote_file: wiredtiger/${build_variant}/${revision}/${dependent_task}_${build_id}-${execution}/full_coverage_report.json
           bucket: build_external
           local_file: wiredtiger/coverage_report/full_coverage_report.json
+      - command: github.generate_token
+        params:
+          expansion_name: github_token
+          permissions:
+            pull_requests: write
       - command: shell.exec
         vars:
           dependent_task: "generate-coverage-report"
@@ -2998,7 +3003,7 @@ tasks:
                 echo "Detected Github PR ${github_pr_number}"
                 pr_args+="--github_repo ${github_org}/${github_repo} "
                 pr_args+="--github_pr_number ${github_pr_number} "
-                pr_args+="--github_token ${github_app_token} "
+                pr_args+="--github_token ${github_token} "
             fi
 
             if [ ${is_patch|false} = true ]; then
