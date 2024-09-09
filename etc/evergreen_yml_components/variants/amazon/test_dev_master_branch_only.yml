@@ -218,6 +218,14 @@ buildvariants:
       - name: .updatefuzzer
       - name: .jstestfuzz
 
+  - &enterprise-amazon-linux2-arm64-all-feature-flags-embedded-router
+    <<: *enterprise-amazon-linux2-arm64-all-feature-flags-template
+    name: enterprise-amazon-linux2-arm64-all-feature-flags-embedded-router
+    display_name: "*| Amazon Linux 2 arm64 Enterprise (all feature flags) Embedded Router Tasks"
+    tags: ["suggested"]
+    tasks:
+      - name: .embedded_router
+
   - name: &al2023-arm64-sep-benchmark al2023-arm64-sep-benchmark
     display_name: "! AL2023.3 arm64 Enterprise (SEP Benchmark)"
     tags: ["required"]

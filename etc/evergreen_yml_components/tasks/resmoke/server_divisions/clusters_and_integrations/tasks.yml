@@ -288,6 +288,8 @@ tasks:
         "concurrency",
         "non_live_record",
         "sharded",
+        "suggested_excluding_required__for_devprod_mitigation_only",
+        "embedded_router",
       ]
     commands:
       - func: "generate resmoke tasks"
@@ -306,6 +308,8 @@ tasks:
         "large",
         "non_live_record",
         "sharded",
+        "suggested_excluding_required__for_devprod_mitigation_only",
+        "embedded_router",
       ]
     commands:
       - func: "generate resmoke tasks"
@@ -325,6 +329,8 @@ tasks:
         "read_concern_maj",
         "large",
         "sharded",
+        "suggested_excluding_required__for_devprod_mitigation_only",
+        "embedded_router",
       ]
     commands:
       - func: "generate resmoke tasks"
@@ -342,6 +348,8 @@ tasks:
         "concurrency",
         "large",
         "sharded",
+        "suggested_excluding_required__for_devprod_mitigation_only",
+        "embedded_router",
       ]
     commands:
       - func: "generate resmoke tasks"
@@ -359,6 +367,8 @@ tasks:
         "concurrency",
         "large",
         "sharded",
+        "suggested_excluding_required__for_devprod_mitigation_only",
+        "embedded_router",
       ]
     commands:
       - func: "generate resmoke tasks"
@@ -376,6 +386,8 @@ tasks:
         "concurrency",
         "large",
         "sharded",
+        "suggested_excluding_required__for_devprod_mitigation_only",
+        "embedded_router",
       ]
     commands:
       - func: "generate resmoke tasks"
@@ -393,6 +405,8 @@ tasks:
         "concurrency",
         "large",
         "sharded",
+        "suggested_excluding_required__for_devprod_mitigation_only",
+        "embedded_router",
       ]
     commands:
       - func: "generate resmoke tasks"
@@ -412,6 +426,8 @@ tasks:
         "read_concern_maj",
         "large",
         "sharded",
+        "suggested_excluding_required__for_devprod_mitigation_only",
+        "embedded_router",
       ]
     commands:
       - func: "generate resmoke tasks"
@@ -429,6 +445,8 @@ tasks:
         "no_txns",
         "large",
         "sharded",
+        "suggested_excluding_required__for_devprod_mitigation_only",
+        "embedded_router",
       ]
     commands:
       - func: "generate resmoke tasks"
@@ -453,6 +471,8 @@ tasks:
         "read_concern_maj",
         "large",
         "sharded",
+        "suggested_excluding_required__for_devprod_mitigation_only",
+        "embedded_router",
       ]
     commands:
       - func: "generate resmoke tasks"
@@ -462,13 +482,25 @@ tasks:
 
   - <<: *gen_task_template
     name: embedded_router_jscore_passthrough_gen
-    tags: ["assigned_to_jira_team_server_catalog_and_routing", "default"]
+    tags:
+      [
+        "assigned_to_jira_team_server_catalog_and_routing",
+        "default",
+        "suggested_excluding_required__for_devprod_mitigation_only",
+        "embedded_router",
+      ]
     commands:
       - func: "generate resmoke tasks"
 
   - <<: *gen_task_template
     name: embedded_router_jscore_passthrough_with_config_shard_gen
-    tags: ["assigned_to_jira_team_server_catalog_and_routing", "default"]
+    tags:
+      [
+        "assigned_to_jira_team_server_catalog_and_routing",
+        "default",
+        "suggested_excluding_required__for_devprod_mitigation_only",
+        "embedded_router",
+      ]
     commands:
       - func: "generate resmoke tasks"
 
@@ -481,37 +513,69 @@ tasks:
         "sharding",
         "jscore",
         "common",
+        "suggested_excluding_required__for_devprod_mitigation_only",
+        "embedded_router",
       ]
     commands:
       - func: "generate resmoke tasks"
 
   - <<: *gen_task_template
     name: aggregation_embedded_router_jscore_passthrough_gen
-    tags: ["assigned_to_jira_team_server_catalog_and_routing", "default"]
+    tags:
+      [
+        "assigned_to_jira_team_server_catalog_and_routing",
+        "default",
+        "suggested_excluding_required__for_devprod_mitigation_only",
+        "embedded_router",
+      ]
     commands:
       - func: "generate resmoke tasks"
 
   - <<: *gen_task_template
     name: embedded_router_jscore_txns_gen
-    tags: ["assigned_to_jira_team_server_catalog_and_routing", "default"]
+    tags:
+      [
+        "assigned_to_jira_team_server_catalog_and_routing",
+        "default",
+        "suggested_excluding_required__for_devprod_mitigation_only",
+        "embedded_router",
+      ]
     commands:
       - func: "generate resmoke tasks"
 
   - <<: *gen_task_template
     name: embedded_router_jscore_txns_with_config_shard_gen
-    tags: ["assigned_to_jira_team_server_catalog_and_routing", "default"]
+    tags:
+      [
+        "assigned_to_jira_team_server_catalog_and_routing",
+        "default",
+        "suggested_excluding_required__for_devprod_mitigation_only",
+        "embedded_router",
+      ]
     commands:
       - func: "generate resmoke tasks"
 
   - <<: *gen_task_template
     name: embedded_router_sharded_collections_jscore_passthrough_gen
-    tags: ["assigned_to_jira_team_server_catalog_and_routing", "default"]
+    tags:
+      [
+        "assigned_to_jira_team_server_catalog_and_routing",
+        "default",
+        "suggested_excluding_required__for_devprod_mitigation_only",
+        "embedded_router",
+      ]
     commands:
       - func: "generate resmoke tasks"
 
   - <<: *gen_task_template
     name: embedded_router_sharded_collections_jscore_txns_gen
-    tags: ["assigned_to_jira_team_server_catalog_and_routing", "default"]
+    tags:
+      [
+        "assigned_to_jira_team_server_catalog_and_routing",
+        "default",
+        "suggested_excluding_required__for_devprod_mitigation_only",
+        "embedded_router",
+      ]
     commands:
       - func: "generate resmoke tasks"
 
@@ -522,13 +586,21 @@ tasks:
         "assigned_to_jira_team_server_catalog_and_routing",
         "default",
         "requires_all_feature_flags",
+        "suggested_excluding_required__for_devprod_mitigation_only",
+        "embedded_router",
       ]
     commands:
       - func: "generate resmoke tasks"
 
   - <<: *gen_task_template
     name: embedded_router_sharded_collections_jscore_txns_with_config_shard_gen
-    tags: ["assigned_to_jira_team_server_catalog_and_routing", "default"]
+    tags:
+      [
+        "assigned_to_jira_team_server_catalog_and_routing",
+        "default",
+        "suggested_excluding_required__for_devprod_mitigation_only",
+        "embedded_router",
+      ]
     commands:
       - func: "generate resmoke tasks"
 
