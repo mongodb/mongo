@@ -111,33 +111,6 @@ Status appendMetadata(RemoteCommandRequestOnAny* request,
     return Status::OK();
 }
 
-/**
- * Invokes `f()`, and returns true if it succeeds.
- * Otherwise, we log the exception with a `hint` string and handle the error.
- * The exception handling has two possibilities, controlled by the server parameter
- * `suppressNetworkInterfaceTransportLayerExceptions`.
- * The old behavior is to simply rethrow the exception, which will crash the process.
- * The new behavior is to invoke `eh(err)` and return false. This gives the caller a way
- * to provide a route to propagate the exception as a Status (perhaps filling a promise
- * with it) and carry on.
- */
-template <typename F, typename EH>
-bool catchingInvoke(F&& f, EH&& eh, StringData hint) {
-    try {
-        std::forward<F>(f)();
-        return true;
-    } catch (...) {
-        Status err = exceptionToStatus();
-        LOGV2(5802401, "Callback failed", "msg"_attr = hint, "error"_attr = err);
-        if (gSuppressNetworkInterfaceTransportLayerExceptions.isEnabled(
-                serverGlobalParams.featureCompatibility.acquireFCVSnapshot()))
-            std::forward<EH>(eh)(err);  // new server parameter protected behavior
-        else
-            throw;  // old behavior
-        return false;
-    }
-}
-
 template <typename IA, typename IB, typename F>
 int compareTransformed(IA a1, IA a2, IB b1, IB b2, F&& f) {
     for (;; ++a1, ++b1)
@@ -710,13 +683,8 @@ Status NetworkInterfaceTL::startCommand(const TaskExecutor::CallbackHandle& cbHa
                         "isOK"_attr = rs.isOK(),
                         "response"_attr =
                             redact(rs.isOK() ? rs.data.toString() : rs.status.toString()));
-            catchingInvoke([&] { onFinish(std::move(rs)); },
-                           [&](Status& err) {
-                               if (!cmdState->promiseFulfilling.swap(true)) {
-                                   cmdState->fulfillFinalPromise(err);
-                               }
-                           },
-                           "The finish callback failed. Aborting command.");
+
+            onFinish(std::move(rs));
         });
 
     if (MONGO_unlikely(networkInterfaceDiscardCommandsBeforeAcquireConn.shouldFail())) {
@@ -775,21 +743,19 @@ Future<RemoteCommandResponse> NetworkInterfaceTL::CommandState::sendRequest(
                    ->runCommandRequest(*requestState->request, baton, std::move(connAcquiredTimer));
            })
         .then([this, requestState](RemoteCommandResponse response) {
-            catchingInvoke(
-                [&] { doMetadataHook(RemoteCommandOnAnyResponse(requestState->host, response)); },
-                [&](Status& err) { promise.setError(err); },
-                "Metadata hook readReplyMetadata");
+            uassertStatusOK(
+                doMetadataHook(RemoteCommandOnAnyResponse(requestState->host, response)));
             return response;
         });
 }
 
-void NetworkInterfaceTL::CommandStateBase::doMetadataHook(
+Status NetworkInterfaceTL::CommandStateBase::doMetadataHook(
     const RemoteCommandOnAnyResponse& response) {
     if (auto& hook = interface->_metadataHook; hook && !promiseFulfilling.load()) {
         invariant(response.target);
-
-        uassertStatusOK(hook->readReplyMetadata(nullptr, response.data));
+        return hook->readReplyMetadata(nullptr, response.data);
     }
+    return Status::OK();
 }
 
 void NetworkInterfaceTL::CommandState::fulfillFinalPromise(
@@ -1185,10 +1151,10 @@ void NetworkInterfaceTL::ExhaustCommandState::continueExhaustRequest(
     }
 
     auto onAnyResponse = RemoteCommandOnAnyResponse(requestState->host, response);
-    if (!catchingInvoke([&] { doMetadataHook(onAnyResponse); },
-                        [&](Status& err) { finalResponsePromise.setError(err); },
-                        "Exhaust command metadata hook readReplyMetadata"))
+    if (Status metadataHookStatus = doMetadataHook(onAnyResponse); !metadataHookStatus.isOK()) {
+        finalResponsePromise.setError(metadataHookStatus);
         return;
+    }
 
     // If the command failed, we will call 'onReply' as a part of the future chain paired with
     // the promise. This is to be sure that all error paths will run 'onReply' only once upon
@@ -1201,10 +1167,7 @@ void NetworkInterfaceTL::ExhaustCommandState::continueExhaustRequest(
         return;
     }
 
-    if (!catchingInvoke([&] { onReplyFn(onAnyResponse); },
-                        [&](Status& err) { finalResponsePromise.setError(err); },
-                        "Exhaust command onReplyFn"))
-        return;
+    onReplyFn(onAnyResponse);
 
     // Reset the stopwatch to measure the correct duration for the following reply
     {
@@ -1215,10 +1178,7 @@ void NetworkInterfaceTL::ExhaustCommandState::continueExhaustRequest(
         deadline = stopwatch.start() + requestOnAny.timeout;
     }
 
-    if (!catchingInvoke([&] { setTimer(requestState); },
-                        [&](Status& err) { finalResponsePromise.setError(err); },
-                        "Exhaust command setTimer"))
-        return;
+    setTimer(requestState);
 
     requestState->getClient(requestState->conn)
         ->awaitExhaustCommand(baton)

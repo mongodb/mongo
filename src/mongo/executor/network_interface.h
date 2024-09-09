@@ -73,8 +73,16 @@ class NetworkInterface {
 
 public:
     using Response = RemoteCommandResponse;
+
+    /**
+     * This must not throw exceptions.
+     */
     using RemoteCommandCompletionFn =
         unique_function<void(const TaskExecutor::ResponseOnAnyStatus&)>;
+
+    /**
+     * This must not throw exceptions.
+     */
     using RemoteCommandOnReplyFn = unique_function<void(const TaskExecutor::ResponseOnAnyStatus&)>;
 
     // Indicates that there is no expiration time by when a request needs to complete
@@ -173,6 +181,8 @@ public:
      *
      * Note that if you pass a baton to startCommand and that baton refuses work, then your onFinish
      * function will not run.
+     *
+     * The `onFinish` argument must not throw exceptions.
      */
     virtual Status startCommand(const TaskExecutor::CallbackHandle& cbHandle,
                                 RemoteCommandRequestOnAny& request,

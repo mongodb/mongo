@@ -29,13 +29,6 @@
 global:
   cpp_namespace: "mongo::executor"
 
-feature_flags:
-  suppressNetworkInterfaceTransportLayerExceptions:
-    description: Suppress network interface transport layer exceptions
-    cpp_varname: gSuppressNetworkInterfaceTransportLayerExceptions
-    default: false 
-    shouldBeFCVGated: false
-
 server_parameters:
   opportunisticSecondaryTargeting:
     description: >-

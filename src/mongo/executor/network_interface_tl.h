@@ -213,7 +213,7 @@ private:
          * Run the NetworkInterface's MetadataHook on a given request if this Command isn't already
          * finished.
          */
-        void doMetadataHook(const RemoteCommandOnAnyResponse& response);
+        Status doMetadataHook(const RemoteCommandOnAnyResponse& response);
 
         /**
          * Return the maximum amount of requests that can come from this command.
