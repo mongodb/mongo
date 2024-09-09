@@ -265,6 +265,8 @@ last-continuous:
       ticket: SERVER-84089
     - test_file: jstests/core/ddl/create_indexes.js
       ticket: SERVER-90952
+    - test_file: jstests/aggregation/bugs/server94212.js
+      ticket: SERVER-94212
   suites: null
 last-lts:
   all:
@@ -544,4 +546,6 @@ last-lts:
       ticket: SERVER-84089
     - test_file: jstests/core/ddl/create_indexes.js
       ticket: SERVER-90952
+    - test_file: jstests/aggregation/bugs/server94212.js
+      ticket: SERVER-94212
   suites: null

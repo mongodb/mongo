@@ -58,6 +58,16 @@ export class QuerySettingsIndexHintsTests {
             networkErrorAndTxnOverrideConfig.wrapCRUDinTransactions;
         const willRetryOnNetworkErrors = networkErrorAndTxnOverrideConfig &&
             networkErrorAndTxnOverrideConfig.retryOnNetworkErrors;
+
+        // If the collection used is a view, determine the underlying collection being used.
+        const collInfo = this._db.getCollectionInfos({name: collOrViewName})[0];
+        let collName = collOrViewName;
+        if (collInfo !== undefined && collInfo.options.hasOwnProperty('viewOn')) {
+            collName = collInfo.options.viewOn;
+        }
+        const collHasPartialIndexes = this._db[collName].getIndexes().some(
+            (idx) => idx.hasOwnProperty('partialFilterExpression'));
+
         const shouldCheckPlanCache =
             // Single solution plans are not cached in classic, therefore do not perform plan cache
             // checks for when the classic cache is used. Note that the classic cache is used
@@ -65,7 +75,9 @@ export class QuerySettingsIndexHintsTests {
             // TODO SERVER-90880: We can relax this check when we cache single-solution plans in the
             // classic cache with SBE.
             // TODO SERVER-13341: Relax this check to include the case where classic is being used.
-            (getEngine(explain) === "sbe" && checkSbeFullFeatureFlagEnabled(this._db)) &&
+            // TODO SERVER-94392: Relax this check when SBE plan cache supports partial indexes.
+            (getEngine(explain) === "sbe" && checkSbeFullFeatureFlagEnabled(this._db) &&
+             !collHasPartialIndexes) &&
             // Express or IDHACK optimized queries are not cached.
             !isIdhackQuery &&
             // Min/max queries are not cached.
@@ -92,10 +104,6 @@ export class QuerySettingsIndexHintsTests {
         if (!shouldCheckPlanCache) {
             return;
         }
-
-        // If the collection used is a view, determine the underlying collection being used.
-        const collInfo = this._db.getCollectionInfos({name: collOrViewName})[0];
-        const collName = collInfo.options.viewOn || collOrViewName;
 
         // Clear the plan cache before running any queries.
         this._db[collName].getPlanCache().clear();

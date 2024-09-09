@@ -102,7 +102,7 @@ void generatePlannerInfo(PlanExecutor* exec,
     boost::optional<uint32_t> planCacheKeyHash;
     const auto& mainCollection = collections.getMainCollection();
     if (auto* cq = exec->getCanonicalQuery(); mainCollection && cq) {
-        if (cq->isSbeCompatible() &&
+        if (cq->isSbeCompatible() && cq->isUsingSbePlanCache() &&
             feature_flags::gFeatureFlagSbeFull.isEnabled(
                 serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
             const auto planCacheKeyInfo =

@@ -1112,6 +1112,27 @@ bool shouldUseRegularSbe(OperationContext* opCtx, const CanonicalQuery& cq, cons
     return cq.getExpCtx()->sbeCompatibility >= minRequiredCompatibility;
 }
 
+bool shouldUseSbePlanCache(const QueryPlannerParams& params) {
+    // The logic in this funtion depends on the fact that we clear the SBE plan cache on index
+    // creation.
+
+    // SBE feature flag guards SBE plan cache use. Check this first to avoid doing potentially
+    // expensive checks unnecessarily.
+    const auto fcvSnapshot = serverGlobalParams.featureCompatibility.acquireFCVSnapshot();
+    if (!feature_flags::gFeatureFlagSbeFull.isEnabled(fcvSnapshot)) {
+        return false;
+    }
+
+    // SBE plan cache does not support partial indexes.
+    // TODO SERVER-94392: Remove this restriction once they are supported.
+    for (const auto& idx : params.mainCollectionInfo.indexes) {
+        if (idx.filterExpr) {
+            return false;
+        }
+    }
+    return true;
+}
+
 boost::optional<ScopedCollectionFilter> getScopedCollectionFilter(
     OperationContext* opCtx,
     const MultipleCollectionAccessor& collections,
@@ -1263,10 +1284,8 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorFind
 
             plannerParams->setTargetSbeStageBuilder(opCtx, *canonicalQuery, collections);
 
-            const auto fcvSnapshot = serverGlobalParams.featureCompatibility.acquireFCVSnapshot();
-            const bool useSbePlanCache = feature_flags::gFeatureFlagSbeFull.isEnabled(fcvSnapshot);
-
-            if (useSbePlanCache) {
+            if (shouldUseSbePlanCache(*plannerParams)) {
+                canonicalQuery->setUsingSbePlanCache(true);
                 return getClassicPlannerForSbe<
                     SbeWithClassicRuntimePlanningAndSbeCachePrepareExecutionHelper>(
                     opCtx,
@@ -1276,6 +1295,7 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorFind
                     std::move(sbeYieldPolicy),
                     std::move(plannerParams));
             } else {
+                canonicalQuery->setUsingSbePlanCache(false);
                 return getClassicPlannerForSbe<
                     SbeWithClassicRuntimePlanningAndClassicCachePrepareExecutionHelper>(
                     opCtx,
@@ -1286,6 +1306,10 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorFind
                     std::move(plannerParams));
             }
         }
+
+        // This codepath will use the classic runtime planner with classic PlanStages, so will not
+        // use the SBE plan cache.
+        canonicalQuery->setUsingSbePlanCache(false);
 
         // Default to using the classic executor with the classic runtime planner.
         return getClassicPlanner(
