@@ -498,6 +498,12 @@ public:
             OperationContext* opCtx);
 
         /**
+         * Returns whether it is safe to retry a command that failed with a stale error. It is not
+         * safe to retry if this router is a sub-router.
+         */
+        bool isSafeToRetryStaleErrors(OperationContext* opCtx);
+
+        /**
          * Commits the transaction.
          *
          * For transactions that only did reads or only wrote to one shard, sends commit directly to

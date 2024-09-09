@@ -601,6 +601,7 @@ env.CppUnitTest(
         "request_types/migration_secondary_throttle_options_test.cpp",
         "request_types/remove_shard_from_zone_request_test.cpp",
         "request_types/update_zone_key_range_request_test.cpp",
+        "router_role_test.cpp",
         "routing_table_cache_gossip_metadata_hook_test.cpp",
         "routing_table_history_test.cpp",
         "sessions_collection_sharded_test.cpp",

@@ -45,6 +45,7 @@
 #include "mongo/s/shard_version.h"
 #include "mongo/s/sharding_state.h"
 #include "mongo/s/stale_exception.h"
+#include "mongo/s/transaction_router.h"
 #include "mongo/util/str.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding
@@ -82,7 +83,7 @@ CachedDatabaseInfo DBPrimaryRouter::_getRoutingInfo(OperationContext* opCtx) con
     return uassertStatusOK(catalogCache->getDatabase(opCtx, _dbName));
 }
 
-void DBPrimaryRouter::_onException(RouteContext* context, Status s) {
+void DBPrimaryRouter::_onException(OperationContext* opCtx, RouteContext* context, Status s) {
     auto catalogCache = Grid::get(_service)->catalogCache();
 
     if (s == ErrorCodes::StaleDbVersion) {
@@ -96,6 +97,12 @@ void DBPrimaryRouter::_onException(RouteContext* context, Status s) {
 
         catalogCache->onStaleDatabaseVersion(si->getDb(), si->getVersionWanted());
     } else {
+        uassertStatusOK(s);
+    }
+
+    // It is not safe for a shard to retry stale errors if it acted as a sub-router.
+    auto txnRouter = TransactionRouter::get(opCtx);
+    if (txnRouter && !txnRouter.isSafeToRetryStaleErrors(opCtx)) {
         uassertStatusOK(s);
     }
 
@@ -118,7 +125,9 @@ CollectionRouterCommon::CollectionRouterCommon(
     ServiceContext* service, const std::vector<NamespaceString>& targetedNamespaces)
     : RouterBase(service), _targetedNamespaces(targetedNamespaces) {}
 
-void CollectionRouterCommon::_onException(RouteContext* context, Status s) {
+void CollectionRouterCommon::_onException(OperationContext* opCtx,
+                                          RouteContext* context,
+                                          Status s) {
     auto catalogCache = Grid::get(_service)->catalogCache();
 
     const auto isNssInvolvedInRouting = [&](const NamespaceString& nss) {
@@ -157,6 +166,12 @@ void CollectionRouterCommon::_onException(RouteContext* context, Status s) {
                 si->getNss(), si->getVersionWanted(), ShardId());
         }
     } else {
+        uassertStatusOK(s);
+    }
+
+    // It is not safe for a shard to retry stale errors if it acted as a sub-router.
+    auto txnRouter = TransactionRouter::get(opCtx);
+    if (txnRouter && !txnRouter.isSafeToRetryStaleErrors(opCtx)) {
         uassertStatusOK(s);
     }
 

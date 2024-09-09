@@ -800,6 +800,10 @@ TransactionRouter::Router::getAdditionalParticipantsForResponse(OperationContext
     return participants;
 }
 
+bool TransactionRouter::Router::isSafeToRetryStaleErrors(OperationContext* opCtx) {
+    return !getAdditionalParticipantsForResponse(opCtx).has_value();
+}
+
 bool TransactionRouter::Router::_isRetryableStmtInARetryableInternalTxn(
     const BSONObj& cmdObj) const {
     if (!isInternalSessionForRetryableWrite(_sessionId())) {

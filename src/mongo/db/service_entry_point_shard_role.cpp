@@ -1147,8 +1147,7 @@ void CheckoutSessionAndInvokeCommand::_tapError(Status status) {
         if (!txnRouter)
             return;
 
-        auto additionalParticipants = txnRouter.getAdditionalParticipantsForResponse(opCtx);
-        if (additionalParticipants) {
+        if (!txnRouter.isSafeToRetryStaleErrors(opCtx)) {
             _ecd->setCannotRetry();
         }
     }

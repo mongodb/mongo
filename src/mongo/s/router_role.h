@@ -79,7 +79,7 @@ public:
             try {
                 return callbackFn(opCtx, cdb);
             } catch (const DBException& ex) {
-                _onException(&context, ex.toStatus());
+                _onException(opCtx, &context, ex.toStatus());
             }
         }
     }
@@ -92,7 +92,7 @@ public:
 
 private:
     CachedDatabaseInfo _getRoutingInfo(OperationContext* opCtx) const;
-    void _onException(RouteContext* context, Status s);
+    void _onException(OperationContext* opCtx, RouteContext* context, Status s);
 
     DatabaseName _dbName;
 };
@@ -109,7 +109,7 @@ protected:
                                                 const CollectionRoutingInfo& cri,
                                                 BSONObjBuilder* builder);
 
-    void _onException(RouteContext* context, Status s);
+    void _onException(OperationContext* opCtx, RouteContext* context, Status s);
     CollectionRoutingInfo _getRoutingInfo(OperationContext* opCtx, const NamespaceString& nss);
 
     const std::vector<NamespaceString> _targetedNamespaces;
@@ -131,7 +131,7 @@ public:
             try {
                 return callbackFn(opCtx, cri);
             } catch (const DBException& ex) {
-                _onException(&context, ex.toStatus());
+                _onException(opCtx, &context, ex.toStatus());
             }
         }
     }
@@ -162,7 +162,7 @@ public:
             try {
                 return callbackFn(opCtx, criMap);
             } catch (const DBException& ex) {
-                _onException(&context, ex.toStatus());
+                _onException(opCtx, &context, ex.toStatus());
             }
         }
     }
