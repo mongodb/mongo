@@ -16,7 +16,9 @@ const runTest = function(db, replSets, timeseries, setUp) {
         assert.commandWorked(
             db.createCollection(coll.getName(), {timeseries: {timeField: "t", metaField: "m"}}));
     }
-    setUp?.(coll);
+    if (setUp) {
+        setUp(coll);
+    }
 
     const awaitReplication = function() {
         for (const replSet of replSets) {
