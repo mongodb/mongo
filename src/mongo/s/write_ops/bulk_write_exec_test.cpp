@@ -2433,10 +2433,10 @@ TEST_F(BulkWriteOpChildBatchErrorTest, LocalTransientTransactionErrorInTxnUnorde
         // created. But to be thorough the assertions below check that our bookkeeping when
         // encountering this error is correct.
 
-        // For unordered writes, we will treat the batch error as a failure of all of the writes
-        // in the batch.
+        // For unordered writes in a transaction, we will treat the batch error as a failure of the
+        // first write in the batch. The other write in the batch should have been re-set to ready.
         ASSERT_EQ(bulkWriteOp.getWriteOp_forTest(0).getWriteState(), WriteOpState_Error);
-        ASSERT_EQ(bulkWriteOp.getWriteOp_forTest(1).getWriteState(), WriteOpState_Error);
+        ASSERT_EQ(bulkWriteOp.getWriteOp_forTest(1).getWriteState(), WriteOpState_Ready);
         // Since these were targeted but we didn't receive a response yet they should still be
         // Pending.
         ASSERT_EQ(bulkWriteOp.getWriteOp_forTest(2).getWriteState(), WriteOpState_Pending);
@@ -2467,10 +2467,10 @@ TEST_F(BulkWriteOpChildBatchErrorTest, LocalTransientTransactionErrorInTxnUnorde
         // created. But to be thorough the assertions below check that our bookkeeping when
         // encountering this error is correct.
 
-        // For unordered writes, we will treat the batch error as a failure of all of the writes
-        // in the batch.
+        // For unordered writes in a transaction, we will treat the batch error as a failure of the
+        // first write in the batch. The other write in the batch should have been re-set to ready.
         ASSERT_EQ(bulkWriteOp.getWriteOp_forTest(0).getWriteState(), WriteOpState_Error);
-        ASSERT_EQ(bulkWriteOp.getWriteOp_forTest(1).getWriteState(), WriteOpState_Error);
+        ASSERT_EQ(bulkWriteOp.getWriteOp_forTest(1).getWriteState(), WriteOpState_Ready);
         // We already received successful responses for these writes.
         ASSERT_EQ(bulkWriteOp.getWriteOp_forTest(2).getWriteState(), WriteOpState_Completed);
         ASSERT_EQ(bulkWriteOp.getWriteOp_forTest(3).getWriteState(), WriteOpState_Completed);
@@ -2498,10 +2498,10 @@ TEST_F(BulkWriteOpChildBatchErrorTest, LocalNonTransientTransactionErrorInTxnUno
         // Simulate an interruption error (which is not a TransientTransactionError.)
         bulkWriteOp.processLocalChildBatchError(*targeted[kShardId1], kInterruptedErrorResponse);
 
-        // For unordered writes, we will treat the error as a failure of all the writes in the
-        // batch.
+        // For unordered writes in a transaction, we will treat the batch error as a failure of the
+        // first write in the batch. The other write in the batch should have been re-set to ready.
         ASSERT_EQ(bulkWriteOp.getWriteOp_forTest(0).getWriteState(), WriteOpState_Error);
-        ASSERT_EQ(bulkWriteOp.getWriteOp_forTest(1).getWriteState(), WriteOpState_Error);
+        ASSERT_EQ(bulkWriteOp.getWriteOp_forTest(1).getWriteState(), WriteOpState_Ready);
         // We didn't receive responses for these yet.
         ASSERT_EQ(bulkWriteOp.getWriteOp_forTest(2).getWriteState(), WriteOpState_Pending);
         ASSERT_EQ(bulkWriteOp.getWriteOp_forTest(3).getWriteState(), WriteOpState_Pending);
@@ -2512,16 +2512,13 @@ TEST_F(BulkWriteOpChildBatchErrorTest, LocalNonTransientTransactionErrorInTxnUno
         // The error for the first two ops should be the interruption error.
         ASSERT_EQ(bulkWriteOp.getWriteOp_forTest(0).getOpError().getStatus(),
                   kInterruptedErrorResponse.swResponse.getStatus());
-        ASSERT_EQ(bulkWriteOp.getWriteOp_forTest(1).getOpError().getStatus(),
-                  kInterruptedErrorResponse.swResponse.getStatus());
 
+        // With an error in a transaction we should stop at the first error generated.
         auto replyInfo = bulkWriteOp.generateReplyInfo();
-        ASSERT_EQ(replyInfo.replyItems.size(), 2);
+        ASSERT_EQ(replyInfo.replyItems.size(), 1);
         ASSERT_EQ(replyInfo.replyItems[0].getStatus(),
                   kInterruptedErrorResponse.swResponse.getStatus());
-        ASSERT_EQ(replyInfo.replyItems[1].getStatus(),
-                  kInterruptedErrorResponse.swResponse.getStatus());
-        ASSERT_EQ(replyInfo.summaryFields.nErrors, 2);
+        ASSERT_EQ(replyInfo.summaryFields.nErrors, 1);
     }
 
     // Case 2: we receive the failed batch response after receiving successful response for other
@@ -2537,10 +2534,10 @@ TEST_F(BulkWriteOpChildBatchErrorTest, LocalNonTransientTransactionErrorInTxnUno
         // Simulate an interruption error (which is not a TransientTransactionError.)
         bulkWriteOp.processLocalChildBatchError(*targeted[kShardId1], kInterruptedErrorResponse);
 
-        // For unordered writes, we will treat the error as a failure of all the writes in the
-        // batch.
+        // For unordered writes in a transaction, we will treat the batch error as a failure of the
+        // first write in the batch. The other write in the batch should have been re-set to ready.
         ASSERT_EQ(bulkWriteOp.getWriteOp_forTest(0).getWriteState(), WriteOpState_Error);
-        ASSERT_EQ(bulkWriteOp.getWriteOp_forTest(1).getWriteState(), WriteOpState_Error);
+        ASSERT_EQ(bulkWriteOp.getWriteOp_forTest(1).getWriteState(), WriteOpState_Ready);
         ASSERT_EQ(bulkWriteOp.getWriteOp_forTest(2).getWriteState(), WriteOpState_Completed);
         ASSERT_EQ(bulkWriteOp.getWriteOp_forTest(3).getWriteState(), WriteOpState_Completed);
         // The command should be considered finished.
@@ -2549,18 +2546,14 @@ TEST_F(BulkWriteOpChildBatchErrorTest, LocalNonTransientTransactionErrorInTxnUno
         // The error for the first two ops should be the interruption error.
         ASSERT_EQ(bulkWriteOp.getWriteOp_forTest(0).getOpError().getStatus(),
                   kInterruptedErrorResponse.swResponse.getStatus());
-        ASSERT_EQ(bulkWriteOp.getWriteOp_forTest(1).getOpError().getStatus(),
-                  kInterruptedErrorResponse.swResponse.getStatus());
 
+        // An error aborts the transaction so we will stop at the first error received even though
+        // the second batch was processed first.
         auto replyInfo = bulkWriteOp.generateReplyInfo();
-        ASSERT_EQ(replyInfo.replyItems.size(), 4);
+        ASSERT_EQ(replyInfo.replyItems.size(), 1);
         ASSERT_EQ(replyInfo.replyItems[0].getStatus(),
                   kInterruptedErrorResponse.swResponse.getStatus());
-        ASSERT_EQ(replyInfo.replyItems[1].getStatus(),
-                  kInterruptedErrorResponse.swResponse.getStatus());
-        ASSERT_OK(replyInfo.replyItems[2].getStatus());
-        ASSERT_OK(replyInfo.replyItems[3].getStatus());
-        ASSERT_EQ(replyInfo.summaryFields.nErrors, 2);
+        ASSERT_EQ(replyInfo.summaryFields.nErrors, 1);
     }
 }
 
@@ -2813,10 +2806,10 @@ TEST_F(BulkWriteOpChildBatchErrorTest, RemoteNonTransientTransactionErrorInTxnUn
         bulkWriteOp.processChildBatchResponseFromRemote(
             *targeted[kShardId1], kRemoteInterruptedResponse, boost::none);
 
-        // For unordered writes, we will treat the error as a failure of all the writes in the
-        // batch.
+        // For unordered writes in a transaction, we will treat the batch error as a failure of the
+        // first write in the batch. The other write in the batch should have been re-set to ready.
         ASSERT_EQ(bulkWriteOp.getWriteOp_forTest(0).getWriteState(), WriteOpState_Error);
-        ASSERT_EQ(bulkWriteOp.getWriteOp_forTest(1).getWriteState(), WriteOpState_Error);
+        ASSERT_EQ(bulkWriteOp.getWriteOp_forTest(1).getWriteState(), WriteOpState_Ready);
         // We didn't receive responses for these yet.
         ASSERT_EQ(bulkWriteOp.getWriteOp_forTest(2).getWriteState(), WriteOpState_Pending);
         ASSERT_EQ(bulkWriteOp.getWriteOp_forTest(3).getWriteState(), WriteOpState_Pending);
@@ -2827,14 +2820,11 @@ TEST_F(BulkWriteOpChildBatchErrorTest, RemoteNonTransientTransactionErrorInTxnUn
         // The error for the first two ops should be the interruption error.
         ASSERT_EQ(bulkWriteOp.getWriteOp_forTest(0).getOpError().getStatus().code(),
                   ErrorCodes::Interrupted);
-        ASSERT_EQ(bulkWriteOp.getWriteOp_forTest(1).getOpError().getStatus().code(),
-                  ErrorCodes::Interrupted);
 
         auto replyInfo = bulkWriteOp.generateReplyInfo();
-        ASSERT_EQ(replyInfo.replyItems.size(), 2);
+        ASSERT_EQ(replyInfo.replyItems.size(), 1);
         ASSERT_EQ(replyInfo.replyItems[0].getStatus().code(), ErrorCodes::Interrupted);
-        ASSERT_EQ(replyInfo.replyItems[1].getStatus(), ErrorCodes::Interrupted);
-        ASSERT_EQ(replyInfo.summaryFields.nErrors, 2);
+        ASSERT_EQ(replyInfo.summaryFields.nErrors, 1);
     }
 
     // Case 2: we receive the failed batch response after receiving successful response for other
@@ -2851,10 +2841,10 @@ TEST_F(BulkWriteOpChildBatchErrorTest, RemoteNonTransientTransactionErrorInTxnUn
         bulkWriteOp.processChildBatchResponseFromRemote(
             *targeted[kShardId1], kRemoteInterruptedResponse, boost::none);
 
-        // For unordered writes, we will treat the error as a failure of all the writes in the
-        // batch.
+        // For unordered writes in a transaction, we will treat the batch error as a failure of the
+        // first write in the batch. The other write in the batch should have been re-set to ready.
         ASSERT_EQ(bulkWriteOp.getWriteOp_forTest(0).getWriteState(), WriteOpState_Error);
-        ASSERT_EQ(bulkWriteOp.getWriteOp_forTest(1).getWriteState(), WriteOpState_Error);
+        ASSERT_EQ(bulkWriteOp.getWriteOp_forTest(1).getWriteState(), WriteOpState_Ready);
         ASSERT_EQ(bulkWriteOp.getWriteOp_forTest(2).getWriteState(), WriteOpState_Completed);
         ASSERT_EQ(bulkWriteOp.getWriteOp_forTest(3).getWriteState(), WriteOpState_Completed);
         // The command should be considered finished.
@@ -2863,16 +2853,11 @@ TEST_F(BulkWriteOpChildBatchErrorTest, RemoteNonTransientTransactionErrorInTxnUn
         // The error for the first two ops should be the interruption error.
         ASSERT_EQ(bulkWriteOp.getWriteOp_forTest(0).getOpError().getStatus().code(),
                   ErrorCodes::Interrupted);
-        ASSERT_EQ(bulkWriteOp.getWriteOp_forTest(1).getOpError().getStatus(),
-                  ErrorCodes::Interrupted);
 
         auto replyInfo = bulkWriteOp.generateReplyInfo();
-        ASSERT_EQ(replyInfo.replyItems.size(), 4);
+        ASSERT_EQ(replyInfo.replyItems.size(), 1);
         ASSERT_EQ(replyInfo.replyItems[0].getStatus().code(), ErrorCodes::Interrupted);
-        ASSERT_EQ(replyInfo.replyItems[1].getStatus().code(), ErrorCodes::Interrupted);
-        ASSERT_OK(replyInfo.replyItems[2].getStatus());
-        ASSERT_OK(replyInfo.replyItems[3].getStatus());
-        ASSERT_EQ(replyInfo.summaryFields.nErrors, 2);
+        ASSERT_EQ(replyInfo.summaryFields.nErrors, 1);
     }
 }
 
@@ -2904,15 +2889,14 @@ TEST_F(BulkWriteOpChildBatchErrorTest, RemoteTransientTransactionErrorUnordered)
         // created. But to be thorough the assertions below check that our bookkeeping when
         // encountering this error is correct.
 
-        // For unordered writes, we will treat the batch error as a failure of all of the writes
-        // in the batch.
+        // For unordered writes in a transaction, we will treat the batch error as a failure of the
+        // first write in the batch. The other write in the batch should have been re-set to ready.
         ASSERT_EQ(bulkWriteOp.getWriteOp_forTest(0).getWriteState(), WriteOpState_Error);
-        ASSERT_EQ(bulkWriteOp.getWriteOp_forTest(1).getWriteState(), WriteOpState_Error);
+        ASSERT_EQ(bulkWriteOp.getWriteOp_forTest(1).getWriteState(), WriteOpState_Ready);
         // Since these were targeted but we didn't receive a response yet they should still be
         // Pending.
         ASSERT_EQ(bulkWriteOp.getWriteOp_forTest(2).getWriteState(), WriteOpState_Pending);
         ASSERT_EQ(bulkWriteOp.getWriteOp_forTest(3).getWriteState(), WriteOpState_Pending);
-
         // Since we saw an execution-aborting error, the command should be considered finished.
         ASSERT(bulkWriteOp.isFinished());
     }
@@ -2939,10 +2923,10 @@ TEST_F(BulkWriteOpChildBatchErrorTest, RemoteTransientTransactionErrorUnordered)
         // created. But to be thorough the assertions below check that our bookkeeping when
         // encountering this error is correct.
 
-        // For unordered writes, we will treat the batch error as a failure of all of the writes
-        // in the batch.
+        // For unordered writes in a transaction, we will treat the batch error as a failure of the
+        // first write in the batch. The other write in the batch should have been re-set to ready.
         ASSERT_EQ(bulkWriteOp.getWriteOp_forTest(0).getWriteState(), WriteOpState_Error);
-        ASSERT_EQ(bulkWriteOp.getWriteOp_forTest(1).getWriteState(), WriteOpState_Error);
+        ASSERT_EQ(bulkWriteOp.getWriteOp_forTest(1).getWriteState(), WriteOpState_Ready);
         // We already received successful responses for these writes.
         ASSERT_EQ(bulkWriteOp.getWriteOp_forTest(2).getWriteState(), WriteOpState_Completed);
         ASSERT_EQ(bulkWriteOp.getWriteOp_forTest(3).getWriteState(), WriteOpState_Completed);
