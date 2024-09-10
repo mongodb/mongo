@@ -13,6 +13,8 @@
 //   requires_scripting,
 //   uses_multiple_connections,
 //   uses_parallel_shell,
+//   # The balancer can interrupt the count operation, entering in a race with the parallel shell.
+//   assumes_balancer_off,
 // ]
 
 var coll = db.count10;
