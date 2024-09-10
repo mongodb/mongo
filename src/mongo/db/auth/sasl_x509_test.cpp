@@ -239,7 +239,7 @@ TEST_F(SASLX509Test, testBasicNoUsername) {
         "featureFlagRearchitectUserAcquisition", true);
     SSLX509Name name = buildX509Name();
     setX509PeerInfo(session, SSLPeerInfo(name));
-    ASSERT_OK(authzManagerExternalState->insertPrivilegeDocument(
+    ASSERT_OK(authzManagerExternalState->insertUserDocument(
         opCtx.get(), generateX509UserDocument(name.toString()), BSONObj()));
 
     ASSERT_OK(saslClientSession->initialize());
@@ -255,7 +255,7 @@ TEST_F(SASLX509Test, testBasicEmptyUsername) {
         "featureFlagRearchitectUserAcquisition", true);
     SSLX509Name name = buildX509Name();
     setX509PeerInfo(session, SSLPeerInfo(name));
-    ASSERT_OK(authzManagerExternalState->insertPrivilegeDocument(
+    ASSERT_OK(authzManagerExternalState->insertUserDocument(
         opCtx.get(), generateX509UserDocument(name.toString()), BSONObj()));
 
     ASSERT_OK(saslClientSession->initialize());
@@ -348,7 +348,7 @@ TEST_F(SASLX509Test, testEnforceUserClusterSeparationFalse) {
     peerInfo.setClusterMembership(name.toString());
     setX509PeerInfo(session, peerInfo);
 
-    ASSERT_OK(authzManagerExternalState->insertPrivilegeDocument(
+    ASSERT_OK(authzManagerExternalState->insertUserDocument(
         opCtx.get(), generateX509UserDocument(kX509Subject), BSONObj()));
 
     ASSERT_OK(saslClientSession->initialize());
@@ -368,7 +368,7 @@ TEST_F(SASLX509Test, testEnforceUserClusterSeparationTrue) {
 
     saslServerSession = std::make_unique<SaslX509ServerMechanism>("$external");
 
-    ASSERT_OK(authzManagerExternalState->insertPrivilegeDocument(
+    ASSERT_OK(authzManagerExternalState->insertUserDocument(
         opCtx.get(), generateX509UserDocument(kX509Subject), BSONObj()));
 
 

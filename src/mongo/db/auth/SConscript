@@ -212,6 +212,7 @@ env.CppUnitTest(
         "builtin_roles_test.cpp",
         "oauth_discovery_factory_test.cpp",
         "privilege_parser_test.cpp",
+        "resolve_role_option_test.cpp",
         "resource_pattern_search_list_test.cpp",
         "restriction_test.cpp",
         "sasl_authentication_session_test.cpp",

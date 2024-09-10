@@ -470,7 +470,7 @@ TEST_F(AuthorizationSessionTest, UseOldUserInfoInFaceOfConnectivityProblems) {
 }
 
 TEST_F(AuthorizationSessionTest, AcquireUserObtainsAndValidatesAuthenticationRestrictions) {
-    ASSERT_OK(managerState->insertPrivilegeDocument(
+    ASSERT_OK(managerState->insertUserDocument(
         _opCtx.get(),
         BSON("user"
              << "spencer"
@@ -1421,33 +1421,33 @@ TEST_F(AuthorizationSessionTest, MayBypassWriteBlockingModeIsSetCorrectly) {
     ASSERT_FALSE(authzSession->mayBypassWriteBlockingMode());
 
     // Add a user without the restore role and ensure we can't bypass
-    ASSERT_OK(managerState->insertPrivilegeDocument(_opCtx.get(),
-                                                    BSON("user"
-                                                         << "spencer"
-                                                         << "db"
-                                                         << "test"
-                                                         << "credentials" << credentials << "roles"
-                                                         << BSON_ARRAY(BSON("role"
-                                                                            << "readWrite"
-                                                                            << "db"
-                                                                            << "test"))),
-                                                    BSONObj()));
+    ASSERT_OK(managerState->insertUserDocument(_opCtx.get(),
+                                               BSON("user"
+                                                    << "spencer"
+                                                    << "db"
+                                                    << "test"
+                                                    << "credentials" << credentials << "roles"
+                                                    << BSON_ARRAY(BSON("role"
+                                                                       << "readWrite"
+                                                                       << "db"
+                                                                       << "test"))),
+                                               BSONObj()));
     ASSERT_OK(
         authzSession->addAndAuthorizeUser(_opCtx.get(), kSpencerTestRequest->clone(), boost::none));
     ASSERT_FALSE(authzSession->mayBypassWriteBlockingMode());
 
     // Add a user with restore role on admin db and ensure we can bypass
-    ASSERT_OK(managerState->insertPrivilegeDocument(_opCtx.get(),
-                                                    BSON("user"
-                                                         << "gmarks"
-                                                         << "db"
-                                                         << "admin"
-                                                         << "credentials" << credentials << "roles"
-                                                         << BSON_ARRAY(BSON("role"
-                                                                            << "restore"
-                                                                            << "db"
-                                                                            << "admin"))),
-                                                    BSONObj()));
+    ASSERT_OK(managerState->insertUserDocument(_opCtx.get(),
+                                               BSON("user"
+                                                    << "gmarks"
+                                                    << "db"
+                                                    << "admin"
+                                                    << "credentials" << credentials << "roles"
+                                                    << BSON_ARRAY(BSON("role"
+                                                                       << "restore"
+                                                                       << "db"
+                                                                       << "admin"))),
+                                               BSONObj()));
     authzSession->logoutDatabase(_client.get(), kTestDB, "End of test"_sd);
 
     ASSERT_OK(
@@ -1460,17 +1460,17 @@ TEST_F(AuthorizationSessionTest, MayBypassWriteBlockingModeIsSetCorrectly) {
 
     // Add a user with the root role, which should confer restore role for cluster resource, and
     // ensure we can bypass
-    ASSERT_OK(managerState->insertPrivilegeDocument(_opCtx.get(),
-                                                    BSON("user"
-                                                         << "admin"
-                                                         << "db"
-                                                         << "admin"
-                                                         << "credentials" << credentials << "roles"
-                                                         << BSON_ARRAY(BSON("role"
-                                                                            << "root"
-                                                                            << "db"
-                                                                            << "admin"))),
-                                                    BSONObj()));
+    ASSERT_OK(managerState->insertUserDocument(_opCtx.get(),
+                                               BSON("user"
+                                                    << "admin"
+                                                    << "db"
+                                                    << "admin"
+                                                    << "credentials" << credentials << "roles"
+                                                    << BSON_ARRAY(BSON("role"
+                                                                       << "root"
+                                                                       << "db"
+                                                                       << "admin"))),
+                                               BSONObj()));
     authzSession->logoutDatabase(_client.get(), kAdminDB, ""_sd);
 
     ASSERT_OK(

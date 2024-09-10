@@ -119,6 +119,7 @@ mongo_cc_library(
         "//src/mongo/db/auth:auth_name.h",
         "//src/mongo/db/auth:cluster_auth_mode.h",
         "//src/mongo/db/auth:privilege.h",
+        "//src/mongo/db/auth:resolve_role_option.h",
         "//src/mongo/db/auth:resource_pattern.h",
         "//src/mongo/db/auth:restriction_environment.h",
         "//src/mongo/db/auth:role_name.h",

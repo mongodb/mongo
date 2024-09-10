@@ -192,10 +192,16 @@ Status AuthzManagerExternalStateMock::insert(OperationContext* opCtx,
     return Status::OK();
 }
 
-Status AuthzManagerExternalStateMock::insertPrivilegeDocument(OperationContext* opCtx,
-                                                              const BSONObj& userObj,
-                                                              const BSONObj& writeConcern) {
+Status AuthzManagerExternalStateMock::insertUserDocument(OperationContext* opCtx,
+                                                         const BSONObj& userObj,
+                                                         const BSONObj& writeConcern) {
     return insert(opCtx, NamespaceString::kAdminUsersNamespace, userObj, writeConcern);
+}
+
+Status AuthzManagerExternalStateMock::insertRoleDocument(OperationContext* opCtx,
+                                                         const BSONObj& roleObj,
+                                                         const BSONObj& writeConcern) {
+    return insert(opCtx, NamespaceString::kAdminRolesNamespace, roleObj, writeConcern);
 }
 
 Status AuthzManagerExternalStateMock::updateOne(OperationContext* opCtx,
