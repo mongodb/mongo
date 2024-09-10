@@ -235,7 +235,7 @@ last-continuous:
       ticket: SERVER-92193
     - test_file: jstests/replsets/write_concern_update_where.js
       ticket: SERVER-87126
-    - test_file: jstests/core/find_with_resume_after_param.js
+    - test_file: jstests/core/query/find_with_resume_after_param.js
       ticket: SERVER-92431
     - test_file: jstests/sharding/txn_two_phase_commit_failover.js
       ticket: SERVER-41314
@@ -514,7 +514,7 @@ last-lts:
       ticket: SERVER-92193
     - test_file: jstests/replsets/write_concern_update_where.js
       ticket: SERVER-87126
-    - test_file: jstests/core/find_with_resume_after_param.js
+    - test_file: jstests/core/query/find_with_resume_after_param.js
       ticket: SERVER-92431
     - test_file: jstests/sharding/txn_two_phase_commit_failover.js
       ticket: SERVER-41314
