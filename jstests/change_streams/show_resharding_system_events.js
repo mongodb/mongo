@@ -144,6 +144,12 @@ if (FeatureFlagUtil.isEnabled(st.s, "ReshardingImprovements")) {
         {
             ns: reshardingNs,
             collectionUUID: newUUID,
+            operationType: "startIndexBuild",
+            operationDescription: {indexes: [{v: 2, key: {a: 1}, name: "a_1"}]},
+        },
+        {
+            ns: reshardingNs,
+            collectionUUID: newUUID,
             operationType: "createIndexes",
             operationDescription: {indexes: [{v: 2, key: {a: 1}, name: "a_1"}]}
         },

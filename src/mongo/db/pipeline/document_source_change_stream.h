@@ -273,6 +273,9 @@ public:
     static constexpr StringData kModifyOpType = "modify"_sd;
     static constexpr StringData kEndOfTransactionOpType = "endOfTransaction"_sd;
 
+    // These events are guarded behind the 'showSystemEvents' flag.
+    static constexpr StringData kStartIndexBuildOpType = "startIndexBuild"_sd;
+
     // Default regex for collections match which prohibits system collections.
     static constexpr StringData kRegexAllCollections = R"((?!(\$|system\.)))"_sd;
 

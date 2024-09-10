@@ -267,6 +267,12 @@ last-continuous:
       ticket: SERVER-90952
     - test_file: jstests/aggregation/bugs/server94212.js
       ticket: SERVER-94212
+    - test_file: jstests/change_streams/ddl_create_drop_index_events.js
+      ticket: SERVER-93153
+    - test_file: jstests/change_streams/resume_expanded_events.js
+      ticket: SERVER-93153
+    - test_file: jstests/change_streams/show_resharding_system_events.js
+      ticket: SERVER-93153
   suites: null
 last-lts:
   all:
@@ -548,4 +554,10 @@ last-lts:
       ticket: SERVER-90952
     - test_file: jstests/aggregation/bugs/server94212.js
       ticket: SERVER-94212
+    - test_file: jstests/change_streams/ddl_create_drop_index_events.js
+      ticket: SERVER-93153
+    - test_file: jstests/change_streams/resume_expanded_events.js
+      ticket: SERVER-93153
+    - test_file: jstests/change_streams/show_resharding_system_events.js
+      ticket: SERVER-93153
   suites: null

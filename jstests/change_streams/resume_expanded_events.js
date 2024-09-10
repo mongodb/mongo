@@ -26,7 +26,7 @@ const ns = {
 };
 
 function runTest(collNameForChangeStream) {
-    let pipeline = [{$changeStream: {showExpandedEvents: true}}];
+    let pipeline = [{$changeStream: {showExpandedEvents: true, showSystemEvents: true}}];
     let cursor = test.startWatchingChanges({
         pipeline,
         collection: collNameForChangeStream,
@@ -68,8 +68,16 @@ function runTest(collNameForChangeStream) {
         }
     })[0];
 
-    // Test the 'createIndexes' event on a non-empty collection.
+    // Test the 'startIndexBuild' and 'createIndexes' events on a non-empty collection.
     assert.commandWorked(testDB[collName].createIndex({b: -1}));
+    const startIndexBuildEvent = test.assertNextChangesEqual({
+        cursor: cursor,
+        expectedChanges: {
+            operationType: "startIndexBuild",
+            ns: ns,
+            operationDescription: {indexes: [{v: 2, key: {b: -1}, name: "b_-1"}]},
+        }
+    })[0];
     const createIndexesEvent2 = test.assertNextChangesEqual({
         cursor: cursor,
         expectedChanges: {
@@ -105,13 +113,17 @@ function runTest(collNameForChangeStream) {
 
     function testResume(resumeOption) {
         function testResumeForEvent(event, nextEventDesc) {
-            pipeline = [{$changeStream: {showExpandedEvents: true, [resumeOption]: event._id}}];
+            pipeline = [{
+                $changeStream:
+                    {showExpandedEvents: true, showSystemEvents: true, [resumeOption]: event._id},
+            }];
             cursor = test.startWatchingChanges({pipeline, collection: collNameForChangeStream});
             test.assertNextChangesEqual({cursor: cursor, expectedChanges: nextEventDesc});
         }
 
         testResumeForEvent(createEvent, createIndexesEvent1);
         testResumeForEvent(createIndexesEvent1, insertEvent1);
+        testResumeForEvent(startIndexBuildEvent, createIndexesEvent2);
         testResumeForEvent(createIndexesEvent2, dropIndexesEvent);
         testResumeForEvent(dropIndexesEvent, insertEvent2);
     }

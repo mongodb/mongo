@@ -18,14 +18,13 @@ const ns = {
     coll: collName
 };
 
-const pipeline = [{$changeStream: {showExpandedEvents: true}}];
 const cst = new ChangeStreamTest(testDB);
 
 function assertNextChangeEvent(cursor, expectedEvent) {
     cst.assertNextChangesEqual({cursor: cursor, expectedChanges: expectedEvent});
 }
 
-function runTest(startChangeStream, insertDataBeforeCreateIndex) {
+function runTest(startChangeStream, pipeline, insertDataBeforeCreateIndex) {
     const cst = new ChangeStreamTest(testDB);
 
     assert.commandWorked(testDB.runCommand({create: collName}));
@@ -57,6 +56,10 @@ function runTest(startChangeStream, insertDataBeforeCreateIndex) {
         let opDesc = {indexes: [Object.assign({v: 2, key: opDescKey, name: name}, options)]};
 
         assert.commandWorked(testDB[collName].createIndex(key, options));
+        if (insertDataBeforeCreateIndex && pipeline[0].$changeStream.showSystemEvents) {
+            assertNextChangeEvent(
+                cursor, {operationType: "startIndexBuild", ns: ns, operationDescription: opDesc});
+        }
         assertNextChangeEvent(
             cursor, {operationType: "createIndexes", ns: ns, operationDescription: opDesc});
 
@@ -137,6 +140,13 @@ function runTest(startChangeStream, insertDataBeforeCreateIndex) {
         // single change stream event that covers both indexes.
         assert.commandWorked(
             testDB[collName].createIndexes([{b: 1, c: -1}, {d: "hashed"}], {sparse: true}));
+        if (pipeline[0].$changeStream.showSystemEvents) {
+            assertNextChangeEvent(cursor, {
+                operationType: "startIndexBuild",
+                ns: ns,
+                operationDescription: {indexes: [opDesc1.indexes[0], opDesc2.indexes[0]]},
+            });
+        }
         assertNextChangeEvent(cursor, {
             operationType: "createIndexes",
             ns: ns,
@@ -155,14 +165,18 @@ function runTest(startChangeStream, insertDataBeforeCreateIndex) {
     testDB[collName].drop();
 }
 
-// Run the test using a whole-db change stream on an empty collection.
-runTest((() => cst.startWatchingChanges({pipeline, collection: 1})), false);
+const runTests = function(pipeline) {
+    // Run the test using a whole-db change stream on an empty collection.
+    runTest((() => cst.startWatchingChanges({pipeline, collection: 1})), pipeline, false);
 
-// Run the test using a single change stream on an empty collection.
-runTest((() => cst.startWatchingChanges({pipeline, collection: collName})), false);
+    // Run the test using a single change stream on an empty collection.
+    runTest((() => cst.startWatchingChanges({pipeline, collection: collName})), pipeline, false);
 
-// Run the test using a whole-db collection change stream on a non-empty collection.
-runTest((() => cst.startWatchingChanges({pipeline, collection: 1})), true);
+    // Run the test using a whole-db collection change stream on a non-empty collection.
+    runTest((() => cst.startWatchingChanges({pipeline, collection: 1})), pipeline, true);
 
-// Run the test using a single collection change stream on a non-empty collection.
-runTest((() => cst.startWatchingChanges({pipeline, collection: collName})), true);
+    // Run the test using a single collection change stream on a non-empty collection.
+    runTest((() => cst.startWatchingChanges({pipeline, collection: collName})), pipeline, true);
+};
+runTests([{$changeStream: {showExpandedEvents: true}}]);
+runTests([{$changeStream: {showExpandedEvents: true, showSystemEvents: true}}]);
