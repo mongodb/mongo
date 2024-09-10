@@ -2049,6 +2049,14 @@ void shutdownTask(const ShutdownTaskArgs& shutdownArgs) {
         shutdownChangeCollectionExpiredDocumentsRemover(serviceContext);
     }
 
+    {
+        TimeElapsedBuilderScopedTimer scopedTimer(
+            serviceContext->getFastClockSource(),
+            "Wait for the oplog cap maintainer thread to stop",
+            &shutdownTimeElapsedBuilder);
+        OplogCapMaintainerThread::get(serviceContext)->waitForFinish();
+    }
+
     // We should always be able to acquire the global lock at shutdown.
     //
     // For a Windows service, dbexit does not call exit(), so we must leak the lock outside
@@ -2064,17 +2072,6 @@ void shutdownTask(const ShutdownTaskArgs& shutdownArgs) {
                                                   &shutdownTimeElapsedBuilder);
         LOGV2(4784930, "Shutting down the storage engine");
         shutdownGlobalStorageEngineCleanly(serviceContext);
-    }
-
-    {
-        // We wait for the oplog cap maintainer thread to stop. This has to be done after the engine
-        // has been closed since the thread will only die once all references to the oplog have been
-        // deleted and we're performing a shutdown.
-        TimeElapsedBuilderScopedTimer scopedTimer(
-            serviceContext->getFastClockSource(),
-            "Wait for the oplog cap maintainer thread to stop",
-            &shutdownTimeElapsedBuilder);
-        OplogCapMaintainerThread::get(serviceContext)->waitForFinish();
     }
 
     // We drop the scope cache because leak sanitizer can't see across the
