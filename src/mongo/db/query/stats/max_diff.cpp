@@ -336,10 +336,6 @@ DataDistribution getDataDistribution(const std::vector<SBEValue>& sortedInput) {
 
     uassert(8674813, "ValFreq contains invalid values", isValidValFreq(result._freq));
 
-    LOGV2(8674810,
-          "Distribution sorted by value",
-          "distribution"_attr = printDistribution(result, result._freq.size()));
-
     return result;
 }
 

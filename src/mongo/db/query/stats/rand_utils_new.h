@@ -29,6 +29,7 @@
 
 #pragma once
 
+#include <absl/random/zipf_distribution.h>
 #include <cmath>
 #include <cstddef>
 #include <memory>
@@ -128,7 +129,50 @@ private:
     double _max;
 };
 
-enum class DistrType { kUniform, kNormal };
+/**
+ * Wrapper of zipfian distribution that is guaranteed to produces size_t values within a certain
+ * range. The absl::zipf_distribution class requires as input the max value expected in the
+ * distribution.
+ */
+class ZipfianDistr : public RandomDistribution {
+public:
+    ZipfianDistr(size_t min, size_t max)
+        : _distr{max}, _backup{min, max}, _min((double)min), _max((double)max) {}
+
+    size_t operator()(std::mt19937_64& gen) override {
+        double randNum = _distr(gen);
+        size_t trials = 0;
+        // If the result is outside the range (an event with low probability), try 10 more times to
+        // get a number in the range.
+        while (!(randNum >= _min && randNum <= _max) && trials < 10) {
+            randNum = _distr(gen);
+            if (randNum < _min) {
+                randNum = std::ceil(randNum);
+            } else if (randNum > _max) {
+                randNum = std::floor(randNum);
+            } else {
+                randNum = std::round(randNum);
+            }
+            ++trials;
+        }
+        if (randNum < _min || randNum > _max) {
+            // We couldn't generate a number in [min,max] within 10 attempts. Generate a uniform
+            // number.
+            randNum = _backup(gen);
+        }
+        size_t result = std::round(randNum);
+        uassert(8871801, "Random index out of range", result >= _min && result <= _max);
+        return result;
+    }
+
+private:
+    absl::zipf_distribution<size_t> _distr;
+    std::uniform_int_distribution<size_t> _backup;
+    double _min;
+    double _max;
+};
+
+enum class DistrType { kUniform, kNormal, kZipfian };
 
 using MixedDistributionDescriptor = std::vector<std::pair<DistrType, double /*weight*/>>;
 
@@ -159,6 +203,9 @@ public:
                     break;
                 case DistrType::kNormal:
                     distrMix.emplace_back(std::make_unique<NormalDistr>(min, max));
+                    break;
+                case DistrType::kZipfian:
+                    distrMix.emplace_back(std::make_unique<ZipfianDistr>(min, max));
                     break;
                 default:
                     MONGO_UNREACHABLE;

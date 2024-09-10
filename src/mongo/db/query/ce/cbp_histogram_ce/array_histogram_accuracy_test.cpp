@@ -90,13 +90,31 @@ void runAccuracyTestConfiguration(const DataDistributionEnum dataDistribution,
             // Create one by one the values.
             switch (dataDistribution) {
                 case kUniform:
-                    generateDataUniform(size, dataInterval, typeCombinationData, seed, data);
+                    // For ndv we set half the number of values in the provided data interval.
+                    generateDataUniform(size,
+                                        dataInterval,
+                                        typeCombinationData,
+                                        seed,
+                                        (dataInterval.second - dataInterval.first) / 2 /*ndv*/,
+                                        data);
                     break;
                 case kNormal:
-                    generateDataNormal(size, dataInterval, typeCombinationData, seed, data);
+                    // For ndv we set half the number of values in the provided data interval.
+                    generateDataNormal(size,
+                                       dataInterval,
+                                       typeCombinationData,
+                                       seed,
+                                       (dataInterval.second - dataInterval.first) / 2 /*ndv*/,
+                                       data);
                     break;
                 case kZipfian:
-                    generateDataZipfian(size, dataInterval, typeCombinationData, seed, data);
+                    // For ndv we set half the number of values in the provided data interval.
+                    generateDataZipfian(size,
+                                        dataInterval,
+                                        typeCombinationData,
+                                        seed,
+                                        (dataInterval.second - dataInterval.first) / 2 /*ndv*/,
+                                        data);
                     break;
             }
 
@@ -196,7 +214,7 @@ int main(int argc, char* argv[]) {
         const TypeCombination typeCombinationsQueries{{TypeTags::NumberInt64, 100},
                                                       {TypeTags::StringSmall, 100},
                                                       {TypeTags::NumberDouble, 100}};
-        const std::pair<size_t, size_t> dataInterval({500, 150});
+        const std::pair<size_t, size_t> dataInterval({0, 1000});
         const std::pair<size_t, size_t> queryInterval({0, 1000});
         const DataDistributionEnum dataDistribution = kNormal;
         QueryType queryType = kPoint;
