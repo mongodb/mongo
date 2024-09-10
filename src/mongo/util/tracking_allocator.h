@@ -103,7 +103,7 @@ public:
     ~TrackingAllocator() = default;
 
     template <class U>
-    TrackingAllocator(const TrackingAllocator<U>& ta) noexcept : _stats{ta.getStats()} {};
+    TrackingAllocator(const TrackingAllocator<U>& ta) noexcept : _stats{ta.stats()} {};
 
     T* allocate(size_t n) {
         const size_t allocation = n * sizeof(T);
@@ -117,7 +117,7 @@ public:
         ::operator delete(p, size);
     }
 
-    TrackingAllocatorStats& getStats() const {
+    TrackingAllocatorStats& stats() const {
         return _stats;
     }
 
@@ -127,12 +127,12 @@ private:
 
 template <class T, class U>
 bool operator==(const TrackingAllocator<T>& lhs, const TrackingAllocator<U>& rhs) noexcept {
-    return &lhs.getStats() == &rhs.getStats();
+    return &lhs.stats() == &rhs.stats();
 }
 
 template <class T, class U>
 bool operator!=(const TrackingAllocator<T>& lhs, const TrackingAllocator<U>& rhs) noexcept {
-    return &lhs.getStats() != &rhs.getStats();
+    return &lhs.stats() != &rhs.stats();
 }
 
 }  // namespace mongo
