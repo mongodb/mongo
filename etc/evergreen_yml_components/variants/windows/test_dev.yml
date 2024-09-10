@@ -48,7 +48,7 @@ variables:
 buildvariants:
   - name: &windows-compile-required windows-compile-required
     display_name: "! Windows Server 2022 Enterprise Compile"
-    tags: ["required", "bazel_check"]
+    tags: ["required", "bazel_check", "forbid_tasks_tagged_with_experimental"]
     run_on:
       - windows-2022-xxlarge
     activate: true # These compile variants run on every commit to reduce latency of the auto-reverter.
@@ -89,7 +89,7 @@ buildvariants:
     <<: *windows_compile_variant_dependency
     name: &enterprise-windows-all-feature-flags-required enterprise-windows-all-feature-flags-required
     display_name: "! Enterprise Windows Server 2022 (all feature flags) essential tasks"
-    tags: ["required"]
+    tags: ["required", "forbid_tasks_tagged_with_experimental"]
     cron: "0 */4 * * *" # From the ${project_required_suggested_cron} parameter
     run_on:
       - windows-2022-small

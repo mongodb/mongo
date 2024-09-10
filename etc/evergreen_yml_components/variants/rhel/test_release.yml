@@ -39,7 +39,7 @@ buildvariants:
 
   - name: rhel8
     display_name: RHEL 8
-    tags: []
+    tags: ["forbid_tasks_tagged_with_experimental"]
     cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
     run_on:
       - rhel8.8-large
@@ -86,7 +86,7 @@ buildvariants:
 
   - name: enterprise-rhel-8-64-bit
     display_name: "Enterprise RHEL 8"
-    tags: []
+    tags: ["forbid_tasks_tagged_with_experimental_experimental"]
     cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
     run_on:
       - rhel8.8-small
@@ -147,7 +147,7 @@ buildvariants:
   - name: rhel-8-arm64
     display_name: RHEL 8 arm64
     cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
-    tags: ["bazel_check"]
+    tags: ["bazel_check", "forbid_tasks_tagged_with_experimental"]
     run_on:
       - rhel8.8-arm64-small
     expansions:
@@ -189,7 +189,7 @@ buildvariants:
 
   - name: enterprise-rhel-8-arm64
     display_name: "Enterprise RHEL 8 arm64"
-    tags: []
+    tags: ["forbid_tasks_tagged_with_experimental"]
     cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
     run_on:
       - rhel8.8-arm64-small
@@ -238,7 +238,7 @@ buildvariants:
 
   - name: rhel93
     display_name: RHEL 9.3
-    tags: ["bazel_check"]
+    tags: ["bazel_check", "forbid_tasks_tagged_with_experimental_experimental"]
     cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
     run_on:
       - rhel93-large
@@ -284,7 +284,7 @@ buildvariants:
 
   - name: enterprise-rhel-93-64-bit
     display_name: "Enterprise RHEL 9.3"
-    tags: []
+    tags: ["forbid_tasks_tagged_with_experimental"]
     cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
     run_on:
       - rhel93-small
@@ -333,7 +333,7 @@ buildvariants:
 
   - name: rhel93-arm64
     display_name: RHEL 9.3 arm64
-    tags: ["bazel_check"]
+    tags: ["bazel_check", "forbid_tasks_tagged_with_experimental"]
     cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
     run_on:
       - rhel93-arm64-small
@@ -379,7 +379,7 @@ buildvariants:
 
   - name: enterprise-rhel-93-arm64
     display_name: "Enterprise RHEL 9.3 arm64"
-    tags: []
+    tags: ["forbid_tasks_tagged_with_experimental"]
     cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
     run_on:
       - rhel93-arm64-small

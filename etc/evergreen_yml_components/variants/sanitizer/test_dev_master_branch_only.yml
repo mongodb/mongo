@@ -200,7 +200,7 @@ buildvariants:
 
   - name: &enterprise-rhel-8-64-bit-dynamic-debug-mode enterprise-rhel-8-64-bit-dynamic-debug-mode
     display_name: "Shared Library Enterprise RHEL 8 Debug Mode"
-    tags: []
+    tags: ["forbid_tasks_tagged_with_experimental"]
     cron: "0 4 * * 0" # From the ${project_weekly_cron} parameter
     run_on:
       - rhel8.8-small
@@ -276,7 +276,7 @@ buildvariants:
 
   - name: &windows-debug-suggested windows-debug-suggested
     display_name: "* Windows Server 2022 DEBUG"
-    tags: ["suggested"]
+    tags: ["suggested", "forbid_tasks_tagged_with_experimental"]
     cron: "0 */4 * * *" # From the ${project_required_suggested_cron} parameter
     run_on:
       - windows-2022-small
@@ -373,7 +373,7 @@ buildvariants:
   - &macos-debug-template
     name: &macos-debug-suggested macos-debug-suggested
     display_name: "* macOS arm64 DEBUG"
-    tags: ["suggested"]
+    tags: ["suggested", "forbid_tasks_tagged_with_experimental"]
     cron: "0 4 * * *" # From the ${project_required_suggested_cron} parameter
     run_on:
       - macos-14-arm64
@@ -492,7 +492,7 @@ buildvariants:
   - <<: *linux_debug_aubsan_compile_variant_dependency
     name: &rhel8-debug-aubsan-all-feature-flags rhel8-debug-aubsan-all-feature-flags
     display_name: "* Shared Library {A,UB}SAN Enterprise RHEL 8 DEBUG (all feature flags)"
-    tags: ["suggested"]
+    tags: ["suggested", "forbid_tasks_tagged_with_experimental_experimental"]
     cron: "0 4 1-31/2 * *" # For cost reasons, we run this variant every other day
     run_on:
       - rhel8.8-large
@@ -580,7 +580,7 @@ buildvariants:
   - <<: *enterprise-rhel8-debug-tsan-compile-dependency
     name: &enterprise-rhel8-debug-tsan-all-feature-flags enterprise-rhel8-debug-tsan-all-feature-flags
     display_name: "* TSAN Enterprise RHEL 8 DEBUG (all feature flags)"
-    tags: ["suggested"]
+    tags: ["suggested", "forbid_tasks_tagged_with_experimental"]
     cron: "0 4 1-31/2 * *" # For cost reasons, we run this variant every other day.
     run_on:
       - rhel8.8-large

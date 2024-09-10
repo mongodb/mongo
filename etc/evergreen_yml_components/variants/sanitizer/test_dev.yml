@@ -240,7 +240,7 @@ buildvariants:
   - <<: *generic_linux_compile_params
     name: &linux-x86-dynamic-debug-compile-required linux-x86-dynamic-debug-compile-required # TODO: replace with Sanitizer.
     display_name: "! Linux x86 Shared Library DEBUG Compile"
-    tags: ["required"]
+    tags: ["required", "forbid_tasks_tagged_with_experimental"]
     stepback: false
     expansions:
       <<: *linux_debug_community_compile_expansions
@@ -264,7 +264,7 @@ buildvariants:
   - <<: *generic_linux_compile_params
     name: &linux-debug-aubsan-compile-required linux-debug-aubsan-compile-required
     display_name: "! Linux x86 Shared Library {A,UB}SAN Enterprise Compile"
-    tags: ["required"]
+    tags: ["required", "forbid_tasks_tagged_with_experimental"]
     expansions:
       <<: *generic_linux_compile_expansions
       separate_debug: off
@@ -304,7 +304,7 @@ buildvariants:
     <<: *linux_x86_dynamic_debug_compile_variant_dependency
     name: &linux-64-debug-required linux-64-debug-required
     display_name: "! Linux x86 Shared Library DEBUG"
-    tags: ["required"]
+    tags: ["required", "forbid_tasks_tagged_with_experimental"]
     cron: "0 */4 * * *" # From the ${project_required_suggested_cron} parameter
     run_on:
       - rhel8.8-medium
@@ -354,7 +354,7 @@ buildvariants:
   - <<: *linux_debug_aubsan_compile_variant_dependency
     name: &rhel8-debug-aubsan rhel8-debug-aubsan
     display_name: "* Shared Library {A,UB}SAN Enterprise RHEL 8 DEBUG"
-    tags: ["suggested"]
+    tags: ["suggested", "forbid_tasks_tagged_with_experimental"]
     cron: "0 4 1-31/2 * *" # For cost reasons, we run this variant every other day
     run_on:
       - rhel8.8-large
@@ -482,7 +482,7 @@ buildvariants:
 
   - name: &enterprise-rhel8-debug-tsan-compile enterprise-rhel8-debug-tsan-compile
     display_name: "* TSAN Enterprise RHEL 8 DEBUG Compile"
-    tags: ["suggested"]
+    tags: ["suggested", "forbid_tasks_tagged_with_experimental"]
     cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
     run_on:
       - rhel8.8-large
@@ -509,7 +509,7 @@ buildvariants:
   - <<: *enterprise-rhel8-debug-tsan-compile-dependency
     name: &enterprise-rhel8-debug-tsan enterprise-rhel8-debug-tsan
     display_name: "* TSAN Enterprise RHEL 8 DEBUG"
-    tags: ["suggested"]
+    tags: ["suggested", "forbid_tasks_tagged_with_experimental"]
     cron: "0 4 1-31/2 * *" # For cost reasons, we run this variant every other day.
     run_on:
       - rhel8.8-large

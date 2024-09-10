@@ -7,7 +7,7 @@
 buildvariants:
   - name: macos-arm64
     display_name: macOS arm64
-    tags: []
+    tags: ["forbid_tasks_tagged_with_experimental"]
     cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
     run_on:
       - macos-14-arm64
@@ -42,7 +42,7 @@ buildvariants:
 
   - name: enterprise-macos-arm64
     display_name: Enterprise macOS arm64
-    tags: ["bazel_check"]
+    tags: ["bazel_check", "forbid_tasks_tagged_with_experimental"]
     cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
     run_on:
       - macos-14-arm64

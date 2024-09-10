@@ -29,6 +29,10 @@ These build variants also have `required` tag.
 "Suggested" build variants are defined as any build variant with a `*` at the front of its display name in Evergreen.
 These build variants also have `suggested` tag.
 
+## Build Variants with forbid_tasks_tagged_with_experimental
+
+Build variants with the `forbid_tasks_tagged_with_experimental` tag indicate that they do not allow tasks tagged as `experimental` to run. This tag is used in conjunction with the `forbid-tasks-with-tag-on-variants` evergreen lint rule to enforce this restriction.
+
 ## Build Variants after branching
 
 In each of platform or build variant group directory there can be these files:

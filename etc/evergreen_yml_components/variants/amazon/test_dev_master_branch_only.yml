@@ -171,7 +171,7 @@ buildvariants:
     <<: *amazon_linux2_arm64_static_compile_variant_dependency
     name: &enterprise-amazon-linux2-arm64-all-feature-flags enterprise-amazon-linux2-arm64-all-feature-flags
     display_name: "! Amazon Linux 2 arm64 Atlas Enterprise (all feature flags)"
-    tags: ["required"]
+    tags: ["required", "forbid_tasks_tagged_with_experimental"]
     cron: "0 */4 * * *" # From the ${project_required_suggested_cron} parameter
     run_on:
       - amazon2-arm64-atlas-latest-small

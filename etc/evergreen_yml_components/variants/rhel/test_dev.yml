@@ -90,7 +90,7 @@ buildvariants:
   - <<: *linux-x86-dynamic-compile-params
     name: &linux-x86-dynamic-compile linux-x86-dynamic-compile
     display_name: "* Linux x86 Enterprise Shared Library"
-    tags: ["suggested"]
+    tags: ["suggested", "forbid_tasks_tagged_with_experimental"]
     expansions:
       <<: *linux-x86-dynamic-enterprise-compile-expansions
       compile_variant: *linux-x86-dynamic-compile
@@ -113,7 +113,7 @@ buildvariants:
     <<: *linux_x86_dynamic_compile_variant_dependency
     name: &enterprise-rhel-8-64-bit-dynamic enterprise-rhel-8-64-bit-dynamic
     display_name: "* Shared Library Enterprise RHEL 8"
-    tags: ["suggested"]
+    tags: ["suggested", "forbid_tasks_tagged_with_experimental_experimental"]
     cron: "0 */4 * * *" # From the ${project_required_suggested_cron} parameter
     run_on:
       - rhel8.8-small

@@ -106,7 +106,7 @@ types-setuptools = "57.4.12" # latest is 68.0.0.0, but that causes pip install r
 types-requests = "^2.32.0.20240712"
 tqdm = "*"
 colorama = "^0.4.6"
-evergreen-lint = "^0.1.8"
+evergreen-lint = "^0.1.9"
 ruff = "^0.5.6"
 
 [tool.poetry.group.platform.dependencies]

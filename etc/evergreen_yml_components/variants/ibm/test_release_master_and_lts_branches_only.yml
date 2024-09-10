@@ -8,7 +8,7 @@ buildvariants:
   - &enterprise-rhel-81-ppc64le-template
     name: enterprise-rhel-81-ppc64le
     display_name: Enterprise RHEL 8.1 PPC64LE
-    tags: ["bazel_check"]
+    tags: ["bazel_check", "forbid_tasks_tagged_with_experimental_experimental"]
     run_on:
       - rhel81-power8-small
     cron: "0 4 * * 0" # From the ${project_weekly_cron} parameter
@@ -85,7 +85,7 @@ buildvariants:
   - &enterprise-rhel-83-s390x-template
     name: enterprise-rhel-83-s390x
     display_name: Enterprise RHEL 8.3 s390x
-    tags: ["bazel_check"]
+    tags: ["bazel_check", "forbid_tasks_tagged_with_experimental"]
     run_on:
       - rhel83-zseries-small
     cron: "0 4 * * 0"

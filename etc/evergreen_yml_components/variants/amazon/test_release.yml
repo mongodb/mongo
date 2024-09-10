@@ -92,7 +92,7 @@ buildvariants:
 
   - name: amazon2023
     display_name: Amazon Linux 2023.3
-    tags: ["bazel_check"]
+    tags: ["bazel_check", "forbid_tasks_tagged_with_experimental"]
     cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
     run_on:
       - amazon2023.3-small
@@ -136,7 +136,7 @@ buildvariants:
 
   - name: enterprise-amazon2023
     display_name: "Enterprise Amazon Linux 2023.3"
-    tags: []
+    tags: ["forbid_tasks_tagged_with_experimental"]
     cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
     run_on:
       - amazon2023.3-small
@@ -229,7 +229,7 @@ buildvariants:
 
   - name: amazon2023-arm64
     display_name: Amazon Linux 2023.3 arm64
-    tags: ["bazel_check"]
+    tags: ["bazel_check", "forbid_tasks_tagged_with_experimental"]
     cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
     run_on:
       - amazon2023.3-arm64-small
@@ -275,7 +275,7 @@ buildvariants:
   - &enterprise-amazon2023-arm64-template
     name: enterprise-amazon2023-arm64
     display_name: "Enterprise Amazon Linux 2023.3 arm64"
-    tags: []
+    tags: ["forbid_tasks_tagged_with_experimental"]
     cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
     run_on:
       - amazon2023.3-arm64-small
@@ -369,7 +369,7 @@ buildvariants:
 
   - name: enterprise-amazon2-streams
     display_name: "Amazon Linux 2 enterprise build with streams"
-    tags: []
+    tags: ["forbid_tasks_tagged_with_experimental"]
     cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
     run_on:
       - amazon2-latest-small

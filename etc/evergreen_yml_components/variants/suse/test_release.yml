@@ -7,7 +7,7 @@
 buildvariants:
   - name: enterprise-suse15-64
     display_name: Enterprise SLES 15 (SP5)
-    tags: []
+    tags: ["forbid_tasks_tagged_with_experimental"]
     cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
     run_on:
       - suse15sp5-small
@@ -55,7 +55,7 @@ buildvariants:
 
   - name: suse15
     display_name: SUSE 15 (SP5)
-    tags: ["bazel_check"]
+    tags: ["bazel_check", "forbid_tasks_tagged_with_experimental"]
     cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
     run_on:
       - suse15sp5-small

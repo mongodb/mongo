@@ -818,13 +818,13 @@ dev = ["black", "build", "commitizen", "isort", "pip-tools", "pre-commit", "twin
 
 [[package]]
 name = "evergreen-lint"
-version = "0.1.8"
+version = "0.1.9"
 description = ""
 optional = false
 python-versions = "<4.0,>=3.9"
 files = [
-    {file = "evergreen_lint-0.1.8-py3-none-any.whl", hash = "sha256:552d1f10030008e9159ad4da5f548d35a970f3fd3b4eedbd1a1fa5362abee005"},
-    {file = "evergreen_lint-0.1.8.tar.gz", hash = "sha256:4740c034f491987c2a8b033922a75b4f211a0ef8825a0ca8dad9438a6ba52b0c"},
+    {file = "evergreen_lint-0.1.9-py3-none-any.whl", hash = "sha256:e71dcee3ee68a580b13c51ca8a2fa7c45fc6f77059bfe31b0f6c388647ff3cbe"},
+    {file = "evergreen_lint-0.1.9.tar.gz", hash = "sha256:936d12d4dca5fc310bce9b0709666076fa695043d82d0c35f8537078f090f363"},
 ]
 
 [package.dependencies]
@@ -4382,4 +4382,4 @@ libdeps = ["cxxfilt", "eventlet", "flask", "flask-cors", "gevent", "lxml", "prog
 [metadata]
 lock-version = "2.0"
 python-versions = ">=3.10,<4.0"
-content-hash = "20c7046759473333df4411daf32a390cabdba42d01707b0f36610be646fdb1ce"
+content-hash = "e220a14c6f8ee1cbde79864922637ae9aef0cfb5b93e9c18e41b8609679d4fb1"

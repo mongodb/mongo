@@ -142,3 +142,23 @@ rules:
       - tag_name: "suggested"
         variant_config:
           display_name_regex: "^\\*.+$"
+
+  # Forbid tasks with specific tags from being used in buildvariants with certain tags
+  # Allows for specific tasks to be included even if violate the linters
+  - rule: "forbid-tasks-with-tag-on-variants"
+    tags:
+      - variant_tag_name: "forbid_tasks_tagged_with_experimental"
+        forbidden_task_tag: "experimental"
+        ignored_tasks: [
+            # TODO: remove this exception when SERVER-94576 is resolved
+            "search_end_to_end_sharded_cluster",
+            "search_end_to_end_single_node",
+            # TODO: remove this exception when SERVER-94572 is resolved
+            "streams_kafka",
+            "streams_kafka_gwproxy",
+            # TODO: remove these exceptions when SERVER-94573 is resolved
+            "selinux_rhel9_enterprise",
+            "selinux_rhel8_org",
+            "selinux_rhel9_org",
+            "selinux_rhel8_enterprise",
+          ]

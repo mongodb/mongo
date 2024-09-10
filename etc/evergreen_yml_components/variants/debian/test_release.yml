@@ -7,7 +7,7 @@
 buildvariants:
   - name: debian12
     display_name: Debian 12
-    tags: ["bazel_check"]
+    tags: ["bazel_check", "forbid_tasks_tagged_with_experimental"]
     cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
     run_on:
       - debian12-small
@@ -53,7 +53,7 @@ buildvariants:
 
   - name: enterprise-debian12-64
     display_name: Enterprise Debian 12
-    tags: []
+    tags: ["forbid_tasks_tagged_with_experimental"]
     cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
     run_on:
       - debian12-small
