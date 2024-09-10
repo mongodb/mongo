@@ -283,7 +283,6 @@ buildvariants:
     expansions:
       exe: ".exe"
       content_type: application/zip
-      # TODO(SERVER-94331): add --use-diagnostic-latches=on when deadlock on shutdown is fixed.
       compile_flags: >-
         --dbg=on
         --opt=on
@@ -298,8 +297,6 @@ buildvariants:
       multiversion_platform: windows
       multiversion_edition: enterprise
       large_distro_name: windows-2022-large
-      # TODO(SERVER-94331): remove --excludeWithAnyTags=requires_latch_analyzer when deadlock
-      # on shutdown is fixed.
       test_flags: >-
         --excludeWithAnyTags=incompatible_with_windows_tls,requires_latch_analyzer
         --enableEnterpriseTests=off
@@ -344,14 +341,13 @@ buildvariants:
         MONGO_DISTMOD=windows
         -j$(bc <<< "$(grep -c '^processor' /proc/cpuinfo) / 1.5")
         --win-version-min=win10
-        --use-diagnostic-latches=on
       num_scons_link_jobs_available: 0.25
       python: "/cygdrive/c/python/python310/python.exe"
       ext: zip
       resmoke_jobs_max: 1
       scons_cache_scope: shared
       test_flags: >-
-        --excludeWithAnyTags=incompatible_with_windows_tls
+        --excludeWithAnyTags=incompatible_with_windows_tls,requires_latch_analyzer
         --mongodSetParameters="{internalQueryEnableAggressiveSpillsInGroup: true}"
     tasks:
       # This variant tests that unoptimized, DEBUG mongos and mongod binaries can run on Windows.
