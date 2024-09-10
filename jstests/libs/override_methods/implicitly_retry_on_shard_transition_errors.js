@@ -118,6 +118,8 @@ function runCommandWithRetries(conn, dbName, cmdName, cmdObj, func, makeFuncArgs
                     res.n += res.writeErrors.length;
                     delete res.writeErrors;
                 }
+                jsTest.log("No longer retrying " + cmdName +
+                           " due to non-retryable error: " + tojson(res));
             }
 
             return kNoRetry;
