@@ -344,6 +344,11 @@ std::tuple<ShardId, int64_t> BalancerPolicy::_getMostOverloadedShard(
         if (!availableShards.count(stat.shardId))
             continue;
 
+        if (stat.isDraining) {
+            // Skip draining shards since we've already analyzed their chunks on a previous step.
+            continue;
+        }
+
         const auto& shardSizeIt = collDataSizeInfo.shardToDataSizeMap.find(stat.shardId);
         if (shardSizeIt == collDataSizeInfo.shardToDataSizeMap.end()) {
             // Skip if stats not available (may happen if add|remove shard during a round)
@@ -469,7 +474,8 @@ MigrateInfosWithReason BalancerPolicy::balance(
             for (const auto& shardZone : shardZones) {
                 const auto& zoneName = shardZone.first;
 
-                const auto chunkFoundForShard = !distribution.forEachChunkOnShardInZone(
+                bool chunkFoundForShard = false;
+                distribution.forEachChunkOnShardInZone(
                     stat.shardId, zoneName, [&](const auto& chunk) {
                         if (chunk.isJumbo()) {
                             numJumboChunks++;
@@ -489,7 +495,10 @@ MigrateInfosWithReason BalancerPolicy::balance(
                                                     distribution.getChunkManager().getUUID(), chunk)
                                                     .toString()));
                             }
-                            return true;  // continue
+
+                            // Stop iterating chunks if there is no valid recipient shard for the
+                            // given zone
+                            return false;
                         }
                         tassert(
                             8245225, "Destination shard is a draining shard", to != stat.shardId);
@@ -509,6 +518,8 @@ MigrateInfosWithReason BalancerPolicy::balance(
                         if (firstReason == MigrationReason::none) {
                             firstReason = MigrationReason::drain;
                         }
+
+                        chunkFoundForShard = true;
 
                         tassert(8245226,
                                 "Migration's source shard does not exist in available shards",
@@ -568,6 +579,12 @@ MigrateInfosWithReason BalancerPolicy::balance(
             if (!availableShards->count(stat.shardId))
                 continue;
 
+            if (stat.isDraining) {
+                // Skip draining shards since we've already analyzed their chunks on a previous
+                // step.
+                continue;
+            }
+
             const auto& shardZones = distribution.getZoneInfoForShard(stat.shardId);
             for (const auto& shardZone : shardZones) {
                 const auto& zoneName = shardZone.first;
@@ -578,7 +595,8 @@ MigrateInfosWithReason BalancerPolicy::balance(
                 if (stat.shardZones.count(zoneName))
                     continue;
 
-                const auto chunkFoundForShard = !distribution.forEachChunkOnShardInZone(
+                bool chunkFoundForShard = false;
+                distribution.forEachChunkOnShardInZone(
                     stat.shardId, zoneName, [&](const auto& chunk) {
                         if (chunk.isJumbo()) {
                             LOGV2_WARNING(
@@ -605,7 +623,10 @@ MigrateInfosWithReason BalancerPolicy::balance(
                                                    .toString()),
                                     "zone"_attr = redact(zoneName));
                             }
-                            return true;  // continue
+
+                            // Stop iterating chunks if there is no valid recipient shard for
+                            // the given zone
+                            return false;
                         }
                         tassert(8245228, "Destination is the starting shard", to != stat.shardId);
 
@@ -623,6 +644,8 @@ MigrateInfosWithReason BalancerPolicy::balance(
                         if (firstReason == MigrationReason::none) {
                             firstReason = MigrationReason::zoneViolation;
                         }
+
+                        chunkFoundForShard = true;
 
                         tassert(8245229,
                                 "Migration's from shard does not exist in available shards",
@@ -729,7 +752,8 @@ bool BalancerPolicy::_singleZoneBalanceBasedOnDataSize(
         _getLeastLoadedReceiverShard(shardStats, collDataSizeInfo, zone, *availableShards);
     if (!to.isValid()) {
         if (migrations->empty()) {
-            LOGV2(6581600, "No available shards to take chunks for zone", "zone"_attr = zone);
+            LOGV2_WARNING(
+                6581600, "No available shards to take chunks for zone", "zone"_attr = zone);
         }
         return false;
     }

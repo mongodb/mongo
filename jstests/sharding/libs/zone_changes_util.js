@@ -11,10 +11,13 @@ import {findChunksUtil} from "jstests/sharding/libs/find_chunks_util.js";
 export function assertChunksOnShards(configDB, ns, shardChunkBounds) {
     for (let [shardName, chunkBounds] of Object.entries(shardChunkBounds)) {
         for (let bounds of chunkBounds) {
+            const chunkEntry =
+                findChunksUtil.findOneChunkByNs(configDB, ns, {min: bounds[0], max: bounds[1]});
+            assert(chunkEntry,
+                   "expected to find chunk " + tojson(bounds) + " on shard \"" + shardName + "\"");
             assert.eq(
                 shardName,
-                findChunksUtil.findOneChunkByNs(configDB, ns, {min: bounds[0], max: bounds[1]})
-                    .shard,
+                chunkEntry.shard,
                 "expected to find chunk " + tojson(bounds) + " on shard \"" + shardName + "\"");
         }
     }
@@ -52,9 +55,15 @@ export function assertDocsOnShards(st, ns, shardChunkBounds, docs, shardKey) {
  */
 export function assertShardTags(configDB, shardTags) {
     for (let [shardName, tags] of Object.entries(shardTags)) {
-        assert.eq(tags.sort(),
-                  configDB.shards.findOne({_id: shardName}).tags.sort(),
-                  "expected shard \"" + shardName + "\" to have tags " + tojson(tags.sort()));
+        if (tags.length !== 0) {
+            assert.eq(tags.sort(),
+                      configDB.shards.findOne({_id: shardName}).tags.sort(),
+                      "expected shard \"" + shardName + "\" to have tags " + tojson(tags.sort()));
+        } else {
+            const shardEntry = configDB.shards.findOne({_id: shardName});
+            assert(shardEntry.tags === undefined || shardEntry.tags.length === 0,
+                   "expected shard \"" + shardName + "\" to have no tags.");
+        }
     }
 }
 

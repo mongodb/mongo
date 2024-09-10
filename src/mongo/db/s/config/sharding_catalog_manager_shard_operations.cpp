@@ -174,6 +174,7 @@ namespace {
 
 MONGO_FAIL_POINT_DEFINE(hangAddShardBeforeUpdatingClusterCardinalityParameter);
 MONGO_FAIL_POINT_DEFINE(hangAfterDroppingDatabaseInTransitionToDedicatedConfigServer);
+MONGO_FAIL_POINT_DEFINE(hangRemoveShardAfterSettingDrainingFlag);
 MONGO_FAIL_POINT_DEFINE(hangRemoveShardAfterDrainingDDL);
 MONGO_FAIL_POINT_DEFINE(hangRemoveShardBeforeUpdatingClusterCardinalityParameter);
 MONGO_FAIL_POINT_DEFINE(skipUpdatingClusterCardinalityParameterAfterAddShard);
@@ -1451,6 +1452,8 @@ RemoveShardProgress ShardingCatalogManager::removeShard(OperationContext* opCtx,
 
     shardMembershipLock.unlock();
     clusterCardinalityParameterLock.unlock();
+
+    hangRemoveShardAfterSettingDrainingFlag.pauseWhileSet(opCtx);
 
     // Draining has already started, now figure out how many chunks and databases are still on the
     // shard.

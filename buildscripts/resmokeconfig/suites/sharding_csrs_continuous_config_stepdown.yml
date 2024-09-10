@@ -61,6 +61,7 @@ selector:
     - jstests/sharding/query/count/count_config_servers.js
     - jstests/sharding/split_large_key.js
     - jstests/sharding/balancer_window.js
+    - jstests/sharding/balancing_zones_with_draining_shard.js
     - jstests/sharding/zone_changes_compound.js
     - jstests/sharding/zone_changes_hashed.js
     - jstests/sharding/zone_changes_range.js
