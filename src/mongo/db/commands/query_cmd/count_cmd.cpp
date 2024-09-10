@@ -359,7 +359,6 @@ public:
         curOp->beginQueryPlanningTimer();
 
         if (shouldDoFLERewrite(request)) {
-            LOGV2_DEBUG(7964102, 2, "Processing Queryable Encryption command", "cmd"_attr = cmdObj);
             if (!request.getEncryptionInformation()->getCrudProcessed().value_or(false)) {
                 processFLECountD(opCtx, nss, &request);
             }

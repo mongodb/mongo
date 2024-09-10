@@ -1043,10 +1043,6 @@ public:
             // Rewrite any FLE find payloads that exist in the query if this is a FLE 2 query.
             if (shouldDoFLERewrite(_cmdRequest)) {
                 invariant(_cmdRequest->getNamespaceOrUUID().isNamespaceString());
-                LOGV2_DEBUG(7964101,
-                            2,
-                            "Processing Queryable Encryption command",
-                            "cmd"_attr = _request.body);
 
                 if (!_cmdRequest->getEncryptionInformation()->getCrudProcessed().value_or(false)) {
                     processFLEFindD(
