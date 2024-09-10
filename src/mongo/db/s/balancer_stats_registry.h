@@ -117,7 +117,7 @@ private:
     /**
      * Terminate the asynchronous initialization of this registry.
      */
-    void _terminate();
+    void _terminate(stdx::unique_lock<Mutex>& lock);
 
     struct CollectionStats {
         // Number of orphan documents for this collection

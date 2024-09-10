@@ -108,7 +108,7 @@ void BalancerStatsRegistry::onStepUpComplete(OperationContext* opCtx, long long 
     // Different threads can trigger ReplicationCoordinator events concurrently.
     stdx::lock_guard lk{_mutex};
 
-    if (!_threadPool) {
+    if (!_threadPool || _state.load() == State::kTerminating) {
         // The registry service has already been shut down.
         return;
     }
@@ -174,7 +174,7 @@ void BalancerStatsRegistry::_initializeAsync(OperationContext* opCtx) {
         .getAsync([](auto) {});
 }
 
-void BalancerStatsRegistry::_terminate() {
+void BalancerStatsRegistry::_terminate(stdx::unique_lock<Mutex>& lock) {
     {
         stdx::lock_guard lk{_stateMutex};
         _state.store(State::kTerminating);
@@ -184,13 +184,13 @@ void BalancerStatsRegistry::_terminate() {
         }
     }
 
-    // Wait for the asynchronous initialization to complete
+    // Wait for the asynchronous initialization to complete. Drop the lock to avoid deadlocks.
+    lock.unlock();
     _threadPool->waitForIdle();
+    lock.lock();
 
-    {
-        // Clear the stats
-        _collStatsMap.clear();
-    }
+    // Clear the stats
+    _collStatsMap.clear();
 
     dassert(_state.load() == State::kTerminating);
     _state.store(State::kPrimaryIdle);
@@ -199,29 +199,29 @@ void BalancerStatsRegistry::_terminate() {
 
 void BalancerStatsRegistry::onStepDown() {
     // Different threads can trigger ReplicationCoordinator events concurrently.
-    stdx::lock_guard lk{_mutex};
+    stdx::unique_lock lk{_mutex};
 
-    if (!_threadPool) {
+    if (!_threadPool || _state.load() == State::kTerminating) {
         // The registry service has already been shut down.
         return;
     }
 
-    _terminate();
+    _terminate(lk);
     _state.store(State::kSecondary);
 }
 
 void BalancerStatsRegistry::onShutdown() {
     // Different threads can trigger ReplicationCoordinator events concurrently.
-    stdx::lock_guard lk{_mutex};
+    stdx::unique_lock lk{_mutex};
 
-    if (!_threadPool) {
+    if (!_threadPool || _state.load() == State::kTerminating) {
         // The registry service was never started (the startup event was not notified so the thread
         // pool was not initialized) or has already been shut down (the shutdown event can be
         // notified more than once).
         return;
     }
 
-    _terminate();
+    _terminate(lk);
     _threadPool->shutdown();
     _threadPool->join();
     _threadPool.reset();
