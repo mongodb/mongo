@@ -1,7 +1,7 @@
 /**
  * This test confirms that query stats for distinct are collected on views.
  *
- * @tags: [featureFlagQueryStatsCountDistinct]
+ * @tags: [requires_fcv_81]
  */
 import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 import {

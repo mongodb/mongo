@@ -1,7 +1,7 @@
 /**
  * Test that $queryStats properly tokenizes (i.e. anonymizes) count commands on mongod.
  *
- * @tags: [featureFlagQueryStatsCountDistinct]
+ * @tags: [requires_fcv_81]
  */
 
 import {getQueryStatsCountCmd, withQueryStatsEnabled} from "jstests/libs/query_stats_utils.js";

@@ -1,7 +1,7 @@
 /**
  * This tests confirms that query stats are not collected for explain for count.
  *
- * @tags: [featureFlagQueryStatsCountDistinct]
+ * @tags: [requires_fcv_81]
  */
 
 import {getQueryStats, withQueryStatsEnabled} from "jstests/libs/query_stats_utils.js";

@@ -2,7 +2,7 @@
  * This test confirms that query stats store metrics fields for a count command are correct
  * when inserting new query stats store entries.
  *
- * @tags: [featureFlagQueryStatsCountDistinct]
+ * @tags: [requires_fcv_81]
  */
 
 import {

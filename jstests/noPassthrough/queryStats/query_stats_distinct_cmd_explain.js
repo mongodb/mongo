@@ -1,7 +1,7 @@
 /**
  * This test confirms that query stats is not collected for explains on distinct.
  *
- * @tags: [featureFlagQueryStatsCountDistinct]
+ * @tags: [requires_fcv_81]
  */
 import {getQueryStatsDistinctCmd, withQueryStatsEnabled} from "jstests/libs/query_stats_utils.js";
 

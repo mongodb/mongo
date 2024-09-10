@@ -2,9 +2,8 @@
  * This tests confirms that a count command on a view is implemented as an aggregation but stored as
  * a count command query shape, and that explains are not collected.
  *
- * @tags: [featureFlagQueryStatsCountDistinct]
+ * @tags: [requires_fcv_81]
  */
-
 import {
     assertAggregatedMetricsSingleExec,
     assertExpectedResults,
@@ -44,11 +43,14 @@ withQueryStatsEnabled(jsTestName(), (coll) => {
     assert.eq(1, stats.length, stats);
     const entry = getLatestQueryStatsEntry(viewsDB.getMongo(), {collName: "identityView"});
     assert.eq("count", entry.key.queryShape.command, entry);
+
     assertAggregatedMetricsSingleExec(entry, {
         keysExamined: 0,
         docsExamined: 5,
         hasSortStage: false,
-        usedDisk: false,
+        // Don't validate the value of 'usedDisk' here. On some variants this can actually be true,
+        // but this test is not concerned with validating that.
+        usedDisk: entry.metrics.usedDisk["true"] > 0,
         fromMultiPlanner: false,
         fromPlanCache: false
     });

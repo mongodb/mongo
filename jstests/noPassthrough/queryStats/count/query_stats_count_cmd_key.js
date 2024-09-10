@@ -2,7 +2,7 @@
  * This test confirms that query stats store key fields for a count command are properly nested and
  * none are missing.
  *
- * @tags: [featureFlagQueryStatsCountDistinct]
+ * @tags: [requires_fcv_81]
  */
 
 import {

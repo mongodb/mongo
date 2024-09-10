@@ -3,7 +3,7 @@
  * where adding the metrics will cause the total result to exceed the
  * 16MB size limit imposed on BSONObjs.
  *
- * @tags: [featureFlagQueryStatsCountDistinct]
+ * @tags: [requires_fcv_81]
  */
 import {getQueryStatsDistinctCmd, resetQueryStatsStore} from "jstests/libs/query_stats_utils.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";

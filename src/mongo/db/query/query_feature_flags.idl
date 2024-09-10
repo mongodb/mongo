@@ -180,5 +180,6 @@ feature_flags:
     featureFlagQueryStatsCountDistinct:
       description: "Feature flag to enable query stats for the count and distinct commands."
       cpp_varname: gFeatureFlagQueryStatsCountDistinct
-      default: false
+      default: true
+      version: 8.1
       shouldBeFCVGated: true

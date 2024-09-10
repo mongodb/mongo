@@ -1,7 +1,7 @@
 /**
  * Test that query stats are collected for distinct queries on non-existent
  * databases.
- * @tags: [featureFlagQueryStatsCountDistinct]
+ * @tags: [requires_fcv_81]
  */
 
 import {getLatestQueryStatsEntry, withQueryStatsEnabled} from "jstests/libs/query_stats_utils.js";

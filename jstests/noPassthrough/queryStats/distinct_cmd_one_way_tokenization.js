@@ -1,7 +1,7 @@
 /**
  * Test that $queryStats properly tokenizes distinct commands on mongod and mongos.
  *
- * @tags: [featureFlagQueryStatsCountDistinct]
+ * @tags: [requires_fcv_81]
  */
 import {getQueryStatsDistinctCmd, withQueryStatsEnabled} from "jstests/libs/query_stats_utils.js";
 
