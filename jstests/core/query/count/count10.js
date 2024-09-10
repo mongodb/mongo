@@ -13,6 +13,8 @@
 //   requires_scripting,
 //   uses_multiple_connections,
 //   uses_parallel_shell,
+//   # The balancer can interrupt the count operation, entering in a race with the parallel shell.
+//   assumes_balancer_off,
 // ]
 
 var coll = db.count10;
@@ -54,16 +56,12 @@ var s = startParallelShell(function() {
         // Found the count op. Try to kill it.
         assert.commandWorked(db.killOp(countOp.opid));
         return true;
-    }, "Could not find count op after retrying, gave up", undefined, 50);
+    }, "Could not find count op after retrying, gave up");
 });
 
-let res;
-assert.soon(function() {
-    res = assert.throws(function() {
-        coll.find("sleep(200)").count();
-    }, [], "Count op completed without being killed");
-    return res.code == ErrorCodes.Interrupted;
-}, "Operation was never interrupted by parallel shell.");
+var res = assert.throws(function() {
+    coll.find("sleep(1000)").count();
+}, [], "Count op completed without being killed");
 
 jsTest.log("Killed count output start");
 printjson(res);
