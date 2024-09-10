@@ -1545,6 +1545,7 @@ inline std::pair<TypeTags, Value> makeSmallString(StringData input) {
 
     Value smallString{0};
     auto buf = getRawStringView(TypeTags::StringSmall, smallString);
+    tassert(9462500, "'input.rawData()' can't be a nullptr", input.rawData());
     memcpy(buf, input.rawData(), input.size());
     return {TypeTags::StringSmall, smallString};
 }

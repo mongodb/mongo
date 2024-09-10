@@ -58,6 +58,8 @@ assertArgsException(16020, ['$x']);
 assertArgsException(16020, ['$x', 1, 2, 3]);
 
 // Tests that $substrCP performs as expected.
+assertSubstring("", "$x", 999, 0);
+assertSubstring("", "$x", 999, 1);
 assertSubstring("Å", "$v", "$a", "$b");
 assertSubstring("a", "$x", "$a", "$b");
 assertSubstring("◢◢", "$w", "$b", "$c");

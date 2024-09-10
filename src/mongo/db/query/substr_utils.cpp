@@ -40,7 +40,7 @@ StringData getSubstringCP(StringData input, int startingPos, int len) {
     std::size_t startIndexBytes = 0;
     for (int i = 0; i < startingPos; ++i) {
         if (startIndexBytes >= input.size()) {
-            return StringData();
+            return ""_sd;
         }
         uassert(34456,
                 "$substrCP: invalid UTF-8 string",
