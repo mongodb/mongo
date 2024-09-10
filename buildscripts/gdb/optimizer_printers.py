@@ -356,7 +356,7 @@ class RootNodePrinter(FixedArityNodePrinter):
         super().__init__(val, 1, "RootNode")
 
     def to_string(self):
-        projections = Vector(self.val["_property"]["_projections"]["_vector"])
+        projections = Vector(self.val["_projections"]["_vector"])
         return "\nRoot[{}]".format(projections.get(0))
 
 
@@ -916,7 +916,7 @@ class CollationNodePrinter(FixedArityNodePrinter):
         super().__init__(val, 1, "Collation")
 
     def to_string(self):
-        return "Collation[" + print_collation_req(self.val["_property"]) + "]"
+        return "Collation[" + print_collation_req(self.val["_collationSpec"]) + "]"
 
 
 class LimitSkipNodePrinter(FixedArityNodePrinter):
@@ -929,9 +929,9 @@ class LimitSkipNodePrinter(FixedArityNodePrinter):
     def to_string(self):
         return (
             "LimitSkip[limit: "
-            + str(self.val["_property"]["_limit"])
+            + str(self.val["_limit"])
             + ", skip: "
-            + str(self.val["_property"]["_skip"])
+            + str(self.val["_skip"])
             + "]"
         )
 

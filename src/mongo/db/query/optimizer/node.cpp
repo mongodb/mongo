@@ -135,17 +135,11 @@ ScanOrder PhysicalScanNode::getScanOrder() const {
     return _scanOrder;
 }
 
-ValueScanNode::ValueScanNode(ProjectionNameVector projections,
-                             boost::optional<properties::LogicalProps> props)
-    : ValueScanNode(
-          std::move(projections), std::move(props), Constant::emptyArray(), false /*hasRID*/) {}
+ValueScanNode::ValueScanNode(ProjectionNameVector projections)
+    : ValueScanNode(std::move(projections), Constant::emptyArray(), false /*hasRID*/) {}
 
-ValueScanNode::ValueScanNode(ProjectionNameVector projections,
-                             boost::optional<properties::LogicalProps> props,
-                             ABT valueArray,
-                             const bool hasRID)
+ValueScanNode::ValueScanNode(ProjectionNameVector projections, ABT valueArray, const bool hasRID)
     : Base(buildSimpleBinder(std::move(projections))),
-      _props(std::move(props)),
       _valueArray(std::move(valueArray)),
       _hasRID(hasRID) {
     const auto constPtr = _valueArray.cast<Constant>();
@@ -179,12 +173,8 @@ ValueScanNode::ValueScanNode(ProjectionNameVector projections,
 }
 
 bool ValueScanNode::operator==(const ValueScanNode& other) const {
-    return binder() == other.binder() && _props == other._props && _arraySize == other._arraySize &&
+    return binder() == other.binder() && _arraySize == other._arraySize &&
         _valueArray == other._valueArray && _hasRID == other._hasRID;
-}
-
-const boost::optional<properties::LogicalProps>& ValueScanNode::getProps() const {
-    return _props;
 }
 
 const ABT& ValueScanNode::getValueArray() const {
@@ -640,45 +630,43 @@ const ABT& NestedLoopJoinNode::getFilter() const {
     return get<2>();
 }
 
-// Helper function to get the projection names from a CollationRequirement as a vector instead of a
-// set, since we would like to keep the order.
+// Helper function to get the projection names from a ProjectionCollationSpec as a vector instead of
+// a set, since we would like to keep the order.
 static ProjectionNameVector getAffectedProjectionNamesOrdered(
-    const properties::CollationRequirement& collReq) {
+    const ProjectionCollationSpec& collSpec) {
     ProjectionNameVector result;
-    for (const auto& entry : collReq.getCollationSpec()) {
+    for (const auto& entry : collSpec) {
         result.push_back(entry.first);
     }
     return result;
 }
 
-SortedMergeNode::SortedMergeNode(properties::CollationRequirement collReq, ABTVector children)
-    : SortedMergeNode(std::move(collReq), NodeChildrenHolder{std::move(children)}) {}
+SortedMergeNode::SortedMergeNode(ProjectionCollationSpec collSpec, ABTVector children)
+    : SortedMergeNode(std::move(collSpec), NodeChildrenHolder{std::move(children)}) {}
 
-SortedMergeNode::SortedMergeNode(properties::CollationRequirement collReq,
-                                 NodeChildrenHolder children)
+SortedMergeNode::SortedMergeNode(ProjectionCollationSpec collSpec, NodeChildrenHolder children)
     : Base(std::move(children._nodes),
-           buildSimpleBinder(getAffectedProjectionNamesOrdered(collReq)),
-           buildUnionTypeReferences(getAffectedProjectionNamesOrdered(collReq),
+           buildSimpleBinder(getAffectedProjectionNamesOrdered(collSpec)),
+           buildUnionTypeReferences(getAffectedProjectionNamesOrdered(collSpec),
                                     children._numOfNodes)),
-      _collationReq(collReq) {
+      _spec(collSpec) {
     for (auto& n : nodes()) {
         assertNodeSort(n);
     }
-    for (const auto& collReq : _collationReq.getCollationSpec()) {
+    for (const auto& collSpec : _spec) {
         tassert(7063703,
                 "SortedMerge collation requirement must be ascending or descending",
-                collReq.second == CollationOp::Ascending ||
-                    collReq.second == CollationOp::Descending);
+                collSpec.second == CollationOp::Ascending ||
+                    collSpec.second == CollationOp::Descending);
     }
 }
 
-const properties::CollationRequirement& SortedMergeNode::getCollationReq() const {
-    return _collationReq;
+const ProjectionCollationSpec& SortedMergeNode::getCollationSpec() const {
+    return _spec;
 }
 
 bool SortedMergeNode::operator==(const SortedMergeNode& other) const {
-    return _collationReq == other._collationReq && binder() == other.binder() &&
-        nodes() == other.nodes();
+    return _spec == other._spec && binder() == other.binder() && nodes() == other.nodes();
 }
 
 UnionNode::UnionNode(ProjectionNameVector unionProjectionNames, ABTVector children)
@@ -866,23 +854,33 @@ int64_t SpoolConsumerNode::getSpoolId() const {
     return _spoolId;
 }
 
-CollationNode::CollationNode(properties::CollationRequirement property, ABT child)
-    : Base(std::move(child),
-           buildReferences(extractReferencedColumns(properties::makePhysProps(property)))),
-      _property(std::move(property)) {
+/**
+ * Helper to extract a set of projection names from a collation spec.
+ */
+static ProjectionNameSet getAffectedProjectionNames(const ProjectionCollationSpec& spec) {
+    ProjectionNameSet result;
+    for (const auto& entry : spec) {
+        result.insert(entry.first);
+    }
+    return result;
+}
+
+CollationNode::CollationNode(ProjectionCollationSpec spec, ABT child)
+    : Base(std::move(child), buildReferences(mongo::optimizer::getAffectedProjectionNames(spec))),
+      _collationSpec(std::move(spec)) {
     assertNodeSort(getChild());
 }
 
-const properties::CollationRequirement& CollationNode::getProperty() const {
-    return _property;
+const ProjectionCollationSpec& CollationNode::getCollationSpec() const {
+    return _collationSpec;
 }
 
-properties::CollationRequirement& CollationNode::getProperty() {
-    return _property;
+ProjectionNameSet CollationNode::getAffectedProjectionNames() const {
+    return mongo::optimizer::getAffectedProjectionNames(_collationSpec);
 }
 
 bool CollationNode::operator==(const CollationNode& other) const {
-    return _property == other._property && getChild() == other.getChild();
+    return _collationSpec == other._collationSpec && getChild() == other.getChild();
 }
 
 const ABT& CollationNode::getChild() const {
@@ -918,7 +916,58 @@ int64_t LimitSkipNode::getSkip() const {
     return _skip;
 }
 
-ExchangeNode::ExchangeNode(properties::DistributionRequirement distribution, ABT child)
+DistributionAndProjections::DistributionAndProjections(DistributionType type)
+    : DistributionAndProjections(type, {}) {}
+
+DistributionAndProjections::DistributionAndProjections(DistributionType type,
+                                                       ProjectionNameVector projectionNames)
+    : _type(type), _projectionNames(std::move(projectionNames)) {
+    uassert(6624096,
+            "Must have projection names when distributed under hash or range partitioning",
+            (_type != DistributionType::HashPartitioning &&
+             _type != DistributionType::RangePartitioning) ||
+                !_projectionNames.empty());
+}
+
+bool DistributionAndProjections::operator==(const DistributionAndProjections& other) const {
+    return _type == other._type && _projectionNames == other._projectionNames;
+}
+
+DistributionRequirement::DistributionRequirement(
+    DistributionAndProjections distributionAndProjections)
+    : _distributionAndProjections(std::move(distributionAndProjections)),
+      _disableExchanges(false) {}
+
+bool DistributionRequirement::operator==(const DistributionRequirement& other) const {
+    return _distributionAndProjections == other._distributionAndProjections &&
+        _disableExchanges == other._disableExchanges;
+}
+
+const DistributionAndProjections& DistributionRequirement::getDistributionAndProjections() const {
+    return _distributionAndProjections;
+}
+
+DistributionAndProjections& DistributionRequirement::getDistributionAndProjections() {
+    return _distributionAndProjections;
+}
+
+ProjectionNameSet DistributionRequirement::getAffectedProjectionNames() const {
+    ProjectionNameSet result;
+    for (const ProjectionName& projectionName : _distributionAndProjections._projectionNames) {
+        result.insert(projectionName);
+    }
+    return result;
+}
+
+bool DistributionRequirement::getDisableExchanges() const {
+    return _disableExchanges;
+}
+
+void DistributionRequirement::setDisableExchanges(const bool disableExchanges) {
+    _disableExchanges = disableExchanges;
+}
+
+ExchangeNode::ExchangeNode(DistributionRequirement distribution, ABT child)
     : Base(std::move(child), buildReferences(distribution.getAffectedProjectionNames())),
       _distribution(std::move(distribution)) {
     assertNodeSort(getChild());
@@ -940,26 +989,26 @@ ABT& ExchangeNode::getChild() {
     return get<0>();
 }
 
-const properties::DistributionRequirement& ExchangeNode::getProperty() const {
+const DistributionRequirement& ExchangeNode::getProperty() const {
     return _distribution;
 }
 
-properties::DistributionRequirement& ExchangeNode::getProperty() {
+DistributionRequirement& ExchangeNode::getProperty() {
     return _distribution;
 }
 
-RootNode::RootNode(properties::ProjectionRequirement property, ABT child)
-    : Base(std::move(child), buildReferences(property.getAffectedProjectionNames())),
-      _property(std::move(property)) {
+RootNode::RootNode(ProjectionNameOrderPreservingSet projections, ABT child)
+    : Base(std::move(child), buildReferences(projections.getAffectedProjectionNames())),
+      _projections(std::move(projections)) {
     assertNodeSort(getChild());
 }
 
 bool RootNode::operator==(const RootNode& other) const {
-    return getChild() == other.getChild() && _property == other._property;
+    return getChild() == other.getChild() && _projections == other._projections;
 }
 
-const properties::ProjectionRequirement& RootNode::getProperty() const {
-    return _property;
+const ProjectionNameOrderPreservingSet& RootNode::getProjections() const {
+    return _projections;
 }
 
 const ABT& RootNode::getChild() const {

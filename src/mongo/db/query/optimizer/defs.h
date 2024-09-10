@@ -105,6 +105,14 @@ public:
 
     const ProjectionNameVector& getVector() const;
 
+    ProjectionNameSet getAffectedProjectionNames() const {
+        ProjectionNameSet result;
+        for (const ProjectionName& projection : _vector) {
+            result.insert(projection);
+        }
+        return result;
+    }
+
 private:
     ProjectionNameMap<size_t> _map;
     ProjectionNameVector _vector;

@@ -52,7 +52,6 @@
 #pragma GCC optimize("O0")
 
 using namespace mongo::optimizer;
-using namespace mongo::optimizer::properties;
 using namespace mongo::optimizer::unit_test_abt_literals;
 
 int clang_optnone main(int argc, char** argv) {

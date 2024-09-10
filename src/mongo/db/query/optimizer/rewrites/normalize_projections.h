@@ -106,8 +106,7 @@ private:
 
     ProjectionNameVector renameVector(const ProjectionNameVector& v) const;
 
-    properties::CollationRequirement renameCollReq(
-        const properties::CollationRequirement& req) const;
+    ProjectionCollationSpec renameCollSpec(ProjectionCollationSpec spec) const;
 
     // Handler called when a projection is renamed.
     const RenamedProjFn& _renamedProjFn;

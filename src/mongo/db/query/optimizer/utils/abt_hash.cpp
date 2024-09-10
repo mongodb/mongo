@@ -58,9 +58,9 @@
 
 namespace mongo::optimizer {
 
-static size_t computeCollationHash(const properties::CollationRequirement& prop) {
+static size_t computeCollationHash(const ProjectionCollationSpec& spec) {
     size_t collationHash = 17;
-    for (const auto& entry : prop.getCollationSpec()) {
+    for (const auto& entry : spec) {
         updateHash(collationHash, ProjectionName::Hasher()(entry.first));
         updateHash(collationHash, std::hash<CollationOp>()(entry.second));
     }
@@ -75,11 +75,12 @@ static size_t computePropertyProjectionsHash(const ProjectionNameVector& project
     return resultHash;
 }
 
-static size_t computeProjectionRequirementHash(const properties::ProjectionRequirement& prop) {
-    return computePropertyProjectionsHash(prop.getProjections().getVector());
+static size_t computeProjectionRequirementHash(
+    const ProjectionNameOrderPreservingSet& projections) {
+    return computePropertyProjectionsHash(projections.getVector());
 }
 
-static size_t computeDistributionHash(const properties::DistributionRequirement& prop) {
+static size_t computeDistributionHash(const DistributionRequirement& prop) {
     size_t resultHash = 17;
     const auto& distribAndProjections = prop.getDistributionAndProjections();
     updateHash(resultHash, std::hash<DistributionType>()(distribAndProjections._type));
@@ -261,7 +262,7 @@ public:
     }
 
     size_t transport(const CollationNode& node, size_t childResult, size_t /*refsResult*/) {
-        return computeHashSeq<13>(computeCollationHash(node.getProperty()), childResult);
+        return computeHashSeq<13>(computeCollationHash(node.getCollationSpec()), childResult);
     }
 
     size_t transport(const LimitSkipNode& node, size_t childResult) {
@@ -276,7 +277,7 @@ public:
     }
 
     size_t transport(const RootNode& node, size_t childResult, size_t /*refsResult*/) {
-        return computeHashSeq<15>(computeProjectionRequirementHash(node.getProperty()),
+        return computeHashSeq<15>(computeProjectionRequirementHash(node.getProjections()),
                                   childResult);
     }
 
@@ -431,56 +432,6 @@ size_t ABTHashGenerator::generate(const ABT& node) {
 size_t ABTHashGenerator::generate(const ABT::reference_type& nodeRef) {
     ABTHashTransporter gen;
     return gen.generate(nodeRef);
-}
-
-class PhysPropsHasher {
-public:
-    size_t operator()(const properties::PhysProperty&,
-                      const properties::CollationRequirement& prop) {
-        return computeHashSeq<1>(computeCollationHash(prop));
-    }
-
-    size_t operator()(const properties::PhysProperty&,
-                      const properties::ProjectionRequirement& prop) {
-        return computeHashSeq<3>(computeProjectionRequirementHash(prop));
-    }
-
-    size_t operator()(const properties::PhysProperty&,
-                      const properties::DistributionRequirement& prop) {
-        return computeHashSeq<4>(computeDistributionHash(prop));
-    }
-
-    size_t operator()(const properties::PhysProperty&,
-                      const properties::IndexingRequirement& prop) {
-        return computeHashSeq<5>(std::hash<IndexReqTarget>()(prop.getIndexReqTarget()),
-                                 std::hash<bool>()(prop.getDedupRID()));
-    }
-
-    size_t operator()(const properties::PhysProperty&, const properties::RepetitionEstimate& prop) {
-        return computeHashSeq<6>(std::hash<double>()(prop.getEstimate()));
-    }
-
-    size_t operator()(const properties::PhysProperty&, const properties::LimitEstimate& prop) {
-        return computeHashSeq<7>(CEType::Hasher()(prop.getEstimate()));
-    }
-
-    size_t operator()(const properties::PhysProperty&,
-                      const properties::RemoveOrphansRequirement& prop) {
-        return computeHashSeq<8>(std::hash<bool>()(prop.mustRemove()));
-    }
-
-    static size_t computeHash(const properties::PhysProps& props) {
-        PhysPropsHasher visitor;
-        size_t result = 17;
-        for (const auto& prop : props) {
-            updateHashUnordered(result, prop.second.visit(visitor));
-        }
-        return result;
-    }
-};
-
-size_t ABTHashGenerator::generateForPhysProps(const properties::PhysProps& props) {
-    return PhysPropsHasher::computeHash(props);
 }
 
 }  // namespace mongo::optimizer

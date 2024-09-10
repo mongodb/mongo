@@ -341,8 +341,7 @@ inline auto _collation(std::vector<std::string> spec, NodeHolder input) {
         }
     }
 
-    return NodeHolder{make<CollationNode>(properties::CollationRequirement{std::move(pcspec)},
-                                          std::move(input._n))};
+    return NodeHolder{make<CollationNode>(std::move(pcspec), std::move(input._n))};
 }
 
 inline auto _union(ProjectionNameVector pns, std::vector<NodeHolder> inputs) {
@@ -383,10 +382,10 @@ inline auto getParam(TypeTags typeTag) {
  */
 template <typename... Ts>
 inline auto _root(Ts&&... pack) {
-    ProjectionNameVector names;
-    (names.push_back(std::forward<Ts>(pack)), ...);
+    ProjectionNameOrderPreservingSet names;
+    (names.emplace_back(std::forward<Ts>(pack)), ...);
     return [n = std::move(names)](NodeHolder input) {
-        return make<RootNode>(properties::ProjectionRequirement{n}, std::move(input._n));
+        return make<RootNode>(std::move(n), std::move(input._n));
     };
 }
 
@@ -455,7 +454,7 @@ public:
 private:
     NodeHolder makeStub() {
         // Need to use a dummy nullary node here (Blackhole does not work: it is not a node).
-        return {make<ValueScanNode>(ProjectionNameVector{}, boost::none)};
+        return {make<ValueScanNode>(ProjectionNameVector{})};
     }
 
     template <class T, class Accessor = DefaultChildAccessor<T>>
@@ -745,7 +744,7 @@ public:
         os << ".collation({";
 
         bool first = true;
-        for (const auto& [projName, op] : node.getProperty().getCollationSpec()) {
+        for (const auto& [projName, op] : node.getCollationSpec()) {
             if (first) {
                 first = false;
             } else {
@@ -790,7 +789,7 @@ public:
     std::string transport(const RootNode& node, std::string childResult, std::string refsResult) {
         str::stream os;
         os << ".root(";
-        printProjNames(os, node.getProperty().getProjections().getVector());
+        printProjNames(os, node.getProjections().getVector());
         return os << ")" << _nodeSeparator << childResult;
     }
 

@@ -39,7 +39,6 @@
 #include "mongo/db/query/optimizer/index_bounds.h"
 #include "mongo/db/query/optimizer/node_defs.h"
 #include "mongo/db/query/optimizer/partial_schema_requirements.h"
-#include "mongo/db/query/optimizer/props.h"
 #include "mongo/db/query/optimizer/syntax/syntax.h"
 
 
@@ -175,7 +174,7 @@ public:
         bob->append(kStage, kRootName);
 
         BSONArrayBuilder projs(bob->subarrayStart(kProj));
-        for (const auto& projName : node.getProperty().getProjections().getVector()) {
+        for (const auto& projName : node.getProjections().getVector()) {
             projs.append(projName.value());
         }
         projs.doneFast();
@@ -329,11 +328,6 @@ public:
     static std::string explainBSONStr(ABT::reference_type node,
                                       bool displayProperties = false,
                                       const NodeToGroupPropsMap& nodeMap = {});
-
-    static std::string explainLogicalProps(const std::string& description,
-                                           const properties::LogicalProps& props);
-    static std::string explainPhysProps(const std::string& description,
-                                        const properties::PhysProps& props);
 
     static std::string explainPartialSchemaReqExpr(const PSRExpr::Node& reqs);
 

@@ -627,7 +627,7 @@ std::unique_ptr<sbe::PlanStage> SBENodeLowering::walk(const ABT& abtn,
 
     sbe::value::SlotVector orderBySlots;
     std::vector<sbe::value::SortDirection> directions;
-    for (const auto& entry : n.getProperty().getCollationSpec()) {
+    for (const auto& entry : n.getCollationSpec()) {
         auto it = slotMap.find(entry.first);
 
         tassert(6624219,
@@ -944,7 +944,7 @@ std::unique_ptr<sbe::PlanStage> SBENodeLowering::walk(const ABT& abtn,
                                                       const ABT& /*refs*/) {
     const auto& names = n.binder().names();
 
-    const ProjectionCollationSpec& collSpec = n.getCollationReq().getCollationSpec();
+    const ProjectionCollationSpec& collSpec = n.getCollationSpec();
 
     std::vector<sbe::value::SortDirection> keyDirs;
     for (const auto& collEntry : collSpec) {

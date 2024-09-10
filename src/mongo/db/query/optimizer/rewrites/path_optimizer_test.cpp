@@ -37,7 +37,6 @@
 #include "mongo/db/query/optimizer/comparison_op.h"
 #include "mongo/db/query/optimizer/defs.h"
 #include "mongo/db/query/optimizer/node.h"  // IWYU pragma: keep
-#include "mongo/db/query/optimizer/props.h"
 #include "mongo/db/query/optimizer/reference_tracker.h"
 #include "mongo/db/query/optimizer/rewrites/const_eval.h"
 #include "mongo/db/query/optimizer/rewrites/path.h"
@@ -151,8 +150,7 @@ TEST(Path, Fuse2) {
     auto get = make<EvalPath>(make<PathGet>("a", make<PathIdentity>()), make<Variable>("x"));
     auto project2 = make<EvaluationNode>("y", std::move(get), std::move(project1));
 
-    auto tree = make<RootNode>(properties::ProjectionRequirement{ProjectionNameVector{"y"}},
-                               std::move(project2));
+    auto tree = make<RootNode>(ProjectionNameVector{"y"}, std::move(project2));
 
     auto env = VariableEnvironment::build(tree);
     {
@@ -206,8 +204,7 @@ TEST(Path, Fuse3) {
                        make<Variable>("x"));
     auto project2 = make<EvaluationNode>("y", std::move(get), std::move(project1));
 
-    auto tree = make<RootNode>(properties::ProjectionRequirement{ProjectionNameVector{"y"}},
-                               std::move(project2));
+    auto tree = make<RootNode>(ProjectionNameVector{"y"}, std::move(project2));
     ASSERT_EXPLAIN_AUTO(
         "Root [{y}]\n"
         "  Evaluation [{y}]\n"
@@ -291,8 +288,7 @@ TEST(Path, Fuse4) {
                        make<Variable>("x"));
     auto project2 = make<EvaluationNode>("y", std::move(get), std::move(project1));
 
-    auto tree = make<RootNode>(properties::ProjectionRequirement{ProjectionNameVector{"x", "y"}},
-                               std::move(project2));
+    auto tree = make<RootNode>(ProjectionNameVector{"x", "y"}, std::move(project2));
 
     ASSERT_EXPLAIN_AUTO(
         "Root [{x, y}]\n"
@@ -401,8 +397,7 @@ TEST(Path, Fuse5) {
                          make<Variable>("x")),
         std::move(project));
 
-    auto tree = make<RootNode>(properties::ProjectionRequirement{ProjectionNameVector{"x"}},
-                               std::move(filter));
+    auto tree = make<RootNode>(ProjectionNameVector{"x"}, std::move(filter));
 
     ASSERT_EXPLAIN_AUTO(
         "Root [{x}]\n"
@@ -462,8 +457,7 @@ TEST(Path, Fuse6) {
                        make<Variable>("root")),
         std::move(scanNode));
 
-    auto tree = make<RootNode>(properties::ProjectionRequirement{ProjectionNameVector{"x"}},
-                               std::move(project));
+    auto tree = make<RootNode>(ProjectionNameVector{"x"}, std::move(project));
 
     ASSERT_EXPLAIN_AUTO(
         "Root [{x}]\n"
@@ -525,8 +519,7 @@ TEST(Path, Fuse7) {
             make<Variable>("root")),
         std::move(project1));
 
-    auto tree = make<RootNode>(properties::ProjectionRequirement{ProjectionNameVector{"py"}},
-                               std::move(project2));
+    auto tree = make<RootNode>(ProjectionNameVector{"py"}, std::move(project2));
 
     ASSERT_EXPLAIN_AUTO(
         "Root [{py}]\n"
@@ -685,8 +678,7 @@ TEST(Path, ProjElim1) {
     auto expr2 = make<Variable>("x");
     auto project2 = make<EvaluationNode>("y", std::move(expr2), std::move(project1));
 
-    auto tree = make<RootNode>(properties::ProjectionRequirement{ProjectionNameVector{"y"}},
-                               std::move(project2));
+    auto tree = make<RootNode>(ProjectionNameVector{"y"}, std::move(project2));
 
     auto env = VariableEnvironment::build(tree);
 
@@ -712,7 +704,7 @@ TEST(Path, ProjElim2) {
     auto expr2 = make<Variable>("x");
     auto project2 = make<EvaluationNode>("y", std::move(expr2), std::move(project1));
 
-    auto tree = make<RootNode>(properties::ProjectionRequirement{{}}, std::move(project2));
+    auto tree = make<RootNode>(ProjectionNameOrderPreservingSet{}, std::move(project2));
 
     auto env = VariableEnvironment::build(tree);
 
@@ -737,8 +729,7 @@ TEST(Path, ProjElim3) {
         var = newVar;
     }
 
-    auto tree = make<RootNode>(properties::ProjectionRequirement{ProjectionNameVector{var}},
-                               std::move(node));
+    auto tree = make<RootNode>(ProjectionNameVector{var}, std::move(node));
 
     auto env = VariableEnvironment::build(tree);
 

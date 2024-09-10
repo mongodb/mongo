@@ -866,9 +866,6 @@ public:
 
         const NodeProps& props = it->second;
 
-        ExplainPrinter logPropPrinter = printLogicalProps("logical", props._logicalProps);
-        ExplainPrinter physPropPrinter = printPhysProps("physical", props._physicalProps);
-
         ExplainPrinter propsPrinter;
         propsPrinter.fieldName("cost")
             .print(props._cost.getCost())
@@ -881,11 +878,7 @@ public:
             .separator(", ")
             .fieldName("planNodeID")
             .print(props._planNodeId)
-            .separator(", ")
-            .fieldName("logicalProperties")
-            .print(logPropPrinter)
-            .fieldName("physicalProperties")
-            .print(physPropPrinter);
+            .separator(", ");
         ExplainPrinter res;
         res.fieldName("properties").print(propsPrinter);
         nodePrinter.printAppend(res);
@@ -1799,7 +1792,7 @@ public:
         printer.separator(" []");
         nodeCEPropsPrint(printer, n, node);
         printer.setChildCount(childResults.size() + 2);
-        printCollationProperty(printer, node.getCollationReq(), false /*directToParent*/);
+        printCollationProperty(printer, node.getCollationSpec(), false /*directToParent*/);
         printer.fieldName("bindings", ExplainVersion::V3).print(bindResult);
         printer.maybeReverse().fieldName("children", ExplainVersion::V3).print(childResults);
         return printer;
@@ -1950,10 +1943,10 @@ public:
     }
 
     static void printCollationProperty(ExplainPrinter& parent,
-                                       const properties::CollationRequirement& property,
+                                       const ProjectionCollationSpec& spec,
                                        const bool directToParent) {
         std::vector<ExplainPrinter> propPrinters;
-        for (const auto& entry : property.getCollationSpec()) {
+        for (const auto& entry : spec) {
             ExplainPrinter local;
             local.fieldName("projectionName", ExplainVersion::V3)
                 .print(entry.first)
@@ -2057,7 +2050,7 @@ public:
         if constexpr (version < ExplainVersion::V3) {
             printer.separator(" [{");
             bool first = true;
-            for (const auto& [projName, op] : node.getProperty().getCollationSpec()) {
+            for (const auto& [projName, op] : node.getCollationSpec()) {
                 if (first) {
                     first = false;
                 } else {
@@ -2071,7 +2064,7 @@ public:
             printer.setChildCount(1, true /*noInline*/);
         } else if constexpr (version == ExplainVersion::V3) {
             nodeCEPropsPrint(printer, n, node);
-            printCollationProperty(printer, node.getProperty(), false /*directToParent*/);
+            printCollationProperty(printer, node.getCollationSpec(), false /*directToParent*/);
             printer.fieldName("references", ExplainVersion::V3).print(refsResult);
         } else {
             MONGO_UNREACHABLE;
@@ -2144,7 +2137,7 @@ public:
     }
 
     static void printDistributionProperty(ExplainPrinter& parent,
-                                          const properties::DistributionRequirement& property,
+                                          const DistributionRequirement& property,
                                           const bool directToParent) {
         const auto& distribAndProjections = property.getDistributionAndProjections();
 
@@ -2168,9 +2161,9 @@ public:
 
     static void printProjectionRequirementProperty(
         ExplainPrinter& parent,
-        const properties::ProjectionRequirement& property,
+        const ProjectionNameOrderPreservingSet& projections,
         const bool directToParent) {
-        printPropertyProjections(parent, property.getProjections().getVector(), directToParent);
+        printPropertyProjections(parent, projections.getVector(), directToParent);
     }
 
     ExplainPrinter transport(const ABT::reference_type n,
@@ -2191,205 +2184,6 @@ public:
 
         return printer;
     }
-
-    struct LogicalPropPrintVisitor {
-        LogicalPropPrintVisitor(ExplainPrinter& parent) : _parent(parent){};
-
-        void operator()(const properties::LogicalProperty&,
-                        const properties::ProjectionAvailability& prop) {
-            const auto& propProj = prop.getProjections();
-            ProjectionNameOrderedSet ordered(propProj.cbegin(), propProj.cend());
-
-            std::vector<ExplainPrinter> printers;
-            for (const ProjectionName& projection : ordered) {
-                ExplainPrinter local;
-                local.print(projection);
-                printers.push_back(std::move(local));
-            }
-            _parent.fieldName("projections").print(printers);
-        }
-
-        void operator()(const properties::LogicalProperty&,
-                        const properties::CardinalityEstimate& prop) {
-            std::vector<ExplainPrinter> fieldPrinters;
-
-            ExplainPrinter cePrinter;
-            cePrinter.fieldName("ce").print(prop.getEstimate());
-            fieldPrinters.push_back(std::move(cePrinter));
-
-            if (const auto& partialSchemaKeyCE = prop.getPartialSchemaKeyCE();
-                !partialSchemaKeyCE.empty()) {
-                std::vector<ExplainPrinter> reqPrinters;
-                for (const auto& [key, ce] : partialSchemaKeyCE) {
-                    ExplainGeneratorTransporter<version> gen;
-                    ExplainPrinter pathPrinter = gen.generate(key._path);
-
-                    ExplainPrinter local;
-                    if (const auto& projName = key._projectionName) {
-                        local.fieldName("refProjection").print(*projName).separator(", ");
-                    }
-                    local.fieldName("path")
-                        .separator("'")
-                        .printSingleLevel(pathPrinter)
-                        .separator("', ")
-                        .fieldName("ce")
-                        .print(ce._ce)
-                        .separator(", ")
-                        .fieldName("mode")
-                        .print(ce._mode);
-                    reqPrinters.push_back(std::move(local));
-                }
-                ExplainPrinter requirementsPrinter;
-                requirementsPrinter.fieldName("requirementCEs").print(reqPrinters);
-                fieldPrinters.push_back(std::move(requirementsPrinter));
-            }
-
-            _parent.fieldName("cardinalityEstimate").print(fieldPrinters);
-        }
-
-        void operator()(const properties::LogicalProperty&,
-                        const properties::IndexingAvailability& prop) {
-            ExplainPrinter printer;
-            printer.separator("[")
-                .fieldName("groupId")
-                .print(prop.getScanGroupId())
-                .separator(", ")
-                .fieldName("scanProjection")
-                .print(prop.getScanProjection())
-                .separator(", ")
-                .fieldName("scanDefName")
-                .print(prop.getScanDefName());
-            printBooleanFlag(printer, "eqPredsOnly", prop.getEqPredsOnly());
-            printBooleanFlag(printer, "hasProperInterval", prop.hasProperInterval());
-            printer.separator("]");
-
-            if (!prop.getSatisfiedPartialIndexes().empty()) {
-                const auto& satisfiedIndexes = prop.getSatisfiedPartialIndexes();
-                std::set<std::string> ordered{satisfiedIndexes.cbegin(), satisfiedIndexes.cend()};
-
-                std::vector<ExplainPrinter> printers;
-                for (const auto& indexName : ordered) {
-                    ExplainPrinter local;
-                    local.print(indexName);
-                    printers.push_back(std::move(local));
-                }
-                printer.fieldName("satisfiedPartialIndexes").print(printers);
-            }
-
-            _parent.fieldName("indexingAvailability").print(printer);
-        }
-
-        void operator()(const properties::LogicalProperty&,
-                        const properties::CollectionAvailability& prop) {
-            const auto& scanDefSet = prop.getScanDefSet();
-            std::set<std::string> orderedSet{scanDefSet.cbegin(), scanDefSet.cend()};
-
-            std::vector<ExplainPrinter> printers;
-            for (const std::string& scanDef : orderedSet) {
-                ExplainPrinter local;
-                local.print(scanDef);
-                printers.push_back(std::move(local));
-            }
-            if (printers.empty()) {
-                ExplainPrinter dummy;
-                printers.push_back(std::move(dummy));
-            }
-
-            _parent.fieldName("collectionAvailability").print(printers);
-        }
-
-        void operator()(const properties::LogicalProperty&,
-                        const properties::DistributionAvailability& prop) {
-            struct Comparator {
-                bool operator()(const properties::DistributionRequirement& d1,
-                                const properties::DistributionRequirement& d2) const {
-                    const properties::DistributionAndProjections& distr1 =
-                        d1.getDistributionAndProjections();
-                    const properties::DistributionAndProjections& distr2 =
-                        d2.getDistributionAndProjections();
-
-                    if (distr1._type < distr2._type) {
-                        return true;
-                    }
-                    if (distr1._type > distr2._type) {
-                        return false;
-                    }
-                    return distr1._projectionNames < distr2._projectionNames;
-                }
-            };
-
-            const auto& distribSet = prop.getDistributionSet();
-            std::set<properties::DistributionRequirement, Comparator> ordered{distribSet.cbegin(),
-                                                                              distribSet.cend()};
-
-            std::vector<ExplainPrinter> printers;
-            for (const auto& distributionProp : ordered) {
-                ExplainPrinter local;
-                printDistributionProperty(local, distributionProp, true /*directToParent*/);
-                printers.push_back(std::move(local));
-            }
-            _parent.fieldName("distributionAvailability").print(printers);
-        }
-
-    private:
-        // We don't own this.
-        ExplainPrinter& _parent;
-    };
-
-    struct PhysPropPrintVisitor {
-        PhysPropPrintVisitor(ExplainPrinter& parent) : _parent(parent){};
-
-        void operator()(const properties::PhysProperty&,
-                        const properties::CollationRequirement& prop) {
-            printCollationProperty(_parent, prop, true /*directToParent*/);
-        }
-
-        void operator()(const properties::PhysProperty&,
-                        const properties::ProjectionRequirement& prop) {
-            printProjectionRequirementProperty(_parent, prop, true /*directToParent*/);
-        }
-
-        void operator()(const properties::PhysProperty&,
-                        const properties::DistributionRequirement& prop) {
-            printDistributionProperty(_parent, prop, true /*directToParent*/);
-        }
-
-        void operator()(const properties::PhysProperty&,
-                        const properties::IndexingRequirement& prop) {
-            ExplainPrinter printer;
-
-            printer.fieldName("target", ExplainVersion::V3)
-                .print(toStringData(prop.getIndexReqTarget()));
-            printBooleanFlag(printer, "dedupRID", prop.getDedupRID());
-
-            // TODO: consider printing satisfied partial indexes.
-            _parent.fieldName("indexingRequirement").print(printer);
-        }
-
-        void operator()(const properties::PhysProperty&,
-                        const properties::RepetitionEstimate& prop) {
-            ExplainPrinter printer;
-            printer.print(prop.getEstimate());
-            _parent.fieldName("repetitionEstimate").print(printer);
-        }
-
-        void operator()(const properties::PhysProperty&, const properties::LimitEstimate& prop) {
-            ExplainPrinter printer;
-            printer.print(prop.getEstimate());
-            _parent.fieldName("limitEstimate").print(printer);
-        }
-
-        void operator()(const properties::PhysProperty&,
-                        const properties::RemoveOrphansRequirement& prop) {
-            ExplainPrinter printer;
-            printer.print(prop.mustRemove() ? "true" : "false");
-            _parent.fieldName("removeOrphans").print(printer);
-        }
-
-    private:
-        // We don't own this.
-        ExplainPrinter& _parent;
-    };
 
     template <class P, class V, class C>
     static ExplainPrinter printProps(const std::string& description, const C& props) {
@@ -2413,16 +2207,6 @@ public:
         return printer;
     }
 
-    static ExplainPrinter printLogicalProps(const std::string& description,
-                                            const properties::LogicalProps& props) {
-        return printProps<properties::LogicalProperty, LogicalPropPrintVisitor>(description, props);
-    }
-
-    static ExplainPrinter printPhysProps(const std::string& description,
-                                         const properties::PhysProps& props) {
-        return printProps<properties::PhysProperty, PhysPropPrintVisitor>(description, props);
-    }
-
     ExplainPrinter transport(const ABT::reference_type n,
                              const RootNode& node,
                              ExplainPrinter childResult,
@@ -2432,7 +2216,7 @@ public:
 
         if constexpr (version < ExplainVersion::V3) {
             printer.separator(" [");
-            printProjectionsOrdered(printer, node.getProperty().getProjections().getVector());
+            printProjectionsOrdered(printer, node.getProjections().getVector());
             printer.separator("]");
             nodeCEPropsPrint(printer, n, node);
             printer.setChildCount(1, true /*noInline*/);
@@ -2440,7 +2224,7 @@ public:
             nodeCEPropsPrint(printer, n, node);
             printer.setChildCount(3);
             printProjectionRequirementProperty(
-                printer, node.getProperty(), false /*directToParent*/);
+                printer, node.getProjections(), false /*directToParent*/);
             printer.fieldName("references", ExplainVersion::V3).print(refsResult);
         } else {
             MONGO_UNREACHABLE;
@@ -2949,16 +2733,6 @@ std::string ExplainGenerator::explainBSONStr(const ABT::reference_type node,
     ExplainPrinterImpl<ExplainVersion::V2> printer;
     printBSONstr(printer, tag, val);
     return printer.str();
-}
-
-std::string ExplainGenerator::explainLogicalProps(const std::string& description,
-                                                  const properties::LogicalProps& props) {
-    return ExplainGeneratorV2::printLogicalProps(description, props).str();
-}
-
-std::string ExplainGenerator::explainPhysProps(const std::string& description,
-                                               const properties::PhysProps& props) {
-    return ExplainGeneratorV2::printPhysProps(description, props).str();
 }
 
 class ShortPlanSummaryTransport {

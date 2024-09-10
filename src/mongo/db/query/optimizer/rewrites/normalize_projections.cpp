@@ -129,7 +129,7 @@ void ProjNormalize::transport(
 
 void ProjNormalize::transport(
     ABT& n, const SortedMergeNode& node, ABTVector& children, ABT& binds, ABT& refs) {
-    n = make<SortedMergeNode>(renameCollReq(node.getCollationReq()), std::move(children));
+    n = make<SortedMergeNode>(renameCollSpec(node.getCollationSpec()), std::move(children));
 }
 
 void ProjNormalize::transport(
@@ -197,7 +197,7 @@ void ProjNormalize::transport(ABT& n, const UniqueNode& node, ABT& child, ABT& r
 }
 
 void ProjNormalize::transport(ABT& n, const CollationNode& node, ABT& child, ABT& refs) {
-    n = make<CollationNode>(renameCollReq(node.getProperty()), std::move(child));
+    n = make<CollationNode>(renameCollSpec(node.getCollationSpec()), std::move(child));
 }
 
 void ProjNormalize::transport(ABT& n, const ExchangeNode& node, ABT& child, ABT& refs) {
@@ -209,9 +209,9 @@ void ProjNormalize::transport(ABT& n, const ExchangeNode& node, ABT& child, ABT&
 }
 
 void ProjNormalize::transport(ABT& n, const RootNode& node, ABT& child, ABT& refs) {
-    n = make<RootNode>(properties::ProjectionRequirement{renameVector(
-                           node.getProperty().getProjections().getVector())},
-                       std::move(child));
+    n = make<RootNode>(
+        ProjectionNameOrderPreservingSet{renameVector(node.getProjections().getVector())},
+        std::move(child));
 }
 
 ProjectionName ProjNormalize::renameProj(const ProjectionName& proj) const {
@@ -242,13 +242,11 @@ ProjectionNameVector ProjNormalize::renameVector(const ProjectionNameVector& v) 
     return result;
 }
 
-properties::CollationRequirement ProjNormalize::renameCollReq(
-    const properties::CollationRequirement& req) const {
-    auto spec = req.getCollationSpec();
+ProjectionCollationSpec ProjNormalize::renameCollSpec(ProjectionCollationSpec spec) const {
     for (auto& [projName, op] : spec) {
         projName = renameProj(projName);
     }
-    return {std::move(spec)};
+    return spec;
 }
 
 }  // namespace mongo::optimizer

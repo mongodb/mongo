@@ -62,48 +62,6 @@ ABT makeBalancedBooleanOpTree(Operations logicOp, std::vector<ABT> leaves) {
     return makeBalancedTreeImpl(builder, leaves, 0, leaves.size());
 }
 
-properties::LogicalProps createInitialScanProps(const ProjectionName& projectionName,
-                                                const std::string& scanDefName,
-                                                const GroupIdType groupId,
-                                                properties::DistributionSet distributions) {
-    return makeLogicalProps(properties::IndexingAvailability(groupId,
-                                                             projectionName,
-                                                             scanDefName,
-                                                             true /*eqPredsOnly*/,
-                                                             false /*hasProperInterval*/,
-                                                             {} /*satisfiedPartialIndexes*/),
-                            properties::CollectionAvailability({scanDefName}),
-                            properties::DistributionAvailability(std::move(distributions)));
-}
-
-/**
- * Used to track references originating from a set of properties.
- */
-class PropertiesAffectedColumnsExtractor {
-public:
-    template <class T>
-    void operator()(const properties::PhysProperty&, const T& prop) {
-        for (const ProjectionName& projection : prop.getAffectedProjectionNames()) {
-            _projections.insert(projection);
-        }
-    }
-
-    static ProjectionNameSet extract(const properties::PhysProps& properties) {
-        PropertiesAffectedColumnsExtractor extractor;
-        for (const auto& entry : properties) {
-            entry.second.visit(extractor);
-        }
-        return extractor._projections;
-    }
-
-private:
-    ProjectionNameSet _projections;
-};
-
-ProjectionNameSet extractReferencedColumns(const properties::PhysProps& properties) {
-    return PropertiesAffectedColumnsExtractor::extract(properties);
-}
-
 void restrictProjections(ProjectionNameVector projNames, const CEType ce, PhysPlanBuilder& input) {
     input.make<UnionNode>(ce, std::move(projNames), makeSeq(std::move(input._node)));
 }

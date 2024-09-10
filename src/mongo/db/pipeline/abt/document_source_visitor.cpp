@@ -73,7 +73,6 @@
 #include "mongo/db/query/optimizer/algebra/polyvalue.h"
 #include "mongo/db/query/optimizer/comparison_op.h"
 #include "mongo/db/query/optimizer/containers.h"
-#include "mongo/db/query/optimizer/props.h"
 #include "mongo/db/query/optimizer/syntax/expr.h"
 #include "mongo/db/query/optimizer/syntax/path.h"
 #include "mongo/db/query/optimizer/utils/path_utils.h"
@@ -434,7 +433,7 @@ void visit(ABTDocumentSourceTranslationVisitorContext* visitorCtx,
     ABT pipelineABTWithoutRoot = pipelineABT.cast<RootNode>()->getChild();
     // Pull out the root projection(s) from the inner pipeline.
     const ProjectionNameVector& rootProjections =
-        pipelineABT.cast<RootNode>()->getProperty().getProjections().getVector();
+        pipelineABT.cast<RootNode>()->getProjections().getVector();
     uassert(6624426,
             "Expected a single projection for inner union branch",
             rootProjections.size() == 1);
@@ -566,9 +565,8 @@ ABT translatePipelineToABT(const Pipeline& pipeline,
     walker.walk(pipeline);
 
     auto entry = ctx.getNode();
-    return make<RootNode>(
-        properties::ProjectionRequirement{ProjectionNameVector{std::move(entry._rootProjection)}},
-        std::move(entry._node));
+    return make<RootNode>(ProjectionNameVector{std::move(entry._rootProjection)},
+                          std::move(entry._node));
 }
 
 }  // namespace mongo::optimizer

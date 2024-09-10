@@ -52,7 +52,6 @@
 #include "mongo/db/query/optimizer/node.h"  // IWYU pragma: keep
 #include "mongo/db/query/optimizer/node_defs.h"
 #include "mongo/db/query/optimizer/partial_schema_requirements.h"
-#include "mongo/db/query/optimizer/props.h"
 #include "mongo/db/query/optimizer/syntax/syntax.h"
 #include "mongo/db/query/optimizer/utils/const_fold_interface.h"
 #include "mongo/db/query/optimizer/utils/physical_plan_builder.h"
@@ -216,16 +215,6 @@ private:
 };
 
 using SpoolIdGenerator = IdGenerator<int64_t>;
-
-properties::LogicalProps createInitialScanProps(const ProjectionName& projectionName,
-                                                const std::string& scanDefName,
-                                                GroupIdType groupId = -1,
-                                                properties::DistributionSet distributions = {});
-
-/**
- * Used to track references originating from a set of physical properties.
- */
-ProjectionNameSet extractReferencedColumns(const properties::PhysProps& properties);
 
 // Use a union node to restrict the set of projections we expose up the tree. The union node is
 // optimized away during lowering.

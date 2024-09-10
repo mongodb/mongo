@@ -34,7 +34,6 @@
 
 #include "mongo/db/query/optimizer/algebra/operator.h"
 #include "mongo/db/query/optimizer/containers.h"
-#include "mongo/db/query/optimizer/props.h"
 #include "mongo/db/query/optimizer/reference_tracker.h"
 #include "mongo/db/query/optimizer/utils/strong_alias.h"
 #include "mongo/util/assert_util.h"
@@ -703,7 +702,7 @@ struct Collector {
         result.mergeNoDefs(std::move(refsResult));
         result.merge(std::move(childResult));
 
-        for (const auto& name : collationNode.getProperty().getAffectedProjectionNames()) {
+        for (const auto& name : collationNode.getAffectedProjectionNames()) {
             tassert(7088001,
                     str::stream() << "Collation projection does not exist: " << name,
                     result.defs.count(name) != 0);
@@ -751,7 +750,7 @@ struct Collector {
         result.mergeNoDefs(std::move(refsResult));
         result.merge(std::move(childResult));
 
-        for (const auto& name : rootNode.getProperty().getAffectedProjectionNames()) {
+        for (const auto& name : rootNode.getProjections().getAffectedProjectionNames()) {
             tassert(7088003,
                     str::stream() << "Root projection does not exist: " << name,
                     result.defs.count(name) != 0);

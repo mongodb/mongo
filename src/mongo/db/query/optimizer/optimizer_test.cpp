@@ -40,7 +40,6 @@
 #include "mongo/db/query/optimizer/comparison_op.h"
 #include "mongo/db/query/optimizer/defs.h"
 #include "mongo/db/query/optimizer/node.h"  // IWYU pragma: keep
-#include "mongo/db/query/optimizer/props.h"
 #include "mongo/db/query/optimizer/reference_tracker.h"
 #include "mongo/db/query/optimizer/rewrites/const_eval.h"
 #include "mongo/db/query/optimizer/rewrites/normalize_projections.h"
@@ -275,9 +274,7 @@ TEST(Optimizer, Tracker1) {
         make<EvalPath>(make<PathConstant>(Constant::int64(2)), make<Variable>("ptest")),
         std::move(filterNode));
 
-    ABT rootNode =
-        make<RootNode>(properties::ProjectionRequirement{ProjectionNameVector{"P1", "ptest"}},
-                       std::move(evalNode));
+    ABT rootNode = make<RootNode>(ProjectionNameVector{"P1", "ptest"}, std::move(evalNode));
 
     auto env = VariableEnvironment::build(rootNode);
     ASSERT(!env.hasFreeVariables());
@@ -393,9 +390,7 @@ TEST(Optimizer, Basic) {
         make<EvalPath>(make<PathConstant>(Constant::int64(2)), make<Variable>("ptest")),
         std::move(filterNode));
 
-    ABT rootNode =
-        make<RootNode>(properties::ProjectionRequirement{ProjectionNameVector{"P1", "ptest"}},
-                       std::move(evalNode));
+    ABT rootNode = make<RootNode>(ProjectionNameVector{"P1", "ptest"}, std::move(evalNode));
 
     ASSERT_EXPLAIN_AUTO(
         "Root [{P1, ptest}]\n"
@@ -459,9 +454,8 @@ TEST(Optimizer, GroupBy) {
                                         makeSeq(std::move(agg1), std::move(agg2)),
                                         std::move(evalNode3));
 
-    ABT rootNode = make<RootNode>(
-        properties::ProjectionRequirement{ProjectionNameVector{"p1", "p2", "a1", "a2"}},
-        std::move(groupByNode));
+    ABT rootNode =
+        make<RootNode>(ProjectionNameVector{"p1", "p2", "a1", "a2"}, std::move(groupByNode));
 
     ASSERT_EXPLAIN_AUTO(
         "Root [{a1, a2, p1, p2}]\n"
@@ -502,9 +496,7 @@ TEST(Optimizer, Union) {
     ABT unionNode = make<UnionNode>(ProjectionNameVector{"ptest", "B"},
                                     makeSeq(projNode1, projNode2, projNode3));
 
-    ABT rootNode =
-        make<RootNode>(properties::ProjectionRequirement{ProjectionNameVector{"ptest", "B"}},
-                       std::move(unionNode));
+    ABT rootNode = make<RootNode>(ProjectionNameVector{"ptest", "B"}, std::move(unionNode));
 
     {
         auto env = VariableEnvironment::build(rootNode);
@@ -557,8 +549,7 @@ TEST(Optimizer, Unwind) {
     ABT unwindNode = make<UnwindNode>("p2", "p2pid", true /*retainNonArrays*/, std::move(evalNode));
 
     // Make a copy of unwindNode as it will be used later again in the wind test.
-    ABT rootNode = make<RootNode>(
-        properties::ProjectionRequirement{ProjectionNameVector{"p1", "p2", "p2pid"}}, unwindNode);
+    ABT rootNode = make<RootNode>(ProjectionNameVector{"p1", "p2", "p2pid"}, unwindNode);
 
     {
         auto env = VariableEnvironment::build(rootNode);
@@ -587,10 +578,9 @@ TEST(Optimizer, Collation) {
         make<EvalPath>(make<PathConstant>(Constant::int64(2)), make<Variable>("a")),
         std::move(scanNode));
 
-    ABT collationNode =
-        make<CollationNode>(properties::CollationRequirement(
-                                {{"a", CollationOp::Ascending}, {"b", CollationOp::Clustered}}),
-                            std::move(evalNode));
+    ABT collationNode = make<CollationNode>(
+        ProjectionCollationSpec({{"a", CollationOp::Ascending}, {"b", CollationOp::Clustered}}),
+        std::move(evalNode));
     {
         auto env = VariableEnvironment::build(collationNode);
         ProjectionNameSet projSet = env.topLevelProjections();
@@ -645,8 +635,7 @@ TEST(Optimizer, Distribution) {
         std::move(scanNode));
 
     ABT exchangeNode = make<ExchangeNode>(
-        properties::DistributionRequirement({DistributionType::HashPartitioning, {"b"}}),
-        std::move(evalNode));
+        DistributionRequirement({DistributionType::HashPartitioning, {"b"}}), std::move(evalNode));
 
     ASSERT_EXPLAIN_AUTO(
         "Exchange []\n"
@@ -664,22 +653,12 @@ TEST(Optimizer, Distribution) {
 }
 
 TEST(Properties, Basic) {
-    using namespace properties;
-
-    CollationRequirement collation1(
+    ProjectionCollationSpec collation1(
         {{"p1", CollationOp::Ascending}, {"p2", CollationOp::Descending}});
-    CollationRequirement collation2(
+    ProjectionCollationSpec collation2(
         {{"p1", CollationOp::Ascending}, {"p2", CollationOp::Clustered}});
-    ASSERT_TRUE(collationsCompatible(collation1.getCollationSpec(), collation2.getCollationSpec()));
-    ASSERT_FALSE(
-        collationsCompatible(collation2.getCollationSpec(), collation1.getCollationSpec()));
-
-    PhysProps props;
-    ASSERT_FALSE(hasProperty<CollationRequirement>(props));
-    ASSERT_TRUE(setProperty(props, collation1));
-    ASSERT_TRUE(hasProperty<CollationRequirement>(props));
-    ASSERT_FALSE(setProperty(props, collation2));
-    ASSERT_TRUE(collation1 == getProperty<CollationRequirement>(props));
+    ASSERT_TRUE(collationsCompatible(collation1, collation2));
+    ASSERT_FALSE(collationsCompatible(collation2, collation1));
 }
 
 TEST(Explain, ExplainV2Compact) {
@@ -846,8 +825,7 @@ TEST(Optimizer, ExplainRIDUnion) {
     ABT unionNode = make<RIDUnionNode>(
         "root", ProjectionNameVector{"root"}, filterNode, make<ScanNode>("root", "c1"));
 
-    ABT rootNode = make<RootNode>(properties::ProjectionRequirement{ProjectionNameVector{"root"}},
-                                  std::move(unionNode));
+    ABT rootNode = make<RootNode>(ProjectionNameVector{"root"}, std::move(unionNode));
 
     ASSERT_EXPLAIN_V2_AUTO(
         "Root [{root}]\n"

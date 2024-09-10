@@ -30,12 +30,8 @@
 #pragma once
 
 #include "mongo/db/query/optimizer/node.h"
-#include "mongo/db/query/optimizer/props.h"
 
 namespace mongo::optimizer {
-
-// Used for physical rewrites. For each child we optimize, we specify physical properties.
-using ChildPropsType = std::vector<std::pair<ABT*, properties::PhysProps>>;
 
 // Use for physical rewrites. For each physical node we implement, we set CE to use when costing.
 using NodeCEMap = opt::unordered_map<const Node*, CEType>;
@@ -46,8 +42,6 @@ struct NodeProps {
 
     // Which is the corresponding memo group, and its properties.
     MemoPhysicalNodeId _groupId;
-    properties::LogicalProps _logicalProps;
-    properties::PhysProps _physicalProps;
 
     // Set if we have an RID projection name.
     boost::optional<ProjectionName> _ridProjName;

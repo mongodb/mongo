@@ -45,7 +45,6 @@
 #include "mongo/db/query/optimizer/defs.h"
 #include "mongo/db/query/optimizer/index_bounds.h"
 #include "mongo/db/query/optimizer/partial_schema_requirements.h"
-#include "mongo/db/query/optimizer/props.h"
 #include "mongo/db/query/optimizer/syntax/expr.h"
 #include "mongo/db/query/optimizer/syntax/path.h"
 #include "mongo/db/query/optimizer/syntax/syntax.h"
@@ -172,17 +171,13 @@ class ValueScanNode final : public ABTOpFixedArity<1>, public ExclusivelyLogical
     using Base = ABTOpFixedArity<1>;
 
 public:
-    ValueScanNode(ProjectionNameVector projections,
-                  boost::optional<properties::LogicalProps> props);
+    ValueScanNode(ProjectionNameVector projections);
 
     /**
      * Each element of 'valueArray' is an array itself and must have one entry corresponding to
      * each of 'projections'.
      */
-    ValueScanNode(ProjectionNameVector projections,
-                  boost::optional<properties::LogicalProps> props,
-                  ABT valueArray,
-                  bool hasRID);
+    ValueScanNode(ProjectionNameVector projections, ABT valueArray, bool hasRID);
 
     bool operator==(const ValueScanNode& other) const;
 
@@ -195,14 +190,9 @@ public:
     const ABT& getValueArray() const;
     size_t getArraySize() const;
 
-    const boost::optional<properties::LogicalProps>& getProps() const;
-
     bool getHasRID() const;
 
 private:
-    // Optional logical properties. Used as a seed during logical proeprties derivation.
-    const boost::optional<properties::LogicalProps> _props;
-
     const ABT _valueArray;
     size_t _arraySize;
 
@@ -577,7 +567,7 @@ class SortedMergeNode final : public ABTOpDynamicArity<2>, public ExclusivelyPhy
     using Base = ABTOpDynamicArity<2>;
 
 public:
-    SortedMergeNode(properties::CollationRequirement collReq, ABTVector children);
+    SortedMergeNode(ProjectionCollationSpec collSpec, ABTVector children);
 
     const ExpressionBinder& binder() const {
         const ABT& result = get<0>();
@@ -585,15 +575,15 @@ public:
         return *result.cast<ExpressionBinder>();
     }
 
-    const properties::CollationRequirement& getCollationReq() const;
+    const ProjectionCollationSpec& getCollationSpec() const;
 
     bool operator==(const SortedMergeNode& other) const;
 
 private:
-    SortedMergeNode(properties::CollationRequirement collReq, NodeChildrenHolder children);
+    SortedMergeNode(ProjectionCollationSpec collSpec, NodeChildrenHolder children);
 
     // Describes how to merge the sorted streams.
-    properties::CollationRequirement _collationReq;
+    ProjectionCollationSpec _spec;
 };
 
 /**
@@ -912,19 +902,21 @@ class CollationNode final : public ABTOpFixedArity<2>, public Node {
     using Base = ABTOpFixedArity<2>;
 
 public:
-    CollationNode(properties::CollationRequirement property, ABT child);
+    CollationNode(ProjectionCollationSpec spec, ABT child);
 
     bool operator==(const CollationNode& other) const;
 
-    const properties::CollationRequirement& getProperty() const;
-    properties::CollationRequirement& getProperty();
+    const ProjectionCollationSpec& getCollationSpec() const;
+    ProjectionCollationSpec& getCollationSpec();
+
+    ProjectionNameSet getAffectedProjectionNames() const;
 
     const ABT& getChild() const;
 
     ABT& getChild();
 
 private:
-    properties::CollationRequirement _property;
+    ProjectionCollationSpec _collationSpec;
 };
 
 /**
@@ -957,6 +949,45 @@ private:
     int64_t _skip;
 };
 
+struct DistributionAndProjections {
+    DistributionAndProjections(DistributionType type);
+    DistributionAndProjections(DistributionType type, ProjectionNameVector projectionNames);
+
+    bool operator==(const DistributionAndProjections& other) const;
+
+    const DistributionType _type;
+
+    /**
+     * Defined for hash and range-based partitioning.
+     */
+    ProjectionNameVector _projectionNames;
+};
+
+/**
+ * A physical property which specifies how the result is to be distributed (or partitioned) amongst
+ * the computing partitions/nodes.
+ */
+class DistributionRequirement {
+public:
+    DistributionRequirement(DistributionAndProjections distributionAndProjections);
+
+    bool operator==(const DistributionRequirement& other) const;
+
+    const DistributionAndProjections& getDistributionAndProjections() const;
+    DistributionAndProjections& getDistributionAndProjections();
+
+    ProjectionNameSet getAffectedProjectionNames() const;
+
+    bool getDisableExchanges() const;
+    void setDisableExchanges(bool disableExchanges);
+
+private:
+    DistributionAndProjections _distributionAndProjections;
+
+    // Heuristic used to disable exchanges right after Filter, Eval, and local GroupBy nodes.
+    bool _disableExchanges;
+};
+
 /**
  * Exchange node.
  * It specifies how the relation is spread across machines in the execution environment.
@@ -968,19 +999,19 @@ class ExchangeNode final : public ABTOpFixedArity<2>, public Node {
     using Base = ABTOpFixedArity<2>;
 
 public:
-    ExchangeNode(properties::DistributionRequirement distribution, ABT child);
+    ExchangeNode(DistributionRequirement distribution, ABT child);
 
     bool operator==(const ExchangeNode& other) const;
 
-    const properties::DistributionRequirement& getProperty() const;
-    properties::DistributionRequirement& getProperty();
+    const DistributionRequirement& getProperty() const;
+    DistributionRequirement& getProperty();
 
     const ABT& getChild() const;
 
     ABT& getChild();
 
 private:
-    properties::DistributionRequirement _distribution;
+    DistributionRequirement _distribution;
 };
 
 /**
@@ -995,17 +1026,17 @@ class RootNode final : public ABTOpFixedArity<2>, public Node {
     using Base = ABTOpFixedArity<2>;
 
 public:
-    RootNode(properties::ProjectionRequirement property, ABT child);
+    RootNode(ProjectionNameOrderPreservingSet projections, ABT child);
 
     bool operator==(const RootNode& other) const;
 
-    const properties::ProjectionRequirement& getProperty() const;
+    const ProjectionNameOrderPreservingSet& getProjections() const;
 
     const ABT& getChild() const;
     ABT& getChild();
 
 private:
-    const properties::ProjectionRequirement _property;
+    const ProjectionNameOrderPreservingSet _projections;
 };
 
 }  // namespace mongo::optimizer

@@ -39,7 +39,6 @@
 #include "mongo/db/query/optimizer/algebra/polyvalue.h"
 #include "mongo/db/query/optimizer/defs.h"
 #include "mongo/db/query/optimizer/node.h"  // IWYU pragma: keep
-#include "mongo/db/query/optimizer/props.h"
 #include "mongo/db/query/optimizer/syntax/expr.h"
 #include "mongo/db/query/optimizer/syntax/path.h"
 #include "mongo/db/query/optimizer/syntax/syntax.h"
@@ -75,9 +74,8 @@ void generateCollationNode(AlgebrizerContext& ctx, const SortPattern& sortPatter
     if (collationSpec.empty()) {
         return;
     }
-    ctx.setNode<CollationNode>(std::move(rootProjection),
-                               properties::CollationRequirement(std::move(collationSpec)),
-                               std::move(ctx.getNode()._node));
+    ctx.setNode<CollationNode>(
+        std::move(rootProjection), std::move(collationSpec), std::move(ctx.getNode()._node));
 }
 
 }  // namespace mongo::optimizer

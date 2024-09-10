@@ -42,8 +42,6 @@ using namespace unit_test_abt_literals;
 using namespace sbe::value;
 
 TEST(ConstEvalTest, RIDUnion) {
-    using namespace properties;
-
     ABT leftChild = make<EvaluationNode>(
         "y",
         make<BinaryOp>(Operations::Add, make<Variable>("x"), Constant::int64(1)),
@@ -58,7 +56,7 @@ TEST(ConstEvalTest, RIDUnion) {
         "p0", ProjectionNameVector{"p0", "x", "y"}, std::move(leftChild), std::move(rightChild));
 
     ABT rootNode = make<RootNode>(
-        ProjectionRequirement{ProjectionNameVector{"z"}},
+        ProjectionNameVector{"z"},
         make<EvaluationNode>(
             "z",
             make<BinaryOp>(Operations::Add, make<Variable>("x"), make<Variable>("y")),

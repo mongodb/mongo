@@ -344,10 +344,10 @@ TEST_F(ABTPlanGeneration, LowerCollationNode) {
                                         ._skip = 0,
                                         ._ridProjName = boost::none};
 
-    auto node = _node(
-        make<CollationNode>(properties::CollationRequirement({{"sortA", CollationOp::Ascending}}),
-                            createBindings({{"a", "sortA"}, {"b", "proj0"}, {"c", "proj1"}})),
-        collationNodeProp);
+    auto node =
+        _node(make<CollationNode>(ProjectionCollationSpec({{"sortA", CollationOp::Ascending}}),
+                                  createBindings({{"a", "sortA"}, {"b", "proj0"}, {"c", "proj1"}})),
+              collationNodeProp);
 
     runNodeVariation(
         ctx,
@@ -364,11 +364,11 @@ TEST_F(ABTPlanGeneration, LowerCollationNode) {
                                          ._skip = 0,
                                          ._ridProjName = boost::none};
 
-    auto node2 = _node(
-        make<CollationNode>(properties::CollationRequirement({{"sortA", CollationOp::Ascending},
-                                                              {"sortB", CollationOp::Descending}}),
-                            createBindings({{"a", "sortA"}, {"b", "sortB"}, {"c", "proj0"}})),
-        collationNodeProp2);
+    auto node2 =
+        _node(make<CollationNode>(ProjectionCollationSpec({{"sortA", CollationOp::Ascending},
+                                                           {"sortB", CollationOp::Descending}}),
+                                  createBindings({{"a", "sortA"}, {"b", "sortB"}, {"c", "proj0"}})),
+              collationNodeProp2);
     runNodeVariation(
         ctx,
         "Lower collation node with two fields",
@@ -863,13 +863,12 @@ TEST_F(ABTPlanGeneration, LowerSortedMergeNode) {
                                                              std::move(child5)))));
     };
     for (auto& op : ops) {
-        runVariations(properties::CollationRequirement(
-                          ProjectionCollationSpec({{ProjectionName{"proj0"}, op}})),
+        runVariations(ProjectionCollationSpec({{ProjectionName{"proj0"}, op}}),
                       op,
                       str::stream() << "sorted on `a` " << toStringData(op));
         for (auto& op2 : ops) {
-            runVariations(properties::CollationRequirement(ProjectionCollationSpec(
-                              {{ProjectionName{"proj0"}, op}, {ProjectionName{"proj1"}, op2}})),
+            runVariations(ProjectionCollationSpec(
+                              {{ProjectionName{"proj0"}, op}, {ProjectionName{"proj1"}, op2}}),
                           op,
                           str::stream() << "sorted on `a` " << toStringData(op) << " and `b` "
                                         << toStringData(op2));
