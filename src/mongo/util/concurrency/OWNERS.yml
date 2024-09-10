@@ -1,27 +1,12 @@
 version: 1.0.0
 filters:
-  - "idle_thread_block.*":
+  - "*":
     approvers:
       - 10gen/server-programmability
-  - "mutex.*":
-    approvers:
-      - 10gen/server-programmability
-  - "notification.*":
-    approvers:
-      - 10gen/server-programmability
-  - "spin_lock*": # note this matches _test.* too
-    approvers:
-      - 10gen/server-programmability
-  - "thread_name.*":
-    approvers:
-      - 10gen/server-programmability
-  - "thread_pool*": # note this matches _test.* and other similarly prefixed files
-    approvers:
-      - 10gen/server-programmability
-  - "ticketholder.*":
+  - "*ticketholder*":
     approvers:
       - 10gen/server-workload-scheduling
-  - "*ticketholder.*":
+  - "ticket_pool*":
     approvers:
       - 10gen/server-workload-scheduling
   - "admission_context.*":

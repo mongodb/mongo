@@ -1,5 +1,17 @@
 version: 1.0.0
 filters:
+  - "*":
+    approvers:
+      - 10gen/server-programmability
+  - "dns_query*":
+    approvers:
+      - 10gen/server-security
+  - "kms_message_support*":
+    approvers:
+      - 10gen/server-security
+  - "murmur3*":
+    approvers:
+      - 10gen/server-security
   - "md5*":
     approvers:
       - 10gen/server-security
@@ -12,6 +24,12 @@ filters:
   - "field_set*":
     approvers:
       - 10gen/query-execution
+  - "generate_icu_init_cpp.py":
+    approvers:
+      - 10gen/query-execution
+  - "icu*":
+    approvers:
+      - 10gen/query-execution
   - "pcre*":
     approvers:
       - 10gen/query-execution
@@ -21,3 +39,15 @@ filters:
   - "log_with_sampling*":
     approvers:
       - 10gen/query-integration
+  - "roaring_bitmaps*":
+    approvers:
+      - 10gen/query-optimization
+  - "latency_distribution*":
+    approvers:
+      - 10gen/server-workload-scheduling
+  - "tcmalloc*":
+    approvers:
+      - 10gen/server-workload-scheduling
+  - "log_and_backoff*":
+    approvers:
+      - 10gen/server-networking-and-observability

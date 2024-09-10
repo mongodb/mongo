@@ -1,17 +1,5 @@
 version: 1.0.0
 filters:
-  - "idl_parser*": # note this also matches _bm.cpp
+  - "*":
     approvers:
       - 10gen/server-programmability
-  - "idl_test*": # note this also matches _types.h
-    approvers:
-      - 10gen/server-programmability
-  - "mutable_observer_registry.*":
-    approvers:
-      - 10gen/server-programmability
-  - "unittest*": # note this also matches _import.idl
-    approvers:
-      - 10gen/server-programmability
-  - "server_parameter*":
-    approvers:
-      - 10gen/server-security

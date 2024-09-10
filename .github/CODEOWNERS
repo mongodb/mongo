@@ -986,11 +986,7 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 /src/mongo/executor/**/thread_pool* @10gen/server-programmability @svc-auto-approve-bot
 
 # The following patterns are parsed from ./src/mongo/idl/OWNERS.yml
-/src/mongo/idl/**/idl_parser* @10gen/server-programmability @svc-auto-approve-bot
-/src/mongo/idl/**/idl_test* @10gen/server-programmability @svc-auto-approve-bot
-/src/mongo/idl/**/mutable_observer_registry.* @10gen/server-programmability @svc-auto-approve-bot
-/src/mongo/idl/**/unittest* @10gen/server-programmability @svc-auto-approve-bot
-/src/mongo/idl/**/server_parameter* @10gen/server-security @svc-auto-approve-bot
+/src/mongo/idl/**/* @10gen/server-programmability @svc-auto-approve-bot
 
 # The following patterns are parsed from ./src/mongo/logv2/OWNERS.yml
 /src/mongo/logv2/**/* @10gen/server-networking-and-observability @svc-auto-approve-bot
@@ -1162,26 +1158,31 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 /src/mongo/unittest/expected_output/**/* @10gen/query-optimization @svc-auto-approve-bot
 
 # The following patterns are parsed from ./src/mongo/util/OWNERS.yml
+/src/mongo/util/**/* @10gen/server-programmability @svc-auto-approve-bot
+/src/mongo/util/**/dns_query* @10gen/server-security @svc-auto-approve-bot
+/src/mongo/util/**/kms_message_support* @10gen/server-security @svc-auto-approve-bot
+/src/mongo/util/**/murmur3* @10gen/server-security @svc-auto-approve-bot
 /src/mongo/util/**/md5* @10gen/server-security @svc-auto-approve-bot
 /src/mongo/util/**/secure* @10gen/server-security @svc-auto-approve-bot
 /src/mongo/util/**/password* @10gen/server-security @svc-auto-approve-bot
 /src/mongo/util/**/field_set* @10gen/query-execution @svc-auto-approve-bot
+/src/mongo/util/**/generate_icu_init_cpp.py @10gen/query-execution @svc-auto-approve-bot
+/src/mongo/util/**/icu* @10gen/query-execution @svc-auto-approve-bot
 /src/mongo/util/**/pcre* @10gen/query-execution @svc-auto-approve-bot
 /src/mongo/util/**/regex_util* @10gen/query-execution @svc-auto-approve-bot
 /src/mongo/util/**/log_with_sampling* @10gen/query-integration @svc-auto-approve-bot
+/src/mongo/util/**/roaring_bitmaps* @10gen/query-optimization @svc-auto-approve-bot
+/src/mongo/util/**/latency_distribution* @10gen/server-workload-scheduling @svc-auto-approve-bot
+/src/mongo/util/**/tcmalloc* @10gen/server-workload-scheduling @svc-auto-approve-bot
+/src/mongo/util/**/log_and_backoff* @10gen/server-networking-and-observability @svc-auto-approve-bot
 
 # The following patterns are parsed from ./src/mongo/util/cmdline_utils/OWNERS.yml
 /src/mongo/util/cmdline_utils/**/* @10gen/server-security @svc-auto-approve-bot
 
 # The following patterns are parsed from ./src/mongo/util/concurrency/OWNERS.yml
-/src/mongo/util/concurrency/**/idle_thread_block.* @10gen/server-programmability @svc-auto-approve-bot
-/src/mongo/util/concurrency/**/mutex.* @10gen/server-programmability @svc-auto-approve-bot
-/src/mongo/util/concurrency/**/notification.* @10gen/server-programmability @svc-auto-approve-bot
-/src/mongo/util/concurrency/**/spin_lock* @10gen/server-programmability @svc-auto-approve-bot
-/src/mongo/util/concurrency/**/thread_name.* @10gen/server-programmability @svc-auto-approve-bot
-/src/mongo/util/concurrency/**/thread_pool* @10gen/server-programmability @svc-auto-approve-bot
-/src/mongo/util/concurrency/**/ticketholder.* @10gen/server-workload-scheduling @svc-auto-approve-bot
-/src/mongo/util/concurrency/**/*ticketholder.* @10gen/server-workload-scheduling @svc-auto-approve-bot
+/src/mongo/util/concurrency/**/* @10gen/server-programmability @svc-auto-approve-bot
+/src/mongo/util/concurrency/**/*ticketholder* @10gen/server-workload-scheduling @svc-auto-approve-bot
+/src/mongo/util/concurrency/**/ticket_pool* @10gen/server-workload-scheduling @svc-auto-approve-bot
 /src/mongo/util/concurrency/**/admission_context.* @10gen/server-workload-scheduling @svc-auto-approve-bot
 
 # The following patterns are parsed from ./src/mongo/util/cryptd/OWNERS.yml
