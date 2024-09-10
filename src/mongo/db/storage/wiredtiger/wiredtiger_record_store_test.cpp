@@ -975,7 +975,7 @@ TEST(WiredTigerRecordStoreTest, OplogTruncateMarkers_AscendingOrder) {
 
 // When the oplog collection is non-empty, but no OplogTruncateMarkers are
 // generated because the estimated 'dataSize' is smaller than the minimum size for a truncate
-// marker, tets that
+// marker, tests that
 //  (1) The oplog is scanned
 //  (2) OplogTruncateMarkers::currentBytes_forTest() reflects the actual size of the oplog instead
 //  of the estimated size.
@@ -1011,9 +1011,15 @@ TEST(WiredTigerRecordStoreTest, OplogTruncateMarkers_NoMarkersGeneratedFromScann
 
     wtrs->postConstructorInit(opCtx.get(), NamespaceString::kRsOplogNamespace);
 
+    // Confirm that small oplogs are processed by scanning.
+    BSONObjBuilder builder;
+    wtrs->getOplogTruncateStats(builder);
+    BSONObj stats = builder.obj();
+    ASSERT_EQ(stats.getField("processingMethod").valueStringDataSafe(), "scanning");
+    ASSERT_GTE(stats.getField("totalTimeProcessingMicros").safeNumberLong(), 0);
+
     auto oplogTruncateMarkers = wtrs->oplogTruncateMarkers();
     ASSERT_FALSE(oplogTruncateMarkers->processedBySampling());
-
     auto numMarkers = oplogTruncateMarkers->numMarkers_forTest();
     ASSERT_EQ(numMarkers, 0U);
 
@@ -1064,9 +1070,15 @@ TEST(WiredTigerRecordStoreTest, OplogTruncateMarkers_Duplicates) {
         wtrs->postConstructorInit(opCtx.get(), NamespaceString::kRsOplogNamespace);
     }
 
-    auto oplogTruncateMarkers = wtrs->oplogTruncateMarkers();
+    // Confirm that sampling occurred.
+    BSONObjBuilder builder;
+    wtrs->getOplogTruncateStats(builder);
+    BSONObj stats = builder.obj();
+    ASSERT_EQ(stats.getField("processingMethod").valueStringDataSafe(), "sampling");
+    ASSERT_GTE(stats.getField("totalTimeProcessingMicros").safeNumberLong(), 0);
 
-    // Confirm that sampling occurred and that some truncate markers were generated.
+    // Confirm that some truncate markers were generated.
+    auto oplogTruncateMarkers = wtrs->oplogTruncateMarkers();
     ASSERT(oplogTruncateMarkers->processedBySampling());
     auto truncateMarkersBefore = oplogTruncateMarkers->numMarkers_forTest();
     ASSERT_GT(truncateMarkersBefore, 0U);

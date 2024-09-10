@@ -400,6 +400,8 @@ TEST_F(CollectionMarkersTest, ScanningMarkerCreation) {
             opCtx.get(), iterator, collNs, kMinBytes, [](const Record& record) {
                 return CollectionTruncateMarkers::RecordIdAndWallTime{record.id, Date_t::now()};
             });
+        ASSERT_EQ(result.methodUsed, CollectionTruncateMarkers::MarkersCreationMethod::Scanning);
+        ASSERT_GTE(result.timeTaken, Microseconds(0));
         ASSERT_EQ(result.leftoverRecordsBytes, kElementSize);
         ASSERT_EQ(result.leftoverRecordsCount, 1);
         ASSERT_EQ(result.markers.size(), 51 / 2);
@@ -448,6 +450,7 @@ TEST_F(CollectionMarkersTest, SamplingMarkerCreation) {
             });
 
         ASSERT_EQ(result.methodUsed, CollectionTruncateMarkers::MarkersCreationMethod::Sampling);
+        ASSERT_GTE(result.timeTaken, Microseconds(0));
         const auto& firstMarker = result.markers.front();
         auto recordCount = firstMarker.records;
         auto recordBytes = firstMarker.bytes;
@@ -496,6 +499,8 @@ TEST_F(CollectionMarkersTest, ScanningAutoYieldingWorks) {
             opCtx.get(), iterator, collNs, kMinBytes, [](const Record& record) {
                 return CollectionTruncateMarkers::RecordIdAndWallTime{record.id, Date_t::now()};
             });
+        ASSERT_EQ(result.methodUsed, CollectionTruncateMarkers::MarkersCreationMethod::Scanning);
+        ASSERT_GTE(result.timeTaken, Microseconds(0));
         ASSERT_EQ(result.leftoverRecordsBytes, kElementSize);
         ASSERT_EQ(result.leftoverRecordsCount, 1);
         ASSERT_EQ(result.markers.size(), kNumElements / 2);
@@ -583,7 +588,6 @@ TEST_F(CollectionMarkersTest, OplogSamplingLogging) {
     static constexpr auto kElementSize = 15;
 
     int totalBytes = 0;
-    int totalRecords = 0;
     auto collNs = NamespaceString::createNamespaceString_forTest("test", "coll");
 
     // Create a collection and insert records into it.
@@ -594,7 +598,6 @@ TEST_F(CollectionMarkersTest, OplogSamplingLogging) {
         for (int round = 0; round < kNumRounds; round++) {
             for (int numBytes = kElementSize; numBytes < kElementSize * 2; numBytes++) {
                 insertElements(opCtx.get(), collNs, numBytes, 1, Timestamp(1, 0));
-                totalRecords++;
                 totalBytes += numBytes;
             }
         }
