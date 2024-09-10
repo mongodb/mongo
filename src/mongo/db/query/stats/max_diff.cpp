@@ -193,6 +193,12 @@ struct AreaDiffComparator {
     }
 };
 
+struct FreqDiffComparator {
+    bool operator()(const ValFreq& a, const ValFreq& b) const {
+        return a._freqDiff > b._freqDiff;
+    }
+};
+
 inline bool isValidValFreq(std::vector<ValFreq>& valFreqVec) {
     return std::any_of(valFreqVec.begin(), valFreqVec.end(), [](ValFreq valFreq) {
         return valFreq._area >= 0.0 && valFreq._areaDiff >= 0.0 && valFreq._normArea >= 0.0 &&
@@ -215,6 +221,9 @@ std::vector<ValFreq> generateTopKBuckets(const DataDistribution& dataDistrib,
         return fillAndReturnPriorityQueueResult(dataDistrib, numBuckets, pq);
     } else if (sortArg == SortArg::kArea) {
         std::priority_queue<ValFreq, std::vector<ValFreq>, AreaComparator> pq;
+        return fillAndReturnPriorityQueueResult(dataDistrib, numBuckets, pq);
+    } else if (sortArg == SortArg::kFreqDiff) {
+        std::priority_queue<ValFreq, std::vector<ValFreq>, FreqDiffComparator> pq;
         return fillAndReturnPriorityQueueResult(dataDistrib, numBuckets, pq);
     }
     MONGO_UNREACHABLE_TASSERT(8674814);
@@ -283,6 +292,7 @@ DataDistribution getDataDistribution(const std::vector<SBEValue>& sortedInput) {
             // first value is picked for a boundary.
             result._freq[i]._area = std::numeric_limits<double>::infinity();
             result._freq[i]._areaDiff = std::numeric_limits<double>::infinity();
+            result._freq[i]._freqDiff = std::numeric_limits<size_t>::infinity();
         } else {
             result._freq[i]._area = boundedCalculateArea(v1, v2, result._freq[i]._freq);
             maxArea = std::max(maxArea, result._freq[i]._area);
@@ -290,6 +300,9 @@ DataDistribution getDataDistribution(const std::vector<SBEValue>& sortedInput) {
                 (i == 1 || result._freq[i - 1]._area == std::numeric_limits<double>::infinity())
                 ? result._freq[i]._area
                 : std::abs(result._freq[i]._area - result._freq[i - 1]._area);
+            result._freq[i]._freqDiff = (i == 1)
+                ? result._freq[i]._freq
+                : std::abs((long)result._freq[i]._freq - (long)result._freq[i - 1]._freq);
             maxAreaDiff = std::max(maxAreaDiff, result._freq[i]._areaDiff);
         }
     }

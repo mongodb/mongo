@@ -36,6 +36,7 @@
 
 #include "mongo/base/string_data.h"
 #include "mongo/db/exec/sbe/values/value.h"
+#include "mongo/db/query/ce/cbp_histogram_ce/test_helpers.h"
 #include "mongo/db/query/ce/histogram_predicate_estimation.h"
 #include "mongo/db/query/ce/test_utils.h"
 #include "mongo/db/query/optimizer/defs.h"
@@ -56,6 +57,12 @@
 namespace mongo::optimizer::ce {
 namespace {
 namespace value = sbe::value;
+
+using stats::TypeCounts;
+using TypeTags = value::TypeTags;
+using TypeProbability = std::pair<value::TypeTags, size_t>;
+using TypeCombination = std::vector<TypeProbability>;
+using TypeCombinations = std::vector<TypeCombination>;
 
 using stats::DataDistribution;
 using stats::genFixedValueArray;
@@ -434,6 +441,44 @@ TEST_F(HistogramTest, MaxDiffEmptyArrays) {
     std::for_each(histograms.begin(), histograms.end(), [emptyArrayCount](auto&& histogram) {
         ASSERT_EQ(histogram->getEmptyArrayCount(), emptyArrayCount);
     });
+}
+
+TEST(HistogramTest, HistogramTopBucketsFreqDiffUniformInt) {
+
+    constexpr size_t nElems = 100;
+    constexpr size_t nBuckets = 10;
+
+    std::vector<stats::SBEValue> data;
+    auto rawData = std::vector<int>{
+        5001,  5001,  5001,  5008,  5008,  5008,  5008,  5008,  5008,  5071,  5071,  5071,  5071,
+        5071,  5071,  5071,  5071,  5071,  5077,  5077,  5077,  5077,  5077,  5077,  5077,  5077,
+        5077,  5077,  5077,  5077,  5100,  5100,  5100,  5100,  5100,  5200,  5200,  5210,  5210,
+        5210,  5210,  5210,  5210,  5210,  5210,  5210,  5210,  5210,  5210,  5210,  5210,  5210,
+        5215,  5215,  5215,  5215,  5215,  5155,  5155,  5573,  5573,  5573,  5573,  5573,  5573,
+        5573,  5573,  5573,  6582,  6582,  6597,  6597,  6597,  6597,  6597,  6597,  6597,  6597,
+        6597,  6597,  7088,  7088,  7088,  7088,  7088,  7088,  7088,  7088,  7088,  7088,  7088,
+        7088,  7088,  7399,  7408,  7408,  7408,  7408,  7408,  7408,  7408,  7408,  7408,  7408,
+        7408,  7408,  7408,  7408,  7408,  8215,  8215,  8215,  8215,  8215,  8215,  8215,  8220,
+        8220,  8454,  8454,  8454,  8454,  8454,  8454,  8454,  8454,  8454,  8454,  8956,  8956,
+        8956,  8956,  8956,  8956,  8956,  8956,  8956,  9872,  9872,  9872,  9872,  9872,  9872,
+        9872,  9872,  9872,  9872,  9872,  9872,  9881,  9881,  9881,  9881,  9881,  10683, 10683,
+        10683, 10683, 10683, 10698, 10698, 10698, 10698, 10698, 10698, 10698, 10698, 10698, 10698,
+        10698, 10698, 10698, 11505, 11505, 11505, 11505, 11505, 11510, 11510, 11510, 11510, 11510,
+        11919, 11919, 11919, 11919, 11919, 11919, 11919, 11919, 11919, 11919, 11919, 11919, 11919,
+        11919, 11919, 11919, 11919, 11919, 11919, 11919, 11919, 12250, 12250, 12250, 12250, 12250};
+    for (size_t i = 0; i < nElems; i++) {
+        const auto [tag, val] = makeInt64Value(rawData[i]);
+        data.emplace_back(tag, val);
+    }
+
+    sortValueVector(data);
+    const DataDistribution& dataDistrib = getDataDistribution(data);
+    auto result = generateTopKBuckets(dataDistrib, nBuckets, stats::SortArg::kFreqDiff);
+
+    std::vector<int> expectedBounds = {1, 3, 4, 5, 7, 8, 9, 10, 11, 13};
+    for (size_t i = 0; i < expectedBounds.size(); i++) {
+        ASSERT_EQ(result[i]._idx, expectedBounds[i]);
+    }
 }
 
 }  // namespace

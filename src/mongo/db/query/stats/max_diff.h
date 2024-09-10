@@ -53,21 +53,23 @@ struct ValFreq {
           _freq(freq),
           _area(kInvalidArea),
           _areaDiff(kInvalidArea),
+          _freqDiff(kInvalidArea),
           _normArea(kInvalidArea),
           _normAreaDiff(kInvalidArea) {}
 
     std::string toString() const {
         std::ostringstream os;
         os << "idx: " << _idx << ", freq: " << _freq << ", area: " << _area
-           << ", areaDiff:" << _areaDiff << ", normArea: " << _normArea
-           << ", normAreaDiff: " << _normAreaDiff;
+           << ", areaDiff:" << _areaDiff << ", freqDiff:" << _freqDiff
+           << ", normArea: " << _normArea << ", normAreaDiff: " << _normAreaDiff;
         return os.str();
     }
 
     size_t _idx;           // Original index according to value order.
     size_t _freq;          // Frequency of the value.
     double _area;          // Derived as: spread * frequency
-    double _areaDiff;      // Difference of thwo neighboring areas
+    double _areaDiff;      // Difference of two neighboring areas
+    long _freqDiff;        // Difference of two neighboring frequencies
     double _normArea;      // Area normalized to the maximum in a type class.
     double _normAreaDiff;  // Area difference normalized to the maximum difference in a type class.
 };
@@ -93,10 +95,12 @@ struct DataDistribution {
  * Functions below use kArea as a default SortArg value.
  */
 enum class SortArg {
-    kArea,     // Sorting on kArea: choose (numBuckets - 1) largest areas to determine bucket
-               // boundaries
-    kAreaDiff  // Sorting on kAreaDiff: choose (numBuckets - 1) largest difference in areas to
-               // determine bucket boundaries
+    kArea,      // Sorting on kArea: choose (numBuckets - 1) largest areas to determine bucket
+                // boundaries
+    kAreaDiff,  // Sorting on kAreaDiff: choose (numBuckets - 1) largest difference in areas to
+                // determine bucket boundaries
+    kFreqDiff   // Sorting on kFreqDiff: choose (numBuckets - 1) largest difference in value
+                // frequency to determine bucket boundaries
 };
 
 
