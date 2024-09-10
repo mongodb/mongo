@@ -1154,5 +1154,20 @@ assert = (function() {
         assert.soon(funcWithRetries, msg, timeout, interval, {runHangAnalyzer});
     };
 
+    /*
+     * Calls a function 'func' at repeated intervals of 'interval' milliseconds until either func()
+     * returns true or more than 'timeout' milliseconds have elapsed. Throws an exception with
+     * message 'msg' after timing out.
+     *
+     * If 'func' encounters a NetworkError, the exception will be ignored, and 'func' will be called
+     * again.
+     */
+    assert.soonRetryOnNetworkErrors = function(
+        func, msg, timeout, interval, {runHangAnalyzer = true} = {}) {
+        let acceptableErrors = Array.from(ErrorCodes.NetworkError);
+        assert.soonRetryOnAcceptableErrors(
+            func, acceptableErrors, msg, timeout, interval, runHangAnalyzer);
+    };
+
     return assert;
 })();
