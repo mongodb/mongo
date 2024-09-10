@@ -381,7 +381,7 @@ TEST_F(DocumentSourceRankFusionTest, ErrorsIfInternalSearchMongotRemoteUsed) {
 
     ASSERT_THROWS_CODE(DocumentSourceRankFusion::createFromBson(spec.firstElement(), getExpCtx()),
                        AssertionException,
-                       9191103);
+                       16436);
 }
 
 TEST_F(DocumentSourceRankFusionTest, CheckLimitSampleAllowed) {
@@ -422,13 +422,13 @@ TEST_F(DocumentSourceRankFusionTest, ErrorsIfUnionWith) {
                },
                {
                 pipeline: [
-                    { $unionWith: 
-                        { coll: "novels" } 
+                    { $unionWith:
+                        { coll: "novels" }
                     },
                     { $sort: {author: 1} }
                 ]
                }
-               
+
             ]
         }
     })");

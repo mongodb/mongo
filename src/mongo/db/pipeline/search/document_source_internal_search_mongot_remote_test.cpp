@@ -40,6 +40,17 @@ namespace {
 
 using InternalSearchMongotRemoteTest = AggregationContextFixture;
 
+boost::intrusive_ptr<DocumentSource> createFromBson(
+    BSONElement elem, const boost::intrusive_ptr<ExpressionContext>& expCtx) {
+    auto specObj = elem.embeddedObject();
+    auto serviceContext = expCtx->opCtx->getServiceContext();
+    auto executor = executor::getMongotTaskExecutor(serviceContext);
+    // The serialization for unsharded search does not contain a 'mongotQuery' field.
+    InternalSearchMongotRemoteSpec spec = InternalSearchMongotRemoteSpec::parse(
+        IDLParserContext(DocumentSourceInternalSearchMongotRemote::kStageName), specObj);
+    return new DocumentSourceInternalSearchMongotRemote(std::move(spec), expCtx, executor);
+}
+
 TEST_F(InternalSearchMongotRemoteTest, SearchMongotRemoteNotAllowedInTransaction) {
     auto expCtx = getExpCtx();
     expCtx->uuid = UUID::gen();
@@ -52,7 +63,7 @@ TEST_F(InternalSearchMongotRemoteTest, SearchMongotRemoteNotAllowedInTransaction
     auto spec = specObj.firstElement();
 
     // Set up the mongotRemote stage.
-    auto mongotRemoteStage = DocumentSourceInternalSearchMongotRemote::createFromBson(spec, expCtx);
+    auto mongotRemoteStage = createFromBson(spec, expCtx);
     ASSERT_THROWS_CODE(Pipeline::create({mongotRemoteStage}, expCtx),
                        AssertionException,
                        ErrorCodes::OperationNotSupportedInTransaction);
@@ -70,7 +81,7 @@ TEST_F(InternalSearchMongotRemoteTest, SearchMongotRemoteAllowsUnknownFields) {
     // Because internalSearchMongotRemoteSpec is {strict: false}, the superfluous fields on the
     // request should be ignored and the DocumentSourceInternalSearchMongotRemote stage should be
     // serialized successfully.
-    auto mongotRemoteStage = DocumentSourceInternalSearchMongotRemote::createFromBson(spec, expCtx);
+    auto mongotRemoteStage = createFromBson(spec, expCtx);
     ASSERT_TRUE(mongotRemoteStage->getNext().isEOF());
 }
 
@@ -84,7 +95,7 @@ TEST_F(InternalSearchMongotRemoteTest, SearchMongotRemoteReturnsEOFWhenCollDoesN
     auto spec = specObj.firstElement();
 
     // Set up the mongotRemote stage.
-    auto mongotRemoteStage = DocumentSourceInternalSearchMongotRemote::createFromBson(spec, expCtx);
+    auto mongotRemoteStage = createFromBson(spec, expCtx);
     ASSERT_TRUE(mongotRemoteStage->getNext().isEOF());
 }
 
@@ -92,8 +103,7 @@ TEST_F(InternalSearchMongotRemoteTest, RedactsCorrectly) {
     auto spec = BSON("$_internalSearchMongotRemote"
                      << BSON("mongotQuery" << BSONObj() << "metadataMergeProtocolVersion" << 1));
 
-    auto mongotRemoteStage =
-        DocumentSourceInternalSearchMongotRemote::createFromBson(spec.firstElement(), getExpCtx());
+    auto mongotRemoteStage = createFromBson(spec.firstElement(), getExpCtx());
 
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
         R"({
@@ -125,8 +135,7 @@ TEST_F(InternalSearchMongotRemoteTest, RedactsCorrectlyWithMergingPipeline) {
         }
     })");
 
-    auto mongotRemoteStage =
-        DocumentSourceInternalSearchMongotRemote::createFromBson(spec.firstElement(), getExpCtx());
+    auto mongotRemoteStage = createFromBson(spec.firstElement(), getExpCtx());
 
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
         R"({

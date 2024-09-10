@@ -53,9 +53,6 @@ class DocumentSourceInternalSearchMongotRemote : public DocumentSource {
 public:
     static constexpr StringData kStageName = "$_internalSearchMongotRemote"_sd;
 
-    static boost::intrusive_ptr<DocumentSource> createFromBson(
-        BSONElement elem, const boost::intrusive_ptr<ExpressionContext>& pExpCtx);
-
     static StageConstraints getSearchDefaultConstraints() {
         StageConstraints constraints(StreamType::kStreaming,
                                      PositionRequirement::kFirst,
@@ -223,17 +220,6 @@ private:
 
     boost::optional<BSONObj> _getNext();
 
-    /**
-     * Helper function that determines whether the document source references the $$SEARCH_META
-     * variable.
-     */
-    static bool hasReferenceToSearchMeta(const DocumentSource& ds) {
-        std::set<Variables::Id> refs;
-        ds.addVariableRefs(&refs);
-        return Variables::hasVariableReferenceTo(refs,
-                                                 std::set<Variables::Id>{Variables::kSearchMetaId});
-    }
-
     InternalSearchMongotRemoteSpec _spec;
 
     std::shared_ptr<executor::TaskExecutor> _taskExecutor;
@@ -267,12 +253,4 @@ private:
         _searchIdLookupMetrics = nullptr;
 };
 
-namespace search_meta {
-/**
- * This function walks the pipeline and verifies that if there is a $search stage in a sub-pipeline
- * that there is no $$SEARCH_META access.
- */
-void assertSearchMetaAccessValid(const Pipeline::SourceContainer& pipeline);
-
-}  // namespace search_meta
 }  // namespace mongo
