@@ -193,17 +193,14 @@ public:
                                                 serviceContext);
             _oplogApplierMetrics =
                 std::make_unique<ReshardingOplogApplierMetrics>(_metrics.get(), boost::none);
+            _applier = std::make_unique<ReshardingOplogApplicationRules>(
+                _outputNss,
+                std::vector<NamespaceString>{_myStashNss, _otherStashNss},
+                0U,
+                _myDonorId,
+                makeChunkManagerForSourceCollection(),
+                _oplogApplierMetrics.get());
         }
-    }
-
-    void initializeApplier(int numDonorShards) {
-        _applier = std::make_unique<ReshardingOplogApplicationRules>(
-            _outputNss,
-            std::vector<NamespaceString>{_myStashNss, _otherStashNss},
-            0U,
-            _myDonorId,
-            makeChunkManagerForSourceCollection(numDonorShards),
-            _oplogApplierMetrics.get());
     }
 
     ReshardingOplogApplicationRules* applier() {
@@ -357,7 +354,7 @@ private:
                             boost::none /* clusterTime */);
     }
 
-    ChunkManager makeChunkManagerForSourceCollection(int numDonorShards) {
+    ChunkManager makeChunkManagerForSourceCollection() {
         // Create three chunks, two that are owned by this donor shard and one owned by some other
         // shard. The chunk for {sk: null} is owned by this donor shard to allow test cases to omit
         // the shard key field when it isn't relevant.
@@ -373,7 +370,7 @@ private:
                       ChunkRange{BSON(_currentShardKey << -std::numeric_limits<double>::infinity()),
                                  BSON(_currentShardKey << 0)},
                       ChunkVersion({epoch, Timestamp(1, 1)}, {100, 1}),
-                      numDonorShards == 1 ? _myDonorId : _otherDonorId},
+                      _otherDonorId},
             ChunkType{_sourceUUID,
                       ChunkRange{BSON(_currentShardKey << 0), BSON(_currentShardKey << MAXKEY)},
                       ChunkVersion({epoch, Timestamp(1, 1)}, {100, 2}),
@@ -428,37 +425,25 @@ private:
 };
 
 TEST_F(ReshardingOplogCrudApplicationTest, InsertOpInsertsIntoOuputCollection) {
-    auto runTest = [&](int numDonorShards) {
-        initializeApplier(numDonorShards);
+    // This case tests applying rule #2 described in
+    // ReshardingOplogApplicationRules::_applyInsert_inlock.
+    {
+        auto opCtx = makeOperationContext();
+        ASSERT_OK(
+            applier()->applyOperation(opCtx.get(), boost::none, makeInsertOp(BSON("_id" << 1))));
+        ASSERT_OK(
+            applier()->applyOperation(opCtx.get(), boost::none, makeInsertOp(BSON("_id" << 2))));
+    }
 
-        // If the number of donor shards is equal to 1, this case tests applying the insert
-        // operation against the output collection without checking the stash collection since by
-        // design there cannot be _id conflicts to resolve. If the number of donor shards is greater
-        // than 1, this case tests applying rule #2 described in
-        // ReshardingOplogApplicationRules::_applyInsert_inlock.
-        {
-            auto opCtx = makeOperationContext();
-            ASSERT_OK(applier()->applyOperation(
-                opCtx.get(), boost::none, makeInsertOp(BSON("_id" << 1))));
-            ASSERT_OK(applier()->applyOperation(
-                opCtx.get(), boost::none, makeInsertOp(BSON("_id" << 2))));
-        }
-
-        {
-            auto opCtx = makeOperationContext();
-            checkCollectionContents(opCtx.get(), outputNss(), {BSON("_id" << 1), BSON("_id" << 2)});
-            checkCollectionContents(opCtx.get(), myStashNss(), {});
-            checkCollectionContents(opCtx.get(), otherStashNss(), {});
-        }
-    };
-
-    runTest(1 /* numDonorShards */);
-    runTest(2 /* numDonorShards */);
+    {
+        auto opCtx = makeOperationContext();
+        checkCollectionContents(opCtx.get(), outputNss(), {BSON("_id" << 1), BSON("_id" << 2)});
+        checkCollectionContents(opCtx.get(), myStashNss(), {});
+        checkCollectionContents(opCtx.get(), otherStashNss(), {});
+    }
 }
 
 TEST_F(ReshardingOplogCrudApplicationTest, InsertOpBecomesReplacementUpdateOnOutputCollection) {
-    initializeApplier(2 /* numDonorShards */);
-
     // This case tests applying rule #3 described in
     // ReshardingOplogApplicationRules::_applyInsert_inlock.
     //
@@ -489,8 +474,6 @@ TEST_F(ReshardingOplogCrudApplicationTest, InsertOpBecomesReplacementUpdateOnOut
 }
 
 TEST_F(ReshardingOplogCrudApplicationTest, InsertOpWritesToStashCollectionAfterConflict) {
-    initializeApplier(2 /* numDonorShards */);
-
     // This case tests applying rules #1 and #4 described in
     // ReshardingOplogApplicationRules::_applyInsert_inlock.
     //
@@ -539,8 +522,6 @@ TEST_F(ReshardingOplogCrudApplicationTest, InsertOpWritesToStashCollectionAfterC
 }
 
 TEST_F(ReshardingOplogCrudApplicationTest, UpdateOpModifiesStashCollectionAfterInsertConflict) {
-    initializeApplier(2 /* numDonorShards */);
-
     // This case tests applying rule #1 described in
     // ReshardingOplogApplicationRules::_applyUpdate_inlock.
     //
@@ -581,8 +562,6 @@ TEST_F(ReshardingOplogCrudApplicationTest, UpdateOpModifiesStashCollectionAfterI
 }
 
 TEST_F(ReshardingOplogCrudApplicationTest, UpdateOpIsNoopWhenDifferentOwningDonorOrNotMatching) {
-    initializeApplier(2 /* numDonorShards */);
-
     // This case tests applying rules #2 and #3 described in
     // ReshardingOplogApplicationRules::_applyUpdate_inlock.
     //
@@ -637,62 +616,49 @@ TEST_F(ReshardingOplogCrudApplicationTest, UpdateOpIsNoopWhenDifferentOwningDono
 }
 
 TEST_F(ReshardingOplogCrudApplicationTest, UpdateOpModifiesOutputCollection) {
-    auto runTest = [&](int numDonorShards) {
-        initializeApplier(numDonorShards);
+    // This case tests applying rule #4 described in
+    // ReshardingOplogApplicationRules::_applyUpdate_inlock.
+    {
+        auto opCtx = makeOperationContext();
+        ASSERT_OK(applier()->applyOperation(
+            opCtx.get(), boost::none, makeInsertOp(BSON("_id" << 1 << sk() << 1))));
+        ASSERT_OK(applier()->applyOperation(
+            opCtx.get(), boost::none, makeInsertOp(BSON("_id" << 2 << sk() << 2))));
 
-        // If the number of donor shards is equal to 1, this case tests applying the update
-        // operation against the output collection without checking the stash collection since by
-        // design there cannot be _id conflicts to resolve. If the number of donor shards is greater
-        // than 1, this case tests applying rule #4 described in
-        // ReshardingOplogApplicationRules::_applyUpdate_inlock.
-        {
-            auto opCtx = makeOperationContext();
-            ASSERT_OK(applier()->applyOperation(
-                opCtx.get(), boost::none, makeInsertOp(BSON("_id" << 1 << sk() << 1))));
-            ASSERT_OK(applier()->applyOperation(
-                opCtx.get(), boost::none, makeInsertOp(BSON("_id" << 2 << sk() << 2))));
+        checkCollectionContents(opCtx.get(),
+                                outputNss(),
+                                {BSON("_id" << 1 << sk() << 1), BSON("_id" << 2 << sk() << 2)});
+    }
 
-            checkCollectionContents(opCtx.get(),
-                                    outputNss(),
-                                    {BSON("_id" << 1 << sk() << 1), BSON("_id" << 2 << sk() << 2)});
-        }
+    {
+        auto opCtx = makeOperationContext();
+        ASSERT_OK(applier()->applyOperation(
+            opCtx.get(),
+            boost::none,
+            makeUpdateOp(BSON("_id" << 1),
+                         update_oplog_entry::makeDeltaOplogEntry(
+                             BSON(doc_diff::kUpdateSectionFieldName << BSON("x" << 1))))));
+        ASSERT_OK(applier()->applyOperation(
+            opCtx.get(),
+            boost::none,
+            makeUpdateOp(BSON("_id" << 2),
+                         update_oplog_entry::makeDeltaOplogEntry(
+                             BSON(doc_diff::kUpdateSectionFieldName << BSON("x" << 2))))));
+    }
 
-        {
-            auto opCtx = makeOperationContext();
-            ASSERT_OK(applier()->applyOperation(
-                opCtx.get(),
-                boost::none,
-                makeUpdateOp(BSON("_id" << 1),
-                             update_oplog_entry::makeDeltaOplogEntry(
-                                 BSON(doc_diff::kUpdateSectionFieldName << BSON("x" << 1))))));
-            ASSERT_OK(applier()->applyOperation(
-                opCtx.get(),
-                boost::none,
-                makeUpdateOp(BSON("_id" << 2),
-                             update_oplog_entry::makeDeltaOplogEntry(
-                                 BSON(doc_diff::kUpdateSectionFieldName << BSON("x" << 2))))));
-        }
-
-        // We should have updated both documents in the output collection to include the new field
-        // "x".
-        {
-            auto opCtx = makeOperationContext();
-            checkCollectionContents(opCtx.get(),
-                                    outputNss(),
-                                    {BSON("_id" << 1 << sk() << 1 << "x" << 1),
-                                     BSON("_id" << 2 << sk() << 2 << "x" << 2)});
-            checkCollectionContents(opCtx.get(), myStashNss(), {});
-            checkCollectionContents(opCtx.get(), otherStashNss(), {});
-        }
-    };
-
-    runTest(1 /* numDonorShards */);
-    runTest(2 /* numDonorShards */);
+    // We should have updated both documents in the output collection to include the new field "x".
+    {
+        auto opCtx = makeOperationContext();
+        checkCollectionContents(
+            opCtx.get(),
+            outputNss(),
+            {BSON("_id" << 1 << sk() << 1 << "x" << 1), BSON("_id" << 2 << sk() << 2 << "x" << 2)});
+        checkCollectionContents(opCtx.get(), myStashNss(), {});
+        checkCollectionContents(opCtx.get(), otherStashNss(), {});
+    }
 }
 
 TEST_F(ReshardingOplogCrudApplicationTest, DeleteOpRemovesFromStashCollectionAfterInsertConflict) {
-    initializeApplier(2 /* numDonorShards */);
-
     // This case tests applying rule #1 described in
     // ReshardingOplogApplicationRules::_applyDelete_inlock.
     //
@@ -727,8 +693,6 @@ TEST_F(ReshardingOplogCrudApplicationTest, DeleteOpRemovesFromStashCollectionAft
 }
 
 TEST_F(ReshardingOplogCrudApplicationTest, DeleteOpIsNoopWhenDifferentOwningDonorOrNotMatching) {
-    initializeApplier(2 /* numDonorShards */);
-
     // This case tests applying rules #2 and #3 described in
     // ReshardingOplogApplicationRules::_applyDelete_inlock.
     //
@@ -775,77 +739,57 @@ TEST_F(ReshardingOplogCrudApplicationTest, DeleteOpIsNoopWhenDifferentOwningDono
 }
 
 TEST_F(ReshardingOplogCrudApplicationTest, DeleteOpRemovesFromOutputCollection) {
-    auto runTest = [&](int numDonorShards) {
-        initializeApplier(numDonorShards);
+    // This case tests applying rule #4 described in
+    // ReshardingOplogApplicationRules::_applyDelete_inlock.
+    {
+        auto opCtx = makeOperationContext();
+        ASSERT_OK(applier()->applyOperation(
+            opCtx.get(), boost::none, makeInsertOp(BSON("_id" << 1 << sk() << 1))));
+        ASSERT_OK(applier()->applyOperation(
+            opCtx.get(), boost::none, makeInsertOp(BSON("_id" << 2 << sk() << 2))));
 
-        // If the number of donor shards is equal to 1, this case tests applying the delete
-        // operation against the output collection without checking the stash collection since by
-        // design there cannot be _id conflicts to resolve. If the number of donor shards is greater
-        // than 1, this case tests applying rule #4 described in
-        // ReshardingOplogApplicationRules::_applyDelete_inlock.
-        {
-            auto opCtx = makeOperationContext();
-            ASSERT_OK(applier()->applyOperation(
-                opCtx.get(), boost::none, makeInsertOp(BSON("_id" << 1 << sk() << 1))));
-            ASSERT_OK(applier()->applyOperation(
-                opCtx.get(), boost::none, makeInsertOp(BSON("_id" << 2 << sk() << 2))));
+        checkCollectionContents(opCtx.get(),
+                                outputNss(),
+                                {BSON("_id" << 1 << sk() << 1), BSON("_id" << 2 << sk() << 2)});
+    }
 
-            checkCollectionContents(opCtx.get(),
-                                    outputNss(),
-                                    {BSON("_id" << 1 << sk() << 1), BSON("_id" << 2 << sk() << 2)});
+    const auto beforeDeleteOpTime = repl::ReplClientInfo::forClient(*getClient()).getLastOp();
+
+    {
+        auto opCtx = makeOperationContext();
+        ASSERT_OK(
+            applier()->applyOperation(opCtx.get(), boost::none, makeDeleteOp(BSON("_id" << 1))));
+        ASSERT_OK(
+            applier()->applyOperation(opCtx.get(), boost::none, makeDeleteOp(BSON("_id" << 2))));
+    }
+
+    // None of the stash collections have documents with _id == [op _id], so we should not have
+    // found any documents to insert into the output collection with either {_id: 1} or {_id: 2}.
+    {
+        auto opCtx = makeOperationContext();
+        checkCollectionContents(opCtx.get(), outputNss(), {});
+        checkCollectionContents(opCtx.get(), myStashNss(), {});
+        checkCollectionContents(opCtx.get(), otherStashNss(), {});
+    }
+
+    // Assert that the delete on the output collection was run in a transaction by looking in the
+    // oplog for an applyOps entry with a "d" op on the output collection.
+    {
+        auto opCtx = makeOperationContext();
+        auto applyOpsInfo = findApplyOpsNewerThan(opCtx.get(), beforeDeleteOpTime.getTimestamp());
+        ASSERT_EQ(applyOpsInfo.size(), 2U);
+        for (size_t i = 0; i < applyOpsInfo.size(); ++i) {
+            ASSERT_EQ(applyOpsInfo[i].operations.size(), 1U);
+            ASSERT_EQ(OpType_serializer(applyOpsInfo[i].operations[0].getOpType()),
+                      OpType_serializer(repl::OpTypeEnum::kDelete));
+            ASSERT_EQ(applyOpsInfo[i].operations[0].getNss(), outputNss());
+            ASSERT_BSONOBJ_BINARY_EQ(applyOpsInfo[i].operations[0].getObject()["_id"].wrap(),
+                                     BSON("_id" << int32_t(i + 1)));
         }
-
-        const auto beforeDeleteOpTime = repl::ReplClientInfo::forClient(*getClient()).getLastOp();
-
-        {
-            auto opCtx = makeOperationContext();
-            ASSERT_OK(applier()->applyOperation(
-                opCtx.get(), boost::none, makeDeleteOp(BSON("_id" << 1))));
-            ASSERT_OK(applier()->applyOperation(
-                opCtx.get(), boost::none, makeDeleteOp(BSON("_id" << 2))));
-        }
-
-        // None of the stash collections have documents with _id == [op _id], so we should not have
-        // found any documents to insert into the output collection with either {_id: 1} or {_id:
-        // 2}.
-        {
-            auto opCtx = makeOperationContext();
-            checkCollectionContents(opCtx.get(), outputNss(), {});
-            checkCollectionContents(opCtx.get(), myStashNss(), {});
-            checkCollectionContents(opCtx.get(), otherStashNss(), {});
-        }
-
-        // If the number of the donor shards is greater than 1, the delete on the output collection
-        // should have been performed in a transaction, i.e. there should be an applyOps entry with
-        // a "d" op on the output collection.
-        {
-            auto opCtx = makeOperationContext();
-            auto applyOpsInfo =
-                findApplyOpsNewerThan(opCtx.get(), beforeDeleteOpTime.getTimestamp());
-
-            if (numDonorShards == 1) {
-                ASSERT_EQ(applyOpsInfo.size(), 0U);
-                return;
-            }
-            ASSERT_EQ(applyOpsInfo.size(), 2U);
-            for (size_t i = 0; i < applyOpsInfo.size(); ++i) {
-                ASSERT_EQ(applyOpsInfo[i].operations.size(), 1U);
-                ASSERT_EQ(OpType_serializer(applyOpsInfo[i].operations[0].getOpType()),
-                          OpType_serializer(repl::OpTypeEnum::kDelete));
-                ASSERT_EQ(applyOpsInfo[i].operations[0].getNss(), outputNss());
-                ASSERT_BSONOBJ_BINARY_EQ(applyOpsInfo[i].operations[0].getObject()["_id"].wrap(),
-                                         BSON("_id" << int32_t(i + 1)));
-            }
-        }
-    };
-
-    runTest(1 /* numDonorShards */);
-    runTest(2 /* numDonorShards */);
+    }
 }
 
 TEST_F(ReshardingOplogCrudApplicationTest, DeleteOpAtomicallyMovesFromOtherStashCollection) {
-    initializeApplier(2 /* numDonorShards */);
-
     // This case tests applying rule #4 described in
     // ReshardingOplogApplicationRules::_applyDelete_inlock.
     //

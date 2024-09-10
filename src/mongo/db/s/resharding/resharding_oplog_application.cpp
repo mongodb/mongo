@@ -123,14 +123,16 @@ ReshardingOplogApplicationRules::ReshardingOplogApplicationRules(
     size_t myStashIdx,
     ShardId donorShardId,
     ChunkManager sourceChunkMgr,
-    ReshardingOplogApplierMetrics* applierMetrics)
+    ReshardingOplogApplierMetrics* applierMetrics,
+    bool isCapped)
     : _outputNss(std::move(outputNss)),
       _allStashNss(std::move(allStashNss)),
       _myStashIdx(myStashIdx),
       _myStashNss(_allStashNss.at(_myStashIdx)),
       _donorShardId(std::move(donorShardId)),
       _sourceChunkMgr(std::move(sourceChunkMgr)),
-      _applierMetrics(applierMetrics) {}
+      _applierMetrics(applierMetrics),
+      _isCapped(isCapped) {}
 
 Status ReshardingOplogApplicationRules::applyOperation(
     OperationContext* opCtx,
@@ -253,13 +255,6 @@ void ReshardingOplogApplicationRules::_applyInsert_inlock(OperationContext* opCt
 
     BSONObj oField = op.getObject();
 
-    if (_sourceChunkMgr.getNShardsOwningChunks() == 1) {
-        // Insert into the output collection since the source collection exists only on a single
-        // shard so by design cannot have any _id conflicts to resolve.
-        uassertStatusOK(Helpers::insert(opCtx, outputColl, oField));
-        return;
-    }
-
     // If the 'o' field does not have an _id, the oplog entry is corrupted.
     auto idField = oField["_id"];
     uassert(ErrorCodes::NoSuchKey,
@@ -364,25 +359,6 @@ void ReshardingOplogApplicationRules::_applyUpdate_inlock(OperationContext* opCt
     auto updateMod = write_ops::UpdateModification::parseFromOplogEntry(
         oField, write_ops::UpdateModification::DiffOptions{});
 
-    auto updateOutputCollection = [&] {
-        auto request = UpdateRequest();
-        request.setNamespaceString(_outputNss);
-        request.setQuery(idQuery);
-        request.setUpdateModification(std::move(updateMod));
-        request.setUpsert(false);
-        request.setFromOplogApplication(true);
-        UpdateResult ur = update(opCtx, outputColl, request);
-
-        invariant(ur.numMatched != 0);
-    };
-
-    if (_sourceChunkMgr.getNShardsOwningChunks() == 1) {
-        // Update the doc in the output collection since the source collection exists only on a
-        // single shard so by design cannot have any _id conflicts to resolve.
-        updateOutputCollection();
-        return;
-    }
-
     // First, query the conflict stash collection using [op _id] as the query. If a doc exists,
     // apply rule #1 and update the doc from the stash collection.
     auto stashCollDoc = _queryStashCollById(opCtx, stashColl.getCollectionPtr(), idQuery);
@@ -421,7 +397,15 @@ void ReshardingOplogApplicationRules::_applyUpdate_inlock(OperationContext* opCt
 
     // A doc with _id == [op _id] exists and is owned by '_donorShardId'. Apply rule #4 and update
     // the doc in the ouput collection.
-    updateOutputCollection();
+    auto request = UpdateRequest();
+    request.setNamespaceString(_outputNss);
+    request.setQuery(idQuery);
+    request.setUpdateModification(std::move(updateMod));
+    request.setUpsert(false);
+    request.setFromOplogApplication(true);
+    UpdateResult ur = update(opCtx, outputColl, request);
+
+    invariant(ur.numMatched != 0);
 }
 
 void ReshardingOplogApplicationRules::_applyDelete(
@@ -457,9 +441,12 @@ void ReshardingOplogApplicationRules::_applyDelete(
     BSONObj idQuery = idField.wrap();
     const NamespaceString outputNss = op.getNss();
 
-    if (_sourceChunkMgr.getNShardsOwningChunks() == 1) {
-        // Delete from the output collection since the source collection exists only on a single
-        // shard so by design cannot have any _id conflicts to resolve.
+    /*
+     * Capped collections are unsplittable collections which exist on a single shard, so stash
+     * collections are redundant for them since they can't have duplicate _id values.
+     * TODO (SERVER-90821): Use this for all unsplittable collections.
+     */
+    if (_isCapped) {
         WriteUnitOfWork wuow(opCtx);
         const auto outputCappedColl = acquireCollectionAndAssertExists(opCtx, _outputNss);
 
@@ -471,6 +458,7 @@ void ReshardingOplogApplicationRules::_applyDelete(
             return;
         }
 
+        // Delete from the output collection
         invariant(!outputCollDoc.isEmpty());
         auto nDeleted = deleteObjects(opCtx, outputCappedColl, idQuery, true /* justOne */);
         invariant(nDeleted != 0);
