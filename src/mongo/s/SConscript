@@ -12,6 +12,46 @@ Import(
 
 env = env.Clone()
 
+if "ldap" in env.get("MONGO_ENTERPRISE_FEATURES", []):
+    ldapconf = Configure(env)
+
+    if env.TargetOSIs("windows"):
+        ldapconf.env["MONGO_LDAP_LIB"] = ["Wldap32"]
+    else:
+        have_ldap_h = ldapconf.CheckLibWithHeader(
+            "ldap",
+            ["ldap.h"],
+            "C",
+            'ldap_is_ldap_url("ldap://127.0.0.1");',
+            autoadd=False,
+        )
+
+        have_lber_h = ldapconf.CheckLibWithHeader(
+            "lber",
+            ["lber.h"],
+            "C",
+            "ber_free(NULL, 0);",
+            autoadd=False,
+        )
+
+        if have_ldap_h:
+            ldapconf.env.AppendUnique(MONGO_LDAP_LIB=["ldap"])
+        else:
+            env.ConfError(
+                "Could not find <ldap.h> and ldap library from OpenLDAP, "
+                "required for LDAP authorization in the enterprise build"
+            )
+
+        if have_lber_h:
+            ldapconf.env.AppendUnique(MONGO_LDAP_LIB=["lber"])
+        else:
+            env.ConfError(
+                "Could not find <lber.h> and lber library from OpenLDAP, "
+                "required for LDAP authorizaton in the enterprise build"
+            )
+
+    env = ldapconf.Finish()
+
 env.SConscript(
     must_exist=1,
     dirs=[
@@ -493,9 +533,7 @@ env.Program(
         "integration-tests",
         "servers",
     ],
-    SYSLIBDEPS="Wldap32"
-    if env.TargetOSIs("windows") and "ldap" in env.get("MONGO_ENTERPRISE_FEATURES", [])
-    else "",
+    SYSLIBDEPS=env.get("MONGO_LDAP_LIB", []),
 )
 
 env.Library(
