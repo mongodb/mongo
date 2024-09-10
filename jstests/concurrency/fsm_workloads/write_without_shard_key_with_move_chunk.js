@@ -90,7 +90,8 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
              // So, if the range deleter has not yet cleaned up that document when the chunk is
              // moved back to the original shard, the moveChunk may fail as a result of a duplicate
              // key error on the recipient.
-             err.message.includes("Location51008") || err.message.includes("Location6718402"));
+             err.message.includes("Location51008") || err.message.includes("Location6718402") ||
+             err.message.includes("Location16977"));
     };
 
     return $config;
