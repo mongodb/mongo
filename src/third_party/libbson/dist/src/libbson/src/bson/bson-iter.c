@@ -1944,7 +1944,11 @@ bson_iter_visit_all (bson_iter_t *iter,             /* INOUT */
 
          bson_iter_document (iter, &doclen, &docbuf);
 
-         if (bson_init_static (&b, docbuf, doclen) && VISIT_DOCUMENT (iter, key, &b, data)) {
+         if (!bson_init_static (&b, docbuf, doclen)) {
+            iter->err_off = iter->off;
+            break;
+         }
+         if (VISIT_DOCUMENT (iter, key, &b, data)) {
             return true;
          }
       } break;
@@ -1955,7 +1959,11 @@ bson_iter_visit_all (bson_iter_t *iter,             /* INOUT */
 
          bson_iter_array (iter, &doclen, &docbuf);
 
-         if (bson_init_static (&b, docbuf, doclen) && VISIT_ARRAY (iter, key, &b, data)) {
+         if (!bson_init_static (&b, docbuf, doclen)) {
+            iter->err_off = iter->off;
+            break;
+         }
+         if (VISIT_ARRAY (iter, key, &b, data)) {
             return true;
          }
       } break;
@@ -2079,7 +2087,11 @@ bson_iter_visit_all (bson_iter_t *iter,             /* INOUT */
             return true;
          }
 
-         if (bson_init_static (&b, docbuf, doclen) && VISIT_CODEWSCOPE (iter, key, length, code, &b, data)) {
+         if (!bson_init_static (&b, docbuf, doclen)) {
+            iter->err_off = iter->off;
+            break;
+         }
+         if (VISIT_CODEWSCOPE (iter, key, length, code, &b, data)) {
             return true;
          }
       } break;

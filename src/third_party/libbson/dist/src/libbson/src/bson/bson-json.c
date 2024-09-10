@@ -362,20 +362,27 @@ _noop (void)
       return;                                                                                                \
    } else                                                                                                    \
       (void) 0
-#define HANDLE_OPTION(_selection_statement, _key, _type, _state)                                 \
-   _selection_statement (len == strlen (_key) && strncmp ((const char *) val, (_key), len) == 0) \
-   {                                                                                             \
-      if (bson->bson_type && bson->bson_type != (_type)) {                                       \
-         _bson_json_read_set_error (reader,                                                      \
-                                    "Invalid key \"%s\".  Looking for values "                   \
-                                    "for type \"%s\", got \"%s\"",                               \
-                                    (_key),                                                      \
-                                    _bson_json_type_name (bson->bson_type),                      \
-                                    _bson_json_type_name (_type));                               \
-         return;                                                                                 \
-      }                                                                                          \
-      bson->bson_type = (_type);                                                                 \
-      bson->bson_state = (_state);                                                               \
+
+#define HANDLE_OPTION_KEY_COMPARE(_key) (len == strlen (_key) && memcmp (key, (_key), len) == 0)
+
+#define HANDLE_OPTION_TYPE_CHECK(_key, _type)                               \
+   if (bson->bson_type && bson->bson_type != (_type)) {                     \
+      _bson_json_read_set_error (reader,                                    \
+                                 "Invalid key \"%s\".  Looking for values " \
+                                 "for type \"%s\", got \"%s\"",             \
+                                 (_key),                                    \
+                                 _bson_json_type_name (bson->bson_type),    \
+                                 _bson_json_type_name (_type));             \
+      return;                                                               \
+   }                                                                        \
+   ((void) 0)
+
+#define HANDLE_OPTION(_selection_statement, _key, _type, _state) \
+   _selection_statement (HANDLE_OPTION_KEY_COMPARE (_key))       \
+   {                                                             \
+      HANDLE_OPTION_TYPE_CHECK (_key, _type);                    \
+      bson->bson_type = (_type);                                 \
+      bson->bson_state = (_state);                               \
    }
 
 
@@ -1159,23 +1166,40 @@ _bson_json_read_start_map (bson_json_reader_t *reader) /* IN */
 }
 
 
+#define BSON_PRIVATE_SPECIAL_KEYS_XMACRO(X) \
+   X (binary)                               \
+   X (code)                                 \
+   X (date)                                 \
+   X (dbPointer)                            \
+   X (maxKey)                               \
+   X (minKey)                               \
+   X (numberDecimal)                        \
+   X (numberDouble)                         \
+   X (numberInt)                            \
+   X (numberLong)                           \
+   X (oid)                                  \
+   X (options)                              \
+   X (regex)                                \
+   X (regularExpression)                    \
+   X (scope)                                \
+   X (symbol)                               \
+   X (timestamp)                            \
+   X (type)                                 \
+   X (undefined)                            \
+   X (uuid)
+
+
 static bool
 _is_known_key (const char *key, size_t len)
 {
-   bool ret;
-
-#define IS_KEY(k) (len == strlen (k) && (0 == memcmp (k, key, len)))
-
-   ret = (IS_KEY ("$regularExpression") || IS_KEY ("$regex") || IS_KEY ("$options") || IS_KEY ("$code") ||
-          IS_KEY ("$scope") || IS_KEY ("$oid") || IS_KEY ("$binary") || IS_KEY ("$type") || IS_KEY ("$date") ||
-          IS_KEY ("$undefined") || IS_KEY ("$maxKey") || IS_KEY ("$minKey") || IS_KEY ("$timestamp") ||
-          IS_KEY ("$numberInt") || IS_KEY ("$numberLong") || IS_KEY ("$numberDouble") || IS_KEY ("$numberDecimal") ||
-          IS_KEY ("$numberInt") || IS_KEY ("$numberLong") || IS_KEY ("$numberDouble") || IS_KEY ("$numberDecimal") ||
-          IS_KEY ("$dbPointer") || IS_KEY ("$symbol") || IS_KEY ("$uuid"));
-
+#define IS_KEY(k)                                                    \
+   if (len == strlen ("$" #k) && (0 == memcmp ("$" #k, key, len))) { \
+      return true;                                                   \
+   }
+   BSON_PRIVATE_SPECIAL_KEYS_XMACRO (IS_KEY)
 #undef IS_KEY
 
-   return ret;
+   return false;
 }
 
 static void
@@ -1242,9 +1266,10 @@ _bson_json_read_map_key (bson_json_reader_t *reader, /* IN */
       return;
    }
 
+   const char *const key = (const char *) val;
+
    if (bson->read_state == BSON_JSON_IN_START_MAP) {
-      if (len > 0 && val[0] == '$' && _is_known_key ((const char *) val, len) &&
-          bson->n >= 0 /* key is in subdocument */) {
+      if (len > 0 && key[0] == '$' && _is_known_key (key, len) && bson->n >= 0 /* key is in subdocument */) {
          bson->read_state = BSON_JSON_IN_BSON_TYPE;
          bson->bson_type = (bson_type_t) 0;
          memset (&bson->bson_type_data, 0, sizeof bson->bson_type_data);
@@ -1281,30 +1306,42 @@ _bson_json_read_map_key (bson_json_reader_t *reader, /* IN */
       HANDLE_OPTION (else if, "$numberDouble", BSON_TYPE_DOUBLE, BSON_JSON_LF_DOUBLE)
       HANDLE_OPTION (else if, "$symbol", BSON_TYPE_SYMBOL, BSON_JSON_LF_SYMBOL)
       HANDLE_OPTION (else if, "$numberDecimal", BSON_TYPE_DECIMAL128, BSON_JSON_LF_DECIMAL128)
-      else if (!strcmp ("$timestamp", (const char *) val))
+      else if (HANDLE_OPTION_KEY_COMPARE ("$timestamp"))
       {
+         HANDLE_OPTION_TYPE_CHECK ("$timestamp", BSON_TYPE_TIMESTAMP);
          bson->bson_type = BSON_TYPE_TIMESTAMP;
          bson->read_state = BSON_JSON_IN_BSON_TYPE_TIMESTAMP_STARTMAP;
       }
-      else if (!strcmp ("$regularExpression", (const char *) val))
+      else if (HANDLE_OPTION_KEY_COMPARE ("$regularExpression"))
       {
+         HANDLE_OPTION_TYPE_CHECK ("$regularExpression", BSON_TYPE_REGEX);
          bson->bson_type = BSON_TYPE_REGEX;
          bson->read_state = BSON_JSON_IN_BSON_TYPE_REGEX_STARTMAP;
       }
-      else if (!strcmp ("$dbPointer", (const char *) val))
+      else if (HANDLE_OPTION_KEY_COMPARE ("$dbPointer"))
       {
+         HANDLE_OPTION_TYPE_CHECK ("$dbPointer", BSON_TYPE_DBPOINTER);
+
          /* start parsing "key": {"$dbPointer": {...}}, save "key" for later */
          _bson_json_buf_set (&bson->dbpointer_key, bson->key, bson->key_buf.len);
 
          bson->bson_type = BSON_TYPE_DBPOINTER;
          bson->read_state = BSON_JSON_IN_BSON_TYPE_DBPOINTER_STARTMAP;
       }
-      else if (!strcmp ("$code", (const char *) val))
+      else if (HANDLE_OPTION_KEY_COMPARE ("$code"))
       {
+         // "$code" may come after "$scope".
+         if (bson->bson_type != BSON_TYPE_CODEWSCOPE) {
+            HANDLE_OPTION_TYPE_CHECK ("$code", BSON_TYPE_CODE);
+         }
          _bson_json_read_code_or_scope_key (bson, false /* is_scope */, val, len);
       }
-      else if (!strcmp ("$scope", (const char *) val))
+      else if (HANDLE_OPTION_KEY_COMPARE ("$scope"))
       {
+         // "$scope" may come after "$code".
+         if (bson->bson_type != BSON_TYPE_CODE) {
+            HANDLE_OPTION_TYPE_CHECK ("$scope", BSON_TYPE_CODEWSCOPE);
+         }
          _bson_json_read_code_or_scope_key (bson, true /* is_scope */, val, len);
       }
       else

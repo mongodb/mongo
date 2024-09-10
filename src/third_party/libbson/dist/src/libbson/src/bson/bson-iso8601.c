@@ -133,7 +133,7 @@ _bson_iso8601_date_parse (const char *str, int32_t len, int64_t *out, bson_error
 
 #define DEFAULT_DATE_PARSE_ERR                                                 \
    DATE_PARSE_ERR ("use ISO8601 format yyyy-mm-ddThh:mm plus timezone, either" \
-                   " \"Z\" or like \"+0500\"")
+                   " \"Z\" or like \"+0500\" or like \"+05:00\"")
 
    ptr = str;
 
@@ -214,7 +214,8 @@ _bson_iso8601_date_parse (const char *str, int32_t len, int64_t *out, bson_error
          int32_t tz_hour;
          int32_t tz_min;
 
-         if (tz_len != 5 || !digits_only (tz_ptr + 1, 4)) {
+         if ((tz_len != 5 || !digits_only (tz_ptr + 1, 4)) &&
+             (tz_len != 6 || !digits_only (tz_ptr + 1, 2) || tz_ptr[3] != ':' || !digits_only (tz_ptr + 4, 2))) {
             DATE_PARSE_ERR ("could not parse timezone");
          }
 
@@ -222,7 +223,8 @@ _bson_iso8601_date_parse (const char *str, int32_t len, int64_t *out, bson_error
             DATE_PARSE_ERR ("timezone hour must be at most 23");
          }
 
-         if (!parse_num (tz_ptr + 3, 2, -1, 0, 59, &tz_min)) {
+         int32_t tz_min_offset = tz_ptr[3] == ':' ? 1 : 0;
+         if (!parse_num (tz_ptr + 3 + tz_min_offset, 2, -1, 0, 59, &tz_min)) {
             DATE_PARSE_ERR ("timezone minute must be at most 59");
          }
 

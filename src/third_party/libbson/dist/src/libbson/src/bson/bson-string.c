@@ -31,6 +31,48 @@
 #include <string.h>
 #endif
 
+// `bson_next_power_of_two_u32` returns 0 on overflow.
+static BSON_INLINE uint32_t
+bson_next_power_of_two_u32 (uint32_t v)
+{
+   BSON_ASSERT (v > 0);
+
+   // https://graphics.stanford.edu/%7Eseander/bithacks.html#RoundUpPowerOf2
+   v--;
+   v |= v >> 1;
+   v |= v >> 2;
+   v |= v >> 4;
+   v |= v >> 8;
+   v |= v >> 16;
+   v++;
+
+   return v;
+}
+
+// `bson_string_ensure_space` ensures `string` has enough room for `needed` + a null terminator.
+static void
+bson_string_ensure_space (bson_string_t *string, uint32_t needed)
+{
+   BSON_ASSERT_PARAM (string);
+   BSON_ASSERT (needed <= UINT32_MAX - 1u);
+   needed += 1u; // Add one for trailing NULL byte.
+   if (string->alloc >= needed) {
+      return;
+   }
+   // Get the next largest power of 2 if possible.
+   uint32_t alloc = bson_next_power_of_two_u32 (needed);
+   if (alloc == 0) {
+      // Overflowed: saturate at UINT32_MAX.
+      alloc = UINT32_MAX;
+   }
+   if (!string->str) {
+      string->str = bson_malloc (alloc);
+   } else {
+      string->str = bson_realloc (string->str, alloc);
+   }
+   string->alloc = alloc;
+}
+
 /*
  *--------------------------------------------------------------------------
  *
@@ -62,33 +104,18 @@ bson_string_t *
 bson_string_new (const char *str) /* IN */
 {
    bson_string_t *ret;
-   size_t len_sz;
 
    ret = bson_malloc0 (sizeof *ret);
+   const size_t len_sz = str == NULL ? 0u : strlen (str);
+   BSON_ASSERT (bson_in_range_unsigned (uint32_t, len_sz));
+   const uint32_t len_u32 = (uint32_t) len_sz;
+   bson_string_ensure_space (ret, len_u32);
    if (str) {
-      len_sz = strlen (str);
-      BSON_ASSERT (len_sz <= UINT32_MAX);
-      ret->len = (uint32_t) len_sz;
-   } else {
-      ret->len = 0;
-   }
-   ret->alloc = ret->len + 1;
-
-   if (!bson_is_power_of_two (ret->alloc)) {
-      len_sz = bson_next_power_of_two ((size_t) ret->alloc);
-      BSON_ASSERT (len_sz <= UINT32_MAX);
-      ret->alloc = (uint32_t) len_sz;
+      memcpy (ret->str, str, len_sz);
    }
 
-   BSON_ASSERT (ret->alloc >= ret->len + 1);
-
-   ret->str = bson_malloc (ret->alloc);
-
-   if (str) {
-      memcpy (ret->str, str, ret->len);
-   }
-
-   ret->str[ret->len] = '\0';
+   ret->str[len_u32] = '\0';
+   ret->len = len_u32;
 
    return ret;
 }
@@ -135,31 +162,18 @@ void
 bson_string_append (bson_string_t *string, /* IN */
                     const char *str)       /* IN */
 {
-   uint32_t len;
-   size_t len_sz;
-
    BSON_ASSERT (string);
    BSON_ASSERT (str);
 
-   len_sz = strlen (str);
+   const size_t len_sz = strlen (str);
    BSON_ASSERT (bson_in_range_unsigned (uint32_t, len_sz));
-   len = (uint32_t) len_sz;
-
-   if ((string->alloc - string->len - 1) < len) {
-      BSON_ASSERT (string->alloc <= UINT32_MAX - len);
-      string->alloc += len;
-      if (!bson_is_power_of_two (string->alloc)) {
-         len_sz = bson_next_power_of_two ((size_t) string->alloc);
-         BSON_ASSERT (len_sz <= UINT32_MAX);
-         string->alloc = (uint32_t) len_sz;
-      }
-      BSON_ASSERT (string->alloc >= string->len + len);
-      string->str = bson_realloc (string->str, string->alloc);
-   }
-
-   memcpy (string->str + string->len, str, len);
-   string->len += len;
-   string->str[string->len] = '\0';
+   const uint32_t len_u32 = (uint32_t) len_sz;
+   BSON_ASSERT (len_u32 <= UINT32_MAX - string->len);
+   const uint32_t new_len = len_u32 + string->len;
+   bson_string_ensure_space (string, new_len);
+   memcpy (string->str + string->len, str, len_sz);
+   string->str[new_len] = '\0';
+   string->len = new_len;
 }
 
 

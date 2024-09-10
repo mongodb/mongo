@@ -18,8 +18,10 @@
 
 #include <limits.h>
 #include <stdarg.h>
+#include <stdbool.h>
 #include <stdlib.h>
 #include <string.h>
+#include <stdint.h>
 
 #include <bson/bson-context-private.h>
 #include <bson/bson-oid.h>
@@ -74,39 +76,41 @@ BSON_MAYBE_UNUSED static const uint16_t gHexCharPairs[] = {
 #endif
 };
 
+static BSON_INLINE void
+_oid_init (bson_oid_t *oid, bson_context_t *context, bool add_random)
+{
+   BSON_ASSERT (oid);
+   if (!context) {
+      context = bson_context_get_default ();
+   }
+
+   const time_t now = time (NULL);
+   // Big-endian encode the low 32 bits of the time as the leading 32 bits of the new OID
+   oid->bytes[0] = (uint8_t) (now >> 24);
+   oid->bytes[1] = (uint8_t) (now >> 16);
+   oid->bytes[2] = (uint8_t) (now >> 8);
+   oid->bytes[3] = (uint8_t) (now >> 0);
+   // Maybe add randomness if the caller wants it
+   if (add_random) {
+      _bson_context_set_oid_rand (context, oid);
+      _bson_context_set_oid_seq32 (context, oid);
+   } else {
+      _bson_context_set_oid_seq64 (context, oid);
+   }
+}
 
 void
 bson_oid_init_sequence (bson_oid_t *oid,         /* OUT */
                         bson_context_t *context) /* IN */
 {
-   uint32_t now = (uint32_t) (time (NULL));
-
-   if (!context) {
-      context = bson_context_get_default ();
-   }
-
-   now = BSON_UINT32_TO_BE (now);
-   memcpy (&oid->bytes[0], &now, sizeof (now));
-   _bson_context_set_oid_seq64 (context, oid);
+   _oid_init (oid, context, false /* no randomness */);
 }
-
 
 void
 bson_oid_init (bson_oid_t *oid,         /* OUT */
                bson_context_t *context) /* IN */
 {
-   uint32_t now = (uint32_t) (time (NULL));
-
-   BSON_ASSERT (oid);
-
-   if (!context) {
-      context = bson_context_get_default ();
-   }
-
-   now = BSON_UINT32_TO_BE (now);
-   memcpy (&oid->bytes[0], &now, sizeof (now));
-   _bson_context_set_oid_rand (context, oid);
-   _bson_context_set_oid_seq32 (context, oid);
+   _oid_init (oid, context, true /* add randomness */);
 }
 
 
