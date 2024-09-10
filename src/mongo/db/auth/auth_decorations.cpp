@@ -35,6 +35,7 @@
 
 
 #include "mongo/base/string_data.h"
+#include "mongo/db/auth/authorization_client_handle.h"
 #include "mongo/db/auth/authorization_manager.h"
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/auth/cluster_auth_mode.h"
@@ -64,6 +65,9 @@ struct DisabledAuthMechanisms {
 const auto getDisabledAuthMechanisms = Service::declareDecoration<DisabledAuthMechanisms>();
 
 const auto getClusterAuthMode = ServiceContext::declareDecoration<AtomicWord<ClusterAuthMode>>();
+
+const auto getAuthorizationClientHandle =
+    Service::declareDecoration<std::unique_ptr<AuthorizationClientHandle>>();
 
 class AuthzClientObserver final : public ServiceContext::ClientObserver {
 public:
@@ -101,9 +105,18 @@ AuthorizationManager* AuthorizationManager::get(Service& service) {
     return getAuthorizationManager(service).get();
 }
 
+AuthorizationClientHandle* AuthorizationClientHandle::get(Service* service) {
+    return getAuthorizationClientHandle(service).get();
+}
+
 void AuthorizationManager::set(Service* service,
                                std::unique_ptr<AuthorizationManager> authzManager) {
     getAuthorizationManager(service) = std::move(authzManager);
+}
+
+void AuthorizationClientHandle::set(Service* service,
+                                    std::unique_ptr<AuthorizationClientHandle> authzClientHandle) {
+    getAuthorizationClientHandle(service) = std::move(authzClientHandle);
 }
 
 AuthorizationSession* AuthorizationSession::get(Client* client) {

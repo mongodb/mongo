@@ -55,7 +55,7 @@ MONGO_STARTUP_OPTIONS_VALIDATE(MongoCryptDOptions)(InitializerContext* context) 
     uassertStatusOK(moe::startupOptionsParsed.validate());
 }
 
-MONGO_INITIALIZER_GENERAL(CoreOptions_Store,
+MONGO_INITIALIZER_GENERAL(CryptdOptions_Store,
                           ("BeginStartupOptionStorage"),
                           ("EndStartupOptionStorage"))
 (InitializerContext* context) {

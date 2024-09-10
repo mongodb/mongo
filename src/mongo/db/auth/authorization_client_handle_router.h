@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2022-present MongoDB, Inc.
+ *    Copyright (C) 2024-present MongoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
@@ -27,16 +27,26 @@
  *    it in the license file.
  */
 
-#include <string>
+#pragma once
 
-#include "mongo/base/init.h"  // IWYU pragma: keep
-#include "mongo/base/initializer.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/db/auth/authorization_client_handle.h"
+#include "mongo/db/database_name.h"
+#include "mongo/db/operation_context.h"
 
 namespace mongo {
-namespace {
-MONGO_INITIALIZER_GENERAL(CoreOptions_Store,
-                          ("BeginStartupOptionStorage"),
-                          ("EndStartupOptionStorage"))
-(InitializerContext* context) {}
-}  // namespace
+
+class AuthorizationClientHandleRouter : public AuthorizationClientHandle {
+public:
+    AuthorizationClientHandleRouter() = default;
+
+protected:
+    AuthorizationClientHandleRouter(const AuthorizationClientHandleRouter&) = delete;
+    AuthorizationClientHandleRouter& operator=(const AuthorizationClientHandleRouter&) = delete;
+
+    StatusWith<BSONObj> runAuthorizationReadCommand(OperationContext* opCtx,
+                                                    const DatabaseName& dbname,
+                                                    const BSONObj& command) final;
+};
+
 }  // namespace mongo

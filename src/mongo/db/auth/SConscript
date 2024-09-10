@@ -87,6 +87,8 @@ env.Library(
         "authz_session_external_state_server_common.cpp",
         "authz_session_external_state_d.cpp",
         "authz_session_external_state_s.cpp",
+        "authorization_client_handle_router.cpp",
+        "authorization_client_handle_shard.cpp",
         "enable_localhost_auth_bypass_parameter_gen.cpp",
     ],
     LIBDEPS=[
@@ -98,13 +100,13 @@ env.Library(
     ],
     LIBDEPS_PRIVATE=[
         "$BUILD_DIR/mongo/db/commands/authentication_commands",
+        "$BUILD_DIR/mongo/db/commands/umc_commands_idl",
         "$BUILD_DIR/mongo/db/dbdirectclient",
         "$BUILD_DIR/mongo/db/dbhelpers",
         "$BUILD_DIR/mongo/db/repl/repl_coordinator_interface",
         "$BUILD_DIR/mongo/db/server_base",
         "$BUILD_DIR/mongo/s/grid",
         "auth_impl_internal_local",
-        "sasl_options_init",
     ],
 )
 
@@ -180,6 +182,9 @@ env.Library(
         "auth",
         "auth_impl_internal",
         "auth_impl_internal_local",
+        "authserver",
+        "sasl_options",
+        "sasl_options_init",
     ],
 )
 

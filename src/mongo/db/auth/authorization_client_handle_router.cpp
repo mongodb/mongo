@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2020-present MongoDB, Inc.
+ *    Copyright (C) 2024-present MongoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
@@ -27,16 +27,24 @@
  *    it in the license file.
  */
 
-#include <string>
-
-#include "mongo/base/init.h"  // IWYU pragma: keep
-#include "mongo/base/initializer.h"
+#include "mongo/db/auth/authorization_client_handle_router.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/s/catalog/sharding_catalog_client.h"
+#include "mongo/s/grid.h"
 
 namespace mongo {
-namespace {
-MONGO_INITIALIZER_GENERAL(CoreOptions_Store,
-                          ("BeginStartupOptionStorage"),
-                          ("EndStartupOptionStorage"))
-(InitializerContext* context) {}
-}  // namespace
+
+StatusWith<BSONObj> AuthorizationClientHandleRouter::runAuthorizationReadCommand(
+    OperationContext* opCtx, const DatabaseName& dbname, const BSONObj& command) {
+    BSONObjBuilder builder;
+    bool ok = Grid::get(opCtx)->catalogClient()->runUserManagementReadCommand(
+        opCtx, dbname, std::move(command), &builder);
+    auto obj = builder.obj();
+
+    if (!ok) {
+        return getErrorStatusFromCommandResult(obj);
+    }
+    return obj;
+}
+
 }  // namespace mongo

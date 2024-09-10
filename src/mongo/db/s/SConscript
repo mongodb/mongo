@@ -869,7 +869,6 @@ env.CppUnitTest(
         "balancer/balancer_defragmentation_policy_test.cpp",
         "balancer/move_unsharded_policy_test.cpp",
         "balancer/balancer_policy_test.cpp",
-        "balancer/core_options_stub.cpp",
         "balancer/balancer_commands_scheduler_test.cpp",
         "balancer/migration_test_fixture.cpp",
         "config_server_op_observer_test.cpp",

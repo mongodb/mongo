@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2023-present MongoDB, Inc.
+ *    Copyright (C) 2024-present MongoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
@@ -29,28 +29,24 @@
 
 #pragma once
 
+#include "mongo/bson/bsonobj.h"
 #include "mongo/db/auth/authorization_client_handle.h"
-#include "mongo/db/auth/authorization_manager.h"
-#include "mongo/db/auth/authorization_manager_factory.h"
+#include "mongo/db/database_name.h"
+#include "mongo/db/operation_context.h"
 #include "mongo/db/service_context.h"
 
 namespace mongo {
 
-/**
- * Factory class for generating the correct authorization manager for the
- * process. The create function returns the correct authorization manager
- * based on the arguments provided.
- */
+class AuthorizationClientHandleShard : public AuthorizationClientHandle {
+    AuthorizationClientHandleShard(const AuthorizationClientHandleShard&) = delete;
+    AuthorizationClientHandleShard& operator=(const AuthorizationClientHandleShard&) = delete;
 
-class AuthorizationManagerFactoryMock : public AuthorizationManagerFactory {
+    StatusWith<BSONObj> runAuthorizationReadCommand(OperationContext* opCtx,
+                                                    const DatabaseName& dbname,
+                                                    const BSONObj& command) final;
 
 public:
-    std::unique_ptr<AuthorizationManager> createRouter(Service* service) override;
-    std::unique_ptr<AuthorizationManager> createShard(Service* service) override;
-
-    std::unique_ptr<AuthorizationClientHandle> createClientHandleRouter(Service* service) override;
-    std::unique_ptr<AuthorizationClientHandle> createClientHandleShard(Service* service) override;
+    AuthorizationClientHandleShard() = default;
 };
-
 
 }  // namespace mongo

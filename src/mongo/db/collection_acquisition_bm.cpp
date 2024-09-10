@@ -48,9 +48,6 @@ namespace {
 
 using namespace fmt::literals;
 
-// Dummy initializer to fill in the initializer graph
-MONGO_INITIALIZER_GENERAL(CoreOptions_Store, (), ())(InitializerContext*) {}
-
 MONGO_INITIALIZER_GENERAL(DisableLogging, (), ())
 (InitializerContext*) {
     auto& lv2Manager = logv2::LogManager::global();

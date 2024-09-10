@@ -70,10 +70,6 @@
 namespace mongo {
 namespace {
 using namespace mongo::repl;
-MONGO_INITIALIZER_GENERAL(CoreOptions_Store, (), ())
-(InitializerContext* context) {
-    // Dummy initializer to fill in the initializer graph
-}
 
 MONGO_INITIALIZER_GENERAL(DisableLogging, (), ())
 (InitializerContext*) {

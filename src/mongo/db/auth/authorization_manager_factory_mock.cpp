@@ -29,6 +29,8 @@
 
 #include "mongo/platform/basic.h"
 
+#include "mongo/db/auth/authorization_client_handle_router.h"
+#include "mongo/db/auth/authorization_client_handle_shard.h"
 #include "mongo/db/auth/authorization_manager_factory_mock.h"
 #include "mongo/db/auth/authorization_manager_impl.h"
 #include "mongo/db/auth/authz_manager_external_state_mock.h"
@@ -47,7 +49,19 @@ std::unique_ptr<AuthorizationManager> AuthorizationManagerFactoryMock::createSha
         service, std::make_unique<AuthzManagerExternalStateMock>());
 }
 
+std::unique_ptr<AuthorizationClientHandle>
+AuthorizationManagerFactoryMock::createClientHandleRouter(Service* service) {
+    return std::make_unique<AuthorizationClientHandleRouter>();
+}
+
+std::unique_ptr<AuthorizationClientHandle> AuthorizationManagerFactoryMock::createClientHandleShard(
+    Service* service) {
+    return std::make_unique<AuthorizationClientHandleShard>();
+}
+
 namespace {
+
+MONGO_INITIALIZER_GENERAL(CoreOptions_Store, (), ())(InitializerContext*) {}
 
 MONGO_INITIALIZER(RegisterGlobalAuthzManagerFactoryMock)(InitializerContext* initializer) {
     globalAuthzManagerFactory = std::make_unique<AuthorizationManagerFactoryMock>();

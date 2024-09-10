@@ -65,7 +65,6 @@
 #include "mongo/util/duration.h"
 #include "mongo/util/fail_point.h"
 #include "mongo/util/future.h"
-#include "mongo/util/options_parser/startup_option_init.h"
 #include "mongo/util/tick_source.h"
 #include "mongo/util/tick_source_mock.h"
 
@@ -428,8 +427,5 @@ void ClusterCommandTestFixture::appendTxnResponseMetadata(BSONObjBuilder& bob) {
     // Set readOnly to false to avoid opting in to the read-only optimization.
     bob.append(TxnResponseMetadata::kReadOnlyFieldName, false);
 }
-
-// Satisfies dependency from StoreSASLOPtions.
-MONGO_STARTUP_OPTIONS_STORE(CoreOptions)(InitializerContext*) {}
 
 }  // namespace mongo

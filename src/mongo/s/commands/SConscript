@@ -269,6 +269,7 @@ env.Library(
         "$BUILD_DIR/mongo/db/auth/saslauth",
         "$BUILD_DIR/mongo/db/commands",
         "$BUILD_DIR/mongo/db/commands/servers",
+        "$BUILD_DIR/mongo/db/commands/umc_commands_idl",
         "$BUILD_DIR/mongo/db/metadata_consistency_types_idl",
         "$BUILD_DIR/mongo/db/server_base",
         "$BUILD_DIR/mongo/rpc/client_metadata",
@@ -299,8 +300,6 @@ env.CppUnitTest(
         "query_cmd/cluster_update_test.cpp",
     ],
     LIBDEPS=[
-        "$BUILD_DIR/mongo/db/auth/authmocks",
-        "$BUILD_DIR/mongo/db/auth/saslauth",
         "$BUILD_DIR/mongo/db/pipeline/process_interface/mongos_process_interface_factory",
         "$BUILD_DIR/mongo/db/read_write_concern_defaults_mock",
         "$BUILD_DIR/mongo/db/service_context_non_d",

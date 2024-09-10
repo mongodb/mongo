@@ -62,7 +62,4 @@ MONGO_STARTUP_OPTIONS_STORE(FrameworkOptions)(InitializerContext* context) {
         quickExit(ExitCode::badOptions);
     }
 }
-
-MONGO_INITIALIZER_GENERAL(CoreOptions_Store, (), ())
-(InitializerContext* context) {}
 }  // namespace mongo

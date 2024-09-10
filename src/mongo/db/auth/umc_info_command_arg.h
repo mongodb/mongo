@@ -63,6 +63,12 @@ public:
     static_assert(std::is_same<UserName, T>::value || std::is_same<RoleName, T>::value,
                   "UMCInfoCommandArg only valid with T = UserName | RoleName");
 
+    using Single = std::variant<T, std::string>;
+    using Multiple = std::vector<Single>;
+
+    explicit UMCInfoCommandArg(Single value) : _value(std::move(value)) {}
+    explicit UMCInfoCommandArg(Multiple values) : _value(std::move(values)) {}
+
     static UMCInfoCommandArg parseFromBSON(const boost::optional<TenantId> tenantId,
                                            const BSONElement& elem,
                                            const SerializationContext&) {
@@ -163,13 +169,9 @@ private:
 
     struct AllOnCurrentDB {};
     struct AllForAllDBs {};
-    using Single = std::variant<T, std::string>;
-    using Multiple = std::vector<Single>;
 
     explicit UMCInfoCommandArg(AllOnCurrentDB opt) : _value(std::move(opt)) {}
     explicit UMCInfoCommandArg(AllForAllDBs opt) : _value(std::move(opt)) {}
-    explicit UMCInfoCommandArg(Single value) : _value(std::move(value)) {}
-    explicit UMCInfoCommandArg(Multiple values) : _value(std::move(values)) {}
 
     static Single parseNamedElement(const BSONElement& elem,
                                     const boost::optional<TenantId> tenantId) {

@@ -117,7 +117,6 @@ env.Library(
         "test_api_version_2_commands.cpp",
         "test_deprecation_command.cpp",
         "traffic_recording_cmds.cpp",
-        "user_management_commands_gen.cpp",
         "user_management_commands_common.cpp",
     ]
     + xray_files,
@@ -150,6 +149,7 @@ env.Library(
         "core",
         "query_cmd/query_settings_cmds",
         "test_commands_enabled",
+        "umc_commands_idl",
     ],
 )
 
@@ -509,6 +509,7 @@ env.Library(
         "test_commands",
         "test_commands_enabled",
         "txn_cmd_request",
+        "umc_commands_idl",
     ],
 )
 

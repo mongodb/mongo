@@ -26,9 +26,11 @@
  *    exception statement from all source files in the program, then also delete
  *    it in the license file.
  */
-
 #include "mongo/platform/basic.h"
 
+#include "mongo/db/auth/authorization_client_handle.h"
+#include "mongo/db/auth/authorization_client_handle_router.h"
+#include "mongo/db/auth/authorization_client_handle_shard.h"
 #include "mongo/db/auth/authorization_manager_factory_impl.h"
 #include "mongo/db/auth/authorization_manager_impl.h"
 #include "mongo/db/auth/authz_manager_external_state_d.h"
@@ -46,6 +48,16 @@ std::unique_ptr<AuthorizationManager> AuthorizationManagerFactoryImpl::createSha
     Service* service) {
     return std::make_unique<AuthorizationManagerImpl>(
         service, std::make_unique<AuthzManagerExternalStateMongod>());
+}
+
+std::unique_ptr<AuthorizationClientHandle>
+AuthorizationManagerFactoryImpl::createClientHandleRouter(Service* service) {
+    return std::make_unique<AuthorizationClientHandleRouter>();
+}
+
+std::unique_ptr<AuthorizationClientHandle> AuthorizationManagerFactoryImpl::createClientHandleShard(
+    Service* service) {
+    return std::make_unique<AuthorizationClientHandleShard>();
 }
 
 namespace {

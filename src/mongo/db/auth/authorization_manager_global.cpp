@@ -40,6 +40,7 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/client/internal_auth.h"
 #include "mongo/config.h"  // IWYU pragma: keep
+#include "mongo/db/auth/authorization_client_handle.h"
 #include "mongo/db/auth/authorization_manager.h"
 #include "mongo/db/auth/authorization_manager_factory.h"
 #include "mongo/db/auth/authorization_manager_global_parameters_gen.h"
@@ -74,11 +75,15 @@ Service::ConstructorActionRegisterer createAuthorizationManager(
             serverGlobalParams.authState == ServerGlobalParams::AuthState::kEnabled;
 
         std::unique_ptr<AuthorizationManager> authzManager;
+        std::unique_ptr<AuthorizationClientHandle> authorizationClientHandle;
 
         if (service->role().hasExclusively(ClusterRole::RouterServer)) {
             authzManager = globalAuthzManagerFactory->createRouter(service);
+            authorizationClientHandle =
+                globalAuthzManagerFactory->createClientHandleRouter(service);
         } else {
             authzManager = globalAuthzManagerFactory->createShard(service);
+            authorizationClientHandle = globalAuthzManagerFactory->createClientHandleShard(service);
         }
 
         authzManager->setAuthEnabled(authIsEnabled);
@@ -90,6 +95,8 @@ Service::ConstructorActionRegisterer createAuthorizationManager(
             authzManager->setAuthEnabled(true);
         }
         AuthorizationManager::set(service, std::move(authzManager));
+
+        AuthorizationClientHandle::set(service, std::move(authorizationClientHandle));
 
         if (clusterAuthMode.allowsKeyFile()) {
             // Load up the keys if we allow key files authentication.

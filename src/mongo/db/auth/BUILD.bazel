@@ -342,6 +342,19 @@ render_template(
     ],
 )
 
+mongo_cc_library(
+    name = "role_name_or_string",
+    srcs = [
+        "role_name_or_string.cpp",
+    ],
+    hdrs = [
+        "role_name_or_string.h",
+    ],
+    deps = [
+        "//src/mongo/db:server_base",
+    ],
+)
+
 # The Auth library should consist only of the shimmed API for Auth usage and the implementations of
 # the data structures used in that API.  No actual Auth subsystem implementation should exist in
 # this library.
@@ -349,13 +362,14 @@ mongo_cc_library(
     name = "auth",
     srcs = [
         "auth_decorations.cpp",
+        "authorization_client_handle.cpp",
         "authorization_manager.cpp",
         "authorization_manager_factory.cpp",
         "authorization_session.cpp",
-        "role_name_or_string.cpp",
         "//src/mongo/util/concurrency:thread_pool.h",
     ],
     hdrs = [
+        "authorization_client_handle.h",
         "authorization_manager_factory.h",
         "//src/mongo/db/commands:authentication_commands.h",
         "//src/mongo/util:sequence_util.h",
@@ -363,9 +377,11 @@ mongo_cc_library(
     deps = [
         "auth_options",
         "cluster_auth_mode",
+        "role_name_or_string",
         "sasl_options",
         "//src/mongo/db:server_base",
         "//src/mongo/db:service_context",
+        "//src/mongo/db/commands:umc_commands_idl",
     ],
 )
 
@@ -579,6 +595,7 @@ mongo_cc_library(
         ":authprivilege",
         ":sasl_mechanism_protocol",
         ":sasl_options",
+        ":sasl_options_init",
         ":user",
         "//src/mongo/db:connection_health_metrics_parameter",
         "//src/mongo/db:server_base",
