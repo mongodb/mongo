@@ -63,6 +63,9 @@ SnapshotId getNextSnapshotId() {
 }
 }  // namespace
 
+const RecoveryUnit::OpenSnapshotOptions RecoveryUnit::kDefaultOpenSnapshotOptions =
+    RecoveryUnit::OpenSnapshotOptions();
+
 void RecoveryUnit::ensureSnapshot() {
     if (!_snapshot) {
         _snapshot.emplace(getNextSnapshotId());

@@ -64,7 +64,7 @@ public:
 
     WiredTigerBeginTxnBlock(WiredTigerSession* session,
                             PrepareConflictBehavior prepareConflictBehavior,
-                            RoundUpPreparedTimestamps roundUpPreparedTimestamps,
+                            bool roundUpPreparedTimestamps,
                             RoundUpReadTimestamp roundUpReadTimestamp,
                             RecoveryUnit::UntimestampedWriteAssertionLevel allowUntimestampedWrite);
     WiredTigerBeginTxnBlock(WiredTigerSession* session, const char* config);
