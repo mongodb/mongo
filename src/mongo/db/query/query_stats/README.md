@@ -13,7 +13,7 @@ including primaries and secondaries.
 
 ## QueryStatsStore
 
-At the center of everything here is the [`QueryStatsStore`](query_stats.h#93-97), which is a
+At the center of everything here is the [`QueryStatsStore`][query stats store], which is a
 partitioned hash table that maps the hash of a [Query Stats Key](#glossary) (also known as the
 _Query Stats Store Key_) to some metrics about how often each one occurs.
 
@@ -46,10 +46,6 @@ db.example.find({x: 55}).batchSize(3);
 There are two distinct query stats store entries here - both the examples which include the batch
 size will be treated separately from the example which does not specify a batch size.
 
-Similarly, `explain` is not included in the query shape, so an aggregation command that has `explain: true`,
-vs. the same command without it, will have the same query shape. However we do want to collect separate metrics
-for these as they are different, so we include `explain` as a dimension in the query stats store key for agg.
-
 The dimensions considered will depend on the command, but can generally be found in the
 [`KeyGenerator`](key_generator.h) interface, which will generate the query stats store keys by which
 we accumulate statistics. As one example, you can find the
@@ -60,7 +56,7 @@ we accumulate statistics. As one example, you can find the
 
 The size of the`QueryStatsStore` can be set by the server parameter
 [`internalQueryStatsCacheSize`](#server-parameters), and the partitions will be created based off
-that. See [`queryStatsStoreManagerRegisterer`](query_stats.cpp#L166-L172) for more details about how
+that. See [`queryStatsStoreManagerRegisterer`][partition calculation comment] for more details about how
 the number of partitions and their size is determined; Each partition is an LRU cache, therefore, if
 adding a new entry to the partition makes it go over its size limit, the least recently used entries
 will be evicted to drop below the max size. Eviction will be tracked in the new [server status
@@ -69,20 +65,16 @@ metrics](#server-status-metrics) for queryStats.
 ## Metric Collection
 
 At a high level, when a query is run and collection of query stats is enabled, during planning we
-call [`registerRequest`](<(query_stats.h#L195-L198)>) in which the query stats store key will be
+call [`registerRequest`][register request] in which the query stats store key will be
 generated based on the query's shape and the various other dimensions. The key will always be serialized
-and stored on the `opDebug`, and also on the cursor in the case that there are `getMore`s, so that we can
-continue to aggregate the operation's metrics. Once the query execution is fully complete,
-[`writeQueryStats`](query_stats.h#L200-216) will be called and will either retrieve the entry for
-the key from the store if it exists and update it, or create a new one and add it to the store. See
-more details in the [comments](query_stats.h#L158-L216).
+and stored on the `opDebug`. For commands that support `getMore`s, it will also be stored on the cursor, so that we can
+continue to aggregate the operation's metrics until it is complete.
 
-This is the case for all collections apart from change stream collections, for which query stats behaves
-a bit differently. For change stream collections, like normal collections we will still collect query stats
-on creation, but a key difference is that we will actually treat each `getMore` as its own query, and collect
-and update query stats for each one rather than accumulating them on the cursor and recording once execution
-completes. We have a flag to determine whether the collection has a change stream, [\_queryStatsWillNeverExhaust](src/mongo/db/clientcursor.h#L510),
-and decide based on that whether to take the change stream approach.
+Once the query execution is fully complete, [`writeQueryStats`][write query stats] will be called and
+will either retrieve the entry for the key from the store if it exists and update it, or create a new one and add it to the store.
+See more details in the [comments][write query stats comments].
+
+### Data-bearing Node Metrics
 
 Some metrics are only known to data-bearing nodes. When a query is selected for query stats
 gathering in a sharded cluster, the router requests that the shards gather those metrics and
@@ -102,6 +94,49 @@ impact to overall system performance through restricting excessive traffic. If a
 the rate limit has been reached, the query will still execute as expected but query stats will not
 be updated in the query stats store. Our rate limiter uses the sliding window algorithm; see details
 [here](rate_limiting.h#82-87).
+
+### Explain
+
+Non-aggregate command types take separate paths when the command is run as an explain as opposed to when
+they are not run as an explain. We do not collect query stats metrics on the explain-only paths. However, aggregate
+explains run through the same path as non-explains, so query stats are collected for aggregate explains.
+
+In the aggregate case, `explain` is not included in the query shape, so an aggregation command that has `explain: true`,
+vs. the same command without it will have the same query shape. However we do want to collect separate metrics
+for these as they are different, so we include `explain` as a dimension in the query stats store key if present (for agg only).
+
+### Views
+
+Queries on views are always run as an aggregation, since the view is defined as a pipeline. Because of this,
+query stats for non-aggregate commands on views would be registered and collected as aggregates without intervention.
+There are two considerations here:
+
+#### 1. Registering the request
+
+We want all commands on views to be registered as the original command type rather than as an aggregate.
+We do this by making sure to call `registerRequest` before the top-level command path redirects to the aggregate
+path, which sets the query stats store key on `CurOp`. This will prevent it from being regenerated as an agg.
+
+However, note that there are special cases even beyond this. When a query is rate-limited in the original `registerRequest`
+call, or when it is being run as an explain, we will not set the query stats store key, but we still do not want
+the aggregate path to register the request. To handle this case, we set the `disableForSubqueryExecution` flag on the
+`OpDebug.QueryStatsInfo` struct to indicate that this request should not be registered for query stats.
+
+#### 2. Collecting the metrics
+
+Regardless of where the query stats store key was generated, the aggregate path will attempt to collect metrics
+for any query that has a key populated on `OpDebug`. This is acceptable in many cases, but for commands that must
+do post-processing after running the view aggregation pipeline (specifically, the distinct command), this results
+in incorrect metrics. These commands must take care to not pass the generated query stats store key to the aggregation
+path and instead collect metrics on their own after the aggregation pipeline is complete.
+
+### Change Streams
+
+Query stats also behaves a bit differently for change stream queries. For change stream collections, like normal collections,
+we will still collect query stats on creation. However, an important difference is that we will actually treat each `getMore` as its own query,
+and collect and update query stats for each one rather than accumulating them on the cursor and recording once execution
+completes. We have a flag to determine whether the collection has a change stream, [\_queryStatsWillNeverExhaust][query stats will never exhaust],
+and decide based on that whether to take the change stream approach.
 
 ## Metric Retrieval
 
@@ -143,6 +178,8 @@ following way:
 ```js
 {
     key: {/* Query Stats Key */},
+    keyHash: string,
+    queryShapeHash: string,
     asOf: ISODate(/* … */),
     metrics: {
         execCount:               0,
@@ -157,6 +194,9 @@ following way:
 ```
 
 - `key`: Query Stats Key.
+- `keyHash`: Hash of the Query Stats Store Key representative value. Corresponds to the `key` field.
+- `queryShapeHash`: Hash of the Query Shape representative value. Corresponds to the `key.queryShape` field.
+  This is particularly useful for cross-referencing query statistics with Persistent Query Settings.
 - `asOf`: UTC time when $queryStats read this entry from the store. This will not return the same
   UTC time for each result. The data structure used for the store is partitioned, and each partition
   will be read at a snapshot individually. You may see up to the number of partitions in unique
@@ -269,3 +309,12 @@ reveal what those identifiers were.
 **Query Stats Key**: Also known as the _Query Stats Store Key_, this is the collection of attributes
 championed by the query shape which identifies one grouping of metrics. The $queryStats stage will
 output one document per query stats key - output in the "key" field.
+
+<!-- Links -->
+
+[query stats store]: https://github.com/10gen/mongo/blob/3cc7cd2a439e25fff9dd26fb1f94057d837a06f9/src/mongo/db/query/query_stats/query_stats.h#L100-L104
+[partition calculation comment]: https://github.com/10gen/mongo/blob/3cc7cd2a439e25fff9dd26fb1f94057d837a06f9/src/mongo/db/query/query_stats/query_stats.cpp#L173-179
+[register request]: https://github.com/10gen/mongo/blob/3cc7cd2a439e25fff9dd26fb1f94057d837a06f9/src/mongo/db/query/query_stats/query_stats.h#L196-L199
+[write query stats]: https://github.com/10gen/mongo/blob/3cc7cd2a439e25fff9dd26fb1f94057d837a06f9/src/mongo/db/query/query_stats/query_stats.h#L253-L258
+[write query stats comments]: https://github.com/10gen/mongo/blob/3cc7cd2a439e25fff9dd26fb1f94057d837a06f9/src/mongo/db/query/query_stats/query_stats.h#L243-L252
+[query stats will never exhaust]: https://github.com/10gen/mongo/blob/8be794e1983e2b24938489ad2b018b630ea9b563/src/mongo/db/clientcursor.h#L510

@@ -23,7 +23,7 @@ While different literal _values_ result in the same shape (matching `x` for 23 v
 BSON _types_ of the literal are considered distinct shapes (matching `x` for 53 vs "string").
 
 The concept of a query shape exists not just for the find command, but for many of the CRUD commands, distinct,
-and aggregate. It also includes most (but not all) components of these commands, not just the query
+count, and aggregate. It also includes most (but not all) components of these commands, not just the query
 predicate (MatchExpresssion). In these ways, "query" is meant more generally. While some components
 included in the query shape are shared across the different types of commands (e.g., the "hint"
 field), some are unique. For example, a find command would include a `filter` while an aggregate
@@ -36,6 +36,7 @@ structure is as follows:
 
 - [`CmdSpecificShapeComponents`](query_shape.h)
   - [`AggCmdShapeComponents`](agg_cmd_shape.h)
+  - [`CountCmdShapeComponents`](count_cmd_shape.h)
   - [`DistinctCmdShapeComponents`](distinct_cmd_shape.h)
   - [`FindCmdShapeComponents`](find_cmd_shape.h)
   - [`LetShapeComponent`](cmd_with_let_shape.h)
@@ -45,6 +46,7 @@ See more information for the different shapes in their respective classes, struc
 - [`Shape`](query_shape.h)
   - [`CmdWithLetShape`](cmd_with_let_shape.h)
     - [`AggCmdShape`](agg_cmd_shape.h)
+    - [`CountCmdShape`](count_cmd_shape.h)
     - [`DistinctCmdShape`](distinct_cmd_shape.h)
     - [`FindCmdShape`](find_cmd_shape.h)
 
