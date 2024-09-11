@@ -11,4 +11,4 @@ filters:
       - 10gen/server-cluster-scalability
   - "write_without_shard_key*":
     approvers:
-      - 10gen/server-cluster-scalability
+      - 10gen/query-execution

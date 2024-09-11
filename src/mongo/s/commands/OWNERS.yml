@@ -75,3 +75,9 @@ filters:
   - "sharding_expressions*":
     approvers:
       - 10gen/query-integration
+  - "cluster_query_without_shard_key_cmd.cpp":
+    approvers:
+      - 10gen/query-execution
+  - "cluster_write_without_shard_key_cmd.cpp":
+    approvers:
+      - 10gen/query-execution

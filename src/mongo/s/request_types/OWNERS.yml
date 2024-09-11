@@ -54,3 +54,6 @@ filters:
   - "update_zone_key_range_request_*":
     approvers:
       - 10gen/server-catalog-and-routing
+  - "cluster_commands_without_shard_key.idl":
+    approvers:
+      - 10gen/query-execution
