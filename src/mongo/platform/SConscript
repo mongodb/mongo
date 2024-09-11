@@ -16,7 +16,6 @@ env.CppUnitTest(
         "bits_test.cpp",
         "endian_test.cpp",
         "int128_test.cpp",
-        "mutex_test.cpp",
         "process_id_test.cpp",
         "random_test.cpp",
         "source_location_test.cpp",

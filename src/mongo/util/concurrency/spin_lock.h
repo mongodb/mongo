@@ -44,7 +44,7 @@
 namespace mongo {
 
 #if defined(_WIN32)
-class SpinLock : public latch_detail::Latch {
+class SpinLock {
     SpinLock(const SpinLock&) = delete;
     SpinLock& operator=(const SpinLock&) = delete;
 
@@ -57,15 +57,15 @@ public:
         DeleteCriticalSection(&_cs);
     }
 
-    void lock() override {
+    void lock() {
         EnterCriticalSection(&_cs);
     }
 
-    void unlock() override {
+    void unlock() {
         LeaveCriticalSection(&_cs);
     }
 
-    bool try_lock() override {
+    bool try_lock() {
         return TryEnterCriticalSection(&_cs);
     }
 
@@ -76,22 +76,22 @@ private:
 #else
 
 #if MONGO_CONFIG_DEBUG_BUILD
-class SpinLock : public latch_detail::Latch {
+class SpinLock {
     SpinLock(const SpinLock&) = delete;
     SpinLock& operator=(const SpinLock&) = delete;
 
 public:
     SpinLock() = default;
 
-    void lock() override {
+    void lock() {
         _mutex.lock();
     }
 
-    void unlock() override {
+    void unlock() {
         _mutex.unlock();
     }
 
-    bool try_lock() override {
+    bool try_lock() {
         return _mutex.try_lock();
     }
 
@@ -101,24 +101,24 @@ private:
 
 #else
 
-class SpinLock : public latch_detail::Latch {
+class SpinLock {
     SpinLock(const SpinLock&) = delete;
     SpinLock& operator=(const SpinLock&) = delete;
 
 public:
     SpinLock() = default;
 
-    void unlock() override {
+    void unlock() {
         _locked.clear(std::memory_order_release);
     }
 
-    void lock() override {
+    void lock() {
         if (MONGO_likely(_tryLock()))
             return;
         _lockSlowPath();
     }
 
-    bool try_lock() override {
+    bool try_lock() {
         return _tryLock();
     }
 

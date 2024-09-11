@@ -47,11 +47,6 @@ generate_config_header(
         },
         "//conditions:default": {},
     }) | select({
-        "//bazel/config:use_diagnostic_latches_disabled": {
-            "MONGO_CONFIG_USE_RAW_LATCHES": "1",
-        },
-        "//conditions:default": {},
-    }) | select({
         "//bazel/config:posix": {
             "MONGO_CONFIG_HAVE_HEADER_UNISTD_H": "1",
         },
@@ -139,7 +134,6 @@ mongo_cc_library(
         "//src/mongo/logv2:text_formatter.cpp",
         "//src/mongo/platform:decimal128.cpp",
         "//src/mongo/platform:int128.cpp",
-        "//src/mongo/platform:mutex.cpp",
         "//src/mongo/platform:posix_fadvise.cpp",
         "//src/mongo/platform:process_id.cpp",
         "//src/mongo/platform:random.cpp",

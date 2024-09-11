@@ -25,7 +25,6 @@ variables:
       -j$(grep -c ^processor /proc/cpuinfo)
       --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
       --link-model=dynamic
-      --use-diagnostic-latches=on
 
   # THIS HAS COPIES IN:
   # - etc/evergreen_yml_components/variants/amazon/test_dev_master_branch_only.yml
@@ -105,7 +104,6 @@ buildvariants:
         -j$(grep -c ^processor /proc/cpuinfo)
         --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
         --link-model=dynamic
-        --use-diagnostic-latches=on
         BAZEL_FLAGS=--config=local
       compile_variant: *amazon-linux2-arm64-local-compile
     tasks:

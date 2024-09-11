@@ -15,7 +15,7 @@ buildvariants:
       - macos-14-arm64
     expansions:
       test_flags: >-
-        --excludeWithAnyTags=incompatible_with_macos,requires_external_data_source,requires_latch_analyzer
+        --excludeWithAnyTags=incompatible_with_macos,requires_external_data_source
         --enableEnterpriseTests=off
       compiling_for_test: true
       push_path: osx
@@ -48,7 +48,6 @@ buildvariants:
         -j$(sysctl -n hw.logicalcpu)
         --libc++
         --variables-files=etc/scons/xcode_macosx_arm.vars
-        --use-diagnostic-latches=on
       resmoke_jobs_max: 6
       num_scons_link_jobs_available: 0.99
     tasks:

@@ -85,9 +85,6 @@
 #include "mongo/util/system_tick_source.h"
 #include "mongo/util/tick_source.h"
 
-#ifndef MONGO_CONFIG_USE_RAW_LATCHES
-#include "mongo/util/diagnostic_info.h"
-#endif
 
 namespace mongo {
 
@@ -582,7 +579,6 @@ public:
     static void reportCurrentOpForClient(const boost::intrusive_ptr<ExpressionContext>& expCtx,
                                          Client* client,
                                          bool truncateOps,
-                                         bool backtraceMode,
                                          BSONObjBuilder* infoBuilder);
 
     static bool currentOpBelongsToTenant(Client* client, TenantId tenantId);

@@ -119,7 +119,6 @@ variables:
       --link-model=dynamic
       -j$(grep -c ^processor /proc/cpuinfo)
       --variables-files=etc/scons/mongodbtoolchain_v4_clang.vars
-      --use-diagnostic-latches=on
     show_scons_timings: false
 
   - &clang_tidy_task_template
@@ -1103,7 +1102,6 @@ tasks:
           task_compile_flags: >-
             PREFIX=dist-test
             --link-model=static
-            --use-diagnostic-latches=off
             --dbg=on
             --opt=on
             --sanitize=

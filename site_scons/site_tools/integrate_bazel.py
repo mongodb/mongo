@@ -832,7 +832,6 @@ def generate(env: SCons.Environment.Environment) -> None:
         f'--//bazel/config:use_libcxx={env.GetOption("libc++") is not None}',
         f'--//bazel/config:detect_odr_violations={env.GetOption("detect-odr-violations") is not None}',
         f"--//bazel/config:linkstatic={linkstatic}",
-        f'--//bazel/config:use_diagnostic_latches={env.GetOption("use-diagnostic-latches") == "on"}',
         f'--//bazel/config:shared_archive={env.GetOption("link-model") == "dynamic-sdk"}',
         f'--//bazel/config:linker={env.GetOption("linker")}',
         f'--//bazel/config:streams_release_build={env.GetOption("streams-release-build")}',

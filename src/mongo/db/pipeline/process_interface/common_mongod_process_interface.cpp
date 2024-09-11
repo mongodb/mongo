@@ -770,15 +770,11 @@ bool CommonMongodProcessInterface::fieldsHaveSupportingUniqueIndex(
 BSONObj CommonMongodProcessInterface::_reportCurrentOpForClient(
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
     Client* client,
-    CurrentOpTruncateMode truncateOps,
-    CurrentOpBacktraceMode backtraceMode) const {
+    CurrentOpTruncateMode truncateOps) const {
     BSONObjBuilder builder;
 
-    CurOp::reportCurrentOpForClient(expCtx,
-                                    client,
-                                    (truncateOps == CurrentOpTruncateMode::kTruncateOps),
-                                    (backtraceMode == CurrentOpBacktraceMode::kIncludeBacktrace),
-                                    &builder);
+    CurOp::reportCurrentOpForClient(
+        expCtx, client, (truncateOps == CurrentOpTruncateMode::kTruncateOps), &builder);
 
     OperationContext* clientOpCtx = client->getOperationContext();
 

@@ -18,9 +18,6 @@ env.Library(
         "$BUILD_DIR/mongo/db/pipeline/field_path",
         "$BUILD_DIR/mongo/s/sharding_router_api",
         "$BUILD_DIR/mongo/util/concurrency/spin_lock",
-        "$BUILD_DIR/mongo/util/diagnostic_info"
-        if get_option("use-diagnostic-latches") == "on"
-        else [],
     ],
 )
 

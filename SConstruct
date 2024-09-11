@@ -495,14 +495,6 @@ add_option(
 )
 
 add_option(
-    "use-diagnostic-latches",
-    choices=["on", "off"],
-    default="off",
-    help="Enable annotated Mutex types",
-    type="choice",
-)
-
-add_option(
     "use-tracing-profiler",
     choices=["on", "off"],
     default="off",

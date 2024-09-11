@@ -98,7 +98,6 @@ variables:
       --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
       --enable-http-client=on
       --link-model=dynamic
-      --use-diagnostic-latches=on
       --modules=
     num_scons_link_jobs_available: 0.99
 
@@ -208,9 +207,6 @@ variables:
     # thread leaks, which we have because we don't do a clean shutdown
     # of the ServiceContext.
     #
-    # Run TSAN with diagnostic latches off, as our diagnostics reduce
-    # TSAN's visibility - see SERVER-88159.
-    #
     san_options: TSAN_OPTIONS="abort_on_error=1:disable_coredump=0:handle_abort=1:halt_on_error=1:report_thread_leaks=0:die_after_fork=0:history_size=4:suppressions=etc/tsan.suppressions:external_symbolizer_path=/opt/mongodbtoolchain/v4/bin/llvm-symbolizer"
     build_mongot: true
     download_mongot_release: true
@@ -224,7 +220,6 @@ variables:
       --use-libunwind=off
       --link-model=dynamic
       -j$(grep -c ^processor /proc/cpuinfo)
-      --use-diagnostic-latches=off
     # Avoid starting too many mongod's under TSAN build.
     resmoke_jobs_factor: 0.3
     scons_cache_scope: shared
@@ -278,7 +273,6 @@ buildvariants:
         --ssl
         -j$(grep -c ^processor /proc/cpuinfo)
         --link-model=dynamic
-        --use-diagnostic-latches=on
       build_mongot: true
       download_mongot_release: true
       compile_variant: *linux-debug-aubsan-compile-required
@@ -416,7 +410,6 @@ buildvariants:
         --ssl
         -j$(grep -c ^processor /proc/cpuinfo)
         --link-model=dynamic
-        --use-diagnostic-latches=on
         --modules=
       multiversion_platform: rhel80
       multiversion_platform_50_or_later: rhel8
@@ -463,7 +456,6 @@ buildvariants:
         --sanitize=undefined,address,fuzzer
         --ssl
         -j$(grep -c ^processor /proc/cpuinfo)
-        --use-diagnostic-latches=on
       test_flags: >-
         --mongodSetParameters="{internalQueryEnableAggressiveSpillsInGroup: true}"
         --excludeWithAnyTags=corrupts_data
@@ -518,7 +510,7 @@ buildvariants:
       <<: *enterprise-rhel8-debug-tsan-expansions-template
       test_flags: >-
         --mongodSetParameters="{internalQueryEnableAggressiveSpillsInGroup: true, receiveChunkWaitForRangeDeleterTimeoutMS: 180000}"
-        --excludeWithAnyTags=tsan_incompatible,requires_latch_analyzer
+        --excludeWithAnyTags=tsan_incompatible
     tasks:
       - name: .development_critical !.requires_large_host !.requires_compile_variant !.requires_large_host_tsan !.incompatible_development_variant !.incompatible_tsan !.incompatible_system_allocator !.requires_all_feature_flags
       - name: .development_critical .requires_large_host !.requires_compile_variant !.incompatible_development_variant !.incompatible_tsan !.incompatible_system_allocator !.requires_all_feature_flags
@@ -619,7 +611,6 @@ buildvariants:
         -j$(grep -c ^processor /proc/cpuinfo)
         --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
         --link-model=dynamic
-        --use-diagnostic-latches=on
         --spider-monkey-dbg=on
       compile_variant: enterprise-rhel-8-64-bit-dynamic-spider-monkey-dbg
       exec_timeout_secs: 32400 # 9 hour timeout

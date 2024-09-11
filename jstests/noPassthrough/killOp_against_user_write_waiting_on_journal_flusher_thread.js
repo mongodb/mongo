@@ -3,7 +3,6 @@
  *
  * @tags: [
  *     requires_journaling,
- *     requires_latch_analyzer,
  *     requires_replication,
  *     requires_fcv_71,
  * ]
@@ -50,7 +49,6 @@ try {
             op: 'insert',
             ns: testColl.getFullName(),
             connectionId: {$exists: true},
-            waitingForLatch: {$exists: true}
         });
         jsTestLog("currentOp results: " + tojson(currentOpResults));
         if (currentOpResults.inprog.length == 1) {
