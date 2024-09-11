@@ -44,7 +44,7 @@ class CompareCollector {
     using Element = typename CMaterializer::Element;
 
 public:
-    CompareCollector(boost::intrusive_ptr<ElementStorage> allocator,
+    CompareCollector(boost::intrusive_ptr<BSONElementStorage> allocator,
                      const StringDataComparator* comparator)
         : _allocator(std::move(allocator)), _comparator(comparator) {}
 
@@ -281,7 +281,7 @@ public:
     // Position info is not supported
     void appendPositionInfo(int32_t n) {}
 
-    ElementStorage& getAllocator() {
+    BSONElementStorage& getAllocator() {
         return *_allocator;
     }
 
@@ -319,7 +319,7 @@ private:
         return lhs.size() - rhs.size();
     }
 
-    boost::intrusive_ptr<ElementStorage> _allocator;
+    boost::intrusive_ptr<BSONElementStorage> _allocator;
     Element _value = CMaterializer::materializeMissing(*_allocator);
     Element _working = _value;
     BSONType _type = EOO;
@@ -341,7 +341,7 @@ class MinMaxCollector {
     using MaxCompare = std::greater<T>;
 
 public:
-    MinMaxCollector(boost::intrusive_ptr<ElementStorage> allocator,
+    MinMaxCollector(boost::intrusive_ptr<BSONElementStorage> allocator,
                     const StringDataComparator* comparator)
         : _allocator(std::move(allocator)), _comparator(comparator) {}
 
@@ -703,7 +703,7 @@ public:
 
     void appendPositionInfo(int32_t n) {}
 
-    ElementStorage& getAllocator() {
+    BSONElementStorage& getAllocator() {
         return *_allocator;
     }
 
@@ -722,7 +722,7 @@ private:
         return lhs.size() - rhs.size();
     }
 
-    boost::intrusive_ptr<ElementStorage> _allocator;
+    boost::intrusive_ptr<BSONElementStorage> _allocator;
     Element _min = CMaterializer::materializeMissing(*_allocator);
     Element _max = _min;
     Element _minForType = _min;
@@ -735,7 +735,7 @@ template <class CMaterializer>
 requires Materializer<CMaterializer>
 typename CMaterializer::Element first(const char* buffer,
                                       size_t size,
-                                      boost::intrusive_ptr<ElementStorage> allocator) {
+                                      boost::intrusive_ptr<BSONElementStorage> allocator) {
     const char* ptr = buffer;
     const char* end = buffer + size;
 
@@ -784,7 +784,7 @@ template <class CMaterializer>
 requires Materializer<CMaterializer>
 typename CMaterializer::Element last(const char* buffer,
                                      size_t size,
-                                     boost::intrusive_ptr<ElementStorage> allocator) {
+                                     boost::intrusive_ptr<BSONElementStorage> allocator) {
     const char* ptr = buffer;
     const char* end = buffer + size;
 
@@ -1016,7 +1016,7 @@ template <class CMaterializer>
 requires Materializer<CMaterializer>
 typename CMaterializer::Element min(const char* buffer,
                                     size_t size,
-                                    boost::intrusive_ptr<ElementStorage> allocator,
+                                    boost::intrusive_ptr<BSONElementStorage> allocator,
                                     const StringDataComparator* comparator) {
 
     CompareCollector<CMaterializer, std::less<>> collector(allocator, comparator);
@@ -1028,7 +1028,7 @@ template <class CMaterializer>
 requires Materializer<CMaterializer>
 typename CMaterializer::Element max(const char* buffer,
                                     size_t size,
-                                    boost::intrusive_ptr<ElementStorage> allocator,
+                                    boost::intrusive_ptr<BSONElementStorage> allocator,
                                     const StringDataComparator* comparator) {
     CompareCollector<CMaterializer, std::greater<>> collector(allocator, comparator);
     BSONColumnBlockBased(buffer, size).decompress(collector);
@@ -1040,7 +1040,7 @@ requires Materializer<CMaterializer>
 typename std::pair<typename CMaterializer::Element, typename CMaterializer::Element> minmax(
     const char* buffer,
     size_t size,
-    boost::intrusive_ptr<ElementStorage> allocator,
+    boost::intrusive_ptr<BSONElementStorage> allocator,
     const StringDataComparator* comparator) {
     MinMaxCollector<CMaterializer> collector(allocator, comparator);
     BSONColumnBlockBased(buffer, size).decompress(collector);

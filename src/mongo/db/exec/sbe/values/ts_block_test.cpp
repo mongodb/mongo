@@ -731,7 +731,7 @@ TEST_F(SbeValueTest, VerifyDecompressedBlockType) {
 
         auto decompressedInternalBlock = tsBlock->decompressedBlock_forTest();
         ASSERT(decompressedInternalBlock);
-        ASSERT(dynamic_cast<value::ElementStorageValueBlock*>(decompressedInternalBlock));
+        ASSERT(dynamic_cast<value::BSONElementStorageValueBlock*>(decompressedInternalBlock));
     }
 
     {

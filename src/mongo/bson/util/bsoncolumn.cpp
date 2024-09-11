@@ -60,11 +60,11 @@ namespace mongo {
 using namespace bsoncolumn;
 
 namespace {
-// Start capacity for memory blocks allocated by ElementStorage
+// Start capacity for memory blocks allocated by BSONElementStorage
 constexpr int kStartCapacity = 128;
 
-// Max capacity for memory blocks allocated by ElementStorage. We need to allow blocks to grow to at
-// least BSONObjMaxUserSize so we can construct user objects efficiently.
+// Max capacity for memory blocks allocated by BSONElementStorage. We need to allow blocks to grow
+// to at least BSONObjMaxUserSize so we can construct user objects efficiently.
 constexpr int kMaxCapacity = BSONObjMaxUserSize;
 
 // Memory offset to get to BSONElement value when field name is an empty string.
@@ -73,45 +73,46 @@ constexpr int kElementValueOffset = 2;
 
 }  // namespace
 
-ElementStorage::Element::Element(char* buffer, int nameSize, int valueSize)
+BSONElementStorage::Element::Element(char* buffer, int nameSize, int valueSize)
     : _buffer(buffer), _nameSize(nameSize), _valueSize(valueSize) {}
 
-char* ElementStorage::Element::value() {
+char* BSONElementStorage::Element::value() {
     // Skip over type byte and null terminator for field name
     return _buffer + _nameSize + kElementValueOffset;
 }
 
-int ElementStorage::Element::size() const {
+int BSONElementStorage::Element::size() const {
     return _valueSize;
 }
 
-BSONElement ElementStorage::Element::element() const {
+BSONElement BSONElementStorage::Element::element() const {
     return {_buffer, _nameSize + 1, BSONElement::TrustedInitTag{}};
 }
 
-ElementStorage::ContiguousBlock::ContiguousBlock(ElementStorage& storage) : _storage(storage) {
+BSONElementStorage::ContiguousBlock::ContiguousBlock(BSONElementStorage& storage)
+    : _storage(storage) {
     _storage._beginContiguous();
 }
 
-ElementStorage::ContiguousBlock::ContiguousBlock(ContiguousBlock&& other)
+BSONElementStorage::ContiguousBlock::ContiguousBlock(ContiguousBlock&& other)
     : _active(other._active), _storage(other._storage), _finished(other._finished) {
     other._active = false;
 }
 
-ElementStorage::ContiguousBlock::~ContiguousBlock() {
+BSONElementStorage::ContiguousBlock::~ContiguousBlock() {
     if (_active && !_finished) {
         _storage._endContiguous();
     }
 }
 
-std::pair<const char*, int> ElementStorage::ContiguousBlock::done() {
+std::pair<const char*, int> BSONElementStorage::ContiguousBlock::done() {
     auto ptr = _storage.contiguous();
     int size = _storage._endContiguous();
     _finished = true;
     return std::make_pair(ptr, size);
 }
 
-char* ElementStorage::allocate(int bytes) {
+char* BSONElementStorage::allocate(int bytes) {
     // If current block doesn't have enough capacity we need to allocate a new one.
     if (_capacity - _pos < bytes) {
         // Keep track of current block if it exists.
@@ -145,27 +146,27 @@ char* ElementStorage::allocate(int bytes) {
     return _block.get() + pos;
 }
 
-void ElementStorage::deallocate(int bytes) {
+void BSONElementStorage::deallocate(int bytes) {
     _pos -= bytes;
 }
 
-ElementStorage::ContiguousBlock ElementStorage::startContiguous() {
+BSONElementStorage::ContiguousBlock BSONElementStorage::startContiguous() {
     return ContiguousBlock(*this);
 }
 
-void ElementStorage::_beginContiguous() {
+void BSONElementStorage::_beginContiguous() {
     _contiguousPos = _pos;
     _contiguousEnabled = true;
 }
 
-int ElementStorage::_endContiguous() {
+int BSONElementStorage::_endContiguous() {
     _contiguousEnabled = false;
     return _pos - _contiguousPos;
 }
 
-ElementStorage::Element ElementStorage::allocate(BSONType type,
-                                                 StringData fieldName,
-                                                 int valueSize) {
+BSONElementStorage::Element BSONElementStorage::allocate(BSONType type,
+                                                         StringData fieldName,
+                                                         int valueSize) {
     // Size needed for this BSONElement
     auto fieldNameSize = fieldName.size();
     int size = valueSize + fieldNameSize + kElementValueOffset;
@@ -183,7 +184,7 @@ ElementStorage::Element ElementStorage::allocate(BSONType type,
     return Element(block, fieldNameSize, valueSize);
 }
 
-BSONColumn::Iterator::Iterator(boost::intrusive_ptr<ElementStorage> allocator,
+BSONColumn::Iterator::Iterator(boost::intrusive_ptr<BSONElementStorage> allocator,
                                const char* pos,
                                const char* end)
     : _index(0), _control(pos), _end(end), _allocator(std::move(allocator)), _mode(Regular{}) {
@@ -288,7 +289,7 @@ void BSONColumn::Iterator::_incrementInterleaved(Interleaved& interleaved) {
         [this](StringData fieldName, const BSONObj& obj, BSONType type) {
             // Called every time we recurse into a subobject. It makes sure we write the size and
             // EOO bytes.
-            return SubObjectAllocator(*_allocator, fieldName, obj, type);
+            return BSONSubObjectAllocator(*_allocator, fieldName, obj, type);
         },
         [this, &stateIt, &stateEnd, &processed](const BSONElement& referenceField) {
             // Called for every scalar field in the reference interleaved BSONObj. We have as many
@@ -463,7 +464,7 @@ void BSONColumn::Iterator::DecodingState::loadUncompressed(const BSONElement& el
 }
 
 BSONColumn::Iterator::DecodingState::LoadControlResult
-BSONColumn::Iterator::DecodingState::loadControl(ElementStorage& allocator,
+BSONColumn::Iterator::DecodingState::loadControl(BSONElementStorage& allocator,
                                                  const char* buffer,
                                                  const char* end) {
     // Load current control byte, it can be either a literal or Simple-8b deltas
@@ -529,7 +530,7 @@ BSONColumn::Iterator::DecodingState::loadControl(ElementStorage& allocator,
     return {deltaElem, size + 1};
 }
 
-BSONElement BSONColumn::Iterator::DecodingState::loadDelta(ElementStorage& allocator,
+BSONElement BSONColumn::Iterator::DecodingState::loadDelta(BSONElementStorage& allocator,
                                                            Decoder64& d64) {
     const auto& delta = *d64.pos;
     // boost::none, or decompressing deltas without a previous uncompressed element (the
@@ -556,7 +557,7 @@ BSONElement BSONColumn::Iterator::DecodingState::loadDelta(ElementStorage& alloc
     return lastValue;
 }
 
-BSONElement BSONColumn::Iterator::DecodingState::loadDelta(ElementStorage& allocator,
+BSONElement BSONColumn::Iterator::DecodingState::loadDelta(BSONElementStorage& allocator,
                                                            Decoder128& d128) {
     const auto& delta = *d128.pos;
     // boost::none represent skip, just append EOO BSONElement.
@@ -579,11 +580,11 @@ BSONElement BSONColumn::Iterator::DecodingState::loadDelta(ElementStorage& alloc
 }
 
 BSONElement BSONColumn::Iterator::DecodingState::Decoder64::materialize(
-    ElementStorage& allocator, BSONElement last, StringData fieldName) const {
+    BSONElementStorage& allocator, BSONElement last, StringData fieldName) const {
     // Decoder state is now setup, materialize new value. We allocate a new BSONElement that fits
     // same value size as previous
     BSONType type = last.type();
-    ElementStorage::Element elem = allocator.allocate(type, fieldName, last.valuesize());
+    BSONElementStorage::Element elem = allocator.allocate(type, fieldName, last.valuesize());
 
     // Write value depending on type
     int64_t valueToWrite = deltaOfDelta ? lastEncodedValueForDeltaOfDelta : lastEncodedValue;
@@ -625,9 +626,9 @@ BSONElement BSONColumn::Iterator::DecodingState::Decoder64::materialize(
 }
 
 BSONElement BSONColumn::Iterator::DecodingState::Decoder128::materialize(
-    ElementStorage& allocator, BSONElement last, StringData fieldName) const {
+    BSONElementStorage& allocator, BSONElement last, StringData fieldName) const {
     // Decoder state is now setup, write value depending on type
-    return [&]() -> ElementStorage::Element {
+    return [&]() -> BSONElementStorage::Element {
         BSONType type = last.type();
         switch (type) {
             case String:
@@ -680,7 +681,7 @@ BSONColumn::Iterator::Interleaved::Interleaved(BSONObj refObj,
     : referenceObj(std::move(refObj)), arrays(interleavedArrays), rootType(referenceObjType) {}
 
 BSONColumn::BSONColumn(const char* buffer, size_t size)
-    : _binary(buffer), _size(size), _allocator(new ElementStorage()) {
+    : _binary(buffer), _size(size), _allocator(new BSONElementStorage()) {
     _initialValidate();
 }
 
@@ -690,7 +691,7 @@ BSONColumn::BSONColumn(BSONElement bin) {
             bin.type() == BSONType::BinData && bin.binDataType() == BinDataType::Column);
 
     _binary = bin.binData(_size);
-    _allocator = new ElementStorage();
+    _allocator = new BSONElementStorage();
     _initialValidate();
 }
 
@@ -767,9 +768,9 @@ bool BSONColumn::contains_forTest(BSONType elementType) const {
     return false;
 }
 
-boost::intrusive_ptr<ElementStorage> BSONColumn::release() {
+boost::intrusive_ptr<BSONElementStorage> BSONColumn::release() {
     auto previous = _allocator;
-    _allocator = new ElementStorage();
+    _allocator = new BSONElementStorage();
     return previous;
 }
 
@@ -803,31 +804,32 @@ bool BSONColumnBlockBased::contains(BSONType type) const {
     return false;
 }
 
-BSONElement BSONElementMaterializer::materialize(ElementStorage& allocator, bool val) {
-    ElementStorage::Element e = allocator.allocate(Bool, "", sizeof(uint8_t));
+BSONElement BSONElementMaterializer::materialize(BSONElementStorage& allocator, bool val) {
+    BSONElementStorage::Element e = allocator.allocate(Bool, "", sizeof(uint8_t));
     DataView(e.value()).write<uint8_t>(val);
     return e.element();
 }
 
-BSONElement BSONElementMaterializer::materialize(ElementStorage& allocator, int32_t val) {
-    ElementStorage::Element e = allocator.allocate(NumberInt, "", sizeof(int32_t));
+BSONElement BSONElementMaterializer::materialize(BSONElementStorage& allocator, int32_t val) {
+    BSONElementStorage::Element e = allocator.allocate(NumberInt, "", sizeof(int32_t));
     DataView(e.value()).write<LittleEndian<int32_t>>(val);
     return e.element();
 }
 
-BSONElement BSONElementMaterializer::materialize(ElementStorage& allocator, int64_t val) {
-    ElementStorage::Element e = allocator.allocate(NumberLong, "", sizeof(int64_t));
+BSONElement BSONElementMaterializer::materialize(BSONElementStorage& allocator, int64_t val) {
+    BSONElementStorage::Element e = allocator.allocate(NumberLong, "", sizeof(int64_t));
     DataView(e.value()).write<LittleEndian<int64_t>>(val);
     return e.element();
 }
 
-BSONElement BSONElementMaterializer::materialize(ElementStorage& allocator, double val) {
-    ElementStorage::Element e = allocator.allocate(NumberDouble, "", sizeof(double));
+BSONElement BSONElementMaterializer::materialize(BSONElementStorage& allocator, double val) {
+    BSONElementStorage::Element e = allocator.allocate(NumberDouble, "", sizeof(double));
     DataView(e.value()).write<LittleEndian<double>>(val);
     return e.element();
 }
 
-BSONElement BSONElementMaterializer::materialize(ElementStorage& allocator, const Decimal128& val) {
+BSONElement BSONElementMaterializer::materialize(BSONElementStorage& allocator,
+                                                 const Decimal128& val) {
     auto elem = allocator.allocate(NumberDecimal, "", 16);
     Decimal128::Value dec128Val = val.getValue();
     DataView(elem.value()).write<LittleEndian<uint64_t>>(dec128Val.low64);
@@ -835,14 +837,15 @@ BSONElement BSONElementMaterializer::materialize(ElementStorage& allocator, cons
     return elem.element();
 }
 
-BSONElement BSONElementMaterializer::materialize(ElementStorage& allocator, const Date_t& val) {
-    ElementStorage::Element e = allocator.allocate(Date, "", sizeof(int64_t));
+BSONElement BSONElementMaterializer::materialize(BSONElementStorage& allocator, const Date_t& val) {
+    BSONElementStorage::Element e = allocator.allocate(Date, "", sizeof(int64_t));
     DataView(e.value()).write<LittleEndian<int64_t>>(val.toMillisSinceEpoch());
     return e.element();
 }
 
-BSONElement BSONElementMaterializer::materialize(ElementStorage& allocator, const Timestamp& val) {
-    ElementStorage::Element e = allocator.allocate(bsonTimestamp, "", sizeof(uint64_t));
+BSONElement BSONElementMaterializer::materialize(BSONElementStorage& allocator,
+                                                 const Timestamp& val) {
+    BSONElementStorage::Element e = allocator.allocate(bsonTimestamp, "", sizeof(uint64_t));
     DataView(e.value()).write<LittleEndian<uint64_t>>(val.asULL());
     return e.element();
 }
@@ -851,11 +854,11 @@ BSONElement BSONElementMaterializer::materialize(ElementStorage& allocator, cons
  * Create a BSONElement with memory from allocator. Both String and Code are treated similarly
  * and use this helper.
  */
-BSONElement BSONElementMaterializer::writeStringData(ElementStorage& allocator,
+BSONElement BSONElementMaterializer::writeStringData(BSONElementStorage& allocator,
                                                      BSONType bsonType,
                                                      StringData val) {
     // Add 5 bytes to size, strings begin with a 4 byte count and ends with a null terminator
-    ElementStorage::Element elem = allocator.allocate(bsonType, "", val.size() + 5);
+    BSONElementStorage::Element elem = allocator.allocate(bsonType, "", val.size() + 5);
     // Write count, size includes null terminator
     DataView(elem.value()).write<LittleEndian<int32_t>>(val.size() + 1);
     // Write string value
@@ -865,11 +868,11 @@ BSONElement BSONElementMaterializer::writeStringData(ElementStorage& allocator,
     return elem.element();
 }
 
-BSONElement BSONElementMaterializer::materialize(ElementStorage& allocator, StringData val) {
+BSONElement BSONElementMaterializer::materialize(BSONElementStorage& allocator, StringData val) {
     return writeStringData(allocator, String, val);
 }
 
-BSONElement BSONElementMaterializer::materialize(ElementStorage& allocator,
+BSONElement BSONElementMaterializer::materialize(BSONElementStorage& allocator,
                                                  const BSONBinData& val) {
     // Layout of a binary element:
     // - 4-byte length of binary data
@@ -883,12 +886,13 @@ BSONElement BSONElementMaterializer::materialize(ElementStorage& allocator,
     return elem.element();
 }
 
-BSONElement BSONElementMaterializer::materialize(ElementStorage& allocator, const BSONCode& val) {
+BSONElement BSONElementMaterializer::materialize(BSONElementStorage& allocator,
+                                                 const BSONCode& val) {
     return writeStringData(allocator, Code, val.code);
 }
 
-BSONElement BSONElementMaterializer::materialize(ElementStorage& allocator, const OID& val) {
-    ElementStorage::Element e = allocator.allocate(jstOID, "", sizeof(OID));
+BSONElement BSONElementMaterializer::materialize(BSONElementStorage& allocator, const OID& val) {
+    BSONElementStorage::Element e = allocator.allocate(jstOID, "", sizeof(OID));
     DataView(e.value()).write<OID>(val);
     return e.element();
 }

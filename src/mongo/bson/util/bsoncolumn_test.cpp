@@ -52,6 +52,7 @@
 #include "mongo/bson/util/bsoncolumn_expressions.h"
 #include "mongo/bson/util/bsoncolumn_test_util.h"
 #include "mongo/bson/util/bsoncolumnbuilder.h"
+#include "mongo/bson/util/bsonobj_traversal.h"
 #include "mongo/bson/util/builder.h"
 #include "mongo/bson/util/simple8b_builder.h"
 #include "mongo/platform/decimal128.h"
@@ -741,7 +742,7 @@ public:
 
         // Set up the iterative and block API.
         BSONColumn col(interleavedBinary);
-        boost::intrusive_ptr<ElementStorage> allocator = new ElementStorage();
+        boost::intrusive_ptr allocator{new BSONElementStorage()};
         std::vector<BSONElement> collection;
         BSONColumnBlockBased block((const char*)interleavedBinary.data, interleavedBinary.length);
         block.decompress<BSONElementMaterializer, std::vector<BSONElement>>(collection, allocator);
@@ -841,7 +842,7 @@ public:
             testPaths.emplace_back(p, vecs.back());
         }
 
-        boost::intrusive_ptr<ElementStorage> allocator = new ElementStorage();
+        boost::intrusive_ptr allocator{new BSONElementStorage()};
         BSONColumnBlockBased c((const char*)columnBinary.data, columnBinary.length);
 
         c.decompress<BSONElementMaterializer>(allocator, std::span(testPaths));
@@ -1002,7 +1003,7 @@ public:
         // BSONElementMaterializer.
         {
             bsoncolumn::BSONColumnBlockBased col(columnBinary);
-            boost::intrusive_ptr<ElementStorage> allocator = new ElementStorage();
+            boost::intrusive_ptr allocator{new BSONElementStorage()};
             std::vector<BSONElement> container;
             col.decompressIterative<BSONElementMaterializer>(container, allocator);
             ASSERT_EQ(container.size(), expected.size());
@@ -1056,7 +1057,7 @@ public:
         {
             using SBEMaterializer = sbe::bsoncolumn::SBEColumnMaterializer;
             bsoncolumn::BSONColumnBlockBased col(columnBinary);
-            boost::intrusive_ptr<ElementStorage> allocator = new ElementStorage();
+            boost::intrusive_ptr allocator{new BSONElementStorage()};
             std::vector<SBEMaterializer::Element> container;
             col.decompressIterative<SBEMaterializer>(container, allocator);
             ASSERT_EQ(container.size(), expected.size());
@@ -1068,7 +1069,7 @@ public:
         }
 
         {
-            boost::intrusive_ptr<ElementStorage> allocator = new ElementStorage();
+            boost::intrusive_ptr allocator{new BSONElementStorage()};
             std::vector<BSONElement> collection;
             BSONColumnBlockBased c((const char*)columnBinary.data, columnBinary.length);
 
@@ -3426,7 +3427,7 @@ TEST_F(BSONColumnTest, BinDataLargerThan16WithNonZeroDelta) {
 
     // Verify block-based interleaved decompression throws an error.
     {
-        boost::intrusive_ptr<ElementStorage> allocator = new ElementStorage();
+        boost::intrusive_ptr allocator{new BSONElementStorage()};
         BSONColumnBlockBased colBlockBased{interleavedBinary.data(),
                                            static_cast<size_t>(interleavedBinary.size())};
         std::vector<BSONElement> collection;
@@ -3437,7 +3438,7 @@ TEST_F(BSONColumnTest, BinDataLargerThan16WithNonZeroDelta) {
 
     // Verify block-based path decompression throws an error.
     {
-        boost::intrusive_ptr<ElementStorage> allocator = new ElementStorage();
+        boost::intrusive_ptr allocator{new BSONElementStorage()};
         BSONColumnBlockBased colBlockBased{interleavedBinary.data(),
                                            static_cast<size_t>(interleavedBinary.size())};
         std::vector<BSONElement> collection;
@@ -3469,7 +3470,7 @@ TEST_F(BSONColumnTest, BinDataLargerThan16WithNonZeroDelta) {
 
     // Verify non-interleaved block-based decompression throws an error.
     {
-        boost::intrusive_ptr<ElementStorage> allocator = new ElementStorage();
+        boost::intrusive_ptr allocator{new BSONElementStorage()};
         BSONColumnBlockBased colBlockBased{scalarBinary.buf(),
                                            static_cast<size_t>(scalarBinary.len())};
         std::vector<BSONElement> collection;
@@ -7660,7 +7661,7 @@ TEST_F(BSONColumnTest, InterleavedEmptySequence) {
 
     BSONColumnBlockBased colBlockBased{interleavedBinary.buf(),
                                        static_cast<size_t>(interleavedBinary.len())};
-    boost::intrusive_ptr<ElementStorage> allocator = new ElementStorage();
+    boost::intrusive_ptr allocator{new BSONElementStorage()};
     std::vector<BSONElement> collection;
     std::vector<std::pair<TestPath, std::vector<BSONElement>&>> testPaths{
         {TestPath{{"x"}}, collection}};
@@ -8905,7 +8906,7 @@ TEST_F(BSONColumnTest, LegacyInterleavedPaths) {
     std::vector<BSONElement> output;
     std::vector<std::pair<ArrayElemPath, std::vector<BSONElement>&>> paths = {
         {ArrayElemPath{}, output}};
-    boost::intrusive_ptr<ElementStorage> allocator = new ElementStorage();
+    boost::intrusive_ptr allocator{new BSONElementStorage()};
     // 'Request for unknown element'
     ASSERT_THROWS_CODE(column.decompress<BSONElementMaterializer>(allocator, std::span(paths)),
                        DBException,
@@ -9016,7 +9017,7 @@ TEST_F(BSONColumnTest, BlockFuzzerDiscoveredEdgeCases) {
         auto binary = base64::decode(binaryBase64);
 
         // Store the results for validation after decompression.
-        boost::intrusive_ptr allocator{new bsoncolumn::ElementStorage()};
+        boost::intrusive_ptr allocator{new BSONElementStorage()};
         std::vector<BSONElement> iteratorElems, blockBasedElems;
         bool blockBasedError = false;
         bool iteratorError = false;
@@ -9092,12 +9093,12 @@ public:
         variant<std::monostate, bool, int32_t, int64_t, double, Timestamp, Date_t, OID, StringData>;
 
     template <typename T>
-    static Element materialize(ElementStorage& a, const T& val) {
+    static Element materialize(BSONElementStorage& a, const T& val) {
         return val;
     }
 
     template <typename T>
-    static Element materialize(ElementStorage& a, const BSONElement& val) {
+    static Element materialize(BSONElementStorage& a, const BSONElement& val) {
         return std::monostate();
     }
 
@@ -9106,7 +9107,7 @@ public:
     }
 
 
-    static Element materializeMissing(ElementStorage& a) {
+    static Element materializeMissing(BSONElementStorage& a) {
         return std::monostate();
     }
 
@@ -9127,80 +9128,80 @@ public:
 
 // Some compilers require that specializations be defined outside of class
 template <>
-TestMaterializer::Element TestMaterializer::materialize<BSONBinData>(ElementStorage& a,
+TestMaterializer::Element TestMaterializer::materialize<BSONBinData>(BSONElementStorage& a,
                                                                      const BSONBinData& val) {
     return StringData((const char*)val.data, val.length);
 }
 
 template <>
-TestMaterializer::Element TestMaterializer::materialize<BSONCode>(ElementStorage& a,
+TestMaterializer::Element TestMaterializer::materialize<BSONCode>(BSONElementStorage& a,
                                                                   const BSONCode& val) {
     return val.code;
 }
 
 template <>
-TestMaterializer::Element TestMaterializer::materialize<bool>(ElementStorage& a,
+TestMaterializer::Element TestMaterializer::materialize<bool>(BSONElementStorage& a,
                                                               const BSONElement& val) {
     return val.Bool();
 }
 
 template <>
-TestMaterializer::Element TestMaterializer::materialize<int32_t>(ElementStorage& a,
+TestMaterializer::Element TestMaterializer::materialize<int32_t>(BSONElementStorage& a,
                                                                  const BSONElement& val) {
     return (int32_t)val.Int();
 }
 
 template <>
-TestMaterializer::Element TestMaterializer::materialize<int64_t>(ElementStorage& a,
+TestMaterializer::Element TestMaterializer::materialize<int64_t>(BSONElementStorage& a,
                                                                  const BSONElement& val) {
     return (int64_t)val.Int();
 }
 
 template <>
-TestMaterializer::Element TestMaterializer::materialize<double>(ElementStorage& a,
+TestMaterializer::Element TestMaterializer::materialize<double>(BSONElementStorage& a,
                                                                 const BSONElement& val) {
     return val.Double();
 }
 
 template <>
 TestMaterializer::Element TestMaterializer::materialize<unsigned long long>(
-    ElementStorage& a, const BSONElement& val) {
+    BSONElementStorage& a, const BSONElement& val) {
     return val.date();
 }
 
 template <>
-TestMaterializer::Element TestMaterializer::materialize<Date_t>(ElementStorage& a,
+TestMaterializer::Element TestMaterializer::materialize<Date_t>(BSONElementStorage& a,
                                                                 const BSONElement& val) {
     return val.Date();
 }
 
 template <>
-TestMaterializer::Element TestMaterializer::materialize<OID>(ElementStorage& a,
+TestMaterializer::Element TestMaterializer::materialize<OID>(BSONElementStorage& a,
                                                              const BSONElement& val) {
     return val.OID();
 }
 
 template <>
-TestMaterializer::Element TestMaterializer::materialize<StringData>(ElementStorage& a,
+TestMaterializer::Element TestMaterializer::materialize<StringData>(BSONElementStorage& a,
                                                                     const BSONElement& val) {
     return val.valueStringData();
 }
 
 template <>
-TestMaterializer::Element TestMaterializer::materialize<BSONBinData>(ElementStorage& a,
+TestMaterializer::Element TestMaterializer::materialize<BSONBinData>(BSONElementStorage& a,
                                                                      const BSONElement& val) {
     int size = 0;
     return StringData(val.binData(size), size);
 }
 
 template <>
-TestMaterializer::Element TestMaterializer::materialize<BSONCode>(ElementStorage& a,
+TestMaterializer::Element TestMaterializer::materialize<BSONCode>(BSONElementStorage& a,
                                                                   const BSONElement& val) {
     return val.valueStringData();
 }
 
 TEST_F(BSONColumnTest, TestCollector) {
-    boost::intrusive_ptr<ElementStorage> allocator = new ElementStorage();
+    boost::intrusive_ptr allocator{new BSONElementStorage()};
     std::vector<TestMaterializer::Element> collection;
     Collector<TestMaterializer, std::vector<TestMaterializer::Element>> collector(collection,
                                                                                   allocator);

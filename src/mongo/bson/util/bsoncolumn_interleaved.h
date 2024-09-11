@@ -33,6 +33,7 @@
 #include <span>
 
 #include "mongo/bson/util/bsoncolumn_helpers.h"
+#include "mongo/bson/util/bsonobj_traversal.h"
 
 namespace mongo::bsoncolumn {
 
@@ -64,7 +65,7 @@ public:
      * Parameter "end" should point to the byte after the end of the BSONColumn data, used for
      * sanity checks.
      */
-    BlockBasedInterleavedDecompressor(ElementStorage& allocator,
+    BlockBasedInterleavedDecompressor(BSONElementStorage& allocator,
                                       const char* control,
                                       const char* end);
 
@@ -96,7 +97,7 @@ private:
         struct Decoder64 {
             Decoder64();
 
-            void writeToElementStorage(ElementStorage& allocator,
+            void writeToElementStorage(BSONElementStorage& allocator,
                                        BSONType type,
                                        int64_t value,
                                        BSONElement lastLiteral,
@@ -119,7 +120,7 @@ private:
          * State when decoding deltas for 128-bit values.
          */
         struct Decoder128 {
-            void writeToElementStorage(ElementStorage& allocator,
+            void writeToElementStorage(BSONElementStorage& allocator,
                                        BSONType type,
                                        int128_t value,
                                        BSONElement lastLiteral,
@@ -154,19 +155,19 @@ private:
          * In both cases, the "size" field will contain the number of bytes to the next control
          * byte.
          */
-        LoadControlResult loadControl(ElementStorage& allocator, const char* buffer);
+        LoadControlResult loadControl(BSONElementStorage& allocator, const char* buffer);
 
         /**
          * Apply a delta or delta of delta to an encoded representation to get a new element value.
          * May also apply a 0 delta to an uncompressed literal, simply returning the literal.
          */
-        Elem loadDelta(ElementStorage& allocator, Decoder64& d64);
+        Elem loadDelta(BSONElementStorage& allocator, Decoder64& d64);
 
         /**
          * Apply a delta to an encoded representation to get a new element value. May also apply a 0
          * delta to an uncompressed literal, simply returning the literal.
          */
-        Elem loadDelta(ElementStorage& allocator, Decoder128& d128);
+        Elem loadDelta(BSONElementStorage& allocator, Decoder128& d128);
 
         /**
          * The last uncompressed literal from the BSONColumn bytes.
@@ -221,7 +222,7 @@ private:
     template <class Buffer>
     static void flushPositionsToBuffers(absl::flat_hash_map<Buffer*, int32_t>& bufferToPositions);
 
-    ElementStorage& _allocator;
+    BSONElementStorage& _allocator;
     const char* const _control;
     const char* const _end;
     const BSONType _rootType;
@@ -415,7 +416,7 @@ const char* BlockBasedInterleavedDecompressor::decompressGeneral(
     control += refObj.objsize() + 1;
     uassert(8625732, "Invalid BSON Column encoding", control < _end && *control != EOO);
 
-    using SOAlloc = SubObjectAllocator<BlockBasedSubObjectFinisher<Buffer>>;
+    using SOAlloc = BSONSubObjectAllocator<BlockBasedSubObjectFinisher<Buffer>>;
     using OptionalSOAlloc = boost::optional<SOAlloc>;
     static_assert(std::is_move_constructible<OptionalSOAlloc>::value,
                   "must be able to move a sub-object allocator to ensure that RAII properties "
@@ -542,8 +543,8 @@ const char* BlockBasedInterleavedDecompressor::decompressGeneral(
 
                 visit(OverloadedVisitor{
                           [&](BSONElement& bsonElem) {
-                              // We must write a BSONElement to ElementStorage since this scalar is
-                              // part of an object being materialized.
+                              // We must write a BSONElement to BSONElementStorage since this scalar
+                              // is part of an object being materialized.
                               appendToBuffers(buffers, bsonElem);
                           },
                           [&](std::pair<BSONType, int64_t> elem) {

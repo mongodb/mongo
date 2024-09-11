@@ -245,6 +245,7 @@ mongo_cc_library(
         "//src/mongo/bson:simple_bsonelement_comparator.h",
         "//src/mongo/bson:simple_bsonobj_comparator.h",
         "//src/mongo/bson:timestamp.h",
+        "//src/mongo/bson/util:bsonobj_traversal.h",
         "//src/mongo/bson/util:builder.h",
         "//src/mongo/bson/util:builder_fwd.h",
         "//src/mongo/logv2:attribute_storage.h",

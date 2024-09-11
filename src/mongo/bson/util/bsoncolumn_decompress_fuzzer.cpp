@@ -31,6 +31,7 @@
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/util/bsoncolumn.h"
 #include "mongo/bson/util/bsoncolumn_test_util.h"
+#include "mongo/bson/util/bsonobj_traversal.h"
 
 // Returns true if the binary contains interleaved data. This function just scans the binary for an
 // interleaved start control byte, it does no validation nor decompression.
@@ -78,7 +79,7 @@ extern "C" int LLVMFuzzerTestOneInput(const char* Data, size_t Size) {
     // Set up both APIs.
     BSONColumn column(Data, Size);
     bsoncolumn::BSONColumnBlockBased block(Data, Size);
-    boost::intrusive_ptr allocator{new bsoncolumn::ElementStorage()};
+    boost::intrusive_ptr allocator{new BSONElementStorage()};
     std::vector<BSONElement> iteratorElems = {};
     std::vector<BSONElement> blockBasedElems = {};
     std::string blockBasedError;

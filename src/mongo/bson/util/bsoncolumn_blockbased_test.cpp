@@ -68,7 +68,7 @@ void assertEquals(const T& lhs, const T& rhs);
  */
 template <typename T>
 void assertRoundtrip(T value) {
-    boost::intrusive_ptr<ElementStorage> allocator = new ElementStorage();
+    boost::intrusive_ptr allocator{new BSONElementStorage()};
     std::vector<BSONElement> vec;
     Collector<BSONElementMaterializer, decltype(vec)> collector{vec, allocator};
     collector.append(value);
@@ -106,7 +106,7 @@ TEST_F(BSONColumnBlockBasedTest, BSONMaterializer) {
 }
 
 TEST_F(BSONColumnBlockBasedTest, BSONMaterializerBSONElement) {
-    boost::intrusive_ptr<ElementStorage> allocator = new ElementStorage();
+    boost::intrusive_ptr allocator{new BSONElementStorage()};
     std::vector<BSONElement> vec;
     Collector<BSONElementMaterializer, decltype(vec)> collector{vec, allocator};
 
@@ -120,7 +120,7 @@ TEST_F(BSONColumnBlockBasedTest, BSONMaterializerBSONElement) {
     collector.append<BSONElement>(bsonElem);
     auto elem = vec.back();
     ASSERT(bsonElem.binaryEqual(elem));
-    // Since we are making a copy and storing it in the ElementStorage, the address of the data
+    // Since we are making a copy and storing it in the BSONElementStorage, the address of the data
     // should not be the same.
     ASSERT_NOT_EQUALS(elem.value(), bsonElem.value());
 
@@ -133,7 +133,7 @@ TEST_F(BSONColumnBlockBasedTest, BSONMaterializerBSONElement) {
 }
 
 TEST_F(BSONColumnBlockBasedTest, BSONMaterializerMissing) {
-    boost::intrusive_ptr<ElementStorage> allocator = new ElementStorage();
+    boost::intrusive_ptr allocator{new BSONElementStorage()};
     std::vector<BSONElement> vec;
     Collector<BSONElementMaterializer, decltype(vec)> collector{vec, allocator};
     collector.appendMissing();
@@ -273,7 +273,7 @@ TEST_F(BSONColumnBlockBasedTest, DecompressScalars) {
         BSON("a" << 13 << "b" << BSON("c" << int64_t(23))),
     });
 
-    boost::intrusive_ptr<ElementStorage> allocator = new ElementStorage();
+    boost::intrusive_ptr allocator{new BSONElementStorage()};
     std::vector<BSONElement> vec0, vec1;
     std::vector<std::pair<TestPath, std::vector<BSONElement>&>> paths{
         {TestPath{{"a"}}, vec0},
@@ -309,7 +309,7 @@ TEST_F(BSONColumnBlockBasedTest, DecompressSomeScalars) {
     auto col = bsonColumnFromObjs(std::move(objs));
 
     // Select a and c, but omit b to show that we can skip over parts of the data as needed.
-    boost::intrusive_ptr<ElementStorage> allocator = new ElementStorage();
+    boost::intrusive_ptr allocator{new BSONElementStorage()};
     std::vector<BSONElement> vec0, vec1;
     std::vector<std::pair<TestPath, std::vector<BSONElement>&>> paths{
         {TestPath{{"a"}}, vec0},
@@ -338,7 +338,7 @@ TEST_F(BSONColumnBlockBasedTest, DecompressObjects) {
         fromjson("{a: 13}"),
     });
 
-    boost::intrusive_ptr<ElementStorage> allocator = new ElementStorage();
+    boost::intrusive_ptr allocator{new BSONElementStorage()};
     std::vector<BSONElement> vec0;
     std::vector<std::pair<TestPath, std::vector<BSONElement>&>> paths{{TestPath{}, vec0}};
 
@@ -363,7 +363,7 @@ TEST_F(BSONColumnBlockBasedTest, DecompressNestedObjects) {
     });
 
     {
-        boost::intrusive_ptr<ElementStorage> allocator = new ElementStorage();
+        boost::intrusive_ptr allocator{new BSONElementStorage()};
         std::vector<BSONElement> vec0;
         std::vector<std::pair<TestPath, std::vector<BSONElement>&>> paths{{TestPath{}, vec0}};
 
@@ -378,7 +378,7 @@ TEST_F(BSONColumnBlockBasedTest, DecompressNestedObjects) {
         ASSERT_BSONOBJ_EQ(paths[0].second[3].Obj(), fromjson("{a: 13, b: {c: 33}}"));
     }
     {
-        boost::intrusive_ptr<ElementStorage> allocator = new ElementStorage();
+        boost::intrusive_ptr allocator{new BSONElementStorage()};
         std::vector<BSONElement> vec0;
         std::vector<std::pair<TestPath, std::vector<BSONElement>&>> paths{{TestPath{{"b"}}, vec0}};
 
@@ -392,7 +392,7 @@ TEST_F(BSONColumnBlockBasedTest, DecompressNestedObjects) {
         ASSERT_BSONOBJ_EQ(paths[0].second[3].Obj(), fromjson("{c: 33}"));
     }
     {
-        boost::intrusive_ptr<ElementStorage> allocator = new ElementStorage();
+        boost::intrusive_ptr allocator{new BSONElementStorage()};
         std::vector<BSONElement> vec0, vec1;
         std::vector<std::pair<TestPath, std::vector<BSONElement>&>> paths{{TestPath{{"a"}}, vec0},
                                                                           {TestPath{{"b"}}, vec1}};
@@ -425,7 +425,7 @@ TEST_F(BSONColumnBlockBasedTest, DecompressSiblingObjects) {
         fromjson("{a: {aa: 103}, b: {c: 33}}"),
     });
 
-    boost::intrusive_ptr<ElementStorage> allocator = new ElementStorage();
+    boost::intrusive_ptr allocator{new BSONElementStorage()};
     std::vector<BSONElement> vec0, vec1;
     std::vector<std::pair<TestPath, std::vector<BSONElement>&>> paths{{TestPath{{"a"}}, vec0},
                                                                       {TestPath{{"b"}}, vec1}};
@@ -478,7 +478,7 @@ struct TestArrayPath {
 
 template <typename T>
 void verifyDecompressPaths(const std::vector<T>& values) {
-    boost::intrusive_ptr<ElementStorage> allocator = new ElementStorage();
+    boost::intrusive_ptr allocator{new BSONElementStorage()};
 
     std::vector<BSONObj> objs;
     for (std::size_t i = 0; i < values.size(); i += 2) {
@@ -710,7 +710,7 @@ TEST_F(BSONColumnBlockBasedTest, DecompressMissingArrays) {
     auto mockRefObj = fromjson("{a: [{b: 0}, {b: 10}]}");
     ASSERT_EQ(path.elementsToMaterialize(mockRefObj).size(), 2);
 
-    boost::intrusive_ptr<ElementStorage> allocator = new ElementStorage();
+    boost::intrusive_ptr allocator{new BSONElementStorage()};
     std::vector<BSONElement> vec0;
     std::vector<std::pair<TestArrayPath, std::vector<BSONElement>&>> paths{{path, vec0}};
 
@@ -743,7 +743,7 @@ TEST_F(BSONColumnBlockBasedTest, DecompressMissingScalar) {
     }
     auto col = bsonColumnFromObjs(std::move(objs));
 
-    boost::intrusive_ptr<ElementStorage> allocator = new ElementStorage();
+    boost::intrusive_ptr allocator{new BSONElementStorage()};
 
     {
         std::vector<BSONElement> vec0;
@@ -804,7 +804,7 @@ TEST_F(BSONColumnBlockBasedTest, DecompressMissingObject) {
     }
     auto col = bsonColumnFromObjs(std::move(objs));
 
-    boost::intrusive_ptr<ElementStorage> allocator = new ElementStorage();
+    boost::intrusive_ptr allocator{new BSONElementStorage()};
 
     {
         std::vector<BSONElement> vec0;
@@ -864,7 +864,7 @@ TEST_F(BSONColumnBlockBasedTest, DecompressMissingNestedObject) {
     }
 
     auto col = bsonColumnFromObjs(std::move(objs));
-    boost::intrusive_ptr<ElementStorage> allocator = new ElementStorage();
+    boost::intrusive_ptr allocator{new BSONElementStorage()};
 
     {
         std::vector<BSONElement> vec0, vec1;
@@ -904,7 +904,7 @@ TEST_F(BSONColumnBlockBasedTest, DecompressWithEmptyInReference) {
     }
 
     auto col = bsonColumnFromObjs(std::move(objs));
-    boost::intrusive_ptr<ElementStorage> allocator = new ElementStorage();
+    boost::intrusive_ptr allocator{new BSONElementStorage()};
 
     {
         std::vector<BSONElement> vec0, vec1;
@@ -934,7 +934,7 @@ TEST_F(BSONColumnBlockBasedTest, DecompressMissingPath) {
         fromjson("{a: {b:  30}}"),
     });
 
-    boost::intrusive_ptr<ElementStorage> allocator = new ElementStorage();
+    boost::intrusive_ptr allocator{new BSONElementStorage()};
 
     {
         // The bogus paths don't match anything in the reference object and so should all be
@@ -990,7 +990,7 @@ TEST_F(BSONColumnBlockBasedTest, DecompressMissingPathWithMinKey) {
 
     ASSERT_EQ(path.elementsToMaterialize(mockRefObj).size(), 2);
 
-    boost::intrusive_ptr<ElementStorage> allocator = new ElementStorage();
+    boost::intrusive_ptr allocator{new BSONElementStorage()};
     std::vector<BSONElement> vec0;
     std::vector<std::pair<TestArrayPath, std::vector<BSONElement>&>> paths{{path, vec0}};
 

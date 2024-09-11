@@ -92,7 +92,7 @@ public:
 
         mongo::bsoncolumn::BSONColumnBlockBased col{static_cast<const char*>(binData.data),
                                                     (size_t)binData.length};
-        boost::intrusive_ptr<ElementStorage> allocator = new ElementStorage();
+        boost::intrusive_ptr allocator{new BSONElementStorage()};
         std::vector<Element> container{{}};
         col.decompressIterative<SBEColumnMaterializer>(container, allocator);
         assertSbeValueEquals(container.back(), expected);
@@ -100,7 +100,7 @@ public:
 
     template <typename T>
     void assertMaterializedValue(const T& value, Element expected) {
-        boost::intrusive_ptr<ElementStorage> allocator = new ElementStorage();
+        boost::intrusive_ptr allocator{new BSONElementStorage()};
         std::vector<Element> vec;
         mongo::bsoncolumn::Collector<SBEColumnMaterializer, decltype(vec)> collector{vec,
                                                                                      allocator};
@@ -136,7 +136,7 @@ public:
 
         mongo::bsoncolumn::BSONColumnBlockBased col{cb.finalize()};
 
-        boost::intrusive_ptr<ElementStorage> allocator = new ElementStorage();
+        boost::intrusive_ptr allocator{new BSONElementStorage()};
         PositionInfoTestContainer positionInfoTestContainer;
         std::vector<std::pair<SBEPath, PositionInfoTestContainer&>> paths{
             {SBEPath{value::CellBlock::PathRequest(
@@ -174,7 +174,7 @@ public:
         PositionInfoTestContainer positionInfoTestContainer;
         std::vector<std::pair<SBEPath, PositionInfoTestContainer&>> paths{
             {path, positionInfoTestContainer}};
-        boost::intrusive_ptr<ElementStorage> allocator = new ElementStorage();
+        boost::intrusive_ptr allocator{new BSONElementStorage()};
 
         col.decompress<SBEColumnMaterializer>(allocator, std::span(paths));
 
@@ -304,7 +304,7 @@ TEST_F(BSONColumnMaterializerTest, SBEMaterializer) {
 }
 
 TEST_F(BSONColumnMaterializerTest, SBEMaterializerOtherTypes) {
-    boost::intrusive_ptr<ElementStorage> allocator = new ElementStorage();
+    boost::intrusive_ptr allocator{new BSONElementStorage()};
     std::vector<Element> vec;
     mongo::bsoncolumn::Collector<SBEColumnMaterializer, decltype(vec)> collector{vec, allocator};
 
@@ -321,7 +321,7 @@ TEST_F(BSONColumnMaterializerTest, SBEMaterializerOtherTypes) {
         vec.back(),
         Element({value::TypeTags::bsonCodeWScope, value::bitcastFrom<const char*>(bytes)}));
     assertSbeValueEquals(vec.back(), bson::convertFrom<true /* view */>(bsonElem));
-    // Since we are making a copy and storing it in the ElementStorage, the address of the data
+    // Since we are making a copy and storing it in the BSONElementStorage, the address of the data
     // should not be the same.
     ASSERT_NOT_EQUALS(
         vec.back(),
@@ -335,7 +335,7 @@ TEST_F(BSONColumnMaterializerTest, SBEMaterializerOtherTypes) {
 }
 
 TEST_F(BSONColumnMaterializerTest, SBEMaterializerMissing) {
-    boost::intrusive_ptr<ElementStorage> allocator = new ElementStorage();
+    boost::intrusive_ptr allocator{new BSONElementStorage()};
     std::vector<Element> vec;
     mongo::bsoncolumn::Collector<SBEColumnMaterializer, decltype(vec)> collector{vec, allocator};
 
@@ -743,7 +743,7 @@ TEST_F(BSONColumnMaterializerTest, DecompressMultipleBuffers) {
 
     // Decompress the path Get(a) / Traverse / Id and Get(b) / Id.
     mongo::bsoncolumn::BSONColumnBlockBased col{cb.finalize()};
-    boost::intrusive_ptr<ElementStorage> allocator = new ElementStorage();
+    boost::intrusive_ptr allocator{new BSONElementStorage()};
     PositionInfoTestContainer positionInfoTestContainer0, positionInfoTestContainer1;
     std::vector<std::pair<SBEPath, PositionInfoTestContainer&>> paths{
         {SBEPath{value::CellBlock::PathRequest(

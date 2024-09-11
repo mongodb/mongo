@@ -53,6 +53,7 @@
 #include "mongo/bson/util/bsoncolumn_helpers.h"
 #include "mongo/bson/util/bsoncolumn_interleaved.h"
 #include "mongo/bson/util/bsoncolumn_util.h"
+#include "mongo/bson/util/bsonobj_traversal.h"
 #include "mongo/bson/util/simple8b.h"
 #include "mongo/bson/util/simple8b_type_util.h"
 #include "mongo/platform/int128.h"
@@ -86,8 +87,6 @@ namespace mongo {
  */
 class BSONColumn {
 public:
-    using ElementStorage = bsoncolumn::ElementStorage;
-
     BSONColumn(const char* buffer, size_t size);
     explicit BSONColumn(BSONElement bin);
     explicit BSONColumn(BSONBinData bin);
@@ -107,7 +106,9 @@ public:
         friend class BSONColumn;
 
         // Constructs a begin iterator
-        Iterator(boost::intrusive_ptr<ElementStorage> allocator, const char* pos, const char* end);
+        Iterator(boost::intrusive_ptr<BSONElementStorage> allocator,
+                 const char* pos,
+                 const char* end);
 
         // typedefs expected in iterators
         using iterator_category = std::input_iterator_tag;
@@ -170,8 +171,8 @@ public:
         // End of BSONColumn memory block, we may not dereference any memory past this.
         const char* _end = nullptr;
 
-        // ElementStorage to use when materializing elements
-        boost::intrusive_ptr<ElementStorage> _allocator;
+        // BSONElementStorage to use when materializing elements
+        boost::intrusive_ptr<BSONElementStorage> _allocator;
 
         /**
          * Decoding state for decoding compressed binary into BSONElement. It is detached from the
@@ -187,7 +188,7 @@ public:
             struct Decoder64 {
                 Decoder64();
 
-                BSONElement materialize(ElementStorage& allocator,
+                BSONElement materialize(BSONElementStorage& allocator,
                                         BSONElement last,
                                         StringData fieldName) const;
 
@@ -202,7 +203,7 @@ public:
              * Internal decoding state for types using 128bit aritmetic
              */
             struct Decoder128 {
-                BSONElement materialize(ElementStorage& allocator,
+                BSONElement materialize(BSONElementStorage& allocator,
                                         BSONElement last,
                                         StringData fieldName) const;
 
@@ -220,13 +221,13 @@ public:
             void loadUncompressed(const BSONElement& elem);
 
             // Loads current control byte
-            LoadControlResult loadControl(ElementStorage& allocator,
+            LoadControlResult loadControl(BSONElementStorage& allocator,
                                           const char* buffer,
                                           const char* end);
 
             // Loads delta value
-            BSONElement loadDelta(ElementStorage& allocator, Decoder64& decoder);
-            BSONElement loadDelta(ElementStorage& allocator, Decoder128& decoder);
+            BSONElement loadDelta(BSONElementStorage& allocator, Decoder64& decoder);
+            BSONElement loadDelta(BSONElementStorage& allocator, Decoder128& decoder);
 
             // Last encoded values used to calculate delta and delta-of-delta
             BSONElement lastValue;
@@ -327,7 +328,7 @@ public:
      *
      * It is NOT safe to call this from multiple threads concurrently.
      */
-    boost::intrusive_ptr<ElementStorage> release();
+    boost::intrusive_ptr<BSONElementStorage> release();
 
 private:
     /**
@@ -340,7 +341,7 @@ private:
     int _size;
 
     // Reference counted allocator, used to allocate memory when materializing BSONElements.
-    boost::intrusive_ptr<ElementStorage> _allocator;
+    boost::intrusive_ptr<BSONElementStorage> _allocator;
 };
 
 // Avoid GCC/Clang compiler issues
@@ -366,7 +367,7 @@ class Collector {
     using Element = typename CMaterializer::Element;
 
 public:
-    Collector(Container& collection, boost::intrusive_ptr<ElementStorage> allocator)
+    Collector(Container& collection, boost::intrusive_ptr<BSONElementStorage> allocator)
         : _collection(collection), _allocator(std::move(allocator)) {}
 
     static constexpr bool kCollectsPositionInfo = PositionInfoAppender<Container>;
@@ -468,13 +469,13 @@ public:
         }
     }
 
-    ElementStorage& getAllocator() {
+    BSONElementStorage& getAllocator() {
         return *_allocator;
     }
 
 private:
     Container& _collection;
-    boost::intrusive_ptr<ElementStorage> _allocator;
+    boost::intrusive_ptr<BSONElementStorage> _allocator;
     Element _last = CMaterializer::materializeMissing(*_allocator);
 };
 
@@ -498,7 +499,8 @@ public:
      */
     template <class CMaterializer, class Container>
     requires Materializer<CMaterializer>
-    void decompress(Container& collection, boost::intrusive_ptr<ElementStorage> allocator) const {
+    void decompress(Container& collection,
+                    boost::intrusive_ptr<BSONElementStorage> allocator) const {
         Collector<CMaterializer, Container> collector(collection, allocator);
         decompress(collector);
     }
@@ -508,7 +510,7 @@ public:
      */
     template <class CMaterializer, class Container, typename Path>
     requires Materializer<CMaterializer>
-    void decompress(boost::intrusive_ptr<ElementStorage> allocator,
+    void decompress(boost::intrusive_ptr<BSONElementStorage> allocator,
                     std::span<std::pair<Path, Container&>> paths) const;
 
     /*
@@ -517,7 +519,8 @@ public:
      */
     template <class Buffer>
     requires Appendable<Buffer>
-    void decompressIterative(Buffer& buffer, boost::intrusive_ptr<ElementStorage> allocator) const {
+    void decompressIterative(Buffer& buffer,
+                             boost::intrusive_ptr<BSONElementStorage> allocator) const {
         BSONColumn::Iterator it(allocator, _binary, _binary + _size);
         for (; it.more(); ++it) {
             buffer.appendPreallocated(*it);
@@ -532,7 +535,7 @@ public:
     template <class CMaterializer, class Container>
     requires Materializer<CMaterializer>
     void decompressIterative(Container& collection,
-                             boost::intrusive_ptr<ElementStorage> allocator) const {
+                             boost::intrusive_ptr<BSONElementStorage> allocator) const {
         Collector<CMaterializer, Container> collector(collection, allocator);
         decompressIterative(collector, std::move(allocator));
     }
@@ -579,7 +582,7 @@ private:
  */
 template <class CMaterializer, class Container, typename Path>
 requires Materializer<CMaterializer>
-void BSONColumnBlockBased::decompress(boost::intrusive_ptr<ElementStorage> allocator,
+void BSONColumnBlockBased::decompress(boost::intrusive_ptr<BSONElementStorage> allocator,
                                       std::span<std::pair<Path, Container&>> paths) const {
 
     // The Collector class wraps a reference to a buffer passed in by the caller.

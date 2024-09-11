@@ -42,14 +42,14 @@ template <class CMaterializer>
 requires Materializer<CMaterializer>
 typename CMaterializer::Element first(const char* buffer,
                                       size_t size,
-                                      boost::intrusive_ptr<ElementStorage> allocator) {
+                                      boost::intrusive_ptr<BSONElementStorage> allocator) {
     return bsoncolumn_internal::first<CMaterializer>(buffer, size, std::move(allocator));
 }
 
 template <class CMaterializer>
 requires Materializer<CMaterializer>
 typename CMaterializer::Element first(BSONBinData bin,
-                                      boost::intrusive_ptr<ElementStorage> allocator) {
+                                      boost::intrusive_ptr<BSONElementStorage> allocator) {
     tassert(9095600, "Invalid BSON type for column", bin.type == BinDataType::Column);
     return bsoncolumn_internal::first<CMaterializer>(reinterpret_cast<const char*>(bin.data),
                                                      static_cast<size_t>(bin.length),
@@ -63,13 +63,13 @@ template <class CMaterializer>
 requires Materializer<CMaterializer>
 typename CMaterializer::Element last(const char* buffer,
                                      size_t size,
-                                     boost::intrusive_ptr<ElementStorage> allocator) {
+                                     boost::intrusive_ptr<BSONElementStorage> allocator) {
     return bsoncolumn_internal::last<CMaterializer>(buffer, size, std::move(allocator));
 }
 template <class CMaterializer>
 requires Materializer<CMaterializer>
 typename CMaterializer::Element last(BSONBinData bin,
-                                     boost::intrusive_ptr<ElementStorage> allocator) {
+                                     boost::intrusive_ptr<BSONElementStorage> allocator) {
     tassert(9095601, "Invalid BSON type for column", bin.type == BinDataType::Column);
     return bsoncolumn_internal::last<CMaterializer>(
         reinterpret_cast<const char*>(bin.data), bin.length, std::move(allocator));
@@ -82,14 +82,14 @@ template <class CMaterializer>
 requires Materializer<CMaterializer>
 typename CMaterializer::Element min(const char* buffer,
                                     size_t size,
-                                    boost::intrusive_ptr<ElementStorage> allocator,
+                                    boost::intrusive_ptr<BSONElementStorage> allocator,
                                     const StringDataComparator* comparator = nullptr) {
     return bsoncolumn_internal::min<CMaterializer>(buffer, size, std::move(allocator), comparator);
 }
 template <class CMaterializer>
 requires Materializer<CMaterializer>
 typename CMaterializer::Element min(BSONBinData bin,
-                                    boost::intrusive_ptr<ElementStorage> allocator,
+                                    boost::intrusive_ptr<BSONElementStorage> allocator,
                                     const StringDataComparator* comparator = nullptr) {
     tassert(9095602, "Invalid BSON type for column", bin.type == BinDataType::Column);
     return bsoncolumn_internal::min<CMaterializer>(
@@ -103,14 +103,14 @@ template <class CMaterializer>
 requires Materializer<CMaterializer>
 typename CMaterializer::Element max(const char* buffer,
                                     size_t size,
-                                    boost::intrusive_ptr<ElementStorage> allocator,
+                                    boost::intrusive_ptr<BSONElementStorage> allocator,
                                     const StringDataComparator* comparator = nullptr) {
     return bsoncolumn_internal::max<CMaterializer>(buffer, size, std::move(allocator), comparator);
 }
 template <class CMaterializer>
 requires Materializer<CMaterializer>
 typename CMaterializer::Element max(BSONBinData bin,
-                                    boost::intrusive_ptr<ElementStorage> allocator,
+                                    boost::intrusive_ptr<BSONElementStorage> allocator,
                                     const StringDataComparator* comparator = nullptr) {
     tassert(9095603, "Invalid BSON type for column", bin.type == BinDataType::Column);
     return bsoncolumn_internal::max<CMaterializer>(
@@ -125,7 +125,7 @@ requires Materializer<CMaterializer>
 typename std::pair<typename CMaterializer::Element, typename CMaterializer::Element> minmax(
     const char* buffer,
     size_t size,
-    boost::intrusive_ptr<ElementStorage> allocator,
+    boost::intrusive_ptr<BSONElementStorage> allocator,
     const StringDataComparator* comparator = nullptr) {
     return bsoncolumn_internal::minmax<CMaterializer>(
         buffer, size, std::move(allocator), comparator);
@@ -134,7 +134,7 @@ template <class CMaterializer>
 requires Materializer<CMaterializer>
 typename std::pair<typename CMaterializer::Element, typename CMaterializer::Element> minmax(
     BSONBinData bin,
-    boost::intrusive_ptr<ElementStorage> allocator,
+    boost::intrusive_ptr<BSONElementStorage> allocator,
     const StringDataComparator* comparator = nullptr) {
     tassert(9095604, "Invalid BSON type for column", bin.type == BinDataType::Column);
     return bsoncolumn_internal::minmax<CMaterializer>(

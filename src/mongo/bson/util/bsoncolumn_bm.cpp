@@ -45,6 +45,7 @@
 #include "mongo/bson/timestamp.h"
 #include "mongo/bson/util/bsoncolumn.h"
 #include "mongo/bson/util/bsoncolumnbuilder.h"
+#include "mongo/bson/util/bsonobj_traversal.h"
 #include "mongo/db/exec/sbe/values/bsoncolumn_materializer.h"
 #include "mongo/util/base64.h"
 #include "mongo/util/time_support.h"
@@ -366,7 +367,7 @@ void benchmarkBlockBasedDecompression(benchmark::State& state,
 
     auto decompress = [&](NoOpContainerForTest<BSONElement>& collection) {
         bsoncolumn::BSONColumnBlockBased col(bin);
-        boost::intrusive_ptr allocator{new bsoncolumn::ElementStorage()};
+        boost::intrusive_ptr allocator{new BSONElementStorage()};
         col.decompress<bsoncolumn::BSONElementMaterializer, NoOpContainerForTest<BSONElement>>(
             collection, allocator);
         return true;
@@ -399,7 +400,7 @@ void benchmarkBlockBasedDecompression_SBE(benchmark::State& state,
 
     auto decompress = [&](NoOpContainerForTest<SBEMaterializer::Element>& collection) {
         bsoncolumn::BSONColumnBlockBased col(bin);
-        boost::intrusive_ptr allocator{new bsoncolumn::ElementStorage()};
+        boost::intrusive_ptr allocator{new BSONElementStorage()};
         col.decompress<SBEMaterializer, NoOpContainerForTest<SBEMaterializer::Element>>(collection,
                                                                                         allocator);
         return true;

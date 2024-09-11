@@ -31,7 +31,7 @@
 
 namespace mongo::bsoncolumn {
 
-BlockBasedInterleavedDecompressor::BlockBasedInterleavedDecompressor(ElementStorage& allocator,
+BlockBasedInterleavedDecompressor::BlockBasedInterleavedDecompressor(BSONElementStorage& allocator,
                                                                      const char* control,
                                                                      const char* end)
     : _allocator(allocator),
@@ -45,33 +45,33 @@ BlockBasedInterleavedDecompressor::BlockBasedInterleavedDecompressor(ElementStor
 }
 
 void BlockBasedInterleavedDecompressor::DecodingState::Decoder64::writeToElementStorage(
-    ElementStorage& allocator,
+    BSONElementStorage& allocator,
     BSONType type,
     int64_t value,
     BSONElement lastLiteral,
     StringData fieldName) const {
     switch (type) {
         case NumberInt: {
-            ElementStorage::Element esElem = allocator.allocate(type, fieldName, 4);
+            BSONElementStorage::Element esElem = allocator.allocate(type, fieldName, 4);
             DataView(esElem.value()).write<LittleEndian<int32_t>>(value);
         } break;
         case bsonTimestamp:
         case Date:
         case NumberLong: {
-            ElementStorage::Element esElem = allocator.allocate(type, fieldName, 8);
+            BSONElementStorage::Element esElem = allocator.allocate(type, fieldName, 8);
             DataView(esElem.value()).write<LittleEndian<int64_t>>(value);
         } break;
         case Bool: {
-            ElementStorage::Element esElem = allocator.allocate(type, fieldName, 1);
+            BSONElementStorage::Element esElem = allocator.allocate(type, fieldName, 1);
             DataView(esElem.value()).write<LittleEndian<bool>>(value);
         } break;
         case jstOID: {
-            ElementStorage::Element esElem = allocator.allocate(type, fieldName, 12);
+            BSONElementStorage::Element esElem = allocator.allocate(type, fieldName, 12);
             Simple8bTypeUtil::decodeObjectIdInto(
                 esElem.value(), value, lastLiteral.__oid().getInstanceUnique());
         } break;
         case NumberDouble: {
-            ElementStorage::Element esElem = allocator.allocate(type, fieldName, 8);
+            BSONElementStorage::Element esElem = allocator.allocate(type, fieldName, 8);
             DataView(esElem.value())
                 .write<LittleEndian<double>>(Simple8bTypeUtil::decodeDouble(value, scaleIndex));
         } break;
@@ -81,7 +81,7 @@ void BlockBasedInterleavedDecompressor::DecodingState::Decoder64::writeToElement
 }
 
 void BlockBasedInterleavedDecompressor::DecodingState::Decoder128::writeToElementStorage(
-    ElementStorage& allocator,
+    BSONElementStorage& allocator,
     BSONType type,
     int128_t value,
     BSONElement lastLiteral,
@@ -92,7 +92,7 @@ void BlockBasedInterleavedDecompressor::DecodingState::Decoder128::writeToElemen
             Simple8bTypeUtil::SmallString ss = Simple8bTypeUtil::decodeString(value);
             // Add 5 bytes to size, strings begin with a 4 byte count and ends with a
             // null terminator
-            ElementStorage::Element esElem = allocator.allocate(type, fieldName, ss.size + 5);
+            BSONElementStorage::Element esElem = allocator.allocate(type, fieldName, ss.size + 5);
             // Write count, size includes null terminator
             DataView(esElem.value()).write<LittleEndian<int32_t>>(ss.size + 1);
             // Write string value
@@ -101,7 +101,7 @@ void BlockBasedInterleavedDecompressor::DecodingState::Decoder128::writeToElemen
             DataView(esElem.value()).write<char>('\0', ss.size + sizeof(int32_t));
         } break;
         case NumberDecimal: {
-            ElementStorage::Element esElem = allocator.allocate(type, fieldName, 16);
+            BSONElementStorage::Element esElem = allocator.allocate(type, fieldName, 16);
             Decimal128 dec128 = Simple8bTypeUtil::decodeDecimal128(value);
             Decimal128::Value dec128Val = dec128.getValue();
             DataView(esElem.value()).write<LittleEndian<long long>>(dec128Val.low64);
@@ -113,7 +113,7 @@ void BlockBasedInterleavedDecompressor::DecodingState::Decoder128::writeToElemen
             // - 4-byte length of binary data
             // - 1-byte binary subtype
             // - The binary data
-            ElementStorage::Element esElem =
+            BSONElementStorage::Element esElem =
                 allocator.allocate(type, fieldName, lastLiteral.valuesize());
             // The first 5 bytes in binData is a count and subType, copy them from
             // previous
@@ -135,7 +135,7 @@ void BlockBasedInterleavedDecompressor::DecodingState::Decoder128::writeToElemen
 void BlockBasedInterleavedDecompressor::writeToElementStorage(BSONElement bsonElem,
                                                               StringData fieldName) {
     if (!bsonElem.eoo()) {
-        ElementStorage::Element esElem =
+        BSONElementStorage::Element esElem =
             _allocator.allocate(bsonElem.type(), fieldName, bsonElem.valuesize());
         memcpy(esElem.value(), bsonElem.value(), bsonElem.valuesize());
     }
@@ -215,7 +215,7 @@ void BlockBasedInterleavedDecompressor::DecodingState::loadUncompressed(const BS
  *   control byte.
  */
 BlockBasedInterleavedDecompressor::DecodingState::LoadControlResult
-BlockBasedInterleavedDecompressor::DecodingState::loadControl(ElementStorage& allocator,
+BlockBasedInterleavedDecompressor::DecodingState::loadControl(BSONElementStorage& allocator,
                                                               const char* buffer) {
     uint8_t control = *buffer;
     if (isUncompressedLiteralControlByte(control)) {
@@ -285,7 +285,7 @@ BlockBasedInterleavedDecompressor::DecodingState::loadControl(ElementStorage& al
  * to an uncompressed literal, simply returning the literal.
  */
 BlockBasedInterleavedDecompressor::DecodingState::Elem
-BlockBasedInterleavedDecompressor::DecodingState::loadDelta(ElementStorage& allocator,
+BlockBasedInterleavedDecompressor::DecodingState::loadDelta(BSONElementStorage& allocator,
                                                             Decoder64& d64) {
     invariant(d64.pos.valid());
     const auto& delta = *d64.pos;
@@ -320,7 +320,7 @@ BlockBasedInterleavedDecompressor::DecodingState::loadDelta(ElementStorage& allo
 }
 
 BlockBasedInterleavedDecompressor::DecodingState::Elem
-BlockBasedInterleavedDecompressor::DecodingState::loadDelta(ElementStorage& allocator,
+BlockBasedInterleavedDecompressor::DecodingState::loadDelta(BSONElementStorage& allocator,
                                                             Decoder128& d128) {
     invariant(d128.pos.valid());
     const auto& delta = *d128.pos;

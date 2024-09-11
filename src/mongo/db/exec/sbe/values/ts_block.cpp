@@ -35,6 +35,7 @@
 #include <utility>
 
 #include "mongo/bson/util/bsoncolumn.h"
+#include "mongo/bson/util/bsonobj_traversal.h"
 #include "mongo/db/exec/sbe/values/block_interface.h"
 #include "mongo/db/exec/sbe/values/bson_block.h"
 #include "mongo/db/exec/sbe/values/bsoncolumn_materializer.h"
@@ -58,11 +59,11 @@ namespace {
  **/
 class BlockBasedDecompressAdaptor {
     using Element = sbe::bsoncolumn::SBEColumnMaterializer::Element;
-    using ElementStorage = mongo::bsoncolumn::ElementStorage;
 
 public:
     BlockBasedDecompressAdaptor(
-        size_t expectedCount, boost::intrusive_ptr<ElementStorage> allocator = new ElementStorage{})
+        size_t expectedCount,
+        boost::intrusive_ptr<BSONElementStorage> allocator = new BSONElementStorage{})
         : _allocator(allocator) {
         _tags.reserve(expectedCount);
         _vals.reserve(expectedCount);
@@ -84,7 +85,7 @@ public:
         _positions.push_back(n);
     }
 
-    boost::intrusive_ptr<ElementStorage> allocator() const {
+    boost::intrusive_ptr<BSONElementStorage> allocator() const {
         return _allocator;
     }
 
@@ -95,9 +96,9 @@ public:
             // values, and we may be able to advantage of homogeneous/repeated data.
             return buildBlockFromStorage(std::move(_tags), std::move(_vals));
         } else {
-            // If the block has any deep types, we output an ElementStorageValueBlock to avoid
+            // If the block has any deep types, we output an BSONElementStorageValueBlockk to avoid
             // copying the deep value(s).
-            return std::make_unique<ElementStorageValueBlock>(
+            return std::make_unique<BSONElementStorageValueBlock>(
                 std::move(_allocator), std::move(_tags), std::move(_vals));
         }
     }
@@ -111,7 +112,7 @@ private:
     std::vector<Value> _vals;
     std::vector<int32_t> _positions;
 
-    boost::intrusive_ptr<ElementStorage> _allocator;
+    boost::intrusive_ptr<BSONElementStorage> _allocator;
 
     // Whether push_back() has been called only with shallow values, which do not point into
     // '_storage'.
@@ -460,8 +461,7 @@ bool TsBucketPathExtractor::tryPathBasedDecompression(
 
     using SBEMaterializer = sbe::bsoncolumn::SBEColumnMaterializer;
 
-    boost::intrusive_ptr<mongo::bsoncolumn::ElementStorage> allocator =
-        new mongo::bsoncolumn::ElementStorage{};
+    boost::intrusive_ptr<BSONElementStorage> allocator = new BSONElementStorage{};
 
     std::vector<BlockBasedDecompressAdaptor> containers;
     std::vector<std::pair<bsoncolumn::SBEPath, BlockBasedDecompressAdaptor&>> pathPairs;
@@ -583,8 +583,8 @@ void TsBlock::deblockFromBsonColumn() {
 
         // Generally when we're in this path, we expect to be decompressing deep types. Instead of
         // copying the values into an owned value block, we insert them into an
-        // ElementStorageValueBlock which will keep the BSONColumn's ElementStorage around. This
-        // prevents us from using HomogeneousBlock, but lets us avoid the copy.
+        // BSONElementStorageValueBlock which will keep the BSONColumn's BSONElementStorage around.
+        // This prevents us from using HomogeneousBlock, but lets us avoid the copy.
 
         for (size_t i = 0; i < _count; ++i) {
             auto [tag, val] = bson::convertFrom</*View*/ true>(*it);
@@ -597,7 +597,7 @@ void TsBlock::deblockFromBsonColumn() {
         }
 
         // Preserve the storage for this BSONColumn so it lives as long as this TsBlock is alive.
-        _decompressedBlock = std::make_unique<ElementStorageValueBlock>(
+        _decompressedBlock = std::make_unique<BSONElementStorageValueBlock>(
             blockColumn.release(), std::move(tags), std::move(vals));
     }
 }
