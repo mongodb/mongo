@@ -371,8 +371,6 @@ if wiredtiger:
             'wiredtiger/wiredtiger',
         ])
 
-    wiredtigerEnv.ShimLibrary(name="wiredtiger")
-
 if env.TargetOSIs('linux') and env['ENABLE_GRPC_BUILD']:
 
     protobufEnv = env.Clone(NINJA_GENSOURCE_INDEPENDENT=True)
