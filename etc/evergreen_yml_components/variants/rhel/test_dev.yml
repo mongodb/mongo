@@ -163,7 +163,6 @@ buildvariants:
       - name: aggregation_sharded_collections_causally_consistent_passthrough
       - name: aggregation_sharded_collections_passthrough
       - name: auth_gen
-      - name: causally_consistent_hedged_reads_jscore_passthrough_gen
       - name: causally_consistent_jscore_passthrough_auth_gen
       - name: causally_consistent_jscore_passthrough_gen
       - name: change_streams

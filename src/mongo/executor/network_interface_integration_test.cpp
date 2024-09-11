@@ -64,7 +64,6 @@
 #include "mongo/db/service_context.h"
 #include "mongo/db/wire_version.h"
 #include "mongo/executor/connection_pool_stats.h"
-#include "mongo/executor/hedge_options_util.h"
 #include "mongo/executor/network_connection_hook.h"
 #include "mongo/executor/network_interface.h"
 #include "mongo/executor/network_interface_integration_fixture.h"
@@ -229,12 +228,14 @@ public:
                                          RemoteCommandRequest::Options options = {},
                                          boost::optional<ErrorCodes::Error> timeoutCode = {},
                                          boost::optional<UUID> operationKey = {}) {
-        if (operationKey) {
-            cmd = cmd.addField(BSON(GenericArguments::kClientOperationKeyFieldName << *operationKey)
-                                   .firstElement());
+        if (!operationKey) {
+            operationKey = UUID::gen();
         }
 
         auto cs = fixture();
+        cmd = cmd.addField(
+            BSON(GenericArguments::kClientOperationKeyFieldName << *operationKey).firstElement());
+
         RemoteCommandRequest request(cs.getServers().front(),
                                      DatabaseName::kAdmin,
                                      std::move(cmd),
@@ -446,7 +447,6 @@ TEST_F(NetworkInterfaceTest, CancelRemotely) {
     auto cbh = makeCallbackHandle();
     auto deferred = [&] {
         RemoteCommandRequest::Options options;
-        options.hedgeOptions.isHedgeEnabled = true;
         // Kick off an "echo" operation, which should block until cancelCommand causes
         // the operation to be killed.
         auto deferred = runCommand(
@@ -503,7 +503,6 @@ TEST_F(NetworkInterfaceTest, CancelRemotelyTimedOut) {
     auto cbh = makeCallbackHandle();
     auto deferred = [&] {
         RemoteCommandRequest::Options options;
-        options.hedgeOptions.isHedgeEnabled = true;
         // Kick off a blocking "echo" operation.
         auto deferred = runCommand(
             cbh, makeTestCommand(kNoTimeout, makeEchoCmdObj(), nullptr /* opCtx */, options));
@@ -789,7 +788,6 @@ TEST_F(NetworkInterfaceTest, AsyncOpTimeoutWithOpCtxDeadlineLater) {
 
 TEST_F(NetworkInterfaceTest, StartCommand) {
     RemoteCommandRequest::Options options;
-    options.hedgeOptions.isHedgeEnabled = true;
     auto request = makeTestCommand(kNoTimeout, makeEchoCmdObj(), nullptr /* opCtx */, options);
 
     auto deferred = runCommand(makeCallbackHandle(), std::move(request));
@@ -858,42 +856,6 @@ TEST_F(NetworkInterfaceTest, FireAndForget) {
     assertNumOps(0u, 0u, 0u, 5u);
 }
 
-TEST_F(NetworkInterfaceInternalClientTest, StartCommandOnAny) {
-    // The echo command below uses hedging so after a response is returned, we will issue
-    // a _killOperations command to kill the pending operation. As a result, the number of
-    // successful commands can sometimes be 2 (echo and _killOperations) instead 1 when the
-    // num ops assertion below runs.
-    FailPointEnableBlock fpb("networkInterfaceShouldNotKillPendingRequests");
-
-    auto commandRequest = makeEchoCmdObj();
-    auto request = [&] {
-        auto cs = fixture();
-        RemoteCommandRequestBase::Options options;
-        options.hedgeOptions.isHedgeEnabled = true;
-        options.hedgeOptions.hedgeCount = 1;
-
-        return RemoteCommandRequestOnAny({cs.getServers()},
-                                         DatabaseName::kAdmin,
-                                         std::move(commandRequest),
-                                         BSONObj(),
-                                         nullptr,
-                                         RemoteCommandRequest::kNoTimeout,
-                                         options);
-    }();
-
-    auto deferred = runCommandOnAny(makeCallbackHandle(), std::move(request));
-    auto res = deferred.get();
-
-    uassertStatusOK(res.status);
-    auto cmdObj = res.data.getObjectField("echo");
-    ASSERT_EQ(1, cmdObj.getIntField("echo"));
-    ASSERT_EQ("bar"_sd, cmdObj.getStringField("foo"));
-    ASSERT_EQ("admin"_sd, cmdObj.getStringField("$db"));
-    ASSERT_FALSE(cmdObj["clientOperationKey"].eoo());
-    ASSERT_EQ(1, res.data.getIntField("ok"));
-    assertNumOps(0u, 0u, 0u, 1u);
-}
-
 TEST_F(NetworkInterfaceTest, SetAlarm) {
     // set a first alarm, to execute after "expiration"
     Date_t expiration = net().now() + Milliseconds(100);
@@ -946,8 +908,6 @@ TEST_F(NetworkInterfaceTest, UseOperationKeyWhenProvided) {
     });
 
     RemoteCommandRequest::Options rcrOptions;
-    rcrOptions.hedgeOptions.isHedgeEnabled = true;
-    rcrOptions.hedgeOptions.hedgeCount = fixture().getServers().size();
     RemoteCommandRequestOnAny rcr(fixture().getServers(),
                                   DatabaseName::kAdmin,
                                   makeEchoCmdObj(),
@@ -956,7 +916,6 @@ TEST_F(NetworkInterfaceTest, UseOperationKeyWhenProvided) {
                                   kNoTimeout,
                                   std::move(rcrOptions),
                                   opKey);
-    // Only internal clients can run hedged operations.
     resetIsInternalClient(true);
     ON_BLOCK_EXIT([&] { resetIsInternalClient(false); });
     auto cbh = makeCallbackHandle();
@@ -964,167 +923,6 @@ TEST_F(NetworkInterfaceTest, UseOperationKeyWhenProvided) {
     fut.get();
 }
 
-class HedgeCancellationTest : public NetworkInterfaceTest {
-public:
-    enum class CancellationMode { kAfterCompletion, kAfterScheduling };
-
-    void runTest(CancellationMode mode) {
-        if (fixture().type() != ConnectionString::ConnectionType::kReplicaSet) {
-            LOGV2(7176401, "Skipped: this test may only run against a replica-set");
-            return;
-        }
-
-        auto cbh = makeCallbackHandle();
-        auto future = [&] {
-            _blockCommandsOnAllServers(BSON_ARRAY("echo"
-                                                  << "_killOperations"));
-            ON_BLOCK_EXIT([&] { _unblockCommandsOnAllServers({"echo", "_killOperations"}); });
-
-            auto future = _scheduleHedgedEcho(cbh);
-
-            _waitForServersToStartRunningEcho();
-
-            if (mode == CancellationMode::kAfterScheduling) {
-                net().cancelCommand(cbh);
-            } else {
-                // Let the first node in the list of servers proceed with running the command by
-                // killing the blocked `echo` operation. This results in the completion of the
-                // operation and cancels all pending hedged operations.
-                _killRemoteOps(fixture().getServers().front(), "echo");
-            }
-
-            _waitForServersToStartRunningKillOperations(mode);
-
-            return future;
-        }();
-
-        LOGV2(7176402, "Wait for the remote command to finish");
-        std::move(future).ignoreValue().get();
-    }
-
-private:
-    void _runCommand(const HostAndPort& server, const DatabaseName& db, BSONObj cmd) {
-        RemoteCommandRequest request{server, db, cmd, BSONObj(), nullptr, kNoTimeout};
-        request.sslMode = transport::kGlobalSSLMode;
-        auto res = runCommandSync(request);
-        ASSERT_OK(res.status);
-        ASSERT_OK(getStatusFromCommandResult(res.data));
-        ASSERT(!res.data["writeErrors"]);
-    }
-
-    void _configureFailPoint(const HostAndPort& server,
-                             std::string fpName,
-                             bool enable,
-                             BSONObj data = BSONObj()) {
-        BSONObjBuilder bob;
-        bob.append("configureFailPoint", fpName);
-        bob.append("mode", enable ? "alwaysOn" : "off");
-        if (!data.isEmpty())
-            bob.append("data", std::move(data));
-        _runCommand(server, DatabaseName::kAdmin, bob.obj());
-    }
-
-    void _blockCommandsOnAllServers(BSONArray cmds) {
-        auto servers = fixture().getServers();
-        for (const auto& server : servers) {
-            _configureFailPoint(server,
-                                "failCommand",
-                                true,
-                                BSON("blockConnection" << true << "blockTimeMS" << 1000000
-                                                       << "failCommands" << cmds));
-        }
-    }
-
-    void _killRemoteOps(HostAndPort server, std::string cmd) {
-        auto res = runCurrentOpForCommand(server, cmd);
-        for (auto& op : res.data["cursor"]["firstBatch"].Array()) {
-            auto opid = op.Obj()["opid"];
-            _runCommand(server, DatabaseName::kAdmin, BSON("killOp" << 1 << "op" << opid));
-        }
-    }
-
-    void _unblockCommandsOnAllServers(std::vector<std::string> cmds) {
-        LOGV2(7176403, "Disabling fail-points to unblock commands");
-        auto servers = fixture().getServers();
-        for (auto& server : servers) {
-            // Must kill (and unblock) the remote operations blocked behind the `failCommand`
-            // fail-point (if still running) before disabling it, otherwise it will hang forever.
-            for (auto& cmd : cmds) {
-                _killRemoteOps(server, cmd);
-            }
-            _configureFailPoint(server, "failCommand", false);
-        }
-    }
-
-    Future<RemoteCommandResponse> _scheduleHedgedEcho(const TaskExecutor::CallbackHandle& cbh) {
-        RemoteCommandRequest::Options rcrOptions;
-        rcrOptions.hedgeOptions.isHedgeEnabled = true;
-        rcrOptions.hedgeOptions.hedgeCount = fixture().getServers().size();
-        RemoteCommandRequestOnAny rcr(fixture().getServers(),
-                                      DatabaseName::kAdmin,
-                                      makeEchoCmdObj(),
-                                      BSONObj(),
-                                      nullptr,
-                                      kNoTimeout,
-                                      std::move(rcrOptions));
-        // Only internal clients can run hedged operations.
-        resetIsInternalClient(true);
-        ON_BLOCK_EXIT([&] { resetIsInternalClient(false); });
-        LOGV2(7176404, "Scheduling the remote command");
-        return runCommand(cbh, std::move(rcr));
-    }
-
-    bool _waitForServerToRunCommand(const HostAndPort& server, std::string command) {
-        ClockSource::StopWatch stopwatch;
-        while (!isCommandRunning(command, server)) {
-            if (auto elapsed = stopwatch.elapsed(); elapsed >= kMaxWait) {
-                LOGV2(9155800,
-                      "Target server did not run command within time limit",
-                      "targetHostAndPort"_attr = server,
-                      "cmd"_attr = command,
-                      "timeElapsedMs"_attr = elapsed);
-                return false;
-            }
-            sleepmillis(100);
-        }
-
-        return true;
-    }
-
-    void _waitForServersToStartRunningEcho() {
-        LOGV2(7176405, "Waiting for all servers to start running the command");
-        const auto cmd = "echo";
-        auto servers = fixture().getServers();
-        for (auto& server : servers) {
-            ASSERT_TRUE(_waitForServerToRunCommand(server, cmd));
-        }
-    }
-
-    void _waitForServersToStartRunningKillOperations(CancellationMode mode) {
-        LOGV2(7176406, "Wait for servers to receive $_killOperations");
-        const auto cmd = "_killOperations";
-        auto servers = fixture().getServers();
-        size_t idx = (mode == CancellationMode::kAfterCompletion) ? 1 : 0;
-        for (; idx < servers.size(); idx++) {
-            ASSERT_TRUE(_waitForServerToRunCommand(servers[idx], cmd));
-        }
-    }
-};
-
-TEST_F(HedgeCancellationTest, CancelAfterScheduling) {
-    // Cancel the hedged operation after it is scheduled on all targets and before completion.
-    // We should send `_killOperations` to all targets that have already acquired a connection
-    // and might have started/completed running the operation.
-    runTest(CancellationMode::kAfterScheduling);
-}
-
-TEST_F(HedgeCancellationTest, CancelAfterCompletion) {
-    // Waits until the hedged operation is scheduled on all targets, then cancels all pending
-    // operations after the first scheduled operation completes. We should send
-    // `_killOperations` to all targets except for the one used to fulfill the final promise
-    // (i.e. complete the operation).
-    runTest(CancellationMode::kAfterCompletion);
-}
 
 TEST_F(NetworkInterfaceInternalClientTest,
        HelloRequestContainsOutgoingWireVersionInternalClientInfo) {

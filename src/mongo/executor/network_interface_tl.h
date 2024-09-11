@@ -51,7 +51,6 @@
 #include "mongo/db/service_context.h"
 #include "mongo/executor/connection_pool.h"
 #include "mongo/executor/connection_pool_tl.h"
-#include "mongo/executor/hedge_options_util.h"
 #include "mongo/executor/network_connection_hook.h"
 #include "mongo/executor/network_interface.h"
 #include "mongo/executor/remote_command_request.h"
@@ -216,17 +215,6 @@ private:
         Status doMetadataHook(const RemoteCommandOnAnyResponse& response);
 
         /**
-         * Return the maximum amount of requests that can come from this command.
-         */
-        size_t maxConcurrentRequests() const noexcept {
-            if (!requestOnAny.options.hedgeOptions.isHedgeEnabled) {
-                return 1;
-            }
-
-            return requestOnAny.options.hedgeOptions.hedgeCount + 1;
-        }
-
-        /**
          * Return the most connections we expect to be able to acquire.
          */
         size_t maxPossibleConns() const noexcept {
@@ -277,8 +265,6 @@ private:
         void fulfillFinalPromise(StatusWith<RemoteCommandOnAnyResponse> response) override;
 
         Promise<RemoteCommandOnAnyResponse> promise;
-
-        const size_t hedgeCount;
     };
 
     struct ExhaustCommandState final : public CommandStateBase {
@@ -316,7 +302,7 @@ private:
     struct RequestManager {
         RequestManager(CommandStateBase* cmdState);
 
-        void trySend(StatusWith<ConnectionPool::ConnectionHandle> swConn, size_t idx) noexcept;
+        void trySend(StatusWith<ConnectionPool::ConnectionHandle> swConn) noexcept;
         void cancelRequests();
         void killOperationsForPendingRequests();
 
@@ -324,22 +310,20 @@ private:
 
         /**
          * Holds context for individual requests, and is only valid if initialized.
-         * `idx` maps the request to its target in the corresponding `cmdState`.
          */
         struct Context {
             bool initialized = false;
-            size_t idx;
             std::weak_ptr<RequestState> request;
         };
-        std::vector<Context> requests;
+        Context request;
 
         Mutex mutex = MONGO_MAKE_LATCH("NetworkInterfaceTL::RequestManager::mutex");
 
         // Number of connections we've resolved.
         size_t connsResolved{0};
 
-        // Number of sent requests.
-        size_t sentIdx{0};
+        // Set to true after we have sent the request.
+        bool isSent{false};
 
         // Set to true when the command finishes or is canceled to block remaining requests.
         bool isLocked{false};
@@ -390,12 +374,8 @@ private:
         ConnectionHandle conn;
         WeakConnectionHandle weakConn;
 
-        // True if this request is an additional request sent to hedge the operation.
-        bool isHedge{false};
-
         // Set to true if the response to the request is used to fulfill the command's
-        // promise (i.e. arrives before the responses to all other requests and is not
-        // a MaxTimeMSExpired error response if this is a hedged request).
+        // promise.
         bool fulfilledPromise{false};
     };
 
@@ -422,7 +402,7 @@ private:
 
     void _run();
 
-    Status _killOperation(CommandStateBase* cmdStateToKill, size_t idx);
+    Status _killOperation(CommandStateBase* cmdStateToKill);
 
     /**
      * Adds the provided cmdState to the list of in-progress commands.

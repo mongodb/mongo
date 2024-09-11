@@ -248,20 +248,6 @@ tasks:
           resmoke_jobs_max: 1
 
   - <<: *gen_task_template
-    name: causally_consistent_hedged_reads_jscore_passthrough_gen
-    tags:
-      [
-        "assigned_to_jira_team_server_servicearch",
-        "release_critical",
-        "incompatible_mac",
-        "causally_consistent",
-        "sharding",
-        "jscore",
-      ]
-    commands:
-      - func: "generate resmoke tasks"
-
-  - <<: *gen_task_template
     name: concurrency_multitenancy_with_atlas_proxy_jscore_passthrough_gen
     # TODO(SERVER-70015) remove "incompatible_debug_mode" tag
     tags:

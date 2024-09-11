@@ -170,8 +170,6 @@ env.CppUnitTest(
         "cancelable_executor_test.cpp",
         "connection_pool_test.cpp",
         "connection_pool_test_fixture.cpp",
-        "hedged_async_rpc_test.cpp",
-        "hedge_options_util_test.cpp",
         "inline_executor_test.cpp",
         "mock_async_rpc_test.cpp",
         "mock_network_fixture_test.cpp",

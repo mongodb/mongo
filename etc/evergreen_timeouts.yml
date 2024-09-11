@@ -93,8 +93,6 @@ overrides:
       exec_timeout: 180 # 3 hours
     - task: aggregation_sharded_collections_passthrough
       exec_timeout: 180 # 3 hours
-    - task: causally_consistent_hedged_reads_jscore_passthrough
-      exec_timeout: 180 # 3 hours
     - task: external_auth
       exec_timeout: 180 # 3 hours
 
