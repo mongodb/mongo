@@ -630,10 +630,11 @@ void BSONColumnBlockBased::decompress(boost::intrusive_ptr<ElementStorage> alloc
             ptr += literal.size();
             switch (type) {
                 case Object: {
-                    // SERVER-88217 Remove this assertion when we can evaluate paths in arbitrary
-                    // object literals.
-                    invariant(literal.Obj().isEmpty(),
-                              "non-empty object literal in path-based decompress()");
+                    const auto obj = literal.Obj();
+                    // TODO(SERVER-88217) Remove when we can evaluate paths in arbitrary objects.
+                    invariant(obj.isEmpty() ||
+                                  !BSONColumnBlockDecompressHelpers::containsScalars(obj),
+                              "object literal with scalars in path-based decompress()");
                     for (auto&& pathPair : pathCollectors) {
                         if (isRootPath(pathPair.first)) {
                             pathPair.second.template append<BSONObj>(literal);
