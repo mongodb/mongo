@@ -45,6 +45,14 @@ idl_generator(
     ],
 )
 
+idl_generator(
+    name = "sessions_server_parameters_gen",
+    src = "sessions_server_parameters.idl",
+    deps = [
+        "//src/mongo/db:basic_types_gen",
+    ],
+)
+
 mongo_cc_library(
     name = "logical_session_cache",
     srcs = [
@@ -149,6 +157,12 @@ mongo_cc_library(
 )
 
 mongo_cc_library(
+    name = "sessions_server_parameters_idl",
+    srcs = ["//src/mongo/db/session:sessions_server_parameters_gen"],
+    deps = ["//src/mongo/db:server_base"],
+)
+
+mongo_cc_library(
     name = "sessions_collection",
     srcs = [
         "sessions_collection.cpp",
@@ -159,6 +173,7 @@ mongo_cc_library(
     deps = [
         ":logical_session_id",  # TODO(SERVER-93876): Remove.
         ":logical_session_id_helpers",  # TODO(SERVER-93876): Remove.
+        ":sessions_server_parameters_idl",
         "//src/mongo/client:clientdriver_minimal",
         "//src/mongo/db:coll_mod_command_idl",  # TODO(SERVER-93876): Remove.
         "//src/mongo/db:index_commands_idl",  # TODO(SERVER-93876): Remove.
