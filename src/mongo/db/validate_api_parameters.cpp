@@ -44,13 +44,17 @@
 #include "mongo/db/api_parameters_gen.h"
 #include "mongo/db/client.h"
 #include "mongo/db/commands.h"
+#include "mongo/db/commands/test_commands_enabled.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/idl/idl_parser.h"
+#include "mongo/logv2/log.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/transport/session.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/decorable.h"
 #include "mongo/util/str.h"
+
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
 
 namespace mongo {
 
@@ -141,6 +145,19 @@ void enforceRequireAPIVersion(OperationContext* opCtx, Command* command) {
     }();
 
     if (gRequireApiVersion.load() && !client->isInDirectClient() && !isInternalThreadOrClient) {
+        // TODO This log aims to give more diagnostics for BF-32357, and will be removed when
+        // the BF has been resolved.
+        if (getTestCommandsEnabled()) {
+            LOGV2(9451900,
+                  "apiVersion parameter requirement check failed.",
+                  "clientDesc"_attr = client->desc(),
+                  "session"_attr = client->hasRemote() ? client->session()->toBSON().toString()
+                                                       : "No session exists.",
+                  "isPossiblyUnauthenticatedInternalClient"_attr =
+                      client->isPossiblyUnauthenticatedInternalClient(),
+                  "commandPassed"_attr = !!command,
+                  "commandRequiresAuth"_attr = command ? command->requiresAuth() : true);
+        }
         uassert(
             498870,
             "The apiVersion parameter is required, please configure your MongoClient's API version",
