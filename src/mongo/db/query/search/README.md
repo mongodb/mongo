@@ -31,4 +31,4 @@ Testing search features is a bit different than other aggregation stages! You wi
 
    Once the released version matches or exceeds the tag on the test, the test will also run for the released version.
 
-Regardless of the category you find yourself in, you are required to run all e2e tests defined on both 10gen/mongod and 10gen/mongot repos. To learn how to run all cross-repo e2e tests, please check out [jstests/with_mongot/cross_repo_testing_requirements.md](https://github.com/10gen/mongo/blob/master/jstests/with_mongot/e2e/cross_repo_testing_requirements.md).
+Regardless of the category you find yourself in, you are required to run all e2e tests defined on both 10gen/mongod and 10gen/mongot repos. To learn how to run all cross-repo e2e tests, please check out [jstests/with_mongot/cross_repo_testing_requirements.md](https://github.com/10gen/mongo/blob/master/jstests/with_mongot/cross_repo_testing_requirements.md).
