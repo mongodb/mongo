@@ -54,9 +54,14 @@
 namespace mongo::timeseries {
 
 bool dateOutsideStandardRange(Date_t date) {
-    constexpr long long kMaxNormalRangeTimestamp = ((1LL << 31) - 1);
-    long long timeSeconds = durationCount<Seconds>(date.toDurationSinceEpoch());
-    return timeSeconds < 0 || timeSeconds > kMaxNormalRangeTimestamp;
+    // The latest timestamp in the standard range is when the bucket OID cannot fit into a 32 bit
+    // integer, because we cannot reliably scan the documents by OID and must indicate the bucket
+    // requires extended range support. Since OID are rounded to seconds, this maximum value is the
+    // largest 32 bit integer number of seconds since the epoch. We convert this value to
+    // milliseconds, since query routing and user specified dates have millisecond precision.
+    constexpr long long kMaxNormalRangeTimestamp = ((1LL << 31) - 1) * 1000;
+    long long timeMilliseconds = date.toMillisSinceEpoch();
+    return timeMilliseconds < 0 || timeMilliseconds > kMaxNormalRangeTimestamp;
 }
 
 bool bucketsHaveDateOutsideStandardRange(const TimeseriesOptions& options,
