@@ -18,15 +18,28 @@ def main():
         elif "archive_dist_test" in dir:
             contains_binaries = True
 
-    # early return if symbols already exist on dist
+    # early return if symbols already exist on disk
     # early return if there are not binaries (which means this is not a resmoke task)
     if contains_symbols or not contains_binaries:
         return
 
+    # some ec2 instances use a newer version of the metadata service.
+    # we try to first use the newer version that required a token
+    # if that doesn't work we then fallback to the unauthenticated version of the api
+    instance_token_endpoint = "http://169.254.169.254/latest/api/token"
     instance_id_endpoint = "http://169.254.169.254/latest/meta-data/instance-id"
-    response = requests.get(instance_id_endpoint)
+    response = requests.put(
+        instance_token_endpoint, headers={"X-aws-ec2-metadata-token-ttl-seconds": "300"}
+    )
+    if response.ok:
+        auth_token = response.content.decode("utf-8")
+        response = requests.get(
+            instance_id_endpoint, headers={"X-aws-ec2-metadata-token": auth_token}
+        )
+    else:
+        response = requests.get(instance_id_endpoint)
     if not response.ok:
-        raise RuntimeError("Could not query the instance endpoint.")
+        raise RuntimeError(f"Could not query the instance endpoint: {response.status_code}")
     instance_id = response.content.decode("utf-8")
     evg_config = os.path.expanduser(os.path.join("~", ".evergreen.yml"))
     evg_api = evergreen_conn.get_evergreen_api(evergreen_config=evg_config)
