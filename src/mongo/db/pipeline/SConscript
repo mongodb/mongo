@@ -33,6 +33,7 @@ env.Library(
         "accumulation_statement.cpp",
         "accumulator_add_to_set.cpp",
         "accumulator_avg.cpp",
+        "accumulator_concat_arrays.cpp",
         "accumulator_covariance.cpp",
         "accumulator_exp_moving_avg.cpp",
         "accumulator_first.cpp",
@@ -580,6 +581,7 @@ env.CppUnitTest(
         "window_function/partition_iterator_test.cpp",
         "window_function/spillable_cache_test.cpp",
         "window_function/window_function_add_to_set_test.cpp",
+        "window_function/window_function_concat_arrays_test.cpp",
         "window_function/window_function_covariance_test.cpp",
         "window_function/window_function_exec_derivative_test.cpp",
         "window_function/window_function_exec_non_removable_test.cpp",
@@ -697,6 +699,18 @@ env.Benchmark(
     target="window_function_percentile_bm",
     source=[
         "window_function/window_function_percentile_bm_fixture.cpp",
+    ],
+    LIBDEPS=[
+        "$BUILD_DIR/mongo/db/query/query_test_service_context",
+        "$BUILD_DIR/mongo/db/service_context_non_d",
+        "accumulator",
+    ],
+)
+
+env.Benchmark(
+    target="window_function_concat_arrays_bm",
+    source=[
+        "window_function/window_function_concat_arrays_bm_fixture.cpp",
     ],
     LIBDEPS=[
         "$BUILD_DIR/mongo/db/query/query_test_service_context",

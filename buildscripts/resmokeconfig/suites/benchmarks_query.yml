@@ -7,6 +7,7 @@ selector:
     # The trailing asterisk is for handling the .exe extension on Windows.
     - build/install/bin/percentile_algo_bm*
     - build/install/bin/window_function_percentile_bm*
+    - build/install/bin/window_function_concat_arrays_bm*
     - build/install/bin/rate_limiting_bm*
     - build/install/bin/shapifying_bm*
     - build/install/bin/profile_filter_bm*

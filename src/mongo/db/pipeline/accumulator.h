@@ -557,4 +557,30 @@ private:
     bool _isDecimal = false;
 };
 
+class AccumulatorConcatArrays : public AccumulatorState {
+public:
+    static constexpr auto kName = "$concatArrays"_sd;
+
+    const char* getOpName() const final {
+        return kName.rawData();
+    }
+
+    /**
+     * Creates a new $concatArrays accumulator. If 'maxMemoryUsageBytes' is not given, defaults to
+     * the value of the server parameter 'internalQueryMaxConcatArraysBytes'.
+     */
+    AccumulatorConcatArrays(ExpressionContext* expCtx,
+                            boost::optional<int> maxMemoryUsageBytes = boost::none);
+
+    void processInternal(const Value& input, bool merging) final;
+    Value getValue(bool) final;
+    void reset() final;
+
+    static boost::intrusive_ptr<AccumulatorState> create(ExpressionContext* expCtx);
+
+private:
+    void addValuesFromArray(const Value& values);
+    std::vector<Value> _array;
+};
+
 }  // namespace mongo

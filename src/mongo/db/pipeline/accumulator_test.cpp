@@ -2081,6 +2081,14 @@ TEST(Accumulators, SerializeWithRedaction) {
     ASSERT_DOCUMENT_EQ_AUTO(  // NOLINT
         R"({"$_internalJsReduce":{"data":"$HASH<emits>","eval":"?string"}})",
         actual);
+
+    auto concatArrays = BSON("$concatArrays" << BSON_ARRAY(4 << 6));
+    actual = parseAndSerializeAccum(
+        concatArrays.firstElement(),
+        &genericParseSBEUnsupportedSingleExpressionAccumulator<AccumulatorConcatArrays>);
+    ASSERT_DOCUMENT_EQ_AUTO(  // NOLINT
+        R"({"$concatArrays": "?array<?number>"})",
+        actual);
 }
 
 TEST(AccumulatorsToExpression, SerializeWithRedaction) {
@@ -2170,6 +2178,111 @@ TEST(AccumulatorMergeObjects, RoundTripSerializationLiteral) {
     ASSERT_DOCUMENT_EQ_AUTO(  // NOLINT
         R"({"$mergeObjects":{"$const":[2,"or more types"]}})",
         roundTrip);
+}
+
+/* ------------------------- AccumulatorConcatArrays -------------------------- */
+
+TEST(AccumulatorConcatArrays, ConcatArraysRespectsMaxMemoryContraint) {
+    auto expCtx = ExpressionContextForTest{};
+    const int maxMemoryBytes = 20ull;
+    auto concatArrays = AccumulatorConcatArrays(&expCtx, maxMemoryBytes);
+    ASSERT_THROWS_CODE(concatArrays.process(
+                           Value(std::vector<Value>{Value("A somewhat long string"_sd),
+                                                    Value("Another somewhat long string"_sd),
+                                                    Value("Yet another somewhat long string!"_sd)}),
+                           false),
+                       AssertionException,
+                       ErrorCodes::ExceededMemoryLimit);
+}
+
+TEST(AccumulatorConcatArrays, ConcatArraysRefusesNonArrayValue) {
+    auto expCtx = ExpressionContextForTest{};
+    auto concatArrays = AccumulatorConcatArrays(&expCtx);
+
+    // $concatArrays should error if it encounters a non-array
+    const std::vector<Value> nonArrayValues = {Value("A string"_sd), Value(1), Value(BSONNULL)};
+    for (auto& val : nonArrayValues) {
+        ASSERT_THROWS_CODE(
+            concatArrays.process(val, false), AssertionException, ErrorCodes::TypeMismatch);
+    }
+}
+
+TEST(AccumulatorConcatArrays, ConcatArraysBasicCases) {
+    auto expCtx = ExpressionContextForTest{};
+
+    // $concatArrays with a single array should produce the same array
+    const std::vector<Value> singleDocument = {
+        Value(std::vector<Value>({Value(1), Value(2), Value(3)}))};
+    const std::vector<Value> singleDocumentExpect = {Value(1), Value(2), Value(3)};
+
+    // $concatArrays with multiple arrays should produce a single array.
+    const std::vector<Value> multipleDocuments = {
+        Value(std::vector<Value>({Value(1), Value(2)})),
+        Value(std::vector<Value>({Value(3), Value(4)})),
+        Value(std::vector<Value>(
+            {Value(std::vector<Value>({Value(5)})), Value(std::vector<Value>({}))})),
+    };
+    const std::vector<Value> multipleDocumentsExpect = {Value(1),
+                                                        Value(2),
+                                                        Value(3),
+                                                        Value(4),
+                                                        Value(std::vector<Value>({Value(5)})),
+                                                        Value(std::vector<Value>({}))};
+
+    assertExpectedResults<AccumulatorConcatArrays>(
+        &expCtx,
+        {{{}, Value(std::vector<Value>({}))},
+         {singleDocument, Value(singleDocumentExpect)},
+         {multipleDocuments, Value(std::vector<Value>(multipleDocumentsExpect))}});
+}
+
+TEST(AccumulatorConcatArrays, ConcatenatingMultipleArraysShouldPreserveOrder) {
+    auto expCtx = ExpressionContextForTest{};
+
+    // Concatenating two or more arrays should preserve the order of elements in each array and
+    // concatenate the arrays in order documents are encountered (i.e. will preserve sort order).
+    const std::vector<Value> values = {
+        Value(std::vector<Value>({Value(1), Value(2)})),
+        Value(std::vector<Value>({Value(3), Value(4)})),
+    };
+
+    const std::vector<Value> expected = {Value(1), Value(2), Value(3), Value(4)};
+
+    assertExpectedResults<AccumulatorConcatArrays>(&expCtx, {{values, Value{expected}}});
+}
+
+TEST(AccumulatorConcatArrays, DoubleNestedArraysShouldReturnNestedArrays) {
+    auto expCtx = ExpressionContextForTest{};
+
+    std::vector<Value> values = {
+        Value(std::vector<Value>({
+            Value(std::vector<Value>({Value("In a double nested array"_sd)})),
+            Value(std::vector<Value>({Value("Also in a double nested array"_sd)})),
+        })),
+        Value(std::vector<Value>({Value("Only singly nested"_sd)})),
+        Value(std::vector<Value>({Value(std::vector<Value>({Value(1), Value(2)}))}))};
+
+    std::vector<Value> expected = {
+        Value(std::vector<Value>({Value("In a double nested array"_sd)})),
+        Value(std::vector<Value>({Value("Also in a double nested array"_sd)})),
+        Value("Only singly nested"_sd),
+        Value(std::vector<Value>({Value(1), Value(2)}))};
+
+    assertExpectedResults<AccumulatorConcatArrays>(&expCtx, {{values, Value{expected}}});
+}
+
+TEST(AccumulatorConcatArrays, AllowsDuplicates) {
+    auto expCtx = ExpressionContextForTest{};
+
+    std::vector<Value> values = {
+        Value(std::vector<Value>({Value(1), Value(1)})),
+        Value(std::vector<Value>({Value(2), Value(3)})),
+        Value(std::vector<Value>({Value(1), Value(1)})),
+    };
+
+    std::vector<Value> expected = {Value(1), Value(1), Value(2), Value(3), Value(1), Value(1)};
+
+    assertExpectedResults<AccumulatorConcatArrays>(&expCtx, {{values, Value{expected}}});
 }
 
 }  // namespace AccumulatorTests

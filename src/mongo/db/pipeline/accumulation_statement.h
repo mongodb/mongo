@@ -88,6 +88,20 @@ namespace mongo {
             serverGlobalParams.featureCompatibility.acquireFCVSnapshot()))
 
 /**
+ * Like REGISTER_ACCUMULATOR_WITH_FEATURE_FLAG, except the accumulator will be set with
+ * AllowedWithApiStrict::kNeverInVersion1 to exclude the accumulator from the stable API.
+ */
+#define REGISTER_UNSTABLE_ACCUMULATOR_WITH_FEATURE_FLAG(key, factory, featureFlag) \
+    REGISTER_ACCUMULATOR_CONDITIONALLY(                                            \
+        key,                                                                       \
+        factory,                                                                   \
+        AllowedWithApiStrict::kNeverInVersion1,                                    \
+        AllowedWithClientType::kAny,                                               \
+        featureFlag,                                                               \
+        featureFlag.isEnabledUseLatestFCVWhenUninitialized(                        \
+            serverGlobalParams.featureCompatibility.acquireFCVSnapshot()))
+
+/**
  * You can specify a condition, evaluated during startup,
  * that decides whether to register the parser.
  *

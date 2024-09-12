@@ -47,6 +47,7 @@ const expectedParamDefaults = {
     internalQueryMaxPushBytes: 100 * 1024 * 1024,
     internalQueryMaxRangeBytes: 100 * 1024 * 1024,
     internalQueryMaxAddToSetBytes: 100 * 1024 * 1024,
+    internalQueryMaxConcatArraysBytes: 100 * 1024 * 1024,
     internalQueryPlannerGenerateCoveredWholeIndexScans: false,
     internalQueryIgnoreUnknownJSONSchemaKeywords: false,
     internalQueryProhibitBlockingMergeOnMongoS: false,
@@ -200,6 +201,10 @@ assertSetParameterFails("internalQueryMaxPushBytes", -1);
 assertSetParameterSucceeds("internalQueryMaxAddToSetBytes", 10);
 assertSetParameterFails("internalQueryMaxAddToSetBytes", 0);
 assertSetParameterFails("internalQueryMaxAddToSetBytes", -1);
+
+assertSetParameterSucceeds("internalQueryMaxConcatArraysBytes", 10);
+assertSetParameterFails("internalQueryMaxConcatArraysBytes", 0);
+assertSetParameterFails("internalQueryMaxConcatArraysBytes", -1);
 
 // Internal BSON max object size is slightly larger than the max user object size, to
 // accommodate command metadata.
