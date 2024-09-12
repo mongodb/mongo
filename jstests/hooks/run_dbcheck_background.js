@@ -27,9 +27,15 @@ const exceptionFilteredBackgroundDbCheck = function(hosts) {
     // Set a higher rate to let 'maxDocsPerBatch' be the only limiting factor.
     assert.commandWorkedOrFailedWithCode(
         db.adminCommand({setParameter: 1, maxDbCheckMBperSec: 1024}), ErrorCodes.InvalidOptions);
-    assert.commandWorkedOrFailedWithCode(
-        db.adminCommand({setParameter: 1, dbCheckSecondaryBatchMaxTimeMs: 10000}),
-        ErrorCodes.InvalidOptions);
+
+    hosts.forEach((host) => {
+        const hostConn = new Mongo(host);
+        assert.commandWorkedOrFailedWithCode(
+            hostConn.getDB("admin").adminCommand(
+                {setParameter: 1, dbCheckSecondaryBatchMaxTimeMs: 10000}),
+            ErrorCodes.InvalidOptions);
+        hostConn.close();
+    });
     const runBackgroundDbCheck = function(hosts) {
         const quietly = (func) => {
             const printOriginal = print;

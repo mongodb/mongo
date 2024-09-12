@@ -99,6 +99,10 @@ selector:
     # This test cares about command metrics, and fails under this suite.
     - jstests/core/query/query_settings/query_settings_reject_application.js
 
+    # TODO SERVER-94428: Reenable this test.
+    # This test is currently incompatible with dbcheck.
+    - jstests/core/timeseries/timeseries_update_multi.js
+
   exclude_with_any_tags:
     - assumes_standalone_mongod
     # After SERVER-80339, the server runs a "listIndexes" command on the background, which could show
