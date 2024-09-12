@@ -553,6 +553,8 @@ last-continuous:
     ticket: SERVER-93099
   - test_file: jstests/core/timeseries/timeseries_update_mixed_schema_bucket.js
     ticket: SERVER-93099
+  - test_file: jstests/sharding/refresh_sessions.js
+    ticket: SERVER-94635
   suites: null
 last-lts:
   all:
@@ -1158,4 +1160,6 @@ last-lts:
     ticket: SERVER-93099
   - test_file: jstests/core/timeseries/timeseries_update_mixed_schema_bucket.js
     ticket: SERVER-93099
+  - test_file: jstests/sharding/refresh_sessions.js
+    ticket: SERVER-94635
   suites: null
