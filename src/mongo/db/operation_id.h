@@ -31,7 +31,6 @@
 
 #include <cstdint>
 
-#include "mongo/base/static_assert.h"
 #include "mongo/platform/mutex.h"
 #include "mongo/stdx/unordered_map.h"
 

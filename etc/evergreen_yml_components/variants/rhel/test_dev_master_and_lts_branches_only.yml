@@ -60,6 +60,7 @@ buildvariants:
         MONGO_DISTMOD=rhel88
         -j$(grep -c ^processor /proc/cpuinfo)
         --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
+        --use-diagnostic-latches=on
       multiversion_platform: rhel80
       multiversion_platform_50_or_later: rhel8
       multiversion_edition: enterprise

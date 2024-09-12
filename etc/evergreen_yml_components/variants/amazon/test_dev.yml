@@ -25,6 +25,7 @@ variables:
       -j$(grep -c ^processor /proc/cpuinfo)
       --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
       --link-model=static
+      --use-diagnostic-latches=on
     unittest_compile_flags: >-
       --link-model=dynamic
 
@@ -167,6 +168,7 @@ buildvariants:
         -j$(grep -c ^processor /proc/cpuinfo)
         --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
         --link-model=dynamic
+        --use-diagnostic-latches=on
       crypt_task_compile_flags: >-
         SHLINKFLAGS_EXTRA="-Wl,-Bsymbolic
         -Wl,--no-gnu-unique"
@@ -205,6 +207,10 @@ buildvariants:
     stepback: true
     expansions:
       <<: *amazon_linux2_arm64_dynamic_expansions
+      # Diagnostic latches are disabled by default, and we match that behavior here. We also need to
+      # exclude tests with 'requires_latch_analyzer'.
+      compile_flags: >-
+        --use-diagnostic-latches=off
       scons_cache_scope: shared
       scons_cache_mode: all
       has_packages: false
@@ -216,7 +222,7 @@ buildvariants:
       exec_timeout_factor: 1.5
       test_flags: >-
         --mongodSetParameters="{internalQueryFrameworkControl: trySbeEngine}"
-        --excludeWithAnyTags=resource_intensive
+        --excludeWithAnyTags=resource_intensive,requires_latch_analyzer
     tasks:
       - name: aggregation_mongos_passthrough
       - name: aggregation_sharded_collections_passthrough

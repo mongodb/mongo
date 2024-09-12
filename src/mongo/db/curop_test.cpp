@@ -455,8 +455,9 @@ TEST(CurOpTest, ShouldReportIsFromUserConnection) {
                                        SerializationContext::Prefix::ExcludePrefix);
         auto expCtx = make_intrusive<ExpressionContextForTest>(opCtx.get(), nss, sc);
 
-        curop->reportCurrentOpForClient(expCtx, client, false, &curOpObj);
-        curop->reportCurrentOpForClient(expCtx, clientUserConn.get(), false, &curOpObjUserConn);
+        curop->reportCurrentOpForClient(expCtx, client, false, false, &curOpObj);
+        curop->reportCurrentOpForClient(
+            expCtx, clientUserConn.get(), false, false, &curOpObjUserConn);
     }
     auto bsonObj = curOpObj.done();
     auto bsonObjUserConn = curOpObjUserConn.done();

@@ -289,11 +289,15 @@ boost::optional<Document> MongosProcessInterface::lookupSingleDocumentLocally(
 BSONObj MongosProcessInterface::_reportCurrentOpForClient(
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
     Client* client,
-    CurrentOpTruncateMode truncateOps) const {
+    CurrentOpTruncateMode truncateOps,
+    CurrentOpBacktraceMode backtraceMode) const {
     BSONObjBuilder builder;
 
-    CurOp::reportCurrentOpForClient(
-        expCtx, client, (truncateOps == CurrentOpTruncateMode::kTruncateOps), &builder);
+    CurOp::reportCurrentOpForClient(expCtx,
+                                    client,
+                                    (truncateOps == CurrentOpTruncateMode::kTruncateOps),
+                                    (backtraceMode == CurrentOpBacktraceMode::kIncludeBacktrace),
+                                    &builder);
 
     OperationContext* clientOpCtx = client->getOperationContext();
 

@@ -33,6 +33,10 @@
       # And the overrides don't work with creating collections in txns, because the override doesn't handle
       # the case of a transaction aborting.
       - jstests/core/txns/*.js
+      # due to error: "enableLatchAnalysis not found"
+      - jstests/core/latch_analyzer.js
+      # due to error: "currentOpSpawnsThreadWaitingForLatch not found"
+      - jstests/core/administrative/current_op/currentop_waiting_for_latch.js
       # due to error: Error: assert.soon failed (timeout 90000ms)
       - jstests/core/query/map_reduce/mr_killop.js
       - jstests/core/query/count/count_plan_summary.js

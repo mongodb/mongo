@@ -1097,39 +1097,42 @@ TEST_F(OperationContextTest, CurrentOpExcludesKilledOperations) {
         opCtx.get(), nullptr, NamespaceString::createNamespaceString_forTest("foo.bar"_sd)));
 
     for (auto truncateOps : {true, false}) {
-        BSONObjBuilder bobNoOpCtx, bobKilledOpCtx;
-        // We use a separate client thread to generate CurrentOp reports in presence and absence
-        // of an `opCtx`. This is because `CurOp::reportCurrentOpForClient()` accepts an `opCtx`
-        // as input and requires it to be present throughout its execution.
-        stdx::thread thread([&]() mutable {
-            stdx::lock_guard<Client> lk(*opCtx->getClient());
+        for (auto backtraceMode : {true, false}) {
+            BSONObjBuilder bobNoOpCtx, bobKilledOpCtx;
+            // We use a separate client thread to generate CurrentOp reports in presence and absence
+            // of an `opCtx`. This is because `CurOp::reportCurrentOpForClient()` accepts an `opCtx`
+            // as input and requires it to be present throughout its execution.
+            stdx::thread thread([&]() mutable {
+                stdx::lock_guard<Client> lk(*opCtx->getClient());
 
-            auto threadClient = getService()->makeClient("ThreadClient");
+                auto threadClient = getService()->makeClient("ThreadClient");
 
-            // Generate report in absence of any opCtx
-            CurOp::reportCurrentOpForClient(expCtx, threadClient.get(), truncateOps, &bobNoOpCtx);
+                // Generate report in absence of any opCtx
+                CurOp::reportCurrentOpForClient(
+                    expCtx, threadClient.get(), truncateOps, backtraceMode, &bobNoOpCtx);
 
-            auto threadOpCtx = threadClient->makeOperationContext();
-            getServiceContext()->killAndDelistOperation(threadOpCtx.get());
+                auto threadOpCtx = threadClient->makeOperationContext();
+                getServiceContext()->killAndDelistOperation(threadOpCtx.get());
 
-            // Generate report in presence of a killed opCtx
-            CurOp::reportCurrentOpForClient(
-                expCtx, threadClient.get(), truncateOps, &bobKilledOpCtx);
-        });
+                // Generate report in presence of a killed opCtx
+                CurOp::reportCurrentOpForClient(
+                    expCtx, threadClient.get(), truncateOps, backtraceMode, &bobKilledOpCtx);
+            });
 
-        thread.join();
-        auto objNoOpCtx = bobNoOpCtx.obj();
-        auto objKilledOpCtx = bobKilledOpCtx.obj();
+            thread.join();
+            auto objNoOpCtx = bobNoOpCtx.obj();
+            auto objKilledOpCtx = bobKilledOpCtx.obj();
 
-        LOGV2_DEBUG(4780201, 1, "With no opCtx", "object"_attr = objNoOpCtx);
-        LOGV2_DEBUG(4780202, 1, "With killed opCtx", "object"_attr = objKilledOpCtx);
+            LOGV2_DEBUG(4780201, 1, "With no opCtx", "object"_attr = objNoOpCtx);
+            LOGV2_DEBUG(4780202, 1, "With killed opCtx", "object"_attr = objKilledOpCtx);
 
-        ASSERT_EQ(objNoOpCtx.nFields(), objKilledOpCtx.nFields());
+            ASSERT_EQ(objNoOpCtx.nFields(), objKilledOpCtx.nFields());
 
-        auto compareBSONObjs = [](BSONObj& a, BSONObj& b) -> bool {
-            return (a == b).type == BSONObj::DeferredComparison::Type::kEQ;
-        };
-        ASSERT(compareBSONObjs(objNoOpCtx, objKilledOpCtx));
+            auto compareBSONObjs = [](BSONObj& a, BSONObj& b) -> bool {
+                return (a == b).type == BSONObj::DeferredComparison::Type::kEQ;
+            };
+            ASSERT(compareBSONObjs(objNoOpCtx, objKilledOpCtx));
+        }
     }
 }
 

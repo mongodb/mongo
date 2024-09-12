@@ -129,7 +129,8 @@ DocumentSource::GetNextResult DocumentSourceCurrentOp::doGetNext() {
             _includeIdleSessions.value_or(kDefaultSessionMode),
             _includeOpsFromAllUsers.value_or(kDefaultUserMode),
             _truncateOps.value_or(kDefaultTruncationMode),
-            _idleCursors.value_or(kDefaultCursorMode));
+            _idleCursors.value_or(kDefaultCursorMode),
+            _backtrace.value_or(kDefaultBacktraceMode));
 
         _opsIter = _ops.begin();
 
@@ -207,6 +208,7 @@ intrusive_ptr<DocumentSource> DocumentSourceCurrentOp::createFromBson(
     boost::optional<LocalOpsMode> showLocalOpsOnMongoS;
     boost::optional<TruncationMode> truncateOps;
     boost::optional<CursorMode> idleCursors;
+    boost::optional<BacktraceMode> backtrace;
     boost::optional<bool> targetAllNodes;
 
     auto currentOpSpec = CurrentOpSpec::parse(IDLParserContext(kStageName), spec.embeddedObject());
@@ -258,6 +260,10 @@ intrusive_ptr<DocumentSource> DocumentSourceCurrentOp::createFromBson(
                     pExpCtx->fromMongos || pExpCtx->inMongos);
         }
     }
+    if (currentOpSpec.getBacktrace().has_value()) {
+        backtrace = currentOpSpec.getBacktrace().value_or(false) ? BacktraceMode::kIncludeBacktrace
+                                                                 : BacktraceMode::kExcludeBacktrace;
+    }
     if (currentOpSpec.getTruncateOps().has_value()) {
         truncateOps = currentOpSpec.getTruncateOps().value_or(false)
             ? TruncationMode::kTruncateOps
@@ -271,6 +277,7 @@ intrusive_ptr<DocumentSource> DocumentSourceCurrentOp::createFromBson(
                                        showLocalOpsOnMongoS,
                                        truncateOps,
                                        idleCursors,
+                                       backtrace,
                                        targetAllNodes);
 }
 
@@ -282,6 +289,7 @@ intrusive_ptr<DocumentSourceCurrentOp> DocumentSourceCurrentOp::create(
     boost::optional<LocalOpsMode> showLocalOpsOnMongoS,
     boost::optional<TruncationMode> truncateOps,
     boost::optional<CursorMode> idleCursors,
+    boost::optional<BacktraceMode> backtrace,
     boost::optional<bool> targetAllNodes) {
     return new DocumentSourceCurrentOp(pExpCtx,
                                        includeIdleConnections,
@@ -290,6 +298,7 @@ intrusive_ptr<DocumentSourceCurrentOp> DocumentSourceCurrentOp::create(
                                        showLocalOpsOnMongoS,
                                        truncateOps,
                                        idleCursors,
+                                       backtrace,
                                        targetAllNodes);
 }
 
@@ -321,6 +330,10 @@ Value DocumentSourceCurrentOp::serialize(const SerializationOptions& opts) const
              {kIdleCursorsFieldName,
               _idleCursors.has_value()
                   ? opts.serializeLiteral(_idleCursors.value() == CursorMode::kIncludeCursors)
+                  : Value()},
+             {kBacktraceFieldName,
+              _backtrace.has_value()
+                  ? opts.serializeLiteral(_backtrace.value() == BacktraceMode::kIncludeBacktrace)
                   : Value()},
              {kTargetAllNodesFieldName,
               _targetAllNodes.has_value() ? opts.serializeLiteral(_targetAllNodes.value())

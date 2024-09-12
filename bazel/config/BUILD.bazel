@@ -33,6 +33,7 @@ load(
     "thin_lto",
     "tsan",
     "ubsan",
+    "use_diagnostic_latches",
     "use_disable_ref_track",
     "use_gdbserver",
     "use_glibcxx_debug",
@@ -1385,6 +1386,29 @@ config_setting(
     name = "http_client_disabled",
     flag_values = {
         "//bazel/config:http_client": "False",
+    },
+)
+
+# --------------------------------------
+# use_diagnostic_latches options
+# --------------------------------------
+
+use_diagnostic_latches(
+    name = "use_diagnostic_latches",
+    build_setting_default = True,
+)
+
+config_setting(
+    name = "use_diagnostic_latches_enabled",
+    flag_values = {
+        "//bazel/config:use_diagnostic_latches": "True",
+    },
+)
+
+config_setting(
+    name = "use_diagnostic_latches_disabled",
+    flag_values = {
+        "//bazel/config:use_diagnostic_latches": "False",
     },
 )
 

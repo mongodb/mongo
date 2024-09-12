@@ -5,6 +5,7 @@
  * # This test file requires multi-threading for writers and tends to fail on small machines due to
  * # thread resource shortage
  * requires_external_data_source,
+ * requires_latch_analyzer,
  * ]
  */
 import {aggPlanHasStage} from "jstests/libs/analyze_plan.js";

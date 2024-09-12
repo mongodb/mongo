@@ -287,6 +287,7 @@
 #include "mongo/util/exit_code.h"
 #include "mongo/util/fail_point.h"
 #include "mongo/util/fast_clock_source_factory.h"
+#include "mongo/util/latch_analyzer.h"
 #include "mongo/util/net/ocsp/ocsp_manager.h"
 #include "mongo/util/net/private/ssl_expiration.h"
 #include "mongo/util/net/socket_utils.h"
@@ -2090,6 +2091,10 @@ void shutdownTask(const ShutdownTaskArgs& shutdownArgs) {
     LOGV2(20565, "Now exiting");
 
     audit::logShutdown(client);
+
+#ifndef MONGO_CONFIG_USE_RAW_LATCHES
+    LatchAnalyzer::get(serviceContext).dump();
+#endif
 
 #if __has_feature(address_sanitizer) || __has_feature(thread_sanitizer)
     // SessionKiller relies on the network stack being cleanly shutdown which only occurs under

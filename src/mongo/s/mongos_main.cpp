@@ -156,6 +156,7 @@
 #include "mongo/util/fail_point.h"
 #include "mongo/util/fast_clock_source_factory.h"
 #include "mongo/util/future.h"
+#include "mongo/util/latch_analyzer.h"
 #include "mongo/util/net/hostandport.h"
 #include "mongo/util/net/ocsp/ocsp_manager.h"
 #include "mongo/util/net/private/ssl_expiration.h"
@@ -569,6 +570,9 @@ void cleanupTask(const ShutdownTaskArgs& shutdownArgs) {
 
     audit::logShutdown(Client::getCurrent());
 
+#ifndef MONGO_CONFIG_USE_RAW_LATCHES
+    LatchAnalyzer::get(serviceContext).dump();
+#endif
 
 #ifdef MONGO_CONFIG_SSL
     {

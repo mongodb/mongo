@@ -468,6 +468,7 @@ buildvariants:
         -j$(grep -c ^processor /proc/cpuinfo)
         --release
         --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
+        --use-diagnostic-latches=off
         --allocator=system
         --enterprise-features=fle
         --js-engine=none

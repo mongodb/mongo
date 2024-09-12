@@ -36,6 +36,7 @@ buildvariants:
         --variables-files=etc/scons/mongodbtoolchain_stable_clang.vars
         CCFLAGS="-fsanitize-coverage=trace-pc-guard"
         LIBS="voidstar"
+        --use-diagnostic-latches=on
 
   - <<: *enterprise-ubuntu2204-64-libvoidstar-template
     name: &enterprise-ubuntu2204-64-aubsan-libvoidstar enterprise-ubuntu2204-64-aubsan-libvoidstar
@@ -60,6 +61,7 @@ buildvariants:
         --link-model=dynamic
         CCFLAGS="-fsanitize-coverage=trace-pc-guard"
         LIBS="voidstar"
+        --use-diagnostic-latches=on
       san_options: >-
         UBSAN_OPTIONS="print_stacktrace=1:external_symbolizer_path=/usr/lib/llvm-12/bin/llvm-symbolizer"
         ASAN_OPTIONS="detect_leaks=1:check_initialization_order=true:strict_init_order=true:abort_on_error=1:disable_coredump=0:handle_abort=1:strict_string_checks=true:detect_invalid_pointer_pairs=1:verify_asan_link_order=0"
@@ -69,6 +71,8 @@ buildvariants:
   # libvoidstar to work. This variant can build and submit images, but they won't work with
   # the antithesis instrumentation provided by libvoidstar.
   # TODO SERVER-83727 After a toolchain upgrade, we should add -shared-libsan
+  # Run TSAN with diagnostic latches off, as our diagnostics reduce TSAN's visibility
+  # - see SERVER-88159.
   - <<: *enterprise-ubuntu2204-64-libvoidstar-template
     name: &enterprise-ubuntu2204-64-tsan-libvoidstar enterprise-ubuntu2204-64-tsan-libvoidstar
     display_name: "~ TSAN Enterprise Ubuntu 22.04 w/ libvoidstar"
@@ -92,6 +96,7 @@ buildvariants:
         --variables-files=etc/scons/mongodbtoolchain_stable_clang.vars
         CCFLAGS="-fsanitize-coverage=trace-pc-guard"
         LIBS="voidstar"
+        --use-diagnostic-latches=off
       san_options: TSAN_OPTIONS="abort_on_error=1:disable_coredump=0:handle_abort=1:halt_on_error=1:report_thread_leaks=0:die_after_fork=0:history_size=4"
       test_flags: >-
-        --excludeWithAnyTags=tsan_incompatible
+        --excludeWithAnyTags=tsan_incompatible,requires_latch_analyzer

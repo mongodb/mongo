@@ -17,6 +17,7 @@ buildvariants:
       additional_package_targets: >-
         archive-mongocryptd
         archive-mongocryptd-debug
+      test_flags: --excludeWithAnyTags=requires_latch_analyzer
       # We need to compensate for SMT8 setting the cpu count very high and lower the amount of parallelism down
       compile_flags: >-
         --ssl
@@ -94,7 +95,7 @@ buildvariants:
         archive-mongocryptd
         archive-mongocryptd-debug
       release_buid: true
-      test_flags: --excludeWithAnyTags=incompatible_with_s390x
+      test_flags: --excludeWithAnyTags=incompatible_with_s390x,requires_latch_analyzer
       compile_flags: >-
         --ssl
         MONGO_DISTMOD=rhel83

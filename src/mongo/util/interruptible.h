@@ -266,6 +266,15 @@ public:
     }
 
     /**
+     * Get the name for a Latch
+     */
+    template <typename LatchT>
+    requires std::is_base_of_v<latch_detail::Latch, LatchT>
+    static StringData getLatchName(const stdx::unique_lock<LatchT>& lk) {
+        return lk.mutex()->getName();
+    }
+
+    /**
      * Get a placeholder name for an arbitrary type
      */
     template <typename LockT>

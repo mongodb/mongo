@@ -1567,6 +1567,9 @@ env.Library(
         "$BUILD_DIR/mongo/util/clock_sources",
         "$BUILD_DIR/mongo/util/elapsed_tracker",
         "$BUILD_DIR/mongo/util/fail_point",
+        "$BUILD_DIR/mongo/util/latch_analyzer"
+        if get_option("use-diagnostic-latches") == "on"
+        else [],
         "$BUILD_DIR/mongo/util/net/network",
         "$BUILD_DIR/mongo/util/ntservice",
         "$BUILD_DIR/mongo/util/options_parser/options_parser_init",
@@ -1700,6 +1703,9 @@ env.Library(
         "$BUILD_DIR/mongo/util/allocator_thread",
         "$BUILD_DIR/mongo/util/cmdline_utils/cmdline_utils",
         "$BUILD_DIR/mongo/util/concurrency/thread_pool",
+        "$BUILD_DIR/mongo/util/latch_analyzer"
+        if get_option("use-diagnostic-latches") == "on"
+        else [],
         "$BUILD_DIR/mongo/util/net/http_client_impl",
         "$BUILD_DIR/mongo/util/net/ssl_manager",
         "$BUILD_DIR/mongo/util/periodic_runner_factory",

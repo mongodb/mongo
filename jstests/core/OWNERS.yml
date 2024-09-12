@@ -12,6 +12,9 @@ filters:
   - "failcommand_failpoint.js":
     approvers:
       - 10gen/server-programmability
+  - "latch_analyzer.js":
+    approvers:
+      - 10gen/server-programmability
   - "capped/*":
     approvers:
       - 10gen/server-storage-execution

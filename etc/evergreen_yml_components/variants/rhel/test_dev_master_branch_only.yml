@@ -29,6 +29,7 @@ variables:
       -j$(grep -c ^processor /proc/cpuinfo)
       --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
       --link-model=dynamic
+      --use-diagnostic-latches=on
 
   # THIS HAS COPIES IN
   # - etc/evergreen_yml_components/variants/sanitizer/test_dev.yml
@@ -130,6 +131,7 @@ variables:
         MONGO_DISTMOD=rhel88
         -j$(grep -c ^processor /proc/cpuinfo)
         --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
+        --use-diagnostic-latches=on
       crypt_task_compile_flags: >-
         SHLINKFLAGS_EXTRA="-Wl,-Bsymbolic -Wl,--no-gnu-unique"
         CCFLAGS="-fno-gnu-unique"
@@ -247,6 +249,7 @@ buildvariants:
         --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
         --link-model=dynamic
         ENABLE_GRPC_BUILD=1
+        --use-diagnostic-latches=on
       compile_variant: *linux-x86-dynamic-grpc-suggested
       clang_tidy_toolchain: v4
       large_distro_name: rhel8.8-xlarge
@@ -381,6 +384,7 @@ buildvariants:
         MONGO_DISTMOD=rhel88
         -j$(grep -c ^processor /proc/cpuinfo)
         --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
+        --use-diagnostic-latches=on
       scons_cache_scope: shared
       num_scons_link_jobs_available: 0.5
       compile_variant: *enterprise-rhel-8-benchmarks
@@ -469,6 +473,7 @@ buildvariants:
         --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
         --enterprise-features=hot_backups,magic_restore,ldap,sasl
         --link-model=dynamic
+        --use-diagnostic-latches=on
       compile_variant: *hot_backups-rhel-8-64-bit
       has_packages: false
       scons_cache_mode: all
@@ -501,6 +506,7 @@ buildvariants:
         -j$(grep -c ^processor /proc/cpuinfo)
         --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
         --link-model=dynamic
+        --use-diagnostic-latches=on
       test_flags: >-
         --mongosSetParameters="{replicaSetMonitorProtocol: sdam}"
         --mongodSetParameters="{replicaSetMonitorProtocol: sdam}"
@@ -586,6 +592,7 @@ buildvariants:
         -j$(grep -c ^processor /proc/cpuinfo)
         --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
         --link-model=dynamic
+        --use-diagnostic-latches=on
       multiversion_platform: rhel80
       multiversion_platform_50_or_later: rhel8
       multiversion_edition: enterprise

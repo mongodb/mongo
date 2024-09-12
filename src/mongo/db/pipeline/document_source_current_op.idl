@@ -52,6 +52,9 @@ structs:
       localOps:
         description: Determines whether we will only report ops running locally on mongos or only those running on shards.
         type: optionalBool
+      backtrace:
+        description: Determines whether callstack information is returned as part of the waitingForLatch output field.
+        type: optionalBool
       truncateOps:
         description: Determines whether the output should be truncated. Internal, only allowed when the server is in test mode.
         type: optionalBool
