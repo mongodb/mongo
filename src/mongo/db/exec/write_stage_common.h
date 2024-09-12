@@ -44,7 +44,7 @@
 #include "mongo/db/exec/working_set_common.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
-#include "mongo/db/ops/write_ops_exec.h"
+#include "mongo/db/query/write_ops/write_ops_exec.h"
 #include "mongo/platform/basic.h"
 #include "mongo/s/shard_version.h"
 #include "mongo/s/stale_exception.h"

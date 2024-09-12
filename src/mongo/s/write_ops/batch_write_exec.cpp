@@ -53,7 +53,7 @@
 #include "mongo/db/feature_flag.h"
 #include "mongo/db/internal_transactions_feature_flag_gen.h"
 #include "mongo/db/namespace_string.h"
-#include "mongo/db/ops/write_ops_parsers.h"
+#include "mongo/db/query/write_ops/write_ops_parsers.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/session/logical_session_id_helpers.h"
 #include "mongo/db/stats/counters.h"

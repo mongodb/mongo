@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#include "mongo/db/ops/write_ops_gen.h"
+#include "mongo/db/query/write_ops/write_ops_gen.h"
 #include <boost/cstdint.hpp>
 #include <boost/move/utility_core.hpp>
 #include <boost/optional.hpp>
@@ -49,7 +49,7 @@
 #include "mongo/db/catalog/collection_catalog.h"
 #include "mongo/db/client.h"
 #include "mongo/db/dbdirectclient.h"
-#include "mongo/db/ops/write_ops_parsers.h"
+#include "mongo/db/query/write_ops/write_ops_parsers.h"
 #include "mongo/db/repl/replica_set_aware_service.h"
 #include "mongo/db/s/analyze_shard_key_util.h"
 #include "mongo/db/s/query_analysis_writer.h"

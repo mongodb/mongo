@@ -41,7 +41,7 @@
 #include "mongo/db/concurrency/lock_manager_defs.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
-#include "mongo/db/ops/insert.h"
+#include "mongo/db/query/write_ops/insert.h"
 #include "mongo/db/service_context.h"
 #include "mongo/unittest/assert.h"
 #include "mongo/unittest/framework.h"

@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#include "mongo/db/ops/write_ops.h"
+#include "mongo/db/query/write_ops/write_ops.h"
 
 #include <algorithm>
 #include <boost/move/utility_core.hpp>

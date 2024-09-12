@@ -31,7 +31,7 @@
 global:
     cpp_namespace: "mongo::analyze_shard_key"
     cpp_includes:
-        - "mongo/db/ops/write_ops.h"
+        - "mongo/db/query/write_ops/write_ops.h"
         - "mongo/db/s/query_analysis_writer.h"
         - "mongo/s/query_analysis_sampler.h"
 

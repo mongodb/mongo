@@ -39,7 +39,7 @@
 #include "mongo/bson/timestamp.h"
 #include "mongo/bson/util/builder.h"
 #include "mongo/db/namespace_string.h"
-#include "mongo/db/ops/write_ops_gen.h"
+#include "mongo/db/query/write_ops/write_ops_gen.h"
 #include "mongo/db/shard_id.h"
 #include "mongo/s/chunk_version.h"
 #include "mongo/s/index_version.h"

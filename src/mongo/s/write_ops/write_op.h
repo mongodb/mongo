@@ -40,7 +40,7 @@
 #include <boost/optional/optional.hpp>
 
 #include "mongo/db/operation_context.h"
-#include "mongo/db/ops/write_ops_parsers.h"
+#include "mongo/db/query/write_ops/write_ops_parsers.h"
 #include "mongo/db/shard_id.h"
 #include "mongo/s/chunk_manager.h"
 #include "mongo/s/ns_targeter.h"

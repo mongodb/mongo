@@ -29,7 +29,7 @@
 
 #include "mongo/db/pipeline/writer_util.h"
 
-#include "mongo/db/ops/write_ops_gen.h"
+#include "mongo/db/query/write_ops/write_ops_gen.h"
 
 namespace mongo {
 

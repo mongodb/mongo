@@ -34,8 +34,8 @@ env.Library(
         "replica_set_node_process_interface.cpp",
     ],
     LIBDEPS=[
-        "$BUILD_DIR/mongo/db/ops/write_ops_exec",
         "$BUILD_DIR/mongo/db/pipeline/pipeline",
+        "$BUILD_DIR/mongo/db/query/write_ops/write_ops_exec",
         "$BUILD_DIR/mongo/db/transaction/transaction",
         "common_process_interface",
     ],
@@ -49,7 +49,7 @@ env.Library(
         "$BUILD_DIR/mongo/db/index_builds_coordinator_mongod",
         "$BUILD_DIR/mongo/db/multitenancy",
         "$BUILD_DIR/mongo/db/operation_time_tracker",
-        "$BUILD_DIR/mongo/db/ops/write_ops",
+        "$BUILD_DIR/mongo/db/query/write_ops/write_ops",
         "$BUILD_DIR/mongo/db/repl/primary_only_service",
         "$BUILD_DIR/mongo/db/s/query_analysis_writer",
         "$BUILD_DIR/mongo/db/s/transaction_coordinator",

@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#include "mongo/db/ops/parsed_delete.h"
+#include "mongo/db/query/write_ops/parsed_delete.h"
 
 #include <boost/move/utility_core.hpp>
 #include <boost/optional/optional.hpp>
@@ -39,9 +39,9 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/feature_flag.h"
-#include "mongo/db/ops/delete_request_gen.h"
-#include "mongo/db/ops/parsed_writes_common.h"
 #include "mongo/db/query/canonical_query.h"
+#include "mongo/db/query/write_ops/delete_request_gen.h"
+#include "mongo/db/query/write_ops/parsed_writes_common.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/storage/storage_parameters_gen.h"
 #include "mongo/db/timeseries/timeseries_gen.h"

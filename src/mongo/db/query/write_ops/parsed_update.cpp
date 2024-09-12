@@ -27,9 +27,9 @@
  *    it in the license file.
  */
 
-#include "mongo/db/ops/parsed_update.h"
+#include "mongo/db/query/write_ops/parsed_update.h"
 
-#include "mongo/db/ops/update_request.h"
+#include "mongo/db/query/write_ops/update_request.h"
 
 namespace mongo {
 

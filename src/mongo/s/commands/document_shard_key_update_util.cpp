@@ -40,7 +40,7 @@
 #include "mongo/crypto/fle_field_schema_gen.h"
 #include "mongo/db/commands/txn_cmds_gen.h"
 #include "mongo/db/namespace_string.h"
-#include "mongo/db/ops/write_ops_gen.h"
+#include "mongo/db/query/write_ops/write_ops_gen.h"
 #include "mongo/db/session/logical_session_id.h"
 #include "mongo/logv2/log.h"
 #include "mongo/logv2/log_component.h"

@@ -680,12 +680,6 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 /src/mongo/db/op_observer/**/op_observer_impl* @10gen/server-replication @svc-auto-approve-bot
 /src/mongo/db/op_observer/**/fcv_op_observer* @10gen/server-replication @svc-auto-approve-bot
 
-# The following patterns are parsed from ./src/mongo/db/ops/OWNERS.yml
-/src/mongo/db/ops/**/* @10gen/query-optimization @svc-auto-approve-bot
-/src/mongo/db/ops/**/write_ops_exec* @10gen/query-execution @svc-auto-approve-bot
-/src/mongo/db/ops/**/delete.* @10gen/query @svc-auto-approve-bot
-/src/mongo/db/ops/**/update.* @10gen/query @svc-auto-approve-bot
-
 # The following patterns are parsed from ./src/mongo/db/pipeline/OWNERS.yml
 /src/mongo/db/pipeline/**/* @10gen/query @svc-auto-approve-bot
 /src/mongo/db/pipeline/**/*.idl @10gen/query-optimization @svc-auto-approve-bot
@@ -801,6 +795,12 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 
 # The following patterns are parsed from ./src/mongo/db/query/timeseries/OWNERS.yml
 /src/mongo/db/query/timeseries/**/* @10gen/query-integration @svc-auto-approve-bot
+
+# The following patterns are parsed from ./src/mongo/db/query/write_ops/OWNERS.yml
+/src/mongo/db/query/write_ops/**/* @10gen/query-optimization @svc-auto-approve-bot
+/src/mongo/db/query/write_ops/**/write_ops_exec* @10gen/query-execution @svc-auto-approve-bot
+/src/mongo/db/query/write_ops/**/delete.* @10gen/query @svc-auto-approve-bot
+/src/mongo/db/query/write_ops/**/update.* @10gen/query @svc-auto-approve-bot
 
 # The following patterns are parsed from ./src/mongo/db/repl/OWNERS.yml
 /src/mongo/db/repl/**/* @10gen/server-replication @svc-auto-approve-bot

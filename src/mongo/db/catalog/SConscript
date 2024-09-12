@@ -428,7 +428,7 @@ env.Library(
         "$BUILD_DIR/mongo/db/index_commands_idl",
         "$BUILD_DIR/mongo/db/internal_transactions_feature_flag",
         "$BUILD_DIR/mongo/db/multitenancy",
-        "$BUILD_DIR/mongo/db/ops/write_ops",
+        "$BUILD_DIR/mongo/db/query/write_ops/write_ops",
         "$BUILD_DIR/mongo/db/query_exec",
         "$BUILD_DIR/mongo/db/repl/drop_pending_collection_reaper",
         "$BUILD_DIR/mongo/db/server_base",

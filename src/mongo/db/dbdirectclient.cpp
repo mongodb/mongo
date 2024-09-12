@@ -43,7 +43,7 @@
 #include "mongo/db/database_name.h"
 #include "mongo/db/dbmessage.h"
 #include "mongo/db/operation_context.h"
-#include "mongo/db/ops/write_ops.h"
+#include "mongo/db/query/write_ops/write_ops.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/wire_version.h"

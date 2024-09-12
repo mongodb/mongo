@@ -38,7 +38,7 @@ global:
 imports:
     - "mongo/client/read_preference_setting.idl"
     - "mongo/db/basic_types.idl"
-    - "mongo/db/ops/write_ops.idl"
+    - "mongo/db/query/write_ops/write_ops.idl"
     - "mongo/db/repl/read_concern_args.idl"
     - "mongo/db/repl/replication_types.idl"
     - "mongo/db/write_concern_options.idl"

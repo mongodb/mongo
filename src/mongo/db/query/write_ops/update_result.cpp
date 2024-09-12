@@ -28,7 +28,7 @@
  */
 
 
-#include "mongo/db/ops/update_result.h"
+#include "mongo/db/query/write_ops/update_result.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/db/not_primary_error_tracker.h"
 #include "mongo/logv2/log.h"

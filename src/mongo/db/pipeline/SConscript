@@ -373,9 +373,9 @@ env.Library(
     ],
     LIBDEPS=[
         "$BUILD_DIR/mongo/db/multitenancy",
-        "$BUILD_DIR/mongo/db/ops/write_ops_parsers",
         "$BUILD_DIR/mongo/db/pipeline/pipeline",
         "$BUILD_DIR/mongo/db/pipeline/sharded_agg_helpers",
+        "$BUILD_DIR/mongo/db/query/write_ops/write_ops_parsers",
         "$BUILD_DIR/mongo/db/update/update_driver",
         "$BUILD_DIR/mongo/s/query/exec/router_exec_stage",
     ],
@@ -405,9 +405,9 @@ env.Library(
     LIBDEPS=[
         "$BUILD_DIR/mongo/db/change_stream_serverless_helpers",
         "$BUILD_DIR/mongo/db/multitenancy",
-        "$BUILD_DIR/mongo/db/ops/write_ops_parsers",
         "$BUILD_DIR/mongo/db/pipeline/pipeline",
         "$BUILD_DIR/mongo/db/pipeline/sharded_agg_helpers",
+        "$BUILD_DIR/mongo/db/query/write_ops/write_ops_parsers",
         "$BUILD_DIR/mongo/db/server_feature_flags",
         "$BUILD_DIR/mongo/db/update/update_driver",
         "$BUILD_DIR/mongo/s/query/exec/router_exec_stage",

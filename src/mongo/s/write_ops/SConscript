@@ -18,7 +18,7 @@ env.Library(
         "$BUILD_DIR/mongo/db/commands/query_cmd/bulk_write_parser",
         "$BUILD_DIR/mongo/db/common",
         "$BUILD_DIR/mongo/db/error_labels",
-        "$BUILD_DIR/mongo/db/ops/write_ops_parsers",
+        "$BUILD_DIR/mongo/db/query/write_ops/write_ops_parsers",
         "$BUILD_DIR/mongo/db/query_expressions",
         "$BUILD_DIR/mongo/db/repl/optime",
         "$BUILD_DIR/mongo/db/vector_clock",

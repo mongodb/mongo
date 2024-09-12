@@ -33,8 +33,8 @@
 #include "mongo/db/jsobj.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
-#include "mongo/db/ops/update_request.h"
-#include "mongo/db/ops/update_result.h"
+#include "mongo/db/query/write_ops/update_request.h"
+#include "mongo/db/query/write_ops/update_result.h"
 #include "mongo/db/shard_role.h"
 
 namespace mongo {

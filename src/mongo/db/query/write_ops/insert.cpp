@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#include "mongo/db/ops/insert.h"
+#include "mongo/db/query/write_ops/insert.h"
 
 #include <boost/move/utility_core.hpp>
 #include <cstddef>

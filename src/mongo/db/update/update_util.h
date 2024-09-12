@@ -32,10 +32,10 @@
 #include "mongo/bson/mutable/document.h"
 #include "mongo/db/field_ref_set.h"
 #include "mongo/db/operation_context.h"
-#include "mongo/db/ops/update_request.h"
-#include "mongo/db/ops/write_ops_gen.h"
 #include "mongo/db/query/canonical_query.h"
 #include "mongo/db/query/explain_options.h"
+#include "mongo/db/query/write_ops/update_request.h"
+#include "mongo/db/query/write_ops/write_ops_gen.h"
 #include "mongo/db/update/update_driver.h"
 #include "mongo/util/safe_num.h"
 

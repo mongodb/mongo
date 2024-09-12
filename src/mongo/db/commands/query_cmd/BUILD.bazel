@@ -26,7 +26,7 @@ idl_generator(
         "//src/mongo/client:read_preference_setting_gen",
         "//src/mongo/db:basic_types_gen",
         "//src/mongo/db:write_concern_options_gen",
-        "//src/mongo/db/ops:write_ops_gen",
+        "//src/mongo/db/query/write_ops:write_ops_gen",
         "//src/mongo/db/repl:read_concern_args_gen",
         "//src/mongo/db/repl:replication_types_gen",
         "//src/mongo/idl:generic_argument_gen",
@@ -50,7 +50,7 @@ mongo_cc_library(
         "//src/mongo/db:commands",  # TODO(SERVER-93876): Remove.
         "//src/mongo/db:server_base",
         "//src/mongo/db:service_context",  # TODO(SERVER-93876): Remove.
-        "//src/mongo/db/ops:write_ops_parsers",
+        "//src/mongo/db/query/write_ops:write_ops_parsers",
         "//src/mongo/s:common_s",
     ],
 )
@@ -135,7 +135,7 @@ mongo_cc_library(
     ],
     deps = [
         "//src/mongo/db/commands:server_status_core",  # TODO(SERVER-93876): Remove.
-        "//src/mongo/db/ops:write_ops_parsers",
+        "//src/mongo/db/query/write_ops:write_ops_parsers",
     ],
 )
 
@@ -151,7 +151,7 @@ mongo_cc_library(
         ":update_metrics",
         "//src/mongo/db/auth",
         "//src/mongo/db/auth:authprivilege",  # TODO(SERVER-93876): Remove.
-        "//src/mongo/db/ops:write_ops_parsers",  # TODO(SERVER-93876): Remove.
         "//src/mongo/db/pipeline:lite_parsed_document_source",
+        "//src/mongo/db/query/write_ops:write_ops_parsers",  # TODO(SERVER-93876): Remove.
     ],
 )

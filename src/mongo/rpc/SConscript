@@ -13,7 +13,7 @@ env.CppLibfuzzerTest(
     ],
     LIBDEPS=[
         "$BUILD_DIR/mongo/db/concurrency/lock_manager",
-        "$BUILD_DIR/mongo/db/ops/write_ops_parsers",
+        "$BUILD_DIR/mongo/db/query/write_ops/write_ops_parsers",
         "$BUILD_DIR/mongo/transport/message_compressor",
         "message",
         "rpc",

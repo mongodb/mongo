@@ -32,9 +32,9 @@
 #include "mongo/db/curop.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/namespace_string.h"
-#include "mongo/db/ops/write_ops.h"
 #include "mongo/db/pipeline/legacy_runtime_constants_gen.h"
 #include "mongo/db/query/explain.h"
+#include "mongo/db/query/write_ops/write_ops.h"
 #include "mongo/db/session/logical_session_id.h"
 #include "mongo/util/str.h"
 

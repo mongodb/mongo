@@ -39,8 +39,8 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
-#include "mongo/db/ops/parsed_update.h"
 #include "mongo/db/pipeline/legacy_runtime_constants_gen.h"
+#include "mongo/db/query/write_ops/parsed_update.h"
 #include "mongo/db/timeseries/timeseries_gen.h"
 #include "mongo/s/request_types/cluster_commands_without_shard_key_gen.h"
 

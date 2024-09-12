@@ -34,10 +34,10 @@
 #include "mongo/db/exec/timeseries_modify.h"
 #include "mongo/db/exec/timeseries_upsert.h"
 #include "mongo/db/exec/upsert_stage.h"
-#include "mongo/db/ops/delete_request_gen.h"
 #include "mongo/db/query/plan_executor_factory.h"
 #include "mongo/db/query/plan_yield_policy_impl.h"
 #include "mongo/db/query/stage_builder/stage_builder_util.h"
+#include "mongo/db/query/write_ops/delete_request_gen.h"
 
 namespace mongo::classic_runtime_planner {
 

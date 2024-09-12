@@ -38,8 +38,8 @@
 #include "mongo/db/exec/timeseries_modify.h"
 #include "mongo/db/exec/working_set.h"
 #include "mongo/db/matcher/expression.h"
-#include "mongo/db/ops/update_request.h"
 #include "mongo/db/pipeline/expression_context.h"
+#include "mongo/db/query/write_ops/update_request.h"
 #include "mongo/db/shard_role.h"
 
 namespace mongo {

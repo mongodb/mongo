@@ -34,7 +34,7 @@
 #include "mongo/base/status.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/namespace_string.h"
-#include "mongo/db/ops/update_result.h"
+#include "mongo/db/query/write_ops/update_result.h"
 #include "mongo/db/record_id.h"
 
 namespace mongo {

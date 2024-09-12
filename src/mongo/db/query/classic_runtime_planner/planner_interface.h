@@ -38,8 +38,6 @@
 #include "mongo/db/exec/trial_stage.h"
 #include "mongo/db/exec/update_stage.h"
 #include "mongo/db/exec/working_set.h"
-#include "mongo/db/ops/parsed_delete.h"
-#include "mongo/db/ops/parsed_update.h"
 #include "mongo/db/query/classic_runtime_planner/planner_interface.h"
 #include "mongo/db/query/plan_cache/classic_plan_cache.h"
 #include "mongo/db/query/plan_executor.h"
@@ -48,6 +46,8 @@
 #include "mongo/db/query/planner_interface.h"
 #include "mongo/db/query/query_planner_params.h"
 #include "mongo/db/query/query_solution.h"
+#include "mongo/db/query/write_ops/parsed_delete.h"
+#include "mongo/db/query/write_ops/parsed_update.h"
 
 namespace mongo::classic_runtime_planner {
 

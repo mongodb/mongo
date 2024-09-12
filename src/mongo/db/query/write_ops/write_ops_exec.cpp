@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#include "mongo/db/ops/write_ops_exec.h"
+#include "mongo/db/query/write_ops/write_ops_exec.h"
 
 #include "mongo/base/error_codes.h"
 #include <absl/container/flat_hash_map.h>
@@ -86,15 +86,6 @@
 #include "mongo/db/matcher/expression.h"
 #include "mongo/db/matcher/expression_leaf.h"
 #include "mongo/db/not_primary_error_tracker.h"
-#include "mongo/db/ops/delete_request_gen.h"
-#include "mongo/db/ops/insert.h"
-#include "mongo/db/ops/parsed_delete.h"
-#include "mongo/db/ops/parsed_update.h"
-#include "mongo/db/ops/parsed_writes_common.h"
-#include "mongo/db/ops/update_request.h"
-#include "mongo/db/ops/write_ops.h"
-#include "mongo/db/ops/write_ops_gen.h"
-#include "mongo/db/ops/write_ops_retryability.h"
 #include "mongo/db/pipeline/legacy_runtime_constants_gen.h"
 #include "mongo/db/pipeline/variables.h"
 #include "mongo/db/profile_collection.h"
@@ -106,6 +97,15 @@
 #include "mongo/db/query/plan_explainer.h"
 #include "mongo/db/query/plan_summary_stats.h"
 #include "mongo/db/query/plan_yield_policy.h"
+#include "mongo/db/query/write_ops/delete_request_gen.h"
+#include "mongo/db/query/write_ops/insert.h"
+#include "mongo/db/query/write_ops/parsed_delete.h"
+#include "mongo/db/query/write_ops/parsed_update.h"
+#include "mongo/db/query/write_ops/parsed_writes_common.h"
+#include "mongo/db/query/write_ops/update_request.h"
+#include "mongo/db/query/write_ops/write_ops.h"
+#include "mongo/db/query/write_ops/write_ops_gen.h"
+#include "mongo/db/query/write_ops/write_ops_retryability.h"
 #include "mongo/db/record_id_helpers.h"
 #include "mongo/db/repl/optime.h"
 #include "mongo/db/repl/replication_coordinator.h"

@@ -29,7 +29,7 @@
 global:
     cpp_namespace: "mongo::write_ops"
     cpp_includes:
-        - "mongo/db/ops/write_ops_parsers.h"
+        - "mongo/db/query/write_ops/write_ops_parsers.h"
         - "mongo/db/repl/optime.h"
 
 imports:

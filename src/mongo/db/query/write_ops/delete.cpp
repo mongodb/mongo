@@ -34,9 +34,9 @@
 #include <boost/optional/optional.hpp>
 
 #include "mongo/db/curop.h"
-#include "mongo/db/ops/delete.h"
-#include "mongo/db/ops/parsed_delete.h"
 #include "mongo/db/query/get_executor.h"
+#include "mongo/db/query/write_ops/delete.h"
+#include "mongo/db/query/write_ops/parsed_delete.h"
 #include "mongo/db/shard_role.h"
 #include "mongo/util/assert_util.h"
 

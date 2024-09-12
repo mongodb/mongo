@@ -27,35 +27,42 @@
  *    it in the license file.
  */
 
-#include <memory>
-#include <set>
-#include <vector>
+#pragma once
 
-#include "mongo/bson/bsonelement.h"
-#include "mongo/bson/bsonobjbuilder.h"
-#include "mongo/db/ops/write_ops_parsers_test_helpers.h"
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
+
+#include "mongo/bson/bsonobj.h"
+#include "mongo/db/jsobj.h"
+#include "mongo/db/operation_context.h"
+#include "mongo/db/query/plan_executor.h"
+#include "mongo/db/query/write_ops/delete_request_gen.h"
 
 namespace mongo {
-namespace {
-std::set<StringData> sequenceFields{"documents", "updates", "deletes", "GARBAGE"};
-}
 
-OpMsgRequest toOpMsg(StringData db, const BSONObj& cmd, bool useDocSequence) {
-    OpMsgRequest request;
-    BSONObjBuilder body;
-    for (auto field : cmd) {
-        if (useDocSequence && sequenceFields.count(field.fieldNameStringData())) {
-            request.sequences.push_back(OpMsg::DocumentSequence{field.fieldName()});
-            for (auto obj : field.Obj()) {
-                request.sequences.back().objs.push_back(obj.Obj());
-            }
-        } else {
-            body.append(field);
-        }
-    }
-    body.append("$db", db);
-    request.body = body.obj();
-    return request;
-}
+class Database;
+class OperationContext;
+class CollectionAcquisition;
+
+/**
+ * Deletes objects from 'collection' that match the query predicate given by 'pattern'. If 'justOne'
+ * is true, deletes only the first matching object. The PlanExecutor used to do the deletion will
+ * not yield. If 'god' is true, deletes are allowed on system namespaces.
+ */
+long long deleteObjects(OperationContext* opCtx,
+                        const CollectionAcquisition& collection,
+                        BSONObj pattern,
+                        bool justOne,
+                        bool god = false,
+                        bool fromMigrate = false);
+
+struct DeleteResult {
+    long long nDeleted;
+    boost::optional<BSONObj> requestedPreImage;
+};
+
+DeleteResult deleteObject(OperationContext* opCtx,
+                          const CollectionAcquisition& collection,
+                          const DeleteRequest& request);
 
 }  // namespace mongo

@@ -41,7 +41,7 @@
 #include "mongo/db/coll_mod_gen.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
-#include "mongo/db/ops/write_ops.h"
+#include "mongo/db/query/write_ops/write_ops.h"
 #include "mongo/db/s/collmod_coordinator_document_gen.h"
 #include "mongo/db/s/sharded_collmod_gen.h"
 #include "mongo/db/s/sharding_ddl_coordinator.h"

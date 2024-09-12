@@ -38,7 +38,7 @@
 #include "mongo/bson/bsontypes.h"
 #include "mongo/bson/oid.h"
 #include "mongo/bson/timestamp.h"
-#include "mongo/db/ops/write_ops_parsers_test_helpers.h"
+#include "mongo/db/query/write_ops/write_ops_parsers_test_helpers.h"
 #include "mongo/s/chunk_version.h"
 #include "mongo/s/index_version.h"
 #include "mongo/s/shard_version_factory.h"

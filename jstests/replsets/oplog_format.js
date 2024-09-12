@@ -1,7 +1,8 @@
 /**
  * These tests verify that the oplog entries are created correctly for updates
  *
- * Do not add more tests here but instead add C++ unit tests in db/ops/modifier*_test files
+ * Do not add more tests here but instead add C++ unit tests in db/query/write_ops/modifier*_test
+ * files
  *
  * @tags: [
  * ]

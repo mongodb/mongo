@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#include "mongo/db/ops/parsed_update_array_filters.h"
+#include "mongo/db/query/write_ops/parsed_update_array_filters.h"
 
 #include <boost/move/utility_core.hpp>
 #include <boost/optional/optional.hpp>

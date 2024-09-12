@@ -30,7 +30,7 @@
 #include "mongo/base/data_range_cursor.h"
 #include "mongo/bson/bson_validate.h"
 #include "mongo/db/dbmessage.h"
-#include "mongo/db/ops/write_ops.h"
+#include "mongo/db/query/write_ops/write_ops.h"
 #include "mongo/rpc/factory.h"
 #include "mongo/rpc/message.h"
 #include "mongo/transport/message_compressor_manager.h"

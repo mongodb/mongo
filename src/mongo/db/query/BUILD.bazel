@@ -226,8 +226,8 @@ mongo_cc_library(
         "//src/mongo/bson/util:bson_extract",  # TODO(SERVER-93876): Remove.
         "//src/mongo/db:common",  # TODO(SERVER-93876): Remove.
         "//src/mongo/db:server_base",
-        "//src/mongo/db/ops:write_ops_parsers",
         "//src/mongo/db/query:hint_parser",
+        "//src/mongo/db/query/write_ops:write_ops_parsers",
         "//src/mongo/db/repl:optime",  # TODO(SERVER-93876): Remove.
         "//src/mongo/rpc",
         "//src/mongo/rpc:command_status",  # TODO(SERVER-93876): Remove.

@@ -54,7 +54,7 @@
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/database_name.h"
 #include "mongo/db/operation_context.h"
-#include "mongo/db/ops/single_write_result_gen.h"
+#include "mongo/db/query/write_ops/single_write_result_gen.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/timeseries/bucket_catalog/bucket.h"
 #include "mongo/db/timeseries/bucket_catalog/bucket_identifiers.h"
