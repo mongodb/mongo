@@ -265,6 +265,11 @@ selector:
     # shardCollection+moveChunk don't miss documents that get deleted by the range deleter.
     - jstests/sharding/query/lookup/lookup_targeting.js
 
+    # Commands may fail with HostUnreachable error due to having consecutive step downs on the
+    # config server, which is more likely to happen on slow variants.
+    # We'll consider re-enabling this test under SPM-3835.
+    - jstests/sharding/causal_consistency_shell_support.js
+
   exclude_with_any_tags:
     - does_not_support_stepdowns
 
