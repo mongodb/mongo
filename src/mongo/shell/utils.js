@@ -517,6 +517,7 @@ jsTestOptions = function() {
             backupOnRestartDir: TestData.backupOnRestartDir || false,
 
             evergreenTaskId: TestData.evergreenTaskId || null,
+            evergreenVariantName: TestData.evergreenVariantName || null,
             configShard: TestData.configShard || false,
 
             useAutoBootstrapProcedure: TestData.useAutoBootstrapProcedure || false,
