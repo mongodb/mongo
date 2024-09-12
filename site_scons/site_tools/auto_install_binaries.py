@@ -344,9 +344,6 @@ def auto_install_task(env, component, role):
     return list(entry.files)
 
 
-bazel_installs = set()
-
-
 def auto_install_pseudobuilder(env, target, source, **kwargs):
     """Auto install pseudo-builder."""
     source = env.Flatten([source])
@@ -380,13 +377,8 @@ def auto_install_pseudobuilder(env, target, source, **kwargs):
         # adding debug files to the runtime component file if we do not skip
         # this.
         existing_installed_files = get_auto_installed_files(env, s)
-        if "BAZEL_INSTALL" in kwargs:
-            if s in bazel_installs:
-                continue
-            bazel_installs.add(s)
-        else:
-            if existing_installed_files:
-                continue
+        if existing_installed_files:
+            continue
 
         # We must do an early subst here so that the _aib_debugdir
         # generator has a chance to run while seeing 'source'. We need

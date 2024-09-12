@@ -25,33 +25,16 @@ def create_link_dep_impl(ctx):
             for input in dep[CcInfo].linking_context.linker_inputs.to_list():
                 for library in input.libraries:
                     if library.dynamic_library:
-                        dep = library.resolved_symlink_dynamic_library.path
-                        if dep not in deps:
-                            deps.append(library.resolved_symlink_dynamic_library.path)
+                        deps.append(depset([library.resolved_symlink_dynamic_library]))
                     if library.static_library:
-                        dep = library.static_library.path
-                        if dep not in deps:
-                            deps.append(library.static_library.path)
-
-    python = ctx.toolchains["@bazel_tools//tools/python:toolchain_type"].py3_runtime
-    link_list = ctx.actions.declare_file(ctx.attr.target_name + "_links.list")
-    ctx.actions.run(
-        executable = python.interpreter.path,
-        outputs = [link_list],
-        inputs = depset(transitive = [ctx.attr._link_list_writer.files, python.files]),
-        arguments = [ctx.attr._link_list_writer.files.to_list()[0].path, link_list.path] + deps,
-        mnemonic = "LinkListFile",
-    )
-
-    return DefaultInfo(files = depset([link_list]))
+                        deps.append(depset([library.static_library]))
+    return DefaultInfo(files = depset(transitive = deps))
 
 create_link_deps = rule(
     create_link_dep_impl,
     attrs = {
-        "target_name": attr.string(),
         "link_deps": attr.label_list(providers = [CcInfo]),
-        "_link_list_writer": attr.label(allow_single_file = True, default = "//bazel:scons_link_list.py"),
     },
     doc = "create a psuedo target to query link deps for",
-    toolchains = ["@bazel_tools//tools/python:toolchain_type"],
+    fragments = ["cpp"],
 )

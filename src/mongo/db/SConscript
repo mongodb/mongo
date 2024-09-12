@@ -2156,7 +2156,6 @@ if wiredtiger:
             "$BUILD_DIR/mongo/util/clock_source_mock",
             "keys_collection_client_direct",
             "keys_collection_document",
-            "op_observer/op_observer",
             "op_observer/op_observer_impl",
             "op_observer/operation_logger_impl",
             "read_write_concern_defaults_mock",
