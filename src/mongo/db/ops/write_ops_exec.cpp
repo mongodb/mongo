@@ -2283,14 +2283,29 @@ bool shouldRetryDuplicateKeyException(const UpdateRequest& updateRequest,
         auto keyValueElem = keyValueIter.next();
 
         auto keyName = keyPatternElem.fieldNameStringData();
-        if (!equalities.count(keyName)) {
+        auto equalityIt = equalities.find(keyName);
+        if (equalityIt == equalities.end()) {
             return false;
         }
+        const BSONElement& equalityElem = equalityIt->second->getData();
 
-        // Comparison which obeys field ordering but ignores field name.
-        BSONElementComparator cmp{BSONElementComparator::FieldNamesMode::kIgnore, nullptr};
-        if (cmp.evaluate(equalities[keyName]->getData() != keyValueElem)) {
-            return false;
+        // If the index have collation and we are comparing strings, we need to compare
+        // ComparisonStrings instead of the raw value to respect collation.
+        if (!indexHasSimpleCollator && equalityElem.type() == mongo::String) {
+            if (keyValueElem.type() != BSONType::String) {
+                return false;
+            }
+            auto equalityComparisonString =
+                cq.getCollator()->getComparisonString(equalityElem.valueStringData());
+            if (equalityComparisonString != keyValueElem.valueStringData()) {
+                return false;
+            }
+        } else {
+            // Comparison which obeys field ordering but ignores field name.
+            BSONElementComparator cmp{BSONElementComparator::FieldNamesMode::kIgnore, nullptr};
+            if (cmp.evaluate(equalityElem != keyValueElem)) {
+                return false;
+            }
         }
     }
     invariant(!keyPatternIter.more());

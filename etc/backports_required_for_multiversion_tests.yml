@@ -275,6 +275,8 @@ last-continuous:
       ticket: SERVER-93153
     - test_file: jstests/change_streams/show_resharding_system_events.js
       ticket: SERVER-93153
+    - test_file: jstests/concurrency/fsm_workloads/query/update/upsert_unique_index_collation.js
+      ticket: SERVER-94156
     - test_file: jstests/core/timeseries/timeseries_filter_extended_range.js
       ticket: SERVER-94207
   suites: null
@@ -566,6 +568,8 @@ last-lts:
       ticket: SERVER-93153
     - test_file: jstests/change_streams/show_resharding_system_events.js
       ticket: SERVER-93153
+    - test_file: jstests/concurrency/fsm_workloads/query/update/upsert_unique_index_collation.js
+      ticket: SERVER-94156
     - test_file: jstests/core/timeseries/timeseries_filter_extended_range.js
       ticket: SERVER-94207
   suites: null
