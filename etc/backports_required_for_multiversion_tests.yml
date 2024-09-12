@@ -281,6 +281,8 @@ last-continuous:
       ticket: SERVER-94156
     - test_file: jstests/core/timeseries/timeseries_filter_extended_range.js
       ticket: SERVER-94207
+    - test_file: jstests/sharding/explain_find_transformed_query.js
+      ticket: SERVER-82471
   suites: null
 last-lts:
   all:
@@ -576,4 +578,6 @@ last-lts:
       ticket: SERVER-94156
     - test_file: jstests/core/timeseries/timeseries_filter_extended_range.js
       ticket: SERVER-94207
+    - test_file: jstests/sharding/explain_find_transformed_query.js
+      ticket: SERVER-82471
   suites: null

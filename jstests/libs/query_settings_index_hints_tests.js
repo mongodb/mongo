@@ -99,7 +99,10 @@ export class QuerySettingsIndexHintsTests {
             !defaultReadConcernLevel &&
             // If the test is performing initial sync it may affect the plan cache by generating an
             // additional entry.
-            !TestData.isRunningInitialSync;
+            !TestData.isRunningInitialSync &&
+            // If the test is running shard key analysis, it may affect the plan cache by generating
+            // and additional entry.
+            !TestData.isAnalyzingShardKey;
 
         if (!shouldCheckPlanCache) {
             return;

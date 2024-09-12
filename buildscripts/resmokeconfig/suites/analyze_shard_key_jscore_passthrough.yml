@@ -128,6 +128,9 @@ executor:
     shell_options:
       eval: >-
         await import("jstests/libs/override_methods/implicitly_configure_query_analyzer.js");
+      global_vars:
+        TestData:
+          isAnalyzingShardKey: true
   hooks:
     - class: AnalyzeShardKeysInBackground
     - class: CheckReplOplogs

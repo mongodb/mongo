@@ -151,74 +151,15 @@ static const BSONObj kGeoNearDistanceMetaProjection = BSON("$meta"
 
 const char kFindCmdName[] = "find";
 
-/**
- * Given the FindCommandRequest 'findCommand' being executed by mongos, returns a copy of the query
- * which is suitable for forwarding to the targeted hosts.
- */
-StatusWith<std::unique_ptr<FindCommandRequest>> transformQueryForShards(
-    const FindCommandRequest& findCommand, bool appendGeoNearDistanceProjection) {
-    // If there is a limit, we forward the sum of the limit and the skip.
-    boost::optional<int64_t> newLimit;
-    if (findCommand.getLimit()) {
-        long long newLimitValue;
-        if (overflow::add(
-                *findCommand.getLimit(), findCommand.getSkip().value_or(0), &newLimitValue)) {
-            return Status(
-                ErrorCodes::Overflow,
-                str::stream()
-                    << "sum of limit and skip cannot be represented as a 64-bit integer, limit: "
-                    << *findCommand.getLimit() << ", skip: " << findCommand.getSkip().value_or(0));
-        }
-        newLimit = newLimitValue;
-    }
-
-    // If there is a sort other than $natural, we send a sortKey meta-projection to the remote node.
-    BSONObj newProjection = findCommand.getProjection();
-    if (!findCommand.getSort().isEmpty() &&
-        !findCommand.getSort()[query_request_helper::kNaturalSortField]) {
-        BSONObjBuilder projectionBuilder;
-        projectionBuilder.appendElements(findCommand.getProjection());
-        projectionBuilder.append(AsyncResultsMerger::kSortKeyField, kSortKeyMetaProjection);
-        newProjection = projectionBuilder.obj();
-    }
-
-    if (appendGeoNearDistanceProjection) {
-        invariant(findCommand.getSort().isEmpty());
-        BSONObjBuilder projectionBuilder;
-        projectionBuilder.appendElements(findCommand.getProjection());
-        projectionBuilder.append(AsyncResultsMerger::kSortKeyField, kGeoNearDistanceMetaProjection);
-        newProjection = projectionBuilder.obj();
-    }
-
-    auto newQR = std::make_unique<FindCommandRequest>(findCommand);
-    newQR->setProjection(newProjection);
-    newQR->setSkip(boost::none);
-    newQR->setLimit(newLimit);
-
-    // Even if the client sends us singleBatch=true, we may need to retrieve
-    // multiple batches from a shard in order to return the single requested batch to the client.
-    // Therefore, we must always send singleBatch=false to the shards.
-    newQR->setSingleBatch(false);
-
-    // Any expansion of the 'showRecordId' flag should have already happened on mongos.
-    if (newQR->getShowRecordId())
-        newQR->setShowRecordId(false);
-
-    uassertStatusOK(query_request_helper::validateFindCommandRequest(*newQR));
-    return std::move(newQR);
-}
-
 std::unique_ptr<FindCommandRequest> makeFindCommandForShards(OperationContext* opCtx,
                                                              const std::set<ShardId>& shardIds,
                                                              const CanonicalQuery& query,
                                                              const boost::optional<UUID> sampleId,
-                                                             bool appendGeoNearDistanceProjection,
                                                              bool requestQueryStatsFromRemotes,
                                                              const UUID& opKey) {
     std::unique_ptr<FindCommandRequest> findCommand;
     if (shardIds.size() > 1) {
-        findCommand = uassertStatusOK(transformQueryForShards(query.getFindCommandRequest(),
-                                                              appendGeoNearDistanceProjection));
+        findCommand = uassertStatusOK(ClusterFind::transformQueryForShards(query));
     } else {
         // Forwards the FindCommandRequest as is to a single shard so that limit and skip can
         // be applied on mongod.
@@ -287,7 +228,6 @@ std::vector<AsyncRequestsSender::Request> constructRequestsForShards(
     const std::set<ShardId>& shardIds,
     const CanonicalQuery& query,
     const boost::optional<UUID> sampleId,
-    bool appendGeoNearDistanceProjection,
     bool requestQueryStatsFromRemotes,
     const auto& opKey) {
     const auto& cm = cri.cm;
@@ -315,13 +255,8 @@ std::vector<AsyncRequestsSender::Request> constructRequestsForShards(
 
     // Constructs the shard request by appending additional attributes to the serialized
     // 'findCommandToForward'.
-    const auto findCommandToForward = makeFindCommandForShards(opCtx,
-                                                               shardIds,
-                                                               query,
-                                                               sampleId,
-                                                               appendGeoNearDistanceProjection,
-                                                               requestQueryStatsFromRemotes,
-                                                               opKey);
+    const auto findCommandToForward = makeFindCommandForShards(
+        opCtx, shardIds, query, sampleId, requestQueryStatsFromRemotes, opKey);
 
     auto shardRegistry = Grid::get(opCtx)->shardRegistry();
     auto makeShardRequest = [&](const auto& shardId) {
@@ -416,17 +351,15 @@ CursorId runQueryWithoutRetrying(OperationContext* opCtx,
                                 .toBson();
     }
 
-    bool appendGeoNearDistanceProjection = false;
     bool compareWholeSortKeyOnRouter = false;
     if (!query.getSortPattern() &&
         QueryPlannerCommon::hasNode(query.getPrimaryMatchExpression(), MatchExpression::GEO_NEAR)) {
         // There is no specified sort, and there is a GEO_NEAR node. This means we should merge sort
-        // by the geoNearDistance. Request the projection {$sortKey: <geoNearDistance>} from the
-        // shards. Indicate to the AsyncResultsMerger that it should extract the sort key
+        // by the geoNearDistance. Indicate to the AsyncResultsMerger that it should extract the
+        // sort key
         // {"$sortKey": <geoNearDistance>} and sort by the order {"$sortKey": 1}.
         sortComparatorObj = AsyncResultsMerger::kWholeSortKeySortPattern;
         compareWholeSortKeyOnRouter = true;
-        appendGeoNearDistanceProjection = true;
     }
 
     // Tailable cursors can't have a sort, which should have already been validated.
@@ -456,14 +389,8 @@ CursorId runQueryWithoutRetrying(OperationContext* opCtx,
         // shards, attaching the shardVersion and session info, if necessary. Attach our own
         // OperationKey as well so establishCursors won't copy each request.
         std::vector<OperationKey> opKeys{UUID::gen()};
-        auto requests = constructRequestsForShards(opCtx,
-                                                   cri,
-                                                   shardIds,
-                                                   query,
-                                                   sampleId,
-                                                   appendGeoNearDistanceProjection,
-                                                   requestQueryStatsFromRemotes,
-                                                   opKeys.front());
+        auto requests = constructRequestsForShards(
+            opCtx, cri, shardIds, query, sampleId, requestQueryStatsFromRemotes, opKeys.front());
 
         // The call to establishCursors has its own timeout mechanism that is controlled by the
         // opCtx, so we don't expect runWithDeadline to throw a timeout at this level. We use
@@ -927,6 +854,65 @@ void validateOperationSessionInfo(OperationContext* opCtx,
     validateLSID(opCtx, cursorId, *cursor);
     validateTxnNumber(opCtx, cursorId, *cursor);
     returnCursorGuard.dismiss();
+}
+
+StatusWith<std::unique_ptr<FindCommandRequest>> ClusterFind::transformQueryForShards(
+    const CanonicalQuery& query) {
+    const FindCommandRequest& findCommand = query.getFindCommandRequest();
+
+    // If there is a limit, we forward the sum of the limit and the skip.
+    boost::optional<int64_t> newLimit;
+    if (findCommand.getLimit()) {
+        long long newLimitValue;
+        if (overflow::add(
+                *findCommand.getLimit(), findCommand.getSkip().value_or(0), &newLimitValue)) {
+            return Status(
+                ErrorCodes::Overflow,
+                str::stream()
+                    << "sum of limit and skip cannot be represented as a 64-bit integer, limit: "
+                    << *findCommand.getLimit() << ", skip: " << findCommand.getSkip().value_or(0));
+        }
+        newLimit = newLimitValue;
+    }
+
+    // If there is a sort other than $natural, we send a sortKey meta-projection to the remote node.
+    BSONObj newProjection = findCommand.getProjection();
+    if (!findCommand.getSort().isEmpty() &&
+        !findCommand.getSort()[query_request_helper::kNaturalSortField]) {
+        BSONObjBuilder projectionBuilder;
+        projectionBuilder.appendElements(findCommand.getProjection());
+        projectionBuilder.append(AsyncResultsMerger::kSortKeyField, kSortKeyMetaProjection);
+        newProjection = projectionBuilder.obj();
+    }
+
+    // There is no specified sort, and there is a GEO_NEAR node. This means we should merge sort
+    // by the geoNearDistance. Request the projection {$sortKey: <geoNearDistance>} from the
+    // shards.
+    if (!query.getSortPattern() &&
+        QueryPlannerCommon::hasNode(query.getPrimaryMatchExpression(), MatchExpression::GEO_NEAR)) {
+        invariant(findCommand.getSort().isEmpty());
+        BSONObjBuilder projectionBuilder;
+        projectionBuilder.appendElements(findCommand.getProjection());
+        projectionBuilder.append(AsyncResultsMerger::kSortKeyField, kGeoNearDistanceMetaProjection);
+        newProjection = projectionBuilder.obj();
+    }
+
+    std::unique_ptr<FindCommandRequest> newQR = std::make_unique<FindCommandRequest>(findCommand);
+    newQR->setProjection(newProjection);
+    newQR->setSkip(boost::none);
+    newQR->setLimit(newLimit);
+
+    // Even if the client sends us singleBatch=true, we may need to retrieve
+    // multiple batches from a shard in order to return the single requested batch to the client.
+    // Therefore, we must always send singleBatch=false to the shards.
+    newQR->setSingleBatch(false);
+
+    // Any expansion of the 'showRecordId' flag should have already happened on mongos.
+    if (newQR->getShowRecordId())
+        newQR->setShowRecordId(false);
+
+    uassertStatusOK(query_request_helper::validateFindCommandRequest(*newQR));
+    return std::move(newQR);
 }
 
 StatusWith<CursorResponse> ClusterFind::runGetMore(OperationContext* opCtx,

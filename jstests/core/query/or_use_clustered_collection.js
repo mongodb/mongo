@@ -152,6 +152,7 @@ function validateQueryPlan({query, expectedStageCount, expectedDocIds, noFetchWi
         const count = test.additionalStages.hasOwnProperty('COUNT');
         const fetch = expectedStageCount.hasOwnProperty('FETCH');
         const group = test.additionalStages.hasOwnProperty('GROUP');
+        const skip = test.additionalStages.hasOwnProperty('SKIP');
         if (noFetchWithCount && (count || group) && fetch) {
             expectedStageCount["FETCH"] = 0;
         }
@@ -159,6 +160,11 @@ function validateQueryPlan({query, expectedStageCount, expectedDocIds, noFetchWi
         // Classic engine doesn't have a GROUP stage like SBE for $group.
         if (group && !isSbeGroupEnabled) {
             test.additionalStages["GROUP"] = 0;
+        }
+
+        // The SKIP stage isn't forwarded to the shards when the query is transformed.
+        if (skip && (shardMergeStage || shards)) {
+            test.additionalStages["SKIP"] = 0;
         }
 
         // Validate all the stages appear the correct number of times in the winning plan.
@@ -180,7 +186,6 @@ function validateQueryPlan({query, expectedStageCount, expectedDocIds, noFetchWi
 
         const projection = test.additionalStages.hasOwnProperty('PROJECTION_SIMPLE');
         const limit = test.additionalStages.hasOwnProperty('LIMIT');
-        const skip = test.additionalStages.hasOwnProperty('SKIP');
         if (count || group) {
             // If we have GROUP stage we are in an aggregation pipeline.
             let results = group ? test.actualQuery.toArray()[0]["count"] : test.actualQuery;

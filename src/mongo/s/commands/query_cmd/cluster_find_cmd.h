@@ -29,6 +29,8 @@
 
 #pragma once
 
+#include "mongo/db/query/find_command.h"
+#include "mongo/db/query/parsed_find_command.h"
 #include <boost/optional.hpp>
 
 #include "mongo/client/read_preference.h"
@@ -38,6 +40,7 @@
 #include "mongo/db/fle_crud.h"
 #include "mongo/db/pipeline/query_request_conversion.h"
 #include "mongo/db/query/cursor_response.h"
+#include "mongo/db/query/query_planner_common.h"
 #include "mongo/db/query/query_settings/query_settings_utils.h"
 #include "mongo/db/query/query_stats/find_key.h"
 #include "mongo/db/query/query_stats/query_stats.h"
@@ -200,12 +203,16 @@ public:
             auto querySettings =
                 query_settings::lookupQuerySettingsForFind(expCtx, *parsedFind, ns());
             expCtx->setQuerySettingsIfNotPresent(querySettings);
-            _cmdRequest = std::move(parsedFind->findCommandRequest);
+
+            auto cq = CanonicalQuery(CanonicalQueryParams{
+                .expCtx = std::move(expCtx),
+                .parsedFind = std::move(parsedFind),
+            });
+
+            _cmdRequest = std::make_unique<FindCommandRequest>(cq.getFindCommandRequest());
+            expCtx = makeExpressionContext(opCtx, *_cmdRequest, verbosity);
 
             try {
-                const auto explainCmd = ClusterExplain::wrapAsExplain(
-                    _cmdRequest->toBSON(), verbosity, querySettings.toBSON());
-
                 long long millisElapsed;
                 std::vector<AsyncRequestsSender::Response> shardResponses;
 
@@ -213,7 +220,18 @@ public:
                 Timer timer;
                 const auto cri =
                     uassertStatusOK(Grid::get(opCtx)->catalogCache()->getCollectionRoutingInfo(
-                        opCtx, _cmdRequest->getNamespaceOrUUID().nss()));
+                        opCtx, cq.getFindCommandRequest().getNamespaceOrUUID().nss()));
+
+                auto numShards = getTargetedShardsForCanonicalQuery(cq, cri.cm).size();
+                // When forwarding the command to multiple shards, need to transform it by adjusting
+                // query parameters such as limits and sorts.
+                if (numShards > 1) {
+                    _cmdRequest = uassertStatusOK(ClusterFind::transformQueryForShards(cq));
+                }
+
+                const auto explainCmd = ClusterExplain::wrapAsExplain(
+                    _cmdRequest->toBSON(), verbosity, querySettings.toBSON());
+
                 shardResponses = scatterGatherVersionedTargetByRoutingTable(
                     opCtx,
                     _cmdRequest->getNamespaceOrUUID().nss().dbName(),

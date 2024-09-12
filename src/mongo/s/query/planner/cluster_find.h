@@ -77,6 +77,13 @@ public:
      */
     static StatusWith<CursorResponse> runGetMore(OperationContext* opCtx,
                                                  const GetMoreCommandRequest& cmd);
+
+    /**
+     * Given the query being executed by mongos, returns a copy of the
+     * query which is suitable for forwarding to the targeted hosts.
+     */
+    static StatusWith<std::unique_ptr<FindCommandRequest>> transformQueryForShards(
+        const CanonicalQuery& query);
 };
 
 }  // namespace mongo
