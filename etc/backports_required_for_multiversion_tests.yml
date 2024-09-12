@@ -263,6 +263,8 @@ last-continuous:
       ticket: SERVER-94151
     - test_file: jstests/core/write/update/upsert_duplicate_key_retry_collation.js
       ticket: SERVER-84089
+    - test_file: jstests/replsets/max_seven_voting_members_allowed.js
+      ticket: SERVER-69418
     - test_file: jstests/core/ddl/create_indexes.js
       ticket: SERVER-90952
     - test_file: jstests/aggregation/bugs/server94212.js
@@ -556,6 +558,8 @@ last-lts:
       ticket: SERVER-94151
     - test_file: jstests/core/write/update/upsert_duplicate_key_retry_collation.js
       ticket: SERVER-84089
+    - test_file: jstests/replsets/max_seven_voting_members_allowed.js
+      ticket: SERVER-69418
     - test_file: jstests/core/ddl/create_indexes.js
       ticket: SERVER-90952
     - test_file: jstests/aggregation/bugs/server94212.js
