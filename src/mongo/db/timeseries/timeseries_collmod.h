@@ -42,15 +42,17 @@ namespace timeseries {
 
 /**
  * Returns a CollMod on the underlying buckets collection of the time-series collection.
+ * Returns null if 'origCmd' is not for a time-series collection.
  */
-std::unique_ptr<CollMod> makeTimeseriesBucketsCollModCommand(TimeseriesOptions& timeseriesOptions,
+std::unique_ptr<CollMod> makeTimeseriesBucketsCollModCommand(OperationContext* opCtx,
                                                              const CollMod& origCmd);
 
 /**
- * Returns a CollMod on the view definition of the time-series collection. Returns null if the view
- * definition need not be changed or if the modifications are invalid.
+ * Returns a CollMod on the view definition of the time-series collection.
+ * Returns null if 'origCmd' is not for a time-series collection or if the view definition need not
+ * be changed.
  */
-std::unique_ptr<CollMod> makeTimeseriesViewCollModCommand(TimeseriesOptions& timeseriesOptions,
+std::unique_ptr<CollMod> makeTimeseriesViewCollModCommand(OperationContext* opCtx,
                                                           const CollMod& origCmd);
 
 /**

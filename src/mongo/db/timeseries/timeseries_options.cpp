@@ -224,15 +224,10 @@ Status isTimeseriesGranularityValidAndUnchanged(const TimeseriesOptions& current
         }
     }
 
-    // Fall back to values derived from granularity, then to values from default granularity if not
-    // specified.
-    int32_t currentMaxSpanSeconds =
-        currentOptions.getBucketMaxSpanSeconds().value_or(getMaxSpanSecondsFromGranularity(
-            currentGranularity.value_or(BucketGranularityEnum::Seconds)));
-
-    int32_t currentBucketRoundingSeconds = currentOptions.getBucketRoundingSeconds().value_or(
-        timeseries::getBucketRoundingSecondsFromGranularity(
-            currentGranularity.value_or(BucketGranularityEnum::Seconds)));
+    int32_t currentMaxSpanSeconds = currentOptions.getBucketMaxSpanSeconds().get();
+    int32_t currentBucketRoundingSeconds = (currentOptions.getBucketRoundingSeconds())
+        ? currentOptions.getBucketRoundingSeconds().get()
+        : timeseries::getBucketRoundingSecondsFromGranularity(*currentGranularity);
 
     // Check if we are trying to set the bucketing parameters to the existing values. If so, we do
     // not need to update any existing options.
