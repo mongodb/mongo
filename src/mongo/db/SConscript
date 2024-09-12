@@ -1442,6 +1442,7 @@ env.Library(
     target='sessions_collection',
     source=[
         'sessions_collection.cpp',
+        'sessions_server_parameters.idl'
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/base',
