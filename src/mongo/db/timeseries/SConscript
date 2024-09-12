@@ -69,6 +69,24 @@ env.Library(
     ],
 )
 
+env.CppUnitTest(
+    target="timeseries_collmod_test",
+    source=[
+        "timeseries_collmod_test.cpp",
+    ],
+    LIBDEPS=[
+        "$BUILD_DIR/mongo/db/catalog/catalog_helpers",
+        "$BUILD_DIR/mongo/db/catalog/catalog_test_fixture",
+        "$BUILD_DIR/mongo/db/catalog/collection_catalog",
+        "$BUILD_DIR/mongo/db/coll_mod_command_idl",
+        "$BUILD_DIR/mongo/db/commands/create_command",
+        "$BUILD_DIR/mongo/db/service_context_d_test_fixture",
+        "$BUILD_DIR/mongo/db/shard_role",
+        "timeseries_collmod",
+        "timeseries_write_util",
+    ],
+)
+
 env.Library(
     target="timeseries_write_util",
     source=[
