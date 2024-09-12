@@ -10,6 +10,7 @@
 //   not_allowed_with_signed_security_token,
 // ]
 
+import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {getLatestProfilerEntry} from "jstests/libs/profiler.js";
 
 const testDB = db.getSiblingDB(jsTestName());
@@ -66,6 +67,10 @@ function testPushedDownSBEPlanReplanning(match1, match2, pushedDownStage) {
 })();
 
 (function testPushedDownGroupReplanning() {
-    testPushedDownSBEPlanReplanning(
-        {$match: {a: 5, b: 15}}, {$match: {a: 15, b: 10}}, {$group: {_id: "$a"}});
+    const featureShardFilteringDistinctScan =
+        FeatureFlagUtil.isEnabled(testDB, "ShardFilteringDistinctScan");
+    if (!featureShardFilteringDistinctScan) {
+        testPushedDownSBEPlanReplanning(
+            {$match: {a: 5, b: 15}}, {$match: {a: 15, b: 10}}, {$group: {_id: "$a"}});
+    }
 })();
