@@ -29,11 +29,6 @@ class ContinuousStepdown(interface.Hook):
     # The hook stops the fixture partially during its execution.
     STOPS_FIXTURE = True
 
-    # The various kill methods this hook can execute.
-    STEPDOWN = 0
-    TERMINATE = 1
-    KILL = 2
-
     def __init__(
         self,
         hook_logger,
@@ -59,7 +54,7 @@ class ContinuousStepdown(interface.Hook):
             stepdown_interval_ms: the number of milliseconds between stepdowns.
             terminate: shut down the node cleanly as a means of stepping it down.
             kill: With a 50% probability, kill the node instead of shutting it down cleanly.
-            randomize_kill: Randomly kill, terminate or stepdown.
+            randomize_kill: With a 50% probability set kill=True, otherwise do normal stepdown.
             use_action_permitted_file: use a file to control if stepdown thread should do a stepdown.
             auth_options: dictionary of auth options.
             background_reconfig: whether to conduct reconfig in the background.
@@ -84,10 +79,12 @@ class ContinuousStepdown(interface.Hook):
         self._mongos_fixtures = []
         self._stepdown_thread = None
 
+        if randomize_kill:
+            kill = random.choice([True, False])
+
         # kill implies terminate.
         self._terminate = terminate or kill
         self._kill = kill
-        self._randomize_kill = randomize_kill
 
         self._background_reconfig = background_reconfig
         self._auth_options = auth_options
@@ -124,7 +121,6 @@ class ContinuousStepdown(interface.Hook):
             self._stepdown_interval_secs,
             self._terminate,
             self._kill,
-            self._randomize_kill,
             lifecycle,
             self._background_reconfig,
             self._fixture,
@@ -184,7 +180,6 @@ class _StepdownThread(threading.Thread):
         stepdown_interval_secs,
         terminate,
         kill,
-        randomize_kill,
         stepdown_lifecycle,
         background_reconfig,
         fixture,
@@ -204,7 +199,6 @@ class _StepdownThread(threading.Thread):
         self._stepdown_duration_secs = 24 * 60 * 60  # 24 hours
         self._terminate = terminate
         self._kill = kill
-        self._randomize_kill = randomize_kill
         self.__lifecycle = stepdown_lifecycle
         self._background_reconfig = background_reconfig
         self._fixture = fixture
@@ -343,21 +337,8 @@ class _StepdownThread(threading.Thread):
             old_primary.port,
             rs_fixture.replset_name,
         )
-
-        kill_method = ContinuousStepdown.STEPDOWN
-        if self._randomize_kill:
-            kill_method = random.choice(
-                [ContinuousStepdown.STEPDOWN, ContinuousStepdown.TERMINATE, ContinuousStepdown.KILL]
-            )
-        elif self._kill:
-            kill_method = random.choice([ContinuousStepdown.TERMINATE, ContinuousStepdown.KILL])
-        elif self._terminate:
-            kill_method = ContinuousStepdown.TERMINATE
-
-        if kill_method == ContinuousStepdown.KILL or kill_method == ContinuousStepdown.TERMINATE:
-            if not rs_fixture.stop_primary(
-                old_primary, self._background_reconfig, kill_method == ContinuousStepdown.KILL
-            ):
+        if self._terminate:
+            if not rs_fixture.stop_primary(old_primary, self._background_reconfig, self._kill):
                 return
 
         if self._should_downgrade:
@@ -386,7 +367,7 @@ class _StepdownThread(threading.Thread):
 
             new_primary = step_up_secondary()
 
-        if kill_method == ContinuousStepdown.KILL or kill_method == ContinuousStepdown.TERMINATE:
+        if self._terminate:
             rs_fixture.restart_node(old_primary)
 
         if secondaries:

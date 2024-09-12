@@ -809,7 +809,7 @@ class ReplicaSetFixture(interface.ReplFixture, interface._DockerComposeInterface
             )
         self.logger.info("Read concern is available on all nodes")
 
-    def stop_primary(self, primary, background_reconfig, should_kill):
+    def stop_primary(self, primary, background_reconfig, kill):
         """Stop the primary node method."""
         # Check that the fixture is still running before stepping down or killing the primary.
         # This ensures we still detect some cases in which the fixture has already crashed.
@@ -835,6 +835,7 @@ class ReplicaSetFixture(interface.ReplFixture, interface._DockerComposeInterface
                 # elect a new primary.
                 return False
 
+        should_kill = kill and random.choice([True, False])
         action = "Killing" if should_kill else "Terminating"
         self.logger.info(
             "%s the primary on port %d of replica set '%s'.",

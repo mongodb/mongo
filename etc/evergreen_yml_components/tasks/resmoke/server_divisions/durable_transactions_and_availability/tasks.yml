@@ -451,7 +451,25 @@ tasks:
           resmoke_jobs_max: 1
 
   - <<: *gen_task_template
-    name: concurrency_sharded_multi_stmt_txn_stepdown_terminate_kill_primary_gen
+    name: concurrency_sharded_multi_stmt_txn_kill_primary_gen
+    tags:
+      [
+        "assigned_to_jira_team_server_repl",
+        "default",
+        "incompatible_debug_mode",
+        "concurrency",
+        "stepdowns",
+        "kill_terminate",
+        "sharded",
+      ]
+    commands:
+      - func: "generate resmoke tasks"
+        vars:
+          use_large_distro: "true"
+          resmoke_jobs_max: 1
+
+  - <<: *gen_task_template
+    name: concurrency_sharded_multi_stmt_txn_terminate_primary_gen
     tags:
       [
         "assigned_to_jira_team_server_repl",
