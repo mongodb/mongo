@@ -45,6 +45,7 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/catalog/import_options.h"
+#include "mongo/db/catalog/validate_results.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/storage/durable_catalog.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_recovery_unit.h"
@@ -405,9 +406,7 @@ public:
                                      StringData uri,
                                      bool isLogged,
                                      boost::optional<StringData> indexName,
-                                     bool& valid,
-                                     std::vector<std::string>& errors,
-                                     std::vector<std::string>& warnings);
+                                     ValidateResultsIf& validationResult);
 
     static bool useTableLogging(const NamespaceString& nss);
 

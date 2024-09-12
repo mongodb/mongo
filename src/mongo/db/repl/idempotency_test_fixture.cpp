@@ -416,7 +416,7 @@ CollectionState IdempotencyTest::validate(const NamespaceString& nss) {
                                            &validateResults,
                                            &bob,
                                            /*logDiagnostics=*/false));
-        ASSERT_TRUE(validateResults.valid);
+        ASSERT_TRUE(validateResults.isValid());
     }
 
     AutoGetCollectionForReadCommand collection(_opCtx.get(), _nss);

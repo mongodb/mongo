@@ -113,7 +113,7 @@ const bool kLogDiagnostics = true;
 
 std::size_t omitTransientWarningsFromCount(const ValidateResults& results) {
     return std::count_if(
-        results.warnings.begin(), results.warnings.end(), [](const std::string& elem) {
+        results.getWarnings().begin(), results.getWarnings().end(), [](const std::string& elem) {
             std::string endMsg =
                 "This is a transient issue as the collection was actively in use by other "
                 "operations.";
@@ -235,7 +235,7 @@ protected:
                                                  kLogDiagnostics));
 
         //  Check if errors are reported if and only if valid is set to false.
-        ASSERT_EQ(results.valid, results.errors.empty());
+        ASSERT_EQ(results.isValid(), results.getErrors().empty());
 
         if (_full) {
             BSONObj outputObj = output.done();
@@ -244,7 +244,7 @@ protected:
                 BSONObj indexDetail(elem.value());
                 allIndexesValid = indexDetail["valid"].boolean() ? allIndexesValid : false;
             }
-            ASSERT_EQ(results.valid, allIndexesValid);
+            ASSERT_EQ(results.isValid(), allIndexesValid);
         }
 
         return results;
@@ -258,7 +258,7 @@ protected:
             StorageDebugUtil::printCollectionAndIndexTableEntries(&_opCtx, _nss);
         });
 
-        ASSERT_TRUE(results.valid) << "Validation failed when it should've worked.";
+        ASSERT_TRUE(results.isValid()) << "Validation failed when it should've worked.";
 
         dumpOnErrorGuard.dismiss();
     }
@@ -271,10 +271,10 @@ protected:
             StorageDebugUtil::printCollectionAndIndexTableEntries(&_opCtx, _nss);
         });
 
-        ASSERT_TRUE(results.valid) << "Validation failed when it should've worked.";
-        ASSERT_TRUE(results.errors.empty())
+        ASSERT_TRUE(results.isValid()) << "Validation failed when it should've worked.";
+        ASSERT_TRUE(results.getErrors().empty())
             << "Validation reported errors when it should not have.";
-        ASSERT_FALSE(results.warnings.empty())
+        ASSERT_FALSE(results.getWarnings().empty())
             << "Validation did not report a warning when it should have.";
 
         dumpOnErrorGuard.dismiss();
@@ -288,7 +288,7 @@ protected:
             StorageDebugUtil::printCollectionAndIndexTableEntries(&_opCtx, _nss);
         });
 
-        ASSERT_FALSE(results.valid) << "Validation worked when it should've failed.";
+        ASSERT_FALSE(results.isValid()) << "Validation worked when it should've failed.";
 
         dumpOnErrorGuard.dismiss();
     }
@@ -1333,11 +1333,11 @@ public:
                 StorageDebugUtil::printCollectionAndIndexTableEntries(&_opCtx, coll()->ns());
             });
 
-            ASSERT_EQ(false, results.valid);
-            ASSERT_EQ(static_cast<size_t>(1), results.errors.size());
+            ASSERT_EQ(false, results.isValid());
+            ASSERT_EQ(static_cast<size_t>(1), results.getErrors().size());
             ASSERT_EQ(static_cast<size_t>(2), omitTransientWarningsFromCount(results));
-            ASSERT_EQ(static_cast<size_t>(1), results.extraIndexEntries.size());
-            ASSERT_EQ(static_cast<size_t>(1), results.missingIndexEntries.size());
+            ASSERT_EQ(static_cast<size_t>(1), results.getExtraIndexEntries().size());
+            ASSERT_EQ(static_cast<size_t>(1), results.getMissingIndexEntries().size());
 
             dumpOnErrorGuard.dismiss();
         }
@@ -1445,11 +1445,11 @@ public:
                 StorageDebugUtil::printCollectionAndIndexTableEntries(&_opCtx, coll()->ns());
             });
 
-            ASSERT_EQ(false, results.valid);
-            ASSERT_EQ(static_cast<size_t>(1), results.errors.size());
+            ASSERT_EQ(false, results.isValid());
+            ASSERT_EQ(static_cast<size_t>(1), results.getErrors().size());
             ASSERT_EQ(static_cast<size_t>(1), omitTransientWarningsFromCount(results));
-            ASSERT_EQ(static_cast<size_t>(0), results.extraIndexEntries.size());
-            ASSERT_EQ(static_cast<size_t>(1), results.missingIndexEntries.size());
+            ASSERT_EQ(static_cast<size_t>(0), results.getExtraIndexEntries().size());
+            ASSERT_EQ(static_cast<size_t>(1), results.getMissingIndexEntries().size());
 
             dumpOnErrorGuard.dismiss();
         }
@@ -1528,11 +1528,11 @@ public:
                 StorageDebugUtil::printCollectionAndIndexTableEntries(&_opCtx, coll()->ns());
             });
 
-            ASSERT_EQ(false, results.valid);
-            ASSERT_EQ(static_cast<size_t>(2), results.errors.size());
+            ASSERT_EQ(false, results.isValid());
+            ASSERT_EQ(static_cast<size_t>(2), results.getErrors().size());
             ASSERT_EQ(static_cast<size_t>(1), omitTransientWarningsFromCount(results));
-            ASSERT_EQ(static_cast<size_t>(2), results.extraIndexEntries.size());
-            ASSERT_EQ(static_cast<size_t>(0), results.missingIndexEntries.size());
+            ASSERT_EQ(static_cast<size_t>(2), results.getExtraIndexEntries().size());
+            ASSERT_EQ(static_cast<size_t>(0), results.getMissingIndexEntries().size());
 
             dumpOnErrorGuard.dismiss();
         }
@@ -1637,11 +1637,11 @@ public:
                 StorageDebugUtil::printCollectionAndIndexTableEntries(&_opCtx, coll()->ns());
             });
 
-            ASSERT_EQ(false, results.valid);
-            ASSERT_EQ(static_cast<size_t>(2), results.errors.size());
+            ASSERT_EQ(false, results.isValid());
+            ASSERT_EQ(static_cast<size_t>(2), results.getErrors().size());
             ASSERT_EQ(static_cast<size_t>(2), omitTransientWarningsFromCount(results));
-            ASSERT_EQ(static_cast<size_t>(3), results.extraIndexEntries.size());
-            ASSERT_EQ(static_cast<size_t>(3), results.missingIndexEntries.size());
+            ASSERT_EQ(static_cast<size_t>(3), results.getExtraIndexEntries().size());
+            ASSERT_EQ(static_cast<size_t>(3), results.getMissingIndexEntries().size());
 
             dumpOnErrorGuard.dismiss();
         }
@@ -1671,17 +1671,17 @@ public:
             });
 
 
-            ASSERT_EQ(true, results.valid);
-            ASSERT_EQ(true, results.repaired);
-            ASSERT_EQ(static_cast<size_t>(0), results.errors.size());
+            ASSERT_EQ(true, results.isValid());
+            ASSERT_EQ(true, results.getRepaired());
+            ASSERT_EQ(static_cast<size_t>(0), results.getErrors().size());
             ASSERT_EQ(static_cast<size_t>(2), omitTransientWarningsFromCount(results));
-            ASSERT_EQ(static_cast<size_t>(0), results.extraIndexEntries.size());
-            ASSERT_EQ(static_cast<size_t>(0), results.missingIndexEntries.size());
-            ASSERT_EQ(3, results.numRemovedExtraIndexEntries);
-            ASSERT_EQ(3, results.numInsertedMissingIndexEntries);
+            ASSERT_EQ(static_cast<size_t>(0), results.getExtraIndexEntries().size());
+            ASSERT_EQ(static_cast<size_t>(0), results.getMissingIndexEntries().size());
+            ASSERT_EQ(3, results.getNumRemovedExtraIndexEntries());
+            ASSERT_EQ(3, results.getNumInsertedMissingIndexEntries());
 
-            ASSERT_EQ(3, results.indexResultsMap[indexNameA].keysTraversed);
-            ASSERT_EQ(3, results.indexResultsMap[indexNameB].keysTraversed);
+            ASSERT_EQ(3, results.getIndexValidateResult(indexNameA).getKeysTraversed());
+            ASSERT_EQ(3, results.getIndexValidateResult(indexNameB).getKeysTraversed());
 
             dumpOnErrorGuard.dismiss();
         }
@@ -1710,14 +1710,14 @@ public:
                 StorageDebugUtil::printCollectionAndIndexTableEntries(&_opCtx, coll()->ns());
             });
 
-            ASSERT_EQ(true, results.valid);
-            ASSERT_EQ(false, results.repaired);
-            ASSERT_EQ(static_cast<size_t>(0), results.errors.size());
+            ASSERT_EQ(true, results.isValid());
+            ASSERT_EQ(false, results.getRepaired());
+            ASSERT_EQ(static_cast<size_t>(0), results.getErrors().size());
             ASSERT_EQ(static_cast<size_t>(0), omitTransientWarningsFromCount(results));
-            ASSERT_EQ(static_cast<size_t>(0), results.extraIndexEntries.size());
-            ASSERT_EQ(static_cast<size_t>(0), results.missingIndexEntries.size());
-            ASSERT_EQ(0, results.numRemovedExtraIndexEntries);
-            ASSERT_EQ(0, results.numInsertedMissingIndexEntries);
+            ASSERT_EQ(static_cast<size_t>(0), results.getExtraIndexEntries().size());
+            ASSERT_EQ(static_cast<size_t>(0), results.getMissingIndexEntries().size());
+            ASSERT_EQ(0, results.getNumRemovedExtraIndexEntries());
+            ASSERT_EQ(0, results.getNumInsertedMissingIndexEntries());
 
             dumpOnErrorGuard.dismiss();
         }
@@ -1827,14 +1827,14 @@ public:
                 StorageDebugUtil::printCollectionAndIndexTableEntries(&_opCtx, coll()->ns());
             });
 
-            ASSERT_EQ(false, results.valid);
-            ASSERT_EQ(false, results.repaired);
-            ASSERT_EQ(static_cast<size_t>(1), results.errors.size());
+            ASSERT_EQ(false, results.isValid());
+            ASSERT_EQ(false, results.getRepaired());
+            ASSERT_EQ(static_cast<size_t>(1), results.getErrors().size());
             ASSERT_EQ(static_cast<size_t>(1), omitTransientWarningsFromCount(results));
-            ASSERT_EQ(static_cast<size_t>(0), results.extraIndexEntries.size());
-            ASSERT_EQ(static_cast<size_t>(1), results.missingIndexEntries.size());
-            ASSERT_EQ(0, results.numRemovedExtraIndexEntries);
-            ASSERT_EQ(0, results.numInsertedMissingIndexEntries);
+            ASSERT_EQ(static_cast<size_t>(0), results.getExtraIndexEntries().size());
+            ASSERT_EQ(static_cast<size_t>(1), results.getMissingIndexEntries().size());
+            ASSERT_EQ(0, results.getNumRemovedExtraIndexEntries());
+            ASSERT_EQ(0, results.getNumInsertedMissingIndexEntries());
 
             dumpOnErrorGuard.dismiss();
         }
@@ -1862,14 +1862,14 @@ public:
                 StorageDebugUtil::printCollectionAndIndexTableEntries(&_opCtx, coll()->ns());
             });
 
-            ASSERT_EQ(true, results.valid);
-            ASSERT_EQ(true, results.valid);
-            ASSERT_EQ(static_cast<size_t>(0), results.errors.size());
+            ASSERT_EQ(true, results.isValid());
+            ASSERT_EQ(true, results.isValid());
+            ASSERT_EQ(static_cast<size_t>(0), results.getErrors().size());
             ASSERT_EQ(static_cast<size_t>(1), omitTransientWarningsFromCount(results));
-            ASSERT_EQ(static_cast<size_t>(0), results.extraIndexEntries.size());
-            ASSERT_EQ(static_cast<size_t>(0), results.missingIndexEntries.size());
-            ASSERT_EQ(0, results.numRemovedExtraIndexEntries);
-            ASSERT_EQ(1, results.numInsertedMissingIndexEntries);
+            ASSERT_EQ(static_cast<size_t>(0), results.getExtraIndexEntries().size());
+            ASSERT_EQ(static_cast<size_t>(0), results.getMissingIndexEntries().size());
+            ASSERT_EQ(0, results.getNumRemovedExtraIndexEntries());
+            ASSERT_EQ(1, results.getNumInsertedMissingIndexEntries());
 
             dumpOnErrorGuard.dismiss();
         }
@@ -1895,14 +1895,14 @@ public:
                 StorageDebugUtil::printCollectionAndIndexTableEntries(&_opCtx, coll()->ns());
             });
 
-            ASSERT_EQ(true, results.valid);
-            ASSERT_EQ(false, results.repaired);
-            ASSERT_EQ(static_cast<size_t>(0), results.errors.size());
+            ASSERT_EQ(true, results.isValid());
+            ASSERT_EQ(false, results.getRepaired());
+            ASSERT_EQ(static_cast<size_t>(0), results.getErrors().size());
             ASSERT_EQ(static_cast<size_t>(0), omitTransientWarningsFromCount(results));
-            ASSERT_EQ(static_cast<size_t>(0), results.extraIndexEntries.size());
-            ASSERT_EQ(static_cast<size_t>(0), results.missingIndexEntries.size());
-            ASSERT_EQ(0, results.numRemovedExtraIndexEntries);
-            ASSERT_EQ(0, results.numInsertedMissingIndexEntries);
+            ASSERT_EQ(static_cast<size_t>(0), results.getExtraIndexEntries().size());
+            ASSERT_EQ(static_cast<size_t>(0), results.getMissingIndexEntries().size());
+            ASSERT_EQ(0, results.getNumRemovedExtraIndexEntries());
+            ASSERT_EQ(0, results.getNumInsertedMissingIndexEntries());
 
             dumpOnErrorGuard.dismiss();
         }
@@ -1983,14 +1983,14 @@ public:
                 StorageDebugUtil::printCollectionAndIndexTableEntries(&_opCtx, coll()->ns());
             });
 
-            ASSERT_EQ(false, results.valid);
-            ASSERT_EQ(false, results.repaired);
-            ASSERT_EQ(static_cast<size_t>(2), results.errors.size());
+            ASSERT_EQ(false, results.isValid());
+            ASSERT_EQ(false, results.getRepaired());
+            ASSERT_EQ(static_cast<size_t>(2), results.getErrors().size());
             ASSERT_EQ(static_cast<size_t>(1), omitTransientWarningsFromCount(results));
-            ASSERT_EQ(static_cast<size_t>(2), results.extraIndexEntries.size());
-            ASSERT_EQ(static_cast<size_t>(0), results.missingIndexEntries.size());
-            ASSERT_EQ(0, results.numRemovedExtraIndexEntries);
-            ASSERT_EQ(0, results.numInsertedMissingIndexEntries);
+            ASSERT_EQ(static_cast<size_t>(2), results.getExtraIndexEntries().size());
+            ASSERT_EQ(static_cast<size_t>(0), results.getMissingIndexEntries().size());
+            ASSERT_EQ(0, results.getNumRemovedExtraIndexEntries());
+            ASSERT_EQ(0, results.getNumInsertedMissingIndexEntries());
 
             dumpOnErrorGuard.dismiss();
         }
@@ -2018,14 +2018,14 @@ public:
                 StorageDebugUtil::printCollectionAndIndexTableEntries(&_opCtx, coll()->ns());
             });
 
-            ASSERT_EQ(true, results.valid);
-            ASSERT_EQ(true, results.repaired);
-            ASSERT_EQ(static_cast<size_t>(0), results.errors.size());
+            ASSERT_EQ(true, results.isValid());
+            ASSERT_EQ(true, results.getRepaired());
+            ASSERT_EQ(static_cast<size_t>(0), results.getErrors().size());
             ASSERT_EQ(static_cast<size_t>(1), omitTransientWarningsFromCount(results));
-            ASSERT_EQ(static_cast<size_t>(0), results.extraIndexEntries.size());
-            ASSERT_EQ(static_cast<size_t>(0), results.missingIndexEntries.size());
-            ASSERT_EQ(2, results.numRemovedExtraIndexEntries);
-            ASSERT_EQ(0, results.numInsertedMissingIndexEntries);
+            ASSERT_EQ(static_cast<size_t>(0), results.getExtraIndexEntries().size());
+            ASSERT_EQ(static_cast<size_t>(0), results.getMissingIndexEntries().size());
+            ASSERT_EQ(2, results.getNumRemovedExtraIndexEntries());
+            ASSERT_EQ(0, results.getNumInsertedMissingIndexEntries());
 
             dumpOnErrorGuard.dismiss();
         }
@@ -2050,14 +2050,14 @@ public:
                 StorageDebugUtil::printCollectionAndIndexTableEntries(&_opCtx, coll()->ns());
             });
 
-            ASSERT_EQ(true, results.valid);
-            ASSERT_EQ(false, results.repaired);
-            ASSERT_EQ(static_cast<size_t>(0), results.errors.size());
+            ASSERT_EQ(true, results.isValid());
+            ASSERT_EQ(false, results.getRepaired());
+            ASSERT_EQ(static_cast<size_t>(0), results.getErrors().size());
             ASSERT_EQ(static_cast<size_t>(0), omitTransientWarningsFromCount(results));
-            ASSERT_EQ(static_cast<size_t>(0), results.extraIndexEntries.size());
-            ASSERT_EQ(static_cast<size_t>(0), results.missingIndexEntries.size());
-            ASSERT_EQ(0, results.numRemovedExtraIndexEntries);
-            ASSERT_EQ(0, results.numInsertedMissingIndexEntries);
+            ASSERT_EQ(static_cast<size_t>(0), results.getExtraIndexEntries().size());
+            ASSERT_EQ(static_cast<size_t>(0), results.getMissingIndexEntries().size());
+            ASSERT_EQ(0, results.getNumRemovedExtraIndexEntries());
+            ASSERT_EQ(0, results.getNumInsertedMissingIndexEntries());
 
             dumpOnErrorGuard.dismiss();
         }
@@ -2203,12 +2203,12 @@ public:
                 StorageDebugUtil::printCollectionAndIndexTableEntries(&_opCtx, coll()->ns());
             });
 
-            ASSERT_EQ(false, results.valid);
-            ASSERT_EQ(false, results.repaired);
-            ASSERT_EQ(static_cast<size_t>(1), results.errors.size());
+            ASSERT_EQ(false, results.isValid());
+            ASSERT_EQ(false, results.getRepaired());
+            ASSERT_EQ(static_cast<size_t>(1), results.getErrors().size());
             ASSERT_EQ(static_cast<size_t>(1), omitTransientWarningsFromCount(results));
-            ASSERT_EQ(static_cast<size_t>(0), results.extraIndexEntries.size());
-            ASSERT_EQ(static_cast<size_t>(1), results.missingIndexEntries.size());
+            ASSERT_EQ(static_cast<size_t>(0), results.getExtraIndexEntries().size());
+            ASSERT_EQ(static_cast<size_t>(1), results.getMissingIndexEntries().size());
 
             dumpOnErrorGuard.dismiss();
         }
@@ -2237,17 +2237,17 @@ public:
                 StorageDebugUtil::printCollectionAndIndexTableEntries(&_opCtx, coll()->ns());
             });
 
-            ASSERT_EQ(true, results.valid);
-            ASSERT_EQ(true, results.repaired);
-            ASSERT_EQ(static_cast<size_t>(0), results.errors.size());
+            ASSERT_EQ(true, results.isValid());
+            ASSERT_EQ(true, results.getRepaired());
+            ASSERT_EQ(static_cast<size_t>(0), results.getErrors().size());
             ASSERT_EQ(static_cast<size_t>(1), omitTransientWarningsFromCount(results));
-            ASSERT_EQ(static_cast<size_t>(0), results.extraIndexEntries.size());
-            ASSERT_EQ(static_cast<size_t>(0), results.missingIndexEntries.size());
-            ASSERT_EQ(0, results.numRemovedExtraIndexEntries);
-            ASSERT_EQ(0, results.numInsertedMissingIndexEntries);
-            ASSERT_EQ(1, results.numDocumentsMovedToLostAndFound);
+            ASSERT_EQ(static_cast<size_t>(0), results.getExtraIndexEntries().size());
+            ASSERT_EQ(static_cast<size_t>(0), results.getMissingIndexEntries().size());
+            ASSERT_EQ(0, results.getNumRemovedExtraIndexEntries());
+            ASSERT_EQ(0, results.getNumInsertedMissingIndexEntries());
+            ASSERT_EQ(1, results.getNumDocumentsMovedToLostAndFound());
 
-            ASSERT_EQ(1, results.indexResultsMap[indexName].keysRemovedFromRecordStore);
+            ASSERT_EQ(1, results.getIndexValidateResult(indexName).getKeysRemovedFromRecordStore());
 
             // Verify the older duplicate document appears in the lost-and-found as expected.
             {
@@ -2291,17 +2291,17 @@ public:
                 StorageDebugUtil::printCollectionAndIndexTableEntries(&_opCtx, coll()->ns());
             });
 
-            ASSERT_EQ(true, results.valid);
-            ASSERT_EQ(false, results.repaired);
-            ASSERT_EQ(static_cast<size_t>(0), results.errors.size());
+            ASSERT_EQ(true, results.isValid());
+            ASSERT_EQ(false, results.getRepaired());
+            ASSERT_EQ(static_cast<size_t>(0), results.getErrors().size());
             ASSERT_EQ(static_cast<size_t>(0), omitTransientWarningsFromCount(results));
-            ASSERT_EQ(static_cast<size_t>(0), results.extraIndexEntries.size());
-            ASSERT_EQ(static_cast<size_t>(0), results.missingIndexEntries.size());
-            ASSERT_EQ(0, results.numRemovedExtraIndexEntries);
-            ASSERT_EQ(0, results.numInsertedMissingIndexEntries);
-            ASSERT_EQ(0, results.numDocumentsMovedToLostAndFound);
+            ASSERT_EQ(static_cast<size_t>(0), results.getExtraIndexEntries().size());
+            ASSERT_EQ(static_cast<size_t>(0), results.getMissingIndexEntries().size());
+            ASSERT_EQ(0, results.getNumRemovedExtraIndexEntries());
+            ASSERT_EQ(0, results.getNumInsertedMissingIndexEntries());
+            ASSERT_EQ(0, results.getNumDocumentsMovedToLostAndFound());
 
-            ASSERT_EQ(0, results.indexResultsMap[indexName].keysRemovedFromRecordStore);
+            ASSERT_EQ(0, results.getIndexValidateResult(indexName).getKeysRemovedFromRecordStore());
 
             dumpOnErrorGuard.dismiss();
         }
@@ -2462,12 +2462,12 @@ public:
                 StorageDebugUtil::printCollectionAndIndexTableEntries(&_opCtx, coll()->ns());
             });
 
-            ASSERT_EQ(false, results.valid);
-            ASSERT_EQ(false, results.repaired);
-            ASSERT_EQ(static_cast<size_t>(2), results.errors.size());
+            ASSERT_EQ(false, results.isValid());
+            ASSERT_EQ(false, results.getRepaired());
+            ASSERT_EQ(static_cast<size_t>(2), results.getErrors().size());
             ASSERT_EQ(static_cast<size_t>(1), omitTransientWarningsFromCount(results));
-            ASSERT_EQ(static_cast<size_t>(0), results.extraIndexEntries.size());
-            ASSERT_EQ(static_cast<size_t>(2), results.missingIndexEntries.size());
+            ASSERT_EQ(static_cast<size_t>(0), results.getExtraIndexEntries().size());
+            ASSERT_EQ(static_cast<size_t>(2), results.getMissingIndexEntries().size());
 
             dumpOnErrorGuard.dismiss();
         }
@@ -2499,19 +2499,21 @@ public:
                 StorageDebugUtil::printCollectionAndIndexTableEntries(&_opCtx, coll()->ns());
             });
 
-            ASSERT_EQ(false, results.valid);
-            ASSERT_EQ(true, results.repaired);
-            ASSERT_EQ(static_cast<size_t>(1), results.errors.size());
+            ASSERT_EQ(false, results.isValid());
+            ASSERT_EQ(true, results.getRepaired());
+            ASSERT_EQ(static_cast<size_t>(1), results.getErrors().size());
             ASSERT_EQ(static_cast<size_t>(2), omitTransientWarningsFromCount(results));
-            ASSERT_EQ(static_cast<size_t>(0), results.extraIndexEntries.size());
-            ASSERT_EQ(static_cast<size_t>(0), results.missingIndexEntries.size());
-            ASSERT_EQ(0, results.numRemovedExtraIndexEntries);
-            ASSERT_EQ(1, results.numInsertedMissingIndexEntries);
-            ASSERT_EQ(1, results.numDocumentsMovedToLostAndFound);
-            ASSERT_EQ(0, results.numOutdatedMissingIndexEntry);
+            ASSERT_EQ(static_cast<size_t>(0), results.getExtraIndexEntries().size());
+            ASSERT_EQ(static_cast<size_t>(0), results.getMissingIndexEntries().size());
+            ASSERT_EQ(0, results.getNumRemovedExtraIndexEntries());
+            ASSERT_EQ(1, results.getNumInsertedMissingIndexEntries());
+            ASSERT_EQ(1, results.getNumDocumentsMovedToLostAndFound());
+            ASSERT_EQ(0, results.getNumOutdatedMissingIndexEntry());
 
-            ASSERT_EQ(1, results.indexResultsMap[indexNameA].keysRemovedFromRecordStore);
-            ASSERT_EQ(0, results.indexResultsMap[indexNameB].keysRemovedFromRecordStore);
+            ASSERT_EQ(1,
+                      results.getIndexValidateResult(indexNameA).getKeysRemovedFromRecordStore());
+            ASSERT_EQ(0,
+                      results.getIndexValidateResult(indexNameB).getKeysRemovedFromRecordStore());
 
             // Verify the older document appears in the lost-and-found as expected.
             {
@@ -2554,19 +2556,21 @@ public:
                 StorageDebugUtil::printCollectionAndIndexTableEntries(&_opCtx, coll()->ns());
             });
 
-            ASSERT_EQ(true, results.valid);
-            ASSERT_EQ(false, results.repaired);
-            ASSERT_EQ(static_cast<size_t>(0), results.errors.size());
+            ASSERT_EQ(true, results.isValid());
+            ASSERT_EQ(false, results.getRepaired());
+            ASSERT_EQ(static_cast<size_t>(0), results.getErrors().size());
             ASSERT_EQ(static_cast<size_t>(0), omitTransientWarningsFromCount(results));
-            ASSERT_EQ(static_cast<size_t>(0), results.extraIndexEntries.size());
-            ASSERT_EQ(static_cast<size_t>(0), results.missingIndexEntries.size());
-            ASSERT_EQ(0, results.numRemovedExtraIndexEntries);
-            ASSERT_EQ(0, results.numInsertedMissingIndexEntries);
-            ASSERT_EQ(0, results.numDocumentsMovedToLostAndFound);
-            ASSERT_EQ(0, results.numOutdatedMissingIndexEntry);
+            ASSERT_EQ(static_cast<size_t>(0), results.getExtraIndexEntries().size());
+            ASSERT_EQ(static_cast<size_t>(0), results.getMissingIndexEntries().size());
+            ASSERT_EQ(0, results.getNumRemovedExtraIndexEntries());
+            ASSERT_EQ(0, results.getNumInsertedMissingIndexEntries());
+            ASSERT_EQ(0, results.getNumDocumentsMovedToLostAndFound());
+            ASSERT_EQ(0, results.getNumOutdatedMissingIndexEntry());
 
-            ASSERT_EQ(0, results.indexResultsMap[indexNameA].keysRemovedFromRecordStore);
-            ASSERT_EQ(0, results.indexResultsMap[indexNameB].keysRemovedFromRecordStore);
+            ASSERT_EQ(0,
+                      results.getIndexValidateResult(indexNameA).getKeysRemovedFromRecordStore());
+            ASSERT_EQ(0,
+                      results.getIndexValidateResult(indexNameB).getKeysRemovedFromRecordStore());
 
             dumpOnErrorGuard.dismiss();
         }
@@ -2819,12 +2823,12 @@ public:
                 StorageDebugUtil::printCollectionAndIndexTableEntries(&_opCtx, coll()->ns());
             });
 
-            ASSERT_EQ(false, results.valid);
-            ASSERT_EQ(false, results.repaired);
-            ASSERT_EQ(static_cast<size_t>(2), results.errors.size());
+            ASSERT_EQ(false, results.isValid());
+            ASSERT_EQ(false, results.getRepaired());
+            ASSERT_EQ(static_cast<size_t>(2), results.getErrors().size());
             ASSERT_EQ(static_cast<size_t>(1), omitTransientWarningsFromCount(results));
-            ASSERT_EQ(static_cast<size_t>(0), results.extraIndexEntries.size());
-            ASSERT_EQ(static_cast<size_t>(2), results.missingIndexEntries.size());
+            ASSERT_EQ(static_cast<size_t>(0), results.getExtraIndexEntries().size());
+            ASSERT_EQ(static_cast<size_t>(2), results.getMissingIndexEntries().size());
 
             dumpOnErrorGuard.dismiss();
         }
@@ -2853,19 +2857,21 @@ public:
                 StorageDebugUtil::printCollectionAndIndexTableEntries(&_opCtx, coll()->ns());
             });
 
-            ASSERT_EQ(true, results.valid);
-            ASSERT_EQ(true, results.repaired);
-            ASSERT_EQ(static_cast<size_t>(0), results.errors.size());
+            ASSERT_EQ(true, results.isValid());
+            ASSERT_EQ(true, results.getRepaired());
+            ASSERT_EQ(static_cast<size_t>(0), results.getErrors().size());
             ASSERT_EQ(static_cast<size_t>(1), omitTransientWarningsFromCount(results));
-            ASSERT_EQ(static_cast<size_t>(0), results.extraIndexEntries.size());
-            ASSERT_EQ(static_cast<size_t>(0), results.missingIndexEntries.size());
-            ASSERT_EQ(0, results.numRemovedExtraIndexEntries);
-            ASSERT_EQ(0, results.numInsertedMissingIndexEntries);
-            ASSERT_EQ(1, results.numDocumentsMovedToLostAndFound);
-            ASSERT_EQ(1, results.numOutdatedMissingIndexEntry);
+            ASSERT_EQ(static_cast<size_t>(0), results.getExtraIndexEntries().size());
+            ASSERT_EQ(static_cast<size_t>(0), results.getMissingIndexEntries().size());
+            ASSERT_EQ(0, results.getNumRemovedExtraIndexEntries());
+            ASSERT_EQ(0, results.getNumInsertedMissingIndexEntries());
+            ASSERT_EQ(1, results.getNumDocumentsMovedToLostAndFound());
+            ASSERT_EQ(1, results.getNumOutdatedMissingIndexEntry());
 
-            ASSERT_EQ(1, results.indexResultsMap[indexNameA].keysRemovedFromRecordStore);
-            ASSERT_EQ(0, results.indexResultsMap[indexNameB].keysRemovedFromRecordStore);
+            ASSERT_EQ(1,
+                      results.getIndexValidateResult(indexNameA).getKeysRemovedFromRecordStore());
+            ASSERT_EQ(0,
+                      results.getIndexValidateResult(indexNameB).getKeysRemovedFromRecordStore());
 
             // Verify the older duplicate document appears in the lost-and-found as expected.
             {
@@ -2908,19 +2914,21 @@ public:
                 StorageDebugUtil::printCollectionAndIndexTableEntries(&_opCtx, coll()->ns());
             });
 
-            ASSERT_EQ(true, results.valid);
-            ASSERT_EQ(false, results.repaired);
-            ASSERT_EQ(static_cast<size_t>(0), results.errors.size());
+            ASSERT_EQ(true, results.isValid());
+            ASSERT_EQ(false, results.getRepaired());
+            ASSERT_EQ(static_cast<size_t>(0), results.getErrors().size());
             ASSERT_EQ(static_cast<size_t>(0), omitTransientWarningsFromCount(results));
-            ASSERT_EQ(static_cast<size_t>(0), results.extraIndexEntries.size());
-            ASSERT_EQ(static_cast<size_t>(0), results.missingIndexEntries.size());
-            ASSERT_EQ(0, results.numRemovedExtraIndexEntries);
-            ASSERT_EQ(0, results.numInsertedMissingIndexEntries);
-            ASSERT_EQ(0, results.numDocumentsMovedToLostAndFound);
-            ASSERT_EQ(0, results.numOutdatedMissingIndexEntry);
+            ASSERT_EQ(static_cast<size_t>(0), results.getExtraIndexEntries().size());
+            ASSERT_EQ(static_cast<size_t>(0), results.getMissingIndexEntries().size());
+            ASSERT_EQ(0, results.getNumRemovedExtraIndexEntries());
+            ASSERT_EQ(0, results.getNumInsertedMissingIndexEntries());
+            ASSERT_EQ(0, results.getNumDocumentsMovedToLostAndFound());
+            ASSERT_EQ(0, results.getNumOutdatedMissingIndexEntry());
 
-            ASSERT_EQ(0, results.indexResultsMap[indexNameA].keysRemovedFromRecordStore);
-            ASSERT_EQ(0, results.indexResultsMap[indexNameB].keysRemovedFromRecordStore);
+            ASSERT_EQ(0,
+                      results.getIndexValidateResult(indexNameA).getKeysRemovedFromRecordStore());
+            ASSERT_EQ(0,
+                      results.getIndexValidateResult(indexNameB).getKeysRemovedFromRecordStore());
 
             dumpOnErrorGuard.dismiss();
         }
@@ -3035,14 +3043,14 @@ public:
                 StorageDebugUtil::printCollectionAndIndexTableEntries(&_opCtx, coll()->ns());
             });
 
-            ASSERT_EQ(false, results.valid);
-            ASSERT_EQ(false, results.repaired);
-            ASSERT_EQ(static_cast<size_t>(1), results.errors.size());
+            ASSERT_EQ(false, results.isValid());
+            ASSERT_EQ(false, results.getRepaired());
+            ASSERT_EQ(static_cast<size_t>(1), results.getErrors().size());
             ASSERT_EQ(static_cast<size_t>(1), omitTransientWarningsFromCount(results));
-            ASSERT_EQ(static_cast<size_t>(0), results.extraIndexEntries.size());
-            ASSERT_EQ(static_cast<size_t>(2), results.missingIndexEntries.size());
-            ASSERT_EQ(0, results.numRemovedExtraIndexEntries);
-            ASSERT_EQ(0, results.numInsertedMissingIndexEntries);
+            ASSERT_EQ(static_cast<size_t>(0), results.getExtraIndexEntries().size());
+            ASSERT_EQ(static_cast<size_t>(2), results.getMissingIndexEntries().size());
+            ASSERT_EQ(0, results.getNumRemovedExtraIndexEntries());
+            ASSERT_EQ(0, results.getNumInsertedMissingIndexEntries());
 
             dumpOnErrorGuard.dismiss();
         }
@@ -3070,14 +3078,14 @@ public:
                 StorageDebugUtil::printCollectionAndIndexTableEntries(&_opCtx, coll()->ns());
             });
 
-            ASSERT_EQ(true, results.valid);
-            ASSERT_EQ(true, results.repaired);
-            ASSERT_EQ(static_cast<size_t>(0), results.errors.size());
+            ASSERT_EQ(true, results.isValid());
+            ASSERT_EQ(true, results.getRepaired());
+            ASSERT_EQ(static_cast<size_t>(0), results.getErrors().size());
             ASSERT_EQ(static_cast<size_t>(2), omitTransientWarningsFromCount(results));
-            ASSERT_EQ(static_cast<size_t>(0), results.extraIndexEntries.size());
-            ASSERT_EQ(static_cast<size_t>(0), results.missingIndexEntries.size());
-            ASSERT_EQ(0, results.numRemovedExtraIndexEntries);
-            ASSERT_EQ(2, results.numInsertedMissingIndexEntries);
+            ASSERT_EQ(static_cast<size_t>(0), results.getExtraIndexEntries().size());
+            ASSERT_EQ(static_cast<size_t>(0), results.getMissingIndexEntries().size());
+            ASSERT_EQ(0, results.getNumRemovedExtraIndexEntries());
+            ASSERT_EQ(2, results.getNumInsertedMissingIndexEntries());
 
             dumpOnErrorGuard.dismiss();
         }
@@ -3106,14 +3114,14 @@ public:
                 StorageDebugUtil::printCollectionAndIndexTableEntries(&_opCtx, coll()->ns());
             });
             StorageDebugUtil::printValidateResults(results);
-            ASSERT_EQ(true, results.valid);
-            ASSERT_EQ(false, results.repaired);
-            ASSERT_EQ(static_cast<size_t>(0), results.errors.size());
-            ASSERT_EQ(static_cast<size_t>(0), results.extraIndexEntries.size());
-            ASSERT_EQ(static_cast<size_t>(0), results.missingIndexEntries.size());
+            ASSERT_EQ(true, results.isValid());
+            ASSERT_EQ(false, results.getRepaired());
+            ASSERT_EQ(static_cast<size_t>(0), results.getErrors().size());
+            ASSERT_EQ(static_cast<size_t>(0), results.getExtraIndexEntries().size());
+            ASSERT_EQ(static_cast<size_t>(0), results.getMissingIndexEntries().size());
             ASSERT_EQ(static_cast<size_t>(0), omitTransientWarningsFromCount(results));
-            ASSERT_EQ(0, results.numRemovedExtraIndexEntries);
-            ASSERT_EQ(0, results.numInsertedMissingIndexEntries);
+            ASSERT_EQ(0, results.getNumRemovedExtraIndexEntries());
+            ASSERT_EQ(0, results.getNumInsertedMissingIndexEntries());
 
             dumpOnErrorGuard.dismiss();
         }
@@ -3433,11 +3441,11 @@ public:
             StorageDebugUtil::printCollectionAndIndexTableEntries(&_opCtx, coll()->ns());
         });
 
-        ASSERT_FALSE(results.valid) << "Validation worked when it should have failed.";
-        ASSERT_EQ(static_cast<size_t>(1), results.errors.size());
+        ASSERT_FALSE(results.isValid()) << "Validation worked when it should have failed.";
+        ASSERT_EQ(static_cast<size_t>(1), results.getErrors().size());
         ASSERT_EQ(static_cast<size_t>(0), omitTransientWarningsFromCount(results));
-        ASSERT_EQ(static_cast<size_t>(0), results.extraIndexEntries.size());
-        ASSERT_EQ(static_cast<size_t>(0), results.missingIndexEntries.size());
+        ASSERT_EQ(static_cast<size_t>(0), results.getExtraIndexEntries().size());
+        ASSERT_EQ(static_cast<size_t>(0), results.getMissingIndexEntries().size());
 
         dumpOnErrorGuard.dismiss();
     }
@@ -3507,13 +3515,13 @@ public:
                 StorageDebugUtil::printCollectionAndIndexTableEntries(&_opCtx, coll()->ns());
             });
 
-            ASSERT_EQ(false, results.valid);
-            ASSERT_EQ(static_cast<size_t>(1), results.errors.size());
+            ASSERT_EQ(false, results.isValid());
+            ASSERT_EQ(static_cast<size_t>(1), results.getErrors().size());
             ASSERT_EQ(static_cast<size_t>(0), omitTransientWarningsFromCount(results));
-            ASSERT_EQ(static_cast<size_t>(0), results.extraIndexEntries.size());
-            ASSERT_EQ(static_cast<size_t>(0), results.missingIndexEntries.size());
-            ASSERT_EQ(static_cast<size_t>(1), results.corruptRecords.size());
-            ASSERT_EQ(rid, results.corruptRecords[0]);
+            ASSERT_EQ(static_cast<size_t>(0), results.getExtraIndexEntries().size());
+            ASSERT_EQ(static_cast<size_t>(0), results.getMissingIndexEntries().size());
+            ASSERT_EQ(static_cast<size_t>(1), results.getCorruptRecords().size());
+            ASSERT_EQ(rid, results.getCorruptRecords()[0]);
 
             dumpOnErrorGuard.dismiss();
         }
@@ -3576,14 +3584,14 @@ public:
                 StorageDebugUtil::printCollectionAndIndexTableEntries(&_opCtx, coll()->ns());
             });
 
-            ASSERT_EQ(false, results.valid);
-            ASSERT_EQ(false, results.repaired);
-            ASSERT_EQ(static_cast<size_t>(1), results.errors.size());
+            ASSERT_EQ(false, results.isValid());
+            ASSERT_EQ(false, results.getRepaired());
+            ASSERT_EQ(static_cast<size_t>(1), results.getErrors().size());
             ASSERT_EQ(static_cast<size_t>(0), omitTransientWarningsFromCount(results));
-            ASSERT_EQ(static_cast<size_t>(0), results.extraIndexEntries.size());
-            ASSERT_EQ(static_cast<size_t>(0), results.missingIndexEntries.size());
-            ASSERT_EQ(static_cast<size_t>(3), results.corruptRecords.size());
-            ASSERT_EQ(0, results.numRemovedCorruptRecords);
+            ASSERT_EQ(static_cast<size_t>(0), results.getExtraIndexEntries().size());
+            ASSERT_EQ(static_cast<size_t>(0), results.getMissingIndexEntries().size());
+            ASSERT_EQ(static_cast<size_t>(3), results.getCorruptRecords().size());
+            ASSERT_EQ(0, results.getNumRemovedCorruptRecords());
 
             dumpOnErrorGuard.dismiss();
         }
@@ -3611,14 +3619,14 @@ public:
                 StorageDebugUtil::printCollectionAndIndexTableEntries(&_opCtx, coll()->ns());
             });
 
-            ASSERT_EQ(true, results.valid);
-            ASSERT_EQ(true, results.repaired);
-            ASSERT_EQ(static_cast<size_t>(0), results.errors.size());
+            ASSERT_EQ(true, results.isValid());
+            ASSERT_EQ(true, results.getRepaired());
+            ASSERT_EQ(static_cast<size_t>(0), results.getErrors().size());
             ASSERT_EQ(static_cast<size_t>(1), omitTransientWarningsFromCount(results));
-            ASSERT_EQ(static_cast<size_t>(0), results.extraIndexEntries.size());
-            ASSERT_EQ(static_cast<size_t>(0), results.missingIndexEntries.size());
-            ASSERT_EQ(static_cast<size_t>(0), results.corruptRecords.size());
-            ASSERT_EQ(3, results.numRemovedCorruptRecords);
+            ASSERT_EQ(static_cast<size_t>(0), results.getExtraIndexEntries().size());
+            ASSERT_EQ(static_cast<size_t>(0), results.getMissingIndexEntries().size());
+            ASSERT_EQ(static_cast<size_t>(0), results.getCorruptRecords().size());
+            ASSERT_EQ(3, results.getNumRemovedCorruptRecords());
 
             // Check that the corrupted records have been removed from the record store.
             ASSERT_EQ(0, rs->numRecords(&_opCtx));
@@ -3650,14 +3658,14 @@ public:
                 StorageDebugUtil::printCollectionAndIndexTableEntries(&_opCtx, coll()->ns());
             });
 
-            ASSERT_EQ(true, results.valid);
-            ASSERT_EQ(false, results.repaired);
-            ASSERT_EQ(static_cast<size_t>(0), results.errors.size());
+            ASSERT_EQ(true, results.isValid());
+            ASSERT_EQ(false, results.getRepaired());
+            ASSERT_EQ(static_cast<size_t>(0), results.getErrors().size());
             ASSERT_EQ(static_cast<size_t>(0), omitTransientWarningsFromCount(results));
-            ASSERT_EQ(static_cast<size_t>(0), results.extraIndexEntries.size());
-            ASSERT_EQ(static_cast<size_t>(0), results.missingIndexEntries.size());
-            ASSERT_EQ(static_cast<size_t>(0), results.corruptRecords.size());
-            ASSERT_EQ(0, results.numRemovedCorruptRecords);
+            ASSERT_EQ(static_cast<size_t>(0), results.getExtraIndexEntries().size());
+            ASSERT_EQ(static_cast<size_t>(0), results.getMissingIndexEntries().size());
+            ASSERT_EQ(static_cast<size_t>(0), results.getCorruptRecords().size());
+            ASSERT_EQ(0, results.getNumRemovedCorruptRecords());
 
             dumpOnErrorGuard.dismiss();
         }
@@ -3682,14 +3690,14 @@ public:
                 StorageDebugUtil::printCollectionAndIndexTableEntries(&_opCtx, coll()->ns());
             });
 
-            ASSERT_EQ(true, results.valid);
-            ASSERT_EQ(false, results.repaired);
-            ASSERT_EQ(static_cast<size_t>(0), results.errors.size());
+            ASSERT_EQ(true, results.isValid());
+            ASSERT_EQ(false, results.getRepaired());
+            ASSERT_EQ(static_cast<size_t>(0), results.getErrors().size());
             ASSERT_EQ(static_cast<size_t>(0), omitTransientWarningsFromCount(results));
-            ASSERT_EQ(static_cast<size_t>(0), results.extraIndexEntries.size());
-            ASSERT_EQ(static_cast<size_t>(0), results.missingIndexEntries.size());
-            ASSERT_EQ(static_cast<size_t>(0), results.corruptRecords.size());
-            ASSERT_EQ(0, results.numRemovedCorruptRecords);
+            ASSERT_EQ(static_cast<size_t>(0), results.getExtraIndexEntries().size());
+            ASSERT_EQ(static_cast<size_t>(0), results.getMissingIndexEntries().size());
+            ASSERT_EQ(static_cast<size_t>(0), results.getCorruptRecords().size());
+            ASSERT_EQ(0, results.getNumRemovedCorruptRecords());
 
             dumpOnErrorGuard.dismiss();
         }
@@ -3853,11 +3861,11 @@ public:
                 StorageDebugUtil::printCollectionAndIndexTableEntries(&_opCtx, coll()->ns());
             });
 
-            ASSERT_EQ(false, results.valid);
-            ASSERT_EQ(false, results.repaired);
-            ASSERT_EQ(static_cast<size_t>(1), results.errors.size());
-            ASSERT_EQ(static_cast<size_t>(0), results.extraIndexEntries.size());
-            ASSERT_EQ(static_cast<size_t>(0), results.missingIndexEntries.size());
+            ASSERT_EQ(false, results.isValid());
+            ASSERT_EQ(false, results.getRepaired());
+            ASSERT_EQ(static_cast<size_t>(1), results.getErrors().size());
+            ASSERT_EQ(static_cast<size_t>(0), results.getExtraIndexEntries().size());
+            ASSERT_EQ(static_cast<size_t>(0), results.getMissingIndexEntries().size());
             ASSERT_EQ(static_cast<size_t>(0), omitTransientWarningsFromCount(results));
 
             dumpOnErrorGuard.dismiss();
@@ -3886,11 +3894,11 @@ public:
                 StorageDebugUtil::printCollectionAndIndexTableEntries(&_opCtx, coll()->ns());
             });
 
-            ASSERT_EQ(true, results.valid);
-            ASSERT_EQ(true, results.repaired);
-            ASSERT_EQ(static_cast<size_t>(0), results.errors.size());
-            ASSERT_EQ(static_cast<size_t>(0), results.extraIndexEntries.size());
-            ASSERT_EQ(static_cast<size_t>(0), results.missingIndexEntries.size());
+            ASSERT_EQ(true, results.isValid());
+            ASSERT_EQ(true, results.getRepaired());
+            ASSERT_EQ(static_cast<size_t>(0), results.getErrors().size());
+            ASSERT_EQ(static_cast<size_t>(0), results.getExtraIndexEntries().size());
+            ASSERT_EQ(static_cast<size_t>(0), results.getMissingIndexEntries().size());
             ASSERT_EQ(static_cast<size_t>(1), omitTransientWarningsFromCount(results));
 
             dumpOnErrorGuard.dismiss();
@@ -3920,11 +3928,11 @@ public:
                 StorageDebugUtil::printCollectionAndIndexTableEntries(&_opCtx, coll()->ns());
             });
 
-            ASSERT_EQ(true, results.valid);
-            ASSERT_EQ(false, results.repaired);
-            ASSERT_EQ(static_cast<size_t>(0), results.errors.size());
-            ASSERT_EQ(static_cast<size_t>(0), results.extraIndexEntries.size());
-            ASSERT_EQ(static_cast<size_t>(0), results.missingIndexEntries.size());
+            ASSERT_EQ(true, results.isValid());
+            ASSERT_EQ(false, results.getRepaired());
+            ASSERT_EQ(static_cast<size_t>(0), results.getErrors().size());
+            ASSERT_EQ(static_cast<size_t>(0), results.getExtraIndexEntries().size());
+            ASSERT_EQ(static_cast<size_t>(0), results.getMissingIndexEntries().size());
             ASSERT_EQ(static_cast<size_t>(0), omitTransientWarningsFromCount(results));
 
             dumpOnErrorGuard.dismiss();
@@ -4078,11 +4086,11 @@ public:
                 StorageDebugUtil::printCollectionAndIndexTableEntries(&_opCtx, coll()->ns());
             });
 
-            ASSERT_EQ(false, results.valid);
-            ASSERT_EQ(false, results.repaired);
-            ASSERT_EQ(static_cast<size_t>(1), results.errors.size());
-            ASSERT_EQ(static_cast<size_t>(0), results.extraIndexEntries.size());
-            ASSERT_EQ(static_cast<size_t>(0), results.missingIndexEntries.size());
+            ASSERT_EQ(false, results.isValid());
+            ASSERT_EQ(false, results.getRepaired());
+            ASSERT_EQ(static_cast<size_t>(1), results.getErrors().size());
+            ASSERT_EQ(static_cast<size_t>(0), results.getExtraIndexEntries().size());
+            ASSERT_EQ(static_cast<size_t>(0), results.getMissingIndexEntries().size());
             ASSERT_EQ(static_cast<size_t>(0), omitTransientWarningsFromCount(results));
 
             dumpOnErrorGuard.dismiss();
@@ -4111,11 +4119,11 @@ public:
                 StorageDebugUtil::printCollectionAndIndexTableEntries(&_opCtx, coll()->ns());
             });
 
-            ASSERT_EQ(true, results.valid);
-            ASSERT_EQ(true, results.repaired);
-            ASSERT_EQ(static_cast<size_t>(0), results.errors.size());
-            ASSERT_EQ(static_cast<size_t>(0), results.extraIndexEntries.size());
-            ASSERT_EQ(static_cast<size_t>(0), results.missingIndexEntries.size());
+            ASSERT_EQ(true, results.isValid());
+            ASSERT_EQ(true, results.getRepaired());
+            ASSERT_EQ(static_cast<size_t>(0), results.getErrors().size());
+            ASSERT_EQ(static_cast<size_t>(0), results.getExtraIndexEntries().size());
+            ASSERT_EQ(static_cast<size_t>(0), results.getMissingIndexEntries().size());
             ASSERT_EQ(static_cast<size_t>(2), omitTransientWarningsFromCount(results));
 
             dumpOnErrorGuard.dismiss();
@@ -4141,11 +4149,11 @@ public:
                 StorageDebugUtil::printCollectionAndIndexTableEntries(&_opCtx, coll()->ns());
             });
 
-            ASSERT_EQ(true, results.valid);
-            ASSERT_EQ(false, results.repaired);
-            ASSERT_EQ(static_cast<size_t>(0), results.errors.size());
-            ASSERT_EQ(static_cast<size_t>(0), results.extraIndexEntries.size());
-            ASSERT_EQ(static_cast<size_t>(0), results.missingIndexEntries.size());
+            ASSERT_EQ(true, results.isValid());
+            ASSERT_EQ(false, results.getRepaired());
+            ASSERT_EQ(static_cast<size_t>(0), results.getErrors().size());
+            ASSERT_EQ(static_cast<size_t>(0), results.getExtraIndexEntries().size());
+            ASSERT_EQ(static_cast<size_t>(0), results.getMissingIndexEntries().size());
             ASSERT_EQ(static_cast<size_t>(0), omitTransientWarningsFromCount(results));
 
             dumpOnErrorGuard.dismiss();
@@ -4253,11 +4261,11 @@ public:
                 StorageDebugUtil::printCollectionAndIndexTableEntries(&_opCtx, coll()->ns());
             });
 
-            ASSERT_EQ(true, results.valid);
-            ASSERT_EQ(true, results.repaired);
-            ASSERT_EQ(static_cast<size_t>(0), results.errors.size());
-            ASSERT_EQ(static_cast<size_t>(0), results.extraIndexEntries.size());
-            ASSERT_EQ(static_cast<size_t>(0), results.missingIndexEntries.size());
+            ASSERT_EQ(true, results.isValid());
+            ASSERT_EQ(true, results.getRepaired());
+            ASSERT_EQ(static_cast<size_t>(0), results.getErrors().size());
+            ASSERT_EQ(static_cast<size_t>(0), results.getExtraIndexEntries().size());
+            ASSERT_EQ(static_cast<size_t>(0), results.getMissingIndexEntries().size());
             ASSERT_EQ(static_cast<size_t>(1), omitTransientWarningsFromCount(results));
 
             dumpOnErrorGuard.dismiss();
@@ -4290,11 +4298,11 @@ public:
                 StorageDebugUtil::printCollectionAndIndexTableEntries(&_opCtx, coll()->ns());
             });
 
-            ASSERT_EQ(true, results.valid);
-            ASSERT_EQ(false, results.repaired);
-            ASSERT_EQ(static_cast<size_t>(0), results.errors.size());
-            ASSERT_EQ(static_cast<size_t>(0), results.extraIndexEntries.size());
-            ASSERT_EQ(static_cast<size_t>(0), results.missingIndexEntries.size());
+            ASSERT_EQ(true, results.isValid());
+            ASSERT_EQ(false, results.getRepaired());
+            ASSERT_EQ(static_cast<size_t>(0), results.getErrors().size());
+            ASSERT_EQ(static_cast<size_t>(0), results.getExtraIndexEntries().size());
+            ASSERT_EQ(static_cast<size_t>(0), results.getMissingIndexEntries().size());
             ASSERT_EQ(static_cast<size_t>(0), omitTransientWarningsFromCount(results));
 
             dumpOnErrorGuard.dismiss();
@@ -4360,13 +4368,13 @@ public:
                 StorageDebugUtil::printCollectionAndIndexTableEntries(&_opCtx, coll()->ns());
             });
 
-            ASSERT_EQ(false, results.valid);
-            ASSERT_EQ(static_cast<size_t>(1), results.errors.size());
+            ASSERT_EQ(false, results.isValid());
+            ASSERT_EQ(static_cast<size_t>(1), results.getErrors().size());
             ASSERT_EQ(static_cast<size_t>(0), omitTransientWarningsFromCount(results));
-            ASSERT_EQ(static_cast<size_t>(0), results.extraIndexEntries.size());
-            ASSERT_EQ(static_cast<size_t>(0), results.missingIndexEntries.size());
-            ASSERT_EQ(static_cast<size_t>(1), results.corruptRecords.size());
-            ASSERT_EQ(rid, results.corruptRecords[0]);
+            ASSERT_EQ(static_cast<size_t>(0), results.getExtraIndexEntries().size());
+            ASSERT_EQ(static_cast<size_t>(0), results.getMissingIndexEntries().size());
+            ASSERT_EQ(static_cast<size_t>(1), results.getCorruptRecords().size());
+            ASSERT_EQ(rid, results.getCorruptRecords()[0]);
 
             dumpOnErrorGuard.dismiss();
         }
@@ -4468,11 +4476,11 @@ public:
                 StorageDebugUtil::printCollectionAndIndexTableEntries(&_opCtx, coll()->ns());
             });
 
-            ASSERT_EQ(false, results.valid);
-            ASSERT_EQ(static_cast<size_t>(1), results.errors.size());
+            ASSERT_EQ(false, results.isValid());
+            ASSERT_EQ(static_cast<size_t>(1), results.getErrors().size());
             ASSERT_EQ(static_cast<size_t>(2), omitTransientWarningsFromCount(results));
-            ASSERT_EQ(static_cast<size_t>(1), results.extraIndexEntries.size());
-            ASSERT_EQ(static_cast<size_t>(1), results.missingIndexEntries.size());
+            ASSERT_EQ(static_cast<size_t>(1), results.getExtraIndexEntries().size());
+            ASSERT_EQ(static_cast<size_t>(1), results.getMissingIndexEntries().size());
 
             dumpOnErrorGuard.dismiss();
         }
@@ -4658,15 +4666,15 @@ public:
         });
 
         if (falsePositiveCase) {
-            ASSERT(results.valid) << "Validation failed when it should have worked.";
-            ASSERT_EQ(static_cast<size_t>(0), results.errors.size());
+            ASSERT(results.isValid()) << "Validation failed when it should have worked.";
+            ASSERT_EQ(static_cast<size_t>(0), results.getErrors().size());
         } else {
-            ASSERT_FALSE(results.valid) << "Validation worked when it should have failed.";
-            ASSERT_EQ(static_cast<size_t>(1), results.errors.size());
+            ASSERT_FALSE(results.isValid()) << "Validation worked when it should have failed.";
+            ASSERT_EQ(static_cast<size_t>(1), results.getErrors().size());
         }
         ASSERT_EQ(static_cast<size_t>(0), omitTransientWarningsFromCount(results));
-        ASSERT_EQ(static_cast<size_t>(0), results.extraIndexEntries.size());
-        ASSERT_EQ(static_cast<size_t>(0), results.missingIndexEntries.size());
+        ASSERT_EQ(static_cast<size_t>(0), results.getExtraIndexEntries().size());
+        ASSERT_EQ(static_cast<size_t>(0), results.getMissingIndexEntries().size());
 
         dumpOnErrorGuard.dismiss();
     }
@@ -4766,11 +4774,11 @@ public:
                 StorageDebugUtil::printCollectionAndIndexTableEntries(&_opCtx, coll()->ns());
             });
 
-            ASSERT_EQ(false, results.valid);
-            ASSERT_EQ(static_cast<size_t>(1), results.errors.size());
+            ASSERT_EQ(false, results.isValid());
+            ASSERT_EQ(static_cast<size_t>(1), results.getErrors().size());
             ASSERT_EQ(static_cast<size_t>(2), omitTransientWarningsFromCount(results));
-            ASSERT_EQ(static_cast<size_t>(1), results.extraIndexEntries.size());
-            ASSERT_EQ(static_cast<size_t>(1), results.missingIndexEntries.size());
+            ASSERT_EQ(static_cast<size_t>(1), results.getExtraIndexEntries().size());
+            ASSERT_EQ(static_cast<size_t>(1), results.getMissingIndexEntries().size());
 
             dumpOnErrorGuard.dismiss();
         }
@@ -4813,14 +4821,14 @@ public:
             });
 
 
-            ASSERT_EQ(true, results.valid);
-            ASSERT_EQ(true, results.repaired);
-            ASSERT_EQ(static_cast<size_t>(0), results.errors.size());
+            ASSERT_EQ(true, results.isValid());
+            ASSERT_EQ(true, results.getRepaired());
+            ASSERT_EQ(static_cast<size_t>(0), results.getErrors().size());
             ASSERT_EQ(static_cast<size_t>(2), omitTransientWarningsFromCount(results));
-            ASSERT_EQ(static_cast<size_t>(0), results.extraIndexEntries.size());
-            ASSERT_EQ(static_cast<size_t>(0), results.missingIndexEntries.size());
-            ASSERT_EQ(1, results.numRemovedExtraIndexEntries);
-            ASSERT_EQ(1, results.numInsertedMissingIndexEntries);
+            ASSERT_EQ(static_cast<size_t>(0), results.getExtraIndexEntries().size());
+            ASSERT_EQ(static_cast<size_t>(0), results.getMissingIndexEntries().size());
+            ASSERT_EQ(1, results.getNumRemovedExtraIndexEntries());
+            ASSERT_EQ(1, results.getNumInsertedMissingIndexEntries());
 
             dumpOnErrorGuard.dismiss();
         }
@@ -4931,14 +4939,14 @@ public:
                 StorageDebugUtil::printCollectionAndIndexTableEntries(&_opCtx, coll()->ns());
             });
 
-            ASSERT_EQ(false, results.valid);
-            ASSERT_EQ(static_cast<size_t>(2), results.errors.size());
+            ASSERT_EQ(false, results.isValid());
+            ASSERT_EQ(static_cast<size_t>(2), results.getErrors().size());
             ASSERT_EQ(static_cast<size_t>(0), omitTransientWarningsFromCount(results));
-            ASSERT_EQ(static_cast<size_t>(0), results.extraIndexEntries.size());
-            ASSERT_EQ(static_cast<size_t>(0), results.missingIndexEntries.size());
-            ASSERT_EQ(static_cast<size_t>(2), results.corruptRecords.size());
-            ASSERT_EQ(ridMissingId, results.corruptRecords[0]);
-            ASSERT_EQ(ridMismatchedId, results.corruptRecords[1]);
+            ASSERT_EQ(static_cast<size_t>(0), results.getExtraIndexEntries().size());
+            ASSERT_EQ(static_cast<size_t>(0), results.getMissingIndexEntries().size());
+            ASSERT_EQ(static_cast<size_t>(2), results.getCorruptRecords().size());
+            ASSERT_EQ(ridMissingId, results.getCorruptRecords()[0]);
+            ASSERT_EQ(ridMismatchedId, results.getCorruptRecords()[1]);
 
             dumpOnErrorGuard.dismiss();
         }

@@ -176,12 +176,11 @@ void WiredTigerIndexUtil::validateStructure(WiredTigerRecoveryUnit& ru,
         std::string msg = str::stream() << "verify() returned an error. "
                                         << "This indicates structural damage. "
                                         << "Not examining individual index entries.";
-        results.errors.push_back(msg);
-        results.valid = false;
+        results.addError(msg);
         return;
     }
 
-    auto err = WiredTigerUtil::verifyTable(ru, uri, &results.errors);
+    auto err = WiredTigerUtil::verifyTable(ru, uri, results.getErrorsUnsafe());
     if (err == EBUSY) {
         std::string msg = str::stream()
             << "Could not complete validation of " << uri << ". "
@@ -193,7 +192,7 @@ void WiredTigerIndexUtil::validateStructure(WiredTigerRecoveryUnit& ru,
                       "the collection was actively in use by other operations",
                       "uri"_attr = uri);
 
-        results.warnings.push_back(msg);
+        results.addWarning(msg);
     } else if (err) {
         std::string msg = str::stream() << "verify() returned " << wiredtiger_strerror(err) << ". "
                                         << "This indicates structural damage. "
@@ -203,8 +202,7 @@ void WiredTigerIndexUtil::validateStructure(WiredTigerRecoveryUnit& ru,
                     "examining individual index entries.",
                     "error"_attr = wiredtiger_strerror(err));
 
-        results.errors.push_back(msg);
-        results.valid = false;
+        results.addError(msg);
     }
 }
 

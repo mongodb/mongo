@@ -133,9 +133,8 @@ void _validateClusteredCollectionRecordId(OperationContext* opCtx,
                                           ValidateResults* results) {
     const auto ridFromDoc = record_id_helpers::keyForDoc(doc, indexSpec, collator);
     if (!ridFromDoc.isOK()) {
-        results->valid = false;
-        results->errors.push_back(str::stream() << rid << " " << ridFromDoc.getStatus().reason());
-        results->corruptRecords.push_back(rid);
+        results->addError(str::stream() << rid << " " << ridFromDoc.getStatus().reason());
+        results->addCorruptRecord(rid);
         return;
     }
 
@@ -145,12 +144,11 @@ void _validateClusteredCollectionRecordId(OperationContext* opCtx,
 
     const auto clusterKeyField = clustered_util::getClusterKeyFieldName(indexSpec);
     if (ksFromRid != ksFromBSON) {
-        results->valid = false;
-        results->errors.push_back(
-            str::stream() << "Document with " << rid << " has mismatched " << doc[clusterKeyField]
+        results->addError(str::stream()
+                          << "Document with " << rid << " has mismatched " << doc[clusterKeyField]
                           << " (RecordId KeyString='" << ksFromRid.toString()
                           << "', cluster key KeyString='" << ksFromBSON.toString() << "')");
-        results->corruptRecords.push_back(rid);
+        results->addCorruptRecord(rid);
     }
 }
 
@@ -165,7 +163,7 @@ void schemaValidationFailed(CollectionValidation::ValidateState* state,
     }
 
     state->setCollectionSchemaViolated();
-    results->warnings.push_back(kSchemaValidationFailedReason);
+    results->addWarning(kSchemaValidationFailedReason);
 }
 
 
@@ -194,8 +192,7 @@ void _timeseriesBucketingParametersChangedCheckFail(const CollectionPtr& coll,
                     "currentBucketMaxSpanSeconds"_attr = originalBucketMaxSpanSeconds,
                     "currentBucketRoundingSeconds"_attr = originalBucketRoundingSeconds,
                     "currentGranularity"_attr = originalGranularity);
-        results->errors.push_back(kTimeseriesBucketingParametersChangedInconsistencyReason);
-        results->valid = false;
+        results->addError(kTimeseriesBucketingParametersChangedInconsistencyReason);
     }
 }
 
@@ -714,10 +711,9 @@ void _timeseriesValidationFailed(CollectionValidation::ValidateState* state,
     if (TestingProctor::instance().isEnabled()) {
         // In testing this is a fatal error. Some time-series checks are vital to test correctness,
         // such as the time field being out-of-order for v: 2 buckets.
-        results->errors.push_back(kTimeseriesValidationInconsistencyReason);
-        results->valid = false;
+        results->addError(kTimeseriesValidationInconsistencyReason);
     } else {
-        results->warnings.push_back(kTimeseriesValidationInconsistencyReason);
+        results->addWarning(kTimeseriesValidationInconsistencyReason);
     }
 }
 
@@ -729,7 +725,7 @@ void _BSONSpecValidationFailed(CollectionValidation::ValidateState* state,
     }
     state->setBSONDataNonConformant();
 
-    results->warnings.push_back(kBSONValidationNonConformantReason);
+    results->addWarning(kBSONValidationNonConformantReason);
 }
 }  // namespace
 
@@ -869,11 +865,11 @@ void ValidateAdaptor::traverseRecordStore(OperationContext* opCtx,
             // TODO SERVER-78040: Clean this up once we can insert errors blindly into the list and
             // not care about deduplication.
             static constexpr auto kErrorMessage = "Detected out-of-order documents. See logs.";
-            if (results->valid ||
-                std::find(results->errors.begin(), results->errors.end(), kErrorMessage) ==
-                    results->errors.end()) {
-                results->errors.push_back(kErrorMessage);
-                results->valid = false;
+            if (results->isValid() ||
+                std::find(results->getErrors().begin(),
+                          results->getErrors().end(),
+                          kErrorMessage) == results->getErrors().end()) {
+                results->addError(kErrorMessage);
             }
         }
 
@@ -900,26 +896,26 @@ void ValidateAdaptor::traverseRecordStore(OperationContext* opCtx,
                     rs->deleteRecord(opCtx, record->id);
                     wunit.commit();
                 });
-                results->repaired = true;
-                results->numRemovedCorruptRecords++;
+                results->setRepaired(true);
+                results->addNumRemovedCorruptRecords(1);
                 _numRecords--;
             } else {
                 // TODO SERVER-78040: Clean this up once we can insert errors blindly into the list
                 // and not care about deduplication.
                 static constexpr auto kErrorMessage =
                     "Detected one or more invalid documents. See logs.";
-                if (results->valid ||
-                    std::find(results->errors.begin(), results->errors.end(), kErrorMessage) ==
-                        results->errors.end()) {
-                    results->errors.push_back(kErrorMessage);
-                    results->valid = false;
+                if (results->isValid() ||
+                    std::find(results->getErrors().begin(),
+                              results->getErrors().end(),
+                              kErrorMessage) == results->getErrors().end()) {
+                    results->addError(kErrorMessage);
                 }
 
                 numCorruptRecordsSizeBytes += record->id.memUsage();
                 if (numCorruptRecordsSizeBytes <= kMaxErrorSizeBytes) {
-                    results->corruptRecords.push_back(record->id);
+                    results->addCorruptRecord(record->id);
                 } else if (!corruptRecordsSizeLimitWarning) {
-                    results->warnings.push_back(
+                    results->addWarning(
                         "Not all corrupted records are listed due to size limitations.");
                     corruptRecordsSizeLimitWarning = true;
                 }
@@ -972,10 +968,9 @@ void ValidateAdaptor::traverseRecordStore(OperationContext* opCtx,
                                       logAttrs(coll->ns()),
                                       "bucketId"_attr = record->id,
                                       "error"_attr = containsMixedSchemaDataResponse.getStatus());
-                        results->errors.push_back(
+                        results->addError(
                             str::stream()
                             << "Detected a time-series bucket with malformed min/max values");
-                        results->valid = false;
                     } else if (containsMixedSchemaDataResponse.isOK() &&
                                containsMixedSchemaDataResponse.getValue()) {
                         bool mixedSchemaAllowed =
@@ -986,7 +981,7 @@ void ValidateAdaptor::traverseRecordStore(OperationContext* opCtx,
                                           "Detected a time-series bucket with mixed schema data",
                                           logAttrs(coll->ns()),
                                           "bucketId"_attr = record->id);
-                            results->warnings.push_back(
+                            results->addWarning(
                                 str::stream()
                                 << "Detected a time-series bucket with mixed schema data");
                         } else if (!mixedSchemaAllowed && !bucketMixedSchemaDataError) {
@@ -997,12 +992,11 @@ void ValidateAdaptor::traverseRecordStore(OperationContext* opCtx,
                                           "You can run the collMod command to set this flag",
                                           logAttrs(coll->ns()),
                                           "bucketId"_attr = record->id);
-                            results->errors.push_back(
+                            results->addError(
                                 str::stream()
                                 << "Detected a time-series bucket with mixed schema data when "
                                    "timeseriesBucketsMayHaveMixedSchemaData is false. You can run "
                                    "the collMod command to set this flag");
-                            results->valid = false;
                         }
                     }
                 }
@@ -1023,23 +1017,22 @@ void ValidateAdaptor::traverseRecordStore(OperationContext* opCtx,
         }
     }
 
-    if (results->numRemovedCorruptRecords > 0) {
-        results->warnings.push_back(str::stream() << "Removed " << results->numRemovedCorruptRecords
-                                                  << " invalid documents.");
+    if (results->getNumRemovedCorruptRecords() > 0) {
+        results->addWarning(str::stream() << "Removed " << results->getNumRemovedCorruptRecords()
+                                          << " invalid documents.");
     }
 
     const auto fastCount = coll->numRecords(opCtx);
     if (_validateState->shouldEnforceFastCount() && fastCount != _numRecords) {
-        results->errors.push_back(str::stream() << "fast count (" << fastCount
-                                                << ") does not match number of records ("
-                                                << _numRecords << ") for collection '"
-                                                << coll->ns().toStringForErrorMsg() << "'");
-        results->valid = false;
+        results->addError(str::stream()
+                          << "fast count (" << fastCount << ") does not match number of records ("
+                          << _numRecords << ") for collection '" << coll->ns().toStringForErrorMsg()
+                          << "'");
     }
 
     // Do not update the record store stats if we're in the background as we've validated a
     // checkpoint and it may not have the most up-to-date changes.
-    if (results->valid && !_validateState->isBackground()) {
+    if (results->isValid() && !_validateState->isBackground()) {
         coll->getRecordStore()->updateStatsAfterRepair(opCtx, _numRecords, dataSizeTotal);
     }
 }
@@ -1145,10 +1138,9 @@ void ValidateAdaptor::_enforceTimeseriesBucketsAreAlwaysCompressed(const BSONObj
         LOGV2(7735100,
               "Expected time-series bucket to be compressed",
               "bucket"_attr = recordBson.toString());
-        results->errors.push_back(
+        results->addError(
             "Expected time-series bucket to be compressed. Search logs for message "
             "with id 7735100.");
-        results->valid = false;
     }
 }
 

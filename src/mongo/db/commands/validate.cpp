@@ -448,7 +448,7 @@ public:
 
         validateResults.appendToResultObj(&result, /*debugging=*/false);
 
-        if (!validateResults.valid) {
+        if (!validateResults.isValid()) {
             result.append("advice",
                           "A corrupt namespace has been detected. See "
                           "http://dochub.mongodb.org/core/data-recovery for recovery steps.");

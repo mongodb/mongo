@@ -378,9 +378,7 @@ IndexValidateResults WiredTigerIndex::validate(OperationContext* opCtx, bool ful
         _uri,
         _isLogged,
         StringData{_indexName},
-        results.valid,
-        results.errors,
-        results.warnings);
+        results);
 
     if (!full) {
         return results;

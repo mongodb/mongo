@@ -145,11 +145,7 @@ void _validateIndexesInternalStructure(OperationContext* opCtx,
 
         auto indexResults = iam->validate(opCtx, full);
 
-        if (!indexResults.valid) {
-            results->valid = false;
-        }
-
-        results->indexResultsMap[descriptor->indexName()] = std::move(indexResults);
+        results->getIndexValidateResult(descriptor->indexName()) = std::move(indexResults);
     }
 }
 
@@ -189,12 +185,8 @@ void _validateIndexes(OperationContext* opCtx,
                                       &numTraversedKeys,
                                       results);
 
-        auto& curIndexResults = (results->indexResultsMap)[indexName];
-        curIndexResults.keysTraversed = numTraversedKeys;
-
-        if (!curIndexResults.valid) {
-            results->valid = false;
-        }
+        auto& curIndexResults = results->getIndexValidateResult(indexName);
+        curIndexResults.addKeysTraversed(numTraversedKeys);
     }
 }
 
@@ -247,10 +239,9 @@ void _gatherIndexEntryErrors(OperationContext* opCtx,
                                       result);
     }
 
-    if (result->numRemovedExtraIndexEntries > 0) {
-        result->warnings.push_back(str::stream()
-                                   << "Removed " << result->numRemovedExtraIndexEntries
-                                   << " extra index entries.");
+    if (result->getNumRemovedExtraIndexEntries() > 0) {
+        result->addWarning(str::stream() << "Removed " << result->getNumRemovedExtraIndexEntries()
+                                         << " extra index entries.");
     }
 
     if (validateState->fixErrors()) {
@@ -271,7 +262,7 @@ void _validateIndexKeyCount(OperationContext* opCtx,
             validateState->getCollection()->getIndexCatalog()->findIndexByIdent(opCtx, indexIdent);
         auto& curIndexResults = (*indexNsResultsMap)[descriptor->indexName()];
 
-        if (curIndexResults.valid) {
+        if (curIndexResults.isValid()) {
             indexValidator->validateIndexKeyCount(opCtx, descriptor->getEntry(), curIndexResults);
         }
     }
@@ -290,14 +281,14 @@ void _printIndexSpec(OperationContext* opCtx,
  * Logs oplog entries related to corrupted records/indexes in validation results.
  */
 void _logOplogEntriesForInvalidResults(OperationContext* opCtx, ValidateResults* results) {
-    if (results->recordTimestamps.empty()) {
+    if (results->getRecordTimestamps().empty()) {
         return;
     }
 
     LOGV2(
         7464200,
         "Validation failed: oplog timestamps referenced by corrupted collection and index entries",
-        "numTimestamps"_attr = results->recordTimestamps.size());
+        "numTimestamps"_attr = results->getRecordTimestamps().size());
 
     // Set up read on oplog collection.
     try {
@@ -305,8 +296,8 @@ void _logOplogEntriesForInvalidResults(OperationContext* opCtx, ValidateResults*
         const auto& oplogCollection = oplogRead.getCollection();
 
         if (!oplogCollection) {
-            for (auto it = results->recordTimestamps.rbegin();
-                 it != results->recordTimestamps.rend();
+            for (auto it = results->getRecordTimestamps().rbegin();
+                 it != results->getRecordTimestamps().rend();
                  it++) {
                 const auto& timestamp = *it;
                 LOGV2(8080900,
@@ -331,7 +322,8 @@ void _logOplogEntriesForInvalidResults(OperationContext* opCtx, ValidateResults*
                 "Validation failed: Unable to get cursor to oplog collection.",
                 cursor);
 
-        for (auto it = results->recordTimestamps.rbegin(); it != results->recordTimestamps.rend();
+        for (auto it = results->getRecordTimestamps().rbegin();
+             it != results->getRecordTimestamps().rend();
              it++) {
             const auto& timestamp = *it;
 
@@ -366,7 +358,7 @@ void _reportValidationResults(OperationContext* opCtx,
                               BSONObjBuilder* output) {
     BSONObjBuilder indexDetails;
 
-    results->readTimestamp = validateState->getValidateTimestamp();
+    results->setReadTimestamp(validateState->getValidateTimestamp());
 
     if (validateState->isFullIndexValidation()) {
         invariant(shard_role_details::getLocker(opCtx)->isCollectionLockedForMode(
@@ -377,29 +369,26 @@ void _reportValidationResults(OperationContext* opCtx,
 
     // Report detailed index validation results gathered when using {full: true} for validated
     // indexes.
-    int nIndexes = results->indexResultsMap.size();
-    for (const auto& [indexName, vr] : results->indexResultsMap) {
-        if (!vr.valid) {
-            results->valid = false;
+    int nIndexes = results->getIndexResultsMap().size();
+    for (auto& [indexName, vr] : results->getIndexResultsMap()) {
+        if (!vr.isValid()) {
             _printIndexSpec(opCtx, validateState, indexName);
         }
 
         BSONObjBuilder bob(indexDetails.subobjStart(indexName));
-        bob.appendBool("valid", vr.valid);
+        bob.appendBool("valid", vr.isValid());
 
-        if (!vr.warnings.empty()) {
-            bob.append("warnings", vr.warnings);
+        if (!vr.getWarnings().empty()) {
+            bob.append("warnings", vr.getWarnings());
         }
 
-        if (!vr.errors.empty()) {
-            bob.append("errors", vr.errors);
+        if (!vr.getErrors().empty()) {
+            bob.append("errors", vr.getErrors());
         }
 
+        keysPerIndex.appendNumber(indexName, static_cast<long long>(vr.getKeysTraversed()));
 
-        keysPerIndex.appendNumber(indexName, static_cast<long long>(vr.keysTraversed));
-
-        results->warnings.insert(results->warnings.end(), vr.warnings.begin(), vr.warnings.end());
-        results->errors.insert(results->errors.end(), vr.errors.begin(), vr.errors.end());
+        results->stealErrorsAndWarnings(vr);
     }
 
     output->append("nIndexes", nIndexes);
@@ -423,10 +412,9 @@ void _reportInvalidResults(OperationContext* opCtx,
 template <typename T>
 void addErrorIfUnequal(T stored, T cached, StringData name, ValidateResults* results) {
     if (stored != cached) {
-        results->valid = false;
-        results->errors.push_back(str::stream() << "stored value for " << name
-                                                << " does not match cached value: " << stored
-                                                << " != " << cached);
+        results->addError(str::stream()
+                          << "stored value for " << name
+                          << " does not match cached value: " << stored << " != " << cached);
     }
 }
 
@@ -458,8 +446,7 @@ void _validateCatalogEntry(OperationContext* opCtx,
     if (options.uuid) {
         addErrorIfUnequal(*(options.uuid), validateState->uuid(), "UUID", results);
     } else {
-        results->valid = false;
-        results->errors.push_back("UUID missing on collection.");
+        results->addError("UUID missing on collection.");
     }
     const CollatorInterface* collation = collection->getDefaultCollator();
     addErrorIfUnequal(options.collation.isEmpty(), !collation, "simple collation", results);
@@ -484,9 +471,8 @@ void _validateCatalogEntry(OperationContext* opCtx,
     addErrorIfUnequal(options.isView(), false, "is a view", results);
     auto status = options.validateForStorage();
     if (!status.isOK()) {
-        results->valid = false;
-        results->errors.push_back(str::stream() << "collection options are not valid for storage: "
-                                                << options.toBSON());
+        results->addError(str::stream()
+                          << "collection options are not valid for storage: " << options.toBSON());
     }
 
     const auto& indexCatalog = collection->getIndexCatalog();
@@ -503,7 +489,7 @@ void _validateCatalogEntry(OperationContext* opCtx,
             index_key_validate::validateIndexSpec(opCtx, indexEntry->descriptor()->infoObj())
                 .getStatus();
         if (!status.isOK()) {
-            results->warnings.push_back(
+            results->addWarning(
                 fmt::format("The index specification for index '{}' contains invalid fields. {}. "
                             "Run the 'collMod' command on the collection without any arguments "
                             "to fix the invalid index options",
@@ -525,8 +511,7 @@ void _validateCatalogEntry(OperationContext* opCtx,
         // paths. If any of the paths are multikey, then the entire index should also be marked
         // multikey.
         if (hasMultiKeyPaths && !isMultikey) {
-            results->valid = false;
-            results->errors.push_back(
+            results->addError(
                 fmt::format("The 'multikey' field for index {} was false with non-empty "
                             "'multikeyPaths': {}",
                             indexName,
@@ -623,7 +608,7 @@ Status validate(OperationContext* opCtx,
         _validateIndexesInternalStructure(
             opCtx, validateState.isFullIndexValidation(), &validateState, results);
 
-        if (!results->valid) {
+        if (!results->isValid()) {
             _reportInvalidResults(opCtx, &validateState, results, output);
             return Status::OK();
         }
@@ -631,7 +616,7 @@ Status validate(OperationContext* opCtx,
         _validateCatalogEntry(opCtx, &validateState, results);
 
         if (validateState.isMetadataValidation()) {
-            if (results->valid) {
+            if (results->isValid()) {
                 LOGV2(5980500,
                       "Validation of metadata complete for collection. No problems detected",
                       logAttrs(validateState.nss()),
@@ -682,7 +667,9 @@ Status validate(OperationContext* opCtx,
             _validationIsPausedForTest.store(false);
         }
 
-        if (!results->valid) {
+        // Continue validation checks are done in case previously reported errors need additional
+        // metadata to be added by later calls
+        if (!results->isValid() && !results->continueValidation()) {
             _reportInvalidResults(opCtx, &validateState, results, output);
             return Status::OK();
         }
@@ -699,15 +686,17 @@ Status validate(OperationContext* opCtx,
             _gatherIndexEntryErrors(opCtx, &validateState, &indexValidator, results);
         }
 
-        if (!results->valid) {
+        if (!results->isValid() && !results->continueValidation()) {
             _reportInvalidResults(opCtx, &validateState, results, output);
             return Status::OK();
         }
 
         // Validate index key count.
-        _validateIndexKeyCount(opCtx, &validateState, &indexValidator, &results->indexResultsMap);
+        _validateIndexKeyCount(
+            opCtx, &validateState, &indexValidator, &results->getIndexResultsMap());
 
-        if (!results->valid) {
+        // We don't want to check continueValidation as there are no more validation checks to do
+        if (!results->isValid()) {
             _reportInvalidResults(opCtx, &validateState, results, output);
             return Status::OK();
         }
@@ -732,7 +721,7 @@ Status validate(OperationContext* opCtx,
         }
 
         string err = str::stream() << "exception during collection validation: " << e.toString();
-        results->warnings.push_back(err);
+        results->addWarning(err);
         LOGV2_OPTIONS(5160302,
                       {LogComponent::kIndex},
                       "Validation failed due to exception",

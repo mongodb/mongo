@@ -259,21 +259,21 @@ void KeyStringIndexConsistency::repairIndexEntries(OperationContext* opCtx,
         it = _missingIndexEntries.erase(it);
     }
 
-    if (results->numInsertedMissingIndexEntries > 0) {
-        results->warnings.push_back(str::stream()
-                                    << "Inserted " << results->numInsertedMissingIndexEntries
-                                    << " missing index entries.");
+    if (results->getNumInsertedMissingIndexEntries() > 0) {
+        results->addWarning(str::stream()
+                            << "Inserted " << results->getNumInsertedMissingIndexEntries()
+                            << " missing index entries.");
     }
-    if (results->numDocumentsMovedToLostAndFound > 0) {
+    if (results->getNumDocumentsMovedToLostAndFound() > 0) {
         const NamespaceString lostAndFoundNss = NamespaceString::makeLocalCollection(
             "lost_and_found." + _validateState->getCollection()->uuid().toString());
-        results->warnings.push_back(str::stream()
-                                    << "Removed " << results->numDocumentsMovedToLostAndFound
-                                    << " duplicate documents to resolve "
-                                    << results->numDocumentsMovedToLostAndFound +
-                                        results->numOutdatedMissingIndexEntry
-                                    << " missing index entries. Removed documents can be found in '"
-                                    << lostAndFoundNss.toStringForErrorMsg() << "'.");
+        results->addWarning(str::stream()
+                            << "Removed " << results->getNumDocumentsMovedToLostAndFound()
+                            << " duplicate documents to resolve "
+                            << results->getNumDocumentsMovedToLostAndFound() +
+                                results->getNumOutdatedMissingIndexEntry()
+                            << " missing index entries. Removed documents can be found in '"
+                            << lostAndFoundNss.toStringForErrorMsg() << "'.");
     }
 }
 
@@ -323,12 +323,12 @@ void KeyStringIndexConsistency::addIndexEntryErrors(OperationContext* opCtx,
 
         numMissingIndexEntriesSizeBytes += entry.objsize();
         if (first || numMissingIndexEntriesSizeBytes <= kErrorSizeBytes) {
-            results->missingIndexEntries.push_back(entry);
+            results->addMissingIndexEntry(entry);
             first = false;
         } else if (!missingIndexEntrySizeLimitWarning) {
             StringBuilder ss;
             ss << "Not all missing index entry inconsistencies are listed due to size limitations.";
-            results->errors.push_back(ss.str());
+            results->addError(ss.str(), false);
 
             missingIndexEntrySizeLimitWarning = true;
         }
@@ -336,15 +336,13 @@ void KeyStringIndexConsistency::addIndexEntryErrors(OperationContext* opCtx,
         _printMetadata(opCtx, results, entryInfo);
 
         std::string indexName = entry["indexName"].String();
-        if (!results->indexResultsMap.at(indexName).valid) {
+        if (!results->getIndexResultsMap().at(indexName).isValid()) {
             continue;
         }
 
         StringBuilder ss;
         ss << "Index with name '" << indexName << "' has inconsistencies.";
-        results->errors.push_back(ss.str());
-
-        results->indexResultsMap.at(indexName).valid = false;
+        results->getIndexResultsMap().at(indexName).addError(ss.str());
     }
 
     // Sort extra index entries by size so we can process in order of increasing size and return as
@@ -378,42 +376,38 @@ void KeyStringIndexConsistency::addIndexEntryErrors(OperationContext* opCtx,
     for (const auto& entry : extraIndexEntriesBySize) {
         numExtraIndexEntriesSizeBytes += entry->objsize();
         if (first || numExtraIndexEntriesSizeBytes <= kErrorSizeBytes) {
-            results->extraIndexEntries.push_back(*entry);
+            results->addExtraIndexEntry(*entry);
             first = false;
         } else if (!extraIndexEntrySizeLimitWarning) {
             StringBuilder ss;
             ss << "Not all extra index entry inconsistencies are listed due to size "
                   "limitations.";
-            results->errors.push_back(ss.str());
+            results->addError(ss.str(), false);
 
             extraIndexEntrySizeLimitWarning = true;
         }
 
         std::string indexName = (*entry)["indexName"].String();
-        if (!results->indexResultsMap.at(indexName).valid) {
+        if (!results->getIndexResultsMap().at(indexName).isValid()) {
             continue;
         }
 
         StringBuilder ss;
         ss << "Index with name '" << indexName << "' has inconsistencies.";
-        results->errors.push_back(ss.str());
-
-        results->indexResultsMap.at(indexName).valid = false;
+        results->getIndexResultsMap().at(indexName).addError(ss.str());
     }
 
     // Inform how many inconsistencies were detected.
     if (numMissingIndexEntryErrors > 0) {
         StringBuilder ss;
         ss << "Detected " << numMissingIndexEntryErrors << " missing index entries.";
-        results->warnings.push_back(ss.str());
-        results->valid = false;
+        results->addWarning(ss.str());
     }
 
     if (numExtraIndexEntryErrors > 0) {
         StringBuilder ss;
         ss << "Detected " << numExtraIndexEntryErrors << " extra index entries.";
-        results->warnings.push_back(ss.str());
-        results->valid = false;
+        results->addWarning(ss.str());
     }
 }
 
@@ -536,10 +530,10 @@ void KeyStringIndexConsistency::addIndexKey(OperationContext* opCtx,
                         opCtx, entry, {ks}, options, &numDeleted);
                     wunit.commit();
                 });
-                auto& indexResults = results->indexResultsMap[indexInfo->indexName];
-                indexResults.keysTraversed -= numDeleted;
-                results->numRemovedExtraIndexEntries += numDeleted;
-                results->repaired = true;
+                auto& indexResults = results->getIndexValidateResult(indexInfo->indexName);
+                indexResults.addKeysTraversed(-numDeleted);
+                results->addNumRemovedExtraIndexEntries(numDeleted);
+                results->setRepaired(true);
                 indexInfo->numKeys--;
                 _extraIndexEntries.erase(key);
                 return;
@@ -553,7 +547,7 @@ void KeyStringIndexConsistency::addIndexKey(OperationContext* opCtx,
 
                 // Prints the collection document's and index entry's metadata.
                 _validateState->getCollection()->getRecordStore()->printRecordMetadata(
-                    opCtx, recordId, &(results->recordTimestamps));
+                    opCtx, recordId, results->getRecordTimestampsPtr());
                 indexInfo->accessMethod->asSortedData()
                     ->getSortedDataInterface()
                     ->printIndexEntryMetadata(opCtx, ks);
@@ -636,8 +630,7 @@ bool KeyStringIndexConsistency::limitMemoryUsageForSecondPhase(ValidateResults* 
           "limit for validation is currently set to "
        << maxValidateMemoryUsageMB.load()
        << "MB and can be configured via the 'maxValidateMemoryUsageMB' parameter.";
-    result->errors.push_back(ss.str());
-    result->valid = false;
+    result->addError(ss.str());
 
     LOGV2(8943500,
           "Not all index entry inconsistencies are reported due to memory limitations; the memory "
@@ -661,46 +654,42 @@ void KeyStringIndexConsistency::validateIndexKeyCount(OperationContext* opCtx,
 
     // Update numRecords by subtracting number of records removed from record store in repair mode
     // when validating index consistency
-    (*numRecords) -= results.keysRemovedFromRecordStore;
+    (*numRecords) -= results.getKeysRemovedFromRecordStore();
 
     if (desc->isIdIndex() && numTotalKeys != (*numRecords)) {
         const std::string msg = str::stream()
             << "number of _id index entries (" << numTotalKeys
             << ") does not match the number of documents in the index (" << (*numRecords) << ")";
-        results.errors.push_back(msg);
-        results.valid = false;
+        results.addError(msg);
     }
 
     // Hashed indexes may never be multikey.
     if (desc->getAccessMethodName() == IndexNames::HASHED &&
         index->isMultikey(opCtx, _validateState->getCollection())) {
-        results.errors.push_back(str::stream() << "Hashed index is incorrectly marked multikey: "
-                                               << desc->indexName());
-        results.valid = false;
+        results.addError(str::stream()
+                         << "Hashed index is incorrectly marked multikey: " << desc->indexName());
     }
 
     // Confirm that the number of index entries is not greater than the number of documents in the
     // collection. This check is only valid for indexes that are not multikey (indexed arrays
     // produce an index key per array entry) and not $** indexes which can produce index keys for
     // multiple paths within a single document.
-    if (results.valid && !index->isMultikey(opCtx, _validateState->getCollection()) &&
+    if (results.isValid() && !index->isMultikey(opCtx, _validateState->getCollection()) &&
         desc->getIndexType() != IndexType::INDEX_WILDCARD && numTotalKeys > (*numRecords)) {
         const std::string err = str::stream()
             << "index " << desc->indexName() << " is not multi-key, but has more entries ("
             << numTotalKeys << ") than documents in the index (" << (*numRecords) << ")";
-        results.errors.push_back(err);
-        results.valid = false;
+        results.addError(err);
     }
 
     // Ignore any indexes with a special access method. If an access method name is given, the
     // index may be a full text, geo or special index plugin with different semantics.
-    if (results.valid && !desc->isSparse() && !desc->isPartial() && !desc->isIdIndex() &&
+    if (results.isValid() && !desc->isSparse() && !desc->isPartial() && !desc->isIdIndex() &&
         desc->getAccessMethodName() == "" && numTotalKeys < (*numRecords)) {
         const std::string msg = str::stream()
             << "index " << desc->indexName() << " is not sparse or partial, but has fewer entries ("
             << numTotalKeys << ") than documents in the index (" << (*numRecords) << ")";
-        results.errors.push_back(msg);
-        results.valid = false;
+        results.addError(msg);
     }
 }
 
@@ -720,13 +709,10 @@ void _validateKeyOrder(OperationContext* opCtx,
     // the format (Key, RID), and all RecordIDs are unique.
     if (currKey->keyString.compare(prevKey->keyString) <= 0 ||
         MONGO_unlikely(failIndexKeyOrdering.shouldFail())) {
-        if (results && results->valid) {
-            results->errors.push_back(str::stream()
-                                      << "index '" << descriptor->indexName()
-                                      << "' is not in strictly ascending or descending order");
-        }
-        if (results) {
-            results->valid = false;
+        if (results && results->isValid()) {
+            results->addError(str::stream()
+                              << "index '" << descriptor->indexName()
+                              << "' is not in strictly ascending or descending order");
         }
         return;
     }
@@ -740,16 +726,13 @@ void _validateKeyOrder(OperationContext* opCtx,
             return;
         }
 
-        if (results && results->valid) {
+        if (results && results->isValid()) {
             const auto bsonKey =
                 key_string::toBson(currKey->keyString, Ordering::make(descriptor->keyPattern()));
-            results->errors.push_back(str::stream() << "Unique index '" << descriptor->indexName()
-                                                    << "' has duplicate key: " << bsonKey
-                                                    << ", first record: " << prevKey->loc
-                                                    << ", second record: " << currKey->loc);
-        }
-        if (results) {
-            results->valid = false;
+            results->addError(str::stream() << "Unique index '" << descriptor->indexName()
+                                            << "' has duplicate key: " << bsonKey
+                                            << ", first record: " << prevKey->loc
+                                            << ", second record: " << currKey->loc);
         }
     }
 }
@@ -761,7 +744,7 @@ int64_t KeyStringIndexConsistency::traverseIndex(OperationContext* opCtx,
                                                  ValidateResults* results) {
     const IndexDescriptor* descriptor = index->descriptor();
     const auto indexName = descriptor->indexName();
-    auto& indexResults = results->indexResultsMap[indexName];
+    auto& indexResults = results->getIndexValidateResult(indexName);
     IndexInfo& indexInfo = this->getIndexInfo(indexName);
     int64_t numKeys = 0;
 
@@ -809,7 +792,7 @@ int64_t KeyStringIndexConsistency::traverseIndex(OperationContext* opCtx,
 
         if (!foundOldUniqueIndexKeys && !descriptor->isIdIndex() && descriptor->unique() &&
             !indexCursor->isRecordIdAtEndOfKeyString()) {
-            results->warnings.push_back(
+            results->addWarning(
                 fmt::format("Unique index {} has one or more keys in the old format (without "
                             "embedded record id). First record: {}",
                             indexInfo.indexName,
@@ -828,8 +811,7 @@ int64_t KeyStringIndexConsistency::traverseIndex(OperationContext* opCtx,
                 StringBuilder ss;
                 ss << "Parsing index key for " << indexInfo.indexName << " recId "
                    << indexEntry->loc << " threw exception " << e.toString();
-                results->errors.push_back(ss.str());
-                results->valid = false;
+                results->addError(ss.str());
             }
         }
         {
@@ -860,10 +842,9 @@ int64_t KeyStringIndexConsistency::traverseIndex(OperationContext* opCtx,
     }
 
     if (results && this->getMultikeyMetadataPathCount(&indexInfo) > 0) {
-        results->errors.push_back(str::stream()
-                                  << "Index '" << descriptor->indexName()
-                                  << "' has one or more missing multikey metadata index keys");
-        results->valid = false;
+        results->addError(str::stream()
+                          << "Index '" << descriptor->indexName()
+                          << "' has one or more missing multikey metadata index keys");
     }
 
     // Adjust multikey metadata when allowed. These states are all allowed by the design of
@@ -898,9 +879,9 @@ int64_t KeyStringIndexConsistency::traverseIndex(OperationContext* opCtx,
             });
 
             if (results) {
-                results->warnings.push_back(str::stream() << "Updated index multikey metadata"
-                                                          << ": " << descriptor->indexName());
-                results->repaired = true;
+                results->addWarning(str::stream() << "Updated index multikey metadata"
+                                                  << ": " << descriptor->indexName());
+                results->setRepaired(true);
             }
         }
 
@@ -925,9 +906,9 @@ int64_t KeyStringIndexConsistency::traverseIndex(OperationContext* opCtx,
             });
 
             if (results) {
-                results->warnings.push_back(str::stream() << "Unset index multikey metadata"
-                                                          << ": " << descriptor->indexName());
-                results->repaired = true;
+                results->addWarning(str::stream() << "Unset index multikey metadata"
+                                                  << ": " << descriptor->indexName());
+                results->setRepaired(true);
             }
         }
     }
@@ -970,9 +951,10 @@ void KeyStringIndexConsistency::traverseRecord(OperationContext* opCtx,
                   "indexName"_attr = descriptor->indexName(),
                   "recordId"_attr = recordId,
                   "record"_attr = redact(recordBson));
-            results->errors.push_back(
-                str::stream() << "Could not build key for index '" << descriptor->indexName()
-                              << "' from document with recordId '" << recordId << "'");
+            results->addError(str::stream()
+                                  << "Could not build key for index '" << descriptor->indexName()
+                                  << "' from document with recordId '" << recordId << "'",
+                              false);
             return;
         }
     }
@@ -1015,13 +997,13 @@ void KeyStringIndexConsistency::traverseRecord(OperationContext* opCtx,
                   "Index set to multikey",
                   "indexName"_attr = descriptor->indexName(),
                   "collection"_attr = coll->ns());
-            results->warnings.push_back(str::stream() << "Index " << descriptor->indexName()
-                                                      << " set to multikey.");
-            results->repaired = true;
+            results->addWarning(str::stream()
+                                << "Index " << descriptor->indexName() << " set to multikey.");
+            results->setRepaired(true);
         } else {
             printMultikeyMetadata();
 
-            auto& curRecordResults = (results->indexResultsMap)[descriptor->indexName()];
+            auto& curRecordResults = results->getIndexValidateResult(descriptor->indexName());
             const std::string msg = fmt::format(
                 "Index {} is not multikey but document with RecordId({}) and {} has multikey data, "
                 "{} key(s)",
@@ -1029,8 +1011,7 @@ void KeyStringIndexConsistency::traverseRecord(OperationContext* opCtx,
                 recordId.toString(),
                 recordBson.getField("_id").toString(),
                 documentKeySet->size());
-            curRecordResults.errors.push_back(msg);
-            curRecordResults.valid = false;
+            curRecordResults.addError(msg, false);
             if (crashOnMultikeyValidateFailure.shouldFail()) {
                 invariant(false, msg);
             }
@@ -1052,9 +1033,9 @@ void KeyStringIndexConsistency::traverseRecord(OperationContext* opCtx,
                       "Multikey paths updated to cover multikey document",
                       "indexName"_attr = descriptor->indexName(),
                       "collection"_attr = coll->ns());
-                results->warnings.push_back(str::stream() << "Index " << descriptor->indexName()
-                                                          << " multikey paths updated.");
-                results->repaired = true;
+                results->addWarning(str::stream() << "Index " << descriptor->indexName()
+                                                  << " multikey paths updated.");
+                results->setRepaired(true);
             } else {
                 printMultikeyMetadata();
 
@@ -1063,9 +1044,8 @@ void KeyStringIndexConsistency::traverseRecord(OperationContext* opCtx,
                     descriptor->indexName(),
                     recordId.toString(),
                     recordBson.getField("_id").toString());
-                auto& curRecordResults = (results->indexResultsMap)[descriptor->indexName()];
-                curRecordResults.errors.push_back(msg);
-                curRecordResults.valid = false;
+                auto& curRecordResults = results->getIndexValidateResult(descriptor->indexName());
+                curRecordResults.addError(msg, false);
             }
         }
     }
@@ -1120,7 +1100,7 @@ void KeyStringIndexConsistency::_printMetadata(OperationContext* opCtx,
                                                ValidateResults* results,
                                                const IndexEntryInfo& entryInfo) {
     _validateState->getCollection()->getRecordStore()->printRecordMetadata(
-        opCtx, entryInfo.recordId, &(results->recordTimestamps));
+        opCtx, entryInfo.recordId, results->getRecordTimestampsPtr());
     getIndexInfo(entryInfo.indexName)
         .accessMethod->asSortedData()
         ->getSortedDataInterface()

@@ -45,7 +45,7 @@ namespace mongo {
 class BSONObjBuilder;
 class BucketDeletionNotification;
 class SortedDataBuilderInterface;
-struct IndexValidateResults;
+class IndexValidateResults;
 class SortedDataKeyValueView;
 
 /**

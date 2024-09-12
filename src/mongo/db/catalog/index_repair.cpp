@@ -186,10 +186,10 @@ int repairMissingIndexEntry(OperationContext* opCtx,
     // duplicate documents.
     if (numInserted > 0) {
         invariant(numInserted == 1);
-        auto& indexResults = results->indexResultsMap[indexName];
-        indexResults.keysTraversed += numInserted;
-        results->numInsertedMissingIndexEntries += numInserted;
-        results->repaired = true;
+        auto& indexResults = results->getIndexValidateResult(indexName);
+        indexResults.addKeysTraversed(numInserted);
+        results->addNumInsertedMissingIndexEntries(numInserted);
+        results->setRepaired(true);
     } else {
         invariant(insertStatus.code() == ErrorCodes::DuplicateKey);
 
@@ -221,10 +221,10 @@ int repairMissingIndexEntry(OperationContext* opCtx,
             auto moveStatus = moveRecordToLostAndFound(opCtx, nss, lostAndFoundNss, ridToMove);
 
             if (moveStatus.isOK() && (moveStatus.getValue() > 0)) {
-                auto& indexResults = results->indexResultsMap[indexName];
-                indexResults.keysRemovedFromRecordStore++;
-                results->numDocumentsMovedToLostAndFound++;
-                results->repaired = true;
+                auto& indexResults = results->getIndexValidateResult(indexName);
+                indexResults.addKeysRemovedFromRecordStore(1);
+                results->addNumDocumentsMovedToLostAndFound(1);
+                results->setRepaired(true);
 
                 // If we moved the record that was already in the index, now neither of the
                 // duplicate records is in the index, so we need to add the newer record to the
@@ -237,18 +237,20 @@ int repairMissingIndexEntry(OperationContext* opCtx,
                         wunit.commit();
                     });
                     if (!insertStatus.isOK()) {
-                        results->errors.push_back(str::stream() << "unable to insert record " << rid
-                                                                << " to " << indexName);
+                        results->addError(str::stream() << "unable to insert record " << rid
+                                                        << " to " << indexName,
+                                          false);
                     }
                 }
             } else {
-                results->errors.push_back(str::stream() << "unable to move record " << rid << " to "
-                                                        << lostAndFoundNss.toStringForErrorMsg());
+                results->addError(str::stream() << "unable to move record " << rid << " to "
+                                                << lostAndFoundNss.toStringForErrorMsg(),
+                                  false);
             }
         } else {
             // If the missing index entry does not exist in the record store, then it has
             // already been moved to the lost and found and is now outdated.
-            results->numOutdatedMissingIndexEntry++;
+            results->addNumOutdatedMissingIndexEntry(1);
         }
     }
     return numInserted;

@@ -38,10 +38,10 @@
 namespace mongo {
 
 void ValidateResults::appendToResultObj(BSONObjBuilder* resultObj, bool debugging) const {
-    resultObj->appendBool("valid", valid);
-    resultObj->appendBool("repaired", repaired);
-    if (readTimestamp) {
-        resultObj->append("readTimestamp", readTimestamp.value());
+    resultObj->appendBool("valid", isValid());
+    resultObj->appendBool("repaired", getRepaired());
+    if (getReadTimestamp()) {
+        resultObj->append("readTimestamp", getReadTimestamp().value());
     }
 
     static constexpr std::size_t kMaxErrorWarningSizeBytes = 2 * 1024 * 1024;
@@ -56,27 +56,29 @@ void ValidateResults::appendToResultObj(BSONObjBuilder* resultObj, bool debuggin
         }
     };
 
-    appendRangeSizeLimited("warnings"_sd, warnings);
-    appendRangeSizeLimited("errors"_sd, errors);
+    appendRangeSizeLimited("warnings"_sd, getWarnings());
+    appendRangeSizeLimited("errors"_sd, getErrors());
 
-    resultObj->append("extraIndexEntries", extraIndexEntries);
-    resultObj->append("missingIndexEntries", missingIndexEntries);
+    resultObj->append("extraIndexEntries", getExtraIndexEntries());
+    resultObj->append("missingIndexEntries", getMissingIndexEntries());
 
     // Need to convert RecordId to a printable type.
     BSONArrayBuilder builder;
-    for (const RecordId& corruptRecord : corruptRecords) {
+    for (const RecordId& corruptRecord : getCorruptRecords()) {
         BSONObjBuilder objBuilder;
         corruptRecord.serializeToken("", &objBuilder);
         builder.append(objBuilder.done().firstElement());
     }
     resultObj->append("corruptRecords", builder.arr());
 
-    if (repaired || debugging) {
-        resultObj->appendNumber("numRemovedCorruptRecords", numRemovedCorruptRecords);
-        resultObj->appendNumber("numRemovedExtraIndexEntries", numRemovedExtraIndexEntries);
-        resultObj->appendNumber("numInsertedMissingIndexEntries", numInsertedMissingIndexEntries);
-        resultObj->appendNumber("numDocumentsMovedToLostAndFound", numDocumentsMovedToLostAndFound);
-        resultObj->appendNumber("numOutdatedMissingIndexEntry", numOutdatedMissingIndexEntry);
+    if (getRepaired() || debugging) {
+        resultObj->appendNumber("numRemovedCorruptRecords", getNumRemovedCorruptRecords());
+        resultObj->appendNumber("numRemovedExtraIndexEntries", getNumRemovedExtraIndexEntries());
+        resultObj->appendNumber("numInsertedMissingIndexEntries",
+                                getNumInsertedMissingIndexEntries());
+        resultObj->appendNumber("numDocumentsMovedToLostAndFound",
+                                getNumDocumentsMovedToLostAndFound());
+        resultObj->appendNumber("numOutdatedMissingIndexEntry", getNumOutdatedMissingIndexEntry());
     }
 }
 }  // namespace mongo

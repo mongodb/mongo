@@ -204,26 +204,23 @@ void ColumnIndexConsistency::_addIndexEntryErrors(OperationContext* opCtx,
     if (!_missingIndexEntries.empty() || !_extraIndexEntries.empty()) {
         StringBuilder ss;
         ss << "Index with name '" << csam->indexName(index) << "' has inconsistencies.";
-        results->errors.push_back(ss.str());
-        results->indexResultsMap.at(csam->indexName(index)).valid = false;
+        results->addError(ss.str());
     }
     if (!_missingIndexEntries.empty()) {
         StringBuilder ss;
         ss << "Detected " << _missingIndexEntries.size() << " missing index entries.";
-        results->warnings.push_back(ss.str());
-        results->valid = false;
+        results->addWarning(ss.str());
         for (const auto& ent : _missingIndexEntries) {
-            results->missingIndexEntries.push_back(_generateInfo(
+            results->addMissingIndexEntry(_generateInfo(
                 csam->indexName(index), RecordId(ent.rid), ent.path, ent.rid, ent.value));
         }
     }
     if (!_extraIndexEntries.empty()) {
         StringBuilder ss;
         ss << "Detected " << _extraIndexEntries.size() << " extra index entries.";
-        results->warnings.push_back(ss.str());
-        results->valid = false;
+        results->addWarning(ss.str());
         for (const auto& ent : _extraIndexEntries) {
-            results->extraIndexEntries.push_back(_generateInfo(
+            results->addExtraIndexEntry(_generateInfo(
                 csam->indexName(index), RecordId(ent.rid), ent.path, ent.rid, ent.value));
         }
     }
@@ -253,26 +250,26 @@ void ColumnIndexConsistency::repairIndexEntries(OperationContext* opCtx,
 
     writeConflictRetry(opCtx, "removingExtraColumnIndexEntries", _validateState->nss(), [&] {
         WriteUnitOfWork wunit(opCtx);
-        auto& indexResults = results->indexResultsMap[csam->indexName(index)];
+        auto& indexResults = results->getIndexValidateResult(csam->indexName(index));
         auto cursor = csam->writableStorage()->newWriteCursor(opCtx);
 
         for (auto it = _extraIndexEntries.begin(); it != _extraIndexEntries.end();) {
             cursor->remove(it->path, it->rid);
-            results->numRemovedExtraIndexEntries++;
-            indexResults.keysTraversed--;
+            results->addNumRemovedExtraIndexEntries(1);
+            indexResults.addKeysTraversed(-1);
             it = _extraIndexEntries.erase(it);
         }
 
         for (auto it = _missingIndexEntries.begin(); it != _missingIndexEntries.end();) {
             cursor->insert(it->path, it->rid, it->value);
-            results->numInsertedMissingIndexEntries++;
-            indexResults.keysTraversed++;
+            results->addNumInsertedMissingIndexEntries(1);
+            indexResults.addKeysTraversed(1);
             it = _missingIndexEntries.erase(it);
         }
         wunit.commit();
     });
 
-    results->repaired = true;
+    results->setRepaired(true);
 }
 
 void ColumnIndexConsistency::repairIndexEntries(OperationContext* opCtx, ValidateResults* results) {

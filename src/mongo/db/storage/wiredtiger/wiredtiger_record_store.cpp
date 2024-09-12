@@ -1517,23 +1517,21 @@ void WiredTigerRecordStore::validate(OperationContext* opCtx, bool full, Validat
         _uri,
         _isLogged,
         boost::none,
-        results->valid,
-        results->errors,
-        results->warnings);
+        *results);
 
     if (!full) {
         return;
     }
 
     if (_oplog) {
-        results->warnings.push_back("Skipping verification of the WiredTiger table for the oplog.");
+        results->addWarning("Skipping verification of the WiredTiger table for the oplog.");
         return;
     }
 
     int err = WiredTigerUtil::verifyTable(
         *WiredTigerRecoveryUnit::get(shard_role_details::getRecoveryUnit(opCtx)),
         _uri,
-        &results->errors);
+        results->getErrorsUnsafe());
     if (!err) {
         return;
     }
@@ -1548,7 +1546,7 @@ void WiredTigerRecordStore::validate(OperationContext* opCtx, bool full, Validat
                       "Could not complete validation, This is a transient issue as the collection "
                       "was actively in use by other operations",
                       "uri"_attr = _uri);
-        results->warnings.push_back(msg);
+        results->addWarning(msg);
         return;
     }
 
@@ -1560,8 +1558,7 @@ void WiredTigerRecordStore::validate(OperationContext* opCtx, bool full, Validat
                 "Verification returned error. This indicates structural damage. Not examining "
                 "individual documents",
                 "error"_attr = errorStr);
-    results->errors.push_back(msg);
-    results->valid = false;
+    results->addError(msg);
 }
 
 void WiredTigerRecordStore::appendNumericCustomStats(OperationContext* opCtx,

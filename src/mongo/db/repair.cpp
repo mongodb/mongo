@@ -316,8 +316,8 @@ Status repairCollection(OperationContext* opCtx,
           "results"_attr = output.done(),
           "detailedResults"_attr = detailedResults.done());
 
-    if (validateResults.repaired) {
-        if (validateResults.valid) {
+    if (validateResults.getRepaired()) {
+        if (validateResults.isValid()) {
             LOGV2(4934000, "Validate successfully repaired all data", "collection"_attr = nss);
         } else {
             LOGV2(4934001, "Validate was unable to repair all data", "collection"_attr = nss);
@@ -327,7 +327,7 @@ Status repairCollection(OperationContext* opCtx,
     }
 
     // If not valid, whether repair ran or not, indexes will need to be rebuilt.
-    if (!validateResults.valid) {
+    if (!validateResults.isValid()) {
         return rebuildIndexesForNamespace(opCtx, nss, engine);
     }
     return Status::OK();

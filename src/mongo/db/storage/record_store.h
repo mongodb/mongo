@@ -70,7 +70,7 @@ class MAdvise;
 class OperationContext;
 class RecordStore;
 
-struct ValidateResults;
+class ValidateResults;
 class ValidateAdaptor;
 
 /**

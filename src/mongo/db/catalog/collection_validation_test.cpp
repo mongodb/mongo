@@ -147,8 +147,8 @@ std::vector<std::pair<BSONObj, ValidateResults>> foregroundValidate(
         validateResults.appendToResultObj(&validateResultsBuilder, true /* debugging */);
         auto validateResultsObj = validateResultsBuilder.obj();
 
-        ASSERT_EQ(validateResults.valid, valid) << obj << validateResultsObj;
-        ASSERT_EQ(validateResults.errors.size(), static_cast<long unsigned int>(numErrors))
+        ASSERT_EQ(validateResults.isValid(), valid) << obj << validateResultsObj;
+        ASSERT_EQ(validateResults.getErrors().size(), static_cast<long unsigned int>(numErrors))
             << obj << validateResultsObj;
 
         ASSERT_EQ(obj.getIntField("nrecords"), numRecords) << obj << validateResultsObj;
@@ -162,8 +162,8 @@ std::vector<std::pair<BSONObj, ValidateResults>> foregroundValidate(
 
 ValidateResults omitTransientWarnings(const ValidateResults& results) {
     ValidateResults copy = results;
-    copy.warnings.clear();
-    for (const auto& warning : results.warnings) {
+    copy.getWarningsUnsafe()->clear();
+    for (const auto& warning : results.getWarnings()) {
         std::string endMsg =
             "This is a transient issue as the collection was actively in use by other "
             "operations.";
@@ -172,10 +172,10 @@ ValidateResults omitTransientWarnings(const ValidateResults& results) {
             bool startsWith = std::equal(beginMsg.begin(), beginMsg.end(), warning.begin());
             bool endsWith = std::equal(endMsg.rbegin(), endMsg.rend(), warning.rbegin());
             if (!(startsWith && endsWith)) {
-                copy.warnings.emplace_back(warning);
+                copy.addWarning(warning);
             }
         } else {
-            copy.warnings.emplace_back(warning);
+            copy.addWarning(warning);
         }
     }
     return copy;
@@ -252,6 +252,7 @@ BSONObj resultToBSON(const ValidateResults& vr) {
     vr.appendToResultObj(&builder, true /* debugging */);
     return builder.obj();
 }
+
 
 // Verify that calling validate() on an empty collection with different validation levels returns an
 // OK status.
@@ -437,13 +438,14 @@ TEST_F(CollectionValidationTest, ValidateOldUniqueIndexKeyWarning) {
     for (const auto& result : results) {
         const auto& validateResults = result.second;
         const auto obj = resultToBSON(validateResults);
-        ASSERT(validateResults.valid) << obj;
+        ASSERT(validateResults.isValid()) << obj;
         const auto warningsWithoutTransientErrors = omitTransientWarnings(validateResults);
-        ASSERT_EQ(warningsWithoutTransientErrors.warnings.size(), 1U) << obj;
-        ASSERT_STRING_CONTAINS(warningsWithoutTransientErrors.warnings[0],
+        ASSERT_EQ(warningsWithoutTransientErrors.getWarnings().size(), 1U) << obj;
+        ASSERT_STRING_CONTAINS(warningsWithoutTransientErrors.getWarnings()[0],
                                "Unique index a_1 has one or more keys in the old format")
             << obj;
     }
 }
+
 }  // namespace
 }  // namespace mongo
