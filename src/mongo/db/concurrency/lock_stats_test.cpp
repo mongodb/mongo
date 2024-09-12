@@ -286,12 +286,12 @@ TEST_F(LockStatsTest, CumulativeWaitTime) {
         ON_BLOCK_EXIT([&] { lockerConflict.unlockGlobal(); });
 
         ASSERT_THROWS_CODE(
-            lockerConflict.lock(opCtx.get(), resId1, MODE_S, Date_t::now() + Milliseconds(5)),
+            lockerConflict.lock(opCtx.get(), resId1, MODE_S, Date_t::now() + Seconds(2)),
             AssertionException,
             ErrorCodes::LockTimeout);
 
         ASSERT_THROWS_CODE(
-            lockerConflict.lock(opCtx.get(), resId2, MODE_S, Date_t::now() + Milliseconds(5)),
+            lockerConflict.lock(opCtx.get(), resId2, MODE_S, Date_t::now() + Seconds(2)),
             AssertionException,
             ErrorCodes::LockTimeout);
     }
@@ -301,8 +301,12 @@ TEST_F(LockStatsTest, CumulativeWaitTime) {
 
     auto wait1 = stats.get(resId1, MODE_S).combinedWaitTimeMicros;
     auto wait2 = stats.get(resId2, MODE_S).combinedWaitTimeMicros;
-    ASSERT_GREATER_THAN(wait1, 0);
-    ASSERT_GREATER_THAN(wait2, 0);
+    ASSERT_GREATER_THAN_OR_EQUALS(wait1, 2 * 1000 * 1000);
+    ASSERT_GREATER_THAN_OR_EQUALS(wait2, 2 * 1000 * 1000);
+    // We give a generous leeway of 500msecs (2.5 seconds, or 2,500,000 microseconds) for the upper
+    // bound of the calculation to ensure it's growing correctly.
+    ASSERT_LESS_THAN(wait1, 2.5 * 1000 * 1000);
+    ASSERT_LESS_THAN(wait2, 2.5 * 1000 * 1000);
     ASSERT_EQ(stats.getCumulativeWaitTimeMicros(), wait1 + wait2);
 }
 
