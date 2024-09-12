@@ -623,6 +623,21 @@ public:
     void clearDatabaseProfileSettings(const DatabaseName& dbName);
 
     /**
+     * Marks the given database as drop pending.
+     */
+    void addDropPending(const DatabaseName&);
+
+    /**
+     * Unmarks the given database as drop pending.
+     */
+    void removeDropPending(const DatabaseName&);
+
+    /**
+     * Returns whether the given database is marked as drop pending.
+     */
+    bool isDropPending(const DatabaseName&) const;
+
+    /**
      * Statistics for the types of collections in the catalog.
      * Total collections = 'internal' + 'userCollections'
      */
@@ -900,6 +915,9 @@ private:
     immutable::
         unordered_map<std::string, std::weak_ptr<IndexCatalogEntry>, StringMapHasher, StringMapEq>
             _dropPendingIndex;
+
+    // Set of databases which are currently in the process of being dropped.
+    immutable::unordered_set<DatabaseName> _dropPendingDatabases;
 
     // Incremented whenever the CollectionCatalog gets closed and reopened (onCloseCatalog and
     // onOpenCatalog).

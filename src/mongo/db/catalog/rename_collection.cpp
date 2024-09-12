@@ -138,13 +138,14 @@ Status checkSourceAndTargetNamespaces(OperationContext* opCtx,
         return {ErrorCodes::IllegalOperation,
                 "Cannot rename collections between a replicated and an unreplicated database"};
 
+    auto catalog = CollectionCatalog::get(opCtx);
+
     auto db = DatabaseHolder::get(opCtx)->getDb(opCtx, source.dbName());
-    if (!db || db->isDropPending(opCtx))
+    if (!db || catalog->isDropPending(source.dbName()))
         return Status(ErrorCodes::NamespaceNotFound,
                       str::stream() << "Database " << source.dbName().toStringForErrorMsg()
                                     << " does not exist or is drop pending");
 
-    auto catalog = CollectionCatalog::get(opCtx);
     const auto sourceColl = catalog->lookupCollectionByNamespace(opCtx, source);
     if (!sourceColl) {
         if (CollectionCatalog::get(opCtx)->lookupView(opCtx, source))

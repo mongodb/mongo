@@ -149,36 +149,17 @@ void DatabaseTest::tearDown() {
     ServiceContextMongoDTest::tearDown();
 }
 
-TEST_F(DatabaseTest, SetDropPendingThrowsExceptionIfDatabaseIsAlreadyInADropPendingState) {
-    writeConflictRetry(_opCtx.get(), "testSetDropPending", _nss, [this] {
-        AutoGetDb autoDb(_opCtx.get(), _nss.dbName(), MODE_X);
-        auto db = autoDb.ensureDbExists(_opCtx.get());
-        ASSERT_TRUE(db);
-
-        ASSERT_FALSE(db->isDropPending(_opCtx.get()));
-        db->setDropPending(_opCtx.get(), true);
-        ASSERT_TRUE(db->isDropPending(_opCtx.get()));
-
-        db->setDropPending(_opCtx.get(), true);
-        ASSERT_TRUE(db->isDropPending(_opCtx.get()));
-
-        db->setDropPending(_opCtx.get(), false);
-        ASSERT_FALSE(db->isDropPending(_opCtx.get()));
-
-        // It's fine to reset 'dropPending' multiple times.
-        db->setDropPending(_opCtx.get(), false);
-        ASSERT_FALSE(db->isDropPending(_opCtx.get()));
-    });
-}
-
 TEST_F(DatabaseTest, CreateCollectionThrowsExceptionWhenDatabaseIsInADropPendingState) {
     writeConflictRetry(
         _opCtx.get(), "testÇreateCollectionWhenDatabaseIsInADropPendingState", _nss, [this] {
+            CollectionCatalog::write(_opCtx.get(),
+                                     [dbName = _nss.dbName()](CollectionCatalog& catalog) {
+                                         catalog.addDropPending(dbName);
+                                     });
+
             AutoGetDb autoDb(_opCtx.get(), _nss.dbName(), MODE_X);
             auto db = autoDb.ensureDbExists(_opCtx.get());
             ASSERT_TRUE(db);
-
-            db->setDropPending(_opCtx.get(), true);
 
             WriteUnitOfWork wuow(_opCtx.get());
 

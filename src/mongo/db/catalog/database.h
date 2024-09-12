@@ -90,19 +90,6 @@ public:
 
     virtual const DatabaseName& name() const = 0;
 
-    /**
-     * Sets the 'drop-pending' state of this Database.
-     * This is done at the beginning of a dropDatabase operation and is used to reject subsequent
-     * collection creation requests on this database.
-     * The database must be locked in MODE_X when calling this function.
-     */
-    virtual void setDropPending(OperationContext* opCtx, bool dropPending) = 0;
-
-    /**
-     * Returns the 'drop-pending' state of this Database.
-     */
-    virtual bool isDropPending(OperationContext* opCtx) const = 0;
-
     virtual void getStats(OperationContext* opCtx,
                           DBStats* output,
                           bool includeFreeStorage,

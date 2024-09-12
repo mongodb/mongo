@@ -61,10 +61,6 @@ public:
         return _name;
     }
 
-    void setDropPending(OperationContext* opCtx, bool dropPending) final;
-
-    bool isDropPending(OperationContext* opCtx) const final;
-
     void getStats(OperationContext* opCtx,
                   DBStats* output,
                   bool includeFreeStorage,
@@ -176,11 +172,6 @@ private:
     const DatabaseName _name;  // "dbname"
 
     const NamespaceString _viewsName;  // "dbname.system.views"
-
-    // If '_dropPending' is true, this Database is in the midst of a two-phase drop. No new
-    // collections may be created in this Database.
-    // This variable may only be read/written while the database is locked in MODE_X.
-    AtomicWord<bool> _dropPending{false};
 };
 
 }  // namespace mongo

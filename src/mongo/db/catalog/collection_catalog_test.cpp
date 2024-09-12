@@ -710,6 +710,19 @@ TEST_F(CollectionCatalogTest, DatabaseProfileLevel) {
               serverGlobalParams.defaultProfile + 1);
 }
 
+TEST_F(CollectionCatalogTest, DropPendingDatabase) {
+    auto dbName = DatabaseName::createDatabaseName_forTest(boost::none, "DropPendingDatabase");
+    ASSERT_FALSE(catalog.isDropPending(dbName));
+    catalog.addDropPending(dbName);
+    ASSERT_TRUE(catalog.isDropPending(dbName));
+    catalog.addDropPending(dbName);
+    ASSERT_TRUE(catalog.isDropPending(dbName));
+    catalog.removeDropPending(dbName);
+    ASSERT_FALSE(catalog.isDropPending(dbName));
+    catalog.removeDropPending(dbName);
+    ASSERT_FALSE(catalog.isDropPending(dbName));
+}
+
 class ForEachCollectionFromDbTest : public CatalogTestFixture {
 public:
     void createTestData() {

@@ -282,17 +282,6 @@ void DatabaseImpl::init(OperationContext* const opCtx) {
     }
 }
 
-void DatabaseImpl::setDropPending(OperationContext* opCtx, bool dropPending) {
-    auto mode = dropPending ? MODE_X : MODE_IX;
-    invariant(shard_role_details::getLocker(opCtx)->isDbLockedForMode(name(), mode));
-    _dropPending.store(dropPending);
-}
-
-bool DatabaseImpl::isDropPending(OperationContext* opCtx) const {
-    invariant(shard_role_details::getLocker(opCtx)->isDbLockedForMode(name(), MODE_IS));
-    return _dropPending.load();
-}
-
 void DatabaseImpl::getStats(OperationContext* opCtx,
                             DBStats* output,
                             bool includeFreeStorage,
@@ -660,7 +649,7 @@ void DatabaseImpl::_checkCanCreateCollection(OperationContext* opCtx,
     uassert(ErrorCodes::DatabaseDropPending,
             str::stream() << "Cannot create collection " << nss.toStringForErrorMsg()
                           << " - database is in the process of being dropped.",
-            !_dropPending.load());
+            !CollectionCatalog::get(opCtx)->isDropPending(nss.dbName()));
 }
 
 Status DatabaseImpl::createView(OperationContext* opCtx,

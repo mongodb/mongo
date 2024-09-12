@@ -113,8 +113,6 @@ Status _checkNssAndReplState(OperationContext* opCtx, Database* db, const Databa
 /**
  * Removes database from catalog and writes dropDatabase entry to oplog.
  *
- * Ensures that the database's drop-pending flag is reset to false if the drop fails.
- *
  * Throws on errors.
  */
 void _finishDropDatabase(OperationContext* opCtx,
@@ -124,9 +122,6 @@ void _finishDropDatabase(OperationContext* opCtx,
                          bool abortIndexBuilds,
                          bool fromMigrate) {
     invariant(shard_role_details::getLocker(opCtx)->isDbLockedForMode(dbName, MODE_X));
-
-    // If DatabaseHolder::dropDb() fails, we should reset the drop-pending state on Database.
-    ScopeGuard dropPendingGuard([db, opCtx] { db->setDropPending(opCtx, false); });
 
     if (!abortIndexBuilds) {
         IndexBuildsCoordinator::get(opCtx)->assertNoBgOpInProgForDb(dbName);
@@ -148,7 +143,6 @@ void _finishDropDatabase(OperationContext* opCtx,
 
         auto databaseHolder = DatabaseHolder::get(opCtx);
         databaseHolder->dropDb(opCtx, db);
-        dropPendingGuard.dismiss();
 
         if (MONGO_unlikely(throwWriteConflictExceptionDuringDropDatabase.shouldFail())) {
             throwWriteConflictException(
@@ -206,7 +200,7 @@ Status _dropDatabase(OperationContext* opCtx,
             return status;
         }
 
-        if (db->isDropPending(opCtx)) {
+        if (CollectionCatalog::get(opCtx)->isDropPending(dbName)) {
             return Status(ErrorCodes::DatabaseDropPending,
                           str::stream() << "The database is currently being dropped. Database: "
                                         << dbName.toStringForErrorMsg());
@@ -220,33 +214,19 @@ Status _dropDatabase(OperationContext* opCtx,
         }
 
         LOGV2(20337, "dropDatabase - starting", logAttrs(dbName));
-        db->setDropPending(opCtx, true);
-
-        // If Database::dropCollectionEvenIfSystem() fails, we should reset the drop-pending state
-        // on Database.
-        ScopeGuard dropPendingGuard([&db, opCtx] { db->setDropPending(opCtx, false); });
+        CollectionCatalog::write(
+            opCtx, [&dbName](CollectionCatalog& catalog) { catalog.addDropPending(dbName); });
+        ScopeGuard dropPendingGuard([opCtx, &dbName] {
+            CollectionCatalog::write(opCtx, [&dbName](CollectionCatalog& catalog) {
+                catalog.removeDropPending(dbName);
+            });
+        });
         auto indexBuildsCoord = IndexBuildsCoordinator::get(opCtx);
 
         if (abortIndexBuilds) {
             // We need to keep aborting all the active index builders for this database until there
             // are none left when we retrieve the exclusive database lock again.
             while (indexBuildsCoord->inProgForDb(dbName)) {
-                // Create a scope guard to reset the drop-pending state on the database to false if
-                // there is a replica state change that kills this operation while the locks were
-                // yielded.
-                ScopeGuard dropPendingGuardWhileUnlocked(
-                    [dbName, opCtx, &dropPendingGuard, tenantLockMode] {
-                        // This scope guard must succeed in acquiring locks and reverting the drop
-                        // pending state even when the failure is due to an interruption.
-                        UninterruptibleLockGuard noInterrupt(opCtx);  // NOLINT.
-                        AutoGetDb autoDB(
-                            opCtx, dbName, MODE_X /* database lock mode*/, tenantLockMode);
-                        if (auto db = autoDB.getDb()) {
-                            db->setDropPending(opCtx, false);
-                        }
-                        dropPendingGuard.dismiss();
-                    });
-
                 // Drop locks. The drop helper will acquire locks on our behalf.
                 autoDB = boost::none;
 
@@ -263,8 +243,6 @@ Status _dropDatabase(OperationContext* opCtx,
 
                 autoDB.emplace(opCtx, dbName, MODE_X /* database lock mode*/, tenantLockMode);
                 db = autoDB->getDb();
-
-                dropPendingGuardWhileUnlocked.dismiss();
 
                 // Abandon the snapshot as the index catalog will compare the in-memory state to the
                 // disk state, which may have changed when we released the collection lock
@@ -394,30 +372,19 @@ Status _dropDatabase(OperationContext* opCtx,
             });
         }
 
-
-        // _finishDropDatabase creates its own scope guard to ensure drop-pending is unset.
-        dropPendingGuard.dismiss();
-
         // If there are no collection drops to wait for, we complete the drop database operation.
         if (numCollectionsToDrop == 0U && latestDropPendingOpTime.isNull()) {
             _finishDropDatabase(
                 opCtx, dbName, db, numCollections, abortIndexBuilds, markFromMigrate);
             return Status::OK();
         }
+
+        dropPendingGuard.dismiss();
     }
 
-    // Create a scope guard to reset the drop-pending state on the Database to false if there are
-    // any errors while we await the replication of any collection drops and then reacquire the
-    // locks (which can throw) needed to finish the drop database.
-    ScopeGuard dropPendingGuardWhileUnlocked([dbName, opCtx] {
-        // This scope guard must succeed in acquiring locks and reverting the drop pending state
-        // even when the failure is due to an interruption.
-        UninterruptibleLockGuard noInterrupt(opCtx);  // NOLINT.
-
-        AutoGetDb autoDB(opCtx, dbName, MODE_IX);
-        if (auto db = autoDB.getDb()) {
-            db->setDropPending(opCtx, false);
-        }
+    ScopeGuard dropPendingGuard([opCtx, &dbName] {
+        CollectionCatalog::write(
+            opCtx, [&dbName](CollectionCatalog& catalog) { catalog.removeDropPending(dbName); });
     });
 
     // Verify again that we haven't obtained any other locks before replication.
@@ -508,9 +475,6 @@ Status _dropDatabase(OperationContext* opCtx,
                           << replCoord->getMemberState().toString() << " while waiting for "
                           << numCollectionsToDrop << " pending collection drop(s).");
     }
-
-    // _finishDropDatabase creates its own scope guard to ensure drop-pending is unset.
-    dropPendingGuardWhileUnlocked.dismiss();
 
     _finishDropDatabase(opCtx, dbName, db, numCollections, abortIndexBuilds, markFromMigrate);
 

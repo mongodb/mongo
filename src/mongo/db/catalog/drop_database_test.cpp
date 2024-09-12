@@ -129,7 +129,7 @@ repl::OpTime OpObserverMock::onDropCollection(OperationContext* opCtx,
 
     // Check drop-pending flag in Database if provided.
     if (db) {
-        ASSERT_TRUE(db->isDropPending(opCtx));
+        ASSERT_TRUE(CollectionCatalog::get(opCtx)->isDropPending(db->name()));
     }
 
     uassert(
@@ -353,11 +353,7 @@ TEST_F(DropDatabaseTest, DropDatabaseResetsDropPendingStateOnException) {
                                 ErrorCodes::OperationFailed,
                                 "onDropCollection() failed");
 
-    {
-        AutoGetDb autoDb(_opCtx.get(), _nss.dbName(), MODE_X);
-        auto db = autoDb.getDb();
-        ASSERT_FALSE(db->isDropPending(_opCtx.get()));
-    }
+    ASSERT_FALSE(CollectionCatalog::get(_opCtx.get())->isDropPending(_nss.dbName()));
 }
 
 void _testDropDatabaseResetsDropPendingStateIfAwaitReplicationFails(OperationContext* opCtx,
@@ -373,7 +369,7 @@ void _testDropDatabaseResetsDropPendingStateIfAwaitReplicationFails(OperationCon
     auto db = autoDb.getDb();
     if (expectDbPresent) {
         ASSERT_TRUE(db);
-        ASSERT_FALSE(db->isDropPending(opCtx));
+        ASSERT_FALSE(CollectionCatalog::get(opCtx)->isDropPending(nss.dbName()));
     } else {
         ASSERT_FALSE(db);
     }
@@ -448,11 +444,8 @@ TEST_F(DropDatabaseTest,
                                             << " because we transitioned from PRIMARY to SECONDARY"
                                             << " while waiting for 1 pending collection drop(s)."));
 
-    // Check drop-pending flag in Database after dropDatabase() fails.
-    AutoGetDb autoDb(_opCtx.get(), _nss.dbName(), MODE_X);
-    auto db = autoDb.getDb();
-    ASSERT_TRUE(db);
-    ASSERT_FALSE(db->isDropPending(_opCtx.get()));
+    // Check drop-pending flag after dropDatabase() fails.
+    ASSERT_FALSE(CollectionCatalog::get(_opCtx.get())->isDropPending(_nss.dbName()));
 }
 
 TEST_F(DropDatabaseTest, DropDatabaseFailsToDropAdmin) {

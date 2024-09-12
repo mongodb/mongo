@@ -2167,6 +2167,18 @@ void CollectionCatalog::clearDatabaseProfileSettings(const DatabaseName& dbName)
     _databaseProfileSettings = _databaseProfileSettings.erase(dbName);
 }
 
+void CollectionCatalog::addDropPending(const DatabaseName& dbName) {
+    _dropPendingDatabases = _dropPendingDatabases.insert(dbName);
+}
+
+void CollectionCatalog::removeDropPending(const DatabaseName& dbName) {
+    _dropPendingDatabases = _dropPendingDatabases.erase(dbName);
+}
+
+bool CollectionCatalog::isDropPending(const DatabaseName& dbName) const {
+    return _dropPendingDatabases.count(dbName);
+}
+
 CollectionCatalog::Stats CollectionCatalog::getStats() const {
     return _stats;
 }
