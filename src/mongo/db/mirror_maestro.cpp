@@ -99,6 +99,7 @@ constexpr auto kMirroredReadsParamName = "mirrorReads"_sd;
 
 constexpr auto kMirroredReadsSeenKey = "seen"_sd;
 constexpr auto kMirroredReadsSentKey = "sent"_sd;
+constexpr auto kMirroredReadsErroredDuringSendKey = "erroredDuringSend"_sd;
 constexpr auto kMirroredReadsProcessedAsSecondaryKey = "processedAsSecondary"_sd;
 constexpr auto kMirroredReadsResolvedKey = "resolved"_sd;
 constexpr auto kMirroredReadsResolvedBreakdownKey = "resolvedBreakdown"_sd;
@@ -213,6 +214,7 @@ public:
         BSONObjBuilder section;
         section.append(kMirroredReadsSeenKey, seen.loadRelaxed());
         section.append(kMirroredReadsSentKey, sent.loadRelaxed());
+        section.append(kMirroredReadsErroredDuringSendKey, erroredDuringSend.loadRelaxed());
         section.append(kMirroredReadsProcessedAsSecondaryKey, processedAsSecondary.loadRelaxed());
 
         if (MONGO_unlikely(mirrorMaestroExpectsResponse.shouldFail())) {
@@ -263,16 +265,19 @@ public:
 
     // Counts the number of operations (as primary) recognized as "to be mirrored".
     AtomicWord<CounterT> seen;
-    // Counts the number of remote requests (for mirroring as primary) sent over the network.
+    // Counts the number of remote requests (for mirroring as primary) that have ever been
+    // scheduled to be sent over the network.
     AtomicWord<CounterT> sent;
+    // Counts the number of remote requests (as primary) that failed with some error when sending.
+    AtomicWord<CounterT> erroredDuringSend;
     // Counts the number of responses (as primary) from secondaries after mirrored operations.
     AtomicWord<CounterT> resolved;
     // Counts the number of responses (as primary) of successful mirrored operations. Disabled by
     // default, hidden behind the mirrorMaestroExpectsResponse fail point.
     AtomicWord<CounterT> succeeded;
-    // Counts the number of operations (as primary) that are scheduled to be mirrored, but
-    // haven't yet been sent. Disabled by default, hidden behind the mirrorMaestroTracksPending
-    // fail point.
+    // Counts the number of operations (as primary) that are currently scheduled to be mirrored,
+    // but have not yet received any response. Disabled by default, hidden behind the
+    // mirrorMaestroTracksPending fail point.
     AtomicWord<CounterT> pending;
     // Counts the number of mirrored operations processed successfully by this node as a
     // secondary. Disabled by default, hidden behind the mirrorMaestroExpectsResponse fail point.
@@ -393,20 +398,9 @@ void MirrorMaestroImpl::tryMirror(const std::shared_ptr<CommandInvocation>& invo
     // building new bsons and evaluating randomness in a less important context.
     auto requestState = std::make_unique<MirroredRequestState>(
         this, std::move(hosts), invocation, std::move(params));
-    if (MONGO_unlikely(mirrorMaestroTracksPending.shouldFail())) {
-        // We've scheduled the operation to be mirrored; it is now "pending" until it has actually
-        // been sent to a secondary.
-        gMirroredReadsSection.pending.fetchAndAdd(1);
-    }
     ExecutorFuture(_executor)  //
         .getAsync([clientExecutorHandle,
                    requestState = std::move(requestState)](const auto& status) mutable {
-            ON_BLOCK_EXIT([&] {
-                if (MONGO_unlikely(mirrorMaestroTracksPending.shouldFail())) {
-                    // The read has been sent to at least one secondary, so it's no longer pending
-                    gMirroredReadsSection.pending.fetchAndSubtract(1);
-                }
-            });
             if (!ErrorCodes::isShutdownError(status)) {
                 invariant(status);
                 requestState->mirror();
@@ -452,6 +446,14 @@ void MirrorMaestroImpl::_mirror(const std::vector<HostAndPort>& hosts,
         auto& host = hosts[(startIndex + i) % hosts.size()];
         std::weak_ptr<executor::TaskExecutor> wExec(_executor);
         auto mirrorResponseCallback = [host, wExec = std::move(wExec)](auto& args) {
+            if (!args.response.status.isOK()) {
+                gMirroredReadsSection.erroredDuringSend.fetchAndAdd(1);
+            }
+
+            if (MONGO_unlikely(mirrorMaestroTracksPending.shouldFail())) {
+                gMirroredReadsSection.pending.fetchAndSubtract(1);
+            }
+
             if (MONGO_likely(!mirrorMaestroExpectsResponse.shouldFail())) {
                 // If we don't expect responses, then there is nothing to do here
                 return;
@@ -461,7 +463,8 @@ void MirrorMaestroImpl::_mirror(const std::vector<HostAndPort>& hosts,
             gMirroredReadsSection.resolved.fetchAndAdd(1);
             gMirroredReadsSection.resolvedBreakdown.onResponseReceived(host);
 
-            if (getStatusFromCommandResult(args.response.data).isOK()) {
+            auto commandResultStatus = getStatusFromCommandResult(args.response.data);
+            if (commandResultStatus.isOK()) {
                 gMirroredReadsSection.succeeded.fetchAndAdd(1);
             }
 
@@ -477,8 +480,7 @@ void MirrorMaestroImpl::_mirror(const std::vector<HostAndPort>& hosts,
                 if (args.response.status == ErrorCodes::CallbackCanceled) {
                     if (auto exec = wExec.lock(); exec && exec->isShuttingDown()) {
                         // The mirroring command was canceled as part of the executor being
-                        // shutdown. We avoid crashing here since it's possible that node shutdown
-                        // was triggered unexpectedly as part of our test infrastructure.
+                        // shutdown.
                         LOGV2_INFO(
                             7558901,
                             "Mirroring command callback was canceled due to maestro shutdown",
@@ -487,7 +489,7 @@ void MirrorMaestroImpl::_mirror(const std::vector<HostAndPort>& hosts,
                         return;
                     }
                 }
-                LOGV2_FATAL(4717301,
+                LOGV2_ERROR(4717301,
                             "Received mirroring response with a non-okay status",
                             "error"_attr = args.response,
                             "host"_attr = host.toString());
@@ -513,6 +515,11 @@ void MirrorMaestroImpl::_mirror(const std::vector<HostAndPort>& hosts,
         }
 
         tassert(status);
+        if (MONGO_unlikely(mirrorMaestroTracksPending.shouldFail())) {
+            // We've scheduled the operation to be mirrored; it is now "pending" until it has
+            // actually been resolved.
+            gMirroredReadsSection.pending.fetchAndAdd(1);
+        }
         gMirroredReadsSection.sent.fetchAndAdd(1);
     }
 } catch (const DBException& e) {

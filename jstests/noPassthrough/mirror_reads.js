@@ -18,8 +18,8 @@ const kBurstCount = 1000;
 const kDbName = "mirrored_reads_test";
 const kCollName = "coll";
 // We use an arbitrarily large maxTimeMS to avoid timing out when processing the mirrored read
-// on slower builds. Otherwise, on slower builds, the primary.mirroredReads.sent metric could
-// be incremented but not the secondary.mirroredReads.processedAsSecondary metric.
+// on slower builds. We want to give the secondary.mirroredReads.processedAsSecondary metric as
+// much time as possible to increment.
 const kLargeMaxTimeMS = 100000000;
 
 function getMirroredReadsStats(node) {
@@ -57,9 +57,9 @@ function sendReads({rst, db, cmd, burstCount, initialStatsOnPrimary}) {
 
 /* Wait for all reads to resolve on primary, and check various other metrics related to the
    primary. */
-function waitForReadsToResolveOnPrimary(rst, initialStatsOnPrimary, expectSuccess) {
+function waitForReadsToResolveOnPrimary(rst, initialStatsOnPrimary, readsExpectedToFail) {
     let primary = rst.getPrimary();
-    let sent, succeeded;
+    let sent, succeeded, erroredDuringSend;
     // Wait for stats to reflect that all the sent reads have been resolved.
     assert.soon(() => {
         let currentStatsOnPrimary = getMirroredReadsStats(primary);
@@ -67,28 +67,31 @@ function waitForReadsToResolveOnPrimary(rst, initialStatsOnPrimary, expectSucces
             getStatDifferences(initialStatsOnPrimary, currentStatsOnPrimary);
         sent = statDifferenceOnPrimary.sent;
         succeeded = statDifferenceOnPrimary.succeeded;
+        erroredDuringSend = statDifferenceOnPrimary.erroredDuringSend;
         let resolved = statDifferenceOnPrimary.resolved;
         let seen = statDifferenceOnPrimary.seen;
         // `pending` refers to the number of reads the primary has decided to mirror to
-        // secondaries, but hasn't yet sent. Unlike the other mirrored reads metrics, this metric
-        // does not accumulate, and refers only to the reads currently pending.
+        // secondaries, but hasn't yet resolved. Unlike the other mirrored reads metrics, this
+        // metric does not accumulate, and refers only to the reads currently pending.
         let pending = currentStatsOnPrimary.pending;
 
         jsTestLog("Verifying that all mirrored reads sent from primary have been resolved: " +
                   tojson({
                       sent: sent,
+                      erroredDuringSend: erroredDuringSend,
                       resolved: resolved,
                       succeeded: succeeded,
                       pending: pending,
                       seen: seen
                   }));
-        // Verify that the reads mirrored to the secondaries have responded and secondaries receive
-        // the same amount of mirrored reads that were sent by the primary.
+        // Verify that the reads mirrored to the secondaries have been resolved by the primary.
         return ((pending == 0) && (sent === resolved));
     }, "Did not resolve all requests within time limit", 10000);
 
-    if (expectSuccess) {
-        assert.eq(succeeded, sent);
+    if (!readsExpectedToFail) {
+        // If we don't expect to fail from some fail point, then we expect most of our reads
+        // to succeed barring some transient errors.
+        assert.eq(succeeded + erroredDuringSend, sent);
     }
 }
 
@@ -104,15 +107,17 @@ function getProcessedAsSecondaryTotal(rst, initialStatsOnSecondaries) {
     return processedAsSecondaryTotal;
 }
 
-function checkStatsOnSecondaries(
-    rst, initialStatsOnPrimary, initialStatsOnSecondaries, currentStatsOnPrimary, expectSuccess) {
+function checkStatsOnSecondaries(rst,
+                                 initialStatsOnPrimary,
+                                 initialStatsOnSecondaries,
+                                 currentStatsOnPrimary,
+                                 readsExpectedToFail) {
     let statDifferenceOnPrimary = getStatDifferences(initialStatsOnPrimary, currentStatsOnPrimary);
     let sent = statDifferenceOnPrimary.sent;
+    let erroredDuringSend = statDifferenceOnPrimary.erroredDuringSend;
     let processedAsSecondaryTotal = getProcessedAsSecondaryTotal(rst, initialStatsOnSecondaries);
-    // TODO(SERVER-91458): The assert.soon for this metric was removed for test accuracy reasons.
-    // SERVER-91458 expects to fix the underlying bug.
-    assert.eq(processedAsSecondaryTotal, sent);
-    if (expectSuccess) {
+    assert.eq(processedAsSecondaryTotal + erroredDuringSend, sent);
+    if (!readsExpectedToFail) {
         let succeeded = statDifferenceOnPrimary.succeeded;
         assert.eq(processedAsSecondaryTotal, succeeded);
     }
@@ -147,7 +152,7 @@ function sendAndCheckReadsSucceedWithRate({rst, db, cmd, minRate, maxRate, burst
 
     sendReads({rst, db, cmd, burstCount, initialStatsOnPrimary});
 
-    waitForReadsToResolveOnPrimary(rst, initialStatsOnPrimary, true);
+    waitForReadsToResolveOnPrimary(rst, initialStatsOnPrimary, false);
 
     // Stats should be stable now that all of the reads have resolved.
     let currentStatsOnPrimary = getMirroredReadsStats(primary);
@@ -155,16 +160,56 @@ function sendAndCheckReadsSucceedWithRate({rst, db, cmd, minRate, maxRate, burst
               tojson({current: currentStatsOnPrimary, start: initialStatsOnPrimary}));
 
     checkStatsOnSecondaries(
-        rst, initialStatsOnPrimary, initialStatsOnSecondaries, currentStatsOnPrimary, true);
+        rst, initialStatsOnPrimary, initialStatsOnSecondaries, currentStatsOnPrimary, false);
     checkReadsMirroringRate(
         {rst, cmd, minRate, maxRate, initialStatsOnPrimary, currentStatsOnPrimary});
 }
 
-/* Send `burstCount` mirror reads. Verify that the processedAsSecondary metric does not increment
-   if the command times out on the secondary before the secondary is able to process the read. */
-function sendAndCheckReadsTimedOutOnSecondaries({rst, db, cmd, burstCount}) {
+/* Send `burstCount` mirror reads. Verify that the metrics when the command fail before processing
+   on the secondaries. */
+function sendAndCheckReadsFailBeforeProcessing(
+    {rst, db, cmd, burstCount, expectErroredDuringSend}) {
     const primary = rst.getPrimary();
     const secondaries = rst.getSecondaries();
+
+    let initialStatsOnPrimary = getMirroredReadsStats(primary);
+    let initialStatsOnSecondaries = {};
+    for (const secondary of secondaries) {
+        initialStatsOnSecondaries[secondary.nodeId] = (getMirroredReadsStats(secondary));
+    }
+
+    sendReads({rst, db, cmd, burstCount, initialStatsOnPrimary});
+
+    waitForReadsToResolveOnPrimary(rst, initialStatsOnPrimary, true);
+
+    // Stats should be stable now that all of the reads have resolved.
+    let currentStatsOnPrimary = getMirroredReadsStats(primary);
+    jsTestLog("Verifying primary statistics: " +
+              tojson({current: currentStatsOnPrimary, start: initialStatsOnPrimary}));
+
+    let processedAsSecondaryTotal = getProcessedAsSecondaryTotal(rst, initialStatsOnSecondaries);
+    let statDifferenceOnPrimary = getStatDifferences(initialStatsOnPrimary, currentStatsOnPrimary);
+    let succeeded = statDifferenceOnPrimary.succeeded;
+    let erroredDuringSend = statDifferenceOnPrimary.erroredDuringSend;
+
+    // Expect no mirrored reads to be processed because the fail point times out the query
+    // before the processed metric is incremented.
+    assert.eq(processedAsSecondaryTotal, 0);
+    assert.eq(succeeded, 0);
+
+    if (expectErroredDuringSend) {
+        assert.eq(erroredDuringSend, statDifferenceOnPrimary.sent);
+    } else {
+        assert.eq(erroredDuringSend, 0);
+    }
+}
+
+/* Verify that the processedAsSecondary metric does not increment if the command fails
+   on the secondary before the secondary is able to process the read. */
+function verifyProcessedAsSecondaryOnEarlyError(rst) {
+    // Mirror every mirror-able command.
+    const samplingRate = 1.0;
+    assert.commandWorked(setParameter({rst: rst, value: {samplingRate: samplingRate}}));
 
     for (const secondary of rst.getSecondaries()) {
         assert.commandWorked(secondary.getDB(kDbName).adminCommand({
@@ -178,34 +223,44 @@ function sendAndCheckReadsTimedOutOnSecondaries({rst, db, cmd, burstCount}) {
         }));
     }
 
-    let initialStatsOnPrimary = getMirroredReadsStats(primary);
-    let initialStatsOnSecondaries = {};
-    for (const secondary of secondaries) {
-        initialStatsOnSecondaries[secondary.nodeId] = (getMirroredReadsStats(secondary));
-    }
-
-    sendReads({rst, db, cmd, burstCount, initialStatsOnPrimary});
-
-    waitForReadsToResolveOnPrimary(rst, initialStatsOnPrimary, false);
-
-    // Stats should be stable now that all of the reads have resolved.
-    let currentStatsOnPrimary = getMirroredReadsStats(primary);
-    jsTestLog("Verifying primary statistics: " +
-              tojson({current: currentStatsOnPrimary, start: initialStatsOnPrimary}));
-
-    let processedAsSecondaryTotal = getProcessedAsSecondaryTotal(rst, initialStatsOnSecondaries);
-    let statDifferenceOnPrimary = getStatDifferences(initialStatsOnPrimary, currentStatsOnPrimary);
-    let succeeded = statDifferenceOnPrimary.succeeded;
-
-    // Expect no mirrored reads to be processed because the fail point times out the query
-    // before the processed metric is incremented.
-    assert.eq(processedAsSecondaryTotal, 0);
-    assert.eq(succeeded, 0);
+    sendAndCheckReadsFailBeforeProcessing({
+        rst: rst,
+        db: kDbName,
+        cmd: {find: kCollName, filter: {}},
+        burstCount: kBurstCount,
+        expectErroredDuringSend: false
+    });
 
     for (const secondary of rst.getSecondaries()) {
         assert.commandWorked(secondary.getDB(kDbName).adminCommand(
             {configureFailPoint: "failCommand", mode: "off"}));
     }
+}
+
+/* Verify that the erroredDuringSend metric increments if the command fails . */
+function verifyErroredDuringSend(rst) {
+    // Mirror every mirror-able command.
+    const samplingRate = 1.0;
+    assert.commandWorked(setParameter({rst: rst, value: {samplingRate: samplingRate}}));
+
+    assert.commandWorked(rst.getPrimary().getDB(kDbName).adminCommand({
+        configureFailPoint: "forceConnectionNetworkTimeout",
+        mode: "alwaysOn",
+        data: {
+            collectionNS: kCollName,
+        }
+    }));
+
+    sendAndCheckReadsFailBeforeProcessing({
+        rst: rst,
+        db: kDbName,
+        cmd: {find: kCollName, filter: {}},
+        burstCount: kBurstCount,
+        expectErroredDuringSend: true
+    });
+
+    assert.commandWorked(rst.getPrimary().getDB(kDbName).adminCommand(
+        {configureFailPoint: "forceConnectionNetworkTimeout", mode: "off"}));
 }
 
 /* Verify mirror reads behavior with various sampling rates. */
@@ -251,17 +306,6 @@ function verifyMirrorReads(rst, db, cmd) {
         sendAndCheckReadsSucceedWithRate(
             {rst: rst, db: db, cmd: cmd, minRate: min, maxRate: max, burstCount: kBurstCount});
     }
-}
-
-/* Verify that the processedAsSecondary metric does not increment if the command fails
-   on the secondary before the secondary is able to process the read. */
-function verifyProcessedAsSecondaryOnEarlyError(rst) {
-    // Mirror every mirror-able command.
-    const samplingRate = 1.0;
-    assert.commandWorked(setParameter({rst: rst, value: {samplingRate: samplingRate}}));
-
-    sendAndCheckReadsTimedOutOnSecondaries(
-        {rst: rst, db: kDbName, cmd: {find: kCollName, filter: {}}, burstCount: kBurstCount});
 }
 
 /* Verify mirror reads behavior for various commands. */
@@ -320,6 +364,9 @@ function verifyProcessedAsSecondaryOnEarlyError(rst) {
     jsTestLog("Verifying processedAsSecondary field for 'find' commands timing out on secondaries");
     verifyProcessedAsSecondaryOnEarlyError(rst);
 
+    jsTestLog("Verifying erroredDuringSend field for 'find' commands failing to send");
+    verifyErroredDuringSend(rst);
+
     if (FeatureFlagUtil.isEnabled(rst.getPrimary(), "BulkWriteCommand")) {
         jsTestLog("Verifying mirrored reads for 'bulkWrite' commands");
         verifyMirrorReads(rst, "admin", {
@@ -334,6 +381,38 @@ function verifyProcessedAsSecondaryOnEarlyError(rst) {
             maxTimeMS: kLargeMaxTimeMS
         });
     }
+
+    // Test that the pending metric works with just the `failpoint.mirrorMaestroTracksPending` fail
+    // point.
+    assert.commandWorked(rst.getPrimary().adminCommand(
+        {configureFailPoint: "mirrorMaestroExpectsResponse", mode: "off"}));
+    let initialStatsOnPrimary = getMirroredReadsStats(rst.getPrimary());
+    sendReads({
+        rst: rst,
+        db: kDbName,
+        cmd: {find: kCollName, filter: {}, maxTimeMS: kLargeMaxTimeMS},
+        burstCount: kBurstCount,
+        initialStatsOnPrimary: initialStatsOnPrimary
+    });
+    assert.soon(() => {
+        let currentStatsOnPrimary = getMirroredReadsStats(rst.getPrimary());
+        const statDifferenceOnPrimary =
+            getStatDifferences(initialStatsOnPrimary, currentStatsOnPrimary);
+        let sent = statDifferenceOnPrimary.sent;
+        let erroredDuringSend = statDifferenceOnPrimary.erroredDuringSend;
+        let seen = statDifferenceOnPrimary.seen;
+        // `pending` refers to the number of reads the primary has decided to mirror to
+        // secondaries, but hasn't yet resolved. Unlike the other mirrored reads metrics, this
+        // metric does not accumulate, and refers only to the reads currently pending.
+        let pending = currentStatsOnPrimary.pending;
+
+        jsTestLog(
+            "Verifying that no mirrored reads remain pending: " +
+            tojson(
+                {sent: sent, erroredDuringSend: erroredDuringSend, pending: pending, seen: seen}));
+        // Verify that no more reads are pending.
+        return (pending == 0);
+    }, "Did not resolve all pending requests within the time limit", 10000);
 
     rst.stopSet();
 }

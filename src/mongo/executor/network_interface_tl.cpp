@@ -814,8 +814,6 @@ void NetworkInterfaceTL::RequestManager::trySend(
             LOGV2(6496502,
                   "forceConnectionNetworkTimeout failpoint enabled, timing out request",
                   "request"_attr = cmdState->requestOnAny.cmdObj.toString());
-            // Sleep to make sure the elapsed wait time for connection timeout is > 1 millisecond.
-            sleepmillis(100);
             swConn =
                 Status(ErrorCodes::PooledConnectionAcquisitionExceededTimeLimit,
                        "PooledConnectionAcquisitionExceededTimeLimit triggered via fail point.");
