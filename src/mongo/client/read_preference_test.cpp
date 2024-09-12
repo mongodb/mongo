@@ -119,13 +119,13 @@ TEST(ReadPreferenceSetting, ParseHedgingMode) {
     ASSERT_TRUE(rps.pref == ReadPreference::PrimaryOnly);
     ASSERT_FALSE(rps.hedgingMode.has_value());
 
-    // Implicit opt-in for readPreference mode "nearest".
+    // Implicit opt-in for readPreference mode "nearest" should no longer default to hedging mode
+    // enabled.
     rpsObj = BSON("mode"
                   << "nearest");
     rps = parse(rpsObj);
     ASSERT_TRUE(rps.pref == ReadPreference::Nearest);
-    ASSERT_TRUE(rps.hedgingMode.has_value());
-    ASSERT_TRUE(rps.hedgingMode->getEnabled());
+    ASSERT_FALSE(rps.hedgingMode.has_value());
 
     // Default hedging mode.
     rpsObj = BSON("mode"

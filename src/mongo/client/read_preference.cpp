@@ -130,8 +130,6 @@ StatusWith<ReadPreferenceSetting> ReadPreferenceSetting::fromReadPreferenceIdl(
                 ErrorCodes::InvalidOptions,
                 str::stream() << "cannot enable hedging for $readPreference mode \"primaryOnly\""};
         }
-    } else if (rp.getMode() == ReadPreference::Nearest) {
-        hedgingMode = HedgingMode();
     }
 
     TagSet tags;

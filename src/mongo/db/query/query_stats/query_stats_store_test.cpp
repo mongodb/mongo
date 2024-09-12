@@ -566,8 +566,7 @@ TEST_F(QueryStatsStoreTest, CorrectlyRedactsFindCommandRequestAllFields) {
             },
             "$readPreference": {
                 "mode": "nearest",
-                "tags": [ { "some": "other tag" }, { "some": "tag" } ],
-                "hedge": { "enabled": true }
+                "tags": [ { "some": "other tag" }, { "some": "tag" } ]
             },
             "collectionType": "collection",
             "hint": {
@@ -625,8 +624,7 @@ TEST_F(QueryStatsStoreTest, CorrectlyRedactsFindCommandRequestAllFields) {
             },
             "$readPreference": {
                 "mode": "nearest",
-                "tags": [ { "some": "other tag" }, { "some": "tag" } ],
-                "hedge": { "enabled": true }
+                "tags": [ { "some": "other tag" }, { "some": "tag" } ]
             },
             "collectionType": "collection",
             "hint": {

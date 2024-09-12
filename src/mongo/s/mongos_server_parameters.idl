@@ -29,8 +29,6 @@
 
 global:
   cpp_namespace: "mongo"
-  cpp_includes:
-    - "mongo/s/mongos_server_parameters.h"
 
 imports:
     - "mongo/db/basic_types.idl"
@@ -38,21 +36,22 @@ imports:
 server_parameters:
   readHedgingMode:
     description: >-
-        Enables hedged reads.
+        DEPRECATED. Has no effect on server behavior.
+        Previously enabled hedged reads.
     set_at: [ startup, runtime ]
     cpp_class:
-      name: HedgingModeServerParameter
+      name: ReadHedgingModeParameter
+      override_set: true
     redact: false
 
   maxTimeMSForHedgedReads:
     description: >-
-        The maxTimeMS to set on hedged reads.
+        DEPRECATED. Has no effect on server behavior.
+        Previously was the maxTimeMS to set on hedged reads.
     set_at: [ startup, runtime ]
-    cpp_vartype: AtomicWord<int>
-    cpp_varname: "gMaxTimeMSForHedgedReads"
-    validator:
-        gte: 0
-    default: 150
+    cpp_class:
+      name: MaxTimeMSForHedgedReadsParameter
+      override_set: true
     redact: false
 
   mongosShutdownTimeoutMillisForSignaledShutdown:

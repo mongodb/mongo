@@ -202,7 +202,6 @@ SemiFuture<AsyncRPCResponse<typename CommandType::Reply>> sendHedgedCommand(
                     });
                 }
 
-                const auto globalMaxTimeMSForHedgedReads = gMaxTimeMSForHedgedReads.load();
                 for (size_t i = 0; i < hostsToTarget; i++) {
                     std::unique_ptr<Targeter> t = std::make_unique<FixedTargeter>(targets[i]);
                     // We explicitly pass "NeverRetryPolicy" here because the retry mechanism
@@ -213,21 +212,6 @@ SemiFuture<AsyncRPCResponse<typename CommandType::Reply>> sendHedgedCommand(
                         hedgeCancellationToken.token(),
                         cmd,
                         std::make_shared<NeverRetryPolicy>());
-
-                    // If the request is a hedged request, set maxTimeMSOpOnly to the smaller of
-                    // the server parameter maxTimeMSForHedgedReads or remaining max time from the
-                    // opCtx.
-                    if (opts.isHedgeEnabled && i != 0) {
-                        auto maxTimeMSOpOnly = globalMaxTimeMSForHedgedReads;
-                        if (opCtx->hasDeadline()) {
-                            if (auto remainingMaxTime = opCtx->getRemainingMaxTimeMillis().count();
-                                remainingMaxTime < maxTimeMSOpOnly) {
-                                maxTimeMSOpOnly = remainingMaxTime;
-                            }
-                        }
-
-                        options->cmd.getGenericArguments().setMaxTimeMSOpOnly(maxTimeMSOpOnly);
-                    }
 
                     options->baton = baton;
                     requests.push_back(

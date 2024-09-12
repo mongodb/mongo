@@ -32,11 +32,13 @@ global:
 server_parameters:
   opportunisticSecondaryTargeting:
     description: >-
-        Allows attempting to establish connections to multiple secondaries and directing the request
-        to the first secondary that accepts the connection.
+        DEPRECATED. Has no effect on server behavior.
+        Previously allowed attempting to establish connections to multiple secondaries and
+        directing the request to the first secondary that accepts the connection.
     set_at: [ startup, runtime ]
-    cpp_vartype: AtomicWord<bool>
-    cpp_varname: gOpportunisticSecondaryTargeting
+    cpp_class:
+      name: OpportunisticSecondaryTargetingParameter
+      override_set: true
     redact: false
 
   slowConnectionThresholdMillis:

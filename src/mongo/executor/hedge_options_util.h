@@ -49,13 +49,10 @@ extern FailPoint hedgedReadsSendRequestsToTargetHostsInAlphabeticalOrder;
  *      (1) Whether or not the invocation should execute as a hedged read via `isHedgeEnabled`
  *      (2) How many hedged operations should be sent, in *addition* to the non-hedged/authoriative
  *          request (`hedgeCount`)
- *      (3) The maxTimeMS each hedge should be executed with (`maxTimeMSForHedgedReads`)
- *      clang-format on
  */
 struct HedgeOptions {
     bool isHedgeEnabled = false;
     size_t hedgeCount = 0;
-    int maxTimeMSForHedgedReads = 0;
 };
 
 /**

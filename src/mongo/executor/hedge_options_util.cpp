@@ -37,8 +37,6 @@
 
 #include "mongo/client/hedging_mode_gen.h"
 #include "mongo/platform/atomic_word.h"
-#include "mongo/s/mongos_server_parameters.h"
-#include "mongo/s/mongos_server_parameters_gen.h"
 #include "mongo/util/ctype.h"
 #include "mongo/util/sort.h"
 
@@ -67,14 +65,7 @@ bool commandCanHedge(StringData command) {
 }
 
 bool commandShouldHedge(StringData command, const ReadPreferenceSetting& readPref) {
-    if (gReadHedgingMode.load() != ReadHedgingMode::kOn) {
-        return false;  // Hedging is globally disabled.
-    }
-    auto&& mode = readPref.hedgingMode;
-    if (!mode || !mode->getEnabled()) {
-        return false;  // The read preference didn't enable hedging.
-    }
-    return commandCanHedge(command);
+    return false;
 }
 
 template <typename IA, typename IB, typename F>
@@ -101,7 +92,6 @@ bool compareByLowerHostThenPort(const HostAndPort& a, const HostAndPort& b) {
 HedgeOptions getHedgeOptions(StringData command, const ReadPreferenceSetting& readPref) {
     bool shouldHedge = commandShouldHedge(command, readPref);
     size_t hedgeCount = shouldHedge ? 1 : 0;
-    int maxTimeMSForHedgedReads = shouldHedge ? gMaxTimeMSForHedgedReads.load() : 0;
-    return {shouldHedge, hedgeCount, maxTimeMSForHedgedReads};
+    return {shouldHedge, hedgeCount};
 }
 }  // namespace mongo

@@ -29,8 +29,6 @@
 
 global:
   cpp_namespace: "mongo"
-  cpp_includes:
-    - "mongo/s/mongos_server_parameters.h"
 
 imports:
     - "mongo/db/basic_types.idl"
