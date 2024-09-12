@@ -590,13 +590,12 @@ public:
         const bool includeMetrics = CurOp::get(opCtx)->debug().queryStatsInfo.metricsRequested;
 
         if (includeMetrics) {
+            // It is safe to unconditionally add the metrics because we are assured that the user
+            // data will not exceed the user size limit, and the limit enforced for sending the
+            // entire message is actually several KB larger, intentionally leaving buffer for
+            // metadata like this.
             auto metrics = CurOp::get(opCtx)->debug().getCursorMetrics().toBSON();
-
-            // Only append the metrics if they were requested and they do not cause the result to
-            // exceed max size.
-            if (result.len() + metrics.objsize() < kMaxResponseSize) {
-                result.append("metrics", metrics);
-            }
+            result.append("metrics", metrics);
         }
 
         return true;

@@ -318,8 +318,6 @@ public:
         const auto cri = uassertStatusOK(std::move(swCri));
         const auto& cm = cri.cm;
 
-        // This boolean will always remain true if shard metrics were not requested.
-        bool allShardMetricsReturned = true;
         std::vector<AsyncRequestsSender::Response> shardResponses;
         try {
             shardResponses = scatterGatherVersionedTargetByRoutingTable(
@@ -377,11 +375,7 @@ public:
 
             if (requestQueryStats) {
                 BSONElement shardMetrics = res["metrics"];
-
-                // If we requested query stats and any of the shard responses did not include
-                // metrics, the flag should be set to false so query stats are not collected later.
-                allShardMetricsReturned &= shardMetrics.isABSONObj();
-                if (allShardMetricsReturned) {
+                if (shardMetrics.isABSONObj()) {
                     auto metrics =
                         CursorMetrics::parse(IDLParserContext("CursorMetrics"), shardMetrics.Obj());
                     CurOp::get(opCtx)->debug().additiveMetrics.aggregateCursorMetrics(metrics);
@@ -405,13 +399,7 @@ public:
         }
 
         CurOp::get(opCtx)->setEndOfOpMetrics(n);
-
-        // Collect query stats if all shards returned metrics when requested or if metrics were
-        // never requested from shards.
-        if (allShardMetricsReturned) {
-            collectQueryStatsMongos(opCtx,
-                                    std::move(CurOp::get(opCtx)->debug().queryStatsInfo.key));
-        }
+        collectQueryStatsMongos(opCtx, std::move(CurOp::get(opCtx)->debug().queryStatsInfo.key));
 
         return true;
     }
