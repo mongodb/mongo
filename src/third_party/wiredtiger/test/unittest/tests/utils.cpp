@@ -17,18 +17,16 @@
 namespace utils {
 
 /*
- * throwIfNonZero --
+ * throw_if_non_zero --
  *     Test result. Throw if it is non-zero.
  *
  * @param result The value to test.
  */
 void
-throwIfNonZero(int result)
+throw_if_non_zero(const int result)
 {
-    if (result != 0) {
-        std::string errorMessage("Error result is " + std::to_string(result));
-        throw std::runtime_error(errorMessage);
-    }
+    if (result != 0)
+        throw std::runtime_error("Error result is " + std::to_string(result));
 }
 
 /*
@@ -44,13 +42,13 @@ remove_wrapper(std::string const &path)
 }
 
 /*
- * wiredtigerCleanup --
+ * wiredtiger_cleanup --
  *     Delete WiredTiger files in directory home and directory home.
  *
  * @param home The directory that contains WiredTiger files.
  */
 void
-wiredtigerCleanup(std::string const &home)
+wiredtiger_cleanup(std::string const &home)
 {
     // Ignoring errors here; we don't mind if something doesn't exist.
     remove_wrapper(home + "/WiredTiger");
@@ -62,7 +60,6 @@ wiredtigerCleanup(std::string const &home)
     remove_wrapper(home + "/backup_test1.wt");
     remove_wrapper(home + "/backup_test2.wt");
     remove_wrapper(home + "/cursor_test.wt");
-
     remove_wrapper(home);
 }
 

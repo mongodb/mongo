@@ -6,24 +6,21 @@
  * See the file LICENSE for redistribution information.
  */
 
-#ifndef WT_BLOCK_MODS_H
-#define WT_BLOCK_MODS_H
+#pragma once
 
 #include "wt_internal.h"
 
-class BlockMods {
+class block_mods {
 public:
-    BlockMods();
-    ~BlockMods();
+    block_mods();
+    ~block_mods();
     WT_BLOCK_MODS *
-    getWTBlockMods()
+    get_wt_block_mods()
     {
         return &_block_mods;
     };
 
 private:
-    void initBlockMods();
+    void init_block_mods();
     WT_BLOCK_MODS _block_mods;
 };
-
-#endif // WT_BLOCK_MODS_H

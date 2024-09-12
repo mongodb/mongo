@@ -165,8 +165,8 @@ TEST_CASE("Basic cols and non key'd op", "[mod_compare]")
 // Test sorting with row and non-key'd operations.
 TEST_CASE("Basic rows and non key'd op", "[mod_compare]")
 {
-    ConnectionWrapper conn(DB_HOME);
-    WT_SESSION_IMPL *session = conn.createSession();
+    connection_wrapper conn(DB_HOME);
+    WT_SESSION_IMPL *session = conn.create_session();
 
     WT_BTREE btrees[2];
     WT_TXN_OP ops[4];
@@ -202,8 +202,8 @@ TEST_CASE("Basic rows and non key'd op", "[mod_compare]")
 // Test sorting with row, column and operations with no keys.
 TEST_CASE("Row, column, and non key'd operations", "[mod_compare]")
 {
-    ConnectionWrapper conn(DB_HOME);
-    WT_SESSION_IMPL *session = conn.createSession();
+    connection_wrapper conn(DB_HOME);
+    WT_SESSION_IMPL *session = conn.create_session();
 
     WT_BTREE btrees[2];
     WT_TXN_OP ops[10];
@@ -248,8 +248,8 @@ TEST_CASE("Row, column, and non key'd operations", "[mod_compare]")
 // Test sorting by b-tree ID. All operations have the same key.
 TEST_CASE("B-tree ID sort test", "[mod_compare]")
 {
-    ConnectionWrapper conn(DB_HOME);
-    WT_SESSION_IMPL *session = conn.createSession();
+    connection_wrapper conn(DB_HOME);
+    WT_SESSION_IMPL *session = conn.create_session();
 
     WT_BTREE btrees[6];
     WT_TXN_OP ops[6];
@@ -281,8 +281,8 @@ TEST_CASE("B-tree ID sort test", "[mod_compare]")
 // Test sorting by keyedness, key'd operations all have the same key and recno.
 TEST_CASE("Keyedness sort test", "[mod_compare]")
 {
-    ConnectionWrapper conn(DB_HOME);
-    WT_SESSION_IMPL *session = conn.createSession();
+    connection_wrapper conn(DB_HOME);
+    WT_SESSION_IMPL *session = conn.create_session();
 
     WT_BTREE btrees[12];
     WT_TXN_OP ops[12];
@@ -321,8 +321,8 @@ TEST_CASE("Keyedness sort test", "[mod_compare]")
 // Test sorting with randomly generated keys on 2 row-store b-trees.
 TEST_CASE("Many different row-store keys", "[mod_compare]")
 {
-    ConnectionWrapper conn(DB_HOME);
-    WT_SESSION_IMPL *session = conn.createSession();
+    connection_wrapper conn(DB_HOME);
+    WT_SESSION_IMPL *session = conn.create_session();
 
     WT_BTREE btrees[12];
     WT_TXN_OP ops[12];

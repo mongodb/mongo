@@ -6,41 +6,41 @@
  * See the file LICENSE for redistribution information.
  */
 
-#ifndef WT_MOCK_SESSION_H
-#define WT_MOCK_SESSION_H
+#pragma once
 
 #include <memory>
 #include <string>
 #include <list>
 
-#include "wt_internal.h"
 #include "mock_connection.h"
+#include "wt_internal.h"
 
-int handleWiredTigerError(
+int handle_wiredtiger_error(
   WT_EVENT_HANDLER *handler, WT_SESSION *session, int error, const char *message);
-int handleWiredTigerMessage(WT_EVENT_HANDLER *handler, WT_SESSION *session, const char *message);
+int handle_wiredtiger_message(WT_EVENT_HANDLER *handler, WT_SESSION *session, const char *message);
 
 /* Forward declare the class so we can include it in our wrapper. */
-class MockSession;
+class mock_session;
 
 /* This is a convenience type that lets us get back to our mock from the handler callback. */
 struct event_handler_wrap {
     WT_EVENT_HANDLER handler;
-    MockSession *mock_session;
+    mock_session *ms;
 };
 
-class MockSession {
+class mock_session {
 public:
-    ~MockSession();
+    ~mock_session();
     WT_SESSION_IMPL *
-    getWtSessionImpl()
+    get_wt_session_impl()
     {
-        return _sessionImpl;
+        return _session_impl;
     };
-    std::shared_ptr<MockConnection>
-    getMockConnection()
+
+    std::shared_ptr<mock_connection>
+    get_mock_connection()
     {
-        return _mockConnection;
+        return _mock_connection;
     };
 
     void
@@ -54,19 +54,17 @@ public:
     {
         return _messages.back();
     }
-    static std::shared_ptr<MockSession> buildTestMockSession();
-    WT_BLOCK_MGR_SESSION *setupBlockManagerSession();
+    static std::shared_ptr<mock_session> build_test_mock_session();
+    WT_BLOCK_MGR_SESSION *setup_block_manager_session();
 
 private:
-    explicit MockSession(
-      WT_SESSION_IMPL *sessionImpl, std::shared_ptr<MockConnection> mockConnection = nullptr);
+    explicit mock_session(
+      WT_SESSION_IMPL *session_impl, std::shared_ptr<mock_connection> mock_connection = nullptr);
 
-    std::shared_ptr<MockConnection> _mockConnection;
+    std::shared_ptr<mock_connection> _mock_connection;
 
     // This class is implemented such that it owns, and is responsible for freeing, this pointer
-    WT_SESSION_IMPL *_sessionImpl;
+    WT_SESSION_IMPL *_session_impl;
     event_handler_wrap _handler_wrap;
     std::list<std::string> _messages;
 };
-
-#endif // WT_MOCK_SESSION_H

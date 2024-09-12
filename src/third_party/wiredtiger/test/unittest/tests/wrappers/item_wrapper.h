@@ -10,6 +10,8 @@
 
 #include <string>
 
+#include "wiredtiger.h"
+
 /*
  * item_wrapper is a simple wrapper class that wraps a WT_ITEM holding a constant, read-only string.
  * It copies the string into a std::string attribute and then sets the WT_ITEM attribute to point to

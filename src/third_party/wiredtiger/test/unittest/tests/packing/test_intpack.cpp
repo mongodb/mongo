@@ -7,9 +7,9 @@
  */
 
 // This file unit tests the macros and functions contained in intpack_inline.h.
+#include <catch2/catch.hpp>
 
 #include "wt_internal.h"
-#include <catch2/catch.hpp>
 
 /*
  * wt_size_check_pack_wrapper --

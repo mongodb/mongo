@@ -40,7 +40,7 @@
 |Rollback To Stable||[test_checkpoint_snapshot03.py](../test/suite/test_checkpoint_snapshot03.py), [test_rollback_to_stable16.py](../test/suite/test_rollback_to_stable16.py), [test_rollback_to_stable18.py](../test/suite/test_rollback_to_stable18.py)
 |Salvage|Prepare|[test_prepare_hs03.py](../test/suite/test_prepare_hs03.py)
 |Schema Api||[test_schema03.py](../test/suite/test_schema03.py)
-|Session Api|Reconfigure|[test_reconfig04.py](../test/suite/test_reconfig04.py)
+|Session Api|Reconfigure|[test_reconfig04.py](../test/suite/test_reconfig04.py), [test_reconfig05.py](../test/suite/test_reconfig05.py)
 |Session Api|Verify|[test_bug005.py](../test/suite/test_bug005.py)
 |Statistics||[test_stat_log02.py](../test/suite/test_stat_log02.py)
 |Tiered Storage|Checkpoint|[test_tiered08.py](../test/suite/test_tiered08.py)

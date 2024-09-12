@@ -8,19 +8,19 @@
 
 #include "block_mods.h"
 
-BlockMods::BlockMods()
+block_mods::block_mods()
 {
-    initBlockMods();
+    init_block_mods();
 }
 
-BlockMods::~BlockMods()
+block_mods::~block_mods()
 {
     __wt_buf_free(nullptr, &_block_mods.bitstring);
     __wt_free(nullptr, _block_mods.id_str);
 }
 
 void
-BlockMods::initBlockMods()
+block_mods::init_block_mods()
 {
     _block_mods.id_str = nullptr;
     _block_mods.bitstring.data = nullptr;

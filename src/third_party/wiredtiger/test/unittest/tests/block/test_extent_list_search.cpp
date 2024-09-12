@@ -20,11 +20,11 @@
 #include <sstream>
 #include <string>
 
-#include "wt_internal.h"
-#include "../wrappers/mock_session.h"
 #include "test_util.h"
+#include "wt_internal.h"
 #include "../utils.h"
 #include "../utils_extlist.h"
+#include "../wrappers/mock_session.h"
 
 using namespace utils;
 
@@ -45,8 +45,8 @@ struct search_before_after {
 TEST_CASE("Extent Lists: block_off_srch_pair", "[extent_list]")
 {
     /* Build Mock session, this will automatically create a mock connection. */
-    std::shared_ptr<MockSession> mock_session = MockSession::buildTestMockSession();
-    WT_SESSION_IMPL *session = mock_session->getWtSessionImpl();
+    std::shared_ptr<mock_session> mock_session = mock_session::build_test_mock_session();
+    WT_SESSION_IMPL *session = mock_session->get_wt_session_impl();
 
     std::vector<WT_EXT **> stack(WT_SKIP_MAXDEPTH, nullptr);
 
@@ -177,8 +177,8 @@ struct search_match {
 TEST_CASE("Extent Lists: block_off_match", "[extent_list]")
 {
     /* Build Mock session, this will automatically create a mock connection. */
-    std::shared_ptr<MockSession> mock_session = MockSession::buildTestMockSession();
-    WT_SESSION_IMPL *session = mock_session->getWtSessionImpl();
+    std::shared_ptr<mock_session> mock_session = mock_session::build_test_mock_session();
+    WT_SESSION_IMPL *session = mock_session->get_wt_session_impl();
 
     /* Extents to insert to create an extent list to search. */
     std::vector<off_size> insert_list{

@@ -16,6 +16,6 @@
 
 namespace utils {
 void break_here(const char *file, const char *func, int line);
-void throwIfNonZero(int result);
-void wiredtigerCleanup(const std::string &db_home);
+void throw_if_non_zero(int result);
+void wiredtiger_cleanup(const std::string &db_home);
 } // namespace utils.

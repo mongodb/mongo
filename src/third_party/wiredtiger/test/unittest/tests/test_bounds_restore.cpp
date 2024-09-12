@@ -24,8 +24,8 @@ TEST_CASE("Bounds save and restore flag logic", "[bounds_restore]")
     WT_CURSOR mock_cursor;
     WT_CURSOR_BOUNDS_STATE mock_state;
 
-    ConnectionWrapper conn(DB_HOME);
-    WT_SESSION_IMPL *session = conn.createSession();
+    connection_wrapper conn(DB_HOME);
+    WT_SESSION_IMPL *session = conn.create_session();
 
     mock_state.lower_bound = NULL;
     mock_state.upper_bound = NULL;

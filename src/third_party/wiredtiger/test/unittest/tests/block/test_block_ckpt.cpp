@@ -7,9 +7,10 @@
  */
 
 #include <catch2/catch.hpp>
+
 #include "wt_internal.h"
-#include "../wrappers/mock_session.h"
 #include "../wrappers/block_mods.h"
+#include "../wrappers/mock_session.h"
 
 TEST_CASE("Block helper: __wt_rduppo2", "[block]")
 {
@@ -34,25 +35,25 @@ TEST_CASE("Block helper: __wt_rduppo2", "[block]")
 }
 
 static void
-test_ckpt_add_blkmod_entry(wt_off_t offset, wt_off_t len, uint64_t expectedBits)
+test_ckpt_add_blkmod_entry(wt_off_t offset, wt_off_t len, uint64_t expected_bits)
 {
-    std::shared_ptr<MockSession> session = MockSession::buildTestMockSession();
-    BlockMods blockMods;
-    blockMods.getWTBlockMods()->granularity = 1;
+    std::shared_ptr<mock_session> session = mock_session::build_test_mock_session();
+    block_mods block_mods;
+    block_mods.get_wt_block_mods()->granularity = 1;
 
-    REQUIRE(blockMods.getWTBlockMods()->nbits == 0);
-    REQUIRE(blockMods.getWTBlockMods()->bitstring.memsize == 0);
-    REQUIRE(blockMods.getWTBlockMods()->bitstring.mem == nullptr);
-    REQUIRE(blockMods.getWTBlockMods()->bitstring.data == nullptr);
+    REQUIRE(block_mods.get_wt_block_mods()->nbits == 0);
+    REQUIRE(block_mods.get_wt_block_mods()->bitstring.memsize == 0);
+    REQUIRE(block_mods.get_wt_block_mods()->bitstring.mem == nullptr);
+    REQUIRE(block_mods.get_wt_block_mods()->bitstring.data == nullptr);
 
     int result = __ut_ckpt_add_blkmod_entry(
-      session->getWtSessionImpl(), blockMods.getWTBlockMods(), offset, len);
+      session->get_wt_session_impl(), block_mods.get_wt_block_mods(), offset, len);
     REQUIRE(result == 0);
 
-    REQUIRE(blockMods.getWTBlockMods()->nbits == expectedBits);
-    REQUIRE(blockMods.getWTBlockMods()->bitstring.memsize == (expectedBits / 8));
-    REQUIRE(blockMods.getWTBlockMods()->bitstring.mem != nullptr);
-    REQUIRE(blockMods.getWTBlockMods()->bitstring.data != nullptr);
+    REQUIRE(block_mods.get_wt_block_mods()->nbits == expected_bits);
+    REQUIRE(block_mods.get_wt_block_mods()->bitstring.memsize == (expected_bits / 8));
+    REQUIRE(block_mods.get_wt_block_mods()->bitstring.mem != nullptr);
+    REQUIRE(block_mods.get_wt_block_mods()->bitstring.data != nullptr);
 }
 
 TEST_CASE("Block manager: __ckpt_add_blkmod_entry", "[block]")

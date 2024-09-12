@@ -14,7 +14,7 @@
 #include "connection_wrapper.h"
 #include "../utils.h"
 
-ConnectionWrapper::ConnectionWrapper(const std::string &db_home, const char *cfg_str)
+connection_wrapper::connection_wrapper(const std::string &db_home, const char *cfg_str)
     : _conn_impl(nullptr), _conn(nullptr), _db_home(db_home), _cfg_str(cfg_str), _do_cleanup(true)
 {
     struct stat sb;
@@ -29,21 +29,21 @@ ConnectionWrapper::ConnectionWrapper(const std::string &db_home, const char *cfg
         }
         /* We are happy that it is an existing directory. */
     } else {
-        utils::throwIfNonZero(mkdir(_db_home.c_str(), 0700));
+        utils::throw_if_non_zero(mkdir(_db_home.c_str(), 0700));
     }
-    utils::throwIfNonZero(wiredtiger_open(_db_home.c_str(), nullptr, cfg_str, &_conn));
+    utils::throw_if_non_zero(wiredtiger_open(_db_home.c_str(), nullptr, cfg_str, &_conn));
 }
 
-ConnectionWrapper::~ConnectionWrapper()
+connection_wrapper::~connection_wrapper()
 {
-    utils::throwIfNonZero(_conn->close(_conn, ""));
+    utils::throw_if_non_zero(_conn->close(_conn, ""));
 
     if (_do_cleanup)
-        utils::wiredtigerCleanup(_db_home);
+        utils::wiredtiger_cleanup(_db_home);
 }
 
 WT_SESSION_IMPL *
-ConnectionWrapper::createSession(std::string cfg)
+connection_wrapper::create_session(std::string cfg)
 {
     WT_SESSION *sess;
     _conn->open_session(_conn, nullptr, cfg.c_str(), &sess);
@@ -55,13 +55,13 @@ ConnectionWrapper::createSession(std::string cfg)
 }
 
 WT_CONNECTION_IMPL *
-ConnectionWrapper::getWtConnectionImpl() const
+connection_wrapper::get_wt_connection_impl() const
 {
     return _conn_impl;
 }
 
 WT_CONNECTION *
-ConnectionWrapper::getWtConnection() const
+connection_wrapper::get_wt_connection() const
 {
     return _conn;
 }

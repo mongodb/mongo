@@ -12,8 +12,9 @@
  * __wt_block_eligible_for_sweep functions.
  */
 
-#include "wt_internal.h"
 #include <catch2/catch.hpp>
+
+#include "wt_internal.h"
 
 static void
 test_block_header_byteswap_copy(WT_BLOCK_HEADER *from, WT_BLOCK_HEADER *to)

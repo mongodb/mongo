@@ -305,6 +305,7 @@ Podir
 Posix
 PostgreSQL
 Pre
+Prealloc
 Precompiled
 Prefetch
 Preload
@@ -532,6 +533,7 @@ blkincr
 blkmod
 blkmods
 bm
+bms
 bnd
 bool
 boolean
@@ -817,7 +819,6 @@ gcc
 gcp
 gdb
 ge
-getWtSessionImpl
 getenv
 getlasterror
 getline
@@ -1069,6 +1070,7 @@ noff
 nolock
 nonces
 nonliteral
+nonoverlapping
 nontransactionally
 noop
 nop
@@ -1331,7 +1333,6 @@ tempdir
 testext
 testutil
 th
-throwIfNonZero
 tid
 timespec
 tinfo
@@ -1454,7 +1455,6 @@ whitespace
 wiredTiger
 wiredTigerTables
 wiredtiger
-wiredtigerCleanup
 workgen
 wrapup
 writeable

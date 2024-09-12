@@ -6,8 +6,8 @@
  * See the file LICENSE for redistribution information.
  */
 
-#include "wiredtiger.h"
 #include "item_wrapper.h"
+#include "wiredtiger.h"
 
 item_wrapper::item_wrapper(std::string const &string) : _string(string)
 {

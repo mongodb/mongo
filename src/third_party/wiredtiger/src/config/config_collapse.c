@@ -106,7 +106,8 @@ __config_merge_scan(
     WT_DECL_ITEM(kb);
     WT_DECL_ITEM(vb);
     WT_DECL_RET;
-    size_t len;
+    size_t i, len;
+    bool is_struct;
 
     WT_ERR(__wt_scr_alloc(session, 1024, &kb));
     WT_ERR(__wt_scr_alloc(session, 1024, &vb));
@@ -154,9 +155,30 @@ __config_merge_scan(
          * WT_CONFIG_ITEM_STRUCT, so we check for a field name in the
          * value.
          */
-        if (v.type == WT_CONFIG_ITEM_STRUCT && strchr(vb->data, '=') != NULL) {
-            WT_ERR(__config_merge_scan(session, kb->data, vb->data, strip, cp));
-            continue;
+        if (v.type == WT_CONFIG_ITEM_STRUCT) {
+            /*
+             * A value is a struct if it has field names, which we can easily check by the presence
+             * of the '=' separator, or if the previous version of the key was a struct. We need to
+             * check the latter to handle cases such as "log=(enabled)", which does not contain '='
+             * in its value.
+             */
+            if (strchr(vb->data, '=') != NULL)
+                is_struct = true;
+            else {
+                is_struct = false;
+                for (i = 0; i < cp->entries_next; i++) {
+                    if (strncmp(cp->entries[i].k, kb->data, kb->size) == 0 &&
+                      strncmp(cp->entries[i].k + kb->size, SEP, strlen(SEP)) == 0) {
+                        is_struct = true;
+                        break;
+                    }
+                }
+            }
+
+            if (is_struct) {
+                WT_ERR(__config_merge_scan(session, kb->data, vb->data, strip, cp));
+                continue;
+            }
         }
 
         /* Insert the value into the array. */

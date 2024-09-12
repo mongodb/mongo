@@ -20,9 +20,9 @@
 TEST_CASE("Chunk cache bitmap: __chunkcache_bitmap_find_free", "[bitmap]")
 {
     /* Build Mock session, this will automatically create a mock connection. */
-    std::shared_ptr<MockSession> session = MockSession::buildTestMockSession();
+    std::shared_ptr<mock_session> session = mock_session::build_test_mock_session();
 
-    WT_SESSION_IMPL *session_impl = session->getWtSessionImpl();
+    WT_SESSION_IMPL *session_impl = session->get_wt_session_impl();
     WT_CHUNKCACHE *chunkcache;
     uint64_t capacity = 1001 + rand() % 100000;
     size_t chunk_size = 1 + rand() % 1000;
@@ -32,7 +32,7 @@ TEST_CASE("Chunk cache bitmap: __chunkcache_bitmap_find_free", "[bitmap]")
     srand((unsigned int)time(NULL));
 
     /* Setup chunk cache. This sets up the bitmap internally. */
-    REQUIRE((session->getMockConnection()->setupChunkCache(
+    REQUIRE((session->get_mock_connection()->setup_chunk_cache(
               session_impl, capacity, chunk_size, chunkcache)) == 0);
 
     SECTION("Sequential allocation and free")

@@ -19,7 +19,7 @@
 TEST_CASE("Directly test the error handler on the mock session", "[mock_session]")
 {
     // Build Mock session, this will automatically create a mock connection.
-    std::shared_ptr<MockSession> session_mock = MockSession::buildTestMockSession();
+    std::shared_ptr<mock_session> session_mock = mock_session::build_test_mock_session();
 
     // Push a new message onto the queue.
     session_mock->add_callback_message("Message 1!");
@@ -28,7 +28,7 @@ TEST_CASE("Directly test the error handler on the mock session", "[mock_session]
     REQUIRE(session_mock->get_last_message() == "Message 1!");
 
     // Get back to our newly created handler, this wouldn't be the typical usage path.
-    WT_EVENT_HANDLER *handler = session_mock->getWtSessionImpl()->event_handler;
+    WT_EVENT_HANDLER *handler = session_mock->get_wt_session_impl()->event_handler;
 
     // Call the two valid function pointers on the handler, validate the rest are NULL.
     REQUIRE(handler->handle_error != nullptr);

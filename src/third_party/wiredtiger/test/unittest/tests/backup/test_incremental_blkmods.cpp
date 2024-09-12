@@ -10,9 +10,9 @@
 #include <iostream>
 #include <regex>
 #include <sstream>
+
 #include "wiredtiger.h"
 #include "wt_internal.h"
-#include "extern.h"
 #include "../utils.h"
 #include "../wrappers/connection_wrapper.h"
 #include "../wrappers/item_wrapper.h"
@@ -293,9 +293,9 @@ TEST_CASE("Backup: Test blkmods in incremental backup", "[backup]")
         std::string conn_config =
           "create,file_manager=(close_handle_minimum=0,close_idle_time=3,close_scan_interval=1),"
           "statistics=(fast)";
-        ConnectionWrapper conn(DB_HOME, conn_config.c_str());
-        conn.clearDoCleanup();
-        WT_SESSION_IMPL *session_impl = conn.createSession();
+        connection_wrapper conn(DB_HOME, conn_config.c_str());
+        conn.clear_do_cleanup();
+        WT_SESSION_IMPL *session_impl = conn.create_session();
 
         WT_SESSION *session = &session_impl->iface;
 
@@ -333,8 +333,8 @@ TEST_CASE("Backup: Test blkmods in incremental backup", "[backup]")
         std::string conn_config =
           "file_manager=(close_handle_minimum=0,close_idle_time=3,close_scan_interval=1),"
           "statistics=(fast)";
-        ConnectionWrapper conn(DB_HOME, conn_config.c_str());
-        WT_SESSION_IMPL *session_impl = conn.createSession();
+        connection_wrapper conn(DB_HOME, conn_config.c_str());
+        WT_SESSION_IMPL *session_impl = conn.create_session();
 
         WT_SESSION *session = &session_impl->iface;
 

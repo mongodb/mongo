@@ -21,9 +21,9 @@
  */
 static void
 test_config_flag(
-  std::shared_ptr<MockSession> session_mock, const std::string &config_param, const int flag)
+  std::shared_ptr<mock_session> session_mock, const std::string &config_param, const int flag)
 {
-    WT_SESSION_IMPL *session = session_mock->getWtSessionImpl();
+    WT_SESSION_IMPL *session = session_mock->get_wt_session_impl();
     std::string param_true = config_param + "=true";
     std::string param_false = config_param + "=false";
     REQUIRE(__ut_session_config_int(session, param_true.c_str()) == 0);
@@ -39,7 +39,7 @@ test_config_flag(
 TEST_CASE("Session config - test setting and clearing a flag", "[session_config]")
 {
     /* Build Mock session, this will automatically create a mock connection. */
-    std::shared_ptr<MockSession> session_mock = MockSession::buildTestMockSession();
+    std::shared_ptr<mock_session> session_mock = mock_session::build_test_mock_session();
 
     SECTION("ignore_cache_size")
     {
@@ -66,8 +66,8 @@ TEST_CASE("Session config - test setting and clearing a flag", "[session_config]
 TEST_CASE("cache_max_wait_ms", "[session_config]")
 {
     /* Build Mock session, this will automatically create a mock connection. */
-    std::shared_ptr<MockSession> session_mock = MockSession::buildTestMockSession();
-    WT_SESSION_IMPL *session = session_mock->getWtSessionImpl();
+    std::shared_ptr<mock_session> session_mock = mock_session::build_test_mock_session();
+    WT_SESSION_IMPL *session = session_mock->get_wt_session_impl();
 
     REQUIRE(__ut_session_config_int(session, "cache_max_wait_ms=2000") == 0);
     REQUIRE(session->cache_max_wait_us == 2000 * WT_THOUSAND);

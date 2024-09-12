@@ -11,10 +11,11 @@
  * This file unit tests block manager functions relating to packing and unpacking address cookies.
  */
 
-#include "wt_internal.h"
 #include <catch2/catch.hpp>
 #include <iostream>
 #include <vector>
+
+#include "wt_internal.h"
 
 void
 unpack_addr_cookie_and_check(const uint8_t *packed, uint32_t block_allocsize, wt_off_t pack_offset,

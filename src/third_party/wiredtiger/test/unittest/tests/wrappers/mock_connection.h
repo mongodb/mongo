@@ -6,10 +6,10 @@
  * See the file LICENSE for redistribution information.
  */
 
-#ifndef WT_MOCK_CONNECTION_H
-#define WT_MOCK_CONNECTION_H
+#pragma once
 
 #include <memory>
+
 #include "wt_internal.h"
 
 /*
@@ -17,32 +17,30 @@
  * fleshed-out connection (or session). There are large speed advantages here, since the real thing
  * will write a bunch of files to disk during the test, which also need to be removed.
  */
-class MockConnection {
+class mock_connection {
 public:
-    ~MockConnection();
+    ~mock_connection();
     WT_CONNECTION_IMPL *
-    getWtConnectionImpl()
+    get_wt_connection_impl()
     {
-        return _connectionImpl;
+        return _connection_impl;
     };
     WT_CONNECTION *
-    getWtConnection()
+    get_wt_connection()
     {
-        return reinterpret_cast<WT_CONNECTION *>(_connectionImpl);
+        return reinterpret_cast<WT_CONNECTION *>(_connection_impl);
     };
 
-    static std::shared_ptr<MockConnection> buildTestMockConnection();
-    int setupChunkCache(WT_SESSION_IMPL *, uint64_t, size_t, WT_CHUNKCACHE *&);
+    static std::shared_ptr<mock_connection> build_test_mock_connection();
+    int setup_chunk_cache(WT_SESSION_IMPL *, uint64_t, size_t, WT_CHUNKCACHE *&);
     // Initialize the data structures, in-memory file system and variables used for file handles and
     // blocks. The block manager requires both to perform file type operations.
-    int setupBlockManager(WT_SESSION_IMPL *);
+    int setup_block_manager(WT_SESSION_IMPL *);
 
 private:
-    explicit MockConnection(WT_CONNECTION_IMPL *connectionImpl);
+    explicit mock_connection(WT_CONNECTION_IMPL *connection_impl);
 
     // This class is implemented such that it owns, and is responsible for freeing,
     // this pointer
-    WT_CONNECTION_IMPL *_connectionImpl;
+    WT_CONNECTION_IMPL *_connection_impl;
 };
-
-#endif // WT_MOCK_CONNECTION_H

@@ -6,8 +6,9 @@
  * See the file LICENSE for redistribution information.
  */
 
-#include "wt_internal.h"
 #include <catch2/catch.hpp>
+
+#include "wt_internal.h"
 
 TEST_CASE("Bitstring macros: __bit_byte", "[bitstring]")
 {
@@ -71,74 +72,74 @@ TEST_CASE("Bitstring macros: __bitstr_size", "[bitstring]")
 
 TEST_CASE("Bitstring functions: __bit_nset", "[bitstring]")
 {
-    const int bitVectorSize = 8;
-    std::vector<uint8_t> bitVector(bitVectorSize, 0);
+    const int bit_vector_size = 8;
+    std::vector<uint8_t> bit_vector(bit_vector_size, 0);
 
-    for (int i = 0; i < bitVectorSize; i++)
-        CHECK(bitVector[i] == 0x00);
+    for (int i = 0; i < bit_vector_size; i++)
+        CHECK(bit_vector[i] == 0x00);
 
     SECTION("Simple test: set first two bytes")
     {
-        __bit_nset(bitVector.data(), 0, 15);
-        CHECK(bitVector[0] == 0xff);
-        CHECK(bitVector[1] == 0xff);
-        CHECK(bitVector[2] == 0x00);
-        CHECK(bitVector[3] == 0x00);
-        CHECK(bitVector[4] == 0x00);
-        CHECK(bitVector[5] == 0x00);
-        CHECK(bitVector[6] == 0x00);
-        CHECK(bitVector[7] == 0x00);
+        __bit_nset(bit_vector.data(), 0, 15);
+        CHECK(bit_vector[0] == 0xff);
+        CHECK(bit_vector[1] == 0xff);
+        CHECK(bit_vector[2] == 0x00);
+        CHECK(bit_vector[3] == 0x00);
+        CHECK(bit_vector[4] == 0x00);
+        CHECK(bit_vector[5] == 0x00);
+        CHECK(bit_vector[6] == 0x00);
+        CHECK(bit_vector[7] == 0x00);
     }
 
     SECTION("Simple test: set bytes 1 and 2 bytes")
     {
-        __bit_nset(bitVector.data(), 8, 23);
-        CHECK(bitVector[0] == 0x00);
-        CHECK(bitVector[1] == 0xff);
-        CHECK(bitVector[2] == 0xff);
-        CHECK(bitVector[3] == 0x00);
-        CHECK(bitVector[4] == 0x00);
-        CHECK(bitVector[5] == 0x00);
-        CHECK(bitVector[6] == 0x00);
-        CHECK(bitVector[7] == 0x00);
+        __bit_nset(bit_vector.data(), 8, 23);
+        CHECK(bit_vector[0] == 0x00);
+        CHECK(bit_vector[1] == 0xff);
+        CHECK(bit_vector[2] == 0xff);
+        CHECK(bit_vector[3] == 0x00);
+        CHECK(bit_vector[4] == 0x00);
+        CHECK(bit_vector[5] == 0x00);
+        CHECK(bit_vector[6] == 0x00);
+        CHECK(bit_vector[7] == 0x00);
     }
 
     SECTION("Simple test: set non byte-aligned bit vector")
     {
-        __bit_nset(bitVector.data(), 9, 20);
-        CHECK(bitVector[0] == 0x00);
-        CHECK(bitVector[1] == 0xfe);
-        CHECK(bitVector[2] == 0x1f);
-        CHECK(bitVector[3] == 0x00);
-        CHECK(bitVector[4] == 0x00);
-        CHECK(bitVector[5] == 0x00);
-        CHECK(bitVector[6] == 0x00);
-        CHECK(bitVector[7] == 0x00);
+        __bit_nset(bit_vector.data(), 9, 20);
+        CHECK(bit_vector[0] == 0x00);
+        CHECK(bit_vector[1] == 0xfe);
+        CHECK(bit_vector[2] == 0x1f);
+        CHECK(bit_vector[3] == 0x00);
+        CHECK(bit_vector[4] == 0x00);
+        CHECK(bit_vector[5] == 0x00);
+        CHECK(bit_vector[6] == 0x00);
+        CHECK(bit_vector[7] == 0x00);
     }
 
     SECTION("Simple test: first non byte-aligned bit vector")
     {
-        __bit_nset(bitVector.data(), 0, 20);
-        CHECK(bitVector[0] == 0xff);
-        CHECK(bitVector[1] == 0xff);
-        CHECK(bitVector[2] == 0x1f);
-        CHECK(bitVector[3] == 0x00);
-        CHECK(bitVector[4] == 0x00);
-        CHECK(bitVector[5] == 0x00);
-        CHECK(bitVector[6] == 0x00);
-        CHECK(bitVector[7] == 0x00);
+        __bit_nset(bit_vector.data(), 0, 20);
+        CHECK(bit_vector[0] == 0xff);
+        CHECK(bit_vector[1] == 0xff);
+        CHECK(bit_vector[2] == 0x1f);
+        CHECK(bit_vector[3] == 0x00);
+        CHECK(bit_vector[4] == 0x00);
+        CHECK(bit_vector[5] == 0x00);
+        CHECK(bit_vector[6] == 0x00);
+        CHECK(bit_vector[7] == 0x00);
     }
 
     SECTION("Simple test: last non-aligned bit vector")
     {
-        __bit_nset(bitVector.data(), 36, 63);
-        CHECK(bitVector[0] == 0x00);
-        CHECK(bitVector[1] == 0x00);
-        CHECK(bitVector[2] == 0x00);
-        CHECK(bitVector[3] == 0x00);
-        CHECK(bitVector[4] == 0xf0);
-        CHECK(bitVector[5] == 0xff);
-        CHECK(bitVector[6] == 0xff);
-        CHECK(bitVector[7] == 0xff);
+        __bit_nset(bit_vector.data(), 36, 63);
+        CHECK(bit_vector[0] == 0x00);
+        CHECK(bit_vector[1] == 0x00);
+        CHECK(bit_vector[2] == 0x00);
+        CHECK(bit_vector[3] == 0x00);
+        CHECK(bit_vector[4] == 0xf0);
+        CHECK(bit_vector[5] == 0xff);
+        CHECK(bit_vector[6] == 0xff);
+        CHECK(bit_vector[7] == 0xff);
     }
 }

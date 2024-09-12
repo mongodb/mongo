@@ -119,14 +119,18 @@ alloc_new_ext(WT_SESSION_IMPL *session, const off_size &one)
 WT_EXT *
 get_off_n(const WT_EXTLIST &extlist, uint32_t idx)
 {
+    WT_EXT *ext = extlist.off[0];
+    uint32_t ext_idx = 0;
     REQUIRE(idx < extlist.entries);
-    if ((extlist.last != nullptr) && (idx == (extlist.entries - 1))) {
-        WT_EXT *last = extlist.off[idx];
-        if (last != nullptr)
-            REQUIRE(last == extlist.last);
-        return extlist.last;
+    while (ext_idx < idx) {
+        REQUIRE(ext != NULL);
+        ext = ext->next[0];
+        ++ext_idx;
     }
-    return extlist.off[idx];
+
+    if (idx == (extlist.entries - 1))
+        REQUIRE(ext == extlist.last);
+    return ext;
 }
 
 /*!
@@ -243,6 +247,7 @@ verify_off_extent_list(
         ++idx;
         expected_bytes += ext->size;
     }
+    REQUIRE(idx == extlist.entries);
     if (!verify_bytes)
         return;
     REQUIRE(extlist.bytes == expected_bytes);

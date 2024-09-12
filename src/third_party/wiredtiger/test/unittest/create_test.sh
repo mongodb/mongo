@@ -78,7 +78,7 @@ TEST_CASE("Boilerplate: test function", "[test_template]")
      * Build Mock session, this will automatically create a mock connection. Remove if not
      * necessary.
      */
-    std::shared_ptr<MockSession> session = MockSession::buildTestMockSession();
+    std::shared_ptr<mock_session> session = mock_session::build_test_mock_session();
 
     /*
      * Sections are a great way to separate the different edge cases for a particular function. In

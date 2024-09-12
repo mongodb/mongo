@@ -181,8 +181,8 @@ TEST_CASE("Connection config: off/on", "[assertions]")
 {
     SECTION("Connection config: off")
     {
-        ConnectionWrapper conn(DB_HOME, "create");
-        WT_SESSION_IMPL *session = conn.createSession();
+        connection_wrapper conn(DB_HOME, "create");
+        WT_SESSION_IMPL *session = conn.create_session();
 
         /*
          * Assert that WT_ASSERT and WT_ASSERT_ALWAYS behave consistently regardless of the
@@ -204,8 +204,8 @@ TEST_CASE("Connection config: off/on", "[assertions]")
 
     SECTION("Connection config: on")
     {
-        ConnectionWrapper conn(DB_HOME, "create, extra_diagnostics=[all]");
-        WT_SESSION_IMPL *session = conn.createSession();
+        connection_wrapper conn(DB_HOME, "create, extra_diagnostics=[all]");
+        WT_SESSION_IMPL *session = conn.create_session();
 
         WT_ASSERT(session, false);
         REQUIRE_FALSE(session->unittest_assert_hit);
@@ -223,8 +223,8 @@ TEST_CASE("Connection config: off/on", "[assertions]")
 /* When WT_DIAGNOSTIC_ALL is enabled, all asserts are enabled. */
 TEST_CASE("Connection config: WT_DIAGNOSTIC_ALL", "[assertions]")
 {
-    ConnectionWrapper conn(DB_HOME, "create, extra_diagnostics= [all]");
-    WT_SESSION_IMPL *session = conn.createSession();
+    connection_wrapper conn(DB_HOME, "create, extra_diagnostics= [all]");
+    WT_SESSION_IMPL *session = conn.create_session();
 
     REQUIRE(configured_asserts_abort(session, WT_DIAGNOSTIC_ALL) == 0);
 
@@ -234,8 +234,8 @@ TEST_CASE("Connection config: WT_DIAGNOSTIC_ALL", "[assertions]")
 /* When a category is enabled, all asserts for that category are enabled. */
 TEST_CASE("Connection config: check one enabled category", "[assertions]")
 {
-    ConnectionWrapper conn(DB_HOME, "create, extra_diagnostics=[key_out_of_order]");
-    WT_SESSION_IMPL *session = conn.createSession();
+    connection_wrapper conn(DB_HOME, "create, extra_diagnostics=[key_out_of_order]");
+    WT_SESSION_IMPL *session = conn.create_session();
 
     REQUIRE(EXTRA_DIAGNOSTICS_ENABLED(session, WT_DIAGNOSTIC_KEY_OUT_OF_ORDER) == true);
     REQUIRE(configured_asserts_abort(session, WT_DIAGNOSTIC_KEY_OUT_OF_ORDER) == 0);
@@ -244,8 +244,8 @@ TEST_CASE("Connection config: check one enabled category", "[assertions]")
 /* Asserts that categories are enabled/disabled following the connection configuration. */
 TEST_CASE("Connection config: check multiple enabled categories", "[assertions]")
 {
-    ConnectionWrapper conn(DB_HOME, "create, extra_diagnostics= [txn_visibility, prepared]");
-    WT_SESSION_IMPL *session = conn.createSession();
+    connection_wrapper conn(DB_HOME, "create, extra_diagnostics= [txn_visibility, prepared]");
+    WT_SESSION_IMPL *session = conn.create_session();
 
     REQUIRE(configured_asserts_abort(session, WT_DIAGNOSTIC_TXN_VISIBILITY) == 0);
 
@@ -258,8 +258,8 @@ TEST_CASE("Connection config: check multiple enabled categories", "[assertions]"
 /* Asserts that categories are enabled/disabled following the connection configuration. */
 TEST_CASE("Connection config: check disabled category", "[assertions]")
 {
-    ConnectionWrapper conn(DB_HOME, "create, extra_diagnostics = [eviction_check]");
-    WT_SESSION_IMPL *session = conn.createSession();
+    connection_wrapper conn(DB_HOME, "create, extra_diagnostics = [eviction_check]");
+    WT_SESSION_IMPL *session = conn.create_session();
 
     REQUIRE(EXTRA_DIAGNOSTICS_ENABLED(session, WT_DIAGNOSTIC_SLOW_OPERATION) == false);
     REQUIRE(configured_asserts_off(session, WT_DIAGNOSTIC_SLOW_OPERATION) == 0);
@@ -268,9 +268,9 @@ TEST_CASE("Connection config: check disabled category", "[assertions]")
 /* Reconfigure with extra_diagnostics not provided. */
 TEST_CASE("Reconfigure: extra_diagnostics not provided", "[assertions]")
 {
-    ConnectionWrapper conn(DB_HOME, "create");
-    auto connection = conn.getWtConnection();
-    WT_SESSION_IMPL *session = conn.createSession();
+    connection_wrapper conn(DB_HOME, "create");
+    auto connection = conn.get_wt_connection();
+    WT_SESSION_IMPL *session = conn.create_session();
 
     connection->reconfigure(connection, "");
     all_diag_asserts_off(session);
@@ -279,9 +279,9 @@ TEST_CASE("Reconfigure: extra_diagnostics not provided", "[assertions]")
 /* Reconfigure the connection with extra_diagnostics as an empty list. */
 TEST_CASE("Reconfigure: extra_diagnostics empty list", "[assertions]")
 {
-    ConnectionWrapper conn(DB_HOME);
-    auto connection = conn.getWtConnection();
-    WT_SESSION_IMPL *session = conn.createSession();
+    connection_wrapper conn(DB_HOME);
+    auto connection = conn.get_wt_connection();
+    WT_SESSION_IMPL *session = conn.create_session();
 
     all_diag_asserts_off(session);
     connection->reconfigure(connection, "extra_diagnostics=[]");
@@ -291,9 +291,9 @@ TEST_CASE("Reconfigure: extra_diagnostics empty list", "[assertions]")
 /* Reconfigure the connection with extra_diagnostics as a list with invalid item. */
 TEST_CASE("Reconfigure: extra_diagnostics with invalid item", "[assertions]")
 {
-    ConnectionWrapper conn(DB_HOME);
-    auto connection = conn.getWtConnection();
-    WT_SESSION_IMPL *session = conn.createSession();
+    connection_wrapper conn(DB_HOME);
+    auto connection = conn.get_wt_connection();
+    WT_SESSION_IMPL *session = conn.create_session();
 
     all_diag_asserts_off(session);
     REQUIRE(connection->reconfigure(
@@ -304,9 +304,9 @@ TEST_CASE("Reconfigure: extra_diagnostics with invalid item", "[assertions]")
 /* Reconfigure the connection with extra_diagnostics as a list of valid items. */
 TEST_CASE("Reconfigure: extra_diagnostics with valid items", "[assertions]")
 {
-    ConnectionWrapper conn(DB_HOME);
-    auto connection = conn.getWtConnection();
-    WT_SESSION_IMPL *session = conn.createSession();
+    connection_wrapper conn(DB_HOME);
+    auto connection = conn.get_wt_connection();
+    WT_SESSION_IMPL *session = conn.create_session();
 
     connection->reconfigure(
       connection, "extra_diagnostics=[checkpoint_validate, log_validate, eviction_check]");
@@ -323,9 +323,9 @@ TEST_CASE("Reconfigure: extra_diagnostics with valid items", "[assertions]")
 /* Reconfigure with assertion categories changed from enabled->disabled and vice-versa. */
 TEST_CASE("Reconfigure: Transition cases", "[assertions]")
 {
-    ConnectionWrapper conn(DB_HOME, "create, extra_diagnostics= [prepared, key_out_of_order]");
-    auto connection = conn.getWtConnection();
-    WT_SESSION_IMPL *session = conn.createSession();
+    connection_wrapper conn(DB_HOME, "create, extra_diagnostics= [prepared, key_out_of_order]");
+    auto connection = conn.get_wt_connection();
+    WT_SESSION_IMPL *session = conn.create_session();
 
     REQUIRE(EXTRA_DIAGNOSTICS_ENABLED(session, WT_DIAGNOSTIC_PREPARED) == true);
     REQUIRE(EXTRA_DIAGNOSTICS_ENABLED(session, WT_DIAGNOSTIC_KEY_OUT_OF_ORDER) == true);

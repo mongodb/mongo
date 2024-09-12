@@ -14,8 +14,9 @@
  * The block session manages an internal caching mechanism for both block and size blocks that are
  * created or discarded.
  */
-#include "wt_internal.h"
 #include <catch2/catch.hpp>
+
+#include "wt_internal.h"
 #include "../wrappers/mock_session.h"
 
 void
@@ -83,67 +84,67 @@ TEST_CASE("Block session: __block_size_alloc", "[block_session_size]")
 
 TEST_CASE("Block session: __block_size_prealloc", "[block_session_size]")
 {
-    std::shared_ptr<MockSession> session = MockSession::buildTestMockSession();
-    WT_BLOCK_MGR_SESSION *bms = session->setupBlockManagerSession();
+    std::shared_ptr<mock_session> session = mock_session::build_test_mock_session();
+    WT_BLOCK_MGR_SESSION *bms = session->setup_block_manager_session();
 
     SECTION("Allocate zero size blocks")
     {
-        REQUIRE(__ut_block_size_prealloc(session->getWtSessionImpl(), 0) == 0);
+        REQUIRE(__ut_block_size_prealloc(session->get_wt_session_impl(), 0) == 0);
         validate_and_free_size_list(bms, 0);
     }
 
     SECTION("Allocate one size block")
     {
-        REQUIRE(__ut_block_size_prealloc(session->getWtSessionImpl(), 1) == 0);
+        REQUIRE(__ut_block_size_prealloc(session->get_wt_session_impl(), 1) == 0);
         validate_and_free_size_list(bms, 1);
     }
 
     SECTION("Allocate multiple size blocks")
     {
-        REQUIRE(__ut_block_size_prealloc(session->getWtSessionImpl(), 3) == 0);
+        REQUIRE(__ut_block_size_prealloc(session->get_wt_session_impl(), 3) == 0);
         validate_and_free_size_list(bms, 3);
     }
 
     SECTION("Allocate blocks on existing cache")
     {
-        REQUIRE(__ut_block_size_prealloc(session->getWtSessionImpl(), 3) == 0);
+        REQUIRE(__ut_block_size_prealloc(session->get_wt_session_impl(), 3) == 0);
         validate_size_list(bms, 3);
 
-        REQUIRE(__ut_block_size_prealloc(session->getWtSessionImpl(), 0) == 0);
+        REQUIRE(__ut_block_size_prealloc(session->get_wt_session_impl(), 0) == 0);
         validate_size_list(bms, 3);
 
-        REQUIRE(__ut_block_size_prealloc(session->getWtSessionImpl(), 2) == 0);
+        REQUIRE(__ut_block_size_prealloc(session->get_wt_session_impl(), 2) == 0);
         validate_size_list(bms, 3);
 
-        REQUIRE(__ut_block_size_prealloc(session->getWtSessionImpl(), 5) == 0);
+        REQUIRE(__ut_block_size_prealloc(session->get_wt_session_impl(), 5) == 0);
         validate_and_free_size_list(bms, 5);
     }
 }
 
 TEST_CASE("Block session: __wti_block_size_alloc with NULL block manager", "[block_session_size]")
 {
-    std::shared_ptr<MockSession> session = MockSession::buildTestMockSession();
+    std::shared_ptr<mock_session> session = mock_session::build_test_mock_session();
 
     SECTION("Allocate with null block manager session and no size cache")
     {
-        std::shared_ptr<MockSession> session_no_bm = MockSession::buildTestMockSession();
+        std::shared_ptr<mock_session> session_no_bm = mock_session::build_test_mock_session();
         WT_SIZE *sz = nullptr;
 
-        REQUIRE(__wti_block_size_alloc(session_no_bm->getWtSessionImpl(), &sz) == 0);
+        REQUIRE(__wti_block_size_alloc(session_no_bm->get_wt_session_impl(), &sz) == 0);
         validate_and_free_size_block(sz);
 
-        REQUIRE(__wti_block_size_alloc(session->getWtSessionImpl(), &sz) == 0);
+        REQUIRE(__wti_block_size_alloc(session->get_wt_session_impl(), &sz) == 0);
         validate_and_free_size_block(sz);
     }
 }
 
 TEST_CASE("Block session: __wti_block_size_alloc with block manager", "[block_session_size]")
 {
-    std::shared_ptr<MockSession> session = MockSession::buildTestMockSession();
-    WT_BLOCK_MGR_SESSION *bms = session->setupBlockManagerSession();
+    std::shared_ptr<mock_session> session = mock_session::build_test_mock_session();
+    WT_BLOCK_MGR_SESSION *bms = session->setup_block_manager_session();
 
     WT_SIZE *sz = nullptr;
-    REQUIRE(__wti_block_size_alloc(session->getWtSessionImpl(), &sz) == 0);
+    REQUIRE(__wti_block_size_alloc(session->get_wt_session_impl(), &sz) == 0);
 
     // Construct extent cache with one item.
     bms->sz_cache = sz;
@@ -155,7 +156,7 @@ TEST_CASE("Block session: __wti_block_size_alloc with block manager", "[block_se
     {
         bms->sz_cache_cnt = 0;
         WT_SIZE *cached_sz = nullptr;
-        REQUIRE(__wti_block_size_alloc(session->getWtSessionImpl(), &cached_sz) == 0);
+        REQUIRE(__wti_block_size_alloc(session->get_wt_session_impl(), &cached_sz) == 0);
         // If a size is in the cache, the function should be returning the cached size.
         REQUIRE(cached_sz == sz);
         validate_and_free_size_list(bms, 0);
@@ -172,7 +173,7 @@ TEST_CASE("Block session: __wti_block_size_alloc with block manager", "[block_se
             sz->next[i + sz->depth] = reinterpret_cast<WT_SIZE *>(addr);
 
         WT_SIZE *cached_sz = nullptr;
-        REQUIRE(__wti_block_size_alloc(session->getWtSessionImpl(), &cached_sz) == 0);
+        REQUIRE(__wti_block_size_alloc(session->get_wt_session_impl(), &cached_sz) == 0);
         // If a size is in the cache, the function should be returning the cached size.
         REQUIRE(cached_sz == sz);
         validate_and_free_size_block(sz);
@@ -184,14 +185,14 @@ TEST_CASE("Block session: __wti_block_size_alloc with block manager", "[block_se
         WT_SIZE *sz2 = nullptr;
         // Point cache to nullptr first otherwise function will be fetching the cached size.
         bms->sz_cache = nullptr;
-        REQUIRE(__wti_block_size_alloc(session->getWtSessionImpl(), &sz2) == 0);
+        REQUIRE(__wti_block_size_alloc(session->get_wt_session_impl(), &sz2) == 0);
         // Construct extent cache with two items.
         sz->next[0] = sz2;
         bms->sz_cache = sz;
         bms->sz_cache_cnt = 2;
 
         WT_SIZE *cached_sz = nullptr;
-        REQUIRE(__wti_block_size_alloc(session->getWtSessionImpl(), &cached_sz) == 0);
+        REQUIRE(__wti_block_size_alloc(session->get_wt_session_impl(), &cached_sz) == 0);
         // The first size should be in the cache, the function should be returning the first
         // size.
         REQUIRE(sz == cached_sz);
@@ -203,18 +204,18 @@ TEST_CASE("Block session: __wti_block_size_alloc with block manager", "[block_se
 
 TEST_CASE("Block session: __wti_block_size_free", "[block_session_size]")
 {
-    std::shared_ptr<MockSession> session = MockSession::buildTestMockSession();
-    WT_BLOCK_MGR_SESSION *bms = session->setupBlockManagerSession();
+    std::shared_ptr<mock_session> session = mock_session::build_test_mock_session();
+    WT_BLOCK_MGR_SESSION *bms = session->setup_block_manager_session();
 
     SECTION("Free with null block manager session")
     {
-        std::shared_ptr<MockSession> session_no_bm = MockSession::buildTestMockSession();
+        std::shared_ptr<mock_session> session_no_bm = mock_session::build_test_mock_session();
         WT_SIZE *sz;
 
-        REQUIRE(__ut_block_size_alloc(session_no_bm->getWtSessionImpl(), &sz) == 0);
+        REQUIRE(__ut_block_size_alloc(session_no_bm->get_wt_session_impl(), &sz) == 0);
         REQUIRE(sz != nullptr);
 
-        __wti_block_size_free(session_no_bm->getWtSessionImpl(), &sz);
+        __wti_block_size_free(session_no_bm->get_wt_session_impl(), &sz);
 
         REQUIRE(sz == nullptr);
     }
@@ -222,17 +223,17 @@ TEST_CASE("Block session: __wti_block_size_free", "[block_session_size]")
     SECTION("Calling free with cache")
     {
         WT_SIZE *sz = nullptr;
-        REQUIRE(__ut_block_size_alloc(session->getWtSessionImpl(), &sz) == 0);
+        REQUIRE(__ut_block_size_alloc(session->get_wt_session_impl(), &sz) == 0);
 
-        __wti_block_size_free(session->getWtSessionImpl(), &sz);
+        __wti_block_size_free(session->get_wt_session_impl(), &sz);
 
         REQUIRE(sz != nullptr);
         REQUIRE(bms->sz_cache == sz);
         validate_size_list(bms, 1);
 
         WT_SIZE *sz2 = nullptr;
-        REQUIRE(__ut_block_size_alloc(session->getWtSessionImpl(), &sz2) == 0);
-        __wti_block_size_free(session->getWtSessionImpl(), &sz2);
+        REQUIRE(__ut_block_size_alloc(session->get_wt_session_impl(), &sz2) == 0);
+        __wti_block_size_free(session->get_wt_session_impl(), &sz2);
 
         REQUIRE(sz != nullptr);
         REQUIRE(bms->sz_cache == sz2);
@@ -243,13 +244,13 @@ TEST_CASE("Block session: __wti_block_size_free", "[block_session_size]")
 
 TEST_CASE("Block session: __block_size_discard", "[block_session_size]")
 {
-    std::shared_ptr<MockSession> session = MockSession::buildTestMockSession();
-    WT_BLOCK_MGR_SESSION *bms = session->setupBlockManagerSession();
+    std::shared_ptr<mock_session> session = mock_session::build_test_mock_session();
+    WT_BLOCK_MGR_SESSION *bms = session->setup_block_manager_session();
 
     WT_SIZE *sz = nullptr, *sz2 = nullptr, *sz3 = nullptr;
-    REQUIRE(__wti_block_size_alloc(session->getWtSessionImpl(), &sz) == 0);
-    REQUIRE(__wti_block_size_alloc(session->getWtSessionImpl(), &sz2) == 0);
-    REQUIRE(__wti_block_size_alloc(session->getWtSessionImpl(), &sz3) == 0);
+    REQUIRE(__wti_block_size_alloc(session->get_wt_session_impl(), &sz) == 0);
+    REQUIRE(__wti_block_size_alloc(session->get_wt_session_impl(), &sz2) == 0);
+    REQUIRE(__wti_block_size_alloc(session->get_wt_session_impl(), &sz3) == 0);
 
     // Construct size cache with three items.
     sz2->next[0] = sz3;
@@ -259,25 +260,25 @@ TEST_CASE("Block session: __block_size_discard", "[block_session_size]")
 
     SECTION("Discard every item in size list with 0 max items in the cache")
     {
-        REQUIRE(__ut_block_size_discard(session->getWtSessionImpl(), 0) == 0);
+        REQUIRE(__ut_block_size_discard(session->get_wt_session_impl(), 0) == 0);
         validate_and_free_size_list(bms, 0);
     }
 
     SECTION("Discard until only one item with 1 max item in size list")
     {
-        REQUIRE(__ut_block_size_discard(session->getWtSessionImpl(), 1) == 0);
+        REQUIRE(__ut_block_size_discard(session->get_wt_session_impl(), 1) == 0);
         validate_and_free_size_list(bms, 1);
     }
 
     SECTION("Discard nothing in the size list because cache already has 3 items")
     {
-        REQUIRE(__ut_block_size_discard(session->getWtSessionImpl(), 3) == 0);
+        REQUIRE(__ut_block_size_discard(session->get_wt_session_impl(), 3) == 0);
         validate_and_free_size_list(bms, 3);
     }
 
     SECTION("Fake cache count and discard every item in size list")
     {
         bms->sz_cache_cnt = 4;
-        REQUIRE(__ut_block_size_discard(session->getWtSessionImpl(), 0) == WT_ERROR);
+        REQUIRE(__ut_block_size_discard(session->get_wt_session_impl(), 0) == WT_ERROR);
     }
 }

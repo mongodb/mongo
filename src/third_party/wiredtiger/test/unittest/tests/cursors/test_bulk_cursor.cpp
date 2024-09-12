@@ -8,6 +8,7 @@
 
 #include <thread>
 #include <catch2/catch.hpp>
+
 #include "wiredtiger.h"
 #include "wt_internal.h"
 #include "../utils.h"
@@ -142,20 +143,21 @@ cache_destroy_memory_check(
 {
     SECTION("Check memory freed when using a cursor: config = " + config)
     {
-        ConnectionWrapper conn(DB_HOME);
-        WT_SESSION_IMPL *session_impl = conn.createSession();
+        connection_wrapper conn(DB_HOME);
+        WT_SESSION_IMPL *session_impl = conn.create_session();
         WT_SESSION *session = &session_impl->iface;
         std::string uri = "table:cursor_test";
 
-        report_cache_status(conn.getWtConnectionImpl()->cache, ", created connection", diagnostics);
+        report_cache_status(
+          conn.get_wt_connection_impl()->cache, ", created connection", diagnostics);
 
         REQUIRE(session->create(session, uri.c_str(), "key_format=S,value_format=S") == 0);
         report_cache_status(
-          conn.getWtConnectionImpl()->cache, config + ", created session", diagnostics);
+          conn.get_wt_connection_impl()->cache, config + ", created session", diagnostics);
 
         REQUIRE(session->begin_transaction(session, "") == 0);
         report_cache_status(
-          conn.getWtConnectionImpl()->cache, config + ", begun transaction", diagnostics);
+          conn.get_wt_connection_impl()->cache, config + ", begun transaction", diagnostics);
 
         WT_CURSOR *cursor = nullptr;
         int open_cursor_result =
@@ -164,19 +166,19 @@ cache_destroy_memory_check(
 
         if (open_cursor_result == 0) {
             report_cache_status(
-              conn.getWtConnectionImpl()->cache, config + ", opened cursor", diagnostics);
+              conn.get_wt_connection_impl()->cache, config + ", opened cursor", diagnostics);
 
             insert_sample_values(cursor);
             report_cache_status(
-              conn.getWtConnectionImpl()->cache, config + ", inserted values", diagnostics);
+              conn.get_wt_connection_impl()->cache, config + ", inserted values", diagnostics);
 
             REQUIRE(cursor->close(cursor) == 0);
             report_cache_status(
-              conn.getWtConnectionImpl()->cache, config + ", closed cursor", diagnostics);
+              conn.get_wt_connection_impl()->cache, config + ", closed cursor", diagnostics);
 
             REQUIRE(session->commit_transaction(session, "") == 0);
-            report_cache_status(
-              conn.getWtConnectionImpl()->cache, config + ", committed transaction", diagnostics);
+            report_cache_status(conn.get_wt_connection_impl()->cache,
+              config + ", committed transaction", diagnostics);
         }
     }
 }
@@ -190,8 +192,8 @@ static void
 cursor_test(std::string const &config, bool close, int expected_open_cursor_result,
   int expected_commit_result, bool diagnostics)
 {
-    ConnectionWrapper conn(DB_HOME);
-    WT_SESSION_IMPL *session_impl = conn.createSession();
+    connection_wrapper conn(DB_HOME);
+    WT_SESSION_IMPL *session_impl = conn.create_session();
     WT_SESSION *session = &session_impl->iface;
     std::string uri = "table:cursor_test";
 
@@ -298,7 +300,7 @@ static void
 multiple_drop_test(std::string const &config, int expected_open_cursor_result,
   int expected_commit_result, bool do_sleep, bool diagnostics)
 {
-    ConnectionWrapper conn(DB_HOME);
+    connection_wrapper conn(DB_HOME);
     std::string uri = "table:cursor_test";
     std::string sleep_as_string = do_sleep ? "true" : "false";
 
@@ -310,7 +312,7 @@ multiple_drop_test(std::string const &config, int expected_open_cursor_result,
         while (count < limit) {
             count++;
 
-            WT_SESSION_IMPL *session_impl = conn.createSession();
+            WT_SESSION_IMPL *session_impl = conn.create_session();
             WT_SESSION *session = &session_impl->iface;
 
             REQUIRE(session->create(session, uri.c_str(), "key_format=S,value_format=S") == 0);
