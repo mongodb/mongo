@@ -5367,6 +5367,42 @@ def doConfigure(myenv):
             LINKFLAGS=["-fxray-instrument"],
         )
 
+    if "ldap" in myenv.get("MONGO_ENTERPRISE_FEATURES", []):
+        if myenv.TargetOSIs("windows"):
+            conf.env["MONGO_LDAP_LIB"] = ["Wldap32"]
+        else:
+            have_ldap_h = conf.CheckLibWithHeader(
+                "ldap",
+                ["ldap.h"],
+                "C",
+                'ldap_is_ldap_url("ldap://127.0.0.1");',
+                autoadd=False,
+            )
+
+            have_lber_h = conf.CheckLibWithHeader(
+                "lber",
+                ["lber.h"],
+                "C",
+                "ber_free(NULL, 0);",
+                autoadd=False,
+            )
+
+            if have_ldap_h:
+                conf.env.AppendUnique(MONGO_LDAP_LIB=["ldap"])
+            else:
+                myenv.ConfError(
+                    "Could not find <ldap.h> and ldap library from OpenLDAP, "
+                    "required for LDAP authorization in the enterprise build"
+                )
+
+            if have_lber_h:
+                conf.env.AppendUnique(MONGO_LDAP_LIB=["lber"])
+            else:
+                myenv.ConfError(
+                    "Could not find <lber.h> and lber library from OpenLDAP, "
+                    "required for LDAP authorizaton in the enterprise build"
+                )
+
     myenv = conf.Finish()
 
     return myenv
