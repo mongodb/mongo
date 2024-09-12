@@ -1396,13 +1396,8 @@ void BulkWriteOp::noteChildBatchResponse(
         // When an error is encountered on an ordered bulk write, it is impossible for any of the
         // remaining operations to have been executed. For that reason we reset them here so they
         // may be retargeted and retried if the error we saw is one we can retry after (e.g.
-        // StaleConfig.). If we are in a transaction we do not abort on WouldChangeOwningShard
-        // because the error is returned from the shard and recorded here as a placeholder, as we
-        // will end up processing the update (as a delete + insert on the corresponding shards in a
-        // txn) at the level of ClusterBulkWriteCmd.
-        if (!batchWillContinue && lastError &&
-            !(_inTransaction &&
-              lastError->getStatus().code() == ErrorCodes::WouldChangeOwningShard)) {
+        // StaleConfig.).
+        if (!batchWillContinue && lastError) {
             tassert(8266002,
                     "bulkWrite should not see replies after an error when ordered:true",
                     replyIndex >= (int)replyItems.size());
