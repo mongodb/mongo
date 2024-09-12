@@ -1419,3 +1419,19 @@ export function getExplainOptimizerPhases(explain) {
 
     return queryPlanner.optimizerPhases;
 }
+
+/**
+ * Recursively remove fields which conditionally appear in plans that may contribute to spurious
+ * differences. Modifies the parameter in-place, no return value.
+ */
+export function canonicalizePlan(p) {
+    delete p.planNodeId;
+    delete p.isCached;
+    if (p.hasOwnProperty("inputStage")) {
+        canonicalizePlan(p.inputStage);
+    } else if (p.hasOwnProperty("inputStages")) {
+        p.inputStages.forEach((s) => {
+            canonicalizePlan(s);
+        });
+    }
+}

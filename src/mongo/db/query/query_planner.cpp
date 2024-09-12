@@ -2273,15 +2273,28 @@ StatusWith<QueryPlanner::SubqueriesPlanningResult> QueryPlanner::planSubqueries(
             // We don't set NO_TABLE_SCAN because peeking at the cache data will keep us from
             // considering any plan that's a collscan.
             invariant(branchResult->solutions.empty());
-            auto statusWithMultiPlanSolns =
-                QueryPlanner::plan(*branchResult->canonicalQuery, params);
-            if (!statusWithMultiPlanSolns.isOK()) {
-                str::stream ss;
-                ss << "Can't plan for subchild " << branchResult->canonicalQuery->toString() << " "
-                   << statusWithMultiPlanSolns.getStatus().reason();
-                return Status(ErrorCodes::BadValue, ss);
+
+            if (planRankerMode.load()) {
+                auto statusWithCBRSolns =
+                    QueryPlanner::planWithCostBasedRanking(*branchResult->canonicalQuery, params);
+                if (!statusWithCBRSolns.isOK()) {
+                    str::stream ss;
+                    ss << "Can't plan for subchild " << branchResult->canonicalQuery->toString()
+                       << " " << statusWithCBRSolns.getStatus().reason();
+                    return statusWithCBRSolns.getStatus().withContext(ss);
+                }
+                branchResult->solutions = std::move(statusWithCBRSolns.getValue().solutions);
+            } else {
+                auto statusWithMultiPlanSolns =
+                    QueryPlanner::plan(*branchResult->canonicalQuery, params);
+                if (!statusWithMultiPlanSolns.isOK()) {
+                    str::stream ss;
+                    ss << "Can't plan for subchild " << branchResult->canonicalQuery->toString()
+                       << " " << statusWithMultiPlanSolns.getStatus().reason();
+                    return Status(ErrorCodes::BadValue, ss);
+                }
+                branchResult->solutions = std::move(statusWithMultiPlanSolns.getValue());
             }
-            branchResult->solutions = std::move(statusWithMultiPlanSolns.getValue());
 
             log_detail::logNumberOfSolutions(branchResult->solutions.size());
         }

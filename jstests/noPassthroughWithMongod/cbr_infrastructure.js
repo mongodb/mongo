@@ -2,7 +2,11 @@
  * Ensure that the correct CBR mode is chosen given certain combinations of query knobs.
  */
 
-import {getRejectedPlans, getWinningPlanFromExplain} from "jstests/libs/analyze_plan.js";
+import {
+    canonicalizePlan,
+    getRejectedPlans,
+    getWinningPlanFromExplain
+} from "jstests/libs/analyze_plan.js";
 
 const collName = jsTestName();
 const coll = db[collName];
@@ -35,8 +39,20 @@ const q3 = {
     b: {$eq: 99},
     c: {$lt: 5}
 };
+const q4 = {
+    $or: [q1, q2]
+};
+const q5 = {
+    $and: [
+        {$or: [{a: 10}, {b: {$gt: 99}}]},
+        {$or: [{a: {$in: [5, 1]}}, {b: {$in: [7, 99]}}]},
+    ],
+};
 
 function checkLastRejectedPlan(query) {
+    assert(!(Object.keys(query).length == 1 && Object.keys(query)[0] === "$or"),
+           "encountered rooted $or query");
+
     // Classic plan via multiplanning
     assert.commandWorked(db.adminCommand({setParameter: 1, planRankerMode: false}));
     const e0 = coll.find(query).explain();
@@ -50,20 +66,38 @@ function checkLastRejectedPlan(query) {
     const w1 = getWinningPlanFromExplain(e1);
 
     const lastMPRejectedPlan = r0[r0.length - 1];
-
-    // Explains of winning and rejected plans with featureFlagSbeFull differ by the 'isCached' and
-    // 'planNodeId' fields. Remove them to allow us to compare.
-    delete w1.planNodeId;
-    delete w1.inputStage.planNodeId;
-    delete w1.isCached;
-    delete lastMPRejectedPlan.isCached;
+    canonicalizePlan(lastMPRejectedPlan);
+    canonicalizePlan(w1);
     assert.eq(lastMPRejectedPlan, w1);
+}
+
+function checkRootedOr(query) {
+    assert(Object.keys(query).length == 1 && Object.keys(query)[0] === "$or",
+           "encountered non rooted $or query");
+
+    // Plan via multiplanning
+    assert.commandWorked(db.adminCommand({setParameter: 1, planRankerMode: false}));
+    const e0 = coll.find(query).explain();
+    const w0 = getWinningPlanFromExplain(e0);
+
+    // Plan via CBR
+    assert.commandWorked(db.adminCommand({setParameter: 1, planRankerMode: true}));
+    const e1 = coll.find(query).explain();
+    const w1 = getWinningPlanFromExplain(e1);
+
+    canonicalizePlan(w0);
+    canonicalizePlan(w1);
+    // Assert that the winning plans between multi-planning and CBR are different. This is the best
+    // we can do for now since subplanning will discard the rejected plans for each branch.
+    assert.neq(w0, w1);
 }
 
 try {
     checkLastRejectedPlan(q1);
     checkLastRejectedPlan(q2);
     checkLastRejectedPlan(q3);
+    checkRootedOr(q4);
+    checkLastRejectedPlan(q5);
 } finally {
     // Ensure that query knob doesn't leak into other testcases in the suite.
     assert.commandWorked(db.adminCommand({setParameter: 1, planRankerMode: false}));
