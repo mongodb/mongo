@@ -65,7 +65,8 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
     $config.teardown = function teardown(db, collName, cluster) {
         // Ensure that no temporary collection is left behind.
         if (TestData.testingReplicaSetEndpoint) {
-            // TODO (SERVER-88154): Interrupting $out on sharded cluster can leave tmp collections.
+            // When testing replica set endpoint, the temporary collection might not get deleted.
+            // Instead, it will be cleaned up on the next step up.
             return;
         }
         assert.eq(db.getCollectionNames().filter(col => col.includes('tmp.agg_out')).length, 0);
