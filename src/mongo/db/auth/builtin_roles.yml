@@ -594,7 +594,7 @@ roles:
         collection: "system.roles"
         actions:
           - createIndex # Create index on the roles collection.
-      - matchType: exact_namespace
+      - matchType: collection
         collection: "system.views"
         actions:
           - dropCollection
