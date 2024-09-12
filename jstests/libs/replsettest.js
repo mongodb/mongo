@@ -81,12 +81,16 @@ export class ReplSetTest {
         // If opts is passed in as a string, let it pass unmodified since strings are pass-by-value.
         // if it is an object, though, pass in a deep copy.
         if (typeof opts === 'string' || opts instanceof String) {
-            retryOnRetryableError(() => {
-                // The primary may unexpectedly step down during startup if under heavy load
-                // and too slowly processing heartbeats. When it steps down, it closes all of
-                // its connections.
-                _constructFromExistingSeedNode(this, opts);
-            }, ReplSetTest.kDefaultRetries, 1000, [ErrorCodes.NotYetInitialized]);
+            retryOnRetryableError(
+                () => {
+                    // The primary may unexpectedly step down during startup if under heavy load
+                    // and too slowly processing heartbeats. When it steps down, it closes all of
+                    // its connections.
+                    _constructFromExistingSeedNode(this, opts);
+                },
+                ReplSetTest.kDefaultRetries,
+                1000,
+                [ErrorCodes.NotYetInitialized, ErrorCodes.InterruptedDueToStorageChange]);
         } else if (typeof opts.rstArgs === "object") {
             _constructFromExistingNodes(this, Object.extend({}, opts.rstArgs, true));
         } else {
