@@ -53,10 +53,12 @@ public:
         auto targetService = opCtx->getServiceContext()->getService(ClusterRole::RouterServer);
         if (!targetService)
             targetService = opCtx->getServiceContext()->getService();
+        ClientLock lk(_opCtx->getClient());
         _opCtx->getClient()->setService(targetService);
     }
 
     ~ScopedRouterBehavior() {
+        ClientLock lk(_opCtx->getClient());
         _opCtx->getClient()->setService(_original);
     }
 

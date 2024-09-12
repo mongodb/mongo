@@ -101,6 +101,40 @@ void SessionsCollectionConfigServer::_shardCollectionIfNeeded(OperationContext* 
     shardsvrCollRequest.setDbName(NamespaceString::kLogicalSessionsNamespace.dbName());
 
     cluster::createCollection(opCtx, std::move(shardsvrCollRequest));
+
+    Lock::GlobalLock lock(opCtx, MODE_IX);
+    if (const auto replCoord = repl::ReplicationCoordinator::get(opCtx);
+        replCoord->canAcceptWritesFor(opCtx, CollectionType::ConfigNS)) {
+        auto filterQuery =
+            BSON("_id" << NamespaceStringUtil::serialize(NamespaceString::kLogicalSessionsNamespace,
+                                                         SerializationContext::stateDefault())
+                       << CollectionType::kMaxChunkSizeBytesFieldName << BSON("$exists" << false));
+        auto updateQuery = BSON("$set" << BSON(CollectionType::kMaxChunkSizeBytesFieldName
+                                               << logical_sessions::kMaxChunkSizeBytes));
+
+        const auto catalogClient = ShardingCatalogManager::get(opCtx)->localCatalogClient();
+
+        // TODO SERVER-83917: Make a more general API to switch the service used by the client.
+        auto originalService = opCtx->getService();
+        auto shardService = opCtx->getServiceContext()->getService(ClusterRole::ShardServer);
+        {
+            ClientLock lk(opCtx->getClient());
+            opCtx->getClient()->setService(shardService);
+        }
+
+        ScopeGuard onScopeExitGuard([&] {
+            ClientLock lk(opCtx->getClient());
+            opCtx->getClient()->setService(originalService);
+        });
+
+        uassertStatusOK(
+            catalogClient->updateConfigDocument(opCtx,
+                                                CollectionType::ConfigNS,
+                                                filterQuery,
+                                                updateQuery,
+                                                false,
+                                                ShardingCatalogClient::kLocalWriteConcern));
+    }
 }
 
 void SessionsCollectionConfigServer::_generateIndexesIfNeeded(OperationContext* opCtx) {
@@ -156,34 +190,6 @@ void SessionsCollectionConfigServer::setupSessionsCollection(OperationContext* o
 
     _shardCollectionIfNeeded(opCtx);
     _generateIndexesIfNeeded(opCtx);
-
-    Lock::GlobalLock lock(opCtx, MODE_IX);
-    if (const auto replCoord = repl::ReplicationCoordinator::get(opCtx);
-        replCoord->canAcceptWritesFor(opCtx, CollectionType::ConfigNS)) {
-        auto filterQuery =
-            BSON("_id" << NamespaceStringUtil::serialize(NamespaceString::kLogicalSessionsNamespace,
-                                                         SerializationContext::stateDefault())
-                       << CollectionType::kMaxChunkSizeBytesFieldName << BSON("$exists" << false));
-        auto updateQuery = BSON("$set" << BSON(CollectionType::kMaxChunkSizeBytesFieldName
-                                               << logical_sessions::kMaxChunkSizeBytes));
-
-        const auto catalogClient = ShardingCatalogManager::get(opCtx)->localCatalogClient();
-
-        // TODO SERVER-83917: Make a more general API to switch the service used by the client.
-        auto originalService = opCtx->getService();
-        auto shardService = opCtx->getServiceContext()->getService(ClusterRole::ShardServer);
-        opCtx->getClient()->setService(shardService);
-
-        ScopeGuard onScopeExitGuard([&] { opCtx->getClient()->setService(originalService); });
-
-        uassertStatusOK(
-            catalogClient->updateConfigDocument(opCtx,
-                                                CollectionType::ConfigNS,
-                                                filterQuery,
-                                                updateQuery,
-                                                false,
-                                                ShardingCatalogClient::kLocalWriteConcern));
-    }
 }
 
 }  // namespace mongo

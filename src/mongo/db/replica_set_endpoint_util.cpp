@@ -106,14 +106,14 @@ ScopedSetRouterService::ScopedSetRouterService(OperationContext* opCtx)
     : _opCtx(opCtx), _originalService(opCtx->getService()) {
     // Verify that the opCtx is not using the router service already.
     invariant(!_originalService->role().has(ClusterRole::RouterServer));
-    stdx::lock_guard<Client> lk(*_opCtx->getClient());
+    ClientLock lk(_opCtx->getClient());
     _opCtx->getClient()->setService(getRouterService(opCtx));
     _opCtx->setRoutedByReplicaSetEndpoint(true);
 }
 
 ScopedSetRouterService::~ScopedSetRouterService() {
     // Verify that the opCtx is still using the router service.
-    stdx::lock_guard<Client> lk(*_opCtx->getClient());
+    ClientLock lk(_opCtx->getClient());
     invariant(_opCtx->getService()->role().has(ClusterRole::RouterServer));
     _opCtx->getClient()->setService(_originalService);
     _opCtx->setRoutedByReplicaSetEndpoint(false);

@@ -86,7 +86,3 @@ deadlock:mongo::(anonymous namespace)::SSLManagerOpenSSL::SSLManagerOpenSSL
 race:S2Loop::FindVertex
 race:S2EdgeIndex::IncrementQueryCount
 race:S2RegionCoverer::NewCandidate
-
-# TODO SERVER-93364
-race:mongo::Client::setService
-race:mongo::Client::getService

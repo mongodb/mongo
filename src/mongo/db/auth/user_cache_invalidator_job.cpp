@@ -128,7 +128,7 @@ private:
 ScopedSetRouterService::ScopedSetRouterService(OperationContext* opCtx)
     : _opCtx(opCtx), _originalService(opCtx->getService()) {
     // Verify that the opCtx is not using the router service already.
-    stdx::lock_guard<Client> lk(*_opCtx->getClient());
+    ClientLock lk(_opCtx->getClient());
 
     auto service = opCtx->getServiceContext()->getService(ClusterRole::RouterServer);
     invariant(service);
@@ -137,7 +137,7 @@ ScopedSetRouterService::ScopedSetRouterService(OperationContext* opCtx)
 
 ScopedSetRouterService::~ScopedSetRouterService() {
     // Verify that the opCtx is still using the router service.
-    stdx::lock_guard<Client> lk(*_opCtx->getClient());
+    ClientLock lk(_opCtx->getClient());
     invariant(_opCtx->getService()->role().has(ClusterRole::RouterServer));
     _opCtx->getClient()->setService(_originalService);
 }
