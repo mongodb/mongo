@@ -42,6 +42,7 @@
 #include "mongo/db/query/optimizer/rewrites/const_eval.h"
 #include "mongo/db/query/optimizer/syntax/expr.h"
 #include "mongo/db/query/optimizer/syntax/syntax.h"
+#include "mongo/db/query/optimizer/utils/bool_expression_builder.h"
 #include "mongo/db/query/optimizer/utils/interval_utils.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"

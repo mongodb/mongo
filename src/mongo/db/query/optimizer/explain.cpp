@@ -1246,124 +1246,6 @@ public:
         return printer.str();
     }
 
-    void printCandidateIndexEntry(ExplainPrinter& local,
-                                  const CandidateIndexEntry& candidateIndexEntry) {
-        local.fieldName("indexDefName", ExplainVersion::V3)
-            .print(candidateIndexEntry._indexDefName)
-            .separator(", ");
-
-        local.separator("{");
-        printFieldProjectionMap(local, candidateIndexEntry._fieldProjectionMap);
-        local.separator("}, {");
-
-        {
-            if constexpr (version < ExplainVersion::V3) {
-                bool first = true;
-                for (const auto type : candidateIndexEntry._predTypes) {
-                    if (first) {
-                        first = false;
-                    } else {
-                        local.print(", ");
-                    }
-                    local.print(toStringData(type));
-                }
-            } else if constexpr (version == ExplainVersion::V3) {
-                std::vector<ExplainPrinter> printers;
-                for (const auto type : candidateIndexEntry._predTypes) {
-                    ExplainPrinter local1;
-                    local1.print(toStringData(type));
-                    printers.push_back(std::move(local1));
-                }
-                local.fieldName("predType").print(printers);
-            } else {
-                MONGO_UNREACHABLE;
-            }
-        }
-
-        local.separator("}, ");
-        {
-            if (candidateIndexEntry._eqPrefixes.size() == 1) {
-                local.fieldName("intervals", ExplainVersion::V3);
-
-                ExplainPrinter intervals = printIntervalExpr<CompoundIntervalRequirement>(
-                    candidateIndexEntry._eqPrefixes.front()._interval);
-                local.printSingleLevel(intervals, "" /*singleLevelSpacer*/);
-            } else {
-                std::vector<ExplainPrinter> eqPrefixPrinters;
-                for (const auto& entry : candidateIndexEntry._eqPrefixes) {
-                    ExplainPrinter eqPrefixPrinter;
-                    eqPrefixPrinter.fieldName("startPos", ExplainVersion::V3)
-                        .print(entry._startPos)
-                        .separator(", ");
-
-                    ExplainPrinter intervals =
-                        printIntervalExpr<CompoundIntervalRequirement>(entry._interval);
-                    eqPrefixPrinter.separator("[")
-                        .fieldName("interval", ExplainVersion::V3)
-                        .printSingleLevel(intervals, "" /*singleLevelSpacer*/)
-                        .separator("]");
-
-                    eqPrefixPrinters.push_back(std::move(eqPrefixPrinter));
-                }
-
-                local.print(eqPrefixPrinters);
-            }
-        }
-
-        if (const auto& residualReqs = candidateIndexEntry._residualRequirements) {
-            local.separator("}, ");
-            if constexpr (version < ExplainVersion::V3) {
-                ExplainPrinter residualReqMapPrinter;
-                printResidualRequirements(residualReqMapPrinter, *residualReqs);
-                local.print(residualReqMapPrinter);
-            } else if (version == ExplainVersion::V3) {
-                printResidualRequirements(local, *residualReqs);
-            } else {
-                MONGO_UNREACHABLE;
-            }
-        }
-    }
-
-
-    std::string printCandidateIndexEntry(const CandidateIndexEntry& indexEntry) {
-        ExplainPrinter printer;
-        printCandidateIndexEntry(printer, indexEntry);
-        return printer.str();
-    }
-
-    void printPartialSchemaEntry(ExplainPrinter& printer, const PartialSchemaEntry& entry) {
-        const auto& [key, req] = entry;
-
-        if (const auto& projName = key._projectionName) {
-            printer.fieldName("refProjection", ExplainVersion::V3).print(*projName).separator(", ");
-        }
-        ExplainPrinter pathPrinter = generate(key._path);
-        printer.fieldName("path", ExplainVersion::V3)
-            .separator("'")
-            .printSingleLevel(pathPrinter)
-            .separator("', ");
-
-        if (const auto& boundProjName = req.getBoundProjectionName()) {
-            printer.fieldName("boundProjection", ExplainVersion::V3)
-                .print(*boundProjName)
-                .separator(", ");
-        }
-
-        printer.fieldName("intervals", ExplainVersion::V3);
-        {
-            ExplainPrinter intervals = printIntervalExpr<IntervalRequirement>(req.getIntervals());
-            printer.printSingleLevel(intervals, "" /*singleLevelSpacer*/);
-        }
-
-        printBooleanFlag(printer, "perfOnly", req.getIsPerfOnly());
-    }
-
-    void printResidualRequirement(ExplainPrinter& printer, const ResidualRequirement& entry) {
-        const auto& [key, req, entryIndex] = entry;
-        printPartialSchemaEntry(printer, {key, req});
-        printer.separator(", ").fieldName("entryIndex").print(entryIndex);
-    }
-
     template <class T>
     ExplainPrinter printIntervalExpr(const typename BoolExpr<T>::Node& intervalExpr) {
         const auto printFn = [this](ExplainPrinter& printer, const T& interval) {
@@ -1372,17 +1254,6 @@ public:
 
         ExplainPrinter printer;
         BoolExprPrinter<T>{printFn}.print(printer, intervalExpr);
-        return printer;
-    }
-
-    ExplainPrinter printPartialSchemaRequirements(
-        const typename BoolExpr<PartialSchemaEntry>::Node& reqs) {
-        const auto printFn = [this](ExplainPrinter& printer, const PartialSchemaEntry& entry) {
-            printPartialSchemaEntry(printer, entry);
-        };
-
-        ExplainPrinter printer;
-        BoolExprPrinter<PartialSchemaEntry>{printFn}.print(printer, reqs);
         return printer;
     }
 
@@ -1591,23 +1462,6 @@ public:
 
         printer.fieldName("child", ExplainVersion::V3).print(childResult);
         return printer;
-    }
-
-    void printPartialSchemaReqMap(ExplainPrinter& parent, const PSRExpr::Node& reqMap) {
-        ExplainPrinter reqs =
-            psr::isNoop(reqMap) ? ExplainPrinter() : printPartialSchemaRequirements(reqMap);
-        parent.fieldName("requirements").print(reqs);
-    }
-
-    void printResidualRequirements(ExplainPrinter& parent,
-                                   const ResidualRequirements::Node& residualReqs) {
-        const auto printFn = [this](ExplainPrinter& printer, const ResidualRequirement& entry) {
-            printResidualRequirement(printer, entry);
-        };
-
-        ExplainPrinter residualReqsPrinter;
-        BoolExprPrinter<ResidualRequirement>{printFn}.print(residualReqsPrinter, residualReqs);
-        parent.fieldName("residualReqs").print(residualReqsPrinter);
     }
 
     ExplainPrinter transport(const ABT::reference_type n,
@@ -2779,21 +2633,6 @@ std::string ABTPrinter::getPlanSummary() const {
     return ShortPlanSummaryTransport().getPlanSummary(_planAndProps._node);
 }
 
-std::string ExplainGenerator::explainPartialSchemaReqExpr(const PSRExpr::Node& reqs) {
-    ExplainGeneratorV2 gen;
-    ExplainGeneratorV2::ExplainPrinter result;
-    gen.printPartialSchemaReqMap(result, reqs);
-    return result.str();
-}
-
-std::string ExplainGenerator::explainResidualRequirements(
-    const ResidualRequirements::Node& resReqs) {
-    ExplainGeneratorV2 gen;
-    ExplainGeneratorV2::ExplainPrinter result;
-    gen.printResidualRequirements(result, resReqs);
-    return result.str();
-}
-
 std::string ExplainGenerator::explainInterval(const IntervalRequirement& interval) {
     ExplainGeneratorV2 gen;
     return gen.printInterval(interval);
@@ -2813,11 +2652,6 @@ std::string ExplainGenerator::explainCompoundIntervalExpr(
     const CompoundIntervalReqExpr::Node& intervalExpr) {
     ExplainGeneratorV2 gen;
     return gen.printIntervalExpr<CompoundIntervalRequirement>(intervalExpr).str();
-}
-
-std::string ExplainGenerator::explainCandidateIndex(const CandidateIndexEntry& indexEntry) {
-    ExplainGeneratorV2 gen;
-    return gen.printCandidateIndexEntry(indexEntry);
 }
 
 bool isEOFPlan(const ABT::reference_type node) {

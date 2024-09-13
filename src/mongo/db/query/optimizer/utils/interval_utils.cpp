@@ -48,6 +48,7 @@
 #include "mongo/db/query/optimizer/syntax/expr.h"
 #include "mongo/db/query/optimizer/syntax/syntax.h"
 #include "mongo/db/query/optimizer/utils/abt_compare.h"
+#include "mongo/db/query/optimizer/utils/bool_expression_builder.h"
 #include "mongo/util/assert_util.h"
 
 

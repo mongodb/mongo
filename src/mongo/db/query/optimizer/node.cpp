@@ -394,24 +394,6 @@ const ProjectionName& RIDUnionNode::getScanProjectionName() const {
     return _scanProjectionName;
 }
 
-static ProjectionNameVector createSargableBindings(const PSRExpr::Node& reqMap) {
-    ProjectionNameVector result;
-    PSRExpr::visitDNF(reqMap, [&](const PartialSchemaEntry& e, const PSRExpr::VisitorContext&) {
-        if (auto binding = e.second.getBoundProjectionName()) {
-            result.push_back(*binding);
-        }
-    });
-    return result;
-}
-
-static ProjectionNameVector createSargableReferences(const PSRExpr::Node& reqMap) {
-    ProjectionNameOrderPreservingSet result;
-    PSRExpr::visitDNF(reqMap, [&](const PartialSchemaEntry& e, const PSRExpr::VisitorContext&) {
-        result.emplace_back(*e.first._projectionName);
-    });
-    return result.getVector();
-}
-
 BinaryJoinNode::BinaryJoinNode(JoinType joinType,
                                ProjectionNameSet correlatedProjectionNames,
                                FilterType filter,

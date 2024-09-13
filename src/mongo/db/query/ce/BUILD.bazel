@@ -13,11 +13,9 @@ mongo_cc_library(
     name = "ce_utils",
     srcs = [
         "bound_utils.cpp",
-        "sel_tree_utils.cpp",
     ],
     hdrs = [
         "bound_utils.h",
-        "sel_tree_utils.h",
     ],
     deps = [
         "//src/mongo/db/pipeline:abt_utils",

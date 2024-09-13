@@ -31,7 +31,7 @@
 
 #include <cstddef>
 
-#include "mongo/db/query/optimizer/partial_schema_requirements.h"
+#include "mongo/db/query/optimizer/index_bounds.h"
 #include "mongo/db/query/optimizer/syntax/syntax.h"
 
 namespace mongo::optimizer {
@@ -42,8 +42,6 @@ public:
     static size_t generate(const ABT::reference_type& nodeRef);
 
     static size_t generate(const IntervalRequirement& req);
-    static size_t generate(const PartialSchemaEntry& entry);
-    static size_t generate(const PSRExpr::Node& reqMap);
 };
 
 }  // namespace mongo::optimizer

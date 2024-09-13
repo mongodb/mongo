@@ -76,28 +76,12 @@ class CompoundIntervalPrinter(OptimizerTypePrinter):
         super().__init__(val, "ExplainGenerator::explainCompoundInterval")
 
 
-class CandidateIndexEntryPrinter(OptimizerTypePrinter):
-    """Pretty-printer for mongo::optimizer::CandidateIndexEntry."""
-
-    def __init__(self, val):
-        """Initialize CandidateIndexEntryPrinter."""
-        super().__init__(val, "ExplainGenerator::explainCandidateIndex")
-
-
 class IntervalExprPrinter(OptimizerTypePrinter):
     """Pretty-printer for mongo::optimizer::IntervalRequirement::Node."""
 
     def __init__(self, val):
         """Initialize IntervalExprPrinter."""
         super().__init__(val, "ExplainGenerator::explainIntervalExpr")
-
-
-class PSRExprPrinter(OptimizerTypePrinter):
-    """Pretty-printer for mongo::optimizer::PSRExpr::Node."""
-
-    def __init__(self, val):
-        """Initialize PSRExprPrinter."""
-        super().__init__(val, "ExplainGenerator::explainPartialSchemaReqExpr")
 
 
 class StrongStringAliasPrinter(object):
@@ -1097,16 +1081,6 @@ def register_optimizer_printers(pp):
         IntervalExprPrinter,
     )
 
-    # PSRExpr printer.
-    pp.add(
-        "PSRExpr",
-        bool_expr_type(
-            f"std::pair<{OPTIMIZER_NS}::PartialSchemaKey, {OPTIMIZER_NS}::PartialSchemaRequirement> "
-        ),
-        False,
-        PSRExprPrinter,
-    )
-
     # Memo printer.
     pp.add("Memo", f"{OPTIMIZER_NS}::cascades::Memo", False, MemoPrinter)
 
@@ -1116,14 +1090,6 @@ def register_optimizer_printers(pp):
         f"{OPTIMIZER_NS}::ResidualRequirement",
         False,
         ResidualRequirementPrinter,
-    )
-
-    # CandidateIndexEntry printer.
-    pp.add(
-        "CandidateIndexEntry",
-        f"{OPTIMIZER_NS}::CandidateIndexEntry",
-        False,
-        CandidateIndexEntryPrinter,
     )
 
     # BoolExpr<ResidualRequirement> is handled by the PolyValue printer, but still need to add

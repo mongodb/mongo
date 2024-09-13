@@ -38,7 +38,6 @@
 #include "mongo/db/query/optimizer/explain_interface.h"
 #include "mongo/db/query/optimizer/index_bounds.h"
 #include "mongo/db/query/optimizer/node_defs.h"
-#include "mongo/db/query/optimizer/partial_schema_requirements.h"
 #include "mongo/db/query/optimizer/syntax/syntax.h"
 
 
@@ -329,10 +328,6 @@ public:
                                       bool displayProperties = false,
                                       const NodeToGroupPropsMap& nodeMap = {});
 
-    static std::string explainPartialSchemaReqExpr(const PSRExpr::Node& reqs);
-
-    static std::string explainResidualRequirements(const ResidualRequirements::Node& resReqs);
-
     static std::string explainInterval(const IntervalRequirement& interval);
 
     static std::string explainCompoundInterval(const CompoundIntervalRequirement& interval);
@@ -341,8 +336,6 @@ public:
 
     static std::string explainCompoundIntervalExpr(
         const CompoundIntervalReqExpr::Node& intervalExpr);
-
-    static std::string explainCandidateIndex(const CandidateIndexEntry& indexEntry);
 };
 
 }  // namespace mongo::optimizer

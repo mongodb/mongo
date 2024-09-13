@@ -49,7 +49,6 @@
 #include "mongo/db/query/optimizer/defs.h"
 #include "mongo/db/query/optimizer/index_bounds.h"
 #include "mongo/db/query/optimizer/node.h"  // IWYU pragma: keep
-#include "mongo/db/query/optimizer/partial_schema_requirements.h"
 #include "mongo/db/query/optimizer/syntax/expr.h"
 #include "mongo/db/query/optimizer/syntax/path.h"
 #include "mongo/db/query/optimizer/utils/strong_alias.h"
@@ -127,32 +126,6 @@ size_t ABTHashGenerator::generate(const IntervalRequirement& req) {
     updateBoundHash(result, req.getLowBound());
     updateBoundHash(result, req.getHighBound());
     return 17;
-}
-
-size_t ABTHashGenerator::generate(const PartialSchemaEntry& entry) {
-    const auto& [key, req] = entry;
-
-    size_t result = 17;
-    if (const auto& projName = key._projectionName) {
-        updateHash(result, ProjectionName::Hasher()(*projName));
-    }
-    updateHash(result, ABTHashGenerator::generate(key._path));
-
-    if (const auto& projName = req.getBoundProjectionName()) {
-        updateHash(result, ProjectionName::Hasher()(*projName));
-    }
-
-    BoolExprHasher<IntervalReqExpr> intervalHasher;
-    updateHash(result, intervalHasher.compute(req.getIntervals()));
-
-    updateHash(result, std::hash<bool>()(req.getIsPerfOnly()));
-
-    return result;
-}
-
-size_t ABTHashGenerator::generate(const PSRExpr::Node& reqMap) {
-    BoolExprHasher<PSRExpr> psrHasher;
-    return psrHasher.compute(reqMap);
 }
 
 /**

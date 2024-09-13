@@ -31,7 +31,6 @@
 
 #include "mongo/db/query/optimizer/index_bounds.h"
 #include "mongo/db/query/optimizer/node.h"  // IWYU pragma: keep
-#include "mongo/db/query/optimizer/partial_schema_requirements.h"
 #include "mongo/db/query/optimizer/syntax/syntax.h"
 
 
@@ -51,11 +50,6 @@ int compareIntervals(const IntervalRequirement& i1, const IntervalRequirement& i
  * Used to compare interval trees.
  */
 int compareIntervalExpr(const IntervalReqExpr::Node& i1, const IntervalReqExpr::Node& i2);
-
-/**
- * Used to compare PartialSchemaEntry trees.
- */
-int comparePartialSchemaRequirementsExpr(const PSRExpr::Node& n1, const PSRExpr::Node& n2);
 
 /**
  * The result of a comparison operation evaluated during constant folding.
