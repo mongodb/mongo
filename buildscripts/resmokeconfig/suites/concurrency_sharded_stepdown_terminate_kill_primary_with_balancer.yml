@@ -64,7 +64,6 @@ selector:
     # Uses getmores.
     - jstests/concurrency/fsm_workloads/query/agg/agg_base.js
     - jstests/concurrency/fsm_workloads/query/agg/agg_unionWith_interrupt_cleanup.js
-    - jstests/concurrency/fsm_workloads/create_capped_collection.js
     - jstests/concurrency/fsm_workloads/create_capped_collection_maxdocs.js
     - jstests/concurrency/fsm_workloads/create_index_background.js
     - jstests/concurrency/fsm_workloads/create_index_background_partial_filter.js
@@ -167,7 +166,7 @@ executor:
       config_stepdown: true
       shard_stepdown: true
       use_action_permitted_file: true
-      kill: true
+      randomize_kill: true
     - class: CheckShardFilteringMetadata
     - class: CheckReplDBHash
     - class: CheckMetadataConsistencyInBackground

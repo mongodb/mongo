@@ -4,7 +4,7 @@
  * Repeatedly creates a capped collection. Also verifies that truncation
  * occurs once the collection reaches a certain size.
  *
- * @tags: [requires_capped, requires_getmore]
+ * @tags: [requires_capped]
  */
 export const $config = (function() {
     // Returns a document of the form { _id: ObjectId(...), field: '...' }
@@ -38,7 +38,7 @@ export const $config = (function() {
     // Returns an array containing the _id fields of all the documents
     // in the collection, sorted according to their insertion order.
     function getObjectIds(db, collName) {
-        return db[collName].find({}, {_id: 1}).map(function(doc) {
+        return db[collName].find({}, {_id: 1}).batchSize(1000).map(function(doc) {
             return doc._id;
         });
     }
