@@ -68,17 +68,12 @@ using IndexIntervals =
 /**
  * This method returns a pair containing: (1) an SBE plan stage tree implementing an index scan;
  * and (2) a PlanStageSlots object containing a kRecordId slot, possibly some other kMeta slots,
- * and slots produced by the index scan that correspond to parts of the index key specified by
- * 'fieldBitset | sortKeyBitset'.
+ * and slots produced by the index scan that were required by 'reqs'.
  */
-std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> generateIndexScan(
-    StageBuilderState& state,
-    const CollectionPtr& collection,
-    const IndexScanNode* ixn,
-    const sbe::IndexKeysInclusionSet& fieldBitset,
-    const sbe::IndexKeysInclusionSet& sortKeyBitset,
-    PlanYieldPolicy* yieldPolicy,
-    const PlanStageReqs& reqs);
+std::pair<SbStage, PlanStageSlots> generateIndexScan(StageBuilderState& state,
+                                                     const CollectionPtr& collection,
+                                                     const IndexScanNode* ixn,
+                                                     const PlanStageReqs& reqs);
 
 /**
  * Constructs the most simple version of an index scan from the single interval index bounds.
@@ -91,9 +86,7 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> generateIndexScan(
  * If 'indexKeySlot' is provided, than the corresponding slot will be filled out with each KeyString
  * in the index.
  */
-std::tuple<std::unique_ptr<sbe::PlanStage>,
-           PlanStageSlots,
-           boost::optional<std::pair<sbe::value::SlotId, sbe::value::SlotId>>>
+std::tuple<SbStage, PlanStageSlots, boost::optional<std::pair<SbSlot, SbSlot>>>
 generateSingleIntervalIndexScanAndSlots(StageBuilderState& state,
                                         const CollectionPtr& collection,
                                         const std::string& indexName,
@@ -101,28 +94,21 @@ generateSingleIntervalIndexScanAndSlots(StageBuilderState& state,
                                         bool forward,
                                         std::unique_ptr<key_string::Value> lowKey,
                                         std::unique_ptr<key_string::Value> highKey,
-                                        sbe::IndexKeysInclusionSet indexKeysToInclude,
-                                        sbe::value::SlotVector indexKeySlots,
                                         const PlanStageReqs& reqs,
-                                        PlanYieldPolicy* yieldPolicy,
                                         PlanNodeId planNodeId,
                                         bool lowPriority,
                                         bool isPointInterval);
 
-std::tuple<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> generateSingleIntervalIndexScan(
-    StageBuilderState& state,
-    const CollectionPtr& collection,
-    const std::string& indexName,
-    const BSONObj& keyPattern,
-    std::unique_ptr<sbe::EExpression> lowKeyExpr,
-    std::unique_ptr<sbe::EExpression> highKeyExpr,
-    sbe::IndexKeysInclusionSet indexKeysToInclude,
-    sbe::value::SlotVector indexKeySlots,
-    const PlanStageReqs& reqs,
-    PlanYieldPolicy* yieldPolicy,
-    PlanNodeId planNodeId,
-    bool forward,
-    bool lowPriority);
+std::pair<SbStage, PlanStageSlots> generateSingleIntervalIndexScan(StageBuilderState& state,
+                                                                   const CollectionPtr& collection,
+                                                                   const std::string& indexName,
+                                                                   const BSONObj& keyPattern,
+                                                                   bool forward,
+                                                                   SbExpr lowKeyExpr,
+                                                                   SbExpr highKeyExpr,
+                                                                   const PlanStageReqs& reqs,
+                                                                   PlanNodeId planNodeId,
+                                                                   bool lowPriority);
 
 /**
  * Constructs low/high key values from the given index 'bounds' if they can be represented either as
@@ -149,16 +135,12 @@ std::pair<sbe::value::TypeTags, sbe::value::Value> packIndexIntervalsInSbeArray(
  *
  * This method returns a pair containing: (1) an SBE plan stage tree implementing a generic multi-
  * interval index scan; and (2) a PlanStageSlots object containing a kRecordId slot, possibly some
- * other kMeta slots, and slots produced by the index scan that correspond to parts of the index
- * key specified by 'fieldBitset | sortKeyBitset'.
+ * other kMeta slots, and slots produced by the index scan that were required by 'reqs'.
  */
-std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> generateIndexScanWithDynamicBounds(
+std::pair<SbStage, PlanStageSlots> generateIndexScanWithDynamicBounds(
     StageBuilderState& state,
     const CollectionPtr& collection,
     const IndexScanNode* ixn,
-    const sbe::IndexKeysInclusionSet& fieldBitset,
-    const sbe::IndexKeysInclusionSet& sortKeyBitset,
-    PlanYieldPolicy* yieldPolicy,
     const PlanStageReqs& reqs);
 
 /**

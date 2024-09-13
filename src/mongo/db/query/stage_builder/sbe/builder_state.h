@@ -170,7 +170,6 @@ struct StageBuilderState {
     // A flag to indicate the user allows disk use for spilling.
     bool allowDiskUse;
 
-    StringMap<sbe::value::SlotId> stringConstantToSlotMap;
     SimpleBSONObjMap<sbe::value::SlotId> keyPatternToSlotMap;
 };  // struct StageBuilderState
 }  // namespace stage_builder

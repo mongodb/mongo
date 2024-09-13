@@ -96,6 +96,27 @@ struct SbIndexInfoSlots {
     boost::optional<SbSlot> snapshotIdSlot;
 };
 
+enum class SbIndexInfoType : uint32_t {
+    kNoInfo = 0u,
+    kIndexIdent = 1u << 0u,
+    kIndexKey = 1u << 1u,
+    kIndexKeyPattern = 1u << 2u,
+    kSnapshotId = 1u << 3u,
+};
+
+inline SbIndexInfoType operator&(SbIndexInfoType t1, SbIndexInfoType t2) {
+    return static_cast<SbIndexInfoType>(static_cast<uint32_t>(t1) & static_cast<uint32_t>(t2));
+}
+inline SbIndexInfoType operator|(SbIndexInfoType t1, SbIndexInfoType t2) {
+    return static_cast<SbIndexInfoType>(static_cast<uint32_t>(t1) | static_cast<uint32_t>(t2));
+}
+inline SbIndexInfoType operator^(SbIndexInfoType t1, SbIndexInfoType t2) {
+    return static_cast<SbIndexInfoType>(static_cast<uint32_t>(t1) ^ static_cast<uint32_t>(t2));
+}
+inline SbIndexInfoType operator~(SbIndexInfoType t) {
+    return static_cast<SbIndexInfoType>(~static_cast<uint32_t>(t));
+}
+
 struct SbScanBounds {
     boost::optional<SbSlot> minRecordIdSlot;
     boost::optional<SbSlot> maxRecordIdSlot;
@@ -147,6 +168,7 @@ public:
     SbExpr makeDoubleConstant(double num);
     SbExpr makeDecimalConstant(const Decimal128& num);
     SbExpr makeStrConstant(StringData str);
+    SbExpr makeUndefinedConstant();
 
     SbExpr makeFunction(StringData name, SbExpr::Vector args);
 
@@ -281,6 +303,83 @@ public:
         sbe::ScanCallbacks scanCallbacks = {},
         boost::optional<SbSlot> oplogTsSlot = boost::none,
         bool lowPriority = false);
+
+    std::tuple<SbStage, SbSlot, SbSlotVector, SbIndexInfoSlots> makeSimpleIndexScan(
+        UUID collectionUuid,
+        DatabaseName dbName,
+        StringData indexName,
+        const BSONObj& keyPattern,
+        bool forward = true,
+        SbExpr lowKeyExpr = SbExpr{},
+        SbExpr highKeyExpr = SbExpr{},
+        sbe::IndexKeysInclusionSet indexKeysToInclude = sbe::IndexKeysInclusionSet{},
+        SbIndexInfoType indexInfoTypeMask = SbIndexInfoType::kNoInfo,
+        bool lowPriority = false) {
+        return makeSimpleIndexScan(VariableTypes{},
+                                   std::move(collectionUuid),
+                                   std::move(dbName),
+                                   indexName,
+                                   keyPattern,
+                                   forward,
+                                   std::move(lowKeyExpr),
+                                   std::move(highKeyExpr),
+                                   std::move(indexKeysToInclude),
+                                   indexInfoTypeMask,
+                                   lowPriority);
+    }
+
+    std::tuple<SbStage, SbSlot, SbSlotVector, SbIndexInfoSlots> makeSimpleIndexScan(
+        const VariableTypes& varTypes,
+        UUID collectionUuid,
+        DatabaseName dbName,
+        StringData indexName,
+        const BSONObj& keyPattern,
+        bool forward = true,
+        SbExpr lowKeyExpr = SbExpr{},
+        SbExpr highKeyExpr = SbExpr{},
+        sbe::IndexKeysInclusionSet indexKeysToInclude = sbe::IndexKeysInclusionSet{},
+        SbIndexInfoType indexInfoTypeMask = SbIndexInfoType::kNoInfo,
+        bool lowPriority = false);
+
+    std::tuple<SbStage, SbSlot, SbSlotVector, SbIndexInfoSlots> makeGenericIndexScan(
+        UUID collectionUuid,
+        DatabaseName dbName,
+        StringData indexName,
+        const BSONObj& keyPattern,
+        bool forward,
+        SbExpr boundsExpr,
+        key_string::Version version,
+        Ordering ordering,
+        sbe::IndexKeysInclusionSet indexKeysToInclude,
+        SbIndexInfoType indexInfoTypeMask) {
+        return makeGenericIndexScan(VariableTypes{},
+                                    std::move(collectionUuid),
+                                    std::move(dbName),
+                                    indexName,
+                                    keyPattern,
+                                    forward,
+                                    std::move(boundsExpr),
+                                    version,
+                                    ordering,
+                                    std::move(indexKeysToInclude),
+                                    indexInfoTypeMask);
+    }
+
+    std::tuple<SbStage, SbSlot, SbSlotVector, SbIndexInfoSlots> makeGenericIndexScan(
+        const VariableTypes& varTypes,
+        UUID collectionUuid,
+        DatabaseName dbName,
+        StringData indexName,
+        const BSONObj& keyPattern,
+        bool forward,
+        SbExpr boundsExpr,
+        key_string::Version version,
+        Ordering ordering,
+        sbe::IndexKeysInclusionSet indexKeysToInclude = sbe::IndexKeysInclusionSet{},
+        SbIndexInfoType indexInfoTypeMask = SbIndexInfoType::kNoInfo);
+
+    std::pair<SbStage, SbSlot> makeVirtualScan(sbe::value::TypeTags inputTag,
+                                               sbe::value::Value inputVal);
 
     SbStage makeLimit(SbStage stage, SbExpr limit) {
         return makeLimit(VariableTypes{}, std::move(stage), std::move(limit));
@@ -512,7 +611,30 @@ public:
                                                      const std::vector<SbSlotVector>& keys,
                                                      std::vector<sbe::value::SortDirection> dirs);
 
+    std::pair<SbStage, SbSlotVector> makeBranch(SbStage thenStage,
+                                                SbStage elseStage,
+                                                SbExpr conditionExpr,
+                                                const SbSlotVector& thenSlots,
+                                                const SbSlotVector& elseSlots) {
+        return makeBranch(VariableTypes{},
+                          std::move(thenStage),
+                          std::move(elseStage),
+                          std::move(conditionExpr),
+                          thenSlots,
+                          elseSlots);
+    }
+
+    std::pair<SbStage, SbSlotVector> makeBranch(const VariableTypes& varTypes,
+                                                SbStage thenStage,
+                                                SbStage elseStage,
+                                                SbExpr conditionExpr,
+                                                const SbSlotVector& thenSlots,
+                                                const SbSlotVector& elseSlots);
+
 protected:
+    SbIndexInfoSlots allocateIndexInfoSlots(SbIndexInfoType indexInfoTypeMask,
+                                            const BSONObj& keyPattern);
+
     SbSlotVector allocateOutSlotsForMergeStage(const std::vector<SbSlotVector>& slots);
 
     sbe::WindowStage::Window lower(SbWindow& sbWindow, const VariableTypes* varTypes = nullptr);

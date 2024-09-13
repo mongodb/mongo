@@ -62,12 +62,10 @@ class PlanStageSlots;
  *
  * In cases of an error, throws.
  */
-std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> generateCollScan(
-    StageBuilderState& state,
-    const CollectionPtr& collection,
-    const CollectionScanNode* csn,
-    std::vector<std::string> scanFieldNames,
-    PlanYieldPolicy* yieldPolicy,
-    bool isResumingTailableScan);
+std::pair<SbStage, PlanStageSlots> generateCollScan(StageBuilderState& state,
+                                                    const CollectionPtr& collection,
+                                                    const CollectionScanNode* csn,
+                                                    std::vector<std::string> scanFieldNames,
+                                                    bool isResumingTailableScan);
 
 }  // namespace mongo::stage_builder

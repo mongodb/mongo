@@ -62,6 +62,7 @@
 #include "mongo/db/exec/sbe/stages/traverse.h"
 #include "mongo/db/exec/sbe/stages/union.h"
 #include "mongo/db/exec/sbe/stages/unwind.h"
+#include "mongo/db/exec/sbe/stages/virtual_scan.h"
 #include "mongo/db/index/index_access_method.h"
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/index/multikey_paths.h"
@@ -138,28 +139,6 @@ std::unique_ptr<sbe::EExpression> makeBinaryOp(sbe::EPrimBinary::Op binaryOp,
     return sbe::makeE<sbe::EPrimBinary>(binaryOp, std::move(lhs), std::move(rhs), std::move(coll));
 }
 
-std::unique_ptr<sbe::EExpression> generateNullOrMissingExpr(const sbe::EExpression& expr) {
-    return sbe::makeE<sbe::EPrimBinary>(
-        sbe::EPrimBinary::fillEmpty,
-        makeFunction(
-            "typeMatch", expr.clone(), makeInt32Constant(getBSONTypeMask(BSONType::jstNULL))),
-        makeBoolConstant(true));
-}
-
-std::unique_ptr<sbe::EExpression> generateNullOrMissing(const sbe::EVariable& var) {
-    return generateNullOrMissingExpr(var);
-}
-
-std::unique_ptr<sbe::EExpression> generateNullOrMissing(const sbe::FrameId frameId,
-                                                        const sbe::value::SlotId slotId) {
-    sbe::EVariable var{frameId, slotId};
-    return generateNullOrMissing(var);
-}
-
-std::unique_ptr<sbe::EExpression> generateNullOrMissing(std::unique_ptr<sbe::EExpression> arg) {
-    return generateNullOrMissingExpr(*arg);
-}
-
 std::unique_ptr<sbe::EExpression> generateNullMissingOrUndefinedExpr(const sbe::EExpression& expr) {
     return sbe::makeE<sbe::EPrimBinary>(
         sbe::EPrimBinary::fillEmpty,
@@ -170,118 +149,8 @@ std::unique_ptr<sbe::EExpression> generateNullMissingOrUndefinedExpr(const sbe::
         makeBoolConstant(true));
 }
 
-
 std::unique_ptr<sbe::EExpression> generateNullMissingOrUndefined(const sbe::EVariable& var) {
     return generateNullMissingOrUndefinedExpr(var);
-}
-
-std::unique_ptr<sbe::EExpression> generateNullMissingOrUndefined(sbe::FrameId frameId,
-                                                                 sbe::value::SlotId slotId) {
-    sbe::EVariable var{frameId, slotId};
-    return generateNullMissingOrUndefined(var);
-}
-
-std::unique_ptr<sbe::EExpression> generateNullMissingOrUndefined(
-    std::unique_ptr<sbe::EExpression> arg) {
-    return generateNullMissingOrUndefinedExpr(*arg);
-}
-
-std::unique_ptr<sbe::EExpression> generateNonNumericCheck(const sbe::EVariable& var) {
-    return makeNot(makeFunction("isNumber", var.clone()));
-}
-
-std::unique_ptr<sbe::EExpression> generateLongLongMinCheck(const sbe::EVariable& var) {
-    return sbe::makeE<sbe::EPrimBinary>(
-        sbe::EPrimBinary::logicAnd,
-        makeFunction("typeMatch",
-                     var.clone(),
-                     makeInt32Constant(MatcherTypeSet{BSONType::NumberLong}.getBSONTypeMask())),
-        sbe::makeE<sbe::EPrimBinary>(sbe::EPrimBinary::eq,
-                                     var.clone(),
-                                     makeInt64Constant(std::numeric_limits<int64_t>::min())));
-}
-
-std::unique_ptr<sbe::EExpression> generateNaNCheck(const sbe::EVariable& var) {
-    return makeFunction("isNaN", var.clone());
-}
-
-std::unique_ptr<sbe::EExpression> generateInfinityCheck(const sbe::EVariable& var) {
-    return makeFunction("isInfinity"_sd, var.clone());
-}
-
-std::unique_ptr<sbe::EExpression> generateNonPositiveCheck(const sbe::EVariable& var) {
-    return sbe::makeE<sbe::EPrimBinary>(
-        sbe::EPrimBinary::EPrimBinary::lessEq, var.clone(), makeInt32Constant(0));
-}
-
-std::unique_ptr<sbe::EExpression> generatePositiveCheck(const sbe::EVariable& var) {
-    return sbe::makeE<sbe::EPrimBinary>(
-        sbe::EPrimBinary::EPrimBinary::greater, var.clone(), makeInt32Constant(0));
-}
-
-std::unique_ptr<sbe::EExpression> generateNegativeCheck(const sbe::EVariable& var) {
-    return sbe::makeE<sbe::EPrimBinary>(
-        sbe::EPrimBinary::EPrimBinary::less, var.clone(), makeInt32Constant(0));
-}
-
-std::unique_ptr<sbe::EExpression> generateNonObjectCheck(const sbe::EVariable& var) {
-    return makeNot(makeFunction("isObject", var.clone()));
-}
-
-std::unique_ptr<sbe::EExpression> generateNonStringCheck(const sbe::EVariable& var) {
-    return makeNot(makeFunction("isString", var.clone()));
-}
-
-std::unique_ptr<sbe::EExpression> generateNullishOrNotRepresentableInt32Check(
-    const sbe::EVariable& var) {
-    auto numericConvert32 =
-        sbe::makeE<sbe::ENumericConvert>(var.clone(), sbe::value::TypeTags::NumberInt32);
-    return sbe::makeE<sbe::EPrimBinary>(
-        sbe::EPrimBinary::logicOr,
-        generateNullMissingOrUndefined(var),
-        makeNot(makeFunction("exists", std::move(numericConvert32))));
-}
-
-std::unique_ptr<sbe::EExpression> generateNonTimestampCheck(const sbe::EVariable& var) {
-    return makeNot(makeFunction("isTimestamp", var.clone()));
-}
-
-template <>
-std::unique_ptr<sbe::EExpression> buildMultiBranchConditional(
-    std::unique_ptr<sbe::EExpression> defaultCase) {
-    return defaultCase;
-}
-
-std::unique_ptr<sbe::EExpression> buildMultiBranchConditionalFromCaseValuePairs(
-    std::vector<CaseValuePair> caseValuePairs, std::unique_ptr<sbe::EExpression> defaultValue) {
-    return std::accumulate(
-        std::make_reverse_iterator(std::make_move_iterator(caseValuePairs.end())),
-        std::make_reverse_iterator(std::make_move_iterator(caseValuePairs.begin())),
-        std::move(defaultValue),
-        [](auto&& expression, auto&& caseValuePair) {
-            return buildMultiBranchConditional(std::move(caseValuePair), std::move(expression));
-        });
-}
-
-std::unique_ptr<sbe::PlanStage> makeLimitCoScanTree(PlanNodeId planNodeId, long long limit) {
-    return sbe::makeS<sbe::LimitSkipStage>(
-        sbe::makeS<sbe::CoScanStage>(planNodeId), makeInt64Constant(limit), nullptr, planNodeId);
-}
-
-std::unique_ptr<sbe::EExpression> makeFillEmpty(std::unique_ptr<sbe::EExpression> expr,
-                                                std::unique_ptr<sbe::EExpression> altExpr) {
-    return sbe::makeE<sbe::EPrimBinary>(
-        sbe::EPrimBinary::fillEmpty, std::move(expr), std::move(altExpr));
-}
-
-std::unique_ptr<sbe::EExpression> makeFillEmptyFalse(std::unique_ptr<sbe::EExpression> e) {
-    return sbe::makeE<sbe::EPrimBinary>(
-        sbe::EPrimBinary::fillEmpty, std::move(e), makeBoolConstant(false));
-}
-
-std::unique_ptr<sbe::EExpression> makeFillEmptyTrue(std::unique_ptr<sbe::EExpression> e) {
-    return sbe::makeE<sbe::EPrimBinary>(
-        sbe::EPrimBinary::fillEmpty, std::move(e), makeBoolConstant(true));
 }
 
 std::unique_ptr<sbe::EExpression> makeVariable(SbSlot ts) {
@@ -299,19 +168,6 @@ std::unique_ptr<sbe::EExpression> makeVariable(sbe::FrameId frameId, sbe::value:
 std::unique_ptr<sbe::EExpression> makeMoveVariable(sbe::FrameId frameId,
                                                    sbe::value::SlotId slotId) {
     return sbe::makeE<sbe::EVariable>(frameId, slotId, true);
-}
-
-std::unique_ptr<sbe::EExpression> makeFillEmptyNull(std::unique_ptr<sbe::EExpression> e) {
-    using namespace std::literals;
-    return sbe::makeE<sbe::EPrimBinary>(
-        sbe::EPrimBinary::fillEmpty, std::move(e), makeNullConstant());
-}
-
-std::unique_ptr<sbe::EExpression> makeFillEmptyUndefined(std::unique_ptr<sbe::EExpression> e) {
-    using namespace std::literals;
-    return sbe::makeE<sbe::EPrimBinary>(sbe::EPrimBinary::fillEmpty,
-                                        std::move(e),
-                                        makeConstant(sbe::value::TypeTags::bsonUndefined, 0));
 }
 
 SbExpr makeNewBsonObject(StageBuilderState& state,
@@ -381,10 +237,6 @@ SbExpr makeShardKeyFunctionForPersistedDocuments(StageBuilderState& state,
     return makeNewBsonObject(state, std::move(projectFields), std::move(projectValues));
 }
 
-SbStage makeProject(SbStage stage, sbe::SlotExprPairVector projects, PlanNodeId nodeId) {
-    return sbe::makeS<sbe::ProjectStage>(std::move(stage), std::move(projects), nodeId);
-}
-
 std::unique_ptr<sbe::EExpression> makeIf(std::unique_ptr<sbe::EExpression> condExpr,
                                          std::unique_ptr<sbe::EExpression> thenExpr,
                                          std::unique_ptr<sbe::EExpression> elseExpr) {
@@ -430,152 +282,6 @@ std::unique_ptr<sbe::EExpression> makeIfNullExpr(sbe::EExpression::Vector values
     return expr;
 }
 
-namespace {
-/**
- * VirtualScanStage stores the array 'arrValue' and getNext() returns each value from the array.
- *
- * This stage mimics the resource management behavior like an actual scan stage. getNext() and
- * doSaveState() release the memory of the returned values. This is useful to expose the potential
- * memory misuse bugs such as heap-use-after-free and memory leaks.
- */
-class VirtualScanStage final : public sbe::PlanStage {
-public:
-    explicit VirtualScanStage(PlanNodeId planNodeId,
-                              sbe::value::SlotId out,
-                              sbe::value::TypeTags arrTag,
-                              sbe::value::Value arrValue,
-                              PlanYieldPolicy* yieldPolicy = nullptr,
-                              bool participateInTrialRunTracking = true)
-        : sbe::PlanStage("virtualscan"_sd, yieldPolicy, planNodeId, participateInTrialRunTracking),
-          _outField(out),
-          _arrTag(arrTag),
-          _arrValue(arrValue) {
-        invariant(sbe::value::isArray(arrTag));
-    }
-
-    ~VirtualScanStage() final {
-        sbe::value::releaseValue(_arrTag, _arrValue);
-        for (; _releaseIndex < _values.size(); ++_releaseIndex) {
-            auto [tagElem, valueElem] = _values.at(_releaseIndex);
-            sbe::value::releaseValue(tagElem, valueElem);
-        }
-    }
-
-    std::unique_ptr<sbe::PlanStage> clone() const final {
-        auto [tag, val] = sbe::value::copyValue(_arrTag, _arrValue);
-        return std::make_unique<VirtualScanStage>(_commonStats.nodeId,
-                                                  _outField,
-                                                  tag,
-                                                  val,
-                                                  _yieldPolicy,
-                                                  participateInTrialRunTracking());
-    }
-
-    void prepare(sbe::CompileCtx& ctx) final {
-        _outFieldOutputAccessor = std::make_unique<sbe::value::ViewOfValueAccessor>();
-    }
-
-    sbe::value::SlotAccessor* getAccessor(sbe::CompileCtx& ctx, sbe::value::SlotId slot) final {
-        if (_outField == slot) {
-            return _outFieldOutputAccessor.get();
-        }
-        return ctx.getAccessor(slot);
-    }
-
-    void open(bool reOpen) final {
-        auto optTimer(getOptTimer(_opCtx));
-
-        for (; _releaseIndex < _values.size(); ++_releaseIndex) {
-            auto [tagElem, valueElem] = _values.at(_releaseIndex);
-            sbe::value::releaseValue(tagElem, valueElem);
-        }
-        _values.clear();
-
-        sbe::value::ArrayEnumerator enumerator(_arrTag, _arrValue);
-        while (!enumerator.atEnd()) {
-            auto [tagElem, valueElem] = enumerator.getViewOfValue();
-            _values.push_back(sbe::value::copyValue(tagElem, valueElem));
-            enumerator.advance();
-        }
-        _releaseIndex = 0;
-        _index = 0;
-
-        _commonStats.opens++;
-    }
-
-    sbe::PlanState getNext() final {
-        auto optTimer(getOptTimer(_opCtx));
-
-        checkForInterruptAndYield(_opCtx);
-
-        if (_index >= _values.size()) {
-            return trackPlanState(sbe::PlanState::IS_EOF);
-        }
-
-        auto [tagElem, valueElem] = _values.at(_index);
-        _outFieldOutputAccessor->reset(tagElem, valueElem);
-        _index++;
-
-        // Depends on whether the last call was to getNext() or open()/doSaveState().
-        invariant(_releaseIndex == _index - 1 || _releaseIndex == _index - 2);
-
-        // We don't want to release at _index-1, since this is the data we're in the process of
-        // returning, but data at any prior index is allowed to be freed.
-        if (_releaseIndex == _index - 2) {
-            auto [returnedTagElem, returnedValueElem] = _values.at(_releaseIndex);
-            sbe::value::releaseValue(returnedTagElem, returnedValueElem);
-            _releaseIndex++;
-        }
-
-        return trackPlanState(sbe::PlanState::ADVANCED);
-    }
-
-    void close() final {
-        auto optTimer(getOptTimer(_opCtx));
-
-        trackClose();
-    }
-
-    std::unique_ptr<sbe::PlanStageStats> getStats(bool includeDebugInfo) const final {
-        auto ret = std::make_unique<sbe::PlanStageStats>(_commonStats);
-        return ret;
-    }
-    const SpecificStats* getSpecificStats() const final {
-        return nullptr;
-    }
-    size_t estimateCompileTimeSize() const final {
-        return sizeof(*this);
-    }
-
-protected:
-    void doSaveState(bool relinquishCursor) final {
-        if (relinquishCursor) {
-            for (; _releaseIndex < _index; ++_releaseIndex) {
-                auto [tagElem, valueElem] = _values.at(_releaseIndex);
-                sbe::value::releaseValue(tagElem, valueElem);
-            }
-        }
-    }
-
-private:
-    const sbe::value::SlotId _outField;
-
-    sbe::value::TypeTags _arrTag;
-    sbe::value::Value _arrValue;
-
-    std::unique_ptr<sbe::value::ViewOfValueAccessor> _outFieldOutputAccessor;
-
-    // Keeps track of an index for the array values, and an index for the next value to release.
-    size_t _index{0};
-    size_t _releaseIndex{0};
-
-    // Stores the values in std::vector instead of value::Array allows to release memory from values
-    // individually. This also avoid releasing memory twice due to value::Array::~Array().
-    std::vector<std::pair<sbe::value::TypeTags, sbe::value::Value>> _values;
-};
-
-}  // namespace
-
 std::pair<sbe::value::SlotId, std::unique_ptr<sbe::PlanStage>> generateVirtualScan(
     sbe::value::SlotIdGenerator* slotIdGenerator,
     sbe::value::TypeTags arrTag,
@@ -586,7 +292,7 @@ std::pair<sbe::value::SlotId, std::unique_ptr<sbe::PlanStage>> generateVirtualSc
     invariant(sbe::value::isArray(arrTag));
 
     auto outputSlot = slotIdGenerator->generate();
-    auto virtualScan = sbe::makeS<VirtualScanStage>(planNodeId, outputSlot, arrTag, arrVal);
+    auto virtualScan = sbe::makeS<sbe::VirtualScanStage>(planNodeId, outputSlot, arrTag, arrVal);
 
     // Return the VirtualScanStage and its output slot.
     return {outputSlot, std::move(virtualScan)};
@@ -612,11 +318,15 @@ std::pair<sbe::value::SlotVector, std::unique_ptr<sbe::PlanStage>> generateVirtu
     sbe::value::SlotVector projectSlots;
     sbe::SlotExprPairVector projections;
     for (int32_t i = 0; i < numSlots; ++i) {
+        auto indexExpr = sbe::makeE<sbe::EConstant>(sbe::value::TypeTags::NumberInt32,
+                                                    sbe::value::bitcastFrom<int32_t>(i));
+
         projectSlots.emplace_back(slotIdGenerator->generate());
-        projections.emplace_back(projectSlots.back(),
-                                 makeFunction("getElement"_sd,
-                                              sbe::makeE<sbe::EVariable>(scanSlot),
-                                              makeInt32Constant(i)));
+        projections.emplace_back(
+            projectSlots.back(),
+            sbe::makeE<sbe::EFunction>(
+                "getElement"_sd,
+                sbe::makeEs(sbe::makeE<sbe::EVariable>(scanSlot), std::move(indexExpr))));
     }
 
     return {
@@ -887,15 +597,6 @@ std::tuple<SbStage, SbSlot, SbSlot, SbSlotVector> makeLoopJoinForFetch(
         auto thenStage = std::move(seekStage);
         seekStage = {};
 
-        // Set 'resultSlot' and 'recordIdSlot' to point to newly allocated slots. Also,
-        // clear 'fieldSlots' and then fill it with newly allocated slots for each field.
-        resultSlot = SbSlot{state.slotId()};
-        recordIdSlot = SbSlot{state.slotId()};
-
-        for (size_t i = 0; i < fields.size(); ++i) {
-            fieldSlots.push_back(SbSlot{state.slotId()});
-        }
-
         // Allocate new slots for the result and record ID produced by the else branch.
         auto elseResultSlot = SbSlot{state.slotId()};
         auto elseRecordIdSlot = SbSlot{state.slotId()};
@@ -907,14 +608,11 @@ std::tuple<SbStage, SbSlot, SbSlot, SbSlotVector> makeLoopJoinForFetch(
                           std::pair(SbExpr{seekRecordIdSlot}, elseRecordIdSlot));
 
         // Project the fields to slots for the else branch.
-        auto [outStage, elseFieldSlots] = projectFieldsToSlots(
+        auto [projectStage, elseFieldSlots] = projectFieldsToSlots(
             std::move(elseStage), fields, elseResultSlot, planNodeId, state.slotIdGenerator, state);
-        elseStage = std::move(outStage);
+        elseStage = std::move(projectStage);
 
-        auto conditionExpr = makeNot(makeFunction("exists", makeVariable(*prefetchedResultSlot)));
-
-        auto outputSlots = SbExpr::makeSV(resultSlot, recordIdSlot);
-        outputSlots.insert(outputSlots.end(), fieldSlots.begin(), fieldSlots.end());
+        auto conditionExpr = b.makeNot(b.makeFunction("exists", *prefetchedResultSlot));
 
         auto thenOutputSlots = SbExpr::makeSV(thenResultSlot, thenRecordIdSlot);
         thenOutputSlots.insert(thenOutputSlots.end(), thenFieldSlots.begin(), thenFieldSlots.end());
@@ -924,13 +622,20 @@ std::tuple<SbStage, SbSlot, SbSlot, SbSlotVector> makeLoopJoinForFetch(
 
         // Create a BranchStage that combines 'thenStage' and 'elseStage' and store it in
         // 'seekStage'.
-        seekStage = sbe::makeS<sbe::BranchStage>(std::move(thenStage),
-                                                 std::move(elseStage),
-                                                 std::move(conditionExpr),
-                                                 b.lower(thenOutputSlots),
-                                                 b.lower(elseOutputSlots),
-                                                 b.lower(outputSlots),
-                                                 planNodeId);
+        auto [outStage, outputSlots] = b.makeBranch(std::move(thenStage),
+                                                    std::move(elseStage),
+                                                    std::move(conditionExpr),
+                                                    thenOutputSlots,
+                                                    elseOutputSlots);
+        seekStage = std::move(outStage);
+
+        // Set 'resultSlot' and 'recordIdSlot' to point to newly allocated slots. Also,
+        // clear 'fieldSlots' and then fill it with newly allocated slots for each field.
+        resultSlot = outputSlots[0];
+        recordIdSlot = outputSlots[1];
+        for (size_t i = 2; i < outputSlots.size(); ++i) {
+            fieldSlots.emplace_back(outputSlots[i]);
+        }
     }
 
     auto correlatedSlots = SbExpr::makeSV(
@@ -976,11 +681,10 @@ SbExpr generateArrayCheckForSort(StageBuilderState& state,
         return b.makeLet(
             frameId,
             SbExpr::makeSeq(std::move(fieldExpr)),
-            b.makeBinaryOp(
-                sbe::EPrimBinary::logicOr,
-                b.makeFunction("isArray"_sd, b.makeVariable(frameId, 0)),
-                generateArrayCheckForSort(
-                    state, b.makeVariable(frameId, 0), fp, level + 1, frameIdGenerator)));
+            b.makeBinaryOp(sbe::EPrimBinary::logicOr,
+                           b.makeFunction("isArray"_sd, SbVar{frameId, 0}),
+                           generateArrayCheckForSort(
+                               state, SbVar{frameId, 0}, fp, level + 1, frameIdGenerator)));
     }();
 
     if (level == 0) {
@@ -1013,7 +717,7 @@ SbExpr generateSortTraverse(boost::optional<SbVar> inputVar,
     auto collatorSlot = state.getCollatorSlot();
 
     // Generate an expression to read a sub-field at the current nested level.
-    auto fieldExpr = fieldSlot ? b.makeVariable(*fieldSlot)
+    auto fieldExpr = fieldSlot ? SbExpr{*fieldSlot}
                                : b.makeFunction("getField"_sd,
                                                 std::move(inputVar),
                                                 b.makeStrConstant(fp.getFieldName(level)));
@@ -1023,11 +727,11 @@ SbExpr generateSortTraverse(boost::optional<SbVar> inputVar,
         // traverse expression.
         auto frameId =
             fieldSlot ? boost::optional<sbe::FrameId>{} : boost::make_optional(state.frameId());
-        auto var = fieldSlot ? fieldExpr.clone() : b.makeVariable(*frameId, 0);
+        auto var = fieldSlot ? fieldExpr.clone() : SbExpr{SbVar{*frameId, 0}};
 
         auto helperArgs = SbExpr::makeSeq(std::move(var));
         if (collatorSlot) {
-            helperArgs.emplace_back(makeVariable(*collatorSlot));
+            helperArgs.emplace_back(SbExpr{SbVar{*collatorSlot}});
         }
 
         StringData helperFn = isAscending ? "getSortKeyAsc"_sd : "getSortKeyDesc"_sd;
@@ -1051,8 +755,8 @@ SbExpr generateSortTraverse(boost::optional<SbVar> inputVar,
     // Be sure to invoke the least/greatest fold expression only if the current nested level is an
     // array.
     auto frameId = state.frameId();
-    auto var = fieldSlot ? b.makeVariable(*fieldSlot) : b.makeVariable(frameId, 0);
-    auto resultVar = b.makeVariable(frameId, fieldSlot ? 0 : 1);
+    auto var = fieldSlot ? SbExpr{*fieldSlot} : SbExpr{SbVar{frameId, 0}};
+    auto resultVar = SbExpr{SbVar{frameId, fieldSlot ? 0 : 1}};
 
     SbExpr::Vector binds;
     if (!fieldSlot) {
@@ -1063,7 +767,7 @@ SbExpr generateSortTraverse(boost::optional<SbVar> inputVar,
 
     auto helperArgs = SbExpr::makeSeq(resultVar.clone());
     if (collatorSlot) {
-        helperArgs.emplace_back(b.makeVariable(*collatorSlot));
+        helperArgs.emplace_back(SbExpr{SbVar{*collatorSlot}});
     }
 
     // According to MQL's sorting semantics, when a non-leaf field is an empty array or does not
@@ -1186,7 +890,7 @@ SortKeysExprs buildSortKeys(StageBuilderState& state,
             // Apply the transformation required by the collation, if specified.
             if (collatorSlot) {
                 sortKeyExpr = b.makeFunction(
-                    "collComparisonKey"_sd, std::move(sortKeyExpr), b.makeVariable(*collatorSlot));
+                    "collComparisonKey"_sd, std::move(sortKeyExpr), SbExpr{SbVar{*collatorSlot}});
             }
 
             sortKeysExprs.keyExprs.emplace_back(std::move(sortKeyExpr));
@@ -1213,11 +917,9 @@ SortKeysExprs buildSortKeys(StageBuilderState& state,
         sortKeysExprs.fullKeyExpr = collatorSlot
             ? b.makeFunction(generateSortKeyFnName,
                              std::move(sortSpecExpr),
-                             b.makeVariable(childResultSlotId),
-                             b.makeVariable(*collatorSlot))
-            : b.makeFunction(generateSortKeyFnName,
-                             std::move(sortSpecExpr),
-                             b.makeVariable(childResultSlotId));
+                             childResultSlotId,
+                             SbVar{*collatorSlot})
+            : b.makeFunction(generateSortKeyFnName, std::move(sortSpecExpr), childResultSlotId);
     } else {
         MONGO_UNREACHABLE;
     }

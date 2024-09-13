@@ -30,14 +30,18 @@
 #include "mongo/db/query/stage_builder/sbe/sbexpr_helpers.h"
 
 #include "mongo/db/exec/sbe/stages/agg_project.h"
+#include "mongo/db/exec/sbe/stages/branch.h"
 #include "mongo/db/exec/sbe/stages/co_scan.h"
+#include "mongo/db/exec/sbe/stages/ix_scan.h"
 #include "mongo/db/exec/sbe/stages/limit_skip.h"
 #include "mongo/db/exec/sbe/stages/sort.h"
 #include "mongo/db/exec/sbe/stages/sorted_merge.h"
 #include "mongo/db/exec/sbe/stages/union.h"
 #include "mongo/db/exec/sbe/stages/unique.h"
 #include "mongo/db/exec/sbe/stages/unwind.h"
+#include "mongo/db/exec/sbe/stages/virtual_scan.h"
 #include "mongo/db/query/stage_builder/sbe/abt_holder_impl.h"
+#include "mongo/db/query/stage_builder/sbe/builder_data.h"
 
 namespace mongo::stage_builder {
 namespace {
@@ -246,6 +250,10 @@ SbExpr SbExprBuilder::makeStrConstant(StringData str) {
     return abt::wrap(optimizer::Constant::str(str));
 }
 
+SbExpr SbExprBuilder::makeUndefinedConstant() {
+    return abt::wrap(optimizer::make<optimizer::Constant>(sbe::value::TypeTags::bsonUndefined, 0));
+}
+
 SbExpr SbExprBuilder::makeFunction(StringData name, SbExpr::Vector args) {
     if (hasABT(args)) {
         return abt::wrap(stage_builder::makeABTFunction(name, extractABT(args)));
@@ -292,43 +300,23 @@ SbExpr SbExprBuilder::makeFail(ErrorCodes::Error error, StringData errorMessage)
 }
 
 SbExpr SbExprBuilder::makeFillEmpty(SbExpr expr, SbExpr altExpr) {
-    if (hasABT(expr) && hasABT(altExpr)) {
-        return abt::wrap(stage_builder::makeFillEmpty(extractABT(expr), extractABT(altExpr)));
-    } else {
-        return stage_builder::makeFillEmpty(lower(expr), lower(altExpr));
-    }
+    return makeBinaryOp(sbe::EPrimBinary::fillEmpty, std::move(expr), std::move(altExpr));
 }
 
 SbExpr SbExprBuilder::makeFillEmptyFalse(SbExpr expr) {
-    if (hasABT(expr)) {
-        return abt::wrap(stage_builder::makeFillEmptyFalse(extractABT(expr)));
-    } else {
-        return stage_builder::makeFillEmptyFalse(lower(expr));
-    }
+    return makeFillEmpty(std::move(expr), makeBoolConstant(false));
 }
 
 SbExpr SbExprBuilder::makeFillEmptyTrue(SbExpr expr) {
-    if (hasABT(expr)) {
-        return abt::wrap(stage_builder::makeFillEmptyTrue(extractABT(expr)));
-    } else {
-        return stage_builder::makeFillEmptyTrue(lower(expr));
-    }
+    return makeFillEmpty(std::move(expr), makeBoolConstant(true));
 }
 
 SbExpr SbExprBuilder::makeFillEmptyNull(SbExpr expr) {
-    if (hasABT(expr)) {
-        return abt::wrap(stage_builder::makeFillEmptyNull(extractABT(expr)));
-    } else {
-        return stage_builder::makeFillEmptyNull(lower(expr));
-    }
+    return makeFillEmpty(std::move(expr), makeNullConstant());
 }
 
 SbExpr SbExprBuilder::makeFillEmptyUndefined(SbExpr expr) {
-    if (hasABT(expr)) {
-        return abt::wrap(stage_builder::makeFillEmptyUndefined(extractABT(expr)));
-    } else {
-        return stage_builder::makeFillEmptyUndefined(lower(expr));
-    }
+    return makeFillEmpty(std::move(expr), makeUndefinedConstant());
 }
 
 SbExpr SbExprBuilder::makeIfNullExpr(SbExpr::Vector values) {
@@ -341,19 +329,20 @@ SbExpr SbExprBuilder::makeIfNullExpr(SbExpr::Vector values) {
 }
 
 SbExpr SbExprBuilder::generateNullOrMissing(SbExpr expr) {
-    if (hasABT(expr)) {
-        return abt::wrap(stage_builder::generateABTNullOrMissing(extractABT(expr)));
-    } else {
-        return stage_builder::generateNullOrMissing(lower(expr));
-    }
+    return makeBinaryOp(sbe::EPrimBinary::fillEmpty,
+                        makeFunction("typeMatch",
+                                     std::move(expr),
+                                     makeInt32Constant(getBSONTypeMask(BSONType::jstNULL))),
+                        makeBoolConstant(true));
 }
 
 SbExpr SbExprBuilder::generateNullMissingOrUndefined(SbExpr expr) {
-    if (hasABT(expr)) {
-        return abt::wrap(stage_builder::generateABTNullMissingOrUndefined(extractABT(expr)));
-    } else {
-        return stage_builder::generateNullMissingOrUndefined(lower(expr));
-    }
+    return makeBinaryOp(sbe::EPrimBinary::fillEmpty,
+                        makeFunction("typeMatch",
+                                     std::move(expr),
+                                     makeInt32Constant(getBSONTypeMask(BSONType::jstNULL) |
+                                                       getBSONTypeMask(BSONType::Undefined))),
+                        makeBoolConstant(true));
 }
 
 SbExpr SbExprBuilder::generatePositiveCheck(SbExpr expr) {
@@ -490,6 +479,99 @@ std::tuple<SbStage, SbSlot, SbSlot, SbSlotVector> SbBuilder::makeScan(
                                                 scanBounds.includeScanEndRecordId);
 
     return {std::move(scanStage), resultSlot, recordIdSlot, std::move(scanFieldSlots)};
+}
+
+std::tuple<SbStage, SbSlot, SbSlotVector, SbIndexInfoSlots> SbBuilder::makeSimpleIndexScan(
+    const VariableTypes& varTypes,
+    UUID collectionUuid,
+    DatabaseName dbName,
+    StringData indexName,
+    const BSONObj& keyPattern,
+    bool forward,
+    SbExpr lowKeyExpr,
+    SbExpr highKeyExpr,
+    sbe::IndexKeysInclusionSet indexKeysToInclude,
+    SbIndexInfoType indexInfoTypeMask,
+    bool lowPriority) {
+    SbSlot recordIdSlot = SbSlot{_state.slotId()};
+    const size_t numIndexKeys = indexKeysToInclude.count();
+
+    SbSlotVector indexKeySlots;
+    indexKeySlots.reserve(numIndexKeys);
+    for (size_t i = 0; i < numIndexKeys; ++i) {
+        indexKeySlots.emplace_back(SbSlot{_state.slotId()});
+    }
+
+    SbIndexInfoSlots indexInfoSlots = allocateIndexInfoSlots(indexInfoTypeMask, keyPattern);
+
+    auto stage = sbe::makeS<sbe::SimpleIndexScanStage>(std::move(collectionUuid),
+                                                       std::move(dbName),
+                                                       indexName,
+                                                       forward,
+                                                       lower(indexInfoSlots.indexKeySlot),
+                                                       lower(recordIdSlot),
+                                                       lower(indexInfoSlots.snapshotIdSlot),
+                                                       lower(indexInfoSlots.indexIdentSlot),
+                                                       std::move(indexKeysToInclude),
+                                                       lower(indexKeySlots),
+                                                       lower(lowKeyExpr, &varTypes),
+                                                       lower(highKeyExpr, &varTypes),
+                                                       _state.yieldPolicy,
+                                                       _nodeId,
+                                                       lowPriority);
+
+    return {std::move(stage), recordIdSlot, std::move(indexKeySlots), std::move(indexInfoSlots)};
+}
+
+std::tuple<SbStage, SbSlot, SbSlotVector, SbIndexInfoSlots> SbBuilder::makeGenericIndexScan(
+    const VariableTypes& varTypes,
+    UUID collectionUuid,
+    DatabaseName dbName,
+    StringData indexName,
+    const BSONObj& keyPattern,
+    bool forward,
+    SbExpr boundsExpr,
+    key_string::Version version,
+    Ordering ordering,
+    sbe::IndexKeysInclusionSet indexKeysToInclude,
+    SbIndexInfoType indexInfoTypeMask) {
+    SbSlot recordIdSlot = SbSlot{_state.slotId()};
+    const int direction = forward ? 1 : -1;
+    const size_t numIndexKeys = indexKeysToInclude.count();
+
+    SbSlotVector indexKeySlots;
+    indexKeySlots.reserve(numIndexKeys);
+    for (size_t i = 0; i < numIndexKeys; ++i) {
+        indexKeySlots.emplace_back(SbSlot{_state.slotId()});
+    }
+
+    SbIndexInfoSlots indexInfoSlots = allocateIndexInfoSlots(indexInfoTypeMask, keyPattern);
+
+    sbe::GenericIndexScanStageParams params{
+        lower(boundsExpr, &varTypes), keyPattern, direction, version, ordering};
+
+    auto stage = sbe::makeS<sbe::GenericIndexScanStage>(std::move(collectionUuid),
+                                                        std::move(dbName),
+                                                        indexName,
+                                                        std::move(params),
+                                                        lower(indexInfoSlots.indexKeySlot),
+                                                        lower(recordIdSlot),
+                                                        lower(indexInfoSlots.snapshotIdSlot),
+                                                        lower(indexInfoSlots.indexIdentSlot),
+                                                        std::move(indexKeysToInclude),
+                                                        lower(indexKeySlots),
+                                                        _state.yieldPolicy,
+                                                        _nodeId);
+
+    return {std::move(stage), recordIdSlot, std::move(indexKeySlots), std::move(indexInfoSlots)};
+}
+
+std::pair<SbStage, SbSlot> SbBuilder::makeVirtualScan(sbe::value::TypeTags inputTag,
+                                                      sbe::value::Value inputVal) {
+    auto outSlotId = _state.slotId();
+    auto outSlot = SbSlot{outSlotId};
+
+    return {sbe::makeS<sbe::VirtualScanStage>(_nodeId, outSlotId, inputTag, inputVal), outSlot};
 }
 
 SbStage SbBuilder::makeLimit(const VariableTypes& varTypes, SbStage stage, SbExpr limitConstant) {
@@ -831,6 +913,85 @@ std::pair<SbStage, SbSlotVector> SbBuilder::makeSortedMerge(
         std::move(stages), lower(keys), std::move(dirs), lower(slots), lower(outSlots), _nodeId);
 
     return {std::move(sortedMergeStage), std::move(outSlots)};
+}
+
+std::pair<SbStage, SbSlotVector> SbBuilder::makeBranch(const VariableTypes& varTypes,
+                                                       SbStage thenStage,
+                                                       SbStage elseStage,
+                                                       SbExpr conditionExpr,
+                                                       const SbSlotVector& thenSlots,
+                                                       const SbSlotVector& elseSlots) {
+    const size_t n = thenSlots.size();
+
+    tassert(9405101, "Expected both input slot vectors to be the same size", n == elseSlots.size());
+
+    SbSlotVector outSlots;
+    outSlots.reserve(n);
+
+    for (size_t i = 0; i < n; ++i) {
+        // Get the type signatures of the jth element from both input slot vectors and compute
+        // the union of these type signatures.
+        boost::optional<TypeSignature> unionTypeSig = thenSlots[i].getTypeSignature();
+
+        if (unionTypeSig) {
+            auto typeSig = elseSlots[i].getTypeSignature();
+            if (typeSig) {
+                unionTypeSig = unionTypeSig->include(*typeSig);
+            } else {
+                unionTypeSig = boost::none;
+            }
+        }
+
+        // Allocate a new slot ID and add it to 'outSlots', using 'unionTypeSig' for the
+        // type signature.
+        outSlots.emplace_back(SbSlot{_state.slotId(), unionTypeSig});
+    }
+
+    auto stage = sbe::makeS<sbe::BranchStage>(std::move(thenStage),
+                                              std::move(elseStage),
+                                              lower(conditionExpr, &varTypes),
+                                              lower(thenSlots),
+                                              lower(elseSlots),
+                                              lower(outSlots),
+                                              _nodeId);
+
+    return {std::move(stage), std::move(outSlots)};
+}
+
+SbIndexInfoSlots SbBuilder::allocateIndexInfoSlots(SbIndexInfoType indexInfoTypeMask,
+                                                   const BSONObj& keyPattern) {
+    SbIndexInfoSlots indexInfoSlots;
+
+    if ((indexInfoTypeMask & SbIndexInfoType::kIndexIdent) != SbIndexInfoType::kNoInfo) {
+        indexInfoSlots.indexIdentSlot = SbSlot{_state.slotId()};
+    }
+
+    if ((indexInfoTypeMask & SbIndexInfoType::kIndexKey) != SbIndexInfoType::kNoInfo) {
+        indexInfoSlots.indexKeySlot = SbSlot{_state.slotId()};
+    }
+
+    if ((indexInfoTypeMask & SbIndexInfoType::kSnapshotId) != SbIndexInfoType::kNoInfo) {
+        indexInfoSlots.snapshotIdSlot = SbSlot{_state.slotId()};
+    }
+
+    if ((indexInfoTypeMask & SbIndexInfoType::kIndexKeyPattern) != SbIndexInfoType::kNoInfo) {
+        auto it = _state.keyPatternToSlotMap.find(keyPattern);
+
+        if (it != _state.keyPatternToSlotMap.end()) {
+            indexInfoSlots.indexKeyPatternSlot = SbSlot{it->second};
+        } else {
+            auto [bsonObjTag, bsonObjVal] =
+                sbe::value::copyValue(sbe::value::TypeTags::bsonObject,
+                                      sbe::value::bitcastFrom<const char*>(keyPattern.objdata()));
+            auto slotId =
+                _state.env->registerSlot(bsonObjTag, bsonObjVal, true, _state.slotIdGenerator);
+            _state.keyPatternToSlotMap[keyPattern] = slotId;
+
+            indexInfoSlots.indexKeyPatternSlot = SbSlot{slotId};
+        }
+    }
+
+    return indexInfoSlots;
 }
 
 SbSlotVector SbBuilder::allocateOutSlotsForMergeStage(const std::vector<SbSlotVector>& slots) {

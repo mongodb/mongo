@@ -263,11 +263,10 @@ SbExpr generateTraverseF(SbExpr inputExpr,
 
     if (childIsLeafWithEmptyName) {
         auto frameId = frameIdGenerator->generate();
-        auto getFieldValue = b.makeVariable(frameId, 0);
-        auto expr =
-            b.makeIf(b.makeFunction("isArray", getFieldValue.clone()),
-                     getFieldValue.clone(),
-                     b.makeFunction("getField", getFieldValue.clone(), b.makeStrConstant(""_sd)));
+        auto getFieldValue = SbLocalVar{frameId, 0};
+        auto expr = b.makeIf(b.makeFunction("isArray", getFieldValue),
+                             getFieldValue,
+                             b.makeFunction("getField", getFieldValue, b.makeStrConstant(""_sd)));
 
         fieldExpr = b.makeLet(frameId, SbExpr::makeSeq(std::move(fieldExpr)), std::move(expr));
     }
@@ -468,7 +467,7 @@ void generateArraySize(MatchExpressionVisitorContext* context,
 
     auto makePredicate = [&](SbExpr inputExpr) {
         auto sizeExpr =
-            inputParamSlotId ? b.makeVariable(*inputParamSlotId) : b.makeInt32Constant(size);
+            inputParamSlotId ? SbExpr{SbSlot{*inputParamSlotId}} : b.makeInt32Constant(size);
         return b.makeFillEmptyFalse(
             b.makeBinaryOp(sbe::EPrimBinary::eq,
                            b.makeFunction("getArraySize", std::move(inputExpr)),
@@ -586,7 +585,7 @@ public:
         // We evaluate $elemMatch's child in a new MatchFrame. For the child's MatchFrame, we set
         // the 'inputExpr' field to be the lambda's parameter (lambdaParam).
         auto lambdaFrameId = _context->state.frameId();
-        auto lambdaParam = b.makeVariable(lambdaFrameId, 0);
+        auto lambdaParam = SbExpr{SbLocalVar{lambdaFrameId, 0}};
         _context->emplaceFrame(_context->state, std::move(lambdaParam), lambdaFrameId);
     }
 
@@ -598,7 +597,7 @@ public:
         // We create a new MatchFrame for evaluating $elemMatch's children. For this new MatchFrame,
         // we set the 'inputExpr' field to be the lambda's parameter (lambdaParam).
         auto lambdaFrameId = _context->state.frameId();
-        auto lambdaParam = b.makeVariable(lambdaFrameId, 0);
+        auto lambdaParam = SbExpr{SbLocalVar{lambdaFrameId, 0}};
         bool childOfElemMatchValue = true;
         _context->emplaceFrame(
             _context->state, std::move(lambdaParam), lambdaFrameId, childOfElemMatchValue);
@@ -744,7 +743,7 @@ std::tuple<SbExpr, bool, bool, bool> _generateInExprInternal(StageBuilderState& 
     // register a SlotId for it and use the slot directly. Note we don't auto-parameterize
     // $in if it contains null, regexes, or nested arrays or objects.
     if (exprIsParameterized) {
-        auto var = b.makeVariable(state.registerInputParamSlot(*expr->getInputParamId()));
+        auto var = SbExpr{SbSlot{state.registerInputParamSlot(*expr->getInputParamId())}};
         return std::make_tuple(std::move(var), false, false, false);
     }
 
@@ -754,7 +753,7 @@ std::tuple<SbExpr, bool, bool, bool> _generateInExprInternal(StageBuilderState& 
     auto val = sbe::value::bitcastFrom<sbe::InList*>(inList);
     const bool owned = false;
 
-    auto var = b.makeVariable(state.env->registerSlot(tag, val, owned, state.slotIdGenerator));
+    auto var = SbExpr{SbSlot{state.env->registerSlot(tag, val, owned, state.slotIdGenerator)}};
 
     return std::make_tuple(std::move(var), expr->hasArray(), expr->hasObject(), expr->hasNull());
 }
@@ -803,12 +802,12 @@ public:
             6987606, "Expected frameId to be defined", _context->topFrame().frameId.has_value());
 
         auto lambdaFrameId = *_context->topFrame().frameId;
-        auto lambdaParam = b.makeVariable(lambdaFrameId, 0);
+        auto lambdaParam = SbLocalVar{lambdaFrameId, 0};
 
         auto lambdaBodyExpr =
             b.makeBinaryOp(sbe::EPrimBinary::logicAnd,
                            b.makeFunction("typeMatch",
-                                          std::move(lambdaParam),
+                                          lambdaParam,
                                           b.makeInt32Constant(getBSONTypeMask(BSONType::Array) |
                                                               getBSONTypeMask(BSONType::Object))),
                            _context->topFrame().popExpr());
@@ -838,7 +837,6 @@ public:
             6987608, "Expected frameId to be defined", _context->topFrame().frameId.has_value());
 
         auto lambdaFrameId = *_context->topFrame().frameId;
-        auto lambdaParam = b.makeVariable(lambdaFrameId, 0);
 
         // Move the children's outputs off of the expr stack into a vector in preparation for
         // calling makeBalancedBooleanOpTree().
@@ -1028,7 +1026,7 @@ public:
         auto& state = _context->state;
 
         const auto frameId = state.frameIdGenerator->generate();
-        auto lhsVar = b.makeVariable(frameId, 0);
+        auto lhsVar = SbExpr{SbLocalVar{frameId, 0}};
 
         auto [rhsTag, rhsVal] = sbe::value::makeValue(Value(expr->getData()));
 
@@ -1166,10 +1164,10 @@ public:
         // register a SlotId for it and use the slot directly. Note that we don't auto-parameterize
         // if the type set contains 'BSONType::Array'.
         if (auto typeMaskParam = expr->getInputParamId()) {
-            auto typeMaskSlotId = _context->state.registerInputParamSlot(*typeMaskParam);
+            auto typeMaskSlot = SbSlot{_context->state.registerInputParamSlot(*typeMaskParam)};
             auto makePredicate = [&](SbExpr inputExpr) {
-                return b.makeFillEmptyFalse(b.makeFunction(
-                    "typeMatch", std::move(inputExpr), b.makeVariable(typeMaskSlotId)));
+                return b.makeFillEmptyFalse(
+                    b.makeFunction("typeMatch", std::move(inputExpr), typeMaskSlot));
             };
 
             const auto traversalMode = LeafTraversalMode::kArrayElementsOnly;
@@ -1277,7 +1275,6 @@ SbExpr generateFilter(StageBuilderState& state,
                       const MatchExpression* root,
                       boost::optional<SbSlot> rootSlot,
                       const PlanStageSlots& slots,
-                      const std::vector<std::string>& keyFields,
                       bool isFilterOverIxscan) {
     // The planner adds an $and expression without the operands if the query was empty. We can bail
     // out early without generating the filter plan stage if this is the case.
@@ -1422,7 +1419,7 @@ SbExpr generateComparisonExpr(StageBuilderState& state,
 
     ValueExpressionFn<SbExpr> makeValExpr = [&](sbe::value::TypeTags tag, sbe::value::Value val) {
         if (auto inputParam = expr->getInputParamId()) {
-            return b.makeVariable(state.registerInputParamSlot(*inputParam));
+            return SbExpr{SbSlot{state.registerInputParamSlot(*inputParam)}};
         }
         auto [copyTag, copyVal] = sbe::value::copyValue(tag, val);
         return b.makeConstant(copyTag, copyVal);
@@ -1453,8 +1450,8 @@ SbExpr generateBitTestExpr(StageBuilderState& state,
     // register a SlotId for it and use the slot directly.
     SbExpr bitPosExpr = [&]() -> SbExpr {
         if (auto bitPosParamId = expr->getBitPositionsParamId()) {
-            auto bitPosSlotId = state.registerInputParamSlot(*bitPosParamId);
-            return b.makeVariable(bitPosSlotId);
+            auto bitPosSlot = SbSlot{state.registerInputParamSlot(*bitPosParamId)};
+            return bitPosSlot;
         } else {
             auto [bitPosTag, bitPosVal] = convertBitTestBitPositions(expr);
             return b.makeConstant(bitPosTag, bitPosVal);
@@ -1484,8 +1481,8 @@ SbExpr generateBitTestExpr(StageBuilderState& state,
 
     SbExpr bitMaskExpr = [&]() -> SbExpr {
         if (auto bitMaskParamId = expr->getBitMaskParamId()) {
-            auto bitMaskSlotId = state.registerInputParamSlot(*bitMaskParamId);
-            return b.makeVariable(bitMaskSlotId);
+            auto bitMaskSlot = SbSlot{state.registerInputParamSlot(*bitMaskParamId)};
+            return bitMaskSlot;
         } else {
             return b.makeInt64Constant(expr->getBitMask());
         }
@@ -1531,16 +1528,16 @@ SbExpr generateModExpr(StageBuilderState& state, const ModMatchExpression* expr,
     // generated slots directly.
     SbExpr divisorExpr = [&]() -> SbExpr {
         if (auto divisorParam = expr->getDivisorInputParamId()) {
-            auto divisorSlotId = state.registerInputParamSlot(*divisorParam);
-            return b.makeVariable(divisorSlotId);
+            auto divisorSlot = SbSlot{state.registerInputParamSlot(*divisorParam)};
+            return divisorSlot;
         } else {
             return b.makeInt64Constant(expr->getDivisor());
         }
     }();
     SbExpr remainderExpr = [&]() -> SbExpr {
         if (auto remainderParam = expr->getRemainderInputParamId()) {
-            auto remainderSlotId = state.registerInputParamSlot(*remainderParam);
-            return b.makeVariable(remainderSlotId);
+            auto remainderSlot = SbSlot{state.registerInputParamSlot(*remainderParam)};
+            return remainderSlot;
         } else {
             return b.makeInt64Constant(expr->getRemainder());
         }
@@ -1562,8 +1559,8 @@ SbExpr generateRegexExpr(StageBuilderState& state,
                 (!expr->getSourceRegexInputParamId() && !expr->getCompiledRegexInputParamId()));
     SbExpr bsonRegexExpr = [&]() -> SbExpr {
         if (auto sourceRegexParam = expr->getSourceRegexInputParamId()) {
-            auto sourceRegexSlotId = state.registerInputParamSlot(*sourceRegexParam);
-            return b.makeVariable(sourceRegexSlotId);
+            auto sourceRegexSlot = SbSlot{state.registerInputParamSlot(*sourceRegexParam)};
+            return sourceRegexSlot;
         } else {
             auto [bsonRegexTag, bsonRegexVal] =
                 sbe::value::makeNewBsonRegex(expr->getString(), expr->getFlags());
@@ -1573,8 +1570,8 @@ SbExpr generateRegexExpr(StageBuilderState& state,
 
     SbExpr compiledRegexExpr = [&]() -> SbExpr {
         if (auto compiledRegexParam = expr->getCompiledRegexInputParamId()) {
-            auto compiledRegexSlotId = state.registerInputParamSlot(*compiledRegexParam);
-            return b.makeVariable(compiledRegexSlotId);
+            auto compiledRegexSlot = SbSlot{state.registerInputParamSlot(*compiledRegexParam)};
+            return compiledRegexSlot;
         } else {
             auto [compiledRegexTag, compiledRegexVal] =
                 sbe::makeNewPcreRegex(expr->getString(), expr->getFlags());
@@ -1612,9 +1609,8 @@ SbExpr generateWhereExpr(StageBuilderState& state,
     // If there's an "inputParamId" in this expr meaning this expr got parameterized, we can
     // register a SlotId for it and use the slot directly.
     if (auto inputParam = expr->getInputParamId()) {
-        auto inputParamSlotId = state.registerInputParamSlot(*inputParam);
-        return b.makeFunction(
-            "runJsPredicate", b.makeVariable(inputParamSlotId), std::move(inputExpr));
+        auto inputParamSlot = SbSlot{state.registerInputParamSlot(*inputParam)};
+        return b.makeFunction("runJsPredicate", inputParamSlot, std::move(inputExpr));
     } else {
         return b.makeFunction("runJsPredicate", std::move(predicate), std::move(inputExpr));
     }

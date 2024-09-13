@@ -83,6 +83,7 @@ sbeEnv.Library(
         "stages/union.cpp",
         "stages/unique.cpp",
         "stages/unwind.cpp",
+        "stages/virtual_scan.cpp",
         "stages/window.cpp",
     ],
     LIBDEPS=[

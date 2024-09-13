@@ -361,15 +361,14 @@ std::pair<SbSlot /* keyValueSlot */, SbStage> buildForeignKeysStream(SbSlot inpu
 
     auto unionOutputSlot = unionOutputSlots[0];
 
-    auto maybeUnionOutputSlot = SbSlot{state.slotId()};
-    unionStage =
-        sbe::makeS<sbe::BranchStage>(std::move(unionStage),
-                                     b.makeLimitOneCoScanTree(),
-                                     b.makeFunction("isArray", keyValueSlot).extractExpr(state),
-                                     sbe::makeSV(unionOutputSlot.getId()),
-                                     sbe::makeSV(keyValueSlot.getId()),
-                                     sbe::makeSV(maybeUnionOutputSlot.getId()),
-                                     nodeId);
+    auto [outStage, outSlots] = b.makeBranch(std::move(unionStage),
+                                             b.makeLimitOneCoScanTree(),
+                                             b.makeFunction("isArray", keyValueSlot),
+                                             SbExpr::makeSV(unionOutputSlot),
+                                             SbExpr::makeSV(keyValueSlot));
+    unionStage = std::move(outStage);
+
+    auto maybeUnionOutputSlot = outSlots[0];
 
     currentStage = b.makeLoopJoin(std::move(currentStage),
                                   std::move(unionStage),
@@ -898,12 +897,7 @@ std::pair<SbSlot, SbStage> buildIndexJoinLookupStage(
 
     // Calculate the low key and high key of each individual local field. They are stored in
     // 'lowKeySlot' and 'highKeySlot', respectively. These two slots will be made available in
-    // the loop join stage to perform index seek. We also set the 'indexKeyPatternSlot' constant
-    // for the seek stage later to perform consistency check.
-    auto [indexKeyPaternTag, indexKeyPatternValue] =
-        sbe::value::copyValue(sbe::value::TypeTags::bsonObject,
-                              sbe::value::bitcastFrom<const char*>(index.keyPattern.objdata()));
-
+    // the loop join stage to perform index seek.
     auto makeNewKeyStringCall = [&](key_string::Discriminator discriminator) {
         StringData functionName = "ks";
 
@@ -924,11 +918,9 @@ std::pair<SbSlot, SbStage> buildIndexJoinLookupStage(
     auto [indexBoundKeyStage, outSlots] =
         b.makeProject(std::move(valueGeneratorStage),
                       makeNewKeyStringCall(key_string::Discriminator::kExclusiveBefore),
-                      makeNewKeyStringCall(key_string::Discriminator::kExclusiveAfter),
-                      b.makeConstant(indexKeyPaternTag, indexKeyPatternValue));
+                      makeNewKeyStringCall(key_string::Discriminator::kExclusiveAfter));
     SbSlot lowKeySlot = outSlots[0];
     SbSlot highKeySlot = outSlots[1];
-    SbSlot indexKeyPatternSlot = outSlots[2];
 
     // To ensure that we compute index bounds for all local values, introduce loop join, where
     // unwinding of local values happens on the right side and index generation happens on the left
@@ -938,36 +930,35 @@ std::pair<SbSlot, SbStage> buildIndexJoinLookupStage(
                                         {} /* outerProjects */,
                                         SbExpr::makeSV(singleLocalValueSlot) /* outerCorrelated */);
 
+    auto indexInfoTypeMask = SbIndexInfoType::kIndexIdent | SbIndexInfoType::kIndexKey |
+        SbIndexInfoType::kIndexKeyPattern | SbIndexInfoType::kSnapshotId;
+
     // Perform the index seek based on the 'lowKeySlot' and 'highKeySlot' from the outer side.
     // The foreign record id of the seek is stored in 'foreignRecordIdSlot'. We also keep
     // 'indexKeySlot' and 'snapshotIdSlot' for the seek stage later to perform consistency
     // check.
-    auto foreignRecordIdSlot = SbSlot{state.slotId()};
-    auto indexKeySlot = SbSlot{state.slotId()};
-    auto snapshotIdSlot = SbSlot{state.slotId()};
-    auto indexIdentSlot = SbSlot{state.slotId()};
-    auto ixScanStage =
-        sbe::makeS<sbe::SimpleIndexScanStage>(foreignCollUUID,
-                                              foreignCollDbName,
-                                              indexName,
-                                              true /* forward */,
-                                              indexKeySlot.getId(),
-                                              foreignRecordIdSlot.getId(),
-                                              snapshotIdSlot.getId(),
-                                              indexIdentSlot.getId(),
-                                              sbe::IndexKeysInclusionSet{} /* indexKeysToInclude */,
-                                              sbe::makeSV() /* vars */,
-                                              SbExpr{lowKeySlot}.extractExpr(state),
-                                              SbExpr{highKeySlot}.extractExpr(state),
-                                              state.yieldPolicy,
-                                              nodeId);
+    auto [ixScanStage, foreignRecordIdSlot, __, indexInfoSlots] =
+        b.makeSimpleIndexScan(foreignCollUUID,
+                              foreignCollDbName,
+                              indexName,
+                              index.keyPattern,
+                              true /* forward */,
+                              lowKeySlot,
+                              highKeySlot,
+                              sbe::IndexKeysInclusionSet{} /* indexKeysToInclude */,
+                              indexInfoTypeMask);
+
+    SbSlot indexIdentSlot = *indexInfoSlots.indexIdentSlot;
+    SbSlot indexKeySlot = *indexInfoSlots.indexKeySlot;
+    SbSlot indexKeyPatternSlot = *indexInfoSlots.indexKeyPatternSlot;
+    SbSlot snapshotIdSlot = *indexInfoSlots.snapshotIdSlot;
 
     // Loop join the low key and high key generation with the index seek stage to produce the
     // foreign record id to seek.
     auto ixScanNljStage =
         b.makeLoopJoin(std::move(indexBoundKeyStage),
                        std::move(ixScanStage),
-                       SbExpr::makeSV(indexKeyPatternSlot) /* outerProjects */,
+                       SbSlotVector{} /* outerProjects */,
                        SbExpr::makeSV(lowKeySlot, highKeySlot) /* outerCorrelated */);
 
     // It is possible for the same record to be returned multiple times when the index is multikey
@@ -985,7 +976,7 @@ std::pair<SbSlot, SbStage> buildIndexJoinLookupStage(
     // stage on the inner side to get matched foreign documents. The foreign documents are
     // stored in 'foreignRecordSlot'. We also pass in 'snapshotIdSlot', 'indexIdentSlot',
     // 'indexKeySlot' and 'indexKeyPatternSlot' to perform index consistency check during the seek.
-    auto [scanNljStage, foreignRecordSlot, __, ___] =
+    auto [scanNljStage, foreignRecordSlot, ___, ____] =
         makeLoopJoinForFetch(std::move(ixScanNljStage),
                              std::vector<std::string>{},
                              foreignRecordIdSlot,

@@ -191,7 +191,7 @@ SbExpr buildWindowFinalizeSum(const WindowOp& op, StageBuilderState& state, SbSl
 
     SbExpr::Vector exprs;
     for (auto slot : slots) {
-        exprs.push_back(b.makeVariable(slot));
+        exprs.push_back(slot);
     }
     return b.makeFunction("aggRemovableSumFinalize", std::move(exprs));
 }
@@ -244,7 +244,7 @@ SbExpr buildWindowFinalizePush(const WindowOp& op, StageBuilderState& state, SbS
 
     SbExpr::Vector exprs;
     for (auto slot : slots) {
-        exprs.push_back(b.makeVariable(slot));
+        exprs.push_back(slot);
     }
     return b.makeFunction("aggRemovablePushFinalize", std::move(exprs));
 }
@@ -328,7 +328,7 @@ SbExpr buildWindowFinalizeStdDevSamp(const WindowOp& op,
     tassert(8019606, "Incorrect number of arguments", slots.size() == 1);
     SbExpr::Vector exprs;
     for (auto slot : slots) {
-        exprs.push_back(b.makeVariable(slot));
+        exprs.push_back(slot);
     }
     return b.makeFunction("aggRemovableStdDevSampFinalize", std::move(exprs));
 }
@@ -341,7 +341,7 @@ SbExpr buildWindowFinalizeStdDevPop(const WindowOp& op,
     tassert(8019607, "Incorrect number of arguments", slots.size() == 1);
     SbExpr::Vector exprs;
     for (auto slot : slots) {
-        exprs.push_back(b.makeVariable(slot));
+        exprs.push_back(slot);
     }
     return b.makeFunction("aggRemovableStdDevPopFinalize", std::move(exprs));
 }
@@ -395,7 +395,7 @@ SbExpr buildWindowFinalizeAvg(const WindowOp& op, StageBuilderState& state, SbSl
 
     SbExpr::Vector exprs;
     for (auto slot : slots) {
-        exprs.push_back(b.makeVariable(slot));
+        exprs.push_back(slot);
     }
 
     return b.makeFunction("aggRemovableAvgFinalize", std::move(exprs));
@@ -421,13 +421,12 @@ SbExpr buildWindowFinalizeFirstLast(const WindowOp& op,
     auto defaultVal = std::move(inputs->defaultVal);
 
     auto thenExpr = b.makeFillEmpty(std::move(inputExpr), defaultVal.clone());
-    return b.makeIf(b.makeBinaryOp(sbe::EPrimBinary::logicAnd,
-                                   b.makeFunction("exists", b.makeVariable(slots[0])),
-                                   b.makeBinaryOp(sbe::EPrimBinary::greater,
-                                                  b.makeVariable(slots[0]),
-                                                  b.makeInt64Constant(0))),
-                    std::move(thenExpr),
-                    std::move(defaultVal));
+    return b.makeIf(
+        b.makeBinaryOp(sbe::EPrimBinary::logicAnd,
+                       b.makeFunction("exists", slots[0]),
+                       b.makeBinaryOp(sbe::EPrimBinary::greater, slots[0], b.makeInt64Constant(0))),
+        std::move(thenExpr),
+        std::move(defaultVal));
 }
 
 SbExpr::Vector buildWindowInitializeFirstN(const WindowOp& op,
@@ -461,7 +460,7 @@ SbExpr buildWindowFinalizeFirstN(const WindowOp& op, StageBuilderState& state, S
     SbExprBuilder b(state);
 
     tassert(8070605, "Expected a single slot", slots.size() == 1);
-    return b.makeFunction("aggRemovableFirstNFinalize", b.makeVariable(slots[0]));
+    return b.makeFunction("aggRemovableFirstNFinalize", slots[0]);
 }
 
 SbExpr::Vector buildWindowInitializeLastN(const WindowOp& op,
@@ -495,7 +494,7 @@ SbExpr buildWindowFinalizeLastN(const WindowOp& op, StageBuilderState& state, Sb
     SbExprBuilder b(state);
 
     tassert(8070606, "Expected a single slot", slots.size() == 1);
-    return b.makeFunction("aggRemovableLastNFinalize", b.makeVariable(slots[0]));
+    return b.makeFunction("aggRemovableLastNFinalize", slots[0]);
 }
 
 SbExpr::Vector buildWindowInitializeAddToSet(const WindowOp& op, StageBuilderState& state) {
@@ -505,8 +504,7 @@ SbExpr::Vector buildWindowInitializeAddToSet(const WindowOp& op, StageBuilderSta
     SbExpr::Vector exprs;
 
     if (collatorSlot) {
-        exprs.push_back(
-            b.makeFunction("aggRemovableAddToSetCollInit", b.makeVariable(*collatorSlot)));
+        exprs.push_back(b.makeFunction("aggRemovableAddToSetCollInit", SbSlot{*collatorSlot}));
     } else {
         exprs.push_back(b.makeFunction("aggRemovableAddToSetInit"));
     }
@@ -538,7 +536,7 @@ SbExpr buildWindowFinalizeAddToSet(const WindowOp& op,
 
     SbExpr::Vector exprs;
     for (auto slot : slots) {
-        exprs.push_back(b.makeVariable(slot));
+        exprs.push_back(slot);
     }
     return b.makeFunction("aggRemovableAddToSetFinalize", std::move(exprs));
 }
@@ -555,7 +553,7 @@ SbExpr::Vector buildWindowInitializeMinMax(const WindowOp& op, StageBuilderState
         exprs.push_back(b.makeFunction("aggRemovableMinMaxNCollInit",
                                        b.makeInt32Constant(1),
                                        b.makeInt32Constant(cap),
-                                       b.makeVariable(*collatorSlot)));
+                                       SbSlot{*collatorSlot}));
     } else {
         exprs.push_back(b.makeFunction(
             "aggRemovableMinMaxNInit", b.makeInt32Constant(1), b.makeInt32Constant(cap)));
@@ -581,8 +579,7 @@ SbExpr::Vector buildWindowInitializeMinMaxN(const WindowOp& op,
         exprs.push_back(b.makeFunction("aggRemovableMinMaxNCollInit",
                                        std::move(maxSizeArg),
                                        b.makeInt32Constant(cap),
-
-                                       b.makeVariable(*collatorSlot)));
+                                       SbSlot{*collatorSlot}));
     } else {
         exprs.push_back(b.makeFunction(
             "aggRemovableMinMaxNInit", std::move(maxSizeArg), b.makeInt32Constant(cap)));
@@ -610,34 +607,32 @@ SbExpr buildWindowFinalizeMinN(const WindowOp& op, StageBuilderState& state, SbS
     SbExprBuilder b(state);
 
     tassert(8178130, "Expected a single slot", slots.size() == 1);
-    return b.makeFunction("aggRemovableMinNFinalize", b.makeVariable(slots[0]));
+    return b.makeFunction("aggRemovableMinNFinalize", slots[0]);
 }
 
 SbExpr buildWindowFinalizeMaxN(const WindowOp& op, StageBuilderState& state, SbSlotVector slots) {
     SbExprBuilder b(state);
 
     tassert(8178131, "Expected a single slot", slots.size() == 1);
-    return b.makeFunction("aggRemovableMaxNFinalize", b.makeVariable(slots[0]));
+    return b.makeFunction("aggRemovableMaxNFinalize", slots[0]);
 }
 
 SbExpr buildWindowFinalizeMin(const WindowOp& op, StageBuilderState& state, SbSlotVector slots) {
     SbExprBuilder b(state);
 
     tassert(8124914, "Expected a single slot", slots.size() == 1);
-    return b.makeFillEmptyNull(
-        b.makeFunction("getElement",
-                       b.makeFunction("aggRemovableMinNFinalize", b.makeVariable(slots[0])),
-                       b.makeInt32Constant(0)));
+    return b.makeFillEmptyNull(b.makeFunction("getElement",
+                                              b.makeFunction("aggRemovableMinNFinalize", slots[0]),
+                                              b.makeInt32Constant(0)));
 }
 
 SbExpr buildWindowFinalizeMax(const WindowOp& op, StageBuilderState& state, SbSlotVector slots) {
     SbExprBuilder b(state);
 
     tassert(8124915, "Expected a single slot", slots.size() == 1);
-    return b.makeFillEmptyNull(
-        b.makeFunction("getElement",
-                       b.makeFunction("aggRemovableMaxNFinalize", b.makeVariable(slots[0])),
-                       b.makeInt32Constant(0)));
+    return b.makeFillEmptyNull(b.makeFunction("getElement",
+                                              b.makeFunction("aggRemovableMaxNFinalize", slots[0]),
+                                              b.makeInt32Constant(0)));
 }
 
 SbExpr::Vector buildWindowInitializeTopBottomN(StageBuilderState& state,
@@ -687,17 +682,16 @@ SbExpr buildWindowFinalizeTopN(const WindowOp& op, StageBuilderState& state, SbS
     SbExprBuilder b(state);
 
     tassert(8155710, "Expected a single slot", slots.size() == 1);
-    return b.makeFunction("aggRemovableTopNFinalize", b.makeVariable(slots[0]));
+    return b.makeFunction("aggRemovableTopNFinalize", slots[0]);
 }
 
 SbExpr buildWindowFinalizeTop(const WindowOp& op, StageBuilderState& state, SbSlotVector slots) {
     SbExprBuilder b(state);
 
     tassert(8155721, "Expected a single slot", slots.size() == 1);
-    return b.makeFillEmptyNull(
-        b.makeFunction("getElement",
-                       b.makeFunction("aggRemovableTopNFinalize", b.makeVariable(slots[0])),
-                       b.makeInt32Constant(0)));
+    return b.makeFillEmptyNull(b.makeFunction("getElement",
+                                              b.makeFunction("aggRemovableTopNFinalize", slots[0]),
+                                              b.makeInt32Constant(0)));
 }
 
 SbExpr::Vector buildWindowInitializeBottomN(const WindowOp& op,
@@ -724,7 +718,7 @@ SbExpr buildWindowFinalizeBottomN(const WindowOp& op,
     SbExprBuilder b(state);
 
     tassert(8155714, "Expected a single slot", slots.size() == 1);
-    return b.makeFunction("aggRemovableBottomNFinalize", b.makeVariable(slots[0]));
+    return b.makeFunction("aggRemovableBottomNFinalize", slots[0]);
 }
 
 SbExpr buildWindowFinalizeBottom(const WindowOp& op, StageBuilderState& state, SbSlotVector slots) {
@@ -733,7 +727,7 @@ SbExpr buildWindowFinalizeBottom(const WindowOp& op, StageBuilderState& state, S
     tassert(8155722, "Expected a single slot", slots.size() == 1);
     return b.makeFillEmptyNull(
         b.makeFunction("getElement",
-                       b.makeFunction("aggRemovableBottomNFinalize", b.makeVariable(slots[0])),
+                       b.makeFunction("aggRemovableBottomNFinalize", slots[0]),
                        b.makeInt32Constant(0)));
 }
 

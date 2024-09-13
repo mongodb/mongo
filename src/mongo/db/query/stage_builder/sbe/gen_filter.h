@@ -56,10 +56,6 @@ class PlanStageSlots;
  * correspond to the full paths needed by the filter. Typically 'isFilterOverIxscan' is false unless
  * we are generating a filter over an index scan.
  *
- * If the caller sets 'isFilterOverIxscan' to true, then the caller must also provide a vector of
- * key field names ('keyFields') that lists the names of all the kField slots that are needed by
- * 'root'.
- *
  * This function returns an SbExpr. If 'root' is an AND with no children, this function will
  * return a null SbExpr to indicate that there is no filter condition.
  */
@@ -67,7 +63,6 @@ SbExpr generateFilter(StageBuilderState& state,
                       const MatchExpression* root,
                       boost::optional<SbSlot> inputSlot,
                       const PlanStageSlots& slots,
-                      const std::vector<std::string>& keyFields = {},
                       bool isFilterOverIxscan = false);
 
 /**

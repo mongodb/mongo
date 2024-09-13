@@ -112,134 +112,9 @@ std::unique_ptr<sbe::EExpression> makeBinaryOp(sbe::EPrimBinary::Op binaryOp,
                                                StageBuilderState& state);
 
 /**
- * Generates an EExpression that checks if the input expression is null or missing.
- */
-std::unique_ptr<sbe::EExpression> generateNullOrMissing(const sbe::EVariable& var);
-
-std::unique_ptr<sbe::EExpression> generateNullOrMissing(sbe::FrameId frameId,
-                                                        sbe::value::SlotId slotId);
-
-std::unique_ptr<sbe::EExpression> generateNullOrMissing(std::unique_ptr<sbe::EExpression> arg);
-
-/**
  * Generates an EExpression that checks if the input expression is null, missing, or undefined.
  */
 std::unique_ptr<sbe::EExpression> generateNullMissingOrUndefined(const sbe::EVariable& var);
-
-std::unique_ptr<sbe::EExpression> generateNullMissingOrUndefined(sbe::FrameId frameId,
-                                                                 sbe::value::SlotId slotId);
-
-std::unique_ptr<sbe::EExpression> generateNullMissingOrUndefined(
-    std::unique_ptr<sbe::EExpression> arg);
-
-/**
- * Generates an EExpression that checks if the input expression is a non-numeric type _assuming
- * that_ it has already been verified to be neither null nor missing.
- */
-std::unique_ptr<sbe::EExpression> generateNonNumericCheck(const sbe::EVariable& var);
-
-/**
- * Generates an EExpression that checks if the input expression is the value NumberLong(-2^64).
- */
-std::unique_ptr<sbe::EExpression> generateLongLongMinCheck(const sbe::EVariable& var);
-
-/**
- * Generates an EExpression that checks if the input expression is NaN _assuming that_ it has
- * already been verified to be numeric.
- */
-std::unique_ptr<sbe::EExpression> generateNaNCheck(const sbe::EVariable& var);
-
-/**
- * Generates an EExpression that checks if the input expression is a numeric Infinity.
- */
-std::unique_ptr<sbe::EExpression> generateInfinityCheck(const sbe::EVariable& var);
-
-/**
- * Generates an EExpression that checks if the input expression is a non-positive number (i.e. <= 0)
- * _assuming that_ it has already been verified to be numeric.
- */
-std::unique_ptr<sbe::EExpression> generateNonPositiveCheck(const sbe::EVariable& var);
-
-/**
- * Generates an EExpression that checks if the input expression is a positive number (i.e. > 0)
- * _assuming that_ it has already been verified to be numeric.
- */
-std::unique_ptr<sbe::EExpression> generatePositiveCheck(const sbe::EVariable& var);
-
-/**
- * Generates an EExpression that checks if the input expression is a negative (i.e., < 0) number
- * _assuming that_ it has already been verified to be numeric.
- */
-std::unique_ptr<sbe::EExpression> generateNegativeCheck(const sbe::EVariable& var);
-
-/**
- * Generates an EExpression that checks if the input expression is _not_ an object, _assuming that_
- * it has already been verified to be neither null nor missing.
- */
-std::unique_ptr<sbe::EExpression> generateNonObjectCheck(const sbe::EVariable& var);
-
-/**
- * Generates an EExpression that checks if the input expression is not a string, _assuming that
- * it has already been verified to be neither null nor missing.
- */
-std::unique_ptr<sbe::EExpression> generateNonStringCheck(const sbe::EVariable& var);
-
-/**
- * Generates an EExpression that checks whether the input expression is null, missing, or
- * unable to be converted to the type NumberInt32.
- */
-std::unique_ptr<sbe::EExpression> generateNullishOrNotRepresentableInt32Check(
-    const sbe::EVariable& var);
-
-std::unique_ptr<sbe::EExpression> generateNonTimestampCheck(const sbe::EVariable& var);
-
-/**
- * A pair representing a 1) true/false condition and 2) the value that should be returned if that
- * condition evaluates to true.
- */
-using CaseValuePair =
-    std::pair<std::unique_ptr<sbe::EExpression>, std::unique_ptr<sbe::EExpression>>;
-
-/**
- * Convert a list of CaseValuePairs into a chain of EIf expressions, with the final else case
- * evaluating to the 'defaultValue' EExpression.
- */
-template <typename... Ts>
-std::unique_ptr<sbe::EExpression> buildMultiBranchConditional(Ts... cases);
-
-template <typename... Ts>
-std::unique_ptr<sbe::EExpression> buildMultiBranchConditional(CaseValuePair headCase, Ts... rest) {
-    return sbe::makeE<sbe::EIf>(std::move(headCase.first),
-                                std::move(headCase.second),
-                                buildMultiBranchConditional(std::move(rest)...));
-}
-
-template <>
-std::unique_ptr<sbe::EExpression> buildMultiBranchConditional(
-    std::unique_ptr<sbe::EExpression> defaultCase);
-
-/**
- * Converts a std::vector of CaseValuePairs into a chain of EIf expressions in the same manner as
- * the 'buildMultiBranchConditional()' function.
- */
-std::unique_ptr<sbe::EExpression> buildMultiBranchConditionalFromCaseValuePairs(
-    std::vector<CaseValuePair> caseValuePairs, std::unique_ptr<sbe::EExpression> defaultValue);
-
-/**
- * Create tree consisting of coscan stage followed by limit stage.
- */
-std::unique_ptr<sbe::PlanStage> makeLimitCoScanTree(PlanNodeId planNodeId, long long limit = 1);
-
-std::unique_ptr<sbe::EExpression> makeFillEmpty(std::unique_ptr<sbe::EExpression> expr,
-                                                std::unique_ptr<sbe::EExpression> altExpr);
-
-/**
- * Check if expression returns Nothing and return boolean false if so. Otherwise, return the
- * expression.
- */
-std::unique_ptr<sbe::EExpression> makeFillEmptyFalse(std::unique_ptr<sbe::EExpression> e);
-
-std::unique_ptr<sbe::EExpression> makeFillEmptyTrue(std::unique_ptr<sbe::EExpression> e);
 
 /**
  * Creates an EFunction expression with the given name and arguments.
@@ -301,17 +176,6 @@ inline auto makeFail(int code, StringData errorMessage) {
     return sbe::makeE<sbe::EFail>(ErrorCodes::Error{code}, errorMessage);
 }
 
-/**
- * Check if expression returns Nothing and return null if so. Otherwise, return the expression.
- */
-std::unique_ptr<sbe::EExpression> makeFillEmptyNull(std::unique_ptr<sbe::EExpression> e);
-
-/**
- * Check if expression returns Nothing and return bsonUndefined if so. Otherwise, return the
- * expression.
- */
-std::unique_ptr<sbe::EExpression> makeFillEmptyUndefined(std::unique_ptr<sbe::EExpression> e);
-
 SbExpr makeNewBsonObject(StageBuilderState& state,
                          std::vector<std::string> projectFields,
                          SbExpr::Vector projectValues);
@@ -325,14 +189,6 @@ SbExpr makeShardKeyFunctionForPersistedDocuments(StageBuilderState& state,
                                                  const std::vector<sbe::MatchPath>& shardKeyPaths,
                                                  const std::vector<bool>& shardKeyHashed,
                                                  const PlanStageSlots& slots);
-
-SbStage makeProject(SbStage stage, sbe::SlotExprPairVector projects, PlanNodeId nodeId);
-
-template <typename... Ts>
-SbStage makeProject(SbStage stage, PlanNodeId nodeId, Ts&&... pack) {
-    return makeProject(
-        std::move(stage), sbe::makeSlotExprPairVec(std::forward<Ts>(pack)...), nodeId);
-}
 
 std::unique_ptr<sbe::EExpression> makeIf(std::unique_ptr<sbe::EExpression> condExpr,
                                          std::unique_ptr<sbe::EExpression> thenExpr,
@@ -463,8 +319,8 @@ std::unique_ptr<sbe::SortSpec> makeSortSpecFromSortPattern(const SortPattern& so
 std::unique_ptr<sbe::SortSpec> makeSortSpecFromSortPattern(
     const boost::optional<SortPattern>& sortPattern);
 
-std::tuple<std::unique_ptr<sbe::PlanStage>, SbSlot, SbSlot, SbSlotVector> makeLoopJoinForFetch(
-    std::unique_ptr<sbe::PlanStage> inputStage,
+std::tuple<SbStage, SbSlot, SbSlot, SbSlotVector> makeLoopJoinForFetch(
+    SbStage inputStage,
     std::vector<std::string> fields,
     SbSlot seekRecordIdSlot,
     SbSlot snapshotIdSlot,
@@ -1118,14 +974,13 @@ std::vector<ProjectNode> cloneProjectNodes(const std::vector<ProjectNode>& nodes
  *
  * The order of slots in 'outSlots' will match the order of field paths in 'fields'.
  */
-std::pair<std::unique_ptr<sbe::PlanStage>, SbSlotVector> projectFieldsToSlots(
-    std::unique_ptr<sbe::PlanStage> stage,
-    const std::vector<std::string>& fields,
-    boost::optional<SbSlot> resultSlot,
-    PlanNodeId nodeId,
-    sbe::value::SlotIdGenerator* slotIdGenerator,
-    StageBuilderState& state,
-    const PlanStageSlots* slots = nullptr);
+std::pair<SbStage, SbSlotVector> projectFieldsToSlots(SbStage stage,
+                                                      const std::vector<std::string>& fields,
+                                                      boost::optional<SbSlot> resultSlot,
+                                                      PlanNodeId nodeId,
+                                                      sbe::value::SlotIdGenerator* slotIdGenerator,
+                                                      StageBuilderState& state,
+                                                      const PlanStageSlots* slots = nullptr);
 
 template <typename T>
 inline StringData getTopLevelField(const T& path) {
