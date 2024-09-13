@@ -1,5 +1,5 @@
-# Based on the concurrency_sharded_with_stepdowns_and_balancer suite. This suite
-# runs continuous config transitions in the background.
+# Based on the concurrency_sharded_replication_with_balancer_and_config_transitions.
+# This suite runs continuous config transitions and chunk migrations in the background.
 config_variables:
   - &movePrimaryComment continuousConfigShardTransitionMovePrimary
 
@@ -12,15 +12,6 @@ selector:
   exclude_files:
     # SERVER-14669 Multi-removes that use $where miscount removed documents
     - jstests/concurrency/fsm_workloads/query/remove/remove_where.js
-
-    # Disabled because MapReduce can lose cursors if the primary steps down during the operation.
-    - jstests/concurrency/fsm_workloads/query/map_reduce/map_reduce_inline.js
-    - jstests/concurrency/fsm_workloads/query/map_reduce/map_reduce_interrupt.js
-    - jstests/concurrency/fsm_workloads/query/map_reduce/map_reduce_merge.js
-    - jstests/concurrency/fsm_workloads/query/map_reduce/map_reduce_reduce.js
-    - jstests/concurrency/fsm_workloads/query/map_reduce/map_reduce_replace.js
-    - jstests/concurrency/fsm_workloads/query/map_reduce/map_reduce_replace_nonexistent.js
-    - jstests/concurrency/fsm_workloads/query/map_reduce/map_reduce_replace_remove.js
 
     # Disabled due to MongoDB restrictions and/or workload restrictions
 
@@ -49,10 +40,39 @@ selector:
     # cannot createIndex after dropDatabase without sharding first
     - jstests/concurrency/fsm_workloads/query/plan_cache_drop_database.js
 
+    # The WTWriteConflictException failpoint is not supported on mongos.
+    - jstests/concurrency/fsm_workloads/collmod_writeconflict.js
+
     # SERVER-20361 Improve the behaviour of multi-update/delete against a sharded collection
     - jstests/concurrency/fsm_workloads/query/update/update_where.js
 
+    # TODO Undenylist (SERVER-38852).
+    - jstests/concurrency/fsm_workloads/query/agg/agg_out_interrupt_cleanup.js
+    - jstests/concurrency/fsm_workloads/query/timeseries/timeseries_agg_out_interrupt_cleanup.js
+
+    # serverStatus does not include transaction metrics on mongos.
+    - jstests/concurrency/fsm_workloads/multi_statement_transaction_atomicity_isolation_metrics_test.js
+
+    # Uses the same transaction id across different routers, which is not allowed because when either
+    # router tries to commit, it may not know the full participant list.
+    - jstests/concurrency/fsm_workloads/multi_statement_transaction_all_commands_same_session.js
+
+    ##
+    # Denylists from concurrency_sharded_kill_primary_with_balancer
+    ##
+
+    # Disabled because MapReduce can lose cursors if the primary goes down during the operation.
+    - jstests/concurrency/fsm_workloads/query/map_reduce/map_reduce_drop.js
+    - jstests/concurrency/fsm_workloads/query/map_reduce/map_reduce_inline.js
+    - jstests/concurrency/fsm_workloads/query/map_reduce/map_reduce_interrupt.js
+    - jstests/concurrency/fsm_workloads/query/map_reduce/map_reduce_merge.js
+    - jstests/concurrency/fsm_workloads/query/map_reduce/map_reduce_reduce.js
+    - jstests/concurrency/fsm_workloads/query/map_reduce/map_reduce_replace.js
+    - jstests/concurrency/fsm_workloads/query/map_reduce/map_reduce_replace_nonexistent.js
+    - jstests/concurrency/fsm_workloads/query/map_reduce/map_reduce_replace_remove.js
+
     # ChunkHelper directly talks to the config servers and doesn't support retries for network errors
+    - jstests/concurrency/fsm_workloads/cleanupOrphanedWhileMigrating.js
     - jstests/concurrency/fsm_workloads/sharded_base_partitioned.js
     - jstests/concurrency/fsm_workloads/sharded_mergeChunks_partitioned.js
     - jstests/concurrency/fsm_workloads/sharded_moveChunk_partitioned.js
@@ -77,7 +97,6 @@ selector:
     - jstests/concurrency/fsm_workloads/query/agg/agg_sort.js
     - jstests/concurrency/fsm_workloads/collmod.js
     - jstests/concurrency/fsm_workloads/collmod_separate_collections.js
-    - jstests/concurrency/fsm_workloads/collmod_writeconflict.js
     - jstests/concurrency/fsm_workloads/query/agg/agg_out_interrupt_cleanup.js
     - jstests/concurrency/fsm_workloads/query/timeseries/timeseries_agg_out_interrupt_cleanup.js
     - jstests/concurrency/fsm_workloads/query/invalidated_cursors.js
@@ -86,33 +105,21 @@ selector:
     - jstests/concurrency/fsm_workloads/view_catalog_cycle_lookup.js
     - jstests/concurrency/fsm_workloads/view_catalog_cycle_with_drop.js
 
+    # The aggregation stage $currentOp cannot run with a readConcern other than 'local'.
+    - jstests/concurrency/fsm_workloads/multi_statement_transaction_current_op.js
+
     # The auto_retry_on_network_error.js override needs to overwrite the response from drop on
     # NamespaceNotFound, and since this workload only creates and drops collections there isn't
     # much value in running it.
     - jstests/concurrency/fsm_workloads/drop_collection.js
 
-    # serverStatus does not include transaction metrics on mongos.
-    - jstests/concurrency/fsm_workloads/multi_statement_transaction_atomicity_isolation_metrics_test.js
-
-    # Uses the same transaction id across different routers, which is not allowed because when either
-    # router tries to commit, it may not know the full participant list.
-    - jstests/concurrency/fsm_workloads/multi_statement_transaction_all_commands_same_session.js
-
     # Use non-retryable commands not allowed by the network retry helper.
     - jstests/concurrency/fsm_workloads/snapshot_read_kill_op_only.js
     - jstests/concurrency/fsm_workloads/snapshot_read_kill_operations.js
 
-    # The test may spuriously fail when run against sharded clusters, due to limitations of the
-    # infrastructure. See SERVER-77039 for full details.
-    - jstests/concurrency/fsm_workloads/query/map_reduce/map_reduce_drop.js
-
     # This test runs a large number of inserts, which can cause moveCollection to take a long time
     # to finish. This can cause the CheckMetadataConsistency hook to hit LockBusy errors.
     - jstests/concurrency/fsm_workloads/timeseries_insert_idle_bucket_expiration.js
-
-    # Exclude tests that run cleanupOrphaned, which can fail running on a config shard if a
-    # concurrent migration fails due to the config shard transitioning to dedicated.
-    - jstests/concurrency/fsm_workloads/cleanupOrphanedWhileMigrating.js
 
   exclude_with_any_tags:
     - assumes_against_mongod_not_mongos
@@ -149,17 +156,19 @@ executor:
         TestData:
           runningWithConfigStepdowns: true
           runningWithShardStepdowns: true
+          killShards: true
           useActionPermittedFile: true
           runningWithBalancer: true
           shardsAddedRemoved: true
           shardCollectionProbability: 0.5
           fsmPreOverridesLoadedCallback: import("jstests/libs/override_methods/implicitly_retry_on_migration_in_progress.js");
-
   hooks:
     - class: ContinuousStepdown
       config_stepdown: true
       shard_stepdown: true
       use_action_permitted_file: true
+      kill: true
+      randomize_kill: true
     - class: ContinuousAddRemoveShard
       transition_configsvr: true
       move_primary_comment: *movePrimaryComment
@@ -173,6 +182,10 @@ executor:
     - class: CheckOrphansDeleted
     - class: CheckRoutingTableConsistency
     - class: ValidateCollections # Validation can interfere with other operations, so this goes last.
+      shell_options:
+        global_vars:
+          TestData:
+            skipEnforceFastCountOnValidate: true
     - class: CleanupConcurrencyWorkloads
   fixture:
     class: ShardedClusterFixture
@@ -220,10 +233,8 @@ executor:
           data:
             comment: *movePrimaryComment
           mode: alwaysOn
-        # Delay orphan cleanup to get around SERVER-87673.
-        # Choose a setting lower than continuous stepdown interval to get around SERVER-90242.
-        orphanCleanupDelaySecs: 5
     num_rs_nodes_per_shard: 3
+    # Use 3 shards so there's always at least two for workloads with manual migrations, etc.
     num_shards: 3
     num_mongos: 2
     enable_balancer: true

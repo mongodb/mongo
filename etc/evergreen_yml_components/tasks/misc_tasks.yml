@@ -53,7 +53,7 @@ variables:
 ################################################
 tasks:
   - <<: *antithesis_task_template
-    name: antithesis_concurrency_sharded_with_stepdowns_and_balancer_and_config_transitions
+    name: antithesis_concurrency_sharded_stepdown_terminate_kill_primary_with_balancer_and_config_transitions
     tags:
       [
         "assigned_to_jira_team_devprod_correctness",
@@ -65,24 +65,7 @@ tasks:
       - func: "do setup for antithesis"
       - func: "antithesis image build and push"
         vars:
-          suite: concurrency_sharded_with_stepdowns_and_balancer_and_config_transitions
-          resmoke_args: >-
-            --runAllFeatureFlagTests
-
-  - <<: *antithesis_task_template
-    name: antithesis_concurrency_sharded_kill_primary_with_balancer_and_config_transitions
-    tags:
-      [
-        "assigned_to_jira_team_devprod_correctness",
-        "experimental",
-        "antithesis",
-      ]
-    commands:
-      - func: "do setup"
-      - func: "do setup for antithesis"
-      - func: "antithesis image build and push"
-        vars:
-          suite: concurrency_sharded_kill_primary_with_balancer_and_config_transitions
+          suite: concurrency_sharded_stepdown_terminate_kill_primary_with_balancer_and_config_transitions
           resmoke_args: >-
             --runAllFeatureFlagTests
 

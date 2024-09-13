@@ -2232,24 +2232,6 @@ tasks:
           resmoke_jobs_max: 1
 
   - <<: *gen_task_template
-    name: concurrency_sharded_with_stepdowns_and_balancer_and_config_transitions_gen
-    tags:
-      [
-        "assigned_to_jira_team_server_catalog_and_routing",
-        "default",
-        "concurrency",
-        "large",
-        "non_live_record",
-        "sharded",
-        "no_debug_mode",
-      ]
-    commands:
-      - func: "generate resmoke tasks"
-        vars:
-          use_large_distro: "true"
-          resmoke_jobs_max: 1
-
-  - <<: *gen_task_template
     name: concurrency_sharded_multi_stmt_txn_with_balancer_and_config_transitions_gen
     tags:
       [
@@ -2269,7 +2251,7 @@ tasks:
           resmoke_jobs_max: 1
 
   - <<: *gen_task_template
-    name: concurrency_sharded_kill_primary_with_balancer_and_config_transitions_gen
+    name: concurrency_sharded_stepdown_terminate_kill_primary_with_balancer_and_config_transitions_gen
     tags:
       [
         "assigned_to_jira_team_server_catalog_and_routing",
