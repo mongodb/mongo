@@ -303,12 +303,12 @@ void BSONInfo::resolve(JSContext* cx, JS::HandleObject obj, JS::HandleId id, boo
     JSStringWrapper jsstr;
 
     auto sname = idw.toStringData(&jsstr);
+    if (sname.find('\0') != std::string::npos)
+        return;
     if (!holder->_readOnly && holder->_removed.find(sname.toString()) != holder->_removed.end())
         return;
-
-    if (!holder->_obj.hasField(sname)) {
+    if (!holder->_obj.hasField(sname))
         return;
-    }
     definePropertyFromBSONElement(cx, *holder, holder->_obj[sname], obj, id);
     *resolvedp = true;
     return;

@@ -185,6 +185,25 @@ function runBuildInvalidBsonTest() {
     }, [], "BSON field name must not contain null terminators.");
 }
 
+function runFindEmptyKeyTest() {
+    const emptyKeyObj = _buildBsonObj("_id", 0, "", 1);
+    assert.eq(true, emptyKeyObj.hasOwnProperty(""));
+    assert.eq(1, emptyKeyObj[""]);
+}
+
+// Ensure operations can't use \0 in field names. Confirm that these operations both
+// execute without error and don't change the value of emptyKeyObj.
+function runNoNullTerminatedFieldNameTest() {
+    const emptyKeyObj = _buildBsonObj("_id", 0, "", 1, "abc", 2);
+    for (const n of ["\0", "\0abc", "ab\0c", "ab\0c\0"]) {
+        let obj = emptyKeyObj;
+        assert.eq(false, obj.hasOwnProperty(n));
+        assert.eq(true, delete obj[n]);
+        // Delete should not have modified obj.
+        testObjectsAreEqual(obj, emptyKeyObj, bsonWoCompareWrapper, "bsonWoCompare");
+    }
+}
+
 // Run the tests which work the same for both comparators.
 runTests(bsonWoCompareWrapper, "bsonWoCompare");
 runTests(bsonBinaryEqual, "bsonBinaryEqual");
@@ -205,3 +224,5 @@ testObjectsAreNotEqual(NumberLong("1"), NumberDecimal("1.0"), bsonBinaryEqual, "
 runObjectEntriesTest();
 runObjectEntriesArrayTypesTest();
 runBuildInvalidBsonTest();
+runFindEmptyKeyTest();
+runNoNullTerminatedFieldNameTest();
