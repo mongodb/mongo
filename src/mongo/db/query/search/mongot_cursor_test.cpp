@@ -678,11 +678,12 @@ public:
                     "nextBatch", 304, 707, cursorId, /*expectedPrefetch*/ false);
             });
             ASSERT_EQUALS(tec->getNext(opCtx.get()).value()["x"].Int(), 304);
+            responseSchedulerThread.join();
+
             // Assert the pre-fetched GetMore was recevied.
             ASSERT_TRUE(tryWaitUntilReadyRequests());
             // Black hole the pre-fetched fourth batch since it won't be necessary.
             blackHoleNextOutgoingRequest();
-            responseSchedulerThread.join();
         });
     }
 
