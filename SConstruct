@@ -1176,12 +1176,6 @@ env_vars.Add(
     default="",
 )
 
-env_vars.Add(
-    "ENTERPRISE_REV",
-    help="Base git revision of enterprise modules",
-    default="",
-)
-
 # Note: This probably is only really meaningful when configured via a variables file. It will
 # also override whatever the SCons platform defaults would be.
 env_vars.Add(
@@ -6146,7 +6140,7 @@ if get_option("lint-scope") == "changed":
             "buildscripts/clang_format.py",
             patch_file,
         ],
-        action="REVISION=$REVISION ENTERPRISE_REV=$ENTERPRISE_REV $PYTHON ${SOURCES[0]} lint-git-diff",
+        action="REVISION=$REVISION $PYTHON ${SOURCES[0]} lint-git-diff",
     )
 
     eslint = env.Command(
@@ -6155,7 +6149,7 @@ if get_option("lint-scope") == "changed":
             "buildscripts/eslint.py",
             patch_file,
         ],
-        action="REVISION=$REVISION ENTERPRISE_REV=$ENTERPRISE_REV $PYTHON ${SOURCES[0]} lint-git-diff",
+        action="REVISION=$REVISION $PYTHON ${SOURCES[0]} lint-git-diff",
     )
 
 else:

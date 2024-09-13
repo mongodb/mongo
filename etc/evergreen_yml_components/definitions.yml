@@ -1582,8 +1582,7 @@ functions:
       params:
         binary: bash
         args:
-          - "src/evergreen/run_python_script.sh"
-          - "evergreen/lint_fuzzer_sanity_patch.py"
+          - "src/evergreen/lint_fuzzer_sanity_patch.sh"
 
   "lint fuzzer sanity all":
     - *f_expansions_write
