@@ -10,7 +10,7 @@
  * ]
  */
 
-import {_copyFileHelper, openBackupCursor} from "jstests/libs/backup_utils.js";
+import {copyFileHelper, openBackupCursor} from "jstests/libs/backup_utils.js";
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {
     checkHealthLog,
@@ -95,7 +95,7 @@ jsTestLog("Backup cursor metadata document: " + tojson(backupCursor.next()));
 while (backupCursor.hasNext()) {
     let doc = backupCursor.next();
     jsTestLog("Copying for backup: " + tojson(doc));
-    _copyFileHelper({filename: doc.filename, fileSize: doc.fileSize}, primary.dbpath, backupDbPath);
+    copyFileHelper({filename: doc.filename, fileSize: doc.fileSize}, primary.dbpath, backupDbPath);
 }
 
 backupCursor.close();

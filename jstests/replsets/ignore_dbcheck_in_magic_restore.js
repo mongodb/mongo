@@ -4,7 +4,8 @@
  * @tags: [
  *     requires_persistence,
  *     requires_wiredtiger,
- *     featureFlagSecondaryIndexChecksInDbCheck
+ *     featureFlagSecondaryIndexChecksInDbCheck,
+ *     incompatible_with_windows_tls
  * ]
  */
 
@@ -18,12 +19,6 @@ import {
     resetAndInsert,
     runDbCheck
 } from "jstests/replsets/libs/dbcheck_utils.js";
-
-// TODO SERVER-86034: Run on Windows machines once named pipe related failures are resolved.
-if (_isWindows()) {
-    jsTestLog("Temporarily skipping test for Windows variants. See SERVER-86034.");
-    quit();
-}
 
 // TODO SERVER-87225: Enable fast count on validate when operations applied during a restore are
 // counted correctly.
@@ -52,14 +47,14 @@ assert.commandWorked(sourceDb.runCommand({
     indexes: [{key: {a: 1}, name: 'a_1'}],
 }));
 assert.eq(sourceColl.find({}).count(), nDocs);
-const skipUnindexingDocumentWhenDeletedPrimary =
-    configureFailPoint(sourceDb, "skipUnindexingDocumentWhenDeleted", {indexName: "a_1"});
+configureFailPoint(sourceDb, "skipUnindexingDocumentWhenDeleted", {indexName: "a_1"});
+
 jsTestLog("Deleting docs");
 assert.commandWorked(sourceColl.deleteMany({}));
 assert.eq(sourceColl.find({}).count(), 0);
 
-const magicRestoreTest = new magicRestoreTest(
-    {backupSource: sourcePrimary, pipeDir: MongoRunner.dataDir, insertHigherTermOplogEntry: true});
+const magicRestoreTest = new MagicRestoreTest(
+    {rst: sourceCluster, pipeDir: MongoRunner.dataDir, insertHigherTermOplogEntry: true});
 
 magicRestoreTest.takeCheckpointAndOpenBackup();
 
@@ -86,7 +81,7 @@ let {lastOplogEntryTs, entriesAfterBackup} = magicRestoreTest.getEntriesAfterBac
 
 magicRestoreTest.copyFilesAndCloseBackup();
 
-let expectedConfig = assert.commandWorked(sourcePrimary.adminCommand({replSetGetConfig: 1})).config;
+let expectedConfig = magicRestoreTest.getExpectedConfig();
 // The new node will be allocated a new port by the test fixture.
 expectedConfig.members[0].host = getHostName() + ":" + (Number(sourcePrimary.port) + 2);
 let restoreConfiguration = {
