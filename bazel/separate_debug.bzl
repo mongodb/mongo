@@ -501,3 +501,35 @@ extract_debuginfo_binary = rule(
     fragments = ["cpp"],
     executable = True,
 )
+
+extract_debuginfo_test = rule(
+    extract_debuginfo_impl,
+    attrs = {
+        "binary_with_debug": attr.label(
+            doc = "The the binary to extract debuginfo from.",
+            allow_files = True,
+        ),
+        "type": attr.string(
+            doc = "Set to either 'library' or 'program' to discern how to extract the info.",
+        ),
+        "enabled": attr.bool(default = False, doc = "Flag to enable/disable separate debug generation."),
+        "deps": attr.label_list(providers = [CcInfo]),
+        "cc_shared_library": attr.label(
+            doc = "If extracting from a shared library, the target of the cc_shared_library. Otherwise empty.",
+            allow_files = True,
+        ),
+        "shared_archive": attr.label(
+            doc = "If generating a shared archive(.so.a/.dll.lib), the shared archive's cc_library. Otherwise empty.",
+            allow_files = True,
+        ),
+        "_cc_toolchain": attr.label(default = "@bazel_tools//tools/cpp:current_cc_toolchain"),
+        "_linux_constraint": attr.label(default = "@platforms//os:linux"),
+        "_macos_constraint": attr.label(default = "@platforms//os:macos"),
+        "_windows_constraint": attr.label(default = "@platforms//os:windows"),
+    },
+    doc = "Extract debuginfo into a separate file",
+    toolchains = ["@bazel_tools//tools/cpp:toolchain_type"],
+    fragments = ["cpp"],
+    executable = True,
+    test = True,
+)

@@ -18,6 +18,7 @@ load(
     "WITH_DEBUG_SUFFIX",
     "extract_debuginfo",
     "extract_debuginfo_binary",
+    "extract_debuginfo_test",
 )
 
 # https://learn.microsoft.com/en-us/cpp/build/reference/md-mt-ld-use-run-time-library?view=msvc-170
@@ -1572,7 +1573,7 @@ def mongo_cc_library(
         deps = deps + [name + HEADER_DEP_SUFFIX],
     )
 
-def mongo_cc_binary(
+def _mongo_cc_binary_and_program(
         name,
         srcs = [],
         deps = [],
@@ -1589,35 +1590,8 @@ def mongo_cc_binary(
         target_compatible_with = [],
         defines = [],
         additional_linker_inputs = [],
-        features = []):
-    """Wrapper around cc_binary.
-
-    Args:
-      name: The name of the library the target is compiling.
-      srcs: The source files to build.
-      deps: The targets the library depends on.
-      header_deps: The targets the library depends on only for headers, omits
-        linking.
-      testonly: Whether or not the target is purely for tests.
-      visibility: The visibility of the target library.
-      data: Data targets the library depends on.
-      tags: Tags to add to the rule.
-      copts: Any extra compiler options to pass in.
-      linkopts: Any extra link options to pass in.
-      includes: Any directory which should be exported to dependents, will be
-        prefixed with the package path
-      linkstatic: Whether or not linkstatic should be passed to the native bazel
-        cc_test rule. This argument is currently not supported. The mongo build
-        must link entirely statically or entirely dynamically. This can be
-        configured via //config/bazel:linkstatic.
-      local_defines: macro definitions passed to all source and header files.
-      defines: macro definitions added to the compile line when building any
-        source in this target, as well as the compile line of targets that
-        depend on this.
-      additional_linker_inputs: Any additional files that you may want to pass
-        to the linker, for example, linker scripts.
-    """
-
+        features = [],
+        _program_type = ""):
     if linkstatic == True:
         fail("""Linking specific targets statically is not supported.
         The mongo build must link entirely statically or entirely dynamically.
@@ -1663,40 +1637,184 @@ def mongo_cc_binary(
         name = name + HEADER_DEP_SUFFIX,
         header_deps = header_deps,
     )
-    cc_binary(
-        name = name + WITH_DEBUG_SUFFIX,
-        srcs = srcs + fincludes_hdr + MONGO_GLOBAL_ACCESSIBLE_HEADERS + SANITIZER_DENYLIST_HEADERS,
-        deps = all_deps + [name + HEADER_DEP_SUFFIX],
-        visibility = visibility,
-        testonly = testonly,
-        copts = MONGO_GLOBAL_COPTS + package_specific_copts + copts + fincludes_copt,
-        data = data,
-        tags = tags,
-        linkopts = MONGO_GLOBAL_LINKFLAGS + package_specific_linkflags + linkopts + rpath_flags,
-        linkstatic = LINKSTATIC_ENABLED,
-        local_defines = MONGO_GLOBAL_DEFINES + local_defines,
-        defines = defines,
-        includes = includes,
-        features = MONGO_GLOBAL_FEATURES + ["pie"] + features + select({
+
+    args = {
+        "name": name + WITH_DEBUG_SUFFIX,
+        "srcs": srcs + fincludes_hdr + MONGO_GLOBAL_ACCESSIBLE_HEADERS + SANITIZER_DENYLIST_HEADERS,
+        "deps": all_deps + [name + HEADER_DEP_SUFFIX],
+        "visibility": visibility,
+        "testonly": testonly,
+        "copts": MONGO_GLOBAL_COPTS + package_specific_copts + copts + fincludes_copt,
+        "data": data,
+        "tags": tags,
+        "linkopts": MONGO_GLOBAL_LINKFLAGS + package_specific_linkflags + linkopts + rpath_flags,
+        "linkstatic": LINKSTATIC_ENABLED,
+        "local_defines": MONGO_GLOBAL_DEFINES + local_defines,
+        "defines": defines,
+        "includes": includes,
+        "features": MONGO_GLOBAL_FEATURES + ["pie"] + features + select({
             "@platforms//os:windows": ["generate_pdb_file"],
             "//conditions:default": [],
         }),
-        dynamic_deps = select({
+        "dynamic_deps": select({
             "//bazel/config:linkstatic_disabled": deps,
             "//conditions:default": [],
         }),
-        target_compatible_with = target_compatible_with + enterprise_compatible,
-        additional_linker_inputs = additional_linker_inputs + MONGO_GLOBAL_ADDITIONAL_LINKER_INPUTS,
+        "target_compatible_with": target_compatible_with + enterprise_compatible,
+        "additional_linker_inputs": additional_linker_inputs + MONGO_GLOBAL_ADDITIONAL_LINKER_INPUTS,
+    }
+
+    if _program_type == "binary":
+        cc_binary(**args)
+        extract_debuginfo_binary(
+            name = name,
+            binary_with_debug = ":" + name + WITH_DEBUG_SUFFIX,
+            type = "program",
+            tags = tags,
+            enabled = SEPARATE_DEBUG_ENABLED,
+            deps = all_deps,
+            visibility = visibility,
+        )
+    else:
+        native.cc_test(**args)
+        extract_debuginfo_test(
+            name = name,
+            binary_with_debug = ":" + name + WITH_DEBUG_SUFFIX,
+            type = "program",
+            tags = tags,
+            enabled = SEPARATE_DEBUG_ENABLED,
+            deps = all_deps,
+            visibility = visibility,
+        )
+
+def mongo_cc_binary(
+        name,
+        srcs = [],
+        deps = [],
+        header_deps = [],
+        testonly = False,
+        visibility = None,
+        data = [],
+        tags = [],
+        copts = [],
+        linkopts = [],
+        includes = [],
+        linkstatic = False,
+        local_defines = [],
+        target_compatible_with = [],
+        defines = [],
+        additional_linker_inputs = [],
+        features = []):
+    """Wrapper around cc_binary.
+
+    Args:
+      name: The name of the library the target is compiling.
+      srcs: The source files to build.
+      deps: The targets the library depends on.
+      header_deps: The targets the library depends on only for headers, omits
+        linking.
+      testonly: Whether or not the target is purely for tests.
+      visibility: The visibility of the target library.
+      data: Data targets the library depends on.
+      tags: Tags to add to the rule.
+      copts: Any extra compiler options to pass in.
+      linkopts: Any extra link options to pass in.
+      includes: Any directory which should be exported to dependents, will be
+        prefixed with the package path
+      linkstatic: Whether or not linkstatic should be passed to the native bazel
+        cc_test rule. This argument is currently not supported. The mongo build
+        must link entirely statically or entirely dynamically. This can be
+        configured via //config/bazel:linkstatic.
+      local_defines: macro definitions passed to all source and header files.
+      defines: macro definitions added to the compile line when building any
+        source in this target, as well as the compile line of targets that
+        depend on this.
+      additional_linker_inputs: Any additional files that you may want to pass
+        to the linker, for example, linker scripts.
+    """
+    _mongo_cc_binary_and_program(
+        name,
+        srcs,
+        deps,
+        header_deps,
+        testonly,
+        visibility,
+        data,
+        tags,
+        copts,
+        linkopts,
+        includes,
+        linkstatic,
+        local_defines,
+        target_compatible_with,
+        defines,
+        additional_linker_inputs,
+        features,
+        _program_type = "binary",
     )
 
-    extract_debuginfo_binary(
-        name = name,
-        binary_with_debug = ":" + name + WITH_DEBUG_SUFFIX,
-        type = "program",
-        tags = tags,
-        enabled = SEPARATE_DEBUG_ENABLED,
-        deps = all_deps,
-        visibility = visibility,
+def mongo_cc_test(
+        name,
+        srcs = [],
+        deps = [],
+        header_deps = [],
+        visibility = None,
+        data = [],
+        tags = [],
+        copts = [],
+        linkopts = [],
+        includes = [],
+        linkstatic = False,
+        local_defines = [],
+        target_compatible_with = [],
+        defines = [],
+        additional_linker_inputs = [],
+        features = []):
+    """Wrapper around cc_test.
+
+    Args:
+      name: The name of the test target.
+      srcs: The source files to build.
+      deps: The targets the library depends on.
+      header_deps: The targets the library depends on only for headers, omits
+        linking.
+      visibility: The visibility of the target library.
+      data: Data targets the library depends on.
+      tags: Tags to add to the rule.
+      copts: Any extra compiler options to pass in.
+      linkopts: Any extra link options to pass in.
+      includes: Any directory which should be exported to dependents, will be
+        prefixed with the package path
+      linkstatic: Whether or not linkstatic should be passed to the native bazel
+        cc_test rule. This argument is currently not supported. The mongo build
+        must link entirely statically or entirely dynamically. This can be
+        configured via //config/bazel:linkstatic.
+      local_defines: macro definitions passed to all source and header files.
+      defines: macro definitions added to the compile line when building any
+        source in this target, as well as the compile line of targets that
+        depend on this.
+      additional_linker_inputs: Any additional files that you may want to pass
+        to the linker, for example, linker scripts.
+    """
+    _mongo_cc_binary_and_program(
+        name,
+        srcs,
+        deps,
+        header_deps,
+        True,
+        visibility,
+        data,
+        tags,
+        copts,
+        linkopts,
+        includes,
+        linkstatic,
+        local_defines,
+        target_compatible_with,
+        defines,
+        additional_linker_inputs,
+        features,
+        _program_type = "test",
     )
 
 IdlInfo = provider(
