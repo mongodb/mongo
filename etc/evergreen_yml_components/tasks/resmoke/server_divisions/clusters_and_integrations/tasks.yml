@@ -2362,24 +2362,6 @@ tasks:
           resmoke_jobs_max: 1
 
   - <<: *gen_task_template
-    name: concurrency_sharded_multi_stmt_txn_with_stepdowns_gen
-    tags:
-      [
-        "assigned_to_jira_team_server_catalog_and_routing",
-        "default",
-        "incompatible_debug_mode",
-        "concurrency",
-        "stepdowns",
-        "large",
-        "sharded",
-      ]
-    commands:
-      - func: "generate resmoke tasks"
-        vars:
-          use_large_distro: "true"
-          resmoke_jobs_max: 1
-
-  - <<: *gen_task_template
     name: concurrency_sharded_with_auto_bootstrap_gen
     tags:
       [

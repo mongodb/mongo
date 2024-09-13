@@ -28,6 +28,7 @@ class TestStepdownThread(unittest.TestCase):
             stepdown_interval_secs=8,
             terminate=False,
             kill=False,
+            randomize_kill=False,
             stepdown_lifecycle=lifecycle_interface.FlagBasedThreadLifecycle(),
             background_reconfig=False,
             fixture=shardcluster_fixture,
