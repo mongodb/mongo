@@ -1042,6 +1042,9 @@ function txnRetryOverrideBody(conn, dbName, cmdName, cmdObj, lsid, clientFunctio
         }
     }
 
+    // Stringified reason why the retries were aborted or not continued.
+    let retryFailureReason;
+
     // On failure of a single request within a transaction, retry the entire transaction.
     // This involves re-playing all preceding requests in the transaction.
     // Note that commits/aborts may be individually retried by networkRunCommandOverride,
@@ -1082,6 +1085,7 @@ function txnRetryOverrideBody(conn, dbName, cmdName, cmdObj, lsid, clientFunctio
         }
 
         if (!shouldRetryTxn(cmdName, cmdObj, res)) {
+            retryFailureReason = `Intentionally not retrying transaction`;
             break;
         }
         if (!isCommitOrAbort(cmdName)) {
@@ -1094,6 +1098,13 @@ function txnRetryOverrideBody(conn, dbName, cmdName, cmdObj, lsid, clientFunctio
             } catch (e) {
             }
         }
+    }
+
+    if (retryTracker.timeoutExceeded) {
+        retryFailureReason = `Retry timeout of ${retryTracker.timeout} ms exceeded`;
+    }
+    if (retryFailureReason) {
+        logMsgFull(`Retrying of transaction stopped: ${retryFailureReason}`);
     }
     return res.unwrap();
 }

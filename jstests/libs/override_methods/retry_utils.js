@@ -88,12 +88,14 @@ export class RetryTracker {
         this.retries = 0;
         this.timeout = timeout;
         this.startTime = Date.now();
+        this.timeoutExceeded = false;
     }
 
     * [Symbol.iterator]() {
         while (true) {
             let elapsed = Date.now() - this.startTime;
             if (elapsed > this.timeout) {
+                this.timeoutExceeded = true;
                 break;
             }
             yield {retries: this.retries++, remainingTime: this.timeout - elapsed};
