@@ -3,6 +3,7 @@
 import random
 import os
 import stat
+import json
 from buildscripts.resmokelib import config, utils
 
 
@@ -446,6 +447,13 @@ def fuzz_mongod_set_parameters(fuzzer_stress_mode, seed, user_provided_params):
     for key, value in utils.load_yaml(user_provided_params).items():
         ret[key] = value
 
+    for key, value in ret.items():
+        # We may at times contain a dictionary for the parameter value, in order to pass them via
+        # setParameter we must dump them as a JSON.
+        if isinstance(value, dict):
+            value = json.dumps(value)
+        ret[key] = value
+
     return (
         utils.dump_yaml(ret),
         generate_eviction_configs(rng, fuzzer_stress_mode),
@@ -465,6 +473,13 @@ def fuzz_mongos_set_parameters(fuzzer_stress_mode, seed, user_provided_params):
         ret[key] = value
 
     for key, value in utils.load_yaml(user_provided_params).items():
+        ret[key] = value
+
+    for key, value in ret.items():
+        # We may at times contain a dictionary for the parameter value, in order to pass them
+        # via setParameter we must dump them as a JSON.
+        if isinstance(value, dict):
+            value = json.dumps(value)
         ret[key] = value
 
     return utils.dump_yaml(ret)
