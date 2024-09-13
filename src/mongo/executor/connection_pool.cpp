@@ -57,6 +57,7 @@
 #include "mongo/logv2/redaction.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/cancellation.h"
 #include "mongo/util/debug_util.h"
 #include "mongo/util/destructor_guard.h"
 #include "mongo/util/fail_point.h"
@@ -85,6 +86,9 @@ MONGO_FAIL_POINT_DEFINE(forceExecutorConnectionPoolTimeout);
 MONGO_FAIL_POINT_DEFINE(connectionPoolReturnsErrorOnGet);
 MONGO_FAIL_POINT_DEFINE(connectionPoolDropConnectionsBeforeGetConnection);
 MONGO_FAIL_POINT_DEFINE(connectionPoolDoesNotFulfillRequests);
+
+static const Status kCancelledStatus{ErrorCodes::CallbackCanceled,
+                                     "Cancelled acquiring connection"};
 
 auto makeSeveritySuppressor() {
     return std::make_unique<logv2::KeyedSeveritySuppressor<HostAndPort>>(
@@ -302,7 +306,9 @@ public:
      * Gets a connection from the specific pool. Sinks a unique_lock from the
      * parent to preserve the lock on _mutex
      */
-    Future<ConnectionHandle> getConnection(Milliseconds timeout, bool lease);
+    Future<ConnectionHandle> getConnection(Milliseconds timeout,
+                                           bool lease,
+                                           const CancellationToken& token);
 
     /**
      * Triggers the shutdown procedure. This function sets isShutdown to true
@@ -421,17 +427,29 @@ private:
     using OwnershipPool = stdx::unordered_map<ConnectionInterface*, OwnedConnection>;
     using LRUOwnershipPool = LRUCache<OwnershipPool::key_type, OwnershipPool::mapped_type>;
     struct Request {
-        Date_t expiration;
+        Request(std::uint64_t i, Promise<ConnectionHandle>&& p, bool l, const CancellationToken& t)
+            : id(i), promise(std::move(p)), lease(l), source(t) {}
+        std::uint64_t id;
         Promise<ConnectionHandle> promise;
         // Whether or not the requested connection should be "leased".
         bool lease;
+        CancellationSource source;
     };
+    using Requests = std::multimap<Date_t, Request>;
 
-    struct RequestComparator {
-        bool operator()(const Request& a, const Request& b) const {
-            return a.expiration > b.expiration;
-        }
-    };
+    // Enqueues a request, returning an iterator into _requests pointing to the request.
+    Requests::iterator pushRequest(Date_t expiration, Request request) {
+        auto it = _requests.emplace(std::pair(expiration, std::move(request)));
+        _requestsById[it->second.id] = it;
+        return it;
+    }
+
+    // Fulfills or denies a request with swConn and removes it from queues.
+    void answerRequest(Requests::iterator it, StatusWith<ConnectionHandle>&& swConn) {
+        it->second.promise.setFrom(std::move(swConn));
+        _requestsById.erase(it->second.id);
+        _requests.erase(it);
+    }
 
     ConnectionHandle makeHandle(ConnectionInterface* connection, bool isLeased);
 
@@ -506,7 +524,8 @@ private:
     OwnershipPool _checkedOutPool;
     OwnershipPool _leasedPool;
 
-    std::vector<Request> _requests;
+    Requests _requests;
+    stdx::unordered_map<std::uint64_t, Requests::iterator> _requestsById;
     Date_t _lastActiveTime;
 
     std::shared_ptr<TimerInterface> _eventTimer;
@@ -540,6 +559,8 @@ private:
     bool _keepOpen = true;
 
     HostHealth _health;
+
+    std::uint64_t _nextRequestId{0};
 };
 
 auto ConnectionPool::SpecificPool::make(std::shared_ptr<ConnectionPool> parent,
@@ -683,7 +704,8 @@ void ConnectionPool::lease_forTest(const HostAndPort& hostAndPort,
 SemiFuture<ConnectionPool::ConnectionHandle> ConnectionPool::_get(const HostAndPort& hostAndPort,
                                                                   transport::ConnectSSLMode sslMode,
                                                                   Milliseconds timeout,
-                                                                  bool lease) {
+                                                                  bool lease,
+                                                                  const CancellationToken& token) {
     auto connRequestedAt = _factory->now();
 
     stdx::lock_guard lk(_mutex);
@@ -719,7 +741,7 @@ SemiFuture<ConnectionPool::ConnectionHandle> ConnectionPool::_get(const HostAndP
         timeout = _controller->pendingTimeout();
     }
 
-    auto connFuture = pool->getConnection(timeout, lease);
+    auto connFuture = pool->getConnection(timeout, lease, token);
     pool->updateState();
 
     // Only count connections being checked-out for ordinary use, not lease, towards cumulative wait
@@ -783,6 +805,7 @@ ConnectionPool::SpecificPool::~SpecificPool() {
 
     if (shouldInvariantOnPoolCorrectness()) {
         invariant(_requests.empty());
+        invariant(_requestsById.empty());
         invariant(_checkedOutPool.empty());
         invariant(_leasedPool.empty());
     }
@@ -833,7 +856,8 @@ size_t ConnectionPool::SpecificPool::requestsPending() const {
 }
 
 Future<ConnectionPool::ConnectionHandle> ConnectionPool::SpecificPool::getConnection(
-    Milliseconds timeout, bool lease) {
+    Milliseconds timeout, bool lease, const CancellationToken& token) {
+
     if (MONGO_unlikely(connectionPoolReturnsErrorOnGet.shouldFail())) {
         return Future<ConnectionPool::ConnectionHandle>::makeReady(
             Status(ErrorCodes::SocketException, "test"));
@@ -852,19 +876,29 @@ Future<ConnectionPool::ConnectionHandle> ConnectionPool::SpecificPool::getConnec
             return Future<ConnectionPool::ConnectionHandle>::makeReady(failpointStatus);
         }
         auto pf = makePromiseFuture<ConnectionHandle>();
-        auto request = std::make_shared<Request>();
-        request->expiration = now + failpointTimeout;
-        request->promise = std::move(pf.promise);
+        auto request = std::make_shared<Request>(0, std::move(pf.promise), false, token);
         auto timeoutTimer = _parent->_factory->makeTimer();
         timeoutTimer->setTimeout(failpointTimeout,
                                  [request, timeoutTimer, failpointStatus]() mutable {
                                      request->promise.setError(failpointStatus);
                                  });
+        // We don't support cancellation when the forceExecutorConnectionPoolTimeout failpoint is
+        // enabled. The purpose of this failpoint is to evaluate the behavior of ConnectionPool
+        // when a connection cannot be retrieved within the timeout, so cancellation shouldn't
+        // ever be necessary in this context. Further, implementing cancellation would require
+        // invasive changes to the timer system that is used to implement the failpoint logic.
+        request->source.token().onCancel().unsafeToInlineFuture().getAsync([](Status s) {
+            invariant(!s.isOK(),
+                      "getConnection() cancellation with forceExecutorConnectionPoolTimeout "
+                      "failpoint enabled is not supported");
+        });
         return std::move(pf.future);
     }
 
-    // If we do not have requests, then we can fulfill immediately
-    if (_requests.size() == 0) {
+    // If we've already been cancelled or we do not have requests, then we can fulfill immediately.
+    if (token.isCanceled()) {
+        return Future<ConnectionPool::ConnectionHandle>::makeReady(kCancelledStatus);
+    } else if (_requests.size() == 0) {
         auto conn = tryGetConnection(lease);
 
         if (conn) {
@@ -885,8 +919,25 @@ Future<ConnectionPool::ConnectionHandle> ConnectionPool::SpecificPool::getConnec
     const auto expiration = now + timeout;
     auto pf = makePromiseFuture<ConnectionHandle>();
 
-    _requests.push_back({expiration, std::move(pf.promise), lease});
-    std::push_heap(begin(_requests), end(_requests), RequestComparator{});
+    auto requestId = _nextRequestId++;
+    auto it = pushRequest(expiration, Request(requestId, std::move(pf.promise), lease, token));
+
+    it->second.source.token()
+        .onCancel()
+        .thenRunOn(_parent->_factory->getExecutor())
+        .getAsync([this, requestId](Status s) {
+            if (!s.isOK()) {
+                return;
+            }
+
+            stdx::lock_guard lk(_parent->_mutex);
+
+            auto it = _requestsById.find(requestId);
+            if (it == _requestsById.end()) {
+                return;
+            }
+            answerRequest(it->second, kCancelledStatus);
+        });
 
     return std::move(pf.future);
 }
@@ -1175,12 +1226,12 @@ void ConnectionPool::SpecificPool::processFailure(const Status& status) {
         return;
     }
 
-    for (auto& request : _requests) {
-        request.promise.setError(status);
+    while (_requests.size() > 0) {
+        answerRequest(_requests.begin(), status);
     }
+    invariant(_requestsById.size() == 0);
 
     LOGV2_DEBUG(22573, kDiagnosticLogLevel, "Failing requests", "hostAndPort"_attr = _hostAndPort);
-    _requests.clear();
 }
 
 // fulfills as many outstanding requests as possible
@@ -1192,27 +1243,23 @@ void ConnectionPool::SpecificPool::fulfillRequests() {
         }
     }
 
-    while (_requests.size()) {
+    while (_requests.size() > 0) {
+        auto it = _requests.begin();
+
         // Marking this as our newest active time
         _lastActiveTime = _parent->_factory->now();
 
         // Caution: If this returns with a value, it's important that we not throw until we've
         // emplaced the promise (as returning a connection would attempt to take the lock and would
         // deadlock).
-        //
-        // None of the heap manipulation code throws, but it's something to keep in mind.
-        auto conn = tryGetConnection(_requests.front().lease);
-
+        auto conn = tryGetConnection(it->second.lease);
         if (!conn) {
             break;
         }
-
-        // Grab the request and callback
-        auto promise = std::move(_requests.front().promise);
-        std::pop_heap(begin(_requests), end(_requests), RequestComparator{});
-        _requests.pop_back();
-
-        promise.emplaceValue(std::move(conn));
+        // Cancellation and fulfillment are both synchronized by _parent->_mutex, so we don't need
+        // to take special care here to destruct the CancellationSource on the Request object before
+        // we fulfill the promise.
+        answerRequest(it, std::move(conn));
     }
 }
 
@@ -1339,8 +1386,8 @@ void ConnectionPool::SpecificPool::updateEventTimer() {
     }
 
     // If a request would timeout before the next event, then it is the next event
-    if (_requests.size() && (_requests.front().expiration < nextEventTime)) {
-        nextEventTime = _requests.front().expiration;
+    if (_requests.size() && (_requests.begin()->first < nextEventTime)) {
+        nextEventTime = _requests.begin()->first;
     }
 
     // Clamp next event time to be either now or in the future. Next event time
@@ -1368,14 +1415,10 @@ void ConnectionPool::SpecificPool::updateEventTimer() {
 
         _health.isFailed = false;
 
-        while (_requests.size() && (_requests.front().expiration <= now)) {
-            std::pop_heap(begin(_requests), end(_requests), RequestComparator{});
-
-            auto& request = _requests.back();
-            request.promise.setError(
-                Status(ErrorCodes::PooledConnectionAcquisitionExceededTimeLimit,
-                       "Couldn't get a connection within the time limit"));
-            _requests.pop_back();
+        while (_requests.size() > 0 && _requests.begin()->first <= now) {
+            answerRequest(_requests.begin(),
+                          {ErrorCodes::PooledConnectionAcquisitionExceededTimeLimit,
+                           "Couldn't get a connection within the time limit"});
 
             // Since we've failed a request, we've interacted with external users
             _lastActiveTime = now;
@@ -1436,6 +1479,7 @@ void ConnectionPool::SpecificPool::updateController() {
             if (shouldInvariantOnPoolCorrectness()) {
                 invariant(pool->_checkedOutPool.empty());
                 invariant(pool->_requests.empty());
+                invariant(pool->_requestsById.empty());
                 invariant(pool->_leasedPool.empty());
             }
 

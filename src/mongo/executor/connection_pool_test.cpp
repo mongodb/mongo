@@ -81,6 +81,10 @@ protected:
         return _pool;
     }
 
+    void dropPool() {
+        _pool = {};
+    }
+
     /**
      * Get from a pool with out-of-line execution and return the future for a connection
      *
@@ -2099,6 +2103,103 @@ TEST_F(ConnectionPoolTest, LeasedConnectionsDontInterfereWithOrdinaryCheckoutUsa
     // Should only include usage time from the checkout, not the lease
     ASSERT_GREATER_THAN_OR_EQUALS(totalTimeUsageDelta, checkOutLength);
     ASSERT_LESS_THAN(totalTimeUsageDelta, checkOutLength * 2);
+}
+
+TEST_F(ConnectionPoolTest, CancelGetBeforeCallDoesntPullConnection) {
+    CancellationSource source;
+    auto pool = makePool();
+
+    source.cancel();
+    auto connFuture =
+        getFromPool(HostAndPort(), transport::kGlobalSSLMode, Seconds(1), source.token());
+    ASSERT_TRUE(connFuture.isReady());
+    ASSERT_THROWS_CODE(connFuture.get(), DBException, ErrorCodes::CallbackCanceled);
+}
+
+TEST_F(ConnectionPoolTest, CancelGetEarlyDoesntPullConnection) {
+    CancellationSource source;
+    auto pool = makePool();
+
+    auto connFuture =
+        getFromPool(HostAndPort(), transport::kGlobalSSLMode, Seconds(1), source.token());
+    ASSERT_FALSE(connFuture.isReady());
+
+    source.cancel();
+    ASSERT_TRUE(connFuture.isReady());
+    ASSERT_THROWS_CODE(connFuture.get(), DBException, ErrorCodes::CallbackCanceled);
+}
+
+TEST_F(ConnectionPoolTest, CancelGetEarlyWithReadyConnectionDoesntPullConnection) {
+    CancellationSource source;
+    auto pool = makePool();
+
+    // Make a connection and return it so that the next request is immediately fulfillable.
+    ConnectionImpl::pushSetup(Status::OK());
+    {
+        auto connFuture = getFromPool(HostAndPort(), transport::kGlobalSSLMode, Seconds(1));
+        ASSERT_TRUE(connFuture.isReady());
+        doneWith(connFuture.get());
+    }
+
+    ASSERT_EQ(pool->getNumConnectionsPerHost(HostAndPort()), 1);
+
+    source.cancel();
+    {
+        auto connFuture =
+            getFromPool(HostAndPort(), transport::kGlobalSSLMode, Seconds(1), source.token());
+        ASSERT_TRUE(connFuture.isReady());
+        ASSERT_THROWS_CODE(connFuture.get(), DBException, ErrorCodes::CallbackCanceled);
+    }
+}
+
+TEST_F(ConnectionPoolTest, CancelGetLatePullsConnection) {
+    CancellationSource source;
+    auto pool = makePool();
+
+    auto connFuture =
+        getFromPool(HostAndPort(), transport::kGlobalSSLMode, Seconds(1), source.token());
+    ASSERT_FALSE(connFuture.isReady());
+
+    ConnectionImpl::pushSetup(Status::OK());
+    ASSERT_TRUE(connFuture.isReady());
+
+    source.cancel();
+    doneWith(connFuture.get());
+}
+
+TEST_F(ConnectionPoolTest, CancelGetAfterDestruction) {
+    CancellationSource source;
+    auto pool = makePool();
+
+    auto connFuture =
+        getFromPool(HostAndPort(), transport::kGlobalSSLMode, Seconds(1), source.token());
+    ASSERT_FALSE(connFuture.isReady());
+
+    ConnectionImpl::pushSetup(Status::OK());
+    ASSERT_TRUE(connFuture.isReady());
+    doneWith(connFuture.get());
+
+    pool->shutdown();
+    pool = {};
+    dropPool();
+
+    source.cancel();
+}
+
+TEST_F(ConnectionPoolTest, DismissBeforeCancelGet) {
+    CancellationSource source;
+    auto pool = makePool();
+
+    auto connFuture =
+        getFromPool(HostAndPort(), transport::kGlobalSSLMode, Seconds(1), source.token());
+    ASSERT_FALSE(connFuture.isReady());
+
+    source = {};
+    ASSERT_FALSE(connFuture.isReady());
+
+    ConnectionImpl::pushSetup(Status::OK());
+    ASSERT_TRUE(connFuture.isReady());
+    doneWith(connFuture.get());
 }
 
 }  // namespace connection_pool_test_details

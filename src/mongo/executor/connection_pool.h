@@ -54,6 +54,7 @@
 #include "mongo/stdx/unordered_map.h"
 #include "mongo/transport/session.h"
 #include "mongo/transport/transport_layer.h"
+#include "mongo/util/cancellation.h"
 #include "mongo/util/clock_source.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/functional.h"
@@ -277,10 +278,12 @@ public:
      */
     void setKeepOpen(const HostAndPort& hostAndPort, bool keepOpen) override;
 
-    inline SemiFuture<ConnectionHandle> get(const HostAndPort& hostAndPort,
-                                            transport::ConnectSSLMode sslMode,
-                                            Milliseconds timeout) {
-        return _get(hostAndPort, sslMode, timeout, false /*lease*/);
+    inline SemiFuture<ConnectionHandle> get(
+        const HostAndPort& hostAndPort,
+        transport::ConnectSSLMode sslMode,
+        Milliseconds timeout,
+        CancellationToken token = CancellationToken::uncancelable()) {
+        return _get(hostAndPort, sslMode, timeout, false /*lease*/, std::move(token));
     }
 
     void get_forTest(const HostAndPort& hostAndPort,
@@ -294,10 +297,12 @@ public:
      * their lease and are reported separately in metrics. Otherwise, this method behaves similarly
      * to `ConnectionPool::get`.
      */
-    inline SemiFuture<ConnectionHandle> lease(const HostAndPort& hostAndPort,
-                                              transport::ConnectSSLMode sslMode,
-                                              Milliseconds timeout) {
-        return _get(hostAndPort, sslMode, timeout, true /*lease*/);
+    inline SemiFuture<ConnectionHandle> lease(
+        const HostAndPort& hostAndPort,
+        transport::ConnectSSLMode sslMode,
+        Milliseconds timeout,
+        CancellationToken token = CancellationToken::uncancelable()) {
+        return _get(hostAndPort, sslMode, timeout, true /*lease*/, std::move(token));
     }
 
     void lease_forTest(const HostAndPort& hostAndPort,
@@ -318,7 +323,8 @@ private:
     SemiFuture<ConnectionHandle> _get(const HostAndPort& hostAndPort,
                                       transport::ConnectSSLMode sslMode,
                                       Milliseconds timeout,
-                                      bool leased);
+                                      bool leased,
+                                      const CancellationToken& token);
 
     void retrieve_forTest(RetrieveConnection retrieve, GetConnectionCallback cb);
 
