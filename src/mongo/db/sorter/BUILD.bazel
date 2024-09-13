@@ -41,6 +41,7 @@ mongo_cc_library(
         "sorter.cpp",  # Intentionally in hdrs.
         "sorter.h",
         "sorter_checksum_calculator.h",
+        "//src/mongo/db/query/util:spill_util.h",
     ],
     deps = [
         ":sorter_stats",  # TODO(SERVER-93876): Remove.

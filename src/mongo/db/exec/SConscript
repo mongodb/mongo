@@ -44,6 +44,7 @@ sortExecutorEnv.Library(
         "working_set",
     ],
     LIBDEPS_PRIVATE=[
+        "$BUILD_DIR/mongo/db/query/spill_util",
         "$BUILD_DIR/mongo/db/sorter/sorter_base",
         "$BUILD_DIR/mongo/db/storage/encryption_hooks",
         "$BUILD_DIR/mongo/db/storage/storage_options",

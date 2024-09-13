@@ -39,7 +39,9 @@
 #include "mongo/db/exec/sbe/stages/hash_agg.h"
 #include "mongo/db/exec/sbe/util/spilling.h"
 #include "mongo/db/exec/sbe/values/value.h"
+#include "mongo/db/query/util/spill_util.h"
 #include "mongo/db/stats/counters.h"
+#include "mongo/db/storage/storage_options.h"
 
 namespace mongo {
 namespace sbe {
@@ -178,6 +180,10 @@ void HashAggBaseStage<Derived>::spill(MemoryCheckData& mcd) {
             "Exceeded memory limit for $group, but didn't allow external spilling;"
             " pass allowDiskUse:true to opt in",
             _allowDiskUse);
+
+    // Ensure there is sufficient disk space for spilling
+    uassertStatusOK(ensureSufficientDiskSpaceForSpilling(
+        storageGlobalParams.dbpath, internalQuerySpillingMinAvailableDiskSpaceBytes.load()));
 
     // Since we flush the entire hash table to disk, we also clear any state related to estimating
     // memory consumption.

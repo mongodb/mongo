@@ -57,6 +57,7 @@ iamEnv.Library(
         "$BUILD_DIR/mongo/db/query/projection_ast",
         "$BUILD_DIR/mongo/db/query/query_stats/query_stats",
         "$BUILD_DIR/mongo/db/query/sort_pattern",
+        "$BUILD_DIR/mongo/db/query/spill_util",
         "$BUILD_DIR/mongo/db/query_expressions",
         "$BUILD_DIR/mongo/db/record_id_helpers",
         "$BUILD_DIR/mongo/db/resumable_index_builds_idl",

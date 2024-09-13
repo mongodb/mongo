@@ -36,7 +36,9 @@
 #include "mongo/db/exec/sbe/size_estimator.h"
 #include "mongo/db/exec/sbe/util/spilling.h"
 #include "mongo/db/exec/sbe/values/arith_common.h"
+#include "mongo/db/query/util/spill_util.h"
 #include "mongo/db/stats/counters.h"
+#include "mongo/db/storage/storage_options.h"
 
 namespace mongo::sbe {
 
@@ -163,6 +165,10 @@ void WindowStage::spill() {
             "Exceeded memory limit for $setWindowFields, but didn't allow external spilling;"
             " pass allowDiskUse:true to opt in",
             _allowDiskUse);
+
+    // Ensure there is sufficient disk space for spilling
+    uassertStatusOK(ensureSufficientDiskSpaceForSpilling(
+        storageGlobalParams.dbpath, internalQuerySpillingMinAvailableDiskSpaceBytes.load()));
 
     // Create spilled record storage if not created.
     if (!_recordStore) {

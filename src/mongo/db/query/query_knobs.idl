@@ -1702,6 +1702,17 @@ server_parameters:
     validator:
       gte: 0
     redact: false
+  
+  internalQuerySpillingMinAvailableDiskSpaceBytes:
+    description: "Minimum disk space that should be available before spilling"
+    set_at: [startup, runtime]
+    cpp_vartype: AtomicWord<long long>
+    cpp_varname: internalQuerySpillingMinAvailableDiskSpaceBytes
+    default: 
+      expr: 500 * 1024 * 1024 # 500 MB
+    validator:
+      gte: 0
+    redact: false
 
   internalQueryCollectOptimizerMetrics:
     description: "If true, collect query optimizer metrics in queryStats."

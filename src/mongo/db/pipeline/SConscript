@@ -337,6 +337,7 @@ pipelineEnv.Library(
         "$BUILD_DIR/mongo/db/query/search/mongot_options",
         "$BUILD_DIR/mongo/db/query/search/search_index_common",
         "$BUILD_DIR/mongo/db/query/search/search_index_process_interface",
+        "$BUILD_DIR/mongo/db/query/spill_util",
         "$BUILD_DIR/mongo/db/repl/image_collection_entry",
         "$BUILD_DIR/mongo/db/shard_role_api",
         "$BUILD_DIR/mongo/db/sorter/sorter_base",

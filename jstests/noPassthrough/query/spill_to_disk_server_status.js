@@ -50,6 +50,19 @@ for (let i = 0; i < nDocs; i++) {
     assert.commandWorked(foreignColl.insert({_id: i}));
 }
 
+const stages = {
+    sort: {$sort: {a: 1}},
+    group: {$group: {_id: "$_id", a: {$sum: "$_id"}}},
+    setWindowFields: {
+        $setWindowFields: {
+            partitionBy: "$_id",
+            sortBy: {_id: 1},
+            output: {b: {$sum: "$_id", window: {documents: [0, 0]}}}
+        }
+    },
+    lookup: {$lookup: {from: foreignCollName, localField: "a", foreignField: "b", as: "c"}},
+};
+
 function getServerStatusSpillingMetrics(serverStatus, stageName) {
     if (stageName === '$sort') {
         const sortMetrics = serverStatus.metrics.query.sort;
@@ -129,31 +142,59 @@ function testSpillingMetrics({stage, expectedSpillingMetrics, expectedSbeSpillin
 }
 
 testSpillingMetrics({
-    stage: {$sort: {a: 1}},
+    stage: stages['sort'],
     expectedSpillingMetrics: {spills: 19, spilledBytes: 654},
     expectedSbeSpillingMetrics: {spills: 19, spilledBytes: 935}
 });
 testSpillingMetrics({
-    stage: {$group: {_id: "$_id", a: {$sum: "$_id"}}},
+    stage: stages['group'],
     expectedSpillingMetrics: {spills: 10, spilledBytes: 410},
     expectedSbeSpillingMetrics: {spills: 10, spilledBytes: 450}
 });
 testSpillingMetrics({
-    stage: {
-        $setWindowFields: {
-            partitionBy: "$_id",
-            sortBy: {_id: 1},
-            output: {b: {$sum: "$_id", window: {documents: [0, 0]}}}
-        }
-    },
+    stage: stages['setWindowFields'],
     expectedSpillingMetrics: {spills: 10, spilledBytes: 180},
     expectedSbeSpillingMetrics: {spills: 9, spilledBytes: 500},
 });
 if (isSbeEnabled) {
     testSpillingMetrics({
-        stage: {$lookup: {from: foreignCollName, localField: "a", foreignField: "b", as: "c"}},
+        stage: stages['lookup'],
         expectedSbeSpillingMetrics: {spills: 20, spilledBytes: 790},
     });
 }
+
+/*
+ * Tests that query fails when attempting to spill with insufficient disk space
+ */
+function testSpillingQueryFailsWithLowDiskSpace(stage) {
+    const simulateAvailableDiskSpaceFp =
+        configureFailPoint(db, 'simulateAvailableDiskSpace', {bytes: 450 * 1024 * 1024});
+
+    // Query should fail with OutOfDiskSpace error
+    assert.commandFailedWithCode(
+        db.runCommand({aggregate: collName, pipeline: [stage], cursor: {}}),
+        ErrorCodes.OutOfDiskSpace);
+
+    simulateAvailableDiskSpaceFp.off();
+}
+
+testSpillingQueryFailsWithLowDiskSpace(stages['sort']);
+testSpillingQueryFailsWithLowDiskSpace(stages['group']);
+testSpillingQueryFailsWithLowDiskSpace(stages['setWindowFields']);
+if (isSbeEnabled) {
+    testSpillingQueryFailsWithLowDiskSpace(stages['lookup']);
+}
+
+// Simulate available disk space to be more than `internalQuerySpillingMinAvailableDiskSpaceBytes`
+// but less than the minimum space requirement during `mergeSpills` phase of sorter so that it fails
+// with OutOfDiskSpace error during merge spills of the sort query.
+assert.commandWorked(
+    db.adminCommand({setParameter: 1, internalQuerySpillingMinAvailableDiskSpaceBytes: 10}));
+const simulateAvailableDiskSpaceFp =
+    configureFailPoint(db, 'simulateAvailableDiskSpace', {bytes: 20});
+
+assert.commandFailedWithCode(
+    db.runCommand({aggregate: collName, pipeline: [stages['sort']], cursor: {}}),
+    ErrorCodes.OutOfDiskSpace);
 
 MongoRunner.stopMongod(conn);

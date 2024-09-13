@@ -262,6 +262,10 @@ private:
 
     void makeTemporaryRecordStore();
 
+    // Determines if we should perform the check for sufficient disk space for spilling.
+    // We do the check after every 100MB of spilling.
+    bool shouldCheckDiskSpace();
+
     /**
      * Normalizes a string if '_collator' is populated and returns a third parameter to let the
      * caller know if it should own the tag and value.
@@ -331,6 +335,13 @@ private:
     // Used to hold a copy of a MaterializedRow from the disk store, so it does not go out of scope
     // when getValueAtIndex() returns a view of it.
     boost::optional<value::MaterializedRow> _bufValueRecordStore;
+
+    // Amount of bytes spilled since last time we performed the disk space check. We reset this
+    // value and perform the disk space check everytime it crosses 100 MB.
+    long long _spilledBytesSinceLastCheck{0};
+    long long _totalSpilledBytes{0};
+
+    static constexpr long long kMaxSpilledBytesForDiskSpaceCheck = 100ll * 1024 * 1024;
 
     friend class LookupHashTableIter;
 };  // class LookupHashTable

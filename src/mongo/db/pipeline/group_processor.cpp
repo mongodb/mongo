@@ -35,6 +35,7 @@
 #include "mongo/db/pipeline/expression.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/query/query_knobs_gen.h"
+#include "mongo/db/query/util/spill_util.h"
 #include "mongo/db/stats/counters.h"
 
 namespace mongo {
@@ -238,6 +239,10 @@ bool GroupProcessor::shouldSpillOnEveryDuplicateId(bool isNewGroup) {
 }
 
 void GroupProcessor::spill() {
+    // Ensure there is sufficient disk space for spilling
+    uassertStatusOK(ensureSufficientDiskSpaceForSpilling(
+        _expCtx->tempDir, internalQuerySpillingMinAvailableDiskSpaceBytes.load()));
+
     std::vector<const GroupProcessorBase::GroupsMap::value_type*>
         ptrs;  // using pointers to speed sorting
     ptrs.reserve(_groups.size());
