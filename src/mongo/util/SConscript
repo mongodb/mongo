@@ -116,6 +116,7 @@ env.Benchmark(
     LIBDEPS=[
         "fail_point",
     ],
+    CONSOLIDATED_TARGET="util_bm",
 )
 
 env.CppUnitTest(
@@ -274,6 +275,7 @@ env.Benchmark(
         "clock_sources",
         "processinfo",
     ],
+    CONSOLIDATED_TARGET="util_bm",
 )
 
 env.Library(
@@ -309,6 +311,7 @@ env.Benchmark(
         "decimal_counter_bm.cpp",
     ],
     LIBDEPS=[],
+    CONSOLIDATED_TARGET="util_bm",
 )
 
 env.Benchmark(
@@ -317,6 +320,7 @@ env.Benchmark(
         "itoa_bm.cpp",
     ],
     LIBDEPS=[],
+    CONSOLIDATED_TARGET="util_bm",
 )
 
 env.Benchmark(
@@ -325,6 +329,7 @@ env.Benchmark(
         "future_bm.cpp",
     ],
     LIBDEPS=[],
+    CONSOLIDATED_TARGET="util_bm",
 )
 
 env.Benchmark(
@@ -333,6 +338,7 @@ env.Benchmark(
         "tick_source_bm.cpp",
     ],
     LIBDEPS=[],
+    CONSOLIDATED_TARGET="util_bm",
 )
 
 env.Library(
@@ -343,6 +349,7 @@ env.Library(
     LIBDEPS=[
         "$BUILD_DIR/mongo/executor/task_executor_interface",
     ],
+    CONSOLIDATED_TARGET="util_bm",
 )
 
 pcre_env = env.Clone()
@@ -353,6 +360,7 @@ env.Benchmark(
         "tracking_allocator_bm.cpp",
     ],
     LIBDEPS=[],
+    CONSOLIDATED_TARGET="util_bm",
 )
 
 env.CppUnitTest(
@@ -369,6 +377,7 @@ env.Benchmark(
     target="hash_table_bm",
     source="hash_table_bm.cpp",
     LIBDEPS=[],
+    CONSOLIDATED_TARGET="util_bm",
 )
 
 if env.TargetOSIs("windows"):
@@ -535,6 +544,7 @@ if env.TargetOSIs("windows"):
 env.Benchmark(
     target="base64_bm",
     source="base64_bm.cpp",
+    CONSOLIDATED_TARGET="util_bm",
 )
 
 stacktraceEnv = env.Clone()
@@ -582,21 +592,25 @@ stacktraceEnv.Benchmark(
     source="stacktrace_bm.cpp",
     # See above for how to handle any future LIBDEPS additions here.
     # LIBDEPS=...
+    CONSOLIDATED_TARGET="util_stacktrace_bm",
 )
 
 env.Benchmark(
     target="string_bm",
     source="string_bm.cpp",
+    CONSOLIDATED_TARGET="util_stacktrace_bm",
 )
 
 env.Benchmark(
     target="cancellation_bm",
     source="cancellation_bm.cpp",
+    CONSOLIDATED_TARGET="util_stacktrace_bm",
 )
 
 env.Benchmark(
     target="inline_memory_bm",
     source="inline_memory_bm.cpp",
+    CONSOLIDATED_TARGET="util_stacktrace_bm",
 )
 
 env.Benchmark(
@@ -608,6 +622,7 @@ env.Benchmark(
         "$BUILD_DIR/mongo/base",
         "processinfo",
     ],
+    CONSOLIDATED_TARGET="util_stacktrace_bm",
 )
 
 pretty_printer_test_program = env.Program(

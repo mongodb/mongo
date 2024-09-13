@@ -103,6 +103,7 @@ env.Benchmark(
         "$BUILD_DIR/mongo/util/processinfo",
         "profile_filter",
     ],
+    CONSOLIDATED_TARGET="db_bm",
 )
 
 if env.TargetOSIs("windows"):
@@ -2218,6 +2219,7 @@ env.Benchmark(
     LIBDEPS=[
         "server_base",
     ],
+    CONSOLIDATED_TARGET="db_bm",
 )
 
 env.Benchmark(
@@ -2229,6 +2231,7 @@ env.Benchmark(
         "service_context_non_d",
         "shard_role_api",
     ],
+    CONSOLIDATED_TARGET="db_nond_bm",
 )
 
 env.Benchmark(
@@ -2240,6 +2243,7 @@ env.Benchmark(
         "service_context_non_d",
         "shard_role_api",
     ],
+    CONSOLIDATED_TARGET="db_nond_bm",
 )
 
 env.Benchmark(
@@ -2266,6 +2270,7 @@ env.Benchmark(
         "storage/wiredtiger/storage_wiredtiger",
         "vector_clock_mongod",
     ],
+    CONSOLIDATED_TARGET="db_bm",
 )
 
 env.Benchmark(
@@ -2276,6 +2281,7 @@ env.Benchmark(
     LIBDEPS=[
         "server_base",
     ],
+    CONSOLIDATED_TARGET="db_bm",
 )
 
 env.Benchmark(
@@ -2289,6 +2295,7 @@ env.Benchmark(
         "shard_role",
         "shard_role_api",
     ],
+    CONSOLIDATED_TARGET="db_bm",
 )
 
 bmEnv = env.Clone()

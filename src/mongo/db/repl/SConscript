@@ -412,6 +412,7 @@ env.Benchmark(
         "apply_ops_command_info",
         "oplog_entry",
     ],
+    CONSOLIDATED_TARGET="repl_bm",
 )
 
 env.Library(
@@ -1716,6 +1717,7 @@ env.Benchmark(
         "replmocks",
         "storage_interface_impl",
     ],
+    CONSOLIDATED_TARGET="repl_bm",
 )
 
 env.Benchmark(
@@ -1728,6 +1730,7 @@ env.Benchmark(
         "$BUILD_DIR/mongo/db/query/stats/stats_test_utils",
         "oplog_application",
     ],
+    CONSOLIDATED_TARGET="repl_bm",
 )
 
 env.Benchmark(
@@ -1760,6 +1763,7 @@ env.Benchmark(
         "tenant_migration_donor_service",
         "tenant_migration_recipient_service",
     ],
+    CONSOLIDATED_TARGET="repl_bm",
 )
 
 env.Benchmark(
@@ -1794,6 +1798,7 @@ env.Benchmark(
         "replmocks",
         "storage_interface_impl",
     ],
+    CONSOLIDATED_TARGET="repl_bm",
 )
 
 env.Benchmark(
@@ -1806,4 +1811,5 @@ env.Benchmark(
         "repl_coordinator_impl",
         "repl_coordinator_test_fixture",
     ],
+    CONSOLIDATED_TARGET="repl_bm",
 )
