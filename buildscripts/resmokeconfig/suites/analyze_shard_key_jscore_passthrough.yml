@@ -85,10 +85,6 @@ selector:
 
     # The following test fails because configureQueryAnalyzer is not allowed on QE collections
     - jstests/core/query/queryable_encryption/**/*.js
-    # TODO SERVER-82471: Remove when we can use explain output instead of plan cache for verification.
-    - jstests/core/query/query_settings/query_settings_index_application_aggregate.js
-    - jstests/core/query/query_settings/query_settings_index_application_distinct.js
-    - jstests/core/query/query_settings/query_settings_index_application_find.js
     # The following test assumes the plan cache to be empty, which may not be guaranteed by this suite.
     - jstests/core/query/query_settings/query_settings_plan_cache.js
     # The following test doesn't support $lookup where one collection is sharded and the other is unsharded
