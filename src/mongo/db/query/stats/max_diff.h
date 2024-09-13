@@ -45,6 +45,7 @@
 namespace mongo::stats {
 
 constexpr double kInvalidArea = -1.0;
+constexpr double kDoubleInf = std::numeric_limits<double>::infinity();
 
 // TODO (SERVER-92732): change the name from ValFreq to ValStats
 struct ValFreq {
@@ -69,7 +70,7 @@ struct ValFreq {
     size_t _freq;          // Frequency of the value.
     double _area;          // Derived as: spread * frequency
     double _areaDiff;      // Difference of two neighboring areas
-    long _freqDiff;        // Difference of two neighboring frequencies
+    double _freqDiff;      // Difference of two neighboring frequencies
     double _normArea;      // Area normalized to the maximum in a type class.
     double _normAreaDiff;  // Area difference normalized to the maximum difference in a type class.
 };

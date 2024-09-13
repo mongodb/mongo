@@ -444,8 +444,6 @@ TEST_F(HistogramTest, MaxDiffEmptyArrays) {
 }
 
 TEST(HistogramTest, HistogramTopBucketsFreqDiffUniformInt) {
-
-    constexpr size_t nElems = 100;
     constexpr size_t nBuckets = 10;
 
     std::vector<stats::SBEValue> data;
@@ -466,16 +464,17 @@ TEST(HistogramTest, HistogramTopBucketsFreqDiffUniformInt) {
         10698, 10698, 10698, 11505, 11505, 11505, 11505, 11505, 11510, 11510, 11510, 11510, 11510,
         11919, 11919, 11919, 11919, 11919, 11919, 11919, 11919, 11919, 11919, 11919, 11919, 11919,
         11919, 11919, 11919, 11919, 11919, 11919, 11919, 11919, 12250, 12250, 12250, 12250, 12250};
-    for (size_t i = 0; i < nElems; i++) {
+    for (size_t i = 0; i < rawData.size(); i++) {
         const auto [tag, val] = makeInt64Value(rawData[i]);
         data.emplace_back(tag, val);
     }
 
     sortValueVector(data);
     const DataDistribution& dataDistrib = getDataDistribution(data);
-    auto result = generateTopKBuckets(dataDistrib, nBuckets, stats::SortArg::kFreqDiff);
 
-    std::vector<int> expectedBounds = {1, 3, 4, 5, 7, 8, 9, 10, 11, 13};
+    auto result = generateTopKBuckets(dataDistrib, nBuckets, stats::SortArg::kFreqDiff);
+    std::vector<size_t> expectedBounds = {0, 7, 8, 13, 14, 15, 17, 22, 23, 25};
+
     for (size_t i = 0; i < expectedBounds.size(); i++) {
         ASSERT_EQ(result[i]._idx, expectedBounds[i]);
     }
