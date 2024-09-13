@@ -699,6 +699,8 @@ config_setting(
 # Spider Monkey Debug options
 # --------------------------------------
 
+# TODO(SERVER-82800): use this flag to enable/disable SpiderMonkey debug mode in mozjs when mozjs
+# is ported over to bazel.
 spider_monkey_dbg(
     name = "spider_monkey_dbg",
     build_setting_default = False,
