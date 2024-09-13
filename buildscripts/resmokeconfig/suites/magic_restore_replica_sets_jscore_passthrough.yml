@@ -42,9 +42,11 @@ selector:
     # ReplicaSetNoPrimary and create a new connection once it get the primary again.
     - jstests/core/failcommand_failpoint.js
 
-    # Uses a view with projected out _id which causes data consistency diffs due to natural order differences between primary and secondary nodes from parallel oplog application.
+    # Uses a view with projected out _id which causes data consistency diffs due to natural order
+    # differences between primary and secondary nodes from parallel oplog application.
     - jstests/core/views/views_find.js
     - jstests/core/views/views_aggregation.js
+    - jstests/core/query/bson_size_limit.js
 
     # Int types within an array type in BSON get their type changed when passed into a C++ function from Javascript.
     - jstests/core/query/type/type_array.js
