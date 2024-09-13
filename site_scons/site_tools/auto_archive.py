@@ -214,9 +214,7 @@ def archive_builder(source, target, env, for_signature):
         else:
             compression_flags = "-z"
 
-        command_prefix = (
-            "{tar} -vc {compression_flags} -C {common_ancestor} -T {file_list} -f {archive_name}"
-        )
+        command_prefix = "{tar} -vc {compression_flags} -C {common_ancestor} -T {file_list} --ignore-failed-read -f {archive_name}"
     else:
         command_prefix = "{python} {make_archive_script} {archive_type} {archive_name} {common_ancestor} {file_list}"
 

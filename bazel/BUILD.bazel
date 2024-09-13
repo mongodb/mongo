@@ -1,0 +1,6 @@
+package(default_visibility = ["//visibility:public"])
+
+# Expose script for external usage through bazel.
+exports_files([
+    "scons_link_list.py",
+])

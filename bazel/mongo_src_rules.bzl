@@ -1479,11 +1479,10 @@ def mongo_cc_library(
 
     create_link_deps(
         name = name + LINK_DEP_SUFFIX,
+        target_name = name,
         link_deps = [name] + deps,
-        target_compatible_with = select({
-            "//bazel/config:scons_query_enabled": [],
-            "//conditions:default": ["@platforms//:incompatible"],
-        }) + target_compatible_with + enterprise_compatible,
+        tags = ["scons_link_lists"],
+        target_compatible_with = target_compatible_with + enterprise_compatible,
     )
 
     # Create a cc_library entry to generate a shared archive of the target.

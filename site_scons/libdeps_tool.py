@@ -800,15 +800,6 @@ def _get_libdeps(node, debug=False):
             _libdeps_visit(child, tsorted, marked, walking, debug=debug)
     tsorted.reverse()
 
-    # Ensure that every thin target transitively-included library is auto-installed.
-    # Note that BAZEL_LIBDEPS_AUTOINSTALLED ensures we only invoke it once for each such library
-    for libdep in tsorted:
-        if str(libdep) not in BAZEL_LIBDEPS_AUTOINSTALLED:
-            env = libdep.get_build_env()
-            shlib_suffix = env.subst("$SHLIBSUFFIX")
-            env.BazelAutoInstall(libdep, shlib_suffix)
-            BAZEL_LIBDEPS_AUTOINSTALLED.add(str(libdep))
-
     setattr(node.attributes, Constants.LibdepsCached, tsorted)
     return tsorted
 
@@ -1252,21 +1243,11 @@ def query_for_results(env, bazel_target, libdeps_ext, bazel_targets_checked):
     results = env.CheckBazelDepsCache(bazel_target)
     if results is None:
         # new query to run, run and cache it
-        bazel_query = (
-            ["cquery"]
-            + env["BAZEL_FLAGS_STR"]
-            + [
-                f'"@{bazel_target}_link_dep"',
-                "--output",
-                "files",
-                "--//bazel/config:scons_query=True",
-            ]
-        )
-        results = env.RunBazelQuery(bazel_query, "getting bazel libdeps")
-        if results.returncode != 0:
-            print("ERROR: bazel libdeps query failed:")
-            print(results)
-            sys.exit(1)
+        linkfile = bazel_target.replace("//src/", "bazel-bin/src/") + "_links.list"
+        linkfile = "/".join(linkfile.rsplit(":", 1))
+        with open(linkfile) as f:
+            results = f.read()
+
         env.AddBazelDepsCache(bazel_target, results)
 
     # now we have some hidden deps to process, if they are the correct
@@ -1274,7 +1255,7 @@ def query_for_results(env, bazel_target, libdeps_ext, bazel_targets_checked):
     # to the results
 
     libs_to_cache = []
-    for line in results.stdout.splitlines():
+    for line in results.splitlines():
         if line.endswith(libdeps_ext):
             scons_node = env.File(
                 line.replace(f"{env['BAZEL_OUT_DIR']}/src", env.Dir("$BUILD_DIR").path)
@@ -1304,6 +1285,7 @@ def process_bazel_libdeps(env, bazel_libdeps_to_add, libdeps_ext, for_sig):
     global BAZEL_SIG_CACHE
 
     bazel_libs = []
+    bazel_libs_set = set()
     bazel_targets_checked = set()
     signature = []
     bazel_libs_to_append = []
@@ -1318,10 +1300,11 @@ def process_bazel_libdeps(env, bazel_libdeps_to_add, libdeps_ext, for_sig):
                     results = query_for_results(
                         env, bazel_target, libdeps_ext, bazel_targets_checked
                     )
-                bazel_libs.extend([lib for lib in results if lib not in bazel_libs])
-
+                new_libs = [lib for lib in results if lib not in bazel_libs_set]
+                bazel_libs_set.update(new_libs)
+                bazel_libs.extend(new_libs)
         # if this is running to generate a signature to determine up to dateness, generate one for scons
-        if for_sig:
+        if for_sig and env.GetOption("ninja") == "disabled":
             for lib in bazel_libs:
                 if str(lib) in BAZEL_SIG_CACHE:
                     signature += [BAZEL_SIG_CACHE[str(lib)]]
@@ -1347,7 +1330,7 @@ EMITTING_SHARED = None
 
 
 def expand_libdeps_for_link(source, target, env, for_signature):
-    global EMITTING_SHARED, BAZEL_SIG_CACHE
+    global EMITTING_SHARED, BAZEL_SIG_CACHE, BAZEL_LIBDEPS_AUTOINSTALLED
 
     libdeps_with_flags = []
     # Used to make modifications to the previous libdep on the link line
