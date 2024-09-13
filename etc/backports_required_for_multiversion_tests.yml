@@ -283,6 +283,8 @@ last-continuous:
       ticket: SERVER-94207
     - test_file: jstests/sharding/explain_find_transformed_query.js
       ticket: SERVER-82471
+    - test_file: jstests/change_streams/ddl_abort_index_build_event.js
+      ticket: SERVER-93154
   suites: null
 last-lts:
   all:
@@ -580,4 +582,6 @@ last-lts:
       ticket: SERVER-94207
     - test_file: jstests/sharding/explain_find_transformed_query.js
       ticket: SERVER-82471
+    - test_file: jstests/change_streams/ddl_abort_index_build_event.js
+      ticket: SERVER-93154
   suites: null
