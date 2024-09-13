@@ -135,7 +135,7 @@ last-continuous:
       ticket: SERVER-89826
     - test_file: jstests/core/index/index_count_scan.js
       ticket: SERVER-90461
-    - test_file: jstests/noPassthrough/move_primary_failpoint.js
+    - test_file: jstests/noPassthrough/sharding/move_primary_failpoint.js
       ticket: SERVER-90465
     - test_file: jstests/sharding/change_streams_with_config_transitions.js
       ticket: SERVER-90358

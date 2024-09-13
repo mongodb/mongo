@@ -1,7 +1,7 @@
 /**
  * Tests sharding specific functionality of the setUserWriteBlockMode command. Non sharding specific
- * aspects of this command should be checked on jstests/noPassthrough/set_user_write_block_mode.js
- * instead.
+ * aspects of this command should be checked on
+ * jstests/noPassthrough/security/set_user_write_block_mode.js instead.
  *
  * @tags: [
  *   requires_fcv_60,

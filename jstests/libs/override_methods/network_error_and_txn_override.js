@@ -19,7 +19,7 @@
  * These two overrides are unified to simplify the retry logic.
  *
  * Unittests for these overrides are included in:
- *     jstests/noPassthrough/txn_override_causal_consistency.js
+ *     jstests/noPassthrough/txns_retryable_writes_sessions/txn_override_causal_consistency.js
  *     jstests/replsets/txn_override_unittests.js
  *     jstests/libs/txns/txn_passthrough_runner_selftest.js
  */

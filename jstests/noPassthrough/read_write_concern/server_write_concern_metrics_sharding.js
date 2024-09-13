@@ -10,7 +10,7 @@ import {
     generateCmdsWithNoWCProvided,
     verifyServerStatusChange,
     verifyServerStatusFields,
-} from "jstests/noPassthrough/server_write_concern_metrics.js";
+} from "jstests/noPassthrough/read_write_concern/server_write_concern_metrics.js";
 
 let rst;
 let conn;
