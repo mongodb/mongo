@@ -4002,7 +4002,7 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
 }
 
 namespace {
-const Expression* getNExprFromAccumulatorN(const WindowFunctionStatement& wfStmt) {
+Expression* getNExprFromAccumulatorN(const WindowFunctionStatement& wfStmt) {
     auto opName = wfStmt.expr->getOpName();
     if (opName == AccumulatorTop::getName()) {
         return dynamic_cast<window_function::ExpressionN<WindowFunctionTop, AccumulatorTop>*>(
@@ -4395,7 +4395,11 @@ public:
             initInputs = std::make_unique<InitIntegralInputs>(std::move(unitExpr));
         } else if (isAccumulatorN(opName)) {
             auto nExprPtr = getNExprFromAccumulatorN(outputField);
-            auto maxSizeExpr = generateExpression(state, nExprPtr, rootSlotOpt, outputs);
+
+            // Verify that our 'nExprPtr' evaluates to an integral constant.
+            // TODO SERVER-94694 Support allowing 'n' expression to reference the partition key.
+            AccumulatorN::validateN(nExprPtr->evaluate({}, &state.expCtx->variables));
+            auto maxSizeExpr = getArgExpr(nExprPtr);
 
             initInputs = std::make_unique<InitAccumNInputs>(std::move(maxSizeExpr),
                                                             b.makeBoolConstant(false));

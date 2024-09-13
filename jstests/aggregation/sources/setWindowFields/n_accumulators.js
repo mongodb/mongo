@@ -50,7 +50,7 @@ for (const acc of Object.keys(nAccumulators)) {
     }
 
     // Verify that the accumulator will not throw if the 'n' expression evaluates to a constant.
-    const pipeline = [
+    let pipeline = [
         {
             $setWindowFields: {
                 partitionBy: "$ticker",
@@ -62,6 +62,23 @@ for (const acc of Object.keys(nAccumulators)) {
 
     assert.doesNotThrow(() => coll.aggregate(pipeline).toArray());
 
+    // Verify that the accumulator will fail if the 'n' expression is non-constant.
+    // Skip testing $top/$bottom as these window functions don't take 'n' expression arguments (and
+    // so cannot possibly)
+    // TODO SERVER-94694 Support allowing 'n' expression to reference the partition key.
+    if (acc !== "$top" && acc !== "$bottom") {
+        pipeline = [
+            {
+                $setWindowFields: {
+                    partitionBy: "$partIndex",
+                    sortBy: {_id: 1},
+                    output: {res: {[acc]: nAccumulators[acc]({$add: ["$partIndex", 2]}, "price")}}
+                },
+            },
+        ];
+
+        assert.throwsWithCode(() => coll.aggregate(pipeline).toArray(), 5787902);
+    }
     // Error cases.
     function testError(accSpec, expectedCode) {
         assert.throwsWithCode(() => coll.aggregate([{
