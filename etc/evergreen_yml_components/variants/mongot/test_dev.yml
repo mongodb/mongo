@@ -16,7 +16,9 @@ buildvariants:
         MONGO_DISTMOD=amazon2023
         -j$(grep -c ^processor /proc/cpuinfo)
         --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
-      test_flags: --excludeWithAnyTags=incompatible_with_amazon_linux,requires_ldap_pool,requires_external_data_source,requires_latch_analyzer
+      test_flags: >-
+        --excludeWithAnyTags=incompatible_with_amazon_linux,requires_ldap_pool,requires_external_data_source,requires_latch_analyzer
+        --runAllFeatureFlagTests
       has_packages: false
       multiversion_platform: amazon2023
       multiversion_edition: enterprise
@@ -79,6 +81,7 @@ buildvariants:
       test_flags: >-
         --excludeWithAnyTags=incompatible_with_amazon_linux,requires_external_data_source,requires_latch_analyzer
         --enableEnterpriseTests=off
+        --runAllFeatureFlagTests
       has_packages: false
       multiversion_platform: amazon2023
       multiversion_edition: enterprise
@@ -193,7 +196,9 @@ buildvariants:
         MONGO_DISTMOD=amazon2
         -j$(grep -c ^processor /proc/cpuinfo)
         --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
-      test_flags: --excludeWithAnyTags=incompatible_with_amazon_linux,requires_ldap_pool,requires_external_data_source,requires_latch_analyzer
+      test_flags: >-
+        --excludeWithAnyTags=incompatible_with_amazon_linux,requires_ldap_pool,requires_external_data_source,requires_latch_analyzer
+        --runAllFeatureFlagTests
       has_packages: false
       multiversion_platform: amazon2
       multiversion_edition: enterprise
