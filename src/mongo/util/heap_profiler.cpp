@@ -679,9 +679,9 @@ private:
     std::atomic_size_t sampleIntervalBytes;  // NOLINT
 
     // guards updates to both object and stack hash tables
-    stdx::mutex hashtable_mutex;  // NOLINT
+    stdx::mutex hashtable_mutex;
     // guards against races updating the StackInfo bson representation
-    stdx::mutex stackinfo_mutex;  // NOLINT
+    stdx::mutex stackinfo_mutex;
 
     // cumulative bytes allocated - determines when samples are taken
     std::atomic_size_t bytesAllocated{0};  // NOLINT
@@ -870,7 +870,7 @@ private:
         }
     }
 
-    mutable stdx::mutex _mutex;  // NOLINT
+    mutable stdx::mutex _mutex;
     size_t _sampleBytesAllocated = 0;
     stdx::unordered_map<uint32_t, std::unique_ptr<StackInfo>> _stackInfoMap;
     Atomic<bool> _logGeneralStats = true;

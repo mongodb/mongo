@@ -131,7 +131,7 @@ public:
 
 private:
     boost::optional<HANDLE> _processHandle;
-    stdx::mutex _mutex;  // NOLINT
+    stdx::mutex _mutex;
     DWORD _origOptions;
 };
 

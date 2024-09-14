@@ -106,7 +106,7 @@ private:
         }
     }
 
-    mutable stdx::mutex _mutex;  // NOLINT
+    mutable stdx::mutex _mutex;
     Date_t _now = ClockSourceMock::kInitialNow;
     AlarmQueue _alarms;
 };

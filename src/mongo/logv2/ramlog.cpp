@@ -42,8 +42,7 @@ using std::string;
 
 namespace {
 typedef std::map<string, RamLog*> RM;
-// stdx::mutex // NOLINT is intentional, mongo::Mutex can not be used here
-stdx::mutex* _namedLock = NULL;  // NOLINT
+stdx::mutex* _namedLock = NULL;
 RM* _named = NULL;
 
 }  // namespace
@@ -157,7 +156,7 @@ size_t RamLog::LineIterator::getTotalLinesWritten() {
 RamLog* RamLog::get(const std::string& name) {
     if (!_namedLock) {
         // Guaranteed to happen before multi-threaded operation.
-        _namedLock = new stdx::mutex();  // NOLINT
+        _namedLock = new stdx::mutex();
     }
 
     stdx::lock_guard<stdx::mutex> lk(*_namedLock);
@@ -204,7 +203,7 @@ MONGO_INITIALIZER(RamLogCatalogV2)(InitializerContext*) {
             uasserted(ErrorCodes::InternalError, "Inconsistent intiailization of RamLogCatalog.");
         }
 
-        _namedLock = new stdx::mutex();  // NOLINT
+        _namedLock = new stdx::mutex();
         _named = new RM();
     }
 }

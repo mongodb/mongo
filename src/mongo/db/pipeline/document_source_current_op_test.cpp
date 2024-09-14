@@ -83,8 +83,7 @@ public:
                                        CurrentOpSessionsMode sessionMode,
                                        CurrentOpUserMode userMode,
                                        CurrentOpTruncateMode truncateMode,
-                                       CurrentOpCursorMode cursorMode,
-                                       CurrentOpBacktraceMode backtraceMode) const override {
+                                       CurrentOpCursorMode cursorMode) const override {
         return _ops;
     }
 

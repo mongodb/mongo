@@ -33,7 +33,7 @@ buildvariants:
       scons_cache_scope: shared
       large_distro_name: windows-2022-large
       test_flags: >-
-        --excludeWithAnyTags=incompatible_with_windows_tls,requires_external_data_source,requires_latch_analyzer
+        --excludeWithAnyTags=incompatible_with_windows_tls,requires_external_data_source
         --enableEnterpriseTests=off
       compile_variant: windows
     tasks:
@@ -82,7 +82,7 @@ buildvariants:
       push_bucket: downloads.10gen.com
       push_name: windows
       push_arch: x86_64-enterprise
-      test_flags: --excludeWithAnyTags=incompatible_with_windows_tls,requires_external_data_source,requires_latch_analyzer
+      test_flags: --excludeWithAnyTags=incompatible_with_windows_tls,requires_external_data_source
       exec_timeout_secs: 14400 # 3 hour timeout
       external_auth_jobs_max: 1
       compile_variant: enterprise-windows

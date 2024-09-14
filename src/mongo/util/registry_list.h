@@ -154,7 +154,7 @@ public:
     }
 
 private:
-    mutable stdx::mutex _m;  // NOLINT
+    mutable stdx::mutex _m;
     DataType _data;
 };
 

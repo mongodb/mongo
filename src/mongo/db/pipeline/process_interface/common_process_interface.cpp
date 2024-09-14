@@ -68,9 +68,6 @@
 #include "mongo/util/serialization_context.h"
 #include "mongo/util/str.h"
 
-#ifndef MONGO_CONFIG_USE_RAW_LATCHES
-#include "mongo/util/diagnostic_info.h"
-#endif
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kDefault
 
@@ -83,16 +80,11 @@ std::vector<BSONObj> CommonProcessInterface::getCurrentOps(
     CurrentOpSessionsMode sessionMode,
     CurrentOpUserMode userMode,
     CurrentOpTruncateMode truncateMode,
-    CurrentOpCursorMode cursorMode,
-    CurrentOpBacktraceMode backtraceMode) const {
+    CurrentOpCursorMode cursorMode) const {
     OperationContext* opCtx = expCtx->opCtx;
     AuthorizationSession* ctxAuth = AuthorizationSession::get(opCtx->getClient());
 
     std::vector<BSONObj> ops;
-
-#ifndef MONGO_CONFIG_USE_RAW_LATCHES
-    auto blockedOpGuard = DiagnosticInfo::maybeMakeBlockedOpForTest(opCtx->getClient());
-#endif
 
     auto reportCurrentOpForService = [&](Service* service) {
         for (Service::LockedClientsCursor cursor(service); ClientLock lc = cursor.next();) {
@@ -125,8 +117,7 @@ std::vector<BSONObj> CommonProcessInterface::getCurrentOps(
 
             // Delegate to the mongoD- or mongoS-specific implementation of
             // _reportCurrentOpForClient.
-            ops.emplace_back(
-                _reportCurrentOpForClient(expCtx, client, truncateMode, backtraceMode));
+            ops.emplace_back(_reportCurrentOpForClient(expCtx, client, truncateMode));
         }
     };
 

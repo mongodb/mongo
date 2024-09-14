@@ -174,8 +174,7 @@ public:
                                        CurrentOpSessionsMode sessionMode,
                                        CurrentOpUserMode userMode,
                                        CurrentOpTruncateMode truncateMode,
-                                       CurrentOpCursorMode cursorMode,
-                                       CurrentOpBacktraceMode backtraceMode) const final;
+                                       CurrentOpCursorMode cursorMode) const final;
 
     std::vector<FieldPath> collectDocumentKeyFieldsActingAsRouter(
         OperationContext*, const NamespaceString&) const override;
@@ -205,8 +204,7 @@ protected:
      */
     virtual BSONObj _reportCurrentOpForClient(const boost::intrusive_ptr<ExpressionContext>& expCtx,
                                               Client* client,
-                                              CurrentOpTruncateMode truncateOps,
-                                              CurrentOpBacktraceMode backtraceMode) const = 0;
+                                              CurrentOpTruncateMode truncateOps) const = 0;
 
     /**
      * Iterates through all entries in the local SessionCatalog, and adds an entry to the 'ops'

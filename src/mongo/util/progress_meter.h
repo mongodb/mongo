@@ -131,8 +131,8 @@ private:
 
     std::string _units;
 
-    mutable stdx::mutex _nameMutex;  // NOLINT
-    std::string _name;               // guarded by _nameMutex
+    mutable stdx::mutex _nameMutex;
+    std::string _name;  // guarded by _nameMutex
 };
 
 /*

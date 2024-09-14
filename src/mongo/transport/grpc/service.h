@@ -117,7 +117,7 @@ private:
     std::shared_ptr<WireVersionProvider> _wvProvider;
     std::shared_ptr<ClientCache> _clientCache;
 
-    mutable stdx::mutex _mutex;  // NOLINT
+    mutable stdx::mutex _mutex;
     stdx::condition_variable _shutdownCV;
     std::list<InSessionPtr> _sessions;
     bool _acceptNewRequests = true;

@@ -222,7 +222,7 @@ private:
 
         EntryImpl(EntryImpl* next, T data) : _readers(0), _data(data), _next(next) {}
 
-        void markDeletedAndAwaitReaders(stdx::unique_lock<stdx::mutex>& lk) {  // NOLINT
+        void markDeletedAndAwaitReaders(stdx::unique_lock<stdx::mutex>& lk) {
             if (_readers.loadRelaxed() & kWriteIntentMask) {
                 // Another thread is removing this entry, or has already removed it.
                 return;
@@ -300,7 +300,7 @@ private:
         EntryImpl* const _next;
     };
 
-    stdx::mutex _updateMutex;                          // NOLINT
+    stdx::mutex _updateMutex;
     std::list<std::unique_ptr<EntryImpl>> _allocated;  // Maintains a list of all allocated entries.
     std::list<EntryImpl*> _freeList;
     Atomic<EntryImpl*> _head;

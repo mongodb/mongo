@@ -119,7 +119,7 @@ public:
     }
 
 private:
-    stdx::mutex _mu;  // NOLINT
+    stdx::mutex _mu;
     stdx::condition_variable _cv;
     std::exception_ptr _ex;
     bool _done = false;

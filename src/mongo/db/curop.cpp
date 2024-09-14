@@ -235,7 +235,6 @@ CurOp* CurOp::get(const OperationContext& opCtx) {
 void CurOp::reportCurrentOpForClient(const boost::intrusive_ptr<ExpressionContext>& expCtx,
                                      Client* client,
                                      bool truncateOps,
-                                     bool backtraceMode,
                                      BSONObjBuilder* infoBuilder) {
     invariant(client);
 
@@ -328,24 +327,6 @@ void CurOp::reportCurrentOpForClient(const boost::intrusive_ptr<ExpressionContex
         // should label each op with its associated role.
         infoBuilder->append("role", toString(client->getService()->role()));
     }
-
-#ifndef MONGO_CONFIG_USE_RAW_LATCHES
-    if (auto diagnostic = DiagnosticInfo::get(*client)) {
-        BSONObjBuilder waitingForLatchBuilder(infoBuilder->subobjStart("waitingForLatch"));
-        waitingForLatchBuilder.append("timestamp", diagnostic->getTimestamp());
-        waitingForLatchBuilder.append("captureName", diagnostic->getCaptureName());
-        if (backtraceMode) {
-            BSONArrayBuilder backtraceBuilder(waitingForLatchBuilder.subarrayStart("backtrace"));
-            /** This branch becomes useful again with SERVER-44091
-            for (const auto& frame : diagnostic->makeStackTrace().frames) {
-                BSONObjBuilder backtraceObj(backtraceBuilder.subobjStart());
-                backtraceObj.append("addr", unsignedHex(frame.instructionOffset));
-                backtraceObj.append("path", frame.objectPath);
-            }
-            */
-        }
-    }
-#endif
 }
 
 bool CurOp::currentOpBelongsToTenant(Client* client, TenantId tenantId) {

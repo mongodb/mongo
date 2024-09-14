@@ -42,7 +42,7 @@ variables:
     push_bucket: downloads.10gen.com
     push_name: windows
     push_arch: x86_64-enterprise
-    test_flags: --excludeWithAnyTags=incompatible_with_windows_tls,requires_latch_analyzer
+    test_flags: --excludeWithAnyTags=incompatible_with_windows_tls
     external_auth_jobs_max: 1
 
 buildvariants:

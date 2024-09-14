@@ -73,7 +73,7 @@ struct Notification {
         cv.wait(lk, [&] { return notified; });
     }
 
-    stdx::mutex mu;  // NOLINT
+    stdx::mutex mu;
     stdx::condition_variable cv;
     bool notified = false;
 };
@@ -114,7 +114,7 @@ public:
         taskRunner->schedule(std::move(task));
     }
 
-    stdx::mutex mu;  // NOLINT
+    stdx::mutex mu;
     int nThreads = 0;
     ServiceContext* sc;
 };

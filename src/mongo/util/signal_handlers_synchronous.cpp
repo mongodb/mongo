@@ -209,12 +209,12 @@ public:
     }
 
 private:
-    static stdx::mutex _streamMutex;  // NOLINT
+    static stdx::mutex _streamMutex;
     static thread_local int terminateDepth;
     stdx::unique_lock<stdx::mutex> _lk;
 };
 
-stdx::mutex MallocFreeOStreamGuard::_streamMutex;  // NOLINT
+stdx::mutex MallocFreeOStreamGuard::_streamMutex;
 thread_local int MallocFreeOStreamGuard::terminateDepth = 0;
 
 void logNoRecursion(StringData message) {

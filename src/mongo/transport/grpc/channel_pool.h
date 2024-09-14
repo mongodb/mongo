@@ -256,7 +256,7 @@ private:
     ChannelFactory _channelFactory;
     StubFactory _stubFactory;
 
-    mutable stdx::mutex _mutex;  // NOLINT
+    mutable stdx::mutex _mutex;
 
     using ChannelMapKeyType = std::pair<HostAndPort, bool>;
     stdx::unordered_map<ChannelMapKeyType, std::shared_ptr<ChannelState>> _channels;

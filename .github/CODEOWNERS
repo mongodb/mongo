@@ -151,7 +151,6 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 /jstests/core/**/hostinfo.js @10gen/server-networking-and-observability @svc-auto-approve-bot
 /jstests/core/**/diagdata.js @10gen/server-networking-and-observability @svc-auto-approve-bot
 /jstests/core/**/failcommand_failpoint.js @10gen/server-programmability @svc-auto-approve-bot
-/jstests/core/**/latch_analyzer.js @10gen/server-programmability @svc-auto-approve-bot
 /jstests/core/capped/* @10gen/server-storage-execution @svc-auto-approve-bot
 /jstests/core/clustered/* @10gen/server-storage-execution @svc-auto-approve-bot
 /jstests/core/timeseries/* @10gen/server-storage-execution @svc-auto-approve-bot

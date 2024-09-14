@@ -77,7 +77,7 @@ private:
 
     private:
         SharedState* _p;
-        stdx::unique_lock<stdx::mutex> _lk{_p->_mutex};  // NOLINT
+        stdx::unique_lock<stdx::mutex> _lk{_p->_mutex};
     };
 
 public:
@@ -101,7 +101,7 @@ private:
     class WorkerThreadInfo;
 
     const RunTaskInline _runTaskInline;
-    mutable stdx::mutex _mutex;  // NOLINT
+    mutable stdx::mutex _mutex;
     stdx::condition_variable _cv;
     AtomicWord<bool> _isRunning;
     size_t _threads = 0;

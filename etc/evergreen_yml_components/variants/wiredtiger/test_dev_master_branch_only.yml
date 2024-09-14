@@ -44,7 +44,6 @@ variables:
       --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
       --enable-http-client=on
       --link-model=dynamic
-      --use-diagnostic-latches=on
       --modules=
     num_scons_link_jobs_available: 0.99
 
@@ -90,7 +89,6 @@ buildvariants:
         --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
         --enable-http-client=on
         --link-model=dynamic
-        --use-diagnostic-latches=on
         --modules=
       scons_cache_mode: all
       scons_cache_scope: shared
@@ -159,7 +157,7 @@ buildvariants:
       multiversion_edition: enterprise
       jstestfuzz_num_generated_files: 35
       large_distro_name: windows-2022-large
-      test_flags: --excludeWithAnyTags=incompatible_with_windows_tls,requires_latch_analyzer
+      test_flags: --excludeWithAnyTags=incompatible_with_windows_tls
       external_auth_jobs_max: 1
       use_wt_develop: true
       compile_variant: *enterprise-windows-wtdevelop

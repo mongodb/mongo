@@ -205,7 +205,7 @@ private:
 
     Client* const _clientPtr;
 
-    stdx::mutex _mutex;  // NOLINT
+    stdx::mutex _mutex;
 
     // Once we have stdx::atomic::wait(), we can get rid of the mutex in favor of this variable.
     AtomicWord<bool> _isBound{false};

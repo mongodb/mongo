@@ -539,7 +539,7 @@ public:
     // These are only used to signal completion to blocking waiters. Benchmarks showed that it was
     // worth deferring the construction of cv, so it can be avoided when it isn't necessary.
 
-    stdx::mutex mx;                                // NOLINT F
+    stdx::mutex mx;                                // F
     boost::optional<stdx::condition_variable> cv;  // F (but guarded by mutex)
 
     // This holds the children created from a SharedSemiFuture. When this SharedState is completed,

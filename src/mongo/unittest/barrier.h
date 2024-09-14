@@ -64,7 +64,7 @@ private:
     size_t _threadCount;
     size_t _threadsWaiting;
     uint64_t _generation;
-    stdx::mutex _mutex;  // NOLINT
+    stdx::mutex _mutex;
     stdx::condition_variable _condition;
 };
 

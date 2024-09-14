@@ -90,7 +90,7 @@ public:
     }
 
 private:
-    stdx::mutex _mutex;  // NOLINT
+    stdx::mutex _mutex;
     stdx::condition_variable _cv;
     bool _released = false;
     uint64_t _progress = 0;

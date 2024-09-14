@@ -67,8 +67,6 @@ selector:
     - jstests/core/loadserverscripts.js
     - jstests/core/shell/shellstartparallel.js
     - jstests/core/txns/*.js
-    - jstests/core/latch_analyzer.js
-    - jstests/core/administrative/current_op/currentop_waiting_for_latch.js
     - jstests/core/query/map_reduce/mr_killop.js
     - jstests/core/query/count/count_plan_summary.js
     - jstests/core/write/crud_ops_do_not_throw_locktimeout.js

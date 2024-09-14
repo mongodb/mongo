@@ -664,7 +664,6 @@ mongo_cc_library(
         "//src/mongo/s/catalog:types_validators.h",
         "//src/mongo/s/resharding:common_types_gen",
         "//src/mongo/s/resharding:type_collection_fields_gen",
-        "//src/mongo/util:diagnostic_info.h",
         "//src/mongo/util:elapsed_tracker.h",
         "//src/mongo/util:hash_utils.h",
         "//src/mongo/util:histogram.h",

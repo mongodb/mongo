@@ -791,11 +791,6 @@ mongo_cc_library(
         "//src/mongo/util:progress_meter",
         "//src/mongo/util/concurrency:spin_lock",  # TODO(SERVER-93876): Remove.
     ] + select({
-        "//bazel/config:use_diagnostic_latches_enabled": [
-            "//src/mongo/util:diagnostic_info",
-        ],
-        "//conditions:default": [],
-    }) + select({
         "//bazel/config:use_tracing_profiler_enabled": [
             "//src/mongo/util/tracing_profiler",  # TODO(SERVER-93876): Remove.
         ],

@@ -60,7 +60,7 @@ stdx::cv_status ClockSource::waitForConditionUntil(stdx::condition_variable& cv,
     }
 
     struct AlarmInfo {
-        stdx::mutex mutex;  // NOLINT
+        stdx::mutex mutex;
 
         stdx::condition_variable* cv;
         stdx::cv_status result = stdx::cv_status::no_timeout;

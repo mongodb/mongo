@@ -96,7 +96,7 @@ private:
 
     const Milliseconds _granularity;
 
-    stdx::mutex _mutex;  // NOLINT
+    stdx::mutex _mutex;
     stdx::condition_variable _condition;
     bool _inShutdown = false;
     bool _started = false;

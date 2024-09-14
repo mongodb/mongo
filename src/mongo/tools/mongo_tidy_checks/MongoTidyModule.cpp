@@ -37,7 +37,6 @@
 #include "MongoHeaderBracketCheck.h"
 #include "MongoInvariantStatusIsOKCheck.h"
 #include "MongoMacroDefinitionLeaksCheck.h"
-#include "MongoMutexCheck.h"
 #include "MongoNoUniqueAddressCheck.h"
 #include "MongoPolyFillCheck.h"
 #include "MongoRWMutexCheck.h"
@@ -73,7 +72,6 @@ public:
         CheckFactories.registerCheck<MongoVolatileCheck>("mongo-volatile-check");
         CheckFactories.registerCheck<MongoTraceCheck>("mongo-trace-check");
         CheckFactories.registerCheck<MongoStdAtomicCheck>("mongo-std-atomic-check");
-        CheckFactories.registerCheck<MongoMutexCheck>("mongo-mutex-check");
         CheckFactories.registerCheck<MongoAssertCheck>("mongo-assert-check");
         CheckFactories.registerCheck<MongoFCVConstantCheck>("mongo-fcv-constant-check");
         CheckFactories.registerCheck<MongoUnstructuredLogCheck>("mongo-unstructured-log-check");

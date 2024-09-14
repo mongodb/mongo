@@ -74,7 +74,7 @@ public:
     }
 
 private:
-    mutable stdx::mutex _mutex;  // NOLINT
+    mutable stdx::mutex _mutex;
     ListType _list;
 };
 
@@ -193,7 +193,7 @@ private:
     Atomic<size_t> _totalObserved;
     Atomic<size_t> _totalUpdated;
 
-    stdx::mutex _mutex;  // NOLINT
+    stdx::mutex _mutex;
     size_t _threads;
     TickSource::Tick _startedAt;
 };

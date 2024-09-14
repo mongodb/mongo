@@ -39,6 +39,7 @@
 #include <utility>
 
 #include "mongo/stdx/unordered_map.h"
+#include "mongo/util/assert_util.h"
 
 namespace mongo {
 

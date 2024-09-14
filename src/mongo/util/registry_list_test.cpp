@@ -100,7 +100,7 @@ TEST(RegistryList, ConcurrentAdd) {
 
 
     struct State {
-        stdx::mutex m;  // NOLINT
+        stdx::mutex m;
         size_t workersDone = 0;
     } state;
 

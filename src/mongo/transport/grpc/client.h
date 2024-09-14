@@ -112,7 +112,7 @@ private:
     std::string _clientMetadata;
     std::shared_ptr<EgressSession::SharedState> _sharedState;
 
-    mutable stdx::mutex _mutex;  // NOLINT
+    mutable stdx::mutex _mutex;
     stdx::condition_variable _shutdownCV;
     ClientState _state = ClientState::kUninitialized;
     size_t _ongoingConnects = 0;

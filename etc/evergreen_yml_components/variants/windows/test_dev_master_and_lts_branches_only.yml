@@ -27,7 +27,7 @@ buildvariants:
       python: "/cygdrive/c/python/python310/python.exe"
       test_flags: >-
         --storageEngine=inMemory
-        --excludeWithAnyTags=requires_persistence,requires_journaling,incompatible_with_windows_tls,requires_latch_analyzer
+        --excludeWithAnyTags=requires_persistence,requires_journaling,incompatible_with_windows_tls
       ext: zip
       scons_cache_scope: shared
       multiversion_platform: windows

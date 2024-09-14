@@ -429,7 +429,7 @@ private:
     // Mutex that synchronizes access to mutable data in this class and its subclasses.
     // Fields guarded by the mutex are labled (M), below, and those that are read-only
     // in multi-threaded execution, and so unsynchronized, are labeled (R).
-    stdx::mutex _mutex;  // NOLINT
+    stdx::mutex _mutex;
 
     // A mocked clock source.
     std::unique_ptr<ClockSourceMock> _clkSource;  // (M)

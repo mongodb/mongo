@@ -815,7 +815,7 @@ public:
 
     private:
         struct Core {
-            mutable stdx::mutex mutex;  // NOLINT
+            mutable stdx::mutex mutex;
             mutable stdx::condition_variable cv;
             int64_t created = 0;
             int64_t started = 0;

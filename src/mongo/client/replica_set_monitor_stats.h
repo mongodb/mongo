@@ -64,7 +64,7 @@ public:
 private:
     const Microseconds _resetTimeout;
 
-    mutable stdx::mutex _mutex;  // NOLINT.
+    mutable stdx::mutex _mutex;
 
     // Stats for the outer loop of getHostAndRefresh().
 

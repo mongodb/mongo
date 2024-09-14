@@ -41,7 +41,6 @@ if env.GetOption("ninja") == "disabled":
         "test_MongoStdOptionalCheck.cpp",
         "test_MongoTraceCheck.cpp",
         "test_MongoStdAtomicCheck.cpp",
-        "test_MongoMutexCheck.cpp",
         "test_MongoAssertCheck.cpp",
         "test_MongoFCVConstantCheck.cpp",
         "test_MongoUnstructuredLogCheck.cpp",

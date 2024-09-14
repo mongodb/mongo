@@ -69,46 +69,6 @@ idl_generator(
     src = "tcmalloc_parameters.idl",
 )
 
-mongo_cc_library(
-    name = "diagnostic_info",
-    srcs = [
-        "diagnostic_info.cpp",
-    ],
-    hdrs = [
-        "diagnostic_info.h",
-    ],
-    target_compatible_with = select({
-        "//bazel/config:use_diagnostic_latches_enabled": [],
-        "//conditions:default": ["@platforms//:incompatible"],
-    }),
-    deps = [
-        ":fail_point",  # TODO(SERVER-93876): Remove.
-        "//src/mongo:base",
-        "//src/mongo/db:service_context",
-        "//src/mongo/util/concurrency:spin_lock",  # TODO(SERVER-93876): Remove.
-    ],
-)
-
-mongo_cc_library(
-    name = "latch_analyzer",
-    srcs = [
-        "latch_analyzer.cpp",
-    ],
-    hdrs = [
-        "latch_analyzer.h",
-    ],
-    target_compatible_with = select({
-        "//bazel/config:use_diagnostic_latches_enabled": [],
-        "//conditions:default": ["@platforms//:incompatible"],
-    }),
-    deps = [
-        ":fail_point",  # TODO(SERVER-93876): Remove.
-        "//src/mongo:base",
-        "//src/mongo/db:service_context",
-        "//src/mongo/db/commands:server_status_core",  # TODO(SERVER-93876): Remove.
-    ],
-)
-
 idl_generator(
     name = "password_params_gen",
     src = "password_params.idl",

@@ -384,8 +384,7 @@ public:
 protected:
     BSONObj _reportCurrentOpForClient(const boost::intrusive_ptr<ExpressionContext>& expCtx,
                                       Client* client,
-                                      CurrentOpTruncateMode truncateOps,
-                                      CurrentOpBacktraceMode backtraceMode) const final;
+                                      CurrentOpTruncateMode truncateOps) const final;
 
     void _reportCurrentOpsForIdleSessions(OperationContext* opCtx,
                                           CurrentOpUserMode userMode,

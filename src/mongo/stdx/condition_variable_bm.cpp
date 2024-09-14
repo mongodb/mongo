@@ -58,7 +58,7 @@ volatile bool alwaysTrue = true;  // NOLINT
 
 void BM_stdWaitWithTruePredicate(benchmark::State& state) {
     std::condition_variable cv;  // NOLINT
-    stdx::mutex mutex;           // NOLINT
+    stdx::mutex mutex;
     stdx::unique_lock<stdx::mutex> lk(mutex);
 
     for (auto _ : state) {
@@ -69,7 +69,7 @@ void BM_stdWaitWithTruePredicate(benchmark::State& state) {
 
 void BM_stdxWaitWithTruePredicate(benchmark::State& state) {
     stdx::condition_variable cv;
-    stdx::mutex mutex;  // NOLINT
+    stdx::mutex mutex;
     stdx::unique_lock<stdx::mutex> lk(mutex);
 
     for (auto _ : state) {

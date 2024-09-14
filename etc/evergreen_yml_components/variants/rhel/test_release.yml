@@ -23,7 +23,7 @@ buildvariants:
       tooltags: ""
       build_mongoreplay: true
       test_flags: >-
-        --excludeWithAnyTags=requires_os_access,requires_latch_analyzer
+        --excludeWithAnyTags=requires_os_access
         --enableEnterpriseTests=off
       compile_variant: ubi8
     tasks:
@@ -54,7 +54,7 @@ buildvariants:
         --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
         --modules=
       test_flags: >-
-        --excludeWithAnyTags=requires_external_data_source,requires_increased_memlock_limits,requires_latch_analyzer
+        --excludeWithAnyTags=requires_external_data_source,requires_increased_memlock_limits
         --enableEnterpriseTests=off
       multiversion_platform: rhel80
       multiversion_platform_50_or_later: rhel8
@@ -102,7 +102,7 @@ buildvariants:
         --ssl MONGO_DISTMOD=rhel88
         -j$(grep -c ^processor /proc/cpuinfo)
         --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
-      test_flags: --excludeWithAnyTags=requires_external_data_source,requires_latch_analyzer
+      test_flags: --excludeWithAnyTags=requires_external_data_source
       crypt_task_compile_flags: >-
         SHLINKFLAGS_EXTRA="-Wl,-Bsymbolic -Wl,--no-gnu-unique"
         CFLAGS="-fno-gnu-unique"
@@ -161,7 +161,7 @@ buildvariants:
         --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
         --modules=
       test_flags: >-
-        --excludeWithAnyTags=requires_external_data_source,requires_increased_memlock_limits,requires_latch_analyzer
+        --excludeWithAnyTags=requires_external_data_source,requires_increased_memlock_limits
         --enableEnterpriseTests=off
       has_packages: true
       packager_script: packager.py
@@ -205,7 +205,7 @@ buildvariants:
         --ssl MONGO_DISTMOD=rhel88
         -j$(grep -c ^processor /proc/cpuinfo)
         --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
-      test_flags: --excludeWithAnyTags=requires_external_data_source,requires_latch_analyzer,resource_intensive
+      test_flags: --excludeWithAnyTags=requires_external_data_source,resource_intensive
       crypt_task_compile_flags: >-
         SHLINKFLAGS_EXTRA="-Wl,-Bsymbolic
         -Wl,--no-gnu-unique"
@@ -253,7 +253,7 @@ buildvariants:
         --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
         --modules=
       test_flags: >-
-        --excludeWithAnyTags=requires_external_data_source,requires_latch_analyzer
+        --excludeWithAnyTags=requires_external_data_source
         --enableEnterpriseTests=off
       multiversion_platform: rhel93
       multiversion_edition: targeted
@@ -295,7 +295,7 @@ buildvariants:
       push_name: linux
       push_arch: x86_64-enterprise-rhel93
       compile_flags: --ssl MONGO_DISTMOD=rhel93 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
-      test_flags: --excludeWithAnyTags=requires_external_data_source,requires_latch_analyzer
+      test_flags: --excludeWithAnyTags=requires_external_data_source
       crypt_task_compile_flags: SHLINKFLAGS_EXTRA="-Wl,-Bsymbolic -Wl,--no-gnu-unique" CCFLAGS="-fno-gnu-unique"
       multiversion_platform: rhel93
       multiversion_edition: enterprise
@@ -348,7 +348,7 @@ buildvariants:
         --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
         --modules=
       test_flags: >-
-        --excludeWithAnyTags=requires_external_data_source,requires_latch_analyzer
+        --excludeWithAnyTags=requires_external_data_source
         --enableEnterpriseTests=off
       has_packages: true
       packager_script: packager.py
@@ -395,7 +395,7 @@ buildvariants:
         --ssl MONGO_DISTMOD=rhel93
         -j$(grep -c ^processor /proc/cpuinfo)
         --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
-      test_flags: --excludeWithAnyTags=requires_external_data_source,requires_latch_analyzer
+      test_flags: --excludeWithAnyTags=requires_external_data_source
       crypt_task_compile_flags: >-
         SHLINKFLAGS_EXTRA="-Wl,-Bsymbolic
         -Wl,--no-gnu-unique"
@@ -433,7 +433,6 @@ buildvariants:
     stepback: false
     expansions:
       test_flags: >-
-        --excludeWithAnyTags=requires_latch_analyzer
         --mongodSetParameters="{internalQueryEnableAggressiveSpillsInGroup: true}"
       compile_flags: >-
         --ssl

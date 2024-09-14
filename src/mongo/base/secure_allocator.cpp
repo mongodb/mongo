@@ -126,7 +126,7 @@ void EnablePrivilege(const wchar_t* name) {
  * size, and then raising the working set. This is the same reason that "i++" has race conditions
  * across multiple threads.
  */
-stdx::mutex workingSizeMutex;  // NOLINT
+stdx::mutex workingSizeMutex;
 
 /**
  * There is a minimum gap between the minimum working set size and maximum working set size.
@@ -376,7 +376,7 @@ public:
     void deallocate(void* ptr, std::size_t bytes);
 
 private:
-    stdx::mutex allocatorMutex;  // NOLINT
+    stdx::mutex allocatorMutex;
     stdx::unordered_map<void*, std::shared_ptr<Allocation>> secureTable;
     std::shared_ptr<Allocation> lastAllocation;
 };
