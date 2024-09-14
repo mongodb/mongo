@@ -936,20 +936,33 @@ Value ExpressionArrayToObject::evaluate(const Document& root, Variables* variabl
                               << typeName(elem.getType()),
                 (elem.getType() == BSONType::Object));
 
+            auto computedSize = elem.getDocument().computeSize();
+            auto key = elem.getDocument().getField("k");
+            auto valuePos = elem.getDocument().positionOf("v");
+            auto value = valuePos.found() ? elem.getDocument().getField(valuePos) : Value{};
+
+            // Check for whether the value is actually present, just EOO. This can occur if the
+            // value is provided, but resolves to EOO. In this case, computeSize() will not count
+            // the value properly and we need to manually increment the computed size to account for
+            // the EOO value.
+            //
+            // We don't need to do this for the key because the key is expected to be a string in a
+            // later check, so EOO isn't an acceptable key.
+            if (value.missing() && valuePos.found()) {
+                computedSize++;
+            }
+
             uassert(40392,
                     str::stream() << "$arrayToObject requires an object keys of 'k' and 'v'. "
                                      "Found incorrect number of keys:"
                                   << elem.getDocument().computeSize(),
-                    (elem.getDocument().computeSize() == 2));
-
-            Value key = elem.getDocument().getField("k");
-            Value value = elem.getDocument().getField("v");
+                    computedSize == 2);
 
             uassert(40393,
                     str::stream() << "$arrayToObject requires an object with keys 'k' and 'v'. "
                                      "Missing either or both keys from: "
                                   << elem.toString(),
-                    (!key.missing() && !value.missing()));
+                    (!key.missing() && valuePos.found()));
 
             uassert(
                 40394,
