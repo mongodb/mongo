@@ -850,8 +850,8 @@ function clearPlanCache(collection) {
 function deepSortObjAndArr(ent) {
     if (Array.isArray(ent)) {
         let result = ent.map(deepSortObjAndArr);
-        return result.map(i => JSON.stringify(i)).sort().map(i => JSON.parse(i));
-    } else if (typeof ent === 'object' && ent !== null) {
+        return result.sort(bsonWoCompare);
+    } else if (typeof ent === 'object' && ent !== null && !ent.tojson) {
         const sortedObj = {};
         Object.keys(ent).sort().forEach(key => {
             sortedObj[key] = deepSortObjAndArr(ent[key]);
@@ -896,7 +896,12 @@ function resultsIdentical(results1, results2) {
     if (results1.length !== results2.length) {
         return false;
     }
-    return JSON.stringify(results1) === JSON.stringify(results2);
+    // For each document in the result, compare them by taking into account different
+    // BSON representations of the same logical value, e.g.
+    // NumberInt(123) == NumberLong(123) == NumberDecimal("123") == JavaScript Number(123).
+    return results1.every((r1, idx) => {
+        return bsonWoCompare(r1, results2[idx]) === 0;
+    });
 }
 
 // Runs a manual repro of just the failing pipeline and its mutant that the user set in
