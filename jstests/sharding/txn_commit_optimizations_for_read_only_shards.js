@@ -73,6 +73,13 @@ let st = new ShardingTest({
     shards: 3,
     // Create shards with more than one node because we test for writeConcern majority failing.
     config: TestData.configShard ? undefined : 1,
+    rsOptions: {
+        setParameter: {
+            // Set this to higher than the deault 5ms to avoid failures due to not being able to
+            // acquire the lock quickly enough.
+            maxTransactionLockRequestTimeoutMillis: ReplSetTest.kDefaultTimeoutMS,
+        }
+    },
     other: {
         // The name of the shards affects the ordering of which shard will be targeted first
         // for broadcast operations so always use the same names for each test run.
