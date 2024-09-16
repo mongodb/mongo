@@ -532,12 +532,14 @@ PreImagesTruncateStats PreImagesTenantMarkers::truncateExpiredPreImages(Operatio
         opCtx, NamespaceStringOrUUID{_preImagesCollectionNss.dbName(), _preImagesCollectionUUID});
     const auto& preImagesColl = preImagesCollection.getCollectionPtr();
 
+    PreImagesTruncateStats stats;
+
     // All pre-images with 'ts' <= 'maxTSEligibleForTruncate' are candidates for truncation.
     // However, pre-images with 'ts' > 'maxTSEligibleForTruncate' are unsafe to truncate, as
     // there may be oplog holes or inconsistent data prior to it. Compute the value once, as it
     // requires making an additional call into the storage engine.
     Timestamp maxTSEligibleForTruncate = getMaxTSEligibleForTruncate(opCtx);
-
+    stats.maxTimestampEligibleForTruncate = maxTSEligibleForTruncate;
 
     // TODO SERVER-90305: Explore options for handling rollback-to-stable with truncate markers.
     //
@@ -553,7 +555,6 @@ PreImagesTruncateStats PreImagesTenantMarkers::truncateExpiredPreImages(Operatio
     //      (3) If a truncate is issued on data that is later rolled back, unexpired pre-images will
     //      be rolled back in the process. From the stable timestamp, oplog entries will be replayed
     //      and re-inserted into truncate markers (mirroring truncate behavior in a stable state).
-    PreImagesTruncateStats stats;
     for (auto& [nsUUID, truncateMarkersForNsUUID] : *markersMapSnapshot) {
         RecordId minRecordId =
             change_stream_pre_image_util::getAbsoluteMinPreImageRecordIdBoundForNs(nsUUID)

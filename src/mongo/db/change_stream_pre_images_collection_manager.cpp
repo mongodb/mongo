@@ -149,6 +149,7 @@ BSONObj ChangeStreamPreImagesCollectionManager::PurgingJobStats::toBSON() const 
         .append("bytesDeleted", bytesDeleted.loadRelaxed())
         .append("scannedCollections", scannedCollections.loadRelaxed())
         .append("scannedInternalCollections", scannedInternalCollections.loadRelaxed())
+        .append("maxTimestampEligibleForTruncate", maxTimestampEligibleForTruncate.loadRelaxed())
         .append("maxStartWallTimeMillis", maxStartWallTime.loadRelaxed().toMillisSinceEpoch())
         .append("timeElapsedMillis", timeElapsedMillis.loadRelaxed());
     return builder.obj();
@@ -468,6 +469,9 @@ size_t ChangeStreamPreImagesCollectionManager::_deleteExpiredPreImagesWithTrunca
     const auto truncateStats =
         _truncateManager.truncateExpiredPreImages(opCtx, std::move(tenantId));
 
+    _purgingJobStats.maxTimestampEligibleForTruncate.store(
+        truncateStats.maxTimestampEligibleForTruncate);
+
     if (truncateStats.maxStartWallTime > _purgingJobStats.maxStartWallTime.loadRelaxed()) {
         _purgingJobStats.maxStartWallTime.store(truncateStats.maxStartWallTime);
     }
@@ -478,7 +482,6 @@ size_t ChangeStreamPreImagesCollectionManager::_deleteExpiredPreImagesWithTrunca
         truncateStats.scannedInternalCollections);
 
     _purgingJobStats.scannedCollections.fetchAndAddRelaxed(1);
-
     return truncateStats.docsDeleted;
 }
 

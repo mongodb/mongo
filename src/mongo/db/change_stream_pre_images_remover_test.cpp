@@ -730,6 +730,7 @@ TEST_F(PreImagesRemoverTest, TruncatesAreOnlyAfterAllDurable) {
     setExpirationTime(Seconds{1});
 
     auto passStats = performPass(Milliseconds{0});
+    ASSERT_EQ(passStats["maxTimestampEligibleForTruncate"].timestamp(), allDurableTS);
     ASSERT_EQ(passStats["totalPass"].numberLong(), 1);
     ASSERT_EQ(passStats["docsDeleted"].numberLong(), numRecordsBeforeAllDurableTimestamp);
     ASSERT_EQ(passStats["scannedInternalCollections"].numberLong(), 1);

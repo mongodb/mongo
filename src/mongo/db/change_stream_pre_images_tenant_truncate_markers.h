@@ -50,6 +50,10 @@ struct PreImagesTruncateStats {
     // The number of 'nsUUID's scanned in the truncate pass.
     int64_t scannedInternalCollections{0};
 
+    // Instantaneous maximum timestamp eligible for truncation. Expired documents will only be
+    // truncated when their timestamp is less than or equal to it.
+    Timestamp maxTimestampEligibleForTruncate;
+
     // The maximum wall time from the pre-images truncated across the collection.
     Date_t maxStartWallTime{};
 };

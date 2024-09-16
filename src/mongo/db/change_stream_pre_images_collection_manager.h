@@ -109,6 +109,12 @@ public:
         AtomicWord<Date_t> maxStartWallTime;
 
         /**
+         * The maximum timestamp expired pre-images, in the most recent pass, could have to be
+         * eligible for truncate.
+         */
+        AtomicWord<Timestamp> maxTimestampEligibleForTruncate;
+
+        /**
          * Serializes the purging job statistics to the BSON object.
          */
         BSONObj toBSON() const;
