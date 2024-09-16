@@ -188,7 +188,7 @@ extern "C" int LLVMFuzzerTestOneInput(const char* Data, size_t Size) {
     // Now we are ready to decompress. Set up both APIs.
     BSONColumn column(Data, Size);
     bsoncolumn::BSONColumnBlockBased block(Data, Size);
-    boost::intrusive_ptr allocator{new ElementStorage()};
+    boost::intrusive_ptr allocator{new BSONElementStorage()};
     std::vector<BSONObj> iteratorObjs;
     std::string blockBasedError;
     std::string iteratorError;

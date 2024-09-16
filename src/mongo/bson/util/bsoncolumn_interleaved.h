@@ -506,7 +506,7 @@ const char* BlockBasedInterleavedDecompressor::decompressGeneral(
                 invariant(buffers.empty(),
                           "decompressing paths with a nested relationship is not yet supported");
 
-                // We must write a BSONElement to ElementStorage since this scalar is part of an
+                // We must write a BSONElement to BSONElementStorage since this scalar is part of an
                 // object being materialized.
                 visit(OverloadedVisitor{
                           [&](BSONElement& bsonElem) {
