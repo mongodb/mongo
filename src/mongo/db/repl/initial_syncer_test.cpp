@@ -712,6 +712,13 @@ BSONObj makeOplogEntryObj(int t, OpTypeEnum opType, int version) {
     return makeOplogEntry(t, opType, version).getEntry().toBSON();
 }
 
+BSONObj getLastLTSBson() {
+    FeatureCompatibilityVersionDocument fcvDoc;
+    // (Generic FCV reference): This FCV reference should exist across LTS binary versions.
+    fcvDoc.setVersion(multiversion::GenericFCV::kLastLTS);
+    return fcvDoc.toBSON();
+}
+
 void InitialSyncerTest::processSuccessfulLastOplogEntryFetcherResponse(std::vector<BSONObj> docs) {
     auto net = getNet();
     auto request =
@@ -1884,32 +1891,22 @@ TEST_F(InitialSyncerTest, InitialSyncerCancelsFCVFetcherOnShutdown) {
     auto opCtx = makeOpCtx();
 
     _syncSourceSelector->setChooseNewSyncSourceResult_forTest(HostAndPort("localhost", 12345));
+
+    _mock
+        ->expect(
+            BSON("find"
+                 << "oplog.rs"),
+            makeCursorResponse(0LL, NamespaceString::kRsOplogNamespace, {makeOplogEntryObj(1)}))
+        .times(2);
+
     ASSERT_OK(initialSyncer->startup(opCtx.get(), maxAttempts));
 
-    auto net = getNet();
-    {
-        executor::NetworkInterfaceMock::InNetworkGuard guard(net);
+    // Run mock.
+    _mock->runUntilExpectationsSatisfied();
 
-        // Base rollback ID.
-        net->scheduleSuccessfulResponse(makeRollbackCheckerResponse(1));
-
-        // Oplog entry associated with the defaultBeginFetchingTimestamp.
-        processSuccessfulLastOplogEntryFetcherResponse({makeOplogEntryObj(1)});
-
-        // Send an empty optime as the response to the beginFetchingOptime find request, which will
-        // cause the beginFetchingTimestamp to be set to the defaultBeginFetchingTimestamp.
-        auto request = net->scheduleSuccessfulResponse(
-            makeCursorResponse(0LL, NamespaceString::kSessionTransactionsTableNamespace, {}, true));
-        net->runReadyNetworkOperations();
-
-        // Oplog entry associated with the beginApplyingTimestamp.
-        processSuccessfulLastOplogEntryFetcherResponse({makeOplogEntryObj(1)});
-
-        ASSERT_TRUE(net->hasReadyRequests());
-    }
-
+    // Shut down initial syncer and verify that cancels on FCV fetcher.
     ASSERT_OK(initialSyncer->shutdown());
-    executor::NetworkInterfaceMock::InNetworkGuard(net)->runReadyNetworkOperations();
+    _mock->runUntilIdle();
 
     initialSyncer->join();
     ASSERT_EQUALS(ErrorCodes::CallbackCanceled, _lastApplied);
@@ -1920,37 +1917,34 @@ TEST_F(InitialSyncerTest, InitialSyncerResendsFindCommandIfFCVFetcherReturnsRetr
     auto opCtx = makeOpCtx();
 
     _syncSourceSelector->setChooseNewSyncSourceResult_forTest(HostAndPort("localhost", 12345));
+
+    _mock
+        ->expect(
+            BSON("find"
+                 << "oplog.rs"),
+            makeCursorResponse(0LL, NamespaceString::kRsOplogNamespace, {makeOplogEntryObj(1)}))
+        .times(2);
+
+    // Respond to the first FCV attempt with a retriable error.
+    _mock
+        ->expect(
+            BSON("find"
+                 << "system.version"),
+            RemoteCommandResponse(ErrorCodes::HostUnreachable, "host unreachable network error"))
+        .times(1);
     ASSERT_OK(initialSyncer->startup(opCtx.get(), maxAttempts));
 
-    auto net = getNet();
-    executor::NetworkInterfaceMock::InNetworkGuard guard(net);
-
-    // Base rollback ID.
-    net->scheduleSuccessfulResponse(makeRollbackCheckerResponse(1));
-
-    // Oplog entry associated with the defaultBeginFetchingTimestamp.
-    processSuccessfulLastOplogEntryFetcherResponse({makeOplogEntryObj(1)});
-
-    // Send an empty optime as the response to the beginFetchingOptime find request, which will
-    // cause the beginFetchingTimestamp to be set to the defaultBeginFetchingTimestamp.
-    auto request = net->scheduleSuccessfulResponse(
-        makeCursorResponse(0LL, NamespaceString::kSessionTransactionsTableNamespace, {}, true));
-    assertRemoteCommandNameEquals("find", request);
-    net->runReadyNetworkOperations();
-
-    // Oplog entry associated with the beginApplyingTimestamp.
-    processSuccessfulLastOplogEntryFetcherResponse({makeOplogEntryObj(1)});
-
-    // FCV first attempt - retriable error.
-    assertRemoteCommandNameEquals(
-        "find", net->scheduleErrorResponse(Status(ErrorCodes::HostUnreachable, "")));
-    net->runReadyNetworkOperations();
-
     // InitialSyncer stays active because it resends the find request for the fCV.
+    _mock->runUntilExpectationsSatisfied();
     ASSERT_TRUE(initialSyncer->isActive());
 
     // FCV second attempt.
-    processSuccessfulFCVFetcherResponseLastLTS();
+    _mock
+        ->expect([](auto& request) { return request["find"].str() == "system.version"; },
+                 makeCursorResponse(
+                     0LL, NamespaceString::kServerConfigurationNamespace, {getLastLTSBson()}))
+        .times(1);
+    _mock->runUntilExpectationsSatisfied();
 }
 
 void InitialSyncerTest::runInitialSyncWithBadFCVResponse(std::vector<BSONObj> docs,
@@ -1959,30 +1953,22 @@ void InitialSyncerTest::runInitialSyncWithBadFCVResponse(std::vector<BSONObj> do
     auto opCtx = makeOpCtx();
 
     _syncSourceSelector->setChooseNewSyncSourceResult_forTest(HostAndPort("localhost", 12345));
+
+    _mock
+        ->expect(
+            BSON("find"
+                 << "oplog.rs"),
+            makeCursorResponse(0LL, NamespaceString::kRsOplogNamespace, {makeOplogEntryObj(1)}))
+        .times(2);
+
+    // FCV response.
+    _mock
+        ->expect([](auto& request) { return request["find"].str() == "system.version"; },
+                 makeCursorResponse(0LL, NamespaceString::kServerConfigurationNamespace, docs))
+        .times(1);
+
     ASSERT_OK(initialSyncer->startup(opCtx.get(), maxAttempts));
-
-    auto net = getNet();
-    {
-        executor::NetworkInterfaceMock::InNetworkGuard guard(net);
-
-        // Base rollback ID.
-        net->scheduleSuccessfulResponse(makeRollbackCheckerResponse(1));
-
-        // Oplog entry associated with the defaultBeginFetchingTimestamp.
-        processSuccessfulLastOplogEntryFetcherResponse({makeOplogEntryObj(1)});
-
-        // Send an empty optime as the response to the beginFetchingOptime find request, which will
-        // cause the beginFetchingTimestamp to be set to the defaultBeginFetchingTimestamp.
-        auto request = net->scheduleSuccessfulResponse(
-            makeCursorResponse(0LL, NamespaceString::kSessionTransactionsTableNamespace, {}, true));
-        assertRemoteCommandNameEquals("find", request);
-        net->runReadyNetworkOperations();
-
-        // Oplog entry associated with the beginApplyingTimestamp.
-        processSuccessfulLastOplogEntryFetcherResponse({makeOplogEntryObj(1)});
-
-        processSuccessfulFCVFetcherResponse(docs);
-    }
+    _mock->runUntilExpectationsSatisfied();
 
     initialSyncer->join();
     ASSERT_EQUALS(expectedError, _lastApplied);
@@ -2035,38 +2021,28 @@ TEST_F(InitialSyncerTest, InitialSyncerSucceedsWhenFCVFetcherReturnsOldVersion) 
     auto opCtx = makeOpCtx();
 
     _syncSourceSelector->setChooseNewSyncSourceResult_forTest(HostAndPort("localhost", 12345));
+
+    _mock
+        ->expect(
+            BSON("find"
+                 << "oplog.rs"),
+            makeCursorResponse(0LL, NamespaceString::kRsOplogNamespace, {makeOplogEntryObj(1)}))
+        .times(2);
+
+    // FCV response.
+    _mock
+        ->expect([](auto& request) { return request["find"].str() == "system.version"; },
+                 makeCursorResponse(
+                     0LL, NamespaceString::kServerConfigurationNamespace, {getLastLTSBson()}))
+        .times(1);
+
     ASSERT_OK(initialSyncer->startup(opCtx.get(), maxAttempts));
-
-    auto net = getNet();
-    {
-        executor::NetworkInterfaceMock::InNetworkGuard guard(net);
-
-        // Base rollback ID.
-        net->scheduleSuccessfulResponse(makeRollbackCheckerResponse(1));
-
-        // Oplog entry associated with the defaultBeginFetchingTimestamp.
-        processSuccessfulLastOplogEntryFetcherResponse({makeOplogEntryObj(1)});
-
-        // Send an empty optime as the response to the beginFetchingOptime find request, which will
-        // cause the beginFetchingTimestamp to be set to the defaultBeginFetchingTimestamp.
-        auto request = net->scheduleSuccessfulResponse(
-            makeCursorResponse(0LL, NamespaceString::kSessionTransactionsTableNamespace, {}, true));
-        assertRemoteCommandNameEquals("find", request);
-        net->runReadyNetworkOperations();
-
-        // Oplog entry associated with the beginApplyingTimestamp.
-        processSuccessfulLastOplogEntryFetcherResponse({makeOplogEntryObj(1)});
-
-        FeatureCompatibilityVersionDocument fcvDoc;
-        // (Generic FCV reference): This FCV reference should exist across LTS binary versions.
-        fcvDoc.setVersion(multiversion::GenericFCV::kLastLTS);
-        processSuccessfulFCVFetcherResponse({fcvDoc.toBSON()});
-    }
+    _mock->runUntilExpectationsSatisfied();
 
     // We shut it down so we do not have to finish initial sync. If the fCV fetcher got an error,
     // we would return that.
     ASSERT_OK(initialSyncer->shutdown());
-    executor::NetworkInterfaceMock::InNetworkGuard(net)->runReadyNetworkOperations();
+    _mock->runUntilIdle();
 
     initialSyncer->join();
     ASSERT_EQUALS(ErrorCodes::CallbackCanceled, _lastApplied);
@@ -2213,39 +2189,29 @@ TEST_F(InitialSyncerTest, InitialSyncerPassesThroughOplogFetcherCallbackError) {
     auto opCtx = makeOpCtx();
 
     _syncSourceSelector->setChooseNewSyncSourceResult_forTest(HostAndPort("localhost", 12345));
+
+    _mock
+        ->expect(
+            BSON("find"
+                 << "oplog.rs"),
+            makeCursorResponse(0LL, NamespaceString::kRsOplogNamespace, {makeOplogEntryObj(1)}))
+        .times(2);
+
+    // FCV response.
+    _mock
+        ->expect([](auto& request) { return request["find"].str() == "system.version"; },
+                 makeCursorResponse(
+                     0LL, NamespaceString::kServerConfigurationNamespace, {getLastLTSBson()}))
+        .times(1);
+
+    // Ensure second lastOplogFetch doesn't happen until we're ready for it.
+    FailPointEnableBlock clonerFailpoint("hangAfterClonerStage", kListDatabasesFailPointData);
+
     ASSERT_OK(initialSyncer->startup(opCtx.get(), maxAttempts));
+    _mock->runUntilExpectationsSatisfied();
 
-    auto net = getNet();
-    {
-        executor::NetworkInterfaceMock::InNetworkGuard guard(net);
-        // Keep the cloner from finishing so end-of-clone-stage network events don't interfere.
-        FailPointEnableBlock clonerFailpoint("hangBeforeClonerStage", kListDatabasesFailPointData);
-
-        // Base rollback ID.
-        net->scheduleSuccessfulResponse(makeRollbackCheckerResponse(1));
-
-        // Oplog entry associated with the defaultBeginFetchingTimestamp.
-        processSuccessfulLastOplogEntryFetcherResponse({makeOplogEntryObj(1)});
-
-        // Send an empty optime as the response to the beginFetchingOptime find request, which will
-        // cause the beginFetchingTimestamp to be set to the defaultBeginFetchingTimestamp.
-        auto request = net->scheduleSuccessfulResponse(
-            makeCursorResponse(0LL, NamespaceString::kSessionTransactionsTableNamespace, {}, true));
-        assertRemoteCommandNameEquals("find", request);
-        net->runReadyNetworkOperations();
-
-        // Oplog entry associated with the beginApplyingTimestamp.
-        net->scheduleSuccessfulResponse(
-            makeCursorResponse(0LL, NamespaceString::kRsOplogNamespace, {makeOplogEntryObj(1)}));
-        net->runReadyNetworkOperations();
-
-        // Feature Compatibility Version.
-        processSuccessfulFCVFetcherResponseLastLTS();
-
-        // Simulate an error response to the OplogFetcher.
-        getOplogFetcher()->simulateResponseError(
-            Status(ErrorCodes::OperationFailed, "dead cursor"));
-    }
+    // Simulate an error response to the OplogFetcher.
+    getOplogFetcher()->simulateResponseError(Status(ErrorCodes::OperationFailed, "dead cursor"));
 
     initialSyncer->join();
     ASSERT_EQUALS(ErrorCodes::OperationFailed, _lastApplied);
@@ -2263,57 +2229,37 @@ TEST_F(InitialSyncerTest,
     FailPointEnableBlock skipRecoverUserWriteCriticalSections(
         "skipRecoverUserWriteCriticalSections");
     FailPointEnableBlock skipRecoverServerlessOperationLock("skipRecoverServerlessOperationLock");
-
     auto initialSyncer = &getInitialSyncer();
     auto opCtx = makeOpCtx();
 
     _syncSourceSelector->setChooseNewSyncSourceResult_forTest(HostAndPort("localhost", 12345));
+
+    _mock
+        ->expect(
+            BSON("find"
+                 << "oplog.rs"),
+            makeCursorResponse(0LL, NamespaceString::kRsOplogNamespace, {makeOplogEntryObj(1)}))
+        .times(2);
+
+    // FCV response.
+    _mock
+        ->expect([](auto& request) { return request["find"].str() == "system.version"; },
+                 makeCursorResponse(
+                     0LL, NamespaceString::kServerConfigurationNamespace, {getLastLTSBson()}))
+        .times(1);
+
     ASSERT_OK(initialSyncer->startup(opCtx.get(), maxAttempts));
+    _mock->runUntilExpectationsSatisfied();
 
-    auto net = getNet();
-    {
-        executor::NetworkInterfaceMock::InNetworkGuard guard(net);
+    _mock
+        ->expect(
+            [](auto& request) { return request["find"].str() == "oplog.rs"; },
+            makeCursorResponse(0LL, NamespaceString::kRsOplogNamespace, {makeOplogEntryObj(1)}))
+        .times(1);
 
-        // Base rollback ID.
-        net->scheduleSuccessfulResponse(makeRollbackCheckerResponse(1));
-
-        // Oplog entry associated with the defaultBeginFetchingTimestamp.
-        processSuccessfulLastOplogEntryFetcherResponse({makeOplogEntryObj(1)});
-
-        // Send an empty optime as the response to the beginFetchingOptime find request, which will
-        // cause the beginFetchingTimestamp to be set to the defaultBeginFetchingTimestamp.
-        auto request = net->scheduleSuccessfulResponse(
-            makeCursorResponse(0LL, NamespaceString::kSessionTransactionsTableNamespace, {}, true));
-        assertRemoteCommandNameEquals("find", request);
-        net->runReadyNetworkOperations();
-
-        // Oplog entry associated with the beginApplyingTimestamp.
-        request = assertRemoteCommandNameEquals(
-            "find",
-            net->scheduleSuccessfulResponse(makeCursorResponse(
-                0LL, NamespaceString::kRsOplogNamespace, {makeOplogEntryObj(1)})));
-        ASSERT_EQUALS(1, request.cmdObj.getIntField("limit"));
-        net->runReadyNetworkOperations();
-
-        {
-            // Ensure second lastOplogFetch doesn't happen until we're ready for it.
-            FailPointEnableBlock clonerFailpoint("hangAfterClonerStage",
-                                                 kListDatabasesFailPointData);
-            // Feature Compatibility Version.
-            processSuccessfulFCVFetcherResponseLastLTS();
-
-            // Simulate cursor closing on sync source.
-            getOplogFetcher()->receiveBatch(0LL, {makeOplogEntryObj(1)});
-        }
-
-        // Oplog entry associated with the stopTimestamp.
-        processSuccessfulLastOplogEntryFetcherResponse({makeOplogEntryObj(1)});
-
-        // Last rollback checker replSetGetRBID command.
-        assertRemoteCommandNameEquals(
-            "replSetGetRBID", net->scheduleSuccessfulResponse(makeRollbackCheckerResponse(1)));
-        net->runReadyNetworkOperations();
-    }
+    // Simulate cursor closing on sync source.
+    getOplogFetcher()->receiveBatch(0LL, {makeOplogEntryObj(1)});
+    _mock->runUntilExpectationsSatisfied();
 
     initialSyncer->join();
     ASSERT_OK(_lastApplied.getStatus());
@@ -2340,51 +2286,37 @@ TEST_F(
     auto opCtx = makeOpCtx();
 
     _syncSourceSelector->setChooseNewSyncSourceResult_forTest(HostAndPort("localhost", 12345));
+
+    _mock
+        ->expect(
+            BSON("find"
+                 << "oplog.rs"),
+            makeCursorResponse(0LL, NamespaceString::kRsOplogNamespace, {makeOplogEntryObj(1)}))
+        .times(2);
+
+    // FCV response.
+    _mock
+        ->expect([](auto& request) { return request["find"].str() == "system.version"; },
+                 makeCursorResponse(
+                     0LL, NamespaceString::kServerConfigurationNamespace, {getLastLTSBson()}))
+        .times(1);
+
     ASSERT_OK(initialSyncer->startup(opCtx.get(), maxAttempts));
+    _mock->runUntilExpectationsSatisfied();
 
-    auto net = getNet();
-    {
-        executor::NetworkInterfaceMock::InNetworkGuard guard(net);
+    // Simulate cursor closing on sync source.
+    getOplogFetcher()->receiveBatch(0LL,
+                                    {makeOplogEntryObj(1),
+                                     makeOplogEntryObj(2, OpTypeEnum::kCommand),
+                                     makeOplogEntryObj(3, OpTypeEnum::kCommand)});
 
-        // Base rollback ID.
-        net->scheduleSuccessfulResponse(makeRollbackCheckerResponse(1));
+    _mock
+        ->expect(
+            [](auto& request) { return request["find"].str() == "oplog.rs"; },
+            makeCursorResponse(0LL, NamespaceString::kRsOplogNamespace, {makeOplogEntryObj(3)}))
+        .times(1);
 
-        // Oplog entry associated with the defaultBeginFetchingTimestamp.
-        processSuccessfulLastOplogEntryFetcherResponse({makeOplogEntryObj(1)});
-
-        // Send an empty optime as the response to the beginFetchingOptime find request, which will
-        // cause the beginFetchingTimestamp to be set to the defaultBeginFetchingTimestamp.
-        auto request = net->scheduleSuccessfulResponse(
-            makeCursorResponse(0LL, NamespaceString::kSessionTransactionsTableNamespace, {}, true));
-        assertRemoteCommandNameEquals("find", request);
-        net->runReadyNetworkOperations();
-
-        // Oplog entry associated with the beginApplyingTimestamp.
-        processSuccessfulLastOplogEntryFetcherResponse({makeOplogEntryObj(1)});
-
-        {
-            // Ensure second lastOplogFetch doesn't happen until we're ready for it.
-            FailPointEnableBlock clonerFailpoint("hangAfterClonerStage",
-                                                 kListDatabasesFailPointData);
-            // Feature Compatibility Version.
-            processSuccessfulFCVFetcherResponseLastLTS();
-
-            // Simulate cursor closing on sync source.
-            getOplogFetcher()->receiveBatch(0LL,
-                                            {makeOplogEntryObj(1),
-                                             makeOplogEntryObj(2, OpTypeEnum::kCommand),
-                                             makeOplogEntryObj(3, OpTypeEnum::kCommand)});
-        }
-
-        // Oplog entry associated with the stopTimestamp.
-        processSuccessfulLastOplogEntryFetcherResponse({makeOplogEntryObj(3)});
-
-        // Last rollback checker replSetGetRBID command.
-        assertRemoteCommandNameEquals(
-            "replSetGetRBID", net->scheduleSuccessfulResponse(makeRollbackCheckerResponse(1)));
-        net->runReadyNetworkOperations();
-    }
-
+    _mock->runUntilExpectationsSatisfied();
     initialSyncer->join();
     ASSERT_OK(_lastApplied.getStatus());
     auto dummyEntry = makeOplogEntry(3);
@@ -2399,49 +2331,41 @@ TEST_F(
     auto opCtx = makeOpCtx();
 
     _syncSourceSelector->setChooseNewSyncSourceResult_forTest(HostAndPort("localhost", 12345));
+    _mock
+        ->expect(
+            BSON("find"
+                 << "oplog.rs"),
+            makeCursorResponse(0LL, NamespaceString::kRsOplogNamespace, {makeOplogEntryObj(1)}))
+        .times(2);
+
+    // FCV response.
+    _mock
+        ->expect([](auto& request) { return request["find"].str() == "system.version"; },
+                 makeCursorResponse(
+                     0LL, NamespaceString::kServerConfigurationNamespace, {getLastLTSBson()}))
+        .times(1);
+
     ASSERT_OK(initialSyncer->startup(opCtx.get(), maxAttempts));
+    _mock->runUntilExpectationsSatisfied();
 
-    auto net = getNet();
-    {
-        executor::NetworkInterfaceMock::InNetworkGuard guard(net);
+    // Simulate cursor closing on sync source.
+    getOplogFetcher()->receiveBatch(0LL,
+                                    {makeOplogEntryObj(1),
+                                     makeOplogEntryObj(2, OpTypeEnum::kCommand),
+                                     makeOplogEntryObj(3, OpTypeEnum::kCommand)});
 
-        // Base rollback ID.
-        net->scheduleSuccessfulResponse(makeRollbackCheckerResponse(1));
+    // Oplog entry associated with the stopTimestamp.
+    // Return an oplog entry with an optime that is more recent than what the completed
+    // OplogFetcher has read from the sync source.
+    _mock
+        ->expect(
+            [](auto& request) { return request["find"].str() == "oplog.rs"; },
+            makeCursorResponse(0LL, NamespaceString::kRsOplogNamespace, {makeOplogEntryObj(4)}))
+        .times(1);
 
-        // Oplog entry associated with the defaultBeginFetchingTimestamp.
-        processSuccessfulLastOplogEntryFetcherResponse({makeOplogEntryObj(1)});
-
-        // Send an empty optime as the response to the beginFetchingOptime find request, which will
-        // cause the beginFetchingTimestamp to be set to the defaultBeginFetchingTimestamp.
-        auto request = net->scheduleSuccessfulResponse(
-            makeCursorResponse(0LL, NamespaceString::kSessionTransactionsTableNamespace, {}, true));
-        assertRemoteCommandNameEquals("find", request);
-        net->runReadyNetworkOperations();
-
-        // Oplog entry associated with the beginApplyingTimestamp.
-        processSuccessfulLastOplogEntryFetcherResponse({makeOplogEntryObj(1)});
-
-        {
-            // Ensure second lastOplogFetch doesn't happen until we're ready for it.
-            FailPointEnableBlock clonerFailpoint("hangAfterClonerStage",
-                                                 kListDatabasesFailPointData);
-            // Feature Compatibility Version.
-            processSuccessfulFCVFetcherResponseLastLTS();
-
-            // Simulate cursor closing on sync source.
-            getOplogFetcher()->receiveBatch(0LL,
-                                            {makeOplogEntryObj(1),
-                                             makeOplogEntryObj(2, OpTypeEnum::kCommand),
-                                             makeOplogEntryObj(3, OpTypeEnum::kCommand)});
-        }
-
-        // Oplog entry associated with the stopTimestamp.
-        // Return an oplog entry with an optime that is more recent than what the completed
-        // OplogFetcher has read from the sync source.
-        processSuccessfulLastOplogEntryFetcherResponse({makeOplogEntryObj(4)});
-    }
-
+    _mock->runUntilExpectationsSatisfied();
     initialSyncer->join();
+
     ASSERT_EQUALS(ErrorCodes::RemoteResultsUnavailable, _lastApplied);
 }
 
@@ -2455,31 +2379,22 @@ TEST_F(InitialSyncerTest,
                                  Status(ErrorCodes::FailedToParse, "listDatabases failed"));
 
     _syncSourceSelector->setChooseNewSyncSourceResult_forTest(HostAndPort("localhost", 12345));
+    _mock
+        ->expect(
+            BSON("find"
+                 << "oplog.rs"),
+            makeCursorResponse(0LL, NamespaceString::kRsOplogNamespace, {makeOplogEntryObj(1)}))
+        .times(2);
+
+    // FCV response.
+    _mock
+        ->expect([](auto& request) { return request["find"].str() == "system.version"; },
+                 makeCursorResponse(
+                     0LL, NamespaceString::kServerConfigurationNamespace, {getLastLTSBson()}))
+        .times(1);
+
     ASSERT_OK(initialSyncer->startup(opCtx.get(), maxAttempts));
-
-    auto net = getNet();
-    {
-        executor::NetworkInterfaceMock::InNetworkGuard guard(net);
-
-        // Base rollback ID.
-        net->scheduleSuccessfulResponse(makeRollbackCheckerResponse(1));
-
-        // Oplog entry associated with the defaultBeginFetchingTimestamp.
-        processSuccessfulLastOplogEntryFetcherResponse({makeOplogEntryObj(1)});
-
-        // Send an empty optime as the response to the beginFetchingOptime find request, which will
-        // cause the beginFetchingTimestamp to be set to the defaultBeginFetchingTimestamp.
-        auto request = net->scheduleSuccessfulResponse(
-            makeCursorResponse(0LL, NamespaceString::kSessionTransactionsTableNamespace, {}, true));
-        assertRemoteCommandNameEquals("find", request);
-        net->runReadyNetworkOperations();
-
-        // Oplog entry associated with the beginApplyingTimestamp.
-        processSuccessfulLastOplogEntryFetcherResponse({makeOplogEntryObj(1)});
-
-        // Feature Compatibility Version.
-        processSuccessfulFCVFetcherResponseLastLTS();
-    }
+    _mock->runUntilExpectationsSatisfied();
 
     initialSyncer->join();
     ASSERT_EQUALS(ErrorCodes::FailedToParse, _lastApplied);
@@ -2490,34 +2405,25 @@ TEST_F(InitialSyncerTest, InitialSyncerCancelsBothOplogFetcherAndAllDatabaseClon
     auto opCtx = makeOpCtx();
 
     _syncSourceSelector->setChooseNewSyncSourceResult_forTest(HostAndPort("localhost", 12345));
+    _mock
+        ->expect(
+            BSON("find"
+                 << "oplog.rs"),
+            makeCursorResponse(0LL, NamespaceString::kRsOplogNamespace, {makeOplogEntryObj(1)}))
+        .times(2);
+
+    // FCV response.
+    _mock
+        ->expect([](auto& request) { return request["find"].str() == "system.version"; },
+                 makeCursorResponse(
+                     0LL, NamespaceString::kServerConfigurationNamespace, {getLastLTSBson()}))
+        .times(1);
+
     ASSERT_OK(initialSyncer->startup(opCtx.get(), maxAttempts));
-
-    auto net = getNet();
-    {
-        executor::NetworkInterfaceMock::InNetworkGuard guard(net);
-
-        // Base rollback ID.
-        net->scheduleSuccessfulResponse(makeRollbackCheckerResponse(1));
-
-        // Oplog entry associated with the defaultBeginFetchingTimestamp.
-        processSuccessfulLastOplogEntryFetcherResponse({makeOplogEntryObj(1)});
-
-        // Send an empty optime as the response to the beginFetchingOptime find request, which will
-        // cause the beginFetchingTimestamp to be set to the defaultBeginFetchingTimestamp.
-        auto request = net->scheduleSuccessfulResponse(
-            makeCursorResponse(0LL, NamespaceString::kSessionTransactionsTableNamespace, {}, true));
-        assertRemoteCommandNameEquals("find", request);
-        net->runReadyNetworkOperations();
-
-        // Oplog entry associated with the beginApplyingTimestamp.
-        processSuccessfulLastOplogEntryFetcherResponse({makeOplogEntryObj(1)});
-
-        // Feature Compatibility Version.
-        processSuccessfulFCVFetcherResponseLastLTS();
-    }
+    _mock->runUntilExpectationsSatisfied();
 
     ASSERT_OK(initialSyncer->shutdown());
-    executor::NetworkInterfaceMock::InNetworkGuard(net)->runReadyNetworkOperations();
+    _mock->runUntilIdle();
 
     initialSyncer->join();
     ASSERT_EQUALS(ErrorCodes::CallbackCanceled, _lastApplied);
@@ -2585,52 +2491,26 @@ TEST_F(InitialSyncerTest,
     auto opCtx = makeOpCtx();
 
     _syncSourceSelector->setChooseNewSyncSourceResult_forTest(HostAndPort("localhost", 12345));
-    ASSERT_OK(initialSyncer->startup(opCtx.get(), maxAttempts));
-
-    auto net = getNet();
     {
-        executor::NetworkInterfaceMock::InNetworkGuard guard(net);
+        MockNetwork::InSequence seq(*_mock);
+        _mock
+            ->expect(
+                BSON("find"
+                     << "oplog.rs"),
+                makeCursorResponse(0LL, NamespaceString::kRsOplogNamespace, {makeOplogEntryObj(1)}))
+            .times(1);
 
-        // Base rollback ID.
-        net->scheduleSuccessfulResponse(makeRollbackCheckerResponse(1));
-
-        // Oplog entry associated with the defaultBeginFetchingTimestamp.
-        processSuccessfulLastOplogEntryFetcherResponse({makeOplogEntryObj(1)});
-
-        // Send an empty optime as the response to the beginFetchingOptime find request, which will
-        // cause the beginFetchingTimestamp to be set to the defaultBeginFetchingTimestamp.
-        auto request = net->scheduleSuccessfulResponse(
-            makeCursorResponse(0LL, NamespaceString::kSessionTransactionsTableNamespace, {}, true));
-        assertRemoteCommandNameEquals("find", request);
-        net->runReadyNetworkOperations();
-
-        // Oplog entry associated with the beginApplyingTimestamp.
-        processSuccessfulLastOplogEntryFetcherResponse({makeOplogEntryObj(1)});
-
-        {
-            // Ensure second lastOplogFetch doesn't happen until we're ready for it.
-            FailPointEnableBlock clonerFailpoint("hangAfterClonerStage",
-                                                 kListDatabasesFailPointData);
-            // Feature Compatibility Version.
-            processSuccessfulFCVFetcherResponseLastLTS();
-        }
-
-        // Oplog entry associated with the stopTimestamp.
-        request = assertRemoteCommandNameEquals(
-            "find",
-            net->scheduleErrorResponse(
-                Status(ErrorCodes::OperationFailed,
-                       "Oplog entry fetcher associated with the stopTimestamp failed")));
-        ASSERT_TRUE(request.cmdObj.hasField("sort"));
-        ASSERT_EQUALS(1, request.cmdObj.getIntField("limit"));
-        net->runReadyNetworkOperations();
-
-        // _lastOplogEntryFetcherCallbackAfterCloningData() will shut down the OplogFetcher after
-        // setting the completion status.
-        // We call runReadyNetworkOperations() again to deliver the cancellation status to
-        // _oplogFetcherCallback().
-        net->runReadyNetworkOperations();
+        _mock
+            ->expect(BSON("find"
+                          << "oplog.rs"),
+                     RemoteCommandResponse(
+                         ErrorCodes::OperationFailed,
+                         "Oplog entry fetcher associated with the stopTimestamp failed"))
+            .times(1);
     }
+
+    ASSERT_OK(initialSyncer->startup(opCtx.get(), maxAttempts));
+    _mock->runUntilExpectationsSatisfied();
 
     initialSyncer->join();
     ASSERT_EQUALS(ErrorCodes::OperationFailed, _lastApplied);
