@@ -39,7 +39,7 @@ class MagicRestoreEveryN(interface.Hook):
             return (self.tests_run == self.n / 2, self.tests_run == self.n)
         # For non point in time restores we want to do the backup and restore after the same test.
         else:
-            return (self.tests_run < self.n, self.tests_run < self.n)
+            return (self.tests_run == self.n, self.tests_run == self.n)
 
     def after_test(self, test, test_report):
         """After test cleanup."""
