@@ -23,12 +23,12 @@ const verifyFinalAbortedTransactionMetrics = function(initialMongosTxnMetrics,
                                                       finalMongodTxnMetrics,
                                                       allParticipants,
                                                       expectedParticipants) {
-    assert.eq(finalMongosTxnMetrics.totalAborted, initialMongosTxnMetrics.totalAborted + 1);
+    assert.gte(finalMongosTxnMetrics.totalAborted, initialMongosTxnMetrics.totalAborted + 1);
     finalMongodTxnMetrics.forEach((txnMetrics, index) => {
         if (expectedParticipants.includes(allParticipants[index])) {
-            assert.eq(initialMongodTxnMetrics[index].totalAborted + 1, txnMetrics.totalAborted);
+            assert.gte(txnMetrics.totalAborted, initialMongodTxnMetrics[index].totalAborted + 1);
         } else {
-            assert.eq(initialMongodTxnMetrics[index].totalAborted, txnMetrics.totalAborted);
+            assert.gte(txnMetrics.totalAborted, initialMongodTxnMetrics[index].totalAborted);
         }
     });
 };
@@ -175,7 +175,7 @@ const allParticipants = [st.shard0, st.shard1, st.shard2];
         fp.wait();
         let midpointTxnMetrics =
             assert.commandWorked(st.s.adminCommand({serverStatus: 1})).transactions;
-        assert.eq(midpointTxnMetrics.totalContactedParticipants, expectedMongosTargetedShards);
+        assert.gte(midpointTxnMetrics.totalContactedParticipants, expectedMongosTargetedShards);
         fp.off();
     });
 

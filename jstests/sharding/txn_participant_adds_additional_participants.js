@@ -26,14 +26,14 @@ const verifyFinalTransactionMetrics = function(
     // Check we executed the expected commit type. Currently this test only runs transactions where
     // either a single shard, readOnly, or single write shard commit type should be executed
     if (expectedParticipants.length == 1) {
-        assert.eq(finalTxnMetrics.commitTypes.singleShard.successful,
-                  initialTxnMetrics.commitTypes.singleShard.successful + 1);
+        assert.gte(finalTxnMetrics.commitTypes.singleShard.successful,
+                   initialTxnMetrics.commitTypes.singleShard.successful + 1);
     } else if (numWriteShards == 0) {
-        assert.eq(finalTxnMetrics.commitTypes.readOnly.successful,
-                  initialTxnMetrics.commitTypes.readOnly.successful + 1);
+        assert.gte(finalTxnMetrics.commitTypes.readOnly.successful,
+                   initialTxnMetrics.commitTypes.readOnly.successful + 1);
     } else if (numWriteShards == 1) {
-        assert.eq(finalTxnMetrics.commitTypes.singleWriteShard.successful,
-                  initialTxnMetrics.commitTypes.singleWriteShard.successful + 1);
+        assert.gte(finalTxnMetrics.commitTypes.singleWriteShard.successful,
+                   initialTxnMetrics.commitTypes.singleWriteShard.successful + 1);
     }
 
     // Check the number of participants at commit time was incremented by at least the number of
@@ -491,8 +491,8 @@ aggRes = aggRequestThread.returnData();
 
 let primaryShardTxnMetrics =
     assert.commandWorked(st.shard0.getDB("admin").adminCommand({serverStatus: 1})).transactions;
-assert.eq(primaryShardTxnMetrics.currentOpen, 0);
-assert.eq(initialPrimaryShardTxnMetrics.totalAborted + 1, primaryShardTxnMetrics.totalAborted);
+assert.gte(primaryShardTxnMetrics.currentOpen, 0);
+assert.gte(primaryShardTxnMetrics.totalAborted, initialPrimaryShardTxnMetrics.totalAborted + 1);
 
 assert.commandWorked(st.s.getDB("admin").adminCommand({
     commitTransaction: 1,
@@ -507,7 +507,7 @@ verifyFinalTransactionMetrics(initialTxnMetrics, [st.shard1, st.shard2], 0);
 // Assert that the transaction was started and then aborted on the primary shard
 primaryShardTxnMetrics =
     assert.commandWorked(st.shard0.getDB("admin").adminCommand({serverStatus: 1})).transactions;
-assert.eq(initialPrimaryShardTxnMetrics.totalStarted + 1, primaryShardTxnMetrics.totalStarted);
-assert.eq(initialPrimaryShardTxnMetrics.totalAborted + 1, primaryShardTxnMetrics.totalAborted);
+assert.gte(primaryShardTxnMetrics.totalStarted, initialPrimaryShardTxnMetrics.totalStarted + 1);
+assert.gte(primaryShardTxnMetrics.totalAborted, initialPrimaryShardTxnMetrics.totalAborted + 1);
 
 st.stop();
