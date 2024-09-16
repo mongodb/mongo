@@ -247,33 +247,6 @@ void handleWaitForUserCacheInvalidation(OperationContext* opCtx, const UserHandl
     }
 }
 
-// TODO SERVER-83488 - move user request role resolution into the UserRequest object.
-std::unique_ptr<UserRequest> getX509UserRequest(OperationContext* opCtx, const UserName& username) {
-#ifdef MONGO_CONFIG_SSL
-    std::shared_ptr<transport::Session> session;
-    if (opCtx && opCtx->getClient()) {
-        session = opCtx->getClient()->session();
-    }
-
-    if (!allowRolesFromX509Certificates || !session) {
-        return std::make_unique<UserRequestGeneral>(username, boost::none);
-    }
-
-    auto& sslPeerInfo = SSLPeerInfo::forSession(session);
-    auto&& peerRoles = sslPeerInfo.roles();
-    if (peerRoles.empty() || (sslPeerInfo.subjectName().toString() != username.getUser())) {
-        return std::make_unique<UserRequestGeneral>(username, boost::none);
-    }
-
-    std::set<RoleName> requestRoles;
-    std::copy(
-        peerRoles.begin(), peerRoles.end(), std::inserter(requestRoles, requestRoles.begin()));
-
-    return std::make_unique<UserRequestX509>(username, std::move(requestRoles), sslPeerInfo);
-#endif
-    return std::make_unique<UserRequestGeneral>(username, boost::none);
-}
-
 }  // namespace
 
 int authorizationManagerCacheSize;
@@ -449,12 +422,6 @@ StatusWith<UserHandle> AuthorizationManagerImpl::acquireUser(
     OperationContext* opCtx, std::unique_ptr<UserRequest> request) try {
     const UserName userName = request->getUserName();
 
-    // X.509 will give us our roles for initial acquire, but we have to lose them during
-    // reacquire (for now) so reparse those roles into the request if not already present.
-    if (request->getType() == UserRequest::UserRequestType::X509) {
-        request = getX509UserRequest(opCtx, userName);
-    }
-
     auto systemUser = internalSecurity.getUser();
     if (userName == (*systemUser)->getName()) {
         uassert(ErrorCodes::OperationFailed,
@@ -511,16 +478,14 @@ StatusWith<UserHandle> AuthorizationManagerImpl::reacquireUser(OperationContext*
         return user;
     }
 
-    // Make a good faith effort to acquire an up-to-date user object, since the one
-    // we've cached is marked "out-of-date."
-    // TODO SERVER-72678 avoid this edge case hack when rearchitecting user acquisition. This is
-    // necessary now to preserve the mechanismData from the original UserRequest while eliminating
-    // the roles. If the roles aren't reset to none, it will cause LDAP acquisition to be bypassed
-    // in favor of reusing the ones from before.
-    std::unique_ptr<UserRequest> requestWithoutRoles = user->getUserRequest()->clone();
-    requestWithoutRoles->setRoles(boost::none);
+    // Since we throw in the constructor if we have an error in acquiring roles for OIDC and X509,
+    // we want to catch these exceptions and return them as proper statuses to be handled later.
+    auto swRequestWithoutRoles = user->getUserRequest()->cloneForReacquire();
+    if (!swRequestWithoutRoles.isOK()) {
+        return swRequestWithoutRoles.getStatus();
+    }
 
-    auto swUserHandle = acquireUser(opCtx, std::move(requestWithoutRoles));
+    auto swUserHandle = acquireUser(opCtx, std::move(swRequestWithoutRoles.getValue()));
     if (!swUserHandle.isOK()) {
         return swUserHandle.getStatus();
     }
@@ -594,29 +559,42 @@ Status AuthorizationManagerImpl::refreshExternalUsers(OperationContext* opCtx) {
     // insertOrAssign if they differ.
     bool isRefreshed{false};
     for (const auto& cachedUser : cachedUsers) {
-        // TODO SERVER-83488: look into whether constructing a new UserRequest makes the most
-        // sense, or re-gather the roles upfront in this pathway.
-        auto storedUserStatus =
-            _externalState->getUserObject(opCtx,
-                                          UserRequestGeneral(cachedUser->getName(), boost::none),
-                                          CurOp::get(opCtx)->getUserAcquisitionStats());
-        if (!storedUserStatus.isOK()) {
-            // If the user simply is not found, then just invalidate the cached user and continue.
-            if (storedUserStatus.getStatus().code() == ErrorCodes::UserNotFound) {
+        auto handleError = [this](const Status& status, const UserHandle& cachedUser) -> Status {
+            if (status.code() == ErrorCodes::UserNotFound) {
                 _userCache.invalidateKey(
                     cachedUser->getUserRequest()->generateUserRequestCacheKey());
-                continue;
+                return Status::OK();
             } else {
-                return storedUserStatus.getStatus();
+                return status;
             }
+        };
+
+        auto swUserReq = cachedUser->getUserRequest()->cloneForReacquire();
+        if (!swUserReq.isOK()) {
+            auto status = handleError(swUserReq.getStatus(), cachedUser);
+            if (!status.isOK()) {
+                return status;
+            }
+            continue;
+        }
+
+        auto& userReq = swUserReq.getValue();
+
+        auto storedUserStatus = _externalState->getUserObject(
+            opCtx, *userReq.get(), CurOp::get(opCtx)->getUserAcquisitionStats());
+
+        if (!storedUserStatus.isOK()) {
+            auto status = handleError(storedUserStatus.getStatus(), cachedUser);
+            if (!status.isOK()) {
+                return status;
+            }
+            continue;
         }
 
         if (cachedUser->hasDifferentRoles(storedUserStatus.getValue())) {
-            _userCache.insertOrAssign(
-                std::make_unique<UserRequestGeneral>(cachedUser->getName(), boost::none)
-                    ->generateUserRequestCacheKey(),
-                std::move(storedUserStatus.getValue()),
-                Date_t::now());
+            _userCache.insertOrAssign(userReq->generateUserRequestCacheKey(),
+                                      std::move(storedUserStatus.getValue()),
+                                      Date_t::now());
             isRefreshed = true;
         }
     }

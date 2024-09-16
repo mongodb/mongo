@@ -140,7 +140,7 @@ StatusWith<std::tuple<bool, std::string>> SASLPlainServerMechanism::stepImpl(
     }
 
     // The authentication database is also the source database for the user.
-    auto swUser = [&]() {
+    auto swUser = [&]() -> StatusWith<UserHandle> {
         if (gEnableDetailedConnectionHealthMetricLogLines.load()) {
             ScopedCallbackTimer timer([&](Microseconds elapsed) {
                 LOGV2(6788606,
@@ -150,7 +150,12 @@ StatusWith<std::tuple<bool, std::string>> SASLPlainServerMechanism::stepImpl(
             });
         }
 
-        return authManager->acquireUser(opCtx, makeUserRequest());
+        auto swRequest = makeUserRequest();
+        if (!swRequest.isOK()) {
+            return swRequest.getStatus();
+        }
+
+        return authManager->acquireUser(opCtx, std::move(swRequest.getValue()));
     }();
 
     if (!swUser.isOK()) {

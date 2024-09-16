@@ -332,7 +332,12 @@ StatusWith<User> AuthzManagerExternalStateLocal::getUserObject(
     const UserRequest& userReq,
     const SharedUserAcquisitionStats& userAcquisitionStats) try {
     std::vector<RoleName> directRoles;
-    User user(userReq.clone());
+
+    auto swReq = userReq.clone();
+    if (!swReq.isOK()) {
+        return swReq.getStatus();
+    }
+    User user(std::move(swReq.getValue()));
 
     const UserRequest* request = user.getUserRequest();
     const UserName& userName = request->getUserName();

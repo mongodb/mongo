@@ -35,10 +35,39 @@ namespace mongo {
 
 #ifdef MONGO_CONFIG_SSL
 
+StatusWith<std::unique_ptr<UserRequest>> UserRequestX509::makeUserRequestX509(
+    UserName name,
+    boost::optional<std::set<RoleName>> roles,
+    const SSLPeerInfo& peerInfo,
+    bool forReacquire) {
+    auto request =
+        std::make_unique<UserRequestX509>(std::move(name), std::move(roles), std::move(peerInfo));
+
+    if (!forReacquire) {
+        return std::unique_ptr<UserRequest>(std::move(request));
+    }
+
+    request->_tryAcquireRoles();
+    return std::unique_ptr<UserRequest>(std::move(request));
+}
+
 UserRequest::UserRequestCacheKey UserRequestX509::generateUserRequestCacheKey() const {
     auto hashElements = getUserNameAndRolesVector(getUserName(), getRoles());
     getPeerInfo().appendPeerInfoToVector(hashElements);
     return UserRequestCacheKey(getUserName(), hashElements);
+}
+
+void UserRequestX509::_tryAcquireRoles() {
+    auto&& peerRoles = getPeerInfo().roles();
+    if (peerRoles.empty()) {
+        return;
+    }
+
+    std::set<RoleName> requestRoles;
+    std::copy(
+        peerRoles.begin(), peerRoles.end(), std::inserter(requestRoles, requestRoles.begin()));
+
+    setRoles(std::move(requestRoles));
 }
 
 #endif  // MONGO_CONFIG_SSL

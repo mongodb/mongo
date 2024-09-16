@@ -127,7 +127,12 @@ StatusWith<User> AuthzManagerExternalStateMongos::getUserObject(
         return status;
     }
 
-    User user(userReq.clone());
+    auto swReq = userReq.clone();
+    if (!swReq.isOK()) {
+        return swReq.getStatus();
+    }
+
+    User user(std::move(swReq.getValue()));
     V2UserDocumentParser dp;
     dp.setTenantId(getActiveTenant(opCtx));
     status = dp.initializeUserFromUserDocument(userDoc, &user);

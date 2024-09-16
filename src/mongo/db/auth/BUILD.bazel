@@ -542,6 +542,7 @@ mongo_cc_library(
         "user_request_x509.cpp",
     ],
     hdrs = [
+        "user_name.h",
         "user_request_x509.h",
     ],
     deps = [

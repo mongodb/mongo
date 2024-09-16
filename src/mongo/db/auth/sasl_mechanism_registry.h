@@ -247,9 +247,9 @@ public:
     /**
      * Create a UserRequest to send to AuthorizationSession.
      */
-    virtual std::unique_ptr<UserRequest> makeUserRequest() const {
-        return std::make_unique<UserRequestGeneral>(
-            UserName(getPrincipalName(), getAuthenticationDatabase()), boost::none);
+    virtual StatusWith<std::unique_ptr<UserRequest>> makeUserRequest() const {
+        return std::unique_ptr<UserRequest>(std::make_unique<UserRequestGeneral>(
+            UserName(getPrincipalName(), getAuthenticationDatabase()), boost::none));
     }
 
 protected:

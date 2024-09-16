@@ -174,7 +174,7 @@ std::unique_ptr<UserRequest> getX509UserRequest(OperationContext* opCtx, const U
     auto roles = std::set<RoleName>();
     std::copy(peerRoles.begin(), peerRoles.end(), std::inserter(roles, roles.begin()));
 
-    return std::make_unique<UserRequestX509>(username, roles, sslPeerInfo);
+    return uassertStatusOK(UserRequestX509::makeUserRequestX509(username, roles, sslPeerInfo));
 }
 
 constexpr auto kX509AuthenticationDisabledMessage = "x.509 authentication is disabled."_sd;

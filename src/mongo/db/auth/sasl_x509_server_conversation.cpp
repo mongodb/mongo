@@ -99,12 +99,12 @@ std::string getUserName(Client* client, StringData inputData, const SSLPeerInfo&
 
 }  // namespace
 
-std::unique_ptr<UserRequest> SaslX509ServerMechanism::makeUserRequest() const {
+StatusWith<std::unique_ptr<UserRequest>> SaslX509ServerMechanism::makeUserRequest() const {
     std::unique_ptr<UserRequest> request = std::make_unique<UserRequestGeneral>(
         UserName(getPrincipalName(), getAuthenticationDatabase()), boost::none);
 
     if (!haveClient()) {
-        return request;
+        return std::move(request);
     }
 
     // TODO: SERVER-72648 - pass opCtx to this function
@@ -122,21 +122,21 @@ std::unique_ptr<UserRequest> SaslX509ServerMechanism::makeUserRequest() const {
     }
 
     if (!allowRolesFromX509Certificates || !session) {
-        return request;
+        return std::move(request);
     }
 
     const auto& sslPeerInfo = SSLPeerInfo::forSession(session);
     auto&& peerRoles = sslPeerInfo.roles();
     if (peerRoles.empty() ||
         (sslPeerInfo.subjectName().toString() != request->getUserName().getUser())) {
-        return request;
+        return std::move(request);
     }
 
     std::set<RoleName> requestRoles;
     std::copy(
         peerRoles.begin(), peerRoles.end(), std::inserter(requestRoles, requestRoles.begin()));
 
-    return std::make_unique<UserRequestX509>(
+    return UserRequestX509::makeUserRequestX509(
         UserName(getPrincipalName(), getAuthenticationDatabase()),
         std::move(requestRoles),
         sslPeerInfo);
