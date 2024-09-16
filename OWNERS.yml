@@ -61,6 +61,7 @@ filters:
   - "copy.bara.sky":
     approvers:
       - IamXander
+      - smcclure15
   - "copybara.staging.sky":
     approvers:
       - 10gen/devprod-correctness
