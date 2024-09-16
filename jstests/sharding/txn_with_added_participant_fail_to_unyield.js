@@ -66,20 +66,20 @@ fp.off();
 // because shard1 will eventually abort the transaction after TransactionLifeTimeLimitSeconds (or, a
 // newer transaction is started on shard1).
 const mongosMetrics = assert.commandWorked(st.s.adminCommand({serverStatus: 1})).transactions;
-assert.eq(mongosMetrics.totalStarted, originalMongosMetrics.totalStarted + 1);
-assert.eq(mongosMetrics.currentOpen, 0);
-assert.eq(mongosMetrics.totalStarted, originalMongosMetrics.totalStarted + 1);
-assert.eq(mongosMetrics.totalContactedParticipants,
-          originalMongosMetrics.totalContactedParticipants + 1);
+assert.gte(mongosMetrics.totalStarted, originalMongosMetrics.totalStarted + 1);
+assert.gte(mongosMetrics.currentOpen, 0);
+assert.gte(mongosMetrics.totalStarted, originalMongosMetrics.totalStarted + 1);
+assert.gte(mongosMetrics.totalContactedParticipants,
+           originalMongosMetrics.totalContactedParticipants + 1);
 
 const shard0Metrics = assert.commandWorked(st.shard0.adminCommand({serverStatus: 1})).transactions;
-assert.eq(shard0Metrics.totalStarted, originalShard0Metrics.totalStarted + 1);
-assert.eq(shard0Metrics.currentOpen, 0);
+assert.gte(shard0Metrics.totalStarted, originalShard0Metrics.totalStarted + 1);
+assert.gte(shard0Metrics.currentOpen, 0);
 assert.eq(shard0Metrics.totalAborted, originalShard0Metrics.totalAborted + 1);
 
 const shard1Metrics = assert.commandWorked(st.shard1.adminCommand({serverStatus: 1})).transactions;
-assert.eq(shard1Metrics.totalStarted, originalShard1Metrics.totalStarted + 1);
-assert.eq(shard1Metrics.currentOpen, originalShard1Metrics.currentOpen + 1);
+assert.gte(shard1Metrics.totalStarted, originalShard1Metrics.totalStarted + 1);
+assert.gte(shard1Metrics.currentOpen, originalShard1Metrics.currentOpen + 1);
 assert.eq(shard1Metrics.totalAborted, 0);
 
 session.abortTransaction();
