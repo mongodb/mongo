@@ -300,7 +300,7 @@ tasks:
         "incompatible_tsan",
         "incompatible_aubsan",
         "requires_compile_variant",
-        "requires_large_host_debug_mode",
+        "requires_large_host",
         "crypt",
         "bazel_check",
       ]

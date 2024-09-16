@@ -4,7 +4,6 @@ src/third_party/abseil-cpp/dist
 src/third_party/protobuf/dist
 src/third_party/re2/dist
 src/third_party/tcmalloc/dist
-src/third_party/mozjs
 src/third_party/wiredtiger/dist
 
 # Ignore node_modules due to the following error
