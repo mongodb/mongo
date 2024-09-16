@@ -277,8 +277,21 @@ function analyzeRandomShardKeys(dbName, collName) {
             analyzeShardKey(ns, shardKey);
         }
     }
+    let indexes;
 
-    const indexes = coll.getIndexes();
+    // Catch any errors due to a collection potentially being dropped and recreated as a view
+    try {
+        indexes = coll.getIndexes();
+    } catch (err) {
+        if (err.code == ErrorCodes.CommandNotSupportedOnView) {
+            jsTestLog("Skip analyzing shard keys for " + ns +
+                      " since the collection has been dropped and recreated as a view" +
+                      tojson(err));
+            return;
+        }
+        throw err;
+    }
+
     if (indexes.length > 0) {
         const indexSpec = AnalyzeShardKeyUtil.getRandomElement(indexes);
         const shardKeys = getSupportedShardKeys(indexSpec.key);
