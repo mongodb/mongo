@@ -84,8 +84,6 @@ namespace mongo {
 namespace executor {
 
 class NetworkInterfaceTL : public NetworkInterface {
-    static constexpr int kDiagnosticLogLevel = 4;
-
 public:
     NetworkInterfaceTL(std::string instanceName,
                        ConnectionPool::Options connPoolOpts,

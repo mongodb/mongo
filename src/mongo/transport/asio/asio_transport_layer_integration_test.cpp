@@ -42,7 +42,9 @@
 #include "mongo/transport/session.h"
 #include "mongo/transport/transport_layer.h"
 #include "mongo/transport/transport_layer_manager.h"
+#include "mongo/unittest/framework.h"
 #include "mongo/unittest/integration_test.h"
+#include "mongo/unittest/log_test.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/fail_point.h"
 
@@ -54,7 +56,13 @@
 namespace mongo {
 namespace {
 
-TEST(AsioTransportLayer, HTTPRequestGetsHTTPError) {
+class AsioTransportLayerTest : public unittest::Test {
+private:
+    unittest::MinimumLoggedSeverityGuard networkSeverityGuard{logv2::LogComponent::kNetwork,
+                                                              logv2::LogSeverity::Debug(4)};
+};
+
+TEST_F(AsioTransportLayerTest, HTTPRequestGetsHTTPError) {
     auto connectionString = unittest::getFixtureConnectionString();
     auto server = connectionString.getServers().front();
 
@@ -97,7 +105,7 @@ TEST(AsioTransportLayer, HTTPRequestGetsHTTPError) {
 //
 // Because of the file size limit, it's only an effective check on debug builds (where the future
 // implementation checks the length of the future chain).
-TEST(AsioTransportLayer, ShortReadsAndWritesWork) {
+TEST_F(AsioTransportLayerTest, ShortReadsAndWritesWork) {
     const auto assertOK = [](executor::RemoteCommandResponse reply) {
         ASSERT_OK(reply.status);
         ASSERT(reply.data["ok"]) << reply.data;
@@ -140,7 +148,7 @@ TEST(AsioTransportLayer, ShortReadsAndWritesWork) {
     handle->runCommandRequest(ecr, opCtx->getBaton()).get(opCtx.get());
 }
 
-TEST(AsioTransportLayer, asyncConnectTimeoutCleansUpSocket) {
+TEST_F(AsioTransportLayerTest, asyncConnectTimeoutCleansUpSocket) {
     auto connectionString = unittest::getFixtureConnectionString();
     auto server = connectionString.getServers().front();
 
@@ -163,7 +171,7 @@ TEST(AsioTransportLayer, asyncConnectTimeoutCleansUpSocket) {
     ASSERT_EQ(client.getStatus(), ErrorCodes::NetworkTimeout);
 }
 
-TEST(AsioTransportLayer, exhaustIsMasterShouldReceiveMultipleReplies) {
+TEST_F(AsioTransportLayerTest, exhaustIsMasterShouldReceiveMultipleReplies) {
     auto connectionString = unittest::getFixtureConnectionString();
     auto server = connectionString.getServers().front();
 
@@ -243,7 +251,7 @@ TEST(AsioTransportLayer, exhaustIsMasterShouldReceiveMultipleReplies) {
     }
 }
 
-TEST(AsioTransportLayer, exhaustIsMasterShouldStopOnFailure) {
+TEST_F(AsioTransportLayerTest, exhaustIsMasterShouldStopOnFailure) {
     const auto assertOK = [](executor::RemoteCommandResponse reply) {
         ASSERT_OK(reply.status);
         ASSERT(reply.data["ok"]) << reply.data;

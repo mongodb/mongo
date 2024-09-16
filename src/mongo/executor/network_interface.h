@@ -88,6 +88,13 @@ public:
     // Indicates that there is no expiration time by when a request needs to complete
     static constexpr Date_t kNoExpirationDate{Date_t::max()};
 
+    /**
+     * Debug log level which includes all debug logging emitted by implementations of
+     * NetworkInterface. Tests for NetworkInterface should ensure the kNetwork component's log
+     * verbosity is set to this debug level.
+     */
+    static constexpr int kDiagnosticLogLevel = 4;
+
     virtual ~NetworkInterface();
 
     /**

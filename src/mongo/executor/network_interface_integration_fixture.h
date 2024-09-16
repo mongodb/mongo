@@ -49,6 +49,7 @@
 #include "mongo/stdx/condition_variable.h"
 #include "mongo/transport/transport_layer.h"
 #include "mongo/unittest/framework.h"
+#include "mongo/unittest/log_test.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/future.h"
@@ -150,6 +151,10 @@ public:
 private:
     void _onSchedulingCommand();
     void _onCompletingCommand();
+
+    unittest::MinimumLoggedSeverityGuard networkSeverityGuard{
+        logv2::LogComponent::kNetwork,
+        logv2::LogSeverity::Debug(NetworkInterface::kDiagnosticLogLevel)};
 
     std::unique_ptr<NetworkInterface> _fixtureNet;
     std::unique_ptr<NetworkInterface> _net;
