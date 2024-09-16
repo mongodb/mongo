@@ -1865,6 +1865,7 @@ if wiredtiger:
             "record_id_test.cpp",
             "server_options_test.cpp",
             "shard_id_test.cpp",
+            "startup_warnings_mongod_thp_test.cpp",
         ],
         LIBDEPS=[
             "$BUILD_DIR/mongo/util/fail_point",
@@ -1877,6 +1878,7 @@ if wiredtiger:
             "server_options_base",
             "server_options_servers",
             "service_context_test_fixture",
+            "startup_warnings_mongod",
         ],
     )
 
