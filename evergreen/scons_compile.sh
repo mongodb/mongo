@@ -20,8 +20,6 @@ extra_args="$extra_args --jlink=${num_scons_link_jobs_available} --separate-debu
 echo "Changing SCons to run with UNITTESTS_COMPILE_CONCURRENCY=${num_scons_unit_cc_jobs_available}"
 extra_args="$extra_args UNITTESTS_COMPILE_CONCURRENCY=${num_scons_unit_cc_jobs_available}"
 
-extra_args="$extra_args --consolidated-test-bins=on"
-
 if [ "${scons_cache_scope}" = "shared" ]; then
   extra_args="$extra_args --cache-debug=scons_cache.log"
 fi

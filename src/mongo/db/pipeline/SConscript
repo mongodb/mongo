@@ -365,7 +365,6 @@ env.Benchmark(
         "document_source_mock",
         "pipeline",
     ],
-    CONSOLIDATED_TARGET="pipeline_bm",
 )
 
 env.Library(
@@ -459,7 +458,6 @@ env.Benchmark(
         "$BUILD_DIR/mongo/unittest/unittest",
         "$BUILD_DIR/mongo/util/processinfo",
     ],
-    CONSOLIDATED_TARGET="pipeline_bm",
 )
 
 env.CppUnitTest(
@@ -672,7 +670,6 @@ env.Benchmark(
     LIBDEPS=[
         "accumulator",
     ],
-    CONSOLIDATED_TARGET="pipeline_bm",
 )
 
 env.CppUnitTest(
@@ -709,7 +706,6 @@ env.Benchmark(
         "$BUILD_DIR/mongo/db/service_context_non_d",
         "accumulator",
     ],
-    CONSOLIDATED_TARGET="pipeline_bm",
 )
 
 env.Benchmark(
@@ -752,5 +748,4 @@ env.Benchmark(
         "accumulator",
         "expression_bm_fixture",
     ],
-    CONSOLIDATED_TARGET="pipeline_bm",
 )

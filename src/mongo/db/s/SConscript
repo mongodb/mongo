@@ -934,7 +934,6 @@ env.Benchmark(
     LIBDEPS=[
         "$BUILD_DIR/mongo/db/shard_role_api",
     ],
-    CONSOLIDATED_TARGET="s_bm",
 )
 
 env.Benchmark(
@@ -947,7 +946,6 @@ env.Benchmark(
         "$BUILD_DIR/mongo/db/auth/authorization_manager_global",
         "sharding_runtime_d",
     ],
-    CONSOLIDATED_TARGET="s_bm",
 )
 
 env.Benchmark(
@@ -979,5 +977,4 @@ env.Benchmark(
         "config_server_test_fixture",
         "sharding_catalog_manager",
     ],
-    CONSOLIDATED_TARGET="s_bm",
 )
