@@ -823,27 +823,6 @@ Status validateWildcardSpec(const BSONObj& spec, IndexVersion indexVersion) {
         return reportInvalidVersion(IndexNames::WILDCARD, indexVersion);
     }
     return Status::OK();
-}  // namespace
-
-Status validateColumnStoreSpec(const CollectionPtr& collection,
-                               const BSONObj& spec,
-                               IndexVersion indexVersion) {
-    if (collection->isClustered()) {
-        return {ErrorCodes::InvalidOptions,
-                "unsupported configuation. Cannot create a columnstore index on a clustered "
-                "collection"};
-    }
-
-    for (auto&& notToBeSpecified :
-         {"sparse"_sd, "unique"_sd, "expireAfterSeconds"_sd, "partialFilterExpression"_sd}) {
-        if (spec.hasField(notToBeSpecified)) {
-            return reportInvalidOption(notToBeSpecified, IndexNames::COLUMN);
-        }
-    }
-    if (indexVersion < IndexVersion::kV2) {
-        return reportInvalidVersion(IndexNames::COLUMN, indexVersion);
-    }
-    return Status::OK();
 }
 }  // namespace
 
@@ -962,19 +941,7 @@ Status IndexCatalogImpl::_isSpecOk(OperationContext* opCtx,
             return wildcardSpecStatus;
         }
     } else if (pluginName == IndexNames::COLUMN) {
-        const auto fcvSnapshot = serverGlobalParams.featureCompatibility.acquireFCVSnapshot();
-        uassert(ErrorCodes::NotImplemented,
-                str::stream() << pluginName
-                              << " indexes are under development and cannot be used without "
-                                 "enabling the feature flag",
-                // With our testing failpoint we may try to run this code before we've initialized
-                // the FCV.
-                !fcvSnapshot.isVersionInitialized() ||
-                    feature_flags::gFeatureFlagColumnstoreIndexes.isEnabled(fcvSnapshot));
-        if (auto columnSpecStatus = validateColumnStoreSpec(collection, spec, indexVersion);
-            !columnSpecStatus.isOK()) {
-            return columnSpecStatus;
-        }
+        uasserted(ErrorCodes::NotImplemented, "Columnstore indexes can no longer be created");
     }
 
     // Create an ExpressionContext, used to parse the match expression and to house the collator for
