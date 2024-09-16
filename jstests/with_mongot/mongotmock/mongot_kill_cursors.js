@@ -34,31 +34,31 @@ prepCollection(conn, dbName, collName);
 const cursorId = NumberLong(123);
 const collectionUUID = getUUIDFromListCollections(db, coll.getName());
 
-function runTest(pipeline, expectedCommand) {
-    const cursorHistory = [
-        {
-            expectedCommand,
-            response: {
-                ok: 1,
-                cursor: {firstBatch: [{_id: 1}, {_id: 2}], id: cursorId, ns: coll.getFullName()}
-            }
-        },
-        {
+function runTest(pipeline, expectedCommand, shouldPrefetchGetMore) {
+    const cursorHistory = [{
+        expectedCommand,
+        response: {
+            ok: 1,
+            cursor: {firstBatch: [{_id: 1}, {_id: 2}], id: cursorId, ns: coll.getFullName()}
+        }
+    }];
+    if (shouldPrefetchGetMore) {
+        cursorHistory.push({
             expectedCommand: {getMore: cursorId, collection: coll.getName()},
             response:
-                {cursor: {id: cursorId, ns: coll.getFullName(), nextBatch: [{_id: 14}]}, ok: 1}
-        },
-        {
-            expectedCommand: {killCursors: coll.getName(), cursors: [cursorId]},
-            response: {
-                cursorsKilled: [cursorId],
-                cursorsNotFound: [],
-                cursorsAlive: [],
-                cursorsUnknown: [],
-                ok: 1,
-            }
+                {cursor: {id: cursorId, ns: coll.getFullName(), nextBatch: [{_id: 14}]}, ok: 1},
+        });
+    }
+    cursorHistory.push({
+        expectedCommand: {killCursors: coll.getName(), cursors: [cursorId]},
+        response: {
+            cursorsKilled: [cursorId],
+            cursorsNotFound: [],
+            cursorsAlive: [],
+            cursorsUnknown: [],
+            ok: 1,
         }
-    ];
+    });
 
     assert.commandWorked(
         mongotTestDB.runCommand({setMockResponses: 1, cursorId: cursorId, history: cursorHistory}));
@@ -76,6 +76,7 @@ function runTest(pipeline, expectedCommand) {
     // getQueuedResponses command to mongot.
     assert.soon(function() {
         let resp = assert.commandWorked(mongotTestDB.runCommand({getQueuedResponses: 1}));
+        jsTestLog(resp);
         return resp.numRemainingResponses === 0;
     });
 }
@@ -86,9 +87,9 @@ const vectorSearchQuery = {
     numCandidates: 10,
     limit: 5
 };
-runTest(
-    [{$vectorSearch: vectorSearchQuery}],
-    mongotCommandForVectorSearchQuery({...vectorSearchQuery, collName, dbName, collectionUUID}));
+runTest([{$vectorSearch: vectorSearchQuery}],
+        mongotCommandForVectorSearchQuery({...vectorSearchQuery, collName, dbName, collectionUUID}),
+        /*shouldPrefetchGetMore*/ true);
 
 const searchQuery = {
     query: "cakes",
@@ -96,7 +97,8 @@ const searchQuery = {
 };
 runTest([{$search: searchQuery}],
         mongotCommandForQuery(
-            {query: searchQuery, collName: collName, db: dbName, collectionUUID: collectionUUID}));
+            {query: searchQuery, collName: collName, db: dbName, collectionUUID: collectionUUID}),
+        /*shouldPrefetchGetMore*/ false);
 
 mongotMock.stop();
 MongoRunner.stopMongod(conn);

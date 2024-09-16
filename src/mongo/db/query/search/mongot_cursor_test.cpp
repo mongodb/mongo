@@ -329,38 +329,38 @@ public:
 
             // Schedule another batch, where the batchSize should have exponentially increased from
             // the first batchSize. The batchSize should be set to kDefaultMongotBatchSize *
-            // kInternalSearchBatchSizeGrowthFactor = 202.
+            // kInternalSearchBatchSizeGrowthFactor = 152.
             auto responseSchedulerThread = monitor.spawn([&] {
                 auto receivedGetMoreCmd = scheduleSuccessfulCursorResponse(
-                    "nextBatch", 102, 303, cursorId, /*expectedPrefetch*/ false);
+                    "nextBatch", 102, 253, cursorId, /*expectedPrefetch*/ false);
                 const auto expectedGetMoreCmd =
                     BSON("getMore" << 1LL << "collection"
                                    << "test"
-                                   << "cursorOptions" << BSON("batchSize" << 202));
+                                   << "cursorOptions" << BSON("batchSize" << 152));
                 ASSERT_BSONOBJ_EQ(expectedGetMoreCmd, receivedGetMoreCmd);
             });
 
             // Schedules the GetMore request and exhausts the cursor.
-            for (int docNum = 102; docNum <= 303; docNum++) {
+            for (int docNum = 102; docNum <= 253; docNum++) {
                 ASSERT_EQUALS(tec->getNext(opCtx.get()).value()["x"].Int(), docNum);
             }
             responseSchedulerThread.join();
 
             // Schedule the final batch, where batchSize should have exponentially increased from
             // the batchSize in the last GetMore request. The batchSize should be set to
-            // kDefaultMongotBatchSize * (kInternalSearchBatchSizeGrowthFactor)^2 = 404.
+            // kDefaultMongotBatchSize * (kInternalSearchBatchSizeGrowthFactor)^2 = 228.
             responseSchedulerThread = monitor.spawn([&] {
                 auto receivedGetMoreCmd = scheduleSuccessfulCursorResponse(
-                    "nextBatch", 303, 303, 0, /*expectedPrefetch*/ false);
+                    "nextBatch", 253, 253, 0, /*expectedPrefetch*/ false);
                 const auto expectedGetMoreCmd =
                     BSON("getMore" << 1LL << "collection"
                                    << "test"
-                                   << "cursorOptions" << BSON("batchSize" << 404));
+                                   << "cursorOptions" << BSON("batchSize" << 228));
                 ASSERT_BSONOBJ_EQ(expectedGetMoreCmd, receivedGetMoreCmd);
             });
 
             // Schedules the GetMore request and exhausts the cursor.
-            ASSERT_EQUALS(tec->getNext(opCtx.get()).value()["x"].Int(), 303);
+            ASSERT_EQUALS(tec->getNext(opCtx.get()).value()["x"].Int(), 253);
             ASSERT_FALSE(tec->getNext(opCtx.get()));
             responseSchedulerThread.join();
 
@@ -400,16 +400,16 @@ public:
             // kInternalSearchBatchSizeGrowthFactor.
             auto responseSchedulerThread = monitor.spawn([&] {
                 auto receivedGetMoreCmd = scheduleSuccessfulCursorResponse(
-                    "nextBatch", 3, 8, cursorId, /*expectedPrefetch*/ false);
+                    "nextBatch", 3, 7, cursorId, /*expectedPrefetch*/ false);
                 const auto expectedGetMoreCmd =
                     BSON("getMore" << 1LL << "collection"
                                    << "test"
-                                   << "cursorOptions" << BSON("batchSize" << 6));
+                                   << "cursorOptions" << BSON("batchSize" << 5));
                 ASSERT_BSONOBJ_EQ(expectedGetMoreCmd, receivedGetMoreCmd);
             });
 
             // Schedules the GetMore request and exhausts the cursor.
-            for (int docNum = 3; docNum <= 8; docNum++) {
+            for (int docNum = 3; docNum <= 7; docNum++) {
                 ASSERT_EQUALS(tec->getNext(opCtx.get()).value()["x"].Int(), docNum);
             }
             responseSchedulerThread.join();
@@ -419,16 +419,16 @@ public:
             // startingBatchSize * (kInternalSearchBatchSizeGrowthFactor)^2.
             responseSchedulerThread = monitor.spawn([&] {
                 auto receivedGetMoreCmd = scheduleSuccessfulCursorResponse(
-                    "nextBatch", 9, 9, 0, /*expectedPrefetch*/ false);
+                    "nextBatch", 8, 8, 0, /*expectedPrefetch*/ false);
                 const auto expectedGetMoreCmd =
                     BSON("getMore" << 1LL << "collection"
                                    << "test"
-                                   << "cursorOptions" << BSON("batchSize" << 12));
+                                   << "cursorOptions" << BSON("batchSize" << 8));
                 ASSERT_BSONOBJ_EQ(expectedGetMoreCmd, receivedGetMoreCmd);
             });
 
             // Schedules the GetMore request and exhausts the cursor.
-            ASSERT_EQUALS(tec->getNext(opCtx.get()).value()["x"].Int(), 9);
+            ASSERT_EQUALS(tec->getNext(opCtx.get()).value()["x"].Int(), 8);
             ASSERT_FALSE(tec->getNext(opCtx.get()));
             responseSchedulerThread.join();
 
@@ -530,56 +530,56 @@ public:
             // Assert that the TaskExecutorCursor has not pre-fetched a GetMore.
             ASSERT_FALSE(hasReadyRequests());
 
-            // Schedule another batch, where the batchSize requested has doubled to 10, but it will
-            // only return 8.
+            // Schedule another batch, where the batchSize requested has increased to 8, but it will
+            // only return 7.
             auto responseSchedulerThread = monitor.spawn([&] {
                 auto receivedGetMoreCmd = scheduleSuccessfulCursorResponse(
-                    "nextBatch", 6, 13, cursorId, /*expectedPrefetch*/ false);
+                    "nextBatch", 6, 12, cursorId, /*expectedPrefetch*/ false);
                 const auto expectedGetMoreCmd =
                     BSON("getMore" << 1LL << "collection"
                                    << "test"
-                                   << "cursorOptions" << BSON("batchSize" << 10));
+                                   << "cursorOptions" << BSON("batchSize" << 8));
                 ASSERT_BSONOBJ_EQ(expectedGetMoreCmd, receivedGetMoreCmd);
             });
 
             // Schedules the GetMore request and exhausts the cursor.
-            for (int docNum = 6; docNum <= 13; docNum++) {
+            for (int docNum = 6; docNum <= 12; docNum++) {
                 ASSERT_EQUALS(tec->getNext(opCtx.get()).value()["x"].Int(), docNum);
             }
             responseSchedulerThread.join();
 
-            // Schedule another batch, where the batchSize remains at 10 and returns a filled batch
-            // of 10.
+            // Schedule another batch, where the batchSize remains at 8 and returns a filled batch
+            // of 8.
             responseSchedulerThread = monitor.spawn([&] {
                 auto receivedGetMoreCmd = scheduleSuccessfulCursorResponse(
-                    "nextBatch", 14, 23, cursorId, /*expectedPrefetch*/ false);
+                    "nextBatch", 13, 20, cursorId, /*expectedPrefetch*/ false);
                 const auto expectedGetMoreCmd =
                     BSON("getMore" << 1LL << "collection"
                                    << "test"
-                                   << "cursorOptions" << BSON("batchSize" << 10));
+                                   << "cursorOptions" << BSON("batchSize" << 8));
                 ASSERT_BSONOBJ_EQ(expectedGetMoreCmd, receivedGetMoreCmd);
             });
 
             // Schedules the GetMore request and exhausts the cursor.
-            for (int docNum = 14; docNum <= 23; docNum++) {
+            for (int docNum = 13; docNum <= 20; docNum++) {
                 ASSERT_EQUALS(tec->getNext(opCtx.get()).value()["x"].Int(), docNum);
             }
             responseSchedulerThread.join();
 
-            // Schedule the final batch, where the batchSize doubling should've resumed and will now
-            // request 20.
+            // Schedule the final batch, where the batchSize exponential increase should've resumed
+            // and will now request 12.
             responseSchedulerThread = monitor.spawn([&] {
                 auto receivedGetMoreCmd = scheduleSuccessfulCursorResponse(
-                    "nextBatch", 24, 40, 0, /*expectedPrefetch*/ false);
+                    "nextBatch", 20, 32, 0, /*expectedPrefetch*/ false);
                 const auto expectedGetMoreCmd =
                     BSON("getMore" << 1LL << "collection"
                                    << "test"
-                                   << "cursorOptions" << BSON("batchSize" << 20));
+                                   << "cursorOptions" << BSON("batchSize" << 12));
                 ASSERT_BSONOBJ_EQ(expectedGetMoreCmd, receivedGetMoreCmd);
             });
 
             // Schedules the GetMore request and exhausts the cursor.
-            for (int docNum = 24; docNum <= 40; docNum++) {
+            for (int docNum = 20; docNum <= 32; docNum++) {
                 ASSERT_EQUALS(tec->getNext(opCtx.get()).value()["x"].Int(), docNum);
             }
             ASSERT_FALSE(tec->getNext(opCtx.get()));

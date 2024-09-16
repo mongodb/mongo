@@ -1,6 +1,6 @@
 /**
  * Tests that the batchSize field is sent to mongot correctly on GetMore requests.
- * @tags: [featureFlagSearchBatchSizeTuning]
+ * @tags: [requires_fcv_81]
  */
 import {getAggPlanStage} from "jstests/libs/analyze_plan.js";
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
@@ -76,8 +76,8 @@ function testSearchGroupPipelineExplain(batchSizeArray) {
     testBatchSizeExplain(batchSizeArray, searchGroupPipeline);
 }
 
-// Tests a pipeline that will exhaust many but not all mongot results (at least up to _id=4000) due
-// to a $limit preceded by a highly selective $match.
+// Tests a pipeline that will exhaust many but not all mongot results (at least up to _id=4000, but
+// likely further with pre-fetching) due to a $limit preceded by a highly selective $match.
 const searchMatchSmallLimitPipeline = [{$search: mongotQuery}, {$match: {a: 0}}, {$limit: 5}];
 function testSearchMatchSmallLimitPipeline() {
     const res = coll.aggregate(searchMatchSmallLimitPipeline).toArray();
@@ -148,10 +148,33 @@ function mockRequests(expectedBatchSizes, explainVerbosity = null) {
     });
 }
 
-// Test first that the pipelines calculate each batchSize using the default growth factor of 2.
+// Test first that the pipelines calculate each batchSize using the default growth factor of 1.50.
 {
-    // Assert the batchSizeGrowthFactor is set to default value of 2 at startup.
-    assertGrowthFactorSetAsExpected(2.000);
+    // Assert the batchSizeGrowthFactor is set to default value of 1.50 at startup.
+    assertGrowthFactorSetAsExpected(1.50);
+
+    const searchGroupBatchList = [101, 152, 228, 342, 513, 770, 1155, 1733, 2600, 3900];
+    mockRequests(searchGroupBatchList);
+    testSearchGroupPipeline();
+    testSearchGroupPipelineExplain(searchGroupBatchList);
+
+    const searchMatchSmallLimitBatchList = [101, 152, 228, 342, 513, 770, 1155, 1733, 2600];
+    mockRequests(searchMatchSmallLimitBatchList);
+    testSearchMatchSmallLimitPipeline();
+    testSearchMatchSmallLimitPipelineExplain(searchMatchSmallLimitBatchList);
+
+    const searchMatchLargeLimitBatchList = [250, 375, 563, 845, 1268, 1902, 2853, 4280];
+    mockRequests(searchMatchLargeLimitBatchList);
+    testSearchMatchLargeLimitPipeline();
+    testSearchMatchLargeLimitPipelineExplain(searchMatchLargeLimitBatchList);
+}
+
+// Confirm that the batchSizeGrowthFactor can be configured to 2.0 and that the same pipelines will
+// calculate each batchSize using that growth factor.
+{
+    assert.commandWorked(db.adminCommand(
+        {setClusterParameter: {internalSearchOptions: {batchSizeGrowthFactor: 2.0}}}));
+    assertGrowthFactorSetAsExpected(2.0);
 
     const searchGroupBatchList = [101, 202, 404, 808, 1616, 3232, 6464];
     mockRequests(searchGroupBatchList);
@@ -168,29 +191,6 @@ function mockRequests(expectedBatchSizes, explainVerbosity = null) {
 
     // batchSize starts at 250 due to {$limit: 250}.
     const searchMatchLargeLimitBatchList = [250, 500, 1000, 2000, 4000, 8000];
-    mockRequests(searchMatchLargeLimitBatchList);
-    testSearchMatchLargeLimitPipeline();
-    testSearchMatchLargeLimitPipelineExplain(searchMatchLargeLimitBatchList);
-}
-
-// Confirm that the batchSizeGrowthFactor can be configured to 1.5 and that the same pipelines will
-// calculate each batchSize using that growth factor.
-{
-    assert.commandWorked(db.adminCommand(
-        {setClusterParameter: {internalSearchOptions: {batchSizeGrowthFactor: 1.5}}}));
-    assertGrowthFactorSetAsExpected(1.5);
-
-    const searchGroupBatchList = [101, 152, 228, 342, 513, 770, 1155, 1733, 2600, 3900];
-    mockRequests(searchGroupBatchList);
-    testSearchGroupPipeline();
-    testSearchGroupPipelineExplain(searchGroupBatchList);
-
-    const searchMatchSmallLimitBatchList = [101, 152, 228, 342, 513, 770, 1155, 1733, 2600];
-    mockRequests(searchMatchSmallLimitBatchList);
-    testSearchMatchSmallLimitPipeline();
-    testSearchMatchSmallLimitPipelineExplain(searchMatchSmallLimitBatchList);
-
-    const searchMatchLargeLimitBatchList = [250, 375, 563, 845, 1268, 1902, 2853, 4280];
     mockRequests(searchMatchLargeLimitBatchList);
     testSearchMatchLargeLimitPipeline();
     testSearchMatchLargeLimitPipelineExplain(searchMatchLargeLimitBatchList);
