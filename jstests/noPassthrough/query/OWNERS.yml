@@ -35,7 +35,15 @@ filters:
       - 10gen/query-optimization
   - "search_hybrid_scoring_feature_flag_test.js":
     approvers:
-      - 10gen/query-integration
+      - TedTuckman
+      - cswanson310
+      - banarun
+    metadata:
+      owning_team: 10gen/query-integration
   - "set_window_fields_read_concern_snapshot.js":
     approvers:
-      - 10gen/query-integration
+      - TedTuckman
+      - cswanson310
+      - banarun
+    metadata:
+      owning_team: 10gen/query-integration

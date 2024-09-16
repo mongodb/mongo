@@ -38,7 +38,11 @@ filters:
       - 10gen/query-execution
   - "log_with_sampling*":
     approvers:
-      - 10gen/query-integration
+      - awagenmaker
+      - banarun
+      - TedTuckman
+    metadata:
+      owning_team: 10gen/query-integration
   - "roaring_bitmaps*":
     approvers:
       - 10gen/query-optimization

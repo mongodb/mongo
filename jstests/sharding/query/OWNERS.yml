@@ -11,4 +11,8 @@ filters:
       - 10gen/query-optimization
   - "sharded_profile.js":
     approvers:
-      - 10gen/query-integration
+      - awagenmaker
+      - cswanson310
+      - TedTuckman
+    metadata:
+      owning_team: 10gen/query-integration

@@ -2,4 +2,15 @@ version: 1.0.0
 filters:
   - "*":
     approvers:
-      - 10gen/query-integration
+      - wbuerger46
+      - TedTuckman
+      - banarun
+    metadata:
+      owning_team: 10gen/query-integration
+  - "OWNERS.yml":
+    approvers:
+      - awagenmaker
+      - banarun
+      - TedTuckman
+    metadata:
+      owning_team: 10gen/query-integration

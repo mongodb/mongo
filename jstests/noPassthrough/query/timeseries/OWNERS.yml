@@ -2,4 +2,9 @@ version: 1.0.0
 filters:
   - "*":
     approvers:
-      - 10gen/query-integration
+      - banarun
+      - wolffcm
+      - galon1
+      - yun-soo
+    metadata:
+      owning_team: 10gen/query-integration

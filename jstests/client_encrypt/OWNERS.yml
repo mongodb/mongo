@@ -2,4 +2,8 @@ version: 1.0.0
 filters:
   - "*":
     approvers:
-      - 10gen/query-integration
+      - awagenmaker
+      - TedTuckman
+      - banarun
+    metadata:
+      owning_team: 10gen/query-integration

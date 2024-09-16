@@ -13,7 +13,11 @@ filters:
       - 10gen/query-execution
   - "current_op*":
     approvers:
-      - 10gen/query-integration
+      - TedTuckman
+      - banarun
+      - awagenmaker
+    metadata:
+      owning_team: 10gen/query-integration
   - "index_filter_commands.*":
     approvers:
       - 10gen/query-optimization
@@ -31,4 +35,8 @@ filters:
       - 10gen/query-execution
   - "search_index_commands.*":
     approvers:
-      - 10gen/query-integration
+      - cswanson310
+      - TedTuckman
+      - madelinezec
+    metadata:
+      owning_team: 10gen/query-integration

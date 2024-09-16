@@ -5,13 +5,27 @@ filters:
       - 10gen/query-execution
   - "*timeseries*":
     approvers:
-      - 10gen/query-integration
+      - banarun
+      - wolffcm
+      - galon1
+      - yun-soo
+    metadata:
+      owning_team: 10gen/query-integration
   - "text_*":
     approvers:
-      - 10gen/query-integration
+      - TedTuckman
+      - banarun
+      - cswanson310
+      - awagenmaker
+    metadata:
+      owning_team: 10gen/query-integration
   - "geo_*":
     approvers:
-      - 10gen/query-integration
+      - wbuerger46
+      - TedTuckman
+      - banarun
+    metadata:
+      owning_team: 10gen/query-integration
   - "cached_plan*":
     approvers:
       - 10gen/query-optimization

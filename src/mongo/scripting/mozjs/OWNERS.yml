@@ -2,8 +2,9 @@ version: 1.0.0
 filters:
   - "*":
     approvers:
-      - cswanson310
+      - jseyster
+      - sroches
+      - banarun
       - awagenmaker
-      - TedTuckman
     metadata:
       owning_team: 10gen/query-integration

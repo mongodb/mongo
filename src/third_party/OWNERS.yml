@@ -14,5 +14,10 @@ filters:
       - 10gen/devprod-build
   - "mozjs":
     approvers:
-      - 10gen/query-integration
+      - jseyster
+      - sroches
+      - banarun
+      - awagenmaker
       - 10gen/server-security
+    metadata:
+      owning_team: 10gen/query-integration
