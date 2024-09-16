@@ -104,7 +104,7 @@ tasks:
             --runAllFeatureFlagTests
 
   - <<: *antithesis_task_template
-    name: antithesis_concurrency_sharded_multi_stmt_txn_kill_primary
+    name: antithesis_concurrency_sharded_multi_stmt_txn_stepdown_terminate_kill_primary
     tags:
       [
         "assigned_to_jira_team_devprod_correctness",
@@ -116,7 +116,7 @@ tasks:
       - func: "do setup for antithesis"
       - func: "antithesis image build and push"
         vars:
-          suite: concurrency_sharded_multi_stmt_txn_kill_primary
+          suite: concurrency_sharded_multi_stmt_txn_stepdown_terminate_kill_primary
           resmoke_args: >-
             --runAllFeatureFlagTests
 
@@ -172,7 +172,7 @@ tasks:
             --runAllFeatureFlagTests
 
   - <<: *antithesis_task_template
-    name: antithesis_concurrency_sharded_with_stepdowns_and_balancer_config_shard
+    name: antithesis_concurrency_sharded_stepdown_terminate_kill_primary_with_balancer_config_shard
     tags:
       [
         "assigned_to_jira_team_devprod_correctness",
@@ -184,7 +184,7 @@ tasks:
       - func: "do setup for antithesis"
       - func: "antithesis image build and push"
         vars:
-          suite: concurrency_sharded_with_stepdowns_and_balancer
+          suite: concurrency_sharded_stepdown_terminate_kill_primary_with_balancer
           resmoke_args: >-
             --configShard=0
             --numShards=2
