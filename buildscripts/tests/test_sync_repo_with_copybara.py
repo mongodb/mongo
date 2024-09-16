@@ -3,7 +3,6 @@ import os
 import sys
 import tempfile
 import traceback
-from unittest.mock import patch
 from buildscripts import sync_repo_with_copybara
 
 
@@ -134,17 +133,27 @@ class TestBranchFunctions(unittest.TestCase):
     def test_branch_exists(self):
         """Perform a test to check that the branch exists in a repository."""
         test_name = "branch_exists_test"
-        repo_url = "git@github.com:mongodb/mongo.git"
-        branch_name = "v7.3"
-        result = sync_repo_with_copybara.check_destination_branch_exists(repo_url, branch_name)
+        copybara_config = sync_repo_with_copybara.CopybaraConfig(
+            source=None,
+            destination=sync_repo_with_copybara.CopybaraRepoConfig(
+                git_url="https://github.com/mongodb/mongo.git",
+                branch="v7.3",
+            ),
+        )
+        result = sync_repo_with_copybara.check_destination_branch_exists(copybara_config)
         self.assertTrue(result, f"{test_name}: SUCCESS!")
 
     def test_branch_not_exists(self):
-        """Perform a test to check that the branch does not exists in a repository."""
+        """Perform a test to check that the branch does not exist in a repository."""
         test_name = "branch_not_exists_test"
-        repo_url = "git@github.com:mongodb/mongo.git"
-        branch_name = "v7.3test"
-        result = sync_repo_with_copybara.check_destination_branch_exists(repo_url, branch_name)
+        copybara_config = sync_repo_with_copybara.CopybaraConfig(
+            source=None,
+            destination=sync_repo_with_copybara.CopybaraRepoConfig(
+                git_url="https://github.com/mongodb/mongo.git",
+                branch="..invalid-therefore-impossible-to-create-branch-name",
+            ),
+        )
+        result = sync_repo_with_copybara.check_destination_branch_exists(copybara_config)
         self.assertFalse(result, f"{test_name}: SUCCESS!")
 
     def test_only_mongodb_mongo_repo(self):
@@ -163,7 +172,7 @@ class TestBranchFunctions(unittest.TestCase):
 
             try:
                 # Check if the repository is only the MongoDB official repository
-                result = sync_repo_with_copybara.is_only_mongodb_mongo_repo()
+                result = sync_repo_with_copybara.has_only_destination_repo_remote("mongodb/mongo")
             except Exception as err:
                 print(f"{test_name}: FAIL!\n Exception occurred: {err}\n {traceback.format_exc()}")
                 self.fail(f"{test_name}: FAIL!")
@@ -188,14 +197,27 @@ class TestBranchFunctions(unittest.TestCase):
 
             try:
                 # Call function to push branch to public repository, expecting an exception
-                sync_repo_with_copybara.push_branch_to_public_repo(
+                sync_repo_with_copybara.push_branch_to_destination_repo(
                     mongodb_mongo_dir,
-                    repo_url="",
-                    destination_branch_name="",
+                    copybara_config=sync_repo_with_copybara.CopybaraConfig(
+                        source=sync_repo_with_copybara.CopybaraRepoConfig(
+                            git_url="",
+                            repo_name="",
+                            branch="",
+                        ),
+                        destination=sync_repo_with_copybara.CopybaraRepoConfig(
+                            git_url="",
+                            repo_name="",
+                            branch="",
+                        ),
+                    ),
                     branching_off_commit="",
                 )
             except Exception as err:
-                if str(err) == "Not only mongodb repo":
+                if (
+                    str(err)
+                    == f"{mongodb_mongo_dir} git repo has not only the destination repo remote"
+                ):
                     return
 
             self.fail(f"{test_name}: FAIL!")
@@ -222,8 +244,21 @@ class TestBranchFunctions(unittest.TestCase):
             self.create_mock_repo_commits(mongodb_mongo_dir, 2)
             try:
                 # Call function to push branch to public repository, expecting an exception
-                sync_repo_with_copybara.push_branch_to_public_repo(
-                    mongodb_mongo_dir, "", "", invalid_branching_off_commit
+                sync_repo_with_copybara.push_branch_to_destination_repo(
+                    mongodb_mongo_dir,
+                    sync_repo_with_copybara.CopybaraConfig(
+                        source=sync_repo_with_copybara.CopybaraRepoConfig(
+                            git_url="",
+                            repo_name="",
+                            branch="",
+                        ),
+                        destination=sync_repo_with_copybara.CopybaraRepoConfig(
+                            git_url="",
+                            repo_name="",
+                            branch="",
+                        ),
+                    ),
+                    invalid_branching_off_commit,
                 )
             except Exception as err:
                 if (

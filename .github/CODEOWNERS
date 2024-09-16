@@ -23,7 +23,7 @@ OWNERS.yml @IamXander @anna-wawrzyniak @dhly-etc @dstorch @kaloianm @markbenvenu
 .style.yapf @10gen/devprod-build @10gen/devprod-correctness @svc-auto-approve-bot
 BUILD.bazel @10gen/devprod-build @svc-auto-approve-bot
 copy.bara.sky @IamXander @smcclure15 @svc-auto-approve-bot
-copybara.staging.sky @10gen/devprod-correctness @svc-auto-approve-bot
+copy.bara.staging.sky @10gen/devprod-correctness @svc-auto-approve-bot
 jsconfig.json @10gen/devprod-correctness @svc-auto-approve-bot
 package.json @10gen/devprod-correctness @svc-auto-approve-bot
 pnpm-lock.yaml @10gen/devprod-correctness @svc-auto-approve-bot

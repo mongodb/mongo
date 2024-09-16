@@ -62,7 +62,7 @@ filters:
     approvers:
       - IamXander
       - smcclure15
-  - "copybara.staging.sky":
+  - "copy.bara.staging.sky":
     approvers:
       - 10gen/devprod-correctness
   - "jsconfig.json":

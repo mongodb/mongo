@@ -34,7 +34,7 @@ The reason they should be pushed as separate commits is in the case of needing t
 
 ### Copybara configuration
 
-`copybara.sky` and `copybara.staging.sky`
+`copy.bara.sky` and `copy.bara.staging.sky`
 
 - Update "master" branch references with a new branch name
 
