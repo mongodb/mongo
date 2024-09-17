@@ -536,6 +536,5 @@ mongo_cc_library(
         "recovery_unit_base",
         "storage_options",
         "//src/mongo:base",
-        "//src/mongo/util:fail_point",
     ],
 )

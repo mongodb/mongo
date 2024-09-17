@@ -43,13 +43,8 @@
 #include "mongo/db/transaction_resources.h"
 #include "mongo/platform/compiler.h"
 #include "mongo/util/assert_util.h"
-#include "mongo/util/duration.h"
-#include "mongo/util/fail_point.h"
-#include "mongo/util/time_support.h"
 
 namespace mongo {
-
-MONGO_FAIL_POINT_DEFINE(sleepBeforeCommit);
 
 WriteUnitOfWork::WriteUnitOfWork(OperationContext* opCtx, OplogEntryGroupType groupOplogEntries)
     : _opCtx(opCtx),
@@ -142,10 +137,6 @@ void WriteUnitOfWork::commit() {
         opObserver->onBatchedWriteCommit(_opCtx, _groupOplogEntries);
     }
     if (_toplevel) {
-        if (MONGO_unlikely(sleepBeforeCommit.shouldFail())) {
-            sleepFor(Milliseconds(100));
-        }
-
         // Execute preCommit hooks before committing the transaction. This is an opportunity to
         // throw or do any last changes before committing.
         shard_role_details::getRecoveryUnit(_opCtx)->runPreCommitHooks(_opCtx);
