@@ -263,7 +263,7 @@ boost::optional<Document> DocumentSourceQueryStats::toDocument(
             SerializationOptions::kRepresentativeQueryShapeSerializeOptions,
             SerializationContext::stateDefault());
         LOGV2_DEBUG(7349403,
-                    2,
+                    3,
                     "Error encountered when applying hmac to query shape, will not publish "
                     "queryStats for this entry.",
                     "status"_attr = ex.toStatus(),
