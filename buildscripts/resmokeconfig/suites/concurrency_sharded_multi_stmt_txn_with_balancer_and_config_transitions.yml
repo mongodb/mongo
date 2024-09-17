@@ -96,6 +96,9 @@ selector:
     - jstests/concurrency/fsm_workloads/create_index_background_unique.js
     - jstests/concurrency/fsm_workloads/create_index_background_unique_capped.js
 
+    # TODO SERVER-92349: Re-enable this test once completed.
+    - jstests/concurrency/fsm_workloads/indexed_insert_ttl.js
+
     # This test runs a large number of inserts, which can cause moveCollection to take a long time
     # to finish. This can cause the CheckMetadataConsistency hook to hit LockBusy errors.
     - jstests/concurrency/fsm_workloads/timeseries_insert_idle_bucket_expiration.js

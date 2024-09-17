@@ -477,9 +477,6 @@ class _AddRemoveShardThread(threading.Thread):
 
     def _move_all_collections_from_shard(self, collections, source):
         for collection in collections:
-            if "noBalance" in collection and collection["noBalance"]:
-                # The collection has been marked as "noBalance" so it should not be moved.
-                continue
             namespace = collection["_id"]
             destination = self._get_other_shard_id(source)
             self.logger.info("Running moveCollection for " + namespace + " to " + destination)
