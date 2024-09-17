@@ -206,7 +206,7 @@ server_parameters:
     set_at: [ startup, runtime ]
     cpp_varname: "internalQueryPlannerEnableIndexPruning"
     cpp_vartype: AtomicWord<bool>
-    default: true
+    default: false
     on_update: plan_cache_util::clearSbeCacheOnParameterChange
     redact: false
 
