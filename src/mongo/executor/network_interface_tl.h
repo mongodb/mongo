@@ -163,10 +163,16 @@ public:
         Milliseconds timeout) override;
 
 private:
+    struct RequestState;
+    struct RequestManager;
+
     /**
-     * For an RPC, an instance of `CommandState` is created to capture the state of the
-     * remote command. As part of running a remote command, `NITL` sends out a request
-     * to the specified target.
+     * For each logical RPC, an instance of `CommandState` is created to capture the state of the
+     * remote command. As part of running a remote command, `NITL` sends out one or more requests
+     * to the specified targets, and `RequestState` represents the state of each request.
+     * `CommandState` owns a `RequestManager` that tracks individual requests. For each request sent
+     * over the wire, `RequestManager` creates a `Context` that holds a weak pointer to the
+     * `Request`, as well as the index of the target.
      */
 
     struct CommandStateBase : public std::enable_shared_from_this<CommandStateBase> {
@@ -175,10 +181,16 @@ private:
                          const TaskExecutor::CallbackHandle& cbHandle_);
         virtual ~CommandStateBase();
 
-        using ConnectionHandle = std::shared_ptr<ConnectionPool::ConnectionHandle::element_type>;
-        using WeakConnectionHandle = std::weak_ptr<ConnectionPool::ConnectionHandle::element_type>;
+        /**
+         * Use the current RequestState to send out a command request.
+         */
+        virtual Future<RemoteCommandResponse> sendRequest(
+            std::shared_ptr<RequestState> requestState) = 0;
 
-        virtual Future<RemoteCommandResponse> sendRequest() = 0;
+        /**
+         * Set a timer to fulfill the promise with a timeout error.
+         */
+        void setTimer(const std::shared_ptr<RequestState>& requestState);
 
         /**
          * Fulfill the promise with the response.
@@ -195,50 +207,21 @@ private:
         void tryFinish(Status status) noexcept;
 
         /**
-         * Return the current connection to the pool and unset it locally.
-         *
-         * This must be called from the networking thread (i.e. the reactor).
-         */
-        void returnConnection(Status status) noexcept;
-
-        void trySend(StatusWith<ConnectionPool::ConnectionHandle> swConn) noexcept;
-
-        void killOperation();
-
-        /**
-         * Set a timer to fulfill the promise with a timeout error.
-         */
-        virtual void setTimer();
-
-        /**
-         * Resolve an eventual response
-         */
-        void resolve(Future<RemoteCommandResponse> future) noexcept;
-
-        /**
-         * Return the client for a given connection
-         */
-        static AsyncDBClient* getClient(const ConnectionHandle& conn) noexcept;
-
-        /**
-         * Cancel the current client operation or do nothing if there is no client.
-         */
-        void cancel() noexcept;
-
-        /**
          * Run the NetworkInterface's MetadataHook on a given request if this Command isn't already
          * finished.
          */
         Status doMetadataHook(const RemoteCommandOnAnyResponse& response);
 
+        /**
+         * Return the most connections we expect to be able to acquire.
+         */
+        size_t maxPossibleConns() const noexcept {
+            return requestOnAny.target.size();
+        }
+
         NetworkInterfaceTL* interface;
 
-        // Original request as received from the caller.
-        const RemoteCommandRequest request;
-
-        // Modified request to emit on the wire.
-        RemoteCommandRequest requestToSend;
-
+        RemoteCommandRequestOnAny requestOnAny;
         TaskExecutor::CallbackHandle cbHandle;
         Date_t deadline = kNoExpirationDate;
 
@@ -246,6 +229,8 @@ private:
 
         BatonHandle baton;
         std::unique_ptr<transport::ReactorTimer> timer;
+
+        std::unique_ptr<RequestManager> requestManager;
 
         // The thread that sets this bit must subsequently call fulfillFinalPromise() exactly once.
         // Once it is set, no other thread may call fulfillFinalPromise().
@@ -258,12 +243,6 @@ private:
 
         // Total time spent waiting for connections that eventually time out.
         Milliseconds connTimeoutWaitTime{0};
-
-        ConnectionHandle conn;
-        WeakConnectionHandle weakConn;
-
-        // Synchronizes requestToSend, conn, and weakConn.
-        Mutex mutex = MONGO_MAKE_LATCH("NetworkInterfaceTL::CommandStateBase::mutex");
     };
 
     struct CommandState final : public CommandStateBase {
@@ -278,7 +257,8 @@ private:
                          RemoteCommandRequestOnAny request,
                          const TaskExecutor::CallbackHandle& cbHandle);
 
-        Future<RemoteCommandResponse> sendRequest() override;
+        Future<RemoteCommandResponse> sendRequest(
+            std::shared_ptr<RequestState> requestState) override;
 
         void fulfillFinalPromise(StatusWith<RemoteCommandOnAnyResponse> response) override;
 
@@ -300,11 +280,13 @@ private:
                          RemoteCommandOnReplyFn&& onReply,
                          const BatonHandle& baton);
 
-        Future<RemoteCommandResponse> sendRequest() override;
+        Future<RemoteCommandResponse> sendRequest(
+            std::shared_ptr<RequestState> requestState) override;
 
         void fulfillFinalPromise(StatusWith<RemoteCommandOnAnyResponse> response) override;
 
-        void continueExhaustRequest(StatusWith<RemoteCommandResponse> swResponse);
+        void continueExhaustRequest(std::shared_ptr<RequestState> requestState,
+                                    StatusWith<RemoteCommandResponse> swResponse);
 
         // Protects against race between reactor thread restarting stopwatch during exhaust
         // request and main thread reading stopwatch elapsed time during shutdown.
@@ -313,6 +295,86 @@ private:
         Promise<void> promise;
         Promise<RemoteCommandResponse> finalResponsePromise;
         RemoteCommandOnReplyFn onReplyFn;
+    };
+
+    struct RequestManager {
+        RequestManager(CommandStateBase* cmdState);
+
+        void trySend(StatusWith<ConnectionPool::ConnectionHandle> swConn) noexcept;
+        void cancelRequests();
+        void killOperationsForPendingRequests();
+
+        CommandStateBase* cmdState;
+
+        /**
+         * Holds context for individual requests, and is only valid if initialized.
+         */
+        struct Context {
+            bool initialized = false;
+            std::weak_ptr<RequestState> request;
+        };
+        Context request;
+
+        Mutex mutex = MONGO_MAKE_LATCH("NetworkInterfaceTL::RequestManager::mutex");
+
+        // Number of connections we've resolved.
+        size_t connsResolved{0};
+
+        // Set to true after we have sent the request.
+        bool isSent{false};
+
+        // Set to true when the command finishes or is canceled to block remaining requests.
+        bool isLocked{false};
+    };
+
+    struct RequestState final : public std::enable_shared_from_this<RequestState> {
+        using ConnectionHandle = std::shared_ptr<ConnectionPool::ConnectionHandle::element_type>;
+        using WeakConnectionHandle = std::weak_ptr<ConnectionPool::ConnectionHandle::element_type>;
+        RequestState(RequestManager* mgr, std::shared_ptr<CommandStateBase> cmdState_)
+            : cmdState{std::move(cmdState_)}, requestManager(mgr) {}
+
+        ~RequestState();
+
+        /**
+         * Return the client for a given connection
+         */
+        static AsyncDBClient* getClient(const ConnectionHandle& conn) noexcept;
+
+        /**
+         * Cancel the current client operation or do nothing if there is no client.
+         */
+        void cancel() noexcept;
+
+        /**
+         * Return the current connection to the pool and unset it locally.
+         *
+         * This must be called from the networking thread (i.e. the reactor).
+         */
+        void returnConnection(Status status) noexcept;
+
+        /**
+         * Resolve an eventual response
+         */
+        void resolve(Future<RemoteCommandResponse> future) noexcept;
+
+        NetworkInterfaceTL* interface() noexcept {
+            return cmdState->interface;
+        }
+
+        std::shared_ptr<CommandStateBase> cmdState;
+
+        ClockSource::StopWatch stopwatch;
+
+        RequestManager* const requestManager{nullptr};
+
+        boost::optional<RemoteCommandRequest> request;
+        HostAndPort host;
+        ConnectionHandle conn;
+        WeakConnectionHandle weakConn;
+
+        // Set to true if the response to the request is used to fulfill the command's
+        // promise.
+        bool fulfilledPromise{false};
     };
 
     struct AlarmState {
