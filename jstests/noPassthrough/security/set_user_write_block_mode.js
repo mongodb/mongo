@@ -227,7 +227,6 @@ function runTest(fixture) {
         // non-sharded collections in internal DBs are built by the config server, which doesn't
         // have the UserWriteBlockModeOpObserver installed.
         const config = conn.getDB('config');
-        assert.commandWorked(config.createCollection("system.sessions"));
         assert.commandWorked(config.system.sessions.insert({"a": 2}));
     });
 
