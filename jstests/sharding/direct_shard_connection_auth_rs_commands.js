@@ -21,6 +21,8 @@ const shardAdminDB = shardConn.getDB("admin");
 jsTest.log("Setup users for test");
 shardAdminDB.createUser({user: "admin", pwd: 'x', roles: ["root"]});
 assert(shardAdminDB.auth("admin", 'x'), "Authentication failed");
+assert.commandWorked(shardAdminDB.runCommand(
+    {setParameter: 1, logComponentVerbosity: {sharding: {verbosity: 2}, assert: {verbosity: 1}}}));
 // The replSetStateChange action type is needed for this test
 shardAdminDB.createUser({user: "user", pwd: "y", roles: ["clusterManager"]});
 shardAdminDB.logout();

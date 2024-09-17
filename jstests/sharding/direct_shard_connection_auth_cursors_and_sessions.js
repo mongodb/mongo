@@ -24,6 +24,9 @@ shardAdminDB.createUser(
     {user: "user", pwd: "y", roles: ["readWriteAnyDatabase", "directShardOperations"]});
 assert(userConn.getDB("admin").auth("user", 'y'), "Authentication failed");
 
+assert.commandWorked(shardAdminDB.runCommand(
+    {setParameter: 1, logComponentVerbosity: {sharding: {verbosity: 2}, assert: {verbosity: 1}}}));
+
 jsTest.log("Create a collection initially.");
 assert.commandWorked(shardAdminTestDB.createCollection(collName));
 let bulk = shardAdminTestDB.getCollection(collName).initializeUnorderedBulkOp();

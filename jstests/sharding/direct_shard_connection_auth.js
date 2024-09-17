@@ -20,6 +20,9 @@ const userTestDB = userConn.getDB("test");
 shardAdminDB.createUser({user: "admin", pwd: 'x', roles: ["root"]});
 assert(shardAdminDB.auth("admin", 'x'), "Authentication failed");
 
+assert.commandWorked(shardAdminDB.runCommand(
+    {setParameter: 1, logComponentVerbosity: {sharding: {verbosity: 2}, assert: {verbosity: 1}}}));
+
 // TODO: (SERVER-87190) Remove once 8.0 becomes last lts.
 const failOnDirectOps =
     FeatureFlagUtil.isPresentAndEnabled(shardAdminDB, "FailOnDirectShardOperations");
