@@ -2164,11 +2164,6 @@ tasks:
     tags: ["assigned_to_jira_team_server_catalog_and_routing", "default"]
     commands:
       - func: "generate resmoke tasks"
-        # The hardcoded timeout is to overrule history-based timeout after test number increases,
-        # which could be removed after gaining enough history for the new tests.
-        vars:
-          exec_timeout_secs: 7200 # 120min
-          timeout_secs: 7200 # 120min
 
   - <<: *gen_task_template
     name: change_streams_change_collection_replica_sets_stepdown_primary_jscore_passthrough_gen
@@ -2181,11 +2176,6 @@ tasks:
     tags: ["assigned_to_jira_team_server_catalog_and_routing", "default"]
     commands:
       - func: "generate resmoke tasks"
-        # The hardcoded timeout is to overrule history-based timeout after test number increases,
-        # which could be removed after gaining enough history for the new tests.
-        vars:
-          exec_timeout_secs: 7200 # 120min
-          timeout_secs: 7200 # 120min
 
   - <<: *gen_task_template
     name: change_streams_pre_images_replica_sets_stepdown_primary_jscore_passthrough_gen

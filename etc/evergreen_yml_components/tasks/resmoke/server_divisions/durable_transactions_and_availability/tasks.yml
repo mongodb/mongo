@@ -1223,11 +1223,6 @@ tasks:
       ]
     commands:
       - func: "generate resmoke tasks"
-        # The hardcoded timeout is to overrule history-based timeout after test number increases,
-        # which could be removed after gaining enough history for the new tests.
-        vars:
-          exec_timeout_secs: 4800 # 80min
-          timeout_secs: 4800 # 80min
 
   - <<: *gen_task_template
     name: replica_sets_lag_oplog_application_jscore_passthrough_gen
