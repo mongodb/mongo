@@ -30,7 +30,7 @@ global:
   cpp_namespace: "mongo"
   cpp_includes:
     - "mongo/db/admission/ingress_admission_controller.h"
-
+    - "mongo/db/server_options.h"
 
 server_parameters:
   ingressAdmissionControlEnabled:
@@ -49,6 +49,8 @@ server_parameters:
     cpp_varname: gIngressAdmissionControllerTicketPoolSize
     cpp_vartype: AtomicWord<int32_t>
     on_update: IngressAdmissionController::onUpdateTicketPoolSize
-    default: 1000000
+    # Setting the pool size equal to the max connections default means it is
+    # effectively infinite. See maxIncomingConnections in server_options_general.idl
+    default: { expr: 'static_cast<int>(DEFAULT_MAX_CONN)' }
     validator: { gte: 0 }
     redact: false
