@@ -1,6 +1,6 @@
 /**
  * Tests that the batchSize field is sent to mongot correctly on the initial request.
- * @tags: [requires_fcv_81]
+ * @tags: [featureFlagSearchBatchSizeTuning]
  */
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {checkSbeRestrictedOrFullyEnabled} from "jstests/libs/sbe_util.js";
