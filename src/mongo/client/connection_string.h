@@ -49,7 +49,7 @@ namespace mongo {
 class ClientAPIVersionParameters;
 class DBClientBase;
 class MongoURI;
-struct TransientSSLParams;
+class TransientSSLParams;
 
 /**
  * ConnectionString handles parsing different ways to connect to mongo and determining method

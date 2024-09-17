@@ -46,6 +46,7 @@
 #include "mongo/util/decorable.h"
 #include "mongo/util/net/sock.h"
 #include "mongo/util/net/ssl/apple.hpp"
+#include "mongo/util/net/ssl_options.h"
 #include "mongo/util/net/ssl_peer_info.h"
 #include "mongo/util/net/ssl_types.h"
 #include "mongo/util/out_of_line_executor.h"
@@ -79,7 +80,7 @@ Status validateDisableNonTLSConnectionLogging(const bool&, const boost::optional
 #ifdef MONGO_CONFIG_SSL
 namespace mongo {
 struct SSLParams;
-struct TransientSSLParams;
+class TransientSSLParams;
 
 namespace transport {
 struct SSLConnectionContext;
@@ -201,6 +202,18 @@ struct SSLInformationToLog {
 };
 
 class SSLManagerInterface : public Decorable<SSLManagerInterface> {
+protected:
+    /**
+     * SSLCoreParams is a lightweight view of SSL configuration parameters.
+     * It holds references to existing strings. The lifetime of an SSLCoreParams object
+     * must not exceed the lifetime of the strings it references.
+     */
+    struct SSLCoreParams {
+        const std::string& clientPEM;
+        const std::string& clientPassword;
+        const std::string& cafile;
+    };
+
 public:
     /**
      * Creates an instance of SSLManagerInterface.
@@ -261,6 +274,37 @@ public:
      */
     virtual bool isTransient() const {
         return false;
+    }
+
+    /**
+     * Defines the operational modes of SSLManager, which determine how TLS parameters are applied
+     * to connections. This should not be confused with SSLParams::SSLModes that control whether
+     * connections are unencrypted or encrypted.
+     *
+     * Different SSLManager modes:
+     * 1. Normal:
+     *    - Uses global TLS parameters.
+     * 2. TransientNoOverride:
+     *    - Applies short-lived connections with TLS parameters that do not override global
+     * settings.
+     * 3. TransientWithOverride:
+     *    - Applies new connections with TLS parameters that override the global settings.
+     */
+    enum class SSLManagerMode { Normal, TransientNoOverride, TransientWithOverride };
+
+    // Returns the SSLManager mode based on transientSSLParams object presence.
+    virtual SSLManagerMode getSSLManagerMode() const {
+        return SSLManagerMode::Normal;
+    }
+
+    SSLCoreParams parseSSLCoreParams(
+        const SSLParams& params, const boost::optional<TransientSSLParams>& transientSSLParams) {
+        if (MONGO_unlikely(transientSSLParams && transientSSLParams->createNewConnection())) {
+            const auto& tlsParams = transientSSLParams->getTLSCredentials();
+            return {tlsParams->tlsPEMKeyFile, tlsParams->tlsPEMKeyPassword, tlsParams->tlsCAFile};
+        } else {
+            return {params.sslPEMKeyFile, params.sslPEMKeyPassword, params.sslCAFile};
+        }
     }
 
     /**

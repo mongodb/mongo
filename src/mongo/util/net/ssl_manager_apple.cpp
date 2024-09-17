@@ -1272,7 +1272,9 @@ namespace {
 
 class SSLManagerApple : public SSLManagerInterface {
 public:
-    explicit SSLManagerApple(const SSLParams& params, bool isServer);
+    explicit SSLManagerApple(const SSLParams& params,
+                             const boost::optional<TransientSSLParams>& transientSSLParams,
+                             bool isServer);
 
     Status initSSLContext(asio::ssl::apple::Context* context,
                           const SSLParams& params,
@@ -1308,6 +1310,8 @@ public:
 
     void stopJobs() final;
 
+    SSLManagerMode getSSLManagerMode() const final;
+
 private:
     bool _weakValidation;
     bool _allowInvalidCertificates;
@@ -1315,6 +1319,8 @@ private:
     bool _suppressNoCertificateWarning;
     asio::ssl::apple::Context _clientCtx;
     asio::ssl::apple::Context _serverCtx;
+    // If set, this parameters are used to create new transient SSL connection.
+    const boost::optional<TransientSSLParams> _transientSSLParams;
 
     /* _clientCA represents the CA to use when acting as a client
      * and validating remotes during outbound connections.
@@ -1336,11 +1342,44 @@ private:
     synchronized_value<std::weak_ptr<const SSLConnectionContext>> _ownedByContext;
 };
 
-SSLManagerApple::SSLManagerApple(const SSLParams& params, bool isServer)
+SSLManagerApple::SSLManagerMode SSLManagerApple::getSSLManagerMode() const {
+    if (!_transientSSLParams) {
+        return SSLManagerMode::Normal;
+    } else if (_transientSSLParams->createNewConnection()) {
+        return SSLManagerMode::TransientWithOverride;
+    } else {
+        return SSLManagerMode::TransientNoOverride;
+    }
+}
+
+SSLManagerApple::SSLManagerApple(const SSLParams& params,
+                                 const boost::optional<TransientSSLParams>& transientSSLParams,
+                                 bool isServer)
     : _weakValidation(params.sslWeakCertificateValidation),
       _allowInvalidCertificates(params.sslAllowInvalidCertificates),
       _allowInvalidHostnames(params.sslAllowInvalidHostnames),
-      _suppressNoCertificateWarning(params.suppressNoTLSPeerCertificateWarning) {
+      _suppressNoCertificateWarning(params.suppressNoTLSPeerCertificateWarning),
+      _transientSSLParams(transientSSLParams) {
+
+    SSLManagerMode managerMode = getSSLManagerMode();
+    const std::string& cafile = [&]() -> const std::string& {
+        if (MONGO_unlikely(managerMode != SSLManagerMode::Normal)) {
+            uassert(
+                ErrorCodes::InvalidSSLConfiguration,
+                "New transient TLS connections are only supported from client-to-server and when "
+                "`tlsOverrideGlobalParams` is set to true",
+                !isServer && managerMode == SSLManagerMode::TransientWithOverride);
+
+            // Transient connections have priority over global SSL params.
+            const auto& tlsParams = transientSSLParams->getTLSCredentials();
+
+            _allowInvalidCertificates = tlsParams->tlsAllowInvalidCertificates;
+            _allowInvalidHostnames = tlsParams->tlsAllowInvalidHostnames;
+            return _transientSSLParams->getTLSCredentials()->tlsCAFile;
+        } else {
+            return params.sslCAFile;
+        }
+    }();
 
     uassertStatusOK(initSSLContext(&_clientCtx, params, ConnectionDirection::kOutgoing));
     if (_clientCtx.certs) {
@@ -1369,10 +1408,10 @@ SSLManagerApple::SSLManagerApple(const SSLParams& params, bool isServer)
         }
     }
 
-    // If the user has specified --setParameter tlsUseSystemCA=true, then no params.sslCAFile nor
+    // If the user has specified --setParameter tlsUseSystemCA=true, then no cafile nor
     // params.sslClusterCAFile will be defined, and the SSL Manager will fall back to the System CA.
-    if (!params.sslCAFile.empty()) {
-        auto ca = uassertStatusOK(loadPEM(params.sslCAFile, "", kLoadPEMStripKeys));
+    if (!cafile.empty()) {
+        auto ca = uassertStatusOK(loadPEM(cafile, "", kLoadPEMStripKeys));
         _clientCA = std::move(ca);
     }
 
@@ -1383,7 +1422,7 @@ SSLManagerApple::SSLManagerApple(const SSLParams& params, bool isServer)
         _clientCA.reset(certs);
     }
 
-    if (!params.sslClusterCAFile.empty()) {
+    if (!params.sslClusterCAFile.empty() && managerMode != SSLManagerMode::TransientWithOverride) {
         auto ca = uassertStatusOK(loadPEM(params.sslClusterCAFile, "", kLoadPEMStripKeys));
         _serverCA = std::move(ca);
     } else {
@@ -1394,10 +1433,12 @@ SSLManagerApple::SSLManagerApple(const SSLParams& params, bool isServer)
     }
 }
 
-StatusWith<std::pair<::SSLProtocol, ::SSLProtocol>> parseProtocolRange(const SSLParams& params) {
+StatusWith<std::pair<::SSLProtocol, ::SSLProtocol>> parseProtocolRange(
+    const std::vector<SSLParams::Protocols>* disabledProtocols) {
+
     // Map disabled protocols to range.
     bool tls10 = true, tls11 = true, tls12 = true;
-    for (const SSLParams::Protocols& protocol : params.sslDisabledProtocols) {
+    for (const SSLParams::Protocols& protocol : *disabledProtocols) {
         if (protocol == SSLParams::Protocols::TLS1_0) {
             tls10 = false;
         } else if (protocol == SSLParams::Protocols::TLS1_1) {
@@ -1429,8 +1470,21 @@ StatusWith<std::pair<::SSLProtocol, ::SSLProtocol>> parseProtocolRange(const SSL
 Status SSLManagerApple::initSSLContext(asio::ssl::apple::Context* context,
                                        const SSLParams& params,
                                        ConnectionDirection direction) {
+    auto sslConfig = parseSSLCoreParams(params, _transientSSLParams);
+
+    const auto [certificateSelector,
+                disabledProtocols] = [&]() -> std::pair<const SSLParams::CertificateSelector*,
+                                                        const std::vector<SSLParams::Protocols>*> {
+        if (MONGO_unlikely(_transientSSLParams)) {
+            const auto& tlsParams = _transientSSLParams->getTLSCredentials();
+            return {&tlsParams->tlsCertificateSelector, &tlsParams->tlsDisabledProtocols};
+        } else {
+            return {&params.sslCertificateSelector, &params.sslDisabledProtocols};
+        }
+    }();
+
     // Protocol Version.
-    const auto swProto = parseProtocolRange(params);
+    const auto swProto = parseProtocolRange(disabledProtocols);
     if (!swProto.isOK()) {
         return swProto.getStatus();
     }
@@ -1462,7 +1516,8 @@ Status SSLManagerApple::initSSLContext(asio::ssl::apple::Context* context,
         return Status::OK();
     };
 
-    if (direction == ConnectionDirection::kOutgoing) {
+    if (direction == ConnectionDirection::kOutgoing &&
+        getSSLManagerMode() != SSLManagerMode::TransientWithOverride) {
         if (params.tlsWithholdClientCertificate) {
             return Status::OK();
         }
@@ -1475,8 +1530,7 @@ Status SSLManagerApple::initSSLContext(asio::ssl::apple::Context* context,
         // Fallthrough...
     }
 
-    return selectCertificate(
-        params.sslCertificateSelector, params.sslPEMKeyFile, params.sslPEMKeyPassword);
+    return selectCertificate(*certificateSelector, sslConfig.clientPEM, sslConfig.clientPassword);
 }
 
 void SSLManagerApple::registerOwnedBySSLContext(
@@ -1858,12 +1912,13 @@ std::shared_ptr<SSLManagerInterface> SSLManagerInterface::create(
     const SSLParams& params,
     const boost::optional<TransientSSLParams>& transientSSLParams,
     bool isServer) {
-    return std::make_shared<SSLManagerApple>(params, isServer);
+    return std::make_shared<SSLManagerApple>(params, transientSSLParams, isServer);
 }
 
 std::shared_ptr<SSLManagerInterface> SSLManagerInterface::create(const SSLParams& params,
                                                                  bool isServer) {
-    return std::make_shared<SSLManagerApple>(params, isServer);
+    return std::make_shared<SSLManagerApple>(
+        params, boost::optional<TransientSSLParams>{}, isServer);
 }
 
 MONGO_INITIALIZER_WITH_PREREQUISITES(SSLManager, ("EndStartupOptionHandling"))

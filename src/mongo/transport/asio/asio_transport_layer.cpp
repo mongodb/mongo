@@ -1419,7 +1419,8 @@ SSLParams::SSLModes AsioTransportLayer::sslMode() const {
 
 Status AsioTransportLayer::rotateCertificates(std::shared_ptr<SSLManagerInterface> manager,
                                               bool asyncOCSPStaple) {
-    if (manager && manager->isTransient()) {
+    if (manager &&
+        manager->getSSLManagerMode() == SSLManagerInterface::SSLManagerMode::TransientNoOverride) {
         return Status(ErrorCodes::InternalError,
                       "Should not rotate transient SSL manager's certificates");
     }
@@ -1478,7 +1479,8 @@ AsioTransportLayer::_createSSLContext(std::shared_ptr<SSLManagerInterface>& mana
         if (!status.isOK()) {
             return status;
         }
-        if (newSSLContext->manager->isTransient()) {
+        if (manager->getSSLManagerMode() ==
+            SSLManagerInterface::SSLManagerMode::TransientNoOverride) {
             newSSLContext->targetClusterURI =
                 newSSLContext->manager->getTargetedClusterConnectionString();
         }

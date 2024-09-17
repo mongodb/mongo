@@ -891,8 +891,8 @@ TEST_F(AsioTransportLayerWithServiceContextTest, TransportStartAfterShutDown) {
 }
 
 #ifdef MONGO_CONFIG_SSL
-#ifndef _WIN32
 // TODO SERVER-62035: enable the following on Windows.
+#if MONGO_CONFIG_SSL_PROVIDER == MONGO_CONFIG_SSL_PROVIDER_OPENSSL
 TEST_F(AsioTransportLayerWithServiceContextTest, ShutdownDuringSSLHandshake) {
     /**
      * Creates a server and a client thread:
@@ -908,15 +908,17 @@ TEST_F(AsioTransportLayerWithServiceContextTest, ShutdownDuringSSLHandshake) {
     DBClientConnection conn;
     conn.setSoTimeout(1);  // 1 second timeout
 
-    TransientSSLParams params;
-    params.sslClusterPEMPayload = loadFile("jstests/libs/client.pem");
-    params.targetedClusterConnectionString = ConnectionString::forLocal();
+    ClusterConnection clusterConnection;
+    clusterConnection.targetedClusterConnectionString = ConnectionString::forLocal();
+    clusterConnection.sslClusterPEMPayload = loadFile("jstests/libs/client.pem");
 
-    ASSERT_THROWS_CODE(conn.connectNoHello({testHostName(), port}, std::move(params)),
+    TransientSSLParams transientParams(clusterConnection);
+
+    ASSERT_THROWS_CODE(conn.connectNoHello({testHostName(), port}, std::move(transientParams)),
                        DBException,
                        ErrorCodes::HostUnreachable);
 }
-#endif  // _WIN32
+#endif  // MONGO_CONFIG_SSL_PROVIDER == MONGO_CONFIG_SSL_PROVIDER_OPENSSL
 #endif  // MONGO_CONFIG_SSL
 
 class AsioTransportLayerWithRouterPortTest : public ServiceContextTest {

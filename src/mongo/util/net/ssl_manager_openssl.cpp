@@ -1314,7 +1314,7 @@ public:
         return _sslConfiguration;
     }
 
-    bool isTransient() const final;
+    SSLManagerMode getSSLManagerMode() const final;
 
     std::string getTargetedClusterConnectionString() const final;
 
@@ -1346,7 +1346,8 @@ private:
     bool _suppressNoCertificateWarning;
     SSLConfiguration _sslConfiguration;
     // If set, this manager is an instance providing authentication with remote server specified
-    // with TransientSSLParams::targetedClusterConnectionString.
+    // with TransientSSLParams::targetedClusterConnectionString or for a new transient SSL
+    // connection.
     const boost::optional<TransientSSLParams> _transientSSLParams;
 
     // Weak pointer to verify that this manager is still owned by this context.
@@ -1739,23 +1740,31 @@ SSLManagerOpenSSL::SSLManagerOpenSSL(const SSLParams& params,
       _suppressNoCertificateWarning(params.suppressNoTLSPeerCertificateWarning),
       _transientSSLParams(transientSSLParams),
       _fetcher(this),
-      _serverPEMPassword(params.sslPEMKeyPassword, "Enter PEM passphrase"),
+      _serverPEMPassword(getSSLManagerMode() == SSLManagerMode::TransientWithOverride
+                             ? transientSSLParams->getTLSCredentials()->tlsPEMKeyPassword
+                             : params.sslPEMKeyPassword,
+                         "Enter PEM passphrase"),
       _clusterPEMPassword(params.sslClusterPassword, "Enter cluster certificate passphrase") {
-    if (!_initSynchronousSSLContext(&_clientContext, params, ConnectionDirection::kOutgoing)) {
-        uasserted(16768, "ssl initialization problem");
-    }
-
-    if (_transientSSLParams.has_value()) {
-        // No other initialization is necessary: this is egress connection manager that
-        // is not using local PEM files.
-        LOGV2_DEBUG(54090, 1, "Default params are ignored for transient SSL manager");
-        return;
-    }
 
     // pick the certificate for use in outgoing connections,
     std::string clientPEM;
     PasswordFetcher* clientPassword;
-    if (!isServer || params.sslClusterFile.empty()) {
+
+    SSLManagerMode managerMode = getSSLManagerMode();
+
+    if (MONGO_unlikely(managerMode == SSLManagerMode::TransientWithOverride)) {
+        uassert(ErrorCodes::InvalidSSLConfiguration,
+                "New transient connections are only supported from client-to-server",
+                !isServer);
+
+        // Transient connections have priority over global SSL params.
+        const auto& tlsParams = transientSSLParams->getTLSCredentials();
+
+        _allowInvalidCertificates = tlsParams->tlsAllowInvalidCertificates;
+        _allowInvalidHostnames = tlsParams->tlsAllowInvalidHostnames;
+        clientPEM = tlsParams->tlsPEMKeyFile;
+        clientPassword = &_serverPEMPassword;
+    } else if (!isServer || params.sslClusterFile.empty()) {
         // We are either a client, or a server without a cluster key,
         // so use the PEM key file, if specified
         clientPEM = params.sslPEMKeyFile;
@@ -1764,6 +1773,17 @@ SSLManagerOpenSSL::SSLManagerOpenSSL(const SSLParams& params,
         // We are a server with a cluster key, so use the cluster key file
         clientPEM = params.sslClusterFile;
         clientPassword = &_clusterPEMPassword;
+    }
+
+    if (!_initSynchronousSSLContext(&_clientContext, params, ConnectionDirection::kOutgoing)) {
+        uasserted(16768, "ssl initialization problem");
+    }
+
+    if (MONGO_unlikely(_transientSSLParams && !_transientSSLParams->createNewConnection())) {
+        // No other initialization is necessary: this is egress connection manager that
+        // is not using local PEM files.
+        LOGV2_DEBUG(54090, 1, "Default params are ignored for transient SSL manager");
+        return;
     }
 
     if (!clientPEM.empty()) {
@@ -2168,7 +2188,9 @@ Status SSLManagerOpenSSL::stapleOCSPResponse(SSL_CTX* context, bool asyncOCSPSta
         return Status::OK();
     }
 
-    if (!isSSLServer || isTransient()) {
+    SSLManagerMode managerMode = getSSLManagerMode();
+
+    if (!isSSLServer || managerMode != SSLManagerMode::Normal) {
         return Status::OK();
     }
 
@@ -2443,13 +2465,20 @@ Milliseconds SSLManagerOpenSSL::updateOcspStaplingContextWithResponse(
     return swResponse.getValue().fetchNewResponseDuration();
 }
 
-bool SSLManagerOpenSSL::isTransient() const {
-    return _transientSSLParams.has_value();
+SSLManagerOpenSSL::SSLManagerMode SSLManagerOpenSSL::getSSLManagerMode() const {
+    if (!_transientSSLParams) {
+        return SSLManagerMode::Normal;
+    } else if (_transientSSLParams->createNewConnection()) {
+        return SSLManagerMode::TransientWithOverride;
+    } else {
+        return SSLManagerMode::TransientNoOverride;
+    }
 }
 
 std::string SSLManagerOpenSSL::getTargetedClusterConnectionString() const {
-    if (_transientSSLParams.has_value()) {
-        return (*_transientSSLParams).targetedClusterConnectionString.toString();
+    if (_transientSSLParams && _transientSSLParams->createNewClusterConnection()) {
+        return _transientSSLParams->getClusterConnection()
+            ->targetedClusterConnectionString.toString();
     }
     return {};
 }
@@ -2457,13 +2486,44 @@ std::string SSLManagerOpenSSL::getTargetedClusterConnectionString() const {
 Status SSLManagerOpenSSL::initSSLContext(SSL_CTX* context,
                                          const SSLParams& params,
                                          ConnectionDirection direction) {
-    if (isTransient()) {
-        LOGV2_DEBUG(5270602,
-                    2,
-                    "Initializing transient egress SSL context",
-                    "targetClusterConnectionString"_attr =
-                        (*_transientSSLParams).targetedClusterConnectionString);
+    SSLManagerMode managerMode = getSSLManagerMode();
+
+    if (MONGO_unlikely(managerMode != SSLManagerMode::Normal)) {
+        if (direction != ConnectionDirection::kOutgoing) {
+            return Status(ErrorCodes::InvalidSSLConfiguration,
+                          "Transient connections are only supported for egress connections.");
+        }
+        if (managerMode == SSLManagerMode::TransientWithOverride) {
+            LOGV2_DEBUG(879501, 2, "Initializing new transient egress SSL context connection");
+        } else {
+            LOGV2_DEBUG(
+                5270602,
+                2,
+                "Initializing transient egress SSL context",
+                "targetClusterConnectionString"_attr =
+                    _transientSSLParams->getClusterConnection()->targetedClusterConnectionString);
+        }
     }
+
+    SSLCoreParams sslConfig = parseSSLCoreParams(params, _transientSSLParams);
+    const auto [disabledProtocols, cipherConfig, cipherSuiteConfig, crlfile] =
+        [&]() -> std::tuple<const std::vector<SSLParams::Protocols>*,
+                            const std::string&,
+                            const std::string&,
+                            const std::string&> {
+        if (MONGO_unlikely(managerMode == SSLManagerMode::TransientWithOverride)) {
+            const auto& tlsParams = _transientSSLParams->getTLSCredentials();
+            return {&tlsParams->tlsDisabledProtocols,
+                    tlsParams->tlsCipherConfig,
+                    tlsParams->tlsCipherSuiteConfig,
+                    tlsParams->tlsCRLFile};
+        } else {
+            return {&params.sslDisabledProtocols,
+                    params.sslCipherConfig,
+                    params.sslCipherSuiteConfig,
+                    params.sslCRLFile};
+        }
+    }();
 
     // SSL_OP_ALL - Activate all bug workaround options, to support buggy client SSL's.
     // SSL_OP_NO_SSLv2 - Disable SSL v2 support
@@ -2472,7 +2532,7 @@ Status SSLManagerOpenSSL::initSSLContext(SSL_CTX* context,
 
     // Set the supported TLS protocols. Allow --sslDisabledProtocols to disable selected
     // ciphers.
-    for (const SSLParams::Protocols& protocol : params.sslDisabledProtocols) {
+    for (const SSLParams::Protocols& protocol : *disabledProtocols) {
         if (protocol == SSLParams::Protocols::TLS1_0) {
             options |= SSL_OP_NO_TLSv1;
         } else if (protocol == SSLParams::Protocols::TLS1_1) {
@@ -2501,21 +2561,21 @@ Status SSLManagerOpenSSL::initSSLContext(SSL_CTX* context,
 
     ::SSL_CTX_set_options(context, options);
 
-    if (0 == ::SSL_CTX_set_cipher_list(context, params.sslCipherConfig.c_str())) {
+    if (0 == ::SSL_CTX_set_cipher_list(context, cipherConfig.c_str())) {
         return Status(ErrorCodes::InvalidSSLConfiguration,
-                      str::stream() << "Can not set supported cipher suites with config string \""
-                                    << params.sslCipherConfig
-                                    << "\": " << getSSLErrorMessage(ERR_get_error()));
+                      str::stream()
+                          << "Can not set supported cipher suites with config string \""
+                          << cipherConfig << "\": " << getSSLErrorMessage(ERR_get_error()));
     }
 
-    if (!params.sslCipherSuiteConfig.empty()) {
+    if (!cipherSuiteConfig.empty()) {
         // OpenSSL versions older than version 1.1.1 are not allowed to configure their cipher
         // suites using the sslCipherSuiteConfig flag.
-        if (0 == ::SSL_CTX_set_ciphersuites(context, params.sslCipherSuiteConfig.c_str())) {
+        if (0 == ::SSL_CTX_set_ciphersuites(context, cipherSuiteConfig.c_str())) {
             return Status(ErrorCodes::InvalidSSLConfiguration,
                           str::stream()
                               << "Can not set supported cipher suites with config string \""
-                              << params.sslCipherSuiteConfig
+                              << cipherSuiteConfig
                               << "\": " << getSSLErrorMessage(ERR_get_error()));
         }
     }
@@ -2536,28 +2596,34 @@ Status SSLManagerOpenSSL::initSSLContext(SSL_CTX* context,
                                     << getSSLErrorMessage(ERR_get_error()));
     }
 
+    if (MONGO_unlikely(managerMode != SSLManagerMode::Normal)) {
+        if (managerMode == SSLManagerMode::TransientWithOverride) {
+            if (!sslConfig.clientPEM.empty() &&
+                !_setupPEM(context, sslConfig.clientPEM, &_serverPEMPassword)) {
+                return Status(ErrorCodes::InvalidSSLConfiguration, "Can not set up PEM key file.");
+            }
+        } else {
+            const auto& clusterParams = _transientSSLParams->getClusterConnection();
+            if (!_setupPEMFromMemoryPayload(
+                    context,
+                    clusterParams->sslClusterPEMPayload,
+                    &_clusterPEMPassword,
+                    clusterParams->targetedClusterConnectionString.toString())) {
+                return Status(ErrorCodes::InvalidSSLConfiguration,
+                              str::stream()
+                                  << "Can not set up transient ssl cluster certificate for "
+                                  << clusterParams->targetedClusterConnectionString);
+            }
 
-    if (direction == ConnectionDirection::kOutgoing && _transientSSLParams) {
-
-        // Transient params for outgoing connection have priority over global params.
-        if (!_setupPEMFromMemoryPayload(
-                context,
-                (*_transientSSLParams).sslClusterPEMPayload,
-                &_clusterPEMPassword,
-                (*_transientSSLParams).targetedClusterConnectionString.toString())) {
-            return Status(ErrorCodes::InvalidSSLConfiguration,
-                          str::stream() << "Can not set up transient ssl cluster certificate for "
-                                        << (*_transientSSLParams).targetedClusterConnectionString);
-        }
-
-        auto status =
-            _parseAndValidateCertificateFromMemory((*_transientSSLParams).sslClusterPEMPayload,
-                                                   &_clusterPEMPassword,
-                                                   &_sslConfiguration.clientSubjectName,
-                                                   false,
-                                                   nullptr);
-        if (!status.isOK()) {
-            return status.withContext("Could not validate transient certificate");
+            auto status =
+                _parseAndValidateCertificateFromMemory(clusterParams->sslClusterPEMPayload,
+                                                       &_clusterPEMPassword,
+                                                       &_sslConfiguration.clientSubjectName,
+                                                       false,
+                                                       nullptr);
+            if (!status.isOK()) {
+                return status.withContext("Could not validate transient certificate");
+            }
         }
 
     } else if (direction == ConnectionDirection::kOutgoing && params.tlsWithholdClientCertificate) {
@@ -2569,27 +2635,33 @@ Status SSLManagerOpenSSL::initSSLContext(SSL_CTX* context,
             return Status(ErrorCodes::InvalidSSLConfiguration, "Can not set up ssl clusterFile.");
         }
 
-    } else if (!params.sslPEMKeyFile.empty()) {
+    } else if (!sslConfig.clientPEM.empty()) {
         // Use the base pemKeyFile for any other outgoing connections,
         // as well as all incoming connections.
-        if (!_setupPEM(context, params.sslPEMKeyFile, &_serverPEMPassword)) {
+        if (!_setupPEM(context, sslConfig.clientPEM, &_serverPEMPassword)) {
             return Status(ErrorCodes::InvalidSSLConfiguration, "Can not set up PEM key file.");
         }
     }
 
-    // If the user has specified --setParameter tlsUseSystemCA=true, then no params.sslCAFile nor
-    // params.sslClusterCAFile will be defined, and the SSL Manager will fall back to the System CA.
-    std::string cafile = params.sslCAFile;
-    if (direction == ConnectionDirection::kIncoming && !params.sslClusterCAFile.empty()) {
-        cafile = params.sslClusterCAFile;
-    }
-    auto status = cafile.empty() ? _setupSystemCA(context) : _setupCA(context, cafile);
-    if (!status.isOK()) {
-        return status;
+    if (direction == ConnectionDirection::kIncoming && !params.sslClusterCAFile.empty() &&
+        managerMode != SSLManagerMode::TransientWithOverride) {
+        // If the user has specified --setParameter tlsUseSystemCA=true, then no
+        // params.sslCAFile nor params.sslClusterCAFile will be defined, and the SSL Manager
+        // will fall back to the System CA.
+        auto status = _setupCA(context, params.sslClusterCAFile);
+        if (!status.isOK()) {
+            return status;
+        }
+    } else {
+        auto status = sslConfig.cafile.empty() ? _setupSystemCA(context)
+                                               : _setupCA(context, sslConfig.cafile);
+        if (!status.isOK()) {
+            return status;
+        }
     }
 
-    if (!params.sslCRLFile.empty()) {
-        if (!_setupCRL(context, params.sslCRLFile)) {
+    if (!crlfile.empty()) {
+        if (!_setupCRL(context, crlfile)) {
             return Status(ErrorCodes::InvalidSSLConfiguration, "Can not set up CRL file.");
         }
     }
@@ -3721,27 +3793,35 @@ void SSLManagerOpenSSL::_getCRLInfo(StringData crlFile, CRLInformationToLog* inf
 
 SSLInformationToLog SSLManagerOpenSSL::getSSLInformationToLog() const {
     SSLInformationToLog info;
-    if (!(sslGlobalParams.sslPEMKeyFile.empty())) {
-        UniqueX509 serverX509Cert =
-            _getX509Object(sslGlobalParams.sslPEMKeyFile, &_serverPEMPassword);
-        _getX509CertInfo(
-            serverX509Cert, &info.server, StringData{sslGlobalParams.sslPEMKeyFile}, boost::none);
+    const auto [PEMKeyFile, clusterFile, CRLFile] =
+        [&]() -> std::tuple<std::string, std::string, std::string> {
+        if (MONGO_unlikely(getSSLManagerMode() == SSLManagerMode::TransientWithOverride)) {
+            const auto& tlsParams = _transientSSLParams->getTLSCredentials();
+            return {tlsParams->tlsPEMKeyFile, "", tlsParams->tlsCRLFile};
+        } else {
+            return {sslGlobalParams.sslPEMKeyFile,
+                    sslGlobalParams.sslClusterFile,
+                    sslGlobalParams.sslCRLFile};
+        }
+    }();
+
+    if (!(PEMKeyFile.empty())) {
+        UniqueX509 serverX509Cert = _getX509Object(PEMKeyFile, &_serverPEMPassword);
+        _getX509CertInfo(serverX509Cert, &info.server, StringData{PEMKeyFile}, boost::none);
     }
 
-    if (!(sslGlobalParams.sslClusterFile.empty())) {
+    if (!(clusterFile.empty())) {
         CertInformationToLog clusterInfo;
-        UniqueX509 clusterX509Cert =
-            _getX509Object(sslGlobalParams.sslClusterFile, &_clusterPEMPassword);
-        _getX509CertInfo(
-            clusterX509Cert, &clusterInfo, StringData{sslGlobalParams.sslClusterFile}, boost::none);
+        UniqueX509 clusterX509Cert = _getX509Object(clusterFile, &_clusterPEMPassword);
+        _getX509CertInfo(clusterX509Cert, &clusterInfo, StringData{clusterFile}, boost::none);
         info.cluster = clusterInfo;
     } else {
         info.cluster = boost::none;
     }
 
-    if (!sslGlobalParams.sslCRLFile.empty()) {
+    if (!CRLFile.empty()) {
         CRLInformationToLog crlInfo;
-        _getCRLInfo(getSSLGlobalParams().sslCRLFile, &crlInfo);
+        _getCRLInfo(CRLFile, &crlInfo);
         info.crl = crlInfo;
     } else {
         info.crl = boost::none;

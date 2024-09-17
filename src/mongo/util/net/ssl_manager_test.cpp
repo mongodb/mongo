@@ -680,8 +680,11 @@ TEST(SSLManager, InitContextFromMemory) {
     params.sslMode.store(::mongo::sslGlobalParams.SSLMode_requireSSL);
     params.sslCAFile = "jstests/libs/ca.pem";
 
-    TransientSSLParams transientParams;
-    transientParams.sslClusterPEMPayload = loadFile("jstests/libs/client.pem");
+    ClusterConnection clusterConnection;
+    clusterConnection.targetedClusterConnectionString = ConnectionString::forLocal();
+    clusterConnection.sslClusterPEMPayload = loadFile("jstests/libs/client.pem");
+
+    TransientSSLParams transientParams(clusterConnection);
 
     std::shared_ptr<SSLManagerInterface> manager =
         SSLManagerInterface::create(params, transientParams, false /* isSSLServer */);
@@ -698,8 +701,11 @@ TEST(SSLManager, IgnoreInitServerSideContextFromMemory) {
     params.sslPEMKeyFile = "jstests/libs/server.pem";
     params.sslCAFile = "jstests/libs/ca.pem";
 
-    TransientSSLParams transientParams;
-    transientParams.sslClusterPEMPayload = loadFile("jstests/libs/client.pem");
+    ClusterConnection clusterConnection;
+    clusterConnection.targetedClusterConnectionString = ConnectionString::forLocal();
+    clusterConnection.sslClusterPEMPayload = loadFile("jstests/libs/client.pem");
+
+    TransientSSLParams transientParams(clusterConnection);
 
     std::shared_ptr<SSLManagerInterface> manager =
         SSLManagerInterface::create(params, transientParams, true /* isSSLServer */);
@@ -723,16 +729,19 @@ TEST(SSLManager, TransientSSLParams) {
     }();
     transport::AsioTransportLayer tla(options, std::make_unique<SessionManagerUtil>());
 
-    TransientSSLParams transientSSLParams;
-    transientSSLParams.sslClusterPEMPayload = loadFile("jstests/libs/client.pem");
-    transientSSLParams.targetedClusterConnectionString = ConnectionString::forLocal();
+    ClusterConnection clusterConnection;
+    clusterConnection.targetedClusterConnectionString = ConnectionString::forLocal();
+    clusterConnection.sslClusterPEMPayload = loadFile("jstests/libs/client.pem");
+
+    TransientSSLParams transientSSLParams(clusterConnection);
 
     auto swContext = tla.createTransientSSLContext(transientSSLParams);
     uassertStatusOK(swContext.getStatus());
 
     // Check that the manager owned by the transient context is also transient.
-    ASSERT_TRUE(swContext.getValue()->manager->isTransient());
-    ASSERT_EQ(transientSSLParams.targetedClusterConnectionString.toString(),
+    ASSERT_TRUE(swContext.getValue()->manager->getSSLManagerMode() ==
+                SSLManagerInterface::SSLManagerMode::TransientNoOverride);
+    ASSERT_EQ(transientSSLParams.getClusterConnection()->targetedClusterConnectionString.toString(),
               swContext.getValue()->manager->getTargetedClusterConnectionString());
 
     // Cannot rotate certs on transient manager.
@@ -754,9 +763,11 @@ TEST(SSLManager, TransientSSLParamsStressTestWithTransport) {
     }();
     transport::AsioTransportLayer tla(options, std::make_unique<SessionManagerUtil>());
 
-    TransientSSLParams transientSSLParams;
-    transientSSLParams.sslClusterPEMPayload = loadFile("jstests/libs/client.pem");
-    transientSSLParams.targetedClusterConnectionString = ConnectionString::forLocal();
+    ClusterConnection clusterConnection;
+    clusterConnection.targetedClusterConnectionString = ConnectionString::forLocal();
+    clusterConnection.sslClusterPEMPayload = loadFile("jstests/libs/client.pem");
+
+    TransientSSLParams transientSSLParams(clusterConnection);
 
     Mutex mutex = MONGO_MAKE_LATCH("::test_mutex");
     std::deque<std::shared_ptr<const transport::SSLConnectionContext>> contexts;
@@ -799,8 +810,11 @@ TEST(SSLManager, TransientSSLParamsStressTestWithManager) {
     params.sslPEMKeyFile = "jstests/libs/server.pem";
     params.sslCAFile = "jstests/libs/ca.pem";
 
-    TransientSSLParams transientParams;
-    transientParams.sslClusterPEMPayload = loadFile("jstests/libs/client.pem");
+    ClusterConnection clusterConnection;
+    clusterConnection.targetedClusterConnectionString = ConnectionString::forLocal();
+    clusterConnection.sslClusterPEMPayload = loadFile("jstests/libs/client.pem");
+
+    TransientSSLParams transientParams(clusterConnection);
 
     Mutex mutex = MONGO_MAKE_LATCH("::test_mutex");
     std::deque<std::shared_ptr<SSLManagerInterface>> managers;
@@ -842,6 +856,77 @@ TEST(SSLManager, TransientSSLParamsStressTestWithManager) {
 }
 
 #endif  // MONGO_CONFIG_SSL_PROVIDER == MONGO_CONFIG_SSL_PROVIDER_OPENSSL
+
+#if MONGO_CONFIG_SSL
+
+TEST(SSLManager, CheckCertificateInTransientManager) {
+    std::string CLIENT_SUBJECT =
+        "CN=client,OU=KernelUser,O=MongoDB,L=New York City,ST=New York,C=US";
+    std::string TRUSTED_CLIENT_SUBJECT =
+        "CN=Trusted Kernel Test Client,OU=Kernel,O=MongoDB,L=New York City,ST=New York,C=US";
+
+    SSLParams params;
+    params.sslMode.store(::mongo::sslGlobalParams.SSLMode_requireSSL);
+    params.sslCAFile = "jstests/libs/ca.pem";
+    params.sslPEMKeyFile = "jstests/libs/client.pem";
+
+    std::shared_ptr<SSLManagerInterface> manager;
+    ASSERT_DOES_NOT_THROW(
+        manager = SSLManagerInterface::create(params, boost::none, false /* isSSLServer */));
+
+    auto sslinfo = manager->getSSLConfiguration();
+    // Manager should have client cert as client.pem
+    ASSERT_EQ(sslinfo.clientSubjectName.toString(), CLIENT_SUBJECT);
+
+    // Assert that sslMode and SSLManagerMode was set correctly
+    ASSERT_EQ(params.sslMode.load(), mongo::sslGlobalParams.SSLMode_requireSSL);
+    ASSERT_EQ(manager->getSSLManagerMode(), SSLManagerInterface::SSLManagerMode::Normal);
+
+    // Now create manager with new transient connection
+    TLSCredentials tlsCredentials;
+    tlsCredentials.tlsPEMKeyFile = "jstests/libs/trusted-client.pem";
+    tlsCredentials.tlsCAFile = "jstests/libs/trusted-ca.pem";
+
+    TransientSSLParams transientParams(tlsCredentials);
+
+    manager = SSLManagerInterface::create(params, transientParams, false /* isSSLServer */);
+
+    // Manager should have trustdclient cert as trusted-client.pem
+    sslinfo = manager->getSSLConfiguration();
+    ASSERT_EQ(sslinfo.clientSubjectName.toString(), TRUSTED_CLIENT_SUBJECT);
+    ASSERT_EQ(manager->getSSLManagerMode(),
+              SSLManagerInterface::SSLManagerMode::TransientWithOverride);
+}
+
+TEST(SSLManager, TransientSSLParamsNewConnection) {
+    SSLParams params;
+    params.sslMode.store(::mongo::sslGlobalParams.SSLMode_requireSSL);
+    params.sslCAFile = "jstests/libs/ca.pem";
+    params.sslClusterFile = "jstests/libs/client.pem";
+
+    auto options = [] {
+        ServerGlobalParams params;
+        params.noUnixSocket = true;
+        transport::AsioTransportLayer::Options opts(&params);
+        return opts;
+    }();
+    transport::AsioTransportLayer tla(options, std::make_unique<SessionManagerUtil>());
+
+    TLSCredentials tlsCredentials;
+    TransientSSLParams transientSSLParams(tlsCredentials);
+
+    auto swContext = tla.createTransientSSLContext(transientSSLParams);
+    uassertStatusOK(swContext.getStatus());
+
+    // Check that the manager owned by the transient context is also transient.
+    ASSERT_TRUE(swContext.getValue()->manager->getSSLManagerMode() ==
+                SSLManagerInterface::SSLManagerMode::TransientWithOverride);
+
+    // Since a new tls connection was created it should be able to rotate certs.
+    ASSERT_OK(tla.rotateCertificates(swContext.getValue()->manager, true));
+}
+
+#endif  // MONGO_CONFIG_SSL
 
 static bool isSanWarningWritten(const std::vector<std::string>& logLines) {
     for (const auto& line : logLines) {

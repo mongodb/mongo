@@ -76,9 +76,11 @@ public:
 
         ConnectionPool::Options options;
         options.transientSSLParams.emplace([] {
-            TransientSSLParams params;
-            params.sslClusterPEMPayload = loadFile("jstests/libs/server.pem");
-            params.targetedClusterConnectionString = ConnectionString::forLocal();
+            ClusterConnection clusterConnection;
+            clusterConnection.targetedClusterConnectionString = ConnectionString::forLocal();
+            clusterConnection.sslClusterPEMPayload = loadFile("jstests/libs/server.pem");
+
+            TransientSSLParams params(clusterConnection);
             return params;
         }());
         LOGV2(5181101, "Initializing the test connection with transient SSL params");

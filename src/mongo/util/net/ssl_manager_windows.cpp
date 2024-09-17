@@ -267,7 +267,9 @@ public:
 
 class SSLManagerWindows : public SSLManagerInterface {
 public:
-    explicit SSLManagerWindows(const SSLParams& params, bool isServer);
+    explicit SSLManagerWindows(const SSLParams& params,
+                               const boost::optional<TransientSSLParams>& transientSSLParams,
+                               bool isServer);
 
     /**
      * Initializes an OpenSSL context according to the provided settings. Only settings which are
@@ -310,6 +312,8 @@ public:
 
     void stopJobs() final;
 
+    SSLManagerMode getSSLManagerMode() const final;
+
 private:
     Status _loadCertificates(const SSLParams& params);
 
@@ -336,6 +340,8 @@ private:
     bool _allowInvalidHostnames;
     bool _suppressNoCertificateWarning;
     SSLConfiguration _sslConfiguration;
+    // If set, this parameters are used to create new transient SSL connection.
+    const boost::optional<TransientSSLParams> _transientSSLParams;
 
     SCHANNEL_CRED _clientCred;
     SCHANNEL_CRED _serverCred;
@@ -409,23 +415,39 @@ std::shared_ptr<SSLManagerInterface> SSLManagerInterface::create(
     const SSLParams& params,
     const boost::optional<TransientSSLParams>& transientSSLParams,
     bool isServer) {
-    return std::make_shared<SSLManagerWindows>(params, isServer);
+    return std::make_shared<SSLManagerWindows>(params, transientSSLParams, isServer);
 }
 
 std::shared_ptr<SSLManagerInterface> SSLManagerInterface::create(const SSLParams& params,
                                                                  bool isServer) {
-    return std::make_shared<SSLManagerWindows>(params, isServer);
+    return std::make_shared<SSLManagerWindows>(
+        params, boost::optional<TransientSSLParams>{}, isServer);
 }
 
 namespace {
 
 StatusWith<std::vector<std::string>> getSubjectAlternativeNames(PCCERT_CONTEXT cert);
 
-SSLManagerWindows::SSLManagerWindows(const SSLParams& params, bool isServer)
+SSLManagerWindows::SSLManagerWindows(const SSLParams& params,
+                                     const boost::optional<TransientSSLParams>& transientSSLParams,
+                                     bool isServer)
     : _weakValidation(params.sslWeakCertificateValidation),
       _allowInvalidCertificates(params.sslAllowInvalidCertificates),
       _allowInvalidHostnames(params.sslAllowInvalidHostnames),
-      _suppressNoCertificateWarning(params.suppressNoTLSPeerCertificateWarning) {
+      _suppressNoCertificateWarning(params.suppressNoTLSPeerCertificateWarning),
+      _transientSSLParams(transientSSLParams) {
+
+    if (MONGO_unlikely(getSSLManagerMode() == SSLManagerMode::TransientWithOverride)) {
+        uassert(ErrorCodes::InvalidSSLConfiguration,
+                "New transient connections are only supported from client-to-server",
+                !isServer);
+
+        // Transient connections have priority over global SSL params.
+        const auto& tlsParams = transientSSLParams->getTLSCredentials();
+
+        _allowInvalidCertificates = tlsParams->tlsAllowInvalidCertificates;
+        _allowInvalidHostnames = tlsParams->tlsAllowInvalidHostnames;
+    }
 
     if (params.sslFIPSMode) {
         BOOLEAN enabled = FALSE;
@@ -1102,7 +1124,7 @@ StatusWith<UniqueCertStore> readCertChains(StringData caFile, StringData crlFile
     return std::move(certStore);
 }
 
-bool hasCertificateSelector(SSLParams::CertificateSelector selector) {
+bool hasCertificateSelector(const SSLParams::CertificateSelector selector) {
     return !selector.subject.empty() || !selector.thumbprint.empty();
 }
 
@@ -1225,13 +1247,42 @@ StatusWith<UniqueCertificate> loadAndValidateCertificateSelector(
     return std::move(swCert.getValue());
 }
 
+SSLManagerWindows::SSLManagerMode SSLManagerWindows::getSSLManagerMode() const {
+    if (!_transientSSLParams) {
+        return SSLManagerMode::Normal;
+    } else if (_transientSSLParams->createNewConnection()) {
+        return SSLManagerMode::TransientWithOverride;
+    } else {
+        return SSLManagerMode::TransientNoOverride;
+    }
+}
+
 Status SSLManagerWindows::_loadCertificates(const SSLParams& params) {
     _clientCertificates[0] = nullptr;
     _serverCertificates[0] = nullptr;
 
+    SSLManagerMode managerMode = getSSLManagerMode();
+    auto sslConfig = parseSSLCoreParams(params, _transientSSLParams);
+
+    const auto [crlfile, certificateSelector, clusterCertificateSelector] =
+        [&]() -> std::tuple<const std::string&,
+                            const SSLParams::CertificateSelector*,
+                            const SSLParams::CertificateSelector*> {
+        if (MONGO_unlikely(_transientSSLParams)) {
+            const auto& tlsParams = _transientSSLParams->getTLSCredentials();
+            return {tlsParams->tlsCRLFile,
+                    &tlsParams->tlsCertificateSelector,
+                    &tlsParams->tlsClusterCertificateSelector};
+        } else {
+            return {params.sslCRLFile,
+                    &params.sslCertificateSelector,
+                    &params.sslClusterCertificateSelector};
+        }
+    }();
+
     // Load the normal PEM file
-    if (!params.sslPEMKeyFile.empty()) {
-        auto swCertificate = readCertPEMFile(params.sslPEMKeyFile, params.sslPEMKeyPassword);
+    if (!sslConfig.clientPEM.empty()) {
+        auto swCertificate = readCertPEMFile(sslConfig.clientPEM, sslConfig.clientPassword);
         if (!swCertificate.isOK()) {
             return swCertificate.getStatus();
         }
@@ -1240,7 +1291,7 @@ Status SSLManagerWindows::_loadCertificates(const SSLParams& params) {
     }
 
     // Load the cluster PEM file, only applies to server side code
-    if (!params.sslClusterFile.empty()) {
+    if (!params.sslClusterFile.empty() && managerMode != SSLManagerMode::TransientWithOverride) {
         auto swCertificate = readCertPEMFile(params.sslClusterFile, params.sslClusterPassword);
         if (!swCertificate.isOK()) {
             return swCertificate.getStatus();
@@ -1260,9 +1311,9 @@ Status SSLManagerWindows::_loadCertificates(const SSLParams& params) {
 
     // If the user has specified --setParameter tlsUseSystemCA=true, then no params.sslCAFile nor
     // params.sslClusterCAFile will be defined, and the SSL Manager will fall back to the System CA.
-    if (!params.sslCAFile.empty()) {
+    if (!sslConfig.cafile.empty()) {
 
-        auto swChain = readCertChains(params.sslCAFile, params.sslCRLFile);
+        auto swChain = readCertChains(sslConfig.cafile, crlfile);
         if (!swChain.isOK()) {
             return swChain.getStatus();
         }
@@ -1271,7 +1322,7 @@ Status SSLManagerWindows::_loadCertificates(const SSLParams& params) {
         // can build a complete chain to send to the remote side.
         if (std::get<0>(_pemCertificate)) {
             auto status =
-                readCAPEMFile(std::get<0>(_pemCertificate).get()->hCertStore, params.sslCAFile);
+                readCAPEMFile(std::get<0>(_pemCertificate).get()->hCertStore, sslConfig.cafile);
             if (!status.isOK()) {
                 return status;
             }
@@ -1279,10 +1330,12 @@ Status SSLManagerWindows::_loadCertificates(const SSLParams& params) {
 
         _clientEngine.CAstore = std::move(swChain.getValue());
     }
-    _clientEngine.hasCRL = !params.sslCRLFile.empty();
+    _clientEngine.hasCRL = !crlfile.empty();
 
     const auto serverCAFile =
-        params.sslClusterCAFile.empty() ? params.sslCAFile : params.sslClusterCAFile;
+        (params.sslClusterCAFile.empty() || managerMode == SSLManagerMode::TransientWithOverride)
+        ? sslConfig.cafile
+        : params.sslClusterCAFile;
     if (!serverCAFile.empty()) {
         auto swChain = readCertChains(serverCAFile, params.sslCRLFile);
         if (!swChain.isOK()) {
@@ -1292,8 +1345,8 @@ Status SSLManagerWindows::_loadCertificates(const SSLParams& params) {
         // Dump the CA cert chain into the memory store for the cluster cert. This ensures Windows
         // can build a complete chain to send to the remote side.
         if (std::get<0>(_clusterPEMCertificate)) {
-            auto status =
-                readCAPEMFile(std::get<0>(_clusterPEMCertificate).get()->hCertStore, serverCAFile);
+            auto status = readCAPEMFile(std::get<0>(_clusterPEMCertificate).get()->hCertStore,
+                                        sslConfig.cafile);
             if (!status.isOK()) {
                 return status;
             }
@@ -1301,18 +1354,19 @@ Status SSLManagerWindows::_loadCertificates(const SSLParams& params) {
 
         _serverEngine.CAstore = std::move(swChain.getValue());
     }
-    _serverEngine.hasCRL = !params.sslCRLFile.empty();
+    _serverEngine.hasCRL = !crlfile.empty();
 
-    if (hasCertificateSelector(params.sslCertificateSelector)) {
-        auto swCert = loadAndValidateCertificateSelector(params.sslCertificateSelector);
+    if (hasCertificateSelector(*certificateSelector)) {
+        auto swCert = loadAndValidateCertificateSelector(*certificateSelector);
         if (!swCert.isOK()) {
             return swCert.getStatus();
         }
         _sslCertificate = std::move(swCert.getValue());
     }
 
-    if (hasCertificateSelector(params.sslClusterCertificateSelector)) {
-        auto swCert = loadAndValidateCertificateSelector(params.sslClusterCertificateSelector);
+    if (hasCertificateSelector(*clusterCertificateSelector) &&
+        managerMode != SSLManagerMode::TransientWithOverride) {
+        auto swCert = loadAndValidateCertificateSelector(*clusterCertificateSelector);
         if (!swCert.isOK()) {
             return swCert.getStatus();
         }
@@ -1320,7 +1374,7 @@ Status SSLManagerWindows::_loadCertificates(const SSLParams& params) {
     }
 
     if (_sslCertificate || _sslClusterCertificate) {
-        if (!params.sslCAFile.empty()) {
+        if (!sslConfig.cafile.empty()) {
             LOGV2_WARNING(23271,
                           "Mixing certs from the system certificate store and PEM files. This may "
                           "produce unexpected results.");
@@ -1347,8 +1401,17 @@ Status SSLManagerWindows::initSSLContext(SCHANNEL_CRED* cred,
     cred->dwVersion = SCHANNEL_CRED_VERSION;
     cred->dwFlags = SCH_USE_STRONG_CRYPTO;  // Use strong crypto;
 
-
     uint32_t supportedProtocols = 0;
+
+    const auto [disabledProtocols, cipherConfig] =
+        [&]() -> std::pair<const std::vector<SSLParams::Protocols>*, const std::string&> {
+        if (MONGO_unlikely(_transientSSLParams)) {
+            const auto& tlsParams = _transientSSLParams->getTLSCredentials();
+            return {&tlsParams->tlsDisabledProtocols, tlsParams->tlsCipherConfig};
+        } else {
+            return {&params.sslDisabledProtocols, params.sslCipherConfig};
+        }
+    }();
 
     if (direction == ConnectionDirection::kIncoming) {
         supportedProtocols = SP_PROT_TLS1_SERVER | SP_PROT_TLS1_0_SERVER | SP_PROT_TLS1_1_SERVER |
@@ -1378,7 +1441,7 @@ Status SSLManagerWindows::initSSLContext(SCHANNEL_CRED* cred,
     }
 
     // Set the supported TLS protocols. Allow --sslDisabledProtocols to disable selected ciphers.
-    for (const SSLParams::Protocols& protocol : params.sslDisabledProtocols) {
+    for (const SSLParams::Protocols& protocol : *disabledProtocols) {
         if (protocol == SSLParams::Protocols::TLS1_0) {
             supportedProtocols &= ~(SP_PROT_TLS1_0_CLIENT | SP_PROT_TLS1_0_SERVER);
         } else if (protocol == SSLParams::Protocols::TLS1_1) {
@@ -1394,7 +1457,7 @@ Status SSLManagerWindows::initSSLContext(SCHANNEL_CRED* cred,
                 "All supported TLS protocols have been disabled."};
     }
 
-    if (params.sslCipherConfig != kSSLCipherConfigDefault) {
+    if (cipherConfig != kSSLCipherConfigDefault) {
         LOGV2_WARNING(
             23272,
             "sslCipherConfig parameter is not supported with Windows SChannel and is ignored.");
