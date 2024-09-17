@@ -502,6 +502,11 @@ Status _createTimeseries(OperationContext* opCtx,
     const auto& bucketsNs =
         (ns.isTimeseriesBucketsCollection()) ? ns : ns.makeTimeseriesBucketsNamespace();
 
+    Status bucketsAllowedStatus = userAllowedCreateNS(opCtx, bucketsNs);
+    if (!bucketsAllowedStatus.isOK()) {
+        return bucketsAllowedStatus;
+    }
+
     Status validateStatus = validateCollectionOptions(opCtx, bucketsNs, optionsArg, idIndex);
     if (!validateStatus.isOK()) {
         return validateStatus;
