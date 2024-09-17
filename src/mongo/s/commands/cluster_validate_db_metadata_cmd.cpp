@@ -97,13 +97,12 @@ public:
         }
 
         Reply typedRun(OperationContext* opCtx) {
+            auto& cmd = request();
+            setReadWriteConcern(opCtx, cmd, this);
             auto shardResponses = scatterGatherUnversionedTargetAllShards(
                 opCtx,
                 request().getDbName(),
-                applyReadWriteConcern(
-                    opCtx,
-                    this,
-                    CommandHelpers::filterCommandRequestForPassthrough(unparsedRequest().body)),
+                CommandHelpers::filterCommandRequestForPassthrough(cmd.toBSON()),
                 ReadPreferenceSetting::get(opCtx),
                 Shard::RetryPolicy::kIdempotent);
 

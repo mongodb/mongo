@@ -33,7 +33,7 @@ imports:
     - "mongo/db/basic_types.idl"
 
 commands:
-    clusterFsyncUnlock:
+    fsyncUnlock:
         description: "The command for calling fsync unlock on all shards of a cluster."
         command_name: fsyncUnlock
         cpp_name: clusterFsyncUnlock

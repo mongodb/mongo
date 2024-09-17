@@ -43,9 +43,7 @@ namespace mongo::generic_argument_util {
 extern const WriteConcernOptions kMajorityWriteConcern;
 
 /**
- * Mirrors command helper methods found in commands.h or cluster_commands_helpers.h.
- * TODO: SERVER-91235 delete the BSON-based equivalents of these methods in
- * cluster_commands_helpers.h
+ * Command helpers that operate on an idl struct rather than modifying an existing BSONObj.
  */
 
 /**

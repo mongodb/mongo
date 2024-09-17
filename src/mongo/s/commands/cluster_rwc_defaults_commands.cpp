@@ -173,13 +173,14 @@ public:
             // If not asking for the in-memory defaults, fetch them from the config server
             GetDefaultRWConcern configsvrRequest;
             configsvrRequest.setDbName(request().getDbName());
+            setReadWriteConcern(opCtx, configsvrRequest, this);
 
             auto configShard = Grid::get(opCtx)->shardRegistry()->getConfigShard();
             auto cmdResponse = uassertStatusOK(configShard->runCommandWithFixedRetryAttempts(
                 opCtx,
                 ReadPreferenceSetting(ReadPreference::PrimaryOnly),
                 DatabaseName::kAdmin,
-                applyReadWriteConcern(opCtx, this, configsvrRequest.toBSON()),
+                configsvrRequest.toBSON(),
                 Shard::RetryPolicy::kIdempotent));
 
             uassertStatusOK(cmdResponse.commandStatus);

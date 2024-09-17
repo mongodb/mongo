@@ -148,7 +148,9 @@ public:
             // namespace.
             auto targeter = CollectionRoutingInfoTargeter(opCtx, ns());
             auto cri = targeter.getRoutingInfo();
-            auto cmdToBeSent = request().toBSON();
+            auto& cmd = request();
+            setReadWriteConcern(opCtx, cmd, this);
+            auto cmdToBeSent = cmd.toBSON();
             if (targeter.timeseriesNamespaceNeedsRewrite(ns())) {
                 cmdToBeSent =
                     timeseries::makeTimeseriesCommand(cmdToBeSent,
@@ -161,7 +163,7 @@ public:
                 opCtx,
                 targeter.getNS(),
                 cri,
-                applyReadWriteConcern(opCtx, this, cmdToBeSent),
+                cmdToBeSent,
                 {Privilege(ResourcePattern::forExactNamespace(ns()), ActionType::listIndexes)});
         }
     };

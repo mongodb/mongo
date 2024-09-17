@@ -47,6 +47,7 @@
 #include "mongo/db/curop.h"
 #include "mongo/db/error_labels.h"
 #include "mongo/db/keypattern.h"
+#include "mongo/db/list_indexes_gen.h"
 #include "mongo/db/logical_time.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/pipeline/expression_context.h"
@@ -76,7 +77,6 @@
 #include "mongo/s/request_types/reshard_collection_gen.h"
 #include "mongo/s/shard_key_pattern.h"
 #include "mongo/s/shard_key_pattern_query_util.h"
-#include "mongo/s/transaction_router.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/database_name_util.h"
 #include "mongo/util/decorable.h"
@@ -436,7 +436,7 @@ BSONObj applyReadWriteConcern(OperationContext* opCtx,
         appendWC = false;
     }
 
-    // Append all original fields except the readConcern/writeConcern field to the new command.
+    // Append all original fields to the new command.
     BSONObjBuilder output;
     bool seenReadConcern = false;
     bool seenWriteConcern = false;
@@ -977,8 +977,9 @@ StatusWith<Shard::QueryResponse> loadIndexesFromAuthoritativeShard(
     OperationContext* opCtx, const NamespaceString& nss, const CollectionRoutingInfo& cri) {
     auto [indexShard, listIndexesCmd] = [&]() -> std::pair<std::shared_ptr<Shard>, BSONObj> {
         const auto& [cm, sii] = cri;
-        auto cmdNoVersion = applyReadWriteConcern(
-            opCtx, true /* appendRC */, false /* appendWC */, BSON("listIndexes" << nss.coll()));
+        ListIndexes listIndexesCmd(nss);
+        setReadWriteConcern(opCtx, listIndexesCmd, true, false);
+        auto cmdNoVersion = listIndexesCmd.toBSON();
 
         // force the read concern level to "local" as other values are not supported for listIndexes
         cmdNoVersion = forceReadConcernLocal(opCtx, cmdNoVersion);

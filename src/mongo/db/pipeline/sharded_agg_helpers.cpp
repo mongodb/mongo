@@ -187,11 +187,8 @@ RemoteCursor openChangeStreamNewShardMonitor(const boost::intrusive_ptr<Expressi
     SimpleCursorOptions cursor;
     cursor.setBatchSize(0);
     aggReq.setCursor(cursor);
-    auto cmdObjWithRWC =
-        applyReadWriteConcern(expCtx->opCtx,
-                              true,             /* appendRC */
-                              !expCtx->explain, /* appendWC */
-                              aggregation_request_helper::serializeToCommandObj(aggReq));
+    setReadWriteConcern(expCtx->opCtx, aggReq, true, !expCtx->explain);
+    auto cmdObjWithRWC = aggregation_request_helper::serializeToCommandObj(aggReq);
     auto configCursor = establishCursors(expCtx->opCtx,
                                          expCtx->mongoProcessInterface->taskExecutor,
                                          aggReq.getNamespace(),

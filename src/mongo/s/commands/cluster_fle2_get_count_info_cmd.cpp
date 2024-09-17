@@ -138,18 +138,18 @@ ClusterGetQueryableEncryptionCountInfoCmd::Invocation::typedRun(OperationContext
         uassertStatusOK(Grid::get(opCtx)->catalogCache()->getCollectionRoutingInfo(opCtx, nss));
     tassert(7924701, "ESC collection cannot be sharded", !cri.cm.isSharded());
 
-    auto response = uassertStatusOK(
-        executeCommandAgainstShardWithMinKeyChunk(
-            opCtx,
-            nss,
-            cri,
-            applyReadWriteConcern(
-                opCtx,
-                this,
-                CommandHelpers::filterCommandRequestForPassthrough(unparsedRequest().body)),
-            ReadPreferenceSetting(ReadPreference::PrimaryOnly),
-            Shard::RetryPolicy::kIdempotent)
-            .swResponse);
+    auto& cmd = request();
+    setReadWriteConcern(opCtx, cmd, this);
+
+    auto response =
+        uassertStatusOK(executeCommandAgainstShardWithMinKeyChunk(
+                            opCtx,
+                            nss,
+                            cri,
+                            CommandHelpers::filterCommandRequestForPassthrough(cmd.toBSON()),
+                            ReadPreferenceSetting(ReadPreference::PrimaryOnly),
+                            Shard::RetryPolicy::kIdempotent)
+                            .swResponse);
 
     BSONObjBuilder result;
     CommandHelpers::filterCommandReplyForPassthrough(response.data, &result);

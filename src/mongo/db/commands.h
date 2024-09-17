@@ -1382,6 +1382,10 @@ protected:
         return _request;
     }
 
+    RequestType& request() {
+        return _request;
+    }
+
     const OpMsgRequest& unparsedRequest() const {
         return _opMsgRequest;
     }

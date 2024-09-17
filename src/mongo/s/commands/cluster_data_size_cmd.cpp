@@ -95,19 +95,19 @@ public:
         }
 
         Reply typedRun(OperationContext* opCtx) {
-            const auto& cmd = request();
+            auto& cmd = request();
             const auto& nss = ns();
 
             auto cri = uassertStatusOK(
                 Grid::get(opCtx)->catalogCache()->getCollectionRoutingInfo(opCtx, nss));
 
+            setReadWriteConcern(opCtx, cmd, this);
             auto shardResults = scatterGatherVersionedTargetByRoutingTable(
                 opCtx,
                 nss.dbName(),
                 nss,
                 cri,
-                applyReadWriteConcern(
-                    opCtx, this, CommandHelpers::filterCommandRequestForPassthrough(cmd.toBSON())),
+                CommandHelpers::filterCommandRequestForPassthrough(cmd.toBSON()),
                 ReadPreferenceSetting::get(opCtx),
                 Shard::RetryPolicy::kIdempotent,
                 {} /*query*/,

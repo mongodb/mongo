@@ -148,15 +148,15 @@ public:
         using TC::InvocationBase::request;
 
         Reply typedRun(OperationContext* opCtx) {
-            const auto& cmd = request();
+            auto& cmd = request();
+            setReadWriteConcern(opCtx, cmd, this);
 
             BSONObjBuilder builder;
             auto status = Grid::get(opCtx)->catalogClient()->runUserManagementWriteCommand(
                 opCtx,
                 Request::kCommandName,
                 cmd.getDbName(),
-                applyReadWriteConcern(
-                    opCtx, this, CommandHelpers::filterCommandRequestForPassthrough(cmd.toBSON())),
+                CommandHelpers::filterCommandRequestForPassthrough(cmd.toBSON()),
                 &builder);
 
             if constexpr (InvalidatorT::kRequireUserName) {
@@ -254,14 +254,14 @@ public:
         using TC::InvocationBase::request;
 
         Reply typedRun(OperationContext* opCtx) {
-            const auto& cmd = request();
+            auto& cmd = request();
+            setReadWriteConcern(opCtx, cmd, this);
 
             BSONObjBuilder builder;
             const bool ok = Grid::get(opCtx)->catalogClient()->runUserManagementReadCommand(
                 opCtx,
                 cmd.getDbName(),
-                applyReadWriteConcern(
-                    opCtx, this, CommandHelpers::filterCommandRequestForPassthrough(cmd.toBSON())),
+                CommandHelpers::filterCommandRequestForPassthrough(cmd.toBSON()),
                 &builder);
 
             auto result = builder.obj();

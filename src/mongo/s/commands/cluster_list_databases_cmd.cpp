@@ -135,9 +135,10 @@ public:
                 shardIds.emplace_back(ShardId::kConfigServerId);
             }
 
+            setReadWriteConcern(opCtx, cmd, this);
+
             // { filter: matchExpression }.
-            auto filteredCmd = applyReadWriteConcern(
-                opCtx, this, CommandHelpers::filterCommandRequestForPassthrough(cmd.toBSON()));
+            auto filteredCmd = CommandHelpers::filterCommandRequestForPassthrough(cmd.toBSON());
 
             for (const ShardId& shardId : shardIds) {
                 auto shardStatus = shardRegistry->getShard(opCtx, shardId);

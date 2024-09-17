@@ -27,7 +27,6 @@
  *    it in the license file.
  */
 
-
 #include <memory>
 #include <string>
 #include <variant>
@@ -164,11 +163,13 @@ public:
                 });
 
             generic_argument_util::setMajorityWriteConcern(renameCollRequest);
+            generic_argument_util::setDbVersionIfPresent(renameCollRequest, dbInfo->getVersion());
+
             auto cmdResponse = uassertStatusOK(shard->runCommandWithFixedRetryAttempts(
                 opCtx,
                 ReadPreferenceSetting(ReadPreference::PrimaryOnly),
                 fromNss.dbName(),
-                appendDbVersionIfPresent(renameCollRequest.toBSON(), dbInfo->getVersion()),
+                renameCollRequest.toBSON(),
                 Shard::RetryPolicy::kNoRetry));
 
             uassertStatusOK(cmdResponse.commandStatus);

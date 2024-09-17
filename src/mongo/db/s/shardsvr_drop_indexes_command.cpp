@@ -189,6 +189,8 @@ ShardsvrDropIndexesCommand::Invocation::Response ShardsvrDropIndexesCommand::Inv
     static constexpr StringData lockReason{"dropIndexes"_sd};
     const DDLLockManager::ScopedCollectionDDLLock collDDLLock{opCtx, ns(), lockReason, MODE_X};
 
+    setReadWriteConcern(opCtx, dropIdxCmd, this);
+
     auto resolvedNs = ns();
     auto dropIdxBSON = dropIdxCmd.toBSON();
 
@@ -211,8 +213,6 @@ ShardsvrDropIndexesCommand::Invocation::Response ShardsvrDropIndexesCommand::Inv
             const auto cri = uassertStatusOK(
                 Grid::get(opCtx)->catalogCache()->getCollectionRoutingInfo(opCtx, resolvedNs));
 
-            auto cmdToBeSent = CommandHelpers::filterCommandRequestForPassthrough(dropIdxBSON);
-
             auto shardResponses =
                 scatterGatherVersionedTargetByRoutingTableNoThrowOnStaleShardVersionErrors(
                     opCtx,
@@ -220,10 +220,7 @@ ShardsvrDropIndexesCommand::Invocation::Response ShardsvrDropIndexesCommand::Inv
                     resolvedNs,
                     cri,
                     retryState.shardsWithSuccessResponses,
-                    applyReadWriteConcern(
-                        opCtx,
-                        this,
-                        CommandHelpers::filterCommandRequestForPassthrough(cmdToBeSent)),
+                    CommandHelpers::filterCommandRequestForPassthrough(dropIdxBSON),
                     ReadPreferenceSetting::get(opCtx),
                     Shard::RetryPolicy::kNotIdempotent,
                     BSONObj() /*query*/,

@@ -72,15 +72,14 @@ public:
         };
 
         Response typedRun(OperationContext* opCtx) {
-            BSONObj fsyncUnlockCmdObj = BSON("fsyncUnlock" << 1);
+            ClusterFsyncUnlock fsyncUnlockCmd;
+            fsyncUnlockCmd.setDbName(request().getDbName());
+            setReadWriteConcern(opCtx, fsyncUnlockCmd, this);
 
             auto responses = scatterGatherUnversionedTargetConfigServerAndShards(
                 opCtx,
                 DatabaseName::kAdmin,
-                applyReadWriteConcern(
-                    opCtx,
-                    this,
-                    CommandHelpers::filterCommandRequestForPassthrough(fsyncUnlockCmdObj)),
+                CommandHelpers::filterCommandRequestForPassthrough(fsyncUnlockCmd.toBSON()),
                 ReadPreferenceSetting::get(opCtx),
                 Shard::RetryPolicy::kIdempotent);
 

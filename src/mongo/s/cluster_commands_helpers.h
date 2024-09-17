@@ -61,6 +61,7 @@
 #include "mongo/s/database_version.h"
 #include "mongo/s/request_types/sharded_ddl_commands_gen.h"
 #include "mongo/s/shard_version.h"
+#include "mongo/s/transaction_router.h"
 
 namespace mongo {
 
@@ -168,11 +169,23 @@ std::vector<AsyncRequestsSender::Response> gatherResponsesNoThrowOnStaleShardVer
 
 /**
  * Returns a copy of 'cmdObj' with dbVersion appended if it exists in 'dbInfo'
+ *
+ * Use generic_argument_util::setDbVersionIfPresent() instead if the BSON is generated from an
+ * IDL-command struct.
+ *
+ * TODO SERVER-91373: Typed commands need to set dbversion using
+ * generic_argument_util::setDbVersionIfPresent() instead of appendDbVersionIfPresent().
  */
 BSONObj appendDbVersionIfPresent(BSONObj cmdObj, const CachedDatabaseInfo& dbInfo);
 
 /**
  * Returns a copy of 'cmdObj' with 'databaseVersion' appended.
+ *
+ * Use generic_argument_util::setDbVersionIfPresent() instead if the BSON is generated from an
+ * IDL-command struct.
+ *
+ * TODO SERVER-91373: Typed commands need to set dbversion using
+ * generic_argument_util::setDbVersionIfPresent() instead of appendDbVersionIfPresent().
  */
 BSONObj appendDbVersionIfPresent(BSONObj cmdObj, DatabaseVersion dbVersion);
 
@@ -184,6 +197,12 @@ BSONObj appendShardVersion(BSONObj cmdObj, ShardVersion version);
 /**
  * Returns a copy of 'cmdObj' with the read/writeConcern from the OpCtx appended, unless the
  * cmdObj explicitly specifies read/writeConcern.
+ *
+ * TODO SERVER-91373: Callers of applyReadWriteConcern that come from a basic command should use
+ * setReadWriteConcern after they are converted to a typed command.
+ * TODO SERVER-92350: Some callers of applyReadWriteConcern operate on a BSON that we get from a
+ * Document. After the changes in 92350 they will operate on an idl command and the callsites can be
+ * replaced with setReadWriteConcern.
  */
 BSONObj applyReadWriteConcern(OperationContext* opCtx,
                               bool appendRC,
@@ -201,6 +220,38 @@ BSONObj applyReadWriteConcern(OperationContext* opCtx,
 BSONObj applyReadWriteConcern(OperationContext* opCtx,
                               BasicCommandWithReplyBuilderInterface* cmd,
                               const BSONObj& cmdObj);
+
+/**
+ * Sets the read/write concern from the opCtx onto the idl command struct given setRc and setWc.
+ */
+template <typename CommandType>
+void setReadWriteConcern(OperationContext* opCtx, CommandType& cmd, bool setRC, bool setWC) {
+    if (TransactionRouter::get(opCtx)) {
+        // When running in a transaction, the rules are:
+        // - Apply readConcern only if this is the first operation in the transaction.
+        // - Never apply writeConcern. This is done directly by the TransactionRouter.
+        if (!opCtx->isStartingMultiDocumentTransaction() || !setRC)
+            return;
+        setWC = false;
+    }
+
+    const auto& readConcernArgs = repl::ReadConcernArgs::get(opCtx);
+    if (readConcernArgs.wasAtClusterTimeSelected() || (setRC && !cmd.getReadConcern()))
+        cmd.setReadConcern(readConcernArgs);
+    if (setWC && !cmd.getWriteConcern())
+        cmd.setWriteConcern(opCtx->getWriteConcern());
+}
+
+template <typename CommandType>
+void setReadWriteConcern(OperationContext* opCtx, CommandType& cmd, CommandInvocation* invocation) {
+    const auto& readConcernArgs = repl::ReadConcernArgs::get(opCtx);
+    const auto readConcernSupport = invocation->supportsReadConcern(
+        readConcernArgs.getLevel(), readConcernArgs.isImplicitDefault());
+    setReadWriteConcern(opCtx,
+                        cmd,
+                        readConcernSupport.readConcernSupport.isOK(),
+                        invocation->supportsWriteConcern());
+}
 
 /**
  * Utility for dispatching unversioned commands to all shards in a cluster.

@@ -103,15 +103,15 @@ public:
 
             auto cri = uassertStatusOK(
                 Grid::get(opCtx)->catalogCache()->getCollectionRoutingInfo(opCtx, nss));
+
+            auto& cmd = request();
+            setReadWriteConcern(opCtx, cmd, this);
             auto shardResponses = scatterGatherVersionedTargetByRoutingTable(
                 opCtx,
                 nss.dbName(),
                 nss,
                 cri,
-                applyReadWriteConcern(
-                    opCtx,
-                    this,
-                    CommandHelpers::filterCommandRequestForPassthrough(unparsedRequest().body)),
+                CommandHelpers::filterCommandRequestForPassthrough(cmd.toBSON()),
                 ReadPreferenceSetting::get(opCtx),
                 Shard::RetryPolicy::kIdempotent,
                 BSONObj() /*query*/,

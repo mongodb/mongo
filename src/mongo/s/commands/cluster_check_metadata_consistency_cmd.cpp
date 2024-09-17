@@ -54,6 +54,7 @@
 #include "mongo/db/commands.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/database_name.h"
+#include "mongo/db/generic_argument_util.h"
 #include "mongo/db/metadata_consistency_types_gen.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
@@ -220,11 +221,12 @@ public:
             shardsvrRequest.setDbName(nss.dbName());
             shardsvrRequest.setCommonFields(request().getCommonFields());
             shardsvrRequest.setCursor(request().getCursor());
+            generic_argument_util::setDbVersionIfPresent(shardsvrRequest, dbInfo->getVersion());
             // Attach db and shard version;
-            auto cmdObj = appendDbVersionIfPresent(shardsvrRequest.toBSON(), dbInfo);
             if (!dbInfo->getVersion().isFixed())
-                cmdObj = appendShardVersion(std::move(cmdObj), ShardVersion::UNSHARDED());
-            return _establishCursors(opCtx, nss, {{dbInfo->getPrimary(), std::move(cmdObj)}});
+                shardsvrRequest.setShardVersion(ShardVersion::UNSHARDED());
+            return _establishCursors(
+                opCtx, nss, {{dbInfo->getPrimary(), shardsvrRequest.toBSON()}});
         }
 
         ClusterClientCursorGuard _establishCursors(

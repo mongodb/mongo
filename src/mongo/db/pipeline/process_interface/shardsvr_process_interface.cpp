@@ -46,6 +46,7 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/client/read_preference.h"
 #include "mongo/db/generic_argument_util.h"
+#include "mongo/db/list_collections_gen.h"
 #include "mongo/db/pipeline/aggregate_command_gen.h"
 #include "mongo/db/pipeline/document_source_cursor.h"
 #include "mongo/db/pipeline/document_source_merge.h"
@@ -295,8 +296,10 @@ BSONObj ShardServerProcessInterface::_runListCollectionsCommand(OperationContext
         opCtx,
         "ShardServerProcessInterface::runListCollectionsCommand",
         [&](OperationContext* opCtx, const CachedDatabaseInfo& cdb) {
-            const BSONObj filterObj = BSON("name" << nss.coll());
-            const BSONObj cmdObj = BSON("listCollections" << 1 << "filter" << filterObj);
+            ListCollections listCollectionsCmd;
+            listCollectionsCmd.setDbName(nss.dbName());
+            listCollectionsCmd.setFilter(BSON("name" << nss.coll()));
+            generic_argument_util::setDbVersionIfPresent(listCollectionsCmd, cdb->getVersion());
 
             const auto shard = uassertStatusOK(
                 Grid::get(opCtx)->shardRegistry()->getShard(opCtx, cdb->getPrimary()));
@@ -307,7 +310,7 @@ BSONObj ShardServerProcessInterface::_runListCollectionsCommand(OperationContext
                     opCtx,
                     ReadPreferenceSetting(ReadPreference::PrimaryOnly),
                     nss.dbName(),
-                    appendDbVersionIfPresent(cmdObj, cdb),
+                    listCollectionsCmd.toBSON(),
                     Milliseconds(-1)));
             } catch (const ExceptionFor<ErrorCodes::NamespaceNotFound>&) {
                 return BSONObj{};
