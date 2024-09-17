@@ -35,39 +35,49 @@ const _id = "randomId";
  * Checks that basic CRUD operations work as expected. Expects the collection to have a
  * { _id: _id } document.
  */
-const checkBasicCRUD = function(withCollection, _id) {
+const checkBasicCRUD = function(withCollection, _id, isReplSetConnection) {
     const sleepMs = 1;
     const numRetries = 99999;
     const NUM_NODES = 3;
 
-    const retryableFindOne = (coll, filter) =>
-        retryOnRetryableError(() => coll.findOne(filter), numRetries, sleepMs);
+    // A CRUD operation can fail with FailedToSatisfyReadPreference during the stage
+    // where the replica set primary is restarted with --shardsvr. This is
+    // not a correctness issue and it is safe to retry.
+    const additionalCodesToRetry = [];
+    if (isReplSetConnection) {
+        additionalCodesToRetry.push(ErrorCodes.FailedToSatisfyReadPreference);
+    }
+
+    const runWithRetries = (fn) =>
+        retryOnRetryableError(fn, numRetries, sleepMs, additionalCodesToRetry);
+    const runFindOneWithRetries = (coll, filter) => runWithRetries(() => coll.findOne(filter));
 
     withCollection((coll) => {
-        const doc = retryableFindOne(coll, {_id: _id, y: {$exists: false}});
+        const doc = runFindOneWithRetries(coll, {_id: _id, y: {$exists: false}});
         assert.neq(null, doc);
     });
 
     withCollection((coll) => {
-        assert.commandWorked(coll.updateOne({_id: _id}, {$set: {y: 2}}));
-        assert.eq(2, retryableFindOne(coll, {_id: _id}).y);
+        assert.commandWorked(runWithRetries(() => coll.updateOne({_id: _id}, {$set: {y: 2}})));
+        assert.eq(2, runFindOneWithRetries(coll, {_id: _id}).y);
     });
 
     withCollection((coll) => {
-        assert.commandWorked(coll.remove({_id: _id}, true /* justOne */));
-        assert.eq(null, retryableFindOne(coll, {_id: _id}));
+        assert.commandWorked(runWithRetries(() => coll.remove({_id: _id}, true /* justOne */)));
+        assert.eq(null, runFindOneWithRetries(coll, {_id: _id}));
     });
 
     withCollection((coll) => {
-        assert.commandWorked(coll.insert({_id: _id}, {writeConcern: {w: NUM_NODES}}));
-        assert.eq(_id, retryableFindOne(coll, {_id: _id})._id);
+        assert.commandWorked(
+            runWithRetries(() => coll.insert({_id: _id}, {writeConcern: {w: NUM_NODES}})));
+        assert.eq(_id, runFindOneWithRetries(coll, {_id: _id})._id);
     });
 };
 
 /**
  * Checks that common DDl operations work as expected.
  */
-const checkDDLOps = function(withDbs) {
+const checkDDLOps = function(withDbs, isReplSetConnection) {
     const DDLDb = "DDL";
     const DDLCollection = "DDLCollection";
     const DDLNs = `${DDLDb}.${DDLCollection}`;
@@ -106,9 +116,16 @@ const checkDDLOps = function(withDbs) {
         }
     };
 
-    const runDDLCommandWithRetries = (db, cmd, additionalCodesToRetry = []) =>
-        retryOnRetryableError(
+    const runDDLCommandWithRetries = (db, cmd, additionalCodesToRetry = []) => {
+        // A DDL command can fail with FailedToSatisfyReadPreference during the stage
+        // where the replica set primary is restarted with --shardsvr. This is
+        // not a correctness issue and it is safe to retry.
+        if (isReplSetConnection) {
+            additionalCodesToRetry.push(ErrorCodes.FailedToSatisfyReadPreference);
+        }
+        return retryOnRetryableError(
             () => assertCommand(db.runCommand(cmd)), numRetries, sleepMs, additionalCodesToRetry);
+    };
 
     withDbs((db, _) => {
         jsTestLog("Running create.");
@@ -190,10 +207,12 @@ const checkCRUDThread = function(
     const replSetDb = replSetSession.getDatabase(dbName);
     const replSetColl = replSetDb[collName];
 
+    let isReplSetConnection = false;
     const withCollection = (op) => {
         switch (stage.getCount()) {
             case 2:  // Before the replica set is added as a shard.
                 op(replSetColl);
+                isReplSetConnection = true;
                 break;
             case 1:  // After the replica set has been added as a shard.
                 // Randomly select mongos or replica set connection to simulate a rolling connection
@@ -211,7 +230,7 @@ const checkCRUDThread = function(
     };
 
     while (countdownLatch.getCount() > 0) {
-        checkBasicCRUD(withCollection, _id);
+        checkBasicCRUD(withCollection, _id, isReplSetConnection);
         sleep(1);  // milliseconds.
     }
 };
@@ -230,10 +249,12 @@ const checkDDLThread = function(mongosHost, replSetHost, countdownLatch, stage, 
     while (countdownLatch.getCount() > 0) {
         let db;
         let adminDb;
+        let isReplSetConnection = false;
         switch (stage.getCount()) {
             case 2:  // Before the replica set is added as a shard.
                 db = replSetDb;
                 adminDb = replSetAdminDb;
+                isReplSetConnection = true;
                 break;
             case 1:  // After the replica set has been added as a shard.
                 // TODO SERVER-67835 When replica set endpoint is enabled, change it so that
@@ -254,7 +275,7 @@ const checkDDLThread = function(mongosHost, replSetHost, countdownLatch, stage, 
             op(db, adminDb);
         };
 
-        checkDDLOps(withDbs);
+        checkDDLOps(withDbs, isReplSetConnection);
         sleep(1);  // milliseconds.
     }
 };
