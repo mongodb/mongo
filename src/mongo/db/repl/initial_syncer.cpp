@@ -110,9 +110,6 @@ namespace repl {
 // Failpoint for initial sync
 MONGO_FAIL_POINT_DEFINE(failInitialSyncWithBadHost);
 
-// Failpoint which fails initial sync and leaves an oplog entry in the buffer.
-MONGO_FAIL_POINT_DEFINE(failInitSyncWithBufferedEntriesLeft);
-
 // Failpoint which causes the initial sync function to hang after getting the oldest active
 // transaction timestamp from the sync source.
 MONGO_FAIL_POINT_DEFINE(initialSyncHangAfterGettingBeginFetchingTimestamp);
