@@ -93,36 +93,6 @@
     "transaction is too large and will not fit in the storage engine cache"
 namespace mongo {
 
-void WiredTigerEventHandler::setWtConnReady(WT_CONNECTION* conn) {
-    stdx::unique_lock<mongo::Mutex> lock(_mutex);
-    _wtConn = conn;
-    if (_activeReaders == 0 || conn) {
-        return;
-    }
-    LOGV2(7003100,
-          "WiredTiger connection close is waiting for active statistics readers to finish",
-          "activeReaders"_attr = _activeReaders);
-    _idleCondition.wait(lock, [this]() { return _activeReaders == 0; });
-}
-
-WT_CONNECTION* WiredTigerEventHandler::getStatsCollectionPermit() {
-    stdx::lock_guard<mongo::Mutex> lock(_mutex);
-    if (_wtConn) {
-        _activeReaders++;
-        return _wtConn;
-    }
-    return nullptr;
-}
-
-void WiredTigerEventHandler::releaseStatsCollectionPermit() {
-    stdx::unique_lock<mongo::Mutex> lock(_mutex);
-    _activeReaders--;
-    if (_activeReaders == 0 && !_wtConn) {
-        _idleCondition.notify_all();
-        return;
-    }
-}
-
 namespace {
 
 // TODO SERVER-81069: Remove this.

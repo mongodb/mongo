@@ -23,6 +23,7 @@ wtEnv.Library(
         "wiredtiger_compiled_configuration.cpp",
         "wiredtiger_cursor.cpp",
         "wiredtiger_cursor_helpers.cpp",
+        "wiredtiger_event_handler.cpp",
         "wiredtiger_global_options.cpp",
         "wiredtiger_index.cpp",
         "wiredtiger_index_util.cpp",
