@@ -173,6 +173,9 @@ using IndexVersion = IndexDescriptor::IndexVersion;
 namespace repl {
 namespace {
 
+// Failpoint to block after a write and its oplog entry have been written to the storage engine and
+// are visible, but before we have advanced 'lastApplied' for the write.
+MONGO_FAIL_POINT_DEFINE(hangBeforeLogOpAdvancesLastApplied);
 // Failpoint to block oplog application after receiving an IndexBuildAlreadyInProgress error.
 MONGO_FAIL_POINT_DEFINE(hangAfterIndexBuildConflict);
 

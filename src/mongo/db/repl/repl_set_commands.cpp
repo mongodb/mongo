@@ -783,6 +783,8 @@ bool replHasDatabases(OperationContext* opCtx) {
 
 }  // namespace
 
+MONGO_FAIL_POINT_DEFINE(rsDelayHeartbeatResponse);
+
 /* { replSetHeartbeat : <setname> } */
 class CmdReplSetHeartbeat : public ReplSetCommand {
 public:
@@ -791,6 +793,9 @@ public:
              const DatabaseName&,
              const BSONObj& cmdObj,
              BSONObjBuilder& result) override {
+        rsDelayHeartbeatResponse.execute(
+            [&](const BSONObj& data) { sleepsecs(data["delay"].numberInt()); });
+
         LOGV2_FOR_HEARTBEATS(24095,
                              2,
                              "Received heartbeat request",
