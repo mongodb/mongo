@@ -263,7 +263,8 @@ void DropCollectionCoordinator::_freezeMigrations(
 
     if (_doc.getCollInfo()) {
         const auto collUUID = _doc.getCollInfo()->getUuid();
-        sharding_ddl_util::stopMigrations(opCtx, nss(), collUUID, getNewSession(opCtx));
+        const auto session = getNewSession(opCtx);
+        sharding_ddl_util::stopMigrations(opCtx, nss(), collUUID, session);
     }
 }
 
@@ -325,7 +326,10 @@ void DropCollectionCoordinator::_commitDropCollection(
     }
 
     // Remove tags even if the collection is not sharded or didn't exist
-    sharding_ddl_util::removeTagsMetadataFromConfig(opCtx, nss(), getNewSession(opCtx));
+    {
+        const auto session = getNewSession(opCtx);
+        sharding_ddl_util::removeTagsMetadataFromConfig(opCtx, nss(), session);
+    }
 
     // Checkpoint the configTime to ensure that, in the case of a stepdown, the new primary will
     // start-up from a configTime that is inclusive of the metadata removable that was committed
@@ -341,26 +345,32 @@ void DropCollectionCoordinator::_commitDropCollection(
     participants.erase(std::remove(participants.begin(), participants.end(), primaryShardId),
                        participants.end());
 
-    sharding_ddl_util::sendDropCollectionParticipantCommandToShards(
-        opCtx,
-        nss(),
-        participants,
-        **executor,
-        getNewSession(opCtx),
-        true /* fromMigrate */,
-        false /* dropSystemCollections */);
+    {
+        const auto session = getNewSession(opCtx);
+        sharding_ddl_util::sendDropCollectionParticipantCommandToShards(
+            opCtx,
+            nss(),
+            participants,
+            **executor,
+            session,
+            true /* fromMigrate */,
+            false /* dropSystemCollections */);
+    }
 
     // The sharded collection must be dropped on the primary shard after it has been
     // dropped on all of the other shards to ensure it can only be re-created as
     // unsharded with a higher optime than all of the drops.
-    sharding_ddl_util::sendDropCollectionParticipantCommandToShards(
-        opCtx,
-        nss(),
-        {primaryShardId},
-        **executor,
-        getNewSession(opCtx),
-        false /* fromMigrate */,
-        false /* dropSystemCollections */);
+    {
+        const auto session = getNewSession(opCtx);
+        sharding_ddl_util::sendDropCollectionParticipantCommandToShards(
+            opCtx,
+            nss(),
+            {primaryShardId},
+            **executor,
+            session,
+            false /* fromMigrate */,
+            false /* dropSystemCollections */);
+    }
 
     ShardingLogging::get(opCtx)->logChange(opCtx, "dropCollection", nss());
     LOGV2(5390503, "Collection dropped", logAttrs(nss()));

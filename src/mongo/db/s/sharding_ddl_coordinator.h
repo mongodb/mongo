@@ -446,6 +446,8 @@ protected:
     /**
      * Advances and persists the `txnNumber` to ensure causality between requests, then returns the
      * updated operation session information (OSI).
+     * This modifies the _doc with a std::move, so any reference to members of the _doc will be
+     * invalidated after this call
      */
     OperationSessionInfo getNewSession(OperationContext* opCtx) {
         _updateSession(opCtx);

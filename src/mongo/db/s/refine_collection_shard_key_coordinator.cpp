@@ -240,15 +240,18 @@ ExecutorFuture<void> RefineCollectionShardKeyCoordinator::_runImpl(
                 getForwardableOpMetadata().setOn(opCtx);
 
                 if (!_firstExecution) {
-                    _performNoopWriteOnDataShardsAndConfigServer(
-                        opCtx, nss(), getNewSession(opCtx), **executor);
+                    const auto session = getNewSession(opCtx);
+                    _performNoopWriteOnDataShardsAndConfigServer(opCtx, nss(), session, **executor);
                 }
 
                 // Stop migrations before checking indexes considering any concurrent index
                 // creation/drop with migrations could leave the cluster with inconsistent indexes,
                 // PM-2077 should address that.
-                sharding_ddl_util::stopMigrations(
-                    opCtx, nss(), _request.getCollectionUUID(), getNewSession(opCtx));
+                {
+                    const auto session = getNewSession(opCtx);
+                    sharding_ddl_util::stopMigrations(
+                        opCtx, nss(), _request.getCollectionUUID(), session);
+                }
 
                 const auto& ns = nss();
                 auto catalogCache = Grid::get(opCtx)->catalogCache();
@@ -289,8 +292,8 @@ ExecutorFuture<void> RefineCollectionShardKeyCoordinator::_runImpl(
                 getForwardableOpMetadata().setOn(opCtx);
 
                 if (!_firstExecution) {
-                    _performNoopWriteOnDataShardsAndConfigServer(
-                        opCtx, nss(), getNewSession(opCtx), **executor);
+                    const auto session = getNewSession(opCtx);
+                    _performNoopWriteOnDataShardsAndConfigServer(opCtx, nss(), session, **executor);
                 }
 
                 ShardsvrParticipantBlock blockCRUDOperationsRequest(nss());
@@ -331,8 +334,8 @@ ExecutorFuture<void> RefineCollectionShardKeyCoordinator::_runImpl(
                 getForwardableOpMetadata().setOn(opCtx);
 
                 if (!_firstExecution) {
-                    _performNoopWriteOnDataShardsAndConfigServer(
-                        opCtx, nss(), getNewSession(opCtx), **executor);
+                    const auto session = getNewSession(opCtx);
+                    _performNoopWriteOnDataShardsAndConfigServer(opCtx, nss(), session, **executor);
                 }
 
                 ConfigsvrCommitRefineCollectionShardKey commitRequest(nss());
@@ -370,8 +373,8 @@ ExecutorFuture<void> RefineCollectionShardKeyCoordinator::_runImpl(
                 getForwardableOpMetadata().setOn(opCtx);
 
                 if (!_firstExecution) {
-                    _performNoopWriteOnDataShardsAndConfigServer(
-                        opCtx, nss(), getNewSession(opCtx), **executor);
+                    const auto session = getNewSession(opCtx);
+                    _performNoopWriteOnDataShardsAndConfigServer(opCtx, nss(), session, **executor);
                 }
 
                 ShardsvrParticipantBlock unblockCRUDOperationsRequest(nss());
@@ -396,8 +399,10 @@ ExecutorFuture<void> RefineCollectionShardKeyCoordinator::_runImpl(
 
                 notifyChangeStreamsOnRefineCollectionShardKeyComplete(
                     opCtx, nss(), _doc.getNewShardKey(), _doc.getOldKey().get(), *_doc.getUuid());
-                sharding_ddl_util::resumeMigrations(
-                    opCtx, nss(), boost::none, getNewSession(opCtx));
+                {
+                    const auto session = getNewSession(opCtx);
+                    sharding_ddl_util::resumeMigrations(opCtx, nss(), boost::none, session);
+                }
 
                 logRefineCollectionShardKey(opCtx, nss(), "end", BSONObj());
             }))
@@ -428,8 +433,8 @@ ExecutorFuture<void> RefineCollectionShardKeyCoordinator::_runImpl(
             // phase.
             if (!finalStatus.isOK() && _doc.getPhase() >= Phase::kRemoteIndexValidation &&
                 !_mustAlwaysMakeProgress() && !_isRetriableErrorForDDLCoordinator(finalStatus)) {
-                sharding_ddl_util::resumeMigrations(
-                    opCtx, nss(), boost::none, getNewSession(opCtx));
+                const auto session = getNewSession(opCtx);
+                sharding_ddl_util::resumeMigrations(opCtx, nss(), boost::none, session);
             }
 
             return finalStatus;

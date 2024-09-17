@@ -748,12 +748,13 @@ void MovePrimaryCoordinator::dropOrphanedDataOnRecipient(
     // Make a copy of this container since `getNewSession` changes the coordinator document.
     const auto collectionsToClone = *_doc.getCollectionsToClone();
     for (const auto& nss : collectionsToClone) {
+        const auto session = getNewSession(opCtx);
         sharding_ddl_util::sendDropCollectionParticipantCommandToShards(
             opCtx,
             nss,
             {_doc.getToShardId()},
             **executor,
-            getNewSession(opCtx),
+            session,
             true /* fromMigrate */,
             true /* dropSystemCollections */);
     }

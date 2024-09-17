@@ -1708,8 +1708,9 @@ ExecutorFuture<void> CreateCollectionCoordinatorLegacy::_runImpl(
                     std::vector<ShardId>{std::make_move_iterator(involvedShards.begin()),
                                          std::make_move_iterator(involvedShards.end())};
                 std::erase(participants, ShardingState::get(opCtx)->shardId());
+                const auto session = getNewSession(opCtx);
                 createCollectionOnShards(opCtx,
-                                         getNewSession(opCtx),
+                                         session,
                                          _collectionUUID,
                                          participants,
                                          nss(),
@@ -2260,7 +2261,7 @@ void CreateCollectionCoordinator::_syncIndexesOnCoordinator(
     _uuid = *sharding_ddl_util::getCollectionUUID(opCtx, nss());
 
     // Get indexes from the dataShard and copy them to the coordinator.
-    auto session = getNewSession(opCtx);
+    const auto session = getNewSession(opCtx);
     createCollectionOnShards(opCtx,
                              session,
                              _uuid,
@@ -2568,13 +2569,14 @@ void CreateCollectionCoordinator::_setPostCommitMetadata(
         const auto primaryShardId = ShardingState::get(opCtx)->shardId();
         std::erase(nonInvolvedShardIds, primaryShardId);
 
+        const auto session = getNewSession(opCtx);
         if (!nonInvolvedShardIds.empty()) {
             sharding_ddl_util::sendDropCollectionParticipantCommandToShards(
                 opCtx,
                 nss(),
                 nonInvolvedShardIds,
                 **executor,
-                getNewSession(opCtx),
+                session,
                 true /* fromMigrate */,
                 false /* dropSystemCollections */,
                 _uuid);
@@ -2665,11 +2667,12 @@ ExecutorFuture<void> CreateCollectionCoordinator::_cleanupOnAbort(
                 // TODO SERVER-83774: Remove the following invariant and skip the broadcast if the
                 // _uuid does not exist.
                 invariant(_uuid);
+                const auto session = getNewSession(opCtx);
                 broadcastDropCollection(opCtx,
                                         nss(),
                                         *_doc.getOriginalDataShard() /* excludedDataShard */,
                                         **executor,
-                                        getNewSession(opCtx),
+                                        session,
                                         _uuid);
             }
 

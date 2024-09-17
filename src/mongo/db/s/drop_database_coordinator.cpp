@@ -462,9 +462,11 @@ ExecutorFuture<void> DropDatabaseCoordinator::_runImpl(
                     _clearDatabaseInfoOnPrimary(opCtx);
                     _clearDatabaseInfoOnSecondaries(opCtx);
 
-                    const auto& osi = getNewSession(opCtx);
-                    removeDatabaseFromConfigAndUpdatePlacementHistory(
-                        opCtx, **executor, _dbName, *metadata().getDatabaseVersion(), osi);
+                    {
+                        const auto& session = getNewSession(opCtx);
+                        removeDatabaseFromConfigAndUpdatePlacementHistory(
+                            opCtx, **executor, _dbName, *metadata().getDatabaseVersion(), session);
+                    }
 
                     VectorClockMutable::get(opCtx)->waitForDurableConfigTime().get(opCtx);
                 }

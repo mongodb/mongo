@@ -312,15 +312,18 @@ ExecutorFuture<void> ConvertToCappedCoordinator::_runImpl(
                     uasserted(ErrorCodes::InternalError,
                               "Reproducing an error. This is part of a test.");
                 }
-                const auto& session = getNewSession(opCtx);
-                convertToCappedOnShard(opCtx,
-                                       nss(),
-                                       _doc.getSize(),
-                                       *_doc.getDataShard(),
-                                       *_doc.getTargetUUID(),
-                                       session,
-                                       executor,
-                                       token);
+
+                {
+                    const auto session = getNewSession(opCtx);
+                    convertToCappedOnShard(opCtx,
+                                           nss(),
+                                           _doc.getSize(),
+                                           *_doc.getDataShard(),
+                                           *_doc.getTargetUUID(),
+                                           session,
+                                           executor,
+                                           token);
+                }
 
                 if (MONGO_unlikely(convertToCappedFailAfterCappingTheCollection.shouldFail())) {
                     convertToCappedFailAfterCappingTheCollection.pauseWhileSet();
@@ -366,16 +369,19 @@ ExecutorFuture<void> ConvertToCappedCoordinator::_runImpl(
                     // guarantee targeting the config server
                     const bool useClusterTransaction{true};
 
-                    // Delete the sharding catalog entries referring the previous incarnation
-                    sharding_ddl_util::removeCollAndChunksMetadataFromConfig(
-                        opCtx,
-                        Grid::get(opCtx)->shardRegistry()->getConfigShard(),
-                        Grid::get(opCtx)->catalogClient(),
-                        *_doc.getOriginalCollection(),
-                        ShardingCatalogClient::kMajorityWriteConcern,
-                        getNewSession(opCtx),
-                        useClusterTransaction,
-                        **executor);
+                    {
+                        const auto session = getNewSession(opCtx);
+                        // Delete the sharding catalog entries referring the previous incarnation
+                        sharding_ddl_util::removeCollAndChunksMetadataFromConfig(
+                            opCtx,
+                            Grid::get(opCtx)->shardRegistry()->getConfigShard(),
+                            Grid::get(opCtx)->catalogClient(),
+                            *_doc.getOriginalCollection(),
+                            ShardingCatalogClient::kMajorityWriteConcern,
+                            session,
+                            useClusterTransaction,
+                            **executor);
+                    }
 
                     auto createCollectionOnShardingCatalogOps = sharding_ddl_util::
                         getOperationsToCreateUnsplittableCollectionOnShardingCatalog(

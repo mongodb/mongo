@@ -1033,16 +1033,17 @@ ExecutorFuture<void> RenameCollectionCoordinator::_runImpl(
 
                 // Block migrations on involved collections.
                 try {
-                    const auto& osi = getNewSession(opCtx);
-                    sharding_ddl_util::stopMigrations(opCtx, fromNss, _doc.getSourceUUID(), osi);
+                    const auto session = getNewSession(opCtx);
+                    sharding_ddl_util::stopMigrations(
+                        opCtx, fromNss, _doc.getSourceUUID(), session);
                 } catch (ExceptionFor<ErrorCodes::NamespaceNotFound>&) {
                     // stopMigrations is allowed to fail when the source collection is not tracked
                     // by the sharding catalog.
                 }
 
                 try {
-                    const auto& osi = getNewSession(opCtx);
-                    sharding_ddl_util::stopMigrations(opCtx, toNss, _doc.getTargetUUID(), osi);
+                    const auto session = getNewSession(opCtx);
+                    sharding_ddl_util::stopMigrations(opCtx, toNss, _doc.getTargetUUID(), session);
                 } catch (ExceptionFor<ErrorCodes::NamespaceNotFound>&) {
                     // stopMigrations is allowed to fail when the target collection doesn't exist or
                     // is not tracked by the sharding catalog.
@@ -1056,8 +1057,8 @@ ExecutorFuture<void> RenameCollectionCoordinator::_runImpl(
                 getForwardableOpMetadata().setOn(opCtx);
 
                 if (!_firstExecution) {
-                    _performNoopRetryableWriteOnAllShardsAndConfigsvr(
-                        opCtx, getNewSession(opCtx), **executor);
+                    const auto session = getNewSession(opCtx);
+                    _performNoopRetryableWriteOnAllShardsAndConfigsvr(opCtx, session, **executor);
                 }
 
                 _updateNewOptTrackedCollInfoFieldAfterBinaryUpgrade();
@@ -1126,15 +1127,15 @@ ExecutorFuture<void> RenameCollectionCoordinator::_runImpl(
                 }
 
                 {
-                    const auto& osi = getNewSession(opCtx);
+                    const auto session = getNewSession(opCtx);
                     renameIndexMetadataInShards(
-                        opCtx, nss(), _request, osi, **executor, &_doc, token);
+                        opCtx, nss(), _request, session, **executor, &_doc, token);
                 }
 
                 // Update the collection metadata after the rename.
                 // Renaming the metadata will also resume migrations for the resulting collection.
                 {
-                    const auto& osi = getNewSession(opCtx);
+                    const auto session = getNewSession(opCtx);
                     renameCollectionMetadataInTransaction(
                         opCtx,
                         _doc.getOptTrackedCollInfo(),
@@ -1144,7 +1145,7 @@ ExecutorFuture<void> RenameCollectionCoordinator::_runImpl(
                         _doc.getNewTargetCollectionUuid(),
                         ShardingCatalogClient::kMajorityWriteConcern,
                         **executor,
-                        osi);
+                        session);
                 }
 
                 // Checkpoint the configTime to ensure that, in the case of a stepdown, the new

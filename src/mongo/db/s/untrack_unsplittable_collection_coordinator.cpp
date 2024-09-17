@@ -127,15 +127,18 @@ void UntrackUnsplittableCollectionCoordinator::_commitUntrackCollection(
     // guarantee targeting the config server
     const bool useClusterTransaction{true};
 
-    sharding_ddl_util::removeCollAndChunksMetadataFromConfig(
-        opCtx,
-        Grid::get(opCtx)->shardRegistry()->getConfigShard(),
-        Grid::get(opCtx)->catalogClient(),
-        _doc.getOptCollType().get(),
-        ShardingCatalogClient::kMajorityWriteConcern,
-        getNewSession(opCtx),
-        useClusterTransaction,
-        **executor);
+    {
+        const auto session = getNewSession(opCtx);
+        sharding_ddl_util::removeCollAndChunksMetadataFromConfig(
+            opCtx,
+            Grid::get(opCtx)->shardRegistry()->getConfigShard(),
+            Grid::get(opCtx)->catalogClient(),
+            _doc.getOptCollType().get(),
+            ShardingCatalogClient::kMajorityWriteConcern,
+            session,
+            useClusterTransaction,
+            **executor);
+    }
 
     // Checkpoint the configTime to ensure that, in the case of a stepdown, the new primary will
     // start-up from a configTime that is inclusive of the metadata deletions that were committed
