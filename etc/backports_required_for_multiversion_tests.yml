@@ -749,6 +749,8 @@ last-continuous:
     ticket: SERVER-93112
   - test_file: jstests/sharding/resharding_collection_cloner_stale_config_retry.js
     ticket: SERVER-94151
+  - test_file: jstests/core/ddl/create_indexes.js
+    ticket: SERVER-90952
   - test_file: jstests/sharding/refresh_sessions.js
     ticket: SERVER-94635
   suites: null
@@ -1560,6 +1562,8 @@ last-lts:
     ticket: SERVER-93112
   - test_file: jstests/sharding/resharding_collection_cloner_stale_config_retry.js
     ticket: SERVER-94151
+  - test_file: jstests/core/ddl/create_indexes.js
+    ticket: SERVER-90952
   - test_file: jstests/sharding/refresh_sessions.js
     ticket: SERVER-94635
   suites: null
