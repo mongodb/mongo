@@ -14,4 +14,3 @@
 - featureFlagAllMongodsAreSharded
 - featureFlagGRPC
 - featureFlagCreateCollectionInPreparedTransactions
-- featureFlagSearchInSbe

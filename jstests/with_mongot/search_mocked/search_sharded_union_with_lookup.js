@@ -489,7 +489,7 @@ verifySearchStageExplainOutput({
 let searchIdLookupStage = getAggPlanStage(pipeline, "$_internalSearchIdLookup");
 assert.neq(searchIdLookupStage, null, unionWithStage);
 verifySearchStageExplainOutput({
-    stage: searchIdLookupStage,
+    stage: searchStage,
     stageType: "$_internalSearchIdLookup",
     nReturned: NumberLong(5),
     verbosity: "executionStats",
@@ -547,7 +547,7 @@ verifySearchStageExplainOutput({
 searchIdLookupStage = getAggPlanStage(pipeline, "$_internalSearchIdLookup");
 assert.neq(searchIdLookupStage, null, unionWithStage);
 verifySearchStageExplainOutput({
-    stage: searchIdLookupStage,
+    stage: searchStage,
     stageType: "$_internalSearchIdLookup",
     nReturned: NumberLong(5),
     verbosity: "executionStats",

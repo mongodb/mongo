@@ -909,7 +909,7 @@ for (const currentVerbosity of ["executionStats", "allPlansExecution"]) {
         const searchIdLookupStage = pipeline[1];
         assert.neq(searchIdLookupStage, null, unionWithStage);
         verifySearchStageExplainOutput({
-            stage: searchIdLookupStage,
+            stage: searchStage,
             stageType: "$_internalSearchIdLookup",
             nReturned: NumberLong(5),
             verbosity: currentVerbosity,
