@@ -80,9 +80,22 @@ public:
      */
     void clearStateBeforeRecovery();
 
+    /**
+     * Informs the SizeRecoveryState that record stores should always check their size information.
+     */
+    void setRecordStoresShouldAlwaysCheckSize(bool);
+
+    /**
+     * Returns whether record stores should always check their size information. This can either be
+     * due to setRecordStoresShouldAlwaysCheckSize being called or due to being in replication
+     * recovery.
+     */
+    bool shouldRecordStoresAlwaysCheckSize() const;
+
 private:
     mutable Mutex _mutex = MONGO_MAKE_LATCH("SizeRecoveryState::_mutex");
     StringSet _collectionsAlwaysNeedingSizeAdjustment;
+    bool _recordStoresShouldAlwayCheckSize = false;
 };
 
 /**

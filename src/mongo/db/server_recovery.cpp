@@ -63,6 +63,21 @@ void SizeRecoveryState::clearStateBeforeRecovery() {
     stdx::lock_guard<Latch> lock(_mutex);
     _collectionsAlwaysNeedingSizeAdjustment.clear();
 }
+
+void SizeRecoveryState::setRecordStoresShouldAlwaysCheckSize(bool shouldAlwayCheckSize) {
+    stdx::lock_guard<Latch> lock(_mutex);
+    _recordStoresShouldAlwayCheckSize = shouldAlwayCheckSize;
+}
+
+bool SizeRecoveryState::shouldRecordStoresAlwaysCheckSize() const {
+    stdx::lock_guard<Latch> lock(_mutex);
+    // Regardless of whether the _recordStoresShouldAlwayCheckSize flag is set, if we are in
+    // replication recovery then sizes should always be checked. This is in case the size storer
+    // information is no longer accurate. This may be necessary if a collection creation was not
+    // part of a stable checkpoint.
+    return _recordStoresShouldAlwayCheckSize ||
+        inReplicationRecovery(getGlobalServiceContext()).load();
+}
 }  // namespace mongo
 
 mongo::AtomicWord<bool>& mongo::inReplicationRecovery(ServiceContext* serviceCtx) {
