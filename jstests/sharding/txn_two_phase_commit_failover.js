@@ -15,9 +15,10 @@ import {
     waitForFailpoint,
     flushRoutersAndRefreshShardMetadata,
 } from "jstests/sharding/libs/sharded_transactions_helpers.js";
-import {funWithArgs} from "jstests/libs/parallel_shell_helpers.js";
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
+import {Thread} from "jstests/libs/parallelTester.js";
+import {extractUUIDFromObject} from "jstests/libs/uuid_util.js";
 
 const dbName = "test";
 const collName = "foo";
@@ -56,38 +57,36 @@ const runTest = function(sameNodeStepsUpAfterFailover) {
     let participant1 = st.shard1;
     let participant2 = st.shard2;
 
-    const runCommitThroughMongosInParallelShellExpectSuccess = function() {
-        return startParallelShell(
-            funWithArgs((passed_lsid, passed_txnNumber) => {
-                try {
-                    assert.commandWorked(db.adminCommand({
-                        commitTransaction: 1,
-                        lsid: passed_lsid,
-                        txnNumber: NumberLong(passed_txnNumber),
-                        stmtId: NumberInt(0),
-                        autocommit: false,
-                    }));
-                } catch (err) {
-                    if ((err.hasOwnProperty('errorLabels') &&
-                         err.errorLabels.includes('TransientTransactionError'))) {
-                        quit(err.code);
-                    } else {
-                        throw err;
-                    }
-                }
-            }, lsid, txnNumber), st.s.port);
+    const runCommitThroughMongosExpectSuccess = function(lsidUUID, txnNumber, mongosHost) {
+        const conn = new Mongo(mongosHost);
+        try {
+            assert.commandWorked(conn.adminCommand({
+                commitTransaction: 1,
+                lsid: {id: UUID(lsidUUID)},
+                txnNumber: NumberLong(txnNumber),
+                stmtId: NumberInt(0),
+                autocommit: false,
+            }));
+        } catch (err) {
+            if ((err.hasOwnProperty('errorLabels') &&
+                 err.errorLabels.includes('TransientTransactionError'))) {
+                quit(err.code);
+            } else {
+                throw err;
+            }
+        }
     };
 
-    const runCommitThroughMongosInParallelShellExpectAbort = function() {
-        const runCommitExpectSuccessCode = "assert.commandFailedWithCode(db.adminCommand({" +
-            "commitTransaction: 1," +
-            "lsid: " + tojson(lsid) + "," +
-            "txnNumber: NumberLong(" + txnNumber + ")," +
-            "stmtId: NumberInt(0)," +
-            "autocommit: false," +
-            "})," +
-            "ErrorCodes.NoSuchTransaction);";
-        return startParallelShell(runCommitExpectSuccessCode, st.s.port);
+    const runCommitThroughMongosExpectAbort = function(lsidUUID, txnNumber, mongosHost) {
+        const conn = new Mongo(mongosHost);
+        assert.commandFailedWithCode(conn.adminCommand({
+            commitTransaction: 1,
+            lsid: {id: UUID(lsidUUID)},
+            txnNumber: NumberLong(txnNumber),
+            stmtId: NumberInt(0),
+            autocommit: false,
+        }),
+                                     ErrorCodes.NoSuchTransaction);
     };
 
     const setUp = function() {
@@ -154,13 +153,20 @@ const runTest = function(sameNodeStepsUpAfterFailover) {
             data: failpointData.data ? failpointData.data : {},
         }));
 
-        // Run commitTransaction through a parallel shell.
-        let awaitResult;
+        // Run commitTransaction through a thread.
+        let commitThread;
         if (expectAbortResponse) {
-            awaitResult = runCommitThroughMongosInParallelShellExpectAbort();
+            commitThread = new Thread(runCommitThroughMongosExpectAbort,
+                                      extractUUIDFromObject(lsid.id),
+                                      txnNumber,
+                                      st.s.host);
         } else {
-            awaitResult = runCommitThroughMongosInParallelShellExpectSuccess();
+            commitThread = new Thread(runCommitThroughMongosExpectSuccess,
+                                      extractUUIDFromObject(lsid.id),
+                                      txnNumber,
+                                      st.s.host);
         }
+        commitThread.start();
 
         waitForFailpoint("Hit " + failpointData.failpoint + " failpoint",
                          failpointData.numTimesShouldBeHit);
@@ -177,7 +183,7 @@ const runTest = function(sameNodeStepsUpAfterFailover) {
         }));
 
         // The router should retry commitTransaction against the new primary.
-        awaitResult();
+        commitThread.join();
 
         // Check that the transaction committed or aborted as expected.
         if (expectAbortResponse) {
