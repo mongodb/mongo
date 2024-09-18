@@ -119,6 +119,7 @@ mongo_cc_library(
         "document_source_rank_fusion_gen",
         "document_source_rank_fusion_inputs_gen",
         "document_source_replace_root_gen",
+        "document_source_score_gen",
         "document_source_set_variable_from_subpipeline_gen",
         "document_source_set_window_fields_gen",
         "document_source_union_with_gen",
@@ -474,6 +475,14 @@ idl_generator(
     src = "document_source_replace_root.idl",
     deps = [
         ":value_gen",
+        "//src/mongo/db:basic_types_gen",
+    ],
+)
+
+idl_generator(
+    name = "document_source_score_gen",
+    src = "document_source_score.idl",
+    deps = [
         "//src/mongo/db:basic_types_gen",
     ],
 )
