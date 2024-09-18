@@ -51,72 +51,6 @@ namespace {
 static const long long max32BitEpochMillis =
     static_cast<long long>(std::numeric_limits<uint32_t>::max()) * 1000;
 
-/**
- * Helper function to make comparison match expressions.
- */
-template <typename T, typename V>
-auto makeCmpMatchExpr(StringData path, V val) {
-    return std::make_unique<T>(path, val);
-}
-
-/**
- * Creates an ObjectId initialized with an appropriate timestamp corresponding to 'rhs' and
- * returns it as a Value.
- */
-template <typename MatchType>
-auto constructObjectIdValue(const BSONElement& rhs, int bucketMaxSpanSeconds) {
-    // Indicates whether to initialize an ObjectId with a max or min value for the non-date bytes.
-    enum class OIDInit : bool { max, min };
-    // Make an ObjectId corresponding to a date value. As a conversion from date to ObjectId will
-    // truncate milliseconds, we round up when needed to prevent missing results.
-    auto makeDateOID = [](auto&& date, auto&& maxOrMin, bool roundMillisUpToSecond = false) {
-        if (roundMillisUpToSecond && (date.toMillisSinceEpoch() % 1000 != 0)) {
-            date += Seconds{1};
-        }
-
-        auto oid = OID{};
-        oid.init(date, maxOrMin == OIDInit::max);
-        return oid;
-    };
-    // Make an ObjectId corresponding to a date value adjusted by the max bucket value for the
-    // time series view that this query operates on. This predicate can be used in a comparison
-    // to gauge a max value for a given bucket, rather than a min value.
-    auto makeMaxAdjustedDateOID = [&](auto&& date, auto&& maxOrMin) {
-        // Ensure we don't underflow.
-        if (date.toDurationSinceEpoch() >= Seconds{bucketMaxSpanSeconds})
-            // Subtract max bucket range.
-            return makeDateOID(date - Seconds{bucketMaxSpanSeconds}, maxOrMin);
-        else
-            // Since we're out of range, just make a predicate that is true for all dates.
-            // We'll never use an OID for a date < 0 due to OID range limitations, so we set the
-            // minimum date to 0.
-            return makeDateOID(Date_t::fromMillisSinceEpoch(0LL), OIDInit::min);
-    };
-
-    // Because the OID timestamp is only 4 bytes, we can't convert larger dates
-    invariant(rhs.date().toMillisSinceEpoch() >= 0LL);
-    invariant(rhs.date().toMillisSinceEpoch() <= max32BitEpochMillis);
-
-    // An ObjectId consists of a 4-byte timestamp, as well as a unique value and a counter, thus
-    // two ObjectIds initialized with the same date will have different values. To ensure that we
-    // do not incorrectly include or exclude any buckets, depending on the operator we will
-    // construct either the largest or the smallest ObjectId possible with the corresponding date.
-    // If the query operand is not of type Date, the original query will not match on any documents
-    // because documents in a time-series collection must have a timeField of type Date. We will
-    // make this case faster by keeping the ObjectId as the lowest or highest possible value so as
-    // to eliminate all buckets.
-    if constexpr (std::is_same_v<MatchType, LTMatchExpression>) {
-        return Value{makeDateOID(rhs.date(), OIDInit::min, true /*roundMillisUpToSecond*/)};
-    } else if constexpr (std::is_same_v<MatchType, LTEMatchExpression>) {
-        return Value{makeDateOID(rhs.date(), OIDInit::max, true /*roundMillisUpToSecond*/)};
-    } else if constexpr (std::is_same_v<MatchType, GTMatchExpression>) {
-        return Value{makeMaxAdjustedDateOID(rhs.date(), OIDInit::max)};
-    } else if constexpr (std::is_same_v<MatchType, GTEMatchExpression>) {
-        return Value{makeMaxAdjustedDateOID(rhs.date(), OIDInit::min)};
-    }
-    MONGO_UNREACHABLE_TASSERT(5756800);
-}
-
 // Checks for the situations when it's not possible to create a bucket-level predicate (against the
 // computed control values) for the given event-level predicate ('matchExpr').
 boost::optional<StringData> checkComparisonPredicateEligibility(
@@ -320,50 +254,6 @@ BucketLevelComparisonPredicateGeneratorBase::Output generateNonTimeFieldPredicat
             MONGO_UNREACHABLE_TASSERT(5348302);
     }
 }
-
-BucketLevelComparisonPredicateGeneratorBase::Output handleExtendedDateRanges(
-    const ComparisonMatchExpressionBase* matchExpr, long long timestamp) {
-    tassert(
-        7823306,
-        "Expected extended date range timestamp, but received a timestamp within the date range.",
-        timestamp < 0LL || timestamp > max32BitEpochMillis);
-
-    switch (matchExpr->matchType()) {
-            // Since by this point we know that no time value has been inserted which is
-            // outside the epoch range, we know that no document can meet this criteria
-        case MatchExpression::EQ:
-        case MatchExpression::INTERNAL_EXPR_EQ:
-            return {std::make_unique<AlwaysFalseMatchExpression>()};
-        case MatchExpression::GT:
-        case MatchExpression::INTERNAL_EXPR_GT:
-        case MatchExpression::GTE:
-        case MatchExpression::INTERNAL_EXPR_GTE:
-            if (timestamp < 0LL) {
-                // Since by this point we know that no time value has been inserted < 0,
-                // every document must meet this criteria
-                return {std::make_unique<AlwaysTrueMatchExpression>()};
-            }
-            // If we are here we are guaranteed that 'timestamp > max32BitEpochMillis'. Since by
-            // this point we know that no time value has been inserted > max32BitEpochMillis, we
-            // know that no document can meet this criteria
-            return {std::make_unique<AlwaysFalseMatchExpression>()};
-        case MatchExpression::LT:
-        case MatchExpression::INTERNAL_EXPR_LT:
-        case MatchExpression::LTE:
-        case MatchExpression::INTERNAL_EXPR_LTE:
-            if (timestamp < 0LL) {
-                // Since by this point we know that no time value has been inserted < 0,
-                // we know that no document can meet this criteria
-                return {std::make_unique<AlwaysFalseMatchExpression>()};
-            }
-            // If we are here we are guaranteed that 'timestamp > max32BitEpochMillis'. Since by
-            // this point we know that no time value has been inserted > 0xffffffff every time value
-            // must be less than this value
-            return {std::make_unique<AlwaysTrueMatchExpression>()};
-        default:
-            MONGO_UNREACHABLE_TASSERT(7823305);
-    }
-}
 }  // namespace
 
 BucketLevelComparisonPredicateGeneratorBase::Output
@@ -495,12 +385,6 @@ DefaultBucketLevelComparisonPredicateGenerator::generateTimeFieldPredicate(
     StringData matchExprPath,
     const BSONElement& matchExprData) const {
     BSONObj minTime = BSON("" << timeField - Seconds(_params.bucketMaxSpanSeconds));
-    // The date is in the "extended" range if it doesn't fit into the bottom 32 bits.
-    long long timestamp = timeField.toMillisSinceEpoch();
-    bool dateIsExtended = timestamp < 0LL || timestamp > max32BitEpochMillis;
-    if (dateIsExtended) {
-        return handleExtendedDateRanges(std::move(matchExpr), timestamp);
-    };
 
     switch (matchExpr->matchType()) {
         case MatchExpression::EQ:
@@ -523,15 +407,7 @@ DefaultBucketLevelComparisonPredicateGenerator::generateTimeFieldPredicate(
                                                                  minTime.firstElement()),
                 makeCmpMatchExpr<InternalExprGTEMatchExpression>(maxPathStringData, matchExprData),
                 makeCmpMatchExpr<InternalExprLTEMatchExpression>(maxPathStringData,
-                                                                 maxTime.firstElement()),
-                makeCmpMatchExpr<LTEMatchExpression, Value>(
-                    timeseries::kBucketIdFieldName,
-                    constructObjectIdValue<LTEMatchExpression>(matchExprData,
-                                                               _params.bucketMaxSpanSeconds)),
-                makeCmpMatchExpr<GTEMatchExpression, Value>(
-                    timeseries::kBucketIdFieldName,
-                    constructObjectIdValue<GTEMatchExpression>(matchExprData,
-                                                               _params.bucketMaxSpanSeconds)))};
+                                                                 maxTime.firstElement()))};
         case MatchExpression::GT:
         case MatchExpression::INTERNAL_EXPR_GT:
             // For $gt, make a $gt predicate against 'control.max'. If the collection doesn't
@@ -549,11 +425,7 @@ DefaultBucketLevelComparisonPredicateGenerator::generateTimeFieldPredicate(
             return {makeAnd(
                 makeCmpMatchExpr<InternalExprGTMatchExpression>(maxPathStringData, matchExprData),
                 makeCmpMatchExpr<InternalExprGTMatchExpression>(minPathStringData,
-                                                                minTime.firstElement()),
-                makeCmpMatchExpr<GTMatchExpression, Value>(
-                    timeseries::kBucketIdFieldName,
-                    constructObjectIdValue<GTMatchExpression>(matchExprData,
-                                                              _params.bucketMaxSpanSeconds)))};
+                                                                minTime.firstElement()))};
         case MatchExpression::GTE:
         case MatchExpression::INTERNAL_EXPR_GTE:
             // For $gte, make a $gte predicate against 'control.max'. In addition, since the
@@ -569,11 +441,7 @@ DefaultBucketLevelComparisonPredicateGenerator::generateTimeFieldPredicate(
             return {makeAnd(
                 makeCmpMatchExpr<InternalExprGTEMatchExpression>(maxPathStringData, matchExprData),
                 makeCmpMatchExpr<InternalExprGTEMatchExpression>(minPathStringData,
-                                                                 minTime.firstElement()),
-                makeCmpMatchExpr<GTEMatchExpression, Value>(
-                    timeseries::kBucketIdFieldName,
-                    constructObjectIdValue<GTEMatchExpression>(matchExprData,
-                                                               _params.bucketMaxSpanSeconds)))};
+                                                                 minTime.firstElement()))};
 
         case MatchExpression::LT:
         case MatchExpression::INTERNAL_EXPR_LT:
@@ -593,11 +461,7 @@ DefaultBucketLevelComparisonPredicateGenerator::generateTimeFieldPredicate(
             return {makeAnd(
                 makeCmpMatchExpr<InternalExprLTMatchExpression>(minPathStringData, matchExprData),
                 makeCmpMatchExpr<InternalExprLTMatchExpression>(maxPathStringData,
-                                                                maxTime.firstElement()),
-                makeCmpMatchExpr<LTMatchExpression, Value>(
-                    timeseries::kBucketIdFieldName,
-                    constructObjectIdValue<LTMatchExpression>(matchExprData,
-                                                              _params.bucketMaxSpanSeconds)))};
+                                                                maxTime.firstElement()))};
 
         case MatchExpression::LTE:
         case MatchExpression::INTERNAL_EXPR_LTE:
@@ -614,62 +478,9 @@ DefaultBucketLevelComparisonPredicateGenerator::generateTimeFieldPredicate(
             return {makeAnd(
                 makeCmpMatchExpr<InternalExprLTEMatchExpression>(minPathStringData, matchExprData),
                 makeCmpMatchExpr<InternalExprLTEMatchExpression>(maxPathStringData,
-                                                                 maxTime.firstElement()),
-                makeCmpMatchExpr<LTEMatchExpression, Value>(
-                    timeseries::kBucketIdFieldName,
-                    constructObjectIdValue<LTEMatchExpression>(matchExprData,
-                                                               _params.bucketMaxSpanSeconds)))};
+                                                                 maxTime.firstElement()))};
         default:
             MONGO_UNREACHABLE_TASSERT(7823301);
-    }
-}
-
-BucketLevelComparisonPredicateGeneratorBase::Output
-ExtendedRangeBucketLevelComparisonPredicateGenerator::generateTimeFieldPredicate(
-    const ComparisonMatchExpressionBase* matchExpr,
-    StringData minPathStringData,
-    StringData maxPathStringData,
-    Date_t timeField,
-    BSONObj maxTime,
-    StringData matchExprPath,
-    const BSONElement& matchExprData) const {
-    BSONObj minTime = BSON("" << timeField - Seconds(_params.bucketMaxSpanSeconds));
-    std::string minPath = minPathStringData.toString();
-    std::string maxPath = maxPathStringData.toString();
-
-    switch (matchExpr->matchType()) {
-        case MatchExpression::EQ:
-        case MatchExpression::INTERNAL_EXPR_EQ:
-            return {makeAnd(
-                makeCmpMatchExpr<InternalExprLTEMatchExpression>(minPath, matchExprData),
-                makeCmpMatchExpr<InternalExprGTEMatchExpression>(minPath, minTime.firstElement()),
-                makeCmpMatchExpr<InternalExprGTEMatchExpression>(maxPath, matchExprData),
-                makeCmpMatchExpr<InternalExprLTEMatchExpression>(maxPath, maxTime.firstElement()))};
-
-        case MatchExpression::GT:
-        case MatchExpression::INTERNAL_EXPR_GT:
-            return {makeAnd(
-                makeCmpMatchExpr<InternalExprGTMatchExpression>(maxPath, matchExprData),
-                makeCmpMatchExpr<InternalExprGTMatchExpression>(minPath, minTime.firstElement()))};
-
-        case MatchExpression::GTE:
-        case MatchExpression::INTERNAL_EXPR_GTE:
-            return {makeAnd(
-                makeCmpMatchExpr<InternalExprGTEMatchExpression>(maxPath, matchExprData),
-                makeCmpMatchExpr<InternalExprGTEMatchExpression>(minPath, minTime.firstElement()))};
-
-        case MatchExpression::LT:
-        case MatchExpression::INTERNAL_EXPR_LT:
-            return {makeAnd(
-                makeCmpMatchExpr<InternalExprLTMatchExpression>(minPath, matchExprData),
-                makeCmpMatchExpr<InternalExprLTMatchExpression>(maxPath, maxTime.firstElement()))};
-        case MatchExpression::LTE:
-        case MatchExpression::INTERNAL_EXPR_LTE:
-            return {makeAnd(
-                makeCmpMatchExpr<InternalExprLTEMatchExpression>(minPath, matchExprData),
-                makeCmpMatchExpr<InternalExprLTEMatchExpression>(maxPath, maxTime.firstElement()))};
-        default:
-            MONGO_UNREACHABLE_TASSERT(7823302);
     }
 }
 
@@ -685,13 +496,6 @@ FixedBucketsLevelComparisonPredicateGenerator::generateTimeFieldPredicate(
     Date_t roundedTimeField =
         timeseries::roundTimestampBySeconds(timeField, _params.bucketMaxSpanSeconds);
     BSONObj minTime = BSON("" << roundedTimeField);
-    // The date is in the "extended" range if it doesn't fit into the bottom 32 bits.
-    long long timestamp = timeField.toMillisSinceEpoch();
-    bool dateIsExtended = timestamp < 0LL || timestamp > max32BitEpochMillis;
-
-    if (dateIsExtended) {
-        return handleExtendedDateRanges(std::move(matchExpr), timestamp);
-    }
 
     // For some queries with fixed buckets, we do not need to filter individual measurements or
     // whole buckets, because it is guaranteed that all buckets returned from the index scan
@@ -726,15 +530,7 @@ FixedBucketsLevelComparisonPredicateGenerator::generateTimeFieldPredicate(
                                                                  minTime.firstElement()),
                 makeCmpMatchExpr<InternalExprGTEMatchExpression>(maxPathStringData, matchExprData),
                 makeCmpMatchExpr<InternalExprLTEMatchExpression>(maxPathStringData,
-                                                                 maxTime.firstElement()),
-                makeCmpMatchExpr<LTEMatchExpression, Value>(
-                    timeseries::kBucketIdFieldName,
-                    constructObjectIdValue<LTEMatchExpression>(matchExprData,
-                                                               _params.bucketMaxSpanSeconds)),
-                makeCmpMatchExpr<GTEMatchExpression, Value>(
-                    timeseries::kBucketIdFieldName,
-                    constructObjectIdValue<GTEMatchExpression>(matchExprData,
-                                                               _params.bucketMaxSpanSeconds)))};
+                                                                 maxTime.firstElement()))};
         case MatchExpression::GT:
         case MatchExpression::INTERNAL_EXPR_GT:
             // For $gt, make a $gt predicate against 'control.max'. If the collection doesn't
@@ -753,11 +549,7 @@ FixedBucketsLevelComparisonPredicateGenerator::generateTimeFieldPredicate(
             return {makeAnd(
                 makeCmpMatchExpr<InternalExprGTMatchExpression>(maxPathStringData, matchExprData),
                 makeCmpMatchExpr<InternalExprGTEMatchExpression>(minPathStringData,
-                                                                 minTime.firstElement()),
-                makeCmpMatchExpr<GTMatchExpression, Value>(
-                    timeseries::kBucketIdFieldName,
-                    constructObjectIdValue<GTMatchExpression>(matchExprData,
-                                                              _params.bucketMaxSpanSeconds)))};
+                                                                 minTime.firstElement()))};
         case MatchExpression::GTE:
         case MatchExpression::INTERNAL_EXPR_GTE:
             // For $gte, make a $gte predicate against 'control.max'. In addition, since the
@@ -774,11 +566,7 @@ FixedBucketsLevelComparisonPredicateGenerator::generateTimeFieldPredicate(
             return {makeAnd(makeCmpMatchExpr<InternalExprGTEMatchExpression>(maxPathStringData,
                                                                              matchExprData),
                             makeCmpMatchExpr<InternalExprGTEMatchExpression>(
-                                minPathStringData, minTime.firstElement()),
-                            makeCmpMatchExpr<GTEMatchExpression, Value>(
-                                timeseries::kBucketIdFieldName,
-                                constructObjectIdValue<GTEMatchExpression>(
-                                    matchExprData, _params.bucketMaxSpanSeconds))),
+                                minPathStringData, minTime.firstElement())),
                     rewriteProvidesExactMatchPredicate};
         case MatchExpression::LT:
         case MatchExpression::INTERNAL_EXPR_LT:
@@ -796,12 +584,8 @@ FixedBucketsLevelComparisonPredicateGenerator::generateTimeFieldPredicate(
             // {$expr: {$lt: [...]}} that can be rewritten to use $_internalExprLt.
             return {makeAnd(makeCmpMatchExpr<InternalExprLTMatchExpression>(minPathStringData,
                                                                             matchExprData),
-                            makeCmpMatchExpr<InternalExprLTMatchExpression>(maxPathStringData,
-                                                                            maxTime.firstElement()),
-                            makeCmpMatchExpr<LTMatchExpression, Value>(
-                                timeseries::kBucketIdFieldName,
-                                constructObjectIdValue<LTMatchExpression>(
-                                    matchExprData, _params.bucketMaxSpanSeconds))),
+                            makeCmpMatchExpr<InternalExprLTMatchExpression>(
+                                maxPathStringData, maxTime.firstElement())),
                     rewriteProvidesExactMatchPredicate};
         case MatchExpression::LTE:
         case MatchExpression::INTERNAL_EXPR_LTE:
@@ -817,11 +601,7 @@ FixedBucketsLevelComparisonPredicateGenerator::generateTimeFieldPredicate(
             return {makeAnd(
                 makeCmpMatchExpr<InternalExprLTEMatchExpression>(minPathStringData, matchExprData),
                 makeCmpMatchExpr<InternalExprLTEMatchExpression>(maxPathStringData,
-                                                                 maxTime.firstElement()),
-                makeCmpMatchExpr<LTEMatchExpression, Value>(
-                    timeseries::kBucketIdFieldName,
-                    constructObjectIdValue<LTEMatchExpression>(matchExprData,
-                                                               _params.bucketMaxSpanSeconds)))};
+                                                                 maxTime.firstElement()))};
         default:
             MONGO_UNREACHABLE_TASSERT(7823303);
     }
@@ -830,13 +610,11 @@ FixedBucketsLevelComparisonPredicateGenerator::generateTimeFieldPredicate(
 std::unique_ptr<BucketLevelComparisonPredicateGeneratorBase>
 BucketLevelComparisonPredicateGenerator::getBuilder(
     BucketLevelComparisonPredicateGeneratorBase::Params params) {
-    if (params.bucketSpec.usesExtendedRange()) {
-        return std::make_unique<ExtendedRangeBucketLevelComparisonPredicateGenerator>(
-            std::move(params));
-    }
-    if (params.fixedBuckets) {
+    if (!params.bucketSpec.usesExtendedRange() && params.fixedBuckets) {
+        // Fixed bucket optimizations are not compatible with extended range data
         return std::make_unique<FixedBucketsLevelComparisonPredicateGenerator>(std::move(params));
     }
+
     return std::make_unique<DefaultBucketLevelComparisonPredicateGenerator>(std::move(params));
 }
 

@@ -64,6 +64,7 @@
 #include "mongo/db/pipeline/expression.h"
 #include "mongo/db/pipeline/field_path.h"
 #include "mongo/db/query/timeseries/bucket_level_comparison_predicate_generator.h"
+#include "mongo/db/query/timeseries/bucket_level_id_predicate_generator.h"
 #include "mongo/db/query/util/make_data_structure.h"
 #include "mongo/db/timeseries/timeseries_constants.h"
 #include "mongo/util/assert_util.h"
@@ -387,6 +388,15 @@ BucketSpec::BucketPredicate BucketSpec::createPredicatesOnBucketLevelField(
         return {std::move(result), nullptr, rewriteProvidesExactMatchPredicate};
     }
     return handleIneligible(policy, matchExpr, "can't handle this predicate");
+}
+
+bool BucketSpec::generateBucketLevelIdPredicates(const ExpressionContext& pExpCtx,
+                                                 const BucketSpec& bucketSpec,
+                                                 int bucketMaxSpanSeconds,
+                                                 MatchExpression* matchExpr) {
+
+    return BucketLevelIdPredicateGenerator::generateIdPredicates(
+        pExpCtx, bucketSpec, bucketMaxSpanSeconds, matchExpr);
 }
 
 std::pair<bool, BSONObj> BucketSpec::pushdownPredicate(

@@ -129,8 +129,6 @@ const requestConfigurations = {
                                     "control.max.time":
                                         {"$_internalExprLte": ISODate("2000-01-01T01:00:00Z")}
                                 },
-                                {"_id": {"$lte": ObjectId("386d4380ffffffffffffffff")}},
-                                {"_id": {"$gte": ObjectId("386d35700000000000000000")}}
                             ]
                         },
                         {

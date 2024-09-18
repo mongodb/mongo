@@ -404,10 +404,6 @@ const replacementDoc = {
                         [`control.max.${timeFieldName}`]:
                             {$_internalExprLte: ISODate("2006-01-01T01:00:00Z")}
                     },
-                    // The bucket's _id encodes the time info and so the bucket filter will include
-                    // the _id range filter.
-                    {"_id": {"$lte": ObjectId("43b71b80ffffffffffffffff")}},
-                    {"_id": {"$gte": ObjectId("43b70d700000000000000000")}}
                 ]
             }),
             residualFilter: {[timeFieldName]: {$eq: doc6_c_f105[timeFieldName]}},

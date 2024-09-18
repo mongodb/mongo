@@ -258,9 +258,6 @@ assert.sameMembers(buckets.getIndexes(), extraBucketIndexes.concat([
                         {"control.max.time": {"$_internalExprGt": ISODate("2000-01-01T00:00:00Z")}},
                         // We also have a bound on the min time, derived from bucketMaxSpanSeconds.
                         {"control.min.time": {"$_internalExprGt": ISODate("1999-12-31T23:00:00Z")}},
-                        // The min time is also encoded in the _id, so we have a bound on that as
-                        // well.
-                        {"_id": {"$gt": ObjectId("386d3570ffffffffffffffff")}},
                     ]
                 },
                 // $gt on a non-time field can only bound the control.max for that field.
@@ -575,16 +572,16 @@ assert.sameMembers(buckets.getIndexes(), extraBucketIndexes.concat([
     // {a: {$in: [/abc/]}} is equivalent to {a: /abc/} which executes the regex, and is not allowed.
     checkPredicateDisallowed({a: {$in: [/abc/]}});
 
-    // Predicates on time are pushed down, and also some extra predicates are inferred.
-    // These inferred predicates don't necessarily result in fewer buckets being indexed:
-    // we're just following the same rules for createIndex that we use when optimizing a query.
+    // Predicates on time are pushed down, being converted into predicates on the control field in
+    // the process. These generated predicates don't necessarily result in fewer buckets being
+    // indexed: we're just following the same rules for createIndex that we use when optimizing a
+    // query.
     checkPredicateOK({
         input: {[timeField]: {$lt: ISODate('2020-01-01T00:00:00Z')}},
         output: {
             $and: [
                 {"control.min.time": {"$_internalExprLt": ISODate("2020-01-01T00:00:00Z")}},
                 {"control.max.time": {"$_internalExprLt": ISODate("2020-01-01T01:00:00Z")}},
-                {"_id": {"$lt": ObjectId("5e0be1000000000000000000")}},
             ]
         }
     });
@@ -594,7 +591,6 @@ assert.sameMembers(buckets.getIndexes(), extraBucketIndexes.concat([
             $and: [
                 {"control.max.time": {"$_internalExprGt": ISODate("2020-01-01T00:00:00Z")}},
                 {"control.min.time": {"$_internalExprGt": ISODate("2019-12-31T23:00:00Z")}},
-                {"_id": {"$gt": ObjectId("5e0bd2f0ffffffffffffffff")}},
             ]
         }
     });
@@ -604,7 +600,6 @@ assert.sameMembers(buckets.getIndexes(), extraBucketIndexes.concat([
             $and: [
                 {"control.min.time": {"$_internalExprLte": ISODate("2020-01-01T00:00:00Z")}},
                 {"control.max.time": {"$_internalExprLte": ISODate("2020-01-01T01:00:00Z")}},
-                {"_id": {"$lte": ObjectId("5e0be100ffffffffffffffff")}},
             ]
         }
     });
@@ -614,7 +609,6 @@ assert.sameMembers(buckets.getIndexes(), extraBucketIndexes.concat([
             $and: [
                 {"control.max.time": {"$_internalExprGte": ISODate("2020-01-01T00:00:00Z")}},
                 {"control.min.time": {"$_internalExprGte": ISODate("2019-12-31T23:00:00Z")}},
-                {"_id": {"$gte": ObjectId("5e0bd2f00000000000000000")}},
             ]
         }
     });
@@ -626,8 +620,6 @@ assert.sameMembers(buckets.getIndexes(), extraBucketIndexes.concat([
                 {"control.min.time": {"$_internalExprGte": ISODate("2019-12-31T23:00:00Z")}},
                 {"control.max.time": {"$_internalExprGte": ISODate("2020-01-01T00:00:00Z")}},
                 {"control.max.time": {"$_internalExprLte": ISODate("2020-01-01T01:00:00Z")}},
-                {"_id": {"$lte": ObjectId("5e0be100ffffffffffffffff")}},
-                {"_id": {"$gte": ObjectId("5e0bd2f00000000000000000")}},
             ]
         }
     });

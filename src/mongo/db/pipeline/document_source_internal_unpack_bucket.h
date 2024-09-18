@@ -201,6 +201,11 @@ public:
         const MatchExpression* matchExpr) const;
 
     /**
+     * Convenience wrapper around BucketSpec::generateBucketLevelIdPredicates().
+     */
+    bool generateBucketLevelIdPredicates(MatchExpression* matchExpr) const;
+
+    /**
      * Attempts to split 'match' into two stages, where the first is dependent only on the metaField
      * and the second is the remainder, so that applying them in sequence is equivalent to applying
      * 'match' once. Will return two intrusive_ptrs to new $match stages. Either pointer may be
@@ -360,7 +365,10 @@ private:
     bool _fixedBuckets = false;
 
     // If any bucket contains dates outside the range of 1970-2038, we are unable to rely on
-    // the _id index, as _id is truncates to 32 bits
+    // the _id index, as _id is truncated to 32 bits. Note that this is a per-shard attribute (some
+    // shards of a collection may have extended range data while others do not), so when mongos
+    // sends a pipeline containing this stage to mongod, it will omit this value, as it may be
+    // different from the DB primary shard.
     bool _usesExtendedRange = false;
 
     timeseries::BucketUnpacker _bucketUnpacker;
@@ -383,6 +391,10 @@ private:
     DepsTracker _eventFilterDeps;
     std::unique_ptr<MatchExpression> _wholeBucketFilter;
     BSONObj _wholeBucketFilterBson;
+
+    // This will be boost::none or true if should check to see if we can generate predicates on _id
+    // in a match stage that has been pushed before this stage.
+    boost::optional<bool> _checkIfNeedsIdPredicates = boost::none;
 
     // If after unpacking there are no stages referencing any fields (e.g. $count), unpack directly
     // to BSON so that data doesn't need to be materialized to Document.

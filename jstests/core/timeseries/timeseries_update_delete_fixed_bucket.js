@@ -64,7 +64,6 @@ import {
                     $and: [
                         {"control.min.time": {$_internalExprLt: startingTime}},
                         {"control.max.time": {$_internalExprLt: ISODate("2023-02-06T01:45:00Z")}},
-                        {_id: {$lt: ObjectId("63e058180000000000000000")}}
                     ]
                 }),
                 residualFilter: {},
@@ -91,7 +90,6 @@ import {
                     $and: [
                         {"control.max.time": {$_internalExprGt: startingTime}},
                         {"control.min.time": {$_internalExprGte: startingTime}},
-                        {_id: {$gt: ObjectId("63e05494ffffffffffffffff")}}
                     ]
                 }),
                 residualFilter: {"time": {"$gt": startingTime}},
@@ -120,7 +118,6 @@ import {
                     $and: [
                         {"control.max.time": {$_internalExprGte: times[3]}},
                         {"control.min.time": {$_internalExprGte: times[3]}},
-                        {_id: {$gte: ObjectId("63e058180000000000000000")}}
                     ]
                 }),
                 residualFilter: {},
@@ -169,7 +166,6 @@ import {
                                     "control.max.time":
                                         {$_internalExprLt: new Date(times[3].getTime() + offset)}
                                 },
-                                {_id: {$lt: ObjectId("63e05b9c0000000000000000")}},
 
                             ]
                         },
@@ -177,7 +173,6 @@ import {
                             $and: [
                                 {"control.max.time": {$_internalExprGte: times[1]}},
                                 {"control.min.time": {$_internalExprGte: times[1]}},
-                                {_id: {$gte: ObjectId("63e054940000000000000000")}},
                             ]
                         }
                     ]
@@ -207,7 +202,6 @@ import {
                     $and: [
                         {"control.max.time": {$_internalExprGte: ISODate("2023-02-06T01:30:00Z")}},
                         {"control.min.time": {$_internalExprGte: ISODate("2023-02-06T01:30:00Z")}},
-                        {_id: {$gte: ObjectId("63e054940000000000000000")}}
                     ]
                 }),
                 residualFilter: {},
@@ -259,7 +253,6 @@ import {
                             "control.max.time":
                                 {$_internalExprLt: new Date(times[2].getTime() + offset)}
                         },
-                        {_id: {$lt: ObjectId("63e059da0000000000000000")}}
                     ]
                 }),
                 residualFilter: {[timeFieldName]: {$lt: times[2]}},
@@ -284,8 +277,6 @@ import {
                         {"control.min.time": {$_internalExprGte: ISODate("2023-02-06T01:30:00Z")}},
                         {"control.max.time": {$_internalExprGte: ISODate("2023-02-06T01:37:30Z")}},
                         {"control.max.time": {$_internalExprLte: ISODate("2023-02-06T01:52:30Z")}},
-                        {_id: {$lte: ObjectId("63e059daffffffffffffffff")}},
-                        {_id: {$gte: ObjectId("63e056560000000000000000")}}
                     ]
                 }),
                 residualFilter: {[timeFieldName]: {$eq: times[2]}},
@@ -308,7 +299,6 @@ import {
                     $and: [
                         {"control.max.time": {$_internalExprGte: times[3]}},
                         {"control.min.time": {$_internalExprGte: times[3]}},
-                        {_id: {$gte: ObjectId("63e058180000000000000000")}}
                     ]
                 }),
                 residualFilter: {},

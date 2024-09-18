@@ -292,14 +292,16 @@ function testDeterministicInput(roundingParam, startingTime) {
         eventFilter: {$and: [{[timeField]: {$lt: startingTime}}, {otherTime: {$gte: times[0]}}]}
     });
 
-    // Test the fixed bucketing specific rewrites are not done for queries that use an extended
-    // range. We still do the generic rewrites on the 'control' fields.
+    // Test that comparisons to extended range dates will return either none or all documents, with
+    // neither wholeBucketFilter of eventFilter being present in the unpack stage.
     checkResults({
         pipeline: [{$match: {[timeField]: {$lt: ISODate("1969-09-03T00:00:00.000Z")}}}],
         expectedDocs: [],
-        eventFilter: {[timeField]: {$lt: ISODate("1969-09-03T00:00:00.000Z")}},
-        wholeBucketFilter:
-            {[`control.max.${timeField}`]: {$lt: ISODate("1969-09-03T00:00:00.000Z")}}
+    });
+
+    checkResults({
+        pipeline: [{$match: {[timeField]: {$lt: ISODate("2040-09-03T00:00:00.000Z")}}}],
+        expectedDocs: docs,
     });
 
     // Test the fixed bucketing specific rewrites are not done if the bucketing parameters have

@@ -172,6 +172,7 @@ env.Library(
     source=[
         "timeseries/bucket_spec.cpp",
         "timeseries/bucket_level_comparison_predicate_generator.cpp",
+        "timeseries/bucket_level_id_predicate_generator.cpp",
     ],
     LIBDEPS=[
         "$BUILD_DIR/mongo/db/exec/document_value/document_value",
