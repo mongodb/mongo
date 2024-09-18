@@ -58,6 +58,10 @@ function testFindQuerySettingsApplication(collOrViewName) {
         // in a sharded cluster. Nevertheless, the shards should use the query settings matching the
         // original query shape.
         skip: 3,
+        let : {
+            c: 1,
+            d: 2,
+        }
     });
 
     qstests.assertQuerySettingsIndexApplication(querySettingsFindQuery, ns);

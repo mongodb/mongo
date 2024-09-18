@@ -345,13 +345,14 @@ Value DocumentSourceMerge::serialize(const SerializationOptions& opts) const {
     spec.setTargetNss(getOutputNs());
     const auto& letVariables = _mergeProcessor->getLetVariables();
     spec.setLet([&]() -> boost::optional<BSONObj> {
-        if (!letVariables) {
+        if (letVariables.empty()) {
             return boost::none;
         }
 
         BSONObjBuilder bob;
-        for (auto&& [name, expr] : *letVariables) {
-            bob << opts.serializeFieldPathFromString(name) << expr->serialize(opts);
+        for (const auto& letVar : letVariables) {
+            bob << opts.serializeFieldPathFromString(letVar.name)
+                << letVar.expression->serialize(opts);
         }
         return bob.obj();
     }());
@@ -366,8 +367,8 @@ Value DocumentSourceMerge::serialize(const SerializationOptions& opts) const {
             auto expCtxWithLetVariables = pExpCtx->copyWith(getOutputNs());
             if (spec.getLet()) {
                 BSONObjBuilder cleanLetSpecBuilder;
-                for (auto&& [name, expr] : *letVariables) {
-                    cleanLetSpecBuilder.append(name, BSONObj{});
+                for (const auto& letVar : letVariables) {
+                    cleanLetSpecBuilder.append(letVar.name, BSONObj{});
                 }
                 expCtxWithLetVariables->variables.seedVariablesWithLetParameters(
                     expCtxWithLetVariables.get(), cleanLetSpecBuilder.obj());
@@ -382,7 +383,10 @@ Value DocumentSourceMerge::serialize(const SerializationOptions& opts) const {
         }
         return mergeOnFields;
     }());
-    spec.setTargetCollectionVersion(_mergeProcessor->getCollectionPlacementVersion());
+    // Do not serialize 'targetCollectionVersion' attribute as it is not part of the query shape.
+    if (opts.literalPolicy == LiteralSerializationPolicy::kUnchanged) {
+        spec.setTargetCollectionVersion(_mergeProcessor->getCollectionPlacementVersion());
+    }
     return Value(Document{{getSourceName(), spec.toBSON(opts)}});
 }
 

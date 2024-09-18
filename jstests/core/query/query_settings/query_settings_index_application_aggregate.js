@@ -69,7 +69,13 @@ function testAggregateQuerySettingsApplicationWithoutSecondaryCollections(collOr
     // Ensure that query settings cluster parameter is empty.
     qsutils.assertQueryShapeConfiguration([]);
 
-    const aggregateCmd = qsutils.makeAggregateQueryInstance({pipeline: [{$match: {a: 1, b: 5}}]});
+    const aggregateCmd = qsutils.makeAggregateQueryInstance({
+        pipeline: [{$match: {a: 1, b: 5}}],
+        let : {
+            c: 1,
+            d: 2,
+        }
+    });
     qstests.assertQuerySettingsIndexApplication(aggregateCmd, mainNs);
     qstests.assertQuerySettingsIgnoreCursorHints(aggregateCmd, mainNs);
     qstests.assertQuerySettingsFallback(aggregateCmd, mainNs);
@@ -99,7 +105,10 @@ function testAggregateQuerySettingsApplicationWithLookupEquiJoin(
       // integrity after the fallback mechanism is engaged.
       { $_internalInhibitOptimization: {} },
       { $limit: 1 },
-    ]});
+    ], let: {
+      c: 1,
+      d: 2,
+    }});
 
     // Ensure query settings index application for 'mainNs', 'secondaryNs' and both.
     qstests.assertQuerySettingsIndexApplication(aggregateCmd, mainNs);
@@ -137,6 +146,39 @@ function testAggregateQuerySettingsApplicationWithLookupEquiJoin(
     qstests.assertQuerySettingsCommandValidation(aggregateCmd, secondaryNs);
 }
 
+function testAggregateQuerySettingsApplicationWithMerge(collOrViewName, outputColl) {
+    const qsutils = new QuerySettingsUtils(db, collOrViewName);
+    const qstests = new QuerySettingsIndexHintsTests(qsutils);
+
+    // Set indexes on both collections.
+    setIndexes(coll, [qstests.indexA, qstests.indexB, qstests.indexAB]);
+
+    // Ensure that query settings cluster parameter is empty.
+    qsutils.assertQueryShapeConfiguration([]);
+
+    const aggregateCmd = qsutils.makeAggregateQueryInstance({
+        pipeline: [
+            {$match: {a: 1, b: 5}},
+            {
+                $merge: {
+                    into: outputColl,
+                    let : {c: 1, d: 2},
+                    whenMatched: [{$addFields: {e: {$add: ["$$c", "$$d", "$$e", "$$f"]}}}]
+                }
+            }
+        ],
+        let : {
+            e: 3,
+            f: 4,
+        }
+    });
+
+    qstests.assertQuerySettingsIndexApplication(aggregateCmd, mainNs);
+    qstests.assertQuerySettingsIgnoreCursorHints(aggregateCmd, mainNs);
+    qstests.assertQuerySettingsFallback(aggregateCmd, mainNs);
+    qstests.assertQuerySettingsCommandValidation(aggregateCmd, mainNs);
+}
+
 function testAggregateQuerySettingsApplicationWithLookupPipeline(collOrViewName,
                                                                  secondaryCollOrViewName) {
     const qsutils = new QuerySettingsUtils(db, collOrViewName);
@@ -154,9 +196,14 @@ function testAggregateQuerySettingsApplicationWithLookupPipeline(collOrViewName,
       { $match: { a: 1, b: 5 } },
       {
         $lookup:
-          { from: secondaryCollOrViewName, pipeline: [{ $match: { a: 1, b: 5 } }], as: "output" }
-      },
-    ]});
+          { from: secondaryCollOrViewName, 
+          let: { c: 1, d: 2 }, pipeline: [{ $match: { a: 1, b: 5 } }], as: "output" }
+      }
+    ], let: {
+      e: 3,
+      f: 4,
+    }
+  });
 
     // Ensure query settings index application for 'mainNs', 'secondaryNs' and both.
     qstests.assertQuerySettingsIndexApplication(aggregateCmd, mainNs);
@@ -280,6 +327,7 @@ if (FixtureHelpers.isSharded(coll) || FixtureHelpers.isSharded(secondaryColl)) {
     );
 
     instantiateTestCasesNoSecondaryView(
+        testAggregateQuerySettingsApplicationWithMerge,
         testAggregateQuerySettingsApplicationWithoutSecondaryCollections);
 } else {
     instantiateTestCases(
@@ -290,5 +338,6 @@ if (FixtureHelpers.isSharded(coll) || FixtureHelpers.isSharded(secondaryColl)) {
     );
 
     instantiateTestCasesNoSecondaryView(
+        testAggregateQuerySettingsApplicationWithMerge,
         testAggregateQuerySettingsApplicationWithoutSecondaryCollections);
 }

@@ -93,15 +93,6 @@ public:
     static constexpr StringData kPipelineField = "pipeline"_sd;
     static constexpr StringData kAsField = "as"_sd;
 
-    struct LetVariable {
-        LetVariable(std::string name, boost::intrusive_ptr<Expression> expression, Variables::Id id)
-            : name(std::move(name)), expression(std::move(expression)), id(id) {}
-
-        std::string name;
-        boost::intrusive_ptr<Expression> expression;
-        Variables::Id id;
-    };
-
     class LiteParsed final : public LiteParsedDocumentSourceNestedPipelines {
     public:
         static std::unique_ptr<LiteParsed> parse(const NamespaceString& nss,
@@ -478,6 +469,8 @@ private:
     // functions. If sub-$lookup stages are present, their pipelines are constructed recursively.
     std::unique_ptr<Pipeline, PipelineDeleter> _resolvedIntrospectionPipeline;
 
+    // Holds 'let' variables defined in $lookup stage. 'let' variables are stored in the vector in
+    // order to ensure the stability in the query shape serialization.
     std::vector<LetVariable> _letVariables;
 
     boost::intrusive_ptr<DocumentSourceMatch> _matchSrc;

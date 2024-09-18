@@ -16,10 +16,6 @@ selector:
     # queries.
     - jstests/core/query/find_with_resume_after_param.js
 
-    # TODO SERVER-93622: Stabilise query shape hash for aggregate merge commands with let variables.
-    - jstests/aggregation/sources/merge/*.js
-    - jstests/core/query/command_let_variables_merge_only.js
-
     # Test which overcomes the imposed 16Mb query settings limit making the 'setQuerySettings' command fail.
     - jstests/aggregation/query_limits_test.js
 

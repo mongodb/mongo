@@ -165,13 +165,13 @@ private:
         // difference at the end-point (in the PipelineExecutor), as in both cases we will end up
         // with the update pipeline ExpressionContext not being populated with any variables, so we
         // are not making a distinction between these two cases here.
-        if (!_letVariables || _letVariables->empty()) {
+        if (_letVariables.empty()) {
             return boost::none;
         }
 
         BSONObjBuilder bob;
-        for (auto&& [name, expr] : *_letVariables) {
-            bob << name << expr->evaluate(doc, &_expCtx->variables);
+        for (const auto& letVar : _letVariables) {
+            bob << letVar.name << letVar.expression->evaluate(doc, &_expCtx->variables);
         }
         return bob.obj();
     }
@@ -186,12 +186,12 @@ private:
     // descriptor.
     const MergeStrategyDescriptor& _descriptor;
 
-    // Holds 'let' variables defined in this stage. These variables are propagated to the
-    // ExpressionContext of the pipeline update for use in the inner pipeline execution. The key
-    // of the map is a variable name as defined in the $merge spec 'let' argument, and the value is
-    // a parsed Expression, defining how the variable value must be evaluated.
-    boost::optional<stdx::unordered_map<std::string, boost::intrusive_ptr<Expression>>>
-        _letVariables;
+    // Holds 'let' variables defined in $merge stage. These variables are propagated to the
+    // ExpressionContext of the pipeline update for use in the inner pipeline execution.
+    //
+    // 'let' variables are stored in the vector in order to ensure the stability in the query shape
+    // serialization.
+    std::vector<LetVariable> _letVariables;
 
     // A custom pipeline to compute a new version of merging documents.
     boost::optional<std::vector<BSONObj>> _pipeline;

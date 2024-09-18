@@ -47,6 +47,7 @@
 #include "mongo/db/pipeline/expression_context_for_test.h"
 #include "mongo/db/pipeline/process_interface/stub_mongo_process_interface.h"
 #include "mongo/db/pipeline/serverless_aggregation_context_fixture.h"
+#include "mongo/db/query/query_shape/serialization_options.h"
 #include "mongo/db/tenant_id.h"
 #include "mongo/idl/server_parameter_test_util.h"
 #include "mongo/unittest/assert.h"
@@ -885,11 +886,87 @@ TEST_F(DocumentSourceMergeTest, SerializeEmptyLetVariables) {
         auto mergeStage = createMergeStage(spec);
         ASSERT(mergeStage);
         auto serialized = mergeStage->serialize().getDocument();
-        ASSERT_VALUE_EQ(serialized["$merge"]["let"],
-                        (whenNotMatched == "insert"_sd ? Value(BSON("new"
-                                                                    << "$$ROOT"))
-                                                       : Value(BSONObj())));
+
+        if (whenNotMatched == "insert"_sd) {
+            ASSERT_VALUE_EQ(serialized["$merge"]["let"],
+                            Value(BSON("new"
+                                       << "$$ROOT")));
+        } else {
+            ASSERT_TRUE(serialized["$merge"]["let"].missing());
+        }
         ASSERT_VALUE_EQ(serialized["$merge"]["whenMatched"], Value(pipeline));
+    }
+}
+
+TEST_F(DocumentSourceMergeTest, SerializeTargetCollectionVersion) {
+    auto pipeline = BSON_ARRAY(fromjson("{$project: {_id: true, x: '$$new'}}"));
+    auto spec =
+        BSON("$merge" << BSON("into"
+                              << "target_collection"
+                              << "whenMatched"
+                              << "merge"
+                              << "whenNotMatched"
+                              << "insert"
+                              << "targetCollectionVersion"
+                              << BSON("e" << OID() << "t" << Timestamp() << "v" << Timestamp())));
+    auto mergeStage = createMergeStage(spec);
+    ASSERT(mergeStage);
+    ASSERT_TRUE(mergeStage->getMergeProcessor()->getCollectionPlacementVersion().has_value());
+
+    // Ensure that 'targetCollectionVersion' attribute is not present in case of non-default literal
+    // policy.
+    {
+        SerializationOptions opts;
+        opts.literalPolicy = LiteralSerializationPolicy::kToRepresentativeParseableValue;
+        auto serialized = mergeStage->serialize(opts).getDocument();
+        ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
+            R"({
+            "$merge": {
+                "into": {
+                    "db": "unittests",
+                    "coll": "target_collection"
+                },
+                "on": "_id",
+                "whenMatched": "merge",
+                "whenNotMatched": "insert"
+            }
+        })",
+            serialized.toBson());
+    }
+
+    // Ensure that 'targetCollectionVersion' attribute is present in case of default literal policy.
+    {
+        auto serialized = mergeStage->serialize().getDocument();
+        ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
+            R"({
+            "$merge": {
+                "into": {
+                    "db": "unittests",
+                    "coll": "target_collection"
+                },
+                "on": "_id",
+                "whenMatched": "merge",
+                "whenNotMatched": "insert",
+                "targetCollectionVersion": {
+                    "e": {
+                        "$oid": "000000000000000000000000"
+                    },
+                    "t": {
+                        "$timestamp": {
+                            "t": 0,
+                            "i": 0
+                        }
+                    },
+                    "v": {
+                        "$timestamp": {
+                            "t": 0,
+                            "i": 0
+                        }
+                    }
+                }
+            }
+        })",
+            serialized.toBson());
     }
 }
 

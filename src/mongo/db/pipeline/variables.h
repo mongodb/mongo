@@ -54,6 +54,7 @@
 #include "mongo/util/string_map.h"
 
 namespace mongo {
+class Expression;
 class ExpressionContext;
 class VariablesParseState;
 
@@ -261,6 +262,21 @@ private:
 
     IdGenerator _idGenerator;
     stdx::unordered_map<Id, ValueAndState> _definitions;
+};
+
+/**
+ * This class represents the let variable that is defined under 'let' attribute in aggregation
+ * stages such as $lookup and $merge.
+ *
+ * 'let' attribute may store multiple let variables and these variables have to be stored in an
+ * order preserving container in order to guarantee the stability in the query shape serialization..
+ */
+struct LetVariable {
+    LetVariable(std::string name, boost::intrusive_ptr<Expression> expression, Variables::Id id);
+
+    std::string name;
+    boost::intrusive_ptr<Expression> expression;
+    Variables::Id id;
 };
 
 /**
