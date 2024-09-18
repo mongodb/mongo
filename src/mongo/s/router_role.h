@@ -103,7 +103,8 @@ private:
 class CollectionRouterCommon : public RouterBase {
 protected:
     CollectionRouterCommon(ServiceContext* service,
-                           const std::vector<NamespaceString>& routingNamespaces);
+                           const std::vector<NamespaceString>& routingNamespaces,
+                           bool retryOnStaleShard);
 
     static void appendCRUDRoutingTokenToCommand(const ShardId& shardId,
                                                 const CollectionRoutingInfo& cri,
@@ -113,6 +114,17 @@ protected:
     CollectionRoutingInfo _getRoutingInfo(OperationContext* opCtx, const NamespaceString& nss);
 
     const std::vector<NamespaceString> _targetedNamespaces;
+
+    // TODO: SERVER-77402: Remove this.
+    // Controls whether this loop will retry when a StaleDatabaseVersion/StaleShardVersion
+    // indicates that the shard (rather than the router) was stale. When 'true', RouterLoop will
+    // retry; when 'false', the exception will be rethrown verbatim.
+    // It only makes sense to retry when the enclosed RouterRole operation results in a shardRole
+    // invocation that ensures that the shard will refresh its metadata in case it was stale. This
+    // is the case for remote command execution, where the shard's ServiceEntryPoint ensures that.
+    // This flag must be set to false for operations that re-enter into the ShardRole without a
+    // ShardRole refresh loop.
+    const bool _retryOnStaleShard{true};
 };
 
 /**
@@ -121,7 +133,7 @@ protected:
  */
 class CollectionRouter : public CollectionRouterCommon {
 public:
-    CollectionRouter(ServiceContext* service, NamespaceString nss);
+    CollectionRouter(ServiceContext* service, NamespaceString nss, bool retryOnStaleShard = true);
 
     template <typename F>
     auto route(OperationContext* opCtx, StringData comment, F&& callbackFn) {
@@ -139,7 +151,9 @@ public:
 
 class MultiCollectionRouter : public CollectionRouterCommon {
 public:
-    MultiCollectionRouter(ServiceContext* service, const std::vector<NamespaceString>& nssList);
+    MultiCollectionRouter(ServiceContext* service,
+                          const std::vector<NamespaceString>& nssList,
+                          bool retryOnStaleShard = true);
 
     /**
      * Member function which discerns whether any of the namespaces in 'routingNamespaces' are not

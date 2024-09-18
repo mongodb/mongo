@@ -7,8 +7,6 @@
  * returned.
  *
  * @tags: [
- *     # These view reads are flaky in suites that enable transactions.
- *     does_not_support_transactions,
  *     # Overflows WT cache on in-memory variants.
  *     requires_persistence,
  * ]

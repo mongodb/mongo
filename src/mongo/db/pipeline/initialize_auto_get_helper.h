@@ -98,13 +98,19 @@ bool intializeAutoGet(OperationContext* opCtx,
             }
         }
 
-        sharding::router::MultiCollectionRouter multiCollectionRouter(opCtx->getServiceContext(),
-                                                                      secondaryExecNssListJustNss);
+        sharding::router::MultiCollectionRouter multiCollectionRouter(
+            opCtx->getServiceContext(),
+            secondaryExecNssListJustNss,
+            false  // retryOnStaleShard=false
+        );
         multiCollectionRouter.route(
             opCtx,
             "initializeAutoGet",
             [&](OperationContext* opCtx,
                 const stdx::unordered_map<NamespaceString, CollectionRoutingInfo>& criMap) {
+                // TODO: SERVER-77402 Use a ShardRoleLoop here and remove this usage of
+                // CollectionRouter's retryOnStaleShard=false.
+
                 // Figure out if all of 'secondaryExecNssListJustNss' are local. This is useful
                 // because we can pushdown $lookup to SBE if:
                 // - All secondary collections are tracked and local to this shard.

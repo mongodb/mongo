@@ -267,6 +267,8 @@ last-continuous:
       ticket: SERVER-69418
     - test_file: jstests/core/ddl/create_indexes.js
       ticket: SERVER-90952
+    - test_file: jstests/sharding/nested_shard_role_within_router_role_recovery_in_txn.js
+      ticket: SERVER-94502
     - test_file: jstests/aggregation/bugs/server94212.js
       ticket: SERVER-94212
     - test_file: jstests/sharding/refresh_sessions.js
@@ -566,6 +568,8 @@ last-lts:
       ticket: SERVER-69418
     - test_file: jstests/core/ddl/create_indexes.js
       ticket: SERVER-90952
+    - test_file: jstests/sharding/nested_shard_role_within_router_role_recovery_in_txn.js
+      ticket: SERVER-94502
     - test_file: jstests/aggregation/bugs/server94212.js
       ticket: SERVER-94212
     - test_file: jstests/sharding/refresh_sessions.js
