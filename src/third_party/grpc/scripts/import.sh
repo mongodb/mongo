@@ -16,10 +16,9 @@ if [[ -d $DEST_DIR/dist ]]; then
     exit 1
 fi
 
-git clone --branch $REVISION git@github.com:mongodb-forks/grpc.git $DEST_DIR/dist
+git clone --branch $REVISION https://github.com/mongodb-forks/grpc.git $DEST_DIR/dist
 pushd $DEST_DIR/dist
 find . -mindepth 1 -maxdepth 1 -name ".*" -exec rm -rf {} \;
-rm -rf bazel
 rm -rf cmake
 rm -rf doc
 rm -rf summerofcode
@@ -40,7 +39,6 @@ rm -rf src/php
 rm -rf src/python
 rm -rf src/ruby
 
-find . -type f -name "*.BUILD" -exec rm -rf {} \;
 find . -type f -name "*.podspec" -exec rm -rf {} \;
 find . -type f -name "*.gemspec" -exec rm -rf {} \;
 popd

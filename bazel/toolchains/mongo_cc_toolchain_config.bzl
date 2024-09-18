@@ -389,12 +389,12 @@ def _impl(ctx):
 
     supports_pic_feature = feature(
         name = "supports_pic",
-        enabled = False,
+        enabled = True,
     )
 
     pic_feature = feature(
         name = "pic",
-        enabled = False,
+        enabled = True,
         flag_sets = [
             flag_set(
                 actions = [
@@ -603,6 +603,42 @@ def _impl(ctx):
         ],
     )
 
+    # Warn when hiding a virtual function.
+    overloaded_virtual_warning_feature = feature(
+        name = "overloaded_virtual_warning",
+        enabled = False,
+        flag_sets = [
+            flag_set(
+                actions = all_cpp_compile_actions,
+                flag_groups = [flag_group(flags = ["-Woverloaded-virtual"])],
+            ),
+        ],
+    )
+
+    # Warn when hiding a virtual function.
+    no_overloaded_virtual_warning_feature = feature(
+        name = "no_overloaded_virtual_warning",
+        enabled = False,
+        flag_sets = [
+            flag_set(
+                actions = all_cpp_compile_actions,
+                flag_groups = [flag_group(flags = ["-Wno-overloaded-virtual"])],
+            ),
+        ],
+    )
+
+    # Warn about moves of prvalues, which can inhibit copy elision.
+    pessimizing_move_warning_feature = feature(
+        name = "pessimizing_move_warning",
+        enabled = True,
+        flag_sets = [
+            flag_set(
+                actions = all_cpp_compile_actions,
+                flag_groups = [flag_group(flags = ["-Wpessimizing-move"])],
+            ),
+        ],
+    )
+
     features = [
         bin_dirs_feature,
         default_compile_flags_feature,
@@ -636,6 +672,9 @@ def _impl(ctx):
         no_deprecated_enum_enum_conversion_feature,
         no_volatile_feature,
         fsized_deallocation_feature,
+        overloaded_virtual_warning_feature,
+        no_overloaded_virtual_warning_feature,
+        pessimizing_move_warning_feature,
     ]
 
     return [

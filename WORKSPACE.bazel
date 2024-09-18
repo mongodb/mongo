@@ -93,21 +93,6 @@ load("@hedron_compile_commands//:workspace_setup_transitive_transitive_transitiv
 hedron_compile_commands_setup_transitive_transitive_transitive()
 
 http_archive(
-    name = "rules_python",
-    sha256 = "be04b635c7be4604be1ef20542e9870af3c49778ce841ee2d92fcb42f9d9516a",
-    strip_prefix = "rules_python-0.35.0",
-    urls = [
-        # Implements retry by relisting each url multiple times to be used as a failover.
-        # TODO(SERVER-86719): Re-implement http_archive to allow sleeping between retries
-        "https://github.com/bazelbuild/rules_python/archive/refs/tags/0.35.0.tar.gz",
-        "https://github.com/bazelbuild/rules_python/archive/refs/tags/0.35.0.tar.gz",
-        "https://github.com/bazelbuild/rules_python/archive/refs/tags/0.35.0.tar.gz",
-        "https://github.com/bazelbuild/rules_python/archive/refs/tags/0.35.0.tar.gz",
-        "https://github.com/bazelbuild/rules_python/archive/refs/tags/0.35.0.tar.gz",
-    ],
-)
-
-http_archive(
     name = "platforms",
     sha256 = "8150406605389ececb6da07cbcb509d5637a3ab9a24bc69b1101531367d89d74",
     urls = [
@@ -211,3 +196,55 @@ npm_translate_lock(
 load("@npm//:repositories.bzl", "npm_repositories")
 
 npm_repositories()
+
+# Sub in the system openssl for boringssl since we don't want two implementations of
+# ssl in the same address space.
+new_local_repository(
+    name = "boringssl",
+    build_file_content = """
+cc_library(
+  name = "crypto",
+  linkopts = ["-lcrypto"],
+  visibility = ["//visibility:public"],
+)
+cc_library(
+  name = "ssl",
+  linkopts = ["-lssl"],
+  visibility = ["//visibility:public"],
+)
+""",
+    path = "bazel/_openssl_placeholder_for_grpc",
+)
+
+# Overloads for the vendored repositories.
+#
+# WARNING: Don't change the order of the deps() calls and local_repositories.
+#          They're read linearly dependencies that come first override later
+#          ones. Dependency updates might change the correct order, though it's
+#          unlikely. This is obviously a temporary solution and will no longer
+#          be necessary once migration to bzlmod is complete.
+
+# Note: rules_python is implicitly loaded with a grpc-compatible version.
+
+local_repository(
+    name = "com_google_absl",
+    path = "src/third_party/abseil-cpp/dist",
+)
+
+local_repository(
+    name = "com_google_protobuf",
+    path = "src/third_party/protobuf/dist",
+)
+
+local_repository(
+    name = "com_github_grpc_grpc",
+    path = "src/third_party/grpc/dist",
+)
+
+load("@com_github_grpc_grpc//bazel:grpc_deps.bzl", "grpc_deps")
+
+grpc_deps()
+
+load("@com_github_grpc_grpc//bazel:grpc_extra_deps.bzl", "grpc_extra_deps")
+
+grpc_extra_deps()

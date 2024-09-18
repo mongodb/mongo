@@ -16,7 +16,7 @@ if [[ -d $DEST_DIR/dist ]]; then
     exit 1
 fi
 
-git clone --branch $REVISION git@github.com:mongodb-forks/protobuf.git $DEST_DIR/dist
+git clone --branch $REVISION https://github.com/mongodb-forks/protobuf.git $DEST_DIR/dist
 pushd $DEST_DIR/dist
 rm -rf benchmarks
 rm -rf cmake

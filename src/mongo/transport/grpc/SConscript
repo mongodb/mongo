@@ -33,7 +33,8 @@ env.Library(
         "$BUILD_DIR/mongo/util/options_parser/options_parser",
     ],
     LIBDEPS=[
-        "$BUILD_DIR/third_party/shim_grpc",
+        "$BUILD_DIR/third_party/grpc/grpc++_reflection",
+        "$BUILD_DIR/third_party/protobuf/protobuf",
     ],
 )
 
@@ -61,7 +62,8 @@ env.Library(
         "$BUILD_DIR/mongo/base",
         "$BUILD_DIR/mongo/db/service_context",
         "$BUILD_DIR/mongo/rpc/client_metadata",
-        "$BUILD_DIR/third_party/shim_grpc",
+        "$BUILD_DIR/third_party/grpc/grpc++_reflection",
+        "$BUILD_DIR/third_party/protobuf/protobuf",
         "grpc_transport_layer",
     ],
 )
@@ -89,7 +91,8 @@ env.CppUnitTest(
         "$BUILD_DIR/mongo/transport/service_executor",
         "$BUILD_DIR/mongo/util/clock_source_mock",
         "$BUILD_DIR/mongo/util/periodic_runner_factory",
-        "$BUILD_DIR/third_party/shim_grpc",
+        "$BUILD_DIR/third_party/grpc/grpc++_reflection",
+        "$BUILD_DIR/third_party/protobuf/protobuf",
         "grpc_transport_layer",
         "grpc_transport_mock",
     ],
@@ -112,6 +115,7 @@ protoEnv.AppendUnique(
 protoEnv.Append(
     CPPPATH=[
         "$BUILD_DIR/third_party/protobuf/dist/src",
+        "#/bazel-bin",
     ]
 )
 
@@ -119,10 +123,11 @@ protoEnv.CppUnitTest(
     target="grpc_core_test",
     source=[
         "core_test.cpp",
-        "core_test.proto",
     ],
     LIBDEPS=[
         "$BUILD_DIR/mongo/base",
-        "$BUILD_DIR/third_party/shim_grpc",
+        "$BUILD_DIR/third_party/grpc/grpc++_reflection",
+        "$BUILD_DIR/third_party/protobuf/protobuf",
+        "core_test_grpc_proto",
     ],
 )

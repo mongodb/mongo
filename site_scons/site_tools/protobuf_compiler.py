@@ -119,8 +119,6 @@ def protoc_emitter(target, source, env):
 
         new_targets += [env.File(f"{base_file_name}{ext}") for ext in exts]
 
-    env.Alias("generated-sources", new_targets)
-
     return new_targets, source
 
 

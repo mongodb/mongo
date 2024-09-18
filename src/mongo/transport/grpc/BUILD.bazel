@@ -1,4 +1,4 @@
-load("//bazel:mongo_src_rules.bzl", "idl_generator", "mongo_cc_library")
+load("//bazel:mongo_src_rules.bzl", "idl_generator", "mongo_cc_grpc_library", "mongo_cc_library", "mongo_cc_proto_library", "mongo_proto_library")
 
 package(default_visibility = ["//visibility:public"])
 
@@ -8,6 +8,11 @@ exports_files(
         "*.cpp",
     ]),
 )
+
+GRPC_TARGET_COMPATIBLE_WITH = select({
+    "//bazel/config:build_grpc_enabled": [],
+    "//conditions:default": ["@platforms//:incompatible"],
+})
 
 idl_generator(
     name = "grpc_feature_flag_gen",
@@ -20,4 +25,26 @@ idl_generator(
 idl_generator(
     name = "grpc_parameters_gen",
     src = "grpc_parameters.idl",
+)
+
+mongo_proto_library(
+    name = "core_test_proto",
+    srcs = [
+        "core_test.proto",
+    ],
+    target_compatible_with = GRPC_TARGET_COMPATIBLE_WITH,
+)
+
+mongo_cc_proto_library(
+    name = "core_test_cc_proto",
+    target_compatible_with = GRPC_TARGET_COMPATIBLE_WITH,
+    deps = [":core_test_proto"],
+)
+
+mongo_cc_grpc_library(
+    name = "core_test_grpc_proto",
+    srcs = [":core_test_proto"],
+    cc_proto = ":core_test_cc_proto",
+    generate_mocks = True,
+    target_compatible_with = GRPC_TARGET_COMPATIBLE_WITH,
 )
