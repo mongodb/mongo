@@ -52,7 +52,7 @@ err:
         last_release = false;
         __wt_blkcache_release_handle(session, block, &last_release);
         if (last_release && __wt_block_eligible_for_sweep(bm, block))
-            WT_TRET(__wt_blkcache_sweep_handles(session, bm));
+            WT_TRET(__wt_bm_sweep_handles(session, bm));
     }
 
     return (ret);
