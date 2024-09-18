@@ -158,10 +158,12 @@ public:
      */
     static std::string redact(StringData url);
 
-    DBClientBase* connect(StringData applicationName,
-                          std::string& errmsg,
-                          boost::optional<double> socketTimeoutSecs = boost::none,
-                          const ClientAPIVersionParameters* apiParameters = nullptr) const;
+    DBClientBase* connect(
+        StringData applicationName,
+        std::string& errmsg,
+        boost::optional<double> socketTimeoutSecs = boost::none,
+        const ClientAPIVersionParameters* apiParameters = nullptr,
+        const boost::optional<TransientSSLParams>& transientSSLParams = boost::none) const;
 
     const std::string& getUser() const {
         return _user;

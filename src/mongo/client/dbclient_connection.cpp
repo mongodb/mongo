@@ -109,7 +109,7 @@ StatusWith<std::shared_ptr<transport::Session>> DBClientConnection::_makeSession
     const HostAndPort& host,
     transport::ConnectSSLMode sslMode,
     Milliseconds timeout,
-    boost::optional<TransientSSLParams> transientSSLParams) {
+    const boost::optional<TransientSSLParams>& transientSSLParams) {
     auto swSession =
         getGlobalServiceContext()->getTransportLayerManager()->getEgressLayer()->connect(
             host,

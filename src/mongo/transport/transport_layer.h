@@ -101,7 +101,7 @@ public:
         HostAndPort peer,
         ConnectSSLMode sslMode,
         Milliseconds timeout,
-        boost::optional<TransientSSLParams> transientSSLParams = boost::none) = 0;
+        const boost::optional<TransientSSLParams>& transientSSLParams = boost::none) = 0;
 
     virtual Future<std::shared_ptr<Session>> asyncConnect(
         HostAndPort peer,
