@@ -134,3 +134,6 @@ patch_aliases:
     description: "Run tests and report code coverage"
     variant: ".*-coverage"
     task: ".*"
+  - alias: cluster_scalability
+    variant_tags: ["cluster_scalability_only"]
+    task_tags: ["cluster_scalability_only"]

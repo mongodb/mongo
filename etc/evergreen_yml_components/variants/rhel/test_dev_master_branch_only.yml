@@ -652,12 +652,12 @@ buildvariants:
       - name: .auth !.suggested_excluding_required__for_devprod_mitigation_only
       - name: .causally_consistent !.sharding
       - name: .change_streams
-      - name: .concurrency !.large !.no_txns !.compute_mode !.feature_flag_guarded
-      - name: .concurrency .large !.no_txns !.compute_mode !.feature_flag_guarded
+      - name: .concurrency !.large !.cluster_scalability_only !.no_txns !.compute_mode !.feature_flag_guarded
+      - name: .concurrency .large !.no_txns !.cluster_scalability_only !.compute_mode !.feature_flag_guarded
         distros:
           - rhel8.8-medium
       - name: .encrypt
-      - name: .jscore .common !jsCore !.sbe_only
+      - name: .jscore .common !.cluster_scalability_only !jsCore !.sbe_only
       - name: .misc_js
       - name: .multi_shard
       - name: query_golden_classic
@@ -671,9 +671,9 @@ buildvariants:
       - name: .replica_sets !.encrypt !.auth
         distros:
           - rhel8.8-xlarge
-      - name: .sharding .common !.feature_flag_guarded !.jstestfuzz
-      - name: .sharding .jscore !.wo_snapshot !.multi_stmt !.feature_flag_guarded
-      - name: .sharding .txns
+      - name: .sharding .common !.cluster_scalability_only !.feature_flag_guarded !.jstestfuzz
+      - name: .sharding .jscore !.cluster_scalability_only !.wo_snapshot !.multi_stmt !.feature_flag_guarded
+      - name: .sharding .txns !.cluster_scalability_only
       - name: aggregation_repeat_queries_multiplan_single_solutions
       - name: audit
       - name: burn_in_tests_gen

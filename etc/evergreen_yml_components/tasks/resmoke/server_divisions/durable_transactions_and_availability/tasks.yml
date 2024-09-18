@@ -315,6 +315,8 @@ tasks:
         "default",
         "replica_set_endpoint",
         "requires_all_feature_flags",
+        "cluster_scalability_only",
+        "suggested_excluding_required__for_devprod_mitigation_only",
       ]
     commands:
       - func: "generate resmoke tasks"
@@ -349,6 +351,8 @@ tasks:
         "default",
         "replica_set_endpoint",
         "requires_all_feature_flags",
+        "cluster_scalability_only",
+        "suggested_excluding_required__for_devprod_mitigation_only",
       ]
     commands:
       - func: "generate resmoke tasks"
@@ -1187,6 +1191,8 @@ tasks:
         "default",
         "replica_set_endpoint",
         "requires_all_feature_flags",
+        "cluster_scalability_only",
+        "suggested_excluding_required__for_devprod_mitigation_only",
       ]
     commands:
       - func: "generate resmoke tasks"

@@ -1753,6 +1753,8 @@ tasks:
         "incompatible_mac",
         "sharding",
         "jscore",
+        "cluster_scalability_only",
+        "suggested_excluding_required__for_devprod_mitigation_only",
       ]
     commands:
       - func: "generate resmoke tasks"
@@ -1893,6 +1895,8 @@ tasks:
         "incompatible_mac",
         "sharding",
         "common",
+        "cluster_scalability_only",
+        "suggested_excluding_required__for_devprod_mitigation_only",
       ]
     commands:
       - func: "generate resmoke tasks"
@@ -2005,6 +2009,8 @@ tasks:
         "sharding",
         "jscore",
         "common",
+        "cluster_scalability_only",
+        "suggested_excluding_required__for_devprod_mitigation_only",
       ]
     commands:
       - func: "generate resmoke tasks"
@@ -2017,6 +2023,8 @@ tasks:
         "default",
         "replica_set_endpoint",
         "requires_all_feature_flags",
+        "cluster_scalability_only",
+        "suggested_excluding_required__for_devprod_mitigation_only",
       ]
     commands:
       - func: "generate resmoke tasks"
@@ -2366,6 +2374,8 @@ tasks:
         "read_concern_maj",
         "large",
         "sharded",
+        "cluster_scalability_only",
+        "suggested_excluding_required__for_devprod_mitigation_only",
       ]
     commands:
       - func: "generate resmoke tasks"
@@ -2401,6 +2411,8 @@ tasks:
         "read_concern_maj",
         "large",
         "sharded",
+        "cluster_scalability_only",
+        "suggested_excluding_required__for_devprod_mitigation_only",
       ]
     commands:
       - func: "generate resmoke tasks"
