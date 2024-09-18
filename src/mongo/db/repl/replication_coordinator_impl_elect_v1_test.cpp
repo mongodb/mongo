@@ -31,14 +31,10 @@
 #include <boost/none.hpp>
 #include <boost/optional/optional.hpp>
 #include <functional>
-#include <list>
 #include <memory>
-#include <ratio>
 #include <string>
-#include <vector>
 
 #include "mongo/base/error_codes.h"
-#include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
@@ -54,8 +50,6 @@
 #include "mongo/db/repl/hello_response.h"
 #include "mongo/db/repl/last_vote.h"
 #include "mongo/db/repl/member_config.h"
-#include "mongo/db/repl/member_data.h"
-#include "mongo/db/repl/member_id.h"
 #include "mongo/db/repl/member_state.h"
 #include "mongo/db/repl/optime.h"
 #include "mongo/db/repl/repl_set_config.h"
@@ -83,7 +77,6 @@
 #include "mongo/logv2/log_attr.h"
 #include "mongo/logv2/log_component.h"
 #include "mongo/logv2/log_severity.h"
-#include "mongo/rpc/topology_version_gen.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/unittest/assert.h"
 #include "mongo/unittest/bson_test_util.h"
@@ -160,6 +153,25 @@ protected:
     std::unique_ptr<MockNetwork> _mock;
 };
 
+BSONObj generateConfigObj(int numNodes, int version, boost::optional<BSONObj> settings) {
+    BSONObjBuilder configObjB;
+    configObjB.append(BSON("_id"
+                           << "mySet")
+                          .getField("_id"));
+    configObjB.append(BSON("version" << version).getField("version"));
+    configObjB.append(BSON("protocolVersion" << 1).getField("protocolVersion"));
+    BSONArrayBuilder arrayBuilder(configObjB.subarrayStart("members"));
+    for (int i = 1; i <= numNodes; ++i) {
+        arrayBuilder.append(BSON("_id" << i << "host"
+                                       << "node" + std::to_string(i) + ":12345"));
+    }
+    arrayBuilder.done();
+    if (settings) {
+        configObjB.append(BSON("settings" << settings.get()).getField("settings"));
+    }
+    return configObjB.obj();
+}
+
 TEST(LastVote, LastVoteAcceptsUnknownField) {
     auto lastVoteBSON =
         BSON("candidateIndex" << 1 << "term" << 2 << "_id" << 3 << "unknownField" << 1);
@@ -169,15 +181,7 @@ TEST(LastVote, LastVoteAcceptsUnknownField) {
 }
 
 TEST_F(ReplCoordTest, RandomizedElectionOffsetWithinProperBounds) {
-    BSONObj configObj = BSON("_id"
-                             << "mySet"
-                             << "version" << 1 << "protocolVersion" << 1 << "members"
-                             << BSON_ARRAY(BSON("_id" << 1 << "host"
-                                                      << "node1:12345")
-                                           << BSON("_id" << 2 << "host"
-                                                         << "node2:12345")
-                                           << BSON("_id" << 3 << "host"
-                                                         << "node3:12345")));
+    auto configObj = generateConfigObj(3, 1, boost::none);
     assertStartSuccess(configObj, HostAndPort("node1", 12345));
     ReplSetConfig config = assertMakeRSConfig(configObj);
 
@@ -196,17 +200,7 @@ TEST_F(ReplCoordTest, RandomizedElectionOffsetWithinProperBounds) {
 }
 
 TEST_F(ReplCoordTest, RandomizedElectionOffsetAvoidsDivideByZero) {
-    BSONObj configObj = BSON("_id"
-                             << "mySet"
-                             << "version" << 1 << "members"
-                             << BSON_ARRAY(BSON("_id" << 1 << "host"
-                                                      << "node1:12345")
-                                           << BSON("_id" << 2 << "host"
-                                                         << "node2:12345")
-                                           << BSON("_id" << 3 << "host"
-                                                         << "node3:12345"))
-                             << "protocolVersion" << 1 << "settings"
-                             << BSON("electionTimeoutMillis" << 1));
+    auto configObj = generateConfigObj(3, 1, BSON("electionTimeoutMillis" << 1));
     assertStartSuccess(configObj, HostAndPort("node1", 12345));
 
     // Make sure that an election timeout of 1ms doesn't make the random number
@@ -287,15 +281,7 @@ TEST_F(ReplCoordTest, ElectionSucceedsWhenNodeIsTheOnlyElectableNode) {
 }
 
 TEST_F(ReplCoordTest, StartElectionDoesNotStartAnElectionWhenNodeIsRecovering) {
-    assertStartSuccess(BSON("_id"
-                            << "mySet"
-                            << "version" << 1 << "members"
-                            << BSON_ARRAY(BSON("_id" << 1 << "host"
-                                                     << "node1:12345")
-                                          << BSON("_id" << 2 << "host"
-                                                        << "node2:12345"))
-                            << "protocolVersion" << 1),
-                       HostAndPort("node1", 12345));
+    assertStartSuccess(generateConfigObj(2, 1, boost::none), HostAndPort("node1", 12345));
 
     ASSERT_OK(getReplCoord()->setFollowerMode(MemberState::RS_RECOVERING));
 
@@ -313,13 +299,7 @@ TEST_F(ReplCoordTest, StartElectionDoesNotStartAnElectionWhenNodeIsRecovering) {
 TEST_F(ReplCoordTest, ElectionSucceedsWhenNodeIsTheOnlyNode) {
     RAIIServerParameterControllerForTest controller("featureFlagReduceMajorityWriteLatency", true);
     startCapturingLogMessages();
-    assertStartSuccess(BSON("_id"
-                            << "mySet"
-                            << "version" << 1 << "members"
-                            << BSON_ARRAY(BSON("_id" << 1 << "host"
-                                                     << "node1:12345"))
-                            << "protocolVersion" << 1),
-                       HostAndPort("node1", 12345));
+    assertStartSuccess(generateConfigObj(1, 1, boost::none), HostAndPort("node1", 12345));
 
     replCoordSetMyLastWrittenAndAppliedAndDurableOpTime(OpTime(Timestamp(10, 1), 0),
                                                         Date_t() + Seconds(10));
@@ -361,16 +341,7 @@ TEST_F(ReplCoordTest, ElectionSucceedsWhenNodeIsTheOnlyNode) {
 }
 
 TEST_F(ReplCoordTest, ElectionSucceedsWhenAllNodesVoteYea) {
-    BSONObj configObj = BSON("_id"
-                             << "mySet"
-                             << "version" << 1 << "members"
-                             << BSON_ARRAY(BSON("_id" << 1 << "host"
-                                                      << "node1:12345")
-                                           << BSON("_id" << 2 << "host"
-                                                         << "node2:12345")
-                                           << BSON("_id" << 3 << "host"
-                                                         << "node3:12345"))
-                             << "protocolVersion" << 1);
+    auto configObj = generateConfigObj(3, 1, boost::none);
     assertStartSuccess(configObj, HostAndPort("node1", 12345));
 
     replCoordSetMyLastWrittenAndAppliedAndDurableOpTime(OpTime(Timestamp(100, 1), 0),
@@ -410,24 +381,7 @@ TEST_F(ReplCoordTest, ElectionSucceedsWhenAllNodesVoteYea) {
 }
 
 TEST_F(ReplCoordTest, ElectionSucceedsWhenMaxSevenNodesVoteYea) {
-    BSONObj configObj = BSON("_id"
-                             << "mySet"
-                             << "version" << 1 << "members"
-                             << BSON_ARRAY(BSON("_id" << 1 << "host"
-                                                      << "node1:12345")
-                                           << BSON("_id" << 2 << "host"
-                                                         << "node2:12345")
-                                           << BSON("_id" << 3 << "host"
-                                                         << "node3:12345")
-                                           << BSON("_id" << 4 << "host"
-                                                         << "node4:12345")
-                                           << BSON("_id" << 5 << "host"
-                                                         << "node5:12345")
-                                           << BSON("_id" << 6 << "host"
-                                                         << "node6:12345")
-                                           << BSON("_id" << 7 << "host"
-                                                         << "node7:12345"))
-                             << "protocolVersion" << 1);
+    auto configObj = generateConfigObj(7, 1, boost::none);
     assertStartSuccess(configObj, HostAndPort("node1", 12345));
     replCoordSetMyLastWrittenAndAppliedAndDurableOpTime(OpTime(Timestamp(100, 1), 0),
                                                         Date_t() + Seconds(100));
@@ -537,16 +491,7 @@ TEST_F(ReplCoordMockTest,
 
 TEST_F(ReplCoordTest, ElectionFailsWhenInsufficientVotesAreReceivedDuringDryRun) {
     startCapturingLogMessages();
-    BSONObj configObj = BSON("_id"
-                             << "mySet"
-                             << "version" << 1 << "members"
-                             << BSON_ARRAY(BSON("_id" << 1 << "host"
-                                                      << "node1:12345")
-                                           << BSON("_id" << 2 << "host"
-                                                         << "node2:12345")
-                                           << BSON("_id" << 3 << "host"
-                                                         << "node3:12345"))
-                             << "protocolVersion" << 1);
+    auto configObj = generateConfigObj(3, 1, boost::none);
     assertStartSuccess(configObj, HostAndPort("node1", 12345));
     ReplSetConfig config = assertMakeRSConfig(configObj);
 
@@ -613,16 +558,7 @@ TEST_F(ReplCoordTest, ElectionFailsWhenInsufficientVotesAreReceivedDuringDryRun)
 
 TEST_F(ReplCoordTest, ElectionFailsWhenDryRunResponseContainsANewerTerm) {
     startCapturingLogMessages();
-    BSONObj configObj = BSON("_id"
-                             << "mySet"
-                             << "version" << 1 << "members"
-                             << BSON_ARRAY(BSON("_id" << 1 << "host"
-                                                      << "node1:12345")
-                                           << BSON("_id" << 2 << "host"
-                                                         << "node2:12345")
-                                           << BSON("_id" << 3 << "host"
-                                                         << "node3:12345"))
-                             << "protocolVersion" << 1);
+    auto configObj = generateConfigObj(3, 1, boost::none);
     assertStartSuccess(configObj, HostAndPort("node1", 12345));
     ReplSetConfig config = assertMakeRSConfig(configObj);
 
@@ -676,14 +612,7 @@ TEST_F(ReplCoordTest, ElectionFailsWhenDryRunResponseContainsANewerTerm) {
 }
 
 TEST_F(ReplCoordTest, ElectionParticipantMetricsAreCollected) {
-    BSONObj configObj = BSON("_id"
-                             << "mySet"
-                             << "version" << 1 << "members"
-                             << BSON_ARRAY(BSON("_id" << 1 << "host"
-                                                      << "node1:12345")
-                                           << BSON("_id" << 2 << "host"
-                                                         << "node2:12345"))
-                             << "protocolVersion" << 1);
+    auto configObj = generateConfigObj(2, 1, boost::none);
     assertStartSuccess(configObj, HostAndPort("node1", 12345));
     OpTime lastOplogEntry = OpTime(Timestamp(999, 0), 1);
 
@@ -727,21 +656,7 @@ TEST_F(ReplCoordTest, ElectionParticipantMetricsAreCollected) {
 TEST_F(ReplCoordTest, NodeWillNotStandForElectionDuringHeartbeatReconfig) {
     // start up, receive reconfig via heartbeat while at the same time, become candidate.
     // candidate state should be cleared.
-    assertStartSuccess(BSON("_id"
-                            << "mySet"
-                            << "version" << 2 << "members"
-                            << BSON_ARRAY(BSON("_id" << 1 << "host"
-                                                     << "node1:12345")
-                                          << BSON("_id" << 2 << "host"
-                                                        << "node2:12345")
-                                          << BSON("_id" << 3 << "host"
-                                                        << "node3:12345")
-                                          << BSON("_id" << 4 << "host"
-                                                        << "node4:12345")
-                                          << BSON("_id" << 5 << "host"
-                                                        << "node5:12345"))
-                            << "protocolVersion" << 1),
-                       HostAndPort("node1", 12345));
+    assertStartSuccess(generateConfigObj(5, 2, boost::none), HostAndPort("node1", 12345));
     ASSERT_OK(getReplCoord()->setFollowerMode(MemberState::RS_SECONDARY));
     replCoordSetMyLastWrittenAndAppliedAndDurableOpTime(OpTime(Timestamp(100, 1), 0),
                                                         Date_t() + Seconds(100));
@@ -752,14 +667,7 @@ TEST_F(ReplCoordTest, NodeWillNotStandForElectionDuringHeartbeatReconfig) {
     NetworkInterfaceMock* net = getNet();
     net->enterNetwork();
     ReplSetHeartbeatResponse hbResp2;
-    auto config = ReplSetConfig::parse(BSON("_id"
-                                            << "mySet"
-                                            << "version" << 3 << "members"
-                                            << BSON_ARRAY(BSON("_id" << 1 << "host"
-                                                                     << "node1:12345")
-                                                          << BSON("_id" << 2 << "host"
-                                                                        << "node2:12345"))
-                                            << "protocolVersion" << 1));
+    auto config = ReplSetConfig::parse(generateConfigObj(2, 3, boost::none));
     hbResp2.setConfig(config);
     hbResp2.setConfigVersion(3);
     hbResp2.setSetName("mySet");
@@ -857,16 +765,7 @@ TEST_F(ReplCoordTest, NodeWillNotStandForElectionDuringHeartbeatReconfig) {
 
 TEST_F(ReplCoordTest, ElectionFailsWhenInsufficientVotesAreReceivedDuringRequestVotes) {
     startCapturingLogMessages();
-    BSONObj configObj = BSON("_id"
-                             << "mySet"
-                             << "version" << 1 << "members"
-                             << BSON_ARRAY(BSON("_id" << 1 << "host"
-                                                      << "node1:12345")
-                                           << BSON("_id" << 2 << "host"
-                                                         << "node2:12345")
-                                           << BSON("_id" << 3 << "host"
-                                                         << "node3:12345"))
-                             << "protocolVersion" << 1);
+    auto configObj = generateConfigObj(3, 1, boost::none);
     assertStartSuccess(configObj, HostAndPort("node1", 12345));
     ReplSetConfig config = assertMakeRSConfig(configObj);
 
@@ -907,16 +806,7 @@ TEST_F(ReplCoordTest, ElectionFailsWhenInsufficientVotesAreReceivedDuringRequest
 }
 
 TEST_F(ReplCoordTest, TransitionToRollbackFailsWhenElectionInProgress) {
-    BSONObj configObj = BSON("_id"
-                             << "mySet"
-                             << "version" << 1 << "members"
-                             << BSON_ARRAY(BSON("_id" << 1 << "host"
-                                                      << "node1:12345")
-                                           << BSON("_id" << 2 << "host"
-                                                         << "node2:12345")
-                                           << BSON("_id" << 3 << "host"
-                                                         << "node3:12345"))
-                             << "protocolVersion" << 1);
+    auto configObj = generateConfigObj(3, 1, boost::none);
     assertStartSuccess(configObj, HostAndPort("node1", 12345));
     ReplSetConfig config = assertMakeRSConfig(configObj);
 
@@ -942,16 +832,7 @@ TEST_F(ReplCoordTest, TransitionToRollbackFailsWhenElectionInProgress) {
 
 TEST_F(ReplCoordTest, ElectionFailsWhenVoteRequestResponseContainsANewerTerm) {
     startCapturingLogMessages();
-    BSONObj configObj = BSON("_id"
-                             << "mySet"
-                             << "version" << 1 << "members"
-                             << BSON_ARRAY(BSON("_id" << 1 << "host"
-                                                      << "node1:12345")
-                                           << BSON("_id" << 2 << "host"
-                                                         << "node2:12345")
-                                           << BSON("_id" << 3 << "host"
-                                                         << "node3:12345"))
-                             << "protocolVersion" << 1);
+    auto configObj = generateConfigObj(3, 1, boost::none);
     assertStartSuccess(configObj, HostAndPort("node1", 12345));
     ReplSetConfig config = assertMakeRSConfig(configObj);
 
@@ -1007,17 +888,7 @@ TEST_F(ReplCoordTest, ElectionFailsWhenVoteRequestResponseContainsANewerTerm) {
 
 TEST_F(ReplCoordTest, ElectionFailsWhenTermChangesDuringDryRun) {
     startCapturingLogMessages();
-    BSONObj configObj = BSON("_id"
-                             << "mySet"
-                             << "version" << 1 << "members"
-                             << BSON_ARRAY(BSON("_id" << 1 << "host"
-                                                      << "node1:12345")
-                                           << BSON("_id" << 2 << "host"
-                                                         << "node2:12345")
-                                           << BSON("_id" << 3 << "host"
-                                                         << "node3:12345"))
-                             << "protocolVersion" << 1);
-
+    auto configObj = generateConfigObj(3, 1, boost::none);
     assertStartSuccess(configObj, HostAndPort("node1", 12345));
     ReplSetConfig config = assertMakeRSConfig(configObj);
 
@@ -1043,16 +914,7 @@ TEST_F(ReplCoordTest, ElectionFailsWhenTermChangesDuringDryRun) {
 
 TEST_F(ReplCoordTest, ElectionFailsWhenTermChangesDuringActualElection) {
     startCapturingLogMessages();
-    BSONObj configObj = BSON("_id"
-                             << "mySet"
-                             << "version" << 1 << "members"
-                             << BSON_ARRAY(BSON("_id" << 1 << "host"
-                                                      << "node1:12345")
-                                           << BSON("_id" << 2 << "host"
-                                                         << "node2:12345")
-                                           << BSON("_id" << 3 << "host"
-                                                         << "node3:12345"))
-                             << "protocolVersion" << 1);
+    auto configObj = generateConfigObj(3, 1, boost::none);
     assertStartSuccess(configObj, HostAndPort("node1", 12345));
     ReplSetConfig config = assertMakeRSConfig(configObj);
 
@@ -1300,18 +1162,8 @@ private:
 };
 
 TEST_F(TakeoverTest, DoesntScheduleCatchupTakeoverIfCatchupDisabledButTakeoverDelaySet) {
-    BSONObj configObj = BSON("_id"
-                             << "mySet"
-                             << "version" << 1 << "members"
-                             << BSON_ARRAY(BSON("_id" << 1 << "host"
-                                                      << "node1:12345")
-                                           << BSON("_id" << 2 << "host"
-                                                         << "node2:12345")
-                                           << BSON("_id" << 3 << "host"
-                                                         << "node3:12345"))
-                             << "protocolVersion" << 1 << "settings"
-                             << BSON("catchUpTimeoutMillis" << 0 << "catchUpTakeoverDelay"
-                                                            << 10000));
+    auto configObj = generateConfigObj(
+        3, 1, BSON("catchUpTimeoutMillis" << 0 << "catchUpTakeoverDelay" << 10000));
     assertStartSuccess(configObj, HostAndPort("node1", 12345));
     ReplSetConfig config = assertMakeRSConfig(configObj);
 
@@ -1342,16 +1194,7 @@ TEST_F(TakeoverTest, DoesntScheduleCatchupTakeoverIfCatchupDisabledButTakeoverDe
 }
 
 TEST_F(TakeoverTest, SchedulesCatchupTakeoverIfNodeIsFresherThanCurrentPrimary) {
-    BSONObj configObj = BSON("_id"
-                             << "mySet"
-                             << "version" << 1 << "members"
-                             << BSON_ARRAY(BSON("_id" << 1 << "host"
-                                                      << "node1:12345")
-                                           << BSON("_id" << 2 << "host"
-                                                         << "node2:12345")
-                                           << BSON("_id" << 3 << "host"
-                                                         << "node3:12345"))
-                             << "protocolVersion" << 1);
+    auto configObj = generateConfigObj(3, 1, boost::none);
     assertStartSuccess(configObj, HostAndPort("node1", 12345));
     ReplSetConfig config = assertMakeRSConfig(configObj);
 
@@ -1483,16 +1326,7 @@ TEST_F(TakeoverTest, PrefersPriorityToCatchupTakeoverIfNodeHasHighestPriority) {
 }
 
 TEST_F(TakeoverTest, CatchupTakeoverNotScheduledTwice) {
-    BSONObj configObj = BSON("_id"
-                             << "mySet"
-                             << "version" << 1 << "members"
-                             << BSON_ARRAY(BSON("_id" << 1 << "host"
-                                                      << "node1:12345")
-                                           << BSON("_id" << 2 << "host"
-                                                         << "node2:12345")
-                                           << BSON("_id" << 3 << "host"
-                                                         << "node3:12345"))
-                             << "protocolVersion" << 1);
+    auto configObj = generateConfigObj(3, 1, boost::none);
     assertStartSuccess(configObj, HostAndPort("node1", 12345));
     ReplSetConfig config = assertMakeRSConfig(configObj);
 
@@ -1596,16 +1430,7 @@ TEST_F(TakeoverTest, CatchupAndPriorityTakeoverNotScheduledAtSameTime) {
 }
 
 TEST_F(TakeoverTest, CatchupTakeoverCallbackCanceledIfElectionTimeoutRuns) {
-    BSONObj configObj = BSON("_id"
-                             << "mySet"
-                             << "version" << 1 << "members"
-                             << BSON_ARRAY(BSON("_id" << 1 << "host"
-                                                      << "node1:12345")
-                                           << BSON("_id" << 2 << "host"
-                                                         << "node2:12345")
-                                           << BSON("_id" << 3 << "host"
-                                                         << "node3:12345"))
-                             << "protocolVersion" << 1);
+    auto configObj = generateConfigObj(3, 1, boost::none);
     assertStartSuccess(configObj, HostAndPort("node1", 12345));
     ReplSetConfig config = assertMakeRSConfig(configObj);
     // Force election timeouts to be exact, with no randomized offset, so that when the election
@@ -1671,16 +1496,7 @@ TEST_F(TakeoverTest, CatchupTakeoverCallbackCanceledIfElectionTimeoutRuns) {
 }
 
 TEST_F(TakeoverTest, CatchupTakeoverCanceledIfTransitionToRollback) {
-    BSONObj configObj = BSON("_id"
-                             << "mySet"
-                             << "version" << 1 << "members"
-                             << BSON_ARRAY(BSON("_id" << 1 << "host"
-                                                      << "node1:12345")
-                                           << BSON("_id" << 2 << "host"
-                                                         << "node2:12345")
-                                           << BSON("_id" << 3 << "host"
-                                                         << "node3:12345"))
-                             << "protocolVersion" << 1);
+    auto configObj = generateConfigObj(3, 1, boost::none);
     assertStartSuccess(configObj, HostAndPort("node1", 12345));
     ReplSetConfig config = assertMakeRSConfig(configObj);
 
@@ -1732,16 +1548,7 @@ TEST_F(TakeoverTest, CatchupTakeoverCanceledIfTransitionToRollback) {
 }
 
 TEST_F(TakeoverTest, SuccessfulCatchupTakeover) {
-    BSONObj configObj = BSON("_id"
-                             << "mySet"
-                             << "version" << 1 << "members"
-                             << BSON_ARRAY(BSON("_id" << 1 << "host"
-                                                      << "node1:12345")
-                                           << BSON("_id" << 2 << "host"
-                                                         << "node2:12345")
-                                           << BSON("_id" << 3 << "host"
-                                                         << "node3:12345"))
-                             << "protocolVersion" << 1);
+    auto configObj = generateConfigObj(3, 1, boost::none);
     assertStartSuccess(configObj, HostAndPort("node1", 12345));
     ReplSetConfig config = assertMakeRSConfig(configObj);
     HostAndPort primaryHostAndPort("node2", 12345);
@@ -1824,20 +1631,7 @@ TEST_F(TakeoverTest, SuccessfulCatchupTakeover) {
 
 TEST_F(TakeoverTest, CatchupTakeoverDryRunFailsPrimarySaysNo) {
     startCapturingLogMessages();
-    BSONObj configObj = BSON("_id"
-                             << "mySet"
-                             << "version" << 1 << "members"
-                             << BSON_ARRAY(BSON("_id" << 1 << "host"
-                                                      << "node1:12345")
-                                           << BSON("_id" << 2 << "host"
-                                                         << "node2:12345")
-                                           << BSON("_id" << 3 << "host"
-                                                         << "node3:12345")
-                                           << BSON("_id" << 4 << "host"
-                                                         << "node4:12345")
-                                           << BSON("_id" << 5 << "host"
-                                                         << "node5:12345"))
-                             << "protocolVersion" << 1);
+    auto configObj = generateConfigObj(5, 1, boost::none);
     assertStartSuccess(configObj, HostAndPort("node1", 12345));
     ReplSetConfig config = assertMakeRSConfig(configObj);
     HostAndPort primaryHostAndPort("node2", 12345);
@@ -1941,16 +1735,7 @@ TEST_F(TakeoverTest, CatchupTakeoverDryRunFailsPrimarySaysNo) {
 }
 
 TEST_F(TakeoverTest, PrimaryCatchesUpBeforeCatchupTakeover) {
-    BSONObj configObj = BSON("_id"
-                             << "mySet"
-                             << "version" << 1 << "members"
-                             << BSON_ARRAY(BSON("_id" << 1 << "host"
-                                                      << "node1:12345")
-                                           << BSON("_id" << 2 << "host"
-                                                         << "node2:12345")
-                                           << BSON("_id" << 3 << "host"
-                                                         << "node3:12345"))
-                             << "protocolVersion" << 1);
+    auto configObj = generateConfigObj(3, 1, boost::none);
     assertStartSuccess(configObj, HostAndPort("node1", 12345));
     ReplSetConfig config = assertMakeRSConfig(configObj);
 
@@ -2402,16 +2187,7 @@ TEST_F(TakeoverTest, DontCallForPriorityTakeoverWhenLaggedDifferentSecond) {
 
 TEST_F(ReplCoordTest, NodeCancelsElectionUponReceivingANewConfigDuringDryRun) {
     // Start up and become electable.
-    assertStartSuccess(BSON("_id"
-                            << "mySet"
-                            << "version" << 2 << "protocolVersion" << 1 << "members"
-                            << BSON_ARRAY(BSON("_id" << 1 << "host"
-                                                     << "node1:12345")
-                                          << BSON("_id" << 3 << "host"
-                                                        << "node3:12345")
-                                          << BSON("_id" << 2 << "host"
-                                                        << "node2:12345"))
-                            << "settings" << BSON("heartbeatIntervalMillis" << 100)),
+    assertStartSuccess(generateConfigObj(3, 2, BSON("heartbeatIntervalMillis" << 100)),
                        HostAndPort("node1", 12345));
     ASSERT_OK(getReplCoord()->setFollowerMode(MemberState::RS_SECONDARY));
     replCoordSetMyLastWrittenAndAppliedAndDurableOpTime(OpTime(Timestamp(100, 1), 0),
@@ -2436,15 +2212,8 @@ TEST_F(ReplCoordTest, NodeCancelsElectionUponReceivingANewConfigDuringDryRun) {
     ASSERT(TopologyCoordinator::Role::kCandidate == getTopoCoord().getRole());
 
     // Submit a reconfig and confirm it cancels the election.
-    ReplicationCoordinatorImpl::ReplSetReconfigArgs config = {
-        BSON("_id"
-             << "mySet"
-             << "version" << 4 << "protocolVersion" << 1 << "members"
-             << BSON_ARRAY(BSON("_id" << 1 << "host"
-                                      << "node1:12345")
-                           << BSON("_id" << 2 << "host"
-                                         << "node2:12345"))),
-        true};
+    ReplicationCoordinatorImpl::ReplSetReconfigArgs config = {generateConfigObj(2, 4, boost::none),
+                                                              true};
 
     BSONObjBuilder result;
     const auto opCtx = makeOperationContext();
@@ -2458,16 +2227,7 @@ TEST_F(ReplCoordTest, NodeCancelsElectionUponReceivingANewConfigDuringDryRun) {
 
 TEST_F(ReplCoordTest, NodeCancelsElectionUponReceivingANewConfigDuringVotePhase) {
     // Start up and become electable.
-    assertStartSuccess(BSON("_id"
-                            << "mySet"
-                            << "version" << 2 << "protocolVersion" << 1 << "members"
-                            << BSON_ARRAY(BSON("_id" << 1 << "host"
-                                                     << "node1:12345")
-                                          << BSON("_id" << 3 << "host"
-                                                        << "node3:12345")
-                                          << BSON("_id" << 2 << "host"
-                                                        << "node2:12345"))
-                            << "settings" << BSON("heartbeatIntervalMillis" << 100)),
+    assertStartSuccess(generateConfigObj(3, 2, BSON("heartbeatIntervalMillis" << 100)),
                        HostAndPort("node1", 12345));
     ASSERT_OK(getReplCoord()->setFollowerMode(MemberState::RS_SECONDARY));
     replCoordSetMyLastWrittenAndAppliedAndDurableOpTime(OpTime(Timestamp(100, 1), 0),
@@ -2477,15 +2237,8 @@ TEST_F(ReplCoordTest, NodeCancelsElectionUponReceivingANewConfigDuringVotePhase)
     ASSERT(TopologyCoordinator::Role::kCandidate == getTopoCoord().getRole());
 
     // Submit a reconfig and confirm it cancels the election.
-    ReplicationCoordinatorImpl::ReplSetReconfigArgs config = {
-        BSON("_id"
-             << "mySet"
-             << "version" << 4 << "protocolVersion" << 1 << "members"
-             << BSON_ARRAY(BSON("_id" << 1 << "host"
-                                      << "node1:12345")
-                           << BSON("_id" << 2 << "host"
-                                         << "node2:12345"))),
-        true};
+    ReplicationCoordinatorImpl::ReplSetReconfigArgs config = {generateConfigObj(2, 4, boost::none),
+                                                              true};
 
     BSONObjBuilder result;
     const auto opCtx = makeOperationContext();
@@ -2499,16 +2252,7 @@ TEST_F(ReplCoordTest, NodeCancelsElectionUponReceivingANewConfigDuringVotePhase)
 
 TEST_F(ReplCoordTest, NodeCancelsElectionWhenWritingLastVoteInDryRun) {
     // Start up and become electable.
-    assertStartSuccess(BSON("_id"
-                            << "mySet"
-                            << "version" << 2 << "protocolVersion" << 1 << "members"
-                            << BSON_ARRAY(BSON("_id" << 1 << "host"
-                                                     << "node1:12345")
-                                          << BSON("_id" << 3 << "host"
-                                                        << "node3:12345")
-                                          << BSON("_id" << 2 << "host"
-                                                        << "node2:12345"))
-                            << "settings" << BSON("heartbeatIntervalMillis" << 100)),
+    assertStartSuccess(generateConfigObj(3, 2, BSON("heartbeatIntervalMillis" << 100)),
                        HostAndPort("node1", 12345));
     ASSERT_OK(getReplCoord()->setFollowerMode(MemberState::RS_SECONDARY));
     replCoordSetMyLastWrittenAndAppliedAndDurableOpTime(OpTime(Timestamp(100, 1), 0),
@@ -2567,16 +2311,7 @@ TEST_F(ReplCoordTest, MemberHbDataIsRestartedUponWinningElection) {
     auto replAllSeverityGuard = unittest::MinimumLoggedSeverityGuard{
         logv2::LogComponent::kReplication, logv2::LogSeverity::Debug(3)};
 
-    auto replConfigBson = BSON("_id"
-                               << "mySet"
-                               << "protocolVersion" << 1 << "version" << 1 << "members"
-                               << BSON_ARRAY(BSON("_id" << 1 << "host"
-                                                        << "node1:12345")
-                                             << BSON("_id" << 2 << "host"
-                                                           << "node2:12345")
-                                             << BSON("_id" << 3 << "host"
-                                                           << "node3:12345")));
-
+    auto replConfigBson = generateConfigObj(3, 1, boost::none);
     auto myHostAndPort = HostAndPort("node1", 12345);
     assertStartSuccess(replConfigBson, myHostAndPort);
     replCoordSetMyLastWrittenAndAppliedAndDurableOpTime(OpTime(Timestamp(100, 1), 0),
@@ -2709,18 +2444,8 @@ protected:
     }
 
     ReplSetConfig setUp3NodeReplSetAndRunForElection(OpTime opTime, long long timeout = 5000) {
-        BSONObj configObj = BSON("_id"
-                                 << "mySet"
-                                 << "version" << 1 << "members"
-                                 << BSON_ARRAY(BSON("_id" << 1 << "host"
-                                                          << "node1:12345")
-                                               << BSON("_id" << 2 << "host"
-                                                             << "node2:12345")
-                                               << BSON("_id" << 3 << "host"
-                                                             << "node3:12345"))
-                                 << "protocolVersion" << 1 << "settings"
-                                 << BSON("heartbeatTimeoutSecs" << 1 << "catchUpTimeoutMillis"
-                                                                << timeout));
+        auto configObj = generateConfigObj(
+            3, 1, BSON("heartbeatTimeoutSecs" << 1 << "catchUpTimeoutMillis" << timeout));
         assertStartSuccess(configObj, HostAndPort("node1", 12345));
         ReplSetConfig config = assertMakeRSConfig(configObj);
 
