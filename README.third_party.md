@@ -40,7 +40,7 @@ a notice will be included in
 | [librdkafka]               | BSD-2-Clause                                                   | 2.0.2                                              |                      |                                 |
 | [libmongocrypt]            | Apache-2.0                                                     | 1.8.4                                              |          ✗           |                ✗                |
 | [linenoise]                | BSD-3-Clause                                                   | 6cdc775 + changes                                  |                      |                ✗                |
-| [mongo-c-driver]           | Apache-2.0                                                     | 1.27.1                                             |          ✗           |                ✗                |
+| [mongo-c-driver]           | Apache-2.0                                                     | 1.27.6                                             |          ✗           |                ✗                |
 | [MozJS]                    | MPL-2.0                                                        | ESR 115.7                                          |                      |                ✗                |
 | [MurmurHash3]              | Public Domain                                                  | a6bd3ce + changes                                  |          ✗           |                ✗                |
 | [ocspbuilder]              | MIT                                                            | 0.10.2                                             |                      |                                 |

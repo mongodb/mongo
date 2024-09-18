@@ -242,9 +242,8 @@ BSON_IF_GNU_LIKE (_Pragma ("GCC diagnostic ignored \"-Wshadow\""))
       bsonBuildError = "Error while appending bool(" _bsonDSL_str (b) ")"; \
    } else                                                                  \
       ((void) 0)
-#define _bsonArrayOperation_bool(X) _bsonArrayAppendValue (bool (X))
-#define _bsonValueOperation__Bool(b) _bsonValueOperation_bool (b)
-#define _bsonArrayOperation__Bool(X) _bsonArrayAppendValue (_Bool (X))
+#define _bsonArrayOperation_boolean(X) _bsonArrayAppendValue (boolean (X))
+#define _bsonValueOperation_boolean(b) _bsonValueOperation_bool (b)
 
 #define _bsonValueOperation_null                       \
    if (!bson_append_null (_bsonBuildAppendArgs)) {     \
@@ -386,9 +385,8 @@ BSON_IF_GNU_LIKE (_Pragma ("GCC diagnostic ignored \"-Wshadow\""))
 #define _bsonDSL_Type_binary BSON_TYPE_BINARY
 #define _bsonDSL_Type_undefined BSON_TYPE_UNDEFINED
 #define _bsonDSL_Type_oid BSON_TYPE_OID
-#define _bsonDSL_Type_bool BSON_TYPE_BOOL
-// ("bool" may be spelled _Bool due to macro expansion:)
-#define _bsonDSL_Type__Bool BSON_TYPE_BOOL
+// Use `boolean`, not `bool`. `bool` may be defined as a macro to `_Bool` or `int`:
+#define _bsonDSL_Type_boolean BSON_TYPE_BOOL
 #define _bsonDSL_Type_date_time BSON_TYPE_DATE_TIME
 #define _bsonDSL_Type_null BSON_TYPE_NULL
 #define _bsonDSL_Type_regex BSON_TYPE_REGEX
@@ -1069,15 +1067,9 @@ _bsonVisitIterAs_int32 (void)
 }
 
 static BSON_INLINE bool
-_bsonVisitIterAs_bool (void)
+_bsonVisitIterAs_boolean (void)
 {
    return bson_iter_as_bool (&bsonVisitIter);
-}
-
-static BSON_INLINE bool
-_bsonVisitIterAs__Bool (void)
-{
-   return _bsonVisitIterAs_bool ();
 }
 
 #define bsonAs(Type) _bsonDSL_paste (_bsonVisitIterAs_, Type) ()

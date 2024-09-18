@@ -50,7 +50,7 @@ Result:
 ### A Simple "okay"
 
 ```c
-bsonBuildDecl(e, kv("okay", bool(true)));
+bsonBuildDecl(e, kv("okay", boolean(true)));
 ```
 
 Result:
@@ -245,7 +245,7 @@ appended to a document or array.
 Generates a BSON null value.
 
 
-#### `bool(bool b)`
+#### `boolean(bool b)`
 
 Generate a BSON boolean value from the given C boolean expression.
 
@@ -642,7 +642,7 @@ match.
 Matches if the element's current type matches the `TypeName` `t`.
 
 The `TypeName`s are: `double`, `utf8`, `doc`, `array`, `binary`, `undefined`,
-`oid`, `bool`, `date_time`, `null`, `regex`, `dbpointer`, `code`, `codewscope`,
+`oid`, `boolean`, `date_time`, `null`, `regex`, `dbpointer`, `code`, `codewscope`,
 `int32`, `timestamp`, `int64`, and `decimal128`.
 
 
@@ -858,7 +858,7 @@ bsonParse(
   find(key("readonly"),
        // bsonPredicate() will evaluate a predicate on bsonVisitIter
        // (which here points to the "readonly" property in "input")
-       append(*output, kv("readonly", bool(bsonPredicate(truthy))))));
+       append(*output, kv("readonly", boolean(bsonPredicate(truthy))))));
 ```
 
 

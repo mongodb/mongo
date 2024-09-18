@@ -1,3 +1,71 @@
+libbson 1.27.6
+==============
+
+Fixes:
+
+  * Fix handling of malformed extended JSON for special BSON types.
+  * Fix large string handling in `bson_string_new` and `bson_string_append`.
+
+Thanks to everyone who contributed to the development of this release.
+
+  * Ezra Chung
+  * Kevin Albertson
+
+
+
+libbson 1.27.5
+==============
+
+  * Fix large string handling in `bson_append_utf8`.
+
+Thanks to everyone who contributed to the development of this release.
+
+  * Roberto C. Sánchez
+
+
+libbson 1.27.4
+==============
+
+Fixes:
+
+  * Fix build with Visual Studio 2013.
+
+Thanks to everyone who contributed to the development of this release.
+
+  * Kevin Albertson
+
+
+
+libbson 1.27.3
+==============
+
+Notes:
+
+  * This patch release introduces changes surrounding the development processes,
+    including new code signing and dependency tracking. There are no behavioral
+    or API changes.
+
+Thanks to everyone who contributed to the development of this release.
+
+  * Colby Pike
+
+
+
+libbson 1.27.2
+==============
+
+Fixes:
+
+  * Fix parsing of colon in timezone.
+  * Error on failure to init subdocument in `bson_iter_visit_all`.
+
+Thanks to everyone who contributed to the development of this release.
+
+  * Roman-Koshelev
+  * Kevin Albertson
+
+
+
 libbson 1.27.1
 ==============
 
@@ -117,7 +185,7 @@ Fixes:
 Thanks to everyone who contributed to the development of this release.
 
   * Kevin Albertson
-  
+
 libbson 1.24.3
 ==============
 
