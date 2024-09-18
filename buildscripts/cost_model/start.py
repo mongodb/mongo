@@ -122,15 +122,10 @@ async def execute_index_intersections_with_requests(
         await database.set_parameter(
             "internalCostModelCoefficients", '{"filterIncrementalCost": 10000.0}'
         )
-        await database.set_parameter("internalCascadesOptimizerDisableMergeJoinRIDIntersect", False)
-        await database.set_parameter("internalCascadesOptimizerDisableHashJoinRIDIntersect", False)
 
         await workload_execution.execute(
             database, main_config.workload_execution, collections, requests
         )
-
-        await database.set_parameter("internalCascadesOptimizerDisableMergeJoinRIDIntersect", True)
-        await database.set_parameter("internalCascadesOptimizerDisableHashJoinRIDIntersect", True)
 
         main_config.workload_execution.write_mode = WriteMode.APPEND
         await workload_execution.execute(
@@ -138,8 +133,6 @@ async def execute_index_intersections_with_requests(
         )
 
     finally:
-        await database.set_parameter("internalCascadesOptimizerDisableMergeJoinRIDIntersect", False)
-        await database.set_parameter("internalCascadesOptimizerDisableHashJoinRIDIntersect", False)
         await database.set_parameter("internalCostModelCoefficients", "")
 
 

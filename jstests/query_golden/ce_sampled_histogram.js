@@ -12,12 +12,7 @@ import {
     summarizeExplainForCE
 } from "jstests/libs/ce_stats_utils.js";
 import {loadJSONDataset} from "jstests/libs/load_ce_test_data.js";
-import {
-    forceCE,
-    round2,
-    runWithFastPathsDisabled,
-    runWithParams
-} from "jstests/libs/optimizer_utils.js";
+import {forceCE, round2} from "jstests/libs/optimizer_utils.js";
 import {computeStrategyErrors} from "jstests/query_golden/libs/compute_errors.js";
 
 /**
@@ -27,8 +22,7 @@ import {computeStrategyErrors} from "jstests/query_golden/libs/compute_errors.js
 function getMatchCE(coll, predicate) {
     jsTestLog(`Query: ${coll.getName()} ${tojson(predicate)}`);
     // Cardinality estimation will be skipped if the query is optimized using a fast path.
-    const explain = runWithFastPathsDisabled(
-        () => coll.explain("executionStats").aggregate([{$match: predicate}]));
+    const explain = coll.explain("executionStats").aggregate([{$match: predicate}]);
     const n = round2(explain.executionStats.nReturned);
     const ce = round2(getRootCE(explain));
     const explainSummarized = tojson(summarizeExplainForCE(explain));
@@ -183,11 +177,5 @@ await runHistogramsTest(async function testSampleHistogram() {
     };
 
     forceCE("histogram");
-    // Sargable nodes and Filter nodes get different CEs. Repeat test with/without sargable rewrite.
-    runWithParams([{key: "internalCascadesOptimizerDisableSargableWhenNoIndexes", value: false}],
-                  runTest);
-    // TODO: Enable with SERVER-84366 - currently explain will incorrectly show Filter CE as the
-    // CE of the PhysicalScanNode.
-    // runWithParams([{key: "internalCascadesOptimizerDisableSargableWhenNoIndexes", value: true}],
-    //              runTest);
+    runTest();
 });

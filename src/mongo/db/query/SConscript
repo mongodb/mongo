@@ -323,7 +323,6 @@ env.CppUnitTest(
         "canonical_query_encoder_test.cpp",
         "canonical_query_test.cpp",
         "canonical_query_test_util.cpp",
-        "ce_mode_parameter_test.cpp",
         "classic_runtime_planner_for_sbe/classic_runtime_planner_for_sbe_test.cpp",
         "classic_runtime_planner_for_sbe/classic_runtime_planner_for_sbe_test_util.cpp",
         "stage_builder/classic_stage_builder_test.cpp",

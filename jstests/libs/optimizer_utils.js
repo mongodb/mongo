@@ -389,11 +389,6 @@ export function assertValueOnPlanPath(value, doc, path) {
     assertValueOnPathFn(value, doc, path, navigateToPlanPath);
 }
 
-export function runWithFastPathsDisabled(fn) {
-    const disableFastPath = [{key: "internalCascadesOptimizerDisableFastPath", value: true}];
-    return runWithParams(disableFastPath, fn);
-}
-
 // TODO SERVER-84743: Consolidate the following two functions.
 /**
  * This is meant to be used by standalone passthrough tests, no need to pass in the db variable.

@@ -94,7 +94,6 @@ mongo_cc_library(
         "//src/mongo/db/pipeline:storage_stats_spec_gen",
         "//src/mongo/db/pipeline:variables.h",
         "//src/mongo/db/query:allowed_contexts.h",
-        "//src/mongo/db/query:ce_mode_parameter.h",
         "//src/mongo/db/query:explain_version_validator.h",
         "//src/mongo/db/query:find_command.h",
         "//src/mongo/db/query:find_command_gen",

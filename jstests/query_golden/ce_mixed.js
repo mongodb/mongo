@@ -11,7 +11,7 @@ import {
     runHistogramsTest,
     summarizeExplainForCE
 } from "jstests/libs/ce_stats_utils.js";
-import {forceCE, runWithFastPathsDisabled} from "jstests/libs/optimizer_utils.js";
+import {forceCE} from "jstests/libs/optimizer_utils.js";
 
 const collCard = 300;
 const numberBuckets = 5;
@@ -77,8 +77,7 @@ assert.commandWorked(
 function testCEForStrategy(predicate, strategy) {
     forceCE(strategy);
     // Cardinality estimation will be skipped if the query is optimized using a fast path.
-    const explain = runWithFastPathsDisabled(
-        () => coll.explain("executionStats").aggregate({$match: predicate}));
+    const explain = coll.explain("executionStats").aggregate({$match: predicate});
     const nReturned = explain.executionStats.nReturned;
     const ce = getRootCE(explain);
     return [nReturned, ce, explain];

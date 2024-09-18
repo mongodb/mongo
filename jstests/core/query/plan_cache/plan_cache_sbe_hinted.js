@@ -15,42 +15,35 @@
  * ]
  */
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
-import {
-    checkExperimentalCascadesOptimizerEnabled,
-    runWithParamsAllNodes
-} from "jstests/libs/optimizer_utils.js";
+import {checkExperimentalCascadesOptimizerEnabled} from "jstests/libs/optimizer_utils.js";
 
-// SERVER-85146: Disable CQF fast path for queries testing the plan cache. Fast path queries do not
-// get cached and may break tests that expect cache entries for fast path-eligible queries.
-runWithParamsAllNodes(db, [{key: "internalCascadesOptimizerDisableFastPath", value: true}], () => {
-    const isBonsaiEnabled = checkExperimentalCascadesOptimizerEnabled(db);
-    const isBonsaiPlanCacheEnabled = FeatureFlagUtil.isPresentAndEnabled(db, "OptimizerPlanCache");
+const isBonsaiEnabled = checkExperimentalCascadesOptimizerEnabled(db);
+const isBonsaiPlanCacheEnabled = FeatureFlagUtil.isPresentAndEnabled(db, "OptimizerPlanCache");
 
-    const coll = db.plan_cache_sbe;
-    coll.drop();
+const coll = db.plan_cache_sbe;
+coll.drop();
 
-    assert.commandWorked(coll.insert({a: 1, b: 1}));
-    assert.commandWorked(coll.createIndexes([{a: 1}, {a: 1, b: 1}]));
+assert.commandWorked(coll.insert({a: 1, b: 1}));
+assert.commandWorked(coll.createIndexes([{a: 1}, {a: 1, b: 1}]));
 
-    const verifyPlanCacheSize = function(len) {
-        const caches = coll.getPlanCache().list();
-        assert.eq(len, caches.length, caches);
-    };
-    const queryAndVerify = function(hint, expected) {
-        assert.eq(1, coll.find({a: 1}).hint(hint).itcount());
-        assert.eq(1, coll.find({a: 1}).hint(hint).itcount());
-        verifyPlanCacheSize(expected);
-    };
-    verifyPlanCacheSize(0);
-    if (!isBonsaiEnabled && !isBonsaiPlanCacheEnabled) {
-        // TODO SERVER-85728: Re-enable index scans for Bonsai plan cache tests.
-        // Hinted query is cached.
-        queryAndVerify({a: 1}, 1);
-        // Non-hinted query is cached as different entry.
-        queryAndVerify({}, 2);
-        // Hinted query cached is reused.
-        queryAndVerify({a: 1}, 2);
-        // Query with different hint.
-        queryAndVerify({a: 1, b: 1}, 3);
-    }
-});
+const verifyPlanCacheSize = function(len) {
+    const caches = coll.getPlanCache().list();
+    assert.eq(len, caches.length, caches);
+};
+const queryAndVerify = function(hint, expected) {
+    assert.eq(1, coll.find({a: 1}).hint(hint).itcount());
+    assert.eq(1, coll.find({a: 1}).hint(hint).itcount());
+    verifyPlanCacheSize(expected);
+};
+verifyPlanCacheSize(0);
+if (!isBonsaiEnabled && !isBonsaiPlanCacheEnabled) {
+    // TODO SERVER-85728: Re-enable index scans for Bonsai plan cache tests.
+    // Hinted query is cached.
+    queryAndVerify({a: 1}, 1);
+    // Non-hinted query is cached as different entry.
+    queryAndVerify({}, 2);
+    // Hinted query cached is reused.
+    queryAndVerify({a: 1}, 2);
+    // Query with different hint.
+    queryAndVerify({a: 1, b: 1}, 3);
+}

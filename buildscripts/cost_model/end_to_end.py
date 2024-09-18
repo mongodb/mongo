@@ -491,22 +491,8 @@ async def execute_index_intersect_queries(
 
     async with (
         get_database_parameter(database, "internalCostModelCoefficients") as cost_model_param,
-        get_database_parameter(
-            database, "internalCascadesOptimizerDisableMergeJoinRIDIntersect"
-        ) as merge_join_param,
-        get_database_parameter(
-            database, "internalCascadesOptimizerDisableHashJoinRIDIntersect"
-        ) as hash_join_param,
     ):
         await cost_model_param.set('{"filterIncrementalCost": 10000.0}')
-        await merge_join_param.set(False)
-        await hash_join_param.set(False)
-
-        await workload_execution.execute(database, we_config, [collection], requests)
-
-        await merge_join_param.set(True)
-        await hash_join_param.set(True)
-
         await workload_execution.execute(database, we_config, [collection], requests)
 
 

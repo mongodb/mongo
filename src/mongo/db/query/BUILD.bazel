@@ -109,7 +109,6 @@ idl_generator(
 mongo_cc_library(
     name = "query_knobs",
     srcs = [
-        "ce_mode_parameter.cpp",
         "explain_version_validator.cpp",
         "framework_control.cpp",
         "query_feature_flags_gen",
@@ -118,7 +117,6 @@ mongo_cc_library(
         "//src/mongo/db/query/query_stats:query_stats_on_parameter_change.cpp",
     ],
     hdrs = [
-        "ce_mode_parameter.h",
         "explain_version_validator.h",
         "//src/mongo/db/query/plan_cache:sbe_plan_cache_on_parameter_change.h",
         "//src/mongo/db/query/query_stats:query_stats_on_parameter_change.h",
