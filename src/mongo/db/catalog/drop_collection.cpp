@@ -747,10 +747,12 @@ Status isDroppableCollection(OperationContext* opCtx, const NamespaceString& nss
         if (!MONGO_unlikely(allowSystemViewsDrop.shouldFail())) {
             const auto viewStats =
                 CollectionCatalog::get(opCtx)->getViewStatsForDatabase(opCtx, nss.dbName());
-            uassert(ErrorCodes::CommandFailed,
+            if (!viewStats || viewStats->userTimeseries != 0) {
+                return Status(
+                    ErrorCodes::CommandFailed,
                     "cannot drop collection {} when time-series collections are present"_format(
-                        nss.toStringForErrorMsg()),
-                    viewStats && viewStats->userTimeseries == 0);
+                        nss.toStringForErrorMsg()));
+            }
         }
     } else if (!isDroppableSystemCollection(nss)) {
         return Status(ErrorCodes::IllegalOperation,
