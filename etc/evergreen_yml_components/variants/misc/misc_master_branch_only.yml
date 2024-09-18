@@ -15,8 +15,6 @@ buildvariants:
   expansions:
     num_scons_link_jobs_available: 0.1
     compile_flags: >-
-      CPPPATH="c:/sasl/include"
-      LIBPATH="c:/sasl/lib"
       -j$(( $(grep -c ^processor /proc/cpuinfo) / 2 ))
       --win-version-min=win10
     python: '/cygdrive/c/python/python310/python.exe'

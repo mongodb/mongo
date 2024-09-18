@@ -1839,6 +1839,14 @@ if unknown_vars:
 
 install_actions.setup(env, get_option('install-action'))
 
+if env.TargetOSIs("windows") and os.path.exists(
+        env.File("#/src/mongo/db/modules/enterprise/SConscript").abspath):
+    # the sasl zip can be rebuilt by following the instructions at:
+    # https://github.com/mongodb-forks/cyrus-sasl/blob/mongo-sasl-2-1-28/README.md
+    import mongo.download_windows_sasl
+
+    mongo.download_windows_sasl.download_sasl(env)
+
 
 def set_config_header_define(env, varname, varval=1):
     env['CONFIG_HEADER_DEFINES'][varname] = varval
