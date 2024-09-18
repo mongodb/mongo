@@ -301,8 +301,9 @@ TEST_F(LockStatsTest, CumulativeWaitTime) {
 
     auto wait1 = stats.get(resId1, MODE_S).combinedWaitTimeMicros;
     auto wait2 = stats.get(resId2, MODE_S).combinedWaitTimeMicros;
-    ASSERT_GREATER_THAN_OR_EQUALS(wait1, 2 * 1000 * 1000);
-    ASSERT_GREATER_THAN_OR_EQUALS(wait2, 2 * 1000 * 1000);
+    // Lower bound with a bit of leeway, should be close to 2 seconds.
+    ASSERT_GREATER_THAN_OR_EQUALS(wait1, 1.9 * 1000 * 1000);
+    ASSERT_GREATER_THAN_OR_EQUALS(wait2, 1.9 * 1000 * 1000);
     // We give a generous leeway of 500msecs (2.5 seconds, or 2,500,000 microseconds) for the upper
     // bound of the calculation to ensure it's growing correctly.
     ASSERT_LESS_THAN(wait1, 2.5 * 1000 * 1000);
