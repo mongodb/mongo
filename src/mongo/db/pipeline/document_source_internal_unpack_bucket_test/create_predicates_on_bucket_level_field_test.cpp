@@ -787,11 +787,14 @@ TEST_F(InternalUnpackBucketPredicateMappingOptimizationTest, OptimizeMapsTimePre
             ASSERT_EQ(pipeline->getSources().size(), 2U);
 
             auto original = dynamic_cast<DocumentSourceMatch*>(container.back().get());
+            auto unpackStage =
+                dynamic_cast<DocumentSourceInternalUnpackBucket*>(container.front().get());
             auto predicate =
-                dynamic_cast<DocumentSourceInternalUnpackBucket*>(container.front().get())
-                    ->createPredicatesOnBucketLevelField(original->getMatchExpression());
+                unpackStage->createPredicatesOnBucketLevelField(original->getMatchExpression());
+            MatchExpression* loosePredicate = predicate.loosePredicate.get();
+            ASSERT_TRUE(unpackStage->generateBucketLevelIdPredicates(loosePredicate));
 
-            auto andExpr = dynamic_cast<AndMatchExpression*>(predicate.loosePredicate.get());
+            auto andExpr = dynamic_cast<AndMatchExpression*>(loosePredicate);
             auto children = andExpr->getChildVector();
 
             ASSERT_EQ(children->size(), 3);
@@ -845,10 +848,14 @@ TEST_F(InternalUnpackBucketPredicateMappingOptimizationTest, OptimizeMapsTimePre
             ASSERT_EQ(pipeline->getSources().size(), 2U);
 
             auto original = dynamic_cast<DocumentSourceMatch*>(container.back().get());
+            auto unpackStage =
+                dynamic_cast<DocumentSourceInternalUnpackBucket*>(container.front().get());
             auto predicate =
-                dynamic_cast<DocumentSourceInternalUnpackBucket*>(container.front().get())
-                    ->createPredicatesOnBucketLevelField(original->getMatchExpression());
-            auto andExpr = dynamic_cast<AndMatchExpression*>(predicate.loosePredicate.get());
+                unpackStage->createPredicatesOnBucketLevelField(original->getMatchExpression());
+            MatchExpression* loosePredicate = predicate.loosePredicate.get();
+            ASSERT_TRUE(unpackStage->generateBucketLevelIdPredicates(loosePredicate));
+
+            auto andExpr = dynamic_cast<AndMatchExpression*>(loosePredicate);
             auto children = andExpr->getChildVector();
 
             ASSERT_EQ(children->size(), 3);
@@ -894,10 +901,14 @@ TEST_F(InternalUnpackBucketPredicateMappingOptimizationTest, OptimizeMapsTimePre
             ASSERT_EQ(pipeline->getSources().size(), 2U);
 
             auto original = dynamic_cast<DocumentSourceMatch*>(container.back().get());
+            auto unpackStage =
+                dynamic_cast<DocumentSourceInternalUnpackBucket*>(container.front().get());
             auto predicate =
-                dynamic_cast<DocumentSourceInternalUnpackBucket*>(container.front().get())
-                    ->createPredicatesOnBucketLevelField(original->getMatchExpression());
-            auto andExpr = dynamic_cast<AndMatchExpression*>(predicate.loosePredicate.get());
+                unpackStage->createPredicatesOnBucketLevelField(original->getMatchExpression());
+            MatchExpression* loosePredicate = predicate.loosePredicate.get();
+            ASSERT_TRUE(unpackStage->generateBucketLevelIdPredicates(loosePredicate));
+
+            auto andExpr = dynamic_cast<AndMatchExpression*>(loosePredicate);
             auto children = andExpr->getChildVector();
 
             ASSERT_EQ(children->size(), 6);
@@ -955,11 +966,14 @@ TEST_F(InternalUnpackBucketPredicateMappingOptimizationTest, OptimizeMapsTimePre
             ASSERT_EQ(pipeline->getSources().size(), 2U);
 
             auto original = dynamic_cast<DocumentSourceMatch*>(container.back().get());
+            auto unpackStage =
+                dynamic_cast<DocumentSourceInternalUnpackBucket*>(container.front().get());
             auto predicate =
-                dynamic_cast<DocumentSourceInternalUnpackBucket*>(container.front().get())
-                    ->createPredicatesOnBucketLevelField(original->getMatchExpression());
+                unpackStage->createPredicatesOnBucketLevelField(original->getMatchExpression());
+            MatchExpression* loosePredicate = predicate.loosePredicate.get();
+            ASSERT_TRUE(unpackStage->generateBucketLevelIdPredicates(loosePredicate));
 
-            auto andExpr = dynamic_cast<AndMatchExpression*>(predicate.loosePredicate.get());
+            auto andExpr = dynamic_cast<AndMatchExpression*>(loosePredicate);
             auto children = andExpr->getChildVector();
 
             ASSERT_EQ(children->size(), 3);
@@ -1005,10 +1019,14 @@ TEST_F(InternalUnpackBucketPredicateMappingOptimizationTest, OptimizeMapsTimePre
             ASSERT_EQ(pipeline->getSources().size(), 2U);
 
             auto original = dynamic_cast<DocumentSourceMatch*>(container.back().get());
+            auto unpackStage =
+                dynamic_cast<DocumentSourceInternalUnpackBucket*>(container.front().get());
             auto predicate =
-                dynamic_cast<DocumentSourceInternalUnpackBucket*>(container.front().get())
-                    ->createPredicatesOnBucketLevelField(original->getMatchExpression());
-            auto andExpr = dynamic_cast<AndMatchExpression*>(predicate.loosePredicate.get());
+                unpackStage->createPredicatesOnBucketLevelField(original->getMatchExpression());
+            MatchExpression* loosePredicate = predicate.loosePredicate.get();
+            ASSERT_TRUE(unpackStage->generateBucketLevelIdPredicates(loosePredicate));
+
+            auto andExpr = dynamic_cast<AndMatchExpression*>(loosePredicate);
             auto children = andExpr->getChildVector();
 
             ASSERT_EQ(children->size(), 3);

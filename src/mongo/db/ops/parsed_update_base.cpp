@@ -118,6 +118,11 @@ ParsedUpdateBase::ParsedUpdateBase(OperationContext* opCtx,
 
     tassert(
         7655104, "timeseries collection must already exist", _collection || !isRequestToTimeseries);
+
+    if (isRequestToTimeseries && _collection &&
+        _collection->getRequiresTimeseriesExtendedRangeSupport()) {
+        _expCtx->setRequiresTimeseriesExtendedRangeSupport(true);
+    }
 }
 
 void ParsedUpdateBase::maybeTranslateTimeseriesUpdate() {

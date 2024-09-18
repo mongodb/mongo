@@ -95,6 +95,11 @@ Status ParsedDelete::parseRequest() {
         return Status::OK();
     }
 
+    if (_isRequestToTimeseries && _collection &&
+        _collection->getRequiresTimeseriesExtendedRangeSupport()) {
+        _expCtx->setRequiresTimeseriesExtendedRangeSupport(true);
+    }
+
     _expCtx->startExpressionCounters();
 
     if (auto&& queryExprs = _timeseriesDeleteQueryExprs) {

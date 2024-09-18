@@ -74,6 +74,7 @@ public:
     Output createLoosePredicate(const ComparisonMatchExpressionBase* matchExpr) const;
     Output createTightPredicate(const ComparisonMatchExpressionBase* matchExpr) const;
 
+
 protected:
     Params _params;
 };
@@ -86,25 +87,6 @@ class DefaultBucketLevelComparisonPredicateGenerator final
     : public BucketLevelComparisonPredicateGeneratorBase {
 public:
     DefaultBucketLevelComparisonPredicateGenerator(Params params)
-        : BucketLevelComparisonPredicateGeneratorBase(std::move(params)){};
-
-    Output generateTimeFieldPredicate(const ComparisonMatchExpressionBase* matchExpr,
-                                      StringData minPathStringData,
-                                      StringData maxPathStringData,
-                                      Date_t timeField,
-                                      BSONObj maxTime,
-                                      StringData matchExprPath,
-                                      const BSONElement& matchExprData) const override;
-};
-
-/**
- * The predicate generator class to be used to be used for creating loose predicates for match
- * expressions for buckets that use an extended range.
- */
-class ExtendedRangeBucketLevelComparisonPredicateGenerator final
-    : public BucketLevelComparisonPredicateGeneratorBase {
-public:
-    ExtendedRangeBucketLevelComparisonPredicateGenerator(Params params)
         : BucketLevelComparisonPredicateGeneratorBase(std::move(params)){};
 
     Output generateTimeFieldPredicate(const ComparisonMatchExpressionBase* matchExpr,
@@ -154,6 +136,14 @@ public:
                      : builder->createLoosePredicate(matchExpr);
     }
 };
+
+/**
+ * Helper function to make comparison match expressions.
+ */
+template <typename T, typename V>
+static auto makeCmpMatchExpr(StringData path, V val) {
+    return std::make_unique<T>(path, val);
+}
 }  // namespace timeseries
 
 }  // namespace mongo

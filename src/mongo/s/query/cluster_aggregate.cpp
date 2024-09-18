@@ -263,21 +263,38 @@ void performValidationChecks(const OperationContext* opCtx,
 }
 
 /**
- * Rebuilds the pipeline and uses a different granularity value for the 'bucketMaxSpanSeconds' field
- * in the $_internalUnpackBucket stage.
+ * Appends the give 'bucketMaxSpanSeconds' attribute to the given object buidler for a timeseries
+ * unpack stage. 'tsFields' will contain values from the catalog if they were found. Otherwise, we
+ * will use the value produced by the kickback exception.
  */
-std::vector<BSONObj> rebuildPipelineWithTimeSeriesGranularity(
-    const std::vector<BSONObj>& pipeline,
-    boost::optional<BucketGranularityEnum> granularity,
-    boost::optional<int32_t> maxSpanSeconds) {
-    int32_t bucketSpan = 0;
-
-    if (maxSpanSeconds) {
-        bucketSpan = *maxSpanSeconds;
+void appendBucketMaxSpan(BSONObjBuilder& bob,
+                         const TypeCollectionTimeseriesFields* tsFields,
+                         BSONElement oldMaxSpanSeconds) {
+    if (tsFields) {
+        int32_t bucketSpan = 0;
+        auto maxSpanSeconds = tsFields->getBucketMaxSpanSeconds();
+        auto granularity = tsFields->getGranularity();
+        if (maxSpanSeconds) {
+            bucketSpan = *maxSpanSeconds;
+        } else {
+            bucketSpan = timeseries::getMaxSpanSecondsFromGranularity(
+                granularity.get_value_or(BucketGranularityEnum::Seconds));
+        }
+        bob.append(DocumentSourceInternalUnpackBucket::kBucketMaxSpanSeconds, bucketSpan);
     } else {
-        bucketSpan = timeseries::getMaxSpanSecondsFromGranularity(
-            granularity.get_value_or(BucketGranularityEnum::Seconds));
+        bob.append(oldMaxSpanSeconds);
     }
+}
+
+/**
+ * Rebuilds the pipeline and possibly updating the granularity value for the 'bucketMaxSpanSeconds'
+ * field in the $_internalUnpackBucket stage, since it may be out of date if a 'collMod' operation
+ * changed it after the DB primary threw the kickback exception. Also removes the
+ * 'usesExtendedRange' field altogether, since an accurate value for this can only be known on the
+ * mongod for the respective shard.
+ */
+std::vector<BSONObj> patchPipelineForTimeSeriesQuery(
+    const std::vector<BSONObj>& pipeline, const TypeCollectionTimeseriesFields* tsFields) {
 
     std::vector<BSONObj> newPipeline;
     for (auto& stage : pipeline) {
@@ -289,8 +306,10 @@ std::vector<BSONObj> rebuildPipelineWithTimeSeriesGranularity(
             for (auto& elem : stage.firstElement().Obj()) {
                 if (elem.fieldNameStringData() ==
                     DocumentSourceInternalUnpackBucket::kBucketMaxSpanSeconds) {
-                    newOptions.append(DocumentSourceInternalUnpackBucket::kBucketMaxSpanSeconds,
-                                      bucketSpan);
+                    appendBucketMaxSpan(newOptions, tsFields, elem);
+                } else if (elem.fieldNameStringData() ==
+                           DocumentSourceInternalUnpackBucket::kUsesExtendedRange) {
+                    // Omit so that target shard can amend with correct value.
                 } else {
                     newOptions.append(elem);
                 }
@@ -780,21 +799,29 @@ Status ClusterAggregate::retryOnViewError(OperationContext* opCtx,
     // bucketMaxSpanSeconds value. We need to make sure we use the bucketMaxSpanSeconds of the same
     // version as the routing table, instead of the one attached in the view error. This way the
     // shard versioning check can correctly catch stale routing information.
+    //
+    // In addition, we should be sure to remove the 'usesExtendedRange' value from the unpack stage,
+    // since the value on the target shard may be different.
     boost::optional<CollectionRoutingInfo> snapshotCri;
     if (nsStruct.executionNss.isTimeseriesBucketsCollection()) {
-        auto executionNsRoutingInfoStatus =
-            sharded_agg_helpers::getExecutionNsRoutingInfo(opCtx, nsStruct.executionNss);
-        if (executionNsRoutingInfoStatus.isOK()) {
-            const auto& cri = executionNsRoutingInfoStatus.getValue();
-            if (cri.cm.isSharded() && cri.cm.getTimeseriesFields()) {
-                const auto patchedPipeline = rebuildPipelineWithTimeSeriesGranularity(
-                    resolvedAggRequest.getPipeline(),
-                    cri.cm.getTimeseriesFields()->getGranularity(),
-                    cri.cm.getTimeseriesFields()->getBucketMaxSpanSeconds());
-                resolvedAggRequest.setPipeline(patchedPipeline);
-                snapshotCri = cri;
+        const TypeCollectionTimeseriesFields* timeseriesFields =
+            [&]() -> const TypeCollectionTimeseriesFields* {
+            StatusWith<CollectionRoutingInfo> criSt =
+                sharded_agg_helpers::getExecutionNsRoutingInfo(opCtx, nsStruct.executionNss);
+
+            if (criSt.isOK()) {
+                const CollectionRoutingInfo& cri = criSt.getValue();
+                if (cri.cm.isSharded()) {
+                    snapshotCri = cri;
+                    return cri.cm.getTimeseriesFields().get_ptr();
+                }
             }
-        }
+            return nullptr;
+        }();
+
+        const auto patchedPipeline =
+            patchPipelineForTimeSeriesQuery(resolvedAggRequest.getPipeline(), timeseriesFields);
+        resolvedAggRequest.setPipeline(patchedPipeline);
     }
 
     auto status = ClusterAggregate::runAggregate(

@@ -64,6 +64,7 @@
 #include "mongo/db/pipeline/expression.h"
 #include "mongo/db/pipeline/field_path.h"
 #include "mongo/db/query/timeseries/bucket_level_comparison_predicate_generator.h"
+#include "mongo/db/query/timeseries/bucket_level_id_predicate_generator.h"
 #include "mongo/db/query/util/make_data_structure.h"
 #include "mongo/db/timeseries/timeseries_constants.h"
 #include "mongo/util/assert_util.h"
@@ -389,6 +390,15 @@ BucketSpec::BucketPredicate BucketSpec::createPredicatesOnBucketLevelField(
     return handleIneligible(policy, matchExpr, "can't handle this predicate");
 }
 
+bool BucketSpec::generateBucketLevelIdPredicates(const ExpressionContext& pExpCtx,
+                                                 const BucketSpec& bucketSpec,
+                                                 int bucketMaxSpanSeconds,
+                                                 MatchExpression* matchExpr) {
+
+    return BucketLevelIdPredicateGenerator::generateIdPredicates(
+        pExpCtx, bucketSpec, bucketMaxSpanSeconds, matchExpr);
+}
+
 std::pair<bool, BSONObj> BucketSpec::pushdownPredicate(
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
     const TimeseriesOptions& tsOptions,
@@ -450,24 +460,34 @@ BucketSpec::SplitPredicates BucketSpec::getPushdownPredicates(
 
     std::unique_ptr<MatchExpression> bucketMetricPred = nullptr;
     if (residualPred) {
-        auto bucketPredicate = createPredicatesOnBucketLevelField(
-            residualPred.get(),
-            BucketSpec{
-                tsOptions.getTimeField().toString(),
-                metaField.map([](StringData s) { return s.toString(); }),
-                // Since we are operating on a collection, not a query-result,
-                // there are no inclusion/exclusion projections we need to apply
-                // to the buckets before unpacking. So we can use default values
-                // for the rest of the arguments.
-            },
-            *tsOptions.getBucketMaxSpanSeconds(),
-            expCtx,
-            haveComputedMetaField,
-            includeMetaField,
-            assumeNoMixedSchemaData,
-            policy,
-            fixedBuckets);
+        BucketSpec bucketSpec{
+            tsOptions.getTimeField().toString(),
+            metaField.map([](StringData s) { return s.toString(); }),
+            // Since we are operating on a collection, not a query-result,
+            // there are no inclusion/exclusion projections we need to apply
+            // to the buckets before unpacking. So we can use default values
+            // for the rest of the arguments.
+        };
+        auto bucketPredicate =
+            createPredicatesOnBucketLevelField(residualPred.get(),
+                                               bucketSpec,
+                                               *tsOptions.getBucketMaxSpanSeconds(),
+                                               expCtx,
+                                               haveComputedMetaField,
+                                               includeMetaField,
+                                               assumeNoMixedSchemaData,
+                                               policy,
+                                               fixedBuckets);
         bucketMetricPred = std::move(bucketPredicate.loosePredicate);
+        if (!expCtx->getRequiresTimeseriesExtendedRangeSupport()) {
+            // It may be possible to generate _id predicates or even '$alwaysTrue' or '$alwaysFalse'
+            // predicates if we know there is no extended range data.
+            bool changed = generateBucketLevelIdPredicates(
+                *expCtx, bucketSpec, *tsOptions.getBucketMaxSpanSeconds(), bucketMetricPred.get());
+            if (changed) {
+                bucketMetricPred = MatchExpression::normalize(std::move(bucketMetricPred));
+            }
+        }
         if (bucketPredicate.rewriteProvidesExactMatchPredicate) {
             residualPred = nullptr;
         } else {

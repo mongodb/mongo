@@ -761,6 +761,10 @@ last-continuous:
     ticket: SERVER-95244
   - test_file: jstests/sharding/migration_after_resharding_multi_insert_session_history.js
     ticket: SERVER-95724
+  - test_file: jstests/sharding/timeseries_query_extended_range.js
+    ticket: SERVER-73641
+  - test_file: jstests/core/timeseries/timeserie_update_delete_extended_range.js
+    ticket: SERVER-95075
   suites: null
 last-lts:
   all:
@@ -1582,4 +1586,8 @@ last-lts:
     ticket: SERVER-95244
   - test_file: jstests/sharding/migration_after_resharding_multi_insert_session_history.js
     ticket: SERVER-95724
+  - test_file: jstests/sharding/timeseries_query_extended_range.js
+    ticket: SERVER-73641
+  - test_file: jstests/core/timeseries/timeserie_update_delete_extended_range.js
+    ticket: SERVER-95075
   suites: null
