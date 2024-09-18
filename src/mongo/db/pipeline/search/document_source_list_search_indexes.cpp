@@ -96,14 +96,25 @@ StageConstraints DocumentSourceListSearchIndexes::constraints(
 }
 
 DocumentSource::GetNextResult DocumentSourceListSearchIndexes::doGetNext() {
+    auto* opCtx = pExpCtx->opCtx;
     // Cache the collectionUUID for subsequent 'doGetNext' calls. We cannot use 'pExpCtx->uuid' like
     // other aggregation stages, because this stage can run directly on mongos. 'pExpCtx->uuid' will
     // always be null on mongos. The search index commands already has helper functions to retrieve
     // the collectionUUID from either mongos or mongod depending on where the request was sent, so
     // we call those functions here.
     if (!_collectionUUID) {
-        _collectionUUID = SearchIndexProcessInterface::get(pExpCtx->opCtx)
-                              ->fetchCollectionUUID(pExpCtx->opCtx, pExpCtx->ns);
+        // TODO SERVER-93637 remove the separate logic for sharded vs unsharded once sharded
+        // views can support all search commands.
+        if (pExpCtx->mongoProcessInterface->inShardedEnvironment(opCtx)) {
+            _collectionUUID =
+                SearchIndexProcessInterface::get(opCtx)->fetchCollectionUUID(opCtx, pExpCtx->ns);
+        } else {
+            // If the query is on a view, this call will return the
+            // underlying source collection UUID and NSS. If not, it will just return a UUID.
+            std::tie(_collectionUUID, _resolvedNamespace) =
+                SearchIndexProcessInterface::get(opCtx)->fetchCollectionUUIDAndResolveView(
+                    opCtx, pExpCtx->ns);
+        }
     }
 
     // Return EOF if the collection requested does not exist.
@@ -121,9 +132,14 @@ DocumentSource::GetNextResult DocumentSourceListSearchIndexes::doGetNext() {
     if (_searchIndexes.empty()) {
         BSONObjBuilder bob;
         bob.append(kStageName, _cmdObj);
+
         // Sends a manageSearchIndex command and returns a cursor with index information.
         BSONObj manageSearchIndexResponse =
-            runSearchIndexCommand(pExpCtx->opCtx, pExpCtx->ns, bob.done());
+            runSearchIndexCommand(opCtx,
+                                  _resolvedNamespace ? *_resolvedNamespace : pExpCtx->ns,
+                                  bob.done(),
+                                  *_collectionUUID,
+                                  pExpCtx->viewNS);
 
         /**
          * 'mangeSearchIndex' returns a cursor with the following fields:

@@ -46,6 +46,7 @@ static constexpr StringData kSearchField = "search"_sd;
 static constexpr StringData kVectorSearchCmd = "vectorSearch"_sd;
 static constexpr StringData kCollectionUuidField = "collectionUUID"_sd;
 static constexpr StringData kQueryField = "query"_sd;
+static constexpr StringData kViewNameField = "viewName"_sd;
 static constexpr StringData kExplainField = "explain"_sd;
 static constexpr StringData kVerbosityField = "verbosity"_sd;
 static constexpr StringData kIntermediateField = "intermediate"_sd;

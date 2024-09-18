@@ -42,6 +42,7 @@
 #include "mongo/db/pipeline/document_source_replace_root.h"
 #include "mongo/db/pipeline/search/document_source_internal_search_id_lookup.h"
 #include "mongo/db/pipeline/search/document_source_internal_search_mongot_remote.h"
+#include "mongo/db/pipeline/search/document_source_list_search_indexes.h"
 #include "mongo/db/pipeline/search/document_source_search.h"
 #include "mongo/db/pipeline/search/document_source_search_meta.h"
 #include "mongo/db/pipeline/search/document_source_vector_search.h"
@@ -49,6 +50,7 @@
 #include "mongo/db/pipeline/variables.h"
 #include "mongo/db/query/search/mongot_cursor.h"
 #include "mongo/db/query/search/search_task_executors.h"
+#include "mongo/db/views/resolved_view.h"
 #include "mongo/s/query/exec/document_source_merge_cursors.h"
 #include "mongo/util/assert_util.h"
 
@@ -264,6 +266,17 @@ bool isSearchMetaPipeline(const Pipeline* pipeline) {
     return isSearchMetaStage(pipeline->peekFront());
 }
 
+void setResolvedNamespaceForSearch(const NamespaceString& origNss,
+                                   const ResolvedView& resolvedView,
+                                   boost::intrusive_ptr<ExpressionContext> expCtx,
+                                   boost::optional<UUID> uuid) {
+    auto resolvedNamespaces = StringMap<ExpressionContext::ResolvedNamespace>{
+        {origNss.coll().toString(),
+         {resolvedView.getNamespace(), resolvedView.getPipeline(), uuid}}};
+    expCtx->setResolvedNamespaces(resolvedNamespaces);
+    expCtx->viewNS = origNss;
+}
+
 bool isMongotPipeline(const Pipeline* pipeline) {
     if (!pipeline || pipeline->getSources().empty()) {
         return false;
@@ -291,7 +304,8 @@ bool isMongotStage(DocumentSource* stage) {
     return stage &&
         (dynamic_cast<mongo::DocumentSourceSearch*>(stage) ||
          dynamic_cast<mongo::DocumentSourceInternalSearchMongotRemote*>(stage) ||
-         dynamic_cast<mongo::DocumentSourceVectorSearch*>(stage));
+         dynamic_cast<mongo::DocumentSourceVectorSearch*>(stage) ||
+         dynamic_cast<mongo::DocumentSourceListSearchIndexes*>(stage));
 }
 
 void assertSearchMetaAccessValid(const Pipeline::SourceContainer& pipeline,

@@ -81,6 +81,10 @@ bool isSearchPipeline(const Pipeline* pipeline);
  */
 bool isSearchMetaPipeline(const Pipeline* pipeline);
 
+void setResolvedNamespaceForSearch(const NamespaceString& origNss,
+                                   const ResolvedView& resolvedView,
+                                   boost::intrusive_ptr<ExpressionContext> expCtx,
+                                   boost::optional<UUID> uuid = boost::none);
 /**
  * Check if this is a search-related pipeline, specifically that the front of the pipeline is a
  * stage that will rely on calls to mongot.

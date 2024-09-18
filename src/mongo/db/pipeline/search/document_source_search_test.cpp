@@ -88,8 +88,10 @@ TEST_F(SearchTest, ShouldSerializeAndExplainAtUnspecifiedVerbosity) {
                        Document({{"$_internalSearchMongotRemote", Document(mongotQuery)}}));
 
     auto idLookupExplain = explainedStages[1];
-    ASSERT_DOCUMENT_EQ(idLookupExplain.getDocument(),
-                       Document({{"$_internalSearchIdLookup", Document()}}));
+    ASSERT_DOCUMENT_EQ(
+        idLookupExplain.getDocument(),
+        Document({{"$_internalSearchIdLookup",
+                   Document(fromjson("{'subPipeline':[{'$match':{'_id':'_id placeholder'}}]}"))}}));
 }
 
 TEST_F(SearchTest, ShouldFailToParseIfSpecIsNotObject) {

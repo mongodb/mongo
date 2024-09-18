@@ -31,6 +31,9 @@
 
 #include "mongo/db/catalog/collection_catalog.h"
 #include "mongo/db/service_context.h"
+#include "mongo/db/views/view_catalog_helpers.h"
+#include <boost/optional/optional.hpp>
+
 
 namespace mongo {
 
@@ -55,6 +58,34 @@ UUID SearchIndexProcessShard::fetchCollectionUUIDOrThrow(OperationContext* opCtx
             str::stream() << "Collection '" << nss.toStringForErrorMsg() << "' does not exist.",
             optUuid);
     return optUuid.get();
+}
+
+std::pair<boost::optional<UUID>, boost::optional<NamespaceString>>
+SearchIndexProcessShard::fetchCollectionUUIDAndResolveView(OperationContext* opCtx,
+                                                           const NamespaceString& nss) {
+
+    auto catalog = CollectionCatalog::get(opCtx);
+    auto view = catalog->lookupView(opCtx, nss);
+    if (!view) {
+        return std::make_pair(catalog->lookupUUIDByNSS(opCtx, nss), boost::none);
+    } else {
+        auto resolvedNamespace =
+            view_catalog_helpers::findSourceCollectionNamespace(opCtx, catalog, nss);
+
+        return std::make_pair(catalog->lookupUUIDByNSS(opCtx, resolvedNamespace),
+                              boost::make_optional(resolvedNamespace));
+    }
+}
+
+std::pair<UUID, boost::optional<NamespaceString>>
+SearchIndexProcessShard::fetchCollectionUUIDAndResolveViewOrThrow(OperationContext* opCtx,
+                                                                  const NamespaceString& nss) {
+    auto uuidResolvdNssPair = fetchCollectionUUIDAndResolveView(opCtx, nss);
+    uassert(ErrorCodes::NamespaceNotFound,
+            str::stream() << "Collection '" << nss.toStringForErrorMsg() << "' does not exist.",
+            uuidResolvdNssPair.first);
+
+    return std::make_pair(*uuidResolvdNssPair.first, uuidResolvdNssPair.second);
 }
 
 }  // namespace mongo
