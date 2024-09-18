@@ -10,7 +10,7 @@ const st = new ShardingTest({
         // Heartbeat will be dropped when the maxTimeAlwaysTimeOut failpoint is set, so increase the
         // heartbeat interval and the time before an election will start to avoid a stepdown during
         // slow execution of the test.
-        settings: {heartbeatIntervalMillis: 120 * 1000, electionTimeoutMillis: 120 * 1000}
+        settings: {heartbeatIntervalMillis: 600 * 1000, electionTimeoutMillis: 600 * 1000}
     }
 });
 
