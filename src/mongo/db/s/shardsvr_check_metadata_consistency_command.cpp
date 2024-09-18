@@ -323,7 +323,7 @@ public:
             // Config server request
             const auto configOpKey = UUID::gen();
             ConfigsvrCheckMetadataConsistency configRequest{nss};
-            participantRequest.setCursor(request().getCursor());
+            configRequest.setCursor(request().getCursor());
 
             BSONObjBuilder configRequestBob;
             configRequest.serialize(&configRequestBob);
