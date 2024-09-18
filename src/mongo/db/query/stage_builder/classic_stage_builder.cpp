@@ -473,7 +473,6 @@ std::unique_ptr<PlanStage> ClassicStageBuilder::build(const QuerySolutionNode* r
         case STAGE_TIMESERIES_MODIFY:
         case STAGE_SPOOL:
         case STAGE_SENTINEL:
-        case STAGE_COLUMN_SCAN:
         case STAGE_UPDATE:
         case STAGE_UNWIND:
         case STAGE_SEARCH:

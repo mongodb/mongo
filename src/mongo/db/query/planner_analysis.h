@@ -148,15 +148,6 @@ public:
         std::unique_ptr<QuerySolution> soln);
 
     /**
-     * Walks the QuerySolutionNode tree rooted in 'soln', and looks for a ColumnScan that
-     * is a child of either a Group or Projection.  If the ColumnScan's parent will ignore
-     * extra fields, then eliminate its row store expression, allowing it to return extra fields
-     * in cases when it falls back to pulling the full document from the row store.
-     * If these conditions are not met this is a noop.
-     */
-    static void removeUselessColumnScanRowStoreExpression(QuerySolutionNode& root);
-
-    /**
      * Walk the solution tree, and trim out useless imprecise filters that are guaranteed to be
      * applied again by a later filter.
      */

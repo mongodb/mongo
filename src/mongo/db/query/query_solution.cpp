@@ -293,21 +293,6 @@ std::string QuerySolution::summaryString() const {
                     sb << " " << keyPattern;
                     break;
                 }
-                case STAGE_COLUMN_SCAN: {
-                    auto cixn = static_cast<const ColumnIndexScanNode*>(node);
-                    auto concat = [](const std::string& a, const std::string& b) {
-                        return a.empty() ? "'{}'"_format(b) : "{},'{}'"_format(a, b);
-                    };
-                    const std::string matchColumns = std::accumulate(
-                        cixn->matchFields.begin(), cixn->matchFields.end(), std::string{}, concat);
-                    const std::string outputColumns = std::accumulate(cixn->outputFields.begin(),
-                                                                      cixn->outputFields.end(),
-                                                                      std::string{},
-                                                                      concat);
-
-                    sb << " {{'match':[{}],'output':[{}]}}"_format(matchColumns, outputColumns);
-                    break;
-                }
                 default:
                     break;
             }
@@ -1270,39 +1255,6 @@ bool IndexScanNode::operator==(const IndexScanNode& other) const {
     return filtersAreEquivalent(filter.get(), other.filter.get()) && index == other.index &&
         direction == other.direction && addKeyMetadata == other.addKeyMetadata &&
         bounds == other.bounds && iets == other.iets;
-}
-
-//
-// ColumnIndexScanNode
-//
-ColumnIndexScanNode::ColumnIndexScanNode(ColumnIndexEntry indexEntry,
-                                         OrderedPathSet outputFieldsIn,
-                                         OrderedPathSet matchFieldsIn,
-                                         OrderedPathSet allFieldsIn,
-                                         StringMap<std::unique_ptr<MatchExpression>> filtersByPath,
-                                         std::unique_ptr<MatchExpression> postAssemblyFilter,
-                                         bool extraFieldsPermitted)
-    : indexEntry(std::move(indexEntry)),
-      outputFields(std::move(outputFieldsIn)),
-      matchFields(std::move(matchFieldsIn)),
-      allFields(std::move(allFieldsIn)),
-      filtersByPath(std::move(filtersByPath)),
-      postAssemblyFilter(std::move(postAssemblyFilter)),
-      extraFieldsPermitted(extraFieldsPermitted) {}
-
-void ColumnIndexScanNode::appendToString(str::stream* ss, int indent) const {
-    addIndent(ss, indent);
-    *ss << "COLUMN_SCAN\n";
-    addIndent(ss, indent + 1);
-    *ss << "outputFields = [" << boost::algorithm::join(outputFields, ", ") << "]\n";
-    addIndent(ss, indent + 1);
-    *ss << "matchFields = [" << boost::algorithm::join(matchFields, ", ") << "]\n";
-    addIndent(ss, indent + 1);
-    *ss << "filtersByPath = " << expression::filterMapToString(filtersByPath) << "\n";
-    addIndent(ss, indent + 1);
-    *ss << "postAssemblyFilter = " << (postAssemblyFilter ? postAssemblyFilter->toString() : "{}")
-        << "\n";
-    addCommon(ss, indent);
 }
 
 //

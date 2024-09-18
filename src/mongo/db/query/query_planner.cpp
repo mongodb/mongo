@@ -222,14 +222,6 @@ bool hintMatchesClusterKey(const boost::optional<ClusteredCollectionInfo>& clust
 }
 
 /**
- * Returns whether the hintedIndex matches the columnstore index.
- */
-bool hintMatchesColumnStoreIndex(const BSONObj& hintObj, const ColumnIndexEntry& columnStoreIndex) {
-    return hintMatchesNameOrPattern(
-        hintObj, columnStoreIndex.identifier.catalogName, columnStoreIndex.keyPattern);
-}
-
-/**
  * Returns the dependencies for the CanonicalQuery, split by those needed to answer the filter,
  * and those needed for "everything else", e.g. project, sort and shard filter.
  */
@@ -265,256 +257,12 @@ std::pair<DepsTracker /* filter */, DepsTracker /* other */> computeDeps(
     return {std::move(filterDeps), std::move(outputDeps)};
 }
 
-/**
- * Determines whether a column scan should be used given information about the query and collection.
- * We are specifically interested in whether a column scan is likely to perform better than a
- * collection scan. Column scan should be used if the following conditions are met:
- *
- * (|referenced fields| < maxNumFields) &&
- * (|filtered fields| >= minNumColumnFilters ||
- *     uncompressedCollectionSize >= minCollectionSize ||
- *     avgDocSize >= minAvgDocSize)
- *
- * In words: we will use column scan if the query is reading fewer than the max number of fields,
- * and at least one of the following is true: we are pushing down filters on a large number of
- * fields, the collection does not fit in memory, or the average document size is large.
- *
- * All of the thresholds listed (referenced fields, column filters, collection size, and average
- * document size) can be adjusted via query knobs.
- */
-Status querySatisfiesCsiPlanningHeuristics(size_t nReferencedFields,
-                                           size_t nFilteredFields,
-                                           const QueryPlannerParams& plannerParams) {
-    // Check that we are reading fewer than the max number of fields allowed for column scan.
-    const int maxNumFields = nFilteredFields > 0
-        ? internalQueryMaxNumberOfFieldsToChooseFilteredColumnScan.load()
-        : internalQueryMaxNumberOfFieldsToChooseUnfilteredColumnScan.load();
-    if (static_cast<int>(nReferencedFields) > maxNumFields) {
-        return Status{ErrorCodes::Error{6430508},
-                      str::stream()
-                          << "query referenced too many fields to use column scan. nReferenced="
-                          << nReferencedFields << ", limit=" << maxNumFields};
-    }
-
-    const auto columnFilterThreshold = internalQueryColumnScanMinNumColumnFilters.load();
-    if (static_cast<int>(nFilteredFields) >= columnFilterThreshold) {
-        // We have enough column filters to make column scan worth it, regardless of the
-        // collection/document size.
-        return Status::OK();
-    }
-
-    const auto numDocs = plannerParams.mainCollectionInfo.stats.noOfRecords;
-    const auto uncompressedDataSizeBytes =
-        plannerParams.mainCollectionInfo.stats.approximateDataSizeBytes;
-
-    // Check if the entire uncompressed collection is greater than our min collection size
-    // threshold, or if it can fit in memory if the min size is unspecified.
-    const auto collectionSizeThresholdBytes = [&]() {
-        const auto configuredThresholdBytes = internalQueryColumnScanMinCollectionSizeBytes.load();
-        // If there is no threshold specified (== -1), use available memory size.
-        return configuredThresholdBytes == -1 ? plannerParams.availableMemoryBytes
-                                              : configuredThresholdBytes;
-    }();
-    if (uncompressedDataSizeBytes >= collectionSizeThresholdBytes) {
-        // The collection is larger than memory/the configured threshold - use column scan.
-        return Status::OK();
-    }
-
-    // If we got here, the query/collection doesn't meet any of our other thresholds. Check if the
-    // average document size is greater than our threshold for using column scan.
-    const auto docSizeThresholdBytes = internalQueryColumnScanMinAvgDocSizeBytes.load();
-    auto avgDocSizeBytes =
-        numDocs > 0 ? uncompressedDataSizeBytes / static_cast<double>(numDocs) : 0.0;
-    if (avgDocSizeBytes >= docSizeThresholdBytes) {
-        return Status::OK();
-    }
-
-    return {ErrorCodes::Error{6995600},
-            str::stream() << "query did not pass heuristics for using column scan. "
-                          << "nFilteredFields: " << nFilteredFields << " < "
-                          << columnFilterThreshold << ", collectionSizeBytes: "
-                          << uncompressedDataSizeBytes << " < " << collectionSizeThresholdBytes
-                          << ", avgDocSizeBytes: " << avgDocSizeBytes << " < "
-                          << docSizeThresholdBytes};
-}
-
-Status computeColumnScanIsPossibleStatus(const CanonicalQuery& query,
-                                         const QueryPlannerParams& params) {
-    if (params.mainCollectionInfo.columnIndexes.empty()) {
-        static const auto status =
-            Status{ErrorCodes::InvalidOptions, "No columnstore indexes available"_sd};
-        return status;
-    }
-    if (!query.isSbeCompatible()) {
-        static const auto status = Status{
-            ErrorCodes::NotImplemented,
-            "A columnstore index can only be used with queries in the SBE engine. The given "_sd
-            "query is not eligible for this engine (yet)"_sd};
-        return status;
-    }
-    if (query.getExpCtx()->getQueryKnobConfiguration().isForceClassicEngineEnabled()) {
-        static const auto status = Status{
-            ErrorCodes::InvalidOptions,
-            "A columnstore index can only be used with queries in the SBE engine, but the "_sd
-            "query specified to force the classic engine"_sd};
-        return status;
-    }
-    return Status::OK();
-}
-
-bool columnScanIsPossible(const CanonicalQuery& query, const QueryPlannerParams& params) {
-    return computeColumnScanIsPossibleStatus(query, params).isOK();
-}
-
-std::unique_ptr<QuerySolution> makeColumnScanPlan(
-    const CanonicalQuery& query,
-    const QueryPlannerParams& params,
-    const ColumnIndexEntry& columnStoreIndex,
-    DepsTracker filterDeps,
-    DepsTracker outputDeps,
-    OrderedPathSet allFieldsReferenced,
-    StringMap<std::unique_ptr<MatchExpression>> filterSplitByColumn,
-    std::unique_ptr<MatchExpression> residualPredicate) {
-    dassert(columnScanIsPossible(query, params));
-
-    return QueryPlannerAnalysis::analyzeDataAccess(
-        query,
-        params,
-        std::make_unique<ColumnIndexScanNode>(columnStoreIndex,
-                                              std::move(outputDeps.fields),
-                                              std::move(filterDeps.fields),
-                                              std::move(allFieldsReferenced),
-                                              std::move(filterSplitByColumn),
-                                              std::move(residualPredicate)));
-}
-
 bool checkProjectionCoversQuery(OrderedPathSet& fields, const ColumnIndexEntry& columnStoreIndex) {
     const auto projectedFields = projection_executor_utils::applyProjectionToFields(
         columnStoreIndex.indexPathProjection->exec(), fields);
     // If the number of fields is equal to the number of fields preserved, then the projection
     // covers the query.
     return projectedFields.size() == fields.size();
-}
-
-/**
- * A helper function that returns the number of column store indexes that cover the query,
- * as well as an arbitary, valid column store index for the column scan.
- */
-std::pair<int, const ColumnIndexEntry*> getValidColumnIndex(
-    OrderedPathSet& fields, const std::vector<ColumnIndexEntry>& columnStoreIndexes) {
-    const ColumnIndexEntry* chosenIndex = nullptr;
-    int numValid = 0;
-    for (const auto& columnStoreIndex : columnStoreIndexes) {
-        if (checkProjectionCoversQuery(fields, columnStoreIndex)) {
-            chosenIndex = numValid == 0 ? &columnStoreIndex : chosenIndex;
-            ++numValid;
-        }
-    }
-    return {numValid, chosenIndex};
-}
-
-/**
- * Attempts to build a plan using a column store index. Returns a non-OK status if it can't build
- * one with the code and message indicating the problem - or a QuerySolution if it can.
- */
-StatusWith<std::unique_ptr<QuerySolution>> tryToBuildColumnScan(
-    const QueryPlannerParams& params,
-    const CanonicalQuery& query,
-    const boost::optional<ColumnIndexEntry>& hintedIndex = boost::none) {
-    if (auto status = computeColumnScanIsPossibleStatus(query, params); !status.isOK()) {
-        return status;
-    }
-
-    invariant(params.mainCollectionInfo.columnIndexes.size() >= 1);
-
-    auto [filterDeps, outputDeps] = computeDeps(params, query);
-    auto allFieldsReferenced = set_util::setUnion(filterDeps.fields, outputDeps.fields);
-    if (filterDeps.needWholeDocument || outputDeps.needWholeDocument) {
-        // TODO SERVER-66284 Would like to enable a plan when hinted, even if we need the whole
-        // document. Something like COLUMN_SCAN -> FETCH.
-        static const auto status =
-            Status{ErrorCodes::Error{6298501},
-                   "cannot use column store index because the query requires seeing the entire "_sd
-                   "document"_sd};
-        return status;
-    } else if (!hintedIndex && expression::containsOverlappingPaths(allFieldsReferenced)) {
-        // The query needs a path and a parent or ancestor path. For example, the query needs to
-        // access both "a" and "a.b". This is a heuristic, but generally we would not expect this to
-        // benefit from the column store index. This kind of dependency pattern is probably an
-        // indication that the parent/ancestor path will be an object or array of objects, which
-        // will require us to fall back to the rowstore and remove any benefit of using the index.
-        return {ErrorCodes::Error{6726400},
-                str::stream() << "cannot use columnstore index because the query requires paths "
-                                 "which are a prefix of each other: "
-                              << set_util::setToString(allFieldsReferenced)};
-    } else if (expression::containsEmptyPaths(allFieldsReferenced)) {
-        return {
-            ErrorCodes::Error{6549400},
-            str::stream() << "cannot use columnstore index because the query requires empty paths: "
-                          << set_util::setToString(allFieldsReferenced)};
-    }
-
-    // Ensures that hinted index is eligible for the column scan.
-    if (hintedIndex && !checkProjectionCoversQuery(allFieldsReferenced, *hintedIndex)) {
-        static const auto status = Status{
-            ErrorCodes::Error{6714002},
-            "the hinted column store index cannot be used because it does not cover the query"_sd};
-        return status;
-    }
-
-    // Check that union of the dependency fields can be successfully projected by at least one
-    // column store index.
-    auto [numValid, selectedColumnStoreIndex] =
-        getValidColumnIndex(allFieldsReferenced, params.mainCollectionInfo.columnIndexes);
-
-    // If not columnar index can support the projection, we will not use column scan.
-    if (numValid == 0) {
-        static const auto status = Status{
-            ErrorCodes::Error{6714001},
-            "cannot use column store index because there exists no column store index for this "_sd
-            "collection that covers the query"_sd};
-        return status;
-    }
-    invariant(selectedColumnStoreIndex);
-
-    if (!hintedIndex && numValid > 1) {
-        LOGV2_DEBUG(6298500,
-                    2,
-                    "Multiple column store indexes present. Selecting the first "
-                    "one arbitrarily",
-                    "indexName"_attr = selectedColumnStoreIndex->identifier.catalogName);
-    }
-
-    const auto& columnStoreIndex = hintedIndex.value_or(*selectedColumnStoreIndex);
-    std::unique_ptr<MatchExpression> residualPredicate;
-    StringMap<std::unique_ptr<MatchExpression>> filterSplitByColumn;
-    std::tie(filterSplitByColumn, residualPredicate) =
-        expression::splitMatchExpressionForColumns(query.getPrimaryMatchExpression());
-    auto heuristicsStatus = querySatisfiesCsiPlanningHeuristics(
-        allFieldsReferenced.size(), filterSplitByColumn.size(), params);
-
-    if (heuristicsStatus.isOK() || hintedIndex) {
-        // We have a hint, or collection stats and dependencies that indicate a column scan is
-        // likely better than a collection scan. Build it and return it.
-
-        // Since the residual predicate must be applied after the column scan, we need to include
-        // the dependencies among the output fields.
-        DepsTracker residualDeps;
-        if (residualPredicate) {
-            match_expression::addDependencies(residualPredicate.get(), &residualDeps);
-            outputDeps.fields = set_util::setUnion(outputDeps.fields, residualDeps.fields);
-        }
-
-        return makeColumnScanPlan(query,
-                                  params,
-                                  columnStoreIndex,
-                                  std::move(filterDeps),
-                                  std::move(outputDeps),
-                                  std::move(allFieldsReferenced),
-                                  std::move(filterSplitByColumn),
-                                  std::move(residualPredicate));
-    }
-    return heuristicsStatus;
 }
 
 bool isSolutionBoundedCollscan(const QuerySolution* querySoln) {
@@ -1312,17 +1060,6 @@ StatusWith<std::vector<std::unique_ptr<QuerySolution>>> QueryPlanner::plan(
             return handleNaturalHint(query, params, naturalHint, isTailable);
         } else if (hintMatchesClusterKey(params.clusteredInfo, hintObj)) {
             return handleClusteredScanHint(query, params, isTailable);
-        } else {
-            for (auto&& columnIndex : params.mainCollectionInfo.columnIndexes) {
-                if (hintMatchesColumnStoreIndex(hintObj, columnIndex)) {
-                    // Hint matches - either build the plan or fail.
-                    auto statusWithSoln = tryToBuildColumnScan(params, query, columnIndex);
-                    if (!statusWithSoln.isOK()) {
-                        return statusWithSoln.getStatus();
-                    }
-                    return singleSolution(std::move(statusWithSoln.getValue()));
-                }
-            }
         }
     }
 
@@ -1813,18 +1550,6 @@ StatusWith<std::vector<std::unique_ptr<QuerySolution>>> QueryPlanner::plan(
         }
     }
 
-    // Check whether we're eligible to use the columnar index, assuming no other indexes can be
-    // used.
-    if (out.empty()) {
-        auto statusWithSoln = tryToBuildColumnScan(params, query);
-        if (statusWithSoln.isOK()) {
-            out.emplace_back(std::move(statusWithSoln.getValue()));
-        } else {
-            LOGV2_DEBUG(
-                6726401, 4, "Not using a column scan", "reason"_attr = statusWithSoln.getStatus());
-        }
-    }
-
     // Create a $search QuerySolution if we are performing a $search.
     if (out.empty()) {
         auto statusWithSoln = tryToBuildSearchQuerySolution(params, query);
@@ -2094,7 +1819,6 @@ std::unique_ptr<QuerySolution> QueryPlanner::extendWithAggPipeline(
 
     solution->extendWith(std::move(solnForAgg));
     solution = QueryPlannerAnalysis::removeInclusionProjectionBelowGroup(std::move(solution));
-    QueryPlannerAnalysis::removeUselessColumnScanRowStoreExpression(*solution->root());
 
     return std::move(solution);
 }  // QueryPlanner::extendWithAggPipeline

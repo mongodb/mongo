@@ -284,31 +284,6 @@ void statsToBSON(const QuerySolutionNode* node,
             bob->append("scanDirection", toString(eln->scanDirection));
             break;
         }
-        case STAGE_COLUMN_SCAN: {
-            auto cisn = static_cast<const ColumnIndexScanNode*>(node);
-
-            {
-                BSONArrayBuilder fieldsBab{bob->subarrayStart("allFields")};
-                for (const auto& field : cisn->allFields) {
-                    fieldsBab.append(field);
-                }
-            }
-
-            if (!cisn->filtersByPath.empty()) {
-                BSONObjBuilder filtersBob(bob->subobjStart("filtersByPath"));
-                for (const auto& [path, matchExpr] : cisn->filtersByPath) {
-                    SerializationOptions opts;
-                    filtersBob.append(path, matchExpr->serialize(opts, false));
-                }
-            }
-
-            if (cisn->postAssemblyFilter) {
-                bob->append("residualPredicate", cisn->postAssemblyFilter->serialize());
-            }
-            bob->appendBool("extraFieldsPermitted", cisn->extraFieldsPermitted);
-
-            break;
-        }
         case STAGE_UNPACK_TS_BUCKET: {
             auto utsbn = static_cast<const UnpackTsBucketNode*>(node);
             {

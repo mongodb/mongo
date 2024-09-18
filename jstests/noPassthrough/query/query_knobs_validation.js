@@ -55,16 +55,11 @@ const expectedParamDefaults = {
     internalQueryCollectionMaxNoOfDocumentsToChooseHashJoin: 10 * 1000,
     internalQueryCollectionMaxDataSizeBytesToChooseHashJoin: 100 * 1024 * 1024,
     internalQueryCollectionMaxStorageSizeBytesToChooseHashJoin: 100 * 1024 * 1024,
-    internalQueryMaxNumberOfFieldsToChooseUnfilteredColumnScan: 5,
-    internalQueryMaxNumberOfFieldsToChooseFilteredColumnScan: 12,
     internalQueryFLERewriteMemoryLimit: 14 * 1024 * 1024,
     internalQueryDisableLookupExecutionUsingHashJoin: false,
     internalQuerySlotBasedExecutionDisableLookupPushdown: false,
     internalQuerySlotBasedExecutionDisableGroupPushdown: false,
     allowDiskUseByDefault: true,
-    internalQueryColumnScanMinAvgDocSizeBytes: 1024,
-    internalQueryColumnScanMinCollectionSizeBytes: -1,
-    internalQueryColumnScanMinNumColumnFilters: 3,
     internalQueryMaxSpoolMemoryUsageBytes: 100 * 1024 * 1024,
     internalQueryMaxSpoolDiskUsageBytes: 10 * 100 * 1024 * 1024,
     deprioritizeUnboundedUserCollectionScans: true,
@@ -256,14 +251,6 @@ assertSetParameterSucceeds("internalQuerySlotBasedExecutionDisableLookupPushdown
 assertSetParameterSucceeds("internalQuerySlotBasedExecutionDisableGroupPushdown", true);
 assertSetParameterSucceeds("internalQuerySlotBasedExecutionDisableGroupPushdown", false);
 
-assertSetParameterSucceeds("internalQueryMaxNumberOfFieldsToChooseUnfilteredColumnScan", 100);
-assertSetParameterSucceeds("internalQueryMaxNumberOfFieldsToChooseUnfilteredColumnScan", 0);
-assertSetParameterFails("internalQueryMaxNumberOfFieldsToChooseUnfilteredColumnScan", -1);
-
-assertSetParameterSucceeds("internalQueryMaxNumberOfFieldsToChooseFilteredColumnScan", 100);
-assertSetParameterSucceeds("internalQueryMaxNumberOfFieldsToChooseFilteredColumnScan", 0);
-assertSetParameterFails("internalQueryMaxNumberOfFieldsToChooseFilteredColumnScan", -1);
-
 assertSetParameterSucceeds("allowDiskUseByDefault", false);
 assertSetParameterSucceeds("allowDiskUseByDefault", true);
 
@@ -274,18 +261,6 @@ assertSetParameterSucceeds("internalQueryFrameworkControl", "forceClassicEngine"
 assertSetParameterSucceeds("internalQueryFrameworkControl", "trySbeEngine");
 assertSetParameterFails("internalQueryFrameworkControl", "tryCascades");
 assertSetParameterFails("internalQueryFrameworkControl", 1);
-
-assertSetParameterSucceeds("internalQueryColumnScanMinAvgDocSizeBytes", 100);
-assertSetParameterSucceeds("internalQueryColumnScanMinAvgDocSizeBytes", 0);
-assertSetParameterFails("internalQueryColumnScanMinAvgDocSizeBytes", -1);
-
-assertSetParameterSucceeds("internalQueryColumnScanMinCollectionSizeBytes", 100);
-assertSetParameterSucceeds("internalQueryColumnScanMinCollectionSizeBytes", -1);
-assertSetParameterFails("internalQueryColumnScanMinCollectionSizeBytes", -2);
-
-assertSetParameterSucceeds("internalQueryColumnScanMinNumColumnFilters", 100);
-assertSetParameterSucceeds("internalQueryColumnScanMinNumColumnFilters", 0);
-assertSetParameterFails("internalQueryColumnScanMinNumColumnFilters", -1);
 
 assertSetParameterSucceeds("internalQueryMaxSpoolMemoryUsageBytes", 100);
 assertSetParameterSucceeds("internalQueryMaxSpoolMemoryUsageBytes", 1);

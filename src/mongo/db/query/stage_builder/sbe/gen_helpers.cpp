@@ -972,7 +972,6 @@ boost::optional<UnfetchedIxscans> getUnfetchedIxscans(const QuerySolutionNode* r
             }
             case STAGE_COLLSCAN:
             case STAGE_VIRTUAL_SCAN:
-            case STAGE_COLUMN_SCAN:
             case STAGE_FETCH: {
                 hasFetchesOrCollScans = true;
                 break;

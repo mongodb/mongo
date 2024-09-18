@@ -272,19 +272,6 @@ std::unique_ptr<MatchExpression> copyExpressionAndApplyRenames(
     const MatchExpression* expr, const StringMap<std::string>& renames);
 
 /**
- * Split a MatchExpression into two parts:
- *  - Filters which can be applied to one "column" at a time in a columnstore index. This will be
- *    returned as a map from path to MatchExpression. For this to be safe:
- *    - any predicate which does not  match should disqualify the entire document
- *    - any document which doesn't contain the path should not match.
- *  - A "residual" predicate which captures any pieces of the expression which cannot be pushed down
- *    into a column, either because it would be incorrect to do so, or we're not smart enough to do
- *    so yet.
- */
-std::pair<StringMap<std::unique_ptr<MatchExpression>>, std::unique_ptr<MatchExpression>>
-splitMatchExpressionForColumns(const MatchExpression* me);
-
-/**
  * Serializes this complex data structure for debugging purposes.
  */
 std::string filterMapToString(const StringMap<std::unique_ptr<MatchExpression>>&);

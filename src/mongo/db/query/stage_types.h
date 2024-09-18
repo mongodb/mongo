@@ -55,8 +55,6 @@ enum StageType {
 
     STAGE_COLLSCAN,
 
-    STAGE_COLUMN_SCAN,
-
     // A virtual scan stage that simulates a collection scan and doesn't depend on underlying
     // storage.
     STAGE_VIRTUAL_SCAN,

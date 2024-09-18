@@ -343,11 +343,6 @@ plan_cache_debug_info::DebugInfoSBE buildDebugInfo(const QuerySolution* solution
                 debugInfo.mainStats.indexesUsed.push_back(ixn->index.identifier.catalogName);
                 break;
             }
-            case STAGE_COLUMN_SCAN: {
-                auto cisn = static_cast<const ColumnIndexScanNode*>(node);
-                debugInfo.mainStats.indexesUsed.push_back(cisn->indexEntry.identifier.catalogName);
-                break;
-            }
             case STAGE_TEXT_MATCH: {
                 auto tn = static_cast<const TextMatchNode*>(node);
                 debugInfo.mainStats.indexesUsed.push_back(tn->index.identifier.catalogName);

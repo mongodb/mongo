@@ -1236,57 +1236,6 @@ bool isPathPrefixOf(StringData first, StringData second) {
     return second.startsWith(first) && second[first.size()] == '.';
 }
 
-std::pair<StringMap<std::unique_ptr<MatchExpression>>, std::unique_ptr<MatchExpression>>
-splitMatchExpressionForColumns(const MatchExpression* me) {
-    StringMap<std::unique_ptr<MatchExpression>> out;
-    StringMap<std::unique_ptr<MatchExpression>> pending;
-    auto residualMatch = mongo::splitMatchExpressionForColumns(me, out, pending);
-
-    // Let's combine pending expressions with those in 'out', if possible.
-    for (auto pIt = pending.begin(); pIt != pending.end();) {
-        const auto& path = pIt->first;
-        auto oIt = out.find(path);
-        if (oIt != out.end()) {
-            auto expr = std::move(pIt->second);
-            // Do not create nested ANDs.
-            if (expr->matchType() == MatchExpression::AND) {
-                auto pendingAnd = checked_cast<AndMatchExpression*>(expr.get());
-                for (size_t i = 0, end = pendingAnd->numChildren(); i != end; ++i) {
-                    mongo::addExpr(path, pendingAnd->releaseChild(i), out);
-                }
-            } else {
-                mongo::addExpr(path, std::move(expr), out);
-            }
-
-            // Remove the path from the 'pending' map.
-            auto toErase = pIt;
-            ++pIt;
-            pending.erase(toErase);
-        } else {
-            ++pIt;
-        }
-    }
-
-    if (pending.empty()) {
-        return {std::move(out), std::move(residualMatch)};
-    }
-
-    // The unmatched pending predicates have to be done as residual.
-    std::vector<std::unique_ptr<MatchExpression>> unmatchedPending;
-    unmatchedPending.reserve(pending.size() + 1);
-    for (auto& p : pending) {
-        unmatchedPending.push_back(std::move(p.second));
-    }
-    if (residualMatch) {
-        unmatchedPending.push_back(std::move(residualMatch));
-    }
-
-    if (unmatchedPending.size() == 1) {
-        return {std::move(out), std::move(unmatchedPending[0])};
-    }
-    return {std::move(out), std::make_unique<AndMatchExpression>(std::move(unmatchedPending))};
-}
-
 std::string filterMapToString(const StringMap<std::unique_ptr<MatchExpression>>& filterMap) {
     StringBuilder sb;
     sb << "{";

@@ -42,7 +42,6 @@ StringData stageTypeToString(StageType stageType) {
         {STAGE_BATCHED_DELETE, "BATCHED_DELETE"_sd},
         {STAGE_CACHED_PLAN, "CACHED_PLAN"},
         {STAGE_COLLSCAN, "COLLSCAN"_sd},
-        {STAGE_COLUMN_SCAN, "COLUMN_SCAN"_sd},
         {STAGE_COUNT, "COUNT"_sd},
         {STAGE_COUNT_SCAN, "COUNT_SCAN"_sd},
         {STAGE_DELETE, "DELETE"_sd},

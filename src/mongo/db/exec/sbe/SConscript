@@ -119,7 +119,6 @@ env.Library(
     target="query_sbe_storage",
     source=[
         "stages/collection_helpers.cpp",
-        "stages/column_scan.cpp",
         "stages/ix_scan.cpp",
         "stages/scan.cpp",
     ],

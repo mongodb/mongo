@@ -485,22 +485,6 @@ std::unique_ptr<QuerySolutionNode> addSortKeyGeneratorStageIfNeeded(
 }
 
 /**
- * Returns a pointer to a COLUMN_SCAN node if there is one. Returns nullptr if it cannot be found or
- * if there is any branching in the tree that would lead to more than one leaf node.
- */
-const ColumnIndexScanNode* treeSourceIsColumnScan(const QuerySolutionNode* root) {
-    if (root->getType() == StageType::STAGE_COLUMN_SCAN) {
-        return static_cast<const ColumnIndexScanNode*>(root);
-    }
-
-    // Non-branching trees only, intentionally ignore >1 child.
-    if (root->children.size() == 1) {
-        return treeSourceIsColumnScan(root->children[0].get());
-    }
-    return nullptr;
-}
-
-/**
  * When a projection needs to be added to the solution tree, this function chooses between the
  * default implementation and one of the fast paths.
  *
@@ -557,30 +541,15 @@ std::unique_ptr<QuerySolutionNode> analyzeProjection(
     // All fast paths can only apply to "simple" projections - see the implementation for details.
     if (projection.isSimple()) {
         const bool isInclusionOnly = projection.isInclusionOnly();
-        // First fast path: We have a COLUMN_SCAN providing the data, there are no computed
-        // expressions, and the requested fields are provided exactly. For 'simple' projections
-        // which must have only top-level fields, A COLUMN_SCAN can provide data in a format safe to
-        // return to the client, so it is safe to elide any projection if the COLUMN_SCAN is
-        // outputting exactly the set of fields that the user required. This may not be the case all
-        // the time if say we needed an extra field for a sort or for shard filtering.
-        const auto* columnScan = treeSourceIsColumnScan(solnRoot.get());
-        if (columnScan && isInclusionOnly &&
-            columnScan->outputFields.size() == projection.getRequiredFields().size()) {
-            // No projection needed. We already checked that all necessary fields are provided, so
-            // if the set sizes match, they match exactly.
-            return solnRoot;
-        }
-
-        // Next fast path: A ProjectionNodeSimple fast-path for plans that have a materialized
-        // object from a FETCH or COLUMN_SCAN stage.
-        if (solnRoot->fetched() || columnScan != nullptr) {
-            // COLUMN_SCAN may fall into this case if it provided all the necessary data but had
-            // too many fields output, so we need to trim them down.
+        // A ProjectionNodeSimple fast-path for plans that have a materialized object from a FETCH
+        // stage or collscan.
+        if (solnRoot->fetched()) {
             return std::make_unique<ProjectionNodeSimple>(
                 addSortKeyGeneratorStageIfNeeded(query, hasSortStage, std::move(solnRoot)),
                 query.getPrimaryMatchExpression(),
                 projection);
         }
+
         if (isInclusionOnly) {
             auto coveredKeyObj = produceCoveredKeyObj(solnRoot.get());
             if (!coveredKeyObj.isEmpty()) {
@@ -893,46 +862,6 @@ std::unique_ptr<QuerySolution> QueryPlannerAnalysis::removeInclusionProjectionBe
     std::unique_ptr<QuerySolution> soln) {
     removeInclusionProjectionBelowGroupRecursive(soln->root());
     return soln;
-}
-
-// static
-void QueryPlannerAnalysis::removeUselessColumnScanRowStoreExpression(QuerySolutionNode& root) {
-    // If a group or projection's child is a COLUMN_SCAN node, try to eliminate the
-    // expression that projects documents retrieved from row store fallback. In other words, the
-    // COLUMN_SCAN's rowStoreExpression can be removed if it does not affect the group or
-    // project above.
-    for (auto& child : root.children) {
-        if (child->getType() == STAGE_COLUMN_SCAN) {
-            auto childColumnScan = static_cast<ColumnIndexScanNode*>(child.get());
-
-            // Look for group above column scan.
-            if (root.getType() == STAGE_GROUP) {
-                auto& parentGroup = static_cast<GroupNode&>(root);
-                // A row store expression that preserves all fields used by the parent $group is
-                // redundant and can be removed.
-                if (!childColumnScan->extraFieldsPermitted &&
-                    isSubset(parentGroup.requiredFields, childColumnScan->outputFields)) {
-                    childColumnScan->extraFieldsPermitted = true;
-                }
-            }
-            // Look for projection above column scan.
-            else if ((root.getType() == STAGE_PROJECTION_SIMPLE ||
-                      root.getType() == STAGE_PROJECTION_DEFAULT) &&
-                     static_cast<ProjectionNode&>(root).proj.type() ==
-                         projection_ast::ProjectType::kInclusion) {
-                auto& parentProjection = static_cast<ProjectionNode&>(root);
-                // A row store expression that preserves all fields used by the parent projection is
-                // redundant and can be removed.
-                if (!childColumnScan->extraFieldsPermitted &&
-                    isSubset(parentProjection.proj.getRequiredFields(),
-                             childColumnScan->outputFields)) {
-                    childColumnScan->extraFieldsPermitted = true;
-                }
-            }
-        }
-        // Recur on child.
-        removeUselessColumnScanRowStoreExpression(*child);
-    }
 }
 
 // static
@@ -1519,7 +1448,6 @@ std::unique_ptr<QuerySolution> QueryPlannerAnalysis::analyzeDataAccess(
 
     solnRoot = tryPushdownProjectBeneathSort(std::move(solnRoot));
 
-    QueryPlannerAnalysis::removeUselessColumnScanRowStoreExpression(*solnRoot);
     QueryPlannerAnalysis::removeImpreciseInternalExprFilters(params, *solnRoot);
 
     soln->setRoot(std::move(solnRoot));

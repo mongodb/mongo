@@ -171,11 +171,10 @@ ColumnIndexEntry columnIndexEntryFromIndexCatalogEntry(OperationContext* opCtx,
 void fillOutIndexEntries(OperationContext* opCtx,
                          const CanonicalQuery& canonicalQuery,
                          const CollectionPtr& collection,
-                         std::vector<IndexEntry>& entries,
-                         std::vector<ColumnIndexEntry>& columnEntries) {
+                         std::vector<IndexEntry>& entries) {
     bool apiStrict = APIParameters::get(opCtx).getAPIStrict().value_or(false);
 
-    std::vector<const IndexCatalogEntry*> columnIndexes, plainIndexes;
+    std::vector<const IndexCatalogEntry*> indexCatalogEntries;
     auto ii = collection->getIndexCatalog()->getIndexIterator(
         opCtx, IndexCatalog::InclusionPolicy::kReady);
     while (ii->more()) {
@@ -195,18 +194,11 @@ void fillOutIndexEntries(OperationContext* opCtx,
             continue;
         }
 
-        if (indexType == IndexType::INDEX_COLUMN) {
-            columnIndexes.push_back(ice);
-        } else {
-            plainIndexes.push_back(ice);
-        }
+        indexCatalogEntries.push_back(ice);
     }
-    columnEntries.reserve(columnIndexes.size());
-    for (auto ice : columnIndexes) {
-        columnEntries.emplace_back(columnIndexEntryFromIndexCatalogEntry(opCtx, collection, *ice));
-    }
-    entries.reserve(plainIndexes.size());
-    for (auto ice : plainIndexes) {
+
+    entries.reserve(indexCatalogEntries.size());
+    for (auto ice : indexCatalogEntries) {
         entries.emplace_back(
             indexEntryFromIndexCatalogEntry(opCtx, collection, *ice, canonicalQuery));
     }
@@ -447,11 +439,7 @@ void QueryPlannerParams::fillOutSecondaryCollectionsPlannerParams(
                                     const CollectionPtr& secondaryColl) {
         auto secondaryInfo = CollectionInfo{.options = providedOptions};
         if (secondaryColl) {
-            fillOutIndexEntries(opCtx,
-                                canonicalQuery,
-                                secondaryColl,
-                                secondaryInfo.indexes,
-                                secondaryInfo.columnIndexes);
+            fillOutIndexEntries(opCtx, canonicalQuery, secondaryColl, secondaryInfo.indexes);
             fillOutPlannerCollectionInfo(
                 opCtx, secondaryColl, &secondaryInfo.stats, true /* include size stats */);
         } else {
@@ -526,11 +514,7 @@ void QueryPlannerParams::fillOutMainCollectionPlannerParams(
     }
 
     // If it's not NULL, we may have indices. Access the catalog and fill out IndexEntry(s)
-    fillOutIndexEntries(opCtx,
-                        canonicalQuery,
-                        mainColl,
-                        mainCollectionInfo.indexes,
-                        mainCollectionInfo.columnIndexes);
+    fillOutIndexEntries(opCtx, canonicalQuery, mainColl, mainCollectionInfo.indexes);
     applyQuerySettingsOrIndexFiltersForMainCollection(canonicalQuery, collections);
 
     fillOutPlannerCollectionInfo(opCtx,
