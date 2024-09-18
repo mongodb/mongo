@@ -186,6 +186,11 @@ public:
         void incrementNinserted(long long n);
 
         /**
+         * Increments ndeleted by n.
+         */
+        void incrementNdeleted(long long n);
+
+        /**
          * Increments nUpserted by n.
          */
         void incrementNUpserted(long long n);

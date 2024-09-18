@@ -48,7 +48,8 @@ bool shouldDeferCappedDeletesToOplogApplication(OperationContext* opCtx,
  */
 void cappedDeleteUntilBelowConfiguredMaximum(OperationContext* opCtx,
                                              const CollectionPtr& collection,
-                                             const RecordId& justInserted);
+                                             const RecordId& justInserted,
+                                             OpDebug* opDebug);
 
 /**
  * This function starts its own WUOW to truncate documents newer than the document at 'end' from the

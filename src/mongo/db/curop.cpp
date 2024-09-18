@@ -2298,6 +2298,13 @@ void OpDebug::AdditiveMetrics::incrementNinserted(long long n) {
     *ninserted += n;
 }
 
+void OpDebug::AdditiveMetrics::incrementNdeleted(long long n) {
+    if (!ndeleted) {
+        ndeleted = 0;
+    }
+    *ndeleted += n;
+}
+
 void OpDebug::AdditiveMetrics::incrementNUpserted(long long n) {
     if (!nUpserted) {
         nUpserted = 0;

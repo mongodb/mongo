@@ -42,11 +42,13 @@
 #include "mongo/db/catalog/collection_options.h"
 #include "mongo/db/catalog/index_catalog.h"
 #include "mongo/db/concurrency/lock_manager_defs.h"
+#include "mongo/db/curop.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/op_observer/op_observer.h"
 #include "mongo/db/op_observer/op_observer_util.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/session/logical_session_id.h"
+#include "mongo/db/stats/counters.h"
 #include "mongo/db/storage/capped_snapshots.h"
 #include "mongo/db/storage/record_data.h"
 #include "mongo/db/storage/record_store.h"
@@ -134,7 +136,8 @@ bool shouldDeferCappedDeletesToOplogApplication(OperationContext* opCtx,
 
 void cappedDeleteUntilBelowConfiguredMaximum(OperationContext* opCtx,
                                              const CollectionPtr& collection,
-                                             const RecordId& justInserted) {
+                                             const RecordId& justInserted,
+                                             OpDebug* opDebug) {
     if (!collection->isCappedAndNeedsDelete(opCtx))
         return;
 
@@ -233,19 +236,25 @@ void cappedDeleteUntilBelowConfiguredMaximum(OperationContext* opCtx,
             opObserver->onDelete(opCtx, collection, kUninitializedStmtId, doc, documentKey, args);
         }
 
-        int64_t unusedKeysDeleted = 0;
+        int64_t keysDeleted = 0;
         collection->getIndexCatalog()->unindexRecord(opCtx,
                                                      collection,
                                                      doc,
                                                      record->id,
                                                      /*logIfError=*/false,
-                                                     &unusedKeysDeleted);
+                                                     &keysDeleted);
 
         // We're about to delete the record our cursor is positioned on, so advance the cursor.
         RecordId toDelete = std::move(record->id);
         record = cursor->next();
 
         collection->getRecordStore()->deleteRecord(opCtx, toDelete);
+
+        if (opDebug) {
+            opDebug->additiveMetrics.incrementKeysDeleted(keysDeleted);
+            opDebug->additiveMetrics.incrementNdeleted(1);
+        }
+        globalOpCounters.gotDelete();
     }
 
     if (cappedDeleteSideTxn) {

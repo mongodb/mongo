@@ -400,7 +400,7 @@ Status insertDocumentsImpl(OperationContext* opCtx,
             /*defaultFromMigrate=*/fromMigrate);
     }
 
-    cappedDeleteUntilBelowConfiguredMaximum(opCtx, collection, records.begin()->id);
+    cappedDeleteUntilBelowConfiguredMaximum(opCtx, collection, records.begin()->id, opDebug);
 
     return Status::OK();
 }
@@ -481,7 +481,8 @@ Status insertDocumentForBulkLoader(OperationContext* opCtx,
         /*fromMigrate=*/std::vector<bool>(inserts.size(), false),
         /*defaultFromMigrate=*/false);
 
-    cappedDeleteUntilBelowConfiguredMaximum(opCtx, collection, loc.getValue());
+    cappedDeleteUntilBelowConfiguredMaximum(
+        opCtx, collection, loc.getValue(), &CurOp::get(opCtx)->debug());
 
     // Capture the recordStore here instead of the CollectionPtr object itself, because the record
     // store's lifetime is controlled by the collection IX lock held on the write paths, whereas the

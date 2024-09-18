@@ -237,8 +237,9 @@ Status insertDocumentsForOplog(OperationContext* opCtx,
     if (!status.isOK())
         return status;
 
+    OpDebug* const nullOpDebug = nullptr;
     collection_internal::cappedDeleteUntilBelowConfiguredMaximum(
-        opCtx, oplogCollection, records->begin()->id);
+        opCtx, oplogCollection, records->begin()->id, nullOpDebug);
 
     // We do not need to notify capped waiters, as we have not yet updated oplog visibility, so
     // these inserts will not be visible.  When visibility updates, it will notify capped

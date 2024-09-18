@@ -742,23 +742,30 @@ TEST_F(CatalogTestFixture, CappedDeleteRecord) {
 
     BSONObj firstDoc = BSON("_id" << 1);
     BSONObj secondDoc = BSON("_id" << 2);
+    auto& opDebug = CurOp::get(operationContext())->debug();
 
     {
         WriteUnitOfWork wuow(operationContext());
         ASSERT_OK(collection_internal::insertDocument(
-            operationContext(), coll, InsertStatement(firstDoc), nullptr));
+            operationContext(), coll, InsertStatement(firstDoc), &opDebug));
         wuow.commit();
     }
 
     ASSERT_EQUALS(1, coll->numRecords(operationContext()));
+    auto globalDeletesInitial = globalOpCounters.getDelete()->load();
 
     // Inserting the second document will remove the first one.
     {
         WriteUnitOfWork wuow(operationContext());
         ASSERT_OK(collection_internal::insertDocument(
-            operationContext(), coll, InsertStatement(secondDoc), nullptr));
+            operationContext(), coll, InsertStatement(secondDoc), &opDebug));
         wuow.commit();
     }
+    auto globalDeletesAfterInsert = globalOpCounters.getDelete()->load();
+    ASSERT_EQUALS(globalDeletesAfterInsert, globalDeletesInitial + 1);
+
+    ASSERT_EQUALS(1, opDebug.additiveMetrics.keysDeleted.get_value_or(-1));
+    ASSERT_EQUALS(1, opDebug.additiveMetrics.ndeleted.get_value_or(-1));
 
     ASSERT_EQUALS(1, coll->numRecords(operationContext()));
 
