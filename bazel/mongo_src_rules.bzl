@@ -400,6 +400,17 @@ BOOST_DEFINES = [
     "//conditions:default": [],
 })
 
+ENTERPRISE_DEFINES = select({
+    "//bazel/config:build_enterprise_enabled": ["MONGO_ENTERPRISE_VERSION=1"],
+    "//conditions:default": [],
+}) + select({
+    "//bazel/config:enterprise_feature_audit_enabled": ["MONGO_ENTERPRISE_AUDIT=1"],
+    "//conditions:default": [],
+}) + select({
+    "//bazel/config:enterprise_feature_encryptdb_enabled": ["MONGO_ENTERPRISE_ENCRYPTDB=1"],
+    "//conditions:default": [],
+})
+
 # Fortify only possibly makes sense on POSIX systems, and we know that clang is
 # not a valid combination:
 # http://lists.llvm.org/pipermail/cfe-dev/2015-November/045852.html
@@ -1204,7 +1215,8 @@ MONGO_GLOBAL_DEFINES = (
     BOOST_DEFINES +
     ABSEIL_DEFINES +
     PCRE2_DEFINES +
-    SAFEINT_DEFINES
+    SAFEINT_DEFINES +
+    ENTERPRISE_DEFINES
 )
 
 MONGO_GLOBAL_COPTS = (
