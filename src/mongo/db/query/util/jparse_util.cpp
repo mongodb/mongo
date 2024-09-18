@@ -28,6 +28,7 @@
  */
 #include "mongo/db/query/util/jparse_util.h"
 
+#include <boost/lexical_cast.hpp>
 #include <cstdint>
 #include <cstring>
 #include <exception>
@@ -99,7 +100,7 @@ Status JParseUtil::value(StringData fieldName, BSONObjBuilder& builder) {
         if (ret != Status::OK()) {
             return ret;
         }
-    } else if (readToken("Date")) {
+    } else if (readToken("Date") || readToken("ISODate")) {
         Status ret = date(fieldName, builder);
         if (ret != Status::OK()) {
             return ret;
@@ -526,11 +527,10 @@ Status JParseUtil::date(StringData fieldName, BSONObjBuilder& builder) {
         }
 
         // Support pre-epoch dates with the date_time_support library.
-        if (dateString.size() == 10) {
-            // Parse date strings of the form YYYY-MM-DD.
+        if (boost::lexical_cast<int>(dateString.substr(0, 4)) < 1970) {
             const TimeZoneDatabase kDefaultTimeZoneDatabase{};
             const TimeZone kDefaultTimeZone = TimeZoneDatabase::utcZone();
-            auto format = "%Y-%m-%d"_sd;
+            auto format = "%Y-%m-%dT%H:%M:%SZ"_sd;
             date = kDefaultTimeZoneDatabase.fromString(dateString, kDefaultTimeZone, format);
         } else {
             // Parse date strings in an ISODate format.

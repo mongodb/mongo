@@ -99,15 +99,17 @@ TEST(JParseUtilTest, InvalidRegexFailsToParse) {
     ASSERT_STRING_CONTAINS(status.reason(), "code 9: FailedToParse: Unexpected end of input");
 }
 
-TEST(JParseUtilTest, PreEpochDate) {
-    auto jsonStr = "{$toDate: {$max: [new Date('0001-01-01'), new Date('0001-01-01')]}}";
+TEST(JParseUtilTest, IsoDate) {
+    auto jsonStr =
+        "{$toDate: {$max: [ISODate(\"0001-01-01T00:00:00Z\"), "
+        "ISODate(\"2019-10-23T08:58:17.868Z\")]}}";
     BSONObj expected = BSON(
         "$toDate" << BSON("$max" << BSON_ARRAY(Date_t::fromMillisSinceEpoch(-62135596800000)
-                                               << Date_t::fromMillisSinceEpoch(-62135596800000))));
+                                               << Date_t::fromMillisSinceEpoch(1571821097868))));
     parseFuzzerJsonAndAssertEq(jsonStr, expected);
 }
 
-TEST(JParseUtilTest, IsoDate) {
+TEST(JParseUtilTest, IsoDateInNewDate) {
     auto jsonStr = "{$match: {dateField: {$lt: new Date(\"2019-10-23T08:58:17.868Z\")}}}";
     BSONObj expected =
         BSON("$match" << BSON("dateField"
