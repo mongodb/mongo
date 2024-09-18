@@ -76,7 +76,7 @@ StatusWith<std::shared_ptr<Session>> TransportLayerMock::connect(
     HostAndPort peer,
     ConnectSSLMode sslMode,
     Milliseconds timeout,
-    const boost::optional<TransientSSLParams>& transientSSLParams) {
+    boost::optional<TransientSSLParams> transientSSLParams) {
     MONGO_UNREACHABLE;
 }
 

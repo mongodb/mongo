@@ -74,7 +74,7 @@ public:
         HostAndPort peer,
         ConnectSSLMode sslMode,
         Milliseconds timeout,
-        const boost::optional<TransientSSLParams>& transientSSLParams) override;
+        boost::optional<TransientSSLParams> transientSSLParams) override;
 
 #ifdef MONGO_CONFIG_SSL
     Status rotateCertificates(std::shared_ptr<SSLManagerInterface> manager, bool asyncOCSPStaple) {

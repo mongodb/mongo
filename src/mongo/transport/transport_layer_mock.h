@@ -76,7 +76,7 @@ public:
         HostAndPort peer,
         ConnectSSLMode sslMode,
         Milliseconds timeout,
-        const boost::optional<TransientSSLParams>& transientSSLParams) override;
+        boost::optional<TransientSSLParams> transientSSLParams) override;
     Future<std::shared_ptr<Session>> asyncConnect(
         HostAndPort peer,
         ConnectSSLMode sslMode,

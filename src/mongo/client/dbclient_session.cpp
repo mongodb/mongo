@@ -249,7 +249,7 @@ boost::optional<Milliseconds> clampTimeout(double timeoutInSec) {
 
 void DBClientSession::connect(const HostAndPort& serverAddress,
                               StringData applicationName,
-                              const boost::optional<TransientSSLParams>& transientSSLParams) {
+                              boost::optional<TransientSSLParams> transientSSLParams) {
     connectNoHello(serverAddress, transientSSLParams);
 
     // NOTE: If the 'applicationName' parameter is a view of the '_applicationName' member, as
@@ -325,9 +325,8 @@ void DBClientSession::connect(const HostAndPort& serverAddress,
     }
 }
 
-void DBClientSession::connectNoHello(
-    const HostAndPort& serverAddress,
-    const boost::optional<TransientSSLParams>& transientSSLParams) {
+void DBClientSession::connectNoHello(const HostAndPort& serverAddress,
+                                     boost::optional<TransientSSLParams> transientSSLParams) {
     _serverAddress = serverAddress;
     _transientSSLParams = transientSSLParams;
     _markFailed(kReleaseSession);

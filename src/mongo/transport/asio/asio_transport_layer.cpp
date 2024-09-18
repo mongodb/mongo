@@ -580,7 +580,7 @@ StatusWith<std::shared_ptr<Session>> AsioTransportLayer::connect(
     HostAndPort peer,
     ConnectSSLMode sslMode,
     Milliseconds timeout,
-    const boost::optional<TransientSSLParams>& transientSSLParams) {
+    boost::optional<TransientSSLParams> transientSSLParams) {
     if (transientSSLParams) {
         uassert(ErrorCodes::InvalidSSLConfiguration,
                 "Specified transient SSL params but connection SSL mode is not set",

@@ -49,7 +49,7 @@ public:
             HostAndPort peer,
             ConnectSSLMode sslMode,
             Milliseconds timeout,
-            const boost::optional<TransientSSLParams>& transientSSLParams = boost::none) override {
+            boost::optional<TransientSSLParams> transientSSLParams = boost::none) override {
             return createSession();
         }
 

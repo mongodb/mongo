@@ -49,12 +49,10 @@
 
 namespace mongo {
 
-DBClientBase* MongoURI::connect(
-    StringData applicationName,
-    std::string& errmsg,
-    boost::optional<double> socketTimeoutSecs,
-    const ClientAPIVersionParameters* apiParameters,
-    const boost::optional<TransientSSLParams>& transientSSLParams) const {
+DBClientBase* MongoURI::connect(StringData applicationName,
+                                std::string& errmsg,
+                                boost::optional<double> socketTimeoutSecs,
+                                const ClientAPIVersionParameters* apiParameters) const {
     OptionsMap::const_iterator it = _options.find("socketTimeoutMS");
     if (it != _options.end() && !socketTimeoutSecs) {
         try {
@@ -65,11 +63,8 @@ DBClientBase* MongoURI::connect(
         }
     }
 
-    auto swConn = _connectString.connect(applicationName,
-                                         socketTimeoutSecs.value_or(0.0),
-                                         this,
-                                         apiParameters,
-                                         transientSSLParams ? &*transientSSLParams : nullptr);
+    auto swConn = _connectString.connect(
+        applicationName, socketTimeoutSecs.value_or(0.0), this, apiParameters);
     if (!swConn.isOK()) {
         errmsg = swConn.getStatus().reason();
         return nullptr;

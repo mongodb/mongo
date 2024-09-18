@@ -140,7 +140,7 @@ private:
         const HostAndPort& host,
         transport::ConnectSSLMode sslMode,
         Milliseconds timeout,
-        const boost::optional<TransientSSLParams>& transientSSLParams = boost::none) override;
+        boost::optional<TransientSSLParams> transientSSLParams = boost::none) override;
     void _reconnectSession() override;
     void _killSession() override;
 
