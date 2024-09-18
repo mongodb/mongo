@@ -707,10 +707,10 @@ TEST_F(SemanticAnalysisFindLongestViablePrefix, FindsPrefixWithoutReplaceRoot) {
         ASSERT(renames["y"] == "x");
     }
     {
-        // TODO (SERVER-55815): "x" should be considered modified in the $set stage.
+        // "x" is overwritten by the $set, so is not preserved.
         auto [itr, renames] = findLongestViablePrefixPreservingPaths(
             pipeline->getSources().begin(), pipeline->getSources().end(), {"x"});
-        ASSERT(itr == pipeline->getSources().end());
+        ASSERT(itr == std::prev(pipeline->getSources().end()));
         ASSERT(renames["x"] == "x");
     }
 }

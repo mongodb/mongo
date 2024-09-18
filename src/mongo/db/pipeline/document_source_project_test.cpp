@@ -51,6 +51,7 @@
 #include "mongo/db/exec/document_value/value.h"
 #include "mongo/db/pipeline/aggregation_context_fixture.h"
 #include "mongo/db/pipeline/dependencies.h"
+#include "mongo/db/pipeline/document_source_add_fields.h"
 #include "mongo/db/pipeline/document_source_mock.h"
 #include "mongo/db/pipeline/document_source_project.h"
 #include "mongo/db/pipeline/semantic_analysis.h"
@@ -302,6 +303,36 @@ TEST_F(ProjectStageTest, ProjectionCorrectlyReportsRenamesForwards) {
     ASSERT_FALSE(single_rename.empty());
     ASSERT_EQUALS(single_rename.mapped(), "renamedB");
     ASSERT_TRUE(renames->empty());
+}
+
+TEST_F(ProjectStageTest, ProjectionRenameModifiesDestination) {
+    auto project = DocumentSourceProject::create(
+        fromjson("{'somePath' : '$otherField'}"), getExpCtx(), "$project"_sd);
+
+    // Forwards: "somePath" is _not_ preserved by this projection - any existing value has been
+    // overwritten.
+    auto renames = semantic_analysis::renamedPaths(
+        {"somePath"}, *project, semantic_analysis::Direction::kForward);
+    ASSERT_FALSE(renames.has_value());
+
+    // Forwards: "otherField" _is_ preserved by this projection, and is renamed to "somePath".
+    renames = semantic_analysis::renamedPaths(
+        {"otherField"}, *project, semantic_analysis::Direction::kForward);
+    ASSERT_TRUE(renames.has_value());
+    ASSERT_EQUALS(renames->at("otherField"), "somePath");
+
+    // Backwards: "somePath" is the result of a rename, so traversing backwards should map to the
+    // previous name.
+    renames = semantic_analysis::renamedPaths(
+        {"somePath"}, *project, semantic_analysis::Direction::kBackward);
+    ASSERT_TRUE(renames.has_value());
+    ASSERT_EQUALS(renames->at("somePath"), "otherField");
+
+    // Backwards: As this is a _projection_, and "otherField" has not explicitly been preserved, it
+    // no longer exists after this stage.
+    renames = semantic_analysis::renamedPaths(
+        {"otherField"}, *project, semantic_analysis::Direction::kBackward);
+    ASSERT_FALSE(renames.has_value());
 }
 
 TEST_F(ProjectStageTest, ProjectionCorrectlyReportsRenamesBackwards) {

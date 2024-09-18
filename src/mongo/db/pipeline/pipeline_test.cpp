@@ -5822,8 +5822,10 @@ TEST_F(PipelineRenameTracking, ReportsNewNamesWhenSingleStageRenames) {
     }
 
     {
-        // This is strange; the mock stage reports to essentially duplicate the "a" field into "b".
-        // Because of this, both "b" and "a" should map to "a".
+        // The mock stage reports that it duplicates "a" field into "b".
+        // This resembles: {"$addFields":{"b":"$a"}}
+        // The resulting document can have both "b" and "a", both with the original value of "a". As
+        // we are traversing backwards, both "a" and "b" should map to "a".
         auto renames = semantic_analysis::renamedPaths(
             pipeline->getSources().crbegin(), pipeline->getSources().crend(), {"b", "a"});
         ASSERT(static_cast<bool>(renames));
@@ -5833,14 +5835,30 @@ TEST_F(PipelineRenameTracking, ReportsNewNamesWhenSingleStageRenames) {
         ASSERT_EQ(nameMap["a"], "a");
     }
     {
-        // Same strangeness as above, but in the forwards direction.
+        // In the forwards direction, "b" does not survive this stage; it is overwritten by the
+        // value of "a". This functionally modifies "b", so as documented renamedPaths should return
+        // boost::none.
         auto renames = semantic_analysis::renamedPaths(
             pipeline->getSources().cbegin(), pipeline->getSources().cend(), {"b", "a"});
+        ASSERT_FALSE(static_cast<bool>(renames));
+    }
+
+    {
+        // As above, any previous value of "b" does not survive past this stage.
+        auto renames = semantic_analysis::renamedPaths(
+            pipeline->getSources().cbegin(), pipeline->getSources().cend(), {"b"});
+        ASSERT_FALSE(static_cast<bool>(renames));
+    }
+
+    {
+        // In the forwards direction, following only "a", it has only been renamed, so it _has_ been
+        // preserved.
+        auto renames = semantic_analysis::renamedPaths(
+            pipeline->getSources().cbegin(), pipeline->getSources().cend(), {"a"});
         ASSERT(static_cast<bool>(renames));
         auto nameMap = *renames;
-        ASSERT_EQ(nameMap.size(), 2UL);
+        ASSERT_EQ(nameMap.size(), 1UL);
         ASSERT_EQ(nameMap["a"], "b");
-        ASSERT_EQ(nameMap["b"], "b");
     }
 }
 

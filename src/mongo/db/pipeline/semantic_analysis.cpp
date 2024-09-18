@@ -367,6 +367,23 @@ boost::optional<StringMap<std::string>> renamedPaths(const OrderedPathSet& paths
         case DocumentSource::GetModPathsReturn::Type::kAllPaths:
             return boost::none;
         case DocumentSource::GetModPathsReturn::Type::kFiniteSet: {
+            if (traversalDir == Direction::kForward) {
+                // Stages use `modifiedPathsRet.paths` to report fields which will be altered by
+                // this stage, meaning optimisations cannot reorder operations which rely on these
+                // paths.
+                // When traversing forwards, renames effectively overwrite the "destination"
+                // name.
+                //   e.g., {"$addFields": {"a": "$b"}}.
+                // While path "a" is logically _not_ preserved, is also not in `paths`.
+                // Traversing backwards relies on this, as the rename can be followed backwards to
+                // "b"; the same value _does_ exist on the "other side" of this stage. Therefore,
+                // for forwards traversal only, rename destinations are added to `paths` to
+                // correctly consider them modified.
+                for (auto&& [newName, oldName] : modifiedPathsRet.renames) {
+                    modifiedPathsRet.paths.insert(newName);
+                }
+            }
+
             // Any overlap of the path means the path of interest is not preserved. For
             // example, if the path of interest is "a.b", then a modified path of "a",
             // "a.b", or "a.b.c" would all signal that "a.b" is not preserved.

@@ -289,5 +289,36 @@ TEST_F(AddFieldsTest, TestModifiedPaths) {
     ASSERT_EQUALS(1U, modifiedPaths.paths.size());
     ASSERT_EQUALS(1U, modifiedPaths.renames.size());
 }
+
+TEST_F(AddFieldsTest, AddFieldsRenameModifiesDestination) {
+    auto addFields =
+        DocumentSourceAddFields::create(fromjson("{'somePath' : '$otherField'}"), getExpCtx());
+
+    // Forwards: "somePath" is _not_ preserved by this addFields - any existing value has been
+    // overwritten.
+    auto renames = semantic_analysis::renamedPaths(
+        {"somePath"}, *addFields, semantic_analysis::Direction::kForward);
+    ASSERT_FALSE(renames.has_value());
+
+    // Forwards: "otherField" _is_ preserved by this addFields, and is renamed to "somePath".
+    renames = semantic_analysis::renamedPaths(
+        {"otherField"}, *addFields, semantic_analysis::Direction::kForward);
+    ASSERT_TRUE(renames.has_value());
+    ASSERT_EQUALS(renames->at("otherField"), "somePath");
+
+    // Backwards: "somePath" is the result of a rename, so traversing backwards should map to the
+    // previous name.
+    renames = semantic_analysis::renamedPaths(
+        {"somePath"}, *addFields, semantic_analysis::Direction::kBackward);
+    ASSERT_TRUE(renames.has_value());
+    ASSERT_EQUALS(renames->at("somePath"), "otherField");
+
+    // Backwards: "otherField" still exists, and has not been modified.
+    renames = semantic_analysis::renamedPaths(
+        {"otherField"}, *addFields, semantic_analysis::Direction::kBackward);
+    ASSERT_TRUE(renames.has_value());
+    ASSERT_EQUALS(renames->at("otherField"), "otherField");
+}
+
 }  // namespace
 }  // namespace mongo
