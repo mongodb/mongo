@@ -60,6 +60,13 @@ both the _mongos_ and _mongod_ entry points interact with the Command subclasses
 through the `CommandHelpers` struct in order to parse requests and ultimately
 run them as Commands.
 
+## Admission control
+
+To ensure stability of our servers, we have implemented different admission control mechanisms to prevent data-nodes from becoming overloaded with operations. When implementing a new command, it's important to decide whether the command will be subject to one of the admission controls in place and understand the resulting outcomes.
+
+For example, user commands may be subject to Ingress Admission Control, which happens in the [ServiceEntryPoint][IngressControl].
+For information on admission control and how to implement admission control into a new command, please see [Admission Control README][ACReadMe]
+
 ## See Also
 
 For details on transport internals, including ingress networking, see [this document][transport_internals].
@@ -77,3 +84,5 @@ For details on transport internals, including ingress networking, see [this docu
 [commands_h]: ../src/mongo/db/commands.h
 [template_method_pattern]: https://en.wikipedia.org/wiki/Template_method_pattern
 [transport_internals]: ../src/mongo/transport/README.md
+[ACReadMe]: ../src/mongo/db/admission/README.md
+[IngressControl]: https://github.com/10gen/mongo/blob/a86c7f5de2a5de4d2f49e40e8970754ec6a5ba6c/src/mongo/db/service_entry_point_shard_role.cpp#L1803
