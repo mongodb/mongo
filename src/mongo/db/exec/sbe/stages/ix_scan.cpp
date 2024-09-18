@@ -103,7 +103,13 @@ void IndexScanStageBase::prepareImpl(CompileCtx& ctx) {
 
     auto indexCatalog = _coll.getPtr()->getIndexCatalog();
     auto indexDesc = indexCatalog->findIndexByName(_opCtx, _indexName);
-    tassert(4938500,
+
+    // TODO SERVER-87437: Using a uassert below is a temporary fix. The long term fix will rely on
+    // using <UUID, minValidSnapshot> pair for caching plans on non-standalone deployments.
+    // Currently we use <UUID, collectionVersion> pair to cache plans; collectionVersion is shared
+    // across different versions of the same collection. This can cause invalid cache reads (see
+    // BF-31798).
+    uassert(4938500,
             str::stream() << "could not find index named '" << _indexName << "' in collection '"
                           << _coll.getCollName()->toStringForErrorMsg() << "'",
             indexDesc);
