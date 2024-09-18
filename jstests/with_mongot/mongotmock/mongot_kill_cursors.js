@@ -3,6 +3,7 @@
  *
  * @tags: [
  *   requires_fcv_71,
+ *   featureFlagSearchBatchSizeTuning_incompatible,
  * ]
  */
 import {getUUIDFromListCollections} from "jstests/libs/uuid_util.js";

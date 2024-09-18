@@ -16,6 +16,9 @@ selector:
     # connection because it cannot send the killCursor command to mongot while the getMore
     # command is on-going.
     - jstests/with_mongot/mongotmock/mongot_kill_cursors.js
+    # TODO SERVER-93583 Re-enable the following two tests. Tests are currently failing due to a race condition in TEC.
+    - jstests/with_mongot/search_mocked/sharded_sort.js
+    - jstests/with_mongot/search_mocked/sharded_search_meta_cursors.js
 
 executor:
   config:
