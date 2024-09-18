@@ -110,6 +110,10 @@ if [ ! -z "${multiversion_architecture_last_lts}" ]; then
   architecture="${multiversion_architecture_last_lts}"
 fi
 
+if [ ! -z "${multiversion_platform_50_or_later}" ]; then
+  platform="${multiversion_platform_50_or_later}"
+fi
+
 db-contrib-tool setup-repro-env \
   --installDir /data/install \
   --linkDir /data/multiversion \
