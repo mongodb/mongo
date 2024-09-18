@@ -507,8 +507,6 @@ public:
                 return runFindOnView(opCtx, *cq, verbosity, replyBuilder);
             }
 
-            cq->setUseCqfIfEligible(true);
-
             // Get the execution plan for the query.
             const auto& collection = collectionOrView->getCollection();
             auto exec = uassertStatusOK(getExecutorFind(opCtx,
@@ -804,8 +802,6 @@ public:
                 // execution to assume read data will not be needed again and need not be cached.
                 shard_role_details::getRecoveryUnit(opCtx)->setReadOnce(true);
             }
-
-            cq->setUseCqfIfEligible(true);
 
             // Get the execution plan for the query.
             auto exec = uassertStatusOK(getExecutorFind(opCtx,
