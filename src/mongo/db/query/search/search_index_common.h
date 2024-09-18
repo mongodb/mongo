@@ -41,8 +41,7 @@ namespace mongo {
 BSONObj getSearchIndexManagerResponse(OperationContext* opCtx,
                                       const NamespaceString& nss,
                                       const UUID& uuid,
-                                      const BSONObj& userCmd,
-                                      boost::optional<StringData> viewName = boost::none);
+                                      const BSONObj& userCmd);
 
 /**
  * Runs the given command against the remote search index management server, if the remote host
@@ -50,9 +49,7 @@ BSONObj getSearchIndexManagerResponse(OperationContext* opCtx,
  */
 BSONObj runSearchIndexCommand(OperationContext* opCtx,
                               const NamespaceString& nss,
-                              const BSONObj& cmdObj,
-                              const UUID& collUUID,
-                              boost::optional<NamespaceString> viewNss = boost::none);
+                              const BSONObj& cmdObj);
 /**
  * Helper function to throw if search index management is not properly configured.
  */

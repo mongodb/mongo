@@ -51,7 +51,3 @@ structs:
                 description: "The original user search index command request"
                 type: object
                 optional: false
-            viewName:
-                description: "If the command is being run on a view namespace, this field must be set to the name of the view"
-                type: string
-                optional: true

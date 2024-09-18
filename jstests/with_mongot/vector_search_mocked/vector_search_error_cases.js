@@ -77,5 +77,12 @@ assert.commandFailedWithCode(
     testDB.runCommand({"findandmodify": collName, "update": [makeVectorSearchStage()]}),
     ErrorCodes.InvalidOptions);
 
+// $vectorSearch is not valid on views.
+assert.commandWorked(
+    testDB.runCommand({create: "idView", viewOn: collName, pipeline: [{$match: {_id: {$gt: 1}}}]}));
+assert.commandFailedWithCode(
+    testDB.runCommand({aggregate: 'idView', pipeline: [makeVectorSearchStage()], cursor: {}}),
+    40602);
+
 mongotMock.stop();
 rst.stopSet();

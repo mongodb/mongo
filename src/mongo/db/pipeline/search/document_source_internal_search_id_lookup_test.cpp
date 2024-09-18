@@ -163,10 +163,7 @@ TEST_F(InternalSearchIdLookupTest, ShouldParseFromSerialized) {
     ASSERT_EQ(serialization.size(), 1UL);
     ASSERT_EQ(serialization[0].getType(), BSONType::Object);
 
-    BSONObj spec =
-        BSON("$_internalSearchIdLookup"
-             << BSON("subPipeline" << BSON_ARRAY(BSON("$match" << BSON("_id"
-                                                                       << "_id placeholder")))));
+    BSONObj spec = BSON("$_internalSearchIdLookup" << BSONObj());
     ASSERT_BSONOBJ_EQ(serialization[0].getDocument().toBson(), spec);
 
     // On mongod we should be able to re-parse it.
@@ -277,10 +274,7 @@ TEST_F(InternalSearchIdLookupTest, ShouldNotErrorOnEmptyResult) {
 TEST_F(InternalSearchIdLookupTest, RedactsCorrectly) {
     auto expCtx = getExpCtx();
     expCtx->uuid = UUID::gen();
-    auto specObj =
-        BSON("$_internalSearchIdLookup" << BSON(
-                 "subPipeline" << BSON_ARRAY(BSON("$match" << BSON("_id" << BSON("$eq"
-                                                                                 << "?string"))))));
+    auto specObj = BSON("$_internalSearchIdLookup" << BSONObj());
     auto spec = specObj.firstElement();
 
     auto idLookupStage = DocumentSourceInternalSearchIdLookUp::createFromBson(spec, expCtx);
@@ -294,9 +288,8 @@ TEST_F(InternalSearchIdLookupTest, RedactsCorrectly) {
     vec.clear();
     auto limitedLookup = DocumentSourceInternalSearchIdLookUp(expCtx, 5);
     limitedLookup.serializeToArray(vec, opts);
-
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
-        R"({"$_internalSearchIdLookup":{"limit":"?number", "subPipeline":[{"$match":{"_id":{"$eq":"?string"}}}]}})",
+        R"({"$_internalSearchIdLookup":{"limit":"?number"}})",
         vec[0].getDocument().toBson());
 }
 

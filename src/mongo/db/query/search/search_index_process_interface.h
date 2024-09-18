@@ -43,10 +43,6 @@ public:
     static SearchIndexProcessInterface* get(OperationContext* opCtx);
 
     static void set(Service* service, std::unique_ptr<SearchIndexProcessInterface> impl);
-    /*
-     * TODO SERVER-93637 remove fetchCollectionUUIDOrThrow and fetchCollectionUUID from the
-     * interface and all derived classes once all search index commands can support sharded views.
-     */
 
     /**
      * Returns the collection UUID or throws a NamespaceNotFound error.
@@ -59,21 +55,6 @@ public:
      */
     virtual boost::optional<UUID> fetchCollectionUUID(OperationContext* opCtx,
                                                       const NamespaceString& nss) = 0;
-
-    /**
-     * Returns the collection UUID and optionally an underlying NSS (if query is on a view). If no
-     * UUID, throws a NamespaceNotFound error.
-     */
-    virtual std::pair<UUID, boost::optional<NamespaceString>>
-    fetchCollectionUUIDAndResolveViewOrThrow(OperationContext* opCtx,
-                                             const NamespaceString& nss) = 0;
-    /**
-     * Returns the collection UUID (or boost::none if no collection is found) and the underlying
-     * source collection NSS if query is on a view (or boost::none if query is on a normal
-     * collection).
-     */
-    virtual std::pair<boost::optional<UUID>, boost::optional<NamespaceString>>
-    fetchCollectionUUIDAndResolveView(OperationContext* opCtx, const NamespaceString& nss) = 0;
 };
 
 }  // namespace mongo

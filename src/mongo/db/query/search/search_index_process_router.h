@@ -35,10 +35,7 @@ class SearchIndexProcessRouter : public SearchIndexProcessInterface {
 public:
     boost::optional<UUID> fetchCollectionUUID(OperationContext* opCtx,
                                               const NamespaceString& nss) override;
-    std::pair<boost::optional<UUID>, boost::optional<NamespaceString>>
-    fetchCollectionUUIDAndResolveView(OperationContext* opCtx, const NamespaceString& nss) override;
-    std::pair<UUID, boost::optional<NamespaceString>> fetchCollectionUUIDAndResolveViewOrThrow(
-        OperationContext* opCtx, const NamespaceString& nss) override;
+
     UUID fetchCollectionUUIDOrThrow(OperationContext* opCtx, const NamespaceString& nss) override;
 };
 

@@ -37,7 +37,6 @@ namespace mongo {
 
 using boost::intrusive_ptr;
 
-// TOOD SERVER-94755 investigate using custom LiteParsedDocumentSource.
 REGISTER_DOCUMENT_SOURCE(_internalSearchIdLookup,
                          LiteParsedDocumentSourceDefault::parse,
                          DocumentSourceInternalSearchIdLookUp::createFromBson,
@@ -67,22 +66,16 @@ DocumentSourceInternalSearchIdLookUp::DocumentSourceInternalSearchIdLookUp(
 
 intrusive_ptr<DocumentSource> DocumentSourceInternalSearchIdLookUp::createFromBson(
     BSONElement elem, const intrusive_ptr<ExpressionContext>& pExpCtx) {
-    // TODO SERVER-94711 replace this clunky parsing and error message with mini IDL.
     uassert(
         31016,
-        str::stream()
-            << "$_internalSearchIdLookup value must be an object. If non-empty, it must have "
-               "a field called 'subPipeline' and optionally a field called 'limit'. Found: "
-            << typeName(elem.type()),
+        str::stream() << "$_internalSearchIdLookup value must be an empty object or just have "
+                         "one field called 'limit'. Found: "
+                      << typeName(elem.type()),
         elem.type() == BSONType::Object &&
             (elem.embeddedObject().isEmpty() ||
              ((elem.embeddedObject().nFields() == 1) &&
-              elem.embeddedObject().hasField("subPipeline")) ||
-             ((elem.embeddedObject().nFields() == 2) &&
-              elem.embeddedObject().hasField("subPipeline") &&
               elem.embeddedObject().hasField(InternalSearchMongotRemoteSpec::kLimitFieldName))));
     auto specObj = elem.embeddedObject();
-
     if (specObj.hasField(InternalSearchMongotRemoteSpec::kLimitFieldName)) {
         auto limitElem = specObj.getField(InternalSearchMongotRemoteSpec::kLimitFieldName);
         uassert(6770001, "Limit must be a long", limitElem.type() == BSONType::NumberLong);
@@ -92,21 +85,10 @@ intrusive_ptr<DocumentSource> DocumentSourceInternalSearchIdLookUp::createFromBs
 }
 
 Value DocumentSourceInternalSearchIdLookUp::serialize(const SerializationOptions& opts) const {
-    MutableDocument outputSpec;
-    if (_limit) {
-        outputSpec["limit"] = Value(opts.serializeLiteral(Value((long long)_limit)));
-    }
-    // At serialization, the _id value is unknown as it is only returned by mongot during execution.
-    std::vector<BSONObj> pipeline = {
-        BSON("$match" << Document({{"_id", Value("_id placeholder"_sd)}}))};
-
-    if (pExpCtx->viewNS) {
-        auto viewPipeline = pExpCtx->getResolvedNamespace(*pExpCtx->viewNS).pipeline;
-        pipeline.insert(pipeline.end(), viewPipeline.begin(), viewPipeline.end());
-    }
-    outputSpec["subPipeline"] = Value(Pipeline::parse(pipeline, pExpCtx)->serializeToBson(opts));
-
-    return Value(DOC(getSourceName() << outputSpec.freezeToValue()));
+    auto internalDoc = _limit == 0 ? Document()
+                                   : DOC(InternalSearchMongotRemoteSpec::kLimitFieldName
+                                         << opts.serializeLiteral(Value((long long)_limit)));
+    return Value(DOC(getSourceName() << internalDoc));
 }
 
 DocumentSource::GetNextResult DocumentSourceInternalSearchIdLookUp::doGetNext() {
@@ -137,17 +119,6 @@ DocumentSource::GetNextResult DocumentSourceInternalSearchIdLookUp::doGetNext() 
             pipelineOpts.attachCursorSource = false;
             auto pipeline =
                 Pipeline::makePipeline({BSON("$match" << documentKey)}, pExpCtx, pipelineOpts);
-            // TODO SERVER-94755 move this entire if clause to constructor and off the hot path.
-            if (pExpCtx->viewNS) {
-                // When search query is being run on a view, we append the view pipeline to the end
-                // of the idLookup's subpipeline. This allows idLookup to retrieve the
-                // full/unmodified documents (from the _id values returned by mongot), apply the
-                // view's data transforms, and pass said transformed documents through the rest of
-                // the user pipeline.
-                auto resolvedNamespace = pExpCtx->getResolvedNamespace(*pExpCtx->viewNS);
-                auto viewPipeline = Pipeline::parse(resolvedNamespace.pipeline, pExpCtx);
-                pipeline->appendPipeline(std::move(viewPipeline));
-            }
 
             pipeline = pExpCtx->mongoProcessInterface->attachCursorSourceToPipelineForLocalRead(
                 pipeline.release());

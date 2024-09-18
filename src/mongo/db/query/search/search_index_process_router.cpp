@@ -46,7 +46,6 @@ ServiceContext::ConstructorActionRegisterer SearchIndexProcessRouterImplementati
         }
     }};
 
-
 boost::optional<UUID> SearchIndexProcessRouter::fetchCollectionUUID(OperationContext* opCtx,
                                                                     const NamespaceString& nss) {
     // We perform a listCollection request to get the UUID from the actual primary shard for the
@@ -77,7 +76,6 @@ boost::optional<UUID> SearchIndexProcessRouter::fetchCollectionUUID(OperationCon
             }
             const auto& bsonDoc = batch.front();
             auto uuid = UUID::parse(bsonDoc["info"]["uuid"]);
-
             if (!uuid.isOK()) {
                 return boost::none;
             }
@@ -94,20 +92,6 @@ UUID SearchIndexProcessRouter::fetchCollectionUUIDOrThrow(OperationContext* opCt
                   str::stream() << "collection " << nss.toStringForErrorMsg() << " does not exist");
     }
     return *uuid;
-}
-
-std::pair<boost::optional<UUID>, boost::optional<NamespaceString>>
-SearchIndexProcessRouter::fetchCollectionUUIDAndResolveView(OperationContext* opCtx,
-                                                            const NamespaceString& nss) {
-    // TODO SERVER-93637 must implement to support running search queries on sharded views.
-    MONGO_UNREACHABLE_TASSERT(9292000);
-}
-
-std::pair<UUID, boost::optional<NamespaceString>>
-SearchIndexProcessRouter::fetchCollectionUUIDAndResolveViewOrThrow(OperationContext* opCtx,
-                                                                   const NamespaceString& nss) {
-    // TODO SERVER-93637 must implement to support running search queries on sharded views.
-    MONGO_UNREACHABLE_TASSERT(9292001);
 }
 
 }  // namespace mongo

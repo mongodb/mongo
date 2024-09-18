@@ -46,16 +46,6 @@ namespace mongo {
 namespace view_catalog_helpers {
 
 /**
- * Exclusively returns the namespace of the underlying/backing source collection. It does not
- * resolve the view definition.
- *
- * This function doesn't descend into sub-pipelines like in $lookup or $unionWith.
- */
-NamespaceString findSourceCollectionNamespace(OperationContext* opCtx,
-                                              std::shared_ptr<const CollectionCatalog> catalog,
-                                              const NamespaceString& nss);
-
-/**
  * Returns Status::OK with the set of involved namespaces if the given pipeline is eligible to
  * act as a view definition. Otherwise, returns ErrorCodes::OptionNotSupportedOnView.
  */

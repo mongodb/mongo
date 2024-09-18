@@ -557,7 +557,6 @@ public:
     bool isUpsert = false;
 
     NamespaceString ns;
-    boost::optional<NamespaceString> viewNS = boost::none;
 
     SerializationContext serializationCtxt;
 

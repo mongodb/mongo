@@ -53,8 +53,7 @@ executor::RemoteCommandRequest getRemoteCommandRequestForSearchQuery(
     const boost::optional<int> protocolVersion = boost::none,
     const boost::optional<long long> docsRequested = boost::none,
     const boost::optional<long long> batchSize = boost::none,
-    const bool requiresSearchSequenceToken = false,
-    const boost::optional<NamespaceString> viewName = boost::none) {
+    const bool requiresSearchSequenceToken = false) {
     BSONObjBuilder cmdBob;
     cmdBob.append(kSearchField, nss.coll());
     uassert(
@@ -64,9 +63,6 @@ executor::RemoteCommandRequest getRemoteCommandRequestForSearchQuery(
         uuid);
     uuid.value().appendToBuilder(&cmdBob, kCollectionUuidField);
     cmdBob.append(kQueryField, query);
-    if (viewName) {
-        cmdBob.append(kViewNameField, viewName->coll());
-    }
     if (explain) {
         cmdBob.append(kExplainField,
                       BSON(kVerbosityField << ExplainOptions::verbosityString(*explain)));
@@ -95,6 +91,7 @@ executor::RemoteCommandRequest getRemoteCommandRequestForSearchQuery(
         }
         cursorOptionsBob.doneFast();
     }
+
 
     return getRemoteCommandRequest(opCtx, nss, cmdBob.obj());
 }
@@ -313,8 +310,7 @@ std::vector<std::unique_ptr<executor::TaskExecutorCursor>> establishCursorsForSe
                                               protocolVersion,
                                               docsRequested,
                                               batchSize,
-                                              spec.getRequiresSearchSequenceToken(),
-                                              expCtx->viewNS),
+                                              spec.getRequiresSearchSequenceToken()),
         taskExecutor,
         std::move(getMoreStrategy),
         std::move(yieldPolicy));
