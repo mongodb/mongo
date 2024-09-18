@@ -191,7 +191,7 @@ PlanState BlockToRowStage::getNext() {
     auto optTimer(getOptTimer(_opCtx));
     // We may produce multiple (potentially x1000) results for a block, so we need to check for
     // interrupts so that we don't hold the lock on the underlying collection for too long.
-    checkForInterrupt(_opCtx);
+    checkForInterruptNoYield(_opCtx);
 
     if (!_deblockedValueRuns.empty() && getNextFromDeblockedValues() == PlanState::ADVANCED) {
         return trackPlanState(PlanState::ADVANCED);

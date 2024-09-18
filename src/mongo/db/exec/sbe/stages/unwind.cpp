@@ -111,7 +111,9 @@ void UnwindStage::open(bool reOpen) {
 PlanState UnwindStage::getNext() {
     auto optTimer(getOptTimer(_opCtx));
 
-    checkForInterrupt(_opCtx);
+    // For performance, we intentionally do not yield while '_inArray' is true. When it is false, we
+    // unconditionally call our child's getNext() so are not required to yield here.
+    checkForInterruptNoYield(_opCtx);
 
 #if defined(MONGO_CONFIG_DEBUG_BUILD)
     // If we are iterating over the array, then we are not going to advance the child.

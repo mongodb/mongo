@@ -604,6 +604,37 @@ private:
  * Provides a method which can be used to check if the current operation has been interrupted.
  * Maintains an internal state to maintain the interrupt check period. Also responsible for
  * triggering yields if this object has been configured with a yield policy.
+ *
+ * When yielding is enabled, we use the following rules to determine when SBE is required to yield:
+ *
+ * 1) Stages that are sources of iteration (scan, coscan, unwind, sort, group, spool) should
+ *    perform a yield check at least once per unit of work / getNext().
+ *
+ * 2) Prolonged blocking computation (like sorting) should also periodically perform a yield check.
+ *
+ * 3) Stages that are not sources of iteration (project, nlj, filter, limit, union, merge) don't
+ *    need to perform a yield check as long as they call subtree methods that do.
+ *
+ * "Source of iteration" refers to a stage's ability to iterate over more than 1 row for each input
+ * row (if it exists). Note: filter, nlj stages do introduce a loop, but it is not a source of
+ * iteration, as each input row maps to 0-1 output rows rather than 0-N output rows like unwind.
+ *
+ * Two yielding models were considered, and the second one was adopted for SBE:
+ *
+ * 1) Strong: "Every call to getNext() must result in at least one yield check." We don't satisfy
+ *    that model today because of unwindy stages, which do not perform yielding when iterating over
+ *    their inner loop. If they did, then we would be able to prove by structural induction that
+ *    when a stage calls a child getNext(), then it itself is not required to perform a yield check
+ *    to satisfy that invariant
+ *
+ * 2) Weak: "Every O(1) calls to getNext() must result in a least one yield check." We do satisfy
+ *    that model today if we assume the size of unwind is O(1). As above, the inductive proof works
+ *    and stages that call a child getNext() are not required to perform a yield check themselves.
+ *
+ * In the Weak model, the constant in O(1) is basically limited by the sizes of arrays (which are
+ * limited by the document size limit), craziness of scalar expressions, and craziness of the
+ * pipeline (like chaining many unwinds together). The pipeline itself also has a limited maximum
+ * size, so in fact the amount of work by non-sources of iteration is indeed bounded by O(1).
  */
 template <typename T>
 class CanInterrupt {
@@ -626,20 +657,17 @@ public:
             // Yielding has been disabled, but interrupt checking can never be disabled (all
             // SBE operations must be interruptible). When yielding is enabled, it is responsible
             // for interrupt checking, but when disabled we do it ourselves.
-            if (--_interruptCounter == 0) {
-                _interruptCounter = kInterruptCheckPeriod;
-                opCtx->checkForInterrupt();
-            }
+            checkForInterruptNoYield(opCtx);
         } else if (_yieldPolicy->shouldYieldOrInterrupt(opCtx)) {
             uassertStatusOK(_yieldPolicy->yieldOrInterrupt(opCtx));
         }
     }
 
     /**
-     * Checks for interrupt if necessary. Will never yield regardless of the yielding policy.
-     * Should only be used for ValueBlock stages.
+     * Checks for interrupt if necessary. This will never yield regardless of the yielding policy.
+     * Should only be used in special cases, e.g. needed for performance or to avoid bad edge cases.
      */
-    void checkForInterrupt(OperationContext* opCtx) {
+    void checkForInterruptNoYield(OperationContext* opCtx) {
         invariant(opCtx);
 
         if (--_interruptCounter == 0) {
