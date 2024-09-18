@@ -62,6 +62,9 @@ Value DocumentSourceSearchMeta::serialize(const SerializationOptions& opts) cons
 }
 
 std::unique_ptr<executor::TaskExecutorCursor> DocumentSourceSearchMeta::establishCursor() {
+    // TODO SERVER-94875 We should be able to remove any cursor establishment logic from
+    // DocumentSourceSearchMeta if we establish the cursors during search_helper
+    // pipeline preparation instead.
     auto cursors = mongot_cursor::establishCursorsForSearchMetaStage(
         pExpCtx, getSearchQuery(), getTaskExecutor(), getIntermediateResultsProtocolVersion());
 

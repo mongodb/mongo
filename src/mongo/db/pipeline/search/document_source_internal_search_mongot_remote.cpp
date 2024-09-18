@@ -287,6 +287,9 @@ DocumentSource::GetNextResult DocumentSourceInternalSearchMongotRemote::getNextA
 
 std::unique_ptr<executor::TaskExecutorCursor>
 DocumentSourceInternalSearchMongotRemote::establishCursor() {
+    // TODO SERVER-94874 We should be able to remove any cursor establishment logic from
+    // DocumentSourceInternalSearchMongotRemote if we establish the cursors during search_helper
+    // pipeline preparation instead.
     auto cursors = mongot_cursor::establishCursorsForSearchStage(
         pExpCtx, _spec, _taskExecutor, boost::none, nullptr, getSearchIdLookupMetrics());
     // Should be called only in unsharded scenario, therefore only expect a results cursor and no

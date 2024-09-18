@@ -59,7 +59,7 @@ MONGO_FAIL_POINT_DEFINE(searchReturnEofImmediately);
 
 namespace search_helpers {
 namespace {
-void prepareSearchPipelineLegacyExecutor(Pipeline* pipeline, bool applyShardFilter) {
+void desugarSearchPipeline(Pipeline* pipeline) {
     auto searchStage = pipeline->popFrontWithName(DocumentSourceSearch::kStageName);
     auto& sources = pipeline->getSources();
     if (searchStage) {
@@ -67,11 +67,13 @@ void prepareSearchPipelineLegacyExecutor(Pipeline* pipeline, bool applyShardFilt
         sources.insert(sources.begin(), desugaredPipeline.begin(), desugaredPipeline.end());
         Pipeline::stitch(&sources);
     }
+}
 
+void injectShardFilter(Pipeline* pipeline) {
+    auto& sources = pipeline->getSources();
     auto internalSearchLookupIt = sources.begin();
-    // Bail early if the pipeline is not $_internalSearchMongotRemote stage or doesn't need to apply
-    // shardFilter.
-    if (internalSearchLookupIt == sources.end() || !applyShardFilter ||
+    // Bail early if the pipeline is not $_internalSearchMongotRemote stage.
+    if (internalSearchLookupIt == sources.end() ||
         (mongo::DocumentSourceInternalSearchMongotRemote::kStageName !=
              (*internalSearchLookupIt)->getSourceName() &&
          mongo::DocumentSourceVectorSearch::kStageName !=
@@ -336,8 +338,10 @@ std::unique_ptr<Pipeline, PipelineDeleter> prepareSearchForTopLevelPipelineLegac
     DocsNeededBounds bounds,
     boost::optional<int64_t> userBatchSize) {
     // First, desuguar $search, and inject shard filterer.
-    prepareSearchPipelineLegacyExecutor(origPipeline, true);
+    desugarSearchPipeline(origPipeline);
+    injectShardFilter(origPipeline);
 
+    // TODO SERVER-94874 Establish mongot cursor for $searchMeta queries too.
     if ((expCtx->explain &&
          !feature_flags::gFeatureFlagSearchExplainExecutionStats.isEnabled(
              serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) ||
@@ -447,7 +451,9 @@ std::unique_ptr<Pipeline, PipelineDeleter> prepareSearchForTopLevelPipelineLegac
 }
 
 void prepareSearchForNestedPipelineLegacyExecutor(Pipeline* pipeline) {
-    prepareSearchPipelineLegacyExecutor(pipeline, false);
+    desugarSearchPipeline(pipeline);
+    // TODO SERVER-94874 Establish mongot cursor here, like is done in
+    // prepareSearchForTopLevelPipelineLegacyExecutor.
 }
 
 void establishSearchCursorsSBE(boost::intrusive_ptr<ExpressionContext> expCtx,
