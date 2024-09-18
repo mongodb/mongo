@@ -30,6 +30,7 @@
 #pragma once
 
 #include "mongo/db/query/ce/cbp_histogram_ce/histogram_common.h"
+#include "mongo/db/query/stats/array_histogram.h"
 
 namespace mongo::optimizer::cbp::ce {
 
@@ -60,37 +61,23 @@ EstimationResult estimateCardinalityRange(const stats::ArrayHistogram& ah,
                                           EstimationAlgo estAlgo = EstimationAlgo::HistogramV2);
 
 /**
- * Returns cumulative total statistics for a histogram.
+ * Estimates the selectivity of a given interval if histogram estimation is possible. Otherwise,
+ * throw an exception.
  */
-EstimationResult getTotals(const stats::ArrayHistogram& ah);
+Cardinality estimateIntervalCardinality(const stats::ArrayHistogram& ah,
+                                        const mongo::Interval& interval,
+                                        bool includeScalar = true);
 
 /**
- * Estimates the selectivity of an equality predicate given an ArrayHistogram and an SBE value and
- * type tag pair.
+ * Checks if a given bound can be estimated via either histograms or type counts.
  */
-Selectivity estimateSelectivityEq(const stats::ArrayHistogram& ah,
-                                  sbe::value::TypeTags tag,
-                                  sbe::value::Value val,
-                                  bool includeScalar);
+bool canEstimateBound(const stats::ArrayHistogram& ah,
+                      sbe::value::TypeTags tag,
+                      bool includeScalar);
 
 /**
- * Estimates the selectivity of a range predicate given an ArrayHistogram and a range predicate.
- * Set 'includeScalar' to true to indicate whether or not the provided range should include no-array
- * values. The other fields define the range of the estimation.
+ * Three ways TypeTags comparison (aka spaceship operator) according to the BSON type sort order.
  */
-Selectivity estimateSelectivityRange(const stats::ArrayHistogram& ah,
-                                     bool lowInclusive,
-                                     sbe::value::TypeTags tagLow,
-                                     sbe::value::Value valLow,
-                                     bool highInclusive,
-                                     sbe::value::TypeTags tagHigh,
-                                     sbe::value::Value valHigh,
-                                     bool includeScalar,
-                                     EstimationAlgo estAlgo = EstimationAlgo::HistogramV2);
-
-/**
- * Converts an input cardinality to a selectivity based on the histogram's sample size.
- */
-Selectivity getSelectivity(const stats::ArrayHistogram& ah, Cardinality cardinality);
+int compareTypeTags(sbe::value::TypeTags a, sbe::value::TypeTags b);
 
 }  // namespace mongo::optimizer::cbp::ce

@@ -27,9 +27,12 @@
  *    it in the license file.
  */
 
+#include "mongo/db/exec/docval_to_sbeval.h"
 #include <absl/random/zipf_distribution.h>
 #include <sstream>
 
+#include "mongo/db/query/ce/cbp_histogram_ce/array_histogram_helpers.h"
+#include "mongo/db/query/ce/cbp_histogram_ce/scalar_histogram_helpers.h"
 #include "mongo/db/query/ce/cbp_histogram_ce/test_helpers.h"
 #include "mongo/db/query/stats/rand_utils_new.h"
 #include "mongo/logv2/log.h"

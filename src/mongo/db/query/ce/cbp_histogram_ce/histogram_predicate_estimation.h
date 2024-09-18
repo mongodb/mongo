@@ -29,9 +29,8 @@
 
 #pragma once
 
-#include "mongo/db/query/ce/cbp_histogram_ce/array_histogram_helpers.h"
 #include "mongo/db/query/ce/cbp_histogram_ce/histogram_common.h"
-#include "mongo/db/query/ce/cbp_histogram_ce/scalar_histogram_helpers.h"
+#include "mongo/db/query/stats/array_histogram.h"
 
 namespace mongo::optimizer::cbp::ce {
 
@@ -39,23 +38,21 @@ class HistogramCardinalityEstimator {
 public:
     /**
      * Estimates the cardinality of an interval based on the provided histogram.
+     * 'collectionSize' represents the number of documents in the collection.
      * 'inputScalar' indicates whether or not the provided interval should include non-array values.
-     * e.g., $elemMatch should exclude the non-array values with includeScalar=false.
-     * 'inputCard' represents the input cardinality from the child stage.
+     * e.g., $elemMatch should exclude the non-array values when 'includeScalar' is set to false.
      */
     static Cardinality estimateCardinality(const stats::ArrayHistogram& hist,
-                                           const OrderedIntervalList& oil,
-                                           bool includeScalar,
-                                           boost::optional<Cardinality> inputCard);
+                                           Cardinality collectionSize,
+                                           const Interval& interval,
+                                           bool includeScalar);
 
     /**
-     * Estimates the selectivity of an interval based on the provided histogram.
-     * 'inputScalar' indicates whether or not the provided interval should include non-array values.
-     * e.g., $elemMatch should exclude the non-array values with includeScalar=false.
+     * Checks if given interval can be estimated.
      */
-    static Selectivity estimateSelectivity(const stats::ArrayHistogram& hist,
-                                           const OrderedIntervalList& oil,
-                                           bool includeScalar);
+    static bool canEstimateInterval(const stats::ArrayHistogram& hist,
+                                    const Interval& interval,
+                                    bool includeScalar);
 };
 
 }  // namespace mongo::optimizer::cbp::ce

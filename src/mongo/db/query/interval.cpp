@@ -187,6 +187,10 @@ bool Interval::isMaxToMin() const {
     return (start.type() == BSONType::MaxKey && end.type() == BSONType::MinKey);
 }
 
+bool Interval::isFullyOpen() const {
+    return isMinToMax() || isMaxToMin();
+}
+
 Interval::IntervalComparison Interval::compare(const Interval& other) const {
     //
     // Intersect cases

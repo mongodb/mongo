@@ -12,6 +12,7 @@ env.Library(
     ],
     LIBDEPS=[
         "$BUILD_DIR/mongo/db/query/ce/ce_utils",
+        "$BUILD_DIR/mongo/db/query/query_index_bounds",
         "$BUILD_DIR/mongo/db/query/stats/stats_histograms",
     ],
 )
@@ -39,6 +40,7 @@ env.Library(
 env.CppUnitTest(
     target="cbp_histogram_estimation_test",
     source=[
+        "histogram_predicate_estimation_test.cpp",
         "scalar_histogram_helpers_test.cpp",
         "array_histogram_helpers_test.cpp",
     ],

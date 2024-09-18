@@ -28,6 +28,7 @@
  */
 
 #include "mongo/db/query/ce/cbp_histogram_ce/scalar_histogram_helpers.h"
+#include "mongo/db/query/stats/value_utils.h"
 
 namespace mongo::optimizer::cbp::ce {
 
@@ -120,6 +121,10 @@ EstimationResult estimateCardinalityRange(const ScalarHistogram& histogram,
                                           bool highInclusive,
                                           sbe::value::TypeTags tagHigh,
                                           sbe::value::Value valHigh) {
+    tassert(8870503,
+            "The interval must be in ascending order",
+            !reversedInterval(tagLow, valLow, tagHigh, valHigh));
+
     const auto highType = highInclusive ? EstimationType::kLessOrEqual : EstimationType::kLess;
     const auto highEstimate = estimateCardinality(histogram, tagHigh, valHigh, highType);
 

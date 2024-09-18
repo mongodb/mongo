@@ -176,6 +176,11 @@ struct Interval {
      */
     bool isMaxToMin() const;
 
+    /**
+     * Returns true if the interval has negative and positive infinities as bounds.
+     */
+    bool isFullyOpen() const;
+
     /** Returns how 'this' compares to 'other' */
     enum IntervalComparison {
         //

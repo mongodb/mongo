@@ -27,10 +27,10 @@
  *    it in the license file.
  */
 
-#include "mongo/db/exec/docval_to_sbeval.h"
 #include "mongo/db/exec/sbe/values/value.h"
 #include "mongo/db/query/ce/cbp_histogram_ce/histogram_common.h"
-#include "mongo/db/query/ce/cbp_histogram_ce/histogram_predicate_estimation.h"
+#include "mongo/db/query/stats/array_histogram.h"
+#include "mongo/db/query/stats/value_utils.h"
 
 namespace mongo::optimizer::cbp::ce {
 

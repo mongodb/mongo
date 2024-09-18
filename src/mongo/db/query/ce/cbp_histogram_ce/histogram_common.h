@@ -29,10 +29,7 @@
 
 #pragma once
 
-#include "mongo/db/exec/document_value/value.h"
 #include "mongo/db/exec/sbe/values/value.h"
-#include "mongo/db/query/stats/array_histogram.h"
-#include "mongo/db/query/stats/scalar_histogram.h"
 
 namespace mongo::optimizer::cbp::ce {
 
@@ -56,5 +53,26 @@ struct EstimationResult {
 
 enum class EstimationType { kEqual, kLess, kLessOrEqual, kGreater, kGreaterOrEqual };
 
+/**
+ * Checks if an interval is in descending direction.
+ */
+inline bool reversedInterval(sbe::value::TypeTags tagLow,
+                             sbe::value::Value valLow,
+                             sbe::value::TypeTags tagHigh,
+                             sbe::value::Value valHigh) {
+    auto [cmpTag, cmpVal] = sbe::value::compareValue(tagLow, valLow, tagHigh, valHigh);
+
+    // Compares 'cmpTag' to check if the comparison is successful.
+    if (cmpTag == sbe::value::TypeTags::NumberInt32) {
+        if (sbe::value::bitcastTo<int32_t>(cmpVal) == 1) {
+            return true;
+        }
+    }
+
+    // The comparison fails to tell which one is smaller or larger. This is not expected because we
+    // do not expect to see 'Nothing', 'ArraySet', 'ArrayMultiSet', 'MultiMap' in interval bounds.
+    uassert(8870501, "Unable to compare bounds", cmpTag == sbe::value::TypeTags::NumberInt32);
+    return false;
+}
 
 }  // namespace mongo::optimizer::cbp::ce

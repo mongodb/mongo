@@ -27,16 +27,14 @@
  *    it in the license file.
  */
 
-#include "mongo/db/query/ce/test_utils.h"
-#include <memory>
 #include <tuple>
 #include <vector>
 
 #include "mongo/db/query/ce/cbp_histogram_ce/array_histogram_helpers.h"
 #include "mongo/db/query/ce/cbp_histogram_ce/histogram_common.h"
-#include "mongo/db/query/ce/cbp_histogram_ce/histogram_predicate_estimation.h"
+#include "mongo/db/query/ce/cbp_histogram_ce/scalar_histogram_helpers.h"
 #include "mongo/db/query/ce/cbp_histogram_ce/test_helpers.h"
-#include "mongo/db/query/stats/maxdiff_test_utils.h"
+#include "mongo/db/query/ce/test_utils.h"
 #include "mongo/unittest/assert.h"
 #include "mongo/unittest/framework.h"
 

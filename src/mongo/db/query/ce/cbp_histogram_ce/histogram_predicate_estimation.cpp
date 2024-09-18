@@ -29,22 +29,38 @@
 
 #include "mongo/db/query/ce/cbp_histogram_ce/histogram_predicate_estimation.h"
 
+#include "mongo/db/exec/sbe/values/bson.h"
+#include "mongo/db/query/ce/cbp_histogram_ce/array_histogram_helpers.h"
+#include "mongo/db/query/ce/cbp_histogram_ce/histogram_common.h"
+#include "mongo/db/query/stats/value_utils.h"
+
 
 namespace mongo::optimizer::cbp::ce {
 
-static Cardinality estimateCardinality(const stats::ArrayHistogram& hist,
-                                       const OrderedIntervalList& oil,
-                                       bool includeScalar,
-                                       boost::optional<Cardinality> inputCard) {
-    // TODO: Implement
-    return 0.0;
+Cardinality HistogramCardinalityEstimator::estimateCardinality(const stats::ArrayHistogram& hist,
+                                                               const Cardinality collectionSize,
+                                                               const Interval& interval,
+                                                               bool includeScalar) {
+    // Rescales the cardinality according to the current collection size.
+    return (estimateIntervalCardinality(hist, interval, includeScalar) / hist.getSampleSize()) *
+        collectionSize;
 }
 
-static Selectivity estimateSelectivity(const stats::ArrayHistogram& hist,
-                                       const OrderedIntervalList& oil,
-                                       bool includeScalar) {
-    // TODO: Implement
-    return {};
+bool HistogramCardinalityEstimator::canEstimateInterval(const stats::ArrayHistogram& hist,
+                                                        const Interval& interval,
+                                                        bool includeScalar) {
+
+    auto [startTag, startVal] = sbe::bson::convertFrom<false>(interval.start);
+    auto [endTag, endVal] = sbe::bson::convertFrom<false>(interval.end);
+    sbe::value::ValueGuard startGuard{startTag, startVal};
+    sbe::value::ValueGuard endGuard{endTag, endVal};
+
+    if (compareTypeTags(startTag, endTag) == 0) {
+        return stats::canEstimateTypeViaHistogram(startTag) ||
+            canEstimateBound(hist, startTag, includeScalar);
+    }
+
+    return false;
 }
 
 }  // namespace mongo::optimizer::cbp::ce
