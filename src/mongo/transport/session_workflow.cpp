@@ -65,6 +65,7 @@
 #include "mongo/logv2/log_attr.h"
 #include "mongo/logv2/log_component.h"
 #include "mongo/logv2/log_severity.h"
+#include "mongo/logv2/log_severity_suppressor.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/platform/compiler.h"
 #include "mongo/rpc/message.h"
@@ -196,8 +197,6 @@ struct SplitTimerPolicy {
     static constexpr size_t numTimeSplitIds = enumExtent<TimeSplitIdType>;
     static constexpr size_t numIntervalIds = enumExtent<IntervalIdType>;
 
-    explicit SplitTimerPolicy(ServiceEntryPoint* sep) : _sep(sep) {}
-
     template <typename E>
     static constexpr size_t toIdx(E e) {
         return static_cast<size_t>(e);
@@ -235,9 +234,12 @@ struct SplitTimerPolicy {
             return;
         }
 
+        static StaticImmortal<logv2::SeveritySuppressor> logSuppressor{
+            Seconds{5}, logv2::LogSeverity::Info(), logv2::LogSeverity::Debug(2)};
+
         logv2::LogSeverity severity = sessionWorkflowDelayOrFailSendMessage.shouldFail()
             ? logv2::LogSeverity::Info()
-            : _sep->slowSessionWorkflowLogSeverity();
+            : (*logSuppressor)();
 
         LOGV2_DEBUG(6983000,
                     severity.toInt(),
@@ -248,16 +250,12 @@ struct SplitTimerPolicy {
     Timer makeTimer() {
         return Timer{};
     }
-
-    ServiceEntryPoint* _sep;
 };
 
 class SessionWorkflowMetrics {
 public:
-    explicit SessionWorkflowMetrics(ServiceEntryPoint* sep) : _sep(sep) {}
-
     void start() {
-        _t.emplace(SplitTimerPolicy{_sep});
+        _t.emplace(SplitTimerPolicy{});
     }
     void yieldedBeforeReceive() {
         _t->notify(TimeSplitId::yieldedBeforeReceive);
@@ -282,7 +280,6 @@ public:
     }
 
 private:
-    ServiceEntryPoint* _sep;
     boost::optional<SplitTimer<SplitTimerPolicy>> _t;
 };
 

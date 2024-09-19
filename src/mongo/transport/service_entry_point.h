@@ -54,25 +54,9 @@ public:
     virtual ~ServiceEntryPoint() = default;
 
     /**
-     * Returns the current severity to log slow SessionWorkflow lifecycles. Returns a suppressed
-     * severity every X seconds (defined in SEP::impl) to prevent logs from overwhelming the rest
-     * of the system.
-     */
-    logv2::LogSeverity slowSessionWorkflowLogSeverity() {
-        return _slowSessionWorkflowLogSuppressor();
-    }
-
-    /**
      * Processes a request and fills out a DbResponse.
      */
     virtual Future<DbResponse> handleRequest(OperationContext* opCtx,
                                              const Message& request) noexcept = 0;
-
-private:
-    static constexpr Seconds kSlowSessionWorkflowLogSuppresionPeriod{5};
-    logv2::SeveritySuppressor _slowSessionWorkflowLogSuppressor{
-        kSlowSessionWorkflowLogSuppresionPeriod,
-        logv2::LogSeverity::Info(),
-        logv2::LogSeverity::Debug(2)};
 };
 }  // namespace mongo
