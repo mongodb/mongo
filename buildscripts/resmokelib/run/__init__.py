@@ -1784,6 +1784,14 @@ class RunPlugin(PluginInterface):
             help="Starts a hook that periodically updates shard and router server parameters while tests run",
         )
 
+        parser.add_argument(
+            "--fuzzRuntimeStress",
+            dest="fuzz_runtime_stress",
+            choices=["off", "cpu"],
+            default="off",
+            help="Starts a hook that produces stress, the amount of which periodically changes.",
+        )
+
         mongodb_server_options.add_argument(
             "--fuzzMongosConfigs",
             dest="fuzz_mongos_configs",

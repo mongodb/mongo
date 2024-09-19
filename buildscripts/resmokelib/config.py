@@ -68,6 +68,7 @@ DEFAULTS = {
     "force_excluded_tests": False,
     "fuzz_mongod_configs": None,
     "fuzz_runtime_params": None,
+    "fuzz_runtime_stress": "off",
     "fuzz_mongos_configs": None,
     "config_fuzz_seed": None,
     "disable_encryption_fuzzing": False,
@@ -411,6 +412,9 @@ FUZZ_MONGOD_CONFIGS = None
 
 # Defines how to fuzz mongod/mongos parameters at test run-time
 FUZZ_RUNTIME_PARAMS = None
+
+# Defines how to stress the system at run-time
+FUZZ_RUNTIME_STRESS = None
 
 # Defines how to fuzz mongos parameters on startup
 FUZZ_MONGOS_CONFIGS = None

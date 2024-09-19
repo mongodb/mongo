@@ -642,6 +642,8 @@ or explicitly pass --installDir to the run subcommand of buildscripts/resmoke.py
 
     _config.MAX_TEST_QUEUE_SIZE = config.pop("max_test_queue_size")
 
+    _config.FUZZ_RUNTIME_STRESS = config.pop("fuzz_runtime_stress")
+
     def configure_tests(test_files, replay_file):
         # `_validate_options` has asserted that at most one of `test_files` and `replay_file` contains input.
 
