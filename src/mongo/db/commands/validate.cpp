@@ -337,42 +337,7 @@ public:
                                     << " on the global indexes namespace");
         }
 
-        if (!serverGlobalParams.quiet.load()) {
-            LOGV2(20514,
-                  "CMD: validate",
-                  logAttrs(nss),
-                  "background"_attr = background,
-                  "full"_attr = fullValidate,
-                  "enforceFastCount"_attr = enforceFastCount,
-                  "checkBSONConformance"_attr = checkBSONConformance,
-                  "repair"_attr = repair);
-        }
-
-        // Only one validation per collection can be in progress, the rest wait.
-        {
-            stdx::unique_lock<Latch> lock(_validationMutex);
-            try {
-                opCtx->waitForConditionOrInterrupt(_validationNotifier, lock, [&] {
-                    return _validationsInProgress.find(nss) == _validationsInProgress.end();
-                });
-            } catch (AssertionException& e) {
-                CommandHelpers::appendCommandStatusNoThrow(
-                    result,
-                    {ErrorCodes::CommandFailed,
-                     str::stream() << "Exception thrown during validation: " << e.toString()});
-                return false;
-            }
-
-            _validationsInProgress.insert(nss);
-        }
-
-        ON_BLOCK_EXIT([&] {
-            stdx::lock_guard<Latch> lock(_validationMutex);
-            _validationsInProgress.erase(nss);
-            _validationNotifier.notify_all();
-        });
-
-        auto mode = [&] {
+        auto validateMode = [&] {
             if (metadata) {
                 return CollectionValidation::ValidateMode::kMetadata;
             }
@@ -399,7 +364,7 @@ public:
                 // On read-only mode we can't make any adjustments.
                 return CollectionValidation::RepairMode::kNone;
             }
-            switch (mode) {
+            switch (validateMode) {
                 case CollectionValidation::ValidateMode::kForeground:
                 case CollectionValidation::ValidateMode::kForegroundCheckBSON:
                 case CollectionValidation::ValidateMode::kForegroundFull:
@@ -419,28 +384,61 @@ public:
             }
         }();
 
+        CollectionValidation::ValidationOptions options(
+            validateMode,
+            repairMode,
+            logDiagnostics,
+            cmdObj["enforceTimeseriesBucketsAreAlwaysCompressed"].trueValue(),
+            getTestCommandsEnabled() ? (ValidationVersion)bsonTestValidationVersion
+                                     : currentValidationVersion);
+
+        if (!serverGlobalParams.quiet.load()) {
+            LOGV2(20514,
+                  "CMD: validate",
+                  logAttrs(nss),
+                  "background"_attr = options.isBackground(),
+                  "full"_attr = options.isFullValidation(),
+                  "enforceFastCount"_attr = options.enforceFastCountRequested(),
+                  "checkBSONConformance"_attr = options.isBSONConformanceValidation(),
+                  "repair"_attr = options.fixErrors());
+        }
+
+        // Only one validation per collection can be in progress, the rest wait.
+        {
+            stdx::unique_lock<Latch> lock(_validationMutex);
+            try {
+                opCtx->waitForConditionOrInterrupt(_validationNotifier, lock, [&] {
+                    return _validationsInProgress.find(nss) == _validationsInProgress.end();
+                });
+            } catch (AssertionException& e) {
+                CommandHelpers::appendCommandStatusNoThrow(
+                    result,
+                    {ErrorCodes::CommandFailed,
+                     str::stream() << "Exception thrown during validation: " << e.toString()});
+                return false;
+            }
+
+            _validationsInProgress.insert(nss);
+        }
+
+        ON_BLOCK_EXIT([&] {
+            stdx::lock_guard<Latch> lock(_validationMutex);
+            _validationsInProgress.erase(nss);
+            _validationNotifier.notify_all();
+        });
+
         if (repair) {
             shard_role_details::getRecoveryUnit(opCtx)->setPrepareConflictBehavior(
                 PrepareConflictBehavior::kIgnoreConflictsAllowWrites);
         }
 
-        CollectionValidation::AdditionalOptions additionalOptions;
-        additionalOptions.enforceTimeseriesBucketsAreAlwaysCompressed =
-            cmdObj["enforceTimeseriesBucketsAreAlwaysCompressed"].trueValue();
-        additionalOptions.validationVersion = getTestCommandsEnabled()
-            ? (ValidationVersion)bsonTestValidationVersion
-            : currentValidationVersion;
-
         ValidateResults validateResults;
         Status status = CollectionValidation::validate(
             opCtx,
             nss,
-            mode,
-            repairMode,
-            additionalOptions,
+            std::move(options),
             &validateResults,
             &result,
-            logDiagnostics,
             SerializationContext::stateCommandReply(reqSerializationCtx));
         if (!status.isOK()) {
             return CommandHelpers::appendCommandStatusNoThrow(result, status);

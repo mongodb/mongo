@@ -67,52 +67,29 @@ namespace CollectionValidation {
  * Contains information about the collection being validated and the user provided validation
  * options. Additionally it maintains the state of shared objects throughtout the validation, such
  * as locking, cursors and data throttling.
+ *
+ * TODO (SERVER-93766): Do not subclass ValidationOptions. Going forward we want a clean separation
+ * between immutable preconditions of the validation (which needs to be logged in advance), and
+ * mutable runtime-state of the validation (which needs to be accounted for memory-limiting
+ * purposes), at present ValidateState does both jobs, hence the best idiom ever:
+ * subclass-which-takes-a-parent-instance-in-its-constructor paradigm.
  */
-class ValidateState {
+class ValidateState : public ValidationOptions {
     ValidateState(const ValidateState&) = delete;
     ValidateState& operator=(const ValidateState&) = delete;
 
 public:
-    ValidateState(OperationContext* opCtx,
-                  const NamespaceString& nss,
-                  ValidateMode mode,
-                  RepairMode repairMode,
-                  const AdditionalOptions& additionalOptions,
-                  bool logDiagnostics);
+    ValidateState(OperationContext* opCtx, const NamespaceString& nss, ValidationOptions options);
 
     const NamespaceString& nss() const {
         return _nss;
     }
 
-    bool isMetadataValidation() const {
-        return _mode == ValidateMode::kMetadata;
-    }
-
-    bool isBackground() const {
-        return _mode == ValidateMode::kBackground || _mode == ValidateMode::kBackgroundCheckBSON;
-    }
-
     bool shouldEnforceFastCount() const;
 
-    bool isFullValidation() const {
-        return _mode == ValidateMode::kForegroundFull ||
-            _mode == ValidateMode::kForegroundFullEnforceFastCount;
-    }
-
-    bool isFullIndexValidation() const {
-        return isFullValidation() || _mode == ValidateMode::kForegroundFullIndexOnly;
-    }
-
-    bool shouldDecompressBSONColumn() const {
-        return isFullValidation() || _mode == ValidateMode::kBackgroundCheckBSON ||
-            _mode == ValidateMode::kForegroundCheckBSON;
-    }
-
     BSONValidateModeEnum getBSONValidateMode() const {
-        return isFullValidation() || _mode == ValidateMode::kForegroundCheckBSON ||
-                _mode == ValidateMode::kBackgroundCheckBSON
-            ? BSONValidateModeEnum::kFull
-            : BSONValidateModeEnum::kExtended;
+        return isBSONConformanceValidation() ? BSONValidateModeEnum::kFull
+                                             : BSONValidateModeEnum::kExtended;
     }
 
     bool isCollectionSchemaViolated() const {
@@ -145,14 +122,6 @@ public:
 
     void setBSONDataNonConformant() {
         _BSONDataNonConformant = true;
-    }
-
-    bool fixErrors() const {
-        return _repairMode == RepairMode::kFixErrors;
-    }
-
-    bool adjustMultikey() const {
-        return _repairMode == RepairMode::kFixErrors || _repairMode == RepairMode::kAdjustMultikey;
     }
 
     UUID uuid() const {
@@ -211,21 +180,6 @@ public:
      */
     void initializeCursors(OperationContext* opCtx);
 
-    /**
-     * Indicates whether extra logging should occur during validation.
-     */
-    bool logDiagnostics() {
-        return _logDiagnostics;
-    }
-
-    bool enforceTimeseriesBucketsAreAlwaysCompressed() const {
-        return _enforceTimeseriesBucketsAreAlwaysCompressed;
-    }
-
-    ValidationVersion validationVersion() const {
-        return _validationVersion;
-    }
-
     boost::optional<Timestamp> getValidateTimestamp() {
         return _validateTs;
     }
@@ -234,15 +188,10 @@ private:
     ValidateState() = delete;
 
     NamespaceString _nss;
-    ValidateMode _mode;
-    RepairMode _repairMode;
     bool _collectionSchemaViolated = false;
     bool _timeseriesDataInconsistency = false;
     bool _timeseriesBucketingParametersChangedInconsistent = false;
     bool _BSONDataNonConformant = false;
-    bool _enforceTimeseriesBucketsAreAlwaysCompressed = false;
-    ValidationVersion _validationVersion = currentValidationVersion;
-
     // To avoid racing with shutdown.
     boost::optional<Lock::GlobalLock> _globalLock;
 
@@ -271,9 +220,6 @@ private:
     RecordId _firstRecordId;
 
     DataThrottle _dataThrottle;
-
-    // Can be set to obtain better insight into what validate sees/does.
-    bool _logDiagnostics;
 
     boost::optional<Timestamp> _validateTs = boost::none;
 };

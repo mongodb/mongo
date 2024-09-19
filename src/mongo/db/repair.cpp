@@ -282,9 +282,9 @@ Status repairCollection(OperationContext* opCtx,
     ValidateResults validateResults;
     BSONObjBuilder output;
     // Serialize valdiate result for logging in which tenant prefix is expected.
-    const SerializationContext serializaionCtx(SerializationContext::Source::Command,
-                                               SerializationContext::CallerType::Reply,
-                                               SerializationContext::Prefix::IncludePrefix);
+    const SerializationContext serializationCtx(SerializationContext::Source::Command,
+                                                SerializationContext::CallerType::Reply,
+                                                SerializationContext::Prefix::IncludePrefix);
 
     // Close the open transaction to allow enabling pre-fetching in validation.
     if (shard_role_details::getRecoveryUnit(opCtx)->isActive()) {
@@ -293,16 +293,16 @@ Status repairCollection(OperationContext* opCtx,
 
     // Exclude full record store validation because we have already validated the underlying
     // record store in the call to repairRecordStore above.
-    status =
-        CollectionValidation::validate(opCtx,
-                                       nss,
-                                       CollectionValidation::ValidateMode::kForegroundFullIndexOnly,
-                                       CollectionValidation::RepairMode::kFixErrors,
-                                       /*additionalOptions=*/{},
-                                       &validateResults,
-                                       &output,
-                                       /*logDiagnostics=*/false,
-                                       serializaionCtx);
+    status = CollectionValidation::validate(
+        opCtx,
+        nss,
+        CollectionValidation::ValidationOptions(
+            CollectionValidation::ValidateMode::kForegroundFullIndexOnly,
+            CollectionValidation::RepairMode::kFixErrors,
+            /*logDiagnostics=*/false),
+        &validateResults,
+        &output,
+        serializationCtx);
     if (!status.isOK()) {
         return status;
     }

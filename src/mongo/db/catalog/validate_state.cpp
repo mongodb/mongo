@@ -62,7 +62,6 @@
 #include "mongo/util/assert_util.h"
 #include "mongo/util/fail_point.h"
 #include "mongo/util/str.h"
-#include "mongo/util/testing_proctor.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kStorage
 
@@ -75,27 +74,10 @@ namespace CollectionValidation {
 
 ValidateState::ValidateState(OperationContext* opCtx,
                              const NamespaceString& nss,
-                             ValidateMode mode,
-                             RepairMode repairMode,
-                             const AdditionalOptions& additionalOptions,
-                             bool logDiagnostics)
-    : _nss(nss),
-      _mode(mode),
-      _repairMode(repairMode),
-      _dataThrottle(opCtx, [&]() { return gMaxValidateMBperSec.load(); }),
-      _logDiagnostics(logDiagnostics) {
-    // Test-only check to ensure time-series buckets are always compressed.
-    if (additionalOptions.enforceTimeseriesBucketsAreAlwaysCompressed) {
-        if (TestingProctor::instance().isEnabled() &&
-            feature_flags::gTimeseriesAlwaysUseCompressedBuckets.isEnabled(
-                serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
-            _enforceTimeseriesBucketsAreAlwaysCompressed = true;
-        } else {
-            LOGV2_WARNING(7735102, "Not enforcing that time-series buckets are always compressed");
-        }
-    }
-
-    _validationVersion = additionalOptions.validationVersion;
+                             ValidationOptions options)
+    : ValidationOptions(std::move(options)),
+      _nss(nss),
+      _dataThrottle(opCtx, [&]() { return gMaxValidateMBperSec.load(); }) {
 
     // RepairMode is incompatible with the ValidateModes kBackground and
     // kForegroundFullEnforceFastCount.
@@ -110,7 +92,7 @@ ValidateState::ValidateState(OperationContext* opCtx,
 }
 
 bool ValidateState::shouldEnforceFastCount() const {
-    if (_mode == ValidateMode::kForegroundFullEnforceFastCount) {
+    if (enforceFastCountRequested()) {
         if (_nss.isOplog() || _nss.isChangeCollection() ||
             _nss.isChangeStreamPreImagesCollection()) {
             // Oplog writers only take a global IX lock, so the oplog can still be written to even

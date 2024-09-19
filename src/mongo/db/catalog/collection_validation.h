@@ -100,9 +100,82 @@ enum class RepairMode {
 /**
  * Additional validation options that can run in any mode.
  */
-struct AdditionalOptions {
-    bool enforceTimeseriesBucketsAreAlwaysCompressed = false;
-    ValidationVersion validationVersion = currentValidationVersion;
+class ValidationOptions {
+public:
+    ValidationOptions(ValidateMode validateMode,
+                      RepairMode repairMode,
+                      bool logDiagnostics,
+                      bool enforceTimeseriesBucketsAreAlwaysCompressed = false,
+                      ValidationVersion validationVersion = currentValidationVersion);
+
+    virtual ~ValidationOptions() = default;
+
+    bool isMetadataValidation() const {
+        return _validateMode == ValidateMode::kMetadata;
+    }
+
+    bool isBackground() const {
+        return _validateMode == ValidateMode::kBackground ||
+            _validateMode == ValidateMode::kBackgroundCheckBSON;
+    }
+
+    bool isFullValidation() const {
+        return _validateMode == ValidateMode::kForegroundFull ||
+            _validateMode == ValidateMode::kForegroundFullEnforceFastCount;
+    }
+
+    bool isFullIndexValidation() const {
+        return isFullValidation() || _validateMode == ValidateMode::kForegroundFullIndexOnly;
+    }
+
+    bool isBSONConformanceValidation() const {
+        return isFullValidation() || _validateMode == ValidateMode::kBackgroundCheckBSON ||
+            _validateMode == ValidateMode::kForegroundCheckBSON;
+    }
+
+    /**
+     * Returns true iff the validation was *asked* to enforce the fast count, whether it actually
+     * does depends on what collection is being validated and what the other options are. See
+     * ValidateState::shouldEnforceFastCount().
+     */
+    bool enforceFastCountRequested() const {
+        return _validateMode == ValidateMode::kForegroundFullEnforceFastCount;
+    }
+
+    bool fixErrors() const {
+        return _repairMode == RepairMode::kFixErrors;
+    }
+
+    bool adjustMultikey() const {
+        return _repairMode == RepairMode::kFixErrors || _repairMode == RepairMode::kAdjustMultikey;
+    }
+
+    /**
+     * Indicates whether extra logging should occur during validation.
+     */
+    bool logDiagnostics() {
+        return _logDiagnostics;
+    }
+
+    bool enforceTimeseriesBucketsAreAlwaysCompressed() const {
+        return _enforceTimeseriesBucketsAreAlwaysCompressed;
+    }
+
+    ValidationVersion validationVersion() const {
+        return _validationVersion;
+    }
+
+private:
+    const ValidateMode _validateMode;
+
+    const RepairMode _repairMode;
+
+    // Can be set to obtain better insight into what validate sees/does.
+    const bool _logDiagnostics;
+
+    const bool _enforceTimeseriesBucketsAreAlwaysCompressed;
+
+    const ValidationVersion _validationVersion;
 };
 
 /**
@@ -114,12 +187,9 @@ struct AdditionalOptions {
  */
 Status validate(OperationContext* opCtx,
                 const NamespaceString& nss,
-                ValidateMode mode,
-                RepairMode repairMode,
-                const AdditionalOptions& additionalOptions,
+                ValidationOptions options,
                 ValidateResults* results,
                 BSONObjBuilder* output,
-                bool logDiagnostics,
                 const SerializationContext& sc = SerializationContext::stateCommandReply());
 
 /**

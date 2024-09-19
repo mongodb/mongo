@@ -947,7 +947,7 @@ void ValidateAdaptor::traverseRecordStore(OperationContext* opCtx,
                                                     recordBson,
                                                     _validateState,
                                                     results,
-                                                    _validateState->shouldDecompressBSONColumn());
+                                                    _validateState->isBSONConformanceValidation());
                 // This log id should be kept in sync with the associated warning messages that are
                 // returned to the client.
                 if (!bucketStatus.isOK()) {

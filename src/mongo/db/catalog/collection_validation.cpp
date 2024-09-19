@@ -94,6 +94,7 @@
 #include "mongo/util/serialization_context.h"
 #include "mongo/util/str.h"
 #include "mongo/util/string_map.h"
+#include "mongo/util/testing_proctor.h"
 #include "mongo/util/uuid.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kStorage
@@ -519,22 +520,44 @@ void _validateCatalogEntry(OperationContext* opCtx,
         }
     }
 }
+
+bool canEnforceTimeseriesAlwaysCompressed() {
+    // Test-only check to ensure time-series buckets are always compressed.
+    if (TestingProctor::instance().isEnabled() &&
+        feature_flags::gTimeseriesAlwaysUseCompressedBuckets.isEnabled(
+            serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
+        return true;
+    } else {
+        LOGV2_WARNING(7735102, "Not enforcing that time-series buckets are always compressed");
+        return false;
+    }
+}
+
 }  // namespace
+
+ValidationOptions::ValidationOptions(ValidateMode validateMode,
+                                     RepairMode repairMode,
+                                     bool logDiagnostics,
+                                     bool enforceTimeseriesBucketsAreAlwaysCompressed,
+                                     ValidationVersion validationVersion)
+    : _validateMode(validateMode),
+      _repairMode(repairMode),
+      _logDiagnostics(logDiagnostics),
+      _enforceTimeseriesBucketsAreAlwaysCompressed(enforceTimeseriesBucketsAreAlwaysCompressed &&
+                                                   canEnforceTimeseriesAlwaysCompressed()),
+      _validationVersion(validationVersion) {}
 
 Status validate(OperationContext* opCtx,
                 const NamespaceString& nss,
-                ValidateMode mode,
-                RepairMode repairMode,
-                const AdditionalOptions& additionalOptions,
+                ValidationOptions options,
                 ValidateResults* results,
                 BSONObjBuilder* output,
-                bool logDiagnostics,
                 const SerializationContext& sc) {
     invariant(!shard_role_details::getLocker(opCtx)->isLocked() || storageGlobalParams.repair);
 
     // This is deliberately outside of the try-catch block, so that any errors thrown in the
     // constructor fail the cmd, as opposed to returning OK with valid:false.
-    ValidateState validateState(opCtx, nss, mode, repairMode, additionalOptions, logDiagnostics);
+    ValidateState validateState(opCtx, nss, std::move(options));
 
     // Foreground validation needs to ignore prepare conflicts, or else it would deadlock.
     // Repair mode cannot use ignore-prepare because it needs to be able to do writes, and there is
@@ -647,7 +670,7 @@ Status validate(OperationContext* opCtx,
         // record key (RecordId) matches the cluster key field in the record value (document's
         // cluster key).
         indexValidator.traverseRecordStore(
-            opCtx, results, output, additionalOptions.validationVersion);
+            opCtx, results, output, validateState.validationVersion());
 
         // Pause collection validation while a lock is held and between collection and index data
         // validation.

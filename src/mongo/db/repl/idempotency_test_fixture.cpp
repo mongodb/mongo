@@ -410,12 +410,12 @@ CollectionState IdempotencyTest::validate(const NamespaceString& nss) {
         ASSERT_OK(
             CollectionValidation::validate(_opCtx.get(),
                                            _nss,
-                                           CollectionValidation::ValidateMode::kForegroundFull,
-                                           CollectionValidation::RepairMode::kNone,
-                                           /*additionalOptions=*/{},
+                                           CollectionValidation::ValidationOptions{
+                                               CollectionValidation::ValidateMode::kForegroundFull,
+                                               CollectionValidation::RepairMode::kNone,
+                                               /*logDiagnostics=*/false},
                                            &validateResults,
-                                           &bob,
-                                           /*logDiagnostics=*/false));
+                                           &bob));
         ASSERT_TRUE(validateResults.isValid());
     }
 

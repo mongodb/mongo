@@ -134,14 +134,14 @@ std::vector<std::pair<BSONObj, ValidateResults>> foregroundValidate(
     for (auto mode : modes) {
         ValidateResults validateResults;
         BSONObjBuilder output;
-        ASSERT_OK(CollectionValidation::validate(opCtx,
-                                                 nss,
-                                                 mode,
-                                                 repairMode,
-                                                 /*additionalOptions=*/{},
-                                                 &validateResults,
-                                                 &output,
-                                                 /*logDiagnostics=*/false));
+        ASSERT_OK(CollectionValidation::validate(
+            opCtx,
+            nss,
+            CollectionValidation::ValidationOptions{mode,
+                                                    repairMode,
+                                                    /*logDiagnostics=*/false},
+            &validateResults,
+            &output));
         BSONObj obj = output.obj();
         BSONObjBuilder validateResultsBuilder;
         validateResults.appendToResultObj(&validateResultsBuilder, true /* debugging */);
