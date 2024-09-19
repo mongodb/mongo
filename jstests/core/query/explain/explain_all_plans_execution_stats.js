@@ -20,22 +20,24 @@ if (checkSbeRestrictedOrFullyEnabled(db)) {
     assert.commandWorked(explainAllPlans);
     const executionStatsAllShards = getExecutionStats(explainAllPlans);
 
-    let examinedDoc = false;
-    let examinedKey = false;
     let seenRejectedPlans = false;
+    assert(executionStatsAllShards.length > 0);
     for (let i = 0; i < executionStatsAllShards.length; i++) {
+        assert(executionStatsAllShards[i].hasOwnProperty("allPlansExecution"));
+        assert(executionStatsAllShards[i].hasOwnProperty("totalKeysExamined"));
+        assert(executionStatsAllShards[i].hasOwnProperty("totalDocsExamined"));
         const rejectedPlans = executionStatsAllShards[i].allPlansExecution;
         for (let j = 0; j < rejectedPlans.length; j++) {
             seenRejectedPlans = true;
-            if (rejectedPlans[j].totalDocsExamined > 0) {
-                examinedDoc = true;
+            if (executionStatsAllShards[i].totalDocsExamined) {
+                assert(rejectedPlans[j].totalDocsExamined > 0,
+                       "did not examine any documents " + tojson(rejectedPlans[j]));
             }
-            if (rejectedPlans[j].totalKeysExamined > 0) {
-                examinedKey = true;
+            if (executionStatsAllShards[i].totalKeysExamined) {
+                assert(rejectedPlans[j].totalKeysExamined > 0,
+                       "did not examine any keys" + tojson(rejectedPlans[j]));
             }
         }
     }
     assert.eq(seenRejectedPlans, true, "did not see any rejected plans");
-    assert.eq(examinedDoc, true, "did not examine any documents");
-    assert.eq(examinedKey, true, "did not examine any keys");
 }
