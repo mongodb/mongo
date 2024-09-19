@@ -899,8 +899,9 @@ __checkpoint_prepare(WT_SESSION_IMPL *session, bool *trackingp, const char *cfg[
     WT_UNUSED(original_snap_min);
 
     if (use_timestamp)
-        __wt_verbose_timestamp(
-          session, txn_global->checkpoint_timestamp, "Checkpoint requested at stable timestamp");
+        __wt_verbose_info(session, WT_VERB_CHECKPOINT,
+          "Checkpoint requested at stable timestamp %s",
+          __wt_timestamp_to_string(txn_global->checkpoint_timestamp, ts_string[0]));
 
     WT_STAT_CONN_SET(session, checkpoint_snapshot_acquired, 1);
 
