@@ -87,7 +87,7 @@ ClusterClientCursorImpl::ClusterClientCursorImpl(OperationContext* opCtx,
       _opCtx(opCtx),
       _createdDate(opCtx->getServiceContext()->getPreciseClockSource()->now()),
       _lastUseDate(_createdDate),
-      _queryHash(CurOp::get(opCtx)->debug().queryHash),
+      _planCacheShapeHash(CurOp::get(opCtx)->debug().planCacheShapeHash),
       _shouldOmitDiagnosticInformation(CurOp::get(opCtx)->getShouldOmitDiagnosticInformation()),
       _queryStatsKeyHash(CurOp::get(opCtx)->debug().queryStatsInfo.keyHash),
       _queryStatsKey(std::move(CurOp::get(opCtx)->debug().queryStatsInfo.key)),
@@ -108,7 +108,7 @@ ClusterClientCursorImpl::ClusterClientCursorImpl(OperationContext* opCtx,
       _opCtx(opCtx),
       _createdDate(opCtx->getServiceContext()->getPreciseClockSource()->now()),
       _lastUseDate(_createdDate),
-      _queryHash(CurOp::get(opCtx)->debug().queryHash),
+      _planCacheShapeHash(CurOp::get(opCtx)->debug().planCacheShapeHash),
       _shouldOmitDiagnosticInformation(CurOp::get(opCtx)->getShouldOmitDiagnosticInformation()),
       _queryStatsKeyHash(CurOp::get(opCtx)->debug().queryStatsInfo.keyHash),
       _queryStatsKey(std::move(CurOp::get(opCtx)->debug().queryStatsInfo.key)),
@@ -253,8 +253,8 @@ void ClusterClientCursorImpl::setLastUseDate(Date_t now) {
     _lastUseDate = std::move(now);
 }
 
-boost::optional<uint32_t> ClusterClientCursorImpl::getQueryHash() const {
-    return _queryHash;
+boost::optional<uint32_t> ClusterClientCursorImpl::getPlanCacheShapeHash() const {
+    return _planCacheShapeHash;
 }
 
 boost::optional<std::size_t> ClusterClientCursorImpl::getQueryStatsKeyHash() const {

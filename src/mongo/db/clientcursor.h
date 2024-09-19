@@ -496,7 +496,7 @@ private:
     // Passed along from the original query so that it can be logged if necessary in getMore
     // requests.
     boost::optional<uint32_t> _planCacheKey;
-    boost::optional<uint32_t> _queryHash;
+    boost::optional<uint32_t> _planCacheShapeHash;
 
     // If boost::none, query stats should not be collected for this cursor.
     boost::optional<std::size_t> _queryStatsKeyHash;

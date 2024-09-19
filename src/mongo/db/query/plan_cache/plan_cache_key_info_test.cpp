@@ -181,8 +181,8 @@ TEST_F(PlanCacheKeyInfoTest, EqualityOperator) {
               keyWithSettingsOneA1IndexKeyPattern.planCacheKeyHash());
     ASSERT_NE(keyWithoutSettingsZero, keyWithSettingsOneA1IndexKeyPattern);
 
-    // Ensure that keys with same query settings and equivalent query hash results in same hash and
-    // passes equality check.
+    // Ensure that keys with same query settings and equivalent 'planCacheShapeHash' results in
+    // same hash and passes equality check.
     ASSERT_EQ(keyWithSettingsOneA1IndexName.planCacheKeyHash(),
               keyWithSettingsZeroA1IndexName.planCacheKeyHash());
     ASSERT_EQ(keyWithSettingsOneA1IndexName, keyWithSettingsZeroA1IndexName);

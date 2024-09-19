@@ -9,7 +9,10 @@
  * ]
  */
 
-import {getPlanCacheKeyFromPipeline} from "jstests/libs/analyze_plan.js";
+import {
+    getPlanCacheKeyFromPipeline,
+    getPlanCacheShapeHashFromObject
+} from "jstests/libs/analyze_plan.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 const dbName = "testdb";
@@ -49,11 +52,11 @@ function runTest({documents, indexes, pipeline, shardKeyBefore, shardKeyAfter}) 
         planCacheStatsAfter.find(entry => entry["planCacheKey"] === planCacheKeyAfter);
     assert.eq(planCacheEntryAfter["version"], 2, "after entry should be cached as SBE plan");
 
-    // After calling refineCollectionShardKey, the queries should have the same queryHash but
-    // different planCacheKey.
-    assert.eq(planCacheEntryBefore["queryHash"],
-              planCacheEntryAfter["queryHash"],
-              "query hash should be the same after refining");
+    // After calling "refineCollectionShardKey", the queries should have the same
+    // 'planCacheShapeHash' but different 'planCacheKey'.
+    assert.eq(getPlanCacheShapeHashFromObject(planCacheEntryBefore),
+              getPlanCacheShapeHashFromObject(planCacheEntryAfter),
+              "plan cache shape hash should be the same after refining");
     assert.neq(
         planCacheKeyBefore, planCacheKeyAfter, "plan cache key should be different after refining");
 }

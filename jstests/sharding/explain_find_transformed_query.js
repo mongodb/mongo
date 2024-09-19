@@ -17,8 +17,16 @@
  * ]
  */
 
-import {getQueryPlanner, getWinningPlan} from "jstests/libs/analyze_plan.js";
-import {checkSbeFullFeatureFlagEnabled} from "jstests/libs/sbe_util.js";
+import {
+    getEngine,
+    getPlanCacheKeyFromExplain,
+    getPlanCacheShapeHashFromExplain,
+    getPlanCacheShapeHashFromObject,
+    getQueryPlanner,
+    getWinningPlan,
+    getWinningSBEPlan
+} from "jstests/libs/analyze_plan.js";
+import {assertDropAndRecreateCollection} from "jstests/libs/collection_drop_recreate.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 const st = new ShardingTest({
@@ -28,43 +36,46 @@ const st = new ShardingTest({
 
 st.s.adminCommand({enableSharding: "test"});
 const db = st.getDB("test");
-const dbAtShard0 = st.shard0.getDB(jsTestName());
-const dbAtShard1 = st.shard1.getDB(jsTestName());
-
-const collName = "jstests_explain_find";
-const t = db[collName];
-t.drop();
+const coll = assertDropAndRecreateCollection(db, jsTestName());
 
 // We need two indexes so that the multi-planner is executed.
-assert.commandWorked(t.createIndex({a: 1}));
-assert.commandWorked(t.createIndex({a: -1, b: 1}));
+assert.commandWorked(coll.createIndex({a: 1}));
+assert.commandWorked(coll.createIndex({a: -1, b: 1}));
+const findCmd = {
+    find: coll.getName(),
+    filter: {a: {$lte: 5}},
+    sort: {b: 1},
+    skip: 1,
+    limit: 2
+};
+assert.commandWorked(db.runCommand(findCmd));
+const explain =
+    assert.commandWorked(db.runCommand({explain: findCmd, verbosity: "executionStats"}));
 
-const find = assert.commandWorked(
-    db.runCommand({find: collName, filter: {a: {$lte: 5}}, sort: {b: 1}, skip: 1, limit: 2}));
-
-const stats = assert.commandWorked(db.runCommand({
-    explain: {find: collName, filter: {a: {$lte: 5}}, sort: {b: 1}, skip: 1, limit: 2},
-    verbosity: "executionStats"
-}));
-
-// Assert that the query hash from the explain is the same as the one in the plan cache.
-const shardExplains = stats.queryPlanner.winningPlan.shards;
-const planCacheKey = shardExplains[0].planCacheKey;
-const planCacheExecutedPlan =
-    t.aggregate([{$planCacheStats: {}}, {$match: {planCacheKey}}]).toArray()[0];
-const queryHashPlanCache = planCacheExecutedPlan.queryHash;
-
-assert(shardExplains.every(s => s.queryHash === queryHashPlanCache), shardExplains);
+// Assert that the plan cache shape hash from the explain is the same as the one in the plan cache.
+const planCacheKey = getPlanCacheKeyFromExplain(explain);
+const planCacheEntry =
+    coll.aggregate([{$planCacheStats: {}}, {$match: {planCacheKey}}]).toArray().at(0);
+assert.neq(planCacheEntry, undefined);
+assert.eq(getPlanCacheShapeHashFromObject(planCacheEntry),
+          getPlanCacheShapeHashFromExplain(explain));
 
 // Assert that the top stage of the winning plan in the explain is the same as the top stage
 // in the executed cached plan.
-const queryPlanner = getQueryPlanner(stats);
-const winningPlanExplain = getWinningPlan(queryPlanner);
-if (!checkSbeFullFeatureFlagEnabled(db)) {
-    assert.eq(winningPlanExplain.stage, planCacheExecutedPlan.cachedPlan.stage);
-} else {
-    assert.eq(queryPlanner.winningPlan.slotBasedPlan.stages,
-              planCacheExecutedPlan.cachedPlan.stages);
+const queryPlanner = getQueryPlanner(explain);
+const engine = getEngine(explain);
+switch (engine) {
+    case "classic": {
+        assert.eq(getWinningPlan(queryPlanner).stage, planCacheEntry.cachedPlan.stage);
+        break;
+    }
+    case "sbe": {
+        assert.eq(getWinningSBEPlan(queryPlanner).stages, planCacheEntry.cachedPlan.stages);
+        break;
+    }
+    default: {
+        assert(false, `Unknown engine ${engine}`);
+        break;
+    }
 }
-
 st.stop();

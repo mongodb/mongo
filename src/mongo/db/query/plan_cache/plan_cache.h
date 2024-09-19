@@ -224,7 +224,7 @@ public:
     using Entry = PlanCacheEntryBase<CachedPlanType, DebugInfoType>;
 
     static std::unique_ptr<Entry> create(std::unique_ptr<CachedPlanType> cachedPlan,
-                                         uint32_t queryHash,
+                                         uint32_t planCacheShapeHash,
                                          uint32_t planCacheKey,
                                          uint32_t planCacheCommandKey,
                                          Date_t timeOfCreation,
@@ -253,7 +253,7 @@ public:
 
         return std::unique_ptr<Entry>(new Entry(std::move(cachedPlan),
                                                 timeOfCreation,
-                                                queryHash,
+                                                planCacheShapeHash,
                                                 planCacheKey,
                                                 planCacheCommandKey,
                                                 isActive,
@@ -268,7 +268,7 @@ public:
      * active.
      */
     static std::unique_ptr<Entry> createPinned(std::unique_ptr<CachedPlanType> cachedPlan,
-                                               uint32_t queryHash,
+                                               uint32_t planCacheShapeHash,
                                                uint32_t planCacheKey,
                                                uint32_t planCacheCommandKey,
                                                Date_t timeOfCreation,
@@ -277,7 +277,7 @@ public:
         return std::unique_ptr<Entry>(
             new Entry(std::move(cachedPlan),
                       timeOfCreation,
-                      queryHash,
+                      planCacheShapeHash,
                       planCacheKey,
                       planCacheCommandKey,
                       true,  // isActive
@@ -306,7 +306,7 @@ public:
     std::unique_ptr<Entry> clone() const {
         return std::unique_ptr<Entry>(new Entry(cachedPlan->clone(),
                                                 timeOfCreation,
-                                                queryHash,
+                                                planCacheShapeHash,
                                                 planCacheKey,
                                                 planCacheCommandKey,
                                                 isActive,
@@ -318,7 +318,7 @@ public:
     std::string debugString() const {
         StringBuilder builder;
         builder << "(";
-        builder << "queryHash: " << zeroPaddedHex(queryHash);
+        builder << "planCacheShapeHash: " << zeroPaddedHex(planCacheShapeHash);
         builder << "; planCacheKey: " << zeroPaddedHex(planCacheKey);
         if (debugInfo) {
             builder << "; " << debugInfo->debugString();
@@ -332,9 +332,9 @@ public:
 
     const Date_t timeOfCreation;
 
-    // Hash of the cache key. Intended as an identifier for the query shape in logs and other
-    // diagnostic output.
-    const uint32_t queryHash;
+    // Hash of the plan cache query shape. Intended as an identifier for the plan cache query shape
+    // in logs and other diagnostic output.
+    const uint32_t planCacheShapeHash;
 
     // Hash of the "stable" cache key, which is the same regardless of what indexes are around.
     const uint32_t planCacheKey;
@@ -377,7 +377,7 @@ private:
      */
     PlanCacheEntryBase(std::unique_ptr<CachedPlanType> cachedPlan,
                        Date_t timeOfCreation,
-                       uint32_t queryHash,
+                       uint32_t planCacheShapeHash,
                        uint32_t planCacheKey,
                        uint32_t planCacheCommandKey,
                        bool isActive,
@@ -386,7 +386,7 @@ private:
                        std::shared_ptr<const DebugInfoType> debugInfo)
         : cachedPlan(std::move(cachedPlan)),
           timeOfCreation(timeOfCreation),
-          queryHash(queryHash),
+          planCacheShapeHash(planCacheShapeHash),
           planCacheKey(planCacheKey),
           planCacheCommandKey(planCacheCommandKey),
           isActive(isActive),
@@ -522,14 +522,14 @@ public:
         // destructure it here.
         auto partitionLock = std::move(oldEntryWithPartitionLock.second);
         auto oldEntryWithStatus = std::move(oldEntryWithPartitionLock.first);
-        auto [queryHash,
+        auto [planCacheShapeHash,
               planCacheKey,
               isNewEntryActive,
               shouldBeCreated,
               increasedReadsOrWorks] = [&]() {
             if (internalQueryCacheDisableInactiveEntries.load()) {
                 // All entries are always active.
-                return std::make_tuple(key.queryHash(),
+                return std::make_tuple(key.planCacheShapeHash(),
                                        key.planCacheKeyHash(),
                                        true /* isNewEntryActive  */,
                                        true /* shouldBeCreated  */,
@@ -551,15 +551,15 @@ public:
                     callbacks);
 
                 // Avoid recomputing the hashes if we've got an old entry to grab them from.
-                auto [queryHash, planCacheKey] = [&]() {
+                auto [planCacheShapeHash, planCacheKey] = [&]() {
                     if (hasOldEntry) {
                         auto&& oldEntry = &**oldEntryWithStatus.getValue();
-                        return std::make_pair(oldEntry->queryHash, oldEntry->planCacheKey);
+                        return std::make_pair(oldEntry->planCacheShapeHash, oldEntry->planCacheKey);
                     } else {
-                        return std::make_pair(key.queryHash(), key.planCacheKeyHash());
+                        return std::make_pair(key.planCacheShapeHash(), key.planCacheKeyHash());
                     }
                 }();
-                return std::make_tuple(queryHash,
+                return std::make_tuple(planCacheShapeHash,
                                        planCacheKey,
                                        newState.shouldBeActive,
                                        newState.shouldBeCreated,
@@ -580,7 +580,7 @@ public:
         // formula for computing an 'increasedReadsOrWorks' value.
         std::shared_ptr<Entry> newEntry =
             Entry::create(std::move(cachedPlan),
-                          queryHash,
+                          planCacheShapeHash,
                           planCacheKey,
                           callbacks->getPlanCacheCommandKeyHash(),
                           now,
@@ -606,7 +606,7 @@ public:
         invariant(plan);
         std::shared_ptr<Entry> entry =
             Entry::createPinned(std::move(plan),
-                                key.queryHash(),
+                                key.planCacheShapeHash(),
                                 key.planCacheKeyHash(),
                                 planCacheCommandKey,
                                 now,

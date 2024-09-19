@@ -130,7 +130,7 @@ ClientCursor::ClientCursor(ClientCursorParams params,
       _createdDate(now),
       _planSummary(_exec->getPlanExplainer().getPlanSummary()),
       _planCacheKey(CurOp::get(operationUsingCursor)->debug().planCacheKey),
-      _queryHash(CurOp::get(operationUsingCursor)->debug().queryHash),
+      _planCacheShapeHash(CurOp::get(operationUsingCursor)->debug().planCacheShapeHash),
       _queryStatsKeyHash(CurOp::get(operationUsingCursor)->debug().queryStatsInfo.keyHash),
       _queryStatsKey(std::move(CurOp::get(operationUsingCursor)->debug().queryStatsInfo.key)),
       _queryStatsWillNeverExhaust(

@@ -98,7 +98,7 @@ void generatePlannerInfo(PlanExecutor* exec,
     plannerBob.append("namespace",
                       NamespaceStringUtil::serialize(exec->nss(), serializationContext));
 
-    boost::optional<uint32_t> queryHash;
+    boost::optional<uint32_t> planCacheShapeHash;
     boost::optional<uint32_t> planCacheKeyHash;
     const auto& mainCollection = collections.getMainCollection();
     if (auto* cq = exec->getCanonicalQuery(); mainCollection && cq) {
@@ -110,12 +110,12 @@ void generatePlannerInfo(PlanExecutor* exec,
                                              collections,
                                              canonical_query_encoder::Optimizer::kSbeStageBuilders);
             planCacheKeyHash = planCacheKeyInfo.planCacheKeyHash();
-            queryHash = planCacheKeyInfo.queryHash();
+            planCacheShapeHash = planCacheKeyInfo.planCacheShapeHash();
         } else {
             const auto planCacheKeyInfo = plan_cache_key_factory::make<PlanCacheKey>(
                 *exec->getCanonicalQuery(), mainCollection);
             planCacheKeyHash = planCacheKeyInfo.planCacheKeyHash();
-            queryHash = planCacheKeyInfo.queryHash();
+            planCacheShapeHash = planCacheKeyInfo.planCacheShapeHash();
         }
     }
 
@@ -152,8 +152,8 @@ void generatePlannerInfo(PlanExecutor* exec,
         }
     }
 
-    if (queryHash) {
-        plannerBob.append("queryHash", zeroPaddedHex(*queryHash));
+    if (planCacheShapeHash) {
+        plannerBob.append("planCacheShapeHash", zeroPaddedHex(*planCacheShapeHash));
     }
 
     if (planCacheKeyHash) {
@@ -356,7 +356,7 @@ BSONObj explainVersionToBson(const PlanExplainer::ExplainVersion& version) {
 
 template <typename EntryType>
 void appendBasicPlanCacheEntryInfoToBSON(const EntryType& entry, BSONObjBuilder* out) {
-    out->append("queryHash", zeroPaddedHex(entry.queryHash));
+    out->append("planCacheShapeHash", zeroPaddedHex(entry.planCacheShapeHash));
     out->append("planCacheKey", zeroPaddedHex(entry.planCacheKey));
     out->append("isActive", entry.isActive);
     out->append("works",
@@ -397,6 +397,7 @@ void Explain::explainStages(PlanExecutor* exec,
         generateExecutionInfo(exec, verbosity, executePlanStatus, winningPlanTrialStats, out);
     }
 
+    explain_common::generateQueryShapeHash(exec->getOpCtx(), out);
     explain_common::appendIfRoom(command, "command", out);
 }
 
@@ -422,6 +423,7 @@ void Explain::explainPipeline(PlanExecutor* exec,
     out->appendElements(explainVersionToBson(explainer.getVersion()));
     *out << "stages" << Value(pipelineExec->writeExplainOps(verbosity));
 
+    explain_common::generateQueryShapeHash(exec->getOpCtx(), out);
     explain_common::generateServerInfo(out);
 
     auto* cq = exec->getCanonicalQuery();
@@ -429,7 +431,6 @@ void Explain::explainPipeline(PlanExecutor* exec,
         ? cq->getExpCtx()
         : ExpressionContext::makeBlankExpressionContext(exec->getOpCtx(), exec->nss());
     explain_common::generateServerParameters(expCtx, out);
-
     explain_common::appendIfRoom(command, "command", out);
 }
 

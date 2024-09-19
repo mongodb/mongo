@@ -1,6 +1,6 @@
 /**
- * Confirms that the SBE and classic engines use the correct format to report 'queryHash' and
- * 'planCacheKey' values across a variety of commands and outputs.
+ * Confirms that the SBE and classic engines use the correct format to report 'planCacheShapeHash'
+ * and 'planCacheKey' values across a variety of commands and outputs.
  *
  * @tags: [
  *   requires_profiling,
@@ -38,29 +38,32 @@ function runTestAgainstSbeAndClassicEngines(testToRun) {
 }
 
 // Verifies and asserts that the two objects 'sbe' and 'classic', which represent the result of
-// execution of some command agains the SBE and classic engine respectively, contain the 'queryHash'
-// and 'planCacheKey' attributes, and the values of those attribuets are different.
+// execution of some command agains the SBE and classic engine respectively, contain the
+// 'planCacheShapeHash' and 'planCacheKey' attributes, and the values of those attribuets are
+// different.
 //
 // The purpose of this assertion is to ensure that the SBE and classic engines use the correct
-// 'queryHash' and 'planCacheKey' formats, which are different between the two engines.
-function assertQueryHashAndPlanCacheKey(sbe, classic) {
-    assert.eq(typeof sbe.queryHash, "string", sbe);
-    assert.gt(sbe.queryHash.length, 0, sbe);
+// 'planCacheShapeHash' and 'planCacheKey' formats, which are different between the two engines.
+function assertPlanCacheShapeHashAndPlanCacheKey(sbe, classic) {
+    assert.eq(typeof sbe.planCacheShapeHash, "string", sbe);
+    assert.gt(sbe.planCacheShapeHash.length, 0, sbe);
     assert.eq(typeof sbe.planCacheKey, "string", sbe);
     assert.gt(sbe.planCacheKey.length, 0, sbe);
 
-    assert.eq(typeof classic.queryHash, "string", classic);
-    assert.gt(classic.queryHash.length, 0, classic);
+    assert.eq(typeof classic.planCacheShapeHash, "string", classic);
+    assert.gt(classic.planCacheShapeHash.length, 0, classic);
     assert.eq(typeof classic.planCacheKey, "string", classic);
     assert.gt(classic.planCacheKey.length, 0, classic);
 
-    assert.neq(sbe.queryHash, classic.queryHash, `sbe=${tojson(sbe)}, classic=${tojson(classic)}`);
+    assert.neq(sbe.planCacheShapeHash,
+               classic.planCacheShapeHash,
+               `sbe=${tojson(sbe)}, classic=${tojson(classic)}`);
     assert.neq(
         sbe.planCacheKey, classic.planCacheKey, `sbe=${tojson(sbe)}, classic=${tojson(classic)}`);
 }
 
-// Validate the the 'queryHash' and 'planCacheKey' are correctly reported in the system.profile
-// collection.
+// Validate the the 'planCacheShapeHash' and 'planCacheKey' are correctly reported in the
+// system.profile collection.
 (function validateProfilerOutput() {
     const [sbe, classic] = runTestAgainstSbeAndClassicEngines(function(engine) {
         // Set db profiling level to collect data for all operations.
@@ -79,10 +82,11 @@ function assertQueryHashAndPlanCacheKey(sbe, classic) {
 
     assert.neq(sbe, null);
     assert.neq(classic, null);
-    assertQueryHashAndPlanCacheKey(sbe, classic);
+    assertPlanCacheShapeHashAndPlanCacheKey(sbe, classic);
 })();
 
-// Validate the the 'queryHash' and 'planCacheKey' are correctly reported in explain output.
+// Validate the the 'planCacheShapeHash' and 'planCacheKey' are correctly reported in explain
+// output.
 (function validateExplainOutput() {
     const [sbe, classic] = runTestAgainstSbeAndClassicEngines(function(engine) {
         return coll.explain().aggregate([{$match: {a: 1}}]);
@@ -93,11 +97,11 @@ function assertQueryHashAndPlanCacheKey(sbe, classic) {
     assert.eq(sbe.explainVersion, "2", sbe);
     assert.eq(classic.explainVersion, "1", classic);
 
-    assertQueryHashAndPlanCacheKey(sbe.queryPlanner, classic.queryPlanner);
+    assertPlanCacheShapeHashAndPlanCacheKey(sbe.queryPlanner, classic.queryPlanner);
 })();
 
-// Validate the the 'queryHash' and 'planCacheKey' are correctly reported in $planCacheStats
-// output.
+// Validate the the 'planCacheShapeHash' and 'planCacheKey' are correctly reported in
+// $planCacheStats output.
 (function validatePlanCacheStatsOutput() {
     const [sbe, classic] = runTestAgainstSbeAndClassicEngines(function(engine) {
         const query = {a: 1};
@@ -117,11 +121,11 @@ function assertQueryHashAndPlanCacheKey(sbe, classic) {
     assert.eq(sbe.version, "2", sbe);
     assert.eq(classic.version, "1", classic);
 
-    assertQueryHashAndPlanCacheKey(sbe, classic);
+    assertPlanCacheShapeHashAndPlanCacheKey(sbe, classic);
 })();
 
-// Validate the the 'queryHash' and 'planCacheKey' are correctly reported in log output for slow
-// queries.
+// Validate the the 'planCacheShapeHash' and 'planCacheKey' are correctly reported in log output for
+// slow queries.
 (function validateSlowQueryLogOutput() {
     const [sbe, classic] = runTestAgainstSbeAndClassicEngines(function(engine) {
         // Set all logging parameters: disable profiling and log all operations at the default
@@ -146,11 +150,11 @@ function assertQueryHashAndPlanCacheKey(sbe, classic) {
 
     assert.neq(sbe, null);
     assert.neq(classic, null);
-    assertQueryHashAndPlanCacheKey(sbe.attr, classic.attr);
+    assertPlanCacheShapeHashAndPlanCacheKey(sbe.attr, classic.attr);
 })();
 
 // Validate that a query with pushed down $lookup stage uses classic plan cache key encoding.
-(function validateLookupQueryHashMap() {
+(function validateLookupPlanCacheShapeHashMap() {
     const lookupColl = db.lookupColl;
     lookupColl.drop();
     assert.commandWorked(lookupColl.createIndex({b: 1}));
@@ -179,11 +183,12 @@ function assertQueryHashAndPlanCacheKey(sbe, classic) {
     // The query hashes and the plan cache keys ('the keys') are different now because
     // 'internalQueryFrameworkControl' flag is encoded into query shape, once this
     // flag is removed from the query shape encoding the keys will be different.
-    assertQueryHashAndPlanCacheKey(sbe.queryPlanner, classic.stages[0]["$cursor"].queryPlanner);
+    assertPlanCacheShapeHashAndPlanCacheKey(sbe.queryPlanner,
+                                            classic.stages[0]["$cursor"].queryPlanner);
 })();
 
 // Validate that a query with pushed down $group stage uses classic plan cache key encoding.
-(function validateGroupQueryHashMap() {
+(function validateGroupPlanCacheShapeHashMap() {
     const groupColl = db.groupColl;
     groupColl.drop();
     assert.commandWorked(groupColl.insertOne({b: 1}));
@@ -204,7 +209,8 @@ function assertQueryHashAndPlanCacheKey(sbe, classic) {
     // The query hashes and the plan cache keys ('the keys') are different now because
     // 'internalQueryFrameworkControl' flag is encoded into query shape, once this
     // flag is removed from the query shape encoding the keys will be different.
-    assertQueryHashAndPlanCacheKey(sbe.queryPlanner, classic.stages[0]["$cursor"].queryPlanner);
+    assertPlanCacheShapeHashAndPlanCacheKey(sbe.queryPlanner,
+                                            classic.stages[0]["$cursor"].queryPlanner);
 })();
 
 MongoRunner.stopMongod(conn);

@@ -66,7 +66,7 @@ for (const query of queries) {
         "It should not be possible to set reject=true for query: " + JSON.stringify(query));
 
     // To be able to conveniently test what happens if reject _is_ set (e.g., in production, by
-    // query hash), temporarily bypass restrictions on setQuerySettings.
+    // query shape hash), temporarily bypass restrictions on setQuerySettings.
     const allowAllSetQuerySettingsFailPoint =
         configureFailPoint(db.getMongo(), "allowAllSetQuerySettings");
 

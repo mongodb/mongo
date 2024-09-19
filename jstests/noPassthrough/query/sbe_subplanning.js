@@ -57,9 +57,11 @@ function assertOneResult(cursor) {
 
 // First make sure there's no matching entries in the plan cache.
 {
-    const planCacheEntries =
-        coll.aggregate([{$planCacheStats: {}}, {$match: {queryHash: queryPlanner.queryHash}}])
-            .toArray();
+    const planCacheEntries = coll.aggregate([
+                                     {$planCacheStats: {}},
+                                     {$match: {planCacheShapeHash: queryPlanner.planCacheShapeHash}}
+                                 ])
+                                 .toArray();
     assert.eq(planCacheEntries.length, 0);
 }
 
@@ -71,7 +73,7 @@ function assertOneResult(cursor) {
     const profileObj = getLatestProfilerEntry(db, {op: {$in: ["command"]}, ns: coll.getFullName()});
 
     assert.eq(profileObj.nreturned, 1);
-    assert.eq(profileObj.queryHash, queryPlanner.queryHash);
+    assert.eq(profileObj.planCacheShapeHash, queryPlanner.planCacheShapeHash);
     assert.eq(profileObj.planCacheKey, queryPlanner.planCacheKey);
     assert.eq(profileObj.queryFramework, "sbe");
     // Check that the planSummary is two IXSCANs.
@@ -84,13 +86,13 @@ function assertOneResult(cursor) {
 
     if (sbePlanCacheEnabled) {
         // We should expect a pinned cache entry to get written for the entire query.
-        planCacheEntries =
-            planCacheEntries.filter((entry) => entry.queryHash == queryPlanner.queryHash);
+        planCacheEntries = planCacheEntries.filter((entry) => entry.planCacheShapeHash ==
+                                                       queryPlanner.planCacheShapeHash);
 
         assert.eq(planCacheEntries.length, 1);
         const entry = planCacheEntries[0];
         assert.eq(entry.planCacheKey, queryPlanner.planCacheKey, entry);
-        assert.eq(entry.queryHash, queryPlanner.queryHash, entry);
+        assert.eq(entry.planCacheShapeHash, queryPlanner.planCacheShapeHash, entry);
         assert.eq(entry.isActive, true, entry);
         assert.eq(entry.version, "2", entry);
         assert.eq(entry.works, 0);
@@ -122,7 +124,7 @@ function assertOneResult(cursor) {
     const profileObj = getLatestProfilerEntry(db, {op: {$in: ["command"]}, ns: coll.getFullName()});
 
     assert.eq(profileObj.nreturned, 1);
-    assert.eq(profileObj.queryHash, queryPlanner.queryHash);
+    assert.eq(profileObj.planCacheShapeHash, queryPlanner.planCacheShapeHash);
     assert.eq(profileObj.planCacheKey, queryPlanner.planCacheKey);
     assert.eq(profileObj.queryFramework, "sbe");
 
@@ -134,8 +136,8 @@ function assertOneResult(cursor) {
     if (sbePlanCacheEnabled) {
         // The pinned cache entry from the first run should still exist and should have been used
         // to answer the query this time.
-        planCacheEntries =
-            planCacheEntries.filter((entry) => entry.queryHash == queryPlanner.queryHash);
+        planCacheEntries = planCacheEntries.filter((entry) => entry.planCacheShapeHash ==
+                                                       queryPlanner.planCacheShapeHash);
 
         assert(profileObj.fromPlanCache);
 
@@ -169,7 +171,7 @@ function assertOneResult(cursor) {
     const profileObj = getLatestProfilerEntry(db, {op: {$in: ["command"]}, ns: coll.getFullName()});
 
     assert.eq(profileObj.nreturned, 1);
-    assert.eq(profileObj.queryHash, queryPlanner.queryHash);
+    assert.eq(profileObj.planCacheShapeHash, queryPlanner.planCacheShapeHash);
     assert.eq(profileObj.planCacheKey, queryPlanner.planCacheKey);
     assert.eq(profileObj.queryFramework, "sbe");
 
@@ -181,8 +183,8 @@ function assertOneResult(cursor) {
     if (sbePlanCacheEnabled) {
         assert(profileObj.fromPlanCache);
 
-        planCacheEntries =
-            planCacheEntries.filter((entry) => entry.queryHash == queryPlanner.queryHash);
+        planCacheEntries = planCacheEntries.filter((entry) => entry.planCacheShapeHash ==
+                                                       queryPlanner.planCacheShapeHash);
 
         assert.eq(planCacheEntries.length, 1);
         const entry = planCacheEntries[0];
@@ -280,14 +282,16 @@ jsTestLog("Running test which forces SubPlanner to plan the entire query");
 
         const engineUsed = profileObj.queryFramework;
 
-        const cacheEntries =
-            coll.aggregate([{$planCacheStats: {}}, {$match: {queryHash: profileObj.queryHash}}])
-                .toArray();
+        const cacheEntries = coll.aggregate([
+                                     {$planCacheStats: {}},
+                                     {$match: {planCacheShapeHash: profileObj.planCacheShapeHash}}
+                                 ])
+                                 .toArray();
         assert.eq(cacheEntries.length, 1);
         const cacheEntry = cacheEntries[0];
 
         if (engineUsed == "sbe") {
-            assert.eq(cacheEntry.queryHash, profileObj.queryHash);
+            assert.eq(cacheEntry.planCacheShapeHash, profileObj.planCacheShapeHash);
             assert.eq(cacheEntry.planCacheKey, profileObj.planCacheKey);
             assert.eq(cacheEntry.isActive, isActive);
 

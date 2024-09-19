@@ -26,6 +26,7 @@
 import {
     getPlanCacheKeyFromPipeline,
     getPlanCacheKeyFromShape,
+    getPlanCacheShapeHashFromObject,
     getPlanStages,
     getWinningPlan
 } from "jstests/libs/analyze_plan.js";
@@ -85,14 +86,16 @@ function assertActiveAndSameCacheEntry(
     expectedActive, isCacheEntrySame, [lhs, lhsTag], [rhs, rhsTag]) {
     assert.eq(lhs.isActive, expectedActive, lhs);
     if (isCacheEntrySame) {
-        assert.eq(
-            lhs.queryHash, rhs.queryHash, `${lhsTag}=${tojson(lhs)}, ${rhsTag}=${tojson(rhs)}`);
+        assert.eq(getPlanCacheShapeHashFromObject(lhs),
+                  getPlanCacheShapeHashFromObject(rhs),
+                  `${lhsTag}=${tojson(lhs)}, ${rhsTag}=${tojson(rhs)}`);
         assert.eq(lhs.planCacheKey,
                   rhs.planCacheKey,
                   `${lhsTag}=${tojson(lhs)}, ${rhsTag}=${tojson(rhs)}`);
     } else {
-        assert.neq(
-            lhs.queryHash, rhs.queryHash, `${lhsTag}=${tojson(lhs)}, ${rhsTag}=${tojson(rhs)}`);
+        assert.neq(getPlanCacheShapeHashFromObject(lhs),
+                   getPlanCacheShapeHashFromObject(rhs),
+                   `${lhsTag}=${tojson(lhs)}, ${rhsTag}=${tojson(rhs)}`);
         assert.neq(lhs.planCacheKey,
                    rhs.planCacheKey,
                    `${lhsTag}=${tojson(lhs)}, ${rhsTag}=${tojson(rhs)}`);
@@ -131,8 +134,8 @@ function assertQueryParameterizedCorrectly({
                                   [activeEntry, "active"],
                                   [inactiveEntry, "inactive"]);
 
-    // Run an equivalent aggregation and check that queryHash and planCacheKey match with the active
-    // entry.
+    // Run an equivalent aggregation and check that 'planCacheShapeHash' and 'planCacheKey' match
+    // with the active entry.
     let pipeline = isEmptySort ? [{$match: query}] : [{$match: query}, {$sort: sortSpec}];
     assert.eq(queryCount, coll.aggregate(pipeline).itcount());
     const activeEntryAgg = getPlanForCacheEntryAgg(pipeline);

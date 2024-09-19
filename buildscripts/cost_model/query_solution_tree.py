@@ -82,7 +82,7 @@ if __name__ == "__main__":
     {
     "explainVersion": "2",
     "queryPlanner": {
-        "queryHash": "5C2C3085",
+        "planCacheShapeHash": "5C2C3085",
         "planCacheKey": "9EB06642",
         "optimizationTimeMillis": 0,
         "maxIndexedOrSolutionsReached": false,

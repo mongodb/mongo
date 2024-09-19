@@ -55,6 +55,11 @@ void generateServerParameters(const boost::intrusive_ptr<ExpressionContext>& exp
                               BSONObjBuilder* out);
 
 /**
+ * Adds the 'queryShapeHash' value to the BSON object being built by 'out'.
+ */
+void generateQueryShapeHash(const OperationContext* opCtx, BSONObjBuilder* out);
+
+/**
  * Conditionally appends a BSONObj to 'bob' depending on whether or not the maximum user size for a
  * BSON object will be exceeded.
  */

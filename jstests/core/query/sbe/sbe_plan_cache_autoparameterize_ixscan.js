@@ -18,7 +18,11 @@
  *   featureFlagSbeFull,
  * ]
  */
-import {getPlanCacheKeyFromExplain, getQueryHashFromExplain} from "jstests/libs/analyze_plan.js";
+import {
+    getPlanCacheKeyFromExplain,
+    getPlanCacheShapeHashFromExplain,
+    getPlanCacheShapeHashFromObject
+} from "jstests/libs/analyze_plan.js";
 
 const coll = db[jsTestName()];
 coll.drop();
@@ -57,18 +61,18 @@ assert.eq(cacheResults, expectedFilter2Result);
 // There should still be exactly one plan cache entry.
 assert.eq(1, coll.getPlanCache().list().length, cacheEntries);
 
-// The plan cache key and the query hashes of both queries should match.
+// The plan cache key and the 'planCacheShapeHashes' of both queries should match.
 const explain = coll.find(filter2).sort(sortPattern).explain();
 const planCacheKey = cacheEntry.planCacheKey;
 assert.neq(null, planCacheKey, cacheEntry);
 assert.eq(planCacheKey, getPlanCacheKeyFromExplain(explain), explain);
 
-const queryHash = cacheEntry.queryHash;
-assert.neq(null, queryHash, cacheEntry);
-assert.eq(queryHash, getQueryHashFromExplain(explain), explain);
+const planCacheShapeHash = getPlanCacheShapeHashFromObject(cacheEntry);
+assert.neq(null, planCacheShapeHash, cacheEntry);
+assert.eq(planCacheShapeHash, getPlanCacheShapeHashFromExplain(explain), explain);
 
 // Clear the plan cache, and run 'filter2' again. This time, verify that we create a cache entry
-// with the same planCacheKey and queryHash as before.
+// with the same 'planCacheKey' and 'planCacheShapeHash' as before.
 coll.getPlanCache().clear();
 assert.eq(0, coll.getPlanCache().list().length, "Expected 0 cache entries");
 const results = coll.find(filter2).sort(sortPattern).toArray();
@@ -76,7 +80,7 @@ const newCacheEntries = coll.getPlanCache().list();
 assert.eq(1, newCacheEntries.length, "Expected 1 cache entry");
 const newCacheEntry = newCacheEntries[0];
 assert.eq(newCacheEntry.planCacheKey, planCacheKey, newCacheEntry);
-assert.eq(newCacheEntry.queryHash, queryHash, newCacheEntry);
+assert.eq(getPlanCacheShapeHashFromObject(newCacheEntry), planCacheShapeHash, newCacheEntry);
 
 // The query should also return the same results as before.
 assert.eq(results, cacheResults);

@@ -34,6 +34,7 @@
 import {
     getPlanCacheKeyFromPipeline,
     getPlanCacheKeyFromShape,
+    getPlanCacheShapeHashFromObject,
     getPlanStage
 } from "jstests/libs/analyze_plan.js";
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
@@ -131,14 +132,16 @@ if (!isUsingSbePlanCache) {
     assert.eq(2, entry.creationExecStats.length, entry);
 }
 
-// Test the queryHash and planCacheKey property by comparing entries for two different
+// Test the 'planCacheShapeHash' and planCacheKey property by comparing entries for two different
 // query shapes.
 assert.eq(0, coll.find({a: 123}).sort({b: -1, a: 1}).itcount(), 'unexpected document count');
 let entryNewShape = getPlansForCacheEntry({a: 123}, {b: -1, a: 1});
-// Assert on queryHash.
-assert.eq(entry.hasOwnProperty("queryHash"), true);
-assert.eq(entryNewShape.hasOwnProperty("queryHash"), true);
-assert.neq(entry["queryHash"], entryNewShape["queryHash"]);
+// Assert on 'planCacheShapeHash'.
+const oldPlanCacheShapeHash = getPlanCacheShapeHashFromObject(entry);
+const newPlanCacheShapeHash = getPlanCacheShapeHashFromObject(entryNewShape);
+assert.neq(oldPlanCacheShapeHash, undefined);
+assert.neq(newPlanCacheShapeHash, undefined);
+assert.neq(oldPlanCacheShapeHash, newPlanCacheShapeHash);
 // Assert on planCacheKey.
 assert.eq(entry.hasOwnProperty("planCacheKey"), true);
 assert.eq(entryNewShape.hasOwnProperty("planCacheKey"), true);

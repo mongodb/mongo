@@ -1178,12 +1178,12 @@ protected:
         QuerySolution qs{};
         qs.cacheData = soln.cacheData->clone();
 
-        uint32_t queryHash = ck.queryHash();
-        uint32_t planCacheKey = queryHash;
+        uint32_t planCacheShapeHash = ck.planCacheShapeHash();
+        uint32_t planCacheKey = planCacheShapeHash;
         auto decision = createDecision(1U);
         auto entry =
             PlanCacheEntry::create(qs.cacheData->clone(),
-                                   queryHash,
+                                   planCacheShapeHash,
                                    planCacheKey,
                                    0, /* planCacheCommandKey */
                                    Date_t(),

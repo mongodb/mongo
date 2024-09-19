@@ -1,9 +1,9 @@
 /**
- * Tests that the queryHash and planCacheKey are logged correctly.
+ * Tests that the 'planCacheShapeHash' and 'planCacheKey' are logged correctly.
  */
 const conn = MongoRunner.runMongod();
 assert.neq(null, conn, "mongod was unable to start up");
-const db = conn.getDB("jstests_logs_query_hash");
+const db = conn.getDB("jstests_logs_plan_cache_shape_hash");
 
 // Set logLevel to 1 so that all queries will be logged.
 assert.commandWorked(db.setLogLevel(1));
@@ -17,7 +17,8 @@ db.bar.drop();
 assert.commandWorked(db.bar.insert({a: 1, b: 1, c: 1}));
 assert.commandWorked(db.bar.createIndexes([{a: 1, b: 1, c: 1}, {b: 1, a: 1, c: 1}]));
 
-// Ensure the slow query log contains the same queryHash and planCacheKey as the explain output.
+// Ensure the slow query log contains the same 'planCacheShapeHash' and 'planCacheKey' as the
+// explain output.
 function runAndVerifySlowQueryLog(pipeline, commentObj, hint) {
     assert.eq(db.foo.aggregate(pipeline, commentObj, hint).itcount(), 1);
     let queryPlanner =
@@ -27,7 +28,7 @@ function runAndVerifySlowQueryLog(pipeline, commentObj, hint) {
     expectedLog.command = {};
     expectedLog.command.cursor = {};
     expectedLog.command.comment = commentObj.comment;
-    expectedLog.queryHash = queryPlanner.queryHash;
+    expectedLog.planCacheShapeHash = queryPlanner.planCacheShapeHash;
     expectedLog.planCacheKey = queryPlanner.planCacheKey;
     assert(checkLog.checkContainsWithCountJson(db, logId, expectedLog, 2, null, true),
            "failed to find [" + tojson(expectedLog) + "] in the slow query log");

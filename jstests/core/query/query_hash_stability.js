@@ -1,5 +1,5 @@
 /**
- * Test that 'queryHash' and 'planCacheKey' from explain() output have sensible values
+ * Test that 'planCacheShapeHash' and 'planCacheKey' from explain() output have sensible values
  * across catalog changes.
  * @tags: [
  *   assumes_read_concern_local,
@@ -17,122 +17,98 @@
  *   assumes_no_implicit_index_creation,
  * ]
  */
-import {getOptimizer} from "jstests/libs/analyze_plan.js";
-import {checkSbeFullyEnabled} from "jstests/libs/sbe_util.js";
 
-const collName = "query_hash_stability";
-const coll = db[collName];
-coll.drop();
-// Be sure the collection exists.
-assert.commandWorked(coll.insert({x: 5}));
+import {
+    getAllNodeExplains,
+    getOptimizer,
+    getPlanCacheKeyFromExplain,
+    getPlanCacheShapeHashFromExplain
+} from "jstests/libs/analyze_plan.js";
+import {assertDropAndRecreateCollection} from "jstests/libs/collection_drop_recreate.js";
+import {checkSbeFullFeatureFlagEnabled} from "jstests/libs/sbe_util.js";
 
-/**
- * Given two explain plans (firstExplain, secondExplain), this function makes assertions about their
- * 'planCacheField' values (in particular, whether they are 'expectedToMatch').
- */
-let assertPlanCacheField = function(
-    {firstExplain, secondExplain, planCacheField, expectedToMatch}) {
-    let compareFn = function(first, second) {
-        assert.eq(typeof (first), "string");
-        assert.eq(typeof (second), "string");
-        assert.eq(first === second,
-                  expectedToMatch,
-                  "Mismatch for field " + planCacheField + " when comparing " +
-                      tojson(firstExplain) + " with " + tojson(secondExplain));
-    };
+function groupBy(arr, keyFn) {
+    let dict = {};
+    for (const elem of arr) {
+        const key = keyFn(elem);
+        if (!dict.hasOwnProperty(key)) {
+            dict[key] = [];
+        }
+        dict[key].push(elem);
+    }
+    return dict;
+}
 
-    // TODO SERVER-77719: Ensure that the test is valid for different combinations of optimizer used
-    // for with/without index cases.
-    if (!(getOptimizer(firstExplain) == getOptimizer(secondExplain))) {
+// SERVER-56980: When running in a sharded environment, we group the explains by shard. This is
+// because in a multi-version environment, we want to ensure that we are comparing the results
+// produced by the same shard in the event that the 'planCacheKey' format changed in between
+// versions.
+function runTest({explain0, explain1, assertionFn}) {
+    const useSameOptimiser = getOptimizer(explain0) == getOptimizer(explain1);
+    if (!useSameOptimiser) {
+        // TODO SERVER-77719: Ensure that the test is valid for different combinations of optimizer
+        // used for with/without index cases.
         return;
     }
 
-    // SERVER-56980: When running in a sharded environment, we group the values for 'planCacheField'
-    // by shard. This is because in a multi-version environment, we want to ensure that we are
-    // comparing the results produced by the same shard in the event that the planCacheKey format
-    // changed in between versions.
-    if (firstExplain.queryPlanner.hasOwnProperty("winningPlan") &&
-        firstExplain.queryPlanner.winningPlan.hasOwnProperty("shards")) {
-        assert(secondExplain.queryPlanner.hasOwnProperty("winningPlan"), secondExplain);
-        assert(secondExplain.queryPlanner.winningPlan.hasOwnProperty("shards"), secondExplain);
-
-        let buildShardMap = function(shardedPlan) {
-            let explainMap = {};
-            for (const shard of shardedPlan.queryPlanner.winningPlan.shards) {
-                explainMap[shard.shardName] = shard[planCacheField];
-            }
-            return explainMap;
-        };
-
-        const firstExplainMap = buildShardMap(firstExplain);
-        const secondExplainMap = buildShardMap(secondExplain);
-
-        // Should have the same number of elements.
-        assert.eq(Object.keys(firstExplainMap).length,
-                  Object.keys(secondExplainMap).length,
-                  "Expected " + tojson(firstExplainMap) + " and " + tojson(secondExplainMap) +
-                      " to have the same number of elements");
-
-        // Match the values for 'planCacheField' for each shard.
-        for (const shardName of Object.keys(firstExplainMap)) {
-            const firstPlanCacheValue = firstExplainMap[shardName];
-            const secondPlanCacheValue = secondExplainMap[shardName];
-            compareFn(firstPlanCacheValue, secondPlanCacheValue);
-        }
-    } else {
-        const first = firstExplain['queryPlanner'][planCacheField];
-        const second = secondExplain['queryPlanner'][planCacheField];
-        compareFn(first, second);
+    const groupedExplains =
+        groupBy([...getAllNodeExplains(explain0), ...getAllNodeExplains(explain1)],
+                /* keyFn */ (explain) => explain.shardName);
+    for (const group of Object.values(groupedExplains)) {
+        assert.eq(group.length, 2);
+        const [nodeExplain0, nodeExplain1] = group;
+        assertionFn(nodeExplain0, nodeExplain1);
     }
-};
+}
+
+const coll = assertDropAndRecreateCollection(db, "plan_cache_shape_hash_stability");
+assert.commandWorked(coll.insert({x: 5}));
 
 const query = {
     x: 3
 };
-
 const initialExplain = coll.find(query).explain();
 
 // Add a sparse index.
 assert.commandWorked(coll.createIndex({x: 1}, {sparse: true}));
-
 const withIndexExplain = coll.find(query).explain();
+runTest({
+    explain0: initialExplain,
+    explain1: withIndexExplain,
+    assertionFn: (nodeExplain0, nodeExplain1) => {
+        assert.eq(getPlanCacheShapeHashFromExplain(nodeExplain0),
+                  getPlanCacheShapeHashFromExplain(nodeExplain1),
+                  "'planCacheShapeHash' shouldn't change accross catalog changes");
 
-// 'queryHash' shouldn't change across catalog changes.
-assertPlanCacheField({
-    firstExplain: initialExplain,
-    secondExplain: withIndexExplain,
-    planCacheField: 'queryHash',
-    expectedToMatch: true
-});
-
-// We added an index so the plan cache key changed.
-assertPlanCacheField({
-    firstExplain: initialExplain,
-    secondExplain: withIndexExplain,
-    planCacheField: 'planCacheKey',
-    expectedToMatch: false
+        // We added an index so the plan cache key changed.
+        assert.neq(getPlanCacheKeyFromExplain(nodeExplain0),
+                   getPlanCacheKeyFromExplain(nodeExplain1),
+                   "'planCacheKey' should change accross catalog changes");
+    }
 });
 
 // Drop the index.
 assert.commandWorked(coll.dropIndex({x: 1}));
 const postDropExplain = coll.find(query).explain();
+const usesSbePlanCache = checkSbeFullFeatureFlagEnabled(db);
+runTest({
+    explain0: initialExplain,
+    explain1: postDropExplain,
+    assertionFn: (nodeExplain0, nodeExplain1) => {
+        assert.eq(getPlanCacheShapeHashFromExplain(nodeExplain0),
+                  getPlanCacheShapeHashFromExplain(nodeExplain1),
+                  "'planCacheShapeHash' shouldn't change accross catalog changes");
 
-// 'queryHash' shouldn't change across catalog changes.
-assertPlanCacheField({
-    firstExplain: initialExplain,
-    secondExplain: postDropExplain,
-    planCacheField: 'queryHash',
-    expectedToMatch: true
+        if (usesSbePlanCache) {
+            // SBE's 'planCacheKey' encoding encodes "collection version" which will be increased
+            // after dropping an index.
+            assert.neq(getPlanCacheKeyFromExplain(nodeExplain0),
+                       getPlanCacheKeyFromExplain(nodeExplain1),
+                       "'planCacheKey' should change accross catalog changes");
+        } else {
+            // The 'planCacheKey' should be the same as what it was before we dropped the index.
+            assert.eq(getPlanCacheKeyFromExplain(nodeExplain0),
+                      getPlanCacheKeyFromExplain(nodeExplain1));
+        }
+    }
 });
-
-// SBE's planCacheKey encoding encodes "collection version" which will be increased after dropping
-// an index.
-if (!checkSbeFullyEnabled(db)) {
-    // The 'planCacheKey' should be the same as what it was before we dropped the index.
-    assertPlanCacheField({
-        firstExplain: initialExplain,
-        secondExplain: postDropExplain,
-        planCacheField: 'planCacheKey',
-        expectedToMatch: true
-    });
-}

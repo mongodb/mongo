@@ -224,7 +224,7 @@ namespace {
  */
 struct PlanCacheInfo {
     boost::optional<uint32_t> planCacheKey;
-    boost::optional<uint32_t> queryHash;
+    boost::optional<uint32_t> planCacheShapeHash;
 };
 
 /**
@@ -233,8 +233,8 @@ struct PlanCacheInfo {
  */
 void setOpDebugPlanCacheInfo(OperationContext* opCtx, const PlanCacheInfo& cacheInfo) {
     OpDebug& opDebug = CurOp::get(opCtx)->debug();
-    if (!opDebug.queryHash && cacheInfo.queryHash) {
-        opDebug.queryHash = *cacheInfo.queryHash;
+    if (!opDebug.planCacheShapeHash && cacheInfo.planCacheShapeHash) {
+        opDebug.planCacheShapeHash = *cacheInfo.planCacheShapeHash;
     }
     if (!opDebug.planCacheKey && cacheInfo.planCacheKey) {
         opDebug.planCacheKey = *cacheInfo.planCacheKey;
@@ -472,7 +472,7 @@ public:
         }
 
         auto planCacheKey = buildPlanCacheKey();
-        getResult()->planCacheInfo().queryHash = planCacheKey.queryHash();
+        getResult()->planCacheInfo().planCacheShapeHash = planCacheKey.planCacheShapeHash();
         getResult()->planCacheInfo().planCacheKey = planCacheKey.planCacheKeyHash();
 
         // In each plan cache entry, we store the hash of the cached plan. We use this to indicate

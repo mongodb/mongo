@@ -147,8 +147,8 @@ public:
         return !(*this == other);
     }
 
-    uint32_t queryHash() const {
-        return _info.queryHash();
+    uint32_t planCacheShapeHash() const {
+        return _info.planCacheShapeHash();
     }
 
     uint32_t planCacheKeyHash() const {

@@ -214,9 +214,9 @@ public:
     virtual void setLastUseDate(Date_t now) = 0;
 
     /**
-     * Returns the queryHash of the query.
+     * Returns the 'planCacheShapeHash' of the query.
      */
-    virtual boost::optional<uint32_t> getQueryHash() const = 0;
+    virtual boost::optional<uint32_t> getPlanCacheShapeHash() const = 0;
 
     virtual boost::optional<std::size_t> getQueryStatsKeyHash() const = 0;
 

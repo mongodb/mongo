@@ -194,7 +194,7 @@ TEST_F(CountCmdShapeTest, CountShapeDebugFormat) {
 
 // Test that the shapified query field of the count command hashes to the same value when equal, and
 // a different hash value otherwise.
-TEST_F(CountCmdShapeTest, CompareQueryHashes) {
+TEST_F(CountCmdShapeTest, CompareQueryShapeHashes) {
     const auto count1 =
         R"({
             count: "testcoll",

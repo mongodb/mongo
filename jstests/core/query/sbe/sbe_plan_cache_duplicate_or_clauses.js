@@ -1,5 +1,3 @@
-import {getQueryPlanner} from "jstests/libs/analyze_plan.js";
-
 /**
  * This test was originally designed to reproduce SERVER-78752. It ensures that the correct plan is
  * added to the cache for similar queries that only differ in their IETs and if there is a
@@ -23,13 +21,19 @@ import {getQueryPlanner} from "jstests/libs/analyze_plan.js";
  *   assumes_balancer_off,
  * ]
  */
-const coll = db.sbe_plan_cache_duplicate_or_clauses;
-coll.drop();
 
-const queryHashSet = new Set();
+import {
+    getPlanCacheShapeHashFromExplain,
+    getPlanCacheShapeHashFromObject
+} from "jstests/libs/analyze_plan.js";
+import {assertDropAndRecreateCollection} from "jstests/libs/collection_drop_recreate.js";
+
+const coll = assertDropAndRecreateCollection(db, "sbe_plan_cache_duplicate_or_clauses");
+const planCacheShapeHashSet = new Set();
 
 const stash = (query) => {
-    queryHashSet.add(getQueryPlanner(query.explain()).queryHash);
+    const planCacheShapeHash = getPlanCacheShapeHashFromExplain(query.explain());
+    planCacheShapeHashSet.add(planCacheShapeHash);
     return query;
 };
 
@@ -47,9 +51,9 @@ assert.eq(1, stash(coll.find({a: 1, b: 1, $or: [{c: 1}, {c: 1, d: {$eq: null}}]}
 assert.eq(1, coll.find({a: 1, b: 1, $or: [{c: 1}, {c: 1, d: {$eq: null}}]}).itcount());
 
 // Check that each query has a separate entry in the plan cache
-const cacheEntries = coll.getPlanCache().list().map(entry => entry.queryHash);
-const matchingEntries = cacheEntries.filter(entry => queryHashSet.has(entry));
-assert.eq(2, matchingEntries.length, [cacheEntries, queryHashSet]);
+const cacheEntries = coll.getPlanCache().list().map(getPlanCacheShapeHashFromObject);
+const matchingEntries = cacheEntries.filter(entry => planCacheShapeHashSet.has(entry));
+assert.eq(2, matchingEntries.length, [cacheEntries, planCacheShapeHashSet]);
 
 // The query from above should still return 2 results.
 assert.eq(2, coll.find({a: 1, b: 1, $or: [{c: 2}, {c: 3, d: {$eq: null}}]}).itcount());

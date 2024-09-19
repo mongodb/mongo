@@ -55,7 +55,7 @@ function checkPipelineUsesCacheEntry({pipeline, expectedId, cacheEntry}) {
         cachedIndexName: null
     });
 
-    assert.eq(cacheEntry.queryHash, newEntry.queryHash, {cacheEntry, newEntry});
+    assert.eq(cacheEntry.planCacheShapeHash, newEntry.planCacheShapeHash, {cacheEntry, newEntry});
     assert.eq(cacheEntry.planCacheKey, newEntry.planCacheKey, {cacheEntry, newEntry});
     return newEntry;
 }
@@ -102,7 +102,7 @@ function testLoweredPipeline({
         cachedIndexName: null
     });
 
-    assert.eq(entry.queryHash, nextEntry.queryHash, {entry, nextEntry});
+    assert.eq(entry.planCacheShapeHash, nextEntry.planCacheShapeHash, {entry, nextEntry});
     assert.eq(entry.planCacheKey, nextEntry.planCacheKey, {entry, nextEntry});
 
     // For the last run, we use the checkPipelineUsesCacheEntry() helper.

@@ -271,7 +271,8 @@ function testPlanCache(direction) {
 
     // Verify that there's a cache entry for this query
     let cacheEntries = clusteredColl.getPlanCache().list();
-    let cachedPlan = cacheEntries.find(e => e.queryHash == plan.queryPlanner.queryHash);
+    let cachedPlan =
+        cacheEntries.find(e => e.planCacheShapeHash == plan.queryPlanner.planCacheShapeHash);
     assert.neq(cachedPlan, null, "Plan not in cache");
 
     assert.commandWorked(clusteredColl.dropIndex(indexName));

@@ -370,6 +370,7 @@ void ClusterExplain::buildEOFExplainResult(OperationContext* opCtx,
 
     queryPlannerBob.doneFast();
 
+    explain_common::generateQueryShapeHash(opCtx, out);
     explain_common::generateServerInfo(out);
     explain_common::generateServerParameters(cq->getExpCtx(), out);
     appendIfRoom(out, command, "command");
@@ -392,6 +393,7 @@ Status ClusterExplain::buildExplainResult(
 
     buildPlannerInfo(expCtx->opCtx, shardResponses, mongosStageName, out);
     buildExecStats(shardResponses, mongosStageName, millisElapsed, out);
+    explain_common::generateQueryShapeHash(expCtx->opCtx, out);
     explain_common::generateServerInfo(out);
     explain_common::generateServerParameters(expCtx, out);
     appendIfRoom(out, command, "command");

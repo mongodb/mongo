@@ -791,6 +791,7 @@ Status ClusterAggregate::runAggregate(OperationContext* opCtx,
                                    involvedNamespaces);
         // Add 'command' object to explain output.
         if (expCtx->explain) {
+            explain_common::generateQueryShapeHash(expCtx->opCtx, result);
             explain_common::appendIfRoom(
                 serializeForPassthrough(expCtx, request).toBson(), "command", result);
             collectQueryStatsMongos(opCtx,

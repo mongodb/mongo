@@ -153,8 +153,8 @@ const groupStage = {
     assert.neq(entryWithoutForeignColl.planCacheKey,
                entryWithForeignColl.planCacheKey,
                {entryWithoutForeignColl, entryWithForeignColl});
-    assert.eq(entryWithoutForeignColl.queryHash,
-              entryWithForeignColl.queryHash,
+    assert.eq(entryWithoutForeignColl.planCacheShapeHash,
+              entryWithForeignColl.planCacheShapeHash,
               {entryWithoutForeignColl, entryWithForeignColl});
 })();
 

@@ -108,7 +108,7 @@ const commonDiagnostics = [
 ];
 const commonQueryDiagnostics = [
     ...commonDiagnostics,
-    "queryHash:",
+    "planCacheShapeHash:",
     "planCacheKey:",
     "queryShapeHash:",
     "queryFramework:",
