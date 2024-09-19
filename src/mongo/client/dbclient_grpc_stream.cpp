@@ -55,7 +55,7 @@ StatusWith<std::shared_ptr<transport::Session>> DBClientGRPCStream::_makeSession
     const HostAndPort& host,
     transport::ConnectSSLMode sslMode,
     Milliseconds timeout,
-    boost::optional<TransientSSLParams> transientSSLParams) {
+    const boost::optional<TransientSSLParams>& transientSSLParams) {
     auto tl = dynamic_cast<transport::grpc::GRPCTransportLayer*>(
         getGlobalServiceContext()->getTransportLayerManager()->getEgressLayer());
     invariant(tl,

@@ -132,7 +132,7 @@ StatusWith<std::shared_ptr<Session>> GRPCTransportLayerMock::connect(
     HostAndPort peer,
     ConnectSSLMode sslMode,
     Milliseconds timeout,
-    boost::optional<TransientSSLParams> transientSSLParams) {
+    const boost::optional<TransientSSLParams>& transientSSLParams) {
     return connectWithAuthToken(std::move(peer), std::move(timeout));
 }
 

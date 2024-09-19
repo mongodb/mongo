@@ -135,7 +135,7 @@ public:
 
     void connect(const HostAndPort& host,
                  StringData applicationName,
-                 boost::optional<TransientSSLParams> transientSSLParams) override {
+                 const boost::optional<TransientSSLParams>& transientSSLParams) override {
         std::string errmsg;
         if (!connect(host.toString().c_str(), applicationName, errmsg)) {
             uasserted(ErrorCodes::HostUnreachable, errmsg);

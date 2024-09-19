@@ -124,7 +124,7 @@ public:
      */
     virtual void connect(const HostAndPort& server,
                          StringData applicationName,
-                         boost::optional<TransientSSLParams> transientSSLParams);
+                         const boost::optional<TransientSSLParams>& transientSSLParams);
 
     /**
      * This version of connect does not run "hello" after establishing a transport::Session with the
@@ -134,7 +134,7 @@ public:
      * @param server The server to connect to.
      */
     void connectNoHello(const HostAndPort& server,
-                        boost::optional<TransientSSLParams> transientSSLParams);
+                        const boost::optional<TransientSSLParams>& transientSSLParams);
     /**
      * @return true if this client is currently known to be in a failed state.  When
      * autoreconnect is on, the client will transition back to an ok state after reconnecting.
@@ -296,7 +296,7 @@ private:
         const HostAndPort& host,
         transport::ConnectSSLMode sslMode,
         Milliseconds timeout,
-        boost::optional<TransientSSLParams> transientSSLParams = boost::none) = 0;
+        const boost::optional<TransientSSLParams>& transientSSLParams = boost::none) = 0;
     virtual void _reconnectSession() = 0;
     virtual void _killSession() = 0;
 

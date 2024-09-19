@@ -205,13 +205,33 @@ idl_generator(
     ],
 )
 
+idl_generator(
+    name = "client_transient_tls_parameters_gen",
+    src = "client_transient_tls_parameters.idl",
+    deps = [
+        "//src/mongo/db:basic_types_gen",
+    ],
+)
+
+idl_generator(
+    name = "mongo_shell_options_gen",
+    src = "mongo_shell_options.idl",
+    deps = [
+        ":client_api_version_parameters_gen",
+        ":client_transient_tls_parameters_gen",
+        "//src/mongo/db:basic_types_gen",
+    ],
+)
+
 mongo_cc_library(
     name = "clientdriver_minimal",
     srcs = [
         "client_api_version_parameters_gen",
+        "client_transient_tls_parameters_gen",
         "dbclient_base.cpp",
         "dbclient_cursor.cpp",
         "index_spec.cpp",
+        "mongo_shell_options_gen",
     ],
     hdrs = [
         "dbclient_base.h",

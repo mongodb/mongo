@@ -223,7 +223,7 @@ StatusWith<std::shared_ptr<Session>> GRPCTransportLayerImpl::connect(
     HostAndPort peer,
     ConnectSSLMode sslMode,
     Milliseconds timeout,
-    boost::optional<TransientSSLParams> transientSSLParams) {
+    const boost::optional<TransientSSLParams>& transientSSLParams) {
     try {
         iassert(ErrorCodes::InvalidSSLConfiguration,
                 "SSL must be enabled when using gRPC",

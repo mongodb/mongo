@@ -53,10 +53,12 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/client/client_api_version_parameters_gen.h"
+#include "mongo/client/client_transient_tls_parameters_gen.h"
 #include "mongo/client/connection_string.h"
 #include "mongo/client/dbclient_base.h"
 #include "mongo/client/dbclient_cursor.h"
 #include "mongo/client/dbclient_rs.h"
+#include "mongo/client/mongo_shell_options_gen.h"
 #include "mongo/client/mongo_uri.h"
 #include "mongo/client/read_preference.h"
 #include "mongo/client/replica_set_monitor.h"
@@ -719,7 +721,15 @@ void setEncryptedDBClientCallbacks(EncryptedDBClientCallback* encCallback,
     getNestedConnectionCallback = getCallback;
 }
 
-// "new Mongo(uri, encryptedDBClientCallback, {options...})"
+/**
+ * Implements new Mongo() in jstests with the following ordered parameters:
+ *
+ * @param {string} uri - The connection URI for the MongoDB instance.
+ * @param {function} encryptedDBClientCallback - Callback function for handling the encrypted
+ * database client.
+ * @param {object} {api: {...}, tls: {...}}: - API options object containing version information or
+ * TLS options object to create a new transient connection.
+ */
 void MongoExternalInfo::construct(JSContext* cx, JS::CallArgs args) {
     auto scope = getScope(cx);
 
@@ -731,28 +741,34 @@ void MongoExternalInfo::construct(JSContext* cx, JS::CallArgs args) {
 
     auto cs = uassertStatusOK(MongoURI::parse(host));
 
-    ClientAPIVersionParameters apiParameters;
+    MongoShellOptions mongoShellOptions;
     if (args.length() > 2 && !args.get(2).isUndefined()) {
         uassert(4938000,
                 str::stream() << "the 'options' parameter to Mongo() must be an object",
                 args.get(2).isObject());
-        auto options = ValueWriter(cx, args.get(2)).toBSON();
-        if (options.hasField("api")) {
-            uassert(4938001,
-                    "the 'api' option for Mongo() must be an object",
-                    options["api"].isABSONObj());
-            apiParameters =
-                ClientAPIVersionParameters::parse(IDLParserContext("api"_sd), options["api"].Obj());
-            if (apiParameters.getDeprecationErrors().value_or(false) ||
-                apiParameters.getStrict().value_or(false)) {
-                uassert(4938002,
-                        "the 'api' option for Mongo() must include 'version' if it includes "
-                        "'strict' or "
-                        "'deprecationErrors'",
-                        apiParameters.getVersion());
-            }
+        mongoShellOptions = MongoShellOptions::parse(IDLParserContext("MongoShellOptions"_sd),
+                                                     ValueWriter(cx, args.get(2)).toBSON());
+    }
+
+    ClientAPIVersionParameters apiParameters;
+    if (auto optApiParameters = mongoShellOptions.getApi()) {
+        apiParameters = *optApiParameters;
+        if (apiParameters.getDeprecationErrors().value_or(false) ||
+            apiParameters.getStrict().value_or(false)) {
+            uassert(4938002,
+                    "the 'api' option for Mongo() must include 'version' if it includes "
+                    "'strict' or 'deprecationErrors'",
+                    apiParameters.getVersion());
         }
     }
+
+    boost::optional<TransientSSLParams> transientSSLParams;
+    if (mongoShellOptions.getTls() && mongoShellOptions.getTls()->getCreateNewConnection()) {
+        // Empty tls options to create a new connection.
+        TLSCredentials tlsCredentials;
+        transientSSLParams = TransientSSLParams(tlsCredentials);
+    }
+
 #ifdef MONGO_CONFIG_GRPC
     if (cs.isGRPC()) {
         uassert(ErrorCodes::InvalidOptions,
@@ -771,8 +787,8 @@ void MongoExternalInfo::construct(JSContext* cx, JS::CallArgs args) {
         cs.connect(appname.value_or(MongoURI::kDefaultTestRunnerAppName),
                    errmsg,
                    boost::none,
-                   &apiParameters));
-
+                   &apiParameters,
+                   transientSSLParams));
     if (!conn.get()) {
         uasserted(ErrorCodes::InternalError, errmsg);
     }
