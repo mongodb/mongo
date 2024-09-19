@@ -787,7 +787,12 @@ tasks:
 
   - <<: *task_template
     name: cursor_hints_to_query_settings_replset_passthrough
-    tags: ["assigned_to_jira_team_server_query_execution", "default"]
+    tags:
+      [
+        "assigned_to_jira_team_server_query_execution",
+        "default",
+        "requires_large_host",
+      ]
     commands:
       - func: "do setup"
       - func: "run tests"
@@ -810,7 +815,12 @@ tasks:
 
   - <<: *task_template
     name: implicit_query_settings_fallback
-    tags: ["assigned_to_jira_team_server_query_execution", "default"]
+    tags:
+      [
+        "assigned_to_jira_team_server_query_execution",
+        "default",
+        "requires_large_host",
+      ]
     commands:
       - func: "do setup"
       - func: "run tests"

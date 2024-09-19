@@ -113,7 +113,7 @@ patch_aliases:
     variant_tags: ["required"]
     task: ".*"
   - alias: query
-    variant: "^(.*query-patch-only|linux-x86-dynamic-compile-required)$"
+    variant: "^(.*query-patch-only|linux-x86-dynamic-compile)$"
     task: ".*"
   - alias: security
     variant: "^(.*security-patch-only|linux-x86-dynamic-compile|windows-compile-required)$"

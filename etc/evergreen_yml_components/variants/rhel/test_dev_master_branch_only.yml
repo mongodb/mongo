@@ -623,7 +623,7 @@ buildvariants:
       - name: sharding_max_mirroring_opportunistic_secondary_targeting_gen
         patch_only: true
 
-  ### QO & QE Patch-Specific Build Variants ###
+  ### Query Patch-Specific Build Variants ###
 
   - name: &enterprise-rhel-8-64-bit-dynamic-classic-engine-query-patch-only enterprise-rhel-8-64-bit-dynamic-classic-engine-query-patch-only
     display_name: "~ Shared Library Enterprise RHEL 8 Query Patch Only (Classic Engine)"
@@ -638,7 +638,7 @@ buildvariants:
       max_sub_suites: 3
       test_flags: >-
         --mongodSetParameters="{internalQueryFrameworkControl: forceClassicEngine}"
-        --excludeWithAnyTags=resource_intensive,featureFlagSbeFull
+        --excludeWithAnyTags=resource_intensive
     depends_on:
       - name: archive_dist_test
         variant: *linux_x86_dynamic_compile_variant_name
@@ -652,8 +652,8 @@ buildvariants:
       - name: .auth !.suggested_excluding_required__for_devprod_mitigation_only
       - name: .causally_consistent !.sharding
       - name: .change_streams
-      - name: .concurrency !.large !.cluster_scalability_only !.no_txns !.compute_mode !.feature_flag_guarded
-      - name: .concurrency .large !.no_txns !.cluster_scalability_only !.compute_mode !.feature_flag_guarded
+      - name: .concurrency !.large !.cluster_scalability_only !.no_txns !.compute_mode !.feature_flag_guarded !.config_fuzzer
+      - name: .concurrency .large !.no_txns !.cluster_scalability_only !.compute_mode !.feature_flag_guarded !.config_fuzzer
         distros:
           - rhel8.8-medium
       - name: .encrypt
@@ -734,9 +734,13 @@ buildvariants:
       - name: vector_search_auth
       - name: vector_search_ssl
       - name: cursor_hints_to_query_settings_replset_passthrough
+        distros:
+          - rhel8.8-medium
       - name: cursor_hints_to_query_settings_sharded_collections_passthrough_gen
       - name: cursor_hints_to_query_settings_unsharded_collections_passthrough_gen
       - name: implicit_query_settings_fallback
+        distros:
+          - rhel8.8-medium
 
   - name: enterprise-rhel-8-64-bit-dynamic-classic-engine-all-feature-flags-fuzzers
     <<: *enterprise-rhel-8-64-bit-dynamic-all-feature-flags-template
@@ -745,8 +749,6 @@ buildvariants:
     cron: "0 4 * * 0" # From the ${project_weekly_cron} parameter # This is a patch-only variant but we run on mainline to pick up task history.
     expansions:
       <<: *enterprise-rhel-8-64-bit-dynamic-all-feature-flags-expansions
-      jstestfuzz_num_generated_files: 20
-      jstestfuzz_concurrent_num_files: 5
       target_resmoke_time: 30
       max_sub_suites: 3
       test_flags: >-
@@ -790,8 +792,8 @@ buildvariants:
       - name: .release_critical .requires_large_host !.requires_compile_variant !.incompatible_development_variant !.incompatible_all_feature_flags !.suggested_excluding_required__for_devprod_mitigation_only
         distros:
           - rhel8.8-medium
-      - name: .default !.requires_large_host !.requires_compile_variant !.incompatible_development_variant !.incompatible_all_feature_flags !.suggested_excluding_required__for_devprod_mitigation_only
-      - name: .default .requires_large_host !.requires_compile_variant !.incompatible_development_variant !.incompatible_all_feature_flags !.suggested_excluding_required__for_devprod_mitigation_only
+      - name: .default !.requires_large_host !.requires_compile_variant !.incompatible_development_variant !.incompatible_all_feature_flags !.suggested_excluding_required__for_devprod_mitigation_only !.config_fuzzer !.config_fuzzer_stress !.jstestfuzz !resharding_timeseries_fuzzer_gen !initial_sync_fuzzer_sanity_patch_gen !rollback_fuzzer_sanity_patch_gen
+      - name: .default .requires_large_host !.requires_compile_variant !.incompatible_development_variant !.incompatible_all_feature_flags !.suggested_excluding_required__for_devprod_mitigation_only !.config_fuzzer !.config_fuzzer_stress !.jstestfuzz !resharding_timeseries_fuzzer_gen !initial_sync_fuzzer_sanity_patch_gen !rollback_fuzzer_sanity_patch_gen
         distros:
           - rhel8.8-medium
       # TODO(SERVER-90936): Remove this once streams_kafka* tests can work with the "default" tag.
