@@ -41,6 +41,7 @@ buildvariants:
       - name: compile_test_parallel_unittest_stream_TG
         distros:
           - amazon2023.3-arm64-large
+      - name: bazel_coverage
 
   # Variant to support Code Coverage on amd64/x86_64
   - name: &rhel-93-64-bit-coverage rhel-93-64-bit-coverage
@@ -82,3 +83,4 @@ buildvariants:
       - name: compile_test_parallel_unittest_stream_TG
         distros:
           - rhel93-large
+      - name: bazel_coverage

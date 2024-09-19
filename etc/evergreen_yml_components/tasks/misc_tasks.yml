@@ -1075,6 +1075,41 @@ tasks:
           args:
             - "src/evergreen/lint_yaml.sh"
 
+  - name: bazel_coverage
+    tags: ["assigned_to_jira_team_devprod_correctness", "auxiliary"]
+    depends_on:
+      - name: version_expansions_gen
+        variant: generate-tasks-for-version
+    commands:
+      - command: timeout.update
+        params:
+          exec_timeout_secs: 2400 # 40 minutes
+      - func: "f_expansions_write"
+      - command: manifest.load
+      - func: "git get project and add git tag"
+      - func: "f_expansions_write"
+      - func: "kill processes"
+      - func: "cleanup environment"
+      - func: "set up venv"
+      - func: "upload pip requirements"
+      - func: "get engflow creds"
+      # TODO SERVER-81038: Remove "fetch bazel" once bazelisk is self-hosted.
+      - func: "fetch bazel"
+      - func: "bazel coverage"
+        vars:
+          # Running something like "bazel test //src/..." has to do a lot of preprocessing on *all*
+          # targets before it actually runs the much smaller fraction of test targets, unless we're
+          # certain that a full build has already been cached.
+          # It might be optimized by doing a query upfront, which uses minimal analysis:
+          #   targets=$(bazel query 'kind(".*_test", //src/...)')
+          #   bazel test $targets
+          target: >-
+            //src/...
+          args: >-
+            --test_output=all
+            --config=local
+            --combined_report=lcov
+
   - name: monitor_build_status
     tags: ["assigned_to_jira_team_devprod_correctness", "auxiliary"]
     commands:
