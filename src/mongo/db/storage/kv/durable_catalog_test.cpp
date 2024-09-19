@@ -203,12 +203,9 @@ public:
         auto collWriter = getCollectionWriter();
         {
             WriteUnitOfWork wuow(operationContext());
-            const bool isSecondaryBackgroundIndexBuild = false;
             boost::optional<UUID> buildUUID(twoPhase, UUID::gen());
-            ASSERT_OK(
-                collWriter.getWritableCollection(operationContext())
-                    ->prepareForIndexBuild(
-                        operationContext(), &desc, buildUUID, isSecondaryBackgroundIndexBuild));
+            ASSERT_OK(collWriter.getWritableCollection(operationContext())
+                          ->prepareForIndexBuild(operationContext(), &desc, buildUUID));
             entry = collWriter.getWritableCollection(operationContext())
                         ->getIndexCatalog()
                         ->createIndexEntry(operationContext(),

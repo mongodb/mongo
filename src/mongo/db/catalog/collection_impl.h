@@ -369,8 +369,7 @@ public:
 
     Status prepareForIndexBuild(OperationContext* opCtx,
                                 const IndexDescriptor* spec,
-                                boost::optional<UUID> buildUUID,
-                                bool isBackgroundSecondaryBuild) final;
+                                boost::optional<UUID> buildUUID) final;
 
     boost::optional<UUID> getIndexBuildUUID(StringData indexName) const final;
 

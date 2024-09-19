@@ -62,15 +62,13 @@ index build on `{lastName: 1}`:
  {'ident': 'collection-0--2147780727179663754',
   'idxIdent': {'_id_': 'index-1--2147780727179663754',
                'lastName_1': 'index-2--2147780727179663754'},
-  'md': {'indexes': [{'backgroundSecondary': False,
-                      'multikey': False,
+  'md': {'indexes': [{'multikey': False,
                       'multikeyPaths': {'_id': Binary('\x00', 0)},
                       'ready': True,
                       'spec': {'key': {'_id': 1},
                                'name': '_id_',
                                'v': 2}},
-                     {'backgroundSecondary': False,
-                      'multikey': False,
+                     {'multikey': False,
                       'multikeyPaths': {'_id': Binary('\x00', 0)},
                       'ready': False,
                       'buildUUID': UUID('d86e8657-1060-4efd-b891-0034d28c3078'),
@@ -122,9 +120,7 @@ Collectionless $listCatalog: [
                     "multikey" : false,
                     "multikeyPaths" : {
                         "_id" : BinData(0,"AA==")
-                    },
-                    "head" : NumberLong(0),
-                    "backgroundSecondary" : false
+                    }
                 }
             ]
         },
@@ -156,9 +152,7 @@ Collectionless $listCatalog: [
                     "multikey" : false,
                     "multikeyPaths" : {
                         "_id" : BinData(0,"AA==")
-                    },
-                    "head" : NumberLong(0),
-                    "backgroundSecondary" : false
+                    }
                 },
                 {
                     "spec" : {
@@ -172,9 +166,7 @@ Collectionless $listCatalog: [
                     "multikey" : false,
                     "multikeyPaths" : {
                         "a" : BinData(0,"AA==")
-                    },
-                    "head" : NumberLong(0),
-                    "backgroundSecondary" : false
+                    }
                 }
             ]
         },
@@ -207,9 +199,7 @@ Collectionless $listCatalog: [
                     "multikey" : false,
                     "multikeyPaths" : {
                         "_id" : BinData(0,"AA==")
-                    },
-                    "head" : NumberLong(0),
-                    "backgroundSecondary" : false
+                    }
                 }
             ]
         },
@@ -307,9 +297,7 @@ of the `$indexStats` operator. The following is a sample test output from
                     "multikey" : false,
                     "multikeyPaths" : {
                         "_id" : BinData(0,"AA==")
-                    },
-                    "head" : NumberLong(0),
-                    "backgroundSecondary" : false
+                    }
                 }
             ]
         },
@@ -342,9 +330,7 @@ of the `$indexStats` operator. The following is a sample test output from
                     "multikey" : false,
                     "multikeyPaths" : {
                         "_id" : BinData(0,"AA==")
-                    },
-                    "head" : NumberLong(0),
-                    "backgroundSecondary" : false
+                    }
                 }
             ]
         },

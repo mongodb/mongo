@@ -383,13 +383,11 @@ TEST_F(StorageEngineTest, ReconcileUnfinishedIndex) {
     ASSERT_OK(swCollInfo.getStatus());
 
 
-    // Start an non-backgroundSecondary single-phase (i.e. no build UUID) index.
-    const bool isBackgroundSecondaryBuild = false;
+    // Start a single-phase (i.e. no build UUID) index.
     const boost::optional<UUID> buildUUID = boost::none;
     {
         WriteUnitOfWork wuow(opCtx.get());
-        ASSERT_OK(
-            startIndexBuild(opCtx.get(), ns, indexName, isBackgroundSecondaryBuild, buildUUID));
+        ASSERT_OK(startIndexBuild(opCtx.get(), ns, indexName, buildUUID));
         wuow.commit();
     }
 
@@ -401,56 +399,11 @@ TEST_F(StorageEngineTest, ReconcileUnfinishedIndex) {
     // Reconcile should have to dropped the ident to allow the index to be rebuilt.
     ASSERT(!identExists(opCtx.get(), indexIdent));
 
-    // Because this non-backgroundSecondary index is unfinished, reconcile will drop the index and
-    // not require it to be rebuilt.
+    // Because this index is unfinished, reconcile will drop the index and not require it to be
+    // rebuilt.
     ASSERT_EQUALS(0UL, reconcileResult.indexesToRebuild.size());
 
     // There are no two-phase builds to resume or restart.
-    ASSERT_EQUALS(0UL, reconcileResult.indexBuildsToRestart.size());
-    ASSERT_EQUALS(0UL, reconcileResult.indexBuildsToResume.size());
-}
-
-TEST_F(StorageEngineTest, ReconcileUnfinishedBackgroundSecondaryIndex) {
-    auto opCtx = cc().makeOperationContext();
-
-    const NamespaceString ns = NamespaceString::createNamespaceString_forTest("db.coll1");
-    const std::string indexName("a_1");
-
-    auto swCollInfo = createCollection(opCtx.get(), ns);
-    ASSERT_OK(swCollInfo.getStatus());
-
-    Lock::GlobalLock lk(&*opCtx, MODE_IX);
-
-    // Start a backgroundSecondary single-phase (i.e. no build UUID) index.
-    const bool isBackgroundSecondaryBuild = true;
-    const boost::optional<UUID> buildUUID = boost::none;
-    {
-        Lock::DBLock dbLk(opCtx.get(), ns.dbName(), MODE_IX);
-        Lock::CollectionLock collLk(opCtx.get(), ns, MODE_X);
-
-        WriteUnitOfWork wuow(opCtx.get());
-        ASSERT_OK(
-            startIndexBuild(opCtx.get(), ns, indexName, isBackgroundSecondaryBuild, buildUUID));
-        wuow.commit();
-    }
-
-    const auto indexIdent = _storageEngine->getCatalog()->getIndexIdent(
-        opCtx.get(), swCollInfo.getValue().catalogId, indexName);
-
-    auto reconcileResult = unittest::assertGet(reconcile(opCtx.get()));
-
-    // Reconcile should not have dropped the ident because it expects the caller will drop and
-    // rebuild the index.
-    ASSERT(identExists(opCtx.get(), indexIdent));
-
-    // Because this backgroundSecondary index is unfinished, reconcile will drop the index and
-    // require it to be rebuilt.
-    ASSERT_EQUALS(1UL, reconcileResult.indexesToRebuild.size());
-    StorageEngine::IndexIdentifier& toRebuild = reconcileResult.indexesToRebuild[0];
-    ASSERT_EQUALS(ns.ns_forTest(), toRebuild.nss.ns_forTest());
-    ASSERT_EQUALS(indexName, toRebuild.indexName);
-
-    // There are no two-phase builds to restart or resume.
     ASSERT_EQUALS(0UL, reconcileResult.indexBuildsToRestart.size());
     ASSERT_EQUALS(0UL, reconcileResult.indexBuildsToResume.size());
 }
@@ -467,10 +420,9 @@ TEST_F(StorageEngineTest, ReconcileTwoPhaseIndexBuilds) {
 
     Lock::GlobalLock lk(&*opCtx, MODE_IX);
 
-    // Using a build UUID implies that this index build is two-phase, so the isBackgroundSecondary
-    // field will be ignored. There is no special behavior on primaries or secondaries.
+    // Using a build UUID implies that this index build is two-phase. There is no special behavior
+    // on primaries or secondaries.
     auto buildUUID = UUID::gen();
-    const bool isBackgroundSecondaryBuild = false;
 
     // Start two indexes with the same buildUUID to simulate building multiple indexes within the
     // same build.
@@ -479,14 +431,12 @@ TEST_F(StorageEngineTest, ReconcileTwoPhaseIndexBuilds) {
         Lock::CollectionLock collLk(opCtx.get(), ns, MODE_X);
         {
             WriteUnitOfWork wuow(opCtx.get());
-            ASSERT_OK(
-                startIndexBuild(opCtx.get(), ns, indexA, isBackgroundSecondaryBuild, buildUUID));
+            ASSERT_OK(startIndexBuild(opCtx.get(), ns, indexA, buildUUID));
             wuow.commit();
         }
         {
             WriteUnitOfWork wuow(opCtx.get());
-            ASSERT_OK(
-                startIndexBuild(opCtx.get(), ns, indexB, isBackgroundSecondaryBuild, buildUUID));
+            ASSERT_OK(startIndexBuild(opCtx.get(), ns, indexB, buildUUID));
             wuow.commit();
         }
     }

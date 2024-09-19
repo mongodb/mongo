@@ -1619,15 +1619,13 @@ void CollectionImpl::removeIndex(OperationContext* opCtx, StringData indexName) 
 
 Status CollectionImpl::prepareForIndexBuild(OperationContext* opCtx,
                                             const IndexDescriptor* spec,
-                                            boost::optional<UUID> buildUUID,
-                                            bool isBackgroundSecondaryBuild) {
+                                            boost::optional<UUID> buildUUID) {
 
     auto durableCatalog = DurableCatalog::get(opCtx);
     BSONCollectionCatalogEntry::IndexMetaData imd;
     imd.spec = spec->infoObj();
     imd.ready = false;
     imd.multikey = false;
-    imd.isBackgroundSecondaryBuild = isBackgroundSecondaryBuild;
     imd.buildUUID = buildUUID;
 
     if (indexTypeSupportsPathLevelMultikeyTracking(spec->getAccessMethodName())) {

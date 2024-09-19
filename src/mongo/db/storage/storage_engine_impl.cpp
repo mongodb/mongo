@@ -814,28 +814,12 @@ StatusWith<StorageEngine::ReconcileResult> StorageEngineImpl::reconcileCatalogAn
                 continue;
             }
 
-            // If the index was kicked off as a background secondary index build, replication
-            // recovery will not run into the oplog entry to recreate the index. If the index build
-            // did not successfully complete, this code will return the index to be rebuilt.
-            if (indexMetaData.isBackgroundSecondaryBuild && !indexMetaData.ready) {
-                LOGV2(22255,
-                      "Expected background index build did not complete, rebuilding in foreground "
-                      "- see SERVER-43097",
-                      logAttrs(md->nss),
-                      "index"_attr = indexName);
-                reconcileResult.indexesToRebuild.push_back(
-                    {entry.catalogId, md->nss, indexName.toString()});
-                continue;
-            }
-
             // The last anomaly is when the index build did not complete. This implies the index
             // build was on:
             // (1) a standalone and the `createIndexes` command never successfully returned, or
             // (2) an initial syncing node bulk building indexes during a collection clone.
             // In both cases the index entry in the catalog should be dropped.
             if (!indexMetaData.ready) {
-                invariant(!indexMetaData.isBackgroundSecondaryBuild);
-
                 LOGV2(22256,
                       "Dropping unfinished index",
                       logAttrs(md->nss),

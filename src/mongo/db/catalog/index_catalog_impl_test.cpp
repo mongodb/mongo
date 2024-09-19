@@ -55,7 +55,7 @@ TEST_F(IndexCatalogImplTest, IndexRebuildHandlesTransientEbusy) {
         IndexSpec spec;
         spec.version(1).name("x_1").addKeys(BSON("x" << 1));
         IndexDescriptor desc = IndexDescriptor(IndexNames::BTREE, spec.toBSON());
-        ASSERT_OK(collWriter->prepareForIndexBuild(operationContext(), &desc, boost::none, false));
+        ASSERT_OK(collWriter->prepareForIndexBuild(operationContext(), &desc, boost::none));
         collWriter->getIndexCatalog()->createIndexEntry(
             operationContext(), collWriter, std::move(desc), CreateIndexEntryFlags::kNone);
         wuow.commit();

@@ -155,18 +155,10 @@ Status IndexBuildBlock::init(OperationContext* opCtx, Collection* collection, bo
                           "IndexBuildStarted",
                           ErrorCodes::OK);
 
-    bool isBackgroundIndex = _method == IndexBuildMethod::kHybrid;
-    bool isBackgroundSecondaryBuild = false;
-    if (auto replCoord = repl::ReplicationCoordinator::get(opCtx)) {
-        isBackgroundSecondaryBuild = replCoord->getSettings().isReplSet() &&
-            !replCoord->getMemberState().primary() && isBackgroundIndex;
-    }
-
     if (!forRecovery) {
         // Setup on-disk structures. We skip this during startup recovery for unfinished indexes as
         // everything is already in-place.
-        Status status = collection->prepareForIndexBuild(
-            opCtx, &descriptor, _buildUUID, isBackgroundSecondaryBuild);
+        Status status = collection->prepareForIndexBuild(opCtx, &descriptor, _buildUUID);
         if (!status.isOK())
             return status;
     }

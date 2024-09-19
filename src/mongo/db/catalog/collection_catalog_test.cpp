@@ -3538,7 +3538,7 @@ TEST_F(CollectionCatalogTimestampTest, IndexCatalogEntryCopying) {
         AutoGetCollection autoColl(opCtx.get(), nss, MODE_X);
         WriteUnitOfWork wuow(opCtx.get());
         auto collWriter = autoColl.getWritableCollection(opCtx.get());
-        ASSERT_OK(collWriter->prepareForIndexBuild(opCtx.get(), &desc, boost::none, false));
+        ASSERT_OK(collWriter->prepareForIndexBuild(opCtx.get(), &desc, boost::none));
         collWriter->getIndexCatalog()->createIndexEntry(
             opCtx.get(), collWriter, std::move(desc), CreateIndexEntryFlags::kNone);
         wuow.commit();

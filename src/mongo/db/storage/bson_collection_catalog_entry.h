@@ -70,10 +70,7 @@ public:
         IndexMetaData() {}
 
         IndexMetaData(const IndexMetaData& other)
-            : spec(other.spec),
-              ready(other.ready),
-              isBackgroundSecondaryBuild(other.isBackgroundSecondaryBuild),
-              buildUUID(other.buildUUID) {
+            : spec(other.spec), ready(other.ready), buildUUID(other.buildUUID) {
             // We need to hold the multikey mutex when copying, someone else might be modifying this
             stdx::lock_guard lock(other.multikeyMutex);
             multikey = other.multikey;
@@ -83,7 +80,6 @@ public:
         IndexMetaData(IndexMetaData&& other)
             : spec(std::move(other.spec)),
               ready(other.ready),
-              isBackgroundSecondaryBuild(other.isBackgroundSecondaryBuild),
               buildUUID(std::move(other.buildUUID)) {
             // No need to hold mutex on move, there are no concurrent readers while we're moving
             // the instance.
@@ -104,7 +100,6 @@ public:
             if (&rhs != this) {
                 spec = std::move(rhs.spec);
                 ready = std::move(rhs.ready);
-                isBackgroundSecondaryBuild = std::move(rhs.isBackgroundSecondaryBuild);
                 buildUUID = std::move(rhs.buildUUID);
 
                 // No need to hold mutex on move, there are no concurrent readers while we're moving
@@ -129,7 +124,6 @@ public:
 
         BSONObj spec;
         bool ready = false;
-        bool isBackgroundSecondaryBuild = false;
 
         // If initialized, a two-phase index build is in progress.
         boost::optional<UUID> buildUUID;

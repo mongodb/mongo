@@ -543,8 +543,7 @@ public:
      */
     virtual Status prepareForIndexBuild(OperationContext* opCtx,
                                         const IndexDescriptor* spec,
-                                        boost::optional<UUID> buildUUID,
-                                        bool isBackgroundSecondaryBuild) = 0;
+                                        boost::optional<UUID> buildUUID) = 0;
 
     /**
      * Returns a UUID if the index is being built with the two-phase index build procedure.

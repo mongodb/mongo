@@ -1242,7 +1242,6 @@ TEST_F(DurableCatalogTest, Idx1) {
                         << "foo");
         imd.ready = false;
         imd.multikey = false;
-        imd.isBackgroundSecondaryBuild = false;
         md.indexes.push_back(imd);
         putMetaData(opCtx, catalog.get(), catalogId, md);
         uow.commit();
@@ -1277,7 +1276,6 @@ TEST_F(DurableCatalogTest, Idx1) {
                         << "foo");
         imd.ready = false;
         imd.multikey = false;
-        imd.isBackgroundSecondaryBuild = false;
         md.indexes.push_back(imd);
         putMetaData(opCtx, catalog.get(), catalogId, md);
         uow.commit();
@@ -1339,7 +1337,6 @@ TEST_F(DurableCatalogTest, DirectoryPerDb1) {
                         << "foo");
         imd.ready = false;
         imd.multikey = false;
-        imd.isBackgroundSecondaryBuild = false;
         md.indexes.push_back(imd);
         putMetaData(opCtx, catalog.get(), catalogId, md);
         ASSERT_STRING_CONTAINS(getIndexIdent(opCtx, catalog.get(), catalogId, "foo"), "a/");
@@ -1398,7 +1395,6 @@ TEST_F(DurableCatalogTest, Split1) {
                         << "foo");
         imd.ready = false;
         imd.multikey = false;
-        imd.isBackgroundSecondaryBuild = false;
         md.indexes.push_back(imd);
         putMetaData(opCtx, catalog.get(), catalogId, md);
         ASSERT_STRING_CONTAINS(getIndexIdent(opCtx, catalog.get(), catalogId, "foo"), "index/");
@@ -1457,7 +1453,6 @@ TEST_F(DurableCatalogTest, DirectoryPerAndSplit1) {
                         << "foo");
         imd.ready = false;
         imd.multikey = false;
-        imd.isBackgroundSecondaryBuild = false;
         md.indexes.push_back(imd);
         putMetaData(opCtx, catalog.get(), catalogId, md);
         ASSERT_STRING_CONTAINS(getIndexIdent(opCtx, catalog.get(), catalogId, "foo"), "a/index/");

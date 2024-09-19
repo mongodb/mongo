@@ -262,9 +262,6 @@ BSONObj BSONCollectionCatalogEntry::MetaData::toBSON(bool hasExclusiveAccess) co
                 }
             }
 
-            sub.append("head", 0ll);  // For backward compatibility with 4.0
-            sub.append("backgroundSecondary", indexes[i].isBackgroundSecondaryBuild);
-
             if (indexes[i].buildUUID) {
                 indexes[i].buildUUID->appendToBuilder(&sub, "buildUUID");
             }
@@ -308,10 +305,6 @@ void BSONCollectionCatalogEntry::MetaData::parse(const BSONObj& obj) {
             if (auto multikeyPathsElem = idx["multikeyPaths"]) {
                 parseMultikeyPathsFromBytes(multikeyPathsElem.Obj(), &imd.multikeyPaths);
             }
-
-            auto bgSecondary = BSONElement(idx["backgroundSecondary"]);
-            // Opt-in to rebuilding behavior for old-format index catalog objects.
-            imd.isBackgroundSecondaryBuild = bgSecondary.eoo() || bgSecondary.trueValue();
 
             if (idx["buildUUID"]) {
                 imd.buildUUID = fassert(31353, UUID::parse(idx["buildUUID"]));

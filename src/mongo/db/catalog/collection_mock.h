@@ -424,8 +424,7 @@ public:
 
     Status prepareForIndexBuild(OperationContext* opCtx,
                                 const IndexDescriptor* spec,
-                                boost::optional<UUID> buildUUID,
-                                bool isBackgroundSecondaryBuild) override {
+                                boost::optional<UUID> buildUUID) override {
         MONGO_UNREACHABLE;
     }
 

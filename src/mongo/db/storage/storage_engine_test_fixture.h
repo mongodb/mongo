@@ -149,12 +149,9 @@ public:
     /**
      * Create an index with a key of `{<key>: 1}` and a `name` of <key>.
      */
-    Status createIndex(OperationContext* opCtx,
-                       NamespaceString collNs,
-                       std::string key,
-                       bool isBackgroundSecondaryBuild) {
+    Status createIndex(OperationContext* opCtx, NamespaceString collNs, std::string key) {
         auto buildUUID = UUID::gen();
-        auto ret = startIndexBuild(opCtx, collNs, key, isBackgroundSecondaryBuild, buildUUID);
+        auto ret = startIndexBuild(opCtx, collNs, key, buildUUID);
         if (!ret.isOK()) {
             return ret;
         }
@@ -166,7 +163,6 @@ public:
     Status startIndexBuild(OperationContext* opCtx,
                            NamespaceString collNs,
                            std::string key,
-                           bool isBackgroundSecondaryBuild,
                            boost::optional<UUID> buildUUID) {
         BSONObjBuilder builder;
         {
@@ -180,8 +176,7 @@ public:
                                                                                        collNs);
         auto descriptor = std::make_unique<IndexDescriptor>(IndexNames::findPluginName(spec), spec);
 
-        auto ret = collection->prepareForIndexBuild(
-            opCtx, descriptor.get(), buildUUID, isBackgroundSecondaryBuild);
+        auto ret = collection->prepareForIndexBuild(opCtx, descriptor.get(), buildUUID);
         return ret;
     }
 
