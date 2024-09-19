@@ -69,3 +69,24 @@ filters:
   - "sharding_catalog_*":
     approvers:
       - 10gen/server-catalog-and-routing
+  - "config_server_test_fixture*":
+    approvers:
+      - 10gen/server-catalog-and-routing
+  - "configsvr_balancer_collection_status_command.cpp":
+    approvers:
+      - 10gen/server-catalog-and-routing
+  - "configsvr_clear_jumbo_flag_command.cpp":
+    approvers:
+      - 10gen/server-catalog-and-routing
+  - "configsvr_configure_collection_balancing.cpp":
+    approvers:
+      - 10gen/server-catalog-and-routing
+  - "configsvr_control_balancer_command.cpp":
+    approvers:
+      - 10gen/server-catalog-and-routing
+  - "index_on_config*":
+    approvers:
+      - 10gen/server-catalog-and-routing
+  - "initial_split_policy*":
+    approvers:
+      - 10gen/server-catalog-and-routing

@@ -167,3 +167,15 @@ filters:
   - "value.idl":
     approvers:
       - 10gen/query-execution
+  - "document_source_coll_stats*":
+    approvers:
+      - 10gen/server-catalog-and-routing
+  - "document_source_internal_all_collection_stats*":
+    approvers:
+      - 10gen/server-catalog-and-routing
+  - "*list_catalog*":
+    approvers:
+      - 10gen/server-catalog-and-routing
+  - "*sharded_data_distribution*":
+    approvers:
+      - 10gen/server-catalog-and-routing

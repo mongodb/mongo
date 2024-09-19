@@ -19,3 +19,7 @@ filters:
       - cswanson310
     metadata:
       owning_team: 10gen/query-integration
+  - "durable_catalog*":
+    approvers:
+      - 10gen/server-catalog-and-routing
+      - 10gen/server-rss-sydney

@@ -38,3 +38,6 @@ filters:
   - "query_stage_multiplan.cpp":
     approvers:
       - 10gen/query-optimization
+  - "catalogtests.cpp":
+    approvers:
+      - 10gen/server-catalog-and-routing

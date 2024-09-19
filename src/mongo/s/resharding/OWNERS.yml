@@ -3,3 +3,6 @@ filters:
   - "*":
     approvers:
       - 10gen/server-cluster-scalability
+  - "type_collection_fields.idl":
+    approvers:
+      - 10gen/server-catalog-and-routing

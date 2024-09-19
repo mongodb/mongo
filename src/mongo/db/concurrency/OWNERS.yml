@@ -6,3 +6,9 @@ filters:
   - "flow_control_ticketholder*":
     approvers:
       - 10gen/server-workload-scheduling
+  - "lock*":
+    approvers:
+      - 10gen/server-catalog-and-routing
+  - "resource_catalog*":
+    approvers:
+      - 10gen/server-catalog-and-routing

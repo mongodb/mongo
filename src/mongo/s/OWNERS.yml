@@ -96,3 +96,48 @@ filters:
   - "type_collection_common_types.idl":
     approvers:
       - 10gen/server-catalog-and-routing
+  - "balancer_configuration*":
+    approvers:
+      - 10gen/server-catalog-and-routing
+  - "gossiped_routing_cache.idl":
+    approvers:
+      - 10gen/server-catalog-and-routing
+  - "grid.*":
+    approvers:
+      - 10gen/server-catalog-and-routing
+  - "*ns_targeter*":
+    approvers:
+      - 10gen/server-catalog-and-routing
+  - "mongod_and_mongos_server_parameters.idl":
+    approvers:
+      - 10gen/server-catalog-and-routing
+  - "*ns_targeter*":
+    approvers:
+      - 10gen/server-catalog-and-routing
+  - "s_sharding_server_status.cpp":
+    approvers:
+      - 10gen/server-catalog-and-routing
+  - "sessions_collection_sharded*":
+    approvers:
+      - 10gen/server-catalog-and-routing
+  - "shard_util*":
+    approvers:
+      - 10gen/server-catalog-and-routing
+  - "*cluster_parameter*":
+    approvers:
+      - 10gen/server-catalog-and-routing
+  - "sharding_feature_flag*":
+    approvers:
+      - 10gen/server-catalog-and-routing
+  - "sharding_initialization*":
+    approvers:
+      - 10gen/server-catalog-and-routing
+  - "sharding_mongos_test_fixture*":
+    approvers:
+      - 10gen/server-catalog-and-routing
+  - "sharding_test_fixture_common*":
+    approvers:
+      - 10gen/server-catalog-and-routing
+  - "*metadata_consistency*":
+    approvers:
+      - 10gen/server-catalog-and-routing

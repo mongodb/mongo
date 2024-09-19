@@ -134,3 +134,42 @@ filters:
   - "feature_compatibility*":
     approvers:
       - 10gen/server-replication
+  - "catalog_raii*":
+    approvers:
+      - 10gen/server-catalog-and-routing
+  - "catalog_shard_feature_flag.idl":
+    approvers:
+      - 10gen/server-catalog-and-routing
+  - "cluster_role*":
+    approvers:
+      - 10gen/server-catalog-and-routing
+  - "coll_mod*":
+    approvers:
+      - 10gen/server-catalog-and-routing
+  - "collection_acquisition*":
+    approvers:
+      - 10gen/server-catalog-and-routing
+  - "collection_type*":
+    approvers:
+      - 10gen/server-catalog-and-routing
+  - "db_raii*":
+    approvers:
+      - 10gen/server-catalog-and-routing
+  - "direct_connection*":
+    approvers:
+      - 10gen/server-catalog-and-routing
+  - "*lock_manager*":
+    approvers:
+      - 10gen/server-catalog-and-routing
+  - "list*idl":
+    approvers:
+      - 10gen/server-catalog-and-routing
+  - "shard_id*":
+    approvers:
+      - 10gen/server-catalog-and-routing
+  - "shard_role*":
+    approvers:
+      - 10gen/server-catalog-and-routing
+  - "vector_clock*":
+    approvers:
+      - 10gen/server-catalog-and-routing

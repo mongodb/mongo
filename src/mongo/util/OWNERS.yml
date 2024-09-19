@@ -55,3 +55,6 @@ filters:
   - "log_and_backoff*":
     approvers:
       - 10gen/server-networking-and-observability
+  - "read_through_cache*":
+    approvers:
+      - 10gen/server-catalog-and-routing

@@ -16,6 +16,7 @@ filters:
   - "import*":
     approvers:
       - 10gen/server-storage-execution
+      - 10gen/server-catalog-and-routing
       - 10gen/server-rss-sydney
   - "index_build*":
     approvers:
@@ -48,5 +49,77 @@ filters:
     approvers:
       - 10gen/server-catalog-and-routing
   - "rename*":
+    approvers:
+      - 10gen/server-catalog-and-routing
+  - "backwards_compatible_collection_options*":
+    approvers:
+      - 10gen/server-catalog-and-routing
+  - "catalog*":
+    approvers:
+      - 10gen/server-catalog-and-routing
+  - "clustered_collection_options.idl":
+    approvers:
+      - 10gen/server-catalog-and-routing
+  - "coll_mod*":
+    approvers:
+      - 10gen/server-catalog-and-routing
+  - "collection.*":
+    approvers:
+      - 10gen/server-catalog-and-routing
+  - "collection_catalog*":
+    approvers:
+      - 10gen/server-catalog-and-routing
+  - "collection_impl*":
+    approvers:
+      - 10gen/server-catalog-and-routing
+  - "collection_mock.*":
+    approvers:
+      - 10gen/server-catalog-and-routing
+  - "collection_operation_source*":
+    approvers:
+      - 10gen/server-catalog-and-routing
+  - "collection_options*":
+    approvers:
+      - 10gen/server-catalog-and-routing
+  - "collection_test.cpp":
+    approvers:
+      - 10gen/server-catalog-and-routing
+  - "collection_uuid_mismatch*":
+    approvers:
+      - 10gen/server-catalog-and-routing
+  - "collection_writer_test.cpp":
+    approvers:
+      - 10gen/server-catalog-and-routing
+  - "collection_yield_restore*":
+    approvers:
+      - 10gen/server-catalog-and-routing
+  - "historical_catalogid_tracker*":
+    approvers:
+      - 10gen/server-catalog-and-routing
+  - "index_catalog*":
+    approvers:
+      - 10gen/server-catalog-and-routing
+  - "index_signature_test.cpp":
+    approvers:
+      - 10gen/server-catalog-and-routing
+  - "list_indexes*":
+    approvers:
+      - 10gen/server-catalog-and-routing
+  - "storage_engine_collection_options_flags_parser*":
+    approvers:
+      - 10gen/server-catalog-and-routing
+  - "uncommitted_catalog_updates*":
+    approvers:
+      - 10gen/server-catalog-and-routing
+  - "uncommitted_multikey*":
+    approvers:
+      - 10gen/server-catalog-and-routing
+  - "unique_collection_name*":
+    approvers:
+      - 10gen/server-catalog-and-routing
+  - "views_for_database.*":
+    approvers:
+      - 10gen/server-catalog-and-routing
+  - "virtual_collection*":
     approvers:
       - 10gen/server-catalog-and-routing

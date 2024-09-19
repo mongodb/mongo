@@ -86,3 +86,63 @@ filters:
   - "cluster_write_without_shard_key_cmd.cpp":
     approvers:
       - 10gen/query-execution
+  - "*balanc*":
+    approvers:
+      - 10gen/server-catalog-and-routing
+  - "cluster_clear_jumbo_flag_cmd.cpp":
+    approvers:
+      - 10gen/server-catalog-and-routing
+  - "cluster_db_stats_cmd.cpp":
+    approvers:
+      - 10gen/server-catalog-and-routing
+  - "cluster_is_db_grid_cmd.cpp":
+    approvers:
+      - 10gen/server-catalog-and-routing
+  - "cluster_move_collection_cmd.cpp":
+    approvers:
+      - 10gen/server-catalog-and-routing
+  - "cluster_move_primary_cmd.cpp":
+    approvers:
+      - 10gen/server-catalog-and-routing
+  - "cluster_rename_collection_cmd.cpp":
+    approvers:
+      - 10gen/server-catalog-and-routing
+  - "cluster_repair_sharded_collection_chunks_history_cmd.cpp":
+    approvers:
+      - 10gen/server-catalog-and-routing
+  - "cluster_rwc_defaults_commands.cpp":
+    approvers:
+      - 10gen/server-catalog-and-routing
+  - "cluster_set_cluster_parameter_cmd.cpp":
+    approvers:
+      - 10gen/server-catalog-and-routing
+  - "cluster_set_feature_compatibility_version_cmd.cpp":
+    approvers:
+      - 10gen/server-catalog-and-routing
+  - "cluster_set_user_write_block_mode_command.cpp":
+    approvers:
+      - 10gen/server-catalog-and-routing
+  - "*shard_collection*":
+    approvers:
+      - 10gen/server-catalog-and-routing
+  - "cluster_update_zone_key_range_cmd.cpp":
+    approvers:
+      - 10gen/server-catalog-and-routing
+  - "cluster_validate_db_metadata_cmd*":
+    approvers:
+      - 10gen/server-catalog-and-routing
+  - "flush_router_config_cmd.cpp":
+    approvers:
+      - 10gen/server-catalog-and-routing
+  - "get_shard_map_cmd.cpp":
+    approvers:
+      - 10gen/server-catalog-and-routing
+  - "refine_collection_shard_key.idl":
+    approvers:
+      - 10gen/server-catalog-and-routing
+  - "s_read_write_concern_defaults_server_status.cpp":
+    approvers:
+      - 10gen/server-catalog-and-routing
+  - "*shard_collection*":
+    approvers:
+      - 10gen/server-catalog-and-routing

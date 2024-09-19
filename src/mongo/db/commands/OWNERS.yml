@@ -80,3 +80,27 @@ filters:
   - "oplog*":
     approvers:
       - 10gen/server-replication
+  - "*cluster*parameter*":
+    approvers:
+      - 10gen/server-catalog-and-routing
+  - "drop_index*":
+    approvers:
+      - 10gen/server-catalog-and-routing
+  - "internal_rename*":
+    approvers:
+      - 10gen/server-catalog-and-routing
+  - "lock_info*":
+    approvers:
+      - 10gen/server-catalog-and-routing
+  - "notify_sharding_event*":
+    approvers:
+      - 10gen/server-catalog-and-routing
+  - "rwc_defaults*":
+    approvers:
+      - 10gen/server-catalog-and-routing
+  - "set_user_write_block_mode*":
+    approvers:
+      - 10gen/server-catalog-and-routing
+  - "validate_db_metadata*":
+    approvers:
+      - 10gen/server-catalog-and-routing

@@ -3,3 +3,9 @@ filters:
   - "shard_registry*":
     approvers:
       - 10gen/server-catalog-and-routing
+  - "config_shard_wrapper*":
+    approvers:
+      - 10gen/server-catalog-and-routing
+  - "num_hosts_targeted_metrics*":
+    approvers:
+      - 10gen/server-catalog-and-routing

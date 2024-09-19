@@ -194,3 +194,108 @@ filters:
   - "shardsvr_delete_global_index_key_command.cpp":
     approvers:
       - 10gen/server-catalog-and-routing
+  - "README.md":
+    approvers:
+      - 10gen/server-catalog-and-routing
+  - "README_balancer.md":
+    approvers:
+      - 10gen/server-catalog-and-routing
+  - "README_startup_and_shutdown.md":
+    approvers:
+      - 10gen/server-catalog-and-routing
+  - "README_timeseries.md":
+    approvers:
+      - 10gen/server-catalog-and-routing
+  - "README_versioning_protocols.md":
+    approvers:
+      - 10gen/server-catalog-and-routing
+  - "check_sharding_index_command.cpp":
+    approvers:
+      - 10gen/server-catalog-and-routing
+  - "chunk_manager_refresh_bm.cpp":
+    approvers:
+      - 10gen/server-catalog-and-routing
+  - "cleanup_structured*":
+    approvers:
+      - 10gen/server-catalog-and-routing
+      - 10gen/server-security
+  - "commit_chunk_migration.idl":
+    approvers:
+      - 10gen/server-catalog-and-routing
+  - "compact_structured*":
+    approvers:
+      - 10gen/server-catalog-and-routing
+      - 10gen/server-security
+  - "config_server_op_observer*":
+    approvers:
+      - 10gen/server-catalog-and-routing
+  - "get_sharding_ready_command.cpp":
+    approvers:
+      - 10gen/server-catalog-and-routing
+  - "migration_coordinator*":
+    approvers:
+      - 10gen/server-catalog-and-routing
+  - "migration_destination_manager.*":
+    approvers:
+      - 10gen/server-catalog-and-routing
+  - "migration_source_manager*":
+    approvers:
+      - 10gen/server-catalog-and-routing
+  - "migration_util*":
+    approvers:
+      - 10gen/server-catalog-and-routing
+  - "range_arithmetic*":
+    approvers:
+      - 10gen/server-catalog-and-routing
+  - "shard_identity_rollback*":
+    approvers:
+      - 10gen/server-catalog-and-routing
+  - "shard_key*util*":
+    approvers:
+      - 10gen/server-catalog-and-routing
+  - "shard_server_op_observer*":
+    approvers:
+      - 10gen/server-catalog-and-routing
+  - "shard_server_test_fixture*":
+    approvers:
+      - 10gen/server-catalog-and-routing
+  - "sharding_api_d_params.idl":
+    approvers:
+      - 10gen/server-catalog-and-routing
+  - "sharding_config_server_parameters.idl":
+    approvers:
+      - 10gen/server-catalog-and-routing
+  - "sharding_initialization*":
+    approvers:
+      - 10gen/server-catalog-and-routing
+  - "sharding_mongod_test_fixture*":
+    approvers:
+      - 10gen/server-catalog-and-routing
+  - "sharding_ready*":
+    approvers:
+      - 10gen/server-catalog-and-routing
+  - "sharding_state_command.cpp":
+    approvers:
+      - 10gen/server-catalog-and-routing
+  - "sharding_statistics*":
+    approvers:
+      - 10gen/server-catalog-and-routing
+  - "sharding_util*":
+    approvers:
+      - 10gen/server-catalog-and-routing
+  - "sharding_write_router*":
+    approvers:
+      - 10gen/server-catalog-and-routing
+  - "*structured_encryption_data_command*":
+    approvers:
+      - 10gen/server-catalog-and-routing
+      - 10gen/server-security
+  - "shardsvr_commit*":
+    approvers:
+      - 10gen/server-catalog-and-routing
+  - "*structured_encryption_data_command*":
+    approvers:
+      - 10gen/server-catalog-and-routing
+  - "shardsvr_notify_sharding_event_command.cpp":
+    approvers:
+      - 10gen/server-catalog-and-routing

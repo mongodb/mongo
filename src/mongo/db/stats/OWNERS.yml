@@ -3,6 +3,7 @@ filters:
   - "storage_stats*":
     approvers:
       - 10gen/server-storage-execution
+      - 10gen/server-catalog-and-routing
       - 10gen/server-rss-sydney
   - "counters*":
     approvers:
