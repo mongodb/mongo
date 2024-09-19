@@ -503,9 +503,6 @@ public:
     // be fulfilled.
     Milliseconds waitForWriteConcernDurationMillis{0};
 
-    // Stores the duration of time spent waiting in a queue for a ticket to be acquired.
-    Milliseconds waitForTicketDurationMillis{0};
-
     // Stores the duration of execution after removing time spent blocked.
     Milliseconds workingTimeMillis{0};
 
