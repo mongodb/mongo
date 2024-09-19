@@ -200,15 +200,18 @@ std::string RemoteCommandRequestImpl<T>::toString() const {
         out << "[{}]"_format(fmt::join(target, ", "));
     }
     out << " db:" << toStringForLogging(dbname);
+    out << " fireAndForget:" << options.fireAndForget;
 
     if (dateScheduled && timeout != kNoTimeout) {
         out << " expDate:" << (*dateScheduled + timeout).toString();
     }
 
     if (options.hedgeOptions.isHedgeEnabled) {
-        invariant(operationKey);
-        out << " options.hedgeCount: " << options.hedgeOptions.hedgeCount;
-        out << " operationKey: " << operationKey.value();
+        out << " options.hedgeCount:" << options.hedgeOptions.hedgeCount;
+    }
+
+    if (operationKey) {
+        out << " operationKey:" << *operationKey;
     }
 
     out << " cmd:" << cmdObj.toString();

@@ -53,7 +53,6 @@
 #include "mongo/db/auth/validated_tenancy_scope.h"
 #include "mongo/db/commands/server_status_metric.h"
 #include "mongo/db/connection_health_metrics_parameter_gen.h"
-#include "mongo/db/feature_flag.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/wire_version.h"
 #include "mongo/executor/connection_pool_tl.h"
@@ -615,15 +614,7 @@ void NetworkInterfaceTL::_unregisterCommand(const TaskExecutor::CallbackHandle& 
 
 void NetworkInterfaceTL::CommandStateBase::cancel() noexcept {
     LOGV2_DEBUG(4646301, 2, "Cancelling request", "requestId"_attr = request.id);
-
-    auto connToCancel = [this] {
-        stdx::lock_guard<Latch> lk(mutex);
-        return conn;
-    }();
-    if (auto clientPtr = getClient(connToCancel)) {
-        // If we have a client, cancel it
-        clientPtr->cancel(baton);
-    }
+    _cancelSource.cancel();
 }
 
 Status NetworkInterfaceTL::startCommand(const TaskExecutor::CallbackHandle& cbHandle,
@@ -738,7 +729,7 @@ Future<RemoteCommandResponse> NetworkInterfaceTL::CommandState::sendRequest() {
                    checked_cast<connection_pool_tl::TLConnection*>(conn.get())
                        ->getConnAcquiredTimer();
                return getClient(conn)->runCommandRequest(
-                   requestToSend, baton, std::move(connAcquiredTimer));
+                   requestToSend, baton, std::move(connAcquiredTimer), _cancelSource.token());
            })
         .then([this](RemoteCommandResponse response) {
             uassertStatusOK(doMetadataHook(RemoteCommandOnAnyResponse(request.target, response)));
@@ -972,7 +963,7 @@ Future<RemoteCommandResponse> NetworkInterfaceTL::ExhaustCommandState::sendReque
 
     setTimer();
     getClient(conn)
-        ->beginExhaustCommandRequest(request, baton)
+        ->beginExhaustCommandRequest(request, baton, _cancelSource.token())
         .thenRunOn(interface->_reactor)
         .getAsync([this](StatusWith<RemoteCommandResponse> swResponse) mutable {
             continueExhaustRequest(swResponse);
@@ -1040,7 +1031,7 @@ void NetworkInterfaceTL::ExhaustCommandState::continueExhaustRequest(
     setTimer();
 
     getClient(conn)
-        ->awaitExhaustCommand(baton)
+        ->awaitExhaustCommand(baton, _cancelSource.token())
         .thenRunOn(interface->_reactor)
         .getAsync([this](StatusWith<RemoteCommandResponse> swResponse) mutable {
             continueExhaustRequest(swResponse);

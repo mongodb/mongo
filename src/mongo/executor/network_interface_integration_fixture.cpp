@@ -141,12 +141,18 @@ Future<RemoteCommandResponse> NetworkInterfaceIntegrationFixture::runCommand(
 
     return net()
         .startCommand(cbHandle, rcroa)
-        .then([](TaskExecutor::ResponseOnAnyStatus roa) {
+        .then([rcroa](TaskExecutor::ResponseOnAnyStatus roa) {
             auto res = RemoteCommandResponse(roa);
             if (res.isOK()) {
-                LOGV2(4820500, "Got command result", "response"_attr = res.toString());
+                LOGV2(4820500,
+                      "Got command result",
+                      "request"_attr = rcroa.toString(),
+                      "response"_attr = res.toString());
             } else {
-                LOGV2(4820501, "Command failed", "error"_attr = res.status);
+                LOGV2(4820501,
+                      "Command failed",
+                      "request"_attr = rcroa.toString(),
+                      "error"_attr = res.status);
             }
             return res;
         })

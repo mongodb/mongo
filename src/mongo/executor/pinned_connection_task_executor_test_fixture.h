@@ -40,6 +40,7 @@
 #include "mongo/executor/thread_pool_task_executor_test_fixture.h"
 #include "mongo/rpc/op_msg_rpc_impls.h"
 #include "mongo/transport/mock_session.h"
+#include "mongo/transport/test_fixtures.h"
 #include "mongo/transport/transport_layer.h"
 #include "mongo/transport/transport_layer_mock.h"
 #include "mongo/unittest/unittest.h"
@@ -219,7 +220,11 @@ private:
                      PinnedConnectionTaskExecutorTest* fixture)
             : _fixture{fixture} {
             invariant(session);
-            _client = std::make_shared<AsyncDBClient>(std::move(hp), std::move(session), nullptr);
+            _client =
+                std::make_shared<AsyncDBClient>(std::move(hp),
+                                                std::move(session),
+                                                nullptr,
+                                                std::make_shared<transport::test::InlineReactor>());
         }
         ~LeasedStream() override {
             _fixture->_streamDestroyedCalls.fetchAndAdd(1);

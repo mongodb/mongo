@@ -116,6 +116,44 @@ private:
     JoinThread _thread;  // Appears after the members _run uses.
 };
 
+class InlineReactor : public Reactor {
+public:
+    void run() noexcept override {}
+    void stop() override {}
+
+    void runFor(Milliseconds time) noexcept override {
+        MONGO_UNREACHABLE;
+    }
+
+    void drain() override {
+        MONGO_UNREACHABLE;
+    }
+
+    void schedule(Task t) override {
+        t(Status::OK());
+    }
+
+    void dispatch(Task) override {
+        MONGO_UNREACHABLE;
+    }
+
+    bool onReactorThread() const override {
+        MONGO_UNREACHABLE;
+    }
+
+    std::unique_ptr<ReactorTimer> makeTimer() override {
+        MONGO_UNREACHABLE;
+    }
+
+    Date_t now() override {
+        MONGO_UNREACHABLE;
+    }
+
+    void appendStats(BSONObjBuilder&) const override {
+        MONGO_UNREACHABLE;
+    }
+};
+
 class NoopReactor : public Reactor {
 public:
     void run() noexcept override {}

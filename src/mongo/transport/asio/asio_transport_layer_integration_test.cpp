@@ -30,30 +30,40 @@
 
 #include <memory>
 
+#include "mongo/bson/bsonmisc.h"
 #include "mongo/client/async_client.h"
 #include "mongo/client/connection_string.h"
 #include "mongo/db/client.h"
+#include "mongo/db/database_name.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/service_context.h"
 #include "mongo/logv2/log.h"
+#include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/rpc/topology_version_gen.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/transport/asio/asio_transport_layer.h"
 #include "mongo/transport/session.h"
 #include "mongo/transport/transport_layer.h"
 #include "mongo/transport/transport_layer_manager.h"
+#include "mongo/unittest/assert.h"
 #include "mongo/unittest/framework.h"
 #include "mongo/unittest/integration_test.h"
 #include "mongo/unittest/log_test.h"
 #include "mongo/unittest/unittest.h"
+#include "mongo/util/cancellation.h"
+#include "mongo/util/duration.h"
 #include "mongo/util/fail_point.h"
+#include "mongo/util/future.h"
+#include "mongo/util/net/hostandport.h"
+#include "mongo/util/scopeguard.h"
 
 #include <asio.hpp>
+#include <boost/none.hpp>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
 
 
-namespace mongo {
+namespace mongo::transport {
 namespace {
 
 class AsioTransportLayerTest : public unittest::Test {
@@ -99,130 +109,222 @@ TEST_F(AsioTransportLayerTest, HTTPRequestGetsHTTPError) {
     ASSERT_EQ(ec, asio::error::eof);
 #endif
 }
+}  // namespace
 
-// This test forces reads and writes to occur one byte at a time, verifying SERVER-34506 (the
-// isJustForContinuation optimization works).
-//
-// Because of the file size limit, it's only an effective check on debug builds (where the future
-// implementation checks the length of the future chain).
-TEST_F(AsioTransportLayerTest, ShortReadsAndWritesWork) {
-    const auto assertOK = [](executor::RemoteCommandResponse reply) {
-        ASSERT_OK(reply.status);
-        ASSERT(reply.data["ok"]) << reply.data;
+class AsyncClientIntegrationTest : public AsioTransportLayerTest {
+public:
+    void setUp() override {
+        auto connectionString = unittest::getFixtureConnectionString();
+        auto server = connectionString.getServers().front();
+
+        auto sc = getGlobalServiceContext();
+        auto tl = sc->getTransportLayerManager()->getEgressLayer();
+        _reactor = tl->getReactor(transport::TransportLayer::kNewReactor);
+        _reactorThread = stdx::thread([&] {
+            _reactor->run();
+            _reactor->drain();
+        });
+    }
+
+    void tearDown() override {
+        _reactor->stop();
+        _reactorThread.join();
+    }
+
+    static BSONObj assertOK(executor::RemoteCommandResponse resp) {
+        ASSERT_OK(resp.status);
+        ASSERT_OK(getStatusFromCommandResult(resp.data));
+        return resp.data;
     };
 
-    auto connectionString = unittest::getFixtureConnectionString();
-    auto server = connectionString.getServers().front();
+    static HostAndPort getServer() {
+        return unittest::getFixtureConnectionString().getServers().front();
+    }
 
-    auto sc = getGlobalServiceContext();
-    auto reactor = sc->getTransportLayerManager()->getEgressLayer()->getReactor(
-        transport::TransportLayer::kNewReactor);
+    ServiceContext* getServiceContext() {
+        return getGlobalServiceContext();
+    }
 
-    stdx::thread thread([&] { reactor->run(); });
-    const ScopeGuard threadGuard([&] {
-        reactor->stop();
-        thread.join();
-    });
+    std::shared_ptr<Reactor> getReactor() {
+        return _reactor;
+    }
 
-    auto metrics = std::make_shared<ConnectionMetrics>(sc->getFastClockSource());
-    AsyncDBClient::Handle handle =
-        AsyncDBClient::connect(
-            server, transport::kGlobalSSLMode, sc, reactor, Milliseconds::max(), metrics)
-            .get();
+    std::shared_ptr<AsyncDBClient> makeClient() {
+        auto metrics =
+            std::make_shared<ConnectionMetrics>(getGlobalServiceContext()->getFastClockSource());
+        auto client = AsyncDBClient::connect(getServer(),
+                                             transport::kGlobalSSLMode,
+                                             getGlobalServiceContext(),
+                                             _reactor,
+                                             Milliseconds::max(),
+                                             metrics)
+                          .get();
+        client->initWireVersion(__FILE__, nullptr).get();
+        return client;
+    }
 
-    handle->initWireVersion(__FILE__, nullptr).get();
+    static executor::RemoteCommandRequest makeTestRequest(
+        DatabaseName dbName,
+        BSONObj cmdObj,
+        boost::optional<UUID> clientOperationKey = boost::none,
+        Milliseconds timeout = executor::RemoteCommandRequest::kNoTimeout) {
+        if (clientOperationKey) {
+            cmdObj = cmdObj.addField(
+                BSON(GenericArguments::kClientOperationKeyFieldName << *clientOperationKey)
+                    .firstElement());
+        }
+
+        return executor::RemoteCommandRequest(getServer(),
+                                              std::move(dbName),
+                                              std::move(cmdObj),
+                                              BSONObj(),
+                                              nullptr,
+                                              timeout,
+                                              {},
+                                              clientOperationKey);
+    }
+
+    executor::RemoteCommandRequest makeExhaustHello(
+        Milliseconds maxAwaitTime, boost::optional<UUID> clientOperationKey = boost::none) {
+        // Send a dummy topologyVersion because the mongod generates this and sends it to the client
+        // on the initial handshake.
+        auto helloCmd =
+            BSON("hello" << 1 << "maxAwaitTimeMS" << maxAwaitTime.count() << "topologyVersion"
+                         << TopologyVersion(OID::max(), 0).toBSON());
+        return makeTestRequest(DatabaseName::kAdmin, std::move(helloCmd), clientOperationKey);
+    }
+
+    class FailPointGuard {
+    public:
+        FailPointGuard(StringData fpName,
+                       std::shared_ptr<AsyncDBClient> client,
+                       int initalTimesEntered)
+            : _fpName(fpName),
+              _client(std::move(client)),
+              _initialTimesEntered(initalTimesEntered) {}
+
+        FailPointGuard(const FailPointGuard&) = delete;
+        FailPointGuard& operator=(const FailPointGuard&) = delete;
+
+        ~FailPointGuard() {
+            auto cmdObj = BSON("configureFailPoint" << _fpName << "mode"
+                                                    << "off");
+            assertOK(
+                _client->runCommandRequest(makeTestRequest(DatabaseName::kAdmin, cmdObj)).get());
+        }
+
+        void waitForTimesEntered(int count) {
+            auto cmdObj =
+                BSON("waitForFailPoint" << _fpName << "timesEntered" << _initialTimesEntered + count
+                                        << "maxTimeMS" << 30000);
+            assertOK(
+                _client->runCommandRequest(makeTestRequest(DatabaseName::kAdmin, cmdObj)).get());
+        }
+
+    private:
+        std::string _fpName;
+        std::shared_ptr<AsyncDBClient> _client;
+        int _initialTimesEntered;
+    };
+
+    FailPointGuard configureFailPoint(const std::shared_ptr<AsyncDBClient>& client,
+                                      StringData fp,
+                                      BSONObj data) {
+        auto configureFailPointRequest =
+            makeTestRequest(DatabaseName::kAdmin,
+                            BSON("configureFailPoint" << fp << "mode"
+                                                      << "alwaysOn"
+                                                      << "data" << data));
+        auto resp = assertOK(client->runCommandRequest(configureFailPointRequest).get());
+        return FailPointGuard(fp, client, resp.getField("count").Int());
+    }
+
+    FailPointGuard configureFailCommand(const std::shared_ptr<AsyncDBClient>& client,
+                                        StringData failCommand,
+                                        boost::optional<ErrorCodes::Error> errorCode = boost::none,
+                                        boost::optional<Milliseconds> blockTime = boost::none) {
+        auto data = BSON("failCommands" << BSON_ARRAY(failCommand));
+
+        if (errorCode) {
+            data = data.addField(BSON("errorCode" << *errorCode).firstElement());
+        }
+
+        if (blockTime) {
+            data = data.addFields(
+                BSON("blockConnection" << true << "blockTimeMS" << blockTime->count()));
+        }
+        return configureFailPoint(client, "failCommand", data);
+    }
+
+    void killOp(AsyncDBClient& client, UUID opKey) {
+        auto killOp =
+            makeTestRequest(DatabaseName::kAdmin,
+                            BSON("_killOperations" << 1 << "operationKeys" << BSON_ARRAY(opKey)));
+        assertOK(client.runCommandRequest(killOp).get());
+    }
+
+private:
+    ReactorHandle _reactor;
+    stdx::thread _reactorThread;
+};
+
+namespace {
+
+// This test forces reads and writes to occur one byte at a time, verifying SERVER-34506
+// (the isJustForContinuation optimization works).
+//
+// Because of the file size limit, it's only an effective check on debug builds (where the
+// future implementation checks the length of the future chain).
+TEST_F(AsyncClientIntegrationTest, ShortReadsAndWritesWork) {
+    auto dbClient = makeClient();
 
     FailPointEnableBlock fp("asioTransportLayerShortOpportunisticReadWrite");
 
-    const executor::RemoteCommandRequest ecr{server,
-                                             DatabaseName::kAdmin,
-                                             BSON("echo" << std::string(1 << 10, 'x')),
-                                             BSONObj(),
-                                             nullptr};
+    auto req = makeTestRequest(DatabaseName::kAdmin, BSON("ping" << 1));
+    assertOK(dbClient->runCommandRequest(req).get());
 
-    assertOK(handle->runCommandRequest(ecr).get());
-
-    auto client = sc->getService()->makeClient(__FILE__);
+    auto client = getGlobalServiceContext()->getService()->makeClient(__FILE__);
     auto opCtx = client->makeOperationContext();
 
-    handle->runCommandRequest(ecr, opCtx->getBaton()).get(opCtx.get());
+    assertOK(dbClient->runCommandRequest(req, opCtx->getBaton()).get(opCtx.get()));
 }
 
-TEST_F(AsioTransportLayerTest, asyncConnectTimeoutCleansUpSocket) {
-    auto connectionString = unittest::getFixtureConnectionString();
-    auto server = connectionString.getServers().front();
-
-    auto sc = getGlobalServiceContext();
-    auto reactor = sc->getTransportLayerManager()->getEgressLayer()->getReactor(
-        transport::TransportLayer::kNewReactor);
-
-    stdx::thread thread([&] { reactor->run(); });
-
-    const ScopeGuard threadGuard([&] {
-        reactor->stop();
-        thread.join();
-    });
-
+TEST_F(AsyncClientIntegrationTest, AsyncConnectTimeoutCleansUpSocket) {
     FailPointEnableBlock fp("asioTransportLayerAsyncConnectTimesOut");
-    auto metrics = std::make_shared<ConnectionMetrics>(sc->getFastClockSource());
-    auto client = AsyncDBClient::connect(
-                      server, transport::kGlobalSSLMode, sc, reactor, Milliseconds{500}, metrics)
+    auto metrics = std::make_shared<ConnectionMetrics>(getServiceContext()->getFastClockSource());
+    auto client = AsyncDBClient::connect(getServer(),
+                                         transport::kGlobalSSLMode,
+                                         getServiceContext(),
+                                         getReactor(),
+                                         Milliseconds{500},
+                                         metrics)
                       .getNoThrow();
     ASSERT_EQ(client.getStatus(), ErrorCodes::NetworkTimeout);
 }
 
-TEST_F(AsioTransportLayerTest, exhaustIsMasterShouldReceiveMultipleReplies) {
-    auto connectionString = unittest::getFixtureConnectionString();
-    auto server = connectionString.getServers().front();
+TEST_F(AsyncClientIntegrationTest, ExhaustHelloShouldReceiveMultipleReplies) {
+    auto client = makeClient();
 
-    auto sc = getGlobalServiceContext();
-    auto reactor = sc->getTransportLayerManager()->getEgressLayer()->getReactor(
-        transport::TransportLayer::kNewReactor);
-
-    stdx::thread thread([&] { reactor->run(); });
-    const ScopeGuard threadGuard([&] {
-        reactor->stop();
-        thread.join();
-    });
-
-    auto metrics = std::make_shared<ConnectionMetrics>(sc->getFastClockSource());
-    AsyncDBClient::Handle handle =
-        AsyncDBClient::connect(
-            server, transport::kGlobalSSLMode, sc, reactor, Milliseconds::max(), metrics)
-            .get();
-
-    handle->initWireVersion(__FILE__, nullptr).get();
-
-    // Send a dummy topologyVersion because the mongod generates this and sends it to the client on
-    // the initial handshake.
-    auto isMasterRequest = executor::RemoteCommandRequest{
-        server,
-        DatabaseName::kAdmin,
-        BSON("isMaster" << 1 << "maxAwaitTimeMS" << 1000 << "topologyVersion"
-                        << TopologyVersion(OID::max(), 0).toBSON()),
-        BSONObj(),
-        nullptr};
+    auto req = makeExhaustHello(Milliseconds(100));
 
     Future<executor::RemoteCommandResponse> beginExhaustFuture =
-        handle->beginExhaustCommandRequest(isMasterRequest);
+        client->beginExhaustCommandRequest(req);
 
     Date_t prevTime;
     TopologyVersion topologyVersion;
     {
         auto reply = beginExhaustFuture.get();
-
-        ASSERT_OK(reply.status);
         ASSERT(reply.moreToCome);
+        assertOK(reply);
         prevTime = reply.data.getField("localTime").Date();
         topologyVersion = TopologyVersion::parse(IDLParserContext("TopologyVersion"),
                                                  reply.data.getField("topologyVersion").Obj());
     }
 
-    Future<executor::RemoteCommandResponse> awaitExhaustFuture = handle->awaitExhaustCommand();
+    Future<executor::RemoteCommandResponse> awaitExhaustFuture = client->awaitExhaustCommand();
     {
         auto reply = awaitExhaustFuture.get();
-
-        ASSERT_OK(reply.status);
+        assertOK(reply);
         ASSERT(reply.moreToCome);
         auto replyTime = reply.data.getField("localTime").Date();
         ASSERT_GT(replyTime, prevTime);
@@ -233,17 +335,17 @@ TEST_F(AsioTransportLayerTest, exhaustIsMasterShouldReceiveMultipleReplies) {
         ASSERT_EQ(replyTopologyVersion.getCounter(), topologyVersion.getCounter());
     }
 
-    Future<executor::RemoteCommandResponse> cancelExhaustFuture = handle->awaitExhaustCommand();
+    Future<executor::RemoteCommandResponse> cancelExhaustFuture = client->awaitExhaustCommand();
     {
-        handle->cancel();
-        handle->end();
+        client->cancel();
+        client->end();
         auto swReply = cancelExhaustFuture.getNoThrow();
 
-        // The original isMaster request has maxAwaitTimeMs = 1000 ms, if the cancel executes before
-        // the 1000ms then we expect the future to resolve with an error. It should resolve with
-        // CallbackCanceled unless the socket is already closed, in which case it will resolve with
-        // HostUnreachable. If the network is slow, the server may response before the cancel
-        // executes however.
+        // The original hello request has maxAwaitTimeMs = 1000 ms, if the cancel executes
+        // before the 1000ms then we expect the future to resolve with an error. It should
+        // resolve with CallbackCanceled unless the socket is already closed, in which case
+        // it will resolve with HostUnreachable. If the network is slow, the server may
+        // response before the cancel executes however.
         if (!swReply.getStatus().isOK()) {
             ASSERT((swReply.getStatus() == ErrorCodes::CallbackCanceled) ||
                    (swReply.getStatus() == ErrorCodes::HostUnreachable));
@@ -251,87 +353,225 @@ TEST_F(AsioTransportLayerTest, exhaustIsMasterShouldReceiveMultipleReplies) {
     }
 }
 
-TEST_F(AsioTransportLayerTest, exhaustIsMasterShouldStopOnFailure) {
-    const auto assertOK = [](executor::RemoteCommandResponse reply) {
-        ASSERT_OK(reply.status);
-        ASSERT(reply.data["ok"]) << reply.data;
-    };
+TEST_F(AsyncClientIntegrationTest, ExhaustHelloShouldStopOnFailure) {
+    auto client = makeClient();
+    auto fpClient = makeClient();
 
-    auto connectionString = unittest::getFixtureConnectionString();
-    auto server = connectionString.getServers().front();
+    // Turn on the failCommand fail point for hello
+    auto fpGuard = configureFailCommand(fpClient, "hello", ErrorCodes::CommandFailed);
 
-    auto sc = getGlobalServiceContext();
-    auto reactor = sc->getTransportLayerManager()->getEgressLayer()->getReactor(
-        transport::TransportLayer::kNewReactor);
+    auto helloReq = makeExhaustHello(Seconds(1));
 
-    stdx::thread thread([&] { reactor->run(); });
-    const ScopeGuard threadGuard([&] {
-        reactor->stop();
-        thread.join();
+    auto resp = client->beginExhaustCommandRequest(helloReq).get();
+    ASSERT_OK(resp.status);
+    ASSERT(!resp.moreToCome);
+    ASSERT_EQ(getStatusFromCommandResult(resp.data), ErrorCodes::CommandFailed);
+}
+
+TEST_F(AsyncClientIntegrationTest, RunCommandRequest) {
+    auto client = makeClient();
+    auto req = makeTestRequest(DatabaseName::kAdmin, BSON("echo" << std::string(1 << 10, 'x')));
+    assertOK(client->runCommandRequest(req).get());
+}
+
+TEST_F(AsyncClientIntegrationTest, RunCommandRequestCancel) {
+    auto client = makeClient();
+    auto fpClient = makeClient();
+    CancellationSource cancelSource;
+
+    auto fpGuard = configureFailCommand(fpClient, "echo", boost::none, Milliseconds(60000));
+
+    UUID operationKey = UUID::gen();
+    auto req = makeTestRequest(DatabaseName::kAdmin,
+                               BSON("echo"
+                                    << "RunCommandRequestCancel"),
+                               operationKey);
+    auto runCommandFuture = client->runCommandRequest(req, nullptr, nullptr, cancelSource.token());
+    ON_BLOCK_EXIT([&] { killOp(*fpClient, operationKey); });
+
+    fpGuard.waitForTimesEntered(1);
+
+    cancelSource.cancel();
+    ASSERT_EQ(runCommandFuture.getNoThrow(), ErrorCodes::CallbackCanceled);
+}
+
+TEST_F(AsyncClientIntegrationTest, RunCommandRequestCancelBaton) {
+    auto fpClient = makeClient();
+    CancellationSource cancelSource;
+
+    auto fpGuard = configureFailCommand(fpClient, "ping", boost::none, Milliseconds(60000));
+
+    auto pf = makePromiseFuture<executor::RemoteCommandResponse>();
+    auto cmdThread = stdx::thread([&] {
+        // Limit dbClient's scope to this thread to test the cancellation callback outliving
+        // the caller's client.
+        auto dbClient = makeClient();
+        auto client = getGlobalServiceContext()->getService()->makeClient(__FILE__);
+        auto opCtx = client->makeOperationContext();
+
+        auto opKey = UUID::gen();
+        auto req = makeTestRequest(DatabaseName::kAdmin, BSON("ping" << 1), opKey);
+        auto fut =
+            dbClient->runCommandRequest(req, opCtx->getBaton(), nullptr, cancelSource.token());
+        ON_BLOCK_EXIT([&]() { killOp(*fpClient, opKey); });
+
+        opCtx->setDeadlineAfterNowBy(Seconds(30), ErrorCodes::ExceededTimeLimit);
+        pf.promise.setFrom(fut.getNoThrow(opCtx.get()));
     });
 
-    auto masterMetrics = std::make_shared<ConnectionMetrics>(sc->getFastClockSource());
-    AsyncDBClient::Handle isMasterHandle =
-        AsyncDBClient::connect(
-            server, transport::kGlobalSSLMode, sc, reactor, Milliseconds::max(), masterMetrics)
-            .get();
-    isMasterHandle->initWireVersion(__FILE__, nullptr).get();
+    fpGuard.waitForTimesEntered(1);
+    cancelSource.cancel();
 
-    auto failpointMetrics = std::make_shared<ConnectionMetrics>(sc->getFastClockSource());
-    AsyncDBClient::Handle failpointHandle =
-        AsyncDBClient::connect(
-            server, transport::kGlobalSSLMode, sc, reactor, Milliseconds::max(), failpointMetrics)
-            .get();
-    failpointHandle->initWireVersion(__FILE__, nullptr).get();
+    ASSERT_EQ(pf.future.getNoThrow(), ErrorCodes::CallbackCanceled);
+    cmdThread.join();
+}
 
-    // Turn on the failCommand fail point for isMaster
-    auto configureFailPointRequest =
-        executor::RemoteCommandRequest{
-            server,
-            DatabaseName::kAdmin,
-            BSON("configureFailPoint"
-                 << "failCommand"
-                 << "mode"
-                 << "alwaysOn"
-                 << "data"
-                 << BSON("errorCode" << ErrorCodes::CommandFailed << "failCommands"
-                                     << BSON_ARRAY("isMaster"))),
-            BSONObj(),
-            nullptr};
-    assertOK(failpointHandle->runCommandRequest(configureFailPointRequest).get());
+TEST_F(AsyncClientIntegrationTest, RunCommandRequestCancelEarly) {
+    auto client = makeClient();
+    CancellationSource cancelSource;
 
-    ON_BLOCK_EXIT([&] {
-        auto stopFpRequest = executor::RemoteCommandRequest{server,
-                                                            DatabaseName::kAdmin,
-                                                            BSON("configureFailPoint"
-                                                                 << "failCommand"
-                                                                 << "mode"
-                                                                 << "off"),
-                                                            BSONObj(),
-                                                            nullptr};
-        assertOK(failpointHandle->runCommandRequest(stopFpRequest).get());
+    cancelSource.cancel();
+
+    auto req = makeTestRequest(DatabaseName::kAdmin,
+                               BSON("echo"
+                                    << "RunCommandRequestCancelEarly"));
+    auto fut = client->runCommandRequest(req, nullptr, nullptr, cancelSource.token());
+    ASSERT(fut.isReady());
+    ASSERT_EQ(fut.getNoThrow(), ErrorCodes::CallbackCanceled);
+}
+
+TEST_F(AsyncClientIntegrationTest, RunCommandRequestCancelSourceDismissed) {
+    auto client = makeClient();
+    auto fpClient = makeClient();
+    auto cancelSource = boost::make_optional(CancellationSource());
+
+    auto fpGuard = configureFailCommand(fpClient, "echo", boost::none, Milliseconds(1000));
+
+    auto req = makeTestRequest(DatabaseName::kAdmin,
+                               BSON("echo"
+                                    << "RunCommandRequestCancelSourceDismissed"));
+
+    auto runCommandFuture = client->runCommandRequest(req, nullptr, nullptr, cancelSource->token());
+    cancelSource.reset();
+    assertOK(runCommandFuture.get());
+}
+
+// Tests that cancellation doesn't "miss" if it happens to occur between sending a command
+// request and reading its response.
+TEST_F(AsyncClientIntegrationTest, RunCommandCancelBetweenSendAndRead) {
+    auto client = makeClient();
+    CancellationSource cancelSource;
+
+    boost::optional<FailPointEnableBlock> fpb("hangBeforeReadResponse");
+
+    auto pf = makePromiseFuture<executor::RemoteCommandResponse>();
+    auto commandThread = stdx::thread([&] {
+        // Run runCommandRequest in a separate thread in case hanging on the failpoint
+        // happens to run on the current thread due to the sending future being immediately
+        // available.
+        auto req = makeTestRequest(DatabaseName::kAdmin, BSON("ping" << 1));
+        pf.promise.setFrom(client->runCommandRequest(req, nullptr, nullptr, cancelSource.token()));
     });
 
-    // Send a dummy topologyVersion because the mongod generates this and sends it to the client on
-    // the initial handshake.
-    auto isMasterRequest = executor::RemoteCommandRequest{
-        server,
-        DatabaseName::kAdmin,
-        BSON("isMaster" << 1 << "maxAwaitTimeMS" << 1000 << "topologyVersion"
-                        << TopologyVersion(OID::max(), 0).toBSON()),
-        BSONObj(),
-        nullptr};
+    fpb.get()->waitForTimesEntered(fpb->initialTimesEntered() + 1);
+    cancelSource.cancel();
+    fpb.reset();
 
-    Future<executor::RemoteCommandResponse> beginExhaustFuture =
-        isMasterHandle->beginExhaustCommandRequest(isMasterRequest);
-    {
-        auto reply = beginExhaustFuture.get();
+    ASSERT_EQ(pf.future.getNoThrow(), ErrorCodes::CallbackCanceled);
+    commandThread.join();
+}
 
-        ASSERT_OK(reply.status);
-        ASSERT_EQ(reply.data["ok"].Double(), 0.0);
-        ASSERT(!reply.moreToCome);
+TEST_F(AsyncClientIntegrationTest, ExhaustCommand) {
+    auto client = makeClient();
+    auto opKey = UUID::gen();
+
+    auto helloReq = makeExhaustHello(Milliseconds(100), opKey);
+    assertOK(client->beginExhaustCommandRequest(helloReq).get());
+
+    for (auto i = 0; i < 3; i++) {
+        assertOK(client->awaitExhaustCommand().get());
     }
+
+    auto killOpClient = makeClient();
+    killOp(*killOpClient, opKey);
+
+    auto now = getGlobalServiceContext()->getFastClockSource()->now();
+    for (auto deadline = now + Seconds(30); now < deadline;
+         now = getGlobalServiceContext()->getFastClockSource()->now()) {
+        auto finalResp = client->awaitExhaustCommand().get();
+        ASSERT_OK(finalResp.status);
+        if (getStatusFromCommandResult(finalResp.data).code() == ErrorCodes::Interrupted) {
+            break;
+        }
+    }
+
+    assertOK(
+        client->runCommandRequest(makeTestRequest(DatabaseName::kAdmin, BSON("ping" << 1))).get());
+}
+
+TEST_F(AsyncClientIntegrationTest, BeginExhaustCommandRequestCancel) {
+    auto client = makeClient();
+    auto fpClient = makeClient();
+    CancellationSource cancelSource;
+
+    auto fpGuard = configureFailCommand(fpClient, "hello", boost::none, Milliseconds(60000));
+
+    UUID operationKey = UUID::gen();
+    auto helloReq = makeExhaustHello(Milliseconds(100), operationKey);
+    auto beginExhaustFuture =
+        client->beginExhaustCommandRequest(helloReq, nullptr, cancelSource.token());
+    ON_BLOCK_EXIT([&]() { killOp(*fpClient, operationKey); });
+
+    fpGuard.waitForTimesEntered(1);
+    cancelSource.cancel();
+    ASSERT_EQ(beginExhaustFuture.getNoThrow(), ErrorCodes::CallbackCanceled);
+}
+
+TEST_F(AsyncClientIntegrationTest, BeginExhaustCommandCancelEarly) {
+    auto client = makeClient();
+    CancellationSource cancelSource;
+    cancelSource.cancel();
+
+    auto beginExhaustFuture = client->beginExhaustCommandRequest(
+        makeExhaustHello(Milliseconds(100)), nullptr, cancelSource.token());
+    ASSERT(beginExhaustFuture.isReady());
+    ASSERT_EQ(beginExhaustFuture.getNoThrow(), ErrorCodes::CallbackCanceled);
+}
+
+TEST_F(AsyncClientIntegrationTest, AwaitExhaustCommandCancel) {
+    auto client = makeClient();
+    CancellationSource cancelSource;
+
+    // Use long maxAwaitTimeMS.
+    auto helloReq = makeExhaustHello(Milliseconds(30000));
+    Future<executor::RemoteCommandResponse> beginExhaustFuture =
+        client->beginExhaustCommandRequest(helloReq, nullptr, cancelSource.token());
+
+    // The first response should come in quickly.
+    assertOK(beginExhaustFuture.get());
+
+    // The second response will take maxAwaitTimeMS.
+    Future<executor::RemoteCommandResponse> awaitExhaustFuture =
+        client->awaitExhaustCommand(nullptr, cancelSource.token());
+    cancelSource.cancel();
+    ASSERT_EQ(awaitExhaustFuture.getNoThrow(), ErrorCodes::CallbackCanceled);
+}
+
+TEST_F(AsyncClientIntegrationTest, AwaitExhaustCommandCancelEarly) {
+    auto client = makeClient();
+    CancellationSource cancelSource;
+
+    auto helloReq = makeExhaustHello(Milliseconds(100));
+    Future<executor::RemoteCommandResponse> beginExhaustFuture =
+        client->beginExhaustCommandRequest(helloReq, nullptr, cancelSource.token());
+    assertOK(beginExhaustFuture.get());
+
+    cancelSource.cancel();
+    Future<executor::RemoteCommandResponse> awaitExhaustFuture =
+        client->awaitExhaustCommand(nullptr, cancelSource.token());
+    ASSERT(awaitExhaustFuture.isReady());
+    ASSERT_EQ(awaitExhaustFuture.getNoThrow(), ErrorCodes::CallbackCanceled);
 }
 
 }  // namespace
-}  // namespace mongo
+}  // namespace mongo::transport

@@ -72,8 +72,8 @@
 #include "mongo/rpc/reply_interface.h"
 #include "mongo/transport/transport_layer_manager.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/clock_source.h"
 #include "mongo/util/fail_point.h"
-#include "mongo/util/future_impl.h"
 #include "mongo/util/net/socket_utils.h"
 #include "mongo/util/net/ssl_manager.h"
 #include "mongo/util/net/ssl_peer_info.h"
@@ -86,6 +86,7 @@
 
 namespace mongo {
 MONGO_FAIL_POINT_DEFINE(pauseBeforeMarkKeepOpen);
+MONGO_FAIL_POINT_DEFINE(hangBeforeReadResponse);
 MONGO_FAIL_POINT_DEFINE(alwaysLogConnAcquisitionToWireTime)
 
 namespace {
@@ -109,8 +110,8 @@ Future<AsyncDBClient::Handle> AsyncDBClient::connect(
                        timeout,
                        std::move(connectionMetrics),
                        std::move(transientSSLContext))
-        .then([peer, context](std::shared_ptr<transport::Session> session) {
-            return std::make_shared<AsyncDBClient>(peer, std::move(session), context);
+        .then([peer, context, reactor](std::shared_ptr<transport::Session> session) {
+            return std::make_shared<AsyncDBClient>(peer, std::move(session), context, reactor);
         });
 }
 
@@ -285,7 +286,10 @@ Future<void> AsyncDBClient::initWireVersion(const std::string& appName,
         });
 }
 
-Future<void> AsyncDBClient::_call(Message request, int32_t msgId, const BatonHandle& baton) {
+Future<void> AsyncDBClient::_call(Message request,
+                                  int32_t msgId,
+                                  const BatonHandle& baton,
+                                  const CancellationToken& token) {
     auto swm = _compressorManager.compressMessage(request);
     if (!swm.isOK()) {
         return swm.getStatus();
@@ -302,13 +306,16 @@ Future<void> AsyncDBClient::_call(Message request, int32_t msgId, const BatonHan
     OpMsg::appendChecksum(&request);
 #endif
 
-    return _session->asyncSinkMessage(request, baton);
+    return _withCancellation<void>(
+        baton, token, [&] { return _session->asyncSinkMessage(request, baton); });
 }
 
 Future<Message> AsyncDBClient::_waitForResponse(boost::optional<int32_t> msgId,
-                                                const BatonHandle& baton) {
-    return _session->asyncSourceMessage(baton).then(
-        [this, msgId](Message response) -> StatusWith<Message> {
+                                                const BatonHandle& baton,
+                                                const CancellationToken& token) {
+    return _withCancellation<Message>(
+               baton, token, [&] { return _session->asyncSourceMessage(baton); })
+        .then([this, msgId](Message response) -> StatusWith<Message> {
             uassert(50787,
                     "ResponseId did not match sent message ID.",
                     msgId ? response.header().getResponseToMsgId() == msgId : true);
@@ -323,13 +330,15 @@ Future<Message> AsyncDBClient::_waitForResponse(boost::optional<int32_t> msgId,
 Future<rpc::UniqueReply> AsyncDBClient::runCommand(OpMsgRequest request,
                                                    const BatonHandle& baton,
                                                    bool fireAndForget,
-                                                   std::shared_ptr<Timer> fromConnAcquiredTimer) {
+                                                   std::shared_ptr<Timer> fromConnAcquiredTimer,
+                                                   const CancellationToken& token) {
     auto requestMsg = request.serialize();
     if (fireAndForget) {
         OpMsg::setFlag(&requestMsg, OpMsg::kMoreToCome);
     }
     auto msgId = nextMessageId();
-    auto future = _call(std::move(requestMsg), msgId, baton);
+    auto future = _call(std::move(requestMsg), msgId, baton, token);
+
     auto logMetrics = [this, fromConnAcquiredTimerInner = std::move(fromConnAcquiredTimer)] {
         if (fromConnAcquiredTimerInner) {
             const auto timeElapsedMicros =
@@ -353,8 +362,9 @@ Future<rpc::UniqueReply> AsyncDBClient::runCommand(OpMsgRequest request,
         }
     };
 
+    Future<Message> responseFuture;
     if (fireAndForget) {
-        return std::move(future).then([msgId, logMetrics, this]() -> Future<rpc::UniqueReply> {
+        responseFuture = std::move(future).then([msgId, logMetrics, this]() mutable {
             logMetrics();
             // Return a mock status OK response since we do not expect a real response.
             OpMsgBuilder builder;
@@ -362,38 +372,45 @@ Future<rpc::UniqueReply> AsyncDBClient::runCommand(OpMsgRequest request,
             Message responseMsg = builder.finish();
             responseMsg.header().setResponseToMsgId(msgId);
             responseMsg.header().setId(msgId);
-            return rpc::UniqueReply(responseMsg, rpc::makeReply(&responseMsg));
+            return responseMsg;
+        });
+    } else {
+        responseFuture = std::move(future).then([msgId, logMetrics, baton, token, this]() {
+            hangBeforeReadResponse.pauseWhileSet();
+            logMetrics();
+            return _waitForResponse(msgId, baton, token);
         });
     }
 
-    return std::move(future)
-        .then([msgId, logMetrics, baton, this]() {
-            logMetrics();
-            return _waitForResponse(msgId, baton);
-        })
-        .then([this](Message response) -> Future<rpc::UniqueReply> {
-            return rpc::UniqueReply(response, rpc::makeReply(&response));
-        });
+    return std::move(responseFuture).then([this](Message response) mutable {
+        return rpc::UniqueReply(response, rpc::makeReply(&response));
+    });
 }
 
 Future<executor::RemoteCommandResponse> AsyncDBClient::runCommandRequest(
     executor::RemoteCommandRequest request,
     const BatonHandle& baton,
-    std::shared_ptr<Timer> fromConnAcquiredTimer) {
+    std::shared_ptr<Timer> fromConnAcquiredTimer,
+    const CancellationToken& token) {
     auto startTimer = Timer();
     auto opMsgRequest = static_cast<OpMsgRequest>(request);
+
     return runCommand(std::move(opMsgRequest),
                       baton,
                       request.options.fireAndForget,
-                      std::move(fromConnAcquiredTimer))
+                      std::move(fromConnAcquiredTimer),
+                      token)
         .then([this, startTimer = std::move(startTimer)](rpc::UniqueReply response) {
             return executor::RemoteCommandResponse(*response, startTimer.elapsed());
         });
 }
 
 Future<executor::RemoteCommandResponse> AsyncDBClient::_continueReceiveExhaustResponse(
-    ClockSource::StopWatch stopwatch, boost::optional<int32_t> msgId, const BatonHandle& baton) {
-    return _waitForResponse(msgId, baton)
+    ClockSource::StopWatch stopwatch,
+    boost::optional<int32_t> msgId,
+    const BatonHandle& baton,
+    const CancellationToken& token) {
+    return _waitForResponse(msgId, baton, token)
         .then([stopwatch, msgId, baton, this](Message responseMsg) mutable {
             bool isMoreToComeSet = OpMsg::isFlagSet(responseMsg, OpMsg::kMoreToCome);
             rpc::UniqueReply response = rpc::UniqueReply(responseMsg, rpc::makeReply(&responseMsg));
@@ -404,26 +421,28 @@ Future<executor::RemoteCommandResponse> AsyncDBClient::_continueReceiveExhaustRe
 }
 
 Future<executor::RemoteCommandResponse> AsyncDBClient::awaitExhaustCommand(
-    const BatonHandle& baton) {
-    return _continueReceiveExhaustResponse(ClockSource::StopWatch(), boost::none, baton);
+    const BatonHandle& baton, const CancellationToken& token) {
+    return _continueReceiveExhaustResponse(ClockSource::StopWatch(), boost::none, baton, token);
 }
 
-Future<executor::RemoteCommandResponse> AsyncDBClient::runExhaustCommand(OpMsgRequest request,
-                                                                         const BatonHandle& baton) {
+Future<executor::RemoteCommandResponse> AsyncDBClient::runExhaustCommand(
+    OpMsgRequest request, const BatonHandle& baton, const CancellationToken& token) {
     auto requestMsg = request.serialize();
     OpMsg::setFlag(&requestMsg, OpMsg::kExhaustSupported);
-
     auto msgId = nextMessageId();
-    return _call(std::move(requestMsg), msgId, baton).then([msgId, baton, this]() mutable {
-        return _continueReceiveExhaustResponse(ClockSource::StopWatch(), msgId, baton);
-    });
+
+    return _call(std::move(requestMsg), msgId, baton, token)
+        .then([msgId, baton, this, token]() mutable {
+            return _continueReceiveExhaustResponse(ClockSource::StopWatch(), msgId, baton, token);
+        });
 }
 
 Future<executor::RemoteCommandResponse> AsyncDBClient::beginExhaustCommandRequest(
-    executor::RemoteCommandRequest request, const BatonHandle& baton) {
+    executor::RemoteCommandRequest request,
+    const BatonHandle& baton,
+    const CancellationToken& token) {
     auto opMsgRequest = static_cast<OpMsgRequest>(request);
-
-    return runExhaustCommand(std::move(opMsgRequest), baton);
+    return runExhaustCommand(std::move(opMsgRequest), baton, token);
 }
 
 void AsyncDBClient::cancel(const BatonHandle& baton) {

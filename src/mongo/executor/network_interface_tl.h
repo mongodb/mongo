@@ -261,6 +261,8 @@ private:
 
         // Synchronizes requestToSend, conn, and weakConn.
         Mutex mutex = MONGO_MAKE_LATCH("NetworkInterfaceTL::CommandStateBase::mutex");
+
+        CancellationSource _cancelSource;
     };
 
     struct CommandState final : public CommandStateBase {
