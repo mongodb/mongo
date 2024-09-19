@@ -442,6 +442,11 @@ export class QuerySettingsIndexHintsTests {
                 winningStagesWithoutQuerySettings,
                 "Expected the query without query settings and the one with settings to have " +
                     "identical plan stages.");
+            assert.eq(
+                explainWithQuerySettings.pipeline,
+                explainWithoutQuerySettings.pipeline,
+                "Expected the query without query settings and the one with settings to have " +
+                    "identical pipelines.");
             this.assertQuerySettingsInCacheForCommand(query, settings);
         });
     }

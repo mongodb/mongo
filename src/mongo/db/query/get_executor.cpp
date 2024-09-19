@@ -1357,14 +1357,6 @@ bool shouldUseRegularSbe(OperationContext* opCtx, const CanonicalQuery& cq, cons
     return cq.getExpCtx()->sbeCompatibility >= minRequiredCompatibility;
 }
 
-bool shouldAttemptSBE(const CanonicalQuery* canonicalQuery) {
-    if (!canonicalQuery->isSbeCompatible()) {
-        return false;
-    }
-
-    return !canonicalQuery->getExpCtx()->getQueryKnobConfiguration().isForceClassicEngineEnabled();
-}
-
 boost::optional<ScopedCollectionFilter> getScopedCollectionFilter(
     OperationContext* opCtx,
     const MultipleCollectionAccessor& collections,
@@ -1377,39 +1369,6 @@ boost::optional<ScopedCollectionFilter> getScopedCollectionFilter(
         return collFilter;
     }
     return boost::none;
-}
-
-using PlanExecutorSbeParams = std::pair<std::unique_ptr<PlanYieldPolicySBE>, bool>;
-boost::optional<PlanExecutorSbeParams> tryGetSbeParams(
-    OperationContext* opCtx,
-    CanonicalQuery* canonicalQuery,
-    const MultipleCollectionAccessor& collections,
-    PlanYieldPolicy::YieldPolicy yieldPolicy,
-    Pipeline* pipeline,
-    bool needsMerge) {
-    if (!shouldAttemptSBE(canonicalQuery)) {
-        return boost::none;
-    }
-
-    // Add the stages that are candidates for SBE lowering from the 'pipeline' into the
-    // 'canonicalQuery'. This must be done _before_ checking shouldUseRegularSbe() or
-    // creating SlotBasedPrepareExecutionHelper because both inspect the pipeline on the
-    // canonical query.
-    attachPipelineStages(collections, pipeline, needsMerge, canonicalQuery);
-
-    const auto fcvSnapshot = serverGlobalParams.featureCompatibility.acquireFCVSnapshot();
-    const bool sbeFull = feature_flags::gFeatureFlagSbeFull.isEnabled(fcvSnapshot);
-    const bool canUseRegularSbe = shouldUseRegularSbe(opCtx, *canonicalQuery, sbeFull);
-    const bool canUseSbe = canUseRegularSbe || sbeFull;
-    if (!canUseSbe) {
-        return boost::none;
-    }
-
-    auto sbeYieldPolicy =
-        PlanYieldPolicySBE::make(opCtx, yieldPolicy, collections, canonicalQuery->nss());
-    const bool useClassicRuntimePlanner =
-        feature_flags::gFeatureFlagClassicRuntimePlanningForSbe.isEnabled(fcvSnapshot);
-    return {{std::move(sbeYieldPolicy), useClassicRuntimePlanner}};
 }
 
 void setCurOpQueryFramework(const PlanExecutor* executor) {
@@ -1500,25 +1459,42 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorFind
         }
     }
 
-    // Set whether the query is suitable for SBE. This will be later needed for eligibility checks.
-    canonicalQuery->setSbeCompatible(isQuerySbeCompatible(&mainColl, canonicalQuery.get()));
+    const bool useSbeEngine = [&] {
+        const bool forceClassic =
+            canonicalQuery->getExpCtx()->getQueryKnobConfiguration().isForceClassicEngineEnabled();
+        if (forceClassic || !isQuerySbeCompatible(&mainColl, canonicalQuery.get())) {
+            return false;
+        }
 
-    // None of the previous paths are viable, so generate one of the following three plan executor
-    // planners:
-    //     * SBE, with classic planner.
-    //     * SBE, with SBE planner.
-    //     * Classic, with classic planner.
+        // Add the stages that are candidates for SBE lowering from the 'pipeline' into the
+        // 'canonicalQuery'. This must be done _before_ checking shouldUseRegularSbe() or
+        // creating the planner.
+        attachPipelineStages(collections, pipeline, needsMerge, canonicalQuery.get());
+
+        const auto fcvSnapshot = serverGlobalParams.featureCompatibility.acquireFCVSnapshot();
+        const bool sbeFull = feature_flags::gFeatureFlagSbeFull.isEnabled(fcvSnapshot);
+        return sbeFull || shouldUseRegularSbe(opCtx, *canonicalQuery, sbeFull);
+    }();
+
+    if (useSbeEngine) {
+        // Commit to using SBE by removing the pushed-down aggregation stages from the original
+        // pipeline and by mutating the canonical query with search specific metadata.
+        finalizePipelineStages(pipeline, unavailableMetadata, canonicalQuery.get());
+        canonicalQuery->setSbeCompatible(true);
+
+    } else {
+        // There's a special case of the projection optimization being skipped when a query has any
+        // user-defined "let" variable and the query may be run with SBE. Here we make sure the
+        // projection is optimized for the classic engine.
+        canonicalQuery->optimizeProjection();
+        canonicalQuery->setSbeCompatible(false);
+    }
+
     auto makePlanner = [&](std::unique_ptr<QueryPlannerParams> plannerParams)
         -> std::unique_ptr<PlannerInterface> {
-        // Prioritize using SBE if allowed. This implies having a query with greater compatibility
-        // levels than the configured thresholds.
-        if (auto sbeParams = tryGetSbeParams(
-                opCtx, canonicalQuery.get(), collections, yieldPolicy, pipeline, needsMerge)) {
-            auto [sbeYieldPolicy, useClassicRuntimePlanner] = std::move(*sbeParams);
-
-            // Push down compatible stages to SBE land and fill out secondary collections
-            // planner parameters.
-            finalizePipelineStages(pipeline, unavailableMetadata, canonicalQuery.get());
+        if (useSbeEngine) {
+            auto sbeYieldPolicy =
+                PlanYieldPolicySBE::make(opCtx, yieldPolicy, collections, canonicalQuery->nss());
 
             plannerParams->fillOutSecondaryCollectionsPlannerParams(
                 opCtx, *canonicalQuery, collections);
@@ -1527,7 +1503,8 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorFind
 
             const auto fcvSnapshot = serverGlobalParams.featureCompatibility.acquireFCVSnapshot();
             const bool useSbePlanCache = feature_flags::gFeatureFlagSbeFull.isEnabled(fcvSnapshot);
-
+            const bool useClassicRuntimePlanner =
+                feature_flags::gFeatureFlagClassicRuntimePlanningForSbe.isEnabled(fcvSnapshot);
             if (useClassicRuntimePlanner) {
                 if (useSbePlanCache) {
                     return getClassicPlannerForSbe<
@@ -1556,14 +1533,6 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorFind
                                            std::move(plannerParams));
             }
         }
-
-        // If we are here, it means the query cannot run in SBE and we should fallback to classic.
-        canonicalQuery->setSbeCompatible(false);
-
-        // There's a special case of the projection optimization being skipped when a query has any
-        // user-defined "let" variable and the query may be run with SBE. Here we make sure the
-        // projection is optimized for the classic engine.
-        canonicalQuery->optimizeProjection();
 
         // Default to using the classic executor with the classic runtime planner.
         return getClassicPlanner(

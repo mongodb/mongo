@@ -10,6 +10,7 @@ selector:
   exclude_files:
     # TODO SERVER-86996: Apply QuerySettings for queries involving timeseries collections.
     - jstests/core/timeseries/**/*.js
+    - jstests/core/write/bypass_empty_ts_replacement_timeseries.js
 
     # TODO SERVER-88977: Apply QuerySettings for queries involving columnstore indexes.
     - jstests/core/columnstore/**/*.js
@@ -19,6 +20,10 @@ selector:
     # queries.
     - jstests/core/find_with_resume_after_param.js
 
+    # TODO SERVER-93622: Stabilise query shape hash for aggregate merge commands with let variables.
+    - jstests/aggregation/sources/merge/*.js
+    - jstests/core/command_let_variables_merge_only.js
+
     # Test which overcomes the imposed 16Mb query settings limit making the 'setQuerySettings' command fail.
     - jstests/aggregation/query_limits_test.js
 
@@ -26,6 +31,7 @@ selector:
     # this suite might cause the test to fail.
     - jstests/aggregation/sources/geonear/geonear_hint.js
     - jstests/aggregation/sources/lookup/lookup_query_stats.js
+    - jstests/aggregation/sources/unionWith/unionWith_query_stats.js
     - jstests/core/administrative/current_op/**/*.js
     - jstests/core/collation.js
     - jstests/core/operation_latency_histogram.js
@@ -37,6 +43,7 @@ selector:
 
     # This suite clears the plan cache and emits additional explains alongside the tested command. This interferes
     # with the number of expected plan cache entries.
+    - jstests/aggregation/sources/lookup/lookup_single_solution_cache.js
     - jstests/core/index/index_filter_commands_invalidate_plan_cache_entries.js
     - jstests/core/index/index_stats.js
     - jstests/core/index/wildcard/wildcard_index_cached_plans.js

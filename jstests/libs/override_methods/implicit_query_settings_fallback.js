@@ -1,4 +1,8 @@
-import {everyWinningPlan, isIdhackOrExpress, isQueryPlan} from "jstests/libs/analyze_plan.js";
+import {
+    everyWinningPlan,
+    getNestedProperties,
+    isIdhackOrExpress
+} from "jstests/libs/analyze_plan.js";
 import {
     getCollectionName,
     getCommandName,
@@ -35,8 +39,9 @@ function runCommandOverride(conn, dbName, _cmdName, cmdObj, clientFunction, make
             return;
         }
 
-        if (!isQueryPlan(explain)) {
-            // Some queries rely exclusively on the query layer without any plan being involved.
+        // If the query explain has no 'winningPlan', we can not assert for query settings
+        // fallback.
+        if (getNestedProperties(explain, "winningPlan").length === 0) {
             return;
         }
 
