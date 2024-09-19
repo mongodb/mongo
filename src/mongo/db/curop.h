@@ -1123,7 +1123,7 @@ public:
         return _queryShapeHash;
     }
 
-    void setQueryShapeHash(const boost::optional<query_shape::QueryShapeHash>& hash) {
+    void setQueryShapeHash(const query_shape::QueryShapeHash& hash) {
         _queryShapeHash = hash;
     }
 
