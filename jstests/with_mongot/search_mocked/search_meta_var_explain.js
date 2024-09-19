@@ -8,6 +8,7 @@ import {getAggPlanStage} from "jstests/libs/analyze_plan.js";
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {checkSbeRestrictedOrFullyEnabled} from "jstests/libs/sbe_util.js";
 import {getUUIDFromListCollections} from "jstests/libs/uuid_util.js";
+import {prepareUnionWithExplain} from "jstests/with_mongot/common_utils.js";
 import {
     mongotCommandForQuery,
     MongotMock,
@@ -18,7 +19,6 @@ import {
     setUpMongotReturnExplain,
     setUpMongotReturnExplainAndCursor,
     setUpMongotReturnExplainAndCursorGetMore,
-    verifySearchStageExplainOutput
 } from "jstests/with_mongot/mongotmock/lib/utils.js";
 
 // Set up mongotmock and point the mongod to it.
@@ -128,23 +128,19 @@ function testUnionWith(searchCmd, verbosity) {
 
     // Check stats for $unionWith subpipeline
     const pipeline = unionWithStage["$unionWith"]["pipeline"];
-    const unionWithSearchStage = pipeline[0];
-    assert.neq(unionWithSearchStage, null, unionWithStage);
-    const unionWithSearchIdLookup = pipeline[1];
-    assert.neq(unionWithSearchIdLookup, null, unionWithStage);
-    verifySearchStageExplainOutput({
-        stage: unionWithSearchStage,
+    let unionSubExplain = prepareUnionWithExplain(pipeline);
+    getSearchStagesAndVerifyExplainOutput({
+        result: unionSubExplain,
         stageType: "$_internalSearchMongotRemote",
+        verbosity,
         nReturned: NumberLong(3),
-        verbosity: verbosity,
-        explain: explainContents,
+        explainObject: explainContents,
     });
-
-    verifySearchStageExplainOutput({
-        stage: unionWithSearchIdLookup,
+    getSearchStagesAndVerifyExplainOutput({
+        result: unionSubExplain,
         stageType: "$_internalSearchIdLookup",
+        verbosity,
         nReturned: NumberLong(3),
-        verbosity: verbosity,
     });
 
     const unionWithProjectStage = pipeline[2];

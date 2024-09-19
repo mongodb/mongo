@@ -2,7 +2,7 @@
  * Sharding test of `$search` aggregation stage within $unionWith and $lookup stages. Also checks
  * explain results.
  */
-import {getAggPlanStage, getAggPlanStages} from "jstests/libs/analyze_plan.js";
+import {getAggPlanStage, getAggPlanStages, getUnionWithStage} from "jstests/libs/analyze_plan.js";
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {checkSbeRestrictedOrFullyEnabled} from "jstests/libs/sbe_util.js";
 import {getUUIDFromListCollections} from "jstests/libs/uuid_util.js";
@@ -16,8 +16,8 @@ import {
 } from "jstests/with_mongot/mongotmock/lib/shardingtest_with_mongotmock.js";
 import {
     getDefaultLastExplainContents,
+    getSearchStagesAndVerifyExplainOutput,
     getShardedSearchStagesAndVerifyExplainOutput,
-    verifySearchStageExplainOutput,
 } from "jstests/with_mongot/mongotmock/lib/utils.js";
 
 const stWithMock = new ShardingTestWithMongotMock({
@@ -455,18 +455,6 @@ function unionWithExplainExecStatsDoesNotThrow(
     return result;
 }
 
-function getUnionWithStageFromMergerPart(explainResult) {
-    const mergerPart = explainResult["splitPipeline"]["mergerPart"];
-    let unionWithStage = null;
-    for (let i = 0; i < mergerPart.length; i++) {
-        let properties = Object.getOwnPropertyNames(mergerPart[i]);
-        if (properties[0] === "$unionWith") {
-            unionWithStage = mergerPart[i];
-        }
-    }
-    return unionWithStage;
-}
-
 // $unionWith will run the subpipeline twice for explain. Once to obtain results for the rest of the
 // pipeline, and once to gather explain results. We send two search requests because of this.
 let explainResult =
@@ -474,25 +462,20 @@ let explainResult =
                                           unshardedSearchColl,
                                           {mongos: [], primary: [kSearch, kSearch], secondary: []},
                                           {mongos: [], primary: [], secondary: []});
-let unionWithStage = getAggPlanStage(explainResult, "$unionWith");
+let unionWithStage = getUnionWithStage(explainResult);
 let pipeline = unionWithStage["$unionWith"]["pipeline"];
-let searchStage = getAggPlanStage(pipeline, "$_internalSearchMongotRemote");
-assert.neq(searchStage, null, unionWithStage);
-verifySearchStageExplainOutput({
-    stage: searchStage,
+getSearchStagesAndVerifyExplainOutput({
+    result: pipeline,
     stageType: "$_internalSearchMongotRemote",
-    nReturned: NumberLong(5),
-    explain: expectedExplainContents,
     verbosity: "executionStats",
+    nReturned: NumberLong(5),
+    explainObject: expectedExplainContents
 });
-
-let searchIdLookupStage = getAggPlanStage(pipeline, "$_internalSearchIdLookup");
-assert.neq(searchIdLookupStage, null, unionWithStage);
-verifySearchStageExplainOutput({
-    stage: searchIdLookupStage,
+getSearchStagesAndVerifyExplainOutput({
+    result: pipeline,
     stageType: "$_internalSearchIdLookup",
-    nReturned: NumberLong(5),
     verbosity: "executionStats",
+    nReturned: NumberLong(5),
 });
 
 // As the search collection is sharded, explain is not set when targeting the shards during the
@@ -503,7 +486,7 @@ explainResult = unionWithExplainExecStatsDoesNotThrow(
     {mongos: [], primary: [kPlan, kPlan, kSearch], secondary: [kSearch]},
     {mongos: [], primary: [kSearch], secondary: [kSearch]});
 
-unionWithStage = getAggPlanStage(explainResult, "$unionWith");
+unionWithStage = getUnionWithStage(explainResult);
 pipeline = unionWithStage["$unionWith"]["pipeline"];
 getShardedSearchStagesAndVerifyExplainOutput({
     result: pipeline,
@@ -531,26 +514,21 @@ explainResult =
                                           {mongos: [], primary: [kSearch], secondary: []},
                                           {mongos: [], primary: [], secondary: []});
 
-unionWithStage = getUnionWithStageFromMergerPart(explainResult);
+unionWithStage = getUnionWithStage(explainResult);
 pipeline = unionWithStage["$unionWith"]["pipeline"];
 
-searchStage = getAggPlanStage(pipeline, "$_internalSearchMongotRemote");
-assert.neq(searchStage, null, unionWithStage);
-verifySearchStageExplainOutput({
-    stage: searchStage,
+getSearchStagesAndVerifyExplainOutput({
+    result: pipeline,
     stageType: "$_internalSearchMongotRemote",
-    nReturned: NumberLong(5),
-    explain: expectedExplainContents,
     verbosity: "executionStats",
+    nReturned: NumberLong(5),
+    explainObject: expectedExplainContents
 });
-
-searchIdLookupStage = getAggPlanStage(pipeline, "$_internalSearchIdLookup");
-assert.neq(searchIdLookupStage, null, unionWithStage);
-verifySearchStageExplainOutput({
-    stage: searchIdLookupStage,
+getSearchStagesAndVerifyExplainOutput({
+    result: pipeline,
     stageType: "$_internalSearchIdLookup",
-    nReturned: NumberLong(5),
     verbosity: "executionStats",
+    nReturned: NumberLong(5),
 });
 
 // The $unionWith stage is part of the merging pipeline and does not execute during the initial
@@ -562,7 +540,7 @@ explainResult = unionWithExplainExecStatsDoesNotThrow(
     {mongos: [kPlan], primary: [kSearch], secondary: [kSearch]},
     {mongos: [], primary: [], secondary: []});
 
-unionWithStage = getUnionWithStageFromMergerPart(explainResult);
+unionWithStage = getUnionWithStage(explainResult);
 pipeline = unionWithStage["$unionWith"]["pipeline"];
 getShardedSearchStagesAndVerifyExplainOutput({
     result: pipeline,

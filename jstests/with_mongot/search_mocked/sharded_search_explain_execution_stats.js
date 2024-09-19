@@ -7,6 +7,7 @@
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {checkSbeRestrictedOrFullyEnabled} from "jstests/libs/sbe_util.js";
 import {getUUIDFromListCollections} from "jstests/libs/uuid_util.js";
+import {verifyShardsPartExplainOutput} from "jstests/with_mongot/common_utils.js";
 import {
     getDefaultProtocolVersionForPlanShardedSearch,
     mongotCommandForQuery,
@@ -20,7 +21,6 @@ import {
     setUpMongotReturnExplain,
     setUpMongotReturnExplainAndMultiCursor,
     setUpMongotReturnExplainAndMultiCursorGetMore,
-    verifyShardsPartExplainOutput,
 } from "jstests/with_mongot/mongotmock/lib/utils.js";
 
 const dbName = jsTestName();

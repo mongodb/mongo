@@ -5,8 +5,9 @@ import {getAggPlanStage} from "jstests/libs/analyze_plan.js";
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {checkSbeRestrictedOrFullyEnabled} from "jstests/libs/sbe_util.js";
 import {getUUIDFromListCollections} from "jstests/libs/uuid_util.js";
+import {prepareUnionWithExplain} from "jstests/with_mongot/common_utils.js";
 import {mongotCommandForQuery, MongotMock} from "jstests/with_mongot/mongotmock/lib/mongotmock.js";
-import {verifySearchStageExplainOutput} from "jstests/with_mongot/mongotmock/lib/utils.js";
+import {getSearchStagesAndVerifyExplainOutput} from "jstests/with_mongot/mongotmock/lib/utils.js";
 
 // Set up mongotmock and point the mongod to it.
 const mongotmock = new MongotMock();
@@ -894,25 +895,20 @@ for (const currentVerbosity of ["executionStats", "allPlansExecution"]) {
         assert.neq(unionWithStage, null, explainResult);
         assert(unionWithStage.hasOwnProperty("nReturned"));
         assert.eq(NumberLong(7), unionWithStage["nReturned"]);
-        const pipeline = unionWithStage["$unionWith"]["pipeline"];
 
-        const searchStage = pipeline[0];
-        assert.neq(searchStage, null, unionWithStage);
-        verifySearchStageExplainOutput({
-            stage: searchStage,
+        let unionSubExplain = prepareUnionWithExplain(unionWithStage.$unionWith.pipeline);
+        getSearchStagesAndVerifyExplainOutput({
+            result: unionSubExplain,
             stageType: "$_internalSearchMongotRemote",
-            nReturned: NumberLong(5),
-            explain: explainObj,
             verbosity: currentVerbosity,
+            nReturned: NumberLong(5),
+            explainObject: explainObj
         });
-
-        const searchIdLookupStage = pipeline[1];
-        assert.neq(searchIdLookupStage, null, unionWithStage);
-        verifySearchStageExplainOutput({
-            stage: searchIdLookupStage,
+        getSearchStagesAndVerifyExplainOutput({
+            result: unionSubExplain,
             stageType: "$_internalSearchIdLookup",
-            nReturned: NumberLong(5),
             verbosity: currentVerbosity,
+            nReturned: NumberLong(5),
         });
     }
     {
@@ -950,16 +946,13 @@ for (const currentVerbosity of ["executionStats", "allPlansExecution"]) {
         assert(unionWithStage.hasOwnProperty("nReturned"));
         assert.eq(NumberLong(2), unionWithStage["nReturned"]);
 
-        const pipeline = unionWithStage["$unionWith"]["pipeline"];
-        const searchMetaStage = pipeline[0];
-        assert.neq(searchMetaStage, null, unionWithStage);
-
-        verifySearchStageExplainOutput({
-            stage: searchMetaStage,
+        let unionSubExplain = prepareUnionWithExplain(unionWithStage.$unionWith.pipeline);
+        getSearchStagesAndVerifyExplainOutput({
+            result: unionSubExplain,
             stageType: "$searchMeta",
-            explain: explainObj,
-            nReturned: NumberLong(1),
             verbosity: currentVerbosity,
+            nReturned: NumberLong(1),
+            explainObject: explainObj
         });
     }
 

@@ -828,6 +828,28 @@ export function getAggPlanStage(root, stage, useQueryPlannerSection = false) {
         return planStageList[0];
     }
 }
+/**
+ * Given the root stage of agg explain's JSON representation of a query plan ('root'), returns
+ * the $unionWith stage of the plan.
+ *
+ * The normal getAggPlanStages() doesn't find the $unionWith stage in the sharded scenario since it
+ * exists in the splitPipeline.
+ **/
+export function getUnionWithStage(root) {
+    if (root.splitPipeline != null) {
+        // If there is only one shard, the whole pipeline will run on that shard.
+        const subAggPipe = root.splitPipeline === null ? root.shards["shard-rs0"].stages
+                                                       : root.splitPipeline.mergerPart;
+        for (let i = 0; i < subAggPipe.length; i++) {
+            const stage = subAggPipe[i];
+            if (stage.hasOwnProperty("$unionWith")) {
+                return stage;
+            }
+        }
+    } else {
+        return getAggPlanStage(root, "$unionWith");
+    }
+}
 
 /**
  * Given the root stage of agg explain's JSON representation of a query plan ('root'), returns

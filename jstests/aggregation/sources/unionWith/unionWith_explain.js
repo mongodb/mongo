@@ -9,7 +9,7 @@
  */
 
 import {anyEq, arrayEq, documentEq} from "jstests/aggregation/extras/utils.js";
-import {getAggPlanStage, getExecutionStats} from "jstests/libs/analyze_plan.js";
+import {getExecutionStats, getUnionWithStage} from "jstests/libs/analyze_plan.js";
 import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 
 const testDB = db.getSiblingDB(jsTestName());
@@ -50,22 +50,6 @@ const queryPlannerIgnoredFields = [
     "optimizedPipeline",
     "optimizationTimeMillis",
 ].concat(stagesIgnoredFields);
-
-function getUnionWithStage(explain) {
-    if (explain.splitPipeline != null) {
-        // If there is only one shard, the whole pipeline will run on that shard.
-        const subAggPipe = explain.splitPipeline === null ? explain.shards["shard-rs0"].stages
-                                                          : explain.splitPipeline.mergerPart;
-        for (let i = 0; i < subAggPipe.length; i++) {
-            const stage = subAggPipe[i];
-            if (stage.hasOwnProperty("$unionWith")) {
-                return stage;
-            }
-        }
-    } else {
-        return getAggPlanStage(explain, "$unionWith");
-    }
-}
 
 function buildErrorString(unionExplain, realExplain, field) {
     return "Explains did not match in field " + field + ". Union:\n" + tojson(unionExplain) +
