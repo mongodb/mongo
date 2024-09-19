@@ -5095,6 +5095,27 @@ TEST_F(BSONColumnTest, InterleavedWithEmptySubObjLegacyDecompress) {
     verifyDecompressPathFast(expected, elems, testPaths);
 }
 
+TEST_F(BSONColumnTest, ObjectLiteralWithNoLeaves) {
+    BSONElement elem = createElementObj(BSON("x" << BSONObj{}));
+    cb.append(elem);
+
+    // Path decompressor should find nothing for path "x"
+    std::vector<BSONElement> expectedElems = {createElementObj({})};
+
+    auto binData = cb.finalize();
+
+    BufBuilder expected;
+    appendLiteral(expected, elem);
+    appendEOO(expected);
+
+    verifyBinary(binData, expected);
+    std::vector<TestPath> testPaths{
+        TestPath{{"x"}},
+        TestPath{{"y"}},
+    };
+    verifyDecompressPathFast(binData, expectedElems, testPaths);
+}
+
 TEST_F(BSONColumnTest, InterleavedRemoveEmptySubObj) {
     std::vector<BSONElement> elems = {
         createElementObj(BSON("x" << 1 << "y" << BSONObjBuilder().obj())),

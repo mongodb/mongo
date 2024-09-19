@@ -831,6 +831,20 @@ public:
                                               simple8b::kSingleZero /* lastNonRLEBlock */,
                                               [](size_t count, uint64_t lastNonRLEBlock) {});
     }
+
+    static bool containsScalars(const BSONObj& obj) {
+        bool result = false;
+        BSONObjTraversal{true,
+                         BSONType::Object,
+                         [](auto&&...) { return true; },
+                         [&](auto&&...) {
+                             result = true;
+                             return false;
+                         }}
+            .traverse(obj);
+
+        return result;
+    }
 };
 
 /**
