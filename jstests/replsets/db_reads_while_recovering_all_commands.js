@@ -178,7 +178,6 @@ const allCommands = {
     autoSplitVector: {skip: isPrimaryOnly},
     buildInfo: {skip: isNotAUserDataRead},
     bulkWrite: {skip: isPrimaryOnly},
-    captrunc: {skip: isPrimaryOnly},
     changePrimary: {skip: isPrimaryOnly},
     checkMetadataConsistency: {skip: isPrimaryOnly},
     checkShardingIndex: {skip: isPrimaryOnly},

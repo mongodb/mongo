@@ -298,7 +298,6 @@ const allCommands = {
         },
         isAdminCommand: true,
     },
-    captrunc: {skip: isAnInternalCommand},
     changePrimary: {skip: requiresMongoS},
     checkMetadataConsistency: {skip: requiresMongoS},
     checkShardingIndex: {

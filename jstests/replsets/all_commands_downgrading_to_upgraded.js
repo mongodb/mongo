@@ -359,9 +359,6 @@ const allCommands = {
             assert.commandWorked(conn.getDB(dbName).runCommand({drop: collName}));
         },
     },
-    captrunc: {
-        skip: isAnInternalCommand,
-    },
     changePrimary: {skip: cannotRunWhileDowngrading},
     checkMetadataConsistency: {
         isAdminCommand: true,

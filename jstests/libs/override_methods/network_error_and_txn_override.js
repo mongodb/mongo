@@ -93,7 +93,6 @@ const kNonRetryableCommands = new Set([
     "_recvChunkStart",
     "appendOplogNote",
     "applyOps",
-    "captrunc",
     "clone",
     "cloneCollectionAsCapped",
     "create",

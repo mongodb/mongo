@@ -297,7 +297,6 @@ let testCases = {
         useLogs: true,
         skipMultiversion: true,
     },
-    captrunc: {skip: "test command"},
     changePrimary: {skip: "does not accept read or write concern"},
     checkMetadataConsistency: {skip: "does not accept read or write concern"},
     checkShardingIndex: {skip: "does not accept read or write concern"},
@@ -954,9 +953,11 @@ function createProfileFilterForTestCase(test, targetId, explicitRWC) {
 function runScenario(
     desc, conn, regularCheckConn, configSvrCheckConn, {explicitRWC, explicitProvenance = false}) {
     let runCommandTest = function(cmdName, test) {
-        // The emptycapped command was removed but breaks this test in multiversion.
-        // TODO (SERVER-92950): Remove this check.
-        if (cmdName == "emptycapped") {
+        // The emptycapped command was removed but breaks this test in multiversion. The same
+        // applies for captrunc.
+        // TODO (SERVER-92950): Remove the check for emptycapped.
+        // TODO (SERVER-94847): Remove the check for captrunc.
+        if (cmdName == "emptycapped" || cmdName == "captrunc") {
             return;
         }
 

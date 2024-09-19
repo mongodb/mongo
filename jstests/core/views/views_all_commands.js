@@ -271,10 +271,7 @@ let viewsCommandTests = {
     balancerStop: {skip: isUnrelated},
     buildInfo: {skip: isUnrelated},
     bulkWrite: {skip: isUnrelated},
-    captrunc: {
-        command: {captrunc: "view", n: 2, inc: false},
-        expectFailure: true,
-    },
+    captrunc: {skip: "removed"},  // TODO: (SERVER-94847): Remove this case.
     changePrimary: {skip: "Tested in sharding/change_primary.js"},
     checkMetadataConsistency: {
         command: {checkMetadataConsistency: "view"},
