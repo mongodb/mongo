@@ -30,6 +30,8 @@
 #include <benchmark/benchmark.h>
 #include <vector>
 
+#include "mongo/db/exec/sbe/values/value.h"
+#include "mongo/db/query/ce/cbp_histogram_ce/accuracy_test_helpers.h"
 #include "mongo/db/query/ce/cbp_histogram_ce/array_histogram_helpers.h"
 #include "mongo/db/query/ce/cbp_histogram_ce/histogram_common.h"
 #include "mongo/db/query/ce/cbp_histogram_ce/histogram_predicate_estimation.h"
@@ -46,7 +48,7 @@
 
 namespace mongo::optimizer::cbp::ce {
 
-namespace {
+// namespace {
 
 enum DataType { kInt, kStringSmall, kString, kDouble };
 
@@ -105,32 +107,17 @@ void BM_CreateHistogram(benchmark::State& state) {
         case kUniform:
             // For ndv we set half the number of values in the provided data interval.
             generateDataUniform(
-                configuration.size,
-                configuration.dataInterval,
-                typeCombinationData,
-                seed,
-                (configuration.dataInterval.second - configuration.dataInterval.first) / 2 /*ndv*/,
-                data);
+                configuration.size, configuration.dataInterval, typeCombinationData, seed, data);
             break;
         case kNormal:
             // For ndv we set half the number of values in the provided data interval.
             generateDataNormal(
-                configuration.size,
-                configuration.dataInterval,
-                typeCombinationData,
-                seed,
-                (configuration.dataInterval.second - configuration.dataInterval.first) / 2 /*ndv*/,
-                data);
+                configuration.size, configuration.dataInterval, typeCombinationData, seed, data);
             break;
         case kZipfian:
             // For ndv we set half the number of values in the provided data interval.
             generateDataZipfian(
-                configuration.size,
-                configuration.dataInterval,
-                typeCombinationData,
-                seed,
-                (configuration.dataInterval.second - configuration.dataInterval.first) / 2 /*ndv*/,
-                data);
+                configuration.size, configuration.dataInterval, typeCombinationData, seed, data);
             break;
     }
 
@@ -156,32 +143,17 @@ void BM_RunHistogramEstimations(benchmark::State& state) {
         case kUniform:
             // For ndv we set half the number of values in the provided data interval.
             generateDataUniform(
-                configuration.size,
-                configuration.dataInterval,
-                typeCombinationData,
-                seed,
-                (configuration.dataInterval.second - configuration.dataInterval.first) / 2 /*ndv*/,
-                data);
+                configuration.size, configuration.dataInterval, typeCombinationData, seed, data);
             break;
         case kNormal:
             // For ndv we set half the number of values in the provided data interval.
             generateDataNormal(
-                configuration.size,
-                configuration.dataInterval,
-                typeCombinationData,
-                seed,
-                (configuration.dataInterval.second - configuration.dataInterval.first) / 2 /*ndv*/,
-                data);
+                configuration.size, configuration.dataInterval, typeCombinationData, seed, data);
             break;
         case kZipfian:
             // For ndv we set half the number of values in the provided data interval.
             generateDataZipfian(
-                configuration.size,
-                configuration.dataInterval,
-                typeCombinationData,
-                seed,
-                (configuration.dataInterval.second - configuration.dataInterval.first) / 2 /*ndv*/,
-                data);
+                configuration.size, configuration.dataInterval, typeCombinationData, seed, data);
             break;
     }
 
@@ -199,6 +171,7 @@ void BM_RunHistogramEstimations(benchmark::State& state) {
                    data,
                    arrHist,
                    true /*includeScalar*/,
+                   false /*useE2EAPI*/,
                    seed);
     }
 }
@@ -330,5 +303,5 @@ BENCHMARK(BM_RunHistogramEstimations)
             /*dataType*/ kString,
             /*queryType*/ kRange});
 
-}  // namespace
+// }  // namespace
 }  // namespace mongo::optimizer::cbp::ce

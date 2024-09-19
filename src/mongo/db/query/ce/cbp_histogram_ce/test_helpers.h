@@ -34,15 +34,6 @@
 
 namespace mongo::optimizer::cbp::ce {
 
-enum DataDistributionEnum { kUniform, kNormal, kZipfian };
-enum QueryType { kPoint, kRange };
-
-using TypeProbability = std::pair<sbe::value::TypeTags, size_t>;
-using TypeCombination = std::vector<TypeProbability>;
-using TypeCombinations = std::vector<TypeCombination>;
-
-static constexpr size_t kPredefinedArraySize = 15;
-
 /**
  * Test utility for helping with creation of manual histograms in the unit tests.
  */
@@ -60,89 +51,9 @@ struct BucketData {
         : BucketData(Value(v), equalFreq, rangeFreq, ndv) {}
 };
 
-struct ErrorCalculationSummary {
-    // actual returned results.
-    std::vector<std::pair<size_t, EstimationResult>> queryResults;
-
-    // calculated results.
-    std::vector<double> relativeErrors;
-    std::vector<double> qErrors;
-    double relativeErrorAvg;
-    double relativeErrorMax;
-
-    double relativeErrorMedian;
-    double relativeError90thPercentile;
-    double relativeError95thPercentile;
-    double relativeError99thPercentile;
-
-    double qErrorMedian;
-    double qError90thPercentile;
-    double qError95thPercentile;
-    double qError99thPercentile;
-};
-
 stats::ScalarHistogram createHistogram(const std::vector<BucketData>& data);
 
 double estimateCardinalityScalarHistogramInteger(const stats::ScalarHistogram& hist,
                                                  int v,
                                                  cbp::ce::EstimationType type);
-
-static size_t calculateFrequencyFromDataVectorEq(const std::vector<stats::SBEValue>& data,
-                                                 sbe::value::TypeTags type,
-                                                 stats::SBEValue valueToCalculate);
-
-/**
- * Calculate the frequency of a range in a given vector of values.
- * The range is always inclusive of the bounds.
- */
-static size_t calculateFrequencyFromDataVectorRange(const std::vector<stats::SBEValue>& data,
-                                                    sbe::value::TypeTags type,
-                                                    stats::SBEValue valueToCalculateLow,
-                                                    stats::SBEValue valueToCalculateHigh);
-
-static std::pair<double, double> computeErrors(size_t actualCard, double estimatedCard);
-
-void printHeader();
-
-void printResult(DataDistributionEnum dataDistribution,
-                 const std::vector<std::pair<sbe::value::TypeTags, size_t>>& typeCombination,
-                 int size,
-                 int numberOfBuckets,
-                 const std::pair<sbe::value::TypeTags, size_t>& typeCombinationQuery,
-                 int numberOfQueries,
-                 QueryType queryType,
-                 const std::pair<size_t, size_t>& dataInterval,
-                 ErrorCalculationSummary error);
-
-void generateDataUniform(size_t size,
-                         const std::pair<size_t, size_t>& interval,
-                         const TypeCombination& typeCombination,
-                         size_t seed,
-                         size_t ndv,
-                         std::vector<stats::SBEValue>& data);
-
-void generateDataNormal(size_t size,
-                        const std::pair<size_t, size_t>& interval,
-                        const TypeCombination& typeCombination,
-                        size_t seed,
-                        size_t ndv,
-                        std::vector<stats::SBEValue>& data);
-
-void generateDataZipfian(size_t size,
-                         const std::pair<size_t, size_t>& interval,
-                         const TypeCombination& typeCombination,
-                         size_t seed,
-                         size_t ndv,
-                         std::vector<stats::SBEValue>& data);
-
-ErrorCalculationSummary runQueries(size_t size,
-                                   size_t numberOfQueries,
-                                   QueryType queryType,
-                                   std::pair<size_t, size_t> interval,
-                                   std::pair<sbe::value::TypeTags, size_t> queryTypeInfo,
-                                   const std::vector<stats::SBEValue>& data,
-                                   std::shared_ptr<const stats::ArrayHistogram> arrHist,
-                                   bool includeScalar,
-                                   size_t seed);
-
 }  // namespace mongo::optimizer::cbp::ce

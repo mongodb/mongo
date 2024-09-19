@@ -36,7 +36,6 @@
 #include "mongo/db/query/ce/cbp_histogram_ce/test_helpers.h"
 #include "mongo/db/query/ce/test_utils.h"
 #include "mongo/unittest/assert.h"
-#include "mongo/unittest/framework.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kDefault
 
@@ -49,7 +48,7 @@ using stats::ArrayHistogram;
 using stats::ScalarHistogram;
 using stats::TypeCounts;
 
-auto NumberInt64 = sbe::value::TypeTags::NumberInt64;
+auto NumberInt64 = value::TypeTags::NumberInt64;
 
 constexpr double kErrorBound = 0.01;
 
@@ -217,16 +216,16 @@ TEST(ArrayHistogramHelpersTest, StringHistogram) {
     ASSERT_EQ(strCnt, getTotals(hist).card);
 
     const auto arrHist = ArrayHistogram::make(
-        hist, stats::TypeCounts{{sbe::value::TypeTags::StringSmall, strCnt}}, strCnt);
+        hist, stats::TypeCounts{{value::TypeTags::StringSmall, strCnt}}, strCnt);
 
-    auto [tag, value] = sbe::value::makeNewString("testA"_sd);
-    sbe::value::ValueGuard vg(tag, value);
+    auto [tag, value] = value::makeNewString("testA"_sd);
+    value::ValueGuard vg(tag, value);
     ASSERT_EQ(5.0, estimateCardinalityEq(*arrHist, tag, value, true).card);
 
-    std::tie(tag, value) = sbe::value::makeNewString("testB"_sd);
+    std::tie(tag, value) = value::makeNewString("testB"_sd);
     ASSERT_EQ(3.0, estimateCardinalityEq(*arrHist, tag, value, true).card);
 
-    std::tie(tag, value) = sbe::value::makeNewString("testC"_sd);
+    std::tie(tag, value) = value::makeNewString("testC"_sd);
     ASSERT_EQ(0, estimateCardinalityEq(*arrHist, tag, value, false).card);
 }
 
@@ -245,7 +244,7 @@ TEST(ArrayHistogramHelpersTest, UniformStrHistogram) {
     const ScalarHistogram& hist = createHistogram(data);
 
     const auto arrHist = ArrayHistogram::make(
-        hist, stats::TypeCounts{{sbe::value::TypeTags::StringSmall, strCnt}}, strCnt);
+        hist, stats::TypeCounts{{value::TypeTags::StringSmall, strCnt}}, strCnt);
 
     const auto [tag, value] = value::makeNewString("TTV"_sd);
     value::ValueGuard vg(tag, value);
@@ -271,7 +270,7 @@ TEST(ArrayHistogramHelpersTest, NormalStrHistogram) {
     const ScalarHistogram& hist = createHistogram(data);
 
     const auto arrHist = ArrayHistogram::make(
-        hist, stats::TypeCounts{{sbe::value::TypeTags::StringSmall, strCnt}}, strCnt);
+        hist, stats::TypeCounts{{value::TypeTags::StringSmall, strCnt}}, strCnt);
 
     auto [tag, value] = value::makeNewString("TTV"_sd);
     value::ValueGuard vg(tag, value);
@@ -295,10 +294,10 @@ TEST(ArrayHistogramHelpersTest, IntStrHistogram) {
 
     const auto arrHist = ArrayHistogram::make(
         hist,
-        stats::TypeCounts{{NumberInt64, intCnt}, {sbe::value::TypeTags::StringSmall, strCnt}},
+        stats::TypeCounts{{NumberInt64, intCnt}, {value::TypeTags::StringSmall, strCnt}},
         totalCnt);
-    auto [tag, value] = sbe::value::makeNewString("test"_sd);
-    sbe::value::ValueGuard vg(tag, value);
+    auto [tag, value] = value::makeNewString("test"_sd);
+    value::ValueGuard vg(tag, value);
 
     ASSERT_EQ(20.0, estimateCardinalityEq(*arrHist, tag, value, true).card);
     ASSERT_EQ(1.0, estimateCardinalityEq(*arrHist, NumberInt64, 1, true).card);
@@ -323,15 +322,15 @@ TEST(ArrayHistogramHelpersTest, UniformIntStrHistogram) {
 
     const auto arrHist = ArrayHistogram::make(
         hist,
-        stats::TypeCounts{{NumberInt64, intCnt}, {sbe::value::TypeTags::StringSmall, strCnt}},
+        stats::TypeCounts{{NumberInt64, intCnt}, {value::TypeTags::StringSmall, strCnt}},
         totalCnt);
 
     ASSERT_APPROX_EQUAL(7.0,
                         estimateCardinalityEq(*arrHist, NumberInt64, 993, true).card,
                         0.1);  // Actual: 9
 
-    auto [tag, value] = sbe::value::makeNewString("04e"_sd);
-    sbe::value::ValueGuard vg(tag, value);
+    auto [tag, value] = value::makeNewString("04e"_sd);
+    value::ValueGuard vg(tag, value);
 
     ASSERT_APPROX_EQUAL(
         2.2, estimateCardinalityEq(*arrHist, tag, value, true).card, 0.1);  // Actual: 3.
@@ -777,10 +776,10 @@ TEST(ArrayHistogramHelpersTest, Histogram1000ArraysSmall10Buckets) {
         auto estCard = estimateCardinalityRange(*arrHist,
                                                 false,
                                                 value::TypeTags::NumberInt32,
-                                                sbe::value::bitcastFrom<int32_t>(q.low),
+                                                value::bitcastFrom<int32_t>(q.low),
                                                 false,
                                                 value::TypeTags::NumberInt32,
-                                                sbe::value::bitcastFrom<int32_t>(q.high),
+                                                value::bitcastFrom<int32_t>(q.high),
                                                 true);
         ASSERT_CE_APPROX_EQUAL(estCard.card, q.estMatch, 0.1);
 
@@ -788,10 +787,10 @@ TEST(ArrayHistogramHelpersTest, Histogram1000ArraysSmall10Buckets) {
         estCard = estimateCardinalityRange(*arrHist,
                                            false,
                                            value::TypeTags::NumberInt32,
-                                           sbe::value::bitcastFrom<int32_t>(q.low),
+                                           value::bitcastFrom<int32_t>(q.low),
                                            false,
                                            value::TypeTags::NumberInt32,
-                                           sbe::value::bitcastFrom<int32_t>(q.high),
+                                           value::bitcastFrom<int32_t>(q.high),
                                            false);
         ASSERT_CE_APPROX_EQUAL(estCard.card, q.estElemMatch, 0.1);
 
@@ -870,10 +869,10 @@ TEST(ArrayHistogramHelpersTest, Histogram1000ArraysLarge10Buckets) {
         auto estCard = estimateCardinalityRange(*arrHist,
                                                 false,
                                                 value::TypeTags::NumberInt32,
-                                                sbe::value::bitcastFrom<int32_t>(q.low),
+                                                value::bitcastFrom<int32_t>(q.low),
                                                 false,
                                                 value::TypeTags::NumberInt32,
-                                                sbe::value::bitcastFrom<int32_t>(q.high),
+                                                value::bitcastFrom<int32_t>(q.high),
                                                 true);
         ASSERT_CE_APPROX_EQUAL(estCard.card, q.estMatch, 0.1);
 
@@ -881,10 +880,10 @@ TEST(ArrayHistogramHelpersTest, Histogram1000ArraysLarge10Buckets) {
         estCard = estimateCardinalityRange(*arrHist,
                                            false,
                                            value::TypeTags::NumberInt32,
-                                           sbe::value::bitcastFrom<int32_t>(q.low),
+                                           value::bitcastFrom<int32_t>(q.low),
                                            false,
                                            value::TypeTags::NumberInt32,
-                                           sbe::value::bitcastFrom<int32_t>(q.high),
+                                           value::bitcastFrom<int32_t>(q.high),
                                            false);
         ASSERT_CE_APPROX_EQUAL(estCard.card, q.estElemMatch, 0.1);
 

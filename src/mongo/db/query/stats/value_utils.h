@@ -142,6 +142,11 @@ double objectIdToDouble(const sbe::value::ObjectIdType* sd);
 double valueToDouble(sbe::value::TypeTags tag, sbe::value::Value val);
 
 /**
+    Convert a SBEValue of any supported type into a BSONObj.
+*/
+BSONObj sbeValueToBSON(const SBEValue& sbeValue, const std::string& fieldName);
+
+/**
  * Returns true for types that can be estimated via histograms, and false for types that need type
  * counters. Any other type results in a uassert.
  *

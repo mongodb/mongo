@@ -37,7 +37,7 @@ using Cardinality = double;
 using Selectivity = double;
 
 struct EstimationResult {
-    double card;
+    Cardinality card;
     double ndv;
 
     EstimationResult operator-(const EstimationResult& other) const {

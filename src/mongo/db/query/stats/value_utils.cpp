@@ -227,6 +227,44 @@ double valueToDouble(value::TypeTags tag, value::Value val) {
     return result;
 }
 
+BSONObj sbeValueToBSON(const SBEValue& sbeValue, const std::string& fieldName) {
+
+    BSONObjBuilder builder;
+
+    switch (sbeValue.getTag()) {
+        case sbe::value::TypeTags::NumberInt32:
+            builder.appendNumber(
+                fieldName,
+                value::numericCast<int>(sbe::value::TypeTags::NumberInt32, sbeValue.getValue()));
+            break;
+        case sbe::value::TypeTags::NumberInt64:
+            builder.appendNumber(fieldName,
+                                 value::numericCast<long long>(sbe::value::TypeTags::NumberInt64,
+                                                               sbeValue.getValue()));
+            break;
+        case sbe::value::TypeTags::NumberDecimal:
+            builder.appendNumber(fieldName,
+                                 value::numericCast<Decimal128>(sbe::value::TypeTags::NumberDecimal,
+                                                                sbeValue.getValue()));
+            break;
+        case sbe::value::TypeTags::NumberDouble:
+            builder.appendNumber(
+                fieldName,
+                value::numericCast<double>(value::TypeTags::NumberInt64, sbeValue.getValue()));
+            break;
+        case sbe::value::TypeTags::StringSmall:
+        case sbe::value::TypeTags::StringBig:
+        case sbe::value::TypeTags::bsonString:
+            builder.append(fieldName, value::getStringView(sbeValue.getTag(), sbeValue.getValue()));
+            break;
+        default:
+            uassert(9370100, "Unexpected value type", false);
+            break;
+    }
+
+    return builder.obj();
+}
+
 bool canEstimateTypeViaHistogram(value::TypeTags tag) {
     if (sbe::value::isNumber(tag) || value::isString(tag)) {
         return true;

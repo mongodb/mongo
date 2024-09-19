@@ -26,132 +26,9 @@
  *    exception statement from all source files in the program, then also delete
  *    it in the license file.
  */
-
-#include "mongo/db/query/ce/test_utils.h"
-#include <map>
-#include <memory>
-#include <ostream>
-#include <random>
-#include <tuple>
-#include <utility>
-#include <vector>
-
-#include "mongo/bson/bsonobj.h"
-#include "mongo/db/query/ce/cbp_histogram_ce/test_helpers.h"
-#include "mongo/db/query/stats/max_diff.h"
-#include "mongo/unittest/assert.h"
-#include "mongo/unittest/framework.h"
-
-#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kDefault
+#include "mongo/db/query/ce/cbp_histogram_ce/accuracy_test_helpers.h"
 
 using namespace mongo::optimizer::cbp::ce;
-using namespace mongo;
-
-namespace value = sbe::value;
-
-using stats::TypeCounts;
-using TypeTags = value::TypeTags;
-using TypeProbability = std::pair<value::TypeTags, size_t>;
-using TypeCombination = std::vector<TypeProbability>;
-using TypeCombinations = std::vector<TypeCombination>;
-
-bool checkTypeExistence(const TypeProbability& typeCombinationQuery,
-                        const TypeCombination& typeCombinationsData) {
-
-    bool typeExists = false;
-    for (const auto& typeCombinationData : typeCombinationsData) {
-        if (typeCombinationQuery.first == typeCombinationData.first) {
-            typeExists = true;
-        }
-    }
-
-    return typeExists;
-}
-
-void runAccuracyTestConfiguration(const DataDistributionEnum dataDistribution,
-                                  const TypeCombinations& typeCombinationsData,
-                                  const TypeCombination& typeCombinationsQueries,
-                                  const std::vector<int>& numberOfBucketsVector,
-                                  const size_t size,
-                                  const std::pair<size_t, size_t>& dataInterval,
-                                  const std::pair<size_t, size_t>& queryInterval,
-                                  const int numberOfQueries,
-                                  QueryType queryType,
-                                  const size_t seed,
-                                  bool printResults) {
-
-
-    for (auto numberOfBuckets : numberOfBucketsVector) {
-        for (const auto& typeCombinationData : typeCombinationsData) {
-            // Random value generator for actual data in histogram.
-            std::vector<stats::SBEValue> data;
-            std::map<stats::SBEValue, double> insertedData;
-
-            // Create one by one the values.
-            switch (dataDistribution) {
-                case kUniform:
-                    // For ndv we set half the number of values in the provided data interval.
-                    generateDataUniform(size,
-                                        dataInterval,
-                                        typeCombinationData,
-                                        seed,
-                                        (dataInterval.second - dataInterval.first) / 2 /*ndv*/,
-                                        data);
-                    break;
-                case kNormal:
-                    // For ndv we set half the number of values in the provided data interval.
-                    generateDataNormal(size,
-                                       dataInterval,
-                                       typeCombinationData,
-                                       seed,
-                                       (dataInterval.second - dataInterval.first) / 2 /*ndv*/,
-                                       data);
-                    break;
-                case kZipfian:
-                    // For ndv we set half the number of values in the provided data interval.
-                    generateDataZipfian(size,
-                                        dataInterval,
-                                        typeCombinationData,
-                                        seed,
-                                        (dataInterval.second - dataInterval.first) / 2 /*ndv*/,
-                                        data);
-                    break;
-            }
-
-            // Build histogram.
-            auto arrHist = stats::createArrayEstimator(data, numberOfBuckets);
-
-            // Run queries.
-            for (const auto& typeCombinationQuery : typeCombinationsQueries) {
-
-                if (!checkTypeExistence(typeCombinationQuery, typeCombinationData)) {
-                    continue;
-                }
-
-                auto error = runQueries(size,
-                                        numberOfQueries,
-                                        queryType,
-                                        queryInterval,
-                                        typeCombinationQuery,
-                                        data,
-                                        arrHist,
-                                        true /*includeScalar*/,
-                                        seed);
-                if (printResults) {
-                    printResult(dataDistribution,
-                                typeCombinationData,
-                                size,
-                                numberOfBuckets,
-                                typeCombinationQuery,
-                                numberOfQueries,
-                                queryType,
-                                dataInterval,
-                                error);
-                }
-            }
-        }
-    }
-}
 
 /**
  * This program generates accuracy calculations for histogram frequency estimates.
@@ -206,6 +83,8 @@ int main(int argc, char* argv[]) {
                                      queryInterval,
                                      numberOfQueries,
                                      queryType,
+                                     true /*includeScalar*/,
+                                     false /*useE2EAPI*/,
                                      seed,
                                      printResults);
     }
@@ -214,7 +93,7 @@ int main(int argc, char* argv[]) {
         const TypeCombination typeCombinationsQueries{{TypeTags::NumberInt64, 100},
                                                       {TypeTags::StringSmall, 100},
                                                       {TypeTags::NumberDouble, 100}};
-        const std::pair<size_t, size_t> dataInterval({0, 1000});
+        const std::pair<size_t, size_t> dataInterval({500, 150});
         const std::pair<size_t, size_t> queryInterval({0, 1000});
         const DataDistributionEnum dataDistribution = kNormal;
         QueryType queryType = kPoint;
@@ -228,6 +107,8 @@ int main(int argc, char* argv[]) {
                                      queryInterval,
                                      numberOfQueries,
                                      queryType,
+                                     true /*includeScalar*/,
+                                     false /*useE2EAPI*/,
                                      seed,
                                      printResults);
     }
@@ -250,6 +131,8 @@ int main(int argc, char* argv[]) {
                                      queryInterval,
                                      numberOfQueries,
                                      queryType,
+                                     true /*includeScalar*/,
+                                     true /*useE2EAPI*/,
                                      seed,
                                      printResults);
     }
@@ -273,6 +156,8 @@ int main(int argc, char* argv[]) {
                                      queryInterval,
                                      numberOfQueries,
                                      queryType,
+                                     true /*includeScalar*/,
+                                     true /*useE2EAPI*/,
                                      seed,
                                      printResults);
     }
@@ -294,6 +179,8 @@ int main(int argc, char* argv[]) {
                                      queryInterval,
                                      numberOfQueries,
                                      queryType,
+                                     true /*includeScalar*/,
+                                     true /*useE2EAPI*/,
                                      seed,
                                      printResults);
     }
@@ -315,6 +202,8 @@ int main(int argc, char* argv[]) {
                                      queryInterval,
                                      numberOfQueries,
                                      queryType,
+                                     true /*includeScalar*/,
+                                     true /*useE2EAPI*/,
                                      seed,
                                      printResults);
     }
