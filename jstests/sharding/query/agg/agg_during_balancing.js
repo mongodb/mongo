@@ -176,11 +176,17 @@ function testSample(size) {
     let result = database.ts1.aggregate([{$sample: {size: size}}]).toArray();
     assert.eq(result.length, Math.min(nItems, size));
 }
-testSample(0);
 testSample(1);
 testSample(10);
 testSample(nItems);
 testSample(nItems + 1);
+
+// TODO(SERVER-94154): Remove version check here.
+const fcvDoc = shardedAggTest.s0.adminCommand({getParameter: 1, featureCompatibilityVersion: 1});
+if (MongoRunner.compareBinVersions(fcvDoc.featureCompatibilityVersion.version, "8.1") >= 0) {
+    // Using a sample of size zero is only disallowed in some newer versions.
+    assert.throwsWithCode(() => testSample(0), 28747);
+}
 
 (function testOutWithCopy() {
     jsTestLog('Testing $out by copying source collection verbatim to output');

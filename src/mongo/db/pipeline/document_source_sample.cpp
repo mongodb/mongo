@@ -129,7 +129,7 @@ intrusive_ptr<DocumentSource> DocumentSourceSample::createFromBson(
 
 boost::intrusive_ptr<DocumentSource> DocumentSourceSample::create(
     const boost::intrusive_ptr<ExpressionContext>& expCtx, long long size) {
-    uassert(28747, "size argument to $sample must not be negative", size >= 0);
+    uassert(28747, "size argument to $sample must be a positive integer", size > 0);
 
     intrusive_ptr<DocumentSourceSample> sample(new DocumentSourceSample(expCtx));
     sample->_size = size;

@@ -136,11 +136,11 @@ private:
 };
 
 /**
- * A sample of size 0 should return 0 results.
+ * Using a sample of size zero is disallowed.
  */
 TEST_F(SampleBasics, ZeroSize) {
     loadDocuments(2);
-    checkResults(0, 0);
+    ASSERT_THROWS_CODE(createSample(0), AssertionException, 28747);
 }
 
 /**
@@ -237,6 +237,15 @@ TEST_F(InvalidSampleSpec, NonNumericSize) {
 TEST_F(InvalidSampleSpec, NegativeSize) {
     ASSERT_THROWS_CODE(createSample(createSpec(BSON("size" << -1))), AssertionException, 28747);
     ASSERT_THROWS_CODE(createSample(createSpec(BSON("size" << -1.0))), AssertionException, 28747);
+}
+
+/**
+ * Using a sample of size zero is disallowed.
+ */
+TEST_F(InvalidSampleSpec, ZeroSize) {
+    ASSERT_THROWS_CODE(createSample(createSpec(BSON("size" << 0))), AssertionException, 28747);
+    ASSERT_THROWS_CODE(createSample(createSpec(BSON("size" << 0.0))), AssertionException, 28747);
+    ASSERT_THROWS_CODE(createSample(createSpec(BSON("size" << 0.5))), AssertionException, 28747);
 }
 
 TEST_F(InvalidSampleSpec, ExtraOption) {

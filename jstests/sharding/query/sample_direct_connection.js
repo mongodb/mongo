@@ -21,4 +21,13 @@ const res = assert.commandWorked(
     shardDB.runCommand({aggregate: 'foo', pipeline: [{$sample: {size: 3}}], cursor: {}}));
 assert.eq(res.cursor.firstBatch.length, 3);
 
+// TODO(SERVER-94154): Remove version check here.
+const fcvDoc = st.s.adminCommand({getParameter: 1, featureCompatibilityVersion: 1});
+if (MongoRunner.compareBinVersions(fcvDoc.featureCompatibilityVersion.version, "8.1") >= 0) {
+    // Using a sample of size zero is only disallowed in some newer versions.
+    assert.commandFailedWithCode(
+        shardDB.runCommand({aggregate: 'foo', pipeline: [{$sample: {size: 0}}], cursor: {}}),
+        28747);
+}
+
 st.stop();
