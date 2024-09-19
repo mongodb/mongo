@@ -329,10 +329,11 @@ public:
         MONGO_UNREACHABLE;
     }
 
-    bool fieldsHaveSupportingUniqueIndex(const boost::intrusive_ptr<ExpressionContext>& expCtx,
-                                         const NamespaceString& nss,
-                                         const std::set<FieldPath>& fieldPaths) const override {
-        return true;
+    SupportingUniqueIndex fieldsHaveSupportingUniqueIndex(
+        const boost::intrusive_ptr<ExpressionContext>& expCtx,
+        const NamespaceString& nss,
+        const std::set<FieldPath>& fieldPaths) const override {
+        return SupportingUniqueIndex::Full;
     }
 
     boost::optional<ShardVersion> refreshAndGetCollectionVersion(
@@ -353,17 +354,18 @@ public:
         uasserted(51019, "Unexpected check of routing table");
     }
 
-    std::pair<std::set<FieldPath>, boost::optional<ChunkVersion>>
-    ensureFieldsUniqueOrResolveDocumentKey(
+    DocumentKeyResolutionMetadata ensureFieldsUniqueOrResolveDocumentKey(
         const boost::intrusive_ptr<ExpressionContext>& expCtx,
         boost::optional<std::set<FieldPath>> fieldPaths,
         boost::optional<ChunkVersion> targetCollectionPlacementVersion,
         const NamespaceString& outputNs) const override {
         if (!fieldPaths) {
-            return {std::set<FieldPath>{"_id"}, targetCollectionPlacementVersion};
+            return {std::set<FieldPath>{"_id"},
+                    targetCollectionPlacementVersion,
+                    SupportingUniqueIndex::Full};
         }
 
-        return {*fieldPaths, targetCollectionPlacementVersion};
+        return {*fieldPaths, targetCollectionPlacementVersion, SupportingUniqueIndex::Full};
     }
 
     std::unique_ptr<ScopedExpectUnshardedCollection> expectUnshardedCollectionInScope(

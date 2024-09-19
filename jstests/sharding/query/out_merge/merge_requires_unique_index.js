@@ -184,7 +184,7 @@ function runOnFieldsTests(targetShardKey, targetSplit) {
                                 }
                             }
                         ],
-                        51132);
+                        [51132, 51185]);
     });
 
     // Test that a unique index that is multikey can still be used.

@@ -105,9 +105,10 @@ StatusWith<CollectionRoutingInfo> getCollectionRoutingInfo(
     return swRoutingInfo;
 }
 
-bool supportsUniqueKey(const boost::intrusive_ptr<ExpressionContext>& expCtx,
-                       const BSONObj& index,
-                       const std::set<FieldPath>& uniqueKeyPaths) {
+MongoProcessInterface::SupportingUniqueIndex supportsUniqueKey(
+    const boost::intrusive_ptr<ExpressionContext>& expCtx,
+    const BSONObj& index,
+    const std::set<FieldPath>& uniqueKeyPaths) {
     // Retrieve the collation from the index, or default to the simple collation.
     const auto collation = uassertStatusOK(
         CollatorFactoryInterface::get(expCtx->opCtx->getServiceContext())
@@ -118,11 +119,18 @@ bool supportsUniqueKey(const boost::intrusive_ptr<ExpressionContext>& expCtx,
     // SERVER-5335: The _id index does not report to be unique, but in fact is unique.
     auto isIdIndex =
         index[IndexDescriptor::kIndexNameFieldName].String() == IndexConstants::kIdIndexName;
-    return (isIdIndex || index.getBoolField(IndexDescriptor::kUniqueFieldName)) &&
+    bool supports =
+        (isIdIndex || index.getBoolField(IndexDescriptor::kUniqueFieldName)) &&
         !index.hasField(IndexDescriptor::kPartialFilterExprFieldName) &&
         CommonProcessInterface::keyPatternNamesExactPaths(
-               index.getObjectField(IndexDescriptor::kKeyPatternFieldName), uniqueKeyPaths) &&
+            index.getObjectField(IndexDescriptor::kKeyPatternFieldName), uniqueKeyPaths) &&
         CollatorInterface::collatorsMatch(collation.get(), expCtx->getCollator());
+    if (!supports) {
+        return MongoProcessInterface::SupportingUniqueIndex::None;
+    }
+    return index.getBoolField(IndexDescriptor::kSparseFieldName)
+        ? MongoProcessInterface::SupportingUniqueIndex::NotNullish
+        : MongoProcessInterface::SupportingUniqueIndex::Full;
 }
 
 }  // namespace
@@ -364,7 +372,8 @@ bool MongosProcessInterface::isSharded(OperationContext* opCtx, const NamespaceS
     return cm.isSharded();
 }
 
-bool MongosProcessInterface::fieldsHaveSupportingUniqueIndex(
+MongoProcessInterface::SupportingUniqueIndex
+MongosProcessInterface::fieldsHaveSupportingUniqueIndex(
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
     const NamespaceString& nss,
     const std::set<FieldPath>& fieldPaths) const {
@@ -379,17 +388,22 @@ bool MongosProcessInterface::fieldsHaveSupportingUniqueIndex(
 
     // If the namespace does not exist, then the field paths *must* be _id only.
     if (response.getStatus() == ErrorCodes::NamespaceNotFound) {
-        return fieldPaths == std::set<FieldPath>{"_id"};
+        return fieldPaths == std::set<FieldPath>{"_id"} ? SupportingUniqueIndex::Full
+                                                        : SupportingUniqueIndex::None;
     }
     uassertStatusOK(response);
 
     const auto& indexes = response.getValue().docs;
-    return std::any_of(indexes.begin(), indexes.end(), [&expCtx, &fieldPaths](const auto& index) {
-        return supportsUniqueKey(expCtx, index, fieldPaths);
-    });
+    return std::accumulate(indexes.begin(),
+                           indexes.end(),
+                           SupportingUniqueIndex::None,
+                           [&expCtx, &fieldPaths](auto result, const auto& index) {
+                               return std::max(result,
+                                               supportsUniqueKey(expCtx, index, fieldPaths));
+                           });
 }
 
-std::pair<std::set<FieldPath>, boost::optional<ChunkVersion>>
+MongosProcessInterface::DocumentKeyResolutionMetadata
 MongosProcessInterface::ensureFieldsUniqueOrResolveDocumentKey(
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
     boost::optional<std::set<FieldPath>> fieldPaths,
@@ -401,13 +415,14 @@ MongosProcessInterface::ensureFieldsUniqueOrResolveDocumentKey(
             !targetCollectionPlacementVersion);
 
     if (fieldPaths) {
+        auto supportingUniqueIndex = fieldsHaveSupportingUniqueIndex(expCtx, outputNs, *fieldPaths);
         uassert(51190,
                 "Cannot find index to verify that join fields will be unique",
-                fieldsHaveSupportingUniqueIndex(expCtx, outputNs, *fieldPaths));
+                supportingUniqueIndex != SupportingUniqueIndex::None);
 
         // If the user supplies the 'fields' array, we don't need to attach a ChunkVersion for
         // the shards since we are not at risk of 'guessing' the wrong shard key.
-        return {*fieldPaths, boost::none};
+        return {*fieldPaths, boost::none, supportingUniqueIndex};
     }
 
     // In case there are multiple shards which will perform this stage in parallel, we need to
@@ -432,7 +447,8 @@ MongosProcessInterface::ensureFieldsUniqueOrResolveDocumentKey(
     auto docKeyPaths = collectDocumentKeyFieldsActingAsRouter(expCtx->opCtx, outputNs);
     return {std::set<FieldPath>(std::make_move_iterator(docKeyPaths.begin()),
                                 std::make_move_iterator(docKeyPaths.end())),
-            targetCollectionPlacementVersion};
+            targetCollectionPlacementVersion,
+            SupportingUniqueIndex::Full};
 }
 
 }  // namespace mongo

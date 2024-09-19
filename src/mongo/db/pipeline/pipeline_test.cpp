@@ -86,6 +86,7 @@
 #include "mongo/db/s/shard_server_test_fixture.h"
 #include "mongo/db/tenant_id.h"
 #include "mongo/dbtests/dbtests.h"  // IWYU pragma: keep
+#include "mongo/idl/server_parameter_test_util.h"
 #include "mongo/s/sharding_state.h"
 #include "mongo/unittest/assert.h"
 #include "mongo/unittest/bson_test_util.h"
@@ -4977,7 +4978,8 @@ public:
 
         static const std::string kSentPipeJson =
             "[{$merge: {into: {db: 'a', coll: 'outColl'}, on: '_id', "
-            "whenMatched: 'merge', whenNotMatched: 'insert'}}]";
+            "whenMatched: 'merge', whenNotMatched: 'insert', "
+            "allowMergeOnNullishValues: true}}]";
 
         std::string shardPipeJson = unsplittable ? "[]" : kSentPipeJson;
         std::string mergePipeJson = unsplittable ? kSentPipeJson : "[]";
@@ -5006,6 +5008,9 @@ TEST_F(PipelineOptimizationsShardMerger, Out) {
 };
 
 TEST_F(PipelineOptimizationsShardMerger, MergeWithUntrackedCollection) {
+    RAIIServerParameterControllerForTest featureFlagController(
+        "featureFlagAllowMergeOnNullishValues", true);
+
     const Timestamp timestamp{1, 1};
     getCatalogCacheMock()->setCollectionReturnValue(
         NamespaceString::createNamespaceString_forTest("a.outColl"),
@@ -5018,15 +5023,20 @@ TEST_F(PipelineOptimizationsShardMerger, MergeWithUntrackedCollection) {
     doTest("[{$merge: 'outColl'}]" /*inputPipeJson*/,
            "[]" /*shardPipeJson*/,
            "[{$merge: {into: {db: 'a', coll: 'outColl'}, on: '_id', "
-           "whenMatched: 'merge', whenNotMatched: 'insert'}}]" /*mergePipeJson*/,
+           "whenMatched: 'merge', whenNotMatched: 'insert', "
+           "allowMergeOnNullishValues: true}}]" /*mergePipeJson*/,
            kMyShardName /*needsSpecificShardMerger*/);
 };
 
 TEST_F(PipelineOptimizationsShardMerger, MergeWithShardedCollection) {
+    RAIIServerParameterControllerForTest featureFlagController(
+        "featureFlagAllowMergeOnNullishValues", true);
     doMergeWithCollectionWithRoutingTableTest(false /*unsplittable*/);
 };
 
 TEST_F(PipelineOptimizationsShardMerger, MergeWithUnsplittableCollection) {
+    RAIIServerParameterControllerForTest featureFlagController(
+        "featureFlagAllowMergeOnNullishValues", true);
     doMergeWithCollectionWithRoutingTableTest(true /*unsplittable*/);
 };
 

@@ -308,7 +308,7 @@ function dropWithoutImplicitRecreate(coll) {
             ],
             cursor: {}
         }),
-                                     [50905, 51132]);
+                                     [50905, 51132, 51185]);
     });
 }());
 

@@ -132,6 +132,13 @@ feature_flags:
       default: false
       shouldBeFCVGated: true
 
+    featureFlagAllowMergeOnNullishValues:
+      description: "Feature flag to support null and missing values for 'on' fields in $merge."
+      cpp_varname: gFeatureFlagAllowMergeOnNullishValues
+      default: true
+      version: 8.1
+      shouldBeFCVGated: true
+
     featureFlagBinDataConvertNumeric:
       description: "Feature flag to enable extended BinData support for int, double and long in $convert."
       cpp_varname: gFeatureFlagBinDataConvertNumeric

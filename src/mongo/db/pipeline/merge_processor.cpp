@@ -178,28 +178,6 @@ BatchTransform makeUpdateTransform(const std::string& updateOp) {
     };
 }
 
-/**
- * Extracts the fields of $merge 'on' from 'doc' and returns the key as a BSONObj. Throws if any
- * field of the 'on' extracted from 'doc' is nullish or an array.
- */
-BSONObj extractMergeOnFieldsFromDoc(const Document& doc, const std::set<FieldPath>& mergeOnFields) {
-    using namespace fmt::literals;
-    MutableDocument result;
-    for (const auto& field : mergeOnFields) {
-        auto value = doc.getNestedField(field);
-        uassert(51185,
-                "$merge write error: 'on' field '{}' is an array"_format(field.fullPath()),
-                !value.isArray());
-        uassert(
-            51132,
-            "$merge write error: 'on' field '{}' cannot be missing, null, undefined or an array"_format(
-                field.fullPath()),
-            !value.nullish());
-        result.addField(field.fullPath(), std::move(value));
-    }
-    return result.freeze().toBson();
-}
-
 }  // namespace
 
 /**
@@ -314,12 +292,14 @@ MergeProcessor::MergeProcessor(const boost::intrusive_ptr<ExpressionContext>& ex
                                MergeStrategyDescriptor::WhenNotMatched whenNotMatched,
                                boost::optional<BSONObj> letVariables,
                                boost::optional<std::vector<BSONObj>> pipeline,
-                               boost::optional<ChunkVersion> collectionPlacementVersion)
+                               boost::optional<ChunkVersion> collectionPlacementVersion,
+                               bool allowMergeOnNullishValues)
     : _expCtx(expCtx),
       _writeConcern(expCtx->opCtx->getWriteConcern()),
       _descriptor(getMergeStrategyDescriptors().at({whenMatched, whenNotMatched})),
       _pipeline(std::move(pipeline)),
-      _collectionPlacementVersion(collectionPlacementVersion) {
+      _collectionPlacementVersion(collectionPlacementVersion),
+      _allowMergeOnNullishValues(allowMergeOnNullishValues) {
     if (!letVariables) {
         return;
     }
@@ -349,7 +329,7 @@ MongoProcessInterface::BatchObject MergeProcessor::makeBatchObject(
         doc = mutableDoc.freeze();
     }
 
-    auto mergeOnFields = extractMergeOnFieldsFromDoc(doc, mergeOnFieldPaths);
+    auto mergeOnFields = _extractMergeOnFieldsFromDoc(doc, mergeOnFieldPaths);
     auto mod = makeBatchUpdateModification(doc);
     auto vars = resolveLetVariablesIfNeeded(doc);
     MongoProcessInterface::BatchObject batchObject{
@@ -375,5 +355,36 @@ void MergeProcessor::flush(const NamespaceString& outputNs,
                          std::move(bcr),
                          _descriptor.upsertType);
 }
+
+BSONObj MergeProcessor::_extractMergeOnFieldsFromDoc(
+    const Document& doc, const std::set<FieldPath>& mergeOnFields) const {
+    using namespace fmt::literals;
+    MutableDocument result;
+    for (const auto& field : mergeOnFields) {
+        Value value{doc};
+        for (size_t i = 0; i < field.getPathLength(); ++i) {
+            value = value.getDocument().getField(field.getFieldName(i));
+            uassert(51185,
+                    "$merge write error: 'on' field '{}' is an array"_format(field.fullPath()),
+                    !value.isArray());
+            if (i + 1 < field.getPathLength() && !value.isObject()) {
+                value = Value();
+                break;
+            }
+        }
+        uassert(
+            51132,
+            "$merge write error: 'on' field '{}' cannot be missing, null or undefined if supporting index is sparse"_format(
+                field.fullPath()),
+            _allowMergeOnNullishValues || !value.nullish());
+        if (value.nullish()) {
+            result.addField(field.fullPath(), Value(BSONNULL));
+        } else {
+            result.addField(field.fullPath(), std::move(value));
+        }
+    }
+    return result.freeze().toBson();
+}
+
 
 }  // namespace mongo

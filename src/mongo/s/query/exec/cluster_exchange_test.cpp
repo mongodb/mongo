@@ -94,6 +94,7 @@ protected:
     boost::optional<std::vector<BSONObj>> _mergePipeline;
     std::set<FieldPath> _mergeOnFields{"_id"};
     boost::optional<ChunkVersion> _mergeTargetCollectionPlacementVersion;
+    bool _allowMergeOnNullishValues{false};
 };
 
 TEST_F(ClusterExchangeTest, ShouldNotExchangeIfPipelineDoesNotEndWithMerge) {
@@ -130,7 +131,8 @@ TEST_F(ClusterExchangeTest, SingleMergeStageNotEligibleForExchangeIfOutputDataba
                                                       _mergeLetVariables,
                                                       _mergePipeline,
                                                       _mergeOnFields,
-                                                      _mergeTargetCollectionPlacementVersion)},
+                                                      _mergeTargetCollectionPlacementVersion,
+                                                      _allowMergeOnNullishValues)},
                          expCtx());
 
     auto future = launchAsync([&] {
@@ -163,7 +165,8 @@ TEST_F(ClusterExchangeTest, SingleMergeStageNotEligibleForExchangeIfOutputCollec
                                                       _mergeLetVariables,
                                                       _mergePipeline,
                                                       _mergeOnFields,
-                                                      _mergeTargetCollectionPlacementVersion)},
+                                                      _mergeTargetCollectionPlacementVersion,
+                                                      _allowMergeOnNullishValues)},
 
                          expCtx());
 
@@ -202,7 +205,8 @@ TEST_F(ClusterExchangeTest, LimitFollowedByMergeStageIsNotEligibleForExchange) {
                                                       _mergeLetVariables,
                                                       _mergePipeline,
                                                       _mergeOnFields,
-                                                      _mergeTargetCollectionPlacementVersion)},
+                                                      _mergeTargetCollectionPlacementVersion,
+                                                      _allowMergeOnNullishValues)},
                          expCtx());
 
     auto future = launchAsync([&] {
@@ -227,7 +231,8 @@ TEST_F(ClusterExchangeTest, GroupFollowedByMergeIsEligbleForExchange) {
                                                       _mergeLetVariables,
                                                       _mergePipeline,
                                                       _mergeOnFields,
-                                                      _mergeTargetCollectionPlacementVersion)},
+                                                      _mergeTargetCollectionPlacementVersion,
+                                                      _allowMergeOnNullishValues)},
                          expCtx());
 
     auto future = launchAsync([&] {
@@ -264,7 +269,8 @@ TEST_F(ClusterExchangeTest, RenamesAreEligibleForExchange) {
                                                       _mergeLetVariables,
                                                       _mergePipeline,
                                                       _mergeOnFields,
-                                                      _mergeTargetCollectionPlacementVersion)},
+                                                      _mergeTargetCollectionPlacementVersion,
+                                                      _allowMergeOnNullishValues)},
                          expCtx());
 
     auto future = launchAsync([&] {
@@ -304,7 +310,8 @@ TEST_F(ClusterExchangeTest, MatchesAreEligibleForExchange) {
                                                       _mergeLetVariables,
                                                       _mergePipeline,
                                                       _mergeOnFields,
-                                                      _mergeTargetCollectionPlacementVersion)},
+                                                      _mergeTargetCollectionPlacementVersion,
+                                                      _allowMergeOnNullishValues)},
                          expCtx());
 
     auto future = launchAsync([&] {
@@ -349,7 +356,8 @@ TEST_F(ClusterExchangeTest, SortThenGroupIsEligibleForExchange) {
                                                       _mergeLetVariables,
                                                       _mergePipeline,
                                                       _mergeOnFields,
-                                                      _mergeTargetCollectionPlacementVersion)},
+                                                      _mergeTargetCollectionPlacementVersion,
+                                                      _allowMergeOnNullishValues)},
                          expCtx());
 
     auto future = launchAsync([&] {
@@ -394,7 +402,8 @@ TEST_F(ClusterExchangeTest, SortThenGroupIsEligibleForExchangeHash) {
                                                       _mergeLetVariables,
                                                       _mergePipeline,
                                                       _mergeOnFields,
-                                                      _mergeTargetCollectionPlacementVersion)},
+                                                      _mergeTargetCollectionPlacementVersion,
+                                                      _allowMergeOnNullishValues)},
                          expCtx());
 
     auto future = launchAsync([&] {
@@ -441,7 +450,8 @@ TEST_F(ClusterExchangeTest, ProjectThroughDottedFieldDoesNotPreserveShardKey) {
                                      _mergeLetVariables,
                                      _mergePipeline,
                                      _mergeOnFields,
-                                     _mergeTargetCollectionPlacementVersion)},
+                                     _mergeTargetCollectionPlacementVersion,
+                                     _allowMergeOnNullishValues)},
         expCtx());
 
     auto future = launchAsync([&] {
@@ -477,7 +487,8 @@ TEST_F(ClusterExchangeTest, WordCountUseCaseExample) {
                                                       _mergeLetVariables,
                                                       _mergePipeline,
                                                       _mergeOnFields,
-                                                      _mergeTargetCollectionPlacementVersion)},
+                                                      _mergeTargetCollectionPlacementVersion,
+                                                      _allowMergeOnNullishValues)},
                          expCtx());
 
     auto future = launchAsync([&] {
@@ -545,7 +556,8 @@ TEST_F(ClusterExchangeTest, WordCountUseCaseExampleShardedByWord) {
                                                       _mergeLetVariables,
                                                       _mergePipeline,
                                                       _mergeOnFields,
-                                                      _mergeTargetCollectionPlacementVersion)},
+                                                      _mergeTargetCollectionPlacementVersion,
+                                                      _allowMergeOnNullishValues)},
                          expCtx());
 
     auto future = launchAsync([&] {
@@ -630,7 +642,8 @@ TEST_F(ClusterExchangeTest, CompoundShardKeyThreeShards) {
                                                       _mergeLetVariables,
                                                       _mergePipeline,
                                                       _mergeOnFields,
-                                                      _mergeTargetCollectionPlacementVersion)},
+                                                      _mergeTargetCollectionPlacementVersion,
+                                                      _allowMergeOnNullishValues)},
                          expCtx());
 
     auto future = launchAsync([&] {

@@ -566,15 +566,23 @@ public:
                                                                 const NamespaceString&,
                                                                 const MatchExpression*) const = 0;
 
+    enum class SupportingUniqueIndex {
+        None,        // No unique index
+        NotNullish,  // Sparse unique index, so only not nullish values are guaranteed to be unique
+        Full,        // Regular unique index, so any combination of indexed values is unique
+    };
     /**
-     * Returns true if there is an index on 'nss' with properties that will guarantee that a
+     * Checks, if there is an index on 'nss' with properties that will guarantee that a
      * document with non-array values for each of 'fieldPaths' will have at most one matching
      * document in 'nss'.
+     *
+     * If such index doesn't exist, returns None. If such index is sparse, returns NotNullish,
+     * because only not nullish values are guaranteed to be unique. Otherwise, returns Full.
      *
      * Specifically, such an index must include all the fields, be unique, not be a partial index,
      * and match the operation's collation as given by 'expCtx'.
      */
-    virtual bool fieldsHaveSupportingUniqueIndex(
+    virtual SupportingUniqueIndex fieldsHaveSupportingUniqueIndex(
         const boost::intrusive_ptr<ExpressionContext>& expCtx,
         const NamespaceString& nss,
         const std::set<FieldPath>& fieldPaths) const = 0;
@@ -621,6 +629,8 @@ public:
         const NamespaceString& nss,
         const boost::optional<DatabaseVersion>& dbVersion) = 0;
 
+    using DocumentKeyResolutionMetadata =
+        std::tuple<std::set<FieldPath>, boost::optional<ChunkVersion>, SupportingUniqueIndex>;
     /**
      * If the user did not provide the 'fieldPaths' set, a default unique key will be picked,
      * which can be either the "_id" field, or a shard key, depending on the 'outputNs' collection
@@ -629,8 +639,7 @@ public:
      * (on mongos only). On mongod, this is the value of the 'targetCollectionPlacementVersion'
      * parameter, which is the target placement version of the collection, as sent by mongos.
      */
-    virtual std::pair<std::set<FieldPath>, boost::optional<ChunkVersion>>
-    ensureFieldsUniqueOrResolveDocumentKey(
+    virtual DocumentKeyResolutionMetadata ensureFieldsUniqueOrResolveDocumentKey(
         const boost::intrusive_ptr<ExpressionContext>& expCtx,
         boost::optional<std::set<FieldPath>> fieldPaths,
         boost::optional<ChunkVersion> targetCollectionPlacementVersion,

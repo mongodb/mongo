@@ -122,3 +122,10 @@ structs:
                              refined. This also can be used to detect if the collection has gone
                              from unsharded to sharded, and thus now has a shard key.
                 query_shape: parameter
+
+            allowMergeOnNullishValues:
+                type: optionalBool
+                description: If set to true, allow values of "on" fields in $merge to include
+                             missing or null values. This fields should only be used by mongos when
+                             passing split pipeline to mongod.
+                query_shape: parameter

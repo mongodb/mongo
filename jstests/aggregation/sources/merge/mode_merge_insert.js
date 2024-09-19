@@ -255,17 +255,17 @@ const pipeline = [mergeStage];
     dropWithoutImplicitRecreate(source.getName());
     dropWithoutImplicitRecreate(target.getName());
 
-    assert.commandWorked(source.createIndex({"z": 1}, {unique: true}));
-    assert.commandWorked(target.createIndex({"z": 1}, {unique: true}));
+    assert.commandWorked(source.createIndex({"z": 1}, {unique: true, sparse: true}));
+    assert.commandWorked(target.createIndex({"z": 1}, {unique: true, sparse: true}));
 
-    // The 'on' field is missing.
+    // The 'on' field is missing and the index is sparse.
     assert.commandWorked(source.insert({_id: 1}));
     let error = assert.throws(
         () => source.aggregate(
             [{$project: {_id: 0}}, {$merge: Object.assign({on: "z"}, mergeStage.$merge)}]));
     assert.commandFailedWithCode(error, 51132);
 
-    // The 'on' field is null.
+    // The 'on' field is null and the index is sparse.
     assert.commandWorked(source.update({_id: 1}, {z: null}));
     error = assert.throws(
         () => source.aggregate(

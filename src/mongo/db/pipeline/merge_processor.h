@@ -120,7 +120,8 @@ public:
                    MergeStrategyDescriptor::WhenNotMatched whenNotMatched,
                    boost::optional<BSONObj> letVariables,
                    boost::optional<std::vector<BSONObj>> pipeline,
-                   boost::optional<ChunkVersion> collectionPlacementVersion);
+                   boost::optional<ChunkVersion> collectionPlacementVersion,
+                   bool allowMergeOnNullishValues);
 
     const MergeStrategyDescriptor& getMergeStrategyDescriptor() const {
         return _descriptor;
@@ -136,6 +137,10 @@ public:
 
     const auto& getCollectionPlacementVersion() const {
         return _collectionPlacementVersion;
+    }
+
+    bool getAllowMergeOnNullishValues() const {
+        return _allowMergeOnNullishValues;
     }
 
     MongoProcessInterface::BatchObject makeBatchObject(Document doc,
@@ -176,6 +181,14 @@ private:
         return bob.obj();
     }
 
+    /**
+     * Extracts the fields of $merge 'on' from 'doc' and returns the key as a BSONObj. Throws if any
+     * field of the 'on' extracted from 'doc' is an array.
+     */
+    BSONObj _extractMergeOnFieldsFromDoc(const Document& doc,
+                                         const std::set<FieldPath>& mergeOnFields) const;
+
+
     boost::intrusive_ptr<ExpressionContext> _expCtx;
 
     WriteConcernOptions _writeConcern;
@@ -197,6 +210,7 @@ private:
     boost::optional<std::vector<BSONObj>> _pipeline;
 
     boost::optional<ChunkVersion> _collectionPlacementVersion;
+    bool _allowMergeOnNullishValues;
 };
 
 }  // namespace mongo

@@ -963,7 +963,8 @@ TEST_F(DocumentSourceMergeTest, SerializeTargetCollectionVersion) {
                             "i": 0
                         }
                     }
-                }
+                },
+                "allowMergeOnNullishValues": true
             }
         })",
             serialized.toBson());
@@ -971,6 +972,8 @@ TEST_F(DocumentSourceMergeTest, SerializeTargetCollectionVersion) {
 }
 
 TEST_F(DocumentSourceMergeTest, SerializeEmptyLetVariableMentionNew) {
+    RAIIServerParameterControllerForTest featureFlagController(
+        "featureFlagAllowMergeOnNullishValues", true);
     auto pipeline = BSON_ARRAY(fromjson("{$project: {_id: true, x: '$$new'}}"));
     auto spec =
         BSON("$merge" << BSON("into"
@@ -999,7 +1002,8 @@ TEST_F(DocumentSourceMergeTest, SerializeEmptyLetVariableMentionNew) {
                         }
                     }
                 ],
-                "whenNotMatched": "insert"
+                "whenNotMatched": "insert",
+                "allowMergeOnNullishValues": true
             }
         })",
         serialized.toBson());
@@ -1235,6 +1239,8 @@ TEST_F(DocumentSourceMergeServerlessTest,
 }
 
 TEST_F(DocumentSourceMergeTest, QueryShape) {
+    RAIIServerParameterControllerForTest featureFlagController(
+        "featureFlagAllowMergeOnNullishValues", true);
     auto pipeline = BSON_ARRAY(BSON("$project" << BSON("x"
                                                        << "1")));
     auto let = BSON("new"

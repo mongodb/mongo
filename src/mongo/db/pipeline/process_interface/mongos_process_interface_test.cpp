@@ -48,13 +48,14 @@ class MongosProcessInterfaceForTest : public MongosProcessInterface {
 public:
     using MongosProcessInterface::MongosProcessInterface;
 
-    bool fieldsHaveSupportingUniqueIndex(const boost::intrusive_ptr<ExpressionContext>& expCtx,
-                                         const NamespaceString& nss,
-                                         const std::set<FieldPath>& fieldPaths) const override {
+    SupportingUniqueIndex fieldsHaveSupportingUniqueIndex(
+        const boost::intrusive_ptr<ExpressionContext>& expCtx,
+        const NamespaceString& nss,
+        const std::set<FieldPath>& fieldPaths) const override {
         return hasSupportingIndexForFields;
     }
 
-    bool hasSupportingIndexForFields{true};
+    SupportingUniqueIndex hasSupportingIndexForFields{SupportingUniqueIndex::Full};
 };
 
 class MongosProcessInterfaceTest : public AggregationContextFixture {
@@ -86,7 +87,8 @@ TEST_F(MongosProcessInterfaceTest, FailsToEnsureFieldsUniqueIfNotSupportedByInde
     auto targetCollectionPlacementVersion = boost::none;
     auto processInterface = makeProcessInterface();
 
-    processInterface->hasSupportingIndexForFields = false;
+    processInterface->hasSupportingIndexForFields =
+        MongoProcessInterface::SupportingUniqueIndex::None;
     ASSERT_THROWS_CODE(processInterface->ensureFieldsUniqueOrResolveDocumentKey(
                            expCtx, {{"x"}}, targetCollectionPlacementVersion, expCtx->ns),
                        AssertionException,

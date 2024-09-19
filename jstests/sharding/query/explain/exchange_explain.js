@@ -62,7 +62,7 @@ st.shardColl(inColl, {a: 1}, {a: 500}, {a: 500}, mongosDB.getName());
 // Insert some data to the input collection.
 let bulk = inColl.initializeUnorderedBulkOp();
 for (let i = 0; i < numDocs; i++) {
-    bulk.insert({a: i}, {b: [0, 1, 2, 3, i]});
+    bulk.insert({a: i, b: [0, 1, 2, 3, i]});
 }
 assert.commandWorked(bulk.execute());
 
@@ -112,7 +112,7 @@ assertErrorCode(inColl,
                         whenNotMatched: "insert"
                     }
                 }],
-                51132);
+                [51132, 51185]);
 
 // Turn off the exchange and rerun the query.
 assert.commandWorked(mongosDB.adminCommand({setParameter: 1, internalQueryDisableExchange: 1}));
@@ -135,7 +135,7 @@ assertErrorCode(inColl,
                         whenNotMatched: "insert"
                     }
                 }],
-                51132);
+                [51132, 51185]);
 
 // SERVER-38349 Make sure mongos rejects specifying exchange directly.
 assert.commandFailedWithCode(mongosDB.runCommand({

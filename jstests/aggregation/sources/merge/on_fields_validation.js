@@ -42,10 +42,10 @@ assertOnFieldsIsInvalid([true, "a"], 51134);
 
 //
 // An error is raised if $merge encounters a document that is missing one or more of the
-// "on" fields.
+// "on" fields when the index is sparse.
 //
 assert.commandWorked(target.remove({}));
-assert.commandWorked(target.createIndex({name: 1, team: -1}, {unique: true}));
+assert.commandWorked(target.createIndex({name: 1, team: -1}, {unique: true, sparse: true}));
 const pipelineNameTeam = [{
     $merge: {
         into: target.getName(),
@@ -73,10 +73,10 @@ assert.eq(target.find().toArray(), [{_id: 0, name: "nicholas", team: "query"}]);
 
 //
 // An error is raised if $merge encounters a document where one of the "on" fields is a nullish
-// value.
+// value when the index is sparse.
 //
 assert.commandWorked(target.remove({}));
-assert.commandWorked(target.createIndex({"song.artist": 1}, {unique: 1}));
+assert.commandWorked(target.createIndex({"song.artist": 1}, {unique: 1, sparse: true}));
 const pipelineSongDotArtist = [{
     $merge: {
         into: target.getName(),
@@ -112,7 +112,7 @@ assert.eq(target.find().toArray(), [{_id: 0, song: {artist: "Illenium"}}]);
 // of an "on" field) is an array.
 //
 assert.commandWorked(target.remove({}));
-assert.commandWorked(target.createIndex({"address.street": 1}, {unique: 1}));
+assert.commandWorked(target.createIndex({"address.street": 1}, {unique: 1, sparse: 1}));
 const pipelineAddressDotStreet = [{
     $merge: {
         into: target.getName(),
@@ -129,7 +129,7 @@ assertErrorCode(source, pipelineAddressDotStreet, 51185);
 
 // "address" is an array (a prefix of an "on" field).
 assert.commandWorked(source.update({_id: 0}, {_id: 0, address: [{street: "1633 Broadway"}]}));
-assertErrorCode(source, pipelineAddressDotStreet, 51132);
+assertErrorCode(source, pipelineAddressDotStreet, 51185);
 
 // A scalar "address.street" is accepted.
 assert.commandWorked(source.update({_id: 0}, {_id: 0, address: {street: "1633 Broadway"}}));

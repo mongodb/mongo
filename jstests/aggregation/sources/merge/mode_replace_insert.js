@@ -105,7 +105,7 @@ assert.neq(null, outResult[1]._id, errmsgFn);
 
 // Test that $merge with a missing non-id "on" field fails.
 dropWithoutImplicitRecreate(outColl.getName());
-assert.commandWorked(outColl.createIndex({missing: 1}, {unique: true}));
+assert.commandWorked(outColl.createIndex({missing: 1}, {unique: true, sparse: true}));
 assertErrorCode(
     coll,
     [{
@@ -150,7 +150,7 @@ assertErrorCode(coll,
                         }
                     }
                 ],
-                51132);
+                [51132, 51185]);
 
 coll.drop();
 assert.commandWorked(coll.insert({_id: 0, a: [{b: 1}]}));
@@ -166,7 +166,7 @@ assertErrorCode(coll,
                         }
                     }
                 ],
-                51132);
+                [51132, 51185]);
 
 // Tests for $merge to a database that differs from the aggregation database.
 const foreignDb = db.getSiblingDB("merge_replace_insert_foreign");

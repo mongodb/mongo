@@ -141,12 +141,20 @@ bool keyPatternNamesExactPaths(const BSONObj& keyPattern,
     return nFieldsMatched == uniqueKeyPaths.size();
 }
 
-bool supportsUniqueKey(const boost::intrusive_ptr<ExpressionContext>& expCtx,
-                       const IndexCatalogEntry* index,
-                       const std::set<FieldPath>& uniqueKeyPaths) {
-    return (index->descriptor()->unique() && !index->descriptor()->isPartial() &&
-            keyPatternNamesExactPaths(index->descriptor()->keyPattern(), uniqueKeyPaths) &&
-            CollatorInterface::collatorsMatch(index->getCollator(), expCtx->getCollator()));
+MongoProcessInterface::SupportingUniqueIndex supportsUniqueKey(
+    const boost::intrusive_ptr<ExpressionContext>& expCtx,
+    const IndexCatalogEntry* index,
+    const std::set<FieldPath>& uniqueKeyPaths) {
+    bool supports =
+        (index->descriptor()->unique() && !index->descriptor()->isPartial() &&
+         keyPatternNamesExactPaths(index->descriptor()->keyPattern(), uniqueKeyPaths) &&
+         CollatorInterface::collatorsMatch(index->getCollator(), expCtx->getCollator()));
+    if (!supports) {
+        return MongoProcessInterface::SupportingUniqueIndex::None;
+    }
+    return index->descriptor()->isSparse()
+        ? MongoProcessInterface::SupportingUniqueIndex::NotNullish
+        : MongoProcessInterface::SupportingUniqueIndex::Full;
 }
 
 // Proactively assert that this operation can safely write before hitting an assertion in the
@@ -737,7 +745,8 @@ std::vector<BSONObj> CommonMongodProcessInterface::getMatchingPlanCacheEntryStat
     return planCacheEntries;
 }
 
-bool CommonMongodProcessInterface::fieldsHaveSupportingUniqueIndex(
+MongoProcessInterface::SupportingUniqueIndex
+CommonMongodProcessInterface::fieldsHaveSupportingUniqueIndex(
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
     const NamespaceString& nss,
     const std::set<FieldPath>& fieldPaths) const {
@@ -753,18 +762,21 @@ bool CommonMongodProcessInterface::fieldsHaveSupportingUniqueIndex(
     auto collection =
         db ? CollectionCatalog::get(opCtx)->lookupCollectionByNamespace(opCtx, nss) : nullptr;
     if (!collection) {
-        return fieldPaths == std::set<FieldPath>{"_id"};
+        return fieldPaths == std::set<FieldPath>{"_id"} ? SupportingUniqueIndex::Full
+                                                        : SupportingUniqueIndex::None;
     }
 
     auto indexIterator = collection->getIndexCatalog()->getIndexIterator(
         opCtx, IndexCatalog::InclusionPolicy::kReady);
+    auto result = SupportingUniqueIndex::None;
     while (indexIterator->more()) {
         const IndexCatalogEntry* entry = indexIterator->next();
-        if (supportsUniqueKey(expCtx, entry, fieldPaths)) {
-            return true;
+        result = std::max(result, supportsUniqueKey(expCtx, entry, fieldPaths));
+        if (result == SupportingUniqueIndex::Full) {
+            break;
         }
     }
-    return false;
+    return result;
 }
 
 BSONObj CommonMongodProcessInterface::_reportCurrentOpForClient(
@@ -874,7 +886,7 @@ std::unique_ptr<CollatorInterface> CommonMongodProcessInterface::_getCollectionD
     return collator ? collator->clone() : nullptr;
 }
 
-std::pair<std::set<FieldPath>, boost::optional<ChunkVersion>>
+CommonMongodProcessInterface::DocumentKeyResolutionMetadata
 CommonMongodProcessInterface::ensureFieldsUniqueOrResolveDocumentKey(
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
     boost::optional<std::set<FieldPath>> fieldPaths,
@@ -886,17 +898,20 @@ CommonMongodProcessInterface::ensureFieldsUniqueOrResolveDocumentKey(
 
     if (!fieldPaths) {
         uassert(51124, "Expected fields to be provided from mongos", !expCtx->fromMongos);
-        return {std::set<FieldPath>{"_id"}, targetCollectionPlacementVersion};
+        return {std::set<FieldPath>{"_id"},
+                targetCollectionPlacementVersion,
+                SupportingUniqueIndex::Full};
     }
 
     // Make sure the 'fields' array has a supporting index. Skip this check if the command is sent
     // from mongos since the 'fields' check would've happened already.
+    auto supportingUniqueIndex = fieldsHaveSupportingUniqueIndex(expCtx, outputNs, *fieldPaths);
     if (!expCtx->fromMongos) {
         uassert(51183,
                 "Cannot find index to verify that join fields will be unique",
-                fieldsHaveSupportingUniqueIndex(expCtx, outputNs, *fieldPaths));
+                supportingUniqueIndex != SupportingUniqueIndex::None);
     }
-    return {*fieldPaths, targetCollectionPlacementVersion};
+    return {*fieldPaths, targetCollectionPlacementVersion, supportingUniqueIndex};
 }
 
 BSONObj CommonMongodProcessInterface::_convertRenameToInternalRename(

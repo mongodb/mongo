@@ -56,9 +56,10 @@ class MongoProcessInterfaceForTest : public StandaloneProcessInterface {
 public:
     using StandaloneProcessInterface::StandaloneProcessInterface;
 
-    bool fieldsHaveSupportingUniqueIndex(const boost::intrusive_ptr<ExpressionContext>& expCtx,
-                                         const NamespaceString& nss,
-                                         const std::set<FieldPath>& fields) const override {
+    SupportingUniqueIndex fieldsHaveSupportingUniqueIndex(
+        const boost::intrusive_ptr<ExpressionContext>& expCtx,
+        const NamespaceString& nss,
+        const std::set<FieldPath>& fields) const override {
         return hasSupportingIndexForFields;
     }
 
@@ -69,7 +70,7 @@ public:
         return;
     }
 
-    bool hasSupportingIndexForFields{true};
+    SupportingUniqueIndex hasSupportingIndexForFields{SupportingUniqueIndex::Full};
 };
 
 class ProcessInterfaceStandaloneTest : public AggregationContextFixture {
@@ -95,12 +96,14 @@ TEST_F(ProcessInterfaceStandaloneTest,
 
     // Test that 'targetCollectionPlacementVersion' is accepted if from mongos.
     expCtx->fromMongos = true;
-    auto [joinKey, chunkVersion] = processInterface->ensureFieldsUniqueOrResolveDocumentKey(
-        expCtx, {{"_id"}}, targetCollectionPlacementVersion, expCtx->ns);
+    auto [joinKey, chunkVersion, supportingUniqueIndex] =
+        processInterface->ensureFieldsUniqueOrResolveDocumentKey(
+            expCtx, {{"_id"}}, targetCollectionPlacementVersion, expCtx->ns);
     ASSERT_EQ(joinKey.size(), 1UL);
     ASSERT_EQ(joinKey.count(FieldPath("_id")), 1UL);
     ASSERT(chunkVersion);
     ASSERT_EQ(*chunkVersion, *targetCollectionPlacementVersion);
+    ASSERT_EQ(supportingUniqueIndex, MongoProcessInterface::SupportingUniqueIndex::Full);
 }
 
 TEST_F(ProcessInterfaceStandaloneTest, FailsToEnsureFieldsUniqueIfJoinFieldsAreNotSentFromMongos) {
@@ -123,7 +126,8 @@ TEST_F(ProcessInterfaceStandaloneTest,
     auto processInterface = makeProcessInterface();
 
     expCtx->fromMongos = false;
-    processInterface->hasSupportingIndexForFields = false;
+    processInterface->hasSupportingIndexForFields =
+        MongoProcessInterface::SupportingUniqueIndex::None;
     ASSERT_THROWS_CODE(processInterface->ensureFieldsUniqueOrResolveDocumentKey(
                            expCtx, {{"x"}}, targetCollectionPlacementVersion, expCtx->ns),
                        AssertionException,

@@ -218,7 +218,8 @@ auto translateOutMerge(boost::intrusive_ptr<ExpressionContext> expCtx,
                                        boost::none,  // Let variables
                                        boost::none,  // pipeline
                                        std::set<FieldPath>{FieldPath("_id"s)},
-                                       std::move(targetCollectionPlacementVersion));
+                                       std::move(targetCollectionPlacementVersion),
+                                       true /*allowMergeOnNullishValues*/);
 }
 
 auto translateOutReduce(boost::intrusive_ptr<ExpressionContext> expCtx,
@@ -249,7 +250,6 @@ auto translateOutReduce(boost::intrusive_ptr<ExpressionContext> expCtx,
                  << BSON("value" << BSON(ExpressionFunction::kExpressionName << finalizeObj)));
         pipelineSpec->emplace_back(std::move(finalizeSpec));
     }
-
     return DocumentSourceMerge::create(std::move(targetNss),
                                        expCtx,
                                        MergeWhenMatchedModeEnum::kPipeline,
@@ -257,7 +257,8 @@ auto translateOutReduce(boost::intrusive_ptr<ExpressionContext> expCtx,
                                        boost::none,  // Let variables
                                        pipelineSpec,
                                        std::set<FieldPath>{FieldPath("_id"s)},
-                                       std::move(targetCollectionPlacementVersion));
+                                       std::move(targetCollectionPlacementVersion),
+                                       true /*allowMergeOnNullishValues*/);
 }
 
 void rejectRequestsToCreateShardedCollections(
@@ -453,7 +454,7 @@ std::unique_ptr<Pipeline, PipelineDeleter> translateFromMR(
     // If non-inline output, verify that the target collection is *not* sharded by anything other
     // than _id.
     if (parsedMr.getOutOptions().getOutputType() != OutputType::InMemory) {
-        std::tie(shardKey, targetCollectionPlacementVersion) =
+        std::tie(shardKey, targetCollectionPlacementVersion, std::ignore) =
             expCtx->mongoProcessInterface->ensureFieldsUniqueOrResolveDocumentKey(
                 expCtx, boost::none, boost::none, outNss);
         uassert(31313,
