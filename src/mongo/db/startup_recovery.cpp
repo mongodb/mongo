@@ -265,6 +265,10 @@ auto downgradeError =
                          << feature_compatibility_version_documentation::kUpgradeLink
                          << " for more details."};
 
+auto needResyncError = Status{ErrorCodes::IndexNotFound,
+                              "The _id index is missing and cannot be rebuilt while using a "
+                              "replica set. A full resync should be run to address this."};
+
 /**
  * Checks that all collections on a database have valid properties for this version of MongoDB.
  *
@@ -292,6 +296,14 @@ Status ensureCollectionProperties(OperationContext* opCtx,
         // that was created manually by the user. Check the list of indexes to confirm index
         // does not exist before attempting to build it or returning an error.
         if (requiresIndex && !hasAutoIndexIdField && !checkIdIndexExists(opCtx, coll)) {
+            if (repl::ReplicationCoordinator::get(opCtx)->getSettings().isReplSet()) {
+                LOGV2_ERROR(9271000,
+                            "Cannot rebuild a missing _id index on a replica set. A full resync "
+                            "should be run to address this.",
+                            logAttrs(*coll));
+                return needResyncError;
+            }
+
             LOGV2(21001, "Collection is missing an _id index", logAttrs(*coll));
             if (EnsureIndexPolicy::kBuildMissing == ensureIndexPolicy) {
                 auto status = buildMissingIdIndex(opCtx, coll->ns());
