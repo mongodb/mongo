@@ -219,6 +219,10 @@ Set.tojson = function(s, indent, nolint, depth) {
     return Array.tojson(Array.from(s), indent, nolint, depth);
 };
 
+Map.tojson = function(m, indent, nolint, depth) {
+    return Array.tojson(Array.from(m.entries()), indent, nolint, depth);
+};
+
 Array.fetchRefs = function(arr, coll) {
     if (!Array.isArray(arr)) {
         throw new Error("The first argument to Array.fetchRefs must be an array");

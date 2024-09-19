@@ -54,6 +54,33 @@ x = {
 };
 assert.eq(tojson(x, "", false), '{\n\t"x" : Timestamp(10, 2)\n}', "H");
 
+// Map type
+x = new Map();
+assert.eq(tojson(x, "", false), '[ ]', "I");
+
+x = new Map();
+x.set("one", 1);
+x.set(2, "two");
+assert.eq(tojson(x, "", false),
+          '[\n\t[\n\t\t\"one\",\n\t\t1\n\t],\n\t[\n\t\t2,\n\t\t\"two\"\n\t]\n]',
+          "J");
+
+x = new Map();
+x.set("one", 1);
+x.set(2, {y: [3, 4]});
+assert.eq(
+    tojson(x, "", false),
+    '[\n\t[\n\t\t\"one\",\n\t\t1\n\t],\n\t[\n\t\t2,\n\t\t{\n\t\t\t\"y\" : [\n\t\t\t\t3,\n\t\t\t\t4\n\t\t\t]\n\t\t}\n\t]\n]',
+    "K");
+
+assert.eq(x, x);
+assert.neq(x, new Map());
+
+y = new Map();
+y.set("one", 1);
+y.set(2, {y: [3, 4]});
+assert.eq(x, y);
+
 // tostrictjson produces proper output
 x = {
     "x": NumberLong(64)
