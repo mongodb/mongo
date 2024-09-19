@@ -56,9 +56,12 @@
 #include "mongo/db/exec/sbe/values/column_op.h"
 #include "mongo/db/exec/sbe/values/slot.h"
 #include "mongo/db/exec/sbe/values/value.h"
-#include "mongo/db/exec/sbe/vm/datetime.h"
-#include "mongo/db/exec/sbe/vm/label.h"
+#include "mongo/db/exec/sbe/vm/code_fragment.h"
 #include "mongo/db/exec/sbe/vm/makeobj_cursors.h"
+#include "mongo/db/exec/sbe/vm/vm_builtin.h"
+#include "mongo/db/exec/sbe/vm/vm_instruction.h"
+#include "mongo/db/exec/sbe/vm/vm_memory.h"
+#include "mongo/db/exec/sbe/vm/vm_types.h"
 #include "mongo/db/pipeline/accumulator_multi.h"
 #include "mongo/db/query/collation/collator_interface.h"
 #include "mongo/db/query/datetime/date_time_support.h"
@@ -77,720 +80,6 @@
 namespace mongo {
 namespace sbe {
 namespace vm {
-namespace {
-template <typename T>
-T readFromMemory(const uint8_t* ptr) noexcept {
-    static_assert(!IsEndian<T>::value);
-
-    T val;
-    memcpy(&val, ptr, sizeof(T));
-    return val;
-}
-
-template <typename T>
-size_t writeToMemory(uint8_t* ptr, const T val) noexcept {
-    static_assert(!IsEndian<T>::value);
-
-    memcpy(ptr, &val, sizeof(T));
-    return sizeof(T);
-}
-}  // namespace
-
-/**
- * Enumeration of built-in VM instructions. These are implemented in vm.cpp ByteCode::runInternal.
- *
- * See also enum class Builtin for built-in functions, like 'addToArray', that are implemented as
- * C++ rather than VM instructions.
- */
-struct Instruction {
-    enum Tags {
-        pushConstVal,
-        pushAccessVal,
-        pushOwnedAccessorVal,
-        pushEnvAccessorVal,
-        pushMoveVal,
-        pushLocalVal,
-        pushMoveLocalVal,
-        pushLocalLambda,
-        pop,
-        swap,
-
-        add,
-        sub,
-        mul,
-        div,
-        idiv,
-        mod,
-        negate,
-        numConvert,
-
-        logicNot,
-
-        less,
-        lessEq,
-        greater,
-        greaterEq,
-        eq,
-        neq,
-
-        // 3 way comparison (spaceship) with bson woCompare semantics.
-        cmp3w,
-
-        // collation-aware comparison instructions
-        collLess,
-        collLessEq,
-        collGreater,
-        collGreaterEq,
-        collEq,
-        collNeq,
-        collCmp3w,
-
-        fillEmpty,
-        fillEmptyImm,
-        getField,
-        getFieldImm,
-        getElement,
-        collComparisonKey,
-        getFieldOrElement,
-        traverseP,  // traverse projection paths
-        traversePImm,
-        traverseF,  // traverse filter paths
-        traverseFImm,
-        magicTraverseF,
-        // Iterates over values in column index cells. Skips values from nested arrays.
-        traverseCsiCellValues,
-        // Iterates the column index cell and returns values representing the types of cell's
-        // content, including arrays and nested objects. Skips contents of nested arrays.
-        traverseCsiCellTypes,
-        setField,      // add or overwrite a field in a document
-        getArraySize,  // number of elements
-
-        aggSum,
-        aggCount,
-        aggMin,
-        aggMax,
-        aggFirst,
-        aggLast,
-
-        aggCollMin,
-        aggCollMax,
-
-        exists,
-        isNull,
-        isObject,
-        isArray,
-        isInList,
-        isString,
-        isNumber,
-        isBinData,
-        isDate,
-        isNaN,
-        isInfinity,
-        isRecordId,
-        isMinKey,
-        isMaxKey,
-        isTimestamp,
-        isKeyString,
-        typeMatchImm,
-
-        function,
-        functionSmall,
-
-        jmp,  // offset is calculated from the end of instruction
-        jmpTrue,
-        jmpFalse,
-        jmpNothing,
-        jmpNotNothing,
-        ret,  // used only by simple local lambdas
-        allocStack,
-
-        fail,
-
-        dateTruncImm,
-
-        valueBlockApplyLambda,  // Applies a lambda to each element in a block, returning a new
-                                // block.
-
-        lastInstruction  // this is just a marker used to calculate number of instructions
-    };
-
-    enum Constants : uint8_t {
-        Nothing,
-        Null,
-        False,
-        True,
-        Int32One,
-    };
-
-    constexpr static size_t kMaxInlineStringSize = 256;
-
-    /**
-     * An instruction parameter descriptor. Values (instruction arguments) live on the VM stack and
-     * the descriptor tells where to find it. The position on the stack is expressed as an offset
-     * from the top of stack.
-     * Optionally, an instruction can "consume" the value by popping the stack. All non-named
-     * temporaries are popped after the use. Naturally, only the top of stack (offset 0) can be
-     * popped. We do not support an arbitrary erasure from the middle of stack.
-     */
-    struct Parameter {
-        int variable{0};
-        bool moveFrom{false};
-        boost::optional<FrameId> frameId;
-
-        // Get the size in bytes of an instruction parameter encoded in byte code.
-        size_t size() const noexcept {
-            return sizeof(bool) + (frameId ? sizeof(int) : 0);
-        }
-
-        MONGO_COMPILER_ALWAYS_INLINE_OPT
-        static FastTuple<bool, bool, int> decodeParam(const uint8_t*& pcPointer) noexcept {
-            auto flags = readFromMemory<uint8_t>(pcPointer);
-            bool pop = flags & 1u;
-            bool moveFrom = flags & 2u;
-            pcPointer += sizeof(pop);
-            int offset = 0;
-            if (!pop) {
-                offset = readFromMemory<int>(pcPointer);
-                pcPointer += sizeof(offset);
-            }
-
-            return {pop, moveFrom, offset};
-        }
-    };
-
-    static const char* toStringConstants(Constants k) {
-        switch (k) {
-            case Nothing:
-                return "Nothing";
-            case Null:
-                return "Null";
-            case True:
-                return "True";
-            case False:
-                return "False";
-            case Int32One:
-                return "1";
-            default:
-                return "unknown";
-        }
-    }
-
-    // Make sure that values in this arrays are always in-sync with the enum.
-    static int stackOffset[];
-
-    uint8_t tag;
-
-    const char* toString() const {
-        switch (tag) {
-            case pushConstVal:
-                return "pushConstVal";
-            case pushAccessVal:
-                return "pushAccessVal";
-            case pushOwnedAccessorVal:
-                return "pushOwnedAccessorVal";
-            case pushEnvAccessorVal:
-                return "pushEnvAccessorVal";
-            case pushMoveVal:
-                return "pushMoveVal";
-            case pushLocalVal:
-                return "pushLocalVal";
-            case pushMoveLocalVal:
-                return "pushMoveLocalVal";
-            case pushLocalLambda:
-                return "pushLocalLambda";
-            case pop:
-                return "pop";
-            case swap:
-                return "swap";
-            case add:
-                return "add";
-            case sub:
-                return "sub";
-            case mul:
-                return "mul";
-            case div:
-                return "div";
-            case idiv:
-                return "idiv";
-            case mod:
-                return "mod";
-            case negate:
-                return "negate";
-            case numConvert:
-                return "numConvert";
-            case logicNot:
-                return "logicNot";
-            case less:
-                return "less";
-            case lessEq:
-                return "lessEq";
-            case greater:
-                return "greater";
-            case greaterEq:
-                return "greaterEq";
-            case eq:
-                return "eq";
-            case neq:
-                return "neq";
-            case cmp3w:
-                return "cmp3w";
-            case collLess:
-                return "collLess";
-            case collLessEq:
-                return "collLessEq";
-            case collGreater:
-                return "collGreater";
-            case collGreaterEq:
-                return "collGreaterEq";
-            case collEq:
-                return "collEq";
-            case collNeq:
-                return "collNeq";
-            case collCmp3w:
-                return "collCmp3w";
-            case fillEmpty:
-                return "fillEmpty";
-            case fillEmptyImm:
-                return "fillEmptyImm";
-            case getField:
-                return "getField";
-            case getFieldImm:
-                return "getFieldImm";
-            case getElement:
-                return "getElement";
-            case collComparisonKey:
-                return "collComparisonKey";
-            case getFieldOrElement:
-                return "getFieldOrElement";
-            case traverseP:
-                return "traverseP";
-            case traversePImm:
-                return "traversePImm";
-            case traverseF:
-                return "traverseF";
-            case traverseFImm:
-                return "traverseFImm";
-            case traverseCsiCellValues:
-                return "traverseCsiCellValues";
-            case traverseCsiCellTypes:
-                return "traverseCsiCellTypes";
-            case setField:
-                return "setField";
-            case getArraySize:
-                return "getArraySize";
-            case aggSum:
-                return "aggSum";
-            case aggCount:
-                return "aggCount";
-            case aggMin:
-                return "aggMin";
-            case aggMax:
-                return "aggMax";
-            case aggFirst:
-                return "aggFirst";
-            case aggLast:
-                return "aggLast";
-            case aggCollMin:
-                return "aggCollMin";
-            case aggCollMax:
-                return "aggCollMax";
-            case exists:
-                return "exists";
-            case isNull:
-                return "isNull";
-            case isObject:
-                return "isObject";
-            case isArray:
-                return "isArray";
-            case isInList:
-                return "isInList";
-            case isString:
-                return "isString";
-            case isNumber:
-                return "isNumber";
-            case isBinData:
-                return "isBinData";
-            case isDate:
-                return "isDate";
-            case isNaN:
-                return "isNaN";
-            case isInfinity:
-                return "isInfinity";
-            case isRecordId:
-                return "isRecordId";
-            case isMinKey:
-                return "isMinKey";
-            case isMaxKey:
-                return "isMaxKey";
-            case isTimestamp:
-                return "isTimestamp";
-            case isKeyString:
-                return "isKeyString";
-            case typeMatchImm:
-                return "typeMatchImm";
-            case function:
-                return "function";
-            case functionSmall:
-                return "functionSmall";
-            case jmp:
-                return "jmp";
-            case jmpTrue:
-                return "jmpTrue";
-            case jmpFalse:
-                return "jmpFalse";
-            case jmpNothing:
-                return "jmpNothing";
-            case jmpNotNothing:
-                return "jmpNotNothing";
-            case ret:
-                return "ret";
-            case allocStack:
-                return "allocStack";
-            case fail:
-                return "fail";
-            case dateTruncImm:
-                return "dateTruncImm";
-            default:
-                return "unrecognized";
-        }
-    }
-};
-static_assert(sizeof(Instruction) == sizeof(uint8_t));
-
-/**
- * Enumeration of SBE VM built-in functions. These are dispatched by ByteCode::dispatchBuiltin() in
- * vm.cpp. An enum value 'foo' refers to a C++ implementing function named builtinFoo().
- *
- * See also struct Instruction for "functions" like 'setField' that are implemented as single VM
- * instructions.
- *
- * Builtins which can fit into one byte and have small arity are encoded using a special instruction
- * tag, functionSmall.
- */
-using SmallBuiltinType = uint8_t;
-enum class Builtin : uint16_t {
-    split,
-    regexMatch,
-    replaceOne,  // replace first occurrence of a specified substring with a diffferent substring
-    dateDiff,
-    dateParts,
-    dateToParts,
-    isoDateToParts,
-    dayOfYear,
-    dayOfMonth,
-    dayOfWeek,
-    datePartsWeekYear,
-    dateToString,
-    dateFromString,
-    dateFromStringNoThrow,
-    dropFields,
-    newArray,  // create a new array from the top 'arity' values on the stack
-    keepFields,
-    newArrayFromRange,
-    newObj,      // create a new object from 'arity' alternating field names and values on the stack
-    newBsonObj,  // same as 'newObj', except it creates a BSON object
-    ksToString,  // KeyString to string
-    newKs,       // new KeyString
-    collNewKs,   // new KeyString (with collation)
-    abs,         // absolute value
-    ceil,
-    floor,
-    trunc,
-    exp,
-    ln,
-    log10,
-    sqrt,
-    pow,
-    addToArray,        // agg function to append to an array
-    addToArrayCapped,  // agg function to append to an array, fails when the array reaches specified
-                       // size
-    mergeObjects,      // agg function to merge BSON documents
-    addToSet,          // agg function to append to a set
-    addToSetCapped,    // agg function to append to a set, fails when the set reaches specified size
-    collAddToSet,      // agg function to append to a set (with collation)
-    collAddToSetCapped,  // agg function to append to a set (with collation), fails when the set
-                         // reaches specified size
-
-    // Special double summation.
-    doubleDoubleSum,
-    // Accumulator to merge simple sums into a double double summation.
-    convertSimpleSumToDoubleDoubleSum,
-    // A variant of the standard sum aggregate function which maintains a DoubleDouble as the
-    // accumulator's underlying state.
-    aggDoubleDoubleSum,
-    // Converts a DoubleDouble sum into a single numeric scalar for use once the summation is
-    // complete.
-    doubleDoubleSumFinalize,
-    // Converts a partial sum into a format suitable for serialization over the wire to the merging
-    // node. The merging node expects the internal state of the DoubleDouble summation to be
-    // serialized in a particular format.
-    doubleDoublePartialSumFinalize,
-    // An agg function which can be used to sum a sequence of DoubleDouble inputs, producing the
-    // resulting total as a DoubleDouble.
-    aggMergeDoubleDoubleSums,
-
-    // Implements Welford's online algorithm for computing sample or population standard deviation
-    // in a single pass.
-    aggStdDev,
-    // Combines standard deviations that have been partially computed on a subset of the data
-    // using Welford's online algorithm.
-    aggMergeStdDevs,
-
-    stdDevPopFinalize,
-    stdDevSampFinalize,
-    bitTestZero,      // test bitwise mask & value is zero
-    bitTestMask,      // test bitwise mask & value is mask
-    bitTestPosition,  // test BinData with a bit position list
-    bsonSize,         // implements $bsonSize
-    strLenBytes,      // implements $strLenBytes
-    strLenCP,         // implements $strLenCP
-    substrBytes,      // implements $substrBytes
-    substrCP,         // implements $substrCP
-    toUpper,
-    toLower,
-    coerceToBool,
-    coerceToString,
-    concat,
-    concatArrays,
-    trim,
-    ltrim,
-    rtrim,
-
-    // Agg function to concatenate arrays, failing when the accumulator reaches a specified size.
-    aggConcatArraysCapped,
-
-    // Agg functions to compute the set union of two arrays (no size cap).
-    aggSetUnion,
-    aggCollSetUnion,
-    // Agg functions to compute the set union of two arrays (with a size cap).
-    aggSetUnionCapped,
-    aggCollSetUnionCapped,
-
-    acos,
-    acosh,
-    asin,
-    asinh,
-    atan,
-    atanh,
-    atan2,
-    cos,
-    cosh,
-    degreesToRadians,
-    radiansToDegrees,
-    sin,
-    sinh,
-    tan,
-    tanh,
-    rand,  // implements $rand
-    round,
-    isMember,
-    collIsMember,
-    indexOfBytes,
-    indexOfCP,
-    isDayOfWeek,
-    isTimeUnit,
-    isTimezone,
-    isValidToStringFormat,
-    validateFromStringFormat,
-    setUnion,
-    setIntersection,
-    setDifference,
-    setEquals,
-    setIsSubset,
-    collSetUnion,
-    collSetIntersection,
-    collSetDifference,
-    collSetEquals,
-    collSetIsSubset,
-    runJsPredicate,
-    regexCompile,  // compile <pattern, options> into value::pcreRegex
-    regexFind,
-    regexFindAll,
-    shardFilter,
-    shardHash,
-    extractSubArray,
-    isArrayEmpty,
-    reverseArray,
-    sortArray,
-    dateAdd,
-    hasNullBytes,
-    getRegexPattern,
-    getRegexFlags,
-    hash,
-    ftsMatch,
-    generateSortKey,
-    generateCheapSortKey,
-    sortKeyComponentVectorGetElement,
-    sortKeyComponentVectorToArray,
-
-    makeBsonObj,
-    tsSecond,
-    tsIncrement,
-    typeMatch,
-    dateTrunc,
-    getSortKeyAsc,          // helper functions for computation of sort keys
-    getSortKeyDesc,         // helper functions for computation of sort keys
-    getNonLeafSortKeyAsc,   // helper functions for computation of sort keys
-    getNonLeafSortKeyDesc,  // helper functions for computation of sort keys
-    year,
-    month,
-    hour,
-    minute,
-    second,
-    millisecond,
-    week,
-    isoWeekYear,
-    isoDayOfWeek,
-    isoWeek,
-    objectToArray,
-    setToArray,
-    arrayToObject,
-    avgOfArray,  // Returns the $avg of an array.
-    maxOfArray,  // Returns the $max element of an array.
-    minOfArray,  // Returns the $min element of an array.
-    stdDevPop,   // Returns the $stdDevPop of an array.
-    stdDevSamp,  // Returns the $stdDevSamp of an array.
-    sumOfArray,  // Returns the $sum of an array
-    unwindArray,
-    arrayToSet,
-    collArrayToSet,
-
-    fillType,
-
-    aggFirstNNeedsMoreInput,
-    aggFirstN,
-    aggFirstNMerge,
-    aggFirstNFinalize,
-    aggLastN,
-    aggLastNMerge,
-    aggLastNFinalize,
-    aggTopN,
-    aggTopNArray,
-    aggTopNMerge,
-    aggTopNFinalize,
-    aggBottomN,
-    aggBottomNArray,
-    aggBottomNMerge,
-    aggBottomNFinalize,
-    aggMaxN,
-    aggMaxNMerge,
-    aggMaxNFinalize,
-    aggMinN,
-    aggMinNMerge,
-    aggMinNFinalize,
-    aggRank,
-    aggRankColl,
-    aggDenseRank,
-    aggDenseRankColl,
-    aggRankFinalize,
-    aggExpMovingAvg,
-    aggExpMovingAvgFinalize,
-    aggRemovableSumAdd,
-    aggRemovableSumRemove,
-    aggRemovableSumFinalize,
-    aggIntegralInit,
-    aggIntegralAdd,
-    aggIntegralRemove,
-    aggIntegralFinalize,
-    aggDerivativeFinalize,
-    aggCovarianceAdd,
-    aggCovarianceRemove,
-    aggCovarianceSampFinalize,
-    aggCovariancePopFinalize,
-    aggRemovablePushAdd,
-    aggRemovablePushRemove,
-    aggRemovablePushFinalize,
-    aggRemovableStdDevAdd,
-    aggRemovableStdDevRemove,
-    aggRemovableStdDevSampFinalize,
-    aggRemovableStdDevPopFinalize,
-    aggRemovableAvgFinalize,
-    aggLinearFillCanAdd,
-    aggLinearFillAdd,
-    aggLinearFillFinalize,
-    aggRemovableFirstNInit,
-    aggRemovableFirstNAdd,
-    aggRemovableFirstNRemove,
-    aggRemovableFirstNFinalize,
-    aggRemovableLastNInit,
-    aggRemovableLastNAdd,
-    aggRemovableLastNRemove,
-    aggRemovableLastNFinalize,
-    aggRemovableAddToSetInit,
-    aggRemovableAddToSetCollInit,
-    aggRemovableAddToSetAdd,
-    aggRemovableAddToSetRemove,
-    aggRemovableAddToSetFinalize,
-    aggRemovableMinMaxNCollInit,
-    aggRemovableMinMaxNInit,
-    aggRemovableMinMaxNAdd,
-    aggRemovableMinMaxNRemove,
-    aggRemovableMinNFinalize,
-    aggRemovableMaxNFinalize,
-    aggRemovableTopNInit,
-    aggRemovableTopNAdd,
-    aggRemovableTopNRemove,
-    aggRemovableTopNFinalize,
-    aggRemovableBottomNInit,
-    aggRemovableBottomNAdd,
-    aggRemovableBottomNRemove,
-    aggRemovableBottomNFinalize,
-
-    // Additional one-byte builtins go here.
-
-    // Start of 2 byte builtins.
-    valueBlockExists = 256,
-    valueBlockTypeMatch,
-    valueBlockIsTimezone,
-    valueBlockFillEmpty,
-    valueBlockFillEmptyBlock,
-    valueBlockFillType,
-    valueBlockAggMin,
-    valueBlockAggMax,
-    valueBlockAggCount,
-    valueBlockAggSum,
-    valueBlockAggDoubleDoubleSum,
-    valueBlockAggTopN,
-    valueBlockAggTopNArray,
-    valueBlockAggBottomN,
-    valueBlockAggBottomNArray,
-    valueBlockDateDiff,
-    valueBlockDateTrunc,
-    valueBlockDateAdd,
-    valueBlockTrunc,
-    valueBlockRound,
-    valueBlockAdd,
-    valueBlockSub,
-    valueBlockMult,
-    valueBlockDiv,
-    valueBlockGtScalar,
-    valueBlockGteScalar,
-    valueBlockEqScalar,
-    valueBlockNeqScalar,
-    valueBlockLtScalar,
-    valueBlockLteScalar,
-    valueBlockCmp3wScalar,
-    valueBlockCombine,
-    valueBlockLogicalAnd,
-    valueBlockLogicalOr,
-    valueBlockLogicalNot,
-    valueBlockNewFill,
-    valueBlockSize,
-    valueBlockNone,
-    valueBlockIsMember,
-    valueBlockCoerceToBool,
-    valueBlockMod,
-    valueBlockConvert,
-    valueBlockGetSortKeyAsc,
-    valueBlockGetSortKeyDesc,
-
-    cellFoldValues_F,
-    cellFoldValues_P,
-    cellBlockGetFlatValuesBlock,
-};  // enum class Builtin
-
-std::string builtinToString(Builtin b);
-
 /**
  * This enum defines indices into an 'Array' that store state for $AccumulatorN expressions.
  *
@@ -1079,260 +368,6 @@ enum class AggFirstLastNElems { kQueue, kN, kSizeOfArray };
  */
 enum class AggAccumulatorNElems { kValues = 0, kN, kMemUsage, kMemLimit, kSizeOfArray };
 
-using SmallArityType = uint8_t;
-using ArityType = uint32_t;
-
-class CodeFragment {
-public:
-    const auto& frames() const {
-        return _frames;
-    }
-    auto& instrs() {
-        return _instrs;
-    }
-    const auto& instrs() const {
-        return _instrs;
-    }
-    auto stackSize() const {
-        return _stackSize;
-    }
-    auto maxStackSize() const {
-        return _maxStackSize;
-    }
-
-    void append(CodeFragment&& code);
-    void appendNoStack(CodeFragment&& code);
-    // Used when either `lhs` or `rhs` will run, but not both. This method will adjust the stack
-    // size once in this call, rather than twice (once for each CodeFragment). The CodeFragments
-    // must have the same stack size for us to know how to adjust the stack at compile time.
-    void append(CodeFragment&& lhs, CodeFragment&& rhs);
-    void appendConstVal(value::TypeTags tag, value::Value val);
-    void appendAccessVal(value::SlotAccessor* accessor);
-    void appendMoveVal(value::SlotAccessor* accessor);
-    void appendLocalVal(FrameId frameId, int variable, bool moveFrom);
-    void appendLocalLambda(int codePosition);
-    void appendPop();
-    void appendSwap();
-    void appendAdd(Instruction::Parameter lhs, Instruction::Parameter rhs);
-    void appendSub(Instruction::Parameter lhs, Instruction::Parameter rhs);
-    void appendMul(Instruction::Parameter lhs, Instruction::Parameter rhs);
-    void appendDiv(Instruction::Parameter lhs, Instruction::Parameter rhs);
-    void appendIDiv(Instruction::Parameter lhs, Instruction::Parameter rhs);
-    void appendMod(Instruction::Parameter lhs, Instruction::Parameter rhs);
-    void appendNegate(Instruction::Parameter input);
-    void appendNot(Instruction::Parameter input);
-    void appendLess(Instruction::Parameter lhs, Instruction::Parameter rhs);
-    void appendLessEq(Instruction::Parameter lhs, Instruction::Parameter rhs);
-    void appendGreater(Instruction::Parameter lhs, Instruction::Parameter rhs);
-    void appendGreaterEq(Instruction::Parameter lhs, Instruction::Parameter rhs);
-    void appendEq(Instruction::Parameter lhs, Instruction::Parameter rhs);
-    void appendNeq(Instruction::Parameter lhs, Instruction::Parameter rhs);
-    void appendCmp3w(Instruction::Parameter lhs, Instruction::Parameter rhs);
-
-    void appendCollLess(Instruction::Parameter lhs,
-                        Instruction::Parameter rhs,
-                        Instruction::Parameter collator);
-
-    void appendCollLessEq(Instruction::Parameter lhs,
-                          Instruction::Parameter rhs,
-                          Instruction::Parameter collator);
-
-    void appendCollGreater(Instruction::Parameter lhs,
-                           Instruction::Parameter rhs,
-                           Instruction::Parameter collator);
-
-    void appendCollGreaterEq(Instruction::Parameter lhs,
-                             Instruction::Parameter rhs,
-                             Instruction::Parameter collator);
-
-    void appendCollEq(Instruction::Parameter lhs,
-                      Instruction::Parameter rhs,
-                      Instruction::Parameter collator);
-
-    void appendCollNeq(Instruction::Parameter lhs,
-                       Instruction::Parameter rhs,
-                       Instruction::Parameter collator);
-
-    void appendCollCmp3w(Instruction::Parameter lhs,
-                         Instruction::Parameter rhs,
-                         Instruction::Parameter collator);
-
-    void appendFillEmpty();
-    void appendFillEmpty(Instruction::Constants k);
-    void appendGetField(Instruction::Parameter lhs, Instruction::Parameter rhs);
-    void appendGetField(Instruction::Parameter input, StringData fieldName);
-    void appendGetElement(Instruction::Parameter lhs, Instruction::Parameter rhs);
-    void appendCollComparisonKey(Instruction::Parameter lhs, Instruction::Parameter rhs);
-    void appendGetFieldOrElement(Instruction::Parameter lhs, Instruction::Parameter rhs);
-    void appendTraverseP();
-    void appendTraverseP(int codePosition, Instruction::Constants k);
-    void appendTraverseF();
-    void appendTraverseF(int codePosition, Instruction::Constants k);
-    void appendMagicTraverseF();
-    void appendTraverseCellValues();
-    void appendTraverseCellValues(int codePosition);
-    void appendTraverseCellTypes();
-    void appendTraverseCellTypes(int codePosition);
-    void appendSetField();
-    void appendGetArraySize(Instruction::Parameter input);
-    void appendDateTrunc(TimeUnit unit, int64_t binSize, TimeZone timezone, DayOfWeek startOfWeek);
-    void appendValueBlockApplyLambda();
-
-    void appendSum();
-    void appendCount();
-    void appendMin();
-    void appendMax();
-    void appendFirst();
-    void appendLast();
-    void appendCollMin();
-    void appendCollMax();
-    void appendExists(Instruction::Parameter input);
-    void appendIsNull(Instruction::Parameter input);
-    void appendIsObject(Instruction::Parameter input);
-    void appendIsArray(Instruction::Parameter input);
-    void appendIsInList(Instruction::Parameter input);
-    void appendIsString(Instruction::Parameter input);
-    void appendIsNumber(Instruction::Parameter input);
-    void appendIsBinData(Instruction::Parameter input);
-    void appendIsDate(Instruction::Parameter input);
-    void appendIsNaN(Instruction::Parameter input);
-    void appendIsInfinity(Instruction::Parameter input);
-    void appendIsRecordId(Instruction::Parameter input);
-    void appendIsMinKey(Instruction::Parameter input);
-    void appendIsMaxKey(Instruction::Parameter input);
-    void appendIsTimestamp(Instruction::Parameter input);
-    void appendIsKeyString(Instruction::Parameter input);
-    void appendTypeMatch(Instruction::Parameter input, uint32_t mask);
-    void appendFunction(Builtin f, ArityType arity);
-    void appendLabelJump(LabelId labelId);
-    void appendLabelJumpTrue(LabelId labelId);
-    void appendLabelJumpFalse(LabelId labelId);
-    void appendLabelJumpNothing(LabelId labelId);
-    void appendLabelJumpNotNothing(LabelId labelId);
-    void appendRet();
-    void appendAllocStack(uint32_t size);
-    void appendFail();
-    void appendNumericConvert(value::TypeTags targetTag);
-
-    // For printing from an interactive debugger.
-    std::string toString() const;
-
-    // Declares and defines a local variable frame at the current depth.
-    // Local frame declaration is used to resolve the stack offsets of local variable access.
-    // All references local variables must have matching frame declaration. The
-    // variable reference and frame declaration is allowed to happen in any order.
-    void declareFrame(FrameId frameId);
-
-    // Declares and defines a local variable frame at the current stack depth modifies by the given
-    // offset.
-    void declareFrame(FrameId frameId, int stackOffset);
-
-    // Removes the frame from scope. The frame must have no outstanding fixups.
-    // That is: must be declared or never referenced.
-    void removeFrame(FrameId frameId);
-
-    // Returns whether the are any frames currently in scope.
-    bool hasFrames() const;
-
-    // Associates the current code position with a label.
-    void appendLabel(LabelId labelId);
-
-    // Removes the label from scope. The label must have no outstanding fixups.
-    // That is: must be associated with code position or never referenced.
-    void removeLabel(LabelId labelId);
-
-    void validate();
-
-private:
-    // Adjusts all the stack offsets in the outstanding fixups by the provided delta as follows: for
-    // a given 'stackOffsetDelta' of frames in this CodeFragment:
-    //   1. Adds this delta to the 'stackPosition' of all frames having a defined stack position.
-    //   2. Adds this delta to all uses of frame stack posn's in code (located at 'fixupOffset's).
-    // The net effect is to change the stack offsets of all frames with defined stack positions and
-    // all code references to frame offsets in this CodeFragment by 'stackOffsetDelta'.
-    void fixupStackOffsets(int stackOffsetDelta);
-
-    // Stores the fixup information for stack frames.
-    // fixupOffsets - byte offsets in the code where the stack depth of the frame was used and need
-    //   fixup.
-    // stackPosition - stack depth in elements of where the frame was declared, or kPositionNotSet
-    //   if not known yet.
-    struct FrameInfo {
-        static constexpr int64_t kPositionNotSet = std::numeric_limits<int64_t>::min();
-
-        absl::InlinedVector<size_t, 2> fixupOffsets;
-        int64_t stackPosition{kPositionNotSet};
-    };
-
-    // Stores the fixup information for labels.
-    // fixupOffsets - offsets in the code where the label was used and need fixup.
-    // definitionOffset - offset in the code where label was defined.
-    struct LabelInfo {
-        static constexpr int64_t kOffsetNotSet = std::numeric_limits<int64_t>::min();
-        absl::InlinedVector<size_t, 2> fixupOffsets;
-        int64_t definitionOffset{kOffsetNotSet};
-    };
-
-    template <typename... Ts>
-    void appendSimpleInstruction(Instruction::Tags tag, Ts&&... params);
-    void appendLabelJumpInstruction(LabelId labelId, Instruction::Tags tag);
-
-    auto allocateSpace(size_t size) {
-        auto oldSize = _instrs.size();
-        _instrs.resize(oldSize + size);
-        return _instrs.data() + oldSize;
-    }
-
-    template <typename... Ts>
-    void adjustStackSimple(const Instruction& i, Ts&&... params);
-    void copyCodeAndFixup(CodeFragment&& from);
-
-    template <typename... Ts>
-    size_t appendParameters(uint8_t* ptr, Ts&&... params);
-    size_t appendParameter(uint8_t* ptr, Instruction::Parameter param, int& popCompensation);
-
-    // Convert a variable index to a stack offset.
-    constexpr int varToOffset(int var) const {
-        return -var - 1;
-    }
-
-    // Returns the frame with ID 'frameId' if it already exists, else creates and returns it.
-    FrameInfo& getOrDeclareFrame(FrameId frameId);
-
-    // For a given 'frame' in this CodeFragment, subtracts the frame's 'stackPosition' from all the
-    // refs to this frame in code (located at 'fixupOffset's). This is done once the true stack
-    // position of the frame is known, so code refs point to the correct location in the frame.
-    void fixupFrame(FrameInfo& frame);
-
-    LabelInfo& getOrDeclareLabel(LabelId labelId);
-    void fixupLabel(LabelInfo& label);
-
-    // The sequence of byte code instructions this CodeFragment represents.
-    absl::InlinedVector<uint8_t, 16> _instrs;
-
-    // A collection of frame information for local variables.
-    // Variables can be declared or referenced out of order and at the time of variable reference
-    // it may not be known the relative stack offset of variable declaration w.r.t to its use.
-    // This tracks both declaration info (stack depth) and use info (code offset).
-    // When code is concatenated the offsets are adjusted if needed and when declaration stack depth
-    // becomes known all fixups are resolved.
-    absl::flat_hash_map<FrameId, FrameInfo> _frames;
-
-    // A collection of label information for labels that are currently in scope.
-    // Labels can be defined or referenced out of order and at at time of label reference (e.g:
-    // jumps or lambda creation), the exact relative offset may not be yet known.
-    // This tracks both label definition (code offset where label is defined) and use info for jumps
-    // or lambdas (code offset). When code is concatenated the offsets are adjusted, if needed, and
-    // when label definition offset becomes known all fixups are resolved.
-    absl::flat_hash_map<LabelId, LabelInfo> _labels;
-
-    // Delta number of '_argStack' entries effect of this CodeFragment; may be negative.
-    int64_t _stackSize{0};
-
-    // Maximum absolute number of entries in '_argStack' from this CodeFragment.
-    int64_t _maxStackSize{0};
-};
-
 class ByteCode {
     // The number of bytes per stack entry.
     static constexpr size_t sizeOfElement =
@@ -1361,14 +396,34 @@ public:
     ByteCode(const ByteCode&) = delete;
     ByteCode& operator=(const ByteCode&) = delete;
 
+    static std::pair<value::TypeTags, value::Value> genericInitializeDoubleDoubleSumState();
+    static std::tuple<value::Array*, int64_t, int64_t, int64_t, int64_t, int64_t>
+    genericRemovableSumState(value::Array* state);
+    static void genericResetDoubleDoubleSumState(value::Array* state);
+
+    /**
+     * Runs a CodeFragment representing an arbitrary VM program that returns one slot value.
+     */
     FastTuple<bool, value::TypeTags, value::Value> run(const CodeFragment* code);
+
+    /**
+     * Runs a CodeFragment reprensenting a predicate that returns a boolean result.
+     */
     bool runPredicate(const CodeFragment* code);
 
     typedef std::tuple<value::Array*, value::Array*, size_t, size_t, int32_t, int32_t, bool>
         MultiAccState;
 
 private:
+    /**
+     * Executes the VM instructions of an arbitrary CodeFragment starting at 'position'.
+     */
     void runInternal(const CodeFragment* code, int64_t position);
+
+    /**
+     * Executes the VM instructions of a CodeFragment starting at 'position' that represents a
+     * lambda function and leaves its result on the top of the stack.
+     */
     void runLambdaInternal(const CodeFragment* code, int64_t position);
 
     MONGO_COMPILER_NORETURN void runFailInstruction();
@@ -1381,11 +436,6 @@ private:
     template <typename T>
     void runTagCheck(const uint8_t*& pcPointer, T&& predicate);
     void runTagCheck(const uint8_t*& pcPointer, value::TypeTags tagRhs);
-
-    MONGO_COMPILER_ALWAYS_INLINE
-    static FastTuple<bool, bool, int> decodeParam(const uint8_t*& pcPointer) noexcept {
-        return Instruction::Parameter::decodeParam(pcPointer);
-    }
 
     FastTuple<bool, value::TypeTags, value::Value> genericDiv(value::TypeTags lhsTag,
                                                               value::Value lhsValue,
@@ -1693,7 +743,6 @@ private:
                                                              int64_t binSize,
                                                              TimeZone timezone,
                                                              DayOfWeek startOfWeek);
-
     /**
      * produceBsonObject() takes a MakeObjSpec ('spec'), a root value ('rootTag' and 'rootVal'),
      * and 0 or more "computed" values as inputs, it builds an output BSON object based on the
@@ -1707,16 +756,15 @@ private:
                                                         UniqueBSONObjBuilder& bob,
                                                         value::TypeTags rootTag,
                                                         value::Value rootVal) {
-        using TypeTags = value::TypeTags;
 
         // Invoke produceBsonObject<CursorT>() with the appropriate cursor type. For
         // SBE objects, we use ObjectCursor. For all other types, we use BsonObjCursor.
-        if (rootTag == TypeTags::Object) {
+        if (rootTag == value::TypeTags::Object) {
             auto obj = value::getObjectView(rootVal);
 
             produceBsonObject(ctx, spec, bob, ObjectCursor(obj));
         } else {
-            const char* obj = rootTag == TypeTags::bsonObject
+            const char* obj = rootTag == value::TypeTags::bsonObject
                 ? value::bitcastTo<const char*>(rootVal)
                 : BSONObj::kEmptyObject.objdata();
 
@@ -1856,6 +904,18 @@ private:
     FastTuple<bool, value::TypeTags, value::Value> builtinCollAddToSetCapped(ArityType arity);
     FastTuple<bool, value::TypeTags, value::Value> builtinSetToArray(ArityType arity);
 
+    /**
+     * If the BSON type of the value at stack[0] matches the BSON type mask at stack[1] (see
+     * value::getBSONTypeMask()), returns true, else returns false. (Returns Nothing if stack[0] is
+     * Nothing or stack[1] is not a NumberInt32.)
+     */
+    FastTuple<bool, value::TypeTags, value::Value> builtinTypeMatch(ArityType arity);
+
+    /**
+     * If the BSON type of the value at stack[0] matches the BSON type mask at stack[1] (see
+     * value::getBSONTypeMask()), returns stack[2] (the fill value), else returns stack[0] (the
+     * original value). (Returns Nothing if stack[0] is Nothing or stack[1] is not a NumberInt32.)
+     */
     FastTuple<bool, value::TypeTags, value::Value> builtinFillType(ArityType arity);
 
     FastTuple<bool, value::TypeTags, value::Value> builtinConvertSimpleSumToDoubleDoubleSum(
@@ -1967,7 +1027,6 @@ private:
                                                                       const CodeFragment* code);
     FastTuple<bool, value::TypeTags, value::Value> builtinTsSecond(ArityType arity);
     FastTuple<bool, value::TypeTags, value::Value> builtinTsIncrement(ArityType arity);
-    FastTuple<bool, value::TypeTags, value::Value> builtinTypeMatch(ArityType arity);
     FastTuple<bool, value::TypeTags, value::Value> builtinDateToString(ArityType arity);
     FastTuple<bool, value::TypeTags, value::Value> builtinDateFromString(ArityType arity);
     FastTuple<bool, value::TypeTags, value::Value> builtinDateFromStringNoThrow(ArityType arity);
@@ -2032,6 +1091,13 @@ private:
     FastTuple<bool, value::TypeTags, value::Value> builtinAggLastNMerge(ArityType arity);
     FastTuple<bool, value::TypeTags, value::Value> builtinAggLastNFinalize(ArityType arity);
 
+    template <TopBottomSense Sense>
+    static int32_t aggTopBottomNAdd(value::Array* state,
+                                    value::Array* array,
+                                    size_t maxSize,
+                                    int32_t memUsage,
+                                    int32_t memLimit,
+                                    ByteCode::TopBottomArgs& args);
     int32_t aggTopNAdd(value::Array* state,
                        value::Array* array,
                        size_t maxSize,

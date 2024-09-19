@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2023-present MongoDB, Inc.
+ *    Copyright (C) 2019-present MongoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
@@ -29,9 +29,34 @@
 
 #pragma once
 
-#include <cstdint>
+namespace mongo {
+namespace sbe {
+namespace vm {
+namespace {
+/**
+ * Reads directly from memory for the ByteCode VM.
+ */
+template <typename T>
+T readFromMemory(const uint8_t* ptr) noexcept {
+    static_assert(!IsEndian<T>::value);
 
-namespace mongo::sbe::vm {
-using LabelId = int64_t;
+    T val;
+    memcpy(&val, ptr, sizeof(T));
+    return val;
+}
 
-}  // namespace mongo::sbe::vm
+/**
+ * Writes directly to memory for the ByteCode VM.
+ */
+template <typename T>
+size_t writeToMemory(uint8_t* ptr, const T val) noexcept {
+    static_assert(!IsEndian<T>::value);
+
+    memcpy(ptr, &val, sizeof(T));
+    return sizeof(T);
+}
+
+}  // namespace
+}  // namespace vm
+}  // namespace sbe
+}  // namespace mongo

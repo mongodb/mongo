@@ -27,8 +27,6 @@
  *    it in the license file.
  */
 #include <algorithm>
-#include <cstddef>
-#include <cstdint>
 #include <iomanip>
 #include <memory>
 #include <string>
@@ -43,7 +41,9 @@
 #include "mongo/db/exec/sbe/values/slot.h"
 #include "mongo/db/exec/sbe/values/value.h"
 #include "mongo/db/exec/sbe/values/value_printer.h"
+#include "mongo/db/exec/sbe/vm/code_fragment.h"
 #include "mongo/db/exec/sbe/vm/vm.h"
+#include "mongo/db/exec/sbe/vm/vm_instruction.h"
 #include "mongo/db/exec/sbe/vm/vm_printer.h"
 #include "mongo/db/query/datetime/date_time_support.h"
 

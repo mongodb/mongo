@@ -611,7 +611,7 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinValueBlockAggDou
 
     // Initialize the accumulator if this is the first use of it.
     if (accTag == value::TypeTags::Nothing) {
-        std::tie(accTag, accValue) = initializeDoubleDoubleSumState();
+        std::tie(accTag, accValue) = genericInitializeDoubleDoubleSumState();
     }
 
     value::ValueGuard guard{accTag, accValue};

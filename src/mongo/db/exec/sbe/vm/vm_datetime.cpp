@@ -29,10 +29,11 @@
 
 #include <cstdint>
 
+#include "mongo/db/exec/sbe/vm/vm_datetime.h"
+
 #include "mongo/base/string_data.h"
 #include "mongo/bson/oid.h"
 #include "mongo/bson/timestamp.h"
-#include "mongo/db/exec/sbe/vm/datetime.h"
 #include "mongo/db/exec/sbe/vm/vm.h"
 #include "mongo/db/query/datetime/date_time_support.h"
 #include "mongo/util/assert_util.h"
