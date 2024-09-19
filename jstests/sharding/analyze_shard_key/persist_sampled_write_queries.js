@@ -8,6 +8,7 @@
 "use strict";
 
 load("jstests/libs/config_shard_util.js");
+load("jstests/libs/uuid_util.js");
 load("jstests/sharding/analyze_shard_key/libs/query_sampling_util.js");
 
 const supportedTestCases = [
@@ -27,7 +28,7 @@ function testWriteCmd(rst, cmdOpts, testCase) {
     // If running on the config server, use "config" as the database name since it is illegal to
     // create a user database on the config server.
     const dbName = rst.isConfigRS ? "config" : "testDb";
-    const collName = "testColl-" + cmdOpts.cmdName + "-" + QuerySamplingUtil.generateRandomString();
+    const collName = "testColl-" + cmdOpts.cmdName + "-" + extractUUIDFromObject(UUID());
     const ns = dbName + "." + collName;
 
     const primary = rst.getPrimary();
@@ -199,7 +200,7 @@ function testFindAndModifyCmd(rst, testCases) {
 
 function testInsertCmd(rst) {
     const dbName = "testDb";
-    const collName = "testColl-insert-" + QuerySamplingUtil.generateRandomString();
+    const collName = "testColl-insert-" + extractUUIDFromObject(UUID());
     const primary = rst.getPrimary();
     const db = primary.getDB(dbName);
     // Verify that no mongods support persisting sampled insert queries. Specifically, "sampleId"
