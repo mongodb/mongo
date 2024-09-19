@@ -2,8 +2,12 @@
  * reindex_writeconflict.js
  *
  * Ensures reIndex successfully handles WriteConflictExceptions.
+ *
+ * The reIndex command is only available on standalone mode.
  * @tags: [
- *   requires_getmore
+ *   requires_getmore,
+ *   requires_standalone,
+ *   incompatible_with_concurrency_simultaneous,
  * ]
  */
 export const $config = (function() {

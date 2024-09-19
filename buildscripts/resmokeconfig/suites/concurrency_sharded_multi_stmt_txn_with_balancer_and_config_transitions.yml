@@ -12,7 +12,6 @@ selector:
     - src/mongo/db/modules/*/jstests/concurrency/fsm_workloads/*.js
   exclude_files:
     # SERVER-14669 Multi-removes that use $where miscount removed documents
-    - jstests/concurrency/fsm_workloads/query/remove/remove_where.js
 
     # Disabled due to MongoDB restrictions and/or workload restrictions
 
@@ -25,26 +24,17 @@ selector:
     - jstests/concurrency/fsm_workloads/auth_drop_user.js
 
     # uses >100MB of data, which can overwhelm test hosts
-    - jstests/concurrency/fsm_workloads/query/agg/agg_group_external.js
-    - jstests/concurrency/fsm_workloads/query/agg/agg_sort_external.js
 
     # compact can only be run against a standalone mongod
-    - jstests/concurrency/fsm_workloads/compact.js
     - jstests/concurrency/fsm_workloads/compact_while_creating_indexes.js
 
     # test creates too many collections for ContinuousAddRemoveShard
     - jstests/concurrency/fsm_workloads/create_collection.js
 
     # can cause OOM kills on test hosts
-    - jstests/concurrency/fsm_workloads/query/findAndModify/findAndModify_update_grow.js
 
     # cannot createIndex after dropDatabase without sharding first
     - jstests/concurrency/fsm_workloads/query/plan_cache_drop_database.js
-
-    # reIndex is not supported in mongos.
-    - jstests/concurrency/fsm_workloads/reindex.js
-    - jstests/concurrency/fsm_workloads/reindex_background.js
-    - jstests/concurrency/fsm_workloads/reindex_writeconflict.js
 
     # The WTWriteConflictException failpoint is not supported on mongos.
     - jstests/concurrency/fsm_workloads/collmod_writeconflict.js
@@ -54,18 +44,15 @@ selector:
 
     # TODO Undenylist (SERVER-38852).
     - jstests/concurrency/fsm_workloads/query/agg/agg_out_interrupt_cleanup.js
-    - jstests/concurrency/fsm_workloads/query/timeseries/timeseries_agg_out_interrupt_cleanup.js
 
     # serverStatus does not include transaction metrics on mongos.
     - jstests/concurrency/fsm_workloads/multi_statement_transaction_atomicity_isolation_metrics_test.js
 
     # Uses the same transaction id across different routers, which is not allowed because when either
     # router tries to commit, it may not know the full participant list.
-    - jstests/concurrency/fsm_workloads/multi_statement_transaction_all_commands_same_session.js
 
     # The test may spuriously fail when run against sharded clusters, due to limitations of the
     # infrastructure. See SERVER-77039 for full details.
-    - jstests/concurrency/fsm_workloads/query/map_reduce/map_reduce_drop.js
 
     ##
     # Denylists from concurrency_sharded_multi_stmt_txn_with_balancer
@@ -78,9 +65,6 @@ selector:
 
     # Relies on having one thread observe writes from the other threads, which won't become visible
     # once a transaction in the thread is started because it'll keep reading from the same snapshot.
-    - jstests/concurrency/fsm_workloads/create_index_background.js
-    - jstests/concurrency/fsm_workloads/create_index_background_partial_filter.js
-    - jstests/concurrency/fsm_workloads/create_index_background_wildcard.js
 
     # Use updates that do not contain the shard key, so they are rejected before any commands are
     # sent to participant shards, but these workloads do not fail, so the auto retry transaction logic
@@ -93,21 +77,19 @@ selector:
     ##
 
     # TODO SERVER-90609: Enable these tests.
-    - jstests/concurrency/fsm_workloads/create_index_background_unique.js
-    - jstests/concurrency/fsm_workloads/create_index_background_unique_capped.js
 
     # TODO SERVER-92349: Re-enable this test once completed.
     - jstests/concurrency/fsm_workloads/indexed_insert_ttl.js
 
     # This test runs a large number of inserts, which can cause moveCollection to take a long time
     # to finish. This can cause the CheckMetadataConsistency hook to hit LockBusy errors.
-    - jstests/concurrency/fsm_workloads/timeseries_insert_idle_bucket_expiration.js
 
     # Exclude tests that run cleanupOrphaned, which can fail running on a config shard if a
     # concurrent migration fails due to the config shard transitioning to dedicated.
     - jstests/concurrency/fsm_workloads/cleanupOrphanedWhileMigrating.js
 
   exclude_with_any_tags:
+    - requires_standalone
     - assumes_against_mongod_not_mongos
     - assumes_balancer_off
     - requires_replication

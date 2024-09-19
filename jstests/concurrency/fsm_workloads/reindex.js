@@ -4,7 +4,10 @@
  * Bulk inserts 1000 documents and builds indexes. Then alternates between reindexing and querying
  * against the collection. Operates on a separate collection for each thread.
  *
- * @tags: [SERVER-40561, requires_getmore]
+ * The reIndex command is only available on standalone mode.
+ *
+ * @tags: [SERVER-40561, requires_getmore, requires_standalone,
+ * incompatible_with_concurrency_simultaneous]
  */
 import {
     assertWorkedHandleTxnErrors

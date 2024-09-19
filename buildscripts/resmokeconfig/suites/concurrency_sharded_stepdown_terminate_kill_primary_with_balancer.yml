@@ -6,7 +6,6 @@ selector:
     - src/mongo/db/modules/*/jstests/concurrency/fsm_workloads/*.js
   exclude_files:
     # SERVER-14669 Multi-removes that use $where miscount removed documents
-    - jstests/concurrency/fsm_workloads/query/remove/remove_where.js
 
     # Disabled because MapReduce can lose cursors if the primary goes down during the operation.
     - jstests/concurrency/fsm_workloads/query/map_reduce/map_reduce_drop.js
@@ -29,32 +28,23 @@ selector:
     - jstests/concurrency/fsm_workloads/auth_drop_user.js
 
     # uses >100MB of data, which can overwhelm test hosts
-    - jstests/concurrency/fsm_workloads/query/agg/agg_group_external.js
-    - jstests/concurrency/fsm_workloads/query/agg/agg_sort_external.js
 
     # compact can only be run against a standalone mongod
     - jstests/concurrency/fsm_workloads/compact.js
     - jstests/concurrency/fsm_workloads/compact_while_creating_indexes.js
 
     # can cause OOM kills on test hosts
-    - jstests/concurrency/fsm_workloads/query/findAndModify/findAndModify_update_grow.js
 
     # cannot createIndex after dropDatabase without sharding first
     - jstests/concurrency/fsm_workloads/query/plan_cache_drop_database.js
 
     # The WTWriteConflictException failpoint is not supported on mongos.
     - jstests/concurrency/fsm_workloads/collmod_writeconflict.js
-    - jstests/concurrency/fsm_workloads/reindex_writeconflict.js
 
     # SERVER-20361 Improve the behaviour of multi-update/delete against a sharded collection
     - jstests/concurrency/fsm_workloads/query/update/update_where.js
 
     # ChunkHelper directly talks to the config servers and doesn't support retries for network errors
-    - jstests/concurrency/fsm_workloads/cleanupOrphanedWhileMigrating.js
-    - jstests/concurrency/fsm_workloads/sharded_base_partitioned.js
-    - jstests/concurrency/fsm_workloads/sharded_mergeChunks_partitioned.js
-    - jstests/concurrency/fsm_workloads/sharded_moveChunk_partitioned.js
-    - jstests/concurrency/fsm_workloads/sharded_splitChunk_partitioned.js
 
     # These workloads frequently time out waiting for the distributed lock to drop a sharded
     # collection.
@@ -64,11 +54,6 @@ selector:
     # Uses getmores.
     - jstests/concurrency/fsm_workloads/query/agg/agg_base.js
     - jstests/concurrency/fsm_workloads/query/agg/agg_unionWith_interrupt_cleanup.js
-    - jstests/concurrency/fsm_workloads/create_capped_collection_maxdocs.js
-    - jstests/concurrency/fsm_workloads/create_index_background.js
-    - jstests/concurrency/fsm_workloads/create_index_background_partial_filter.js
-    - jstests/concurrency/fsm_workloads/create_index_background_wildcard.js
-    - jstests/concurrency/fsm_workloads/query/globally_managed_cursors.js
     - jstests/concurrency/fsm_workloads/indexed_insert_ordered_bulk.js
     - jstests/concurrency/fsm_workloads/indexed_insert_text.js
     - jstests/concurrency/fsm_workloads/indexed_insert_unordered_bulk.js
@@ -76,10 +61,6 @@ selector:
     - jstests/concurrency/fsm_workloads/indexed_insert_where.js
     - jstests/concurrency/fsm_workloads/list_indexes.js
     - jstests/concurrency/fsm_workloads/query/query_stats/query_stats_concurrent.js
-    - jstests/concurrency/fsm_workloads/reindex.js
-    - jstests/concurrency/fsm_workloads/reindex_background.js
-    - jstests/concurrency/fsm_workloads/query/remove/remove_multiple_documents.js
-    - jstests/concurrency/fsm_workloads/server_status_with_time_out_cursors.js
     - jstests/concurrency/fsm_workloads/query/update/update_where.js
     - jstests/concurrency/fsm_workloads/query/yield/yield.js
     - jstests/concurrency/fsm_workloads/query/yield/yield_fetch.js
@@ -104,9 +85,6 @@ selector:
     - jstests/concurrency/fsm_workloads/collmod.js
     - jstests/concurrency/fsm_workloads/collmod_separate_collections.js
     - jstests/concurrency/fsm_workloads/query/agg/agg_out_interrupt_cleanup.js
-    - jstests/concurrency/fsm_workloads/query/timeseries/timeseries_agg_out_interrupt_cleanup.js
-    - jstests/concurrency/fsm_workloads/query/invalidated_cursors.js
-    - jstests/concurrency/fsm_workloads/query/kill_multicollection_aggregation.js
     - jstests/concurrency/fsm_workloads/view_catalog.js
     - jstests/concurrency/fsm_workloads/view_catalog_cycle_lookup.js
     - jstests/concurrency/fsm_workloads/view_catalog_cycle_with_drop.js
@@ -135,6 +113,7 @@ selector:
     - jstests/concurrency/fsm_workloads/timeseries_insert_idle_bucket_expiration.js
 
   exclude_with_any_tags:
+    - requires_standalone
     - assumes_balancer_off
     - assumes_against_mongod_not_mongos
     - requires_replication

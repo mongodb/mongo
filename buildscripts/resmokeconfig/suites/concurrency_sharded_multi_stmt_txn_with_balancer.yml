@@ -15,37 +15,26 @@ selector:
     - jstests/concurrency/fsm_workloads/auth_drop_user.js
 
     # uses >100MB of data, which can overwhelm test hosts
-    - jstests/concurrency/fsm_workloads/query/agg/agg_group_external.js
-    - jstests/concurrency/fsm_workloads/query/agg/agg_sort_external.js
 
     # compact can only be run against a standalone mongod
-    - jstests/concurrency/fsm_workloads/compact.js
     - jstests/concurrency/fsm_workloads/compact_while_creating_indexes.js
 
     # can cause OOM kills on test hosts
-    - jstests/concurrency/fsm_workloads/query/findAndModify/findAndModify_update_grow.js
 
     # cannot createIndex after dropDatabase without sharding first
     - jstests/concurrency/fsm_workloads/query/plan_cache_drop_database.js
-
-    # reIndex is not supported in mongos.
-    - jstests/concurrency/fsm_workloads/reindex.js
-    - jstests/concurrency/fsm_workloads/reindex_background.js
-    - jstests/concurrency/fsm_workloads/reindex_writeconflict.js
 
     # The WTWriteConflictException failpoint is not supported on mongos.
     - jstests/concurrency/fsm_workloads/collmod_writeconflict.js
 
     # TODO Undenylist (SERVER-38852).
     - jstests/concurrency/fsm_workloads/query/agg/agg_out_interrupt_cleanup.js
-    - jstests/concurrency/fsm_workloads/query/timeseries/timeseries_agg_out_interrupt_cleanup.js
 
     # serverStatus does not include transaction metrics on mongos.
     - jstests/concurrency/fsm_workloads/multi_statement_transaction_atomicity_isolation_metrics_test.js
 
     # Uses the same transaction id across different routers, which is not allowed because when either
     # router tries to commit, it may not know the full participant list.
-    - jstests/concurrency/fsm_workloads/multi_statement_transaction_all_commands_same_session.js
 
     # Expects reads to die with a particular error, but other errors are possible if the read is part
     # of a transaction (e.g. ErrorCodes.LockTimeout).
@@ -58,9 +47,6 @@ selector:
 
     # Relies on having one thread observe writes from the other threads, which won't become visible
     # once a transaction in the thread is started because it'll keep reading from the same snapshot.
-    - jstests/concurrency/fsm_workloads/create_index_background.js
-    - jstests/concurrency/fsm_workloads/create_index_background_partial_filter.js
-    - jstests/concurrency/fsm_workloads/create_index_background_wildcard.js
 
     ##
     # Denylists specific to this suite.
@@ -74,9 +60,9 @@ selector:
 
     # This test runs a large number of inserts, which can cause moveCollection to take a long time
     # to finish. This can cause the CheckMetadataConsistency hook to hit LockBusy errors.
-    - jstests/concurrency/fsm_workloads/timeseries_insert_idle_bucket_expiration.js
 
   exclude_with_any_tags:
+    - requires_standalone
     - assumes_balancer_off
     - assumes_against_mongod_not_mongos
     - does_not_support_causal_consistency

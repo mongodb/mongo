@@ -5,6 +5,7 @@ selector:
     - jstests/concurrency/fsm_workloads_add_remove_shards/**/*.js
 
   exclude_with_any_tags:
+    - requires_standalone
     - requires_replication
     # mongos has no system.profile collection.
     - requires_profiling

@@ -5,6 +5,11 @@
  * repeatedly performs the findAndModify command. Checks that document
  * moves don't happen and that large changes in document size are handled
  * correctly.
+ *
+ * The findAndModify_update_grow.js workload can cause OOM kills on test hosts;
+ * therefore it is run only on standalones.
+ * @tags: [requires_standalone]
+ *
  */
 import {isMongod} from "jstests/concurrency/fsm_workload_helpers/server_types.js";
 

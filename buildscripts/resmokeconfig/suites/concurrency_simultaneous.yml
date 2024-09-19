@@ -8,7 +8,6 @@ selector:
     # isn't guaranteed to be true when they are run in parallel with other workloads.
     - jstests/concurrency/fsm_workloads/query/findAndModify/findAndModify_inc_pipeline.js
     - jstests/concurrency/fsm_workloads/list_indexes.js
-    - jstests/concurrency/fsm_workloads/query/secondary_reads.js
     - jstests/concurrency/fsm_workloads/query/update/update_inc_capped.js
     - jstests/concurrency/fsm_workloads/query/update/update_inc_pipeline.js
     # These workloads implicitly assume that their tid ranges are [0, $config.threadCount), as above,
@@ -17,10 +16,6 @@ selector:
     - jstests/concurrency/fsm_workloads/create_index_background_wildcard.js
     - jstests/concurrency/fsm_workloads/create_index_background.js
 
-    # These workloads uses >100MB of data, which can overwhelm test hosts.
-    - jstests/concurrency/fsm_workloads/query/agg/agg_group_external.js
-    - jstests/concurrency/fsm_workloads/query/agg/agg_sort_external.js
-
     # SERVER-30644 These tests create/drop/modify views which can deadlock on the ViewCatalog mutex if
     # there's a concurrent operation which acquires a MODE_X lock.
     - jstests/concurrency/fsm_workloads/view_catalog*.js
@@ -28,7 +23,6 @@ selector:
     # SERVER-43053 These workloads set a failpoint that causes intermittent WriteConflict errors,
     # which presently can cause other simultaneous workloads to fail.
     - jstests/concurrency/fsm_workloads/collmod_writeconflict.js
-    - jstests/concurrency/fsm_workloads/reindex_writeconflict.js
 
   exclude_with_any_tags:
     - uses_transactions

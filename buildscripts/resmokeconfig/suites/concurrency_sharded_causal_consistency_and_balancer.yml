@@ -6,10 +6,6 @@ selector:
     - src/mongo/db/modules/*/jstests/concurrency/fsm_workloads/*.js
   exclude_files:
     # SERVER-14669 Multi-removes that use $where miscount removed documents
-    - jstests/concurrency/fsm_workloads/query/remove/remove_where.js
-
-    # SERVER-30983 background indexes are incompatible with causal consistency
-    - jstests/concurrency/fsm_workloads/reindex_background.js
 
     # Disabled due to MongoDB restrictions and/or workload restrictions
 
@@ -22,22 +18,15 @@ selector:
     - jstests/concurrency/fsm_workloads/auth_drop_user.js
 
     # uses >100MB of data, which can overwhelm test hosts
-    - jstests/concurrency/fsm_workloads/query/agg/agg_group_external.js
-    - jstests/concurrency/fsm_workloads/query/agg/agg_sort_external.js
 
     # compact can only be run against a standalone mongod
     - jstests/concurrency/fsm_workloads/compact.js
     - jstests/concurrency/fsm_workloads/compact_while_creating_indexes.js
 
     # can cause OOM kills on test hosts
-    - jstests/concurrency/fsm_workloads/query/findAndModify/findAndModify_update_grow.js
 
     # cannot createIndex after dropDatabase without sharding first
     - jstests/concurrency/fsm_workloads/query/plan_cache_drop_database.js
-
-    # reIndex is not supported in mongos.
-    - jstests/concurrency/fsm_workloads/reindex.js
-    - jstests/concurrency/fsm_workloads/reindex_writeconflict.js
 
     # The WTWriteConflictException failpoint is not supported on mongos.
     - jstests/concurrency/fsm_workloads/collmod_writeconflict.js
@@ -50,6 +39,7 @@ selector:
     - jstests/concurrency/fsm_workloads/timeseries_insert_idle_bucket_expiration.js
 
   exclude_with_any_tags:
+    - requires_standalone
     - does_not_support_causal_consistency
     # This suite uses secondary read preference, which isn't currently compatible with transactions.
     - uses_transactions

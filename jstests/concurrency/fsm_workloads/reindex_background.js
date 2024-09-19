@@ -6,7 +6,10 @@
  * that because indexes are initially built in the background, reindexing is also done in the
  * background.
  *
- * @tags: [SERVER-40561, creates_background_indexes, requires_getmore]
+ * The reIndex command is only available on standalone mode.
+ *
+ * @tags: [SERVER-40561, creates_background_indexes, requires_getmore, requires_standalone,
+ * incompatible_with_concurrency_simultaneous]
  */
 
 import {extendWorkload} from "jstests/concurrency/fsm_libs/extend_workload.js";

@@ -44,6 +44,7 @@ executor:
 matrix_suite: true
 selector:
   exclude_with_any_tags:
+    - requires_standalone
     - requires_replication
     - requires_profiling
     - does_not_support_add_remove_shards

@@ -7,11 +7,6 @@ selector:
     ##
     # Disabled due to MongoDB restrictions and/or workload restrictions
     ##
-    # These workloads use >100MB of data, which can overwhelm test hosts.
-    - jstests/concurrency/fsm_workloads/query/agg/agg_group_external.js
-    - jstests/concurrency/fsm_workloads/query/agg/agg_sort_external.js
-    # The findAndModify_update_grow.js workload can cause OOM kills on test hosts.
-    - jstests/concurrency/fsm_workloads/query/findAndModify/findAndModify_update_grow.js
 
     # Relies on having one thread observe writes from the other threads, which won't become visible
     # once a transaction in the thread is started because it'll keep reading from the same snapshot.
@@ -33,12 +28,8 @@ selector:
     # Induces non-blindly-retriable errors (see SERVER-45767).
     - jstests/concurrency/fsm_workloads/create_database.js
 
-    # These workloads run the reIndex command, which is only allowed on a standalone node.
-    - jstests/concurrency/fsm_workloads/reindex.js
-    - jstests/concurrency/fsm_workloads/reindex_background.js
-    - jstests/concurrency/fsm_workloads/reindex_writeconflict.js
-
   exclude_with_any_tags:
+    - requires_standalone
     - does_not_support_causal_consistency
     - requires_sharding
     # Snapshot reads in transactions are banned on capped collections.

@@ -31,37 +31,26 @@ selector:
     - jstests/concurrency/fsm_workloads/auth_drop_user.js
 
     # uses >100MB of data, which can overwhelm test hosts
-    - jstests/concurrency/fsm_workloads/query/agg/agg_group_external.js
-    - jstests/concurrency/fsm_workloads/query/agg/agg_sort_external.js
 
     # compact can only be run against a standalone mongod
-    - jstests/concurrency/fsm_workloads/compact.js
     - jstests/concurrency/fsm_workloads/compact_while_creating_indexes.js
 
     # can cause OOM kills on test hosts
-    - jstests/concurrency/fsm_workloads/query/findAndModify/findAndModify_update_grow.js
 
     # cannot createIndex after dropDatabase without sharding first
     - jstests/concurrency/fsm_workloads/query/plan_cache_drop_database.js
 
-    # reIndex is not supported in mongos.
-    - jstests/concurrency/fsm_workloads/reindex.js
-    - jstests/concurrency/fsm_workloads/reindex_background.js
-
     # The WTWriteConflictException failpoint is not supported on mongos.
     - jstests/concurrency/fsm_workloads/collmod_writeconflict.js
-    - jstests/concurrency/fsm_workloads/reindex_writeconflict.js
 
     # TODO Undenylist (SERVER-38852).
     - jstests/concurrency/fsm_workloads/query/agg/agg_out_interrupt_cleanup.js
-    - jstests/concurrency/fsm_workloads/query/timeseries/timeseries_agg_out_interrupt_cleanup.js
 
     # serverStatus does not include transaction metrics on mongos.
     - jstests/concurrency/fsm_workloads/multi_statement_transaction_atomicity_isolation_metrics_test.js
 
     # Uses the same transaction id across different routers, which is not allowed because when either
     # router tries to commit, it may not know the full participant list.
-    - jstests/concurrency/fsm_workloads/multi_statement_transaction_all_commands_same_session.js
 
     ##
     # Denylists from concurrency_replication_multi_stmt_txn
@@ -89,14 +78,12 @@ selector:
     - jstests/concurrency/fsm_workloads/query/update/update_rename_noindex.js
 
     # Expects DocumentValidationFailure which causes transaction to abort and retry indefinitely.
-    - jstests/concurrency/fsm_workloads/query/schema_validator_with_expr_variables.js
 
     ##
     # Denylists from concurrency_sharded_with_stepdowns
     ##
 
     # ChunkHelper directly talks to the config servers and doesn't support retries for network errors
-    - jstests/concurrency/fsm_workloads/cleanupOrphanedWhileMigrating.js
     - jstests/concurrency/fsm_workloads/sharded_mergeChunks_partitioned.js
     - jstests/concurrency/fsm_workloads/sharded_splitChunk_partitioned.js
 
@@ -106,21 +93,13 @@ selector:
     - jstests/concurrency/fsm_workloads/query/kill_rooted_or.js
 
     # Uses non retryable commands.
-    - jstests/concurrency/fsm_workloads/query/agg/agg_out.js
     - jstests/concurrency/fsm_workloads/query/agg/agg_out_interrupt_cleanup.js
-    - jstests/concurrency/fsm_workloads/query/timeseries/timeseries_agg_out_interrupt_cleanup.js
     - jstests/concurrency/fsm_workloads/query/agg/agg_sort.js
     - jstests/concurrency/fsm_workloads/collmod.js
     - jstests/concurrency/fsm_workloads/collmod_separate_collections.js
-    - jstests/concurrency/fsm_workloads/query/invalidated_cursors.js
-    - jstests/concurrency/fsm_workloads/query/kill_multicollection_aggregation.js
-    - jstests/concurrency/fsm_workloads/random_moveChunk_timeseries_meta_updates.js
-    - jstests/concurrency/fsm_workloads/random_moveChunk_timeseries_arbitrary_updates.js
     - jstests/concurrency/fsm_workloads/view_catalog.js
     - jstests/concurrency/fsm_workloads/view_catalog_cycle_with_drop.js
-    - jstests/concurrency/fsm_workloads/random_moveChunk_timeseries_deletes.js
     - jstests/concurrency/fsm_workloads/query/timeseries/timeseries_deletes_and_inserts.js
-    - jstests/concurrency/fsm_workloads/timeseries_crud_operations_respect_control_closed.js
     - jstests/concurrency/fsm_workloads/timeseries_findAndModify_remove_and_inserts.js
     - jstests/concurrency/fsm_workloads/timeseries_updates_and_inserts.js
     - jstests/concurrency/fsm_workloads/timeseries_upserts.js
@@ -134,8 +113,6 @@ selector:
     # We currently do not retry the transaction on this exception.
     - jstests/concurrency/fsm_workloads/query/agg/agg_unionWith_interrupt_cleanup.js
     - jstests/concurrency/fsm_workloads/query/agg/agg_union_with_chunk_migrations.js
-    - jstests/concurrency/fsm_workloads/create_capped_collection.js
-    - jstests/concurrency/fsm_workloads/create_capped_collection_maxdocs.js
     - jstests/concurrency/fsm_workloads/list_indexes.js
     - jstests/concurrency/fsm_workloads/query/query_stats/query_stats_concurrent.js
 
@@ -151,6 +128,7 @@ selector:
     - jstests/concurrency/fsm_workloads/query/update/update_where.js
 
   exclude_with_any_tags:
+    - requires_standalone
     - requires_replication
     - assumes_against_mongod_not_mongos
     - assumes_balancer_on

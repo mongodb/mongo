@@ -11,7 +11,6 @@ selector:
     - src/mongo/db/modules/*/jstests/concurrency/fsm_workloads/*.js
   exclude_files:
     # SERVER-14669 Multi-removes that use $where miscount removed documents
-    - jstests/concurrency/fsm_workloads/query/remove/remove_where.js
 
     # Disabled due to MongoDB restrictions and/or workload restrictions
 
@@ -24,8 +23,6 @@ selector:
     - jstests/concurrency/fsm_workloads/auth_drop_user.js
 
     # uses >100MB of data, which can overwhelm test hosts
-    - jstests/concurrency/fsm_workloads/query/agg/agg_group_external.js
-    - jstests/concurrency/fsm_workloads/query/agg/agg_sort_external.js
 
     # compact can only be run against a standalone mongod
     - jstests/concurrency/fsm_workloads/compact.js
@@ -35,7 +32,6 @@ selector:
     - jstests/concurrency/fsm_workloads/create_collection.js
 
     # can cause OOM kills on test hosts
-    - jstests/concurrency/fsm_workloads/query/findAndModify/findAndModify_update_grow.js
 
     # cannot createIndex after dropDatabase without sharding first
     - jstests/concurrency/fsm_workloads/query/plan_cache_drop_database.js
@@ -44,11 +40,8 @@ selector:
     - jstests/concurrency/fsm_workloads/collmod_writeconflict.js
 
     # SERVER-20361 Improve the behaviour of multi-update/delete against a sharded collection
-    - jstests/concurrency/fsm_workloads/query/update/update_where.js
 
     # TODO Undenylist (SERVER-38852).
-    - jstests/concurrency/fsm_workloads/query/agg/agg_out_interrupt_cleanup.js
-    - jstests/concurrency/fsm_workloads/query/timeseries/timeseries_agg_out_interrupt_cleanup.js
 
     # serverStatus does not include transaction metrics on mongos.
     - jstests/concurrency/fsm_workloads/multi_statement_transaction_atomicity_isolation_metrics_test.js
@@ -64,7 +57,6 @@ selector:
     # Disabled because MapReduce can lose cursors if the primary goes down during the operation.
     - jstests/concurrency/fsm_workloads/query/map_reduce/map_reduce_drop.js
     - jstests/concurrency/fsm_workloads/query/map_reduce/map_reduce_inline.js
-    - jstests/concurrency/fsm_workloads/query/map_reduce/map_reduce_interrupt.js
     - jstests/concurrency/fsm_workloads/query/map_reduce/map_reduce_merge.js
     - jstests/concurrency/fsm_workloads/query/map_reduce/map_reduce_reduce.js
     - jstests/concurrency/fsm_workloads/query/map_reduce/map_reduce_replace.js
@@ -72,16 +64,9 @@ selector:
     - jstests/concurrency/fsm_workloads/query/map_reduce/map_reduce_replace_remove.js
 
     # ChunkHelper directly talks to the config servers and doesn't support retries for network errors
-    - jstests/concurrency/fsm_workloads/cleanupOrphanedWhileMigrating.js
-    - jstests/concurrency/fsm_workloads/sharded_base_partitioned.js
-    - jstests/concurrency/fsm_workloads/sharded_mergeChunks_partitioned.js
-    - jstests/concurrency/fsm_workloads/sharded_moveChunk_partitioned.js
-    - jstests/concurrency/fsm_workloads/sharded_splitChunk_partitioned.js
 
     # These workloads frequently time out waiting for the distributed lock to drop a sharded
     # collection.
-    - jstests/concurrency/fsm_workloads/query/kill_aggregation.js
-    - jstests/concurrency/fsm_workloads/query/kill_rooted_or.js
 
     # Uses non retryable writes.
     - jstests/concurrency/fsm_workloads/query/remove/remove_and_bulk_insert.js
@@ -97,16 +82,11 @@ selector:
     - jstests/concurrency/fsm_workloads/query/agg/agg_sort.js
     - jstests/concurrency/fsm_workloads/collmod.js
     - jstests/concurrency/fsm_workloads/collmod_separate_collections.js
-    - jstests/concurrency/fsm_workloads/query/agg/agg_out_interrupt_cleanup.js
-    - jstests/concurrency/fsm_workloads/query/timeseries/timeseries_agg_out_interrupt_cleanup.js
-    - jstests/concurrency/fsm_workloads/query/invalidated_cursors.js
-    - jstests/concurrency/fsm_workloads/query/kill_multicollection_aggregation.js
     - jstests/concurrency/fsm_workloads/view_catalog.js
     - jstests/concurrency/fsm_workloads/view_catalog_cycle_lookup.js
     - jstests/concurrency/fsm_workloads/view_catalog_cycle_with_drop.js
 
     # The aggregation stage $currentOp cannot run with a readConcern other than 'local'.
-    - jstests/concurrency/fsm_workloads/multi_statement_transaction_current_op.js
 
     # The auto_retry_on_network_error.js override needs to overwrite the response from drop on
     # NamespaceNotFound, and since this workload only creates and drops collections there isn't
@@ -114,8 +94,6 @@ selector:
     - jstests/concurrency/fsm_workloads/drop_collection.js
 
     # Use non-retryable commands not allowed by the network retry helper.
-    - jstests/concurrency/fsm_workloads/snapshot_read_kill_op_only.js
-    - jstests/concurrency/fsm_workloads/snapshot_read_kill_operations.js
 
     # This test runs a large number of inserts, which can cause moveCollection to take a long time
     # to finish. This can cause the CheckMetadataConsistency hook to hit LockBusy errors.
@@ -125,6 +103,7 @@ selector:
     - assumes_against_mongod_not_mongos
     - assumes_balancer_off
     - requires_replication
+    - requires_standalone
     - requires_non_retryable_writes
     # Curop requires readConcern local.
     - uses_curop_agg_stage

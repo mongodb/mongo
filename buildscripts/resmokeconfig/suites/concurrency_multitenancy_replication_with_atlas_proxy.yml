@@ -8,19 +8,9 @@ selector:
     ##
     # Disabled due to MongoDB restrictions and/or workload restrictions
     ##
-    # These workloads use >100MB of data, which can overwhelm test hosts.
-    - jstests/concurrency/fsm_workloads/query/agg/agg_group_external.js
-    - jstests/concurrency/fsm_workloads/query/agg/agg_sort_external.js
 
-    # The findAndModify_update_grow.js and schema_validator_with_expr_variables.js workload can cause
     # OOM kills on test hosts.
-    - jstests/concurrency/fsm_workloads/query/findAndModify/findAndModify_update_grow.js
     - jstests/concurrency/fsm_workloads/query/schema_validator_with_expr_variables.js
-
-    # These workloads run the reIndex command, which is only allowed on a standalone node.
-    - jstests/concurrency/fsm_workloads/reindex.js
-    - jstests/concurrency/fsm_workloads/reindex_background.js
-    - jstests/concurrency/fsm_workloads/reindex_writeconflict.js
 
     # TODO SERVER-80966: `rolesInfo` is returning unprefixed database names.
     - jstests/concurrency/fsm_workloads/auth_privilege_cache_miss.js
@@ -35,6 +25,7 @@ selector:
     - src/mongo/db/modules/enterprise/jstests/concurrency/fsm_workloads/fle2_crud.js
 
   exclude_with_any_tags:
+    - requires_standalone
     - requires_sharding
     # This passthrough uses the `simulate_atlas_proxy` override, which some tests are incompatible with.
     - simulate_atlas_proxy_incompatible

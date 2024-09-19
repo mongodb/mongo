@@ -5,6 +5,13 @@
  *
  * The data passed to the $group is greater than 100MB, which should force
  * disk to be used.
+ *
+ * @tags: [
+ *      # These workloads uses >100MB of data, which can overwhelm test hosts.
+ *      requires_standalone,
+ *      incompatible_with_concurrency_simultaneous,
+ * ]
+ *
  */
 import {extendWorkload} from "jstests/concurrency/fsm_libs/extend_workload.js";
 import {$config as $baseConfig} from "jstests/concurrency/fsm_workloads/query/agg/agg_base.js";

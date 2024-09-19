@@ -18,12 +18,6 @@ selector:
     - jstests/concurrency/fsm_workloads/create_index_background_wildcard.js
     - jstests/concurrency/fsm_workloads/create_index_background.js
 
-    # These workloads uses >100MB of data, which can overwhelm test hosts.
-    - jstests/concurrency/fsm_workloads/query/agg/agg_group_external.js
-    - jstests/concurrency/fsm_workloads/query/agg/agg_sort_external.js
-    # The findAndModify_update_grow.js workload can cause OOM kills on test hosts.
-    - jstests/concurrency/fsm_workloads/query/findAndModify/findAndModify_update_grow.js
-
     # This workload kills random cursors which takes a collection lock.
     # TODO: SERVER-39939.
     - jstests/concurrency/fsm_workloads/snapshot_read_kill_operations.js
@@ -40,12 +34,8 @@ selector:
     # which presently can cause other simultaneous workloads to fail.
     - jstests/concurrency/fsm_workloads/collmod_writeconflict.js
 
-    # These workloads run the reIndex command, which is only allowed on a standalone node.
-    - jstests/concurrency/fsm_workloads/reindex.js
-    - jstests/concurrency/fsm_workloads/reindex_background.js
-    - jstests/concurrency/fsm_workloads/reindex_writeconflict.js
-
   exclude_with_any_tags:
+    - requires_standalone
     - requires_sharding
     - kills_random_sessions
     - incompatible_with_concurrency_simultaneous
