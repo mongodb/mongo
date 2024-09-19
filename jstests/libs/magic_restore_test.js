@@ -402,7 +402,10 @@ export class MagicRestoreTest {
     assertOplogCountForNamespace(node, findObj, expectedNumEntries) {
         const entries =
             node.getDB("local").getCollection('oplog.rs').find(findObj).sort({ts: -1}).toArray();
-        assert.eq(entries.length, expectedNumEntries);
+        assert.eq(entries.length,
+                  expectedNumEntries,
+                  `Expected ${expectedNumEntries} entries but found ${entries.length}. entries = ${
+                      tojson(entries)}`);
     }
 
     /**
