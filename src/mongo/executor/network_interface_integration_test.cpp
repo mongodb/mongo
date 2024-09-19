@@ -857,35 +857,94 @@ TEST_F(NetworkInterfaceTest, FireAndForget) {
 }
 
 TEST_F(NetworkInterfaceTest, SetAlarm) {
-    // set a first alarm, to execute after "expiration"
-    Date_t expiration = net().now() + Milliseconds(100);
-    auto makeTimerFuture = [&] {
-        auto pf = makePromiseFuture<Date_t>();
-        return std::make_pair(
-            [this, promise = std::move(pf.promise)](Status status) mutable {
-                if (status.isOK()) {
-                    promise.emplaceValue(net().now());
-                } else {
-                    promise.setError(status);
-                }
-            },
-            std::move(pf.future));
-    };
+    // Set alarm, wait for fulfillment.
+    {
+        Date_t expiration = net().now() + Milliseconds(100);
+        net().setAlarm(expiration).get();
+        ASSERT(net().now() >= expiration);
+    }
 
-    auto futurePair = makeTimerFuture();
-    ASSERT_OK(net().setAlarm(makeCallbackHandle(), expiration, std::move(futurePair.first)));
+    // Set alarm with passed deadline.
+    {
+        Date_t expiration = net().now() - Milliseconds(100);
+        auto future = net().setAlarm(expiration);
+        auto now = net().now();
+        future.get();
+        ASSERT(net().now() <= now + Milliseconds(10));
+    }
 
-    // assert that it executed after "expiration"
-    auto& result = futurePair.second.get();
-    ASSERT(result >= expiration);
+    // Set alarm, shutdown, then check that future finishes as though it were cancelled.
+    {
+        Date_t expiration = net().now() + Milliseconds(99999999);
+        auto future = net().setAlarm(expiration);
+        ASSERT(!future.isReady());
 
-    expiration = net().now() + Milliseconds(99999999);
-    auto futurePair2 = makeTimerFuture();
-    ASSERT_OK(net().setAlarm(makeCallbackHandle(), expiration, std::move(futurePair2.first)));
+        net().shutdown();
+        ASSERT_THROWS_CODE(future.get(), DBException, ErrorCodes::CallbackCanceled);
+        startNet();
+    }
 
-    net().shutdown();
-    auto swResult = futurePair2.second.getNoThrow();
-    ASSERT_FALSE(swResult.isOK());
+    // Set alarm with cancelled token.
+    {
+        Date_t expiration = net().now() + Milliseconds(99999999);
+        CancellationSource source;
+        source.cancel();
+        auto future = net().setAlarm(expiration, source.token());
+        ASSERT_THROWS_CODE(future.get(), DBException, ErrorCodes::CallbackCanceled);
+        ASSERT(net().now() < expiration);
+    }
+
+    // Set alarm, then cancel.
+    {
+        Date_t expiration = net().now() + Milliseconds(9999999);
+        CancellationSource source;
+        auto future = net().setAlarm(expiration, source.token());
+        ASSERT(!future.isReady());
+        source.cancel();
+        ASSERT_THROWS_CODE(future.get(), DBException, ErrorCodes::CallbackCanceled);
+        ASSERT(net().now() < expiration);
+    }
+
+    // Set alarm, then dismiss source, and check that deadline is respected.
+    {
+        Date_t expiration = net().now() + Milliseconds(100);
+        CancellationSource source;
+        auto future = net().setAlarm(expiration, source.token());
+        ASSERT(!future.isReady());
+        source = {};
+        ASSERT(!future.isReady());
+        ASSERT(net().now() < expiration);
+        future.get();
+        ASSERT(net().now() >= expiration);
+    }
+
+    // Set alarm, cancel after deadline.
+    {
+        Date_t expiration = net().now() + Milliseconds(100);
+        CancellationSource source;
+        net().setAlarm(expiration, source.token()).get();
+        ASSERT(net().now() >= expiration);
+        source.cancel();
+    }
+
+    // Set alarm, cancel after destruction.
+    {
+        Date_t expiration = net().now() + Milliseconds(100);
+        CancellationSource source;
+        net().setAlarm(expiration, source.token()).get();
+        ASSERT(net().now() >= expiration);
+        net().shutdown();
+        startNet();
+        source.cancel();
+    }
+
+    // Set alarm after shutdown.
+    {
+        Date_t expiration = net().now() + Seconds(60);
+        net().shutdown();
+        ASSERT_THROWS_CODE(
+            net().setAlarm(expiration).get(), DBException, ErrorCodes::ShutdownInProgress);
+    }
 }
 
 TEST_F(NetworkInterfaceTest, UseOperationKeyWhenProvided) {

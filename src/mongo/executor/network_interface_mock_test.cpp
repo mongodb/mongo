@@ -353,7 +353,10 @@ TEST_F(NetworkInterfaceMockTest, SetAlarmFires) {
     bool alarmHasFired = false;
 
     const auto deadline = net().now() + Milliseconds(100);
-    ASSERT_OK(net().setAlarm(cb, deadline, [&](Status) { alarmHasFired = true; }));
+    net().setAlarm(deadline).unsafeToInlineFuture().getAsync([&](Status status) {
+        ASSERT_OK(status);
+        alarmHasFired = true;
+    });
     ASSERT_FALSE(alarmHasFired);
 
     {
@@ -371,10 +374,13 @@ TEST_F(NetworkInterfaceMockTest, SetAlarmCanceled) {
     bool alarmHasFired = false;
 
     const auto deadline = net().now() + Milliseconds(100);
-    ASSERT_OK(net().setAlarm(cb, deadline, [&](Status) { alarmHasFired = true; }));
+    CancellationSource source;
+    auto future = net().setAlarm(deadline, source.token()).unsafeToInlineFuture().then([&]() {
+        alarmHasFired = true;
+    });
     ASSERT_FALSE(alarmHasFired);
 
-    net().cancelAlarm(cb);
+    source.cancel();
 
     {
         executor::NetworkInterfaceMock::InNetworkGuard guard(&net());
@@ -382,6 +388,10 @@ TEST_F(NetworkInterfaceMockTest, SetAlarmCanceled) {
         net().advanceTime(deadline);
         ASSERT_FALSE(alarmHasFired);
     }
+
+    // The future won't be ready until we actually advance the clock due to how cancellation works
+    // in NetworkInterfaceMock
+    ASSERT_THROWS_CODE(future.get(), DBException, ErrorCodes::CallbackCanceled);
 }
 
 TEST_F(NetworkInterfaceMockTest, InShutdown) {
@@ -403,8 +413,9 @@ TEST_F(NetworkInterfaceMockTest, StartCommandReturnsNotOKIfShutdownHasStarted) {
 TEST_F(NetworkInterfaceMockTest, SetAlarmReturnsNotOKIfShutdownHasStarted) {
     startNetwork();
     tearDown();
-    ASSERT_NOT_OK(net().setAlarm(
-        TaskExecutor::CallbackHandle(), net().now() + Milliseconds(100), [](Status) {}));
+    ASSERT_THROWS_CODE(net().setAlarm(net().now() + Milliseconds(100)).get(),
+                       DBException,
+                       ErrorCodes::ShutdownInProgress);
 }
 
 TEST_F(NetworkInterfaceMockTest, CommandTimeout) {

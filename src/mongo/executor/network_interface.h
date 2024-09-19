@@ -231,27 +231,13 @@ public:
                                const BatonHandle& baton = nullptr) = 0;
 
     /**
-     * Sets an alarm, which schedules "action" to run no sooner than "when".
+     * Sets an alarm, which fulfills the returned Future no sooner than "when".
      *
-     * Returns ErrorCodes::ShutdownInProgress if NetworkInterface::shutdown has already started
-     * and true otherwise. If it returns Status::OK(), then the action will be executed by
-     * NetworkInterface eventually if no error occurs while waiting for the alarm; otherwise,
-     * it will not.
-     *
-     * "action" should not do anything that requires a lot of computation, or that might block for a
-     * long time, as it may execute in a network thread.
-     *
-     * Any callbacks invoked from setAlarm must observe onNetworkThread to
-     * return true. See that method for why.
+     * Ready immediately with ErrorCodes::ShutdownInProgress if NetworkInterface::shutdown has
+     * already started.
      */
-    virtual Status setAlarm(const TaskExecutor::CallbackHandle& cbHandle,
-                            Date_t when,
-                            unique_function<void(Status)> action) = 0;
-
-    /**
-     * Requests cancellation of the alarm associated with "cbHandle" if it has not yet completed.
-     */
-    virtual void cancelAlarm(const TaskExecutor::CallbackHandle& cbHandle) = 0;
+    virtual SemiFuture<void> setAlarm(
+        Date_t when, const CancellationToken& token = CancellationToken::uncancelable()) = 0;
 
     /**
      * Schedules the specified action to run as soon as possible on the network interface's

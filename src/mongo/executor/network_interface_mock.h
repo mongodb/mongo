@@ -155,11 +155,8 @@ public:
     void cancelCommand(const TaskExecutor::CallbackHandle& cbHandle,
                        const BatonHandle& baton = nullptr) override;
 
-    Status setAlarm(const TaskExecutor::CallbackHandle& cbHandle,
-                    Date_t when,
-                    unique_function<void(Status)> action) override;
-
-    void cancelAlarm(const TaskExecutor::CallbackHandle& cbHandle) override;
+    SemiFuture<void> setAlarm(
+        Date_t when, const CancellationToken& token = CancellationToken::uncancelable()) override;
 
     Status schedule(unique_function<void(Status)> action) override;
 
@@ -343,16 +340,15 @@ private:
      * Information describing a scheduled alarm.
      */
     struct AlarmInfo {
-        using AlarmAction = unique_function<void(Status)>;
-        AlarmInfo(TaskExecutor::CallbackHandle inHandle, Date_t inWhen, AlarmAction inAction)
-            : handle(inHandle), when(inWhen), action(std::move(inAction)) {}
+        AlarmInfo(std::uint64_t inId, Date_t inWhen, Promise<void> inPromise)
+            : id(inId), when(inWhen), promise(std::move(inPromise)) {}
         bool operator>(const AlarmInfo& rhs) const {
             return when > rhs.when;
         }
 
-        TaskExecutor::CallbackHandle handle;
+        std::uint64_t id;
         Date_t when;
-        mutable AlarmAction action;
+        Promise<void> promise;
     };
 
     /**
@@ -465,11 +461,14 @@ private:
     // runReadyNetworkOperations().
     NetworkResponseList _responses;  // (M)
 
+    // Next alarm ID
+    std::uint64_t _nextAlarmId{0};  // (M)
+
     // Heap of alarms, with the next alarm always on top.
     std::priority_queue<AlarmInfo, std::vector<AlarmInfo>, std::greater<AlarmInfo>> _alarms;  // (M)
 
-    // A set of CallbackHandles for canceled alarms
-    stdx::unordered_set<TaskExecutor::CallbackHandle> _canceledAlarms;  // (M^:)
+    // A set of alarm IDs for canceled alarms
+    stdx::unordered_set<std::uint64_t> _canceledAlarms;  // (M^:)
 
     // The connection hook.
     std::unique_ptr<NetworkConnectionHook> _hook;  // (R)

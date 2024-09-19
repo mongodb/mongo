@@ -67,6 +67,7 @@
 #include "mongo/transport/baton.h"
 #include "mongo/transport/transport_layer.h"
 #include "mongo/transport/transport_layer_manager.h"
+#include "mongo/util/cancellation.h"
 #include "mongo/util/clock_source.h"
 #include "mongo/util/concurrency/notification.h"
 #include "mongo/util/duration.h"
@@ -118,13 +119,10 @@ public:
 
     void cancelCommand(const TaskExecutor::CallbackHandle& cbHandle,
                        const BatonHandle& baton) override;
-    Status setAlarm(const TaskExecutor::CallbackHandle& cbHandle,
-                    Date_t when,
-                    unique_function<void(Status)> action) override;
+    SemiFuture<void> setAlarm(
+        Date_t when, const CancellationToken& token = CancellationToken::uncancelable()) override;
 
     Status schedule(unique_function<void(Status)> action) override;
-
-    void cancelAlarm(const TaskExecutor::CallbackHandle& cbHandle) override;
 
     bool onNetworkThread() override;
 
@@ -315,25 +313,24 @@ private:
     };
 
     struct AlarmState {
-        AlarmState(Date_t when_,
-                   TaskExecutor::CallbackHandle cbHandle_,
+        AlarmState(NetworkInterfaceTL* interface_,
+                   std::uint64_t id_,
                    std::unique_ptr<transport::ReactorTimer> timer_,
-                   Promise<void> promise_)
-            : cbHandle(std::move(cbHandle_)),
-              when(when_),
-              timer(std::move(timer_)),
-              promise(std::move(promise_)) {}
+                   const CancellationToken& token)
+            : interface(interface_), id(id_), timer(std::move(timer_)), source(token) {}
+        ~AlarmState() {
+            interface->_removeAlarm(id);
+        }
 
-        TaskExecutor::CallbackHandle cbHandle;
-        Date_t when;
+        NetworkInterfaceTL* interface;
+        std::uint64_t id;
         std::unique_ptr<transport::ReactorTimer> timer;
-
-        AtomicWord<bool> done;
-        Promise<void> promise;
+        CancellationSource source;
     };
 
+    bool _inShutdown_inlock(WithLock lk) const;
+
     void _shutdownAllAlarms();
-    void _answerAlarm(Status status, std::shared_ptr<AlarmState> state);
 
     void _run();
 
@@ -352,6 +349,11 @@ private:
      * Has no effect if the command was never registered.
      */
     void _unregisterCommand(const TaskExecutor::CallbackHandle& cbHandle);
+
+    /**
+     * Removes an alarm from the in progress alarms by its ID.
+     */
+    void _removeAlarm(std::uint64_t id);
 
     std::string _instanceName;
     ServiceContext* _svcCtx = nullptr;
@@ -389,8 +391,7 @@ private:
             .at(s);
     }
 
-    // Guards _state, _inProgress, _inProgressAlarmsInShutdown, and
-    // _inProgressAlarms.
+    // Guards _state, _inProgress, and _inProgressAlarms.
     mutable Mutex _mutex;
 
     // This condition variable is dedicated to block a thread calling this class
@@ -407,9 +408,8 @@ private:
     // shutdown() will block until this list is empty.
     stdx::unordered_map<TaskExecutor::CallbackHandle, std::weak_ptr<CommandStateBase>> _inProgress;
 
-    bool _inProgressAlarmsInShutdown = false;
-    stdx::unordered_map<TaskExecutor::CallbackHandle, std::shared_ptr<AlarmState>>
-        _inProgressAlarms;
+    AtomicWord<std::uint64_t> nextAlarmId{0};
+    stdx::unordered_map<std::uint64_t, std::weak_ptr<AlarmState>> _inProgressAlarms;
 
     stdx::condition_variable _workReadyCond;
     bool _isExecutorRunnable = false;

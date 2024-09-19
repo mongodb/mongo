@@ -173,29 +173,32 @@ void NetworkInterfaceMock::_interruptWithResponse_inlock(const CallbackHandle& c
     _scheduleResponse_inlock(noi, _now_inlock(), response);
 }
 
-Status NetworkInterfaceMock::setAlarm(const TaskExecutor::CallbackHandle& cbHandle,
-                                      const Date_t when,
-                                      unique_function<void(Status)> action) {
+SemiFuture<void> NetworkInterfaceMock::setAlarm(const Date_t when, const CancellationToken& token) {
     if (inShutdown()) {
-        return {ErrorCodes::ShutdownInProgress, "NetworkInterfaceMock shutdown in progress"};
+        return Status(ErrorCodes::ShutdownInProgress, "NetworkInterfaceMock shutdown in progress");
     }
 
     stdx::unique_lock<stdx::mutex> lk(_mutex);
 
     if (when <= _now_inlock()) {
-        lk.unlock();
-        action(Status::OK());
         return Status::OK();
     }
-    _alarms.emplace(cbHandle, when, std::move(action));
 
-    return Status::OK();
-}
+    auto [promise, future] = makePromiseFuture<void>();
+    auto id = _nextAlarmId++;
 
-void NetworkInterfaceMock::cancelAlarm(const TaskExecutor::CallbackHandle& cbHandle) {
-    // Alarms live in a priority queue, so removing them isn't worth it
-    // Thus we add the handle to a map and check at fire time
-    _canceledAlarms.insert(cbHandle);
+    token.onCancel().unsafeToInlineFuture().getAsync([this, id](Status status) {
+        if (status.isOK()) {
+            // Alarms live in a priority queue, so removing them isn't worth it
+            // Thus we add the handle to a map and check at fire time
+            stdx::unique_lock<stdx::mutex> lk(_mutex);
+            _canceledAlarms.insert(id);
+        }
+    });
+
+    _alarms.emplace(id, when, std::move(promise));
+
+    return std::move(future).semi();
 }
 
 Status NetworkInterfaceMock::schedule(unique_function<void(Status)> action) {
@@ -485,7 +488,12 @@ void NetworkInterfaceMock::_enqueueOperation_inlock(NetworkOperation&& op) {
 
     if (timeout != RemoteCommandRequest::kNoTimeout) {
         invariant(timeout >= Milliseconds(0));
-        _alarms.emplace(cbh, _now_inlock() + timeout, [this, cbh](Status) {
+        auto [promise, future] = makePromiseFuture<void>();
+        _alarms.emplace(_nextAlarmId++, _now_inlock() + timeout, std::move(promise));
+        std::move(future).getAsync([this, cbh](Status status) {
+            if (!status.isOK()) {
+                return;
+            }
             auto response = ResponseStatus(
                 ErrorCodes::NetworkInterfaceExceededTimeLimit, "Network timeout", Milliseconds(0));
             _interruptWithResponse_inlock(cbh, std::move(response));
@@ -590,13 +598,16 @@ void NetworkInterfaceMock::_runReadyNetworkOperations_inlock(stdx::unique_lock<s
         _alarms.pop();
 
         // If the handle isn't cancelled, then run it
-        auto iter = _canceledAlarms.find(alarm.handle);
+        auto iter = _canceledAlarms.find(alarm.id);
         if (iter == _canceledAlarms.end()) {
             lk->unlock();
-            alarm.action(Status::OK());
+            alarm.promise.emplaceValue();
             lk->lock();
         } else {
             _canceledAlarms.erase(iter);
+            lk->unlock();
+            alarm.promise.setError({ErrorCodes::CallbackCanceled, "Alarm cancelled"});
+            lk->lock();
         }
     }
     while (!_responses.empty() && _now_inlock() >= _responses.front().when) {

@@ -120,6 +120,7 @@ public:
     AtomicWord<bool> exhaustErased{
         false};  // Used only in the exhaust path. Used to indicate that a cbState associated with
                  // an exhaust request has been removed from the '_networkInProgressQueue'.
+    CancellationSource source;
 };
 
 class ThreadPoolTaskExecutor::EventState : public TaskExecutor::EventState {
@@ -191,9 +192,11 @@ void ThreadPoolTaskExecutor::shutdown() {
     }
     for (auto&& cbState : pending) {
         cbState->canceled.store(1);
+        cbState->source.cancel();
     }
     for (auto&& cbState : _poolInProgressQueue) {
         cbState->canceled.store(1);
+        cbState->source.cancel();
     }
     scheduleIntoPool_inlock(&pending, std::move(lk));
 }
@@ -391,11 +394,16 @@ StatusWith<TaskExecutor::CallbackHandle> ThreadPoolTaskExecutor::scheduleWorkAt(
     if (!cbHandle.isOK()) {
         return cbHandle;
     }
+    auto cbState = checked_cast<CallbackState*>(getCallbackFromHandle(cbHandle.getValue()));
+    CancellationToken token = cbState->source.token();
     lk.unlock();
 
-    auto status = _net->setAlarm(
-        cbHandle.getValue(), when, [this, cbHandle = cbHandle.getValue()](Status status) {
-            if (status == ErrorCodes::CallbackCanceled) {
+    // TODO SERVER-93651 once all owning references to TaskExecutors are by shared_ptr, change the
+    // unsafeToInlineFuture below to thenRunOn(shared_from_this()).
+    _net->setAlarm(when, token)
+        .unsafeToInlineFuture()
+        .getAsync([this, when, cbHandle = cbHandle.getValue()](Status status) {
+            if (!status.isOK()) {
                 return;
             }
 
@@ -407,11 +415,6 @@ StatusWith<TaskExecutor::CallbackHandle> ThreadPoolTaskExecutor::scheduleWorkAt(
 
             scheduleIntoPool_inlock(&_sleepersQueue, cbState->iter, std::move(lk));
         });
-
-    if (!status.isOK()) {
-        cancel(cbHandle.getValue());
-        return status;
-    }
 
     return cbHandle;
 }
@@ -514,7 +517,7 @@ void ThreadPoolTaskExecutor::cancel(const CallbackHandle& cbHandle) {
     }
     if (cbState->isTimerOperation) {
         lk.unlock();
-        _net->cancelAlarm(cbHandle);
+        cbState->source.cancel();
         lk.lock();
     }
     if (cbState->readyDate != Date_t{}) {

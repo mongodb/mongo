@@ -246,10 +246,10 @@ TEST_F(MockNetworkTest, MockFixtureRunUntilReadyRequest) {
     TaskExecutor::CallbackHandle cbAlarm;
     bool alarmFired = false;
     const auto deadline = net().now() + Milliseconds(100);
-    ASSERT_OK(net().setAlarm(cbAlarm, deadline, [&](Status status) {
+    net().setAlarm(deadline).unsafeToInlineFuture().getAsync([&](Status status) {
         ASSERT(status.isOK());
         alarmFired = true;
-    }));
+    });
     ASSERT_FALSE(alarmFired);
 
     mock().runUntil(deadline);
@@ -270,10 +270,10 @@ TEST_F(MockNetworkTest, MockFixtureRunUntilNotAllExpectationsSatisfied) {
     TaskExecutor::CallbackHandle cbAlarm;
     bool alarmFired = false;
     const auto deadline = net().now() + Milliseconds(100);
-    ASSERT_OK(net().setAlarm(cbAlarm, deadline, [&](Status status) {
+    net().setAlarm(deadline).unsafeToInlineFuture().getAsync([&](Status status) {
         ASSERT(status.isOK());
         alarmFired = true;
-    }));
+    });
     ASSERT_FALSE(alarmFired);
 
     mock().runUntil(deadline);

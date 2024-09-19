@@ -119,6 +119,7 @@ namespace {
 MONGO_FAIL_POINT_DEFINE(triggerSendRequestNetworkTimeout);
 MONGO_FAIL_POINT_DEFINE(forceConnectionNetworkTimeout);
 MONGO_FAIL_POINT_DEFINE(waitForShutdownBeforeSendRequest);
+MONGO_FAIL_POINT_DEFINE(networkInterfaceSendsRequestsOnReactorThread);
 
 auto& numConnectionNetworkTimeouts =
     *MetricBuilder<Counter64>("operation.numConnectionNetworkTimeouts");
@@ -335,6 +336,8 @@ void NetworkInterfaceTL::shutdown() {
 
     LOGV2_DEBUG(22594, 2, "Shutting down network interface.");
 
+    _shutdownAllAlarms();
+
     const ScopeGuard finallySetStopped = [&] {
         stdx::lock_guard lk(_mutex);
         _state = kStopped;
@@ -378,13 +381,15 @@ void NetworkInterfaceTL::shutdown() {
 
     _reactor->stop();
 
-    _shutdownAllAlarms();
-
     _ioThread.join();
 }
 
 bool NetworkInterfaceTL::inShutdown() const {
     stdx::lock_guard lk(_mutex);
+    return _inShutdown_inlock(lk);
+}
+
+bool NetworkInterfaceTL::_inShutdown_inlock(WithLock lk) const {
     return _state == kStopping || _state == kStopped;
 }
 
@@ -416,7 +421,7 @@ void NetworkInterfaceTL::_registerCommand(const TaskExecutor::CallbackHandle& cb
                                           std::shared_ptr<CommandStateBase> cmdState) {
     stdx::lock_guard lk(_mutex);
 
-    if (_state == State::kStopping || _state == State::kStopped) {
+    if (_inShutdown_inlock(lk)) {
         uassertStatusOK(kNetworkInterfaceShutdownInProgress);
     }
 
@@ -699,7 +704,8 @@ Status NetworkInterfaceTL::startCommand(const TaskExecutor::CallbackHandle& cbHa
 
     auto connFuture = _pool->get(targetNode, request.sslMode, request.timeout);
 
-    if (connFuture.isReady()) {
+    if (connFuture.isReady() &&
+        !MONGO_unlikely(networkInterfaceSendsRequestsOnReactorThread.shouldFail())) {
         cmdState->trySend(std::move(connFuture).getNoThrow());
     } else {
         // Otherwise, schedule the request.
@@ -1166,159 +1172,83 @@ Status NetworkInterfaceTL::schedule(unique_function<void(Status)> action) {
     return Status::OK();
 }
 
-Status NetworkInterfaceTL::setAlarm(const TaskExecutor::CallbackHandle& cbHandle,
-                                    Date_t when,
-                                    unique_function<void(Status)> action) {
+SemiFuture<void> NetworkInterfaceTL::setAlarm(Date_t when, const CancellationToken& token) {
     if (inShutdown()) {
         // Pessimistically check if we're in shutdown and save some work
         return kNetworkInterfaceShutdownInProgress;
     }
 
     if (when <= now()) {
-        _reactor->schedule([action = std::move(action)](auto status) { action(status); });
         return Status::OK();
     }
 
-    auto pf = makePromiseFuture<void>();
-    std::move(pf.future).getAsync(std::move(action));
-
-    auto alarmState =
-        std::make_shared<AlarmState>(when, cbHandle, _reactor->makeTimer(), std::move(pf.promise));
-
-    auto weakAlarmState = std::weak_ptr<AlarmState>(alarmState);
+    auto id = nextAlarmId.fetchAndAdd(1);
+    auto alarmState = std::make_shared<AlarmState>(this, id, _reactor->makeTimer(), token);
 
     {
         stdx::lock_guard<Mutex> lk(_mutex);
 
-        if (_inProgressAlarmsInShutdown) {
+        if (_inShutdown_inlock(lk)) {
             // Check that we've won any possible race with _shutdownAllAlarms();
             return kNetworkInterfaceShutdownInProgress;
         }
 
         // If a user has already scheduled an alarm with a handle, make sure they intentionally
         // override it by canceling and setting a new one.
-        auto&& [_, wasInserted] = _inProgressAlarms.emplace(cbHandle, alarmState);
+        auto&& [it, wasInserted] =
+            _inProgressAlarms.emplace(alarmState->id, std::weak_ptr(alarmState));
         invariant(wasInserted);
     }
 
-    alarmState->timer->waitUntil(alarmState->when, nullptr)
-        .getAsync([this, weakAlarmState](Status status) mutable {
-            auto state = weakAlarmState.lock();
-            if (!state) {
-                LOGV2_DEBUG(4511701, 4, "AlarmState destroyed before timer callback finished");
+    auto future =
+        alarmState->timer->waitUntil(when, nullptr).tapAll([alarmState](Status status) {});
+
+    alarmState->source.token().onCancel().thenRunOn(_reactor).getAsync(
+        [this, weakAlarmState = std::weak_ptr(alarmState)](Status status) {
+            if (!status.isOK()) {
                 return;
             }
 
-            _answerAlarm(status, std::move(state));
+            auto alarmState = weakAlarmState.lock();
+            if (!alarmState) {
+                return;
+            }
+
+            alarmState->timer->cancel();
         });
 
-    return Status::OK();
-}
-
-void NetworkInterfaceTL::cancelAlarm(const TaskExecutor::CallbackHandle& cbHandle) {
-    stdx::unique_lock<Mutex> lk(_mutex);
-
-    auto iter = _inProgressAlarms.find(cbHandle);
-
-    if (iter == _inProgressAlarms.end()) {
-        return;
-    }
-
-    auto alarmState = std::move(iter->second);
-
-    _inProgressAlarms.erase(iter);
-
-    lk.unlock();
-
-    if (alarmState->done.swap(true)) {
-        return;
-    }
-
-    alarmState->timer->cancel();
-    alarmState->promise.setError(Status(ErrorCodes::CallbackCanceled, "Alarm cancelled"));
+    return std::move(future).semi();
 }
 
 void NetworkInterfaceTL::_shutdownAllAlarms() {
     auto alarms = [&] {
         stdx::unique_lock<Mutex> lk(_mutex);
-
-        // Prevent any more alarms from registering
-        _inProgressAlarmsInShutdown = true;
-
-        return std::exchange(_inProgressAlarms, {});
+        invariant(_state == kStopping);
+        return _inProgressAlarms;
     }();
 
-    for (auto&& [cbHandle, state] : alarms) {
-        if (state->done.swap(true)) {
+    for (auto&& [_, weakState] : alarms) {
+        auto alarmState = weakState.lock();
+        if (!alarmState) {
             continue;
         }
+        alarmState->source.cancel();
+    }
 
-        state->timer->cancel();
-        state->promise.setError(Status(ErrorCodes::CallbackCanceled, "Alarm cancelled"));
+    {
+        stdx::unique_lock<Mutex> lk(_mutex);
+        _stoppedCV.wait(lk, [&] { return _inProgressAlarms.empty(); });
     }
 }
 
-void NetworkInterfaceTL::_answerAlarm(Status status, std::shared_ptr<AlarmState> state) {
-    // Since the lock is released before canceling the timer, this thread can win the race with
-    // cancelAlarm(). Thus if status is CallbackCanceled, then this alarm is already removed from
-    // _inProgressAlarms.
-    if (ErrorCodes::isCancellationError(status)) {
-        return;
+void NetworkInterfaceTL::_removeAlarm(std::uint64_t id) {
+    stdx::lock_guard<Mutex> lk(_mutex);
+    auto it = _inProgressAlarms.find(id);
+    invariant(it != _inProgressAlarms.end());
+    _inProgressAlarms.erase(it);
+    if (_inShutdown_inlock(lk) && _inProgressAlarms.empty()) {
+        _stoppedCV.notify_all();
     }
-
-    if (inShutdown()) {
-        // No alarms get processed in shutdown
-        return;
-    }
-
-    // transport::Reactor timers do not involve spurious wake ups, however, this check is nearly
-    // free and allows us to be resilient to a world where timers impls do have spurious wake ups.
-    auto currentTime = now();
-    if (status.isOK() && currentTime < state->when) {
-        LOGV2_DEBUG(22600,
-                    2,
-                    "Alarm returned early",
-                    "expectedTime"_attr = state->when,
-                    "currentTime"_attr = currentTime);
-        state->timer->waitUntil(state->when, nullptr)
-            .getAsync([this, state = std::move(state)](Status status) mutable {
-                _answerAlarm(status, state);
-            });
-        return;
-    }
-
-    // Erase the AlarmState from the map.
-    {
-        stdx::lock_guard<Mutex> lk(_mutex);
-
-        auto iter = _inProgressAlarms.find(state->cbHandle);
-        if (iter == _inProgressAlarms.end()) {
-            return;
-        }
-
-        _inProgressAlarms.erase(iter);
-    }
-
-    if (state->done.swap(true)) {
-        return;
-    }
-
-    // A not OK status here means the timer experienced a system error.
-    // It is not reasonable to complete the promise on a reactor thread because there is likely no
-    // properly functioning reactor.
-    if (!status.isOK()) {
-        state->promise.setError(status);
-        return;
-    }
-
-    // Fulfill the promise on a reactor thread
-    _reactor->schedule([state](auto status) {
-        if (status.isOK()) {
-            state->promise.emplaceValue();
-        } else {
-            state->promise.setError(status);
-        }
-    });
 }
 
 bool NetworkInterfaceTL::onNetworkThread() {
