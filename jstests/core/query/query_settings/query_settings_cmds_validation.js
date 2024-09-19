@@ -122,7 +122,7 @@ const nonExistentQueryShapeHash = "0".repeat(64);
         [qsutils.makeQueryShapeConfiguration({reject: true}, query)]);
 
     // Ensure updating with empty query settings fails.
-    const queryShapeHash = qsutils.getQueryHashFromQuerySettings(query);
+    const queryShapeHash = qsutils.getQueryShapeHashFromQuerySettings(query);
     assert.commandFailedWithCode(db.adminCommand({setQuerySettings: queryShapeHash, settings: {}}),
                                  8727502);
     assert.commandFailedWithCode(db.adminCommand({setQuerySettings: query, settings: {}}), 8727502);

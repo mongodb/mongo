@@ -105,7 +105,7 @@ export class QuerySettingsUtils {
     /**
      * Return queryShapeHash for a given query from querySettings.
      */
-    getQueryHashFromQuerySettings(representativeQuery) {
+    getQueryShapeHashFromQuerySettings(representativeQuery) {
         const settings =
             this.getQuerySettings({showQueryShapeHash: true, filter: {representativeQuery}});
         assert.lte(

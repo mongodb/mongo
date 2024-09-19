@@ -60,7 +60,7 @@ function testQuerySettingsUsing(params) {
     // Ensure that 'querySettings' cluster parameter gets updated on subsequent call of
     // setQuerySettings by passing a QueryShapeHash.
     {
-        queryShapeHashA = qsutils.getQueryHashFromQuerySettings(params.queryA);
+        queryShapeHashA = qsutils.getQueryShapeHashFromQuerySettings(params.queryA);
         assert.neq(queryShapeHashA, undefined);
         assert.commandWorked(
             db.adminCommand({setQuerySettings: queryShapeHashA, settings: params.querySettingsB}));

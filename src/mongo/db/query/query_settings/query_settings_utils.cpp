@@ -120,7 +120,7 @@ void failIfRejectedBySettings(const boost::intrusive_ptr<ExpressionContext>& exp
                               const Pipeline& pipeline,
                               const QuerySettings& settings) {
     // Agg requests with "system" stages like $querySettings should not be failed,
-    // even if reject has been set by query hash.
+    // even if reject has been set by query shape hash.
     if (!pipelineCanBeRejected(pipeline)) {
         return;
     }
@@ -154,6 +154,10 @@ void setQueryShapeHash(OperationContext* opCtx, const QueryShapeHash& hash) {
     // within a critical section.
     stdx::lock_guard<Client> lk(*opCtx->getClient());
     CurOp::get(opCtx)->setQueryShapeHash(hash);
+}
+
+bool requestComesFromMongosOrSentDirectlyToShard(Client* client) {
+    return client->isInternalClient() || client->isInDirectClient();
 }
 }  // namespace
 
@@ -340,10 +344,12 @@ QuerySettings lookupQuerySettingsForFind(const boost::intrusive_ptr<ExpressionCo
                 return query_settings::QuerySettings();
             }
 
-            // If query settings are present as part of the request, use them as opposed to
-            // performing the query settings lookup.
-            if (auto querySettings = parsedFind.findCommandRequest->getQuerySettings()) {
-                return *querySettings;
+            // If the incoming request comes from mongos, then no additional query setting lookup
+            // has to be performed, rather, if there are query settings associated with the request,
+            // they should be attached to the command by mongos.
+            if (requestComesFromMongosOrSentDirectlyToShard(expCtx->opCtx->getClient())) {
+                return parsedFind.findCommandRequest->getQuerySettings().value_or(
+                    query_settings::QuerySettings());
             }
 
             // We need to use isEnabledUseLatestFCVWhenUninitialized instead of isEnabled because
@@ -410,10 +416,17 @@ QuerySettings lookupQuerySettingsForAgg(
                 return query_settings::QuerySettings();
             }
 
-            // If query settings are present as part of the request, use them as opposed to
-            // performing the query settings lookup.
-            if (auto querySettings = aggregateCommandRequest.getQuerySettings()) {
-                return *querySettings;
+            // If the incoming request comes from mongos, then no additional query setting lookup
+            // has to be performed, rather, if there are query settings associated with the request,
+            // they should be attached to the command by mongos. While query settings are not
+            // allowed to be passed directly to the command, it may occur that query settings are
+            // part of the command if the command was created as part of the view resolution. In
+            // that case the query settings looked up for the original command are attached to
+            // 'aggregateCommandRequest'.
+            if (requestComesFromMongosOrSentDirectlyToShard(expCtx->opCtx->getClient()) ||
+                aggregateCommandRequest.getQuerySettings().has_value()) {
+                return aggregateCommandRequest.getQuerySettings().value_or(
+                    query_settings::QuerySettings());
             }
 
             // We need to use isEnabledUseLatestFCVWhenUninitialized instead of isEnabled because
@@ -471,11 +484,14 @@ QuerySettings lookupQuerySettingsForDistinct(const boost::intrusive_ptr<Expressi
                 return query_settings::QuerySettings();
             }
 
-            // If query settings are present as part of the request, use them as opposed to
-            // performing the query settings lookup.
-            if (auto querySettings = parsedDistinct.distinctCommandRequest->getQuerySettings()) {
-                return *querySettings;
+            // If the incoming request comes from mongos, then no additional query setting lookup
+            // has to be performed, rather, if there are query settings associated with the request,
+            // they should be attached to the command by mongos.
+            if (requestComesFromMongosOrSentDirectlyToShard(expCtx->opCtx->getClient())) {
+                return parsedDistinct.distinctCommandRequest->getQuerySettings().value_or(
+                    query_settings::QuerySettings());
             }
+
 
             // We need to use isEnabledUseLatestFCVWhenUninitialized instead of isEnabled because
             // this could run during startup while the FCV is still uninitialized.
@@ -530,7 +546,7 @@ bool allowQuerySettingsFromClient(Client* client) {
     // - comes from mongos (internal client), which has already performed the query settings lookup
     // or
     // - has been created interally and is executed via DBDirectClient.
-    return client->isInternalClient() || client->isInDirectClient();
+    return requestComesFromMongosOrSentDirectlyToShard(client);
 }
 
 bool isDefault(const QuerySettings& settings) {

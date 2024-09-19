@@ -98,6 +98,9 @@ selector:
     - jstests/core/query/query_settings/query_settings_size_limits.js
     # This test cares about command metrics, and fails under this suite.
     - jstests/core/query/query_settings/query_settings_reject_application.js
+    # The 'queryShapeHash' is only computed on mongos in sharded clusters, therefore the test will fail
+    # as hash won't be present when running via replica set endpoint.
+    - jstests/core/query/query_settings/query_shape_hash_in_current_op.js
 
     # TODO SERVER-94428: Reenable this test.
     # This test is currently incompatible with dbcheck.

@@ -54,6 +54,9 @@ selector:
     # Test expects changes in metrics (rejected command count), but these are
     # per-ClusterRole. This suite changes which role's metrics are updated.
     - jstests/core/query/query_settings/query_settings_reject_application.js
+    # The 'queryShapeHash' is only computed on mongos in sharded clusters, therefore the test will fail
+    # as hash won't be present when running via replica set endpoint.
+    - jstests/core/query/query_settings/query_shape_hash_in_current_op.js
 
   exclude_with_any_tags:
     - assumes_standalone_mongod
