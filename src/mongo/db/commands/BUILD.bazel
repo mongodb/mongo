@@ -353,6 +353,8 @@ idl_generator(
     src = "rename_collection.idl",
     deps = [
         "//src/mongo/db:basic_types_gen",
+        "//src/mongo/db/auth:access_checks_gen",
+        "//src/mongo/db/auth:action_type_gen",
         "//src/mongo/idl:generic_argument_gen",
     ],
 )
@@ -727,6 +729,7 @@ mongo_cc_library(
     ],
     deps = [
         "//src/mongo/db:server_base",
+        "//src/mongo/db/auth:authprivilege",
     ],
 )
 

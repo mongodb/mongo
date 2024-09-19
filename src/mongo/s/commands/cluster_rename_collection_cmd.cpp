@@ -28,6 +28,7 @@
  */
 
 #include <memory>
+#include <set>
 #include <string>
 #include <variant>
 
@@ -77,6 +78,10 @@ namespace {
 class RenameCollectionCmd final : public TypedCommand<RenameCollectionCmd> {
 public:
     using Request = RenameCollectionCommand;
+
+    const std::set<std::string>& apiVersions() const override {
+        return kApiVersions1;
+    }
 
     AllowedOnSecondary secondaryAllowed(ServiceContext*) const override {
         return AllowedOnSecondary::kNever;

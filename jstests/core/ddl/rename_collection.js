@@ -38,6 +38,14 @@ jsTest.log("Rename collection with documents");
     dst.drop();
 }
 
+jsTest.log("Rename non-existing collection");
+{
+    const src = getNewColl();
+    const dst = getNewColl();
+
+    assert.commandFailed(src.renameCollection(dst.getName()));
+}
+
 jsTest.log("Rename collection with indexes");
 {
     const src = getNewColl();

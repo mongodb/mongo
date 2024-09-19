@@ -30,6 +30,8 @@ global:
     cpp_namespace: "mongo"
 
 imports:
+    - "mongo/db/auth/access_checks.idl"
+    - "mongo/db/auth/action_type.idl"
     - "mongo/db/basic_types.idl"
 
 commands:
@@ -37,14 +39,21 @@ commands:
         description: "Parser for the 'renameCollection' command."
         command_name: renameCollection
         cpp_name: RenameCollectionCommand
+        reply_type: ErrorReply
         strict: true
         namespace: type
-        api_version: ""
         type: namespacestring
+        api_version: "1"
+        access_check:
+            simple:
+                privilege:
+                    resource_pattern: exact_namespace
+                    action_type: renameCollection
         fields:
             to:
                 description: "The new namespace for the collection being renamed."
                 type: namespacestring
+                stability: stable
             dropTarget:
                 description: >-
                   If true or a UUID, mongod will drop the target of renameCollection prior to
@@ -53,12 +62,17 @@ commands:
                 type:
                   variant: [bool, uuid]
                 default: false
+                stability: stable
+            # stayTemp is an internal attribute, which is intentionally undocumented and
+            # not part of the stable API. 
             stayTemp:
                 description: "If true, the original collection will remain temp if it was temp
                 before the rename."
                 type: bool
                 default: false
+                stability: internal
             collectionUUID:
                 description: "The expected UUID of the collection."
                 type: uuid
                 optional: true
+                stability: stable

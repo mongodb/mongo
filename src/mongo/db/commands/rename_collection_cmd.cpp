@@ -31,6 +31,7 @@
 #include <algorithm>
 #include <iosfwd>
 #include <memory>
+#include <set>
 #include <string>
 #include <variant>
 
@@ -62,6 +63,10 @@ namespace {
 class CmdRenameCollection final : public TypedCommand<CmdRenameCollection> {
 public:
     using Request = RenameCollectionCommand;
+
+    const std::set<std::string>& apiVersions() const override {
+        return kApiVersions1;
+    }
 
     bool adminOnly() const override {
         return true;
