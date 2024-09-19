@@ -34,16 +34,17 @@
 
 namespace mongo {
 
-class WindowFunctionConcatArrays final : public WindowFunctionState {
+class WindowFunctionSetUnion final : public WindowFunctionState {
 public:
-    static inline const Value kDefaultEmptyArray = Value{std::vector<Value>()};
+    static inline const Value kDefault = Value{std::vector<Value>()};
 
-    static std::unique_ptr<WindowFunctionState> create(ExpressionContext* const expCtx) {
-        return std::make_unique<WindowFunctionConcatArrays>(expCtx);
+    static std::unique_ptr<WindowFunctionState> create(ExpressionContext* expCtx) {
+        return std::make_unique<WindowFunctionSetUnion>(expCtx);
     }
 
-    explicit WindowFunctionConcatArrays(ExpressionContext* const expCtx)
-        : WindowFunctionState(expCtx) {
+    explicit WindowFunctionSetUnion(ExpressionContext* const expCtx)
+        : WindowFunctionState(expCtx),
+          _values(MemoryTokenValueComparator(&_expCtx->getValueComparator())) {
         _memUsageTracker.set(sizeof(*this));
     }
 
@@ -53,14 +54,15 @@ public:
         }
 
         uassert(ErrorCodes::TypeMismatch,
-                str::stream() << "$concatArrays requires array inputs, but input "
+                str::stream() << "$setUnion requires array inputs, but input "
                               << redact(value.toString()) << " is of type "
                               << typeName(value.getType()),
                 value.isArray());
 
-        _count += value.getArrayLength();
-        _values.emplace_back(SimpleMemoryUsageToken{value.getApproximateSize(), &_memUsageTracker},
-                             std::move(value));
+        for (const auto& val : value.getArray()) {
+            _values.emplace(SimpleMemoryUsageToken{val.getApproximateSize(), &_memUsageTracker},
+                            val);
+        }
     }
 
     void remove(Value value) override {
@@ -68,51 +70,42 @@ public:
             return;
         }
 
-        tassert(
-            1628400, "Can only remove an array from WindowFunctionConcatArrays", value.isArray());
+        tassert(1628403, "Can only remove an array from WindowFunctionSetUnion", value.isArray());
 
-        tassert(
-            1628401, "Can't remove from an empty WindowFunctionConcatArrays", _values.size() > 0);
+        auto numValuesToRemove = value.getArrayLength();
 
-        // Assert that we are removing the element at the front of the WindowFunctionConcatArrays
-        // (i.e. that removals are occurring in FIFO order). This check is expensive on workloads
-        // with a lot of removals, an becomes even more expensive with arbitrarily long arrays.
-        dassert(_expCtx->getValueComparator().getEqualTo()(_values.front().value(), value));
+        tassert(1628404,
+                "Can't remove more values than the number contained in WindowFunctionSetUnion",
+                _values.size() >= numValuesToRemove);
 
-        _count -= value.getArrayLength();
-        _values.pop_front();
+        for (const auto& valToRemove : value.getArray()) {
+            auto iter = _values.find(valToRemove);
+            tassert(1628405,
+                    "Can't remove a value that is not contained in the WindowFunctionSetUnion",
+                    iter != _values.end());
+            _values.erase(iter);
+        }
     }
 
     void reset() override {
         _values.clear();
         _memUsageTracker.set(sizeof(*this));
-        _count = 0;
     }
 
     Value getValue() const override {
+        std::vector<Value> output;
         if (_values.empty()) {
-            return kDefaultEmptyArray;
+            return kDefault;
+        }
+        for (auto it = _values.begin(); it != _values.end(); it = _values.upper_bound(*it)) {
+            output.push_back(it->value());
         }
 
-        std::vector<Value> result;
-        result.reserve(_count);
-
-        for (const auto& array : _values) {
-            for (const auto& val : array.value().getArray()) {
-                result.emplace_back(val);
-            }
-        }
-
-        return Value{std::move(result)};
+        return Value(std::move(output));
     }
 
 private:
-    // Every Value in _values will be an array. This will be unrolled in getValue() to produce a
-    // single array that is the concatenation of all the arrays in _values.
-    std::deque<SimpleMemoryUsageTokenWith<Value>> _values;
-
-    // The number of Values that will be present in the array produced by getValue().
-    long long _count = 0;
+    std::multiset<SimpleMemoryUsageTokenWith<Value>, MemoryTokenValueComparator> _values;
 };
 
 }  // namespace mongo

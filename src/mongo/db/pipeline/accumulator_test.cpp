@@ -77,6 +77,27 @@ namespace mongo {
 namespace AccumulatorTests {
 
 /**
+ * Asserts that all elements contained in the array 'result' are contained in the array 'expected'
+ * and vice versa.
+ */
+static void assertArrayValueEqualityWithoutOrdering(ExpressionContext* const expCtx,
+                                                    Value result,
+                                                    Value expected) {
+    ASSERT(result.isArray());
+    ASSERT(expected.isArray());
+    ASSERT_EQUALS(result.getArrayLength(), expected.getArrayLength());
+
+    std::vector<Value> resultArray = result.getArray();
+    std::sort(resultArray.begin(), resultArray.end(), expCtx->getValueComparator().getLessThan());
+
+    std::vector<Value> expectedArray = expected.getArray();
+    std::sort(
+        expectedArray.begin(), expectedArray.end(), expCtx->getValueComparator().getLessThan());
+
+    ASSERT_VALUE_EQ(Value(resultArray), Value(expectedArray));
+}
+
+/**
  * Takes a list of pairs of arguments and expected results, and creates an AccumulatorState using
  * the provided lambda. It then asserts that for the given AccumulatorState the input returns
  * the expected results.
@@ -88,7 +109,8 @@ static void assertExpectedResults(
     OperationsType operations,
     std::function<boost::intrusive_ptr<AccumulatorState>(ExpressionContext* const)>
         initializeAccumulator,
-    bool skipMerging = false) {
+    bool skipMerging = false,
+    bool ignoreArrayOrdering = false) {
     for (auto&& op : operations) {
         try {
             // Asserts that result equals expected result when not sharded.
@@ -98,7 +120,11 @@ static void assertExpectedResults(
                     accum->process(val, false);
                 }
                 Value result = accum->getValue(false);
-                ASSERT_VALUE_EQ(op.second, result);
+                if (result.isArray() && ignoreArrayOrdering) {
+                    assertArrayValueEqualityWithoutOrdering(expCtx, op.second, result);
+                } else {
+                    ASSERT_VALUE_EQ(op.second, result);
+                }
                 ASSERT_EQUALS(op.second.getType(), result.getType());
             }
 
@@ -112,7 +138,11 @@ static void assertExpectedResults(
                 auto val = shard->getValue(true);
                 accum->process(val, true);
                 Value result = accum->getValue(false);
-                ASSERT_VALUE_EQ(op.second, result);
+                if (result.isArray() && ignoreArrayOrdering) {
+                    assertArrayValueEqualityWithoutOrdering(expCtx, op.second, result);
+                } else {
+                    ASSERT_VALUE_EQ(op.second, result);
+                }
                 ASSERT_EQUALS(op.second.getType(), result.getType());
             }
 
@@ -125,7 +155,11 @@ static void assertExpectedResults(
                     accum->process(shard->getValue(true), true);
                 }
                 Value result = accum->getValue(false);
-                ASSERT_VALUE_EQ(op.second, result);
+                if (result.isArray() && ignoreArrayOrdering) {
+                    assertArrayValueEqualityWithoutOrdering(expCtx, op.second, result);
+                } else {
+                    ASSERT_VALUE_EQ(op.second, result);
+                }
                 ASSERT_EQUALS(op.second.getType(), result.getType());
             }
         } catch (...) {
@@ -2089,6 +2123,14 @@ TEST(Accumulators, SerializeWithRedaction) {
     ASSERT_DOCUMENT_EQ_AUTO(  // NOLINT
         R"({"$concatArrays": "?array<?number>"})",
         actual);
+
+    auto setUnion = BSON("$setUnion" << BSON_ARRAY(4 << 6));
+    actual = parseAndSerializeAccum(
+        setUnion.firstElement(),
+        &genericParseSBEUnsupportedSingleExpressionAccumulator<AccumulatorSetUnion>);
+    ASSERT_DOCUMENT_EQ_AUTO(  // NOLINT
+        R"({"$setUnion": "?array<?number>"})",
+        actual);
 }
 
 TEST(AccumulatorsToExpression, SerializeWithRedaction) {
@@ -2283,6 +2325,149 @@ TEST(AccumulatorConcatArrays, AllowsDuplicates) {
     std::vector<Value> expected = {Value(1), Value(1), Value(2), Value(3), Value(1), Value(1)};
 
     assertExpectedResults<AccumulatorConcatArrays>(&expCtx, {{values, Value{expected}}});
+}
+
+/* ------------------------- AccumulatorSetUnion -------------------------- */
+
+static void assertSetUnionResults(
+    ExpressionContext* const expCtx,
+    std::initializer_list<std::pair<std::vector<Value>, Value>> operations) {
+    auto initializeAccumulator =
+        [&](ExpressionContext* const expCtx) -> boost::intrusive_ptr<AccumulatorState> {
+        auto accum = AccumulatorSetUnion::create(expCtx);
+        return accum;
+    };
+    assertExpectedResults(expCtx,
+                          OperationsType(operations),
+                          initializeAccumulator,
+                          false /*skipMerging*/,
+                          true /*ignoreArrayOrdering*/);
+}
+
+TEST(AccumulatorSetUnion, SetUnionRespectsMaxMemoryContraint) {
+    auto expCtx = ExpressionContextForTest{};
+    const int maxMemoryBytes = 20ull;
+    auto setUnion = AccumulatorSetUnion(&expCtx, maxMemoryBytes);
+    ASSERT_THROWS_CODE(
+        setUnion.process(Value(std::vector<Value>{Value("A somewhat long string"_sd),
+                                                  Value("Another somwhat long string"_sd),
+                                                  Value("Yet another somewhat long string!"_sd)}),
+                         false),
+        AssertionException,
+        ErrorCodes::ExceededMemoryLimit);
+}
+
+TEST(AccumulatorSetUnion, SetUnionRefusesNonArrayValue) {
+    auto expCtx = ExpressionContextForTest{};
+    auto setUnion = AccumulatorSetUnion(&expCtx);
+
+    // $setUnion should error if it encounters a non-array value.
+    const std::vector<Value> nonArrayValues = {Value("A string"_sd), Value(1), Value(BSONNULL)};
+    for (auto& val : nonArrayValues) {
+        ASSERT_THROWS_CODE(
+            setUnion.process(val, false), AssertionException, ErrorCodes::TypeMismatch);
+    }
+}
+
+TEST(AccumulatorSetUnion, SetUnionRespectsCollation) {
+    auto expCtx = ExpressionContextForTest{};
+    auto collator =
+        std::make_unique<CollatorInterfaceMock>(CollatorInterfaceMock::MockType::kAlwaysEqual);
+    expCtx.setCollator(std::move(collator));
+
+    std::vector<Value> values = {
+        Value(std::vector<Value>({Value("a"_sd), Value("b"_sd), Value("c"_sd)})),
+        Value(std::vector<Value>({Value("d"_sd)}))};
+    std::vector<Value> expected = {Value("a"_sd)};
+
+    assertSetUnionResults(&expCtx, {{values, Value(expected)}});
+}
+
+TEST(AccumulatorSetUnion, SetUnionBasicCases) {
+    auto expCtx = ExpressionContextForTest{};
+
+    // $setUnion with a single array containing no duplicate values should produce the same array.
+    const std::vector<Value> singleDocument = {
+        Value(std::vector<Value>({Value(1), Value(2), Value(3)}))};
+    const std::vector<Value> singleDocumentExpect = {Value(1), Value(2), Value(3)};
+
+    // $setUnion with multiple arrays of all unique values should produce a single array.
+    const std::vector<Value> multipleDocuments = {
+        Value(std::vector<Value>({Value(4), Value(2)})),
+        Value(std::vector<Value>({Value(3), Value(1)})),
+        Value(std::vector<Value>(
+            {Value(std::vector<Value>({Value(5)})), Value(std::vector<Value>({}))})),
+    };
+    const std::vector<Value> multipleDocumentsExpect = {
+        Value(1),
+        Value(2),
+        Value(3),
+        Value(4),
+        Value(std::vector<Value>({})),
+        Value(std::vector<Value>({Value(5)})),
+    };
+
+    assertSetUnionResults(
+        &expCtx,
+        {{{}, Value(std::vector<Value>({}))},
+         {singleDocument, Value(singleDocumentExpect)},
+         {multipleDocuments, Value(std::vector<Value>(multipleDocumentsExpect))}});
+}
+
+TEST(AccumulatorSetUnion, DoesNotAllowDuplicates) {
+    auto expCtx = ExpressionContextForTest{};
+
+    // $setUnion with a single array containin duplicates should produce the same array, but
+    // deduplicated.
+    const std::vector<Value> singleDocumentWithDuplicates = {
+        Value(std::vector<Value>({Value(1), Value(2), Value(2), Value(3)}))};
+    const std::vector<Value> singleDocumentWithDuplicatesExpect = {Value(1), Value(2), Value(3)};
+
+    // $setUnion with multiple arrays, some of which contain duplicate values should produce a
+    // single array containing no duplicates.
+    const std::vector<Value> multipleDocumentsWithDuplicates = {
+        Value(std::vector<Value>({Value(1), Value(2), Value(2)})),
+        Value(std::vector<Value>({Value(2), Value(3), Value(4), Value(std::vector<Value>({}))})),
+        Value(std::vector<Value>(
+            {Value(std::vector<Value>({Value(5)})), Value(std::vector<Value>({}))})),
+    };
+    const std::vector<Value> multipleDocumentsWithDuplicatesExpect = {
+        Value(1),
+        Value(2),
+        Value(3),
+        Value(4),
+        Value(std::vector<Value>({})),
+        Value(std::vector<Value>({Value(5)})),
+    };
+
+    assertSetUnionResults(
+        &expCtx,
+        {
+            {singleDocumentWithDuplicates, Value(singleDocumentWithDuplicatesExpect)},
+            {multipleDocumentsWithDuplicates,
+             Value(std::vector<Value>(multipleDocumentsWithDuplicatesExpect))},
+        });
+}
+
+TEST(AccumulatorSetUnion, DoubleNestedArraysShouldReturnNestedArrays) {
+    auto expCtx = ExpressionContextForTest{};
+
+    std::vector<Value> values = {
+        Value(std::vector<Value>({
+            Value(std::vector<Value>({Value("In a double nested array"_sd)})),
+            Value(std::vector<Value>({Value("Also in a double nested array"_sd)})),
+        })),
+        Value(std::vector<Value>({Value("Only singly nested"_sd)})),
+        Value(std::vector<Value>({Value(std::vector<Value>({Value(1), Value(2)}))}))};
+
+    std::vector<Value> expected = {
+        Value("Only singly nested"_sd),
+        Value(std::vector<Value>({Value(1), Value(2)})),
+        Value(std::vector<Value>({Value("Also in a double nested array"_sd)})),
+        Value(std::vector<Value>({Value("In a double nested array"_sd)})),
+    };
+
+    assertSetUnionResults(&expCtx, {{values, Value{expected}}});
 }
 
 }  // namespace AccumulatorTests

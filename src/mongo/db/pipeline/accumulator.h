@@ -583,4 +583,31 @@ private:
     std::vector<Value> _array;
 };
 
+class AccumulatorSetUnion : public AccumulatorState {
+public:
+    static constexpr auto kName = "$setUnion"_sd;
+
+    const char* getOpName() const final {
+        return kName.rawData();
+    }
+
+    /**
+     * Creates a new $setUnion accumulator. If 'maxMemoryUsageBytes' is not given, defaults to the
+     * value of the server parameter 'internalQueryMaxSetUnionBytes'.
+     */
+    AccumulatorSetUnion(ExpressionContext* expCtx,
+                        boost::optional<int> maxMemoryUsageBytes = boost::none);
+
+    void processInternal(const Value& input, bool merging) final;
+    Value getValue(bool toBeMerged) final;
+    void reset() final;
+
+    static boost::intrusive_ptr<AccumulatorState> create(ExpressionContext* expCtx);
+
+private:
+    void addValues(const std::vector<Value>& values);
+
+    ValueFlatUnorderedSet _set;
+};
+
 }  // namespace mongo

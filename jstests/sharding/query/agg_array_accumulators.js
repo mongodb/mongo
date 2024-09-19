@@ -5,6 +5,9 @@
 
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
+const setUnionAcc = "$setUnion";
+const concatArraysAcc = "$concatArrays";
+
 const st = new ShardingTest({shards: 2, mongos: 1});
 
 const collName = "agg_concat_arrays";
@@ -32,20 +35,18 @@ assert.commandWorked(
 assert.commandWorked(
     db.adminCommand({moveChunk: coll.getFullName(), find: {_id: 150}, to: st.shard1.shardName}));
 
-function runTest({testName}) {
-    let res =
-        coll.aggregate(
-                [{$sort: {_id: 1}}, {$group: {_id: null, lotsOfNumbers: {$concatArrays: '$x'}}}])
-            .toArray();
-
-    let resUnsharded =
-        collUnsharded
-            .aggregate(
-                [{$sort: {_id: 1}}, {$group: {_id: null, lotsOfNumbers: {$concatArrays: '$x'}}}])
-            .toArray();
-
+function runArrayAccumTest(testName, accumulator) {
     // Check the result of the aggregation on the unsharded collection vs. the sharded collection to
-    // ensure $concatArrays produces the same results in both.
+    // ensure $concatArrays and $setUnion produce the same results in both.
+    let pipeline = [{$sort: {_id: 1}}, {$group: {_id: null, lotsOfNumbers: {[accumulator]: '$x'}}}];
+    if (accumulator === setUnionAcc) {
+        // Need to add a stage to sort the values in the result array since the $setUnion
+        // accumulator does not guarantee anything about the order of values.
+        pipeline.push(
+            {$project: {_id: 1, numbers: {$sortArray: {input: '$lotsOfNumbers', sortBy: 1}}}});
+    }
+    let res = coll.aggregate(pipeline).toArray();
+    let resUnsharded = collUnsharded.aggregate(pipeline).toArray();
     assert.eq(
         res,
         resUnsharded,
@@ -53,46 +54,39 @@ function runTest({testName}) {
             `Got different results from the unsharded and sharded collections. Result from unsharded collection: ${
                 tojson(resUnsharded)}. Result from sharded collection: ${tojson(res)}`);
 
-    // Run the same test again, but with the reverse sort order to ensure sortedness is being
-    // respected.
-    res = coll.aggregate(
-                  [{$sort: {_id: -1}}, {$group: {_id: null, lotsOfNumbers: {$concatArrays: '$x'}}}])
-              .toArray();
-
-    resUnsharded =
-        collUnsharded
-            .aggregate(
-                [{$sort: {_id: -1}}, {$group: {_id: null, lotsOfNumbers: {$concatArrays: '$x'}}}])
-            .toArray();
-
-    assert.eq(
-        res,
-        resUnsharded,
-        testName +
-            `Got different results from the unsharded and sharded collections. Result from unsharded collection: ${
-                tojson(resUnsharded)}. Result from sharded collection: ${tojson(res)}`);
+    // For $concatArrays, run the same test again but with the reverse sort order to ensure
+    // sortedness is being respected.
+    if (accumulator === concatArraysAcc) {
+        pipeline[0] = {$sort: {_id: -1}};
+        res = coll.aggregate(pipeline).toArray();
+        resUnsharded = collUnsharded.aggregate(pipeline).toArray();
+        assert.eq(
+            res,
+            resUnsharded,
+            testName +
+                `Got different results from the unsharded and sharded collections. Result from unsharded collection: ${
+                    tojson(resUnsharded)}. Result from sharded collection: ${tojson(res)}`);
+    }
 
     // Test with grouping to ensure that sharded clusters correctly compute the groups. The extra
     // $set and $sort ensure that we do not rely on order of documents encountered for the final
     // pipeline result.
-    res = coll.aggregate([
-                  {$sort: {_id: 1}},
-                  {$group: {_id: {$mod: ['$_id', 5]}, lotsOfNumbers: {$concatArrays: '$x'}}},
-                  {$set: {_id: {$mod: ['$_id', 5]}}},
-                  {$sort: {_id: 1}}
-              ])
-              .toArray();
+    pipeline = [
+        {$sort: {_id: 1}},
+        {$group: {_id: {$mod: ['$_id', 5]}, lotsOfNumbers: {[accumulator]: '$x'}}},
+        {$set: {_id: {$mod: ['$_id', 5]}}},
+    ];
+    if (accumulator === setUnionAcc) {
+        // Need to add a stage to sort the values in the result array since the $setUnion
+        // accumulator does not guarantee anything about the order of values.
+        pipeline.push(
+            {$project: {_id: 1, numbers: {$sortArray: {input: '$lotsOfNumbers', sortBy: 1}}}},
+        );
+    }
+    pipeline.push({$sort: {_id: 1}});
 
-    resUnsharded =
-        collUnsharded
-            .aggregate([
-                {$sort: {_id: 1}},
-                {$group: {_id: {$mod: ['$_id', 5]}, lotsOfNumbers: {$concatArrays: '$x'}}},
-                {$set: {_id: {$mod: ['$_id', 5]}}},
-                {$sort: {_id: 1}}
-            ])
-            .toArray();
-
+    res = coll.aggregate(pipeline).toArray();
+    resUnsharded = collUnsharded.aggregate(pipeline).toArray();
     assert.eq(
         res,
         resUnsharded,
@@ -114,7 +108,8 @@ function runTest({testName}) {
         assert.commandWorked(collUnsharded.insert(docToInsert));
     }
 
-    runTest("testMergingAcrossAllShards");
+    runArrayAccumTest("testMergingAcrossAllShards", concatArraysAcc);
+    runArrayAccumTest("testMergingAcrossAllShards", setUnionAcc);
 })();
 
 (function testMergingOneShardHasArrays() {
@@ -129,7 +124,8 @@ function runTest({testName}) {
         assert.commandWorked(collUnsharded.insert(docToInsert));
     }
 
-    runTest("testMergingOneShardHasArrays");
+    runArrayAccumTest("testMergingOneShardHasArrays", concatArraysAcc);
+    runArrayAccumTest("testMergingOneShardHasArrays", setUnionAcc);
 })();
 
 (function testMergingNoShardsHaveArrays() {
@@ -143,14 +139,16 @@ function runTest({testName}) {
         assert.commandWorked(collUnsharded.insert(docToInsert));
     }
 
-    runTest("testMergingNoShardsHaveArrays");
+    runArrayAccumTest("testMergingNoShardsHaveArrays", concatArraysAcc);
+    runArrayAccumTest("testMergingNoShardsHaveArrays", setUnionAcc);
 })();
 
 (function testMergingNoShardsHaveDocuments() {
     coll.remove({});
     collUnsharded.remove({});
 
-    runTest("testMergingNoShardsHaveDocuments");
+    runArrayAccumTest("testMergingNoShardsHaveDocuments", concatArraysAcc);
+    runArrayAccumTest("testMergingNoShardsHaveDocuments", setUnionAcc);
 })();
 
 (function testWithOverlappingDatasets() {
@@ -166,7 +164,8 @@ function runTest({testName}) {
         assert.commandWorked(collUnsharded.insert(docToInsert));
     }
 
-    runTest("testWithOverlappingDatasets");
+    runArrayAccumTest("testWithOverlappingDatasets", concatArraysAcc);
+    runArrayAccumTest("testWithOverlappingDatasets", setUnionAcc);
 })();
 
 st.stop();

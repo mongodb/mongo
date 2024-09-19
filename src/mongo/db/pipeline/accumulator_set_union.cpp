@@ -27,32 +27,47 @@
  *    it in the license file.
  */
 
-#include "mongo/db/pipeline/window_function/window_function_concat_arrays.h"
 #include "mongo/db/pipeline/window_function/window_function_expression.h"
+#include "mongo/db/pipeline/window_function/window_function_set_union.h"
 
 namespace mongo {
 
 REGISTER_UNSTABLE_ACCUMULATOR_WITH_FEATURE_FLAG(
-    concatArrays,
-    genericParseSBEUnsupportedSingleExpressionAccumulator<AccumulatorConcatArrays>,
+    setUnion,
+    genericParseSBEUnsupportedSingleExpressionAccumulator<AccumulatorSetUnion>,
     feature_flags::gFeatureFlagArrayAccumulators);
 
 REGISTER_WINDOW_FUNCTION_WITH_FEATURE_FLAG(
-    concatArrays,
-    (mongo::window_function::genericParseSBEUnsupportedExpressionRemovable<
-        AccumulatorConcatArrays,
-        WindowFunctionConcatArrays>),
+    setUnion,
+    (mongo::window_function::genericParseSBEUnsupportedExpressionRemovable<AccumulatorSetUnion,
+                                                                           WindowFunctionSetUnion>),
     feature_flags::gFeatureFlagArrayAccumulators,
     AllowedWithApiStrict::kNeverInVersion1);
 
-AccumulatorConcatArrays::AccumulatorConcatArrays(ExpressionContext* const expCtx,
-                                                 boost::optional<int> maxMemoryUsageBytes)
-    : AccumulatorState(expCtx,
-                       maxMemoryUsageBytes.value_or(internalQueryMaxConcatArraysBytes.load())) {
+AccumulatorSetUnion::AccumulatorSetUnion(ExpressionContext* const expCtx,
+                                         boost::optional<int> maxMemoryUsageBytes)
+    : AccumulatorState(expCtx, maxMemoryUsageBytes.value_or(internalQueryMaxSetUnionBytes.load())),
+      _set(expCtx->getValueComparator().makeFlatUnorderedValueSet()) {
     _memUsageTracker.set(sizeof(*this));
 }
 
-void AccumulatorConcatArrays::processInternal(const Value& input, bool merging) {
+void AccumulatorSetUnion::addValues(const std::vector<Value>& values) {
+    for (auto&& val : values) {
+        bool inserted = _set.insert(val).second;
+        if (inserted) {
+            _memUsageTracker.add(val.getApproximateSize());
+            uassert(ErrorCodes::ExceededMemoryLimit,
+                    str::stream() << "$setUnion used too much memory and spilling to disk will not "
+                                     "reduce memory usage. Used: "
+                                  << _memUsageTracker.currentMemoryBytes()
+                                  << "bytes. Memory limit: "
+                                  << _memUsageTracker.maxAllowedMemoryUsageBytes() << " bytes",
+                    _memUsageTracker.withinMemoryLimit());
+        }
+    }
+}
+
+void AccumulatorSetUnion::processInternal(const Value& input, bool merging) {
     // The main difference here between the merging and non-merging case is that if the input is
     // malformed (i.e. not an array) in the non-merging case, that is a user error (we required that
     // the input to this accumulator is of type array). If the input is malformed in the merging
@@ -64,13 +79,13 @@ void AccumulatorConcatArrays::processInternal(const Value& input, bool merging) 
         }
 
         uassert(ErrorCodes::TypeMismatch,
-                str::stream() << "$concatArrays requires array inputs, but input "
+                str::stream() << "$setUnion requires array inputs, but input "
                               << redact(input.toString()) << " is of type "
                               << typeName(input.getType()),
                 input.isArray());
     } else {
         tassert(ErrorCodes::TypeMismatch,
-                str::stream() << "$concatArrays requires array inputs, but input "
+                str::stream() << "$setUnion requires array inputs, but input "
                               << redact(input.toString()) << " is of type "
                               << typeName(input.getType()),
                 input.isArray());
@@ -78,34 +93,21 @@ void AccumulatorConcatArrays::processInternal(const Value& input, bool merging) 
 
     // In both cases (merging and non-merging), we take apart the arrays we receive and put their
     // elements into the array we are collecting. Otherwise, we would get an array of arrays.
-    addValuesFromArray(input);
+    addValues(input.getArray());
 }
 
-void AccumulatorConcatArrays::addValuesFromArray(const Value& values) {
-    invariant(values.isArray());
-    _memUsageTracker.add(values.getApproximateSize());
-
-    uassert(ErrorCodes::ExceededMemoryLimit,
-            str::stream() << "$concatArrays used too much memory and spilling to disk will not "
-                             "reduce memory usage. Used: "
-                          << _memUsageTracker.maxAllowedMemoryUsageBytes() << " bytes",
-            _memUsageTracker.withinMemoryLimit());
-
-    _array.insert(_array.end(), values.getArray().begin(), values.getArray().end());
+Value AccumulatorSetUnion::getValue(bool) {
+    return Value(std::vector<Value>(_set.begin(), _set.end()));
 }
 
-Value AccumulatorConcatArrays::getValue(bool) {
-    return Value(_array);
-}
-
-void AccumulatorConcatArrays::reset() {
-    std::vector<Value>().swap(_array);
+void AccumulatorSetUnion::reset() {
+    _set = getExpressionContext()->getValueComparator().makeFlatUnorderedValueSet();
     _memUsageTracker.set(sizeof(*this));
 }
 
-boost::intrusive_ptr<AccumulatorState> AccumulatorConcatArrays::create(
+boost::intrusive_ptr<AccumulatorState> AccumulatorSetUnion::create(
     ExpressionContext* const expCtx) {
-    return new AccumulatorConcatArrays(expCtx, boost::none);
+    return new AccumulatorSetUnion(expCtx, boost::none);
 }
 
 }  // namespace mongo

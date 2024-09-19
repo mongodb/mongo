@@ -5,7 +5,7 @@
 import {assertErrorCode} from "jstests/aggregation/extras/utils.js";
 
 const coll = db["accumulators_concat_arrays"];
-coll.drop();
+assert(coll.drop());
 
 // Test that $concatArrays correctly concatenates arrays, preserves sort order and preserves order
 // of the elements inside the concatenated arrays.

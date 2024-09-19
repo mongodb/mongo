@@ -1,5 +1,5 @@
 /**
- * Tests accumulators (e.g. $concatArrays) that are not supported in API Version 1.
+ * Tests accumulators (e.g. $concatArrays and $setUnion) that are not supported in API Version 1.
  *
  * @tags: [featureFlagArrayAccumulators, uses_api_parameters, requires_fcv_81]
  */
@@ -15,7 +15,9 @@ assert.commandWorked(coll.insert({a: [1]}));
 
 const unstableAccumulatorPipelines = [
     [{$group: {_id: null, field: {$concatArrays: '$a'}}}],
-    [{$setWindowFields: {output: {field: {$concatArrays: '$a'}}}}]
+    [{$setWindowFields: {output: {field: {$concatArrays: '$a'}}}}],
+    [{$group: {_id: null, field: {$setUnion: '$a'}}}],
+    [{$setWindowFields: {output: {field: {$setUnion: '$a'}}}}]
 ];
 
 for (const pipeline of unstableAccumulatorPipelines) {
