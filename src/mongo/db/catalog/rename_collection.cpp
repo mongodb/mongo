@@ -75,6 +75,7 @@
 #include "mongo/db/op_observer/batched_write_policy.h"
 #include "mongo/db/op_observer/op_observer.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/profile_settings.h"
 #include "mongo/db/query/write_ops/insert.h"
 #include "mongo/db/record_id.h"
 #include "mongo/db/repl/oplog.h"
@@ -402,12 +403,12 @@ Status renameCollectionWithinDB(OperationContext* opCtx,
         }
     }
 
-    AutoStatsTracker statsTracker(
-        opCtx,
-        source,
-        Top::LockType::NotLocked,
-        AutoStatsTracker::LogMode::kUpdateCurOp,
-        CollectionCatalog::get(opCtx)->getDatabaseProfileLevel(source.dbName()));
+    AutoStatsTracker statsTracker(opCtx,
+                                  source,
+                                  Top::LockType::NotLocked,
+                                  AutoStatsTracker::LogMode::kUpdateCurOp,
+                                  DatabaseProfileSettings::get(opCtx->getServiceContext())
+                                      .getDatabaseProfileLevel(source.dbName()));
 
     if (!targetColl) {
         return renameCollectionDirectly(opCtx, db, sourceColl->uuid(), source, target, options);
@@ -437,12 +438,12 @@ Status renameCollectionWithinDBForApplyOps(OperationContext* opCtx,
     const auto sourceColl =
         CollectionCatalog::get(opCtx)->lookupCollectionByNamespace(opCtx, source);
 
-    AutoStatsTracker statsTracker(
-        opCtx,
-        source,
-        Top::LockType::NotLocked,
-        AutoStatsTracker::LogMode::kUpdateCurOp,
-        CollectionCatalog::get(opCtx)->getDatabaseProfileLevel(source.dbName()));
+    AutoStatsTracker statsTracker(opCtx,
+                                  source,
+                                  Top::LockType::NotLocked,
+                                  AutoStatsTracker::LogMode::kUpdateCurOp,
+                                  DatabaseProfileSettings::get(opCtx->getServiceContext())
+                                      .getDatabaseProfileLevel(source.dbName()));
 
     return writeConflictRetry(opCtx, "renameCollection", target, [&] {
         auto targetColl = CollectionCatalog::get(opCtx)->lookupCollectionByNamespace(opCtx, target);
@@ -571,7 +572,8 @@ Status renameCollectionAcrossDatabases(OperationContext* opCtx,
         source,
         Top::LockType::NotLocked,
         AutoStatsTracker::LogMode::kUpdateCurOp,
-        CollectionCatalog::get(opCtx)->getDatabaseProfileLevel(source.dbName()));
+        DatabaseProfileSettings::get(opCtx->getServiceContext())
+            .getDatabaseProfileLevel(source.dbName()));
 
     auto catalog = CollectionCatalog::get(opCtx);
     const auto sourceColl = catalog->lookupCollectionByNamespace(opCtx, source);

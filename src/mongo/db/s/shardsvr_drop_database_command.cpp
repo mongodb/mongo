@@ -40,13 +40,13 @@
 #include "mongo/db/auth/action_type.h"
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/auth/resource_pattern.h"
-#include "mongo/db/catalog/collection_catalog.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/database_name.h"
 #include "mongo/db/feature_flag.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/profile_settings.h"
 #include "mongo/db/s/drop_database_coordinator.h"
 #include "mongo/db/s/drop_database_coordinator_document_gen.h"
 #include "mongo/db/s/operation_sharding_state.h"
@@ -102,7 +102,8 @@ public:
             // Since this operation is not directly writing locally we need to force its db
             // profile level increase in order to be logged in "<db>.system.profile"
             CurOp::get(opCtx)->raiseDbProfileLevel(
-                CollectionCatalog::get(opCtx)->getDatabaseProfileLevel(ns().dbName()));
+                DatabaseProfileSettings::get(opCtx->getServiceContext())
+                    .getDatabaseProfileLevel(ns().dbName()));
 
             DropDatabaseCoordinatorDocument coordinatorDoc;
             coordinatorDoc.setShardingDDLCoordinatorMetadata(

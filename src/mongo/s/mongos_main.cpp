@@ -76,6 +76,7 @@
 #include "mongo/db/logical_time_validator.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/process_health/fault_manager.h"
+#include "mongo/db/profile_filter_impl.h"
 #include "mongo/db/query/query_settings/query_settings_manager.h"
 #include "mongo/db/read_write_concern_defaults.h"
 #include "mongo/db/server_options.h"
@@ -793,6 +794,8 @@ ExitCode runMongosServer(ServiceContext* serviceContext) {
     }
     CertificateExpirationMonitor::get()->start(serviceContext);
 #endif
+
+    ProfileFilterImpl::initializeDefaults(serviceContext);
 
     serviceContext->getService(ClusterRole::RouterServer)
         ->setServiceEntryPoint(std::make_unique<ServiceEntryPointRouterRole>());

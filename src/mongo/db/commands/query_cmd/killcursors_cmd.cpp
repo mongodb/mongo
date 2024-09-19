@@ -35,7 +35,6 @@
 #include <vector>
 
 #include "mongo/base/status.h"
-#include "mongo/db/catalog/collection_catalog.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/commands/query_cmd/killcursors_common.h"
 #include "mongo/db/cursor_id.h"
@@ -43,6 +42,7 @@
 #include "mongo/db/db_raii.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/profile_settings.h"
 #include "mongo/db/query/kill_cursors_gen.h"
 #include "mongo/db/stats/top.h"
 
@@ -56,12 +56,12 @@ struct KillCursorsCmd {
     static Status doKillCursor(OperationContext* opCtx, const NamespaceString& nss, CursorId id) {
         boost::optional<AutoStatsTracker> statsTracker;
         if (!nss.isCollectionlessCursorNamespace()) {
-            statsTracker.emplace(
-                opCtx,
-                nss,
-                Top::LockType::NotLocked,
-                AutoStatsTracker::LogMode::kUpdateTopAndCurOp,
-                CollectionCatalog::get(opCtx)->getDatabaseProfileLevel(nss.dbName()));
+            statsTracker.emplace(opCtx,
+                                 nss,
+                                 Top::LockType::NotLocked,
+                                 AutoStatsTracker::LogMode::kUpdateTopAndCurOp,
+                                 DatabaseProfileSettings::get(opCtx->getServiceContext())
+                                     .getDatabaseProfileLevel(nss.dbName()));
         }
 
         auto cursorManager = CursorManager::get(opCtx);

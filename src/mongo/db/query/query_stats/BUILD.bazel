@@ -49,7 +49,6 @@ mongo_cc_library(
         ":rate_limiting",
         "//src/mongo/bson/mutable:mutable_bson",
         "//src/mongo/db:commands",
-        "//src/mongo/db:profile_filter",  # TODO(SERVER-93876): Remove.
         "//src/mongo/db:server_base",  # TODO(SERVER-93876): Remove.
         "//src/mongo/db:server_options",  # TODO(SERVER-93876): Remove.
         "//src/mongo/db:service_context",  # TODO(SERVER-93876): Remove.

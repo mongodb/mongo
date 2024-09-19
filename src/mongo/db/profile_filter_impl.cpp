@@ -39,13 +39,13 @@
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/init.h"  // IWYU pragma: keep
-#include "mongo/base/initializer.h"
 #include "mongo/db/matcher/match_expression_dependencies.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/pipeline/dependencies.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/field_path.h"
 #include "mongo/db/profile_filter_impl.h"
+#include "mongo/db/profile_settings.h"
 #include "mongo/db/server_options.h"
 #include "mongo/logv2/log.h"
 #include "mongo/logv2/log_attr.h"
@@ -96,16 +96,13 @@ bool ProfileFilterImpl::matches(OperationContext* opCtx,
     }
 }
 
-// PathlessOperatorMap is required for parsing a MatchExpression.
-MONGO_INITIALIZER_GENERAL(ProfileFilterDefault,
-                          ("PathlessOperatorMap",
-                           "MatchExpressionParser",
-                           "EndExpressionRegistration"),
-                          ())
-(InitializerContext*) {
+void ProfileFilterImpl::initializeDefaults(ServiceContext* service) {
+    auto& dbProfileSettings = DatabaseProfileSettings::get(service);
+    dbProfileSettings.setDefaultLevel(serverGlobalParams.defaultProfile);
+
     try {
         if (auto expr = serverGlobalParams.defaultProfileFilter) {
-            ProfileFilter::setDefault(std::make_shared<ProfileFilterImpl>(*expr));
+            dbProfileSettings.setDefaultFilter(std::make_shared<ProfileFilterImpl>(*expr));
         }
     } catch (AssertionException& e) {
         // Add more context to the error
@@ -114,5 +111,4 @@ MONGO_INITIALIZER_GENERAL(ProfileFilterDefault,
                                 << e.reason());
     }
 }
-
 }  // namespace mongo

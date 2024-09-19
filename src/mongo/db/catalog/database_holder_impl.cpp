@@ -55,6 +55,7 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/op_observer/op_observer.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/profile_settings.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/stats/top.h"
@@ -240,16 +241,14 @@ void DatabaseHolderImpl::dropDb(OperationContext* opCtx, Database* db) {
         Top::get(serviceContext).collectionDropped(coll->ns());
     }
 
-    // Clean up the in-memory database state.
-    CollectionCatalog::write(
-        opCtx, [&](CollectionCatalog& catalog) { catalog.clearDatabaseProfileSettings(name); });
-
     // close() is called as part of the onCommit handler as it frees the memory pointed to by 'db'.
     // We need to keep this memory valid until the transaction successfully commits.
-    shard_role_details::getRecoveryUnit(opCtx)->onCommit(
-        [this, name = name](OperationContext* opCtx, boost::optional<Timestamp>) {
-            close(opCtx, name);
-        });
+    shard_role_details::getRecoveryUnit(opCtx)->onCommit([this,
+                                                          name = name](OperationContext* opCtx,
+                                                                       boost::optional<Timestamp>) {
+        close(opCtx, name);
+        DatabaseProfileSettings::get(opCtx->getServiceContext()).clearDatabaseProfileSettings(name);
+    });
 
     auto const storageEngine = serviceContext->getStorageEngine();
     writeConflictRetry(opCtx, "dropDatabase", NamespaceString(name), [&] {

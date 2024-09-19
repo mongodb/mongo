@@ -77,6 +77,7 @@
 #include "mongo/db/index_names.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/profile_settings.h"
 #include "mongo/db/query/write_ops/insert.h"
 #include "mongo/db/repl/repl_client_info.h"
 #include "mongo/db/repl/replication_coordinator.h"
@@ -592,7 +593,8 @@ CreateIndexesReply runCreateIndexesWithCoordinator(OperationContext* opCtx,
                          ns,
                          Top::LockType::WriteLocked,
                          AutoStatsTracker::LogMode::kUpdateTopAndCurOp,
-                         CollectionCatalog::get(opCtx)->getDatabaseProfileLevel(ns.dbName()));
+                         DatabaseProfileSettings::get(opCtx->getServiceContext())
+                             .getDatabaseProfileLevel(ns.dbName()));
 
     auto buildUUID = UUID::gen();
     ReplIndexBuildState::IndexCatalogStats stats;

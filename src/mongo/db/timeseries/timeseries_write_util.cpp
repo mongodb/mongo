@@ -52,7 +52,6 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/util/bsoncolumn.h"
 #include "mongo/client/dbclient_cursor.h"
-#include "mongo/db/catalog/collection_catalog.h"
 #include "mongo/db/catalog/collection_operation_source.h"
 #include "mongo/db/catalog/collection_write_path.h"
 #include "mongo/db/catalog/document_validation.h"
@@ -61,6 +60,7 @@
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/feature_flag.h"
 #include "mongo/db/pipeline/aggregate_command_gen.h"
+#include "mongo/db/profile_settings.h"
 #include "mongo/db/query/collation/collator_interface.h"
 #include "mongo/db/query/write_ops/delete_request_gen.h"
 #include "mongo/db/query/write_ops/update_request.h"
@@ -1238,7 +1238,8 @@ void performAtomicWrites(
     lastOpFixer.startingOp(ns);
 
     auto curOp = CurOp::get(opCtx);
-    curOp->raiseDbProfileLevel(CollectionCatalog::get(opCtx)->getDatabaseProfileLevel(ns.dbName()));
+    curOp->raiseDbProfileLevel(DatabaseProfileSettings::get(opCtx->getServiceContext())
+                                   .getDatabaseProfileLevel(ns.dbName()));
 
     write_ops_exec::assertCanWrite_inlock(opCtx, ns);
 

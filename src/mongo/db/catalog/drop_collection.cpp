@@ -63,6 +63,7 @@
 #include "mongo/db/db_raii.h"
 #include "mongo/db/index_builds_coordinator.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/profile_settings.h"
 #include "mongo/db/repl/drop_pending_collection_reaper.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/s/collection_sharding_state.h"
@@ -193,12 +194,12 @@ Status _dropView(OperationContext* opCtx,
         hangDuringDropCollection.pauseWhileSet();
     }
 
-    AutoStatsTracker statsTracker(
-        opCtx,
-        collectionName,
-        Top::LockType::NotLocked,
-        AutoStatsTracker::LogMode::kUpdateCurOp,
-        CollectionCatalog::get(opCtx)->getDatabaseProfileLevel(collectionName.dbName()));
+    AutoStatsTracker statsTracker(opCtx,
+                                  collectionName,
+                                  Top::LockType::NotLocked,
+                                  AutoStatsTracker::LogMode::kUpdateCurOp,
+                                  DatabaseProfileSettings::get(opCtx->getServiceContext())
+                                      .getDatabaseProfileLevel(collectionName.dbName()));
 
     if (opCtx->writesAreReplicated() &&
         !repl::ReplicationCoordinator::get(opCtx)->canAcceptWritesFor(opCtx, collectionName)) {
@@ -260,12 +261,12 @@ Status _abortIndexBuildsAndDrop(OperationContext* opCtx,
         hangDuringDropCollection.pauseWhileSet();
     }
 
-    AutoStatsTracker statsTracker(
-        opCtx,
-        startingNss,
-        Top::LockType::NotLocked,
-        AutoStatsTracker::LogMode::kUpdateCurOp,
-        CollectionCatalog::get(opCtx)->getDatabaseProfileLevel(startingNss.dbName()));
+    AutoStatsTracker statsTracker(opCtx,
+                                  startingNss,
+                                  Top::LockType::NotLocked,
+                                  AutoStatsTracker::LogMode::kUpdateCurOp,
+                                  DatabaseProfileSettings::get(opCtx->getServiceContext())
+                                      .getDatabaseProfileLevel(startingNss.dbName()));
 
     IndexBuildsCoordinator* indexBuildsCoord = IndexBuildsCoordinator::get(opCtx);
     const UUID collectionUUID = coll->uuid();
@@ -371,12 +372,12 @@ Status _dropCollectionForApplyOps(OperationContext* opCtx,
         hangDuringDropCollection.pauseWhileSet();
     }
 
-    AutoStatsTracker statsTracker(
-        opCtx,
-        collectionName,
-        Top::LockType::NotLocked,
-        AutoStatsTracker::LogMode::kUpdateCurOp,
-        CollectionCatalog::get(opCtx)->getDatabaseProfileLevel(collectionName.dbName()));
+    AutoStatsTracker statsTracker(opCtx,
+                                  collectionName,
+                                  Top::LockType::NotLocked,
+                                  AutoStatsTracker::LogMode::kUpdateCurOp,
+                                  DatabaseProfileSettings::get(opCtx->getServiceContext())
+                                      .getDatabaseProfileLevel(collectionName.dbName()));
 
     WriteUnitOfWork wunit(opCtx);
 
@@ -740,7 +741,8 @@ Status isDroppableCollection(OperationContext* opCtx, const NamespaceString& nss
 
     using namespace fmt::literals;
     if (nss.isSystemDotProfile()) {
-        if (CollectionCatalog::get(opCtx)->getDatabaseProfileLevel(nss.dbName()) != 0)
+        if (DatabaseProfileSettings::get(opCtx->getServiceContext())
+                .getDatabaseProfileLevel(nss.dbName()) != 0)
             return Status(ErrorCodes::IllegalOperation,
                           "turn off profiling before dropping system.profile collection");
     } else if (nss.isSystemDotViews()) {

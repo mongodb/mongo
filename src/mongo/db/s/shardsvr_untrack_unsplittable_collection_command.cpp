@@ -29,6 +29,7 @@
 
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/commands.h"
+#include "mongo/db/profile_settings.h"
 #include "mongo/db/s/untrack_unsplittable_collection_coordinator.h"
 #include "mongo/s/request_types/sharded_ddl_commands_gen.h"
 #include "mongo/s/sharding_state.h"
@@ -68,7 +69,8 @@ public:
             // Since this operation is not directly writing locally we need to force its db
             // profile level increase in order to be logged in "<db>.system.profile"
             CurOp::get(opCtx)->raiseDbProfileLevel(
-                CollectionCatalog::get(opCtx)->getDatabaseProfileLevel(ns().dbName()));
+                DatabaseProfileSettings::get(opCtx->getServiceContext())
+                    .getDatabaseProfileLevel(ns().dbName()));
 
             const auto& nss = ns();
 

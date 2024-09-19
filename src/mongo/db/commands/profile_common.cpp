@@ -37,10 +37,10 @@
 #include "mongo/db/auth/action_type.h"
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/auth/resource_pattern.h"
-#include "mongo/db/catalog/collection_catalog.h"
 #include "mongo/db/commands/profile_common.h"
 #include "mongo/db/commands/profile_gen.h"
 #include "mongo/db/profile_filter.h"
+#include "mongo/db/profile_settings.h"
 #include "mongo/db/server_options.h"
 #include "mongo/idl/idl_parser.h"
 #include "mongo/logv2/attribute_storage.h"
@@ -149,7 +149,8 @@ bool ProfileCmdBase::run(OperationContext* opCtx,
         // newSettings.level may differ from profilingLevel: profilingLevel is part of the request,
         // and if the request specifies {profile: -1, ...} then we want to show the unchanged value
         // (0, 1, or 2).
-        auto newSettings = CollectionCatalog::get(opCtx)->getDatabaseProfileSettings(dbName);
+        auto& dbProfileSettings = DatabaseProfileSettings::get(opCtx->getServiceContext());
+        auto newSettings = dbProfileSettings.getDatabaseProfileSettings(dbName);
         newState.append("level"_sd, newSettings.level);
         newState.append("slowms"_sd, serverGlobalParams.slowMS.load());
         newState.append("sampleRate"_sd, serverGlobalParams.sampleRate.load());

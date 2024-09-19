@@ -44,6 +44,7 @@
 #include "mongo/db/db_raii.h"
 #include "mongo/db/dump_lock_manager_impl.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/profile_settings.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/storage/storage_engine.h"
 
@@ -89,12 +90,12 @@ public:
         }
 
         void run(OperationContext* opCtx, rpc::ReplyBuilderInterface* reply) override {
-            AutoStatsTracker statsTracker(
-                opCtx,
-                ns(),
-                Top::LockType::NotLocked,
-                AutoStatsTracker::LogMode::kUpdateTopAndCurOp,
-                CollectionCatalog::get(opCtx)->getDatabaseProfileLevel(request().getDbName()));
+            AutoStatsTracker statsTracker(opCtx,
+                                          ns(),
+                                          Top::LockType::NotLocked,
+                                          AutoStatsTracker::LogMode::kUpdateTopAndCurOp,
+                                          DatabaseProfileSettings::get(opCtx->getServiceContext())
+                                              .getDatabaseProfileLevel(request().getDbName()));
 
             auto lockToClientMap = getLockerIdToClientMap(opCtx->getServiceContext());
 

@@ -39,10 +39,10 @@
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
-#include "mongo/db/catalog/collection_catalog.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/database_name.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/profile_settings.h"
 #include "mongo/db/service_context.h"
 
 namespace mongo {
@@ -86,10 +86,9 @@ public:
 protected:
     // Applies the given profiling level and filter, or throws if the profiling level could not be
     // set. On success, returns a struct indicating the previous profiling level and filter.
-    virtual CollectionCatalog::ProfileSettings _applyProfilingLevel(
-        OperationContext* opCtx,
-        const DatabaseName& dbName,
-        const ProfileCmdRequest& request) const = 0;
+    virtual ProfileSettings _applyProfilingLevel(OperationContext* opCtx,
+                                                 const DatabaseName& dbName,
+                                                 const ProfileCmdRequest& request) const = 0;
 };
 
 struct ObjectOrUnset {

@@ -56,7 +56,6 @@
 #include "mongo/db/auth/authorization_checks.h"
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/basic_types.h"
-#include "mongo/db/catalog/collection_catalog.h"
 #include "mongo/db/catalog/external_data_source_scope_guard.h"
 #include "mongo/db/catalog_raii.h"
 #include "mongo/db/client.h"
@@ -73,6 +72,7 @@
 #include "mongo/db/op_observer/op_observer.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/pipeline/change_stream_invalidation_info.h"
+#include "mongo/db/profile_settings.h"
 #include "mongo/db/query/canonical_query.h"
 #include "mongo/db/query/command_diagnostic_printer.h"
 #include "mongo/db/query/cursor_response.h"
@@ -628,12 +628,12 @@ public:
                 invariant(!cursorPin->getExecutor()->usesCollectionAcquisitions());
 
                 if (!nss.isCollectionlessCursorNamespace()) {
-                    statsTracker.emplace(
-                        opCtx,
-                        nss,
-                        Top::LockType::NotLocked,
-                        AutoStatsTracker::LogMode::kUpdateTopAndCurOp,
-                        CollectionCatalog::get(opCtx)->getDatabaseProfileLevel(nss.dbName()));
+                    statsTracker.emplace(opCtx,
+                                         nss,
+                                         Top::LockType::NotLocked,
+                                         AutoStatsTracker::LogMode::kUpdateTopAndCurOp,
+                                         DatabaseProfileSettings::get(opCtx->getServiceContext())
+                                             .getDatabaseProfileLevel(nss.dbName()));
                 }
             } else {
                 invariant(cursorPin->getExecutor()->lockPolicy() ==
@@ -669,12 +669,12 @@ public:
                                          secondaryNamespaces.cbegin(), secondaryNamespaces.cend()));
                 }
 
-                statsTracker.emplace(
-                    opCtx,
-                    nss,
-                    Top::LockType::ReadLocked,
-                    AutoStatsTracker::LogMode::kUpdateTopAndCurOp,
-                    CollectionCatalog::get(opCtx)->getDatabaseProfileLevel(nss.dbName()));
+                statsTracker.emplace(opCtx,
+                                     nss,
+                                     Top::LockType::ReadLocked,
+                                     AutoStatsTracker::LogMode::kUpdateTopAndCurOp,
+                                     DatabaseProfileSettings::get(opCtx->getServiceContext())
+                                         .getDatabaseProfileLevel(nss.dbName()));
 
                 // Check whether we are allowed to read from this node after acquiring our locks.
                 uassertStatusOK(repl::ReplicationCoordinator::get(opCtx)->checkCanServeReadsFor(

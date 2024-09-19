@@ -686,30 +686,6 @@ TEST_F(CollectionCatalogTest, GetAllTenants) {
     catalog.deregisterAllCollectionsAndViews(getServiceContext());
 }
 
-// Test setting and fetching the profile level for a database.
-TEST_F(CollectionCatalogTest, DatabaseProfileLevel) {
-    DatabaseName testDBNameFirst =
-        DatabaseName::createDatabaseName_forTest(boost::none, "testdbfirst");
-    DatabaseName testDBNameSecond =
-        DatabaseName::createDatabaseName_forTest(boost::none, "testdbsecond");
-
-    // Requesting a profile level that is not in the _databaseProfileLevel map should return the
-    // default server-wide setting
-    ASSERT_EQ(catalog.getDatabaseProfileSettings(testDBNameFirst).level,
-              serverGlobalParams.defaultProfile);
-    // Setting the default profile level should have not change the result.
-    catalog.setDatabaseProfileSettings(testDBNameFirst,
-                                       {serverGlobalParams.defaultProfile, nullptr});
-    ASSERT_EQ(catalog.getDatabaseProfileSettings(testDBNameFirst).level,
-              serverGlobalParams.defaultProfile);
-
-    // Changing the profile level should make fetching it different.
-    catalog.setDatabaseProfileSettings(testDBNameSecond,
-                                       {serverGlobalParams.defaultProfile + 1, nullptr});
-    ASSERT_EQ(catalog.getDatabaseProfileSettings(testDBNameSecond).level,
-              serverGlobalParams.defaultProfile + 1);
-}
-
 TEST_F(CollectionCatalogTest, DropPendingDatabase) {
     auto dbName = DatabaseName::createDatabaseName_forTest(boost::none, "DropPendingDatabase");
     ASSERT_FALSE(catalog.isDropPending(dbName));

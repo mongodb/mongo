@@ -98,6 +98,7 @@
 #include "mongo/db/pipeline/process_interface/mongo_process_interface.h"
 #include "mongo/db/pipeline/search/search_helper.h"
 #include "mongo/db/pipeline/visitors/document_source_visitor_docs_needed_bounds.h"
+#include "mongo/db/profile_settings.h"
 #include "mongo/db/query/canonical_query.h"
 #include "mongo/db/query/collation/collation_spec.h"
 #include "mongo/db/query/collation/collator_interface.h"
@@ -1075,7 +1076,8 @@ Status _runAggregate(AggExState& aggExState, rpc::ReplyBuilderInterface* result)
                 aggExState.getExecutionNss(),
                 Top::LockType::NotLocked,
                 AutoStatsTracker::LogMode::kUpdateTopAndCurOp,
-                catalog->getDatabaseProfileLevel(aggExState.getExecutionNss().dbName()));
+                DatabaseProfileSettings::get(aggExState.getOpCtx()->getServiceContext())
+                    .getDatabaseProfileLevel(aggExState.getExecutionNss().dbName()));
             auto [collator, match] =
                 resolveCollator(aggExState.getOpCtx(),
                                 aggExState.getRequest().getCollation().get_value_or(BSONObj()),

@@ -182,7 +182,6 @@ env.Library(
         "$BUILD_DIR/mongo/db/audit",
         "$BUILD_DIR/mongo/db/concurrency/lock_manager",
         "$BUILD_DIR/mongo/db/index/index_access_method",
-        "$BUILD_DIR/mongo/db/profile_filter",
         "$BUILD_DIR/mongo/db/query/collation/collator_factory_interface",
         "$BUILD_DIR/mongo/db/query/query_stats/query_stats",
         "$BUILD_DIR/mongo/db/server_base",

@@ -101,7 +101,17 @@ env.Benchmark(
     LIBDEPS=[
         "$BUILD_DIR/mongo/db/commands/profile_common",
         "$BUILD_DIR/mongo/util/processinfo",
-        "profile_filter",
+        "profile_settings",
+    ],
+)
+
+env.CppUnitTest(
+    target="profile_settings_test",
+    source=[
+        "profile_settings_test.cpp",
+    ],
+    LIBDEPS=[
+        "profile_settings",
     ],
 )
 
@@ -443,6 +453,7 @@ env.Library(
     LIBDEPS=[
         "catalog/collection_catalog",
         "catalog/database_holder",
+        "profile_settings",
         "shard_role_api",
     ],
     LIBDEPS_PRIVATE=[
@@ -1680,6 +1691,7 @@ env.Library(
         "change_streams_cluster_parameter",
         "commands/mongod",
         "commands/mongod_fsync",
+        "commands/profile_common",
         "commands/test_commands",
         "concurrency/flow_control_ticketholder",
         "fle_crud_mongod",

@@ -68,6 +68,7 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/pipeline/aggregation_request_helper.h"
+#include "mongo/db/profile_settings.h"
 #include "mongo/db/query/bson/dotted_path_support.h"
 #include "mongo/db/query/canonical_distinct.h"
 #include "mongo/db/query/canonical_query.h"
@@ -338,12 +339,12 @@ public:
         // need to be released.
         const auto nss = CommandHelpers::parseNsCollectionRequired(dbName, cmdObj);
 
-        AutoStatsTracker tracker(
-            opCtx,
-            nss,
-            Top::LockType::ReadLocked,
-            AutoStatsTracker::LogMode::kUpdateTopAndCurOp,
-            CollectionCatalog::get(opCtx)->getDatabaseProfileLevel(nss.dbName()));
+        AutoStatsTracker tracker(opCtx,
+                                 nss,
+                                 Top::LockType::ReadLocked,
+                                 AutoStatsTracker::LogMode::kUpdateTopAndCurOp,
+                                 DatabaseProfileSettings::get(opCtx->getServiceContext())
+                                     .getDatabaseProfileLevel(nss.dbName()));
 
         const auto acquisitionRequest = CollectionOrViewAcquisitionRequest::fromOpCtx(
             opCtx, nss, AcquisitionPrerequisites::kRead);
@@ -410,7 +411,8 @@ public:
                             nss,
                             Top::LockType::ReadLocked,
                             AutoStatsTracker::LogMode::kUpdateTopAndCurOp,
-                            CollectionCatalog::get(opCtx)->getDatabaseProfileLevel(nss.dbName()));
+                            DatabaseProfileSettings::get(opCtx->getServiceContext())
+                                .getDatabaseProfileLevel(nss.dbName()));
         };
         auto const nssOrUUID = CommandHelpers::parseNsOrUUID(dbName, cmdObj);
         if (nssOrUUID.isNamespaceString()) {

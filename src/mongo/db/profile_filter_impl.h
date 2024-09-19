@@ -56,6 +56,8 @@ public:
         return _needWholeDocument || _dependencies.count(topLevelField) > 0;
     }
 
+    static void initializeDefaults(ServiceContext* svcCtx);
+
 private:
     StringSet _dependencies;
     bool _needWholeDocument = false;

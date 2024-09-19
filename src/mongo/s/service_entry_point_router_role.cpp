@@ -46,7 +46,6 @@
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/auth/authorization_session.h"
-#include "mongo/db/catalog/collection_catalog.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/curop_metrics.h"
 #include "mongo/db/cursor_id.h"
@@ -54,6 +53,7 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/not_primary_error_tracker.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/profile_settings.h"
 #include "mongo/db/request_execution_context.h"
 #include "mongo/db/session/logical_session_id.h"
 #include "mongo/db/session/logical_session_id_gen.h"
@@ -168,13 +168,12 @@ void HandleRequest::onSuccess(const DbResponse& dbResponse) {
     const auto currentOp = CurOp::get(opCtx);
 
     // Mark the op as complete, populate the response length, and log it if appropriate.
-    currentOp->completeAndLogOperation(
-        {logv2::LogComponent::kCommand},
-        CollectionCatalog::get(opCtx)
-            ->getDatabaseProfileSettings(currentOp->getNSS().dbName())
-            .filter,
-        dbResponse.response.size(),
-        slowMsOverride);
+    currentOp->completeAndLogOperation({logv2::LogComponent::kCommand},
+                                       DatabaseProfileSettings::get(opCtx->getServiceContext())
+                                           .getDatabaseProfileSettings(currentOp->getNSS().dbName())
+                                           .filter,
+                                       dbResponse.response.size(),
+                                       slowMsOverride);
 
     recordCurOpMetrics(opCtx);
 

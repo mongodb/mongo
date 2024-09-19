@@ -763,6 +763,7 @@ mongo_cc_library(
         ":generic_cursor",
         ":index_commands_idl",  # TODO(SERVER-93876): Remove.
         ":prepare_conflict_tracker",
+        ":profile_settings",
         ":server_base",  # TODO(SERVER-93876): Remove.
         ":server_feature_flags",  # TODO(SERVER-93876): Remove.
         "//src/mongo/bson/mutable:mutable_bson",
@@ -1179,15 +1180,16 @@ idl_generator(
 )
 
 mongo_cc_library(
-    name = "profile_filter",
+    name = "profile_settings",
     srcs = [
-        "profile_filter.cpp",
+        "profile_settings.cpp",
     ],
     hdrs = [
         "profile_filter.h",
+        "profile_settings.h",
     ],
     deps = [
-        "//src/mongo:base",
+        "//src/mongo/db:server_base",
     ],
 )
 

@@ -49,7 +49,6 @@
 #include "mongo/db/auth/action_type.h"
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/auth/resource_pattern.h"
-#include "mongo/db/catalog/collection_catalog.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/concurrency/lock_manager_defs.h"
 #include "mongo/db/curop.h"
@@ -59,6 +58,7 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/pipeline/legacy_runtime_constants_gen.h"
+#include "mongo/db/profile_settings.h"
 #include "mongo/db/s/ddl_lock_manager.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/shard_id.h"
@@ -176,8 +176,8 @@ ShardsvrDropIndexesCommand::Invocation::Response ShardsvrDropIndexesCommand::Inv
 
     // Since this operation is not directly writing locally we need to force its db profile level
     // increase in order to be logged in "<db>.system.profile".
-    CurOp::get(opCtx)->raiseDbProfileLevel(
-        CollectionCatalog::get(opCtx)->getDatabaseProfileLevel(ns().dbName()));
+    CurOp::get(opCtx)->raiseDbProfileLevel(DatabaseProfileSettings::get(opCtx->getServiceContext())
+                                               .getDatabaseProfileLevel(ns().dbName()));
 
     DropIndexes dropIdxCmd(ns());
     dropIdxCmd.setDropIndexesRequest(request().getDropIndexesRequest());

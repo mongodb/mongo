@@ -42,7 +42,6 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/catalog/collection.h"
-#include "mongo/db/catalog/collection_catalog.h"
 #include "mongo/db/catalog/database_holder.h"
 #include "mongo/db/catalog_raii.h"
 #include "mongo/db/curop.h"
@@ -52,6 +51,7 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/pipeline/expression_context.h"
+#include "mongo/db/profile_settings.h"
 #include "mongo/db/query/canonical_query.h"
 #include "mongo/db/query/find_command.h"
 #include "mongo/db/query/get_executor.h"
@@ -97,13 +97,13 @@ BSONObj findOneOplogEntry(OperationContext* opCtx,
 
     const auto localDb = DatabaseHolder::get(opCtx)->getDb(opCtx, DatabaseName::kLocal);
     invariant(localDb);
-    AutoStatsTracker statsTracker(
-        opCtx,
-        NamespaceString::kRsOplogNamespace,
-        Top::LockType::ReadLocked,
-        AutoStatsTracker::LogMode::kUpdateTop,
-        CollectionCatalog::get(opCtx)->getDatabaseProfileLevel(DatabaseName::kLocal),
-        Date_t::max());
+    AutoStatsTracker statsTracker(opCtx,
+                                  NamespaceString::kRsOplogNamespace,
+                                  Top::LockType::ReadLocked,
+                                  AutoStatsTracker::LogMode::kUpdateTop,
+                                  DatabaseProfileSettings::get(opCtx->getServiceContext())
+                                      .getDatabaseProfileLevel(DatabaseName::kLocal),
+                                  Date_t::max());
 
     const auto yieldPolicy = permitYield ? PlanYieldPolicy::YieldPolicy::YIELD_AUTO
                                          : PlanYieldPolicy::YieldPolicy::INTERRUPT_ONLY;

@@ -36,7 +36,6 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/auth/authorization_checks.h"
 #include "mongo/db/auth/authorization_session.h"
-#include "mongo/db/catalog/collection_catalog.h"
 #include "mongo/db/client.h"
 #include "mongo/db/coll_mod_gen.h"
 #include "mongo/db/coll_mod_reply_validation.h"
@@ -46,6 +45,7 @@
 #include "mongo/db/feature_flag.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/profile_settings.h"
 #include "mongo/db/s/collmod_coordinator.h"
 #include "mongo/db/s/collmod_coordinator_document_gen.h"
 #include "mongo/db/s/sharding_ddl_coordinator_gen.h"
@@ -122,7 +122,8 @@ public:
         // profile level increase in order to be logged in "<db>.system.profile"
         const auto& cmd = requestParser.request();
         CurOp::get(opCtx)->raiseDbProfileLevel(
-            CollectionCatalog::get(opCtx)->getDatabaseProfileLevel(cmd.getNamespace().dbName()));
+            DatabaseProfileSettings::get(opCtx->getServiceContext())
+                .getDatabaseProfileLevel(cmd.getNamespace().dbName()));
 
         auto coordinatorDoc = CollModCoordinatorDocument();
         coordinatorDoc.setCollModRequest(cmd.getCollModRequest());

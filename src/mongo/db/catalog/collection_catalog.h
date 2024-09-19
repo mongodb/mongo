@@ -53,7 +53,6 @@
 #include "mongo/db/database_name.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
-#include "mongo/db/profile_filter.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/storage/durable_catalog_entry.h"
 #include "mongo/db/tenant_id.h"
@@ -110,26 +109,6 @@ public:
     private:
         OrderedCollectionMap _map;
         DatabaseName _dbName;
-    };
-
-    struct ProfileSettings {
-        int level;
-        std::shared_ptr<const ProfileFilter> filter;  // nullable
-
-        ProfileSettings(int level, std::shared_ptr<ProfileFilter> filter)
-            : level(level), filter(filter) {
-            // ProfileSettings represents a state, not a request to change the state.
-            // -1 is not a valid profiling level: it is only used in requests, to represent
-            // leaving the state unchanged.
-            invariant(0 <= level && level <= 2,
-                      str::stream() << "Invalid profiling level: " << level);
-        }
-
-        ProfileSettings() = default;
-
-        bool operator==(const ProfileSettings& other) const {
-            return level == other.level && filter == other.filter;
-        }
     };
 
     /**
@@ -589,40 +568,6 @@ public:
         OperationContext* opCtx, boost::optional<TenantId> tenantId) const;
 
     /**
-     * Updates the profile filter on all databases with non-default settings.
-     */
-    void setAllDatabaseProfileFilters(std::shared_ptr<ProfileFilter> filter);
-
-    /**
-     * Sets 'newProfileSettings' as the profiling settings for the database 'dbName'.
-     */
-    void setDatabaseProfileSettings(const DatabaseName& dbName, ProfileSettings newProfileSettings);
-
-    /**
-     * Fetches the profiling settings for database 'dbName'.
-     *
-     * Returns the server's default database profile settings if the database does not exist.
-     */
-    ProfileSettings getDatabaseProfileSettings(const DatabaseName& dbName) const;
-
-    /**
-     * Fetches the profiling level for database 'dbName'.
-     *
-     * Returns the server's default database profile settings if the database does not exist.
-     *
-     * There is no corresponding setDatabaseProfileLevel; use setDatabaseProfileSettings instead.
-     * This method only exists as a convenience.
-     */
-    int getDatabaseProfileLevel(const DatabaseName& dbName) const {
-        return getDatabaseProfileSettings(dbName).level;
-    }
-
-    /**
-     * Clears the database profile settings entry for 'dbName'.
-     */
-    void clearDatabaseProfileSettings(const DatabaseName& dbName);
-
-    /**
      * Marks the given database as drop pending.
      */
     void addDropPending(const DatabaseName&);
@@ -887,7 +832,6 @@ private:
     using NamespaceCollectionMap =
         immutable::unordered_map<NamespaceString, std::shared_ptr<Collection>>;
     using UncommittedViewsSet = immutable::unordered_set<NamespaceString>;
-    using DatabaseProfileSettingsMap = immutable::unordered_map<DatabaseName, ProfileSettings>;
     using ViewsForDatabaseMap = immutable::unordered_map<DatabaseName, ViewsForDatabase>;
 
     CollectionCatalogMap _catalog;
@@ -930,13 +874,6 @@ private:
     // A thread must hold the global exclusive lock to write to this variable, and must hold the
     // global lock in at least MODE_IS to read it.
     uint64_t _epoch = 0;
-
-    /**
-     * Contains non-default database profile settings. New collections, current collections and
-     * views must all be able to access the correct profile settings for the database in which they
-     * reside. Simple database name to struct ProfileSettings map.
-     */
-    DatabaseProfileSettingsMap _databaseProfileSettings;
 
     // Tracks usage of collection usage features (e.g. capped).
     Stats _stats;

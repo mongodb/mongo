@@ -89,6 +89,7 @@
 #include "mongo/db/pipeline/legacy_runtime_constants_gen.h"
 #include "mongo/db/pipeline/variables.h"
 #include "mongo/db/profile_collection.h"
+#include "mongo/db/profile_settings.h"
 #include "mongo/db/query/canonical_query.h"
 #include "mongo/db/query/collection_query_info.h"
 #include "mongo/db/query/explain_options.h"
@@ -642,8 +643,8 @@ bool insertBatchAndHandleErrors(OperationContext* opCtx,
             makeCollection(opCtx, nss);
         }
 
-        curOp.raiseDbProfileLevel(
-            CollectionCatalog::get(opCtx)->getDatabaseProfileLevel(nss.dbName()));
+        curOp.raiseDbProfileLevel(DatabaseProfileSettings::get(opCtx->getServiceContext())
+                                      .getDatabaseProfileLevel(nss.dbName()));
         assertCanWrite_inlock(opCtx, nss);
 
         CurOpFailpointHelpers::waitWhileFailPointEnabled(
@@ -811,7 +812,8 @@ UpdateResult performUpdate(OperationContext* opCtx,
     }();
 
     invariant(DatabaseHolder::get(opCtx)->getDb(opCtx, dbName));
-    curOp->raiseDbProfileLevel(CollectionCatalog::get(opCtx)->getDatabaseProfileLevel(dbName));
+    curOp->raiseDbProfileLevel(
+        DatabaseProfileSettings::get(opCtx->getServiceContext()).getDatabaseProfileLevel(dbName));
 
     assertCanWrite_inlock(opCtx, nsString);
 
@@ -977,7 +979,8 @@ long long performDelete(OperationContext* opCtx,
 
     auto dbName = nsString.dbName();
     if (DatabaseHolder::get(opCtx)->getDb(opCtx, dbName)) {
-        curOp->raiseDbProfileLevel(CollectionCatalog::get(opCtx)->getDatabaseProfileLevel(dbName));
+        curOp->raiseDbProfileLevel(DatabaseProfileSettings::get(opCtx->getServiceContext())
+                                       .getDatabaseProfileLevel(dbName));
     }
 
     assertCanWrite_inlock(opCtx, nsString);
@@ -1092,9 +1095,11 @@ void updateRetryStats(OperationContext* opCtx, bool containsRetry) {
 }
 
 void logOperationAndProfileIfNeeded(OperationContext* opCtx, CurOp* curOp) {
-    const bool shouldProfile = curOp->completeAndLogOperation(
-        {MONGO_LOGV2_DEFAULT_COMPONENT},
-        CollectionCatalog::get(opCtx)->getDatabaseProfileSettings(curOp->getNSS().dbName()).filter);
+    const bool shouldProfile =
+        curOp->completeAndLogOperation({MONGO_LOGV2_DEFAULT_COMPONENT},
+                                       DatabaseProfileSettings::get(opCtx->getServiceContext())
+                                           .getDatabaseProfileSettings(curOp->getNSS().dbName())
+                                           .filter);
 
     if (shouldProfile) {
         // Stash the current transaction so that writes to the profile collection are not
@@ -1413,8 +1418,8 @@ static SingleWriteResult performSingleUpdateOp(OperationContext* opCtx,
     auto& curOp = *CurOp::get(opCtx);
 
     if (DatabaseHolder::get(opCtx)->getDb(opCtx, ns.dbName())) {
-        curOp.raiseDbProfileLevel(
-            CollectionCatalog::get(opCtx)->getDatabaseProfileLevel(ns.dbName()));
+        curOp.raiseDbProfileLevel(DatabaseProfileSettings::get(opCtx->getServiceContext())
+                                      .getDatabaseProfileLevel(ns.dbName()));
     }
 
     assertCanWrite_inlock(opCtx, ns);
@@ -1857,8 +1862,8 @@ static SingleWriteResult performSingleDeleteOp(OperationContext* opCtx,
     uassertStatusOK(parsedDelete.parseRequest());
 
     if (DatabaseHolder::get(opCtx)->getDb(opCtx, ns.dbName())) {
-        curOp.raiseDbProfileLevel(
-            CollectionCatalog::get(opCtx)->getDatabaseProfileLevel(ns.dbName()));
+        curOp.raiseDbProfileLevel(DatabaseProfileSettings::get(opCtx->getServiceContext())
+                                      .getDatabaseProfileLevel(ns.dbName()));
     }
 
     assertCanWrite_inlock(opCtx, ns);
@@ -2054,7 +2059,8 @@ Status performAtomicTimeseriesWrites(
     }
 
     auto curOp = CurOp::get(opCtx);
-    curOp->raiseDbProfileLevel(CollectionCatalog::get(opCtx)->getDatabaseProfileLevel(ns.dbName()));
+    curOp->raiseDbProfileLevel(DatabaseProfileSettings::get(opCtx->getServiceContext())
+                                   .getDatabaseProfileLevel(ns.dbName()));
 
     assertCanWrite_inlock(opCtx, ns);
 

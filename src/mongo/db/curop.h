@@ -51,7 +51,6 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/auth/user_acquisition_stats.h"
-#include "mongo/db/catalog/collection_catalog.h"
 #include "mongo/db/client.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/concurrency/flow_control_ticketholder.h"
@@ -723,19 +722,7 @@ public:
      *
      * When a custom filter is set, we conservatively assume it would match this operation.
      */
-    bool shouldDBProfile() {
-        // Profile level 2 should override any sample rate or slowms settings.
-        if (_dbprofile >= 2)
-            return true;
-
-        if (_dbprofile <= 0)
-            return false;
-
-        if (CollectionCatalog::get(opCtx())->getDatabaseProfileSettings(getNSS().dbName()).filter)
-            return true;
-
-        return elapsedTimeExcludingPauses() >= Milliseconds{serverGlobalParams.slowMS.load()};
-    }
+    bool shouldDBProfile();
 
     /**
      * Raises the profiling level for this operation to "dbProfileLevel" if it was previously

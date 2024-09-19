@@ -61,6 +61,7 @@
 #include "mongo/db/index_build_entry_helpers.h"
 #include "mongo/db/index_builds_coordinator_mongod.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/profile_settings.h"
 #include "mongo/db/repl/member_config.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/repl/tenant_migration_access_blocker_util.h"
@@ -552,8 +553,8 @@ IndexBuildsCoordinatorMongod::_startIndexBuild(OperationContext* opCtx,
             CurOp::get(opCtx.get())
                 ->completeAndLogOperation(
                     {MONGO_LOGV2_DEFAULT_COMPONENT, toLogService(opCtx->getService())},
-                    CollectionCatalog::get(opCtx.get())
-                        ->getDatabaseProfileSettings(nss.dbName())
+                    DatabaseProfileSettings::get(opCtx->getServiceContext())
+                        .getDatabaseProfileSettings(nss.dbName())
                         .filter);
         } catch (const DBException& e) {
             LOGV2(4656002, "unable to log operation", "error"_attr = e);

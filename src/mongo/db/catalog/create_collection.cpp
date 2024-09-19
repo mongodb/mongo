@@ -74,6 +74,7 @@
 #include "mongo/db/op_observer/op_observer.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/pipeline/change_stream_pre_and_post_images_options_gen.h"
+#include "mongo/db/profile_settings.h"
 #include "mongo/db/query/collation/collator_factory_interface.h"
 #include "mongo/db/query/query_knobs_gen.h"
 #include "mongo/db/query/write_ops/insert.h"
@@ -292,12 +293,12 @@ Status _createView(OperationContext* opCtx,
 
         WriteUnitOfWork wunit(opCtx);
 
-        AutoStatsTracker statsTracker(
-            opCtx,
-            nss,
-            Top::LockType::NotLocked,
-            AutoStatsTracker::LogMode::kUpdateTopAndCurOp,
-            CollectionCatalog::get(opCtx)->getDatabaseProfileLevel(nss.dbName()));
+        AutoStatsTracker statsTracker(opCtx,
+                                      nss,
+                                      Top::LockType::NotLocked,
+                                      AutoStatsTracker::LogMode::kUpdateTopAndCurOp,
+                                      DatabaseProfileSettings::get(opCtx->getServiceContext())
+                                          .getDatabaseProfileLevel(nss.dbName()));
 
         // If the view creation rolls back, ensure that the Top entry created for the view is
         // deleted.
@@ -563,7 +564,8 @@ Status _createTimeseries(OperationContext* opCtx,
             bucketsNs,
             Top::LockType::NotLocked,
             AutoStatsTracker::LogMode::kUpdateTopAndCurOp,
-            CollectionCatalog::get(opCtx)->getDatabaseProfileLevel(ns.dbName()));
+            DatabaseProfileSettings::get(opCtx->getServiceContext())
+                .getDatabaseProfileLevel(ns.dbName()));
 
         // If the buckets collection and time-series view creation roll back, ensure that their
         // Top entries are deleted.
@@ -716,12 +718,12 @@ Status _createCollection(
 
         WriteUnitOfWork wunit(opCtx);
 
-        AutoStatsTracker statsTracker(
-            opCtx,
-            nss,
-            Top::LockType::NotLocked,
-            AutoStatsTracker::LogMode::kUpdateTopAndCurOp,
-            CollectionCatalog::get(opCtx)->getDatabaseProfileLevel(nss.dbName()));
+        AutoStatsTracker statsTracker(opCtx,
+                                      nss,
+                                      Top::LockType::NotLocked,
+                                      AutoStatsTracker::LogMode::kUpdateTopAndCurOp,
+                                      DatabaseProfileSettings::get(opCtx->getServiceContext())
+                                          .getDatabaseProfileLevel(nss.dbName()));
 
         // If the collection creation rolls back, ensure that the Top entry created for the
         // collection is deleted.

@@ -95,6 +95,7 @@
 #include "mongo/db/not_primary_error_tracker.h"
 #include "mongo/db/op_observer/op_observer.h"
 #include "mongo/db/profile_collection.h"
+#include "mongo/db/profile_settings.h"
 #include "mongo/db/query/query_request_helper.h"
 #include "mongo/db/read_concern_support_result.h"
 #include "mongo/db/read_write_concern_defaults.h"
@@ -2407,8 +2408,8 @@ void HandleRequest::completeOperation(DbResponse& response) {
     // this op should be written to the profiler.
     const bool shouldProfile = currentOp.completeAndLogOperation(
         {MONGO_LOGV2_DEFAULT_COMPONENT},
-        CollectionCatalog::get(opCtx)
-            ->getDatabaseProfileSettings(currentOp.getNSS().dbName())
+        DatabaseProfileSettings::get(opCtx->getServiceContext())
+            .getDatabaseProfileSettings(currentOp.getNSS().dbName())
             .filter,
         response.response.size(),
         executionContext.slowMsOverride,

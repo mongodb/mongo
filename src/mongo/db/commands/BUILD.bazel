@@ -684,6 +684,7 @@ mongo_cc_library(
         "//conditions:default": [],
     }),
     deps = [
+        "//src/mongo/db:profile_settings",
         "//src/mongo/db:server_base",
     ],
 )

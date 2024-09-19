@@ -1111,7 +1111,6 @@ mongo_cc_library(
         "//src/mongo/db/fts:fts_query_noop",
         "//src/mongo/db/repl:oplog_buffer_batched_queue",
         "//src/mongo/db/repl:oplog_constraint_violation_logger",
-        "//src/mongo/db:profile_filter",
         "//src/mongo/platform:visibility_test_libcommon",
         "//src/mongo/util:secure_compare_memory",
     ],

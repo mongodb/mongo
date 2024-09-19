@@ -2138,35 +2138,6 @@ std::vector<DatabaseName> CollectionCatalog::getAllConsistentDbNamesForTenant(
     return ret;
 }
 
-void CollectionCatalog::setAllDatabaseProfileFilters(std::shared_ptr<ProfileFilter> filter) {
-    auto dbProfileSettingsWriter = _databaseProfileSettings.transient();
-    for (const auto& [dbName, settings] : _databaseProfileSettings) {
-        ProfileSettings clone = settings;
-        clone.filter = filter;
-        dbProfileSettingsWriter.set(dbName, std::move(clone));
-    }
-    _databaseProfileSettings = dbProfileSettingsWriter.persistent();
-}
-
-void CollectionCatalog::setDatabaseProfileSettings(
-    const DatabaseName& dbName, CollectionCatalog::ProfileSettings newProfileSettings) {
-    _databaseProfileSettings = _databaseProfileSettings.set(dbName, std::move(newProfileSettings));
-}
-
-CollectionCatalog::ProfileSettings CollectionCatalog::getDatabaseProfileSettings(
-    const DatabaseName& dbName) const {
-    const ProfileSettings* settings = _databaseProfileSettings.find(dbName);
-    if (settings) {
-        return *settings;
-    }
-
-    return {serverGlobalParams.defaultProfile, ProfileFilter::getDefault()};
-}
-
-void CollectionCatalog::clearDatabaseProfileSettings(const DatabaseName& dbName) {
-    _databaseProfileSettings = _databaseProfileSettings.erase(dbName);
-}
-
 void CollectionCatalog::addDropPending(const DatabaseName& dbName) {
     _dropPendingDatabases = _dropPendingDatabases.insert(dbName);
 }

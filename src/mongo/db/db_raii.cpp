@@ -54,6 +54,7 @@
 #include "mongo/db/curop.h"
 #include "mongo/db/direct_connection_util.h"
 #include "mongo/db/logical_time.h"
+#include "mongo/db/profile_settings.h"
 #include "mongo/db/repl/read_concern_args.h"
 #include "mongo/db/repl/read_concern_level.h"
 #include "mongo/db/repl/replication_coordinator.h"
@@ -1012,7 +1013,8 @@ AutoGetCollectionForReadCommandBase<AutoGetCollectionForReadType>::
                     nsOrUUID.isNamespaceString() ? nsOrUUID.nss() : NamespaceString::kEmpty,
                     Top::LockType::ReadLocked,
                     logMode,
-                    CollectionCatalog::get(opCtx)->getDatabaseProfileLevel(nsOrUUID.dbName()),
+                    DatabaseProfileSettings::get(opCtx->getServiceContext())
+                        .getDatabaseProfileLevel(nsOrUUID.dbName()),
                     options._deadline,
                     options._secondaryNssOrUUIDsBegin,
                     options._secondaryNssOrUUIDsEnd),
@@ -1028,8 +1030,8 @@ AutoGetCollectionForReadCommandBase<AutoGetCollectionForReadType>::
                               _autoCollForRead.getNss(),
                               Top::LockType::ReadLocked,
                               logMode,
-                              CollectionCatalog::get(opCtx)->getDatabaseProfileLevel(
-                                  _autoCollForRead.getNss().dbName()),
+                              DatabaseProfileSettings::get(opCtx->getServiceContext())
+                                  .getDatabaseProfileLevel(_autoCollForRead.getNss().dbName()),
                               options._deadline,
                               options._secondaryNssOrUUIDsBegin,
                               options._secondaryNssOrUUIDsEnd);
@@ -1082,7 +1084,8 @@ OldClientContext::OldClientContext(OperationContext* opCtx,
     stdx::lock_guard<Client> lk(*_opCtx->getClient());
     currentOp->enter_inlock(nss.isTimeseriesBucketsCollection() ? nss.getTimeseriesViewNamespace()
                                                                 : nss,
-                            CollectionCatalog::get(opCtx)->getDatabaseProfileLevel(_db->name()));
+                            DatabaseProfileSettings::get(opCtx->getServiceContext())
+                                .getDatabaseProfileLevel(_db->name()));
 }
 
 AutoGetCollectionForReadCommandMaybeLockFree::AutoGetCollectionForReadCommandMaybeLockFree(

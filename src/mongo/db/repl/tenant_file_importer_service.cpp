@@ -50,6 +50,7 @@
 #include "mongo/db/database_name.h"
 #include "mongo/db/db_raii.h"
 #include "mongo/db/op_observer/op_observer.h"
+#include "mongo/db/profile_settings.h"
 #include "mongo/db/repl/oplog_applier.h"
 #include "mongo/db/repl/repl_server_parameters_gen.h"
 #include "mongo/db/repl/replication_auth.h"
@@ -192,13 +193,13 @@ void importCollectionAndItsIndexesInMainWTInstance(OperationContext* opCtx,
         auto db = autoDb.ensureDbExists(opCtx);
         invariant(db);
         Lock::CollectionLock collLock(opCtx, nss, MODE_X);
-        auto catalog = CollectionCatalog::get(opCtx);
+        auto& dbProfileSettings = DatabaseProfileSettings::get(opCtx->getServiceContext());
         WriteUnitOfWork wunit(opCtx);
         AutoStatsTracker statsTracker(opCtx,
                                       nss,
                                       Top::LockType::NotLocked,
                                       AutoStatsTracker::LogMode::kUpdateTopAndCurOp,
-                                      catalog->getDatabaseProfileLevel(nss.dbName()));
+                                      dbProfileSettings.getDatabaseProfileLevel(nss.dbName()));
 
         // If the collection creation rolls back, ensure that the Top entry created for the
         // collection is deleted.

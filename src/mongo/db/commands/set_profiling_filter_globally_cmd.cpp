@@ -38,11 +38,11 @@
 #include "mongo/db/auth/action_type.h"
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/auth/resource_pattern.h"
-#include "mongo/db/catalog/collection_catalog.h"
 #include "mongo/db/commands/profile_common.h"
 #include "mongo/db/commands/profile_gen.h"
 #include "mongo/db/profile_filter.h"
 #include "mongo/db/profile_filter_impl.h"
+#include "mongo/db/profile_settings.h"
 #include "mongo/db/query/query_knobs_gen.h"
 #include "mongo/idl/idl_parser.h"
 #include "mongo/logv2/log.h"
@@ -77,8 +77,10 @@ bool SetProfilingFilterGloballyCmd::run(OperationContext* opCtx,
 
     auto request = SetProfilingFilterGloballyCmdRequest::parse(IDLParserContext(getName()), cmdObj);
 
+    auto& dbProfileSettings = DatabaseProfileSettings::get(opCtx->getServiceContext());
+
     // Save off the old global default setting so that we can log it and return in the result.
-    auto oldDefault = ProfileFilter::getDefault();
+    auto oldDefault = dbProfileSettings.getDefaultFilter();
     auto newDefault = [&request] {
         const auto& filterOrUnset = request.getFilter();
         if (auto filter = filterOrUnset.obj) {
@@ -88,20 +90,12 @@ bool SetProfilingFilterGloballyCmd::run(OperationContext* opCtx,
     }();
 
     // Update the global default.
-    // Note that since this is not done atomically with the collection catalog write, there is a
-    // minor race condition where queries on some databases see the new global default while queries
-    // on other databases see old database-specific settings. This is a temporary state and
-    // shouldn't impact much in practice. We also don't have to worry about races with database
-    // creation, since the global default gets picked up dynamically by queries instead of being
-    // explicitly stored for new databases.
-    ProfileFilter::setDefault(newDefault);
-
-    Lock::GlobalLock lk{opCtx, MODE_IX};
-
-    // Update all existing database settings.
-    CollectionCatalog::write(opCtx, [&](CollectionCatalog& catalog) {
-        catalog.setAllDatabaseProfileFilters(newDefault);
-    });
+    // There is a minor race condition where queries on some databases see the new global default
+    // while queries on other databases see old database-specific settings. This is a temporary
+    // state and shouldn't impact much in practice. We also don't have to worry about races with
+    // database creation, since the global default gets picked up dynamically by queries instead of
+    // being explicitly stored for new databases.
+    dbProfileSettings.setAllDatabaseProfileFiltersAndDefault(newDefault);
 
     // Capture the old setting in the result object.
     if (oldDefault) {

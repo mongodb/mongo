@@ -137,6 +137,7 @@
 #include "mongo/db/pipeline/change_stream_expired_pre_image_remover.h"
 #include "mongo/db/pipeline/change_stream_preimage_gen.h"
 #include "mongo/db/pipeline/process_interface/replica_set_node_process_interface.h"
+#include "mongo/db/profile_filter_impl.h"
 #include "mongo/db/query/query_knobs_gen.h"
 #include "mongo/db/query/query_settings/query_settings_manager.h"
 #include "mongo/db/query/stats/stats_cache_loader_impl.h"
@@ -524,6 +525,8 @@ ExitCode _initAndListen(ServiceContext* serviceContext) {
     logProcessDetails(nullptr);
 
     initializeCommandHooks(serviceContext);
+
+    ProfileFilterImpl::initializeDefaults(serviceContext);
 
     {
         // (Ignore FCV check): The ReplicaSetEndpoint service entry point needs to be set even

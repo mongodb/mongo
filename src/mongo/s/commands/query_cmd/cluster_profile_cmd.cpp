@@ -32,13 +32,13 @@
 #include <boost/optional/optional.hpp>
 
 #include "mongo/base/error_codes.h"
-#include "mongo/db/catalog/collection_catalog.h"
 #include "mongo/db/commands/profile_common.h"
 #include "mongo/db/commands/profile_gen.h"
 #include "mongo/db/commands/set_profiling_filter_globally_cmd.h"
 #include "mongo/db/database_name.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/profile_filter_impl.h"
+#include "mongo/db/profile_settings.h"
 #include "mongo/util/assert_util.h"
 
 namespace mongo {
@@ -55,12 +55,9 @@ public:
     }
 
 protected:
-    CollectionCatalog::ProfileSettings _applyProfilingLevel(
-        OperationContext* opCtx,
-        const DatabaseName& dbName,
-        const ProfileCmdRequest& request) const final {
-        Lock::GlobalLock lk{opCtx, MODE_IX};
-
+    ProfileSettings _applyProfilingLevel(OperationContext* opCtx,
+                                         const DatabaseName& dbName,
+                                         const ProfileCmdRequest& request) const final {
         const auto profilingLevel = request.getCommandParameter();
 
         // The only valid profiling level for mongoS is 0, because mongoS has no system.profile
@@ -72,7 +69,8 @@ protected:
                 "values",
                 profilingLevel == -1 || profilingLevel == 0);
 
-        auto oldSettings = CollectionCatalog::get(opCtx)->getDatabaseProfileSettings(dbName);
+        auto& dbProfileSettings = DatabaseProfileSettings::get(opCtx->getServiceContext());
+        auto oldSettings = dbProfileSettings.getDatabaseProfileSettings(dbName);
 
         if (auto filterOrUnset = request.getFilter()) {
             auto newSettings = oldSettings;
@@ -81,9 +79,7 @@ protected:
             } else {
                 newSettings.filter = nullptr;
             }
-            CollectionCatalog::write(opCtx, [&](CollectionCatalog& catalog) {
-                catalog.setDatabaseProfileSettings(dbName, newSettings);
-            });
+            dbProfileSettings.setDatabaseProfileSettings(dbName, newSettings);
         }
 
         return oldSettings;

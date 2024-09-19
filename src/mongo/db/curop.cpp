@@ -61,6 +61,7 @@
 #include "mongo/db/concurrency/lock_manager_defs.h"
 #include "mongo/db/prepare_conflict_tracker.h"
 #include "mongo/db/profile_filter.h"
+#include "mongo/db/profile_settings.h"
 #include "mongo/db/query/plan_summary_stats.h"
 #include "mongo/db/repl/read_concern_args.h"
 #include "mongo/db/server_feature_flags_gen.h"
@@ -570,6 +571,21 @@ void CurOp::enter_inlock(NamespaceString nss, int dbProfileLevel) {
 
 void CurOp::enter_inlock(const DatabaseName& dbName, int dbProfileLevel) {
     enter_inlock(NamespaceString(dbName), dbProfileLevel);
+}
+
+bool CurOp::shouldDBProfile() {
+    // Profile level 2 should override any sample rate or slowms settings.
+    if (_dbprofile >= 2)
+        return true;
+
+    if (_dbprofile <= 0)
+        return false;
+
+    auto& dbProfileSettings = DatabaseProfileSettings::get(opCtx()->getServiceContext());
+    if (dbProfileSettings.getDatabaseProfileSettings(getNSS().dbName()).filter)
+        return true;
+
+    return elapsedTimeExcludingPauses() >= Milliseconds{serverGlobalParams.slowMS.load()};
 }
 
 void CurOp::raiseDbProfileLevel(int dbProfileLevel) {

@@ -74,6 +74,7 @@
 #include "mongo/db/keypattern.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/profile_settings.h"
 #include "mongo/db/query/explain_verbosity_gen.h"
 #include "mongo/db/query/index_bounds.h"
 #include "mongo/db/query/internal_plans.h"
@@ -739,7 +740,9 @@ public:
                 {
                     stdx::lock_guard<Client> lk(*opCtx->getClient());
                     CurOp::get(opCtx)->enter_inlock(
-                        dbname, CollectionCatalog::get(opCtx)->getDatabaseProfileLevel(dbname));
+                        dbname,
+                        DatabaseProfileSettings::get(opCtx->getServiceContext())
+                            .getDatabaseProfileLevel(dbname));
                 }
 
                 db->getStats(opCtx, &reply, cmd.getFreeStorage(), cmd.getScale());

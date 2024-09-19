@@ -62,17 +62,6 @@ public:
      * otherwise.
      */
     virtual bool dependsOn(StringData topLevelField) const = 0;
-
-    /**
-     * Thread-safe getter for the global 'ProfileFilter' default.
-     */
-    static std::shared_ptr<ProfileFilter> getDefault();
-
-    /**
-     * Thread-safe setter for the global 'ProfileFilter' default. Initially this is set from the
-     * configuration file on startup.
-     */
-    static void setDefault(std::shared_ptr<ProfileFilter>);
 };
 
 }  // namespace mongo

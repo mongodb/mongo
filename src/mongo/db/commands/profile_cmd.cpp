@@ -28,7 +28,6 @@
  */
 
 #include "mongo/base/status.h"
-#include "mongo/db/catalog/collection_catalog.h"
 #include "mongo/db/catalog/database.h"
 #include "mongo/db/catalog/database_holder.h"
 #include "mongo/db/commands.h"
@@ -40,6 +39,7 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/profile_collection.h"
 #include "mongo/db/profile_filter_impl.h"
+#include "mongo/db/profile_settings.h"
 
 namespace mongo {
 namespace {
@@ -47,10 +47,11 @@ namespace {
 Status _setProfileSettings(OperationContext* opCtx,
                            Database* db,
                            const DatabaseName& dbName,
-                           mongo::CollectionCatalog::ProfileSettings newSettings) {
+                           ProfileSettings newSettings) {
     invariant(db);
 
-    auto currSettings = CollectionCatalog::get(opCtx)->getDatabaseProfileSettings(dbName);
+    auto& dbProfileSettings = DatabaseProfileSettings::get(opCtx->getServiceContext());
+    auto currSettings = dbProfileSettings.getDatabaseProfileSettings(dbName);
 
     if (currSettings == newSettings) {
         return Status::OK();
@@ -58,9 +59,7 @@ Status _setProfileSettings(OperationContext* opCtx,
 
     if (newSettings.level == 0) {
         // No need to create the profile collection.
-        CollectionCatalog::write(opCtx, [&](CollectionCatalog& catalog) {
-            catalog.setDatabaseProfileSettings(dbName, newSettings);
-        });
+        dbProfileSettings.setDatabaseProfileSettings(dbName, newSettings);
         return Status::OK();
     }
 
@@ -75,9 +74,7 @@ Status _setProfileSettings(OperationContext* opCtx,
         return status;
     }
 
-    CollectionCatalog::write(opCtx, [&](CollectionCatalog& catalog) {
-        catalog.setDatabaseProfileSettings(dbName, newSettings);
-    });
+    dbProfileSettings.setDatabaseProfileSettings(dbName, newSettings);
 
     return Status::OK();
 }
@@ -92,10 +89,9 @@ public:
     CmdProfile() = default;
 
 protected:
-    CollectionCatalog::ProfileSettings _applyProfilingLevel(
-        OperationContext* opCtx,
-        const DatabaseName& dbName,
-        const ProfileCmdRequest& request) const final {
+    ProfileSettings _applyProfilingLevel(OperationContext* opCtx,
+                                         const DatabaseName& dbName,
+                                         const ProfileCmdRequest& request) const final {
         const auto profilingLevel = request.getCommandParameter();
 
         // An invalid profiling level (outside the range [0, 2]) represents a request to read the
@@ -109,9 +105,11 @@ protected:
         AutoGetCollection ctx(opCtx, nss, dbMode);
         Database* db = ctx.getDb();
 
+        auto& dbProfileSettings = DatabaseProfileSettings::get(opCtx->getServiceContext());
+
         // Fetches the database profiling level + filter or the server default if the db does not
         // exist.
-        auto oldSettings = CollectionCatalog::get(opCtx)->getDatabaseProfileSettings(dbName);
+        auto oldSettings = dbProfileSettings.getDatabaseProfileSettings(dbName);
 
         if (!readOnly) {
             if (!db) {
