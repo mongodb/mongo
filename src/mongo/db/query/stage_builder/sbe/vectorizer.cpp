@@ -599,6 +599,9 @@ Vectorizer::Tree Vectorizer::operator()(const optimizer::ABT& n,
                 return {makeABTFunction("valueBlockExists"_sd, std::move(*args[0].expr)),
                         TypeSignature::kBlockType.include(TypeSignature::kBooleanType),
                         args[0].sourceCell};
+            } else if (op.name() == "makeOwn"s) {
+                // In block mode, ownership of values is not needed.
+                return std::move(args[0]);
             }
         }
 
