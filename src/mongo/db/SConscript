@@ -1076,7 +1076,6 @@ execEnv.Library(
         "query/stage_builder/sbe/sbexpr_helpers.cpp",
         "query/stage_builder/sbe/type_checker.cpp",
         "query/stage_builder/sbe/type_signature.cpp",
-        "query/stage_builder/sbe/value_lifetime.cpp",
         "query/stage_builder/sbe/vectorizer.cpp",
         "query/stage_builder/stage_builder_util.cpp",
         "query/wildcard_multikey_paths.cpp",

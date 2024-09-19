@@ -428,10 +428,6 @@ void CodeFragment::appendSwap() {
     appendSimpleInstruction(Instruction::swap);
 }
 
-void CodeFragment::appendMakeOwn(Instruction::Parameter arg) {
-    appendSimpleInstruction(Instruction::makeOwn, arg);
-}
-
 void CodeFragment::appendCmp3w(Instruction::Parameter lhs, Instruction::Parameter rhs) {
     appendSimpleInstruction(Instruction::cmp3w, lhs, rhs);
 }

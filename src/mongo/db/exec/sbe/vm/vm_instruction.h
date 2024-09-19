@@ -60,9 +60,6 @@ struct Instruction {
         pushLocalLambda,
         pop,
         swap,
-        makeOwn,
-        // If the only argument is a stack-owned value, it is propagated unchanged;
-        // if it is not owned by the stack, it returns a copy of it.
 
         add,
         sub,

@@ -74,7 +74,6 @@ public:
     void appendLocalLambda(int codePosition);
     void appendPop();
     void appendSwap();
-    void appendMakeOwn(Instruction::Parameter arg);
     void appendAdd(Instruction::Parameter lhs, Instruction::Parameter rhs);
     void appendSub(Instruction::Parameter lhs, Instruction::Parameter rhs);
     void appendMul(Instruction::Parameter lhs, Instruction::Parameter rhs);

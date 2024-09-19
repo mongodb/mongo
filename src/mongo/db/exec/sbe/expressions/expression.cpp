@@ -1256,7 +1256,6 @@ vm::CodeFragment generateTraverseCellTypes(CompileCtx& ctx,
  * The map of functions that resolve directly to instructions.
  */
 static stdx::unordered_map<std::string, InstrFn> kInstrFunctions = {
-    {"makeOwn", InstrFn{1, generator<1, &vm::CodeFragment::appendMakeOwn>, false}},
     {"getElement", InstrFn{2, generator<2, &vm::CodeFragment::appendGetElement>, false}},
     {"getField", InstrFn{2, generateGetField, false}},
     {"getArraySize", InstrFn{1, generator<1, &vm::CodeFragment::appendGetArraySize>, false}},
