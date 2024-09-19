@@ -102,6 +102,10 @@ public:
         return DocumentSourceReshardingIterateTransaction::kStageName.rawData();
     }
 
+    DocumentSourceType getType() const override {
+        return DocumentSourceType::kReshardingIterateTransaction;
+    }
+
     void addVariableRefs(std::set<Variables::Id>* refs) const final {}
 
 protected:

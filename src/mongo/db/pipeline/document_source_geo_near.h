@@ -71,6 +71,10 @@ public:
         return DocumentSourceGeoNear::kStageName.rawData();
     }
 
+    DocumentSourceType getType() const override {
+        return DocumentSourceType::kGeoNear;
+    }
+
     StageConstraints constraints(Pipeline::SplitState pipeState) const final {
         StageConstraints constraints{StreamType::kStreaming,
                                      PositionRequirement::kCustom,

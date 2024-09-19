@@ -52,6 +52,10 @@ public:
         return kStageName.rawData();
     }
 
+    DocumentSourceType getType() const override {
+        return DocumentSourceType::kInternalShredDocuments;
+    }
+
     StageConstraints constraints(Pipeline::SplitState pipeState) const override {
         StageConstraints constraints(StreamType::kStreaming,
                                      PositionRequirement::kNone,

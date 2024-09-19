@@ -148,6 +148,10 @@ public:
 
     const char* getSourceName() const final;
 
+    DocumentSourceType getType() const override {
+        return DocumentSourceType::kCurrentOp;
+    }
+
     StageConstraints constraints(Pipeline::SplitState pipeState) const final {
         bool showLocalOps =
             _showLocalOpsOnMongoS.value_or(kDefaultLocalOpsMode) == LocalOpsMode::kLocalMongosOps;

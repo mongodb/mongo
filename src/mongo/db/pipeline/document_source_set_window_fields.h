@@ -142,6 +142,10 @@ public:
         return kStageName.rawData();
     };
 
+    DocumentSourceType getType() const override {
+        return DocumentSourceType::kInternalSetWindowFields;
+    }
+
     DepsTracker::State getDependencies(DepsTracker* deps) const final {
         if (_sortBy) {
             _sortBy->addDependencies(deps);

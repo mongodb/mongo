@@ -114,6 +114,10 @@ public:
 
     const char* getSourceName() const final;
 
+    DocumentSourceType getType() const override {
+        return DocumentSourceType::kGraphLookup;
+    }
+
     const FieldPath& getConnectFromField() const {
         return _connectFromField;
     }

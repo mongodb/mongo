@@ -78,6 +78,10 @@ public:
 
     const char* getSourceName() const final;
 
+    DocumentSourceType getType() const override {
+        return DocumentSourceType::kStreamingGroup;
+    }
+
     /**
      * Convenience method for creating a new $_internalStreamingGroup stage. If maxMemoryUsageBytes
      * is boost::none, then it will actually use the value of

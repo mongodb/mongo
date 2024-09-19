@@ -84,6 +84,10 @@ public:
         return kStageName.rawData();
     }
 
+    DocumentSourceType getType() const override {
+        return DocumentSourceType::kSkip;
+    }
+
     /**
      * Attempts to move a subsequent $limit before the skip, potentially allowing for forther
      * optimizations earlier in the pipeline.

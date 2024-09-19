@@ -139,6 +139,10 @@ public:
         return DocumentSourceFacet::kStageName.rawData();
     }
 
+    DocumentSourceType getType() const override {
+        return DocumentSourceType::kFacet;
+    }
+
     /**
      * Sets 'source' as the source of '_teeBuffer'.
      */

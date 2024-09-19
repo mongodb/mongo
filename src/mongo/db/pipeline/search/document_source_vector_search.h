@@ -58,6 +58,10 @@ public:
         return kStageName.rawData();
     }
 
+    DocumentSourceType getType() const override {
+        return DocumentSourceType::kVectorSearch;
+    }
+
     boost::optional<DistributedPlanLogic> distributedPlanLogic() override {
         DistributedPlanLogic logic;
         logic.shardsStage = this;

@@ -58,6 +58,10 @@ public:
 
     const char* getSourceName() const final;
 
+    DocumentSourceType getType() const override {
+        return DocumentSourceType::kInternalProjection;
+    }
+
     void addVariableRefs(std::set<Variables::Id>* refs) const final{};
 
     StageConstraints constraints(Pipeline::SplitState pipeState) const final {

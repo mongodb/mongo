@@ -197,6 +197,79 @@ class Document;
                                            boost::none,                            \
                                            ::mongo::getTestCommandsEnabled())
 
+enum class DocumentSourceType {
+    kAnalyzeShardKeyReadWriteDistribution,  // DocumentSourceAnalyzeShardKeyReadWriteDistribution
+    kBackupCursor,                          // DocumentSourceBackupCursor
+    kBackupCursorExtend,                    // DocumentSourceBackupCursorExtend
+    kBackupFile,                            // DocumentSourceBackupFile
+    kBucketAuto,                            // DocumentSourceBucketAuto
+    kChangeStreamSplitLargeEvent,           // DocumentSourceChangeStreamSplitLargeEvent
+    kCollStats,                             // DocumentSourceCollStats
+    kCursor,                                // DocumentSourceCursor
+    kCurrentOp,                             // DocumentSourceCurrentOp
+    kExchange,                              // DocumentSourceExchange
+    kFacet,                                 // DocumentSourceFacet
+    kFeeder,                                // DocumentSourceFeeder
+    kFindAndModifyImageLookup,              // DocumentSourceFindAndModifyImageLookup
+    kGeoNear,                               // DocumentSourceGeoNear
+    kGraphLookup,                           // DocumentSourceGraphLookup
+    kGroup,                                 // DocumentSourceGroup
+    kInternalAllCollectionStats,            // DocumentSourceInternalAllCollectionStats
+    kInternalApplyOplogUpdate,              // DocumentSourceInternalApplyOplogUpdate
+    kInternalChangeStream,                  // DocumentSourceInternalChangeStreamStage
+    kInternalConvertBucketIndexStats,       // DocumentSourceInternalConvertBucketIndexStats
+    kInternalDensify,                       // DocumentSourceInternalDensify
+    kInternalGeoNearDistance,               // DocumentSourceInternalGeoNearDistance
+    kInternalInhibitOptimization,           // DocumentSourceInternalInhibitOptimization
+    kInternalProjection,                    // DocumentSourceInternalProjection
+    kInternalReplaceRoot,                   // DocumentSourceInternalReplaceRoot
+    kInternalSearchIdLookUp,                // DocumentSourceInternalSearchIdLookUp
+    kInternalSearchMongotRemote,            // DocumentSourceInternalSearchMongotRemote
+    kInternalSetWindowFields,               // DocumentSourceInternalSetWindowFields
+    kInternalShardFilter,                   // DocumentSourceInternalShardFilter
+    kInternalShardServerInfo,               // DocumentSourceInternalShardServerInfo
+    kInternalShredDocuments,                // DocumentSourceInternalShredDocuments
+    kInternalSplitPipeline,                 // DocumentSourceInternalSplitPipeline
+    kInternalUnpackBucket,                  // DocumentSourceInternalUnpackBucket
+    kLimit,                                 // DocumentSourceLimit
+    kListCatalog,                           // DocumentSourceListCatalog
+    kListLocalSessions,                     // DocumentSourceListLocalSessions
+    kListSampledQueries,                    // DocumentSourceListSampledQueries
+    kListSearchIndexes,                     // DocumentSourceListSearchIndexes
+    kLookUp,                                // DocumentSourceLookUp
+    kMatch,                                 // DocumentSourceMatch
+    kMerge,                                 // DocumentSourceMerge
+    kMergeCursors,                          // DocumentSourceMergeCursors
+    kMock,                                  // DocumentSourceMock
+    kOperationMetrics,                      // DocumentSourceOperationMetrics
+    kOut,                                   // DocumentSourceOut
+    kPlanCacheStats,                        // DocumentSourcePlanCacheStats
+    kQueue,                                 // DocumentSourceQueue
+    kQueryStats,                            // DocumentSourceQueryStats
+    kRedact,                                // DocumentSourceRedact
+    kRemoteDbCursor,                        // DocumentSourceDbCursor
+    kReshardingIterateTransaction,          // DocumentSourceReshardingIterateTransaction
+    kReshardingAddResumeId,                 // DocumentSourceReshardingAddResumeId
+    kReshardingOwnershipMatch,              // DocumentSourceReshardingOwnershipMatch
+    kSample,                                // DocumentSourceSample
+    kSampleFromRandomCursor,                // DocumentSourceSampleFromRandomCursor
+    kSearch,                                // DocumentSourceSearch
+    kSearchMeta,                            // DocumentSourceSearchMeta
+    kSequentialDocumentCache,               // DocumentSourceSequentialDocumentCache
+    kSetVariableFromSubPipeline,            // DocumentSourceSetVariableFromSubPipeline
+    kSingleDocumentTransformation,          // DocumentSourceSingleDocumentTransformation
+    kSkip,                                  // DocumentSourceSkip
+    kSort,                                  // DocumentSourceSort
+    kStreamingGroup,                        // DocumentSourceStreamingGroup
+    kTeeConsumer,                           // DocumentSourceTeeConsumer
+    kTestOptimizations,                     // DocumentSourceTestOptimizations
+    kUnionWith,                             // DocumentSourceUnionWith
+    kUnwind,                                // DocumentSourceUnwind
+    kValidateStub,                          // DocumentSourceValidateStub
+    kVectorSearch,                          // DocumentSourceVectorSearch
+    kWindowStub,                            // DocumentSourceWindowStub
+};
+
 class DocumentSource : public RefCountable {
 public:
     // In general a parser returns a list of DocumentSources, to accomodate "multi-stage aliases"
@@ -456,6 +529,17 @@ public:
     virtual const char* getSourceName() const = 0;
 
     /**
+     * Get the stage's type. This method is useful for cases where we have multiple condition checks
+     * that are based on the stage's type.
+     *
+     * Using dynamic_cast or typeid in an if/else might result in a situation where we have a lot of
+     * type checks-- there will be a type call for every document source type we need to check.
+     * Instead, we can use this method in a switch, which will result in one virtual call for the
+     * type check.
+     */
+    virtual DocumentSourceType getType() const = 0;
+
+    /**
      * Set the underlying source this source should use to get Documents from. Must not throw
      * exceptions.
      */
@@ -499,7 +583,7 @@ public:
 
     virtual bool usedDisk() {
         return false;
-    };
+    }
 
     /**
      * Create a DocumentSource pipeline stage from 'stageObj'.

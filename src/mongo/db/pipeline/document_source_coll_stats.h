@@ -128,6 +128,10 @@ public:
 
     const char* getSourceName() const final;
 
+    DocumentSourceType getType() const override {
+        return DocumentSourceType::kCollStats;
+    }
+
     StageConstraints constraints(Pipeline::SplitState pipeState) const final {
         HostTypeRequirement hostTypeRequirement =
             _targetAllNodes ? HostTypeRequirement::kAllShardHosts : HostTypeRequirement::kAnyShard;

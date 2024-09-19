@@ -88,6 +88,10 @@ public:
         return DocumentSourceReshardingOwnershipMatch::kStageName.rawData();
     }
 
+    DocumentSourceType getType() const override {
+        return DocumentSourceType::kReshardingOwnershipMatch;
+    }
+
 private:
     DocumentSourceReshardingOwnershipMatch(ShardId recipientShardId,
                                            ShardKeyPattern reshardingKey,

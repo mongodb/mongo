@@ -77,6 +77,10 @@ public:
     // virtuals from DocumentSource
     const char* getSourceName() const final;
 
+    DocumentSourceType getType() const override {
+        return DocumentSourceType::kSingleDocumentTransformation;
+    }
+
     boost::intrusive_ptr<DocumentSource> optimize() final;
     Value serialize(const SerializationOptions& opts = SerializationOptions{}) const final;
     DepsTracker::State getDependencies(DepsTracker* deps) const final;
@@ -105,7 +109,7 @@ public:
         return boost::none;
     }
 
-    TransformerInterface::TransformerType getType() const {
+    TransformerInterface::TransformerType getTransformerType() const {
         return _transformationProcessor->getTransformer().getType();
     }
 
@@ -170,10 +174,6 @@ private:
         DocumentSourceSingleDocumentTransformation* nextSingleDocTransform);
 
     boost::optional<SingleDocumentTransformationProcessor> _transformationProcessor;
-
-    TransformerInterface::TransformerType getTransformerType() {
-        return getTransformationProcessor()->getTransformer().getType();
-    }
 
     projection_executor::ExclusionNode& getExclusionNode();
 

@@ -99,6 +99,10 @@ public:
         return kStageName.rawData();
     }
 
+    DocumentSourceType getType() const override {
+        return DocumentSourceType::kMergeCursors;
+    }
+
     const PlanSummaryStats& getPlanSummaryStats() const {
         return _stats.planSummaryStats;
     }

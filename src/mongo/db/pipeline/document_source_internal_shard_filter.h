@@ -70,6 +70,10 @@ public:
         return kStageName.rawData();
     }
 
+    DocumentSourceType getType() const override {
+        return DocumentSourceType::kInternalShardFilter;
+    }
+
     StageConstraints constraints(Pipeline::SplitState pipeState) const override {
         return StageConstraints(StreamType::kStreaming,
                                 PositionRequirement::kNone,

@@ -731,7 +731,7 @@ DepsTracker Pipeline::getDependenciesForContainer(
                 const auto projStage =
                     exact_pointer_cast<DocumentSourceSingleDocumentTransformation*>(source.get());
                 return projStage &&
-                    projStage->getType() ==
+                    projStage->getTransformerType() ==
                     TransformerInterface::TransformerType::kExclusionProjection;
             };
             if (localGeneratedPaths.type == DocumentSource::GetModPathsReturn::Type::kFiniteSet &&

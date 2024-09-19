@@ -52,6 +52,10 @@ public:
         return kStageName.rawData();
     }
 
+    DocumentSourceType getType() const override {
+        return DocumentSourceType::kSearchMeta;
+    }
+
     /**
      * This is the first stage in the pipeline, but we need to gather responses from all shards in
      * order to set $$SEARCH_META appropriately.

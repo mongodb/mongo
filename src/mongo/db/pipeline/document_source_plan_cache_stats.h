@@ -133,6 +133,10 @@ public:
         return DocumentSourcePlanCacheStats::kStageName.rawData();
     }
 
+    DocumentSourceType getType() const override {
+        return DocumentSourceType::kPlanCacheStats;
+    }
+
     /**
      * Absorbs a subsequent $match, in order to avoid copying the entire contents of the plan cache
      * prior to filtering.

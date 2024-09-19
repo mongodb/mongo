@@ -66,6 +66,10 @@ public:
         return DocumentSourceSequentialDocumentCache::kStageName.rawData();
     }
 
+    DocumentSourceType getType() const override {
+        return DocumentSourceType::kSequentialDocumentCache;
+    }
+
     StageConstraints constraints(Pipeline::SplitState pipeState) const override {
         StageConstraints constraints(StreamType::kStreaming,
                                      _cache->isServing() ? PositionRequirement::kFirst

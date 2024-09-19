@@ -78,6 +78,11 @@ public:
     const char* getSourceName() const final {
         return kStageName.rawData();
     }
+
+    DocumentSourceType getType() const override {
+        return DocumentSourceType::kSetVariableFromSubPipeline;
+    }
+
     StageConstraints constraints(Pipeline::SplitState) const final {
         StageConstraints setVariableConstraints(StreamType::kStreaming,
                                                 PositionRequirement::kNone,

@@ -104,6 +104,10 @@ public:
         return kStageName.rawData();
     }
 
+    DocumentSourceType getType() const override {
+        return DocumentSourceType::kSort;
+    }
+
     void serializeToArray(std::vector<Value>& array,
                           const SerializationOptions& opts = SerializationOptions{}) const final;
 

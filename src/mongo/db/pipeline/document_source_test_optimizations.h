@@ -46,6 +46,11 @@ public:
     const char* getSourceName() const override {
         return DocumentSourceTestOptimizations::kStageName.rawData();
     }
+
+    DocumentSourceType getType() const override {
+        return DocumentSourceType::kTestOptimizations;
+    }
+
     GetNextResult doGetNext() override {
         MONGO_UNREACHABLE;
     }

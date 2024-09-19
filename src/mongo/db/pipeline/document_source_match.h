@@ -119,6 +119,10 @@ public:
 
     const char* getSourceName() const override;
 
+    DocumentSourceType getType() const override {
+        return DocumentSourceType::kMatch;
+    }
+
     StageConstraints constraints(Pipeline::SplitState pipeState) const override {
         StageConstraints constraints{StreamType::kStreaming,
                                      PositionRequirement::kNone,

@@ -402,6 +402,10 @@ public:
     }
 
     virtual Value doSerialize(const SerializationOptions& opts) const = 0;
+
+    DocumentSourceType getType() const final {
+        return DocumentSourceType::kInternalChangeStream;
+    }
 };
 
 }  // namespace mongo

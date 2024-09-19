@@ -79,6 +79,10 @@ public:
     const char* getSourceName() const final;
     boost::intrusive_ptr<DocumentSource> optimize() final;
 
+    DocumentSourceType getType() const override {
+        return DocumentSourceType::kBucketAuto;
+    }
+
     StageConstraints constraints(Pipeline::SplitState pipeState) const final {
         return {StreamType::kBlocking,
                 PositionRequirement::kNone,

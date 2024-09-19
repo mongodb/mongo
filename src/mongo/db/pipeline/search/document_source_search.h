@@ -77,6 +77,10 @@ public:
     boost::optional<DistributedPlanLogic> distributedPlanLogic() final;
     void addVariableRefs(std::set<Variables::Id>* refs) const final {}
 
+    DocumentSourceType getType() const override {
+        return DocumentSourceType::kSearch;
+    }
+
     auto isStoredSource() const {
         auto storedSourceElem = _spec.getMongotQuery()[mongot_cursor::kReturnStoredSourceArg];
         return !storedSourceElem.eoo() && storedSourceElem.Bool();

@@ -245,6 +245,10 @@ public:
 
     const char* getSourceName() const final;
 
+    DocumentSourceType getType() const override {
+        return DocumentSourceType::kExchange;
+    }
+
     Value serialize(const SerializationOptions& opts = SerializationOptions{}) const final;
 
     /**

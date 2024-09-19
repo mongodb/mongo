@@ -420,6 +420,10 @@ public:
         return kStageName.rawData();
     }
 
+    DocumentSourceType getType() const override {
+        return DocumentSourceType::kInternalDensify;
+    }
+
     Value serialize(const SerializationOptions& opts = SerializationOptions{}) const final;
 
     DepsTracker::State getDependencies(DepsTracker* deps) const final {

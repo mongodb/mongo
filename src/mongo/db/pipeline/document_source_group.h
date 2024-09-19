@@ -55,6 +55,10 @@ public:
 
     const char* getSourceName() const final;
 
+    DocumentSourceType getType() const override {
+        return DocumentSourceType::kGroup;
+    }
+
     /**
      * Convenience method for creating a new $group stage. If maxMemoryUsageBytes is boost::none,
      * then it will actually use the value of internalDocumentSourceGroupMaxMemoryBytes.

@@ -99,6 +99,10 @@ public:
         return kStageNameInternal.rawData();
     }
 
+    DocumentSourceType getType() const override {
+        return DocumentSourceType::kInternalUnpackBucket;
+    }
+
     void serializeToArray(std::vector<Value>& array,
                           const SerializationOptions& opts = SerializationOptions{}) const final;
 

@@ -87,6 +87,10 @@ public:
 
     const char* getSourceName() const override;
 
+    DocumentSourceType getType() const override {
+        return DocumentSourceType::kInternalSearchMongotRemote;
+    }
+
     boost::optional<DistributedPlanLogic> distributedPlanLogic() override {
         // The desugaring of DocumentSourceSearch happens after sharded planning, so we should never
         // execute distributedPlanLogic here, instead it should be called against

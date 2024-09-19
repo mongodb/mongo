@@ -103,6 +103,10 @@ public:
 
     const char* getSourceName() const override;
 
+    DocumentSourceType getType() const override {
+        return DocumentSourceType::kMock;
+    }
+
     size_t size() const;
 
     void reattachToOperationContext(OperationContext* opCtx) override {

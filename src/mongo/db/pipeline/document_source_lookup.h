@@ -144,6 +144,11 @@ public:
                          const boost::intrusive_ptr<ExpressionContext>&);
 
     const char* getSourceName() const final;
+
+    DocumentSourceType getType() const override {
+        return DocumentSourceType::kLookUp;
+    }
+
     void serializeToArray(std::vector<Value>& array,
                           const SerializationOptions& opts = SerializationOptions{}) const final;
 

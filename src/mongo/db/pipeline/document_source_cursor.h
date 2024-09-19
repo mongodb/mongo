@@ -105,6 +105,10 @@ public:
 
     const char* getSourceName() const override;
 
+    DocumentSourceType getType() const override {
+        return DocumentSourceType::kCursor;
+    }
+
     Value serialize(const SerializationOptions& opts = SerializationOptions{}) const final;
 
     StageConstraints constraints(Pipeline::SplitState pipeState) const final {

@@ -95,6 +95,10 @@ public:
 
     const char* getSourceName() const override;
 
+    DocumentSourceType getType() const override {
+        return DocumentSourceType::kTeeConsumer;
+    }
+
     Value serialize(const SerializationOptions& opts = SerializationOptions{}) const final;
 
 protected:

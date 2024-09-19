@@ -120,6 +120,10 @@ public:
         return kStageName.rawData();
     }
 
+    DocumentSourceType getType() const override {
+        return DocumentSourceType::kUnionWith;
+    }
+
     GetModPathsReturn getModifiedPaths() const final {
         // Since we might have a document arrive from the foreign pipeline with the same path as a
         // document in the main pipeline. Without introspecting the sub-pipeline, we must report

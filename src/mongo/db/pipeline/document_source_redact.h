@@ -58,6 +58,10 @@ public:
     const char* getSourceName() const final;
     boost::intrusive_ptr<DocumentSource> optimize() final;
 
+    DocumentSourceType getType() const override {
+        return DocumentSourceType::kRedact;
+    }
+
     StageConstraints constraints(Pipeline::SplitState pipeState) const final {
         return {StreamType::kStreaming,
                 PositionRequirement::kNone,

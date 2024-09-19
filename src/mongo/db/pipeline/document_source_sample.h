@@ -56,6 +56,11 @@ public:
     const char* getSourceName() const final {
         return kStageName.rawData();
     }
+
+    DocumentSourceType getType() const override {
+        return DocumentSourceType::kSample;
+    }
+
     Value serialize(const SerializationOptions& opts = SerializationOptions{}) const final;
 
     StageConstraints constraints(Pipeline::SplitState pipeState) const final {

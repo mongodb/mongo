@@ -133,10 +133,12 @@ bool canInternalizeProjectObj(const BSONObj& projObj) {
  */
 auto getIncludeExcludeProjectAndType(DocumentSource* src) {
     if (const auto proj = dynamic_cast<DocumentSourceSingleDocumentTransformation*>(src); proj &&
-        (proj->getType() == TransformerInterface::TransformerType::kInclusionProjection ||
-         proj->getType() == TransformerInterface::TransformerType::kExclusionProjection)) {
+        (proj->getTransformerType() ==
+             TransformerInterface::TransformerType::kInclusionProjection ||
+         proj->getTransformerType() ==
+             TransformerInterface::TransformerType::kExclusionProjection)) {
         return std::pair{proj->getTransformer().serializeTransformation(boost::none).toBson(),
-                         proj->getType() ==
+                         proj->getTransformerType() ==
                              TransformerInterface::TransformerType::kInclusionProjection};
     }
     return std::pair{BSONObj{}, false};
@@ -1051,7 +1053,7 @@ DocumentSourceInternalUnpackBucket::pushDownComputedMetaProjection(
         return boost::none;
     }
 
-    if (auto transformType = nextTransform->getType();
+    if (auto transformType = nextTransform->getTransformerType();
         (transformType != TransformerInterface::TransformerType::kInclusionProjection &&
          transformType != TransformerInterface::TransformerType::kComputedProjection)) {
         return boost::none;
@@ -1211,7 +1213,8 @@ std::pair<BSONObj, bool> DocumentSourceInternalUnpackBucket::extractProjectForPu
     DocumentSource* src) const {
     if (auto nextProject = dynamic_cast<DocumentSourceSingleDocumentTransformation*>(src);
         _bucketUnpacker.bucketSpec().metaField() && nextProject &&
-        nextProject->getType() == TransformerInterface::TransformerType::kExclusionProjection) {
+        nextProject->getTransformerType() ==
+            TransformerInterface::TransformerType::kExclusionProjection) {
         return nextProject->extractProjectOnFieldAndRename(
             _bucketUnpacker.bucketSpec().metaField().value(), timeseries::kBucketMetaFieldName);
     }

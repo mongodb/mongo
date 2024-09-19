@@ -68,7 +68,7 @@ boost::intrusive_ptr<DocumentSource> sbeCompatibleProjectionFromSingleDocumentTr
     const DocumentSourceSingleDocumentTransformation& transformStage,
     SbeCompatibility minRequiredCompatibility) {
     InternalProjectionPolicyEnum policies;
-    switch (transformStage.getType()) {
+    switch (transformStage.getTransformerType()) {
         case TransformerInterface::TransformerType::kExclusionProjection:
         case TransformerInterface::TransformerType::kInclusionProjection:
             policies = InternalProjectionPolicyEnum::kAggregate;
@@ -106,7 +106,8 @@ boost::intrusive_ptr<DocumentSource> sbeCompatibleProjectionFromSingleDocumentTr
 boost::intrusive_ptr<DocumentSource> sbeCompatibleReplaceRootStage(
     DocumentSourceSingleDocumentTransformation* replaceRootStage,
     SbeCompatibility minRequiredCompatibility) {
-    if (replaceRootStage->getType() != TransformerInterface::TransformerType::kReplaceRoot) {
+    if (replaceRootStage->getTransformerType() !=
+        TransformerInterface::TransformerType::kReplaceRoot) {
         return nullptr;
     }
 
@@ -149,90 +150,102 @@ bool pushDownPipelineStageIfCompatible(
     SbeCompatibility minRequiredCompatibility,
     const CompatiblePipelineStages& allowedStages,
     std::vector<boost::intrusive_ptr<DocumentSource>>& stagesForPushdown) {
-    if (auto matchStage = dynamic_cast<DocumentSourceMatch*>(stage.get())) {
-        if (!allowedStages.match || matchStage->sbeCompatibility() < minRequiredCompatibility) {
-            return false;
-        }
 
-        stagesForPushdown.emplace_back(std::move(stage));
-        return true;
-    } else if (auto groupStage = dynamic_cast<DocumentSourceGroup*>(stage.get())) {
-        if (!allowedStages.group || groupStage->doingMerge() ||
-            groupStage->sbeCompatibility() < minRequiredCompatibility) {
-            return false;
-        }
-
-        stagesForPushdown.emplace_back(std::move(stage));
-        return true;
-    } else if (auto lookupStage = dynamic_cast<DocumentSourceLookUp*>(stage.get())) {
-        if (!allowedStages.lookup || lookupStage->sbeCompatibility() < minRequiredCompatibility) {
-            return false;
-        }
-
-        stagesForPushdown.emplace_back(std::move(stage));
-        return true;
-    } else if (auto unwindStage = dynamic_cast<DocumentSourceUnwind*>(stage.get())) {
-        if (!allowedStages.unwind || unwindStage->sbeCompatibility() < minRequiredCompatibility) {
-            return false;
-        }
-
-        stagesForPushdown.emplace_back(std::move(stage));
-        return true;
-    } else if (auto transformStage =
-                   dynamic_cast<DocumentSourceSingleDocumentTransformation*>(stage.get())) {
-        if (!allowedStages.transform) {
-            return false;
-        }
-        if (auto replaceRoot =
-                sbeCompatibleReplaceRootStage(transformStage, minRequiredCompatibility)) {
-            stagesForPushdown.emplace_back(std::move(replaceRoot));
+    switch (stage->getType()) {
+        case DocumentSourceType::kMatch:
+            if (!allowedStages.match ||
+                static_cast<DocumentSourceMatch*>(stage.get())->sbeCompatibility() <
+                    minRequiredCompatibility) {
+                return false;
+            }
+            stagesForPushdown.emplace_back(std::move(stage));
             return true;
-        } else if (auto projectionStage = sbeCompatibleProjectionFromSingleDocumentTransformation(
-                       *transformStage, minRequiredCompatibility)) {
-            stagesForPushdown.emplace_back(std::move(projectionStage));
+        case DocumentSourceType::kGroup:
+            if (!allowedStages.group ||
+                static_cast<DocumentSourceGroup*>(stage.get())->doingMerge() ||
+                static_cast<DocumentSourceGroup*>(stage.get())->sbeCompatibility() <
+                    minRequiredCompatibility) {
+                return false;
+            }
+            stagesForPushdown.emplace_back(std::move(stage));
             return true;
-        }
-        return false;
-    } else if (auto sortStage = dynamic_cast<DocumentSourceSort*>(stage.get())) {
-        if (!allowedStages.sort || !isSortSbeCompatible(sortStage->getSortKeyPattern())) {
+        case DocumentSourceType::kLookUp:
+            if (!allowedStages.lookup ||
+                static_cast<DocumentSourceLookUp*>(stage.get())->sbeCompatibility() <
+                    minRequiredCompatibility) {
+                return false;
+            }
+            stagesForPushdown.emplace_back(std::move(stage));
+            return true;
+        case DocumentSourceType::kUnwind:
+            if (!allowedStages.unwind ||
+                static_cast<DocumentSourceUnwind*>(stage.get())->sbeCompatibility() <
+                    minRequiredCompatibility) {
+                return false;
+            }
+            stagesForPushdown.emplace_back(std::move(stage));
+            return true;
+        case DocumentSourceType::kSingleDocumentTransformation:
+            if (!allowedStages.transform) {
+                return false;
+            }
+            if (auto replaceRoot = sbeCompatibleReplaceRootStage(
+                    static_cast<DocumentSourceSingleDocumentTransformation*>(stage.get()),
+                    minRequiredCompatibility)) {
+                stagesForPushdown.emplace_back(std::move(replaceRoot));
+                return true;
+            } else if (auto projectionStage =
+                           sbeCompatibleProjectionFromSingleDocumentTransformation(
+                               *static_cast<DocumentSourceSingleDocumentTransformation*>(
+                                   stage.get()),
+                               minRequiredCompatibility)) {
+                stagesForPushdown.emplace_back(std::move(projectionStage));
+                return true;
+            }
             return false;
-        }
-
-        stagesForPushdown.emplace_back(std::move(stage));
-        return true;
-    } else if (dynamic_cast<DocumentSourceLimit*>(stage.get()) ||
-               dynamic_cast<DocumentSourceSkip*>(stage.get())) {
-        if (!allowedStages.limitSkip) {
+        case DocumentSourceType::kSort:
+            if (!allowedStages.sort ||
+                !isSortSbeCompatible(
+                    static_cast<DocumentSourceSort*>(stage.get())->getSortKeyPattern())) {
+                return false;
+            }
+            stagesForPushdown.emplace_back(std::move(stage));
+            return true;
+        case DocumentSourceType::kLimit:
+            [[fallthrough]];
+        case DocumentSourceType::kSkip:
+            if (!allowedStages.limitSkip) {
+                return false;
+            }
+            stagesForPushdown.emplace_back(std::move(stage));
+            return true;
+        case DocumentSourceType::kSearchMeta:
+            [[fallthrough]];
+        case DocumentSourceType::kSearch:
+            [[fallthrough]];
+        case DocumentSourceType::kInternalSearchMongotRemote:
+            if (!allowedStages.search) {
+                return false;
+            }
+            stagesForPushdown.emplace_back(std::move(stage));
+            return true;
+        case DocumentSourceType::kInternalSetWindowFields:
+            if (!allowedStages.window ||
+                static_cast<DocumentSourceInternalSetWindowFields*>(stage.get())
+                        ->sbeCompatibility() < minRequiredCompatibility) {
+                return false;
+            }
+            stagesForPushdown.emplace_back(std::move(stage));
+            return true;
+        case DocumentSourceType::kInternalUnpackBucket:
+            if (!allowedStages.unpackBucket) {
+                return false;
+            }
+            stagesForPushdown.emplace_back(std::move(stage));
+            return true;
+        default:
             return false;
-        }
-
-        stagesForPushdown.emplace_back(std::move(stage));
-        return true;
-    } else if (search_helpers::isSearchStage(stage.get()) ||
-               search_helpers::isSearchMetaStage(stage.get())) {
-        if (!allowedStages.search) {
-            return false;
-        }
-
-        stagesForPushdown.emplace_back(std::move(stage));
-        return true;
-    } else if (auto windowStage =
-                   dynamic_cast<DocumentSourceInternalSetWindowFields*>(stage.get())) {
-        if (!allowedStages.window || windowStage->sbeCompatibility() < minRequiredCompatibility) {
-            return false;
-        }
-        stagesForPushdown.emplace_back(std::move(stage));
-        return true;
-    } else if (dynamic_cast<DocumentSourceInternalUnpackBucket*>(stage.get())) {
-        if (!allowedStages.unpackBucket) {
-            return false;
-        }
-
-        stagesForPushdown.emplace_back(std::move(stage));
-        return true;
     }
-
-    return false;
 }  // pushDownPipelineStageIfCompatible
 
 /**

@@ -66,6 +66,10 @@ public:
     // virtuals from DocumentSource
     const char* getSourceName() const final;
 
+    DocumentSourceType getType() const override {
+        return DocumentSourceType::kUnwind;
+    }
+
     Value serialize(const SerializationOptions& opts = SerializationOptions{}) const final;
 
     /**

@@ -97,6 +97,10 @@ public:
     const char* getSourceName() const final;
     Value serialize(const SerializationOptions& opts = SerializationOptions{}) const final;
 
+    DocumentSourceType getType() const override {
+        return DocumentSourceType::kListCatalog;
+    }
+
     StageConstraints constraints(Pipeline::SplitState pipeState) const final {
         StageConstraints constraints(StreamType::kStreaming,
                                      PositionRequirement::kFirst,

@@ -113,6 +113,10 @@ public:
 
     const char* getSourceName() const final;
 
+    DocumentSourceType getType() const override {
+        return DocumentSourceType::kInternalAllCollectionStats;
+    }
+
     void addVariableRefs(std::set<Variables::Id>* refs) const final{};
 
     Value serialize(const SerializationOptions& opts = SerializationOptions{}) const final;

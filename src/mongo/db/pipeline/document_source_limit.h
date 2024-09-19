@@ -84,6 +84,10 @@ public:
         return kStageName.rawData();
     }
 
+    DocumentSourceType getType() const override {
+        return DocumentSourceType::kLimit;
+    }
+
     /**
      * Attempts to combine with a subsequent $limit stage, setting 'limit' appropriately.
      */

@@ -82,6 +82,10 @@ public:
         return DocumentSourceReshardingAddResumeId::kStageName.rawData();
     }
 
+    DocumentSourceType getType() const override {
+        return DocumentSourceType::kReshardingAddResumeId;
+    }
+
 protected:
     DocumentSource::GetNextResult doGetNext() override;
 

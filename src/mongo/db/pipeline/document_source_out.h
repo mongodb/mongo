@@ -150,6 +150,10 @@ public:
         return kStageName.rawData();
     }
 
+    DocumentSourceType getType() const override {
+        return DocumentSourceType::kOut;
+    }
+
     void addVariableRefs(std::set<Variables::Id>* refs) const final {}
 
 private:

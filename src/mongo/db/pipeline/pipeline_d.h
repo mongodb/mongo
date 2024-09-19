@@ -182,6 +182,18 @@ private:
         const AggregateCommandRequest* aggRequest,
         Pipeline* pipeline);
 
+    /**
+     * Helper to perform bounded sort optimization rewrites on time-series collections. The rewrite
+     * involves a replacement of the $sort stage with a bounded sort stage.
+     *
+     *  See ../db/query/timeseries/README.md#_internalboundedsort-on-the-timefield for a description
+     * of the bounded sort optimization.
+     */
+    static void performBoundedSortOptimization(PlanStage* rootStage,
+                                               Pipeline* pipeline,
+                                               const DocumentSourceSort* sort,
+                                               DocumentSourceInternalUnpackBucket* unpack);
+
     static BuildQueryExecutorResult buildInnerQueryExecutorSearch(
         const MultipleCollectionAccessor& collections,
         const NamespaceString& nss,

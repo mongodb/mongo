@@ -97,6 +97,10 @@ public:
 
     const char* getSourceName() const override;
 
+    DocumentSourceType getType() const override {
+        return DocumentSourceType::kQueue;
+    }
+
     Value serialize(const SerializationOptions& opts = SerializationOptions{}) const override;
 
     StageConstraints constraints(Pipeline::SplitState pipeState) const override {

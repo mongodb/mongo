@@ -872,7 +872,8 @@ auto buildProjectionForPushdown(const DepsTracker& deps,
 
     // If there is an inclusion projection at the front of the pipeline, we have case 1.
     if (projStage &&
-        projStage->getType() == TransformerInterface::TransformerType::kInclusionProjection) {
+        projStage->getTransformerType() ==
+            TransformerInterface::TransformerType::kInclusionProjection) {
         auto projObj = getProjectionObj();
         if (allowExpressions || !parseProjection(projObj).hasExpressions()) {
             sources.pop_front();
@@ -891,7 +892,8 @@ auto buildProjectionForPushdown(const DepsTracker& deps,
 
     // If there is an exclusion projection at the front of the pipeline, we have case 3.
     if (projStage &&
-        projStage->getType() == TransformerInterface::TransformerType::kExclusionProjection &&
+        projStage->getTransformerType() ==
+            TransformerInterface::TransformerType::kExclusionProjection &&
         // TODO SERVER-70655: Remove this check and argument when it is no longer needed.
         !timeseriesBoundedSortOptimization) {
         auto projObj = getProjectionObj();
@@ -1788,192 +1790,7 @@ PipelineD::BuildQueryExecutorResult PipelineD::buildInnerQueryExecutorGeneric(
     if (timeseriesBoundedSortOptimization) {
         auto execImpl = dynamic_cast<PlanExecutorImpl*>(exec.get());
         if (execImpl) {
-            // Get source stage
-            PlanStage* rootStage = execImpl->getRootStage();
-            while (rootStage &&
-                   (rootStage->getChildren().size() == 1 ||
-                    rootStage->stageType() == STAGE_MULTI_PLAN)) {
-                switch (rootStage->stageType()) {
-                    case STAGE_FETCH:
-                        rootStage = rootStage->child().get();
-                        break;
-                    case STAGE_SHARDING_FILTER:
-                        rootStage = rootStage->child().get();
-                        break;
-                    case STAGE_MULTI_PLAN: {
-                        auto mps = static_cast<MultiPlanStage*>(rootStage);
-                        if (mps->bestPlanChosen() && mps->bestPlanIdx()) {
-                            rootStage = (mps->getChildren())[*(mps->bestPlanIdx())].get();
-                        } else {
-                            rootStage = nullptr;
-                            tasserted(6655801,
-                                      "Expected multiplanner to have selected a bestPlan.");
-                        }
-                        break;
-                    }
-                    case STAGE_CACHED_PLAN: {
-                        auto cp = static_cast<CachedPlanStage*>(rootStage);
-                        if (cp->bestPlanChosen()) {
-                            rootStage = rootStage->child().get();
-                        } else {
-                            rootStage = nullptr;
-                            tasserted(6655802, "Expected cached plan to have selected a bestPlan.");
-                        }
-                        break;
-                    }
-                    default:
-                        rootStage = nullptr;
-                }
-            }
-
-            if (rootStage && rootStage->getChildren().size() != 0) {
-                rootStage = nullptr;
-            }
-
-            const auto& sortPattern = sort->getSortKeyPattern();
-            if (auto agree = supportsSort(unpack->bucketUnpacker(), rootStage, sortPattern)) {
-                // Scan the pipeline to check if it's compatible with the  optimization.
-                bool badStage = false;
-                bool seenSort = false;
-                bool seenUnpack = false;
-                std::list<boost::intrusive_ptr<DocumentSource>>::iterator iter =
-                    pipeline->_sources.begin();
-                std::list<boost::intrusive_ptr<DocumentSource>>::iterator unpackIter =
-                    pipeline->_sources.end();
-                for (; !badStage && iter != pipeline->_sources.end() && !seenSort; ++iter) {
-                    if (dynamic_cast<const DocumentSourceSort*>(iter->get())) {
-                        seenSort = true;
-                    } else if (dynamic_cast<const DocumentSourceMatch*>(iter->get())) {
-                        // do nothing
-                    } else if (const auto* unpack =
-                                   dynamic_cast<const DocumentSourceInternalUnpackBucket*>(
-                                       iter->get())) {
-                        unpackIter = iter;
-                        tassert(6505001,
-                                str::stream()
-                                    << "Expected at most one "
-                                    << DocumentSourceInternalUnpackBucket::kStageNameInternal
-                                    << " stage in the pipeline",
-                                !seenUnpack);
-                        seenUnpack = true;
-
-                        // Check that the time field is preserved.
-                        if (!unpack->includeTimeField())
-                            badStage = true;
-
-                        // If the sort is compound, check that the entire meta field is preserved.
-                        if (sortPattern.size() > 1) {
-                            // - Is there a meta field?
-                            // - Will it be unpacked?
-                            // - Will it be overwritten by 'computedMetaProjFields'?
-                            auto&& unpacker = unpack->bucketUnpacker();
-                            const boost::optional<std::string>& metaField = unpacker.getMetaField();
-                            if (!metaField || !unpack->includeMetaField() ||
-                                unpacker.bucketSpec().fieldIsComputed(*metaField)) {
-                                badStage = true;
-                            }
-                        }
-                    } else if (auto projection =
-                                   dynamic_cast<const DocumentSourceSingleDocumentTransformation*>(
-                                       iter->get())) {
-                        auto modPaths = projection->getModifiedPaths();
-                        if (areSortFieldsModifiedByProjection(seenUnpack, sortPattern, modPaths)) {
-                            badStage = true;
-                        }
-                    } else {
-                        badStage = true;
-                    }
-                }
-                if (!badStage && seenSort) {
-                    auto [indexSortOrderAgree, indexOrderedByMinTime] = *agree;
-                    // This is safe because we have seen a sort so we must have at least one stage
-                    // to the left of the current iterator position.
-                    --iter;
-
-                    if (indexOrderedByMinTime) {
-                        unpack->setIncludeMinTimeAsMetadata();
-                    } else {
-                        unpack->setIncludeMaxTimeAsMetadata();
-                    }
-
-                    if (indexSortOrderAgree) {
-                        pipeline->_sources.insert(
-                            iter,
-                            DocumentSourceSort::createBoundedSort(sort->getSortKeyPattern(),
-                                                                  (indexOrderedByMinTime
-                                                                       ? DocumentSourceSort::kMin
-                                                                       : DocumentSourceSort::kMax),
-                                                                  0,
-                                                                  sort->getLimit(),
-                                                                  expCtx));
-                    } else {
-                        // Since the sortPattern and the direction of the index don't agree we must
-                        // use the offset to get an estimate on the bounds of the bucket.
-                        pipeline->_sources.insert(
-                            iter,
-                            DocumentSourceSort::createBoundedSort(
-                                sort->getSortKeyPattern(),
-                                (indexOrderedByMinTime ? DocumentSourceSort::kMin
-                                                       : DocumentSourceSort::kMax),
-                                static_cast<long long>((indexOrderedByMinTime)
-                                                           ? unpack->getBucketMaxSpanSeconds()
-                                                           : -unpack->getBucketMaxSpanSeconds()) *
-                                    1000,
-                                sort->getLimit(),
-                                expCtx));
-
-                        /**
-                         * We wish to create the following predicate to avoid returning incorrect
-                         * results in the unlikely event bucketMaxSpanSeconds changes under us.
-                         *
-                         * {$expr:
-                         *   {$lte: [
-                         *     {$subtract: [$control.max.timeField, $control.min.timeField]},
-                         *     {$const: bucketMaxSpanSeconds, in milliseconds}
-                         * ]}}
-                         */
-                        auto minTime = unpack->getMinTimeField();
-                        auto maxTime = unpack->getMaxTimeField();
-                        auto match = std::make_unique<ExprMatchExpression>(
-                            // This produces {$lte: ... }
-                            make_intrusive<ExpressionCompare>(
-                                expCtx.get(),
-                                ExpressionCompare::CmpOp::LTE,
-                                // This produces [...]
-                                makeVector<boost::intrusive_ptr<Expression>>(
-                                    // This produces {$subtract: ... }
-                                    make_intrusive<ExpressionSubtract>(
-                                        expCtx.get(),
-                                        // This produces [...]
-                                        makeVector<boost::intrusive_ptr<Expression>>(
-                                            // This produces "$control.max.timeField"
-                                            ExpressionFieldPath::createPathFromString(
-                                                expCtx.get(), maxTime, expCtx->variablesParseState),
-                                            // This produces "$control.min.timeField"
-                                            ExpressionFieldPath::createPathFromString(
-                                                expCtx.get(),
-                                                minTime,
-                                                expCtx->variablesParseState))),
-                                    // This produces {$const: maxBucketSpanSeconds}
-                                    make_intrusive<ExpressionConstant>(
-                                        expCtx.get(),
-                                        Value{static_cast<long long>(
-                                                  unpack->getBucketMaxSpanSeconds()) *
-                                              1000}))),
-                            expCtx);
-                        pipeline->_sources.insert(
-                            unpackIter,
-                            make_intrusive<DocumentSourceMatch>(std::move(match), expCtx));
-                    }
-                    // Ensure we're erasing the sort source.
-                    tassert(6434901,
-                            "we must erase a $sort stage and replace it with a bounded sort stage",
-                            strcmp((*iter)->getSourceName(),
-                                   DocumentSourceSort::kStageName.rawData()) == 0);
-                    pipeline->_sources.erase(iter);
-                    pipeline->stitch();
-                }
-            }
+            performBoundedSortOptimization(execImpl->getRootStage(), pipeline, sort, unpack);
         }
     }
 
@@ -2065,6 +1882,198 @@ PipelineD::BuildQueryExecutorResult PipelineD::buildInnerQueryExecutorGeoNear(
     // Remove the initial $geoNear; it will be replaced by $geoNearCursor.
     sources.pop_front();
     return {std::move(exec), std::move(attachExecutorCallback), {}};
+}
+
+void PipelineD::performBoundedSortOptimization(PlanStage* rootStage,
+                                               Pipeline* pipeline,
+                                               const DocumentSourceSort* sort,
+                                               DocumentSourceInternalUnpackBucket* unpack) {
+    auto expCtx = pipeline->getContext();
+
+    while (rootStage &&
+           (rootStage->getChildren().size() == 1 || rootStage->stageType() == STAGE_MULTI_PLAN)) {
+        switch (rootStage->stageType()) {
+            case STAGE_FETCH:
+                rootStage = rootStage->child().get();
+                break;
+            case STAGE_SHARDING_FILTER:
+                rootStage = rootStage->child().get();
+                break;
+            case STAGE_MULTI_PLAN: {
+                auto mps = static_cast<MultiPlanStage*>(rootStage);
+                if (mps->bestPlanChosen() && mps->bestPlanIdx()) {
+                    rootStage = (mps->getChildren())[*(mps->bestPlanIdx())].get();
+                } else {
+                    rootStage = nullptr;
+                    tasserted(6655801, "Expected multiplanner to have selected a bestPlan.");
+                }
+                break;
+            }
+            case STAGE_CACHED_PLAN: {
+                auto cp = static_cast<CachedPlanStage*>(rootStage);
+                if (cp->bestPlanChosen()) {
+                    rootStage = rootStage->child().get();
+                } else {
+                    rootStage = nullptr;
+                    tasserted(6655802, "Expected cached plan to have selected a bestPlan.");
+                }
+                break;
+            }
+            default:
+                rootStage = nullptr;
+        }
+    }
+
+    if (rootStage && rootStage->getChildren().size() != 0) {
+        rootStage = nullptr;
+    }
+
+    const auto& sortPattern = sort->getSortKeyPattern();
+    if (auto agree = supportsSort(unpack->bucketUnpacker(), rootStage, sortPattern)) {
+        // Scan the pipeline to check if it's compatible with the optimization.
+        bool unsupportedStage = false;
+        bool seenSort = false;
+        bool seenUnpack = false;
+        auto iter = pipeline->_sources.begin();
+        auto unpackIter = pipeline->_sources.end();
+        for (; !unsupportedStage && iter != pipeline->_sources.end() && !seenSort; ++iter) {
+            const auto* source = iter->get();
+            switch (source->getType()) {
+                case DocumentSourceType::kSort:
+                    seenSort = true;
+                    break;
+                case DocumentSourceType::kMatch:
+                    // do nothing
+                    break;
+                case DocumentSourceType::kInternalUnpackBucket: {
+                    const auto* unpack =
+                        static_cast<const DocumentSourceInternalUnpackBucket*>(source);
+                    unpackIter = iter;
+                    tassert(6505001,
+                            str::stream() << "Expected at most one "
+                                          << DocumentSourceInternalUnpackBucket::kStageNameInternal
+                                          << " stage in the pipeline",
+                            !seenUnpack);
+                    seenUnpack = true;
+
+                    // Check that the time field is preserved.
+                    if (!unpack->includeTimeField())
+                        unsupportedStage = true;
+
+                    // If the sort is compound, check that the entire meta field is preserved.
+                    if (sortPattern.size() > 1) {
+                        // - Is there a meta field?
+                        // - Will it be unpacked?
+                        // - Will it be overwritten by 'computedMetaProjFields'?
+                        auto&& unpacker = unpack->bucketUnpacker();
+                        const boost::optional<std::string>& metaField = unpacker.getMetaField();
+                        if (!metaField || !unpack->includeMetaField() ||
+                            unpacker.bucketSpec().fieldIsComputed(*metaField)) {
+                            unsupportedStage = true;
+                        }
+                    }
+                    break;
+                }
+                case DocumentSourceType::kSingleDocumentTransformation: {
+                    auto projection =
+                        static_cast<const DocumentSourceSingleDocumentTransformation*>(source);
+                    auto modPaths = projection->getModifiedPaths();
+                    if (areSortFieldsModifiedByProjection(seenUnpack, sortPattern, modPaths)) {
+                        unsupportedStage = true;
+                    }
+                    break;
+                }
+                default:
+                    unsupportedStage = true;
+                    break;
+            }
+        }
+        if (!unsupportedStage && seenSort) {
+            auto [indexSortOrderAgree, indexOrderedByMinTime] = *agree;
+            // This is safe because we have seen a sort so we must have at least one stage to the
+            // left of the current iterator position.
+            --iter;
+
+            if (indexOrderedByMinTime) {
+                unpack->setIncludeMinTimeAsMetadata();
+            } else {
+                unpack->setIncludeMaxTimeAsMetadata();
+            }
+
+            if (indexSortOrderAgree) {
+                pipeline->_sources.insert(iter,
+                                          DocumentSourceSort::createBoundedSort(
+                                              sort->getSortKeyPattern(),
+                                              (indexOrderedByMinTime ? DocumentSourceSort::kMin
+                                                                     : DocumentSourceSort::kMax),
+                                              0,
+                                              sort->getLimit(),
+                                              expCtx));
+            } else {
+                // Since the sortPattern and the direction of the index don't agree we must use the
+                // offset to get an estimate on the bounds of the bucket.
+                pipeline->_sources.insert(
+                    iter,
+                    DocumentSourceSort::createBoundedSort(
+                        sort->getSortKeyPattern(),
+                        (indexOrderedByMinTime ? DocumentSourceSort::kMin
+                                               : DocumentSourceSort::kMax),
+                        static_cast<long long>((indexOrderedByMinTime)
+                                                   ? unpack->getBucketMaxSpanSeconds()
+                                                   : -unpack->getBucketMaxSpanSeconds()) *
+                            1000,
+                        sort->getLimit(),
+                        expCtx));
+
+                /**
+                 * We wish to create the following predicate to avoid returning incorrect
+                 * results in the unlikely event bucketMaxSpanSeconds changes under us.
+                 *
+                 * {$expr:
+                 *   {$lte: [
+                 *     {$subtract: [$control.max.timeField, $control.min.timeField]},
+                 *     {$const: bucketMaxSpanSeconds, in milliseconds}
+                 * ]}}
+                 */
+                auto minTime = unpack->getMinTimeField();
+                auto maxTime = unpack->getMaxTimeField();
+                auto match = std::make_unique<ExprMatchExpression>(
+                    // This produces {$lte: ... }
+                    make_intrusive<ExpressionCompare>(
+                        expCtx.get(),
+                        ExpressionCompare::CmpOp::LTE,
+                        // This produces [...]
+                        makeVector<boost::intrusive_ptr<Expression>>(
+                            // This produces {$subtract: ... }
+                            make_intrusive<ExpressionSubtract>(
+                                expCtx.get(),
+                                // This produces [...]
+                                makeVector<boost::intrusive_ptr<Expression>>(
+                                    // This produces "$control.max.timeField"
+                                    ExpressionFieldPath::createPathFromString(
+                                        expCtx.get(), maxTime, expCtx->variablesParseState),
+                                    // This produces "$control.min.timeField"
+                                    ExpressionFieldPath::createPathFromString(
+                                        expCtx.get(), minTime, expCtx->variablesParseState))),
+                            // This produces {$const: maxBucketSpanSeconds}
+                            make_intrusive<ExpressionConstant>(
+                                expCtx.get(),
+                                Value{static_cast<long long>(unpack->getBucketMaxSpanSeconds()) *
+                                      1000}))),
+                    expCtx);
+                pipeline->_sources.insert(
+                    unpackIter, make_intrusive<DocumentSourceMatch>(std::move(match), expCtx));
+            }
+            // Ensure we're erasing the sort source.
+            tassert(6434901,
+                    "we must erase a $sort stage and replace it with a bounded sort stage",
+                    strncmp((*iter)->getSourceName(),
+                            DocumentSourceSort::kStageName.rawData(),
+                            DocumentSourceSort::kStageName.length()) == 0);
+            pipeline->_sources.erase(iter);
+            pipeline->stitch();
+        }
+    }
 }
 
 Timestamp PipelineD::getLatestOplogTimestamp(const Pipeline* pipeline) {
