@@ -38,6 +38,8 @@
 
 using namespace mongo;
 
+static constexpr size_t kRecursionLimit = BSONObj::maxToStringRecursionDepth + 1;
+
 // in element creation functions, we use a common elementMemory as storage
 // to hold content in scope for the lifetime on the fuzzer
 
@@ -183,7 +185,8 @@ BSONElement createElementArray(BSONArray arr, std::forward_list<BSONObj>& elemen
 bool createFuzzedObj(const char*& ptr,
                      const char* end,
                      std::forward_list<BSONObj>& elementMemory,
-                     BSONObj& result);
+                     BSONObj& result,
+                     size_t depth);
 
 
 // We restrict lengths of generated bufs to 25 bytes, this is not exhaustive but is
@@ -246,13 +249,16 @@ bool generateBuf(const char*& ptr, const char* end, const char* buf, size_t& len
  *                 generated elements to remain valid
  * repetition - number of instances to emit, may be discarded or used by caller
  * result - receives new BSONElement
+ * depth - nesting depth of the element currently being generated, used to
+ *         bound total depth
  * return - true if successful, false if fuzzer input is invalid
  */
 bool createFuzzedElement(const char*& ptr,
                          const char* end,
                          std::forward_list<BSONObj>& elementMemory,
                          int& repetition,
-                         BSONElement& result) {
+                         BSONElement& result,
+                         size_t depth = 0) {
     if (ptr >= end)
         return false;
 
@@ -295,6 +301,8 @@ bool createFuzzedElement(const char*& ptr,
     char buf[kMaxBufLength];
     switch (type) {
         case Array: {
+            if (depth >= kRecursionLimit)
+                return false;
             // Get a count up to 255
             uint8_t count;
             if (ptr >= end)
@@ -306,7 +314,7 @@ bool createFuzzedElement(const char*& ptr,
             for (uint8_t i = 0; i < count; ++i) {
                 BSONElement elem;
                 int dummy;  // do not use repetition for arrays; we don't rle on this axis
-                if (!createFuzzedElement(ptr, end, elementMemory, dummy, elem))
+                if (!createFuzzedElement(ptr, end, elementMemory, dummy, elem, depth + 1))
                     return false;
                 if (elem.eoo())
                     return false;
@@ -337,10 +345,12 @@ bool createFuzzedElement(const char*& ptr,
             return true;
         }
         case CodeWScope: {
+            if (depth >= kRecursionLimit)
+                return false;
             if (!generateBuf(ptr, end, &buf[0], len))
                 return false;
             BSONObj obj;
-            if (!createFuzzedObj(ptr, end, elementMemory, obj))
+            if (!createFuzzedObj(ptr, end, elementMemory, obj, depth))
                 return false;
             result = createCodeWScope(StringData(buf, len), obj, elementMemory);
             return true;
@@ -359,8 +369,10 @@ bool createFuzzedElement(const char*& ptr,
             return true;
         }
         case Object: {
+            if (depth >= kRecursionLimit)
+                return false;
             BSONObj obj;
-            if (!createFuzzedObj(ptr, end, elementMemory, obj))
+            if (!createFuzzedObj(ptr, end, elementMemory, obj, depth))
                 return false;
             result = createElementObj(obj, elementMemory);
             return true;
@@ -506,7 +518,8 @@ bool createFuzzedElement(const char*& ptr,
 bool createFuzzedObj(const char*& ptr,
                      const char* end,
                      std::forward_list<BSONObj>& elementMemory,
-                     BSONObj& result) {
+                     BSONObj& result,
+                     size_t depth) {
     // Use branching factor of objects of up to 255
     uint8_t count;
     if (ptr >= end)
@@ -528,7 +541,7 @@ bool createFuzzedObj(const char*& ptr,
 
         BSONElement elem;
         int dummy;  // do not use repetition for obj; we don't rle on this axis
-        if (!createFuzzedElement(ptr, end, elementMemory, dummy, elem))
+        if (!createFuzzedElement(ptr, end, elementMemory, dummy, elem, depth + 1))
             return false;
 
         if (elem.eoo())
