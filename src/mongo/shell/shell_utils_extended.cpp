@@ -674,6 +674,51 @@ BSONObj readDumpFile(const BSONObj& a, void*) {
     return builder.obj();
 }
 
+BSONObj generateStorageBSON(const BSONObj& args, void* data) {
+    uassert(9492300,
+            "generateStorageBSON() requires 4 arguments: generateStorageBSON(dbpath, "
+            "storageEngine, directoryPerDB, directoryForIndexes)",
+            args.nFields() == 4);
+
+    // Writes out a storage.bson file in the given dbpath.
+    BSONObjIterator it(args);
+
+    const std::string dbpath = it.next().str();
+    const std::string storageEngine = it.next().str();
+    const bool directoryPerDB = it.next().booleanSafe();
+    const bool directoryForIndexes = it.next().booleanSafe();
+
+    // Generates a document with the following structure.
+    // {
+    //     storage: {
+    //         engine: <string>,
+    //         options: {
+    //             directoryPerDB: <bool>,
+    //             directoryForIndexes: <bool>
+    //         }
+    //     }
+    // }
+    BSONObj storage =
+        BSON("storage" << BSON("engine"
+                               << storageEngine << "options"
+                               << BSON("directoryPerDB" << directoryPerDB << "directoryForIndexes"
+                                                        << directoryForIndexes)));
+
+    boost::filesystem::path storageBSONPath = boost::filesystem::path(dbpath) / "storage.bson";
+
+    std::ofstream out(storageBSONPath.string(), std::ios::binary | std::ios::out | std::ios::trunc);
+    uassert(CANT_OPEN_FILE,
+            "Couldn't open file {} for writing"_format(storageBSONPath.string()),
+            out.is_open());
+
+    out.exceptions(std::ofstream::eofbit | std::ofstream::failbit | std::ofstream::badbit);
+
+    out.write(storage.objdata(), storage.objsize());
+    out.close();
+
+    return BSON("ok" << 1);
+}
+
 BSONObj shellGetEnv(const BSONObj& a, void*) {
     uassert(4671206,
             "_getEnv() takes one argument: the name of the environment variable",
@@ -731,6 +776,7 @@ void installShellUtilsExtended(Scope& scope) {
     scope.injectNative("_getEnv", shellGetEnv);
     scope.injectNative("writeBsonArrayToFile", writeBsonArrayToFile);
     scope.injectNative("getStringWidth", getStringWidth);
+    scope.injectNative("_generateStorageBSON", generateStorageBSON);
 }
 
 }  // namespace shell_utils
