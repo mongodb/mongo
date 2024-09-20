@@ -152,6 +152,8 @@ DBCollection.prototype.help = function() {
     print(
         "\tdb." + shortName +
         ".getSplitKeysForChunks( <maxChunkSize> ) - calculates split points over all chunks and returns splitter function");
+    print("\tdb." + shortName + ".disableBalancing() - disables the balancer for this collection");
+    print("\tdb." + shortName + ".enableBalancing() - enables the balancer for this collection");
     print(
         "\tdb." + shortName +
         ".getWriteConcern() - returns the write concern used for any operations on this collection, inherited from server/db if set");
@@ -1357,6 +1359,61 @@ DBCollection.prototype.getSplitKeysForChunks = function(chunkSize) {
           "  > splitter() // Execute splits on cluster !\n");
 
     return splitFunction;
+};
+
+/**
+ * Enable balancing for this collection. Uses the configureCollectionBalancing command
+ * with the noBalance paramater if FCV >= 8.1 and directly writes to config.collections if FCV
+ * < 8.1.
+ * TODO: SERVER-94845 remove FCV check when 9.0 becomes the last LTS
+ */
+DBCollection.prototype.enableBalancing = function() {
+    if (!this._isSharded()) {
+        throw Error("Collection " + this + " is not sharded.");
+    }
+
+    var adminDb = this.getDB().getSiblingDB("admin");
+    const fcvDoc = adminDb.runCommand({
+        getParameter: 1,
+        featureCompatibilityVersion: 1,
+    });
+    if (MongoRunner.compareBinVersions(
+            fcvDoc.featureCompatibilityVersion.version,
+            "8.1",
+            ) >= 0) {
+        return adminDb.runCommand({configureCollectionBalancing: this._fullName, noBalance: false});
+    } else {
+        var configDb = this.getDB().getSiblingDB("config");
+        return assert.commandWorked(
+            configDb.collections.update({_id: this._fullName}, {$set: {"noBalance": false}}));
+    }
+};
+
+/**
+ * Disable balancing for this collection. Uses the configureCollectionBalancing command
+ * with the noBalance paramater if FCV >= 8.1 and directly writes to config.collections if FCV
+ * < 8.1.
+ * TODO: SERVER-94845 remove FCV check when 9.0 becomes the last LTS
+ */
+DBCollection.prototype.disableBalancing = function() {
+    if (!this._isSharded()) {
+        throw Error("Collection " + this + " is not sharded.");
+    }
+    var adminDb = this.getDB().getSiblingDB("admin");
+    const fcvDoc = adminDb.runCommand({
+        getParameter: 1,
+        featureCompatibilityVersion: 1,
+    });
+    if (MongoRunner.compareBinVersions(
+            fcvDoc.featureCompatibilityVersion.version,
+            "8.1",
+            ) >= 0) {
+        return adminDb.runCommand({configureCollectionBalancing: this._fullName, noBalance: true});
+    } else {
+        var configDb = this.getDB().getSiblingDB("config");
+        return assert.commandWorked(
+            configDb.collections.update({_id: this._fullName}, {$set: {"noBalance": true}}));
+    }
 };
 
 DBCollection.prototype.setSlaveOk = function(value) {

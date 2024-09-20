@@ -514,7 +514,8 @@ public:
                                       const NamespaceString& nss,
                                       boost::optional<int32_t> chunkSizeMB,
                                       boost::optional<bool> defragmentCollection,
-                                      boost::optional<bool> enableAutoMerger);
+                                      boost::optional<bool> enableAutoMerger,
+                                      boost::optional<bool> noBalance);
 
     /**
      * Updates the bucketing parameters of a time-series collection. Also bumps the placement

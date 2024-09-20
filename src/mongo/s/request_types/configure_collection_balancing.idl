@@ -51,6 +51,10 @@ structs:
                 type: bool
                 description: "Tell the balancer to defragment the collection"
                 optional: true
+            noBalance:
+                type: bool
+                description: "Specifies whether the balancer should be enabled or not for this collection."
+                optional: true
 
 commands:
     configureCollectionBalancing:

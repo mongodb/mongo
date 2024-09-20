@@ -61,7 +61,7 @@ assert.commandFailedWithCode(
 
 // Recreate the index and verify that we can re-enable balancing.
 assert.commandWorked(coll.createIndex({"_id": "hashed"}));
-st.enableBalancing(nss);
+st.enableBalancing(coll);
 
 assert.eq(false, configDB.getCollection('collections').findOne({_id: nss}).noBalance);
 st.awaitBalancerRound();

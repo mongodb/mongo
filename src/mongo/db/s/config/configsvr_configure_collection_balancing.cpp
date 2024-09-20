@@ -83,7 +83,8 @@ public:
                 nss,
                 request().getChunkSizeMB(),
                 request().getDefragmentCollection(),
-                request().getEnableAutoMerger());
+                request().getEnableAutoMerger(),
+                request().getNoBalance());
         }
 
     private:

@@ -378,38 +378,20 @@ sh.disableBalancing = function(coll) {
     if (coll === undefined) {
         throw Error("Must specify collection");
     }
-    var dbase = globalThis.db;
-    if (coll instanceof DBCollection) {
-        dbase = coll.getDB();
-    } else {
-        sh._checkMongos();
+    if (!(coll instanceof DBCollection)) {
+        throw Error("Collection must be a DBCollection");
     }
-
-    return sh.assertRetryableCommandWorkedOrFailedWithCodes(() => {
-        return dbase.getSiblingDB("config").collections.update(
-            {_id: coll + ""},
-            {$set: {"noBalance": true}},
-            {writeConcern: {w: 'majority', wtimeout: 60000}});
-    }, 'Timed out waiting for disabling balancer');
+    return coll.disableBalancing();
 };
 
 sh.enableBalancing = function(coll) {
     if (coll === undefined) {
         throw Error("Must specify collection");
     }
-    var dbase = globalThis.db;
-    if (coll instanceof DBCollection) {
-        dbase = coll.getDB();
-    } else {
-        sh._checkMongos();
+    if (!(coll instanceof DBCollection)) {
+        throw Error("Collection must be a DBCollection");
     }
-
-    return sh.assertRetryableCommandWorkedOrFailedWithCodes(() => {
-        return dbase.getSiblingDB("config").collections.update(
-            {_id: coll + ""},
-            {$set: {"noBalance": false}},
-            {writeConcern: {w: 'majority', wtimeout: 60000}});
-    }, 'Timed out waiting for enabling balancer');
+    return coll.enableBalancing();
 };
 
 sh.awaitCollectionBalance = function(coll, timeout, interval) {
