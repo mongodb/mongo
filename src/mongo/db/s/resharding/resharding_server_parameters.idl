@@ -173,6 +173,21 @@ server_parameters:
             gte: 0
         redact: false
     
+    reshardingDelayBeforeRemainingOperationTimeQueryMillis:
+        description: >-
+            Initial delay before querying for remaining operation time from recipient shards.
+            The delay allows for applying more oplog entries before calculating time remaining, giving
+            a more accurate value.
+            Note we will have this delay every time we happen to have a failover occur.
+        set_at: [startup, runtime]
+        cpp_vartype: AtomicWord<int>
+        cpp_varname: gReshardingDelayBeforeRemainingOperationTimeQueryMillis
+        default:
+            expr: 0
+        validator:
+            gte: 0
+        redact: false
+    
     reshardingCriticalSectionTimeoutMillis:
         description: >-
             The upper limit on how long to wait to hear back from recipient shards reaching strict
