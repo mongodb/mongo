@@ -10,6 +10,7 @@ export const $config = (function() {
         getUniqueKey: function() {
             return this.uniqueKeys[Random.randInt(this.uniqueKeys.length)];
         },
+        originalReshardingOplogBatchTaskCount: {},
     };
 
     const states = {
@@ -41,6 +42,27 @@ export const $config = (function() {
         db[collName].drop();
         assert.commandWorked(db[collName].createIndex(
             {uniqueKey: 1}, {unique: 1, collation: {locale: "en", strength: 2}}));
+
+        // Creating an unique index on a key other than _id can result in DuplicateKey errors for
+        // background resharding operations. To avoid this, lower reshardingOplogBatchTaskCount
+        // to 1.
+        cluster.executeOnMongodNodes((db) => {
+            const res = assert.commandWorked(db.adminCommand({
+                setParameter: 1,
+                reshardingOplogBatchTaskCount: 1,
+            }));
+            this.originalReshardingOplogBatchTaskCount[db.getMongo().host] = res.was;
+        });
+    }
+
+    function teardown(db, collName, cluster) {
+        cluster.executeOnMongodNodes((db) => {
+            assert.commandWorked(db.adminCommand({
+                setParameter: 1,
+                reshardingOplogBatchTaskCount:
+                    this.originalReshardingOplogBatchTaskCount[db.getMongo().host],
+            }));
+        });
     }
 
     return {
@@ -51,5 +73,6 @@ export const $config = (function() {
         transitions: transitions,
         data: data,
         setup: setup,
+        teardown: teardown,
     };
 })();
