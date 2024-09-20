@@ -101,7 +101,7 @@ public:
 private:
     friend class Context;
 
-    Mutex _lock = MONGO_MAKE_LATCH("OperationContextGroup::_lock");
+    stdx::mutex _lock;
     std::vector<UniqueOperationContext> _contexts;
 
 };  // class OperationContextGroup

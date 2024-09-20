@@ -82,7 +82,7 @@ public:
     int countLookups{0};
 
 private:
-    Mutex _mutex = MONGO_MAKE_LATCH("ReadThroughCacheTest::Cache");
+    stdx::mutex _mutex;
 };
 
 class CausallyConsistentCache : public ReadThroughCache<std::string, CachedValue, Timestamp> {
@@ -107,7 +107,7 @@ public:
     int countLookups{0};
 
 private:
-    Mutex _mutex = MONGO_MAKE_LATCH("ReadThroughCacheTest::CausallyConsistentCache");
+    stdx::mutex _mutex;
 };
 
 class CausallyConsistentCacheWithLookupArgs
@@ -135,7 +135,7 @@ public:
     int countLookups{0};
 
 private:
-    Mutex _mutex = MONGO_MAKE_LATCH("ReadThroughCacheTest::CausallyConsistentCache");
+    stdx::mutex _mutex;
 };
 
 /**

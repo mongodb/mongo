@@ -310,7 +310,7 @@ private:
     std::string _name;
     ServerParameterType _type;
 
-    mutable Mutex _mutex = MONGO_MAKE_LATCH("ServerParameter::_mutex");
+    mutable stdx::mutex _mutex;
 
     bool _testOnly = false;
     bool _redact = false;

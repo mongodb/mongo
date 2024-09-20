@@ -105,7 +105,7 @@ private:
     Mutex* _getMutex() noexcept override;
 
     // Used by AbstractAsyncComponent to guard start changes.
-    Mutex _mutex = MONGO_MAKE_LATCH("MockAsyncComponent::_mutex");
+    stdx::mutex _mutex;
 
 public:
     // Asserted to be OK by _doStartup_inlock(). Override for testing.

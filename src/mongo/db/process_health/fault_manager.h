@@ -183,8 +183,7 @@ private:
     // Callback used to crash the server.
     std::function<void(std::string cause)> _crashCb;
 
-    mutable Mutex _mutex =
-        MONGO_MAKE_LATCH(HierarchicalAcquisitionLevel(5), "FaultManager::_mutex");
+    mutable stdx::mutex _mutex;
 
     std::shared_ptr<Fault> _fault;
     // This source is canceled before the _taskExecutor shutdown(). It
@@ -195,8 +194,7 @@ private:
     SharedPromise<void> _initialHealthCheckCompletedPromise;
 
     // Protects the state below.
-    mutable Mutex _stateMutex =
-        MONGO_MAKE_LATCH(HierarchicalAcquisitionLevel(0), "FaultManager::_stateMutex");
+    mutable stdx::mutex _stateMutex;
 
     bool _initialized = false;
     Date_t _lastTransitionTime;

@@ -318,7 +318,7 @@ private:
     }
 
     ServiceContext* _serviceContext;
-    mutable Mutex _mutex = MONGO_MAKE_LATCH("ShardingReplicaSetChangeListenerMongod::mutex");
+    mutable stdx::mutex _mutex;
 
     struct ReplSetConfigUpdateState {
         ReplSetConfigUpdateState() = default;

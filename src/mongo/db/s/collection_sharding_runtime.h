@@ -367,8 +367,7 @@ private:
     ShardingMigrationCriticalSection _critSec;
 
     // Protects state around the metadata manager below
-    mutable Mutex _metadataManagerLock =
-        MONGO_MAKE_LATCH("CollectionShardingRuntime::_metadataManagerLock");
+    mutable stdx::mutex _metadataManagerLock;
 
     // Track status of filtering metadata for a specific collection
     enum class MetadataType {

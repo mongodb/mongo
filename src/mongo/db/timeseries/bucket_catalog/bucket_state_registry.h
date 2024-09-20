@@ -125,8 +125,7 @@ struct BucketStateRegistry {
     using Era = std::uint64_t;
     using ShouldClearFn = std::function<bool(const UUID&)>;
 
-    mutable Mutex mutex =
-        MONGO_MAKE_LATCH(HierarchicalAcquisitionLevel(0), "BucketStateRegistry::mutex");
+    mutable stdx::mutex mutex;
 
     // Global number tracking the current number of eras that have passed. Incremented each time
     // a bucket is cleared.

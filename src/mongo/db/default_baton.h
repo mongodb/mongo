@@ -88,7 +88,7 @@ private:
      */
     void _safeExecute(stdx::unique_lock<Mutex> lk, Job job);
 
-    Mutex _mutex = MONGO_MAKE_LATCH("DefaultBaton::_mutex");
+    stdx::mutex _mutex;
     stdx::condition_variable _cv;
     bool _notified = false;
     bool _sleeping = false;

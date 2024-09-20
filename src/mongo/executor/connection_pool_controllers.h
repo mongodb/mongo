@@ -104,7 +104,7 @@ private:
     std::function<size_t()> _minLoader;
     std::function<size_t()> _maxLoader;
     std::string _name;
-    Mutex _mutex = MONGO_MAKE_LATCH("DynamicLimitController::_mutex");
+    stdx::mutex _mutex;
     stdx::unordered_map<PoolId, PoolData> _poolData;
 };
 }  // namespace mongo::executor

@@ -222,7 +222,7 @@ public:
 private:
     // Ensures concurrent accesses to `get()`, `appendInternalClientWireVersionIfNeeded()`, and
     // `reset()` are thread-safe.
-    mutable Mutex _mutex = MONGO_MAKE_LATCH("WireSpec::_mutex");
+    mutable stdx::mutex _mutex;
 
     std::shared_ptr<const Specification> _spec;
 };

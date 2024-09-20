@@ -185,7 +185,7 @@ private:
 
     const std::string kPolicyName{"BalancerDefragmentationPolicy"};
 
-    Mutex _stateMutex = MONGO_MAKE_LATCH("BalancerChunkMergerImpl::_stateMutex");
+    stdx::mutex _stateMutex;
 
     ClusterStatistics* const _clusterStats;
 

@@ -101,8 +101,7 @@ public:
 private:
     void _addListener(std::shared_ptr<Listener> listener);
 
-    Mutex _mutex =
-        MONGO_MAKE_LATCH(HierarchicalAcquisitionLevel(0), "ReplicaSetChangeNotifier::_mutex");
+    stdx::mutex _mutex;
     std::vector<std::weak_ptr<Listener>> _listeners;
     stdx::unordered_map<Key, State> _replicaSetStates;
 };

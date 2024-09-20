@@ -88,7 +88,7 @@ protected:
         }
     }
 
-    Mutex mutex = MONGO_MAKE_LATCH("ThreadPoolTest::mutex");
+    stdx::mutex mutex;
     stdx::condition_variable cv1;
     stdx::condition_variable cv2;
     size_t count1 = 0U;
@@ -229,7 +229,7 @@ DEATH_TEST_REGEX(ThreadPoolTest,
                  "Attempted to join pool.*more than once.*DoubleJoinPool") {
     // This test ensures that the ThreadPool destructor runs while some thread is blocked
     // running ThreadPool::join, to see that double-join is fatal in the pool destructor.
-    auto mutex = MONGO_MAKE_LATCH();
+    stdx::mutex mutex;
     ThreadPool::Options options;
     options.minThreads = 1;
     options.maxThreads = 1;

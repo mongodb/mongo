@@ -86,7 +86,7 @@ protected:
         return _serviceContextHolder.get();
     }
 
-    Mutex _mutex = MONGO_MAKE_LATCH("LockManagerTest BM Mutex");
+    stdx::mutex _mutex;
     stdx::condition_variable _cv;
 
     ServiceContext::UniqueServiceContext _serviceContextHolder;
@@ -96,7 +96,7 @@ protected:
 };
 
 BENCHMARK_DEFINE_F(LockManagerTest, BM_LockUnlock_Mutex)(benchmark::State& state) {
-    static auto mtx = MONGO_MAKE_LATCH("BM_LockUnlock_Mutex");
+    static stdx::mutex mtx;
 
     for (auto keepRunning : state) {
         stdx::unique_lock<Latch> lk(mtx);

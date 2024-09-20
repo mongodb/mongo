@@ -72,7 +72,7 @@ public:
 
 private:
     // These two go together to implement the conditional variable pattern.
-    Mutex _mutex = MONGO_MAKE_LATCH("CondVarLockGrantNotification::_mutex");
+    stdx::mutex _mutex;
     stdx::condition_variable _cond;
 
     // Result from the last call to notify

@@ -123,8 +123,7 @@ private:
     mutable stdx::condition_variable _oplogEntriesBecameVisibleCV;
 
     // Protects the state below.
-    mutable Mutex _oplogVisibilityStateMutex =
-        MONGO_MAKE_LATCH("WiredTigerOplogManager::_oplogVisibilityStateMutex");
+    mutable stdx::mutex _oplogVisibilityStateMutex;
 
     AtomicWord<bool> _isRunning{false};
 

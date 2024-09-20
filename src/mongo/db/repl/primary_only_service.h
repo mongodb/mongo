@@ -529,7 +529,7 @@ private:
     // (S)  Self-synchronizing; access according to class's own rules.
     // (M)  Reads and writes guarded by _mutex.
     // (W)  Synchronization required only for writes.
-    mutable Mutex _mutex = MONGO_MAKE_LATCH("PrimaryOnlyService::_mutex");
+    mutable stdx::mutex _mutex;
 
     // Condvar to receive notifications when _state changes.
     stdx::condition_variable _stateChangeCV;  // (S)

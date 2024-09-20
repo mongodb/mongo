@@ -123,8 +123,7 @@ protected:
 
     ServiceContext* const _svcCtx;
 
-    mutable Mutex _mutex =
-        MONGO_MAKE_LATCH(HierarchicalAcquisitionLevel(1), "HealthObserverBase::_mutex");
+    mutable stdx::mutex _mutex;
 
     // Indicates if there any check running to prevent running checks concurrently.
     bool _currentlyRunningHealthCheck = false;

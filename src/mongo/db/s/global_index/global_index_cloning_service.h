@@ -245,7 +245,7 @@ private:
     boost::optional<resharding::RetryingCancelableOperationContextFactory>
         _retryingCancelableOpCtxFactory;  // (TS)
 
-    mutable Mutex _mutex = MONGO_MAKE_LATCH("GlobalIndexCloningStateMachine::_mutex");
+    mutable stdx::mutex _mutex;
 
     GlobalIndexClonerMutableState _mutableState;  // (NC)
 

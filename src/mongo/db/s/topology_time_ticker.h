@@ -76,7 +76,7 @@ public:
     void onReplicationRollback(const repl::OpTime& lastAppliedOpTime);
 
 private:
-    Mutex _mutex = MONGO_MAKE_LATCH("TopologyTimeTicker");
+    stdx::mutex _mutex;
     /**
      * Container that stores time-related information about a topology change in a sharded cluster.
      * More specifically, the vector clock should start gossiping a new topologyTime once the

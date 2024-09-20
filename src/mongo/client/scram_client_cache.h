@@ -139,7 +139,7 @@ public:
     }
 
 private:
-    mutable Mutex _hostToSecretsMutex = MONGO_MAKE_LATCH("SCRAMClientCache::_hostToSecretsMutex");
+    mutable stdx::mutex _hostToSecretsMutex;
     HostToSecretsMap _hostToSecrets;
     mutable Stats _stats;
 };

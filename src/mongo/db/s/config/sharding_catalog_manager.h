@@ -976,7 +976,7 @@ private:
     // (S) Self-synchronizing; access in any way from any context.
     //
 
-    Mutex _mutex = MONGO_MAKE_LATCH("ShardingCatalogManager::_mutex");
+    stdx::mutex _mutex;
 
     // True if startup() has been called.
     bool _started{false};  // (M)

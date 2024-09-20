@@ -469,8 +469,7 @@ private:
 
         // This mutex synchronizes allocating and registering RecordIds for uncommited writes on
         // capped collections that accept concurrent writes (i.e. usesCappedSnapshots()).
-        mutable Mutex _registerCappedIdsMutex =
-            MONGO_MAKE_LATCH("CollectionImpl::_registerCappedIdsMutex");
+        mutable stdx::mutex _registerCappedIdsMutex;
 
         // Time-series collections are allowed to contain measurements with arbitrary dates;
         // however, many of our query optimizations only work properly with dates that can be stored

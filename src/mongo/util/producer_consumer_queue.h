@@ -922,7 +922,7 @@ private:
         });
     }
 
-    mutable Mutex _mutex = MONGO_MAKE_LATCH("ProducerConsumerQueue::_mutex");
+    mutable stdx::mutex _mutex;
 
     Options _options;
 

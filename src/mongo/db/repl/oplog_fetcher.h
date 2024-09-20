@@ -456,7 +456,7 @@ private:
     Status _checkTooStaleToSyncFromSource(OpTime lastFetched, OpTime firstOpTimeInBatch);
 
     // Protects member data of this OplogFetcher.
-    mutable Mutex _mutex = MONGO_MAKE_LATCH("OplogFetcher::_mutex");
+    mutable stdx::mutex _mutex;
 
     // Namespace of the oplog to read.
     const NamespaceString _nss = NamespaceString::kRsOplogNamespace;

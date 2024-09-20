@@ -250,7 +250,7 @@ private:
     ChildIteratorsList::iterator _itToRemove;
 
     // Mutex to protect the shared state below
-    Mutex _mutex = MONGO_MAKE_LATCH("AsyncWorkScheduler::_mutex");
+    stdx::mutex _mutex;
 
     // If shutdown() is called, this contains the first status that was passed to it and is an
     // indication that no more operations can be scheduled
@@ -334,7 +334,7 @@ Future<GlobalResult> collect(std::vector<Future<IndividualResult>>&& futures,
          * The first few fields have fixed values.           *
          ******************************************************/
         // Protects all state in the SharedBlock.
-        Mutex mutex = MONGO_MAKE_LATCH("SharedBlock::mutex");
+        stdx::mutex mutex;
 
         // If any response returns an error prior to a response setting shouldStopIteration to
         // ShouldStopIteration::kYes, the promise will be set with that error rather than the global

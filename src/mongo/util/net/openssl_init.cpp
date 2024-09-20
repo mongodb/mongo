@@ -137,8 +137,7 @@ private:
 
     private:
         // Machinery for producing IDs that are unique for the life of a thread.
-        Mutex _idMutex =
-            MONGO_MAKE_LATCH("ThreadIDManager::_idMutex");  // Protects _idNext and _idLast.
+        stdx::mutex _idMutex;       // Protects _idNext and _idLast.
         unsigned long _idNext = 0;  // Stores the next thread ID to use, if none already allocated.
         std::stack<unsigned long, std::vector<unsigned long>>
             _idLast;  // Stores old thread IDs, for reuse.

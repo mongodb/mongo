@@ -46,7 +46,7 @@ public:
 private:
     static inline const auto kLogLevel = 1;
 
-    mutable Mutex _mutex = MONGO_MAKE_LATCH("ReplicaSetMonitorQueryProcessor");
+    mutable stdx::mutex _mutex;
     bool _isShutdown = false;
 };
 }  // namespace mongo

@@ -210,7 +210,7 @@ private:
     const Milliseconds _updatePositionTimeout;
 
     // Protects member data of this Reporter declared below.
-    mutable Mutex _mutex = MONGO_MAKE_LATCH("Reporter::_mutex");
+    mutable stdx::mutex _mutex;
 
     mutable stdx::condition_variable _condition;
 

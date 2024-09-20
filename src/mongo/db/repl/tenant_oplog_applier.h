@@ -218,7 +218,7 @@ private:
         return &_mutex;
     }
 
-    Mutex _mutex = MONGO_MAKE_LATCH("TenantOplogApplier::_mutex");
+    stdx::mutex _mutex;
     // All member variables are labeled with one of the following codes indicating the
     // synchronization rules for accessing them.
     //

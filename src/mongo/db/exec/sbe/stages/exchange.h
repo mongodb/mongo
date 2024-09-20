@@ -143,7 +143,7 @@ public:
     void putFullBuffer(std::unique_ptr<ExchangeBuffer>);
 
 private:
-    Mutex _mutex = MONGO_MAKE_LATCH("ExchangePipe::_mutex");
+    stdx::mutex _mutex;
     stdx::condition_variable _cond;
 
     std::vector<std::unique_ptr<ExchangeBuffer>> _fullBuffers;

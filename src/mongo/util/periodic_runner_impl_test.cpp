@@ -87,7 +87,7 @@ TEST_F(PeriodicRunnerImplTest, OneJobTest) {
     int count = 0;
     Milliseconds interval{5};
 
-    auto mutex = MONGO_MAKE_LATCH();
+    stdx::mutex mutex;
     stdx::condition_variable cv;
 
     // Add a job, ensure that it runs once
@@ -122,7 +122,7 @@ TEST_F(PeriodicRunnerImplTest, OnePausableJobDoesNotRunWithoutStart) {
     int count = 0;
     Milliseconds interval{5};
 
-    auto mutex = MONGO_MAKE_LATCH();
+    stdx::mutex mutex;
     stdx::condition_variable cv;
 
     // Add a job, ensure that it runs once
@@ -149,7 +149,7 @@ TEST_F(PeriodicRunnerImplTest, OnePausableJobRunsCorrectlyWithStart) {
     int count = 0;
     Milliseconds interval{5};
 
-    auto mutex = MONGO_MAKE_LATCH();
+    stdx::mutex mutex;
     stdx::condition_variable cv;
 
     // Add a job, ensure that it runs once
@@ -184,7 +184,7 @@ TEST_F(PeriodicRunnerImplTest, OnePausableJobPausesCorrectly) {
     bool isPaused = false;
     Milliseconds interval{5};
 
-    auto mutex = MONGO_MAKE_LATCH();
+    stdx::mutex mutex;
     stdx::condition_variable cv;
 
     // Add a job, ensure that it runs once
@@ -231,7 +231,7 @@ TEST_F(PeriodicRunnerImplTest, OnePausableJobResumesCorrectly) {
     int count = 0;
     Milliseconds interval{5};
 
-    auto mutex = MONGO_MAKE_LATCH();
+    stdx::mutex mutex;
     stdx::condition_variable cv;
 
     PeriodicRunner::PeriodicJob job(
@@ -299,7 +299,7 @@ TEST_F(PeriodicRunnerImplTest, TwoJobsTest) {
     Milliseconds intervalA{5};
     Milliseconds intervalB{10};
 
-    auto mutex = MONGO_MAKE_LATCH();
+    stdx::mutex mutex;
     stdx::condition_variable cv;
 
     // Add two jobs, ensure they both run the proper number of times
@@ -346,7 +346,7 @@ TEST_F(PeriodicRunnerImplTest, TwoJobsTest) {
 }
 
 TEST_F(PeriodicRunnerImplTest, TwoJobsDontDeadlock) {
-    auto mutex = MONGO_MAKE_LATCH();
+    stdx::mutex mutex;
     stdx::condition_variable cv;
     stdx::condition_variable doneCv;
     bool a = false;
@@ -400,7 +400,7 @@ TEST_F(PeriodicRunnerImplTest, TwoJobsDontDeadlock) {
 TEST_F(PeriodicRunnerImplTest, ChangingIntervalWorks) {
     size_t timesCalled = 0;
 
-    auto mutex = MONGO_MAKE_LATCH();
+    stdx::mutex mutex;
     stdx::condition_variable cv;
 
     // Add a job, ensure that it runs once
@@ -478,7 +478,7 @@ TEST_F(PeriodicRunnerImplTest, StopProperlyInterruptsOpCtx) {
         "job",
         [&barrier, &killed](Client* client) {
             stdx::condition_variable cv;
-            auto mutex = MONGO_MAKE_LATCH();
+            stdx::mutex mutex;
             barrier.countDownAndWait();
 
             try {

@@ -505,7 +505,7 @@ private:
     NamespaceMetadataChangeNotifications _namespaceNotifications;
 
     // Protects the class state below
-    Mutex _mutex = MONGO_MAKE_LATCH("ShardServerCatalogCacheLoader::_mutex");
+    stdx::mutex _mutex;
 
     // True if shutDown was called.
     bool _inShutdown{false};

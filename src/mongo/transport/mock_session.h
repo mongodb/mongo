@@ -217,7 +217,7 @@ protected:
     TransportLayerMock* const _tl;
     const bool _isFromRouterPort;
 
-    mutable Mutex _waitForDataMutex = MONGO_MAKE_LATCH("MockSession::_waitForDataMutex");
+    mutable stdx::mutex _waitForDataMutex;
     std::list<Promise<void>> _waitForDataQueue;
 };
 

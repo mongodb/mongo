@@ -135,7 +135,7 @@ private:
     AtomicWord<unsigned long long> _currentPrepared{0};
 
     // Protects member variables below.
-    mutable Mutex _mutex = MONGO_MAKE_LATCH("ServerTransactionsMetrics::_mutex");
+    mutable stdx::mutex _mutex;
 
     boost::optional<LastCommittedTransaction> _lastCommittedTransaction;
 };

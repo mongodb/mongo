@@ -708,8 +708,7 @@ public:
         size_t _defaultWriteConcernChanges{0};  // (M)
 
         // Used to synchronize access to the above variables.
-        Mutex _mutex = MONGO_MAKE_LATCH(
-            "ReplicationCoordinatorImpl::PendingWriteConcernTagChangesImpl::_mutex");  // (S)
+        stdx::mutex _mutex;  // (S)
     };
 
     /**
@@ -905,7 +904,7 @@ private:
         // Tracks number of operations left running on step up / step down.
         size_t _totalOpsRunning = 0;
         // Protects killSignaled and stopKillingOps cond. variable.
-        Mutex _mutex = MONGO_MAKE_LATCH("AutoGetRstlForStepUpStepDown::_mutex");
+        stdx::mutex _mutex;
         // Signals thread about the change of killSignaled value.
         stdx::condition_variable _stopKillingOps;
         // Once this is set to true, the killOpThreadFn method will terminate.
@@ -1921,7 +1920,7 @@ private:
     // (I)  Independently synchronized, see member variable comment.
 
     // Protects member data of this ReplicationCoordinator.
-    mutable Mutex _mutex = MONGO_MAKE_LATCH("ReplicationCoordinatorImpl::_mutex");  // (S)
+    mutable stdx::mutex _mutex;  // (S)
 
     // Handles to actively queued heartbeats.
     std::vector<HeartbeatHandle> _heartbeatHandles;  // (M)

@@ -93,7 +93,7 @@ private:
     void _refreshSessions(const LogicalSessionRecordSet& sessions);
     void _removeRecords(const LogicalSessionIdSet& sessions);
 
-    Mutex _mutex = MONGO_MAKE_LATCH("MockSessionsCollectionImpl::_mutex");
+    stdx::mutex _mutex;
     SessionMap _sessions;
 
     RefreshHook _refresh;

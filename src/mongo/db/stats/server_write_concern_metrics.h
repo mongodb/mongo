@@ -133,7 +133,7 @@ private:
         std::uint64_t majorityJFalseOverriddenCount = 0;
     };
 
-    mutable Mutex _mutex = MONGO_MAKE_LATCH("ServerWriteConcernMetrics::_mutex");
+    mutable stdx::mutex _mutex;
     WriteConcernMetricsForOperationType _insertMetrics;
     WriteConcernMetricsForOperationType _updateMetrics;
     WriteConcernMetricsForOperationType _deleteMetrics;

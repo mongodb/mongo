@@ -120,7 +120,7 @@ private:
     ClockSource* const _clockSource;
     const Date_t _startTime;
 
-    mutable Mutex _mutex = MONGO_MAKE_LATCH(HierarchicalAcquisitionLevel(0), "Fault::_mutex");
+    mutable stdx::mutex _mutex;
     // We don't need a map by type because we expect to have only few facets.
     // Linear search is much faster, we want to avoid any lock contention here.
     std::deque<FaultFacetPtr> _facets;

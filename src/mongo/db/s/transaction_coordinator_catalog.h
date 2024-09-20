@@ -159,7 +159,7 @@ private:
     std::string _toString(WithLock wl) const;
 
     // Protects the state below.
-    mutable Mutex _mutex = MONGO_MAKE_LATCH("TransactionCoordinatorCatalog::_mutex");
+    mutable stdx::mutex _mutex;
 
     // Contains TransactionCoordinator objects by session id and transaction number. May contain
     // more than one coordinator per session. All coordinators for a session that do not correspond

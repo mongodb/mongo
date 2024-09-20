@@ -129,7 +129,7 @@ TEST(BackgroundJobLifeCycle, Go) {
         }
 
     private:
-        Mutex _mutex = MONGO_MAKE_LATCH("Job::_mutex");
+        stdx::mutex _mutex;
         bool _hasRun;
         Notification<void> _n;
     };

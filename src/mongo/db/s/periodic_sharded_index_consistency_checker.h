@@ -106,8 +106,7 @@ private:
 
     // Protects the variables below. Uses acquisition level 1 because it will be held while starting
     // a periodic job, which resolves a future.
-    mutable Mutex _mutex = MONGO_MAKE_LATCH(HierarchicalAcquisitionLevel(1),
-                                            "PeriodicShardedIndexConsistencyChecker::_mutex");
+    mutable stdx::mutex _mutex;
 
     // Periodic job for counting inconsistent indexes in the cluster.
     PeriodicJobAnchor _shardedIndexConsistencyChecker;

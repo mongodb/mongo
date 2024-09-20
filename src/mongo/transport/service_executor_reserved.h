@@ -91,7 +91,7 @@ private:
 
     AtomicWord<bool> _stillRunning{false};
 
-    mutable Mutex _mutex = MONGO_MAKE_LATCH("ServiceExecutorReserved::_mutex");
+    mutable stdx::mutex _mutex;
     stdx::condition_variable _threadWakeup;
     stdx::condition_variable _shutdownCondition;
 

@@ -307,7 +307,7 @@ public:
         SharedPromise<void> _completionPromise;
         // set only if doing a write to the state document throws an exception.
         SharedPromise<void> _documentWriteException;
-        Mutex _mutex = MONGO_MAKE_LATCH("PrimaryOnlyServiceTest::TestService::_mutex");
+        stdx::mutex _mutex;
         const TestService* const _service;
     };
 

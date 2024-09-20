@@ -944,8 +944,7 @@ protected:
     stdx::thread _stepUpThread;
 
     // Manages _newIndexBuildsBlocked.
-    mutable Mutex _newIndexBuildsBlockedMutex =
-        MONGO_MAKE_LATCH("IndexBuildsCoordinator::_newIndexBuildsBlocked");
+    mutable stdx::mutex _newIndexBuildsBlockedMutex;
     // Condition signalled to indicate new index builds are unblocked.
     stdx::condition_variable _newIndexBuildsBlockedCV;
     // Protected by _newIndexBuildsBlockedMutex.

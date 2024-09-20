@@ -59,8 +59,7 @@ public:
 
 private:
     std::stringstream _buffer;
-    mutable Mutex _mongoProgramOutputMutex =
-        MONGO_MAKE_LATCH("ProgramOutputMultiplexer::_mongoProgramOutputMutex");
+    mutable stdx::mutex _mongoProgramOutputMutex;
 };
 
 /**

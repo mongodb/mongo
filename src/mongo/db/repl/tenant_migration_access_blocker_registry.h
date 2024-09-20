@@ -246,7 +246,7 @@ private:
     std::shared_ptr<TenantMigrationDonorAccessBlocker> _getGlobalTenantDonorAccessBlocker(
         WithLock, const DatabaseName& dbName) const;
 
-    mutable Mutex _mutex = MONGO_MAKE_LATCH("TenantMigrationAccessBlockerRegistry::_mutex");
+    mutable stdx::mutex _mutex;
 
     // All member variables are labeled with one of the following codes indicating the
     // synchronization rules for accessing them.

@@ -182,7 +182,7 @@ private:
     AtomicWord<bool> _shardingInitialized{false};
     AtomicWord<bool> _isGridInitialized{false};
 
-    mutable Mutex _mutex = MONGO_MAKE_LATCH(HierarchicalAcquisitionLevel(0), "Grid::_mutex");
+    mutable stdx::mutex _mutex;
 
     CustomConnectionPoolStatsFn _customConnectionPoolStatsFn;
 };

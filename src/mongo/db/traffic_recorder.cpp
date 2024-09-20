@@ -263,7 +263,7 @@ private:
     MultiProducerSingleConsumerQueue<TrafficRecordingPacket, CostFunction>::Pipe _pcqPipe;
     stdx::thread _thread;
 
-    Mutex _mutex = MONGO_MAKE_LATCH("Recording::_mutex");
+    stdx::mutex _mutex;
     bool _inShutdown = false;
     TrafficRecorderStats _trafficStats;
     size_t _written = 0;

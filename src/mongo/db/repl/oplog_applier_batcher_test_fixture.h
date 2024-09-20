@@ -83,7 +83,7 @@ public:
                            SeekStrategy exact = SeekStrategy::kExact) final;
 
 private:
-    mutable Mutex _mutex = MONGO_MAKE_LATCH("OplogBufferMock::_mutex");
+    mutable stdx::mutex _mutex;
     stdx::condition_variable _notEmptyCv;
     bool _hasShutDown = false;
     bool _hasStartedUp = false;

@@ -122,7 +122,7 @@ private:
     executor::TaskExecutor* const _executor;
 
     // Protects member data of this RollbackChecker.
-    mutable Mutex _mutex = MONGO_MAKE_LATCH("RollbackChecker::_mutex");
+    mutable stdx::mutex _mutex;
 
     // The sync source to check for rollbacks against.
     HostAndPort _syncSource;

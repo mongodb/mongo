@@ -499,7 +499,7 @@ private:
 
     // Protects the in-memory state of the Scheduler
     // (_state, _requests, _unsubmittedRequestIds, _recentlyCompletedRequests).
-    Mutex _mutex = MONGO_MAKE_LATCH("BalancerCommandsSchedulerImpl::_mutex");
+    stdx::mutex _mutex;
 
     SchedulerState _state{SchedulerState::Stopped};
 

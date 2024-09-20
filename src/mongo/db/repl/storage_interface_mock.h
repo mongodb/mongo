@@ -483,7 +483,7 @@ public:
     Timestamp oldestOpenReadTimestamp = Timestamp::min();
 
 private:
-    mutable Mutex _mutex = MONGO_MAKE_LATCH("StorageInterfaceMock::_mutex");
+    mutable stdx::mutex _mutex;
     int _rbid;
     bool _rbidInitialized = false;
     Timestamp _stableTimestamp = Timestamp::min();

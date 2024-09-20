@@ -152,7 +152,7 @@ public:
                             ActionType::setUserWriteBlockMode}));
         }
 
-        Mutex _mutex = MONGO_MAKE_LATCH("SetUserWriteBlockModeCommand::_mutex");
+        stdx::mutex _mutex;
     };
 };
 MONGO_REGISTER_COMMAND(SetUserWriteBlockModeCommand).forShard();

@@ -181,7 +181,7 @@ public:
     static DDLLockManager* get(OperationContext* opCtx);
 
 protected:
-    Mutex _mutex = MONGO_MAKE_LATCH("DDLLockManager::_mutex");
+    stdx::mutex _mutex;
 
     enum class State {
         /**

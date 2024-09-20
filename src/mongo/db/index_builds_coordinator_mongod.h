@@ -203,8 +203,7 @@ private:
     ThreadPool _threadPool;
 
     // Manages _numActiveIndexBuilds and _indexBuildFinished.
-    mutable Mutex _throttlingMutex =
-        MONGO_MAKE_LATCH("IndexBuildsCoordinatorMongod::_throttlingMutex");
+    mutable stdx::mutex _throttlingMutex;
 
     // Protected by _mutex.
     int _numActiveIndexBuilds = 0;

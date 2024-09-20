@@ -237,7 +237,7 @@ private:
     boost::filesystem::path _path;
 
     // Mutex to protect the condvar, configuration changes, and most recent periodic document.
-    Mutex _mutex = MONGO_MAKE_LATCH("FTDCController::_mutex");
+    stdx::mutex _mutex;
     stdx::condition_variable _condvar;
 
     // Indicates that a rotate should be triggered before the next FTDC log is collected and

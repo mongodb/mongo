@@ -142,8 +142,7 @@ private:
     const NamespaceString _initialSyncIdNss;
 
     // Protects modifying and reading _isPrimary below.
-    mutable Mutex _truncatePointIsPrimaryMutex =
-        MONGO_MAKE_LATCH("ReplicationConsistencyMarkers::_truncatePointIsPrimaryMutex");
+    mutable stdx::mutex _truncatePointIsPrimaryMutex;
 
     // Tracks whether or not the node is primary. Avoids potential deadlocks taking the replication
     // coordinator's mutex to check replication state. Also remains false for standalones that do
@@ -153,8 +152,7 @@ private:
     // Locks around fetching the 'all_durable' timestamp from the storage engine and updating the
     // oplogTruncateAfterPoint. This prevents the oplogTruncateAfterPoint from going backwards in
     // time in case of multiple callers to refreshOplogTruncateAfterPointIfPrimary.
-    mutable Mutex _refreshOplogTruncateAfterPointMutex =
-        MONGO_MAKE_LATCH("ReplicationConsistencyMarkers::_refreshOplogTruncateAfterPointMutex");
+    mutable stdx::mutex _refreshOplogTruncateAfterPointMutex;
 
     // In-memory cache of the of the oplog entry LTE to the oplogTruncateAfterPoint timestamp.
     // Eventually matches the oplogTruncateAfterPoint timestamp when parallel writes finish. Avoids

@@ -121,7 +121,7 @@ Future<std::vector<SingleResult>> getAllResponsesOrFirstErrorWithCancellation(
     struct SharedUtil {
         SharedUtil(int responsesLeft, CancellationSource cancelSource)
             : responsesLeft(responsesLeft), source(cancelSource) {}
-        Mutex mutex = MONGO_MAKE_LATCH("SharedUtil::mutex");
+        stdx::mutex mutex;
         int responsesLeft;
         StatusWith<std::vector<SingleResult>> results =
             StatusWith<std::vector<SingleResult>>(std::vector<SingleResult>());

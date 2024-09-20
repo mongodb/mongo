@@ -119,8 +119,7 @@ private:
     const HostAndPort _host;
     const std::shared_ptr<ReplicaSetMonitorStats> _stats;
 
-    Mutex _mutex =
-        MONGO_MAKE_LATCH(HierarchicalAcquisitionLevel(4), "SingleServerDiscoveryMonitor::mutex");
+    stdx::mutex _mutex;
     boost::optional<TopologyVersion> _topologyVersion;
     TopologyEventsPublisherPtr _eventListener;
     std::shared_ptr<executor::TaskExecutor> _executor;
@@ -177,8 +176,7 @@ private:
 
     const std::shared_ptr<ReplicaSetMonitorStats> _stats;
 
-    Mutex _mutex =
-        MONGO_MAKE_LATCH(HierarchicalAcquisitionLevel(5), "ServerDiscoveryMonitor::mutex");
+    stdx::mutex _mutex;
     SdamConfiguration _sdamConfiguration;
     TopologyEventsPublisherPtr _eventPublisher;
     std::shared_ptr<executor::TaskExecutor> _executor;

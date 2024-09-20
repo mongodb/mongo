@@ -171,7 +171,7 @@ protected:
 
     typedef std::vector<BaseClonerStage*> ClonerStages;
 
-    mutable Mutex _mutex = MONGO_MAKE_LATCH(_clonerName + "::_mutex"_sd);
+    mutable stdx::mutex _mutex;
 
     StringData getClonerName() const {
         return _clonerName;

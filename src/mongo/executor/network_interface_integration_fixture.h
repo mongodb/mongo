@@ -162,7 +162,7 @@ private:
 
     size_t _workInProgress = 0;
     stdx::condition_variable _fixtureIsIdle;
-    mutable Mutex _mutex = MONGO_MAKE_LATCH("NetworkInterfaceIntegrationFixture::_mutex");
+    mutable stdx::mutex _mutex;
 };
 
 }  // namespace executor

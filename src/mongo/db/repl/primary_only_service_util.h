@@ -154,7 +154,7 @@ private:
     virtual void _removeStateDocument(OperationContext* opCtx) = 0;
 
     // Guards the access of the '_completionPromise'.
-    Mutex _mutex = MONGO_MAKE_LATCH("DefaultPrimaryOnlyServiceInstance::_mutex");
+    stdx::mutex _mutex;
 
     // Tracks the completion state of the instance.
     SharedPromise<void> _completionPromise;

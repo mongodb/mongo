@@ -1604,7 +1604,7 @@ TEST_F(SessionCatalogTestWithDefaultOpCtx, ConcurrentCheckOutAndKill) {
 
             // The main thread won't check in the session until it's killed.
             {
-                auto m = MONGO_MAKE_LATCH();
+                stdx::mutex m;
                 stdx::condition_variable cond;
                 stdx::unique_lock<Latch> lock(m);
                 ASSERT_THROWS_CODE(

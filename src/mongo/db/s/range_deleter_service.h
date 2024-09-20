@@ -168,7 +168,7 @@ private:
 
         ServiceContext* const _service;
 
-        mutable Mutex _mutex = MONGO_MAKE_LATCH("ReadyRangeDeletionsProcessor");
+        mutable stdx::mutex _mutex;
 
         enum State { kRunning, kStopped };
         State _state{kRunning};
@@ -222,7 +222,7 @@ private:
 
     // Protecting the access to all class members (DO NOT USE DIRECTLY: rely on
     // `_acquireMutexUnconditionally` and `_acquireMutexFailIfServiceNotUp`)
-    Mutex _mutex_DO_NOT_USE_DIRECTLY = MONGO_MAKE_LATCH("RangeDeleterService::_mutex");
+    stdx::mutex _mutex_DO_NOT_USE_DIRECTLY;
 
 public:
     /*

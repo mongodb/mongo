@@ -151,7 +151,7 @@ public:
 private:
     const bool _inMaintenanceMode;
 
-    mutable Mutex _mutex = MONGO_MAKE_LATCH("ShardingState::_mutex");
+    mutable stdx::mutex _mutex;
 
     // Promise/future pair which will be set when the recovery of the shard role completes
     SharedPromise<RecoveredClusterRole> _awaitClusterRoleRecoveryPromise;

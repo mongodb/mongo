@@ -99,7 +99,7 @@ protected:
 
     OperationSessionInfo _getCurrentSession() const;
 
-    Mutex _mutex = MONGO_MAKE_LATCH("ConfigsvrCoordinator::_mutex");
+    stdx::mutex _mutex;
     SharedPromise<void> _completionPromise;
 };
 
@@ -240,7 +240,7 @@ protected:
         }
     }
 
-    mutable Mutex _docMutex = MONGO_MAKE_LATCH("ConfigsvrCoordinatorImpl::_docMutex");
+    mutable stdx::mutex _docMutex;
     StateDoc _doc;
 };
 

@@ -66,7 +66,7 @@
 
 namespace mongo {
 
-Mutex ConnectionString::_connectHookMutex = MONGO_MAKE_LATCH();
+stdx::mutex ConnectionString::_connectHookMutex;
 ConnectionString::ConnectionHook* ConnectionString::_connectHook = nullptr;
 
 StatusWith<std::unique_ptr<DBClientBase>> ConnectionString::connect(

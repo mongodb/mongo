@@ -35,6 +35,7 @@
 
 #include "mongo/platform/mutex.h"
 #include "mongo/stdx/condition_variable.h"
+#include "mongo/stdx/mutex.h"
 
 namespace mongo {
 /**
@@ -119,7 +120,7 @@ public:
 private:
     bool _startupSuccessful = false;
     bool _wtIncompatible = false;
-    mutable mongo::Mutex _mutex = MONGO_MAKE_LATCH("mongo::WiredTigerEventHandler::_mutex");
+    mutable stdx::mutex _mutex;
     WT_CONNECTION* _wtConn = nullptr;
     stdx::condition_variable _idleCondition;
     int32_t _activeReaders{0};

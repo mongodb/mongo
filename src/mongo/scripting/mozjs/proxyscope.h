@@ -213,7 +213,7 @@ private:
      * This mutex protects _function, _state and _status as channels for
      * function invocation and exception handling
      */
-    Mutex _mutex = MONGO_MAKE_LATCH("MozJSProxyScope::_mutex");
+    stdx::mutex _mutex;
     unique_function<void()> _function;
     State _state;
     Status _status;

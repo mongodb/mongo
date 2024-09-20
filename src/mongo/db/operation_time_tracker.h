@@ -59,7 +59,7 @@ public:
 
 private:
     // protects _maxOperationTime
-    mutable Mutex _mutex = MONGO_MAKE_LATCH("OperationTimeTracker::_mutex");
+    mutable stdx::mutex _mutex;
     LogicalTime _maxOperationTime;
 };
 

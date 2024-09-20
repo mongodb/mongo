@@ -293,7 +293,7 @@ private:
      */
     bool _exceedsMaxSizeBytes();
 
-    mutable Mutex _mutex = MONGO_MAKE_LATCH("QueryAnalysisWriter::_mutex");
+    mutable stdx::mutex _mutex;
 
     std::shared_ptr<PeriodicJobAnchor> _periodicQueryWriter;
     Buffer _queries{NamespaceString::kConfigSampledQueriesNamespace};

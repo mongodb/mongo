@@ -148,7 +148,7 @@ private:
         WithLock lk, IndexBuildFilterFn indexBuildFilter) const;
 
     // Manages all of the below state
-    mutable Mutex _mutex = MONGO_MAKE_LATCH("ActiveIndexBuilds::_mutex");
+    mutable stdx::mutex _mutex;
 
     // Build UUID to index build information
     stdx::unordered_map<UUID, std::shared_ptr<ReplIndexBuildState>, UUID::Hash> _allIndexBuilds;

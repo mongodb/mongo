@@ -87,12 +87,10 @@ public:
     BSONObj getInitialSyncId(OperationContext* opCtx) override;
 
 private:
-    mutable Mutex _initialSyncFlagMutex =
-        MONGO_MAKE_LATCH("ReplicationConsistencyMarkersMock::_initialSyncFlagMutex");
+    mutable stdx::mutex _initialSyncFlagMutex;
     bool _initialSyncFlag = false;
 
-    mutable Mutex _minValidBoundariesMutex =
-        MONGO_MAKE_LATCH("ReplicationConsistencyMarkersMock::_minValidBoundariesMutex");
+    mutable stdx::mutex _minValidBoundariesMutex;
     OpTime _appliedThrough;
     OpTime _minValid;
     Timestamp _oplogTruncateAfterPoint;

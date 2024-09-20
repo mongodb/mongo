@@ -77,7 +77,7 @@ private:
     AtomicWord<bool> _shouldRecord;
 
     // The mutex only protects the last recording shared_ptr
-    mutable Mutex _mutex = MONGO_MAKE_LATCH("TrafficRecorder::_mutex");
+    mutable stdx::mutex _mutex;
     std::shared_ptr<Recording> _recording;
 };
 

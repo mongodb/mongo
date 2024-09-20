@@ -147,7 +147,7 @@ public:
 
 private:
     // Protects the state below.
-    mutable Mutex _stateMutex = MONGO_MAKE_LATCH("ChangeStreamExpiredPreImagesRemoverStateMutex");
+    mutable stdx::mutex _stateMutex;
 
     // Signaled to wake up the thread, if the thread is waiting. The thread will check whether
     // _shuttingDown is set and stop accordingly.

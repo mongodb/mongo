@@ -133,7 +133,7 @@ private:
     std::string _strData;
     std::int32_t _intData;
 
-    mutable Mutex _mutex = MONGO_MAKE_LATCH("SpecializedClusterServerParameterStorage::_mutex");
+    mutable stdx::mutex _mutex;
 };
 
 }  // namespace test

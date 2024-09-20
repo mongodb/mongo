@@ -86,7 +86,7 @@ private:
                               const StatsPathString& statsPath,
                               const ValueHandle& stats);
 
-    Mutex _mutex = MONGO_MAKE_LATCH("StatsCache::_mutex");
+    stdx::mutex _mutex;
 
     std::unique_ptr<StatsCacheLoader> _statsCacheLoader;
 };

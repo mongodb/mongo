@@ -171,7 +171,7 @@ public:
     ApplyOplogBatchFn applyOplogBatchFn;
 
 private:
-    mutable Mutex _mutex = MONGO_MAKE_LATCH("DataReplicatorExternalStateMock::_mutex");
+    mutable stdx::mutex _mutex;
 
     // Returned by shouldStopFetching.
     ChangeSyncSourceAction shouldStopFetchingResult = ChangeSyncSourceAction::kContinueSyncing;

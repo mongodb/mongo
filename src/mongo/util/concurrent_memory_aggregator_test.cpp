@@ -297,7 +297,7 @@ TEST_F(ConcurrentMemoryAggregatorTest, ConcurrentChunkedMemoryAggregators) {
     ASSERT_EQUALS(0, memoryAggregator->getCurrentMemoryUsageBytes());
     ASSERT_TRUE(localMemoryAggregators.empty());
 
-    Mutex mutex = MONGO_MAKE_LATCH();
+    stdx::mutex mutex;
     stdx::condition_variable completedCv;
     stdx::condition_variable shutdownCv;
     int numCompleted{0};

@@ -255,8 +255,7 @@ private:
     const std::string _ident;
 
     // This mutex protects all variables below.
-    mutable Mutex _mutex =
-        MONGO_MAKE_LATCH(HierarchicalAcquisitionLevel(0), "CappedVisibilityObserver::_mutex");
+    mutable stdx::mutex _mutex;
 
     // The set of uncommitted writes to this capped collection. We use a std::list so that we can
     // use splice() for constant time insertion and deletion. This relies on the ability to maintain

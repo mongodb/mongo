@@ -146,7 +146,7 @@ private:
     CallbackFn _onCompletion;
 
     // Protects member data of this MultiApplier.
-    mutable Mutex _mutex = MONGO_MAKE_LATCH("MultiApplier::_mutex");
+    mutable stdx::mutex _mutex;
 
     stdx::condition_variable _condition;
 

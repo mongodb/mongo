@@ -87,7 +87,7 @@ private:
     int _count = 0;
     int _size = 0;
     int _numSettingsWithReject = 0;
-    mutable Mutex _mutex = MONGO_MAKE_LATCH("QuerySettingsServerStatusSection::_mutex");
+    mutable stdx::mutex _mutex;
 };
 
 auto& querySettingsServerStatusSection =

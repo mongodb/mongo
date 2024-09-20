@@ -210,7 +210,7 @@ public:
         return _rejected.load();
     }
 
-    mutable Mutex _mutex = MONGO_MAKE_LATCH("ServiceEntryPoint::Sessions::_mutex");
+    mutable stdx::mutex _mutex;
     stdx::condition_variable _cv;      ///< notified on `_byClient` changes.
     Atomic<std::size_t> _size{0};      ///< Kept in sync with `_byClient.size()`
     Atomic<std::size_t> _created{0};   ///< Increases with each `insert` call.

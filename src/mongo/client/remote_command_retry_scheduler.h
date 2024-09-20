@@ -156,8 +156,7 @@ private:
     Milliseconds _currentUsedMillis{0};
 
     // Protects member data of this scheduler declared after mutex.
-    mutable Mutex _mutex =
-        MONGO_MAKE_LATCH(HierarchicalAcquisitionLevel(2), "RemoteCommandRetryScheduler::_mutex");
+    mutable stdx::mutex _mutex;
 
     mutable stdx::condition_variable _condition;
 

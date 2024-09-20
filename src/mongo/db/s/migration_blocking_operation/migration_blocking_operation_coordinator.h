@@ -71,8 +71,7 @@ private:
                                       OperationContext* opCtx,
                                       StateDoc newStateDocument);
 
-    mutable Mutex _mutex =
-        MONGO_MAKE_LATCH("MigrationBlockingOperationCoordinatorInstance::_mutex");
+    mutable stdx::mutex _mutex;
 
     UUIDSet _operations;
     SharedPromise<void> _beginCleanupPromise;

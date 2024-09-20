@@ -90,7 +90,7 @@ protected:
     void _doWrite(OperationContext* opCtx, AdmissionContext* admCtx);
 
 protected:
-    mutable Mutex _mutex = MONGO_MAKE_LATCH("TicketedWorkloadDriver::_mutex");
+    mutable stdx::mutex _mutex;
 
     EventQueue& _queue;
     std::unique_ptr<MockWorkloadCharacteristics> _characteristics;

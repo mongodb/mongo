@@ -178,7 +178,7 @@ TEST_F(ResultsMergerTestFixture, ShouldBeAbleToBlockUntilNextResultIsReadyWithDe
     future.default_timed_get();
 
     // Used for synchronizing the background thread with this thread.
-    auto mutex = MONGO_MAKE_LATCH();
+    stdx::mutex mutex;
     stdx::unique_lock<Latch> lk(mutex);
 
     // Issue a blocking wait for the next result asynchronously on a different thread.

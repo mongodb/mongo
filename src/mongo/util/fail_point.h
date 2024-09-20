@@ -335,7 +335,7 @@ private:
         const std::string _name;
 
         // protects _mode, _modeValue, _data
-        mutable Mutex _modMutex = MONGO_MAKE_LATCH("FailPoint::_modMutex");
+        mutable stdx::mutex _modMutex;
     };
 
 public:

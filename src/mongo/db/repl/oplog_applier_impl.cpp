@@ -406,7 +406,7 @@ private:
     void _run();
 
     // Protects _cond, _shutdownSignaled, and _latestOpTime.
-    Mutex _mutex = MONGO_MAKE_LATCH("OplogApplierImpl::_mutex");
+    stdx::mutex _mutex;
     // Used to alert our thread of a new OpTime.
     stdx::condition_variable _cond;
     // The next OpTime to set as the ReplicationCoordinator's lastOpTime after flushing.

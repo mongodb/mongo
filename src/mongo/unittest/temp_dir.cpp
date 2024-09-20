@@ -49,7 +49,7 @@ namespace mongo {
 namespace unittest {
 namespace {
 
-Mutex tempPathRootMutex = MONGO_MAKE_LATCH("tempPathRootMutex");
+stdx::mutex tempPathRootMutex;
 boost::filesystem::path tempPathRoot;
 
 void setTempPathRoot(boost::filesystem::path root) {

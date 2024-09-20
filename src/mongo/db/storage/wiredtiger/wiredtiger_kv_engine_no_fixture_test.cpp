@@ -109,7 +109,7 @@ public:
     }
 
 private:
-    Mutex _mutex = MONGO_MAKE_LATCH("KVTestClientObserver::_mutex");  // protects _kvEngine
+    stdx::mutex _mutex;  // protects _kvEngine
     KVEngine* _kvEngine;
 };
 

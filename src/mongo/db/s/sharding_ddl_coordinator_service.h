@@ -131,7 +131,7 @@ private:
 
     void _transitionToRecovered(WithLock lk, OperationContext* opCtx);
 
-    mutable Mutex _mutex = MONGO_MAKE_LATCH("ShardingDDLCoordinatorService::_mutex");
+    mutable stdx::mutex _mutex;
 
     // When the node stepDown the state is set to kPaused and all the new DDL operation will be
     // blocked. On step-up we set _coordinatorsToWait to the numbers of coordinators that needs to

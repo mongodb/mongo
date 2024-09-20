@@ -80,7 +80,7 @@ private:
     Status _updateUpstream(Reporter* reporter);
 
     // protects cond, _shutdownSignaled, _keepAliveInterval, and _positionChanged.
-    Mutex _mtx = MONGO_MAKE_LATCH("SyncSourceFeedback::_mtx");
+    stdx::mutex _mtx;
     // used to alert our thread of changes which need to be passed up the chain
     stdx::condition_variable _cond;
     // used to indicate a position change which has not yet been pushed along

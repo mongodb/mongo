@@ -92,7 +92,7 @@ public:
 
 private:
     // Protects the state below.
-    Mutex _mutex = MONGO_MAKE_LATCH("Checkpointer::_mutex");
+    stdx::mutex _mutex;
 
     // The checkpoint thread idles on this condition variable for a particular time duration between
     // taking checkpoints. It can be triggered early to expedite either: immediate checkpointing if

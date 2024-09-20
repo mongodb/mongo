@@ -215,7 +215,7 @@ private:
         boost::optional<RWConcernDefault> lookup(OperationContext* opCtx);
 
     private:
-        Mutex _mutex = MONGO_MAKE_LATCH("ReadWriteConcernDefaults::Cache");
+        stdx::mutex _mutex;
 
         FetchDefaultsFn _fetchDefaultsFn;
     };

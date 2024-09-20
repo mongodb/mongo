@@ -680,7 +680,7 @@ PRODUCER_CONSUMER_QUEUE_TEST(popManyUpToPopWithBlockingWithSpecialCost,
 PRODUCER_CONSUMER_QUEUE_TEST(singleProducerMultiConsumer, runPermutations<false, true>) {
     typename Helper::template ProducerConsumerQueue<MoveOnly> pcq{};
 
-    auto mutex = MONGO_MAKE_LATCH();
+    stdx::mutex mutex;
     size_t successes = 0;
     size_t failures = 0;
 
@@ -723,7 +723,7 @@ PRODUCER_CONSUMER_QUEUE_TEST(multiProducerSingleConsumer, runPermutations<true, 
 
     pcq.push(MoveOnly(1));
 
-    auto mutex = MONGO_MAKE_LATCH();
+    stdx::mutex mutex;
     size_t success = 0;
     size_t failure = 0;
 
@@ -802,7 +802,7 @@ PRODUCER_CONSUMER_QUEUE_TEST(multiProducerMiddleWaiterBreaks, runPermutations<tr
 
     pcq.push(MoveOnly(1));
 
-    auto mutex = MONGO_MAKE_LATCH();
+    stdx::mutex mutex;
     bool failed = false;
     OperationContext* threadBopCtx = nullptr;
 

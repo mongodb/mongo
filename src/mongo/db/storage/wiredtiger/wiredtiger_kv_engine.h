@@ -132,13 +132,13 @@ struct WiredTigerBackup {
 
     // 'wtBackupCursorMutex' provides concurrency control between beginNonBlockingBackup(),
     // endNonBlockingBackup(), and getNextBatch() because we stream the output of the backup cursor.
-    Mutex wtBackupCursorMutex = MONGO_MAKE_LATCH("WiredTigerKVEngine::wtBackupCursorMutex");
+    stdx::mutex wtBackupCursorMutex;
 
     // 'wtBackupDupCursorMutex' provides concurrency control between getNextBatch() and
     // extendBackupCursor() because WiredTiger only allows one duplicate cursor to be open at a
     // time. extendBackupCursor() blocks on condition variable 'wtBackupDupCursorCV' if a duplicate
     // cursor is already open.
-    Mutex wtBackupDupCursorMutex = MONGO_MAKE_LATCH("WiredTigerKVEngine::wtBackupDupCursorMutex");
+    stdx::mutex wtBackupDupCursorMutex;
     stdx::condition_variable wtBackupDupCursorCV;
 
     // This file flags there was an ongoing backup when an unclean shutdown happened.
@@ -687,8 +687,7 @@ private:
     std::pair<JournalListener*, boost::optional<JournalListener::Token>>
     _getJournalListenerWithToken(OperationContext* opCtx, UseJournalListener useListener);
 
-    mutable Mutex _oldestActiveTransactionTimestampCallbackMutex =
-        MONGO_MAKE_LATCH("::_oldestActiveTransactionTimestampCallbackMutex");
+    mutable stdx::mutex _oldestActiveTransactionTimestampCallbackMutex;
     StorageEngine::OldestActiveTransactionTimestampCallback
         _oldestActiveTransactionTimestampCallback;
 
@@ -699,7 +698,7 @@ private:
     ClockSource* const _clockSource;
 
     // Mutex to protect use of _oplogRecordStore by this instance of KV engine.
-    mutable Mutex _oplogManagerMutex = MONGO_MAKE_LATCH("::_oplogManagerMutex");
+    mutable stdx::mutex _oplogManagerMutex;
     const WiredTigerRecordStore* _oplogRecordStore = nullptr;
     std::unique_ptr<WiredTigerOplogManager> _oplogManager;
 
@@ -710,8 +709,7 @@ private:
     std::unique_ptr<WiredTigerSizeStorer> _sizeStorer;
     std::string _sizeStorerUri;
     mutable ElapsedTracker _sizeStorerSyncTracker;
-    mutable Mutex _sizeStorerSyncTrackerMutex =
-        MONGO_MAKE_LATCH("WiredTigerKVEngine::_sizeStorerSyncTrackerMutex");
+    mutable stdx::mutex _sizeStorerSyncTrackerMutex;
 
     bool _ephemeral;  // whether we are using the in-memory mode of the WT engine
     const bool _inRepairMode;
@@ -724,8 +722,7 @@ private:
     std::unique_ptr<WiredTigerSession> _backupSession;
     WiredTigerBackup _wtBackup;
 
-    mutable Mutex _oplogPinnedByBackupMutex =
-        MONGO_MAKE_LATCH("WiredTigerKVEngine::_oplogPinnedByBackupMutex");
+    mutable stdx::mutex _oplogPinnedByBackupMutex;
     boost::optional<Timestamp> _oplogPinnedByBackup;
     Timestamp _recoveryTimestamp;
 
@@ -739,15 +736,14 @@ private:
 
     AtomicWord<std::uint64_t> _oplogNeededForCrashRecovery;
 
-    mutable Mutex _oldestTimestampPinRequestsMutex =
-        MONGO_MAKE_LATCH("WiredTigerKVEngine::_oldestTimestampPinRequestsMutex");
+    mutable stdx::mutex _oldestTimestampPinRequestsMutex;
     std::map<std::string, Timestamp> _oldestTimestampPinRequests;
 
     // Pins the oplog so that OplogTruncateMarkers will not truncate oplog history equal or newer to
     // this timestamp.
     AtomicWord<std::uint64_t> _pinnedOplogTimestamp;
 
-    Mutex _checkpointMutex = MONGO_MAKE_LATCH("WiredTigerKVEngine::_checkpointMutex");
+    stdx::mutex _checkpointMutex;
 
     // The amount of memory alloted for the WiredTiger cache.
     size_t _cacheSizeMB;
@@ -764,7 +760,7 @@ private:
     AtomicWord<std::uint64_t> _finishedCheckpointIteration{0};
 
     // Protects getting and setting the _journalListener below.
-    Mutex _journalListenerMutex = MONGO_MAKE_LATCH("WiredTigerSessionCache::_journalListenerMutex");
+    stdx::mutex _journalListenerMutex;
 
     // Notified when we commit to the journal.
     //
@@ -776,7 +772,7 @@ private:
 
     // Counter and critical section mutex for waitUntilDurable
     AtomicWord<unsigned> _lastSyncTime;
-    Mutex _lastSyncMutex = MONGO_MAKE_LATCH("WiredTigerSessionCache::_lastSyncMutex");
+    stdx::mutex _lastSyncMutex;
 
     // owned, and never explicitly closed (uses connection close to clean up)
     WT_SESSION* _waitUntilDurableSession = nullptr;

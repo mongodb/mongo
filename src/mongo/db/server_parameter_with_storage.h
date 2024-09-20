@@ -257,8 +257,7 @@ struct storage_wrapper<TenantIdMap<U>> {
     }
 
 private:
-    mutable Mutex _storageMutex =
-        MONGO_MAKE_LATCH("IDLServerParameterWithStorage::_tenantStorageMutex");
+    mutable stdx::mutex _storageMutex;
     TenantIdMap<U>& _storage;
 
     // Copy of original value to be read from during resets.
@@ -298,7 +297,7 @@ struct storage_wrapper {
     }
 
 private:
-    mutable Mutex _storageMutex = MONGO_MAKE_LATCH("IDLServerParameterWithStorage:_storageMutex");
+    mutable stdx::mutex _storageMutex;
     U& _storage;
 
     // Copy of original value to be read from during resets.

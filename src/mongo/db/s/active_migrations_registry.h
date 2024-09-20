@@ -223,7 +223,7 @@ private:
     void _clearSplitMergeChunk(const NamespaceString& nss);
 
     // Protects the state below
-    Mutex _mutex = MONGO_MAKE_LATCH("ActiveMigrationsRegistry::_mutex");
+    stdx::mutex _mutex;
 
     // Condition variable which will be signaled whenever any of the states below become false,
     // boost::none or a specific namespace removed from the map.

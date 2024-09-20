@@ -84,7 +84,7 @@ public:
     size_t size() const;
 
 private:
-    mutable Mutex _mutex = MONGO_MAKE_LATCH("OperationKeyManager::_mutex");
+    mutable stdx::mutex _mutex;
 
     stdx::unordered_map<OperationKey, OperationId, OperationKey::Hash> _idByOperationKey;
 };

@@ -69,7 +69,7 @@ private:
 
     void _threadRoutine();
 
-    Mutex _mutex = MONGO_MAKE_LATCH("AlarmRunnerBackgroundThread::_mutex");
+    stdx::mutex _mutex;
     stdx::condition_variable _condVar;
     bool _running = false;
     Date_t _nextAlarm = Date_t::max();

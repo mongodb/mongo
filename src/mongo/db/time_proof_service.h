@@ -95,7 +95,7 @@ private:
     };
 
     // protects _cache
-    Mutex _cacheMutex = MONGO_MAKE_LATCH("TimeProofService::_cacheMutex");
+    stdx::mutex _cacheMutex;
 
     // one-entry cache
     boost::optional<CacheEntry> _cache;

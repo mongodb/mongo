@@ -71,8 +71,7 @@ public:
     void setKeepOpen(const HostAndPort& hostAndPort, bool keepOpen);
 
 private:
-    Mutex _mutex =
-        MONGO_MAKE_LATCH(HierarchicalAcquisitionLevel(2), "EgressConnectionCloserManager::_mutex");
+    stdx::mutex _mutex;
     stdx::unordered_set<EgressConnectionCloser*> _egressConnectionClosers;
 };
 

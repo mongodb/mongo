@@ -596,7 +596,7 @@ private:
     ClockSource* _clockSource;
 
     // Synchronizes access to all private state variables below.
-    mutable Mutex _mutex = MONGO_MAKE_LATCH("ClusterCursorManager::_mutex");
+    mutable stdx::mutex _mutex;
 
     bool _inShutdown{false};
 

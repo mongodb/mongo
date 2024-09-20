@@ -132,7 +132,7 @@ private:
 
     const MultiUpdateCoordinatorService* const _service;
 
-    mutable Mutex _mutex = MONGO_MAKE_LATCH("MultiUpdateCoordinatorInstance::_mutex");
+    mutable stdx::mutex _mutex;
     const MultiUpdateCoordinatorMetadata _metadata;
     MultiUpdateCoordinatorMutableFields _mutableFields;
     const MultiUpdateCoordinatorPhaseEnum _beganInPhase;

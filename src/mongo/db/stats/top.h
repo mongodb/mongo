@@ -180,7 +180,7 @@ private:
     AtomicOperationLatencyHistogram _workingTimeHistogramStats;
 
     // _lockUsage should always be acquired before using _usage.
-    Mutex _lockUsage = MONGO_MAKE_LATCH("Top::_lockUsage");
+    stdx::mutex _lockUsage;
     UsageMap _usage;
 };
 

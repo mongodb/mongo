@@ -174,7 +174,7 @@ private:
     KVEngine* const _engine;
 
     // Guards access to member variables below.
-    mutable Mutex _mutex = MONGO_MAKE_LATCH("KVDropPendingIdentReaper::_mutex");
+    mutable stdx::mutex _mutex;
 
     // Drop-pending idents. Ordered by drop timestamp.
     DropPendingIdents _dropPendingIdents;

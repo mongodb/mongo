@@ -223,7 +223,7 @@ COMMON_THREAD_POOL_TEST(RepeatedScheduleDoesntSmashStack) {
     auto& pool = getThreadPool();
     std::function<void()> func;
     std::size_t n = 0;
-    auto mutex = MONGO_MAKE_LATCH();
+    stdx::mutex mutex;
     stdx::condition_variable condvar;
     func = [&pool, &n, &func, &condvar, &mutex, depth]() {
         stdx::unique_lock<Latch> lk(mutex);

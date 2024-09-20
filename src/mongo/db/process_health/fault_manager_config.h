@@ -228,8 +228,7 @@ private:
     bool _periodicChecksDisabledForTests = false;
 
     stdx::unordered_map<FaultFacetType, HealthObserverIntensityEnum> _facetToIntensityMapForTest;
-    mutable Mutex _mutex =
-        MONGO_MAKE_LATCH(HierarchicalAcquisitionLevel(5), "FaultManagerConfig::_mutex");
+    mutable stdx::mutex _mutex;
 };
 
 }  // namespace process_health

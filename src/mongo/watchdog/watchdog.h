@@ -209,7 +209,7 @@ private:
     stdx::thread _thread;
 
     // Lock to protect _state and control _thread
-    Mutex _mutex = MONGO_MAKE_LATCH("WatchdogPeriodicThread::_mutex");
+    stdx::mutex _mutex;
     stdx::condition_variable _condvar;
 };
 
@@ -429,7 +429,7 @@ private:
     };
 
     // Lock to protect _state and control _thread
-    Mutex _mutex = MONGO_MAKE_LATCH("WatchdogMonitor::_mutex");
+    stdx::mutex _mutex;
 
     // State of watchdog
     State _state{State::kNotStarted};

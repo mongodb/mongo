@@ -84,7 +84,7 @@ private:
     void _waitForSpace_inlock(stdx::unique_lock<Latch>& lk, std::size_t size);
     void _clear_inlock(WithLock lk);
 
-    mutable Mutex _mutex = MONGO_MAKE_LATCH("OplogBufferBatchedQueue::_mutex");
+    mutable stdx::mutex _mutex;
     stdx::condition_variable _notEmptyCV;
     stdx::condition_variable _notFullCV;
     const std::size_t _maxSize;

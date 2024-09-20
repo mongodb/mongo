@@ -108,7 +108,6 @@ private:
     /**
      * Protects access to member variables.
      */
-    mutable Mutex _memberAccessMutex =
-        MONGO_MAKE_LATCH("LDAPCumulativeOperationStats::_memberAccessMutex");
+    mutable stdx::mutex _memberAccessMutex;
 };
 }  // namespace mongo

@@ -550,11 +550,11 @@ private:
     // Executor for periodically reloading the registry (ie. in which _periodicReload() runs).
     std::shared_ptr<executor::TaskExecutor> _executor{};
 
-    mutable Mutex _cacheMutex = MONGO_MAKE_LATCH("ShardRegistry::_cacheMutex");
+    mutable stdx::mutex _cacheMutex;
     std::unique_ptr<Cache> _cache;
 
     // Protects _configShardData, and _latestNewConnStrings.
-    mutable Mutex _mutex = MONGO_MAKE_LATCH("ShardRegistry::_mutex");
+    mutable stdx::mutex _mutex;
 
     // Store a reference to the configShard.
     ShardRegistryData _configShardData;

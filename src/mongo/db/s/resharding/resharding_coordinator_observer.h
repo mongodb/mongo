@@ -133,7 +133,7 @@ private:
     void _onAbortOrStepdown(WithLock, Status status);
 
     // Protects the state below
-    Mutex _mutex = MONGO_MAKE_LATCH("ReshardingCoordinatorObserver::_mutex");
+    stdx::mutex _mutex;
 
     /**
      * Promises indicating that either all donors or all recipients have entered a specific state.

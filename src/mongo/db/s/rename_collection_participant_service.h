@@ -188,7 +188,7 @@ private:
     void _invalidateFutures(const Status& errStatus, WithLock);
 
     // Protects the state of the service object (the recovery doc and the promise fields).
-    Mutex _stateMutex = MONGO_MAKE_LATCH("RenameParticipantInstance::_stateMutex");
+    stdx::mutex _stateMutex;
 
     // Ready when step 1 (drop target && rename source) has been completed: once set, a successful
     // response to `ShardsvrRenameCollectionParticipantCommand` can be returned to the coordinator.

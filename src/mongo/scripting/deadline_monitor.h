@@ -194,7 +194,7 @@ private:
     using TaskDeadlineMap = stdx::unordered_map<_Task*, Date_t>;
     TaskDeadlineMap _tasks;  // map of running tasks with deadlines
     // protects all non-const members, except _monitorThread
-    Mutex _deadlineMutex = MONGO_MAKE_LATCH("DeadlineMonitor::_deadlineMutex");
+    stdx::mutex _deadlineMutex;
     stdx::condition_variable _newDeadlineAvailable;    // Signaled for timeout, start and stop
     stdx::thread _monitorThread;                       // the deadline monitor thread
     Date_t _nearestDeadlineWallclock = Date_t::max();  // absolute time of the nearest deadline

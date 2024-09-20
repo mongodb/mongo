@@ -256,9 +256,8 @@ private:
                             const NamespaceString& nss,
                             SampledCommandNameEnum cmdName);
 
-    mutable Mutex _sampleRateLimitersMutex =
-        MONGO_MAKE_LATCH("QueryAnalysisSampler::_sampleRateLimitersMutex");
-    mutable Mutex _queryStatsMutex = MONGO_MAKE_LATCH("QueryAnalysisSampler::_queryStatsMutex");
+    mutable stdx::mutex _sampleRateLimitersMutex;
+    mutable stdx::mutex _queryStatsMutex;
 
     PeriodicJobAnchor _periodicQueryStatsRefresher;
     QueryStats _queryStats;

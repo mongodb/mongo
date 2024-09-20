@@ -49,9 +49,7 @@ public:
     Milliseconds getPrimaryServerChangeElapsedTime() const;
 
 private:
-    mutable Mutex _mutex =
-        MONGO_MAKE_LATCH(HierarchicalAcquisitionLevel(0),
-                         "StreamableReplicaSetMonitorDiscoveryTimeProcessor::_mutex");
+    mutable stdx::mutex _mutex;
     Timer _elapsedTime;
 };
 }  // namespace mongo

@@ -275,8 +275,7 @@ private:
     // index builds that were resumed.
     const bool _skipNumAppliedCheck = false;
 
-    mutable Mutex _multikeyPathMutex =
-        MONGO_MAKE_LATCH("IndexBuildInterceptor::_multikeyPathMutex");
+    mutable stdx::mutex _multikeyPathMutex;
     boost::optional<MultikeyPaths> _multikeyPaths;
 };
 }  // namespace mongo

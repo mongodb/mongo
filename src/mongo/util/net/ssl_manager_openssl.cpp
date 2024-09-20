@@ -1156,7 +1156,7 @@ private:
 
     static const ServiceContext::Decoration<boost::optional<OCSPCache>> getOCSPCache;
 
-    Mutex _mutex = MONGO_MAKE_LATCH("OCSPCache::_mutex");
+    stdx::mutex _mutex;
 
     ThreadPool _threadPool{[] {
         ThreadPool::Options options;
@@ -1236,7 +1236,7 @@ private:
     // and the manager it owns still matches the manager.
     std::weak_ptr<const SSLConnectionContext> _ownedByContext;
 
-    Mutex _staplingMutex = MONGO_MAKE_LATCH("OCSPStaplingJobRunner::_mutex");
+    stdx::mutex _staplingMutex;
     PeriodicRunner::JobAnchor _ocspStaplingAnchor;
     bool _shutdown{false};
 };
@@ -1353,7 +1353,7 @@ private:
     // Weak pointer to verify that this manager is still owned by this context.
     synchronized_value<std::weak_ptr<const SSLConnectionContext>> _ownedByContext;
 
-    Mutex _sharedResponseMutex = MONGO_MAKE_LATCH("OCSPStaplingJobRunner::_sharedResponseMutex");
+    stdx::mutex _sharedResponseMutex;
     std::shared_ptr<OCSPStaplingContext> _ocspStaplingContext;
 
     OCSPFetcher _fetcher;
@@ -1413,7 +1413,7 @@ private:
         }
 
     private:
-        Mutex _mutex = MONGO_MAKE_LATCH("PasswordFetcher::_mutex");
+        stdx::mutex _mutex;
         SecureString _password;  // Protected by _mutex
 
         std::string _prompt;

@@ -250,7 +250,7 @@ private:
 
     // Protects member data of BackgroundSync.
     // Never hold the BackgroundSync mutex when trying to acquire the ReplicationCoordinator mutex.
-    mutable Mutex _mutex = MONGO_MAKE_LATCH("BackgroundSync::_mutex");  // (S)
+    mutable stdx::mutex _mutex;  // (S)
 
     OpTime _lastOpTimeFetched;  // (M)
 

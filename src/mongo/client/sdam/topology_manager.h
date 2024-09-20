@@ -113,7 +113,7 @@ private:
         const TopologyDescriptionPtr& oldTopologyDescription,
         const TopologyDescriptionPtr& newTopologyDescription) const;
 
-    mutable mongo::Mutex _mutex = MONGO_MAKE_LATCH("TopologyManager");
+    mutable mongo::stdx::mutex _mutex;
     const SdamConfiguration _config;
     ClockSource* _clockSource;
     TopologyDescriptionPtr _topologyDescription;

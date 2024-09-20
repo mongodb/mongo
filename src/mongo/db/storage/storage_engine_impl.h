@@ -304,7 +304,7 @@ public:
         PeriodicRunner* _periodicRunner;
 
         // Protects access to _listeners below.
-        Mutex _monitorMutex = MONGO_MAKE_LATCH("TimestampMonitor::_monitorMutex");
+        stdx::mutex _monitorMutex;
         std::vector<TimestampListener*> _listeners;
 
         // This should remain as the last member variable so that its destructor gets executed first

@@ -139,7 +139,7 @@ private:
     // counter of how many successful and failed responses were received.
     responseOutcomeCount _responseOutcomeCount;
 
-    Mutex _mutex = MONGO_MAKE_LATCH("ExhaustRequestHandlerUtil::_mutex");
+    stdx::mutex _mutex;
     stdx::condition_variable _cv;
 
     // called when a server sends a new isMaster exhaust response. Updates _responseOutcomeCount

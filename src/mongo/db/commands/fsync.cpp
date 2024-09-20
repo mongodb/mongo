@@ -74,7 +74,7 @@
 namespace mongo {
 
 // Protects access to globalFsyncLockThread and other global fsync state.
-Mutex fsyncStateMutex = MONGO_MAKE_LATCH("fsyncStateMutex");
+stdx::mutex fsyncStateMutex;
 
 // Globally accessible FsyncLockThread to allow shutdown to coordinate with any active fsync cmds.
 // Must acquire the 'fsyncStateMutex' before accessing.
@@ -283,7 +283,7 @@ private:
     // number is decremented to 0. May only be accessed while 'fsyncStateMutex' is held.
     int64_t _lockCount = 0;
 
-    Mutex _fsyncLockedMutex = MONGO_MAKE_LATCH("FSyncCommand::_fsyncLockedMutex");
+    stdx::mutex _fsyncLockedMutex;
     bool _fsyncLocked = false;
 };
 FSyncCore fsyncCore;

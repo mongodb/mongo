@@ -67,7 +67,7 @@ protected:
     std::unique_ptr<RollbackChecker> _rollbackChecker;
     RollbackChecker::Result _hasRolledBackResult = {ErrorCodes::NotYetInitialized, ""};
     bool _hasCalledCallback;
-    mutable Mutex _mutex = MONGO_MAKE_LATCH("RollbackCheckerTest::_mutex");
+    mutable stdx::mutex _mutex;
 };
 
 void RollbackCheckerTest::setUp() {

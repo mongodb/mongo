@@ -169,7 +169,7 @@ private:
     ServiceContext* _serviceContext;
 
     // Protects the state below.
-    mutable Mutex _mutex = MONGO_MAKE_LATCH("TenantMigrationRecipientAccessBlocker::_mutex");
+    mutable stdx::mutex _mutex;
 
     BlockerState _state;
 

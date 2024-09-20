@@ -341,7 +341,7 @@ private:
         TenantFileCloner* currentTenantFileCloner = nullptr;
     };
 
-    Mutex _mutex = MONGO_MAKE_LATCH("TenantFileImporterService::_mutex");
+    stdx::mutex _mutex;
 
     // All member variables are labeled with one of the following codes indicating the
     // synchronization rules for accessing them.

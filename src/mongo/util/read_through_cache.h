@@ -115,7 +115,7 @@ private:
     //
     // Has a lock level of 2, meaning what while held, any code is only allowed to take the Client
     // lock.
-    Mutex _cancelTokensMutex = MONGO_MAKE_LATCH("ReadThroughCacheBase::_cancelTokensMutex");
+    stdx::mutex _cancelTokensMutex;
 };
 
 template <typename Result, typename Key, typename Value, typename Time, typename... LookupArgs>

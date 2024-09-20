@@ -87,7 +87,7 @@ private:
         stdx::thread _thread;
         SharedPromise<void> _stopPromise;
 
-        mutable Mutex _mutex = MONGO_MAKE_LATCH("PeriodicJobImpl::_mutex");
+        mutable stdx::mutex _mutex;
         stdx::condition_variable _condvar;
         /**
          * The current execution status of the job.

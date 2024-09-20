@@ -93,7 +93,7 @@ public:
 private:
     std::string printActiveOperations(WithLock lock) const;
 
-    mutable Mutex _mutex = MONGO_MAKE_LATCH("ServerlessMutualExclusionRegistry::_mutex");
+    mutable stdx::mutex _mutex;
     boost::optional<LockType> _activeLockType;
     std::set<UUID> _activeOperations;
 };

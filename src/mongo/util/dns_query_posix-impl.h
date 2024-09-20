@@ -377,7 +377,7 @@ private:
     static Mutex _staticMutex;
 };
 
-Mutex DNSQueryState::_staticMutex = MONGO_MAKE_LATCH("DNSQueryState::_staticMutex");
+stdx::mutex DNSQueryState::_staticMutex;
 
 }  // namespace
 }  // namespace dns

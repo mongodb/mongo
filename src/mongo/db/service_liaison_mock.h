@@ -100,7 +100,7 @@ private:
 
     boost::optional<SessionKiller::Matcher> _matcher;
 
-    mutable Mutex _mutex = MONGO_MAKE_LATCH("MockServiceLiaisonImpl::_mutex");
+    mutable stdx::mutex _mutex;
     LogicalSessionIdSet _activeSessions;
     LogicalSessionIdSet _cursorSessions;
 };

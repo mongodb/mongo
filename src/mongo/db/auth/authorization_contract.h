@@ -106,7 +106,7 @@ public:
     bool contains(const AuthorizationContract& other) const;
 
 private:
-    mutable Mutex _mutex = MONGO_MAKE_LATCH("AuthorizationContract::_mutex");
+    mutable stdx::mutex _mutex;
 
     // Set of access checks performed
     std::bitset<idlEnumCount<AccessCheckEnum>> _checks;

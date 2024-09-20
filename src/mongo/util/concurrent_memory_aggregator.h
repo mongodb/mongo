@@ -122,7 +122,7 @@ private:
     AtomicWord<int64_t> _curMemoryUsageBytes;
 
     // Mutex that protects access to `_chunkedMemoryAggregators`.
-    mutable Mutex _mutex = MONGO_MAKE_LATCH("ConcurrentMemoryAggregator::_mutex");
+    mutable stdx::mutex _mutex;
 
     // Map (key is the ID) of currently active chunked memory aggregators. This gets automatically
     // cleaned up when `ChunkedMemoryAggregator`s go out of scope.

@@ -458,7 +458,7 @@ private:
 
     typedef std::deque<ScopeAndPool> Pools;  // More-recently used Scopes are kept at the front.
     Pools _pools;                            // protected by _mutex
-    Mutex _mutex = MONGO_MAKE_LATCH("ScopeCache::_mutex");
+    stdx::mutex _mutex;
 };
 
 ScopeCache scopeCache;

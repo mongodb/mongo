@@ -311,7 +311,7 @@ TEST_F(OperationCPUTimerTest, TimerPausesOnBlockingSleep) {
         timer->stop();
 
         stdx::condition_variable cv;
-        auto mutex = MONGO_MAKE_LATCH("TimerPausesOnBlockingSleep");
+        stdx::mutex mutex;
         timer->start();
         stdx::unique_lock lk(mutex);
         cv.wait_for(lk, kSomeDelay.toSystemDuration(), [] { return false; });

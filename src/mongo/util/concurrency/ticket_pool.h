@@ -258,7 +258,7 @@ private:
 
     // This mutex protects the _waiters queue by preventing items from being added and removed, but
     // does not protect the elements of the queue.
-    Mutex _mutex = MONGO_MAKE_LATCH("TicketPool::_mutex");
+    stdx::mutex _mutex;
     Queue _waiters;
 };
 }  // namespace mongo

@@ -87,7 +87,7 @@ protected:
         return _serviceContextHolder.get();
     }
 
-    Mutex _mutex = MONGO_MAKE_LATCH("DConcurrencyTest BM Mutex");
+    stdx::mutex _mutex;
     stdx::condition_variable _cv;
 
     ServiceContext::UniqueServiceContext _serviceContextHolder;

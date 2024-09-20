@@ -535,7 +535,7 @@ TEST(InvalidatingLRUCacheParallelTest, CacheSizeZeroInsertOrAssignAndGet) {
 
 TEST(InvalidatingLRUCacheParallelTest, AdvanceTime) {
     AtomicWord<uint64_t> counter{1};
-    Mutex insertOrAssignMutex = MONGO_MAKE_LATCH("ReadThroughCacheBase::_cancelTokenMutex");
+    stdx::mutex insertOrAssignMutex;
 
     parallelTest<TestValueCacheCausallyConsistent>(0, [&](auto& cache) {
         const int key = 300;

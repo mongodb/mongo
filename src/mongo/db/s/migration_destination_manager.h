@@ -321,7 +321,7 @@ private:
     AtomicWord<long long> _sessionOplogEntriesMigrated{0};
 
     // Mutex to guard all fields below
-    mutable Mutex _mutex = MONGO_MAKE_LATCH("MigrationDestinationManager::_mutex");
+    mutable stdx::mutex _mutex;
 
     // Migration session ID uniquely identifies the migration and indicates whether the prepare
     // method has been called.

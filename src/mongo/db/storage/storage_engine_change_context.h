@@ -68,7 +68,7 @@ public:
     void notifyOpCtxDestroyed() noexcept;
 
 private:
-    Mutex _mutex = MONGO_MAKE_LATCH("StorageEngineChangeContext::_mutex");
+    stdx::mutex _mutex;
 
     // Keeps track of opCtxs associated with a storage engine that is being replaced.
     // Protected by _mutex

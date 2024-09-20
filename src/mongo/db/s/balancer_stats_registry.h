@@ -134,11 +134,11 @@ private:
         kSecondary,
     };
 
-    mutable Mutex _stateMutex = MONGO_MAKE_LATCH("BalancerStatsRegistry::_stateMutex");
+    mutable stdx::mutex _stateMutex;
     AtomicWord<State> _state{State::kSecondary};
     ServiceContext::UniqueOperationContext _initOpCtxHolder;
 
-    mutable Mutex _mutex = MONGO_MAKE_LATCH("BalancerStatsRegistry::_mutex");
+    mutable stdx::mutex _mutex;
     // Map containing all the currently cached collection stats
     stdx::unordered_map<UUID, CollectionStats, UUID::Hash> _collStatsMap;
 

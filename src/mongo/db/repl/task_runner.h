@@ -149,7 +149,7 @@ private:
     ThreadPool* _threadPool;
 
     // Protects member data of this TaskRunner.
-    mutable Mutex _mutex = MONGO_MAKE_LATCH("TaskRunner::_mutex");
+    mutable stdx::mutex _mutex;
 
     stdx::condition_variable _condition;
 

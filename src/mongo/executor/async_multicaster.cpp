@@ -61,7 +61,7 @@ std::vector<AsyncMulticaster::Reply> AsyncMulticaster::multicast(
     struct State {
         State(size_t leftToDo) : leftToDo(leftToDo) {}
 
-        Mutex mutex = MONGO_MAKE_LATCH("State::mutex");
+        stdx::mutex mutex;
         stdx::condition_variable cv;
         size_t leftToDo;
         size_t running = 0;

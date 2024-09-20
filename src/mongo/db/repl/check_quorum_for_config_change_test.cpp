@@ -110,7 +110,7 @@ private:
 
     std::unique_ptr<stdx::thread> _quorumCheckThread;
     Status _quorumCheckStatus;
-    Mutex _mutex = MONGO_MAKE_LATCH("CheckQuorumTest::_mutex");
+    stdx::mutex _mutex;
     bool _isQuorumCheckDone;
 };
 

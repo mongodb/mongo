@@ -244,7 +244,7 @@ private:
 
 private:
     const NamespaceString _stateDocumentsNS = NamespaceString::kShardSplitDonorsNamespace;
-    mutable Mutex _mutex = MONGO_MAKE_LATCH("ShardSplitDonorService::_mutex");
+    mutable stdx::mutex _mutex;
 
     const UUID _migrationId;
     ServiceContext* const _serviceContext;

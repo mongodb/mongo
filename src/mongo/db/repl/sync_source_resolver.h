@@ -200,7 +200,7 @@ private:
     const OnCompletionFn _onCompletion;
 
     // Protects members of this sync source resolver defined below.
-    mutable Mutex _mutex = MONGO_MAKE_LATCH("SyncSourceResolverResponse::_mutex");
+    mutable stdx::mutex _mutex;
     mutable stdx::condition_variable _condition;
 
     // State transitions:

@@ -185,7 +185,7 @@ private:
      */
     Date_t _getMinLastPingTime();
 
-    mutable Mutex _mutex = MONGO_MAKE_LATCH("QueryAnalysisCoordinator::_mutex");
+    mutable stdx::mutex _mutex;
 
     CollectionQueryAnalyzerConfigurationMap _configurations;
     StringMap<Sampler> _samplers;

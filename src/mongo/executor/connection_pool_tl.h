@@ -101,8 +101,7 @@ private:
     const ConnectionPool::Options _connPoolOptions;
     std::shared_ptr<const transport::SSLConnectionContext> _transientSSLContext;
 
-    mutable Mutex _mutex =
-        MONGO_MAKE_LATCH(HierarchicalAcquisitionLevel(0), "TLTypeFactory::_mutex");
+    mutable stdx::mutex _mutex;
     AtomicWord<bool> _inShutdown{false};
     stdx::unordered_set<Type*> _collars;
 };

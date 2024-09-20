@@ -110,7 +110,7 @@ private:
      */
     void _deregisterTTLInfo(UUID uuid, const Info& info);
 
-    Mutex _ttlInfosLock = MONGO_MAKE_LATCH("TTLCollectionCache::_ttlInfosLock");
+    stdx::mutex _ttlInfosLock;
     InfoMap _ttlInfos;
 };
 }  // namespace mongo

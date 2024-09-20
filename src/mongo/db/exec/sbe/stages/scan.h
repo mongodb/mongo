@@ -379,7 +379,7 @@ class ParallelScanStage final : public PlanStage {
         RecordId end;
     };
     struct ParallelState {
-        Mutex mutex = MONGO_MAKE_LATCH("ParallelScanStage::ParallelState::mutex");
+        stdx::mutex mutex;
         std::vector<Range> ranges;
         AtomicWord<size_t> currentRange{0};
     };

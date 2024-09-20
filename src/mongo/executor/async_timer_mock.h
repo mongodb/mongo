@@ -89,7 +89,7 @@ public:
 private:
     void _callAllHandlers(std::error_code ec);
 
-    Mutex _mutex = MONGO_MAKE_LATCH("AsyncTimerMockImpl::_mutex");
+    stdx::mutex _mutex;
     Milliseconds _timeLeft;
     std::vector<AsyncTimerInterface::Handler> _handlers;
 };

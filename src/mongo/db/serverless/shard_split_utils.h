@@ -143,8 +143,7 @@ public:
     SharedSemiFuture<HostAndPort> getSplitAcceptedFuture() const;
 
 private:
-    mutable Mutex _mutex =
-        MONGO_MAKE_LATCH("ShardSplitDonorService::getRecipientAcceptSplitFuture::_mutex");
+    mutable stdx::mutex _mutex;
 
     bool _fulfilled{false};
     const size_t _numberOfRecipient;

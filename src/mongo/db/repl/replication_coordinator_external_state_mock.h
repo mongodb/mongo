@@ -247,8 +247,7 @@ private:
     Status _storeLocalConfigDocumentStatus;
     Status _storeLocalLastVoteDocumentStatus;
     // mutex and cond var for controlling stroeLocalLastVoteDocument()'s hanging
-    Mutex _shouldHangLastVoteMutex =
-        MONGO_MAKE_LATCH("ReplicationCoordinatorExternalStateMock::_shouldHangLastVoteMutex");
+    stdx::mutex _shouldHangLastVoteMutex;
     stdx::condition_variable _shouldHangLastVoteCondVar;
     bool _storeLocalLastVoteDocumentShouldHang;
     bool _connectionsClosed;

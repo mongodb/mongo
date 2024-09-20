@@ -54,7 +54,7 @@ TEST(ConnectionPoolTest, ConnectionPoolMaxInUseConnectionsTest) {
     auto host = fixture.getServers()[0].toString();
 
     stdx::condition_variable cv;
-    auto mutex = MONGO_MAKE_LATCH();
+    stdx::mutex mutex;
     int counter = 0;
 
     pool.setMaxInUse(2);
@@ -133,7 +133,7 @@ TEST(ConnectionPoolTest, ConnectionPoolShutdownLogicTest) {
     auto host = fixture.getServers()[0].toString();
 
     stdx::condition_variable cv;
-    auto mutex = MONGO_MAKE_LATCH();
+    stdx::mutex mutex;
     int counter = 0;
 
     pool.setMaxInUse(2);

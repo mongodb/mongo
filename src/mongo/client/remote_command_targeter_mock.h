@@ -115,7 +115,7 @@ private:
     StatusWith<std::vector<HostAndPort>> _findHostReturnValue;
 
     // Protects _hostsMarkedDown.
-    mutable Mutex _mutex = MONGO_MAKE_LATCH("RemoteCommandTargeterMock::_mutex");
+    mutable stdx::mutex _mutex;
 
     // HostAndPorts marked not primary or unreachable. Meant to verify a code path updates the
     // RemoteCommandTargeterMock.

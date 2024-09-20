@@ -310,7 +310,7 @@ private:
     mutable std::vector<BSONObj> _sentRequests;
     bool _runningLocalTransaction{false};
 
-    mutable Mutex _mutex = MONGO_MAKE_LATCH("MockTransactionClient");
+    mutable stdx::mutex _mutex;
     mutable stdx::condition_variable _hangNextCommitOrAbortCommandCV;
     bool _hangNextCommitOrAbortCommand{false};
     mutable unittest::Barrier _hitHungCommitOrAbort{2};

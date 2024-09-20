@@ -202,7 +202,7 @@ private:
     UserCacheAccessStats _userCacheAccessStats;
     LDAPOperationStats _ldapOperationStats;
 
-    mutable Mutex _mutex = MONGO_MAKE_LATCH("UserAcquisitionStats::_mutex");
+    mutable stdx::mutex _mutex;
 };
 
 using SharedUserAcquisitionStats = std::shared_ptr<UserAcquisitionStats>;

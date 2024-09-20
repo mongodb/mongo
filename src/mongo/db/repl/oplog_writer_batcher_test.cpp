@@ -136,7 +136,7 @@ public:
         _drainMode = false;
     }
 
-    mutable Mutex _mutex = MONGO_MAKE_LATCH("OplogWriterBufferMock::mutex");
+    mutable stdx::mutex _mutex;
     stdx::condition_variable _notEmptyCv;
     std::queue<OplogWriterBatch> _queue;
     bool _drainMode = false;

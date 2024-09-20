@@ -201,7 +201,7 @@ public:
                             ActionType::internal));
         }
 
-        Mutex _mutex = MONGO_MAKE_LATCH("ShardsvrSetUserWriteBlockCommand::_mutex");
+        stdx::mutex _mutex;
     };
 
     std::string help() const override {

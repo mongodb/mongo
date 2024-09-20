@@ -341,8 +341,7 @@ private:
     Status _refreshAutoMergeSettings(OperationContext* opCtx);
 
     // The latest read balancer settings and a mutex to protect its swaps
-    mutable Mutex _balancerSettingsMutex =
-        MONGO_MAKE_LATCH("BalancerConfiguration::_balancerSettingsMutex");
+    mutable stdx::mutex _balancerSettingsMutex;
     BalancerSettingsType _balancerSettings;
 
     // Max chunk size after which a chunk would be considered jumbo and won't be moved. This value

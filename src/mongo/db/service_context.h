@@ -788,7 +788,7 @@ private:
      */
     void _delistOperation(OperationContext* opCtx) noexcept;
 
-    Mutex _mutex = MONGO_MAKE_LATCH(/*HierarchicalAcquisitionLevel(2), */ "ServiceContext::_mutex");
+    stdx::mutex _mutex;
 
     /**
      * The periodic runner.

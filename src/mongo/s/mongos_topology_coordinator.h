@@ -112,7 +112,7 @@ private:
     // (M)  Reads and writes guarded by _mutex
 
     // Protects member data of this MongosTopologyCoordinator.
-    mutable Mutex _mutex = MONGO_MAKE_LATCH("MongosTopologyCoordinator::_mutex");
+    mutable stdx::mutex _mutex;
 
     // Keeps track of the current mongos TopologyVersion.
     TopologyVersion _topologyVersion;  // (M)

@@ -103,8 +103,7 @@ struct CappedCollectionState {
     // For capped deletes performed on collections where 'needsCappedLock' is false, the mutex below
     // protects 'cappedFirstRecord'. Otherwise, when 'needsCappedLock' is true, the exclusive
     // metadata resource protects 'cappedFirstRecord'.
-    Mutex cappedFirstRecordMutex =
-        MONGO_MAKE_LATCH("CappedCollectionState::cappedFirstRecordMutex");
+    stdx::mutex cappedFirstRecordMutex;
     RecordId cappedFirstRecord;
 };
 

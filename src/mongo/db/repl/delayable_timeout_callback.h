@@ -104,7 +104,7 @@ protected:
         return _executor;
     }
 
-    mutable Mutex _mutex = MONGO_MAKE_LATCH("DelayableTimeoutCallback");
+    mutable stdx::mutex _mutex;
 
 private:
     void _handleTimeout(const executor::TaskExecutor::CallbackArgs& cbData);

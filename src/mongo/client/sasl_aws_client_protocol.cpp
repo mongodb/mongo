@@ -58,7 +58,7 @@ namespace mongo {
 namespace awsIam {
 namespace {
 // Secure Random for AWS SASL Nonce generation
-Mutex saslAWSClientMutex = MONGO_MAKE_LATCH("IAMAWSClientMutex");
+stdx::mutex saslAWSClientMutex;
 SecureRandom saslAWSClientGen;
 
 std::vector<char> generateClientNonce() {

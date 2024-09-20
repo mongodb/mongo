@@ -76,7 +76,7 @@ private:
     // Clock source used for timing outages and recording stats.
     ClockSource* const _clock;
 
-    mutable Mutex _mutex = MONGO_MAKE_LATCH("ReplSyncSharedData::_mutex"_sd);
+    mutable stdx::mutex _mutex;
 
     // Status of the entire sync process.  All syncing tasks should exit if this becomes non-OK.
     Status _status = Status::OK();

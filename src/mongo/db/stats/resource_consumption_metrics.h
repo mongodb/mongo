@@ -573,7 +573,7 @@ public:
 
 private:
     // Protects _dbMetrics and _cpuTime
-    mutable Mutex _mutex = MONGO_MAKE_LATCH("ResourceConsumption::_mutex");
+    mutable stdx::mutex _mutex;
     MetricsMap _dbMetrics;
     Nanoseconds _cpuTime;
 };

@@ -331,8 +331,7 @@ protected:
     };
 
     // protects _storageInterfaceWorkDone.
-    Mutex _storageInterfaceWorkDoneMutex =
-        MONGO_MAKE_LATCH("InitialSyncerTest::_storageInterfaceWorkDoneMutex");
+    stdx::mutex _storageInterfaceWorkDoneMutex;
     StorageInterfaceResults _storageInterfaceWorkDone;
 
     void setUp() override {

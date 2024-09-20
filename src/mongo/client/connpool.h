@@ -449,8 +449,7 @@ private:
 
     typedef std::map<PoolKey, PoolForHost, poolKeyCompare> PoolMap;  // servername -> pool
 
-    mutable Mutex _mutex =
-        MONGO_MAKE_LATCH(HierarchicalAcquisitionLevel(0), "DBConnectionPool::_mutex");
+    mutable stdx::mutex _mutex;
     std::string _name;
 
     // The maximum number of connections we'll save in the pool per-host

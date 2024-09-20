@@ -173,7 +173,7 @@ private:
     std::shared_ptr<executor::ThreadPoolTaskExecutor> _executor;
 
     // TODO SERVER-57253: get rid of _mutex and _started fields
-    Mutex _mutex = MONGO_MAKE_LATCH("MigrationUtilExecutor::_mutex");
+    stdx::mutex _mutex;
     bool _started = false;
 };
 

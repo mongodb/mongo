@@ -122,7 +122,7 @@ private:
 
     void _finishCallback(Status status);
 
-    mutable Mutex _mutex = MONGO_MAKE_LATCH("OplogFetcherMock::_mutex");
+    mutable stdx::mutex _mutex;
 
     std::unique_ptr<OplogFetcherRestartDecision> _oplogFetcherRestartDecision;
 
@@ -138,8 +138,7 @@ private:
 
     // Mutex to ensure we call join() on the _waitForFinishThread only once.  This mutex should
     // never be held when _mutex is held.
-    mutable Mutex _joinFinishThreadMutex =
-        MONGO_MAKE_LATCH("OplogFetcherMock::_joinFinishThreadMutex");
+    mutable stdx::mutex _joinFinishThreadMutex;
 
     // Thread to wait for _finishPromise and call _onShutdownCallbackFn with the given status only
     // once before the OplogFetcher finishes.

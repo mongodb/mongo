@@ -38,7 +38,7 @@ template <int level = 0>
 struct LeveledSynchronizedValueMutexPolicy {
     using mutex_type = Mutex;
     static mutex_type construct() {
-        return MONGO_MAKE_LATCH(HierarchicalAcquisitionLevel(level), "synchronized_value::_mutex");
+        return stdx::mutex();
     }
 };
 

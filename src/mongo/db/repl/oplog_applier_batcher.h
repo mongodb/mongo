@@ -168,7 +168,7 @@ private:
     OplogApplier* _oplogApplier;
     OplogBuffer* const _oplogBuffer;
 
-    Mutex _mutex = MONGO_MAKE_LATCH("OplogApplierBatcher::_mutex");
+    stdx::mutex _mutex;
     stdx::condition_variable _cv;
 
     /**

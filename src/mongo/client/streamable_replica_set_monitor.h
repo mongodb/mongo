@@ -339,7 +339,7 @@ private:
 
     AtomicWord<bool> _isDropped{true};
 
-    mutable Mutex _mutex = MONGO_MAKE_LATCH("ReplicaSetMonitor");
+    mutable stdx::mutex _mutex;
     std::list<HostQueryPtr> _outstandingQueries;
     boost::optional<ChangeNotifierState> _confirmedNotifierState;
     std::shared_ptr<ReplicaSetMonitorStats> _stats;

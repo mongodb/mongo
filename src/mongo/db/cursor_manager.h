@@ -287,7 +287,7 @@ private:
     // A mapping from client OperationKey to corresponding CursorID. Note that it's possible that
     // cursors in the map above are not present in this map, since OperationKey is not required when
     // registering a cursor.
-    mutable Mutex _opKeyMutex = MONGO_MAKE_LATCH("CursorManager::_opKeyMutex");
+    mutable stdx::mutex _opKeyMutex;
     stdx::unordered_map<OperationKey, std::set<CursorId>, UUID::Hash> _opKeyMap;
 };
 

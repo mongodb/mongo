@@ -194,7 +194,7 @@ private:
     std::unique_ptr<Pipeline, PipelineDeleter> _pipeline;
 
     // Synchronization.
-    Mutex _mutex = MONGO_MAKE_LATCH("Exchange::_mutex");
+    stdx::mutex _mutex;
     stdx::condition_variable _haveBufferSpace;
 
     // A thread that is currently loading the exchange buffers.

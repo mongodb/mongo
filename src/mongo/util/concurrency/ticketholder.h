@@ -202,8 +202,7 @@ private:
     void _updateQueueStatsOnTicketAcquisition(AdmissionContext* admCtx,
                                               TicketHolder::QueueStats& queueStats);
 
-    Mutex _resizeMutex =
-        MONGO_MAKE_LATCH(HierarchicalAcquisitionLevel(2), "TicketHolder::_resizeMutex");
+    stdx::mutex _resizeMutex;
     QueueStats _exemptQueueStats;
 
 protected:

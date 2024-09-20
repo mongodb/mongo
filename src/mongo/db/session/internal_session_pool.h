@@ -129,7 +129,7 @@ private:
     stdx::unordered_map<SHA256Block, std::list<Session>> _perUserSessionPool;
 
     // Protects the internal data structures.
-    mutable Mutex _mutex = MONGO_MAKE_LATCH("InternalSessionPool::_mutex");
+    mutable stdx::mutex _mutex;
 };
 
 }  // namespace mongo

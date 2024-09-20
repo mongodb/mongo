@@ -252,7 +252,7 @@ private:
         }
     }
 
-    mutable Mutex _lock = MONGO_MAKE_LATCH(HierarchicalAcquisitionLevel(0), "BlockingQueue::_lock");
+    mutable stdx::mutex _lock;
     std::queue<T> _queue;
     const size_t _maxSize;
     size_t _currentSize = 0;

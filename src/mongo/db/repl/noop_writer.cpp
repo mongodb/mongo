@@ -136,7 +136,7 @@ private:
     /**
      *  Mutex for the CV
      */
-    Mutex _mutex = MONGO_MAKE_LATCH("PeriodicNoopRunner::_mutex");
+    stdx::mutex _mutex;
 
     /**
      * CV to wait for.

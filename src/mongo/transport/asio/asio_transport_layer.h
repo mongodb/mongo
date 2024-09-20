@@ -170,7 +170,7 @@ public:
 
         // Serializes invocations of `start()` and `stop()`, and allows updating `_state` and
         // `_thread` as a single atomic operation.
-        Mutex _mutex = MONGO_MAKE_LATCH("AsioTransportLayer::TimerService::_mutex");
+        stdx::mutex _mutex;
 
         // State transitions: `kInitialized` --> `kStarted` --> `kStopped`
         //                          |_______________________________^
@@ -289,7 +289,7 @@ private:
 
     void _trySetListenerSocketBacklogQueueDepth(GenericAcceptor& acceptor) noexcept;
 
-    Mutex _mutex = MONGO_MAKE_LATCH(HierarchicalAcquisitionLevel(0), "AsioTransportLayer::_mutex");
+    stdx::mutex _mutex;
     void stopAcceptingSessionsWithLock(stdx::unique_lock<Mutex> lk);
 
     // There are three reactors that are used by AsioTransportLayer. The _ingressReactor contains

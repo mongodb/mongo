@@ -360,7 +360,7 @@ private:
     const bool _forceUpdateWithFullDocument;
 
     // Protects initialization of the _nextIdNum.
-    mutable Mutex _initNextIdMutex = MONGO_MAKE_LATCH("WiredTigerRecordStore::_initNextIdMutex");
+    mutable stdx::mutex _initNextIdMutex;
     AtomicWord<long long> _nextIdNum{0};
 
     WiredTigerSizeStorer* _sizeStorer;  // not owned, can be NULL

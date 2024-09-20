@@ -542,7 +542,7 @@ private:
     TailableModeEnum _tailableMode;
 
     // Must be acquired before accessing any data members (other than _params, which is read-only).
-    mutable Mutex _mutex = MONGO_MAKE_LATCH("AsyncResultsMerger::_mutex");
+    mutable stdx::mutex _mutex;
 
     // Metrics aggregated from remote cursors.
     query_stats::DataBearingNodeMetrics _metrics;

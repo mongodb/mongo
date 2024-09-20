@@ -152,7 +152,7 @@ protected:
 
 private:
     // Protects member data of this OplogWriter.
-    mutable Mutex _mutex = MONGO_MAKE_LATCH("OplogWriter::_mutex");
+    mutable stdx::mutex _mutex;
 
     // Used to schedule task for oplog write loop.
     // Not owned by us.

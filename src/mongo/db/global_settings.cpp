@@ -59,7 +59,7 @@ repl::ReplSettings globalReplSettings;
 const auto getClusterNetworkRestrictionManager =
     ServiceContext::declareDecoration<std::unique_ptr<ClusterNetworkRestrictionManager>>();
 
-Mutex mtxSetAllowListedCluster = MONGO_MAKE_LATCH("AllowListedClusterNetworkSetting::mutex");
+stdx::mutex mtxSetAllowListedCluster;
 
 }  // namespace
 

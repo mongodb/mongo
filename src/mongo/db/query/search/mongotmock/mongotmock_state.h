@@ -215,7 +215,7 @@ private:
     BSONObj _mockManageSearchIndexResponse;
 
     // Protects access to all members. Should be acquired using a MongotMockStateGuard.
-    Mutex _lock = MONGO_MAKE_LATCH("MongotMockState::_lock");
+    stdx::mutex _lock;
 
     friend class MongotMockStateGuard;
     bool _doOrderChecks = true;

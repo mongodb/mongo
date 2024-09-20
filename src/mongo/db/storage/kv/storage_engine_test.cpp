@@ -695,7 +695,7 @@ TEST_F(TimestampKVEngineTest, TimestampListeners) {
 }
 
 TEST_F(TimestampKVEngineTest, TimestampMonitorNotifiesListeners) {
-    auto mutex = MONGO_MAKE_LATCH();
+    stdx::mutex mutex;
     stdx::condition_variable cv;
 
     bool changes[4] = {false, false, false, false};

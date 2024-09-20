@@ -133,7 +133,7 @@ public:
 private:
     WaitForMajorityService _waitForMajorityService;
 
-    Mutex _mutex = MONGO_MAKE_LATCH("WaitForMajorityServiceTest::_mutex");
+    stdx::mutex _mutex;
     stdx::condition_variable _isTestReadyCV;
     stdx::condition_variable _finishWaitingOneOpTimeCV;
     stdx::condition_variable _callCountChangedCV;

@@ -106,8 +106,7 @@ private:
                                               ShardingCatalogClient* catalogClient,
                                               const repl::ReadConcernLevel& readConcernLevel);
 
-    Mutex _mutex =
-        MONGO_MAKE_LATCH(HierarchicalAcquisitionLevel(0), "ClusterIdentityLoader::_mutex");
+    stdx::mutex _mutex;
     stdx::condition_variable _inReloadCV;
 
     // Used to ensure that only one thread at a time attempts to reload the cluster ID from the

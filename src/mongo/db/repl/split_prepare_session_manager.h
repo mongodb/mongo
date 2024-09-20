@@ -126,7 +126,7 @@ public:
 
 private:
     // Guards access to member variables.
-    mutable Mutex _mutex = MONGO_MAKE_LATCH("SplitPrepareSessionManager::_mutex");
+    mutable stdx::mutex _mutex;
 
     // The global session pool storing reusable sessions, from which split sessions are acquired.
     InternalSessionPool* _sessionPool;

@@ -88,7 +88,7 @@ private:
         _state = StateEnum::kUnused;
     }
 
-    Mutex _mutex = MONGO_MAKE_LATCH("StateTransitionController::_mutex");
+    stdx::mutex _mutex;
     stdx::condition_variable _pauseDuringTransitionCond;
     stdx::condition_variable _waitUntilUnpausedCond;
 

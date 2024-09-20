@@ -137,7 +137,7 @@ private:
 
     void _unregisterNotificationToken_inlock(WithLock, const NotificationToken& token);
 
-    Mutex _mutex = MONGO_MAKE_LATCH("NamespaceMetadataChangeNotifications::_mutex");
+    stdx::mutex _mutex;
     // The timestamp represents the latest commitTime for a given namespace seen via notifyChange.
     std::map<NamespaceString, std::pair<Timestamp, NotificationsList>> _notificationsList;
 };

@@ -433,7 +433,7 @@ public:
     void rotate();
 
 private:
-    Mutex _lock = MONGO_MAKE_LATCH("SSLManagerCoordinator::_lock");
+    stdx::mutex _lock;
     synchronized_value<std::shared_ptr<SSLManagerInterface>> _manager;
 };
 

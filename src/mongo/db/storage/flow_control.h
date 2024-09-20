@@ -153,7 +153,7 @@ private:
     AtomicWord<std::int64_t> _isLaggedTimeMicros{0};
     AtomicWord<Date_t> _disableUntil;
 
-    mutable Mutex _sampledOpsMutex = MONGO_MAKE_LATCH("FlowControl::_sampledOpsMutex");
+    mutable stdx::mutex _sampledOpsMutex;
     std::deque<Sample> _sampledOpsApplied;
 
     // These values are used in the sampling process.

@@ -54,7 +54,7 @@
 namespace mongo {
 namespace auth {
 
-static auto internalAuthKeysMutex = MONGO_MAKE_LATCH();
+static stdx::mutex internalAuthKeysMutex;
 static bool internalAuthSet = false;
 static std::vector<std::string> internalAuthKeys;
 static BSONObj internalAuthParams;

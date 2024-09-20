@@ -80,7 +80,7 @@ public:
                              boost::optional<Status> status);
 
 private:
-    mutable Mutex _mutex = MONGO_MAKE_LATCH("OplogConstraintViolationLogger::mutex");
+    mutable stdx::mutex _mutex;
 
     std::vector<Date_t> _lastLogTimes = std::vector<Date_t>(
         static_cast<int>(OplogConstraintViolationEnum::NUM_VIOLATION_TYPES));  // (M)

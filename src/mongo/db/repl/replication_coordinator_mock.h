@@ -534,7 +534,7 @@ private:
     RunCmdOnPrimaryAndAwaitResponseFunction _runCmdOnPrimaryAndAwaitResponseFn;
 
     // Guards all the variables below
-    mutable Mutex _mutex = MONGO_MAKE_LATCH("ReplicationCoordinatorExternalStateMock::_mutex");
+    mutable stdx::mutex _mutex;
 
     MemberState _memberState;
     ReplSetConfig _getConfigReturnValue;

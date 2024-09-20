@@ -232,7 +232,7 @@ void handleWaitForUserCacheInvalidation(OperationContext* opCtx, const UserHandl
     // variable or with some novel Notifiable/Waitable-like type that synthesizes multiple
     // notifications.
     constexpr auto kCheckPeriod = Milliseconds{1};
-    auto m = MONGO_MAKE_LATCH();
+    stdx::mutex m;
     auto cv = stdx::condition_variable{};
     auto pred = [&] {
         return !fp.isStillEnabled() || !user.isValid();

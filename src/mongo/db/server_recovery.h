@@ -93,7 +93,7 @@ public:
     bool shouldRecordStoresAlwaysCheckSize() const;
 
 private:
-    mutable Mutex _mutex = MONGO_MAKE_LATCH("SizeRecoveryState::_mutex");
+    mutable stdx::mutex _mutex;
     StringSet _collectionsAlwaysNeedingSizeAdjustment;
     bool _recordStoresShouldAlwayCheckSize = false;
 };

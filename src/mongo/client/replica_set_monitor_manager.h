@@ -200,8 +200,7 @@ private:
     using ReplicaSetMonitorsMap = StringMap<std::weak_ptr<ReplicaSetMonitor>>;
 
     // Protects access to the replica set monitors and several fields.
-    mutable Mutex _mutex =
-        MONGO_MAKE_LATCH(HierarchicalAcquisitionLevel(6), "ReplicaSetMonitorManager::_mutex");
+    mutable stdx::mutex _mutex;
 
     // Fields guarded by _mutex:
 
@@ -229,8 +228,7 @@ private:
     // It is necessary to avoid deadlock while invoking the 'registerForGarbageCollection()' while
     // already holding any lvl 2-6 mutex up the stack. The 'registerForGarbageCollection()' method
     // is not locking the lvl 6 _mutex above.
-    mutable Mutex _gcMutex =
-        MONGO_MAKE_LATCH(HierarchicalAcquisitionLevel(1), "ReplicaSetMonitorManager::_gcMutex");
+    mutable stdx::mutex _gcMutex;
 
     // Fields guarded by _gcMutex.
 

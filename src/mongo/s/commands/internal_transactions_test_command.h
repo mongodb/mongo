@@ -179,8 +179,7 @@ public:
         }
 
         std::shared_ptr<executor::TaskExecutor> getTransactionExecutor() {
-            static Mutex mutex =
-                MONGO_MAKE_LATCH("InternalTransactionsTestCommandExecutor::_mutex");
+            static stdx::mutex mutex;
             static std::shared_ptr<executor::ThreadPoolTaskExecutor> executor;
 
             stdx::lock_guard<Latch> lg(mutex);

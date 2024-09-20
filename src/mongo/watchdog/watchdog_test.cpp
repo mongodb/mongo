@@ -95,7 +95,7 @@ public:
 private:
     std::uint32_t _counter{0};
 
-    Mutex _mutex = MONGO_MAKE_LATCH("TestPeriodicThread::_mutex");
+    stdx::mutex _mutex;
     stdx::condition_variable _condvar;
     std::uint32_t _wait{0};
 };
@@ -246,7 +246,7 @@ public:
 private:
     std::uint32_t _counter{0};
 
-    Mutex _mutex = MONGO_MAKE_LATCH("TestCounterCheck::_mutex");
+    stdx::mutex _mutex;
     stdx::condition_variable _condvar;
     std::uint32_t _wait{0};
 };
@@ -301,7 +301,7 @@ public:
 private:
     bool _set{false};
 
-    Mutex _mutex = MONGO_MAKE_LATCH("ManualResetEvent::_mutex");
+    stdx::mutex _mutex;
     stdx::condition_variable _condvar;
 };
 
@@ -368,7 +368,7 @@ public:
     }
 
 private:
-    Mutex _mutex = MONGO_MAKE_LATCH("SleepyCheck::_mutex");
+    stdx::mutex _mutex;
     stdx::condition_variable _condvar;
     std::uint32_t _counter{0};
 };

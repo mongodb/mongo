@@ -168,7 +168,7 @@ private:
         const NamespaceString& nss,
         const boost::optional<UUID>& collUuid);
 
-    mutable Mutex _mutex = MONGO_MAKE_LATCH("QueryAnalysisSampleTracker::_mutex");
+    mutable stdx::mutex _mutex;
 
     int64_t _totalSampledReadsCount = 0;
     int64_t _totalSampledWritesCount = 0;

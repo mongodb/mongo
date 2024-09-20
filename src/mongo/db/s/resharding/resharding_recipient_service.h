@@ -363,7 +363,7 @@ private:
     SharedSemiFuture<void> _dataReplicationQuiesced;
 
     // Protects the state below
-    Mutex _mutex = MONGO_MAKE_LATCH("RecipientStateMachine::_mutex");
+    stdx::mutex _mutex;
 
     std::unique_ptr<ReshardingDataReplicationInterface> _dataReplication;
 

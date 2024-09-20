@@ -103,7 +103,7 @@ private:
         OperationContext* opCtx);
 
 private:
-    Mutex _mutex = MONGO_MAKE_LATCH("AutoMergerPolicyPolicyImpl::_mutex");
+    stdx::mutex _mutex;
 
     inline static constexpr int MAX_NUMBER_OF_CONCURRENT_MERGE_ACTIONS = 10;
 

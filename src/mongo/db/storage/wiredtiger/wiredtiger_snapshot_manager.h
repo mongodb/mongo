@@ -86,13 +86,11 @@ public:
 
 private:
     // Snapshot to use for reads at a commit timestamp.
-    mutable Mutex _committedSnapshotMutex =  // Guards _committedSnapshot.
-        MONGO_MAKE_LATCH("WiredTigerSnapshotManager::_committedSnapshotMutex");
+    mutable stdx::mutex _committedSnapshotMutex;  // Guards _committedSnapshot.
     boost::optional<Timestamp> _committedSnapshot;
 
     // Timestamp to use for reads at a the lastApplied timestamp.
-    mutable Mutex _lastAppliedMutex =  // Guards _lastApplied.
-        MONGO_MAKE_LATCH("WiredTigerSnapshotManager::_lastAppliedMutex");
+    mutable stdx::mutex _lastAppliedMutex;  // Guards _lastApplied.
     boost::optional<Timestamp> _lastApplied;
 };
 }  // namespace mongo

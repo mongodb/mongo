@@ -109,7 +109,7 @@ private:
     const std::string _purpose;
     KeysCollectionClient* const _client;
 
-    Mutex _cacheMutex = MONGO_MAKE_LATCH("KeysCollectionCache::_cacheMutex");
+    stdx::mutex _cacheMutex;
 
     // Stores keys for signing and validating cluster times created by the cluster that this node
     // is in.

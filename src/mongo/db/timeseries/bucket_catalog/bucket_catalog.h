@@ -148,8 +148,7 @@ using InsertResult = std::variant<SuccessfulInsertion, ReopeningContext, InsertW
  */
 struct Stripe {
     // All access to a stripe should happen while 'mutex' is locked.
-    mutable Mutex mutex =
-        MONGO_MAKE_LATCH(HierarchicalAcquisitionLevel(1), "BucketCatalog::Stripe::mutex");
+    mutable stdx::mutex mutex;
 
     // All buckets currently open in the catalog, including buckets which are full or pending
     // closure but not yet committed, indexed by BucketId. Owning pointers.
@@ -215,7 +214,7 @@ public:
     // Per-namespace execution stats. This map is protected by 'mutex'. Once you complete your
     // lookup, you can keep the shared_ptr to an individual namespace's stats object and release the
     // lock. The object itself is thread-safe (using atomics).
-    mutable Mutex mutex = MONGO_MAKE_LATCH(HierarchicalAcquisitionLevel(0), "BucketCatalog::mutex");
+    mutable stdx::mutex mutex;
     tracked_unordered_map<UUID, shared_tracked_ptr<ExecutionStats>> executionStats;
 
     // Global execution stats used to report aggregated metrics in server status.

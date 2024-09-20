@@ -276,7 +276,7 @@ private:
     CallbackFn _work;
 
     // Protects member data of this Fetcher.
-    mutable Mutex _mutex = MONGO_MAKE_LATCH("Fetcher::_mutex");
+    mutable stdx::mutex _mutex;
 
     mutable stdx::condition_variable _condition;
 

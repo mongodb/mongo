@@ -175,7 +175,7 @@ private:
     /**
      * Guards all non-const, non-thread-safe members.
      */
-    Mutex _mutex = MONGO_MAKE_LATCH("DeferredWriter::_mutex");
+    stdx::mutex _mutex;
 
     /**
      * The number of bytes currently in the in-memory buffer.

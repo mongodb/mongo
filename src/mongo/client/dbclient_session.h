@@ -275,8 +275,7 @@ protected:
     // rebind the handle from the owning thread. The thread that owns this DBClientSession is
     // allowed to use the _session without locking the mutex. This mutex also guards writes to
     // _stayFailed, although reads are allowed outside the mutex.
-    Mutex _sessionMutex =
-        MONGO_MAKE_LATCH(HierarchicalAcquisitionLevel(0), "DBClientSession::_sessionMutex");
+    stdx::mutex _sessionMutex;
     std::shared_ptr<transport::Session> _session;
     boost::optional<Milliseconds> _socketTimeout;
     uint64_t _sessionCreationTimeMicros = INVALID_SOCK_CREATION_TIME;

@@ -111,8 +111,7 @@ public:
     }
 
 private:
-    mutable Mutex _mutex =
-        MONGO_MAKE_LATCH(HierarchicalAcquisitionLevel(0), "Notification::_mutex");
+    mutable stdx::mutex _mutex;
     stdx::condition_variable _condVar;
 
     // Protected by mutex and only moves from not-set to set once

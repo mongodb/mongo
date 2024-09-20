@@ -157,8 +157,7 @@ private:
     CommitStats _recoverWithTokenCommitStats;
 
     // Mutual exclusion for _abortCauseMap
-    Mutex _abortCauseMutex = MONGO_MAKE_LATCH(HierarchicalAcquisitionLevel(0),
-                                              "RouterTransactionsMetrics::_abortCauseMutex");
+    stdx::mutex _abortCauseMutex;
 
     // Map tracking the total number of each abort cause for any multi-statement transaction that
     // was aborted through this router.

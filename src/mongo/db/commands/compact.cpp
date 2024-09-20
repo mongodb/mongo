@@ -60,7 +60,7 @@
 namespace mongo {
 
 namespace {
-static Mutex mutex = MONGO_MAKE_LATCH("CompactCmd::mutex");
+static stdx::mutex mutex;
 static absl::btree_set<UUID> compactsRunning;
 }  // namespace
 

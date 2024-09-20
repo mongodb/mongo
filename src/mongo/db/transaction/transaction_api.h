@@ -593,7 +593,7 @@ private:
 
     // Protects the members below that are accessed by the TxnHooks, which are called by the user's
     // callback and may run on a separate thread than the one that is driving the Transaction.
-    mutable Mutex _mutex = MONGO_MAKE_LATCH("Transaction::_mutex");
+    mutable stdx::mutex _mutex;
 
     LogicalTime _lastOperationTime;
     bool _latestResponseHasTransientTransactionErrorLabel{false};

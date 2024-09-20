@@ -94,9 +94,7 @@ private:
     void _runTask(PeriodicTask* task);
 
     // _mutex protects the _shutdownRequested flag and the _tasks vector.
-    Mutex _mutex = MONGO_MAKE_LATCH(
-        // This mutex is held around task execution HierarchicalAcquisitionLevel(0),
-        "PeriodicTaskRunner::_mutex");
+    stdx::mutex _mutex;
 
     // The condition variable is used to sleep for the interval between task
     // executions, and is notified when the _shutdownRequested flag is toggled.
@@ -145,7 +143,7 @@ bool runnerDestroyed = false;
 struct BackgroundJob::JobStatus {
     JobStatus() : state(NotStarted) {}
 
-    Mutex mutex = MONGO_MAKE_LATCH("JobStatus::mutex");
+    stdx::mutex mutex;
     stdx::condition_variable done;
     State state;
 };

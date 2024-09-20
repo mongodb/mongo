@@ -203,7 +203,7 @@ private:
     const Options _options;
 
     // Mutex guarding all non-const member variables.
-    mutable Mutex _mutex = MONGO_MAKE_LATCH(HierarchicalAcquisitionLevel(0), "ThreadPool::_mutex");
+    mutable stdx::mutex _mutex;
 
     // This variable represents the lifecycle state of the pool.
     //

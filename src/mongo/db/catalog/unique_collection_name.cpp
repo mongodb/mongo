@@ -51,7 +51,7 @@
 namespace mongo {
 namespace {
 
-Mutex uniqueCollectionNameMutex = MONGO_MAKE_LATCH("UniqueCollectionNameMutex");
+stdx::mutex uniqueCollectionNameMutex;
 
 // Random number generator used to create unique collection namespaces suitable for temporary
 // collections

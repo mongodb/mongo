@@ -123,7 +123,7 @@ private:
     /**
      * Must be held to access any of the member variables below.
      */
-    mutable Mutex _mutex = MONGO_MAKE_LATCH("SingleServerPingMonitor::mutex");
+    mutable stdx::mutex _mutex;
 
     /**
      * Enables a scheduled or outgoing ping to be cancelled upon drop().
@@ -191,7 +191,7 @@ private:
 
     static constexpr auto kLogLevel = 0;
 
-    mutable Mutex _mutex = MONGO_MAKE_LATCH("ServerPingMonitor::mutex");
+    mutable stdx::mutex _mutex;
 
     /**
      * Maps each server to a SingleServerPingMonitor.

@@ -96,7 +96,7 @@ public:
     }
 
 private:
-    mutable Mutex _mutex = MONGO_MAKE_LATCH("::_mutex");
+    mutable stdx::mutex _mutex;
     stdx::condition_variable _cv;
     std::vector<std::shared_ptr<transport::Session>> _sessions;
     transport::TransportLayer* _transport = nullptr;
@@ -769,7 +769,7 @@ TEST(SSLManager, TransientSSLParamsStressTestWithTransport) {
 
     TransientSSLParams transientSSLParams(clusterConnection);
 
-    Mutex mutex = MONGO_MAKE_LATCH("::test_mutex");
+    stdx::mutex mutex;
     std::deque<std::shared_ptr<const transport::SSLConnectionContext>> contexts;
     std::vector<stdx::thread> threads;
     Counter64 iterations;
@@ -816,7 +816,7 @@ TEST(SSLManager, TransientSSLParamsStressTestWithManager) {
 
     TransientSSLParams transientParams(clusterConnection);
 
-    Mutex mutex = MONGO_MAKE_LATCH("::test_mutex");
+    stdx::mutex mutex;
     std::deque<std::shared_ptr<SSLManagerInterface>> managers;
     std::vector<stdx::thread> threads;
     Counter64 iterations;

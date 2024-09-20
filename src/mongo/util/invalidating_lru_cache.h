@@ -692,7 +692,7 @@ private:
     }
 
     // Protects the state below
-    mutable Mutex _mutex = MONGO_MAKE_LATCH("InvalidatingLRUCache::_mutex");
+    mutable stdx::mutex _mutex;
 
     // This map is used to track any values, which were evicted from the LRU cache below, while they
     // were checked out (i.e., their use_count > 1, where the 1 comes from the ownership by

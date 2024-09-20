@@ -286,7 +286,7 @@ private:
     mutable stdx::condition_variable _notifier;
 
     // Mutex used with '_notifier'. Protects access to '_version'.
-    mutable Mutex _mutex = MONGO_MAKE_LATCH("CappedInsertNotifier::_mutex");
+    mutable stdx::mutex _mutex;
 
     // A counter, incremented on insertion of new data into the capped collection.
     //

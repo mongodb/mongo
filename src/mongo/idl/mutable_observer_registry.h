@@ -66,8 +66,7 @@ public:
     }
 
 private:
-    Mutex _mutex =
-        MONGO_MAKE_LATCH(HierarchicalAcquisitionLevel(0), "MutableObserverRegistry::_mutex");
+    stdx::mutex _mutex;
     std::vector<unique_function<void(const T&)>> _registry;
 };
 

@@ -198,7 +198,7 @@ private:
 
     void _clearAllAlarmsImpl(stdx::unique_lock<Latch>& lk);
 
-    Mutex _mutex = MONGO_MAKE_LATCH("AlarmSchedulerPrecise::_mutex");
+    stdx::mutex _mutex;
     bool _shutdown = false;
     AlarmMap _alarms;
 };

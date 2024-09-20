@@ -68,7 +68,7 @@ private:
         LOGV2(23122, "{i} bleep(s)\n", "i"_attr = i);
         return i;
     }
-    Mutex _m = MONGO_MAKE_LATCH("Beerp::_m");
+    stdx::mutex _m;
 };
 
 TEST(WithLockTest, OverloadSet) {
@@ -76,7 +76,7 @@ TEST(WithLockTest, OverloadSet) {
     ASSERT_EQ(1, b.bleep('1'));
     ASSERT_EQ(2, b.bleep(2));
 
-    auto m = MONGO_MAKE_LATCH();
+    stdx::mutex m;
     stdx::lock_guard<Latch> lk(m);
     Beerp(lk, 3);
 }

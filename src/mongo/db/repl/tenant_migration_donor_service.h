@@ -340,7 +340,7 @@ public:
 
         // Protects the durable state, state document, abort requested boolean, and the promises
         // below.
-        mutable Mutex _mutex = MONGO_MAKE_LATCH("TenantMigrationDonorService::_mutex");
+        mutable stdx::mutex _mutex;
 
         // The latest majority-committed migration state.
         boost::optional<DurableState> _durableState;

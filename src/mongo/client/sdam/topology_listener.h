@@ -152,12 +152,10 @@ private:
     void _scheduleNextDelivery();
 
     // Lock acquisition order to avoid deadlock is _eventQueueMutex -> _mutex
-    Mutex _eventQueueMutex = MONGO_MAKE_LATCH(HierarchicalAcquisitionLevel(6),
-                                              "TopologyEventsPublisher::_eventQueueMutex");
+    stdx::mutex _eventQueueMutex;
     std::deque<EventPtr> _eventQueue;
 
-    Mutex _mutex =
-        MONGO_MAKE_LATCH(HierarchicalAcquisitionLevel(5), "TopologyEventsPublisher::_mutex");
+    stdx::mutex _mutex;
     bool _isClosed = false;
     std::shared_ptr<executor::TaskExecutor> _executor;
     std::vector<TopologyListenerPtr> _listeners;

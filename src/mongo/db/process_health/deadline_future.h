@@ -119,8 +119,7 @@ private:
 private:
     const std::shared_ptr<executor::TaskExecutor> _executor;
 
-    mutable Mutex _mutex =
-        MONGO_MAKE_LATCH(HierarchicalAcquisitionLevel(4), "DeadlineFuture::_mutex");
+    mutable stdx::mutex _mutex;
     Future<ResultStatus> _inputFuture;
     boost::optional<executor::TaskExecutor::CallbackHandle> _timeoutCbHandle;
     std::unique_ptr<SharedPromise<ResultStatus>> _outputFuturePromise;

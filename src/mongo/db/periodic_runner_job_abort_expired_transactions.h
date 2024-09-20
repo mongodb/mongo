@@ -59,8 +59,7 @@ private:
     inline static const auto _serviceDecoration =
         ServiceContext::declareDecoration<PeriodicThreadToAbortExpiredTransactions>();
 
-    mutable Mutex _mutex = MONGO_MAKE_LATCH(HierarchicalAcquisitionLevel(1),
-                                            "PeriodicThreadToAbortExpiredTransactions::_mutex");
+    mutable stdx::mutex _mutex;
     std::shared_ptr<PeriodicJobAnchor> _anchor;
 };
 

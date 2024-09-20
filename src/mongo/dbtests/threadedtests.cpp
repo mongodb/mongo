@@ -281,7 +281,7 @@ private:
             MONGO_verify(_checkedIn >= 0);
         }
 
-        Mutex _frontDesk = MONGO_MAKE_LATCH("Hotel::_frontDesk");
+        stdx::mutex _frontDesk;
         int _nRooms;
         int _checkedIn;
         int _maxRooms;

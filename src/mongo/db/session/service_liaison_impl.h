@@ -87,7 +87,7 @@ protected:
      */
     ServiceContext* _context() override;
 
-    Mutex _mutex = MONGO_MAKE_LATCH(HierarchicalAcquisitionLevel(0), "ServiceLiaisonImpl::_mutex");
+    stdx::mutex _mutex;
     std::vector<PeriodicJobAnchor> _jobs;
 
 private:

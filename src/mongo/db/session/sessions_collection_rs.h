@@ -110,7 +110,7 @@ private:
                                                            LocalCallback&& localCallback,
                                                            RemoteCallback&& remoteCallback);
 
-    Mutex _mutex = MONGO_MAKE_LATCH("SessionsCollectionRS::_mutex");
+    stdx::mutex _mutex;
     std::unique_ptr<RemoteCommandTargeter> _targeter;
 };
 

@@ -102,7 +102,7 @@ private:
     struct CertificateState {
         Certificates cache;
         bool shouldReload = true;
-        Mutex _mutex = MONGO_MAKE_LATCH("CertificateStateHolder::_mutex");
+        stdx::mutex _mutex;
     };
 
     static grpc_ssl_certificate_config_reload_status _certificateConfigCallback(
@@ -110,7 +110,7 @@ private:
     std::shared_ptr<::grpc::ServerCredentials> _makeServerCredentialsWithFetcher();
 
     Options _options;
-    mutable Mutex _mutex = MONGO_MAKE_LATCH("grpc::Server::_mutex");
+    mutable stdx::mutex _mutex;
     std::vector<std::unique_ptr<Service>> _services;
     std::unique_ptr<::grpc::Server> _server;
     std::vector<std::unique_ptr<CertificateState>> _certificateStates;

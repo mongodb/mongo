@@ -76,7 +76,7 @@ protected:
 
 
 protected:
-    mutable Mutex _mutex = MONGO_MAKE_LATCH("DelayableTimeoutCallbackBaseTest::_mutex");
+    mutable stdx::mutex _mutex;
     boost::optional<T> _delayableTimeoutCallback;
     executor::NetworkInterfaceMock* _net;
     std::shared_ptr<executor::TaskExecutor> _executor;

@@ -103,7 +103,7 @@ private:
     // (M)  Reads and writes guarded by _mutex.
 
     // Guards access to member variables.
-    mutable Mutex _mutex = MONGO_MAKE_LATCH("ReplicationProcess::_mutex");
+    mutable stdx::mutex _mutex;
 
     // Used to access the storage layer.
     StorageInterface* const _storageInterface;  // (R)

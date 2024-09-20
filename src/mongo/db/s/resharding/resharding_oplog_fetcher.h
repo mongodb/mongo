@@ -173,7 +173,7 @@ private:
 
     int _numOplogEntriesCopied = 0;
 
-    Mutex _mutex = MONGO_MAKE_LATCH("ReshardingOplogFetcher::_mutex");
+    stdx::mutex _mutex;
     Promise<void> _onInsertPromise;
     Future<void> _onInsertFuture;
 

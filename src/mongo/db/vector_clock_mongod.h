@@ -125,7 +125,7 @@ private:
     ExecutorFuture<void> _createPersisterTask();
 
     // Protects the shared state below
-    Mutex _mutex = MONGO_MAKE_LATCH("VectorClockMongoD::_mutex");
+    stdx::mutex _mutex;
 
     // If boost::none, means the durable time needs to be recovered from disk, otherwise contains
     // the latest-known durable time

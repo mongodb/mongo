@@ -168,7 +168,7 @@ private:
                                     const CollectionAcquisition& collection);
 
     // Protects the state below.
-    mutable Mutex _stateMutex = MONGO_MAKE_LATCH("TTLMonitorStateMutex");
+    mutable stdx::mutex _stateMutex;
 
     // Signaled to wake up the thread, if the thread is waiting. This condition variable is used to
     // notify the thread of either:

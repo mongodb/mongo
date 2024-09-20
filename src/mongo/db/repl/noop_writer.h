@@ -78,7 +78,7 @@ private:
      * Protects member data of this class during start and stop. There is no need to synchronize
      * access once its running because its run by a one thread only.
      */
-    mutable Mutex _mutex = MONGO_MAKE_LATCH("NoopWriter::_mutex");
+    mutable stdx::mutex _mutex;
 
     std::unique_ptr<PeriodicNoopRunner> _noopRunner;
 };

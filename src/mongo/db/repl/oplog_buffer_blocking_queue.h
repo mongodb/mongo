@@ -91,7 +91,7 @@ private:
     void _clear_inlock(WithLock lk);
     void _push(Batch::const_iterator begin, Batch::const_iterator end, const Cost& cost);
 
-    mutable Mutex _mutex = MONGO_MAKE_LATCH("OplogBufferBlockingQueue::_mutex");
+    mutable stdx::mutex _mutex;
     stdx::condition_variable _notEmptyCV;
     stdx::condition_variable _notFullCV;
     const std::size_t _maxSize;

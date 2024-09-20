@@ -44,7 +44,7 @@ class InterruptibleTest : public unittest::Test {};
 TEST_F(InterruptibleTest, NotInterruptibleWaitForConditionFailsWithOverflowError) {
     auto notInterruptible = Interruptible::notInterruptible();
 
-    auto mutex = MONGO_MAKE_LATCH();
+    stdx::mutex mutex;
     stdx::condition_variable cv;
     stdx::unique_lock<Latch> lk(mutex);
 

@@ -277,7 +277,7 @@ private:
     boost::optional<CancelableOperationContextFactory> _cancelableOpCtxFactory;
 
     // Protects the state below
-    Mutex _mutex = MONGO_MAKE_LATCH("DonorStateMachine::_mutex");
+    stdx::mutex _mutex;
 
     // Canceled by 2 different sources: (1) This DonorStateMachine when it learns of an
     // unrecoverable error (2) The primary-only service instance driving this DonorStateMachine that

@@ -239,7 +239,7 @@ protected:
         size_t target = 0;
     };
 
-    Mutex _mutex = MONGO_MAKE_LATCH(HierarchicalAcquisitionLevel(0), "LimitController::_mutex");
+    stdx::mutex _mutex;
     stdx::unordered_map<PoolId, PoolData> _poolData;
 };
 

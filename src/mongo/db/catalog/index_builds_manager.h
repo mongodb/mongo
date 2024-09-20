@@ -231,7 +231,7 @@ private:
     StatusWith<MultiIndexBlock*> _getBuilder(const UUID& buildUUID);
 
     // Protects the map data structures below.
-    mutable Mutex _mutex = MONGO_MAKE_LATCH("IndexBuildsManager::_mutex");
+    mutable stdx::mutex _mutex;
 
     // Map of index builders by build UUID. Allows access to the builders so that actions can be
     // taken on and information passed to and from index builds.

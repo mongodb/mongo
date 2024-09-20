@@ -374,7 +374,7 @@ private:
                                      const ComparableDatabaseVersion& previousDbVersion);
 
         CatalogCacheLoader& _catalogCacheLoader;
-        Mutex _mutex = MONGO_MAKE_LATCH("DatabaseCache::_mutex");
+        stdx::mutex _mutex;
     };
 
     class CollectionCache : public RoutingTableHistoryCache {
@@ -392,7 +392,7 @@ private:
                                        const ComparableChunkVersion& previousChunkVersion);
 
         CatalogCacheLoader& _catalogCacheLoader;
-        Mutex _mutex = MONGO_MAKE_LATCH("CollectionCache::_mutex");
+        stdx::mutex _mutex;
 
         struct Stats {
             // Tracks how many incremental refreshes are waiting to complete currently
@@ -431,7 +431,7 @@ private:
                                     const NamespaceString& nss,
                                     const ValueHandle& indexes,
                                     const ComparableIndexVersion& previousIndexVersion);
-        Mutex _mutex = MONGO_MAKE_LATCH("IndexCache::_mutex");
+        stdx::mutex _mutex;
     };
 
     // Callers of this internal function that are passing allowLocks must handle allowLocks failures

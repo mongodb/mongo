@@ -280,8 +280,7 @@ private:
         _defaultMakeSessionWorkerFnForEagerReap;
 
     // Protects the state below
-    mutable Mutex _mutex =
-        MONGO_MAKE_LATCH(HierarchicalAcquisitionLevel(4), "SessionCatalog::_mutex");
+    mutable stdx::mutex _mutex;
 
     // Owns the Session objects for all current Sessions.
     SessionRuntimeInfoMap _sessions;

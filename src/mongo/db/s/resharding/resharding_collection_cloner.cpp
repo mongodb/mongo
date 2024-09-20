@@ -551,7 +551,7 @@ private:
     };
     std::vector<boost::optional<MultiProducerSingleConsumerQueue<QueueData>>> _queues;
 
-    Mutex _mutex = MONGO_MAKE_LATCH("ReshardingCloneFetcher::_mutex");
+    stdx::mutex _mutex;
     int _activeCursors;                  // (M)
     int _openConsumers;                  // (M)
     Status _finalResult = Status::OK();  // (M)

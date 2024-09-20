@@ -117,7 +117,7 @@ public:
     }
 
 private:
-    mutable Mutex _mutex = MONGO_MAKE_LATCH("TenantOplogApplierTestOpObserver::_mutex");
+    mutable stdx::mutex _mutex;
     std::vector<MutableOplogEntry> _entries;
 };
 

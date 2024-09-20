@@ -260,7 +260,7 @@ public:
 
 private:
     int _value;
-    mutable Mutex _mutex = MONGO_MAKE_LATCH("PendingValue::_mutex");
+    mutable stdx::mutex _mutex;
     mutable stdx::condition_variable _condition;
 };
 

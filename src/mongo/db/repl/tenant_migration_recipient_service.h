@@ -573,7 +573,7 @@ public:
          */
         void _dropTempCollections();
 
-        mutable Mutex _mutex = MONGO_MAKE_LATCH("TenantMigrationRecipientService::_mutex");
+        mutable stdx::mutex _mutex;
 
         // All member variables are labeled with one of the following codes indicating the
         // synchronization rules for accessing them.

@@ -215,7 +215,7 @@ private:
     uint64_t _sockCreationTime;
     boost::optional<OpMsgRequest> _lastCursorMessage;
 
-    Mutex _netMutex = MONGO_MAKE_LATCH("MockDBClientConnection");
+    stdx::mutex _netMutex;
 
     stdx::condition_variable _mockCallResponsesCV;
     Responses _mockCallResponses;

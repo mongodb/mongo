@@ -203,7 +203,7 @@ public:
     }
 
 private:
-    mutable Mutex _mutex = MONGO_MAKE_LATCH("MockReplReconfigCommand::_mutex");
+    mutable stdx::mutex _mutex;
     bool _hasBeenCalled{false};
     BSONObj _msg;
 };

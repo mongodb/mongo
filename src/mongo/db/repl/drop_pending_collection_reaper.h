@@ -130,7 +130,7 @@ private:
     // (M)  Reads and writes guarded by _mutex.
 
     // Guards access to member variables.
-    Mutex _mutex = MONGO_MAKE_LATCH("DropPendingCollectionReaper::_mutex");
+    stdx::mutex _mutex;
 
     // Used to access the storage layer.
     StorageInterface* const _storageInterface;  // (R)

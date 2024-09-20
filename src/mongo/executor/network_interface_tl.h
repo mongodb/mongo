@@ -260,7 +260,7 @@ private:
         ConnectionHandle conn;
 
         // Synchronizes requestToSend, conn, and weakConn.
-        Mutex mutex = MONGO_MAKE_LATCH("NetworkInterfaceTL::CommandStateBase::mutex");
+        stdx::mutex mutex;
 
         CancellationSource _cancelSource;
     };
@@ -307,7 +307,7 @@ private:
 
         // Protects against race between reactor thread restarting stopwatch during exhaust
         // request and main thread reading stopwatch elapsed time during shutdown.
-        Mutex stopwatchMutex = MONGO_MAKE_LATCH("NetworkInterfaceTL::ExhaustCommandState::mutex");
+        stdx::mutex stopwatchMutex;
 
         Promise<void> promise;
         Promise<RemoteCommandResponse> finalResponsePromise;

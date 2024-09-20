@@ -474,7 +474,7 @@ public:
     void onWorkerFinished();
 
 private:
-    mutable Mutex _mutex = MONGO_MAKE_LATCH("BenchRunState::_mutex");
+    mutable stdx::mutex _mutex;
 
     stdx::condition_variable _stateChangeCondition;
 

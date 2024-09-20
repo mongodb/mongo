@@ -655,8 +655,7 @@ void CollectionCatalog::write(ServiceContext* svcCtx, CatalogWriteFn job) {
 
     static std::list<JobEntry> queue;
     static bool workerExists = false;
-    static Mutex mutex =
-        MONGO_MAKE_LATCH("CollectionCatalog::write");  // Protecting the two globals above
+    static stdx::mutex mutex;  // Protecting the two globals above
 
     invariant(job);
 

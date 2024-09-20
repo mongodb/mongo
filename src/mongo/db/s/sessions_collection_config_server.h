@@ -58,7 +58,7 @@ private:
 
     // Serialises concurrent calls to setupSessionsCollection so that only one thread performs the
     // sharded operations
-    Mutex _mutex = MONGO_MAKE_LATCH("SessionsCollectionConfigServer::_mutex");
+    stdx::mutex _mutex;
 };
 
 }  // namespace mongo

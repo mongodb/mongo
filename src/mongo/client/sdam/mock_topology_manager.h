@@ -55,7 +55,7 @@ public:
         override;
 
 private:
-    mutable mongo::Mutex _mutex = MONGO_MAKE_LATCH("MockTopologyManager");
+    mutable mongo::stdx::mutex _mutex;
     TopologyDescriptionPtr _topologyDescription;
 };
 

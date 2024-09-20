@@ -38,9 +38,3 @@ using Latch = stdx::mutex;
 using Mutex = stdx::mutex;
 
 }  // namespace mongo
-
-/**
- * Construct a mongo::Mutex using the result of MONGO_GET_LATCH_DATA with all arguments forwarded
- * TODO SERVER-94685 remove MONGO_MAKE_LATCH.
- */
-#define MONGO_MAKE_LATCH(...) ::mongo::stdx::mutex()

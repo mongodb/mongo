@@ -146,7 +146,7 @@ public:
     }
 
 private:
-    Mutex _mutex = MONGO_MAKE_LATCH("WriteRequestSynchronizer::_mutex");
+    stdx::mutex _mutex;
     std::map<Timestamp, std::shared_ptr<Notification<Status>>> _writeRequests;
 };
 

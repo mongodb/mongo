@@ -71,8 +71,7 @@ private:
     NetworkInterface* const _net;
 
     // Protects all of the pool state below
-    Mutex _mutex =
-        MONGO_MAKE_LATCH(HierarchicalAcquisitionLevel(0), "NetworkInterfaceThreadPool::_mutex");
+    stdx::mutex _mutex;
     stdx::condition_variable _joiningCondition;
     std::vector<Task> _tasks;
     bool _started = false;

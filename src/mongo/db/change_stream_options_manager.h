@@ -89,7 +89,7 @@ public:
 private:
     ChangeStreamOptions _changeStreamOptions;
 
-    mutable Mutex _mutex = MONGO_MAKE_LATCH("ChangeStreamOptionsManager::mutex");
+    mutable stdx::mutex _mutex;
 };
 
 }  // namespace mongo

@@ -83,7 +83,7 @@ private:
     // These are the options with which the pool was configured at construction time.
     const Options _options;
 
-    Mutex _mutex = MONGO_MAKE_LATCH("ThreadPoolMock::_mutex");
+    stdx::mutex _mutex;
     stdx::thread _worker;
     std::vector<Task> _tasks;
     PseudoRandom _prng;

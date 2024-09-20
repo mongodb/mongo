@@ -130,7 +130,7 @@ private:
      * consumers are readers of `_cache` and the producer is the observer thread. The assumption
      * is that the contention on this lock is insignificant.
      */
-    mutable Mutex _mutex = MONGO_MAKE_LATCH(kTopologyVersionObserverName);
+    mutable stdx::mutex _mutex;
     stdx::condition_variable _cv;
 
     /**

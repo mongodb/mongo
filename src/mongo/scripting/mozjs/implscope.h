@@ -425,7 +425,7 @@ public:
         ASANHandles& operator=(const ASANHandles&) = delete;
 #if __has_feature(address_sanitizer)
     private:
-        Mutex _mutex = MONGO_MAKE_LATCH("ASANHandles::_mutex");
+        stdx::mutex _mutex;
         ASANHandlesNoLock _handles;
 #endif
     };
@@ -496,7 +496,7 @@ private:
     StringMap<ScriptingFunction> _funcCodeToHandleMap;
     InternedStringTable _internedStrings;
     Status _killStatus;
-    mutable Mutex _mutex = MONGO_MAKE_LATCH("MozJSImplScope::_mutex");
+    mutable stdx::mutex _mutex;
     stdx::condition_variable _sleepCondition;
     std::string _error;
     OperationContext* _opCtx;         // Op context for DbEval

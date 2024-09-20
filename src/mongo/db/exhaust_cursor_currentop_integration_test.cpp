@@ -200,7 +200,7 @@ auto startExhaustQuery(
     Milliseconds awaitDataTimeoutMS = Milliseconds(5000),
     const boost::optional<repl::OpTime>& lastKnownCommittedOpTime = boost::none) {
     boost::optional<CursorId> cursorId;
-    auto cursorIdMutex = MONGO_MAKE_LATCH();  // Protects the 'cursorId' variable.
+    stdx::mutex cursorIdMutex;            // Protects the 'cursorId' variable.
     stdx::condition_variable cursorIdCV;  // Synchronizes the threads on 'cursorId' initialization.
 
     auto queryThread = stdx::async(

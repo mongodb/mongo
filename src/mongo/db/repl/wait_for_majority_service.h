@@ -87,7 +87,7 @@ public:
     }
 
 private:
-    mutable Mutex _mutex = MONGO_MAKE_LATCH("AsyncConditionVariable::_mutex");
+    mutable stdx::mutex _mutex;
     boost::optional<SharedPromise<void>> _current;
     bool _inShutdown{false};
 };
@@ -144,7 +144,7 @@ private:
     ClientStrandPtr _waitForMajorityCancellationClient;
 
     // This mutex synchronizes access to the members declared below.
-    Mutex _mutex = MONGO_MAKE_LATCH("WaitForMajorityService::_mutex");
+    stdx::mutex _mutex;
 
     // Contains an ordered list of opTimes to wait to be majority comitted.
     OpTimeWaitingMap _queuedOpTimes;

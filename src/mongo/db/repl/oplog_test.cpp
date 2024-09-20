@@ -184,7 +184,8 @@ void _testConcurrentLogOp(const F& makeTaskFunction,
     // Run 2 concurrent logOp() requests using the thread pool.
     // Use a barrier with a thread count of 3 to ensure both logOp() tasks are complete before this
     // test thread can proceed with shutting the thread pool down.
-    auto mtx = MONGO_MAKE_LATCH();
+    stdx::mutex mtx;
+    ;
     unittest::Barrier barrier(3U);
     const NamespaceString nss1 = NamespaceString::createNamespaceString_forTest("test1.coll");
     const NamespaceString nss2 = NamespaceString::createNamespaceString_forTest("test2.coll");

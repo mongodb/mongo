@@ -785,7 +785,7 @@ Future<std::shared_ptr<Session>> AsioTransportLayer::asyncConnect(
         AtomicWord<bool> done{false};
         Promise<std::shared_ptr<Session>> promise;
 
-        Mutex mutex = MONGO_MAKE_LATCH(HierarchicalAcquisitionLevel(0), "AsyncConnectState::mutex");
+        stdx::mutex mutex;
         AsioSession::GenericSocket socket;
         AsioReactorTimer timeoutTimer;
         WrappedResolver resolver;

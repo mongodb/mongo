@@ -73,11 +73,10 @@ private:
 
     void _remove(ResourceId id, const std::string& name);
 
-    mutable Mutex _mutex = MONGO_MAKE_LATCH("ResourceCatalog::_mutex");
+    mutable stdx::mutex _mutex;
     stdx::unordered_map<ResourceId, StringSet> _resources;
 
-    mutable Mutex _mutexResourceIdLabelsMutex =
-        MONGO_MAKE_LATCH("ResourceCatalog::_mutexResourceIdLabelsMutex");
+    mutable stdx::mutex _mutexResourceIdLabelsMutex;
     std::vector<std::string> _mutexResourceIdLabels;
 };
 

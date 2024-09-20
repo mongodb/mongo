@@ -68,7 +68,7 @@ int timeNetworkTestMillis(std::size_t operations, NetworkInterface* net) {
     auto server = fixture.getServers()[0];
 
     std::atomic<int> remainingOps(operations);  // NOLINT
-    auto mtx = MONGO_MAKE_LATCH();
+    stdx::mutex mtx;
     stdx::condition_variable cv;
     Timer t;
 

@@ -60,7 +60,7 @@ public:
     }
 
 private:
-    Mutex _m = MONGO_MAKE_LATCH("TaskGroup::_m");
+    stdx::mutex _m;
     stdx::condition_variable _c;
     uint64_t _killCount;
     uint64_t _targetKillCount;

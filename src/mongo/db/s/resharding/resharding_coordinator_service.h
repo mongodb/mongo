@@ -654,14 +654,12 @@ private:
     /**
      * Must be locked while the `_canEnterCritical` promise is being fulfilled.
      */
-    mutable Mutex _fulfillmentMutex =
-        MONGO_MAKE_LATCH("ReshardingCoordinatorService::_fulfillmentMutex");
+    mutable stdx::mutex _fulfillmentMutex;
 
     /**
      * Must be locked while the _abortCalled is being set to true.
      */
-    mutable Mutex _abortCalledMutex =
-        MONGO_MAKE_LATCH("ReshardingCoordinatorService::_abortCalledMutex");
+    mutable stdx::mutex _abortCalledMutex;
 
 
     /**

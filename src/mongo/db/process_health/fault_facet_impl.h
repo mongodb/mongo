@@ -70,8 +70,7 @@ private:
 
     const Date_t _startTime = _clockSource->now();
 
-    mutable Mutex _mutex =
-        MONGO_MAKE_LATCH(HierarchicalAcquisitionLevel(1), "FaultFacetImpl::_mutex");
+    mutable stdx::mutex _mutex;
     Severity _severity = Severity::kOk;
     std::string _description;
 };

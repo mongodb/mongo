@@ -530,7 +530,7 @@ private:
          */
         void _finishedOneInProgressRead();
 
-        mutable Mutex _mutex = MONGO_MAKE_LATCH("MigrationChunkClonerSource::CloneList::_mutex");
+        mutable stdx::mutex _mutex;
 
         RecordIdSet _recordIds;
 
@@ -710,7 +710,7 @@ private:
     std::unique_ptr<SessionCatalogMigrationSource> _sessionCatalogSource;
 
     // Protects the entries below
-    mutable Mutex _mutex = MONGO_MAKE_LATCH("MigrationChunkClonerSource::_mutex");
+    mutable stdx::mutex _mutex;
 
     // The current state of the cloner
     State _state{kNew};

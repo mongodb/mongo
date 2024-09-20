@@ -271,7 +271,7 @@ private:
                                                ActionsStreamPolicy* policy);
 
     // Protects the state below
-    Mutex _mutex = MONGO_MAKE_LATCH("Balancer::_mutex");
+    stdx::mutex _mutex;
 
     // Indicates the current state of the worker threads instantiated by the balancer
     // (_thread, _actionStreamConsumerThread and _commandScheduler)

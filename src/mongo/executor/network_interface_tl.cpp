@@ -192,8 +192,7 @@ public:
     }
 
 private:
-    mutable Mutex _mutex = MONGO_MAKE_LATCH(HierarchicalAcquisitionLevel(0),
-                                            "NetworkInterfaceTL::SynchronizedCounters::_mutex");
+    mutable stdx::mutex _mutex;
     Counters _data;
 };
 

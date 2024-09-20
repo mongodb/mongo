@@ -200,7 +200,7 @@ private:
     ServiceContext* _service;
 
     // Guards starting threads and setting _startedThreads
-    Mutex _threadMutex = MONGO_MAKE_LATCH("ReplicationCoordinatorExternalStateImpl::_threadMutex");
+    stdx::mutex _threadMutex;
 
     // Flag for guarding against concurrent data replication stopping.
     bool _stoppingDataReplication = false;
@@ -264,8 +264,7 @@ private:
     Future<void> _oplogApplierShutdownFuture;
 
     // Mutex guarding the _nextThreadId value to prevent concurrent incrementing.
-    Mutex _nextThreadIdMutex =
-        MONGO_MAKE_LATCH("ReplicationCoordinatorExternalStateImpl::_nextThreadIdMutex");
+    stdx::mutex _nextThreadIdMutex;
     // Number used to uniquely name threads.
     long long _nextThreadId = 0;
 

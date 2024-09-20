@@ -86,10 +86,10 @@ private:
     std::unique_ptr<OplogBuffer> _target;
 
     // If both mutexes have to be acquired, acquire _lastPushedMutex first.
-    mutable Mutex _lastPushedMutex = MONGO_MAKE_LATCH("OplogBufferProxy::_lastPushedMutex");
+    mutable stdx::mutex _lastPushedMutex;
     boost::optional<Value> _lastPushed;
 
-    mutable Mutex _lastPeekedMutex = MONGO_MAKE_LATCH("OplogBufferProxy::_lastPeekedMutex");
+    mutable stdx::mutex _lastPeekedMutex;
     boost::optional<Value> _lastPeeked;
 };
 

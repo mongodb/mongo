@@ -61,7 +61,7 @@ TEST_F(TaskRunnerTest, GetDiagnosticString) {
 }
 
 TEST_F(TaskRunnerTest, CallbackValues) {
-    auto mutex = MONGO_MAKE_LATCH();
+    stdx::mutex mutex;
     bool called = false;
     OperationContext* opCtx = nullptr;
     Status status = getDetectableErrorStatus();
@@ -87,7 +87,7 @@ using OpIdVector = std::vector<unsigned int>;
 OpIdVector _testRunTaskTwice(TaskRunnerTest& test, unique_function<void(Task task)> schedule) {
     auto nextAction = TaskRunner::NextAction::kDisposeOperationContext;
     unittest::Barrier barrier(2U);
-    auto mutex = MONGO_MAKE_LATCH();
+    stdx::mutex mutex;
     std::vector<OperationContext*> txns;
     OpIdVector txnIds;
     auto task = [&](OperationContext* theTxn, const Status& theStatus) {
@@ -142,7 +142,7 @@ TEST_F(TaskRunnerTest, RunTaskTwiceDisposeOperationContextJoinThreadPoolBeforeSc
 }
 
 TEST_F(TaskRunnerTest, SkipSecondTask) {
-    auto mutex = MONGO_MAKE_LATCH();
+    stdx::mutex mutex;
     int i = 0;
     OperationContext* opCtx[2] = {nullptr, nullptr};
     Status status[2] = {getDetectableErrorStatus(), getDetectableErrorStatus()};
@@ -184,7 +184,7 @@ TEST_F(TaskRunnerTest, SkipSecondTask) {
 }
 
 TEST_F(TaskRunnerTest, FirstTaskThrowsException) {
-    auto mutex = MONGO_MAKE_LATCH();
+    stdx::mutex mutex;
     int i = 0;
     OperationContext* opCtx[2] = {nullptr, nullptr};
     Status status[2] = {getDetectableErrorStatus(), getDetectableErrorStatus()};
@@ -233,7 +233,7 @@ TEST_F(TaskRunnerTest, FirstTaskThrowsException) {
 }
 
 TEST_F(TaskRunnerTest, Cancel) {
-    auto mutex = MONGO_MAKE_LATCH();
+    stdx::mutex mutex;
     stdx::condition_variable condition;
     Status status = getDetectableErrorStatus();
     bool taskRunning = false;
@@ -276,7 +276,7 @@ TEST_F(TaskRunnerTest, Cancel) {
 
 TEST_F(TaskRunnerTest, JoinShouldWaitForTasksToComplete) {
     unittest::Barrier barrier(2U);
-    auto mutex = MONGO_MAKE_LATCH();
+    stdx::mutex mutex;
     Status status1 = getDetectableErrorStatus();
     Status status2 = getDetectableErrorStatus();
 
@@ -310,7 +310,7 @@ TEST_F(TaskRunnerTest, JoinShouldWaitForTasksToComplete) {
 }
 
 TEST_F(TaskRunnerTest, DestroyShouldWaitForTasksToComplete) {
-    auto mutex = MONGO_MAKE_LATCH();
+    stdx::mutex mutex;
     stdx::condition_variable condition;
     Status status = getDetectableErrorStatus();
     bool taskRunning = false;

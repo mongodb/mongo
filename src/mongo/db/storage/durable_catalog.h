@@ -388,13 +388,12 @@ private:
     const bool _directoryForIndexes;
 
     // Protects '_rand' and '_next'.
-    mutable Mutex _randLock = MONGO_MAKE_LATCH("DurableCatalogImpl::_rand");
+    mutable stdx::mutex _randLock;
     std::string _rand;
     unsigned long long _next;
 
     absl::flat_hash_map<RecordId, EntryIdentifier, RecordId::Hasher> _catalogIdToEntryMap;
-    mutable Mutex _catalogIdToEntryMapLock =
-        MONGO_MAKE_LATCH("DurableCatalogImpl::_catalogIdToEntryMap");
+    mutable stdx::mutex _catalogIdToEntryMapLock;
 
     StorageEngineInterface* const _engine;
 };

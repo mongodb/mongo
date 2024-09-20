@@ -138,7 +138,7 @@ public:
 private:
     void _updateAverageCatchUpOps(WithLock lk);
 
-    mutable Mutex _mutex = MONGO_MAKE_LATCH("ReplicationMetrics::_mutex");
+    mutable stdx::mutex _mutex;
     ElectionMetrics _electionMetrics;
     ElectionCandidateMetrics _electionCandidateMetrics;
     ElectionParticipantMetrics _electionParticipantMetrics;

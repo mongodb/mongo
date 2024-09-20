@@ -127,8 +127,7 @@ private:
 
     // This mutex ensures that only one thread at a time executes the sharding
     // initialization/teardown sequence
-    Mutex _initSynchronizationMutex =
-        MONGO_MAKE_LATCH("ShardingInitializationMongod::_initSynchronizationMutex");
+    stdx::mutex _initSynchronizationMutex;
 
     // Function for initializing the sharding environment components (i.e. everything on the Grid)
     ShardingEnvironmentInitFunc _initFunc;

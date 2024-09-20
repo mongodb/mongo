@@ -1550,7 +1550,7 @@ BSONObj BenchRunner::finish(BenchRunner* runner) {
     return zoo;
 }
 
-Mutex BenchRunner::_staticMutex = MONGO_MAKE_LATCH("BenchRunner");
+stdx::mutex BenchRunner::_staticMutex;
 std::map<OID, BenchRunner*> BenchRunner::_activeRuns;
 
 /**

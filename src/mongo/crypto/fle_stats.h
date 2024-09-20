@@ -137,10 +137,10 @@ private:
     AtomicWord<long long> emuBinarySuboperation;
     AtomicWord<long long> emuBinaryTotalMillis;
 
-    mutable Mutex _compactMutex = MONGO_MAKE_LATCH("FLECompactStats::_mutex");
+    mutable stdx::mutex _compactMutex;
     CompactStats _compactStats;
 
-    mutable Mutex _cleanupMutex = MONGO_MAKE_LATCH("FLECleanupStats::_mutex");
+    mutable stdx::mutex _cleanupMutex;
     CleanupStats _cleanupStats;
 };
 

@@ -82,7 +82,7 @@ private:
     void _transitionToConfigShard(ServiceContext* serviceContext);
 
     // Protects _isReady.
-    mutable Mutex _mutex = MONGO_MAKE_LATCH("ShardingReady::_mutex");
+    mutable stdx::mutex _mutex;
     SharedPromise<void> _isReady;
 };
 }  // namespace mongo

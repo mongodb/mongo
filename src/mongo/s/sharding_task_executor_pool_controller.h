@@ -237,7 +237,7 @@ private:
 
     std::shared_ptr<ReplicaSetChangeNotifier::Listener> _listener;
 
-    Mutex _mutex = MONGO_MAKE_LATCH("ShardingTaskExecutorPoolController::_mutex");
+    stdx::mutex _mutex;
 
     // Entires to _poolDatas are added by addHost() and removed by removeHost()
     stdx::unordered_map<PoolId, PoolData> _poolDatas;

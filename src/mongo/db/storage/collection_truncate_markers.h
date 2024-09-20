@@ -302,7 +302,7 @@ private:
     AtomicWord<int64_t> _currentBytes;    // Number of bytes in the marker being filled.
 
     // Protects against concurrent access to the deque of collection markers.
-    mutable Mutex _markersMutex = MONGO_MAKE_LATCH("CollectionTruncateMarkers::_markersMutex");
+    mutable stdx::mutex _markersMutex;
     std::deque<Marker> _markers;  // front = oldest, back = newest.
 
 protected:
@@ -388,8 +388,7 @@ public:
 private:
     // Highest marker seen during the lifetime of the class. Modifications must happen
     // while holding '_lastHighestRecordMutex'.
-    mutable Mutex _lastHighestRecordMutex =
-        MONGO_MAKE_LATCH("CollectionTruncateMarkersWithPartialExpiration::_lastHighestRecordMutex");
+    mutable stdx::mutex _lastHighestRecordMutex;
     RecordId _lastHighestRecordId;
     Date_t _lastHighestWallTime;
 

@@ -380,7 +380,7 @@ private:
         }
     }
 
-    mutable Mutex _mutex = MONGO_MAKE_LATCH("ScopedTaskExecutor::_mutex");
+    mutable stdx::mutex _mutex;
     bool _inShutdown = false;
     std::shared_ptr<TaskExecutor> _executor;
     Status _shutdownStatus;

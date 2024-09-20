@@ -1109,7 +1109,7 @@ public:
 private:
     std::vector<OplogEntry> _operationsApplied;
     // Synchronize reads and writes to 'operationsApplied'.
-    Mutex _mutex = MONGO_MAKE_LATCH("TrackOpsAppliedApplier::_mutex");
+    stdx::mutex _mutex;
 };
 
 Status TrackOpsAppliedApplier::applyOplogBatchPerWorker(
@@ -2045,7 +2045,7 @@ protected:
     std::unique_ptr<ThreadPool> _workerPool;
 
 private:
-    Mutex _insertMutex = MONGO_MAKE_LATCH("MultiOplogEntryOplogApplierImplTest::_insertMutex");
+    stdx::mutex _insertMutex;
 };
 
 TEST_F(MultiOplogEntryOplogApplierImplTest, MultiApplyUnpreparedTransactionSeparate) {
@@ -2583,7 +2583,7 @@ protected:
     std::unique_ptr<ThreadPool> _workerPool;
 
 private:
-    Mutex _mutex = MONGO_MAKE_LATCH("MultiOplogEntryOplogApplierImplTest::_mutex");
+    stdx::mutex _mutex;
 };
 
 TEST_F(MultiOplogEntryOplogApplierImplTestMultitenant,
@@ -2796,7 +2796,7 @@ protected:
         _abortSinglePrepareApplyOp;
 
 private:
-    Mutex _insertMutex = MONGO_MAKE_LATCH("MultiOplogEntryPreparedTransactionTest::_insertMutex");
+    stdx::mutex _insertMutex;
 };
 
 TEST_F(MultiOplogEntryPreparedTransactionTest, MultiApplyPreparedTransactionSteadyState) {
@@ -3381,8 +3381,8 @@ protected:
     std::map<NamespaceString, int> _deletedDocs;
 
 private:
-    Mutex _insertMutex = MONGO_MAKE_LATCH("MultiPreparedTransactionInOneBatchTest::_insertMutex");
-    Mutex _deleteMutex = MONGO_MAKE_LATCH("MultiPreparedTransactionInOneBatchTest::_deleteMutex");
+    stdx::mutex _insertMutex;
+    stdx::mutex _deleteMutex;
 };
 
 TEST_F(MultiPreparedTransactionsInOneBatchTest, CommitAndAbortMultiPreparedTransactionsInOneBatch) {

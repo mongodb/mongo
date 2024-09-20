@@ -536,7 +536,7 @@ TEST_F(DocumentSourceExchangeTest, RandomExchangeNConsumerResourceYielding) {
     // thread holds this while it calls getNext(). This is to simulate the case where a thread may
     // hold some "real" resources which need to be yielded while waiting, such as the Session, or
     // the locks held in a transaction.
-    auto artificalGlobalMutex = MONGO_MAKE_LATCH();
+    stdx::mutex artificalGlobalMutex;
 
     boost::intrusive_ptr<Exchange> ex =
         new Exchange(std::move(spec), Pipeline::create({source}, getExpCtx()));

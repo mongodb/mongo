@@ -94,7 +94,7 @@ private:
 
     std::unique_ptr<PeriodicJobAnchor> _job;
     multiversion::FeatureCompatibilityVersion _lastFcv;
-    Mutex _mutex = MONGO_MAKE_LATCH("ClusterServerParameterRefresher::_mutex");
+    stdx::mutex _mutex;
 };
 
 Status clusterServerParameterRefreshIntervalSecsNotify(const int& newValue);

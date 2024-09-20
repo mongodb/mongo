@@ -116,7 +116,7 @@ private:
     struct CountDownLatch {
         CountDownLatch(int32_t count) : count(count) {}
 
-        Mutex mutex = MONGO_MAKE_LATCH("Latch::mutex");
+        stdx::mutex mutex;
         stdx::condition_variable cv;
         int32_t count;
     };
@@ -134,7 +134,7 @@ private:
 
     using Map = stdx::unordered_map<int32_t, std::shared_ptr<CountDownLatch>>;
 
-    Mutex _mutex = MONGO_MAKE_LATCH("CountDownLatchHolder::_mutex");
+    stdx::mutex _mutex;
     Map _latches;
     int32_t _counter;
 };

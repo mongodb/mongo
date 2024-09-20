@@ -142,14 +142,14 @@ private:
     void _triggerJournalFlush(WithLock lk);
 
     // Serializes setting/resetting _uniqueCtx and marking _uniqueCtx killed.
-    mutable Mutex _opCtxMutex = MONGO_MAKE_LATCH("JournalFlusherOpCtxMutex");
+    mutable stdx::mutex _opCtxMutex;
 
     // Saves a reference to the flusher thread's operation context so it can be interrupted if the
     // flusher is active.
     boost::optional<ServiceContext::UniqueOperationContext> _uniqueCtx;
 
     // Protects the state below.
-    mutable Mutex _stateMutex = MONGO_MAKE_LATCH("JournalFlusherStateMutex");
+    mutable stdx::mutex _stateMutex;
 
     // Signaled to wake up the thread, if the thread is waiting or paused. The thread will check
     // whether _flushJournalNow, _needToPause, or _shuttingDown is set and flush, pause, or stop

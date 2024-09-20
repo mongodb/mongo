@@ -176,7 +176,7 @@ public:
 private:
     static const ServiceContext::Decoration<BridgeContext> _get;
 
-    Mutex _settingsMutex = MONGO_MAKE_LATCH("BridgeContext::_settingsMutex");
+    stdx::mutex _settingsMutex;
     HostSettingsMap _settings;
 };
 

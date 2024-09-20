@@ -119,8 +119,7 @@ private:
     std::shared_ptr<ThreadPool> _threadPool;
 
     // Protects the state below.
-    mutable Mutex _mutex = MONGO_MAKE_LATCH(HierarchicalAcquisitionLevel(1),
-                                            "InternalTransactionsReapService::_mutex");
+    mutable stdx::mutex _mutex;
 
     bool _enabled{false};
     boost::optional<ExecutorFuture<void>> _drainedSessionsFuture;

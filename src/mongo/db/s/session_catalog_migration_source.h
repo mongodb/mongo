@@ -328,8 +328,7 @@ private:
 
     // Protects _sessionOplogIterators, _currentOplogIterator, _lastFetchedOplog,
     // _lastFetchedOplogImage and _unprocessedOplogBuffer.
-    Mutex _sessionCloneMutex =
-        MONGO_MAKE_LATCH("SessionCatalogMigrationSource::_sessionCloneMutex");
+    stdx::mutex _sessionCloneMutex;
 
     // List of remaining session records that needs to be cloned.
     std::vector<std::unique_ptr<SessionOplogIterator>> _sessionOplogIterators;
@@ -351,7 +350,7 @@ private:
 
     // Protects _newWriteOpTimeList, _lastFetchedNewWriteOplog, _lastFetchedNewWriteOplogImage,
     // _unprocessedNewWriteOplogBuffer, _state, _newOplogNotification.
-    Mutex _newOplogMutex = MONGO_MAKE_LATCH("SessionCatalogMigrationSource::_newOplogMutex");
+    stdx::mutex _newOplogMutex;
 
     // The average size of documents in config.transactions.
     uint64_t _averageSessionDocSize{0};

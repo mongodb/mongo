@@ -110,7 +110,7 @@ public:
     }
 
 private:
-    Mutex _mutex = MONGO_MAKE_LATCH("DatabaseShardingStateMap::_mutex");
+    stdx::mutex _mutex;
 
     // Entries of the _databases map must never be deleted or replaced. This is to guarantee that a
     // 'dbName' is always associated to the same 'ResourceMutex'.

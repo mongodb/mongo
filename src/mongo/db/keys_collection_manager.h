@@ -221,7 +221,7 @@ private:
         AtomicWord<bool> _hasSeenKeys{false};
 
         // protects all the member variables below.
-        mutable Mutex _mutex = MONGO_MAKE_LATCH("PeriodicRunner::_mutex");
+        mutable stdx::mutex _mutex;
         std::shared_ptr<Notification<void>> _refreshRequest;
         stdx::condition_variable _refreshNeededCV;
 

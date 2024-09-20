@@ -247,7 +247,7 @@ public:
     }
 
 private:
-    mutable Mutex _mutex = MONGO_MAKE_LATCH("StorageInterfaceRollback::_mutex");
+    mutable stdx::mutex _mutex;
 
     Timestamp _stableTimestamp;
 

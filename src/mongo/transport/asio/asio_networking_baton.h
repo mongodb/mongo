@@ -168,7 +168,7 @@ private:
 
     void detachImpl() noexcept override;
 
-    Mutex _mutex = MONGO_MAKE_LATCH(HierarchicalAcquisitionLevel(0), "AsioNetworkingBaton::_mutex");
+    stdx::mutex _mutex;
 
     OperationContext* _opCtx;
 

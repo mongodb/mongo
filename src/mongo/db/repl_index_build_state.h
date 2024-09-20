@@ -607,7 +607,7 @@ private:
     void _cancelAndClearVoteRequestCbk(WithLock, OperationContext* opCtx);
 
     // Protects the state below.
-    mutable Mutex _mutex = MONGO_MAKE_LATCH("ReplIndexBuildState::_mutex");
+    mutable stdx::mutex _mutex;
 
     // Primary and secondaries gets their commit or abort signal via this promise future pair.
     std::unique_ptr<SharedPromise<IndexBuildAction>> _waitForNextAction;

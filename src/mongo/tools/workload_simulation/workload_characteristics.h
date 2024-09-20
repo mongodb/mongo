@@ -109,7 +109,7 @@ protected:
     AtomicWord<RWPair> _optimalConcurrency;
     AtomicWord<RWPair> _throughputAtOptimalConcurrency;
     double _jitterDev = 0.0;
-    mutable Mutex _mutex = MONGO_MAKE_LATCH("MockWorkloadCharacteristics::_mutex");
+    mutable stdx::mutex _mutex;
     mutable std::mt19937 _rng;
     mutable std::normal_distribution<double> _jitterDist;
 };

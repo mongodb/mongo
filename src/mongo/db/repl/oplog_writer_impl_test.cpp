@@ -90,7 +90,7 @@ public:
     }
 
 private:
-    Mutex _mutex = MONGO_MAKE_LATCH("JournalListenerMock::_mutex");
+    stdx::mutex _mutex;
     OpTimeAndWallTime _onDurableToken;
 };
 

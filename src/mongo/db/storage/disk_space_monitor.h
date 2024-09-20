@@ -93,7 +93,7 @@ private:
     // Copy of the dbpath which is always safe to access.
     std::string _dbpath;
     // This mutex protects _actions and the entire run loop of the disk space monitor.
-    Mutex _mutex = MONGO_MAKE_LATCH("DiskSpaceMonitor::_mutex");
+    stdx::mutex _mutex;
     std::vector<std::unique_ptr<Action>> _actions;
 };
 }  // namespace mongo

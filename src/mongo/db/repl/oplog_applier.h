@@ -227,7 +227,7 @@ private:
     Observer* const _observer;
 
     // Protects member data of OplogApplier.
-    mutable Mutex _mutex = MONGO_MAKE_LATCH("OplogApplier::_mutex");
+    mutable stdx::mutex _mutex;
 
     // Set to true if shutdown() has been called.
     bool _inShutdown = false;

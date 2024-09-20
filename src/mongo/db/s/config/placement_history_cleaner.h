@@ -95,7 +95,7 @@ private:
         return "PlacementHistoryCleaner";
     }
 
-    Mutex _mutex = MONGO_MAKE_LATCH("PlacementHistoryCleaner::_mutex");
+    stdx::mutex _mutex;
 
     PeriodicJobAnchor _anchor;
 

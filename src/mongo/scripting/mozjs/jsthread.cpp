@@ -193,7 +193,7 @@ private:
         std::string _stack;
 
     private:
-        Mutex _statusMutex = MONGO_MAKE_LATCH("SharedData::_statusMutex");
+        stdx::mutex _statusMutex;
         Status _status = Status::OK();
     };
 

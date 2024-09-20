@@ -171,7 +171,7 @@ private:
     /**
      * Protects data in query settings.
      */
-    mutable Mutex _mutex = MONGO_MAKE_LATCH("QuerySettings::_mutex");
+    mutable stdx::mutex _mutex;
 };
 
 }  // namespace mongo

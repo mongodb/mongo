@@ -139,7 +139,7 @@ private:
         void remove(int sizeBytes);
 
     private:
-        Mutex _mutex = MONGO_MAKE_LATCH("MigrationBatchFetcher::BufferSizeTracker::_mutex");
+        stdx::mutex _mutex;
         stdx::condition_variable _hasAvailableSpace;
 
         const int _maxSizeBytes;

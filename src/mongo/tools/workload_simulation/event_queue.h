@@ -113,7 +113,7 @@ private:
     time_type _nextEventTime();
     std::pair<const storage_type*, queue_type*> _nextEventToProcess();
 
-    mutable Mutex _mutex = MONGO_MAKE_LATCH("EventQueue::_mutex");
+    mutable stdx::mutex _mutex;
     mutable stdx::condition_variable _cv;
 
     TickSourceMock<Nanoseconds>& _tickSource;

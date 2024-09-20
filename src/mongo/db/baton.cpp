@@ -147,7 +147,7 @@ private:
 
     BatonHandle _baton;
 
-    Mutex _mutex = MONGO_MAKE_LATCH("SubBaton::_mutex");
+    stdx::mutex _mutex;
     bool _isDead = false;
     std::vector<Task> _scheduled;
 };
