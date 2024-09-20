@@ -35,7 +35,8 @@ export class MagicRestoreTest {
         this.checkpointTimestamp = undefined;
         this.pointInTimeTimestamp = undefined;
         // When we perform a selective restore, we need to store a list of collections to restore to
-        // pass into the restore configuration.
+        // pass into the restore configuration. This list includes namespaces for this particular
+        // replica set.
         this.collectionsToRestore = [];
 
         // Store dbhashes for each db and collection prior to restore. After magic restore
@@ -126,25 +127,36 @@ export class MagicRestoreTest {
     }
 
     /**
-     * Copies data files from the source dbpath to the backup dbpath. 'namespacesToSkip' is used to
-     * test selective restore.
+     * Copies data files from the source dbpath to the backup dbpath. 'collectionsToRestore' is used
+     * to test selective restore.
      */
-    copyFiles(namespacesToSkip = []) {
+    copyFiles(collectionsToRestore = []) {
         resetDbpath(this.backupDbPath);
         // TODO(SERVER-13455): Replace `journal/` with the configurable journal path.
         mkdir(this.backupDbPath + "/journal");
         while (this.backupCursor.hasNext()) {
             const doc = this.backupCursor.next();
-            if (namespacesToSkip.includes(doc.ns) && !doc.required) {
-                jsTestLog("Skipping backup for: " + tojson(doc));
-            } else {
+            // If 'collectionsToRestore' parameter has non-zero elements, this indicates we are
+            // testing selective restore. If we are not testing selective restore, we should copy
+            // all files.
+            const isSelectiveRestore = collectionsToRestore.length > 0;
+            const shouldCopy =
+                !isSelectiveRestore || collectionsToRestore.includes(doc.ns) || doc.required;
+            if (shouldCopy) {
                 jsTestLog("Copying for backup: " + tojson(doc));
                 backupUtils.copyFileHelper({filename: doc.filename, fileSize: doc.fileSize},
                                            this.backupSource.dbpath,
                                            this.backupDbPath);
-                if (doc.ns && doc.uuid) {
-                    this.collectionsToRestore.push({ns: doc.ns, uuid: UUID(doc.uuid)});
+                if (isSelectiveRestore && doc.ns && doc.uuid) {
+                    const exists = this.collectionsToRestore.some(
+                        (item) => item.ns === doc.ns &&
+                            item.uuid.toString() === UUID(doc.uuid).toString());
+                    if (!exists) {
+                        this.collectionsToRestore.push({ns: doc.ns, uuid: UUID(doc.uuid)});
+                    }
                 }
+            } else {
+                jsTestLog("Skipping backup for: " + tojson(doc));
             }
         }
     }
@@ -153,8 +165,8 @@ export class MagicRestoreTest {
      * Copies data files from the source dbpath to the backup dbpath, and then closes the backup
      * cursor. Copies the data files from the backup path to each node's restore db path.
      */
-    copyFilesAndCloseBackup(namespacesToSkip = []) {
-        this.copyFiles(namespacesToSkip);
+    copyFilesAndCloseBackup(collectionsToRestore = []) {
+        this.copyFiles(collectionsToRestore);
         this.backupCursor.close();
         this.restoreDbPaths.forEach((restoreDbPath) => {
             resetDbpath(restoreDbPath);
@@ -165,10 +177,10 @@ export class MagicRestoreTest {
     /**
      * Extends the backup cursor, copies the extend files and closes the backup cursor.
      */
-    extendAndCloseBackup(node, maxCheckpointTs) {
+    extendAndCloseBackup(node, maxCheckpointTs, collectionsToRestore) {
         backupUtils.extendBackupCursor(node, this.backupId, maxCheckpointTs);
         backupUtils.copyBackupCursorExtendFiles(this.backupCursor,
-                                                [] /*namespacesToSkip*/,
+                                                collectionsToRestore,
                                                 this.backupSource.dbpath,
                                                 this.backupDbPath,
                                                 false /*async*/);
@@ -348,12 +360,12 @@ export class MagicRestoreTest {
      * Returns an object with the timestamp of the last oplog entry, as well as the oplog
      * entry array
      */
-    getEntriesAfterBackup(sourceNode = this.backupSource, namespacesToSkip = []) {
+    getEntriesAfterBackup(sourceNode = this.backupSource) {
         let oplog = sourceNode.getDB("local").getCollection('oplog.rs');
-        const entriesAfterBackup = oplog.find({ts: {$gt: this.checkpointTimestamp}})
-                                       .sort({ts: 1})
-                                       .toArray()
-                                       .filter((entry) => !namespacesToSkip.includes(entry.ns));
+        const entriesAfterBackup =
+            oplog.find({ts: {$gt: this.checkpointTimestamp}}).sort({ts: 1}).toArray();
+        // We expect the caller to insert data after the backup, for PIT restores.
+        assert(entriesAfterBackup.length > 0);
         this.entriesAfterBackup = entriesAfterBackup;
         return {
             lastOplogEntryTs: entriesAfterBackup[entriesAfterBackup.length - 1].ts,
@@ -607,6 +619,10 @@ export class ShardedMagicRestoreTest {
         this.shardIdentityDocuments = undefined;
         this.maxCheckpointTs = undefined;
         this.pointInTimeTimestamp = undefined;
+        // We combine the lists of restored collections from each shard into one
+        // 'collectionsToRestore' list, and pass that into the restoreConfiguration. This is used by
+        // the config server to remove metadata about unrestored collections.
+        this.collectionsToRestore = [];
     }
 
     mkdirAndResetPath(path) {
@@ -628,23 +644,37 @@ export class ShardedMagicRestoreTest {
         return this.shardRestoreTests;
     }
 
-    findMaxCheckpointTsAndExtendBackupCursors() {
-        this.maxCheckpointTs = Timestamp(0, 0);
-        this.magicRestoreTests.forEach((magicRestoreTest) => {
-            magicRestoreTest.copyFiles();
+    findMaxCheckpointTsAndExtendBackupCursors(collectionsToRestore = []) {
+        // Helper function to retrieve and set the max checkpoint timestamp.
+        const updateMaxCheckpointTs = (magicRestoreTest) => {
             const ts = magicRestoreTest.getCheckpointTimestamp();
             if (timestampCmp(ts, this.maxCheckpointTs) > 0) {
                 this.maxCheckpointTs = ts;
             }
+        };
+        this.maxCheckpointTs = Timestamp(0, 0);
+        // Config servers are always restored from a full backup, even when testing selective
+        // restore with 'collectionsToRestore'.
+        this.configRestoreTest.copyFiles();
+        updateMaxCheckpointTs(this.configRestoreTest);
+
+        this.shardRestoreTests.forEach((magicRestoreTest) => {
+            magicRestoreTest.copyFiles(collectionsToRestore);
+            updateMaxCheckpointTs(magicRestoreTest);
         });
 
         jsTestLog("Computed maxCheckpointTs: " + tojson(this.maxCheckpointTs));
 
         jsTestLog("Extending backup cursors");
-        this.magicRestoreTests.forEach((magicRestoreTest) => {
-            magicRestoreTest.extendAndCloseBackup(magicRestoreTest.backupSource,
-                                                  this.maxCheckpointTs);
+        this.configRestoreTest.extendAndCloseBackup(
+            this.configRestoreTest.backupSource, this.maxCheckpointTs, []);
+        this.shardRestoreTests.forEach((magicRestoreTest) => {
+            magicRestoreTest.extendAndCloseBackup(
+                magicRestoreTest.backupSource, this.maxCheckpointTs, collectionsToRestore);
         });
+        // If we performed a selective backup, we should set the list of collections to restore
+        // after copying files. This will be passed into the restore configuration.
+        this.setCollectionsToRestore();
     }
 
     setPointInTimeTimestamp() {
@@ -662,8 +692,32 @@ export class ShardedMagicRestoreTest {
             `Computed point-in-time timestamp ${tojson(this.pointInTimeTimestamp)} for cluster`);
     }
 
+    /**
+     * Retrieves the 'collectionsToRestore' list from each shard, and combines them into one list.
+     * This list of restored namespaces is passed into magic restore via the restoreConfiguration.
+     * Note that we only combine the lists from shard nodes, as we take a full backup of the config
+     * server.
+     */
+    setCollectionsToRestore() {
+        this.shardRestoreTests.forEach((shardRestoreTest) => {
+            shardRestoreTest.collectionsToRestore.forEach((collToRestore) => {
+                const exists = this.collectionsToRestore.some(
+                    (item) => item.ns === collToRestore.ns &&
+                        item.uuid.toString() === collToRestore.uuid.toString());
+
+                if (!exists) {
+                    this.collectionsToRestore.push(collToRestore);
+                }
+            });
+        });
+        jsTestLog(`Combined each shard's collectionsToRestore lists: ${
+            tojson(this.collectionsToRestore)}`);
+    }
+
     runMagicRestore() {
         this.magicRestoreTests.forEach((magicRestoreTest, idx) => {
+            const rstOptions = {"replSet": magicRestoreTest.rst.name};
+
             let restoreConfiguration = {
                 "nodeType": idx > 0 ? "shard" : "configServer",
                 "replicaSetConfig": magicRestoreTest.getExpectedConfig(),
@@ -679,12 +733,17 @@ export class ShardedMagicRestoreTest {
             if (this.shardIdentityDocuments) {
                 restoreConfiguration.shardIdentityDocument = this.shardIdentityDocuments[idx];
             }
+            // When we perform a selective restore, we need to store a list of collections to
+            // restore to pass into the restore configuration. This list is used by the config
+            // server, but we can pass it in via the restoreConfiguration for all nodes.
+            if (this.collectionsToRestore.length != 0) {
+                restoreConfiguration.collectionsToRestore = this.collectionsToRestore;
+                rstOptions.restore = '';
+            }
             restoreConfiguration =
                 magicRestoreTest.appendRestoreToHigherTermThanIfNeeded(restoreConfiguration);
-
-            magicRestoreTest.writeObjsAndRunMagicRestore(restoreConfiguration,
-                                                         magicRestoreTest.entriesAfterBackup,
-                                                         {"replSet": magicRestoreTest.rst.name});
+            magicRestoreTest.writeObjsAndRunMagicRestore(
+                restoreConfiguration, magicRestoreTest.entriesAfterBackup, rstOptions);
         });
     }
 
