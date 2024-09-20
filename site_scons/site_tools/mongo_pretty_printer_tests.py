@@ -70,8 +70,6 @@ def build_pretty_printer_test(env, target, **kwargs):
     else:
         kwargs["AIB_COMPONENTS_EXTRA"] = list(test_component)
 
-    python_bin = sys.executable
-
     test_program = kwargs.get("TEST_PROGRAM", ["$DESTDIR/$PREFIX/bin/mongod"])
     if isinstance(test_program, list):
         test_program = test_program[0]

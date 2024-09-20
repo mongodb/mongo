@@ -604,7 +604,9 @@ class ReplicaSetFixture(interface.ReplFixture, interface._DockerComposeInterface
         self.logger.info("Waiting for %s to auto-bootstrap as a config shard...", connection_string)
 
         deadline = time.time() + ReplicaSetFixture.AWAIT_SHARDING_INITIALIZATION_TIMEOUT_SECS
-        timeout_occurred = lambda: deadline - time.time() <= 0.0
+
+        def timeout_occurred():
+            return deadline - time.time() <= 0.0
 
         while True:
             client = interface.build_client(self.get_primary(), self.auth_options)

@@ -29,7 +29,7 @@ class ValidateCommitMessageTest(unittest.TestCase):
             ),
         ]
 
-        self.assertTrue(all(is_valid_commit(message) == True for message in messages))
+        self.assertTrue(all(is_valid_commit(message) for message in messages))
 
     def test_invalid(self):
         fake_repo = Repo()
@@ -66,4 +66,4 @@ class ValidateCommitMessageTest(unittest.TestCase):
             ),  # Contains some banned strings with extra newlines
         ]
 
-        self.assertTrue(all(is_valid_commit(message) == False for message in messages))
+        self.assertTrue(all(not is_valid_commit(message) for message in messages))

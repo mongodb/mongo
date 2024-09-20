@@ -408,7 +408,6 @@ class _AddRemoveShardThread(threading.Thread):
             all_dbs = direct_shard_conn.admin.command({"listDatabases": 1})
             for db in all_dbs["databases"]:
                 if db["name"] not in ["admin", "config", "local"] and db["empty"] is False:
-                    db_name = db["name"]
                     all_collections = direct_shard_conn.db_name.command({"listCollections": 1})
                     for coll in all_collections:
                         if len(list(direct_shard_conn.db_name.coll.find())) != 0:

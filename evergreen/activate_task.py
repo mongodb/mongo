@@ -22,7 +22,7 @@ def main(task_name: str):
     if found_task:
         # In non-patch evergreen versions the task will live as not activated
         # We can just find the task and activate it if it is not activated yet
-        if found_task.activated == True:
+        if found_task.activated:
             return
 
         evg_api.configure_task(found_task.task_id, activated=True)

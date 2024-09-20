@@ -98,7 +98,7 @@ def get_opt_options(env) -> str:
 
 
 def default_variant_dir_generator(target, source, env, for_signature):
-    if env.GetOption("cache") != None:
+    if env.GetOption("cache") is not None:
         return "cached"
 
     # If an option should affect the variant directory, name it here.

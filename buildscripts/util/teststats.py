@@ -147,8 +147,12 @@ class HistoricTestInfo(NamedTuple):
         self, predicate: Optional[Callable[[HistoricHookInfo], bool]] = None
     ) -> float:
         """Get the average runtime of all the hooks associated with this test."""
+
+        def default_predicate(_) -> bool:
+            return True
+
         if not predicate:
-            predicate = lambda _: True
+            predicate = default_predicate
         return sum(
             [
                 hook.avg_duration * (hook.num_pass // self.num_pass if self.num_pass else 1)

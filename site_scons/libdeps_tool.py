@@ -165,7 +165,7 @@ class FlaggedLibdep:
         apply the libdep taking care of the prefix, postfix and any required separators when
         adding to the list.
         """
-        if self.start_index != None:
+        if self.start_index is not None:
             result[:] = result[: self.start_index]
         self._add_lib_and_flags(result)
 
@@ -1412,7 +1412,6 @@ def expand_libdeps_for_link(source, target, env, for_signature):
 def generate_libdeps_graph(env):
     if env.get("SYMBOLDEPSSUFFIX", None):
         find_symbols = env.Dir("$BUILD_DIR").path + "/libdeps/find_symbols"
-        libdeps_graph = env.GetLibdepsGraph()
 
         symbol_deps = []
         for symbols_file, target_node in env.get("LIBDEPS_SYMBOL_DEP_FILES", []):
@@ -1612,7 +1611,7 @@ def setup_environment(env, emitting_shared=False, debug="off", linting="on"):
         # setups the binary to be built.
         find_symbols_env = env.Clone()
         find_symbols_env.VariantDir("${BUILD_DIR}/libdeps", "buildscripts/libdeps", duplicate=0)
-        find_symbols_node = find_symbols_env.Program(
+        find_symbols_env.Program(
             target="${BUILD_DIR}/libdeps/find_symbols",
             source=["${BUILD_DIR}/libdeps/find_symbols.c"],
             CFLAGS=["-O3"],

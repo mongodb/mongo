@@ -303,14 +303,24 @@ def main(
     if path is None:
         extra_args += ["ICECC="]
 
-    if os.name == "nt":
-        target_fmt = lambda target_library: os.path.join(
+    # Define separate functions instead of using lambdas
+    def target_fmt_nt(target_library: str) -> str:
+        return os.path.join(
             os.path.dirname(target_library), os.path.basename(target_library)[3:-2] + "lib"
         )
+
+    def target_fmt_darwin(target_library: str) -> str:
+        return target_library[:-2] + "a"
+
+    def target_fmt_default(x: str) -> None:
+        return None
+
+    if os.name == "nt":
+        target_fmt = target_fmt_nt
     elif platform.system() == "Darwin":
-        target_fmt = lambda target_library: target_library[:-2] + "a"
+        target_fmt = target_fmt_darwin
     else:
-        target_fmt = lambda x: None
+        target_fmt = target_fmt_default
 
     map(target_fmt, target_libraries)
 

@@ -34,7 +34,10 @@ def is_interesting_file(file_name: str) -> bool:
 
 def _lint_files(file_names: List[str]) -> None:
     """Lint a list of files with clang-format."""
-    run_lint1 = lambda param1: mongolint.lint_file(param1) == 0
+
+    def run_lint1(param1):
+        return mongolint.lint_file(param1) == 0
+
     if not parallel.parallel_process([os.path.abspath(f) for f in file_names], run_lint1):
         print("ERROR: Code Style does not match coding style")
         sys.exit(1)

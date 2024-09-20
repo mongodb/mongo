@@ -73,7 +73,10 @@ class _RuleDesc(object):
         self.node_type = node_type  # type: str
         self.required = required  # type: int
         self.mapping_parser_func = mapping_parser_func  # type: Callable[[errors.ParserContext,yaml.nodes.MappingNode], Any]
-        default_seq_parser = lambda ctxt, node: ctxt.get_list(node)
+
+        def default_seq_parser(ctxt, node):
+            return ctxt.get_list(node)
+
         self.sequence_parser_func = sequence_parser_func or default_seq_parser  # type: Callable[[errors.ParserContext,yaml.nodes.SequenceNode], Any]
 
 

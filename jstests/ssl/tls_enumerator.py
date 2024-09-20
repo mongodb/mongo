@@ -29,7 +29,7 @@ def enumerate_tls_ciphers(protocol_options, host, port, cert, cafile):
             with context.wrap_socket(sock, server_hostname=host) as conn:
                 try:
                     conn.connect((host, port))
-                except Exception as e:
+                except Exception:
                     continue
                 accepted_ciphers.append(cipher_name)
 

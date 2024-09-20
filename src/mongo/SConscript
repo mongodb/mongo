@@ -63,7 +63,7 @@ sys.path.append("src/mongo")
 # it, and do not declare other libraries in this file.
 baseEnv = env.Clone()
 
-if use_libunwind == True:
+if use_libunwind:
     baseEnv.InjectThirdParty("unwind")
 baseEnv.InjectThirdParty("intel_decimal128")
 

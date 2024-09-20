@@ -28,7 +28,7 @@ try:
     import bson.json_util
     import collections
     from bson.codec_options import CodecOptions
-except ImportError as err:
+except ImportError:
     print("Warning: Could not load bson library for Python '" + str(sys.version) + "'.")
     print("Check with the pip command if pymongo 3.x is installed.")
     bson = None

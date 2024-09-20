@@ -198,5 +198,5 @@ History:
         self.assertTrue(test_dict.write_equals(second_dict))
 
         # Reads aren't counted
-        gotten_value = second_dict["foo"]  # pylint: disable=unused-variable
+        _ = second_dict["foo"]
         self.assertTrue(test_dict.write_equals(second_dict))

@@ -95,7 +95,7 @@ def _add_action(builder):
 
 
 def exists(env):
-    result = _detect(env) != None
+    result = _detect(env) is not None
     return result
 
 
