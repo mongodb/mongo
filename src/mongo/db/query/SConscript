@@ -397,6 +397,7 @@ env.CppUnitTest(
         "stage_builder/sbe/sbe_builder_test_fixture.cpp",
         "stage_builder/sbe/shard_filter_test.cpp",
         "stage_builder/sbe/type_checker_test.cpp",
+        "stage_builder/sbe/value_lifetime_test.cpp",
         "stage_builder/sbe/vectorizer_test.cpp",
         "util/cartesian_product_test.cpp",
         "util/deferred_test.cpp",

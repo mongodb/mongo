@@ -227,6 +227,7 @@ public:
                     break;
                 }
                 // Instructions with 1 argument.
+                case Instruction::makeOwn:
                 case Instruction::negate:
                 case Instruction::logicNot:
                 case Instruction::getArraySize:
