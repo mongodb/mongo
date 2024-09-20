@@ -87,10 +87,10 @@ class test_prepare_hs05(wttest.WiredTigerTestCase):
         cursor2.set_key(key)
         if self.value_format == '8t':
             # In FLCS, deleted values read back as 0.
-            self.assertEquals(cursor2.search(), 0)
-            self.assertEquals(cursor2.get_value(), 0)
+            self.assertEqual(cursor2.search(), 0)
+            self.assertEqual(cursor2.get_value(), 0)
         else:
-            self.assertEquals(cursor2.search(), WT_NOTFOUND)
+            self.assertEqual(cursor2.search(), WT_NOTFOUND)
         cursor2.reset()
 
         # This should abort the prepared transaction.
@@ -110,8 +110,8 @@ class test_prepare_hs05(wttest.WiredTigerTestCase):
         cursor.set_key(key)
         if self.value_format == '8t':
             # In FLCS, deleted values read back as 0.
-            self.assertEquals(cursor.search(), 0)
-            self.assertEquals(cursor.get_value(), 0)
+            self.assertEqual(cursor.search(), 0)
+            self.assertEqual(cursor.get_value(), 0)
         else:
             self.assertEqual(cursor.search(), WT_NOTFOUND)
         self.session.rollback_transaction()

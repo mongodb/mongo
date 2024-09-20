@@ -116,10 +116,10 @@ class test_hs24(wttest.WiredTigerTestCase):
             if not newer_data_visible:
                 newer_data_visible = ret != wiredtiger.WT_NOTFOUND
             if newer_data_visible:
-                self.assertEquals(cursor.get_value(), self.value2)
-                self.assertEquals(cursor2.get_value(), self.value1)
+                self.assertEqual(cursor.get_value(), self.value2)
+                self.assertEqual(cursor2.get_value(), self.value1)
             else:
-                self.assertEquals(ret2, wiredtiger.WT_NOTFOUND)
+                self.assertEqual(ret2, wiredtiger.WT_NOTFOUND)
         session2.rollback_transaction()
         self.session.rollback_transaction()
 
@@ -163,9 +163,9 @@ class test_hs24(wttest.WiredTigerTestCase):
             if not newer_data_visible:
                 newer_data_visible = value != self.value3
             if newer_data_visible:
-                self.assertEquals(value, self.value1)
+                self.assertEqual(value, self.value1)
             else:
-                self.assertEquals(value, self.value3)
+                self.assertEqual(value, self.value3)
         self.session.rollback_transaction()
 
     def missing_ts_commits(self):

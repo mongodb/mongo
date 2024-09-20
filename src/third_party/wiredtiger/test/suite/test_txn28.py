@@ -100,11 +100,11 @@ class test_txn28(wttest.WiredTigerTestCase):
                     sub1 = ", snapshot: ["
                     sub2 = "], commit_timestamp:"
                     snapshot_list_item_count = self.count_integers_between_substrings(line, sub1, sub2)
-                    self.assertEquals(snapshot_count, snapshot_list_item_count)
+                    self.assertEqual(snapshot_count, snapshot_list_item_count)
                     if max_snapshot_list_item_count < snapshot_list_item_count:
                         max_snapshot_list_item_count = snapshot_list_item_count
 
-        self.assertEquals(max_snapshot_list_item_count, 2)
+        self.assertEqual(max_snapshot_list_item_count, 2)
         session3.commit_transaction()
         session2.commit_transaction()
         session1.commit_transaction()

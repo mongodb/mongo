@@ -488,8 +488,8 @@ class test_cursor13_big(test_cursor13_big_base):
         #         ', closes = ' + str(self.closecount))
         #self.tty('stats after = ' + str(end_stats))
 
-        self.assertEquals(end_stats[0] - begin_stats[0], self.closecount)
-        self.assertEquals(end_stats[1] - begin_stats[1], self.opencount)
+        self.assertEqual(end_stats[0] - begin_stats[0], self.closecount)
+        self.assertEqual(end_stats[1] - begin_stats[1], self.opencount)
 
 class test_cursor13_sweep(test_cursor13_big_base):
     # Set dhandle sweep configuration so that dhandles should be closed within
@@ -548,7 +548,7 @@ class test_cursor13_sweep(test_cursor13_big_base):
         #         ', closes = ' + str(self.closecount))
         #self.tty('stats after = ' + str(end_stats))
         #self.tty('sweep stats after = ' + str(end_sweep_stats))
-        self.assertEquals(end_stats[0] - begin_stats[0], self.closecount)
+        self.assertEqual(end_stats[0] - begin_stats[0], self.closecount)
         swept = end_sweep_stats[3] - begin_sweep_stats[3]
 
         # Although this is subject to tuning parameters, we know that

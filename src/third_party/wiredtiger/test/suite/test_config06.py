@@ -58,7 +58,7 @@ class test_config06(wttest.WiredTigerTestCase):
             "key_format=" + str(len) + fmt + ",value_format=" + str(len) + fmt)
         cursor = self.session.open_cursor(self.uri, None)
         cursor[k] = v
-        self.assertEquals(cursor[k[:len]], v[:len])
+        self.assertEqual(cursor[k[:len]], v[:len])
     def test_format_string_S_1(self):
         self.format_string('S', 1)
     def test_format_string_S_4(self):
@@ -78,7 +78,7 @@ class test_config06(wttest.WiredTigerTestCase):
         self.session.create(self.uri, "key_format=S,value_format=S")
         cursor = self.session.open_cursor(self.uri, None)
         cursor[k] = v
-        self.assertEquals(cursor[k], v)
+        self.assertEqual(cursor[k], v)
 
     def test_format_string_s_default(self):
         k = self.key
@@ -86,4 +86,4 @@ class test_config06(wttest.WiredTigerTestCase):
         self.session.create(self.uri, "key_format=s,value_format=s")
         cursor = self.session.open_cursor(self.uri, None)
         cursor[k] = v
-        self.assertEquals(cursor[k[:1]], v[:1])
+        self.assertEqual(cursor[k[:1]], v[:1])

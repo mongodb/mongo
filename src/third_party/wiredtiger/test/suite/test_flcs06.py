@@ -140,8 +140,8 @@ class test_flcs06(wttest.WiredTigerTestCase):
         # each page once when we get a suitable interface for that.
         for i in range(lo, hi, 53):
             evict_cursor.set_key(i)
-            self.assertEquals(evict_cursor.search(), 0)
-            self.assertEquals(evict_cursor.get_value(), value)
+            self.assertEqual(evict_cursor.search(), 0)
+            self.assertEqual(evict_cursor.get_value(), value)
             evict_cursor.reset()
         self.session.rollback_transaction()
         evict_cursor.close()

@@ -67,7 +67,7 @@ class test_backup14(backup_base):
                 num = j + (i * self.nops)
                 key = self.bigkey + str(num)
                 c.set_key(key)
-                self.assertEquals(c.remove(), 0)
+                self.assertEqual(c.remove(), 0)
         c.close()
         # Increase the counter so that later backups have unique ids.
         self.bkup_id += 1

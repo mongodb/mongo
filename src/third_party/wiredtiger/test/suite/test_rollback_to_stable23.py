@@ -64,8 +64,8 @@ class test_rollback_to_stable23(test_rollback_to_stable_base):
         self.session.begin_transaction("read_timestamp = " + self.timestamp_str(read_ts))
         for i in range(1, nrows + 1):
             cursor.set_key(ds.key(i))
-            self.assertEquals(cursor.search(), 0)
-            self.assertEquals(cursor.get_value(), check_value)
+            self.assertEqual(cursor.search(), 0)
+            self.assertEqual(cursor.get_value(), check_value)
         cursor.close()
         self.session.commit_transaction()
 

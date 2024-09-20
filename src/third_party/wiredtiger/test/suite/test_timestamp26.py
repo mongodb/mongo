@@ -128,7 +128,7 @@ class test_timestamp26_read_timestamp(wttest.WiredTigerTestCase):
         self.session.begin_transaction()
         c.set_key(key)
         if self.read_ts != 'always':
-            self.assertEquals(c.search(), 0)
+            self.assertEqual(c.search(), 0)
             self.assertEqual(c.get_value(), value)
         else:
             msg = '/read timestamps required and none set/'
@@ -141,7 +141,7 @@ class test_timestamp26_read_timestamp(wttest.WiredTigerTestCase):
         self.session.timestamp_transaction('read_timestamp=20')
         c.set_key(key)
         if self.read_ts != 'never':
-            self.assertEquals(c.search(), 0)
+            self.assertEqual(c.search(), 0)
             self.assertEqual(c.get_value(), value)
         else:
             msg = '/read timestamps disallowed/'
@@ -398,31 +398,31 @@ class test_timestamp26_inconsistent_update(wttest.WiredTigerTestCase):
         c[key1] = ds.value(14)
         c[key2] = ds.value(15)
         self.session.commit_transaction()
-        self.assertEquals(c[key1], ds.value(14))
-        self.assertEquals(c[key2], ds.value(15))
+        self.assertEqual(c[key1], ds.value(14))
+        self.assertEqual(c[key2], ds.value(15))
 
         self.session.begin_transaction()
         c[key1] = ds.value(16)
         self.session.timestamp_transaction('commit_timestamp=' + self.timestamp_str(31))
         c[key2] = ds.value(17)
         self.session.commit_transaction()
-        self.assertEquals(c[key1], ds.value(16))
-        self.assertEquals(c[key2], ds.value(17))
+        self.assertEqual(c[key1], ds.value(16))
+        self.assertEqual(c[key2], ds.value(17))
 
         self.session.begin_transaction()
         c[key1] = ds.value(18)
         c[key2] = ds.value(19)
         self.session.timestamp_transaction('commit_timestamp=' + self.timestamp_str(32))
         self.session.commit_transaction()
-        self.assertEquals(c[key1], ds.value(18))
-        self.assertEquals(c[key2], ds.value(19))
+        self.assertEqual(c[key1], ds.value(18))
+        self.assertEqual(c[key2], ds.value(19))
 
         self.session.begin_transaction()
         c[key1] = ds.value(20)
         c[key2] = ds.value(21)
         self.session.commit_transaction('commit_timestamp=' + self.timestamp_str(33))
-        self.assertEquals(c[key1], ds.value(20))
-        self.assertEquals(c[key2], ds.value(21))
+        self.assertEqual(c[key1], ds.value(20))
+        self.assertEqual(c[key2], ds.value(21))
 
 # Test that timestamps are ignored in logged files.
 class test_timestamp26_log_ts(wttest.WiredTigerTestCase):

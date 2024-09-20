@@ -183,14 +183,14 @@ class test_join08(wttest.WiredTigerTestCase):
         self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
             lambda: jc.prev(), msg)
 
-        self.assertEquals(jc.next(), 0)
-        self.assertEquals(jc.next(), wiredtiger.WT_NOTFOUND)
+        self.assertEqual(jc.next(), 0)
+        self.assertEqual(jc.next(), wiredtiger.WT_NOTFOUND)
 
         # Only after the join cursor is closed can we use the index cursor
         # normally
         jc.close()
-        self.assertEquals(ic0.next(), wiredtiger.WT_NOTFOUND)
-        self.assertEquals(ic0.prev(), 0)
+        self.assertEqual(ic0.next(), wiredtiger.WT_NOTFOUND)
+        self.assertEqual(ic0.prev(), 0)
 
     # common code for making sure that cursors can be
     # implicitly closed, no matter the order they are created
@@ -254,7 +254,7 @@ class test_join08(wttest.WiredTigerTestCase):
             [desc, pvalue, value] = statcur.get_values()
             #self.tty(str(desc) + "=" + str(pvalue))
             found = True
-        self.assertEquals(found, True)
+        self.assertEqual(found, True)
 
         jcursor.close()
         cursor.close()

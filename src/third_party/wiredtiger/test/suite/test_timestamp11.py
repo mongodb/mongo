@@ -103,15 +103,15 @@ class test_timestamp11(wttest.WiredTigerTestCase, suite_subprocess):
 
         c = self.session.open_cursor(uri)
         self.session.begin_transaction()
-        self.assertEquals(c[key], value2)
-        self.assertEquals(c[key2], valueNOTS)
+        self.assertEqual(c[key], value2)
+        self.assertEqual(c[key2], valueNOTS)
         self.session.commit_transaction()
         c.close()
 
         c = self.session.open_cursor(uri)
         self.session.begin_transaction('read_timestamp=' + stable_ts)
-        self.assertEquals(c[key], value2)
-        self.assertEquals(c[key2], valueNOTS)
+        self.assertEqual(c[key], value2)
+        self.assertEqual(c[key2], valueNOTS)
         self.session.commit_transaction()
         c.close()
 
@@ -136,8 +136,8 @@ class test_timestamp11(wttest.WiredTigerTestCase, suite_subprocess):
         # Without a timestamp. We should see the latest value for each.
         c = self.session.open_cursor(uri)
         self.session.begin_transaction()
-        self.assertEquals(c[key], valueNOTS)
-        self.assertEquals(c[key2], value5)
+        self.assertEqual(c[key], valueNOTS)
+        self.assertEqual(c[key2], value5)
         self.session.commit_transaction()
         c.close()
 
@@ -145,8 +145,8 @@ class test_timestamp11(wttest.WiredTigerTestCase, suite_subprocess):
         # value at timestamp 2.
         c = self.session.open_cursor(uri)
         self.session.begin_transaction('read_timestamp=' + stable_ts)
-        self.assertEquals(c[key], valueNOTS)
-        self.assertEquals(c[key2], valueNOTS)
+        self.assertEqual(c[key], valueNOTS)
+        self.assertEqual(c[key2], valueNOTS)
         self.session.commit_transaction()
         c.close()
 
@@ -155,7 +155,7 @@ class test_timestamp11(wttest.WiredTigerTestCase, suite_subprocess):
         # we inserted at timestamp 5 after the non-timestamped insert.
         c = self.session.open_cursor(uri)
         self.session.begin_transaction('read_timestamp=' + self.timestamp_str(5))
-        self.assertEquals(c[key], valueNOTS)
-        self.assertEquals(c[key2], value5)
+        self.assertEqual(c[key], valueNOTS)
+        self.assertEqual(c[key2], value5)
         self.session.commit_transaction()
         c.close()

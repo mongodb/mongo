@@ -49,11 +49,11 @@ class test_prepare_hs01(wttest.WiredTigerTestCase):
         self.session.begin_transaction('read_timestamp=' + self.timestamp_str(read_ts))
         for i in range(1, nsessions * nkeys):
             cursor.set_key(ds.key(nrows + i))
-            self.assertEquals(cursor.search(), 0)
+            self.assertEqual(cursor.search(), 0)
             # Correctness Test - commit_value should be visible
-            self.assertEquals(cursor.get_value(), expected_value)
+            self.assertEqual(cursor.get_value(), expected_value)
             # Correctness Test - prepare_value should NOT be visible
-            self.assertNotEquals(cursor.get_value(), not_expected_value)
+            self.assertNotEqual(cursor.get_value(), not_expected_value)
         cursor.close()
         self.session.commit_transaction()
 
@@ -87,7 +87,7 @@ class test_prepare_hs01(wttest.WiredTigerTestCase):
             self.session.begin_transaction()
             cursor.set_key(ds.key(nrows + i))
             cursor.set_value(bigvalue1)
-            self.assertEquals(cursor.insert(), 0)
+            self.assertEqual(cursor.insert(), 0)
             self.session.commit_transaction('commit_timestamp=' + self.timestamp_str(2))
 
         # Have prepared updates in multiple sessions. This should ensure writing
@@ -104,7 +104,7 @@ class test_prepare_hs01(wttest.WiredTigerTestCase):
             for i in range(start, end):
                 cursors[j].set_key(ds.key(nrows + i))
                 cursors[j].set_value(bigvalue2)
-                self.assertEquals(cursors[j].insert(), 0)
+                self.assertEqual(cursors[j].insert(), 0)
             sessions[j].prepare_transaction('prepare_timestamp=' + self.timestamp_str(3))
 
         # Re-read the original versions of all the data. This ensures reading
@@ -141,7 +141,7 @@ class test_prepare_hs01(wttest.WiredTigerTestCase):
         for i in range(1, 10000):
             cursor.set_key(ds.key(nrows + i))
             cursor.set_value(bigvalue)
-            self.assertEquals(cursor.insert(), 0)
+            self.assertEqual(cursor.insert(), 0)
         cursor.close()
         self.session.checkpoint()
 

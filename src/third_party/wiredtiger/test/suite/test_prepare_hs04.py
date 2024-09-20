@@ -112,7 +112,7 @@ class test_prepare_hs04(wttest.WiredTigerTestCase):
             key = commit_key + ds.key(self.nrows + i)
             cursor.set_key(key)
             cursor.set_value(commit_value)
-            self.assertEquals(cursor.insert(), 0)
+            self.assertEqual(cursor.insert(), 0)
             self.session.commit_transaction('commit_timestamp=' + self.timestamp_str(2))
         cursor.close()
 
@@ -124,7 +124,7 @@ class test_prepare_hs04(wttest.WiredTigerTestCase):
             self.session.begin_transaction()
             key = commit_key + ds.key(self.nrows + i)
             cursor.set_key(key)
-            self.assertEquals(cursor.remove(), 0)
+            self.assertEqual(cursor.remove(), 0)
             self.session.commit_transaction('commit_timestamp=' + self.timestamp_str(10))
         cursor.close()
 
@@ -146,7 +146,7 @@ class test_prepare_hs04(wttest.WiredTigerTestCase):
             for i in range(start, end):
                 cursors[j].set_key(commit_key + ds.key(self.nrows + i))
                 cursors[j].set_value(prepare_value)
-                self.assertEquals(cursors[j].insert(), 0)
+                self.assertEqual(cursors[j].insert(), 0)
             sessions[j].prepare_transaction('prepare_timestamp=' + self.timestamp_str(20))
 
         hs_writes = self.get_stat(stat.conn.cache_write_hs) - hs_writes_start
@@ -241,7 +241,7 @@ class test_prepare_hs04(wttest.WiredTigerTestCase):
         for i in range(1, 10000):
             cursor.set_key(ds.key(self.nrows + i))
             cursor.set_value(bigvalue)
-            self.assertEquals(cursor.insert(), 0)
+            self.assertEqual(cursor.insert(), 0)
         cursor.close()
         self.session.checkpoint()
 

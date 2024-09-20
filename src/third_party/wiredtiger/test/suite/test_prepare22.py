@@ -88,7 +88,7 @@ class test_prepare22(wttest.WiredTigerTestCase):
         session2 = self.conn.open_session()
         evict_cursor = session2.open_cursor(uri, None, 'debug=(release_evict)')
         session2.begin_transaction('ignore_prepare=true,read_timestamp=' + self.timestamp_str(20))
-        self.assertEquals(evict_cursor[1], value_b)
+        self.assertEqual(evict_cursor[1], value_b)
         evict_cursor.reset()
         evict_cursor.close()
         session2.rollback_transaction()
@@ -108,27 +108,27 @@ class test_prepare22(wttest.WiredTigerTestCase):
         # Evict the page again
         evict_cursor = session2.open_cursor(uri, None, 'debug=(release_evict)')
         session2.begin_transaction('read_timestamp=' + self.timestamp_str(20))
-        self.assertEquals(evict_cursor[1], value_b)
+        self.assertEqual(evict_cursor[1], value_b)
         evict_cursor.reset()
         evict_cursor.close()
         session2.rollback_transaction()
 
         # Verify we can still read back value a
         self.session.begin_transaction('read_timestamp=' + self.timestamp_str(10))
-        self.assertEquals(cursor[1], value_a)
+        self.assertEqual(cursor[1], value_a)
         self.session.rollback_transaction()
 
         # Verify we can still read back value b
         self.session.begin_transaction('read_timestamp=' + self.timestamp_str(20))
-        self.assertEquals(cursor[1], value_b)
+        self.assertEqual(cursor[1], value_b)
         self.session.rollback_transaction()
 
         # Verify we can still read back the deletion
         if self.delete:
             self.session.begin_transaction('read_timestamp=' + self.timestamp_str(30))
             if self.value_format == '8t':
-                self.assertEquals(cursor[1], 0)
+                self.assertEqual(cursor[1], 0)
             else:
                 cursor.set_key(1)
-                self.assertEquals(cursor.search(), wiredtiger.WT_NOTFOUND)
+                self.assertEqual(cursor.search(), wiredtiger.WT_NOTFOUND)
             self.session.rollback_transaction()

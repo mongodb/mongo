@@ -276,7 +276,7 @@ class test_rollback_to_stable10(test_rollback_to_stable_base):
                 key = ds.key(i)
                 cursor.set_key(key)
                 cursor.set_value(value)
-                self.assertEquals(cursor.update(), 0)
+                self.assertEqual(cursor.update(), 0)
             self.pr("prepare")
             session.prepare_transaction(prepare_config)
 

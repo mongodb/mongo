@@ -40,12 +40,12 @@ class test_tiered16(TieredConfigMixin, wttest.WiredTigerTestCase):
     def check_cache(self, cache_dir, expect1):
         got = sorted(list(os.listdir(cache_dir)))
         expect = sorted(expect1)
-        self.assertEquals(got, expect)
+        self.assertEqual(got, expect)
 
     def check_bucket(self, expect1):
         got = sorted(list(os.listdir(self.bucket)))
         expect = sorted(expect1)
-        self.assertEquals(got, expect)
+        self.assertEqual(got, expect)
 
     def test_remove_shared(self):
         uri_a = "table:tiereda"

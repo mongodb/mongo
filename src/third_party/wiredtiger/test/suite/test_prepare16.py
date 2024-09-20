@@ -104,10 +104,10 @@ class test_prepare16(wttest.WiredTigerTestCase):
             evict_cursor.set_key(self.make_key(i))
             # In FLCS (at least for now) uncommitted values extend the table with zeros.
             if self.value_format == '8t':
-                self.assertEquals(evict_cursor.search(), 0)
-                self.assertEquals(evict_cursor.get_value(), 0)
+                self.assertEqual(evict_cursor.search(), 0)
+                self.assertEqual(evict_cursor.get_value(), 0)
             else:
-                self.assertEquals(evict_cursor.search(), WT_NOTFOUND)
+                self.assertEqual(evict_cursor.search(), WT_NOTFOUND)
             evict_cursor.reset()
 
         if self.commit:
@@ -126,12 +126,12 @@ class test_prepare16(wttest.WiredTigerTestCase):
         for i in range(1, nrows + 1):
             cursor.set_key(self.make_key(i))
             if self.commit:
-                self.assertEquals(cursor.search(), 0)
+                self.assertEqual(cursor.search(), 0)
                 self.assertEqual(cursor.get_value(), valuea)
             elif self.value_format == '8t':
                 # In FLCS (at least for now) uncommitted values extend the table with zeros.
-                self.assertEquals(cursor.search(), 0)
-                self.assertEquals(cursor.get_value(), 0)
+                self.assertEqual(cursor.search(), 0)
+                self.assertEqual(cursor.get_value(), 0)
             else:
-                self.assertEquals(cursor.search(), WT_NOTFOUND)
+                self.assertEqual(cursor.search(), WT_NOTFOUND)
         self.session.commit_transaction()

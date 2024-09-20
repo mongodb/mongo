@@ -70,13 +70,13 @@ class test_join09(wttest.WiredTigerTestCase):
         jc = self.session.open_cursor('join:table:join09', None, None)
         c0 = self.session.open_cursor('index:join09:index0', None, None)
         c0.set_key('520')
-        self.assertEquals(0, c0.search())
+        self.assertEqual(0, c0.search())
         self.session.join(jc, c0, 'compare=ge')
 
         joinconfig = 'compare=eq,' + self.config
         c1 = self.session.open_cursor('index:join09:index1', None, None)
         c1.set_key('555')
-        self.assertEquals(0, c1.search())
+        self.assertEqual(0, c1.search())
         self.session.join(jc, c1, joinconfig)
 
         mbr = set(range(520,600)) | set(range(53,60))
@@ -85,7 +85,7 @@ class test_join09(wttest.WiredTigerTestCase):
         while jc.next() == 0:
             [k] = jc.get_keys()
             [v0,v1] = jc.get_values()
-            self.assertEquals(self.gen_values(k), [v0, v1])
+            self.assertEqual(self.gen_values(k), [v0, v1])
             if not k in mbr:
                 # With false positives, we can see extra values
                 if self.false_positives:
@@ -98,7 +98,7 @@ class test_join09(wttest.WiredTigerTestCase):
 
         if len(mbr) != 0:
             self.tty('**** ERROR: did not see these: ' + str(mbr))
-        self.assertEquals(0, len(mbr))
+        self.assertEqual(0, len(mbr))
 
         # Turning on false positives does not guarantee we'll see extra
         # values, but we've configured our test with a low count to

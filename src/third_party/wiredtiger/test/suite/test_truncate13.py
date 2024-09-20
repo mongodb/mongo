@@ -83,8 +83,8 @@ class test_truncate13(wttest.WiredTigerTestCase):
         # each page once when we get a suitable interface for that.
         for i in range(lo, hi, 3):
             evict_cursor.set_key(i)
-            self.assertEquals(evict_cursor.search(), 0)
-            self.assertEquals(evict_cursor.get_value(), self.mkdata(basevalue, i))
+            self.assertEqual(evict_cursor.search(), 0)
+            self.assertEqual(evict_cursor.get_value(), self.mkdata(basevalue, i))
             evict_cursor.reset()
         self.session.rollback_transaction()
         evict_cursor.close()

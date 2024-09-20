@@ -951,7 +951,7 @@ restart:
         goto restart;
     }
 
-    /* Shut down the history store table after all eviction is complete. */
+    /* Indicate the history store file can no longer be used. */
     __wt_hs_close(session);
 
     /*

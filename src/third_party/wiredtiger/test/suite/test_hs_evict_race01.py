@@ -88,7 +88,7 @@ class test_hs_evict_race01(wttest.WiredTigerTestCase):
         simulate_crash_restart(self, '.', "RESTART")
         cursor = self.session.open_cursor(self.uri)
         self.session.begin_transaction('read_timestamp=' + self.timestamp_str(4))
-        self.assertEquals(self.value1, cursor[1])
+        self.assertEqual(self.value1, cursor[1])
         self.session.rollback_transaction()
 
     def no_timestamp_update_and_evict(self):
@@ -102,7 +102,7 @@ class test_hs_evict_race01(wttest.WiredTigerTestCase):
         sleep(1.5)
         evict_cursor = session.open_cursor(self.uri, None, "debug=(release_evict)")
         evict_cursor.set_key(1)
-        self.assertEquals(evict_cursor.search(), 0)
+        self.assertEqual(evict_cursor.search(), 0)
         evict_cursor.reset()
         evict_cursor.close()
         session.close()

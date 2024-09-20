@@ -45,7 +45,7 @@ class test_join05(wttest.WiredTigerTestCase):
 
         cursor = self.session.open_cursor("index:test_2384:index", None, None)
         cursor.set_key(13)
-        self.assertEquals(cursor.search(), 0)
+        self.assertEqual(cursor.search(), 0)
 
         jcursor = self.session.open_cursor("join:table:test_2384", None, None)
         self.session.join(jcursor, cursor, "compare=lt")
@@ -57,6 +57,6 @@ class test_join05(wttest.WiredTigerTestCase):
             #self.tty("jcursor: k=" + str(k) + ", v=" + str(v))
             nr_found += 1
 
-        self.assertEquals(nr_found, 2)
+        self.assertEqual(nr_found, 2)
         jcursor.close()
         cursor.close()

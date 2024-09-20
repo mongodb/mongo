@@ -124,7 +124,7 @@ class test_rollback_to_stable40(test_rollback_to_stable_base):
         for i in range (1, nrows + 1):
             cursor.set_key(ds.key(i))
             self.assertEqual(cursor.search(), 0)
-            self.assertEquals(cursor.get_value(), value_d)
+            self.assertEqual(cursor.get_value(), value_d)
         self.session.rollback_transaction()
         cursor.close()
 
@@ -138,9 +138,9 @@ class test_rollback_to_stable40(test_rollback_to_stable_base):
             cursor.set_key(ds.key(i))
             self.assertEqual(cursor.search(), 0)
             if i % 2 == 0:
-                self.assertEquals(cursor.get_value(), value_c)
+                self.assertEqual(cursor.get_value(), value_c)
             else:
-                self.assertEquals(cursor.get_value(), value_a)
+                self.assertEqual(cursor.get_value(), value_a)
         self.session.rollback_transaction()
 
         stat_cursor = self.session.open_cursor('statistics:', None, None)

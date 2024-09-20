@@ -99,9 +99,9 @@ class test_cursor17(wttest.WiredTigerTestCase):
         evict_cursor = self.ds.open_cursor(self.type + self.tablename, None, "debug=(release_evict)")
         evict_cursor.set_key(100)
         if self.valueformat != '8t':
-            self.assertEquals(evict_cursor.search(), wiredtiger.WT_NOTFOUND)
+            self.assertEqual(evict_cursor.search(), wiredtiger.WT_NOTFOUND)
         else:
-            self.assertEquals(evict_cursor.search(), 0)
+            self.assertEqual(evict_cursor.search(), 0)
         evict_cursor.close()
 
         # Verify the largest key changed.
@@ -110,7 +110,7 @@ class test_cursor17(wttest.WiredTigerTestCase):
         if self.valueformat != '8t':
             self.assertEqual(cursor.get_key(), 99)
         else:
-            self.assertEquals(cursor.get_key(), 100)
+            self.assertEqual(cursor.get_key(), 100)
         self.session.rollback_transaction()
 
     def test_uncommitted_insert(self):
@@ -142,7 +142,7 @@ class test_cursor17(wttest.WiredTigerTestCase):
         # Verify the largest key.
         self.session.begin_transaction()
         self.assertEqual(cursor.largest_key(), 0)
-        self.assertEquals(cursor.get_key(), 200)
+        self.assertEqual(cursor.get_key(), 200)
         self.session.rollback_transaction()
 
     def test_invisible_timestamp(self):
@@ -221,7 +221,7 @@ class test_cursor17(wttest.WiredTigerTestCase):
         cursor = self.session.open_cursor(self.type + self.tablename, None)
         # Verify the largest key.
         self.session.begin_transaction()
-        self.assertEquals(cursor.largest_key(), wiredtiger.WT_NOTFOUND)
+        self.assertEqual(cursor.largest_key(), wiredtiger.WT_NOTFOUND)
         self.session.rollback_transaction()
 
     @wttest.prevent(["timestamp"])  # this test uses timestamps, hooks should not
@@ -233,7 +233,7 @@ class test_cursor17(wttest.WiredTigerTestCase):
         self.session.begin_transaction()
         for i in range(1, 101):
             evict_cursor.set_key(i)
-            self.assertEquals(evict_cursor.search(), 0)
+            self.assertEqual(evict_cursor.search(), 0)
         self.session.rollback_transaction()
         evict_cursor.close()
 

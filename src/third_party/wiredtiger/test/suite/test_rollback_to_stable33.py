@@ -84,10 +84,10 @@ class test_rollback_to_stable33(wttest.WiredTigerTestCase):
         # should have their updates rolled back.
         c = self.session.open_cursor(uri, None)
         if self.logged:
-            self.assertEquals(c[ds.key(10)], ds.value(100))
-            self.assertEquals(c[ds.key(11)], ds.value(101))
-            self.assertEquals(c[ds.key(12)], ds.value(102))
+            self.assertEqual(c[ds.key(10)], ds.value(100))
+            self.assertEqual(c[ds.key(11)], ds.value(101))
+            self.assertEqual(c[ds.key(12)], ds.value(102))
         else:
-            self.assertEquals(c[ds.key(10)], ds.value(10))
-            self.assertEquals(c[ds.key(11)], ds.value(11))
-            self.assertEquals(c[ds.key(12)], ds.value(12))
+            self.assertEqual(c[ds.key(10)], ds.value(10))
+            self.assertEqual(c[ds.key(11)], ds.value(11))
+            self.assertEqual(c[ds.key(12)], ds.value(12))

@@ -95,10 +95,10 @@ class test_prepare14(wttest.WiredTigerTestCase):
         evict_cursor.set_key(key)
         if self.value_format == '8t':
             # In FLCS deleted values read back as 0.
-            self.assertEquals(evict_cursor.search(), 0)
-            self.assertEquals(evict_cursor.get_value(), 0)
+            self.assertEqual(evict_cursor.search(), 0)
+            self.assertEqual(evict_cursor.get_value(), 0)
         else:
-            self.assertEquals(evict_cursor.search(), WT_NOTFOUND)
+            self.assertEqual(evict_cursor.search(), WT_NOTFOUND)
         evict_cursor.reset()
         evict_cursor.close()
         self.session.commit_transaction()
@@ -108,8 +108,8 @@ class test_prepare14(wttest.WiredTigerTestCase):
         cursor2.set_key(key)
         if self.value_format == '8t':
             # In FLCS deleted values read back as 0.
-            self.assertEquals(cursor2.search(), 0)
-            self.assertEquals(cursor2.get_value(), 0)
+            self.assertEqual(cursor2.search(), 0)
+            self.assertEqual(cursor2.get_value(), 0)
         else:
-            self.assertEquals(cursor2.search(), WT_NOTFOUND)
+            self.assertEqual(cursor2.search(), WT_NOTFOUND)
         self.session.commit_transaction()

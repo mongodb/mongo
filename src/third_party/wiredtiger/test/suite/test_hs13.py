@@ -66,7 +66,7 @@ class test_hs13(wttest.WiredTigerTestCase):
         session2.begin_transaction()
         cursor2.set_key(1)
         cursor2.search()
-        self.assertEquals(cursor2.get_value(),  'A' + value1)
+        self.assertEqual(cursor2.get_value(),  'A' + value1)
         session2.commit_transaction()
 
         # Reset the cursor.
@@ -92,10 +92,10 @@ class test_hs13(wttest.WiredTigerTestCase):
         # and evict the page.
         evict_cursor = self.session.open_cursor(uri, None, "debug=(release_evict)")
         evict_cursor.set_key(1)
-        self.assertEquals(evict_cursor.search(), 0)
+        self.assertEqual(evict_cursor.search(), 0)
         evict_cursor.reset()
 
         # Try to find the value we saw earlier.
         cursor2.set_key(1)
         cursor2.search()
-        self.assertEquals(cursor2.get_value(), 'A' + value1)
+        self.assertEqual(cursor2.get_value(), 'A' + value1)

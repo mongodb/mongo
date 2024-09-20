@@ -251,14 +251,14 @@ class test_join07(wttest.WiredTigerTestCase):
             # Duplicates may be returned when the disjunctions are used,
             # so we ignore them.
             if not i in gotkeys:
-                self.assertEquals(self.gen_values(i), values)
+                self.assertEqual(self.gen_values(i), values)
                 if not i in mbr:
                     self.tty('ERROR: result ' + str(i) + ' is not in: ' +
                              str(mbr))
                     self.assertTrue(i in mbr)
                 mbr.remove(i)
                 gotkeys.append(i)
-        self.assertEquals(0, len(mbr))
+        self.assertEqual(0, len(mbr))
 
     def token_literal(self, token):
         if token.kind == Token.STRING:
@@ -286,7 +286,7 @@ class test_join07(wttest.WiredTigerTestCase):
         if searchret != 0:
             self.tty('ERROR: cannot find value ' + str(literal) +
                      ' in ' + idxname)
-        self.assertEquals(0, searchret)
+        self.assertEqual(0, searchret)
         op = optok.kind
         if not isright:
             op = self.reverseop[op]

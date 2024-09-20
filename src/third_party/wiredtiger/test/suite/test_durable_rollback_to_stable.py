@@ -70,11 +70,11 @@ class test_durable_rollback_to_stable(wttest.WiredTigerTestCase, suite_subproces
 
         # Update all values with value 111 i.e. first update value.
         session.begin_transaction()
-        self.assertEquals(cursor.next(), 0)
+        self.assertEqual(cursor.next(), 0)
         for i in range(1, 50):
             cursor.set_value(ds.value(111))
-            self.assertEquals(cursor.update(), 0)
-            self.assertEquals(cursor.next(), 0)
+            self.assertEqual(cursor.update(), 0)
+            self.assertEqual(cursor.next(), 0)
 
         session.prepare_transaction('prepare_timestamp=' + self.timestamp_str(150))
         session.timestamp_transaction('commit_timestamp=' + self.timestamp_str(200))
@@ -83,40 +83,40 @@ class test_durable_rollback_to_stable(wttest.WiredTigerTestCase, suite_subproces
 
         # Check the values read are correct with different timestamps.
         # Read the initial dataset.
-        self.assertEquals(cursor.reset(), 0)
+        self.assertEqual(cursor.reset(), 0)
         session.begin_transaction('read_timestamp=' + self.timestamp_str(150))
-        self.assertEquals(cursor.next(), 0)
+        self.assertEqual(cursor.next(), 0)
         for i in range(1, 50):
-            self.assertEquals(cursor.get_value(), ds.value(i))
-            self.assertEquals(cursor.next(), 0)
+            self.assertEqual(cursor.get_value(), ds.value(i))
+            self.assertEqual(cursor.next(), 0)
         session.commit_transaction()
 
         # Read the first update value with timestamp.
-        self.assertEquals(cursor.reset(), 0)
+        self.assertEqual(cursor.reset(), 0)
         session.begin_transaction('read_timestamp=' + self.timestamp_str(220))
-        self.assertEquals(cursor.next(), 0)
+        self.assertEqual(cursor.next(), 0)
         for i in range(1, 50):
-            self.assertEquals(cursor.get_value(), ds.value(111))
-            self.assertEquals(cursor.next(), 0)
+            self.assertEqual(cursor.get_value(), ds.value(111))
+            self.assertEqual(cursor.next(), 0)
         session.commit_transaction()
 
         # Check that latest value is same as first update value.
-        self.assertEquals(cursor.reset(), 0)
+        self.assertEqual(cursor.reset(), 0)
         session.begin_transaction()
-        self.assertEquals(cursor.next(), 0)
+        self.assertEqual(cursor.next(), 0)
         for i in range(1, 50):
-            self.assertEquals(cursor.get_value(), ds.value(111))
-            self.assertEquals(cursor.next(), 0)
+            self.assertEqual(cursor.get_value(), ds.value(111))
+            self.assertEqual(cursor.next(), 0)
         session.commit_transaction()
 
         # Update all values with value 222 i.e. second update value.
-        self.assertEquals(cursor.reset(), 0)
+        self.assertEqual(cursor.reset(), 0)
         session.begin_transaction()
-        self.assertEquals(cursor.next(), 0)
+        self.assertEqual(cursor.next(), 0)
         for i in range(1, 50):
             cursor.set_value(ds.value(222))
-            self.assertEquals(cursor.update(), 0)
-            self.assertEquals(cursor.next(), 0)
+            self.assertEqual(cursor.update(), 0)
+            self.assertEqual(cursor.next(), 0)
 
         session.prepare_transaction('prepare_timestamp=' + self.timestamp_str(230))
 
@@ -135,11 +135,11 @@ class test_durable_rollback_to_stable(wttest.WiredTigerTestCase, suite_subproces
         self.session.checkpoint()
 
         # Check that second update value is visible.
-        self.assertEquals(cursor.reset(), 0)
-        self.assertEquals(cursor.next(), 0)
+        self.assertEqual(cursor.reset(), 0)
+        self.assertEqual(cursor.next(), 0)
         for i in range(1, 50):
-            self.assertEquals(cursor.get_value(), ds.value(222))
-            self.assertEquals(cursor.next(), 0)
+            self.assertEqual(cursor.get_value(), ds.value(222))
+            self.assertEqual(cursor.next(), 0)
 
         cursor.close()
         session.close()
@@ -150,10 +150,10 @@ class test_durable_rollback_to_stable(wttest.WiredTigerTestCase, suite_subproces
         cursor = session.open_cursor(uri, None)
         self.conn.set_timestamp('stable_timestamp=' + self.timestamp_str(250))
         self.conn.set_timestamp('oldest_timestamp=' + self.timestamp_str(250))
-        self.assertEquals(cursor.next(), 0)
+        self.assertEqual(cursor.next(), 0)
         for i in range(1, 50):
-            self.assertEquals(cursor.get_value(), ds.value(111))
-            self.assertEquals(cursor.next(), 0)
+            self.assertEqual(cursor.get_value(), ds.value(111))
+            self.assertEqual(cursor.next(), 0)
 
         # Use util to verify that second updates values have been flushed.
         errfilename = "verifyrollbackerr.out"

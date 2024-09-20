@@ -58,12 +58,12 @@ class test_prepare07(wttest.WiredTigerTestCase):
         self.session.begin_transaction()
         cursor.set_key(ds.key(nrows + 1))
         cursor.set_value(value_b)
-        self.assertEquals(cursor.update(), 0)
+        self.assertEqual(cursor.update(), 0)
         self.session.commit_transaction('commit_timestamp=' + self.timestamp_str(110))
         self.session.begin_transaction()
         cursor.set_key(ds.key(nrows + 2))
         cursor.set_value(value_b)
-        self.assertEquals(cursor.update(), 0)
+        self.assertEqual(cursor.update(), 0)
         self.session.commit_transaction('commit_timestamp=' + self.timestamp_str(120))
 
         # Prepare a transaction and keep it open.
@@ -72,19 +72,19 @@ class test_prepare07(wttest.WiredTigerTestCase):
         session_p.begin_transaction()
         cursor_p.set_key(ds.key(nrows + 3))
         cursor_p.set_value(value_b)
-        self.assertEquals(cursor_p.update(), 0)
+        self.assertEqual(cursor_p.update(), 0)
         session_p.prepare_transaction('prepare_timestamp=' + self.timestamp_str(130))
 
         # Commit some more updates.
         self.session.begin_transaction()
         cursor.set_key(ds.key(nrows + 4))
         cursor.set_value(value_b)
-        self.assertEquals(cursor.update(), 0)
+        self.assertEqual(cursor.update(), 0)
         self.session.commit_transaction('commit_timestamp=' + self.timestamp_str(140))
         self.session.begin_transaction()
         cursor.set_key(ds.key(nrows + 5))
         cursor.set_value(value_b)
-        self.assertEquals(cursor.update(), 0)
+        self.assertEqual(cursor.update(), 0)
         self.session.commit_transaction('commit_timestamp=' + self.timestamp_str(150))
 
         # Move the oldest and the stable timestamp to the latest.
@@ -95,7 +95,7 @@ class test_prepare07(wttest.WiredTigerTestCase):
         self.session.begin_transaction()
         cursor.set_key(ds.key(nrows + 6))
         cursor.set_value(value_b)
-        self.assertEquals(cursor.update(), 0)
+        self.assertEqual(cursor.update(), 0)
         self.session.commit_transaction('commit_timestamp=' + self.timestamp_str(160))
 
         # Take a checkpoint here, so that prepared transaction will not be durable..
@@ -113,27 +113,27 @@ class test_prepare07(wttest.WiredTigerTestCase):
 
         # Committed non - prepared transactions data should be seen.
         cursor_b.set_key(ds.key(nrows + 1))
-        self.assertEquals(cursor_b.search(), 0)
-        self.assertEquals(cursor_b.get_value(),value_b)
+        self.assertEqual(cursor_b.search(), 0)
+        self.assertEqual(cursor_b.get_value(),value_b)
         cursor_b.set_key(ds.key(nrows + 2))
-        self.assertEquals(cursor_b.search(), 0)
-        self.assertEquals(cursor_b.get_value(),value_b)
+        self.assertEqual(cursor_b.search(), 0)
+        self.assertEqual(cursor_b.get_value(),value_b)
         # Committed prepared transaction data should not be seen.
         cursor_b.set_key(ds.key(nrows + 3))
-        self.assertEquals(cursor_b.search(), 0)
-        self.assertEquals(cursor_b.get_value(),value_a)
+        self.assertEqual(cursor_b.search(), 0)
+        self.assertEqual(cursor_b.get_value(),value_a)
         # Committed non - prepared transactions data should be seen.
         cursor_b.set_key(ds.key(nrows + 4))
-        self.assertEquals(cursor_b.search(), 0)
-        self.assertEquals(cursor_b.get_value(),value_b)
+        self.assertEqual(cursor_b.search(), 0)
+        self.assertEqual(cursor_b.get_value(),value_b)
         cursor_b.set_key(ds.key(nrows + 5))
-        self.assertEquals(cursor_b.search(), 0)
-        self.assertEquals(cursor_b.get_value(),value_b)
+        self.assertEqual(cursor_b.search(), 0)
+        self.assertEqual(cursor_b.get_value(),value_b)
 
         # Committed transactions newer to the stable timestamp should not be seen.
         cursor_b.set_key(ds.key(nrows + 6))
-        self.assertEquals(cursor_b.search(), 0)
-        self.assertEquals(cursor_b.get_value(),value_a)
+        self.assertEqual(cursor_b.search(), 0)
+        self.assertEqual(cursor_b.get_value(),value_a)
 
         # close sessions.
         cursor_p.close()
@@ -163,7 +163,7 @@ class test_prepare07(wttest.WiredTigerTestCase):
         for i in range(1, 10000):
             cursor.set_key(ds.key(nrows + i))
             cursor.set_value(value_a)
-            self.assertEquals(cursor.insert(), 0)
+            self.assertEqual(cursor.insert(), 0)
         cursor.close()
         self.session.checkpoint()
 

@@ -101,18 +101,18 @@ class test_backup10(backup_base):
         msg = "/already a duplicate backup cursor open/"
         # Test multiple duplicate backup cursors.
         self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
-            lambda:self.assertEquals(self.session.open_cursor(None,
+            lambda:self.assertEqual(self.session.open_cursor(None,
             bkup_c, config), 0), msg)
         # Test duplicate of duplicate backup cursor.
         self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
-            lambda:self.assertEquals(self.session.open_cursor(None,
+            lambda:self.assertEqual(self.session.open_cursor(None,
             dupc, config), 0), msg)
         dupc.close()
 
         # Test we must use the log target.
         msg = "/must be for /"
         self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
-            lambda:self.assertEquals(self.session.open_cursor(None,
+            lambda:self.assertEqual(self.session.open_cursor(None,
             bkup_c, None), 0), msg)
 
         bkup_c.close()

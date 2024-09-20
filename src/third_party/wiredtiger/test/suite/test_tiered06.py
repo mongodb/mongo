@@ -99,22 +99,22 @@ class test_tiered06(wttest.WiredTigerTestCase, TieredConfigMixin):
         f.close()
 
         # Nothing is in the directory list until a flush.
-        self.assertEquals(fs.fs_directory_list(session, '', ''), [])
+        self.assertEqual(fs.fs_directory_list(session, '', ''), [])
 
         # Flushing copies the file into the file system.
         ss.ss_flush(session, fs, 'foobar', 'foobar', None)
         ss.ss_flush_finish(session, fs, 'foobar', 'foobar', None)
 
         # The object exists now.
-        self.assertEquals(fs.fs_directory_list(session, '', ''), ['foobar'])
+        self.assertEqual(fs.fs_directory_list(session, '', ''), ['foobar'])
         self.assertTrue(fs.fs_exist(session, 'foobar'))
 
         fh = fs.fs_open_file(session, 'foobar', FileSystem.open_file_type_data, FileSystem.open_readonly)
         inbytes = bytes(1000000)         # An empty buffer with a million zero bytes.
         fh.fh_read(session, 0, inbytes)  # Read into the buffer.
-        self.assertEquals(outbytes[0:1000000], inbytes)
-        self.assertEquals(fs.fs_size(session, 'foobar'), len(outbytes))
-        self.assertEquals(fh.fh_size(session), len(outbytes))
+        self.assertEqual(outbytes[0:1000000], inbytes)
+        self.assertEqual(fs.fs_size(session, 'foobar'), len(outbytes))
+        self.assertEqual(fh.fh_size(session), len(outbytes))
         fh.close(session)
 
         # The fh_lock call doesn't do anything in the directory and S3 store implementation.
@@ -135,17 +135,17 @@ class test_tiered06(wttest.WiredTigerTestCase, TieredConfigMixin):
         with self.expectedStderrPattern('foobar: rename of file not supported'):
             self.assertRaisesException(wiredtiger.WiredTigerError,
                 lambda: fs.fs_rename(session, 'foobar', 'barfoo', 0))
-        self.assertEquals(fs.fs_directory_list(session, '', ''), ['foobar'])
+        self.assertEqual(fs.fs_directory_list(session, '', ''), ['foobar'])
 
         if self.ss_name != 'dir_store':
             # Files that have been flushed cannot be manipulated through the custom file system.
             with self.expectedStderrPattern('foobar: remove of file not supported'):
                 self.assertRaisesException(wiredtiger.WiredTigerError,
                     lambda: fs.fs_remove(session, 'foobar', 0))
-            self.assertEquals(fs.fs_directory_list(session, '', ''), ['foobar'])
+            self.assertEqual(fs.fs_directory_list(session, '', ''), ['foobar'])
         else:
             fs.fs_remove(session, 'foobar', 0)
-            self.assertEquals(fs.fs_directory_list(session, '', ''), [])
+            self.assertEqual(fs.fs_directory_list(session, '', ''), [])
 
         fs.terminate(session)
         ss.terminate(session)
@@ -213,11 +213,11 @@ class test_tiered06(wttest.WiredTigerTestCase, TieredConfigMixin):
 
             # Do some spot checks, reading non-sequentially.
             fh.fh_read(session, 500 * block_size, in_block)  # divisible by 2, not 3
-            self.assertEquals(in_block, b_block)
+            self.assertEqual(in_block, b_block)
             fh.fh_read(session, 333 * block_size, in_block)  # divisible by 3, not 2
-            self.assertEquals(in_block, c_block)
+            self.assertEqual(in_block, c_block)
             fh.fh_read(session, 401 * block_size, in_block)  # not divisible by 2 or 3
-            self.assertEquals(in_block, a_block)
+            self.assertEqual(in_block, a_block)
 
             # Read the whole file, backwards checking to make sure
             # each block was written correctly.
@@ -225,11 +225,11 @@ class test_tiered06(wttest.WiredTigerTestCase, TieredConfigMixin):
                 pos = block_num * block_size
                 fh.fh_read(session, pos, in_block)
                 if block_num % 3 == 0:
-                    self.assertEquals(in_block, c_block)
+                    self.assertEqual(in_block, c_block)
                 elif block_num % 2 == 0:
-                    self.assertEquals(in_block, b_block)
+                    self.assertEqual(in_block, b_block)
                 else:
-                    self.assertEquals(in_block, a_block)
+                    self.assertEqual(in_block, a_block)
             fh.close(session)
 
         ss.terminate(session)
@@ -252,7 +252,7 @@ class test_tiered06(wttest.WiredTigerTestCase, TieredConfigMixin):
         # so we'll sort before comparing.'
         got = sorted(fs.fs_directory_list(self.session, '', prefix))
         expect = sorted(self.suffix(expect, 'wtobj'))
-        self.assertEquals(got, expect)
+        self.assertEqual(got, expect)
 
     # Check for data files in the WiredTiger home directory.
     def check_home(self, expect):
@@ -260,7 +260,7 @@ class test_tiered06(wttest.WiredTigerTestCase, TieredConfigMixin):
         got = sorted(list(os.listdir(self.home)))
         got = [x for x in got if not x.startswith('WiredTiger') and x.endswith('.wt')]
         expect = sorted(self.suffix(expect, 'wt'))
-        self.assertEquals(got, expect)
+        self.assertEqual(got, expect)
 
     # Check that objects are "in the cloud" for the directory store after a flush.
     # Using the directory storage module, they are actually going to be in either
@@ -271,10 +271,10 @@ class test_tiered06(wttest.WiredTigerTestCase, TieredConfigMixin):
 
         got = sorted(list(os.listdir(self.bucket)))
         expect = sorted(self.suffix(expect1, 'wtobj'))
-        self.assertEquals(got, expect)
+        self.assertEqual(got, expect)
         got = sorted(list(os.listdir(self.bucket1)))
         expect = sorted(self.suffix(expect2, 'wtobj'))
-        self.assertEquals(got, expect)
+        self.assertEqual(got, expect)
 
     def create_wt_file(self, name):
         with open(name + '.wt', 'w') as f:

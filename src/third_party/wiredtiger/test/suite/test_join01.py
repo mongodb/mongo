@@ -112,17 +112,17 @@ class test_join01(wttest.WiredTigerTestCase):
             i = k - 1
             if do_proj:  # our projection reverses the values and adds the key
                 [v2,v1,v0,kproj] = jc.get_values()
-                self.assertEquals(k, kproj)
+                self.assertEqual(k, kproj)
             else:
                 [v0,v1,v2] = jc.get_values()
-            self.assertEquals(self.gen_values(i), [v0,v1,v2])
+            self.assertEqual(self.gen_values(i), [v0,v1,v2])
             if len(expect) == 0 or i != expect[0]:
                 self.tty('ERROR: ' + str(i) + ' is not next in: ' +
                          str(expect))
                 self.tty('JOIN ORDER=' + str(join_order) + ', NESTED=' + str(do_nested))
             self.assertTrue(i == expect[0])
             expect.remove(i)
-        self.assertEquals(0, len(expect))
+        self.assertEqual(0, len(expect))
 
     # Stats are collected twice: after iterating
     # through the join cursor once, and secondly after resetting
@@ -243,7 +243,7 @@ class test_join01(wttest.WiredTigerTestCase):
         # Adding a projection to a reference cursor should be allowed.
         c2 = self.session.open_cursor('index:join01:index2(v1)', None, None)
         c2.set_key(99)   # skips all entries w/ primary key divisible by three
-        self.assertEquals(0, c2.search())
+        self.assertEqual(0, c2.search())
         self.session_record_join(jc, c2, 'compare=gt', 0, joins)
 
         # Then select all the numbers 0-99 whose string representation
@@ -254,19 +254,19 @@ class test_join01(wttest.WiredTigerTestCase):
         else:
             c0 = self.session.open_cursor('table:join01', None, None)
             c0.set_key(60)
-        self.assertEquals(0, c0.search())
+        self.assertEqual(0, c0.search())
         self.session_record_join(jc, c0, 'compare=ge' + joincfg0, 1, joins)
 
         # Then select all numbers whose reverse string representation
         # is in '20' < x < '40'.
         c1a = self.session.open_cursor('index:join01:index1(v1)', None, None)
         c1a.set_key('21')
-        self.assertEquals(0, c1a.search())
+        self.assertEqual(0, c1a.search())
         self.session_record_join(jc, c1a, 'compare=gt' + joincfg1, 2, joins)
 
         c1b = self.session.open_cursor('index:join01:index1(v1)', None, None)
         c1b.set_key('41')
-        self.assertEquals(0, c1b.search())
+        self.assertEqual(0, c1b.search())
         self.session_record_join(jc, c1b, 'compare=lt' + joincfg1, 2, joins)
 
         # Numbers that satisfy these 3 conditions (with ordering implied by c2):
@@ -289,13 +289,13 @@ class test_join01(wttest.WiredTigerTestCase):
 
             nc = self.session.open_cursor('index:join01:index0', None, None)
             nc.set_key('90')
-            self.assertEquals(0, nc.search())
+            self.assertEqual(0, nc.search())
             self.session.join(nest2, nc, 'compare=ge')  # joincfg left out
             closeme.append(nc)
 
             nc = self.session.open_cursor('index:join01:index0', None, None)
             nc.set_key('99')
-            self.assertEquals(0, nc.search())
+            self.assertEqual(0, nc.search())
             self.session.join(nest2, nc, 'compare=le')
             closeme.append(nc)
 
@@ -304,7 +304,7 @@ class test_join01(wttest.WiredTigerTestCase):
             for val in [ '72', '73', '82', '83' ]:
                 nc = self.session.open_cursor('index:join01:index0', None, None)
                 nc.set_key(val)
-                self.assertEquals(0, nc.search())
+                self.assertEqual(0, nc.search())
                 self.session.join(nest1, nc, 'compare=eq,operation=or' +
                                   joincfg0)
                 closeme.append(nc)

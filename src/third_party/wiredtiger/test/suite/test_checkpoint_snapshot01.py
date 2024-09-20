@@ -82,7 +82,7 @@ class test_checkpoint_snapshot01(wttest.WiredTigerTestCase):
             for i in range(start, end):
                 cursors[j].set_key(ds.key(self.nrows + i))
                 cursors[j].set_value(value)
-                self.assertEquals(cursors[j].insert(),0)
+                self.assertEqual(cursors[j].insert(),0)
 
         session_p2 = self.conn.open_session()
         session_p2.checkpoint()

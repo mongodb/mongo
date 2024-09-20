@@ -96,7 +96,7 @@ def get_check(storage_source, tc, base, n):
     for i in range(base, n):
         storage_source.assertEqual(tc[str(i)], str(i))
     tc.set_key(str(n))
-    storage_source.assertEquals(tc.search(), wiredtiger.WT_NOTFOUND)
+    storage_source.assertEqual(tc.search(), wiredtiger.WT_NOTFOUND)
 
 # Generate a unique object prefix for the S3 store.
 def generate_prefix(random_prefix = '', test_name = ''):

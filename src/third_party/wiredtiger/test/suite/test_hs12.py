@@ -70,10 +70,10 @@ class test_hs12(wttest.WiredTigerTestCase):
         session2.begin_transaction()
         cursor2.set_key(1)
         cursor2.search()
-        self.assertEquals(cursor2.get_value(),  value1 + 'A')
+        self.assertEqual(cursor2.get_value(),  value1 + 'A')
         cursor2.set_key(2)
         cursor2.search()
-        self.assertEquals(cursor2.get_value(),  'AB' + value1)
+        self.assertEqual(cursor2.get_value(),  'AB' + value1)
         session2.commit_transaction()
 
         # Begin transaction on session 2 so it sees the current snap_min and snap_max
@@ -92,13 +92,13 @@ class test_hs12(wttest.WiredTigerTestCase):
         # and evict the page.
         evict_cursor = self.session.open_cursor(uri, None, "debug=(release_evict)")
         evict_cursor.set_key(1)
-        self.assertEquals(evict_cursor.search(), 0)
+        self.assertEqual(evict_cursor.search(), 0)
         evict_cursor.reset()
 
         # Try to find the value we saw earlier
         cursor2.set_key(1)
         cursor2.search()
-        self.assertEquals(cursor2.get_value(), value1 + 'A')
+        self.assertEqual(cursor2.get_value(), value1 + 'A')
         cursor2.set_key(2)
         cursor2.search()
-        self.assertEquals(cursor2.get_value(), 'AB' + value1)
+        self.assertEqual(cursor2.get_value(), 'AB' + value1)

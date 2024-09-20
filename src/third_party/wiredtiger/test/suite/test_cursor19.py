@@ -51,15 +51,15 @@ class test_cursor19(wttest.WiredTigerTestCase):
     def verify_value(self, version_cursor, expected_start_ts, expected_start_durable_ts, expected_stop_ts, expected_stop_durable_ts, expected_type, expected_prepare_state, expected_flags, expected_location, expected_value):
         values = version_cursor.get_values()
         # Ignore the transaction ids from the value in the verification
-        self.assertEquals(values[1], expected_start_ts)
-        self.assertEquals(values[2], expected_start_durable_ts)
-        self.assertEquals(values[4], expected_stop_ts)
-        self.assertEquals(values[5], expected_stop_durable_ts)
-        self.assertEquals(values[6], expected_type)
-        self.assertEquals(values[7], expected_prepare_state)
-        self.assertEquals(values[8], expected_flags)
-        self.assertEquals(values[9], expected_location)
-        self.assertEquals(values[10], expected_value)
+        self.assertEqual(values[1], expected_start_ts)
+        self.assertEqual(values[2], expected_start_durable_ts)
+        self.assertEqual(values[4], expected_stop_ts)
+        self.assertEqual(values[5], expected_stop_durable_ts)
+        self.assertEqual(values[6], expected_type)
+        self.assertEqual(values[7], expected_prepare_state)
+        self.assertEqual(values[8], expected_flags)
+        self.assertEqual(values[9], expected_location)
+        self.assertEqual(values[10], expected_value)
 
     def test_modify(self):
         self.create()
@@ -80,21 +80,21 @@ class test_cursor19(wttest.WiredTigerTestCase):
         self.session.begin_transaction()
         cursor.set_key(1)
         mods = [wiredtiger.Modify("b", 0, 1)]
-        self.assertEquals(cursor.modify(mods), 0)
+        self.assertEqual(cursor.modify(mods), 0)
         self.session.commit_transaction("commit_timestamp=" + self.timestamp_str(5))
 
         # Modify the value
         self.session.begin_transaction()
         cursor.set_key(1)
         mods = [wiredtiger.Modify("c", 0, 1)]
-        self.assertEquals(cursor.modify(mods), 0)
+        self.assertEqual(cursor.modify(mods), 0)
         self.session.commit_transaction("commit_timestamp=" + self.timestamp_str(10))
 
         # Modify the value
         self.session.begin_transaction()
         cursor.set_key(1)
         mods = [wiredtiger.Modify("d", 0, 1)]
-        self.assertEquals(cursor.modify(mods), 0)
+        self.assertEqual(cursor.modify(mods), 0)
         self.session.commit_transaction("commit_timestamp=" + self.timestamp_str(15))
 
         cursor.reset()
@@ -102,7 +102,7 @@ class test_cursor19(wttest.WiredTigerTestCase):
         evict_cursor = self.session.open_cursor(self.uri, None, "debug=(release_evict)")
         self.session.begin_transaction()
         evict_cursor.set_key(1)
-        self.assertEquals(evict_cursor.search(), 0)
+        self.assertEqual(evict_cursor.search(), 0)
         evict_cursor.reset()
         self.session.rollback_transaction()
 
@@ -110,42 +110,42 @@ class test_cursor19(wttest.WiredTigerTestCase):
         self.session.begin_transaction()
         cursor.set_key(1)
         mods = [wiredtiger.Modify("e", 0, 1)]
-        self.assertEquals(cursor.modify(mods), 0)
+        self.assertEqual(cursor.modify(mods), 0)
         self.session.commit_transaction("commit_timestamp=" + self.timestamp_str(20))
 
         # Modify the value
         self.session.begin_transaction()
         cursor.set_key(1)
         mods = [wiredtiger.Modify("f", 0, 1)]
-        self.assertEquals(cursor.modify(mods), 0)
+        self.assertEqual(cursor.modify(mods), 0)
         self.session.commit_transaction("commit_timestamp=" + self.timestamp_str(25))
 
         # Delete the key
         self.session.begin_transaction()
         cursor.set_key(1)
-        self.assertEquals(cursor.remove(), 0)
+        self.assertEqual(cursor.remove(), 0)
         self.session.commit_transaction("commit_timestamp=" + self.timestamp_str(30))
 
         # Open a version cursor
         self.session.begin_transaction()
         version_cursor = self.session.open_cursor(self.uri, None, "debug=(dump_version=true)")
         version_cursor.set_key(1)
-        self.assertEquals(version_cursor.search(), 0)
-        self.assertEquals(version_cursor.get_key(), 1)
+        self.assertEqual(version_cursor.search(), 0)
+        self.assertEqual(version_cursor.get_key(), 1)
         self.verify_value(version_cursor, 25, 25, 30, 30, 1, 0, 0, 0, value6)
-        self.assertEquals(version_cursor.next(), 0)
-        self.assertEquals(version_cursor.get_key(), 1)
+        self.assertEqual(version_cursor.next(), 0)
+        self.assertEqual(version_cursor.get_key(), 1)
         self.verify_value(version_cursor, 20, 20, 25, 25, 1, 0, 0, 0, value5)
-        self.assertEquals(version_cursor.next(), 0)
-        self.assertEquals(version_cursor.get_key(), 1)
+        self.assertEqual(version_cursor.next(), 0)
+        self.assertEqual(version_cursor.get_key(), 1)
         self.verify_value(version_cursor, 15, 15, 20, 20, 3, 0, 0, 1, value4)
-        self.assertEquals(version_cursor.next(), 0)
-        self.assertEquals(version_cursor.get_key(), 1)
+        self.assertEqual(version_cursor.next(), 0)
+        self.assertEqual(version_cursor.get_key(), 1)
         self.verify_value(version_cursor, 10, 10, 15, 15, 3, 0, 0, 2, value3)
-        self.assertEquals(version_cursor.next(), 0)
-        self.assertEquals(version_cursor.get_key(), 1)
+        self.assertEqual(version_cursor.next(), 0)
+        self.assertEqual(version_cursor.get_key(), 1)
         self.verify_value(version_cursor, 5, 5, 10, 10, 1, 0, 0, 2, value2)
-        self.assertEquals(version_cursor.next(), 0)
-        self.assertEquals(version_cursor.get_key(), 1)
+        self.assertEqual(version_cursor.next(), 0)
+        self.assertEqual(version_cursor.get_key(), 1)
         self.verify_value(version_cursor, 1, 1, 5, 5, 1, 0, 0, 2, value1)
-        self.assertEquals(version_cursor.next(), wiredtiger.WT_NOTFOUND)
+        self.assertEqual(version_cursor.next(), wiredtiger.WT_NOTFOUND)

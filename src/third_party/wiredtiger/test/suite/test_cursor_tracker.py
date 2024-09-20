@@ -200,7 +200,7 @@ class TestCursorTracker(wttest.WiredTigerTestCase):
     def check_content(self, s, sizes):
         if sizes != None:
             stretched = self.stretch_content(s[0:20], sizes)
-            self.assertEquals(s, stretched)
+            self.assertEqual(s, stretched)
 
     # There are variants of {encode,decode}_{key,value} to be
     # used with each table kind: 'row', 'col', 'fix'
@@ -282,15 +282,15 @@ class TestCursorTracker(wttest.WiredTigerTestCase):
     def cur_first(self, cursor, expect=0):
         self.setpos(0, True)
         self.traceapi('cursor.first()')
-        self.assertEquals(0, cursor.reset())
-        self.assertEquals(expect, cursor.next())
+        self.assertEqual(0, cursor.reset())
+        self.assertEqual(expect, cursor.next())
         self.curremoved = False
 
     def cur_last(self, cursor, expect=0):
         self.setpos(len(self.bitlist) - 1, False)
         self.traceapi('cursor.last()')
-        self.assertEquals(0, cursor.reset())
-        self.assertEquals(expect, cursor.prev())
+        self.assertEqual(0, cursor.reset())
+        self.assertEqual(expect, cursor.prev())
         self.curremoved = False
 
     def cur_update(self, cursor, key):

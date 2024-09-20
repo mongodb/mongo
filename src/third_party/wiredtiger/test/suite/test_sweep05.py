@@ -52,8 +52,8 @@ class test_sweep05(wttest.WiredTigerTestCase):
 
     def assert_stats(self, expected_5min, expected_60min):
         stats = self.get_stats()
-        self.assertEquals(stats['5min'], expected_5min)
-        self.assertEquals(stats['60min'], expected_60min)
+        self.assertEqual(stats['5min'], expected_5min)
+        self.assertEqual(stats['60min'], expected_60min)
 
     def create_table(self, name):
         self.session.create(self.table_uri_format % name, self.create_params)
@@ -65,7 +65,7 @@ class test_sweep05(wttest.WiredTigerTestCase):
     def use_session(self, session, table_name):
         c = session.open_cursor(self.table_uri_format % table_name, None)
         for k in range(self.table_numkv):
-            self.assertEquals(c[k+1], 1)
+            self.assertEqual(c[k+1], 1)
         c.close()
 
     def test_short(self):

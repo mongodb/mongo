@@ -56,7 +56,7 @@ class test_util16(wttest.WiredTigerTestCase, suite_subprocess):
         while cursor.next() == 0:
             count +=1
         cursor.close()
-        self.assertEquals(self.nentries, count)
+        self.assertEqual(self.nentries, count)
 
         self.runWt(["rename", "table:" + self.tablename2, "table:" + self.tablename])
         self.assertTrue(self.tableExists(self.tablename))
@@ -65,4 +65,4 @@ class test_util16(wttest.WiredTigerTestCase, suite_subprocess):
         while cursor.next() == 0:
             count +=1
         cursor.close()
-        self.assertEquals(self.nentries, count)
+        self.assertEqual(self.nentries, count)

@@ -95,7 +95,7 @@ class test_timestamp22(wttest.WiredTigerTestCase):
             message += ': ERROR expected ' + expected
             self.checkStderr()
         self.pr(message)
-        self.assertEquals(expected, got)
+        self.assertEqual(expected, got)
 
     # Create a predictable value based on the iteration number and timestamp.
     def gen_value(self, iternum, ts):
@@ -371,8 +371,8 @@ class test_timestamp22(wttest.WiredTigerTestCase):
         query_oldest = self.conn.query_timestamp('get=oldest_timestamp')
         query_stable = self.conn.query_timestamp('get=stable_timestamp')
 
-        self.assertEquals(expect_query_oldest, query_oldest)
-        self.assertEquals(expect_query_stable, query_stable)
+        self.assertEqual(expect_query_oldest, query_oldest)
+        self.assertEqual(expect_query_stable, query_stable)
         self.pr('oldest now: ' + query_oldest)
         self.pr('stable now: ' + query_stable)
 
@@ -454,8 +454,8 @@ class test_timestamp22(wttest.WiredTigerTestCase):
         expect_key = 1
         expect_value = self.commit_value
         for k,v in cursor:
-            self.assertEquals(k, expect_key)
-            self.assertEquals(v, expect_value)
+            self.assertEqual(k, expect_key)
+            self.assertEqual(v, expect_value)
             expect_key += 1
 
         # Although it's theoretically possible to never successfully update a single row,

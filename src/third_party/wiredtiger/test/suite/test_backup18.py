@@ -69,7 +69,7 @@ class test_backup18(backup_base):
         msg = "/is not configured/"
         self.pr("Query IDs before any backup")
         self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
-            lambda:self.assertEquals(self.session.open_cursor('backup:query_id',
+            lambda:self.assertEqual(self.session.open_cursor('backup:query_id',
             None, None), 0), msg)
 
         # Open up the backup cursor.
@@ -84,14 +84,14 @@ class test_backup18(backup_base):
         msg = "/should be passed either/"
         self.pr("Query IDs as duplicate cursor")
         self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
-            lambda:self.assertEquals(self.session.open_cursor('backup:query_id',
+            lambda:self.assertEqual(self.session.open_cursor('backup:query_id',
             bkup_c, None), 0), msg)
 
         # Try to open the query cursor while backup cursor is open.
         msg = "/there is already a backup/"
         self.pr("Query IDs while backup cursor open")
         self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
-            lambda:self.assertEquals(self.session.open_cursor('backup:query_id',
+            lambda:self.assertEqual(self.session.open_cursor('backup:query_id',
             None, None), 0), msg)
         bkup_c.close()
         self.assertEqual(0, self.get_stat(stat.conn.backup_cursor_open))
@@ -126,7 +126,7 @@ class test_backup18(backup_base):
         bkup_c = self.session.open_cursor('backup:', None, config)
         bkup_c.close()
         self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
-            lambda:self.assertEquals(self.session.open_cursor('backup:query_id',
+            lambda:self.assertEqual(self.session.open_cursor('backup:query_id',
             None, None), 0), msg)
         self.assertEqual(0, self.get_stat(stat.conn.backup_cursor_open))
         self.assertEqual(0, self.get_stat(stat.conn.backup_incremental))
@@ -145,7 +145,7 @@ class test_backup18(backup_base):
         bkup_c.close()
         simulate_crash_restart(self, ".", "RESTART")
         self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
-            lambda:self.assertEquals(self.session.open_cursor('backup:query_id',
+            lambda:self.assertEqual(self.session.open_cursor('backup:query_id',
             None, None), 0), msg)
         self.assertEqual(0, self.get_stat(stat.conn.backup_cursor_open))
         self.assertEqual(0, self.get_stat(stat.conn.backup_incremental))

@@ -91,8 +91,8 @@ class test_prepare09(wttest.WiredTigerTestCase):
         # Do a search, if we've aborted the update correct we won't have inserted a tombstone
         # and the original value will be visible to us.
         cursor.set_key(1)
-        self.assertEquals(cursor.search(), 0)
-        self.assertEquals(cursor.get_value(), value1)
+        self.assertEqual(cursor.search(), 0)
+        self.assertEqual(cursor.get_value(), value1)
 
     def test_prepared_update_is_aborted_correctly(self):
         uri = "table:test_prepare09"

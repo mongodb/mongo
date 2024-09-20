@@ -55,12 +55,12 @@ class test_join03(wttest.WiredTigerTestCase):
             [k] = jc.get_keys()
             i = k - 1
             [v] = jc.get_values()
-            self.assertEquals(self.gen_values(i), [v])
+            self.assertEqual(self.gen_values(i), [v])
             if not i in mbr:
                 self.tty('  result ' + str(i) + ' is not in: ' + str(mbr))
             self.assertTrue(i in mbr)
             mbr.remove(i)
-        self.assertEquals(0, len(mbr))
+        self.assertEqual(0, len(mbr))
 
     # Common function for testing the most basic functionality
     # of joins
@@ -93,7 +93,7 @@ class test_join03(wttest.WiredTigerTestCase):
             c0.set_key('60')
         else:
             c0.set_key(60)
-        self.assertEquals(0, c0.search())
+        self.assertEqual(0, c0.search())
         self.session.join(jc, c0, 'compare=ge' + args0)
 
         c1a = self.session.open_cursor('index:join03:index1', None, None)
@@ -101,7 +101,7 @@ class test_join03(wttest.WiredTigerTestCase):
             c1a.set_key('21')
         else:
             c1a.set_key(21)
-        self.assertEquals(0, c1a.search())
+        self.assertEqual(0, c1a.search())
         self.session.join(jc, c1a, 'compare=gt' + args1)
 
         c1b = self.session.open_cursor('index:join03:index1', None, None)
@@ -109,7 +109,7 @@ class test_join03(wttest.WiredTigerTestCase):
             c1b.set_key('41')
         else:
             c1b.set_key(41)
-        self.assertEquals(0, c1b.search())
+        self.assertEqual(0, c1b.search())
         self.session.join(jc, c1b, 'compare=lt' + args1)
 
         # Iterate, and make sure that reset allows us to iterate again.

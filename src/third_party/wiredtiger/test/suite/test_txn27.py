@@ -54,11 +54,11 @@ class test_txn27(wttest.WiredTigerTestCase):
         cursor2.set_value("bbb")
         msg1 = '/conflict between concurrent operations/'
         self.assertRaisesException(wiredtiger.WiredTigerError, lambda: cursor2.update(), msg1)
-        self.assertEquals('/' + session2.get_rollback_reason() + '/', msg1)
+        self.assertEqual('/' + session2.get_rollback_reason() + '/', msg1)
 
         # Rollback the transactions, check that session2's rollback error was cleared.
         session2.rollback_transaction()
-        self.assertEquals(session2.get_rollback_reason(), None)
+        self.assertEqual(session2.get_rollback_reason(), None)
         session1.rollback_transaction()
 
         # Start a new transaction and insert a value far too large for cache.
@@ -81,4 +81,4 @@ class test_txn27(wttest.WiredTigerTestCase):
         # This reason is the default reason for WT_ROLLBACK errors so we need to catch it.
         self.assertRaisesException(wiredtiger.WiredTigerError, lambda: cursor1.update(), msg1)
         # Expect the rollback reason to give us the true reason for the rollback.
-        self.assertEquals(session1.get_rollback_reason(), msg2)
+        self.assertEqual(session1.get_rollback_reason(), msg2)

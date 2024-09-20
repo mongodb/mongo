@@ -116,7 +116,7 @@ class test_collator(wttest.WiredTigerTestCase):
             for key, val in c:
                 primkey = int(val.split(',')[1])
                 expected.remove(primkey)
-            self.assertEquals(0, len(expected))
+            self.assertEqual(0, len(expected))
             c.close()
 
     def test_index(self):

@@ -77,7 +77,7 @@ class test_backup11(backup_base):
         msg = "/file name can only be specified on a duplicate/"
         self.pr("Specify file on primary")
         self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
-            lambda:self.assertEquals(self.session.open_cursor('backup:',
+            lambda:self.assertEqual(self.session.open_cursor('backup:',
             None, config), 0), msg)
 
         # Open a non-incremental full backup cursor.
@@ -86,7 +86,7 @@ class test_backup11(backup_base):
         bkup_c = self.session.open_cursor('backup:', None, None)
         msg = "/must have an incremental primary/"
         self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
-            lambda:self.assertEquals(self.session.open_cursor(None,
+            lambda:self.assertEqual(self.session.open_cursor(None,
             bkup_c, config), 0), msg)
         bkup_c.close()
 
@@ -103,7 +103,7 @@ class test_backup11(backup_base):
         self.pr("=========")
         # Test multiple duplicate backup cursors.
         self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
-            lambda:self.assertEquals(self.session.open_cursor(None,
+            lambda:self.assertEqual(self.session.open_cursor(None,
             bkup_c, config), 0), msg)
 
         # - We cannot make multiple incremental duplicate backup cursors.
@@ -115,11 +115,11 @@ class test_backup11(backup_base):
         self.pr("=========")
         # Test multiple duplicate backup cursors.
         self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
-            lambda:self.assertEquals(self.session.open_cursor(None,
+            lambda:self.assertEqual(self.session.open_cursor(None,
             bkup_c, config), 0), msg)
         # Test duplicate of duplicate backup cursor.
         self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
-            lambda:self.assertEquals(self.session.open_cursor(None,
+            lambda:self.assertEqual(self.session.open_cursor(None,
             dupc, config), 0), msg)
         dupc.close()
 
@@ -129,7 +129,7 @@ class test_backup11(backup_base):
         msg = "/cannot be used for/"
         config = 'target=("file:test.wt")'
         self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
-            lambda:self.assertEquals(self.session.open_cursor(None,
+            lambda:self.assertEqual(self.session.open_cursor(None,
             bkup_c, config), 0), msg)
 
         # - We cannot mix block incremental with a log target on the same duplicate.
@@ -138,7 +138,7 @@ class test_backup11(backup_base):
         config = 'incremental=(file=test.wt),target=("log:")'
         msg = "/incremental backup incompatible/"
         self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
-            lambda:self.assertEquals(self.session.open_cursor(None,
+            lambda:self.assertEqual(self.session.open_cursor(None,
             bkup_c, config), 0), msg)
 
         # - Incremental ids must be on primary, not duplicate.
@@ -147,11 +147,11 @@ class test_backup11(backup_base):
         config = 'incremental=(src_id="ID1")'
         msg = "/specified on a primary/"
         self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
-            lambda:self.assertEquals(self.session.open_cursor(None,
+            lambda:self.assertEqual(self.session.open_cursor(None,
             bkup_c, config), 0), msg)
         config = 'incremental=(this_id="ID1")'
         self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
-            lambda:self.assertEquals(self.session.open_cursor(None,
+            lambda:self.assertEqual(self.session.open_cursor(None,
             bkup_c, config), 0), msg)
 
         # - Force stop must be on primary, not duplicate.
@@ -159,7 +159,7 @@ class test_backup11(backup_base):
         self.pr("=========")
         config = 'incremental=(force_stop=true)'
         self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
-            lambda:self.assertEquals(self.session.open_cursor(None,
+            lambda:self.assertEqual(self.session.open_cursor(None,
             bkup_c, config), 0), msg)
 
         bkup_c.close()

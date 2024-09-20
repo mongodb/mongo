@@ -68,8 +68,8 @@ class test_cursor_random(wttest.WiredTigerTestCase):
             wiredtiger.WiredTigerError, lambda: cursor.update(), msg)
 
         self.assertTrue(cursor.next(), wiredtiger.WT_NOTFOUND)
-        self.assertEquals(cursor.reconfigure(), 0)
-        self.assertEquals(cursor.reset(), 0)
+        self.assertEqual(cursor.reconfigure(), 0)
+        self.assertEqual(cursor.reset(), 0)
         cursor.close()
 
     # Check that next_random fails with an empty tree, repeatedly.
@@ -90,8 +90,8 @@ class test_cursor_random(wttest.WiredTigerTestCase):
         cursor.close()
         cursor = self.session.open_cursor(uri, None, self.config)
         for i in range(1,5):
-            self.assertEquals(cursor.next(), 0)
-            self.assertEquals(cursor.get_key(), 'AAA')
+            self.assertEqual(cursor.next(), 0)
+            self.assertEqual(cursor.get_key(), 'AAA')
         cursor.close
 
     # Check that next_random works in the presence of a larger set of values,
@@ -275,7 +275,7 @@ class test_cursor_random_invisible(wttest.WiredTigerTestCase):
         # return the only possible record.
         s = self.conn.open_session()
         cursor = s.open_cursor(uri, None, self.config)
-        self.assertEquals(cursor.next(), 0)
+        self.assertEqual(cursor.next(), 0)
         self.assertEqual(cursor.get_key(), simple_key(cursor, 1))
 
     def test_cursor_random_invisible_before(self):
@@ -295,5 +295,5 @@ class test_cursor_random_invisible(wttest.WiredTigerTestCase):
         # return the only possible record.
         s = self.conn.open_session()
         cursor = s.open_cursor(uri, None, self.config)
-        self.assertEquals(cursor.next(), 0)
+        self.assertEqual(cursor.next(), 0)
         self.assertEqual(cursor.get_key(), simple_key(cursor, 99))

@@ -71,9 +71,9 @@ class test_stat_cursor_config(wttest.WiredTigerTestCase):
             stat_cur.reset()
             while stat_cur.next() == 0:
                 [desc, pvalue, value] = stat_cur.get_values()
-                self.assertEquals(value, 0)
+                self.assertEqual(value, 0)
                 found = True
-            self.assertEquals(found, True)
+            self.assertEqual(found, True)
 
         else:
             msg = '/database statistics configuration/'

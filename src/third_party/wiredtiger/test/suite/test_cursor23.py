@@ -45,13 +45,13 @@ class test_cursor23(wttest.WiredTigerTestCase):
     def check_get_key_and_value(self, cursor, expected_key, expected_value):
         key = cursor.get_key()
         value = cursor.get_value()
-        self.assertEquals(key, expected_key)
-        self.assertEquals(value, expected_value)
+        self.assertEqual(key, expected_key)
+        self.assertEqual(value, expected_value)
 
     def check_get_raw_key_value(self, cursor, expected_key, expected_value):
         (key, value) = cursor.get_raw_key_value()
-        self.assertEquals(key, expected_key)
-        self.assertEquals(value, expected_value)
+        self.assertEqual(key, expected_key)
+        self.assertEqual(value, expected_value)
 
     def test_cursor23(self):
         uri = self.type + "test_cursor23"

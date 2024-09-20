@@ -65,15 +65,15 @@ class test_pack(wttest.WiredTigerTestCase):
         #self.dump_cursor(forw_idx, 'index')
 
         forw.set_key(1234)
-        self.assertEquals(forw.search(), 0)
+        self.assertEqual(forw.search(), 0)
         got = forw.get_value()
         if nargs == 1:  # API does not return a list, we want one for comparing
             got = [got]
-        self.assertEquals(got, v)
+        self.assertEqual(got, v)
 
         forw_idx.set_key(*v)
-        self.assertEquals(forw_idx.search(), 0)
-        self.assertEquals(forw_idx.get_value(), 1234)
+        self.assertEqual(forw_idx.search(), 0)
+        self.assertEqual(forw_idx.get_value(), 1234)
         forw.close()
         forw_idx.close()
 

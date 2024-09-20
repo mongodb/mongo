@@ -92,7 +92,7 @@ class test_prepare23(wttest.WiredTigerTestCase):
 
             # Evict the page
             session2.begin_transaction('ignore_prepare=true,read_timestamp=' + self.timestamp_str(ts + 20))
-            self.assertEquals(evict_cursor[i], value_b)
+            self.assertEqual(evict_cursor[i], value_b)
             evict_cursor.reset()
             session2.rollback_transaction()
 
@@ -107,22 +107,22 @@ class test_prepare23(wttest.WiredTigerTestCase):
 
             # Verify we can still read back value a
             self.session.begin_transaction('read_timestamp=' + self.timestamp_str(ts + 10))
-            self.assertEquals(cursor[i], value_a)
+            self.assertEqual(cursor[i], value_a)
             self.session.rollback_transaction()
 
             # Verify we can still read back value b
             self.session.begin_transaction('read_timestamp=' + self.timestamp_str(ts + 20))
-            self.assertEquals(cursor[i], value_b)
+            self.assertEqual(cursor[i], value_b)
             self.session.rollback_transaction()
 
             # Verify we can still read back the deletion
             if self.delete:
                 self.session.begin_transaction('read_timestamp=' + self.timestamp_str(ts + 30))
                 if self.value_format == '8t':
-                    self.assertEquals(cursor[i], 0)
+                    self.assertEqual(cursor[i], 0)
                 else:
                     cursor.set_key(i)
-                    self.assertEquals(cursor.search(), wiredtiger.WT_NOTFOUND)
+                    self.assertEqual(cursor.search(), wiredtiger.WT_NOTFOUND)
                 self.session.rollback_transaction()
 
             ts += 40

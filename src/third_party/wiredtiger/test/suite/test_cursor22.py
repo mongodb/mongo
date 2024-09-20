@@ -37,13 +37,13 @@ class test_cursor22(wttest.WiredTigerTestCase):
     def check_get_key_and_value(self, cursor, expected_key, expected_value):
         key = cursor.get_key()
         value = cursor.get_value()
-        self.assertEquals(key, expected_key)
-        self.assertEquals(value, expected_value)
+        self.assertEqual(key, expected_key)
+        self.assertEqual(value, expected_value)
 
     def check_get_raw_key_value(self, cursor, expected_key, expected_value):
         (key, value) = cursor.get_raw_key_value()
-        self.assertEquals(key, expected_key)
-        self.assertEquals(value, expected_value)
+        self.assertEqual(key, expected_key)
+        self.assertEqual(value, expected_value)
 
     def test_cursor22(self):
         self.session.create(self.uri, 'key_format=S,value_format=S')
@@ -83,8 +83,8 @@ class test_cursor22(wttest.WiredTigerTestCase):
         cursor.get_raw_key_value()
         # Get only the value (and ignore the key)
         (_, value) = cursor.get_raw_key_value()
-        self.assertEquals(key, "key1")
-        self.assertEquals(value, "value101")
+        self.assertEqual(key, "key1")
+        self.assertEqual(value, "value101")
         self.session.commit_transaction()
 
         cursor.close()

@@ -68,7 +68,7 @@ class test_prepare_hs03(wttest.WiredTigerTestCase):
 
     def corrupt_table(self, data_to_corrupt_with):
         tablename="test_prepare_hs03.wt"
-        self.assertEquals(os.path.exists(tablename), True)
+        self.assertEqual(os.path.exists(tablename), True)
 
         # This code will overwrite part of the table with 'bad' data, corrupting the table in the process.
         # The impact of this overwriting can depend on the number of bytes overwritten, depending on what the
@@ -121,7 +121,7 @@ class test_prepare_hs03(wttest.WiredTigerTestCase):
                 else:
                     self.pr('Key {} not found'.format(key))
         self.pr("nkeys_checked = {}, correct_values = {}".format(nkeys_checked, correct_values))
-        self.assertEquals(nkeys_checked, correct_values)
+        self.assertEqual(nkeys_checked, correct_values)
         cursor.close()
         self.session.commit_transaction()
 
@@ -156,7 +156,7 @@ class test_prepare_hs03(wttest.WiredTigerTestCase):
             self.session.begin_transaction()
             cursor.set_key(ds.key(nrows + i))
             cursor.set_value(commit_value)
-            self.assertEquals(cursor.insert(), 0)
+            self.assertEqual(cursor.insert(), 0)
             self.session.commit_transaction('commit_timestamp=' + self.timestamp_str(timestamp_early))
         cursor.close()
 
@@ -183,7 +183,7 @@ class test_prepare_hs03(wttest.WiredTigerTestCase):
             for i in range(start, end):
                 cursors[j].set_key(ds.key(nrows + i))
                 cursors[j].set_value(prepare_value)
-                self.assertEquals(cursors[j].insert(), 0)
+                self.assertEqual(cursors[j].insert(), 0)
             sessions[j].prepare_transaction('prepare_timestamp=' + self.timestamp_str(timestamp_later))
 
         hs_writes = self.get_stat(stat.conn.cache_write_hs) - hs_writes_start
@@ -201,9 +201,9 @@ class test_prepare_hs03(wttest.WiredTigerTestCase):
             # The search should pass.
             self.assertEqual(cursor.search(), 0)
             # Correctness Test - commit_value should be visible
-            self.assertEquals(cursor.get_value(), commit_value)
+            self.assertEqual(cursor.get_value(), commit_value)
             # Correctness Test - prepare_value should NOT be visible
-            self.assertNotEquals(cursor.get_value(), prepare_value)
+            self.assertNotEqual(cursor.get_value(), prepare_value)
         cursor.close()
 
         # Close all sessions (and cursors), this will cause prepared updates to be rolled back.
@@ -251,7 +251,7 @@ class test_prepare_hs03(wttest.WiredTigerTestCase):
         for i in range(1, 10000):
             cursor.set_key(ds.key(nrows + i))
             cursor.set_value(bigvalue)
-            self.assertEquals(cursor.insert(), 0)
+            self.assertEqual(cursor.insert(), 0)
         cursor.close()
         self.session.checkpoint()
 

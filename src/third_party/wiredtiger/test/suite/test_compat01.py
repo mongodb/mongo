@@ -211,7 +211,7 @@ class test_reconfig_fail(wttest.WiredTigerTestCase):
         c = self.session.open_cursor(uri, None)
         c.set_key(ds.key(20))
         c.set_value("abcde")
-        self.assertEquals(c.update(), 0)
+        self.assertEqual(c.update(), 0)
 
         # Make sure we can reconfigure unrelated things while downgraded
         # and we have an active transaction.

@@ -78,11 +78,11 @@ class test_durable_ts03(wttest.WiredTigerTestCase):
         # Scenario: 1
         # Check to see commit timestamp > durable timestamap, returns error.
         session.begin_transaction()
-        self.assertEquals(cursor.next(), 0)
+        self.assertEqual(cursor.next(), 0)
         for i in range(1, 10):
             cursor.set_value(ds.value(111))
-            self.assertEquals(cursor.update(), 0)
-            self.assertEquals(cursor.next(), 0)
+            self.assertEqual(cursor.update(), 0)
+            self.assertEqual(cursor.next(), 0)
 
         session.prepare_transaction('prepare_timestamp=' + self.timestamp_str(150))
         msg = "/is less than the commit timestamp/"
@@ -97,13 +97,13 @@ class test_durable_ts03(wttest.WiredTigerTestCase):
         # Scenario: 2
         # Check to see durable timestamp < stable timestamp, returns error.
         # Update all values with value 222 i.e. second update value.
-        self.assertEquals(cursor.reset(), 0)
+        self.assertEqual(cursor.reset(), 0)
         session.begin_transaction()
-        self.assertEquals(cursor.next(), 0)
+        self.assertEqual(cursor.next(), 0)
         for i in range(1, 10):
             cursor.set_value(ds.value(222))
-            self.assertEquals(cursor.update(), 0)
-            self.assertEquals(cursor.next(), 0)
+            self.assertEqual(cursor.update(), 0)
+            self.assertEqual(cursor.next(), 0)
 
         session.prepare_transaction('prepare_timestamp=' + self.timestamp_str(150))
 

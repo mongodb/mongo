@@ -164,8 +164,8 @@ class test_assert06(wttest.WiredTigerTestCase, suite_subprocess):
         self.apply_timestamps(13, False)
         self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
             lambda: self.session.commit_transaction(), '/unexpected timestamp usage/')
-        self.assertEquals(c[ds.key(3)], ds.value(3))
-        self.assertEquals(c[ds.key(4)], ds.value(4))
+        self.assertEqual(c[ds.key(3)], ds.value(3))
+        self.assertEqual(c[ds.key(4)], ds.value(4))
 
         # Modify a key previously used with timestamps without one. We should get the inconsistent
         # usage message.
@@ -185,7 +185,7 @@ class test_assert06(wttest.WiredTigerTestCase, suite_subprocess):
         self.session.timestamp_transaction('commit_timestamp=' + self.timestamp_str(16))
         c[key] = ds.value(9)
         self.session.commit_transaction()
-        self.assertEquals(c[key], ds.value(9))
+        self.assertEqual(c[key], ds.value(9))
 
         key = ds.key(7)
         self.session.begin_transaction()
@@ -195,14 +195,14 @@ class test_assert06(wttest.WiredTigerTestCase, suite_subprocess):
         c[key] = ds.value(12)
         c[key] = ds.value(13)
         self.session.commit_transaction()
-        self.assertEquals(c[key], ds.value(13))
+        self.assertEqual(c[key], ds.value(13))
 
         key = ds.key(8)
         self.session.begin_transaction()
         c[key] = ds.value(14)
         self.apply_timestamps(18, True)
         self.session.commit_transaction()
-        self.assertEquals(c[key], ds.value(14))
+        self.assertEqual(c[key], ds.value(14))
 
         # Confirm it is okay to set the durable timestamp on the commit call.
         key = ds.key(9)

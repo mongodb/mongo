@@ -71,7 +71,7 @@ class test_prepare26(wttest.WiredTigerTestCase):
         session2 = self.conn.open_session()
         evict_cursor = session2.open_cursor(uri, None, 'debug=(release_evict)')
         session2.begin_transaction('ignore_prepare=true,read_timestamp=' + self.timestamp_str(10))
-        self.assertEquals(evict_cursor[1], value_a)
+        self.assertEqual(evict_cursor[1], value_a)
         evict_cursor.reset()
         evict_cursor.close()
         session2.rollback_transaction()
@@ -93,10 +93,10 @@ class test_prepare26(wttest.WiredTigerTestCase):
         session2.begin_transaction()
         evict_cursor.set_key(1)
         if self.value_format == '8t':
-            self.assertEquals(evict_cursor[1], 0)
+            self.assertEqual(evict_cursor[1], 0)
         else:
             evict_cursor.set_key(1)
-            self.assertEquals(evict_cursor.search(), wiredtiger.WT_NOTFOUND)
+            self.assertEqual(evict_cursor.search(), wiredtiger.WT_NOTFOUND)
         evict_cursor.reset()
         evict_cursor.close()
         session2.rollback_transaction()
@@ -116,7 +116,7 @@ class test_prepare26(wttest.WiredTigerTestCase):
         # Evict the page again
         evict_cursor = session2.open_cursor(uri, None, 'debug=(release_evict)')
         session2.begin_transaction('read_timestamp=' + self.timestamp_str(50))
-        self.assertEquals(evict_cursor[1], value_c)
+        self.assertEqual(evict_cursor[1], value_c)
         evict_cursor.reset()
         evict_cursor.close()
         session2.rollback_transaction()
@@ -124,8 +124,8 @@ class test_prepare26(wttest.WiredTigerTestCase):
         # Verify we read nothing at the oldest
         self.session.begin_transaction('read_timestamp=' + self.timestamp_str(30))
         if self.value_format == '8t':
-            self.assertEquals(cursor[1], 0)
+            self.assertEqual(cursor[1], 0)
         else:
             cursor.set_key(1)
-            self.assertEquals(cursor.search(), wiredtiger.WT_NOTFOUND)
+            self.assertEqual(cursor.search(), wiredtiger.WT_NOTFOUND)
         self.session.rollback_transaction()
