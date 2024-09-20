@@ -29,31 +29,10 @@
 
 #pragma once
 
-#include <boost/optional/optional.hpp>
-#include <cstddef>
-#include <cstdint>
-#include <limits>
-#include <string>
-#include <utility>
-#include <vector>
-#include <wiredtiger.h>
-
-#include "mongo/base/status.h"
-#include "mongo/base/status_with.h"
-#include "mongo/base/string_data.h"
-#include "mongo/bson/bsonelement.h"
-#include "mongo/bson/bsonobj.h"
-#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/catalog/import_options.h"
 #include "mongo/db/catalog/validate_results.h"
-#include "mongo/db/namespace_string.h"
-#include "mongo/db/storage/durable_catalog.h"
-#include "mongo/db/storage/wiredtiger/wiredtiger_event_handler.h"
+#include "mongo/db/storage/wiredtiger/wiredtiger_error_util.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_recovery_unit.h"
-#include "mongo/platform/compiler.h"
-#include "mongo/platform/mutex.h"
-#include "mongo/stdx/condition_variable.h"
-#include "mongo/util/assert_util.h"
 
 namespace mongo {
 
@@ -64,60 +43,7 @@ class OperationContext;
 class WiredTigerConfigParser;
 
 class WiredTigerKVEngine;
-class WiredTigerSession;
 class WiredTigerSessionCache;
-
-Status wtRCToStatus_slow(int retCode, WT_SESSION* session, StringData prefix);
-
-/**
- * converts wiredtiger return codes to mongodb statuses.
- */
-inline Status wtRCToStatus(int retCode, WT_SESSION* session, const char* prefix = nullptr) {
-    if (MONGO_likely(retCode == 0))
-        return Status::OK();
-
-    return wtRCToStatus_slow(retCode, session, prefix);
-}
-
-template <typename ContextExpr>
-Status wtRCToStatus(int retCode, WT_SESSION* session, ContextExpr&& contextExpr) {
-    if (MONGO_likely(retCode == 0))
-        return Status::OK();
-
-    return wtRCToStatus_slow(retCode, session, std::forward<ContextExpr>(contextExpr)());
-}
-
-inline void uassertWTOK(int ret, WT_SESSION* session) {
-    uassertStatusOK(wtRCToStatus(ret, session));
-}
-
-#define MONGO_invariantWTOK_2(expression, session)                                               \
-    do {                                                                                         \
-        int _invariantWTOK_retCode = expression;                                                 \
-        if (MONGO_unlikely(_invariantWTOK_retCode != 0)) {                                       \
-            invariantOKFailed(                                                                   \
-                #expression, wtRCToStatus(_invariantWTOK_retCode, session), __FILE__, __LINE__); \
-        }                                                                                        \
-    } while (false)
-
-#define MONGO_invariantWTOK_3(expression, session, contextExpr)                     \
-    do {                                                                            \
-        int _invariantWTOK_retCode = expression;                                    \
-        if (MONGO_unlikely(_invariantWTOK_retCode != 0)) {                          \
-            invariantOKFailedWithMsg(#expression,                                   \
-                                     wtRCToStatus(_invariantWTOK_retCode, session), \
-                                     contextExpr,                                   \
-                                     __FILE__,                                      \
-                                     __LINE__);                                     \
-        }                                                                           \
-    } while (false)
-
-#define MONGO_invariantWTOK_EXPAND(x) x /**< MSVC workaround */
-#define MONGO_invariantWTOK_PICK(_1, _2, _3, x, ...) x
-#define invariantWTOK(...)                                                                 \
-    MONGO_invariantWTOK_EXPAND(MONGO_invariantWTOK_PICK(                                   \
-        __VA_ARGS__, MONGO_invariantWTOK_3, MONGO_invariantWTOK_2, MONGO_invariantWTOK_1)( \
-        __VA_ARGS__))
 
 struct WiredTigerItem : public WT_ITEM {
     WiredTigerItem(const void* d, size_t s) {

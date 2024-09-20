@@ -30,67 +30,19 @@
 
 #include "mongo/db/storage/wiredtiger/wiredtiger_util.h"
 
-#include <absl/container/node_hash_set.h>
-#include <boost/cstdint.hpp>
-#include <boost/filesystem/directory.hpp>
-#include <boost/filesystem/operations.hpp>
-#include <boost/filesystem/path.hpp>
-#include <boost/iterator/iterator_facade.hpp>
-#include <boost/move/utility_core.hpp>
-#include <fmt/format.h>
-// IWYU pragma: no_include "boost/system/detail/error_code.hpp"
-#include <algorithm>
-#include <cerrno>
-#include <cstdint>
-#include <cstring>
-#include <exception>
-#include <map>
-#include <memory>
-#include <new>
-#include <ostream>
-#include <stdexcept>
-#include <wiredtiger.h>
-
-#include <boost/optional/optional.hpp>
-
-#include "mongo/base/error_codes.h"
-#include "mongo/bson/bsontypes.h"
 #include "mongo/bson/json.h"
-#include "mongo/bson/timestamp.h"
-#include "mongo/bson/util/builder.h"
-#include "mongo/bson/util/builder_fwd.h"
-#include "mongo/db/concurrency/exception_util.h"
-#include "mongo/db/concurrency/exception_util_gen.h"
 #include "mongo/db/global_settings.h"
-#include "mongo/db/repl/repl_settings.h"
 #include "mongo/db/server_feature_flags_gen.h"
 #include "mongo/db/snapshot_window_options_gen.h"
 #include "mongo/db/storage/storage_options.h"
-#include "mongo/db/storage/wiredtiger/wiredtiger_kv_engine.h"
+#include "mongo/db/storage/wiredtiger/wiredtiger_event_handler.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_parameters_gen.h"
-#include "mongo/db/storage/wiredtiger/wiredtiger_recovery_unit.h"
-#include "mongo/db/storage/wiredtiger/wiredtiger_session_cache.h"
-#include "mongo/logv2/log.h"
-#include "mongo/logv2/redaction.h"
-#include "mongo/platform/atomic_word.h"
 #include "mongo/util/pcre.h"
 #include "mongo/util/processinfo.h"
-#include "mongo/util/scopeguard.h"
-#include "mongo/util/static_immortal.h"
-#include "mongo/util/str.h"
-#include "mongo/util/string_map.h"
 #include "mongo/util/testing_proctor.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kWiredTiger
 
-// From src/third_party/wiredtiger/src/include/txn.h
-#define WT_TXN_ROLLBACK_REASON_CACHE_OVERFLOW "transaction rolled back because of cache overflow"
-
-#define WT_TXN_ROLLBACK_REASON_OLDEST_FOR_EVICTION \
-    "oldest pinned transaction ID rolled back for eviction"
-
-#define WT_TXN_ROLLBACK_REASON_TOO_LARGE_FOR_CACHE \
-    "transaction is too large and will not fit in the storage engine cache"
 namespace mongo {
 
 namespace {
@@ -102,111 +54,28 @@ const std::string kTableExtension = ".wt";
 const std::string kWiredTigerBackupFile = "WiredTiger.backup";
 const static StaticImmortal<pcre::Regex> encryptionOptsRegex(R"re(encryption=\([^\)]*\),?)re");
 
+StatusWith<std::string> _getMetadata(WT_CURSOR* cursor, StringData uri) {
+    std::string strUri = uri.toString();
+    cursor->set_key(cursor, strUri.c_str());
+    int ret = cursor->search(cursor);
+    if (ret == WT_NOTFOUND) {
+        return StatusWith<std::string>(ErrorCodes::NoSuchKey,
+                                       str::stream() << "Unable to find metadata for " << uri);
+    } else if (ret != 0) {
+        return StatusWith<std::string>(wtRCToStatus(ret, cursor->session));
+    }
+    const char* metadata = nullptr;
+    ret = cursor->get_value(cursor, &metadata);
+    if (ret != 0) {
+        return StatusWith<std::string>(wtRCToStatus(ret, cursor->session));
+    }
+    invariant(metadata);
+    return StatusWith<std::string>(metadata);
+}
+
 }  // namespace
 
 using std::string;
-
-/**
- * Configured WT cache is deemed insufficient for a transaction when its dirty bytes in cache
- * exceed a certain threshold on the proportion of total cache which is used by transaction.
- *
- * For instance, if the transaction uses 80% of WT cache and the threshold is set to 75%, the
- * transaction is considered too large.
- */
-bool isCacheInsufficientForTransaction(WT_SESSION* session, double threshold) {
-    StatusWith<int64_t> txnDirtyBytes = WiredTigerUtil::getStatisticsValue(
-        session, "statistics:session", "", WT_STAT_SESSION_TXN_BYTES_DIRTY);
-    if (!txnDirtyBytes.isOK()) {
-        tasserted(6190900,
-                  str::stream() << "unable to gather the WT session's txn dirty bytes: "
-                                << txnDirtyBytes.getStatus());
-    }
-
-    StatusWith<int64_t> cacheDirtyBytes = WiredTigerUtil::getStatisticsValue(
-        session, "statistics:", "", WT_STAT_CONN_CACHE_BYTES_DIRTY);
-    if (!cacheDirtyBytes.isOK()) {
-        tasserted(6190901,
-                  str::stream() << "unable to gather the WT connection's cache dirty bytes: "
-                                << txnDirtyBytes.getStatus());
-    }
-
-
-    double txnBytesDirtyOverCacheBytesDirty =
-        static_cast<double>(txnDirtyBytes.getValue()) / cacheDirtyBytes.getValue();
-
-    LOGV2_DEBUG(6190902,
-                2,
-                "Checking if transaction can eventually succeed",
-                "txnDirtyBytes"_attr = txnDirtyBytes.getValue(),
-                "cacheDirtyBytes"_attr = cacheDirtyBytes.getValue(),
-                "txnBytesDirtyOverCacheBytesDirty"_attr = txnBytesDirtyOverCacheBytesDirty,
-                "threshold"_attr = threshold);
-
-    return txnBytesDirtyOverCacheBytesDirty > threshold;
-}
-
-Status wtRCToStatus_slow(int retCode, WT_SESSION* session, StringData prefix) {
-    if (retCode == 0)
-        return Status::OK();
-
-    const auto generateContextStrStream = [&](StringData reason) {
-        str::stream contextStrStream;
-        if (!prefix.empty())
-            contextStrStream << prefix << " ";
-        contextStrStream << retCode << ": " << reason;
-
-        return contextStrStream;
-    };
-
-    if (retCode == WT_ROLLBACK) {
-        double cacheThreshold = gTransactionTooLargeForCacheThreshold.load();
-        bool txnTooLargeEnabled = cacheThreshold < 1.0;
-        bool temporarilyUnavailableEnabled = gEnableTemporarilyUnavailableExceptions.load();
-        const char* reason = session ? session->get_rollback_reason(session) : "";
-        bool reasonWasCachePressure = (txnTooLargeEnabled || temporarilyUnavailableEnabled) &&
-            reason && session &&
-            (strncmp(WT_TXN_ROLLBACK_REASON_OLDEST_FOR_EVICTION,
-                     reason,
-                     sizeof(WT_TXN_ROLLBACK_REASON_OLDEST_FOR_EVICTION)) == 0 ||
-             strncmp(WT_TXN_ROLLBACK_REASON_CACHE_OVERFLOW,
-                     reason,
-                     sizeof(WT_TXN_ROLLBACK_REASON_CACHE_OVERFLOW)) == 0);
-
-        if (reasonWasCachePressure) {
-            if (txnTooLargeEnabled && isCacheInsufficientForTransaction(session, cacheThreshold)) {
-                throwTransactionTooLargeForCache(
-                    generateContextStrStream(WT_TXN_ROLLBACK_REASON_TOO_LARGE_FOR_CACHE)
-                    << " (" << reason << ")");
-            }
-
-            if (temporarilyUnavailableEnabled) {
-                throwTemporarilyUnavailableException(generateContextStrStream(reason));
-            }
-        }
-
-        throwWriteConflictException(prefix);
-    }
-
-    // Don't abort on WT_PANIC when repairing, as the error will be handled at a higher layer.
-    fassert(28559, retCode != WT_PANIC || storageGlobalParams.repair);
-
-    auto s = generateContextStrStream(wiredtiger_strerror(retCode));
-
-    if (retCode == EINVAL) {
-        return Status(ErrorCodes::BadValue, s);
-    }
-    if (retCode == EMFILE) {
-        return Status(ErrorCodes::TooManyFilesOpen, s);
-    }
-    if (retCode == EBUSY) {
-        return Status(ErrorCodes::ObjectIsBusy, s);
-    }
-
-    uassert(ErrorCodes::ExceededMemoryLimit, s, retCode != WT_CACHE_FULL);
-
-    // TODO convert specific codes rather than just using UNKNOWN_ERROR for everything.
-    return Status(ErrorCodes::UnknownError, s);
-}
 
 void WiredTigerUtil::fetchTypeAndSourceURI(WiredTigerRecoveryUnit& ru,
                                            const std::string& tableUri,
@@ -230,27 +99,6 @@ void WiredTigerUtil::fetchTypeAndSourceURI(WiredTigerRecoveryUnit& ru,
     invariant(sourceItem.type == WT_CONFIG_ITEM::WT_CONFIG_ITEM_STRING);
     *source = std::string(sourceItem.str, sourceItem.len);
 }
-
-namespace {
-StatusWith<std::string> _getMetadata(WT_CURSOR* cursor, StringData uri) {
-    std::string strUri = uri.toString();
-    cursor->set_key(cursor, strUri.c_str());
-    int ret = cursor->search(cursor);
-    if (ret == WT_NOTFOUND) {
-        return StatusWith<std::string>(ErrorCodes::NoSuchKey,
-                                       str::stream() << "Unable to find metadata for " << uri);
-    } else if (ret != 0) {
-        return StatusWith<std::string>(wtRCToStatus(ret, cursor->session));
-    }
-    const char* metadata = nullptr;
-    ret = cursor->get_value(cursor, &metadata);
-    if (ret != 0) {
-        return StatusWith<std::string>(wtRCToStatus(ret, cursor->session));
-    }
-    invariant(metadata);
-    return StatusWith<std::string>(metadata);
-}
-}  // namespace
 
 StatusWith<std::string> WiredTigerUtil::getMetadataCreate(WT_SESSION* session, StringData uri) {
     WT_CURSOR* cursor;

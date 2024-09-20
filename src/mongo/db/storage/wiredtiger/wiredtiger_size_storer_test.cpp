@@ -30,8 +30,8 @@
 #include <wiredtiger.h>
 
 #include "mongo/db/service_context_test_fixture.h"
+#include "mongo/db/storage/wiredtiger/wiredtiger_error_util.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_size_storer.h"
-#include "mongo/db/storage/wiredtiger/wiredtiger_util.h"
 #include "mongo/unittest/assert.h"
 #include "mongo/unittest/temp_dir.h"
 
