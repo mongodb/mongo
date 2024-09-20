@@ -509,6 +509,7 @@ env.CppUnitTest(
         "document_source_replace_root_test.cpp",
         "document_source_rank_fusion_test.cpp",
         "document_source_score_test.cpp",
+        "document_source_score_fusion_test.cpp",
         "document_source_sample_test.cpp",
         "document_source_sequential_document_cache_test.cpp",
         "document_source_set_variable_from_subpipeline_test.cpp",

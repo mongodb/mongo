@@ -748,6 +748,7 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 /src/mongo/db/pipeline/**/document_source_query_stats* @TedTuckman @awagenmaker @cswanson310 @svc-auto-approve-bot
 /src/mongo/db/pipeline/**/document_source_rank_fusion* @TedTuckman @banarun @cswanson310 @svc-auto-approve-bot
 /src/mongo/db/pipeline/**/document_source_score* @TedTuckman @banarun @cswanson310 @svc-auto-approve-bot
+/src/mongo/db/pipeline/**/document_source_score_fusion* @TedTuckman @banarun @cswanson310 @svc-auto-approve-bot
 /src/mongo/db/pipeline/**/document_source_set_window_fields* @TedTuckman @banarun @cswanson310 @svc-auto-approve-bot
 /src/mongo/db/pipeline/**/granularity_rounder* @10gen/query-execution @svc-auto-approve-bot
 /src/mongo/db/pipeline/**/javascript_execution* @TedTuckman @awagenmaker @banarun @cswanson310 @svc-auto-approve-bot

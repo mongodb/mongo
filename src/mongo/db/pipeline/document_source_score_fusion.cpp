@@ -29,10 +29,14 @@
 
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 
+#include "mongo/base/error_codes.h"
 #include "mongo/bson/bsontypes.h"
+#include "mongo/db/pipeline/document_source.h"
 #include "mongo/db/pipeline/document_source_score_fusion.h"
+#include "mongo/db/pipeline/document_source_score_fusion_gen.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/lite_parsed_document_source.h"
+#include "mongo/db/pipeline/pipeline.h"
 #include "mongo/db/query/allowed_contexts.h"
 
 namespace mongo {
@@ -46,6 +50,19 @@ REGISTER_DOCUMENT_SOURCE_WITH_FEATURE_FLAG(scoreFusion,
 std::list<boost::intrusive_ptr<DocumentSource>> DocumentSourceScoreFusion::createFromBson(
     BSONElement elem, const boost::intrusive_ptr<ExpressionContext>& pExpCtx) {
 
+    uassert(ErrorCodes::FailedToParse,
+            str::stream() << "The " << kStageName
+                          << " stage specification must be an object, found "
+                          << typeName(elem.type()),
+            elem.type() == BSONType::Object);
+    auto spec = ScoreFusionSpec::parse(IDLParserContext(kStageName), elem.embeddedObject());
+
+    for (const auto& input : spec.getInputs()) {
+        auto pipeline =
+            Pipeline::parse(input.getPipeline(), pExpCtx->copyForSubPipeline(pExpCtx->ns));
+    }
+
+    // TODO SERVER-94025: Validate that these are scored pipelines.
     return {};
 }
 }  // namespace mongo

@@ -99,6 +99,13 @@ filters:
       - banarun
     metadata:
       owning_team: 10gen/query-integration
+  - "document_source_score_fusion*":
+    approvers:
+      - TedTuckman
+      - cswanson310
+      - banarun
+    metadata:
+      owning_team: 10gen/query-integration
   - "document_source_set_window_fields*":
     approvers:
       - TedTuckman

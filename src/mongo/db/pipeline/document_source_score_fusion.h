@@ -45,6 +45,8 @@ namespace mongo {
  */
 class DocumentSourceScoreFusion final {
 public:
+    static constexpr StringData kStageName = "$scoreFusion"_sd;
+
     /**
      * Returns a list of stages to execute hybrid scoring with score fusion.
      */
@@ -54,7 +56,7 @@ public:
 private:
     // It is illegal to construct a DocumentSourceScoreFusion directly, use createFromBson()
     // instead.
-    DocumentSourceScoreFusion() = default;
+    DocumentSourceScoreFusion() = delete;
 };
 
 }  // namespace mongo

@@ -1,0 +1,66 @@
+# Copyright (C) 2024-present MongoDB, Inc.
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the Server Side Public License, version 1,
+# as published by MongoDB, Inc.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# Server Side Public License for more details.
+#
+# You should have received a copy of the Server Side Public License
+# along with this program. If not, see
+# <http://www.mongodb.com/licensing/server-side-public-license>.
+#
+# As a special exception, the copyright holders give permission to link the
+# code of portions of this program with the OpenSSL library under certain
+# conditions as described in each individual source file and distribute
+# linked combinations including the program with the OpenSSL library. You
+# must comply with the Server Side Public License in all respects for
+# all of the code used other than as permitted herein. If you modify file(s)
+# with this exception, you may extend this exception to your version of the
+# file(s), but you are not obligated to do so. If you do not wish to do so,
+# delete this exception statement from your version. If you delete this
+# exception statement from all source files in the program, then also delete
+# it in the license file.
+#
+global:
+  cpp_namespace: "mongo"
+  cpp_includes:
+    - "mongo/db/pipeline/document_source_hybrid_scoring_util.h"
+imports:
+  - "mongo/db/pipeline/document_source_score_fusion_inputs.idl"
+  - "mongo/db/basic_types.idl"
+structs:
+  # The ScoreFusionSpec needs to be in a separate file because use of the 
+  # validateScoreFusionMinInputs callback will otherwise create a circular dependency.
+  ScoreFusionSpec:
+    description: Specification for a $scoreFusion stage.
+    strict: true
+    fields:
+      inputs:
+        description: The set of sub-pipelines' results to be merged with score fusion.
+        type: array<ScoreFusionInputsSpec>
+        optional: false
+        validator:
+            {callback: "validateScoreFusionMinInputs"}
+      score:
+        description: Logic to combine all scores together
+        type: IDLAnyType
+        optional: true
+      inputNormalization:
+        description: none for no normalization, sigmoid and minMaxScaler for the type of normalization
+        type: string
+        optional: false
+      weights:
+        description: A number to multiply the 'score' expression by, after normalization
+        type: array<safeDouble>
+        optional: true
+      scoreNulls:
+        description: Value to assign missing or null scores
+        type: IDLAnyType
+        optional: true
+
+
+      

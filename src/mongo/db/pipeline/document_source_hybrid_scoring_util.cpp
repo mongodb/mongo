@@ -33,12 +33,21 @@
 
 namespace mongo {
 
-Status validateRankFusionMinInputs(const std::vector<RankFusionInputsSpec>& inputs) {
-    if (inputs.size() < 1) {
-        return {
-            ErrorCodes::BadValue,
-            str::stream() << "A hybrid scoring stage should be run with at least one pipeline."};
+template <typename T>
+
+Status requireNonEmpty(const std::vector<T>& inputs) {
+    if (inputs.empty()) {
+        return {ErrorCodes::BadValue,
+                "A hybrid scoring stage should be run with at least one pipeline."};
     }
     return Status::OK();
+}
+
+Status validateRankFusionMinInputs(const std::vector<RankFusionInputsSpec>& inputs) {
+    return requireNonEmpty(inputs);
+}
+
+Status validateScoreFusionMinInputs(const std::vector<ScoreFusionInputsSpec>& inputs) {
+    return requireNonEmpty(inputs);
 }
 }  // namespace mongo

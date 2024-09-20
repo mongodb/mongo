@@ -31,12 +31,26 @@
 
 #include "mongo/base/status.h"
 #include "mongo/db/pipeline/document_source_rank_fusion_inputs_gen.h"
+#include "mongo/db/pipeline/document_source_score_fusion_inputs_gen.h"
 
 namespace mongo {
+
+/**
+ * Generic function to check inputs is not empty.
+ */
+template <typename T>
+Status requireNonEmpty(const std::vector<T>& inputs);
+
 /**
  * Helper function to validate that there is at least one input pipeline for a hybrid scoring
  * $rankFusion stage.
  */
 Status validateRankFusionMinInputs(const std::vector<RankFusionInputsSpec>& inputs);
+
+/**
+ * Helper function to validate that there is at least one input pipeline for a hybrid scoring
+ * $scoreFusion stage.
+ */
+Status validateScoreFusionMinInputs(const std::vector<ScoreFusionInputsSpec>& inputs);
 
 }  // namespace mongo
