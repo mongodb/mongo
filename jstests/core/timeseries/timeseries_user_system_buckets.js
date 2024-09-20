@@ -13,7 +13,7 @@
  *   # Running shardCollection instead of createCollection returns different error types which are
  *   # not expected by the test
  *   assumes_unsharded_collection,
- *
+ *   cannot_run_during_upgrade_downgrade,
  * ]
  */
 import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
