@@ -329,7 +329,7 @@ void StorageEngineImpl::loadCatalog(OperationContext* opCtx,
           "Initializing all collections in durable catalog",
           "numEntries"_attr = catalogEntries.size());
     for (DurableCatalog::EntryIdentifier entry : catalogEntries) {
-        if (_options.forRestore || storageGlobalParams.magicRestore) {
+        if (_options.forRestore) {
             // When restoring a subset of user collections from a backup, the collections not
             // restored are in the catalog but are unknown to the storage engine. The catalog
             // entries for these collections will be removed.
