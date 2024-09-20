@@ -45,6 +45,7 @@
 #include "mongo/db/commands.h"
 #include "mongo/db/commands/list_databases_common.h"
 #include "mongo/db/commands/list_databases_gen.h"
+#include "mongo/db/commands/shuffle_list_command_results.h"
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/concurrency/lock_manager_defs.h"
 #include "mongo/db/curop_failpoint_helpers.h"
@@ -142,6 +143,13 @@ public:
                     &hangBeforeListDatabases, opCtx, "hangBeforeListDatabases", []() {});
                 dbNames = catalog->getAllConsistentDbNamesForTenant(opCtx, tenantId);
             }
+
+            shuffleListCommandResults.execute([&](const auto&) {
+                std::random_device rd;
+                std::mt19937 g(rd());
+                std::shuffle(dbNames.begin(), dbNames.end(), g);
+            });
+
             std::vector<ListDatabasesReplyItem> items;
             SerializationContext scReply =
                 SerializationContext::stateCommandReply(cmd.getSerializationContext());

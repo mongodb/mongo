@@ -173,6 +173,8 @@ config_fuzzer_params = {
         "failpoint.hangBeforePublishingCatalogUpdates": {
             "pauseEntireCommitMillis": {"min": 10, "max": 100},
         },
+        # Choose whether to shuffle the list command results or not.
+        "failpoint.shuffleListCommandResults": {"choices": [{"mode": "off"}, {"mode": "alwaysOn"}]},
     },
     "mongos": {
         # We need a higher timeout to account for test slowness

@@ -12,6 +12,9 @@
  * @tags: [
  *   uses_prepare_transaction,
  *   uses_transactions,
+ *   # TODO SERVER-94948: Remove this tag once the test is fixed to handle arbitrary listCollection
+ *   # ordering.
+ *   does_not_support_config_fuzzer,
  * ]
  */
 

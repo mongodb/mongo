@@ -252,6 +252,7 @@ env.Library(
         "query_cmd/write_commands.cpp",
         "rename_collection_cmd.cpp",
         "sleep_command.cpp",
+        "shuffle_list_command_results.cpp",
         "validate.cpp",
         "validate_db_metadata_cmd.cpp",
         "whats_my_sni_command.cpp",

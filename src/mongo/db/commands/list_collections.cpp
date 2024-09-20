@@ -63,6 +63,7 @@
 #include "mongo/db/clientcursor.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/commands/list_collections_filter.h"
+#include "mongo/db/commands/shuffle_list_command_results.h"
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/concurrency/lock_manager_defs.h"
 #include "mongo/db/curop_failpoint_helpers.h"
@@ -160,7 +161,7 @@ boost::optional<vector<StringData>> _getExactNameMatches(const MatchExpression* 
 
 /**
  * Uses 'matcher' to determine if the collection's information should be added to 'root'. If so,
- * allocates a WorkingSetMember containing information about 'collection', and adds it to 'root'.
+ * allocates a WorkingSetMember containing information about 'collection', and adds it to 'results'.
  *
  * Does not add any information about non-existent collections.
  */
@@ -168,7 +169,7 @@ void _addWorkingSetMember(OperationContext* opCtx,
                           const BSONObj& maybe,
                           const MatchExpression* matcher,
                           WorkingSet* ws,
-                          QueuedDataStage* root) {
+                          std::vector<WorkingSetID>& results) {
     if (matcher && !matcher->matchesBSON(maybe)) {
         return;
     }
@@ -179,7 +180,7 @@ void _addWorkingSetMember(OperationContext* opCtx,
     member->recordId = RecordId();
     member->resetDocument(SnapshotId(), maybe);
     member->transitionToOwnedObj();
-    root->pushBack(id);
+    results.emplace_back(std::move(id));
 }
 
 BSONObj buildViewBson(const ViewDefinition& view, bool nameOnly) {
@@ -391,6 +392,7 @@ public:
 
                 auto ws = std::make_unique<WorkingSet>();
                 auto root = std::make_unique<QueuedDataStage>(expCtx.get(), ws.get());
+                std::vector<WorkingSetID> results;
                 auto readTimestamp =
                     shard_role_details::getRecoveryUnit(opCtx)->getPointInTimeReadTimestamp();
                 tassert(9089302,
@@ -440,7 +442,7 @@ public:
 
                             if (!collBson.isEmpty()) {
                                 _addWorkingSetMember(
-                                    opCtx, collBson, matcher.get(), ws.get(), root.get());
+                                    opCtx, collBson, matcher.get(), ws.get(), results);
                             }
                         }
                     } else {
@@ -461,7 +463,7 @@ public:
                                         buildTimeseriesBson(opCtx, collection, nameOnly),
                                         matcher.get(),
                                         ws.get(),
-                                        root.get());
+                                        results);
                                 }
                             }
 
@@ -475,7 +477,7 @@ public:
                                 opCtx, collection, includePendingDrops, nameOnly);
                             if (!collBson.isEmpty()) {
                                 _addWorkingSetMember(
-                                    opCtx, collBson, matcher.get(), ws.get(), root.get());
+                                    opCtx, collBson, matcher.get(), ws.get(), results);
                             }
 
                             return true;
@@ -512,7 +514,7 @@ public:
                                         buildTimeseriesBson(opCtx, view.name().coll(), nameOnly),
                                         matcher.get(),
                                         ws.get(),
-                                        root.get());
+                                        results);
                                 }
                                 return true;
                             }
@@ -520,11 +522,21 @@ public:
                             BSONObj viewBson = buildViewBson(view, nameOnly);
                             if (!viewBson.isEmpty()) {
                                 _addWorkingSetMember(
-                                    opCtx, viewBson, matcher.get(), ws.get(), root.get());
+                                    opCtx, viewBson, matcher.get(), ws.get(), results);
                             }
                             return true;
                         });
                     }
+                }
+
+                shuffleListCommandResults.execute([&](const auto&) {
+                    std::random_device rd;
+                    std::mt19937 g(rd());
+                    std::shuffle(results.begin(), results.end(), g);
+                });
+
+                for (const auto& id : results) {
+                    root->pushBack(id);
                 }
 
                 exec = uassertStatusOK(

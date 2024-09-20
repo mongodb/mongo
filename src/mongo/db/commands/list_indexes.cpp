@@ -59,6 +59,7 @@
 #include "mongo/db/catalog/list_indexes.h"
 #include "mongo/db/clientcursor.h"
 #include "mongo/db/commands.h"
+#include "mongo/db/commands/shuffle_list_command_results.h"
 #include "mongo/db/cursor_manager.h"
 #include "mongo/db/db_raii.h"
 #include "mongo/db/exec/plan_stage.h"
@@ -304,6 +305,16 @@ public:
                     "to true",
                     !(buildUUID && indexBuildInfo));
             auto indexSpecsWithNss = getIndexSpecsWithNamespaceString(opCtx, cmd);
+
+            shuffleListCommandResults.execute([&](const auto&) {
+                auto& indexList = indexSpecsWithNss.first;
+                std::vector<BSONObj> shuffledResults(indexList.begin(), indexList.end());
+                std::random_device rd;
+                std::mt19937 g(rd());
+                std::shuffle(shuffledResults.begin(), shuffledResults.end(), g);
+                indexList = std::list<BSONObj>(shuffledResults.begin(), shuffledResults.end());
+            });
+
             const auto& indexList = indexSpecsWithNss.first;
             const auto& nss = indexSpecsWithNss.second;
             return ListIndexesReply(_makeCursor(opCtx, indexList, nss));
