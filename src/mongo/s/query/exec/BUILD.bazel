@@ -19,3 +19,130 @@ idl_generator(
         "//src/mongo/util/net:hostandport_gen",
     ],
 )
+
+mongo_cc_library(
+    name = "async_results_merger",
+    srcs = [
+        "async_results_merger.cpp",
+        "blocking_results_merger.cpp",
+        "establish_cursors.cpp",
+        ":async_results_merger_params_gen",
+    ],
+    hdrs = [
+        "async_results_merger.h",
+        "blocking_results_merger.h",
+        "establish_cursors.h",
+    ],
+    deps = [
+        "//src/mongo/db:server_feature_flags",
+        "//src/mongo/db/catalog:collection_uuid_mismatch_info",
+        "//src/mongo/db/query:command_request_response",
+        "//src/mongo/db/query:query_common",
+        "//src/mongo/executor:async_multicaster",
+        "//src/mongo/executor:task_executor_interface",
+        "//src/mongo/s:sharding_router_api",
+        "//src/mongo/s/client:sharding_client",
+    ],
+)
+
+mongo_cc_library(
+    name = "cluster_cursor_manager",
+    srcs = [
+        "cluster_cursor_manager.cpp",
+    ],
+    hdrs = [
+        "cluster_client_cursor.h",
+        "cluster_client_cursor_guard.h",
+        "cluster_client_cursor_params.h",
+        "cluster_cursor_manager.h",
+        "cluster_query_result.h",
+        "router_exec_stage.h",
+        ":async_results_merger_params_gen",
+    ],
+    deps = [
+        "//src/mongo:base",
+        "//src/mongo/db:commands",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/db:generic_cursor",
+        "//src/mongo/db/auth",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/db/auth:authprivilege",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/db/query:query_knobs",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/db/query/query_stats",
+        "//src/mongo/db/session:kill_sessions",
+        "//src/mongo/db/session:logical_session_cache",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/db/session:logical_session_id",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/util/concurrency:spin_lock",  # TODO(SERVER-93876): Remove.
+    ],
+)
+
+mongo_cc_library(
+    name = "router_exec_stage",
+    srcs = [
+        "document_source_merge_cursors.cpp",
+        "router_stage_limit.cpp",
+        "router_stage_mock.cpp",
+        "router_stage_pipeline.cpp",
+        "router_stage_queued_data.cpp",
+        "router_stage_remove_metadata_fields.cpp",
+        "router_stage_skip.cpp",
+    ],
+    hdrs = [
+        "document_source_merge_cursors.h",
+        "router_stage_limit.h",
+        "router_stage_mock.h",
+        "router_stage_pipeline.h",
+        "router_stage_queued_data.h",
+        "router_stage_remove_metadata_fields.h",
+        "router_stage_skip.h",
+    ],
+    deps = [
+        ":async_results_merger",
+        "//src/mongo/db/pipeline",
+        "//src/mongo/s:resource_yielders",
+        "//src/mongo/s:sharding_router_api",
+    ],
+)
+
+mongo_cc_library(
+    name = "cluster_cursor",
+    srcs = [
+        "cluster_client_cursor_impl.cpp",
+        "cluster_client_cursor_params.cpp",
+        "store_possible_cursor.cpp",
+    ],
+    hdrs = [
+        "cluster_client_cursor_impl.h",
+        "cluster_client_cursor_params.h",
+        "owned_remote_cursor.h",
+        "store_possible_cursor.h",
+    ],
+    deps = [
+        ":async_results_merger",
+        ":cluster_cursor_cleanup_job",
+        ":cluster_cursor_manager",
+        ":router_exec_stage",
+        "//src/mongo/db:commands",
+        "//src/mongo/db:curop_failpoint_helpers",
+        "//src/mongo/db:server_base",
+        "//src/mongo/db/catalog:collection_uuid_mismatch_info",
+        "//src/mongo/db/query:command_request_response",
+        "//src/mongo/db/query:query_common",
+        "//src/mongo/db/query/query_stats",
+        "//src/mongo/s:sharding_router_api",
+        "//src/mongo/util/concurrency:spin_lock",
+    ],
+)
+
+mongo_cc_library(
+    name = "cluster_cursor_cleanup_job",
+    srcs = [
+        "cluster_cursor_cleanup_job.cpp",
+    ],
+    hdrs = [
+        "cluster_cursor_cleanup_job.h",
+    ],
+    deps = [
+        "//src/mongo/db:cursor_server_params",
+        "//src/mongo/s:grid",
+        "//src/mongo/util:background_job",
+    ],
+)

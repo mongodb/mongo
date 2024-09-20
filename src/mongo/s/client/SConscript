@@ -3,35 +3,3 @@
 Import("env")
 
 env = env.Clone()
-
-env.Library(
-    target="sharding_client",
-    source=[
-        "num_hosts_targeted_metrics.cpp",
-        "shard_remote.cpp",
-    ],
-    LIBDEPS_PRIVATE=[
-        "$BUILD_DIR/mongo/client/fetcher",
-        "$BUILD_DIR/mongo/db/commands",
-        "$BUILD_DIR/mongo/db/server_base",
-        "$BUILD_DIR/mongo/executor/hedging_metrics",
-        "$BUILD_DIR/mongo/executor/task_executor_pool",
-        "$BUILD_DIR/mongo/s/grid",
-        "shard_interface",
-    ],
-)
-
-env.Library(
-    target="shard_interface",
-    source=[
-        "shard.cpp",
-        "shard_gen.cpp",
-    ],
-    LIBDEPS=[
-        "$BUILD_DIR/mongo/client/remote_command_retry_scheduler",
-        "$BUILD_DIR/mongo/s/write_ops/batch_write_types",
-    ],
-    LIBDEPS_PRIVATE=[
-        "$BUILD_DIR/mongo/db/server_base",
-    ],
-)

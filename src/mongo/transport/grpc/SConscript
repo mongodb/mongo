@@ -5,69 +5,6 @@ Import("env")
 env = env.Clone()
 env.InjectThirdParty(libraries=["grpc"])
 
-env.Library(
-    target="grpc_transport_layer",
-    source=[
-        "client.cpp",
-        "client_cache.cpp",
-        "grpc_feature_flag_gen.cpp",
-        "grpc_session_manager.cpp",
-        "grpc_transport_layer_impl.cpp",
-        "server.cpp",
-        "service.cpp",
-        "util.cpp",
-        "wire_version_provider.cpp",
-    ],
-    LIBDEPS_PRIVATE=[
-        "$BUILD_DIR/mongo/client/connection_string",
-        "$BUILD_DIR/mongo/db/commands/server_status_core",
-        "$BUILD_DIR/mongo/db/server_base",
-        "$BUILD_DIR/mongo/db/service_context",
-        "$BUILD_DIR/mongo/db/wire_version",
-        "$BUILD_DIR/mongo/rpc/client_metadata",
-        "$BUILD_DIR/mongo/transport/service_executor",
-        "$BUILD_DIR/mongo/transport/session_manager",
-        "$BUILD_DIR/mongo/transport/transport_layer_common",
-        "$BUILD_DIR/mongo/util/net/network",
-        "$BUILD_DIR/mongo/util/net/ssl_util",
-        "$BUILD_DIR/mongo/util/options_parser/options_parser",
-    ],
-    LIBDEPS=[
-        "$BUILD_DIR/third_party/grpc/grpc++_reflection",
-        "$BUILD_DIR/third_party/protobuf/protobuf",
-    ],
-)
-
-env.Library(
-    target="grpc_transport_server_options",
-    source=[
-        "grpc_parameters_gen.cpp",
-    ],
-    LIBDEPS=[
-        "$BUILD_DIR/mongo/base",
-        "$BUILD_DIR/mongo/db/server_base",
-        "$BUILD_DIR/mongo/util/options_parser/options_parser",
-    ],
-)
-
-env.Library(
-    target="grpc_transport_mock",
-    source=[
-        "mock_client_stream.cpp",
-        "mock_server_context.cpp",
-        "mock_server_stream.cpp",
-        "grpc_transport_layer_mock.cpp",
-    ],
-    LIBDEPS=[
-        "$BUILD_DIR/mongo/base",
-        "$BUILD_DIR/mongo/db/service_context",
-        "$BUILD_DIR/mongo/rpc/client_metadata",
-        "$BUILD_DIR/third_party/grpc/grpc++_reflection",
-        "$BUILD_DIR/third_party/protobuf/protobuf",
-        "grpc_transport_layer",
-    ],
-)
-
 env.CppUnitTest(
     target="grpc_transport_layer_test",
     source=[

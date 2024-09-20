@@ -10,6 +10,74 @@ exports_files(
 )
 
 mongo_cc_library(
+    name = "unittest",
+    srcs = [
+        "barrier.cpp",
+        "bson_test_util.cpp",
+        "death_test.cpp",
+        "golden_test.cpp",
+        "inline_auto_update.cpp",
+        "matcher.cpp",
+        "stringify.cpp",
+        "temp_dir.cpp",
+        "unittest.cpp",
+
+        # Note: Only used here and for the corresponding test. consider moving.
+        "//src/mongo/logv2:log_capture_backend.h",
+        "//src/mongo/bson/mutable:mutable_bson_test_utils.h",
+    ],
+    hdrs = [
+        "assert.h",
+        "assert_that.h",
+        "barrier.h",
+        "bson_test_util.h",
+        "death_test.h",
+        "framework.h",
+        "golden_test.h",
+        "inline_auto_update.h",
+        "log_test.h",
+        "matcher.h",
+        "matcher_core.h",
+        "stringify.h",
+        "temp_dir.h",
+        "thread_assertion_monitor.h",
+        "unittest.h",
+    ],
+    header_deps = [
+        "//src/mongo/db/timeseries:bucket_compression",
+        "//src/mongo/bson/mutable:mutable_bson",
+    ],
+    deps = [
+        ":golden_test_base",
+        "//src/mongo/db:server_base",
+        "//src/mongo/util:pcre_util",
+        "//src/mongo/util:pcre_wrapper",
+        "//src/mongo/util/options_parser",
+        "//src/third_party/yaml-cpp:yaml",
+    ],
+)
+
+mongo_cc_library(
+    name = "unittest_main",
+    srcs = [
+        "unittest_main.cpp",
+        ":unittest_options_gen",
+    ],
+    deps = [
+        ":unittest",
+        "//src/mongo/db:wire_version",
+        "//src/mongo/db/commands:test_commands_enabled",
+        "//src/mongo/util/options_parser",
+    ] + select({
+        "//bazel/config:non_system_allocator_enabled": [
+            # "//src/mongo/util:tcmalloc_set_parameter",
+        ],
+        "//conditions:default": [],
+    }),
+    # TODO(before-merge): ?? AIB_COMPONENT="unittests",
+)
+
+mongo_cc_library(
     name = "golden_test_base",
     srcs = [
         "golden_test_base.cpp",

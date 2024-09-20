@@ -106,6 +106,27 @@ idl_generator(
     src = "sharding_runtime_d_params.idl",
 )
 
+mongo_cc_library(
+    name = "balancer_stats_registry",
+    srcs = [
+        "balancer_stats_registry.cpp",
+    ],
+    hdrs = [
+        "balancer_stats_registry.h",
+        "range_deleter_service.h",
+        "sharding_runtime_d_params.h",
+        ":range_deletion_task_gen",
+        ":sharding_runtime_d_params_gen",
+    ],
+    deps = [
+        "//src/mongo/db:dbdirectclient",
+        "//src/mongo/db:shard_role",
+        "//src/mongo/db/repl:replica_set_aware_service",
+        "//src/mongo/s:grid",
+        "//src/mongo/util/concurrency:spin_lock",
+    ],
+)
+
 idl_generator(
     name = "type_shard_collection_gen",
     src = "type_shard_collection.idl",

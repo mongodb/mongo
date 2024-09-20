@@ -7,50 +7,6 @@ env.InjectThirdParty(libraries=["yaml"])
 
 utEnv = env.Clone()
 utEnv.InjectThirdParty(libraries=["yaml"])
-utEnv.Library(
-    target="unittest",
-    source=[
-        "barrier.cpp",
-        "bson_test_util.cpp",
-        "death_test.cpp",
-        "golden_test.cpp",
-        "inline_auto_update.cpp",
-        "matcher.cpp",
-        "stringify.cpp",
-        "temp_dir.cpp",
-        "unittest.cpp",
-    ],
-    LIBDEPS=[
-        "golden_test_base",
-    ],
-    LIBDEPS_PRIVATE=[
-        "$BUILD_DIR/mongo/db/server_base",
-        "$BUILD_DIR/mongo/util/options_parser/options_parser",
-        "$BUILD_DIR/mongo/util/pcre_util",
-        "$BUILD_DIR/mongo/util/pcre_wrapper",
-        "$BUILD_DIR/third_party/yaml-cpp/yaml",
-    ],
-)
-
-env.Library(
-    target="unittest_main",
-    source=[
-        "unittest_main.cpp",
-        "unittest_options_gen.cpp",
-    ],
-    LIBDEPS=[
-        "unittest",
-    ],
-    LIBDEPS_PRIVATE=[
-        "$BUILD_DIR/mongo/db/commands/test_commands_enabled",
-        "$BUILD_DIR/mongo/db/wire_version",
-        "$BUILD_DIR/mongo/util/options_parser/options_parser",
-        "$BUILD_DIR/mongo/util/tcmalloc_set_parameter"
-        if env["MONGO_ALLOCATOR"] in ["tcmalloc-google", "tcmalloc-gperf"]
-        else "",
-    ],
-    AIB_COMPONENT="unittests",
-)
 
 env.Library(
     target="integration_test_main",

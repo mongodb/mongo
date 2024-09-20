@@ -17,11 +17,10 @@ if [[ -d $DEST_DIR/dist ]]; then
     exit 1
 fi
 
-git clone --branch $REVISION git@github.com:mongodb-forks/abseil-cpp.git $DEST_DIR/dist
+git clone --branch $REVISION https://github.com/mongodb-forks/abseil-cpp.git $DEST_DIR/dist
 pushd $DEST_DIR/dist
 find . -mindepth 1 -maxdepth 1 -name ".*" -exec rm -rf {} \;
 rm -rf ci
 rm -rf scons_gen_build
 find absl -depth -type d -name "testdata" -exec rm -rf {} \;
-find absl -type d -name "*.bazel" -exec rm -rf {} \;
 popd

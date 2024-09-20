@@ -50,55 +50,6 @@ clientDriverEnv.InjectThirdParty("asio")
 if shouldBuildGRPC(env):
     clientDriverEnv.InjectThirdParty(libraries=["grpc"])
 
-clientDriverEnv.Library(
-    target="clientdriver_network",
-    source=[
-        "connection_string_connect.cpp",
-        "mongo_uri_connect.cpp",
-        "connpool.cpp",
-        "dbclient_connection.cpp",
-        "dbclient_grpc_stream.cpp" if shouldBuildGRPC(env) else [],
-        "dbclient_rs.cpp",
-        "dbclient_session.cpp",
-        "global_conn_pool.cpp",
-        "global_conn_pool_gen.cpp",
-        "replica_set_change_notifier.cpp",
-        "replica_set_monitor.cpp",
-        "replica_set_monitor_manager.cpp",
-        "replica_set_monitor_stats.cpp",
-        "streamable_replica_set_monitor.cpp",
-        "streamable_replica_set_monitor_query_processor.cpp",
-        "streamable_replica_set_monitor_error_handler.cpp",
-        "server_discovery_monitor.cpp",
-        "server_ping_monitor.cpp",
-        "streamable_replica_set_monitor_discovery_time_processor.cpp",
-    ],
-    LIBDEPS=[
-        "$BUILD_DIR/mongo/client/sdam/sdam",
-        "$BUILD_DIR/mongo/db/server_base",
-        "$BUILD_DIR/mongo/executor/connection_pool_stats",
-        "$BUILD_DIR/mongo/executor/network_interface",
-        "$BUILD_DIR/mongo/executor/network_interface_factory",
-        "$BUILD_DIR/mongo/executor/network_interface_thread_pool",
-        "$BUILD_DIR/mongo/executor/thread_pool_task_executor",
-        "$BUILD_DIR/mongo/transport/grpc/grpc_transport_layer" if shouldBuildGRPC(env) else [],
-        "$BUILD_DIR/mongo/transport/transport_layer_manager",
-        "$BUILD_DIR/mongo/util/background_job",
-        "$BUILD_DIR/mongo/util/md5",
-        "$BUILD_DIR/mongo/util/net/network",
-        "clientdriver_minimal",
-        "read_preference",
-        "replica_set_monitor_server_parameters",
-    ],
-    LIBDEPS_PRIVATE=[
-        "$BUILD_DIR/mongo/db/auth/auth",
-        "$BUILD_DIR/mongo/db/commands/test_commands_enabled",
-        "$BUILD_DIR/mongo/db/server_feature_flags",
-        "$BUILD_DIR/mongo/transport/message_compressor",
-        "$BUILD_DIR/mongo/util/net/ssl_manager",
-    ],
-)
-
 env.Library(
     target="remote_command_targeter",
     source=[

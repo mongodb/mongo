@@ -335,16 +335,6 @@ env.Benchmark(
     LIBDEPS=[],
 )
 
-env.Library(
-    target="future_util",
-    source=[
-        "future_util.cpp",
-    ],
-    LIBDEPS=[
-        "$BUILD_DIR/mongo/executor/task_executor_interface",
-    ],
-)
-
 pcre_env = env.Clone()
 pcre_env.InjectThirdParty(libraries=["pcre2"])
 env.Benchmark(

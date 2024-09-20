@@ -125,11 +125,95 @@ idl_generator(
     ],
 )
 
+mongo_cc_library(
+    name = "auth_impl_internal",
+    srcs = [
+        "authorization_manager_impl.cpp",
+        "authorization_session_impl.cpp",
+        "authz_manager_external_state.cpp",
+        "authz_session_external_state.cpp",
+        ":authorization_manager_impl_parameters_gen",
+        "//src/mongo/db/auth:user_request_x509.h",
+    ],
+    hdrs = [
+        "authorization_manager_impl.h",
+        "authorization_session_impl.h",
+        "authz_manager_external_state.h",
+        "authz_session_external_state.h",
+        "resource_pattern_search_list.h",
+    ],
+    deps = [
+        ":address_restriction",
+        ":auth",
+        ":auth_umc",
+        ":authentication_session",
+        ":authorization_manager_global",
+        ":authprivilege",
+        ":builtin_roles",
+        ":sasl_options",
+        ":user",
+        ":user_acquisition_stats",
+        ":user_document_parser",
+        "//src/mongo/base:secure_allocator",
+        "//src/mongo/bson/util:bson_extract",
+        "//src/mongo/db:api_parameters",
+        "//src/mongo/db:audit",  # audit:logLogout in AuthZSession.
+        "//src/mongo/db:common",
+        "//src/mongo/db:global_settings",
+        "//src/mongo/db:server_base",
+        "//src/mongo/db/query/query_stats",
+        "//src/mongo/db/stats:counters",
+        "//src/mongo/util:caching",
+        "//src/mongo/util:icu",
+        "//src/mongo/util/concurrency:spin_lock",
+        "//src/mongo/util/concurrency:thread_pool",
+        "//src/mongo/util/net:ssl_manager",
+        "//src/mongo/util/net:ssl_types",
+    ] + select({
+        "//bazel/config:ssl_enabled": [":user_request_x509"],
+        "//conditions:default": [],
+    }),
+)
+
+mongo_cc_library(
+    name = "auth_impl_internal_local",
+    srcs = [
+        "authz_manager_external_state_local.cpp",
+    ],
+    hdrs = [
+        "authz_manager_external_state_local.h",
+    ],
+    deps = [
+        ":auth_impl_internal",
+        "//src/mongo/db:multitenancy",
+        "//src/mongo/db:shard_role",
+        "//src/mongo/db/storage:storage_options",
+    ],
+)
+
 idl_generator(
     name = "user_cache_invalidator_job_parameters_gen",
     src = "user_cache_invalidator_job_parameters.idl",
     deps = [
         "//src/mongo/db:basic_types_gen",
+    ],
+)
+
+mongo_cc_library(
+    name = "user_cache_invalidator",
+    srcs = [
+        "user_cache_invalidator_job.cpp",
+        ":user_cache_invalidator_job_parameters_gen",
+    ],
+    hdrs = [
+        "user_cache_invalidator_job.h",
+    ],
+    deps = [
+        ":auth",
+        ":auth_impl_internal_local",
+        ":authorization_manager_global",
+        "//src/mongo/db:server_base",
+        "//src/mongo/s:grid",
     ],
 )
 
@@ -193,6 +277,29 @@ idl_generator(
     deps = [
         "//src/mongo/db:basic_types_gen",
         "//src/mongo/idl:generic_argument_gen",
+    ],
+)
+
+mongo_cc_library(
+    name = "sasl_commands",
+    srcs = [
+        "sasl_commands.cpp",
+        "sasl_payload.cpp",
+        ":sasl_commands_gen",
+    ],
+    hdrs = [
+        "sasl_commands.h",
+        "sasl_payload.h",
+    ],
+    deps = [
+        ":auth",
+        ":auth_impl_internal",
+        ":authentication_session",
+        ":authorization_manager_global",
+        ":saslauth",
+        "//src/mongo/client:native_sasl_client",
+        "//src/mongo/db:commands",
+        "//src/mongo/db/commands:test_commands_enabled",
     ],
 )
 
@@ -382,6 +489,94 @@ mongo_cc_library(
         "//src/mongo/db:server_base",
         "//src/mongo/db:service_context",
         "//src/mongo/db/commands:umc_commands_idl",
+    ],
+)
+
+mongo_cc_library(
+    name = "authserver",
+    srcs = [
+        "authorization_client_handle_router.cpp",
+        "authorization_client_handle_shard.cpp",
+        "authorization_manager_factory_impl.cpp",
+        "authz_manager_external_state_d.cpp",
+        "authz_manager_external_state_s.cpp",
+        "authz_session_external_state_d.cpp",
+        "authz_session_external_state_s.cpp",
+        "authz_session_external_state_server_common.cpp",
+        ":enable_localhost_auth_bypass_parameter_gen",
+    ],
+    hdrs = [
+        "authorization_client_handle_router.h",
+        "authorization_client_handle_shard.h",
+        "authorization_manager_factory_impl.h",
+        "authz_manager_external_state_d.h",
+        "authz_manager_external_state_s.h",
+        "authz_session_external_state_d.h",
+        "authz_session_external_state_s.h",
+        "authz_session_external_state_server_common.h",
+    ],
+    deps = [
+        ":auth",
+        ":auth_impl_internal_local",
+        ":authorization_manager_global",
+        ":sasl_commands",
+        ":saslauth",
+        ":user_cache_invalidator",
+        "//src/mongo/db:dbdirectclient",
+        "//src/mongo/db:dbhelpers",
+        "//src/mongo/db:server_base",
+        "//src/mongo/db/commands:authentication_commands",
+        "//src/mongo/db/commands:umc_commands_idl",
+        "//src/mongo/db/repl:repl_coordinator_interface",
+        "//src/mongo/s:grid",
+    ],
+)
+
+mongo_cc_library(
+    name = "authmocks",
+    srcs = [
+        "authorization_manager_factory_mock.cpp",
+        "authz_manager_external_state_mock.cpp",
+        "authz_session_external_state_mock.cpp",
+    ],
+    hdrs = [
+        "authorization_manager_factory_mock.h",
+        "authz_manager_external_state_mock.h",
+        "authz_session_external_state_mock.h",
+    ],
+    deps = [
+        ":auth",
+        ":auth_impl_internal",
+        ":auth_impl_internal_local",
+        ":authserver",
+        ":sasl_options",
+        ":sasl_options_init",
+        "//src/mongo/db:query_expressions",
+        "//src/mongo/db:service_context",
+        "//src/mongo/db/update:update_driver",
+    ],
+)
+
+mongo_cc_library(
+    name = "auth_checks",
+    srcs = [
+        "authorization_checks.cpp",
+    ],
+    hdrs = [
+        "authorization_checks.h",
+    ],
+    deps = [
+        ":auth",
+        ":authprivilege",
+        ":builtin_roles",
+        ":user",
+        ":user_document_parser",
+        "//src/mongo/db:audit",
+        "//src/mongo/db:common",
+        "//src/mongo/db:server_base",
+        "//src/mongo/db/catalog:document_validation",
+        "//src/mongo/db/pipeline:lite_parsed_document_source",
+        "//src/mongo/db/update:update_driver",
     ],
 )
 

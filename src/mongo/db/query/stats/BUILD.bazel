@@ -47,3 +47,27 @@ mongo_cc_library(
         ":stats_histograms",
     ],
 )
+
+mongo_cc_library(
+    name = "stats",
+    srcs = [
+        "collection_statistics_impl.cpp",
+        "stats_cache.cpp",
+        "stats_cache_loader_impl.cpp",
+        "stats_catalog.cpp",
+    ],
+    hdrs = [
+        "collection_statistics.h",
+        "collection_statistics_impl.h",
+        "stats_cache.h",
+        "stats_cache_loader.h",
+        "stats_cache_loader_impl.h",
+        "stats_catalog.h",
+    ],
+    deps = [
+        ":stats_histograms",
+        "//src/mongo/db:dbdirectclient",
+        "//src/mongo/util:caching",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/util/concurrency:thread_pool",  # TODO(SERVER-93876): Remove.
+    ],
+)

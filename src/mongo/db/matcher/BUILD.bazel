@@ -24,3 +24,24 @@ mongo_cc_library(
         "//src/mongo/db:common",
     ],
 )
+
+mongo_cc_library(
+    name = "expressions_mongod_only",
+    srcs = [
+        "expression_text.cpp",
+        "expression_where.cpp",
+        "extensions_callback_real.cpp",
+    ],
+    hdrs = [
+        "expression_text.h",
+        "expression_where.h",
+        "extensions_callback_real.h",
+    ],
+    deps = [
+        "//src/mongo/db:query_expressions",
+        "//src/mongo/db:shard_role",
+        "//src/mongo/db/exec:js_function",
+        "//src/mongo/db/fts:base_fts",
+        "//src/mongo/scripting:scripting_server",
+    ],
+)

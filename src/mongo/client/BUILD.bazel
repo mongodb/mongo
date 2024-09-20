@@ -262,6 +262,84 @@ idl_generator(
     ],
 )
 
+mongo_cc_library(
+    name = "clientdriver_network",
+    srcs = [
+        "connection_string_connect.cpp",
+        "connpool.cpp",
+        "dbclient_connection.cpp",
+        "dbclient_rs.cpp",
+        "dbclient_session.cpp",
+        "global_conn_pool.cpp",
+        "global_conn_pool_gen",
+        "mongo_uri_connect.cpp",
+        "replica_set_change_notifier.cpp",
+        "replica_set_monitor.cpp",
+        "replica_set_monitor_manager.cpp",
+        "replica_set_monitor_stats.cpp",
+        "server_discovery_monitor.cpp",
+        "server_ping_monitor.cpp",
+        "streamable_replica_set_monitor.cpp",
+        "streamable_replica_set_monitor_discovery_time_processor.cpp",
+        "streamable_replica_set_monitor_error_handler.cpp",
+        "streamable_replica_set_monitor_query_processor.cpp",
+    ] + select({
+        "//bazel/config:build_grpc_enabled": [
+            "dbclient_grpc_stream.cpp",
+        ],
+        "//conditions:default": [],
+    }),
+    hdrs = [
+        "connpool.h",
+        "dbclient_connection.h",
+        "dbclient_rs.h",
+        "dbclient_session.h",
+        "global_conn_pool.h",
+        "replica_set_change_notifier.h",
+        "replica_set_monitor.h",
+        "replica_set_monitor_interface.h",
+        "replica_set_monitor_manager.h",
+        "replica_set_monitor_stats.h",
+        "server_discovery_monitor.h",
+        "server_ping_monitor.h",
+        "streamable_replica_set_monitor.h",
+        "streamable_replica_set_monitor_discovery_time_processor.h",
+        "streamable_replica_set_monitor_error_handler.h",
+        "streamable_replica_set_monitor_query_processor.h",
+    ] + select({
+        "//bazel/config:build_grpc_enabled": [
+            "dbclient_grpc_stream.h",
+        ],
+        "//conditions:default": [],
+    }),
+    deps = [
+        ":clientdriver_minimal",
+        ":read_preference",  # TODO(SERVER-93876): Remove.
+        ":replica_set_monitor_server_parameters",
+        "//src/mongo/client/sdam",
+        "//src/mongo/db:server_base",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/db:server_feature_flags",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/db/auth",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/db/commands:test_commands_enabled",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/executor:connection_pool_stats",
+        "//src/mongo/executor:network_interface",
+        "//src/mongo/executor:network_interface_factory",
+        "//src/mongo/executor:network_interface_thread_pool",
+        "//src/mongo/executor:thread_pool_task_executor",
+        "//src/mongo/transport:message_compressor",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/transport:transport_layer_manager",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/util:background_job",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/util:md5",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/util/net:network",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/util/net:ssl_manager",
+    ] + select({
+        "//bazel/config:build_grpc_enabled": [
+            "//src/mongo/transport/grpc:grpc_transport_layer",
+        ],
+        "//conditions:default": [],
+    }),
+)
+
 idl_generator(
     name = "replica_set_monitor_server_parameters_gen",
     src = "replica_set_monitor_server_parameters.idl",

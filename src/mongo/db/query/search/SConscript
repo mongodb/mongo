@@ -6,27 +6,6 @@ env = env.Clone()
 
 env.SConscript(must_exist=1, dirs=["mongotmock"], exports=["env"])
 
-env.Library(
-    target="mongot_cursor",
-    source=[
-        "internal_search_cluster_parameters_gen.cpp",
-        "internal_search_mongot_remote_spec_gen.cpp",
-        "mongot_cursor.cpp",
-        "mongot_cursor_getmore_strategy.cpp",
-    ],
-    LIBDEPS=[
-        "$BUILD_DIR/mongo/db/pipeline/docs_needed_bounds",
-        "$BUILD_DIR/mongo/db/query/common_query_enums_and_helpers",
-        "$BUILD_DIR/mongo/db/query/plan_yield_policy",
-        "$BUILD_DIR/mongo/executor/task_executor_cursor",
-        "mongot_options",
-        "search_task_executors",
-    ],
-    LIBDEPS_PRIVATE=[
-        "$BUILD_DIR/mongo/idl/cluster_server_parameter",
-    ],
-)
-
 env.CppUnitTest(
     target="mongot_cursor_test",
     source=["mongot_cursor_test.cpp", "mongot_cursor_helpers_test.cpp"],
@@ -35,25 +14,6 @@ env.CppUnitTest(
         "$BUILD_DIR/mongo/executor/network_interface_tl",
         "$BUILD_DIR/mongo/executor/thread_pool_task_executor_test_fixture",
         "mongot_cursor",
-    ],
-)
-
-env.Library(
-    target="search_task_executors",
-    source=[
-        "search_task_executors.cpp",
-    ],
-    LIBDEPS=[
-        "$BUILD_DIR/mongo/executor/connection_pool_controllers",
-        "$BUILD_DIR/mongo/executor/network_interface_factory",
-        "$BUILD_DIR/mongo/executor/network_interface_thread_pool",
-        "$BUILD_DIR/mongo/executor/task_executor_interface",
-        "$BUILD_DIR/mongo/executor/thread_pool_task_executor",
-        "$BUILD_DIR/mongo/util/concurrency/thread_pool",
-    ],
-    LIBDEPS_PRIVATE=[
-        "mongot_options",
-        "search_index_options",
     ],
 )
 
@@ -81,28 +41,6 @@ env.CppUnitTest(
         "$BUILD_DIR/mongo/db/auth/auth_checks",
         "$BUILD_DIR/mongo/db/auth/authorization_session_test_fixture",
         "$BUILD_DIR/mongo/db/pipeline/pipeline",
-    ],
-)
-
-# This target holds the shared logic for dispatching search index requests to a mongot,
-# whereas the search_index_process targets below hold the logic for fetching collection
-# metadata, either as a mongos router or mongod shard.
-env.Library(
-    target="search_index_common",
-    source=[
-        "manage_search_index_request_gen.cpp",
-        "search_index_common.cpp",
-    ],
-    LIBDEPS=[
-        "search_index_options",
-        "search_index_process_interface",
-        "search_task_executors",
-    ],
-    LIBDEPS_PRIVATE=[
-        "$BUILD_DIR/mongo/db/server_base",
-        "$BUILD_DIR/mongo/db/service_context",
-        "$BUILD_DIR/mongo/rpc/command_status",
-        "$BUILD_DIR/mongo/util/net/network",
     ],
 )
 

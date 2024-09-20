@@ -74,3 +74,20 @@ mongo_cc_library(
         "//src/mongo/idl:cluster_server_parameter",  # TODO(SERVER-93876): Remove.
     ],
 )
+
+mongo_cc_library(
+    name = "utils",
+    srcs = [
+        "query_settings_hash.cpp",
+        "query_settings_utils.cpp",
+    ],
+    hdrs = [
+        "query_settings_hash.h",
+        "query_settings_utils.h",
+    ],
+    deps = [
+        ":manager",
+        "//src/mongo/db/query:canonical_query",
+        "//src/mongo/db/query/query_shape",
+    ],
+)

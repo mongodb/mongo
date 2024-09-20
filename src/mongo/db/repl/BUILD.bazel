@@ -147,6 +147,20 @@ idl_generator(
     src = "replication_coordinator_impl.idl",
 )
 
+mongo_cc_library(
+    name = "replica_set_aware_service",
+    srcs = [
+        "replica_set_aware_service.cpp",
+    ],
+    hdrs = [
+        "replica_set_aware_service.h",
+    ],
+    deps = [
+        ":repl_server_parameters",
+        "//src/mongo/db:service_context",
+    ],
+)
+
 idl_generator(
     name = "repl_set_test_egress_gen",
     src = "repl_set_test_egress.idl",
@@ -1268,5 +1282,28 @@ mongo_cc_library(
     deps = [
         "//src/mongo:base",  # TODO(SERVER-93876): Remove.
         "//src/mongo/executor:task_executor_interface",
+    ],
+)
+
+mongo_cc_library(
+    name = "wait_for_majority_service",
+    srcs = [
+        "wait_for_majority_service.cpp",
+    ],
+    hdrs = [
+        "wait_for_majority_service.h",
+    ],
+    copts = select({
+        # TODO(SERVER-77205): Review and Possibly Remove '-Wno-deprecated' after
+        #                     Mozjs Update
+        "@platforms//os:windows": [],
+        "//conditions:default": ["-Wno-deprecated"],
+    }),
+    deps = [
+        "//src/mongo/db:rw_concern_d",
+        "//src/mongo/db:server_base",
+        "//src/mongo/util:future_util",
+        "//src/mongo/util/concurrency:spin_lock",
+        "//src/mongo/util/concurrency:thread_pool",
     ],
 )

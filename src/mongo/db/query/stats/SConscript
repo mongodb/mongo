@@ -4,22 +4,6 @@ Import("env")
 
 env = env.Clone()
 
-env.Library(
-    target="stats",
-    source=[
-        "collection_statistics_impl.cpp",
-        "stats_catalog.cpp",
-        "stats_cache.cpp",
-        "stats_cache_loader_impl.cpp",
-    ],
-    LIBDEPS_PRIVATE=[
-        "$BUILD_DIR/mongo/db/dbdirectclient",
-        "$BUILD_DIR/mongo/util/caching",
-        "$BUILD_DIR/mongo/util/concurrency/thread_pool",
-        "stats_histograms",
-    ],
-)
-
 env.CppUnitTest(
     target="stats_cache_loader_test",
     source=[

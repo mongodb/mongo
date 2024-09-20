@@ -26,6 +26,7 @@ load(
     "pgo_profile",
     "release",
     "separate_debug",
+    "server_js",
     "shared_archive",
     "spider_monkey_dbg",
     "ssl",
@@ -2027,3 +2028,19 @@ selects.config_setting_group(
     )
     for feature in ALL_ENTERPRISE_FEATURES
 ]
+
+# --------------------------------------
+# server_js
+# --------------------------------------
+
+server_js(
+    name = "server_js",
+    build_setting_default = True,
+)
+
+config_setting(
+    name = "server_js_enabled",
+    flag_values = {
+        "//bazel/config:server_js": "True",
+    },
+)

@@ -8,3 +8,28 @@ exports_files(
         "*.cpp",
     ]),
 )
+
+mongo_cc_library(
+    name = "query_plan_cache",
+    srcs = [
+        "classic_plan_cache.cpp",
+        "plan_cache_callbacks.cpp",
+        "plan_cache_invalidator.cpp",
+        "sbe_plan_cache.cpp",
+        "//src/mongo/db/query/stage_builder/sbe:builder_data.h",
+    ],
+    hdrs = [
+        "classic_plan_cache.h",
+        "plan_cache_callbacks.h",
+        "plan_cache_invalidator.h",
+        "sbe_plan_cache.h",
+    ],
+    deps = [
+        "//src/mongo:base",
+        "//src/mongo/db:query_expressions",
+        "//src/mongo/db/exec/sbe:query_sbe",
+        "//src/mongo/db/query:canonical_query",
+        "//src/mongo/db/query:memory_util",
+        "//src/mongo/db/query/query_settings:utils",
+    ],
+)

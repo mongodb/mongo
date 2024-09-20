@@ -44,3 +44,136 @@ mongo_cc_library(
         "//src/mongo/db:update_index_data",
     ],
 )
+
+mongo_cc_library(
+    name = "update_common",
+    srcs = [
+        "field_checker.cpp",
+        "path_support.cpp",
+        "runtime_update_path.cpp",
+        "storage_validation.cpp",
+        "update_oplog_entry_serialization.cpp",
+        "v2_log_builder.cpp",
+    ],
+    hdrs = [
+        "field_checker.h",
+        "log_builder_interface.h",
+        "path_support.h",
+        "runtime_update_path.h",
+        "storage_validation.h",
+        "update_executor.h",
+        "update_oplog_entry_serialization.h",
+        "v2_log_builder.h",
+    ],
+    deps = [
+        ":pattern_cmp",  # TODO(SERVER-93876): Remove.
+        ":update_document_diff",
+        "//src/mongo:base",
+        "//src/mongo/bson/mutable:mutable_bson",
+        "//src/mongo/db:common",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/db:query_expressions",
+    ],
+)
+
+mongo_cc_library(
+    name = "update_nodes",
+    srcs = [
+        "addtoset_node.cpp",
+        "arithmetic_node.cpp",
+        "array_culling_node.cpp",
+        "bit_node.cpp",
+        "compare_node.cpp",
+        "current_date_node.cpp",
+        "modifier_node.cpp",
+        "modifier_table.cpp",
+        "pop_node.cpp",
+        "pull_node.cpp",
+        "pullall_node.cpp",
+        "push_node.cpp",
+        "rename_node.cpp",
+        "set_node.cpp",
+        "unset_node.cpp",
+        "update_array_node.cpp",
+        "update_internal_node.cpp",
+        "update_leaf_node.cpp",
+        "update_node.cpp",
+        "update_object_node.cpp",
+    ],
+    hdrs = [
+        "addtoset_node.h",
+        "arithmetic_node.h",
+        "array_culling_node.h",
+        "bit_node.h",
+        "compare_node.h",
+        "conflict_placeholder_node.h",
+        "current_date_node.h",
+        "modifier_node.h",
+        "modifier_table.h",
+        "pop_node.h",
+        "pull_node.h",
+        "pullall_node.h",
+        "push_node.h",
+        "rename_node.h",
+        "set_node.h",
+        "unset_node.h",
+        "update_array_node.h",
+        "update_internal_node.h",
+        "update_leaf_node.h",
+        "update_node.h",
+        "update_node_visitor.h",
+        "update_object_node.h",
+    ],
+    deps = [
+        ":update_common",
+        "//src/mongo/db:update_index_data",
+        "//src/mongo/db:vector_clock_mutable",
+    ],
+)
+
+mongo_cc_library(
+    name = "update",
+    srcs = [
+        "delta_executor.cpp",
+        "object_replace_executor.cpp",
+        "object_transform_executor.cpp",
+        "pipeline_executor.cpp",
+    ],
+    hdrs = [
+        "delta_executor.h",
+        "object_replace_executor.h",
+        "object_transform_executor.h",
+        "pipeline_executor.h",
+    ],
+    deps = [
+        ":update_common",
+        ":update_document_diff",
+        ":update_nodes",
+        "//src/mongo/db/pipeline",
+    ],
+)
+
+mongo_cc_library(
+    name = "update_driver",
+    srcs = [
+        "update_driver.cpp",
+        "update_util.cpp",
+    ],
+    hdrs = [
+        "update_driver.h",
+        "update_tree_executor.h",
+        "update_util.h",
+        "//src/mongo/db/exec/sbe:in_list.h",
+        "//src/mongo/db/query:explain.h",
+        "//src/mongo/db/query/plan_cache:sbe_plan_cache.h",
+        "//src/mongo/db/query/stage_builder/sbe:builder_data.h",
+        "//src/mongo/db/query/write_ops:update_request.h",
+    ],
+    deps = [
+        ":update",
+        "//src/mongo/db:common",
+        "//src/mongo/db:query_expressions",
+        "//src/mongo/db:server_base",
+        "//src/mongo/db/query:canonical_query",
+        "//src/mongo/db/query/write_ops:write_ops_parsers",
+    ],
+)

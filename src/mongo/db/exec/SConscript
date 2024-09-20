@@ -16,58 +16,6 @@ env.SConscript(
 )
 
 env.Library(
-    target="bucket_unpacker",
-    source=[
-        "timeseries/bucket_unpacker.cpp",
-    ],
-    LIBDEPS=[
-        "$BUILD_DIR/mongo/db/query_expressions",
-        "document_value/document_value",
-    ],
-    LIBDEPS_PRIVATE=[
-        "$BUILD_DIR/mongo/bson/util/bson_column",
-        "$BUILD_DIR/mongo/db/query/bucket_predicate_generator",
-    ],
-)
-
-sortExecutorEnv = env.Clone()
-sortExecutorEnv.InjectThirdParty(libraries=["snappy"])
-sortExecutorEnv.Library(
-    target="sort_executor",
-    source=[
-        "sort_executor.cpp",
-        "sort_key_comparator.cpp",
-    ],
-    LIBDEPS=[
-        "$BUILD_DIR/mongo/db/query/sort_pattern",
-        "$BUILD_DIR/mongo/db/sorter/sorter_stats",
-        "working_set",
-    ],
-    LIBDEPS_PRIVATE=[
-        "$BUILD_DIR/mongo/db/query/spill_util",
-        "$BUILD_DIR/mongo/db/sorter/sorter_base",
-        "$BUILD_DIR/mongo/db/storage/encryption_hooks",
-        "$BUILD_DIR/mongo/db/storage/storage_options",
-        "$BUILD_DIR/third_party/snappy/snappy",
-    ],
-)
-
-env.Library(
-    target="projection_executor",
-    source=[
-        "add_fields_projection_executor.cpp",
-        "exclusion_projection_executor.cpp",
-        "inclusion_projection_executor.cpp",
-        "projection_executor_builder.cpp",
-        "projection_executor_utils.cpp",
-        "projection_node.cpp",
-    ],
-    LIBDEPS=[
-        "$BUILD_DIR/mongo/db/query_expressions",
-    ],
-)
-
-env.Library(
     target="stagedebug_cmd",
     source=[
         "stagedebug_cmd.cpp",

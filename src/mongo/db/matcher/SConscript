@@ -4,22 +4,6 @@ Import("env")
 
 env = env.Clone()
 
-env.Library(
-    target="expressions_mongod_only",
-    source=[
-        "extensions_callback_real.cpp",
-        "expression_text.cpp",
-        "expression_where.cpp",
-    ],
-    LIBDEPS=[
-        "$BUILD_DIR/mongo/db/exec/js_function",
-        "$BUILD_DIR/mongo/db/fts/base_fts",
-        "$BUILD_DIR/mongo/db/query_expressions",
-        "$BUILD_DIR/mongo/db/shard_role",
-        "$BUILD_DIR/mongo/scripting/scripting_server",
-    ],
-)
-
 env.CppUnitTest(
     target="db_matcher_test",
     source=[

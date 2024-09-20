@@ -9,11 +9,79 @@ exports_files(
     ]),
 )
 
+mongo_cc_library(
+    name = "write_ops_exec_util",
+    srcs = [
+        "write_ops_exec_util.cpp",
+    ],
+    hdrs = [
+        "write_ops_exec_util.h",
+    ],
+    deps = [
+        "//src/mongo:base",
+        "//src/mongo/db:shard_role_api",
+        "//src/mongo/db/repl:repl_coordinator_interface",
+    ],
+)
+
+mongo_cc_library(
+    name = "parsed_update",
+    srcs = [
+        "parsed_update_array_filters.cpp",
+        "parsed_update_base.cpp",
+    ],
+    hdrs = [
+        "parsed_update.h",
+        "parsed_update_array_filters.h",
+    ],
+    deps = [
+        "//src/mongo/db:disk_use_options_idl",
+        "//src/mongo/db:query_expressions",
+        "//src/mongo/db:server_base",
+        "//src/mongo/db:shard_role_api",
+        "//src/mongo/db/storage:storage_options",
+        "//src/mongo/db/timeseries:timeseries_conversion_util",
+        "//src/mongo/db/update:update_driver",
+    ],
+)
+
 idl_generator(
     name = "single_write_result_gen",
     src = "single_write_result.idl",
     deps = [
         "//src/mongo/db:basic_types_gen",
+    ],
+)
+
+mongo_cc_library(
+    name = "write_ops",
+    srcs = [
+        "delete.cpp",
+        "insert.cpp",
+        "update.cpp",
+        "write_ops_retryability.cpp",
+        ":single_write_result_gen",
+    ],
+    hdrs = [
+        "delete.h",
+        "insert.h",
+        "update.h",
+        "write_ops_retryability.h",
+    ],
+    deps = [
+        "//src/mongo:base",
+        "//src/mongo/db:mongod_options",
+        "//src/mongo/db:profile_collection",
+        "//src/mongo/db:query_exec",
+        "//src/mongo/db:service_context",
+        "//src/mongo/db:shard_role",
+        "//src/mongo/db/concurrency:exception_util",
+        "//src/mongo/db/matcher:expressions_mongod_only",
+        "//src/mongo/db/query:command_request_response",
+        "//src/mongo/db/query/query_stats",
+        "//src/mongo/db/repl:image_collection_entry",
+        "//src/mongo/db/repl:repl_coordinator_interface",
+        "//src/mongo/db/update:update_driver",
     ],
 )
 

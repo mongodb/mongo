@@ -167,3 +167,44 @@ mongo_cc_library(
         "//src/mongo/util/concurrency:spin_lock",
     ],
 )
+
+mongo_cc_library(
+    name = "serveronly_stats",
+    srcs = [
+        "lock_server_status_section.cpp",
+        "storage_stats.cpp",
+    ],
+    hdrs = [
+        "storage_stats.h",
+    ],
+    deps = [
+        ":top",
+        "//src/mongo/db:server_base",
+        "//src/mongo/db:shard_role",
+        "//src/mongo/db/catalog:collection_options",
+        "//src/mongo/db/catalog:index_catalog",
+        "//src/mongo/db/commands:server_status_core",
+        "//src/mongo/db/index:index_access_method",
+        "//src/mongo/db/pipeline:document_sources_idl",
+        "//src/mongo/db/s:balancer_stats_registry",
+        "//src/mongo/db/timeseries/bucket_catalog",
+        "//src/mongo/util/concurrency:spin_lock",
+    ],
+)
+
+mongo_cc_library(
+    name = "latency_server_stats",
+    srcs = [
+        "latency_server_status_section.cpp",
+    ],
+    deps = [
+        ":top",
+        "//src/mongo/db:server_base",
+        "//src/mongo/db:shard_role",
+        "//src/mongo/db/catalog:index_catalog",
+        "//src/mongo/db/commands:server_status_core",
+        "//src/mongo/db/index:index_access_method",
+        "//src/mongo/db/pipeline:document_sources_idl",
+        "//src/mongo/db/timeseries/bucket_catalog",
+    ],
+)

@@ -569,3 +569,17 @@ js_engine = rule(
     implementation = lambda ctx: js_engine_provider(engine = ctx.build_setting_value),
     build_setting = config.string(flag = True),
 )
+
+# =========
+# server_js
+# =========
+
+server_js_provider = provider(
+    doc = "Build mongod without JavaScript support",
+    fields = ["enabled"],
+)
+
+server_js = rule(
+    implementation = lambda ctx: server_js_provider(enabled = ctx.build_setting_value),
+    build_setting = config.bool(flag = True),
+)

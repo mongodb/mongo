@@ -209,33 +209,6 @@ env.Benchmark(
     ],
 )
 
-env.Library(
-    target="flow_control_parameters",
-    source=[
-        "flow_control_parameters_gen.cpp",
-    ],
-    LIBDEPS_PRIVATE=[
-        "$BUILD_DIR/mongo/db/server_base",
-    ],
-)
-
-env.Library(
-    target="flow_control",
-    source=[
-        "flow_control.cpp",
-    ],
-    LIBDEPS_PRIVATE=[
-        "$BUILD_DIR/mongo/db/commands/server_status_core",
-        "$BUILD_DIR/mongo/db/concurrency/flow_control_ticketholder",
-        "$BUILD_DIR/mongo/db/server_base",
-        "$BUILD_DIR/mongo/db/service_context",
-        "$BUILD_DIR/mongo/db/shard_role_api",
-        "$BUILD_DIR/mongo/util/background_job",
-        "$BUILD_DIR/mongo/util/fail_point",
-        "flow_control_parameters",
-    ],
-)
-
 env.CppUnitTest(
     target="db_storage_test",
     source=[

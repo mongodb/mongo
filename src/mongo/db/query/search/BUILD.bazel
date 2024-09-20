@@ -62,6 +62,32 @@ mongo_cc_library(
 )
 
 mongo_cc_library(
+    name = "mongot_cursor",
+    srcs = [
+        "mongot_cursor.cpp",
+        "mongot_cursor_getmore_strategy.cpp",
+        ":internal_search_cluster_parameters_gen",
+        ":internal_search_mongot_remote_spec_gen",
+        "//src/mongo/db/pipeline:document_source_set_variable_from_subpipeline.h",
+        "//src/mongo/db/pipeline/search:document_source_internal_search_id_lookup.h",
+        "//src/mongo/db/pipeline/search:document_source_internal_search_mongot_remote.h",
+    ],
+    hdrs = [
+        "mongot_cursor.h",
+        "mongot_cursor_getmore_strategy.h",
+    ],
+    deps = [
+        ":mongot_options",  # TODO(SERVER-93876): Remove.
+        ":search_task_executors",
+        "//src/mongo/db/pipeline:docs_needed_bounds",
+        "//src/mongo/db/query:common_query_enums_and_helpers",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/db/query:plan_yield_policy",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/executor:task_executor_cursor",
+        "//src/mongo/idl:cluster_server_parameter",  # TODO(SERVER-93876): Remove.
+    ],
+)
+
+mongo_cc_library(
     name = "search_index_options",
     srcs = [
         "search_index_options.cpp",
@@ -77,6 +103,26 @@ mongo_cc_library(
 )
 
 mongo_cc_library(
+    name = "search_task_executors",
+    srcs = [
+        "search_task_executors.cpp",
+    ],
+    hdrs = [
+        "search_task_executors.h",
+    ],
+    deps = [
+        ":mongot_options",
+        ":search_index_options",
+        "//src/mongo/executor:connection_pool_controllers",
+        "//src/mongo/executor:network_interface_factory",
+        "//src/mongo/executor:network_interface_thread_pool",
+        "//src/mongo/executor:task_executor_interface",
+        "//src/mongo/executor:thread_pool_task_executor",
+        "//src/mongo/util/concurrency:thread_pool",  # TODO(SERVER-93876): Remove.
+    ],
+)
+
+mongo_cc_library(
     name = "search_index_process_interface",
     srcs = [
         "search_index_process_interface.cpp",
@@ -88,5 +134,28 @@ mongo_cc_library(
         "//src/mongo/db:commands",  # TODO(SERVER-93876): Remove.
         "//src/mongo/db:server_base",
         "//src/mongo/db:service_context",  # TODO(SERVER-93876): Remove.
+    ],
+)
+
+# This target holds the shared logic for dispatching search index requests to a
+# mongot, whereas the search_index_process targets below hold the logic for
+# fetching collection metadata, either as a mongos router or mongod shard.
+mongo_cc_library(
+    name = "search_index_common",
+    srcs = [
+        "search_index_common.cpp",
+        ":manage_search_index_request_gen",
+    ],
+    hdrs = [
+        "search_index_common.h",
+    ],
+    deps = [
+        "search_index_options",
+        "search_index_process_interface",
+        "search_task_executors",
+        "//src/mongo/db:server_base",
+        "//src/mongo/db:service_context",
+        "//src/mongo/rpc:command_status",
+        "//src/mongo/util/net:network",
     ],
 )

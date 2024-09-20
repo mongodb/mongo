@@ -632,17 +632,6 @@ env.Library(
 )
 
 env.Library(
-    target="replica_set_aware_service",
-    source=[
-        "replica_set_aware_service.cpp",
-    ],
-    LIBDEPS_PRIVATE=[
-        "$BUILD_DIR/mongo/db/service_context",
-        "repl_server_parameters",
-    ],
-)
-
-env.Library(
     target="replmocks",
     source=[
         "replication_consistency_markers_mock.cpp",
@@ -1608,30 +1597,6 @@ env.Library(
         "$BUILD_DIR/mongo/db/auth/saslauth",
         "$BUILD_DIR/mongo/db/commands/authentication_commands",
         "hello_command",
-    ],
-)
-wait_for_majority_service_env = env.Clone()
-# TODO(SERVER-77205): Review and Possibly Remove '-Wno-deprecated' After Mozjs Update
-wait_for_majority_service_env.Append(
-    CXXFLAGS=[]
-    if wait_for_majority_service_env.TargetOSIs("windows")
-    else [
-        "-Wno-deprecated",
-    ],
-)
-wait_for_majority_service_env.Library(
-    target="wait_for_majority_service",
-    source=[
-        "wait_for_majority_service.cpp",
-    ],
-    LIBDEPS=[
-        "$BUILD_DIR/mongo/db/rw_concern_d",
-        "$BUILD_DIR/mongo/util/concurrency/thread_pool",
-        "$BUILD_DIR/mongo/util/future_util",
-    ],
-    LIBDEPS_PRIVATE=[
-        "$BUILD_DIR/mongo/db/server_base",
-        "$BUILD_DIR/mongo/util/concurrency/spin_lock",
     ],
 )
 

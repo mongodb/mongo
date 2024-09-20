@@ -124,6 +124,22 @@ mongo_cc_library(
 )
 
 mongo_cc_library(
+    name = "op_observer_util",
+    srcs = [
+        "op_observer_util.cpp",
+    ],
+    hdrs = [
+        "op_observer_util.h",
+    ],
+    deps = [
+        "//src/mongo:base",
+        "//src/mongo/db:shard_role_api",
+        "//src/mongo/db/catalog:collection_options",
+        "//src/mongo/db/query/bson:dotted_path_support",  # TODO(SERVER-93876): Remove.
+    ],
+)
+
+mongo_cc_library(
     name = "operation_logger_transaction_proxy",
     srcs = [
         "operation_logger_transaction_proxy.cpp",

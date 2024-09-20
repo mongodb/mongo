@@ -10,6 +10,28 @@ exports_files(
 )
 
 mongo_cc_library(
+    name = "sort_executor",
+    srcs = [
+        "sort_executor.cpp",
+        "sort_key_comparator.cpp",
+    ],
+    hdrs = [
+        "sort_executor.h",
+        "sort_key_comparator.h",
+    ],
+    deps = [
+        ":working_set",
+        "//src/mongo/db/query:sort_pattern",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/db/query:spill_util",
+        "//src/mongo/db/sorter:sorter_base",
+        "//src/mongo/db/sorter:sorter_stats",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/db/storage:encryption_hooks",
+        "//src/mongo/db/storage:storage_options",  # TODO(SERVER-93876): Remove.
+        "//src/third_party/snappy",
+    ],
+)
+
+mongo_cc_library(
     name = "js_function",
     srcs = [
         "js_function.cpp",
@@ -77,5 +99,46 @@ mongo_cc_library(
     deps = [
         "//src/mongo/db:service_context",
         "//src/mongo/util/net:network",
+    ],
+)
+
+mongo_cc_library(
+    name = "bucket_unpacker",
+    srcs = [
+        "//src/mongo/db/exec/timeseries:bucket_unpacker.cpp",
+    ],
+    hdrs = [
+        "//src/mongo/db/exec/timeseries:bucket_unpacker.h",
+    ],
+    deps = [
+        "//src/mongo/bson/util:bson_column",
+        "//src/mongo/db:query_expressions",
+        "//src/mongo/db/exec/document_value",
+        "//src/mongo/db/query:bucket_predicate_generator",
+    ],
+)
+
+mongo_cc_library(
+    name = "projection_executor",
+    srcs = [
+        "add_fields_projection_executor.cpp",
+        "exclusion_projection_executor.cpp",
+        "inclusion_projection_executor.cpp",
+        "projection_executor_builder.cpp",
+        "projection_executor_utils.cpp",
+        "projection_node.cpp",
+        "//src/mongo/base:exact_cast.h",
+        "//src/mongo/db/query:projection_ast_path_tracking_visitor.h",
+    ],
+    hdrs = [
+        "add_fields_projection_executor.h",
+        "exclusion_projection_executor.h",
+        "inclusion_projection_executor.h",
+        "projection_executor_builder.h",
+        "projection_executor_utils.h",
+        "projection_node.h",
+    ],
+    deps = [
+        "//src/mongo/db:query_expressions",
     ],
 )

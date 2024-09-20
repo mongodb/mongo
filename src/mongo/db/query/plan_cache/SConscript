@@ -7,24 +7,6 @@ Import(
 env = env.Clone()
 
 env.Library(
-    target="query_plan_cache",
-    source=[
-        "classic_plan_cache.cpp",
-        "plan_cache_callbacks.cpp",
-        "plan_cache_invalidator.cpp",
-        "sbe_plan_cache.cpp",
-    ],
-    LIBDEPS=[
-        "$BUILD_DIR/mongo/base",
-        "$BUILD_DIR/mongo/db/exec/sbe/query_sbe",
-        "$BUILD_DIR/mongo/db/query/canonical_query",
-        "$BUILD_DIR/mongo/db/query/memory_util",
-        "$BUILD_DIR/mongo/db/query/query_settings/utils",
-        "$BUILD_DIR/mongo/db/query_expressions",
-    ],
-)
-
-env.Library(
     target="plan_cache_test_util",
     source=[
         "plan_cache_test_util.cpp",

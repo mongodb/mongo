@@ -47,20 +47,6 @@ env.Library(
     ],
 )
 
-
-env.Library(
-    target="op_observer_util",
-    source=[
-        "op_observer_util.cpp",
-    ],
-    LIBDEPS_PRIVATE=[
-        "$BUILD_DIR/mongo/base",
-        "$BUILD_DIR/mongo/db/catalog/collection_options",
-        "$BUILD_DIR/mongo/db/query/bson/dotted_path_support",
-        "$BUILD_DIR/mongo/db/shard_role_api",
-    ],
-)
-
 env.Library(
     target="operation_logger_impl",
     source=[

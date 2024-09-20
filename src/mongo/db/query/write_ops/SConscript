@@ -5,44 +5,6 @@ Import("env")
 env = env.Clone()
 
 env.Library(
-    target="write_ops",
-    source=[
-        "delete.cpp",
-        "insert.cpp",
-        "update.cpp",
-        "write_ops_retryability.cpp",
-        "single_write_result_gen.cpp",
-    ],
-    LIBDEPS_PRIVATE=[
-        "$BUILD_DIR/mongo/base",
-        "$BUILD_DIR/mongo/db/concurrency/exception_util",
-        "$BUILD_DIR/mongo/db/matcher/expressions_mongod_only",
-        "$BUILD_DIR/mongo/db/mongod_options",
-        "$BUILD_DIR/mongo/db/profile_collection",
-        "$BUILD_DIR/mongo/db/query/command_request_response",
-        "$BUILD_DIR/mongo/db/query/query_stats/query_stats",
-        "$BUILD_DIR/mongo/db/query_exec",
-        "$BUILD_DIR/mongo/db/repl/image_collection_entry",
-        "$BUILD_DIR/mongo/db/repl/repl_coordinator_interface",
-        "$BUILD_DIR/mongo/db/service_context",
-        "$BUILD_DIR/mongo/db/shard_role",
-        "$BUILD_DIR/mongo/db/update/update_driver",
-    ],
-)
-
-env.Library(
-    target="write_ops_exec_util",
-    source=[
-        "write_ops_exec_util.cpp",
-    ],
-    LIBDEPS_PRIVATE=[
-        "$BUILD_DIR/mongo/base",
-        "$BUILD_DIR/mongo/db/repl/repl_coordinator_interface",
-        "$BUILD_DIR/mongo/db/shard_role_api",
-    ],
-)
-
-env.Library(
     target="write_ops_exec",
     source=[
         "write_ops_exec.cpp",
@@ -95,25 +57,6 @@ env.Library(
     LIBDEPS=[
         "$BUILD_DIR/mongo/base",
         "$BUILD_DIR/mongo/db/dbmessage",
-    ],
-)
-
-env.Library(
-    target="parsed_update",
-    source=[
-        "parsed_update_array_filters.cpp",
-        "parsed_update_base.cpp",
-    ],
-    LIBDEPS=[
-        "$BUILD_DIR/mongo/db/disk_use_options_idl",
-        "$BUILD_DIR/mongo/db/query_expressions",
-        "$BUILD_DIR/mongo/db/shard_role_api",
-        "$BUILD_DIR/mongo/db/timeseries/timeseries_conversion_util",
-        "$BUILD_DIR/mongo/db/update/update_driver",
-    ],
-    LIBDEPS_PRIVATE=[
-        "$BUILD_DIR/mongo/db/server_base",
-        "$BUILD_DIR/mongo/db/storage/storage_options",
     ],
 )
 

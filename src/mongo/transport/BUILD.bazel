@@ -31,9 +31,78 @@ mongo_cc_library(
     ],
 )
 
+mongo_cc_library(
+    name = "transport_layer_manager",
+    srcs = [
+        "transport_layer_manager_impl.cpp",
+    ],
+    hdrs = [
+        "transport_layer_manager_impl.h",
+    ],
+    deps = [
+        ":service_executor",
+        ":session_manager",
+        ":transport_layer",
+        "//src/mongo/db:server_base",
+        "//src/third_party/asio-master:asio",
+    ] + select({
+        "//bazel/config:build_grpc_enabled": [
+            "//src/mongo/transport/grpc:grpc_transport_layer",
+        ],
+        "//conditions:default": [],
+    }),
+)
+
 idl_generator(
     name = "transport_options_gen",
     src = "transport_options.idl",
+)
+
+mongo_cc_library(
+    name = "transport_layer",
+    srcs = [
+        "proxy_protocol_header_parser.cpp",
+        ":transport_options_gen",
+        "//src/mongo/transport/asio:asio_session_impl.cpp",
+        "//src/mongo/transport/asio:asio_session_manager.cpp",
+        "//src/mongo/transport/asio:asio_tcp_fast_open.cpp",
+        "//src/mongo/transport/asio:asio_transport_layer.cpp",
+        "//src/mongo/transport/asio:asio_utils.cpp",
+        "//src/mongo/util:strong_weak_finish_line.h",
+    ] + select({
+        "@platforms//os:linux": [
+            "//src/mongo/transport/asio:asio_networking_baton.cpp",
+        ],
+        "//conditions:default": [],
+    }),
+    hdrs = [
+        "proxy_protocol_header_parser.h",
+        "//src/mongo/transport/asio:asio_networking_baton.h",
+        "//src/mongo/transport/asio:asio_session.h",
+        "//src/mongo/transport/asio:asio_session_impl.h",
+        "//src/mongo/transport/asio:asio_session_manager.h",
+        "//src/mongo/transport/asio:asio_tcp_fast_open.h",
+        "//src/mongo/transport/asio:asio_transport_layer.h",
+        "//src/mongo/transport/asio:asio_utils.h",
+    ],
+    deps = [
+        ":service_executor",  # TODO(SERVER-93876): Remove.
+        ":session_manager",
+        ":session_util",
+        ":transport_layer_common",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/base:system_error",
+        "//src/mongo/db:server_base",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/db:server_feature_flags",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/db:service_context",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/db/commands:server_status_core",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/db/stats:counters",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/s:common_s",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/util:executor_stats",
+        "//src/mongo/util/concurrency:spin_lock",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/util/net:ssl_manager",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/util/options_parser",  # TODO(SERVER-93876): Remove.
+        "//src/third_party/asio-master:asio",
+    ],
 )
 
 idl_generator(

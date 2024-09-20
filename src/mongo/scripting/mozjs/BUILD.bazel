@@ -7,6 +7,7 @@ exports_files(
     glob([
         "*.h",
         "*.cpp",
+        "*.defs",
     ]),
 )
 

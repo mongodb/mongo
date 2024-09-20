@@ -119,3 +119,84 @@ mongo_cc_library(
         "//src/mongo/util:fail_point",
     ],
 )
+
+mongo_cc_library(
+    name = "timeseries_conversion_util",
+    srcs = [
+        "timeseries_commands_conversion_helper.cpp",
+        "timeseries_dotted_path_support.cpp",
+        "timeseries_index_schema_conversion_functions.cpp",
+        "timeseries_update_delete_util.cpp",
+        "//src/mongo/db/matcher:extensions_callback_real.h",
+        "//src/mongo/db/pipeline:document_source_coll_stats.h",
+        "//src/mongo/db/pipeline:document_source_index_stats.h",
+        "//src/mongo/db/pipeline:document_source_internal_convert_bucket_index_stats.h",
+        "//src/mongo/db/pipeline:document_source_internal_unpack_bucket.h",
+        "//src/mongo/db/query/write_ops:parsed_writes_common.h",
+    ],
+    hdrs = [
+        "timeseries_commands_conversion_helper.h",
+        "timeseries_dotted_path_support.h",
+        "timeseries_index_schema_conversion_functions.h",
+        "timeseries_update_delete_util.h",
+    ],
+    deps = [
+        ":bucket_compression",
+        ":timeseries_options",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/bson/util:bson_column",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/db:coll_mod_command_idl",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/db:index_commands_idl",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/db:server_base",
+        "//src/mongo/db/catalog:index_catalog",
+        "//src/mongo/db/exec:bucket_unpacker",
+        "//src/mongo/db/query:bucket_predicate_generator",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/db/query/write_ops:write_ops_parsers",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/db/storage:storage_options",  # TODO(SERVER-93876): Remove.
+    ],
+)
+
+mongo_cc_library(
+    name = "catalog_helper",
+    srcs = [
+        "catalog_helper.cpp",
+    ],
+    hdrs = [
+        "catalog_helper.h",
+    ],
+    deps = [
+        ":timeseries_options",
+        "//src/mongo/db:server_base",
+        "//src/mongo/db/catalog:collection_catalog",
+    ],
+)
+
+mongo_cc_library(
+    name = "timeseries_write_util",
+    srcs = [
+        "timeseries_write_util.cpp",
+        "//src/mongo/db/query:explain.h",
+        "//src/mongo/db/query/write_ops:update_request.h",
+    ],
+    hdrs = [
+        "timeseries_write_util.h",
+    ],
+    deps = [
+        ":bucket_compression",
+        ":bucket_compression_failure",
+        ":timeseries_conversion_util",
+        ":timeseries_options",
+        "//src/mongo/db:dbdirectclient",
+        "//src/mongo/db:record_id_helpers",
+        "//src/mongo/db:shard_role",
+        "//src/mongo/db/catalog:collection_crud",
+        "//src/mongo/db/catalog:collection_query_info",
+        "//src/mongo/db/catalog:document_validation",
+        "//src/mongo/db/query/query_stats",
+        "//src/mongo/db/query/write_ops:delete_request_idl",
+        "//src/mongo/db/query/write_ops:write_ops_exec_util",
+        "//src/mongo/db/repl:tenant_migration_decoration",
+        "//src/mongo/db/storage:storage_options",
+        "//src/mongo/db/timeseries/bucket_catalog",
+        "//src/mongo/db/update:update_common",
+    ],
+)

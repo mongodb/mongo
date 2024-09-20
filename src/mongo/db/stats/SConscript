@@ -22,44 +22,6 @@ env.Library(
     ],
 )
 
-env.Library(
-    target="serveronly_stats",
-    source=[
-        "lock_server_status_section.cpp",
-        "storage_stats.cpp",
-    ],
-    LIBDEPS_PRIVATE=[
-        "$BUILD_DIR/mongo/db/catalog/collection_options",
-        "$BUILD_DIR/mongo/db/catalog/index_catalog",
-        "$BUILD_DIR/mongo/db/commands/server_status_core",
-        "$BUILD_DIR/mongo/db/index/index_access_method",
-        "$BUILD_DIR/mongo/db/pipeline/document_sources_idl",
-        "$BUILD_DIR/mongo/db/s/balancer_stats_registry",
-        "$BUILD_DIR/mongo/db/server_base",
-        "$BUILD_DIR/mongo/db/shard_role",
-        "$BUILD_DIR/mongo/db/timeseries/bucket_catalog/bucket_catalog",
-        "$BUILD_DIR/mongo/util/concurrency/spin_lock",
-        "top",
-    ],
-)
-
-env.Library(
-    target="latency_server_stats",
-    source=[
-        "latency_server_status_section.cpp",
-    ],
-    LIBDEPS_PRIVATE=[
-        "$BUILD_DIR/mongo/db/catalog/index_catalog",
-        "$BUILD_DIR/mongo/db/commands/server_status_core",
-        "$BUILD_DIR/mongo/db/index/index_access_method",
-        "$BUILD_DIR/mongo/db/pipeline/document_sources_idl",
-        "$BUILD_DIR/mongo/db/server_base",
-        "$BUILD_DIR/mongo/db/shard_role",
-        "$BUILD_DIR/mongo/db/timeseries/bucket_catalog/bucket_catalog",
-        "top",
-    ],
-)
-
 env.CppUnitTest(
     target="db_stats_test",
     source=[

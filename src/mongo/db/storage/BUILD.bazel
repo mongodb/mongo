@@ -184,6 +184,36 @@ idl_generator(
     src = "flow_control_parameters.idl",
 )
 
+mongo_cc_library(
+    name = "flow_control_parameters",
+    srcs = [
+        ":flow_control_parameters_gen",
+    ],
+    deps = [
+        "//src/mongo/db:server_base",
+    ],
+)
+
+mongo_cc_library(
+    name = "flow_control",
+    srcs = [
+        "flow_control.cpp",
+    ],
+    hdrs = [
+        "flow_control.h",
+    ],
+    deps = [
+        ":flow_control_parameters",
+        "//src/mongo/db:server_base",
+        "//src/mongo/db:service_context",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/db:shard_role_api",
+        "//src/mongo/db/commands:server_status_core",
+        "//src/mongo/db/concurrency:flow_control_ticketholder",
+        "//src/mongo/util:background_job",
+        "//src/mongo/util:fail_point",
+    ],
+)
+
 idl_generator(
     name = "two_phase_index_build_knobs_gen",
     src = "two_phase_index_build_knobs.idl",

@@ -26,3 +26,49 @@ mongo_cc_library(
         "//src/mongo/db/query/collation:collator_factory_interface",  # TODO(SERVER-93876): Remove.
     ],
 )
+
+mongo_cc_library(
+    name = "resolved_view",
+    srcs = [
+        "resolved_view.cpp",
+    ],
+    hdrs = [
+        "resolved_view.h",
+        "//src/mongo/db/pipeline:document_source_limit.h",
+        "//src/mongo/db/pipeline:document_source_set_variable_from_subpipeline.h",
+        "//src/mongo/db/pipeline/search:document_source_internal_search_id_lookup.h",
+        "//src/mongo/db/pipeline/search:document_source_internal_search_mongot_remote.h",
+        "//src/mongo/db/pipeline/search:document_source_list_search_indexes.h",
+        "//src/mongo/db/pipeline/search:document_source_list_search_indexes_gen",
+        "//src/mongo/db/pipeline/search:document_source_search.h",
+        "//src/mongo/db/pipeline/search:document_source_search_meta.h",
+        "//src/mongo/db/pipeline/search:document_source_vector_search.h",
+        "//src/mongo/db/pipeline/search:search_helper_bson_obj.h",
+    ],
+    header_deps = [
+        "//src/mongo/db/query/search:mongot_cursor",
+    ],
+    deps = [
+        "//src/mongo:base",
+        "//src/mongo/db/pipeline:aggregation_request_helper",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/db/timeseries:timeseries_conversion_util",
+        "//src/mongo/db/timeseries:timeseries_options",  # TODO(SERVER-93876): Remove.
+    ],
+)
+
+mongo_cc_library(
+    name = "view_catalog_helpers",
+    srcs = [
+        "view_catalog_helpers.cpp",
+    ],
+    hdrs = [
+        "view_catalog_helpers.h",
+    ],
+    deps = [
+        ":resolved_view",
+        ":views",
+        "//src/mongo/db/catalog:collection_catalog",
+        "//src/mongo/db/pipeline:aggregation",
+        "//src/mongo/db/storage:storage_options",
+    ],
+)

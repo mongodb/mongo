@@ -4,40 +4,6 @@ Import("env")
 
 env = env.Clone()
 
-env.Library(
-    target="bucket_catalog",
-    source=[
-        "bucket.cpp",
-        "bucket_catalog.cpp",
-        "bucket_catalog_internal.cpp",
-        "bucket_catalog_helpers.cpp",
-        "bucket_catalog_server_status.cpp",
-        "bucket_identifiers.cpp",
-        "bucket_metadata.cpp",
-        "bucket_state_registry.cpp",
-        "closed_bucket.cpp",
-        "execution_stats.cpp",
-        "flat_bson.cpp",
-        "reopening.cpp",
-        "measurement_map.cpp",
-        "write_batch.cpp",
-    ],
-    LIBDEPS_PRIVATE=[
-        "$BUILD_DIR/mongo/bson/util/bson_column",
-        "$BUILD_DIR/mongo/db/catalog/collection_catalog",
-        "$BUILD_DIR/mongo/db/commands/server_status_core",
-        "$BUILD_DIR/mongo/db/dbdirectclient",
-        "$BUILD_DIR/mongo/db/record_id_helpers",
-        "$BUILD_DIR/mongo/db/server_base",
-        "$BUILD_DIR/mongo/db/storage/storage_options",
-        "$BUILD_DIR/mongo/db/timeseries/bucket_compression",
-        "$BUILD_DIR/mongo/db/timeseries/bucket_compression_failure",
-        "$BUILD_DIR/mongo/db/timeseries/timeseries_metadata",
-        "$BUILD_DIR/mongo/db/timeseries/timeseries_options",
-        "$BUILD_DIR/mongo/util/fail_point",
-    ],
-)
-
 env.CppUnitTest(
     target="db_bucket_catalog_test",
     source=[

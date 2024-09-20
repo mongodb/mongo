@@ -40,57 +40,6 @@ tlEnv.InjectThirdParty(libraries=["asio"])
 if shouldBuildGRPC(tlEnv):
     tlEnv.InjectThirdParty(libraries=["grpc"])
 
-tlEnv.Library(
-    target="transport_layer_manager",
-    source=[
-        "transport_layer_manager_impl.cpp",
-    ],
-    LIBDEPS=[
-        "grpc/grpc_transport_layer" if shouldBuildGRPC(tlEnv) else [],
-        "transport_layer",
-    ],
-    LIBDEPS_PRIVATE=[
-        "$BUILD_DIR/mongo/db/server_base",
-        "$BUILD_DIR/third_party/asio-master/asio",
-        "service_executor",
-        "session_manager",
-    ],
-)
-
-tlEnv.Library(
-    target="transport_layer",
-    source=[
-        "asio/asio_networking_baton.cpp" if env.TargetOSIs("linux") else [],
-        "asio/asio_session_impl.cpp",
-        "asio/asio_session_manager.cpp",
-        "asio/asio_tcp_fast_open.cpp",
-        "asio/asio_transport_layer.cpp",
-        "asio/asio_utils.cpp",
-        "proxy_protocol_header_parser.cpp",
-        "transport_options_gen.cpp",
-    ],
-    LIBDEPS=[
-        "$BUILD_DIR/mongo/base/system_error",
-        "$BUILD_DIR/mongo/db/service_context",
-        "$BUILD_DIR/mongo/util/executor_stats",
-        "session_util",
-        "transport_layer_common",
-    ],
-    LIBDEPS_PRIVATE=[
-        "$BUILD_DIR/mongo/db/commands/server_status_core",
-        "$BUILD_DIR/mongo/db/server_base",
-        "$BUILD_DIR/mongo/db/server_feature_flags",
-        "$BUILD_DIR/mongo/db/stats/counters",
-        "$BUILD_DIR/mongo/s/common_s",
-        "$BUILD_DIR/mongo/util/concurrency/spin_lock",
-        "$BUILD_DIR/mongo/util/net/ssl_manager",
-        "$BUILD_DIR/mongo/util/options_parser/options_parser",
-        "$BUILD_DIR/third_party/asio-master/asio",
-        "service_executor",
-        "session_manager",
-    ],
-)
-
 # This library will initialize an egress transport layer in a mongo initializer
 # for C++ tests that require networking.
 env.Library(

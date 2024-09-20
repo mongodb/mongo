@@ -1,4 +1,5 @@
-load("//bazel:mongo_src_rules.bzl", "idl_generator", "mongo_cc_library")
+load("//bazel:mongo_src_rules.bzl", "idl_generator", "mongo_cc_binary", "mongo_cc_library", "mongo_cc_test")
+load("@bazel_skylib//lib:selects.bzl", "selects")
 
 package(default_visibility = ["//visibility:public"])
 
@@ -63,3 +64,195 @@ mongo_cc_library(
         "//src/mongo/util:md5",  # TODO(SERVER-93876): Remove.
     ],
 )
+
+mongo_cc_library(
+    name = "scripting",
+    srcs = select({
+        "//bazel/config:js_engine_none": [
+            "scripting_none.cpp",
+        ],
+        "//bazel/config:js_engine_mozjs": [
+            "//src/mongo/scripting/mozjs:PosixNSPR.cpp",
+            "//src/mongo/scripting/mozjs:base.cpp",
+            "//src/mongo/scripting/mozjs:bindata.cpp",
+            "//src/mongo/scripting/mozjs:bson.cpp",
+            "//src/mongo/scripting/mozjs:code.cpp",
+            "//src/mongo/scripting/mozjs:countdownlatch.cpp",
+            "//src/mongo/scripting/mozjs:cursor.cpp",
+            "//src/mongo/scripting/mozjs:cursor_handle.cpp",
+            "//src/mongo/scripting/mozjs:db.cpp",
+            "//src/mongo/scripting/mozjs:dbcollection.cpp",
+            "//src/mongo/scripting/mozjs:dbpointer.cpp",
+            "//src/mongo/scripting/mozjs:dbquery.cpp",
+            "//src/mongo/scripting/mozjs:dbref.cpp",
+            "//src/mongo/scripting/mozjs:engine.cpp",
+            "//src/mongo/scripting/mozjs:engine_gen",
+            "//src/mongo/scripting/mozjs:error.cpp",
+            "//src/mongo/scripting/mozjs:exception.cpp",
+            "//src/mongo/scripting/mozjs:global.cpp",
+            "//src/mongo/scripting/mozjs:idwrapper.cpp",
+            "//src/mongo/scripting/mozjs:implscope.cpp",
+            "//src/mongo/scripting/mozjs:internedstring.cpp",
+            "//src/mongo/scripting/mozjs:jscustomallocator.cpp",
+            "//src/mongo/scripting/mozjs:jsstringwrapper.cpp",
+            "//src/mongo/scripting/mozjs:jsthread.cpp",
+            "//src/mongo/scripting/mozjs:maxkey.cpp",
+            "//src/mongo/scripting/mozjs:minkey.cpp",
+            "//src/mongo/scripting/mozjs:module_loader.cpp",
+            "//src/mongo/scripting/mozjs:mongo.cpp",
+            "//src/mongo/scripting/mozjs:mongohelpers.cpp",
+            "//src/mongo/scripting/mozjs:mongohelpers_js.cpp",
+            "//src/mongo/scripting/mozjs:nativefunction.cpp",
+            "//src/mongo/scripting/mozjs:numberdecimal.cpp",
+            "//src/mongo/scripting/mozjs:numberint.cpp",
+            "//src/mongo/scripting/mozjs:numberlong.cpp",
+            "//src/mongo/scripting/mozjs:object.cpp",
+            "//src/mongo/scripting/mozjs:objectwrapper.cpp",
+            "//src/mongo/scripting/mozjs:oid.cpp",
+            "//src/mongo/scripting/mozjs:proxyscope.cpp",
+            "//src/mongo/scripting/mozjs:regexp.cpp",
+            "//src/mongo/scripting/mozjs:scripting_util_gen",
+            "//src/mongo/scripting/mozjs:session.cpp",
+            "//src/mongo/scripting/mozjs:status.cpp",
+            "//src/mongo/scripting/mozjs:timestamp.cpp",
+            "//src/mongo/scripting/mozjs:uri.cpp",
+            "//src/mongo/scripting/mozjs:valuereader.cpp",
+            "//src/mongo/scripting/mozjs:valuewriter.cpp",
+        ],
+    }),
+    hdrs = select({
+        "//bazel/config:js_engine_none": [
+            "scripting_none.cpp",
+        ],
+        "//bazel/config:js_engine_mozjs": [
+            "//src/mongo/scripting/mozjs:base.h",
+            "//src/mongo/scripting/mozjs:bindata.h",
+            "//src/mongo/scripting/mozjs:bson.h",
+            "//src/mongo/scripting/mozjs:code.h",
+            "//src/mongo/scripting/mozjs:countdownlatch.h",
+            "//src/mongo/scripting/mozjs:cursor.h",
+            "//src/mongo/scripting/mozjs:cursor_handle.h",
+            "//src/mongo/scripting/mozjs:db.h",
+            "//src/mongo/scripting/mozjs:dbcollection.h",
+            "//src/mongo/scripting/mozjs:dbpointer.h",
+            "//src/mongo/scripting/mozjs:dbquery.h",
+            "//src/mongo/scripting/mozjs:dbref.h",
+            "//src/mongo/scripting/mozjs:engine.h",
+            "//src/mongo/scripting/mozjs:error.h",
+            "//src/mongo/scripting/mozjs:exception.h",
+            "//src/mongo/scripting/mozjs:global.h",
+            "//src/mongo/scripting/mozjs:idwrapper.h",
+            "//src/mongo/scripting/mozjs:implscope.h",
+            "//src/mongo/scripting/mozjs:internedstring.defs",
+            "//src/mongo/scripting/mozjs:internedstring.h",
+            "//src/mongo/scripting/mozjs:jsstringwrapper.h",
+            "//src/mongo/scripting/mozjs:jsthread.h",
+            "//src/mongo/scripting/mozjs:lifetimestack.h",
+            "//src/mongo/scripting/mozjs:maxkey.h",
+            "//src/mongo/scripting/mozjs:minkey.h",
+            "//src/mongo/scripting/mozjs:module_loader.h",
+            "//src/mongo/scripting/mozjs:mongo.h",
+            "//src/mongo/scripting/mozjs:mongohelpers.h",
+            "//src/mongo/scripting/mozjs:nativefunction.h",
+            "//src/mongo/scripting/mozjs:numberdecimal.h",
+            "//src/mongo/scripting/mozjs:numberint.h",
+            "//src/mongo/scripting/mozjs:numberlong.h",
+            "//src/mongo/scripting/mozjs:object.h",
+            "//src/mongo/scripting/mozjs:objectwrapper.h",
+            "//src/mongo/scripting/mozjs:oid.h",
+            "//src/mongo/scripting/mozjs:proxyscope.h",
+            "//src/mongo/scripting/mozjs:regexp.h",
+            "//src/mongo/scripting/mozjs:session.h",
+            "//src/mongo/scripting/mozjs:status.h",
+            "//src/mongo/scripting/mozjs:timestamp.h",
+            "//src/mongo/scripting/mozjs:uri.h",
+            "//src/mongo/scripting/mozjs:valuereader.h",
+            "//src/mongo/scripting/mozjs:valuewriter.h",
+            "//src/mongo/scripting/mozjs:wrapconstrainedmethod.h",
+            "//src/mongo/scripting/mozjs:wraptype.h",
+        ],
+    }),
+    copts = select({
+        "@platforms//os:windows": [
+            # The default MSVC preprocessor elides commas in some cases as a
+            # convenience, but this behavior breaks compilation of jspubtd.h.
+            # Enabling the newer preprocessor fixes the problem.
+            "/Zc:preprocessor",
+            "/wd5104",
+            "/wd5105",
+        ],
+        "//conditions:default": [
+            # TODO(SERVER-59992): Remove -Wno-class-memacces where possible.
+            "-Wno-unknown-warning-option",
+            "-Wno-class-memaccess",
+            # TODO(SERVER-77205): Review and Possibly Remove '-Wno-deprecated' After Mozjs Update
+            "-Wno-deprecated",
+        ],
+    }),
+    local_defines = select({
+        "//bazel/config:spider_monkey_dbg_enabled": ["MONGO_SPIDERMONKEY_DBG"],
+        "//conditions:default": [],
+    }),
+    deps = [
+        ":scripting_common",
+    ] + select({
+        "//bazel/config:js_engine_none": [
+            ":scripting_none",
+        ],
+        "//bazel/config:js_engine_mozjs": [
+            "//src/mongo/client:clientdriver_network",
+            "//src/mongo/db:service_context",
+            "//src/mongo/db/auth:security_token_auth",
+            "//src/mongo/util/concurrency:spin_lock",
+            "//src/third_party/mozjs",
+        ],
+    }),
+)
+
+mongo_cc_library(
+    name = "scripting_none",
+    srcs = [
+        "engine_none.cpp",
+    ],
+    hdrs = [
+        "engine_none.cpp",
+    ],
+    deps = [
+        ":scripting_common",
+    ],
+)
+
+mongo_cc_library(
+    name = "scripting_server",
+    srcs = [
+        "scripting_server.cpp",
+    ],
+    hdrs = [
+        "scripting_server.cpp",
+    ],
+    deps = select({
+        "//bazel/config:server_js_enabled": ["scripting"],
+        "//conditions:default": ["scripting_none"],
+    }),
+)
+
+# Note: These are not fully migrateable yet, but we'll leave them for future
+# reference in case you're working on scripting-related issues.
+
+#mongo_cc_test(
+#    name = "scripting_mozjs_test",
+#    srcs = [
+#        "//src/mongo/scripting/mozjs:asan_handles_test.cpp",
+#        "//src/mongo/scripting/mozjs:module_loader_test.cpp",
+#    ],
+#    target_compatible_with = select({
+#        "//bazel/config:js_engine_mozjs": [],
+#        "//conditions:default": ["@platforms//:incompatible"],
+#    }),
+#    deps = [
+#        ":bson_template_evaluator",
+#        ":scripting",
+#        "//src/mongo/unittest",
+#        "//src/mongo/unittest:unittest_main",
+#    ],
+#)

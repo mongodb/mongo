@@ -104,6 +104,117 @@ idl_generator(
     ],
 )
 
+mongo_cc_library(
+    name = "local_oplog_info",
+    srcs = [
+        "local_oplog_info.cpp",
+    ],
+    hdrs = [
+        "local_oplog_info.h",
+    ],
+    deps = [
+        "//src/mongo/db:server_base",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/db:shard_role_api",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/db:vector_clock_mutable",
+        "//src/mongo/db/repl:optime",
+        "//src/mongo/db/repl:repl_coordinator_interface",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/db/storage:flow_control",
+        "//src/mongo/db/storage:record_store_base",
+    ],
+)
+
+mongo_cc_library(
+    name = "collection_crud",
+    srcs = [
+        "capped_collection_maintenance.cpp",
+        "collection_write_path.cpp",
+    ],
+    hdrs = [
+        "capped_collection_maintenance.h",
+        "collection_write_path.h",
+    ],
+    deps = [
+        ":document_validation",
+        ":local_oplog_info",
+        "//src/mongo/db:record_id_helpers",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/db:shard_role_api",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/db:write_stage_common",
+        "//src/mongo/db/op_observer:op_observer_util",
+        "//src/mongo/db/query/query_stats",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/db/repl:repl_coordinator_interface",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/db/storage:capped_snapshots",
+        "//src/mongo/db/storage:index_entry_comparison",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/db/storage:record_store_base",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/db/storage:storage_options",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/util:fail_point",  # TODO(SERVER-93876): Remove.
+    ],
+)
+
+mongo_cc_library(
+    name = "collection_catalog",
+    srcs = [
+        "collection_catalog.cpp",
+        "historical_catalogid_tracker.cpp",
+        "uncommitted_catalog_updates.cpp",
+        "uncommitted_multikey.cpp",
+        "views_for_database.cpp",
+    ],
+    hdrs = [
+        "collection_catalog.h",
+        "historical_catalogid_tracker.h",
+        "uncommitted_catalog_updates.h",
+        "uncommitted_multikey.h",
+        "views_for_database.h",
+    ],
+    deps = [
+        ":collection_crud",
+        "//src/mongo/db:audit",
+        "//src/mongo/db:server_base",
+        "//src/mongo/db:service_context",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/db:shard_role_api_stor_ex",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/db/concurrency:lock_manager",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/db/index:index_access_method",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/db/query/collation:collator_factory_interface",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/db/query/query_stats",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/db/storage:bson_collection_catalog_entry",
+        "//src/mongo/db/storage:capped_snapshots",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/db/storage:durable_catalog",
+        "//src/mongo/db/storage:storage_options",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/db/views",  # TODO(SERVER-93876): Remove.
+    ],
+)
+
+mongo_cc_library(
+    name = "collection_query_info",
+    srcs = [
+        "//src/mongo/db/query:collection_index_usage_tracker_decoration.cpp",
+        "//src/mongo/db/query:collection_query_info.cpp",
+        "//src/mongo/db/query:query_settings_decoration.cpp",
+        "//src/mongo/db/query/plan_cache:plan_cache_key_factory.cpp",
+    ],
+    hdrs = [
+        "//src/mongo/db/query:collection_index_usage_tracker_decoration.h",
+        "//src/mongo/db/query:collection_query_info.h",
+        "//src/mongo/db/query:query_settings_decoration.h",
+        "//src/mongo/db/query/plan_cache:plan_cache_key_factory.h",
+    ],
+    deps = [
+        "//src/mongo/db/query/plan_cache:query_plan_cache",
+        "//src/mongo/db:update_index_data",
+        "//src/mongo/db:collection_index_usage_tracker",
+        "//src/mongo/db/fts:base_fts",
+        "//src/mongo/db/query:query_planner",
+        "//src/mongo/db/query/query_settings",
+        "//src/mongo/db/query/query_stats",
+        "//src/mongo/db:server_base",
+        "//src/mongo/db:service_context",
+        # TODO SERVER-77571 this should only depend on the shard_role_api library.
+        "//src/mongo/db:shard_role",
+        "//src/mongo/db/storage:storage_options",
+        "index_catalog",
+    ],
+)
+
 idl_generator(
     name = "import_collection_oplog_entry_gen",
     src = "import_collection_oplog_entry.idl",

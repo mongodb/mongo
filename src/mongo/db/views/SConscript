@@ -4,37 +4,6 @@ Import("env")
 
 env = env.Clone()
 
-env.Library(
-    target="view_catalog_helpers",
-    source=[
-        "view_catalog_helpers.cpp",
-    ],
-    LIBDEPS=[
-        "$BUILD_DIR/mongo/db/catalog/collection_catalog",
-        "$BUILD_DIR/mongo/db/pipeline/aggregation",
-        "resolved_view",
-        "views",
-    ],
-    LIBDEPS_PRIVATE=[
-        "$BUILD_DIR/mongo/db/storage/storage_options",
-    ],
-)
-
-env.Library(
-    target="resolved_view",
-    source=[
-        "resolved_view.cpp",
-    ],
-    LIBDEPS=[
-        "$BUILD_DIR/mongo/base",
-        "$BUILD_DIR/mongo/db/pipeline/aggregation_request_helper",
-    ],
-    LIBDEPS_PRIVATE=[
-        "$BUILD_DIR/mongo/db/timeseries/timeseries_conversion_util",
-        "$BUILD_DIR/mongo/db/timeseries/timeseries_options",
-    ],
-)
-
 env.CppUnitTest(
     target="db_views_test",
     source=[

@@ -8,3 +8,32 @@ exports_files(
         "*.cpp",
     ]),
 )
+
+mongo_cc_library(
+    name = "batch_write_types",
+    srcs = [
+        "batched_command_request.cpp",
+        "batched_command_response.cpp",
+        "batched_upsert_detail.cpp",
+        "bulk_write_command_modifier.cpp",
+    ],
+    hdrs = [
+        "batched_command_request.h",
+        "batched_command_response.h",
+        "batched_upsert_detail.h",
+        "bulk_write_command_modifier.h",
+    ],
+    deps = [
+        "//src/mongo:base",
+        "//src/mongo/db:commands",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/db:common",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/db:error_labels",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/db:query_expressions",
+        "//src/mongo/db:vector_clock",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/db/commands/query_cmd:bulk_write_parser",
+        "//src/mongo/db/query/write_ops:write_ops_parsers",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/db/repl:optime",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/rpc:command_status",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/s:common_s",  # TODO(SERVER-93876): Remove.
+    ],
+)

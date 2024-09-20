@@ -29,6 +29,7 @@ mongo_cc_library(
     ],
     hdrs = [
         "election_id_set_version_pair.h",
+        "sdam.h",
         "sdam_configuration.h",
         "sdam_datatypes.h",
         "server_description.h",

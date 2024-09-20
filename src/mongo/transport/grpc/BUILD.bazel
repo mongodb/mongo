@@ -1,4 +1,12 @@
-load("//bazel:mongo_src_rules.bzl", "idl_generator", "mongo_cc_grpc_library", "mongo_cc_library", "mongo_cc_proto_library", "mongo_proto_library")
+load(
+    "//bazel:mongo_src_rules.bzl",
+    "idl_generator",
+    "mongo_cc_binary",
+    "mongo_cc_grpc_library",
+    "mongo_cc_library",
+    "mongo_cc_proto_library",
+    "mongo_proto_library",
+)
 
 package(default_visibility = ["//visibility:public"])
 
@@ -22,10 +30,79 @@ idl_generator(
     ],
 )
 
+mongo_cc_library(
+    name = "grpc_transport_layer",
+    srcs = [
+        "client.cpp",
+        "client_cache.cpp",
+        "grpc_session_manager.cpp",
+        "grpc_transport_layer_impl.cpp",
+        "server.cpp",
+        "service.cpp",
+        "util.cpp",
+        "wire_version_provider.cpp",
+        ":grpc_feature_flag_gen",
+    ],
+    hdrs = [
+        "channel_pool.h",
+        "client.h",
+        "client_cache.h",
+        "client_context.h",
+        "client_stream.h",
+        "grpc_client_context.h",
+        "grpc_client_stream.h",
+        "grpc_server_context.h",
+        "grpc_server_stream.h",
+        "grpc_session.h",
+        "grpc_session_manager.h",
+        "grpc_transport_layer.h",
+        "grpc_transport_layer_impl.h",
+        "metadata.h",
+        "serialization.h",
+        "server.h",
+        "server_context.h",
+        "server_stream.h",
+        "service.h",
+        "util.h",
+        "wire_version_provider.h",
+    ],
+    # At the moment, server.cpp depends directly on the gRPC-internal header
+    # "src/core/lib/security/credentials/ssl/ssl_credentials.h".
+    # Instead of adding it to the grpc overlay we explicitly add the include
+    # path for the header so that we don't leak the include globally.
+    copts = ["-Isrc/third_party/grpc/dist"],
+    target_compatible_with = select({
+        "//bazel/config:build_grpc_enabled": [],
+        "//conditions:default": ["@platforms//:incompatible"],
+    }),
+    deps = [
+        "//src/mongo/client:connection_string",
+        "//src/mongo/db:server_base",
+        "//src/mongo/db:service_context",
+        "//src/mongo/db:wire_version",
+        "//src/mongo/db/commands:server_status_core",
+        "//src/mongo/rpc:client_metadata",
+        "//src/mongo/transport:service_executor",
+        "//src/mongo/transport:session_manager",
+        "//src/mongo/transport:transport_layer_common",
+        "//src/mongo/util/net:network",
+        "//src/mongo/util/net:ssl_util",
+        "//src/mongo/util/options_parser",
+        "//src/third_party/grpc:grpc++_reflection",
+    ],
+)
+
 idl_generator(
     name = "grpc_parameters_gen",
     src = "grpc_parameters.idl",
 )
+
+# Note: The naming convention for a proto called foo.proto is:
+#
+#   proto_library      -> "foo_proto"
+#   grpc_proto_library -> "foo"
+#   cc_proto_library   -> "foo_cc_proto"
+#   cc_grpc_library    -> "foo_cc_grpc"
 
 mongo_proto_library(
     name = "core_test_proto",
@@ -42,9 +119,118 @@ mongo_cc_proto_library(
 )
 
 mongo_cc_grpc_library(
-    name = "core_test_grpc_proto",
+    name = "core_test_cc_grpc",
     srcs = [":core_test_proto"],
     cc_proto = ":core_test_cc_proto",
     generate_mocks = True,
     target_compatible_with = GRPC_TARGET_COMPATIBLE_WITH,
 )
+
+mongo_cc_library(
+    name = "grpc_transport_server_options",
+    srcs = [
+        ":grpc_parameters_gen",
+    ],
+    target_compatible_with = select({
+        "//bazel/config:build_grpc_enabled": [],
+        "//conditions:default": ["@platforms//:incompatible"],
+    }),
+    deps = [
+        "//src/mongo:base",
+        "//src/mongo/db:server_base",
+        "//src/mongo/util/options_parser",
+    ],
+)
+
+mongo_cc_library(
+    name = "grpc_transport_mock",
+    srcs = [
+        "grpc_transport_layer_mock.cpp",
+        "mock_client_stream.cpp",
+        "mock_server_context.cpp",
+        "mock_server_stream.cpp",
+        "//src/mongo/db:service_context_test_fixture.h",
+        "//src/mongo/transport:test_fixtures.h",
+        "//src/mongo/transport:transport_layer_mock.h",
+        "//src/mongo/unittest:join_thread.h",
+        "//src/mongo/util:clock_source_mock.h",
+    ],
+    hdrs = [
+        "bidirectional_pipe.h",
+        "grpc_transport_layer_mock.h",
+        "mock_client.h",
+        "mock_client_context.h",
+        "mock_client_stream.h",
+        "mock_server_context.h",
+        "mock_server_stream.h",
+        "mock_stub.h",
+        "mock_util.h",
+        "mock_wire_version_provider.h",
+        "test_fixtures.h",
+    ],
+    header_deps = [
+        "//src/mongo/unittest",
+    ],
+    deps = [
+        ":grpc_transport_layer",
+        "//src/mongo:base",
+        "//src/mongo/db:service_context",
+        "//src/mongo/rpc:client_metadata",
+    ],
+)
+
+# Note: These are not fully migrateable yet, but we'll leave them for future
+# reference in case you're working on grpc-related issues.
+
+# mongo_cc_binary(
+#     name = "grpc_transport_layer_test",
+#     srcs = [
+#         "channel_pool_test.cpp",
+#         "client_cache_test.cpp",
+#         "grpc_client_test.cpp",
+#         "grpc_session_test.cpp",
+#         "grpc_transport_layer_test.cpp",
+#         "mock_client_test.cpp",
+#         "mock_server_stream_test.cpp",
+#         "mock_stub_test.cpp",
+#         "server_test.cpp",
+#         "service_test.cpp",
+#         "//src/mongo/transport:mock_session.h",
+#         "//src/mongo/transport:session_workflow_test_util.h",
+#     ],
+#     deps = [
+#         "//src/mongo:base",
+#         "//src/mongo/db:service_context_non_d",
+#         "//src/mongo/db:service_context_test_fixture",
+#         "//src/mongo/db:wire_version",
+#         "//src/mongo/rpc:message",
+#         "//src/mongo/transport:service_executor",
+#         "//src/mongo/util:clock_source_mock",
+#         "//src/mongo/util:periodic_runner_factory",
+#         "//src/third_party/grpc:grpc++_reflection",
+#         ":grpc_transport_layer",
+#         ":grpc_transport_mock",
+#
+#         # extra
+#         "//src/mongo/unittest",
+#         "//src/mongo/unittest:unittest_main",
+#     ],
+# )
+#
+# cc_test(
+#     name = "grpc_core_test",
+#     srcs = [
+#         "core_test.cpp",
+#     ],
+#     copts = [
+#         "-Isrc",
+#         "-I$(BINDIR)/src",
+#     ],
+#     deps = [
+#         ":core_test_cc_grpc",
+#         "//src/mongo:base",
+#         "//src/mongo/unittest",
+#         "//src/mongo/unittest:unittest_main",
+#         "//src/third_party/grpc:grpc++_reflection",
+#     ],
+# )

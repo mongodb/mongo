@@ -1,6 +1,7 @@
 load("//bazel:mongo_src_rules.bzl", "idl_generator", "mongo_cc_library")
 load("//bazel/config:render_template.bzl", "render_template")
 load("@poetry//:dependencies.bzl", "dependency")
+load("@bazel_skylib//lib:selects.bzl", "selects")
 
 package(default_visibility = ["//visibility:public"])
 
@@ -72,7 +73,13 @@ mongo_cc_library(
             "/wd5104",
             "/wd5105",
         ],
-        "//conditions:default": [],
+        "//conditions:default": [
+            # TODO(SERVER-59992): Remove -Wno-class-memacces where possible.
+            "-Wno-unknown-warning-option",
+            "-Wno-class-memaccess",
+            # TODO(SERVER-77205): Review and Possibly Remove '-Wno-deprecated' After Mozjs Update
+            "-Wno-deprecated",
+        ],
     }),
     deps = [
         "//src/mongo:base",
@@ -130,6 +137,103 @@ mongo_cc_library(
         "//src/mongo/base:secure_allocator",  # TODO(SERVER-93876): Remove.
         "//src/mongo/crypto:aead_encryption",
         "//src/mongo/db/commands:test_commands_enabled",
+    ],
+)
+
+mongo_cc_library(
+    name = "shell_utils",
+    srcs = [
+        "mongo-server.cpp",
+        "named_pipe_test_helper.cpp",
+        "shell_options.cpp",
+        "shell_utils.cpp",
+        "shell_utils_extended.cpp",
+        "shell_utils_launcher.cpp",
+    ],
+    hdrs = [
+        "named_pipe_test_helper.h",
+        "shell_options.h",
+        "shell_utils.h",
+        "shell_utils_extended.h",
+        "shell_utils_launcher.h",
+        "//src/mongo/bson:bson_bin_util.h",
+        "//src/mongo/bson:bsonobj_comparator.h",
+        "//src/mongo/transport:message_compressor_options_client_gen",
+        "//src/mongo/util:signal_win32.h",
+    ],
+    deps = [
+        ":benchrun",
+        ":program_runner",  # TODO(SERVER-93876): Remove.
+        ":shell_options_storage",
+        "//src/mongo/base:environment_buffer",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/bson/util:bson_column",
+        "//src/mongo/client:clientdriver_network",
+        "//src/mongo/db:mongohasher",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/db:traffic_reader",
+        "//src/mongo/db/auth:security_token_auth",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/db/query/collation:collator_icu",
+        "//src/mongo/db/storage:record_store_base",
+        "//src/mongo/scripting",
+        "//src/mongo/transport:message_compressor",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/unittest:golden_test_base",
+        "//src/mongo/util:icu",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/util:password",
+    ],
+)
+
+mongo_cc_library(
+    name = "kms_shell",
+    srcs = [
+        "kms_shell.cpp",
+    ],
+    target_compatible_with = select({
+        "//bazel/config:ssl_enabled": [],
+        "//conditions:default": ["@platforms//:incompatible"],
+    }),
+    deps = [
+        ":kms",  # TODO(SERVER-93876): Remove.
+        ":shell_utils",
+    ],
+)
+
+mongo_cc_library(
+    name = "encrypted_dbclient",
+    srcs = [
+        "encrypted_dbclient_base.cpp",
+    ],
+    hdrs = [
+        "encrypted_dbclient_base.h",
+    ],
+    copts = select({
+        "@platforms//os:windows": [
+            "/Zc:preprocessor",
+            "/wd5104",
+            "/wd5105",
+        ],
+        "//conditions:default": [
+            # TODO(SERVER-59992): Remove -Wno-class-memacces where possible.
+            "-Wno-unknown-warning-option",
+            "-Wno-class-memaccess",
+            # TODO(SERVER-77205): Review and Possibly Remove '-Wno-deprecated' After Mozjs Update
+            "-Wno-deprecated",
+        ],
+    }),
+    target_compatible_with = select({
+        "//bazel/config:js_engine_mozjs": [],
+        "//conditions:default": ["@platforms//:incompatible"],
+    }),
+    deps = [
+        ":kms",
+        "//src/mongo/client:clientdriver_minimal",
+        "//src/mongo/crypto:aead_encryption",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/crypto:encrypted_field_config",
+        "//src/mongo/crypto:fle_crypto",
+        "//src/mongo/crypto:fle_fields",
+        "//src/mongo/crypto:symmetric_crypto",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/db:query_expressions",
+        "//src/mongo/scripting",
+        "//src/mongo/shell:shell_options_register",
+        "//src/third_party/mozjs",
     ],
 )
 

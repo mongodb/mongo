@@ -49,29 +49,6 @@ env.Library(
 )
 
 env.Library(
-    target="network_interface_tl",
-    source=[
-        "connection_pool_tl.cpp",
-        "network_interface_tl.cpp",
-        "network_interface_tl_gen.cpp",
-    ],
-    LIBDEPS=[
-        "$BUILD_DIR/mongo/client/async_client",
-        "$BUILD_DIR/mongo/transport/transport_layer",
-        "hedging_metrics",
-    ],
-    LIBDEPS_PRIVATE=[
-        "$BUILD_DIR/mongo/db/auth/auth",
-        "$BUILD_DIR/mongo/db/commands/server_status_core",
-        "$BUILD_DIR/mongo/db/server_feature_flags",
-        "$BUILD_DIR/mongo/transport/transport_layer_manager",
-        "connection_pool_executor",
-        "hedge_options_util",
-        "network_interface",
-    ],
-)
-
-env.Library(
     target="network_interface_fixture",
     source=[
         "network_interface_integration_fixture.cpp",
@@ -84,21 +61,6 @@ env.Library(
         "$BUILD_DIR/mongo/unittest/integration_test_main",
         "$BUILD_DIR/mongo/util/concurrency/thread_pool",
         "$BUILD_DIR/mongo/util/version_impl",
-    ],
-)
-
-env.Library(
-    target="network_interface_factory",
-    source=[
-        "network_interface_factory.cpp",
-    ],
-    LIBDEPS=[
-        "connection_pool_executor",
-    ],
-    LIBDEPS_PRIVATE=[
-        "egress_connection_closer_manager",
-        "network_interface",
-        "network_interface_tl",
     ],
 )
 
@@ -142,23 +104,6 @@ env.Library(
     LIBDEPS=[
         "task_executor_test_fixture",
         "thread_pool_task_executor",
-    ],
-)
-
-env.Library(
-    target="task_executor_cursor",
-    source=[
-        "task_executor_cursor.cpp",
-        "task_executor_cursor_options.cpp",
-        "task_executor_cursor_parameters_gen.cpp",
-    ],
-    LIBDEPS=[
-        "$BUILD_DIR/mongo/db/query/command_request_response",
-        "task_executor_interface",
-    ],
-    LIBDEPS_PRIVATE=[
-        "$BUILD_DIR/mongo/db/query/plan_yield_policy",
-        "pinned_connection_task_executor_factory",
     ],
 )
 

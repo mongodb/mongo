@@ -554,6 +554,12 @@ GCC_WARNINGS_COPTS = select({
         # Disable warning about variables that may not be initialized
         # Failures are triggered in the case of boost::optional
         "-Wno-maybe-uninitialized",
+
+        # Prevents warning about unused but set variables found in boost version
+        # 1.49 in boost/date_time/format_date_parser.hpp which does not work for
+        # compilers GCC >= 4.6. Error explained in
+        # https://svn.boost.org/trac/boost/ticket/6136 .
+        "-Wno-unused-but-set-variable",
     ],
     "//conditions:default": [],
 })

@@ -115,29 +115,6 @@ env.Library(
 )
 
 env.Library(
-    target="collection_crud",
-    source=[
-        "capped_collection_maintenance.cpp",
-        "collection_write_path.cpp",
-    ],
-    LIBDEPS_PRIVATE=[
-        "$BUILD_DIR/mongo/db/op_observer/op_observer_util",
-        "$BUILD_DIR/mongo/db/query/query_stats/query_stats",
-        "$BUILD_DIR/mongo/db/record_id_helpers",
-        "$BUILD_DIR/mongo/db/repl/repl_coordinator_interface",
-        "$BUILD_DIR/mongo/db/shard_role_api",
-        "$BUILD_DIR/mongo/db/storage/capped_snapshots",
-        "$BUILD_DIR/mongo/db/storage/index_entry_comparison",
-        "$BUILD_DIR/mongo/db/storage/record_store_base",
-        "$BUILD_DIR/mongo/db/storage/storage_options",
-        "$BUILD_DIR/mongo/db/write_stage_common",
-        "$BUILD_DIR/mongo/util/fail_point",
-        "document_validation",
-        "local_oplog_info",
-    ],
-)
-
-env.Library(
     target="multi_index_block",
     source=[
         "multi_index_block.cpp",
@@ -163,35 +140,6 @@ env.Library(
         "collection_query_info",
         "index_build_block",
         "index_catalog",
-    ],
-)
-
-env.Library(
-    target="collection_catalog",
-    source=[
-        "collection_catalog.cpp",
-        "historical_catalogid_tracker.cpp",
-        "uncommitted_catalog_updates.cpp",
-        "uncommitted_multikey.cpp",
-        "views_for_database.cpp",
-    ],
-    LIBDEPS=[
-        "$BUILD_DIR/mongo/db/shard_role_api_stor_ex",
-    ],
-    LIBDEPS_PRIVATE=[
-        "$BUILD_DIR/mongo/db/audit",
-        "$BUILD_DIR/mongo/db/concurrency/lock_manager",
-        "$BUILD_DIR/mongo/db/index/index_access_method",
-        "$BUILD_DIR/mongo/db/query/collation/collator_factory_interface",
-        "$BUILD_DIR/mongo/db/query/query_stats/query_stats",
-        "$BUILD_DIR/mongo/db/server_base",
-        "$BUILD_DIR/mongo/db/service_context",
-        "$BUILD_DIR/mongo/db/storage/bson_collection_catalog_entry",
-        "$BUILD_DIR/mongo/db/storage/capped_snapshots",
-        "$BUILD_DIR/mongo/db/storage/durable_catalog",
-        "$BUILD_DIR/mongo/db/storage/storage_options",
-        "$BUILD_DIR/mongo/db/views/views",
-        "collection_crud",
     ],
 )
 
@@ -384,22 +332,6 @@ env.Library(
 )
 
 env.Library(
-    target="local_oplog_info",
-    source=[
-        "local_oplog_info.cpp",
-    ],
-    LIBDEPS_PRIVATE=[
-        "$BUILD_DIR/mongo/db/repl/optime",
-        "$BUILD_DIR/mongo/db/repl/repl_coordinator_interface",
-        "$BUILD_DIR/mongo/db/server_base",
-        "$BUILD_DIR/mongo/db/shard_role_api",
-        "$BUILD_DIR/mongo/db/storage/flow_control",
-        "$BUILD_DIR/mongo/db/storage/record_store_base",
-        "$BUILD_DIR/mongo/db/vector_clock_mutable",
-    ],
-)
-
-env.Library(
     target="catalog_helpers",
     source=[
         "backwards_compatible_collection_options_util.cpp",
@@ -455,33 +387,6 @@ env.Library(
         "multi_index_block",
         "throttle_cursor",
         "validate_idl",
-    ],
-)
-
-env.Library(
-    target="collection_query_info",
-    source=[
-        "$BUILD_DIR/mongo/db/query/collection_query_info.cpp",
-        "$BUILD_DIR/mongo/db/query/collection_index_usage_tracker_decoration.cpp",
-        "$BUILD_DIR/mongo/db/query/plan_cache/plan_cache_key_factory.cpp",
-        "$BUILD_DIR/mongo/db/query/query_settings_decoration.cpp",
-    ],
-    LIBDEPS=[
-        "$BUILD_DIR/mongo/db/query/plan_cache/query_plan_cache",
-        "$BUILD_DIR/mongo/db/update_index_data",
-    ],
-    LIBDEPS_PRIVATE=[
-        "$BUILD_DIR/mongo/db/collection_index_usage_tracker",
-        "$BUILD_DIR/mongo/db/fts/base_fts",
-        "$BUILD_DIR/mongo/db/query/query_planner",
-        "$BUILD_DIR/mongo/db/query/query_settings/query_settings",
-        "$BUILD_DIR/mongo/db/query/query_stats/query_stats",
-        "$BUILD_DIR/mongo/db/server_base",
-        "$BUILD_DIR/mongo/db/service_context",
-        # TODO SERVER-77571 this should only depend on the shard_role_api library.
-        "$BUILD_DIR/mongo/db/shard_role",
-        "$BUILD_DIR/mongo/db/storage/storage_options",
-        "index_catalog",
     ],
 )
 

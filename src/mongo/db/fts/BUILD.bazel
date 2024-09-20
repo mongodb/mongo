@@ -1,4 +1,5 @@
 load("//bazel:mongo_src_rules.bzl", "mongo_cc_library")
+load("//bazel/config:render_template.bzl", "render_template")
 
 package(default_visibility = ["//visibility:public"])
 
@@ -20,5 +21,91 @@ mongo_cc_library(
     ],
     deps = [
         "//src/mongo:base",
+    ],
+)
+
+STOP_WORD_LANGUAGES = [
+    "danish",
+    "dutch",
+    "english",
+    "finnish",
+    "french",
+    "german",
+    "hungarian",
+    "italian",
+    "norwegian",
+    "portuguese",
+    "romanian",
+    "russian",
+    "spanish",
+    "swedish",
+    "turkish",
+]
+
+render_template(
+    name = "stop_words_list_cpp_gen",
+    srcs = [
+        "stop_words_{}.txt".format(lang)
+        for lang in STOP_WORD_LANGUAGES
+    ] + [
+        "generate_stop_words.py",
+    ],
+    cmd = [
+        "$(location generate_stop_words.py)",
+    ] + [
+        "$(location stop_words_{}.txt)".format(lang)
+        for lang in STOP_WORD_LANGUAGES
+    ] + [
+        "$(location stop_words_list.cpp)",
+    ],
+    output = "stop_words_list.cpp",
+)
+
+mongo_cc_library(
+    name = "base_fts",
+    srcs = [
+        "fts_basic_phrase_matcher.cpp",
+        "fts_basic_tokenizer.cpp",
+        "fts_element_iterator.cpp",
+        "fts_index_format.cpp",
+        "fts_language.cpp",
+        "fts_matcher.cpp",
+        "fts_query_impl.cpp",
+        "fts_query_parser.cpp",
+        "fts_spec.cpp",
+        "fts_spec_legacy.cpp",
+        "fts_unicode_phrase_matcher.cpp",
+        "fts_unicode_tokenizer.cpp",
+        "fts_util.cpp",
+        "stemmer.cpp",
+        "stop_words.cpp",
+        "tokenizer.cpp",
+        ":stop_words_list_cpp_gen",
+    ],
+    hdrs = [
+        "fts_basic_phrase_matcher.h",
+        "fts_basic_tokenizer.h",
+        "fts_element_iterator.h",
+        "fts_index_format.h",
+        "fts_language.h",
+        "fts_matcher.h",
+        "fts_query_impl.h",
+        "fts_query_parser.h",
+        "fts_spec.h",
+        "fts_unicode_phrase_matcher.h",
+        "fts_unicode_tokenizer.h",
+        "fts_util.h",
+        "stemmer.h",
+        "stop_words.h",
+        "stop_words_list.h",
+        "tokenizer.h",
+    ],
+    deps = [
+        "//src/mongo:base",
+        "//src/mongo/db:common",
+        "//src/mongo/db:query_expressions",
+        "//src/mongo/db/fts/unicode",
+        "//src/mongo/db/query/bson:dotted_path_support",
+        "//src/mongo/util:md5",
     ],
 )

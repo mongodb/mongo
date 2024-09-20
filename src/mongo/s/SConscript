@@ -19,7 +19,6 @@ env.SConscript(
         "client",
         "commands",
         "query",
-        "write_ops",
     ],
     exports=[
         "env",
@@ -73,61 +72,6 @@ env.Library(
     ],
 )
 
-env.Library(
-    target="query_analysis_sampler",
-    source=[
-        "query_analysis_client.cpp",
-        "query_analysis_sampler.cpp",
-        "query_analysis_sampler_util.cpp",
-        "query_analysis_server_status.cpp",
-    ],
-    LIBDEPS_PRIVATE=[
-        "$BUILD_DIR/mongo/db/concurrency/lock_manager",
-        "$BUILD_DIR/mongo/db/dbdirectclient",
-        "analyze_shard_key_common",
-        "grid",
-    ],
-)
-
-env.Library(
-    target="sharding_router_api",
-    source=[
-        "cluster_commands_helpers.cpp",
-        "collection_uuid_mismatch.cpp",
-        "multi_statement_transaction_requests_sender.cpp",
-        "router_transactions_metrics.cpp",
-        "router_transactions_stats_gen.cpp",
-        "router_role.cpp",
-        "session_catalog_router.cpp",
-        "shard_key_pattern_query_util.cpp",
-        "stale_shard_version_helpers.cpp",
-        "transaction_router_resource_yielder.cpp",
-        "transaction_router.cpp",
-    ],
-    LIBDEPS=[
-        "$BUILD_DIR/mongo/db/commands/txn_cmd_request",
-        "$BUILD_DIR/mongo/db/pipeline/process_interface/mongo_process_interface",
-        "$BUILD_DIR/mongo/db/repl/read_concern_args",
-        "$BUILD_DIR/mongo/db/session/logical_session_id_helpers",
-        "$BUILD_DIR/mongo/db/session/session_catalog",
-        "$BUILD_DIR/mongo/db/shared_request_handling",
-        "async_requests_sender",
-        "grid",
-        "query_analysis_sampler",
-    ],
-    LIBDEPS_PRIVATE=[
-        "$BUILD_DIR/mongo/db/catalog/collection_uuid_mismatch_info",
-        "$BUILD_DIR/mongo/db/concurrency/lock_manager",
-        "$BUILD_DIR/mongo/db/internal_transactions_feature_flag",
-        "$BUILD_DIR/mongo/db/mongohasher",
-        "$BUILD_DIR/mongo/db/query/query_planner",
-        "$BUILD_DIR/mongo/db/query/query_stats/query_stats",
-        "$BUILD_DIR/mongo/db/session/sessions_collection",
-        "$BUILD_DIR/mongo/util/concurrency/spin_lock",
-        "resource_yielders",
-    ],
-)
-
 # Functionality for initializing all the services used by sharding, which are common between MongoS
 # and MongoD
 env.Library(
@@ -162,25 +106,6 @@ env.Library(
 )
 
 env.Library(
-    target="async_requests_sender",
-    source=[
-        "async_requests_sender.cpp",
-    ],
-    LIBDEPS=[
-        "$BUILD_DIR/mongo/db/query/command_request_response",
-        "$BUILD_DIR/mongo/executor/scoped_task_executor",
-        "$BUILD_DIR/mongo/executor/task_executor_interface",
-        "client/shard_interface",
-        "client/sharding_client",
-        "mongos_server_parameters",
-    ],
-    LIBDEPS_PRIVATE=[
-        "$BUILD_DIR/mongo/executor/hedge_options_util",
-        "grid",
-    ],
-)
-
-env.Library(
     target="sharding_task_executor",
     source=[
         "sharding_task_executor.cpp",
@@ -193,45 +118,6 @@ env.Library(
         "$BUILD_DIR/mongo/db/server_base",
         "client/sharding_client",
         "sharding_router_api",
-    ],
-)
-
-# This library contains sharding functionality used by both mongod and mongos
-env.Library(
-    target="grid",
-    source=[
-        "balancer_configuration.cpp",
-        "catalog_cache.cpp",
-        "catalog_cache_loader.cpp",
-        "client/config_shard_wrapper.cpp",
-        "client/shard_factory.cpp",
-        "client/shard_registry.cpp",
-        "cluster_identity_loader.cpp",
-        "config_server_catalog_cache_loader.cpp",
-        "grid.cpp",
-        "router_uptime_reporter.cpp",
-        "routing_information_cache.cpp",
-        "shard_util.cpp",
-        "sharding_index_catalog_cache.cpp",
-        "sharding_state.cpp",
-    ],
-    LIBDEPS=[
-        "$BUILD_DIR/mongo/client/clientdriver_network",
-        "$BUILD_DIR/mongo/db/logical_time_metadata_hook",
-        "$BUILD_DIR/mongo/db/repl/replica_set_messages",
-        "$BUILD_DIR/mongo/db/update/update_common",
-        "$BUILD_DIR/mongo/executor/task_executor_pool",
-        "$BUILD_DIR/mongo/util/caching",
-        "$BUILD_DIR/mongo/util/concurrency/thread_pool",
-        "client/shard_interface",
-        "common_s",
-        "query/exec/cluster_cursor_manager",
-    ],
-    LIBDEPS_PRIVATE=[
-        "$BUILD_DIR/mongo/db/concurrency/lock_manager",
-        "$BUILD_DIR/mongo/db/read_write_concern_defaults",
-        "$BUILD_DIR/mongo/db/server_base",
-        "$BUILD_DIR/mongo/util/concurrency/spin_lock",
     ],
 )
 

@@ -1,44 +1,38 @@
 import sys
+import os
 
 
-def generate(header, source, language_files):
-    out = open(header, "w")
-    out.write("""
-#pragma once
-#include <set>
-#include <string>
-#include "mongo/util/string_map.h"
+def read_stop_words(file_path):
+    if not os.path.exists(file_path):
+        print(f"Warning: File {file_path} does not exist. Skipping.")
+        return []
+    with open(file_path, "r", encoding="utf-8") as f:
+        return [line.strip() for line in f if line.strip() and not line.strip().startswith("#")]
+
+
+def generate(source, language_files):
+    with open(source, "w", encoding="utf-8") as out:
+        out.write("""
+#include "mongo/db/fts/stop_words_list.h"
+
 namespace mongo {
 namespace fts {
-
-  void loadStopWordMap( StringMap< std::set< std::string > >* m );
-}
-}
-""")
-    out.close()
-
-    out = open(source, "w", encoding="utf-8")
-    out.write('#include "{}"'.format(header.rpartition("/")[2].rpartition("\\")[2]))
-    out.write("""
-namespace mongo {
-namespace fts {
-
-  void loadStopWordMap( StringMap< std::set< std::string > >* m ) {
-
+  void loadStopWordMap(StringMap<std::set<std::string>>* m) {
     m->insert({
 """)
 
-    for l_file in language_files:
-        l = l_file.rpartition("_")[2].partition(".")[0]
+        for l_file in language_files:
+            language = l_file.rpartition("_")[2].partition(".")[0]
+            words = read_stop_words(l_file)
 
-        out.write("  // %s\n" % l_file)
-        out.write("  {\n")
-        out.write('    "%s", {\n' % l)
-        for word in open(l_file, "rb"):
-            out.write('       "%s",\n' % word.decode("utf-8").strip())
-        out.write("  }},\n")
+            if words:
+                out.write(f"      // {l_file}\n")
+                out.write(f'      {{"{language}", {{\n')
+                for word in words:
+                    out.write(f'        "{word}",\n')
+                out.write("      }},\n")
 
-    out.write("""
+        out.write("""
     });
   }
 } // namespace fts
@@ -47,4 +41,7 @@ namespace fts {
 
 
 if __name__ == "__main__":
-    generate(sys.argv[len(sys.argv) - 2], sys.argv[len(sys.argv) - 1], sys.argv[1:-2])
+    source_file = sys.argv[-1]
+    language_files = sys.argv[1:-1]
+
+    generate(source_file, language_files)
