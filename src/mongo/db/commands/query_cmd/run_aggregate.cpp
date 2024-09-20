@@ -180,6 +180,43 @@ using NamespaceStringSet = stdx::unordered_set<NamespaceString>;
 Counter64& allowDiskUseFalseCounter = *MetricBuilder<Counter64>{"query.allowDiskUseFalse"};
 
 namespace {
+std::unique_ptr<Pipeline, PipelineDeleter> handleViewHelper(
+    const AggExState& aggExState,
+    boost::intrusive_ptr<ExpressionContext> expCtx,
+    std::unique_ptr<Pipeline, PipelineDeleter> pipeline,
+    boost::optional<UUID> uuid) {
+    if (aggExState.getResolvedView()->timeseries()) {
+        // For timeseries, there may have been rewrites done on the raw BSON pipeline
+        // during view resolution. We must parse the request's full resolved pipeline
+        // which will account for those rewrites.
+        // TODO SERVER-82101 Re-organize timeseries rewrites so timeseries can follow the
+        // same pattern here as other views
+        return Pipeline::parse(aggExState.getRequest().getPipeline(), expCtx);
+    }
+    // Search queries on views behave differently than non-search aggregations on views.
+    // When a user pipeline contains a $search/$vectorSearch stage, idLookup will apply the
+    // view transforms as part of its subpipeline. In this way, the view stages will always
+    // be applied directly after $_internalSearchMongotRemote and before the remaining
+    // stages of the user pipeline. This is to ensure the stages following
+    // $search/$vectorSearch in the user pipeline will receive the modified documents: when
+    // storedSource is disabled, idLookup will retrieve full/unmodified documents during
+    // (from the _id values returned by mongot), apply the view's data transforms, and pass
+    // said transformed documents through the rest of the user pipeline.
+    else if (search_helpers::isMongotPipeline(pipeline.get())) {
+        search_helpers::setResolvedNamespaceForSearch(
+            aggExState.getOriginalNss(), aggExState.getResolvedView().value(), expCtx, uuid);
+        return pipeline;
+    }
+    // Parse the view pipeline, then stitch the user pipeline and view pipeline together
+    // to build the total aggregation pipeline.
+    auto userPipeline = std::move(pipeline);
+    pipeline = Pipeline::parse(aggExState.getResolvedView()->getPipeline(), expCtx);
+    pipeline->appendPipeline(std::move(userPipeline));
+    return pipeline;
+}
+}  // namespace
+
+namespace {
 // Ticks for server-side Javascript deprecation log messages.
 Rarely _samplerAccumulatorJs, _samplerFunctionJs;
 
@@ -854,22 +891,7 @@ std::unique_ptr<Pipeline, PipelineDeleter> parsePipelineAndRegisterQueryStats(
 
     if (aggExState.getResolvedView().has_value()) {
         expCtx->startExpressionCounters();
-
-        if (aggExState.getResolvedView()->timeseries()) {
-            // For timeseries, there may have been rewrites done on the raw BSON pipeline
-            // during view resolution. We must parse the request's full resolved pipeline
-            // which will account for those rewrites.
-            // TODO SERVER-82101 Re-organize timeseries rewrites so timeseries can follow the
-            // same pattern here as other views
-            pipeline = Pipeline::parse(aggExState.getRequest().getPipeline(), expCtx);
-        } else {
-            // Parse the view pipeline, then stitch the user pipeline and view pipeline together
-            // to build the total aggregation pipeline.
-            auto userPipeline = std::move(pipeline);
-            pipeline = Pipeline::parse(aggExState.getResolvedView()->getPipeline(), expCtx);
-            pipeline->appendPipeline(std::move(userPipeline));
-        }
-
+        pipeline = handleViewHelper(aggExState, expCtx, std::move(pipeline), uuid);
         expCtx->stopExpressionCounters();
     }
 

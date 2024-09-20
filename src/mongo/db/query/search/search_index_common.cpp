@@ -28,7 +28,6 @@
  */
 
 #include "mongo/db/query/search/search_index_common.h"
-
 #include "mongo/db/query/search/manage_search_index_request_gen.h"
 #include "mongo/db/query/search/search_index_options.h"
 #include "mongo/db/query/search/search_index_options_gen.h"
@@ -43,7 +42,11 @@ namespace {
  * the remote search index management endpoint.
  */
 executor::RemoteCommandRequest createManageSearchIndexRemoteCommandRequest(
-    OperationContext* opCtx, const NamespaceString& nss, const UUID& uuid, const BSONObj& userCmd) {
+    OperationContext* opCtx,
+    const NamespaceString& nss,
+    const UUID& uuid,
+    const BSONObj& userCmd,
+    boost::optional<StringData> viewName = boost::none) {
     // Fetch the search index management host and port.
     invariant(!globalSearchIndexParams.host.empty());
     auto swHostAndPort = HostAndPort::parse(globalSearchIndexParams.host);
@@ -55,6 +58,9 @@ executor::RemoteCommandRequest createManageSearchIndexRemoteCommandRequest(
     manageSearchIndexRequest.setManageSearchIndex(nss.coll());
     manageSearchIndexRequest.setCollectionUUID(uuid);
     manageSearchIndexRequest.setUserCommand(userCmd);
+    if (viewName) {
+        manageSearchIndexRequest.setViewName(viewName);
+    }
 
     // Create a RemoteCommandRequest with the request and host-and-port.
     executor::RemoteCommandRequest remoteManageSearchIndexRequest(executor::RemoteCommandRequest(
@@ -67,9 +73,10 @@ executor::RemoteCommandRequest createManageSearchIndexRemoteCommandRequest(
 BSONObj getSearchIndexManagerResponse(OperationContext* opCtx,
                                       const NamespaceString& nss,
                                       const UUID& uuid,
-                                      const BSONObj& userCmd) {
+                                      const BSONObj& userCmd,
+                                      boost::optional<StringData> viewName) {
     // Create the RemoteCommandRequest.
-    auto request = createManageSearchIndexRemoteCommandRequest(opCtx, nss, uuid, userCmd);
+    auto request = createManageSearchIndexRemoteCommandRequest(opCtx, nss, uuid, userCmd, viewName);
     auto [promise, future] = makePromiseFuture<executor::TaskExecutor::RemoteCommandCallbackArgs>();
     auto promisePtr = std::make_shared<Promise<executor::TaskExecutor::RemoteCommandCallbackArgs>>(
         std::move(promise));
@@ -103,7 +110,6 @@ BSONObj getSearchIndexManagerResponse(OperationContext* opCtx,
 
     // Check the command response for an error and throw if there is one.
     uassertStatusOK(getStatusFromCommandResult(responseData));
-
     // Return the successful command data to the caller.
     return responseData.getOwned();
 }
@@ -126,13 +132,17 @@ void throwIfNotRunningWithRemoteSearchIndexManagement() {
 
 BSONObj runSearchIndexCommand(OperationContext* opCtx,
                               const NamespaceString& nss,
-                              const BSONObj& cmdObj) {
+                              const BSONObj& cmdObj,
+                              const UUID& collUUID,
+                              boost::optional<NamespaceString> viewNss) {
     throwIfNotRunningWithRemoteSearchIndexManagement();
 
-    auto collectionUUID =
-        SearchIndexProcessInterface::get(opCtx)->fetchCollectionUUIDOrThrow(opCtx, nss);
-    BSONObj manageSearchIndexResponse =
-        getSearchIndexManagerResponse(opCtx, nss, collectionUUID, cmdObj);
+    BSONObj manageSearchIndexResponse = getSearchIndexManagerResponse(
+        opCtx,
+        nss,
+        collUUID,
+        cmdObj,
+        viewNss ? boost::make_optional(viewNss->coll()) : boost::none);
 
     return manageSearchIndexResponse;
 }

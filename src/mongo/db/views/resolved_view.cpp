@@ -45,6 +45,7 @@
 #include "mongo/db/pipeline/document_source_index_stats.h"
 #include "mongo/db/pipeline/document_source_internal_convert_bucket_index_stats.h"
 #include "mongo/db/pipeline/document_source_internal_unpack_bucket.h"
+#include "mongo/db/pipeline/search/search_helper_bson_obj.h"
 #include "mongo/db/query/explain_options.h"
 #include "mongo/db/timeseries/timeseries_constants.h"
 #include "mongo/db/timeseries/timeseries_index_schema_conversion_functions.h"
@@ -223,13 +224,21 @@ void ResolvedView::handleTimeseriesRewrites(std::vector<BSONObj>* resolvedPipeli
 
 AggregateCommandRequest ResolvedView::asExpandedViewAggregation(
     const AggregateCommandRequest& request) const {
-    // Perform the aggregation on the resolved namespace.  The new pipeline consists of two parts:
-    // first, 'pipeline' in this ResolvedView; then, the pipeline in 'request'.
     std::vector<BSONObj> resolvedPipeline;
-    resolvedPipeline.reserve(_pipeline.size() + request.getPipeline().size());
-    resolvedPipeline.insert(resolvedPipeline.end(), _pipeline.begin(), _pipeline.end());
-    resolvedPipeline.insert(
-        resolvedPipeline.end(), request.getPipeline().begin(), request.getPipeline().end());
+    // Mongot user pipelines are a unique case: $_internalSearchIdLookup applies the view pipeline.
+    // For this reason, we do not expand the aggregation request to include the view pipeline.
+    if (search_helpers_bson_obj::isMongotPipeline(resolvedPipeline)) {
+        resolvedPipeline.reserve(request.getPipeline().size());
+        resolvedPipeline.insert(
+            resolvedPipeline.end(), request.getPipeline().begin(), request.getPipeline().end());
+    } else {
+        // The new pipeline consists of two parts: first, 'pipeline' in this ResolvedView; then, the
+        // pipeline in 'request'.
+        resolvedPipeline.reserve(_pipeline.size() + request.getPipeline().size());
+        resolvedPipeline.insert(resolvedPipeline.end(), _pipeline.begin(), _pipeline.end());
+        resolvedPipeline.insert(
+            resolvedPipeline.end(), request.getPipeline().begin(), request.getPipeline().end());
+    }
 
     if (resolvedPipeline.size() >= 1 &&
         resolvedPipeline[0][DocumentSourceInternalUnpackBucket::kStageNameInternal]) {

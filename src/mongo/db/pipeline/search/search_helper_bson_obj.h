@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2023-present MongoDB, Inc.
+ *    Copyright (C) 2024-present MongoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
@@ -27,35 +27,29 @@
  *    it in the license file.
  */
 
-#include "mongo/bson/bsonobj.h"
-#include "mongo/db/namespace_string.h"
-#include "mongo/db/operation_context.h"
-#include "mongo/util/uuid.h"
+#include "document_source_list_search_indexes.h"
+#include "mongo/db/pipeline/search/document_source_list_search_indexes.h"
+#include "mongo/db/pipeline/search/document_source_search.h"
+#include "mongo/db/pipeline/search/document_source_search_meta.h"
+#include "mongo/db/pipeline/search/document_source_vector_search.h"
 
 namespace mongo {
-/**
- * Runs a ManageSearchIndex command request against the remote search index management endpoint.
- * Passes the remote command response data back to the caller if the status is OK, otherwise throws
- * if the command failed.
- */
-BSONObj getSearchIndexManagerResponse(OperationContext* opCtx,
-                                      const NamespaceString& nss,
-                                      const UUID& uuid,
-                                      const BSONObj& userCmd,
-                                      boost::optional<StringData> viewName = boost::none);
 
-/**
- * Runs the given command against the remote search index management server, if the remote host
- * information has been set via 'searchIndexManagementHostAndPort'.
- */
-BSONObj runSearchIndexCommand(OperationContext* opCtx,
-                              const NamespaceString& nss,
-                              const BSONObj& cmdObj,
-                              const UUID& collUUID,
-                              boost::optional<NamespaceString> viewNss = boost::none);
-/**
- * Helper function to throw if search index management is not properly configured.
- */
-void throwIfNotRunningWithRemoteSearchIndexManagement();
+namespace search_helpers_bson_obj {
+
+inline bool isMongotPipeline(const std::vector<BSONObj> pipeline) {
+    if (pipeline.size() >= 1 &&
+        (pipeline[0][DocumentSourceSearch::kStageName] ||
+         pipeline[0][DocumentSourceVectorSearch::kStageName] ||
+         pipeline[0][DocumentSourceSearchMeta::kStageName] ||
+         pipeline[0][DocumentSourceListSearchIndexes::kStageName])) {
+        return true;
+    }
+    return false;
+}
+
+
+}  // namespace search_helpers_bson_obj
+
 
 }  // namespace mongo

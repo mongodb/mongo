@@ -118,6 +118,9 @@ private:
 
     // Cache the collection UUID to avoid retrieving the collection UUID for each 'doGetNext' call.
     boost::optional<UUID> _collectionUUID;
+    // Cache the underlying source collection name, which is necessary for supporting running search
+    // queries on views, to avoid retrieving on each getNext.
+    boost::optional<NamespaceString> _resolvedNamespace;
 };
 
 }  // namespace mongo

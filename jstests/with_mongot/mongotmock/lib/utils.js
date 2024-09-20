@@ -1,5 +1,5 @@
 /**
- * Utility functions for mongot tests.
+ * Utility functions for mongotmock tests.
  */
 
 import {

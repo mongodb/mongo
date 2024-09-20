@@ -157,6 +157,27 @@ StatusWith<stdx::unordered_set<NamespaceString>> validatePipeline(OperationConte
 
     return liteParsedPipeline.getInvolvedNamespaces();
 }
+// TODO SERVER-93638 add comment for expected behavior of $lookup/$unionWith which might have
+// multiple backing collections.
+NamespaceString findSourceCollectionNamespace(OperationContext* opCtx,
+                                              std::shared_ptr<const CollectionCatalog> catalog,
+                                              const NamespaceString& nss) {
+
+    // Points to the name of the most resolved namespace.
+    const NamespaceString* resolvedNss = &nss;
+
+    int depth = 0;
+    for (; depth < ViewGraph::kMaxViewDepth; depth++) {
+        auto view = catalog->lookupView(opCtx, *resolvedNss);
+        if (!view) {
+            return NamespaceString({*resolvedNss});
+        }
+        resolvedNss = &view->viewOn();
+    }
+
+    MONGO_UNREACHABLE;
+}
+
 
 StatusWith<ResolvedView> resolveView(OperationContext* opCtx,
                                      std::shared_ptr<const CollectionCatalog> catalog,
