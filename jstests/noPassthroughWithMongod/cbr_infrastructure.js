@@ -54,14 +54,14 @@ function checkLastRejectedPlan(query) {
            "encountered rooted $or query");
 
     // Classic plan via multiplanning
-    assert.commandWorked(db.adminCommand({setParameter: 1, planRankerMode: false}));
+    assert.commandWorked(db.adminCommand({setParameter: 1, planRankerMode: "multiPlanning"}));
     const e0 = coll.find(query).explain();
     const r0 = getRejectedPlans(e0);
     // Validate there are rejected plans
     assert.gte(r0.length, 1);
 
     // Classic plan via CBR
-    assert.commandWorked(db.adminCommand({setParameter: 1, planRankerMode: true}));
+    assert.commandWorked(db.adminCommand({setParameter: 1, planRankerMode: "automaticCE"}));
     const e1 = coll.find(query).explain();
     const w1 = getWinningPlanFromExplain(e1);
 
@@ -76,12 +76,12 @@ function checkRootedOr(query) {
            "encountered non rooted $or query");
 
     // Plan via multiplanning
-    assert.commandWorked(db.adminCommand({setParameter: 1, planRankerMode: false}));
+    assert.commandWorked(db.adminCommand({setParameter: 1, planRankerMode: "multiPlanning"}));
     const e0 = coll.find(query).explain();
     const w0 = getWinningPlanFromExplain(e0);
 
     // Plan via CBR
-    assert.commandWorked(db.adminCommand({setParameter: 1, planRankerMode: true}));
+    assert.commandWorked(db.adminCommand({setParameter: 1, planRankerMode: "automaticCE"}));
     const e1 = coll.find(query).explain();
     const w1 = getWinningPlanFromExplain(e1);
 
@@ -100,5 +100,5 @@ try {
     checkLastRejectedPlan(q5);
 } finally {
     // Ensure that query knob doesn't leak into other testcases in the suite.
-    assert.commandWorked(db.adminCommand({setParameter: 1, planRankerMode: false}));
+    assert.commandWorked(db.adminCommand({setParameter: 1, planRankerMode: "multiPlanning"}));
 }

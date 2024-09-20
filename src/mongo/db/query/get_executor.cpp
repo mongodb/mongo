@@ -505,7 +505,8 @@ public:
         }
 
         std::vector<std::unique_ptr<QuerySolution>> solutions;
-        if (planRankerMode.load()) {
+        if (_cq->getExpCtx()->getQueryKnobConfiguration().getPlanRankerMode() !=
+            QueryPlanRankerModeEnum::kMultiPlanning) {
             auto statusWithCBRSolns = QueryPlanner::planWithCostBasedRanking(*_cq, *_plannerParams);
             if (!statusWithCBRSolns.isOK()) {
                 return statusWithCBRSolns.getStatus();

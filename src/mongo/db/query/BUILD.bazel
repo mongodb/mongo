@@ -111,6 +111,7 @@ mongo_cc_library(
     srcs = [
         "explain_version_validator.cpp",
         "framework_control.cpp",
+        "plan_ranker_mode.cpp",
         "query_feature_flags_gen",
         "query_knobs_gen",
         "//src/mongo/db/query/plan_cache:sbe_plan_cache_on_parameter_change.cpp",

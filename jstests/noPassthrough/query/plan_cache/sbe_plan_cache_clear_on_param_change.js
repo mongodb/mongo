@@ -41,7 +41,6 @@ const paramList = [
     {name: "allowDiskUseByDefault", value: false},
     {name: "internalQuerySlotBasedExecutionDisableTimeSeriesPushdown", value: true},
     {name: "internalQueryDisablePlanCache", value: true},
-    {name: "planRankerMode", value: true},
 ];
 
 const conn = MongoRunner.runMongod();

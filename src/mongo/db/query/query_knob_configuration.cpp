@@ -45,12 +45,20 @@ QueryKnobConfiguration::QueryKnobConfiguration(const query_settings::QuerySettin
             ->_data.get();
     });
 
+    _planRankerMode = ServerParameterSet::getNodeParameterSet()
+                          ->get<QueryPlanRankerMode>("planRankerMode")
+                          ->_data.get();
+
     _planEvaluationMaxResults = internalQueryPlanEvaluationMaxResults.loadRelaxed();
     _maxScansToExplodeValue = static_cast<size_t>(internalQueryMaxScansToExplode.loadRelaxed());
 }
 
 QueryFrameworkControlEnum QueryKnobConfiguration::getInternalQueryFrameworkControlForOp() const {
     return _queryFrameworkControlValue;
+}
+
+QueryPlanRankerModeEnum QueryKnobConfiguration::getPlanRankerMode() const {
+    return _planRankerMode;
 }
 
 bool QueryKnobConfiguration::getSbeDisableGroupPushdownForOp() const {

@@ -1998,7 +1998,8 @@ StatusWith<QueryPlanner::SubqueriesPlanningResult> QueryPlanner::planSubqueries(
             // considering any plan that's a collscan.
             invariant(branchResult->solutions.empty());
 
-            if (planRankerMode.load()) {
+            if (query.getExpCtx()->getQueryKnobConfiguration().getPlanRankerMode() !=
+                QueryPlanRankerModeEnum::kMultiPlanning) {
                 auto statusWithCBRSolns =
                     QueryPlanner::planWithCostBasedRanking(*branchResult->canonicalQuery, params);
                 if (!statusWithCBRSolns.isOK()) {

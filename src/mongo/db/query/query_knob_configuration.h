@@ -46,6 +46,7 @@ public:
     QueryKnobConfiguration(const query_settings::QuerySettings& querySettings);
 
     QueryFrameworkControlEnum getInternalQueryFrameworkControlForOp() const;
+    QueryPlanRankerModeEnum getPlanRankerMode() const;
     bool getSbeDisableGroupPushdownForOp() const;
     bool getSbeDisableLookupPushdownForOp() const;
     bool getSbeDisableTimeSeriesForOp() const;
@@ -66,6 +67,7 @@ public:
 
 private:
     QueryFrameworkControlEnum _queryFrameworkControlValue;
+    QueryPlanRankerModeEnum _planRankerMode;
     size_t _planEvaluationMaxResults;
     size_t _maxScansToExplodeValue;
     bool _sbeDisableGroupPushdownValue;

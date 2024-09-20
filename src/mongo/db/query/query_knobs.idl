@@ -54,6 +54,16 @@ enums:
             # Attempt to use SBE for eligible queries, otherwise fallback to the classic engine.
             kTrySbeEngine: "trySbeEngine"
 
+    QueryPlanRankerMode:
+        description: "Enum for possible values for planRankerMode."
+        type: string
+        values:
+            kAutomaticCE: "automaticCE"
+            kHistogramCE: "histogramCE"
+            kSamplingCE: "samplingCE"
+            kHeuristicCE: "heuristicCE"
+            kMultiPlanning: "multiPlanning"
+
 structs:
   InternalQueryCutoffForSampleFromRandomCursorStorage:
     description: "A specification for the 'internalQueryCutoffForSampleFromRandomCursor' cluster-wide configuration parameter type."
@@ -1413,14 +1423,14 @@ server_parameters:
     redact: false
 
   planRankerMode:
-    description: "Enable cost-based ranking of query plans."
+    description: "Control ranking method of query plans."
     set_at: [ startup, runtime ]
-    cpp_varname: planRankerMode
-    # TODO SERVER-92587: change to an enum
-    cpp_vartype: AtomicWord<bool>
-    default: false
+    cpp_class:
+      name: QueryPlanRankerMode
+      data: synchronized_value<QueryPlanRankerModeEnum>
+    default:
+      expr: QueryPlanRankerModeEnum::kMultiPlanning
     redact: false
-    on_update: plan_cache_util::clearSbeCacheOnParameterChange
 
 # Note for adding additional query knobs:
 #
