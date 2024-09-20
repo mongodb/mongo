@@ -38,10 +38,10 @@
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
-#include "mongo/bson/mutable/damage_vector.h"
 #include "mongo/bson/ordering.h"
 #include "mongo/db/catalog/validate_results.h"
 #include "mongo/db/record_id.h"
+#include "mongo/db/storage/damage_vector.h"
 #include "mongo/db/storage/devnull/devnull_kv_engine.h"
 #include "mongo/db/storage/devnull/ephemeral_catalog_record_store.h"
 #include "mongo/db/storage/duplicate_key_error_info.h"
@@ -153,7 +153,7 @@ public:
                                                const RecordId& loc,
                                                const RecordData& oldRec,
                                                const char* damageSource,
-                                               const mutablebson::DamageVector& damages) override {
+                                               const DamageVector& damages) override {
         MONGO_UNREACHABLE;
     }
 

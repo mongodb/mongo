@@ -37,12 +37,12 @@
 #include "mongo/base/init.h"  // IWYU pragma: keep
 #include "mongo/base/status_with.h"
 #include "mongo/base/string_data.h"
-#include "mongo/bson/mutable/damage_vector.h"
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/record_id.h"
 #include "mongo/db/service_context.h"
+#include "mongo/db/storage/damage_vector.h"
 #include "mongo/db/storage/key_format.h"
 #include "mongo/db/storage/record_data.h"
 #include "mongo/db/storage/record_store.h"
@@ -233,8 +233,8 @@ TEST_F(SizeStorerUpdateTest, DataSizeModification) {
     {
         WriteUnitOfWork uow(opCtx.get());
         const auto damageSource = "";
-        mutablebson::DamageVector damageVector;
-        damageVector.push_back(mutablebson::DamageEvent(0, 0, 0, 1));
+        DamageVector damageVector;
+        damageVector.push_back(DamageEvent(0, 0, 0, 1));
         auto newDoc =
             rs->updateWithDamages(opCtx.get(), recordId, oldRecordData, damageSource, damageVector);
         ASSERT_TRUE(newDoc.isOK());
@@ -246,8 +246,8 @@ TEST_F(SizeStorerUpdateTest, DataSizeModification) {
     {
         WriteUnitOfWork uow(opCtx.get());
         const auto damageSource = "3456";
-        mutablebson::DamageVector damageVector;
-        damageVector.push_back(mutablebson::DamageEvent(0, 4, 1, 2));
+        DamageVector damageVector;
+        damageVector.push_back(DamageEvent(0, 4, 1, 2));
         ASSERT_TRUE(
             rs->updateWithDamages(opCtx.get(), recordId, oldRecordData, damageSource, damageVector)
                 .isOK());

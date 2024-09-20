@@ -110,7 +110,6 @@ mongo_cc_library(
         "//src/mongo/util:tracking_context.h",
     ],
     header_deps = [
-        "//src/mongo/bson/mutable:mutable_bson",
         "//src/mongo/db/commands:server_status_core",
     ],
     deps = [

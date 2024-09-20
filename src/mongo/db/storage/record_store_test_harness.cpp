@@ -42,7 +42,6 @@
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
-#include "mongo/bson/mutable/damage_vector.h"
 #include "mongo/bson/oid.h"
 #include "mongo/db/catalog/clustered_collection_options_gen.h"
 #include "mongo/db/catalog/clustered_collection_util.h"
@@ -51,6 +50,7 @@
 #include "mongo/db/record_id.h"
 #include "mongo/db/record_id_helpers.h"
 #include "mongo/db/service_context.h"
+#include "mongo/db/storage/damage_vector.h"
 #include "mongo/db/storage/record_data.h"
 #include "mongo/db/storage/record_store.h"
 #include "mongo/db/storage/write_unit_of_work.h"
@@ -313,8 +313,8 @@ TEST(RecordStoreTestHarness, UpdateInPlace1) {
         {
             WriteUnitOfWork uow(opCtx.get());
             const char* damageSource = "222";
-            mutablebson::DamageVector dv;
-            dv.push_back(mutablebson::DamageEvent());
+            DamageVector dv;
+            dv.push_back(DamageEvent());
             dv[0].sourceOffset = 0;
             dv[0].sourceSize = 3;
             dv[0].targetOffset = 3;

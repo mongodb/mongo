@@ -68,6 +68,7 @@
 #include "mongo/db/stats/resource_consumption_metrics.h"
 #include "mongo/db/storage/capped_snapshots.h"
 #include "mongo/db/storage/collection_truncate_markers.h"
+#include "mongo/db/storage/damage_vector.h"
 #include "mongo/db/storage/duplicate_key_error_info.h"
 #include "mongo/db/storage/ident.h"
 #include "mongo/db/storage/recovery_unit.h"
@@ -1242,16 +1243,15 @@ bool WiredTigerRecordStore::updateWithDamagesSupported() const {
     return true;
 }
 
-StatusWith<RecordData> WiredTigerRecordStore::doUpdateWithDamages(
-    OperationContext* opCtx,
-    const RecordId& id,
-    const RecordData& oldRec,
-    const char* damageSource,
-    const mutablebson::DamageVector& damages) {
+StatusWith<RecordData> WiredTigerRecordStore::doUpdateWithDamages(OperationContext* opCtx,
+                                                                  const RecordId& id,
+                                                                  const RecordData& oldRec,
+                                                                  const char* damageSource,
+                                                                  const DamageVector& damages) {
 
     const int nentries = damages.size();
-    mutablebson::DamageVector::const_iterator where = damages.begin();
-    const mutablebson::DamageVector::const_iterator end = damages.cend();
+    DamageVector::const_iterator where = damages.begin();
+    const DamageVector::const_iterator end = damages.cend();
     std::vector<WT_MODIFY> entries(nentries);
     for (u_int i = 0; where != end; ++i, ++where) {
         entries[i].data.data = damageSource + where->sourceOffset;

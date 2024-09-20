@@ -29,44 +29,31 @@
 
 #pragma once
 
-#include <cstdint>
+#include <cstddef>
 #include <vector>
 
 namespace mongo {
-namespace mutablebson {
 
-// A damage event represents a change of size 'targetSize' byte at starting at offset
-// 'targetOffset' in some target buffer, with the replacement data being 'sourceSize' bytes of
-// data from the 'sourceOffset'. The base addresses against which these offsets are to be
-// applied are not captured here.
+// Represents one modification from a source to a target. Specifies a change of 'targetSize' bytes
+// starting at 'targetOffset', with the replacement data being 'sourceSize' bytes from
+// 'sourceOffset'. The base addresses for these offsets are handled externally and not captured
+// here.
 struct DamageEvent {
-    typedef uint32_t OffsetSizeType;
 
     DamageEvent() = default;
 
-    DamageEvent(OffsetSizeType srcOffset, size_t srcSize, OffsetSizeType tgtOffset, size_t tgtSize)
+    DamageEvent(size_t srcOffset, size_t srcSize, size_t tgtOffset, size_t tgtSize)
         : sourceOffset(srcOffset),
           sourceSize(srcSize),
           targetOffset(tgtOffset),
           targetSize(tgtSize) {}
 
-    // Offset of source data (in some buffer held elsewhere).
-    OffsetSizeType sourceOffset;
-
-    // Size of the data from the source.
-    // If 'sourceSize' is zero, no new data is inserted and 'targetSize' of bytes are deleted from
-    // the target.
-    size_t sourceSize;
-
-    // Offset of target data (in some buffer held elsewhere).
-    OffsetSizeType targetOffset;
-
-    // Size of the data to be replaced in the target.
-    // If 'targetSize' is zero, no bytes from the target are replaced and the new data is inserted.
-    size_t targetSize;
+    size_t sourceOffset;  // Offset from some base address to copy data from
+    size_t sourceSize;    // Size of source data to copy. If 0, delete target data at targetOffset
+    size_t targetOffset;  // Offset from some base address to apply the damage
+    size_t targetSize;  // Size of target data to replace. If 0, insert source data at targetOffset
 };
 
-typedef std::vector<DamageEvent> DamageVector;
+using DamageVector = std::vector<DamageEvent>;
 
-}  // namespace mutablebson
 }  // namespace mongo

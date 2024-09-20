@@ -63,7 +63,6 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/json.h"
-#include "mongo/bson/mutable/damage_vector.h"
 #include "mongo/bson/mutable/document.h"
 #include "mongo/bson/simple_bsonobj_comparator.h"
 #include "mongo/bson/timestamp.h"
@@ -140,6 +139,7 @@
 #include "mongo/db/session/session_txn_record_gen.h"
 #include "mongo/db/shard_role.h"
 #include "mongo/db/storage/bson_collection_catalog_entry.h"
+#include "mongo/db/storage/damage_vector.h"
 #include "mongo/db/storage/durable_catalog.h"
 #include "mongo/db/storage/durable_catalog_entry.h"
 #include "mongo/db/storage/record_data.h"
@@ -3228,7 +3228,7 @@ TEST_F(RetryableFindAndModifyTest, RetryableFindAndModifyUpdateWithDamages) {
     // Create a new document representing BSONObj with the above contents.
     mmb::Document doc(bsonObj, mmb::Document::kInPlaceEnabled);
 
-    mmb::DamageVector damages;
+    DamageVector damages;
     const char* source = nullptr;
     size_t size = 0;
     ASSERT_TRUE(doc.getInPlaceUpdates(&damages, &source, &size));

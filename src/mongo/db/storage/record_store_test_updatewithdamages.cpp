@@ -36,12 +36,12 @@
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/json.h"
-#include "mongo/bson/mutable/damage_vector.h"
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/concurrency/lock_manager_defs.h"
 #include "mongo/db/record_id.h"
 #include "mongo/db/service_context.h"
+#include "mongo/db/storage/damage_vector.h"
 #include "mongo/db/storage/record_data.h"
 #include "mongo/db/storage/record_store.h"
 #include "mongo/db/storage/record_store_test_harness.h"
@@ -92,7 +92,7 @@ TEST(RecordStoreTestHarness, UpdateWithDamages) {
     {
         ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
         {
-            mutablebson::DamageVector dv(3);
+            DamageVector dv(3);
             dv[0].sourceOffset = 5;
             dv[0].sourceSize = 2;
             dv[0].targetOffset = 0;
@@ -162,7 +162,7 @@ TEST(RecordStoreTestHarness, UpdateWithOverlappingDamageEvents) {
     {
         ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
         {
-            mutablebson::DamageVector dv(2);
+            DamageVector dv(2);
             dv[0].sourceOffset = 3;
             dv[0].sourceSize = 5;
             dv[0].targetOffset = 0;
@@ -229,7 +229,7 @@ TEST(RecordStoreTestHarness, UpdateWithOverlappingDamageEventsReversed) {
     {
         ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
         {
-            mutablebson::DamageVector dv(2);
+            DamageVector dv(2);
             dv[0].sourceOffset = 0;
             dv[0].sourceSize = 5;
             dv[0].targetOffset = 3;
@@ -293,7 +293,7 @@ TEST(RecordStoreTestHarness, UpdateWithNoDamages) {
     {
         ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
         {
-            mutablebson::DamageVector dv;
+            DamageVector dv;
 
             WriteUnitOfWork uow(opCtx.get());
             auto newRecStatus = rs->updateWithDamages(opCtx.get(), loc, rec, "", dv);

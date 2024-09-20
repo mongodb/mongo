@@ -46,6 +46,7 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/record_id_helpers.h"
+#include "mongo/db/storage/damage_vector.h"
 #include "mongo/db/storage/recovery_unit.h"
 #include "mongo/db/transaction_resources.h"
 #include "mongo/logv2/log.h"
@@ -450,7 +451,7 @@ StatusWith<RecordData> EphemeralForTestRecordStore::doUpdateWithDamages(
     const RecordId& loc,
     const RecordData& oldRec,
     const char* damageSource,
-    const mutablebson::DamageVector& damages) {
+    const DamageVector& damages) {
 
     stdx::lock_guard<stdx::recursive_mutex> lock(_data->recordsMutex);
 
@@ -467,8 +468,8 @@ StatusWith<RecordData> EphemeralForTestRecordStore::doUpdateWithDamages(
 
     char* root = newRecord.data.get();
     char* old = oldRecord->data.get();
-    mutablebson::DamageVector::const_iterator where = damages.begin();
-    const mutablebson::DamageVector::const_iterator end = damages.end();
+    DamageVector::const_iterator where = damages.begin();
+    const DamageVector::const_iterator end = damages.end();
     // Since the 'targetOffset' is referring to the location in the new record, we need to subtract
     // the accumulated change of size by the damages to get the offset in the old record.
     int diffSize = 0;

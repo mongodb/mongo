@@ -20,6 +20,7 @@ mongo_cc_library(
         "const_element.h",
         "document.h",
         "element.h",
+        "//src/mongo/db/storage:damage_vector.h",
     ],
     mongo_api_name = "mutable_bson",
     deps = [

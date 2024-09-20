@@ -35,7 +35,6 @@ env.Library(
         "timeseries_update_delete_util.cpp",
     ],
     LIBDEPS_PRIVATE=[
-        "$BUILD_DIR/mongo/bson/mutable/mutable_bson",
         "$BUILD_DIR/mongo/bson/util/bson_column",
         "$BUILD_DIR/mongo/db/catalog/index_catalog",
         "$BUILD_DIR/mongo/db/coll_mod_command_idl",
@@ -56,7 +55,6 @@ env.Library(
         "timeseries_collmod.cpp",
     ],
     LIBDEPS_PRIVATE=[
-        "$BUILD_DIR/mongo/bson/mutable/mutable_bson",
         "$BUILD_DIR/mongo/db/catalog/catalog_helpers",
         "$BUILD_DIR/mongo/db/coll_mod_command_idl",
         "$BUILD_DIR/mongo/db/exec/bucket_unpacker",

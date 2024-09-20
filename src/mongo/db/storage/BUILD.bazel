@@ -66,6 +66,7 @@ mongo_cc_library(
         "named_pipe.h",
         "record_store.h",
         "//src/mongo/db/exec:batched_delete_stage_gen",
+        "//src/mongo/db/storage:damage_vector.h",
     ],
     deps = [
         ":storage_options",  # TODO(SERVER-93876): Remove.
@@ -528,7 +529,6 @@ mongo_cc_library(
         "write_unit_of_work.cpp",
     ],
     header_deps = [
-        "//src/mongo/bson/mutable:mutable_bson",
         "//src/mongo/db/commands:server_status_core",
         "//src/mongo/db/op_observer:op_observer",
     ],

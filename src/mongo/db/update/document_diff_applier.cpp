@@ -47,6 +47,7 @@
 #include "mongo/bson/bsontypes.h"
 #include "mongo/bson/util/builder.h"
 #include "mongo/db/field_ref.h"
+#include "mongo/db/storage/damage_vector.h"
 #include "mongo/db/update/document_diff_applier.h"
 #include "mongo/db/update_index_data.h"
 #include "mongo/util/assert_util.h"
@@ -142,7 +143,7 @@ DocumentDiffTables buildObjDiffTables(DocumentDiffReader* reader,
 int32_t computeDamageOnArray(const BSONObj& preImageRoot,
                              const BSONObj& arrayPreImage,
                              ArrayDiffReader* reader,
-                             mutablebson::DamageVector* damages,
+                             DamageVector* damages,
                              BufBuilder* bufBuilder,
                              size_t offsetRoot,
                              bool mustCheckExistenceForInsertOperations);
@@ -159,7 +160,7 @@ size_t targetOffsetInPostImage(const char* cur,
 }
 
 // Merges the new damage with the previous one if possible, otherwise adds a new one.
-void appendDamage(mutablebson::DamageVector* damages,
+void appendDamage(DamageVector* damages,
                   size_t sourceOffset,
                   size_t sourceSize,
                   size_t targetOffset,
@@ -180,9 +181,7 @@ void appendDamage(mutablebson::DamageVector* damages,
     damages->emplace_back(sourceOffset, sourceSize, targetOffset, targetSize);
 }
 
-void appendEOOByte(mutablebson::DamageVector* damages,
-                   BufBuilder* bufBuilder,
-                   size_t targetOffset) {
+void appendEOOByte(DamageVector* damages, BufBuilder* bufBuilder, size_t targetOffset) {
     auto lastDamage = damages->back();
     if (lastDamage.targetOffset + lastDamage.sourceSize == targetOffset) {
         // Appends EOO byte to help with potential merging.
@@ -192,7 +191,7 @@ void appendEOOByte(mutablebson::DamageVector* damages,
 }
 
 void addElementPrefix(const BSONElement& elt,
-                      mutablebson::DamageVector* damages,
+                      DamageVector* damages,
                       BufBuilder* bufBuilder,
                       size_t targetOffset) {
     auto prev = damages->back();
@@ -213,7 +212,7 @@ void addElementPrefix(const BSONElement& elt,
 int32_t computeDamageOnObject(const BSONObj& preImageRoot,
                               const BSONObj& preImageSub,
                               DocumentDiffReader* reader,
-                              mutablebson::DamageVector* damages,
+                              DamageVector* damages,
                               BufBuilder* bufBuilder,
                               size_t offsetRoot,
                               bool mustCheckExistenceForInsertOperations) {
@@ -344,7 +343,7 @@ int32_t computeDamageForArrayIndex(const BSONObj& preImageRoot,
                                    const BSONObj& arrayPreImage,
                                    boost::optional<BSONElement> preImageValue,
                                    const ArrayDiffReader::ArrayModification& modification,
-                                   mutablebson::DamageVector* damages,
+                                   DamageVector* damages,
                                    BufBuilder* bufBuilder,
                                    size_t offsetRoot,
                                    bool mustCheckExistenceForInsertOperations) {
@@ -413,7 +412,7 @@ int32_t computeDamageForArrayIndex(const BSONObj& preImageRoot,
 int32_t computeDamageOnArray(const BSONObj& preImageRoot,
                              const BSONObj& arrayPreImage,
                              ArrayDiffReader* reader,
-                             mutablebson::DamageVector* damages,
+                             DamageVector* damages,
                              BufBuilder* bufBuilder,
                              size_t offsetRoot,
                              bool mustCheckExistenceForInsertOperations) {
@@ -761,7 +760,7 @@ DamagesOutput computeDamages(const BSONObj& pre,
                              const Diff& diff,
                              bool mustCheckExistenceForInsertOperations) {
     DocumentDiffReader reader(diff);
-    mutablebson::DamageVector damages;
+    DamageVector damages;
     BufBuilder b;
     computeDamageOnObject(
         pre, pre, &reader, &damages, &b, 0, mustCheckExistenceForInsertOperations);

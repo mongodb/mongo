@@ -31,7 +31,7 @@
 
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
-#include "mongo/bson/mutable/damage_vector.h"
+#include "mongo/db/storage/damage_vector.h"
 #include "mongo/db/update/document_diff_serialization.h"
 #include "mongo/db/update_index_data.h"
 #include "mongo/util/shared_buffer.h"
@@ -42,7 +42,7 @@ namespace doc_diff {
 struct DamagesOutput {
     const BSONObj preImage;
     SharedBuffer damageSource;
-    mutablebson::DamageVector damages;
+    DamageVector damages;
 };
 
 /**

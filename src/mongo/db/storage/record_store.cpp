@@ -33,6 +33,7 @@
 #include <boost/optional/optional.hpp>
 
 #include "mongo/db/operation_context.h"
+#include "mongo/db/storage/damage_vector.h"
 #include "mongo/db/storage/record_store.h"
 
 namespace mongo {
@@ -74,7 +75,7 @@ StatusWith<RecordData> RecordStore::updateWithDamages(OperationContext* opCtx,
                                                       const RecordId& loc,
                                                       const RecordData& oldRec,
                                                       const char* damageSource,
-                                                      const mutablebson::DamageVector& damages) {
+                                                      const DamageVector& damages) {
     validateWriteAllowed(opCtx);
     return doUpdateWithDamages(opCtx, loc, oldRec, damageSource, damages);
 }

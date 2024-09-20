@@ -37,7 +37,6 @@
 
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
-#include "mongo/bson/mutable/damage_vector.h"
 #include "mongo/bson/mutable/document.h"
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/curop.h"
@@ -55,6 +54,7 @@
 #include "mongo/db/s/scoped_collection_metadata.h"
 #include "mongo/db/s/sharding_write_router.h"
 #include "mongo/db/shard_role.h"
+#include "mongo/db/storage/damage_vector.h"
 #include "mongo/db/storage/snapshot.h"
 #include "mongo/db/update/update_driver.h"
 #include "mongo/stdx/unordered_set.h"
@@ -224,7 +224,7 @@ protected:
 
     // These get reused for each update.
     mutablebson::Document& _doc;
-    mutablebson::DamageVector _damages;
+    DamageVector _damages;
 
 private:
     /**

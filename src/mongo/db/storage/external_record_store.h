@@ -43,10 +43,10 @@
 #include "mongo/base/status_with.h"
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobjbuilder.h"
-#include "mongo/bson/mutable/damage_vector.h"
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/catalog/virtual_collection_options.h"
 #include "mongo/db/record_id.h"
+#include "mongo/db/storage/damage_vector.h"
 #include "mongo/db/storage/key_format.h"
 #include "mongo/db/storage/record_data.h"
 #include "mongo/db/storage/record_store.h"
@@ -144,7 +144,7 @@ protected:
                                                const RecordId&,
                                                const RecordData&,
                                                const char*,
-                                               const mutablebson::DamageVector&) final {
+                                               const DamageVector&) final {
         unimplementedTasserted();
         return {ErrorCodes::Error::UnknownError, "Unknown error"};
     }

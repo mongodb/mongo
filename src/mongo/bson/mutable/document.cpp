@@ -36,9 +36,9 @@
 #include "mongo/base/error_codes.h"
 #include "mongo/base/static_assert.h"
 #include "mongo/base/status.h"
-#include "mongo/bson/mutable/damage_vector.h"
 #include "mongo/bson/mutable/document.h"
 #include "mongo/bson/util/builder.h"
+#include "mongo/db/storage/damage_vector.h"
 #include "mongo/platform/compiler.h"
 #include "mongo/util/assert_util_core.h"
 #include "mongo/util/debug_util.h"
@@ -1019,9 +1019,7 @@ public:
         return getCurrentInPlaceMode() == Document::kInPlaceEnabled;
     }
 
-    void recordDamageEvent(DamageEvent::OffsetSizeType targetOffset,
-                           DamageEvent::OffsetSizeType sourceOffset,
-                           size_t size) {
+    void recordDamageEvent(size_t targetOffset, size_t sourceOffset, size_t size) {
         _damages.push_back(DamageEvent());
         _damages.back().targetOffset = targetOffset;
         _damages.back().targetSize = size;
@@ -2079,10 +2077,10 @@ Status Element::setValue(const Element::RepIdx newValueIdx) {
             // calculate the source and target offsets in the damage entries we are
             // going to write.
 
-            const DamageEvent::OffsetSizeType targetBaseOffset =
+            const size_t targetBaseOffset =
                 getElementOffset(impl.getObject(thisRep.objIdx), thisElt);
 
-            const DamageEvent::OffsetSizeType sourceBaseOffset =
+            const size_t sourceBaseOffset =
                 getElementOffset(impl.getObject(valueRep.objIdx), valueElt);
 
             // If this is a type change, record a damage event for the new type.

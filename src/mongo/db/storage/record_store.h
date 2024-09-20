@@ -46,11 +46,11 @@
 #include "mongo/base/status_with.h"
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobjbuilder.h"
-#include "mongo/bson/mutable/damage_vector.h"
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/record_id.h"
 #include "mongo/db/storage/compact_options.h"
+#include "mongo/db/storage/damage_vector.h"
 #include "mongo/db/storage/ident.h"
 #include "mongo/db/storage/key_format.h"
 #include "mongo/db/storage/record_data.h"
@@ -531,7 +531,7 @@ public:
                                              const RecordId& loc,
                                              const RecordData& oldRec,
                                              const char* damageSource,
-                                             const mutablebson::DamageVector& damages);
+                                             const DamageVector& damages);
 
     /**
      * Prints any storage engine provided metadata for the record with 'recordId'.
@@ -745,12 +745,11 @@ protected:
                                   const RecordId& recordId,
                                   const char* data,
                                   int len) = 0;
-    virtual StatusWith<RecordData> doUpdateWithDamages(
-        OperationContext* opCtx,
-        const RecordId& loc,
-        const RecordData& oldRec,
-        const char* damageSource,
-        const mutablebson::DamageVector& damages) = 0;
+    virtual StatusWith<RecordData> doUpdateWithDamages(OperationContext* opCtx,
+                                                       const RecordId& loc,
+                                                       const RecordData& oldRec,
+                                                       const char* damageSource,
+                                                       const DamageVector& damages) = 0;
     virtual Status doTruncate(OperationContext* opCtx) = 0;
     virtual Status doRangeTruncate(OperationContext* opCtx,
                                    const RecordId& minRecordId,

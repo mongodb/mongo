@@ -64,6 +64,7 @@
 #include "mongo/db/s/scoped_collection_metadata.h"
 #include "mongo/db/session/logical_session_id.h"
 #include "mongo/db/shard_role.h"
+#include "mongo/db/storage/damage_vector.h"
 #include "mongo/db/storage/record_store.h"
 #include "mongo/db/storage/snapshot.h"
 #include "mongo/db/storage/write_unit_of_work.h"
@@ -968,7 +969,7 @@ public:
                                   (collection.getCollectionPtr()->updateWithDamagesSupported()
                                        ? mutablebson::Document::kInPlaceEnabled
                                        : mutablebson::Document::kInPlaceDisabled));
-        mutablebson::DamageVector damages;
+        DamageVector damages;
 
 
         if (_isUserInitiatedWrite) {
