@@ -63,6 +63,7 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
             // The refienCollectionCoordinator interrupt all migrations by setting `allowMigration`
             // to false
             ErrorCodes.Interrupted,
+            ErrorCodes.OrphanedRangeCleanUpFailed,
         ];
         return (err.code && codes.includes(err.code)) ||
             (err.message &&
