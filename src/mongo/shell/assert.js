@@ -258,6 +258,16 @@ assert = (function() {
         }
     };
 
+    // Given two arrays of documents, check that each array has the same members, but,
+    // for the numeric fields specified in 'fuzzyFields,' the values need to be 'close,' but do
+    // not have to be equal.
+    assert.fuzzySameMembers = function(aArr, bArr, fuzzyFields, msg, places = 4) {
+        function fuzzyCompare(docA, docB) {
+            return _fieldsClose(docA, docB, fuzzyFields, msg, places);
+        }
+        return assert.sameMembers(aArr, bArr, null, fuzzyCompare);
+    };
+
     assert.neq = function(a, b, msg) {
         _validateAssertionMessage(msg);
 
@@ -1071,23 +1081,57 @@ assert = (function() {
         assert.between(a, b, c, msg, false);
     };
 
-    assert.close = function(a, b, msg, places = 4) {
-        // This treats 'places' as digits past the decimal point.
+    // Returns an array [isClose, msg] where 'isClose' is a bool indiciating whether or not values
+    // 'a' and 'b' are sufficiently close, and, if they're not, 'msg' is set to a descriptive error
+    // string.
+    function _isClose(a, b, places = 4) {
         var absoluteError = Math.abs(a - b);
         if (Math.round(absoluteError * Math.pow(10, places)) === 0) {
-            return;
+            return [true, null];
         }
-
         // This treats 'places' as significant figures.
         var relativeError = Math.abs(absoluteError / b);
         if (Math.round(relativeError * Math.pow(10, places)) === 0) {
-            return;
+            return [true, null];
         }
-
         const msgPrefix = `${a} is not equal to ${b} within ${places} places, absolute error: ` +
             `${absoluteError}, relative error: ${relativeError}`;
-        doassert(_buildAssertionMessage(msg, msgPrefix));
+        return [false, msgPrefix];
+    }
+
+    // Assert that numerical values are equivalent to 'places' significant figures.
+    assert.close = function(a, b, msg, places = 4) {
+        const [isClose, errMsg] = _isClose(a, b, places);
+        if (!isClose) {
+            doassert(_buildAssertionMessage(msg, errMsg));
+        }
     };
+
+    // Given the names of numerical fuzzyFields check that:
+    //  - For each fuzzyField: if it exists in both docA and docB, those values are 'close'
+    //  - All other fields are equal between docA and docB.
+    function _fieldsClose(docA, docB, fuzzyFields, places = 4) {
+        let exactSubsets = {a: {}, b: {}};
+        for (let currField of Object.keys(docA)) {
+            if (docB.hasOwnProperty(currField)) {
+                if (fuzzyFields.includes(currField)) {
+                    if (!_isClose(
+                            parseFloat(docA[currField]), parseFloat(docB[currField]), places)) {
+                        return false;
+                    }
+                } else {
+                    exactSubsets.a[currField] = docA[currField];
+                    exactSubsets.b[currField] = docB[currField];
+                }
+            }
+        }
+        for (let currField of Object.keys(docB)) {
+            if (!docA.hasOwnProperty(currField)) {
+                return false;
+            }
+        }
+        return _isDocEq(exactSubsets.a, exactSubsets.b);
+    }
 
     /**
      * Asserts if the times in millis are not withing delta milliseconds, in either direction.

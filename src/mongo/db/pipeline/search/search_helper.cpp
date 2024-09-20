@@ -65,6 +65,19 @@ void desugarSearchPipeline(Pipeline* pipeline) {
         sources.insert(sources.begin(), desugaredPipeline.begin(), desugaredPipeline.end());
         Pipeline::stitch(&sources);
     }
+    // TODO: SERVER-85426 Take the below code out of the if statement--i.e., it should always
+    // happen.
+    // TODO: BACKPORT-22945 (8.0) Ensure that using this feature inside a view definition is not
+    // permitted.
+    if (enableUnionWithVectorSearch.load()) {
+        auto vectorSearchStage = pipeline->popFrontWithName(DocumentSourceVectorSearch::kStageName);
+        if (vectorSearchStage) {
+            auto desugaredPipeline =
+                dynamic_cast<DocumentSourceVectorSearch*>(vectorSearchStage.get())->desugar();
+            sources.insert(sources.begin(), desugaredPipeline.begin(), desugaredPipeline.end());
+            Pipeline::stitch(&sources);
+        }
+    }
 }
 
 void injectShardFilter(Pipeline* pipeline) {

@@ -483,7 +483,7 @@ server_parameters:
     validator:
       gte: 0
     redact: false
-  
+
   internalQueryExpressionInterruptPeriodMS:
     description: "In some potentially long running expressions check if the query has been killed every time this period has elapsed."
     set_at: [ startup, runtime ]
@@ -900,6 +900,16 @@ server_parameters:
     required on 4.4 to access SEARCH_META variables. Does not do anything."
     set_at: [ startup, runtime ]
     cpp_varname: "enableSearchMeta"
+    cpp_vartype: AtomicWord<bool>
+    default: true
+    redact: false
+
+  enableUnionWithVectorSearch:
+    description: "Enables $vectorSearch inside a $unionWith and changes where the
+    internalSearchIdLookup is added: it's moved from createFromBSON to a new desugar function,
+    which is called in prepareSearchPipelineLegacyExecutor."
+    set_at: [startup, runtime ]
+    cpp_varname: "enableUnionWithVectorSearch"
     cpp_vartype: AtomicWord<bool>
     default: true
     redact: false

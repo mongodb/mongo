@@ -54,6 +54,8 @@ public:
     static std::list<boost::intrusive_ptr<DocumentSource>> createFromBson(
         BSONElement elem, const boost::intrusive_ptr<ExpressionContext>& pExpCtx);
 
+    std::list<boost::intrusive_ptr<DocumentSource>> desugar();
+
     const char* getSourceName() const override {
         return kStageName.rawData();
     }
@@ -91,6 +93,12 @@ public:
                                      LookupRequirement::kNotAllowed,
                                      UnionRequirement::kNotAllowed,
                                      ChangeStreamRequirement::kDenylist);
+        // TODO: SERVER-85426 The constraint should now always be UnionRequirement::kAllowed.
+        // TODO: BACKPORT-22945 (8.0) Ensure that using this feature inside a view definition is not
+        // permitted.
+        if (enableUnionWithVectorSearch.load()) {
+            constraints.unionRequirement = UnionRequirement::kAllowed;
+        }
         constraints.requiresInputDocSource = false;
         constraints.noFieldModifications = true;
         return constraints;

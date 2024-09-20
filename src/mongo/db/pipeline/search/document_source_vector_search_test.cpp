@@ -202,6 +202,15 @@ TEST_F(DocumentSourceVectorSearchTest, HasTheCorrectStagesWhenCreated) {
     })");
 
     auto vectorStage = DocumentSourceVectorSearch::createFromBson(spec.firstElement(), expCtx);
+
+    // TODO: SERVER-85426 take the desugar code out of the if statement--i.e., it should always
+    // happen.
+    // TODO: BACKPORT-22945 (8.0) Ensure that using this feature inside a view definition is not
+    // permitted.
+    if (enableUnionWithVectorSearch.load()) {
+        vectorStage =
+            dynamic_cast<DocumentSourceVectorSearch*>(vectorStage.front().get())->desugar();
+    }
     ASSERT_EQUALS(vectorStage.size(), 2UL);
 
     const auto* vectorSearchStage =
