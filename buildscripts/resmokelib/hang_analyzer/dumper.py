@@ -499,7 +499,6 @@ class GDBDumper(Dumper):
             mongodb_uniqstack = "mongodb-uniqstack mongodb-bt-if-active"
             mongodb_javascript_stack = "mongodb-javascript-stack"
             mongod_dump_sessions = "mongod-dump-sessions"
-            mongodb_dump_mutexes = "mongodb-dump-mutexes"
             mongodb_dump_recovery_units = "mongodb-dump-recovery-units"
             mongodb_dump_storage_engine_info = "mongodb-dump-storage-engine-info"
 
@@ -553,7 +552,6 @@ class GDBDumper(Dumper):
                         mongodb_waitsfor_graph,
                         mongodb_javascript_stack,
                         mongod_dump_sessions,
-                        mongodb_dump_mutexes,
                         mongodb_dump_recovery_units,
                         mongodb_dump_storage_engine_info,
                         "detach",
@@ -769,7 +767,6 @@ class GDBDumper(Dumper):
         add_commands("mongodb-uniqstack mongodb-bt-if-active", "uniqstack")
         add_commands("mongodb-show-locks", "show_locks")
         add_commands("mongod-dump-sessions", "dump_sessions")
-        add_commands("mongodb-dump-mutexes", "dump_mutexes")
         add_commands("mongodb-dump-recovery-units", "dump_recovery_units")
         # depends on gdbmongo python dependency
         add_commands("python print(gdbmongo.LockManagerPrinter.from_global().val)", "dump_locks")
