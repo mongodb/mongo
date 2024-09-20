@@ -178,6 +178,9 @@ public:
      */
     virtual std::unique_ptr<const IndexCatalogEntry> getNormalizedEntry(
         OperationContext* opCtx, const CollectionPtr& coll) const = 0;
+
+    virtual std::unique_ptr<const IndexCatalogEntry> cloneWithDifferentDescriptor(
+        IndexDescriptor descriptor) const = 0;
 };
 
 class IndexCatalogEntryContainer {

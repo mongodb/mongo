@@ -204,10 +204,11 @@ public:
         MONGO_UNREACHABLE;
     }
 
-    std::vector<BSONObj> removeExistingIndexesNoChecks(OperationContext*,
-                                                       const CollectionPtr&,
-                                                       const std::vector<BSONObj>&,
-                                                       bool) const override {
+    std::vector<BSONObj> removeExistingIndexesNoChecks(
+        OperationContext*,
+        const CollectionPtr&,
+        const std::vector<BSONObj>&,
+        IndexCatalog::RemoveExistingIndexesFlags) const override {
         MONGO_UNREACHABLE;
     }
 

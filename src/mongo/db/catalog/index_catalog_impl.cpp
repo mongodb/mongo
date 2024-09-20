@@ -559,7 +559,7 @@ std::vector<BSONObj> IndexCatalogImpl::removeExistingIndexesNoChecks(
     OperationContext* const opCtx,
     const CollectionPtr& collection,
     const std::vector<BSONObj>& indexSpecsToBuild,
-    bool removeInProgressIndexBuilds) const {
+    IndexCatalog::RemoveExistingIndexesFlags flags) const {
     std::vector<BSONObj> result;
     // Filter out ready and in-progress index builds, and any non-_id indexes if 'buildIndexes' is
     // set to false in the replica set's config.
@@ -572,11 +572,12 @@ std::vector<BSONObj> IndexCatalogImpl::removeExistingIndexesNoChecks(
         // _doesSpecConflictWithExisting currently does more work than we require here: we are only
         // interested in the index already exists error.
 
-        auto inclusionPolicy = removeInProgressIndexBuilds
+        auto inclusionPolicy = flags.removeInProgressIndexBuilds
             ? IndexCatalog::InclusionPolicy::kReady | IndexCatalog::InclusionPolicy::kUnfinished
             : IndexCatalog::InclusionPolicy::kReady;
         if (ErrorCodes::IndexAlreadyExists ==
-            _doesSpecConflictWithExisting(opCtx, collection, spec, inclusionPolicy)) {
+            _doesSpecConflictWithExisting(
+                opCtx, collection, spec, inclusionPolicy, flags.fieldsToUseForComparison)) {
             continue;
         }
 
@@ -1046,10 +1047,12 @@ Status IndexCatalogImpl::_isSpecOk(OperationContext* opCtx,
     return Status::OK();
 }
 
-Status IndexCatalogImpl::_doesSpecConflictWithExisting(OperationContext* opCtx,
-                                                       const CollectionPtr& collection,
-                                                       const BSONObj& spec,
-                                                       InclusionPolicy inclusionPolicy) const {
+Status IndexCatalogImpl::_doesSpecConflictWithExisting(
+    OperationContext* opCtx,
+    const CollectionPtr& collection,
+    const BSONObj& spec,
+    InclusionPolicy inclusionPolicy,
+    const std::map<StringData, std::set<IndexType>>* allowedFieldNames) const {
     StringData name = spec.getStringField(IndexDescriptor::kIndexNameFieldName);
     invariant(name[0]);
 
@@ -1069,7 +1072,18 @@ Status IndexCatalogImpl::_doesSpecConflictWithExisting(OperationContext* opCtx,
             // Index already exists with same name. Check whether the options are the same as well.
             auto entry = getEntry(desc);
             IndexDescriptor candidate(_getAccessMethodName(key), spec);
-            auto indexComparison = candidate.compareIndexOptions(opCtx, collection->ns(), entry);
+            auto indexComparison = [&] {
+                if (allowedFieldNames) {
+                    auto filteredEntry = entry->cloneWithDifferentDescriptor(
+                        IndexDescriptor(desc->getAccessMethodName(),
+                                        index_key_validate::repairIndexSpec(
+                                            collection->ns(), desc->toBSON(), *allowedFieldNames)));
+                    return candidate.compareIndexOptions(
+                        opCtx, collection->ns(), filteredEntry.get());
+                } else {
+                    return candidate.compareIndexOptions(opCtx, collection->ns(), entry);
+                }
+            }();
 
             // Key pattern or another uniquely-identifying option differs. We can build this index,
             // but not with the specified (duplicate) name. User must specify another index name.
@@ -1130,7 +1144,18 @@ Status IndexCatalogImpl::_doesSpecConflictWithExisting(OperationContext* opCtx,
             auto entry = getEntry(desc);
 
             IndexDescriptor candidate(_getAccessMethodName(key), spec);
-            auto indexComparison = candidate.compareIndexOptions(opCtx, collection->ns(), entry);
+            auto indexComparison = [&] {
+                if (allowedFieldNames) {
+                    auto filteredEntry = entry->cloneWithDifferentDescriptor(
+                        IndexDescriptor(desc->getAccessMethodName(),
+                                        index_key_validate::repairIndexSpec(
+                                            collection->ns(), desc->toBSON(), *allowedFieldNames)));
+                    return candidate.compareIndexOptions(
+                        opCtx, collection->ns(), filteredEntry.get());
+                } else {
+                    return candidate.compareIndexOptions(opCtx, collection->ns(), entry);
+                }
+            }();
 
             // The candidate's key and uniquely-identifying options are equivalent to an existing
             // index, but some other options are not identical. Return a message to that effect.

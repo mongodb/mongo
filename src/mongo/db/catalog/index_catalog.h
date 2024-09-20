@@ -46,6 +46,7 @@
 #include "mongo/db/catalog/clustered_collection_options_gen.h"
 #include "mongo/db/catalog/index_catalog_entry.h"
 #include "mongo/db/index/multikey_paths.h"
+#include "mongo/db/index_names.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
@@ -420,6 +421,29 @@ public:
         bool removeIndexBuildsToo) const = 0;
 
     /**
+     * Options struct used for IndexCatalog::removeExistingIndexesNoChecks. See the comments above
+     * the members explaining what they each stand for.
+     */
+    struct RemoveExistingIndexesFlags {
+        RemoveExistingIndexesFlags(){};
+        RemoveExistingIndexesFlags(
+            bool removeInProgressIndexBuilds,
+            const std::map<StringData, std::set<IndexType>>* fieldsToUseForComparison)
+            : removeInProgressIndexBuilds(removeInProgressIndexBuilds),
+              fieldsToUseForComparison(fieldsToUseForComparison){};
+        // Flag indicating whether we should also check unfinished index builds for wether the given
+        // specs match.
+        bool removeInProgressIndexBuilds = true;
+        // Pointer to a map containing all the allowed fields we'll use for comparing entries. For
+        // example, if we have an existing invalid on-disk index spec where we have extra unknown
+        // fields this will ignore them when comparing for a match. Note that this can also repair
+        // the on-disk index spec so that invalid fields become valid.
+        //
+        // Useful when comapring against output that has been fixed beforehand and won't affect the
+        // correctness of the check.
+        const std::map<StringData, std::set<IndexType>>* fieldsToUseForComparison = nullptr;
+    };
+    /**
      * Filters out ready and in-progress indexes that already exist and returns the remaining
      * indexes. Additionally filters out non-_id indexes if the replica set member config has
      * {buildIndexes:false} set.
@@ -429,14 +453,14 @@ public:
      * This should only be used when we are confident in the specs, such as when specs are received
      * via replica set cloning or chunk migrations.
      *
-     * 'removeInProgressIndexBuilds' controls whether in-progress index builds are also filtered
-     * out.
+     * 'flagsToUse' controls whether in-progress index builds are also filtered out and whether we
+     * should also use a subset of fields when comparing.
      */
     virtual std::vector<BSONObj> removeExistingIndexesNoChecks(
         OperationContext* opCtx,
         const CollectionPtr& collection,
         const std::vector<BSONObj>& indexSpecsToBuild,
-        bool removeInProgressIndexBuilds = true) const = 0;
+        RemoveExistingIndexesFlags flagsToUse = RemoveExistingIndexesFlags()) const = 0;
 
     /**
      * Drops indexes in the index catalog that returns true when it's descriptor returns true for

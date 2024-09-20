@@ -172,6 +172,11 @@ public:
         MONGO_UNIMPLEMENTED;
     }
 
+    std::unique_ptr<const IndexCatalogEntry> cloneWithDifferentDescriptor(
+        IndexDescriptor) const final {
+        MONGO_UNREACHABLE;
+    }
+
 private:
     IndexDescriptor* _descriptor;
 };

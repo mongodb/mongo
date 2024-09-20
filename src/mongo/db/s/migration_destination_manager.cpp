@@ -56,6 +56,7 @@
 #include "mongo/db/catalog/index_catalog.h"
 #include "mongo/db/catalog_raii.h"
 #include "mongo/db/client.h"
+#include "mongo/db/commands/list_indexes_allowed_fields.h"
 #include "mongo/db/concurrency/exception_util.h"
 #include "mongo/db/concurrency/lock_manager_defs.h"
 #include "mongo/db/dbdirectclient.h"
@@ -1142,8 +1143,13 @@ void MigrationDestinationManager::cloneCollectionIndexesAndOptions(
 
         auto checkEmptyOrGetMissingIndexesFromDonor = [&](const CollectionPtr& collection) {
             auto indexCatalog = collection->getIndexCatalog();
+            // We force the index comparison to only use the fields allowed by listIndexes and to
+            // repair our index. Otherwise we might unnecessary fail the chunk migration due to
+            // having some invalid/unused fields in the index spec.
+            IndexCatalog::RemoveExistingIndexesFlags opts{!isFirstMigration,
+                                                          &kAllowedListIndexesFieldNames};
             auto indexSpecs = indexCatalog->removeExistingIndexesNoChecks(
-                opCtx, collection, collectionOptionsAndIndexes.indexSpecs, !isFirstMigration);
+                opCtx, collection, collectionOptionsAndIndexes.indexSpecs, opts);
             if (!indexSpecs.empty()) {
                 // Only allow indexes to be copied if the collection does not have any documents.
                 uassert(ErrorCodes::CannotCreateCollection,

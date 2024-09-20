@@ -530,10 +530,141 @@ public:
         return std::make_unique<NormalizedIndexCatalogEntry>(*this);
     };
 
+    std::unique_ptr<const IndexCatalogEntry> cloneWithDifferentDescriptor(
+        IndexDescriptor descriptor) const final {
+        MONGO_UNREACHABLE;
+    }
+
 private:
     const IndexCatalogEntry* _original;
     IndexDescriptor _indexDescriptor;
     std::unique_ptr<CollatorInterface> _collator;
+};
+
+class WithDifferentIndexDescriptorEntry : public IndexCatalogEntry {
+public:
+    WithDifferentIndexDescriptorEntry(IndexDescriptor descriptor, const IndexCatalogEntry* entry)
+        : IndexCatalogEntry(), _original(entry), _indexDescriptor(std::move(descriptor)) {
+        _indexDescriptor.setEntry(this);
+    }
+
+    const std::string& getIdent() const final {
+        return _original->getIdent();
+    }
+
+    std::shared_ptr<Ident> getSharedIdent() const final {
+        return _original->getSharedIdent();
+    }
+
+    void setIdent(std::shared_ptr<Ident> newIdent) final {
+        MONGO_UNREACHABLE;
+    }
+
+    IndexDescriptor* descriptor() final {
+        MONGO_UNREACHABLE;
+    }
+
+    const IndexDescriptor* descriptor() const final {
+        return &_indexDescriptor;
+    }
+
+    IndexAccessMethod* accessMethod() const final {
+        return _original->accessMethod();
+    }
+
+    void setAccessMethod(std::unique_ptr<IndexAccessMethod> accessMethod) final {
+        MONGO_UNREACHABLE;
+    }
+
+    bool isHybridBuilding() const final {
+        return _original->isHybridBuilding();
+    }
+
+    IndexBuildInterceptor* indexBuildInterceptor() const final {
+        return _original->indexBuildInterceptor();
+    }
+
+    void setIndexBuildInterceptor(IndexBuildInterceptor* interceptor) final {
+        MONGO_UNREACHABLE;
+    }
+
+    const Ordering& ordering() const final {
+        return _original->ordering();
+    }
+
+    const MatchExpression* getFilterExpression() const final {
+        return _original->getFilterExpression();
+    }
+
+    const CollatorInterface* getCollator() const final {
+        return _original->getCollator();
+    }
+
+    NamespaceString getNSSFromCatalog(OperationContext* opCtx) const final {
+        return _original->getNSSFromCatalog(opCtx);
+    }
+
+    void setIsReady(bool newIsReady) final {
+        MONGO_UNREACHABLE;
+    }
+
+    void setIsFrozen(bool newIsFrozen) final {
+        MONGO_UNREACHABLE;
+    }
+
+    bool isMultikey(OperationContext* opCtx, const CollectionPtr& collection) const final {
+        return _original->isMultikey(opCtx, collection);
+    }
+
+    MultikeyPaths getMultikeyPaths(OperationContext* opCtx,
+                                   const CollectionPtr& collection) const final {
+        return _original->getMultikeyPaths(opCtx, collection);
+    }
+
+    void setMultikey(OperationContext* opCtx,
+                     const CollectionPtr& coll,
+                     const KeyStringSet& multikeyMetadataKeys,
+                     const MultikeyPaths& multikeyPaths) const final {
+        return _original->setMultikey(opCtx, coll, multikeyMetadataKeys, multikeyPaths);
+    }
+
+    void forceSetMultikey(OperationContext* opCtx,
+                          const CollectionPtr& coll,
+                          bool isMultikey,
+                          const MultikeyPaths& multikeyPaths) const final {
+        return _original->forceSetMultikey(opCtx, coll, isMultikey, multikeyPaths);
+    }
+
+    bool isReady() const final {
+        return _original->isReady();
+    }
+
+    bool isFrozen() const final {
+        return _original->isFrozen();
+    }
+
+    bool shouldValidateDocument() const final {
+        return _original->shouldValidateDocument();
+    }
+
+    const UpdateIndexData& getIndexedPaths() const final {
+        return _original->getIndexedPaths();
+    }
+
+    std::unique_ptr<const IndexCatalogEntry> getNormalizedEntry(
+        OperationContext* opCtx, const CollectionPtr& coll) const final {
+        MONGO_UNREACHABLE;
+    };
+
+    std::unique_ptr<const IndexCatalogEntry> cloneWithDifferentDescriptor(
+        IndexDescriptor descriptor) const final {
+        return std::make_unique<WithDifferentIndexDescriptorEntry>(std::move(descriptor),
+                                                                   _original);
+    }
+
+private:
+    const IndexCatalogEntry* _original;
+    IndexDescriptor _indexDescriptor;
 };
 
 }  // namespace
@@ -541,6 +672,11 @@ private:
 std::unique_ptr<const IndexCatalogEntry> IndexCatalogEntryImpl::getNormalizedEntry(
     OperationContext* opCtx, const CollectionPtr& coll) const {
     return std::make_unique<NormalizedIndexCatalogEntry>(opCtx, coll, this);
+}
+
+std::unique_ptr<const IndexCatalogEntry> IndexCatalogEntryImpl::cloneWithDifferentDescriptor(
+    IndexDescriptor descriptor) const {
+    return std::make_unique<WithDifferentIndexDescriptorEntry>(std::move(descriptor), this);
 }
 
 // ----

@@ -59,6 +59,7 @@
 #include "mongo/db/catalog/list_indexes.h"
 #include "mongo/db/clientcursor.h"
 #include "mongo/db/commands.h"
+#include "mongo/db/commands/list_indexes_allowed_fields.h"
 #include "mongo/db/commands/shuffle_list_command_results.h"
 #include "mongo/db/cursor_manager.h"
 #include "mongo/db/db_raii.h"
@@ -96,44 +97,6 @@
 
 namespace mongo {
 namespace {
-
-// The allowed fields have to be in sync with those defined in 'src/mongo/db/list_indexes.idl'.
-static std::map<StringData, std::set<IndexType>> allowedFieldNames = {
-    {ListIndexesReplyItem::k2dsphereIndexVersionFieldName,
-     {IndexType::INDEX_2DSPHERE, IndexType::INDEX_2DSPHERE_BUCKET}},
-    {ListIndexesReplyItem::kBackgroundFieldName, {}},
-    {ListIndexesReplyItem::kBitsFieldName, {IndexType::INDEX_2D}},
-    {ListIndexesReplyItem::kBucketSizeFieldName, {}},
-    {ListIndexesReplyItem::kBuildUUIDFieldName, {}},
-    {ListIndexesReplyItem::kClusteredFieldName, {}},
-    {ListIndexesReplyItem::kCoarsestIndexedLevelFieldName, {IndexType::INDEX_2DSPHERE}},
-    {ListIndexesReplyItem::kCollationFieldName, {}},
-    {ListIndexesReplyItem::kDefault_languageFieldName, {}},
-    {ListIndexesReplyItem::kDropDupsFieldName, {}},
-    {ListIndexesReplyItem::kExpireAfterSecondsFieldName, {}},
-    {ListIndexesReplyItem::kFinestIndexedLevelFieldName, {IndexType::INDEX_2DSPHERE}},
-    {ListIndexesReplyItem::kHiddenFieldName, {}},
-    {ListIndexesReplyItem::kIndexBuildInfoFieldName, {}},
-    {ListIndexesReplyItem::kKeyFieldName, {}},
-    {ListIndexesReplyItem::kLanguage_overrideFieldName, {}},
-    {ListIndexesReplyItem::kMaxFieldName, {IndexType::INDEX_2D}},
-    {ListIndexesReplyItem::kMinFieldName, {IndexType::INDEX_2D}},
-    {ListIndexesReplyItem::kNameFieldName, {}},
-    {ListIndexesReplyItem::kNsFieldName, {}},
-    {ListIndexesReplyItem::kOriginalSpecFieldName, {}},
-    {ListIndexesReplyItem::kPartialFilterExpressionFieldName, {}},
-    {ListIndexesReplyItem::kPrepareUniqueFieldName, {}},
-    {ListIndexesReplyItem::kSparseFieldName, {}},
-    {ListIndexesReplyItem::kSpecFieldName, {}},
-    {ListIndexesReplyItem::kStorageEngineFieldName, {}},
-    {ListIndexesReplyItem::kTextIndexVersionFieldName, {IndexType::INDEX_TEXT}},
-    {ListIndexesReplyItem::kUniqueFieldName, {}},
-    {ListIndexesReplyItem::kVFieldName, {}},
-    {ListIndexesReplyItem::kWeightsFieldName, {IndexType::INDEX_TEXT}},
-    {ListIndexesReplyItem::kWildcardProjectionFieldName, {IndexType::INDEX_WILDCARD}},
-    {ListIndexesReplyItem::kColumnstoreProjectionFieldName, {IndexType::INDEX_COLUMN}},
-    {ListIndexesReplyItem::kColumnstoreCompressorFieldName, {IndexType::INDEX_COLUMN}},
-};
 
 /**
  * Returns index specs, with resolved namespace, from the catalog for this listIndexes request.
@@ -373,7 +336,8 @@ public:
                     break;
                 }
                 invariant(state == PlanExecutor::ADVANCED);
-                nextDoc = index_key_validate::repairIndexSpec(nss, nextDoc, allowedFieldNames);
+                nextDoc = index_key_validate::repairIndexSpec(
+                    nss, nextDoc, kAllowedListIndexesFieldNames);
 
                 // If we can't fit this result inside the current batch, then we stash it for
                 // later.

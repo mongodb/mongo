@@ -182,6 +182,9 @@ public:
     std::unique_ptr<const IndexCatalogEntry> getNormalizedEntry(
         OperationContext* opCtx, const CollectionPtr& coll) const final;
 
+    std::unique_ptr<const IndexCatalogEntry> cloneWithDifferentDescriptor(
+        IndexDescriptor) const final;
+
 private:
     /**
      * Sets this index to be multikey when we are running inside a multi-document transaction.

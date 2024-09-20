@@ -29,6 +29,8 @@
 
 #include "mongo/db/catalog/catalog_test_fixture.h"
 #include "mongo/db/catalog/index_catalog_impl.h"
+#include "mongo/db/catalog/index_key_validate.h"
+#include "mongo/db/commands/list_indexes_allowed_fields.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/storage/sorted_data_interface.h"
 #include "mongo/stdx/thread.h"
@@ -99,6 +101,52 @@ TEST_F(IndexCatalogImplTest, IndexRebuildHandlesTransientEbusy) {
     }
 
     async_close_cursor.join();
+}
+
+TEST_F(IndexCatalogImplTest, WithInvalidIndexSpec) {
+    const NamespaceString nss =
+        NamespaceString::createNamespaceString_forTest("IndexCatalogImplTest.WithInvalidIndexSpec");
+    ASSERT_OK(storageInterface()->createCollection(operationContext(), nss, CollectionOptions()));
+
+    IndexSpec spec;
+    spec.version(1).name("x_1").addKeys(BSON("x" << 1));
+    auto bson = spec.toBSON();
+    BSONObjBuilder bob(bson);
+    // Explicitly add an invalid spec field so that we store the wrong spec on disk.
+    bob.append(IndexDescriptor::kExpireAfterSecondsFieldName, "true");
+    bson = bob.obj();
+
+    // Create an index which has an invalid on-disk format. This gets fixed whenever we return them
+    // with listIndexes.
+    {
+        AutoGetCollection autoColl(operationContext(), nss, MODE_X);
+        WriteUnitOfWork wuow(operationContext());
+        auto collWriter = autoColl.getWritableCollection(operationContext());
+        IndexDescriptor desc{IndexNames::BTREE, bson};
+        ASSERT_OK(collWriter->prepareForIndexBuild(operationContext(), &desc, boost::none));
+        auto entry = collWriter->getIndexCatalog()->createIndexEntry(
+            operationContext(), collWriter, std::move(desc), CreateIndexEntryFlags::kNone);
+        collWriter->indexBuildSuccess(operationContext(), entry);
+        wuow.commit();
+    }
+
+    {
+        auto fixedSpec = index_key_validate::repairIndexSpec(nss, bson);
+        AutoGetCollection autoColl(operationContext(), nss, MODE_X);
+        // We have a spec that's fixed according to what listIndexes would output and the on-disk
+        // one. These two are different, so we expect them to cause a conflict and mismatch.
+        auto indexes = autoColl->getIndexCatalog()->removeExistingIndexesNoChecks(
+            operationContext(), autoColl.getCollection(), {fixedSpec});
+        ASSERT_FALSE(indexes.empty());
+        // However, if we specify to the index catalog that we must repair the spec before
+        // comparison with the given allowed fields then we should have no conflict.
+        indexes = autoColl->getIndexCatalog()->removeExistingIndexesNoChecks(
+            operationContext(),
+            autoColl.getCollection(),
+            {fixedSpec},
+            IndexCatalog::RemoveExistingIndexesFlags{true, &kAllowedListIndexesFieldNames});
+        ASSERT_TRUE(indexes.empty());
+    }
 }
 
 }  // namespace mongo
