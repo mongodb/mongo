@@ -52,8 +52,7 @@ const NamespaceString CanonicalQueryTest::nss =
 CanonicalQuery::QueryShapeString encodeKey(const CanonicalQuery& cq) {
     return (cq.getExpCtx()->getQueryKnobConfiguration().isForceClassicEngineEnabled() &&
             cq.isSbeCompatible())
-        ? canonical_query_encoder::encodeSBE(cq,
-                                             canonical_query_encoder::Optimizer::kSbeStageBuilders)
+        ? canonical_query_encoder::encodeSBE(cq)
         : canonical_query_encoder::encodeClassic(cq);
 }
 

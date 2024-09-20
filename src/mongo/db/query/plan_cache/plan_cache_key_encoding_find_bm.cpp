@@ -68,8 +68,7 @@ public:
 
         // This is where recording starts.
         for (auto keepRunning : state) {
-            benchmark::DoNotOptimize(canonical_query_encoder::encodeSBE(
-                *cq, canonical_query_encoder::Optimizer::kBonsai));
+            benchmark::DoNotOptimize(canonical_query_encoder::encodeSBE(*cq));
             benchmark::ClobberMemory();
         }
     }

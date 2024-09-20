@@ -365,9 +365,7 @@ std::unique_ptr<PlannerInterface> PlannerGeneratorFromSbeCacheEntry::makePlanner
         // Deactivate the current cache entry.
         auto& sbePlanCache = sbe::getPlanCache(plannerData.opCtx);
         sbePlanCache.deactivate(
-            plan_cache_key_factory::make(*plannerData.cq,
-                                         plannerData.collections,
-                                         canonical_query_encoder::Optimizer::kSbeStageBuilders));
+            plan_cache_key_factory::make(*plannerData.cq, plannerData.collections));
     };
 
     return attemptToUsePlan(std::move(_plannerData),

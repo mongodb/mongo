@@ -184,9 +184,7 @@ PlanCacheKey make(const CanonicalQuery& query,
 sbe::PlanCacheKey make(const CanonicalQuery& query,
                        const CollectionPtr& collection,
                        PlanCacheKeyTag<sbe::PlanCacheKey> tag) {
-    return plan_cache_key_factory::make(query,
-                                        MultipleCollectionAccessor(collection),
-                                        canonical_query_encoder::Optimizer::kSbeStageBuilders);
+    return plan_cache_key_factory::make(query, MultipleCollectionAccessor(collection));
 }
 }  // namespace plan_cache_detail
 
@@ -212,10 +210,10 @@ getCollectionState(OperationContext* opCtx, const MultipleCollectionAccessor& co
 
 sbe::PlanCacheKey make(const CanonicalQuery& query,
                        const MultipleCollectionAccessor& collections,
-                       const canonical_query_encoder::Optimizer optimizer) {
+                       const bool requiresSbeCompatibility) {
     OperationContext* opCtx = query.getOpCtx();
     auto [mainCollectionState, secondaryCollectionStates] = getCollectionState(opCtx, collections);
-    auto shapeString = canonical_query_encoder::encodeSBE(query, optimizer);
+    auto shapeString = canonical_query_encoder::encodeSBE(query, requiresSbeCompatibility);
     return {plan_cache_detail::makePlanCacheKeyInfo(std::move(shapeString),
                                                     query.getPrimaryMatchExpression(),
                                                     collections.getMainCollection(),
@@ -237,9 +235,7 @@ sbe::PlanCacheKey make(const Pipeline& query, const MultipleCollectionAccessor& 
 
     auto matchStage = dynamic_cast<DocumentSourceMatch*>(stages.front().get());
 
-    // Pipelines are used to generate a plan cache key directly only in the Bonsai flow.
-    auto shapeString = canonical_query_encoder::encodePipeline(
-        query.getContext().get(), stages, canonical_query_encoder::Optimizer::kBonsai);
+    auto shapeString = canonical_query_encoder::encodePipeline(query.getContext().get(), stages);
     return {plan_cache_detail::makePlanCacheKeyInfo(std::move(shapeString),
                                                     matchStage->getMatchExpression(),
                                                     collections.getMainCollection(),

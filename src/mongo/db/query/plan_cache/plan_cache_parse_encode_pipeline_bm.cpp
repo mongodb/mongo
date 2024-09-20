@@ -62,8 +62,7 @@ public:
             pipelineStages.emplace_back(source);
         }
 
-        return canonical_query_encoder::encodePipeline(
-            expCtx.get(), pipelineStages, canonical_query_encoder::Optimizer::kBonsai);
+        return canonical_query_encoder::encodePipeline(expCtx.get(), pipelineStages);
     }
 
     void benchmarkQueryMatchProject(benchmark::State& state,

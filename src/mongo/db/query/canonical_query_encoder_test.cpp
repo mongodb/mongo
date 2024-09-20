@@ -218,8 +218,7 @@ protected:
                                                    isCountLike,
                                                    needsMerge));
         cq->setSbeCompatible(true);
-        const auto key = canonical_query_encoder::encodeSBE(
-            *cq, canonical_query_encoder::Optimizer::kSbeStageBuilders);
+        const auto key = canonical_query_encoder::encodeSBE(*cq);
         gctx.outStream() << key << std::endl;
     }
 
@@ -227,7 +226,7 @@ protected:
                                    StringData matchStr,
                                    StringData projStr) {
         auto& stream = gctx.outStream();
-        stream << "==== VARIATION: bonsai + sbe, " << matchStr << ", " << projStr;
+        stream << "==== VARIATION: sbe pipeline: " << matchStr << ", " << projStr;
         stream << std::endl;
 
         auto pipelineObj = [](StringData matchStr, StringData projStr) -> std::vector<BSONObj> {
@@ -243,8 +242,7 @@ protected:
         const auto expCtx = make_intrusive<ExpressionContextForTest>(opCtx(), nss);
         auto pipeline = parsePipeline(expCtx, pipelineObj(matchStr, projStr), true);
 
-        const auto key = canonical_query_encoder::encodePipeline(
-            expCtx.get(), pipeline, canonical_query_encoder::Optimizer::kBonsai);
+        const auto key = canonical_query_encoder::encodePipeline(expCtx.get(), pipeline);
         gctx.outStream() << key << std::endl;
     }
 };
@@ -760,7 +758,6 @@ TEST_F(CanonicalQueryEncoderTest, ComputeKeyWithNeedsMerge) {
 TEST_F(CanonicalQueryEncoderTest, ComputeKeyForPipeline) {
     unittest::GoldenTestContext gctx(&goldenTestConfig);
     // SBE must be enabled in order to generate SBE plan cache keys.
-    // Bonsai plan cache
     RAIIServerParameterControllerForTest controllerSBE("internalQueryFrameworkControl",
                                                        "trySbeEngine");
 
@@ -778,16 +775,5 @@ TEST_F(CanonicalQueryEncoderTest, ComputeKeyForPipeline) {
     testComputeKeyForPipeline(
         gctx, "{$match: {$or: [{a: 1}, {b: 1}]}}", "{$project: {a: 1, b: 1}}");
 }
-
-TEST_F(CanonicalQueryEncoderTest, EncodeOptimizerType) {
-    auto query = canonicalize(opCtx(), "{a: 1}");
-    query->setSbeCompatible(true);
-    auto classicEncoding = canonical_query_encoder::encodeSBE(
-        *query, canonical_query_encoder::Optimizer::kSbeStageBuilders);
-    auto cqfEncoding =
-        canonical_query_encoder::encodeSBE(*query, canonical_query_encoder::Optimizer::kBonsai);
-    ASSERT_NE(classicEncoding, cqfEncoding);
-}
-
 }  // namespace
 }  // namespace mongo

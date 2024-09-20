@@ -116,8 +116,6 @@
 #include "mongo/db/query/internal_plans.h"
 #include "mongo/db/query/interval.h"
 #include "mongo/db/query/interval_evaluation_tree.h"
-#include "mongo/db/query/optimizer/defs.h"
-#include "mongo/db/query/optimizer/explain_interface.h"
 #include "mongo/db/query/plan_cache/classic_plan_cache.h"
 #include "mongo/db/query/plan_cache/plan_cache.h"
 #include "mongo/db/query/plan_cache/plan_cache_key_factory.h"
@@ -914,8 +912,7 @@ public:
 
 private:
     sbe::PlanCacheKey buildPlanCacheKey() const override {
-        return plan_cache_key_factory::make(
-            *_cq, _collections, canonical_query_encoder::Optimizer::kSbeStageBuilders);
+        return plan_cache_key_factory::make(*_cq, _collections);
     }
 
     std::unique_ptr<SbeWithClassicRuntimePlanningResult> tryToBuildCachedPlanFromSbeCache(

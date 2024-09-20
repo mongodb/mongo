@@ -445,9 +445,7 @@ TEST_F(ClassicRuntimePlannerForSbeTest, SingleSolutionPassthroughPlannerCreatesC
         if (sbeFullEnabled) {  // Run CachedPlanner to execute the cached plan.
             auto [cq, plannerData] = createPlannerData();
             auto planCacheKey =
-                plan_cache_key_factory::make(*plannerData.cq,
-                                             plannerData.collections,
-                                             canonical_query_encoder::Optimizer::kSbeStageBuilders);
+                plan_cache_key_factory::make(*plannerData.cq, plannerData.collections);
             auto&& planCache = sbe::getPlanCache(operationContext());
             auto cacheEntry = planCache.getCacheEntryIfActive(planCacheKey);
             ASSERT_TRUE(cacheEntry);
@@ -494,10 +492,8 @@ TEST_F(ClassicRuntimePlannerForSbeTest, MultiPlannerPicksMoreEfficientPlan) {
             std::unique_ptr<PlannerInterface> cachedPlanner;
             auto [cq, plannerData] = createPlannerData();
             if (sbeFullEnabled) {
-                auto planCacheKey = plan_cache_key_factory::make(
-                    *plannerData.cq,
-                    plannerData.collections,
-                    canonical_query_encoder::Optimizer::kSbeStageBuilders);
+                auto planCacheKey =
+                    plan_cache_key_factory::make(*plannerData.cq, plannerData.collections);
                 auto&& planCache = sbe::getPlanCache(operationContext());
                 auto cacheEntry = planCache.getCacheEntryIfActive(planCacheKey);
                 ASSERT_TRUE(cacheEntry);
@@ -578,10 +574,7 @@ TEST_F(ClassicRuntimePlannerForSbeTest, SbePlanCacheIsUpdatedDuringEofOptimizati
     }
     {  // Run CachedPlanner to execute the cached plan.
         auto [cq, plannerData] = createPlannerData(kFindFilter, BSONObj{} /*addFieldsSpec*/);
-        auto planCacheKey =
-            plan_cache_key_factory::make(*plannerData.cq,
-                                         plannerData.collections,
-                                         canonical_query_encoder::Optimizer::kSbeStageBuilders);
+        auto planCacheKey = plan_cache_key_factory::make(*plannerData.cq, plannerData.collections);
         auto&& planCache = sbe::getPlanCache(operationContext());
         auto cacheEntry = planCache.getCacheEntryIfActive(planCacheKey);
         ASSERT_TRUE(cacheEntry);
@@ -630,10 +623,7 @@ TEST_F(ClassicRuntimePlannerForSbeTest,
 
     // Run CachedPlanner to execute the cached plan.
     auto [cq, plannerData] = createPlannerData(kRootedOrFilter);
-    auto planCacheKey =
-        plan_cache_key_factory::make(*plannerData.cq,
-                                     plannerData.collections,
-                                     canonical_query_encoder::Optimizer::kSbeStageBuilders);
+    auto planCacheKey = plan_cache_key_factory::make(*plannerData.cq, plannerData.collections);
 
     auto cacheEntry = sbePlanCache.getCacheEntryIfActive(planCacheKey);
     ASSERT_TRUE(cacheEntry);
@@ -741,9 +731,7 @@ TEST_F(ClassicRuntimePlannerForSbeTest, SbeCachedPlannerReplansOnFailureMemoryLi
     auto [cq, plannerData] = createPlannerData();
     // Run CachedPlanner to execute the cached plan.
     sbe::PlanCacheKey sbePlanCacheKey =
-        plan_cache_key_factory::make(*plannerData.cq,
-                                     plannerData.collections,
-                                     canonical_query_encoder::Optimizer::kSbeStageBuilders);
+        plan_cache_key_factory::make(*plannerData.cq, plannerData.collections);
     auto cacheEntry = sbePlanCache.getCacheEntryIfActive(sbePlanCacheKey);
     ASSERT_TRUE(cacheEntry);
 
@@ -842,10 +830,7 @@ TEST_F(ClassicRuntimePlannerForSbeTest, SbeCachedPlannerReplansOnHittingMaxNumRe
 
     {  // Run CachedPlanner to execute the cached plan.
         auto [cq, plannerData] = createPlannerData();
-        auto planCacheKey =
-            plan_cache_key_factory::make(*plannerData.cq,
-                                         plannerData.collections,
-                                         canonical_query_encoder::Optimizer::kSbeStageBuilders);
+        auto planCacheKey = plan_cache_key_factory::make(*plannerData.cq, plannerData.collections);
         auto&& planCache = sbe::getPlanCache(operationContext());
         ASSERT_TRUE(planCache.getCacheEntryIfActive(planCacheKey));
 

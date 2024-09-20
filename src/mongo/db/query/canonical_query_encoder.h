@@ -81,20 +81,11 @@ bool isQueryNegatingEqualToNull(const mongo::MatchExpression* tree);
 namespace canonical_query_encoder {
 
 /**
- * Types of query optimizers that can produce SBE plans.
- */
-enum class Optimizer {
-    kSbeStageBuilders,
-    kBonsai,
-};
-
-/**
  * Wrapper that encodes pipelines that are eligible for the Bonsai plan cache.
  */
 CanonicalQuery::QueryShapeString encodePipeline(
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
-    const std::vector<boost::intrusive_ptr<DocumentSource>>& pipelineStages,
-    Optimizer optimizer);
+    const std::vector<boost::intrusive_ptr<DocumentSource>>& pipelineStages);
 
 /**
  * Encode the given CanonicalQuery into a string representation which represents the shape of the
@@ -111,7 +102,8 @@ CanonicalQuery::QueryShapeString encodeClassic(const CanonicalQuery& cq);
  * Two queries with the same shape may not necessarily be able to use the same plan, so the
  * plan cache has to add information to discriminate between queries with the same shape.
  */
-CanonicalQuery::QueryShapeString encodeSBE(const CanonicalQuery& cq, Optimizer optimizer);
+CanonicalQuery::QueryShapeString encodeSBE(const CanonicalQuery& cq,
+                                           bool requiresSbeCompatibility = true);
 
 /**
  * Encode the given CanonicalQuery into a string representation which represents the shape of the

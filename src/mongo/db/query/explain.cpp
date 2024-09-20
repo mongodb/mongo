@@ -106,9 +106,7 @@ void generatePlannerInfo(PlanExecutor* exec,
             feature_flags::gFeatureFlagSbeFull.isEnabled(
                 serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
             const auto planCacheKeyInfo =
-                plan_cache_key_factory::make(*exec->getCanonicalQuery(),
-                                             collections,
-                                             canonical_query_encoder::Optimizer::kSbeStageBuilders);
+                plan_cache_key_factory::make(*exec->getCanonicalQuery(), collections);
             planCacheKeyHash = planCacheKeyInfo.planCacheKeyHash();
             planCacheShapeHash = planCacheKeyInfo.planCacheShapeHash();
         } else {

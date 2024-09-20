@@ -89,7 +89,7 @@ Key make(const CanonicalQuery& query, const CollectionPtr& collection) {
  */
 sbe::PlanCacheKey make(const CanonicalQuery& query,
                        const MultipleCollectionAccessor& collections,
-                       canonical_query_encoder::Optimizer optimizer);
+                       bool requiresSbeCompatibility = true);
 
 /**
  * Similar to above, a factory helper to make a SBE plan cache key, but used for agg queries that
