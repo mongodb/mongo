@@ -33,14 +33,10 @@ def create_link_dep_impl(ctx):
                         if dep not in deps:
                             deps.append(library.static_library.path)
 
-    python = ctx.toolchains["@bazel_tools//tools/python:toolchain_type"].py3_runtime
     link_list = ctx.actions.declare_file(ctx.attr.target_name + "_links.list")
-    ctx.actions.run(
-        executable = python.interpreter.path,
-        outputs = [link_list],
-        inputs = depset(transitive = [ctx.attr._link_list_writer.files, python.files]),
-        arguments = [ctx.attr._link_list_writer.files.to_list()[0].path, link_list.path] + deps,
-        mnemonic = "LinkListFile",
+    ctx.actions.write(
+        output = link_list,
+        content = "\n".join(deps),
     )
 
     return DefaultInfo(files = depset([link_list]))
@@ -50,8 +46,6 @@ create_link_deps = rule(
     attrs = {
         "target_name": attr.string(),
         "link_deps": attr.label_list(providers = [CcInfo]),
-        "_link_list_writer": attr.label(allow_single_file = True, default = "//bazel:scons_link_list.py"),
     },
     doc = "create a psuedo target to query link deps for",
-    toolchains = ["@bazel_tools//tools/python:toolchain_type"],
 )
