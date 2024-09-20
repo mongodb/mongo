@@ -33,7 +33,37 @@ export const $config = (function() {
 
         numDocs: 100,
         batchSize: 2,
-
+        isCreateIndexRequested: false,
+        isCreatedSucceedAtLeastOnce: false,
+        createIndexAndAssert: function(db, collName, indexSpecs) {
+            const errorCodesTxn = [
+                ErrorCodes.DatabaseDropPending,
+                ErrorCodes.IndexBuildAborted,
+                ErrorCodes.IndexBuildAlreadyInProgress,
+                ErrorCodes.NoMatchingDocument,
+            ];
+            const errorCodesNonTxn = [
+                ErrorCodes.DatabaseDropPending,
+                ErrorCodes.IndexBuildAborted,
+                ErrorCodes.NoMatchingDocument,
+            ];
+            // TODO(SERVER-18047): Unify error codes once an explain against a non-existent
+            // database fails in an unsharded environment.
+            if (isMongos(db) || TestData.testingReplicaSetEndpoint) {
+                errorCodesNonTxn.push(ErrorCodes.NamespaceNotFound);
+                errorCodesNonTxn.push(ErrorCodes.CannotImplicitlyCreateCollection);
+                errorCodesNonTxn.push(ErrorCodes.StaleConfig);
+                errorCodesTxn.push(ErrorCodes.CannotImplicitlyCreateCollection);
+            }
+            this.isCreateIndexRequested = true;
+            indexSpecs.forEach(indexSpec => {
+                const res = db[collName].createIndex(indexSpec);
+                assertWorkedOrFailedHandleTxnErrors(res, errorCodesTxn, errorCodesNonTxn);
+                if (res.ok) {
+                    this.isCreatedSucceedAtLeastOnce = true;
+                }
+            });
+        },
         /**
          * Inserts 'this.numDocs' new documents into the specified collection and ensures that the
          * indexes 'this.indexSpecs' exist on the collection. Note that means it is safe for
@@ -53,26 +83,7 @@ export const $config = (function() {
                 assert.writeErrorWithCode(ex, ErrorCodes.DatabaseDropPending);
             }
 
-            const errorCodesTxn = [
-                ErrorCodes.DatabaseDropPending,
-                ErrorCodes.IndexBuildAborted,
-                ErrorCodes.IndexBuildAlreadyInProgress,
-                ErrorCodes.NoMatchingDocument,
-            ];
-            const errorCodesNonTxn = [
-                ErrorCodes.DatabaseDropPending,
-                ErrorCodes.IndexBuildAborted,
-                ErrorCodes.NoMatchingDocument,
-            ];
-            // TODO(SERVER-18047): Unify error codes once an explain against a non-existent database
-            // fails in an unsharded environment.
-            if (isMongos(db) || TestData.testingReplicaSetEndpoint) {
-                errorCodesNonTxn.push(ErrorCodes.NamespaceNotFound);
-            }
-            this.indexSpecs.forEach(indexSpec => {
-                let res = db[collName].createIndex(indexSpec);
-                assertWorkedOrFailedHandleTxnErrors(res, errorCodesTxn, errorCodesNonTxn);
-            });
+            this.createIndexAndAssert(db, collName, this.indexSpecs);
         },
 
         /**
@@ -241,19 +252,7 @@ export const $config = (function() {
             // possible another thread has already dropped this index.
             myDB[targetColl].dropIndex(indexSpec);
 
-            // Re-create the index that was dropped.
-            const expectedErrorCodes = [
-                ErrorCodes.DatabaseDropPending,
-                ErrorCodes.IndexBuildAborted,
-                ErrorCodes.NoMatchingDocument,
-            ];
-            // TODO(SERVER-18047): Unify error codes once an explain against a non-existent database
-            // fails in an unsharded environment.
-            if (isMongos(unusedDB) || TestData.testingReplicaSetEndpoint) {
-                expectedErrorCodes.push(ErrorCodes.NamespaceNotFound);
-            }
-            assert.commandWorkedOrFailedWithCode(myDB[targetColl].createIndex(indexSpec),
-                                                 expectedErrorCodes);
+            this.createIndexAndAssert(myDB, targetColl, [indexSpec]);
         }
     };
 
@@ -289,6 +288,14 @@ export const $config = (function() {
         });
     }
 
+    function teardown(db, collName, cluster) {
+        // Assert the createIndex succeeded at least once if requested. Considering the level of
+        // concurrency of this test, it's highly unluckely all the createIndex will fail. The test
+        // swallows many rare transient errors. The approach could potentially mask an underling
+        // issue if those errors happen consistently and no creation go through.
+        assert.eq(this.isCreateIndexRequested, this.isCreatedSucceedAtLeastOnce);
+    }
+
     return {
         threadCount: 10,
         iterations: 200,
@@ -297,5 +304,6 @@ export const $config = (function() {
         transitions: transitions,
         data: data,
         setup: setup,
+        teardown: teardown
     };
 })();
