@@ -73,7 +73,6 @@ std::unique_ptr<PlanExplainer> make(
     bool isFromPlanCache,
     boost::optional<size_t> cachedPlanHash,
     std::shared_ptr<const plan_cache_debug_info::DebugInfoSBE> debugInfo,
-    OptimizerCounterInfo optCounterInfo = {},
     RemoteExplainVector* remoteExplains = nullptr);
 
 /**

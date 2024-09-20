@@ -149,7 +149,6 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> make(
     std::unique_ptr<PlanYieldPolicySBE> yieldPolicy,
     bool planIsFromCache,
     boost::optional<size_t> cachedPlanHash,
-    OptimizerCounterInfo optCounterInfo,
     std::unique_ptr<RemoteCursorMap> remoteCursors,
     std::unique_ptr<RemoteExplainVector> remoteExplains,
     std::unique_ptr<MultiPlanStage> classicRuntimePlannerStage) {
@@ -176,7 +175,6 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> make(
                  false /*isOpen*/,
                  std::move(yieldPolicy),
                  cachedPlanHash,
-                 std::move(optCounterInfo),
                  std::move(remoteCursors),
                  std::move(remoteExplains),
                  std::move(classicRuntimePlannerStage)),
@@ -208,7 +206,6 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> make(
                                  true, /*isOpen*/
                                  std::move(yieldPolicy),
                                  cachedPlanHash,
-                                 {} /* optCounterInfo */,
                                  std::move(remoteCursors),
                                  std::move(remoteExplains),
                                  nullptr /*classicRuntimePlannerStage*/),

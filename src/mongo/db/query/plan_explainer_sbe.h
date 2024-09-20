@@ -66,7 +66,6 @@ public:
                          bool isCachedPlan,
                          boost::optional<size_t> cachedPlanHash,
                          std::shared_ptr<const plan_cache_debug_info::DebugInfoSBE> debugInfo,
-                         OptimizerCounterInfo optCounterInfo,
                          RemoteExplainVector* remoteExplains);
 
     bool isMultiPlan() const final {
@@ -122,7 +121,6 @@ public:
                      bool isCachedPlan,
                      boost::optional<size_t> cachedPlanHash,
                      std::shared_ptr<const plan_cache_debug_info::DebugInfoSBE> debugInfo,
-                     OptimizerCounterInfo optCounterInfo = {},
                      RemoteExplainVector* remoteExplains = nullptr);
 
     PlanStatsDetails getWinningPlanTrialStats() const final;

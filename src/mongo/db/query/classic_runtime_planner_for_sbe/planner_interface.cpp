@@ -72,7 +72,6 @@ std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> PlannerBase::prepareSbePlan
                                                        extractSbeYieldPolicy(),
                                                        isFromPlanCache,
                                                        cachedPlanHash,
-                                                       OptimizerCounterInfo{} /* used for Bonsai */,
                                                        std::move(remoteCursors),
                                                        std::move(remoteExplains),
                                                        std::move(classicRuntimePlannerStage)));

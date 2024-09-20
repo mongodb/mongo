@@ -512,9 +512,8 @@ PlanExplainerSBEBase::PlanExplainerSBEBase(
     bool isCachedPlan,
     boost::optional<size_t> cachedPlanHash,
     std::shared_ptr<const plan_cache_debug_info::DebugInfoSBE> debugInfo,
-    OptimizerCounterInfo optCounterInfo,
     RemoteExplainVector* remoteExplains)
-    : PlanExplainer{solution, boost::optional<OptimizerCounterInfo>(std::move(optCounterInfo))},
+    : PlanExplainer{solution},
       _root{root},
       _rootData{data},
       _isMultiPlan{isMultiPlan},
@@ -621,7 +620,6 @@ PlanExplainerSBE::PlanExplainerSBE(
     bool isCachedPlan,
     boost::optional<size_t> cachedPlanHash,
     std::shared_ptr<const plan_cache_debug_info::DebugInfoSBE> debugInfo,
-    OptimizerCounterInfo optCounterInfo,
     RemoteExplainVector* remoteExplains)
     : PlanExplainerSBEBase{root,
                            data,
@@ -630,7 +628,6 @@ PlanExplainerSBE::PlanExplainerSBE(
                            isCachedPlan,
                            cachedPlanHash,
                            std::move(debugInfo),
-                           std::move(optCounterInfo),
                            remoteExplains},
       _rejectedCandidates{std::move(rejectedCandidates)} {};
 
@@ -700,7 +697,6 @@ PlanExplainerClassicRuntimePlannerForSBE::PlanExplainerClassicRuntimePlannerForS
                            isCachedPlan,
                            cachedPlanHash,
                            std::move(debugInfo),
-                           {} /*optCounterInfo*/,
                            remoteExplains},
       _classicRuntimePlannerStage{std::move(classicRuntimePlannerStage)},
       _classicRuntimePlannerExplainer{

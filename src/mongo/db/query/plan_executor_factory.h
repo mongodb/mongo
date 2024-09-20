@@ -135,7 +135,6 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> make(
     std::unique_ptr<PlanYieldPolicySBE> yieldPolicy,
     bool isFromPlanCache,
     boost::optional<size_t> cachedPlanHash,
-    OptimizerCounterInfo optCounterInfo = {},
     std::unique_ptr<RemoteCursorMap> remoteCursors = nullptr,
     std::unique_ptr<RemoteExplainVector> remoteExplains = nullptr,
     std::unique_ptr<MultiPlanStage> classicRuntimePlannerStage = nullptr);

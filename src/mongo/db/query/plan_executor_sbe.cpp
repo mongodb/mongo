@@ -88,7 +88,6 @@ PlanExecutorSBE::PlanExecutorSBE(OperationContext* opCtx,
                                  bool isOpen,
                                  std::unique_ptr<PlanYieldPolicySBE> yieldPolicy,
                                  boost::optional<size_t> cachedPlanHash,
-                                 OptimizerCounterInfo optCounterInfo,
                                  std::unique_ptr<RemoteCursorMap> remoteCursors,
                                  std::unique_ptr<RemoteExplainVector> remoteExplains,
                                  std::unique_ptr<MultiPlanStage> classicRuntimePlannerStage)
@@ -184,7 +183,6 @@ PlanExecutorSBE::PlanExecutorSBE(OperationContext* opCtx,
                                        isCachedCandidate,
                                        cachedPlanHash,
                                        _rootData.debugInfo,
-                                       std::move(optCounterInfo),
                                        _remoteExplains.get());
     _cursorType = _rootData.staticData->cursorType;
 

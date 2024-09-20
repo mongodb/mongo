@@ -32,7 +32,6 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/exec/plan_stats.h"
 #include "mongo/db/query/explain_options.h"
-#include "mongo/db/query/opt_counter_info.h"
 #include "mongo/db/query/plan_cache/classic_plan_cache.h"
 #include "mongo/db/query/plan_enumerator/plan_enumerator_explain_info.h"
 #include "mongo/db/query/plan_summary_stats.h"
@@ -63,12 +62,10 @@ public:
     using PlanStatsDetails = std::pair<BSONObj, boost::optional<PlanSummaryStats>>;
 
     PlanExplainer() {}
-    PlanExplainer(const QuerySolution* solution,
-                  boost::optional<OptimizerCounterInfo> optCounterInfo = boost::none)
+    PlanExplainer(const QuerySolution* solution)
         : _solution(solution),
           _enumeratorExplainInfo{_solution ? _solution->_enumeratorExplainInfo
-                                           : PlanEnumeratorExplainInfo{}},
-          _optCounterInfo(std::move(optCounterInfo)) {}
+                                           : PlanEnumeratorExplainInfo{}} {}
     PlanExplainer(const PlanEnumeratorExplainInfo& info) : _enumeratorExplainInfo{info} {}
 
     virtual ~PlanExplainer() = default;
@@ -141,13 +138,6 @@ public:
         _enumeratorExplainInfo.merge(other);
     }
 
-    /**
-     * Returns an object containing what query limits the optimizer hit. This is specific to CQF.
-     */
-    OptimizerCounterInfo getOptExplainInfo() const {
-        return _optCounterInfo.get();
-    }
-
     void setQuerySolution(const QuerySolution* qs) {
         _solution = qs;
     }
@@ -155,6 +145,5 @@ public:
 protected:
     const QuerySolution* _solution{nullptr};
     PlanEnumeratorExplainInfo _enumeratorExplainInfo;
-    boost::optional<OptimizerCounterInfo> _optCounterInfo;
 };
 }  // namespace mongo

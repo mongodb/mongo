@@ -584,7 +584,6 @@ mongo_cc_library(
         "//src/mongo/db/query:find_command_gen",
         "//src/mongo/db/query:index_entry.h",
         "//src/mongo/db/query:interval_evaluation_tree.h",
-        "//src/mongo/db/query:opt_counter_info.h",
         "//src/mongo/db/query:parsed_find_command.h",
         "//src/mongo/db/query:plan_executor.h",
         "//src/mongo/db/query:plan_explainer.h",
