@@ -393,8 +393,6 @@ public:
                 auto ws = std::make_unique<WorkingSet>();
                 auto root = std::make_unique<QueuedDataStage>(expCtx.get(), ws.get());
                 std::vector<WorkingSetID> results;
-                auto readTimestamp =
-                    shard_role_details::getRecoveryUnit(opCtx)->getPointInTimeReadTimestamp();
                 tassert(9089302,
                         "point in time catalog lookup for a collection list is not supported",
                         RecoveryUnit::ReadSource::kNoTimestamp ==
@@ -415,8 +413,7 @@ public:
 
                             auto collBson = [&] {
                                 const Collection* collection =
-                                    catalog->establishConsistentCollection(
-                                        opCtx, nss, readTimestamp);
+                                    catalog->establishConsistentCollection(opCtx, nss, boost::none);
                                 if (collection != nullptr) {
                                     return buildCollectionBson(
                                         opCtx, collection, includePendingDrops, nameOnly);
@@ -427,7 +424,7 @@ public:
                                 if (view && view->timeseries()) {
                                     if (auto bucketsCollection =
                                             catalog->establishConsistentCollection(
-                                                opCtx, view->viewOn(), readTimestamp)) {
+                                                opCtx, view->viewOn(), boost::none)) {
                                         return buildTimeseriesBson(
                                             opCtx, bucketsCollection, nameOnly);
                                     } else {
@@ -484,7 +481,7 @@ public:
                         };
 
                         std::vector<const Collection*> collections =
-                            catalog->establishConsistentCollections(opCtx, dbName, readTimestamp);
+                            catalog->establishConsistentCollections(opCtx, dbName);
                         for (const auto& collection : collections) {
                             perCollectionWork(collection);
                         }

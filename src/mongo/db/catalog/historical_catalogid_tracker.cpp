@@ -130,34 +130,33 @@ HistoricalCatalogIdTracker::LookupResult findInRange(
     }
     return {RecordId{}, HistoricalCatalogIdTracker::LookupResult::Existence::kNotExists};
 }
-}  // namespace
 
-HistoricalCatalogIdTracker::LookupResult HistoricalCatalogIdTracker::lookup(
-    const NamespaceString& nss, boost::optional<Timestamp> ts) const {
-    if (const std::vector<TimestampedCatalogId>* mapping = _nss.find(nss)) {
+HistoricalCatalogIdTracker::LookupResult findInTimestampCatalog(
+    boost::optional<Timestamp> ts,
+    const std::vector<HistoricalCatalogIdTracker::TimestampedCatalogId>* mapping,
+    Timestamp oldestTimestampMaintained) {
+    if (mapping) {
         // Mapping found for namespace, get result depending on timestamp.
         if (ts) {
-            return findInRange(*ts, *mapping, _oldestTimestampMaintained);
+            return findInRange(*ts, *mapping, oldestTimestampMaintained);
         }
         return latestInRange(*mapping);
     }
     // No mapping found for namespace, result is either not found or unknown depending on timestamp
-    return resultForNotFound(ts, _oldestTimestampMaintained);
+    return resultForNotFound(ts, oldestTimestampMaintained);
+}
+
+}  // namespace
+
+HistoricalCatalogIdTracker::LookupResult HistoricalCatalogIdTracker::lookup(
+    const NamespaceString& nss, boost::optional<Timestamp> ts) const {
+    return findInTimestampCatalog(ts, _nss.find(nss), _oldestTimestampMaintained);
 }
 
 
 HistoricalCatalogIdTracker::LookupResult HistoricalCatalogIdTracker::lookup(
     const UUID& uuid, boost::optional<Timestamp> ts) const {
-    if (const std::vector<TimestampedCatalogId>* mapping = _uuid.find(uuid)) {
-        // Mapping found for namespace, get result depending on timestamp.
-        if (ts) {
-            return findInRange(*ts, *mapping, _oldestTimestampMaintained);
-        }
-        return latestInRange(*mapping);
-    }
-
-    // No mapping found for namespace, result is either not found or unknown depending on timestamp
-    return resultForNotFound(ts, _oldestTimestampMaintained);
+    return findInTimestampCatalog(ts, _uuid.find(uuid), _oldestTimestampMaintained);
 }
 
 void HistoricalCatalogIdTracker::create(const NamespaceString& nss,

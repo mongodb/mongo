@@ -237,10 +237,11 @@ public:
                                                     const NamespaceStringOrUUID& nssOrUUID,
                                                     boost::optional<Timestamp> readTimestamp) const;
 
-    std::vector<const Collection*> establishConsistentCollections(
-        OperationContext* opCtx,
-        const DatabaseName& dbName,
-        boost::optional<Timestamp> readTimestamp) const;
+    // Establish a consistent view of the database. This method will only work against the latest
+    // timestamp. It is equivalent to calling establishConsistentCollection with no timestamp on all
+    // collections of the database.
+    std::vector<const Collection*> establishConsistentCollections(OperationContext* opCtx,
+                                                                  const DatabaseName& dbName) const;
 
     /**
      * Returns a shared_ptr to a drop pending index if it's found and not expired.
