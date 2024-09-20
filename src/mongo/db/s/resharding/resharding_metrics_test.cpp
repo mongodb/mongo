@@ -791,5 +791,23 @@ TEST_F(ReshardingMetricsTest, onIndexBuild) {
     ASSERT_EQ(report.getIntField("indexesBuilt"), 1);
 }
 
+TEST_F(ReshardingMetricsTest, RecipientReportsRemainingTimeLowElapsed) {
+    auto metrics = createInstanceMetrics(getClockSource(), UUID::gen(), Role::kRecipient);
+    const auto& clock = getClockSource();
+    constexpr auto timeSpentCloning = Seconds(20);
+    constexpr auto timeSpentApplying = Milliseconds(50);
+    metrics->onOplogEntriesFetched(500000);
+    metrics->setStartFor(TimedPhase::kCloning, clock->now());
+
+    clock->advance(timeSpentCloning);
+    metrics->setEndFor(TimedPhase::kCloning, clock->now());
+    metrics->setStartFor(TimedPhase::kApplying, clock->now());
+    clock->advance(timeSpentApplying);
+    metrics->onOplogEntriesApplied(300000);
+
+    auto report = metrics->getHighEstimateRemainingTimeMillis();
+    ASSERT_NE(report, Milliseconds{0});
+}
+
 }  // namespace
 }  // namespace mongo
