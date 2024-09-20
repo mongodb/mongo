@@ -291,6 +291,7 @@ public:
         }
 
         CreateCommandReply typedRun(OperationContext* opCtx) final {
+            // Intentional copy of request made here, as request object can be modified below.
             auto cmd = request();
 
             CreateCommandReply reply;

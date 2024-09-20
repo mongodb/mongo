@@ -761,7 +761,7 @@ TEST_F(CountCommandTest, MirrorableKeys) {
                       BSON("collation" << BSONObj()),
                       BSON("shardVersion" << kShardVersion.toBSON()),
                       BSON("databaseVersion" << kDatabaseVersion.toBSON()),
-                      BSON("encryptionInformation" << BSONObj())};
+                      BSON("encryptionInformation" << BSON("schema" << BSONObj::kEmptyObject))};
 
     auto mirroredObj = createCommandAndGetMirrored(kCollection, countArgs);
     checkFieldNamesAreAllowed(mirroredObj);
@@ -787,7 +787,7 @@ TEST_F(CountCommandTest, ValidateMirroredQuery) {
     ASSERT(!mirroredObj.hasField("collation"));
     ASSERT(compareBSONObjs(mirroredObj["query"].Obj(), query));
     ASSERT(compareBSONObjs(mirroredObj["hint"].Obj(), hint));
-    ASSERT_EQ(mirroredObj["limit"].Int(), limit);
+    ASSERT_EQ(mirroredObj["limit"].Long(), limit);
     ASSERT(compareBSONObjs(mirroredObj["shardVersion"].Obj(), kShardVersion.toBSON()));
     ASSERT(compareBSONObjs(mirroredObj["databaseVersion"].Obj(), kDatabaseVersion.toBSON()));
     ASSERT(compareBSONObjs(mirroredObj["encryptionInformation"].Obj(), encInfoValue));

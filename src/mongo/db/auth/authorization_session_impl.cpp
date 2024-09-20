@@ -1076,7 +1076,7 @@ void AuthorizationSessionImpl::verifyContract(const AuthorizationContract* contr
                                         ActionType::issueDirectShardOperations));
 
     uassert(5452401,
-            "Authorization Session contains more authorization checks then permitted by contract.",
+            "Authorization Session contains more authorization checks than permitted by contract.",
             tempContract.contains(_contract));
 }
 

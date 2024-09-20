@@ -699,7 +699,7 @@ class _CppHeaderFileWriter(_CppFileWriterBase):
         with self._with_template(template_params):
             if field.chained_struct_field:
                 self._writer.write_template(
-                    "${const_type} ${param_type} ${method_name}() const { return %s.%s(); }"
+                    "${const_type}${param_type} ${method_name}() const { return %s.%s(); }"
                     % (
                         (
                             _get_field_member_name(field.chained_struct_field),

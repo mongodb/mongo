@@ -920,7 +920,7 @@ bool isClusteredScan(QuerySolutionNode* node) {
 }
 
 // Check if this is a real coll scan or a hidden ClusteredIDX scan.
-bool isColusteredIDXScanSoln(QuerySolution* collscanSoln) {
+bool isClusteredIDXScanSoln(QuerySolution* collscanSoln) {
     if (collscanSoln->root()->getType() == STAGE_SHARDING_FILTER) {
         auto child = collscanSoln->root()->children.begin();
         return isClusteredScan(child->get());
@@ -1591,7 +1591,7 @@ StatusWith<std::vector<std::unique_ptr<QuerySolution>>> QueryPlanner::plan(
             return Status(ErrorCodes::NoQueryExecutionPlans,
                           "Failed to build collection scan soln");
         }
-        isClusteredIDXScan = isColusteredIDXScanSoln(collscanSoln.get());
+        isClusteredIDXScan = isClusteredIDXScanSoln(collscanSoln.get());
         // We consider collection scan in the following cases:
         // 1. collScanRequested - specifically requested by caller.
         // 2. collScanRequired - there are no other possible plans, so we fallback to full scan.

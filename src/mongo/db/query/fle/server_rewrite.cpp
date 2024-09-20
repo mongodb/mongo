@@ -157,9 +157,9 @@ public:
         auto efc = EncryptionInformationHelpers::getAndValidateSchema(nss, encryptInfo);
         esc = efc.getEscCollection()->toString();
     }
-    virtual ~RewriteBase(){};
+    virtual ~RewriteBase() {}
 
-    virtual void doRewrite(FLETagQueryInterface* queryImpl, const NamespaceString& nssEsc){};
+    virtual void doRewrite(FLETagQueryInterface* queryImpl, const NamespaceString& nssEsc) {}
 
 
     boost::intrusive_ptr<ExpressionContext> expCtx;
@@ -175,7 +175,7 @@ public:
                     std::unique_ptr<Pipeline, PipelineDeleter> toRewrite)
         : RewriteBase(toRewrite->getContext(), nss, encryptInfo), pipeline(std::move(toRewrite)) {}
 
-    ~PipelineRewrite() override{};
+    ~PipelineRewrite() override {}
 
     void doRewrite(FLETagQueryInterface* queryImpl, const NamespaceString& nssEsc) final {
         auto rewriter = QueryRewriter(expCtx, queryImpl, nssEsc);
@@ -204,7 +204,7 @@ public:
                   EncryptedCollScanModeAllowed mode)
         : RewriteBase(expCtx, nss, encryptInfo), userFilter(toRewrite), _mode(mode) {}
 
-    ~FilterRewrite() override{};
+    ~FilterRewrite() override {}
 
     void doRewrite(FLETagQueryInterface* queryImpl, const NamespaceString& nssEsc) final {
         rewrittenFilter = rewriteEncryptedFilterV2(queryImpl, nssEsc, expCtx, userFilter, _mode);

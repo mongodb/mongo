@@ -239,9 +239,7 @@ public:
 
             result.resetToEmpty();
             ViewResponseFormatter formatter(aggResult);
-            auto formatStatus = formatter.appendAsCountResponse(&result, boost::none);
-            uassertStatusOK(formatStatus);
-
+            formatter.appendAsCountResponse(&result, boost::none);
             return true;
         } catch (const ExceptionFor<ErrorCodes::NamespaceNotFound>&) {
             // If there's no collection with this name, the count aggregation behavior below

@@ -13,7 +13,7 @@ import {checkSbeRestrictedOrFullyEnabled} from "jstests/libs/sbe_util.js";
 
 const sbeEnabled = checkSbeRestrictedOrFullyEnabled(db);
 
-var viewsDB = db.getSiblingDB("views_count");
+const viewsDB = db.getSiblingDB("views_count");
 assert.commandWorked(viewsDB.dropDatabase());
 
 // Insert documents into a collection.

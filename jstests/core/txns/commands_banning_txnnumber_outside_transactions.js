@@ -48,7 +48,7 @@ nonRetryableWriteCommands.forEach(function(command) {
     jsTest.log("Testing command: " + tojson(command));
     assert.commandFailedWithCode(
         sessionDb.runCommand(Object.assign({}, command, {txnNumber: NumberLong(0)})),
-        [50768, 50889]);
+        [50768, 50889, ErrorCodes.TypeMismatch]);
 });
 
 if (!FixtureHelpers.isMongos(db)) {

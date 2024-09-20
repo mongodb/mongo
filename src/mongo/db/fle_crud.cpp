@@ -1765,6 +1765,7 @@ std::pair<write_ops::DeleteCommandReply, BSONObj> FLEQueryInterfaceImpl::deleteW
     findAndModifyRequest.setLet(deleteRequest.getLet());
     findAndModifyRequest.setStmtId(deleteRequest.getStmtId());
 
+    // Intentionally copying the original encryption information here as we are going to modify it.
     auto ei2 = ei;
     ei2.setCrudProcessed(true);
     findAndModifyRequest.setEncryptionInformation(ei2);
@@ -1833,6 +1834,7 @@ std::pair<write_ops::UpdateCommandReply, BSONObj> FLEQueryInterfaceImpl::updateW
     findAndModifyRequest.setStmtId(updateRequest.getStmtId());
     findAndModifyRequest.setBypassDocumentValidation(updateRequest.getBypassDocumentValidation());
 
+    // Intentionally copying the original encryption information here as we are going to modify it.
     auto ei2 = ei;
     ei2.setCrudProcessed(true);
     findAndModifyRequest.setEncryptionInformation(ei2);
@@ -1902,8 +1904,9 @@ write_ops::FindAndModifyCommandReply FLEQueryInterfaceImpl::findAndModify(
     const NamespaceString& nss,
     const EncryptionInformation& ei,
     const write_ops::FindAndModifyCommandRequest& findAndModifyRequest) {
-
+    // Intentional copy of the request made here, as the original request is modified.
     auto newFindAndModifyRequest = findAndModifyRequest;
+    // Intentionally copying the original encryption information here as we are going to modify it.
     auto ei2 = ei;
     ei2.setCrudProcessed(true);
     newFindAndModifyRequest.setEncryptionInformation(ei2);

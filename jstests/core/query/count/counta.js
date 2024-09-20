@@ -4,10 +4,10 @@
 //   requires_fastcount
 // ]
 
-var t = db.jstests_counta;
+const t = db.jstests_counta;
 t.drop();
 
-for (var i = 0; i < 10; ++i) {
+for (let i = 0; i < 10; ++i) {
     t.save({a: i});
 }
 
@@ -26,4 +26,5 @@ assert.throws(function() {
 });
 
 // count must return error if collection name is absent
-assert.commandFailedWithCode(db.runCommand("count"), ErrorCodes.InvalidNamespace);
+assert.commandFailedWithCode(db.runCommand("count"),
+                             [ErrorCodes.InvalidNamespace, ErrorCodes.TypeMismatch]);

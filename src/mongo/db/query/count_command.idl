@@ -48,16 +48,37 @@ types:
         # std::int64_t is not a view.
         is_view: false
 
+structs:
+    CountCommandReply:
+        description: 'Reply from the {count: ...} command'
+        strict: true
+        is_command_reply: true
+        fields:
+            n:
+                description: 'Number of documents'
+                type:
+                    variant: [int, long]
+                optional: false
+                cpp_name: count
+                stability: stable
+            metrics:
+                description: 'The metrics for the count command'
+                type: object_owned
+                optional: true
+                stability: unstable
+
 commands:
     count:
         description: "Parser for the 'count' command."
         command_name: count
         cpp_name: CountCommandRequest
         strict: true
+        # Note: calling count with a UUID is not part of the stable API v1.
         namespace: concatenate_with_db_or_uuid
         api_version: "1"
         access_check:
             complex:
+                - check: should_ignore_auth_checks
                 - check: is_authorized_to_parse_namespace_element
                 - privilege:
                     resource_pattern: exact_namespace
@@ -65,8 +86,7 @@ commands:
                 - privilege:
                     resource_pattern: cluster
                     action_type: useUUID
-        # Dummy reply type as we won't use it to parse the count reply.
-        reply_type: OkReply
+        reply_type: CountCommandReply
         fields:
             query:
                 description: "A query that selects which documents to count in the collection or

@@ -125,6 +125,7 @@ ALLOW_ANY_TYPE_LIST: List[str] = [
     "count-param-hint",
     "count-param-limit",
     "count-param-maxTimeMS",
+    "count-reply-n",
     "find-param-filter",
     "find-param-projection",
     "find-param-sort",
@@ -308,6 +309,7 @@ ALLOWED_STABLE_FIELDS_LIST: List[str] = [
     "dropIndexes-param-isTimeseriesNamespace",
     "listIndexes-param-isTimeseriesNamespace",
     "listIndexes-reply-clustered",
+    "count-reply-n",
     "create-param-encryptedFields",
     "create-param-bucketRoundingSeconds",
     "create-param-temp",
@@ -397,6 +399,14 @@ ALLOWED_NEW_COMPLEX_ACCESS_CHECKS = dict(
     aggregate={
         # Added in 6.3 due to the new $_analyzeShardKeyReadWriteDistribution stage.
         "check_cursor_session_privilege"
+    },
+    count={
+        # Added in 8.1 because the count command was changed from a BasicCommand to an IDL
+        # Typed command. BasicCommands do not perform contract verification at the end of the
+        # request, but IDL Typed commands do. It turned out that when running the count
+        # command on a view, the shouldIgnoreAuthChecks() method is called, which previously
+        # went undetected because of the disabled contract checks.
+        "should_ignore_auth_checks"
     },
     # This list is only used in unit-tests.
     complexChecksSupersetAllowed={"checkTwo", "checkThree"},

@@ -29,7 +29,6 @@
 
 #include <set>
 #include <string>
-#include <vector>
 
 #include "mongo/base/status.h"
 #include "mongo/base/string_data.h"
@@ -38,7 +37,6 @@
 #include "mongo/db/database_name.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/s/commands/query_cmd/cluster_count_cmd.h"
-#include "mongo/util/assert_util.h"
 
 namespace mongo {
 namespace {

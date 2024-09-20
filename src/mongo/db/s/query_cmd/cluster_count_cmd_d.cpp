@@ -29,7 +29,6 @@
 
 #include <set>
 #include <string>
-#include <vector>
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"

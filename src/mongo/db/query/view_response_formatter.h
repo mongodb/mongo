@@ -39,7 +39,6 @@
 
 namespace mongo {
 class BSONObjBuilder;
-class Status;
 
 /**
  * Utility functions for converting aggregation responses into other CRUD command responses.
@@ -54,12 +53,23 @@ public:
     explicit ViewResponseFormatter(BSONObj aggregationResponse);
 
     /**
+     * Extracts the `n` field from response as if '_response' were a response from the count
+     * command.
+     *
+     * If '_response' is not a valid cursor-based response from the aggregation command, the
+     * function will fail with a uassert.
+     */
+    long long getCountValue(
+        boost::optional<TenantId> tenantId,
+        const SerializationContext& serializationCtxt = SerializationContext::stateCommandReply());
+
+    /**
      * Appends fields to 'resultBuilder' as if '_response' were a response from the count command.
      *
-     * If '_response' is not a valid cursor-based response from the aggregation command, a non-OK
-     * status is returned and 'resultBuilder' will not be modified.
+     * If '_response' is not a valid cursor-based response from the aggregation command, the
+     * function uasserts and 'resultBuilder' will not be modified.
      */
-    Status appendAsCountResponse(
+    void appendAsCountResponse(
         BSONObjBuilder* resultBuilder,
         boost::optional<TenantId> tenantId,
         const SerializationContext& serializationCtxt = SerializationContext::stateCommandReply());

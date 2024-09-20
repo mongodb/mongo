@@ -28,11 +28,11 @@
  */
 
 #include <boost/smart_ptr.hpp>
-#include <memory>
-#include <mutex>
-#include <set>
+#include <functional>
+#include <limits>
 #include <string>
 #include <utility>
+#include <variant>
 
 #include <boost/move/utility_core.hpp>
 #include <boost/none.hpp>
@@ -46,7 +46,6 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/client/read_preference.h"
 #include "mongo/crypto/fle_field_schema_gen.h"
-#include "mongo/db/api_parameters.h"
 #include "mongo/db/auth/authorization_checks.h"
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/auth/privilege.h"
@@ -66,7 +65,6 @@
 #include "mongo/db/fle_crud.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
-#include "mongo/db/pipeline/aggregate_command_gen.h"
 #include "mongo/db/pipeline/aggregation_request_helper.h"
 #include "mongo/db/query/collection_query_info.h"
 #include "mongo/db/query/command_diagnostic_printer.h"
@@ -90,20 +88,16 @@
 #include "mongo/db/s/scoped_collection_metadata.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/tenant_id.h"
-#include "mongo/idl/idl_parser.h"
 #include "mongo/rpc/op_msg.h"
 #include "mongo/rpc/reply_builder_interface.h"
 #include "mongo/s/analyze_shard_key_common_gen.h"
 #include "mongo/s/query_analysis_sampler_util.h"
 #include "mongo/util/assert_util.h"
-#include "mongo/util/database_name_util.h"
 #include "mongo/util/decorable.h"
 #include "mongo/util/fail_point.h"
 #include "mongo/util/future.h"
 #include "mongo/util/serialization_context.h"
 #include "mongo/util/uuid.h"
-
-#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kCommand
 
 namespace mongo {
 namespace {
@@ -126,27 +120,436 @@ MONGO_FAIL_POINT_DEFINE(hangBeforeCollectionCount);
 /**
  * Implements the MongoD side of the count command.
  */
-class CmdCount : public BasicCommand {
+class CmdCount : public CountCmdVersion1Gen<CmdCount> {
 public:
-    CmdCount() : BasicCommand("count") {}
-
-    const std::set<std::string>& apiVersions() const override {
-        return kApiVersions1;
-    }
-
     std::string help() const override {
         return "count objects in collection";
     }
 
-    bool supportsWriteConcern(const BSONObj& cmd) const override {
-        return false;
-    }
+    class Invocation final : public InvocationBaseGen {
+    public:
+        using InvocationBaseGen::InvocationBaseGen;
+
+        Invocation(OperationContext* opCtx,
+                   const Command* command,
+                   const OpMsgRequest& opMsgRequest)
+            : InvocationBaseGen(opCtx, command, opMsgRequest),
+              _ns(request().getNamespaceOrUUID().isNamespaceString()
+                      ? request().getNamespaceOrUUID().nss()
+                      : CollectionCatalog::get(opCtx)->resolveNamespaceStringFromDBNameAndUUID(
+                            opCtx,
+                            request().getNamespaceOrUUID().dbName(),
+                            request().getNamespaceOrUUID().uuid())) {
+            uassert(ErrorCodes::InvalidNamespace,
+                    str::stream() << "Invalid namespace specified '" << _ns.toStringForErrorMsg()
+                                  << "'",
+                    _ns.isValid());
+        }
+
+        bool supportsWriteConcern() const final {
+            return false;
+        }
+
+        bool isSubjectToIngressAdmissionControl() const override {
+            return true;
+        }
+
+        void doCheckAuthorization(OperationContext* opCtx) const final {
+            AuthorizationSession* authSession = AuthorizationSession::get(opCtx->getClient());
+            const auto& req = request();
+            NamespaceStringOrUUID const& nsOrUUID = req.getNamespaceOrUUID();
+            uassert(ErrorCodes::Unauthorized,
+                    "Unauthorized",
+                    authSession->isAuthorizedToParseNamespaceElement(nsOrUUID));
+
+            constexpr auto hasTerm = false;
+            uassertStatusOK(auth::checkAuthForFind(authSession, _ns, hasTerm));
+        }
+
+        void explain(OperationContext* opCtx,
+                     ExplainOptions::Verbosity verbosity,
+                     rpc::ReplyBuilderInterface* replyBuilder) override {
+            // Using explain + count + UUID is not supported here so that there is "feature parity"
+            // with mongos, which also does not support using a UUID for count + explain.
+            uassert(ErrorCodes::InvalidNamespace,
+                    str::stream() << "Collection name must be provided. UUID is not valid in this "
+                                  << "context",
+                    !request().getNamespaceOrUUID().isUUID());
+
+            // This optional will contain the request object in case it was modified by the
+            // prepareRequest function. We need this so that the request object remains valid during
+            // the lifetime of this function. This approach avoids making a copy of the request
+            // object in case no FLE is used. As a future refactoring, this should be generalized
+            // and moved into the base class(es), so that other commands can make use of the same
+            // mechanism.
+            // TODO(SERVER-94834): clean this up when centralizing processing for FLE in the
+            // TypedCommand base class.
+            boost::optional<CountCommandRequest> potentiallyRewrittenReq;
+            auto req = prepareRequest(opCtx, potentiallyRewrittenReq);
+
+            // Acquire locks. The RAII object is optional, because in the case of a view, the locks
+            // need to be released.
+            boost::optional<AutoGetCollectionForReadCommandMaybeLockFree> ctx;
+            ctx.emplace(opCtx,
+                        _ns,
+                        AutoGetCollection::Options{}.viewMode(
+                            auto_get_collection::ViewMode::kViewsPermitted));
+
+            // Start the query planning timer.
+            CurOp::get(opCtx)->beginQueryPlanningTimer();
+
+            if (ctx->getView()) {
+                // Relinquish locks. The aggregation command will re-acquire them.
+                ctx.reset();
+                return runExplainOnView(opCtx, req.get(), verbosity, replyBuilder);
+            }
+
+            const auto& collection = ctx->getCollection();
+
+            // RAII object that prevents chunks from being cleaned on sharded collections.
+            auto rangePreverser = buildRangePreserverForShardedCollections(opCtx, collection);
+
+            auto expCtx = makeExpressionContextForGetExecutor(
+                opCtx, req.get().getCollation().value_or(BSONObj()), _ns, verbosity);
+            const auto extensionsCallback = getExtensionsCallback(collection, opCtx, _ns);
+            auto parsedFind = uassertStatusOK(
+                parsed_find_command::parseFromCount(expCtx, req.get(), *extensionsCallback, _ns));
+
+            auto statusWithPlanExecutor =
+                getExecutorCount(expCtx, &collection, std::move(parsedFind), req.get());
+            uassertStatusOK(statusWithPlanExecutor.getStatus());
+
+            auto exec = std::move(statusWithPlanExecutor.getValue());
+            auto bodyBuilder = replyBuilder->getBodyBuilder();
+            Explain::explainStages(
+                exec.get(),
+                collection,
+                verbosity,
+                BSONObj(),
+                SerializationContext::stateCommandReply(req.get().getSerializationContext()),
+                req.get().toBSON(),
+                &bodyBuilder);
+        }
+
+        NamespaceString ns() const final {
+            // Guaranteed to be valid.
+            return _ns;
+        }
+
+        CountCommandReply typedRun(OperationContext* opCtx) final {
+            CommandHelpers::handleMarkKillOnClientDisconnect(opCtx);
+
+            // Capture diagnostics for tassert and invariant failures that may occur during query
+            // parsing, planning or execution. No work is done on the hot-path, all computation of
+            // these diagnostics is done lazily during failure handling. This line just creates an
+            // RAII object which holds references to objects on this stack frame, which will be used
+            // to print diagnostics in the event of a tassert or invariant.
+            ScopedDebugInfo countCmdDiagnostics("commandDiagnostics",
+                                                command_diagnostics::Printer{opCtx});
+
+            // This optional will contain the request object in case it was modified by the
+            // prepareRequest function. We need this so that the request object remains valid during
+            // the lifetime of this function. This approach avoids making a copy of the request
+            // object in case no FLE is used. As a future refactoring, this should be generalized
+            // and moved into the base class(es), so that other commands can make use of the same
+            // mechanism.
+            // TODO(SERVER-94834): clean this up when centralizing processing for FLE in the
+            // TypedCommand base class.
+            boost::optional<CountCommandRequest> potentiallyRewrittenReq;
+            auto req = prepareRequest(opCtx, potentiallyRewrittenReq);
+
+            // Acquire locks. The RAII object is optional, because in the case of a view, the locks
+            // need to be released.
+            boost::optional<AutoGetCollectionForReadCommandMaybeLockFree> ctx;
+            ctx.emplace(opCtx,
+                        _ns,
+                        AutoGetCollection::Options{}.viewMode(
+                            auto_get_collection::ViewMode::kViewsPermitted));
+
+            CurOpFailpointHelpers::waitWhileFailPointEnabled(
+                &hangBeforeCollectionCount, opCtx, "hangBeforeCollectionCount", []() {}, _ns);
+
+            // Start the query planning timer.
+            auto curOp = CurOp::get(opCtx);
+            curOp->beginQueryPlanningTimer();
+
+            if (req.get().getMirrored().value_or(false)) {
+                const auto& invocation = CommandInvocation::get(opCtx);
+                invocation->markMirrored();
+            } else {
+                analyzeShardKeyIfNeeded(opCtx, req.get());
+            }
+
+            auto expCtx =
+                makeExpressionContextForGetExecutor(opCtx,
+                                                    req.get().getCollation().value_or(BSONObj()),
+                                                    _ns,
+                                                    boost::none /* verbosity*/);
+
+            const auto& collection = ctx->getCollection();
+            const auto extensionsCallback = getExtensionsCallback(collection, opCtx, _ns);
+            auto parsedFind = uassertStatusOK(
+                parsed_find_command::parseFromCount(expCtx, req.get(), *extensionsCallback, _ns));
+
+            registerRequestForQueryStats(opCtx, expCtx, curOp, ctx, req.get(), *parsedFind);
+
+            if (ctx->getView()) {
+                // Relinquish locks. The aggregation command will re-acquire them.
+                ctx.reset();
+                return runCountOnView(opCtx, req);
+            }
+
+            // Check whether we are allowed to read from this node after acquiring our locks.
+            auto replCoord = repl::ReplicationCoordinator::get(opCtx);
+            uassertStatusOK(replCoord->checkCanServeReadsFor(
+                opCtx, _ns, ReadPreferenceSetting::get(opCtx).canRunOnSecondary()));
+
+            // RAII object that prevents chunks from being cleaned on sharded collections.
+            auto rangePreverser = buildRangePreserverForShardedCollections(opCtx, collection);
+
+            auto statusWithPlanExecutor =
+                getExecutorCount(expCtx, &collection, std::move(parsedFind), req.get());
+            uassertStatusOK(statusWithPlanExecutor.getStatus());
+
+            auto exec = std::move(statusWithPlanExecutor.getValue());
+
+            // Store the plan summary string in CurOp.
+            {
+                stdx::lock_guard<Client> lk(*opCtx->getClient());
+                curOp->setPlanSummary_inlock(exec->getPlanExplainer().getPlanSummary());
+            }
+
+            auto countResult = exec->executeCount();
+
+            // Store metrics for current operation.
+            recordCurOpMetrics(opCtx, curOp, collection, *exec);
+
+            // Store profiling data if profiling is enabled.
+            collectProfilingDataIfNeeded(curOp, *exec);
+
+            collectQueryStatsMongod(opCtx, expCtx, std::move(curOp->debug().queryStatsInfo.key));
+
+            CountCommandReply reply = buildCountReply(countResult);
+            if (curOp->debug().queryStatsInfo.metricsRequested) {
+                reply.setMetrics(curOp->debug().getCursorMetrics().toBSON());
+            }
+            return reply;
+        }
+
+        ReadConcernSupportResult supportsReadConcern(repl::ReadConcernLevel level,
+                                                     bool isImplicitDefault) const override {
+            static const Status kSnapshotNotSupported{ErrorCodes::InvalidOptions,
+                                                      "read concern snapshot not supported"};
+            return {{level == repl::ReadConcernLevel::kSnapshotReadConcern, kSnapshotNotSupported},
+                    Status::OK()};
+        }
+
+        bool supportsReadMirroring() const override {
+            return true;
+        }
+
+        void appendMirrorableRequest(BSONObjBuilder* bob) const override {
+            const auto& req = request();
+
+            // Append the keys that can be mirrored.
+            if (const auto& nsOrUUID = req.getNamespaceOrUUID(); nsOrUUID.isNamespaceString()) {
+                bob->append(CountCommandRequest::kCommandName, nsOrUUID.nss().coll());
+            } else {
+                uassert(7145300, "expecting nsOrUUID to contain a UUID", nsOrUUID.isUUID());
+                bob->append(CountCommandRequest::kCommandName, nsOrUUID.uuid().toBSON());
+            }
+            bob->append(CountCommandRequest::kQueryFieldName, req.getQuery());
+            if (req.getSkip()) {
+                bob->append(CountCommandRequest::kSkipFieldName, *req.getSkip());
+            }
+            if (req.getLimit()) {
+                bob->append(CountCommandRequest::kLimitFieldName, *req.getLimit());
+            }
+            bob->append(CountCommandRequest::kHintFieldName, req.getHint());
+            if (req.getCollation()) {
+                bob->append(CountCommandRequest::kCollationFieldName, *req.getCollation());
+            }
+            if (req.getShardVersion()) {
+                req.getShardVersion()->serialize(CountCommandRequest::kShardVersionFieldName, bob);
+            }
+            if (req.getDatabaseVersion()) {
+                bob->append(CountCommandRequest::kDatabaseVersionFieldName,
+                            req.getDatabaseVersion()->toBSON());
+            }
+            if (req.getEncryptionInformation()) {
+                bob->append(CountCommandRequest::kEncryptionInformationFieldName,
+                            req.getEncryptionInformation()->toBSON());
+            }
+        }
+
+        bool canIgnorePrepareConflicts() const override {
+            return true;
+        }
+
+    private:
+        void registerRequestForQueryStats(
+            OperationContext* opCtx,
+            const boost::intrusive_ptr<ExpressionContext>& expCtx,
+            CurOp* curOp,
+            const boost::optional<AutoGetCollectionForReadCommandMaybeLockFree>& ctx,
+            const CountCommandRequest& req,
+            const ParsedFindCommand& parsedFind) {
+            if (feature_flags::gFeatureFlagQueryStatsCountDistinct
+                    .isEnabledUseLastLTSFCVWhenUninitialized(
+                        serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
+                query_stats::registerRequest(opCtx, _ns, [&]() {
+                    return std::make_unique<query_stats::CountKey>(expCtx,
+                                                                   parsedFind,
+                                                                   req.getLimit().has_value(),
+                                                                   req.getSkip().has_value(),
+                                                                   req.getReadConcern(),
+                                                                   req.getMaxTimeMS().has_value(),
+                                                                   ctx->getCollectionType());
+                });
+
+                if (req.getIncludeQueryStatsMetrics() &&
+                    feature_flags::gFeatureFlagQueryStatsDataBearingNodes.isEnabled(
+                        serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
+                    curOp->debug().queryStatsInfo.metricsRequested = true;
+                }
+            }
+        }
+
+        void recordCurOpMetrics(OperationContext* opCtx,
+                                CurOp* curOp,
+                                const CollectionPtr& collection,
+                                const PlanExecutor& exec) {
+            PlanSummaryStats summaryStats;
+            exec.getPlanExplainer().getSummaryStats(&summaryStats);
+            if (collection) {
+                CollectionQueryInfo::get(collection).notifyOfQuery(opCtx, collection, summaryStats);
+            }
+            curOp->debug().setPlanSummaryMetrics(std::move(summaryStats));
+            curOp->setEndOfOpMetrics(kNReturned);
+        }
+
+        void collectProfilingDataIfNeeded(CurOp* curOp, PlanExecutor& exec) {
+            if (!curOp->shouldDBProfile()) {
+                return;
+            }
+            auto&& explainer = exec.getPlanExplainer();
+            auto&& [stats, _] =
+                explainer.getWinningPlanStats(ExplainOptions::Verbosity::kExecStats);
+            curOp->debug().execStats = std::move(stats);
+        }
+
+        void analyzeShardKeyIfNeeded(OperationContext* opCtx, const CountCommandRequest& req) {
+            if (auto sampleId = analyze_shard_key::getOrGenerateSampleId(
+                    opCtx, _ns, analyze_shard_key::SampledCommandNameEnum::kCount, req)) {
+                analyze_shard_key::QueryAnalysisWriter::get(opCtx)
+                    ->addCountQuery(
+                        *sampleId, _ns, req.getQuery(), req.getCollation().value_or(BSONObj()))
+                    .getAsync([](auto) {});
+            }
+        }
+
+        // Prevent chunks from being cleaned up during yields - this allows us to only check the
+        // version on initial entry into count.
+        boost::optional<ScopedCollectionFilter> buildRangePreserverForShardedCollections(
+            OperationContext* opCtx, const CollectionPtr& collection) {
+            boost::optional<ScopedCollectionFilter> rangePreserver;
+            if (collection.isSharded_DEPRECATED()) {
+                rangePreserver.emplace(
+                    CollectionShardingState::acquire(opCtx, _ns)
+                        ->getOwnershipFilter(
+                            opCtx,
+                            CollectionShardingState::OrphanCleanupPolicy::kDisallowOrphanCleanup));
+            }
+            return rangePreserver;
+        }
+
+        // Prepare request object so that it gets rewritten when FLE is enabled. Otherwise return
+        // the original request object without modifying/copying it.
+        std::reference_wrapper<const CountCommandRequest> prepareRequest(
+            OperationContext* opCtx,
+            boost::optional<CountCommandRequest>& potentiallyRewrittenReq) {
+            auto req = std::cref(request());
+
+            if (shouldDoFLERewrite(req.get())) {
+                if (!req.get().getEncryptionInformation()->getCrudProcessed().value_or(false)) {
+                    potentiallyRewrittenReq.emplace(req);
+                    processFLECountD(opCtx, _ns, &*potentiallyRewrittenReq);
+                    req = std::cref(potentiallyRewrittenReq.value());
+                }
+                stdx::lock_guard<Client> lk(*opCtx->getClient());
+                CurOp::get(opCtx)->setShouldOmitDiagnosticInformation_inlock(lk, true);
+            }
+
+            return req;
+        }
+
+        // Build the return value for this command.
+        CountCommandReply buildCountReply(long long countResult) {
+            uassert(7145301, "count value must not be negative", countResult >= 0);
+
+            // Return either BSON int32 or int64, depending on the value of countResult.
+            // This is required so that drivers can continue to use a BSON int32 for count
+            // values < 2 ^ 31, which is what some client applications may still depend on.
+            // int64 is only used when the count value exceeds 2 ^ 31.
+            auto count = [](long long countResult) -> std::variant<std::int32_t, std::int64_t> {
+                constexpr long long maxIntCountResult = std::numeric_limits<std::int32_t>::max();
+                if (countResult < maxIntCountResult) {
+                    return static_cast<std::int32_t>(countResult);
+                }
+                return static_cast<std::int64_t>(countResult);
+            }(countResult);
+
+            CountCommandReply reply;
+            reply.setCount(count);
+            return reply;
+        }
+
+        void runExplainOnView(OperationContext* opCtx,
+                              const RequestType& req,
+                              ExplainOptions::Verbosity verbosity,
+                              rpc::ReplyBuilderInterface* replyBuilder) {
+            auto curOp = CurOp::get(opCtx);
+            curOp->debug().queryStatsInfo.disableForSubqueryExecution = true;
+            const auto vts = auth::ValidatedTenancyScope::get(opCtx);
+            auto viewAggregation = countCommandAsAggregationCommand(req, _ns);
+            uassertStatusOK(viewAggregation);
+
+            auto viewAggCmd =
+                OpMsgRequestBuilder::create(vts, _ns.dbName(), viewAggregation.getValue()).body;
+            auto viewAggRequest = aggregation_request_helper::parseFromBSON(
+                viewAggCmd, vts, verbosity, req.getSerializationContext());
+
+            // An empty PrivilegeVector is acceptable because these privileges are only checked
+            // on getMore and explain will not open a cursor.
+            auto runStatus = runAggregate(opCtx,
+                                          viewAggRequest,
+                                          {viewAggRequest},
+                                          viewAggregation.getValue(),
+                                          PrivilegeVector(),
+                                          replyBuilder);
+            uassertStatusOK(runStatus);
+        }
+
+        CountCommandReply runCountOnView(OperationContext* opCtx, const RequestType& req) {
+            const auto vts = auth::ValidatedTenancyScope::get(opCtx);
+            auto viewAggregation = countCommandAsAggregationCommand(req, _ns);
+            uassertStatusOK(viewAggregation.getStatus());
+            auto aggRequest = OpMsgRequestBuilder::create(
+                vts, _ns.dbName(), std::move(viewAggregation.getValue()));
+
+            BSONObj aggResult = CommandHelpers::runCommandDirectly(opCtx, aggRequest);
+            long long countResult = ViewResponseFormatter(aggResult).getCountValue(
+                _ns.dbName().tenantId(),
+                SerializationContext::stateCommandReply(req.getSerializationContext()));
+
+            return buildCountReply(countResult);
+        }
+
+    private:
+        const NamespaceString _ns;
+    };
 
     bool collectsResourceConsumptionMetrics() const override {
-        return true;
-    }
-
-    bool canIgnorePrepareConflicts() const override {
         return true;
     }
 
@@ -166,347 +569,12 @@ public:
         return true;
     }
 
-    ReadConcernSupportResult supportsReadConcern(const BSONObj& cmdObj,
-                                                 repl::ReadConcernLevel level,
-                                                 bool isImplicitDefault) const override {
-        static const Status kSnapshotNotSupported{ErrorCodes::InvalidOptions,
-                                                  "read concern snapshot not supported"};
-        return {{level == repl::ReadConcernLevel::kSnapshotReadConcern, kSnapshotNotSupported},
-                Status::OK()};
-    }
-
-    bool isSubjectToIngressAdmissionControl() const override {
-        return true;
-    }
-
     bool shouldAffectReadOptionCounters() const override {
-        return true;
-    }
-
-    bool supportsReadMirroring(const BSONObj&) const override {
         return true;
     }
 
     ReadWriteType getReadWriteType() const override {
         return ReadWriteType::kRead;
-    }
-
-    Status checkAuthForOperation(OperationContext* opCtx,
-                                 const DatabaseName& dbname,
-                                 const BSONObj& cmdObj) const override {
-        AuthorizationSession* authSession = AuthorizationSession::get(opCtx->getClient());
-
-        if (!authSession->isAuthorizedToParseNamespaceElement(cmdObj.firstElement())) {
-            return Status(ErrorCodes::Unauthorized, "Unauthorized");
-        }
-
-        const auto hasTerm = false;
-        const auto nsOrUUID = CommandHelpers::parseNsOrUUID(dbname, cmdObj);
-        if (nsOrUUID.isNamespaceString()) {
-            uassert(ErrorCodes::InvalidNamespace,
-                    str::stream() << "Namespace " << nsOrUUID.toStringForErrorMsg()
-                                  << " is not a valid collection name",
-                    nsOrUUID.nss().isValid());
-            return auth::checkAuthForFind(authSession, nsOrUUID.nss(), hasTerm);
-        }
-
-        const auto resolvedNss =
-            CollectionCatalog::get(opCtx)->resolveNamespaceStringFromDBNameAndUUID(
-                opCtx, nsOrUUID.dbName(), nsOrUUID.uuid());
-        return auth::checkAuthForFind(authSession, resolvedNss, hasTerm);
-    }
-
-    Status explain(OperationContext* opCtx,
-                   const OpMsgRequest& opMsgRequest,
-                   ExplainOptions::Verbosity verbosity,
-                   rpc::ReplyBuilderInterface* result) const override {
-        DatabaseName dbName = opMsgRequest.parseDbName();
-        const BSONObj& cmdObj = opMsgRequest.body;
-        // Acquire locks. The RAII object is optional, because in the case
-        // of a view, the locks need to be released.
-        boost::optional<AutoGetCollectionForReadCommandMaybeLockFree> ctx;
-        ctx.emplace(
-            opCtx,
-            CommandHelpers::parseNsCollectionRequired(dbName, cmdObj),
-            AutoGetCollection::Options{}.viewMode(auto_get_collection::ViewMode::kViewsPermitted));
-        const auto nss = ctx->getNss();
-
-        std::unique_ptr<CountCommandRequest> request;
-        try {
-            request = std::make_unique<CountCommandRequest>(
-                CountCommandRequest::parse(IDLParserContext("count"), opMsgRequest));
-        } catch (...) {
-            return exceptionToStatus();
-        }
-
-        // Start the query planning timer right after parsing.
-        CurOp::get(opCtx)->beginQueryPlanningTimer();
-
-        if (shouldDoFLERewrite(request)) {
-            if (!request->getEncryptionInformation()->getCrudProcessed().value_or(false)) {
-                processFLECountD(opCtx, nss, request.get());
-            }
-            stdx::lock_guard<Client> lk(*opCtx->getClient());
-            CurOp::get(opCtx)->setShouldOmitDiagnosticInformation_inlock(lk, true);
-        }
-
-        SerializationContext serializationCtx = request->getSerializationContext();
-        if (ctx->getView()) {
-            // Relinquish locks. The aggregation command will re-acquire them.
-            ctx.reset();
-
-            auto curOp = CurOp::get(opCtx);
-            curOp->debug().queryStatsInfo.disableForSubqueryExecution = true;
-
-            auto viewAggregation = countCommandAsAggregationCommand(*request, nss);
-            if (!viewAggregation.isOK()) {
-                return viewAggregation.getStatus();
-            }
-
-            auto viewAggCmd = OpMsgRequestBuilder::create(opMsgRequest.validatedTenancyScope,
-                                                          nss.dbName(),
-                                                          viewAggregation.getValue())
-                                  .body;
-            auto viewAggRequest = aggregation_request_helper::parseFromBSON(
-                viewAggCmd, opMsgRequest.validatedTenancyScope, verbosity, serializationCtx);
-
-            // An empty PrivilegeVector is acceptable because these privileges are only checked
-            // on getMore and explain will not open a cursor.
-            return runAggregate(opCtx,
-                                viewAggRequest,
-                                {viewAggRequest},
-                                viewAggregation.getValue(),
-                                PrivilegeVector(),
-                                result);
-        }
-
-        const auto& collection = ctx->getCollection();
-
-        // Prevent chunks from being cleaned up during yields - this allows us to only check the
-        // version on initial entry into count.
-        boost::optional<ScopedCollectionFilter> rangePreserver;
-        if (collection.isSharded_DEPRECATED()) {
-            rangePreserver.emplace(
-                CollectionShardingState::acquire(opCtx, nss)
-                    ->getOwnershipFilter(
-                        opCtx,
-                        CollectionShardingState::OrphanCleanupPolicy::kDisallowOrphanCleanup));
-        }
-
-        auto expCtx = makeExpressionContextForGetExecutor(
-            opCtx, request->getCollation().value_or(BSONObj()), nss, verbosity);
-
-        const auto extensionsCallback = getExtensionsCallback(collection, opCtx, nss);
-        auto parsedFind = uassertStatusOK(
-            parsed_find_command::parseFromCount(expCtx, *request, *extensionsCallback, nss));
-
-        auto statusWithPlanExecutor =
-            getExecutorCount(expCtx, &collection, std::move(parsedFind), *request);
-
-        if (!statusWithPlanExecutor.isOK()) {
-            return statusWithPlanExecutor.getStatus();
-        }
-
-        auto exec = std::move(statusWithPlanExecutor.getValue());
-
-        auto bodyBuilder = result->getBodyBuilder();
-        Explain::explainStages(exec.get(),
-                               collection,
-                               verbosity,
-                               BSONObj(),
-                               SerializationContext::stateCommandReply(serializationCtx),
-                               cmdObj,
-                               &bodyBuilder);
-        return Status::OK();
-    }
-
-    bool run(OperationContext* opCtx,
-             const DatabaseName& dbName,
-             const BSONObj& cmdObj,
-             BSONObjBuilder& result) override {
-        CommandHelpers::handleMarkKillOnClientDisconnect(opCtx);
-
-        // Capture diagnostics for tassert and invariant failures that may occur during query
-        // parsing, planning or execution. No work is done on the hot-path, all computation of
-        // these diagnostics is done lazily during failure handling. This line just creates an
-        // RAII object which holds references to objects on this stack frame, which will be used
-        // to print diagnostics in the event of a tassert or invariant.
-        ScopedDebugInfo countCmdDiagnostics("commandDiagnostics",
-                                            command_diagnostics::Printer{opCtx});
-
-        // Acquire locks and resolve possible UUID. The RAII object is optional, because in the case
-        // of a view, the locks need to be released.
-        boost::optional<AutoGetCollectionForReadCommandMaybeLockFree> ctx;
-        ctx.emplace(
-            opCtx,
-            CommandHelpers::parseNsOrUUID(dbName, cmdObj),
-            AutoGetCollection::Options{}.viewMode(auto_get_collection::ViewMode::kViewsPermitted));
-        const auto& nss = ctx->getNss();
-
-        CurOpFailpointHelpers::waitWhileFailPointEnabled(
-            &hangBeforeCollectionCount, opCtx, "hangBeforeCollectionCount", []() {}, nss);
-
-        const auto vts = auth::ValidatedTenancyScope::get(opCtx);
-        const auto sc = vts != boost::none
-            ? SerializationContext::stateCommandRequest(vts->hasTenantId(), vts->isFromAtlasProxy())
-            : SerializationContext::stateCommandRequest();
-
-        auto request = CountCommandRequest::parse(
-            IDLParserContext("count", vts, dbName.tenantId(), sc), cmdObj);
-
-        // Start the query planning timer right after parsing.
-        auto curOp = CurOp::get(opCtx);
-        curOp->beginQueryPlanningTimer();
-
-        if (shouldDoFLERewrite(request)) {
-            if (!request.getEncryptionInformation()->getCrudProcessed().value_or(false)) {
-                processFLECountD(opCtx, nss, &request);
-            }
-            stdx::lock_guard<Client> lk(*opCtx->getClient());
-            CurOp::get(opCtx)->setShouldOmitDiagnosticInformation_inlock(lk, true);
-        }
-        if (request.getMirrored().value_or(false)) {
-            const auto& invocation = CommandInvocation::get(opCtx);
-            invocation->markMirrored();
-        }
-
-        if (!request.getMirrored()) {
-            if (auto sampleId = analyze_shard_key::getOrGenerateSampleId(
-                    opCtx, nss, analyze_shard_key::SampledCommandNameEnum::kCount, request)) {
-                analyze_shard_key::QueryAnalysisWriter::get(opCtx)
-                    ->addCountQuery(*sampleId,
-                                    nss,
-                                    request.getQuery(),
-                                    request.getCollation().value_or(BSONObj()))
-                    .getAsync([](auto) {});
-            }
-        }
-
-        auto expCtx = makeExpressionContextForGetExecutor(
-            opCtx, request.getCollation().value_or(BSONObj()), nss, boost::none /* verbosity*/);
-
-        const auto& collection = ctx->getCollection();
-        const auto extensionsCallback = getExtensionsCallback(collection, opCtx, nss);
-        auto parsedFind = uassertStatusOK(
-            parsed_find_command::parseFromCount(expCtx, request, *extensionsCallback, nss));
-
-        if (feature_flags::gFeatureFlagQueryStatsCountDistinct
-                .isEnabledUseLastLTSFCVWhenUninitialized(
-                    serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
-            query_stats::registerRequest(opCtx, nss, [&]() {
-                return std::make_unique<query_stats::CountKey>(expCtx,
-                                                               *parsedFind,
-                                                               request.getLimit().has_value(),
-                                                               request.getSkip().has_value(),
-                                                               request.getReadConcern(),
-                                                               request.getMaxTimeMS().has_value(),
-                                                               ctx->getCollectionType());
-            });
-
-            if (request.getIncludeQueryStatsMetrics() &&
-                feature_flags::gFeatureFlagQueryStatsDataBearingNodes.isEnabled(
-                    serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
-                curOp->debug().queryStatsInfo.metricsRequested = true;
-            }
-        }
-
-        if (ctx->getView()) {
-            auto viewAggregation = countCommandAsAggregationCommand(request, nss);
-            // Relinquish locks. The aggregation command will re-acquire them.
-            ctx.reset();
-
-            uassertStatusOK(viewAggregation.getStatus());
-
-            auto aggRequest =
-                OpMsgRequestBuilder::create(vts, dbName, std::move(viewAggregation.getValue()));
-            BSONObj aggResult = CommandHelpers::runCommandDirectly(opCtx, aggRequest);
-
-            uassertStatusOK(ViewResponseFormatter(aggResult).appendAsCountResponse(
-                &result,
-                dbName.tenantId(),
-                SerializationContext::stateCommandReply(request.getSerializationContext())));
-            return true;
-        }
-
-        // Check whether we are allowed to read from this node after acquiring our locks.
-        auto replCoord = repl::ReplicationCoordinator::get(opCtx);
-        uassertStatusOK(replCoord->checkCanServeReadsFor(
-            opCtx, nss, ReadPreferenceSetting::get(opCtx).canRunOnSecondary()));
-
-
-        // Prevent chunks from being cleaned up during yields - this allows us to only check the
-        // version on initial entry into count.
-        boost::optional<ScopedCollectionFilter> rangePreserver;
-        if (collection.isSharded_DEPRECATED()) {
-            rangePreserver.emplace(
-                CollectionShardingState::acquire(opCtx, nss)
-                    ->getOwnershipFilter(
-                        opCtx,
-                        CollectionShardingState::OrphanCleanupPolicy::kDisallowOrphanCleanup));
-        }
-
-        auto statusWithPlanExecutor =
-            getExecutorCount(expCtx, &collection, std::move(parsedFind), request);
-        uassertStatusOK(statusWithPlanExecutor.getStatus());
-
-        auto exec = std::move(statusWithPlanExecutor.getValue());
-
-        // Store the plan summary string in CurOp.
-        {
-            stdx::lock_guard<Client> lk(*opCtx->getClient());
-            curOp->setPlanSummary_inlock(exec->getPlanExplainer().getPlanSummary());
-        }
-
-        auto countResult = exec->executeCount();
-
-        PlanSummaryStats summaryStats;
-        exec->getPlanExplainer().getSummaryStats(&summaryStats);
-        if (collection) {
-            CollectionQueryInfo::get(collection).notifyOfQuery(opCtx, collection, summaryStats);
-        }
-        curOp->debug().setPlanSummaryMetrics(std::move(summaryStats));
-        curOp->setEndOfOpMetrics(kNReturned);
-
-        if (curOp->shouldDBProfile()) {
-            auto&& explainer = exec->getPlanExplainer();
-            auto&& [stats, _] =
-                explainer.getWinningPlanStats(ExplainOptions::Verbosity::kExecStats);
-            curOp->debug().execStats = std::move(stats);
-        }
-
-        result.appendNumber("n", countResult);
-
-        const auto* cq = exec->getCanonicalQuery();
-        expCtx = cq ? cq->getExpCtx()
-                    : ExpressionContext::makeBlankExpressionContext(opCtx, exec->nss());
-        collectQueryStatsMongod(opCtx, expCtx, std::move(curOp->debug().queryStatsInfo.key));
-
-        if (curOp->debug().queryStatsInfo.metricsRequested) {
-            result.append("metrics", curOp->debug().getCursorMetrics().toBSON());
-        }
-
-        return true;
-    }
-
-    void appendMirrorableRequest(BSONObjBuilder* bob, const BSONObj& cmdObj) const override {
-        static const auto kMirrorableKeys = [] {
-            BSONObjBuilder keyBob;
-
-            keyBob.append("count", 1);
-            keyBob.append("query", 1);
-            keyBob.append("skip", 1);
-            keyBob.append("limit", 1);
-            keyBob.append("hint", 1);
-            keyBob.append("collation", 1);
-            keyBob.append("shardVersion", 1);
-            keyBob.append("databaseVersion", 1);
-            keyBob.append("encryptionInformation", 1);
-
-            return keyBob.obj();
-        }();
-
-        // Filter the keys that can be mirrored
-        cmdObj.filterFieldsUndotted(bob, kMirrorableKeys, true);
     }
 };
 MONGO_REGISTER_COMMAND(CmdCount).forShard();
