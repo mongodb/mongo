@@ -53,12 +53,10 @@
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
 
 namespace mongo::stage_builder {
-namespace sv = sbe::value;
-
 namespace {
 struct CellPathReqsRet {
-    std::vector<sv::CellBlock::PathRequest> topLevelPaths;
-    std::vector<sv::CellBlock::PathRequest> traversePaths;
+    std::vector<sbe::value::CellBlock::PathRequest> topLevelPaths;
+    std::vector<sbe::value::CellBlock::PathRequest> traversePaths;
 };
 
 // The set of fields specified in a bucket spec contains the fields that should be available after
@@ -76,8 +74,9 @@ CellPathReqsRet getCellPathReqs(const UnpackTsBucketNode* unpackNode) {
         if (computedFromMeta.find(field) == computedFromMeta.end()) {
             // For each path requested by the query we generate a 'topLevelPath' version, which is
             // just the value of the top level field, with no traversal.
-            ret.topLevelPaths.emplace_back(sv::CellBlock::PathRequest(
-                sv::CellBlock::kProject, {sv::CellBlock::Get{field}, sv::CellBlock::Id{}}));
+            ret.topLevelPaths.emplace_back(sbe::value::CellBlock::PathRequest(
+                sbe::value::CellBlock::kProject,
+                {sbe::value::CellBlock::Get{field}, sbe::value::CellBlock::Id{}}));
         }
     }
 
@@ -94,36 +93,19 @@ CellPathReqsRet getCellPathReqs(const UnpackTsBucketNode* unpackNode) {
                 computedFromMeta.find(rootField) == computedFromMeta.end()) {
 
                 FieldPath fp(path);
-                sv::CellBlock::PathRequest pReq(sv::CellBlock::kFilter);
+                sbe::value::CellBlock::PathRequest pReq(sbe::value::CellBlock::kFilter);
                 for (size_t i = 0; i < fp.getPathLength(); i++) {
                     pReq.path.insert(pReq.path.end(),
-                                     {sv::CellBlock::Get{fp.getFieldName(i).toString()},
-                                      sv::CellBlock::Traverse{}});
+                                     {sbe::value::CellBlock::Get{fp.getFieldName(i).toString()},
+                                      sbe::value::CellBlock::Traverse{}});
                 }
-                pReq.path.emplace_back(sv::CellBlock::Id{});
+                pReq.path.emplace_back(sbe::value::CellBlock::Id{});
                 ret.traversePaths.emplace_back(std::move(pReq));
             }
         }
     }
 
     return ret;
-}
-
-const std::string& getTopLevelField(const sv::CellBlock::PathRequest& pathReq) {
-    return get<sv::CellBlock::Get>(pathReq.path[0]).field;
-}
-
-std::string getFullPath(const sv::CellBlock::PathRequest& pathReq) {
-    StringBuilder sb;
-    for (const auto& path : pathReq.path) {
-        if (holds_alternative<sv::CellBlock::Get>(path)) {
-            if (sb.len() != 0) {
-                sb.append(".");
-            }
-            sb.append(get<sv::CellBlock::Get>(path).field);
-        }
-    }
-    return sb.str();
 }
 
 // TODO SERVER-80243: Remove this function once the stage builder is stable.
@@ -138,113 +120,93 @@ void printPlan(const sbe::PlanStage& stage) {
 }
 }  // namespace
 
-std::unique_ptr<sbe::PlanStage> buildBlockToRow(std::unique_ptr<sbe::PlanStage> stage,
-                                                StageBuilderState& state,
-                                                PlanStageSlots& outputs) {
+SbStage buildBlockToRow(SbStage stage, StageBuilderState& state, PlanStageSlots& outputs) {
     auto [outStage, _] = buildBlockToRow(std::move(stage), state, outputs, SbSlotVector{});
     return std::move(outStage);
 }
 
-std::pair<std::unique_ptr<sbe::PlanStage>, SbSlotVector> buildBlockToRow(
-    std::unique_ptr<sbe::PlanStage> stage,
-    StageBuilderState& state,
-    PlanStageSlots& outputs,
-    SbSlotVector individualSlots) {
+std::pair<SbStage, SbSlotVector> buildBlockToRow(SbStage stage,
+                                                 StageBuilderState& state,
+                                                 PlanStageSlots& outputs,
+                                                 SbSlotVector individualSlots) {
     // For this stage we output the 'topLevelSlots' (i.e. kField) and NOT the 'traversedSlots' (i.e.
     // kFilterCellField).
     using UnownedSlotName = PlanStageSlots::UnownedSlotName;
 
-    absl::flat_hash_map<sbe::value::SlotId, sbe::value::SlotId> blockIdToUnpackedIdMap;
-    sbe::value::SlotVector blockSlots;
-    sbe::value::SlotVector unpackedSlots;
+    SbBuilder b(state, stage->getCommonStats()->nodeId);
 
-    std::vector<PlanStageSlots::UnownedSlotName> fieldNames, outputsToRemove;
-    outputsToRemove.push_back(PlanStageSlots::kBlockSelectivityBitmap);
+    SbSlotVector blockSlots;
+    absl::flat_hash_map<sbe::value::SlotId, size_t> blockSlotIdToPosMap;
 
-    auto processSlot = [&](SbSlot slot, boost::optional<UnownedSlotName> name) {
+    std::vector<PlanStageSlots::OwnedSlotName> fieldNames, outputsToRemove;
+
+    // Helper lambda for processing slots and adding them to 'blockSlots' and 'blockSlotIdToPosMap'
+    // if appropriate. The lambda will return true if the slot was added to 'blockSlots' or it was
+    // already present in 'blockSlots', otherwise the lambda will return false.
+    auto processSlot = [&](SbSlot slot) -> bool {
         auto typeSig = slot.getTypeSignature();
-        // If slot is a Block or Cell, add a mapping for it to 'blockIdToUnpackedIdMap'.
+        // If slot is a Block or Cell, add it to 'blockSlotIdToPosMap'.
         if (typeSig &&
             (TypeSignature::kBlockType.isSubset(*typeSig) ||
              TypeSignature::kCellType.isSubset(*typeSig))) {
-            if (!blockIdToUnpackedIdMap.count(slot.getId())) {
-                auto slotId = slot.getId();
-                auto unpackedId = state.slotId();
-
-                blockIdToUnpackedIdMap[slotId] = unpackedId;
-                blockSlots.push_back(slotId);
-                unpackedSlots.push_back(unpackedId);
+            if (!blockSlotIdToPosMap.count(slot.getId())) {
+                size_t pos = blockSlots.size();
+                blockSlots.push_back(slot);
+                blockSlotIdToPosMap.emplace(slot.getId(), pos);
             }
+            return true;
         }
+        return false;
     };
 
     for (const auto& [name, slot] : outputs.getAllNameSlotPairsInOrder()) {
         if (name.first == PlanStageSlots::kField) {
-            fieldNames.push_back(name);
-            processSlot(slot, name);
+            if (processSlot(slot)) {
+                fieldNames.push_back(PlanStageSlots::OwnedSlotName{name});
+            }
         }
         if (name.first == PlanStageSlots::kFilterCellField) {
-            outputsToRemove.push_back(name);
+            outputsToRemove.push_back(PlanStageSlots::OwnedSlotName{name});
         }
     }
 
     for (const auto& slot : individualSlots) {
-        processSlot(slot, boost::none);
+        processSlot(slot);
     }
 
-    // If there aren't any required block slots, use the bitmap.
-    if (blockSlots.empty()) {
-        // If we have no block slots, tell block_to_row to unwind the bitset itself.
-        auto slotId = outputs.get(PlanStageSlots::kBlockSelectivityBitmap).getId();
-
-        blockSlots.push_back(slotId);
-        unpackedSlots.push_back(state.slotId());
-    }
-
-    // Adds the BlockToRowStage.
-    PlanNodeId nodeId = stage->getCommonStats()->nodeId;
-    stage = std::make_unique<sbe::BlockToRowStage>(
-        std::move(stage),
-        blockSlots,
-        unpackedSlots,
-        outputs.get(PlanStageSlots::kBlockSelectivityBitmap).getId(),
-        nodeId,
-        state.yieldPolicy);
-    printPlan(*stage);
+    auto bitmapSlot = outputs.get(PlanStageSlots::kBlockSelectivityBitmap);
 
     // Remove all the slots that should not be propagated.
-    for (size_t i = 0; i < outputsToRemove.size(); ++i) {
-        outputs.clear(outputsToRemove[i]);
+    outputs.clear(PlanStageSlots::kBlockSelectivityBitmap);
+    for (const auto& name : outputsToRemove) {
+        outputs.clear(name);
     }
+
+    // If there aren't any required block slots, use the bitmap slot.
+    if (blockSlots.empty()) {
+        blockSlots.push_back(bitmapSlot);
+    }
+
+    // Add the BlockToRowStage.
+    auto [outStage, unpackedSlots] = b.makeBlockToRow(std::move(stage), blockSlots, bitmapSlot);
+    stage = std::move(outStage);
+
+    printPlan(*stage);
 
     // Update 'outputs' after the BlockToRow stage.
     for (const auto& fieldName : fieldNames) {
         auto slot = outputs.get(fieldName);
-        auto it = blockIdToUnpackedIdMap.find(slot.getId());
-        if (it != blockIdToUnpackedIdMap.end()) {
-            // 'slot' and 'unpackedSlot' will have the same type except that unpackedSlot's
-            // type will be scalar.
-            auto typeSig = slot.getTypeSignature();
-            auto unpackedTypeSig =
-                typeSig->exclude(TypeSignature::kBlockType).exclude(TypeSignature::kCellType);
-
-            auto unpackedSlot = SbSlot{it->second, unpackedTypeSig};
-            outputs.set(fieldName, unpackedSlot);
+        if (auto it = blockSlotIdToPosMap.find(slot.getId()); it != blockSlotIdToPosMap.end()) {
+            size_t pos = it->second;
+            outputs.set(fieldName, unpackedSlots[pos]);
         }
     }
 
     // Update 'individualSlots' after the BlockToRow stage.
     for (auto& slot : individualSlots) {
-        auto it = blockIdToUnpackedIdMap.find(slot.getId());
-        if (it != blockIdToUnpackedIdMap.end()) {
-            // 'slot' and 'unpackedSlot' will have the same type except that unpackedSlot's
-            // type will be scalar.
-            auto typeSig = slot.getTypeSignature();
-            auto unpackedTypeSig =
-                typeSig->exclude(TypeSignature::kBlockType).exclude(TypeSignature::kCellType);
-
-            auto unpackedSlot = SbSlot{it->second, unpackedTypeSig};
-            slot = unpackedSlot;
+        if (auto it = blockSlotIdToPosMap.find(slot.getId()); it != blockSlotIdToPosMap.end()) {
+            size_t pos = it->second;
+            slot = unpackedSlots[pos];
         }
     }
 
@@ -284,7 +246,7 @@ SbExpr buildVectorizedExpr(StageBuilderState& state,
         return scalarExpression;
     }
 
-    if (scalarExpression.canExtractABT()) {
+    if (scalarExpression) {
         auto purpose = forFilterStage ? Vectorizer::Purpose::Filter : Vectorizer::Purpose::Project;
         const bool mayHaveCollation = state.getCollatorSlot().has_value();
 
@@ -314,7 +276,7 @@ SbExpr buildVectorizedExpr(StageBuilderState& state,
             e.setTypeSignature(blockABT.typeSignature);
 
             // Mark this SbExpr as "finished optimizing" so that it won't get optimized again
-            // when extractExpr() gets called.
+            // when lower() gets called.
             e.setFinishedOptimizing();
 
             return e;
@@ -324,9 +286,10 @@ SbExpr buildVectorizedExpr(StageBuilderState& state,
     return {};
 }
 
-std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots>
-SlotBasedStageBuilder::buildUnpackTsBucket(const QuerySolutionNode* root,
-                                           const PlanStageReqs& reqs) {
+std::pair<SbStage, PlanStageSlots> SlotBasedStageBuilder::buildUnpackTsBucket(
+    const QuerySolutionNode* root, const PlanStageReqs& reqs) {
+    SbBuilder b(_state, root->nodeId());
+
     const auto unpackNode = static_cast<const UnpackTsBucketNode*>(root);
 
     // Setup the request for the child stage that should place the bucket to be unpacked into a
@@ -375,58 +338,32 @@ SlotBasedStageBuilder::buildUnpackTsBucket(const QuerySolutionNode* root,
     // a sequence of "rows" with fields, extracted from the bucket's data. The stages between these
     // two do block processing over the cells.
     auto [topLevelReqs, traverseReqs] = getCellPathReqs(unpackNode);
-    auto allReqs = topLevelReqs;
-    allReqs.insert(allReqs.end(), traverseReqs.begin(), traverseReqs.end());
 
-    auto allCellSlots = _slotIdGenerator.generateMultiple(allReqs.size());
-    auto traversedCellSlots =
-        sbe::value::SlotVector(allCellSlots.begin() + topLevelReqs.size(), allCellSlots.end());
+    // Add a TsBucketToCellBlock stage. Among other things, this stage generates a "default" bitmap
+    // of all 1s in to this slot. The bitmap represents which documents are present (1) and which
+    // have been filtered (0). This bitmap is carried around until the block_to_row stage.
+    auto [stage, bitmapSlot, metaSlot, topLevelSlots, traverseSlots] =
+        b.makeTsBucketToCellBlock(std::move(childStage),
+                                  bucketSlot,
+                                  false /* reqMeta */,
+                                  topLevelReqs,
+                                  traverseReqs,
+                                  unpackNode->bucketSpec.timeField());
 
-    // The TsBucketToCellBlock stage generates a "default" bitmap of all 1s in to this slot.
-    // The bitmap represents which documents are present (1) and which have been filtered (0).
-    // This bitmap is carried around until the block_to_row stage.
-    const auto bitmapSlotId = SbSlot{_slotIdGenerator.generate()};
-
-    std::unique_ptr<sbe::PlanStage> stage =
-        std::make_unique<sbe::TsBucketToCellBlockStage>(std::move(childStage),
-                                                        bucketSlot.slotId,
-                                                        allReqs,
-                                                        allCellSlots,
-                                                        boost::none /* metaField slot*/,
-                                                        bitmapSlotId.getId(),
-                                                        unpackNode->bucketSpec.timeField(),
-                                                        unpackNode->nodeId());
-    outputs.set(PlanStageSlots::kBlockSelectivityBitmap, bitmapSlotId);
     printPlan(*stage);
 
-    // Declare the top level fields produced as block values.
+    outputs.set(PlanStageSlots::kBlockSelectivityBitmap, bitmapSlot);
+
     for (size_t i = 0; i < topLevelReqs.size(); ++i) {
-        auto field = getTopLevelField(topLevelReqs[i]);
-        auto key = std::make_pair(PlanStageSlots::kField, field);
-        SbSlot slot;
-        if (field == unpackNode->bucketSpec.timeField()) {
-            slot = SbSlot{allCellSlots[i],
-                          TypeSignature::kCellType.include(TypeSignature::kDateTimeType)};
-            outputs.set(key, slot);
-        } else {
-            slot = SbSlot{allCellSlots[i],
-                          TypeSignature::kCellType.include(TypeSignature::kAnyScalarType)};
-            outputs.set(key, slot);
-        }
+        auto key = std::pair(PlanStageSlots::kField, topLevelReqs[i].getTopLevelField());
+        SbSlot slot = topLevelSlots[i];
+        outputs.set(key, slot);
     }
-    // Declare the traversed fields which can be used for evaluating $match.
+
     for (size_t i = 0; i < traverseReqs.size(); ++i) {
-        auto field = getFullPath(traverseReqs[i]);
-        auto key = std::make_pair(PlanStageSlots::kFilterCellField, field);
-        if (field == unpackNode->bucketSpec.timeField()) {
-            outputs.set(key,
-                        SbSlot{traversedCellSlots[i],
-                               TypeSignature::kCellType.include(TypeSignature::kDateTimeType)});
-        } else {
-            outputs.set(key,
-                        SbSlot{traversedCellSlots[i],
-                               TypeSignature::kCellType.include(TypeSignature::kAnyScalarType)});
-        }
+        auto key = std::pair(PlanStageSlots::kFilterCellField, traverseReqs[i].getFullPath());
+        SbSlot slot = traverseSlots[i];
+        outputs.set(key, slot);
     }
 
     MatchExpression* eventFilter = unpackNode->eventFilter.get();
@@ -441,7 +378,7 @@ SlotBasedStageBuilder::buildUnpackTsBucket(const QuerySolutionNode* root,
             const auto& name =
                 std::pair(PlanStageSlots::kField, FieldPath(eventFilterPath).front().toString());
             if (!outputs.has(name)) {
-                outputs.set(name, _state.getNothingSlot());
+                outputs.set(name, SbSlot{_state.getNothingSlot()});
             }
         }
     }
@@ -460,8 +397,7 @@ SlotBasedStageBuilder::buildUnpackTsBucket(const QuerySolutionNode* root,
             auto eventFilterSbExpr =
                 generateFilter(_state, eventFilter, boost::none /* rootSlot */, outputs);
             if (!eventFilterSbExpr.isNull()) {
-                stage = sbe::makeS<sbe::FilterStage<false>>(
-                    std::move(stage), eventFilterSbExpr.extractExpr(_state), unpackNode->nodeId());
+                stage = b.makeFilter(std::move(stage), std::move(eventFilterSbExpr));
                 printPlan(*stage);
             }
         }
@@ -477,32 +413,25 @@ SlotBasedStageBuilder::buildUnpackTsBucket(const QuerySolutionNode* root,
     // If the parent wants us to produce a result object, create an object with all published
     // fields.
     if (reqs.hasResult()) {
-        std::vector<std::string> fieldNames;
-        sbe::value::SlotVector fieldSlots;
-
+        SbExpr::Vector newBsonObjArgs;
         for (auto&& p : outputs.getAllNameSlotPairsInOrder()) {
             auto& name = p.first;
             auto& slot = p.second;
             if (name.first == PlanStageSlots::kField) {
-                fieldNames.push_back(std::string{name.second});
-                fieldSlots.push_back(slot.slotId);
+                newBsonObjArgs.emplace_back(b.makeStrConstant(name.second));
+                newBsonObjArgs.emplace_back(slot);
             }
         }
 
-        auto resultSlot = _slotIdGenerator.generate();
+        auto newBsonObjExpr = b.makeFunction("newBsonObj"_sd, std::move(newBsonObjArgs));
+
+        auto [outStage, outSlots] = b.makeProject(std::move(stage), std::move(newBsonObjExpr));
+        stage = std::move(outStage);
+
+        auto resultSlot = outSlots[0];
+
         outputs.setResultObj(resultSlot);
         outputs.clear(PlanStageSlots::kBlockSelectivityBitmap);
-
-        stage = sbe::makeS<sbe::MakeBsonObjStage>(std::move(stage),
-                                                  resultSlot,                  // objSlot
-                                                  boost::none,                 // rootSlot
-                                                  boost::none,                 // fieldBehavior
-                                                  std::vector<std::string>{},  // fields
-                                                  fieldNames,                  // projectFields
-                                                  fieldSlots,                  // projectVars
-                                                  true,                        // forceNewObject
-                                                  false,                       // returnOldObject
-                                                  unpackNode->nodeId());
     } else {
         // As we are not producing a result record, we must fulfill all reqs in a way that would be
         // equivalent to fetching the same fields from the result object, that is, we'll map the

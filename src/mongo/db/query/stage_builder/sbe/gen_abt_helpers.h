@@ -52,9 +52,6 @@ namespace mongo::stage_builder {
 /**
  * Creates a balanced boolean binary expression tree from given collection of leaf expression.
  */
-std::unique_ptr<sbe::EExpression> makeBalancedBooleanOpTree(
-    sbe::EPrimBinary::Op logicOp, std::vector<std::unique_ptr<sbe::EExpression>> leaves);
-
 SbExpr makeBalancedBooleanOpTree(sbe::EPrimBinary::Op logicOp,
                                  std::vector<SbExpr> leaves,
                                  StageBuilderState& state);

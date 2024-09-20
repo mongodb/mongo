@@ -1054,34 +1054,30 @@ std::pair<SbSlot /*matched docs*/, SbStage> buildHashJoinLookupStage(
 
     // Build lookup stage that matches the local and foreign rows and aggregates the
     // foreign values in an array.
-    auto lookupStageOutputSlot = SbSlot{state.slotId()};
     if (hasUnwindSrc) {
-        // $LU [$lookup, $unwind] pattern: use HashLookupUnwindStage.
-        SbStage hl = sbe::makeS<sbe::HashLookupUnwindStage>(std::move(outerRootStage),
-                                                            std::move(foreignKeyStage),
-                                                            localKeySlot.getId(),
-                                                            foreignKeySlot.getId(),
-                                                            foreignRecordSlot.getId(),
-                                                            lookupStageOutputSlot.getId(),
-                                                            collatorSlot,
-                                                            nodeId);
+        auto [hl, lookupStageOutputSlot] = b.makeHashLookupUnwind(std::move(outerRootStage),
+                                                                  std::move(foreignKeyStage),
+                                                                  localKeySlot,
+                                                                  foreignKeySlot,
+                                                                  foreignRecordSlot,
+                                                                  collatorSlot);
 
         return {lookupStageOutputSlot, std::move(hl)};
     } else {
         // Plain $lookup without $unwind: use HashLookupStage.
         // Aggregator to assemble the matched foreign documents into an array.
-        sbe::SlotExprPair agg =
-            std::make_pair(lookupStageOutputSlot.getId(),
-                           b.makeFunction("addToArray", foreignRecordSlot).extractExpr(state));
+        SbAggExpr agg{SbExpr{} /*init*/,
+                      SbExpr{} /*blockAgg*/,
+                      b.makeFunction("addToArray", foreignRecordSlot) /*agg*/};
 
-        SbStage hl = sbe::makeS<sbe::HashLookupStage>(std::move(outerRootStage),
-                                                      std::move(foreignKeyStage),
-                                                      localKeySlot.getId(),
-                                                      foreignKeySlot.getId(),
-                                                      foreignRecordSlot.getId(),
-                                                      std::move(agg),
-                                                      collatorSlot,
-                                                      nodeId);
+        auto [hl, lookupStageOutputSlot] = b.makeHashLookup(std::move(outerRootStage),
+                                                            std::move(foreignKeyStage),
+                                                            localKeySlot,
+                                                            foreignKeySlot,
+                                                            foreignRecordSlot,
+                                                            std::move(agg),
+                                                            boost::none /* optOutputSlot */,
+                                                            collatorSlot);
 
         // Add a projection that returns an empty array in the "as" field if no foreign row matched.
         auto [emptyArrayTag, emptyArrayVal] = sbe::value::makeNewArray();
@@ -1163,70 +1159,28 @@ std::pair<SbSlot, SbStage> buildLookupResultObject(SbStage stage,
                                                    bool shouldProduceBson) {
     SbBuilder b(state, nodeId);
 
-    if (shouldProduceBson) {
-        std::vector<std::string> paths;
-        paths.emplace_back(fieldPath.fullPath());
+    std::vector<std::string> paths;
+    paths.emplace_back(fieldPath.fullPath());
 
-        std::vector<ProjectNode> nodes;
-        nodes.emplace_back(resultArraySlot);
+    std::vector<ProjectNode> nodes;
+    nodes.emplace_back(resultArraySlot);
 
-        // We generate a projection with traversalDepth set to 0 to suppress array traversal.
-        constexpr int32_t traversalDepth = 0;
+    // We generate a projection with traversalDepth set to 0 to suppress array traversal.
+    constexpr int32_t traversalDepth = 0;
 
-        SbExpr updatedDocExpr = generateProjection(state,
-                                                   projection_ast::ProjectType::kAddition,
-                                                   std::move(paths),
-                                                   std::move(nodes),
-                                                   localDocSlot,
-                                                   nullptr /* slots */,
-                                                   traversalDepth);
+    SbExpr updatedDocExpr = generateProjection(state,
+                                               projection_ast::ProjectType::kAddition,
+                                               std::move(paths),
+                                               std::move(nodes),
+                                               localDocSlot,
+                                               nullptr /* slots */,
+                                               traversalDepth,
+                                               shouldProduceBson);
 
-        auto [outStage, outSlots] = b.makeProject(std::move(stage), std::move(updatedDocExpr));
-        SbSlot updatedDocSlot = outSlots[0];
+    auto [outStage, outSlots] = b.makeProject(std::move(stage), std::move(updatedDocExpr));
+    SbSlot updatedDocSlot = outSlots[0];
 
-        return {updatedDocSlot, std::move(outStage)};
-    }
-
-    const int32_t pathLength = fieldPath.getPathLength();
-    SbSlotVector fieldSlots;
-
-    // Extract values of all fields along the path except the last one.
-    for (int32_t i = 0; i < pathLength - 1; i++) {
-        StringData fieldName = fieldPath.getFieldName(i);
-        SbSlot inputSlot = i == 0 ? localDocSlot : fieldSlots.back();
-
-        auto [outStage, outSlots] =
-            b.makeProject(std::move(stage),
-                          b.makeFunction("getField"_sd, inputSlot, b.makeStrConstant(fieldName)));
-
-        stage = std::move(outStage);
-        fieldSlots.push_back(outSlots[0]);
-    }
-
-    // Construct new objects for each path level.
-    SbSlot objectSlot = resultArraySlot;
-
-    for (int32_t i = pathLength - 1; i >= 0; i--) {
-        std::string fieldName = fieldPath.getFieldName(i).toString();
-        SbSlot rootObjectSlot = i == 0 ? localDocSlot : fieldSlots[i - 1];
-        SbSlot valueSlot = objectSlot;
-
-        objectSlot = SbSlot{state.slotId()};
-
-        stage = sbe::makeS<sbe::MakeObjStage>(
-            std::move(stage),
-            objectSlot.getId(),                         /* objSlot */
-            rootObjectSlot.getId(),                     /* rootSlot */
-            sbe::MakeBsonObjStage::FieldBehavior::drop, /* fieldBehaviour */
-            std::vector<std::string>{},                 /* fields */
-            std::vector<std::string>{fieldName},        /* projectFields */
-            sbe::value::SlotVector{valueSlot.getId()},  /* projectVars */
-            true,                                       /* forceNewObject */
-            false,                                      /* returnOldObject */
-            nodeId);
-    }
-
-    return {objectSlot, std::move(stage)};
+    return {updatedDocSlot, std::move(outStage)};
 }
 }  // namespace
 

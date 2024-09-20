@@ -996,14 +996,11 @@ SbExpr::Vector buildAccumAggsFirstN(const AccumOp& acc,
     auto frameId = state.frameIdGenerator->generate();
     auto binds = SbExpr::makeSeq(b.makeFunction("aggState"));
 
-    auto varExpr = SbExpr{SbVar{frameId, 0}};
-    auto moveVarExpr = SbExpr{makeMoveVariable(frameId, 0)};
-
-    auto e = b.makeIf(b.makeFunction("aggFirstNNeedsMoreInput", std::move(varExpr)),
+    auto e = b.makeIf(b.makeFunction("aggFirstNNeedsMoreInput", SbLocalVar{frameId, 0}),
                       b.makeFunction("aggFirstN",
-                                     moveVarExpr.clone(),
+                                     SbLocalVar{frameId, 0},
                                      b.makeFillEmptyNull(std::move(inputs->inputExpr))),
-                      moveVarExpr.clone());
+                      SbLocalVar{frameId, 0});
 
     return SbExpr::makeSeq(b.makeLet(frameId, std::move(binds), std::move(e)));
 }

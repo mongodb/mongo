@@ -185,10 +185,10 @@ bool doesExpressionReferenceBlock(const PlanStageSlots& outputs,
         outputs.get(PlanStageReqs::UnownedSlotName(PlanStageReqs::kField, firstComponent));
 
     // Skip any field path expressions on blocks. Those will be computed after block_to_row.
-    if (outputSlot.typeSig &&
-        (*outputSlot.typeSig)
-            .containsAny(TypeSignature::kBlockType.include(TypeSignature::kCellType))) {
-        return true;
+    if (auto typeSig = outputSlot.getTypeSignature()) {
+        if (typeSig->containsAny(TypeSignature::kBlockType.include(TypeSignature::kCellType))) {
+            return true;
+        }
     }
 
     return false;
@@ -543,12 +543,12 @@ AccumInputsPtr generateAccumExprs(StageBuilderState& state,
     // For $topN and $bottomN, we need to pass multiple SbExprs to buildAddExprs()
     // (an "input" expression and a "sortBy" expression).
     if (isTopBottomN(accStmt)) {
-        auto spec = SbExpr{state.getSortSpecSlot(&accStmt)};
+        auto specSlot = SbSlot{state.getSortSpecSlot(&accStmt)};
 
         inputs = std::make_unique<AddTopBottomNInputs>(
             getTopBottomNValueExpr(state, accStmt, outputs),
-            getTopBottomNSortByExpr(state, accStmt, outputs, std::move(spec)),
-            SbExpr{state.getSortSpecSlot(&accStmt)});
+            getTopBottomNSortByExpr(state, accStmt, outputs, SbExpr{specSlot}),
+            SbExpr{specSlot});
     } else {
         // For all other accumulators, we call generateExpression() on 'argument' to create an
         // SbExpr and then we pass this SbExpr as the kInput arg to buildAddExprs().
@@ -592,12 +592,12 @@ boost::optional<AddBlockExprs> generateAccumBlockExprs(StageBuilderState& state,
     // For $topN and $bottomN, we need to pass multiple SbExprs to buildAddExprs()
     // (an "input" expression and a "sortBy" expression).
     if (isTopBottomN(accStmt)) {
-        auto spec = SbExpr{state.getSortSpecSlot(&accStmt)};
+        auto specSlot = SbSlot{state.getSortSpecSlot(&accStmt)};
 
         inputs = std::make_unique<AddBlockTopBottomNInputs>(
             getBlockTopBottomNValueExpr(state, accStmt, outputs),
-            getBlockTopBottomNSortByExpr(state, accStmt, outputs, std::move(spec)),
-            SbExpr{state.getSortSpecSlot(&accStmt)});
+            getBlockTopBottomNSortByExpr(state, accStmt, outputs, SbExpr{specSlot}),
+            SbExpr{specSlot});
     } else {
         // For all other accumulators, we call generateExpression() on 'argument' to create an
         // SbExpr and then we pass this SbExpr as the kInput arg to buildAddExprs().
@@ -790,7 +790,7 @@ SbExprSbSlotVector generateMergingExpressions(StageBuilderState& state,
         AccumInputsPtr combineInputs;
 
         if (isTopBottomN(accStmt)) {
-            auto sortSpec = SbExpr{state.getSortSpecSlot(&accStmt)};
+            auto sortSpec = SbExpr{SbSlot{state.getSortSpecSlot(&accStmt)}};
             combineInputs = std::make_unique<CombineAggsTopBottomNInputs>(std::move(sortSpec));
         }
 
@@ -914,7 +914,7 @@ std::tuple<SbStage, std::vector<std::string>, SbSlotVector, PlanStageSlots> gene
         AccumInputsPtr finalizeInputs;
 
         if (isTopBottomN(accStmt)) {
-            auto sortSpec = SbExpr{state.getSortSpecSlot(&accStmt)};
+            auto sortSpec = SbExpr{SbSlot{state.getSortSpecSlot(&accStmt)}};
             finalizeInputs = std::make_unique<FinalizeTopBottomNInputs>(std::move(sortSpec));
         }
 

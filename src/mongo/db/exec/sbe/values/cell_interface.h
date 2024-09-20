@@ -91,6 +91,10 @@ struct CellBlock {
         // etc etc or if we want to specify which type of position info will be needed.
 
         std::string toString() const;
+
+        StringData getTopLevelField() const;
+
+        std::string getFullPath() const;
     };
 
     virtual ~CellBlock() = default;

@@ -242,12 +242,12 @@ public:
             slotAccessors.emplace_back();
             slots.set(std::make_pair(stage_builder::PlanStageSlots::kField,
                                      shardKeyPaths.back().getPart(0)),
-                      bindAccessor(&slotAccessors.back()));
+                      stage_builder::SbSlot{bindAccessor(&slotAccessors.back())});
         }
 
-        auto shardKeyExpression = stage_builder::makeShardKeyFunctionForPersistedDocuments(
+        auto shardKeyExpression = stage_builder::makeShardKeyForPersistedDocuments(
                                       _state, shardKeyPaths, shardKeyHashed, slots)
-                                      .extractExpr(_state);
+                                      .lower(_state);
         auto compiledShardKey = compileExpression(*shardKeyExpression);
 
         ShardKeyPattern shardKeyPattern{shardKeyPatternDefinition};

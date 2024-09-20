@@ -2198,7 +2198,7 @@ public:
         auto exprs =
             stage_builder::AccumOp{accStatement}.buildCombineAggs(_state, {}, {_inputSlotId});
         ASSERT_EQ(exprs.size(), 1u);
-        _expr = exprs[0].extractExpr(_state);
+        _expr = exprs[0].lower(_state);
 
         return compileAggExpression(*_expr, &_aggAccessor);
     }
@@ -2374,8 +2374,8 @@ public:
 
         // Construct an expression which calls the given agg function, aggregating the values in
         // '_inputSlotId'.
-        auto expr =
-            stage_builder::makeFunction(aggFuncName, stage_builder::makeVariable(_inputSlotId));
+        auto expr = stage_builder::makeFunction(aggFuncName,
+                                                stage_builder::makeVariable(_inputSlotId.getId()));
         auto code = compileAggExpression(*expr, &_aggAccessor);
 
         // Find the first element by skipping the length.
@@ -2454,7 +2454,7 @@ public:
 
                 auto expr =
                     stage_builder::makeFunction(aggExpr + "Merge",
-                                                stage_builder::makeVariable(_inputSlotId),
+                                                stage_builder::makeVariable(_inputSlotId.getId()),
                                                 stage_builder::makeVariable(collatorSlotId));
                 auto finalizeExpr =
                     stage_builder::makeFunction(aggExpr + "Finalize",
@@ -2463,8 +2463,8 @@ public:
 
                 return {std::move(expr), std::move(finalizeExpr)};
             } else {
-                auto expr = stage_builder::makeFunction(aggExpr + "Merge",
-                                                        stage_builder::makeVariable(_inputSlotId));
+                auto expr = stage_builder::makeFunction(
+                    aggExpr + "Merge", stage_builder::makeVariable(_inputSlotId.getId()));
                 auto finalizeExpr = stage_builder::makeFunction(
                     aggExpr + "Finalize", stage_builder::makeVariable(aggSlot));
                 return {std::move(expr), std::move(finalizeExpr)};
@@ -2505,7 +2505,7 @@ public:
             sbe::value::TypeTags::sortSpec, sbe::value::bitcastFrom<sbe::SortSpec*>(sortSpec));
 
         auto expr = stage_builder::makeFunction(aggExpr + "Merge",
-                                                stage_builder::makeVariable(_inputSlotId),
+                                                stage_builder::makeVariable(_inputSlotId.getId()),
                                                 sortSpecConstant->clone());
 
         auto aggSlot = bindAccessor(&_aggAccessor);
@@ -2583,7 +2583,7 @@ TEST_F(SbeStageBuilderGroupAggCombinerTest, CombinePartialAggsMinWithCollation) 
 
     auto exprs = stage_builder::AccumOp{accStatement}.buildCombineAggs(_state, {}, {_inputSlotId});
     ASSERT_EQ(exprs.size(), 1u);
-    auto expr = exprs[0].extractExpr(_state);
+    auto expr = exprs[0].lower(_state);
 
     auto compiledExpr = compileAggExpression(*expr, &_aggAccessor);
 
@@ -2620,7 +2620,7 @@ TEST_F(SbeStageBuilderGroupAggCombinerTest, CombinePartialAggsMaxWithCollation) 
 
     auto exprs = stage_builder::AccumOp{accStatement}.buildCombineAggs(_state, {}, {_inputSlotId});
     ASSERT_EQ(exprs.size(), 1u);
-    auto expr = exprs[0].extractExpr(_state);
+    auto expr = exprs[0].lower(_state);
 
     auto compiledExpr = compileAggExpression(*expr, &_aggAccessor);
 
@@ -2726,7 +2726,7 @@ TEST_F(SbeStageBuilderGroupAggCombinerTest, CombinePartialAggsAddToSetWithCollat
 
     auto exprs = stage_builder::AccumOp{accStatement}.buildCombineAggs(_state, {}, {_inputSlotId});
     ASSERT_EQ(exprs.size(), 1u);
-    auto expr = exprs[0].extractExpr(_state);
+    auto expr = exprs[0].lower(_state);
 
     auto compiledExpr = compileAggExpression(*expr, &_aggAccessor);
 
@@ -2880,8 +2880,8 @@ TEST_F(SbeStageBuilderGroupAggCombinerTest, CombinePartialAggsDoubleDoubleSumLar
     // to make sure that the resulting sum is mathematically correct.
     auto [resTag, resVal] = _aggAccessor.copyOrMoveValue();
     _inputAccessor.reset(true, resTag, resVal);
-    auto finalizeExpr = stage_builder::makeFunction("doubleDoubleSumFinalize",
-                                                    stage_builder::makeVariable(_inputSlotId));
+    auto finalizeExpr = stage_builder::makeFunction(
+        "doubleDoubleSumFinalize", stage_builder::makeVariable(_inputSlotId.getId()));
     auto finalizeCode = compileExpression(*finalizeExpr);
     auto [finalizedTag, finalizedRes] = runCompiledExpression(finalizeCode.get());
     ASSERT_EQ(finalizedTag, sbe::value::TypeTags::NumberInt64);
@@ -2893,7 +2893,7 @@ TEST_F(SbeStageBuilderGroupAggCombinerTest, CombinePartialAggsAvg) {
 
     // We expect $avg to result in two separate agg expressions: one for computing the sum and the
     // other for computing the count. Both agg expressions read from the same input slot.
-    auto exprs = stage_builder::AccumOp{accStatement}.buildCombineAggs(
+    const auto exprs = stage_builder::AccumOp{accStatement}.buildCombineAggs(
         _state, {}, {_inputSlotId, _inputSlotId});
     ASSERT_EQ(exprs.size(), 2u);
 
@@ -2909,12 +2909,12 @@ TEST_F(SbeStageBuilderGroupAggCombinerTest, CombinePartialAggsAvg) {
                                       << BSON_ARRAY(1 << 2 << 3ll << 4ll << 5.5 << 6.6)
                                       << BSON_ARRAY(1 << 2 << 3ll << 4ll << 5.5 << 6.6
                                                       << Decimal128(7) << Decimal128(8))));
-    auto doubleDoubleSumExpr = compileAggExpression(*exprs[0].getExpr(_state), &_aggAccessor);
+    auto doubleDoubleSumExpr = compileAggExpression(*exprs[0].clone().lower(_state), &_aggAccessor);
     aggregateAndAssertResults(
         inputTag, inputVal, expectedTag, expectedVal, doubleDoubleSumExpr.get());
 
     // Now compile the second expression and make sure it computes a simple sum.
-    auto simpleSumExpr = compileAggExpression(*exprs[1].getExpr(_state), &_aggAccessor);
+    auto simpleSumExpr = compileAggExpression(*exprs[1].clone().lower(_state), &_aggAccessor);
 
     auto inputValues = BSON_ARRAY(5 << 8 << 0 << 4);
     auto expectedAggStates = BSON_ARRAY(5 << 13 << 13 << 17);
@@ -2939,8 +2939,8 @@ TEST_F(SbeStageBuilderGroupAggCombinerTest, CombinePartialAggsStdDevPop) {
     // Feed the result back into the input accessor.
     auto [resTag, resVal] = _aggAccessor.copyOrMoveValue();
     _inputAccessor.reset(true, resTag, resVal);
-    auto finalizeExpr =
-        stage_builder::makeFunction("stdDevPopFinalize", stage_builder::makeVariable(_inputSlotId));
+    auto finalizeExpr = stage_builder::makeFunction(
+        "stdDevPopFinalize", stage_builder::makeVariable(_inputSlotId.getId()));
     auto finalizeCode = compileExpression(*finalizeExpr);
     auto [finalizedTag, finalizedRes] = runCompiledExpression(finalizeCode.get());
     ASSERT_EQ(finalizedTag, sbe::value::TypeTags::NumberDouble);
@@ -2965,8 +2965,8 @@ TEST_F(SbeStageBuilderGroupAggCombinerTest, CombinePartialAggsStdDevSamp) {
     // Feed the result back into the input accessor.
     auto [resTag, resVal] = _aggAccessor.copyOrMoveValue();
     _inputAccessor.reset(true, resTag, resVal);
-    auto finalizeExpr = stage_builder::makeFunction("stdDevSampFinalize",
-                                                    stage_builder::makeVariable(_inputSlotId));
+    auto finalizeExpr = stage_builder::makeFunction(
+        "stdDevSampFinalize", stage_builder::makeVariable(_inputSlotId.getId()));
     auto finalizeCode = compileExpression(*finalizeExpr);
     auto [finalizedTag, finalizedRes] = runCompiledExpression(finalizeCode.get());
     ASSERT_EQ(finalizedTag, sbe::value::TypeTags::NumberDouble);

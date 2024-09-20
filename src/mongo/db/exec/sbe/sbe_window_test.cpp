@@ -103,7 +103,8 @@ public:
             window.initExprs.push_back(nullptr);
             window.addExprs.push_back(makeFunction("aggDoubleDoubleSum", makeVariable(valueSlot)));
             window.removeExprs.push_back(makeFunction(
-                "aggDoubleDoubleSum", makeUnaryOp(EPrimUnary::negate, makeVariable(valueSlot))));
+                "aggDoubleDoubleSum",
+                sbe::makeE<sbe::EPrimUnary>(EPrimUnary::negate, makeVariable(valueSlot))));
 
             windows.emplace_back(std::move(window));
         }

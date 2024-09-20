@@ -48,7 +48,7 @@ namespace mongo::stage_builder {
 
 class PlanStageSlots;
 struct StageBuilderState;
-struct SbSlot;
+class SbSlot;
 class SbLocalVar;
 class SbVar;
 class SbExpr;
@@ -82,17 +82,19 @@ TypeSignature constantFold(optimizer::ABT& abt,
  * The SbSlot struct is used to represent slot variables in the SBE stage builder. "SbSlot" is short
  * for "stage builder slot".
  */
-struct SbSlot {
+class SbSlot {
+public:
     using SlotId = sbe::value::SlotId;
 
     struct Less {
         bool operator()(const SbSlot& lhs, const SbSlot& rhs) const {
-            return lhs.slotId < rhs.slotId;
+            return lhs.getId() < rhs.getId();
         }
     };
+
     struct EqualTo {
         bool operator()(const SbSlot& lhs, const SbSlot& rhs) const {
-            return lhs.slotId == rhs.slotId;
+            return lhs.getId() == rhs.getId();
         }
     };
 
@@ -130,6 +132,7 @@ struct SbSlot {
         typeSig = sig;
     }
 
+private:
     SlotId slotId{0};
     OptTypeSignature typeSig;
 };
@@ -314,7 +317,6 @@ public:
     using SlotId = sbe::value::SlotId;
     using FrameId = sbe::FrameId;
     using LocalVarInfo = std::pair<int32_t, int32_t>;
-    using EExpr = std::unique_ptr<sbe::EExpression>;
 
     struct Abt {
         abt::HolderPtr ptr;
@@ -324,17 +326,15 @@ public:
     };
 
     /**
-     * At any given time, an SbExpr object can be in one of 6 states:
+     * At any given time, an SbExpr object can be in one of 5 states:
      *  1) Null - The SbExpr doesn't hold anything.
      *  2) Slot - The SbExpr holds a slot variable (slot ID).
      *  3) LocalVar - The SbExpr holds a local variable (frame ID and slot ID).
-     *  4) Expr - The SbExpr holds an EExpression.
-     *  5) Abt - The SbExpr holds an ABT expression.
-     *  6) OptimizedAbt - The SbExpr holds an ABT expression that has been marked
+     *  4) Abt - The SbExpr holds an ABT expression.
+     *  5) OptimizedAbt - The SbExpr holds an ABT expression that has been marked
      *                    as "finished optimizing".
      */
-    using VariantType =
-        std::variant<std::monostate, SlotId, LocalVarInfo, EExpr, Abt, OptimizedAbt>;
+    using VariantType = std::variant<std::monostate, SlotId, LocalVarInfo, Abt, OptimizedAbt>;
 
     template <typename... Args>
     static Vector makeSeq(Args&&... args) {
@@ -358,13 +358,6 @@ public:
 
     SbExpr(const SbExpr&) = delete;
 
-    SbExpr(EExpr&& e, boost::optional<TypeSignature> typeSig = boost::none) noexcept {
-        if (e) {
-            _storage = std::move(e);
-            _typeSig = typeSig;
-        }
-    }
-
     SbExpr(SbSlot s) noexcept : _storage(s.getId()), _typeSig(s.getTypeSignature()) {}
 
     SbExpr(SbLocalVar l) noexcept {
@@ -381,21 +374,11 @@ public:
         }
     }
 
-    explicit SbExpr(SlotId s, boost::optional<TypeSignature> typeSig = boost::none) noexcept
-        : _storage(s), _typeSig(typeSig) {}
-
     SbExpr(boost::optional<SbSlot> s) : SbExpr(s ? SbExpr{*s} : SbExpr{}) {}
 
     SbExpr(boost::optional<SbLocalVar> l) : SbExpr(l ? SbExpr{*l} : SbExpr{}) {}
 
     SbExpr(boost::optional<SbVar> var) : SbExpr(var ? SbExpr{*var} : SbExpr{}) {}
-
-    SbExpr(boost::optional<SlotId> s, boost::optional<TypeSignature> typeSig = boost::none) {
-        if (s) {
-            _storage = *s;
-            _typeSig = typeSig;
-        }
-    }
 
     SbExpr(const abt::HolderPtr& a, boost::optional<TypeSignature> typeSig = boost::none);
 
@@ -419,19 +402,6 @@ public:
     }
 
     SbExpr& operator=(const SbExpr&) = delete;
-
-    SbExpr& operator=(EExpr&& e) noexcept {
-        if (e) {
-            _storage = std::move(e);
-            _typeSig.reset();
-        } else {
-            reset();
-        }
-
-        e.reset();
-
-        return *this;
-    }
 
     SbExpr& operator=(SbSlot s) {
         _storage = s.getId();
@@ -468,11 +438,6 @@ public:
         return *this;
     }
 
-    SbExpr& operator=(boost::optional<SlotId> s) noexcept {
-        *this = (s ? SbExpr{*s} : SbExpr{});
-        return *this;
-    }
-
     SbExpr& operator=(const abt::HolderPtr& a);
 
     SbExpr& operator=(abt::HolderPtr&& a) noexcept;
@@ -501,50 +466,26 @@ public:
     bool isLocalVarExpr() const;
     bool isConstantExpr() const;
 
-    /**
-     * Returns true if this SbExpr currently holds an sbe::EExpression, otherwise returns false.
-     */
-    bool isEExpr() const noexcept {
-        return holds_alternative<EExpr>(_storage);
-    }
-
     SbVar toVar() const;
     SbSlot toSlot() const;
     SbLocalVar toLocalVar() const;
     std::pair<sbe::value::TypeTags, sbe::value::Value> getConstantValue() const;
 
     /**
-     * Returns a copy of the contents of this SbExpr in the form of an SBE EExpression, lowering
-     * if needed. This method is const and will not modify 'this->_storage'.
+     * Lowers the contents of this SbExpr into SBE EExpression and returns it.
      *
-     * This method may be called regardless of whether isEExpr() is true or false.
+     * Note that this method calls optimize(), which may modify '_typeSig' and '_storage' (if the
+     * typechecker deduces an updated type, or if constant folding can simplify the expression).
+     *
+     * Aside from calling optimize(), this method will not make any other modifications to
+     * '_typeSig' or '_storage'.
      */
-    EExpr getExpr(StageBuilderState& state, const VariableTypes* slotInfo = nullptr) const {
-        return clone().extractExpr(state, slotInfo);
-    }
-
-    /**
-     * Extracts the contents of this SbExpr in the form of an SBE EExpression and returns it,
-     * lowering if needed.
-     *
-     * As its name suggests, extractExpr() should be treated like a "move-from" style operation
-     * that leaves 'this' in a valid but indeterminate state.
-     *
-     * This method may be called regardless of whether isEExpr() is true or false.
-     */
-    EExpr extractExpr(StageBuilderState& state, const VariableTypes* slotInfo = nullptr);
-
-    EExpr extractExpr(StageBuilderState& state, const VariableTypes& slotInfo) {
-        return extractExpr(state, &slotInfo);
-    }
-
-    bool canExtractABT() const noexcept {
-        return holdsAbtInternal() || isVarExpr() || isConstantExpr();
-    }
+    std::unique_ptr<sbe::EExpression> lower(StageBuilderState& state,
+                                            const VariableTypes* slotInfo = nullptr);
 
     /**
      * Extracts the contents of this SbExpr in the form of an ABT expression and returns it.
-     * This method will tassert if it's invoked when canExtractABT() is false.
+     * This method will tassert if it's invoked when isNull() is true.
      *
      * As its name suggests, extractABT() should be treated like a "move-from" style operation
      * that leaves 'this' in a valid but indeterminate state.
@@ -579,7 +520,10 @@ public:
     void setFinishedOptimizing();
 
 private:
-    SbExpr(LocalVarInfo localVarInfo, boost::optional<TypeSignature> typeSig = boost::none)
+    explicit SbExpr(SlotId s, boost::optional<TypeSignature> typeSig)
+        : _storage(s), _typeSig(typeSig) {}
+
+    explicit SbExpr(LocalVarInfo localVarInfo, boost::optional<TypeSignature> typeSig)
         : _storage(localVarInfo), _typeSig(typeSig) {}
 
     void set(SbLocalVar l);

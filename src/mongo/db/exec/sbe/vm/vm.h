@@ -58,6 +58,7 @@
 #include "mongo/db/exec/sbe/values/value.h"
 #include "mongo/db/exec/sbe/vm/code_fragment.h"
 #include "mongo/db/exec/sbe/vm/makeobj_cursors.h"
+#include "mongo/db/exec/sbe/vm/makeobj_writers.h"
 #include "mongo/db/exec/sbe/vm/vm_builtin.h"
 #include "mongo/db/exec/sbe/vm/vm_instruction.h"
 #include "mongo/db/exec/sbe/vm/vm_memory.h"
@@ -203,9 +204,9 @@ struct ProduceObjContext {
 };
 
 /**
- * This struct is used by traverseAndProduceBsonObj() to hold args that stay the same across
+ * This struct is used by traverseAndProduceObj() to hold args that stay the same across
  * each level of recursion. Also, by making use of this struct, on most common platforms we
- * will be able to pass all of traverseAndProduceBsonObj()'s args via CPU registers (rather
+ * will be able to pass all of traverseAndProduceObj()'s args via CPU registers (rather
  * than passing them via the native stack).
  */
 struct ProduceObjContextAndSpec {
@@ -744,76 +745,82 @@ private:
                                                              TimeZone timezone,
                                                              DayOfWeek startOfWeek);
     /**
-     * produceBsonObject() takes a MakeObjSpec ('spec'), a root value ('rootTag' and 'rootVal'),
+     * produceObject() takes a MakeObjSpec ('spec'), a root value ('rootTag' and 'rootVal'),
      * and 0 or more "computed" values as inputs, it builds an output BSON object based on the
      * instructions provided by 'spec' and based on the contents of 'root' and the computed input
      * values, and then it returns the output object. (Note the computed input values are not
      * directly passed in as C++ parameters -- instead the computed input values are passed via
      * the VM's stack.)
      */
-    MONGO_COMPILER_ALWAYS_INLINE void produceBsonObject(const ProduceObjContext& ctx,
-                                                        const MakeObjSpec* spec,
-                                                        UniqueBSONObjBuilder& bob,
-                                                        value::TypeTags rootTag,
-                                                        value::Value rootVal) {
+    template <typename ObjWriterT>
+    MONGO_COMPILER_ALWAYS_INLINE void produceObject(const ProduceObjContext& ctx,
+                                                    const MakeObjSpec* spec,
+                                                    ObjWriterT& bob,
+                                                    value::TypeTags rootTag,
+                                                    value::Value rootVal) {
 
-        // Invoke produceBsonObject<CursorT>() with the appropriate cursor type. For
+        // Invoke produceObject<ObjWriterT, CursorT>() with the appropriate cursor type. For
         // SBE objects, we use ObjectCursor. For all other types, we use BsonObjCursor.
         if (rootTag == value::TypeTags::Object) {
             auto obj = value::getObjectView(rootVal);
 
-            produceBsonObject(ctx, spec, bob, ObjectCursor(obj));
+            produceObject(ctx, spec, bob, ObjectCursor(obj));
         } else {
             const char* obj = rootTag == value::TypeTags::bsonObject
                 ? value::bitcastTo<const char*>(rootVal)
                 : BSONObj::kEmptyObject.objdata();
 
-            produceBsonObject(ctx, spec, bob, BsonObjCursor(obj));
+            produceObject(ctx, spec, bob, BsonObjCursor(obj));
         }
     }
 
-    template <typename CursorT>
-    void produceBsonObject(const ProduceObjContext& ctx,
-                           const MakeObjSpec* spec,
-                           UniqueBSONObjBuilder& bob,
-                           CursorT cursor);
+    template <typename ObjWriterT, typename CursorT>
+    void produceObject(const ProduceObjContext& ctx,
+                       const MakeObjSpec* spec,
+                       ObjWriterT& bob,
+                       CursorT cursor);
 
-    void traverseAndProduceBsonObj(const ProduceObjContextAndSpec& ctx,
-                                   value::TypeTags tag,
-                                   value::Value val,
-                                   int64_t maxDepth,
-                                   UniqueBSONArrayBuilder& bab);
+    template <typename ArrWriterT>
+    void traverseAndProduceObj(const ProduceObjContextAndSpec& ctx,
+                               value::TypeTags tag,
+                               value::Value val,
+                               int64_t maxDepth,
+                               ArrWriterT& bab);
 
-    void traverseAndProduceBsonObj(const ProduceObjContextAndSpec& ctx,
-                                   value::TypeTags tag,
-                                   value::Value val,
-                                   StringData fieldName,
-                                   UniqueBSONObjBuilder& bob);
+    template <typename ObjWriterT>
+    void traverseAndProduceObj(const ProduceObjContextAndSpec& ctx,
+                               value::TypeTags tag,
+                               value::Value val,
+                               StringData fieldName,
+                               ObjWriterT& bob);
 
+    template <typename ObjWriterT>
     MONGO_COMPILER_ALWAYS_INLINE void performSetArgAction(const ProduceObjContext& ctx,
                                                           const MakeObjSpec::FieldAction& action,
                                                           StringData fieldName,
-                                                          UniqueBSONObjBuilder& bob) {
+                                                          ObjWriterT& bob) {
         size_t argIdx = action.getSetArgIdx();
         auto [_, tag, val] = getFromStack(ctx.argsStackOffset + argIdx);
-        bson::appendValueToBsonObj(bob, fieldName, tag, val);
+        bob.appendValue(fieldName, tag, val);
     }
 
+    template <typename ObjWriterT>
     MONGO_COMPILER_ALWAYS_INLINE void performAddArgAction(const ProduceObjContext& ctx,
                                                           const MakeObjSpec::FieldAction& action,
                                                           StringData fieldName,
-                                                          UniqueBSONObjBuilder& bob) {
+                                                          ObjWriterT& bob) {
         size_t argIdx = action.getAddArgIdx();
         auto [_, tag, val] = getFromStack(ctx.argsStackOffset + argIdx);
-        bson::appendValueToBsonObj(bob, fieldName, tag, val);
+        bob.appendValue(fieldName, tag, val);
     }
 
+    template <typename ObjWriterT>
     MONGO_COMPILER_ALWAYS_INLINE void performLambdaArgAction(const ProduceObjContext& ctx,
                                                              const MakeObjSpec::FieldAction& action,
                                                              value::TypeTags tag,
                                                              value::Value val,
                                                              StringData fieldName,
-                                                             UniqueBSONObjBuilder& bob) {
+                                                             ObjWriterT& bob) {
         const auto& lambdaArg = action.getLambdaArg();
         size_t argIdx = lambdaArg.argIdx;
         auto [_, lamTag, lamVal] = getFromStack(ctx.argsStackOffset + argIdx);
@@ -823,18 +830,19 @@ private:
         runLambdaInternal(ctx.code, value::bitcastTo<int64_t>(lamVal));
 
         auto [__, outputTag, outputVal] = getFromStack(0);
-        bson::appendValueToBsonObj(bob, fieldName, outputTag, outputVal);
+        bob.appendValue(fieldName, outputTag, outputVal);
         popAndReleaseStack();
     }
 
+    template <typename ObjWriterT>
     MONGO_COMPILER_ALWAYS_INLINE void performMakeObjAction(const ProduceObjContext& ctx,
                                                            const MakeObjSpec::FieldAction& action,
                                                            value::TypeTags tag,
                                                            value::Value val,
                                                            StringData fieldName,
-                                                           UniqueBSONObjBuilder& bob) {
+                                                           ObjWriterT& bob) {
         const MakeObjSpec* spec = action.getMakeObjSpec();
-        traverseAndProduceBsonObj({ctx, spec}, tag, val, fieldName, bob);
+        traverseAndProduceObj({ctx, spec}, tag, val, fieldName, bob);
     }
 
     template <bool IsBlockBuiltin = false>
@@ -1023,6 +1031,8 @@ private:
         ArityType arity);
     FastTuple<bool, value::TypeTags, value::Value> builtinSortKeyComponentVectorToArray(
         ArityType arity);
+    FastTuple<bool, value::TypeTags, value::Value> builtinMakeObj(ArityType arity,
+                                                                  const CodeFragment* code);
     FastTuple<bool, value::TypeTags, value::Value> builtinMakeBsonObj(ArityType arity,
                                                                       const CodeFragment* code);
     FastTuple<bool, value::TypeTags, value::Value> builtinTsSecond(ArityType arity);
@@ -1629,16 +1639,49 @@ protected:
 
 std::pair<value::TypeTags, value::Value> initializeDoubleDoubleSumState();
 
-// Instantiations of the templated produceBsonObject() method.
-extern template void ByteCode::produceBsonObject<BsonObjCursor>(const ProduceObjContext& ctx,
-                                                                const MakeObjSpec* spec,
-                                                                UniqueBSONObjBuilder& bob,
-                                                                BsonObjCursor cursor);
+// Instantiations of the templated produceObject() and traverseAndProduceObj() methods.
+extern template void ByteCode::produceObject<BsonObjWriter, BsonObjCursor>(
+    const ProduceObjContext& ctx,
+    const MakeObjSpec* spec,
+    BsonObjWriter& bob,
+    BsonObjCursor cursor);
 
-extern template void ByteCode::produceBsonObject<ObjectCursor>(const ProduceObjContext& ctx,
-                                                               const MakeObjSpec* spec,
-                                                               UniqueBSONObjBuilder& bob,
-                                                               ObjectCursor cursor);
+extern template void ByteCode::produceObject<BsonObjWriter, ObjectCursor>(
+    const ProduceObjContext& ctx, const MakeObjSpec* spec, BsonObjWriter& bob, ObjectCursor cursor);
+
+extern template void ByteCode::traverseAndProduceObj<BsonArrWriter>(
+    const ProduceObjContextAndSpec& ctx,
+    value::TypeTags tag,
+    value::Value val,
+    int64_t maxDepth,
+    BsonArrWriter& bab);
+
+extern template void ByteCode::traverseAndProduceObj<BsonObjWriter>(
+    const ProduceObjContextAndSpec& ctx,
+    value::TypeTags tag,
+    value::Value val,
+    StringData fieldName,
+    BsonObjWriter& bob);
+
+extern template void ByteCode::produceObject<ObjectWriter, BsonObjCursor>(
+    const ProduceObjContext& ctx, const MakeObjSpec* spec, ObjectWriter& bob, BsonObjCursor cursor);
+
+extern template void ByteCode::produceObject<ObjectWriter, ObjectCursor>(
+    const ProduceObjContext& ctx, const MakeObjSpec* spec, ObjectWriter& bob, ObjectCursor cursor);
+
+extern template void ByteCode::traverseAndProduceObj<ArrayWriter>(
+    const ProduceObjContextAndSpec& ctx,
+    value::TypeTags tag,
+    value::Value val,
+    int64_t maxDepth,
+    ArrayWriter& bab);
+
+extern template void ByteCode::traverseAndProduceObj<ObjectWriter>(
+    const ProduceObjContextAndSpec& ctx,
+    value::TypeTags tag,
+    value::Value val,
+    StringData fieldName,
+    ObjectWriter& bob);
 }  // namespace vm
 }  // namespace sbe
 }  // namespace mongo

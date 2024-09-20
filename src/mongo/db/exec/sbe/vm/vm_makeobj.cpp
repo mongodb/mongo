@@ -37,11 +37,12 @@
 
 namespace mongo::sbe::vm {
 
-void ByteCode::traverseAndProduceBsonObj(const ProduceObjContextAndSpec& ctx,
-                                         value::TypeTags tag,
-                                         value::Value val,
-                                         int64_t maxDepth,
-                                         UniqueBSONArrayBuilder& bab) {
+template <typename ArrWriterT>
+void ByteCode::traverseAndProduceObj(const ProduceObjContextAndSpec& ctx,
+                                     value::TypeTags tag,
+                                     value::Value val,
+                                     int64_t maxDepth,
+                                     ArrWriterT& bab) {
     constexpr int64_t maxInt64 = std::numeric_limits<int64_t>::max();
 
     // Loop over each element in the array.
@@ -50,30 +51,36 @@ void ByteCode::traverseAndProduceBsonObj(const ProduceObjContextAndSpec& ctx,
             // If 'tag' is an array and we have not exceeded the maximum depth yet, traverse
             // the array.
             auto newMaxDepth = maxDepth == maxInt64 ? maxDepth : maxDepth - 1;
+            auto nestedBab = bab.startArr();
 
-            UniqueBSONArrayBuilder nestedBab(bab.subarrayStart());
-            traverseAndProduceBsonObj(ctx, elemTag, elemVal, newMaxDepth, nestedBab);
+            traverseAndProduceObj(ctx, elemTag, elemVal, newMaxDepth, nestedBab);
+
+            bab.finishArr(std::move(nestedBab));
         } else if (ctx.spec->nonObjInputBehavior != MakeObjSpec::NonObjInputBehavior::kNewObj &&
                    !value::isObject(elemTag)) {
             // Otherwise, if 'tag' is not an object and 'nonObjInputBehavior' is not 'kNewObj',
             // then we either append 'tag'/'val' if ('nonObjInputBehavior' is 'kReturnInput') or we
             // skip 'tag'/'val' (if 'nonObjInputBehavior' is 'kReturnNothing').
             if (ctx.spec->nonObjInputBehavior == MakeObjSpec::NonObjInputBehavior::kReturnInput) {
-                bson::appendValueToBsonArr(bab, elemTag, elemVal);
+                bab.appendValue(elemTag, elemVal);
             }
         } else {
-            // For all other cases, call produceBsonObject().
-            UniqueBSONObjBuilder bob(bab.subobjStart());
-            produceBsonObject(ctx.produceObjCtx, ctx.spec, bob, elemTag, elemVal);
+            // For all other cases, call produceObject().
+            auto bob = bab.startObj();
+
+            produceObject(ctx.produceObjCtx, ctx.spec, bob, elemTag, elemVal);
+
+            bab.finishObj(std::move(bob));
         }
     });
 }
 
-void ByteCode::traverseAndProduceBsonObj(const ProduceObjContextAndSpec& ctx,
-                                         value::TypeTags tag,
-                                         value::Value val,
-                                         StringData fieldName,
-                                         UniqueBSONObjBuilder& bob) {
+template <typename ObjWriterT>
+void ByteCode::traverseAndProduceObj(const ProduceObjContextAndSpec& ctx,
+                                     value::TypeTags tag,
+                                     value::Value val,
+                                     StringData fieldName,
+                                     ObjWriterT& bob) {
     constexpr int64_t maxInt64 = std::numeric_limits<int64_t>::max();
 
     auto maxDepth = ctx.spec->traversalDepth ? *ctx.spec->traversalDepth : maxInt64;
@@ -81,29 +88,34 @@ void ByteCode::traverseAndProduceBsonObj(const ProduceObjContextAndSpec& ctx,
     if (value::isArray(tag) && maxDepth > 0) {
         // If 'tag' is an array and we have not exceeded the maximum depth yet, traverse the array.
         auto newMaxDepth = maxDepth == maxInt64 ? maxDepth : maxDepth - 1;
+        auto bab = bob.startArr(fieldName);
 
-        UniqueBSONArrayBuilder bab(bob.subarrayStart(fieldName));
-        traverseAndProduceBsonObj(ctx, tag, val, newMaxDepth, bab);
+        traverseAndProduceObj(ctx, tag, val, newMaxDepth, bab);
+
+        bob.finishArr(fieldName, std::move(bab));
     } else if (ctx.spec->nonObjInputBehavior != MakeObjSpec::NonObjInputBehavior::kNewObj &&
                !value::isObject(tag)) {
         // Otherwise, if 'tag' is not an object and 'nonObjInputBehavior' is not 'kNewObj',
         // then we either append 'tag'/'val' if ('nonObjInputBehavior' is 'kReturnInput') or we
         // skip 'tag'/'val' (if 'nonObjInputBehavior' is 'kReturnNothing').
         if (ctx.spec->nonObjInputBehavior == MakeObjSpec::NonObjInputBehavior::kReturnInput) {
-            bson::appendValueToBsonObj(bob, fieldName, tag, val);
+            bob.appendValue(fieldName, tag, val);
         }
     } else {
-        // For all other cases, call produceBsonObject().
-        UniqueBSONObjBuilder nestedBob(bob.subobjStart(fieldName));
-        produceBsonObject(ctx.produceObjCtx, ctx.spec, nestedBob, tag, val);
+        // For all other cases, call produceObject().
+        auto nestedBob = bob.startObj(fieldName);
+
+        produceObject(ctx.produceObjCtx, ctx.spec, nestedBob, tag, val);
+
+        bob.finishObj(fieldName, std::move(nestedBob));
     }
 }
 
-template <typename CursorT>
-void ByteCode::produceBsonObject(const ProduceObjContext& ctx,
-                                 const MakeObjSpec* spec,
-                                 UniqueBSONObjBuilder& bob,
-                                 CursorT cursor) {
+template <typename ObjWriterT, typename CursorT>
+void ByteCode::produceObject(const ProduceObjContext& ctx,
+                             const MakeObjSpec* spec,
+                             ObjWriterT& bob,
+                             CursorT cursor) {
     using TypeTags = value::TypeTags;
     using Value = value::Value;
 
@@ -215,14 +227,48 @@ void ByteCode::produceBsonObject(const ProduceObjContext& ctx,
     }
 }
 
-template void ByteCode::produceBsonObject<BsonObjCursor>(const ProduceObjContext& ctx,
-                                                         const MakeObjSpec* spec,
-                                                         UniqueBSONObjBuilder& bob,
-                                                         BsonObjCursor cursor);
+template void ByteCode::produceObject<BsonObjWriter, BsonObjCursor>(const ProduceObjContext& ctx,
+                                                                    const MakeObjSpec* spec,
+                                                                    BsonObjWriter& bob,
+                                                                    BsonObjCursor cursor);
 
-template void ByteCode::produceBsonObject<ObjectCursor>(const ProduceObjContext& ctx,
-                                                        const MakeObjSpec* spec,
-                                                        UniqueBSONObjBuilder& bob,
-                                                        ObjectCursor cursor);
+template void ByteCode::produceObject<BsonObjWriter, ObjectCursor>(const ProduceObjContext& ctx,
+                                                                   const MakeObjSpec* spec,
+                                                                   BsonObjWriter& bob,
+                                                                   ObjectCursor cursor);
+
+template void ByteCode::traverseAndProduceObj<BsonArrWriter>(const ProduceObjContextAndSpec& ctx,
+                                                             value::TypeTags tag,
+                                                             value::Value val,
+                                                             int64_t maxDepth,
+                                                             BsonArrWriter& bab);
+
+template void ByteCode::traverseAndProduceObj<BsonObjWriter>(const ProduceObjContextAndSpec& ctx,
+                                                             value::TypeTags tag,
+                                                             value::Value val,
+                                                             StringData fieldName,
+                                                             BsonObjWriter& bob);
+
+template void ByteCode::produceObject<ObjectWriter, BsonObjCursor>(const ProduceObjContext& ctx,
+                                                                   const MakeObjSpec* spec,
+                                                                   ObjectWriter& bob,
+                                                                   BsonObjCursor cursor);
+
+template void ByteCode::produceObject<ObjectWriter, ObjectCursor>(const ProduceObjContext& ctx,
+                                                                  const MakeObjSpec* spec,
+                                                                  ObjectWriter& bob,
+                                                                  ObjectCursor cursor);
+
+template void ByteCode::traverseAndProduceObj<ArrayWriter>(const ProduceObjContextAndSpec& ctx,
+                                                           value::TypeTags tag,
+                                                           value::Value val,
+                                                           int64_t maxDepth,
+                                                           ArrayWriter& bab);
+
+template void ByteCode::traverseAndProduceObj<ObjectWriter>(const ProduceObjContextAndSpec& ctx,
+                                                            value::TypeTags tag,
+                                                            value::Value val,
+                                                            StringData fieldName,
+                                                            ObjectWriter& bob);
 
 }  // namespace mongo::sbe::vm

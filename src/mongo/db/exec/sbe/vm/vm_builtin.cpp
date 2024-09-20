@@ -289,6 +289,8 @@ std::string builtinToString(Builtin b) {
             return "sortKeyComponentVectorGetElement";
         case Builtin::sortKeyComponentVectorToArray:
             return "sortKeyComponentVectorToArray";
+        case Builtin::makeObj:
+            return "makeObj";
         case Builtin::makeBsonObj:
             return "makeBsonObj";
         case Builtin::tsSecond:
@@ -864,6 +866,8 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::dispatchBuiltin(Builtin
             return builtinSortKeyComponentVectorGetElement(arity);
         case Builtin::sortKeyComponentVectorToArray:
             return builtinSortKeyComponentVectorToArray(arity);
+        case Builtin::makeObj:
+            return builtinMakeObj(arity, code);
         case Builtin::makeBsonObj:
             return builtinMakeBsonObj(arity, code);
         case Builtin::tsSecond:

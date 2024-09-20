@@ -208,6 +208,62 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinNewBsonObj(Arity
     return {true, value::TypeTags::bsonObject, value::bitcastFrom<char*>(data)};
 }
 
+FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinMakeObj(ArityType arity,
+                                                                        const CodeFragment* code) {
+    constexpr int64_t maxInt64 = std::numeric_limits<int64_t>::max();
+
+    tassert(9459700,
+            str::stream() << "Unsupported number of args passed to makeObj(): " << arity,
+            arity >= 2);
+
+    auto [specOwned, specTag, specVal] = getFromStack(0);
+    auto [objOwned, objTag, objVal] = getFromStack(1);
+
+    if (specTag != value::TypeTags::makeObjSpec) {
+        return {false, value::TypeTags::Nothing, 0};
+    }
+
+    auto spec = value::getMakeObjSpecView(specVal);
+    auto maxDepth = spec->traversalDepth ? *spec->traversalDepth : maxInt64;
+
+    // If 'obj' is not an object or array, check if there is any applicable "NonObjInputBehavior"
+    // that should be applied.
+    if (spec->nonObjInputBehavior != MakeObjSpec::NonObjInputBehavior::kNewObj &&
+        !value::isObject(objTag) && (!value::isArray(objTag) || maxDepth == 0)) {
+        if (spec->nonObjInputBehavior == MakeObjSpec::NonObjInputBehavior::kReturnNothing) {
+            // If the input is Nothing or not an Object and if 'nonObjInputBehavior' equals
+            // 'kReturnNothing', then return Nothing.
+            return {false, value::TypeTags::Nothing, 0};
+        } else if (spec->nonObjInputBehavior == MakeObjSpec::NonObjInputBehavior::kReturnInput) {
+            // If the input is Nothing or not an Object and if 'nonObjInputBehavior' equals
+            // 'kReturnInput', then return the input.
+            topStack(false, value::TypeTags::Nothing, 0);
+            return {objOwned, objTag, objVal};
+        }
+    }
+
+    const int argsStackOff = 2;
+    const auto ctx = ProduceObjContext{argsStackOff, code};
+
+    // If 'tag' is an array and we have not exceeded the maximum depth yet, traverse the array.
+    if (maxDepth > 0 && value::isArray(objTag)) {
+        ArrayWriter bab;
+
+        auto newMaxDepth = maxDepth == maxInt64 ? maxDepth : maxDepth - 1;
+        traverseAndProduceObj({ctx, spec}, objTag, objVal, newMaxDepth, bab);
+
+        auto [resultTag, resultVal] = bab.done();
+        return {true, resultTag, resultVal};
+    } else {
+        ObjectWriter bob;
+
+        produceObject(ctx, spec, bob, objTag, objVal);
+
+        auto [resultTag, resultVal] = bob.done();
+        return {true, resultTag, resultVal};
+    }
+}
+
 FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinMakeBsonObj(
     ArityType arity, const CodeFragment* code) {
     constexpr int64_t maxInt64 = std::numeric_limits<int64_t>::max();
@@ -247,22 +303,20 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinMakeBsonObj(
 
     // If 'tag' is an array and we have not exceeded the maximum depth yet, traverse the array.
     if (maxDepth > 0 && value::isArray(objTag)) {
-        UniqueBSONArrayBuilder bab;
+        BsonArrWriter bab;
 
         auto newMaxDepth = maxDepth == maxInt64 ? maxDepth : maxDepth - 1;
-        traverseAndProduceBsonObj({ctx, spec}, objTag, objVal, newMaxDepth, bab);
+        traverseAndProduceObj({ctx, spec}, objTag, objVal, newMaxDepth, bab);
 
-        bab.doneFast();
-        char* data = bab.bb().release().release();
-        return {true, value::TypeTags::bsonArray, value::bitcastFrom<char*>(data)};
+        auto [resultTag, resultVal] = bab.done();
+        return {true, resultTag, resultVal};
     } else {
-        UniqueBSONObjBuilder bob;
+        BsonObjWriter bob;
 
-        produceBsonObject(ctx, spec, bob, objTag, objVal);
+        produceObject(ctx, spec, bob, objTag, objVal);
 
-        bob.doneFast();
-        char* data = bob.bb().release().release();
-        return {true, value::TypeTags::bsonObject, value::bitcastFrom<char*>(data)};
+        auto [resultTag, resultVal] = bob.done();
+        return {true, resultTag, resultVal};
     }
 }
 

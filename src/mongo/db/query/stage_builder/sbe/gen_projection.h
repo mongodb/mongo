@@ -244,7 +244,10 @@ ProjectActions evaluateFieldEffects(StageBuilderState& state,
  * This function takes a plan for applying a projection ('pa') and an input object ('expr') and it
  * returns an expression that produces the updated object.
  */
-SbExpr generateObjectExpr(StageBuilderState& state, ProjectActions pa, SbExpr expr);
+SbExpr generateObjectExpr(StageBuilderState& state,
+                          ProjectActions pa,
+                          SbExpr expr,
+                          bool shouldProduceBson = true);
 
 /**
  * This function takes a plan for applying a projection ('pa') to an entire object, the name of
@@ -255,7 +258,8 @@ SbExpr generateObjectExpr(StageBuilderState& state, ProjectActions pa, SbExpr ex
 SbExpr generateSingleFieldExpr(StageBuilderState& state,
                                ProjectActions pa,
                                SbExpr expr,
-                               const std::string& singleField);
+                               const std::string& singleField,
+                               bool shouldProduceBson = true);
 
 /**
  * Generates an SbExpr applies a projection to a document. The 'inputExpr' parameter provides the
@@ -266,7 +270,8 @@ SbExpr generateProjection(StageBuilderState& state,
                           const projection_ast::Projection* projection,
                           SbExpr inputExpr,
                           const PlanStageSlots* slots = nullptr,
-                          boost::optional<int32_t> traversalDepth = boost::none);
+                          boost::optional<int32_t> traversalDepth = boost::none,
+                          bool shouldProduceBson = true);
 
 SbExpr generateProjection(StageBuilderState& state,
                           projection_ast::ProjectType projType,
@@ -274,7 +279,8 @@ SbExpr generateProjection(StageBuilderState& state,
                           std::vector<ProjectNode> nodes,
                           SbExpr inputExpr,
                           const PlanStageSlots* slots = nullptr,
-                          boost::optional<int32_t> traversalDepth = boost::none);
+                          boost::optional<int32_t> traversalDepth = boost::none,
+                          bool shouldProduceBson = true);
 
 /**
  * Generates an SbExpr that applies the applicable parts of a projection to a single field (as given
@@ -287,7 +293,8 @@ SbExpr generateSingleFieldProjection(StageBuilderState& state,
                                      SbExpr inputExpr,
                                      const PlanStageSlots* slots,
                                      const std::string& singleField,
-                                     boost::optional<int32_t> traversalDepth = boost::none);
+                                     boost::optional<int32_t> traversalDepth = boost::none,
+                                     bool shouldProduceBson = true);
 
 SbExpr generateSingleFieldProjection(StageBuilderState& state,
                                      projection_ast::ProjectType projType,
@@ -296,7 +303,8 @@ SbExpr generateSingleFieldProjection(StageBuilderState& state,
                                      SbExpr inputExpr,
                                      const PlanStageSlots* slots,
                                      const std::string& singleField,
-                                     boost::optional<int32_t> traversalDepth = boost::none);
+                                     boost::optional<int32_t> traversalDepth = boost::none,
+                                     bool shouldProduceBson = true);
 
 /**
  * Generates an SbExpr applies 'effects' to a document, retrieving the new values for each field
@@ -305,5 +313,6 @@ SbExpr generateSingleFieldProjection(StageBuilderState& state,
 SbExpr generateProjectionFromEffects(StageBuilderState& state,
                                      const FieldEffects& effects,
                                      SbExpr inputExpr,
-                                     const PlanStageSlots& slots);
+                                     const PlanStageSlots& slots,
+                                     bool shouldProduceBson = true);
 }  // namespace mongo::stage_builder

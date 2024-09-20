@@ -202,6 +202,7 @@ enum class Builtin : uint16_t {
     sortKeyComponentVectorGetElement,
     sortKeyComponentVectorToArray,
 
+    makeObj,
     makeBsonObj,
     tsSecond,
     tsIncrement,

@@ -58,48 +58,18 @@
 #include "mongo/util/str.h"
 
 namespace mongo::stage_builder {
-std::unique_ptr<sbe::EExpression> makeBalancedBooleanOpTreeImpl(
-    sbe::EPrimBinary::Op logicOp,
-    std::vector<std::unique_ptr<sbe::EExpression>>& leaves,
-    size_t from,
-    size_t until) {
-    invariant(from < until);
-    if (from + 1 == until) {
-        return std::move(leaves[from]);
-    } else {
-        size_t mid = (from + until) / 2;
-        auto lhs = makeBalancedBooleanOpTreeImpl(logicOp, leaves, from, mid);
-        auto rhs = makeBalancedBooleanOpTreeImpl(logicOp, leaves, mid, until);
-        return sbe::makeE<sbe::EPrimBinary>(logicOp, std::move(lhs), std::move(rhs));
-    }
-}
-
-std::unique_ptr<sbe::EExpression> makeBalancedBooleanOpTree(
-    sbe::EPrimBinary::Op logicOp, std::vector<std::unique_ptr<sbe::EExpression>> leaves) {
-    return makeBalancedBooleanOpTreeImpl(logicOp, leaves, 0, leaves.size());
-}
-
 SbExpr makeBalancedBooleanOpTree(sbe::EPrimBinary::Op logicOp,
                                  std::vector<SbExpr> leaves,
                                  StageBuilderState& state) {
-    if (std::all_of(leaves.begin(), leaves.end(), [](auto&& e) { return e.canExtractABT(); })) {
-        std::vector<optimizer::ABT> abtExprs;
-        abtExprs.reserve(leaves.size());
-        for (auto&& e : leaves) {
-            abtExprs.push_back(abt::unwrap(e.extractABT()));
-        }
-        return abt::wrap(makeBalancedBooleanOpTree(logicOp == sbe::EPrimBinary::logicAnd
-                                                       ? optimizer::Operations::And
-                                                       : optimizer::Operations::Or,
-                                                   std::move(abtExprs)));
-    }
-
-    std::vector<std::unique_ptr<sbe::EExpression>> exprs;
-    exprs.reserve(leaves.size());
+    std::vector<optimizer::ABT> abtExprs;
+    abtExprs.reserve(leaves.size());
     for (auto&& e : leaves) {
-        exprs.emplace_back(e.extractExpr(state));
+        abtExprs.push_back(abt::unwrap(e.extractABT()));
     }
-    return SbExpr{makeBalancedBooleanOpTree(logicOp, std::move(exprs))};
+    return abt::wrap(makeBalancedBooleanOpTree(logicOp == sbe::EPrimBinary::logicAnd
+                                                   ? optimizer::Operations::And
+                                                   : optimizer::Operations::Or,
+                                               std::move(abtExprs)));
 }
 
 optimizer::ABT makeFillEmpty(optimizer::ABT expr, optimizer::ABT altExpr) {

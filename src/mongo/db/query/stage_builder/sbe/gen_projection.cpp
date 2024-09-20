@@ -334,7 +334,10 @@ void postVisitNonLeafNode(PathTreeNode<boost::optional<ProjectNode>>* node,
 }
 }  // namespace
 
-SbExpr generateObjectExpr(StageBuilderState& state, ProjectActions pa, SbExpr expr) {
+SbExpr generateObjectExpr(StageBuilderState& state,
+                          ProjectActions pa,
+                          SbExpr expr,
+                          bool shouldProduceBson) {
     SbExprBuilder b(state);
 
     expr = expr ? std::move(expr) : b.makeNullConstant();
@@ -351,7 +354,7 @@ SbExpr generateObjectExpr(StageBuilderState& state, ProjectActions pa, SbExpr ex
     auto specExpr = b.makeConstant(sbe::value::TypeTags::makeObjSpec,
                                    sbe::value::bitcastFrom<sbe::MakeObjSpec*>(spec.release()));
 
-    constexpr auto makeObjFn = "makeBsonObj"_sd;
+    const StringData makeObjFn = shouldProduceBson ? "makeBsonObj"_sd : "makeObj"_sd;
     auto funcArgs = SbExpr::makeSeq(std::move(specExpr), std::move(expr));
 
     std::move(args.begin(), args.end(), std::back_inserter(funcArgs));
@@ -362,10 +365,11 @@ SbExpr generateObjectExpr(StageBuilderState& state, ProjectActions pa, SbExpr ex
 SbExpr generateSingleFieldExpr(StageBuilderState& state,
                                ProjectActions pa,
                                SbExpr expr,
-                               const std::string& singleField) {
+                               const std::string& singleField,
+                               bool shouldProduceBson) {
     SbExprBuilder b(state);
 
-    constexpr auto makeObjFn = "makeBsonObj"_sd;
+    const StringData makeObjFn = shouldProduceBson ? "makeBsonObj"_sd : "makeObj"_sd;
     const auto defActionType = pa.fieldsScope == FieldListScope::kClosed ? ProjectActionType::kDrop
                                                                          : ProjectActionType::kKeep;
 
@@ -380,7 +384,7 @@ SbExpr generateSingleFieldExpr(StageBuilderState& state,
             return expr;
         case ProjectActionType::kDrop:
             // Return Nothing.
-            return SbExpr{state.getNothingSlot()};
+            return SbExpr{SbSlot{state.getNothingSlot()}};
         case ProjectActionType::kSetArg:
             // Return the arg.
             return std::move(eval->getSetArg().arg);
@@ -502,16 +506,16 @@ ProjectActions evaluateSliceOps(StageBuilderState& state,
 
             auto [limit, skip] = node->value->getSlice();
             auto frameId = state.frameId();
-            auto var = b.makeVariable(frameId, 0);
+            auto var = SbLocalVar{frameId, 0};
 
-            auto args = SbExpr::makeSeq(var.clone(), b.makeInt32Constant(limit));
+            auto args = SbExpr::makeSeq(var, b.makeInt32Constant(limit));
             if (skip) {
                 args.emplace_back(b.makeInt32Constant(*skip));
             }
 
-            auto extractSubArrayExpr = b.makeIf(b.makeFunction("isArray"_sd, var.clone()),
+            auto extractSubArrayExpr = b.makeIf(b.makeFunction("isArray"_sd, var),
                                                 b.makeFunction("extractSubArray", std::move(args)),
-                                                var.clone());
+                                                var);
 
             context.pushLambdaArg(std::move(extractSubArrayExpr), frameId);
         }
@@ -586,7 +590,8 @@ SbExpr generateProjection(StageBuilderState& state,
                           const projection_ast::Projection* projection,
                           SbExpr inputExpr,
                           const PlanStageSlots* slots,
-                          boost::optional<int32_t> traversalDepth) {
+                          boost::optional<int32_t> traversalDepth,
+                          bool shouldProduceBson) {
     const auto projType = projection->type();
 
     // Do a DFS on the projection AST to populate 'paths' and 'nodes'.
@@ -598,7 +603,8 @@ SbExpr generateProjection(StageBuilderState& state,
                               std::move(nodes),
                               std::move(inputExpr),
                               slots,
-                              traversalDepth);
+                              traversalDepth,
+                              shouldProduceBson);
 }
 
 SbExpr generateProjection(StageBuilderState& state,
@@ -607,15 +613,16 @@ SbExpr generateProjection(StageBuilderState& state,
                           std::vector<ProjectNode> nodes,
                           SbExpr inputExpr,
                           const PlanStageSlots* slots,
-                          boost::optional<int32_t> traversalDepth) {
+                          boost::optional<int32_t> traversalDepth,
+                          bool shouldProduceBson) {
     auto [pa, slicePa] = evaluateProjection(
         state, projType, std::move(paths), std::move(nodes), slots, traversalDepth);
 
     // Apply 'pa', and then apply 'slicePa' if it's set.
-    auto expr = generateObjectExpr(state, std::move(pa), std::move(inputExpr));
+    auto expr = generateObjectExpr(state, std::move(pa), std::move(inputExpr), shouldProduceBson);
 
     if (slicePa) {
-        expr = generateObjectExpr(state, std::move(*slicePa), std::move(expr));
+        expr = generateObjectExpr(state, std::move(*slicePa), std::move(expr), shouldProduceBson);
     }
 
     return expr;
@@ -626,14 +633,22 @@ SbExpr generateSingleFieldProjection(StageBuilderState& state,
                                      SbExpr inputExpr,
                                      const PlanStageSlots* slots,
                                      const std::string& singleField,
-                                     boost::optional<int32_t> traversalDepth) {
+                                     boost::optional<int32_t> traversalDepth,
+                                     bool shouldProduceBson) {
     const auto projType = projection->type();
 
     // Do a DFS on the projection AST to populate 'paths' and 'nodes'.
     auto [paths, nodes] = getProjectNodes(*projection);
 
-    return generateSingleFieldProjection(
-        state, projType, paths, nodes, std::move(inputExpr), slots, singleField, traversalDepth);
+    return generateSingleFieldProjection(state,
+                                         projType,
+                                         paths,
+                                         nodes,
+                                         std::move(inputExpr),
+                                         slots,
+                                         singleField,
+                                         traversalDepth,
+                                         shouldProduceBson);
 }
 
 SbExpr generateSingleFieldProjection(StageBuilderState& state,
@@ -643,7 +658,8 @@ SbExpr generateSingleFieldProjection(StageBuilderState& state,
                                      SbExpr inputExpr,
                                      const PlanStageSlots* slots,
                                      const std::string& singleField,
-                                     boost::optional<int32_t> traversalDepth) {
+                                     boost::optional<int32_t> traversalDepth,
+                                     bool shouldProduceBson) {
     std::vector<std::string> paths;
     std::vector<ProjectNode> nodes;
     for (size_t i = 0; i < pathsIn.size(); ++i) {
@@ -657,10 +673,12 @@ SbExpr generateSingleFieldProjection(StageBuilderState& state,
         state, projType, std::move(paths), std::move(nodes), slots, traversalDepth);
 
     // Apply 'pa', and then apply 'slicePa' if it's set.
-    auto expr = generateSingleFieldExpr(state, std::move(pa), std::move(inputExpr), singleField);
+    auto expr = generateSingleFieldExpr(
+        state, std::move(pa), std::move(inputExpr), singleField, shouldProduceBson);
 
     if (slicePa) {
-        expr = generateSingleFieldExpr(state, std::move(*slicePa), std::move(expr), singleField);
+        expr = generateSingleFieldExpr(
+            state, std::move(*slicePa), std::move(expr), singleField, shouldProduceBson);
     }
 
     return expr;
@@ -690,14 +708,14 @@ ProjectActions evaluateFieldEffects(StageBuilderState& state,
                     actions.emplace_back(ProjectAction::Drop{});
                     break;
                 case FieldEffect::kAdd: {
-                    auto expr = SbExpr{slots.get(std::pair(PlanStageSlots::kField, field)).slotId};
+                    auto expr = SbExpr{slots.get(std::pair(PlanStageSlots::kField, field))};
                     actions.emplace_back(ProjectAction::AddArg{std::move(expr)});
                     break;
                 }
                 case FieldEffect::kModify:
                 case FieldEffect::kSet:
                 case FieldEffect::kGeneric: {
-                    auto expr = SbExpr{slots.get(std::pair(PlanStageSlots::kField, field)).slotId};
+                    auto expr = SbExpr{slots.get(std::pair(PlanStageSlots::kField, field))};
                     actions.emplace_back(ProjectAction::SetArg{std::move(expr)});
                     break;
                 }
@@ -720,8 +738,9 @@ ProjectActions evaluateFieldEffects(StageBuilderState& state,
 SbExpr generateProjectionFromEffects(StageBuilderState& state,
                                      const FieldEffects& effects,
                                      SbExpr inputExpr,
-                                     const PlanStageSlots& slots) {
+                                     const PlanStageSlots& slots,
+                                     bool shouldProduceBson) {
     ProjectActions pa = evaluateFieldEffects(state, effects, slots);
-    return generateObjectExpr(state, std::move(pa), std::move(inputExpr));
+    return generateObjectExpr(state, std::move(pa), std::move(inputExpr), shouldProduceBson);
 }
 }  // namespace mongo::stage_builder

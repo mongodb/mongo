@@ -158,8 +158,9 @@ namespace {
  * Generates an EOF plan. Note that even though this plan will return nothing, it will still define
  * the slots specified by 'reqs'.
  */
-std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> generateEofPlan(
-    StageBuilderState& state, const PlanStageReqs& reqs, PlanNodeId nodeId) {
+std::pair<SbStage, PlanStageSlots> generateEofPlan(StageBuilderState& state,
+                                                   const PlanStageReqs& reqs,
+                                                   PlanNodeId nodeId) {
     SbBuilder b(state, nodeId);
 
     // If the parent is asking for a result, then set materialized result on 'forwardingReqs'.
@@ -366,12 +367,11 @@ void prepareSlotBasedExecutableTree(OperationContext* opCtx,
     prepareSearchQueryParameters(data, cq);
 }  // prepareSlotBasedExecutableTree
 
-std::pair<std::unique_ptr<sbe::PlanStage>, stage_builder::PlanStageData>
-buildSearchMetadataExecutorSBE(OperationContext* opCtx,
-                               const CanonicalQuery& cq,
-                               size_t remoteCursorId,
-                               RemoteCursorMap* remoteCursors,
-                               PlanYieldPolicySBE* yieldPolicy) {
+std::pair<SbStage, PlanStageData> buildSearchMetadataExecutorSBE(OperationContext* opCtx,
+                                                                 const CanonicalQuery& cq,
+                                                                 size_t remoteCursorId,
+                                                                 RemoteCursorMap* remoteCursors,
+                                                                 PlanYieldPolicySBE* yieldPolicy) {
     auto expCtx = cq.getExpCtxRaw();
     Environment env(std::make_unique<sbe::RuntimeEnvironment>());
     std::unique_ptr<PlanStageStaticData> data(std::make_unique<PlanStageStaticData>());
@@ -987,7 +987,7 @@ SlotBasedStageBuilder::SlotBasedStageBuilder(OperationContext* opCtx,
     }
 }
 
-std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder::buildTree() {
+std::pair<SbStage, PlanStageSlots> SlotBasedStageBuilder::buildTree() {
     const bool needsRecordIdSlot = _data->shouldUseTailableScan || _data->shouldTrackResumeToken ||
         _cq.getForceGenerateRecordId();
 
@@ -1032,7 +1032,7 @@ SlotBasedStageBuilder::PlanType SlotBasedStageBuilder::build(const QuerySolution
     }
 
     auto resultSlot = outputs.getResultObjIfExists();
-    auto recordIdSlot = outputs.getIfExists(stage_builder::PlanStageSlots::kRecordId);
+    auto recordIdSlot = outputs.getIfExists(PlanStageSlots::kRecordId);
 
     _data->resultSlot = resultSlot ? boost::make_optional(resultSlot->getId()) : boost::none;
     _data->recordIdSlot = recordIdSlot ? boost::make_optional(recordIdSlot->getId()) : boost::none;
@@ -1040,7 +1040,7 @@ SlotBasedStageBuilder::PlanType SlotBasedStageBuilder::build(const QuerySolution
     return {std::move(stage), PlanStageData(std::move(_env), std::move(_data))};
 }
 
-std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder::buildCollScan(
+std::pair<SbStage, PlanStageSlots> SlotBasedStageBuilder::buildCollScan(
     const QuerySolutionNode* root, const PlanStageReqs& reqs) {
     tassert(6023400, "buildCollScan() does not support kSortKey", !reqs.hasSortKeys());
 
@@ -1062,7 +1062,7 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
     return {std::move(stage), std::move(outputs)};
 }
 
-std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder::buildVirtualScan(
+std::pair<SbStage, PlanStageSlots> SlotBasedStageBuilder::buildVirtualScan(
     const QuerySolutionNode* root, const PlanStageReqs& reqs) {
     using namespace std::literals;
     tassert(7182001, "buildVirtualScan() does not support kSortKey", !reqs.hasSortKeys());
@@ -1127,7 +1127,7 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
     return {std::move(stage), std::move(outputs)};
 }
 
-std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder::buildIndexScan(
+std::pair<SbStage, PlanStageSlots> SlotBasedStageBuilder::buildIndexScan(
     const QuerySolutionNode* root, const PlanStageReqs& reqs) {
     SbBuilder b(_state, root->nodeId());
 
@@ -1150,7 +1150,7 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
     return {std::move(stage), std::move(outputs)};
 }
 
-std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder::buildCountScan(
+std::pair<SbStage, PlanStageSlots> SlotBasedStageBuilder::buildCountScan(
     const QuerySolutionNode* root, const PlanStageReqs& reqs) {
     SbBuilder b(_state, root->nodeId());
 
@@ -1235,8 +1235,8 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
     return {std::move(stage), std::move(planStageSlots)};
 }
 
-std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder::buildFetch(
-    const QuerySolutionNode* root, const PlanStageReqs& reqs) {
+std::pair<SbStage, PlanStageSlots> SlotBasedStageBuilder::buildFetch(const QuerySolutionNode* root,
+                                                                     const PlanStageReqs& reqs) {
     SbBuilder b(_state, root->nodeId());
 
     auto fn = static_cast<const FetchNode*>(root);
@@ -1412,8 +1412,8 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
     return {std::move(stage), std::move(outputs)};
 }
 
-std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder::buildLimit(
-    const QuerySolutionNode* root, const PlanStageReqs& reqs) {
+std::pair<SbStage, PlanStageSlots> SlotBasedStageBuilder::buildLimit(const QuerySolutionNode* root,
+                                                                     const PlanStageReqs& reqs) {
     SbBuilder b(_state, root->nodeId());
 
     const auto ln = static_cast<const LimitNode*>(root);
@@ -1445,8 +1445,8 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
     return {std::move(stage), std::move(outputs)};
 }
 
-std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder::buildSkip(
-    const QuerySolutionNode* root, const PlanStageReqs& reqs) {
+std::pair<SbStage, PlanStageSlots> SlotBasedStageBuilder::buildSkip(const QuerySolutionNode* root,
+                                                                    const PlanStageReqs& reqs) {
     SbBuilder b(_state, root->nodeId());
 
     const auto sn = static_cast<const SkipNode*>(root);
@@ -1536,8 +1536,8 @@ SbExpr SlotBasedStageBuilder::buildLimitSkipSumExpression(
     return b.makeLet(frameId, SbExpr::makeSeq(std::move(sumExpr)), std::move(resultExpr));
 }
 
-std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder::buildSort(
-    const QuerySolutionNode* root, const PlanStageReqs& reqsIn) {
+std::pair<SbStage, PlanStageSlots> SlotBasedStageBuilder::buildSort(const QuerySolutionNode* root,
+                                                                    const PlanStageReqs& reqsIn) {
     SbBuilder b(_state, root->nodeId());
 
     const auto sn = static_cast<const SortNode*>(root);
@@ -1717,7 +1717,7 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
     return {std::move(stage), std::move(outputs)};
 }
 
-std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder::buildSortCovered(
+std::pair<SbStage, PlanStageSlots> SlotBasedStageBuilder::buildSortCovered(
     const QuerySolutionNode* root, const PlanStageReqs& reqs) {
     SbBuilder b(_state, root->nodeId());
 
@@ -1809,13 +1809,12 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
     return {std::move(stage), std::move(outputs)};
 }
 
-std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots>
-SlotBasedStageBuilder::buildSortKeyGenerator(const QuerySolutionNode* root,
-                                             const PlanStageReqs& reqs) {
+std::pair<SbStage, PlanStageSlots> SlotBasedStageBuilder::buildSortKeyGenerator(
+    const QuerySolutionNode* root, const PlanStageReqs& reqs) {
     uasserted(4822883, "Sort key generator in not supported in SBE yet");
 }
 
-std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder::buildSortMerge(
+std::pair<SbStage, PlanStageSlots> SlotBasedStageBuilder::buildSortMerge(
     const QuerySolutionNode* root, const PlanStageReqs& reqs) {
     using namespace std::literals;
     auto mergeSortNode = static_cast<const MergeSortNode*>(root);
@@ -1897,8 +1896,8 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
     return {std::move(stage), std::move(outputs)};
 }
 
-std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder::buildMatch(
-    const QuerySolutionNode* root, const PlanStageReqs& reqs) {
+std::pair<SbStage, PlanStageSlots> SlotBasedStageBuilder::buildMatch(const QuerySolutionNode* root,
+                                                                     const PlanStageReqs& reqs) {
     const MatchNode* mn = static_cast<const MatchNode*>(root);
 
     SbBuilder b(_state, root->nodeId());
@@ -1977,8 +1976,8 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
  * This also builds a child project stage to get the field to be unwound, and ancestor project
  * stage(s) to add the $unwind outputs (value and optionally array index) to the result document.
  */
-std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder::buildUnwind(
-    const QuerySolutionNode* root, const PlanStageReqs& reqs) {
+std::pair<SbStage, PlanStageSlots> SlotBasedStageBuilder::buildUnwind(const QuerySolutionNode* root,
+                                                                      const PlanStageReqs& reqs) {
     const UnwindNode* un = static_cast<const UnwindNode*>(root);
     const FieldPath& fp = un->fieldPath;
 
@@ -2102,13 +2101,12 @@ SbExpr projectUnwindOutputs(StageBuilderState& state,
  * nonexistent foreign collection, where the $lookup result array is empty and thus its
  * materialization is not a performance or memory problem.
  */
-std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder::buildOnlyUnwind(
-    const UnwindNode* un,
-    const PlanStageReqs& reqs,
-    std::unique_ptr<sbe::PlanStage>& stage,
-    PlanStageSlots& outputs,
-    SbSlot childResultSlot,
-    SbSlot getFieldSlot) {
+std::pair<SbStage, PlanStageSlots> SlotBasedStageBuilder::buildOnlyUnwind(const UnwindNode* un,
+                                                                          const PlanStageReqs& reqs,
+                                                                          SbStage& stage,
+                                                                          PlanStageSlots& outputs,
+                                                                          SbSlot childResultSlot,
+                                                                          SbSlot getFieldSlot) {
     using namespace std::literals::string_literals;
 
     SbBuilder b(_state, un->nodeId());
@@ -2243,7 +2241,7 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
  * Create a ProjectStage that evalutes the "newRoot" expression from a $replaceRoot pipeline stage
  * and append it to the root of the SBE plan.
  */
-std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder::buildReplaceRoot(
+std::pair<SbStage, PlanStageSlots> SlotBasedStageBuilder::buildReplaceRoot(
     const QuerySolutionNode* root, const PlanStageReqs& reqs) {
     SbBuilder b(_state, root->nodeId());
 
@@ -2625,11 +2623,11 @@ std::unique_ptr<SlotBasedStageBuilder::ResultPlan> SlotBasedStageBuilder::getRes
     return {};
 }
 
-std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots>
-SlotBasedStageBuilder::makeResultUsingPlan(std::unique_ptr<sbe::PlanStage> stage,
-                                           PlanStageSlots outputs,
-                                           const QuerySolutionNode* qsNode,
-                                           std::unique_ptr<ResultPlan> plan) {
+std::pair<SbStage, PlanStageSlots> SlotBasedStageBuilder::makeResultUsingPlan(
+    SbStage stage,
+    PlanStageSlots outputs,
+    const QuerySolutionNode* qsNode,
+    std::unique_ptr<ResultPlan> plan) {
     SbBuilder b(_state, qsNode->nodeId());
 
     // If hasBlockOutput() is true, terminate the block processing section of the pipeline here.
@@ -2639,7 +2637,7 @@ SlotBasedStageBuilder::makeResultUsingPlan(std::unique_ptr<sbe::PlanStage> stage
 
     // Update the kField slots in 'outputs' that correspond to 'nothingPaths'.
     if (!plan->nothingPaths.empty()) {
-        auto nothingSlot = _state.getNothingSlot();
+        auto nothingSlot = SbSlot{_state.getNothingSlot()};
         for (auto& nothingPath : plan->nothingPaths) {
             outputs.set(std::make_pair(PlanStageSlots::kField, std::move(nothingPath)),
                         nothingSlot);
@@ -2834,7 +2832,7 @@ std::unique_ptr<ProjectionPlan> SlotBasedStageBuilder::makeProjectionPlan(
                                                            std::move(*effects)});
 }
 
-std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder::buildProjection(
+std::pair<SbStage, PlanStageSlots> SlotBasedStageBuilder::buildProjection(
     const QuerySolutionNode* root, const PlanStageReqs& reqs) {
     tassert(8146605, "buildProjection() does not support kSortKey", !reqs.hasSortKeys());
 
@@ -2852,12 +2850,12 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
     return {std::move(stage), std::move(outputs)};
 }
 
-std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots>
-SlotBasedStageBuilder::buildProjectionImpl(const QuerySolutionNode* root,
-                                           const PlanStageReqs& reqs,
-                                           std::unique_ptr<ProjectionPlan> plan,
-                                           std::unique_ptr<sbe::PlanStage> stage,
-                                           PlanStageSlots outputs) {
+std::pair<SbStage, PlanStageSlots> SlotBasedStageBuilder::buildProjectionImpl(
+    const QuerySolutionNode* root,
+    const PlanStageReqs& reqs,
+    std::unique_ptr<ProjectionPlan> plan,
+    SbStage stage,
+    PlanStageSlots outputs) {
     const bool isCoveredProjection = plan->isCoveredProjection;
 
     const bool isInclusion = plan->isInclusion;
@@ -3018,7 +3016,7 @@ SlotBasedStageBuilder::buildProjectionImpl(const QuerySolutionNode* root,
         for (const auto& field : resultFields) {
             auto expr = preimageAllowedFields.count(field)
                 ? SbExpr{outputs.get(std::pair(kField, field))}
-                : SbExpr{_state.getNothingSlot()};
+                : SbExpr{SbSlot{_state.getNothingSlot()}};
 
             projects.emplace_back(
                 generateSingleFieldProjection(
@@ -3039,7 +3037,7 @@ SlotBasedStageBuilder::buildProjectionImpl(const QuerySolutionNode* root,
 
     // Update the kField slots in 'outputs' that correspond to 'nothingPaths'.
     if (!plan->nothingPaths.empty()) {
-        auto nothingSlot = _state.getNothingSlot();
+        auto nothingSlot = SbSlot{_state.getNothingSlot()};
         for (auto& nothingPath : plan->nothingPaths) {
             outputs.set(std::make_pair(PlanStageSlots::kField, std::move(nothingPath)),
                         nothingSlot);
@@ -3124,8 +3122,8 @@ SlotBasedStageBuilder::buildProjectionImpl(const QuerySolutionNode* root,
     return {std::move(stage), std::move(outputs)};
 }
 
-std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder::buildOr(
-    const QuerySolutionNode* root, const PlanStageReqs& reqs) {
+std::pair<SbStage, PlanStageSlots> SlotBasedStageBuilder::buildOr(const QuerySolutionNode* root,
+                                                                  const PlanStageReqs& reqs) {
     auto orn = static_cast<const OrNode*>(root);
 
     SbBuilder b(_state, root->nodeId());
@@ -3197,7 +3195,7 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
     return {std::move(stage), std::move(outputs)};
 }
 
-std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder::buildTextMatch(
+std::pair<SbStage, PlanStageSlots> SlotBasedStageBuilder::buildTextMatch(
     const QuerySolutionNode* root, const PlanStageReqs& reqs) {
     SbBuilder b(_state, root->nodeId());
 
@@ -3248,7 +3246,7 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
     return {std::move(stage), std::move(outputs)};
 }
 
-std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder::buildReturnKey(
+std::pair<SbStage, PlanStageSlots> SlotBasedStageBuilder::buildReturnKey(
     const QuerySolutionNode* root, const PlanStageReqs& reqs) {
     tassert(6023411, "buildReturnKey() does not support kSortKey", !reqs.hasSortKeys());
 
@@ -3269,14 +3267,14 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
     return {std::move(stage), std::move(outputs)};
 }
 
-std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder::buildEof(
-    const QuerySolutionNode* root, const PlanStageReqs& reqs) {
+std::pair<SbStage, PlanStageSlots> SlotBasedStageBuilder::buildEof(const QuerySolutionNode* root,
+                                                                   const PlanStageReqs& reqs) {
     return generateEofPlan(_state, reqs, root->nodeId());
 }
 
-std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder::buildAndHash(
+std::pair<SbStage, PlanStageSlots> SlotBasedStageBuilder::buildAndHash(
     const QuerySolutionNode* root, const PlanStageReqs& reqs) {
-    SbExprBuilder b(_state);
+    SbBuilder b(_state, root->nodeId());
 
     // Note: This implementation is incomplete and doesn't support all the possible cases that
     // the query planner could potentially generate. This implementation is only enabled when
@@ -3347,15 +3345,13 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
         outputs.set(kPrefetchedResult, *innerPrefetchedResultSlot);
     }
 
-    auto stage = sbe::makeS<sbe::HashJoinStage>(std::move(outerStage),
-                                                std::move(innerStage),
-                                                b.lower(outerCondSlots),
-                                                b.lower(outerProjectSlots),
-                                                b.lower(innerCondSlots),
-                                                b.lower(innerProjectSlots),
-                                                collatorSlot,
-                                                _yieldPolicy,
-                                                root->nodeId());
+    auto stage = b.makeHashJoin(std::move(outerStage),
+                                std::move(innerStage),
+                                outerCondSlots,
+                                outerProjectSlots,
+                                innerCondSlots,
+                                innerProjectSlots,
+                                collatorSlot);
 
     // If there are more than 2 children, iterate all remaining children and hash
     // join together.
@@ -3372,23 +3368,21 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
 
         // The previous HashJoinStage is always set as the inner stage, so that we can reuse the
         // innerIdSlot and innerResultSlot that have been designated as outputs.
-        stage = sbe::makeS<sbe::HashJoinStage>(std::move(childStage),
-                                               std::move(stage),
-                                               b.lower(condSlots),
-                                               b.lower(projectSlots),
-                                               b.lower(innerCondSlots),
-                                               b.lower(innerProjectSlots),
-                                               collatorSlot,
-                                               _yieldPolicy,
-                                               root->nodeId());
+        stage = b.makeHashJoin(std::move(childStage),
+                               std::move(stage),
+                               condSlots,
+                               projectSlots,
+                               innerCondSlots,
+                               innerProjectSlots,
+                               collatorSlot);
     }
 
     return {std::move(stage), std::move(outputs)};
 }
 
-std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder::buildAndSorted(
+std::pair<SbStage, PlanStageSlots> SlotBasedStageBuilder::buildAndSorted(
     const QuerySolutionNode* root, const PlanStageReqs& reqs) {
-    SbExprBuilder b(_state);
+    SbBuilder b(_state, root->nodeId());
 
     // Note: This implementation is incomplete and doesn't support all the possible cases that
     // the query planner could potentially generate. This implementation is only enabled when
@@ -3470,14 +3464,13 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
     std::vector<sbe::value::SortDirection> sortDirs(outerKeySlots.size(),
                                                     sbe::value::SortDirection::Ascending);
 
-    auto stage = sbe::makeS<sbe::MergeJoinStage>(std::move(outerStage),
-                                                 std::move(innerStage),
-                                                 b.lower(outerKeySlots),
-                                                 b.lower(outerProjectSlots),
-                                                 b.lower(innerKeySlots),
-                                                 b.lower(innerProjectSlots),
-                                                 sortDirs,
-                                                 root->nodeId());
+    auto stage = b.makeMergeJoin(std::move(outerStage),
+                                 std::move(innerStage),
+                                 outerKeySlots,
+                                 outerProjectSlots,
+                                 innerKeySlots,
+                                 innerProjectSlots,
+                                 sortDirs);
 
     // If there are more than 2 children, iterate all remaining children and merge
     // join together.
@@ -3492,22 +3485,20 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
         keySlots.emplace_back(idSlot);
         projectSlots.emplace_back(resultSlot);
 
-        stage = sbe::makeS<sbe::MergeJoinStage>(std::move(childStage),
-                                                std::move(stage),
-                                                b.lower(keySlots),
-                                                b.lower(projectSlots),
-                                                b.lower(innerKeySlots),
-                                                b.lower(innerProjectSlots),
-                                                sortDirs,
-                                                root->nodeId());
+        stage = b.makeMergeJoin(std::move(childStage),
+                                std::move(stage),
+                                keySlots,
+                                projectSlots,
+                                innerKeySlots,
+                                innerProjectSlots,
+                                sortDirs);
     }
 
     return {std::move(stage), std::move(outputs)};
 }
 
-std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots>
-SlotBasedStageBuilder::makeUnionForTailableCollScan(const QuerySolutionNode* root,
-                                                    const PlanStageReqs& reqs) {
+std::pair<SbStage, PlanStageSlots> SlotBasedStageBuilder::makeUnionForTailableCollScan(
+    const QuerySolutionNode* root, const PlanStageReqs& reqs) {
     using namespace std::literals;
     tassert(
         6023415, "makeUnionForTailableCollScan() does not support kSortKey", !reqs.hasSortKeys());
@@ -3575,9 +3566,8 @@ SlotBasedStageBuilder::makeUnionForTailableCollScan(const QuerySolutionNode* roo
                                                     postimageAllowedFieldSets);
 }
 
-std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots>
-SlotBasedStageBuilder::buildShardFilterCovered(const QuerySolutionNode* root,
-                                               const PlanStageReqs& reqs) {
+std::pair<SbStage, PlanStageSlots> SlotBasedStageBuilder::buildShardFilterCovered(
+    const QuerySolutionNode* root, const PlanStageReqs& reqs) {
     SbBuilder b(_state, root->nodeId());
 
     // Constructs an optimized SBE plan for 'filterNode' in the case that the fields of the
@@ -3624,8 +3614,7 @@ SlotBasedStageBuilder::buildShardFilterCovered(const QuerySolutionNode* root,
     }
 
     // Build expressions to create shard key fields and deal with hashed shard keys.
-    std::vector<std::string> projectFields;
-    SbExpr::Vector projectValues;
+    SbExpr::Vector newBsonObjArgs;
     for (auto&& shardKeyPatternElt : shardKeyPattern) {
         auto it = indexKeyPatternMap.find(shardKeyPatternElt.fieldNameStringData());
         tassert(5562303, "Could not find element", it != indexKeyPatternMap.end());
@@ -3649,12 +3638,12 @@ SlotBasedStageBuilder::buildShardFilterCovered(const QuerySolutionNode* root,
             elem = b.makeFunction("shardHash"_sd, std::move(elem));
         }
 
-        projectFields.push_back(shardKeyPatternElt.fieldName());
-        projectValues.push_back(std::move(elem));
+        newBsonObjArgs.emplace_back(b.makeStrConstant(shardKeyPatternElt.fieldName()));
+        newBsonObjArgs.emplace_back(std::move(elem));
     }
 
-    auto shardKeyExpression =
-        makeNewBsonObject(_state, std::move(projectFields), std::move(projectValues));
+    auto shardKeyExpression = b.makeFunction("newBsonObj"_sd, std::move(newBsonObjArgs));
+
     auto shardFilterExpression =
         b.makeFunction("shardFilter", shardFiltererSlot, std::move(shardKeyExpression));
 
@@ -3663,7 +3652,7 @@ SlotBasedStageBuilder::buildShardFilterCovered(const QuerySolutionNode* root,
     return {std::move(stage), std::move(outputs)};
 }
 
-std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder::buildShardFilter(
+std::pair<SbStage, PlanStageSlots> SlotBasedStageBuilder::buildShardFilter(
     const QuerySolutionNode* root, const PlanStageReqs& reqs) {
     SbBuilder b(_state, root->nodeId());
 
@@ -3712,7 +3701,7 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
     auto shardFilterExpression = b.makeFunction(
         "shardFilter",
         shardFiltererSlot,
-        makeShardKeyFunctionForPersistedDocuments(_state, shardKeyPaths, shardKeyHashed, outputs));
+        makeShardKeyForPersistedDocuments(_state, shardKeyPaths, shardKeyHashed, outputs));
 
     stage = b.makeFilter(std::move(stage), std::move(shardFilterExpression));
 
@@ -4512,7 +4501,7 @@ public:
                 std::move(frameFirstInput), getDefaultValueExpr(state, outputField));
         } else if (isTopBottomN(outputField)) {
             finalizeInputs = std::make_unique<FinalizeTopBottomNInputs>(
-                SbExpr{state.getSortSpecSlot(&outputField)});
+                SbExpr{SbSlot{state.getSortSpecSlot(&outputField)}});
         }
 
         // Build finalize.
@@ -4695,8 +4684,8 @@ WindowStageBuilder::BuildOutput WindowStageBuilder::build(SbStage stage) {
 }
 }  // namespace
 
-std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder::buildWindow(
-    const QuerySolutionNode* root, const PlanStageReqs& reqs) {
+std::pair<SbStage, PlanStageSlots> SlotBasedStageBuilder::buildWindow(const QuerySolutionNode* root,
+                                                                      const PlanStageReqs& reqs) {
     auto windowNode = static_cast<const WindowNode*>(root);
 
     auto [reqResult, childReqs, forwardingReqs] = computeChildReqsForWindow(reqs, windowNode);
@@ -4751,13 +4740,12 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
     return {std::move(stage), std::move(outputs)};
 }  // buildWindow
 
-std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> buildSearchMeta(
-    const SearchNode* root,
-    StageBuilderState& state,
-    const CanonicalQuery& cq,
-    sbe::value::SlotIdGenerator* slotIdGenerator,
-    Environment& env,
-    PlanYieldPolicySBE* const yieldPolicy) {
+std::pair<SbStage, PlanStageSlots> buildSearchMeta(const SearchNode* root,
+                                                   StageBuilderState& state,
+                                                   const CanonicalQuery& cq,
+                                                   sbe::value::SlotIdGenerator* slotIdGenerator,
+                                                   Environment& env,
+                                                   PlanYieldPolicySBE* const yieldPolicy) {
     SbBuilder b(state, root->nodeId());
 
     auto expCtx = cq.getExpCtxRaw();
@@ -4828,8 +4816,8 @@ SlotBasedStageBuilder::buildSearchMetadataSlots() {
     return {metadataNames, metadataSlots};
 }
 
-std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder::buildSearch(
-    const QuerySolutionNode* root, const PlanStageReqs& reqs) {
+std::pair<SbStage, PlanStageSlots> SlotBasedStageBuilder::buildSearch(const QuerySolutionNode* root,
+                                                                      const PlanStageReqs& reqs) {
     SbBuilder b(_state, root->nodeId());
 
     auto sn = static_cast<const SearchNode*>(root);
@@ -5001,8 +4989,8 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
     return {std::move(stage), std::move(outputs)};
 }
 
-std::pair<std::unique_ptr<sbe::PlanStage>, bool> SlotBasedStageBuilder::buildVectorizedFilterExpr(
-    std::unique_ptr<sbe::PlanStage> stage,
+std::pair<SbStage, bool> SlotBasedStageBuilder::buildVectorizedFilterExpr(
+    SbStage stage,
     const PlanStageReqs& reqs,
     SbExpr scalarFilterExpression,
     PlanStageSlots& outputs,
@@ -5092,11 +5080,11 @@ CollectionPtr SlotBasedStageBuilder::getCurrentCollection(const PlanStageReqs& r
 
 // Returns a non-null pointer to the root of a plan tree, or a non-OK status if the PlanStage tree
 // could not be constructed.
-std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder::build(
-    const QuerySolutionNode* root, const PlanStageReqs& reqsIn) {
+std::pair<SbStage, PlanStageSlots> SlotBasedStageBuilder::build(const QuerySolutionNode* root,
+                                                                const PlanStageReqs& reqsIn) {
     // Define the 'builderCallback' typedef.
-    typedef std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> (
-        SlotBasedStageBuilder::*builderCallback)(const QuerySolutionNode*, const PlanStageReqs&);
+    typedef std::pair<SbStage, PlanStageSlots> (SlotBasedStageBuilder::*builderCallback)(
+        const QuerySolutionNode*, const PlanStageReqs&);
 
     static const stdx::unordered_map<StageType, builderCallback> kStageBuilders = {
         {STAGE_COLLSCAN, &SlotBasedStageBuilder::buildCollScan},

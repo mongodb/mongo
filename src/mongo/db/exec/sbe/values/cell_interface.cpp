@@ -73,4 +73,21 @@ std::string CellBlock::PathRequest::toString() const {
     return str::stream() << (type == kFilter ? "FilterPath" : "ProjectPath") << "("
                          << pathToString(path) << ")";
 }
+
+StringData CellBlock::PathRequest::getTopLevelField() const {
+    return get<Get>(path[0]).field;
+}
+
+std::string CellBlock::PathRequest::getFullPath() const {
+    StringBuilder sb;
+    for (const auto& component : path) {
+        if (holds_alternative<Get>(component)) {
+            if (sb.len() != 0) {
+                sb.append(".");
+            }
+            sb.append(get<Get>(component).field);
+        }
+    }
+    return sb.str();
+}
 }  // namespace mongo::sbe::value

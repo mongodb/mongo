@@ -31,6 +31,7 @@
 
 #include "mongo/db/exec/sbe/stages/loop_join.h"
 #include "mongo/db/exec/sbe/stages/scan.h"
+#include "mongo/db/exec/sbe/values/cell_interface.h"
 #include "mongo/db/query/stage_builder/sbe/gen_abt_helpers.h"
 #include "mongo/db/query/stage_builder/sbe/gen_helpers.h"
 #include "mongo/db/query/stage_builder/sbe/sbexpr.h"
@@ -239,6 +240,9 @@ public:
         return result;
     }
 
+    /**
+     * Creates a balanced boolean binary expression tree from given collection of leaf expression.
+     */
     SbExpr makeBalancedBooleanOpTree(sbe::EPrimBinary::Op logicOp, SbExpr::Vector leaves) {
         return stage_builder::makeBalancedBooleanOpTree(logicOp, std::move(leaves), _state);
     }
@@ -249,7 +253,7 @@ public:
     }
 
     std::unique_ptr<sbe::EExpression> lower(SbExpr& e, const VariableTypes* varTypes = nullptr) {
-        return e.extractExpr(_state, varTypes);
+        return e.lower(_state, varTypes);
     }
 
     sbe::EExpression::Vector lower(SbExpr::Vector& sbExprs,
@@ -272,6 +276,12 @@ public:
     sbe::SlotExprPairVector lower(SbExprSbSlotVector& sbSlotSbExprVec,
                                   const VariableTypes* varTypes = nullptr);
 
+    sbe::WindowStage::Window lower(SbWindow& sbWindow, const VariableTypes* varTypes = nullptr);
+
+    std::vector<sbe::WindowStage::Window> lower(std::vector<SbWindow>& sbWindows,
+                                                const VariableTypes* varTypes = nullptr);
+
+protected:
     StageBuilderState& _state;
 };
 
@@ -381,6 +391,8 @@ public:
     std::pair<SbStage, SbSlot> makeVirtualScan(sbe::value::TypeTags inputTag,
                                                sbe::value::Value inputVal);
 
+    SbStage makeCoScan();
+
     SbStage makeLimit(SbStage stage, SbExpr limit) {
         return makeLimit(VariableTypes{}, std::move(stage), std::move(limit));
     }
@@ -392,8 +404,6 @@ public:
     }
 
     SbStage makeLimitSkip(const VariableTypes& varTypes, SbStage stage, SbExpr limit, SbExpr skip);
-
-    SbStage makeCoScan();
 
     SbStage makeLimitOneCoScanTree();
 
@@ -454,43 +464,9 @@ public:
                                                  SbStage stage,
                                                  SbExprOptSbSlotVector projects);
 
-    inline SbStage makeLoopJoin(SbStage outer,
-                                SbStage inner,
-                                const SbSlotVector& outerProjects,
-                                const SbSlotVector& outerCorrelated,
-                                const SbSlotVector& innerProjects = SbSlotVector{},
-                                SbExpr predicate = SbExpr{},
-                                sbe::JoinType joinType = sbe::JoinType::Inner) {
-        return makeLoopJoin(VariableTypes{},
-                            std::move(outer),
-                            std::move(inner),
-                            outerProjects,
-                            outerCorrelated,
-                            innerProjects,
-                            std::move(predicate),
-                            joinType);
-    }
+    SbStage makeUnique(SbStage stage, SbSlot key);
 
-    SbStage makeLoopJoin(const VariableTypes& varTypes,
-                         SbStage outer,
-                         SbStage inner,
-                         const SbSlotVector& outerProjects,
-                         const SbSlotVector& outerCorrelated,
-                         const SbSlotVector& innerProjects = SbSlotVector{},
-                         SbExpr predicate = SbExpr{},
-                         sbe::JoinType joinType = sbe::JoinType::Inner);
-
-    SbStage makeUnique(SbStage stage, SbSlot key) {
-        return makeUnique(VariableTypes{}, std::move(stage), key);
-    }
-
-    SbStage makeUnique(const VariableTypes& varTypes, SbStage stage, SbSlot key);
-
-    SbStage makeUnique(SbStage stage, const SbSlotVector& keys) {
-        return makeUnique(VariableTypes{}, std::move(stage), keys);
-    }
-
-    SbStage makeUnique(const VariableTypes& varTypes, SbStage stage, const SbSlotVector& keys);
+    SbStage makeUnique(SbStage stage, const SbSlotVector& keys);
 
     SbStage makeSort(SbStage stage,
                      const SbSlotVector& orderBy,
@@ -603,6 +579,18 @@ public:
                                                    SbSlot inputSlot,
                                                    bool preserveNullAndEmptyArrays);
 
+    std::tuple<SbStage, SbSlot, boost::optional<SbSlot>, SbSlotVector, SbSlotVector>
+    makeTsBucketToCellBlock(SbStage stage,
+                            SbSlot bucketSlot,
+                            bool reqMeta,
+                            const std::vector<sbe::value::CellBlock::PathRequest>& topLevelReqs,
+                            const std::vector<sbe::value::CellBlock::PathRequest>& traverseReqs,
+                            const std::string& timeField);
+
+    std::pair<SbStage, SbSlotVector> makeBlockToRow(SbStage stage,
+                                                    const SbSlotVector& blockSlots,
+                                                    SbSlot bitmapSlot);
+
     std::pair<SbStage, SbSlotVector> makeUnion(sbe::PlanStage::Vector stages,
                                                const std::vector<SbSlotVector>& slots);
 
@@ -631,16 +619,107 @@ public:
                                                 const SbSlotVector& thenSlots,
                                                 const SbSlotVector& elseSlots);
 
+    inline SbStage makeLoopJoin(SbStage outer,
+                                SbStage inner,
+                                const SbSlotVector& outerProjects,
+                                const SbSlotVector& outerCorrelated,
+                                const SbSlotVector& innerProjects = SbSlotVector{},
+                                SbExpr predicate = SbExpr{},
+                                sbe::JoinType joinType = sbe::JoinType::Inner) {
+        return makeLoopJoin(VariableTypes{},
+                            std::move(outer),
+                            std::move(inner),
+                            outerProjects,
+                            outerCorrelated,
+                            innerProjects,
+                            std::move(predicate),
+                            joinType);
+    }
+
+    SbStage makeLoopJoin(const VariableTypes& varTypes,
+                         SbStage outer,
+                         SbStage inner,
+                         const SbSlotVector& outerProjects,
+                         const SbSlotVector& outerCorrelated,
+                         const SbSlotVector& innerProjects = SbSlotVector{},
+                         SbExpr predicate = SbExpr{},
+                         sbe::JoinType joinType = sbe::JoinType::Inner);
+
+    std::pair<SbStage, SbSlot> makeHashLookup(SbStage localStage,
+                                              SbStage foreignStage,
+                                              SbSlot localKeySlot,
+                                              SbSlot foreignKeySlot,
+                                              SbSlot foreignRecordSlot,
+                                              SbAggExpr sbAggExpr,
+                                              boost::optional<SbSlot> optOutputSlot,
+                                              boost::optional<sbe::value::SlotId> collatorSlot) {
+        return makeHashLookup(VariableTypes{},
+                              std::move(localStage),
+                              std::move(foreignStage),
+                              localKeySlot,
+                              foreignKeySlot,
+                              foreignRecordSlot,
+                              std::move(sbAggExpr),
+                              optOutputSlot,
+                              collatorSlot);
+    }
+
+    std::pair<SbStage, SbSlot> makeHashLookup(const VariableTypes& varTypes,
+                                              SbStage localStage,
+                                              SbStage foreignStage,
+                                              SbSlot localKeySlot,
+                                              SbSlot foreignKeySlot,
+                                              SbSlot foreignRecordSlot,
+                                              SbAggExpr sbAggExpr,
+                                              boost::optional<SbSlot> optOutputSlot,
+                                              boost::optional<sbe::value::SlotId> collatorSlot);
+
+    std::pair<SbStage, SbSlot> makeHashLookupUnwind(
+        SbStage localStage,
+        SbStage foreignStage,
+        SbSlot localKeySlot,
+        SbSlot foreignKeySlot,
+        SbSlot foreignRecordSlot,
+        boost::optional<sbe::value::SlotId> collatorSlot) {
+        return makeHashLookupUnwind(VariableTypes{},
+                                    std::move(localStage),
+                                    std::move(foreignStage),
+                                    localKeySlot,
+                                    foreignKeySlot,
+                                    foreignRecordSlot,
+                                    collatorSlot);
+    }
+
+    std::pair<SbStage, SbSlot> makeHashLookupUnwind(
+        const VariableTypes& varTypes,
+        SbStage localStage,
+        SbStage foreignStage,
+        SbSlot localKeySlot,
+        SbSlot foreignKeySlot,
+        SbSlot foreignRecordSlot,
+        boost::optional<sbe::value::SlotId> collatorSlot);
+
+    SbStage makeHashJoin(SbStage outerStage,
+                         SbStage innerStage,
+                         const SbSlotVector& outerCondSlots,
+                         const SbSlotVector& outerProjectSlots,
+                         const SbSlotVector& innerCondSlots,
+                         const SbSlotVector& innerProjectSlots,
+                         boost::optional<sbe::value::SlotId> collatorSlot);
+
+    SbStage makeMergeJoin(SbStage outerStage,
+                          SbStage innerStage,
+                          const SbSlotVector& outerKeySlots,
+                          const SbSlotVector& outerProjectSlots,
+                          const SbSlotVector& innerKeySlots,
+                          const SbSlotVector& innerProjectSlots,
+                          std::vector<sbe::value::SortDirection> dirs);
+
 protected:
     SbIndexInfoSlots allocateIndexInfoSlots(SbIndexInfoType indexInfoTypeMask,
                                             const BSONObj& keyPattern);
 
     SbSlotVector allocateOutSlotsForMergeStage(const std::vector<SbSlotVector>& slots);
-
-    sbe::WindowStage::Window lower(SbWindow& sbWindow, const VariableTypes* varTypes = nullptr);
-
-    std::vector<sbe::WindowStage::Window> lower(std::vector<SbWindow>& sbWindows,
-                                                const VariableTypes* varTypes = nullptr);
 
     PlanNodeId _nodeId;
 };

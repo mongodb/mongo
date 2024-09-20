@@ -49,6 +49,7 @@
 #include "mongo/db/exec/sbe/makeobj_spec.h"
 #include "mongo/db/exec/sbe/values/slot.h"
 #include "mongo/db/exec/sbe/values/value.h"
+#include "mongo/db/exec/sbe/vm/makeobj_writers.h"
 #include "mongo/util/assert_util.h"
 
 namespace mongo::sbe::vm {
@@ -83,8 +84,12 @@ public:
     MONGO_COMPILER_ALWAYS_INLINE std::pair<value::TypeTags, value::Value> value() const {
         return bson::convertFrom<true>(bsonElement());
     }
-    MONGO_COMPILER_ALWAYS_INLINE void appendTo(UniqueBSONObjBuilder& bob) const {
-        bob.append(bsonElement());
+    MONGO_COMPILER_ALWAYS_INLINE void appendTo(BsonObjWriter& bob) const {
+        bob.appendBsonElement(bsonElement());
+    }
+    MONGO_COMPILER_ALWAYS_INLINE void appendTo(ObjectWriter& bob) const {
+        auto [tag, val] = value();
+        bob.appendValue(fieldName(), tag, val);
     }
 
 private:
@@ -126,9 +131,13 @@ public:
     MONGO_COMPILER_ALWAYS_INLINE std::pair<value::TypeTags, value::Value> value() const {
         return _objRoot->getAt(_idx);
     }
-    MONGO_COMPILER_ALWAYS_INLINE void appendTo(UniqueBSONObjBuilder& bob) const {
+    MONGO_COMPILER_ALWAYS_INLINE void appendTo(BsonObjWriter& bob) const {
         auto [tag, val] = value();
-        bson::appendValueToBsonObj(bob, _name, tag, val);
+        bob.appendValue(_name, tag, val);
+    }
+    MONGO_COMPILER_ALWAYS_INLINE void appendTo(ObjectWriter& bob) const {
+        auto [tag, val] = value();
+        bob.appendValue(_name, tag, val);
     }
 
 private:

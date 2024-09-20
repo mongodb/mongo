@@ -30,12 +30,18 @@
 #include "mongo/db/query/stage_builder/sbe/sbexpr_helpers.h"
 
 #include "mongo/db/exec/sbe/stages/agg_project.h"
+#include "mongo/db/exec/sbe/stages/block_to_row.h"
 #include "mongo/db/exec/sbe/stages/branch.h"
 #include "mongo/db/exec/sbe/stages/co_scan.h"
+#include "mongo/db/exec/sbe/stages/hash_join.h"
+#include "mongo/db/exec/sbe/stages/hash_lookup.h"
+#include "mongo/db/exec/sbe/stages/hash_lookup_unwind.h"
 #include "mongo/db/exec/sbe/stages/ix_scan.h"
 #include "mongo/db/exec/sbe/stages/limit_skip.h"
+#include "mongo/db/exec/sbe/stages/merge_join.h"
 #include "mongo/db/exec/sbe/stages/sort.h"
 #include "mongo/db/exec/sbe/stages/sorted_merge.h"
+#include "mongo/db/exec/sbe/stages/ts_bucket_to_cell_block.h"
 #include "mongo/db/exec/sbe/stages/union.h"
 #include "mongo/db/exec/sbe/stages/unique.h"
 #include "mongo/db/exec/sbe/stages/unwind.h"
@@ -45,24 +51,6 @@
 
 namespace mongo::stage_builder {
 namespace {
-inline bool hasABT(const SbExpr& e) {
-    return !e.isEExpr() && e.canExtractABT();
-}
-
-inline bool hasABT(const SbExpr::Vector& exprs) {
-    return std::all_of(exprs.begin(), exprs.end(), [](auto&& e) { return hasABT(e); });
-}
-
-template <typename... Ts>
-inline bool hasABT(const SbExpr& head, Ts&&... rest) {
-    return hasABT(head) && hasABT(std::forward<Ts>(rest)...);
-}
-
-template <typename... Ts>
-inline bool hasABT(const SbExpr::Vector& head, Ts&&... rest) {
-    return hasABT(head) && hasABT(std::forward<Ts>(rest)...);
-}
-
 inline optimizer::ABT extractABT(SbExpr& e) {
     return abt::unwrap(e.extractABT());
 }
@@ -166,52 +154,58 @@ sbe::SlotExprPairVector SbExprBuilder::lower(SbExprSbSlotVector& sbSlotSbExprVec
     slotExprVec.reserve(sbSlotSbExprVec.size());
 
     for (auto& [sbExpr, sbSlot] : sbSlotSbExprVec) {
-        slotExprVec.emplace_back(std::pair(sbSlot.getId(), sbExpr.extractExpr(_state, varTypes)));
+        slotExprVec.emplace_back(std::pair(sbSlot.getId(), sbExpr.lower(_state, varTypes)));
     }
 
     return slotExprVec;
 }
 
-SbExpr SbExprBuilder::makeNot(SbExpr e) {
-    if (hasABT(e)) {
-        return abt::wrap(stage_builder::makeNot(extractABT(e)));
-    } else {
-        return stage_builder::makeNot(lower(e));
+sbe::WindowStage::Window SbExprBuilder::lower(SbWindow& sbWindow, const VariableTypes* varTypes) {
+    sbe::WindowStage::Window window;
+
+    window.windowExprSlots = lower(sbWindow.windowExprSlots, varTypes);
+    window.frameFirstSlots = lower(sbWindow.frameFirstSlots, varTypes);
+    window.frameLastSlots = lower(sbWindow.frameLastSlots, varTypes);
+    window.initExprs = lower(sbWindow.initExprs, varTypes);
+    window.addExprs = lower(sbWindow.addExprs, varTypes);
+    window.removeExprs = lower(sbWindow.removeExprs, varTypes);
+    window.lowBoundExpr = lower(sbWindow.lowBoundExpr, varTypes);
+    window.highBoundExpr = lower(sbWindow.highBoundExpr, varTypes);
+
+    return window;
+}
+
+std::vector<sbe::WindowStage::Window> SbExprBuilder::lower(std::vector<SbWindow>& sbWindows,
+                                                           const VariableTypes* varTypes) {
+    std::vector<sbe::WindowStage::Window> windows;
+    windows.reserve(sbWindows.size());
+
+    for (auto& sbWindow : sbWindows) {
+        windows.emplace_back(lower(sbWindow, varTypes));
     }
+
+    return windows;
+}
+
+SbExpr SbExprBuilder::makeNot(SbExpr e) {
+    return abt::wrap(stage_builder::makeNot(extractABT(e)));
 }
 
 SbExpr SbExprBuilder::makeUnaryOp(sbe::EPrimUnary::Op unaryOp, SbExpr e) {
-    if (hasABT(e)) {
-        return abt::wrap(stage_builder::makeUnaryOp(getOptimizerOp(unaryOp), extractABT(e)));
-    } else {
-        return stage_builder::makeUnaryOp(unaryOp, lower(e));
-    }
+    return abt::wrap(stage_builder::makeUnaryOp(getOptimizerOp(unaryOp), extractABT(e)));
 }
 
 SbExpr SbExprBuilder::makeUnaryOp(optimizer::Operations unaryOp, SbExpr e) {
-    if (hasABT(e)) {
-        return abt::wrap(stage_builder::makeUnaryOp(unaryOp, extractABT(e)));
-    } else {
-        return stage_builder::makeUnaryOp(getEPrimUnaryOp(unaryOp), lower(e));
-    }
+    return abt::wrap(stage_builder::makeUnaryOp(unaryOp, extractABT(e)));
 }
 
 SbExpr SbExprBuilder::makeBinaryOp(sbe::EPrimBinary::Op binaryOp, SbExpr lhs, SbExpr rhs) {
-    if (hasABT(lhs, rhs)) {
-        return abt::wrap(stage_builder::makeBinaryOp(
-            getOptimizerOp(binaryOp), extractABT(lhs), extractABT(rhs)));
-    } else {
-        return stage_builder::makeBinaryOp(binaryOp, lower(lhs), lower(rhs), _state);
-    }
+    return abt::wrap(
+        stage_builder::makeBinaryOp(getOptimizerOp(binaryOp), extractABT(lhs), extractABT(rhs)));
 }
 
 SbExpr SbExprBuilder::makeBinaryOp(optimizer::Operations binaryOp, SbExpr lhs, SbExpr rhs) {
-    if (hasABT(lhs, rhs)) {
-        return abt::wrap(stage_builder::makeBinaryOp(binaryOp, extractABT(lhs), extractABT(rhs)));
-    } else {
-        return stage_builder::makeBinaryOp(
-            getEPrimBinaryOp(binaryOp), lower(lhs), lower(rhs), _state);
-    }
+    return makeBinaryOp(getEPrimBinaryOp(binaryOp), std::move(lhs), std::move(rhs));
 }
 
 SbExpr SbExprBuilder::makeConstant(sbe::value::TypeTags tag, sbe::value::Value val) {
@@ -255,44 +249,24 @@ SbExpr SbExprBuilder::makeUndefinedConstant() {
 }
 
 SbExpr SbExprBuilder::makeFunction(StringData name, SbExpr::Vector args) {
-    if (hasABT(args)) {
-        return abt::wrap(stage_builder::makeABTFunction(name, extractABT(args)));
-    } else {
-        return stage_builder::makeFunction(name, lower(args));
-    }
+    return abt::wrap(stage_builder::makeABTFunction(name, extractABT(args)));
 }
 
 SbExpr SbExprBuilder::makeIf(SbExpr condExpr, SbExpr thenExpr, SbExpr elseExpr) {
-    if (hasABT(condExpr, thenExpr, elseExpr)) {
-        return abt::wrap(stage_builder::makeIf(
-            extractABT(condExpr), extractABT(thenExpr), extractABT(elseExpr)));
-    } else {
-        return stage_builder::makeIf(lower(condExpr), lower(thenExpr), lower(elseExpr));
-    }
+    return abt::wrap(
+        stage_builder::makeIf(extractABT(condExpr), extractABT(thenExpr), extractABT(elseExpr)));
 }
 
 SbExpr SbExprBuilder::makeLet(sbe::FrameId frameId, SbExpr::Vector binds, SbExpr expr) {
-    if (hasABT(expr, binds)) {
-        return abt::wrap(stage_builder::makeLet(frameId, extractABT(binds), extractABT(expr)));
-    } else {
-        return stage_builder::makeLet(frameId, lower(binds), lower(expr));
-    }
+    return abt::wrap(stage_builder::makeLet(frameId, extractABT(binds), extractABT(expr)));
 }
 
 SbExpr SbExprBuilder::makeLocalLambda(sbe::FrameId frameId, SbExpr expr) {
-    if (hasABT(expr)) {
-        return abt::wrap(stage_builder::makeLocalLambda(frameId, extractABT(expr)));
-    } else {
-        return stage_builder::makeLocalLambda(frameId, lower(expr));
-    }
+    return abt::wrap(stage_builder::makeLocalLambda(frameId, extractABT(expr)));
 }
 
 SbExpr SbExprBuilder::makeNumericConvert(SbExpr expr, sbe::value::TypeTags tag) {
-    if (hasABT(expr)) {
-        return abt::wrap(stage_builder::makeNumericConvert(extractABT(expr), tag));
-    } else {
-        return stage_builder::makeNumericConvert(lower(expr), tag);
-    }
+    return abt::wrap(stage_builder::makeNumericConvert(extractABT(expr), tag));
 }
 
 SbExpr SbExprBuilder::makeFail(ErrorCodes::Error error, StringData errorMessage) {
@@ -320,12 +294,7 @@ SbExpr SbExprBuilder::makeFillEmptyUndefined(SbExpr expr) {
 }
 
 SbExpr SbExprBuilder::makeIfNullExpr(SbExpr::Vector values) {
-    if (hasABT(values)) {
-        return abt::wrap(
-            stage_builder::makeIfNullExpr(extractABT(values), _state.frameIdGenerator));
-    } else {
-        return stage_builder::makeIfNullExpr(lower(values), _state.frameIdGenerator);
-    }
+    return abt::wrap(stage_builder::makeIfNullExpr(extractABT(values), _state.frameIdGenerator));
 }
 
 SbExpr SbExprBuilder::generateNullOrMissing(SbExpr expr) {
@@ -404,33 +373,6 @@ SbExpr SbExprBuilder::generateInfinityCheck(SbVar var) {
 
 SbExpr SbExprBuilder::generateInvalidRoundPlaceArgCheck(SbVar var) {
     return abt::wrap(stage_builder::generateInvalidRoundPlaceArgCheck(var.getABTName()));
-}
-
-sbe::WindowStage::Window SbBuilder::lower(SbWindow& sbWindow, const VariableTypes* varTypes) {
-    sbe::WindowStage::Window window;
-
-    window.windowExprSlots = lower(sbWindow.windowExprSlots, varTypes);
-    window.frameFirstSlots = lower(sbWindow.frameFirstSlots, varTypes);
-    window.frameLastSlots = lower(sbWindow.frameLastSlots, varTypes);
-    window.initExprs = lower(sbWindow.initExprs, varTypes);
-    window.addExprs = lower(sbWindow.addExprs, varTypes);
-    window.removeExprs = lower(sbWindow.removeExprs, varTypes);
-    window.lowBoundExpr = lower(sbWindow.lowBoundExpr, varTypes);
-    window.highBoundExpr = lower(sbWindow.highBoundExpr, varTypes);
-
-    return window;
-}
-
-std::vector<sbe::WindowStage::Window> SbBuilder::lower(std::vector<SbWindow>& sbWindows,
-                                                       const VariableTypes* varTypes) {
-    std::vector<sbe::WindowStage::Window> windows;
-    windows.reserve(sbWindows.size());
-
-    for (auto& sbWindow : sbWindows) {
-        windows.emplace_back(lower(sbWindow, varTypes));
-    }
-
-    return windows;
 }
 
 std::tuple<SbStage, SbSlot, SbSlot, SbSlotVector> SbBuilder::makeScan(
@@ -574,6 +516,10 @@ std::pair<SbStage, SbSlot> SbBuilder::makeVirtualScan(sbe::value::TypeTags input
     return {sbe::makeS<sbe::VirtualScanStage>(_nodeId, outSlotId, inputTag, inputVal), outSlot};
 }
 
+SbStage SbBuilder::makeCoScan() {
+    return sbe::makeS<sbe::CoScanStage>(_nodeId);
+}
+
 SbStage SbBuilder::makeLimit(const VariableTypes& varTypes, SbStage stage, SbExpr limitConstant) {
     return sbe::makeS<sbe::LimitSkipStage>(
         std::move(stage), lower(limitConstant, &varTypes), nullptr, _nodeId);
@@ -585,10 +531,6 @@ SbStage SbBuilder::makeLimitSkip(const VariableTypes& varTypes,
                                  SbExpr skipConstant) {
     return sbe::makeS<sbe::LimitSkipStage>(
         std::move(stage), lower(limitConstant, &varTypes), lower(skipConstant, &varTypes), _nodeId);
-}
-
-SbStage SbBuilder::makeCoScan() {
-    return sbe::makeS<sbe::CoScanStage>(_nodeId);
 }
 
 SbStage SbBuilder::makeLimitOneCoScanTree() {
@@ -603,24 +545,6 @@ SbStage SbBuilder::makeFilter(const VariableTypes& varTypes, SbStage stage, SbEx
 SbStage SbBuilder::makeConstFilter(const VariableTypes& varTypes, SbStage stage, SbExpr condition) {
     return sbe::makeS<sbe::FilterStage<true>>(
         std::move(stage), lower(condition, &varTypes), _nodeId);
-}
-
-SbStage SbBuilder::makeLoopJoin(const VariableTypes& varTypes,
-                                SbStage outer,
-                                SbStage inner,
-                                const SbSlotVector& outerProjects,
-                                const SbSlotVector& outerCorrelated,
-                                const SbSlotVector& innerProjects,
-                                SbExpr predicate,
-                                sbe::JoinType joinType) {
-    return sbe::makeS<sbe::LoopJoinStage>(std::move(outer),
-                                          std::move(inner),
-                                          lower(outerProjects, &varTypes),
-                                          lower(outerCorrelated, &varTypes),
-                                          lower(innerProjects, &varTypes),
-                                          lower(predicate, &varTypes),
-                                          joinType,
-                                          _nodeId);
 }
 
 std::pair<SbStage, SbSlotVector> SbBuilder::makeProject(const VariableTypes& varTypes,
@@ -643,7 +567,7 @@ std::pair<SbStage, SbSlotVector> SbBuilder::makeProject(const VariableTypes& var
             // into 'outSlots'.
             sbe::value::SlotId slot = optSlot ? optSlot->getId() : _state.slotId();
             outSlots.emplace_back(slot, expr.getTypeSignature());
-            slotExprPairs.emplace_back(slot, expr.extractExpr(_state));
+            slotExprPairs.emplace_back(slot, expr.lower(_state));
         }
     }
 
@@ -655,17 +579,15 @@ std::pair<SbStage, SbSlotVector> SbBuilder::makeProject(const VariableTypes& var
     return {std::move(stage), std::move(outSlots)};
 }
 
-SbStage SbBuilder::makeUnique(const VariableTypes& varTypes, SbStage stage, SbSlot key) {
+SbStage SbBuilder::makeUnique(SbStage stage, SbSlot key) {
     sbe::value::SlotVector keySlots;
     keySlots.emplace_back(key.getId());
 
     return sbe::makeS<sbe::UniqueStage>(std::move(stage), std::move(keySlots), _nodeId);
 }
 
-SbStage SbBuilder::makeUnique(const VariableTypes& varTypes,
-                              SbStage stage,
-                              const SbSlotVector& keys) {
-    return sbe::makeS<sbe::UniqueStage>(std::move(stage), lower(keys, &varTypes), _nodeId);
+SbStage SbBuilder::makeUnique(SbStage stage, const SbSlotVector& keys) {
+    return sbe::makeS<sbe::UniqueStage>(std::move(stage), lower(keys), _nodeId);
 }
 
 SbStage SbBuilder::makeSort(const VariableTypes& varTypes,
@@ -722,8 +644,8 @@ std::tuple<SbStage, SbSlotVector, SbSlotVector> SbBuilder::makeHashAgg(
         auto sbSlot = optSbSlot ? *optSbSlot : SbSlot{_state.slotId()};
         aggOutSlots.emplace_back(sbSlot);
 
-        auto exprPair = sbe::AggExprPair{sbAggExpr.init.extractExpr(_state, &varTypes),
-                                         sbAggExpr.agg.extractExpr(_state, &varTypes)};
+        auto exprPair = sbe::AggExprPair{sbAggExpr.init.lower(_state, &varTypes),
+                                         sbAggExpr.agg.lower(_state, &varTypes)};
 
         aggExprsVec.emplace_back(std::pair(sbSlot.getId(), std::move(exprPair)));
     }
@@ -771,12 +693,12 @@ std::tuple<SbStage, SbSlotVector, SbSlotVector> SbBuilder::makeBlockHashAgg(
 
         std::unique_ptr<sbe::EExpression> init, blockAgg, agg;
         if (sbAggExpr.init) {
-            init = sbAggExpr.init.extractExpr(_state, &varTypes);
+            init = sbAggExpr.init.lower(_state, &varTypes);
         }
         if (sbAggExpr.blockAgg) {
-            blockAgg = sbAggExpr.blockAgg.extractExpr(_state, &varTypes);
+            blockAgg = sbAggExpr.blockAgg.lower(_state, &varTypes);
         }
-        agg = sbAggExpr.agg.extractExpr(_state, &varTypes);
+        agg = sbAggExpr.agg.lower(_state, &varTypes);
 
         aggs.emplace_back(sbSlot.getId(),
                           sbe::AggExprTuple{std::move(init), std::move(blockAgg), std::move(agg)});
@@ -840,8 +762,8 @@ std::tuple<SbStage, SbSlotVector> SbBuilder::makeAggProject(const VariableTypes&
         auto sbSlot = optSbSlot ? *optSbSlot : SbSlot{_state.slotId()};
         aggOutSlots.emplace_back(sbSlot);
 
-        auto exprPair = sbe::AggExprPair{sbAggExpr.init.extractExpr(_state, &varTypes),
-                                         sbAggExpr.agg.extractExpr(_state, &varTypes)};
+        auto exprPair = sbe::AggExprPair{sbAggExpr.init.lower(_state, &varTypes),
+                                         sbAggExpr.agg.lower(_state, &varTypes)};
 
         aggExprsVec.emplace_back(std::pair(sbSlot.getId(), std::move(exprPair)));
     }
@@ -882,6 +804,91 @@ std::tuple<SbStage, SbSlot, SbSlot> SbBuilder::makeUnwind(SbStage stage,
                                          _nodeId);
 
     return {std::move(stage), unwindOutputSlot, indexOutputSlot};
+}
+
+std::tuple<SbStage, SbSlot, boost::optional<SbSlot>, SbSlotVector, SbSlotVector>
+SbBuilder::makeTsBucketToCellBlock(
+    SbStage stage,
+    SbSlot bucketSlot,
+    bool reqMeta,
+    const std::vector<sbe::value::CellBlock::PathRequest>& topLevelReqs,
+    const std::vector<sbe::value::CellBlock::PathRequest>& traverseReqs,
+    const std::string& timeField) {
+    const auto bitmapSlot = SbSlot{_state.slotId()};
+    auto metaSlot = reqMeta ? boost::make_optional(SbSlot{_state.slotId()}) : boost::none;
+
+    SbSlotVector topLevelSlots;
+    topLevelSlots.reserve(topLevelReqs.size());
+    for (size_t i = 0; i < topLevelReqs.size(); ++i) {
+        auto field = topLevelReqs[i].getTopLevelField();
+        auto typeSig = field == timeField
+            ? TypeSignature::kCellType.include(TypeSignature::kDateTimeType)
+            : TypeSignature::kCellType.include(TypeSignature::kAnyScalarType);
+
+        topLevelSlots.emplace_back(SbSlot{_state.slotId(), typeSig});
+    }
+
+    SbSlotVector traverseSlots;
+    traverseSlots.reserve(traverseReqs.size());
+    for (size_t i = 0; i < traverseReqs.size(); ++i) {
+        auto field = traverseReqs[i].getFullPath();
+        auto typeSig = field == timeField
+            ? TypeSignature::kCellType.include(TypeSignature::kDateTimeType)
+            : TypeSignature::kCellType.include(TypeSignature::kAnyScalarType);
+
+        traverseSlots.emplace_back(SbSlot{_state.slotId(), typeSig});
+    }
+
+    auto allReqs = topLevelReqs;
+    allReqs.insert(allReqs.end(), traverseReqs.begin(), traverseReqs.end());
+
+    sbe::value::SlotVector allCellSlots;
+    allCellSlots.reserve(allReqs.size());
+    for (const SbSlot& slot : topLevelSlots) {
+        allCellSlots.push_back(slot.getId());
+    }
+    for (const SbSlot& slot : traverseSlots) {
+        allCellSlots.push_back(slot.getId());
+    }
+
+    stage = std::make_unique<sbe::TsBucketToCellBlockStage>(std::move(stage),
+                                                            lower(bucketSlot),
+                                                            allReqs,
+                                                            std::move(allCellSlots),
+                                                            lower(metaSlot),
+                                                            lower(bitmapSlot),
+                                                            timeField,
+                                                            _nodeId);
+
+    return {
+        std::move(stage), bitmapSlot, metaSlot, std::move(topLevelSlots), std::move(traverseSlots)};
+}
+
+std::pair<SbStage, SbSlotVector> SbBuilder::makeBlockToRow(SbStage stage,
+                                                           const SbSlotVector& blockSlots,
+                                                           SbSlot bitmapSlot) {
+    SbSlotVector unpackedSlots;
+    unpackedSlots.reserve(blockSlots.size());
+
+    for (size_t i = 0; i < blockSlots.size(); ++i) {
+        // 'blockSlots[i]' and 'unpackedSlots[i]' will have the same type except that the
+        // unpacked slot's type will be scalar.
+        boost::optional<TypeSignature> typeSig = blockSlots[i].getTypeSignature();
+        if (typeSig) {
+            typeSig = typeSig->exclude(TypeSignature::kBlockType).exclude(TypeSignature::kCellType);
+        }
+
+        unpackedSlots.emplace_back(SbSlot{_state.slotId(), typeSig});
+    }
+
+    stage = std::make_unique<sbe::BlockToRowStage>(std::move(stage),
+                                                   lower(blockSlots),
+                                                   lower(unpackedSlots),
+                                                   lower(bitmapSlot),
+                                                   _nodeId,
+                                                   _state.yieldPolicy);
+
+    return {std::move(stage), std::move(unpackedSlots)};
 }
 
 std::pair<SbStage, SbSlotVector> SbBuilder::makeUnion(sbe::PlanStage::Vector stages,
@@ -956,6 +963,107 @@ std::pair<SbStage, SbSlotVector> SbBuilder::makeBranch(const VariableTypes& varT
                                               _nodeId);
 
     return {std::move(stage), std::move(outSlots)};
+}
+
+SbStage SbBuilder::makeLoopJoin(const VariableTypes& varTypes,
+                                SbStage outer,
+                                SbStage inner,
+                                const SbSlotVector& outerProjects,
+                                const SbSlotVector& outerCorrelated,
+                                const SbSlotVector& innerProjects,
+                                SbExpr predicate,
+                                sbe::JoinType joinType) {
+    return sbe::makeS<sbe::LoopJoinStage>(std::move(outer),
+                                          std::move(inner),
+                                          lower(outerProjects, &varTypes),
+                                          lower(outerCorrelated, &varTypes),
+                                          lower(innerProjects, &varTypes),
+                                          lower(predicate, &varTypes),
+                                          joinType,
+                                          _nodeId);
+}
+
+std::pair<SbStage, SbSlot> SbBuilder::makeHashLookup(
+    const VariableTypes& varTypes,
+    SbStage localStage,
+    SbStage foreignStage,
+    SbSlot localKeySlot,
+    SbSlot foreignKeySlot,
+    SbSlot foreignRecordSlot,
+    SbAggExpr sbAggExpr,
+    boost::optional<SbSlot> optOutputSlot,
+    boost::optional<sbe::value::SlotId> collatorSlot) {
+    auto outputSlot = optOutputSlot ? *optOutputSlot : SbSlot{_state.slotId()};
+
+    sbe::SlotExprPair agg{outputSlot.getId(), sbAggExpr.agg.lower(_state, &varTypes)};
+
+    SbStage stage = sbe::makeS<sbe::HashLookupStage>(std::move(localStage),
+                                                     std::move(foreignStage),
+                                                     localKeySlot.getId(),
+                                                     foreignKeySlot.getId(),
+                                                     foreignRecordSlot.getId(),
+                                                     std::move(agg),
+                                                     collatorSlot,
+                                                     _nodeId);
+
+    return {std::move(stage), outputSlot};
+}
+
+std::pair<SbStage, SbSlot> SbBuilder::makeHashLookupUnwind(
+    const VariableTypes& varTypes,
+    SbStage localStage,
+    SbStage foreignStage,
+    SbSlot localKeySlot,
+    SbSlot foreignKeySlot,
+    SbSlot foreignRecordSlot,
+    boost::optional<sbe::value::SlotId> collatorSlot) {
+    auto outputSlot = SbSlot{_state.slotId()};
+
+    auto stage = sbe::makeS<sbe::HashLookupUnwindStage>(std::move(localStage),
+                                                        std::move(foreignStage),
+                                                        localKeySlot.getId(),
+                                                        foreignKeySlot.getId(),
+                                                        foreignRecordSlot.getId(),
+                                                        outputSlot.getId(),
+                                                        collatorSlot,
+                                                        _nodeId);
+
+    return {std::move(stage), outputSlot};
+}
+
+SbStage SbBuilder::makeHashJoin(SbStage outerStage,
+                                SbStage innerStage,
+                                const SbSlotVector& outerCondSlots,
+                                const SbSlotVector& outerProjectSlots,
+                                const SbSlotVector& innerCondSlots,
+                                const SbSlotVector& innerProjectSlots,
+                                boost::optional<sbe::value::SlotId> collatorSlot) {
+    return sbe::makeS<sbe::HashJoinStage>(std::move(outerStage),
+                                          std::move(innerStage),
+                                          lower(outerCondSlots),
+                                          lower(outerProjectSlots),
+                                          lower(innerCondSlots),
+                                          lower(innerProjectSlots),
+                                          collatorSlot,
+                                          _state.yieldPolicy,
+                                          _nodeId);
+}
+
+SbStage SbBuilder::makeMergeJoin(SbStage outerStage,
+                                 SbStage innerStage,
+                                 const SbSlotVector& outerKeySlots,
+                                 const SbSlotVector& outerProjectSlots,
+                                 const SbSlotVector& innerKeySlots,
+                                 const SbSlotVector& innerProjectSlots,
+                                 std::vector<sbe::value::SortDirection> dirs) {
+    return sbe::makeS<sbe::MergeJoinStage>(std::move(outerStage),
+                                           std::move(innerStage),
+                                           lower(outerKeySlots),
+                                           lower(outerProjectSlots),
+                                           lower(innerKeySlots),
+                                           lower(innerProjectSlots),
+                                           std::move(dirs),
+                                           _nodeId);
 }
 
 SbIndexInfoSlots SbBuilder::allocateIndexInfoSlots(SbIndexInfoType indexInfoTypeMask,

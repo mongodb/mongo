@@ -1063,6 +1063,7 @@ execEnv.Library(
         "query/stage_builder/sbe/gen_abt_helpers.cpp",
         "query/stage_builder/sbe/gen_accumulator.cpp",
         "query/stage_builder/sbe/gen_coll_scan.cpp",
+        "query/stage_builder/sbe/gen_eexpr_helpers.cpp",
         "query/stage_builder/sbe/gen_expression.cpp",
         "query/stage_builder/sbe/gen_filter.cpp",
         "query/stage_builder/sbe/gen_group.cpp",

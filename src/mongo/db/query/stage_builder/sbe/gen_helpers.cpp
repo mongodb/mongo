@@ -51,18 +51,6 @@
 #include "mongo/db/catalog/index_catalog_entry.h"
 #include "mongo/db/exec/docval_to_sbeval.h"
 #include "mongo/db/exec/sbe/expressions/expression.h"
-#include "mongo/db/exec/sbe/stages/branch.h"
-#include "mongo/db/exec/sbe/stages/co_scan.h"
-#include "mongo/db/exec/sbe/stages/hash_agg.h"
-#include "mongo/db/exec/sbe/stages/limit_skip.h"
-#include "mongo/db/exec/sbe/stages/loop_join.h"
-#include "mongo/db/exec/sbe/stages/makeobj.h"
-#include "mongo/db/exec/sbe/stages/project.h"
-#include "mongo/db/exec/sbe/stages/scan.h"
-#include "mongo/db/exec/sbe/stages/traverse.h"
-#include "mongo/db/exec/sbe/stages/union.h"
-#include "mongo/db/exec/sbe/stages/unwind.h"
-#include "mongo/db/exec/sbe/stages/virtual_scan.h"
 #include "mongo/db/index/index_access_method.h"
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/index/multikey_paths.h"
@@ -102,117 +90,18 @@
 
 namespace mongo::stage_builder {
 
-std::unique_ptr<sbe::EExpression> makeUnaryOp(sbe::EPrimUnary::Op unaryOp,
-                                              std::unique_ptr<sbe::EExpression> operand) {
-    return sbe::makeE<sbe::EPrimUnary>(unaryOp, std::move(operand));
-}
-
-std::unique_ptr<sbe::EExpression> makeNot(std::unique_ptr<sbe::EExpression> e) {
-    return makeUnaryOp(sbe::EPrimUnary::logicNot, std::move(e));
-}
-
-std::unique_ptr<sbe::EExpression> makeBinaryOp(sbe::EPrimBinary::Op binaryOp,
-                                               std::unique_ptr<sbe::EExpression> lhs,
-                                               std::unique_ptr<sbe::EExpression> rhs,
-                                               StageBuilderState& state) {
-    std::unique_ptr<sbe::EExpression> coll = nullptr;
-
-    if (sbe::EPrimBinary::isComparisonOp(binaryOp)) {
-        auto collatorSlot = state.getCollatorSlot();
-
-        auto hasNonCollatableType = [](const std::unique_ptr<sbe::EExpression>& arg) {
-            auto constExpr = arg->as<sbe::EConstant>();
-            return constExpr && !sbe::value::isCollatableType(constExpr->getConstant().first);
-        };
-
-        // If either arg is a non-collatable type constant, we can always use the native
-        // comparison op even when a collation is set (because the native comparison op
-        // will behave the same as the collation-aware comparison op for such cases).
-        const bool useCollationAwareOp =
-            collatorSlot && !hasNonCollatableType(lhs) && !hasNonCollatableType(rhs);
-
-        if (useCollationAwareOp) {
-            coll = sbe::makeE<sbe::EVariable>(*collatorSlot);
-        }
-    }
-
-    return sbe::makeE<sbe::EPrimBinary>(binaryOp, std::move(lhs), std::move(rhs), std::move(coll));
-}
-
-std::unique_ptr<sbe::EExpression> generateNullMissingOrUndefinedExpr(const sbe::EExpression& expr) {
-    return sbe::makeE<sbe::EPrimBinary>(
-        sbe::EPrimBinary::fillEmpty,
-        makeFunction("typeMatch",
-                     expr.clone(),
-                     makeInt32Constant(getBSONTypeMask(BSONType::jstNULL) |
-                                       getBSONTypeMask(BSONType::Undefined))),
-        makeBoolConstant(true));
-}
-
-std::unique_ptr<sbe::EExpression> generateNullMissingOrUndefined(const sbe::EVariable& var) {
-    return generateNullMissingOrUndefinedExpr(var);
-}
-
-std::unique_ptr<sbe::EExpression> makeVariable(SbSlot ts) {
-    return sbe::makeE<sbe::EVariable>(ts.slotId);
-}
-
-std::unique_ptr<sbe::EExpression> makeVariable(sbe::value::SlotId slotId) {
-    return sbe::makeE<sbe::EVariable>(slotId);
-}
-
-std::unique_ptr<sbe::EExpression> makeVariable(sbe::FrameId frameId, sbe::value::SlotId slotId) {
-    return sbe::makeE<sbe::EVariable>(frameId, slotId);
-}
-
-std::unique_ptr<sbe::EExpression> makeMoveVariable(sbe::FrameId frameId,
-                                                   sbe::value::SlotId slotId) {
-    return sbe::makeE<sbe::EVariable>(frameId, slotId, true);
-}
-
-SbExpr makeNewBsonObject(StageBuilderState& state,
-                         std::vector<std::string> fields,
-                         SbExpr::Vector values) {
-    SbExprBuilder b(state);
-
-    tassert(7103507,
-            "Expected 'fields' and 'values' to be the same size",
-            fields.size() == values.size());
-
-    std::vector<sbe::MakeObjSpec::FieldAction> fieldActions;
-    for (size_t i = 0; i < fields.size(); ++i) {
-        fieldActions.emplace_back(sbe::MakeObjSpec::AddArg{i});
-    }
-
-    auto makeObjSpec =
-        b.makeConstant(sbe::value::TypeTags::makeObjSpec,
-                       sbe::value::bitcastFrom<sbe::MakeObjSpec*>(new sbe::MakeObjSpec(
-                           FieldListScope::kOpen, std::move(fields), std::move(fieldActions))));
-    auto makeObjRoot = b.makeNothingConstant();
-    SbExpr::Vector makeObjArgs;
-    makeObjArgs.reserve(2 + values.size());
-
-    makeObjArgs.push_back(std::move(makeObjSpec));
-    makeObjArgs.push_back(std::move(makeObjRoot));
-    std::move(values.begin(), values.end(), std::back_inserter(makeObjArgs));
-
-    return b.makeFunction("makeBsonObj", std::move(makeObjArgs));
-}
-
-SbExpr makeShardKeyFunctionForPersistedDocuments(StageBuilderState& state,
-                                                 const std::vector<sbe::MatchPath>& shardKeyPaths,
-                                                 const std::vector<bool>& shardKeyHashed,
-                                                 const PlanStageSlots& slots) {
+SbExpr makeShardKeyForPersistedDocuments(StageBuilderState& state,
+                                         const std::vector<sbe::MatchPath>& shardKeyPaths,
+                                         const std::vector<bool>& shardKeyHashed,
+                                         const PlanStageSlots& slots) {
     SbExprBuilder b(state);
 
     // Build an expression to extract the shard key from the document based on the shard key
     // pattern. To do this, we iterate over the shard key pattern parts and build nested 'getField'
     // expressions. This will handle single-element paths, and dotted paths for each shard key part.
-    std::vector<std::string> projectFields;
-    SbExpr::Vector projectValues;
+    SbExpr::Vector newBsonObjArgs;
+    newBsonObjArgs.reserve(shardKeyPaths.size() * 2);
 
-    projectFields.reserve(shardKeyPaths.size());
-    projectValues.reserve(shardKeyPaths.size());
     for (size_t i = 0; i < shardKeyPaths.size(); ++i) {
         const auto& fieldRef = shardKeyPaths[i];
 
@@ -230,108 +119,11 @@ SbExpr makeShardKeyFunctionForPersistedDocuments(StageBuilderState& state,
             shardKeyBinding = b.makeFunction("shardHash"_sd, std::move(shardKeyBinding));
         }
 
-        projectFields.push_back(fieldRef.dottedField().toString());
-        projectValues.push_back(std::move(shardKeyBinding));
+        newBsonObjArgs.emplace_back(b.makeStrConstant(fieldRef.dottedField()));
+        newBsonObjArgs.emplace_back(std::move(shardKeyBinding));
     }
 
-    return makeNewBsonObject(state, std::move(projectFields), std::move(projectValues));
-}
-
-std::unique_ptr<sbe::EExpression> makeIf(std::unique_ptr<sbe::EExpression> condExpr,
-                                         std::unique_ptr<sbe::EExpression> thenExpr,
-                                         std::unique_ptr<sbe::EExpression> elseExpr) {
-    return sbe::makeE<sbe::EIf>(std::move(condExpr), std::move(thenExpr), std::move(elseExpr));
-}
-
-std::unique_ptr<sbe::EExpression> makeLet(sbe::FrameId frameId,
-                                          sbe::EExpression::Vector bindExprs,
-                                          std::unique_ptr<sbe::EExpression> expr) {
-    return sbe::makeE<sbe::ELocalBind>(frameId, std::move(bindExprs), std::move(expr));
-}
-
-std::unique_ptr<sbe::EExpression> makeLocalLambda(sbe::FrameId frameId,
-                                                  std::unique_ptr<sbe::EExpression> expr) {
-    return sbe::makeE<sbe::ELocalLambda>(frameId, std::move(expr));
-}
-
-std::unique_ptr<sbe::EExpression> makeNumericConvert(std::unique_ptr<sbe::EExpression> expr,
-                                                     sbe::value::TypeTags tag) {
-    return sbe::makeE<sbe::ENumericConvert>(std::move(expr), tag);
-}
-
-std::unique_ptr<sbe::EExpression> makeIfNullExpr(sbe::EExpression::Vector values,
-                                                 sbe::value::FrameIdGenerator* frameIdGenerator) {
-    tassert(6987503, "Expected 'values' to be non-empty", values.size() > 0);
-
-    size_t idx = values.size() - 1;
-    auto expr = std::move(values[idx]);
-
-    while (idx > 0) {
-        --idx;
-
-        auto frameId = frameIdGenerator->generate();
-        auto var = sbe::EVariable{frameId, 0};
-
-        expr = sbe::makeE<sbe::ELocalBind>(
-            frameId,
-            sbe::makeEs(std::move(values[idx])),
-            sbe::makeE<sbe::EIf>(
-                makeNot(generateNullMissingOrUndefined(var)), var.clone(), std::move(expr)));
-    }
-
-    return expr;
-}
-
-std::pair<sbe::value::SlotId, std::unique_ptr<sbe::PlanStage>> generateVirtualScan(
-    sbe::value::SlotIdGenerator* slotIdGenerator,
-    sbe::value::TypeTags arrTag,
-    sbe::value::Value arrVal,
-    PlanYieldPolicy* yieldPolicy,
-    PlanNodeId planNodeId) {
-    // The value passed in must be an array.
-    invariant(sbe::value::isArray(arrTag));
-
-    auto outputSlot = slotIdGenerator->generate();
-    auto virtualScan = sbe::makeS<sbe::VirtualScanStage>(planNodeId, outputSlot, arrTag, arrVal);
-
-    // Return the VirtualScanStage and its output slot.
-    return {outputSlot, std::move(virtualScan)};
-}
-
-std::pair<sbe::value::SlotVector, std::unique_ptr<sbe::PlanStage>> generateVirtualScanMulti(
-    sbe::value::SlotIdGenerator* slotIdGenerator,
-    int numSlots,
-    sbe::value::TypeTags arrTag,
-    sbe::value::Value arrVal,
-    PlanYieldPolicy* yieldPolicy,
-    PlanNodeId planNodeId) {
-    using namespace std::literals;
-
-    invariant(numSlots >= 1);
-
-    // Generate a mock scan with a single output slot.
-    auto [scanSlot, scanStage] =
-        generateVirtualScan(slotIdGenerator, arrTag, arrVal, yieldPolicy, planNodeId);
-
-    // Create a ProjectStage that will read the data from 'scanStage' and split it up
-    // across multiple output slots.
-    sbe::value::SlotVector projectSlots;
-    sbe::SlotExprPairVector projections;
-    for (int32_t i = 0; i < numSlots; ++i) {
-        auto indexExpr = sbe::makeE<sbe::EConstant>(sbe::value::TypeTags::NumberInt32,
-                                                    sbe::value::bitcastFrom<int32_t>(i));
-
-        projectSlots.emplace_back(slotIdGenerator->generate());
-        projections.emplace_back(
-            projectSlots.back(),
-            sbe::makeE<sbe::EFunction>(
-                "getElement"_sd,
-                sbe::makeEs(sbe::makeE<sbe::EVariable>(scanSlot), std::move(indexExpr))));
-    }
-
-    return {
-        std::move(projectSlots),
-        sbe::makeS<sbe::ProjectStage>(std::move(scanStage), std::move(projections), planNodeId)};
+    return b.makeFunction("newBsonObj"_sd, std::move(newBsonObjArgs));
 }
 
 std::pair<sbe::value::TypeTags, sbe::value::Value> makeValue(const BSONObj& bo) {

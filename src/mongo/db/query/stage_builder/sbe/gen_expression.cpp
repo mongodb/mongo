@@ -4623,7 +4623,7 @@ SbExpr generateExpressionFieldPath(StageBuilderState& state,
                                   << "' (id=" << varId << ") is not available",
                     slot.has_value());
 
-            inputExpr = SbExpr{*slot};
+            inputExpr = SbExpr{SbSlot{*slot}};
         }
     } else {
         if (environment) {
@@ -4634,7 +4634,7 @@ SbExpr generateExpressionFieldPath(StageBuilderState& state,
         }
 
         if (!inputExpr) {
-            inputExpr = state.getGlobalVariableSlot(varId);
+            inputExpr = SbSlot{state.getGlobalVariableSlot(varId)};
         }
     }
 

@@ -98,142 +98,15 @@ class PlanStageSlots;
 struct Environment;
 struct PlanStageStaticData;
 
-std::unique_ptr<sbe::EExpression> makeUnaryOp(sbe::EPrimUnary::Op unaryOp,
-                                              std::unique_ptr<sbe::EExpression> operand);
-
-/**
- * Wrap expression into logical negation.
- */
-std::unique_ptr<sbe::EExpression> makeNot(std::unique_ptr<sbe::EExpression> e);
-
-std::unique_ptr<sbe::EExpression> makeBinaryOp(sbe::EPrimBinary::Op binaryOp,
-                                               std::unique_ptr<sbe::EExpression> lhs,
-                                               std::unique_ptr<sbe::EExpression> rhs,
-                                               StageBuilderState& state);
-
-/**
- * Generates an EExpression that checks if the input expression is null, missing, or undefined.
- */
-std::unique_ptr<sbe::EExpression> generateNullMissingOrUndefined(const sbe::EVariable& var);
-
-/**
- * Creates an EFunction expression with the given name and arguments.
- */
-inline std::unique_ptr<sbe::EExpression> makeFunction(StringData name,
-                                                      sbe::EExpression::Vector args) {
-    return sbe::makeE<sbe::EFunction>(name, std::move(args));
-}
-
-template <typename... Args>
-inline std::unique_ptr<sbe::EExpression> makeFunction(StringData name, Args&&... args) {
-    return sbe::makeE<sbe::EFunction>(name, sbe::makeEs(std::forward<Args>(args)...));
-}
-
-inline auto makeConstant(sbe::value::TypeTags tag, sbe::value::Value val) {
-    return sbe::makeE<sbe::EConstant>(tag, val);
-}
-
-inline auto makeNothingConstant() {
-    return sbe::makeE<sbe::EConstant>(sbe::value::TypeTags::Nothing, 0);
-}
-inline auto makeNullConstant() {
-    return sbe::makeE<sbe::EConstant>(sbe::value::TypeTags::Null, 0);
-}
-inline auto makeBoolConstant(bool boolVal) {
-    auto val = sbe::value::bitcastFrom<bool>(boolVal);
-    return sbe::makeE<sbe::EConstant>(sbe::value::TypeTags::Boolean, val);
-}
-inline auto makeInt32Constant(int32_t num) {
-    auto val = sbe::value::bitcastFrom<int32_t>(num);
-    return sbe::makeE<sbe::EConstant>(sbe::value::TypeTags::NumberInt32, val);
-}
-inline auto makeInt64Constant(int64_t num) {
-    auto val = sbe::value::bitcastFrom<int64_t>(num);
-    return sbe::makeE<sbe::EConstant>(sbe::value::TypeTags::NumberInt64, val);
-}
-inline auto makeDoubleConstant(double num) {
-    auto val = sbe::value::bitcastFrom<double>(num);
-    return sbe::makeE<sbe::EConstant>(sbe::value::TypeTags::NumberDouble, val);
-}
-inline auto makeDecimalConstant(const Decimal128& num) {
-    auto [tag, val] = sbe::value::makeCopyDecimal(num);
-    return sbe::makeE<sbe::EConstant>(tag, val);
-}
-inline auto makeStrConstant(StringData str) {
-    auto [tag, val] = sbe::value::makeNewString(str);
-    return sbe::makeE<sbe::EConstant>(tag, val);
-}
-
-std::unique_ptr<sbe::EExpression> makeVariable(SbSlot ts);
-
-std::unique_ptr<sbe::EExpression> makeVariable(sbe::value::SlotId slotId);
-
-std::unique_ptr<sbe::EExpression> makeVariable(sbe::FrameId frameId, sbe::value::SlotId slotId);
-
-std::unique_ptr<sbe::EExpression> makeMoveVariable(sbe::FrameId frameId, sbe::value::SlotId slotId);
-
-inline auto makeFail(int code, StringData errorMessage) {
-    return sbe::makeE<sbe::EFail>(ErrorCodes::Error{code}, errorMessage);
-}
-
-SbExpr makeNewBsonObject(StageBuilderState& state,
-                         std::vector<std::string> projectFields,
-                         SbExpr::Vector projectValues);
-
 /**
  * Generates an expression that returns shard key that behaves similarly to
  * ShardKeyPattern::extractShardKeyFromDoc. However, it will not check for arrays in shard key, as
  * it is used only for documents that are already persisted in a sharded collection
  */
-SbExpr makeShardKeyFunctionForPersistedDocuments(StageBuilderState& state,
-                                                 const std::vector<sbe::MatchPath>& shardKeyPaths,
-                                                 const std::vector<bool>& shardKeyHashed,
-                                                 const PlanStageSlots& slots);
-
-std::unique_ptr<sbe::EExpression> makeIf(std::unique_ptr<sbe::EExpression> condExpr,
-                                         std::unique_ptr<sbe::EExpression> thenExpr,
-                                         std::unique_ptr<sbe::EExpression> elseExpr);
-
-std::unique_ptr<sbe::EExpression> makeLet(sbe::FrameId frameId,
-                                          sbe::EExpression::Vector bindExprs,
-                                          std::unique_ptr<sbe::EExpression> expr);
-
-std::unique_ptr<sbe::EExpression> makeLocalLambda(sbe::FrameId frameId,
-                                                  std::unique_ptr<sbe::EExpression> expr);
-
-std::unique_ptr<sbe::EExpression> makeNumericConvert(std::unique_ptr<sbe::EExpression> expr,
-                                                     sbe::value::TypeTags tag);
-
-/**
- * Creates a chain of EIf expressions that will inspect each arg in order and return the first
- * arg that is not null or missing.
- */
-std::unique_ptr<sbe::EExpression> makeIfNullExpr(sbe::EExpression::Vector values,
-                                                 sbe::value::FrameIdGenerator* frameIdGenerator);
-
-/** This helper takes an SBE SlotIdGenerator and an SBE Array and returns an output slot and a
- * unwind/project/limit/coscan subtree that streams out the elements of the array one at a time via
- * the output slot over a series of calls to getNext(), mimicking the output of a collection scan or
- * an index scan. Note that this method assumes ownership of the SBE Array being passed in.
- */
-std::pair<sbe::value::SlotId, std::unique_ptr<sbe::PlanStage>> generateVirtualScan(
-    sbe::value::SlotIdGenerator* slotIdGenerator,
-    sbe::value::TypeTags arrTag,
-    sbe::value::Value arrVal,
-    PlanYieldPolicy* yieldPolicy = nullptr,
-    PlanNodeId planNodeId = kEmptyPlanNodeId);
-
-/**
- * Make a mock scan with multiple output slots from an BSON array. This method does NOT assume
- * ownership of the BSONArray passed in.
- */
-std::pair<sbe::value::SlotVector, std::unique_ptr<sbe::PlanStage>> generateVirtualScanMulti(
-    sbe::value::SlotIdGenerator* slotIdGenerator,
-    int numSlots,
-    sbe::value::TypeTags arrTag,
-    sbe::value::Value arrVal,
-    PlanYieldPolicy* yieldPolicy = nullptr,
-    PlanNodeId planNodeId = kEmptyPlanNodeId);
+SbExpr makeShardKeyForPersistedDocuments(StageBuilderState& state,
+                                         const std::vector<sbe::MatchPath>& shardKeyPaths,
+                                         const std::vector<bool>& shardKeyHashed,
+                                         const PlanStageSlots& slots);
 
 /**
  * Helper functions for converting from BSONObj/BSONArray to SBE Object/Array. Caller owns the SBE
