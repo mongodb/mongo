@@ -76,6 +76,7 @@ if get_option("ssl") == "on":
             "ssl_manager_test.cpp",
             "ssl_options_test.cpp",
             "sock_test.cpp",
+            "sock_test_utils.cpp",
         ],
         LIBDEPS=[
             "$BUILD_DIR/mongo/client/connection_string",

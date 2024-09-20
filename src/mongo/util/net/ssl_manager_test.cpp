@@ -28,15 +28,19 @@
  */
 
 
+#include <asio.hpp>
 #include <fstream>
 
 #include "mongo/config.h"
 #include "mongo/platform/basic.h"
 
+#include "mongo/bson/json.h"
 #include "mongo/transport/asio/asio_transport_layer.h"
 #include "mongo/transport/session_manager.h"
 #include "mongo/transport/transport_layer_manager.h"
+#include "mongo/util/net/sock_test_utils.h"
 #include "mongo/util/net/ssl/context.hpp"
+#include "mongo/util/net/ssl/stream.hpp"
 #include "mongo/util/net/ssl_manager.h"
 #include "mongo/util/net/ssl_options.h"
 
@@ -972,6 +976,169 @@ TEST(SSLManager, InitContextNoSanWarning) {
     stopCapturingLogMessages();
 
     ASSERT_FALSE(isSanWarningWritten(getCapturedTextFormatLogMessages()));
+}
+
+class SSLTestFixture {
+public:
+    SSLTestFixture(const SSLParams& ingressParams,
+                   const SSLParams& egressParams,
+                   bool ingressIsServer = true,
+                   bool egressIsServer = true) {
+        auto serviceContext = ServiceContext::make();
+        setGlobalServiceContext(std::move(serviceContext));
+
+        // SSLManagerWindows uses this global boolean to decide whether to
+        // use unique key container names when setting up the crypto context.
+        // This must be true in order for the handshake to work.
+        isSSLServer = true;
+
+        serverSSLManager = SSLManagerInterface::create(ingressParams, ingressIsServer);
+        clientSSLManager = SSLManagerInterface::create(egressParams, egressIsServer);
+
+        serverSSLContext = std::make_shared<asio::ssl::context>(asio::ssl::context::sslv23);
+        clientSSLContext = std::make_shared<asio::ssl::context>(asio::ssl::context::sslv23);
+        uassertStatusOK(
+            serverSSLManager->initSSLContext(serverSSLContext->native_handle(),
+                                             ingressParams,
+                                             SSLManagerInterface::ConnectionDirection::kIncoming));
+        uassertStatusOK(
+            clientSSLManager->initSSLContext(clientSSLContext->native_handle(),
+                                             egressParams,
+                                             SSLManagerInterface::ConnectionDirection::kOutgoing));
+    }
+
+    void doHandshake() {
+        auto socks = socketPair(SOCK_STREAM);
+
+        serverConn = std::make_shared<ConnectionContext>(socks.first->rawFD(), *serverSSLContext);
+        clientConn = std::make_shared<ConnectionContext>(socks.second->rawFD(), *clientSSLContext);
+        Status serverStatus = Status::OK();
+        Status clientStatus = Status::OK();
+
+        auto serverThread = stdx::thread([this, &serverStatus]() {
+            try {
+                serverConn->sslSocket->handshake(asio::ssl::stream_base::server);
+            } catch (const DBException& ex) {
+                serverStatus = ex.toStatus().withContext("Server handshake failed");
+            }
+        });
+
+        try {
+            clientConn->sslSocket->handshake(asio::ssl::stream_base::client);
+        } catch (const DBException& ex) {
+            clientStatus = ex.toStatus().withContext("Client handshake failed");
+        }
+        serverThread.join();
+
+        // rethrow any handshake errors with context
+        uassertStatusOK(serverStatus);
+        uassertStatusOK(clientStatus);
+    }
+
+    class ConnectionContext {
+    public:
+        ConnectionContext(int fd, asio::ssl::context& ctx) : io_context() {
+            asio::ip::tcp::socket socket(io_context, asio::ip::tcp::v4(), fd);
+            sslSocket =
+                std::make_unique<asio::ssl::stream<decltype(socket)>>(std::move(socket), ctx, "");
+        }
+        asio::io_context io_context;
+        std::unique_ptr<asio::ssl::stream<asio::ip::tcp::socket>> sslSocket;
+    };
+
+    std::shared_ptr<SSLManagerInterface> clientSSLManager;
+    std::shared_ptr<SSLManagerInterface> serverSSLManager;
+
+    std::shared_ptr<asio::ssl::context> clientSSLContext;
+    std::shared_ptr<asio::ssl::context> serverSSLContext;
+
+    std::shared_ptr<ConnectionContext> clientConn;
+    std::shared_ptr<ConnectionContext> serverConn;
+};
+
+struct CertValidationTestCase {
+    std::string cafile;
+    std::string clusterCaFile;
+    bool pass;
+    bool allowInvalidCerts{false};
+
+    void serialize(BSONObjBuilder* bob) const {
+        bob->append("CAFile", cafile);
+        bob->append("clusterCAFile", clusterCaFile);
+        bob->append("expectPass", pass);
+        bob->append("allowInvalidCerts", allowInvalidCerts);
+    }
+};
+
+// Tests peer certificate validation on the egress side.
+// ingress (server) uses sslPEMKeyFile: "server.pem", sslCAFile: "ca.pem"
+// egress (client) uses sslPEMKeyFile: "client.pem"
+TEST(SSLManager, basicEgressValidationTests) {
+    const HostAndPort hostForLogging("hostforlogging");
+    constexpr const char* validCaFile = "jstests/libs/ca.pem";
+    constexpr const char* badCaFile = "jstests/libs/trusted-ca.pem";
+
+    std::vector<CertValidationTestCase> testCases = {
+        {"", "", false},
+        {validCaFile, "", true},
+        {badCaFile, "", false},
+        {badCaFile, validCaFile, false},
+        {validCaFile, badCaFile, true},
+    };
+
+    SSLParams serverParams;
+    serverParams.sslMode.store(::mongo::sslGlobalParams.SSLMode_requireSSL);
+    serverParams.sslCAFile = "jstests/libs/ca.pem";
+    serverParams.sslPEMKeyFile = "jstests/libs/server.pem";
+    serverParams.sslAllowInvalidHostnames = true;
+
+    for (auto& test : testCases) {
+        SSLParams clientParams;
+        clientParams.sslMode.store(::mongo::sslGlobalParams.SSLMode_requireSSL);
+        clientParams.sslPEMKeyFile = "jstests/libs/client.pem";
+        clientParams.sslAllowInvalidHostnames = true;
+        clientParams.sslCAFile = test.cafile;
+        clientParams.sslClusterCAFile = test.clusterCaFile;
+
+        for (auto weak : {false, true}) {
+            test.allowInvalidCerts = weak;
+            clientParams.sslAllowInvalidCertificates = weak;
+
+            LOGV2(9476400, "Running test case", "test"_attr = test);
+
+            SSLTestFixture tf(serverParams, clientParams);
+            tf.doHandshake();
+
+            SSLPeerInfo peerInfo;
+            Status status = Status::OK();
+            try {
+                peerInfo =
+                    tf.clientSSLManager
+                        ->parseAndValidatePeerCertificate(tf.clientConn->sslSocket->native_handle(),
+                                                          boost::none,
+                                                          "localhost",
+                                                          hostForLogging,
+                                                          nullptr)
+                        .get();
+            } catch (const DBException& ex) {
+                status = ex.toStatus();
+            }
+
+            if (status.isOK()) {
+                if (!test.pass) {
+                    ASSERT(weak) << "Test unexpectedly passed validation";
+                }
+                ASSERT_EQ(peerInfo.subjectName().empty(), !test.pass);
+                ASSERT(peerInfo.isTLS());
+                ASSERT(peerInfo.roles().empty());
+                ASSERT_FALSE(peerInfo.getClusterMembership().has_value());
+                ASSERT_FALSE(peerInfo.sniName().has_value());
+            } else {
+                ASSERT_FALSE(test.pass)
+                    << "Test unexpectedly failed validation with exception: " << status;
+            }
+        }
+    }
 }
 
 }  // namespace
