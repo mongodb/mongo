@@ -862,6 +862,9 @@ def generate(env: SCons.Environment.Environment) -> None:
                 for feature in enterprise_features.split(",")
             ]
 
+    if env.GetOption("gcov") is not None:
+        bazel_internal_flags += ["--collect_code_coverage"]
+
     if env["DWARF_VERSION"]:
         bazel_internal_flags.append(f"--//bazel/config:dwarf_version={env['DWARF_VERSION']}")
 

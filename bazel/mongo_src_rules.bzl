@@ -1182,6 +1182,12 @@ SYMBOL_ORDER_FILES = [
     "//:symbols.orderfile",
 ]
 
+# Passed to both the compiler and linker
+COVERAGE_FLAGS = select({
+    "//bazel/config:gcov_enabled": ["--coverage", "-fprofile-update=single"],
+    "//conditions:default": [],
+})
+
 MONGO_GLOBAL_INCLUDE_DIRECTORIES = [
     "-Isrc",
     "-I$(GENDIR)/src",
@@ -1251,7 +1257,8 @@ MONGO_GLOBAL_COPTS = (
     THIN_LTO_FLAGS +
     SYMBOL_ORDER_COPTS +
     GCC_WARNINGS_COPTS +
-    SASL_WINDOWS_COPTS
+    SASL_WINDOWS_COPTS +
+    COVERAGE_FLAGS
 )
 
 MONGO_GLOBAL_LINKFLAGS = (
@@ -1277,7 +1284,8 @@ MONGO_GLOBAL_LINKFLAGS = (
     DISABLE_SOURCE_WARNING_AS_ERRORS_LINKFLAGS +
     THIN_LTO_FLAGS +
     SYMBOL_ORDER_LINKFLAGS +
-    SASL_WINDOWS_LINKFLAGS
+    SASL_WINDOWS_LINKFLAGS +
+    COVERAGE_FLAGS
 )
 
 MONGO_GLOBAL_ADDITIONAL_LINKER_INPUTS = SYMBOL_ORDER_FILES + SASL_WINDOWS_LIB_FILES
