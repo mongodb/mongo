@@ -65,6 +65,6 @@ protoEnv.CppUnitTest(
         "$BUILD_DIR/mongo/base",
         "$BUILD_DIR/third_party/grpc/grpc++_reflection",
         "$BUILD_DIR/third_party/protobuf/protobuf",
-        "core_test_grpc_proto",
+        "core_test_cc_grpc",
     ],
 )
