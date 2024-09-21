@@ -171,12 +171,14 @@ mongo_cc_library(
     name = "network_interface_tl",
     srcs = [
         "connection_pool_tl.cpp",
+        "exhaust_response_reader_tl.cpp",
         "network_interface_tl.cpp",
         ":network_interface_tl_gen",
         "//src/mongo/util:strong_weak_finish_line.h",
     ],
     hdrs = [
         "connection_pool_tl.h",
+        "exhaust_response_reader_tl.h",
         "network_interface_tl.h",
     ],
     deps = [

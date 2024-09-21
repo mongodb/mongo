@@ -95,6 +95,41 @@ public:
      */
     static constexpr int kDiagnosticLogLevel = 4;
 
+    class ExhaustResponseReader : public std::enable_shared_from_this<ExhaustResponseReader> {
+    public:
+        ExhaustResponseReader(const ExhaustResponseReader&) = delete;
+        ExhaustResponseReader& operator=(const ExhaustResponseReader&) = delete;
+
+        virtual ~ExhaustResponseReader() = default;
+
+        /**
+         * Reads the next response from the exhaust command.
+         *
+         * The returned future is always successful, though the status contained in the
+         * RemoteCommandResponse may not be OK.
+         *
+         * If the returned Future is fulfilled with a response whose moreToCome member is false,
+         * then no further responses will be available for reading. Any subsequent attempt to read a
+         * response will return a Future fulfilled with a RemoteCommandResponse containing an
+         * ExhaustCommandFinished error.
+         *
+         * If the startExhaustCommand invocation that created this used a baton, calls to next()
+         * will also use that baton.
+         *
+         * Similarly, cancelling the source associated with the CancellationToken that was
+         * originally passed to the the startExhaustCommand invocation will cancel this
+         * ExhaustResponseReader and cause subsequent calls to next() to return futures fulfilled
+         * with responses containing CallbackCancelled errors.
+         *
+         * The timeout provided to the originating RemoteCommandRequest will be used for each call
+         * to next().
+         */
+        virtual SemiFuture<RemoteCommandResponse> next() = 0;
+
+    protected:
+        ExhaustResponseReader() = default;
+    };
+
     virtual ~NetworkInterface();
 
     /**

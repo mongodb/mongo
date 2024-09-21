@@ -507,10 +507,19 @@ env.Library(
 )
 
 env.Library(
+    target="kill_operations_idl",
+    source=[
+        "kill_operations_gen.cpp",
+    ],
+    LIBDEPS=[
+        "$BUILD_DIR/mongo/db/server_base",
+    ],
+)
+
+env.Library(
     target="kill_common",
     source=[
         "kill_op_cmd_base.cpp",
-        "kill_operations_gen.cpp",
     ],
     LIBDEPS=[
         "$BUILD_DIR/mongo/db/audit",
@@ -519,6 +528,7 @@ env.Library(
         "$BUILD_DIR/mongo/db/commands",
         "$BUILD_DIR/mongo/db/operation_killer",
         "$BUILD_DIR/mongo/db/query/command_request_response",
+        "kill_operations_idl",
     ],
 )
 
