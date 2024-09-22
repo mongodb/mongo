@@ -541,6 +541,7 @@ conn_stats = [
     SessionOpStat('session_table_alter_trigger_checkpoint', 'table alter triggering checkpoint calls', 'no_clear,no_scale'),
     SessionOpStat('session_table_compact_fail', 'table compact failed calls', 'no_clear,no_scale'),
     SessionOpStat('session_table_compact_fail_cache_pressure', 'table compact failed calls due to cache pressure', 'no_clear,no_scale'),
+    SessionOpStat('session_table_compact_passes', 'table compact passes', 'no_scale'),
     SessionOpStat('session_table_compact_running', 'table compact running', 'no_clear,no_scale'),
     SessionOpStat('session_table_compact_skipped', 'table compact skipped as process would not reduce file size', 'no_clear,no_scale'),
     SessionOpStat('session_table_compact_success', 'table compact successful calls', 'no_clear,no_scale'),
