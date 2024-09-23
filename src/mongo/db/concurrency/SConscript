@@ -42,6 +42,18 @@ env.CppUnitTest(
     ],
 )
 
+env.CppUnitTest(
+    target="exception_util_test",
+    source=[
+        "exception_util_test.cpp",
+    ],
+    LIBDEPS=[
+        "$BUILD_DIR/mongo/db/service_context_d_test_fixture",
+        "$BUILD_DIR/mongo/transport/transport_layer_mock",
+        "exception_util",
+    ],
+)
+
 env.Benchmark(
     target="lock_manager_bm",
     source=[

@@ -205,58 +205,6 @@ public:
     }
 };
 
-
-TEST_F(DConcurrencyTestFixture, WriteConflictRetryInstantiatesOK) {
-    auto opCtx = makeOperationContextWithLocker();
-    writeConflictRetry(opCtx.get(), "", NamespaceString::kEmpty, [] {});
-}
-
-TEST_F(DConcurrencyTestFixture, WriteConflictRetryRetriesFunctionOnWriteConflictException) {
-    auto opCtx = makeOperationContextWithLocker();
-    auto&& opDebug = CurOp::get(opCtx.get())->debug();
-    ASSERT_EQUALS(0, opDebug.additiveMetrics.writeConflicts.load());
-    ASSERT_EQUALS(100, writeConflictRetry(opCtx.get(), "", NamespaceString::kEmpty, [&opDebug] {
-                      if (0 == opDebug.additiveMetrics.writeConflicts.load()) {
-                          throwWriteConflictException(
-                              str::stream()
-                              << "Verify that we retry the WriteConflictRetry function when we "
-                                 "encounter a WriteConflictException.");
-                      }
-                      return 100;
-                  }));
-    ASSERT_EQUALS(1LL, opDebug.additiveMetrics.writeConflicts.load());
-}
-
-TEST_F(DConcurrencyTestFixture, WriteConflictRetryPropagatesNonWriteConflictException) {
-    auto opCtx = makeOperationContextWithLocker();
-    ASSERT_THROWS_CODE(writeConflictRetry(opCtx.get(),
-                                          "",
-                                          NamespaceString::kEmpty,
-                                          [] {
-                                              uassert(ErrorCodes::OperationFailed, "", false);
-                                              MONGO_UNREACHABLE;
-                                          }),
-                       AssertionException,
-                       ErrorCodes::OperationFailed);
-}
-
-TEST_F(DConcurrencyTestFixture,
-       WriteConflictRetryPropagatesWriteConflictExceptionIfAlreadyInAWriteUnitOfWork) {
-    auto opCtx = makeOperationContextWithLocker();
-    Lock::GlobalWrite globalWrite(opCtx.get());
-    WriteUnitOfWork wuow(opCtx.get());
-    ASSERT_THROWS(writeConflictRetry(
-                      opCtx.get(),
-                      "",
-                      NamespaceString::kEmpty,
-                      [] {
-                          throwWriteConflictException(
-                              str::stream() << "Verify that WriteConflictExceptions are propogated "
-                                               "if we are already in a WriteUnitOfWork.");
-                      }),
-                  WriteConflictException);
-}
-
 TEST_F(DConcurrencyTestFixture, ResourceMutex) {
     Lock::ResourceMutex mtx("testMutex");
     auto opCtx = makeOperationContext();
