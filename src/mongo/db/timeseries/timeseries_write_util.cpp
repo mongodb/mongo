@@ -276,13 +276,17 @@ doc_diff::VerifierFunc makeVerifierFunction(std::vector<details::Measurement> so
     };
 };
 
-// Builds the data field of a bucket document. Computes the min and max fields if necessary.
+// Builds the data field of a bucket document. Computes the min and max fields if necessary. If a
+// minTime is passed in, this means that we want to preserve the currentMinTime in the updated
+// bucket; we will update all min and max values to reflect the new data except for the minTime in
+// this case, which will remain unchanged.
 boost::optional<std::pair<BSONObj, BSONObj>> processTimeseriesMeasurements(
     const std::vector<BSONObj>& measurements,
     const BSONObj& metadata,
     StringDataMap<BSONObjBuilder>& dataBuilders,
     const boost::optional<TimeseriesOptions>& options = boost::none,
-    const boost::optional<const StringDataComparator*>& comparator = boost::none) {
+    const boost::optional<const StringDataComparator*>& comparator = boost::none,
+    const boost::optional<Date_t> currentMinTime = boost::none) {
     TrackingContext trackingContext;
     bucket_catalog::MinMax minmax{trackingContext};
     bool computeMinmax = options && comparator;
@@ -310,8 +314,10 @@ boost::optional<std::pair<BSONObj, BSONObj>> processTimeseriesMeasurements(
 
     // Rounds the minimum timestamp and updates the min time field.
     if (computeMinmax) {
-        auto minTime = roundTimestampToGranularity(
-            minmax.min().getField(options->getTimeField()).Date(), *options);
+        auto minTime = (currentMinTime != boost::none)
+            ? currentMinTime.get()
+            : roundTimestampToGranularity(minmax.min().getField(options->getTimeField()).Date(),
+                                          *options);
         auto controlDoc =
             bucket_catalog::buildControlMinTimestampDoc(options->getTimeField(), minTime);
         minmax.update(controlDoc, /*metaField=*/boost::none, *comparator);
@@ -883,10 +889,11 @@ BucketDocument makeNewDocumentForWrite(
     const std::vector<BSONObj>& measurements,
     const BSONObj& metadata,
     const TimeseriesOptions& options,
-    const boost::optional<const StringDataComparator*>& comparator) {
+    const boost::optional<const StringDataComparator*>& comparator,
+    const boost::optional<Date_t> currentMinTime) {
     StringDataMap<BSONObjBuilder> dataBuilders;
-    auto minmax =
-        processTimeseriesMeasurements(measurements, metadata, dataBuilders, options, comparator);
+    auto minmax = processTimeseriesMeasurements(
+        measurements, metadata, dataBuilders, options, comparator, currentMinTime);
 
     invariant(minmax);
 
@@ -913,8 +920,14 @@ BSONObj makeBucketDocument(const std::vector<BSONObj>& measurements,
         trackingContext, collectionUUID, comparator, options, measurements[0]));
     auto time = res.second;
     auto [oid, _] = bucket_catalog::internal::generateBucketOID(time, options);
-    BucketDocument bucketDoc = makeNewDocumentForWrite(
-        nss, collectionUUID, oid, measurements, res.first.metadata.toBSON(), options, comparator);
+    BucketDocument bucketDoc = makeNewDocumentForWrite(nss,
+                                                       collectionUUID,
+                                                       oid,
+                                                       measurements,
+                                                       res.first.metadata.toBSON(),
+                                                       options,
+                                                       comparator,
+                                                       boost::none);
 
     invariant(bucketDoc.compressedBucket ||
               !feature_flags::gTimeseriesAlwaysUseCompressedBuckets.isEnabled(
@@ -926,7 +939,10 @@ BSONObj makeBucketDocument(const std::vector<BSONObj>& measurements,
 }
 
 std::variant<write_ops::UpdateCommandRequest, write_ops::DeleteCommandRequest> makeModificationOp(
-    const OID& bucketId, const CollectionPtr& coll, const std::vector<BSONObj>& measurements) {
+    const OID& bucketId,
+    const CollectionPtr& coll,
+    const std::vector<BSONObj>& measurements,
+    const boost::optional<Date_t> currentMinTime) {
     // A bucket will be fully deleted if no measurements are passed in.
     if (measurements.empty()) {
         write_ops::DeleteOpEntry deleteEntry(BSON("_id" << bucketId), false);
@@ -952,7 +968,8 @@ std::variant<write_ops::UpdateCommandRequest, write_ops::DeleteCommandRequest> m
                                                        measurements,
                                                        metadata,
                                                        *timeseriesOptions,
-                                                       coll->getDefaultCollator());
+                                                       coll->getDefaultCollator(),
+                                                       currentMinTime);
     BSONObj bucketToReplace = bucketDoc.uncompressedBucket;
     invariant(bucketDoc.compressedBucket ||
               !feature_flags::gTimeseriesAlwaysUseCompressedBuckets.isEnabled(
@@ -1372,9 +1389,10 @@ void performAtomicWritesForDelete(OperationContext* opCtx,
                                   const RecordId& recordId,
                                   const std::vector<BSONObj>& unchangedMeasurements,
                                   bool fromMigrate,
-                                  StmtId stmtId) {
+                                  StmtId stmtId,
+                                  Date_t currentMinTime) {
     OID bucketId = record_id_helpers::toBSONAs(recordId, "_id")["_id"].OID();
-    auto modificationOp = makeModificationOp(bucketId, coll, unchangedMeasurements);
+    auto modificationOp = makeModificationOp(bucketId, coll, unchangedMeasurements, currentMinTime);
     performAtomicWrites(opCtx, coll, recordId, modificationOp, {}, {}, fromMigrate, stmtId);
 }
 
@@ -1388,7 +1406,8 @@ void performAtomicWritesForUpdate(
     bool fromMigrate,
     StmtId stmtId,
     std::set<bucket_catalog::BucketId>* bucketIds,
-    const CompressAndWriteBucketFunc& compressAndWriteBucketFunc) {
+    const CompressAndWriteBucketFunc& compressAndWriteBucketFunc,
+    const boost::optional<Date_t> currentMinTime) {
     auto timeSeriesOptions = *coll->getTimeseriesOptions();
     auto batches = insertIntoBucketCatalogForUpdate(opCtx,
                                                     sideBucketCatalog,
@@ -1402,7 +1421,8 @@ void performAtomicWritesForUpdate(
         ? boost::make_optional(
               makeModificationOp(record_id_helpers::toBSONAs(recordId, "_id")["_id"].OID(),
                                  coll,
-                                 *unchangedMeasurements))
+                                 *unchangedMeasurements,
+                                 currentMinTime))
         : boost::none;
     commitTimeseriesBucketsAtomically(opCtx,
                                       sideBucketCatalog,

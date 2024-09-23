@@ -457,6 +457,7 @@ TimeseriesModifyStage::_writeToTimeseriesBuckets(ScopeGuard<F>& bucketFreer,
                                                  WorkingSetID bucketWsmId,
                                                  std::vector<BSONObj>&& unchangedMeasurements,
                                                  std::vector<BSONObj>&& matchedMeasurements,
+                                                 Date_t currentMinTime,
                                                  bool bucketFromMigrate) {
     // No measurements needed to be updated or deleted from the bucket document.
     if (matchedMeasurements.empty()) {
@@ -548,14 +549,16 @@ TimeseriesModifyStage::_writeToTimeseriesBuckets(ScopeGuard<F>& bucketFreer,
                                                              _params.stmtId,
                                                              &_insertedBucketIds,
                                                              /*compressAndWriteBucketFunc=*/
-                                                             nullptr);
+                                                             nullptr,
+                                                             currentMinTime);
                 } else {
                     timeseries::performAtomicWritesForDelete(opCtx(),
                                                              collectionPtr(),
                                                              recordId,
                                                              unchangedMeasurements,
                                                              bucketFromMigrate,
-                                                             _params.stmtId);
+                                                             _params.stmtId,
+                                                             currentMinTime);
                 }
                 return PlanStage::NEED_TIME;
             },
@@ -741,6 +744,14 @@ PlanStage::StageState TimeseriesModifyStage::doWork(WorkingSetID* out) {
 
     // Unpack the bucket and determine which measurements match the residual predicate.
     auto ownedBucket = member->doc.value().toBson().getOwned();
+    // Get the minTime of the bucket we are unpacking. We rely on the invariant that the minTime of
+    // the bucket will not be changed, even if it is updated or has some of its measurements
+    // deleted.
+    auto timeseriesOptions = collectionPtr()->getTimeseriesOptions();
+    Date_t currentMinTime = ownedBucket.getObjectField(timeseries::kBucketControlFieldName)
+                                .getObjectField(timeseries::kBucketControlMinFieldName)
+                                .getField(timeseriesOptions->getTimeField())
+                                .Date();
     _bucketUnpacker.reset(std::move(ownedBucket));
     // Closed buckets should have been filtered out by the bucket predicate.
     tassert(7554700, "Expected bucket to not be closed", !_bucketUnpacker.isClosedBucket());
@@ -769,6 +780,7 @@ PlanStage::StageState TimeseriesModifyStage::doWork(WorkingSetID* out) {
                                   id,
                                   std::move(unchangedMeasurements),
                                   std::move(matchedMeasurements),
+                                  currentMinTime,
                                   bucketFromMigrate);
     if (status != PlanStage::NEED_TIME) {
         *out = WorkingSet::INVALID_ID;
