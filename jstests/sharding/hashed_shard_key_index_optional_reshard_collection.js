@@ -11,7 +11,7 @@
  */
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
-function runTest(hashedShardKeyIndexOptionalUponShardingCollection, reshardingImprovements) {
+function runTest(hashedShardKeyIndexOptionalUponShardingCollection) {
     const st = new ShardingTest({
         shards: 2,
         rs: {
@@ -19,10 +19,6 @@ function runTest(hashedShardKeyIndexOptionalUponShardingCollection, reshardingIm
             setParameter: {
                 featureFlagHashedShardKeyIndexOptionalUponShardingCollection:
                     hashedShardKeyIndexOptionalUponShardingCollection,
-                featureFlagReshardingImprovements: reshardingImprovements,
-                // The feature flags below depend on featureFlagReshardingImprovements.
-                featureFlagMoveCollection: reshardingImprovements,
-                featureFlagUnshardCollection: reshardingImprovements,
             }
         }
     });
@@ -31,7 +27,6 @@ function runTest(hashedShardKeyIndexOptionalUponShardingCollection, reshardingIm
         jsTest.log("Testing reshardCollection " + tojson({
                        implicitlyCreateIndex,
                        hashedShardKeyIndexOptionalUponShardingCollection,
-                       reshardingImprovements
                    }));
         const dbName = "testDb";
         const collName = "testColl";
@@ -109,12 +104,5 @@ function runTest(hashedShardKeyIndexOptionalUponShardingCollection, reshardingIm
 }
 
 for (let hashedShardKeyIndexOptionalUponShardingCollection of [true, false]) {
-    for (let reshardingImprovements of [true, false]) {
-        if (!reshardingImprovements) {
-            // TODO (SERVER-92257): Investigate why reshardCollection can fail to clone indexes when
-            // featureFlagReshardingImprovements is not enabled.
-            continue;
-        }
-        runTest(hashedShardKeyIndexOptionalUponShardingCollection, reshardingImprovements);
-    }
+    runTest(hashedShardKeyIndexOptionalUponShardingCollection);
 }
