@@ -3,6 +3,8 @@
 import os.path
 import sys
 
+import buildscripts.util.testname as testname_utils
+
 from buildscripts.resmokelib import errors
 from buildscripts.resmokelib.testing.fixtures import multi_sharded_cluster, shardedcluster
 from buildscripts.resmokelib.testing.hooks import jsfile
@@ -31,7 +33,7 @@ class CheckMetadataConsistencyInBackground(jsfile.PerClusterDataConsistencyHook)
     ]
 
     if _IS_WINDOWS:
-        SKIP_TESTS = [path.replace("/", "\\") for path in SKIP_TESTS]
+        SKIP_TESTS = [testname_utils.denormalize_test_file(path)[1] for path in SKIP_TESTS]
 
     def __init__(self, hook_logger, fixture, shell_options=None):
         """Initialize CheckMetadataConsistencyInBackground."""
