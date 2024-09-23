@@ -6057,22 +6057,6 @@ export const authCommandsLib = {
           ]
         },
         {
-          testname: "_configsvrRefineCollectionShardKey",
-          command:
-            {_configsvrRefineCollectionShardKey: "test.x", key: {aKey: 1}, epoch: ObjectId()},
-          skipSharded: true,
-          testcases: [
-              {
-                runOnDb: adminDbName,
-                roles: {__system: 1},
-                privileges: [{resource: {cluster: true}, actions: ["internal"]}],
-                expectFail: true
-              },
-              {runOnDb: firstDbName, roles: {}},
-              {runOnDb: secondDbName, roles: {}}
-          ]
-        },
-        {
           testname: "_configsvrCommitRefineCollectionShardKey",
           command: {
             _configsvrCommitRefineCollectionShardKey: "test.x",

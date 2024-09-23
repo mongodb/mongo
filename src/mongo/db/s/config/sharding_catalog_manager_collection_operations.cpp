@@ -285,9 +285,10 @@ void refineCollectionShardKeyInTxn(OperationContext* opCtx,
         collQuery.setFilter(builder.obj());
         collQuery.setLimit(1);
         const auto findCollResponse = txnClient.exhaustiveFindSync(collQuery);
-        // TODO SERVER-79064: Remove once 8.0 becomes last LTS
-        uassert(ErrorCodes::NamespaceNotFound,
-                str::stream() << "Expected to find collection " << nss.toStringForErrorMsg(),
+        tassert(7906400,
+                str::stream()
+                    << "Couldn't find collection '" << nss.toStringForErrorMsg()
+                    << "' in the cluster catalog during refineCollectionShardKey commit phase",
                 findCollResponse.size() == 1);
 
         CollectionType collType(findCollResponse[0]);
@@ -424,77 +425,6 @@ void ShardingCatalogManager::commitRefineCollectionShardKey(
 
     refineCollectionShardKeyInTxn(
         opCtx, nss, newShardKeyPattern, newTimestamp, newEpoch, oldTimestamp);
-}
-
-void ShardingCatalogManager::refineCollectionShardKeyDEPRECATED(
-    OperationContext* opCtx,
-    const NamespaceString& nss,
-    const ShardKeyPattern& newShardKeyPattern) {
-    // Mark opCtx as interruptible to ensure that all reads and writes to the metadata collections
-    // under the exclusive _kChunkOpLock happen on the same term.
-    opCtx->setAlwaysInterruptAtStepDownOrUp_UNSAFE();
-
-    // Take _kChunkOpLock in exclusive mode to prevent concurrent chunk modifications and generate
-    // strictly monotonously increasing collection placement versions
-    Lock::ExclusiveLock chunkLk(opCtx, _kChunkOpLock);
-    Lock::ExclusiveLock zoneLk(opCtx, _kZoneOpLock);
-
-    struct RefineTimers {
-        Timer executionTimer;
-        Timer totalTimer;
-    };
-    auto timers = std::make_shared<RefineTimers>();
-
-    const auto newEpoch = OID::gen();
-
-    auto collType = _localCatalogClient->getCollection(opCtx, nss);
-    const auto oldShardKeyPattern = ShardKeyPattern(collType.getKeyPattern());
-
-    uassertStatusOK(ShardingLogging::get(opCtx)->logChangeChecked(
-        opCtx,
-        "refineCollectionShardKey.start",
-        nss,
-        BSON("oldKey" << oldShardKeyPattern.toBSON() << "newKey" << newShardKeyPattern.toBSON()
-                      << "oldEpoch" << collType.getEpoch() << "newEpoch" << newEpoch),
-        ShardingCatalogClient::kLocalWriteConcern,
-        _localConfigShard,
-        _localCatalogClient.get()));
-
-    // The transaction API will use the write concern on the opCtx, which will have the default
-    // sharding wTimeout of 60 seconds. Refining a shard key may involve writing many more
-    // documents than a normal operation, so we override the write concern to not use a
-    // wTimeout, matching the behavior before the API was introduced.
-    WriteConcernOptions originalWC = opCtx->getWriteConcern();
-    opCtx->setWriteConcern(WriteConcernOptions{WriteConcernOptions::kMajority,
-                                               WriteConcernOptions::SyncMode::UNSET,
-                                               WriteConcernOptions::kNoTimeout});
-    ON_BLOCK_EXIT([opCtx, originalWC] { opCtx->setWriteConcern(originalWC); });
-
-    auto now = VectorClock::get(opCtx)->getTime();
-    Timestamp newTimestamp = now.clusterTime().asTimestamp();
-    refineCollectionShardKeyInTxn(
-        opCtx, nss, newShardKeyPattern, newTimestamp, newEpoch, boost::none);
-
-    ShardingLogging::get(opCtx)->logChange(opCtx,
-                                           "refineCollectionShardKey.end",
-                                           nss,
-                                           BSONObj(),
-                                           ShardingCatalogClient::kLocalWriteConcern,
-                                           _localConfigShard,
-                                           _localCatalogClient.get());
-
-    // Trigger refreshes on each shard containing chunks in the namespace 'nss'. Since this isn't
-    // necessary for correctness, all refreshes are best-effort.
-    try {
-        triggerFireAndForgetShardRefreshes(
-            opCtx, _localConfigShard.get(), _localCatalogClient.get(), collType);
-    } catch (const DBException& ex) {
-        LOGV2(
-            51798,
-            "refineCollectionShardKey: failed to best-effort refresh all shards containing chunks",
-            "error"_attr = ex.toStatus(),
-            logAttrs(nss));
-    }
 }
 
 void ShardingCatalogManager::configureCollectionBalancing(

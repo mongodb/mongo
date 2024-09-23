@@ -5,6 +5,7 @@
 export const commandsRemovedFromMongodSinceLastLTS = [
     "_configsvrRenameCollectionMetadata",
     "_shardsvrDropCollectionIfUUIDNotMatching",
+    "_configsvrRefineCollectionShardKey",
 ];
 
 // These commands were added in mongod since the last LTS version, so will not appear in the

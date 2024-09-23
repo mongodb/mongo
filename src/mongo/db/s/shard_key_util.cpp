@@ -472,62 +472,6 @@ void ValidationBehaviorsShardCollection::createShardKeyIndex(
     uassertStatusOK(getStatusFromCommandResult(res));
 }
 
-ValidationBehaviorsRefineShardKey::ValidationBehaviorsRefineShardKey(OperationContext* opCtx,
-                                                                     const NamespaceString& nss)
-    : _opCtx(opCtx),
-      _cri(uassertStatusOK(
-          Grid::get(opCtx)->catalogCache()->getShardedCollectionRoutingInfoWithRefresh(opCtx,
-                                                                                       nss))),
-      _indexShard(uassertStatusOK(Grid::get(opCtx)->shardRegistry()->getShard(
-          opCtx, _cri.cm.getMinKeyShardIdWithSimpleCollation()))) {}
-
-std::vector<BSONObj> ValidationBehaviorsRefineShardKey::loadIndexes(
-    const NamespaceString& nss) const {
-    auto indexesRes = _indexShard->runExhaustiveCursorCommand(
-        _opCtx,
-        ReadPreferenceSetting(ReadPreference::PrimaryOnly),
-        nss.dbName(),
-        appendShardVersion(BSON("listIndexes" << nss.coll()),
-                           _cri.getShardVersion(_indexShard->getId())),
-        Milliseconds(-1));
-    if (indexesRes.getStatus().code() != ErrorCodes::NamespaceNotFound) {
-        return uassertStatusOK(indexesRes).docs;
-    }
-    return {};
-}
-
-void ValidationBehaviorsRefineShardKey::verifyUsefulNonMultiKeyIndex(
-    const NamespaceString& nss, const BSONObj& proposedKey) const {
-    uassertStatusOK(Shard::CommandResponse::getEffectiveStatus(_indexShard->runCommand(
-        _opCtx,
-        ReadPreferenceSetting(ReadPreference::PrimaryOnly),
-        DatabaseName::kAdmin,
-        appendShardVersion(
-            BSON(kCheckShardingIndexCmdName
-                 << NamespaceStringUtil::serialize(nss, SerializationContext::stateDefault())
-                 << kKeyPatternField << proposedKey),
-            _cri.getShardVersion(_indexShard->getId())),
-        Shard::RetryPolicy::kIdempotent)));
-}
-
-void ValidationBehaviorsRefineShardKey::verifyCanCreateShardKeyIndex(const NamespaceString& nss,
-                                                                     std::string* errMsg) const {
-    uasserted(
-        ErrorCodes::InvalidOptions,
-        str::stream() << "Please create an index that starts with the proposed shard key before"
-                         " refining the collection's shard key. "
-                      << *errMsg);
-}
-
-void ValidationBehaviorsRefineShardKey::createShardKeyIndex(
-    const NamespaceString& nss,
-    const BSONObj& proposedKey,
-    const boost::optional<BSONObj>& defaultCollation,
-    bool unique,
-    boost::optional<TimeseriesOptions> tsOpts) const {
-    MONGO_UNREACHABLE;
-}
-
 ValidationBehaviorsLocalRefineShardKey::ValidationBehaviorsLocalRefineShardKey(
     OperationContext* opCtx, const CollectionPtr& coll)
     : _opCtx(opCtx), _coll(coll) {}

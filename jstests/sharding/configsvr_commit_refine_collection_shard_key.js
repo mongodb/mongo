@@ -2,7 +2,6 @@
  * Tests the idempotency of the _configsvrCommitRefineCollectionShardKey command.
  *
  * @tags: [
- *   featureFlagAuthoritativeRefineCollectionShardKey,
  *   does_not_support_stepdowns,
  * ]
  */

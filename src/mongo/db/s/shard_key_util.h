@@ -107,35 +107,6 @@ private:
 };
 
 /**
- * Implementation of steps for validating a shard key for refineCollectionShardKey.
- */
-class ValidationBehaviorsRefineShardKey final : public ShardKeyValidationBehaviors {
-public:
-    ValidationBehaviorsRefineShardKey(OperationContext* opCtx, const NamespaceString& nss);
-
-    std::vector<BSONObj> loadIndexes(const NamespaceString& nss) const override;
-
-    void verifyUsefulNonMultiKeyIndex(const NamespaceString& nss,
-                                      const BSONObj& proposedKey) const override;
-
-    void verifyCanCreateShardKeyIndex(const NamespaceString& nss,
-                                      std::string* errMsg) const override;
-
-    void createShardKeyIndex(const NamespaceString& nss,
-                             const BSONObj& proposedKey,
-                             const boost::optional<BSONObj>& defaultCollation,
-                             bool unique,
-                             boost::optional<TimeseriesOptions> tsOpts) const override;
-
-private:
-    OperationContext* _opCtx;
-
-    CollectionRoutingInfo _cri;
-
-    std::shared_ptr<Shard> _indexShard;
-};
-
-/**
  * Implementation of steps for validating a shard key for refineCollectionShardKey locally.
  */
 class ValidationBehaviorsLocalRefineShardKey final : public ShardKeyValidationBehaviors {

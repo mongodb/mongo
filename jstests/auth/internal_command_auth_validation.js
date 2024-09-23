@@ -253,10 +253,6 @@ const internalCommandsMap = {
             toShard: shard0name,
         },
     },
-    _configsvrRefineCollectionShardKey: {
-        testname: "_configsvrRefineCollectionShardKey",
-        command: {_configsvrRefineCollectionShardKey: "test.x", key: {aKey: 1}, epoch: ObjectId()},
-    },
     _configsvrRemoveChunks: {
         testname: "_configsvrRemoveChunks",
         command: {

@@ -347,8 +347,7 @@ hangAfterRefreshFailPoint.wait();
 // Drop and re-create namespace 'db.foo' without staleMongos refreshing its metadata.
 dropAndRecreateColl({aKey: 1});
 
-// Should fail because namespace 'db.foo' is not sharded. NOTE: This NamespaceNotSharded error
-// is thrown in ConfigsvrRefineCollectionShardKeyCommand.
+// Should fail because namespace 'db.foo' is not sharded.
 hangAfterRefreshFailPoint.off();
 awaitShellToTriggerNamespaceNotSharded();
 

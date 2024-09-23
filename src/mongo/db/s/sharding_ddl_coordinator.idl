@@ -51,8 +51,6 @@ enums:
             kCreateCollection: "createCollection_V4"
             # TODO SERVER-79304: Remove once 8.0 becomes last LTS
             kCreateCollectionPre80Compatible: "createCollection_V3"
-            # TODO SERVER-79064: Remove once 8.0 becomes last LTS
-            kRefineCollectionShardKeyPre71Compatible: "refineCollectionShardKey"
             kRefineCollectionShardKey: "refineCollectionShardKey_V2"
             kSetAllowMigrations: "setAllowMigrations"
             kCollMod: "collMod_V3"

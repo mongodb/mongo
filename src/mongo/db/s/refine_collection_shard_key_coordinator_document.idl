@@ -49,14 +49,6 @@ enums:
             kReleaseCritSec: "ReleaseCritSec"
             kResumeMigrations: "ResumeMigrations"
 
-    # TODO SERVER-79064: Remove once 8.0 becomes last LTS
-    RefineCollectionShardKeyCoordinatorPhasePre71Compatible:
-        description: "Old refine collection shard key coordinator's operation state."
-        type: string
-        values:
-            kUnset: "unset"
-            kRefineCollectionShardKey: "RefineCollectionShardKey"
-
 structs:
     RefineCollectionShardKeyCoordinatorDocument:
         description: "Object with neccessary fields to refine a collection's shard key"
@@ -94,17 +86,3 @@ structs:
                 type: timestamp
                 description: "Old timestamp for the collection."
                 optional: true
-
-    # TODO SERVER-79064: Remove once 8.0 becomes last LTS
-    RefineCollectionShardKeyCoordinatorDocumentPre71Compatible:
-        description: "Object with neccessary fields to refine a collection's shard key"
-        generate_comparison_operators: false
-        strict: false
-        chained_structs:
-            ShardingDDLCoordinatorMetadata: ShardingDDLCoordinatorMetadata
-            RefineCollectionShardKeyRequest: RefineCollectionShardKeyRequest
-        fields:
-            phase:
-                type: RefineCollectionShardKeyCoordinatorPhasePre71Compatible
-                description: "Coordinator phase."
-                default: kUnset

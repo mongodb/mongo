@@ -39,9 +39,6 @@ filters:
   - "configsvr_merge_chunks_command.cpp":
     approvers:
       - 10gen/server-catalog-and-routing
-  - "configsvr_refine_collection_shard_key_command.cpp":
-    approvers:
-      - 10gen/server-catalog-and-routing
   - "configsvr_remove*":
     approvers:
       - 10gen/server-catalog-and-routing

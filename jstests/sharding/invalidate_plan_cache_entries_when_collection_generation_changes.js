@@ -93,23 +93,7 @@ assert.commandWorked(mongos.adminCommand({enableSharding: dbName}));
     st.shard0.adminCommand(
         {_flushRoutingTableCacheUpdates: collA.getFullName(), syncFromConfig: true});
 
-    // TODO SERVER-79064: Remove once 8.0 becomes last LTS.
-    let res = st.configRS.getPrimary().adminCommand(
-        {getParameter: 1, featureFlagAuthoritativeRefineCollectionShardKey: 1});
-    // Check if there is a featureFlagAuthoritativeRefineCollectionShardKey field in the response,
-    // otherwise, this a cluster with mixed binaries, in which case the legacy path will be the one
-    // executed.
-    let isNewRefine = res.hasOwnProperty('featureFlagAuthoritativeRefineCollectionShardKey') &&
-        res.featureFlagAuthoritativeRefineCollectionShardKey.hasOwnProperty('value') &&
-        res.featureFlagAuthoritativeRefineCollectionShardKey.value;
-    if (TestData.configShard && !isNewRefine) {
-        // Refining a shard key runs a "noop" find on the refined namespace, which runs locally on
-        // the config server without a shard version, so it generates a plan key cache on collA that
-        // is not cleared.
-        assertPlanCacheSizeForColl(collA.getFullName(), 1);
-    } else {
-        assertPlanCacheSizeForColl(collA.getFullName(), 0);
-    }
+    assertPlanCacheSizeForColl(collA.getFullName(), 0);
     assertPlanCacheSizeForColl(collB.getFullName(), 1);
 })();
 

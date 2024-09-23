@@ -61,13 +61,6 @@ feature_flags:
     cpp_varname: feature_flags::gMultiServiceLogAndFTDCFormat
     default: true
     shouldBeFCVGated: false
-  # TODO SERVER-79064: Remove once 8.0 becomes last LTS.
-  featureFlagAuthoritativeRefineCollectionShardKey:
-    description: "Feature flag for enabling the authoritative version of the refine collection shard key."
-    cpp_varname: feature_flags::gAuthoritativeRefineCollectionShardKey
-    default: true
-    version: 7.1
-    shouldBeFCVGated: true
   # TODO (SERVER-87189): Remove once 9.0 becomes last LTS.
   featureFlagTrackUnshardedCollectionsUponCreation:
     description: "Feature flag for enabling the tracking of user unsharded collection on creation"

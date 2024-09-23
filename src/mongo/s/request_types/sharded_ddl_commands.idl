@@ -616,30 +616,6 @@ commands:
                     Verifies that the shard key index has the same unique setting as the command.
                 type: optionalBool
 
-    _configsvrRefineCollectionShardKey:
-        command_name: _configsvrRefineCollectionShardKey
-        cpp_name: ConfigsvrRefineCollectionShardKey
-        description: "The internal refineCollectionShardKey command on the config server"
-        strict: false
-        namespace: type
-        api_version: ""
-        type: namespacestring
-        fields:
-            key:
-                type: object
-                description: "The index specification document to use as the new shard key."
-                optional: false
-            epoch:
-                type: objectid
-                description: "The expected epoch of the namespace provided to
-                              refineCollectionShardKey."
-                optional: false
-            enforceUniquenessCheck:
-                description: >-
-                    Verifies that the shard key index has the same unique setting as the command.
-                type: optionalBool
-        reply_type: OkReply
-
     _configsvrCommitRefineCollectionShardKey:
         command_name: _configsvrCommitRefineCollectionShardKey
         cpp_name: ConfigsvrCommitRefineCollectionShardKey

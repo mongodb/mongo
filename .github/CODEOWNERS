@@ -983,7 +983,6 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 /src/mongo/db/s/config/**/configsvr_get_historical_placement_info.cpp @10gen/server-catalog-and-routing @svc-auto-approve-bot
 /src/mongo/db/s/config/**/configsvr_merge_all_chunks_on_shard_command.cpp @10gen/server-catalog-and-routing @svc-auto-approve-bot
 /src/mongo/db/s/config/**/configsvr_merge_chunks_command.cpp @10gen/server-catalog-and-routing @svc-auto-approve-bot
-/src/mongo/db/s/config/**/configsvr_refine_collection_shard_key_command.cpp @10gen/server-catalog-and-routing @svc-auto-approve-bot
 /src/mongo/db/s/config/**/configsvr_remove* @10gen/server-catalog-and-routing @svc-auto-approve-bot
 /src/mongo/db/s/config/**/configsvr_repair_sharded_collection_chunks_history_command.cpp @10gen/server-catalog-and-routing @svc-auto-approve-bot
 /src/mongo/db/s/config/**/configsvr_reset_placement_history_command.cpp @10gen/server-catalog-and-routing @svc-auto-approve-bot
