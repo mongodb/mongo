@@ -1418,8 +1418,6 @@ extern int __wti_cache_create(WT_SESSION_IMPL *session, const char *cfg[])
   WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
 extern int __wti_cache_destroy(WT_SESSION_IMPL *session)
   WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
-extern int __wti_cache_pool_config(WT_SESSION_IMPL *session, const char **cfg)
-  WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
 extern int __wti_capacity_server_create(WT_SESSION_IMPL *session, const char *cfg[])
   WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
 extern int __wti_capacity_server_destroy(WT_SESSION_IMPL *session)
@@ -1441,9 +1439,9 @@ extern int __wti_col_fix_read_auxheader(WT_SESSION_IMPL *session, const WT_PAGE_
   WT_COL_FIX_AUXILIARY_HEADER *auxhdr) WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
 extern int __wti_config_get(WT_SESSION_IMPL *session, const char **cfg_arg, WT_CONFIG_ITEM *key,
   WT_CONFIG_ITEM *value) WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
-extern int __wti_conn_cache_pool_destroy(WT_SESSION_IMPL *session)
+extern int __wti_conn_cache_pool_create(WT_SESSION_IMPL *session, const char *cfg[])
   WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
-extern int __wti_conn_cache_pool_open(WT_SESSION_IMPL *session)
+extern int __wti_conn_cache_pool_destroy(WT_SESSION_IMPL *session)
   WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
 extern int __wti_conn_compat_config(WT_SESSION_IMPL *session, const char **cfg, bool reconfig)
   WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
@@ -1536,6 +1534,12 @@ extern int __wti_delete_page(WT_SESSION_IMPL *session, WT_REF *ref, bool *skipp)
 extern int __wti_delete_page_instantiate(WT_SESSION_IMPL *session, WT_REF *ref)
   WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
 extern int __wti_desc_write(WT_SESSION_IMPL *session, WT_FH *fh, uint32_t allocsize)
+  WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
+extern int __wti_evict_config(WT_SESSION_IMPL *session, const char *cfg[], bool reconfig)
+  WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
+extern int __wti_evict_create(WT_SESSION_IMPL *session, const char *cfg[])
+  WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
+extern int __wti_evict_destroy(WT_SESSION_IMPL *session)
   WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
 extern int __wti_execute_handle_operation(WT_SESSION_IMPL *session, const char *uri,
   int (*file_func)(WT_SESSION_IMPL *, const char *[]), const char *cfg[], uint32_t open_flags)
@@ -2008,6 +2012,7 @@ extern void __wti_cursor_reopen(WT_CURSOR *cursor, WT_DATA_HANDLE *dhandle);
 extern void __wti_cursor_set_key_notsup(WT_CURSOR *cursor, ...);
 extern void __wti_cursor_set_value_notsup(WT_CURSOR *cursor, ...);
 extern void __wti_evict_list_clear_page(WT_SESSION_IMPL *session, WT_REF *ref);
+extern void __wti_evict_stats_update(WT_SESSION_IMPL *session);
 extern void __wti_free_ref(WT_SESSION_IMPL *session, WT_REF *ref, int page_type, bool free_pages);
 extern void __wti_free_ref_index(
   WT_SESSION_IMPL *session, WT_PAGE *page, WT_PAGE_INDEX *pindex, bool free_pages);

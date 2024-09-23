@@ -36,13 +36,15 @@
 static void __cache_pool_adjust(WT_SESSION_IMPL *, uint64_t, uint64_t, bool, bool *);
 static void __cache_pool_assess(WT_SESSION_IMPL *, uint64_t *);
 static void __cache_pool_balance(WT_SESSION_IMPL *, bool);
+static int __cache_pool_config(WT_SESSION_IMPL *, const char **);
+static int __conn_cache_pool_open(WT_SESSION_IMPL *);
 
 /*
- * __wti_cache_pool_config --
+ * __cache_pool_config --
  *     Parse and setup the cache pool options.
  */
-int
-__wti_cache_pool_config(WT_SESSION_IMPL *session, const char **cfg)
+static int
+__cache_pool_config(WT_SESSION_IMPL *session, const char **cfg)
 {
     WT_CACHE_POOL *cp;
     WT_CONFIG_ITEM cval, cval_cache_size;
@@ -273,11 +275,11 @@ __cache_pool_server(void *arg)
 }
 
 /*
- * __wti_conn_cache_pool_open --
+ * __conn_cache_pool_open --
  *     Add a connection to the cache pool.
  */
-int
-__wti_conn_cache_pool_open(WT_SESSION_IMPL *session)
+static int
+__conn_cache_pool_open(WT_SESSION_IMPL *session)
 {
     WT_CACHE *cache;
     WT_CACHE_POOL *cp;
@@ -319,6 +321,34 @@ __wti_conn_cache_pool_open(WT_SESSION_IMPL *session)
 
     /* Wake up the cache pool server to get our initial chunk. */
     __wt_cond_signal(session, cp->cache_pool_cond);
+
+    return (0);
+}
+
+/*
+ * __wti_conn_cache_pool_create --
+ *     Create shared cache.
+ */
+int
+__wti_conn_cache_pool_create(WT_SESSION_IMPL *session, const char *cfg[])
+{
+    WT_CONFIG_ITEM cval;
+    WT_CONNECTION_IMPL *conn;
+    bool now_shared, was_shared;
+
+    conn = S2C(session);
+    WT_ASSERT(session, conn->cache != NULL);
+
+    WT_RET(__wt_config_gets_none(session, cfg, "shared_cache.name", &cval));
+    now_shared = cval.len != 0;
+    was_shared = F_ISSET(conn, WT_CONN_CACHE_POOL);
+
+    if (now_shared) {
+        WT_RET(__cache_pool_config(session, cfg));
+        WT_ASSERT(session, F_ISSET(conn, WT_CONN_CACHE_POOL));
+        if (!was_shared)
+            WT_RET(__conn_cache_pool_open(session));
+    }
 
     return (0);
 }

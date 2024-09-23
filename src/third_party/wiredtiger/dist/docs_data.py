@@ -71,8 +71,8 @@ arch_doc_pages = [
          'src/session/session_dhandle.c']),
     ArchDocPage('arch-eviction',
         ['WT_EVICT_ENTRY', 'WT_EVICT_QUEUE'],
-        ['src/include/cache.h', 'src/include/evict_inline.h',
-         'src/evict/']),
+        ['src/include/cache.h', 'src/include/evict_inline.h', 
+         'src/conn/conn_evict.c', 'src/evict/']),
     ArchDocPage('arch-fast-truncate',
         ['WT_PAGE_DELETED'],
         # It would be nice to have this link to the list of places at the bottom of the page

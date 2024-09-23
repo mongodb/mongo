@@ -80,6 +80,7 @@ src/conn/conn_chunkcache.c
 src/conn/conn_ckpt.c
 src/conn/conn_compact.c
 src/conn/conn_dhandle.c
+src/conn/conn_evict.c
 src/conn/conn_handle.c
 src/conn/conn_open.c
 src/conn/conn_prefetch.c
