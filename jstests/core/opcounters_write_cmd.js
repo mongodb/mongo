@@ -15,6 +15,10 @@ var mongo = new Mongo(db.getMongo().host);
 
 var newdb = mongo.getDB(db.toString());
 
+// Deletes in the system.profile collection can interfere with the opcounters tests below.
+newdb.setProfilingLevel(0);
+newdb.system.profile.drop();
+
 var t = newdb.opcounters;
 var opCounters;
 var res;
