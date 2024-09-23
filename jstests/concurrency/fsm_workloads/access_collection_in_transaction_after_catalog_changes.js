@@ -28,42 +28,23 @@ export const $config = (function() {
             const ddlColl = session.getDatabase(ddlDBName)[ddlCollName];
 
             const expectedTxnErrorCodes = [
-                ErrorCodes.LockTimeout,
-                ErrorCodes.WriteConflict,
-                ErrorCodes.SnapshotUnavailable,
                 ErrorCodes.OperationNotSupportedInTransaction,
+                // As of SERVER-45405, inserts that implicitly create collections inside of
+                // multi- document transactions can fail at commit time with WriteConflict
+                // errors, if a conflicting collection does not get created until commit time.
+                ErrorCodes.WriteConflict,
             ];
-            if (TestData.testingReplicaSetEndpoint) {
-                expectedTxnErrorCodes.push(ErrorCodes.StaleConfig);
-                expectedTxnErrorCodes.push(ErrorCodes.StaleDbVersion);
-                expectedTxnErrorCodes.push(ErrorCodes.ExceededTimeLimit);
-                // This error is thrown when there is a placement change during the transaction.
-                expectedTxnErrorCodes.push(ErrorCodes.MigrationConflict);
-            }
 
             let success = false;
 
             try {
                 withTxnAndAutoRetry(session, () => {
-                    // Run the specified operation on 'ddlColl'. Another thread may have performed a
-                    // DDL operation on 'ddlColl' since the transaction started. The operation may
-                    // fail with one of the allowed error codes, but it must not crash the server.
-                    try {
-                        assert.eq(1, startColl.find({_id: "startTxnDoc"}).itcount());
-                        op(ddlColl);
-                        success = true;
-                    } catch (e) {
-                        assert.contains(e.code, expectedTxnErrorCodes, () => tojson(e));
-                        throw e;
-                    }
+                    assert.eq(1, startColl.find({_id: "startTxnDoc"}).itcount());
+                    op(ddlColl);
                 });
+                success = true;
             } catch (e) {
-                if (e.hasOwnProperty("code") && e.code == ErrorCodes.WriteConflict) {
-                    // As of SERVER-45405, inserts that implicitly create collections inside of
-                    // multi- document transactions can fail at commit time with WriteConflict
-                    // errors, if a conflicting collection does not get created until commit time.
-                    success = false;
-                } else {
+                if (!e.hasOwnProperty("code") || !expectedTxnErrorCodes.includes(e.code)) {
                     throw e;
                 }
             }
