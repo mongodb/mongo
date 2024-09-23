@@ -40,12 +40,6 @@ enums:
             # execution-related info. String alias is "queryPlanner".
             kQueryPlanner: "queryPlanner"
 
-            # queryPlannerDebug is a special case of queryPlanner verbosity that includes inside 
-            # the queryPlanner object also all the resulting plans from intermediate optimization 
-            # phases of Bonsai. Does not include any execution-related info. String alias is 
-            # "queryPlannerDebug".
-            kQueryPlannerDebug: "queryPlannerDebug"
-
             # At all verbosities greater than or equal to kExecStats, we display a section of output
             # containing both overall execution stats, and stats per stage in the execution tree.
             # String alias is "executionStats".

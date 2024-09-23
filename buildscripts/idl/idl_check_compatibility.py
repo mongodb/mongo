@@ -418,6 +418,13 @@ CHANGED_ACCESS_CHECKS_TYPE = dict(
     update=["simple", "complex"]
 )
 
+# Permit removal of a command parameter's possible values.
+ALLOW_FIELD_VALUE_REMOVAL_LIST = dict(
+    # This verbosity option was removed in 8.1, but it was never available to users prior to that,
+    # so it does not represent a real compatiblity change.
+    explain_param_verbosity_type_Verbosity=["kQueryPlannerDebug"],
+)
+
 
 @dataclass
 class AllowedNewPrivilege:
@@ -598,6 +605,11 @@ def check_subset(
         ctxt.add_reply_field_not_subset_error(cmd_name, field_name, type_name, file_path)
 
 
+def construct_cmd_param_type_str(cmd_name: str, param_name: Optional[str], type_name: str):
+    """Construct string "<cmd_name>_[param_<param_name>_]type_<type_name>."""
+    return cmd_name + ("_param_" + param_name if param_name else "") + "_type_" + type_name
+
+
 def check_superset(
     ctxt: IDLCompatibilityContext,
     cmd_name: str,
@@ -609,7 +621,15 @@ def check_superset(
     is_command_parameter: bool,
 ):
     """Check if super_list is a superset of the sub_list and log an error if not."""
-    if not set(super_list).issuperset(sub_list):
+    ignore_list: list[str] = ALLOW_FIELD_VALUE_REMOVAL_LIST.get(
+        construct_cmd_param_type_str(cmd_name, param_name, type_name), []
+    )
+
+    missing_elts: set(Union[str, syntax.EnumValue]) = set(sub_list).difference(super_list)
+    names_of_missing_elts: set[str] = set(
+        map(lambda elt: elt if isinstance(elt, str) else elt.name, missing_elts)
+    )
+    if not set(names_of_missing_elts).issubset(ignore_list):
         ctxt.add_command_or_param_type_not_superset_error(
             cmd_name, type_name, file_path, param_name, is_command_parameter
         )

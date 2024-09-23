@@ -1370,7 +1370,7 @@ export function getNumberOfColumnScans(explain) {
     return columnIndexScans.length;
 }
 
-/**
+/*
  * Returns whether a query is using a multikey index.
  *
  * This helper function can be used only for "classic" optimizer.
@@ -1406,30 +1406,6 @@ export function checkNWouldDelete(explain, nWouldDelete) {
         assert(execStages.stage === "BATCHED_DELETE", explain);
         assert.eq(execStages.nWouldDelete, nWouldDelete, explain);
     }
-}
-
-/**
- * Returns whether an explain output has the optimizerPhases field.
- *
- * This helper function is relevant only for the CQF optimizer.
- */
-export function explainHasOptimizerPhases(explain) {
-    let queryPlanner = getQueryPlanner(explain);
-    return queryPlanner.hasOwnProperty("optimizerPhases");
-}
-
-/**
- * Returns the OptimizerPhases element.
- *
- * This helper function is relevant only for the CQF optimizer.
- */
-export function getExplainOptimizerPhases(explain) {
-    let queryPlanner = getQueryPlanner(explain);
-
-    assert(explainHasOptimizerPhases(explain),
-           "Explain output does not have optimizer phases: " + tojson(explain));
-
-    return queryPlanner.optimizerPhases;
 }
 
 /**

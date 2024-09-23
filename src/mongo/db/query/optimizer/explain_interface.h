@@ -42,7 +42,6 @@ class AbstractABTPrinter {
 public:
     virtual ~AbstractABTPrinter() = default;
     virtual BSONObj explainBSON() const = 0;
-    virtual BSONObj explainQueryPlannerDebug() const = 0;
     virtual std::string getPlanSummary() const = 0;
     virtual BSONObj getQueryParameters() const = 0;
 };

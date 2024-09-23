@@ -80,15 +80,6 @@ ABTPrinter::ABTPrinter(PlanAndProps planAndProps,
       _explainVersion(explainVersion),
       _queryParameters(std::move(qpMap)) {}
 
-ABTPrinter::ABTPrinter(PlanAndProps planAndProps,
-                       const ExplainVersion explainVersion,
-                       QueryParameterMap qpMap,
-                       QueryPlannerOptimizationStagesForDebugExplain queryPlannerOptimizationStages)
-    : _planAndProps(std::move(planAndProps)),
-      _explainVersion(explainVersion),
-      _queryParameters(std::move(qpMap)),
-      _queryPlannerOptimizationStages(std::move(queryPlannerOptimizationStages)) {}
-
 BSONObj ABTPrinter::explainBSON() const {
     const auto explainPlanStr = [&](const std::string& planStr) {
         BSONObjBuilder builder;
@@ -147,105 +138,6 @@ BSONObj ABTPrinter::getQueryParameters() const {
     }
 
     return result.obj();
-}
-
-BSONObj ABTPrinter::explainQueryPlannerDebug() const {
-
-    const auto explainPlan = [&]<typename T>(const std::string& fieldName, const T& planStr) {
-        BSONObjBuilder local_builder;
-        local_builder.append("name", fieldName);
-        local_builder.append("plan", planStr);
-        return local_builder.done().getOwned();
-    };
-
-    /**
-     * Simplify the creation of a single BSONObj from the collected plans from Bonsai optimization
-     * stages. The lambda returns an array BSONObj. It expects as a parameter a function that will
-     * transform each plan into a BSONObj.
-     * The function taken as parameter returns auto to match the different output types (BSONObj or
-     * string).
-     */
-    const auto explainPlanForAllStagesFunction =
-        [&](const bool displayProperties,
-            const QueryPlannerOptimizationStagesForDebugExplain& queryPlannerOptimizationStages,
-            auto (*func)(const ABT::reference_type node,
-                         const bool displayProperties,
-                         const NodeToGroupPropsMap& nodeMap)) {
-            BSONArrayBuilder builder;
-
-            if (queryPlannerOptimizationStages._logicalTranslated) {
-                builder.append(
-                    explainPlan("logicalTranslated",
-                                func(queryPlannerOptimizationStages._logicalTranslated.get(),
-                                     false /*displayProperties*/,
-                                     {} /*nodeMap*/)));
-            }
-
-            if (queryPlannerOptimizationStages._logicalStructuralRewrites) {
-                builder.append(explainPlan(
-                    "logicalStructuralRewrites",
-                    func(queryPlannerOptimizationStages._logicalStructuralRewrites.get(),
-                         false /*displayProperties*/,
-                         {} /*nodeMap*/)));
-            }
-
-            if (queryPlannerOptimizationStages._logicalMemoSub) {
-                builder.append(
-                    explainPlan("logicalMemoSubstitution",
-                                func(queryPlannerOptimizationStages._logicalMemoSub.get()._node,
-                                     displayProperties /*displayProperties*/,
-                                     queryPlannerOptimizationStages._logicalMemoSub.get()._map)));
-            }
-
-            if (queryPlannerOptimizationStages._physical) {
-                builder.append(
-                    explainPlan("physical",
-                                func(queryPlannerOptimizationStages._physical.get()._node,
-                                     displayProperties /*displayProperties*/,
-                                     queryPlannerOptimizationStages._physical.get()._map)));
-            }
-
-            if (queryPlannerOptimizationStages._physicalLowered) {
-                builder.append(
-                    explainPlan("physicalLowered",
-                                func(queryPlannerOptimizationStages._physicalLowered.get()._node,
-                                     displayProperties /*displayProperties*/,
-                                     queryPlannerOptimizationStages._physicalLowered.get()._map)));
-            }
-
-            return builder.done().getOwned();
-        };
-
-    // Invoke the corresponding plan serializer for each version of explain format.
-    // Plan serializing with properties is supported only for BSONObj and V3. Displaying properties
-    // is disabled for all other versions.
-    switch (_explainVersion) {
-        case ExplainVersion::V1:
-            return explainPlanForAllStagesFunction(false /*displayProperties*/,
-                                                   _queryPlannerOptimizationStages,
-                                                   ExplainGenerator::explain);
-        case ExplainVersion::V2:
-            return explainPlanForAllStagesFunction(false /*displayProperties*/,
-                                                   _queryPlannerOptimizationStages,
-                                                   ExplainGenerator::explainV2);
-        case ExplainVersion::V2Compact:
-            return explainPlanForAllStagesFunction(false /*displayProperties*/,
-                                                   _queryPlannerOptimizationStages,
-                                                   ExplainGenerator::explainV2Compact);
-        case ExplainVersion::V3:
-            return explainPlanForAllStagesFunction(true /*displayProperties*/,
-                                                   _queryPlannerOptimizationStages,
-                                                   ExplainGenerator::explainBSONObj);
-        case ExplainVersion::UserFacingExplain:
-            return explainPlanForAllStagesFunction(true /*displayProperties*/,
-                                                   _queryPlannerOptimizationStages,
-                                                   ExplainGenerator::explainBSONObj);
-        case ExplainVersion::Vmax:
-            // Should not be seeing this value here.
-            break;
-    }
-
-    return {};
 }
 
 bool constexpr operator<(const ExplainVersion v1, const ExplainVersion v2) {

@@ -50,7 +50,6 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/query/explain_options.h"
-#include "mongo/db/query/query_feature_flags_gen.h"
 #include "mongo/db/service_context.h"
 #include "mongo/idl/idl_parser.h"
 #include "mongo/rpc/op_msg.h"
@@ -218,16 +217,6 @@ std::unique_ptr<CommandInvocation> CmdExplain::parse(OperationContext* opCtx,
     auto const dbName = cmdObj.getDbName();
     ExplainOptions::Verbosity verbosity = cmdObj.getVerbosity();
     auto explainedObj = cmdObj.getCommandParameter();
-
-    // Ensure the explain verbosities are supported
-    uassert(
-        ErrorCodes::CommandNotSupported,
-        str::stream() << "Verbosity \"" << Verbosity_serializer(verbosity)
-                      << "\" not available for this configuration. featureFlagCommonQueryFramework "
-                         "must be enabled to run with verbosity queryPlannerDebug",
-        verbosity != ExplainOptions::Verbosity::kQueryPlannerDebug ||
-            feature_flags::gFeatureFlagCommonQueryFramework.isEnabled(
-                serverGlobalParams.featureCompatibility.acquireFCVSnapshot()));
 
     // Extract 'comment' field from the 'explainedObj' only if there is no top-level comment.
     auto commentField = explainedObj["comment"];

@@ -46,31 +46,6 @@ namespace mongo::optimizer {
 enum class ExplainVersion { V1, V2, V2Compact, V3, UserFacingExplain, Vmax };
 
 /**
- * This struct stores the evolution of the query plan as it passes through optimizer phases.
- * It is only populated when queryPlannerDebug verbosity is set.
- */
-struct QueryPlannerOptimizationStagesForDebugExplain {
-
-    // The logical plan ABT as given as input to the query optimizer.
-    boost::optional<ABT> _logicalTranslated;
-
-    // The logical plan ABT after performing all structural rewrites.
-    boost::optional<ABT> _logicalStructuralRewrites;
-
-    // Stores the logical plan ABT (with corresponding properties) after performing memo
-    // substitution phase.
-    boost::optional<PlanAndProps> _logicalMemoSub;
-
-    // Stores the best physical plan ABT (with corresponding properties) after performing memo
-    // logical exploration and physical rewrite phases.
-    boost::optional<PlanAndProps> _physical;
-
-    // Stores the final physical plan ABT (with corresponding properties) which will is given as
-    // input to the execution engine.
-    boost::optional<PlanAndProps> _physicalLowered;
-};
-
-/**
  * Given the RootNode of an ABT, determine whether the ABT represents an EOF plan. This function
  * checks for the following form:
  *
@@ -92,13 +67,7 @@ class ABTPrinter : public AbstractABTPrinter {
 public:
     ABTPrinter(PlanAndProps planAndProps, ExplainVersion explainVersion, QueryParameterMap qpMap);
 
-    ABTPrinter(PlanAndProps planAndProps,
-               ExplainVersion explainVersion,
-               QueryParameterMap qpMap,
-               QueryPlannerOptimizationStagesForDebugExplain queryPlannerOptimizationStages);
-
     BSONObj explainBSON() const final;
-    BSONObj explainQueryPlannerDebug() const final;
     std::string getPlanSummary() const final;
     BSONObj getQueryParameters() const final;
 
@@ -106,7 +75,6 @@ private:
     PlanAndProps _planAndProps;
     ExplainVersion _explainVersion;
     QueryParameterMap _queryParameters;
-    QueryPlannerOptimizationStagesForDebugExplain _queryPlannerOptimizationStages;
 };
 
 /**
