@@ -1083,7 +1083,7 @@ tasks:
     commands:
       - command: timeout.update
         params:
-          exec_timeout_secs: 2400 # 40 minutes
+          exec_timeout_secs: 10800 # 3 hours
       - func: "f_expansions_write"
       - command: manifest.load
       - func: "git get project and add git tag"
