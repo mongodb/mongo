@@ -147,7 +147,7 @@ std::vector<AsyncRequestsSender::Response> sendAuthenticatedCommandToShards(
                 reply.genericReplyFields.serialize(&replyBob);
                 return AsyncRequestsSender::Response{
                     (*indexToShardId)[index],
-                    executor::RemoteCommandOnAnyResponse(
+                    executor::RemoteCommandResponse(
                         reply.targetUsed, replyBob.obj(), reply.elapsed)};
             })
             .getNoThrow();

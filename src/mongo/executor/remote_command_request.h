@@ -140,19 +140,6 @@ template <typename Target>
 struct RemoteCommandRequestImpl : RemoteCommandRequestBase {
     RemoteCommandRequestImpl();
 
-    // Allow implicit conversion from RemoteCommandRequest to RemoteCommandRequestOnAny
-    template <int...>
-    requires std::is_same_v<Target, std::vector<HostAndPort>> RemoteCommandRequestImpl(
-        const RemoteCommandRequestImpl<HostAndPort>& other)
-        : RemoteCommandRequestBase(other), target({other.target}) {}
-
-    // Allow conversion from RemoteCommandRequestOnAny to RemoteCommandRequest with the index of a
-    // particular host
-    template <int...>
-    requires std::is_same_v<Target, HostAndPort> RemoteCommandRequestImpl(
-        const RemoteCommandRequestImpl<std::vector<HostAndPort>>& other, size_t idx)
-        : RemoteCommandRequestBase(other), target(other.target[idx]) {}
-
     RemoteCommandRequestImpl(RequestId requestId,
                              const Target& theTarget,
                              const DatabaseName& theDbName,
@@ -221,7 +208,6 @@ extern template struct RemoteCommandRequestImpl<HostAndPort>;
 extern template struct RemoteCommandRequestImpl<std::vector<HostAndPort>>;
 
 using RemoteCommandRequest = RemoteCommandRequestImpl<HostAndPort>;
-using RemoteCommandRequestOnAny = RemoteCommandRequestImpl<std::vector<HostAndPort>>;
 
 }  // namespace executor
 }  // namespace mongo

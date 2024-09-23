@@ -104,15 +104,15 @@ class TaskExecutorWithFailureInScheduleRemoteCommand : public unittest::TaskExec
 public:
     using unittest::TaskExecutorProxy::TaskExecutorProxy;
 
-    StatusWith<executor::TaskExecutor::CallbackHandle> scheduleRemoteCommandOnAny(
-        const executor::RemoteCommandRequestOnAny& request,
-        const RemoteCommandOnAnyCallbackFn& cb,
+    StatusWith<executor::TaskExecutor::CallbackHandle> scheduleRemoteCommand(
+        const executor::RemoteCommandRequest& request,
+        const RemoteCommandCallbackFn& cb,
         const BatonHandle& baton = nullptr) override {
         if (scheduleRemoteCommandFailPoint) {
             return Status(ErrorCodes::ShutdownInProgress,
                           "failed to send remote command - shutdown in progress");
         }
-        return getExecutor()->scheduleRemoteCommandOnAny(request, cb, baton);
+        return getExecutor()->scheduleRemoteCommand(request, cb, baton);
     }
 
     bool scheduleRemoteCommandFailPoint = false;

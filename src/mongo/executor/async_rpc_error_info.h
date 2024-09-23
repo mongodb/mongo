@@ -50,7 +50,7 @@
 #include "mongo/util/net/hostandport.h"
 
 namespace mongo {
-using executor::RemoteCommandOnAnyResponse;
+using executor::RemoteCommandResponse;
 
 enum class CommandErrorProvenance { kLocal, kRemote };
 
@@ -67,7 +67,7 @@ public:
     public:
         // The BSON received over-the-wire that encodes the remote
         // error is stored and used to construct this in-memory representation.
-        explicit RemoteError(RemoteCommandOnAnyResponse rcr)
+        explicit RemoteError(RemoteCommandResponse rcr)
             : _error{rcr.data},
               _remoteCommandResult{getStatusFromCommandResult(_error)},
               _remoteCommandWriteConcernError{getWriteConcernStatusFromCommandResult(_error)},
@@ -138,7 +138,7 @@ public:
      * Construct the relevant extra info from the RemoteCommandResponse provided by the TaskExecutor
      * used to invoke the remote command.
      */
-    AsyncRPCErrorInfo(RemoteCommandOnAnyResponse rcr, boost::optional<HostAndPort> target)
+    AsyncRPCErrorInfo(RemoteCommandResponse rcr, boost::optional<HostAndPort> target)
         : _prov{[&] {
               if (!rcr.status.isOK())
                   return CommandErrorProvenance::kLocal;

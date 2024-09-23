@@ -134,11 +134,7 @@ public:
      * Runs the given remote command request, and returns the response.
      */
     RemoteCommandResponse runCommand(RemoteCommandRequest request) {
-        RemoteCommandRequestOnAny rcroa{request};
-        auto deferred = net->startCommand(makeCallbackHandle(), rcroa)
-                            .then([](TaskExecutor::ResponseOnAnyStatus roa) {
-                                return RemoteCommandResponse(roa);
-                            });
+        auto deferred = net->startCommand(makeCallbackHandle(), request);
         return deferred.get();
     }
 

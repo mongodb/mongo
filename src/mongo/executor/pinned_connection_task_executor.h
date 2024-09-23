@@ -134,14 +134,13 @@ public:
     StatusWith<CallbackHandle> scheduleWorkAt(Date_t when, CallbackFn&& work) override;
 
     // This type provides special connection-pinning behavior for RPC functionality here.
-    StatusWith<CallbackHandle> scheduleRemoteCommandOnAny(
-        const RemoteCommandRequestOnAny& request,
-        const RemoteCommandOnAnyCallbackFn& cb,
-        const BatonHandle& baton = nullptr) override;
+    StatusWith<CallbackHandle> scheduleRemoteCommand(const RemoteCommandRequest& request,
+                                                     const RemoteCommandCallbackFn& cb,
+                                                     const BatonHandle& baton = nullptr) override;
 
-    StatusWith<CallbackHandle> scheduleExhaustRemoteCommandOnAny(
-        const RemoteCommandRequestOnAny& request,
-        const RemoteCommandOnAnyCallbackFn& cb,
+    StatusWith<CallbackHandle> scheduleExhaustRemoteCommand(
+        const RemoteCommandRequest& request,
+        const RemoteCommandCallbackFn& cb,
         const BatonHandle& baton = nullptr) override;
 
     // When cancel() is passed a CallbackHandle that was returned from schedule{Work}()/onEvent(),

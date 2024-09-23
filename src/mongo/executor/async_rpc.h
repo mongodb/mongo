@@ -183,7 +183,7 @@ public:
  * Returns a RemoteCommandExecutionError with ErrorExtraInfo populated to contain
  * details about any error, local or remote, contained in `r`.
  */
-inline Status makeErrorIfNeeded(TaskExecutor::ResponseOnAnyStatus r,
+inline Status makeErrorIfNeeded(TaskExecutor::ResponseStatus r,
                                 boost::optional<HostAndPort> targetAttempted) {
     if (r.status.isOK() && getStatusFromCommandResult(r.data).isOK() &&
         getWriteConcernStatusFromCommandResult(r.data).isOK() &&

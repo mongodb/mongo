@@ -85,29 +85,12 @@ protected:
     ~RemoteCommandResponseBase() = default;
 };
 
-struct RemoteCommandOnAnyResponse;
-
-struct RemoteCommandResponse : RemoteCommandResponseBase {
-    using RemoteCommandResponseBase::RemoteCommandResponseBase;
-
-    RemoteCommandResponse(const RemoteCommandOnAnyResponse& other);
-
-    std::string toString() const;
-
-    bool operator==(const RemoteCommandResponse& rhs) const;
-    bool operator!=(const RemoteCommandResponse& rhs) const;
-
-    friend std::ostream& operator<<(std::ostream& os, const RemoteCommandResponse& request);
-};
-
 /**
- * This type is a RemoteCommandResponse + the target that the origin request was actually run on.
- *
- * For the moment, it is only returned by scheduleRemoteCommandOnAny, and should be thought of as a
- * different return type for that rpc api, rather than a higher-information RemoteCommandResponse.
+ * This type is a RemoteCommandResponseBase + the target that the origin request was actually run
+ * on.
  *
  * The target member may be used by callers to associate a HostAndPort with the remote or
- * local error that the RemoteCommandOnAnyResponse holds. The "status" member will be populated
+ * local error that the RemoteCommandResponse holds. The "status" member will be populated
  * with possible local errors, while the "data" member may hold any remote errors. For local
  * errors that are not caused by the remote (for example, local shutdown), the target member will
  * not be filled.
@@ -118,38 +101,36 @@ struct RemoteCommandResponse : RemoteCommandResponseBase {
  *   2. When using the connection to the remote.
  *   3. Enforcing a timeout (propagated or internal) while using the connection to the remote.
  */
-struct RemoteCommandOnAnyResponse : RemoteCommandResponseBase {
-    RemoteCommandOnAnyResponse() = default;
+struct RemoteCommandResponse : RemoteCommandResponseBase {
+    using RemoteCommandResponseBase::RemoteCommandResponseBase;
 
-    RemoteCommandOnAnyResponse(boost::optional<HostAndPort> hp,
-                               ErrorCodes::Error code,
-                               std::string reason);
+    RemoteCommandResponse(boost::optional<HostAndPort> hp,
+                          ErrorCodes::Error code,
+                          std::string reason);
 
-    RemoteCommandOnAnyResponse(boost::optional<HostAndPort> hp,
-                               ErrorCodes::Error code,
-                               std::string reason,
-                               Microseconds elapsed);
+    RemoteCommandResponse(boost::optional<HostAndPort> hp,
+                          ErrorCodes::Error code,
+                          std::string reason,
+                          Microseconds elapsed);
 
-    RemoteCommandOnAnyResponse(boost::optional<HostAndPort> hp, Status s);
+    RemoteCommandResponse(boost::optional<HostAndPort> hp, Status s);
 
-    RemoteCommandOnAnyResponse(boost::optional<HostAndPort> hp, Status s, Microseconds elapsed);
+    RemoteCommandResponse(boost::optional<HostAndPort> hp, Status s, Microseconds elapsed);
 
-    RemoteCommandOnAnyResponse(HostAndPort hp, BSONObj dataObj, Microseconds elapsed);
+    RemoteCommandResponse(HostAndPort hp, BSONObj dataObj, Microseconds elapsed);
 
-    RemoteCommandOnAnyResponse(HostAndPort hp,
-                               const rpc::ReplyInterface& rpcReply,
-                               Microseconds elapsed);
-
-    RemoteCommandOnAnyResponse(boost::optional<HostAndPort> hp, const RemoteCommandResponse& other);
+    RemoteCommandResponse(HostAndPort hp,
+                          const rpc::ReplyInterface& rpcReply,
+                          Microseconds elapsed);
 
     std::string toString() const;
 
-    bool operator==(const RemoteCommandOnAnyResponse& rhs) const;
-    bool operator!=(const RemoteCommandOnAnyResponse& rhs) const;
+    bool operator==(const RemoteCommandResponse& rhs) const;
+    bool operator!=(const RemoteCommandResponse& rhs) const;
 
     boost::optional<HostAndPort> target;
 
-    friend std::ostream& operator<<(std::ostream& os, const RemoteCommandOnAnyResponse& request);
+    friend std::ostream& operator<<(std::ostream& os, const RemoteCommandResponse& request);
 };
 
 }  // namespace executor

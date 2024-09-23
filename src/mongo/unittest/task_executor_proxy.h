@@ -85,13 +85,12 @@ public:
                                              Date_t deadline) override;
     StatusWith<CallbackHandle> scheduleWork(CallbackFn&& work) override;
     StatusWith<CallbackHandle> scheduleWorkAt(Date_t when, CallbackFn&& work) override;
-    StatusWith<CallbackHandle> scheduleRemoteCommandOnAny(
-        const executor::RemoteCommandRequestOnAny& request,
-        const RemoteCommandOnAnyCallbackFn& cb,
-        const BatonHandle& baton = nullptr) override;
-    StatusWith<CallbackHandle> scheduleExhaustRemoteCommandOnAny(
-        const executor::RemoteCommandRequestOnAny& request,
-        const RemoteCommandOnAnyCallbackFn& cb,
+    StatusWith<CallbackHandle> scheduleRemoteCommand(const executor::RemoteCommandRequest& request,
+                                                     const RemoteCommandCallbackFn& cb,
+                                                     const BatonHandle& baton = nullptr) override;
+    StatusWith<CallbackHandle> scheduleExhaustRemoteCommand(
+        const executor::RemoteCommandRequest& request,
+        const RemoteCommandCallbackFn& cb,
         const BatonHandle& baton = nullptr) override;
     bool hasTasks() override;
     void cancel(const CallbackHandle& cbHandle) override;

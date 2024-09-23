@@ -173,24 +173,23 @@ public:
             std::move(work));
     }
 
-    StatusWith<CallbackHandle> scheduleRemoteCommandOnAny(
-        const RemoteCommandRequestOnAny& request,
-        const RemoteCommandOnAnyCallbackFn& cb,
-        const BatonHandle& baton = nullptr) override {
+    StatusWith<CallbackHandle> scheduleRemoteCommand(const RemoteCommandRequest& request,
+                                                     const RemoteCommandCallbackFn& cb,
+                                                     const BatonHandle& baton = nullptr) override {
         return _wrapCallback(
             [&](auto&& x) {
-                return _executor->scheduleRemoteCommandOnAny(request, std::move(x), baton);
+                return _executor->scheduleRemoteCommand(request, std::move(x), baton);
             },
             cb);
     }
 
-    StatusWith<CallbackHandle> scheduleExhaustRemoteCommandOnAny(
-        const RemoteCommandRequestOnAny& request,
-        const RemoteCommandOnAnyCallbackFn& cb,
+    StatusWith<CallbackHandle> scheduleExhaustRemoteCommand(
+        const RemoteCommandRequest& request,
+        const RemoteCommandCallbackFn& cb,
         const BatonHandle& baton = nullptr) override {
         return _wrapCallback(
             [&](auto&& x) {
-                return _executor->scheduleExhaustRemoteCommandOnAny(request, std::move(x), baton);
+                return _executor->scheduleExhaustRemoteCommand(request, std::move(x), baton);
             },
             cb);
     }
@@ -326,9 +325,9 @@ private:
                 if constexpr (std::is_same_v<ArgsT, CallbackArgs>) {
                     args.status = self->_shutdownStatus;
                 } else {
-                    static_assert(std::is_same_v<ArgsT, RemoteCommandOnAnyCallbackArgs>,
+                    static_assert(std::is_same_v<ArgsT, RemoteCommandCallbackArgs>,
                                   "_wrapCallback only supports CallbackArgs and "
-                                  "RemoteCommandOnAnyCallbackArgs");
+                                  "RemoteCommandCallbackArgs");
                     args.response.status = self->_shutdownStatus;
                 }
 

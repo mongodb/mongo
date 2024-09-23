@@ -81,6 +81,33 @@ bool RemoteCommandResponseBase::isOK() const {
     return status.isOK();
 }
 
+RemoteCommandResponse::RemoteCommandResponse(boost::optional<HostAndPort> hp,
+                                             ErrorCodes::Error code,
+                                             std::string reason)
+    : RemoteCommandResponseBase(code, std::move(reason)), target(std::move(hp)) {}
+
+RemoteCommandResponse::RemoteCommandResponse(boost::optional<HostAndPort> hp,
+                                             ErrorCodes::Error code,
+                                             std::string reason,
+                                             Microseconds elapsed)
+    : RemoteCommandResponseBase(code, std::move(reason), elapsed), target(std::move(hp)) {}
+
+RemoteCommandResponse::RemoteCommandResponse(boost::optional<HostAndPort> hp, Status s)
+    : RemoteCommandResponseBase(std::move(s)), target(std::move(hp)) {}
+
+RemoteCommandResponse::RemoteCommandResponse(boost::optional<HostAndPort> hp,
+                                             Status s,
+                                             Microseconds elapsed)
+    : RemoteCommandResponseBase(std::move(s), elapsed), target(std::move(hp)) {}
+
+RemoteCommandResponse::RemoteCommandResponse(HostAndPort hp, BSONObj dataObj, Microseconds elapsed)
+    : RemoteCommandResponseBase(std::move(dataObj), elapsed), target(std::move(hp)) {}
+
+RemoteCommandResponse::RemoteCommandResponse(HostAndPort hp,
+                                             const rpc::ReplyInterface& rpcReply,
+                                             Microseconds elapsed)
+    : RemoteCommandResponseBase(rpcReply, elapsed), target(std::move(hp)) {}
+
 std::string RemoteCommandResponse::toString() const {
     return format(FMT_STRING("RemoteResponse --"
                              " cmd: {}"
@@ -106,73 +133,6 @@ bool RemoteCommandResponse::operator!=(const RemoteCommandResponse& rhs) const {
 }
 
 std::ostream& operator<<(std::ostream& os, const RemoteCommandResponse& response) {
-    return os << response.toString();
-}
-
-RemoteCommandResponse::RemoteCommandResponse(const RemoteCommandOnAnyResponse& other)
-    : RemoteCommandResponseBase(other) {}
-
-RemoteCommandOnAnyResponse::RemoteCommandOnAnyResponse(boost::optional<HostAndPort> hp,
-                                                       ErrorCodes::Error code,
-                                                       std::string reason)
-    : RemoteCommandResponseBase(code, std::move(reason)), target(std::move(hp)) {}
-
-RemoteCommandOnAnyResponse::RemoteCommandOnAnyResponse(boost::optional<HostAndPort> hp,
-                                                       ErrorCodes::Error code,
-                                                       std::string reason,
-                                                       Microseconds elapsed)
-    : RemoteCommandResponseBase(code, std::move(reason), elapsed), target(std::move(hp)) {}
-
-RemoteCommandOnAnyResponse::RemoteCommandOnAnyResponse(boost::optional<HostAndPort> hp, Status s)
-    : RemoteCommandResponseBase(std::move(s)), target(std::move(hp)) {}
-
-RemoteCommandOnAnyResponse::RemoteCommandOnAnyResponse(boost::optional<HostAndPort> hp,
-                                                       Status s,
-                                                       Microseconds elapsed)
-    : RemoteCommandResponseBase(std::move(s), elapsed), target(std::move(hp)) {}
-
-RemoteCommandOnAnyResponse::RemoteCommandOnAnyResponse(HostAndPort hp,
-                                                       BSONObj dataObj,
-                                                       Microseconds elapsed)
-    : RemoteCommandResponseBase(std::move(dataObj), elapsed), target(std::move(hp)) {}
-
-RemoteCommandOnAnyResponse::RemoteCommandOnAnyResponse(HostAndPort hp,
-                                                       const rpc::ReplyInterface& rpcReply,
-                                                       Microseconds elapsed)
-    : RemoteCommandResponseBase(rpcReply, elapsed), target(std::move(hp)) {}
-
-RemoteCommandOnAnyResponse::RemoteCommandOnAnyResponse(boost::optional<HostAndPort> hp,
-                                                       const RemoteCommandResponse& other)
-    : RemoteCommandResponseBase(other), target(std::move(hp)) {}
-
-bool RemoteCommandOnAnyResponse::operator==(const RemoteCommandOnAnyResponse& rhs) const {
-    if (this == &rhs) {
-        return true;
-    }
-    SimpleBSONObjComparator bsonComparator;
-    return bsonComparator.evaluate(data == rhs.data) && elapsed == rhs.elapsed &&
-        target == rhs.target;
-}
-
-bool RemoteCommandOnAnyResponse::operator!=(const RemoteCommandOnAnyResponse& rhs) const {
-    return !(*this == rhs);
-}
-
-std::string RemoteCommandOnAnyResponse::toString() const {
-    return format(FMT_STRING("RemoteOnAnyResponse -- "
-                             " cmd: {}"
-                             " target: {}"
-                             " status: {}"
-                             " elapsedMicros: {}"
-                             " moreToCome: {}"),
-                  data.toString(),
-                  target ? StringData(target->toString()) : "[none]"_sd,
-                  status.toString(),
-                  elapsed ? StringData(elapsed.value().toString()) : "n/a"_sd,
-                  moreToCome);
-}
-
-std::ostream& operator<<(std::ostream& os, const RemoteCommandOnAnyResponse& response) {
     return os << response.toString();
 }
 

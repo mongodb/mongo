@@ -657,7 +657,7 @@ TEST_F(NetworkInterfaceTest, CustomCodeRequestTimeoutHit) {
     // Force timeout by setting timeout to 0.
     auto request = makeTestCommand(
         Milliseconds(0), makeFindCmdObj(), nullptr, {}, ErrorCodes::MaxTimeMSExpired);
-    auto deferred = runCommandOnAny(cb, request);
+    auto deferred = runCommand(cb, request);
     auto res = deferred.get();
 
     ASSERT(!res.isOK());
@@ -672,7 +672,7 @@ TEST_F(NetworkInterfaceTest, NoCustomCodeRequestTimeoutHit) {
     auto cb = makeCallbackHandle();
     // Force timeout by setting timeout to 0.
     auto request = makeTestCommand(Milliseconds(0), makeFindCmdObj());
-    auto deferred = runCommandOnAny(cb, request);
+    auto deferred = runCommand(cb, request);
     auto res = deferred.get();
 
     ASSERT(!res.isOK());
@@ -683,7 +683,7 @@ TEST_F(NetworkInterfaceTest, AsyncOpTimeout) {
     // Kick off operation
     auto cb = makeCallbackHandle();
     auto request = makeTestCommand(Milliseconds{1000}, makeSleepCmdObj());
-    auto deferred = runCommandOnAny(cb, request);
+    auto deferred = runCommand(cb, request);
 
     waitForHello();
 
@@ -715,7 +715,7 @@ TEST_F(NetworkInterfaceTest, AsyncOpTimeoutWithOpCtxDeadlineSooner) {
 
     auto request = makeTestCommand(requestTimeout, makeSleepCmdObj(), opCtx.get());
 
-    auto deferred = runCommandOnAny(cb, request);
+    auto deferred = runCommand(cb, request);
     // The time returned in result.elapsed is measured from when the command started, which happens
     // in runCommand. The delay between setting the deadline on opCtx and starting the command can
     // be long enough that the assertion about opCtxDeadline fails.
@@ -758,7 +758,7 @@ TEST_F(NetworkInterfaceTest, AsyncOpTimeoutWithOpCtxDeadlineLater) {
 
     auto request = makeTestCommand(requestTimeout, makeSleepCmdObj(), opCtx.get());
 
-    auto deferred = runCommandOnAny(cb, request);
+    auto deferred = runCommand(cb, request);
     // The time returned in result.elapsed is measured from when the command started, which happens
     // in runCommand. The delay between setting the deadline on opCtx and starting the command can
     // be long enough that the assertion about opCtxDeadline fails.
@@ -967,21 +967,20 @@ TEST_F(NetworkInterfaceTest, UseOperationKeyWhenProvided) {
     });
 
     RemoteCommandRequest::Options rcrOptions;
-    RemoteCommandRequestOnAny rcr(fixture().getServers(),
-                                  DatabaseName::kAdmin,
-                                  makeEchoCmdObj(),
-                                  BSONObj(),
-                                  nullptr,
-                                  kNoTimeout,
-                                  std::move(rcrOptions),
-                                  opKey);
+    RemoteCommandRequest rcr(fixture().getServers().front(),
+                             DatabaseName::kAdmin,
+                             makeEchoCmdObj(),
+                             BSONObj(),
+                             nullptr,
+                             kNoTimeout,
+                             std::move(rcrOptions),
+                             opKey);
     resetIsInternalClient(true);
     ON_BLOCK_EXIT([&] { resetIsInternalClient(false); });
     auto cbh = makeCallbackHandle();
     auto fut = runCommand(cbh, std::move(rcr));
     fut.get();
 }
-
 
 TEST_F(NetworkInterfaceInternalClientTest,
        HelloRequestContainsOutgoingWireVersionInternalClientInfo) {
@@ -1251,7 +1250,7 @@ TEST_F(NetworkInterfaceTest, ConnectionErrorAssociatedWithRemote) {
 
     auto cb = makeCallbackHandle();
     auto request = makeTestCommand(kNoTimeout, makeEchoCmdObj());
-    auto deferred = runCommandOnAny(cb, request);
+    auto deferred = runCommand(cb, request);
 
     auto result = deferred.get();
 
@@ -1295,7 +1294,7 @@ TEST_F(NetworkInterfaceTest, ShutdownBeforeSendRequest) {
     auto commandThread = stdx::thread([&]() {
         auto cb = makeCallbackHandle();
         auto request = makeTestCommand(kNoTimeout, makeEchoCmdObj(), nullptr, {}, {}, operationKey);
-        auto deferred = runCommandOnAny(cb, request);
+        auto deferred = runCommand(cb, request);
 
         auto result = deferred.get();
         ASSERT_EQ(ErrorCodes::ShutdownInProgress, result.status);

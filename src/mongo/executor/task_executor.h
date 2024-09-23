@@ -97,14 +97,12 @@ public:
 
     struct CallbackArgs;
     struct RemoteCommandCallbackArgs;
-    struct RemoteCommandOnAnyCallbackArgs;
     class CallbackState;
     class CallbackHandle;
     class EventState;
     class EventHandle;
 
     using ResponseStatus = RemoteCommandResponse;
-    using ResponseOnAnyStatus = RemoteCommandOnAnyResponse;
 
     /**
      * Type of a regular callback function.
@@ -125,8 +123,6 @@ public:
      * command in the usual way.
      */
     using RemoteCommandCallbackFn = std::function<void(const RemoteCommandCallbackArgs&)>;
-
-    using RemoteCommandOnAnyCallbackFn = std::function<void(const RemoteCommandOnAnyCallbackArgs&)>;
 
     /**
      * Destroys the task executor. Implicitly performs the equivalent of shutdown() and join()
@@ -323,9 +319,10 @@ public:
      * Contract: Implementations should guarantee that callback should be called *after* doing any
      * processing related to the callback.
      */
-    virtual StatusWith<CallbackHandle> scheduleRemoteCommand(const RemoteCommandRequest& request,
-                                                             const RemoteCommandCallbackFn& cb,
-                                                             const BatonHandle& baton = nullptr);
+    virtual StatusWith<CallbackHandle> scheduleRemoteCommand(
+        const RemoteCommandRequest& request,
+        const RemoteCommandCallbackFn& cb,
+        const BatonHandle& baton = nullptr) = 0;
 
     /**
      * Schedules the given request to be sent and returns a future containing the response. The
@@ -342,12 +339,6 @@ public:
         const CancellationToken& token,
         const BatonHandle& baton = nullptr);
 
-    virtual StatusWith<CallbackHandle> scheduleRemoteCommandOnAny(
-        const RemoteCommandRequestOnAny& request,
-        const RemoteCommandOnAnyCallbackFn& cb,
-        const BatonHandle& baton = nullptr) = 0;
-
-
     /**
      * Schedules "cb" to be run by the executor on each reply received from executing the exhaust
      * remote command described by "request".
@@ -363,11 +354,6 @@ public:
     virtual StatusWith<CallbackHandle> scheduleExhaustRemoteCommand(
         const RemoteCommandRequest& request,
         const RemoteCommandCallbackFn& cb,
-        const BatonHandle& baton = nullptr);
-
-    virtual StatusWith<CallbackHandle> scheduleExhaustRemoteCommandOnAny(
-        const RemoteCommandRequestOnAny& request,
-        const RemoteCommandOnAnyCallbackFn& cb,
         const BatonHandle& baton = nullptr) = 0;
 
     /**
@@ -388,12 +374,6 @@ public:
     ExecutorFuture<TaskExecutor::ResponseStatus> scheduleExhaustRemoteCommand(
         const RemoteCommandRequest& request,
         const RemoteCommandCallbackFn& cb,
-        const CancellationToken& token,
-        const BatonHandle& baton = nullptr);
-
-    ExecutorFuture<TaskExecutor::ResponseOnAnyStatus> scheduleExhaustRemoteCommandOnAny(
-        const RemoteCommandRequestOnAny& request,
-        const RemoteCommandOnAnyCallbackFn& cb,
         const CancellationToken& token,
         const BatonHandle& baton = nullptr);
 
@@ -616,24 +596,12 @@ struct TaskExecutor::RemoteCommandCallbackArgs {
                               const RemoteCommandRequest& theRequest,
                               const ResponseStatus& theResponse);
 
-    RemoteCommandCallbackArgs(const RemoteCommandOnAnyCallbackArgs& other, size_t idx);
+    RemoteCommandCallbackArgs(const RemoteCommandCallbackArgs& other);
 
     TaskExecutor* executor;
     CallbackHandle myHandle;
     RemoteCommandRequest request;
     ResponseStatus response;
-};
-
-struct TaskExecutor::RemoteCommandOnAnyCallbackArgs {
-    RemoteCommandOnAnyCallbackArgs(TaskExecutor* theExecutor,
-                                   const CallbackHandle& theHandle,
-                                   const RemoteCommandRequestOnAny& theRequest,
-                                   const ResponseOnAnyStatus& theResponse);
-
-    TaskExecutor* executor;
-    CallbackHandle myHandle;
-    RemoteCommandRequestOnAny request;
-    ResponseOnAnyStatus response;
 };
 
 }  // namespace executor

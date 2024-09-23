@@ -106,10 +106,7 @@ public:
                       StartCommandCB onFinish);
 
     Future<RemoteCommandResponse> runCommand(const TaskExecutor::CallbackHandle& cbHandle,
-                                             RemoteCommandRequestOnAny rcroa);
-
-    Future<RemoteCommandOnAnyResponse> runCommandOnAny(const TaskExecutor::CallbackHandle& cbHandle,
-                                                       RemoteCommandRequestOnAny request);
+                                             RemoteCommandRequest rcroa);
 
     /**
      * Runs a command on the fixture NetworkInterface and asserts it suceeded.

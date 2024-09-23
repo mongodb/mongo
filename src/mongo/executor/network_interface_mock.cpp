@@ -97,7 +97,7 @@ std::string NetworkInterfaceMock::getHostName() {
  */
 template <typename CallbackFn>
 Status NetworkInterfaceMock::_startCommand(const TaskExecutor::CallbackHandle& cbHandle,
-                                           RemoteCommandRequestOnAny& request,
+                                           RemoteCommandRequest& request,
                                            CallbackFn&& onResponse,
                                            const BatonHandle& baton) {
     if (inShutdown()) {
@@ -112,30 +112,28 @@ Status NetworkInterfaceMock::_startCommand(const TaskExecutor::CallbackHandle& c
 
     auto op = NetworkOperation(cbHandle, request, now, std::move(onResponse));
 
-    // network interface mock only works with single target requests
-    invariant(request.target.size() == 1);
-
     // If we don't have a hook, or we have already 'connected' to this host, enqueue the op.
-    if (!_hook || _connections.count(request.target[0])) {
+    if (!_hook || _connections.count(request.target)) {
         _enqueueOperation_inlock(std::move(op));
     } else {
-        _connectThenEnqueueOperation_inlock(request.target[0], std::move(op));
+        _connectThenEnqueueOperation_inlock(request.target, std::move(op));
     }
 
     return Status::OK();
 }
 
 Status NetworkInterfaceMock::startCommand(const CallbackHandle& cbHandle,
-                                          RemoteCommandRequestOnAny& request,
+                                          RemoteCommandRequest& request,
                                           RemoteCommandCompletionFn&& onFinish,
                                           const BatonHandle& baton) {
     return _startCommand(cbHandle, request, onFinish, baton);
 }
 
 Status NetworkInterfaceMock::startExhaustCommand(const CallbackHandle& cbHandle,
-                                                 RemoteCommandRequestOnAny& request,
+                                                 RemoteCommandRequest& request,
                                                  RemoteCommandOnReplyFn&& onReply,
                                                  const BatonHandle& baton) {
+
     return _startCommand(cbHandle, request, onReply, baton);
 }
 
@@ -540,7 +538,7 @@ void NetworkInterfaceMock::_connectThenEnqueueOperation_inlock(const HostAndPort
     auto cbh = op.getCallbackHandle();
     // The completion handler for the postconnect command schedules the original command.
     auto postconnectCompletionHandler =
-        [this, op = std::move(op)](TaskExecutor::ResponseOnAnyStatus rs) mutable {
+        [this, op = std::move(op)](TaskExecutor::ResponseStatus rs) mutable {
             stdx::lock_guard<stdx::mutex> lk(_mutex);
             if (!rs.isOK()) {
                 auto response = NetworkResponse{{}, _now_inlock(), rs};
@@ -714,18 +712,14 @@ bool NetworkInterfaceMock::_isExecutorThreadRunnable_inlock() {
 NetworkInterfaceMock::NetworkOperation::NetworkOperation()
     : _requestDate(), _request(), _onResponse() {}
 
-NetworkInterfaceMock::NetworkOperation::NetworkOperation(
-    const CallbackHandle& cbHandle,
-    const RemoteCommandRequestOnAny& theRequest,
-    Date_t theRequestDate,
-    RemoteCommandCompletionFn onResponse)
+NetworkInterfaceMock::NetworkOperation::NetworkOperation(const CallbackHandle& cbHandle,
+                                                         const RemoteCommandRequest& theRequest,
+                                                         Date_t theRequestDate,
+                                                         RemoteCommandCompletionFn onResponse)
     : _requestDate(theRequestDate),
       _cbHandle(cbHandle),
-      _requestOnAny(theRequest),
-      _request(theRequest, 0),
-      _onResponse(std::move(onResponse)) {
-    invariant(theRequest.target.size() == 1);
-}
+      _request(theRequest),
+      _onResponse(std::move(onResponse)) {}
 
 std::string NetworkInterfaceMock::NetworkOperation::getDiagnosticString() const {
     return str::stream() << "NetworkOperation -- request:'" << _request.toString()
@@ -746,9 +740,8 @@ bool NetworkInterfaceMock::NetworkOperation::processResponse(NetworkResponse res
         }
     });
 
-    auto responseOnAny =
-        TaskExecutor::ResponseOnAnyStatus(_request.target, std::move(response.response));
-    _onResponse(responseOnAny);
+    response.response.target = _request.target;
+    _onResponse(response.response);
 
     return true;
 }

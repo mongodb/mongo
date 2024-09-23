@@ -160,7 +160,7 @@ public:
                                                "Remote command execution failed"});
                     }
                     Status maybeError(
-                        detail::makeErrorIfNeeded(executor::RemoteCommandOnAnyResponse(
+                        detail::makeErrorIfNeeded(executor::RemoteCommandResponse(
                                                       targetUsed, resp.getValue(), Microseconds(1)),
                                                   targetUsed));
                     uassertStatusOK(maybeError);
@@ -280,10 +280,9 @@ public:
                     uassertStatusOK(Status{AsyncRPCErrorInfo(ans.getStatus(), targets[0]),
                                            "Remote command execution failed"});
                 }
-                Status maybeError(
-                    detail::makeErrorIfNeeded(executor::RemoteCommandOnAnyResponse(
-                                                  targets[0], ans.getValue(), Microseconds(1)),
-                                              targets[0]));
+                Status maybeError(detail::makeErrorIfNeeded(
+                    executor::RemoteCommandResponse(targets[0], ans.getValue(), Microseconds(1)),
+                    targets[0]));
                 uassertStatusOK(maybeError);
                 return detail::AsyncRPCInternalResponse{ans.getValue(), targets[0]};
             });

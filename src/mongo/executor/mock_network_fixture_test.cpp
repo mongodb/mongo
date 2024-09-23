@@ -73,7 +73,7 @@ public:
         mock().verifyAndClearExpectations();
     }
 
-    Status startCommand(RemoteCommandRequestOnAny& request) {
+    Status startCommand(RemoteCommandRequest& request) {
         TaskExecutor::CallbackHandle cb;
         return net().startCommand(cb, request, [&](const auto& resp) {
             LOGV2(5015503, "Test got command response", "resp"_attr = resp);
@@ -96,35 +96,35 @@ public:
     std::string kExampleCmdNameFour = kExampleCmdName + "_four";
 
     const DatabaseName dbName = DatabaseName::createDatabaseName_forTest(boost::none, "testDB");
-    RemoteCommandRequestOnAny kExampleRequest{
+    RemoteCommandRequest kExampleRequest{
         {testHost()}, dbName, BSON(kExampleCmdName << 1), rpc::makeEmptyMetadata(), nullptr};
-    RemoteCommandRequestOnAny kExampleRequestTwo{
+    RemoteCommandRequest kExampleRequestTwo{
         {testHost()}, dbName, BSON(kExampleCmdNameTwo << 1), rpc::makeEmptyMetadata(), nullptr};
-    RemoteCommandRequestOnAny kExampleRequestThree{
+    RemoteCommandRequest kExampleRequestThree{
         {testHost()}, dbName, BSON(kExampleCmdNameThree << 1), rpc::makeEmptyMetadata(), nullptr};
-    RemoteCommandRequestOnAny kExampleRequestFour{
+    RemoteCommandRequest kExampleRequestFour{
         {testHost()}, dbName, BSON(kExampleCmdNameFour << 1), rpc::makeEmptyMetadata(), nullptr};
 
     BSONObj kExampleResponse = BSON("some"
                                     << "response");
 
-    RemoteCommandRequestOnAny makeRequest(std::string cmdName) {
+    RemoteCommandRequest makeRequest(std::string cmdName) {
         return {{testHost()}, dbName, BSON(cmdName << 1), rpc::makeEmptyMetadata(), nullptr};
     }
 
-    RemoteCommandRequestOnAny makeRequest(BSONObj obj) {
+    RemoteCommandRequest makeRequest(BSONObj obj) {
         return {{testHost()}, dbName, obj, rpc::makeEmptyMetadata(), nullptr};
     }
 
 private:
     MockNetwork _mock;
-    std::vector<RemoteCommandOnAnyResponse> _responses;
+    std::vector<RemoteCommandResponse> _responses;
 };
 
 TEST_F(MockNetworkTest, MockFixtureBasicTest) {
     mock().expect(kExampleCmdName, kExampleResponse);
 
-    RemoteCommandRequestOnAny request{kExampleRequest};
+    RemoteCommandRequest request{kExampleRequest};
     ASSERT_OK(startCommand(request));
 
     mock().runUntilExpectationsSatisfied();
@@ -136,7 +136,7 @@ TEST_F(MockNetworkTest, MockFixtureBasicTestWithMatcherFn) {
         [&](auto& request) { return request.firstElementFieldNameStringData() == kExampleCmdName; },
         kExampleResponse);
 
-    RemoteCommandRequestOnAny request{kExampleRequest};
+    RemoteCommandRequest request{kExampleRequest};
     ASSERT_OK(startCommand(request));
 
     mock().runUntilExpectationsSatisfied();
@@ -146,7 +146,7 @@ TEST_F(MockNetworkTest, MockFixtureBasicTestWithMatcherFn) {
 TEST_F(MockNetworkTest, MockFixtureBasicTestSameCommandMultipleTimes) {
     mock().expect(kExampleCmdName, kExampleResponse).times(3);
 
-    RemoteCommandRequestOnAny request{kExampleRequest};
+    RemoteCommandRequest request{kExampleRequest};
 
     // Run command three times.
     ASSERT_OK(startCommand(request));
@@ -163,8 +163,8 @@ TEST_F(MockNetworkTest, MockFixtureSeveralExpectationsUnordered) {
     mock().expect(kExampleCmdName, kExampleResponse).times(2);
     mock().expect(kExampleCmdNameTwo, kExampleResponse).times(3);
 
-    RemoteCommandRequestOnAny requestOne{kExampleRequest};
-    RemoteCommandRequestOnAny requestTwo{kExampleRequestTwo};
+    RemoteCommandRequest requestOne{kExampleRequest};
+    RemoteCommandRequest requestTwo{kExampleRequestTwo};
 
     // Run commands in this specific order.
     ASSERT_OK(startCommand(requestTwo));
@@ -185,9 +185,8 @@ TEST_F(MockNetworkTest, MockFixtureSimilarExpectationsSpecialization) {
     mock().expect(kExampleCmdName, kExampleResponse).times(1);
     mock().expect(BSON(kExampleCmdName << 1 << "extradata" << 1), kExampleResponse).times(1);
 
-    RemoteCommandRequestOnAny cmdNameRequest{kExampleRequest};
-    RemoteCommandRequestOnAny bsonRequest{
-        makeRequest(BSON(kExampleCmdName << 1 << "extradata" << 1))};
+    RemoteCommandRequest cmdNameRequest{kExampleRequest};
+    RemoteCommandRequest bsonRequest{makeRequest(BSON(kExampleCmdName << 1 << "extradata" << 1))};
 
     // Run commands starting with the one for the older (potentially overridden) expectations.
     ASSERT_OK(startCommand(cmdNameRequest));
@@ -210,9 +209,8 @@ TEST_F(MockNetworkTest, MockFixtureSimilarExpectationsOverride) {
         mock().expect(BSON(kExampleCmdName << 1 << "extradata" << 1), kExampleResponse).times(1);
     mock().expect(kExampleCmdName, kExampleResponse).times(1);
 
-    RemoteCommandRequestOnAny bsonRequest{
-        makeRequest(BSON(kExampleCmdName << 1 << "extradata" << 1))};
-    RemoteCommandRequestOnAny cmdNameRequest{kExampleRequest};
+    RemoteCommandRequest bsonRequest{makeRequest(BSON(kExampleCmdName << 1 << "extradata" << 1))};
+    RemoteCommandRequest cmdNameRequest{kExampleRequest};
 
     // Run commands starting with the one for the older (potentially overridden) expectations.
     // The first request is meant for the older expectation, however it fulfills the matching
@@ -240,7 +238,7 @@ TEST_F(MockNetworkTest, MockFixtureSimilarExpectationsOverride) {
 TEST_F(MockNetworkTest, MockFixtureRunUntilReadyRequest) {
     mock().expect(kExampleCmdName, kExampleResponse);
 
-    RemoteCommandRequestOnAny request{kExampleRequest};
+    RemoteCommandRequest request{kExampleRequest};
     ASSERT_OK(startCommand(request));
 
     TaskExecutor::CallbackHandle cbAlarm;
@@ -264,7 +262,7 @@ TEST_F(MockNetworkTest, MockFixtureRunUntilNotAllExpectationsSatisfied) {
     mock().expect(kExampleCmdName, kExampleResponse);
     mock().expect(kExampleCmdNameTwo, kExampleResponse);
 
-    RemoteCommandRequestOnAny request{kExampleRequest};
+    RemoteCommandRequest request{kExampleRequest};
     ASSERT_OK(startCommand(request));
 
     TaskExecutor::CallbackHandle cbAlarm;
@@ -284,7 +282,7 @@ TEST_F(MockNetworkTest, MockFixtureRunUntilNotAllExpectationsSatisfied) {
     ASSERT_THROWS_CODE(mock().verifyExpectations(), DBException, (ErrorCodes::Error)5015501);
 
     // Satisfy the other expectation to terminate the test.
-    RemoteCommandRequestOnAny requestTwo{kExampleRequestTwo};
+    RemoteCommandRequest requestTwo{kExampleRequestTwo};
     ASSERT_OK(startCommand(requestTwo));
 
     mock().runUntilExpectationsSatisfied();
@@ -294,7 +292,7 @@ TEST_F(MockNetworkTest, MockFixtureRunUntilNotAllExpectationsSatisfied) {
 TEST_F(MockNetworkTest, MockFixtureNotEnoughTimesMatched) {
     mock().expect(kExampleCmdName, kExampleResponse).times(2);
 
-    RemoteCommandRequestOnAny request{kExampleRequest};
+    RemoteCommandRequest request{kExampleRequest};
     ASSERT_OK(startCommand(request));
 
     const auto deadline = net().now() + Milliseconds(100);
@@ -318,8 +316,8 @@ TEST_F(MockNetworkTest, MockFixtureSequenceTestCorrectOrder) {
         mock().expect(kExampleCmdNameTwo, kExampleResponse).times(1);
     }
 
-    RemoteCommandRequestOnAny requestOne{kExampleRequest};
-    RemoteCommandRequestOnAny requestTwo{kExampleRequestTwo};
+    RemoteCommandRequest requestOne{kExampleRequest};
+    RemoteCommandRequest requestTwo{kExampleRequestTwo};
 
     // Run commands in this specific order.
     ASSERT_OK(startCommand(requestOne));
@@ -342,8 +340,8 @@ TEST_F(MockNetworkTest, MockFixtureSequenceTestOppositeOrder) {
         mock().expect(kExampleCmdNameTwo, kExampleResponse).times(1);
     }
 
-    RemoteCommandRequestOnAny requestOne{kExampleRequest};
-    RemoteCommandRequestOnAny requestTwo{kExampleRequestTwo};
+    RemoteCommandRequest requestOne{kExampleRequest};
+    RemoteCommandRequest requestTwo{kExampleRequestTwo};
 
     // Run commands in this specific order.
     ASSERT_OK(startCommand(requestTwo));
@@ -373,9 +371,9 @@ TEST_F(MockNetworkTest, MockFixtureSequenceTestCorrectPartialOrder) {
 
     mock().expect(kExampleCmdNameThree, kExampleResponse).times(1);
 
-    RemoteCommandRequestOnAny requestOne{kExampleRequest};
-    RemoteCommandRequestOnAny requestTwo{kExampleRequestTwo};
-    RemoteCommandRequestOnAny requestThree{kExampleRequestThree};
+    RemoteCommandRequest requestOne{kExampleRequest};
+    RemoteCommandRequest requestTwo{kExampleRequestTwo};
+    RemoteCommandRequest requestThree{kExampleRequestThree};
 
     // Run commands in this specific order.
     ASSERT_OK(startCommand(requestOne));
@@ -402,10 +400,10 @@ TEST_F(MockNetworkTest, MockFixtureSequenceTestTwoSequencesNoOverlap) {
         mock().expect(kExampleCmdNameFour, kExampleResponse).times(1);
     }
 
-    RemoteCommandRequestOnAny requestOne{kExampleRequest};
-    RemoteCommandRequestOnAny requestTwo{kExampleRequestTwo};
-    RemoteCommandRequestOnAny requestThree{kExampleRequestThree};
-    RemoteCommandRequestOnAny requestFour{kExampleRequestFour};
+    RemoteCommandRequest requestOne{kExampleRequest};
+    RemoteCommandRequest requestTwo{kExampleRequestTwo};
+    RemoteCommandRequest requestThree{kExampleRequestThree};
+    RemoteCommandRequest requestFour{kExampleRequestFour};
 
     // Run commands in this specific order.
     ASSERT_OK(startCommand(requestOne));
@@ -433,10 +431,10 @@ TEST_F(MockNetworkTest, MockFixtureSequenceTestTwoSequencesPartialOrder) {
         mock().expect(kExampleCmdNameFour, kExampleResponse).times(1);
     }
 
-    RemoteCommandRequestOnAny requestOne{kExampleRequest};
-    RemoteCommandRequestOnAny requestTwo{kExampleRequestTwo};
-    RemoteCommandRequestOnAny requestThree{kExampleRequestThree};
-    RemoteCommandRequestOnAny requestFour{kExampleRequestFour};
+    RemoteCommandRequest requestOne{kExampleRequest};
+    RemoteCommandRequest requestTwo{kExampleRequestTwo};
+    RemoteCommandRequest requestThree{kExampleRequestThree};
+    RemoteCommandRequest requestFour{kExampleRequestFour};
 
     // Run commands in this specific order.
     ASSERT_OK(startCommand(requestOne));
@@ -459,10 +457,10 @@ TEST_F(MockNetworkTest, MockFixtureSequenceTestLongerChain) {
         mock().expect(kExampleCmdNameFour, kExampleResponse).times(1);
     }
 
-    RemoteCommandRequestOnAny requestOne{kExampleRequest};
-    RemoteCommandRequestOnAny requestTwo{kExampleRequestTwo};
-    RemoteCommandRequestOnAny requestThree{kExampleRequestThree};
-    RemoteCommandRequestOnAny requestFour{kExampleRequestFour};
+    RemoteCommandRequest requestOne{kExampleRequest};
+    RemoteCommandRequest requestTwo{kExampleRequestTwo};
+    RemoteCommandRequest requestThree{kExampleRequestThree};
+    RemoteCommandRequest requestFour{kExampleRequestFour};
 
     // Run commands in this specific order.
     ASSERT_OK(startCommand(requestOne));

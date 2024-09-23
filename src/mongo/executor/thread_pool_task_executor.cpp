@@ -428,9 +428,9 @@ using ResponseStatus = TaskExecutor::ResponseStatus;
 // which expects a RemoteCommandResponse as part of RemoteCommandCallbackArgs,
 // can be run despite a RemoteCommandResponse never having been created.
 void remoteCommandFinished(const TaskExecutor::CallbackArgs& cbData,
-                           const TaskExecutor::RemoteCommandOnAnyCallbackFn& cb,
-                           const RemoteCommandRequestOnAny& request,
-                           const TaskExecutor::ResponseOnAnyStatus& rs) {
+                           const TaskExecutor::RemoteCommandCallbackFn& cb,
+                           const RemoteCommandRequest& request,
+                           const TaskExecutor::ResponseStatus& rs) {
     cb({cbData.executor, cbData.myHandle, request, rs});
 }
 
@@ -439,20 +439,19 @@ void remoteCommandFinished(const TaskExecutor::CallbackArgs& cbData,
 // which expects a RemoteCommandResponse as part of RemoteCommandCallbackArgs,
 // can be run despite a RemoteCommandResponse never having been created.
 void remoteCommandFailedEarly(const TaskExecutor::CallbackArgs& cbData,
-                              const TaskExecutor::RemoteCommandOnAnyCallbackFn& cb,
-                              const RemoteCommandRequestOnAny& request) {
+                              const TaskExecutor::RemoteCommandCallbackFn& cb,
+                              const RemoteCommandRequest& request) {
     invariant(!cbData.status.isOK());
     cb({cbData.executor, cbData.myHandle, request, {boost::none, cbData.status}});
 }
-
 }  // namespace
 
-StatusWith<TaskExecutor::CallbackHandle> ThreadPoolTaskExecutor::scheduleRemoteCommandOnAny(
-    const RemoteCommandRequestOnAny& request,
-    const RemoteCommandOnAnyCallbackFn& cb,
+StatusWith<TaskExecutor::CallbackHandle> ThreadPoolTaskExecutor::scheduleRemoteCommand(
+    const RemoteCommandRequest& request,
+    const RemoteCommandCallbackFn& cb,
     const BatonHandle& baton) {
 
-    RemoteCommandRequestOnAny scheduledRequest = request;
+    RemoteCommandRequest scheduledRequest = request;
     scheduledRequest.dateScheduled = _net->now();
 
     // In case the request fails to even get a connection from the pool,
@@ -477,7 +476,7 @@ StatusWith<TaskExecutor::CallbackHandle> ThreadPoolTaskExecutor::scheduleRemoteC
     auto commandStatus = _net->startCommand(
         swCbHandle.getValue(),
         scheduledRequest,
-        [this, scheduledRequest, cbState, cb](const ResponseOnAnyStatus& response) {
+        [this, scheduledRequest, cbState, cb](const ResponseStatus& response) {
             using std::swap;
             CallbackFn newCb = [cb, scheduledRequest, response](const CallbackArgs& cbData) {
                 remoteCommandFinished(cbData, cb, scheduledRequest, response);
@@ -701,11 +700,11 @@ void ThreadPoolTaskExecutor::runCallback(std::shared_ptr<CallbackState> cbStateA
     }
 }
 
-StatusWith<TaskExecutor::CallbackHandle> ThreadPoolTaskExecutor::scheduleExhaustRemoteCommandOnAny(
-    const RemoteCommandRequestOnAny& request,
-    const RemoteCommandOnAnyCallbackFn& cb,
+StatusWith<TaskExecutor::CallbackHandle> ThreadPoolTaskExecutor::scheduleExhaustRemoteCommand(
+    const RemoteCommandRequest& request,
+    const RemoteCommandCallbackFn& cb,
     const BatonHandle& baton) {
-    RemoteCommandRequestOnAny scheduledRequest = request;
+    RemoteCommandRequest scheduledRequest = request;
     scheduledRequest.dateScheduled = _net->now();
 
     // In case the request fails to even get a connection from the pool,
@@ -730,7 +729,7 @@ StatusWith<TaskExecutor::CallbackHandle> ThreadPoolTaskExecutor::scheduleExhaust
     auto commandStatus = _net->startExhaustCommand(
         swCbHandle.getValue(),
         scheduledRequest,
-        [this, scheduledRequest, cbState, cb, baton](const ResponseOnAnyStatus& response) {
+        [this, scheduledRequest, cbState, cb, baton](const ResponseStatus& response) {
             using std::swap;
 
             LOGV2_DEBUG(4495134,

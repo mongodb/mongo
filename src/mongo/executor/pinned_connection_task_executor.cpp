@@ -59,7 +59,7 @@ class PinnedConnectionTaskExecutor::CallbackState : public TaskExecutor::Callbac
     CallbackState& operator=(const CallbackState&) = delete;
 
 public:
-    static std::shared_ptr<CallbackState> make(const RemoteCommandOnAnyCallbackFn& cb,
+    static std::shared_ptr<CallbackState> make(const RemoteCommandCallbackFn& cb,
                                                const BatonHandle& baton) {
         return std::make_shared<CallbackState>(cb, baton);
     }
@@ -67,7 +67,7 @@ public:
     /**
      * Do not call directly. Use make.
      */
-    CallbackState(const RemoteCommandOnAnyCallbackFn& cb, const BatonHandle& baton)
+    CallbackState(const RemoteCommandCallbackFn& cb, const BatonHandle& baton)
         : callback(cb), baton(baton) {}
 
     ~CallbackState() override = default;
@@ -90,8 +90,8 @@ public:
                                     TaskExecutor* exec) {
         CallbackHandle cbHandle;
         setCallbackForHandle(&cbHandle, rcb.second);
-        auto errorResponse = RemoteCommandOnAnyResponse(boost::none, kCallbackCanceledErrorStatus);
-        TaskExecutor::RemoteCommandOnAnyCallbackFn callback;
+        auto errorResponse = RemoteCommandResponse(boost::none, kCallbackCanceledErrorStatus);
+        TaskExecutor::RemoteCommandCallbackFn callback;
         using std::swap;
         swap(rcb.second->callback, callback);
         ScopedUnlock guard(lk);
@@ -107,21 +107,20 @@ public:
         // Convert the result into a RemoteCommandResponse unconditionally.
         RemoteCommandResponse asRcr =
             result.isOK() ? result.getValue() : RemoteCommandResponse(result.getStatus());
-        // Convert the response into an OnAnyResponse using the provided target.
-        RemoteCommandOnAnyResponse asOnAnyRcr(targetUsed, asRcr);
+        asRcr.target = targetUsed;
         CallbackHandle cbHandle;
         setCallbackForHandle(&cbHandle, rcb.second);
-        TaskExecutor::RemoteCommandOnAnyCallbackFn callback;
+        TaskExecutor::RemoteCommandCallbackFn callback;
         using std::swap;
         swap(rcb.second->callback, callback);
         ScopedUnlock guard(lk);
-        callback({exec, cbHandle, rcb.first, asOnAnyRcr});
+        callback({exec, cbHandle, rcb.first, asRcr});
     }
 
     // All fields except for "canceled" are guarded by the owning task executor's _mutex.
     enum class State { kWaiting, kRunning, kDone, kCanceled };
 
-    RemoteCommandOnAnyCallbackFn callback;
+    RemoteCommandCallbackFn callback;
     boost::optional<stdx::condition_variable> finishedCondition;
     State state{State::kWaiting};
     bool isNetworkOperation = true;
@@ -175,20 +174,17 @@ StatusWith<TaskExecutor::CallbackHandle> PinnedConnectionTaskExecutor::scheduleW
     return _executor->scheduleWorkAt(when, std::move(work));
 }
 
-StatusWith<TaskExecutor::CallbackHandle> PinnedConnectionTaskExecutor::scheduleRemoteCommandOnAny(
-    const RemoteCommandRequestOnAny& requestOnAny,
-    const RemoteCommandOnAnyCallbackFn& cb,
+StatusWith<TaskExecutor::CallbackHandle> PinnedConnectionTaskExecutor::scheduleRemoteCommand(
+    const RemoteCommandRequest& request,
+    const RemoteCommandCallbackFn& cb,
     const BatonHandle& baton) {
 
     stdx::unique_lock<Latch> lk{_mutex};
     if (_state != State::running) {
         return {ErrorCodes::ShutdownInProgress, "Shutdown in progress"};
     }
-    invariant(requestOnAny.target.size() == 1,
-              "RPCs scheduled through PinnedConnectionTaskExecutor can only target a single host.");
-    RemoteCommandRequest req = RemoteCommandRequest(requestOnAny, 0);
     auto state = PinnedConnectionTaskExecutor::CallbackState::make(cb, baton);
-    _requestQueue.push_back({req, state});
+    _requestQueue.push_back({request, state});
 
     CallbackHandle cbHandle;
     setCallbackForHandle(&cbHandle, state);
@@ -424,10 +420,9 @@ void PinnedConnectionTaskExecutor::wait(const CallbackHandle& cbHandle,
     MONGO_UNIMPLEMENTED;
 }
 
-StatusWith<TaskExecutor::CallbackHandle>
-PinnedConnectionTaskExecutor::scheduleExhaustRemoteCommandOnAny(
-    const RemoteCommandRequestOnAny& request,
-    const RemoteCommandOnAnyCallbackFn& cb,
+StatusWith<TaskExecutor::CallbackHandle> PinnedConnectionTaskExecutor::scheduleExhaustRemoteCommand(
+    const RemoteCommandRequest& request,
+    const RemoteCommandCallbackFn& cb,
     const BatonHandle& baton) {
     MONGO_UNIMPLEMENTED;
 }

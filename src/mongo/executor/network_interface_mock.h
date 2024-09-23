@@ -138,11 +138,11 @@ public:
     Date_t now() override;
     std::string getHostName() override;
     Status startCommand(const TaskExecutor::CallbackHandle& cbHandle,
-                        RemoteCommandRequestOnAny& request,
+                        RemoteCommandRequest& request,
                         RemoteCommandCompletionFn&& onFinish,
                         const BatonHandle& baton = nullptr) override;
     Status startExhaustCommand(const TaskExecutor::CallbackHandle& cbHandle,
-                               RemoteCommandRequestOnAny& request,
+                               RemoteCommandRequest& request,
                                RemoteCommandOnReplyFn&& onReply,
                                const BatonHandle& baton = nullptr) override;
 
@@ -418,7 +418,7 @@ private:
 
     template <typename CallbackFn>
     Status _startCommand(const TaskExecutor::CallbackHandle& cbHandle,
-                         RemoteCommandRequestOnAny& request,
+                         RemoteCommandRequest& request,
                          CallbackFn&& onReply,
                          const BatonHandle& baton = nullptr);
 
@@ -498,12 +498,12 @@ private:
  * Representation of an in-progress network operation.
  */
 class NetworkInterfaceMock::NetworkOperation {
-    using ResponseCallback = unique_function<void(const TaskExecutor::ResponseOnAnyStatus&)>;
+    using ResponseCallback = unique_function<void(const TaskExecutor::ResponseStatus&)>;
 
 public:
     NetworkOperation();
     NetworkOperation(const TaskExecutor::CallbackHandle& cbHandle,
-                     const RemoteCommandRequestOnAny& theRequest,
+                     const RemoteCommandRequest& theRequest,
                      Date_t theRequestDate,
                      ResponseCallback onResponse);
 
@@ -540,13 +540,6 @@ public:
 
     const TaskExecutor::CallbackHandle& getCallbackHandle() const {
         return _cbHandle;
-    }
-
-    /**
-     * Gets the request that initiated this operation.
-     */
-    const RemoteCommandRequestOnAny& getRequestOnAny() const {
-        return _requestOnAny;
     }
 
     /**
@@ -590,7 +583,6 @@ public:
 private:
     Date_t _requestDate;
     TaskExecutor::CallbackHandle _cbHandle;
-    RemoteCommandRequestOnAny _requestOnAny;
     RemoteCommandRequest _request;
 
     bool _isProcessing = false;

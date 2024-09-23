@@ -85,8 +85,8 @@ public:
                    clientOperationKey](std::vector<HostAndPort> targets) {
                 invariant(targets.size(),
                           "Successful targeting implies there are hosts to target.");
-                executor::RemoteCommandRequestOnAny executorRequest(
-                    targets,
+                executor::RemoteCommandRequest executorRequest(
+                    targets[0],
                     dbName,
                     cmdBSON,
                     rpc::makeEmptyMetadata(),
@@ -106,12 +106,11 @@ public:
                     }
                 }
 
-                auto [p, f] = makePromiseFuture<TaskExecutor::RemoteCommandOnAnyCallbackArgs>();
-                auto swCallbackHandle = exec->scheduleRemoteCommandOnAny(
+                auto [p, f] = makePromiseFuture<TaskExecutor::RemoteCommandCallbackArgs>();
+                auto swCallbackHandle = exec->scheduleRemoteCommand(
                     executorRequest,
-                    [p = std::make_shared<Promise<TaskExecutor::RemoteCommandOnAnyCallbackArgs>>(
-                         std::move(p))](
-                        const TaskExecutor::RemoteCommandOnAnyCallbackArgs& cbData) {
+                    [p = std::make_shared<Promise<TaskExecutor::RemoteCommandCallbackArgs>>(
+                         std::move(p))](const TaskExecutor::RemoteCommandCallbackArgs& cbData) {
                         pauseAsyncRPCAfterNetworkResponse.pauseWhileSet();
                         p->emplaceValue(cbData);
                     },
@@ -126,13 +125,13 @@ public:
                     .getAsync([](auto) {});
                 return std::move(f);
             })
-            .onError([](Status s)
-                         -> StatusWith<TaskExecutor::TaskExecutor::RemoteCommandOnAnyCallbackArgs> {
-                // If there was a scheduling error or other local error before the
-                // command was accepted by the executor.
-                return Status{AsyncRPCErrorInfo(s, {}), "Remote command execution failed"};
-            })
-            .then([targeter](TaskExecutor::RemoteCommandOnAnyCallbackArgs cbargs) {
+            .onError(
+                [](Status s) -> StatusWith<TaskExecutor::TaskExecutor::RemoteCommandCallbackArgs> {
+                    // If there was a scheduling error or other local error before the
+                    // command was accepted by the executor.
+                    return Status{AsyncRPCErrorInfo(s, {}), "Remote command execution failed"};
+                })
+            .then([targeter](TaskExecutor::RemoteCommandCallbackArgs cbargs) {
                 auto r = cbargs.response;
                 auto s = makeErrorIfNeeded(r, r.target);
                 // Update targeter for errors.

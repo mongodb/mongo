@@ -109,11 +109,11 @@ public:
     void signalWorkAvailable() override;
     Date_t now() override;
     Status startCommand(const TaskExecutor::CallbackHandle& cbHandle,
-                        RemoteCommandRequestOnAny& request,
+                        RemoteCommandRequest& request,
                         RemoteCommandCompletionFn&& onFinish,
                         const BatonHandle& baton) override;
     Status startExhaustCommand(const TaskExecutor::CallbackHandle& cbHandle,
-                               RemoteCommandRequestOnAny& request,
+                               RemoteCommandRequest& request,
                                RemoteCommandOnReplyFn&& onReply,
                                const BatonHandle& baton) override;
 
@@ -169,7 +169,7 @@ private:
 
     struct CommandStateBase : public std::enable_shared_from_this<CommandStateBase> {
         CommandStateBase(NetworkInterfaceTL* interface_,
-                         RemoteCommandRequestOnAny request_,
+                         RemoteCommandRequest request_,
                          const TaskExecutor::CallbackHandle& cbHandle_);
         virtual ~CommandStateBase();
 
@@ -181,7 +181,7 @@ private:
         /**
          * Fulfill the promise with the response.
          */
-        virtual void fulfillFinalPromise(StatusWith<RemoteCommandOnAnyResponse> response) = 0;
+        virtual void fulfillFinalPromise(StatusWith<RemoteCommandResponse> response) = 0;
 
         /**
          * Fulfill the promise for the Command.
@@ -227,7 +227,7 @@ private:
          * Run the NetworkInterface's MetadataHook on a given request if this Command isn't already
          * finished.
          */
-        Status doMetadataHook(const RemoteCommandOnAnyResponse& response);
+        Status doMetadataHook(const RemoteCommandResponse& response);
 
         NetworkInterfaceTL* interface;
 
@@ -267,26 +267,26 @@ private:
 
     struct CommandState final : public CommandStateBase {
         CommandState(NetworkInterfaceTL* interface_,
-                     RemoteCommandRequestOnAny request_,
+                     RemoteCommandRequest request_,
                      const TaskExecutor::CallbackHandle& cbHandle_);
         ~CommandState() override = default;
 
         // Create a new CommandState in a shared_ptr
         // Prefer this over raw construction
         static auto make(NetworkInterfaceTL* interface,
-                         RemoteCommandRequestOnAny request,
+                         RemoteCommandRequest request,
                          const TaskExecutor::CallbackHandle& cbHandle);
 
         Future<RemoteCommandResponse> sendRequest() override;
 
-        void fulfillFinalPromise(StatusWith<RemoteCommandOnAnyResponse> response) override;
+        void fulfillFinalPromise(StatusWith<RemoteCommandResponse> response) override;
 
-        Promise<RemoteCommandOnAnyResponse> promise;
+        Promise<RemoteCommandResponse> promise;
     };
 
     struct ExhaustCommandState final : public CommandStateBase {
         ExhaustCommandState(NetworkInterfaceTL* interface_,
-                            RemoteCommandRequestOnAny request_,
+                            RemoteCommandRequest request_,
                             const TaskExecutor::CallbackHandle& cbHandle_,
                             RemoteCommandOnReplyFn&& onReply_);
         ~ExhaustCommandState() override = default;
@@ -294,14 +294,14 @@ private:
         // Create a new ExhaustCommandState in a shared_ptr
         // Prefer this over raw construction
         static auto make(NetworkInterfaceTL* interface,
-                         RemoteCommandRequestOnAny request,
+                         RemoteCommandRequest request,
                          const TaskExecutor::CallbackHandle& cbHandle,
                          RemoteCommandOnReplyFn&& onReply,
                          const BatonHandle& baton);
 
         Future<RemoteCommandResponse> sendRequest() override;
 
-        void fulfillFinalPromise(StatusWith<RemoteCommandOnAnyResponse> response) override;
+        void fulfillFinalPromise(StatusWith<RemoteCommandResponse> response) override;
 
         void continueExhaustRequest(StatusWith<RemoteCommandResponse> swResponse);
 

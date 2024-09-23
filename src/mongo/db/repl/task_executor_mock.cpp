@@ -62,25 +62,24 @@ StatusWith<executor::TaskExecutor::CallbackHandle> TaskExecutorMock::scheduleWor
     return getExecutor()->scheduleWorkAt(when, std::move(work));
 }
 
-StatusWith<executor::TaskExecutor::CallbackHandle> TaskExecutorMock::scheduleRemoteCommandOnAny(
-    const executor::RemoteCommandRequestOnAny& request,
-    const RemoteCommandOnAnyCallbackFn& cb,
+StatusWith<executor::TaskExecutor::CallbackHandle> TaskExecutorMock::scheduleRemoteCommand(
+    const executor::RemoteCommandRequest& request,
+    const RemoteCommandCallbackFn& cb,
     const BatonHandle& baton) {
     if (shouldFailScheduleRemoteCommandRequest(request)) {
         return Status(failureCode, "failed to schedule remote command");
     }
-    return getExecutor()->scheduleRemoteCommandOnAny(request, cb, baton);
+    return getExecutor()->scheduleRemoteCommand(request, cb, baton);
 }
 
-StatusWith<executor::TaskExecutor::CallbackHandle>
-TaskExecutorMock::scheduleExhaustRemoteCommandOnAny(
-    const executor::RemoteCommandRequestOnAny& request,
-    const RemoteCommandOnAnyCallbackFn& cb,
+StatusWith<executor::TaskExecutor::CallbackHandle> TaskExecutorMock::scheduleExhaustRemoteCommand(
+    const executor::RemoteCommandRequest& request,
+    const RemoteCommandCallbackFn& cb,
     const BatonHandle& baton) {
     if (shouldFailScheduleRemoteCommandRequest(request)) {
         return Status(failureCode, "failed to schedule remote command");
     }
-    return getExecutor()->scheduleExhaustRemoteCommandOnAny(request, cb, baton);
+    return getExecutor()->scheduleExhaustRemoteCommand(request, cb, baton);
 }
 
 bool TaskExecutorMock::hasTasks() {

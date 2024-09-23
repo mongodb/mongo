@@ -49,19 +49,18 @@ class TaskExecutorMock : public unittest::TaskExecutorProxy {
 public:
     using ShouldFailScheduleWorkRequestFn = std::function<bool()>;
     using ShouldFailScheduleRemoteCommandRequestFn =
-        std::function<bool(const executor::RemoteCommandRequestOnAny&)>;
+        std::function<bool(const executor::RemoteCommandRequest&)>;
 
     explicit TaskExecutorMock(executor::TaskExecutor* executor);
 
     StatusWith<CallbackHandle> scheduleWork(CallbackFn&& work) override;
     StatusWith<CallbackHandle> scheduleWorkAt(Date_t when, CallbackFn&& work) override;
-    StatusWith<CallbackHandle> scheduleRemoteCommandOnAny(
-        const executor::RemoteCommandRequestOnAny& request,
-        const RemoteCommandOnAnyCallbackFn& cb,
-        const BatonHandle& baton = nullptr) override;
-    StatusWith<CallbackHandle> scheduleExhaustRemoteCommandOnAny(
-        const executor::RemoteCommandRequestOnAny& request,
-        const RemoteCommandOnAnyCallbackFn& cb,
+    StatusWith<CallbackHandle> scheduleRemoteCommand(const executor::RemoteCommandRequest& request,
+                                                     const RemoteCommandCallbackFn& cb,
+                                                     const BatonHandle& baton = nullptr) override;
+    StatusWith<CallbackHandle> scheduleExhaustRemoteCommand(
+        const executor::RemoteCommandRequest& request,
+        const RemoteCommandCallbackFn& cb,
         const BatonHandle& baton = nullptr) override;
     bool hasTasks() override;
 
@@ -84,7 +83,7 @@ public:
 
     // Override to make scheduleRemoteCommand fail during testing.
     ShouldFailScheduleRemoteCommandRequestFn shouldFailScheduleRemoteCommandRequest =
-        [](const executor::RemoteCommandRequestOnAny&) {
+        [](const executor::RemoteCommandRequest&) {
             return false;
         };
 

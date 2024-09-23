@@ -66,8 +66,8 @@ public:
     void setUp() override;
     void tearDown() override;
 
-    RemoteCommandRequestOnAny kUnimportantRequest{
-        {testHost()},
+    RemoteCommandRequest kUnimportantRequest{
+        testHost(),
         DatabaseName::createDatabaseName_forTest(boost::none, "testDB"),
         BSON("test" << 1),
         rpc::makeEmptyMetadata(),

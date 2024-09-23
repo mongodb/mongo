@@ -73,17 +73,14 @@ class NetworkInterface {
 
 public:
     using Response = RemoteCommandResponse;
-
     /**
      * This must not throw exceptions.
      */
-    using RemoteCommandCompletionFn =
-        unique_function<void(const TaskExecutor::ResponseOnAnyStatus&)>;
-
+    using RemoteCommandCompletionFn = unique_function<void(const TaskExecutor::ResponseStatus&)>;
     /**
      * This must not throw exceptions.
      */
-    using RemoteCommandOnReplyFn = unique_function<void(const TaskExecutor::ResponseOnAnyStatus&)>;
+    using RemoteCommandOnReplyFn = unique_function<void(const TaskExecutor::ResponseStatus&)>;
 
     // Indicates that there is no expiration time by when a request needs to complete
     static constexpr Date_t kNoExpirationDate{Date_t::max()};
@@ -227,24 +224,23 @@ public:
      * The `onFinish` argument must not throw exceptions.
      */
     virtual Status startCommand(const TaskExecutor::CallbackHandle& cbHandle,
-                                RemoteCommandRequestOnAny& request,
+                                RemoteCommandRequest& request,
                                 RemoteCommandCompletionFn&& onFinish,
                                 const BatonHandle& baton = nullptr) = 0;
     virtual Status startExhaustCommand(const TaskExecutor::CallbackHandle& cbHandle,
-                                       RemoteCommandRequestOnAny& request,
+                                       RemoteCommandRequest& request,
                                        RemoteCommandOnReplyFn&& onReply,
                                        const BatonHandle& baton = nullptr) = 0;
 
-    Future<TaskExecutor::ResponseOnAnyStatus> startCommand(
-        const TaskExecutor::CallbackHandle& cbHandle,
-        RemoteCommandRequestOnAny& request,
-        const BatonHandle& baton = nullptr) {
-        auto pf = makePromiseFuture<TaskExecutor::ResponseOnAnyStatus>();
+    Future<TaskExecutor::ResponseStatus> startCommand(const TaskExecutor::CallbackHandle& cbHandle,
+                                                      RemoteCommandRequest& request,
+                                                      const BatonHandle& baton = nullptr) {
+        auto pf = makePromiseFuture<TaskExecutor::ResponseStatus>();
 
         auto status = startCommand(
             cbHandle,
             request,
-            [p = std::move(pf.promise)](const TaskExecutor::ResponseOnAnyStatus& rs) mutable {
+            [p = std::move(pf.promise)](const TaskExecutor::ResponseStatus& rs) mutable {
                 p.emplaceValue(rs);
             },
             baton);

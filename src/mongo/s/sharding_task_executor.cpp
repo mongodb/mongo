@@ -133,18 +133,18 @@ StatusWith<TaskExecutor::CallbackHandle> ShardingTaskExecutor::scheduleWorkAt(Da
     return _executor->scheduleWorkAt(when, std::move(work));
 }
 
-StatusWith<TaskExecutor::CallbackHandle> ShardingTaskExecutor::scheduleRemoteCommandOnAny(
-    const RemoteCommandRequestOnAny& request,
-    const RemoteCommandOnAnyCallbackFn& cb,
+StatusWith<TaskExecutor::CallbackHandle> ShardingTaskExecutor::scheduleRemoteCommand(
+    const RemoteCommandRequest& request,
+    const RemoteCommandCallbackFn& cb,
     const BatonHandle& baton) {
 
     // schedule the user's callback if there is not opCtx
     if (!request.opCtx) {
-        return _executor->scheduleRemoteCommandOnAny(request, cb, baton);
+        return _executor->scheduleRemoteCommand(request, cb, baton);
     }
 
-    boost::optional<RemoteCommandRequestOnAny> requestWithFixedLsid = [&] {
-        boost::optional<RemoteCommandRequestOnAny> newRequest;
+    boost::optional<RemoteCommandRequest> requestWithFixedLsid = [&] {
+        boost::optional<RemoteCommandRequest> newRequest;
 
         if (!request.opCtx->getLogicalSessionId()) {
             return newRequest;
@@ -185,7 +185,7 @@ StatusWith<TaskExecutor::CallbackHandle> ShardingTaskExecutor::scheduleRemoteCom
     std::shared_ptr<OperationTimeTracker> timeTracker = OperationTimeTracker::get(request.opCtx);
 
     auto shardingCb = [timeTracker, cb, grid = Grid::get(request.opCtx), hosts = request.target](
-                          const TaskExecutor::RemoteCommandOnAnyCallbackArgs& args) {
+                          const TaskExecutor::RemoteCommandCallbackArgs& args) {
         ON_BLOCK_EXIT([&cb, &args]() { cb(args); });
 
         if (!args.response.isOK()) {
@@ -194,7 +194,7 @@ StatusWith<TaskExecutor::CallbackHandle> ShardingTaskExecutor::scheduleRemoteCom
             if (args.response.target) {
                 target = *args.response.target;
             } else {
-                target = hosts.front();
+                target = hosts;
             }
 
             auto shard = grid->shardRegistry()->getShardForHostNoReload(target);
@@ -244,13 +244,13 @@ StatusWith<TaskExecutor::CallbackHandle> ShardingTaskExecutor::scheduleRemoteCom
         }
     };
 
-    return _executor->scheduleRemoteCommandOnAny(
+    return _executor->scheduleRemoteCommand(
         requestWithFixedLsid ? *requestWithFixedLsid : request, shardingCb, baton);
 }
 
-StatusWith<TaskExecutor::CallbackHandle> ShardingTaskExecutor::scheduleExhaustRemoteCommandOnAny(
-    const RemoteCommandRequestOnAny& request,
-    const RemoteCommandOnAnyCallbackFn& cb,
+StatusWith<TaskExecutor::CallbackHandle> ShardingTaskExecutor::scheduleExhaustRemoteCommand(
+    const RemoteCommandRequest& request,
+    const RemoteCommandCallbackFn& cb,
     const BatonHandle& baton) {
     MONGO_UNREACHABLE;
 }

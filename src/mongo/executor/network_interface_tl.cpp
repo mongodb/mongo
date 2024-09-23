@@ -125,7 +125,7 @@ auto& numConnectionNetworkTimeouts =
 auto& timeSpentWaitingBeforeConnectionTimeoutMillis =
     *MetricBuilder<Counter64>("operation.totalTimeWaitingBeforeConnectionTimeoutMillis");
 
-Status appendMetadata(RemoteCommandRequestOnAny* request,
+Status appendMetadata(RemoteCommandRequest* request,
                       const std::unique_ptr<rpc::EgressMetadataHook>& hook) {
     if (hook) {
         BSONObjBuilder bob(std::move(request->metadata));
@@ -428,10 +428,10 @@ void NetworkInterfaceTL::_registerCommand(const TaskExecutor::CallbackHandle& cb
 
 NetworkInterfaceTL::CommandStateBase::CommandStateBase(
     NetworkInterfaceTL* interface_,
-    RemoteCommandRequestOnAny request_,
+    RemoteCommandRequest request_,
     const TaskExecutor::CallbackHandle& cbHandle_)
     : interface(interface_),
-      request(RemoteCommandRequest(std::move(request_), 0)),
+      request(std::move(request_)),
       requestToSend(request),
       cbHandle(cbHandle_),
       timer(interface->_reactor->makeTimer()),
@@ -443,15 +443,15 @@ NetworkInterfaceTL::CommandStateBase::~CommandStateBase() {
 }
 
 NetworkInterfaceTL::CommandState::CommandState(NetworkInterfaceTL* interface_,
-                                               RemoteCommandRequestOnAny request_,
+                                               RemoteCommandRequest request_,
                                                const TaskExecutor::CallbackHandle& cbHandle_)
     : CommandStateBase(interface_, std::move(request_), cbHandle_) {}
 
 auto NetworkInterfaceTL::CommandState::make(NetworkInterfaceTL* interface,
-                                            RemoteCommandRequestOnAny request,
+                                            RemoteCommandRequest request,
                                             const TaskExecutor::CallbackHandle& cbHandle) {
     auto state = std::make_shared<CommandState>(interface, std::move(request), cbHandle);
-    auto [promise, future] = makePromiseFuture<RemoteCommandOnAnyResponse>();
+    auto [promise, future] = makePromiseFuture<RemoteCommandResponse>();
     state->promise = std::move(promise);
 
     interface->_registerCommand(cbHandle, state);
@@ -461,7 +461,7 @@ auto NetworkInterfaceTL::CommandState::make(NetworkInterfaceTL* interface,
     future = std::move(future)
                  .onError([state](Status error) {
                      // If command promise was canceled or timed out, wrap the error in a RCRsp
-                     return RemoteCommandOnAnyResponse(
+                     return RemoteCommandResponse(
                          boost::none, std::move(error), state->stopwatch.elapsed());
                  })
                  .tapAll([state](const auto& swRequest) {
@@ -538,7 +538,7 @@ void NetworkInterfaceTL::CommandStateBase::setTimer() {
                         "requestId"_attr = request.id,
                         "deadline"_attr = deadline,
                         "request"_attr = request);
-            fulfillFinalPromise(StatusWith<RemoteCommandOnAnyResponse>(RemoteCommandOnAnyResponse(
+            fulfillFinalPromise(StatusWith<RemoteCommandResponse>(RemoteCommandResponse(
                 request.target, Status(timeoutCode, message), stopwatch.elapsed())));
         });
 }
@@ -617,7 +617,7 @@ void NetworkInterfaceTL::CommandStateBase::cancel() noexcept {
 }
 
 Status NetworkInterfaceTL::startCommand(const TaskExecutor::CallbackHandle& cbHandle,
-                                        RemoteCommandRequestOnAny& request,
+                                        RemoteCommandRequest& request,
                                         RemoteCommandCompletionFn&& onFinish,
                                         const BatonHandle& baton) try {
     if (inShutdown()) {
@@ -632,8 +632,7 @@ Status NetworkInterfaceTL::startCommand(const TaskExecutor::CallbackHandle& cbHa
         return status;
     }
 
-    request.target.resize(1);
-    auto targetNode = request.target.front();
+    auto targetNode = request.target;
 
     auto [cmdState, future] = CommandState::make(this, request, cbHandle);
     if (cmdState->request.timeout != cmdState->request.kNoTimeout) {
@@ -647,7 +646,7 @@ Status NetworkInterfaceTL::startCommand(const TaskExecutor::CallbackHandle& cbHa
         // otherwise.
         .thenRunOn(makeGuaranteedExecutor(baton, _reactor))
         .getAsync([cmdState = cmdState,
-                   onFinish = std::move(onFinish)](StatusWith<RemoteCommandOnAnyResponse> swr) {
+                   onFinish = std::move(onFinish)](StatusWith<RemoteCommandResponse> swr) {
             invariant(swr.getStatus(),
                       "Remote command response failed with an error: {}"_format(
                           swr.getStatus().toString()));
@@ -731,13 +730,13 @@ Future<RemoteCommandResponse> NetworkInterfaceTL::CommandState::sendRequest() {
                    requestToSend, baton, std::move(connAcquiredTimer), _cancelSource.token());
            })
         .then([this](RemoteCommandResponse response) {
-            uassertStatusOK(doMetadataHook(RemoteCommandOnAnyResponse(request.target, response)));
+            response.target = request.target;
+            uassertStatusOK(doMetadataHook(response));
             return response;
         });
 }
 
-Status NetworkInterfaceTL::CommandStateBase::doMetadataHook(
-    const RemoteCommandOnAnyResponse& response) {
+Status NetworkInterfaceTL::CommandStateBase::doMetadataHook(const RemoteCommandResponse& response) {
     if (auto& hook = interface->_metadataHook; hook && !promiseFulfilling.load()) {
         invariant(response.target);
         return hook->readReplyMetadata(nullptr, response.data);
@@ -746,7 +745,7 @@ Status NetworkInterfaceTL::CommandStateBase::doMetadataHook(
 }
 
 void NetworkInterfaceTL::CommandState::fulfillFinalPromise(
-    StatusWith<RemoteCommandOnAnyResponse> response) {
+    StatusWith<RemoteCommandResponse> response) {
     promise.setFrom(std::move(response));
     promiseFulfilled.set();
 }
@@ -797,13 +796,13 @@ void NetworkInterfaceTL::CommandStateBase::trySend(
             auto& reactor = interface->_reactor;
             boost::optional<HostAndPort> target = request.target;
             if (reactor->onReactorThread()) {
-                fulfillFinalPromise(StatusWith<RemoteCommandOnAnyResponse>(
-                    RemoteCommandOnAnyResponse(target, std::move(swConn.getStatus()))));
+                fulfillFinalPromise(StatusWith<RemoteCommandResponse>(
+                    RemoteCommandResponse(target, std::move(swConn.getStatus()))));
             } else {
                 ExecutorFuture<void>(reactor, swConn.getStatus())
                     .getAsync([this, anchor = shared_from_this(), target](Status status) {
-                        fulfillFinalPromise(StatusWith<RemoteCommandOnAnyResponse>(
-                            RemoteCommandOnAnyResponse(target, std::move(status))));
+                        fulfillFinalPromise(StatusWith<RemoteCommandResponse>(
+                            RemoteCommandResponse(target, std::move(status))));
                     });
             }
         }
@@ -882,17 +881,18 @@ void NetworkInterfaceTL::CommandStateBase::trySend(
 
 void NetworkInterfaceTL::CommandStateBase::resolve(Future<RemoteCommandResponse> future) noexcept {
     // Convert the RemoteCommandResponse to a RemoteCommandOnAnyResponse and wrap any error
-    auto anyFuture = std::move(future)
-                         .then([this, anchor = shared_from_this()](RemoteCommandResponse response) {
-                             // The RCRq ran successfully, wrap the result with the host in question
-                             return RemoteCommandOnAnyResponse(request.target, std::move(response));
-                         })
-                         .onError([this, anchor = shared_from_this()](Status error) {
-                             // The RCRq failed, wrap the error into a RCRsp with the host and
-                             // duration
-                             return RemoteCommandOnAnyResponse(
-                                 request.target, std::move(error), stopwatch.elapsed());
-                         });
+    auto anyFuture =
+        std::move(future)
+            .then([this, anchor = shared_from_this()](RemoteCommandResponse response) {
+                // The RCRq ran successfully, wrap the result with the host in question
+                response.target = request.target;
+                return response;
+            })
+            .onError([this, anchor = shared_from_this()](Status error) {
+                // The RCRq failed, wrap the error into a RCRsp with the host and
+                // duration
+                return RemoteCommandResponse(request.target, std::move(error), stopwatch.elapsed());
+            });
 
     std::move(anyFuture)
         .thenRunOn(
@@ -921,14 +921,14 @@ void NetworkInterfaceTL::CommandStateBase::resolve(Future<RemoteCommandResponse>
 
 NetworkInterfaceTL::ExhaustCommandState::ExhaustCommandState(
     NetworkInterfaceTL* interface_,
-    RemoteCommandRequestOnAny request_,
+    RemoteCommandRequest request_,
     const TaskExecutor::CallbackHandle& cbHandle_,
     RemoteCommandOnReplyFn&& onReply_)
     : CommandStateBase(interface_, std::move(request_), cbHandle_),
       onReplyFn(std::move(onReply_)) {}
 
 auto NetworkInterfaceTL::ExhaustCommandState::make(NetworkInterfaceTL* interface,
-                                                   RemoteCommandRequestOnAny request,
+                                                   RemoteCommandRequest request,
                                                    const TaskExecutor::CallbackHandle& cbHandle,
                                                    RemoteCommandOnReplyFn&& onReply,
                                                    const BatonHandle& baton) {
@@ -945,8 +945,8 @@ auto NetworkInterfaceTL::ExhaustCommandState::make(NetworkInterfaceTL* interface
         .thenRunOn(makeGuaranteedExecutor(baton, interface->_reactor))
         .onError([state](Status error) {
             stdx::lock_guard<Latch> lk(state->stopwatchMutex);
-            state->onReplyFn(RemoteCommandOnAnyResponse(
-                boost::none, std::move(error), state->stopwatch.elapsed()));
+            state->onReplyFn(
+                RemoteCommandResponse(boost::none, std::move(error), state->stopwatch.elapsed()));
         })
         .getAsync([state](Status status) {
             state->tryFinish(
@@ -973,7 +973,7 @@ Future<RemoteCommandResponse> NetworkInterfaceTL::ExhaustCommandState::sendReque
 }
 
 void NetworkInterfaceTL::ExhaustCommandState::fulfillFinalPromise(
-    StatusWith<RemoteCommandOnAnyResponse> swr) {
+    StatusWith<RemoteCommandResponse> swr) {
     promise.setFrom([&] {
         if (!swr.isOK())
             return swr.getStatus();
@@ -999,8 +999,8 @@ void NetworkInterfaceTL::ExhaustCommandState::continueExhaustRequest(
         return;
     }
 
-    auto onAnyResponse = RemoteCommandOnAnyResponse(request.target, response);
-    if (Status metadataHookStatus = doMetadataHook(onAnyResponse); !metadataHookStatus.isOK()) {
+    response.target = request.target;
+    if (Status metadataHookStatus = doMetadataHook(response); !metadataHookStatus.isOK()) {
         finalResponsePromise.setError(metadataHookStatus);
         return;
     }
@@ -1016,7 +1016,7 @@ void NetworkInterfaceTL::ExhaustCommandState::continueExhaustRequest(
         return;
     }
 
-    onReplyFn(onAnyResponse);
+    onReplyFn(response);
 
     // Reset the stopwatch to measure the correct duration for the following reply
     {
@@ -1038,7 +1038,7 @@ void NetworkInterfaceTL::ExhaustCommandState::continueExhaustRequest(
 }
 
 Status NetworkInterfaceTL::startExhaustCommand(const TaskExecutor::CallbackHandle& cbHandle,
-                                               RemoteCommandRequestOnAny& request,
+                                               RemoteCommandRequest& request,
                                                RemoteCommandOnReplyFn&& onReply,
                                                const BatonHandle& baton) try {
     if (inShutdown()) {
@@ -1060,7 +1060,7 @@ Status NetworkInterfaceTL::startExhaustCommand(const TaskExecutor::CallbackHandl
     cmdState->baton = baton;
 
     // Attempt to get a connection to the target host
-    auto connFuture = _pool->get(request.target.front(), request.sslMode, request.timeout);
+    auto connFuture = _pool->get(request.target, request.sslMode, request.timeout);
 
     if (connFuture.isReady()) {
         cmdState->trySend(std::move(connFuture).getNoThrow());
@@ -1129,7 +1129,7 @@ Status NetworkInterfaceTL::_killOperation(CommandStateBase* cmdStateToKill) try 
     killOpCmdState->deadline = killOpCmdState->stopwatch.start() + killOpRequest.timeout;
 
     std::move(future).getAsync(
-        [this, operationKey, killOpRequest](StatusWith<RemoteCommandOnAnyResponse> swr) {
+        [this, operationKey, killOpRequest](StatusWith<RemoteCommandResponse> swr) {
             invariant(swr.getStatus());
             auto rs = std::move(swr.getValue());
             LOGV2_DEBUG(51813,
