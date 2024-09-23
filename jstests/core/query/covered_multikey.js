@@ -10,7 +10,6 @@
  */
 // For making assertions about explain output.
 import {
-    getOptimizer,
     getPlanStage,
     getWinningPlan,
     isCollscan,
@@ -29,18 +28,7 @@ assert.eq(1, coll.find({a: 1, b: 2}, {_id: 0, a: 1}).itcount());
 assert.eq({a: 1}, coll.findOne({a: 1, b: 2}, {_id: 0, a: 1}));
 let explainRes = coll.explain("queryPlanner").find({a: 1, b: 2}, {_id: 0, a: 1}).finish();
 let winningPlan = getWinningPlan(explainRes.queryPlanner);
-switch (getOptimizer(explainRes)) {
-    case "classic": {
-        assert(isIxscan(db, winningPlan));
-        break;
-    }
-    case "CQF": {
-        // TODO SERVER-77719: Ensure that the decision for using the scan lines up with CQF
-        // optimizer. M2: allow only collscans, M4: check bonsai behavior for index scan.
-        assert(isCollscan(db, winningPlan));
-        break;
-    }
-}
+assert(isIxscan(db, winningPlan));
 assert(!planHasStage(db, winningPlan, "FETCH"));
 
 coll.drop();
@@ -66,20 +54,9 @@ assert.commandWorked(coll.createIndex({a: 1}));
 assert.eq({a: []}, coll.findOne({a: []}, {_id: 0, a: 1}));
 explainRes = coll.explain("queryPlanner").find({a: []}, {_id: 0, a: 1}).finish();
 winningPlan = getWinningPlan(explainRes.queryPlanner);
-switch (getOptimizer(explainRes)) {
-    case "classic": {
-        assert(isIxscan(db, winningPlan));
-        assert(planHasStage(db, winningPlan, "FETCH"));
-        assert(isIxscanMultikey(winningPlan));
-        break;
-    }
-    case "CQF": {
-        // TODO SERVER-77719: Ensure that the decision for using the scan lines up with CQF
-        // optimizer. M2: allow only collscans, M4: check bonsai behavior for index scan.
-        assert(isCollscan(db, winningPlan));
-        break;
-    }
-}
+assert(isIxscan(db, winningPlan));
+assert(planHasStage(db, winningPlan, "FETCH"));
+assert(isIxscanMultikey(winningPlan));
 
 // Verify that a query cannot be covered over a path which is multikey due to a single-element
 // array.
@@ -89,20 +66,9 @@ assert.commandWorked(coll.createIndex({a: 1}));
 assert.eq({a: [2]}, coll.findOne({a: 2}, {_id: 0, a: 1}));
 explainRes = coll.explain("queryPlanner").find({a: 2}, {_id: 0, a: 1}).finish();
 winningPlan = getWinningPlan(explainRes.queryPlanner);
-switch (getOptimizer(explainRes)) {
-    case "classic": {
-        assert(isIxscan(db, winningPlan));
-        assert(planHasStage(db, winningPlan, "FETCH"));
-        assert(isIxscanMultikey(winningPlan));
-        break;
-    }
-    case "CQF": {
-        // TODO SERVER-77719: Ensure that the decision for using the scan lines up with CQF
-        // optimizer. M2: allow only collscans, M4: check bonsai behavior for index scan.
-        assert(isCollscan(db, winningPlan));
-        break;
-    }
-}
+assert(isIxscan(db, winningPlan));
+assert(planHasStage(db, winningPlan, "FETCH"));
+assert(isIxscanMultikey(winningPlan));
 
 // Verify that a query cannot be covered over a path which is multikey due to a single-element
 // array, where the path is made multikey by an update rather than an insert.
@@ -113,20 +79,9 @@ assert.commandWorked(coll.update({}, {$set: {a: [2]}}));
 assert.eq({a: [2]}, coll.findOne({a: 2}, {_id: 0, a: 1}));
 explainRes = coll.explain("queryPlanner").find({a: 2}, {_id: 0, a: 1}).finish();
 winningPlan = getWinningPlan(explainRes.queryPlanner);
-switch (getOptimizer(explainRes)) {
-    case "classic": {
-        assert(isIxscan(db, winningPlan));
-        assert(planHasStage(db, winningPlan, "FETCH"));
-        assert(isIxscanMultikey(winningPlan));
-        break;
-    }
-    case "CQF": {
-        // TODO SERVER-77719: Ensure that the decision for using the scan lines up with CQF
-        // optimizer. M2: allow only collscans, M4: check bonsai behavior for index scan.
-        assert(isCollscan(db, winningPlan));
-        break;
-    }
-}
+assert(isIxscan(db, winningPlan));
+assert(planHasStage(db, winningPlan, "FETCH"));
+assert(isIxscanMultikey(winningPlan));
 
 // Verify that a trailing empty array makes a 2dsphere index multikey.
 assert(coll.drop());
@@ -134,26 +89,14 @@ assert.commandWorked(coll.createIndex({"a.b": 1, c: "2dsphere"}));
 assert.commandWorked(coll.insert({a: {b: 1}, c: {type: "Point", coordinates: [0, 0]}}));
 explainRes = coll.explain().find().hint({"a.b": 1, c: "2dsphere"}).finish();
 winningPlan = getWinningPlan(explainRes.queryPlanner);
-let optimizer = getOptimizer(explainRes);
-let stages = {"classic": "IXSCAN", "CQF": "IndexScan"};
-let ixscanStage = getPlanStage(winningPlan, stages[optimizer]);
+let ixscanStage = getPlanStage(winningPlan, "IXSCAN");
 assert.neq(null, ixscanStage);
 assert.eq(false, ixscanStage.isMultiKey);
 assert.commandWorked(coll.insert({a: {b: []}, c: {type: "Point", coordinates: [0, 0]}}));
 explainRes = coll.explain().find().hint({"a.b": 1, c: "2dsphere"}).finish();
 winningPlan = getWinningPlan(explainRes.queryPlanner);
-switch (getOptimizer(explainRes)) {
-    case "classic": {
-        assert(isIxscan(db, winningPlan));
-        assert(isIxscanMultikey(winningPlan));
-        break;
-    }
-    case "CQF": {
-        // TODO SERVER-77719: Ensure that the decision for using the scan lines up with CQF
-        // optimizer. M2: allow only collscans, M4: check bonsai behavior for index scan.
-        break;
-    }
-}
+assert(isIxscan(db, winningPlan));
+assert(isIxscanMultikey(winningPlan));
 
 // Verify that a mid-path empty array makes a 2dsphere index multikey.
 assert(coll.drop());
@@ -161,18 +104,8 @@ assert.commandWorked(coll.createIndex({"a.b": 1, c: "2dsphere"}));
 assert.commandWorked(coll.insert({a: [], c: {type: "Point", coordinates: [0, 0]}}));
 explainRes = coll.explain().find().hint({"a.b": 1, c: "2dsphere"}).finish();
 winningPlan = getWinningPlan(explainRes.queryPlanner);
-switch (getOptimizer(explainRes)) {
-    case "classic": {
-        assert(isIxscan(db, winningPlan));
-        assert(isIxscanMultikey(winningPlan));
-        break;
-    }
-    case "CQF": {
-        // TODO SERVER-77719: Ensure that the decision for using the scan lines up with CQF
-        // optimizer. M2: allow only collscans, M4: check bonsai behavior for index scan.
-        break;
-    }
-}
+assert(isIxscan(db, winningPlan));
+assert(isIxscanMultikey(winningPlan));
 
 // Verify that a single-element array makes a 2dsphere index multikey.
 assert(coll.drop());
@@ -180,15 +113,5 @@ assert.commandWorked(coll.createIndex({"a.b": 1, c: "2dsphere"}));
 assert.commandWorked(coll.insert({a: {b: [3]}, c: {type: "Point", coordinates: [0, 0]}}));
 explainRes = coll.explain().find().hint({"a.b": 1, c: "2dsphere"}).finish();
 winningPlan = getWinningPlan(explainRes.queryPlanner);
-switch (getOptimizer(explainRes)) {
-    case "classic": {
-        assert(isIxscan(db, winningPlan));
-        assert(isIxscanMultikey(winningPlan));
-        break;
-    }
-    case "CQF": {
-        // TODO SERVER-77719: Ensure that the decision for using the scan lines up with CQF
-        // optimizer. M2: allow only collscans, M4: check bonsai behavior for index scan.
-        break;
-    }
-}
+assert(isIxscan(db, winningPlan));
+assert(isIxscanMultikey(winningPlan));

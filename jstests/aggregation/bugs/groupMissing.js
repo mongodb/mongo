@@ -76,9 +76,7 @@ let collScanResult = coll.aggregate({$match: {a: 1}}, {$project: {_id: 0, a: 1, 
 assertArrayEq({actual: collScanResult, expected: [{"a": 1, "b": null}, {"a": 1}]});
 
 // After creating the index, the classic plan will use PROJECTION_COVERED, and the index will
-// incorrectly provide a null for the missing "b" value. Bonsai does not exhibit SERVER-23229. So,
-// either the new engine is used and the correct results (collScanResult) are seen, or we see the
-// incorrect result, where all values of "b" are null.
+// incorrectly provide a null for the missing "b" value.
 assert.commandWorked(coll.createIndex({a: 1, b: 1}));
 const possibleResults = [collScanResult, [{"a": 1, "b": null}, {"a": 1, "b": null}]];
 

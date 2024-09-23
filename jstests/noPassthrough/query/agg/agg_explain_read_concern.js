@@ -2,7 +2,7 @@
  * Test that explained aggregation commands behave correctly with the readConcern option.
  */
 
-import {getOptimizer, planHasStage} from "jstests/libs/analyze_plan.js";
+import {planHasStage} from "jstests/libs/analyze_plan.js";
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
@@ -72,15 +72,7 @@ const runTest = (db, coll) => {
 
     explain = db.runCommand(
         {explain: {find: coll.getName(), filter: {}}, readConcern: {level: "snapshot"}});
-    let optimizer = getOptimizer(explain);
-    switch (optimizer) {
-        case "classic":
-            assert(planHasStage(db, explain, "SHARDING_FILTER"));
-            break;
-        case "CQF":
-            // TODO SERVER-77719: Implement the assertion for CQF.
-            break;
-    }
+    assert(planHasStage(db, explain, "SHARDING_FILTER"));
 
     st.stop();
 }

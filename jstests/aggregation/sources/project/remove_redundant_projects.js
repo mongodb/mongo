@@ -9,7 +9,6 @@ import {
     orderedArrayEq,
 } from "jstests/aggregation/extras/utils.js";
 import {
-    getOptimizer,
     getPlanStages,
     getWinningPlan,
     isAggregationPlan,
@@ -67,54 +66,41 @@ function assertResultsMatch({
             result = getWinningPlan(explain.stages[0].$cursor.queryPlanner);
         }
 
-        let optimizer = getOptimizer(explain);
+        // Check that $project uses the query system and all expectedCoalescedProjects are
+        // actually present in explain.
+        if (expectProjectToCoalesce) {
+            assert.gte(
+                expectedCoalescedProjects.length,
+                1,
+                "If we expect project to coalesce, there should be at least one such projection in expectedCoalescedProjects " +
+                    tojson(expectedCoalescedProjects));
 
-        switch (optimizer) {
-            case "classic": {
-                // Check that $project uses the query system and all expectedCoalescedProjects are
-                // actually present in explain.
-                if (expectProjectToCoalesce) {
-                    assert.gte(
-                        expectedCoalescedProjects.length,
-                        1,
-                        "If we expect project to coalesce, there should be at least one such projection in expectedCoalescedProjects " +
-                            tojson(expectedCoalescedProjects));
+            const projects = [
+                ...getPlanStages(result, "PROJECTION_DEFAULT"),
+                ...getPlanStages(result, "PROJECTION_COVERED"),
+                ...getPlanStages(result, "PROJECTION_SIMPLE")
+            ];
 
-                    const projects = [
-                        ...getPlanStages(result, "PROJECTION_DEFAULT"),
-                        ...getPlanStages(result, "PROJECTION_COVERED"),
-                        ...getPlanStages(result, "PROJECTION_SIMPLE")
-                    ];
+            assert.gte(projects.length, 1, explain);
 
-                    assert.gte(projects.length, 1, explain);
-
-                    const areAllexpectedCoalescedProjectsPresent =
-                        expectedCoalescedProjects.every(coalescedProject => {
-                            return projects.some(project => {
-                                return documentEq(project.transformBy, coalescedProject);
-                            });
-                        });
-
-                    assert(areAllexpectedCoalescedProjectsPresent,
-                           "There were missing or extra coalesced projects in " +
-                               tojson(expectedCoalescedProjects) + " with explain " +
-                               tojson(explain));
-                }
-
-                if (!pipelineOptimizedAway) {
-                    // Check that $project was removed from pipeline and pushed to the query system.
-                    explain.stages.forEach(function(stage) {
-                        if (stage.hasOwnProperty("$project"))
-                            assert.neq(removedProjectStage, stage["$project"], explain);
+            const areAllexpectedCoalescedProjectsPresent =
+                expectedCoalescedProjects.every(coalescedProject => {
+                    return projects.some(project => {
+                        return documentEq(project.transformBy, coalescedProject);
                     });
-                }
-                break;
-            }
-            case "CQF": {
-                // TODO SERVER-77719: Implement the assertion for projection optimization rules for
-                // CQF.
-                break;
-            }
+                });
+
+            assert(areAllexpectedCoalescedProjectsPresent,
+                   "There were missing or extra coalesced projects in " +
+                       tojson(expectedCoalescedProjects) + " with explain " + tojson(explain));
+        }
+
+        if (!pipelineOptimizedAway) {
+            // Check that $project was removed from pipeline and pushed to the query system.
+            explain.stages.forEach(function(stage) {
+                if (stage.hasOwnProperty("$project"))
+                    assert.neq(removedProjectStage, stage["$project"], explain);
+            });
         }
     }
 

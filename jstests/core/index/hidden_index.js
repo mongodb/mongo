@@ -10,7 +10,7 @@
  * ]
  */
 
-import {getNumberOfIndexScans, getOptimizer} from "jstests/libs/analyze_plan.js";
+import {getNumberOfIndexScans} from "jstests/libs/analyze_plan.js";
 import {assertDropAndRecreateCollection} from "jstests/libs/collection_drop_recreate.js";
 import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 import {IndexCatalogHelpers} from "jstests/libs/index_catalog_helpers.js";
@@ -40,18 +40,7 @@ function validateHiddenIndexBehaviour(
 
     // Assert the plan is using an index scan.
     let explain = assert.commandWorked(coll.find(query, projection).explain());
-    switch (getOptimizer(explain)) {
-        case "classic":
-            assert.gt(numOfUsedIndexes(explain), 0);
-            break;
-        case "CQF":
-            // TODO SERVER-77719: Ensure that the decision for using the scan lines up with CQF
-            // optimizer. M2: allow only collscans, M4: check bonsai behavior for index scan.
-            assert.eq(numOfUsedIndexes(explain), 0);
-            break;
-        default:
-            break;
-    }
+    assert.gt(numOfUsedIndexes(explain), 0);
 
     assert.commandWorked(coll.hideIndex(index_name));
     idxSpec = IndexCatalogHelpers.findByName(coll.getIndexes(), index_name);
@@ -72,18 +61,7 @@ function validateHiddenIndexBehaviour(
 
     // Assert the plan is using an index scan.
     explain = assert.commandWorked(coll.find(query, projection).explain());
-    switch (getOptimizer(explain)) {
-        case "classic":
-            assert.gt(numOfUsedIndexes(explain), 0);
-            break;
-        case "CQF":
-            // TODO SERVER-77719: Ensure that the decision for using the scan lines up with CQF
-            // optimizer. M2: allow only collscans, M4: check bonsai behavior for index scan.
-            assert.eq(numOfUsedIndexes(explain), 0);
-            break;
-        default:
-            break;
-    }
+    assert.gt(numOfUsedIndexes(explain), 0);
 
     assert.commandWorked(coll.dropIndex(index_name));
 

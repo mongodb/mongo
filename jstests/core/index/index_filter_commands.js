@@ -42,7 +42,6 @@
  */
 
 import {
-    getOptimizer,
     getPlanCacheKeyFromPipeline,
     getPlanCacheKeyFromShape,
     getPlanStage,
@@ -236,19 +235,7 @@ const collectionIsClustered = ClusteredCollectionUtil.areAllCollectionsClustered
 if (collectionIsClustered) {
     assert(isExpress(db, getWinningPlan(queryPlanner)), "Expected Express: " + tojson(explain));
 } else {
-    switch (getOptimizer(explain)) {
-        case "classic":
-            assert(isIdhackOrExpress(db, winningPlan), winningPlan);
-            break;
-        case "CQF":
-            // TODO SERVER-70847, how to recognize the case of an IDHACK for Bonsai?
-            // TODO SERVER-77719: Ensure that the decision for using the scan lines up with CQF
-            // optimizer. M2: allow only collscans, M4: check bonsai behavior for index scan.
-            assert(isCollscan(db, getWinningPlanFromExplain(explain)));
-            break;
-        default:
-            break;
-    }
+    assert(isIdhackOrExpress(db, winningPlan), winningPlan);
 }
 
 // Clearing filters on a missing collection should be a no-op.

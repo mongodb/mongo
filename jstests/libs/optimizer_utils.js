@@ -4,63 +4,6 @@ import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {setParameterOnAllHosts} from "jstests/noPassthrough/libs/server_parameter_helpers.js";
 
 /**
- * Utility for checking if the Cascades optimizer code path is enabled (checks framework control).
- */
-export function checkCascadesOptimizerEnabled(theDB) {
-    const val = theDB.adminCommand({getParameter: 1, internalQueryFrameworkControl: 1})
-                    .internalQueryFrameworkControl;
-    return val == "tryBonsai" || val == "tryBonsaiExperimental" || val == "forceBonsai";
-}
-
-/**
- * Utility for checking if the experimental Cascades optimizer code path is enabled (checks
- * framework control for M4+).
- */
-export function checkExperimentalCascadesOptimizerEnabled(theDB) {
-    const val = theDB.adminCommand({getParameter: 1, internalQueryFrameworkControl: 1})
-                    .internalQueryFrameworkControl;
-    return val == "tryBonsaiExperimental" || val == "forceBonsai";
-}
-
-/**
- * Utility for checking if the Cascades optimizer feature flag is on.
- */
-export function checkCascadesFeatureFlagEnabled(theDB) {
-    return FeatureFlagUtil.isPresentAndEnabled(theDB, "CommonQueryFramework");
-}
-
-/**
- * Given the result of an explain command, returns whether the bonsai optimizer was used.
- */
-export function usedBonsaiOptimizer(explain) {
-    function isCQF(queryPlanner) {
-        return queryPlanner.queryFramework === "cqf";
-    }
-
-    // This section handles the explain output for aggregations against sharded colls.
-    if (explain.hasOwnProperty("shards")) {
-        for (let shardName of Object.keys(explain.shards)) {
-            if (!isCQF(getQueryPlanner(explain.shards[shardName]))) {
-                return false;
-            }
-        }
-        return true;
-    } else if (explain.hasOwnProperty("queryPlanner") &&
-               explain.queryPlanner.winningPlan.hasOwnProperty("shards")) {
-        // This section handles the explain output for find queries against sharded colls.
-        for (let shardExplain of explain.queryPlanner.winningPlan.shards) {
-            if (!isCQF(shardExplain)) {
-                return false;
-            }
-        }
-        return true;
-    }
-
-    // This section handles the explain output for unsharded queries.
-    return explain.hasOwnProperty("queryPlanner") && isCQF(explain.queryPlanner);
-}
-
-/**
  * Given a query plan or explain output, follow the leftmost child until
  * we reach a leaf stage, and return it.
  *

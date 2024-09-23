@@ -1,6 +1,5 @@
 import {assertArrayEq} from "jstests/aggregation/extras/utils.js";
 import {
-    checkCascadesFeatureFlagEnabled,
     extractLogicalCEFromNode,
     getPlanSkeleton,
     navigateToRootNode,
@@ -113,11 +112,6 @@ export function createAndValidateHistogram({coll, expectedHistogram, empty = fal
  * relevant flags is restored after the test.
  */
 export async function runHistogramsTest(test) {
-    if (!checkCascadesFeatureFlagEnabled(db)) {
-        jsTestLog("Skipping test because the optimizer is not enabled");
-        return;
-    }
-
     // We will be updating some query knobs, so store the old state and restore it after the test.
     const {internalQueryCardinalityEstimatorMode, internalQueryFrameworkControl} = db.adminCommand({
         getParameter: 1,

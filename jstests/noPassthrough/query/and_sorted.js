@@ -1,6 +1,6 @@
 // Tests for whether the query solution correctly used an AND_SORTED stage for index intersection.
 import {assertArrayEq} from "jstests/aggregation/extras/utils.js";
-import {getOptimizer, getWinningPlan, planHasStage} from "jstests/libs/analyze_plan.js";
+import {getWinningPlan, planHasStage} from "jstests/libs/analyze_plan.js";
 
 const conn = MongoRunner.runMongod();
 const db = conn.getDB("test");
@@ -31,16 +31,8 @@ function runAndSortedTests() {
 
         assertArrayEq({actual: queryResult.toArray(), expected: expectedResult});
 
-        let optimizer = getOptimizer(expl);
-        switch (optimizer) {
-            case "classic":
-                assert.eq(shouldUseAndSorted,
-                          planHasStage(db, getWinningPlan(expl.queryPlanner), "AND_SORTED"));
-                break;
-            case "CQF":
-                // TODO SERVER-77719: Implement the assertion for CQF.
-                break;
-        }
+        assert.eq(shouldUseAndSorted,
+                  planHasStage(db, getWinningPlan(expl.queryPlanner), "AND_SORTED"));
     }
 
     // Test basic index intersection where we expect AND_SORTED to be used.

@@ -9,10 +9,6 @@
  */
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
-import {
-    checkCascadesOptimizerEnabled,
-    checkExperimentalCascadesOptimizerEnabled
-} from "jstests/libs/optimizer_utils.js";
 import {checkSbeFullyEnabled} from "jstests/libs/sbe_util.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
@@ -87,8 +83,6 @@ function runTests({conn, currentOp, truncatedOps, localOps}) {
     const isRemoteShardCurOp = (FixtureHelpers.isMongos(testDB) && !localOps);
 
     const sbeEnabled = checkSbeFullyEnabled(testDB);
-    const cqfEnabled = checkCascadesOptimizerEnabled(testDB);
-    const cqfExperimentalEnabled = checkExperimentalCascadesOptimizerEnabled(testDB);
 
     // If 'truncatedOps' is true, run only the subset of tests designed to validate the
     // truncation behaviour. Otherwise, run the standard set of tests which assume that
@@ -243,9 +237,7 @@ function runTests({conn, currentOp, truncatedOps, localOps}) {
                               2);
                 },
                 planSummary: "IXSCAN { _id: 1 }",
-                queryFramework: cqfExperimentalEnabled ? "cqf"
-                    : sbeEnabled                       ? "sbe"
-                                                       : "classic",
+                queryFramework: sbeEnabled ? "sbe" : "classic",
                 currentOpFilter: {"command.comment": "currentop_query_id_hint"}
             },
             {
@@ -286,9 +278,7 @@ function runTests({conn, currentOp, truncatedOps, localOps}) {
                 },
                 command: "find",
                 planSummary: "COLLSCAN",
-                queryFramework: cqfEnabled ? "cqf"
-                    : sbeEnabled           ? "sbe"
-                                           : "classic",
+                queryFramework: sbeEnabled ? "sbe" : "classic",
                 currentOpFilter: {"command.comment": "currentop_query"}
             },
             {
@@ -302,9 +292,7 @@ function runTests({conn, currentOp, truncatedOps, localOps}) {
                 // expected to work when running against a mongos with localOps=true.
                 skipMongosLocalOps: true,
                 planSummary: "COLLSCAN",
-                queryFramework: cqfEnabled ? "cqf"
-                    : sbeEnabled           ? "sbe"
-                                           : "classic",
+                queryFramework: sbeEnabled ? "sbe" : "classic",
                 currentOpFilter: {"command.comment": "currentop_query", numYields: {$gt: 0}}
             },
             {
@@ -447,9 +435,7 @@ function runTests({conn, currentOp, truncatedOps, localOps}) {
                     comment: "currentop_query_find_getmore",
                     batchSize: 0
                 },
-                queryFramework: cqfEnabled ? "cqf"
-                    : sbeEnabled           ? "sbe"
-                                           : "classic",
+                queryFramework: sbeEnabled ? "sbe" : "classic",
                 cmdName: "find",
             },
             {
@@ -459,9 +445,7 @@ function runTests({conn, currentOp, truncatedOps, localOps}) {
                     comment: "currentop_query_agg_getmore",
                     cursor: {batchSize: 0}
                 },
-                queryFramework: cqfEnabled ? "cqf"
-                    : sbeEnabled           ? "sbe"
-                                           : "classic",
+                queryFramework: sbeEnabled ? "sbe" : "classic",
                 cmdName: "aggregate",
             },
         ];

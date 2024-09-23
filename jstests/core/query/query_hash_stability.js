@@ -20,7 +20,6 @@
 
 import {
     getAllNodeExplains,
-    getOptimizer,
     getPlanCacheKeyFromExplain,
     getPlanCacheShapeHashFromExplain
 } from "jstests/libs/analyze_plan.js";
@@ -44,13 +43,6 @@ function groupBy(arr, keyFn) {
 // produced by the same shard in the event that the 'planCacheKey' format changed in between
 // versions.
 function runTest({explain0, explain1, assertionFn}) {
-    const useSameOptimiser = getOptimizer(explain0) == getOptimizer(explain1);
-    if (!useSameOptimiser) {
-        // TODO SERVER-77719: Ensure that the test is valid for different combinations of optimizer
-        // used for with/without index cases.
-        return;
-    }
-
     const groupedExplains =
         groupBy([...getAllNodeExplains(explain0), ...getAllNodeExplains(explain1)],
                 /* keyFn */ (explain) => explain.shardName);

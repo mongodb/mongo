@@ -6,7 +6,7 @@
  *   assumes_read_concern_local,
  * ]
  */
-import {getOptimizer, isIndexOnly} from "jstests/libs/analyze_plan.js";
+import {isIndexOnly} from "jstests/libs/analyze_plan.js";
 
 var coll = db.jstests_bindata_indexonly;
 
@@ -28,16 +28,8 @@ function testIndexOnlyBinData(blob) {
             .hint({_id: 1, a: 1})
             .explain("executionStats");
 
-    switch (getOptimizer(explain)) {
-        case "classic":
-            assert(isIndexOnly(db, explain.queryPlanner.winningPlan),
-                   "indexonly.BinData(0, " + blob + ") - must be index-only");
-            break;
-        case "CQF":
-            // TODO SERVER-77719: Ensure that the decision for using the scan lines up with CQF
-            // optimizer. M2: allow only collscans, M4: check bonsai behavior for index scan.
-            break;
-    }
+    assert(isIndexOnly(db, explain.queryPlanner.winningPlan),
+           "indexonly.BinData(0, " + blob + ") - must be index-only");
     assert.eq(1,
               explain.executionStats.nReturned,
               "EXACTone.BinData(0, " + blob + ") - should only return one in unique set");
@@ -53,60 +45,28 @@ var explain;
 explain = coll.find({_id: {$lt: BinData(0, "AAAAAAAAAAAAAAAAAAAAAAAAAAAA")}}, {_id: 1, a: 1})
               .hint({_id: 1, a: 1})
               .explain("executionStats");
-switch (getOptimizer(explain)) {
-    case "classic":
-        assert(isIndexOnly(db, explain), "indexonly.$lt.1 - must be index-only");
-        break;
-    case "CQF":
-        // TODO SERVER-77719: Ensure that the decision for using the scan lines up with CQF
-        // optimizer. M2: allow only collscans, M4: check bonsai behavior for index scan.
-        break;
-}
+assert(isIndexOnly(db, explain), "indexonly.$lt.1 - must be index-only");
 assert.eq(
     0, explain.executionStats.nReturned, "correctcount.$lt.1 - not returning correct documents");
 
 explain = coll.find({_id: {$gt: BinData(0, "////////////////////////////")}}, {_id: 1, a: 1})
               .hint({_id: 1, a: 1})
               .explain("executionStats");
-switch (getOptimizer(explain)) {
-    case "classic":
-        assert(isIndexOnly(db, explain), "indexonly.$gt.2 - must be index-only");
-        break;
-    case "CQF":
-        // TODO SERVER-77719: Ensure that the decision for using the scan lines up with CQF
-        // optimizer. M2: allow only collscans, M4: check bonsai behavior for index scan.
-        break;
-}
+assert(isIndexOnly(db, explain), "indexonly.$gt.2 - must be index-only");
 assert.eq(
     0, explain.executionStats.nReturned, "correctcount.$gt.2 - not returning correct documents");
 
 explain = coll.find({_id: {$lte: BinData(0, "AQAAAAEBAAVlbl9VSwAAAAAAAAhv")}}, {_id: 1, a: 1})
               .hint({_id: 1, a: 1})
               .explain("executionStats");
-switch (getOptimizer(explain)) {
-    case "classic":
-        assert(isIndexOnly(db, explain), "indexonly.$lte.3 - must be index-only");
-        break;
-    case "CQF":
-        // TODO SERVER-77719: Ensure that the decision for using the scan lines up with CQF
-        // optimizer. M2: allow only collscans, M4: check bonsai behavior for index scan.
-        break;
-}
+assert(isIndexOnly(db, explain), "indexonly.$lte.3 - must be index-only");
 assert.eq(
     2, explain.executionStats.nReturned, "correctcount.$lte.3 - not returning correct documents");
 
 explain = coll.find({_id: {$gte: BinData(0, "AQAAAAEBAAVlbl9VSwAAAAAAAAhz")}}, {_id: 1, a: 1})
               .hint({_id: 1, a: 1})
               .explain("executionStats");
-switch (getOptimizer(explain)) {
-    case "classic":
-        assert(isIndexOnly(db, explain), "indexonly.$gte.3 - must be index-only");
-        break;
-    case "CQF":
-        // TODO SERVER-77719: Ensure that the decision for using the scan lines up with CQF
-        // optimizer. M2: allow only collscans, M4: check bonsai behavior for index scan.
-        break;
-}
+assert(isIndexOnly(db, explain), "indexonly.$gte.3 - must be index-only");
 assert.eq(
     2, explain.executionStats.nReturned, "correctcount.$gte.3 - not returning correct documents");
 

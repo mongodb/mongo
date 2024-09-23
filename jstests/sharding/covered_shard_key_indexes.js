@@ -3,7 +3,7 @@
 // particular queries
 //
 
-import {getChunkSkipsFromShard, getOptimizer} from "jstests/libs/analyze_plan.js";
+import {getChunkSkipsFromShard} from "jstests/libs/analyze_plan.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 const st = new ShardingTest({shards: 1});
@@ -33,14 +33,7 @@ assert.commandWorked(coll.createIndex({a: 1, _id: 1}));
 assert.eq(1, coll.find({a: true}).explain(true).executionStats.totalDocsExamined);
 
 let explainOut = coll.find({a: true}, {_id: 1, a: 1}).explain(true);
-switch (getOptimizer(explainOut)) {
-    case "classic":
-        assert.eq(0, explainOut.executionStats.totalDocsExamined);
-        break;
-    case "CQF":
-        // TODO SERVER-77719: Implement the assertion for CQF.
-        break;
-}
+assert.eq(0, explainOut.executionStats.totalDocsExamined);
 
 // Compound index with shard key query - covered when projecting
 assert.commandWorked(coll.dropIndexes());
@@ -48,14 +41,7 @@ assert.commandWorked(coll.createIndex({a: 1, b: 1, _id: 1}));
 assert.eq(1, coll.find({a: true, b: true}).explain(true).executionStats.totalDocsExamined);
 
 explainOut = coll.find({a: true, b: true}, {_id: 1, a: 1}).explain(true);
-switch (getOptimizer(explainOut)) {
-    case "classic":
-        assert.eq(0, explainOut.executionStats.totalDocsExamined);
-        break;
-    case "CQF":
-        // TODO SERVER-77719: Implement the assertion for CQF.
-        break;
-}
+assert.eq(0, explainOut.executionStats.totalDocsExamined);
 
 jsTest.log('Tests with _id : hashed shard key');
 coll.drop();
@@ -89,14 +75,7 @@ assert.commandWorked(coll.createIndex({c: 1}));
 assert.eq(1, coll.find({c: true}).explain(true).executionStats.totalDocsExamined);
 
 explainOut = coll.find({c: true}, {_id: 0, a: 1, b: 1, c: 1}).explain(true);
-switch (getOptimizer(explainOut)) {
-    case "classic":
-        assert.eq(1, explainOut.executionStats.totalDocsExamined);
-        break;
-    case "CQF":
-        // TODO SERVER-77719: Implement the assertion for CQF.
-        break;
-}
+assert.eq(1, explainOut.executionStats.totalDocsExamined);
 
 // Index with shard key query - covered when projecting
 assert.commandWorked(coll.dropIndex({c: 1}));
@@ -104,14 +83,7 @@ assert.commandWorked(coll.createIndex({c: 1, b: 1, a: 1}));
 assert.eq(1, coll.find({c: true}).explain(true).executionStats.totalDocsExamined);
 
 explainOut = coll.find({c: true}, {_id: 0, a: 1, b: 1, c: 1}).explain(true);
-switch (getOptimizer(explainOut)) {
-    case "classic":
-        assert.eq(0, explainOut.executionStats.totalDocsExamined);
-        break;
-    case "CQF":
-        // TODO SERVER-77719: Implement the assertion for CQF.
-        break;
-}
+assert.eq(0, explainOut.executionStats.totalDocsExamined);
 
 // Compound index with shard key query - covered when projecting
 assert.commandWorked(coll.dropIndex({c: 1, b: 1, a: 1}));
@@ -119,14 +91,7 @@ assert.commandWorked(coll.createIndex({c: 1, d: 1, a: 1, b: 1, _id: 1}));
 assert.eq(1, coll.find({c: true, d: true}).explain(true).executionStats.totalDocsExamined);
 
 explainOut = coll.find({c: true, d: true}, {a: 1, b: 1, c: 1, d: 1}).explain(true);
-switch (getOptimizer(explainOut)) {
-    case "classic":
-        assert.eq(0, explainOut.executionStats.totalDocsExamined);
-        break;
-    case "CQF":
-        // TODO SERVER-77719: Implement the assertion for CQF.
-        break;
-}
+assert.eq(0, explainOut.executionStats.totalDocsExamined);
 
 jsTest.log('Tests with nested shard key');
 coll.drop();
@@ -141,14 +106,7 @@ assert.commandWorked(coll.createIndex({c: 1}));
 assert.eq(1, coll.find({c: true}).explain(true).executionStats.totalDocsExamined);
 
 explainOut = coll.find({c: true}, {_id: 0, 'a.b': 1, c: 1}).explain(true);
-switch (getOptimizer(explainOut)) {
-    case "classic":
-        assert.eq(1, explainOut.executionStats.totalDocsExamined);
-        break;
-    case "CQF":
-        // TODO SERVER-77719: Implement the assertion for CQF.
-        break;
-}
+assert.eq(1, explainOut.executionStats.totalDocsExamined);
 
 // Index with shard key query - can be covered given the appropriate projection.
 assert.commandWorked(coll.dropIndex({c: 1}));
@@ -156,14 +114,7 @@ assert.commandWorked(coll.createIndex({c: 1, 'a.b': 1}));
 assert.eq(1, coll.find({c: true}).explain(true).executionStats.totalDocsExamined);
 
 explainOut = coll.find({c: true}, {_id: 0, 'a.b': 1, c: 1}).explain(true);
-switch (getOptimizer(explainOut)) {
-    case "classic":
-        assert.eq(0, explainOut.executionStats.totalDocsExamined);
-        break;
-    case "CQF":
-        // TODO SERVER-77719: Implement the assertion for CQF.
-        break;
-}
+assert.eq(0, explainOut.executionStats.totalDocsExamined);
 
 jsTest.log('Tests with bad data with no shard key');
 coll.drop();
@@ -190,14 +141,7 @@ assert.eq(0,
 assert.commandWorked(coll.createIndex({c: 1, a: 1}));
 explain = coll.find({c: true}, {_id: 0, a: 1, c: 1}).explain(true);
 assert.eq(1, explain.executionStats.nReturned);
-switch (getOptimizer(explain)) {
-    case "classic":
-        assert.eq(0, explain.executionStats.totalDocsExamined);
-        break;
-    case "CQF":
-        // TODO SERVER-77719: Implement the assertion for CQF.
-        break;
-}
+assert.eq(0, explain.executionStats.totalDocsExamined);
 assert.eq(0,
           getChunkSkipsFromShard(explain.queryPlanner.winningPlan.shards[0],
                                  explain.executionStats.executionStages.shards[0]));

@@ -68,10 +68,6 @@ function discoverNodesAndCheck(theDB, checkFunction) {
  * Checks the status of SBE on any one node in the cluster and returns one of the constants
  * kSbeFullyEnabled, kSbeRestricted, kSbeDisabled.
  *
- * For tryBonsai*, we return kSbeFullyEnabled when featureFlagSbeFull is on and kSbeRestricted when
- * featureFlagSbeFull is off. This reflects the expected SBE behavior when we cannot use Bonsai and
- * instead fall back to SBE without Bonsai.
- *
  * Quits test if there is no primary node and we are running in a mixed configuration.
  */
 export function checkSbeStatus(theDB) {
@@ -87,9 +83,7 @@ export function checkSbeStatus(theDB) {
             return kSbeDisabled;
         } else if (FeatureFlagUtil.isPresentAndEnabled(conn, "SbeFull")) {
             return kFeatureFlagSbeFullEnabled;
-        } else if (getParam.internalQueryFrameworkControl === "trySbeRestricted" ||
-                   getParam.internalQueryFrameworkControl === "tryBonsai" ||
-                   getParam.internalQueryFrameworkControl === "tryBonsaiExperimental") {
+        } else if (getParam.internalQueryFrameworkControl === "trySbeRestricted") {
             return kSbeRestricted;
         } else if (getParam.internalQueryFrameworkControl === "trySbeEngine") {
             return kSbeFullyEnabled;

@@ -4,7 +4,6 @@
  *   featureFlagSbeFull
  * ]
  */
-import {checkCascadesOptimizerEnabled} from "jstests/libs/optimizer_utils.js";
 import {getLatestProfilerEntry} from "jstests/libs/profiler.js";
 
 const conn = MongoRunner.runMongod();

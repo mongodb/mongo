@@ -14,8 +14,6 @@
  * ]
  */
 
-import {checkCascadesOptimizerEnabled} from "jstests/libs/optimizer_utils.js";
-
 (function() {
 "use strict";
 
@@ -29,8 +27,6 @@ if (buildInfo.isDebug() || !buildInfo.isOptimizationsEnabled() ||
     jsTestLog("Returning early because debug is on, opt is off, or a sanitizer is enabled.");
     return;
 }
-
-const isBonsaiEnabled = checkCascadesOptimizerEnabled(db);
 
 const coll = db.query_limits_test;
 coll.drop();
@@ -77,11 +73,6 @@ function testLargeProject() {
 
 // Run $and and $or with many different types of predicates.
 function testLargeAndOrPredicates() {
-    // TODO: SERVER-80735 remove this early return once this ticket is done. This is a
-    // Bonsai-specific issues with PSR.
-    if (isBonsaiEnabled) {
-        return;
-    }
     jsTestLog("Testing large $and/$or predicates");
 
     // Large $match of the form {$match: {a0: 1, a1: 1, ...}}

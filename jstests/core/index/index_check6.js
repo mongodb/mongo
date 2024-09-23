@@ -4,9 +4,6 @@
 //   assumes_unsharded_collection,
 // ]
 
-// Include helpers for analyzing explain output.
-import {getOptimizer} from "jstests/libs/analyze_plan.js";
-
 const collNamePrefix = 'jstests_index_check6_';
 let collCount = 0;
 let t = db.getCollection(collNamePrefix + collCount++);
@@ -14,19 +11,7 @@ t.drop();
 
 function assertKeysExamined(expectedKeys, query, hint, comment) {
     let explain = t.find(query).hint(hint).explain("executionStats");
-
-    switch (getOptimizer(explain)) {
-        case "classic":
-            assert.eq(expectedKeys, explain.executionStats.totalKeysExamined, comment);
-            break;
-        case "CQF":
-            // TODO SERVER-77719: Ensure that the decision for using the scan lines up with CQF
-            // optimizer. M2: allow only collscans, M4: check bonsai behavior for index scan.
-            assert.lte(expectedKeys, explain.executionStats.totalKeysExamined, comment);
-            break;
-        default:
-            break;
-    }
+    assert.eq(expectedKeys, explain.executionStats.totalKeysExamined, comment);
 }
 
 assert.commandWorked(t.createIndex({age: 1, rating: 1}));

@@ -5,16 +5,11 @@
  * ]
  */
 
-import {checkExperimentalCascadesOptimizerEnabled} from "jstests/libs/optimizer_utils.js";
 import {getPlanCacheNumEntries, getPlanCacheSize} from "jstests/libs/plan_cache_utils.js";
 
 const conn = MongoRunner.runMongod();
 assert.neq(conn, null, "mongod failed to start");
 const db = conn.getDB("sbe_plan_cache_invalidation");
-
-// TODO SERVER-85728: Enable Bonsai plan cache tests involving indices. We run a modified version of
-// this test without indexes to obtain coverage of plan cache invalidation logic.
-const isBonsaiExperimental = checkExperimentalCascadesOptimizerEnabled(db);
 
 /**
  * Helper class that creates a collection, indexes on it, and makes a few queries to add entries
@@ -26,13 +21,9 @@ class TestCollection {
         this.coll.drop();
 
         this.indexNames = ["index1", "index2", "index3"];
-        if (isBonsaiExperimental) {
-            assert.commandWorked(this.coll.insert({unused_field: 1}));
-        } else {
-            assert.commandWorked(this.coll.createIndex({a: 1}, {name: this.indexNames[0]}));
-            assert.commandWorked(this.coll.createIndex({b: 1}, {name: this.indexNames[1]}));
-            assert.commandWorked(this.coll.createIndex({b: 1, a: 1}, {name: this.indexNames[2]}));
-        }
+        assert.commandWorked(this.coll.createIndex({a: 1}, {name: this.indexNames[0]}));
+        assert.commandWorked(this.coll.createIndex({b: 1}, {name: this.indexNames[1]}));
+        assert.commandWorked(this.coll.createIndex({b: 1, a: 1}, {name: this.indexNames[2]}));
 
         assert.eq(0, this.coll.find({a: 1, b: 2}).itcount());
         assert.eq(0, this.coll.find({a: 1, c: 3, b: 2}).itcount());
@@ -97,9 +88,6 @@ class TestCollection {
 }());
 
 (function cacheEntriesRemovedIfAnyIndexDropped() {
-    if (isBonsaiExperimental) {
-        return;
-    }
     const test = new TestCollection();
     const initialPlanCacheSize = getPlanCacheSize(db);
 
@@ -122,9 +110,6 @@ class TestCollection {
 }());
 
 (function cacheEntriesRemovedIfIndexChanged() {
-    if (isBonsaiExperimental) {
-        return;
-    }
     const collectionName = "coll";
     const test = new TestCollection(collectionName);
     const initialPlanCacheSize = getPlanCacheSize(db);

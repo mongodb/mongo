@@ -6,7 +6,7 @@
  *   requires_sharding,
  * ]
  */
-import {getOptimizer, isIndexOnly, isIxscan, planHasStage} from "jstests/libs/analyze_plan.js";
+import {isIndexOnly, isIxscan, planHasStage} from "jstests/libs/analyze_plan.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 // Deliberately inserts orphans outside of migration.
@@ -67,18 +67,11 @@ assert.eq(mongosColl.find().itcount(), 10);
 // shard key. In this case, shard filtering can occur before the FETCH stage, but the plan is not
 // covered.
 let explain = mongosColl.find({a: {$gte: 0}}).explain();
-switch (getOptimizer(explain)) {
-    case "classic":
-        assert.eq(explain.queryPlanner.winningPlan.stage, "SHARD_MERGE", explain);
-        assert(planHasStage(mongosDb, explain.queryPlanner.winningPlan, "SHARDING_FILTER"),
-               explain);
-        assert(isIxscan(mongosDb, explain.queryPlanner.winningPlan), explain);
-        assert(!isIndexOnly(mongosDb, explain.queryPlanner.winningPlan), explain);
-        break;
-    case "CQF":
-        // TODO SERVER-77719: Implement the assertion for CQF.
-        break;
-}
+assert.eq(explain.queryPlanner.winningPlan.stage, "SHARD_MERGE", explain);
+assert(planHasStage(mongosDb, explain.queryPlanner.winningPlan, "SHARDING_FILTER"), explain);
+assert(isIxscan(mongosDb, explain.queryPlanner.winningPlan), explain);
+assert(!isIndexOnly(mongosDb, explain.queryPlanner.winningPlan), explain);
+
 assert.sameMembers(mongosColl.find({a: {$gte: 0}}).toArray(), [
     {_id: 0, a: 1, b: {c: 1}, d: {e: {f: 1}}, g: 100},
     {_id: 1, a: 1, b: {c: 2}, d: {e: {f: 2}}, g: 100.9},
@@ -89,18 +82,11 @@ assert.sameMembers(mongosColl.find({a: {$gte: 0}}).toArray(), [
 
 // In this case, shard filtering is done as part of a covered plan.
 explain = mongosColl.find({a: {$gte: 0}}, {_id: 0, a: 1}).explain();
-switch (getOptimizer(explain)) {
-    case "classic":
-        assert.eq(explain.queryPlanner.winningPlan.stage, "SHARD_MERGE", explain);
-        assert(planHasStage(mongosDb, explain.queryPlanner.winningPlan, "SHARDING_FILTER"),
-               explain);
-        assert(isIxscan(mongosDb, explain.queryPlanner.winningPlan), explain);
-        assert(isIndexOnly(mongosDb, explain.queryPlanner.winningPlan), explain);
-        break;
-    case "CQF":
-        // TODO SERVER-77719: Implement the assertion for CQF.
-        break;
-}
+assert.eq(explain.queryPlanner.winningPlan.stage, "SHARD_MERGE", explain);
+assert(planHasStage(mongosDb, explain.queryPlanner.winningPlan, "SHARDING_FILTER"), explain);
+assert(isIxscan(mongosDb, explain.queryPlanner.winningPlan), explain);
+assert(isIndexOnly(mongosDb, explain.queryPlanner.winningPlan), explain);
+
 assert.sameMembers(mongosColl.find({a: {$gte: 0}}, {_id: 0, a: 1}).toArray(), [
     {a: 1},
     {a: 1},
@@ -133,55 +119,34 @@ assert.commandWorked(st.shard0.getCollection(collName).insert({_id: 6, a: 0, b: 
 // Run a query that can use covered shard filtering where the projection involves more than one
 // field of the shard key.
 explain = mongosColl.find({a: {$gte: 0}}, {_id: 0, a: 1, b: 1, d: 1}).explain();
-switch (getOptimizer(explain)) {
-    case "classic":
-        assert.eq(explain.queryPlanner.winningPlan.stage, "SHARD_MERGE", explain);
-        assert(planHasStage(mongosDb, explain.queryPlanner.winningPlan, "SHARDING_FILTER"),
-               explain);
-        assert(isIxscan(mongosDb, explain.queryPlanner.winningPlan), explain);
-        assert(isIndexOnly(mongosDb, explain.queryPlanner.winningPlan), explain);
-        assert.sameMembers(mongosColl.find({a: {$gte: 0}}, {_id: 0, a: 1, b: 1, d: 1}).toArray(),
-                           [{a: 0, b: 0, d: 0}, {a: 1, b: 1, d: 1}]);
-        break;
-    case "CQF":
-        // TODO SERVER-77719: Implement the assertion for CQF.
-        break;
-}
+
+assert.eq(explain.queryPlanner.winningPlan.stage, "SHARD_MERGE", explain);
+assert(planHasStage(mongosDb, explain.queryPlanner.winningPlan, "SHARDING_FILTER"), explain);
+assert(isIxscan(mongosDb, explain.queryPlanner.winningPlan), explain);
+assert(isIndexOnly(mongosDb, explain.queryPlanner.winningPlan), explain);
+assert.sameMembers(mongosColl.find({a: {$gte: 0}}, {_id: 0, a: 1, b: 1, d: 1}).toArray(),
+                   [{a: 0, b: 0, d: 0}, {a: 1, b: 1, d: 1}]);
 assert.sameMembers(mongosColl.find({a: {$gte: 0}}, {_id: 0, a: 1, b: 1, d: 1}).toArray(),
                    [{a: 0, b: 0, d: 0}, {a: 1, b: 1, d: 1}]);
 
 // Run a query that will use a covered OR plan.
 explain = mongosColl.find({$or: [{a: 0, c: 0}, {a: 25, c: 0}]}, {_id: 0, a: 1, c: 1}).explain();
-switch (getOptimizer(explain)) {
-    case "classic":
-        assert.eq(explain.queryPlanner.winningPlan.stage, "SHARD_MERGE", explain);
-        assert(planHasStage(mongosDb, explain.queryPlanner.winningPlan, "SHARDING_FILTER"),
-               explain);
-        assert(planHasStage(mongosDb, explain.queryPlanner.winningPlan, "OR"), explain);
-        assert(isIndexOnly(mongosDb, explain.queryPlanner.winningPlan), explain);
-        break;
-    case "CQF":
-        // TODO SERVER-77719: Implement the assertion for CQF.
-        break;
-}
+assert.eq(explain.queryPlanner.winningPlan.stage, "SHARD_MERGE", explain);
+assert(planHasStage(mongosDb, explain.queryPlanner.winningPlan, "SHARDING_FILTER"), explain);
+assert(planHasStage(mongosDb, explain.queryPlanner.winningPlan, "OR"), explain);
+assert(isIndexOnly(mongosDb, explain.queryPlanner.winningPlan), explain);
+
 assert.sameMembers(
     mongosColl.find({$or: [{a: 0, c: 0}, {a: 25, c: 0}]}, {_id: 0, a: 1, c: 1}).toArray(),
     [{a: 0, c: 0}]);
 
 // Similar case to above, but here the index scans involve a single interval of the index.
 explain = mongosColl.find({$or: [{a: 0, b: 0}, {a: 25, b: 0}]}, {_id: 0, a: 1, b: 1}).explain();
-switch (getOptimizer(explain)) {
-    case "classic":
-        assert.eq(explain.queryPlanner.winningPlan.stage, "SHARD_MERGE", explain);
-        assert(planHasStage(mongosDb, explain.queryPlanner.winningPlan, "SHARDING_FILTER"),
-               explain);
-        assert(planHasStage(mongosDb, explain.queryPlanner.winningPlan, "OR"), explain);
-        assert(isIndexOnly(mongosDb, explain.queryPlanner.winningPlan), explain);
-        break;
-    case "CQF":
-        // TODO SERVER-77719: Implement the assertion for CQF.
-        break;
-}
+assert.eq(explain.queryPlanner.winningPlan.stage, "SHARD_MERGE", explain);
+assert(planHasStage(mongosDb, explain.queryPlanner.winningPlan, "SHARDING_FILTER"), explain);
+assert(planHasStage(mongosDb, explain.queryPlanner.winningPlan, "OR"), explain);
+assert(isIndexOnly(mongosDb, explain.queryPlanner.winningPlan), explain);
+
 assert.sameMembers(
     mongosColl.find({$or: [{a: 0, b: 0}, {a: 25, b: 0}]}, {_id: 0, a: 1, b: 1}).toArray(),
     [{a: 0, b: 0}]);

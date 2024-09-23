@@ -6,7 +6,6 @@
  */
 
 import {
-    checkCascadesFeatureFlagEnabled,
     getExpectedPipelineLimit,
 } from "jstests/libs/optimizer_utils.js";
 

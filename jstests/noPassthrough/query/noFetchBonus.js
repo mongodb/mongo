@@ -2,12 +2,7 @@
 //   requires_replication,
 //   requires_sharding,
 // ]
-import {
-    getOptimizer,
-    getRejectedPlans,
-    isIndexOnly,
-    planHasStage
-} from "jstests/libs/analyze_plan.js";
+import {getRejectedPlans, isIndexOnly, planHasStage} from "jstests/libs/analyze_plan.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 const st = new ShardingTest({shards: 1, rs: {nodes: 1}, config: 1});
@@ -22,29 +17,12 @@ st.shardColl(coll, {a: 1, b: 1}, false);
 // sharding filter needs check the value of b. The other plan uses the {a: 1, b: 1}, which does
 // cover the query. Assert the covered plan wins.
 let explain = coll.explain().count({a: 1});
-const optimizer = getOptimizer(explain);
-switch (optimizer) {
-    case "classic": {
-        assert(planHasStage(db, explain, 'SHARDING_FILTER'), explain);
-        assert(isIndexOnly(db, explain), explain);
-        break;
-    }
-    case "CQF":
-        // TODO SERVER-77719: Implement the assertion for CQF.
-        break;
-}
+assert(planHasStage(db, explain, 'SHARDING_FILTER'), explain);
+assert(isIndexOnly(db, explain), explain);
 
 let rejected = getRejectedPlans(explain);
-switch (optimizer) {
-    case "classic": {
-        assert.eq(rejected.length, 1, rejected);
-        assert(planHasStage(db, rejected[0], 'SHARDING_FILTER'), explain);
-        assert(planHasStage(db, rejected[0], 'FETCH'), rejected);
-        break;
-    }
-    case "CQF":
-        // TODO SERVER-77719: Implement the assertion for CQF.
-        break;
-}
+assert.eq(rejected.length, 1, rejected);
+assert(planHasStage(db, rejected[0], 'SHARDING_FILTER'), explain);
+assert(planHasStage(db, rejected[0], 'FETCH'), rejected);
 
 st.stop();

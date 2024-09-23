@@ -8,7 +8,7 @@
 // Simple covered index query test
 
 // Include helpers for analyzing explain output.
-import {getOptimizer, isIndexOnly} from "jstests/libs/analyze_plan.js";
+import {isIndexOnly} from "jstests/libs/analyze_plan.js";
 
 var coll = db.getCollection("covered_simple_1");
 coll.drop();
@@ -58,17 +58,9 @@ if (!TestData.isHintsToQuerySettingsSuite) {
     var plan = coll.find({}, {foo: 1, _id: 0}).hint({foo: 1}).explain("executionStats");
     assert(isIndexOnly(db, plan.queryPlanner.winningPlan),
            "simple.1.4 - indexOnly should be true on covered query");
-    switch (getOptimizer(plan)) {
-        case "classic":
-            assert.eq(0,
-                      plan.executionStats.totalDocsExamined,
-                      "simple.1.4 - docs examined should be 0 for covered query");
-            break;
-        case "CQF":
-            // TODO SERVER-77719: Ensure that the decision for using the scan lines up with CQF
-            // optimizer. M2: allow only collscans, M4: check bonsai behavior for index scan.
-            break;
-    }
+    assert.eq(0,
+              plan.executionStats.totalDocsExamined,
+              "simple.1.4 - docs examined should be 0 for covered query");
 }
 
 // Test range query

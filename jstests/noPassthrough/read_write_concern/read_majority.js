@@ -19,7 +19,7 @@
  * ]
  */
 
-import {getOptimizer, getWinningPlan, isCollscan, isIxscan} from "jstests/libs/analyze_plan.js";
+import {getWinningPlan, isCollscan, isIxscan} from "jstests/libs/analyze_plan.js";
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 
 // Tests the functionality for committed reads for the given read concern level.
@@ -184,16 +184,7 @@ function testReadConcernLevel(level) {
     assert.eq(getAggCursorForReadConcernLevel().itcount(), 10);
 
     let explain = getExplainPlan({version: 1});
-    let optimizer = getOptimizer(explain);
-    switch (optimizer) {
-        case "classic":
-            assert(isIxscan(db, explain));
-            break;
-        case "CQF":
-            // TODO SERVER-77719: Implement the assertion for CQF. Depending on the evolution of
-            // CQF, the use of index may be different.
-            break;
-    }
+    assert(isIxscan(db, explain));
 
     // Dropping an index does not bump the min snapshot, so the query should succeed.
     t.dropIndex({version: 1});

@@ -5,7 +5,7 @@
  * ]
  */
 
-import {getOptimizer, planHasStage} from "jstests/libs/analyze_plan.js";
+import {planHasStage} from "jstests/libs/analyze_plan.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 const st = new ShardingTest({shards: 2});
@@ -20,15 +20,7 @@ let explain = coll.explain().aggregate([{$project: {a: 1}}]);
 if (explain.hasOwnProperty("splitPipeline")) {
     assert.eq(explain.splitPipeline, null, explain);
 }
-let optimizer = getOptimizer(explain);
-switch (optimizer) {
-    case "classic":
-        assert(planHasStage(mongosDB, explain, "PROJECTION_SIMPLE"), explain);
-        break;
-    case "CQF":
-        // TODO SERVER-77719: Implement the assertion for CQF.
-        break;
-}
+assert(planHasStage(mongosDB, explain, "PROJECTION_SIMPLE"), explain);
 
 // Now shard the collection by _id and move a chunk to each shard.
 st.shardColl(coll, {_id: 1}, {_id: 0}, {_id: 0});

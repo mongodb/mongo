@@ -1,8 +1,7 @@
 /**
  * Test that $unionWith's pipeline argument returns the same explain as an equivalent normal
  * pipeline. The assertions in this test assume that the optimizer for $unionWith queries is
- * the same as the optimizer for the "normal" pipeline. This assumption is not strictly true when
- * CQF is enabled.
+ * the same as the optimizer for the "normal" pipeline.
  * @tags: [
  *   do_not_wrap_aggregations_in_facets,
  * ]

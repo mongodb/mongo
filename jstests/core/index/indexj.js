@@ -12,7 +12,7 @@
 //   requires_fcv_63,
 // ]
 
-import {getOptimizer, getPlanStages} from "jstests/libs/analyze_plan.js";
+import {getPlanStages} from "jstests/libs/analyze_plan.js";
 import {checkSbeFullyEnabled} from "jstests/libs/sbe_util.js";
 
 const t = db[jsTestName()];
@@ -71,15 +71,8 @@ let errMsg = function(actualNumKeys) {
     return "Chosen plan examined " + actualNumKeys + " keys";
 };
 let keysExaminedRet = keysExamined({a: {$in: [1, 2]}, b: {$gt: 1, $lt: 2}}, {a: 1, b: 1});
-switch (getOptimizer(keysExaminedRet.explain)) {
-    case "classic":
-        assert.eq(keysExaminedRet.keysExamined, expectedKeys, errMsg(keysExaminedRet.keysExamined));
-        break;
-    case "CQF":
-        // TODO SERVER-77719: Ensure that the decision for using the scan lines up with CQF
-        // optimizer. M2: allow only collscans, M4: check bonsai behavior for index scan.
-        break;
-}
+assert.eq(keysExaminedRet.keysExamined, expectedKeys, errMsg(keysExaminedRet.keysExamined));
+
 keysExaminedRet =
     keysExamined({a: {$in: [1, 2]}, b: {$gt: 1, $lt: 2}}, {a: 1, b: 1}, {a: -1, b: -1});
 assert.eq(keysExaminedRet.keysExamined, expectedKeys, errMsg(keysExaminedRet.keysExamined));
@@ -87,25 +80,11 @@ assert.eq(keysExaminedRet.keysExamined, expectedKeys, errMsg(keysExaminedRet.key
 assert.commandWorked(t.insert({a: 1, b: 1}));
 assert.commandWorked(t.insert({a: 1, b: 1}));
 keysExaminedRet = keysExamined({a: {$in: [1, 2]}, b: {$gt: 1, $lt: 2}}, {a: 1, b: 1});
-switch (getOptimizer(keysExaminedRet.explain)) {
-    case "classic":
-        assert.eq(keysExaminedRet.keysExamined, expectedKeys, errMsg(keysExaminedRet.keysExamined));
-        break;
-    case "CQF":
-        // TODO SERVER-77719: Ensure that the decision for using the scan lines up with CQF
-        // optimizer. M2: allow only collscans, M4: check bonsai behavior for index scan.
-        break;
-}
+assert.eq(keysExaminedRet.keysExamined, expectedKeys, errMsg(keysExaminedRet.keysExamined));
+
 keysExaminedRet = keysExamined({a: {$in: [1, 2]}, b: {$gt: 1, $lt: 2}}, {a: 1, b: 1});
-switch (getOptimizer(keysExaminedRet.explain)) {
-    case "classic":
-        assert.eq(keysExaminedRet.keysExamined, expectedKeys, errMsg(keysExaminedRet.keysExamined));
-        break;
-    case "CQF":
-        // TODO SERVER-77719: Ensure that the decision for using the scan lines up with CQF
-        // optimizer. M2: allow only collscans, M4: check bonsai behavior for index scan.
-        break;
-}
+assert.eq(keysExaminedRet.keysExamined, expectedKeys, errMsg(keysExaminedRet.keysExamined));
+
 keysExaminedRet =
     keysExamined({a: {$in: [1, 2]}, b: {$gt: 1, $lt: 2}}, {a: 1, b: 1}, {a: -1, b: -1});
 assert.eq(keysExaminedRet.keysExamined, expectedKeys, errMsg(keysExaminedRet.keysExamined));
@@ -116,15 +95,8 @@ if (!isSBEEnabled) {
 }
 
 keysExaminedRet = keysExamined({a: {$in: [1, 1.9]}, b: {$gt: 1, $lt: 2}}, {a: 1, b: 1});
-switch (getOptimizer(keysExaminedRet.explain)) {
-    case "classic":
-        assert.eq(keysExaminedRet.keysExamined, expectedKeys, errMsg(keysExaminedRet.keysExamined));
-        break;
-    case "CQF":
-        // TODO SERVER-77719: Ensure that the decision for using the scan lines up with CQF
-        // optimizer. M2: allow only collscans, M4: check bonsai behavior for index scan.
-        break;
-}
+assert.eq(keysExaminedRet.keysExamined, expectedKeys, errMsg(keysExaminedRet.keysExamined));
+
 keysExaminedRet =
     keysExamined({a: {$in: [1.1, 2]}, b: {$gt: 1, $lt: 2}}, {a: 1, b: 1}, {a: -1, b: -1});
 assert.eq(keysExaminedRet.keysExamined, expectedKeys, errMsg(keysExaminedRet.keysExamined));
@@ -134,15 +106,7 @@ assert.commandWorked(t.insert({a: 1, b: 1.5}));
 // both sets of bounds being scanned.
 expectedKeys = isSBEEnabled ? 1 : 4;
 keysExaminedRet = keysExamined({a: {$in: [1, 2]}, b: {$gt: 1, $lt: 2}}, {a: 1, b: 1});
-switch (getOptimizer(keysExaminedRet.explain)) {
-    case "classic":
-        assert.eq(keysExaminedRet.keysExamined, expectedKeys, errMsg(keysExaminedRet.keysExamined));
-        break;
-    case "CQF":
-        // TODO SERVER-77719: Ensure that the decision for using the scan lines up with CQF
-        // optimizer. M2: allow only collscans, M4: check bonsai behavior for index scan.
-        break;
-}
+assert.eq(keysExaminedRet.keysExamined, expectedKeys, errMsg(keysExaminedRet.keysExamined));
 
 if (isSBEEnabled) {
     const explain = t.find({a: {$gte: 1, $lt: 3}, b: {$gte: 1, $lt: 3}})

@@ -5,10 +5,8 @@
 //
 // Relies on the pipeline stages to be collapsed into a single $cursor stage, so pipelines cannot be
 // wrapped into a facet stage to not prevent this optimization. Also, this test is not prepared to
-// handle explain output for sharded collections. The assertions made in this test are irrelevant
-// for CQF, since it has no concept of a "query layer" or "aggregation layer". This test makes
-// assumptions about how the explain output will be formatted, so cannot be run when pipeline
-// optimization is disabled.
+// handle explain output for sharded collections. This test makes assumptions about how the explain
+// output will be formatted, so cannot be run when pipeline optimization is disabled.
 // @tags: [
 //   assumes_unsharded_collection,
 //   do_not_wrap_aggregations_in_facets,

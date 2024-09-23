@@ -9,7 +9,7 @@
 //   assumes_no_implicit_index_creation,
 // ]
 // Include helpers for analyzing explain output.
-import {getOptimizer, getWinningPlan, isIndexOnly} from "jstests/libs/analyze_plan.js";
+import {getWinningPlan, isIndexOnly} from "jstests/libs/analyze_plan.js";
 
 const t = db["jstests_coveredIndex2"];
 t.drop();
@@ -28,16 +28,7 @@ plan = t.find({a: 1}, {a: 1}).explain();
 assert(!isIndexOnly(db, getWinningPlan(plan.queryPlanner)),
        "Find using covered index but _id is returned");
 plan = t.find({a: 1}, {a: 1, _id: 0}).explain();
-switch (getOptimizer(plan)) {
-    case "classic":
-        assert(isIndexOnly(db, getWinningPlan(plan.queryPlanner)),
-               "Find is not using covered index");
-        break;
-    case "CQF":
-        // TODO SERVER-77719: Ensure that the decision for using the scan lines up with CQF
-        // optimizer. M2: allow only collscans, M4: check bonsai behavior for index scan.
-        break;
-}
+assert(isIndexOnly(db, getWinningPlan(plan.queryPlanner)), "Find is not using covered index");
 
 // add multikey
 assert.commandWorked(t.insert({a: [3, 4]}));

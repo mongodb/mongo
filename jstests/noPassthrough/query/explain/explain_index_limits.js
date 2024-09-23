@@ -1,6 +1,5 @@
 // Test that explain correctly outputs whether the planner hit or, and, or scan limits.
 
-import {getOptimizer} from "jstests/libs/analyze_plan.js";
 import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 
 const conn = MongoRunner.runMongod({});
@@ -44,14 +43,8 @@ FixtureHelpers.runCommandOnEachPrimary({
     }
 });
 const orResult = coll.find({common: 1, $or: [{one: 0, two: 0}, {one: 1, two: 1}]}).explain();
-switch (getOptimizer(orResult)) {
-    case "classic":
-        assert(orResult.queryPlanner.maxIndexedOrSolutionsReached, tojson(orResult));
-        break;
-    case "CQF":
-        // TODO SERVER-77719: Implement the assertion for CQF.
-        break;
-}
+assert(orResult.queryPlanner.maxIndexedOrSolutionsReached, tojson(orResult));
+
 FixtureHelpers.runCommandOnEachPrimary({
     db: testDB.getSiblingDB("admin"),
     cmdObj: {
@@ -69,14 +62,7 @@ FixtureHelpers.runCommandOnEachPrimary({
     }
 });
 const andResult = coll.find({common: 1, two: 0, one: 1}).explain();
-switch (getOptimizer(andResult)) {
-    case "classic":
-        assert(andResult.queryPlanner.maxIndexedAndSolutionsReached, tojson(andResult));
-        break;
-    case "CQF":
-        // TODO SERVER-77719: Implement the assertion for CQF.
-        break;
-}
+assert(andResult.queryPlanner.maxIndexedAndSolutionsReached, tojson(andResult));
 
 // Test that andLimit and orLimit will both show in one query.
 FixtureHelpers.runCommandOnEachPrimary({
@@ -87,15 +73,8 @@ FixtureHelpers.runCommandOnEachPrimary({
     }
 });
 const comboResult = coll.find({common: 1, one: 10, $or: [{one: 1}, {two: 2}]}).explain();
-switch (getOptimizer(andResult)) {
-    case "classic":
-        assert(comboResult.queryPlanner.maxIndexedAndSolutionsReached, tojson(comboResult));
-        assert(comboResult.queryPlanner.maxIndexedOrSolutionsReached, tojson(comboResult));
-        break;
-    case "CQF":
-        // TODO SERVER-77719: Implement the assertion for CQF.
-        break;
-}
+assert(comboResult.queryPlanner.maxIndexedAndSolutionsReached, tojson(comboResult));
+assert(comboResult.queryPlanner.maxIndexedOrSolutionsReached, tojson(comboResult));
 
 // Reset values to defaults.
 FixtureHelpers.runCommandOnEachPrimary({

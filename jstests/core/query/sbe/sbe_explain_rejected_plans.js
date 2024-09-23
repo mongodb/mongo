@@ -7,7 +7,6 @@
  */
 import {
     getExecutionStages,
-    getOptimizer,
     getPlanStages,
     getRejectedPlan,
     getRejectedPlans,
@@ -40,20 +39,10 @@ const a1IndexName = "a_1";
 const b1IndexName = "b_1";
 const explain = coll.find({a: 7, b: 9}).explain("executionStats");
 
-switch (getOptimizer(explain)) {
-    case "classic": {
-        // Verify that the winner plan has index scan stage on 'a_1_b_1'.
-        let ixscans = getPlanStages(getWinningPlan(explain.queryPlanner), "IXSCAN");
-        assert.neq(ixscans.length, 0, explain);
-        for (let ixscan of ixscans) {
-            assert.eq(ixscan.indexName, a1b1IndexName, explain);
-        }
-        break;
-    }
-    case "CQF":
-        // TODO SERVER-77719: Ensure that the decision for using the scan lines up with CQF
-        // optimizer. M2: allow only collscans, M4: check bonsai behavior for index scan.
-        break;
+let ixscans = getPlanStages(getWinningPlan(explain.queryPlanner), "IXSCAN");
+assert.neq(ixscans.length, 0, explain);
+for (let ixscan of ixscans) {
+    assert.eq(ixscan.indexName, a1b1IndexName, explain);
 }
 
 // Verify that the winning SBE plan has index scan stage on 'a_1_b_1'.
@@ -69,9 +58,7 @@ for (let executionStage of executionStages) {
 
 // Verify that rejected plans should have index scan on 'a_1' or 'b_1'.
 for (let rejectedPlan of getRejectedPlans(explain)) {
-    let stages = {"classic": "IXSCAN", "CQF": "IndexScan"};
-    let optimizer = getOptimizer(explain);
-    let ixscans = getPlanStages(getRejectedPlan(rejectedPlan), stages[optimizer]);
+    let ixscans = getPlanStages(getRejectedPlan(rejectedPlan), "IXSCAN");
     assert.neq(ixscans.length, 0, explain);
     for (let ixscan of ixscans) {
         assert.contains(ixscan.indexName, [a1IndexName, b1IndexName], ixscan);

@@ -115,9 +115,7 @@ function runTest(conn) {
             assert.commandWorked(
                 db.setProfilingLevel(isMongos ? 0 : 1, {filter: {[field]: {$exists: true}}}));
             const comment = 'profile_filter_input_has_field_' + field;
-            // Use a $natural hint to force a collection scan without fast paths to ensure
-            // cost-estimation is done when 'tryBonsai' framework control is enabled.
-            assert.eq(100, coll.find().hint({$natural: 1}).comment(comment).itcount());
+            assert.eq(100, coll.find().comment(comment).itcount());
             // If the profile filter's input didn't contain `field`, then this operation wouldn't be
             // profiled.
             assert(db.system.profile.findOne({'command.comment': comment}),

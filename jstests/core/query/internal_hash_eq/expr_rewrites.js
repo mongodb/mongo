@@ -10,7 +10,6 @@
  */
 import {
     getExecutionStages,
-    getOptimizer,
     getPlanStages,
     isCollscan,
     isIxscan
@@ -48,18 +47,7 @@ function getHash(coll, filterSpec, field, indexSpec) {
  * @param {int} expectedKeysExamined - The expected number of keys in the index that were examined.
  */
 function assertExplainIxscan(explainPlan, expectedIndexSpec, expectedKeysExamined = 1) {
-    switch (getOptimizer(explainPlan)) {
-        case "classic": {
-            assert(isIxscan(db, explainPlan), explainPlan);
-            break;
-        }
-        case "CQF": {
-            // TODO SERVER-77719: Ensure that the decision for using the scan lines up with CQF
-            // optimizer. M2: allow only collscans, M4: check bonsai behavior for index scan.
-            assert(isCollscan(db, explainPlan));
-            break;
-        }
-    }
+    assert(isIxscan(db, explainPlan), explainPlan);
     let execStages = getExecutionStages(explainPlan);
     execStages.forEach(execStage => {
         if (execStage.stage == "SHARDING_FILTER" && execStage.nReturned == 0) {

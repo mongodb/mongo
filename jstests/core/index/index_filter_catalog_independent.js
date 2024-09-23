@@ -15,7 +15,6 @@
  * ]
  */
 import {
-    getOptimizer,
     getPlanStages,
     getQueryPlanners,
     getWinningPlan,
@@ -39,24 +38,13 @@ function assertOneIndexFilter(query, indexes) {
 }
 
 function assertIsIxScanOnIndex(explain, keyPattern) {
-    switch (getOptimizer(explain)) {
-        case "classic": {
-            let winningPlan = getWinningPlan(explain.queryPlanner);
-            const ixScans = getPlanStages(winningPlan, "IXSCAN");
-            assert.gt(ixScans.length, 0);
-            ixScans.every((ixScan) => assert.eq(ixScan.keyPattern, keyPattern));
+    let winningPlan = getWinningPlan(explain.queryPlanner);
+    const ixScans = getPlanStages(winningPlan, "IXSCAN");
+    assert.gt(ixScans.length, 0);
+    ixScans.every((ixScan) => assert.eq(ixScan.keyPattern, keyPattern));
 
-            const collScans = getPlanStages(winningPlan, "COLLSCAN");
-            assert.eq(collScans.length, 0);
-            break;
-        }
-        case "CQF": {
-            // TODO SERVER-77719: Ensure that the decision for using the scan lines up with CQF
-            // optimizer. M2: allow only collscans, M4: check bonsai behavior for index scan.
-            assert(isCollscan(db, getWinningPlanFromExplain(explain)));
-            break;
-        }
-    }
+    const collScans = getPlanStages(winningPlan, "COLLSCAN");
+    assert.eq(collScans.length, 0);
 }
 
 function checkIndexFilterSet(explain, shouldBeSet) {

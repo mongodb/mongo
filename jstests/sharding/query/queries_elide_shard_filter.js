@@ -5,48 +5,24 @@
 // @tags: [
 // ]
 
-import {getOptimizer, getPlanStage} from "jstests/libs/analyze_plan.js";
+import {getPlanStage} from "jstests/libs/analyze_plan.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 function assertShardFilter(explain) {
-    switch (getOptimizer(explain)) {
-        case "classic": {
-            const filterStage = getPlanStage(explain.queryPlanner.winningPlan, "SHARDING_FILTER");
-            assert.eq(filterStage.stage, "SHARDING_FILTER");
-            const scanStage = filterStage.inputStage;
-            assert.contains(scanStage.stage, ["IXSCAN", "FETCH"]);
-            break;
-        }
-        case "CQF":
-            // TODO SERVER-77719: Implement the assertion for CQF.
-            break;
-    }
+    const filterStage = getPlanStage(explain.queryPlanner.winningPlan, "SHARDING_FILTER");
+    assert.eq(filterStage.stage, "SHARDING_FILTER");
+    const scanStage = filterStage.inputStage;
+    assert.contains(scanStage.stage, ["IXSCAN", "FETCH"]);
 }
 
 function assertNoShardFilter(explain) {
-    switch (getOptimizer(explain)) {
-        case "classic": {
-            const filterStage = getPlanStage(explain.queryPlanner.winningPlan, "SHARDING_FILTER");
-            assert.eq(filterStage, null, explain);
-            break;
-        }
-        case "CQF":
-            // TODO SERVER-77719: Implement the assertion for CQF.
-            break;
-    }
+    const filterStage = getPlanStage(explain.queryPlanner.winningPlan, "SHARDING_FILTER");
+    assert.eq(filterStage, null, explain);
 }
 
 function assertCountScan(explain) {
-    switch (getOptimizer(explain)) {
-        case "classic": {
-            const countStage = getPlanStage(explain.queryPlanner.winningPlan, "COUNT_SCAN");
-            assert.eq(countStage.stage, "COUNT_SCAN");
-            break;
-        }
-        case "CQF":
-            // TODO SERVER-77719: Implement the assertion for CQF.
-            break;
-    }
+    const countStage = getPlanStage(explain.queryPlanner.winningPlan, "COUNT_SCAN");
+    assert.eq(countStage.stage, "COUNT_SCAN");
 }
 
 const st = new ShardingTest({shards: 1});

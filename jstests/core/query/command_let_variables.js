@@ -7,12 +7,7 @@
 //   does_not_support_config_fuzzer,
 // ]
 //
-import {
-    getOptimizer,
-    getPlanStage,
-    getSingleNodeExplain,
-    planHasStage
-} from "jstests/libs/analyze_plan.js";
+import {getPlanStage, getSingleNodeExplain, planHasStage} from "jstests/libs/analyze_plan.js";
 import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 import {checkSbeFullFeatureFlagEnabled} from "jstests/libs/sbe_util.js";
 
@@ -98,8 +93,7 @@ let explain = assert.commandWorked(testDB.runCommand({
     verbosity: "executionStats"
 }));
 
-// TODO SERVER-77719: Extend the testing for unwind operator to CQF optimizer.
-if (!isMongos && getOptimizer(explain) == "classic") {
+if (!isMongos) {
     if (checkSbeFullFeatureFlagEnabled(testDB)) {
         // $unwind should be pushed down to SBE.
         assert(planHasStage(testDB, explain, "UNWIND"), explain);
@@ -342,8 +336,7 @@ explain = assert.commandWorked(testDB.runCommand({
     },
     verbosity: "executionStats"
 }));
-// TODO SERVER-77719: Extend the testing for CQF optimizer.
-if (!isMongos && getOptimizer(explain) == "classic") {
+if (!isMongos) {
     let deleteStage = getPlanStage(explain.executionStats.executionStages, "DELETE");
     assert.eq(deleteStage.nWouldDelete, 1, explain);
 }
@@ -417,8 +410,7 @@ explain = assert.commandWorked(testDB.runCommand({
     },
     verbosity: "executionStats"
 }));
-// TODO SERVER-77719: Extend the testing for CQF optimizer.
-if (!isMongos && getOptimizer(explain) == "classic") {
+if (!isMongos) {
     let updateStage = getPlanStage(explain.executionStats.executionStages, "UPDATE");
     assert.eq(updateStage.nMatched, 1, explain);
     assert.eq(updateStage.nWouldModify, 1, explain);
@@ -466,8 +458,7 @@ explain = assert.commandWorked(testDB.runCommand({
     },
     verbosity: "executionStats"
 }));
-// TODO SERVER-77719: Extend the testing for CQF optimizer.
-if (!isMongos && getOptimizer(explain) == "classic") {
+if (!isMongos) {
     let updateStage = getPlanStage(explain.executionStats.executionStages, "UPDATE");
     assert.eq(updateStage.nMatched, 1, explain);
     assert.eq(updateStage.nWouldModify, 1, explain);

@@ -7,12 +7,7 @@
 
 // Test indexing of decimal numbers
 // Include helpers for analyzing explain output.
-import {
-    getOptimizer,
-    getWinningPlanFromExplain,
-    isCollscan,
-    isIndexOnly
-} from "jstests/libs/analyze_plan.js";
+import {getWinningPlanFromExplain, isCollscan, isIndexOnly} from "jstests/libs/analyze_plan.js";
 
 var t = db.decimal_indexing;
 t.drop();
@@ -41,21 +36,8 @@ assert.neq(tojson(NumberDecimal('0.1')),
            'trailing zeros are significant for exact equality');
 assert.eq(
     qres, [{x: NumberDecimal('0.10')}], 'query for x equal to decimal 0.10 returns wrong value');
-
-switch (getOptimizer(qplan)) {
-    case "classic": {
-        assert(isIndexOnly(db, qplan.queryPlanner.winningPlan),
-               'query on decimal should be covered: ' + tojson(qplan));
-        break;
-    }
-    case "CQF": {
-        // TODO SERVER-77719: Ensure that the decision for using the scan lines up with CQF
-        // optimizer. M2: allow only collscans, M4: check bonsai behavior for index scan.
-        assert(isCollscan(db, getWinningPlanFromExplain(qplan)),
-               'query on decimal in Bonsai M4 is always using collection scan: ' + tojson(qplan));
-        break;
-    }
-}
+assert(isIndexOnly(db, qplan.queryPlanner.winningPlan),
+       'query on decimal should be covered: ' + tojson(qplan));
 
 // Check that queries for exact floating point numbers don't return nearby decimals.
 assert.eq(t.find({x: 0.1}, {_id: 0}).sort({x: 1, y: 1}).toArray(),

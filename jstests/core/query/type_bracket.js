@@ -132,7 +132,7 @@ let tests = [
 
 // Currently, depending on which query engine is used, documents which are missing 'a' may or may
 // not be returned when comparing 'a' against MinKey/MaxKey. For example, for query
-// {a: {$gte: MinKey()}}, classic and CQF correctly return documents missing 'a', but SBE does not.
+// {a: {$gte: MinKey()}}, classic correctly returns documents missing 'a', but SBE does not.
 // TODO SERVER-68274: Restrict these testcases once SBE correctly handles the semantics of
 // missing fields and type bracketing (missing field is implicitly null which is greater than
 // MinKey).

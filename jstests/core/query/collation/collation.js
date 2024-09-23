@@ -21,7 +21,6 @@
 
 // Integration tests for the collation feature.
 import {
-    getOptimizer,
     getPlanStage,
     getSingleNodeExplain,
     getWinningPlan,
@@ -813,18 +812,7 @@ assert.commandWorked(coll.createIndex({a: 1}, {collation: {locale: "en_US"}}));
 var explain = coll.find({a: "foo"}).explain("queryPlanner");
 
 // Assert the plan is using an index scan.
-switch (getOptimizer(explain)) {
-    case "classic":
-        assert(isIxscan(testDb, getWinningPlan(explain.queryPlanner)));
-        break;
-    case "CQF":
-        // TODO SERVER-77719: Ensure that the decision for using the scan lines up with CQF
-        // optimizer. M2: allow only collscans, M4: check bonsai behavior for index scan.
-        assert(isCollscan(testDb, getWinningPlan(explain.queryPlanner)));
-        break;
-    default:
-        break;
-}
+assert(isIxscan(testDb, getWinningPlan(explain.queryPlanner)));
 
 // Find should select compatible index when no collation specified and collection default
 // collation is "simple".
@@ -835,18 +823,7 @@ assert.commandWorked(coll.createIndex({a: 1}, {collation: {locale: "simple"}}));
 var explain = coll.find({a: "foo"}).explain("queryPlanner");
 
 // Assert the plan is using an index scan.
-switch (getOptimizer(explain)) {
-    case "classic":
-        assert(isIxscan(testDb, getWinningPlan(explain.queryPlanner)));
-        break;
-    case "CQF":
-        // TODO SERVER-77719: Ensure that the decision for using the scan lines up with CQF
-        // optimizer. M2: allow only collscans, M4: check bonsai behavior for index scan.
-        assert(isCollscan(testDb, getWinningPlan(explain.queryPlanner)));
-        break;
-    default:
-        break;
-}
+assert(isIxscan(testDb, getWinningPlan(explain.queryPlanner)));
 
 // Find should not use index when no collation specified, index collation is "simple", and
 // collection has a non-"simple" default collation.

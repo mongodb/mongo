@@ -8,7 +8,7 @@
 // Compound index covered query tests
 
 // Include helpers for analyzing explain output.
-import {getOptimizer, isIndexOnly} from "jstests/libs/analyze_plan.js";
+import {isIndexOnly} from "jstests/libs/analyze_plan.js";
 
 var coll = db.getCollection("covered_compound_1");
 coll.drop();
@@ -31,19 +31,11 @@ assert.eq(0,
 var plan = coll.find({a: 26, b: "strvar_0"}, {a: 1, b: 1, c: 1, _id: 0})
                .hint({a: 1, b: -1, c: 1})
                .explain("executionStats");
-switch (getOptimizer(plan)) {
-    case "classic":
-        assert(isIndexOnly(db, plan.queryPlanner.winningPlan),
-               "compound.1.2 - indexOnly should be true on covered query");
-        assert.eq(0,
-                  plan.executionStats.totalDocsExamined,
-                  "compound.1.2 - nscannedObjects should be 0 for covered query");
-        break;
-    case "CQF":
-        // TODO SERVER-77719: Ensure that the decision for using the scan lines up with CQF
-        // optimizer. M2: allow only collscans, M4: check bonsai behavior for index scan.
-        break;
-}
+assert(isIndexOnly(db, plan.queryPlanner.winningPlan),
+       "compound.1.2 - indexOnly should be true on covered query");
+assert.eq(0,
+          plan.executionStats.totalDocsExamined,
+          "compound.1.2 - nscannedObjects should be 0 for covered query");
 
 // Test query on all fields queried and project subset
 var plan = coll.find({a: 38, b: "strvar_12", c: 8}, {b: 1, c: 1, _id: 0})
@@ -73,37 +65,21 @@ if (!TestData.isHintsToQuerySettingsSuite) {
 var plan = coll.find({a: {$gt: 25, $lt: 43}}, {b: 1, c: 1, _id: 0})
                .hint({a: 1, b: -1, c: 1})
                .explain("executionStats");
-switch (getOptimizer(plan)) {
-    case "classic":
-        assert(isIndexOnly(db, plan.queryPlanner.winningPlan),
-               "compound.1.5 - indexOnly should be true on covered query");
-        assert.eq(0,
-                  plan.executionStats.totalDocsExamined,
-                  "compound.1.5 - nscannedObjects should be 0 for covered query");
-        break;
-    case "CQF":
-        // TODO SERVER-77719: Ensure that the decision for using the scan lines up with CQF
-        // optimizer. M2: allow only collscans, M4: check bonsai behavior for index scan.
-        break;
-}
+assert(isIndexOnly(db, plan.queryPlanner.winningPlan),
+       "compound.1.5 - indexOnly should be true on covered query");
+assert.eq(0,
+          plan.executionStats.totalDocsExamined,
+          "compound.1.5 - nscannedObjects should be 0 for covered query");
 
 // Test in query
 var plan = coll.find({a: 38, b: "strvar_12", c: {$in: [5, 8]}}, {b: 1, c: 1, _id: 0})
                .hint({a: 1, b: -1, c: 1})
                .explain("executionStats");
-switch (getOptimizer(plan)) {
-    case "classic":
-        assert(isIndexOnly(db, plan.queryPlanner.winningPlan),
-               "compound.1.6 - indexOnly should be true on covered query");
-        assert.eq(0,
-                  plan.executionStats.totalDocsExamined,
-                  "compound.1.6 - nscannedObjects should be 0 for covered query");
-        break;
-    case "CQF":
-        // TODO SERVER-77719: Ensure that the decision for using the scan lines up with CQF
-        // optimizer. M2: allow only collscans, M4: check bonsai behavior for index scan.
-        break;
-}
+assert(isIndexOnly(db, plan.queryPlanner.winningPlan),
+       "compound.1.6 - indexOnly should be true on covered query");
+assert.eq(0,
+          plan.executionStats.totalDocsExamined,
+          "compound.1.6 - nscannedObjects should be 0 for covered query");
 
 // Test no result
 var plan = coll.find({a: 38, b: "strvar_12", c: 55}, {a: 1, b: 1, c: 1, _id: 0})

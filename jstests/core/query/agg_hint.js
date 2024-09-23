@@ -7,7 +7,7 @@
 //   # Explain of a resolved view must be executed by mongos.
 //   directly_against_shardsvrs_incompatible,
 // ]
-import {getAggPlanStages, getOptimizer, getPlanStages} from "jstests/libs/analyze_plan.js";
+import {getAggPlanStages, getPlanStages} from "jstests/libs/analyze_plan.js";
 import {assertDropCollection} from "jstests/libs/collection_drop_recreate.js";
 
 const isHintsToQuerySettingsSuite = TestData.isHintsToQuerySettingsSuite || false;
@@ -21,30 +21,12 @@ const view = testDB.getCollection(viewName);
 
 function confirmWinningPlanUsesExpectedIndex(
     explainResult, expectedKeyPattern, stageName, pipelineOptimizedAway) {
-    const optimizer = getOptimizer(explainResult);
-
-    if (!(optimizer in stageName) || stageName[optimizer] === "") {
-        // TODO SERVER-77719: Ensure that the expected operator is defined for all optimizers. There
-        // should be an exception here.
-        return;
-    }
-
-    const planStages = pipelineOptimizedAway
-        ? getPlanStages(explainResult, stageName[optimizer])
-        : getAggPlanStages(explainResult, stageName[optimizer]);
-
-    switch (optimizer) {
-        case "classic":
-            assert.neq(null, planStages, tojson(explainResult));
-            planStages.forEach(planStage => {
-                assert.eq(planStage.keyPattern, expectedKeyPattern, tojson(planStage));
-            });
-            break;
-        case "CQF":
-            // TODO SERVER-77719: Ensure that the decision for using the scan lines up with CQF
-            // optimizer. M2: allow only collscans, M4: check bonsai behavior for index scan.
-            break;
-    }
+    const planStages = pipelineOptimizedAway ? getPlanStages(explainResult, stageName)
+                                             : getAggPlanStages(explainResult, stageName);
+    assert.neq(null, planStages, tojson(explainResult));
+    planStages.forEach(planStage => {
+        assert.eq(planStage.keyPattern, expectedKeyPattern, tojson(planStage));
+    });
 }
 
 // Runs explain on 'command', with the hint specified by 'hintKeyPattern' when not null.
@@ -55,10 +37,7 @@ function confirmCommandUsesIndex({
     command = null,
     hintKeyPattern = null,
     expectedKeyPattern = null,
-    stageName = {
-        "classic": "IXSCAN",
-        "CQF": "IndexScan"
-    },
+    stageName = "IXSCAN",
     pipelineOptimizedAway = false
 } = {}) {
     if (hintKeyPattern) {
@@ -81,10 +60,7 @@ function confirmAggUsesIndex({
     aggPipeline = [],
     hintKeyPattern = null,
     expectedKeyPattern = null,
-    stageName = {
-        "classic": "IXSCAN",
-        "CQF": "IndexScan"
-    },
+    stageName = "IXSCAN",
     pipelineOptimizedAway = false
 } = {}) {
     let options = {};
@@ -286,18 +262,16 @@ for (let i = 0; i < 5; ++i) {
 }
 assert.commandWorked(testDB.createView(viewName, collName, []));
 
-// TODO SERVER-77719: Ensure that the decision for using the scan lines up with CQF
-// optimizer. M2: allow only collscans, M4: check bonsai behavior for index scan.
 confirmCommandUsesIndex({
     command: {count: view.getName(), query: {x: 3}},
     expectedKeyPattern: {x: 1},
-    stageName: {"classic": "COUNT_SCAN", "CQF": ""},
+    stageName: "COUNT_SCAN",
 });
 confirmCommandUsesIndex({
     command: {count: view.getName(), query: {x: 3}},
     hintKeyPattern: {x: 1},
     expectedKeyPattern: {x: 1},
-    stageName: {"classic": "COUNT_SCAN", "CQF": ""},
+    stageName: "COUNT_SCAN",
 });
 
 // Query settings do not force indexes and therefore '_id' index is not used when filtering on 'x'.
