@@ -1367,7 +1367,8 @@ void MigrationDestinationManager::_migrateDriver(OperationContext* outerOpCtx,
         if (initialState == kAbort) {
             LOGV2_ERROR(22013,
                         "Migration abort requested before the migration started",
-                        "migrationId"_attr = _migrationId->toBSON());
+                        "migrationId"_attr = _migrationId->toBSON(),
+                        logAttrs(_nss));
             return;
         }
 
@@ -1622,7 +1623,8 @@ void MigrationDestinationManager::_migrateDriver(OperationContext* outerOpCtx,
                     if (i > 100) {
                         LOGV2(22003,
                               "secondaries having hard time keeping up with migrate",
-                              "migrationId"_attr = _migrationId->toBSON());
+                              "migrationId"_attr = _migrationId->toBSON(),
+                              logAttrs(_nss));
                     }
 
                     sleepmillis(20);
@@ -1648,12 +1650,14 @@ void MigrationDestinationManager::_migrateDriver(OperationContext* outerOpCtx,
 
             LOGV2(22004,
                   "Waiting for replication to catch up before entering critical section",
-                  "migrationId"_attr = _migrationId->toBSON());
+                  "migrationId"_attr = _migrationId->toBSON(),
+                  logAttrs(_nss));
             LOGV2_DEBUG_OPTIONS(4817411,
                                 2,
                                 {logv2::LogComponent::kShardMigrationPerf},
                                 "Starting majority commit wait on recipient",
-                                "migrationId"_attr = _migrationId->toBSON());
+                                "migrationId"_attr = _migrationId->toBSON(),
+                                logAttrs(_nss));
 
             runWithoutSession(outerOpCtx, [&] {
                 auto awaitReplicationResult =
@@ -1665,12 +1669,14 @@ void MigrationDestinationManager::_migrateDriver(OperationContext* outerOpCtx,
 
             LOGV2(22005,
                   "Chunk data replicated successfully.",
-                  "migrationId"_attr = _migrationId->toBSON());
+                  "migrationId"_attr = _migrationId->toBSON(),
+                  logAttrs(_nss));
             LOGV2_DEBUG_OPTIONS(4817412,
                                 2,
                                 {logv2::LogComponent::kShardMigrationPerf},
                                 "Finished majority commit wait on recipient",
-                                "migrationId"_attr = _migrationId->toBSON());
+                                "migrationId"_attr = _migrationId->toBSON(),
+                                logAttrs(_nss));
         }
 
         {
@@ -1713,7 +1719,8 @@ void MigrationDestinationManager::_migrateDriver(OperationContext* outerOpCtx,
                 if (getState() == kAbort) {
                     LOGV2(22006,
                           "Migration aborted while transferring mods",
-                          "migrationId"_attr = _migrationId->toBSON());
+                          "migrationId"_attr = _migrationId->toBSON(),
+                          logAttrs(_nss));
                     return;
                 }
 
@@ -1764,7 +1771,8 @@ void MigrationDestinationManager::_migrateDriver(OperationContext* outerOpCtx,
             LOGV2_DEBUG(5899113,
                         2,
                         "Persisted migration recipient recovery document",
-                        "sessionId"_attr = _sessionId);
+                        "sessionId"_attr = _sessionId,
+                        logAttrs(_nss));
 
             // Enter critical section. Ensure it has been majority commited before _recvChunkCommit
             // returns success to the donor, so that if the recipient steps down, the critical
@@ -1809,7 +1817,8 @@ void MigrationDestinationManager::_migrateDriver(OperationContext* outerOpCtx,
         LOGV2_DEBUG(6064501,
                     2,
                     "Reacquired migration recipient critical section",
-                    "sessionId"_attr = *_sessionId);
+                    "sessionId"_attr = *_sessionId,
+                    logAttrs(_nss));
 
         {
             stdx::lock_guard<Latch> sl(_mutex);
@@ -1817,7 +1826,10 @@ void MigrationDestinationManager::_migrateDriver(OperationContext* outerOpCtx,
             _stateChangedCV.notify_all();
         }
 
-        LOGV2(6064503, "Recovered migration recipient", "sessionId"_attr = *_sessionId);
+        LOGV2(6064503,
+              "Recovered migration recipient",
+              "sessionId"_attr = *_sessionId,
+              logAttrs(_nss));
     }
 
     outerOpCtx->setAlwaysInterruptAtStepDownOrUp_UNSAFE();
@@ -1935,7 +1947,8 @@ bool MigrationDestinationManager::_applyMigrateOp(OperationContext* opCtx, const
                     "reloaded remote document",
                     "localDoc"_attr = redact(localDoc),
                     "remoteDoc"_attr = redact(updatedDoc),
-                    "migrationId"_attr = _migrationId->toBSON());
+                    "migrationId"_attr = _migrationId->toBSON(),
+                    logAttrs(_nss));
             }
 
             // We are in write lock here, so sure we aren't killing
@@ -2012,6 +2025,7 @@ void MigrationDestinationManager::awaitCriticalSectionReleaseSignalAndCompleteMi
                     2,
                     "Post-migration commit refresh failed on recipient",
                     "migrationId"_attr = _migrationId,
+                    logAttrs(_nss),
                     "error"_attr = redact(ex));
         refreshFailed = true;
     }
@@ -2075,7 +2089,8 @@ void MigrationDestinationManager::onStepDown() {
     if (migrateThreadFinishedFuture) {
         LOGV2(8991401,
               "Waiting for migrate thread to finish on stepdown",
-              "migrationId"_attr = _migrationId);
+              "migrationId"_attr = _migrationId,
+              logAttrs(_nss));
         migrateThreadFinishedFuture->wait();
     }
 }

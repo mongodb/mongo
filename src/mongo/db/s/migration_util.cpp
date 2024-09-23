@@ -666,7 +666,8 @@ void recoverMigrationCoordinations(OperationContext* opCtx,
                           "migrationCoordinatorDocument"_attr = redact(doc.toBSON()),
                           "refreshedMetadataUUID"_attr =
                               currentMetadata.getChunkManager()->getUUID(),
-                          "coordinatorDocumentUUID"_attr = doc.getCollectionUuid());
+                          "coordinatorDocumentUUID"_attr = doc.getCollectionUuid(),
+                          logAttrs(doc.getNss()));
                 }
 
                 // TODO SERVER-77472: remove this once we are sure all operations persist the config
@@ -753,6 +754,7 @@ ExecutorFuture<void> launchReleaseCriticalSectionOnRecipientFuture(
                           "Failed to release critical section on recipient",
                           "shardId"_attr = recipientShardId,
                           "sessionId"_attr = sessionId,
+                          logAttrs(nss),
                           "error"_attr = exShardNotFound);
                 }
             },

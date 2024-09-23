@@ -203,7 +203,8 @@ void MigrationBatchInserter::run(Status status) const try {
         LOGV2(6718408,
               "Incrementing cloned count by  ",
               "batchNumCloned"_attr = batchNumCloned,
-              "batchClonedBytes"_attr = batchClonedBytes);
+              "batchClonedBytes"_attr = batchClonedBytes,
+              logAttrs(_nss));
         _migrationProgress->incNumCloned(batchNumCloned);
         _migrationProgress->incNumBytes(batchClonedBytes);
 
@@ -219,7 +220,8 @@ void MigrationBatchInserter::run(Status status) const try {
                     if (replStatus.status.code() == ErrorCodes::WriteConcernFailed) {
                         LOGV2_WARNING(22011,
                                       "secondaryThrottle on, but doc insert timed out; continuing",
-                                      "migrationId"_attr = _migrationId.toBSON());
+                                      "migrationId"_attr = _migrationId.toBSON(),
+                                      logAttrs(_nss));
                     } else {
                         uassertStatusOK(replStatus.status);
                     }
@@ -236,6 +238,6 @@ void MigrationBatchInserter::run(Status status) const try {
 } catch (const DBException& e) {
     ClientLock lk(_innerOpCtx->getClient());
     _innerOpCtx->getServiceContext()->killOperation(lk, _innerOpCtx, ErrorCodes::Error(6718402));
-    LOGV2(6718407, "Batch application failed", "error"_attr = e.toStatus());
+    LOGV2(6718407, "Batch application failed", "error"_attr = e.toStatus(), logAttrs(_nss));
 }
 }  // namespace mongo

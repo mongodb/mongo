@@ -278,7 +278,8 @@ void LogTransactionOperationsForShardingHandler::commit(OperationContext* opCtx,
         if (idElement.eoo()) {
             LOGV2_WARNING(21994,
                           "Received a document without an _id and will ignore that document",
-                          "documentKey"_attr = redact(preImageDocKey));
+                          "documentKey"_attr = redact(preImageDocKey),
+                          logAttrs(nss));
             continue;
         }
 
@@ -492,7 +493,10 @@ void MigrationChunkClonerSource::cancelClone(OperationContext* opCtx) noexcept {
                                createRequestWithSessionId(kRecvChunkAbort, nss(), _sessionId))
                     .getStatus();
             if (!status.isOK()) {
-                LOGV2(21991, "Failed to cancel migration", "error"_attr = redact(status));
+                LOGV2(21991,
+                      "Failed to cancel migration",
+                      "error"_attr = redact(status),
+                      logAttrs(nss()));
             }
             [[fallthrough]];
         }
@@ -514,7 +518,8 @@ void MigrationChunkClonerSource::onInsertOp(OperationContext* opCtx,
         LOGV2_WARNING(21995,
                       "logInsertOp received a document without an _id field and will ignore that "
                       "document",
-                      "insertedDoc"_attr = redact(insertedDoc));
+                      "insertedDoc"_attr = redact(insertedDoc),
+                      logAttrs(nss()));
         return;
     }
 
@@ -541,7 +546,8 @@ void MigrationChunkClonerSource::onUpdateOp(OperationContext* opCtx,
         LOGV2_WARNING(
             21996,
             "logUpdateOp received a document without an _id field and will ignore that document",
-            "postImageDoc"_attr = redact(postImageDoc));
+            "postImageDoc"_attr = redact(postImageDoc),
+            logAttrs(nss()));
         return;
     }
 
@@ -576,7 +582,8 @@ void MigrationChunkClonerSource::onDeleteOp(OperationContext* opCtx,
         LOGV2_WARNING(
             21997,
             "logDeleteOp received a document without an _id field and will ignore that document",
-            "deletedDocShardKeyAndId"_attr = redact(shardKeyAndId));
+            "deletedDocShardKeyAndId"_attr = redact(shardKeyAndId),
+            logAttrs(nss()));
         return;
     }
 
@@ -584,7 +591,8 @@ void MigrationChunkClonerSource::onDeleteOp(OperationContext* opCtx,
         LOGV2_WARNING(8023600,
                       "logDeleteOp received a document without the shard key field and will ignore "
                       "that document",
-                      "deletedDocShardKeyAndId"_attr = redact(shardKeyAndId));
+                      "deletedDocShardKeyAndId"_attr = redact(shardKeyAndId),
+                      logAttrs(nss()));
         return;
     }
 
@@ -1222,6 +1230,7 @@ Status MigrationChunkClonerSource::_checkRecipientCloningStatus(OperationContext
             LOGV2(21992,
                   "moveChunk data transfer progress",
                   "response"_attr = redact(res),
+                  logAttrs(nss()),
                   "memoryUsedBytes"_attr = _memoryUsed,
                   "docsCloned"_attr = _jumboChunkCloneState->docsCloned,
                   "untransferredModsSizeBytes"_attr = untransferredModsSizeBytes,
@@ -1231,6 +1240,7 @@ Status MigrationChunkClonerSource::_checkRecipientCloningStatus(OperationContext
             LOGV2(21993,
                   "moveChunk data transfer progress",
                   "response"_attr = redact(res),
+                  logAttrs(nss()),
                   "memoryUsedBytes"_attr = _memoryUsed,
                   "docsRemainingToClone"_attr =
                       _cloneList.size() - _numRecordsCloned - _numRecordsPassedOver,
@@ -1279,6 +1289,7 @@ Status MigrationChunkClonerSource::_checkRecipientCloningStatus(OperationContext
                 // Block writes, so that it can drain everything.
                 LOGV2(5630700,
                       "moveChunk data transfer within threshold to allow write blocking",
+                      logAttrs(nss()),
                       "_untransferredUpsertsCounter"_attr = _untransferredUpsertsCounter,
                       "_untransferredDeletesCounter"_attr = _untransferredDeletesCounter,
                       "_deferredUntransferredOpsCounter"_attr = _deferredUntransferredOpsCounter,
