@@ -14,6 +14,25 @@ env.SConscript(
 )
 
 env.Library(
+    target="sampling_estimator",
+    source=[
+        "sampling_estimator.cpp",
+    ],
+    LIBDEPS=["$BUILD_DIR/mongo/db/query_exec"],
+)
+
+env.CppUnitTest(
+    target="sampling_estimator_test",
+    source=[
+        "sampling_estimator_test.cpp",
+    ],
+    LIBDEPS=[
+        "$BUILD_DIR/mongo/db/service_context_test_fixture",
+        "sampling_estimator",
+    ],
+)
+
+env.Library(
     target="test_utils",
     source=[
         "test_utils.cpp",
