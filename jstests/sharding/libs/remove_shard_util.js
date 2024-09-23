@@ -1,5 +1,9 @@
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
+// Make it easier to understand whether or not returns from the assert.soon are being retried.
+const kRetry = false;
+const kNoRetry = true;
+
 export function removeShard(shardingTestOrConn, shardName, timeout) {
     if (timeout == undefined) {
         timeout = 10 * 60 * 1000;  // 10 minutes
@@ -30,12 +34,13 @@ export function removeShard(shardingTestOrConn, shardName, timeout) {
                 // server primary, which would not find the removed shard in its ShardRegistry if it
                 // has done a ShardRegistry reload after the config.shards doc for the shard was
                 // removed. This would cause the command to fail with ShardNotFound.
-                return true;
+                return kNoRetry;
             }
             if (res.code === ErrorCodes.HostUnreachable && TestData.runningWithConfigStepdowns) {
                 // The mongos may exhaust its retries due to having consecutive config stepdowns. In
                 // this case, the mongos will return a HostUnreachable error.
-                return true;
+                // We should retry the operation when this happens.
+                return kRetry;
             }
         }
         assert.commandWorked(res);
