@@ -753,6 +753,8 @@ last-continuous:
     ticket: SERVER-90952
   - test_file: jstests/sharding/refresh_sessions.js
     ticket: SERVER-94635
+  - test_file: jstests/core/timeseries/timeseries_filter_extended_range.js
+    ticket: SERVER-94207
   suites: null
 last-lts:
   all:
@@ -1566,4 +1568,6 @@ last-lts:
     ticket: SERVER-90952
   - test_file: jstests/sharding/refresh_sessions.js
     ticket: SERVER-94635
+  - test_file: jstests/core/timeseries/timeseries_filter_extended_range.js
+    ticket: SERVER-94207
   suites: null
