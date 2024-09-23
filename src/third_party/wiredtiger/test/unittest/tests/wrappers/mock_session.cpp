@@ -28,11 +28,19 @@ mock_session::~mock_session()
 {
     WT_CONNECTION_IMPL *connection_impl = _mock_connection->get_wt_connection_impl();
     if (_session_impl->block_manager != nullptr)
-        __wt_free(nullptr, _session_impl->block_manager);
+        _session_impl->block_manager_cleanup(_session_impl);
     // FIXME-WT-13505: Move terminate function to connection once circular dependency is fixed.
     if (connection_impl->file_system != nullptr)
         utils::throw_if_non_zero(connection_impl->file_system->terminate(
           connection_impl->file_system, reinterpret_cast<WT_SESSION *>(_session_impl)));
+    if (_session_impl->dhandle != nullptr) {
+        if (_session_impl->dhandle->handle != nullptr)
+            __wt_free(nullptr, _session_impl->dhandle->handle);
+        __wt_free(nullptr, _session_impl->dhandle);
+    }
+    // WiredTiger caches any allocated scratch buffer during the lifetime of the test. Free all
+    // the memory here.
+    __wt_scr_discard(_session_impl);
     __wt_free(nullptr, _session_impl);
 }
 
@@ -56,8 +64,17 @@ mock_session::setup_block_manager_session()
     __wt_random_init(&_session_impl->rnd);
     utils::throw_if_non_zero(
       __wt_calloc(nullptr, 1, sizeof(WT_BLOCK_MGR_SESSION), &_session_impl->block_manager));
-
+    _session_impl->block_manager_cleanup = __ut_block_manager_session_cleanup;
     return static_cast<WT_BLOCK_MGR_SESSION *>(_session_impl->block_manager);
+}
+
+void
+mock_session::setup_block_manager_file_operations()
+{
+    utils::throw_if_non_zero(
+      __wt_calloc(nullptr, 1, sizeof(WT_DATA_HANDLE), &_session_impl->dhandle));
+    utils::throw_if_non_zero(
+      __wt_calloc(nullptr, 1, sizeof(WT_BTREE), &_session_impl->dhandle->handle));
 }
 
 int

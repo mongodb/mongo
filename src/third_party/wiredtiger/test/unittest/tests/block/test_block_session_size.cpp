@@ -42,16 +42,6 @@ validate_and_free_size_block(WT_SIZE *size)
 }
 
 void
-free_size_list(WT_BLOCK_MGR_SESSION *bms)
-{
-    WT_SIZE *curr = bms->sz_cache;
-    while (curr != nullptr) {
-        WT_SIZE *tmp = curr;
-        curr = curr->next[0];
-        __wt_free(nullptr, tmp);
-    }
-}
-void
 validate_size_list(WT_BLOCK_MGR_SESSION *bms, int expected_items)
 {
     REQUIRE(bms != nullptr);
@@ -65,13 +55,6 @@ validate_size_list(WT_BLOCK_MGR_SESSION *bms, int expected_items)
         curr = curr->next[0];
     }
     REQUIRE(curr == nullptr);
-}
-
-void
-validate_and_free_size_list(WT_BLOCK_MGR_SESSION *bms, int expected_items)
-{
-    validate_size_list(bms, expected_items);
-    free_size_list(bms);
 }
 
 TEST_CASE("Block session: __block_size_alloc", "[block_session_size]")
@@ -90,19 +73,19 @@ TEST_CASE("Block session: __block_size_prealloc", "[block_session_size]")
     SECTION("Allocate zero size blocks")
     {
         REQUIRE(__ut_block_size_prealloc(session->get_wt_session_impl(), 0) == 0);
-        validate_and_free_size_list(bms, 0);
+        validate_size_list(bms, 0);
     }
 
     SECTION("Allocate one size block")
     {
         REQUIRE(__ut_block_size_prealloc(session->get_wt_session_impl(), 1) == 0);
-        validate_and_free_size_list(bms, 1);
+        validate_size_list(bms, 1);
     }
 
     SECTION("Allocate multiple size blocks")
     {
         REQUIRE(__ut_block_size_prealloc(session->get_wt_session_impl(), 3) == 0);
-        validate_and_free_size_list(bms, 3);
+        validate_size_list(bms, 3);
     }
 
     SECTION("Allocate blocks on existing cache")
@@ -117,7 +100,7 @@ TEST_CASE("Block session: __block_size_prealloc", "[block_session_size]")
         validate_size_list(bms, 3);
 
         REQUIRE(__ut_block_size_prealloc(session->get_wt_session_impl(), 5) == 0);
-        validate_and_free_size_list(bms, 5);
+        validate_size_list(bms, 5);
     }
 }
 
@@ -159,7 +142,7 @@ TEST_CASE("Block session: __wti_block_size_alloc with block manager", "[block_se
         REQUIRE(__wti_block_size_alloc(session->get_wt_session_impl(), &cached_sz) == 0);
         // If a size is in the cache, the function should be returning the cached size.
         REQUIRE(cached_sz == sz);
-        validate_and_free_size_list(bms, 0);
+        validate_size_list(bms, 0);
         validate_and_free_size_block(sz);
     }
 
@@ -197,7 +180,7 @@ TEST_CASE("Block session: __wti_block_size_alloc with block manager", "[block_se
         // size.
         REQUIRE(sz == cached_sz);
         REQUIRE(sz2 != cached_sz);
-        validate_and_free_size_list(bms, 1);
+        validate_size_list(bms, 1);
         validate_and_free_size_block(sz);
     }
 }
@@ -238,7 +221,7 @@ TEST_CASE("Block session: __wti_block_size_free", "[block_session_size]")
         REQUIRE(sz != nullptr);
         REQUIRE(bms->sz_cache == sz2);
         REQUIRE(bms->sz_cache->next[0] == sz);
-        validate_and_free_size_list(bms, 2);
+        validate_size_list(bms, 2);
     }
 }
 
@@ -261,19 +244,19 @@ TEST_CASE("Block session: __block_size_discard", "[block_session_size]")
     SECTION("Discard every item in size list with 0 max items in the cache")
     {
         REQUIRE(__ut_block_size_discard(session->get_wt_session_impl(), 0) == 0);
-        validate_and_free_size_list(bms, 0);
+        validate_size_list(bms, 0);
     }
 
     SECTION("Discard until only one item with 1 max item in size list")
     {
         REQUIRE(__ut_block_size_discard(session->get_wt_session_impl(), 1) == 0);
-        validate_and_free_size_list(bms, 1);
+        validate_size_list(bms, 1);
     }
 
     SECTION("Discard nothing in the size list because cache already has 3 items")
     {
         REQUIRE(__ut_block_size_discard(session->get_wt_session_impl(), 3) == 0);
-        validate_and_free_size_list(bms, 3);
+        validate_size_list(bms, 3);
     }
 
     SECTION("Fake cache count and discard every item in size list")

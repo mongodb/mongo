@@ -108,13 +108,13 @@ __logmgr_get_log_version(WT_VERSION version)
 }
 
 /*
- * __wti_logmgr_compat_version --
+ * __wt_logmgr_compat_version --
  *     Set up the compatibility versions in the log manager. This is split out because it is called
  *     much earlier than log subsystem creation on startup so that we can verify the system state in
  *     files before modifying files.
  */
 void
-__wti_logmgr_compat_version(WT_SESSION_IMPL *session)
+__wt_logmgr_compat_version(WT_SESSION_IMPL *session)
 {
     WT_CONNECTION_IMPL *conn;
 
@@ -154,7 +154,7 @@ __logmgr_version(WT_SESSION_IMPL *session, bool reconfig)
     else
         first_record = WT_LOG_END_HEADER;
 
-    __wti_logmgr_compat_version(session);
+    __wt_logmgr_compat_version(session);
 
     /*
      * If the version is the same, there is nothing to do.
@@ -181,18 +181,18 @@ __logmgr_version(WT_SESSION_IMPL *session, bool reconfig)
      * Set the version. If it is a live change the logging subsystem will do other work as well to
      * move to a new log file.
      */
-    WT_RET(__wt_log_set_version(session, new_version, first_record, downgrade, reconfig, &lognum));
+    WT_RET(__wti_log_set_version(session, new_version, first_record, downgrade, reconfig, &lognum));
     if (reconfig && FLD_ISSET(conn->log_flags, WT_CONN_LOG_DOWNGRADED))
         WT_RET(__logmgr_force_remove(session, lognum));
     return (0);
 }
 
 /*
- * __wti_logmgr_config --
+ * __wt_logmgr_config --
  *     Parse and setup the logging server options.
  */
 int
-__wti_logmgr_config(WT_SESSION_IMPL *session, const char **cfg, bool reconfig)
+__wt_logmgr_config(WT_SESSION_IMPL *session, const char **cfg, bool reconfig)
 {
     WT_CONFIG_ITEM cval;
     WT_CONNECTION_IMPL *conn;
@@ -347,13 +347,13 @@ __wti_logmgr_config(WT_SESSION_IMPL *session, const char **cfg, bool reconfig)
 }
 
 /*
- * __wti_logmgr_reconfig --
+ * __wt_logmgr_reconfig --
  *     Reconfigure logging.
  */
 int
-__wti_logmgr_reconfig(WT_SESSION_IMPL *session, const char **cfg)
+__wt_logmgr_reconfig(WT_SESSION_IMPL *session, const char **cfg)
 {
-    WT_RET(__wti_logmgr_config(session, cfg, true));
+    WT_RET(__wt_logmgr_config(session, cfg, true));
     return (__logmgr_version(session, true));
 }
 
@@ -369,9 +369,9 @@ __log_remove_once_int(
     u_int i;
 
     for (i = 0; i < logcount; i++) {
-        WT_RET(__wt_log_extract_lognum(session, logfiles[i], &lognum));
+        WT_RET(__wti_log_extract_lognum(session, logfiles[i], &lognum));
         if (lognum < min_lognum)
-            WT_RET(__wt_log_remove(session, WT_LOG_FILENAME, lognum));
+            WT_RET(__wti_log_remove(session, WT_LOG_FILENAME, lognum));
     }
 
     return (0);
@@ -550,7 +550,7 @@ __log_prealloc_once(WT_SESSION_IMPL *session)
      * Allocate up to the maximum number that we just computed and detected.
      */
     for (i = reccount; i < (u_int)conn->log_prealloc; i++) {
-        WT_ERR(__wt_log_allocfile(session, ++log->prep_fileid, WT_LOG_PREPNAME));
+        WT_ERR(__wti_log_allocfile(session, ++log->prep_fileid, WT_LOG_PREPNAME));
         WT_STAT_CONN_INCR(session, log_prealloc_files);
     }
     /*
@@ -633,7 +633,7 @@ __log_file_server(void *arg)
          */
         WT_ACQUIRE_READ_WITH_BARRIER(close_fh, log->log_close_fh);
         if (close_fh != NULL) {
-            WT_ERR(__wt_log_extract_lognum(session, close_fh->name, &filenum));
+            WT_ERR(__wti_log_extract_lognum(session, close_fh->name, &filenum));
             /*
              * The closing file handle should have a correct close LSN.
              */
@@ -708,13 +708,13 @@ typedef struct {
         __wt_lsn_offset(&(entry1).lsn) < __wt_lsn_offset(&(entry2).lsn)))
 
 /*
- * __wt_log_wrlsn --
+ * __wti_log_wrlsn --
  *     Process written log slots and attempt to coalesce them if the LSNs are contiguous. The
  *     purpose of this function is to advance the write_lsn in LSN order after the buffer is written
  *     to the log file.
  */
 void
-__wt_log_wrlsn(WT_SESSION_IMPL *session, int *yield)
+__wti_log_wrlsn(WT_SESSION_IMPL *session, int *yield)
 {
     WT_CONNECTION_IMPL *conn;
     WT_LOG *log;
@@ -765,7 +765,7 @@ restart:
              */
             if (__wt_log_cmp(&slot->slot_start_lsn, &slot->slot_release_lsn) == 0 &&
               __wt_log_cmp(&slot->slot_start_lsn, &slot->slot_end_lsn) == 0) {
-                __wt_log_slot_free(session, slot);
+                __wti_log_slot_free(session, slot);
                 continue;
             }
             if (coalescing != NULL) {
@@ -823,7 +823,7 @@ restart:
                 if (F_ISSET_ATOMIC_16(slot, WT_SLOT_CLOSEFH))
                     __wt_cond_signal(session, conn->log_file_cond);
             }
-            __wt_log_slot_free(session, slot);
+            __wti_log_slot_free(session, slot);
         }
     }
     __wt_spin_unlock(session, &log->log_writelsn_lock);
@@ -857,14 +857,14 @@ __log_wrlsn_server(void *arg)
          */
         if (__wt_log_cmp(&prev, &log->alloc_lsn) != 0 ||
           __wt_log_cmp(&log->write_lsn, &log->alloc_lsn) != 0)
-            __wt_log_wrlsn(session, &yield);
+            __wti_log_wrlsn(session, &yield);
         else
             WT_STAT_CONN_INCR(session, log_write_lsn_skip);
         prev = log->alloc_lsn;
         did_work = (yield == 0);
 
         /*
-         * If __wt_log_wrlsn did work we want to yield instead of sleep.
+         * If __wti_log_wrlsn did work we want to yield instead of sleep.
          */
         if (yield++ < WT_THOUSAND)
             __wt_yield();
@@ -876,7 +876,7 @@ __log_wrlsn_server(void *arg)
      * need to be written.
      */
     WT_ERR(__wt_log_force_write(session, true, NULL));
-    __wt_log_wrlsn(session, NULL);
+    __wti_log_wrlsn(session, NULL);
     if (0) {
 err:
         WT_IGNORE_RET(__wt_panic(session, ret, "log wrlsn server error"));
@@ -981,11 +981,11 @@ err:
 }
 
 /*
- * __wti_logmgr_create --
+ * __wt_logmgr_create --
  *     Initialize the log subsystem (before running recovery).
  */
 int
-__wti_logmgr_create(WT_SESSION_IMPL *session)
+__wt_logmgr_create(WT_SESSION_IMPL *session)
 {
     WT_CONNECTION_IMPL *conn;
     WT_LOG *log;
@@ -1032,8 +1032,8 @@ __wti_logmgr_create(WT_SESSION_IMPL *session)
 
     WT_RET(__wt_cond_alloc(session, "log sync", &log->log_sync_cond));
     WT_RET(__wt_cond_alloc(session, "log write", &log->log_write_cond));
-    WT_RET(__wt_log_open(session));
-    WT_RET(__wt_log_slot_init(session, true));
+    WT_RET(__wti_log_open(session));
+    WT_RET(__wti_log_slot_init(session, true));
 
     /* Write the start log record on creation, which is before recovery is run. */
     __wt_seconds(session, &now);
@@ -1042,11 +1042,11 @@ __wti_logmgr_create(WT_SESSION_IMPL *session)
 }
 
 /*
- * __wti_logmgr_open --
+ * __wt_logmgr_open --
  *     Start the log service threads.
  */
 int
-__wti_logmgr_open(WT_SESSION_IMPL *session)
+__wt_logmgr_open(WT_SESSION_IMPL *session)
 {
     WT_CONNECTION_IMPL *conn;
     uint64_t now;
@@ -1119,11 +1119,11 @@ __wti_logmgr_open(WT_SESSION_IMPL *session)
 }
 
 /*
- * __wti_logmgr_destroy --
+ * __wt_logmgr_destroy --
  *     Destroy the log removal server thread and logging subsystem.
  */
 int
-__wti_logmgr_destroy(WT_SESSION_IMPL *session)
+__wt_logmgr_destroy(WT_SESSION_IMPL *session)
 {
     WT_CONNECTION_IMPL *conn;
     WT_DECL_RET;
@@ -1164,8 +1164,8 @@ __wti_logmgr_destroy(WT_SESSION_IMPL *session)
         conn->log_wrlsn_session = NULL;
     }
 
-    WT_TRET(__wt_log_slot_destroy(session));
-    WT_TRET(__wt_log_close(session));
+    WT_TRET(__wti_log_slot_destroy(session));
+    WT_TRET(__wti_log_close(session));
 
     /* Close the server thread's session. */
     if (conn->log_session != NULL) {

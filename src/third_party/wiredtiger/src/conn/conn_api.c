@@ -2787,7 +2787,7 @@ __conn_version_verify(WT_SESSION_IMPL *session)
     conn->recovery_version = WT_NO_VERSION;
 
     /* Always set the compatibility versions. */
-    __wti_logmgr_compat_version(session);
+    __wt_logmgr_compat_version(session);
     /*
      * If we're salvaging, don't verify now.
      */
@@ -3229,7 +3229,7 @@ wiredtiger_open(const char *home, WT_EVENT_HANDLER *event_handler, const char *c
      * We need to parse the logging configuration here to verify the compatibility settings because
      * we may need the log path and encryption and compression settings.
      */
-    WT_ERR(__wti_logmgr_config(session, cfg, false));
+    WT_ERR(__wt_logmgr_config(session, cfg, false));
     WT_ERR(__conn_version_verify(session));
 
     /*

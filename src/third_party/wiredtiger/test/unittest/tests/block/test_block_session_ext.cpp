@@ -60,24 +60,6 @@ validate_and_free_ext_block(WT_EXT *ext)
     free_ext_block(ext);
 }
 
-void
-free_ext_list(WT_BLOCK_MGR_SESSION *bms)
-{
-    WT_EXT *curr = bms->ext_cache;
-    while (curr != nullptr) {
-        WT_EXT *tmp = curr;
-        curr = curr->next[0];
-        __wt_free(nullptr, tmp);
-    }
-}
-
-void
-validate_and_free_ext_list(WT_BLOCK_MGR_SESSION *bms, int expected_items)
-{
-    validate_ext_list(bms, expected_items);
-    free_ext_list(bms);
-}
-
 TEST_CASE("Block session: __block_ext_alloc", "[block_session_ext]")
 {
     std::shared_ptr<mock_session> session = mock_session::build_test_mock_session();
@@ -96,19 +78,19 @@ TEST_CASE("Block session: __block_ext_prealloc", "[block_session_ext]")
     SECTION("Allocate zero extent blocks")
     {
         REQUIRE(__ut_block_ext_prealloc(session->get_wt_session_impl(), 0) == 0);
-        validate_and_free_ext_list(bms, 0);
+        validate_ext_list(bms, 0);
     }
 
     SECTION("Allocate one extent block")
     {
         REQUIRE(__ut_block_ext_prealloc(session->get_wt_session_impl(), 1) == 0);
-        validate_and_free_ext_list(bms, 1);
+        validate_ext_list(bms, 1);
     }
 
     SECTION("Allocate multiple extent blocks")
     {
         REQUIRE(__ut_block_ext_prealloc(session->get_wt_session_impl(), 3) == 0);
-        validate_and_free_ext_list(bms, 3);
+        validate_ext_list(bms, 3);
     }
 
     SECTION("Allocate blocks on existing cache")
@@ -123,7 +105,7 @@ TEST_CASE("Block session: __block_ext_prealloc", "[block_session_ext]")
         validate_ext_list(bms, 3);
 
         REQUIRE(__ut_block_ext_prealloc(session->get_wt_session_impl(), 5) == 0);
-        validate_and_free_ext_list(bms, 5);
+        validate_ext_list(bms, 5);
     }
 }
 
@@ -156,7 +138,7 @@ TEST_CASE("Block session: __wti_block_ext_alloc", "[block_session_ext]")
         WT_EXT *cached_ext;
         REQUIRE(__wti_block_ext_alloc(session->get_wt_session_impl(), &cached_ext) == 0);
         REQUIRE(cached_ext == ext);
-        validate_and_free_ext_list(bms, 0);
+        validate_ext_list(bms, 0);
         validate_and_free_ext_block(ext);
     }
 
@@ -193,7 +175,7 @@ TEST_CASE("Block session: __wti_block_ext_alloc", "[block_session_ext]")
         REQUIRE(__wti_block_ext_alloc(session->get_wt_session_impl(), &cached_ext) == 0);
         REQUIRE(ext == cached_ext);
         REQUIRE(ext2 != cached_ext);
-        validate_and_free_ext_list(bms, 1);
+        validate_ext_list(bms, 1);
         validate_and_free_ext_block(cached_ext);
     }
 }
@@ -233,7 +215,7 @@ TEST_CASE("Block session: __wti_block_ext_free", "[block_session_ext]")
         REQUIRE(ext != nullptr);
         REQUIRE(bms->ext_cache == ext2);
         REQUIRE(bms->ext_cache->next[0] == ext);
-        validate_and_free_ext_list(bms, 2);
+        validate_ext_list(bms, 2);
     }
 }
 
@@ -255,20 +237,20 @@ TEST_CASE("Block session: __block_ext_discard", "[block_session_ext]")
     SECTION("Discard every item in extent list with 0 max items in the cache")
     {
         REQUIRE(__ut_block_ext_discard(session->get_wt_session_impl(), 0) == 0);
-        validate_and_free_ext_list(bms, 0);
+        validate_ext_list(bms, 0);
     }
 
     SECTION("Discard until only one item with 1 max item in extent list")
     {
         REQUIRE(__ut_block_ext_discard(session->get_wt_session_impl(), 1) == 0);
 
-        validate_and_free_ext_list(bms, 1);
+        validate_ext_list(bms, 1);
     }
 
     SECTION("Discard nothing in the extent list because cache already has 3 items")
     {
         REQUIRE(__ut_block_ext_discard(session->get_wt_session_impl(), 3) == 0);
-        validate_and_free_ext_list(bms, 3);
+        validate_ext_list(bms, 3);
     }
 
     SECTION("Fake cache count and discard everything in extent list with 0 max items in cache")

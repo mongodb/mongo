@@ -45,8 +45,8 @@ TEST_CASE("Block session: __wti_block_ext_prealloc", "[block_session_bms]")
     {
         REQUIRE(__wti_block_ext_prealloc(session->get_wt_session_impl(), 2) == 0);
         REQUIRE(session->get_wt_session_impl()->block_manager == bms);
-        validate_and_free_ext_list(bms, 2);
-        validate_and_free_size_list(bms, 2);
+        validate_ext_list(bms, 2);
+        validate_size_list(bms, 2);
     }
 
     SECTION("Prealloc with existing cache")
@@ -57,8 +57,8 @@ TEST_CASE("Block session: __wti_block_ext_prealloc", "[block_session_bms]")
         validate_size_list(bms, 2);
 
         REQUIRE(__wti_block_ext_prealloc(session->get_wt_session_impl(), 5) == 0);
-        validate_and_free_ext_list(bms, 5);
-        validate_and_free_size_list(bms, 5);
+        validate_ext_list(bms, 5);
+        validate_size_list(bms, 5);
     }
 }
 

@@ -5,7 +5,6 @@
  *
  * See the file LICENSE for redistribution information.
  */
-
 #include "mock_connection.h"
 #include "../utils.h"
 
@@ -58,6 +57,9 @@ mock_connection::setup_block_manager(WT_SESSION_IMPL *session)
     // Check that there should be no connection flags set.
     WT_ASSERT(session, _connection_impl->flags == 0);
 
+    // Initialize the checksum function.
+    __wt_process.checksum = wiredtiger_crc32c_func();
+
     // Initialize block and file hashmap.
     _connection_impl->hash_size = DEFAULT_HASH_SIZE;
     WT_RET(__wt_calloc_def(session, _connection_impl->hash_size, &_connection_impl->blockhash));
@@ -75,9 +77,12 @@ mock_connection::setup_block_manager(WT_SESSION_IMPL *session)
     WT_RET(__wt_spin_init(session, &_connection_impl->fh_lock, "file list"));
     WT_RET(__wt_spin_init(session, &_connection_impl->block_lock, "block manager"));
 
-    // Initialize an in-memory file system layer used for testing purposes.
-    F_SET(_connection_impl, WT_CONN_IN_MEMORY);
+    // Initialize a file system layer used for testing purposes.
     _connection_impl->home = "";
-    WT_RET(__wt_os_inmemory(session));
+#if defined(_MSC_VER)
+    WT_RET(__wt_os_win(session));
+#else
+    WT_RET(__wt_os_posix(session));
+#endif
     return 0;
 }

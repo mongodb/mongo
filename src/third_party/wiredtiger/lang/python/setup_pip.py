@@ -33,7 +33,7 @@
 # are part of the package. To create the distribution, in this directory, run
 # "python setup_pip.py sdist", this creates a tar.gz file under ./dist .
 from __future__ import print_function
-import os, os.path, re, shutil, sys
+import os, os.path, platform, re, shutil, sys
 from setuptools import setup, Distribution, Extension
 import subprocess
 from subprocess import call
@@ -75,7 +75,9 @@ def get_compile_flags(inc_paths, lib_paths):
         cppflags.append('-DHAVE_CONFIG_H')
         ldflags = ['-L' + path for path in lib_paths]
         if sys.platform == 'darwin':
-            cflags.extend([ '-arch', 'x86_64' ])
+            # Figure out the machine architecture, e.g. arm64, x86_64.
+            arch = platform.machine()
+            cflags.extend(['-arch', f'{arch}'])
     return (cppflags, cflags, ldflags)
 
 # get_sources_curdir --

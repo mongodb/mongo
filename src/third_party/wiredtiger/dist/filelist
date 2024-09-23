@@ -81,7 +81,6 @@ src/conn/conn_ckpt.c
 src/conn/conn_compact.c
 src/conn/conn_dhandle.c
 src/conn/conn_handle.c
-src/conn/conn_log.c
 src/conn/conn_open.c
 src/conn/conn_prefetch.c
 src/conn/conn_reconfig.c
@@ -115,6 +114,7 @@ src/history/hs_rec.c
 src/history/hs_verify.c
 src/log/log.c
 src/log/log_auto.c
+src/log/log_mgr.c
 src/log/log_slot.c
 src/log/log_sys.c
 src/lsm/lsm_cursor.c
