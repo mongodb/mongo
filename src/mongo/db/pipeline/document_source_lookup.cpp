@@ -1178,6 +1178,7 @@ void DocumentSourceLookUp::serializeToArray(std::vector<Value>& array,
         }
         if (opts.transformIdentifiers ||
             opts.literalPolicy != LiteralSerializationPolicy::kUnchanged) {
+            // TODO SERVER-94227 we don't need to do any validation as part of this parsing pass.
             return Pipeline::parse(*_userPipeline, _fromExpCtx)->serializeToBson(opts);
         }
         if (opts.serializeForQueryAnalysis) {

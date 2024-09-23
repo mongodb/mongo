@@ -392,6 +392,8 @@ Value DocumentSourceUnionWith::serialize(const SerializationOptions& opts) const
             std::move(_pushedDownStages.begin(),
                       _pushedDownStages.end(),
                       std::back_inserter(recoveredPipeline));
+            // TODO SERVER-94227 we probably don't need to do any validation as part of this parsing
+            // pass?
             pipeCopy = Pipeline::parse(recoveredPipeline, _pipeline->getContext()).release();
         } else {
             // The plan does not require reading from the sub-pipeline, so just include the
@@ -453,6 +455,8 @@ Value DocumentSourceUnionWith::serialize(const SerializationOptions& opts) const
         auto serializedPipeline = [&]() -> std::vector<BSONObj> {
             if (opts.transformIdentifiers ||
                 opts.literalPolicy != LiteralSerializationPolicy::kUnchanged) {
+                // TODO SERVER-94227 we don't need to do any validation as part of this parsing
+                // pass.
                 return Pipeline::parse(_userPipeline, _pipeline->getContext())
                     ->serializeToBson(opts);
             }
