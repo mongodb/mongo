@@ -131,14 +131,14 @@ public:
     User* addSimpleUser(UserName un) {
         const auto creds = BSON("SCRAM-SHA-1" << scram::Secrets<SHA1Block>::generateCredentials(
                                     "a", saslGlobalParams.scramSHA1IterationCount.load()));
-        ASSERT_OK(managerState->insertPrivilegeDocument(
-            _opCtx.get(),
-            BSON("user" << un.getUser() << "db" << un.getDB() << "credentials" << creds << "roles"
-                        << BSON_ARRAY(BSON("role"
-                                           << "readWrite"
-                                           << "db"
-                                           << "test"))),
-            BSONObj()));
+        ASSERT_OK(managerState->insertUserDocument(_opCtx.get(),
+                                                   BSON("user" << un.getUser() << "db" << un.getDB()
+                                                               << "credentials" << creds << "roles"
+                                                               << BSON_ARRAY(BSON("role"
+                                                                                  << "readWrite"
+                                                                                  << "db"
+                                                                                  << "test"))),
+                                                   BSONObj()));
         ASSERT_OK(authzSession->addAndAuthorizeUser(_opCtx.get(), {un, boost::none}, boost::none));
         return authzSession->lookupUser(un);
     }
@@ -146,15 +146,17 @@ public:
     User* addClusterUser(UserName un) {
         const auto creds = BSON("SCRAM-SHA-256" << scram::Secrets<SHA256Block>::generateCredentials(
                                     "a", saslGlobalParams.scramSHA256IterationCount.load()));
-        ASSERT_OK(managerState->insertPrivilegeDocument(
-            _opCtx.get(),
-            BSON("user" << un.getUser() << "db" << un.getDB() << "credentials" << creds << "roles"
-                        << BSON_ARRAY(BSON("role"
-                                           << "__system"
-                                           << "db"
-                                           << "admin"))),
-            BSONObj()));
+
+        ASSERT_OK(managerState->insertUserDocument(_opCtx.get(),
+                                                   BSON("user" << un.getUser() << "db" << un.getDB()
+                                                               << "credentials" << creds << "roles"
+                                                               << BSON_ARRAY(BSON("role"
+                                                                                  << "__system"
+                                                                                  << "db"
+                                                                                  << "admin"))),
+                                                   BSONObj()));
         ASSERT_OK(authzSession->addAndAuthorizeUser(_opCtx.get(), {un, boost::none}, boost::none));
+
         return authzSession->lookupUser(un);
     }
 };

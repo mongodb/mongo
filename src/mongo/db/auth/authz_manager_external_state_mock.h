@@ -87,9 +87,16 @@ public:
     /**
      * Inserts the given user object into the "admin" database.
      */
-    Status insertPrivilegeDocument(OperationContext* opCtx,
-                                   const BSONObj& userObj,
-                                   const BSONObj& writeConcern);
+    Status insertUserDocument(OperationContext* opCtx,
+                              const BSONObj& userObj,
+                              const BSONObj& writeConcern);
+
+    /**
+     * Inserts the given role object into the "admin" database.
+     */
+    Status insertRoleDocument(OperationContext* opCtx,
+                              const BSONObj& roleObj,
+                              const BSONObj& writeConcern);
 
     // This implementation does not understand uniqueness constraints.
     virtual Status insert(OperationContext* opCtx,
