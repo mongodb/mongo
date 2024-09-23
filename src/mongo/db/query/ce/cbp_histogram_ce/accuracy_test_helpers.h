@@ -95,25 +95,26 @@ void printResult(DataDistributionEnum dataDistribution,
                  const std::pair<size_t, size_t>& dataInterval,
                  ErrorCalculationSummary error);
 
-void generateDataUniform(
-    size_t size,
-    const std::pair<size_t, size_t>& interval,
-    const std::vector<std::pair<sbe::value::TypeTags, size_t>>& typeCombination,
-    size_t seed,
-    std::vector<stats::SBEValue>& data);
+void generateDataUniform(size_t size,
+                         const std::pair<size_t, size_t>& interval,
+                         const TypeCombination& typeCombination,
+                         size_t seed,
+                         size_t ndv,
+                         std::vector<stats::SBEValue>& data);
 
 void generateDataNormal(size_t size,
                         const std::pair<size_t, size_t>& interval,
-                        const std::vector<std::pair<sbe::value::TypeTags, size_t>>& typeCombination,
+                        const TypeCombination& typeCombination,
                         size_t seed,
+                        size_t ndv,
                         std::vector<stats::SBEValue>& data);
 
-void generateDataZipfian(
-    size_t size,
-    const std::pair<size_t, size_t>& interval,
-    const std::vector<std::pair<sbe::value::TypeTags, size_t>>& typeCombination,
-    size_t seed,
-    std::vector<stats::SBEValue>& data);
+void generateDataZipfian(size_t size,
+                         const std::pair<size_t, size_t>& interval,
+                         const TypeCombination& typeCombination,
+                         size_t seed,
+                         size_t ndv,
+                         std::vector<stats::SBEValue>& data);
 
 ErrorCalculationSummary runQueries(size_t size,
                                    size_t numberOfQueries,

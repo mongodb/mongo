@@ -48,8 +48,6 @@
 
 namespace mongo::optimizer::cbp::ce {
 
-// namespace {
-
 enum DataType { kInt, kStringSmall, kString, kDouble };
 
 using mongo::stats::TypeCounts;
@@ -102,22 +100,35 @@ void BM_CreateHistogram(benchmark::State& state) {
     const size_t seed = 1724178214;
     TypeCounts typeCounts;
 
+    auto ndv = (configuration.dataInterval.second - configuration.dataInterval.first) / 2;
     // Create one by one the values.
     switch (configuration.dataDistribution) {
         case kUniform:
             // For ndv we set half the number of values in the provided data interval.
-            generateDataUniform(
-                configuration.size, configuration.dataInterval, typeCombinationData, seed, data);
+            generateDataUniform(configuration.size,
+                                configuration.dataInterval,
+                                typeCombinationData,
+                                seed,
+                                ndv,
+                                data);
             break;
         case kNormal:
             // For ndv we set half the number of values in the provided data interval.
-            generateDataNormal(
-                configuration.size, configuration.dataInterval, typeCombinationData, seed, data);
+            generateDataNormal(configuration.size,
+                               configuration.dataInterval,
+                               typeCombinationData,
+                               seed,
+                               ndv,
+                               data);
             break;
         case kZipfian:
             // For ndv we set half the number of values in the provided data interval.
-            generateDataZipfian(
-                configuration.size, configuration.dataInterval, typeCombinationData, seed, data);
+            generateDataZipfian(configuration.size,
+                                configuration.dataInterval,
+                                typeCombinationData,
+                                seed,
+                                ndv,
+                                data);
             break;
     }
 
@@ -136,24 +147,38 @@ void BM_RunHistogramEstimations(benchmark::State& state) {
     std::vector<stats::SBEValue> data;
     const size_t seed = 1724178214;
     TypeCounts typeCounts;
-    const int numberOfQueries = 1000;
+    const int numberOfQueries = 100;
+
+    auto ndv = (configuration.dataInterval.second - configuration.dataInterval.first) / 2;
 
     // Create one by one the values.
     switch (configuration.dataDistribution) {
         case kUniform:
             // For ndv we set half the number of values in the provided data interval.
-            generateDataUniform(
-                configuration.size, configuration.dataInterval, typeCombinationData, seed, data);
+            generateDataUniform(configuration.size,
+                                configuration.dataInterval,
+                                typeCombinationData,
+                                seed,
+                                ndv,
+                                data);
             break;
         case kNormal:
             // For ndv we set half the number of values in the provided data interval.
-            generateDataNormal(
-                configuration.size, configuration.dataInterval, typeCombinationData, seed, data);
+            generateDataNormal(configuration.size,
+                               configuration.dataInterval,
+                               typeCombinationData,
+                               seed,
+                               ndv,
+                               data);
             break;
         case kZipfian:
             // For ndv we set half the number of values in the provided data interval.
-            generateDataZipfian(
-                configuration.size, configuration.dataInterval, typeCombinationData, seed, data);
+            generateDataZipfian(configuration.size,
+                                configuration.dataInterval,
+                                typeCombinationData,
+                                seed,
+                                ndv,
+                                data);
             break;
     }
 
@@ -303,5 +328,4 @@ BENCHMARK(BM_RunHistogramEstimations)
             /*dataType*/ kString,
             /*queryType*/ kRange});
 
-// }  // namespace
 }  // namespace mongo::optimizer::cbp::ce

@@ -31,11 +31,15 @@
 #include <sstream>
 
 #include "mongo/bson/json.h"
+#include "mongo/db/exec/docval_to_sbeval.h"
 #include "mongo/db/exec/sbe/values/bson.h"
 #include "mongo/db/query/ce/cbp_histogram_ce/accuracy_test_helpers.h"
 #include "mongo/db/query/ce/cbp_histogram_ce/array_histogram_helpers.h"
 #include "mongo/db/query/ce/cbp_histogram_ce/histogram_predicate_estimation.h"
+#include "mongo/db/query/ce/cbp_histogram_ce/scalar_histogram_helpers.h"
+#include "mongo/db/query/ce/cbp_histogram_ce/test_helpers.h"
 #include "mongo/db/query/interval.h"
+#include "mongo/db/query/stats/rand_utils_new.h"
 #include "mongo/logv2/log.h"
 
 namespace mongo::optimizer::cbp::ce {
@@ -48,7 +52,7 @@ namespace mongo::optimizer::cbp::ce {
  * percentiles.
  */
 std::tuple<double, double, double, double> percentiles(std::vector<double> arr) {
-    // sort array before calculating the cummulative stats.
+    // Sort array before calculating the cummulative stats.
     std::sort(arr.begin(), arr.end());
 
     return {arr[(size_t)(arr.size() * 0.50)],
@@ -76,7 +80,7 @@ static size_t calculateFrequencyFromDataVectorRange(const std::vector<stats::SBE
                                                     stats::SBEValue valueToCalculateHigh) {
     int actualCard = 0;
     for (const auto& value : data) {
-        // higher OR equal to low AND lower OR equal to high
+        // Higher OR equal to low AND lower OR equal to high.
         if (((mongo::stats::compareValues(
                   type, value.getValue(), type, valueToCalculateLow.getValue()) > 0) ||
              (mongo::stats::compareValues(
@@ -188,63 +192,75 @@ void printResult(const DataDistributionEnum dataDistribution,
     LOGV2(8871202, "Accuracy experiment", ""_attr = ss.str());
 }
 
-void generateDataUniform(
-    size_t size,
-    const std::pair<size_t, size_t>& interval,
-    const std::vector<std::pair<sbe::value::TypeTags, size_t>>& typeCombination,
-    const size_t seed,
-    std::vector<stats::SBEValue>& data) {
+
+void populateTypeDistrVectorAccordingToInputConfig(stats::TypeDistrVector& td,
+                                                   const std::pair<size_t, size_t>& interval,
+                                                   const TypeCombination& typeCombination,
+                                                   const size_t ndv,
+                                                   std::mt19937_64& seedArray,
+                                                   stats::MixedDistributionDescriptor& mdd) {
+    for (auto type : typeCombination) {
+        switch (type.first) {
+            case sbe::value::TypeTags::NumberInt32:
+            case sbe::value::TypeTags::NumberInt64:
+                td.push_back(std::make_unique<stats::IntDistribution>(
+                    mdd, type.second, ndv, interval.first, interval.second));
+                break;
+            case sbe::value::TypeTags::NumberDouble:
+                td.push_back(std::make_unique<stats::DoubleDistribution>(
+                    mdd, type.second, ndv, interval.first, interval.second));
+                break;
+            case sbe::value::TypeTags::StringSmall:
+            case sbe::value::TypeTags::StringBig:
+                td.push_back(std::make_unique<stats::StrDistribution>(
+                    mdd, type.second, ndv, interval.first, interval.second));
+                break;
+            case sbe::value::TypeTags::Array: {
+                stats::TypeDistrVector arrayData;
+                arrayData.push_back(
+                    std::make_unique<stats::IntDistribution>(mdd, 1.0, 100, 0, 10000));
+                auto arrayDataDesc =
+                    std::make_unique<stats::DatasetDescriptorNew>(std::move(arrayData), seedArray);
+                td.push_back(std::make_unique<stats::ArrDistribution>(
+                    mdd, 1.0, 10, 1, 5, std::move(arrayDataDesc)));
+                break;
+            }
+            default:
+                break;
+        }
+    }
+}
+
+void generateDataUniform(size_t size,
+                         const std::pair<size_t, size_t>& interval,
+                         const TypeCombination& typeCombination,
+                         const size_t seed,
+                         const size_t ndv,
+                         std::vector<stats::SBEValue>& data) {
 
     // Generator for type selection.
     std::mt19937 rng(seed);
     std::uniform_int_distribution<std::mt19937::result_type> distTypes(0, 100);
 
     // Random value generator for actual data in histogram.
-    std::mt19937 gen(seed);
-    std::uniform_int_distribution<> distData(interval.first, interval.second);
+    std::mt19937_64 seedArray(42);
+    std::mt19937_64 seedDataset(seed);
 
-    // Create one by one the values
-    for (size_t i = 0; i < size; i++) {
+    stats::MixedDistributionDescriptor uniform{{stats::DistrType::kUniform, 1.0}};
+    stats::TypeDistrVector td;
 
-        // Decide which value type should create.
-        for (auto type : typeCombination) {
+    populateTypeDistrVectorAccordingToInputConfig(
+        td, interval, typeCombination, ndv, seedArray, uniform);
 
-            // Create values based on probabilities.
-            if (distTypes(rng) > type.second) {
-                continue;
-            }
-
-            if (type.first == sbe::value::TypeTags::Array) {
-
-                std::vector<stats::SBEValue> randArray;
-                for (size_t j = 0; j < kPredefinedArraySize; j++) {
-                    stats::SBEValue newValue(sbe::value::TypeTags::NumberInt64,
-                                             sbe::value::bitcastFrom<int64_t>(distData(gen)));
-                    randArray.emplace_back(newValue);
-                }
-
-                auto [arrayTag, arrayVal] = sbe::value::makeNewArray();
-                sbe::value::Array* arr = sbe::value::getArrayView(arrayVal);
-                for (const auto& elem : randArray) {
-                    const auto [copyTag, copyVal] =
-                        sbe::value::copyValue(elem.getTag(), elem.getValue());
-                    arr->push_back(copyTag, copyVal);
-                }
-
-                data.emplace_back(arrayTag, arrayVal);
-            } else {
-                stats::SBEValue newValue(type.first,
-                                         sbe::value::bitcastFrom<int64_t>(distData(gen)));
-                data.emplace_back(newValue);
-            }
-        }
-    }
+    stats::DatasetDescriptorNew desc{std::move(td), seedDataset};
+    data = desc.genRandomDataset(size);
 }
 
 void generateDataNormal(size_t size,
                         const std::pair<size_t, size_t>& interval,
-                        const std::vector<std::pair<sbe::value::TypeTags, size_t>>& typeCombination,
+                        const TypeCombination& typeCombination,
                         const size_t seed,
+                        const size_t ndv,
                         std::vector<stats::SBEValue>& data) {
 
     // Generator for type selection.
@@ -252,98 +268,42 @@ void generateDataNormal(size_t size,
     std::uniform_int_distribution<std::mt19937::result_type> distTypes(0, 100);
 
     // Random value generator for actual data in histogram.
-    std::mt19937 gen(seed);
-    std::normal_distribution<> distData((float)interval.first, (float)interval.second);
+    std::mt19937_64 seedArray(42);
+    std::mt19937_64 seedDataset(seed);
 
-    // Create one by one the values
-    for (size_t i = 0; i < size; i++) {
+    stats::MixedDistributionDescriptor normal{{stats::DistrType::kNormal, 1.0}};
+    stats::TypeDistrVector td;
 
-        // Decide which value type should create.
-        for (auto type : typeCombination) {
+    populateTypeDistrVectorAccordingToInputConfig(
+        td, interval, typeCombination, ndv, seedArray, normal);
 
-            // Create values based on probabilities.
-            if (distTypes(rng) > type.second) {
-                continue;
-            }
-
-            if (type.first == sbe::value::TypeTags::Array) {
-
-                std::vector<stats::SBEValue> randArray;
-                for (size_t j = 0; j < kPredefinedArraySize; j++) {
-                    stats::SBEValue newValue(sbe::value::TypeTags::NumberInt64,
-                                             sbe::value::bitcastFrom<int64_t>(distData(gen)));
-                    randArray.emplace_back(newValue);
-                }
-
-                auto [arrayTag, arrayVal] = sbe::value::makeNewArray();
-                sbe::value::Array* arr = sbe::value::getArrayView(arrayVal);
-                for (const auto& elem : randArray) {
-                    const auto [copyTag, copyVal] =
-                        sbe::value::copyValue(elem.getTag(), elem.getValue());
-                    arr->push_back(copyTag, copyVal);
-                }
-
-                data.emplace_back(arrayTag, arrayVal);
-            } else {
-                stats::SBEValue newValue(type.first,
-                                         sbe::value::bitcastFrom<int64_t>(distData(gen)));
-                data.emplace_back(newValue);
-            }
-        }
-    }
+    stats::DatasetDescriptorNew desc{std::move(td), seedDataset};
+    data = desc.genRandomDataset(size);
 }
 
-void generateDataZipfian(
-    const size_t size,
-    const std::pair<size_t, size_t>& interval,
-    const std::vector<std::pair<sbe::value::TypeTags, size_t>>& typeCombination,
-    const size_t seed,
-    std::vector<stats::SBEValue>& data) {
+void generateDataZipfian(const size_t size,
+                         const std::pair<size_t, size_t>& interval,
+                         const TypeCombination& typeCombination,
+                         const size_t seed,
+                         const size_t ndv,
+                         std::vector<stats::SBEValue>& data) {
 
     // Generator for type selection.
     std::mt19937 rng(seed);
     std::uniform_int_distribution<std::mt19937::result_type> distTypes(0, 100);
 
     // Random value generator for actual data in histogram.
-    std::default_random_engine gen(seed);
-    absl::zipf_distribution<int> distData(interval.second);
+    std::mt19937_64 seedArray(42);
+    std::mt19937_64 seedDataset(seed);
 
-    // Create one by one the values
-    for (size_t i = 0; i < size; i++) {
+    stats::MixedDistributionDescriptor zipfian{{stats::DistrType::kZipfian, 1.0}};
+    stats::TypeDistrVector td;
 
-        // Decide which value type should create.
-        for (auto type : typeCombination) {
+    populateTypeDistrVectorAccordingToInputConfig(
+        td, interval, typeCombination, ndv, seedArray, zipfian);
 
-            // Create values based on probabilities.
-            if (distTypes(rng) > type.second) {
-                continue;
-            }
-
-            if (type.first == sbe::value::TypeTags::Array) {
-
-                std::vector<stats::SBEValue> randArray;
-                for (size_t j = 0; j < kPredefinedArraySize; j++) {
-                    stats::SBEValue newValue(sbe::value::TypeTags::NumberInt64,
-                                             sbe::value::bitcastFrom<int64_t>(distData(gen)));
-                    randArray.emplace_back(newValue);
-                }
-
-                auto [arrayTag, arrayVal] = sbe::value::makeNewArray();
-                sbe::value::Array* arr = sbe::value::getArrayView(arrayVal);
-                for (const auto& elem : randArray) {
-                    const auto [copyTag, copyVal] =
-                        sbe::value::copyValue(elem.getTag(), elem.getValue());
-                    arr->push_back(copyTag, copyVal);
-                }
-
-                data.emplace_back(arrayTag, arrayVal);
-            } else {
-                stats::SBEValue newValue(type.first,
-                                         sbe::value::bitcastFrom<int64_t>(distData(gen)));
-                data.emplace_back(newValue);
-            }
-        }
-    }
+    stats::DatasetDescriptorNew desc{std::move(td), seedDataset};
+    data = desc.genRandomDataset(size);
 }
 
 ErrorCalculationSummary runQueries(size_t size,
@@ -356,16 +316,41 @@ ErrorCalculationSummary runQueries(size_t size,
                                    bool includeScalar,
                                    bool useE2EAPI,
                                    const size_t seed) {
-
-    // Generator for type selection.
-    std::mt19937 rng1(seed);
-    std::uniform_int_distribution<std::mt19937::result_type> distData(interval.first,
-                                                                      interval.second);
-
-    double relativeErrorSum = 0;
-    double relativeErrorMax = 0;
-
+    double relativeErrorSum = 0, relativeErrorMax = 0;
     ErrorCalculationSummary finalResults;
+
+    // 'sbeValLow' stores also the values for the equality comparison.
+    std::vector<stats::SBEValue> sbeValLow, sbeValHigh;
+    TypeCombination typeCombination{{queryTypeInfo.first, 100}};
+    switch (queryType) {
+        case kPoint: {
+            // For ndv we set the number of values in the provided data interval. This may lead to
+            // re-running values the same values if the number of queries is larger than the size of
+            // the interval.
+            auto ndv = interval.second - interval.first;
+            generateDataUniform(numberOfQueries, interval, typeCombination, seed, ndv, sbeValLow);
+            break;
+        }
+        case kRange: {
+
+            const std::pair<size_t, size_t> intervalLow{
+                interval.first, interval.first + (interval.second - interval.first) / 2};
+
+            const std::pair<size_t, size_t> intervalHigh{
+                interval.first + (interval.second - interval.first) / 2, interval.second};
+
+            // For ndv we set the number of values in the provided data interval. This may lead to
+            // re-running values the same values if the number of queries is larger than the size of
+            // the interval.
+            auto ndv = intervalLow.second - intervalLow.first;
+            generateDataUniform(
+                numberOfQueries, intervalLow, typeCombination, seed, ndv, sbeValLow);
+
+            generateDataUniform(
+                numberOfQueries, intervalHigh, typeCombination, seed, ndv, sbeValHigh);
+            break;
+        }
+    }
 
     for (size_t i = 0; i < numberOfQueries; i++) {
 
@@ -374,80 +359,46 @@ ErrorCalculationSummary runQueries(size_t size,
 
         switch (queryType) {
             case kPoint: {
-                stats::SBEValue sbeValEq(queryTypeInfo.first,
-                                         sbe::value::bitcastFrom<int64_t>(distData(rng1)));
 
                 // Find actual frequency.
                 actualCard =
-                    calculateFrequencyFromDataVectorEq(data, queryTypeInfo.first, sbeValEq);
+                    calculateFrequencyFromDataVectorEq(data, queryTypeInfo.first, sbeValLow[i]);
 
                 // Estimate result.
-                if (useE2EAPI) {
-
-                    auto bsonobjLow = sbeValueToBSON(sbeValEq, "low");
-                    auto bsonobjHigh = sbeValueToBSON(sbeValEq, "high");
-                    bsonobjLow = bsonobjLow.addFields(bsonobjHigh);
-
-                    mongo::Interval interval(bsonobjLow, true, true);
-
-                    estimatedCard.card = HistogramCardinalityEstimator::estimateCardinality(
-                        *arrHist, size, interval, includeScalar);
-                } else {
-
-                    estimatedCard = estimateCardinalityEq(
-                        *arrHist, queryTypeInfo.first, sbeValEq.getValue(), includeScalar);
-                }
+                estimatedCard = mongo::optimizer::cbp::ce::estimateCardinalityEq(
+                    *arrHist, queryTypeInfo.first, sbeValLow[i].getValue(), includeScalar);
                 break;
             }
             case kRange: {
-                auto rawLow = distData(rng1);
-                stats::SBEValue sbeValLow(queryTypeInfo.first,
-                                          sbe::value::bitcastFrom<int64_t>(rawLow));
-
-                std::uniform_int_distribution<std::mt19937::result_type> distDataHigh(
-                    rawLow, interval.second);
-
-                auto rawHigh = distDataHigh(rng1);
-                stats::SBEValue sbeValHigh(queryTypeInfo.first,
-                                           sbe::value::bitcastFrom<int64_t>(rawHigh));
+                if (mongo::stats::compareValues(sbeValLow[i].getTag(),
+                                                sbeValLow[i].getValue(),
+                                                sbeValHigh[i].getTag(),
+                                                sbeValHigh[i].getValue()) >= 0) {
+                    continue;
+                }
 
                 // Find actual frequency.
                 actualCard = calculateFrequencyFromDataVectorRange(
-                    data, queryTypeInfo.first, sbeValLow, sbeValHigh);
+                    data, queryTypeInfo.first, sbeValLow[i], sbeValHigh[i]);
 
                 // Estimate result.
-                if (useE2EAPI) {
-
-                    auto bsonobjLow = sbeValueToBSON(sbeValLow, "low");
-                    auto bsonobjHigh = sbeValueToBSON(sbeValHigh, "high");
-                    bsonobjLow = bsonobjLow.addFields(bsonobjHigh);
-
-                    mongo::Interval interval(bsonobjLow, true, true);
-
-                    estimatedCard.card = HistogramCardinalityEstimator::estimateCardinality(
-                        *arrHist, size, interval, includeScalar);
-                } else {
-
-                    estimatedCard = estimateCardinalityRange(*arrHist,
-                                                             true /*lowInclusive*/,
-                                                             queryTypeInfo.first,
-                                                             sbeValLow.getValue(),
-                                                             true /*highInclusive*/,
-                                                             queryTypeInfo.first,
-                                                             sbeValHigh.getValue(),
-                                                             includeScalar);
-                }
+                estimatedCard =
+                    mongo::optimizer::cbp::ce::estimateCardinalityRange(*arrHist,
+                                                                        true /*lowInclusive*/,
+                                                                        queryTypeInfo.first,
+                                                                        sbeValLow[i].getValue(),
+                                                                        true /*highInclusive*/,
+                                                                        queryTypeInfo.first,
+                                                                        sbeValHigh[i].getValue(),
+                                                                        includeScalar);
                 break;
             }
         }
 
-        std::pair<boost::optional<double>, boost::optional<double>> errors =
-            computeErrors(actualCard, estimatedCard.card);
+        // Store results to final structure.
+        auto errors = computeErrors(actualCard, estimatedCard.card);
 
-        // If error calculation was successful.
-        if (errors.first.has_value()) {
-
-            // Store results to final structure.
+        if (errors.first.has_value() && errors.second.has_value()) {
             finalResults.queryResults.push_back({actualCard, estimatedCard});
 
             finalResults.qErrors.push_back(abs(errors.first.get()));
@@ -504,6 +455,7 @@ void runAccuracyTestConfiguration(const DataDistributionEnum dataDistribution,
                                   const size_t seed,
                                   bool printResults) {
 
+    auto ndv = (dataInterval.second - dataInterval.first) / 2;
 
     for (auto numberOfBuckets : numberOfBucketsVector) {
         for (const auto& typeCombinationData : typeCombinationsData) {
@@ -514,13 +466,13 @@ void runAccuracyTestConfiguration(const DataDistributionEnum dataDistribution,
             // Create one by one the values.
             switch (dataDistribution) {
                 case kUniform:
-                    generateDataUniform(size, dataInterval, typeCombinationData, seed, data);
+                    generateDataUniform(size, dataInterval, typeCombinationData, seed, ndv, data);
                     break;
                 case kNormal:
-                    generateDataNormal(size, dataInterval, typeCombinationData, seed, data);
+                    generateDataNormal(size, dataInterval, typeCombinationData, seed, ndv, data);
                     break;
                 case kZipfian:
-                    generateDataZipfian(size, dataInterval, typeCombinationData, seed, data);
+                    generateDataZipfian(size, dataInterval, typeCombinationData, seed, ndv, data);
                     break;
             }
 
