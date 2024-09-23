@@ -1336,8 +1336,15 @@ void OplogApplication::checkOnOplogFailureForRecovery(OperationContext* opCtx,
     const bool isReplicaSet =
         repl::ReplicationCoordinator::get(opCtx->getServiceContext())->getSettings().isReplSet();
     // Relax the constraints of oplog application if the node is not a replica set member or the
-    // node is in the middle of a backup and restore process.
+    // node is in the middle of a selective restore (in this case, applying oplog entries for
+    // selectively unrestored collections will result in NamespaceNotFound errors that should be
+    // ignored.)
     if (!isReplicaSet || storageGlobalParams.restore) {
+        LOGV2_DEBUG(9452700,
+                    1,
+                    "Skipped processing an error during oplog application.",
+                    "oplogEntry"_attr = oplogEntry,
+                    "error"_attr = errorMsg);
         return;
     }
 
