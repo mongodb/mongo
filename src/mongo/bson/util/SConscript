@@ -16,6 +16,16 @@ env.Program(
     ],
 )
 
+env.Program(
+    target="bson_corpus_gen",
+    source=[
+        "bson_corpus_gen.cpp",
+    ],
+    LIBDEPS=[
+        "$BUILD_DIR/mongo/base",
+    ],
+)
+
 env.Benchmark(
     target="simple8b_bm",
     source=[
