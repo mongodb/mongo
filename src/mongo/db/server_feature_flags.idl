@@ -129,11 +129,6 @@ feature_flags:
         cpp_varname: gFeatureFlagLogSlowOpsBasedOnTimeWorking
         default: true
         shouldBeFCVGated: false
-    featureFlagOnlineTransitionToSharded:
-        description: "Feature flag to transition a replica set into a one shard cluster (config shard)."
-        cpp_varname: gFeatureFlagOnlineTransitionToSharded
-        default: false
-        shouldBeFCVGated: true
     # TODO SERVER-89999 remove once the version becomes last LTS
     featureFlagDisallowBucketCollectionWithoutTimeseriesOptions:
         description: "Disallow creation of timeseries bucket collection without timeseries options"
