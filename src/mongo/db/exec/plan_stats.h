@@ -48,6 +48,15 @@
 
 namespace mongo {
 
+class PlanStage;
+/**
+ * The type which represents a unique identifier for PlanStages across all enumerated plans for a
+ * query. It is implemented as a typedef to PlanStage* as a convenience, since that is guarenteed to
+ * be unique, but this pointer is never intended to be dereferenced as this type may exist after the
+ * underlying PlanStage has been destroyed.
+ */
+using PlanStageKey = const PlanStage*;
+
 /**
  * The interface all specific-to-stage stats provide.
  */
@@ -69,8 +78,11 @@ struct SpecificStats {
 struct CommonStats {
     CommonStats() = delete;
 
-    CommonStats(const char* type)
+    CommonStats(const char* type) : CommonStats(type, nullptr /*originalPlanStage*/) {}
+
+    CommonStats(const char* type, PlanStageKey originalPlanStage)
         : stageTypeStr(type),
+          planStage(originalPlanStage),
           works(0),
           yields(0),
           unyields(0),
@@ -85,6 +97,9 @@ struct CommonStats {
     }
     // String giving the type of the stage. Not owned.
     const char* stageTypeStr;
+
+    // Store an identifier to the plan stage which this object is describing.
+    PlanStageKey planStage;
 
     // Count calls into the stage.
     size_t works;
