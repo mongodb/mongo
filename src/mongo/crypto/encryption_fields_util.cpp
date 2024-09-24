@@ -37,6 +37,9 @@
 
 #include <boost/optional/optional.hpp>
 
+#include "mongo/crypto/fle_options_gen.h"
+#include "mongo/db/server_feature_flags_gen.h"
+
 namespace mongo {
 
 boost::optional<EncryptedFieldMatchResult> findMatchingEncryptedField(
@@ -48,6 +51,19 @@ boost::optional<EncryptedFieldMatchResult> findMatchingEncryptedField(
         return boost::none;
     }
     return {{*itr, key.numParts() <= itr->numParts()}};
+}
+
+Status checkForVersion70IncompatibleFields(const FLECompactionOptions& newVal,
+                                           const boost::optional<TenantId>& tenantId) {
+    if (!gFeatureFlagQERangeV2.isEnabledUseLastLTSFCVWhenUninitialized(
+            serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
+        if (newVal.getCompactAnchorPaddingFactor().has_value()) {
+            return Status{ErrorCodes::BadValue,
+                          "Cannot set fleCompactionOptions.compactAnchorPaddingFactor unless "
+                          "Queryable Encryption range version 2 is enabled"};
+        }
+    }
+    return Status::OK();
 }
 
 }  // namespace mongo

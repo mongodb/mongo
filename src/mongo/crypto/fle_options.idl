@@ -28,6 +28,8 @@
 
 global:
   cpp_namespace: "mongo"
+  cpp_includes:
+  - "mongo/crypto/encryption_fields_util.h"
 
 imports:
   - "mongo/idl/cluster_server_parameter.idl"
@@ -88,3 +90,5 @@ server_parameters:
     cpp_vartype: FLECompactionOptions
     redact: false
     omit_in_ftdc: false
+    validator:
+      callback: "checkForVersion70IncompatibleFields"

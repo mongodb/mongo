@@ -53,6 +53,7 @@
 #include "mongo/bson/timestamp.h"
 #include "mongo/client/dbclient_cursor.h"
 #include "mongo/crypto/fle_crypto.h"
+#include "mongo/crypto/fle_options_gen.h"
 #include "mongo/db/audit.h"
 #include "mongo/db/auth/action_type.h"
 #include "mongo/db/auth/authorization_session.h"
@@ -1311,6 +1312,46 @@ private:
         }
     }
 
+    // This helper function addresses the incompatibility of the fleCompactionOptions cluster
+    // parameter between v8.0+ and earlier binary versions. Upon downgrade to an FCV that does
+    // not have the QE range v2 feature flag enabled, the cluster parameter document must be
+    // scrubbed of all fields that are strictly forbidden in earlier versions.
+    void _cleanUpFLECompactionOptionsClusterParameter(
+        OperationContext* opCtx,
+        const multiversion::FeatureCompatibilityVersion fromVersion,
+        const multiversion::FeatureCompatibilityVersion requestedVersion) {
+        if (gFeatureFlagQERangeV2.isEnabledOnVersion(requestedVersion)) {
+            return;
+        }
+        /* Always reserialize the options struct when downgrading to ensure that no
+         * unrecognized fields have snuck in. This includes `compactAnchorPaddingFactor`
+         * as well as anything else not explicitly named in the struct.
+         * This is to protect against the change in IDL type strictness.
+         */
+        auto* clusterParameters = ServerParameterSet::getClusterParameterSet();
+
+        auto fleCompactOpts =
+            clusterParameters
+                ->get<ClusterParameterWithStorage<FLECompactionOptions>>("fleCompactionOptions")
+                ->getValue(boost::none);
+        fleCompactOpts.setCompactAnchorPaddingFactor(boost::none);
+
+        write_ops::UpdateCommandRequest updateOp(NamespaceString::kClusterParametersNamespace);
+        updateOp.setUpdates(
+            {[&] {
+                write_ops::UpdateOpEntry entry;
+                entry.setQ(BSON("_id"
+                                << "fleCompactionOptions"));
+                entry.setU(
+                    write_ops::UpdateModification::parseFromClassicUpdate(fleCompactOpts.toBSON()));
+                return entry;
+            }()});
+
+        DBDirectClient client(opCtx);
+        auto reply = client.update(updateOp);
+        write_ops::checkWriteErrors(reply);
+    }
+
     // Remove cluster parameters from the clusterParameters collections which are not enabled on
     // requestedVersion.
     void _cleanUpClusterParameters(
@@ -1320,6 +1361,9 @@ private:
         const auto& [fromVersion, _] = getTransitionFCVFromAndTo(fcvSnapshot.getVersion());
 
         auto* clusterParameters = ServerParameterSet::getClusterParameterSet();
+
+        _cleanUpFLECompactionOptionsClusterParameter(opCtx, fromVersion, requestedVersion);
+
         std::vector<write_ops::DeleteOpEntry> deletes;
         for (const auto& [name, sp] : clusterParameters->getMap()) {
             if (sp->isEnabledOnVersion(fromVersion) && !sp->isEnabledOnVersion(requestedVersion)) {

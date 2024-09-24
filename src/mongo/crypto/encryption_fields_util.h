@@ -37,6 +37,7 @@
 #include "mongo/bson/bsontypes.h"
 #include "mongo/crypto/fle_field_schema_gen.h"
 #include "mongo/db/field_ref.h"
+#include "mongo/db/tenant_id.h"
 #include "mongo/util/assert_util.h"
 
 namespace mongo {
@@ -176,5 +177,9 @@ struct EncryptedFieldMatchResult {
 
 boost::optional<EncryptedFieldMatchResult> findMatchingEncryptedField(
     const FieldRef& key, const std::vector<FieldRef>& encryptedFields);
+
+class FLECompactionOptions;
+Status checkForVersion70IncompatibleFields(const FLECompactionOptions& newVal,
+                                           const boost::optional<TenantId>& tenantId);
 
 }  // namespace mongo
