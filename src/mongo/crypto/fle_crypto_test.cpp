@@ -2898,47 +2898,34 @@ TEST(CompactionHelpersTest, parseCompactionTokensTest) {
     const AnchorPaddingRootToken anchor2(
         decodePrf("7df988a08052e24dbe938c58b91ab00c812f58eabb3d4db1b047c3187d57f668"_sd));
 
-    for (const bool ffEnabled : {false, true}) {
-        RAIIServerParameterControllerForTest featureFlagController("featureFlagQERangeV2",
-                                                                   ffEnabled);
-        for (const bool includePaddingToken : {false, true}) {
-            BSONObjBuilder builder;
-            builder.appendBinData("a.b.c",
-                                  token1.toCDR().length(),
-                                  BinDataType::BinDataGeneral,
-                                  token1.toCDR().data());
-            if (includePaddingToken) {
-                BSONObjBuilder xy(builder.subobjStart("x.y"));
-                xy.appendBinData("ecoc",
-                                 token2.toCDR().length(),
-                                 BinDataType::BinDataGeneral,
-                                 token2.toCDR().data());
-                xy.appendBinData("anchorPaddingToken",
-                                 anchor2.toCDR().length(),
-                                 BinDataType::BinDataGeneral,
-                                 anchor2.toCDR().data());
-                xy.doneFast();
-            }
+    for (const bool includePaddingToken : {false, true}) {
+        BSONObjBuilder builder;
+        builder.appendBinData(
+            "a.b.c", token1.toCDR().length(), BinDataType::BinDataGeneral, token1.toCDR().data());
+        if (includePaddingToken) {
+            BSONObjBuilder xy(builder.subobjStart("x.y"));
+            xy.appendBinData("ecoc",
+                             token2.toCDR().length(),
+                             BinDataType::BinDataGeneral,
+                             token2.toCDR().data());
+            xy.appendBinData("anchorPaddingToken",
+                             anchor2.toCDR().length(),
+                             BinDataType::BinDataGeneral,
+                             anchor2.toCDR().data());
+            xy.doneFast();
+        }
 
-            const bool expectSuccess = ffEnabled || !includePaddingToken;
-            if (!expectSuccess) {
-                ASSERT_THROWS_CODE(
-                    CompactionHelpers::parseCompactionTokens(builder.obj()), DBException, 6346801);
-                continue;
-            }
+        const auto result = CompactionHelpers::parseCompactionTokens(builder.obj());
+        ASSERT_EQ(result.size(), includePaddingToken ? 2UL : 1UL);
 
-            const auto result = CompactionHelpers::parseCompactionTokens(builder.obj());
-            ASSERT_EQ(result.size(), includePaddingToken ? 2UL : 1UL);
+        ASSERT_EQ(result[0].fieldPathName, "a.b.c");
+        ASSERT(result[0].token == token1);
+        ASSERT(result[0].anchorPaddingToken == boost::none);
 
-            ASSERT_EQ(result[0].fieldPathName, "a.b.c");
-            ASSERT(result[0].token == token1);
-            ASSERT(result[0].anchorPaddingToken == boost::none);
-
-            if (includePaddingToken) {
-                ASSERT_EQ(result[1].fieldPathName, "x.y");
-                ASSERT(result[1].token == token2);
-                ASSERT(result[1].anchorPaddingToken == anchor2);
-            }
+        if (includePaddingToken) {
+            ASSERT_EQ(result[1].fieldPathName, "x.y");
+            ASSERT(result[1].token == token2);
+            ASSERT(result[1].anchorPaddingToken == anchor2);
         }
     }
 }

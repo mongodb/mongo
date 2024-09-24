@@ -751,23 +751,6 @@ private:
         const auto& [originalVersion, _] = getTransitionFCVFromAndTo(
             serverGlobalParams.featureCompatibility.acquireFCVSnapshot().getVersion());
 
-        if (gFeatureFlagQERangeV2.isEnabledOnTargetFCVButDisabledOnOriginalFCV(requestedVersion,
-                                                                               originalVersion)) {
-            collValidationFunctions.emplace_back([](const Collection* collection) -> void {
-                const auto& encryptedFields =
-                    collection->getCollectionOptions().encryptedFieldConfig;
-                if (encryptedFields) {
-                    uassert(ErrorCodes::CannotUpgrade,
-                            fmt::format("Collection {} has an encrypted field with query type "
-                                        "rangePreview, which is deprecated. Please drop this "
-                                        "collection before upgrading FCV.",
-                                        collection->ns().toStringForErrorMsg()),
-                            !hasQueryType(encryptedFields.get(),
-                                          QueryTypeEnum::RangePreviewDeprecated));
-                }
-            });
-        }
-
         if (gFeatureFlagDisallowBucketCollectionWithoutTimeseriesOptions
                 .isEnabledOnTargetFCVButDisabledOnOriginalFCV(requestedVersion, originalVersion)) {
             collValidationFunctions.emplace_back([](const Collection* collection) {
@@ -1195,26 +1178,6 @@ private:
                     [&](const Collection* collection) {
                         return collection->areRecordIdsReplicated();
                     });
-            }
-        }
-
-        if (!gFeatureFlagQERangeV2.isEnabledOnVersion(requestedVersion)) {
-            auto checkForNewRangeQueryType = [](const Collection* collection) {
-                const auto& encryptedFields =
-                    collection->getCollectionOptions().encryptedFieldConfig;
-                if (encryptedFields) {
-                    uassert(ErrorCodes::CannotDowngrade,
-                            str::stream() << "Collection " << collection->ns().toStringForErrorMsg()
-                                          << " has an encrypted field with query type range, "
-                                             "which is new in 8.0. Please drop this collection "
-                                             "before trying to downgrade FCV.",
-                            !hasQueryType(encryptedFields.get(), QueryTypeEnum::Range));
-                }
-                return true;
-            };
-            for (const auto& dbName : DatabaseHolder::get(opCtx)->getNames()) {
-                Lock::DBLock dbLock(opCtx, dbName, MODE_IS);
-                catalog::forEachCollectionFromDb(opCtx, dbName, MODE_IS, checkForNewRangeQueryType);
             }
         }
 

@@ -169,14 +169,9 @@ public:
             compact.setEcocNss(namespaces.ecocNss);
             compact.setEcocRenameNss(namespaces.ecocRenameNss);
             compact.setCompactionTokens(req.getCompactionTokens().getOwned());
+            compact.setEncryptionInformation(req.getEncryptionInformation());
+            compact.setAnchorPaddingFactor(req.getAnchorPaddingFactor());
 
-            const bool featureFlagQERangeV2 =
-                gFeatureFlagQERangeV2.isEnabledUseLastLTSFCVWhenUninitialized(
-                    serverGlobalParams.featureCompatibility.acquireFCVSnapshot());
-            if (featureFlagQERangeV2) {
-                compact.setEncryptionInformation(req.getEncryptionInformation());
-                compact.setAnchorPaddingFactor(req.getAnchorPaddingFactor());
-            }
 
             return compact;
         }

@@ -4179,14 +4179,12 @@ ParsedFindRangePayload::ParsedFindRangePayload(ConstDataRange cdr) {
 
 
 std::vector<CompactionToken> CompactionHelpers::parseCompactionTokens(BSONObj compactionTokens) {
-    const bool featureFlagQERangeV2 = gFeatureFlagQERangeV2.isEnabledUseLastLTSFCVWhenUninitialized(
-        serverGlobalParams.featureCompatibility.acquireFCVSnapshot());
     std::vector<CompactionToken> parsed;
     std::transform(
         compactionTokens.begin(),
         compactionTokens.end(),
         std::back_inserter(parsed),
-        [featureFlagQERangeV2](const auto& token) {
+        [](const auto& token) {
             auto fieldName = token.fieldNameStringData().toString();
 
             if (token.isBinData(BinDataType::BinDataGeneral)) {
@@ -4194,7 +4192,7 @@ std::vector<CompactionToken> CompactionHelpers::parseCompactionTokens(BSONObj co
                 return CompactionToken{std::move(fieldName), std::move(ecoc), boost::none};
             }
 
-            if (featureFlagQERangeV2 && (token.type() == Object)) {
+            if (token.type() == Object) {
                 auto doc =
                     CompactionTokenDoc::parse(IDLParserContext{"compactionToken"}, token.Obj());
                 return CompactionToken{

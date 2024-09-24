@@ -129,12 +129,6 @@ feature_flags:
         cpp_varname: gFeatureFlagLogSlowOpsBasedOnTimeWorking
         default: true
         shouldBeFCVGated: false
-    featureFlagQERangeV2:
-        description: "Queryable Encryption Range V2"
-        cpp_varname: gFeatureFlagQERangeV2
-        default: true
-        version: 8.0
-        shouldBeFCVGated: true
     featureFlagOnlineTransitionToSharded:
         description: "Feature flag to transition a replica set into a one shard cluster (config shard)."
         cpp_varname: gFeatureFlagOnlineTransitionToSharded
