@@ -38,6 +38,7 @@
 #include "mongo/db/pipeline/field_path.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
+#include <compare>
 
 namespace mongo {
 
@@ -130,13 +131,20 @@ void DepsTracker::setNeedsMetadata(DocumentMetadataFields::MetaType type, bool r
 
 // Returns true if the lhs value should sort before the rhs, false otherwise.
 bool PathComparator::operator()(StringData lhs, StringData rhs) const {
+    // Use the three-way (<=>) comparator to avoid code duplication.
+    return std::is_lt(ThreeWayPathComparator{}(lhs, rhs));
+}
+
+std::strong_ordering ThreeWayPathComparator::operator()(StringData lhs, StringData rhs) const {
     constexpr char dot = '.';
 
     for (size_t pos = 0, len = std::min(lhs.size(), rhs.size()); pos < len; ++pos) {
         // Below, we explicitly choose unsigned char because the usual const char& returned by
         // operator[] is actually signed on x86 and will incorrectly order unicode characters.
         unsigned char lchar = lhs[pos], rchar = rhs[pos];
-        if (lchar == rchar) {
+
+        const auto res = lchar <=> rchar;
+        if (std::is_eq(res)) {
             continue;
         }
 
@@ -144,19 +152,19 @@ bool PathComparator::operator()(StringData lhs, StringData rhs) const {
         // paths sort directly before any paths they prefix and directly after any paths
         // which prefix them.
         if (lchar == dot) {
-            return true;
+            return std::strong_ordering::less;
         } else if (rchar == dot) {
-            return false;
+            return std::strong_ordering::greater;
         }
 
         // Otherwise, default to normal character comparison.
-        return lchar < rchar;
+        return res;
     }
 
     // If we get here, then we have reached the end of lhs and/or rhs and all of their path
     // segments up to this point match. If lhs is shorter than rhs, then lhs prefixes rhs
     // and should sort before it.
-    return lhs.size() < rhs.size();
+    return lhs.size() <=> rhs.size();
 }
 
 }  // namespace mongo

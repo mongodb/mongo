@@ -29,9 +29,12 @@
 
 #include "mongo/db/pipeline/split_pipeline.h"
 
+#include <algorithm>
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 
 #include "mongo/db/pipeline/dependencies.h"
+#include "mongo/db/pipeline/document_source_add_fields.h"
+#include "mongo/db/pipeline/document_source_group.h"
 #include "mongo/db/pipeline/document_source_match.h"
 #include "mongo/db/pipeline/document_source_project.h"
 #include "mongo/db/pipeline/document_source_sequential_document_cache.h"
@@ -98,9 +101,11 @@ boost::optional<long long> getPipelineLimit(Pipeline* pipeline) {
  */
 class PipelineSplitter {
 public:
-    PipelineSplitter(std::unique_ptr<Pipeline, PipelineDeleter> pipelineToSplit)
+    PipelineSplitter(std::unique_ptr<Pipeline, PipelineDeleter> pipelineToSplit,
+                     boost::optional<OrderedPathSet> shardKeyPaths)
         : _splitPipeline(
-              SplitPipeline::mergeOnlyWithEmptyShardsPipeline(std::move(pipelineToSplit))) {}
+              SplitPipeline::mergeOnlyWithEmptyShardsPipeline(std::move(pipelineToSplit))),
+          _initialShardKeyPaths(std::move(shardKeyPaths)) {}
 
     PipelineSplitter(const PipelineSplitter& other) = delete;
     ~PipelineSplitter() = default;
@@ -118,6 +123,10 @@ public:
         // The order in which optimizations are applied can have significant impact on the
         // efficiency of the final pipeline. Be Careful!
         _moveEligibleStreamingStagesBeforeSortOnShards();
+        if (feature_flags::gFeatureFlagShardFilteringDistinctScan.isEnabled(
+                serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
+            _moveGroupFollowingSortFromMergerToShards();
+        }
         _moveFinalUnwindFromShardsToMerger();
         _propagateDocLimitToShards();
         _limitFieldsSentFromShardsToMerger();
@@ -305,6 +314,73 @@ private:
     }
 
     /**
+     * In case the last shard stage is a $sort and the first merge stage is a $group which is
+     * grouping on (a superset of) the shard key, the $group is partially moved to the shards. The
+     * $group is partially moved to the shards because it consumes and discards the sort-order
+     * generated per-shard, so we don't need to preserve this sort order at the merge stage.
+     */
+    void _moveGroupFollowingSortFromMergerToShards() {
+        if (_splitPipeline.shardsPipeline->getSources().empty() ||
+            _splitPipeline.mergePipeline->getSources().empty()) {
+            return;
+        }
+
+        const auto lastShardSort = dynamic_cast<DocumentSourceSort*>(
+            _splitPipeline.shardsPipeline->getSources().back().get());
+        const auto firstMergerGroup = dynamic_cast<DocumentSourceGroup*>(
+            _splitPipeline.mergePipeline->getSources().front().get());
+        if (!lastShardSort || !firstMergerGroup) {
+            return;
+        }
+
+        if (!_initialShardKeyPaths) {
+            return;
+        }
+
+        const auto& shardKeyPaths = *_initialShardKeyPaths;
+
+        const auto groupExprs = firstMergerGroup->getTriviallyReferencedPaths();
+        if (groupExprs.empty()) {
+            // The group _id doesn't contain any simple referenced paths; it may be
+            // a constant, or a more complex computation. In any case, it is not
+            // guaranteed that the group can be pushed down as it doesn't directly
+            // contain the shard key.
+            return;
+        }
+
+        const auto& stages = _splitPipeline.shardsPipeline->getSources();
+        // Walk backwards through the pipeline to find the original paths for
+        // these fields, before any renames.
+        const auto originPaths = semantic_analysis::traceOriginatingPaths(stages, groupExprs);
+
+        if (originPaths.empty()) {
+            // The group _id relies on fields which are not derived from the underlying
+            // document purely by rename/projection. Even if the entire shard key is used
+            // to compute the _id, that alone is not sufficient to guarantee the _id will
+            // uniquely occur on one shard.
+            return;
+        }
+
+        if (!std::includes(originPaths.begin(),
+                           originPaths.end(),
+                           shardKeyPaths.begin(),
+                           shardKeyPaths.end(),
+                           originPaths.key_comp())) {
+            // The group does not include all of the paths of the shard key; it cannot be
+            // pushed down.
+            return;
+        }
+
+        // The $group can be partially pushed down to the shards.
+        const auto groupDistributedLogic = firstMergerGroup->distributedPlanLogic();
+        if (groupDistributedLogic) {
+            _splitPipeline.mergePipeline->popFront();
+            _splitPipeline.shardCursorsSortSpec = boost::none;
+            _addSplitStages(*groupDistributedLogic);
+        }
+    }
+
+    /**
      * If the final stage on shards is to unwind an array, move that stage to the merger. This
      * cuts down on network traffic and allows us to take advantage of reduced copying in
      * unwind.
@@ -434,10 +510,14 @@ private:
 
     // Output.
     SplitPipeline _splitPipeline;
+
+    // Stores the shard key paths as they are named at the start of the pipeline.
+    boost::optional<OrderedPathSet> _initialShardKeyPaths;
 };
 
-SplitPipeline SplitPipeline::split(std::unique_ptr<Pipeline, PipelineDeleter> pipelineToSplit) {
-    return PipelineSplitter(std::move(pipelineToSplit)).split().release();
+SplitPipeline SplitPipeline::split(std::unique_ptr<Pipeline, PipelineDeleter> pipelineToSplit,
+                                   boost::optional<OrderedPathSet> shardKeyPaths) {
+    return PipelineSplitter(std::move(pipelineToSplit), std::move(shardKeyPaths)).split().release();
 }
 
 }  // namespace sharded_agg_helpers

@@ -30,6 +30,7 @@
 #pragma once
 
 #include <boost/optional.hpp>
+#include <compare>
 #include <cstddef>
 #include <set>
 #include <string>
@@ -50,6 +51,17 @@ struct PathComparator {
 
     /* Returns true if the lhs value should sort before the rhs, false otherwise. */
     bool operator()(StringData lhs, StringData rhs) const;
+};
+
+/**
+ * Three way (<=>) version of PathComparator.
+ * See PathComparator for sorting semantics.
+ */
+struct ThreeWayPathComparator {
+    using is_transparent = void;
+
+    /* Returns strong_ordering::less, equal, greater indicating the relation lhs <=> rhs */
+    std::strong_ordering operator()(StringData lhs, StringData rhs) const;
 };
 
 /**

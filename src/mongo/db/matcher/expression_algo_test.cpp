@@ -27,6 +27,7 @@
  *    it in the license file.
  */
 
+#include <algorithm>
 #include <cstddef>
 #include <initializer_list>
 #include <memory>
@@ -47,6 +48,7 @@
 #include "mongo/db/matcher/expression_algo.h"
 #include "mongo/db/matcher/expression_parser.h"
 #include "mongo/db/matcher/parsed_match_expression_for_test.h"
+#include "mongo/db/pipeline/dependencies.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/expression_context_for_test.h"
 #include "mongo/db/query/collation/collator_interface_mock.h"
@@ -55,6 +57,8 @@
 #include "mongo/unittest/bson_test_util.h"
 #include "mongo/unittest/framework.h"
 #include "mongo/util/intrusive_counter.h"
+#include <fmt/format.h>
+#include <fmt/ranges.h>
 
 namespace mongo {
 
@@ -2324,4 +2328,47 @@ TEST(RemoveImprecisePredicates, RemovesTriviallyFalseChildOfNor) {
             "}"}};
     testRemoveImprecisePredicates(t);
 }
+
+TEST(Independence, MakeIndependent) {
+    // Test that makeIndependent correctly results in a set which contains members of
+    // the first set, which do _not_ have a match in the second set for either:
+    // * The exact path
+    // * A prefix of the path
+    // * A sub path
+    // That is, if a "$addFields" overwrote all the fields of the second set,
+    // all the paths of the first set would be unaffected.
+    // Verifies with areIndependent.
+    for (const auto& [a, b] : std::vector<std::pair<OrderedPathSet, OrderedPathSet>>{
+             // Set: A  -   B
+             {{"a"}, {"a"}},        // Exactly equal.
+             {{"a"}, {"a.b"}},      // Value removed by subpath match.
+             {{"a.b"}, {"a"}},      // Value removed by prefix match.
+             {{"a.b.c.d"}, {"a"}},  // Deeply nested value removed by prefix match.
+             {{"a"}, {"a.b.c.d"}},  // Value removed by deeply nested subpath match.
+             {{"a", "b"}, {"a"}},   // Above + unaffected member of a.
+             {{"a", "b"}, {"a.b"}},
+             {{"a.b", "b"}, {"a"}},
+             {{"a.b.c.d", "b"}, {"a"}},
+             {{"a", "b"}, {"a.b.c.d"}},
+             {{"a"}, {"a", "b"}},  // Above + member in b with no match in a.
+             {{"a"}, {"a.b", "b"}},
+             {{"a.b"}, {"a", "b"}},
+             {{"a.b.c.d"}, {"a", "b"}},
+             {{"a"}, {"a.b.c.d", "b"}},
+             {{"a", "a.b"}, {"a"}},         // Multiple paths removed by one member of b.
+             {{"a", "a.b"}, {"a", "a.b"}},  // Multiple paths removed by multiple members of b.
+             {{"a"}, {"a", "a.b"}},         // One path would be removed by multiple members of b.
+         }) {
+        // Start off not independent.
+        ASSERT_FALSE(expression::areIndependent(a, b))
+            << fmt::format("[{}], [{}] ", fmt::join(a, ", "), fmt::join(b, ", "));
+        auto aPrime = expression::makeIndependent(a, b);
+        // Are now independent.
+        ASSERT_TRUE(expression::areIndependent(aPrime, b)) << fmt::format(
+            "[{}], [{}], [{}] ", fmt::join(a, ", "), fmt::join(aPrime, ", "), fmt::join(b, ", "));
+        // Only members of a are retained.
+        ASSERT_TRUE(std::includes(a.begin(), a.end(), aPrime.begin(), aPrime.end(), a.key_comp()));
+    }
+}
+
 }  // namespace mongo

@@ -27,6 +27,7 @@
  *    it in the license file.
  */
 
+#include "mongo/db/pipeline/variables.h"
 #include <absl/container/flat_hash_map.h>
 #include <absl/container/node_hash_map.h>
 #include <absl/meta/type_traits.h>
@@ -47,10 +48,12 @@
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/exec/document_value/value.h"
 #include "mongo/db/exec/document_value/value_comparator.h"
+#include "mongo/db/matcher/expression_tree.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/pipeline/accumulation_statement.h"
 #include "mongo/db/pipeline/accumulator.h"
 #include "mongo/db/pipeline/accumulator_percentile.h"
+#include "mongo/db/pipeline/dependencies.h"
 #include "mongo/db/pipeline/document_source_group.h"
 #include "mongo/db/pipeline/document_source_group_base.h"
 #include "mongo/db/pipeline/expression.h"
@@ -340,6 +343,48 @@ bool DocumentSourceGroupBase::pathIncludedInGroupKeys(const std::string& dottedP
         }
         return false;
     });
+}
+
+/**
+ * Visitor collecting paths which are referenced in an object or an array,
+ * but _not_ in any expression which may compute a derived value.
+ *
+ * e.g., {a:"$a", b:"$b"} and ["$a", "$b"] both reference "a" and "b".
+ *
+ * For more complex expressions, like
+ *  {a:{"$add":["$b", "$c"]}, d:"$d"}
+ * only the "unmodified" fields will be reported, "d".
+ *
+ * This can be used to determine fields a group _id "directly" references.
+ */
+class TriviallyReferencedFieldsVisitor : public SelectiveConstExpressionVisitorBase {
+public:
+    using SelectiveConstExpressionVisitorBase::visit;
+    void visitChildren(const Expression* expr) {
+        for (const auto& child : expr->getChildren()) {
+            child->acceptVisitor(this);
+        }
+    }
+    void visit(const ExpressionArray* expr) override {
+        visitChildren(expr);
+    }
+    void visit(const ExpressionObject* expr) override {
+        visitChildren(expr);
+    }
+    void visit(const ExpressionFieldPath* efp) override {
+        if (!efp->isVariableReference()) {
+            fields.insert(efp->getFieldPathWithoutCurrentPrefix().fullPath());
+        }
+    }
+    OrderedPathSet fields;
+};
+
+OrderedPathSet DocumentSourceGroupBase::getTriviallyReferencedPaths() const {
+    TriviallyReferencedFieldsVisitor visitor;
+    for (const auto& expr : _groupProcessor.getIdExpressions()) {
+        expr->acceptVisitor(&visitor);
+    }
+    return visitor.fields;
 }
 
 bool DocumentSourceGroupBase::canRunInParallelBeforeWriteStage(

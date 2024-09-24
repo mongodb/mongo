@@ -177,6 +177,15 @@ public:
         return _groupProcessor.getIdExpressions();
     }
 
+    /**
+     * Returns a set of paths which the group _id references.
+     * Only includes fields which are used unmodified - e.g.,
+     *   {foo:{"$add":["$b", "$c"]}, bar:"$d"}
+     * returns {"d"}, as the field "d" is used, but has not been altered
+     * by any further computation.
+     */
+    OrderedPathSet getTriviallyReferencedPaths() const;
+
     bool canRunInParallelBeforeWriteStage(
         const OrderedPathSet& nameOfShardKeyFieldsUponEntryToStage) const final;
 

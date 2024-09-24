@@ -4571,7 +4571,8 @@ public:
 
     void doTest(const std::string& inputPipeJson,
                 const std::string& shardPipeJson,
-                const std::string& mergePipeJson) {
+                const std::string& mergePipeJson,
+                boost::optional<OrderedPathSet> shardKey = boost::none) {
         const BSONObj inputBson = pipelineFromJsonArray(inputPipeJson);
         const BSONObj shardPipeExpected = pipelineFromJsonArray(shardPipeJson);
         const BSONObj mergePipeExpected = pipelineFromJsonArray(mergePipeJson);
@@ -4598,7 +4599,8 @@ public:
         mergePipe = Pipeline::parse(request.getPipeline(), ctx);
         mergePipe->optimizePipeline();
 
-        auto splitPipeline = sharded_agg_helpers::SplitPipeline::split(std::move(mergePipe));
+        auto splitPipeline =
+            sharded_agg_helpers::SplitPipeline::split(std::move(mergePipe), shardKey);
         const auto explain = SerializationOptions{
             .verbosity = boost::make_optional(ExplainOptions::Verbosity::kQueryPlanner)};
         ASSERT_VALUE_EQ(Value(splitPipeline.shardsPipeline->writeExplainOps(explain)),
@@ -4925,6 +4927,253 @@ TEST_F(PipelineOptimizations, ShouldNotCoalesceUnwindNotOnAs) {
 };
 
 }  // namespace coalesceLookUpAndUnwind
+
+namespace pushDownGroupPrecededBySort {
+
+TEST_F(PipelineOptimizations, ShouldNotPushdownGroupWithoutShardKey) {
+    doTest("[{$sort: {a: 1}}, {$group: {_id: '$_id'}}]" /*inputPipeJson*/,
+           "[{$sort: {sortKey: {a: 1}}}, {$project: {_id: true}}]" /*shardPipeJson*/,
+           "[{$group: {_id: '$_id'}}]" /*mergePipeJson*/);
+};
+
+TEST_F(PipelineOptimizations, ShouldNotPushdownGroupIfNotOnShardKey) {
+    const OrderedPathSet shardKey = {"a", "c"};
+    doTest("[{$sort: {a: 1}}, {$group: {_id: '$c'}}]" /*inputPipeJson*/,
+           "[{$sort: {sortKey: {a: 1}}}, {$project: {c: true, _id: false}}]" /*shardPipeJson*/,
+           "[{$group: {_id: '$c'}}]" /*mergePipeJson*/,
+           shardKey);
+};
+
+TEST_F(PipelineOptimizations, ShouldNotPushdownGroupIfProjectDoesNotPreserveShardKey) {
+    const OrderedPathSet shardKey = {"shardKey"};
+    doTest(
+        "[{$project: {shardKey: '$other'}}, {$sort: {shardKey: 1}}, {$group: {_id: '$shardKey'}}]" /*inputPipeJson*/
+        ,
+        "[{$project: {_id: true, shardKey: '$other'}}, {$sort: {sortKey: {shardKey: 1}}}]" /*shardPipeJson*/
+        ,
+        "[{$group: {_id: '$shardKey'}}]" /*mergePipeJson*/,
+        shardKey);
+};
+
+TEST_F(PipelineOptimizations, ShouldNotPushdownGroupIfShardKeyIsUnset) {
+    const OrderedPathSet shardKey = {"shardKey"};
+    doTest(
+        "[{$unset: 'shardKey'}, {$sort: {shardKey: 1}}, {$group: {_id: '$shardKey'}}]" /*inputPipeJson*/
+        ,
+        "[{$project: {shardKey: false, _id: true}}"
+        ",{$sort: {sortKey: {shardKey: 1}}}"
+        ",{$project: {shardKey: true, _id: false}}]" /*shardPipeJson*/,
+        "[{$group: {_id: '$shardKey'}}]" /*mergePipeJson*/,
+        shardKey);
+};
+
+TEST_F(PipelineOptimizations, ShouldNotPushdownGroupIfAddFieldsOverwritesShardKey) {
+    const OrderedPathSet shardKey = {"shardKey"};
+    doTest(
+        "[{$addFields: {shardKey: '$other'}}, {$sort: {shardKey: 1}}, {$group: {_id: '$shardKey'}}]" /*inputPipeJson*/
+        ,
+        "[{$addFields: {shardKey: '$other'}}"
+        ",{$sort: {sortKey: {shardKey: 1}}}"
+        ",{$project: {shardKey: true, _id: false}}]" /*shardPipeJson*/,
+        "[{$group: {_id: '$shardKey'}}]" /*mergePipeJson*/,
+        shardKey);
+};
+
+TEST_F(PipelineOptimizations, ShouldNotPushdownGroupIfUsingAddFieldsWithoutShardFilteringDistinct) {
+    RAIIServerParameterControllerForTest controller("featureFlagShardFilteringDistinctScan", false);
+    const OrderedPathSet shardKey = {"shardKey"};
+    doTest(
+        "[{$addFields: {new: '$shardKey'}}, {$sort: {shardKey: 1}}, {$group: {_id: '$shardKey'}}]" /*inputPipeJson*/
+        ,
+        "[{$addFields: {new: '$shardKey'}}"
+        ",{$sort: {sortKey: {shardKey: 1}}}"
+        ",{$project: {shardKey: true, _id: false}}]" /*shardPipeJson*/,
+        "[{$group: {_id: '$shardKey'}}]" /*mergePipeJson*/,
+        shardKey);
+};
+
+TEST_F(PipelineOptimizations, ShouldPushdownGroupIfUsingAddFields) {
+    RAIIServerParameterControllerForTest controller("featureFlagShardFilteringDistinctScan", true);
+    const OrderedPathSet shardKey = {"shardKey"};
+    doTest(
+        "[{$addFields: {new: '$shardKey'}}, {$sort: {shardKey: 1}}, {$group: {_id: '$shardKey'}}]", /*inputPipeJson*/
+        "[{$addFields: {new: '$shardKey'}}"
+        ",{$sort: {sortKey: {shardKey: 1}}}"
+        ",{$group: {_id: '$shardKey'}}]",                     /*shardPipeJson*/
+        "[{$group: {_id: '$$ROOT._id', $doingMerge: true}}]", /*mergePipeJson*/
+        shardKey);
+};
+
+TEST_F(PipelineOptimizations, ShouldPushdownGroupOnShardKey) {
+    RAIIServerParameterControllerForTest controller("featureFlagShardFilteringDistinctScan", true);
+    const OrderedPathSet shardKey = {"_id"};
+    doTest("[{$sort: {a: 1}}, {$group: {_id: '$_id'}}]" /*inputPipeJson*/,
+           "[{$sort: {sortKey: {a: 1}}}, {$group: {_id: '$_id'}}]" /*shardPipeJson*/,
+           "[{$group: {_id: '$$ROOT._id', $doingMerge: true}}]" /*mergePipeJson*/,
+           shardKey);
+};
+
+TEST_F(PipelineOptimizations, ShouldPushdownGroupOnSupersetOfShardKey) {
+    RAIIServerParameterControllerForTest controller("featureFlagShardFilteringDistinctScan", true);
+    const OrderedPathSet shardKey = {"a", "b"};
+    doTest(
+        "[{$sort: {a: 1}}, {$group: {_id: {a: '$a', b: '$b', c: '$c'}}}]" /*inputPipeJson*/,
+        "[{$sort: {sortKey: {a: 1}}}, {$group: {_id: {a: '$a', b: '$b', c: '$c'}}}]" /*shardPipeJson*/
+        ,
+        "[{$group: {_id: '$$ROOT._id', $doingMerge: true}}]" /*mergePipeJson*/,
+        shardKey);
+};
+
+TEST_F(PipelineOptimizations, ShouldPushdownGroupOnSupersetOfShardKeyInArray) {
+    RAIIServerParameterControllerForTest controller("featureFlagShardFilteringDistinctScan", true);
+    const OrderedPathSet shardKey = {"a", "b"};
+    doTest("[{$sort: {a: 1}}, {$group: {_id: ['$a', '$b', '$c']}}]" /*inputPipeJson*/,
+           "[{$sort: {sortKey: {a: 1}}}, {$group: {_id: ['$a', '$b', '$c']}}]" /*shardPipeJson*/
+           ,
+           "[{$group: {_id: '$$ROOT._id', $doingMerge: true}}]" /*mergePipeJson*/,
+           shardKey);
+};
+
+TEST_F(PipelineOptimizations, ShouldPushdownGroupOnSupersetOfShardKeyInNestedStructure) {
+    RAIIServerParameterControllerForTest controller("featureFlagShardFilteringDistinctScan", true);
+    const OrderedPathSet shardKey = {"a", "b"};
+    doTest(
+        "[{$sort: {a: 1}}, {$group: {_id: {foo:[{bar:'$a'}, '$b', '$c']}}}]" /*inputPipeJson*/,
+        "[{$sort: {sortKey: {a: 1}}}, {$group: {_id: {foo:[{bar:'$a'}, '$b', '$c']}}}]" /*shardPipeJson*/
+        ,
+        "[{$group: {_id: '$$ROOT._id', $doingMerge: true}}]" /*mergePipeJson*/,
+        shardKey);
+};
+
+TEST_F(PipelineOptimizations, ShouldPushdownGroupOnSupersetOfShardKeyWithIrrelevantFieldsModified) {
+    RAIIServerParameterControllerForTest controller("featureFlagShardFilteringDistinctScan", true);
+    const OrderedPathSet shardKey = {"a", "b"};
+    doTest(
+        "[{$addFields: {c:{$const:'foobar'}}}, {$sort: {a: 1}}, {$group: {_id: ['$a', '$b', "
+        "'$c']}}]" /*inputPipeJson*/,
+        "[{$addFields: {c:{$const:'foobar'}}}, {$sort: {sortKey: {a: 1}}}, {$group: {_id: ['$a', "
+        "'$b', '$c']}}]" /*shardPipeJson*/
+        ,
+        "[{$group: {_id: '$$ROOT._id', $doingMerge: true}}]" /*mergePipeJson*/,
+        shardKey);
+};
+
+TEST_F(PipelineOptimizations, ShouldPushdownGroupOnShardKeyWithDuplicatesViaRenameProject) {
+    RAIIServerParameterControllerForTest controller("featureFlagShardFilteringDistinctScan", true);
+    const OrderedPathSet shardKey = {"a"};
+    doTest(
+        "[{$project:{'a':true, b:'$a'}}, {$sort: {a: 1}}, {$group: {_id: ['$a', '$b']}}]", /*inputPipeJson*/
+        "[{$project:{_id:true, 'a':true, b:'$a'}}, {$sort: {sortKey: {a: 1}}}, {$group: {_id: "
+        "['$a', '$b']}}]",                                    /*shardPipeJson*/
+        "[{$group: {_id: '$$ROOT._id', $doingMerge: true}}]", /*mergePipeJson*/
+        shardKey);
+};
+
+TEST_F(PipelineOptimizations, ShouldPushdownGroupOnShardKeyWithDuplicatesViaRenameAddFields) {
+    RAIIServerParameterControllerForTest controller("featureFlagShardFilteringDistinctScan", true);
+    const OrderedPathSet shardKey = {"a"};
+    doTest(
+        "[{$addFields:{b:'$a'}}, {$sort: {a: 1}}, {$group: {_id: ['$a', '$b']}}]", /*inputPipeJson*/
+        "[{$addFields:{b:'$a'}}, {$sort: {sortKey: {a: 1}}}, {$group: {_id: ['$a', '$b']}}]", /*shardPipeJson*/
+        "[{$group: {_id: '$$ROOT._id', $doingMerge: true}}]", /*mergePipeJson*/
+        shardKey);
+};
+
+TEST_F(PipelineOptimizations, ShouldPushdownGroupOnShardKeyWithUnrelatedExclusion) {
+    RAIIServerParameterControllerForTest controller("featureFlagShardFilteringDistinctScan", true);
+    const OrderedPathSet shardKey = {"a"};
+    doTest(
+        "[{$project:{'c':false}}, {$sort: {a: 1}}, {$group: {_id: ['$a', '$b']}}]", /*inputPipeJson*/
+        "[{$project:{'c':false, _id:true}}, {$sort: {sortKey: {a: 1}}}, {$group: {_id: ['$a', "
+        "'$b']}}]",                                           /*shardPipeJson*/
+        "[{$group: {_id: '$$ROOT._id', $doingMerge: true}}]", /*mergePipeJson*/
+        shardKey);
+};
+
+TEST_F(PipelineOptimizations, ShouldNotPushdownGroupIfComputesValue) {
+    // A group _id which is _derived_ from the shard key is not sufficient.
+    const OrderedPathSet shardKey = {"shardKey"};
+    doTest(
+        "[{$sort: {shardKey: 1}}, {$group: {_id: {'$add':[{$const: 1}, '$shardKey']}}}]", /*inputPipeJson*/
+        "[{$sort: {sortKey: {shardKey: 1}}} ,{$project: {shardKey: true, _id: false}}]", /*shardPipeJson*/
+        "[{$group: {_id: {'$add':[{$const: 1}, '$shardKey']}}}]" /*mergePipeJson*/,
+        shardKey);
+};
+
+TEST_F(PipelineOptimizations, ShouldPushdownGroupOnShardKeyWithRenames) {
+    RAIIServerParameterControllerForTest controller("featureFlagShardFilteringDistinctScan", true);
+    const OrderedPathSet shardKey = {"shardKey"};
+    doTest(
+        "[{$project: {rename: '$shardKey'}}"
+        ",{$project: {anotherRename: '$rename'}}"
+        ",{$sort: {anotherRename: 1}}"
+        ",{$group: {_id: '$anotherRename'}}]" /*inputPipeJson*/,
+        "[{$project: {_id: true, rename: '$shardKey'}}"
+        ",{$project: {_id: true, anotherRename: '$rename'}}"
+        ",{$sort: {sortKey: {anotherRename: 1}}}"
+        ",{$group: {_id: '$anotherRename'}}]" /*shardPipeJson*/,
+        "[{$group: {_id: '$$ROOT._id', $doingMerge: true}}]" /*mergePipeJson*/,
+        shardKey);
+};
+
+TEST_F(PipelineOptimizations, ShouldPushdownGroupOnShardKeyWithMultipleRenames) {
+    RAIIServerParameterControllerForTest controller("featureFlagShardFilteringDistinctScan", true);
+    const OrderedPathSet shardKey = {"shardKey"};
+    doTest(
+        "[{$project: {rename: '$shardKey'}}"
+        ",{$project: {anotherRename: '$rename', anotherRename2: '$rename'}}"
+        ",{$sort: {anotherRename2: 1}}"
+        ",{$group: {_id: '$anotherRename2'}}]" /*inputPipeJson*/,
+        "[{$project: {_id: true, rename: '$shardKey'}}"
+        ",{$project: {_id: true, anotherRename: '$rename', anotherRename2: '$rename'}}"
+        ",{$sort: {sortKey: {anotherRename2: 1}}}"
+        ",{$group: {_id: '$anotherRename2'}}]" /*shardPipeJson*/,
+        "[{$group: {_id: '$$ROOT._id', $doingMerge: true}}]" /*mergePipeJson*/,
+        shardKey);
+};
+
+TEST_F(PipelineOptimizations, ShouldPushdownGroupOnShardKeyWithMatchBetweenSortAndGroup) {
+    RAIIServerParameterControllerForTest controller("featureFlagShardFilteringDistinctScan", true);
+    const OrderedPathSet shardKey = {"shardKey"};
+    doTest(
+        "[{$sort: {shardKey: 1}}, {$match: {shardKey: 'val'}}, {$group: {_id: '$shardKey'}}]" /*inputPipeJson*/
+        ,
+        "[{$match: {shardKey: {$eq: 'val'}}}"
+        ",{$sort: {sortKey: {shardKey: 1}}}"
+        ",{$group: {_id: '$shardKey'}}]" /*shardPipeJson*/,
+        "[{$group: {_id: '$$ROOT._id', $doingMerge: true}}]" /*mergePipeJson*/,
+        shardKey);
+};
+
+TEST_F(PipelineOptimizations, ShouldPushdownGroupOnShardKeyWithFirstAccumulator) {
+    RAIIServerParameterControllerForTest controller("featureFlagShardFilteringDistinctScan", true);
+    const OrderedPathSet shardKey = {"shardKey"};
+    doTest(
+        "[{$sort: {shardKey: 1}}, {$group: {_id: '$shardKey', first: {$first: '$other'}}}]" /*inputPipeJson*/
+        ,
+        "[{$sort: {sortKey: {shardKey: 1}}}, {$group: {_id: '$shardKey', first: {$first: "
+        "'$other'}}}]" /*shardPipeJson*/,
+        "[{$group: {_id: '$$ROOT._id', first: {$first: '$$ROOT.first'}, $doingMerge: true}}]" /*mergePipeJson*/
+        ,
+        shardKey);
+};
+
+TEST_F(PipelineOptimizations, ShouldPushdownGroupOnShardKeyWithTopAccumulator) {
+    RAIIServerParameterControllerForTest controller("featureFlagShardFilteringDistinctScan", true);
+    const OrderedPathSet shardKey = {"shardKey"};
+    doTest(
+        "[{$sort: {shardKey: 1}}"
+        ",{$group: {_id: '$shardKey', top: {$top: {output: '$other', sortBy: {other: 1}}}}}]" /*inputPipeJson*/
+        ,
+        "[{$sort: {sortKey: {shardKey: 1}}}"
+        ",{$group: {_id: '$shardKey', top: {$top: {output: '$other', sortBy: {other: 1}}}}}]" /*shardPipeJson*/
+        ,
+        "[{$group: {_id: '$$ROOT._id', top: {$top: {output: '$$ROOT.top', sortBy: {other: 1}}}, "
+        "$doingMerge: true}}]" /*mergePipeJson*/,
+        shardKey);
+};
+
+}  // namespace pushDownGroupPrecededBySort
 
 namespace needsSpecificShardMerger {
 

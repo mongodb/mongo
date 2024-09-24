@@ -347,7 +347,9 @@ export function formatExplainRoot(explain) {
 
     if ("shards" in explain) {
         for (const [shardName, shardExplain] of Object.entries(explain["shards"])) {
-            res[shardName] = formatPipeline(shardExplain.stages);
+            res[shardName] = ("queryPlanner" in shardExplain)
+                ? formatQueryPlanner(shardExplain.queryPlanner)
+                : formatPipeline(shardExplain.stages);
         }
     } else if ("queryPlanner" in explain && "shards" in explain.queryPlanner.winningPlan) {
         res = {...res, ...invertShards(explain.queryPlanner)};

@@ -31,6 +31,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <compare>
 #include <cstddef>
 #include <iterator>
 #include <set>
@@ -982,6 +983,60 @@ bool containsEmptyPaths(const OrderedPathSet& testSet) {
 
 bool areIndependent(const OrderedPathSet& pathSet1, const OrderedPathSet& pathSet2) {
     return !containsDependency(pathSet1, pathSet2) && !containsDependency(pathSet2, pathSet1);
+}
+
+OrderedPathSet makeIndependent(OrderedPathSet testSet, const OrderedPathSet& toRemove) {
+    auto testItr = testSet.begin();
+    auto removalItr = toRemove.begin();
+
+    ThreeWayPathComparator comp;
+
+    while (testItr != testSet.end() && removalItr != toRemove.end()) {
+        const auto& path = *testItr;
+        const auto& removePath = *removalItr;
+
+        const auto res = comp(path, removePath);
+
+        if (std::is_lt(res)) {
+            // The currently considered path sorts before the current removePath.
+            // Therefore, it either doesn't match the path, or is a prefix.
+            if (isPathPrefixOf(path, removePath)) {
+                // `path` prefixes a path in toRemove. To make the sets independent,
+                // `path` must be erased.
+                // `removePath` may match more elements in `testSet`.
+                testItr = testSet.erase(testItr);
+            } else {
+                // `path` < `removePath`, but `path` is not a prefix of `removePath`.
+                // `toRemove` is sorted, so no later element of `toRemove` can match `path`.
+                // Thus, `path` should remain in `testSet`.
+                // `removePath` may match later elements in `testSet`.
+                ++testItr;
+            }
+        } else if (std::is_gt(res)) {
+            // `removePath` sorts _before_ the current path.
+            // `path` either prefixes `removePath`, or is unrelated.
+            if (isPathPrefixOf(removePath, path)) {
+                // A path in toRemove prefixes `path`. To make the sets independent,
+                // `path` must be erased.
+                // `removePath` may match more elements in `testSet`.
+                testItr = testSet.erase(testItr);
+            } else {
+                // `path` > `removePath`, but `path` is not prefixed by `removePath`.
+                // `path` _may_ match a later path in `toRemove`, so advance to the next
+                // element of `toRemove`.
+                // This is safe, as `removePath` can't match any later elements in `testSet`.
+                ++removalItr;
+            }
+        } else {
+            // !(a < b) && !(b < a) => a == b
+            // There is an exact matching path in `toRemove`.
+            // Remove it from `testSet`.
+            // `removePath` may match more elements in `testSet`.
+            testItr = testSet.erase(testItr);
+        }
+    }
+
+    return testSet;
 }
 
 template <typename E, typename... Args>

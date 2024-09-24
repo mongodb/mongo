@@ -139,6 +139,19 @@ bool areIndependent(const OrderedPathSet& pathSet1, const OrderedPathSet& pathSe
 bool containsDependency(const OrderedPathSet& testSet, const OrderedPathSet& prefixCandidates);
 
 /**
+ * Returns elements from testSet which:
+ *  * Do not appear in toRemove
+ *  * Are not prefixed by an element of toRemove
+ *  * Are not a prefix of an element of toRemove
+ *
+ * The remaining elements are paths which would be unaltered if all paths in toRemove were (e.g.,)
+ * erased.
+ *
+ * Post-condition: areIndependent(returnValue, toRemove) == true
+ */
+OrderedPathSet makeIndependent(OrderedPathSet testSet, const OrderedPathSet& toRemove);
+
+/**
  * Returns true if any of the paths in 'testSet' are an ancestor of any of the other paths in
  * 'testSet'. Examples:
  * containsOverlappingPaths([a.b, a]) --> true

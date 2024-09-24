@@ -46,12 +46,17 @@ public:
      * results within a merging process. This call also performs optimizations with the aim of
      * reducing computing time and network traffic when a pipeline has been split into two pieces.
      *
+     * The 'shardKeyPaths' represent the initial shard key at the start of the pipeline, which can
+     * be used to make splitting decisions (e.g. whether or not a $group can be pushed down to the
+     * shards).
+     *
      * The 'mergePipeline' returned as part of the SplitPipeline here is not ready to execute until
      * the 'shardsPipeline' has been sent to the shards and cursors have been established. Once
      * cursors have been established, the merge pipeline can be made executable by calling
      * 'addMergeCursorsSource()'.
      */
-    static SplitPipeline split(std::unique_ptr<Pipeline, PipelineDeleter> pipelineToSplit);
+    static SplitPipeline split(std::unique_ptr<Pipeline, PipelineDeleter> pipelineToSplit,
+                               boost::optional<OrderedPathSet> shardKeyPaths = boost::none);
 
     /**
      * Creates a SplitPipeline using the given pipeline as the 'mergePipeline', where the

@@ -576,7 +576,8 @@ DocumentSourceMatch::splitMatchByModifiedFields(
                 preservedPaths.insert(rename.first);
             }
             modifiedPaths =
-                semantic_analysis::extractModifiedDependencies(depsTracker.fields, preservedPaths);
+                semantic_analysis::extractModifiedDependencies(depsTracker.fields, preservedPaths)
+                    .modified;
         }
     }
     return std::move(*match).splitSourceBy(modifiedPaths, modifiedPathsRet.renames);

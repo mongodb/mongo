@@ -404,6 +404,34 @@ TEST_F(DocumentSourceGroupTest, CanOutputExectionStatsExplainWithoutProcessingDo
                        group->serialize(explainOpts).getDocument());
 }
 
+TEST_F(DocumentSourceGroupTest, CorrectlyReportsTriviallyReferencedExprsFromID) {
+    // Verify that DocumentSourceGroupBase::getTriviallyReferencedPaths identifies paths which are
+    // used directly, without further computation - "trivially" referenced.
+    const auto getTriviallyReferenced = [&](StringData idJsonStr) {
+        auto idExpr = fromjson(idJsonStr);
+        auto spec = BSON("$group" << BSON("_id" << idExpr));
+        auto group = boost::dynamic_pointer_cast<DocumentSourceGroup>(
+            DocumentSourceGroup::createFromBson(spec.firstElement(), getExpCtx()));
+        return group->getTriviallyReferencedPaths();
+    };
+    const auto expect = [&](StringData idJsonStr, OrderedPathSet expected) {
+        auto actual = getTriviallyReferenced(idJsonStr);
+        ASSERT_EQ(actual, expected) << fmt::format(
+            "_id:{}, [{}] != [{}]", idJsonStr, fmt::join(actual, ", "), fmt::join(expected, ", "));
+    };
+    expect(R"(["$a"])", {"a"});
+    expect(R"(["$a", "$a"])", {"a"});
+    expect(R"({"foo":"$a"})", {"a"});
+    expect(R"({"foo":"$a", "bar":"$a"})", {"a"});
+
+    expect(R"(["$a", "$b"])", {"a", "b"});
+    expect(R"({"foo":"$a", "bar":"$b"})", {"a", "b"});
+
+    expect(R"({"foo":["$a", "$b"]})", {"a", "b"});
+    expect(R"([{"foo":["$a", "$b"]}])", {"a", "b"});
+}
+
+
 BSONObj toBson(const boost::intrusive_ptr<DocumentSource>& source) {
     std::vector<Value> arr;
     source->serializeToArray(arr);
