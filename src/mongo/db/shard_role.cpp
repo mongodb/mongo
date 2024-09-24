@@ -72,6 +72,7 @@
 #include "mongo/logv2/log.h"
 #include "mongo/logv2/log_attr.h"
 #include "mongo/logv2/log_component.h"
+#include "mongo/logv2/log_severity_suppressor.h"
 #include "mongo/logv2/redaction.h"
 #include "mongo/s/shard_version.h"
 #include "mongo/s/stale_exception.h"
@@ -1831,6 +1832,16 @@ void shard_role_details::checkShardingAndLocalCatalogCollectionUUIDMatch(
                     collectionPtr ? collectionPtr->uuid().toString() : ""));
         } else {
             // TODO: SERVER-88476: reintroduce tassert here similar to the uassert above.
+            static logv2::SeveritySuppressor logSeverity{
+                Minutes{1}, logv2::LogSeverity::Warning(), logv2::LogSeverity::Debug(5)};
+            auto clusterUuidString = shardingCollectionDescription.getUUID().toString();
+            auto localUuidString = collectionPtr ? collectionPtr->uuid().toString() : "";
+            LOGV2_DEBUG(9087200,
+                        logSeverity().toInt(),
+                        "Sharding catalog and local catalog collection uuid do not match",
+                        "nss"_attr = nss.toStringForErrorMsg(),
+                        "sharding uuid"_attr = clusterUuidString,
+                        "local uuid"_attr = localUuidString);
         }
     }
 }
