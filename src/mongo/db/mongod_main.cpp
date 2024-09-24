@@ -2056,7 +2056,7 @@ void shutdownTask(const ShutdownTaskArgs& shutdownArgs) {
             serviceContext->getFastClockSource(),
             "Wait for the oplog cap maintainer thread to stop",
             &shutdownTimeElapsedBuilder);
-        OplogCapMaintainerThread::get(serviceContext)->waitForFinish();
+        OplogCapMaintainerThread::get(serviceContext)->shutdown();
     }
 
     // We should always be able to acquire the global lock at shutdown.

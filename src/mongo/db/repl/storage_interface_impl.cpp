@@ -1510,7 +1510,7 @@ void StorageInterfaceImpl::initializeStorageControlsForReplication(
     if (serviceCtx->getStorageEngine()->supportsOplogTruncateMarkers() &&
         !storageGlobalParams.restore) {
         auto maintainerThread = OplogCapMaintainerThread::get(serviceCtx);
-        maintainerThread->go();
+        maintainerThread->start();
     }
 }
 

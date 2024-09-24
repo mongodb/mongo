@@ -27,12 +27,11 @@
  *    it in the license file.
  */
 
+#include "oplog_cap_maintainer_thread.h"
 
 #include <exception>
 #include <mutex>
 #include <utility>
-
-#include "oplog_cap_maintainer_thread.h"
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
@@ -120,9 +119,18 @@ bool OplogCapMaintainerThread::_deleteExcessDocuments(OperationContext* opCtx) {
     return true;
 }
 
-void OplogCapMaintainerThread::run() {
-    LOGV2_DEBUG(5295000, 1, "Oplog cap maintainer thread started", "threadName"_attr = _name);
-    ThreadClient tc(_name, getGlobalServiceContext()->getService(ClusterRole::ShardServer));
+void OplogCapMaintainerThread::start() {
+    massert(4204300, "OplogCapMaintainerThread already started", !_thread.joinable());
+    _thread = stdx::thread(&OplogCapMaintainerThread::_run, this);
+}
+
+void OplogCapMaintainerThread::_run() {
+    std::string name = std::string("OplogCapMaintainerThread-") +
+        toStringForLogging(NamespaceString::kRsOplogNamespace);
+    setThreadName(name);
+
+    LOGV2_DEBUG(5295000, 1, "Oplog cap maintainer thread started", "threadName"_attr = name);
+    ThreadClient tc(name, getGlobalServiceContext()->getService(ClusterRole::ShardServer));
 
     {
         stdx::lock_guard<Client> lk(*tc.get());
@@ -180,10 +188,10 @@ void OplogCapMaintainerThread::run() {
     MONGO_UNREACHABLE;
 }
 
-void OplogCapMaintainerThread::waitForFinish() {
-    if (running()) {
+void OplogCapMaintainerThread::shutdown() {
+    if (_thread.joinable()) {
         LOGV2_INFO(7474902, "Shutting down oplog cap maintainer thread");
-        wait();
+        _thread.join();
         LOGV2(7474901, "Finished shutting down oplog cap maintainer thread");
     }
 }
