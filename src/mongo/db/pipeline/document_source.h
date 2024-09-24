@@ -958,7 +958,12 @@ protected:
      * Tracks this stage's merge ShardId, if one exists.
      */
     DeferredFn<boost::optional<ShardId>> mergeShardId{[this]() -> boost::optional<ShardId> {
-        return this->computeMergeShardId();
+        auto shardId = this->computeMergeShardId();
+        tassert(9514400,
+                str::stream() << "ShardId must be either boost::none or valid, but got "
+                              << (shardId ? shardId->toString() : "boost::none"),
+                !shardId || shardId->isValid());
+        return shardId;
     }};
 
 private:

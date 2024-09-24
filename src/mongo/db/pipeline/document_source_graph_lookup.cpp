@@ -256,7 +256,14 @@ boost::optional<ShardId> DocumentSourceGraphLookUp::computeMergeShardId() const 
                                                                                _from);
         }
     } else {
-        return ShardingState::get(pExpCtx->opCtx)->shardId();
+        auto shardId = ShardingState::get(pExpCtx->opCtx)->shardId();
+        // If the command is executed on a mongos, we might get an empty shardId. We should return a
+        // shardId only if it is valid (non-empty).
+        if (shardId.isValid()) {
+            return shardId;
+        } else {
+            return boost::none;
+        }
     }
     return boost::none;
 }
