@@ -2,15 +2,7 @@ version: 1.0.0
 filters:
   - "*":
     approvers:
-      - cswanson310
-      - awagenmaker
-      - TedTuckman
-    metadata:
-      owning_team: 10gen/query-integration
+      - 10gen/query-integration-observability
   - "OWNERS.yml":
     approvers:
-      - awagenmaker
-      - banarun
-      - TedTuckman
-    metadata:
-      owning_team: 10gen/query-integration
+      - 10gen/query-integration-staff-leads

@@ -10,12 +10,7 @@ filters:
       - 10gen/query-optimization
   - "cluster_current_op.cpp":
     approvers:
-      - awagenmaker
-      - cswanson310
-      - banarun
-      - TedTuckman
-    metadata:
-      owning_team: 10gen/query-integration
+      - 10gen/query-integration-observability
   - "cluster_index_filter_cmd.cpp":
     approvers:
       - 10gen/query-optimization
@@ -24,9 +19,4 @@ filters:
       - 10gen/query-optimization
   - "cluster_profile_cmd.cpp":
     approvers:
-      - cswanson310
-      - awagenmaker
-      - TedTuckman
-      - banarun
-    metadata:
-      owning_team: 10gen/query-integration
+      - 10gen/query-integration-observability

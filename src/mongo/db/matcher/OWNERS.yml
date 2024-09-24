@@ -14,38 +14,20 @@ filters:
   # These files are related to field level encryption, which is owned by QI.
   - "implicit_validator*":
     approvers:
-      - cswanson310
-      - TedTuckman
-      - awagenmaker
-    metadata:
-      owning_team: 10gen/query-integration
+      - 10gen/query-integration-fle
   - "rewrite_expr*":
     approvers:
       - 10gen/query-optimization
   - "expression_geo*":
     approvers:
-      - TedTuckman
-      - wbuerger46
-      - banarun
-    metadata:
-      owning_team: 10gen/query-integration
+      - 10gen/query-integration-geo
   - "expression_text*":
     approvers:
-      - TedTuckman
-      - banarun
-      - cswanson310
-      - awagenmaker
-    metadata:
-      owning_team: 10gen/query-integration
+      - 10gen/query-integration-staff-leads
   # The JS engine is owned by QI.
   - "expression_where*":
     approvers:
-      - TedTuckman
-      - banarun
-      - cswanson310
-      - awagenmaker
-    metadata:
-      owning_team: 10gen/query-integration
+      - 10gen/query-integration-staff-leads
 
   # These files are related to boolean simplification and thus owned by QO.
   - "expression_bitset_tree_converter*":

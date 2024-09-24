@@ -10,15 +10,7 @@ filters:
       - 10gen/query-execution
   - "top*":
     approvers:
-      - awagenmaker
-      - cswanson310
-      - TedTuckman
-    metadata:
-      owning_team: 10gen/query-integration
+      - 10gen/query-integration-observability
   - "latency_server_status_section.cpp":
     approvers:
-      - awagenmaker
-      - banarun
-      - TedTuckman
-    metadata:
-      owning_team: 10gen/query-integration
+      - 10gen/query-integration-observability

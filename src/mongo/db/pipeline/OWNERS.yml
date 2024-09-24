@@ -29,109 +29,52 @@ filters:
       - 10gen/query-optimization
   - "document_source_current_op*":
     approvers:
-      - TedTuckman
-      - banarun
-      - awagenmaker
-      - cswanson310
-    metadata:
-      owning_team: 10gen/query-integration
+      - 10gen/query-integration-observability
   - "document_source_densify*":
     approvers:
-      - TedTuckman
-      - cswanson310
-      - banarun
-    metadata:
-      owning_team: 10gen/query-integration
+      - 10gen/query-integration-analytic-extensions
   - "document_source_fill*":
     approvers:
-      - TedTuckman
-      - cswanson310
-      - banarun
-    metadata:
-      owning_team: 10gen/query-integration
+      - 10gen/query-integration-analytic-extensions
   - "document_source_hybrid_scoring*":
     approvers:
-      - TedTuckman
-      - cswanson310
-      - banarun
-    metadata:
-      owning_team: 10gen/query-integration
+      - 10gen/query-integration-search
   - "document_source_index_stats*":
     approvers:
       - 10gen/query-execution
   - "document_source_internal_unpack_bucket*":
     approvers:
-      - banarun
-      - wolffcm
-      - galon1
-      - yun-soo
-    metadata:
-      owning_team: 10gen/query-integration
+      - 10gen/query-integration-timeseries
   - "document_source_internal_convert_bucket_index_stats*":
     approvers:
-      - banarun
-      - wolffcm
-      - galon1
-      - yun-soo
-    metadata:
-      owning_team: 10gen/query-integration
+      - 10gen/query-integration-timeseries
   - "document_source_parsing_validators*":
     approvers:
       - 10gen/query-optimization
   - "document_source_query_stats*":
     approvers:
-      - cswanson310
-      - awagenmaker
-      - TedTuckman
-    metadata:
-      owning_team: 10gen/query-integration
+      - 10gen/query-integration-observability
   - "document_source_rank_fusion*":
     approvers:
-      - TedTuckman
-      - cswanson310
-      - banarun
-    metadata:
-      owning_team: 10gen/query-integration
+      - 10gen/query-integration-search
   - "document_source_score*":
     approvers:
-      - TedTuckman
-      - cswanson310
-      - banarun
-    metadata:
-      owning_team: 10gen/query-integration
+      - 10gen/query-integration-search
   - "document_source_score_fusion*":
     approvers:
-      - TedTuckman
-      - cswanson310
-      - banarun
-    metadata:
-      owning_team: 10gen/query-integration
+      - 10gen/query-integration-search
   - "document_source_set_window_fields*":
     approvers:
-      - TedTuckman
-      - cswanson310
-      - banarun
-    metadata:
-      owning_team: 10gen/query-integration
+      - 10gen/query-integration-analytic-extensions
   - "granularity_rounder*":
     approvers:
       - 10gen/query-execution
   - "javascript_execution*":
     approvers:
-      - TedTuckman
-      - banarun
-      - cswanson310
-      - awagenmaker
-    metadata:
-      owning_team: 10gen/query-integration
+      - 10gen/query-integration-javascript
   - "make_js_function*":
     approvers:
-      - TedTuckman
-      - banarun
-      - cswanson310
-      - awagenmaker
-    metadata:
-      owning_team: 10gen/query-integration
+      - 10gen/query-integration-javascript
   - "group_processor*":
     approvers:
       - 10gen/query-execution
@@ -145,11 +88,7 @@ filters:
   # QI.
   - "percentile_algo*":
     approvers:
-      - TedTuckman
-      - cswanson310
-      - banarun
-    metadata:
-      owning_team: 10gen/query-integration
+      - 10gen/query-integration-analytic-extensions
   - "plan_executor_pipeline*":
     approvers:
       - 10gen/query-execution

@@ -74,12 +74,7 @@ filters:
       - 10gen/server-catalog-and-routing
   - "sharding_expressions*":
     approvers:
-      - banarun
-      - awagenmaker
-      - cswanson310
-      - TedTuckman
-    metadata:
-      owning_team: 10gen/query-integration
+      - 10gen/query-integration-staff-leads
   - "cluster_query_without_shard_key_cmd.cpp":
     approvers:
       - 10gen/query-execution

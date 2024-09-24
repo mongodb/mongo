@@ -2,5 +2,4 @@ version: 1.0.0
 filters:
   - "*":
     approvers:
-      - madelinezec
-      - TedTuckman
+      - 10gen/query-integration-search-testing

@@ -2,16 +2,7 @@ version: 1.0.0
 filters:
   - "*":
     approvers:
-      - banarun
-      - wolffcm
-      - galon1
-      - yun-soo
-    metadata:
-      owning_team: 10gen/query-integration
+      - 10gen/query-integration-timeseries
   - "OWNERS.yml":
     approvers:
-      - awagenmaker
-      - banarun
-      - TedTuckman
-    metadata:
-      owning_team: 10gen/query-integration
+      - 10gen/query-integration-staff-leads

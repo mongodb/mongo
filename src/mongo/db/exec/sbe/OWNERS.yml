@@ -2,17 +2,7 @@ version: 1.0.0
 filters:
   - "*columnar*":
     approvers:
-      - TedTuckman
-      - banarun
-      - cswanson310
-      - awagenmaker
-    metadata:
-      owning_team: 10gen/query-integration
+      - 10gen/query-integration-staff-leads
   - "*column_store*":
     approvers:
-      - TedTuckman
-      - banarun
-      - cswanson310
-      - awagenmaker
-    metadata:
-      owning_team: 10gen/query-integration
+      - 10gen/query-integration-staff-leads

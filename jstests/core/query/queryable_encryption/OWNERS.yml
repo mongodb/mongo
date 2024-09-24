@@ -3,10 +3,4 @@ filters:
   - "*":
     approvers:
       - 10gen/server-security
-      - awagenmaker
-      - TedTuckman
-      - banarun
-    metadata:
-      owning_team:
-        - 10gen/query-integration
-        - 10gen/server-security
+      - 10gen/query-integration-fle

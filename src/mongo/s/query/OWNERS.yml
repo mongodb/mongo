@@ -5,9 +5,4 @@ filters:
       - 10gen/query
   - "document_source_visitor_docs_needed_bounds*":
     approvers:
-      - wbuerger46
-      - banarun
-      - cswanson310
-      - TedTuckman
-    metadata:
-      owning_team: 10gen/query-integration
+      - 10gen/query-integration-search

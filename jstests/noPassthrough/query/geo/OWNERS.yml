@@ -2,8 +2,4 @@ version: 1.0.0
 filters:
   - "*":
     approvers:
-      - wbuerger46
-      - TedTuckman
-      - banarun
-    metadata:
-      owning_team: 10gen/query-integration
+      - 10gen/query-integration-geo

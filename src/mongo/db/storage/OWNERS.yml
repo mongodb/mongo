@@ -6,19 +6,10 @@ filters:
       - 10gen/server-rss-sydney
   - "named_pipe*":
     approvers:
-      - banarun
-      - yun-soo
-      - TedTuckman
-    metadata:
-      owning_team: 10gen/query-integration
+      - 10gen/query-integration-staff-leads
   - "column_store*":
     approvers:
-      - banarun
-      - yun-soo
-      - TedTuckman
-      - cswanson310
-    metadata:
-      owning_team: 10gen/query-integration
+      - 10gen/query-integration-staff-leads
   - "durable_catalog*":
     approvers:
       - 10gen/server-catalog-and-routing

@@ -5,11 +5,7 @@ filters:
       - 10gen/query
   - "*query_stats*":
     approvers:
-      - cswanson310
-      - awagenmaker
-      - TedTuckman
-    metadata:
-      owning_team: 10gen/query-integration
+      - 10gen/query-integration-observability
   - "plan_cache*":
     approvers:
       - 10gen/query-optimization

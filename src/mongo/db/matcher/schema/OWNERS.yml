@@ -7,15 +7,7 @@ filters:
       - 10gen/query
   - "encrypt_keyword*":
     approvers:
-      - TedTuckman
-      - awagenmaker
-      - banarun
-    metadata:
-      owning_team: 10gen/query-integration
+      - 10gen/query-integration-fle
   - "encrypt_schema*":
     approvers:
-      - TedTuckman
-      - awagenmaker
-      - banarun
-    metadata:
-      owning_team: 10gen/query-integration
+      - 10gen/query-integration-fle

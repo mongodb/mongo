@@ -23,11 +23,7 @@ filters:
       - 10gen/server-security
   - "search_*":
     approvers:
-      - TedTuckman
-      - cswanson310
-      - madelinezec
-    metadata:
-      owning_team: 10gen/query-integration
+      - 10gen/query-integration-search
   - "validate.cpp":
     approvers:
       - 10gen/server-storage-execution
@@ -52,25 +48,13 @@ filters:
       - 10gen/server-catalog-and-routing
   - "profile*":
     approvers:
-      - awagenmaker
-      - cswanson310
-      - TedTuckman
-    metadata:
-      owning_team: 10gen/query-integration
+      - 10gen/query-integration-observability
   - "set_profiling_filter_globally_cmd*":
     approvers:
-      - awagenmaker
-      - cswanson310
-      - TedTuckman
-    metadata:
-      owning_team: 10gen/query-integration
+      - 10gen/query-integration-observability
   - "top_command.cpp":
     approvers:
-      - awagenmaker
-      - cswanson310
-      - TedTuckman
-    metadata:
-      owning_team: 10gen/query-integration
+      - 10gen/query-integration-observability
   - "dbcheck*":
     approvers:
       - 10gen/server-replication
