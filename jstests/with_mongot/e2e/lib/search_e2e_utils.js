@@ -2,10 +2,6 @@
  * Contains common test utilities for e2e search tests involving mongot.
  */
 import {stringifyArray} from "jstests/aggregation/extras/utils.js";
-import {
-    getAggPlanStages,
-} from "jstests/libs/analyze_plan.js";
-import {verifyShardsPartExplainOutput} from "jstests/with_mongot/common_utils.js";
 
 /**
  * This function is used in place of direct assertions between expected and actual document array
@@ -247,45 +243,4 @@ export function assertDocArrExpectedFuzzy(expectedDocArr,
 export function waitUntilDocIsVisibleByQuery({docId, coll, queryPipeline}) {
     assert.soon(() =>
                     coll.aggregate(queryPipeline.concat([{$match: {_id: docId}}])).itcount() === 1);
-}
-
-/**
- * This function checks that the explain output for $search queries from an e2e test contains the
- * information that it should.
- * @param {Object} explainOutput the results from running coll.explain().aggregate([[$search: ....],
- *     ...])
- * @param {string} stageType ex. "$_internalSearchMongotRemote" , "$_internalSearchIdLookup "
- * @param {string} verbosity The verbosity of explain. "nReturned" and "executionTimeMillisEstimate"
- *     will not be checked for 'queryPlanner' verbosity "
- * @param {NumberLong} nReturned not needed if verbosity is 'queryPlanner'. For a sharded scenario,
- *     this should be the total returned across all shards.
- */
-export function verifyE2ESearchExplainOutput(
-    {explainOutput, stageType, verbosity, nReturned = null}) {
-    if (explainOutput.hasOwnProperty("splitPipeline")) {
-        // We check metadata and protocol version for sharded $search.
-        verifyShardsPartExplainOutput({result: explainOutput, searchType: "$search"});
-    }
-    let totalNReturned = 0;
-    let stages = getAggPlanStages(explainOutput, stageType);
-    assert(stages.length > 0,
-           "There should be at least one stage corresponding to " + stageType +
-               " in the explain output. " + tojson(explainOutput));
-    // In a sharded scenario, there may be multiple stages. For an unsharded scenario, there is
-    // only one stage.
-    for (let stage of stages) {
-        if (verbosity != "queryPlanner") {
-            assert(stage.hasOwnProperty("nReturned"));
-            assert(stage.hasOwnProperty("executionTimeMillisEstimate"));
-            totalNReturned += stage["nReturned"];
-        }
-        // Non $_internalSearchIdLookup stages must contain an explain object.
-        if (stageType != "$_internalSearchIdLookup") {
-            const explainStage = stage[stageType];
-            assert(explainStage.hasOwnProperty("explain"), explainStage);
-        }
-    }
-    if (verbosity != "queryPlanner") {
-        assert.eq(totalNReturned, nReturned);
-    }
 }

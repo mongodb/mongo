@@ -7,18 +7,10 @@
  */
 
 import {getAggPlanStages, getUnionWithStage} from "jstests/libs/analyze_plan.js";
-import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
-import {checkSbeRestrictedOrFullyEnabled} from "jstests/libs/sbe_util.js";
 import {prepareUnionWithExplain} from "jstests/with_mongot/common_utils.js";
 import {
     verifyE2ESearchExplainOutput,
-} from "jstests/with_mongot/e2e/lib/search_e2e_utils.js";
-
-if (checkSbeRestrictedOrFullyEnabled(db) &&
-    FeatureFlagUtil.isPresentAndEnabled(db.getMongo(), 'SearchInSbe')) {
-    jsTestLog("Skipping the test because it only applies to $search in classic engine.");
-    quit();
-}
+} from "jstests/with_mongot/e2e/lib/explain_utils.js";
 
 const coll = db[jsTestName()];
 coll.drop();

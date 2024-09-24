@@ -61,11 +61,54 @@ export function prepareUnionWithExplain(unionSubExplain) {
             "updated in order to replicate a non-unionWith explain object. " +
             tojson(unionSubExplain));
 
-    // The first stage of the explain array should be a $search stage.
+    // The first stage of the explain array should be a initial mongot stage.
     assert(Object.keys(unionSubExplain[0]).includes("$_internalSearchMongotRemote") ||
                Object.keys(unionSubExplain[0]).includes("$searchMeta") ||
                Object.keys(unionSubExplain[0]).includes("$vectorSearch"),
-           "The first stage of the array should be a search stage.");
+           "The first stage of the array should be a mongot stage.");
 
     return {stages: unionSubExplain};
+}
+
+const mongotStages =
+    ["$_internalSearchMongotRemote", "$searchMeta", "$_internalSearchIdLookup", "$vectorSearch"];
+
+/**
+ * Validates that the mongot stage from the explain output includes the required execution metrics.
+ *
+ * @param {Object} stage The object representing a mongot stage ($_internalSearchMongotRemote,
+ *     $searchMeta, $_internalSearchIdLookup) from explain output.
+ * @param {string} stageType ex. "$_internalSearchMongotRemote" , "$searchMeta",
+ *     "$_internalSearchIdLookup", "$vectorSearch"
+ * @param {string} verbosity The verbosity of explain. "nReturned" and "executionTimeMillisEstimate"
+ *     will not be checked for 'queryPlanner' verbosity "
+ * @param {NumberLong} nReturned The number of documents that should be returned in the
+ *     mongot stage. Optional for "queryPlanner" verbosity.
+ * @param {Object} explain The explain object that the stage should contain.
+ * @param {Boolean} isE2E True if this function is being called for an e2e test. Since an e2e test
+ *     uses an actual mongot, we don't know the value of the explain object and cannot check it.
+ */
+export function validateMongotStageExplainExecutionStats(
+    {stage, stageType, verbosity, nReturned = null, explain = null, isE2E = false}) {
+    assert(mongotStages.includes(stageType),
+           "stageType must be a mongot stage found in mongotStages.");
+    assert(stage[stageType],
+           "Given stage isn't the expected stage. " + stageType + " is not found.");
+
+    if (verbosity != "queryPlanner") {
+        assert(stage.hasOwnProperty("nReturned"));
+        assert.eq(nReturned, stage["nReturned"]);
+        assert(stage.hasOwnProperty("executionTimeMillisEstimate"));
+    }
+
+    // Non $_internalSearchIdLookup mongot stages must contain an explain object.
+    if (stageType != "$_internalSearchIdLookup") {
+        const explainStage = stage[stageType];
+        assert(explainStage.hasOwnProperty("explain"), explainStage);
+        // We don't know the actual value of the explain object for e2e tests and can't check it.
+        if (!isE2E) {
+            assert(explain, "Explain is null but needs to be provided for initial mongot stage.");
+            assert.eq(explain, explainStage["explain"]);
+        }
+    }
 }
