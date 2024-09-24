@@ -17,6 +17,7 @@ env.SConscript(
         "ce",
         "client_cursor",
         "collation",
+        "cost_based_ranker",
         "datetime",
         "optimizer",
         "plan_cache",

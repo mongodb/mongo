@@ -1,0 +1,23 @@
+Import("env")
+
+env = env.Clone()
+
+env.Library(
+    target="cost_based_ranker",
+    source=[
+        "estimates.cpp",
+    ],
+    LIBDEPS=[
+        "$BUILD_DIR/mongo/base",
+    ],
+)
+
+env.CppUnitTest(
+    target="cost_based_ranker_test",
+    source=[
+        "estimates_test.cpp",
+    ],
+    LIBDEPS=[
+        "cost_based_ranker",
+    ],
+)

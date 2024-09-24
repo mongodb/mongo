@@ -140,7 +140,7 @@ public:
     ProfilerTestFixture()
         : profilerTags(), profiler(&profilerTags, {5, 5}), shard(profiler.createShard()) {}
 
-    template <ConstString name>
+    template <FixedString name>
     MONGO_COMPILER_ALWAYS_INLINE Profiler::SpanState enterSpan() {
         return shard->enterSpan(profilerTags.getOrInsertTag(name).id, &clock);
     }

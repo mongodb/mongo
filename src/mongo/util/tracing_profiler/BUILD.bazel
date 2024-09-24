@@ -16,6 +16,7 @@ mongo_cc_library(
         "//src/mongo/util/tracing_profiler/internal:profiler_internal.cpp",
     ],
     hdrs = [
+        "//src/mongo/util:fixed_string.h",
         "//src/mongo/util/tracing_profiler/internal:cycleclock.h",
         "//src/mongo/util/tracing_profiler/internal:profiler_internal.h",
     ],

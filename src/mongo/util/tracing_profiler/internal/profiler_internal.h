@@ -42,6 +42,7 @@
 #include "mongo/stdx/mutex.h"
 #include "mongo/stdx/unordered_set.h"
 #include "mongo/util/aligned.h"
+#include "mongo/util/fixed_string.h"
 #include "mongo/util/overloaded_visitor.h"
 #include "mongo/util/tracing_profiler/internal/cycleclock.h"
 
@@ -70,23 +71,6 @@ struct TagIdHash {
         return x;
     }
 };
-
-/**
- * Utility struct that allows strings to be represented as template arguments.
- */
-template <unsigned N>
-struct ConstString {
-    char buf[N + 1]{};
-    constexpr ConstString(char const* s) {
-        for (unsigned i = 0; i < N; ++i)
-            buf[i] = s[i];
-    }
-    constexpr operator char const *() const {
-        return buf;
-    }
-};
-template <unsigned N>
-ConstString(char const (&)[N]) -> ConstString<N - 1>;
 
 /**
  * A profiled tag that combines tags id and it's string representation.
@@ -118,7 +102,7 @@ private:
  * A utility that performs compile time binding of a template string argument to a sequential and
  * unique tags id.
  */
-template <ConstString name>
+template <FixedString name>
 struct ProfilerTagSource {
 
     static TagId id;
@@ -131,7 +115,7 @@ struct ProfilerTagSource {
         return ProfilerTag{id, name};
     }
 };
-template <ConstString name>
+template <FixedString name>
 TagId ProfilerTagSource<name>::id = ProfilerTags::get()->getOrInsertTag(name).id;
 
 /**
@@ -586,7 +570,7 @@ public:
         return shard ? shard : (_tlShard = _profiler.createShard()).get();
     }
 
-    template <ConstString name>
+    template <FixedString name>
     MONGO_COMPILER_ALWAYS_INLINE [[nodiscard]] static ProfilerSpan enterSpan() {
         auto shard = GlobalProfilerService::getShard();
         return ProfilerSpan(shard,
