@@ -72,6 +72,11 @@ generate_config_header(
             "MONGO_CONFIG_OCSP_STAPLING_ENABLED": "1",
         },
         "//conditions:default": {},
+    }) | select({
+        "//bazel/config:use_tracing_profiler_enabled": {
+            "MONGO_CONFIG_USE_TRACING_PROFILER": "1",
+        },
+        "//conditions:default": {},
     }),
     logfile = "mongo_config.log",
     output = "config.h",

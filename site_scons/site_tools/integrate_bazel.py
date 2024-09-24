@@ -828,6 +828,7 @@ def generate(env: SCons.Environment.Environment) -> None:
         f'--//bazel/config:use_disable_ref_track={False if env.GetOption("disable-ref-track") is None else True}',
         f'--//bazel/config:use_wiredtiger={True if env.GetOption("wiredtiger") == "on" else False}',
         f'--//bazel/config:use_glibcxx_debug={env.GetOption("use-glibcxx-debug") is not None}',
+        f'--//bazel/config:use_tracing_profiler={env.GetOption("use-tracing-profiler") == "on"}',
         f'--//bazel/config:build_grpc={True if env["ENABLE_GRPC_BUILD"] else False}',
         f'--//bazel/config:use_libcxx={env.GetOption("libc++") is not None}',
         f'--//bazel/config:detect_odr_violations={env.GetOption("detect-odr-violations") is not None}',
