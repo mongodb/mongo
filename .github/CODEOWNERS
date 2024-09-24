@@ -276,6 +276,9 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 # The following patterns are parsed from ./jstests/noPassthrough/admission/OWNERS.yml
 /jstests/noPassthrough/admission/**/* @10gen/server-workload-scheduling @svc-auto-approve-bot
 
+# The following patterns are parsed from ./jstests/noPassthrough/configuration/OWNERS.yml
+/jstests/noPassthrough/configuration/**/configExpand_* @10gen/server-security @svc-auto-approve-bot
+
 # The following patterns are parsed from ./jstests/noPassthrough/query/OWNERS.yml
 /jstests/noPassthrough/query/**/* @10gen/query @svc-auto-approve-bot
 /jstests/noPassthrough/query/**/and_hash.js @10gen/query-optimization @svc-auto-approve-bot
@@ -335,6 +338,9 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 
 # The following patterns are parsed from ./jstests/noPassthrough/rs_endpoint/OWNERS.yml
 /jstests/noPassthrough/rs_endpoint/**/* @10gen/server-cluster-scalability @svc-auto-approve-bot
+
+# The following patterns are parsed from ./jstests/noPassthrough/security/OWNERS.yml
+/jstests/noPassthrough/security/**/* @10gen/server-security @svc-auto-approve-bot
 
 # The following patterns are parsed from ./jstests/noPassthrough/timeseries/OWNERS.yml
 /jstests/noPassthrough/timeseries/**/* @10gen/server-storage-execution @svc-auto-approve-bot

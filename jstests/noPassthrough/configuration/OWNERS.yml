@@ -1,0 +1,5 @@
+version: 1.0.0
+filters:
+  - "configExpand_*":
+    approvers:
+      - 10gen/server-security
