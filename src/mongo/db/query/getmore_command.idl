@@ -33,7 +33,7 @@ global:
 
 imports:
     - "mongo/db/basic_types.idl"
-    - "mongo/db/query/cursor_response.idl"
+    - "mongo/db/query/client_cursor/cursor_response.idl"
     - "mongo/db/repl/replication_types.idl"
 
 commands:

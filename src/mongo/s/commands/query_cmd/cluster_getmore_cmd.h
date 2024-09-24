@@ -33,7 +33,7 @@
 #include "mongo/db/auth/authorization_checks.h"
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/commands.h"
-#include "mongo/db/query/cursor_response.h"
+#include "mongo/db/query/client_cursor/cursor_response.h"
 #include "mongo/db/query/getmore_command_gen.h"
 #include "mongo/db/stats/counters.h"
 #include "mongo/s/query/exec/cluster_cursor_manager.h"

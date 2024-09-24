@@ -59,7 +59,7 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/operation_time_tracker.h"
-#include "mongo/db/query/cursor_response.h"
+#include "mongo/db/query/client_cursor/cursor_response.h"
 #include "mongo/db/query/getmore_command_gen.h"
 #include "mongo/db/query/write_ops/write_ops_gen.h"
 #include "mongo/db/read_write_concern_provenance_base_gen.h"

@@ -30,7 +30,7 @@
 
 #include "mongo/db/session/service_liaison_shard.h"
 #include "mongo/db/client.h"
-#include "mongo/db/cursor_manager.h"
+#include "mongo/db/query/client_cursor/cursor_manager.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/session/service_liaison_router.h"
 

@@ -73,7 +73,7 @@
 #include "mongo/db/pipeline/document_source_union_with.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/pipeline.h"
-#include "mongo/db/query/cursor_response.h"
+#include "mongo/db/query/client_cursor/cursor_response.h"
 #include "mongo/db/query/find_command.h"
 #include "mongo/db/query/write_ops/write_ops.h"
 #include "mongo/db/query/write_ops/write_ops_gen.h"

@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2021-present MongoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
@@ -29,20 +29,20 @@
 
 #pragma once
 
-#include <ostream>
+#include <functional>
 
-#include "mongo/base/status_with.h"
-#include "mongo/bson/util/builder.h"
-#include "mongo/db/generic_cursor_gen.h"
+#include "mongo/db/query/client_cursor/cursor_id.h"
+#include "mongo/platform/random.h"
 
-namespace mongo {
+namespace mongo::generic_cursor {
 
-inline std::ostream& operator<<(std::ostream& s, const GenericCursor& gc) {
-    return (s << gc.toBSON());
-}
+/**
+ * Allocates a positive CursorId that satisfies 'pred', which checks that the CursorId is not
+ * already in use.
+ *
+ * The caller of this function is responsible for synchronization between the check of whether a
+ * cursor is already allocated in 'pred' and the creation of new cursors.
+ */
+CursorId allocateCursorId(const std::function<bool(CursorId)>& pred, PseudoRandom& random);
 
-inline StringBuilder& operator<<(StringBuilder& s, const GenericCursor& gc) {
-    return (s << gc.toBSON());
-}
-
-}  // namespace mongo
+}  // namespace mongo::generic_cursor

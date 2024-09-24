@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#include "mongo/db/query/cursor_request.h"
+#include "mongo/db/query/client_cursor/cursor_request.h"
 
 #include <cstdint>
 

@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2021-present MongoDB, Inc.
+ *    Copyright (C) 2022-present MongoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
@@ -27,42 +27,38 @@
  *    it in the license file.
  */
 
-#include "mongo/db/allocate_cursor_id.h"
+#include "mongo/db/query/client_cursor/cursor_idl_validator.h"
 
-#include <cstdlib>
-#include <limits>
+#include <boost/optional.hpp>
 
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+
+#include "mongo/db/query/client_cursor/cursor_response_gen.h"
 #include "mongo/util/assert_util.h"
 
-namespace mongo::generic_cursor {
+namespace mongo {
 
-CursorId allocateCursorId(const std::function<bool(CursorId)>& pred, PseudoRandom& random) {
-    for (int i = 0; i < 10000; i++) {
-        CursorId id = random.nextInt64();
-
-        // A cursor id of zero is reserved to indicate that the cursor has been closed. If the
-        // random number generator gives us zero, then try again.
-        if (id == 0) {
-            continue;
-        }
-
-        // Avoid negative cursor ids by taking the absolute value. If the cursor id is the minimum
-        // representable negative number, then just generate another random id.
-        if (id == std::numeric_limits<CursorId>::min()) {
-            continue;
-        }
-        id = std::abs(id);
-
-        if (pred(id)) {
-            // The cursor id is not already in use, so return it.
-            return id;
-        }
-
-        // The cursor id is already in use. Generate another random id.
-    }
-
-    // We failed to generate a unique cursor id.
-    fassertFailed(17360);
+/**
+ * Function used by the IDL parser to validate that a response has exactly one cursor type field.
+ */
+void validateIDLParsedCursorResponse(const CursorInitialReply* idlParsedObj) {
+    bool hasCursor = idlParsedObj->getCursor() != boost::none;
+    bool hasCursors = idlParsedObj->getCursors() != boost::none;
+    uassert(6253507,
+            "MultiResponseInitialCursor must have exactly one of 'cursor' or 'cursors' fields",
+            hasCursor != hasCursors);
 }
 
-}  // namespace mongo::generic_cursor
+/**
+ * Function used by the IDL parser to verify that a response cursor has a firstBatch or nextBatch.
+ */
+void validateIDLParsedAnyCursor(const AnyCursor* idlParsedObj) {
+    bool hasFirst = idlParsedObj->getFirstBatch() != boost::none;
+    bool hasNext = idlParsedObj->getNextBatch() != boost::none;
+    uassert(8362701,
+            "AnyCursor must have exactly one of 'firstBatch' or 'nextBatch'",
+            hasFirst != hasNext);
+}
+
+}  // namespace mongo

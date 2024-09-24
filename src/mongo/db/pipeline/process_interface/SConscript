@@ -13,9 +13,9 @@ env.Library(
     LIBDEPS_PRIVATE=[
         "$BUILD_DIR/mongo/db/auth/auth",
         "$BUILD_DIR/mongo/db/concurrency/lock_manager",
-        "$BUILD_DIR/mongo/db/generic_cursor",
         "$BUILD_DIR/mongo/db/operation_time_tracker",
         "$BUILD_DIR/mongo/db/pipeline/field_path",
+        "$BUILD_DIR/mongo/db/query/client_cursor/generic_cursor",
         "$BUILD_DIR/mongo/s/sharding_router_api",
         "$BUILD_DIR/mongo/util/concurrency/spin_lock",
     ],
@@ -46,6 +46,7 @@ env.Library(
         "$BUILD_DIR/mongo/db/index_builds_coordinator_mongod",
         "$BUILD_DIR/mongo/db/multitenancy",
         "$BUILD_DIR/mongo/db/operation_time_tracker",
+        "$BUILD_DIR/mongo/db/query/client_cursor/client_cursor",
         "$BUILD_DIR/mongo/db/query/write_ops/write_ops",
         "$BUILD_DIR/mongo/db/repl/primary_only_service",
         "$BUILD_DIR/mongo/db/s/query_analysis_writer",

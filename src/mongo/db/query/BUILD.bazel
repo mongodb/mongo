@@ -181,24 +181,16 @@ idl_generator(
 )
 
 idl_generator(
-    name = "cursor_response_gen",
-    src = "cursor_response.idl",
-    deps = [
-        "//src/mongo/db:basic_types_gen",
-    ],
-)
-
-idl_generator(
     name = "find_command_gen",
     src = "find_command.idl",
     deps = [
-        ":cursor_response_gen",
         ":hint_gen",
         "//src/mongo/crypto:fle_field_schema_gen",
         "//src/mongo/db:basic_types_gen",
         "//src/mongo/db/auth:access_checks_gen",
         "//src/mongo/db/auth:action_type_gen",
         "//src/mongo/db/pipeline:legacy_runtime_constants_gen",
+        "//src/mongo/db/query/client_cursor:cursor_response_gen",
         "//src/mongo/db/query/query_settings:query_settings_gen",
         "//src/mongo/db/session:logical_session_id_gen",
         "//src/mongo/idl:generic_argument_gen",
@@ -488,17 +480,6 @@ idl_generator(
     ],
 )
 
-idl_generator(
-    name = "kill_cursors_gen",
-    src = "kill_cursors.idl",
-    deps = [
-        "//src/mongo/db:basic_types_gen",
-        "//src/mongo/db/auth:access_checks_gen",
-        "//src/mongo/db/auth:action_type_gen",
-        "//src/mongo/idl:generic_argument_gen",
-    ],
-)
-
 mongo_cc_library(
     name = "command_request_response",
     srcs = [
@@ -506,27 +487,27 @@ mongo_cc_library(
         "count_command_as_aggregation_command.cpp",
         "count_command_gen",
         "count_request.cpp",
-        "cursor_request.cpp",
-        "cursor_response.cpp",
-        "kill_cursors_gen",
         "view_response_formatter.cpp",
-        "//src/mongo/db:clientcursor.h",
-        "//src/mongo/db:cursor_id.h",
+        "//src/mongo/db/query/client_cursor:clientcursor.h",
+        "//src/mongo/db/query/client_cursor:cursor_id.h",
+        "//src/mongo/db/query/client_cursor:cursor_request.cpp",
+        "//src/mongo/db/query/client_cursor:cursor_response.cpp",
+        "//src/mongo/db/query/client_cursor:kill_cursors_gen",
     ],
     hdrs = [
         "count_command_as_aggregation_command.h",
         "count_request.h",
-        "cursor_request.h",
-        "cursor_response.h",
         "view_response_formatter.h",
+        "//src/mongo/db/query/client_cursor:cursor_request.h",
+        "//src/mongo/db/query/client_cursor:cursor_response.h",
     ],
     deps = [
-        ":cursor_response_idl",
         ":query_request",  # TODO(SERVER-93876): Remove.
         "//src/mongo/bson/util:bson_extract",  # TODO(SERVER-93876): Remove.
         "//src/mongo/db:common",  # TODO(SERVER-93876): Remove.
         "//src/mongo/db:server_base",
         "//src/mongo/db/query:hint_parser",
+        "//src/mongo/db/query/client_cursor:cursor_response_idl",
         "//src/mongo/db/query/write_ops:write_ops_parsers",
         "//src/mongo/db/repl:optime",  # TODO(SERVER-93876): Remove.
         "//src/mongo/rpc",
@@ -538,8 +519,8 @@ idl_generator(
     name = "getmore_command_gen",
     src = "getmore_command.idl",
     deps = [
-        ":cursor_response_gen",
         "//src/mongo/db:basic_types_gen",
+        "//src/mongo/db/query/client_cursor:cursor_response_gen",
         "//src/mongo/db/repl:replication_types_gen",
         "//src/mongo/idl:generic_argument_gen",
     ],
@@ -560,7 +541,6 @@ mongo_cc_library(
         "tailable_mode.h",
     ],
     deps = [
-        ":cursor_response_idl",
         ":hint_parser",
         "//src/mongo/crypto:fle_fields",
         "//src/mongo/db:api_parameters",  # TODO(SERVER-93876): Remove.
@@ -569,6 +549,7 @@ mongo_cc_library(
         "//src/mongo/db/auth:security_token_auth",  # TODO(SERVER-93876): Remove.
         "//src/mongo/db/commands:test_commands_enabled",
         "//src/mongo/db/pipeline:runtime_constants_idl",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/db/query/client_cursor:cursor_response_idl",
         "//src/mongo/db/query/query_settings",
         "//src/mongo/db/repl:read_concern_args",  # TODO(SERVER-93876): Remove.
         "//src/mongo/db/repl:repl_coordinator_interface",  # TODO(SERVER-93876): Remove.
@@ -604,17 +585,6 @@ mongo_cc_library(
     ],
     deps = [
         "//src/mongo:base",
-    ],
-)
-
-mongo_cc_library(
-    name = "cursor_response_idl",
-    srcs = [
-        "cursor_idl_validator.cpp",
-        "cursor_response_gen",
-    ],
-    deps = [
-        "//src/mongo/db:server_base",
     ],
 )
 

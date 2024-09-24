@@ -34,11 +34,11 @@
 
 #include "mongo/base/string_data.h"
 #include "mongo/db/catalog/collection.h"
-#include "mongo/db/clientcursor.h"
 #include "mongo/db/metadata_consistency_types_gen.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
-#include "mongo/db/query/cursor_response_gen.h"
+#include "mongo/db/query/client_cursor/clientcursor.h"
+#include "mongo/db/query/client_cursor/cursor_response_gen.h"
 #include "mongo/db/query/plan_executor.h"
 #include "mongo/db/query/plan_executor_factory.h"
 #include "mongo/db/shard_id.h"

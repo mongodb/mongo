@@ -29,7 +29,7 @@
 global:
     cpp_namespace: "mongo"
     cpp_includes:
-        - "mongo/db/cursor_id.h"
+        - "mongo/db/query/client_cursor/cursor_id.h"
 
 imports:
     - "mongo/db/auth/access_checks.idl"

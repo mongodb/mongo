@@ -39,7 +39,7 @@
 #include "mongo/client/read_preference.h"
 #include "mongo/db/client.h"
 #include "mongo/db/cluster_role.h"
-#include "mongo/db/query/cursor_response.h"
+#include "mongo/db/query/client_cursor/cursor_response.h"
 #include "mongo/db/query/write_ops/write_ops_gen.h"
 #include "mongo/db/query/write_ops/write_ops_parsers.h"
 #include "mongo/db/repl/member_state.h"

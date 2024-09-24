@@ -40,10 +40,10 @@
 
 #include "mongo/base/error_codes.h"
 #include "mongo/bson/bsonobj.h"
-#include "mongo/db/allocate_cursor_id.h"
 #include "mongo/db/auth/authorization_manager.h"
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/curop.h"
+#include "mongo/db/query/client_cursor/allocate_cursor_id.h"
 #include "mongo/db/query/query_knobs_gen.h"
 #include "mongo/db/query/query_stats/query_stats.h"
 #include "mongo/db/query/query_stats/vector_search_stats_entry.h"

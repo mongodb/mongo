@@ -46,7 +46,7 @@ imports:
     - "mongo/s/sharding_types.idl"
     - "mongo/s/resharding/common_types.idl"
     - "mongo/db/timeseries/timeseries.idl"
-    - "mongo/db/query/cursor_response.idl"
+    - "mongo/db/query/client_cursor/cursor_response.idl"
     - "mongo/db/metadata_consistency_types.idl"
 
 types:

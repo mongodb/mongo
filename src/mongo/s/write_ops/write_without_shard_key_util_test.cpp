@@ -35,10 +35,10 @@
 #include <boost/optional/optional.hpp>
 
 #include "mongo/bson/json.h"
-#include "mongo/db/cursor_id.h"
 #include "mongo/db/feature_flag.h"
+#include "mongo/db/query/client_cursor/cursor_id.h"
+#include "mongo/db/query/client_cursor/cursor_response.h"
 #include "mongo/db/query/collation/collator_interface.h"
-#include "mongo/db/query/cursor_response.h"
 #include "mongo/db/query/write_ops/update_request.h"
 #include "mongo/db/query/write_ops/write_ops_gen.h"
 #include "mongo/db/query/write_ops/write_ops_parsers.h"

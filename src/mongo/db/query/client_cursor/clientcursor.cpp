@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#include "mongo/db/clientcursor.h"
+#include "mongo/db/query/client_cursor/clientcursor.h"
 
 #include <boost/cstdint.hpp>
 #include <fmt/format.h>
@@ -44,8 +44,8 @@
 #include "mongo/db/client.h"
 #include "mongo/db/commands/server_status_metric.h"
 #include "mongo/db/curop.h"
-#include "mongo/db/cursor_manager.h"
-#include "mongo/db/cursor_server_params.h"
+#include "mongo/db/query/client_cursor/cursor_manager.h"
+#include "mongo/db/query/client_cursor/cursor_server_params.h"
 #include "mongo/db/query/plan_explainer.h"
 #include "mongo/db/query/query_knob_configuration.h"
 #include "mongo/db/query/query_knobs_gen.h"

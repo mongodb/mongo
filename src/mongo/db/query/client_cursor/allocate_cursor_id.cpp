@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2022-present MongoDB, Inc.
+ *    Copyright (C) 2021-present MongoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
@@ -27,21 +27,42 @@
  *    it in the license file.
  */
 
-#pragma once
-#include "mongo/db/query/cursor_response_gen.h"
+#include "mongo/db/query/client_cursor/allocate_cursor_id.h"
 
-namespace mongo {
+#include <cstdlib>
+#include <limits>
 
-class CursorInitialReply;
-class AnyCursor;
+#include "mongo/util/assert_util.h"
 
-/**
- * Function used by the IDL parser to validate that a response has exactly one cursor type field.
- */
-void validateIDLParsedCursorResponse(const CursorInitialReply* idlParsedObj);
+namespace mongo::generic_cursor {
 
-/**
- * Function used by the IDL parser to verify that a response cursor has a firstBatch or nextBatch.
- */
-void validateIDLParsedAnyCursor(const AnyCursor* idlParsedObj);
-}  // namespace mongo
+CursorId allocateCursorId(const std::function<bool(CursorId)>& pred, PseudoRandom& random) {
+    for (int i = 0; i < 10000; i++) {
+        CursorId id = random.nextInt64();
+
+        // A cursor id of zero is reserved to indicate that the cursor has been closed. If the
+        // random number generator gives us zero, then try again.
+        if (id == 0) {
+            continue;
+        }
+
+        // Avoid negative cursor ids by taking the absolute value. If the cursor id is the minimum
+        // representable negative number, then just generate another random id.
+        if (id == std::numeric_limits<CursorId>::min()) {
+            continue;
+        }
+        id = std::abs(id);
+
+        if (pred(id)) {
+            // The cursor id is not already in use, so return it.
+            return id;
+        }
+
+        // The cursor id is already in use. Generate another random id.
+    }
+
+    // We failed to generate a unique cursor id.
+    fassertFailed(17360);
+}
+
+}  // namespace mongo::generic_cursor

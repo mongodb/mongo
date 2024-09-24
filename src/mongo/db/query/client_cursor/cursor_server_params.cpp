@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2022-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MongoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
@@ -27,38 +27,22 @@
  *    it in the license file.
  */
 
-#include "mongo/db/query/cursor_idl_validator.h"
-
-#include <boost/optional.hpp>
-
-#include <boost/none.hpp>
-#include <boost/optional/optional.hpp>
-
-#include "mongo/db/query/cursor_response_gen.h"
-#include "mongo/util/assert_util.h"
+#include "mongo/db/query/client_cursor/cursor_server_params.h"
+#include "mongo/db/query/client_cursor/cursor_server_params_gen.h"
+#include "mongo/platform/atomic_word.h"
 
 namespace mongo {
 
-/**
- * Function used by the IDL parser to validate that a response has exactly one cursor type field.
- */
-void validateIDLParsedCursorResponse(const CursorInitialReply* idlParsedObj) {
-    bool hasCursor = idlParsedObj->getCursor() != boost::none;
-    bool hasCursors = idlParsedObj->getCursors() != boost::none;
-    uassert(6253507,
-            "MultiResponseInitialCursor must have exactly one of 'cursor' or 'cursors' fields",
-            hasCursor != hasCursors);
+int getClientCursorMonitorFrequencySecs() {
+    return gClientCursorMonitorFrequencySecs.load();
 }
 
-/**
- * Function used by the IDL parser to verify that a response cursor has a firstBatch or nextBatch.
- */
-void validateIDLParsedAnyCursor(const AnyCursor* idlParsedObj) {
-    bool hasFirst = idlParsedObj->getFirstBatch() != boost::none;
-    bool hasNext = idlParsedObj->getNextBatch() != boost::none;
-    uassert(8362701,
-            "AnyCursor must have exactly one of 'firstBatch' or 'nextBatch'",
-            hasFirst != hasNext);
+long long getCursorTimeoutMillis() {
+    return gCursorTimeoutMillis.load();
+}
+
+Milliseconds getDefaultCursorTimeoutMillis() {
+    return Milliseconds(kCursorTimeoutMillisDefault);
 }
 
 }  // namespace mongo

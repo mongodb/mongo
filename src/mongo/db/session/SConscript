@@ -45,6 +45,7 @@ env.Library(
         "sessions_collection",
     ],
     LIBDEPS_PRIVATE=[
+        "$BUILD_DIR/mongo/db/query/client_cursor/client_cursor",
         "$BUILD_DIR/mongo/db/query_exec",
         "$BUILD_DIR/mongo/db/service_context",
         "$BUILD_DIR/mongo/s/grid",
@@ -83,6 +84,7 @@ env.Library(
         "$BUILD_DIR/mongo/db/query_exec",
     ],
     LIBDEPS_PRIVATE=[
+        "$BUILD_DIR/mongo/db/query/client_cursor/client_cursor",
         "$BUILD_DIR/mongo/db/transaction/transaction",
         "kill_sessions",
         "session_catalog",

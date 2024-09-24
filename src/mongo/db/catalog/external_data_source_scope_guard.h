@@ -33,10 +33,10 @@
 #include <utility>
 #include <vector>
 
-#include "mongo/db/clientcursor.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/pipeline/external_data_source_option_gen.h"
+#include "mongo/db/query/client_cursor/clientcursor.h"
 #include "mongo/util/decorable.h"
 
 namespace mongo {

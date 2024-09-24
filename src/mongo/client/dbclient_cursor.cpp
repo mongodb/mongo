@@ -55,7 +55,7 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/pipeline/aggregate_command_gen.h"
 #include "mongo/db/pipeline/aggregation_request_helper.h"
-#include "mongo/db/query/cursor_response.h"
+#include "mongo/db/query/client_cursor/cursor_response.h"
 #include "mongo/db/query/getmore_command_gen.h"
 #include "mongo/logv2/log.h"
 #include "mongo/logv2/log_component.h"

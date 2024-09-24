@@ -39,7 +39,7 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/timestamp.h"
-#include "mongo/db/cursor_id.h"
+#include "mongo/db/query/client_cursor/cursor_id.h"
 #include "mongo/db/query/getmore_command_gen.h"
 #include "mongo/db/repl/optime.h"
 #include "mongo/stdx/type_traits.h"

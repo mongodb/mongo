@@ -12,18 +12,6 @@ filters:
   - "collection_query_info*":
     approvers:
       - 10gen/query-execution
-  - "cursor_idl_validator*":
-    approvers:
-      - 10gen/query-execution
-  - "cursor_request*":
-    approvers:
-      - 10gen/query-execution
-  - "cursor_response*":
-    approvers:
-      - 10gen/query-execution
-  - "kill*cursors*":
-    approvers:
-      - 10gen/query-execution
   - "*query_settings*":
     approvers:
       - 10gen/query-execution

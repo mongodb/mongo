@@ -32,8 +32,8 @@
 
 #include <boost/optional.hpp>
 
-#include "mongo/db/cursor_id.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/query/client_cursor/cursor_id.h"
 #include "mongo/db/request_execution_context.h"
 #include "mongo/db/session/session.h"
 #include "mongo/db/session/session_catalog.h"

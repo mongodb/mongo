@@ -27,22 +27,22 @@
  *    it in the license file.
  */
 
-#include "mongo/db/cursor_server_params.h"
-#include "mongo/db/cursor_server_params_gen.h"
-#include "mongo/platform/atomic_word.h"
+#pragma once
+
+#include <ostream>
+
+#include "mongo/base/status_with.h"
+#include "mongo/bson/util/builder.h"
+#include "mongo/db/query/client_cursor/generic_cursor_gen.h"
 
 namespace mongo {
 
-int getClientCursorMonitorFrequencySecs() {
-    return gClientCursorMonitorFrequencySecs.load();
+inline std::ostream& operator<<(std::ostream& s, const GenericCursor& gc) {
+    return (s << gc.toBSON());
 }
 
-long long getCursorTimeoutMillis() {
-    return gCursorTimeoutMillis.load();
-}
-
-Milliseconds getDefaultCursorTimeoutMillis() {
-    return Milliseconds(kCursorTimeoutMillisDefault);
+inline StringBuilder& operator<<(StringBuilder& s, const GenericCursor& gc) {
+    return (s << gc.toBSON());
 }
 
 }  // namespace mongo

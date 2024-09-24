@@ -39,7 +39,7 @@
 #include "mongo/client/remote_command_targeter_factory_mock.h"
 #include "mongo/client/remote_command_targeter_mock.h"
 #include "mongo/db/namespace_string.h"
-#include "mongo/db/query/cursor_response.h"
+#include "mongo/db/query/client_cursor/cursor_response.h"
 #include "mongo/executor/network_test_env.h"
 #include "mongo/s/async_requests_sender.h"
 #include "mongo/s/catalog/type_shard.h"

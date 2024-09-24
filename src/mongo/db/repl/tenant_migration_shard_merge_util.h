@@ -32,10 +32,10 @@
 
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
-#include "mongo/db/cursor_id.h"
-#include "mongo/db/cursor_server_params_gen.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/query/client_cursor/cursor_id.h"
+#include "mongo/db/query/client_cursor/cursor_server_params_gen.h"
 #include "mongo/db/storage/storage_options.h"
 #include "mongo/executor/task_executor.h"
 #include "mongo/util/net/hostandport.h"

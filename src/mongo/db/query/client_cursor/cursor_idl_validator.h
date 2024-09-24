@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2021-present MongoDB, Inc.
+ *    Copyright (C) 2022-present MongoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
@@ -28,21 +28,20 @@
  */
 
 #pragma once
+#include "mongo/db/query/client_cursor/cursor_response_gen.h"
 
-#include <functional>
+namespace mongo {
 
-#include "mongo/db/cursor_id.h"
-#include "mongo/platform/random.h"
-
-namespace mongo::generic_cursor {
+class CursorInitialReply;
+class AnyCursor;
 
 /**
- * Allocates a positive CursorId that satisfies 'pred', which checks that the CursorId is not
- * already in use.
- *
- * The caller of this function is responsible for synchronization between the check of whether a
- * cursor is already allocated in 'pred' and the creation of new cursors.
+ * Function used by the IDL parser to validate that a response has exactly one cursor type field.
  */
-CursorId allocateCursorId(const std::function<bool(CursorId)>& pred, PseudoRandom& random);
+void validateIDLParsedCursorResponse(const CursorInitialReply* idlParsedObj);
 
-}  // namespace mongo::generic_cursor
+/**
+ * Function used by the IDL parser to verify that a response cursor has a firstBatch or nextBatch.
+ */
+void validateIDLParsedAnyCursor(const AnyCursor* idlParsedObj);
+}  // namespace mongo

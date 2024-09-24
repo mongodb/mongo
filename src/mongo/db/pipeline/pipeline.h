@@ -57,7 +57,7 @@
 #include "mongo/db/pipeline/process_interface/mongo_process_interface.h"
 #include "mongo/db/pipeline/sharded_agg_helpers_targeting_policy.h"
 #include "mongo/db/pipeline/variables.h"
-#include "mongo/db/query/cursor_response_gen.h"
+#include "mongo/db/query/client_cursor/cursor_response_gen.h"
 #include "mongo/db/query/explain_options.h"
 #include "mongo/db/query/query_knobs_gen.h"
 #include "mongo/db/query/query_shape/serialization_options.h"

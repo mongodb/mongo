@@ -1,0 +1,108 @@
+load("//bazel:mongo_src_rules.bzl", "idl_generator", "mongo_cc_library")
+
+package(default_visibility = ["//visibility:public"])
+
+exports_files(
+    glob([
+        "*.h",
+        "*.cpp",
+    ]),
+)
+
+mongo_cc_library(
+    name = "client_cursor",
+    srcs = [
+        "clientcursor.cpp",
+        "cursor_manager.cpp",
+    ],
+    hdrs = [
+        "clientcursor.h",
+        "cursor_manager.h",
+        "//src/mongo/db/catalog:external_data_source_scope_guard.h",  # TODO(SERVER-95100): Remove
+    ],
+    deps = [
+        ":cursor_server_params",
+        "//src/mongo/db:commands",
+        "//src/mongo/db:shard_role",
+        "//src/mongo/db/auth:auth_checks",
+    ],
+)
+
+idl_generator(
+    name = "cursor_response_gen",
+    src = "cursor_response.idl",
+    deps = [
+        "//src/mongo/db:basic_types_gen",
+    ],
+)
+
+mongo_cc_library(
+    name = "cursor_response_idl",
+    srcs = [
+        "cursor_idl_validator.cpp",
+        ":cursor_response_gen",
+    ],
+    deps = [
+        "//src/mongo/db:server_base",
+    ],
+)
+
+idl_generator(
+    name = "cursor_server_params_gen",
+    src = "cursor_server_params.idl",
+    deps = [
+        "//src/mongo/db:basic_types_gen",
+    ],
+)
+
+mongo_cc_library(
+    name = "cursor_server_params",
+    srcs = [
+        "cursor_server_params.cpp",
+        ":cursor_server_params_gen",
+    ],
+    hdrs = [
+        "cursor_server_params.h",
+    ],
+    deps = [
+        "//src/mongo/db:server_base",
+    ],
+)
+
+idl_generator(
+    name = "generic_cursor_gen",
+    src = "generic_cursor.idl",
+    deps = [
+        "//src/mongo/db:basic_types_gen",
+        "//src/mongo/db/repl:replication_types_gen",
+        "//src/mongo/db/session:logical_session_id_gen",
+    ],
+)
+
+mongo_cc_library(
+    name = "generic_cursor",
+    srcs = [
+        "allocate_cursor_id.cpp",
+        ":generic_cursor_gen",
+    ],
+    hdrs = [
+        "allocate_cursor_id.h",
+        "cursor_id.h",
+    ],
+    deps = [
+        "//src/mongo/db:server_base",
+        "//src/mongo/db:service_context",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/db/repl:optime",  # TODO(SERVER-93876): Remove.
+    ],
+)
+
+idl_generator(
+    name = "kill_cursors_gen",
+    src = "kill_cursors.idl",
+    deps = [
+        "//src/mongo/db:basic_types_gen",
+        "//src/mongo/db/auth:access_checks_gen",
+        "//src/mongo/db/auth:action_type_gen",
+        "//src/mongo/idl:generic_argument_gen",
+    ],
+)

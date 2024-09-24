@@ -45,7 +45,7 @@
 #include "mongo/client/dbclient_connection.h"
 #include "mongo/client/dbclient_cursor.h"
 #include "mongo/db/operation_context.h"
-#include "mongo/db/query/cursor_response.h"
+#include "mongo/db/query/client_cursor/cursor_response.h"
 #include "mongo/db/tenant_id.h"
 #include "mongo/idl/server_parameter_test_util.h"
 #include "mongo/logv2/log.h"

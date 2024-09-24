@@ -43,7 +43,7 @@
 #include "mongo/db/client.h"
 #include "mongo/db/database_name.h"
 #include "mongo/db/namespace_string.h"
-#include "mongo/db/query/cursor_response.h"
+#include "mongo/db/query/client_cursor/cursor_response.h"
 #include "mongo/db/repl/tenant_cloner_test_fixture.h"
 #include "mongo/db/repl/tenant_file_cloner.h"
 #include "mongo/db/repl/tenant_migration_shard_merge_util.h"

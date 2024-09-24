@@ -34,7 +34,7 @@
 #include "mongo/client/async_client.h"
 #include "mongo/db/commands/kill_operations_gen.h"
 #include "mongo/db/database_name.h"
-#include "mongo/db/query/cursor_response_gen.h"
+#include "mongo/db/query/client_cursor/cursor_response_gen.h"
 #include "mongo/db/query/find_command.h"
 #include "mongo/db/query/getmore_command_gen.h"
 #include "mongo/db/query/write_ops/write_ops_gen.h"

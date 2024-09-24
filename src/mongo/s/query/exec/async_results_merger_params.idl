@@ -31,7 +31,7 @@ global:
     cpp_includes:
         - "mongo/db/shard_id.h"
         - "mongo/util/net/hostandport.h"
-        - "mongo/db/query/cursor_response.h"
+        - "mongo/db/query/client_cursor/cursor_response.h"
 
 imports:
     - "mongo/db/session/logical_session_id.idl"

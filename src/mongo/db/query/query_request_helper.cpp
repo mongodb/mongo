@@ -47,7 +47,7 @@
 #include "mongo/db/commands/test_commands_enabled.h"
 #include "mongo/db/feature_flag.h"
 #include "mongo/db/pipeline/legacy_runtime_constants_gen.h"
-#include "mongo/db/query/cursor_response_gen.h"
+#include "mongo/db/query/client_cursor/cursor_response_gen.h"
 #include "mongo/db/query/find_command_gen.h"
 #include "mongo/db/query/query_knobs_gen.h"
 #include "mongo/db/query/query_request_helper.h"

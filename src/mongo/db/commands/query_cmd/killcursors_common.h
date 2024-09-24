@@ -29,10 +29,10 @@
 
 #include "mongo/db/audit.h"
 #include "mongo/db/client.h"
-#include "mongo/db/cursor_id.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
-#include "mongo/db/query/kill_cursors_gen.h"
+#include "mongo/db/query/client_cursor/cursor_id.h"
+#include "mongo/db/query/client_cursor/kill_cursors_gen.h"
 #include "mongo/db/read_concern_support_result.h"
 
 namespace mongo {

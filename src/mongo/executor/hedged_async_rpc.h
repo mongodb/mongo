@@ -48,7 +48,7 @@
 #include "mongo/db/baton.h"
 #include "mongo/db/commands/kill_operations_gen.h"
 #include "mongo/db/operation_context.h"
-#include "mongo/db/query/cursor_response.h"
+#include "mongo/db/query/client_cursor/cursor_response.h"
 #include "mongo/db/service_context.h"
 #include "mongo/executor/async_rpc.h"
 #include "mongo/executor/async_rpc_error_info.h"

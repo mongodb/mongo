@@ -52,7 +52,7 @@
 #include "mongo/client/dbclient_connection.h"
 #include "mongo/db/database_name.h"
 #include "mongo/db/dbmessage.h"
-#include "mongo/db/query/cursor_response.h"
+#include "mongo/db/query/client_cursor/cursor_response.h"
 #include "mongo/db/tenant_id.h"
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/rpc/message.h"

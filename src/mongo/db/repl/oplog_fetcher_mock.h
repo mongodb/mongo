@@ -37,7 +37,7 @@
 
 #include "mongo/base/status.h"
 #include "mongo/bson/timestamp.h"
-#include "mongo/db/cursor_id.h"
+#include "mongo/db/query/client_cursor/cursor_id.h"
 #include "mongo/db/repl/data_replicator_external_state.h"
 #include "mongo/db/repl/oplog_fetcher.h"
 #include "mongo/db/repl/optime.h"

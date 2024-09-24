@@ -31,8 +31,8 @@ global:
 
 imports:
     - "mongo/db/basic_types.idl"
-    - "mongo/db/query/cursor_response.idl"
     - "mongo/db/metadata_consistency_types.idl"
+    - "mongo/db/query/client_cursor/cursor_response.idl"
 
 commands:
     checkMetadataConsistency:

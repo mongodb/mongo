@@ -33,8 +33,8 @@
 #include <boost/filesystem/fstream.hpp>
 
 #include "mongo/base/status.h"
-#include "mongo/db/cursor_server_params_gen.h"
 #include "mongo/db/db_raii.h"
+#include "mongo/db/query/client_cursor/cursor_server_params_gen.h"
 #include "mongo/db/repl/storage_interface.h"
 #include "mongo/db/storage/storage_file_util.h"
 #include "mongo/db/transaction_resources.h"

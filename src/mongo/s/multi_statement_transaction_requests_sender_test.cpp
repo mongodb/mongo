@@ -42,7 +42,7 @@
 #include "mongo/client/remote_command_targeter_factory_mock.h"
 #include "mongo/client/remote_command_targeter_mock.h"
 #include "mongo/db/namespace_string.h"
-#include "mongo/db/query/cursor_response.h"
+#include "mongo/db/query/client_cursor/cursor_response.h"
 #include "mongo/db/s/shard_server_test_fixture.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/session/logical_session_id.h"

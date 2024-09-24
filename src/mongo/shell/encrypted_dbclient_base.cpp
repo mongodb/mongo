@@ -72,7 +72,7 @@
 #include "mongo/crypto/symmetric_crypto.h"
 #include "mongo/db/matcher/schema/encrypt_schema_gen.h"
 #include "mongo/db/namespace_string.h"
-#include "mongo/db/query/cursor_response.h"
+#include "mongo/db/query/client_cursor/cursor_response.h"
 #include "mongo/db/repl/read_concern_args.h"
 #include "mongo/db/tenant_id.h"
 #include "mongo/idl/idl_parser.h"

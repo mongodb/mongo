@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#include "mongo/db/cursor_manager.h"
+#include "mongo/db/query/client_cursor/cursor_manager.h"
 
 #include <absl/container/node_hash_set.h>
 #include <absl/meta/type_traits.h>
@@ -43,15 +43,15 @@
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/init.h"  // IWYU pragma: keep
-#include "mongo/db/allocate_cursor_id.h"
 #include "mongo/db/auth/authorization_checks.h"
 #include "mongo/db/auth/authorization_manager.h"
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/client.h"
 #include "mongo/db/curop.h"
-#include "mongo/db/cursor_server_params.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/query/client_cursor/allocate_cursor_id.h"
+#include "mongo/db/query/client_cursor/cursor_server_params.h"
 #include "mongo/db/query/plan_executor.h"
 #include "mongo/db/query/query_knobs_gen.h"
 #include "mongo/db/service_context.h"

@@ -212,6 +212,7 @@ env.Library(
         "$BUILD_DIR/mongo/db/op_observer/op_observer_impl",
         "$BUILD_DIR/mongo/db/op_observer/op_observer_util",
         "$BUILD_DIR/mongo/db/pipeline/docs_needed_bounds_visitor",
+        "$BUILD_DIR/mongo/db/query/client_cursor/client_cursor",
         "$BUILD_DIR/mongo/db/query/write_ops/write_ops",
         "$BUILD_DIR/mongo/db/repl/image_collection_entry",
         "$BUILD_DIR/mongo/db/repl/primary_only_service",

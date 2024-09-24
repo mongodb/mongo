@@ -62,10 +62,10 @@ mongo_cc_library(
     deps = [
         "//src/mongo:base",
         "//src/mongo/db:commands",  # TODO(SERVER-93876): Remove.
-        "//src/mongo/db:generic_cursor",
         "//src/mongo/db/auth",  # TODO(SERVER-93876): Remove.
         "//src/mongo/db/auth:authprivilege",  # TODO(SERVER-93876): Remove.
         "//src/mongo/db/query:query_knobs",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/db/query/client_cursor:generic_cursor",
         "//src/mongo/db/query/query_stats",
         "//src/mongo/db/session:kill_sessions",
         "//src/mongo/db/session:logical_session_cache",  # TODO(SERVER-93876): Remove.
@@ -141,7 +141,7 @@ mongo_cc_library(
         "cluster_cursor_cleanup_job.h",
     ],
     deps = [
-        "//src/mongo/db:cursor_server_params",
+        "//src/mongo/db/query/client_cursor:cursor_server_params",
         "//src/mongo/s:grid",
         "//src/mongo/util:background_job",
     ],

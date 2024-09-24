@@ -1,0 +1,12 @@
+version: 1.0.0
+filters:
+  - "*":
+    approvers:
+      - 10gen/query-execution
+  - "exhaust_cursor_currentop_integration_test.cpp":
+    approvers:
+      - TedTuckman
+      - banarun
+      - awagenmaker
+    metadata:
+      owning_team: 10gen/query-integration

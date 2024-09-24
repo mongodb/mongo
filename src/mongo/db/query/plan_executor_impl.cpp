@@ -54,7 +54,7 @@
 #include "mongo/db/exec/trial_stage.h"
 #include "mongo/db/exec/update_stage.h"
 #include "mongo/db/exec/working_set.h"
-#include "mongo/db/query/cursor_response.h"
+#include "mongo/db/query/client_cursor/cursor_response.h"
 #include "mongo/db/query/find_command.h"
 #include "mongo/db/query/find_common.h"
 #include "mongo/db/query/mock_yield_policies.h"

@@ -39,7 +39,7 @@
 #include "mongo/db/commands.h"
 #include "mongo/db/fle_crud.h"
 #include "mongo/db/pipeline/query_request_conversion.h"
-#include "mongo/db/query/cursor_response.h"
+#include "mongo/db/query/client_cursor/cursor_response.h"
 #include "mongo/db/query/query_planner_common.h"
 #include "mongo/db/query/query_settings/query_settings_utils.h"
 #include "mongo/db/query/query_stats/find_key.h"

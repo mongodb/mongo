@@ -30,8 +30,8 @@
 #pragma once
 
 #include "mongo/bson/bsonobj.h"
-#include "mongo/db/cursor_id.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/db/query/client_cursor/cursor_id.h"
 #include "mongo/db/query/plan_yield_policy.h"
 #include "mongo/executor/task_executor_cursor_parameters_gen.h"
 

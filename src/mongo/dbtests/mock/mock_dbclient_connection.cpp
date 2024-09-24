@@ -38,7 +38,7 @@
 #include "mongo/client/dbclient_mockcursor.h"
 #include "mongo/db/basic_types.h"
 #include "mongo/db/pipeline/pipeline.h"
-#include "mongo/db/query/cursor_response.h"
+#include "mongo/db/query/client_cursor/cursor_response.h"
 #include "mongo/db/tenant_id.h"
 #include "mongo/dbtests/mock/mock_dbclient_connection.h"
 #include "mongo/platform/atomic_word.h"

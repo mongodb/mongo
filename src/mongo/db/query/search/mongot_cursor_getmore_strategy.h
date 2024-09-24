@@ -30,10 +30,10 @@
 #pragma once
 
 #include "mongo/bson/bsonobj.h"
-#include "mongo/db/cursor_id.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/pipeline/search/document_source_internal_search_id_lookup.h"
 #include "mongo/db/pipeline/visitors/docs_needed_bounds_gen.h"
+#include "mongo/db/query/client_cursor/cursor_id.h"
 #include "mongo/db/query/query_feature_flags_gen.h"
 #include "mongo/db/query/search/mongot_cursor.h"
 #include "mongo/executor/task_executor_cursor_options.h"

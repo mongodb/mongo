@@ -34,10 +34,9 @@
 #include <utility>
 #include <vector>
 
-
 #include "mongo/db/client.h"
-#include "mongo/db/cursor_manager.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/query/client_cursor/cursor_manager.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/session/kill_sessions.h"
 #include "mongo/db/session/kill_sessions_common.h"

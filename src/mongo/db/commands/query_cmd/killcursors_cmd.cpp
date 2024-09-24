@@ -37,13 +37,13 @@
 #include "mongo/base/status.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/commands/query_cmd/killcursors_common.h"
-#include "mongo/db/cursor_id.h"
-#include "mongo/db/cursor_manager.h"
 #include "mongo/db/db_raii.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/profile_settings.h"
-#include "mongo/db/query/kill_cursors_gen.h"
+#include "mongo/db/query/client_cursor/cursor_id.h"
+#include "mongo/db/query/client_cursor/cursor_manager.h"
+#include "mongo/db/query/client_cursor/kill_cursors_gen.h"
 #include "mongo/db/stats/top.h"
 
 namespace mongo {

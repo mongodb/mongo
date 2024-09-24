@@ -29,7 +29,7 @@
 
 #include "mongo/db/commands.h"
 #include "mongo/db/namespace_string.h"
-#include "mongo/db/query/cursor_response.h"
+#include "mongo/db/query/client_cursor/cursor_response.h"
 #include "mongo/db/service_context_test_fixture.h"
 #include "mongo/db/vector_clock.h"
 #include "mongo/idl/server_parameter_test_util.h"

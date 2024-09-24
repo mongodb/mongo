@@ -172,7 +172,7 @@ env.CppIntegrationTest(
         "$BUILD_DIR/mongo/client/async_client",
         "$BUILD_DIR/mongo/client/clientdriver_network",
         "$BUILD_DIR/mongo/db/commands/kill_operations_idl",
-        "$BUILD_DIR/mongo/db/query/cursor_response_idl",
+        "$BUILD_DIR/mongo/db/query/client_cursor/cursor_response_idl",
         "$BUILD_DIR/mongo/db/query/write_ops/write_ops_parsers",
         "$BUILD_DIR/mongo/db/wire_version",
         "$BUILD_DIR/mongo/executor/network_interface_factory",

@@ -59,7 +59,7 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/pipeline/aggregate_command_gen.h"
-#include "mongo/db/query/cursor_response_gen.h"
+#include "mongo/db/query/client_cursor/cursor_response_gen.h"
 #include "mongo/db/query/find_common.h"
 #include "mongo/db/query/query_request_helper.h"
 #include "mongo/db/repl/read_concern_level.h"

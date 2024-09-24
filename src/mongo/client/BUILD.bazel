@@ -456,8 +456,6 @@ mongo_cc_library(
     name = "fetcher",
     srcs = [
         "fetcher.cpp",
-        "//src/mongo/db:clientcursor.h",
-        "//src/mongo/db:cursor_id.h",
     ],
     hdrs = [
         "fetcher.h",
@@ -465,6 +463,7 @@ mongo_cc_library(
     deps = [
         ":remote_command_retry_scheduler",
         "//src/mongo/db:server_base",
+        "//src/mongo/db/query/client_cursor",
         "//src/mongo/executor:task_executor_interface",  # TODO(SERVER-93876): Remove.
         "//src/mongo/rpc:command_status",
     ],

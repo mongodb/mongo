@@ -34,10 +34,10 @@
 
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/catalog/collection.h"
-#include "mongo/db/clientcursor.h"
 #include "mongo/db/dbmessage.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/query/canonical_query.h"
+#include "mongo/db/query/client_cursor/clientcursor.h"
 #include "mongo/db/query/plan_executor.h"
 #include "mongo/rpc/message.h"
 

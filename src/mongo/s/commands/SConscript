@@ -159,8 +159,8 @@ env.Library(
         "$BUILD_DIR/mongo/db/modules/enterprise/src/audit/audit_mongos"
         if "audit" in env.get("MONGO_ENTERPRISE_FEATURES", [])
         else "",
+        "$BUILD_DIR/mongo/db/query/client_cursor/cursor_response_idl",
         "$BUILD_DIR/mongo/db/query/command_request_response",
-        "$BUILD_DIR/mongo/db/query/cursor_response_idl",
         "$BUILD_DIR/mongo/db/query/map_reduce_output_format",
         "$BUILD_DIR/mongo/db/query/query_settings/utils",
         "$BUILD_DIR/mongo/db/query/query_shape/query_shape",

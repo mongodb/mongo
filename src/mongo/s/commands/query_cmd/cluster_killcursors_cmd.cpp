@@ -40,10 +40,10 @@
 #include "mongo/db/auth/user_name.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/commands/query_cmd/killcursors_common.h"
-#include "mongo/db/cursor_id.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
-#include "mongo/db/query/kill_cursors_gen.h"
+#include "mongo/db/query/client_cursor/cursor_id.h"
+#include "mongo/db/query/client_cursor/kill_cursors_gen.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/query/exec/cluster_cursor_manager.h"
 

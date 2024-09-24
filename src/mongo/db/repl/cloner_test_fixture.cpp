@@ -33,7 +33,7 @@
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/client.h"
-#include "mongo/db/cursor_id.h"
+#include "mongo/db/query/client_cursor/cursor_id.h"
 #include "mongo/db/repl/cloner_test_fixture.h"
 #include "mongo/dbtests/mock/mock_dbclient_connection.h"
 #include "mongo/util/concurrency/thread_pool.h"

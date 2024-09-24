@@ -40,7 +40,7 @@
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/client.h"
-#include "mongo/db/query/cursor_response.h"
+#include "mongo/db/query/client_cursor/cursor_response.h"
 #include "mongo/db/query/find_common.h"
 #include "mongo/db/service_context.h"
 #include "mongo/executor/network_test_env.h"

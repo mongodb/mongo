@@ -142,6 +142,7 @@ env.Program(
         "$BUILD_DIR/mongo/db/op_observer/op_observer_impl",
         "$BUILD_DIR/mongo/db/op_observer/operation_logger_impl",
         "$BUILD_DIR/mongo/db/query/bson/dotted_path_support",
+        "$BUILD_DIR/mongo/db/query/client_cursor/client_cursor",
         "$BUILD_DIR/mongo/db/query/collation/collator_interface_mock",
         "$BUILD_DIR/mongo/db/query/command_request_response",
         "$BUILD_DIR/mongo/db/query/query_planner_test_lib",

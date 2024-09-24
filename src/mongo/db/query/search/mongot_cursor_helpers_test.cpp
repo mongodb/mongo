@@ -26,7 +26,7 @@
  *    exception statement from all source files in the program, then also delete
  *    it in the license file.
  */
-#include "mongo/db/cursor_id.h"
+#include "mongo/db/query/client_cursor/cursor_id.h"
 #include "mongo/db/query/search/mongot_cursor_getmore_strategy.h"
 #include "mongo/idl/server_parameter_test_util.h"
 #include "mongo/unittest/assert.h"

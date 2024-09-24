@@ -54,9 +54,9 @@ mongo_cc_library(
         "//src/mongo/db:service_context",  # TODO(SERVER-93876): Remove.
         "//src/mongo/db/auth",  # TODO(SERVER-93876): Remove.
         "//src/mongo/db/query:command_request_response",  # TODO(SERVER-93876): Remove.
-        "//src/mongo/db/query:cursor_response_idl",  # TODO(SERVER-93876): Remove.
         "//src/mongo/db/query:memory_util",  # TODO(SERVER-93876): Remove.
         "//src/mongo/db/query:query_knobs",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/db/query/client_cursor:cursor_response_idl",  # TODO(SERVER-93876): Remove.
         "//src/mongo/db/query/query_shape",  # TODO(SERVER-93876): Remove.
         "//src/mongo/db/stats:counters",  # TODO(SERVER-93876): Remove.
         "//src/mongo/rpc:client_metadata",  # TODO(SERVER-93876): Remove.

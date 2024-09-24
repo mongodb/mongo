@@ -31,7 +31,7 @@
 
 #include <cstdint>
 
-#include "mongo/db/query/cursor_response_gen.h"
+#include "mongo/db/query/client_cursor/cursor_response_gen.h"
 
 namespace mongo::query_stats {
 

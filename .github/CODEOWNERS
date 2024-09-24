@@ -482,13 +482,6 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 /src/mongo/db/**/*change_stream* @10gen/query-execution @svc-auto-approve-bot
 /src/mongo/db/**/collection_index_usage_tracker* @10gen/query-execution @svc-auto-approve-bot
 /src/mongo/db/**/curop* @TedTuckman @awagenmaker @cswanson310 @svc-auto-approve-bot
-/src/mongo/db/**/allocate_cursor_id* @10gen/query-execution @svc-auto-approve-bot
-/src/mongo/db/**/clientcursor* @10gen/query-execution @svc-auto-approve-bot
-/src/mongo/db/**/cursor_id.h @10gen/query-execution @svc-auto-approve-bot
-/src/mongo/db/**/cursor_manager* @10gen/query-execution @svc-auto-approve-bot
-/src/mongo/db/**/cursor_server_params* @10gen/query-execution @svc-auto-approve-bot
-/src/mongo/db/**/exhaust_cursor_currentop_integration_test.cpp @TedTuckman @awagenmaker @banarun @svc-auto-approve-bot
-/src/mongo/db/**/generic_cursor* @10gen/query-execution @svc-auto-approve-bot
 /src/mongo/db/**/update_index_data* @10gen/query-execution @svc-auto-approve-bot
 /src/mongo/db/**/create* @10gen/server-catalog-and-routing @svc-auto-approve-bot
 /src/mongo/db/**/drop*idl @10gen/server-catalog-and-routing @svc-auto-approve-bot
@@ -788,10 +781,6 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 /src/mongo/db/query/**/* @10gen/query @svc-auto-approve-bot
 /src/mongo/db/query/**/collection_index_usage_tracker* @10gen/query-execution @svc-auto-approve-bot
 /src/mongo/db/query/**/collection_query_info* @10gen/query-execution @svc-auto-approve-bot
-/src/mongo/db/query/**/cursor_idl_validator* @10gen/query-execution @svc-auto-approve-bot
-/src/mongo/db/query/**/cursor_request* @10gen/query-execution @svc-auto-approve-bot
-/src/mongo/db/query/**/cursor_response* @10gen/query-execution @svc-auto-approve-bot
-/src/mongo/db/query/**/kill*cursors* @10gen/query-execution @svc-auto-approve-bot
 /src/mongo/db/query/**/*query_settings* @10gen/query-execution @svc-auto-approve-bot
 /src/mongo/db/query/**/mock_yield_policies.h @10gen/query-execution @svc-auto-approve-bot
 /src/mongo/db/query/**/*yield_policy* @10gen/query-execution @svc-auto-approve-bot
@@ -813,6 +802,10 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 
 # The following patterns are parsed from ./src/mongo/db/query/classic_runtime_planner_for_sbe/OWNERS.yml
 /src/mongo/db/query/classic_runtime_planner_for_sbe/**/* @10gen/query-optimization @svc-auto-approve-bot
+
+# The following patterns are parsed from ./src/mongo/db/query/client_cursor/OWNERS.yml
+/src/mongo/db/query/client_cursor/**/* @10gen/query-execution @svc-auto-approve-bot
+/src/mongo/db/query/client_cursor/**/exhaust_cursor_currentop_integration_test.cpp @TedTuckman @awagenmaker @banarun @svc-auto-approve-bot
 
 # The following patterns are parsed from ./src/mongo/db/query/collation/OWNERS.yml
 /src/mongo/db/query/collation/**/* @10gen/query-execution @svc-auto-approve-bot

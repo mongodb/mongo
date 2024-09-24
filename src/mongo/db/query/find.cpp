@@ -36,9 +36,9 @@
 #include <boost/optional/optional.hpp>
 
 #include "mongo/db/basic_types.h"
-#include "mongo/db/clientcursor.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/query/canonical_query.h"
+#include "mongo/db/query/client_cursor/clientcursor.h"
 #include "mongo/db/query/collection_query_info.h"
 #include "mongo/db/query/explain_options.h"
 #include "mongo/db/query/find.h"
