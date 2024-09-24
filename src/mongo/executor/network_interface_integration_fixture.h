@@ -106,12 +106,13 @@ public:
                       StartCommandCB onFinish);
 
     Future<RemoteCommandResponse> runCommand(const TaskExecutor::CallbackHandle& cbHandle,
-                                             RemoteCommandRequest rcroa);
+                                             RemoteCommandRequest rcroa,
+                                             const std::shared_ptr<Baton>& baton = nullptr);
 
     /**
      * Runs a command on the fixture NetworkInterface and asserts it suceeded.
      */
-    void runSetupCommandSync(const DatabaseName& db, BSONObj cmdObj);
+    BSONObj runSetupCommandSync(const DatabaseName& db, BSONObj cmdObj);
 
     Future<void> startExhaustCommand(
         const TaskExecutor::CallbackHandle& cbHandle,
@@ -144,6 +145,51 @@ public:
         auto lk = stdx::unique_lock(_mutex);
         return _workInProgress;
     }
+
+    class FailPointGuard {
+    public:
+        FailPointGuard(StringData fpName,
+                       NetworkInterfaceIntegrationFixture* fixture,
+                       int initalTimesEntered)
+            : _fpName(fpName), _fixture(fixture), _initialTimesEntered(initalTimesEntered) {}
+
+        FailPointGuard(const FailPointGuard&) = delete;
+        FailPointGuard& operator=(const FailPointGuard&) = delete;
+
+        ~FailPointGuard() {
+            disable();
+        }
+
+        void waitForAdditionalTimesEntered(int count) {
+            auto cmdObj =
+                BSON("waitForFailPoint" << _fpName << "timesEntered" << _initialTimesEntered + count
+                                        << "maxTimeMS" << 30000);
+            _fixture->runSetupCommandSync(DatabaseName::kAdmin, cmdObj);
+        }
+
+        void disable() {
+            if (std::exchange(_disabled, true)) {
+                return;
+            }
+
+            auto cmdObj = BSON("configureFailPoint" << _fpName << "mode"
+                                                    << "off");
+            _fixture->runSetupCommandSync(DatabaseName::kAdmin, cmdObj);
+        }
+
+    private:
+        std::string _fpName;
+        NetworkInterfaceIntegrationFixture* _fixture;
+        int _initialTimesEntered;
+        bool _disabled{false};
+    };
+
+
+    FailPointGuard configureFailPoint(StringData fp, BSONObj data);
+
+    FailPointGuard configureFailCommand(StringData failCommand,
+                                        boost::optional<ErrorCodes::Error> errorCode = boost::none,
+                                        boost::optional<Milliseconds> blockTime = boost::none);
 
 private:
     void _onSchedulingCommand();

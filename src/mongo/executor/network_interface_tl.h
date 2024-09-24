@@ -170,27 +170,20 @@ private:
     struct CommandStateBase : public std::enable_shared_from_this<CommandStateBase> {
         CommandStateBase(NetworkInterfaceTL* interface_,
                          RemoteCommandRequest request_,
-                         const TaskExecutor::CallbackHandle& cbHandle_);
+                         const TaskExecutor::CallbackHandle& cbHandle_,
+                         const BatonHandle& baton_);
         virtual ~CommandStateBase();
 
         using ConnectionHandle = std::shared_ptr<ConnectionPool::ConnectionHandle::element_type>;
         using WeakConnectionHandle = std::weak_ptr<ConnectionPool::ConnectionHandle::element_type>;
 
-        virtual Future<RemoteCommandResponse> sendRequest() = 0;
+        SemiFuture<ConnectionPool::ConnectionHandle> getConnection(
+            std::shared_ptr<ConnectionPool> pool);
 
-        /**
-         * Fulfill the promise with the response.
-         */
-        virtual void fulfillFinalPromise(StatusWith<RemoteCommandResponse> response) = 0;
+        Status handleConnectionAcquisitionError(Status status);
 
-        /**
-         * Fulfill the promise for the Command.
-         *
-         * This will throw/invariant if called multiple times. In an ideal world, this would do the
-         * swap on CommandState::done for you and return early if it was already true. It does not
-         * do so currently.
-         */
-        void tryFinish(Status status) noexcept;
+        ExecutorFuture<RemoteCommandResponse> sendRequest(ConnectionPool::ConnectionHandle conn);
+        virtual Future<RemoteCommandResponse> sendRequestImpl(RemoteCommandRequest toSend) = 0;
 
         /**
          * Return the current connection to the pool and unset it locally.
@@ -199,19 +192,11 @@ private:
          */
         void returnConnection(Status status) noexcept;
 
-        void trySend(StatusWith<ConnectionPool::ConnectionHandle> swConn) noexcept;
-
-        void killOperation();
-
         /**
-         * Set a timer to fulfill the promise with a timeout error.
+         * Set a timer to cancel the request at the requested deadline, if any.
+         * If no timeout was specified on the request, this is a noop.
          */
-        virtual void setTimer();
-
-        /**
-         * Resolve an eventual response
-         */
-        void resolve(Future<RemoteCommandResponse> future) noexcept;
+        void setTimer();
 
         /**
          * Return the client for a given connection
@@ -219,9 +204,9 @@ private:
         static AsyncDBClient* getClient(const ConnectionHandle& conn) noexcept;
 
         /**
-         * Cancel the current client operation or do nothing if there is no client.
+         * Cancel the operation with the provided status.
          */
-        void cancel() noexcept;
+        void cancel(Status status);
 
         /**
          * Run the NetworkInterface's MetadataHook on a given request if this Command isn't already
@@ -234,74 +219,45 @@ private:
         // Original request as received from the caller.
         const RemoteCommandRequest request;
 
-        // Modified request to emit on the wire.
-        RemoteCommandRequest requestToSend;
-
         TaskExecutor::CallbackHandle cbHandle;
-        Date_t deadline = kNoExpirationDate;
 
         ClockSource::StopWatch stopwatch;
+        Date_t deadline = kNoExpirationDate;
 
         BatonHandle baton;
         std::unique_ptr<transport::ReactorTimer> timer;
 
-        // The thread that sets this bit must subsequently call fulfillFinalPromise() exactly once.
-        // Once it is set, no other thread may call fulfillFinalPromise().
-        Atomic<bool> promiseFulfilling{false};
-
-        // Set from fulfillFinalPromise to indicate that the promise has been fulfilled.
-        Notification<void> promiseFulfilled;
-
-        boost::optional<UUID> operationKey;
-
-        // Total time spent waiting for connections that eventually time out.
-        Milliseconds connTimeoutWaitTime{0};
-
         ConnectionHandle conn;
 
-        // Synchronizes requestToSend, conn, and weakConn.
-        stdx::mutex mutex;
-
         CancellationSource _cancelSource;
+
+        stdx::mutex cancelMutex;
+        // Overwrites the generic cancellation status when the operation is cancelled.
+        Status cancelStatus = Status::OK();
     };
 
     struct CommandState final : public CommandStateBase {
-        CommandState(NetworkInterfaceTL* interface_,
-                     RemoteCommandRequest request_,
-                     const TaskExecutor::CallbackHandle& cbHandle_);
+        CommandState(NetworkInterfaceTL* interface,
+                     RemoteCommandRequest request,
+                     const TaskExecutor::CallbackHandle& cbHandle,
+                     const BatonHandle& baton)
+            : CommandStateBase(interface, std::move(request), cbHandle, baton) {}
         ~CommandState() override = default;
 
-        // Create a new CommandState in a shared_ptr
-        // Prefer this over raw construction
-        static auto make(NetworkInterfaceTL* interface,
-                         RemoteCommandRequest request,
-                         const TaskExecutor::CallbackHandle& cbHandle);
-
-        Future<RemoteCommandResponse> sendRequest() override;
-
-        void fulfillFinalPromise(StatusWith<RemoteCommandResponse> response) override;
-
-        Promise<RemoteCommandResponse> promise;
+        Future<RemoteCommandResponse> sendRequestImpl(RemoteCommandRequest toSend) override;
     };
 
     struct ExhaustCommandState final : public CommandStateBase {
-        ExhaustCommandState(NetworkInterfaceTL* interface_,
-                            RemoteCommandRequest request_,
-                            const TaskExecutor::CallbackHandle& cbHandle_,
-                            RemoteCommandOnReplyFn&& onReply_);
+        ExhaustCommandState(NetworkInterfaceTL* interface,
+                            RemoteCommandRequest request,
+                            const TaskExecutor::CallbackHandle& cbHandle,
+                            const BatonHandle& baton,
+                            RemoteCommandOnReplyFn&& onReply)
+            : CommandStateBase(interface, std::move(request), cbHandle, baton),
+              onReplyFn(std::move(onReply)) {}
         ~ExhaustCommandState() override = default;
 
-        // Create a new ExhaustCommandState in a shared_ptr
-        // Prefer this over raw construction
-        static auto make(NetworkInterfaceTL* interface,
-                         RemoteCommandRequest request,
-                         const TaskExecutor::CallbackHandle& cbHandle,
-                         RemoteCommandOnReplyFn&& onReply,
-                         const BatonHandle& baton);
-
-        Future<RemoteCommandResponse> sendRequest() override;
-
-        void fulfillFinalPromise(StatusWith<RemoteCommandResponse> response) override;
+        Future<RemoteCommandResponse> sendRequestImpl(RemoteCommandRequest toSend) override;
 
         void continueExhaustRequest(StatusWith<RemoteCommandResponse> swResponse);
 
@@ -309,7 +265,6 @@ private:
         // request and main thread reading stopwatch elapsed time during shutdown.
         stdx::mutex stopwatchMutex;
 
-        Promise<void> promise;
         Promise<RemoteCommandResponse> finalResponsePromise;
         RemoteCommandOnReplyFn onReplyFn;
     };
@@ -336,7 +291,7 @@ private:
 
     void _run();
 
-    Status _killOperation(CommandStateBase* cmdStateToKill);
+    void _killOperation(CommandStateBase* cmdStateToKill);
 
     /**
      * Adds the provided cmdState to the list of in-progress commands.
@@ -356,6 +311,8 @@ private:
      * Removes an alarm from the in progress alarms by its ID.
      */
     void _removeAlarm(std::uint64_t id);
+
+    ExecutorFuture<RemoteCommandResponse> _runCommand(std::shared_ptr<CommandStateBase> cmdState);
 
     std::string _instanceName;
     ServiceContext* _svcCtx = nullptr;

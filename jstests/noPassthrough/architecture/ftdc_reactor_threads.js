@@ -29,10 +29,6 @@ const st = new ShardingTest({
 const fp = 'networkInterfaceHangCommandsAfterAcquireConn';
 let res = assert.commandWorked(st.s.adminCommand({configureFailPoint: fp, mode: 'alwaysOn'}));
 
-// Force request sending to occur on the reactor thread.
-const reactorThreadFP = 'networkInterfaceSendsRequestsOnReactorThread';
-assert.commandWorked(st.s.adminCommand({configureFailPoint: reactorThreadFP, mode: 'alwaysOn'}));
-
 // Run some operations and have them all blocked after acquiring a connection.
 let threads = [];
 for (var t = 0; t < numThreads; t++) {
@@ -67,7 +63,6 @@ for (var t = 1; t <= numThreads; t++) {
 
 // Introduce some delay before disabling the fail point and unblocking the operation.
 sleep(5000);
-assert.commandWorked(st.s.adminCommand({configureFailPoint: reactorThreadFP, mode: 'off'}));
 assert.commandWorked(st.s.adminCommand({configureFailPoint: fp, mode: 'off'}));
 
 for (var t = 0; t < numThreads; t++) {

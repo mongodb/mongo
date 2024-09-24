@@ -133,12 +133,14 @@ void NetworkInterfaceIntegrationFixture::startCommand(const TaskExecutor::Callba
 }
 
 Future<RemoteCommandResponse> NetworkInterfaceIntegrationFixture::runCommand(
-    const TaskExecutor::CallbackHandle& cbHandle, RemoteCommandRequest request) {
+    const TaskExecutor::CallbackHandle& cbHandle,
+    RemoteCommandRequest request,
+    const std::shared_ptr<Baton>& baton) {
 
     _onSchedulingCommand();
 
     return net()
-        .startCommand(cbHandle, request)
+        .startCommand(cbHandle, request, baton)
         .then([request](TaskExecutor::ResponseStatus resStatus) {
             if (resStatus.isOK()) {
                 LOGV2(4820500,
@@ -191,8 +193,8 @@ Future<void> NetworkInterfaceIntegrationFixture::startExhaustCommand(
     return std::move(pf.future);
 }
 
-void NetworkInterfaceIntegrationFixture::runSetupCommandSync(const DatabaseName& db,
-                                                             BSONObj cmdObj) {
+BSONObj NetworkInterfaceIntegrationFixture::runSetupCommandSync(const DatabaseName& db,
+                                                                BSONObj cmdObj) {
     RemoteCommandRequest request(
         fixture().getServers()[0], db, std::move(cmdObj), BSONObj(), nullptr, Minutes(1));
     request.sslMode = transport::kGlobalSSLMode;
@@ -200,6 +202,34 @@ void NetworkInterfaceIntegrationFixture::runSetupCommandSync(const DatabaseName&
     auto res = _fixtureNet->startCommand(makeCallbackHandle(), request).get();
     ASSERT_OK(res.status);
     ASSERT_OK(getStatusFromCommandResult(res.data));
+    return res.data;
+}
+
+NetworkInterfaceIntegrationFixture::FailPointGuard
+NetworkInterfaceIntegrationFixture::configureFailPoint(StringData fp, BSONObj data) {
+    auto resp = runSetupCommandSync(DatabaseName::kAdmin,
+                                    BSON("configureFailPoint" << fp << "mode"
+                                                              << "alwaysOn"
+                                                              << "data" << data));
+    return FailPointGuard(fp, this, resp.getField("count").Int());
+}
+
+NetworkInterfaceIntegrationFixture::FailPointGuard
+NetworkInterfaceIntegrationFixture::configureFailCommand(
+    StringData failCommand,
+    boost::optional<ErrorCodes::Error> errorCode,
+    boost::optional<Milliseconds> blockTime) {
+    auto data = BSON("failCommands" << BSON_ARRAY(failCommand));
+
+    if (errorCode) {
+        data = data.addField(BSON("errorCode" << *errorCode).firstElement());
+    }
+
+    if (blockTime) {
+        data =
+            data.addFields(BSON("blockConnection" << true << "blockTimeMS" << blockTime->count()));
+    }
+    return configureFailPoint("failCommand", data);
 }
 
 RemoteCommandResponse NetworkInterfaceIntegrationFixture::runCommandSync(
