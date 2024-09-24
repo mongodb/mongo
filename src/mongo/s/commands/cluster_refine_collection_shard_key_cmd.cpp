@@ -98,7 +98,7 @@ public:
             generic_argument_util::setMajorityWriteConcern(refineCollectionShardKeyCommand,
                                                            &opCtx->getWriteConcern());
 
-            auto cmdResponse = executeCommandAgainstDatabasePrimary(
+            auto cmdResponse = executeCommandAgainstDatabasePrimaryOnlyAttachingDbVersion(
                 opCtx,
                 nss.dbName(),
                 dbInfo,

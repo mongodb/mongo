@@ -141,13 +141,13 @@ BSONObj executeCoordinateMultiUpdate(OperationContext* opCtx,
     const auto dbInfo = uassertStatusOK(catalogCache->getDatabase(opCtx, nss.dbName()));
 
     generic_argument_util::setMajorityWriteConcern(coordinateCommand, &opCtx->getWriteConcern());
-    auto response =
-        executeCommandAgainstDatabasePrimary(opCtx,
-                                             DatabaseName::kAdmin,
-                                             dbInfo,
-                                             coordinateCommand.toBSON(),
-                                             ReadPreferenceSetting(ReadPreference::PrimaryOnly),
-                                             Shard::RetryPolicy::kIdempotent);
+    auto response = executeCommandAgainstDatabasePrimaryOnlyAttachingDbVersion(
+        opCtx,
+        DatabaseName::kAdmin,
+        dbInfo,
+        coordinateCommand.toBSON(),
+        ReadPreferenceSetting(ReadPreference::PrimaryOnly),
+        Shard::RetryPolicy::kIdempotent);
 
     uassertStatusOK(AsyncRequestsSender::Response::getEffectiveStatus(response));
     auto parsed = ShardsvrCoordinateMultiUpdateResponse::parse(

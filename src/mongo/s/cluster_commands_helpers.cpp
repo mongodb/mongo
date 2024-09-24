@@ -603,29 +603,7 @@ scatterGatherVersionedTargetByRoutingTableNoThrowOnStaleShardVersionErrors(
         opCtx, dbName, readPref, retryPolicy, requests);
 }
 
-AsyncRequestsSender::Response executeCommandAgainstDatabasePrimary(
-    OperationContext* opCtx,
-    const DatabaseName& dbName,
-    const CachedDatabaseInfo& dbInfo,
-    const BSONObj& cmdObj,
-    const ReadPreferenceSetting& readPref,
-    Shard::RetryPolicy retryPolicy) {
-    // Attach shardVersion "UNSHARDED", unless targeting a fixed db collection.
-    const auto cmdObjWithShardVersion = !dbInfo->getVersion().isFixed()
-        ? appendShardVersion(cmdObj, ShardVersion::UNSHARDED())
-        : cmdObj;
-
-    auto responses = gatherResponses(
-        opCtx,
-        dbName,
-        readPref,
-        retryPolicy,
-        std::vector<AsyncRequestsSender::Request>{AsyncRequestsSender::Request(
-            dbInfo->getPrimary(), appendDbVersionIfPresent(cmdObjWithShardVersion, dbInfo))});
-    return std::move(responses.front());
-}
-
-AsyncRequestsSender::Response executeDDLCoordinatorCommandAgainstDatabasePrimary(
+AsyncRequestsSender::Response executeCommandAgainstDatabasePrimaryOnlyAttachingDbVersion(
     OperationContext* opCtx,
     const DatabaseName& dbName,
     const CachedDatabaseInfo& dbInfo,

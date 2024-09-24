@@ -358,24 +358,11 @@ scatterGatherVersionedTargetByRoutingTableNoThrowOnStaleShardVersionErrors(
     const boost::optional<LegacyRuntimeConstants>& runtimeConstants);
 
 /**
- * Utility for dispatching commands against the primary of a database and attaching the appropriate
- * database version. Also attaches UNSHARDED to the command. Does not retry on stale version.
- */
-AsyncRequestsSender::Response executeCommandAgainstDatabasePrimary(
-    OperationContext* opCtx,
-    const DatabaseName& dbName,
-    const CachedDatabaseInfo& dbInfo,
-    const BSONObj& cmdObj,
-    const ReadPreferenceSetting& readPref,
-    Shard::RetryPolicy retryPolicy);
-
-/**
- * Utility for dispatching ddl coordinators commands against the primary of a database and attaching
+ * Utility for dispatching commands against the primary of a database and attaching
  * the appropriate database version.
- * NOTE: It only attaches the database version which is what is required by the DDL coordinators to
- * ensure they are running on the current DB primary.
+ * NOTE: It only attaches the database version and no shard version.
  */
-AsyncRequestsSender::Response executeDDLCoordinatorCommandAgainstDatabasePrimary(
+AsyncRequestsSender::Response executeCommandAgainstDatabasePrimaryOnlyAttachingDbVersion(
     OperationContext* opCtx,
     const DatabaseName& dbName,
     const CachedDatabaseInfo& dbInfo,

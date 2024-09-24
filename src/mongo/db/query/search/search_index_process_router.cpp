@@ -62,7 +62,7 @@ boost::optional<UUID> SearchIndexProcessRouter::fetchCollectionUUID(OperationCon
             listCollections.setDbName(nss.dbName());
             listCollections.setFilter(BSON("name" << nss.coll()));
 
-            auto response = executeCommandAgainstDatabasePrimary(
+            auto response = executeCommandAgainstDatabasePrimaryOnlyAttachingDbVersion(
                 opCtx,
                 nss.dbName(),
                 cdb,

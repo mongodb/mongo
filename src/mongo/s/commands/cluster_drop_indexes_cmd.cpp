@@ -146,13 +146,13 @@ public:
         const CachedDatabaseInfo dbInfo =
             uassertStatusOK(Grid::get(opCtx)->catalogCache()->getDatabase(opCtx, dbName));
 
-        auto cmdResponse =
-            executeCommandAgainstDatabasePrimary(opCtx,
-                                                 dbName,
-                                                 dbInfo,
-                                                 shardsvrDropIndexCmd.toBSON(),
-                                                 ReadPreferenceSetting(ReadPreference::PrimaryOnly),
-                                                 Shard::RetryPolicy::kNotIdempotent);
+        auto cmdResponse = executeCommandAgainstDatabasePrimaryOnlyAttachingDbVersion(
+            opCtx,
+            dbName,
+            dbInfo,
+            shardsvrDropIndexCmd.toBSON(),
+            ReadPreferenceSetting(ReadPreference::PrimaryOnly),
+            Shard::RetryPolicy::kNotIdempotent);
 
         const auto remoteResponse = uassertStatusOK(cmdResponse.swResponse);
         CommandHelpers::filterCommandReplyForPassthrough(remoteResponse.data, &output);

@@ -95,13 +95,13 @@ Status populateCollectionUUIDMismatch(OperationContext* opCtx,
     listCollections.setDbName(info->dbName());
     listCollections.setFilter(BSON("info.uuid" << info->collectionUUID()));
 
-    auto response =
-        executeCommandAgainstDatabasePrimary(opCtx,
-                                             info->dbName(),
-                                             swDbInfo.getValue(),
-                                             listCollections.toBSON(),
-                                             ReadPreferenceSetting{ReadPreference::PrimaryOnly},
-                                             Shard::RetryPolicy::kIdempotent);
+    auto response = executeCommandAgainstDatabasePrimaryOnlyAttachingDbVersion(
+        opCtx,
+        info->dbName(),
+        swDbInfo.getValue(),
+        listCollections.toBSON(),
+        ReadPreferenceSetting{ReadPreference::PrimaryOnly},
+        Shard::RetryPolicy::kIdempotent);
     if (!response.swResponse.isOK()) {
         return response.swResponse.getStatus();
     }

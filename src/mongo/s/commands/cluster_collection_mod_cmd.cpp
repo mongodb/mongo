@@ -153,14 +153,15 @@ public:
         ShardsvrCollMod collModCommand(nss);
         collModCommand.setCollModRequest(cmd.getCollModRequest());
         generic_argument_util::setMajorityWriteConcern(collModCommand, &opCtx->getWriteConcern());
-        auto cmdResponse = uassertStatusOK(
-            executeCommandAgainstDatabasePrimary(opCtx,
-                                                 dbName,
-                                                 dbInfo,
-                                                 collModCommand.toBSON(),
-                                                 ReadPreferenceSetting(ReadPreference::PrimaryOnly),
-                                                 Shard::RetryPolicy::kIdempotent)
-                .swResponse);
+        auto cmdResponse =
+            uassertStatusOK(executeCommandAgainstDatabasePrimaryOnlyAttachingDbVersion(
+                                opCtx,
+                                dbName,
+                                dbInfo,
+                                collModCommand.toBSON(),
+                                ReadPreferenceSetting(ReadPreference::PrimaryOnly),
+                                Shard::RetryPolicy::kIdempotent)
+                                .swResponse);
 
         CommandHelpers::filterCommandReplyForPassthrough(cmdResponse.data, &result);
         return cmdResponse.isOK();

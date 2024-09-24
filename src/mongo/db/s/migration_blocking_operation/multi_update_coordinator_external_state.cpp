@@ -50,7 +50,7 @@ auto runDDLOperationWithRetry(OperationContext* opCtx,
     auto catalogCache = Grid::get(opCtx)->catalogCache();
     return shardVersionRetry(opCtx, catalogCache, nss, cmdName, [&] {
         const auto dbInfo = uassertStatusOK(catalogCache->getDatabase(opCtx, nss.dbName()));
-        auto response = executeDDLCoordinatorCommandAgainstDatabasePrimary(
+        auto response = executeCommandAgainstDatabasePrimaryOnlyAttachingDbVersion(
             opCtx,
             DatabaseName::kAdmin,
             dbInfo,

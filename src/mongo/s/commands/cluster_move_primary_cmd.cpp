@@ -88,7 +88,7 @@ public:
             generic_argument_util::setMajorityWriteConcern(shardsvrRequest,
                                                            &opCtx->getWriteConcern());
 
-            const auto commandResponse = executeCommandAgainstDatabasePrimary(
+            const auto commandResponse = executeCommandAgainstDatabasePrimaryOnlyAttachingDbVersion(
                 opCtx,
                 DatabaseName::kAdmin,
                 dbInfo,

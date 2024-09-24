@@ -136,7 +136,7 @@ public:
 
             generic_argument_util::setMajorityWriteConcern(shardsvrReshardCollection,
                                                            &opCtx->getWriteConcern());
-            auto cmdResponse = executeDDLCoordinatorCommandAgainstDatabasePrimary(
+            auto cmdResponse = executeCommandAgainstDatabasePrimaryOnlyAttachingDbVersion(
                 opCtx,
                 DatabaseName::kAdmin,
                 dbInfo,

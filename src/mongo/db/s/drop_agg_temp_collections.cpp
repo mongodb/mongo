@@ -54,13 +54,14 @@ void dropTempCollection(OperationContext* opCtx, const NamespaceString& nss) {
 
                      ShardsvrDropCollection shardsvrDropCollection(nss);
                      generic_argument_util::setMajorityWriteConcern(shardsvrDropCollection);
-                     const auto cmdResponse = executeCommandAgainstDatabasePrimary(
-                         opCtx,
-                         nss.dbName(),
-                         cdb,
-                         shardsvrDropCollection.toBSON(),
-                         ReadPreferenceSetting(ReadPreference::PrimaryOnly),
-                         Shard::RetryPolicy::kIdempotent);
+                     const auto cmdResponse =
+                         executeCommandAgainstDatabasePrimaryOnlyAttachingDbVersion(
+                             opCtx,
+                             nss.dbName(),
+                             cdb,
+                             shardsvrDropCollection.toBSON(),
+                             ReadPreferenceSetting(ReadPreference::PrimaryOnly),
+                             Shard::RetryPolicy::kIdempotent);
 
                      const auto remoteResponse = uassertStatusOK(cmdResponse.swResponse);
                      uassertStatusOK(getStatusFromCommandResult(remoteResponse.data));

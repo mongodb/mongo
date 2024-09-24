@@ -225,7 +225,7 @@ void createCollection(OperationContext* opCtx, ShardsvrCreateCollection request)
                 ReadPreferenceSetting(ReadPreference::PrimaryOnly),
                 Shard::RetryPolicy::kIdempotent);
         else {
-            return executeDDLCoordinatorCommandAgainstDatabasePrimary(
+            return executeCommandAgainstDatabasePrimaryOnlyAttachingDbVersion(
                 opCtx,
                 nss.dbName(),
                 dbInfo,

@@ -112,7 +112,7 @@ public:
                 generic_argument_util::setMajorityWriteConcern(dropDatabaseCommand,
                                                                &opCtx->getWriteConcern());
 
-                auto cmdResponse = executeCommandAgainstDatabasePrimary(
+                auto cmdResponse = executeCommandAgainstDatabasePrimaryOnlyAttachingDbVersion(
                     opCtx,
                     dbName,
                     dbInfo,

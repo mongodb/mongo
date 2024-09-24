@@ -95,7 +95,7 @@ bool cursorCommandPassthroughPrimaryShard(OperationContext* opCtx,
                                           const NamespaceString& nss,
                                           BSONObjBuilder* out,
                                           const PrivilegeVector& privileges) {
-    auto response = executeCommandAgainstDatabasePrimary(
+    auto response = executeCommandAgainstDatabasePrimaryOnlyAttachingDbVersion(
         opCtx,
         dbName,
         dbInfo,

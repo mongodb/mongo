@@ -289,13 +289,13 @@ void ReshardingCoordinatorCleaner::_dropTemporaryReshardingCollection(
     const auto dbInfo = uassertStatusOK(
         Grid::get(opCtx)->catalogCache()->getDatabase(opCtx, tempReshardingNss.dbName()));
 
-    auto cmdResponse =
-        executeCommandAgainstDatabasePrimary(opCtx,
-                                             tempReshardingNss.dbName(),
-                                             dbInfo,
-                                             dropCollectionCommand.toBSON(),
-                                             ReadPreferenceSetting(ReadPreference::PrimaryOnly),
-                                             Shard::RetryPolicy::kIdempotent);
+    auto cmdResponse = executeCommandAgainstDatabasePrimaryOnlyAttachingDbVersion(
+        opCtx,
+        tempReshardingNss.dbName(),
+        dbInfo,
+        dropCollectionCommand.toBSON(),
+        ReadPreferenceSetting(ReadPreference::PrimaryOnly),
+        Shard::RetryPolicy::kIdempotent);
 
     assertResponseOK(
         _originalCollectionNss, std::move(cmdResponse.swResponse), std::move(cmdResponse.shardId));

@@ -128,7 +128,7 @@ public:
                 generic_argument_util::setMajorityWriteConcern(dropCollectionCommand,
                                                                &opCtx->getWriteConcern());
 
-                auto cmdResponse = executeCommandAgainstDatabasePrimary(
+                auto cmdResponse = executeCommandAgainstDatabasePrimaryOnlyAttachingDbVersion(
                     opCtx,
                     nss.dbName(),
                     dbInfo,

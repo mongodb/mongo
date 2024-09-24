@@ -101,7 +101,7 @@ public:
 
         const CachedDatabaseInfo dbInfo =
             uassertStatusOK(Grid::get(opCtx)->catalogCache()->getDatabase(opCtx, nss.dbName()));
-        auto cmdResponse = executeDDLCoordinatorCommandAgainstDatabasePrimary(
+        auto cmdResponse = executeCommandAgainstDatabasePrimaryOnlyAttachingDbVersion(
             opCtx,
             dbName,
             dbInfo,

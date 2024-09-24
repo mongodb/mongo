@@ -268,7 +268,7 @@ void ShardServerProcessInterface::renameIfOptionsAndIndexesHaveNotChanged(
                      newCmdWithWriteConcernBuilder.append(WriteConcernOptions::kWriteConcernField,
                                                           opCtx->getWriteConcern().toBSON());
                      newCmdObj = newCmdWithWriteConcernBuilder.done();
-                     auto response = executeCommandAgainstDatabasePrimary(
+                     auto response = executeCommandAgainstDatabasePrimaryOnlyAttachingDbVersion(
                          opCtx,
                          // internalRenameIfOptionsAndIndexesMatch is adminOnly.
                          DatabaseName::kAdmin,
@@ -429,7 +429,7 @@ void ShardServerProcessInterface::_createCollectionCommon(OperationContext* opCt
                          finalCmdBuilder.append(WriteConcernOptions::kWriteConcernField,
                                                 opCtx->getWriteConcern().toBSON());
                          BSONObj finalCmdObj = finalCmdBuilder.obj();
-                         auto response = executeCommandAgainstDatabasePrimary(
+                         auto response = executeCommandAgainstDatabasePrimaryOnlyAttachingDbVersion(
                              opCtx,
                              dbName,
                              cdb,
@@ -558,7 +558,7 @@ void ShardServerProcessInterface::dropCollection(OperationContext* opCtx,
                          generic_argument_util::setMajorityWriteConcern(dropCollectionCommand,
                                                                         &opCtx->getWriteConcern());
                          BSONObj cmdObj = dropCollectionCommand.toBSON();
-                         auto response = executeCommandAgainstDatabasePrimary(
+                         auto response = executeCommandAgainstDatabasePrimaryOnlyAttachingDbVersion(
                              opCtx,
                              ns.dbName(),
                              cdb,
