@@ -24,6 +24,8 @@ selector:
   # $unionWith explain output does not check whether the collection is sharded in a sharded
   # cluster.
   - jstests/aggregation/sources/unionWith/unionWith_explain.js
+  # TODO SERVER-92403 Re-enable this test.
+  - jstests/aggregation/sources/setWindowFields/n_accumulators.js
   exclude_with_any_tags:
   # The following tests start their own ShardingTest or ReplSetTest, respectively.
   - requires_sharding

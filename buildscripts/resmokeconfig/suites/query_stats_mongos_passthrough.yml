@@ -42,6 +42,10 @@ selector:
   - jstests/core/**/explain_upsert.js
   # The following test fires a query that is too large for a debug query shape.
   - jstests/core/query/query_settings/query_settings_size_limits.js
+  # TODO SERVER-94818 Re-enable this test in query stats passthroughs.
+  # Query stats changes the error code expected by this test due to how it propagates parsing
+  # errors in test environments.
+  - jstests/core/json_schema/misc_validation.js
   exclude_with_any_tags:
   - assumes_standalone_mongod
   - assumes_against_mongod_not_mongos
