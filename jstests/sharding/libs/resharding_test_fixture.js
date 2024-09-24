@@ -1271,6 +1271,12 @@ export var ReshardingTest = class {
             return cloneTimestamp !== undefined;
         });
 
+        for (let donor of this._donorShards()) {
+            // Send a command through the router so $clusterTime gossiping advances the timestamp to
+            // atleast the cloneTimestamp on all donors.
+            donor.getCollection(this._underlyingSourceNs).findOne();
+        }
+
         return cloneTimestamp;
     }
 
