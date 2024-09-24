@@ -6,6 +6,7 @@ import platform
 import subprocess
 
 from simple_report import put_report, try_combine_reports, make_report
+import download_buildifier
 
 mongo_dir = pathlib.Path(__file__).parents[1]
 
@@ -129,6 +130,13 @@ def main():
         binary_path = os.path.join(args.binary_dir, binary_name)
     else:
         binary_path = os.path.join(os.curdir, binary_name)
+
+    if not os.path.exists(binary_path):
+        binary_dir = args.binary_dir if args.binary_dir else os.curdir
+        try:
+            download_buildifier.download(download_location=binary_dir)
+        except Exception as ex:
+            raise RuntimeError("Could not download and setup buildifier", ex)
 
     subcommand = args.subcommand
     if subcommand == "lint-all":

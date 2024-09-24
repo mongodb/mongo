@@ -37,12 +37,24 @@ def determine_architecture():
     return arch
 
 
-def main():
+def download(download_location: str = "./"):
     operating_system = determine_platform()
     architechture = determine_architecture()
     if operating_system == "windows" and architechture == "arm64":
         raise RuntimeError("There are no published arm windows releases for buildifier.")
 
+    extension = ".exe" if operating_system == "windows" else ""
+    binary_name = f"buildifier-{operating_system}-{architechture}{extension}"
+    url = f"{RELEASE_URL}{binary_name}"
+
+    file_location = os.path.join(download_location, f"buildifier{extension}")
+    urllib.request.urlretrieve(url, file_location)
+    print(f"Downloaded buildifier from {url} to {file_location}")
+    os.chmod(file_location, stat.S_IRUSR | stat.S_IWUSR | stat.S_IXUSR)
+    print(f"Set user executable permissions on {file_location}")
+
+
+def main():
     parser = argparse.ArgumentParser(
         prog="DownloadBuildifier",
         description="This downloads buildifier, it is intended for use in evergreen."
@@ -57,17 +69,9 @@ def main():
         default="./",
     )
 
-    args = parser.parse_args()
+    args = parser.parse_known_args()
 
-    extension = ".exe" if operating_system == "windows" else ""
-    binary_name = f"buildifier-{operating_system}-{architechture}{extension}"
-    url = f"{RELEASE_URL}{binary_name}"
-
-    file_location = os.path.join(args.download_location, f"buildifier{extension}")
-    urllib.request.urlretrieve(url, file_location)
-    print(f"Downloaded buildifier from {url} to {file_location}")
-    os.chmod(file_location, stat.S_IRUSR | stat.S_IWUSR | stat.S_IXUSR)
-    print(f"Set user executable permissions on {file_location}")
+    download(download_location=args[0].download_location)
 
 
 if __name__ == "__main__":
