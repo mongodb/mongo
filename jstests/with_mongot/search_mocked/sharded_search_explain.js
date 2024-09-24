@@ -19,7 +19,7 @@ import {
 } from "jstests/with_mongot/mongotmock/lib/shardingtest_with_mongotmock.js";
 import {
     getDefaultLastExplainContents,
-    getShardedSearchStagesAndVerifyExplainOutput,
+    getShardedMongotStagesAndValidateExplainExecutionStats,
     setUpMongotReturnExplain,
     setUpMongotReturnExplainAndCursor,
 } from "jstests/with_mongot/mongotmock/lib/utils.js";
@@ -145,7 +145,7 @@ function runExplainTest(verbosity) {
 
             const result = coll.explain(verbosity).aggregate([{$search: searchQuery}]);
 
-            getShardedSearchStagesAndVerifyExplainOutput({
+            getShardedMongotStagesAndValidateExplainExecutionStats({
                 result,
                 stageType: "$_internalSearchMongotRemote",
                 expectedNumStages: 2,
@@ -186,7 +186,7 @@ function runExplainTest(verbosity) {
                 });
 
                 const result = coll.explain(verbosity).aggregate([{$search: searchQuery}]);
-                getShardedSearchStagesAndVerifyExplainOutput({
+                getShardedMongotStagesAndValidateExplainExecutionStats({
                     result,
                     stageType: "$_internalSearchMongotRemote",
                     expectedNumStages: 2,

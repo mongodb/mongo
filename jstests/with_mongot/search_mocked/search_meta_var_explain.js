@@ -15,7 +15,7 @@ import {
 } from "jstests/with_mongot/mongotmock/lib/mongotmock.js";
 import {
     getDefaultLastExplainContents,
-    getSearchStagesAndVerifyExplainOutput,
+    getMongotStagesAndValidateExplainExecutionStats,
     setUpMongotReturnExplain,
     setUpMongotReturnExplainAndCursor,
     setUpMongotReturnExplainAndCursorGetMore,
@@ -104,7 +104,7 @@ function testUnionWith(searchCmd, verbosity) {
     ]);
 
     // Check stats for toplevel pipeline.
-    getSearchStagesAndVerifyExplainOutput({
+    getMongotStagesAndValidateExplainExecutionStats({
         result,
         stageType: "$_internalSearchMongotRemote",
         nReturned: NumberLong(3),
@@ -112,7 +112,7 @@ function testUnionWith(searchCmd, verbosity) {
         verbosity: verbosity,
     });
 
-    getSearchStagesAndVerifyExplainOutput({
+    getMongotStagesAndValidateExplainExecutionStats({
         result,
         stageType: "$_internalSearchIdLookup",
         nReturned: NumberLong(3),
@@ -129,14 +129,14 @@ function testUnionWith(searchCmd, verbosity) {
     // Check stats for $unionWith subpipeline
     const pipeline = unionWithStage["$unionWith"]["pipeline"];
     let unionSubExplain = prepareUnionWithExplain(pipeline);
-    getSearchStagesAndVerifyExplainOutput({
+    getMongotStagesAndValidateExplainExecutionStats({
         result: unionSubExplain,
         stageType: "$_internalSearchMongotRemote",
         verbosity,
         nReturned: NumberLong(3),
         explainObject: explainContents,
     });
-    getSearchStagesAndVerifyExplainOutput({
+    getMongotStagesAndValidateExplainExecutionStats({
         result: unionSubExplain,
         stageType: "$_internalSearchIdLookup",
         verbosity,
@@ -181,14 +181,14 @@ function runExplainTest(verbosity) {
             });
         }
         const result = coll.explain(verbosity).aggregate(pipeline);
-        getSearchStagesAndVerifyExplainOutput({
+        getMongotStagesAndValidateExplainExecutionStats({
             result,
             stageType: "$_internalSearchMongotRemote",
             verbosity,
             nReturned: NumberLong(0),
             explainObject
         });
-        getSearchStagesAndVerifyExplainOutput({
+        getMongotStagesAndValidateExplainExecutionStats({
             result,
             stageType: "$_internalSearchIdLookup",
             verbosity,
@@ -209,14 +209,14 @@ function runExplainTest(verbosity) {
                 ],
             });
             const result = coll.explain(verbosity).aggregate(pipeline);
-            getSearchStagesAndVerifyExplainOutput({
+            getMongotStagesAndValidateExplainExecutionStats({
                 result,
                 stageType: "$_internalSearchMongotRemote",
                 verbosity,
                 nReturned: NumberLong(3),
                 explainObject
             });
-            getSearchStagesAndVerifyExplainOutput({
+            getMongotStagesAndValidateExplainExecutionStats({
                 result,
                 stageType: "$_internalSearchIdLookup",
                 verbosity,
@@ -239,14 +239,14 @@ function runExplainTest(verbosity) {
                 vars,
             });
             const result = coll.explain(verbosity).aggregate(pipeline, {cursor: {batchSize: 2}});
-            getSearchStagesAndVerifyExplainOutput({
+            getMongotStagesAndValidateExplainExecutionStats({
                 result,
                 stageType: "$_internalSearchMongotRemote",
                 verbosity,
                 nReturned: NumberLong(5),
                 explainObject
             });
-            getSearchStagesAndVerifyExplainOutput({
+            getMongotStagesAndValidateExplainExecutionStats({
                 result,
                 stageType: "$_internalSearchIdLookup",
                 verbosity,

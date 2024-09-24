@@ -17,7 +17,7 @@ import {
 } from "jstests/with_mongot/mongotmock/lib/shardingtest_with_mongotmock.js";
 import {
     getDefaultLastExplainContents,
-    getShardedSearchStagesAndVerifyExplainOutput,
+    getShardedMongotStagesAndValidateExplainExecutionStats,
     setUpMongotReturnExplain,
     setUpMongotReturnExplainAndMultiCursor,
     setUpMongotReturnExplainAndMultiCursorGetMore,
@@ -161,7 +161,7 @@ function runExplainTest(verbosity) {
             searchCmd.intermediate = protocolVersion;
 
             const result = coll.explain(verbosity).aggregate([{$search: searchQuery}]);
-            getShardedSearchStagesAndVerifyExplainOutput({
+            getShardedMongotStagesAndValidateExplainExecutionStats({
                 result,
                 stageType: "$_internalSearchMongotRemote",
                 expectedNumStages: 2,
@@ -169,7 +169,7 @@ function runExplainTest(verbosity) {
                 nReturnedList: [NumberLong(0), NumberLong(0)],
                 expectedExplainContents,
             });
-            getShardedSearchStagesAndVerifyExplainOutput({
+            getShardedMongotStagesAndValidateExplainExecutionStats({
                 result,
                 stageType: "$_internalSearchIdLookup",
                 expectedNumStages: 2,
@@ -208,7 +208,7 @@ function runExplainTest(verbosity) {
             });
 
             const result = coll.explain(verbosity).aggregate([{$search: searchQuery}]);
-            getShardedSearchStagesAndVerifyExplainOutput({
+            getShardedMongotStagesAndValidateExplainExecutionStats({
                 result,
                 stageType: "$_internalSearchMongotRemote",
                 expectedNumStages: 2,
@@ -216,7 +216,7 @@ function runExplainTest(verbosity) {
                 nReturnedList: [NumberLong(4), NumberLong(3)],
                 expectedExplainContents,
             });
-            getShardedSearchStagesAndVerifyExplainOutput({
+            getShardedMongotStagesAndValidateExplainExecutionStats({
                 result,
                 stageType: "$_internalSearchIdLookup",
                 expectedNumStages: 2,
@@ -256,7 +256,7 @@ function runExplainTest(verbosity) {
 
             const result = coll.explain(verbosity).aggregate([{$search: searchQuery}],
                                                              {cursor: {batchSize: 2}});
-            getShardedSearchStagesAndVerifyExplainOutput({
+            getShardedMongotStagesAndValidateExplainExecutionStats({
                 result,
                 stageType: "$_internalSearchMongotRemote",
                 expectedNumStages: 2,
@@ -264,7 +264,7 @@ function runExplainTest(verbosity) {
                 nReturnedList: [NumberLong(4), NumberLong(3)],
                 expectedExplainContents,
             });
-            getShardedSearchStagesAndVerifyExplainOutput({
+            getShardedMongotStagesAndValidateExplainExecutionStats({
                 result,
                 stageType: "$_internalSearchIdLookup",
                 expectedNumStages: 2,
@@ -314,7 +314,7 @@ function runExplainTest(verbosity) {
                 [{$search: searchQuery}, {$project: {_id: 1, meta: "$$SEARCH_META"}}],
                 {cursor: {batchSize: 2}});
 
-            getShardedSearchStagesAndVerifyExplainOutput({
+            getShardedMongotStagesAndValidateExplainExecutionStats({
                 result,
                 stageType: "$_internalSearchMongotRemote",
                 expectedNumStages: 2,
@@ -322,7 +322,7 @@ function runExplainTest(verbosity) {
                 nReturnedList: [NumberLong(4), NumberLong(3)],
                 expectedExplainContents,
             });
-            getShardedSearchStagesAndVerifyExplainOutput({
+            getShardedMongotStagesAndValidateExplainExecutionStats({
                 result,
                 stageType: "$_internalSearchIdLookup",
                 expectedNumStages: 2,

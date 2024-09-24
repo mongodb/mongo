@@ -16,7 +16,7 @@ import {
 } from "jstests/with_mongot/mongotmock/lib/shardingtest_with_mongotmock.js";
 import {
     getDefaultLastExplainContents,
-    getShardedSearchStagesAndVerifyExplainOutput,
+    getShardedMongotStagesAndValidateExplainExecutionStats,
     setUpMongotReturnExplain,
     setUpMongotReturnExplainAndMultiCursor,
     setUpMongotReturnExplainAndMultiCursorGetMore,
@@ -162,7 +162,7 @@ function runExplainTest(verbosity) {
                 searchCmd.intermediate = protocolVersion;
             }
             const result = coll.explain(verbosity).aggregate(pipeline);
-            getShardedSearchStagesAndVerifyExplainOutput({
+            getShardedMongotStagesAndValidateExplainExecutionStats({
                 result,
                 stageType: "$searchMeta",
                 expectedNumStages: 2,
@@ -202,7 +202,7 @@ function runExplainTest(verbosity) {
                     metaBatch: [{val: 11}, {val: 12}]
                 });
                 const result = coll.explain(verbosity).aggregate(pipeline);
-                getShardedSearchStagesAndVerifyExplainOutput({
+                getShardedMongotStagesAndValidateExplainExecutionStats({
                     result,
                     stageType: "$searchMeta",
                     expectedNumStages: 2,
@@ -247,7 +247,7 @@ function runExplainTest(verbosity) {
                 });
                 const result =
                     coll.explain(verbosity).aggregate(pipeline, {cursor: {batchSize: 2}});
-                getShardedSearchStagesAndVerifyExplainOutput({
+                getShardedMongotStagesAndValidateExplainExecutionStats({
                     result,
                     stageType: "$searchMeta",
                     expectedNumStages: 2,

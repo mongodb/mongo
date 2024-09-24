@@ -16,8 +16,8 @@ import {
 } from "jstests/with_mongot/mongotmock/lib/shardingtest_with_mongotmock.js";
 import {
     getDefaultLastExplainContents,
-    getSearchStagesAndVerifyExplainOutput,
-    getShardedSearchStagesAndVerifyExplainOutput,
+    getMongotStagesAndValidateExplainExecutionStats,
+    getShardedMongotStagesAndValidateExplainExecutionStats,
 } from "jstests/with_mongot/mongotmock/lib/utils.js";
 
 const stWithMock = new ShardingTestWithMongotMock({
@@ -464,14 +464,14 @@ let explainResult =
                                           {mongos: [], primary: [], secondary: []});
 let unionWithStage = getUnionWithStage(explainResult);
 let pipeline = unionWithStage["$unionWith"]["pipeline"];
-getSearchStagesAndVerifyExplainOutput({
+getMongotStagesAndValidateExplainExecutionStats({
     result: pipeline,
     stageType: "$_internalSearchMongotRemote",
     verbosity: "executionStats",
     nReturned: NumberLong(5),
     explainObject: expectedExplainContents
 });
-getSearchStagesAndVerifyExplainOutput({
+getMongotStagesAndValidateExplainExecutionStats({
     result: pipeline,
     stageType: "$_internalSearchIdLookup",
     verbosity: "executionStats",
@@ -488,7 +488,7 @@ explainResult = unionWithExplainExecStatsDoesNotThrow(
 
 unionWithStage = getUnionWithStage(explainResult);
 pipeline = unionWithStage["$unionWith"]["pipeline"];
-getShardedSearchStagesAndVerifyExplainOutput({
+getShardedMongotStagesAndValidateExplainExecutionStats({
     result: pipeline,
     stageType: "$_internalSearchMongotRemote",
     expectedNumStages: 2,
@@ -497,7 +497,7 @@ getShardedSearchStagesAndVerifyExplainOutput({
     expectedExplainContents,
 });
 
-getShardedSearchStagesAndVerifyExplainOutput({
+getShardedMongotStagesAndValidateExplainExecutionStats({
     result: pipeline,
     stageType: "$_internalSearchIdLookup",
     expectedNumStages: 2,
@@ -517,14 +517,14 @@ explainResult =
 unionWithStage = getUnionWithStage(explainResult);
 pipeline = unionWithStage["$unionWith"]["pipeline"];
 
-getSearchStagesAndVerifyExplainOutput({
+getMongotStagesAndValidateExplainExecutionStats({
     result: pipeline,
     stageType: "$_internalSearchMongotRemote",
     verbosity: "executionStats",
     nReturned: NumberLong(5),
     explainObject: expectedExplainContents
 });
-getSearchStagesAndVerifyExplainOutput({
+getMongotStagesAndValidateExplainExecutionStats({
     result: pipeline,
     stageType: "$_internalSearchIdLookup",
     verbosity: "executionStats",
@@ -542,7 +542,7 @@ explainResult = unionWithExplainExecStatsDoesNotThrow(
 
 unionWithStage = getUnionWithStage(explainResult);
 pipeline = unionWithStage["$unionWith"]["pipeline"];
-getShardedSearchStagesAndVerifyExplainOutput({
+getShardedMongotStagesAndValidateExplainExecutionStats({
     result: pipeline,
     stageType: "$_internalSearchMongotRemote",
     expectedNumStages: 2,
@@ -551,7 +551,7 @@ getShardedSearchStagesAndVerifyExplainOutput({
     expectedExplainContents,
 });
 
-getShardedSearchStagesAndVerifyExplainOutput({
+getShardedMongotStagesAndValidateExplainExecutionStats({
     result: pipeline,
     stageType: "$_internalSearchIdLookup",
     expectedNumStages: 2,

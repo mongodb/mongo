@@ -13,7 +13,7 @@ import {
 } from "jstests/with_mongot/mongotmock/lib/mongotmock.js";
 import {
     getDefaultLastExplainContents,
-    getSearchStagesAndVerifyExplainOutput,
+    getMongotStagesAndValidateExplainExecutionStats,
     setUpMongotReturnExplain,
     setUpMongotReturnExplainAndCursor,
     setUpMongotReturnExplainAndCursorGetMore,
@@ -74,13 +74,13 @@ function runExplainQueryPlannerTest() {
     });
     const result = coll.explain(verbosity).aggregate(pipeline);
 
-    getSearchStagesAndVerifyExplainOutput({
+    getMongotStagesAndValidateExplainExecutionStats({
         result: result,
         stageType: "$vectorSearch",
         verbosity: verbosity,
         explainObject: expectedExplainObject,
     });
-    getSearchStagesAndVerifyExplainOutput({
+    getMongotStagesAndValidateExplainExecutionStats({
         result: result,
         stageType: "$_internalSearchIdLookup",
         verbosity: verbosity,
@@ -111,14 +111,14 @@ function runExplainExecutionStatsTest(verbosity) {
             cursorId: NumberLong(124),
         });
         const result = coll.explain(verbosity).aggregate(pipeline);
-        getSearchStagesAndVerifyExplainOutput({
+        getMongotStagesAndValidateExplainExecutionStats({
             result: result,
             stageType: "$vectorSearch",
             verbosity: verbosity,
             nReturned: NumberLong(0),
             explainObject: expectedExplainObject,
         });
-        getSearchStagesAndVerifyExplainOutput({
+        getMongotStagesAndValidateExplainExecutionStats({
             result,
             stageType: "$_internalSearchIdLookup",
             verbosity: verbosity,
@@ -138,14 +138,14 @@ function runExplainExecutionStatsTest(verbosity) {
             ],
         });
         const result = coll.explain(verbosity).aggregate(pipeline);
-        getSearchStagesAndVerifyExplainOutput({
+        getMongotStagesAndValidateExplainExecutionStats({
             result: result,
             stageType: "$vectorSearch",
             verbosity: verbosity,
             nReturned: NumberLong(4),
             explainObject: expectedExplainObject,
         });
-        getSearchStagesAndVerifyExplainOutput({
+        getMongotStagesAndValidateExplainExecutionStats({
             result: result,
             stageType: "$_internalSearchIdLookup",
             verbosity: verbosity,
@@ -164,14 +164,14 @@ function runExplainExecutionStatsTest(verbosity) {
             ],
         });
         const result = coll.explain(verbosity).aggregate(pipeline, {cursor: {batchSize: 2}});
-        getSearchStagesAndVerifyExplainOutput({
+        getMongotStagesAndValidateExplainExecutionStats({
             result: result,
             stageType: "$vectorSearch",
             verbosity: verbosity,
             nReturned: NumberLong(5),
             explainObject: expectedExplainObject,
         });
-        getSearchStagesAndVerifyExplainOutput({
+        getMongotStagesAndValidateExplainExecutionStats({
             result: result,
             stageType: "$_internalSearchIdLookup",
             verbosity: verbosity,

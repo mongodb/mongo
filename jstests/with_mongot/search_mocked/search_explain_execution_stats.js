@@ -13,7 +13,7 @@ import {
 } from "jstests/with_mongot/mongotmock/lib/mongotmock.js";
 import {
     getDefaultLastExplainContents,
-    getSearchStagesAndVerifyExplainOutput,
+    getMongotStagesAndValidateExplainExecutionStats,
     setUpMongotReturnExplain,
     setUpMongotReturnExplainAndCursor,
     setUpMongotReturnExplainAndCursorGetMore,
@@ -79,14 +79,14 @@ function runExplainTest(verbosity) {
             cursorId: NumberLong(124),
         });
         const result = coll.explain(verbosity).aggregate(pipeline);
-        getSearchStagesAndVerifyExplainOutput({
+        getMongotStagesAndValidateExplainExecutionStats({
             result,
             stageType: "$_internalSearchMongotRemote",
             verbosity,
             nReturned: NumberLong(0),
             explainObject
         });
-        getSearchStagesAndVerifyExplainOutput({
+        getMongotStagesAndValidateExplainExecutionStats({
             result,
             stageType: "$_internalSearchIdLookup",
             verbosity,
@@ -106,14 +106,14 @@ function runExplainTest(verbosity) {
             ],
         });
         const result = coll.explain(verbosity).aggregate(pipeline);
-        getSearchStagesAndVerifyExplainOutput({
+        getMongotStagesAndValidateExplainExecutionStats({
             result,
             stageType: "$_internalSearchMongotRemote",
             verbosity,
             nReturned: NumberLong(4),
             explainObject
         });
-        getSearchStagesAndVerifyExplainOutput({
+        getMongotStagesAndValidateExplainExecutionStats({
             result,
             stageType: "$_internalSearchIdLookup",
             verbosity,
@@ -132,14 +132,14 @@ function runExplainTest(verbosity) {
             ],
         });
         const result = coll.explain(verbosity).aggregate(pipeline, {cursor: {batchSize: 2}});
-        getSearchStagesAndVerifyExplainOutput({
+        getMongotStagesAndValidateExplainExecutionStats({
             result,
             stageType: "$_internalSearchMongotRemote",
             verbosity,
             nReturned: NumberLong(5),
             explainObject
         });
-        getSearchStagesAndVerifyExplainOutput({
+        getMongotStagesAndValidateExplainExecutionStats({
             result,
             stageType: "$_internalSearchIdLookup",
             verbosity,

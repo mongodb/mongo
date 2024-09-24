@@ -353,19 +353,19 @@ export function setUpMongotReturnExplainAndMultiCursorGetMore({
 }
 
 /**
- * Helper function to obtain the search stage (ex. $searchMeta, $_internalSearchMongotRemote) and to
+ * Helper function to obtain the mongot stage (ex. $searchMeta, $_internalSearchMongotRemote) and to
  * check its explain result. Will only check $_internalSearchIdLookup if 'nReturnedIdLookup is
- * provided. Function will fail for non-search stages.
+ * provided. Function will fail for non-mongot stages.
  * @param {Object} result the results from running coll.explain().aggregate([[$search: ....], ...])
  * @param {string} stageType ex. "$_internalSearchMongotRemote" , "$searchMeta",
  *     "$_internalSearchIdLookup "
  * @param {string} verbosity The verbosity of explain. "nReturned" and "executionTimeMillisEstimate"
  *     will not be checked for 'queryPlanner' verbosity "
  * @param {NumberLong} nReturned The number of documents that should be returned in the
- *     searchStage.
+ *     mongot stage.
  * @param {Object} explainContents The explain object that the stage should contain.
  */
-export function getSearchStagesAndVerifyExplainOutput(
+export function getMongotStagesAndValidateExplainExecutionStats(
     {result, stageType, verbosity, nReturned, explainObject = null}) {
     const searchStage = getAggPlanStage(result, stageType);
     assert.neq(searchStage, null, result);
@@ -395,7 +395,7 @@ export function getSearchStagesAndVerifyExplainOutput(
  * @param {Object} expectedExplainContents Optional - The explain object that the stage should
  *     contain.
  */
-export function getShardedSearchStagesAndVerifyExplainOutput(
+export function getShardedMongotStagesAndValidateExplainExecutionStats(
     {result, stageType, expectedNumStages, verbosity, nReturnedList, expectedExplainContents}) {
     assert.eq(nReturnedList.length, expectedNumStages);
     assert(result.hasOwnProperty("shards"),

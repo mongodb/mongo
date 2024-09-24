@@ -7,7 +7,9 @@ import {checkSbeRestrictedOrFullyEnabled} from "jstests/libs/sbe_util.js";
 import {getUUIDFromListCollections} from "jstests/libs/uuid_util.js";
 import {prepareUnionWithExplain} from "jstests/with_mongot/common_utils.js";
 import {mongotCommandForQuery, MongotMock} from "jstests/with_mongot/mongotmock/lib/mongotmock.js";
-import {getSearchStagesAndVerifyExplainOutput} from "jstests/with_mongot/mongotmock/lib/utils.js";
+import {
+    getMongotStagesAndValidateExplainExecutionStats
+} from "jstests/with_mongot/mongotmock/lib/utils.js";
 
 // Set up mongotmock and point the mongod to it.
 const mongotmock = new MongotMock();
@@ -897,14 +899,14 @@ for (const currentVerbosity of ["executionStats", "allPlansExecution"]) {
         assert.eq(NumberLong(7), unionWithStage["nReturned"]);
 
         let unionSubExplain = prepareUnionWithExplain(unionWithStage.$unionWith.pipeline);
-        getSearchStagesAndVerifyExplainOutput({
+        getMongotStagesAndValidateExplainExecutionStats({
             result: unionSubExplain,
             stageType: "$_internalSearchMongotRemote",
             verbosity: currentVerbosity,
             nReturned: NumberLong(5),
             explainObject: explainObj
         });
-        getSearchStagesAndVerifyExplainOutput({
+        getMongotStagesAndValidateExplainExecutionStats({
             result: unionSubExplain,
             stageType: "$_internalSearchIdLookup",
             verbosity: currentVerbosity,
@@ -947,7 +949,7 @@ for (const currentVerbosity of ["executionStats", "allPlansExecution"]) {
         assert.eq(NumberLong(2), unionWithStage["nReturned"]);
 
         let unionSubExplain = prepareUnionWithExplain(unionWithStage.$unionWith.pipeline);
-        getSearchStagesAndVerifyExplainOutput({
+        getMongotStagesAndValidateExplainExecutionStats({
             result: unionSubExplain,
             stageType: "$searchMeta",
             verbosity: currentVerbosity,

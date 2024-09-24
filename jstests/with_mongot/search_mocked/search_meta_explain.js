@@ -12,7 +12,7 @@ import {
 } from "jstests/with_mongot/mongotmock/lib/mongotmock.js";
 import {
     getDefaultLastExplainContents,
-    getSearchStagesAndVerifyExplainOutput,
+    getMongotStagesAndValidateExplainExecutionStats,
     setUpMongotReturnExplain,
     setUpMongotReturnExplainAndCursor,
 } from "jstests/with_mongot/mongotmock/lib/utils.js";
@@ -79,7 +79,7 @@ function runExplainTest(verbosity) {
             });
         }
         const result = coll.explain(verbosity).aggregate(pipeline);
-        getSearchStagesAndVerifyExplainOutput(
+        getMongotStagesAndValidateExplainExecutionStats(
             {result, stageType: "$searchMeta", verbosity, nReturned: NumberLong(0), explainObject});
     }
     // TODO SERVER-85637 Remove check for SearchExplainExecutionStats after the feature flag is
@@ -97,7 +97,7 @@ function runExplainTest(verbosity) {
             ],
         });
         const result = coll.explain(verbosity).aggregate(pipeline);
-        getSearchStagesAndVerifyExplainOutput(
+        getMongotStagesAndValidateExplainExecutionStats(
             {result, stageType: "$searchMeta", verbosity, nReturned: NumberLong(1), explainObject});
     }
 }
