@@ -50,6 +50,24 @@ outputAggregationPlanAndResults(
     coll, [{$group: {_id: "$d", accum: {$top: {sortBy: {d: -1}, output: "$c"}}}}]);
 outputAggregationPlanAndResults(coll,
                                 [{$sort: {d: -1}}, {$group: {_id: "$d", accum: {$first: "$c"}}}]);
+// Force particular DISTINCT_SCAN using hint, even if auto-selected by multiplanning.
+outputAggregationPlanAndResults(
+    coll, [{$sort: {a: 1, b: 1}}, {$group: {_id: "$a", accum: {$first: "$b"}}}], {hint: "a_1_b_1"});
+// Force particular DISTINCT_SCAN using hint, even if different from multiplanning.
+outputAggregationPlanAndResults(
+    coll,
+    [{$sort: {a: 1, b: 1}}, {$group: {_id: "$a", accum: {$first: "$b"}}}],
+    {hint: "a_1_b_1_c_1"});
+outputAggregationPlanAndResults(
+    coll, [{$group: {_id: "$a", accum: {$first: "$b"}}}], {hint: "a_1_b_1"});
+outputAggregationPlanAndResults(
+    coll,
+    [{$group: {_id: "$a", accum: {$top: {sortBy: {a: 1, b: 1}, output: "$c"}}}}],
+    {hint: "a_1_b_1"});
+outputAggregationPlanAndResults(
+    coll,
+    [{$group: {_id: "$a", accum: {$bottom: {sortBy: {a: -1, b: -1}, output: "$c"}}}}],
+    {hint: "a_1_b_1"});
 
 section("Both DISTINCT_SCAN and non-DISTINCT_SCAN candidates considered");
 coll.insertMany([{a: 4, b: 2, c: 3}, {a: 4, b: 3, c: 6}, {a: 5, b: 4, c: 7, d: [1, 2, 3]}]);
@@ -58,6 +76,17 @@ outputAggregationPlanAndResults(
     coll, [{$sort: {a: -1, b: -1}}, {$group: {_id: "$a", accum: {$last: "$b"}}}]);
 outputAggregationPlanAndResults(
     coll, [{$sort: {a: -1, b: -1}}, {$group: {_id: "$a", accum: {$first: "$b"}}}]);
+
+subSection("non-DISTINCT_SCAN selected, with hint");
+outputAggregationPlanAndResults(
+    coll,
+    [{$sort: {a: -1, b: -1}}, {$group: {_id: "$a", accum: {$last: "$b"}}}],
+    {hint: "a_1_b_1_d_1"});
+
+outputAggregationPlanAndResults(
+    coll,
+    [{$sort: {a: -1, b: -1}}, {$group: {_id: "$a", accum: {$first: "$b"}}}],
+    {hint: {$natural: 1}});
 
 // TODO SERVER-92469: See if we have to do something to break the tie.
 subSection("Multiplanning tie between DISTINCT_SCAN and IXSCAN");
@@ -70,14 +99,10 @@ for (let i = 0; i < 5; i++) {
 coll2.insertMany(distinctDocs);
 coll2.createIndex({a: -1, b: 1});
 coll2.createIndex({a: 1, b: 1});
-outputAggregationPlanAndResults(
-    coll2,
-    [
-        {$match: {a: {$gt: 0}}},
-        {$group: {_id: "$a", accum: {$top: {sortBy: {a: 1, b: 1}, output: "$b"}}}}
-    ],
-    true,
-    5);
+outputAggregationPlanAndResults(coll2, [
+    {$match: {a: {$gt: 0}}},
+    {$group: {_id: "$a", accum: {$top: {sortBy: {a: 1, b: 1}, output: "$b"}}}}
+]);
 
 section("No DISTINCT_SCAN candidates considered due to conflicting sort specs");
 // The $sort is incompatible with the 'sortBy', so a distinct scan can't provide both sorts.

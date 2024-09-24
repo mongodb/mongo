@@ -42,13 +42,19 @@ export function linebreak() {
  * a summary of the explain to markdown. By default the results will be sorted, but the original
  * order can be kept by setting `shouldSortResults` to false.
  */
-export function outputAggregationPlanAndResults(coll, pipeline, shouldSortResults = true) {
-    const results = coll.aggregate(pipeline).toArray();
-    const explain = coll.explain("allPlansExecution").aggregate(pipeline);
+export function outputAggregationPlanAndResults(
+    coll, pipeline, options = {}, shouldSortResults = true) {
+    const results = coll.aggregate(pipeline, options).toArray();
+    const explain = coll.explain("allPlansExecution").aggregate(pipeline, options);
     const flatPlan = formatExplainRoot(explain);
 
     subSection("Pipeline");
     code(tojson(pipeline));
+
+    if (Object.keys(options).length > 0) {
+        subSection("Options");
+        code(tojson(options));
+    }
 
     subSection("Results");
     code(normalizeArray(results, shouldSortResults));
@@ -64,12 +70,13 @@ export function outputAggregationPlanAndResults(coll, pipeline, shouldSortResult
  * query. Outputs the expected results, the actual returned distinct results and a summary of the
  * explain to markdown.
  */
-export function outputDistinctPlanAndResults(coll, key, filter = {}) {
-    const results = coll.distinct(key, filter);
-    const explain = coll.explain("allPlansExecution").distinct(key, filter);
+export function outputDistinctPlanAndResults(coll, key, filter = {}, options = {}) {
+    const results = coll.distinct(key, filter, options);
+    const explain = coll.explain("allPlansExecution").distinct(key, filter, options);
     const flatPlan = formatExplainRoot(explain);
 
-    subSection(`Distinct on "${key}", with filter: ${tojson(filter)}`);
+    subSection(`Distinct on "${key}", with filter: ${tojson(filter)}${
+        Object.keys(options).length ? `, and options: ${tojson(options)}` : ''}`);
 
     subSection("Expected results");
     codeOneLine(getUniqueResults(coll, key, filter));

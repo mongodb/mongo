@@ -404,3 +404,158 @@
 }
 ```
 
+## 5. Use hinted DISTINCT_SCAN
+### Distinct on "x", with filter: { "x" : { "$gt" : 3 }, "y" : 5 }, and options: { "hint" : { "x" : 1, "y" : 1 } }
+### Expected results
+`[ 5, 6, 7 ]`
+### Distinct results
+`[ 5, 6, 7 ]`
+### Summarized explain
+```json
+{
+	"rejectedPlans" : [ ],
+	"winningPlan" : [
+		{
+			"stage" : "PROJECTION_COVERED",
+			"transformBy" : {
+				"_id" : 0,
+				"x" : 1
+			}
+		},
+		{
+			"direction" : "forward",
+			"indexBounds" : {
+				"x" : [
+					"(3.0, inf.0]"
+				],
+				"y" : [
+					"[5.0, 5.0]"
+				]
+			},
+			"indexName" : "x_1_y_1",
+			"isFetching" : false,
+			"isMultiKey" : false,
+			"isPartial" : false,
+			"isShardFiltering" : false,
+			"isSparse" : false,
+			"isUnique" : false,
+			"keyPattern" : {
+				"x" : 1,
+				"y" : 1
+			},
+			"multiKeyPaths" : {
+				"x" : [ ],
+				"y" : [ ]
+			},
+			"stage" : "DISTINCT_SCAN"
+		}
+	]
+}
+```
+
+## 6. Use hinted IXSCAN, even with preferable DISTINCT_SCAN
+### Distinct on "x", with filter: { "x" : { "$gt" : -1 }, "y" : { "$lt" : 250 } }, and options: { "hint" : { "x" : 1 } }
+### Expected results
+`[ 0, 1 ]`
+### Distinct results
+`[ 0, 1 ]`
+### Summarized explain
+```json
+{
+	"rejectedPlans" : [ ],
+	"winningPlan" : [
+		{
+			"stage" : "FETCH"
+		},
+		{
+			"direction" : "forward",
+			"indexBounds" : {
+				"x" : [
+					"(-1.0, inf.0]"
+				]
+			},
+			"indexName" : "x_1",
+			"isMultiKey" : false,
+			"isPartial" : false,
+			"isSparse" : false,
+			"isUnique" : false,
+			"keyPattern" : {
+				"x" : 1
+			},
+			"multiKeyPaths" : {
+				"x" : [ ]
+			},
+			"stage" : "IXSCAN"
+		}
+	]
+}
+```
+
+## 7. Use hinted COLLSCAN, even with preferable DISTINCT_SCAN
+### Distinct on "x", with filter: { "x" : { "$gt" : -1 }, "y" : { "$lt" : 250 } }, and options: { "hint" : { "$natural" : 1 } }
+### Expected results
+`[ 0, 1 ]`
+### Distinct results
+`[ 0, 1 ]`
+### Summarized explain
+```json
+{
+	"rejectedPlans" : [ ],
+	"winningPlan" : [
+		{
+			"direction" : "forward",
+			"stage" : "COLLSCAN"
+		}
+	]
+}
+```
+
+## 8. Use hinted DISTINCT_SCAN, even with no duplicate values
+### Distinct on "x", with filter: { "x" : { "$gt" : -1 }, "y" : { "$lt" : 105 } }, and options: { "hint" : { "x" : 1, "y" : 1 } }
+### Expected results
+`[ 0, 1, 2, 3, 4 ]`
+### Distinct results
+`[ 0, 1, 2, 3, 4 ]`
+### Summarized explain
+```json
+{
+	"rejectedPlans" : [ ],
+	"winningPlan" : [
+		{
+			"stage" : "PROJECTION_COVERED",
+			"transformBy" : {
+				"_id" : 0,
+				"x" : 1
+			}
+		},
+		{
+			"direction" : "forward",
+			"indexBounds" : {
+				"x" : [
+					"(-1.0, inf.0]"
+				],
+				"y" : [
+					"[-inf.0, 105.0)"
+				]
+			},
+			"indexName" : "x_1_y_1",
+			"isFetching" : false,
+			"isMultiKey" : false,
+			"isPartial" : false,
+			"isShardFiltering" : false,
+			"isSparse" : false,
+			"isUnique" : false,
+			"keyPattern" : {
+				"x" : 1,
+				"y" : 1
+			},
+			"multiKeyPaths" : {
+				"x" : [ ],
+				"y" : [ ]
+			},
+			"stage" : "DISTINCT_SCAN"
+		}
+	]
+}
+```
+

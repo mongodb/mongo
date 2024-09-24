@@ -1352,6 +1352,425 @@
 }
 ```
 
+### Pipeline
+```json
+[
+	{
+		"$sort" : {
+			"a" : 1,
+			"b" : 1
+		}
+	},
+	{
+		"$group" : {
+			"_id" : "$a",
+			"accum" : {
+				"$first" : "$b"
+			}
+		}
+	}
+]
+```
+### Options
+```json
+{ "hint" : "a_1_b_1" }
+```
+### Results
+```json
+{  "_id" : 4,  "accum" : 2 }
+{  "_id" : 5,  "accum" : 4 }
+```
+### Summarized explain
+```json
+{
+	"stages" : [
+		{
+			"$cursor" : {
+				"rejectedPlans" : [ ],
+				"winningPlan" : [
+					{
+						"stage" : "PROJECTION_COVERED",
+						"transformBy" : {
+							"_id" : 0,
+							"a" : 1,
+							"b" : 1
+						}
+					},
+					{
+						"direction" : "forward",
+						"indexBounds" : {
+							"a" : [
+								"[MinKey, MaxKey]"
+							],
+							"b" : [
+								"[MinKey, MaxKey]"
+							]
+						},
+						"indexName" : "a_1_b_1",
+						"isFetching" : false,
+						"isMultiKey" : false,
+						"isPartial" : false,
+						"isShardFiltering" : false,
+						"isSparse" : false,
+						"isUnique" : false,
+						"keyPattern" : {
+							"a" : 1,
+							"b" : 1
+						},
+						"multiKeyPaths" : {
+							"a" : [ ],
+							"b" : [ ]
+						},
+						"stage" : "DISTINCT_SCAN"
+					}
+				]
+			}
+		},
+		{
+			"$groupByDistinctScan" : {
+				"newRoot" : {
+					"_id" : "$a",
+					"accum" : "$b"
+				}
+			}
+		}
+	]
+}
+```
+
+### Pipeline
+```json
+[
+	{
+		"$sort" : {
+			"a" : 1,
+			"b" : 1
+		}
+	},
+	{
+		"$group" : {
+			"_id" : "$a",
+			"accum" : {
+				"$first" : "$b"
+			}
+		}
+	}
+]
+```
+### Options
+```json
+{ "hint" : "a_1_b_1_c_1" }
+```
+### Results
+```json
+{  "_id" : 4,  "accum" : 2 }
+{  "_id" : 5,  "accum" : 4 }
+```
+### Summarized explain
+```json
+{
+	"stages" : [
+		{
+			"$cursor" : {
+				"rejectedPlans" : [ ],
+				"winningPlan" : [
+					{
+						"stage" : "PROJECTION_COVERED",
+						"transformBy" : {
+							"_id" : 0,
+							"a" : 1,
+							"b" : 1
+						}
+					},
+					{
+						"direction" : "forward",
+						"indexBounds" : {
+							"a" : [
+								"[MinKey, MaxKey]"
+							],
+							"b" : [
+								"[MinKey, MaxKey]"
+							],
+							"c" : [
+								"[MinKey, MaxKey]"
+							]
+						},
+						"indexName" : "a_1_b_1_c_1",
+						"isFetching" : false,
+						"isMultiKey" : false,
+						"isPartial" : false,
+						"isShardFiltering" : false,
+						"isSparse" : false,
+						"isUnique" : false,
+						"keyPattern" : {
+							"a" : 1,
+							"b" : 1,
+							"c" : 1
+						},
+						"multiKeyPaths" : {
+							"a" : [ ],
+							"b" : [ ],
+							"c" : [ ]
+						},
+						"stage" : "DISTINCT_SCAN"
+					}
+				]
+			}
+		},
+		{
+			"$groupByDistinctScan" : {
+				"newRoot" : {
+					"_id" : "$a",
+					"accum" : "$b"
+				}
+			}
+		}
+	]
+}
+```
+
+### Pipeline
+```json
+[
+	{
+		"$group" : {
+			"_id" : "$a",
+			"accum" : {
+				"$first" : "$b"
+			}
+		}
+	}
+]
+```
+### Options
+```json
+{ "hint" : "a_1_b_1" }
+```
+### Results
+```json
+{  "_id" : 4,  "accum" : 2 }
+{  "_id" : 5,  "accum" : 4 }
+```
+### Summarized explain
+```json
+{
+	"stages" : [
+		{
+			"$cursor" : {
+				"rejectedPlans" : [ ],
+				"winningPlan" : [
+					{
+						"stage" : "PROJECTION_COVERED",
+						"transformBy" : {
+							"_id" : 0,
+							"a" : 1,
+							"b" : 1
+						}
+					},
+					{
+						"direction" : "forward",
+						"indexBounds" : {
+							"a" : [
+								"[MinKey, MaxKey]"
+							],
+							"b" : [
+								"[MinKey, MaxKey]"
+							]
+						},
+						"indexName" : "a_1_b_1",
+						"isFetching" : false,
+						"isMultiKey" : false,
+						"isPartial" : false,
+						"isShardFiltering" : false,
+						"isSparse" : false,
+						"isUnique" : false,
+						"keyPattern" : {
+							"a" : 1,
+							"b" : 1
+						},
+						"multiKeyPaths" : {
+							"a" : [ ],
+							"b" : [ ]
+						},
+						"stage" : "DISTINCT_SCAN"
+					}
+				]
+			}
+		},
+		{
+			"$groupByDistinctScan" : {
+				"newRoot" : {
+					"_id" : "$a",
+					"accum" : "$b"
+				}
+			}
+		}
+	]
+}
+```
+
+### Pipeline
+```json
+[
+	{
+		"$group" : {
+			"_id" : "$a",
+			"accum" : {
+				"$top" : {
+					"sortBy" : {
+						"a" : 1,
+						"b" : 1
+					},
+					"output" : "$c"
+				}
+			}
+		}
+	}
+]
+```
+### Options
+```json
+{ "hint" : "a_1_b_1" }
+```
+### Results
+```json
+{  "_id" : 4,  "accum" : 3 }
+{  "_id" : 5,  "accum" : 7 }
+```
+### Summarized explain
+```json
+{
+	"stages" : [
+		{
+			"$cursor" : {
+				"rejectedPlans" : [ ],
+				"winningPlan" : [
+					{
+						"stage" : "FETCH"
+					},
+					{
+						"direction" : "forward",
+						"indexBounds" : {
+							"a" : [
+								"[MinKey, MaxKey]"
+							],
+							"b" : [
+								"[MinKey, MaxKey]"
+							]
+						},
+						"indexName" : "a_1_b_1",
+						"isFetching" : false,
+						"isMultiKey" : false,
+						"isPartial" : false,
+						"isShardFiltering" : false,
+						"isSparse" : false,
+						"isUnique" : false,
+						"keyPattern" : {
+							"a" : 1,
+							"b" : 1
+						},
+						"multiKeyPaths" : {
+							"a" : [ ],
+							"b" : [ ]
+						},
+						"stage" : "DISTINCT_SCAN"
+					}
+				]
+			}
+		},
+		{
+			"$groupByDistinctScan" : {
+				"newRoot" : {
+					"_id" : "$a",
+					"accum" : "$c"
+				}
+			}
+		}
+	]
+}
+```
+
+### Pipeline
+```json
+[
+	{
+		"$group" : {
+			"_id" : "$a",
+			"accum" : {
+				"$bottom" : {
+					"sortBy" : {
+						"a" : -1,
+						"b" : -1
+					},
+					"output" : "$c"
+				}
+			}
+		}
+	}
+]
+```
+### Options
+```json
+{ "hint" : "a_1_b_1" }
+```
+### Results
+```json
+{  "_id" : 4,  "accum" : 3 }
+{  "_id" : 5,  "accum" : 7 }
+```
+### Summarized explain
+```json
+{
+	"stages" : [
+		{
+			"$cursor" : {
+				"rejectedPlans" : [ ],
+				"winningPlan" : [
+					{
+						"stage" : "FETCH"
+					},
+					{
+						"direction" : "forward",
+						"indexBounds" : {
+							"a" : [
+								"[MinKey, MaxKey]"
+							],
+							"b" : [
+								"[MinKey, MaxKey]"
+							]
+						},
+						"indexName" : "a_1_b_1",
+						"isFetching" : false,
+						"isMultiKey" : false,
+						"isPartial" : false,
+						"isShardFiltering" : false,
+						"isSparse" : false,
+						"isUnique" : false,
+						"keyPattern" : {
+							"a" : 1,
+							"b" : 1
+						},
+						"multiKeyPaths" : {
+							"a" : [ ],
+							"b" : [ ]
+						},
+						"stage" : "DISTINCT_SCAN"
+					}
+				]
+			}
+		},
+		{
+			"$groupByDistinctScan" : {
+				"newRoot" : {
+					"_id" : "$a",
+					"accum" : "$c"
+				}
+			}
+		}
+	]
+}
+```
+
 ## 2. Both DISTINCT_SCAN and non-DISTINCT_SCAN candidates considered
 ### DISTINCT_SCAN selected
 ### Pipeline
@@ -1685,6 +2104,148 @@
 					"accum" : "$b"
 				}
 			}
+		}
+	]
+}
+```
+
+### non-DISTINCT_SCAN selected, with hint
+### Pipeline
+```json
+[
+	{
+		"$sort" : {
+			"a" : -1,
+			"b" : -1
+		}
+	},
+	{
+		"$group" : {
+			"_id" : "$a",
+			"accum" : {
+				"$last" : "$b"
+			}
+		}
+	}
+]
+```
+### Options
+```json
+{ "hint" : "a_1_b_1_d_1" }
+```
+### Results
+```json
+{  "_id" : 4,  "accum" : 2 }
+{  "_id" : 5,  "accum" : 4 }
+```
+### Summarized explain
+```json
+{
+	"rejectedPlans" : [ ],
+	"winningPlan" : [
+		{
+			"stage" : "GROUP"
+		},
+		{
+			"stage" : "PROJECTION_COVERED",
+			"transformBy" : {
+				"_id" : false,
+				"a" : true,
+				"b" : true
+			}
+		},
+		{
+			"direction" : "backward",
+			"indexBounds" : {
+				"a" : [
+					"[MaxKey, MinKey]"
+				],
+				"b" : [
+					"[MaxKey, MinKey]"
+				],
+				"d" : [
+					"[MaxKey, MinKey]"
+				]
+			},
+			"indexName" : "a_1_b_1_d_1",
+			"isMultiKey" : true,
+			"isPartial" : false,
+			"isSparse" : false,
+			"isUnique" : false,
+			"keyPattern" : {
+				"a" : 1,
+				"b" : 1,
+				"d" : 1
+			},
+			"multiKeyPaths" : {
+				"a" : [ ],
+				"b" : [ ],
+				"d" : [
+					"d"
+				]
+			},
+			"stage" : "IXSCAN"
+		}
+	]
+}
+```
+
+### Pipeline
+```json
+[
+	{
+		"$sort" : {
+			"a" : -1,
+			"b" : -1
+		}
+	},
+	{
+		"$group" : {
+			"_id" : "$a",
+			"accum" : {
+				"$first" : "$b"
+			}
+		}
+	}
+]
+```
+### Options
+```json
+{ "hint" : { "$natural" : 1 } }
+```
+### Results
+```json
+{  "_id" : 4,  "accum" : 3 }
+{  "_id" : 5,  "accum" : 4 }
+```
+### Summarized explain
+```json
+{
+	"rejectedPlans" : [ ],
+	"winningPlan" : [
+		{
+			"stage" : "GROUP"
+		},
+		{
+			"memLimit" : 104857600,
+			"sortPattern" : {
+				"a" : -1,
+				"b" : -1
+			},
+			"stage" : "SORT",
+			"type" : "simple"
+		},
+		{
+			"stage" : "PROJECTION_SIMPLE",
+			"transformBy" : {
+				"_id" : false,
+				"a" : true,
+				"b" : true
+			}
+		},
+		{
+			"direction" : "forward",
+			"stage" : "COLLSCAN"
 		}
 	]
 }

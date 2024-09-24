@@ -58,3 +58,40 @@ coll.createIndex({x: 1});
 coll.createIndex({x: 1, y: 1});
 coll.createIndex({y: 1, z: 1});
 outputDistinctPlanAndResults(coll, "x", {x: {$gt: -1}, y: {$lt: 105}});
+
+section("Use hinted DISTINCT_SCAN");
+coll.drop();
+coll.createIndex({x: 1, y: 1});
+coll.createIndex({y: 1, x: 1});
+coll.createIndex({x: 1, z: 1, y: 1});
+coll.insertMany([
+    {x: 3, y: 5, z: 7},
+    {x: 5, y: 6, z: 5},
+    {x: 5, y: 5, z: 4},
+    {x: 6, y: 5, z: 3},
+    {x: 7, y: 5, z: 8},
+    {x: 8, y: 7, z: 3},
+    {x: 8, y: 8, z: 3},
+]);
+outputDistinctPlanAndResults(coll, "x", {x: {$gt: 3}, y: 5}, {hint: {x: 1, y: 1}});
+
+section("Use hinted IXSCAN, even with preferable DISTINCT_SCAN");
+coll.drop();
+for (let i = 0; i < 100; ++i)
+    coll.insert({x: i % 2, y: i + 100, z: i + 200});
+coll.createIndex({x: 1});
+coll.createIndex({x: 1, y: 1});
+coll.createIndex({y: 1, z: 1});
+outputDistinctPlanAndResults(coll, "x", {x: {$gt: -1}, y: {$lt: 250}}, {hint: {x: 1}});
+
+section("Use hinted COLLSCAN, even with preferable DISTINCT_SCAN");
+outputDistinctPlanAndResults(coll, "x", {x: {$gt: -1}, y: {$lt: 250}}, {hint: {$natural: 1}});
+
+section("Use hinted DISTINCT_SCAN, even with no duplicate values");
+coll.drop();
+for (let i = 0; i < 100; ++i)
+    coll.insert({x: i, y: i + 100, z: i + 200});
+coll.createIndex({x: 1});
+coll.createIndex({x: 1, y: 1});
+coll.createIndex({y: 1, z: 1});
+outputDistinctPlanAndResults(coll, "x", {x: {$gt: -1}, y: {$lt: 105}}, {hint: {x: 1, y: 1}});
