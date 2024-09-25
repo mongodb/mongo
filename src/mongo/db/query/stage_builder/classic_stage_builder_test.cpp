@@ -38,6 +38,8 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/json.h"
 #include "mongo/db/catalog/collection.h"
+#include "mongo/db/catalog/collection_mock.h"
+#include "mongo/db/catalog/index_catalog_mock.h"
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
@@ -64,11 +66,20 @@ public:
     void setUp() override {
         _opCtx = makeOperationContext();
         _workingSet = std::make_unique<WorkingSet>();
+
+        auto indexCatalog = std::make_unique<IndexCatalogMock>();
+        IndexSpec spec;
+        spec.version(1).name("a_1").addKeys(BSON("a" << 1));
+        auto desc = IndexDescriptor(IndexNames::BTREE, spec.toBSON());
+        indexCatalog->createIndexEntry(
+            _opCtx.get(), nullptr /*collection*/, std::move(desc), CreateIndexEntryFlags::kNone);
+        _collection = std::make_unique<CollectionMock>(UUID::gen(), kNss, std::move(indexCatalog));
     }
 
     void tearDown() override {
         _opCtx.reset();
         _workingSet.reset();
+        _planStageQsnMap.clear();
     }
 
     /**
@@ -89,8 +100,9 @@ public:
             CanonicalQueryParams{.expCtx = makeExpressionContext(opCtx(), *findCommand),
                                  .parsedFind = ParsedFindCommandParams{std::move(findCommand)}});
 
+        auto coll = CollectionPtr(_collection.get());
         stage_builder::ClassicStageBuilder builder{
-            opCtx(), &CollectionPtr::null, *cq, *querySolution, workingSet()};
+            opCtx(), &coll, *cq, *querySolution, workingSet(), &_planStageQsnMap};
         return builder.build(querySolution->root());
     }
 
@@ -122,11 +134,34 @@ public:
         return _workingSet.get();
     }
 
+    const stage_builder::PlanStageToQsnMap& planStageQsnMap() const {
+        return _planStageQsnMap;
+    }
+
 private:
     ServiceContext::UniqueOperationContext _opCtx;
     std::unique_ptr<WorkingSet> _workingSet;
+    std::unique_ptr<Collection> _collection;
+    stage_builder::PlanStageToQsnMap _planStageQsnMap;
 };
 
+namespace {
+IndexEntry buildSimpleIndexEntry(const BSONObj& kp) {
+    return {kp,
+            IndexNames::nameToType(IndexNames::findPluginName(kp)),
+            IndexDescriptor::kLatestIndexVersion,
+            false,
+            {},
+            {},
+            false,
+            false,
+            CoreIndexInfo::Identifier("a_1"),
+            nullptr,
+            {},
+            nullptr,
+            nullptr};
+}
+}  // namespace
 
 /**
  * Verify that a VirtualScanNode can be translated to a MockStage and produce a filtered data
@@ -166,4 +201,18 @@ TEST_F(ClassicStageBuilderTest, VirtualScanTranslation) {
         ASSERT_BSONOBJ_EQ(firstElt.embeddedObject(), results[i]);
     }
 }
+
+TEST_F(ClassicStageBuilderTest, IndexFetchTranslationPopulatesMap) {
+    auto idxScan = std::make_unique<IndexScanNode>(buildSimpleIndexEntry(BSON("a" << 1)));
+    QuerySolutionNode* idxScanPtr = idxScan.get();
+    auto fetch = std::make_unique<FetchNode>(std::move(idxScan));
+    QuerySolutionNode* fetchPtr = fetch.get();
+
+    auto stage = buildPlanStage(makeQuerySolution(std::move(fetch)));
+
+    stage_builder::PlanStageToQsnMap expectedResults = {{stage.get(), fetchPtr},
+                                                        {stage->child().get(), idxScanPtr}};
+    ASSERT_EQ(expectedResults, planStageQsnMap());
+}
+
 }  // namespace mongo

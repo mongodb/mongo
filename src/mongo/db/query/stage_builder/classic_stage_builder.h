@@ -43,6 +43,12 @@
 #include "mongo/db/query/stage_builder/stage_builder.h"
 
 namespace mongo::stage_builder {
+
+/**
+ * Map from PlanStageKey to the QuerySolutionNode* which generated it.
+ */
+using PlanStageToQsnMap = absl::flat_hash_map<PlanStageKey, const QuerySolutionNode*>;
+
 /**
  * A stage builder which builds an executable tree using classic PlanStages.
  */
@@ -54,8 +60,12 @@ public:
                         VariantCollectionPtrOrAcquisition collection,
                         const CanonicalQuery& cq,
                         const QuerySolution& solution,
-                        WorkingSet* ws)
-        : StageBuilder<PlanType>{opCtx, cq, solution}, _collection(collection), _ws{ws} {}
+                        WorkingSet* ws,
+                        PlanStageToQsnMap* planStageQsnMap)
+        : StageBuilder<PlanType>{opCtx, cq, solution},
+          _collection(collection),
+          _ws{ws},
+          _planStageQsnMap(planStageQsnMap) {}
 
     PlanType build(const QuerySolutionNode* root) final;
 
@@ -64,5 +74,8 @@ private:
     WorkingSet* _ws;
 
     boost::optional<size_t> _ftsKeyPrefixSize;
+
+    // We don't own this, we populate it during the build phase.
+    PlanStageToQsnMap* _planStageQsnMap;
 };
 }  // namespace mongo::stage_builder
