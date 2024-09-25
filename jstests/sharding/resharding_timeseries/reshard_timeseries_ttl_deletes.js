@@ -27,7 +27,13 @@ const expireAfterSeconds = 5;
 // Default maximum range of time for a bucket.
 const defaultBucketMaxRange = 3600;
 const st = reshardingTest._st;
-
+reshardingTest.createUnshardedCollection({
+    ns: ns,
+    collOptions: {
+        timeseries: timeseriesInfo,
+        expireAfterSeconds: expireAfterSeconds,
+    }
+});
 const timeseriesCollection = reshardingTest.createShardedCollection({
     ns: ns,
     shardKeyPattern: {'meta.x': 1},
@@ -35,10 +41,7 @@ const timeseriesCollection = reshardingTest.createShardedCollection({
         {min: {'meta.x': MinKey}, max: {'meta.x': 0}, shard: donorShardNames[0]},
         {min: {'meta.x': 0}, max: {'meta.x': MaxKey}, shard: donorShardNames[1]},
     ],
-    collOptions: {
-        timeseries: timeseriesInfo,
-        expireAfterSeconds: expireAfterSeconds,
-    }
+    collOptions: {timeseries: timeseriesInfo}
 });
 
 function assertNumOfDocs(expected) {
