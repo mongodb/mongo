@@ -216,10 +216,10 @@ buildvariants:
       - name: .updatefuzzer
       - name: .jstestfuzz
 
-  - &enterprise-amazon-linux2-arm64-cluster-scalability-only
+  - &enterprise-amazon-linux2-arm64-all-feature-flags-cluster-scalability-only
     <<: *enterprise-amazon-linux2-arm64-all-feature-flags-template
-    name: enterprise-amazon-linux2-arm64-cluster-scalability-only
-    display_name: "*| Amazon Linux 2 arm64 Cluster Scalability Patch Only"
+    name: enterprise-amazon-linux2-arm64-all-feature-flags-cluster-scalability-only
+    display_name: "*| Amazon Linux 2 arm64 Enterprise (all feature flags) Cluster Scalability Patch Only"
     tags: ["cluster_scalability_only", "suggested"]
     tasks:
       - name: .cluster_scalability_only
