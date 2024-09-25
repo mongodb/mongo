@@ -1040,7 +1040,8 @@ void KeyStringIndexConsistency::traverseRecord(OperationContext* opCtx,
                 printMultikeyMetadata();
 
                 const std::string msg = fmt::format(
-                    "Index {} multikey paths do not cover a document with RecordId({}) and {}",
+                    "Index {} multikey paths do not cover a document with RecordId({}) and {}. "
+                    "Rerun with {{fixMultikey: true}} if not already set. ",
                     descriptor->indexName(),
                     recordId.toString(),
                     recordBson.getField("_id").toString());

@@ -1,5 +1,5 @@
 /**
- * Test that validate detects and properly reports multikey inconsistencies.
+ * Test that validate detects and properly reports multikey inconsistencies and fix multikey.
  */
 const baseName = "validate_multikey_failures";
 const dbpath = MongoRunner.dataPath + baseName + "/";
@@ -31,7 +31,7 @@ resetCollection();
 disableMultikeyUpdate();
 assert.commandWorked(coll.insert({a: {b: [1, 2]}}));
 enableMultikeyUpdate();
-let res = coll.validate();
+let res = coll.validate({fixMultikey: true});
 assert.commandWorked(res);
 assert(!res.valid);
 assert.eq(res.indexDetails["a.b_1"].errors.length, 1);
@@ -46,7 +46,7 @@ resetCollection();
 disableMultikeyUpdate();
 assert.commandWorked(coll.insert({a: {b: [3]}}));
 enableMultikeyUpdate();
-res = coll.validate();
+res = coll.validate({fixMultikey: true});
 assert.commandWorked(res);
 assert(!res.valid);
 assert.eq(res.indexDetails["a.b_1"].errors.length, 1);
@@ -61,7 +61,7 @@ assert.commandWorked(coll.insert({a: [{b: 4}, {b: 5}]}));
 disableMultikeyUpdate();
 assert.commandWorked(coll.insert({a: {b: [6]}}));
 enableMultikeyUpdate();
-res = coll.validate();
+res = coll.validate({fixMultikey: true});
 assert.commandWorked(res);
 assert(!res.valid);
 assert.eq(res.indexDetails["a.b_1"].errors.length, 1);

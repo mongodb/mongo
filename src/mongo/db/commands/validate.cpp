@@ -194,6 +194,7 @@ public:
             << "\tAdd {full: true} option to do a more thorough check.\n"
             << "\tAdd {background: true} to validate in the background.\n"
             << "\tAdd {repair: true} to run repair mode.\n"
+            << "\tAdd {fixMultikey: true} to fix the multi key.\n"
             << "\tAdd {checkBSONConformance: true} to validate BSON documents more thoroughly.\n"
             << "\tAdd {metadata: true} to only check collection metadata.\n"
             << "Cannot specify both {full: true, background: true}.";
@@ -302,6 +303,21 @@ public:
                           << " performed in standalone mode.");
         }
 
+        const auto rawFixMultikey = cmdObj["fixMultikey"];
+        const bool fixMultikey = cmdObj["fixMultikey"].trueValue();
+        if (fixMultikey && replCoord->getSettings().isReplSet()) {
+            uasserted(ErrorCodes::InvalidOptions,
+                      str::stream()
+                          << "Running the validate command with { fixMultikey: true } can only be"
+                          << " performed in standalone mode.");
+        }
+        if (rawFixMultikey && !fixMultikey && repair) {
+            uasserted(ErrorCodes::InvalidOptions,
+                      str::stream()
+                          << "Running the validate command with both { fixMultikey: false }"
+                          << " and { repair: true } is not supported.");
+        }
+
         const bool metadata = cmdObj["metadata"].trueValue();
         if (metadata &&
             (background || fullValidate || enforceFastCount || checkBSONConformance || repair)) {
@@ -377,8 +393,10 @@ public:
                     if (repair) {
                         return CollectionValidation::RepairMode::kFixErrors;
                     }
-                    // Foreground validation will adjust multikey metadata by default.
-                    return CollectionValidation::RepairMode::kAdjustMultikey;
+                    if (fixMultikey) {
+                        return CollectionValidation::RepairMode::kAdjustMultikey;
+                    }
+                    return CollectionValidation::RepairMode::kNone;
                 default:
                     return CollectionValidation::RepairMode::kNone;
             }
@@ -400,6 +418,7 @@ public:
                   "full"_attr = options.isFullValidation(),
                   "enforceFastCount"_attr = options.enforceFastCountRequested(),
                   "checkBSONConformance"_attr = options.isBSONConformanceValidation(),
+                  "fixMultiKey"_attr = options.adjustMultikey(),
                   "repair"_attr = options.fixErrors());
         }
 

@@ -9,7 +9,7 @@ const collName = 'test';
 const db = conn.getDB(dbName);
 
 const assertValidate = (coll, assertFn) => {
-    let res = assert.commandWorked(coll.validate());
+    let res = assert.commandWorked(coll.validate({fixMultikey: true}));
     assertFn(res);
 };
 
