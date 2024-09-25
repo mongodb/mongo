@@ -244,27 +244,20 @@ Mongo.prototype.tojson = Mongo.prototype.toString;
  * @param mode {string} read preference mode to use. Pass null to disable read
  *     preference.
  * @param tagSet {Array.<Object>} optional. The list of tags to use, order matters.
- * @param hedgeOptions {<Object>} optional. The hedge options of the form {enabled: <bool>}.
  */
-Mongo.prototype.setReadPref = function(mode, tagSet, hedgeOptions) {
-    if (this._readPrefMode === "primary") {
-        if ((typeof (tagSet) !== "undefined") && (Object.keys(tagSet).length > 0)) {
-            // we allow empty arrays/objects or no tagSet for compatibility reasons
-            throw Error("Cannot supply tagSet with readPref mode \"primary\"");
-        }
-        if ((typeof (hedgeOptions) === "object") && hedgeOptions.enabled) {
-            throw Error("Cannot enable hedging with readPref mode \"primary\"");
-        }
+Mongo.prototype.setReadPref = function(mode, tagSet) {
+    if (this._readPrefMode === "primary" && typeof tagSet !== "undefined" &&
+        Object.keys(tagSet).length > 0) {
+        // we allow empty arrays/objects or no tagSet for compatibility reasons
+        throw Error("Cannot supply tagSet with readPref mode \"primary\"");
     }
-
-    this._setReadPrefUnsafe(mode, tagSet, hedgeOptions);
+    this._setReadPrefUnsafe(mode, tagSet);
 };
 
 // Set readPref without validating. Exposed so we can test the server's readPref validation.
-Mongo.prototype._setReadPrefUnsafe = function(mode, tagSet, hedgeOptions) {
+Mongo.prototype._setReadPrefUnsafe = function(mode, tagSet) {
     this._readPrefMode = mode;
     this._readPrefTagSet = tagSet;
-    this._readPrefHedgeOptions = hedgeOptions;
 };
 
 Mongo.prototype.getReadPrefMode = function() {
@@ -273,10 +266,6 @@ Mongo.prototype.getReadPrefMode = function() {
 
 Mongo.prototype.getReadPrefTagSet = function() {
     return this._readPrefTagSet;
-};
-
-Mongo.prototype.getReadPrefHedgeOptions = function() {
-    return this._readPrefHedgeOptions;
 };
 
 // Returns a readPreference object of the type expected by mongos.
@@ -295,13 +284,6 @@ Mongo.prototype.getReadPref = function() {
     const tagSet = this.getReadPrefTagSet();
     if (Array.isArray(tagSet)) {
         obj.tags = tagSet;
-    }
-
-    // Hedged Reads Spec: - if readPref mode is "primary" then the hegde.enabled MUST
-    // be false. Ensured by setReadPref.
-    const hedgeOptions = this.getReadPrefHedgeOptions();
-    if (typeof (hedgeOptions) === "object") {
-        obj.hedge = hedgeOptions;
     }
 
     return obj;

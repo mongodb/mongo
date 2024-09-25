@@ -45,7 +45,6 @@ mongo_cc_library(
         "//src/mongo/client:fetcher",
         "//src/mongo/db:commands",
         "//src/mongo/db:server_base",
-        "//src/mongo/executor:hedging_metrics",
         "//src/mongo/executor:task_executor_pool",
         "//src/mongo/s:grid",
     ],

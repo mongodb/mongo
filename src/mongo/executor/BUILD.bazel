@@ -183,8 +183,6 @@ mongo_cc_library(
     ],
     deps = [
         ":connection_pool_executor",
-        ":hedge_options_util",
-        ":hedging_metrics",
         ":network_interface",
         "//src/mongo/client:async_client",
         "//src/mongo/db:server_feature_flags",  # TODO(SERVER-93876): Remove.
@@ -208,23 +206,6 @@ mongo_cc_library(
         ":egress_connection_closer_manager",  # TODO(SERVER-93876): Remove.
         ":network_interface",  # TODO(SERVER-93876): Remove.
         ":network_interface_tl",
-    ],
-)
-
-mongo_cc_library(
-    name = "hedge_options_util",
-    srcs = [
-        "hedge_options_util.cpp",
-        "//src/mongo/util:sort.h",  # Only usage. Might want to move it here.
-    ],
-    hdrs = [
-        "hedge_options_util.h",
-    ],
-    deps = [
-        "//src/mongo:base",
-        "//src/mongo/client:read_preference",
-        "//src/mongo/s:mongos_server_parameters",
-        "//src/mongo/util:fail_point",  # TODO(SERVER-93876): Remove.
     ],
 )
 
@@ -335,31 +316,6 @@ mongo_cc_library(
 )
 
 mongo_cc_library(
-    name = "hedging_metrics",
-    srcs = [
-        "hedging_metrics.cpp",
-    ],
-    hdrs = [
-        "hedging_metrics.h",
-        "//src/mongo/db:read_write_concern_provenance_base_gen",
-        "//src/mongo/db:resumable_index_builds_gen",
-        "//src/mongo/db/commands/query_cmd:explain_gen",
-        "//src/mongo/db/commands/query_cmd:query_settings_cmds_gen",
-        "//src/mongo/db/ftdc:ftdc_mongod_gen",
-        "//src/mongo/db/repl:oplog_entry_gen",
-        "//src/mongo/db/repl:repl_set_config_gen",
-    ],
-    header_deps = [
-        "//src/mongo/db/concurrency:flow_control_ticketholder",
-        "//src/mongo/db/exec/sbe:query_sbe_plan_stats",
-        "//src/mongo/db/fts:fts_query_noop",
-    ],
-    deps = [
-        "//src/mongo:base",
-    ],
-)
-
-mongo_cc_library(
     name = "network_interface_thread_pool",
     srcs = [
         "network_interface_thread_pool.cpp",
@@ -380,7 +336,6 @@ mongo_cc_library(
         "//src/mongo/db/repl:repl_set_config_gen",
         "//src/mongo/db/sorter:sorter_gen",
         "//src/mongo/executor:connection_metrics.h",
-        "//src/mongo/executor:hedge_options_util.h",
         "//src/mongo/executor:network_connection_hook.h",
         "//src/mongo/executor:network_interface.h",
         "//src/mongo/executor:network_interface_thread_pool.h",

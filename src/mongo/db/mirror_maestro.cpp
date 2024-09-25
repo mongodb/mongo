@@ -499,9 +499,9 @@ void MirrorMaestroImpl::_mirror(const std::vector<HostAndPort>& hosts,
         auto newRequest = executor::RemoteCommandRequest(
             host, invocation.getDBForReadMirroring(), payload, nullptr /* opCtx */);
 
-        newRequest.options.fireAndForget = true;
+        newRequest.fireAndForget = true;
         if (MONGO_unlikely(mirrorMaestroExpectsResponse.shouldFail()))
-            newRequest.options.fireAndForget = false;
+            newRequest.fireAndForget = false;
 
         LOGV2_DEBUG(31455, 4, "About to mirror", "host"_attr = host, "request"_attr = newRequest);
 

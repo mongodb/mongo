@@ -450,19 +450,14 @@ DBQuery.prototype.allowDiskUse = function(value) {
  *
  * 'mode': A string indicating read preference mode to use.
  * 'tagSet': An optional list of tags to use. Order matters.
- * 'hedgeOptions': An optional object of the form {enabled: <bool>}.
  *
  * Returns 'this'.
  */
-DBQuery.prototype.readPref = function(mode, tagSet, hedgeOptions) {
+DBQuery.prototype.readPref = function(mode, tagSet) {
     let readPrefObj = {mode: mode};
 
     if (tagSet) {
         readPrefObj.tags = tagSet;
-    }
-
-    if (hedgeOptions) {
-        readPrefObj.hedge = hedgeOptions;
     }
 
     this._additionalCmdParams["$readPreference"] = readPrefObj;

@@ -61,7 +61,7 @@ void NetworkTestEnv::onCommands(std::vector<OnCommandFunction> funcs) {
 
         auto resultStatus = func(request);
 
-        if (request.options.fireAndForget) {
+        if (request.fireAndForget) {
             _mockNetwork->blackHole(noi);
         } else if (resultStatus.isOK()) {
             BSONObjBuilder result(std::move(resultStatus.getValue()));
@@ -86,7 +86,7 @@ void NetworkTestEnv::onCommandWithMetadata(OnCommandWithMetadataFunction func) {
 
     auto cmdResponseStatus = func(request);
 
-    if (request.options.fireAndForget) {
+    if (request.fireAndForget) {
         _mockNetwork->blackHole(noi);
     } else if (cmdResponseStatus.isOK()) {
         BSONObjBuilder result(std::move(cmdResponseStatus.data));

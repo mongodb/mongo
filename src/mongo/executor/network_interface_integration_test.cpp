@@ -225,7 +225,7 @@ public:
     RemoteCommandRequest makeTestCommand(Milliseconds timeout,
                                          BSONObj cmd,
                                          OperationContext* opCtx = nullptr,
-                                         RemoteCommandRequest::Options options = {},
+                                         bool fireAndForget = false,
                                          boost::optional<ErrorCodes::Error> timeoutCode = {},
                                          boost::optional<UUID> operationKey = {}) {
         if (!operationKey) {
@@ -242,7 +242,7 @@ public:
                                      BSONObj(),
                                      opCtx,
                                      timeout,
-                                     std::move(options),
+                                     fireAndForget,
                                      operationKey);
         // Don't override possible opCtx error code.
         if (timeoutCode) {
@@ -446,11 +446,10 @@ TEST_F(NetworkInterfaceTest, CancelRemotely) {
 
     auto cbh = makeCallbackHandle();
     auto deferred = [&] {
-        RemoteCommandRequest::Options options;
         // Kick off an "echo" operation, which should block until cancelCommand causes
         // the operation to be killed.
-        auto deferred = runCommand(
-            cbh, makeTestCommand(kNoTimeout, makeEchoCmdObj(), nullptr /* opCtx */, options));
+        auto deferred =
+            runCommand(cbh, makeTestCommand(kNoTimeout, makeEchoCmdObj(), nullptr /* opCtx */));
 
         // Wait for the "echo" operation to start.
         numCurrentOpRan += waitForCommandToStart("echo", kMaxWait);
@@ -502,10 +501,9 @@ TEST_F(NetworkInterfaceTest, CancelRemotelyTimedOut) {
 
     auto cbh = makeCallbackHandle();
     auto deferred = [&] {
-        RemoteCommandRequest::Options options;
         // Kick off a blocking "echo" operation.
-        auto deferred = runCommand(
-            cbh, makeTestCommand(kNoTimeout, makeEchoCmdObj(), nullptr /* opCtx */, options));
+        auto deferred =
+            runCommand(cbh, makeTestCommand(kNoTimeout, makeEchoCmdObj(), nullptr /* opCtx */));
 
         // Wait for the "echo" operation to start.
         numCurrentOpRan += waitForCommandToStart("echo", kMaxWait);
@@ -581,11 +579,12 @@ TEST_F(NetworkInterfaceTest, CancelBaton) {
     int numCurrentOpRan = 0;
 
     auto deferred = [&] {
-        RemoteCommandRequest::Options options;
         // Kick off an "echo" operation, which should block until cancelCommand causes
         // the operation to be killed.
         auto deferred = runCommand(
-            cbh, makeTestCommand(kNoTimeout, makeEchoCmdObj(), nullptr /* opCtx */, options));
+            cbh,
+            makeTestCommand(
+                kNoTimeout, makeEchoCmdObj(), nullptr /* opCtx */, false /* fireAndForget */));
 
         // Wait for the "echo" operation to start.
         fp.waitForAdditionalTimesEntered(1);
@@ -687,7 +686,7 @@ TEST_F(NetworkInterfaceTest, CustomCodeRequestTimeoutHit) {
     auto cb = makeCallbackHandle();
     // Force timeout by setting timeout to 0.
     auto request = makeTestCommand(
-        Milliseconds(0), makeFindCmdObj(), nullptr, {}, ErrorCodes::MaxTimeMSExpired);
+        Milliseconds(0), makeFindCmdObj(), nullptr, false, ErrorCodes::MaxTimeMSExpired);
     auto deferred = runCommand(cb, request);
     auto res = deferred.get();
 
@@ -818,8 +817,7 @@ TEST_F(NetworkInterfaceTest, AsyncOpTimeoutWithOpCtxDeadlineLater) {
 }
 
 TEST_F(NetworkInterfaceTest, StartCommand) {
-    RemoteCommandRequest::Options options;
-    auto request = makeTestCommand(kNoTimeout, makeEchoCmdObj(), nullptr /* opCtx */, options);
+    auto request = makeTestCommand(kNoTimeout, makeEchoCmdObj(), nullptr /* opCtx */);
 
     auto deferred = runCommand(makeCallbackHandle(), std::move(request));
 
@@ -861,12 +859,10 @@ TEST_F(NetworkInterfaceTest, FireAndForget) {
     const int numFireAndForgetRequests = 3;
     std::vector<Future<RemoteCommandResponse>> futures;
 
-    RemoteCommandRequest::Options options;
-    options.fireAndForget = true;
     for (int i = 0; i < numFireAndForgetRequests; i++) {
         auto cbh = makeCallbackHandle();
-        auto fireAndForgetRequest =
-            makeTestCommand(kNoTimeout, makeEchoCmdObj(), nullptr /* opCtx */, options);
+        auto fireAndForgetRequest = makeTestCommand(
+            kNoTimeout, makeEchoCmdObj(), nullptr /* opCtx */, true /* fireAndForget */);
         futures.push_back(runCommand(cbh, fireAndForgetRequest));
     }
 
@@ -997,14 +993,13 @@ TEST_F(NetworkInterfaceTest, UseOperationKeyWhenProvided) {
                         kNoTimeout);
     });
 
-    RemoteCommandRequest::Options rcrOptions;
     RemoteCommandRequest rcr(fixture().getServers().front(),
                              DatabaseName::kAdmin,
                              makeEchoCmdObj(),
                              BSONObj(),
                              nullptr,
                              kNoTimeout,
-                             std::move(rcrOptions),
+                             false,
                              opKey);
     resetIsInternalClient(true);
     ON_BLOCK_EXIT([&] { resetIsInternalClient(false); });
@@ -1302,7 +1297,8 @@ TEST_F(NetworkInterfaceTest, ShutdownBeforeSendRequest) {
     auto pf = makePromiseFuture<RemoteCommandResponse>();
     auto commandThread = stdx::thread([&]() {
         auto cb = makeCallbackHandle();
-        auto request = makeTestCommand(kNoTimeout, makeEchoCmdObj(), nullptr, {}, {}, operationKey);
+        auto request =
+            makeTestCommand(kNoTimeout, makeEchoCmdObj(), nullptr, false, {}, operationKey);
         pf.promise.setFrom(runCommand(cb, request));
     });
     ON_BLOCK_EXIT([&] {
@@ -1358,7 +1354,8 @@ TEST_F(NetworkInterfaceTest, ShutdownAfterSendRequest) {
     auto pf = makePromiseFuture<RemoteCommandResponse>();
     auto commandThread = stdx::thread([&]() {
         auto cb = makeCallbackHandle();
-        auto request = makeTestCommand(kNoTimeout, makeEchoCmdObj(), nullptr, {}, {}, operationKey);
+        auto request =
+            makeTestCommand(kNoTimeout, makeEchoCmdObj(), nullptr, false, {}, operationKey);
         pf.promise.setFrom(runCommand(cb, request));
     });
     ON_BLOCK_EXIT([&] {

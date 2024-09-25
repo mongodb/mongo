@@ -91,7 +91,7 @@ const cacheFP = configureFailPoint(configShard, "blockCollectionCacheLookup", {n
 let parallelShellArr = collections.map((coll) => {
     return startParallelShell(
         funWithArgs(function(dbName, collName) {
-            // Avoid hedged reads, we want the query to happen on the primary.
+            // We want the query to happen on the primary.
             db.getMongo().setReadPref("primary");
             const testDB = db.getSiblingDB(dbName);
             // Use a $unionWith to cause the shard to perform some routing internally. Otherwise

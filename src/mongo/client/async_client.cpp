@@ -397,7 +397,7 @@ Future<executor::RemoteCommandResponse> AsyncDBClient::runCommandRequest(
 
     return runCommand(std::move(opMsgRequest),
                       baton,
-                      request.options.fireAndForget,
+                      request.fireAndForget,
                       std::move(fromConnAcquiredTimer),
                       token)
         .then([this, startTimer = std::move(startTimer)](rpc::UniqueReply response) {

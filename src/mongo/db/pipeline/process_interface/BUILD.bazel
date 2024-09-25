@@ -157,7 +157,6 @@ mongo_cc_library(
         "//src/mongo/db/update:document_diff_applier.h",
         "//src/mongo/db/update:document_diff_serialization.h",
         "//src/mongo/executor:connection_metrics.h",
-        "//src/mongo/executor:hedge_options_util.h",
         "//src/mongo/executor:remote_command_request.h",
         "//src/mongo/executor:remote_command_response.h",
         "//src/mongo/executor:task_executor.h",

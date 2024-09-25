@@ -426,15 +426,13 @@ void CursorEstablisher::killOpOnShards(ServiceContext* srvCtx,
             opKey.appendToArrayBuilder(&opKeyArrayBuilder);
         }
 
-        executor::RemoteCommandRequest::Options options;
-        options.fireAndForget = true;
         executor::RemoteCommandRequest request(
             host,
             DatabaseName::kAdmin,
             BSON("_killOperations" << 1 << "operationKeys" << opKeyArrayBuilder.arr()),
             opCtx.get(),
             executor::RemoteCommandRequestBase::kNoTimeout,
-            options);
+            true /* fireAndForget */);
 
         // We do not process the response to the killOperations request (we make a good-faith
         // attempt at cleaning up the cursors, but ignore any returned errors).

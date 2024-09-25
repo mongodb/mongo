@@ -70,13 +70,13 @@ RemoteCommandRequestBase::RemoteCommandRequestBase(RequestId requestId,
                                                    const BSONObj& metadataObj,
                                                    OperationContext* opCtx,
                                                    Milliseconds timeoutMillis,
-                                                   Options options,
+                                                   bool fireAndForget,
                                                    boost::optional<UUID> opKey)
     : id(requestId),
       dbname(theDbName),
       metadata(metadataObj),
       opCtx(opCtx),
-      options(options),
+      fireAndForget(fireAndForget),
       operationKey(opKey),
       timeout(timeoutMillis) {
 
@@ -86,20 +86,12 @@ RemoteCommandRequestBase::RemoteCommandRequestBase(RequestId requestId,
         ? theCmdObj.addField(*opCtx->getComment())
         : cmdObj = theCmdObj;
 
-    // For hedged requests, adjust timeout
     if (cmdObj.hasField("maxTimeMSOpOnly")) {
         int maxTimeField = cmdObj["maxTimeMSOpOnly"].Number();
         if (auto maxTimeMSOpOnly = Milliseconds(maxTimeField);
             timeout == executor::RemoteCommandRequest::kNoTimeout || maxTimeMSOpOnly < timeout) {
             timeout = maxTimeMSOpOnly;
         }
-    }
-
-    // Assumes if argument for opKey is not empty, cmdObj already contains serialized version
-    // of the opKey.
-    if (operationKey == boost::none && options.hedgeOptions.isHedgeEnabled) {
-        operationKey.emplace(UUID::gen());
-        cmdObj = cmdObj.addField(BSON("clientOperationKey" << operationKey.value()).firstElement());
     }
 
     if (opCtx && APIParameters::get(opCtx).getParamsPassed()) {
@@ -155,7 +147,7 @@ RemoteCommandRequestImpl<T>::RemoteCommandRequestImpl(RequestId requestId,
                                                       const BSONObj& metadataObj,
                                                       OperationContext* opCtx,
                                                       Milliseconds timeoutMillis,
-                                                      Options options,
+                                                      bool fireAndForget,
                                                       boost::optional<UUID> operationKey)
     : RemoteCommandRequestBase(requestId,
                                theDbName,
@@ -163,7 +155,7 @@ RemoteCommandRequestImpl<T>::RemoteCommandRequestImpl(RequestId requestId,
                                metadataObj,
                                opCtx,
                                timeoutMillis,
-                               options,
+                               fireAndForget,
                                operationKey),
       target(theTarget) {
     if constexpr (std::is_same_v<T, std::vector<HostAndPort>>) {
@@ -178,7 +170,7 @@ RemoteCommandRequestImpl<T>::RemoteCommandRequestImpl(const T& theTarget,
                                                       const BSONObj& metadataObj,
                                                       OperationContext* opCtx,
                                                       Milliseconds timeoutMillis,
-                                                      Options options,
+                                                      bool fireAndForget,
                                                       boost::optional<UUID> operationKey)
     : RemoteCommandRequestImpl(requestIdCounter.addAndFetch(1),
                                theTarget,
@@ -187,7 +179,7 @@ RemoteCommandRequestImpl<T>::RemoteCommandRequestImpl(const T& theTarget,
                                metadataObj,
                                opCtx,
                                timeoutMillis,
-                               options,
+                               fireAndForget,
                                operationKey) {}
 
 template <typename T>
@@ -200,14 +192,10 @@ std::string RemoteCommandRequestImpl<T>::toString() const {
         out << "[{}]"_format(fmt::join(target, ", "));
     }
     out << " db:" << toStringForLogging(dbname);
-    out << " fireAndForget:" << options.fireAndForget;
+    out << " fireAndForget:" << fireAndForget;
 
     if (dateScheduled && timeout != kNoTimeout) {
         out << " expDate:" << (*dateScheduled + timeout).toString();
-    }
-
-    if (options.hedgeOptions.isHedgeEnabled) {
-        out << " options.hedgeCount:" << options.hedgeOptions.hedgeCount;
     }
 
     if (operationKey) {
@@ -236,10 +224,5 @@ bool RemoteCommandRequestImpl<T>::operator!=(const RemoteCommandRequestImpl& rhs
 
 template struct RemoteCommandRequestImpl<HostAndPort>;
 template struct RemoteCommandRequestImpl<std::vector<HostAndPort>>;
-
-void RemoteCommandRequestBase::Options::resetHedgeOptions() {
-    hedgeOptions = {};
-}
-
 }  // namespace executor
 }  // namespace mongo

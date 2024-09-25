@@ -38,7 +38,6 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/repl/optime.h"
 #include "mongo/db/vector_clock.h"
-#include "mongo/executor/hedging_metrics.h"
 #include "mongo/idl/cluster_server_parameter_server_status.h"
 #include "mongo/s/balancer_configuration.h"
 #include "mongo/s/catalog_cache.h"
@@ -128,24 +127,6 @@ public:
 };
 auto& shardingStatisitcsServerStatus =
     *ServerStatusSectionBuilder<ShardingStatisticsServerStatus>("shardingStatistics").forRouter();
-
-class HedgingMetricsServerStatus : public ServerStatusSection {
-public:
-    using ServerStatusSection::ServerStatusSection;
-
-    ~HedgingMetricsServerStatus() override = default;
-
-    bool includeByDefault() const override {
-        return true;
-    }
-
-    BSONObj generateSection(OperationContext* opCtx,
-                            const BSONElement& configElement) const override {
-        return HedgingMetrics::get(opCtx)->toBSON();
-    }
-};
-auto& hedgingMetricsServerStatus =
-    *ServerStatusSectionBuilder<HedgingMetricsServerStatus>("hedgingMetrics").forRouter();
 
 }  // namespace
 }  // namespace mongo
