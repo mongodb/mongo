@@ -9,6 +9,9 @@ set -o verbose
 # Use the Evergreen temp directory to avoid filling up the disk.
 mkdir -p $TMPDIR
 if [[ "$OSTYPE" == "cygwin" ]] || [[ "$OSTYPE" == "win32" ]]; then
+  # TODO(SERVER-94605): remove when Windows temp directory is cleared between task runs
+  rm -rf Z:/bazel_tmp/* || true
+
   # Z:/ path is necessary to avoid running into MSVC's file length limit,
   # see https://jira.mongodb.org/browse/DEVPROD-11126
   abs_path=$(cygpath -w "$TMPDIR" | tr '\\' '/')
