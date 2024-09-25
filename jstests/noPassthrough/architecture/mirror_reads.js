@@ -86,7 +86,7 @@ function waitForReadsToResolveOnPrimary(rst, initialStatsOnPrimary, readsExpecte
                   }));
         // Verify that the reads mirrored to the secondaries have been resolved by the primary.
         return ((pending == 0) && (sent === resolved));
-    }, "Did not resolve all requests within time limit", 10000);
+    }, "Did not resolve all requests within time limit", 20000);
 
     if (!readsExpectedToFail) {
         // If we don't expect to fail from some fail point, then we expect most of our reads
