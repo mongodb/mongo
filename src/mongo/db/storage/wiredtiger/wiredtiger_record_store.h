@@ -64,10 +64,6 @@
 #include "mongo/db/storage/wiredtiger/wiredtiger_size_storer.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_util.h"
 #include "mongo/platform/atomic_word.h"
-#include "mongo/platform/compiler.h"
-#include "mongo/platform/mutex.h"
-#include "mongo/stdx/condition_variable.h"
-#include "mongo/stdx/thread.h"
 #include "mongo/util/fail_point.h"
 #include "mongo/util/uuid.h"
 

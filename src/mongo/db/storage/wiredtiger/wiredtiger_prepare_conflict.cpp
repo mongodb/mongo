@@ -30,8 +30,6 @@
 
 #include <boost/none.hpp>
 #include <boost/optional/optional.hpp>
-#include <string>
-#include <vector>
 
 #include <wiredtiger.h>
 
@@ -45,9 +43,7 @@
 #include "mongo/db/storage/wiredtiger/wiredtiger_session_cache.h"
 #include "mongo/logv2/log.h"
 #include "mongo/logv2/log_attr.h"
-#include "mongo/logv2/log_component.h"
 #include "mongo/platform/compiler.h"
-#include "mongo/util/decorable.h"
 #include "mongo/util/fail_point.h"
 #include "mongo/util/scopeguard.h"
 #include "mongo/util/str.h"

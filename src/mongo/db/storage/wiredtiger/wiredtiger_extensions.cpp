@@ -27,14 +27,12 @@
  *    it in the license file.
  */
 
-#include <memory>
-#include <utility>
 
+#include "mongo/db/storage/wiredtiger/wiredtiger_extensions.h"
 #include "mongo/base/string_data.h"
 #include "mongo/bson/util/builder.h"
 #include "mongo/bson/util/builder_fwd.h"
 #include "mongo/db/service_context.h"
-#include "mongo/db/storage/wiredtiger/wiredtiger_extensions.h"
 #include "mongo/util/decorable.h"
 
 namespace mongo {

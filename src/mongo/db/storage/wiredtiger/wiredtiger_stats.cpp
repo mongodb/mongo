@@ -30,7 +30,6 @@
 #include "mongo/db/storage/wiredtiger/wiredtiger_stats.h"
 
 #include <cstdint>
-#include <utility>
 
 #include <absl/container/node_hash_map.h>
 #include <boost/optional/optional.hpp>

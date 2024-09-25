@@ -70,7 +70,6 @@
 #include "mongo/unittest/temp_dir.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/clock_source_mock.h"
-#include "mongo/util/decorable.h"
 #include "mongo/util/str.h"
 
 namespace mongo {

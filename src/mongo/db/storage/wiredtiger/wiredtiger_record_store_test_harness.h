@@ -40,7 +40,6 @@
 #include "mongo/db/storage/recovery_unit.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_kv_engine.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_record_store.h"
-#include "mongo/platform/basic.h"
 #include "mongo/unittest/temp_dir.h"
 #include "mongo/util/clock_source_mock.h"
 

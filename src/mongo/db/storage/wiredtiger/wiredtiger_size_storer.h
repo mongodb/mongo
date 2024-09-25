@@ -35,9 +35,7 @@
 #include <wiredtiger.h>
 
 #include "mongo/base/string_data.h"
-#include "mongo/db/storage/wiredtiger/wiredtiger_session_cache.h"
 #include "mongo/platform/atomic_word.h"
-#include "mongo/platform/mutex.h"
 #include "mongo/util/assert_util_core.h"
 #include "mongo/util/string_map.h"
 

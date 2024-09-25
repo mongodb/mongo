@@ -29,9 +29,10 @@
 
 #pragma once
 
-#include "mongo/base/string_data.h"
 #include "mongo/db/operation_context.h"
-#include "mongo/db/storage/wiredtiger/wiredtiger_index.h"
+#include "mongo/db/storage/wiredtiger/wiredtiger_error_util.h"
+#include "mongo/db/storage/wiredtiger/wiredtiger_prepare_conflict.h"
+#include "mongo/db/storage/wiredtiger/wiredtiger_record_store.h"
 
 namespace mongo {
 /**

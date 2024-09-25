@@ -30,14 +30,11 @@
 
 #include <boost/move/utility_core.hpp>
 #include <boost/none.hpp>
-#include <mutex>
-#include <string>
 #include <wiredtiger.h>
 
 #include <boost/optional/optional.hpp>
 
 #include "mongo/base/error_codes.h"
-#include "mongo/db/server_options.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_begin_transaction_block.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_recovery_unit.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_snapshot_manager.h"

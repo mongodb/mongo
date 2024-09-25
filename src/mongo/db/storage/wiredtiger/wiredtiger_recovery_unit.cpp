@@ -31,9 +31,7 @@
 #include <algorithm>
 #include <boost/cstdint.hpp>
 #include <fmt/format.h>
-#include <memory>
 #include <string>
-#include <utility>
 #include <wiredtiger.h>
 
 #include <boost/move/utility_core.hpp>
@@ -46,7 +44,6 @@
 #include "mongo/bson/util/builder_fwd.h"
 #include "mongo/db/concurrency/exception_util.h"
 #include "mongo/db/server_options.h"
-#include "mongo/db/storage/snapshot.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_begin_transaction_block.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_error_util.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_kv_engine.h"
@@ -57,7 +54,6 @@
 #include "mongo/logv2/log.h"
 #include "mongo/logv2/log_attr.h"
 #include "mongo/logv2/log_severity.h"
-#include "mongo/logv2/log_truncation.h"
 #include "mongo/platform/compiler.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/fail_point.h"

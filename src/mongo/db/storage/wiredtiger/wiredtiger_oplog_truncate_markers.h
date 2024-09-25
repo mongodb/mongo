@@ -36,7 +36,6 @@
 #include "mongo/db/record_id.h"
 #include "mongo/db/storage/collection_truncate_markers.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_record_store.h"
-#include "mongo/platform/mutex.h"
 #include "mongo/stdx/condition_variable.h"
 
 namespace mongo {

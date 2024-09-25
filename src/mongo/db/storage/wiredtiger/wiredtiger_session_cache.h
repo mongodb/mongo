@@ -37,15 +37,12 @@
 #include <vector>
 #include <wiredtiger.h>
 
-#include "mongo/db/operation_context.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_compiled_configuration.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_snapshot_manager.h"
 #include "mongo/platform/atomic_word.h"
-#include "mongo/platform/mutex.h"
 #include "mongo/stdx/condition_variable.h"
 #include "mongo/util/clock_source.h"
 #include "mongo/util/time_support.h"
-#include "mongo/util/timer.h"
 
 namespace mongo {
 

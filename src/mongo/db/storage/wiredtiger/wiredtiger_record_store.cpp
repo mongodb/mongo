@@ -39,14 +39,7 @@
 // IWYU pragma: no_include "cxxabi.h"
 #include <algorithm>
 #include <cstring>
-#include <deque>
-#include <iostream>
-#include <iterator>
-#include <memory>
-#include <mutex>
-#include <utility>
 
-#include "mongo/base/checked_cast.h"
 #include "mongo/base/error_codes.h"
 #include "mongo/base/static_assert.h"
 #include "mongo/bson/bsonelement.h"
@@ -61,8 +54,6 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/record_id_helpers.h"
 #include "mongo/db/repl/oplog_entry.h"
-#include "mongo/db/repl/oplog_entry_gen.h"
-#include "mongo/db/server_options.h"
 #include "mongo/db/server_recovery.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/stats/resource_consumption_metrics.h"
@@ -70,7 +61,6 @@
 #include "mongo/db/storage/collection_truncate_markers.h"
 #include "mongo/db/storage/damage_vector.h"
 #include "mongo/db/storage/duplicate_key_error_info.h"
-#include "mongo/db/storage/ident.h"
 #include "mongo/db/storage/recovery_unit.h"
 #include "mongo/db/storage/storage_options.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_begin_transaction_block.h"
@@ -95,9 +85,7 @@
 #include "mongo/logv2/log_component.h"
 #include "mongo/logv2/log_options.h"
 #include "mongo/logv2/redaction.h"
-#include "mongo/stdx/condition_variable.h"
 #include "mongo/util/assert_util.h"
-#include "mongo/util/concurrency/idle_thread_block.h"
 #include "mongo/util/debug_util.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/net/sockaddr.h"

@@ -30,7 +30,6 @@
 #include "mongo/db/storage/wiredtiger/wiredtiger_index_util.h"
 
 #include <cerrno>
-#include <vector>
 
 #include <boost/move/utility_core.hpp>
 #include <wiredtiger.h>
@@ -50,7 +49,6 @@
 #include "mongo/logv2/log_attr.h"
 #include "mongo/logv2/log_component.h"
 #include "mongo/platform/compiler.h"
-#include "mongo/util/assert_util_core.h"
 #include "mongo/util/fail_point.h"
 #include "mongo/util/str.h"
 

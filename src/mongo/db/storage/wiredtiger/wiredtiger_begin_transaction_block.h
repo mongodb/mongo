@@ -29,7 +29,6 @@
 
 #pragma once
 
-#include <string>
 #include <wiredtiger.h>
 
 #include "mongo/base/status.h"

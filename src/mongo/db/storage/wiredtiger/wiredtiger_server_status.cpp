@@ -29,12 +29,10 @@
 
 
 #include <string>
-#include <vector>
 
 #include <wiredtiger.h>
 
 #include "mongo/base/checked_cast.h"
-#include "mongo/base/status.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/service_context.h"
@@ -44,9 +42,6 @@
 #include "mongo/db/storage/wiredtiger/wiredtiger_server_status.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_util.h"
 #include "mongo/logv2/log.h"
-#include "mongo/logv2/log_component.h"
-#include "mongo/util/assert_util.h"
-#include "mongo/util/time_support.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kFTDC
 

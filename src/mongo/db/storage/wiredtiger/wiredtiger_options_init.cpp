@@ -28,7 +28,6 @@
  */
 
 #include <iostream>
-#include <string>
 #include <vector>
 
 #include "mongo/base/initializer.h"
@@ -38,7 +37,6 @@
 #include "mongo/util/exit_code.h"
 #include "mongo/util/options_parser/startup_option_init.h"
 #include "mongo/util/options_parser/startup_options.h"
-#include "mongo/util/options_parser/value.h"
 
 #if defined(MONGO_CONFIG_HAVE_HEADER_UNISTD_H)
 #include <unistd.h>
