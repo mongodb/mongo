@@ -56,7 +56,7 @@ structs:
       batchSizeGrowthFactor:
         description: Specifies the factor by which the batchSize sent to mongot increases per batch.
         type: double
-        default: 2.00
+        default: 1.50
         validator:
           gte: 1.0
 

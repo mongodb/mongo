@@ -3,8 +3,7 @@
  * information in the docsRequested field.
  * All tests are skipped if featureFlagSearchBatchSizeTuning is enabled, since this file only tests
  * the docsRequested options, whereas that flag enables the batchSize option.
- * TODO SERVER-81646 Remove this test when featureFlagSearchBatchSizeTuning is enabled since the
- * test will no longer run.
+ * TODO SERVER-92576 Remove this test when featureFlagSearchBatchSizeLimit is removed.
  * @tags: [requires_fcv_71]
  */
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
