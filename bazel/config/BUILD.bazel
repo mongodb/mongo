@@ -411,41 +411,41 @@ selects.config_setting_group(
 )
 
 selects.config_setting_group(
-    name = "linux_opt_off",
+    name = "gcc_or_clang_opt_off",
     match_all = [
-        "@platforms//os:linux",
+        ":gcc_or_clang",
         ":opt_off",
     ],
 )
 
 selects.config_setting_group(
-    name = "linux_opt_on",
+    name = "gcc_or_clang_opt_on",
     match_all = [
-        "@platforms//os:linux",
+        ":gcc_or_clang",
         ":opt_on",
     ],
 )
 
 selects.config_setting_group(
-    name = "linux_opt_any",
+    name = "gcc_or_clang_opt_any",
     match_all = [
-        "@platforms//os:linux",
+        ":gcc_or_clang",
         ":opt_any",
     ],
 )
 
 selects.config_setting_group(
-    name = "linux_opt_size",
+    name = "gcc_or_clang_opt_size",
     match_all = [
-        "@platforms//os:linux",
+        ":gcc_or_clang",
         ":opt_size",
     ],
 )
 
 selects.config_setting_group(
-    name = "linux_opt_debug",
+    name = "gcc_or_clang_opt_debug",
     match_all = [
-        "@platforms//os:linux",
+        ":gcc_or_clang",
         ":opt_debug",
     ],
 )

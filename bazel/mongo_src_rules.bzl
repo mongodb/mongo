@@ -421,16 +421,16 @@ GCC_OPT_DEFINES = select({
 
 LINUX_OPT_COPTS = select({
     # This is opt=debug, not to be confused with (opt=on && dbg=on)
-    "//bazel/config:linux_opt_debug": [
+    "//bazel/config:gcc_or_clang_opt_debug": [
         "-Og",
     ],
-    "//bazel/config:linux_opt_off": [
+    "//bazel/config:gcc_or_clang_opt_off": [
         "-O0",
     ],
-    "//bazel/config:linux_opt_on": [
+    "//bazel/config:gcc_or_clang_opt_on": [
         "-O2",
     ],
-    "//bazel/config:linux_opt_size": [
+    "//bazel/config:gcc_or_clang_opt_size": [
         "-Os",
     ],
     "//conditions:default": [],
