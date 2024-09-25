@@ -54,7 +54,8 @@ public:
 
     bool isClusterMember(Client* client) const override;
 
-    StatusWith<std::unique_ptr<UserRequest>> makeUserRequest() const override;
+    StatusWith<std::unique_ptr<UserRequest>> makeUserRequest(
+        OperationContext* opCtx) const override;
 
 private:
     static constexpr unsigned int kMaxStep = 1;

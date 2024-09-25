@@ -150,7 +150,7 @@ StatusWith<std::tuple<bool, std::string>> SASLPlainServerMechanism::stepImpl(
             });
         }
 
-        auto swRequest = makeUserRequest();
+        auto swRequest = makeUserRequest(opCtx);
         if (!swRequest.isOK()) {
             return swRequest.getStatus();
         }

@@ -194,7 +194,7 @@ SaslReply doSaslStep(OperationContext* opCtx,
     }
 
     if (mechanism.isSuccess()) {
-        auto request = uassertStatusOK(mechanism.makeUserRequest());
+        auto request = uassertStatusOK(mechanism.makeUserRequest(opCtx));
         auto expirationTime = mechanism.getExpirationTime();
         uassertStatusOK(AuthorizationSession::get(opCtx->getClient())
                             ->addAndAuthorizeUser(opCtx, std::move(request), expirationTime));

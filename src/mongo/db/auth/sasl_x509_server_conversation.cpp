@@ -99,22 +99,18 @@ std::string getUserName(Client* client, StringData inputData, const SSLPeerInfo&
 
 }  // namespace
 
-StatusWith<std::unique_ptr<UserRequest>> SaslX509ServerMechanism::makeUserRequest() const {
+StatusWith<std::unique_ptr<UserRequest>> SaslX509ServerMechanism::makeUserRequest(
+    OperationContext* opCtx) const {
     std::unique_ptr<UserRequest> request = std::make_unique<UserRequestGeneral>(
         UserName(getPrincipalName(), getAuthenticationDatabase()), boost::none);
 
-    if (!haveClient()) {
+    if (!opCtx || !opCtx->getClient()) {
+        // Without an opCtx, we have no client, and none of the paths to
+        // acquiring roles below will succeed.
         return std::move(request);
     }
 
-    // TODO: SERVER-72648 - pass opCtx to this function
-    // We can use cc since we are guaranteed to have a client.
-    auto opCtx = cc().getOperationContext();
-
-    std::shared_ptr<transport::Session> session;
-    if (opCtx && opCtx->getClient()) {
-        session = opCtx->getClient()->session();
-    }
+    auto session = opCtx->getClient()->session();
 
     if (isClusterMember(opCtx->getClient())) {
         return std::make_unique<UserRequestGeneral>((*internalSecurity.getUser())->getName(),
