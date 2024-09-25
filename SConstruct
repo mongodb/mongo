@@ -5759,7 +5759,7 @@ gdb_index_enabled = env.get("GDB_INDEX")
 if gdb_index_enabled == "auto" and link_model == "dynamic":
     gdb_index_enabled = True
 
-if gdb_index_enabled:
+if gdb_index_enabled is True:
     gdb_index = Tool("gdb_index")
     if gdb_index.exists(env):
         gdb_index.generate(env)
