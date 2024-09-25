@@ -39,6 +39,7 @@
 #include "mongo/db/repl/initial_syncer.h"
 #include "mongo/db/storage/control/journal_flusher.h"
 #include "mongo/db/storage/storage_util.h"
+#include "mongo/stdx/mutex.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kReplication
 
@@ -212,7 +213,7 @@ void OplogWriterImpl::_run() {
         auto lastOpTimeAndWallTime =
             invariantStatusOK(OpTimeAndWallTime::parseOpTimeAndWallTimeFromOplogEntry(ops.back()));
 
-        stdx::lock_guard<SimpleMutex> fsynclk(oplogWriterLockedFsync);
+        stdx::lock_guard<stdx::mutex> fsynclk(oplogWriterLockedFsync);
 
         {
             LOGV2_DEBUG(8352100, 2, "Oplog write batch size", "size"_attr = ops.size());

@@ -51,7 +51,6 @@
 #if defined(_WIN32)
 #include <mmsystem.h>
 
-#include "mongo/util/concurrency/mutex.h"
 #include "mongo/util/system_tick_source.h"
 #include "mongo/util/timer.h"
 #elif defined(__linux__)

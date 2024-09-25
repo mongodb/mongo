@@ -54,7 +54,6 @@
 #include "mongo/transport/session.h"
 #include "mongo/transport/ssl_connection_context.h"
 #include "mongo/util/assert_util.h"
-#include "mongo/util/concurrency/mutex.h"
 #include "mongo/util/debug_util.h"
 #include "mongo/util/exit.h"
 #include "mongo/util/fail_point.h"

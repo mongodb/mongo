@@ -62,6 +62,7 @@
 #include "mongo/logv2/log_component.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/platform/random.h"
+#include "mongo/stdx/mutex.h"
 #include "mongo/util/aligned.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/decorable.h"
@@ -389,7 +390,7 @@ ClientCursorPin CursorManager::registerCursor(OperationContext* opCtx,
 
     // Note we must hold the registration lock from now until insertion into '_cursorMap' to ensure
     // we don't insert two cursors with the same cursor id.
-    stdx::lock_guard<SimpleMutex> lock(_registrationLock);
+    stdx::lock_guard<stdx::mutex> lock(_registrationLock);
     CursorId cursorId = generic_cursor::allocateCursorId(
         [&](CursorId cursorId) -> bool {
             // Even though we drop the lock on the '_cursorMap' partition, another thread cannot

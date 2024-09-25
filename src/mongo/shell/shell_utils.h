@@ -42,7 +42,6 @@
 #include "mongo/client/mongo_uri.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/platform/mutex.h"
-#include "mongo/util/concurrency/mutex.h"
 
 namespace mongo {
 

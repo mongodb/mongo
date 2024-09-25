@@ -43,7 +43,6 @@
 #include "mongo/platform/mutex.h"
 #include "mongo/platform/process_id.h"
 #include "mongo/util/assert_util_core.h"
-#include "mongo/util/concurrency/mutex.h"
 #include "mongo/util/static_immortal.h"
 
 namespace mongo {

@@ -35,9 +35,9 @@
 #include "mongo/client/authenticate.h"
 #include "mongo/client/native_sasl_client_session.h"
 #include "mongo/logv2/log.h"
+#include "mongo/stdx/mutex.h"
 #include "mongo/util/allocator.h"
 #include "mongo/util/assert_util.h"
-#include "mongo/util/concurrency/mutex.h"
 #include "mongo/util/signal_handlers_synchronous.h"
 #include "mongo/util/str.h"
 
@@ -95,21 +95,21 @@ void* saslOurRealloc(void* ptr, SaslAllocSize sz) {
  */
 
 void* saslMutexAlloc(void) {
-    return new SimpleMutex;
+    return new stdx::mutex;
 }
 
 int saslMutexLock(void* mutex) {
-    static_cast<SimpleMutex*>(mutex)->lock();
+    static_cast<stdx::mutex*>(mutex)->lock();
     return SASL_OK;
 }
 
 int saslMutexUnlock(void* mutex) {
-    static_cast<SimpleMutex*>(mutex)->unlock();
+    static_cast<stdx::mutex*>(mutex)->unlock();
     return SASL_OK;
 }
 
 void saslMutexFree(void* mutex) {
-    delete static_cast<SimpleMutex*>(mutex);
+    delete static_cast<stdx::mutex*>(mutex);
 }
 
 /**

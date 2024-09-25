@@ -37,8 +37,8 @@
 #include "mongo/db/auth/cluster_auth_mode.h"
 #include "mongo/db/concurrency/lock_manager_defs.h"
 #include "mongo/db/service_context.h"
+#include "mongo/stdx/mutex.h"
 #include "mongo/stdx/unordered_map.h"
-#include "mongo/util/concurrency/mutex.h"
 
 namespace mongo {
 
@@ -145,7 +145,7 @@ private:
     struct LockBucket {
         LockHead* findOrInsert(ResourceId resId);
 
-        SimpleMutex mutex;
+        stdx::mutex mutex;
         using Map = stdx::unordered_map<ResourceId, LockHead*>;
         Map data;
     };
@@ -157,7 +157,7 @@ private:
         PartitionedLockHead* find(ResourceId resId);
         PartitionedLockHead* findOrInsert(ResourceId resId);
 
-        SimpleMutex mutex;
+        stdx::mutex mutex;
         using Map = stdx::unordered_map<ResourceId, PartitionedLockHead*>;
         Map data;
     };

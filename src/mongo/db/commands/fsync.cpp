@@ -81,8 +81,8 @@ stdx::mutex fsyncStateMutex;
 std::unique_ptr<FSyncLockThread> globalFsyncLockThread = nullptr;
 
 // Exposed publically via extern in fsync.h.
-SimpleMutex oplogWriterLockedFsync;
-SimpleMutex oplogApplierLockedFsync;
+stdx::mutex oplogWriterLockedFsync;
+stdx::mutex oplogApplierLockedFsync;
 
 namespace {
 
@@ -444,9 +444,9 @@ void FSyncLockThread::run() {
     // We first lock to stop oplogWriter then wait oplogApplier to apply everything in its buffer.
     // This can make sure we have applied all oplogs that have been written when we fsync lock the
     // server.
-    stdx::lock_guard<SimpleMutex> writerLk(oplogWriterLockedFsync);
+    stdx::lock_guard<stdx::mutex> writerLk(oplogWriterLockedFsync);
     _waitUntilLastAppliedCatchupLastWritten();
-    stdx::lock_guard<SimpleMutex> applierLk(oplogApplierLockedFsync);
+    stdx::lock_guard<stdx::mutex> applierLk(oplogApplierLockedFsync);
     stdx::unique_lock<Latch> stateLock(fsyncStateMutex);
 
     invariant(fsyncCore.getLockCount_inLock() == 1);

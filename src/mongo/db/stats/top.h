@@ -45,7 +45,6 @@
 #include "mongo/db/stats/operation_latency_histogram.h"
 #include "mongo/platform/mutex.h"
 #include "mongo/rpc/message.h"
-#include "mongo/util/concurrency/mutex.h"
 #include "mongo/util/string_map.h"
 
 namespace mongo {

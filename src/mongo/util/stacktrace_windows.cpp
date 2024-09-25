@@ -57,7 +57,6 @@
 #include "mongo/logv2/log.h"
 #include "mongo/stdx/mutex.h"
 #include "mongo/util/assert_util.h"
-#include "mongo/util/concurrency/mutex.h"
 #include "mongo/util/text.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kControl

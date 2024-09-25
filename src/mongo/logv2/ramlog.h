@@ -37,7 +37,6 @@
 
 #include "mongo/base/string_data.h"
 #include "mongo/platform/mutex.h"
-#include "mongo/util/concurrency/mutex.h"
 #include "mongo/util/concurrency/with_lock.h"
 
 namespace mongo::logv2 {

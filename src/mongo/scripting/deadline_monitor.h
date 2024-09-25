@@ -39,7 +39,6 @@
 #include "mongo/stdx/thread.h"
 #include "mongo/stdx/unordered_map.h"
 #include "mongo/util/concurrency/idle_thread_block.h"
-#include "mongo/util/concurrency/mutex.h"
 #include "mongo/util/concurrency/thread_name.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/time_support.h"

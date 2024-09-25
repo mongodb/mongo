@@ -53,7 +53,6 @@
 #include "mongo/s/client/shard.h"
 #include "mongo/stdx/condition_variable.h"
 #include "mongo/util/assert_util.h"
-#include "mongo/util/concurrency/mutex.h"
 #include "mongo/util/concurrency/with_lock.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/future.h"

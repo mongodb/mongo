@@ -33,8 +33,8 @@
 #include <mutex>
 
 #include "mongo/platform/atomic_word.h"
+#include "mongo/stdx/mutex.h"
 #include "mongo/util/clock_source.h"
-#include "mongo/util/concurrency/mutex.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/system_clock_source.h"
 #include "mongo/util/time_support.h"
@@ -127,6 +127,6 @@ private:
     /*
      * Mutex used when reading/writing the window.
      */
-    SimpleMutex _windowMutex;
+    stdx::mutex _windowMutex;
 };
 }  // namespace mongo

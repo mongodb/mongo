@@ -46,7 +46,6 @@
 #include "mongo/platform/random.h"
 #include "mongo/transport/ssl_connection_context.h"
 #include "mongo/util/base64.h"
-#include "mongo/util/concurrency/mutex.h"
 #include "mongo/util/fail_point.h"
 #include "mongo/util/net/cidr.h"
 #include "mongo/util/net/private/ssl_expiration.h"

@@ -36,8 +36,8 @@
 #include "mongo/db/catalog/database_holder.h"
 #include "mongo/db/database_name.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/stdx/mutex.h"
 #include "mongo/stdx/unordered_map.h"
-#include "mongo/util/concurrency/mutex.h"
 #include "mongo/util/string_map.h"
 
 namespace mongo {
@@ -96,7 +96,7 @@ public:
 private:
     boost::optional<DatabaseName> _getNameWithConflictingCasing_inlock(const DatabaseName& dbName);
 
-    mutable SimpleMutex _m;
+    mutable stdx::mutex _m;
 
     DatabaseHolderImpl::DBsIndex _dbs;
 };

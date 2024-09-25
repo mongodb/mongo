@@ -81,9 +81,9 @@
 #include "mongo/logv2/log_component.h"
 #include "mongo/logv2/log_tag.h"
 #include "mongo/rpc/get_status_from_command_result.h"
+#include "mongo/stdx/mutex.h"
 #include "mongo/stdx/unordered_map.h"
 #include "mongo/util/assert_util.h"
-#include "mongo/util/concurrency/mutex.h"
 #include "mongo/util/str.h"
 #include "mongo/util/uuid.h"
 #include "mongo/util/version/releases.h"
@@ -250,7 +250,7 @@ Lock::ResourceMutex fcvDocumentLock("featureCompatibilityVersionDocumentLock");
 // lastFCVUpdateTimestamp contains the latest oplog entry timestamp which updated the FCV.
 // It is reset on rollback.
 Timestamp lastFCVUpdateTimestamp;
-SimpleMutex lastFCVUpdateTimestampMutex;
+stdx::mutex lastFCVUpdateTimestampMutex;
 
 /**
  * Build update command for featureCompatibilityVersion document updates.

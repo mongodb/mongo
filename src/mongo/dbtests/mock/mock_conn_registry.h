@@ -40,7 +40,6 @@
 #include "mongo/dbtests/mock/mock_remote_db_server.h"
 #include "mongo/platform/mutex.h"
 #include "mongo/stdx/unordered_map.h"
-#include "mongo/util/concurrency/mutex.h"
 
 namespace mongo {
 /**

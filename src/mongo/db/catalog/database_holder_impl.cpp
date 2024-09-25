@@ -65,6 +65,7 @@
 #include "mongo/logv2/log.h"
 #include "mongo/logv2/log_attr.h"
 #include "mongo/logv2/log_component.h"
+#include "mongo/stdx/mutex.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/scopeguard.h"
 #include "mongo/util/str.h"
@@ -81,7 +82,7 @@ Database* DatabaseHolderImpl::getDb(OperationContext* opCtx, const DatabaseName&
     invariant(shard_role_details::getLocker(opCtx)->isDbLockedForMode(dbName, MODE_IS) ||
               (dbName.isLocalDB() && shard_role_details::getLocker(opCtx)->isLocked()));
 
-    stdx::lock_guard<SimpleMutex> lk(_m);
+    stdx::lock_guard<stdx::mutex> lk(_m);
 
     auto it = _dbs.viewAll().find(dbName);
     if (it != _dbs.viewAll().end()) {
@@ -95,7 +96,7 @@ bool DatabaseHolderImpl::dbExists(OperationContext* opCtx, const DatabaseName& d
     uassert(6198702,
             "invalid db name: " + dbName.toStringForErrorMsg(),
             DatabaseName::isValid(dbName, DatabaseName::DollarInDbNameBehavior::Allow));
-    stdx::lock_guard<SimpleMutex> lk(_m);
+    stdx::lock_guard<stdx::mutex> lk(_m);
 
     auto it = _dbs.viewAll().find(dbName);
     return it != _dbs.viewAll().end() && it->second != nullptr;
@@ -109,12 +110,12 @@ boost::optional<DatabaseName> DatabaseHolderImpl::_getNameWithConflictingCasing_
 
 boost::optional<DatabaseName> DatabaseHolderImpl::getNameWithConflictingCasing(
     const DatabaseName& dbName) {
-    stdx::lock_guard<SimpleMutex> lk(_m);
+    stdx::lock_guard<stdx::mutex> lk(_m);
     return _getNameWithConflictingCasing_inlock(dbName);
 }
 
 std::vector<DatabaseName> DatabaseHolderImpl::getNames() {
-    stdx::lock_guard<SimpleMutex> lk(_m);
+    stdx::lock_guard<stdx::mutex> lk(_m);
     std::vector<DatabaseName> dbNames;
     for (const auto& nameAndPointer : _dbs.viewAll()) {
         dbNames.push_back(nameAndPointer.first);
@@ -133,7 +134,7 @@ Database* DatabaseHolderImpl::openDb(OperationContext* opCtx,
     if (justCreated)
         *justCreated = false;  // Until proven otherwise.
 
-    stdx::unique_lock<SimpleMutex> lk(_m);
+    stdx::unique_lock<stdx::mutex> lk(_m);
 
     // The following will insert a nullptr for dbname, which will treated the same as a non-
     // existant database by the get method, yet still counts in getNameWithConflictingCasing.
@@ -262,7 +263,7 @@ void DatabaseHolderImpl::close(OperationContext* opCtx, const DatabaseName& dbNa
             DatabaseName::isValid(dbName, DatabaseName::DollarInDbNameBehavior::Allow));
     invariant(shard_role_details::getLocker(opCtx)->isDbLockedForMode(dbName, MODE_X));
 
-    stdx::lock_guard<SimpleMutex> lk(_m);
+    stdx::lock_guard<stdx::mutex> lk(_m);
 
     if (!_dbs.viewAll().contains(dbName)) {
         return;
@@ -282,7 +283,7 @@ void DatabaseHolderImpl::closeAll(OperationContext* opCtx) {
     while (true) {
         std::vector<DatabaseName> dbs;
         {
-            stdx::lock_guard<SimpleMutex> lk(_m);
+            stdx::lock_guard<stdx::mutex> lk(_m);
             for (auto i = _dbs.viewAll().begin(); i != _dbs.viewAll().end(); ++i) {
                 // It is the caller's responsibility to ensure that no index builds are active in
                 // the database.

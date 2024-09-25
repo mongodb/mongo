@@ -35,8 +35,8 @@
 
 #include "mongo/db/service_context.h"
 #include "mongo/platform/mutex.h"
+#include "mongo/stdx/mutex.h"
 #include "mongo/util/background.h"
-#include "mongo/util/concurrency/mutex.h"
 
 namespace mongo {
 
@@ -79,12 +79,12 @@ private:
 /**
  * This is used to block oplogWriter and should never be acquired by others.
  */
-extern SimpleMutex oplogWriterLockedFsync;
+extern stdx::mutex oplogWriterLockedFsync;
 
 /**
  * This is used to block oplogApplier and should never be acquired by others.
  */
-extern SimpleMutex oplogApplierLockedFsync;
+extern stdx::mutex oplogApplierLockedFsync;
 
 /**
  * Must be taken before accessing globalFsyncLockThread below.

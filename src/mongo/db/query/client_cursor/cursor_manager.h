@@ -56,10 +56,10 @@
 #include "mongo/db/session/session_killer.h"
 #include "mongo/platform/mutex.h"
 #include "mongo/platform/random.h"
+#include "mongo/stdx/mutex.h"
 #include "mongo/stdx/unordered_map.h"
 #include "mongo/stdx/unordered_set.h"
 #include "mongo/util/clock_source.h"
-#include "mongo/util/concurrency/mutex.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/time_support.h"
 #include "mongo/util/uuid.h"
@@ -280,7 +280,7 @@ private:
     // - If you need to access multiple partitions within '_cursorMap' at once, you must acquire the
     // mutexes for those partitions in ascending order, or use the partition helpers to acquire
     // mutexes for all partitions.
-    mutable SimpleMutex _registrationLock;
+    mutable stdx::mutex _registrationLock;
     std::unique_ptr<PseudoRandom> _random;
     std::unique_ptr<Partitioned<stdx::unordered_map<CursorId, ClientCursor*>>> _cursorMap;
 

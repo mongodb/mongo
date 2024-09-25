@@ -43,11 +43,11 @@
 #include "mongo/logv2/redaction.h"
 #include "mongo/platform/mutex.h"
 #include "mongo/stdx/condition_variable.h"
+#include "mongo/stdx/mutex.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/background.h"
 #include "mongo/util/concurrency/idle_thread_block.h"
-#include "mongo/util/concurrency/mutex.h"
 #include "mongo/util/concurrency/thread_name.h"
 #include "mongo/util/debug_util.h"
 #include "mongo/util/duration.h"
@@ -110,15 +110,15 @@ private:
     std::vector<PeriodicTask*> _tasks;
 };
 
-SimpleMutex* runnerMutex() {
-    static SimpleMutex mutex;
+stdx::mutex* runnerMutex() {
+    static stdx::mutex mutex;
     return &mutex;
 }
 
 // A scoped lock like object that only locks/unlocks the mutex if it exists.
 class ConditionalScopedLock {
 public:
-    ConditionalScopedLock(SimpleMutex* mutex) : _mutex(mutex) {
+    ConditionalScopedLock(stdx::mutex* mutex) : _mutex(mutex) {
         if (_mutex)
             _mutex->lock();
     }
@@ -128,7 +128,7 @@ public:
     }
 
 private:
-    SimpleMutex* const _mutex;
+    stdx::mutex* const _mutex;
 };
 
 // The unique PeriodicTaskRunner, also zero-initialized.
