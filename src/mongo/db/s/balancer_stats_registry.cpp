@@ -102,9 +102,6 @@ void BalancerStatsRegistry::onStartup(OperationContext* opCtx) {
 }
 
 void BalancerStatsRegistry::onStepUpComplete(OperationContext* opCtx, long long term) {
-    dassert(_state.load() == State::kSecondary);
-    _state.store(State::kPrimaryIdle);
-
     // Different threads can trigger ReplicationCoordinator events concurrently.
     stdx::lock_guard lk{_mutex};
 
@@ -112,6 +109,9 @@ void BalancerStatsRegistry::onStepUpComplete(OperationContext* opCtx, long long 
         // The registry service has already been shut down.
         return;
     }
+
+    dassert(_state.load() == State::kSecondary);
+    _state.store(State::kPrimaryIdle);
 
     _initializeAsync(opCtx);
 }
