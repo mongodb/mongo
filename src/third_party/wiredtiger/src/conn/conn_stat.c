@@ -74,7 +74,7 @@ __wt_conn_stat_init(WT_SESSION_IMPL *session)
     stats = conn->stats;
 
     __wti_cache_stats_update(session);
-    __wti_evict_stats_update(session);
+    __wt_evict_stats_update(session);
     __wt_txn_stats_update(session);
 
     WT_STATP_CONN_SET(session, stats, file_open, conn->open_file_count);

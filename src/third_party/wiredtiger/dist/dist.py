@@ -7,7 +7,7 @@ from contextlib import contextmanager
 #    Return a list of the WiredTiger source file names.
 def source_files():
     file_re = re.compile(r'^\w')
-    for line in glob.iglob('../src/include/*.h'):
+    for line in glob.iglob('../src/*/*.h'):
         yield line
     for line in open('filelist', 'r'):
         if file_re.match(line):

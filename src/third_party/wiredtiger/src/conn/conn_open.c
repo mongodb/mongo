@@ -50,7 +50,7 @@ __wti_connection_open(WT_CONNECTION_IMPL *conn, const char *cfg[])
     WT_RET(__wti_cache_create(session, cfg));
 
     /* Initialize eviction. */
-    WT_RET(__wti_evict_create(session, cfg));
+    WT_RET(__wt_evict_create(session, cfg));
 
     /* Create shared cache.*/
     WT_RET(__wti_conn_cache_pool_create(session, cfg));
@@ -106,7 +106,7 @@ __wti_connection_close(WT_CONNECTION_IMPL *conn)
     WT_TRET(__wti_prefetch_destroy(session));
 
     /* The eviction server is shut down last. */
-    WT_TRET(__wt_evict_destroy(session));
+    WT_TRET(__wt_evict_threads_destroy(session));
     /* The capacity server can only be shut down after all I/O is complete. */
     WT_TRET(__wti_capacity_server_destroy(session));
 
@@ -146,7 +146,7 @@ __wti_connection_close(WT_CONNECTION_IMPL *conn)
     WT_TRET(__wti_conn_cache_pool_destroy(session));
 
     /* Destroy Eviction. */
-    WT_TRET(__wti_evict_destroy(session));
+    WT_TRET(__wt_evict_destroy(session));
 
     /* Discard the cache. */
     WT_TRET(__wti_cache_destroy(session));
@@ -266,7 +266,7 @@ __wti_connection_workers(WT_SESSION_IMPL *session, const char *cfg[])
      * Start eviction threads. NOTE: Eviction must be started after the history store table is
      * created.
      */
-    WT_RET(__wt_evict_create(session));
+    WT_RET(__wt_evict_threads_create(session));
 
     /* Start the handle sweep thread. */
     WT_RET(__wti_sweep_create(session));

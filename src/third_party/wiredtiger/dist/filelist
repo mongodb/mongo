@@ -80,7 +80,6 @@ src/conn/conn_chunkcache.c
 src/conn/conn_ckpt.c
 src/conn/conn_compact.c
 src/conn/conn_dhandle.c
-src/conn/conn_evict.c
 src/conn/conn_handle.c
 src/conn/conn_open.c
 src/conn/conn_prefetch.c
@@ -105,6 +104,7 @@ src/cursor/cur_stat.c
 src/cursor/cur_std.c
 src/cursor/cur_table.c
 src/cursor/cur_version.c
+src/evict/evict_conn.c
 src/evict/evict_file.c
 src/evict/evict_lru.c
 src/evict/evict_page.c

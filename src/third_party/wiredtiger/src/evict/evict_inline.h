@@ -20,21 +20,21 @@ __wt_cache_aggressive(WT_SESSION_IMPL *session)
 }
 
 /*
- * __wt_cache_read_gen --
+ * __cache_read_gen --
  *     Get the current read generation number.
  */
 static WT_INLINE uint64_t
-__wt_cache_read_gen(WT_SESSION_IMPL *session)
+__cache_read_gen(WT_SESSION_IMPL *session)
 {
     return (__wt_atomic_load64(&S2C(session)->cache->read_gen));
 }
 
 /*
- * __wt_cache_read_gen_incr --
+ * __wti_cache_read_gen_incr --
  *     Increment the current read generation number.
  */
 static WT_INLINE void
-__wt_cache_read_gen_incr(WT_SESSION_IMPL *session)
+__wti_cache_read_gen_incr(WT_SESSION_IMPL *session)
 {
     (void)__wt_atomic_add64(&S2C(session)->cache->read_gen, 1);
 }
@@ -51,7 +51,7 @@ __wt_cache_read_gen_bump(WT_SESSION_IMPL *session, WT_PAGE *page)
         return;
 
     /* Ignore pages already in the future. */
-    if (__wt_atomic_load64(&page->read_gen) > __wt_cache_read_gen(session))
+    if (__wt_atomic_load64(&page->read_gen) > __cache_read_gen(session))
         return;
 
     /*
@@ -61,7 +61,7 @@ __wt_cache_read_gen_bump(WT_SESSION_IMPL *session, WT_PAGE *page)
      * current global generation, we don't bother updating the page. In other words, the goal is to
      * avoid some number of updates immediately after each update we have to make.
      */
-    __wt_atomic_store64(&page->read_gen, __wt_cache_read_gen(session) + WT_READGEN_STEP);
+    __wt_atomic_store64(&page->read_gen, __cache_read_gen(session) + WT_READGEN_STEP);
 }
 
 /*
@@ -74,8 +74,7 @@ __wt_cache_read_gen_new(WT_SESSION_IMPL *session, WT_PAGE *page)
     WT_CACHE *cache;
 
     cache = S2C(session)->cache;
-    __wt_atomic_store64(
-      &page->read_gen, (__wt_cache_read_gen(session) + cache->read_gen_oldest) / 2);
+    __wt_atomic_store64(&page->read_gen, (__cache_read_gen(session) + cache->read_gen_oldest) / 2);
 }
 
 /*
@@ -169,11 +168,11 @@ __wt_eviction_clean_needed(WT_SESSION_IMPL *session, double *pct_fullp)
 }
 
 /*
- * __wt_eviction_dirty_target --
+ * __wti_eviction_dirty_target --
  *     Return the effective dirty target (including checkpoint scrubbing).
  */
 static WT_INLINE double
-__wt_eviction_dirty_target(WT_CACHE *cache)
+__wti_eviction_dirty_target(WT_CACHE *cache)
 {
     double dirty_target, scrub_target;
 
@@ -209,12 +208,12 @@ __wt_eviction_dirty_needed(WT_SESSION_IMPL *session, double *pct_fullp)
 }
 
 /*
- * __wt_eviction_updates_needed --
+ * __wti_eviction_updates_needed --
  *     Return if an application thread should do eviction due to the total volume of updates in
  *     cache.
  */
 static WT_INLINE bool
-__wt_eviction_updates_needed(WT_SESSION_IMPL *session, double *pct_fullp)
+__wti_eviction_updates_needed(WT_SESSION_IMPL *session, double *pct_fullp)
 {
     WT_CACHE *cache;
     uint64_t bytes_max, bytes_updates;
@@ -234,11 +233,11 @@ __wt_eviction_updates_needed(WT_SESSION_IMPL *session, double *pct_fullp)
 }
 
 /*
- * __wt_btree_dominating_cache --
+ * __wti_btree_dominating_cache --
  *     Return if a single btree is occupying at least half of any of our target's cache usage.
  */
 static WT_INLINE bool
-__wt_btree_dominating_cache(WT_SESSION_IMPL *session, WT_BTREE *btree)
+__wti_btree_dominating_cache(WT_SESSION_IMPL *session, WT_BTREE *btree)
 {
     WT_CACHE *cache;
     uint64_t bytes_dirty;
@@ -290,7 +289,7 @@ __wt_eviction_needed(WT_SESSION_IMPL *session, bool busy, bool readonly, double 
         pct_dirty = pct_updates = 0.0;
     } else {
         dirty_needed = __wt_eviction_dirty_needed(session, &pct_dirty);
-        updates_needed = __wt_eviction_updates_needed(session, &pct_updates);
+        updates_needed = __wti_eviction_updates_needed(session, &pct_updates);
     }
 
     /*
@@ -315,11 +314,11 @@ __wt_eviction_needed(WT_SESSION_IMPL *session, bool busy, bool readonly, double 
 }
 
 /*
- * __wt_cache_hs_dirty --
+ * __wti_cache_hs_dirty --
  *     Return if a major portion of the cache is dirty due to history store content.
  */
 static WT_INLINE bool
-__wt_cache_hs_dirty(WT_SESSION_IMPL *session)
+__wti_cache_hs_dirty(WT_SESSION_IMPL *session)
 {
     WT_CACHE *cache;
     WT_CONNECTION_IMPL *conn;
@@ -411,5 +410,5 @@ __wt_cache_eviction_check(WT_SESSION_IMPL *session, bool busy, bool readonly, bo
     if (didworkp != NULL)
         *didworkp = true;
 
-    return (__wt_cache_eviction_worker(session, busy, readonly, pct_full));
+    return (__wti_cache_eviction_worker(session, busy, readonly, pct_full));
 }

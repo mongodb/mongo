@@ -3007,9 +3007,9 @@ tasks:
             fi
 
             if [ ${is_patch|false} = true ]; then
-                ./test/evergreen/coverage-report.sh true ${python_binary|python3} ${github_commit} "${pr_args}"
+              ./test/evergreen/coverage-report.sh true ${python_binary|python3} ${github_commit} "$pr_args"
             else
-                ./test/evergreen/coverage-report.sh false ${python_binary|python3} ${github_commit} "${pr_args}"
+              ./test/evergreen/coverage-report.sh false ${python_binary|python3} ${github_commit} "$pr_args"
             fi
 
       - func: "code coverage publish report"

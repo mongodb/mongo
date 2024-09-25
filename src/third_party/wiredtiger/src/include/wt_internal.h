@@ -560,10 +560,10 @@ typedef uint64_t wt_timestamp_t;
 #include "verify_build.h"
 
 #include "cache_inline.h"
-#include "evict_inline.h"   /* required by misc_inline.h */
-#include "ctype_inline.h"   /* required by packing_inline.h */
-#include "intpack_inline.h" /* required by cell_inline.h, packing_inline.h */
-#include "misc_inline.h"    /* required by mutex_inline.h */
+#include "../evict/evict_inline.h" /* required by misc_inline.h */
+#include "ctype_inline.h"          /* required by packing_inline.h */
+#include "intpack_inline.h"        /* required by cell_inline.h, packing_inline.h */
+#include "misc_inline.h"           /* required by mutex_inline.h */
 
 #include "buf_inline.h"       /* required by cell_inline.h */
 #include "ref_inline.h"       /* required by btree_inline.h */

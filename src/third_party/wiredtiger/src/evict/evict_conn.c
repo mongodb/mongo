@@ -177,11 +177,11 @@ __evict_validate_config(WT_SESSION_IMPL *session, const char *cfg[])
 }
 
 /*
- * __wti_evict_config --
+ * __wt_evict_config --
  *     Configure or reconfigure eviction.
  */
 int
-__wti_evict_config(WT_SESSION_IMPL *session, const char *cfg[], bool reconfig)
+__wt_evict_config(WT_SESSION_IMPL *session, const char *cfg[], bool reconfig)
 {
     WT_CACHE *cache;
     WT_CONFIG_ITEM cval;
@@ -232,11 +232,11 @@ __wti_evict_config(WT_SESSION_IMPL *session, const char *cfg[], bool reconfig)
 }
 
 /*
- * __wti_evict_create --
+ * __wt_evict_create --
  *     Initialize eviction.
  */
 int
-__wti_evict_create(WT_SESSION_IMPL *session, const char *cfg[])
+__wt_evict_create(WT_SESSION_IMPL *session, const char *cfg[])
 {
     WT_CACHE *cache;
     WT_CONNECTION_IMPL *conn;
@@ -247,7 +247,7 @@ __wti_evict_create(WT_SESSION_IMPL *session, const char *cfg[])
     cache = conn->cache;
 
     /* Use a common routine for run-time configuration options. */
-    WT_RET(__wti_evict_config(session, cfg, false));
+    WT_RET(__wt_evict_config(session, cfg, false));
 
     /*
      * The lowest possible page read-generation has a special meaning, it marks a page for forcible
@@ -280,16 +280,16 @@ __wti_evict_create(WT_SESSION_IMPL *session, const char *cfg[])
     /*
      * We get/set some values in the evict statistics (rather than have two copies), configure them.
      */
-    __wti_evict_stats_update(session);
+    __wt_evict_stats_update(session);
     return (0);
 }
 
 /*
- * __wti_evict_destroy --
+ * __wt_evict_destroy --
  *     Destroy Eviction
  */
 int
-__wti_evict_destroy(WT_SESSION_IMPL *session)
+__wt_evict_destroy(WT_SESSION_IMPL *session)
 {
     WT_CACHE *cache;
     WT_DECL_RET;
@@ -316,11 +316,11 @@ __wti_evict_destroy(WT_SESSION_IMPL *session)
 }
 
 /*
- * __wti_evict_stats_update --
+ * __wt_evict_stats_update --
  *     Update the eviction statistics for return to the application.
  */
 void
-__wti_evict_stats_update(WT_SESSION_IMPL *session)
+__wt_evict_stats_update(WT_SESSION_IMPL *session)
 {
     WT_CACHE *cache;
     WT_CONNECTION_IMPL *conn;
