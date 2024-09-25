@@ -55,19 +55,13 @@ executor:
 matrix_suite: true
 selector:
   exclude_files:
-    - jstests/concurrency/fsm_workloads/auth_create_role.js
-    - jstests/concurrency/fsm_workloads/auth_create_user.js
-    - jstests/concurrency/fsm_workloads/auth_drop_role.js
-    - jstests/concurrency/fsm_workloads/auth_drop_user.js
     - jstests/concurrency/fsm_workloads/compact.js
-    - jstests/concurrency/fsm_workloads/compact_while_creating_indexes.js
     - jstests/concurrency/fsm_workloads/query/plan_cache_drop_database.js
     - jstests/concurrency/fsm_workloads/collmod_writeconflict.js
     - jstests/concurrency/fsm_workloads/query/agg/agg_out_interrupt_cleanup.js
     - jstests/concurrency/fsm_workloads/query/timeseries/timeseries_agg_out_interrupt_cleanup.js
     - jstests/concurrency/fsm_workloads/multi_statement_transaction_atomicity_isolation_metrics_test.js
     - jstests/concurrency/fsm_workloads/multi_statement_transaction_all_commands_same_session.js
-    - jstests/concurrency/fsm_workloads/query/map_reduce/map_reduce_drop.js
   exclude_with_any_tags:
     - requires_standalone
     - requires_replication

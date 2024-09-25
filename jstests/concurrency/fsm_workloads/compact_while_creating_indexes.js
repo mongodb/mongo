@@ -4,7 +4,7 @@
  * run the 'compact' command while simultaneously inserting documents and creating indexes on the
  * collection being compacted.
  *
- * @tags: [requires_compact, does_not_support_wiredtiger_lsm]
+ * @tags: [requires_compact, does_not_support_wiredtiger_lsm, assumes_against_mongod_not_mongos]
  */
 
 import {isEphemeral} from "jstests/concurrency/fsm_workload_helpers/server_types.js";

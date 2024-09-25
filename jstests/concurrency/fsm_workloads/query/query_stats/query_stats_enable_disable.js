@@ -13,6 +13,8 @@
  *  # query stats results.
  *  incompatible_with_concurrency_simultaneous,
  *  requires_getmore,
+ *  # TODO (SERVER-95174): Re-enable this test on txn concurrency suites.
+ *  does_not_support_transactions,
  * ]
  *
  */

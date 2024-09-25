@@ -8,30 +8,17 @@ selector:
     # SERVER-14669 Multi-removes that use $where miscount removed documents
 
     # Disabled because MapReduce can lose cursors if the primary goes down during the operation.
-    - jstests/concurrency/fsm_workloads/query/map_reduce/map_reduce_drop.js
-    - jstests/concurrency/fsm_workloads/query/map_reduce/map_reduce_inline.js
-    - jstests/concurrency/fsm_workloads/query/map_reduce/map_reduce_interrupt.js
-    - jstests/concurrency/fsm_workloads/query/map_reduce/map_reduce_merge.js
-    - jstests/concurrency/fsm_workloads/query/map_reduce/map_reduce_reduce.js
-    - jstests/concurrency/fsm_workloads/query/map_reduce/map_reduce_replace.js
-    - jstests/concurrency/fsm_workloads/query/map_reduce/map_reduce_replace_nonexistent.js
-    - jstests/concurrency/fsm_workloads/query/map_reduce/map_reduce_replace_remove.js
 
     # Disabled due to MongoDB restrictions and/or workload restrictions
 
     # These workloads sometimes trigger 'Could not lock auth data update lock'
     # errors because the AuthorizationManager currently waits for only five
     # seconds to acquire the lock for authorization documents
-    - jstests/concurrency/fsm_workloads/auth_create_role.js
-    - jstests/concurrency/fsm_workloads/auth_create_user.js
-    - jstests/concurrency/fsm_workloads/auth_drop_role.js
-    - jstests/concurrency/fsm_workloads/auth_drop_user.js
 
     # uses >100MB of data, which can overwhelm test hosts
 
     # compact can only be run against a standalone mongod
     - jstests/concurrency/fsm_workloads/compact.js
-    - jstests/concurrency/fsm_workloads/compact_while_creating_indexes.js
 
     # can cause OOM kills on test hosts
 

@@ -12,6 +12,12 @@
  * @tags: [
  *   # mapReduce does not support afterClusterTime.
  *   does_not_support_causal_consistency,
+ *   # TODO (SERVER-95150): Re-enable this test in multi-stmt-txn suites.
+ *   does_not_support_transactions,
+ *   # TODO (SERVER-95165): Re-enable this test in sharded cluster suites.
+ *   assumes_against_mongod_not_mongos,
+ *   # Disabled because MapReduce can lose cursors if the primary goes down during the operation.
+ *   does_not_support_stepdowns,
  * ]
  */
 export const $config = (function() {

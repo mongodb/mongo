@@ -12,16 +12,11 @@ selector:
     # These workloads sometimes trigger 'Could not lock auth data update lock'
     # errors because the AuthorizationManager currently waits for only five
     # seconds to acquire the lock for authorization documents
-    - jstests/concurrency/fsm_workloads/auth_create_role.js
-    - jstests/concurrency/fsm_workloads/auth_create_user.js
-    - jstests/concurrency/fsm_workloads/auth_drop_role.js
-    - jstests/concurrency/fsm_workloads/auth_drop_user.js
 
     # uses >100MB of data, which can overwhelm test hosts
 
     # compact can only be run against a standalone mongod
     - jstests/concurrency/fsm_workloads/compact.js
-    - jstests/concurrency/fsm_workloads/compact_while_creating_indexes.js
 
     # can cause OOM kills on test hosts
 

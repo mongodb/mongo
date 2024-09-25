@@ -7,6 +7,8 @@
  *  requires_fcv_72,
  *  does_not_support_causal_consistency,
  *  requires_getmore,
+ *  # TODO (SERVER-95174): Re-enable this test on txn concurrency suites.
+ *  does_not_support_transactions,
  * ]
  *
  *

@@ -7,6 +7,7 @@
  *   does_not_support_causal_consistency,
  *   requires_majority_read_concern,
  *   requires_replication,
+ *   does_not_support_transactions,
  * ]
  */
 import {interruptedQueryErrors} from "jstests/concurrency/fsm_libs/assert.js";

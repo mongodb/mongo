@@ -56,11 +56,6 @@ executor:
 matrix_suite: true
 selector:
   exclude_files:
-    - jstests/concurrency/fsm_workloads/auth_create_role.js
-    - jstests/concurrency/fsm_workloads/auth_create_user.js
-    - jstests/concurrency/fsm_workloads/auth_drop_role.js
-    - jstests/concurrency/fsm_workloads/auth_drop_user.js
-    - jstests/concurrency/fsm_workloads/compact_while_creating_indexes.js
     - jstests/concurrency/fsm_workloads/query/plan_cache_drop_database.js
     - jstests/concurrency/fsm_workloads/collmod_writeconflict.js
     - jstests/concurrency/fsm_workloads/query/agg/agg_out_interrupt_cleanup.js
@@ -74,7 +69,6 @@ selector:
     - requires_standalone
     - assumes_balancer_off
     - assumes_against_mongod_not_mongos
-    - does_not_support_causal_consistency
     - requires_replication
     - requires_capped
     - state_functions_share_cursor

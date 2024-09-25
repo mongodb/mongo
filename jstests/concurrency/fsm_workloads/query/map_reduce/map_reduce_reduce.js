@@ -13,6 +13,10 @@
  *   does_not_support_causal_consistency,
  *   # Use mapReduce.
  *   requires_scripting,
+ *   # Disabled because MapReduce can lose cursors if the primary goes down during the operation.
+ *   does_not_support_stepdowns,
+ *   # TODO (SERVER-95170): Re-enable this test in txn suites.
+ *   does_not_support_transactions,
  * ]
  */
 import {extendWorkload} from "jstests/concurrency/fsm_libs/extend_workload.js";

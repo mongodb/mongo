@@ -30,7 +30,6 @@ selector:
 
   exclude_with_any_tags:
     - requires_standalone
-    - does_not_support_causal_consistency
     - requires_sharding
     # Snapshot reads in transactions are banned on capped collections.
     - requires_capped

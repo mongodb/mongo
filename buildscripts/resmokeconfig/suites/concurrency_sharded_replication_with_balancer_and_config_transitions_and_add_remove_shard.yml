@@ -14,16 +14,11 @@ selector:
     # These workloads sometimes trigger 'Could not lock auth data update lock'
     # errors because the AuthorizationManager currently waits for only five
     # seconds to acquire the lock for authorization documents
-    - jstests/concurrency/fsm_workloads/auth_create_role.js
-    - jstests/concurrency/fsm_workloads/auth_create_user.js
-    - jstests/concurrency/fsm_workloads/auth_drop_role.js
-    - jstests/concurrency/fsm_workloads/auth_drop_user.js
 
     # uses >100MB of data, which can overwhelm test hosts
 
     # compact can only be run against a standalone mongod
     - jstests/concurrency/fsm_workloads/compact.js
-    - jstests/concurrency/fsm_workloads/compact_while_creating_indexes.js
 
     # test creates too many collections for ContinuousAddRemoveShard
     - jstests/concurrency/fsm_workloads/create_collection.js
@@ -51,7 +46,6 @@ selector:
 
     # The test may spuriously fail when run against sharded clusters, due to limitations of the
     # infrastructure. See SERVER-77039 for full details.
-    - jstests/concurrency/fsm_workloads/query/map_reduce/map_reduce_drop.js
 
     # TODO SERVER-89555: Timeseries collections hit movePrimaryInProgress errors and the temporary
     # retry logic for this hook leads to breaking a test assertion.

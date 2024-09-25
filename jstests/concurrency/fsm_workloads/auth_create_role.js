@@ -2,6 +2,10 @@
  * auth_create_role.js
  *
  * Repeatedly creates new roles on a database.
+ *
+ * @tags: [
+ *  assumes_against_mongod_not_mongos
+ * ]
  */
 import {dropRoles} from "jstests/concurrency/fsm_workload_helpers/drop_utils.js";
 

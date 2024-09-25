@@ -2,6 +2,10 @@
  * auth_create_user.js
  *
  * Repeatedly creates new users on a database.
+ * @tags: [
+ *  assumes_against_mongod_not_mongos
+ * ]
+ *
  */
 import {dropUsers} from "jstests/concurrency/fsm_workload_helpers/drop_utils.js";
 

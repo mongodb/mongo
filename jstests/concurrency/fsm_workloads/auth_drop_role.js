@@ -3,7 +3,10 @@
  *
  * Repeatedly creates a new role on a database, and subsequently
  * drops it from the database.
- * @tags: [incompatible_with_concurrency_simultaneous]
+ * @tags: [
+ *  incompatible_with_concurrency_simultaneous,
+ *  assumes_against_mongod_not_mongos,
+ * ]
  */
 // UMC commands are not supported in transactions.
 TestData.runInsideTransaction = false;
