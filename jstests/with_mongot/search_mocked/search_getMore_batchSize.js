@@ -1,6 +1,6 @@
 /**
  * Tests that the batchSize field is sent to mongot correctly on GetMore requests.
- * @tags: [featureFlagSearchBatchSizeTuning]
+ * @tags: [requires_fcv_81]
  */
 import {getAggPlanStage} from "jstests/libs/analyze_plan.js";
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
