@@ -114,7 +114,6 @@ MONGO_FAIL_POINT_DEFINE(hangAfterStartingIndexBuild);
 MONGO_FAIL_POINT_DEFINE(hangAfterStartingIndexBuildUnlocked);
 MONGO_FAIL_POINT_DEFINE(hangIndexBuildDuringCollectionScanPhaseBeforeInsertion);
 MONGO_FAIL_POINT_DEFINE(hangIndexBuildDuringCollectionScanPhaseAfterInsertion);
-MONGO_FAIL_POINT_DEFINE(leaveIndexBuildUnfinishedForShutdown);
 
 namespace {
 
@@ -667,15 +666,6 @@ Status MultiIndexBlock::insertAllDocumentsInCollection(
             return ex.toStatus();
         }
     } while (restartCollectionScan);
-
-    if (MONGO_unlikely(leaveIndexBuildUnfinishedForShutdown.shouldFail())) {
-        LOGV2(20389,
-              "Index build interrupted due to 'leaveIndexBuildUnfinishedForShutdown' failpoint. "
-              "Mimicking shutdown error code");
-        return Status(
-            ErrorCodes::InterruptedAtShutdown,
-            "background index build interrupted due to failpoint. returning a shutdown error.");
-    }
 
     if (MONGO_unlikely(hangAfterStartingIndexBuildUnlocked.shouldFail())) {
         // Unlock before hanging so replication recognizes we've completed.

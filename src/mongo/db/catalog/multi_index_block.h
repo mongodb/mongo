@@ -63,8 +63,6 @@
 
 namespace mongo {
 
-extern FailPoint leaveIndexBuildUnfinishedForShutdown;
-
 class Collection;
 class CollectionPtr;
 class MatchExpression;
