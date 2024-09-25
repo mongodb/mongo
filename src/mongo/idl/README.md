@@ -508,8 +508,8 @@ The five key things to note in this example:
 - `serializer` - omitted in this example because `BSONObjBuilder` has builtin support for
   `std::string`
 - `is_view` - indicates whether the type is a view or not. If the type is a view, then it's
-  possible that objects of the type will not own all of it's members. If the type is not a view,
-  then objects of the type are guaranteed to own all of it's members. This field is optional and
+  possible that objects of the type will not own all of its members. If the type is not a view,
+  then objects of the type are guaranteed to own all of its members. This field is optional and
   defaults to True. To reduce the size of the C++ representation of structs including this type,
   you can specify this field as False if the type is not a view type.
 
@@ -582,8 +582,8 @@ obj)` - For `any` types that are not in an array, the serializer's function sign
 - `default` - string - default value for a type. A field in a struct inherits this value if a field
   does not set a default. See struct's `default` rules for more information.
 - `is_view` - indicates whether the type is a view or not. If the type is a view, then it's
-  possible that objects of the type will not own all of it's members. If the type is not a view,
-  then objects of the type are guaranteed to own all of it's members.
+  possible that objects of the type will not own all of its members. If the type is not a view,
+  then objects of the type are guaranteed to own all of its members.
 
 ## Structs
 
@@ -985,8 +985,8 @@ owned or shared.
 
 #### View Types
 
-If the struct is a view, then it's possible that objects of the type will not own all of it's
-members. If the struct is not a view, then objects of the type are guaranteed to own all of it's
+If the struct is a view, then it's possible that objects of the type will not own all of its
+members. If the struct is not a view, then objects of the type are guaranteed to own all of its
 members. This is determined by recursively checking the fields of a struct. This info is used
 during generation to determine whether or not a struct will need a `BSONObj` anchor.
 

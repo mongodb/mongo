@@ -50,6 +50,7 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 # The following patterns are parsed from ./buildscripts/idl/OWNERS.yml
 /buildscripts/idl/**/* @10gen/server-programmability @svc-auto-approve-bot
 /buildscripts/idl/**/*.bazel @10gen/devprod-build @svc-auto-approve-bot
+/buildscripts/idl/**/compatibility_rules.yml @10gen/query-optimization @svc-auto-approve-bot
 
 # The following patterns are parsed from ./buildscripts/resmokeconfig/matrix_suites/OWNERS.yml
 /buildscripts/resmokeconfig/matrix_suites/**/*

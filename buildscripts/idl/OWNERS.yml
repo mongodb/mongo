@@ -6,3 +6,6 @@ filters:
   - "*.bazel":
     approvers:
       - 10gen/devprod-build
+  - "compatibility_rules.yml":
+    approvers:
+      - 10gen/query-optimization
