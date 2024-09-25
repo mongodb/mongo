@@ -130,9 +130,6 @@ Status storeMongosOptions(const moe::Environment& params) {
         return Status(ErrorCodes::BadValue, "error: no args for --configdb");
     }
 
-    mongosGlobalParams.upgradeBackCompat = params.count("upgradeBackCompat");
-    mongosGlobalParams.downgradeBackCompat = params.count("downgradeBackCompat");
-
     std::string configdbString = params["sharding.configDB"].as<std::string>();
 
     auto configdbConnectionString = ConnectionString::parse(configdbString);

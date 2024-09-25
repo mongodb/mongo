@@ -54,65 +54,53 @@ for (let oldVersion of ["last-lts", "last-continuous"]) {
     testCRUDAndAgg(st.s.getDB('sharded'));
     testDDLOps(st);
 
-    const testCluster = () => {
-        testCRUDAndAgg(st.s.getDB('unsharded'));
-        testCRUDAndAgg(st.s.getDB('sharded'));
-        testDDLOps(st);
-
-        // Restart mongos to clear all cache and force it to do remote calls.
-        st.restartMongoses();
-
-        testCRUDAndAgg(st.s.getDB('unsharded'));
-        testCRUDAndAgg(st.s.getDB('sharded'));
-        testDDLOps(st);
-    };
-
     // upgrade the config servers first
-    jsTest.log('upgrading config servers (back-compat)');
-    st.upgradeBinariesWithBackCompat("latest", {upgradeMongos: false, upgradeShards: false});
+    jsTest.log('upgrading config servers');
+    st.upgradeCluster("latest", {upgradeMongos: false, upgradeShards: false});
 
-    testCluster();
+    testCRUDAndAgg(st.s.getDB('unsharded'));
+    testCRUDAndAgg(st.s.getDB('sharded'));
+    testDDLOps(st);
+
+    // Restart mongos to clear all cache and force it to do remote calls.
+    st.restartMongoses();
+
+    testCRUDAndAgg(st.s.getDB('unsharded'));
+    testCRUDAndAgg(st.s.getDB('sharded'));
+    testDDLOps(st);
 
     // Then upgrade the shards.
-    jsTest.log('upgrading shard servers (back-compat)');
-    st.upgradeBinariesWithBackCompat("latest", {upgradeMongos: false, upgradeConfigs: false});
+    jsTest.log('upgrading shard servers');
+    st.upgradeCluster("latest", {upgradeMongos: false, upgradeConfigs: false});
 
     awaitRSClientHosts(st.s, st.rs0.getPrimary(), {ok: true, ismaster: true});
     awaitRSClientHosts(st.s, st.rs1.getPrimary(), {ok: true, ismaster: true});
 
-    testCluster();
+    testCRUDAndAgg(st.s.getDB('unsharded'));
+    testCRUDAndAgg(st.s.getDB('sharded'));
+    testDDLOps(st);
+
+    // Restart mongos to clear all cache and force it to do remote calls.
+    st.restartMongoses();
+
+    testCRUDAndAgg(st.s.getDB('unsharded'));
+    testCRUDAndAgg(st.s.getDB('sharded'));
+    testDDLOps(st);
 
     // Finally, upgrade mongos
-    jsTest.log('upgrading mongos servers (back-compat)');
-    st.upgradeBinariesWithBackCompat("latest", {upgradeConfigs: false, upgradeShards: false});
+    jsTest.log('upgrading mongos servers');
+    st.upgradeCluster("latest", {upgradeConfigs: false, upgradeShards: false});
 
-    testCluster();
+    testCRUDAndAgg(st.s.getDB('unsharded'));
+    testCRUDAndAgg(st.s.getDB('sharded'));
+    testDDLOps(st);
 
-    // Repeat everything without back-compat
+    // Restart mongos to clear all cache and force it to do remote calls.
+    st.restartMongoses();
 
-    // upgrade the config servers first
-    jsTest.log('upgrading config servers (no back-compat)');
-    st.restartBinariesWithoutUpgradeBackCompat("latest",
-                                               {upgradeMongos: false, upgradeShards: false});
-
-    testCluster();
-
-    // Then upgrade the shards.
-    jsTest.log('upgrading shard servers (no back-compat)');
-    st.restartBinariesWithoutUpgradeBackCompat("latest",
-                                               {upgradeMongos: false, upgradeConfigs: false});
-
-    awaitRSClientHosts(st.s, st.rs0.getPrimary(), {ok: true, ismaster: true});
-    awaitRSClientHosts(st.s, st.rs1.getPrimary(), {ok: true, ismaster: true});
-
-    testCluster();
-
-    // Finally, upgrade mongos
-    jsTest.log('upgrading mongos servers (no back-compat)');
-    st.restartBinariesWithoutUpgradeBackCompat("latest",
-                                               {upgradeConfigs: false, upgradeShards: false});
-
-    testCluster();
+    testCRUDAndAgg(st.s.getDB('unsharded'));
+    testCRUDAndAgg(st.s.getDB('sharded'));
+    testDDLOps(st);
 
     // Check that version document is unmodified.
     version = st.s.getCollection('config.version').findOne();
@@ -121,49 +109,50 @@ for (let oldVersion of ["last-lts", "last-continuous"]) {
     ///////////////////////////////////////////////////////////////////////////////////////////
     // Downgrade back
 
-    jsTest.log('downgrading mongos servers (back-compat)');
-    st.restartBinariesWithDowngradeBackCompat("latest",
-                                              {downgradeConfigs: false, downgradeShards: false});
+    jsTest.log('downgrading mongos servers');
+    st.downgradeCluster(oldVersion, {downgradeConfigs: false, downgradeShards: false});
 
-    testCluster();
+    testCRUDAndAgg(st.s.getDB('unsharded'));
+    testCRUDAndAgg(st.s.getDB('sharded'));
+    testDDLOps(st);
 
-    jsTest.log('downgrading shard servers (back-compat)');
-    st.restartBinariesWithDowngradeBackCompat("latest",
-                                              {downgradeMongos: false, downgradeConfigs: false});
+    // Restart mongos to clear all cache and force it to do remote calls.
+    st.restartMongoses();
 
-    awaitRSClientHosts(st.s, st.rs0.getPrimary(), {ok: true, ismaster: true});
-    awaitRSClientHosts(st.s, st.rs1.getPrimary(), {ok: true, ismaster: true});
+    testCRUDAndAgg(st.s.getDB('unsharded'));
+    testCRUDAndAgg(st.s.getDB('sharded'));
+    testDDLOps(st);
 
-    testCluster();
-
-    jsTest.log('downgrading config servers (back-compat)');
-    st.restartBinariesWithDowngradeBackCompat("latest",
-                                              {downgradeMongos: false, downgradeShards: false});
-
-    testCluster();
-
-    // Repeat everything without back-compat
-
-    jsTest.log('downgrading mongos servers (no back-compat)');
-    st.downgradeBinariesWithoutDowngradeBackCompat(
-        oldVersion, {downgradeConfigs: false, downgradeShards: false});
-
-    testCluster();
-
-    jsTest.log('downgrading shard servers (no back-compat)');
-    st.downgradeBinariesWithoutDowngradeBackCompat(
-        oldVersion, {downgradeMongos: false, downgradeConfigs: false});
+    jsTest.log('downgrading shard servers');
+    st.downgradeCluster(oldVersion, {downgradeMongos: false, downgradeConfigs: false});
 
     awaitRSClientHosts(st.s, st.rs0.getPrimary(), {ok: true, ismaster: true});
     awaitRSClientHosts(st.s, st.rs1.getPrimary(), {ok: true, ismaster: true});
 
-    testCluster();
+    testCRUDAndAgg(st.s.getDB('unsharded'));
+    testCRUDAndAgg(st.s.getDB('sharded'));
+    testDDLOps(st);
 
-    jsTest.log('downgrading config servers (no back-compat)');
-    st.downgradeBinariesWithoutDowngradeBackCompat(
-        oldVersion, {downgradeMongos: false, downgradeShards: false});
+    // Restart mongos to clear all cache and force it to do remote calls.
+    st.restartMongoses();
 
-    testCluster();
+    testCRUDAndAgg(st.s.getDB('unsharded'));
+    testCRUDAndAgg(st.s.getDB('sharded'));
+    testDDLOps(st);
+
+    jsTest.log('downgrading config servers');
+    st.downgradeCluster(oldVersion, {downgradeMongos: false, downgradeShards: false});
+
+    testCRUDAndAgg(st.s.getDB('unsharded'));
+    testCRUDAndAgg(st.s.getDB('sharded'));
+    testDDLOps(st);
+
+    // Restart mongos to clear all cache and force it to do remote calls.
+    st.restartMongoses();
+
+    testCRUDAndAgg(st.s.getDB('unsharded'));
+    testCRUDAndAgg(st.s.getDB('sharded'));
+    testDDLOps(st);
 
     // Check that version document is unmodified.
     version = st.s.getCollection('config.version').findOne();

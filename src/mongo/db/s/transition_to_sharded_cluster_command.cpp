@@ -72,14 +72,6 @@ public:
                     "Command cannot be run on dedicated shards",
                     serverGlobalParams.clusterRole.has(ClusterRole::ConfigServer));
 
-            uassert(8263000,
-                    "Command was attempted when the replica set is still in the process of being "
-                    "upgraded or downgraded (upgradeBackCompat or downgradeBackCompat options are "
-                    "on). Please finish upgrading or downgrading the replica set before attempting "
-                    "to convert it to a sharded cluster.",
-                    !serverGlobalParams.upgradeBackCompat &&
-                        !serverGlobalParams.downgradeBackCompat);
-
             if (!ShardingState::get(opCtx)->enabled()) {
                 ShardingCatalogManager::get(opCtx)->installConfigShardIdentityDocument(opCtx);
             }

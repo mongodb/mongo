@@ -92,12 +92,6 @@ ReplSetTest.prototype.upgradePrimary = function(primary, options, user, pwd) {
 
     authNode(primary);
 
-    // Can't step down if there is just one node
-    if (this.nodes.length == 1) {
-        this.upgradeNode(primary, options, user, pwd);
-        return primary;
-    }
-
     let oldPrimary = this.stepdown(primary);
     this.waitForState(oldPrimary, ReplSetTest.State.SECONDARY, undefined, authNode);
 
@@ -127,7 +121,6 @@ ReplSetTest.prototype.upgradePrimary = function(primary, options, user, pwd) {
         assert.eq(
             newPrimary, primary, "Primary changed unexpectedly after upgrading old primary node");
     }
-
     return newPrimary;
 };
 
@@ -139,7 +132,7 @@ ReplSetTest.prototype.upgradeNode = function(node, opts = {}, user, pwd) {
 
     var isMaster = node.getDB('admin').runCommand({isMaster: 1});
 
-    if (!isMaster.ismaster && !isMaster.arbiterOnly) {
+    if (!isMaster.arbiterOnly) {
         // Must retry this command, as it might return "currently running for election" and fail.
         // Node might still be running for an election that will fail because it lost the election
         // race with another node, at test initialization.  See SERVER-23133.

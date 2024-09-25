@@ -1317,7 +1317,7 @@ export class ShardingTest {
                 // Start the config server's replica set without waiting for it to complete. This
                 // allows it to proceed in parallel with the startup of each shard.
                 this.configRS = new ReplSetTest(rstOptions);
-                this.configRS.startSetAsync(startOptions, false, clusterVersionInfo.isMixedVersion);
+                this.configRS.startSetAsync(startOptions);
             }
 
             //
@@ -1434,7 +1434,7 @@ export class ShardingTest {
                 this._rs[i] = {
                     setName: setName,
                     test: rs,
-                    nodes: rs.startSetAsync(rsDefaults, false, clusterVersionInfo.isMixedVersion),
+                    nodes: rs.startSetAsync(rsDefaults),
                     url: rs.getURL()
                 };
                 if (i == 0 && isConfigShardMode) {
@@ -2248,17 +2248,11 @@ function clusterHasBinVersion(st, version) {
                                               MongoRunner.getBinVersionFor(params.binVersion));
     };
 
-    // Must check mongosBinVersion because it does not update mongosOptions.binVersion. Also check
-    // useRandomBinVersionsWithinReplicaSet, as it may cause some nodes within a replica set to be
-    // downgraded.
+    // Must check mongosBinVersion because it does not update mongosOptions.binVersion.
     const isMixedVersionMongos = jsTestOptions().mongosBinVersion &&
         MongoRunner.areBinVersionsTheSame(binVersion, jsTestOptions().mongosBinVersion);
 
-    const isMixedVersionReplicaSet = jsTestOptions().useRandomBinVersionsWithinReplicaSet &&
-        MongoRunner.areBinVersionsTheSame(binVersion,
-                                          jsTestOptions().useRandomBinVersionsWithinReplicaSet);
-
-    if (isMixedVersionMongos || isMixedVersionReplicaSet) {
+    if (isMixedVersionMongos) {
         return true;
     }
 

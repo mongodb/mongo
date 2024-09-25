@@ -271,7 +271,6 @@ mongo_cc_library(
         "server_options_base_gen",
         "server_options_general_gen",
         "server_options_nongeneral_gen",
-        "server_options_upgrade_downgrade_gen",
     ],
     hdrs = [
         "server_options_base.h",
@@ -307,11 +306,6 @@ idl_generator(
 idl_generator(
     name = "server_options_nongeneral_gen",
     src = "server_options_nongeneral.idl",
-)
-
-idl_generator(
-    name = "server_options_upgrade_downgrade_gen",
-    src = "server_options_upgrade_downgrade.idl",
 )
 
 idl_generator(
