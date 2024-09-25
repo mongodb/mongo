@@ -32,6 +32,7 @@
 #include <utility>
 
 #include "mongo/client/replica_set_monitor_manager.h"
+#include "mongo/db/auth/authorization_backend_interface.h"
 #include "mongo/db/auth/authorization_manager_factory_mock.h"
 #include "mongo/db/query/query_settings/query_settings_manager.h"
 #include "mongo/db/wire_version.h"
@@ -52,6 +53,8 @@ ScopedGlobalServiceContextForTest::ScopedGlobalServiceContextForTest() {
 
     auto globalAuthzManagerFactory = std::make_unique<AuthorizationManagerFactoryMock>();
     AuthorizationManager::set(getService(), globalAuthzManagerFactory->createShard(getService()));
+    auth::AuthorizationBackendInterface::set(
+        getService(), globalAuthzManagerFactory->createBackendInterface(getService()));
 
     query_settings::QuerySettingsManager::create(getServiceContext(), {});
 }

@@ -41,7 +41,10 @@
 #include "mongo/crypto/mechanism_scram.h"
 #include "mongo/crypto/sha1_block.h"
 #include "mongo/crypto/sha256_block.h"
+#include "mongo/db/auth/authorization_backend_interface.h"
+#include "mongo/db/auth/authorization_backend_mock.h"
 #include "mongo/db/auth/authorization_manager.h"
+#include "mongo/db/auth/authorization_manager_factory_mock.h"
 #include "mongo/db/auth/authorization_manager_impl.h"
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/auth/authz_manager_external_state_mock.h"
@@ -255,17 +258,20 @@ public:
         ServiceContextMongoDTest::setUp();
 
         // Set up the auth subsystem to authorize the command.
-        auto localManagerState = std::make_unique<AuthzManagerExternalStateMock>();
-        _managerState = localManagerState.get();
+        auto globalAuthzManagerFactory = std::make_unique<AuthorizationManagerFactoryMock>();
+        AuthorizationManager::set(getService(),
+                                  globalAuthzManagerFactory->createShard(getService()));
+        auth::AuthorizationBackendInterface::set(
+            getService(), globalAuthzManagerFactory->createBackendInterface(getService()));
+        _mockBackend = reinterpret_cast<auth::AuthorizationBackendMock*>(
+            auth::AuthorizationBackendInterface::get(getService()));
         {
             auto opCtxHolder = makeOperationContext();
             auto* opCtx = opCtxHolder.get();
-            _managerState->setAuthzVersion(opCtx, AuthorizationManager::schemaVersion26Final);
+            _mockBackend->setAuthzVersion(opCtx, AuthorizationManager::schemaVersion26Final);
         }
-        auto uniqueAuthzManager =
-            std::make_unique<AuthorizationManagerImpl>(getService(), std::move(localManagerState));
-        _authzManager = uniqueAuthzManager.get();
-        AuthorizationManager::set(getService(), std::move(uniqueAuthzManager));
+
+        _authzManager = AuthorizationManager::get(getService());
         _authzManager->setAuthEnabled(true);
 
         _session = _transportLayer.createSession();
@@ -294,7 +300,7 @@ public:
                                                   << "test"_sd)));
 
         auto opCtx = _client->makeOperationContext();
-        ASSERT_OK(_managerState->insertUserDocument(opCtx.get(), userDoc, {}));
+        ASSERT_OK(_mockBackend->insertUserDocument(opCtx.get(), userDoc, {}));
     }
 
     template <typename ConcreteCommand>
@@ -366,7 +372,7 @@ protected:
 
 protected:
     AuthorizationManager* _authzManager;
-    AuthzManagerExternalStateMock* _managerState;
+    auth::AuthorizationBackendMock* _mockBackend;
     transport::TransportLayerMock _transportLayer;
     std::shared_ptr<transport::Session> _session;
     ServiceContext::UniqueClient _client;

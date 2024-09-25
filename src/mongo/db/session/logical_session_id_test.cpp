@@ -46,7 +46,11 @@
 #include "mongo/crypto/mechanism_scram.h"
 #include "mongo/crypto/sha1_block.h"
 #include "mongo/crypto/sha256_block.h"
+#include "mongo/db/auth/authorization_backend_local.h"
+#include "mongo/db/auth/authorization_backend_mock.h"
 #include "mongo/db/auth/authorization_manager.h"
+#include "mongo/db/auth/authorization_manager_factory.h"
+#include "mongo/db/auth/authorization_manager_factory_mock.h"
 #include "mongo/db/auth/authorization_manager_impl.h"
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/auth/authz_manager_external_state_mock.h"
@@ -88,7 +92,7 @@ namespace {
 
 class LogicalSessionIdTest : public ServiceContextTest {
 public:
-    AuthzManagerExternalStateMock* managerState;
+    auth::AuthorizationBackendMock* mockBackend;
     transport::TransportLayerMock transportLayer;
     std::shared_ptr<transport::Session> session = transportLayer.createSession();
     ServiceContext::UniqueOperationContext _opCtx;
@@ -98,16 +102,22 @@ public:
         auto session = std::make_shared<transport::MockSession>(
             HostAndPort(), SockAddr(), SockAddr(), nullptr);
         auto localManagerState = std::make_unique<AuthzManagerExternalStateMock>();
-        managerState = localManagerState.get();
-        {
-            auto opCtxHolder = makeOperationContext();
-            auto* opCtx = opCtxHolder.get();
-            managerState->setAuthzVersion(opCtx, AuthorizationManager::schemaVersion26Final);
-        }
         auto authzManager =
             std::make_unique<AuthorizationManagerImpl>(getService(), std::move(localManagerState));
         authzManager->setAuthEnabled(true);
         AuthorizationManager::set(getService(), std::move(authzManager));
+
+        auto globalAuthzManagerFactory = std::make_unique<AuthorizationManagerFactoryMock>();
+        auth::AuthorizationBackendInterface::set(
+            getService(), globalAuthzManagerFactory->createBackendInterface(getService()));
+        mockBackend = reinterpret_cast<auth::AuthorizationBackendMock*>(
+            auth::AuthorizationBackendInterface::get(getService()));
+        {
+            auto opCtxHolder = makeOperationContext();
+            auto* opCtx = opCtxHolder.get();
+            mockBackend->setAuthzVersion(opCtx, AuthorizationManager::schemaVersion26Final);
+        }
+
         Client::releaseCurrent();
         Client::initThread(getThreadName(), getServiceContext()->getService(), session);
         authzSession = AuthorizationSession::get(getClient());
@@ -131,14 +141,14 @@ public:
     User* addSimpleUser(UserName un) {
         const auto creds = BSON("SCRAM-SHA-1" << scram::Secrets<SHA1Block>::generateCredentials(
                                     "a", saslGlobalParams.scramSHA1IterationCount.load()));
-        ASSERT_OK(managerState->insertUserDocument(_opCtx.get(),
-                                                   BSON("user" << un.getUser() << "db" << un.getDB()
-                                                               << "credentials" << creds << "roles"
-                                                               << BSON_ARRAY(BSON("role"
-                                                                                  << "readWrite"
-                                                                                  << "db"
-                                                                                  << "test"))),
-                                                   BSONObj()));
+        ASSERT_OK(mockBackend->insertUserDocument(_opCtx.get(),
+                                                  BSON("user" << un.getUser() << "db" << un.getDB()
+                                                              << "credentials" << creds << "roles"
+                                                              << BSON_ARRAY(BSON("role"
+                                                                                 << "readWrite"
+                                                                                 << "db"
+                                                                                 << "test"))),
+                                                  BSONObj()));
         ASSERT_OK(authzSession->addAndAuthorizeUser(
             _opCtx.get(), std::make_unique<UserRequestGeneral>(un, boost::none), boost::none));
         return authzSession->lookupUser(un);
@@ -147,14 +157,14 @@ public:
     User* addClusterUser(UserName un) {
         const auto creds = BSON("SCRAM-SHA-256" << scram::Secrets<SHA256Block>::generateCredentials(
                                     "a", saslGlobalParams.scramSHA256IterationCount.load()));
-        ASSERT_OK(managerState->insertUserDocument(_opCtx.get(),
-                                                   BSON("user" << un.getUser() << "db" << un.getDB()
-                                                               << "credentials" << creds << "roles"
-                                                               << BSON_ARRAY(BSON("role"
-                                                                                  << "__system"
-                                                                                  << "db"
-                                                                                  << "admin"))),
-                                                   BSONObj()));
+        ASSERT_OK(mockBackend->insertUserDocument(_opCtx.get(),
+                                                  BSON("user" << un.getUser() << "db" << un.getDB()
+                                                              << "credentials" << creds << "roles"
+                                                              << BSON_ARRAY(BSON("role"
+                                                                                 << "__system"
+                                                                                 << "db"
+                                                                                 << "admin"))),
+                                                  BSONObj()));
         ASSERT_OK(authzSession->addAndAuthorizeUser(
             _opCtx.get(), std::make_unique<UserRequestGeneral>(un, boost::none), boost::none));
         return authzSession->lookupUser(un);

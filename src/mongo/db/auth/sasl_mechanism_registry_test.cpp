@@ -37,7 +37,10 @@
 #include "mongo/crypto/mechanism_scram.h"
 #include "mongo/crypto/sha256_block.h"
 #include "mongo/db/auth/auth_name.h"
+#include "mongo/db/auth/authorization_backend_interface.h"
+#include "mongo/db/auth/authorization_backend_local.h"
 #include "mongo/db/auth/authorization_manager.h"
+#include "mongo/db/auth/authorization_manager_factory_mock.h"
 #include "mongo/db/auth/authorization_manager_impl.h"
 #include "mongo/db/auth/authz_manager_external_state.h"
 #include "mongo/db/auth/authz_manager_external_state_mock.h"
@@ -200,13 +203,20 @@ class MechanismRegistryTest : public ServiceContextTest {
 public:
     MechanismRegistryTest()
         : opCtx(makeOperationContext()),
-          authManagerExternalState(new AuthzManagerExternalStateMock()),
-          authManager(new AuthorizationManagerImpl(
-              getService(),
-              std::unique_ptr<AuthzManagerExternalStateMock>(authManagerExternalState))),
           // By default the registry is initialized with all mechanisms enabled.
           registry(opCtx->getService(), {"FOO", "BAR", "InternalAuth"}) {
-        AuthorizationManager::set(getService(), std::unique_ptr<AuthorizationManager>(authManager));
+
+        auto globalAuthzManagerFactory = std::make_unique<AuthorizationManagerFactoryMock>();
+        auto externalStateWrapper = std::make_unique<AuthzManagerExternalStateMock>();
+        authManagerExternalState = externalStateWrapper.get();
+
+        AuthorizationManager::set(getService(),
+                                  std::make_unique<AuthorizationManagerImpl>(
+                                      getService(), std::move(externalStateWrapper)));
+        auth::AuthorizationBackendInterface::set(
+            getService(), globalAuthzManagerFactory->createBackendInterface(getService()));
+
+        authManager = AuthorizationManager::get(getService());
 
         ASSERT_OK(authManagerExternalState->updateOne(
             opCtx.get(),

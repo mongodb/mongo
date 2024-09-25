@@ -28,6 +28,7 @@
  */
 
 
+#include "mongo/db/auth/authorization_backend_interface.h"
 #include <absl/container/node_hash_set.h>
 #include <boost/move/utility_core.hpp>
 #include <boost/none.hpp>
@@ -48,6 +49,7 @@
 #include "mongo/db/auth/address_restriction.h"
 #include "mongo/db/auth/auth_name.h"
 #include "mongo/db/auth/auth_types_gen.h"
+#include "mongo/db/auth/authorization_backend_local.h"
 #include "mongo/db/auth/authz_manager_external_state_local.h"
 #include "mongo/db/auth/builtin_roles.h"
 #include "mongo/db/auth/parsed_privilege_gen.h"
@@ -248,61 +250,13 @@ ResolveRoleOption makeResolveRoleOption(PrivilegeFormat showPrivileges,
     return option;
 }
 
-MONGO_FAIL_POINT_DEFINE(authLocalGetSubRoles);
-void handleAuthLocalGetSubRolesFailPoint(const std::vector<RoleName>& directRoles) {
-    auto sfp = authLocalGetSubRoles.scoped();
-    if (!sfp.isActive()) {
-        return;
-    }
-
-    IDLParserContext ctx("authLocalGetSubRoles");
-    auto delay = AuthLocalGetSubRolesFailPoint::parse(ctx, sfp.getData()).getResolveRolesDelayMS();
-
-    if (delay <= 0) {
-        return;
-    }
-
-    LOGV2_DEBUG(4859400,
-                3,
-                "Sleeping prior to merging direct roles, after user acquisition",
-                "duration"_attr = Milliseconds(delay),
-                "directRoles"_attr = directRoles);
-    sleepmillis(delay);
-}
 }  // namespace
-
-Status AuthzManagerExternalStateLocal::hasAnyUserDocuments(
-    OperationContext* opCtx, const boost::optional<TenantId>& tenantId) {
-    BSONObj userBSONObj;
-    return findOne(
-        opCtx, NamespaceString::makeTenantUsersCollection(tenantId), BSONObj(), &userBSONObj);
-}
 
 // If tenantId is none, we're checking whether to enable localhost auth bypass which by definition
 // will be a local user.
 bool AuthzManagerExternalStateLocal::hasAnyPrivilegeDocuments(OperationContext* opCtx) {
-    if (_hasAnyPrivilegeDocuments.load()) {
-        return true;
-    }
-
-    Status statusFindUsers = hasAnyUserDocuments(opCtx, boost::none);
-
-    // If we were unable to complete the query,
-    // it's best to assume that there _are_ privilege documents.
-    if (statusFindUsers != ErrorCodes::NoMatchingDocument) {
-        _hasAnyPrivilegeDocuments.store(true);
-        return true;
-    }
-
-    BSONObj userBSONObj;
-    Status statusFindRoles =
-        findOne(opCtx, NamespaceString::kAdminRolesNamespace, BSONObj(), &userBSONObj);
-    if (statusFindRoles != ErrorCodes::NoMatchingDocument) {
-        _hasAnyPrivilegeDocuments.store(true);
-        return true;
-    }
-
-    return false;
+    return auth::AuthorizationBackendLocal::get(opCtx->getService())
+        ->hasAnyPrivilegeDocuments(opCtx);
 }
 
 AuthzManagerExternalStateLocal::RolesLocks::RolesLocks(OperationContext* opCtx,
@@ -330,291 +284,35 @@ AuthzManagerExternalStateLocal::RolesLocks AuthzManagerExternalStateLocal::_lock
 StatusWith<User> AuthzManagerExternalStateLocal::getUserObject(
     OperationContext* opCtx,
     const UserRequest& userReq,
-    const SharedUserAcquisitionStats& userAcquisitionStats) try {
-    std::vector<RoleName> directRoles;
-
-    auto swReq = userReq.clone();
-    if (!swReq.isOK()) {
-        return swReq.getStatus();
-    }
-    User user(std::move(swReq.getValue()));
-
-    const UserRequest* request = user.getUserRequest();
-    const UserName& userName = request->getUserName();
-
-    auto rolesLock = _lockRoles(opCtx, userName.tenantId());
-
-    // Set ResolveRoleOption to mine all information from role tree.
-    auto options = ResolveRoleOption::kAllInfo();
-
-    bool hasExternalRoles = request->getRoles().has_value();
-    if (!hasExternalRoles) {
-        // Normal path: Acquire a user from the local store by UserName.
-        BSONObj userDoc;
-        auto status =
-            findOne(opCtx, getUsersCollection(userName.tenantId()), userName.toBSON(), &userDoc);
-        if (!status.isOK()) {
-            if (status == ErrorCodes::NoMatchingDocument) {
-                return {ErrorCodes::UserNotFound,
-                        str::stream() << "Could not find user \"" << userName.getUser()
-                                      << "\" for db \"" << userName.getDB() << "\""};
-            }
-            return status;
-        }
-
-        V2UserDocumentParser userDocParser;
-        userDocParser.setTenantId(request->getUserName().tenantId());
-        uassertStatusOK(userDocParser.initializeUserFromUserDocument(userDoc, &user));
-        for (auto iter = user.getRoles(); iter.more();) {
-            directRoles.push_back(iter.next());
-        }
-    } else {
-        // Proxy path.  Some other external mechanism (e.g. X509 or LDAP) has acquired
-        // a base user definition with a set of immediate roles.
-        // We're being asked to use the local roles collection to derive privileges,
-        // subordinate roles, and authentication restrictions.
-        const auto& requestRoles = *request->getRoles();
-        directRoles.assign(requestRoles.begin(), requestRoles.end());
-
-        User::CredentialData credentials;
-        credentials.isExternal = true;
-        user.setCredentials(credentials);
-        user.setRoles(makeRoleNameIteratorForContainer(directRoles));
-
-        // Update ResolveRoleOption to skip emitting warning logs for unknown roles, since they came
-        // from an external source.
-        options.setIgnoreUnknown(true /* shouldEnable */);
-    }
-
-    if (auto tenant = userName.tenantId()) {
-        // Apply TenantID for user to all roles (which are assumed to be part of the same tenant).
-        for (auto& role : directRoles) {
-            role = RoleName(role.getRole(), role.getDB(), tenant);
-        }
-    }
-
-    handleAuthLocalGetSubRolesFailPoint(directRoles);
-
-    auto data = uassertStatusOK(resolveRoles(opCtx, directRoles, options));
-    data.roles->insert(directRoles.cbegin(), directRoles.cend());
-    user.setIndirectRoles(makeRoleNameIteratorForContainer(data.roles.value()));
-    user.addPrivileges(data.privileges.value());
-    user.setIndirectRestrictions(data.restrictions.value());
-
-    LOGV2_DEBUG(5517200,
-                3,
-                "Acquired new user object",
-                "userName"_attr = userName,
-                "directRoles"_attr = directRoles);
-
-    return std::move(user);
-} catch (const AssertionException& ex) {
-    return ex.toStatus();
+    const SharedUserAcquisitionStats& userAcquisitionStats) {
+    const auto& backend = auth::AuthorizationBackendInterface::get(opCtx->getService());
+    invariant(backend);
+    return backend->getUserObject(opCtx, userReq, userAcquisitionStats);
 }
 
 Status AuthzManagerExternalStateLocal::getUserDescription(
     OperationContext* opCtx,
     const UserRequest& userReq,
     BSONObj* result,
-    const SharedUserAcquisitionStats& userAcquisitionStats) try {
-
-    const UserName& userName = userReq.getUserName();
-    std::vector<RoleName> directRoles;
-    BSONObjBuilder resultBuilder;
-
-    auto rolesLock = _lockRoles(opCtx, userName.tenantId());
-
-    auto options = ResolveRoleOption::kAllInfo();
-    bool hasExternalRoles = userReq.getRoles().has_value();
-    if (!hasExternalRoles) {
-        BSONObj userDoc;
-        auto status =
-            findOne(opCtx, getUsersCollection(userName.tenantId()), userName.toBSON(), &userDoc);
-        if (!status.isOK()) {
-            if (status == ErrorCodes::NoMatchingDocument) {
-                return {ErrorCodes::UserNotFound,
-                        str::stream() << "Could not find user \"" << userName.getUser()
-                                      << "\" for db \"" << userName.getDB() << "\""};
-            }
-            return status;
-        }
-
-        directRoles =
-            filterAndMapRole(&resultBuilder, userDoc, options, false, userName.tenantId());
-    } else {
-        // Set ResolveRoleOption to include the ignoreUnknownFlag so that external roles that don't
-        // exist do not generate warning logs.
-        options.setIgnoreUnknown(true /* shouldEnable */);
-
-        uassert(ErrorCodes::BadValue,
-                "Illegal combination of pre-defined roles with tenant identifier",
-                userName.tenantId() == boost::none);
-
-        // We are able to artifically construct the external user from the request
-        resultBuilder.append("_id", str::stream() << userName.getDB() << '.' << userName.getUser());
-        resultBuilder.append("user", userName.getUser());
-        resultBuilder.append("db", userName.getDB());
-        resultBuilder.append("credentials", BSON("external" << true));
-
-        directRoles =
-            std::vector<RoleName>(userReq.getRoles()->cbegin(), userReq.getRoles()->cend());
-        BSONArrayBuilder rolesBuilder(resultBuilder.subarrayStart("roles"));
-        for (const RoleName& role : directRoles) {
-            rolesBuilder.append(role.toBSON());
-        }
-        rolesBuilder.doneFast();
-    }
-
-    if (auto tenant = userName.tenantId()) {
-        // Apply TenantID for user to all roles (which are assumed to be part of the same tenant).
-        for (auto& role : directRoles) {
-            role = RoleName(role.getRole(), role.getDB(), tenant);
-        }
-    }
-
-    handleAuthLocalGetSubRolesFailPoint(directRoles);
-
-    auto data = uassertStatusOK(resolveRoles(opCtx, directRoles, options));
-    data.roles->insert(directRoles.cbegin(), directRoles.cend());
-    serializeResolvedRoles(&resultBuilder, data);
-    *result = resultBuilder.obj();
-
-    return Status::OK();
-} catch (const AssertionException& ex) {
-    return ex.toStatus();
+    const SharedUserAcquisitionStats& userAcquisitionStats) {
+    const auto& backend = auth::AuthorizationBackendInterface::get(opCtx->getService());
+    invariant(backend);
+    return backend->getUserDescription(opCtx, userReq, result, userAcquisitionStats);
 }
 
 Status AuthzManagerExternalStateLocal::rolesExist(OperationContext* opCtx,
                                                   const std::vector<RoleName>& roleNames) {
-    // Perform DB queries for user-defined roles (skipping builtin roles).
-    stdx::unordered_set<RoleName> unknownRoles;
-    for (const auto& roleName : roleNames) {
-        if (!auth::isBuiltinRole(roleName) &&
-            !hasOne(opCtx, getRolesCollection(roleName.tenantId()), roleName.toBSON())) {
-            unknownRoles.insert(roleName);
-        }
-    }
-
-    // If anything remains, raise it as an unknown role error.
-    if (!unknownRoles.empty()) {
-        return makeRoleNotFoundStatus(unknownRoles);
-    }
-
-    return Status::OK();
+    const auto& backend = auth::AuthorizationBackendInterface::get(opCtx->getService());
+    invariant(backend);
+    return backend->rolesExist(opCtx, roleNames);
 }
 
 using ResolvedRoleData = AuthzManagerExternalState::ResolvedRoleData;
 StatusWith<ResolvedRoleData> AuthzManagerExternalStateLocal::resolveRoles(
-    OperationContext* opCtx, const std::vector<RoleName>& roleNames, ResolveRoleOption option) try {
-    using RoleNameSet = typename decltype(ResolvedRoleData::roles)::value_type;
-    const bool processRoles = option.shouldMineRoles();
-    const bool processPrivs = option.shouldMinePrivileges();
-    const bool processRests = option.shouldMineRestrictions();
-    const bool walkIndirect = !option.shouldMineDirectOnly();
-    const bool skipUnknownRolesLog = option.shouldIgnoreUnknown();
-    IDLParserContext idlctx("resolveRoles");
-
-    RoleNameSet inheritedRoles;
-    PrivilegeVector inheritedPrivileges;
-    RestrictionDocuments::sequence_type inheritedRestrictions;
-
-    RoleNameSet frontier(roleNames.cbegin(), roleNames.cend());
-    RoleNameSet visited;
-    while (!frontier.empty()) {
-        RoleNameSet nextFrontier;
-        for (const auto& role : frontier) {
-            visited.insert(role);
-
-            if (auth::isBuiltinRole(role)) {
-                if (processPrivs) {
-                    invariant(auth::addPrivilegesForBuiltinRole(role, &inheritedPrivileges));
-                }
-                continue;
-            }
-
-            BSONObj roleDoc;
-            auto status =
-                findOne(opCtx, getRolesCollection(role.tenantId()), role.toBSON(), &roleDoc);
-            if (!status.isOK()) {
-                if (status.code() == ErrorCodes::NoMatchingDocument) {
-                    if (!skipUnknownRolesLog) {
-                        LOGV2(5029200, "Role does not exist", "role"_attr = role);
-                    }
-
-                    continue;
-                }
-                return status;
-            }
-
-            BSONElement elem;
-            if ((processRoles || walkIndirect) && (elem = roleDoc["roles"])) {
-                if (elem.type() != Array) {
-                    return {ErrorCodes::BadValue,
-                            str::stream()
-                                << "Invalid 'roles' field in role document '" << role
-                                << "', expected an array but found " << typeName(elem.type())};
-                }
-                for (const auto& subroleElem : elem.Obj()) {
-                    auto subrole = RoleName::parseFromBSON(subroleElem, role.tenantId());
-                    if (visited.count(subrole) || nextFrontier.count(subrole)) {
-                        continue;
-                    }
-                    if (walkIndirect) {
-                        nextFrontier.insert(subrole);
-                    }
-                    if (processRoles) {
-                        inheritedRoles.insert(std::move(subrole));
-                    }
-                }
-            }
-
-            if (processPrivs && (elem = roleDoc["privileges"])) {
-                if (elem.type() != Array) {
-                    return {ErrorCodes::UnsupportedFormat,
-                            str::stream()
-                                << "Invalid 'privileges' field in role document '" << role << "'"};
-                }
-                for (const auto& privElem : elem.Obj()) {
-                    if (privElem.type() != Object) {
-                        return {ErrorCodes::UnsupportedFormat,
-                                "Expected privilege document as object, got {}"_format(
-                                    typeName(privElem.type()))};
-                    }
-                    auto pp = auth::ParsedPrivilege::parse(idlctx, privElem.Obj());
-                    Privilege::addPrivilegeToPrivilegeVector(
-                        &inheritedPrivileges,
-                        Privilege::resolvePrivilegeWithTenant(role.tenantId(), pp));
-                }
-            }
-
-            if (processRests && (elem = roleDoc["authenticationRestrictions"])) {
-                if (elem.type() != Array) {
-                    return {ErrorCodes::UnsupportedFormat,
-                            str::stream()
-                                << "Invalid 'authenticationRestrictions' field in role document '"
-                                << role << "'"};
-                }
-                inheritedRestrictions.push_back(
-                    uassertStatusOK(parseAuthenticationRestriction(BSONArray(elem.Obj()))));
-            }
-        }
-        frontier = std::move(nextFrontier);
-    }
-
-    ResolvedRoleData ret;
-    if (processRoles) {
-        ret.roles = std::move(inheritedRoles);
-    }
-    if (processPrivs) {
-        ret.privileges = std::move(inheritedPrivileges);
-    }
-    if (processRests) {
-        ret.restrictions = RestrictionDocuments(std::move(inheritedRestrictions));
-    }
-
-    return ret;
-} catch (const AssertionException& ex) {
-    return ex.toStatus();
+    OperationContext* opCtx, const std::vector<RoleName>& roleNames, ResolveRoleOption option) {
+    const auto& backend = auth::AuthorizationBackendInterface::get(opCtx->getService());
+    invariant(backend);
+    return backend->resolveRoles(opCtx, roleNames, option);
 }
 
 Status AuthzManagerExternalStateLocal::getRolesAsUserFragment(
@@ -650,7 +348,6 @@ Status AuthzManagerExternalStateLocal::getRolesDescription(
     PrivilegeFormat showPrivileges,
     AuthenticationRestrictionsFormat showRestrictions,
     std::vector<BSONObj>* result) {
-
     if (showPrivileges == PrivilegeFormat::kShowAsUserFragment) {
         // Shouldn't be called this way, but cope if we are.
         BSONObj fragment;
@@ -943,10 +640,6 @@ void AuthzManagerExternalStateLocal::logOp(OperationContext* opCtx,
     }
 
     _invalidateUserCache(opCtx, authzManager, op, coll, o, o2);
-
-    if (coll.isPrivilegeCollection() && (op == kOpInsert)) {
-        _hasAnyPrivilegeDocuments.store(true);
-    }
 }
 
 }  // namespace mongo

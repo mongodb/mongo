@@ -38,6 +38,7 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/audit.h"
 #include "mongo/db/auth/auth_op_observer.h"
+#include "mongo/db/auth/authorization_backend_interface.h"
 #include "mongo/db/auth/authorization_manager.h"
 #include "mongo/db/catalog/collection_options.h"
 #include "mongo/db/op_observer/op_observer_util.h"

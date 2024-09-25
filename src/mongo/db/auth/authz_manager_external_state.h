@@ -186,13 +186,6 @@ public:
                                             std::vector<BSONObj>* result) = 0;
 
     /**
-     * Returns true if there exists at least one user document in the system. If `tenantId` is
-     * set, checks whether a doc associated with this tenantId exists.
-     */
-    virtual Status hasAnyUserDocuments(OperationContext* opCtx,
-                                       const boost::optional<TenantId>& tenantId) = 0;
-
-    /**
      * Returns true if there exists at least one privilege document in the system. If `tenantId` is
      * set, checks whether a doc associated with this tenantId exists.
      */

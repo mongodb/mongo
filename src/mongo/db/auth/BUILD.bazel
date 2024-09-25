@@ -181,6 +181,7 @@ mongo_cc_library(
         "authz_manager_external_state_local.cpp",
     ],
     hdrs = [
+        "authorization_backend_local.h",
         "authz_manager_external_state_local.h",
     ],
     deps = [
@@ -476,6 +477,7 @@ mongo_cc_library(
         "//src/mongo/util/concurrency:thread_pool.h",
     ],
     hdrs = [
+        "authorization_backend_interface.h",
         "authorization_client_handle.h",
         "authorization_manager_factory.h",
         "//src/mongo/db/commands:authentication_commands.h",
@@ -495,6 +497,7 @@ mongo_cc_library(
 mongo_cc_library(
     name = "authserver",
     srcs = [
+        "authorization_backend_local.cpp",
         "authorization_client_handle_router.cpp",
         "authorization_client_handle_shard.cpp",
         "authorization_manager_factory_impl.cpp",
@@ -506,6 +509,7 @@ mongo_cc_library(
         ":enable_localhost_auth_bypass_parameter_gen",
     ],
     hdrs = [
+        "authorization_backend_local.h",
         "authorization_client_handle_router.h",
         "authorization_client_handle_shard.h",
         "authorization_manager_factory_impl.h",
@@ -527,6 +531,7 @@ mongo_cc_library(
         "//src/mongo/db:server_base",
         "//src/mongo/db/commands:authentication_commands",
         "//src/mongo/db/commands:umc_commands_idl",
+        "//src/mongo/db/query:command_request_response",
         "//src/mongo/db/repl:repl_coordinator_interface",
         "//src/mongo/s:grid",
     ],
@@ -535,11 +540,13 @@ mongo_cc_library(
 mongo_cc_library(
     name = "authmocks",
     srcs = [
+        "authorization_backend_mock.cpp",
         "authorization_manager_factory_mock.cpp",
         "authz_manager_external_state_mock.cpp",
         "authz_session_external_state_mock.cpp",
     ],
     hdrs = [
+        "authorization_backend_mock.h",
         "authorization_manager_factory_mock.h",
         "authz_manager_external_state_mock.h",
         "authz_session_external_state_mock.h",

@@ -54,7 +54,7 @@ AuthzSessionExternalStateServerCommon::AuthzSessionExternalStateServerCommon(
 AuthzSessionExternalStateServerCommon::~AuthzSessionExternalStateServerCommon() {}
 
 void AuthzSessionExternalStateServerCommon::_checkShouldAllowLocalhost(OperationContext* opCtx) {
-    if (!_authzManager->isAuthEnabled())
+    if (!AuthorizationManager::get(opCtx->getService())->isAuthEnabled())
         return;
     // If we know that an admin user exists, don't re-check.
     if (!_allowLocalhost)
@@ -65,7 +65,8 @@ void AuthzSessionExternalStateServerCommon::_checkShouldAllowLocalhost(Operation
         return;
     }
 
-    _allowLocalhost = !_authzManager->hasAnyPrivilegeDocuments(opCtx);
+    _allowLocalhost =
+        !AuthorizationManager::get(opCtx->getService())->hasAnyPrivilegeDocuments(opCtx);
     if (_allowLocalhost) {
         std::call_once(checkShouldAllowLocalhostOnceFlag, []() {
             LOGV2(20248,

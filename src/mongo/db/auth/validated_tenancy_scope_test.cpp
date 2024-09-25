@@ -45,7 +45,10 @@
 #include "mongo/bson/oid.h"
 #include "mongo/db/auth/action_type.h"
 #include "mongo/db/auth/auth_name.h"
+#include "mongo/db/auth/authorization_backend_interface.h"
+#include "mongo/db/auth/authorization_backend_local.h"
 #include "mongo/db/auth/authorization_manager.h"
+#include "mongo/db/auth/authorization_manager_factory_mock.h"
 #include "mongo/db/auth/authorization_manager_impl.h"
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/auth/authorization_session_impl.h"
@@ -97,6 +100,9 @@ protected:
             std::make_unique<AuthorizationManagerImpl>(getService(), std::move(authzManagerState));
         authzManager->setAuthEnabled(true);
         AuthorizationManager::set(getService(), std::move(authzManager));
+        auto globalAuthzManagerFactory = std::make_unique<AuthorizationManagerFactoryMock>();
+        auth::AuthorizationBackendInterface::set(
+            getService(), globalAuthzManagerFactory->createBackendInterface(getService()));
 
         client = getServiceContext()->getService()->makeClient("test");
     }

@@ -95,15 +95,11 @@ public:
 
     OID getCacheGeneration() override;
 
-    Status hasValidAuthSchemaVersionDocumentForInitialSync(OperationContext* opCtx) override;
-
     bool hasAnyPrivilegeDocuments(OperationContext* opCtx) override;
 
     Status getUserDescription(OperationContext* opCtx,
                               const UserName& userName,
                               BSONObj* result) override;
-
-    bool hasUser(OperationContext* opCtx, const boost::optional<TenantId>& tenantId) override;
 
     Status rolesExist(OperationContext* opCtx, const std::vector<RoleName>& roleNames) override;
 
@@ -121,13 +117,6 @@ public:
                                   const std::vector<RoleName>& roleName,
                                   AuthenticationRestrictionsFormat,
                                   BSONObj* result) override;
-
-    Status getRoleDescriptionsForDB(OperationContext* opCtx,
-                                    const DatabaseName& dbname,
-                                    PrivilegeFormat privilegeFormat,
-                                    AuthenticationRestrictionsFormat,
-                                    bool showBuiltinRoles,
-                                    std::vector<BSONObj>* result) override;
 
     StatusWith<UserHandle> acquireUser(OperationContext* opCtx,
                                        std::unique_ptr<UserRequest> userRequest) override;
@@ -155,13 +144,13 @@ public:
      */
     void invalidateUserCache() override;
 
-    void logOp(OperationContext* opCtx,
-               StringData opstr,
-               const NamespaceString& nss,
-               const BSONObj& obj,
-               const BSONObj* patt) override;
-
     std::vector<CachedUserInfo> getUserCacheInfo() const override;
+
+    void logOp(OperationContext* opCtx,
+               StringData op,
+               const NamespaceString& ns,
+               const BSONObj& o,
+               const BSONObj* o2) override;
 
 private:
     void _updateCacheGeneration();

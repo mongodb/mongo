@@ -39,6 +39,7 @@
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonmisc.h"
+#include "mongo/db/auth/authorization_backend_interface.h"
 #include "mongo/db/auth/authorization_manager.h"
 #include "mongo/db/client.h"
 #include "mongo/db/feature_flag.h"
@@ -306,12 +307,23 @@ void AllDatabaseCloner::postStage() {
                     opCtxPtr = cc().makeOperationContext();
                     opCtx = opCtxPtr.get();
                 }
-                auto authzManager = AuthorizationManager::get(opCtx->getService());
+
+                // To use the AuthorizationBackendInterface we need to be in a shard
+                // or config role.
+                auto authBackend = auth::AuthorizationBackendInterface::get(opCtx->getService());
+                if (!authBackend) {
+                    LOGV2_WARNING(8366000,
+                                  "Database clone failed, running from invalid cluster role");
+                    setSyncFailedStatus(
+                        Status(ErrorCodes::InitialSyncFailure,
+                               "Database clone failed, running from invalid cluster role"));
+                    return;
+                }
 
                 // Check if global admin has a valid auth schema version document.
                 if (!dbName.tenantId() && !foundAuthSchemaDoc) {
                     auto status =
-                        authzManager->hasValidAuthSchemaVersionDocumentForInitialSync(opCtx);
+                        authBackend->hasValidAuthSchemaVersionDocumentForInitialSync(opCtx);
                     if (status == ErrorCodes::AuthSchemaIncompatible) {
                         handleAdminDbNotValid(status);
                         return;
@@ -322,7 +334,9 @@ void AllDatabaseCloner::postStage() {
 
                 // We haven't yet found a user document, look for one. In a multitenant environment,
                 // user documents will live in tenant-specific admin collections.
-                foundUser = authzManager->hasUser(opCtx, dbName.tenantId());
+                foundUser = auth::AuthorizationBackendInterface::get(opCtx->getService())
+                                ->hasAnyUserDocuments(opCtx, dbName.tenantId())
+                                .isOK();
             }
 
             // The global admin db sorts first even in a multitenant environemnt, so if we've found

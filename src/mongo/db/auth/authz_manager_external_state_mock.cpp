@@ -45,6 +45,8 @@
 #include "mongo/bson/mutable/document.h"
 #include "mongo/bson/mutable/element.h"
 #include "mongo/bson/oid.h"
+#include "mongo/db/auth/authorization_backend_interface.h"
+#include "mongo/db/auth/authorization_backend_mock.h"
 #include "mongo/db/auth/authz_session_external_state.h"
 #include "mongo/db/auth/authz_session_external_state_mock.h"
 #include "mongo/db/auth/privilege.h"
@@ -107,13 +109,10 @@ void AuthzManagerExternalStateMock::setAuthorizationManager(AuthorizationManager
 }
 
 void AuthzManagerExternalStateMock::setAuthzVersion(OperationContext* opCtx, int version) {
-    uassertStatusOK(
-        updateOne(opCtx,
-                  NamespaceString::kServerConfigurationNamespace,
-                  AuthorizationManager::versionDocumentQuery,
-                  BSON("$set" << BSON(AuthorizationManager::schemaVersionFieldName << version)),
-                  true,
-                  BSONObj()));
+    auto backendMock = reinterpret_cast<auth::AuthorizationBackendMock*>(
+        auth::AuthorizationBackendInterface::get(opCtx->getService()));
+    invariant(backendMock);
+    return backendMock->setAuthzVersion(opCtx, version);
 }
 
 std::unique_ptr<AuthzSessionExternalState>
@@ -131,12 +130,10 @@ Status AuthzManagerExternalStateMock::findOne(OperationContext* opCtx,
                                               const NamespaceString& collectionName,
                                               const BSONObj& query,
                                               BSONObj* result) {
-    BSONObjCollection::iterator iter;
-    Status status = _findOneIter(opCtx, collectionName, query, &iter);
-    if (!status.isOK())
-        return status;
-    *result = iter->copy();
-    return Status::OK();
+    auto backendMock = reinterpret_cast<auth::AuthorizationBackendMock*>(
+        auth::AuthorizationBackendInterface::get(opCtx->getService()));
+    invariant(backendMock);
+    return backendMock->findOne(opCtx, collectionName, query, result);
 }
 
 
@@ -174,34 +171,28 @@ Status AuthzManagerExternalStateMock::insert(OperationContext* opCtx,
                                              const NamespaceString& collectionName,
                                              const BSONObj& document,
                                              const BSONObj&) {
-    BSONObj toInsert;
-    if (document["_id"].eoo()) {
-        BSONObjBuilder docWithIdBuilder;
-        docWithIdBuilder.append("_id", OID::gen());
-        docWithIdBuilder.appendElements(document);
-        toInsert = docWithIdBuilder.obj();
-    } else {
-        toInsert = document.copy();
-    }
-    _documents[collectionName].push_back(toInsert);
-
-    if (_authzManager) {
-        _authzManager->logOp(opCtx, "i", collectionName, toInsert, nullptr);
-    }
-
-    return Status::OK();
+    auto backendMock = reinterpret_cast<auth::AuthorizationBackendMock*>(
+        auth::AuthorizationBackendInterface::get(opCtx->getService()));
+    invariant(backendMock);
+    return backendMock->insert(opCtx, collectionName, document, {});
 }
 
 Status AuthzManagerExternalStateMock::insertUserDocument(OperationContext* opCtx,
                                                          const BSONObj& userObj,
                                                          const BSONObj& writeConcern) {
-    return insert(opCtx, NamespaceString::kAdminUsersNamespace, userObj, writeConcern);
+    auto backendMock = reinterpret_cast<auth::AuthorizationBackendMock*>(
+        auth::AuthorizationBackendInterface::get(opCtx->getService()));
+    invariant(backendMock);
+    return backendMock->insertUserDocument(opCtx, userObj, writeConcern);
 }
 
 Status AuthzManagerExternalStateMock::insertRoleDocument(OperationContext* opCtx,
                                                          const BSONObj& roleObj,
                                                          const BSONObj& writeConcern) {
-    return insert(opCtx, NamespaceString::kAdminRolesNamespace, roleObj, writeConcern);
+    auto backendMock = reinterpret_cast<auth::AuthorizationBackendMock*>(
+        auth::AuthorizationBackendInterface::get(opCtx->getService()));
+    invariant(backendMock);
+    return backendMock->insertRoleDocument(opCtx, roleObj, writeConcern);
 }
 
 Status AuthzManagerExternalStateMock::updateOne(OperationContext* opCtx,
@@ -210,66 +201,11 @@ Status AuthzManagerExternalStateMock::updateOne(OperationContext* opCtx,
                                                 const BSONObj& updatePattern,
                                                 bool upsert,
                                                 const BSONObj& writeConcern) {
-    namespace mmb = mutablebson;
-    boost::intrusive_ptr<ExpressionContext> expCtx(
-        new ExpressionContext(opCtx, std::unique_ptr<CollatorInterface>(nullptr), collectionName));
-    UpdateDriver driver(std::move(expCtx));
-    std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
-    driver.parse(write_ops::UpdateModification::parseFromClassicUpdate(updatePattern),
-                 arrayFilters);
-
-    BSONObjCollection::iterator iter;
-    Status status = _findOneIter(opCtx, collectionName, query, &iter);
-    mmb::Document document;
-    if (status.isOK()) {
-        document.reset(*iter, mmb::Document::kInPlaceDisabled);
-        const bool validateForStorage = false;
-        const FieldRefSet emptyImmutablePaths;
-        const bool isInsert = false;
-        BSONObj logObj;
-        status = driver.update(opCtx,
-                               StringData(),
-                               &document,
-                               validateForStorage,
-                               emptyImmutablePaths,
-                               isInsert,
-                               &logObj);
-        if (!status.isOK())
-            return status;
-        BSONObj newObj = document.getObject().copy();
-        *iter = newObj;
-        BSONElement idQuery = newObj["_id"_sd];
-        BSONObj idQueryObj = idQuery.isABSONObj() ? idQuery.Obj() : BSON("_id" << idQuery);
-
-        if (_authzManager) {
-            _authzManager->logOp(opCtx, "u", collectionName, logObj, &idQueryObj);
-        }
-
-        return Status::OK();
-    } else if (status == ErrorCodes::NoMatchingDocument && upsert) {
-        if (query.hasField("_id")) {
-            document.root().appendElement(query["_id"]).transitional_ignore();
-        }
-        const FieldRef idFieldRef("_id");
-        FieldRefSet immutablePaths;
-        invariant(immutablePaths.insert(&idFieldRef));
-        status = driver.populateDocumentWithQueryFields(opCtx, query, immutablePaths, document);
-        if (!status.isOK()) {
-            return status;
-        }
-
-        const bool validateForStorage = false;
-        const FieldRefSet emptyImmutablePaths;
-        const bool isInsert = false;
-        status = driver.update(
-            opCtx, StringData(), &document, validateForStorage, emptyImmutablePaths, isInsert);
-        if (!status.isOK()) {
-            return status;
-        }
-        return insert(opCtx, collectionName, document.getObject(), writeConcern);
-    } else {
-        return status;
-    }
+    auto backendMock = reinterpret_cast<auth::AuthorizationBackendMock*>(
+        auth::AuthorizationBackendInterface::get(opCtx->getService()));
+    invariant(backendMock);
+    return backendMock->updateOne(
+        opCtx, collectionName, query, updatePattern, upsert, writeConcern);
 }
 
 Status AuthzManagerExternalStateMock::update(OperationContext* opCtx,
@@ -289,19 +225,10 @@ Status AuthzManagerExternalStateMock::remove(OperationContext* opCtx,
                                              const BSONObj& query,
                                              const BSONObj&,
                                              int* numRemoved) {
-    int n = 0;
-    BSONObjCollection::iterator iter;
-    while (_findOneIter(opCtx, collectionName, query, &iter).isOK()) {
-        BSONObj idQuery = (*iter)["_id"].wrap();
-        _documents[collectionName].erase(iter);
-        ++n;
-
-        if (_authzManager) {
-            _authzManager->logOp(opCtx, "d", collectionName, idQuery, nullptr);
-        }
-    }
-    *numRemoved = n;
-    return Status::OK();
+    auto backendMock = reinterpret_cast<auth::AuthorizationBackendMock*>(
+        auth::AuthorizationBackendInterface::get(opCtx->getService()));
+    invariant(backendMock);
+    return backendMock->remove(opCtx, collectionName, query, {}, numRemoved);
 }
 
 std::vector<BSONObj> AuthzManagerExternalStateMock::getCollectionContents(

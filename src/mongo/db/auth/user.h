@@ -126,7 +126,7 @@ public:
     virtual const boost::optional<std::set<RoleName>>& getRoles() const = 0;
     virtual UserRequestType getType() const = 0;
     virtual void setRoles(boost::optional<std::set<RoleName>> roles) = 0;
-    virtual StatusWith<std::unique_ptr<UserRequest>> clone() const = 0;
+    virtual std::unique_ptr<UserRequest> clone() const = 0;
 
     /**
      * Version of clone that clones the UserRequest by erasing the roles from
@@ -164,7 +164,7 @@ public:
         this->roles = std::move(roles);
     }
 
-    StatusWith<std::unique_ptr<UserRequest>> clone() const override {
+    std::unique_ptr<UserRequest> clone() const override {
         return std::unique_ptr<UserRequest>(
             std::make_unique<UserRequestGeneral>(getUserName(), getRoles()));
     }

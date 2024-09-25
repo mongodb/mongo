@@ -107,11 +107,6 @@ public:
     }
 
     bool hasAnyPrivilegeDocuments(OperationContext* opCtx) final;
-
-    Status hasAnyUserDocuments(OperationContext* opCtx,
-                               const boost::optional<TenantId>& tenantId) final {
-        return {ErrorCodes::NotImplemented, "AuthzMongos::hasValidStoredAuthorizationVersion"};
-    }
 };
 
 }  // namespace mongo

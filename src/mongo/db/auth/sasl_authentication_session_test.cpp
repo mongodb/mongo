@@ -47,7 +47,11 @@
 #include "mongo/crypto/mechanism_scram.h"
 #include "mongo/crypto/sha1_block.h"
 #include "mongo/crypto/sha256_block.h"
+#include "mongo/db/auth/authorization_backend_interface.h"
+#include "mongo/db/auth/authorization_backend_local.h"
+#include "mongo/db/auth/authorization_backend_mock.h"
 #include "mongo/db/auth/authorization_manager.h"
+#include "mongo/db/auth/authorization_manager_factory_mock.h"
 #include "mongo/db/auth/authorization_manager_impl.h"
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/auth/authz_manager_external_state.h"
@@ -110,6 +114,10 @@ SaslConversation::SaslConversation(std::string mech)
       mechanism(mech) {
 
     AuthorizationManager::set(getService(), std::unique_ptr<AuthorizationManager>(authManager));
+
+    auto globalAuthzManagerFactory = std::make_unique<AuthorizationManagerFactoryMock>();
+    auth::AuthorizationBackendInterface::set(
+        getService(), globalAuthzManagerFactory->createBackendInterface(getService()));
 
     client.reset(SaslClientSession::create(mechanism));
 

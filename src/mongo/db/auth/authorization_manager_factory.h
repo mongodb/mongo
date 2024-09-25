@@ -29,6 +29,7 @@
 
 #pragma once
 
+#include "mongo/db/auth/authorization_backend_interface.h"
 #include "mongo/db/auth/authorization_client_handle.h"
 #include "mongo/db/auth/authorization_manager.h"
 #include "mongo/db/service_context.h"
@@ -55,6 +56,9 @@ public:
     virtual std::unique_ptr<AuthorizationClientHandle> createClientHandleRouter(
         Service* service) = 0;
     virtual std::unique_ptr<AuthorizationClientHandle> createClientHandleShard(
+        Service* service) = 0;
+
+    virtual std::unique_ptr<auth::AuthorizationBackendInterface> createBackendInterface(
         Service* service) = 0;
 };
 

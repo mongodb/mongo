@@ -63,6 +63,10 @@ void AuthorizationSessionTestFixture::setUp() {
     managerState->setAuthzVersion(_opCtx.get(), AuthorizationManager::schemaVersion26Final);
 
     authzManager = AuthorizationManager::get(_client->getService());
+    auth::AuthorizationBackendInterface::set(_client->getService(),
+                                             std::make_unique<auth::AuthorizationBackendMock>());
+    backendMock = reinterpret_cast<auth::AuthorizationBackendMock*>(
+        auth::AuthorizationBackendInterface::get(_client->getService()));
     auto localSessionState = std::make_unique<AuthzSessionExternalStateMock>(authzManager);
     sessionState = localSessionState.get();
     authzSession = std::make_unique<AuthorizationSessionForTest>(

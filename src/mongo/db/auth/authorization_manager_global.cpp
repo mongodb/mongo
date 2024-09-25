@@ -84,6 +84,8 @@ Service::ConstructorActionRegisterer createAuthorizationManager(
         } else {
             authzManager = globalAuthzManagerFactory->createShard(service);
             authorizationClientHandle = globalAuthzManagerFactory->createClientHandleShard(service);
+            auth::AuthorizationBackendInterface::set(
+                service, globalAuthzManagerFactory->createBackendInterface(service));
         }
 
         authzManager->setAuthEnabled(authIsEnabled);

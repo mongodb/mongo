@@ -48,6 +48,8 @@
 #include "mongo/db/auth/action_set.h"
 #include "mongo/db/auth/action_type.h"
 #include "mongo/db/auth/auth_name.h"
+#include "mongo/db/auth/authorization_backend_interface.h"
+#include "mongo/db/auth/authorization_backend_mock.h"
 #include "mongo/db/auth/authorization_manager.h"
 #include "mongo/db/auth/authorization_manager_impl.h"
 #include "mongo/db/auth/authz_manager_external_state_mock.h"
@@ -150,13 +152,17 @@ class RecoveryUnitMock : public RecoveryUnitNoop {
 class AuthorizationManagerTest : public ServiceContextTest {
 public:
     AuthorizationManagerTest() {
-        auto localExternalState = std::make_unique<AuthzManagerExternalStateMock>();
-        externalState = localExternalState.get();
+        auto externalStateWrapper = std::make_unique<AuthzManagerExternalStateMock>();
+        externalState = externalStateWrapper.get();
         auto localAuthzManager = std::make_unique<AuthorizationManagerImplForTest>(
-            getService(), std::move(localExternalState));
+            getService(), std::move(externalStateWrapper));
         authzManager = localAuthzManager.get();
         authzManager->setAuthEnabled(true);
         AuthorizationManager::set(getService(), std::move(localAuthzManager));
+        auth::AuthorizationBackendInterface::set(
+            getService(), std::make_unique<auth::AuthorizationBackendMock>());
+        mockBackend = reinterpret_cast<auth::AuthorizationBackendMock*>(
+            auth::AuthorizationBackendInterface::get(getService()));
 
         // Re-initialize the client after setting the AuthorizationManager to get an
         // AuthorizationSession.
@@ -226,37 +232,38 @@ public:
     std::shared_ptr<transport::Session> session = transportLayer.createSession();
     AuthorizationManagerImplForTest* authzManager;
     AuthzManagerExternalStateMock* externalState;
+    auth::AuthorizationBackendMock* mockBackend;
     BSONObj credentials;
     ServiceContext::UniqueOperationContext opCtx;
 };
 
 TEST_F(AuthorizationManagerTest, testAcquireV2User) {
-    ASSERT_OK(externalState->insertUserDocument(opCtx.get(),
-                                                BSON("_id"
-                                                     << "admin.v2read"
-                                                     << "user"
-                                                     << "v2read"
-                                                     << "db"
-                                                     << "test"
-                                                     << "credentials" << credentials << "roles"
-                                                     << BSON_ARRAY(BSON("role"
-                                                                        << "read"
-                                                                        << "db"
-                                                                        << "test"))),
-                                                BSONObj()));
-    ASSERT_OK(externalState->insertUserDocument(opCtx.get(),
-                                                BSON("_id"
-                                                     << "admin.v2cluster"
-                                                     << "user"
-                                                     << "v2cluster"
-                                                     << "db"
-                                                     << "admin"
-                                                     << "credentials" << credentials << "roles"
-                                                     << BSON_ARRAY(BSON("role"
-                                                                        << "clusterAdmin"
-                                                                        << "db"
-                                                                        << "admin"))),
-                                                BSONObj()));
+    ASSERT_OK(mockBackend->insertUserDocument(opCtx.get(),
+                                              BSON("_id"
+                                                   << "admin.v2read"
+                                                   << "user"
+                                                   << "v2read"
+                                                   << "db"
+                                                   << "test"
+                                                   << "credentials" << credentials << "roles"
+                                                   << BSON_ARRAY(BSON("role"
+                                                                      << "read"
+                                                                      << "db"
+                                                                      << "test"))),
+                                              BSONObj()));
+    ASSERT_OK(mockBackend->insertUserDocument(opCtx.get(),
+                                              BSON("_id"
+                                                   << "admin.v2cluster"
+                                                   << "user"
+                                                   << "v2cluster"
+                                                   << "db"
+                                                   << "admin"
+                                                   << "credentials" << credentials << "roles"
+                                                   << BSON_ARRAY(BSON("role"
+                                                                      << "clusterAdmin"
+                                                                      << "db"
+                                                                      << "admin"))),
+                                              BSONObj()));
 
     auto swu = authzManager->acquireUser(
         opCtx.get(), std::make_unique<UserRequestGeneral>(UserName("v2read", "test"), boost::none));
@@ -339,30 +346,29 @@ TEST_F(AuthorizationManagerTest, testLocalX509AuthenticationNoAuthorization) {
 
 // Tests SERVER-21535, unrecognized actions should be ignored rather than causing errors.
 TEST_F(AuthorizationManagerTest, testAcquireV2UserWithUnrecognizedActions) {
-    ASSERT_OK(
-        externalState->insertUserDocument(opCtx.get(),
-                                          BSON("_id"
-                                               << "admin.myUser"
-                                               << "user"
-                                               << "myUser"
-                                               << "db"
-                                               << "test"
-                                               << "credentials" << credentials << "roles"
-                                               << BSON_ARRAY(BSON("role"
-                                                                  << "myRole"
-                                                                  << "db"
-                                                                  << "test"))
-                                               << "inheritedPrivileges"
-                                               << BSON_ARRAY(BSON("resource"
-                                                                  << BSON("db"
-                                                                          << "test"
-                                                                          << "collection"
-                                                                          << "")
-                                                                  << "actions"
-                                                                  << BSON_ARRAY("find"
-                                                                                << "fakeAction"
-                                                                                << "insert")))),
-                                          BSONObj()));
+    ASSERT_OK(mockBackend->insertUserDocument(opCtx.get(),
+                                              BSON("_id"
+                                                   << "admin.myUser"
+                                                   << "user"
+                                                   << "myUser"
+                                                   << "db"
+                                                   << "test"
+                                                   << "credentials" << credentials << "roles"
+                                                   << BSON_ARRAY(BSON("role"
+                                                                      << "myRole"
+                                                                      << "db"
+                                                                      << "test"))
+                                                   << "inheritedPrivileges"
+                                                   << BSON_ARRAY(BSON("resource"
+                                                                      << BSON("db"
+                                                                              << "test"
+                                                                              << "collection"
+                                                                              << "")
+                                                                      << "actions"
+                                                                      << BSON_ARRAY("find"
+                                                                                    << "fakeAction"
+                                                                                    << "insert")))),
+                                              BSONObj()));
 
     auto swu = authzManager->acquireUser(
         opCtx.get(), std::make_unique<UserRequestGeneral>(UserName("myUser", "test"), boost::none));
@@ -434,7 +440,7 @@ TEST_F(AuthorizationManagerTest, testRefreshExternalV2User) {
                                            << "test")};
 
     for (const auto& userDoc : userDocs) {
-        ASSERT_OK(externalState->insertUserDocument(opCtx.get(), userDoc, BSONObj()));
+        ASSERT_OK(mockBackend->insertUserDocument(opCtx.get(), userDoc, BSONObj()));
     }
 
     // Acquire these users to force the AuthorizationManager to load these users into the user
@@ -465,12 +471,12 @@ TEST_F(AuthorizationManagerTest, testRefreshExternalV2User) {
     for (const auto& userDoc : userDocs) {
         BSONObj updateQuery = BSON("user" << userDoc.getStringField(kUserFieldName));
         ASSERT_OK(
-            externalState->updateOne(opCtx.get(),
-                                     NamespaceString::kAdminUsersNamespace,
-                                     updateQuery,
-                                     BSON("$set" << BSON("roles" << BSON_ARRAY(updatedRoles[0]))),
-                                     true,
-                                     BSONObj()));
+            mockBackend->updateOne(opCtx.get(),
+                                   NamespaceString::kAdminUsersNamespace,
+                                   updateQuery,
+                                   BSON("$set" << BSON("roles" << BSON_ARRAY(updatedRoles[0]))),
+                                   true,
+                                   BSONObj()));
     }
 
     // Refresh all external entries in the authorization manager's cache.
@@ -639,13 +645,13 @@ TEST_F(AuthorizationManagerTest, testAuthzManagerExternalStateResolveRoles) {
     std::vector<BSONObj> customRoleDocuments{innerCustomRole, middleCustomRole, outerCustomRole};
 
     for (const auto& roleDoc : customRoleDocuments) {
-        ASSERT_OK(externalState->insertRoleDocument(opCtx.get(), roleDoc, BSONObj()));
+        ASSERT_OK(mockBackend->insertRoleDocument(opCtx.get(), roleDoc, BSONObj()));
     }
 
     // First, resolve all roles (but no privileges or restrictions).
     ResolveRoleOption option{ResolveRoleOption::kRoles()};
     std::vector<RoleName> roleNames{RoleName{"outerTestRole", "admin"}};
-    auto swResolvedData = externalState->resolveRoles(opCtx.get(), roleNames, option);
+    auto swResolvedData = mockBackend->resolveRoles(opCtx.get(), roleNames, option);
     ASSERT_OK(swResolvedData.getStatus());
     auto resolvedData = swResolvedData.getValue();
     ASSERT_TRUE(resolvedData.roles.has_value());
@@ -655,7 +661,7 @@ TEST_F(AuthorizationManagerTest, testAuthzManagerExternalStateResolveRoles) {
 
     // Resolve privileges and roles, no restrictions.
     option.setPrivileges(true /* shouldEnable */);
-    swResolvedData = externalState->resolveRoles(opCtx.get(), roleNames, option);
+    swResolvedData = mockBackend->resolveRoles(opCtx.get(), roleNames, option);
     ASSERT_OK(swResolvedData.getStatus());
     resolvedData = swResolvedData.getValue();
     ASSERT_TRUE(resolvedData.roles.has_value());
@@ -665,7 +671,7 @@ TEST_F(AuthorizationManagerTest, testAuthzManagerExternalStateResolveRoles) {
 
     // Resolve all roles, privileges, and restrictions.
     option.setRestrictions(true /* shouldEnable */);
-    swResolvedData = externalState->resolveRoles(opCtx.get(), roleNames, option);
+    swResolvedData = mockBackend->resolveRoles(opCtx.get(), roleNames, option);
     ASSERT_OK(swResolvedData.getStatus());
     resolvedData = swResolvedData.getValue();
     ASSERT_TRUE(resolvedData.roles.has_value());
@@ -675,7 +681,7 @@ TEST_F(AuthorizationManagerTest, testAuthzManagerExternalStateResolveRoles) {
 
     // Resolve only direct roles, privileges, and restrictions.
     option.setDirectOnly(true /* shouldEnable */);
-    swResolvedData = externalState->resolveRoles(opCtx.get(), roleNames, option);
+    swResolvedData = mockBackend->resolveRoles(opCtx.get(), roleNames, option);
     ASSERT_OK(swResolvedData.getStatus());
     resolvedData = swResolvedData.getValue();
     ASSERT_TRUE(resolvedData.roles.has_value());

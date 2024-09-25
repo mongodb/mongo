@@ -28,6 +28,8 @@
  */
 #include "mongo/platform/basic.h"
 
+#include "mongo/db/auth/authorization_backend_interface.h"
+#include "mongo/db/auth/authorization_backend_local.h"
 #include "mongo/db/auth/authorization_client_handle.h"
 #include "mongo/db/auth/authorization_client_handle_router.h"
 #include "mongo/db/auth/authorization_client_handle_shard.h"
@@ -58,6 +60,15 @@ AuthorizationManagerFactoryImpl::createClientHandleRouter(Service* service) {
 std::unique_ptr<AuthorizationClientHandle> AuthorizationManagerFactoryImpl::createClientHandleShard(
     Service* service) {
     return std::make_unique<AuthorizationClientHandleShard>();
+}
+
+// TODO SERVER-95189 - move to protected or remove, may need to move this into the
+// AuthorizationManagerImpl class so externally not callable.
+std::unique_ptr<auth::AuthorizationBackendInterface>
+AuthorizationManagerFactoryImpl::createBackendInterface(Service* service) {
+    invariant(service->role().has(ClusterRole::ShardServer) ||
+              service->role().has(ClusterRole::ConfigServer));
+    return std::make_unique<auth::AuthorizationBackendLocal>();
 }
 
 namespace {

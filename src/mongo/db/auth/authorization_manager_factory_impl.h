@@ -42,6 +42,9 @@ public:
 
     std::unique_ptr<AuthorizationClientHandle> createClientHandleRouter(Service* service) override;
     std::unique_ptr<AuthorizationClientHandle> createClientHandleShard(Service* service) override;
+
+    std::unique_ptr<auth::AuthorizationBackendInterface> createBackendInterface(
+        Service* service) override;
 };
 
 }  // namespace mongo

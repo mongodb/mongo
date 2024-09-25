@@ -193,11 +193,6 @@ public:
     virtual bool isAuthEnabled() const = 0;
 
     /**
-     * Returns whether a schema version document exists.
-     */
-    virtual Status hasValidAuthSchemaVersionDocumentForInitialSync(OperationContext* opCtx) = 0;
-
-    /**
      * Returns via the output parameter "version" the version number of the authorization
      * system.  Returns Status::OK() if it was able to successfully fetch the current
      * authorization version.  If it has problems fetching the most up to date version it
@@ -232,12 +227,6 @@ public:
     virtual Status getUserDescription(OperationContext* opCtx,
                                       const UserName& userName,
                                       BSONObj* result) = 0;
-
-    /**
-     * Returns true if there exists at least one user document in the system. If `tenantId` is set,
-     * only looks for users associated with `tenantId`.
-     */
-    virtual bool hasUser(OperationContext* opCtx, const boost::optional<TenantId>& tenantId) = 0;
 
     /**
      * Delegates method call to the underlying AuthzManagerExternalState.
@@ -281,15 +270,6 @@ public:
                                           AuthenticationRestrictionsFormat,
                                           BSONObj* result) = 0;
 
-    /**
-     * Delegates method call to the underlying AuthzManagerExternalState.
-     */
-    virtual Status getRoleDescriptionsForDB(OperationContext* opCtx,
-                                            const DatabaseName& dbname,
-                                            PrivilegeFormat privilegeFormat,
-                                            AuthenticationRestrictionsFormat,
-                                            bool showBuiltinRoles,
-                                            std::vector<BSONObj>* result) = 0;
 
     /**
      * Returns a Status or UserHandle for the given userRequest. If the user cache already has a
@@ -342,16 +322,6 @@ public:
      */
     virtual Status initialize(OperationContext* opCtx) = 0;
 
-    /**
-     * Hook called by replication code to let the AuthorizationManager observe changes
-     * to relevant collections.
-     */
-    virtual void logOp(OperationContext* opCtx,
-                       StringData opstr,
-                       const NamespaceString& nss,
-                       const BSONObj& obj,
-                       const BSONObj* patt) = 0;
-
     /*
      * Represents a user in the user cache.
      */
@@ -362,6 +332,12 @@ public:
     };
 
     virtual std::vector<CachedUserInfo> getUserCacheInfo() const = 0;
+
+    virtual void logOp(OperationContext* opCtx,
+                       StringData op,
+                       const NamespaceString& ns,
+                       const BSONObj& o,
+                       const BSONObj* o2) = 0;
 };
 
 }  // namespace mongo

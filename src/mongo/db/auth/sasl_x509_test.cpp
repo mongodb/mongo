@@ -38,7 +38,10 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/client/native_sasl_client_session.h"
 #include "mongo/client/sasl_client_session.h"
+#include "mongo/db/auth/authorization_backend_interface.h"
+#include "mongo/db/auth/authorization_backend_local.h"
 #include "mongo/db/auth/authorization_manager.h"
+#include "mongo/db/auth/authorization_manager_factory_mock.h"
 #include "mongo/db/auth/authorization_manager_impl.h"
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/auth/authorization_session_impl.h"
@@ -132,6 +135,10 @@ protected:
             AuthorizationSessionImpl::InstallMockForTestingOrAuthImpl{});
         authzManager = newManager.get();
         AuthorizationManager::set(serviceContext->getService(), std::move(newManager));
+        auto globalAuthzManagerFactory = std::make_unique<AuthorizationManagerFactoryMock>();
+        auth::AuthorizationBackendInterface::set(
+            serviceContext->getService(),
+            globalAuthzManagerFactory->createBackendInterface(serviceContext->getService()));
 
         saslServerSession = std::make_unique<SaslX509ServerMechanism>("$external");
         saslClientSession = std::make_unique<NativeSaslClientSession>();

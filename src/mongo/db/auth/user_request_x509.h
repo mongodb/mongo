@@ -74,8 +74,11 @@ public:
     const SSLPeerInfo& getPeerInfo() const {
         return _peerInfo;
     }
-    StatusWith<std::unique_ptr<UserRequest>> clone() const final {
-        return makeUserRequestX509(getUserName(), getRoles(), getPeerInfo(), false);
+    std::unique_ptr<UserRequest> clone() const final {
+        // Since we are invoking the non-reacquire version of makeUserRequestX509,
+        // we can be certain that the uassert below will not throw.
+        return uassertStatusOK(
+            makeUserRequestX509(getUserName(), getRoles(), getPeerInfo(), false));
     }
 
     StatusWith<std::unique_ptr<UserRequest>> cloneForReacquire() const final {

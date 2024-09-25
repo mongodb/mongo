@@ -64,6 +64,7 @@
 #include "mongo/db/auth/restriction_set.h"
 #include "mongo/db/auth/user.h"
 #include "mongo/db/auth/user_request_x509.h"
+#include "mongo/db/cluster_role.h"
 #include "mongo/db/commands/authentication_commands.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/global_settings.h"
@@ -270,7 +271,6 @@ AuthorizationManagerImpl::AuthorizationManagerImpl(
       }()) {
     _threadPool.startup();
 }
-
 AuthorizationManagerImpl::~AuthorizationManagerImpl() = default;
 
 std::unique_ptr<AuthorizationSession> AuthorizationManagerImpl::makeAuthorizationSession() {
@@ -341,39 +341,6 @@ Status AuthorizationManagerImpl::getUserDescription(OperationContext* opCtx,
                                               CurOp::get(opCtx)->getUserAcquisitionStats());
 }
 
-Status AuthorizationManagerImpl::hasValidAuthSchemaVersionDocumentForInitialSync(
-    OperationContext* opCtx) {
-    BSONObj foundDoc;
-    auto status = _externalState->hasValidStoredAuthorizationVersion(opCtx, &foundDoc);
-
-    if (status == ErrorCodes::NoSuchKey || status == ErrorCodes::TypeMismatch) {
-        std::string msg = str::stream()
-            << "During initial sync, found malformed auth schema version document: "
-            << status.toString() << "; document: " << foundDoc;
-        return Status(ErrorCodes::AuthSchemaIncompatible, msg);
-    }
-
-    if (status.isOK()) {
-        auto version = foundDoc.getIntField(AuthorizationManager::schemaVersionFieldName);
-        if ((version != AuthorizationManager::schemaVersion26Final) &&
-            (version != AuthorizationManager::schemaVersion28SCRAM)) {
-            std::string msg = str::stream()
-                << "During initial sync, found auth schema version " << version
-                << ", but this version of MongoDB only supports schema versions "
-                << AuthorizationManager::schemaVersion26Final << " and "
-                << AuthorizationManager::schemaVersion28SCRAM;
-            return {ErrorCodes::AuthSchemaIncompatible, msg};
-        }
-    }
-
-    return status;
-}
-
-bool AuthorizationManagerImpl::hasUser(OperationContext* opCtx,
-                                       const boost::optional<TenantId>& tenantId) {
-    return _externalState->hasAnyUserDocuments(opCtx, tenantId).isOK();
-}
-
 Status AuthorizationManagerImpl::rolesExist(OperationContext* opCtx,
                                             const std::vector<RoleName>& roleNames) {
     return _externalState->rolesExist(opCtx, roleNames);
@@ -399,18 +366,6 @@ Status AuthorizationManagerImpl::getRolesAsUserFragment(
     AuthenticationRestrictionsFormat restrictions,
     BSONObj* result) {
     return _externalState->getRolesAsUserFragment(opCtx, roleName, restrictions, result);
-}
-
-
-Status AuthorizationManagerImpl::getRoleDescriptionsForDB(
-    OperationContext* opCtx,
-    const DatabaseName& dbname,
-    PrivilegeFormat privileges,
-    AuthenticationRestrictionsFormat restrictions,
-    bool showBuiltinRoles,
-    std::vector<BSONObj>* result) {
-    return _externalState->getRoleDescriptionsForDB(
-        opCtx, dbname, privileges, restrictions, showBuiltinRoles, result);
 }
 
 namespace {
@@ -546,6 +501,14 @@ void AuthorizationManagerImpl::invalidateUserCache() {
     _updateCacheGeneration();
 }
 
+void AuthorizationManagerImpl::logOp(OperationContext* opCtx,
+                                     StringData op,
+                                     const NamespaceString& ns,
+                                     const BSONObj& o,
+                                     const BSONObj* o2) {
+    return _externalState->logOp(opCtx, this, op, ns, o, o2);
+}
+
 Status AuthorizationManagerImpl::refreshExternalUsers(OperationContext* opCtx) {
     LOGV2_DEBUG(5914801, 2, "Refreshing all users from the $external database");
     // First, get a snapshot of the UserHandles in the cache.
@@ -615,16 +578,6 @@ Status AuthorizationManagerImpl::initialize(OperationContext* opCtx) {
 
     invalidateUserCache();
     return Status::OK();
-}
-
-void AuthorizationManagerImpl::logOp(OperationContext* opCtx,
-                                     StringData op,
-                                     const NamespaceString& nss,
-                                     const BSONObj& o,
-                                     const BSONObj* o2) {
-    if (appliesToAuthzData(op, nss, o)) {
-        _externalState->logOp(opCtx, this, op, nss, o, o2);
-    }
 }
 
 std::vector<AuthorizationManager::CachedUserInfo> AuthorizationManagerImpl::getUserCacheInfo()

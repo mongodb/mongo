@@ -69,6 +69,7 @@
 #include "mongo/db/audit.h"
 #include "mongo/db/audit_interface.h"
 #include "mongo/db/auth/auth_op_observer.h"
+#include "mongo/db/auth/authorization_backend_interface.h"
 #include "mongo/db/auth/authorization_manager.h"
 #include "mongo/db/auth/user_cache_invalidator_job.h"
 #include "mongo/db/catalog/collection.h"
@@ -779,11 +780,15 @@ ExitCode _initAndListen(ServiceContext* serviceContext) {
 
     auto const authzManagerShard =
         AuthorizationManager::get(serviceContext->getService(ClusterRole::ShardServer));
+
+    auto authzBackend = auth::AuthorizationBackendInterface::get(
+        serviceContext->getService(ClusterRole::ShardServer));
     {
         TimeElapsedBuilderScopedTimer scopedTimer(serviceContext->getFastClockSource(),
                                                   "Build user and roles graph",
                                                   &startupTimeElapsedBuilder);
         uassertStatusOK(authzManagerShard->initialize(startupOpCtx.get()));
+        uassertStatusOK(authzBackend->initialize(startupOpCtx.get()));
     }
 
     if (audit::initializeManager) {

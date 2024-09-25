@@ -29,9 +29,12 @@
 
 #include "mongo/platform/basic.h"
 
+#include "mongo/db/auth/authorization_manager_factory_mock.h"
+
+#include "mongo/db/auth/authorization_backend_interface.h"
+#include "mongo/db/auth/authorization_backend_mock.h"
 #include "mongo/db/auth/authorization_client_handle_router.h"
 #include "mongo/db/auth/authorization_client_handle_shard.h"
-#include "mongo/db/auth/authorization_manager_factory_mock.h"
 #include "mongo/db/auth/authorization_manager_impl.h"
 #include "mongo/db/auth/authz_manager_external_state_mock.h"
 
@@ -57,6 +60,11 @@ AuthorizationManagerFactoryMock::createClientHandleRouter(Service* service) {
 std::unique_ptr<AuthorizationClientHandle> AuthorizationManagerFactoryMock::createClientHandleShard(
     Service* service) {
     return std::make_unique<AuthorizationClientHandleShard>();
+}
+
+std::unique_ptr<auth::AuthorizationBackendInterface>
+AuthorizationManagerFactoryMock::createBackendInterface(Service* service) {
+    return std::make_unique<auth::AuthorizationBackendMock>();
 }
 
 namespace {
