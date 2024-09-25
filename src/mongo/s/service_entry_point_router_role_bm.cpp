@@ -35,8 +35,12 @@ namespace mongo {
 class ServiceEntryPointRouterRoleBenchmarkFixture : public ServiceEntryPointBenchmarkFixture {
 public:
     void setServiceEntryPoint(ServiceContext* service) const override {
-        service->getService()->setServiceEntryPoint(
-            std::make_unique<ServiceEntryPointRouterRole>());
+        service->getService(getClusterRole())
+            ->setServiceEntryPoint(std::make_unique<ServiceEntryPointRouterRole>());
+    }
+
+    ClusterRole getClusterRole() const override {
+        return ClusterRole::RouterServer;
     }
 };
 

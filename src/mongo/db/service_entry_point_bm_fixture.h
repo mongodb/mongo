@@ -52,6 +52,8 @@ public:
         stdx::lock_guard lk(_setupMutex);
         if (_configuredThreads++)
             return;
+
+        serverGlobalParams.clusterRole = getClusterRole();
         BenchmarkWithProfiler::SetUp(state);
 
         setGlobalServiceContext(ServiceContext::make());
@@ -79,14 +81,18 @@ public:
 
     virtual void setupImpl(ServiceContext* service){};
 
+    virtual ClusterRole getClusterRole() const = 0;
+
     void doRequest(ServiceEntryPoint* sep, Client* client, Message& msg) {
         auto newOpCtx = client->makeOperationContext();
         iassert(sep->handleRequest(newOpCtx.get(), msg).getNoThrow());
     }
 
     void runBenchmark(benchmark::State& state, BSONObj obj) {
-        auto strand = ClientStrand::make(getGlobalServiceContext()->getService()->makeClient(
-            fmt::format("conn{}", _nextClientId.fetchAndAdd(1)), nullptr));
+        auto strand = ClientStrand::make(
+            getGlobalServiceContext()
+                ->getService(getClusterRole())
+                ->makeClient(fmt::format("conn{}", _nextClientId.fetchAndAdd(1)), nullptr));
         OpMsgRequest request;
         request.body = obj;
         auto msg = request.serialize();

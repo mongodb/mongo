@@ -37,7 +37,8 @@ namespace mongo {
 class ServiceEntryPointShardRoleBenchmarkFixture : public ServiceEntryPointBenchmarkFixture {
 public:
     void setServiceEntryPoint(ServiceContext* service) const override {
-        service->getService()->setServiceEntryPoint(std::make_unique<ServiceEntryPointShardRole>());
+        service->getService(getClusterRole())
+            ->setServiceEntryPoint(std::make_unique<ServiceEntryPointShardRole>());
     }
 
     void setupImpl(ServiceContext* service) override {
@@ -45,6 +46,10 @@ public:
         // Transition to primary so that the server can accept writes.
         invariant(replCoordMock->setFollowerMode(repl::MemberState::RS_PRIMARY));
         repl::ReplicationCoordinator::set(service, std::move(replCoordMock));
+    }
+
+    ClusterRole getClusterRole() const override {
+        return ClusterRole::ShardServer;
     }
 };
 
