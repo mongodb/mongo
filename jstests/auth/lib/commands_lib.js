@@ -7372,6 +7372,78 @@ export const authCommandsLib = {
           },
       ]
       },
+      {
+        testname: "aggregate_$rankFusion",
+        command: {
+            aggregate: "foo",
+            cursor: {},
+            pipeline: [{
+              $rankFusion: {
+                inputs: [
+                  {
+                    pipeline: [
+                      {
+                        $geoNear: {near: [50, 50], distanceField: "dist"}
+                      },
+                      {
+                        $limit: 2
+                      }
+                    ]
+                  },
+                  {
+                    pipeline: [
+                      {
+                        $match: {a: 1}
+                      },
+                      {
+                        $sort: {x: 1}
+                      },
+                    ]
+                  },
+                  {
+                    pipeline: [
+                      {
+                        $search: {
+                          // empty query
+                        }
+                      }
+                    ]
+                  },
+                  {
+                    pipeline: [
+                      {
+                        $vectorSearch: {
+                          // empty query
+                        }
+                      }
+                    ]
+                  }
+                ]
+              }
+          }]
+        },
+        setup: function(db) {
+          db.createCollection("foo");
+        },
+        skipSharded: false,
+        disableSearch: true,
+        skipTest: (conn) => {
+          return !TestData.setParameters.featureFlagSearchHybridScoring;
+        },
+        testcases: [
+          {
+            runOnDb: firstDbName,
+            roles: roles_read,
+            privileges: [{resource: {db: firstDbName, collection: "foo"}, actions: ["find"]}]
+          },
+          {
+            runOnDb: secondDbName,
+            roles: roles_readAny,
+            privileges:
+                [{resource: {db: secondDbName, collection: "foo"}, actions: ["find"]}]
+          },
+        ]
+      },
     ],
 
     /************* SHARED TEST LOGIC ****************/

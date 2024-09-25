@@ -28,7 +28,8 @@
  */
 
 #include "mongo/base/string_data.h"
-#include "mongo/db/pipeline/search/document_source_vector_search.h"
+#include "mongo/db/pipeline/lite_parsed_document_source.h"
+#include "mongo/db/pipeline/lite_parsed_pipeline.h"
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 
 #include "mongo/base/error_codes.h"
@@ -38,7 +39,6 @@
 #include "mongo/db/pipeline/document_source_rank_fusion.h"
 #include "mongo/db/pipeline/document_source_sort.h"
 #include "mongo/db/pipeline/expression_context.h"
-#include "mongo/db/pipeline/lite_parsed_document_source.h"
 #include "mongo/db/pipeline/pipeline.h"
 #include "mongo/db/pipeline/search/document_source_search.h"
 #include "mongo/db/pipeline/search/document_source_vector_search.h"
@@ -47,7 +47,7 @@
 namespace mongo {
 
 REGISTER_DOCUMENT_SOURCE_WITH_FEATURE_FLAG(rankFusion,
-                                           LiteParsedDocumentSourceDefault::parse,
+                                           DocumentSourceRankFusion::LiteParsed::parse,
                                            DocumentSourceRankFusion::createFromBson,
                                            AllowedWithApiStrict::kNeverInVersion1,
                                            feature_flags::gFeatureFlagSearchHybridScoring);
@@ -106,6 +106,21 @@ static void rankFusionPipelineValidator(const Pipeline& pipeline) {
     });
 }
 }  // namespace
+
+std::unique_ptr<DocumentSourceRankFusion::LiteParsed> DocumentSourceRankFusion::LiteParsed::parse(
+    const NamespaceString& nss, const BSONElement& spec) {
+    std::vector<LiteParsedPipeline> liteParsedPipelines;
+
+    auto parsedSpec = RankFusionSpec::parse(IDLParserContext(kStageName), spec.embeddedObject());
+
+    // Ensure that all pipelines are valid ranked selection pipelines.
+    for (const auto& input : parsedSpec.getInputs()) {
+        liteParsedPipelines.emplace_back(LiteParsedPipeline(nss, input.getPipeline()));
+    }
+
+    return std::make_unique<DocumentSourceRankFusion::LiteParsed>(spec.fieldName(),
+                                                                  std::move(liteParsedPipelines));
+}
 
 std::list<boost::intrusive_ptr<DocumentSource>> DocumentSourceRankFusion::createFromBson(
     BSONElement elem, const boost::intrusive_ptr<ExpressionContext>& pExpCtx) {

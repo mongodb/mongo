@@ -58,6 +58,21 @@ public:
     static std::list<boost::intrusive_ptr<DocumentSource>> createFromBson(
         BSONElement elem, const boost::intrusive_ptr<ExpressionContext>& pExpCtx);
 
+    class LiteParsed final : public LiteParsedDocumentSourceNestedPipelines {
+    public:
+        static std::unique_ptr<LiteParsed> parse(const NamespaceString& nss,
+                                                 const BSONElement& spec);
+
+        LiteParsed(std::string parseTimeName, std::vector<LiteParsedPipeline> pipelines)
+            : LiteParsedDocumentSourceNestedPipelines(
+                  std::move(parseTimeName), boost::none, std::move(pipelines)) {}
+
+        PrivilegeVector requiredPrivileges(bool isMongos,
+                                           bool bypassDocumentValidation) const final {
+            return requiredPrivilegesBasic(isMongos, bypassDocumentValidation);
+        };
+    };
+
 private:
     // It is illegal to construct a DocumentSourceRankFusion directly, use createFromBson() instead.
     DocumentSourceRankFusion() = default;

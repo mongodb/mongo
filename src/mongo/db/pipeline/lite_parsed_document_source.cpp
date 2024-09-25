@@ -168,4 +168,14 @@ ReadConcernSupportResult LiteParsedDocumentSourceNestedPipelines::supportsReadCo
     return result;
 }
 
+PrivilegeVector LiteParsedDocumentSourceNestedPipelines::requiredPrivilegesBasic(
+    bool isMongos, bool bypassDocumentValidation) const {
+    PrivilegeVector requiredPrivileges;
+    for (auto&& pipeline : _pipelines) {
+        Privilege::addPrivilegesToPrivilegeVector(
+            &requiredPrivileges, pipeline.requiredPrivileges(isMongos, bypassDocumentValidation));
+    }
+    return requiredPrivileges;
+}
+
 }  // namespace mongo

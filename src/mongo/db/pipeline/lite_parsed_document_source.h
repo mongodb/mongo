@@ -372,6 +372,11 @@ public:
                                                  bool isImplicitDefault) const override;
 
 protected:
+    /**
+     * Simple implementation that only gets the privileges needed by children pipelines.
+     */
+    PrivilegeVector requiredPrivilegesBasic(bool isMongos, bool bypassDocumentValidation) const;
+
     boost::optional<NamespaceString> _foreignNss;
     std::vector<LiteParsedPipeline> _pipelines;
 };

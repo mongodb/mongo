@@ -105,14 +105,8 @@ public:
 
         PrivilegeVector requiredPrivileges(bool isMongos,
                                            bool bypassDocumentValidation) const final {
-            PrivilegeVector requiredPrivileges;
-            for (auto&& pipeline : _pipelines) {
-                Privilege::addPrivilegesToPrivilegeVector(
-                    &requiredPrivileges,
-                    pipeline.requiredPrivileges(isMongos, bypassDocumentValidation));
-            }
-            return requiredPrivileges;
-        }
+            return requiredPrivilegesBasic(isMongos, bypassDocumentValidation);
+        };
     };
 
     static boost::intrusive_ptr<DocumentSource> createFromBson(
