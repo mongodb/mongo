@@ -12,9 +12,6 @@
  *   # During fcv upgrade/downgrade the index created might not be what we expect.
  *   # TODO SERVER-79304 remove this tag.
  *   cannot_run_during_upgrade_downgrade,
- *   # TODO SERVER-89705 a concurrent moveCollection can cause the default index to have the
- *   # collation in the new collection causing some assertions to fail.
- *   assumes_balancer_off,
  * ]
  */
 import {
