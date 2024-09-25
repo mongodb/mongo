@@ -275,7 +275,8 @@ assert = (function() {
             return;
         }
 
-        doassert(_buildAssertionMessage(msg, "[" + a + "] != [" + b + "] are equal"));
+        doassert(
+            _buildAssertionMessage(msg, "[" + tojson(a) + "] == [" + tojson(b) + "] are equal"));
     };
 
     assert.hasFields = function(result, arr, msg) {
