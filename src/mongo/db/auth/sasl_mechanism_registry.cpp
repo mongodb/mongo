@@ -194,7 +194,9 @@ Service::ConstructorActionRegisterer SASLServerMechanismRegistryInitializer{
     }};
 
 Service::ConstructorActionRegisterer SASLServerMechanismRegistryValidationInitializer{
-    "ValidateSASLServerMechanismRegistry", [](Service* service) {
+    "ValidateSASLServerMechanismRegistry",
+    {"CreateSASLServerMechanismRegistry"},
+    [](Service* service) {
         auto supportedMechanisms = SASLServerMechanismRegistry::get(service).getMechanismNames();
 
         // Manually include MONGODB-X509 since there is no factory for it since it not a SASL
