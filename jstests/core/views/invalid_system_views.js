@@ -17,6 +17,9 @@
  *   tenant_migration_incompatible,
  *   uses_compact,
  *   references_foreign_collection,
+ *   # The test leaves the database in a broken state such that listCollections will fail and
+ *   # trigger a validation failure.
+ *   antithesis_incompatible,
  * ]
  */
 import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
