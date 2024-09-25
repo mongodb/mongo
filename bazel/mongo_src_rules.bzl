@@ -1049,6 +1049,8 @@ GDWARF_FEATURES = select({
     # -gdwarf64 was supported. If this creates incompatibility issues, we may
     # need to fallback to -gdwarf32 in certain cases.
     "//bazel/config:linux_gcc": ["dwarf64"],
+    # SUSE15 builds system libraries with dwarf32, use dwarf32 to be keep consistent
+    "//bazel/config:suse15_gcc": ["dwarf32"],
     "//conditions:default": [],
 })
 

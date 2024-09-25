@@ -98,12 +98,25 @@ selects.config_setting_group(
     ],
 )
 
-selects.config_setting_group(
+config_setting(
     name = "linux_gcc",
-    match_all = [
+    constraint_values = [
         "@platforms//os:linux",
-        ":compiler_type_gcc",
     ],
+    flag_values = {
+        "//bazel/config:compiler_type": "gcc",
+    },
+)
+
+config_setting(
+    name = "suse15_gcc",
+    constraint_values = [
+        "@platforms//os:linux",
+        "//bazel/platforms:suse15",
+    ],
+    flag_values = {
+        "//bazel/config:compiler_type": "gcc",
+    },
 )
 
 selects.config_setting_group(
