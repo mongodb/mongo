@@ -823,6 +823,9 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 # The following patterns are parsed from ./src/mongo/db/query/collation/OWNERS.yml
 /src/mongo/db/query/collation/**/* @10gen/query-execution @svc-auto-approve-bot
 
+# The following patterns are parsed from ./src/mongo/db/query/cost_based_ranker/OWNERS.yml
+/src/mongo/db/query/cost_based_ranker/**/* @10gen/query-optimization @svc-auto-approve-bot
+
 # The following patterns are parsed from ./src/mongo/db/query/datetime/OWNERS.yml
 /src/mongo/db/query/datetime/**/* @10gen/query-execution @svc-auto-approve-bot
 
