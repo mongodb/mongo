@@ -116,23 +116,23 @@ public:
                 "Sharding a Queryable Encryption state collection is not allowed",
                 !nss.isFLE2StateCollection());
 
-        // Parse the cluster request using the shardsvr request. This ensures the cluster and the
-        // shardsvr requests are always compatible.
-        auto shardsvrRequest =
-            ShardsvrCreateCollectionRequest::parse(IDLParserContext("ShardCollection"), cmdObj);
+        auto clusterRequest = ShardCollection::parse(IDLParserContext(""), cmdObj);
+        ShardsvrCreateCollectionRequest serverRequest;
+        serverRequest.setShardKey(clusterRequest.getKey());
+        serverRequest.setUnique(clusterRequest.getUnique());
+        serverRequest.setNumInitialChunks(clusterRequest.getNumInitialChunks());
+        serverRequest.setPresplitHashedZones(clusterRequest.getPresplitHashedZones());
+        serverRequest.setCollation(clusterRequest.getCollation());
+        serverRequest.setTimeseries(clusterRequest.getTimeseries());
+        serverRequest.setCollectionUUID(clusterRequest.getCollectionUUID());
+        serverRequest.setImplicitlyCreateIndex(clusterRequest.getImplicitlyCreateIndex());
+        serverRequest.setEnforceUniquenessCheck(clusterRequest.getEnforceUniquenessCheck());
 
-        auto clusterRequest = ShardCollection::parse(IDLParserContext("ShardCollection"), cmdObj);
-        shardsvrRequest.setShardKey(clusterRequest.getKey());
-        shardsvrRequest.setCollation(clusterRequest.getCollation());
-        shardsvrRequest.setPresplitHashedZones(clusterRequest.getPresplitHashedZones());
-        shardsvrRequest.setUnique(clusterRequest.getUnique());
-        shardsvrRequest.setNumInitialChunks(clusterRequest.getNumInitialChunks());
+        ShardsvrCreateCollection shardsvrCreateCommand(nss);
+        shardsvrCreateCommand.setShardsvrCreateCollectionRequest(std::move(serverRequest));
+        shardsvrCreateCommand.setDbName(nss.dbName());
 
-        ShardsvrCreateCollection shardsvrCollCmd(nss);
-        shardsvrCollCmd.setShardsvrCreateCollectionRequest(std::move(shardsvrRequest));
-        shardsvrCollCmd.setDbName(nss.dbName());
-
-        cluster::createCollection(opCtx, shardsvrCollCmd);
+        cluster::createCollection(opCtx, std::move(shardsvrCreateCommand));
 
         // Add only collectionsharded as a response parameter and remove the version to maintain the
         // same format as before.
