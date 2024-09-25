@@ -2,7 +2,6 @@
  * Tests explain for $search with a subpipeline ($unionWith and $lookup).
  * @tags: [
  * featureFlagSearchExplainExecutionStats,
- * requires_mongot_1_39
  * ]
  */
 

@@ -123,3 +123,48 @@ export function verifyE2ESearchMetaExplainOutput(
         });
     }
 }
+
+/**
+ * Generates an array of random values from [-1, 1). Useful for explain when the actual documents
+ * and scoring for $vectorSearch does not matter.
+ *
+ * @param {*} n length of array
+ * @returns array of random values from [-1, 1]
+ */
+export function generateRandomVectorEmbedding(n) {
+    // Generates array of random values from [-1, 1)
+    let embedding = Array.from({length: n}, function() {
+        return Math.random() * 2 - 1;
+    });
+    return embedding;
+}
+
+/**
+ * This function checks that the explain output for $vectorSearch queries from an e2e test contains
+ * the information that it should.
+ *
+ * In the sharded scenario, make sure the collection has enough documents to return the limit for
+ * each shard.
+ * @param {Object} explainOutput the results from running coll.explain().aggregate([[$vectorSearch:
+ *     ....], ...])
+ * @param {string} stageType ex. "$vectorSearch", $_internalSearchMongotRemote" ,
+ * @param {NumberLong} limit The limit for the $vectorSearch query. In a sharded scenario, this
+ *     applies per shard.
+ * @param {string} verbosity The verbosity of explain. "nReturned" and "executionTimeMillisEstimate"
+ *     will not be checked for 'queryPlanner' verbosity "
+ */
+export function verifyE2EVectorSearchExplainOutput({explainOutput, stageType, limit, verbosity}) {
+    let stages = getAggPlanStages(explainOutput, stageType);
+    // For $vectorSearch, the limit in the query is applied per shard. This means that nReturned for
+    // each shard should match the limit. We don't need to differentiate between the sharded and
+    // unsharded scenario.
+    for (let stage of stages) {
+        validateMongotStageExplainExecutionStats({
+            stage: stage,
+            stageType: stageType,
+            nReturned: limit,
+            verbosity: verbosity,
+            isE2E: true
+        });
+    }
+}

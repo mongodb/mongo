@@ -2,7 +2,6 @@
  * Tests explain for $search.
  * @tags: [
  * featureFlagSearchExplainExecutionStats,
- * requires_mongot_1_39
  * ]
  */
 import {
