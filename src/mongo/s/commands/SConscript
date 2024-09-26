@@ -294,6 +294,7 @@ env.CppUnitTest(
         "query_cmd/cluster_bulk_write_test.cpp",
         "query_cmd/cluster_delete_test.cpp",
         "query_cmd/cluster_distinct_test.cpp",
+        "query_cmd/cluster_explain_test.cpp",
         "query_cmd/cluster_find_and_modify_test.cpp",
         "query_cmd/cluster_find_test.cpp",
         "query_cmd/cluster_insert_test.cpp",

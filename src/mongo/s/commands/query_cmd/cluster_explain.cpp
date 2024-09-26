@@ -38,7 +38,6 @@
 #include "mongo/bson/bsontypes.h"
 #include "mongo/bson/util/builder.h"
 #include "mongo/client/connection_string.h"
-#include "mongo/db/commands.h"
 #include "mongo/db/query/explain_common.h"
 #include "mongo/db/shard_id.h"
 #include "mongo/executor/remote_command_response.h"
@@ -130,27 +129,39 @@ void throwOnBadARSResponse(const AsyncRequestsSender::Response& arsResponse) {
 BSONObj ClusterExplain::wrapAsExplain(const BSONObj& cmdObj,
                                       ExplainOptions::Verbosity verbosity,
                                       const BSONObj& querySettings) {
-    const auto filtered = [&]() {
-        BSONObjIterator cmdIter(cmdObj);
-        BSONObjBuilder explainBuilder;
-        CommandHelpers::filterCommandRequestForPassthrough(&cmdIter, &explainBuilder);
-
-        // Propagate query settings if there are any.
-        if (!querySettings.isEmpty()) {
-            explainBuilder.append("querySettings", querySettings);
-        }
-        return explainBuilder.obj();
-    }();
     BSONObjBuilder out;
-    out.append("explain", filtered);
-    out.append("verbosity", ExplainOptions::verbosityString(verbosity));
-
-    // Propagate all generic arguments out of the inner command since the shards will only process
-    // them at the top level.
-    for (auto elem : filtered) {
-        if (isGenericArgument(elem.fieldNameStringData())) {
-            out.append(elem);
+    // Prune generic arguments out of the inner command since any relevant ones should already
+    // be provided to the outer explain command. The shards will only process them at the top level.
+    // As an exception, the "comment" parameter will be propagated out of the inner command to
+    // maintain the behavior in our documentation:
+    // https://www.mongodb.com/docs/manual/reference/command/explain/.
+    // The "readConcern" parameter will also be propagated out of the inner command as the final
+    // explain command inherits readConcern from the inner command invocation.
+    BSONObjBuilder explainBuilder = out.subobjStart("explain");
+    BSONElement commentField;
+    BSONElement readConcernField;
+    for (auto&& elem : cmdObj) {
+        const auto& fieldName = elem.fieldNameStringData();
+        if (!isGenericArgument(fieldName)) {
+            explainBuilder.append(elem);
+        } else if (fieldName == "comment"_sd) {
+            commentField = elem;
+        } else if (fieldName == "readConcern"_sd) {
+            readConcernField = elem;
         }
+    }
+    // Propagate query settings if there are any.
+    if (!querySettings.isEmpty()) {
+        explainBuilder.append("querySettings", querySettings);
+    }
+    explainBuilder.done();
+
+    out.append("verbosity", ExplainOptions::verbosityString(verbosity));
+    if (commentField) {
+        out.append(commentField);
+    }
+    if (readConcernField) {
+        out.append(readConcernField);
     }
 
     return out.obj();
