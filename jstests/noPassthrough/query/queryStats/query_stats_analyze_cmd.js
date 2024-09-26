@@ -1,7 +1,5 @@
 /**
  *  Tests that query stats won't be collected for the 'analyze' command.
- *
- * @tags: [featureFlagCommonQueryFramework]
  */
 import {
     getQueryStats,

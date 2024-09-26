@@ -5,7 +5,6 @@
 # by modifying their respective definitions in evergreen.yml.
 
 - featureFlagFryer
-- featureFlagCommonQueryFramework
 # This flag exists to help users in managed environments that upgraded to 6.0 before 6.0.0-rc8 was
 # released create the transactions collection index and is only meant to be enabled adhoc, so only
 # its targeted tests should enable it.

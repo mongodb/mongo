@@ -30,12 +30,6 @@ global:
   cpp_namespace: "mongo::feature_flags"
 
 feature_flags:
-    featureFlagCommonQueryFramework:
-      description: "Feature flag for allowing use of Cascades-based query optimizer"
-      cpp_varname: gFeatureFlagCommonQueryFramework
-      default: false
-      shouldBeFCVGated: false
-
     featureFlagColumnstoreIndexes:
       description: "Enables creation of a new columnstore index type"
       cpp_varname: gFeatureFlagColumnstoreIndexes

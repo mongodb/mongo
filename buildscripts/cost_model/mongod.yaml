@@ -5,7 +5,6 @@ systemLog:
   destination: file
   logAppend: false
 setParameter:
-  featureFlagCommonQueryFramework: true
   internalQueryFrameworkControl: "tryBonsaiExperimental"
   internalMeasureQueryExecutionTimeInNanoseconds: true
   enableTestCommands: 1

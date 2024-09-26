@@ -1,7 +1,7 @@
 /**
  * @tags: [featureFlagSbeFull]
  */
-const conn = MongoRunner.runMongod({setParameter: {featureFlagCommonQueryFramework: true}});
+const conn = MongoRunner.runMongod();
 assert.neq(null, conn, "mongod was unable to start up");
 
 const db = conn.getDB(jsTestName());

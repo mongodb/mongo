@@ -4,14 +4,7 @@
 
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
-const st = new ShardingTest({
-    shards: 2,
-    mongos: 1,
-    other: {
-        shardOptions: {setParameter: {featureFlagCommonQueryFramework: true}},
-        mongosOptions: {setParameter: {featureFlagCommonQueryFramework: true}}
-    }
-});
+const st = new ShardingTest({shards: 2, mongos: 1});
 
 const db = st.getDB("test");
 const coll = db.analyze_coll;

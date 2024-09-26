@@ -94,18 +94,7 @@ class DatabaseInstance:
         )
 
     async def enable_cascades(self, state: bool) -> None:
-        """Enable new query optimizer. Requires featureFlagCommonQueryFramework set to True."""
-
-        # Set FeatureCompatibilityVersion compatible with featureFlagCommonQueryFramework.
-        version = (
-            await self.client.admin.command(
-                {"getParameter": 1, "featureFlagCommonQueryFramework": 1}
-            )
-        )["featureFlagCommonQueryFramework"]["version"]
-        await self.client.admin.command(
-            {"setFeatureCompatibilityVersion": version, "confirm": True}
-        )
-
+        """Enable new query optimizer."""
         await self.client.admin.command(
             {"configureFailPoint": "enableExplainInBonsai", "mode": "alwaysOn"}
         )

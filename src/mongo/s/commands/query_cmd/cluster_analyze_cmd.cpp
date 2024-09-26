@@ -94,11 +94,6 @@ public:
         }
 
         void typedRun(OperationContext* opCtx) {
-            uassert(6765500,
-                    "Analyze command requires common query framework feature flag to be enabled",
-                    feature_flags::gFeatureFlagCommonQueryFramework.isEnabled(
-                        serverGlobalParams.featureCompatibility.acquireFCVSnapshot()));
-
             const NamespaceString& nss = ns();
 
             auto cri = uassertStatusOK(
@@ -140,7 +135,7 @@ public:
         }
     };
 };
-MONGO_REGISTER_COMMAND(ClusterAnalyzeCmd).forRouter();
+MONGO_REGISTER_COMMAND(ClusterAnalyzeCmd).forRouter().testOnly();
 
 }  // namespace
 }  // namespace mongo

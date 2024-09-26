@@ -8,5 +8,6 @@ export const testOnlyCommands = [
     'cpuload',
     'sysprofile',
     '_dropConnectionsToMongot',
-    '_mongotConnPoolStats'
+    '_mongotConnPoolStats',
+    'analyze'
 ];
