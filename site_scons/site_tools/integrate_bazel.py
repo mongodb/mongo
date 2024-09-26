@@ -688,6 +688,14 @@ def auto_install_bazel(env, libdep, shlib_suffix):
         with open(os.path.join(env.Dir("#").abspath, linkfile)) as f:
             query_results = f.read()
 
+        filtered_results = ""
+        for lib in query_results.splitlines():
+            bazel_out_path = lib.replace(f"{env['BAZEL_OUT_DIR']}/src", "bazel-bin/src")
+            if os.path.exists(env.File("#/" + bazel_out_path + ".exclude_lib").abspath):
+                continue
+            filtered_results += lib + "\n"
+        query_results = filtered_results
+
         env.AddBazelDepsCache(bazel_target, query_results)
 
     for line in query_results.splitlines():

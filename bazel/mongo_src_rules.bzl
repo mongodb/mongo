@@ -2006,8 +2006,9 @@ def mongo_proto_library(
     )
 
     dummy_file(
-        name = name + "_dummy_debug_symbol",
-        output = "lib" + name + ".so.debug",
+        name = name + "_exclude_link",
+        output = "lib" + name + ".so.exclude_lib",
+        tags = ["scons_link_lists"],
     )
 
 def mongo_cc_proto_library(
@@ -2018,11 +2019,6 @@ def mongo_cc_proto_library(
         name = name,
         deps = deps,
         **kwargs
-    )
-
-    dummy_file(
-        name = name + "_dummy_debug_symbol",
-        output = "lib" + name + ".so.debug",
     )
 
 def mongo_cc_grpc_library(
