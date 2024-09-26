@@ -793,6 +793,13 @@ public:
         }
     }
 
+    /**
+     * Returns BSON types Timestamp and Date as Timestamp.
+     *
+     * This can be dangerous if the result is used for comparisons as Timestamp is an unsigned type
+     * where Date is signed. Instead, consider using date() when a timestamp before the unix epoch
+     * is possible.
+     */
     Timestamp timestamp() const {
         if (type() == mongo::Date || type() == bsonTimestamp) {
             return Timestamp(ConstDataView(value()).read<LittleEndian<unsigned long long>>().value);
