@@ -366,9 +366,12 @@ def generate_flow_control_parameters(rng, ret, flow_control_params, params):
     # Assigning flow control parameters.
     ret["enableFlowControl"] = rng.choice(params["enableFlowControl"]["choices"])
     if ret["enableFlowControl"]:
-        ret["flowControlThresholdLagPercentage"] = rng.random()
         for name in flow_control_params:
-            ret[name] = rng.randint(params[name]["min"], params[name]["max"])
+            if "isUniform" in params[name]:
+                ret[name] = rng.uniform(params[name]["min"], params[name]["max"])
+            else:
+                ret[name] = rng.randint(params[name]["min"], params[name]["max"])
+        ret["flowControlThresholdLagPercentage"] = rng.random()
     return ret
 
 
@@ -380,11 +383,16 @@ def generate_mongod_parameters(rng, fuzzer_stress_mode):
 
     # Parameter sets with different behaviors.
     flow_control_params = [
+        "flowControlTicketAdderConstant",
+        "flowControlDecayConstant",
+        "flowControlFudgeFactor",
         "flowControlMaxSamples",
         "flowControlMinTicketsPerSecond",
+        "flowControlTicketMultiplierConstant",
         "flowControlSamplePeriod",
         "flowControlTargetLagSeconds",
         "flowControlThresholdLagPercentage",
+        "flowControlWarnThresholdSeconds",
     ]
 
     # excluded_normal_params are params that we want to exclude from the for-loop because they have some different assignment behavior

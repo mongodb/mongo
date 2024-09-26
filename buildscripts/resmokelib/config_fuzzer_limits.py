@@ -56,11 +56,19 @@ config_fuzzer_params = {
     "mongod": {
         "analyzeShardKeySplitPointExpirationSecs": {"min": 1, "max": 300},
         "chunkMigrationConcurrency": {"choices": [1, 4, 16], "min": 1, "max": 16},
+        "collectionSamplingLogIntervalSeconds": {"min": 5, "max": 15},
         "disableLogicalSessionCacheRefresh": {
             "choices": [True, False],
         },
         "enableAutoCompaction": {
             "choices": [True, False],
+        },
+        "enableTemporarilyUnavailableExceptions": {
+            "choices": [True, False],
+        },
+        "indexBuildMinAvailableDiskSpaceMB": {
+            "min": 250,
+            "max": 750,
         },
         "initialServiceExecutorUseDedicatedThread": {
             "choices": [True, False],
@@ -72,6 +80,10 @@ config_fuzzer_params = {
         "initialSyncSourceReadPreference": {
             "choices": ["nearest", "primary", "primaryPreferred", "secondaryPreferred"],
         },
+        "internalInsertMaxBatchSize": {
+            "min": 1,
+            "max": 750,
+        },
         # internalQueryExecYieldIterations takes a weighted random choice with a rand int generated betwen the lower_bound and upper_bound and 1.
         "internalQueryExecYieldIterations": {
             "min": 1,
@@ -81,6 +93,10 @@ config_fuzzer_params = {
         },
         "internalQueryExecYieldPeriodMS": {"min": 1, "max": 100},
         "internalQueryFindCommandBatchSize": {"min": 1, "max": 500},
+        "journalCommitInterval": {
+            "min": 50,
+            "max": 250,
+        },
         "lockCodeSegmentsInMemory": {"choices": [True, False]},
         "logicalSessionRefreshMillis": {
             "choices": [100, 1000, 10_000, 100_000],
@@ -93,6 +109,11 @@ config_fuzzer_params = {
             "choices": [1, 10, 100],
             "min": 1,
             "max": 1000,
+        },
+        "maxNumActiveUserIndexBuilds": {"min": 1, "max": 5},
+        "operationMemoryPoolBlockMaxSizeKB": {
+            "min": 1024,
+            "max": 2048,
         },
         "oplogFetcherUsesExhaust": {
             "choices": [True, False],
@@ -110,6 +131,8 @@ config_fuzzer_params = {
             "choices": ["throughputProbing", "fixedConcurrentTransactions"],
         },
         "storageEngineConcurrencyAdjustmentIntervalMillis": {"min": 10, "max": 1000},
+        "temporarilyUnavailableBackoffBaseMs": {"min": 1, "max": 1000},
+        "temporarilyUnavailableMaxRetries": {"min": 1, "max": 10},
         # throughputProbingConcurrencyMovingAverageWeight is 1 - rng.random(), so the min is NOT inclusive.
         "throughputProbingConcurrencyMovingAverageWeight": {"min": 0.0, "max": 1.0},
         "throughputProbingInitialConcurrency": {"min": 4, "max": 128},
@@ -120,6 +143,7 @@ config_fuzzer_params = {
         },
         "throughputProbingReadWriteRatio": {"min": 0, "max": 1, "isUniform": True},
         "throughputProbingStepMultiple": {"min": 0.1, "max": 0.5, "isUniform": True},
+        "transactionTooLargeForCacheThreshold": {"min": 0.5, "max": 1, "isUniform": True},
         "wiredTigerStressConfig": {
             "choices": [True, False],
         },
@@ -133,15 +157,25 @@ config_fuzzer_params = {
         "mirrorReads": {"choices": [0, 0.25, 0.50, 0.75, 1.0], "min": 0, "max": 1},
         # Flow control related parameters
         "enableFlowControl": {"choices": [True, False]},
+        "flowControlTicketAdderConstant": {"min": 500, "max": 1000},
+        "flowControlDecayConstant": {"min": 0.1, "max": 1, "isUniform": True},
+        "flowControlFudgeFactor": {"min": 0.9, "max": 1, "isUniform": True},
         "flowControlMaxSamples": {"min": 1, "max": 1000 * 1000},
         "flowControlMinTicketsPerSecond": {"min": 1, "max": 10 * 1000},
+        "flowControlTicketMultiplierConstant": {"min": 1.01, "max": 1.09, "isUniform": True},
         "flowControlSamplePeriod": {"min": 1, "max": 1000 * 1000},
         "flowControlTargetLagSeconds": {"min": 1, "max": 1000},
         # flowControlThresholdLagPercentage is found by calling rng.random(), which means the max is NOT inclusive.
         "flowControlThresholdLagPercentage": {"min": 0.0, "max": 1.0},
+        "flowControlWarnThresholdSeconds": {"min": 5, "max": 15},
         # We need a higher timeout to account for test slowness
         "receiveChunkWaitForRangeDeleterTimeoutMS": {"default": 300_000},
         "defaultConfigCommandTimeoutMS": {"default": 90_000},
+        "maxSizeOfBatchedInsertsForRenameAcrossDatabasesBytes": {
+            "min": 2_097_152,
+            "max": 6_291_456,
+        },
+        "maxNumberOfInsertsBatchInsertsForRenameAcrossDatabases": {"min": 1, "max": 1000},
         # These parameters have a min, max, and a choice with one value because we first find rng.randint(min, max)
         # and then add this value to the choices array and call rng.choices(choices).
         "minSnapshotHistoryWindowInSeconds": {
