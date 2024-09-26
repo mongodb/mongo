@@ -372,6 +372,110 @@ TEST(ArrayHistogramHelpersTest, UniformIntStrHistogram) {
     ASSERT_CE_APPROX_EQUAL(15.5, expectedCard.card, 0.1);  // Actual: 29.
 }
 
+TEST(ArrayHistogramHelpersTest, UniformIntStrEstimate) {
+    // This hard-codes a maxdiff histogram with 20 buckets built off of a uniform distribution with
+    // two types occurring with equal probability:
+    // - 100 distinct ints between 0 and 1000, and
+    // - 100 distinct strings of length between 2 and 5.
+    constexpr double numInt = 254;
+    constexpr double numStr = 246;
+    constexpr double collCard = numInt + numStr;
+    std::vector<BucketData> data{{
+        {2, 3, 0, 0},       {19, 4, 1, 1},      {226, 2, 49, 20},  {301, 5, 12, 4},
+        {317, 3, 0, 0},     {344, 2, 3, 1},     {423, 5, 18, 6},   {445, 3, 0, 0},
+        {495, 3, 4, 2},     {542, 5, 9, 3},     {696, 3, 44, 19},  {773, 4, 11, 5},
+        {805, 2, 8, 4},     {931, 5, 21, 8},    {998, 4, 21, 3},   {"8N4", 5, 31, 14},
+        {"MIb", 5, 45, 17}, {"Zgi", 3, 55, 22}, {"pZ", 6, 62, 25}, {"yUwxz", 5, 29, 12},
+    }};
+    const ScalarHistogram hist = createHistogram(data);
+    const auto arrHist = ArrayHistogram::make(
+        hist,
+        TypeCounts{{value::TypeTags::NumberInt64, numInt}, {value::TypeTags::StringSmall, numStr}},
+        collCard);
+
+    // Predicates over value inside of the last numeric bucket.
+
+    // Query: [{$match: {a: {$eq: 993}}}].
+    EstimationResult expectedCard{
+        estimateCardinalityScalarHistogramInteger(hist, 993, EstimationType::kEqual)};
+    ASSERT_CE_APPROX_EQUAL(7.0, expectedCard.card, 0.1);  // Actual: 9.
+
+    // Query: [{$match: {a: {$lt: 993}}}].
+    expectedCard = {estimateCardinalityScalarHistogramInteger(hist, 993, EstimationType::kLess)};
+    ASSERT_CE_APPROX_EQUAL(241.4, expectedCard.card, 0.1);  // Actual: 241.
+
+    // Query: [{$match: {a: {$lte: 993}}}].
+    expectedCard = {
+        estimateCardinalityScalarHistogramInteger(hist, 993, EstimationType::kLessOrEqual)};
+    ASSERT_CE_APPROX_EQUAL(248.4, expectedCard.card, 0.1);  // Actual: 250.
+
+    // Predicates over value inside of the first string bucket.
+    auto [tag, value] = value::makeNewString("04e"_sd);
+    value::ValueGuard vg(tag, value);
+
+    // Query: [{$match: {a: {$eq: '04e'}}}].
+    expectedCard = {estimateCardinality(hist, tag, value, EstimationType::kEqual).card};
+    ASSERT_CE_APPROX_EQUAL(2.2, expectedCard.card, 0.1);  // Actual: 3.
+
+    value::TypeTags lowTag = value::TypeTags::NumberInt64;
+    value::Value lowVal = 100000000;
+
+    // Type bracketing: low value of different type than the bucket bound.
+    // Query: [{$match: {a: {$eq: 100000000}}}].
+    expectedCard = estimateCardinalityEq(*arrHist, lowTag, lowVal, true /* includeScalar */);
+    ASSERT_CE_APPROX_EQUAL(0.0, expectedCard.card, 0.1);  // Actual: 0.
+
+    // No interpolation for inequality to values inside the first string bucket, fallback to half of
+    // the bucket frequency.
+
+    // Query: [{$match: {a: {$lt: '04e'}}}].
+    expectedCard = estimateCardinalityRange(*arrHist,
+                                            false /* lowInclusive */,
+                                            lowTag,
+                                            lowVal,
+                                            false /* highInclusive */,
+                                            tag,
+                                            value,
+                                            true /* includeScalar */);
+    ASSERT_CE_APPROX_EQUAL(13.3, expectedCard.card, 0.1);  // Actual: 0.
+
+    // Query: [{$match: {a: {$lte: '04e'}}}].
+    expectedCard = estimateCardinalityRange(*arrHist,
+                                            false /* lowInclusive */,
+                                            lowTag,
+                                            lowVal,
+                                            true /* highInclusive */,
+                                            tag,
+                                            value,
+                                            true /* includeScalar */);
+    ASSERT_CE_APPROX_EQUAL(15.5, expectedCard.card, 0.1);  // Actual: 3.
+
+    // Value towards the end of the bucket gets the same half bucket estimate.
+    std::tie(tag, value) = value::makeNewString("8B5"_sd);
+
+    // Query: [{$match: {a: {$lt: '8B5'}}}].
+    expectedCard = estimateCardinalityRange(*arrHist,
+                                            false /* lowInclusive */,
+                                            lowTag,
+                                            lowVal,
+                                            false /* highInclusive */,
+                                            tag,
+                                            value,
+                                            true /* includeScalar */);
+    ASSERT_CE_APPROX_EQUAL(13.3, expectedCard.card, 0.1);  // Actual: 24.
+
+    // Query: [{$match: {a: {$lte: '8B5'}}}].
+    expectedCard = estimateCardinalityRange(*arrHist,
+                                            false /* lowInclusive */,
+                                            lowTag,
+                                            lowVal,
+                                            true /* highInclusive */,
+                                            tag,
+                                            value,
+                                            true /* includeScalar */);
+    ASSERT_CE_APPROX_EQUAL(15.5, expectedCard.card, 0.1);  // Actual: 29.
+}
+
 TEST(ArrayHistogramHelpersTest, UniformIntArrayOnlyEstimate) {
     // This hard-codes a maxdiff histogram with 10 buckets built off of an array distribution with
     // arrays between 3 and 5 elements long, each containing 100 distinct ints uniformly distributed

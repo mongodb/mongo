@@ -75,25 +75,3 @@ env.CppUnitTest(
         "test_utils",
     ],
 )
-
-env.CppUnitTest(
-    target="generated_histograms_test",
-    source=[
-        "generated_histograms_test.cpp",
-    ],
-    LIBDEPS=[
-        "test_utils",
-    ],
-)
-
-env.CppUnitTest(
-    target="maxdiff_histogram_test",
-    source=[
-        "maxdiff_histogram_test.cpp",
-    ],
-    LIBDEPS=[
-        "$BUILD_DIR/mongo/db/query/stats/stats_test_utils",
-        "$BUILD_DIR/mongo/db/service_context_test_fixture",
-        "test_utils",
-    ],
-)

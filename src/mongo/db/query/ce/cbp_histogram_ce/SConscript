@@ -46,6 +46,30 @@ env.CppUnitTest(
     ],
 )
 
+env.CppUnitTest(
+    target="maxdiff_histogram_cbp_test",
+    source=[
+        "maxdiff_histogram_test.cpp",
+    ],
+    LIBDEPS=[
+        "$BUILD_DIR/mongo/db/query/ce/test_utils",
+        "cbp_ce_test_helpers",
+    ],
+)
+
+env.CppUnitTest(
+    target="generated_histograms_test",
+    source=[
+        "generated_histograms_test.cpp",
+    ],
+    LIBDEPS=[
+        "$BUILD_DIR/mongo/db/query/ce/test_utils",
+        "$BUILD_DIR/mongo/db/query/stats/stats_test_utils",
+        "$BUILD_DIR/mongo/db/service_context_test_fixture",
+        "cbp_ce_test_helpers",
+    ],
+)
+
 env.Benchmark(
     target="cbp_histogram_bm",
     source=["array_histogram_bm.cpp"],

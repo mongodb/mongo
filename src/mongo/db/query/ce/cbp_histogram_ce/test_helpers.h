@@ -34,6 +34,62 @@
 
 namespace mongo::optimizer::cbp::ce {
 
+#define ASSERT_CE_APPROX_EQUAL(estimatedCE, expectedCE, kMaxCEError) \
+    ASSERT_APPROX_EQUAL(                                             \
+        static_cast<double>(estimatedCE), static_cast<double>(expectedCE), kMaxCEError)
+
+template <class T1, class T2>
+constexpr double absCEDiff(const T1 v1, const T2 v2) {
+    return std::abs(static_cast<double>(v1) - static_cast<double>(v2));
+}
+
+/**
+ * Helpful macros for asserting that the CE of a $match predicate is approximately what we were
+ * expecting.
+ */
+
+#define _ASSERT_CE(estimatedCE, expectedCE)                             \
+    if constexpr (kCETestLogOnly) {                                     \
+        if (absCEDiff(estimatedCE, expectedCE) > kMaxCEError) {         \
+            std::cout << "ERROR: expected " << expectedCE << std::endl; \
+        }                                                               \
+        ASSERT_APPROX_EQUAL(1.0, 1.0, kMaxCEError);                     \
+    } else {                                                            \
+        ASSERT_CE_APPROX_EQUAL(estimatedCE, expectedCE, kMaxCEError);   \
+    }
+#define _PREDICATE(field, predicate) (str::stream() << "{" << field << ": " << predicate "}")
+#define _ELEMMATCH_PREDICATE(field, predicate) \
+    (str::stream() << "{" << field << ": {$elemMatch: " << predicate << "}}")
+
+// This macro verifies the cardinality of a pipeline or an input ABT.
+#define ASSERT_CE(ce, pipeline, expectedCE) _ASSERT_CE(ce.getCE(pipeline), (expectedCE))
+
+// This macro does the same as above but also sets the collection cardinality.
+#define ASSERT_CE_CARD(ce, pipeline, expectedCE, collCard) \
+    ce.setCollCard({collCard});                            \
+    ASSERT_CE(ce, pipeline, expectedCE)
+
+// This macro verifies the cardinality of a pipeline with a single $match predicate.
+#define ASSERT_MATCH_CE(ce, predicate, expectedCE) \
+    _ASSERT_CE(ce.getMatchCE(predicate), (expectedCE))
+
+#define ASSERT_MATCH_CE_NODE(ce, queryPredicate, expectedCE, nodePredicate) \
+    _ASSERT_CE(ce.getMatchCE(queryPredicate, nodePredicate), (expectedCE))
+
+// This macro does the same as above but also sets the collection cardinality.
+#define ASSERT_MATCH_CE_CARD(ce, predicate, expectedCE, collCard) \
+    ce.setCollCard({collCard});                                   \
+    ASSERT_MATCH_CE(ce, predicate, expectedCE)
+
+// This macro tests cardinality of two versions of the predicate; with and without $elemMatch.
+#define ASSERT_EQ_ELEMMATCH_CE(tester, expectedCE, elemMatchExpectedCE, field, predicate) \
+    ASSERT_MATCH_CE(tester, _PREDICATE(field, predicate), expectedCE);                    \
+    ASSERT_MATCH_CE(tester, _ELEMMATCH_PREDICATE(field, predicate), elemMatchExpectedCE)
+
+#define ASSERT_EQ_ELEMMATCH_CE_NODE(tester, expectedCE, elemMatchExpectedCE, field, predicate, n) \
+    ASSERT_MATCH_CE_NODE(tester, _PREDICATE(field, predicate), expectedCE, n);                    \
+    ASSERT_MATCH_CE_NODE(tester, _ELEMMATCH_PREDICATE(field, predicate), elemMatchExpectedCE, n)
+
 /**
  * Test utility for helping with creation of manual histograms in the unit tests.
  */

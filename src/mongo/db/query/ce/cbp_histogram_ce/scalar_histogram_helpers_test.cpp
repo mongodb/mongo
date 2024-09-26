@@ -84,6 +84,182 @@ TEST(ScalarHistogramHelpersTest, ManualHistogram) {
     ASSERT_EQ(21.5, estimateCardinalityScalarHistogramInteger(hist, 25, kGreaterOrEqual));
 }
 
+TEST(ScalarHistogramHelpersTest, UniformIntEstimate) {
+    // This hard-codes a maxdiff histogram with 10 buckets built off a uniform int distribution with
+    // a minimum of 0, a maximum of 1000, and 70 distinct values.
+    std::vector<BucketData> data{{2, 1, 0, 0},
+                                 {57, 3, 2, 1},
+                                 {179, 5, 10, 6},
+                                 {317, 5, 9, 6},
+                                 {344, 3, 0, 0},
+                                 {558, 4, 19, 12},
+                                 {656, 2, 4, 3},
+                                 {798, 3, 7, 4},
+                                 {951, 5, 17, 7},
+                                 {986, 1, 0, 0}};
+    const ScalarHistogram hist = createHistogram(data);
+
+    // Predicates over bucket bound.
+    double expectedCard =
+        estimateCardinalityScalarHistogramInteger(hist, 558, EstimationType::kEqual);
+    ASSERT_EQ(4.0, expectedCard);
+    expectedCard = estimateCardinalityScalarHistogramInteger(hist, 558, EstimationType::kLess);
+    ASSERT_EQ(57.0, expectedCard);
+    expectedCard =
+        estimateCardinalityScalarHistogramInteger(hist, 558, EstimationType::kLessOrEqual);
+    ASSERT_EQ(61.0, expectedCard);
+
+    // Predicates over value inside of a bucket.
+
+    // Query: [{$match: {a: {$eq: 530}}}].
+    expectedCard = estimateCardinalityScalarHistogramInteger(hist, 530, EstimationType::kEqual);
+    ASSERT_APPROX_EQUAL(1.6, expectedCard, 0.1);  // Actual: 1.
+
+    // Query: [{$match: {a: {$lt: 530}}}].
+    expectedCard = estimateCardinalityScalarHistogramInteger(hist, 530, EstimationType::kLess);
+    ASSERT_APPROX_EQUAL(52.9, expectedCard, 0.1);  // Actual: 50.
+
+    // Query: [{$match: {a: {$lte: 530}}}].
+    expectedCard =
+        estimateCardinalityScalarHistogramInteger(hist, 530, EstimationType::kLessOrEqual);
+    ASSERT_APPROX_EQUAL(54.5, expectedCard, 0.1);  // Actual: 51.
+
+    // Query: [{$match: {a: {$eq: 400}}}].
+    expectedCard = estimateCardinalityScalarHistogramInteger(hist, 400, EstimationType::kEqual);
+    ASSERT_APPROX_EQUAL(1.6, expectedCard, 0.1);  // Actual: 1.
+
+    // Query: [{$match: {a: {$lt: 400}}}].
+    expectedCard = estimateCardinalityScalarHistogramInteger(hist, 400, EstimationType::kLess);
+    ASSERT_APPROX_EQUAL(41.3, expectedCard, 0.1);  // Actual: 39.
+
+    // Query: [{$match: {a: {$lte: 400}}}].
+    expectedCard =
+        estimateCardinalityScalarHistogramInteger(hist, 400, EstimationType::kLessOrEqual);
+    ASSERT_APPROX_EQUAL(43.0, expectedCard, 0.1);  // Actual: 40.
+}
+
+TEST(ScalarHistogramHelpersTest, NormalIntEstimate) {
+    // This hard-codes a maxdiff histogram with 10 buckets built off a normal int distribution with
+    // a minimum of 0, a maximum of 1000, and 70 distinct values.
+    std::vector<BucketData> data{{2, 1, 0, 0},
+                                 {317, 8, 20, 15},
+                                 {344, 2, 0, 0},
+                                 {388, 3, 0, 0},
+                                 {423, 4, 2, 2},
+                                 {579, 4, 12, 8},
+                                 {632, 3, 2, 1},
+                                 {696, 3, 5, 3},
+                                 {790, 5, 4, 2},
+                                 {993, 1, 21, 9}};
+    const ScalarHistogram hist = createHistogram(data);
+
+    // Predicates over bucket bound.
+    double expectedCard =
+        estimateCardinalityScalarHistogramInteger(hist, 696, EstimationType::kEqual);
+    ASSERT_EQ(3.0, expectedCard);
+    expectedCard = estimateCardinalityScalarHistogramInteger(hist, 696, EstimationType::kLess);
+    ASSERT_EQ(66.0, expectedCard);
+    expectedCard =
+        estimateCardinalityScalarHistogramInteger(hist, 696, EstimationType::kLessOrEqual);
+    ASSERT_EQ(69.0, expectedCard);
+
+    // Predicates over value inside of a bucket.
+
+    // Query: [{$match: {a: {$eq: 150}}}].
+    expectedCard = estimateCardinalityScalarHistogramInteger(hist, 150, EstimationType::kEqual);
+    ASSERT_APPROX_EQUAL(1.3, expectedCard, 0.1);  // Actual: 1.
+
+    // Query: [{$match: {a: {$lt: 150}}}].
+    expectedCard = estimateCardinalityScalarHistogramInteger(hist, 150, EstimationType::kLess);
+    ASSERT_APPROX_EQUAL(9.1, expectedCard, 0.1);  // Actual: 9.
+
+    // Query: [{$match: {a: {$lte: 150}}}].
+    expectedCard =
+        estimateCardinalityScalarHistogramInteger(hist, 150, EstimationType::kLessOrEqual);
+    ASSERT_APPROX_EQUAL(10.4, expectedCard, 0.1);  // Actual: 10.
+}
+
+TEST(ScalarHistogramHelpersTest, UniformStrEstimate) {
+    // This hard-codes a maxdiff histogram with 10 buckets built off a uniform string distribution
+    // with a minimum length of 3, a maximum length of 5, and 80 distinct values.
+    std::vector<BucketData> data{{{"0ejz", 2, 0, 0},
+                                  {"8DCaq", 3, 4, 4},
+                                  {"Cy5Kw", 3, 3, 3},
+                                  {"WXX7w", 3, 31, 20},
+                                  {"YtzS", 2, 0, 0},
+                                  {"fuK", 5, 13, 7},
+                                  {"gLkp", 3, 0, 0},
+                                  {"ixmVx", 2, 6, 2},
+                                  {"qou", 1, 9, 6},
+                                  {"z2b", 1, 9, 6}}};
+    const ScalarHistogram hist = createHistogram(data);
+
+    // Predicates over value inside of a bucket.
+    const auto [tag, value] = value::makeNewString("TTV"_sd);
+    value::ValueGuard vg(tag, value);
+
+    // Query: [{$match: {a: {$eq: 'TTV'}}}].
+    double expectedCard = estimateCardinality(hist, tag, value, EstimationType::kEqual).card;
+    ASSERT_APPROX_EQUAL(1.55, expectedCard, 0.1);  // Actual: 2.
+
+    // Query: [{$match: {a: {$lt: 'TTV'}}}].
+    expectedCard = estimateCardinality(hist, tag, value, EstimationType::kLess).card;
+    ASSERT_APPROX_EQUAL(39.8, expectedCard, 0.1);  // Actual: 39.
+
+    // Query: [{$match: {a: {$lte: 'TTV'}}}].
+    expectedCard = estimateCardinality(hist, tag, value, EstimationType::kLessOrEqual).card;
+    ASSERT_APPROX_EQUAL(41.3, expectedCard, 0.1);  // Actual: 41.
+}
+
+TEST(ScalarHistogramHelpersTest, NormalStrEstimate) {
+    // This hard-codes a maxdiff histogram with 10 buckets built off a normal string distribution
+    // with a minimum length of 3, a maximum length of 5, and 80 distinct values.
+    std::vector<BucketData> data{{
+        {"0ejz", 1, 0, 0},
+        {"4FGjc", 3, 5, 3},
+        {"9bU3", 2, 3, 2},
+        {"Cy5Kw", 3, 3, 3},
+        {"Lm4U", 2, 11, 5},
+        {"TTV", 5, 14, 8},
+        {"YtzS", 2, 3, 2},
+        {"o9cD4", 6, 26, 16},
+        {"qfmnP", 1, 4, 2},
+        {"xqbi", 2, 4, 4},
+    }};
+    const ScalarHistogram hist = createHistogram(data);
+
+    // Predicates over bucket bound.
+    auto [tag, value] = value::makeNewString("TTV"_sd);
+    value::ValueGuard vg(tag, value);
+
+    // Query: [{$match: {a: {$eq: 'TTV'}}}].
+    double expectedCard = estimateCardinality(hist, tag, value, EstimationType::kEqual).card;
+    ASSERT_APPROX_EQUAL(5.0, expectedCard, 0.1);  // Actual: 5.
+
+    // Query: [{$match: {a: {$lt: 'TTV'}}}].
+    expectedCard = estimateCardinality(hist, tag, value, EstimationType::kLess).card;
+    ASSERT_APPROX_EQUAL(47.0, expectedCard, 0.1);  // Actual: 47.
+
+    // Query: [{$match: {a: {$lte: 'TTV'}}}].
+    expectedCard = estimateCardinality(hist, tag, value, EstimationType::kLessOrEqual).card;
+    ASSERT_APPROX_EQUAL(52.0, expectedCard, 0.1);  // Actual: 52.
+
+    // Predicates over value inside of a bucket.
+    std::tie(tag, value) = value::makeNewString("Pfa"_sd);
+
+    // Query: [{$match: {a: {$eq: 'Pfa'}}}].
+    expectedCard = estimateCardinality(hist, tag, value, EstimationType::kEqual).card;
+    ASSERT_APPROX_EQUAL(1.75, expectedCard, 0.1);  // Actual: 2.
+
+    // Query: [{$match: {a: {$lt: 'Pfa'}}}].
+    expectedCard = estimateCardinality(hist, tag, value, EstimationType::kLess).card;
+    ASSERT_APPROX_EQUAL(38.3, expectedCard, 0.1);  // Actual: 35.
+
+    // Query: [{$match: {a: {$lte: 'Pfa'}}}].
+    expectedCard = estimateCardinality(hist, tag, value, EstimationType::kLessOrEqual).card;
+    ASSERT_APPROX_EQUAL(40.0, expectedCard, 0.1);  // Actual: 37.
+}
+
 TEST(ScalarHistogramHelpersTest, OneBucketIntHistogram) {
 
     std::vector<BucketData> data{{100, 3.0, 27.0, 9.0}};

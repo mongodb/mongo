@@ -36,9 +36,9 @@
 
 #include "mongo/base/string_data.h"
 #include "mongo/db/exec/sbe/values/value.h"
+#include "mongo/db/query/ce/cbp_histogram_ce/array_histogram_helpers.h"
+#include "mongo/db/query/ce/cbp_histogram_ce/scalar_histogram_helpers.h"
 #include "mongo/db/query/ce/cbp_histogram_ce/test_helpers.h"
-#include "mongo/db/query/ce/histogram_predicate_estimation.h"
-#include "mongo/db/query/ce/test_utils.h"
 #include "mongo/db/query/optimizer/defs.h"
 #include "mongo/db/query/stats/array_histogram.h"
 #include "mongo/db/query/stats/max_diff.h"
@@ -54,7 +54,7 @@
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kDefault
 
-namespace mongo::optimizer::ce {
+namespace mongo::optimizer::cbp::ce {
 namespace {
 namespace value = sbe::value;
 
@@ -76,7 +76,7 @@ class HistogramTest : public ServiceContextTest {};
 
 static double estimateCard(const ScalarHistogram& hist, const int v, const EstimationType type) {
     const auto [tag, val] = makeInt64Value(v);
-    return estimate(hist, tag, val, type).card;
+    return estimateCardinality(hist, tag, val, type).card;
 };
 
 TEST_F(HistogramTest, BasicCreate) {
@@ -260,14 +260,14 @@ TEST_F(HistogramTest, MaxDiffTestString) {
     const ScalarHistogram& hist = genMaxDiffHistogram(dataDistrib, nBuckets, stats::SortArg::kArea);
     LOGV2(8674804, "Generated histogram", "histogram"_attr = hist.toString());
     ASSERT_LTE(hist.getBuckets().size(), nBuckets);
-    const double estimatedCard = estimate(hist, tag, val, EstimationType::kLess).card;
+    const double estimatedCard = estimateCardinality(hist, tag, val, EstimationType::kLess).card;
     ASSERT_APPROX_EQUAL(15.9443, estimatedCard, kTolerance);
 
     const ScalarHistogram& histAreaDiff = genMaxDiffHistogram(dataDistrib, nBuckets);
     LOGV2(8674805, "Generated histogram", "histogram"_attr = histAreaDiff.toString());
     ASSERT_LTE(histAreaDiff.getBuckets().size(), nBuckets);
     const double estimatedCardAreaDiff =
-        estimate(histAreaDiff, tag, val, EstimationType::kLess).card;
+        estimateCardinality(histAreaDiff, tag, val, EstimationType::kLess).card;
     ASSERT_APPROX_EQUAL(9.59627, estimatedCardAreaDiff, kTolerance);
 }
 
@@ -353,12 +353,14 @@ TEST_F(HistogramTest, MaxDiffIntArrays) {
 
         const auto [tag, val] = makeInt64Value(2);
         value::ValueGuard vg(tag, val);
-        const CEType estimatedCard = estimateCardEq(*estimator, tag, val, true /*includeScalar*/);
-        const CEType estimatedCardAreaDiff = estimateCardEq(*estimatorAreaDiff, tag, val, true);
+        const EstimationResult estimatedCard =
+            estimateCardinalityEq(*estimator, tag, val, true /*includeScalar*/);
+        const EstimationResult estimatedCardAreaDiff =
+            estimateCardinalityEq(*estimatorAreaDiff, tag, val, true);
 
         ASSERT_EQ(4, actualCard);
-        ASSERT_CE_APPROX_EQUAL(4.0, estimatedCard, kTolerance);
-        ASSERT_CE_APPROX_EQUAL(4.0, estimatedCardAreaDiff, kTolerance);
+        ASSERT_CE_APPROX_EQUAL(4.0, estimatedCard.card, kTolerance);
+        ASSERT_CE_APPROX_EQUAL(4.0, estimatedCardAreaDiff.card, kTolerance);
     }
 
     {
@@ -367,26 +369,27 @@ TEST_F(HistogramTest, MaxDiffIntArrays) {
 
         const auto [tag, val] = makeInt64Value(3);
         value::ValueGuard vg(tag, val);
-        const CEType estimatedCard = estimateCardRange(*estimator,
-                                                       false /*lowInclusive*/,
-                                                       value::TypeTags::MinKey,
-                                                       0,
-                                                       false /*highInclusive*/,
-                                                       tag,
-                                                       val,
-                                                       true /* includeScalar */);
-        const CEType estimatedCardAreaDiff = estimateCardRange(*estimatorAreaDiff,
-                                                               false /*lowInclusive*/,
-                                                               value::TypeTags::MinKey,
-                                                               0,
-                                                               false /*highInclusive*/,
-                                                               tag,
-                                                               val,
-                                                               true /* includeScalar */);
+        const EstimationResult estimatedCard = estimateCardinalityRange(*estimator,
+                                                                        false /*lowInclusive*/,
+                                                                        value::TypeTags::MinKey,
+                                                                        0,
+                                                                        false /*highInclusive*/,
+                                                                        tag,
+                                                                        val,
+                                                                        true /* includeScalar */);
+        const EstimationResult estimatedCardAreaDiff =
+            estimateCardinalityRange(*estimatorAreaDiff,
+                                     false /*lowInclusive*/,
+                                     value::TypeTags::MinKey,
+                                     0,
+                                     false /*highInclusive*/,
+                                     tag,
+                                     val,
+                                     true /* includeScalar */);
 
         ASSERT_EQ(6, actualCard);
-        ASSERT_CE_APPROX_EQUAL(6.0, estimatedCard, kTolerance);
-        ASSERT_CE_APPROX_EQUAL(7.0, estimatedCardAreaDiff, kTolerance);
+        ASSERT_CE_APPROX_EQUAL(6.0, estimatedCard.card, kTolerance);
+        ASSERT_CE_APPROX_EQUAL(7.0, estimatedCardAreaDiff.card, kTolerance);
     }
 
     {
@@ -398,26 +401,27 @@ TEST_F(HistogramTest, MaxDiffIntArrays) {
         const auto [highTag, highVal] = makeInt64Value(5);
         value::ValueGuard vgHigh(highTag, highVal);
 
-        const CEType estimatedCard = estimateCardRange(*estimator,
-                                                       false /*lowInclusive*/,
-                                                       lowTag,
-                                                       lowVal,
-                                                       false /*highInclusive*/,
-                                                       highTag,
-                                                       highVal,
-                                                       false /* includeScalar */);
-        const CEType estimatedCardAreaDiff = estimateCardRange(*estimatorAreaDiff,
-                                                               false /*lowInclusive*/,
-                                                               lowTag,
-                                                               lowVal,
-                                                               false /*highInclusive*/,
-                                                               highTag,
-                                                               highVal,
-                                                               false /* includeScalar */);
+        const EstimationResult estimatedCard = estimateCardinalityRange(*estimator,
+                                                                        false /*lowInclusive*/,
+                                                                        lowTag,
+                                                                        lowVal,
+                                                                        false /*highInclusive*/,
+                                                                        highTag,
+                                                                        highVal,
+                                                                        false /* includeScalar */);
+        const EstimationResult estimatedCardAreaDiff =
+            estimateCardinalityRange(*estimatorAreaDiff,
+                                     false /*lowInclusive*/,
+                                     lowTag,
+                                     lowVal,
+                                     false /*highInclusive*/,
+                                     highTag,
+                                     highVal,
+                                     false /* includeScalar */);
 
         ASSERT_EQ(2, actualCard);
-        ASSERT_CE_APPROX_EQUAL(3.15479, estimatedCard, kTolerance);
-        ASSERT_CE_APPROX_EQUAL(2.52383, estimatedCardAreaDiff, kTolerance);
+        ASSERT_CE_APPROX_EQUAL(3.15479, estimatedCard.card, kTolerance);
+        ASSERT_CE_APPROX_EQUAL(2.52383, estimatedCardAreaDiff.card, kTolerance);
     }
 }
 
@@ -481,4 +485,4 @@ TEST(HistogramTest, HistogramTopBucketsFreqDiffUniformInt) {
 }
 
 }  // namespace
-}  // namespace mongo::optimizer::ce
+}  // namespace mongo::optimizer::cbp::ce
