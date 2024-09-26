@@ -3522,11 +3522,11 @@ TEST(PipelineOptimizationTest, MatchOnFmodShouldSwapWithAdjacentStage) {
 class ChangeStreamPipelineOptimizationTest : public ServiceContextTest {
 public:
     struct ExpressionContextOptionsStruct {
-        bool inMongos;
+        bool inRouter;
     };
 
     ChangeStreamPipelineOptimizationTest()
-        : ChangeStreamPipelineOptimizationTest({.inMongos = false}) {}
+        : ChangeStreamPipelineOptimizationTest({.inRouter = false}) {}
 
     ChangeStreamPipelineOptimizationTest(ExpressionContextOptionsStruct options) {
         _opCtx = _testServiceContext.makeOperationContext();
@@ -3536,7 +3536,7 @@ public:
                 boost::none, "unittests", "pipeline_test"));
         _expCtx->opCtx = _opCtx.get();
         _expCtx->uuid = UUID::gen();
-        _expCtx->inMongos = options.inMongos;
+        _expCtx->inRouter = options.inRouter;
         setMockReplicationCoordinatorOnOpCtx(_expCtx->opCtx);
     }
 
@@ -3665,7 +3665,7 @@ TEST_F(ChangeStreamPipelineOptimizationTest,
 class ChangeStreamPipelineOptimizationTestWithMongoS : public ChangeStreamPipelineOptimizationTest {
 public:
     ChangeStreamPipelineOptimizationTestWithMongoS()
-        : ChangeStreamPipelineOptimizationTest({.inMongos = true}) {}
+        : ChangeStreamPipelineOptimizationTest({.inRouter = true}) {}
 };
 
 TEST_F(ChangeStreamPipelineOptimizationTestWithMongoS,
@@ -5374,7 +5374,7 @@ using HostTypeRequirement = StageConstraints::HostTypeRequirement;
 using PipelineMustRunOnMongoSTest = AggregationContextFixture;
 
 TEST_F(PipelineMustRunOnMongoSTest, UnsplittablePipelineMustRunOnMongoS) {
-    setExpCtx({.inMongos = true, .allowDiskUse = false});
+    setExpCtx({.inRouter = true, .allowDiskUse = false});
     auto pipeline = makePipeline({matchStage("{x: 5}"), runOnMongos()});
     ASSERT_TRUE(pipeline->requiredToRunOnMongos());
 
@@ -5383,7 +5383,7 @@ TEST_F(PipelineMustRunOnMongoSTest, UnsplittablePipelineMustRunOnMongoS) {
 }
 
 TEST_F(PipelineMustRunOnMongoSTest, UnsplittableMongoSPipelineAssertsIfDisallowedStagePresent) {
-    setExpCtx({.inMongos = true, .allowDiskUse = true});
+    setExpCtx({.inRouter = true, .allowDiskUse = true});
     auto pipeline = makePipeline({matchStage("{x: 5}"), runOnMongos(), sortStage("{x: 1}")});
     pipeline->optimizePipeline();
 
@@ -5395,7 +5395,7 @@ TEST_F(PipelineMustRunOnMongoSTest, UnsplittableMongoSPipelineAssertsIfDisallowe
 DEATH_TEST_F(PipelineMustRunOnMongoSTest,
              SplittablePipelineMustMergeOnMongoSAfterSplit,
              "invariant") {
-    setExpCtx({.inMongos = true, .allowDiskUse = false});
+    setExpCtx({.inRouter = true, .allowDiskUse = false});
     auto pipeline =
         makePipeline({matchStage("{x: 5}"), splitStage(HostTypeRequirement::kNone), runOnMongos()});
 
@@ -5426,7 +5426,7 @@ public:
 };
 
 TEST_F(PipelineMustRunOnMongoSTest, SplitMongoSMergePipelineAssertsIfShardStagePresent) {
-    setExpCtx({.inMongos = true, .allowDiskUse = true});
+    setExpCtx({.inRouter = true, .allowDiskUse = true});
     auto expCtx = getExpCtx();
     expCtx->mongoProcessInterface = std::make_shared<FakeMongoProcessInterface>();
     auto pipeline = makePipeline(
@@ -5444,7 +5444,7 @@ TEST_F(PipelineMustRunOnMongoSTest, SplitMongoSMergePipelineAssertsIfShardStageP
 }
 
 TEST_F(PipelineMustRunOnMongoSTest, SplittablePipelineAssertsIfMongoSStageOnShardSideOfSplit) {
-    setExpCtx({.inMongos = true, .allowDiskUse = false});
+    setExpCtx({.inRouter = true, .allowDiskUse = false});
     auto pipeline = makePipeline(
         {matchStage("{x: 5}"), runOnMongos(), splitStage(HostTypeRequirement::kAnyShard)});
     pipeline->optimizePipeline();
@@ -5458,7 +5458,7 @@ TEST_F(PipelineMustRunOnMongoSTest, SplittablePipelineAssertsIfMongoSStageOnShar
 }
 
 TEST_F(PipelineMustRunOnMongoSTest, SplittablePipelineRunsUnsplitOnMongoSIfSplitpointIsEligible) {
-    setExpCtx({.inMongos = true, .allowDiskUse = false});
+    setExpCtx({.inRouter = true, .allowDiskUse = false});
     auto pipeline =
         makePipeline({matchStage("{x: 5}"), runOnMongos(), splitStage(HostTypeRequirement::kNone)});
     pipeline->optimizePipeline();
@@ -5476,7 +5476,7 @@ using PipelineDeferredMergeSortTest = AggregationContextFixture;
 using HostTypeRequirement = StageConstraints::HostTypeRequirement;
 
 TEST_F(PipelineDeferredMergeSortTest, StageWithDeferredSortDoesNotSplit) {
-    setExpCtx({.inMongos = true, .allowDiskUse = false});
+    setExpCtx({.inRouter = true, .allowDiskUse = false});
     auto splitPipeline = makeAndSplitPipeline({mockDeferredSortStage(),
                                                swappableStage(),
                                                splitStage(HostTypeRequirement::kNone),
@@ -5488,7 +5488,7 @@ TEST_F(PipelineDeferredMergeSortTest, StageWithDeferredSortDoesNotSplit) {
 }
 
 TEST_F(PipelineDeferredMergeSortTest, EarliestSortIsSelectedIfDeferred) {
-    setExpCtx({.inMongos = true, .allowDiskUse = false});
+    setExpCtx({.inRouter = true, .allowDiskUse = false});
     auto splitPipeline = makeAndSplitPipeline({mockDeferredSortStage(),
                                                swappableStage(),
                                                sortStage("{NO: 1}"),
@@ -5501,7 +5501,7 @@ TEST_F(PipelineDeferredMergeSortTest, EarliestSortIsSelectedIfDeferred) {
 }
 
 TEST_F(PipelineDeferredMergeSortTest, StageThatCantSwapGoesToMergingHalf) {
-    setExpCtx({.inMongos = true, .allowDiskUse = false});
+    setExpCtx({.inRouter = true, .allowDiskUse = false});
     auto match1 = matchStage("{a: 5}");
     auto match2 = matchStage("{b: 5}");
     auto splitPipeline = makeAndSplitPipeline(

@@ -329,10 +329,10 @@ void assertSearchMetaAccessValid(const Pipeline::SourceContainer& pipeline,
         return;
     }
 
-    // If we already validated this pipeline on mongos, no need to do it again on a shard. Check
+    // If we already validated this pipeline on router, no need to do it again on a shard. Check
     // for $mergeCursors because we could be on a shard doing the merge and only want to validate if
     // we have the whole pipeline.
-    bool alreadyValidated = !expCtx->inMongos && expCtx->needsMerge;
+    bool alreadyValidated = !expCtx->inRouter && expCtx->needsMerge;
     if (!alreadyValidated ||
         pipeline.front()->getSourceName() != DocumentSourceMergeCursors::kStageName) {
         assertSearchMetaAccessValidHelper({&pipeline});
@@ -372,11 +372,11 @@ std::unique_ptr<Pipeline, PipelineDeleter> prepareSearchForTopLevelPipelineLegac
     tassert(6253727, "Expected search stage", origSearchStage);
     origSearchStage->setDocsNeededBounds(bounds);
 
-    // We expect to receive unmerged metadata documents from mongot if we are not in mongos and have
+    // We expect to receive unmerged metadata documents from mongot if we are not in router and have
     // a metadata merge protocol version. However, we can ignore the meta cursor if the pipeline
     // doesn't have a downstream reference to $$SEARCH_META.
     auto expectsMetaCursorFromMongot =
-        !expCtx->inMongos && origSearchStage->getIntermediateResultsProtocolVersion();
+        !expCtx->inRouter && origSearchStage->getIntermediateResultsProtocolVersion();
     auto shouldBuildMetadataPipeline =
         expectsMetaCursorFromMongot && origSearchStage->queryReferencesSearchMeta();
 
@@ -494,7 +494,7 @@ void establishSearchCursorsSBE(boost::intrusive_ptr<ExpressionContext> expCtx,
         // metadata.
         tassert(7856002,
                 "Didn't expect metadata cursor from mongot",
-                !expCtx->inMongos && searchStage->getIntermediateResultsProtocolVersion());
+                !expCtx->inRouter && searchStage->getIntermediateResultsProtocolVersion());
         searchStage->setMetadataCursor(std::move(metaCursor));
     }
 }

@@ -1189,11 +1189,11 @@ Status _runAggregate(AggExState& aggExState, rpc::ReplyBuilderInterface* result)
                 "https://www.mongodb.com/docs/manual/reference/operator/aggregation/function/");
         }
 
-        // Only allow the use of runtime constants when from Mongos is true.
+        // Only allow the use of runtime constants when 'fromRouter' is true.
         uassert(463840,
                 "Manually setting 'runtimeConstants' is not supported. Use 'let' for user-defined "
                 "constants.",
-                expCtx->fromMongos || !aggExState.getRequest().getLegacyRuntimeConstants());
+                expCtx->fromRouter || !aggExState.getRequest().getLegacyRuntimeConstants());
 
         // This prevents opening a new change stream in the critical section of a serverless shard
         // split or merge operation to prevent resuming on the recipient with a resume token higher

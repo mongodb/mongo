@@ -233,7 +233,7 @@ bool GroupProcessor::shouldSpillOnEveryDuplicateId(bool isNewGroup) {
     // Spill every time we have a duplicate id to stress merge logic.
     return (internalQueryEnableAggressiveSpillsInGroup && !_expCtx->opCtx->readOnly() &&
             !isNewGroup &&                    // is not a new group
-            !_expCtx->inMongos &&             // can't spill to disk in mongos
+            !_expCtx->inRouter &&             // can't spill to disk in router
             _memoryTracker.allowDiskUse() &&  // never spill when disk use is explicitly prohibited
             _sortedFiles.size() < 20);
 }

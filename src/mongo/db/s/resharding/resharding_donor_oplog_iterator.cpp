@@ -106,7 +106,7 @@ std::unique_ptr<Pipeline, PipelineDeleter> ReshardingDonorOplogIterator::makePip
 
     auto expCtx = make_intrusive<ExpressionContext>(opCtx,
                                                     boost::none, /* explain */
-                                                    false,       /* fromMongos */
+                                                    false,       /* fromRouter */
                                                     false,       /* needsMerge */
                                                     false,       /* allowDiskUse */
                                                     false,       /* bypassDocumentValidation */

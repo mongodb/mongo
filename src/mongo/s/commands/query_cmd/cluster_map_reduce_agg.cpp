@@ -142,7 +142,7 @@ auto makeExpressionContext(OperationContext* opCtx,
     auto expCtx = make_intrusive<ExpressionContext>(
         opCtx,
         verbosity,
-        false,  // fromMongos
+        false,  // fromRouter
         false,  // needsMerge
         true,   // allowDiskUse
         parsedMr.getBypassDocumentValidation().get_value_or(false),
@@ -157,7 +157,7 @@ auto makeExpressionContext(OperationContext* opCtx,
         boost::none,
         false  // mayDbProfile: false because mongos has no profile collection.
     );
-    expCtx->inMongos = true;
+    expCtx->inRouter = true;
     if (!cm.hasRoutingTable() && collationObj.isEmpty()) {
         expCtx->setIgnoreCollator();
     }

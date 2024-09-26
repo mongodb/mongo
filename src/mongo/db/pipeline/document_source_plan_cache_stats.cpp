@@ -74,7 +74,7 @@ boost::intrusive_ptr<DocumentSource> DocumentSourcePlanCacheStats::createFromBso
     if (allHosts) {
         uassert(4503200,
                 "$planCacheStats stage supports allHosts parameter only for sharded clusters",
-                pExpCtx->fromMongos || pExpCtx->inMongos);
+                pExpCtx->fromRouter || pExpCtx->inRouter);
     }
     return new DocumentSourcePlanCacheStats(pExpCtx, allHosts);
 }
@@ -138,7 +138,7 @@ DocumentSource::GetNextResult DocumentSourcePlanCacheStats::doGetNext() {
     if (_hostAndPort.empty()) {
         _hostAndPort = pExpCtx->mongoProcessInterface->getHostAndPort(pExpCtx->opCtx);
         uassert(31386,
-                "Aggregation request specified 'fromMongos' but unable to retrieve host name "
+                "Aggregation request specified 'fromRouter' but unable to retrieve host name "
                 "for $planCacheStats pipeline stage.",
                 !_hostAndPort.empty());
     }
@@ -146,11 +146,11 @@ DocumentSource::GetNextResult DocumentSourcePlanCacheStats::doGetNext() {
 
     // If we're returning results to mongos, then additionally augment each plan cache entry with
     // the shard name, for the node from which we're collecting plan cache information.
-    if (pExpCtx->fromMongos) {
+    if (pExpCtx->fromRouter) {
         if (_shardName.empty()) {
             _shardName = pExpCtx->mongoProcessInterface->getShardName(pExpCtx->opCtx);
             uassert(31385,
-                    "Aggregation request specified 'fromMongos' but unable to retrieve shard name "
+                    "Aggregation request specified 'fromRouter' but unable to retrieve shard name "
                     "for $planCacheStats pipeline stage.",
                     !_shardName.empty());
         }

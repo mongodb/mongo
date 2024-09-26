@@ -133,18 +133,18 @@ DocumentSource::GetNextResult DocumentSourceCurrentOp::doGetNext() {
 
         _opsIter = _ops.begin();
 
-        if (pExpCtx->fromMongos) {
+        if (pExpCtx->fromRouter) {
             _shardName = pExpCtx->mongoProcessInterface->getShardName(pExpCtx->opCtx);
 
             uassert(40465,
-                    "Aggregation request specified 'fromMongos' but unable to retrieve shard name "
+                    "Aggregation request specified 'fromRouter' but unable to retrieve shard name "
                     "for $currentOp pipeline stage.",
                     !_shardName.empty());
         }
     }
 
     if (_opsIter != _ops.end()) {
-        if (!pExpCtx->fromMongos) {
+        if (!pExpCtx->fromRouter) {
             return Document(*_opsIter++);
         }
 
@@ -255,7 +255,7 @@ intrusive_ptr<DocumentSource> DocumentSourceCurrentOp::createFromBson(
         if (targetAllNodesVal) {
             uassert(ErrorCodes::FailedToParse,
                     "$currentOp supports targetAllNodes parameter only for sharded clusters",
-                    pExpCtx->fromMongos || pExpCtx->inMongos);
+                    pExpCtx->fromRouter || pExpCtx->inRouter);
         }
     }
     if (currentOpSpec.getTruncateOps().has_value()) {

@@ -209,7 +209,7 @@ class ExecutableStubMongoProcessInterface : public StubMongoProcessInterface {
 
 TEST_F(DocumentSourceFacetTest, ShouldRejectConflictingHostTypeRequirementsWithinSinglePipeline) {
     auto ctx = getExpCtx();
-    ctx->inMongos = true;
+    ctx->inRouter = true;
     ctx->mongoProcessInterface = std::make_unique<ExecutableStubMongoProcessInterface>();
 
     auto spec = fromjson(
@@ -223,7 +223,7 @@ TEST_F(DocumentSourceFacetTest, ShouldRejectConflictingHostTypeRequirementsWithi
 
 TEST_F(DocumentSourceFacetTest, ShouldRejectConflictingHostTypeRequirementsAcrossPipelines) {
     auto ctx = getExpCtx();
-    ctx->inMongos = true;
+    ctx->inRouter = true;
     ctx->mongoProcessInterface = std::make_unique<ExecutableStubMongoProcessInterface>();
 
     auto spec = fromjson(

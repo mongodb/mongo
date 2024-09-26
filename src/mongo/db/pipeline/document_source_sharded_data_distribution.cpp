@@ -61,7 +61,7 @@ list<intrusive_ptr<DocumentSource>> DocumentSourceShardedDataDistribution::creat
             elem.type() == Object && elem.Obj().isEmpty());
 
     uassert(
-        6789101, "The $shardedDataDistribution stage can only be run on mongoS", expCtx->inMongos);
+        6789101, "The $shardedDataDistribution stage can only be run on mongoS", expCtx->inRouter);
 
     uassert(6789102,
             "The $shardedDataDistribution stage must be run on the admin database",

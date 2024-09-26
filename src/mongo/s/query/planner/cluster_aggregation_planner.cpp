@@ -945,8 +945,8 @@ Status runPipelineOnSpecificShardOnly(const boost::intrusive_ptr<ExpressionConte
     auto opCtx = expCtx->opCtx;
 
     tassert(6273804,
-            "Per shard cursors are supposed to pass fromMongos: false to shards",
-            !expCtx->inMongos);
+            "Per shard cursors are supposed to pass fromRouter: false to shards",
+            !expCtx->inRouter);
     // By using an initial batchSize of zero all of the events will get returned through
     // the getMore path and have metadata stripped out.
     boost::optional<int> overrideBatchSize = 0;

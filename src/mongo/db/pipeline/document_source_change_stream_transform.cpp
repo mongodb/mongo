@@ -238,9 +238,9 @@ DocumentSource::GetModPathsReturn DocumentSourceChangeStreamTransform::getModifi
 
 DocumentSource::GetNextResult DocumentSourceChangeStreamTransform::doGetNext() {
     uassert(50988,
-            "Illegal attempt to execute an internal change stream stage on mongos. A $changeStream "
+            "Illegal attempt to execute an internal change stream stage on router. A $changeStream "
             "stage must be the first stage in a pipeline",
-            !pExpCtx->inMongos);
+            !pExpCtx->inRouter);
 
     auto input = pSource->getNext();
     if (!input.isAdvanced()) {

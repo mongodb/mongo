@@ -88,7 +88,7 @@ using DocumentSourceGroupTest = AggregationContextFixture;
 
 TEST_F(DocumentSourceGroupTest, ShouldBeAbleToPauseLoading) {
     auto expCtx = getExpCtx();
-    expCtx->inMongos = true;  // Disallow external sort.
+    expCtx->inRouter = true;  // Disallow external sort.
                               // This is the only way to do this in a debug build.
     auto&& [parser, _1, _2, _3] = AccumulationStatement::getParser("$sum");
     auto accumulatorArg = BSON("" << 1);
@@ -167,7 +167,7 @@ TEST_F(DocumentSourceGroupTest, ShouldBeAbleToPauseLoadingWhileSpilled) {
 TEST_F(DocumentSourceGroupTest, ShouldErrorIfNotAllowedToSpillToDiskAndResultSetIsTooLarge) {
     auto expCtx = getExpCtx();
     const size_t maxMemoryUsageBytes = 1000;
-    expCtx->inMongos = true;  // Disallow external sort.
+    expCtx->inRouter = true;  // Disallow external sort.
                               // This is the only way to do this in a debug build.
 
     auto&& [parser, _1, _2, _3] = AccumulationStatement::getParser("$push");
@@ -193,7 +193,7 @@ TEST_F(DocumentSourceGroupTest, ShouldErrorIfNotAllowedToSpillToDiskAndResultSet
 TEST_F(DocumentSourceGroupTest, ShouldCorrectlyTrackMemoryUsageBetweenPauses) {
     auto expCtx = getExpCtx();
     const size_t maxMemoryUsageBytes = 1000;
-    expCtx->inMongos = true;  // Disallow external sort.
+    expCtx->inRouter = true;  // Disallow external sort.
                               // This is the only way to do this in a debug build.
 
     auto&& [parser, _1, _2, _3] = AccumulationStatement::getParser("$push");
@@ -482,7 +482,7 @@ protected:
         }
     }
 
-    void createGroup(const BSONObj& spec, bool inShard = false, bool inMongos = false) {
+    void createGroup(const BSONObj& spec, bool inShard = false, bool inRouter = false) {
         BSONObj namedSpec = BSON(getStageName() << spec);
         BSONElement specElement = namedSpec.firstElement();
 
@@ -492,9 +492,9 @@ protected:
                 AggregateCommandRequest(NamespaceString::createNamespaceString_forTest(ns),
                                         std::vector<mongo::BSONObj>()));
         expressionContext->allowDiskUse = true;
-        // For $group, 'inShard' implies 'fromMongos' and 'needsMerge'.
-        expressionContext->fromMongos = expressionContext->needsMerge = inShard;
-        expressionContext->inMongos = inMongos;
+        // For $group, 'inShard' implies 'fromRouter' and 'needsMerge'.
+        expressionContext->fromRouter = expressionContext->needsMerge = inShard;
+        expressionContext->inRouter = inRouter;
         // Won't spill to disk properly if it needs to.
         expressionContext->tempDir = _tempDir.path();
 

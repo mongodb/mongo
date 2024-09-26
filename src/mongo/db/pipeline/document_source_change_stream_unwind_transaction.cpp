@@ -217,8 +217,8 @@ DocumentSource::GetModPathsReturn DocumentSourceChangeStreamUnwindTransaction::g
 
 DocumentSource::GetNextResult DocumentSourceChangeStreamUnwindTransaction::doGetNext() {
     uassert(5543812,
-            str::stream() << kStageName << " cannot be executed from mongos",
-            !pExpCtx->inMongos);
+            str::stream() << kStageName << " cannot be executed from router",
+            !pExpCtx->inRouter);
 
     while (true) {
         // If we're unwinding an 'applyOps' from a transaction, check if there are any documents

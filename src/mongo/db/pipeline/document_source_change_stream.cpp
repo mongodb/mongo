@@ -262,7 +262,7 @@ Timestamp DocumentSourceChangeStream::getStartTimeForNewStream(
     // current clusterTime so that all shards start in sync.
     auto replCoord = repl::ReplicationCoordinator::get(expCtx->opCtx);
     const auto currentTime =
-        !expCtx->inMongos ? LogicalTime{replCoord->getMyLastAppliedOpTime().getTimestamp()} : [&] {
+        !expCtx->inRouter ? LogicalTime{replCoord->getMyLastAppliedOpTime().getTimestamp()} : [&] {
             const auto currentTime = VectorClock::get(expCtx->opCtx)->getTime();
             return currentTime.clusterTime();
         }();
@@ -338,11 +338,11 @@ std::list<boost::intrusive_ptr<DocumentSource>> DocumentSourceChangeStream::_bui
     // cover the change stream's starting point, and to swallow all events up to the resume point.
     stages.push_back(DocumentSourceChangeStreamCheckResumability::create(expCtx, spec));
 
-    // If the pipeline is built on MongoS, we check for topology change events here. If a topology
+    // If the pipeline is built on router, we check for topology change events here. If a topology
     // change event is detected, this stage forwards the event directly to the executor via an
-    // exception (bypassing the rest of the pipeline). MongoS must see all topology change events,
+    // exception (bypassing the rest of the pipeline). Router must see all topology change events,
     // so it's important that this stage occurs before any filtering is performed.
-    if (expCtx->inMongos) {
+    if (expCtx->inRouter) {
         stages.push_back(DocumentSourceChangeStreamCheckTopologyChange::create(expCtx));
     }
 
@@ -360,10 +360,10 @@ std::list<boost::intrusive_ptr<DocumentSource>> DocumentSourceChangeStream::_bui
         stages.push_back(DocumentSourceChangeStreamAddPostImage::create(expCtx, spec));
     }
 
-    // If the pipeline is built on MongoS, then the DSCSHandleTopologyChange stage acts as the
+    // If the pipeline is built on router, then the DSCSHandleTopologyChange stage acts as the
     // split point for the pipline. All stages before this stages will run on shards and all
-    // stages after and inclusive of this stage will run on the MongoS.
-    if (expCtx->inMongos) {
+    // stages after and inclusive of this stage will run on the router.
+    if (expCtx->inRouter) {
         stages.push_back(DocumentSourceChangeStreamHandleTopologyChange::create(expCtx));
     }
 
@@ -387,7 +387,7 @@ void DocumentSourceChangeStream::assertIsLegalSpecification(
     auto replCoord = repl::ReplicationCoordinator::get(expCtx->opCtx);
     uassert(40573,
             "The $changeStream stage is only supported on replica sets",
-            expCtx->inMongos || (replCoord && replCoord->getSettings().isReplSet()));
+            expCtx->inRouter || (replCoord && replCoord->getSettings().isReplSet()));
 
     // We will not validate user specified options when we are not expecting to execute queries,
     // such as during $queryStats.
@@ -421,12 +421,12 @@ void DocumentSourceChangeStream::assertIsLegalSpecification(
     uassert(ErrorCodes::InvalidNamespace,
             str::stream() << "$changeStream may not be opened on the internal "
                           << expCtx->ns.toStringForErrorMsg() << " collection"
-                          << (spec.getAllowToRunOnSystemNS() ? " through mongos" : ""),
-            !expCtx->ns.isSystem() || (spec.getAllowToRunOnSystemNS() && !expCtx->inMongos));
+                          << (spec.getAllowToRunOnSystemNS() ? " through router" : ""),
+            !expCtx->ns.isSystem() || (spec.getAllowToRunOnSystemNS() && !expCtx->inRouter));
 
     uassert(31123,
-            "Change streams from mongos may not show migration events",
-            !(expCtx->inMongos && spec.getShowMigrationEvents()));
+            "Change streams from router may not show migration events",
+            !(expCtx->inRouter && spec.getShowMigrationEvents()));
 
     uassert(50865,
             "Do not specify both 'resumeAfter' and 'startAfter' in a $changeStream stage",

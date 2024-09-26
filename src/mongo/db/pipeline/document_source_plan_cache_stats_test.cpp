@@ -137,7 +137,7 @@ TEST_F(DocumentSourcePlanCacheStatsTest, CanParseAndSerializeAsExplainSuccessful
 }
 
 TEST_F(DocumentSourcePlanCacheStatsTest, CanParseAndSerializeAllHostsSuccessfully) {
-    getExpCtx()->fromMongos = true;
+    getExpCtx()->fromRouter = true;
     auto stage = DocumentSourcePlanCacheStats::createFromBson(kAllHostsTrueSpecObj.firstElement(),
                                                               getExpCtx());
     std::vector<Value> serialized;
@@ -147,7 +147,7 @@ TEST_F(DocumentSourcePlanCacheStatsTest, CanParseAndSerializeAllHostsSuccessfull
 }
 
 TEST_F(DocumentSourcePlanCacheStatsTest, CanParseAndSerializeAsExplainAllHostsSuccessfully) {
-    getExpCtx()->fromMongos = true;
+    getExpCtx()->fromRouter = true;
     auto stage = DocumentSourcePlanCacheStats::createFromBson(kAllHostsTrueSpecObj.firstElement(),
                                                               getExpCtx());
     std::vector<Value> serialized;
@@ -191,7 +191,7 @@ TEST_F(DocumentSourcePlanCacheStatsTest, SerializesSuccessfullyAfterAbsorbingMat
 }
 
 TEST_F(DocumentSourcePlanCacheStatsTest, SerializesAllHostsSuccessfullyAfterAbsorbingMatch) {
-    getExpCtx()->fromMongos = true;
+    getExpCtx()->fromRouter = true;
     auto planCacheStats = DocumentSourcePlanCacheStats::createFromBson(
         kAllHostsTrueSpecObj.firstElement(), getExpCtx());
     auto match = DocumentSourceMatch::create(fromjson("{foo: 'bar'}"), getExpCtx());
@@ -209,7 +209,7 @@ TEST_F(DocumentSourcePlanCacheStatsTest, SerializesAllHostsSuccessfullyAfterAbso
 
 TEST_F(DocumentSourcePlanCacheStatsTest,
        SerializesAllHostsSuccessfullyAfterAbsorbingMatchForExplain) {
-    getExpCtx()->fromMongos = true;
+    getExpCtx()->fromRouter = true;
     auto planCacheStats = DocumentSourcePlanCacheStats::createFromBson(
         kAllHostsTrueSpecObj.firstElement(), getExpCtx());
     auto match = DocumentSourceMatch::create(fromjson("{foo: 'bar'}"), getExpCtx());
@@ -314,7 +314,7 @@ TEST_F(DocumentSourcePlanCacheStatsTest, ReturnsShardAndHostNameWhenFromMongos) 
                                     << "baz")};
     getExpCtx()->mongoProcessInterface =
         std::make_shared<PlanCacheStatsMongoProcessInterface>(stats);
-    getExpCtx()->fromMongos = true;
+    getExpCtx()->fromRouter = true;
 
     auto planCacheStats =
         DocumentSourcePlanCacheStats::createFromBson(kEmptySpecObj.firstElement(), getExpCtx());

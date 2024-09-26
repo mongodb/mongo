@@ -63,7 +63,7 @@ const char* DocumentSourceSearch::getSourceName() const {
 }
 
 Value DocumentSourceSearch::serialize(const SerializationOptions& opts) const {
-    if (!opts.verbosity || pExpCtx->inMongos) {
+    if (!opts.verbosity || pExpCtx->inRouter) {
         // When serializing $search, we only need to serialize the full mongot remote spec when
         // in a sharded scenario (i.e., when we have a metadata merge protocol verison), regardless
         // of whether we're on a router or a data-bearing node. Otherwise, we only need the mongot

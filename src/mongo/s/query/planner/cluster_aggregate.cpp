@@ -167,7 +167,7 @@ boost::intrusive_ptr<ExpressionContext> makeExpressionContext(
             CollatorFactoryInterface::get(opCtx->getServiceContext())->makeFromBSON(collationObj));
     }
 
-    // Create the expression context, and set 'inMongos' to true. We explicitly do *not* set
+    // Create the expression context, and set 'inRouter' to true. We explicitly do *not* set
     // mergeCtx->tempDir.
     auto mergeCtx = make_intrusive<ExpressionContext>(
         opCtx,
@@ -178,7 +178,7 @@ boost::intrusive_ptr<ExpressionContext> makeExpressionContext(
         std::move(resolvedNamespaces),
         uuid);
 
-    mergeCtx->inMongos = true;
+    mergeCtx->inRouter = true;
 
     if ((!cri || !cri->cm.hasRoutingTable()) && collationObj.isEmpty()) {
         mergeCtx->setIgnoreCollator();
@@ -632,17 +632,17 @@ Status ClusterAggregate::runAggregate(OperationContext* opCtx,
         expCtx->addResolvedNamespaces(involvedNamespaces);
 
 
-        // We might need 'inMongos' temporarily set to true for query stats parsing, but we don't
+        // We might need 'inRouter' temporarily set to true for query stats parsing, but we don't
         // want to modify the value of 'expCtx' for future code execution so we will set it back to
         // its original value.
-        ON_BLOCK_EXIT([&expCtx, originalInMongosVal = expCtx->inMongos]() {
-            expCtx->inMongos = originalInMongosVal;
+        ON_BLOCK_EXIT([&expCtx, originalInRouterVal = expCtx->inRouter]() {
+            expCtx->inRouter = originalInRouterVal;
         });
 
-        // In order to parse a change stream request for query stats, 'inMongos' needs
+        // In order to parse a change stream request for query stats, 'inRouter' needs
         // to be set to true.
         if (hasChangeStream) {
-            expCtx->inMongos = true;
+            expCtx->inRouter = true;
         }
 
         // Skip query stats recording for queryable encryption queries.

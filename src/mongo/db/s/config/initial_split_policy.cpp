@@ -930,7 +930,7 @@ SamplingBasedSplitPolicy::_makePipelineDocumentSource(OperationContext* opCtx,
 
     auto expCtx = make_intrusive<ExpressionContext>(opCtx,
                                                     boost::none, /* explain */
-                                                    false,       /* fromMongos */
+                                                    false,       /* fromRouter */
                                                     false,       /* needsMerge */
                                                     true,        /* allowDiskUse */
                                                     true,        /* bypassDocumentValidation */

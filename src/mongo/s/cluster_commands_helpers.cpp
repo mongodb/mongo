@@ -189,7 +189,7 @@ boost::intrusive_ptr<ExpressionContext> makeExpressionContextWithDefaultsForTarg
     auto expCtx = make_intrusive<ExpressionContext>(
         opCtx,
         verbosity,
-        true,   // fromMongos
+        true,   // fromRouter
         false,  // needs merge
         false,  // disk use is banned on mongos
         true,   // bypass document validation, mongos isn't a storage node

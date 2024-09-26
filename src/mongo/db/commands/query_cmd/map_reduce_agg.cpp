@@ -115,7 +115,7 @@ auto makeExpressionContext(OperationContext* opCtx,
     auto expCtx = make_intrusive<ExpressionContext>(
         opCtx,
         verbosity,
-        false,                         // fromMongos
+        false,                         // fromRouter
         false,                         // needsMerge
         allowDiskUseByDefault.load(),  // allowDiskUse
         parsedMr.getBypassDocumentValidation().get_value_or(false),

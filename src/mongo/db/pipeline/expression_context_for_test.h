@@ -68,7 +68,7 @@ public:
     ExpressionContextForTest(NamespaceString nss)
         : ExpressionContext(nullptr,      // opCtx, nullptr while base class is constructed.
                             boost::none,  // explain
-                            false,        // fromMongos,
+                            false,        // fromRouter,
                             false,        // needsMerge,
                             false,        // allowDiskUse,
                             false,        // bypassDocumentValidation,
@@ -120,7 +120,7 @@ public:
     ExpressionContextForTest(OperationContext* opCtx, NamespaceString nss)
         : ExpressionContext(opCtx,
                             boost::none,  // explain
-                            false,        // fromMongos,
+                            false,        // fromRouter,
                             false,        // needsMerge,
                             false,        // allowDiskUse,
                             false,        // bypassDocumentValidation,
@@ -147,7 +147,7 @@ public:
     ExpressionContextForTest(OperationContext* opCtx, NamespaceString nss, SerializationContext sc)
         : ExpressionContext(opCtx,
                             boost::none,  // explain
-                            false,        // fromMongos,
+                            false,        // fromRouter,
                             false,        // needsMerge,
                             false,        // allowDiskUse,
                             false,        // bypassDocumentValidation,
@@ -189,7 +189,7 @@ public:
                              const boost::optional<BSONObj>& letParameters = boost::none)
         : ExpressionContext(opCtx,
                             boost::none,  // explain
-                            false,        // fromMongos,
+                            false,        // fromRouter,
                             false,        // needsMerge,
                             false,        // allowDiskUse,
                             false,        // bypassDocumentValidation,

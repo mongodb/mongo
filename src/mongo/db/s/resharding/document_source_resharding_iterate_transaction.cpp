@@ -155,8 +155,8 @@ DocumentSource::GetModPathsReturn DocumentSourceReshardingIterateTransaction::ge
 
 DocumentSource::GetNextResult DocumentSourceReshardingIterateTransaction::doGetNext() {
     uassert(5730301,
-            str::stream() << kStageName << " cannot be executed from mongos",
-            !pExpCtx->inMongos);
+            str::stream() << kStageName << " cannot be executed from router",
+            !pExpCtx->inRouter);
 
     while (true) {
         // If we're unwinding an 'applyOps' from a transaction, check if there are any documents

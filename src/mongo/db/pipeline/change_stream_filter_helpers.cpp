@@ -358,9 +358,9 @@ std::unique_ptr<MatchExpression> buildInternalOpFilter(
     std::vector<StringData> internalOpTypes = {
         "reshardBegin"_sd, "reshardDoneCatchUp"_sd, "shardCollection"_sd};
 
-    // Noop change events that are only applicable when merging results on mongoS:
+    // Noop change events that are only applicable when merging results on router:
     //   - migrateChunkToNewShard: A chunk migrated to a shard that didn't have any chunks.
-    if (expCtx->inMongos || expCtx->needsMerge) {
+    if (expCtx->inRouter || expCtx->needsMerge) {
         internalOpTypes.push_back("migrateChunkToNewShard"_sd);
     }
 

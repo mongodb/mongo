@@ -157,7 +157,7 @@ TEST_F(InternalSearchIdLookupTest, ShouldParseFromSerialized) {
 
     DocumentSourceInternalSearchIdLookUp idLookupStage(expCtx);
 
-    // Serialize the idLookup stage, as we would on mongos.
+    // Serialize the idLookup stage, as we would on router.
     vector<Value> serialization;
     idLookupStage.serializeToArray(serialization);
     ASSERT_EQ(serialization.size(), 1UL);
@@ -169,12 +169,12 @@ TEST_F(InternalSearchIdLookupTest, ShouldParseFromSerialized) {
                                                                        << "_id placeholder")))));
     ASSERT_BSONOBJ_EQ(serialization[0].getDocument().toBson(), spec);
 
-    // On mongod we should be able to re-parse it.
-    expCtx->inMongos = false;
-    auto idLookupStageMongod =
+    // On shard we should be able to re-parse it.
+    expCtx->inRouter = false;
+    auto idLookupStageShard =
         DocumentSourceInternalSearchIdLookUp::createFromBson(spec.firstElement(), expCtx);
     ASSERT_EQ(DocumentSourceInternalSearchIdLookUp::kStageName,
-              idLookupStageMongod->getSourceName());
+              idLookupStageShard->getSourceName());
 }
 
 TEST_F(InternalSearchIdLookupTest, ShouldFailParsingWhenSpecNotEmptyObject) {

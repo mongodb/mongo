@@ -169,9 +169,9 @@ void validateTopLevelPipeline(const Pipeline& pipeline) {
                 !(hasSplitEventResumeToken && !hasChangeStreamSplitLargeEventStage));
     }
 
-    // Verify that usage of $searchMeta and $search is legal. Note that on mongos, we defer this
+    // Verify that usage of $searchMeta and $search is legal. Note that on routers, we defer this
     // check until after we've established cursors on the shards to resolve any views.
-    if (expCtx->opCtx->getServiceContext() && !expCtx->inMongos) {
+    if (expCtx->opCtx->getServiceContext() && !expCtx->inRouter) {
         search_helpers::assertSearchMetaAccessValid(sources, expCtx.get());
     }
 }
@@ -336,10 +336,10 @@ void Pipeline::validateCommon(bool alreadyOptimized) const {
             stage->validatePipelinePosition(alreadyOptimized, sourceIter, _sources);
         }
 
-        // Verify that we are not attempting to run a mongoS-only stage on mongoD.
+        // Verify that we are not attempting to run a router-only stage on a data bearing node.
         uassert(40644,
-                str::stream() << stage->getSourceName() << " can only be run on mongoS",
-                !(constraints.hostRequirement == HostTypeRequirement::kMongoS && !pCtx->inMongos));
+                str::stream() << stage->getSourceName() << " can only be run on router",
+                !(constraints.hostRequirement == HostTypeRequirement::kMongoS && !pCtx->inRouter));
 
         uassert(
             ErrorCodes::OperationNotSupportedInTransaction,

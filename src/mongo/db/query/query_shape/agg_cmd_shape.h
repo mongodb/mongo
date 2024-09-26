@@ -92,9 +92,9 @@ public:
 
 private:
     AggCmdShapeComponents _components;
-    // Flag to denote if the query was run on mongos. Needed to rebuild the "dummy" expression
-    // context for re-parsing.
-    bool _inMongos;
+    // Flag to denote if the query was run in a router-role context. Needed to rebuild the "dummy"
+    // expression context for re-parsing.
+    bool _inRouter;
 };
 static_assert(sizeof(AggCmdShape) <=
                   sizeof(CmdWithLetShape) + sizeof(AggCmdShapeComponents) + 8 /* bool and padding*/,

@@ -183,7 +183,7 @@ TEST_F(DocumentSourceCurrentOpTest, ShouldFailToParseTrueTargetAllNodesIfUnshard
 TEST_F(DocumentSourceCurrentOpTest, ShouldParseAndSerializeTargetAllNodesIfSharded) {
     const auto specObj = fromjson("{$currentOp:{targetAllNodes:true}}");
 
-    getExpCtx()->fromMongos = true;
+    getExpCtx()->fromRouter = true;
 
     const auto parsed =
         DocumentSourceCurrentOp::createFromBson(specObj.firstElement(), getExpCtx());
@@ -284,7 +284,7 @@ TEST_F(DocumentSourceCurrentOpTest, ShouldReturnEOFImmediatelyIfNoCurrentOps) {
 
 TEST_F(DocumentSourceCurrentOpTest,
        ShouldAddShardNameModifyOpIDAndClientFieldNameInShardedContext) {
-    getExpCtx()->fromMongos = true;
+    getExpCtx()->fromRouter = true;
 
     std::vector<BSONObj> ops{fromjson("{ client: '192.168.1.10:50844', opid: 430 }")};
     getExpCtx()->mongoProcessInterface = std::make_shared<MockMongoInterface>(ops);
@@ -301,7 +301,7 @@ TEST_F(DocumentSourceCurrentOpTest,
 
 TEST_F(DocumentSourceCurrentOpTest,
        ShouldReturnOpIDAndClientFieldNameUnmodifiedWhenNotInShardedContext) {
-    getExpCtx()->fromMongos = false;
+    getExpCtx()->fromRouter = false;
 
     std::vector<BSONObj> ops{fromjson("{ client: '192.168.1.10:50844', opid: 430 }")};
     getExpCtx()->mongoProcessInterface = std::make_shared<MockMongoInterface>(ops);
@@ -315,7 +315,7 @@ TEST_F(DocumentSourceCurrentOpTest,
 }
 
 TEST_F(DocumentSourceCurrentOpTest, ShouldFailIfNoShardNameAvailableForShardedRequest) {
-    getExpCtx()->fromMongos = true;
+    getExpCtx()->fromRouter = true;
 
     getExpCtx()->mongoProcessInterface = std::make_shared<MockMongoInterface>(false);
 
@@ -325,7 +325,7 @@ TEST_F(DocumentSourceCurrentOpTest, ShouldFailIfNoShardNameAvailableForShardedRe
 }
 
 TEST_F(DocumentSourceCurrentOpTest, ShouldFailIfOpIDIsNonNumericWhenModifyingInShardedContext) {
-    getExpCtx()->fromMongos = true;
+    getExpCtx()->fromRouter = true;
 
     std::vector<BSONObj> ops{fromjson("{ client: '192.168.1.10:50844', opid: 'string' }")};
     getExpCtx()->mongoProcessInterface = std::make_shared<MockMongoInterface>(ops);

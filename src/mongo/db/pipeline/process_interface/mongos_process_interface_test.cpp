@@ -61,7 +61,7 @@ public:
 class MongosProcessInterfaceTest : public AggregationContextFixture {
 public:
     MongosProcessInterfaceTest() {
-        getExpCtx()->inMongos = true;
+        getExpCtx()->inRouter = true;
     }
 
     auto makeProcessInterface() {

@@ -54,7 +54,7 @@ enum class Tracking { forwards, backwards };
 class AggregationContextFixture : public ServiceContextTest {
 public:
     struct ExpressionContextOptionsStruct {
-        bool inMongos = false;
+        bool inRouter = false;
         bool allowDiskUse = true;
     };
 
@@ -82,7 +82,7 @@ public:
     }
 
     void setExpCtx(ExpressionContextOptionsStruct options) {
-        _expCtx->inMongos = options.inMongos;
+        _expCtx->inRouter = options.inRouter;
         _expCtx->allowDiskUse = options.allowDiskUse;
     }
 

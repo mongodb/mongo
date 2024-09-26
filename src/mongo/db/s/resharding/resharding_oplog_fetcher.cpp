@@ -111,7 +111,7 @@ boost::intrusive_ptr<ExpressionContext> _makeExpressionContext(OperationContext*
         NamespaceString::kRsOplogNamespace, std::vector<BSONObj>()};
     return make_intrusive<ExpressionContext>(opCtx,
                                              boost::none, /* explain */
-                                             false,       /* fromMongos */
+                                             false,       /* fromRouter */
                                              false,       /* needsMerge */
                                              true,        /* allowDiskUse */
                                              true,        /* bypassDocumentValidation */

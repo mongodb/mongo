@@ -1756,14 +1756,14 @@ Pipeline::SourceContainer::iterator DocumentSourceInternalUnpackBucket::doOptimi
         // are on control.(min|max).<timeField>, we may be able to augment them with a predicate on
         // _id as well, if there are no extended range values.
         //
-        // Note that this transformation cannot apply on mongos, because the presence of extended
+        // Note that this transformation cannot apply on router, because the presence of extended
         // range values is not known there. See SERVER-73641.
         //
         // Unlike other rewrites for this stage, this rewrite affects a $match stage that is
         // *before* the unpack stage. So we need to apply this rewrite first, before the others,
         // which might cause us to return early.
         if (auto prevMatch = dynamic_cast<DocumentSourceMatch*>(std::prev(itr)->get());
-            prevMatch && !pExpCtx->inMongos && !_bucketUnpacker.bucketSpec().usesExtendedRange()) {
+            prevMatch && !pExpCtx->inRouter && !_bucketUnpacker.bucketSpec().usesExtendedRange()) {
             MatchExpression* matchExpr = prevMatch->getMatchExpression();
             bool updated = generateBucketLevelIdPredicates(matchExpr);
             if (updated) {

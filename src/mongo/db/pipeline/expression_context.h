@@ -191,7 +191,7 @@ public:
      */
     ExpressionContext(OperationContext* opCtx,
                       const boost::optional<ExplainOptions::Verbosity>& explain,
-                      bool fromMongos,
+                      bool fromRouter,
                       bool needsMerge,
                       bool allowDiskUse,
                       bool bypassDocumentValidation,
@@ -440,7 +440,7 @@ public:
             (variables.hasValue(Variables::kIsMapReduceId) &&
              variables.getValue(Variables::kIsMapReduceId).getType() == BSONType::Bool &&
              variables.getValue(Variables::kIsMapReduceId).coerceToBool());
-        if (inMongos) {
+        if (inRouter) {
             invariant(!forceLoadOfStoredProcedures);
             invariant(!isMapReduce);
         }
@@ -547,9 +547,9 @@ public:
     // The explain verbosity requested by the user, or boost::none if no explain was requested.
     boost::optional<ExplainOptions::Verbosity> explain;
 
-    bool fromMongos = false;
+    bool fromRouter = false;
     bool needsMerge = false;
-    bool inMongos = false;
+    bool inRouter = false;
     bool forPerShardCursor = false;
     bool allowDiskUse = false;
     bool bypassDocumentValidation = false;

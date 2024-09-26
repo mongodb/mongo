@@ -206,7 +206,7 @@ BSONObj genericTransformForShards(MutableDocument&& cmdForShards,
     cmdForShards[AggregateCommandRequest::kLetFieldName] =
         Value(expCtx->variablesParseState.serialize(expCtx->variables));
 
-    cmdForShards[AggregateCommandRequest::kFromMongosFieldName] = Value(expCtx->inMongos);
+    cmdForShards[AggregateCommandRequest::kFromMongosFieldName] = Value(expCtx->inRouter);
 
     if (auto collationObj = expCtx->getCollatorBSON();
         !collationObj.isEmpty() && !expCtx->getIgnoreCollator()) {
@@ -910,7 +910,7 @@ TargetingResults targetPipeline(const boost::intrusive_ptr<ExpressionContext>& e
         // opening is expected to fail at a later stage with a ShardNotFound error which will be
         // returned to the client; upon retry, anyShardRemovedSince() will return an accurate
         // response.
-        if (expCtx->inMongos) {
+        if (expCtx->inRouter) {
             const auto changeStreamOpeningTime =
                 ResumeToken::parse(expCtx->initialPostBatchResumeToken).getData().clusterTime;
             uassert(ErrorCodes::ChangeStreamHistoryLost,
@@ -1352,7 +1352,7 @@ Status appendExplainResults(DispatchShardPipelineResults&& dispatchResults,
         auto specificMergeShardId = dispatchResults.mergeShardId;
         auto mergeType = [&]() -> std::string {
             if (mergePipeline->canRunOnMongos().isOK() && !specificMergeShardId) {
-                if (mergeCtx->inMongos) {
+                if (mergeCtx->inRouter) {
                     return "mongos";
                 }
                 return "local";

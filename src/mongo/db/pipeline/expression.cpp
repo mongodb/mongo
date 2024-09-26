@@ -7374,9 +7374,9 @@ intrusive_ptr<Expression> ExpressionConvert::parse(ExpressionContext* const expC
                                      "current feature compatibility version. See "
                                   << feature_compatibility_version_documentation::kCompatibilityLink
                                   << ".",
-                    // If the command came from mongos, it means mongos must be on an FCV that
+                    // If the command came from router, it means router must be on an FCV that
                     // supports the 'format' field.
-                    expCtx->fromMongos || allowBinDataConvert);
+                    expCtx->fromRouter || allowBinDataConvert);
             format = parseOperand(expCtx, elem, vps);
         } else if (field == "onError"_sd) {
             onError = parseOperand(expCtx, elem, vps);

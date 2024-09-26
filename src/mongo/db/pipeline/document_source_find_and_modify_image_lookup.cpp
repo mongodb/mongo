@@ -239,8 +239,8 @@ DocumentSource::GetModPathsReturn DocumentSourceFindAndModifyImageLookup::getMod
 
 DocumentSource::GetNextResult DocumentSourceFindAndModifyImageLookup::doGetNext() {
     uassert(5806001,
-            str::stream() << kStageName << " cannot be executed from mongos",
-            !pExpCtx->inMongos);
+            str::stream() << kStageName << " cannot be executed from router",
+            !pExpCtx->inRouter);
     if (_stashedDownconvertedDoc) {
         // Return the stashed downconverted document. This indicates that the previous document
         // returned was a forged noop image document.

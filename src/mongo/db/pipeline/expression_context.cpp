@@ -62,7 +62,7 @@ ExpressionContext::ExpressionContext(OperationContext* opCtx,
     // includes the following fields which here we simply initialize to some meaningless default
     // value:
     //  - explain
-    //  - fromMongos
+    //  - fromRouter
     //  - needsMerge
     //  - bypassDocumentValidation
     //  - mongoProcessInterface
@@ -74,7 +74,7 @@ ExpressionContext::ExpressionContext(OperationContext* opCtx,
     : ExpressionContext(
           opCtx,
           verbosity,
-          false,  // fromMongos
+          false,  // fromRouter
           false,  // needsMerge
           findCmd.getAllowDiskUse().value_or(allowDiskUseDefault),
           false,  // bypassDocumentValidation
@@ -105,7 +105,7 @@ ExpressionContext::ExpressionContext(OperationContext* opCtx,
     : ExpressionContext(
           opCtx,
           verbosity,
-          false,  // fromMongos
+          false,  // fromRouter
           false,  // needsMerge
           false,  // allowDiskUse
           false,  // bypassDocumentValidation
@@ -161,7 +161,7 @@ ExpressionContext::ExpressionContext(OperationContext* opCtx,
 ExpressionContext::ExpressionContext(
     OperationContext* opCtx,
     const boost::optional<ExplainOptions::Verbosity>& explain,
-    bool fromMongos,
+    bool fromRouter,
     bool needsMerge,
     bool allowDiskUse,
     bool bypassDocumentValidation,
@@ -176,7 +176,7 @@ ExpressionContext::ExpressionContext(
     bool mayDbProfile,
     const SerializationContext& serializationCtx)
     : explain(explain),
-      fromMongos(fromMongos),
+      fromRouter(fromRouter),
       needsMerge(needsMerge),
       allowDiskUse(allowDiskUse && ([&]() {
                        tassert(7738401, "opCtx null check", opCtx);
@@ -325,7 +325,7 @@ boost::intrusive_ptr<ExpressionContext> ExpressionContext::copyWith(
 
     auto expCtx = make_intrusive<ExpressionContext>(opCtx,
                                                     explain,
-                                                    fromMongos,
+                                                    fromRouter,
                                                     needsMerge,
                                                     allowDiskUse,
                                                     bypassDocumentValidation,
@@ -344,7 +344,7 @@ boost::intrusive_ptr<ExpressionContext> ExpressionContext::copyWith(
         expCtx->setIgnoreCollator();
     }
 
-    expCtx->inMongos = inMongos;
+    expCtx->inRouter = inRouter;
     expCtx->maxFeatureCompatibilityVersion = maxFeatureCompatibilityVersion;
     expCtx->subPipelineDepth = subPipelineDepth;
     expCtx->tempDir = tempDir;

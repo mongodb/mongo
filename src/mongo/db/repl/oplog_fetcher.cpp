@@ -587,7 +587,7 @@ AggregateCommandRequest OplogFetcher::_makeAggregateCommandRequest(long long max
     boost::intrusive_ptr<ExpressionContext> expCtx =
         make_intrusive<ExpressionContext>(opCtx.get(),
                                           boost::none, /* explain */
-                                          false,       /* fromMongos */
+                                          false,       /* fromRouter */
                                           false,       /* needsMerge */
                                           true,        /* allowDiskUse */
                                           true,        /* bypassDocumentValidation */

@@ -440,7 +440,7 @@ public:
         const std::vector<BSONObj>& rawPipeline) {
         auto expCtx = getExpCtx();
         expCtx->ns = NamespaceString::createNamespaceString_forTest(boost::none, "a.collection");
-        expCtx->inMongos = true;
+        expCtx->inRouter = true;
 
         auto pipeline = Pipeline::parse(rawPipeline, expCtx);
         pipeline->optimizePipeline();
@@ -650,7 +650,7 @@ TEST_F(ChangeStreamStageTest, CanCreateStageForSystemCollectionWhenAllowToRunOnS
     auto expressionContext = getExpCtx();
     expressionContext->ns =
         NamespaceString::createNamespaceString_forTest("db", "system.namespace");
-    expressionContext->inMongos = false;
+    expressionContext->inRouter = false;
     const auto spec = fromjson("{$changeStream: {allowToRunOnSystemNS: true}}");
     DocumentSourceChangeStream::createFromBson(spec.firstElement(), getExpCtx());
 }
@@ -660,7 +660,7 @@ TEST_F(ChangeStreamStageTest,
     auto expressionContext = getExpCtx();
     expressionContext->ns =
         NamespaceString::createNamespaceString_forTest("db", "system.namespace");
-    expressionContext->inMongos = true;
+    expressionContext->inRouter = true;
     const auto spec = fromjson("{$changeStream: {allowToRunOnSystemNS: true}}");
     ASSERT_THROWS_CODE(DocumentSourceChangeStream::createFromBson(spec.firstElement(), getExpCtx()),
                        AssertionException,
@@ -674,7 +674,7 @@ TEST_F(ChangeStreamStageTest, CanCreateStageForNonSystemCollection) {
 
 TEST_F(ChangeStreamStageTest, ShowMigrationsFailsOnMongos) {
     auto expCtx = getExpCtx();
-    expCtx->inMongos = true;
+    expCtx->inRouter = true;
     auto spec = fromjson("{$changeStream: {showMigrationEvents: true}}");
 
     ASSERT_THROWS_CODE(

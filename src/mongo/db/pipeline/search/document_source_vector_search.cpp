@@ -111,9 +111,9 @@ Value DocumentSourceVectorSearch::serialize(const SerializationOptions& opts) co
         return Value(Document{{kStageName, builder.obj()}});
     }
 
-    // We don't want mongos to make a remote call to mongot even though it can generate explain
+    // We don't want router to make a remote call to mongot even though it can generate explain
     // output.
-    if (!opts.verbosity || pExpCtx->inMongos) {
+    if (!opts.verbosity || pExpCtx->inRouter) {
         return Value(Document{{kStageName, _originalSpec}});
     }
 

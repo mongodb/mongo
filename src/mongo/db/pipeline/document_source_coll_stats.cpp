@@ -93,7 +93,7 @@ intrusive_ptr<DocumentSource> DocumentSourceCollStats::createFromBson(
     if (spec.getTargetAllNodes().value_or(false)) {
         uassert(ErrorCodes::FailedToParse,
                 "$collStats supports targetAllNodes parameter only for sharded clusters",
-                pExpCtx->inMongos || pExpCtx->fromMongos);
+                pExpCtx->inRouter || pExpCtx->fromRouter);
     }
     return make_intrusive<DocumentSourceCollStats>(pExpCtx, std::move(spec));
 }

@@ -409,7 +409,7 @@ MongosProcessInterface::ensureFieldsUniqueOrResolveDocumentKey(
     boost::optional<std::set<FieldPath>> fieldPaths,
     boost::optional<ChunkVersion> targetCollectionPlacementVersion,
     const NamespaceString& outputNs) const {
-    invariant(expCtx->inMongos);
+    invariant(expCtx->inRouter);
     uassert(51179,
             "Received unexpected 'targetCollectionPlacementVersion' on mongos",
             !targetCollectionPlacementVersion);

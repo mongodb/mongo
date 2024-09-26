@@ -129,8 +129,8 @@ DocumentSource::GetModPathsReturn DocumentSourceReshardingAddResumeId::getModifi
 
 DocumentSource::GetNextResult DocumentSourceReshardingAddResumeId::doGetNext() {
     uassert(6387804,
-            str::stream() << kStageName << " cannot be executed from mongos",
-            !pExpCtx->inMongos);
+            str::stream() << kStageName << " cannot be executed from router",
+            !pExpCtx->inRouter);
 
     // Get the next input document.
     auto input = pSource->getNext();

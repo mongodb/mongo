@@ -894,19 +894,19 @@ CommonMongodProcessInterface::ensureFieldsUniqueOrResolveDocumentKey(
     const NamespaceString& outputNs) const {
     uassert(51123,
             "Unexpected target chunk version specified",
-            !targetCollectionPlacementVersion || expCtx->fromMongos);
+            !targetCollectionPlacementVersion || expCtx->fromRouter);
 
     if (!fieldPaths) {
-        uassert(51124, "Expected fields to be provided from mongos", !expCtx->fromMongos);
+        uassert(51124, "Expected fields to be provided from router", !expCtx->fromRouter);
         return {std::set<FieldPath>{"_id"},
                 targetCollectionPlacementVersion,
                 SupportingUniqueIndex::Full};
     }
 
     // Make sure the 'fields' array has a supporting index. Skip this check if the command is sent
-    // from mongos since the 'fields' check would've happened already.
+    // from router since the 'fields' check would've happened already.
     auto supportingUniqueIndex = fieldsHaveSupportingUniqueIndex(expCtx, outputNs, *fieldPaths);
-    if (!expCtx->fromMongos) {
+    if (!expCtx->fromRouter) {
         uassert(51183,
                 "Cannot find index to verify that join fields will be unique",
                 supportingUniqueIndex != SupportingUniqueIndex::None);

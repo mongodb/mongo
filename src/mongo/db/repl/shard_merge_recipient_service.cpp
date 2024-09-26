@@ -190,7 +190,7 @@ boost::intrusive_ptr<ExpressionContext> makeExpressionContext(OperationContext* 
 
     return make_intrusive<ExpressionContext>(opCtx,
                                              boost::none, /* explain */
-                                             false,       /* fromMongos */
+                                             false,       /* fromRouter */
                                              false,       /* needsMerge */
                                              true,        /* allowDiskUse */
                                              true,        /* bypassDocumentValidation */

@@ -57,7 +57,7 @@ TEST_F(ExpressionContextTest, ExpressionContextSummonsMissingTimeValues) {
         const auto expCtx = ExpressionContext{
             opCtx.get(),
             {},     // explain
-            false,  // fromMongos
+            false,  // fromRouter
             false,  // needsMerge
             false,  // allowDiskUse
             false,  // bypassDocumentValidation
@@ -80,7 +80,7 @@ TEST_F(ExpressionContextTest, ExpressionContextSummonsMissingTimeValues) {
         const auto expCtx = ExpressionContext{
             opCtx.get(),
             {},     // explain
-            false,  // fromMongos
+            false,  // fromRouter
             false,  // needsMerge
             false,  // allowDiskUse
             false,  // bypassDocumentValidation
@@ -106,7 +106,7 @@ TEST_F(ExpressionContextTest, ParametersCanContainExpressionsWhichAreFolded) {
     const auto expCtx =
         ExpressionContext{opCtx.get(),
                           {},     // explain
-                          false,  // fromMongos
+                          false,  // fromRouter
                           false,  // needsMerge
                           false,  // allowDiskUse
                           false,  // bypassDocumentValidation
@@ -129,7 +129,7 @@ TEST_F(ExpressionContextTest, ParametersCanReferToAlreadyDefinedParameters) {
     const auto expCtx =
         ExpressionContext{opCtx.get(),
                           {},     // explain
-                          false,  // fromMongos
+                          false,  // fromRouter
                           false,  // needsMerge
                           false,  // allowDiskUse
                           false,  // bypassDocumentValidation
@@ -154,7 +154,7 @@ TEST_F(ExpressionContextTest, ParametersCanOverwriteInLeftToRightOrder) {
     const auto expCtx =
         ExpressionContext{opCtx.get(),
                           {},     // explain
-                          false,  // fromMongos
+                          false,  // fromRouter
                           false,  // needsMerge
                           false,  // allowDiskUse
                           false,  // bypassDocumentValidation
@@ -176,7 +176,7 @@ TEST_F(ExpressionContextTest, ParametersCauseGracefulFailuresIfNonConstant) {
     ASSERT_THROWS_CODE(
         static_cast<void>(ExpressionContext{opCtx.get(),
                                             {},     // explain
-                                            false,  // fromMongos
+                                            false,  // fromRouter
                                             false,  // needsMerge
                                             false,  // allowDiskUse
                                             false,  // bypassDocumentValidation
@@ -201,7 +201,7 @@ TEST_F(ExpressionContextTest, ParametersCauseGracefulFailuresIfUppercase) {
         static_cast<void>(ExpressionContext{
             opCtx.get(),
             {},     // explain
-            false,  // fromMongos
+            false,  // fromRouter
             false,  // needsMerge
             false,  // allowDiskUse
             false,  // bypassDocumentValidation

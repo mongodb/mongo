@@ -589,7 +589,7 @@ TEST_F(CheckResumeTokenTest, ShouldSucceedWithBinaryCollation) {
 
 TEST_F(CheckResumeTokenTest, UnshardedTokenFailsForShardedResumeOnMongosIfIdDoesNotMatchFirstDoc) {
     Timestamp resumeTimestamp(100, 1);
-    getExpCtx()->inMongos = true;
+    getExpCtx()->inRouter = true;
 
     auto checkResumeToken =
         createDSEnsureResumeTokenPresent(resumeTimestamp, Document{{"_id"_sd, 1}});
@@ -604,10 +604,10 @@ TEST_F(CheckResumeTokenTest, UnshardedTokenFailsForShardedResumeOnMongosIfIdDoes
 TEST_F(CheckResumeTokenTest, ShardedResumeFailsOnMongosIfTokenHasSubsetOfDocumentKeyFields) {
     // Verify that the relaxed _id check only applies if _id is the sole field present in the
     // client's resume token, even if all the fields that are present match the first doc. We set
-    // 'inMongos' since this is only applicable when DSCSEnsureResumeTokenPresent is running on
+    // 'inRouter' since this is only applicable when DSCSEnsureResumeTokenPresent is running on
     // mongoS.
     Timestamp resumeTimestamp(100, 1);
-    getExpCtx()->inMongos = true;
+    getExpCtx()->inRouter = true;
 
     auto checkResumeToken =
         createDSEnsureResumeTokenPresent(resumeTimestamp, Document{{"x"_sd, 0}, {"_id"_sd, 1}});
@@ -624,7 +624,7 @@ TEST_F(CheckResumeTokenTest, ShardedResumeFailsOnMongosIfDocumentKeyIsNonObject)
     // cause an invariant when we perform the relaxed eventIdentifier._id check when running in a
     // sharded context.
     Timestamp resumeTimestamp(100, 1);
-    getExpCtx()->inMongos = true;
+    getExpCtx()->inRouter = true;
 
     auto checkResumeToken = createDSEnsureResumeTokenPresent(resumeTimestamp, boost::none);
 
@@ -640,7 +640,7 @@ TEST_F(CheckResumeTokenTest, ShardedResumeFailsOnMongosIfDocumentKeyOmitsId) {
     // cause an invariant when we perform the relaxed eventIdentifier._id, even when compared
     // against an artificial stream token whose _id is also missing.
     Timestamp resumeTimestamp(100, 1);
-    getExpCtx()->inMongos = true;
+    getExpCtx()->inRouter = true;
 
     auto checkResumeToken =
         createDSEnsureResumeTokenPresent(resumeTimestamp, Document{{"x"_sd, 0}});
@@ -661,7 +661,7 @@ TEST_F(CheckResumeTokenTest,
     // the current document sorts before the client's resume token, we should continue to examine
     // the next document in the stream.
     Timestamp resumeTimestamp(100, 1);
-    getExpCtx()->inMongos = true;
+    getExpCtx()->inRouter = true;
 
     // Create an ordered array of 2 UUIDs.
     UUID uuids[2] = {UUID::gen(), UUID::gen()};
@@ -699,7 +699,7 @@ TEST_F(CheckResumeTokenTest,
 TEST_F(CheckResumeTokenTest,
        ShardedResumeFailsOnMongosWithSameClusterTimeIfUUIDsSortAfterResumeToken) {
     Timestamp resumeTimestamp(100, 1);
-    getExpCtx()->inMongos = true;
+    getExpCtx()->inRouter = true;
 
     // Create an ordered array of 2 UUIDs.
     UUID uuids[2] = {UUID::gen(), UUID::gen()};
@@ -731,7 +731,7 @@ TEST_F(CheckResumeTokenTest, ShouldSwallowInvalidateFromEachShardForStartAfterIn
     UUID uuids[2] = {UUID::gen(), UUID::gen()};
 
     // This behaviour is only relevant when DSEnsureResumeTokenPresent is running on mongoS.
-    getExpCtx()->inMongos = true;
+    getExpCtx()->inRouter = true;
 
     // Create a resume token representing an 'invalidate' event, and use it to seed the stage. A
     // resume token with {fromInvalidate:true} can only be used with startAfter, to start a new
@@ -770,7 +770,7 @@ TEST_F(CheckResumeTokenTest, ShouldNotSwallowUnrelatedInvalidateForStartAfterInv
     Timestamp resumeTimestamp(100, 1);
 
     // This behaviour is only relevant when DSEnsureResumeTokenPresent is running on mongoS.
-    getExpCtx()->inMongos = true;
+    getExpCtx()->inRouter = true;
 
     // Create an ordered array of of 2 UUIDs.
     std::vector<UUID> uuids = {UUID::gen(), UUID::gen()};
