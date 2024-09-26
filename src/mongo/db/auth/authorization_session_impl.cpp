@@ -660,7 +660,7 @@ void AuthorizationSessionImpl::_refreshUserInfoAsNeeded(OperationContext* opCtx)
         _updateInternalAuthorizationState();
     };
 
-    auto swUser = getAuthorizationManager().reacquireUser(opCtx, currentUser);
+    auto swUser = AuthorizationManager::get(opCtx->getService())->reacquireUser(opCtx, currentUser);
     if (!swUser.isOK()) {
         auto& status = swUser.getStatus();
         switch (status.code()) {
