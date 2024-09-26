@@ -102,7 +102,6 @@
 #include "mongo/db/matcher/expression_type.h"
 #include "mongo/db/matcher/match_expression_dependencies.h"
 #include "mongo/db/matcher/matcher_type_set.h"
-#include "mongo/db/pipeline/abt/field_map_builder.h"
 #include "mongo/db/pipeline/accumulation_statement.h"
 #include "mongo/db/pipeline/accumulator.h"
 #include "mongo/db/pipeline/accumulator_multi.h"

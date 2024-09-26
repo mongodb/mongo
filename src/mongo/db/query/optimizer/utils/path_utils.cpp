@@ -77,40 +77,6 @@ static ABT appendFieldPath(const FieldPathType& fieldPath, ABT input) {
     return input;
 }
 
-boost::optional<ABT> decomposeToFilterNodes(const ABT& input,
-                                            const ABT& path,
-                                            const ABT& pathInput,
-                                            const size_t minDepth,
-                                            const size_t maxDepth) {
-    if (maxDepth == 1 && minDepth == maxDepth) {
-        // When maxDepth = 1, a conjunctive path is not decomposed into a sequence of FilterNodes.
-        // In this case the path is attached directly to a single FilterNode.
-        return make<FilterNode>(make<EvalFilter>(path, pathInput), input);
-    }
-
-    ABT::reference_type subPathRef = path.ref();
-    FieldPathType fieldPath;
-    while (const auto newPath = subPathRef.cast<PathGet>()) {
-        fieldPath.push_back(newPath->name());
-        subPathRef = newPath->getPath().ref();
-    }
-
-    ABT subPath{subPathRef};
-    if (auto composition = collectComposedBounded(subPath, maxDepth);
-        composition.size() >= minDepth) {
-        // Remove the path composition and insert separate filter nodes.
-        ABT result = input;
-        for (const auto& element : composition) {
-            result = make<FilterNode>(
-                make<EvalFilter>(appendFieldPath(fieldPath, element.copy()), pathInput),
-                std::move(result));
-        }
-        return result;
-    }
-
-    return boost::none;
-}
-
 bool isSimplePath(const ABT& node) {
     if (auto getPtr = node.cast<PathGet>();
         getPtr != nullptr && getPtr->getPath().is<PathIdentity>()) {

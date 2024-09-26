@@ -389,7 +389,6 @@ mongo_cc_library(
     name = "query_sbe_abt",
     srcs = [
         "//src/mongo/db/exec/sbe/abt:abt_lower.cpp",
-        "//src/mongo/db/pipeline/abt:match_expression_visitor.h",
     ],
     hdrs = [
         "//src/mongo/db/exec/sbe/abt:abt_lower.h",

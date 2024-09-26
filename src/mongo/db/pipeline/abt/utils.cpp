@@ -29,11 +29,9 @@
 
 #include "mongo/db/pipeline/abt/utils.h"
 
-#include <absl/container/node_hash_map.h>
 #include <boost/move/utility_core.hpp>
 #include <boost/none.hpp>
 #include <limits>
-#include <vector>
 
 #include <boost/optional/optional.hpp>
 
@@ -44,87 +42,11 @@
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/exec/document_value/value.h"
 #include "mongo/db/exec/docval_to_sbeval.h"
-#include "mongo/db/query/optimizer/algebra/operator.h"
 #include "mongo/db/query/optimizer/algebra/polyvalue.h"
-#include "mongo/db/query/optimizer/bool_expression.h"
 #include "mongo/db/query/optimizer/syntax/expr.h"
-#include "mongo/db/query/optimizer/syntax/path.h"
-#include "mongo/db/query/optimizer/utils/path_utils.h"
-#include "mongo/util/assert_util.h"
 #include "mongo/util/time_support.h"
 
 namespace mongo::optimizer {
-
-ABT translateFieldPath(const FieldPath& fieldPath,
-                       ABT initial,
-                       const ABTFieldNameFn& fieldNameFn,
-                       const size_t skipFromStart) {
-    ABT result = std::move(initial);
-
-    const size_t fieldPathLength = fieldPath.getPathLength();
-    bool isLastElement = true;
-    for (size_t i = fieldPathLength; i-- > skipFromStart;) {
-        result = fieldNameFn(
-            FieldNameType{fieldPath.getFieldName(i).toString()}, isLastElement, std::move(result));
-        isLastElement = false;
-    }
-
-    return result;
-}
-
-ABT translateFieldRef(const FieldRef& fieldRef, ABT initial) {
-    ABT result = std::move(initial);
-
-    const size_t fieldPathLength = fieldRef.numParts();
-
-    // Handle empty field paths separately.
-    if (fieldPathLength == 0) {
-        return make<PathGet>("", std::move(result));
-    }
-
-    for (size_t i = fieldPathLength; i-- > 0;) {
-        // A single empty field path will parse to a FieldRef with 0 parts but should
-        // logically be considered a single part with an empty string.
-        if (i != fieldPathLength - 1) {
-            // For field paths with empty elements such as 'x.', we should traverse the
-            // array 'x' but not reach into any sub-objects. So a predicate such as {'x.':
-            // {$eq: 5}} should match {x: [5]} and {x: {"": 5}} but not {x: [{"": 5}]}.
-            const bool trailingEmptyPath =
-                (fieldPathLength >= 2u && i == fieldPathLength - 2u) && (fieldRef[i + 1] == ""_sd);
-            if (trailingEmptyPath) {
-                auto arrCase = make<PathArr>();
-                maybeComposePath(arrCase, result.cast<PathGet>()->getPath());
-                maybeComposePath<PathComposeA>(result, std::move(arrCase));
-            } else {
-                result = make<PathTraverse>(PathTraverse::kSingleLevel, std::move(result));
-            }
-        }
-        result = make<PathGet>(FieldNameType{fieldRef[i].toString()}, std::move(result));
-    }
-
-    return result;
-}
-
-// This function generates an ABT representing a path from a string. This works by searching
-// backwards in the string and using each component (delimited by '.') to build up an ABT.
-// For example, 'a.b.c' results in PathGet[a] PathGet[b] PathGet[c].
-ABT translateShardKeyField(std::string shardKey) {
-    auto abt = make<PathIdentity>();
-    // Keep track of the search space in the string.
-    size_t curPos = shardKey.size();
-    while (curPos != std::string::npos) {
-        // Get the index of the start of the next component in the path. This may return npos which
-        // is an alias for -1.
-        size_t start = shardKey.find_last_of('.', curPos - 1);
-        // Add path component into ABT.
-        abt = make<PathGet>(FieldNameType{shardKey.substr(start + 1, curPos - start - 1)},
-                            std::move(abt));
-        // Update search space for the next component.
-        curPos = start;
-    }
-    return abt;
-}
-
 std::pair<boost::optional<ABT>, bool> getMinMaxBoundForType(const bool isMin,
                                                             const sbe::value::TypeTags& tag) {
     switch (tag) {
@@ -256,45 +178,4 @@ std::pair<boost::optional<ABT>, bool> getMinMaxBoundForType(const bool isMin,
 
     MONGO_UNREACHABLE;
 }
-
-class PathToIntervalTransport {
-public:
-    using ResultType = boost::optional<IntervalReqExpr::Node>;
-
-    PathToIntervalTransport() {}
-
-    template <sbe::value::TypeTags tag>
-    ResultType getBoundsForNode() {
-        auto [lowBound, lowInclusive] = getMinMaxBoundForType(true /*isMin*/, tag);
-        invariant(lowBound);
-
-        auto [highBound, highInclusive] = getMinMaxBoundForType(false /*isMin*/, tag);
-        invariant(highBound);
-
-        return IntervalReqExpr::makeSingularDNF(IntervalRequirement{
-            {lowInclusive, std::move(*lowBound)}, {highInclusive, std::move(*highBound)}});
-    }
-
-    ResultType transport(const ABT& /*n*/, const PathArr& /*node*/) {
-        return getBoundsForNode<sbe::value::TypeTags::Array>();
-    }
-
-    ResultType transport(const ABT& /*n*/, const PathObj& /*node*/) {
-        return getBoundsForNode<sbe::value::TypeTags::Object>();
-    }
-
-    template <typename T, typename... Ts>
-    ResultType transport(const ABT& /*n*/, const T& /*node*/, Ts&&...) {
-        return {};
-    }
-
-    ResultType convert(const ABT& path) {
-        return algebra::transport<true>(path, *this);
-    }
-};
-
-boost::optional<IntervalReqExpr::Node> defaultConvertPathToInterval(const ABT& node) {
-    return PathToIntervalTransport{}.convert(node);
-}
-
 }  // namespace mongo::optimizer

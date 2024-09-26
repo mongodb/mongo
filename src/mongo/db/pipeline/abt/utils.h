@@ -31,44 +31,14 @@
 
 #include <boost/optional/optional.hpp>
 #include <cstddef>
-#include <functional>
 #include <utility>
 
-#include "mongo/db/exec/document_value/value.h"
 #include "mongo/db/exec/sbe/values/value.h"
-#include "mongo/db/field_ref.h"
-#include "mongo/db/pipeline/field_path.h"
-#include "mongo/db/query/optimizer/defs.h"
-#include "mongo/db/query/optimizer/index_bounds.h"
 #include "mongo/db/query/optimizer/node.h"  // IWYU pragma: keep
 #include "mongo/db/query/optimizer/syntax/syntax.h"
 
 
 namespace mongo::optimizer {
-
-using ABTFieldNameFn =
-    std::function<ABT(FieldNameType fieldName, const bool isLastElement, ABT input)>;
-
-/**
- * Translates an aggregation FieldPath by invoking the `fieldNameFn` for each path component.
- */
-ABT translateFieldPath(const FieldPath& fieldPath,
-                       ABT initial,
-                       const ABTFieldNameFn& fieldNameFn,
-                       size_t skipFromStart = 0);
-
-/**
- * Translates a given FieldRef (typically used in a MatchExpression) with 'initial' as the input
- * ABT.
- */
-ABT translateFieldRef(const FieldRef& fieldRef, ABT initial);
-
-/**
- * Translates a given field of a shard key into an ABT. The resulting paths will not contain
- * 'PathTraverse' elements because shard keys are guarenteed to be non-multikey.
- */
-ABT translateShardKeyField(std::string shardKey);
-
 /**
  * Return the minimum or maximum value for the "class" of values represented by the input
  * constant. Used to support type bracketing. Note that we only take a type tag as input; this means
@@ -79,9 +49,5 @@ ABT translateShardKeyField(std::string shardKey);
 std::pair<boost::optional<ABT>, bool> getMinMaxBoundForType(bool isMin,
                                                             const sbe::value::TypeTags& tag);
 
-/**
- * Used by the optimizer to optionally convert path elements (e.g. PathArr) directly into intervals.
- */
-boost::optional<IntervalReqExpr::Node> defaultConvertPathToInterval(const ABT& node);
 
 }  // namespace mongo::optimizer

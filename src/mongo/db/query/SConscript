@@ -181,7 +181,6 @@ env.CppUnitTest(
         "$BUILD_DIR/mongo/db/exec/document_value/document_value_test_util",
         "$BUILD_DIR/mongo/db/exec/sbe/sbe_plan_stage_test",
         "$BUILD_DIR/mongo/db/multitenancy",
-        "$BUILD_DIR/mongo/db/pipeline/abt_translation",
         "$BUILD_DIR/mongo/db/pipeline/aggregation_request_helper",
         "$BUILD_DIR/mongo/db/pipeline/document_source_mock",
         "$BUILD_DIR/mongo/db/pipeline/pipeline",
