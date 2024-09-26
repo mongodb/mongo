@@ -1,3 +1,7 @@
+import {
+    withAbortAndRetryOnTransientTxnError
+} from "jstests/libs/auto_retry_transaction_in_sharding.js";
+
 export function getReplicaSetURL(db) {
     const rsConfig = assert.commandWorked(db.adminCommand({replSetGetConfig: 1})).config;
     const rsName = rsConfig._id;
@@ -96,9 +100,11 @@ export function runCommands(conn, execCtxType, dbName, collName, cmdFunc) {
         case execCtxTypes.kTransaction: {
             const session = conn.startSession({retryWrites: false});
             const coll = session.getDatabase(dbName).getCollection(collName);
-            session.startTransaction();
-            cmdFunc(coll);
-            session.commitTransaction();
+            withAbortAndRetryOnTransientTxnError(session, () => {
+                session.startTransaction();
+                cmdFunc(coll);
+                session.commitTransaction();
+            });
             session.endSession();
             return;
         }
