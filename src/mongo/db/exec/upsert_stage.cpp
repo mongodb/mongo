@@ -29,12 +29,10 @@
 
 #include "mongo/db/exec/upsert_stage.h"
 
-#include <map>
-#include <string>
-#include <vector>
-
 #include <boost/move/utility_core.hpp>
 #include <boost/optional/optional.hpp>
+#include <string>
+#include <vector>
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/string_data.h"
@@ -74,7 +72,6 @@
 #include "mongo/util/fail_point.h"
 #include "mongo/util/safe_num.h"
 #include "mongo/util/str.h"
-#include "mongo/util/uuid.h"
 
 namespace mongo {
 
@@ -128,24 +125,25 @@ PlanStage::StageState UpsertStage::doWork(WorkingSetID* out) {
     invariant(updateState == PlanStage::IS_EOF && !isEOF());
 
     // Since this is an insert, we will be logging it as such in the oplog. We don't need the
-    // driver's help to build the oplog record. We also set the 'nUpserted' stats counter here.
+    // driver's help to build the oplog record.
     _params.driver->setLogOp(false);
-    _specificStats.nUpserted = 1;
 
     // Generate the new document to be inserted.
-    _specificStats.objInserted = _produceNewDocumentForInsert();
+    auto newObj = _produceNewDocumentForInsert();
 
     // If this is an explain, skip performing the actual insert.
     if (!_params.request->explain()) {
-        _performInsert(_specificStats.objInserted);
+        _performInsert(newObj);
     }
+
+    _specificStats.objInserted = newObj;
+    _specificStats.nUpserted = 1;
 
     // We should always be EOF at this point.
     invariant(isEOF());
 
     // If we want to return the document we just inserted, create it as a WorkingSetMember.
     if (_params.request->shouldReturnNewDocs()) {
-        BSONObj newObj = _specificStats.objInserted;
         *out = _ws->allocate();
         WorkingSetMember* member = _ws->get(*out);
         member->resetDocument(shard_role_details::getRecoveryUnit(opCtx())->getSnapshotId(),

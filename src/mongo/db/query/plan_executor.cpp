@@ -31,6 +31,7 @@
 
 #include <boost/move/utility_core.hpp>
 #include <boost/optional/optional.hpp>
+#include <fmt/format.h>
 #include <utility>
 
 #include "mongo/base/error_codes.h"
@@ -126,9 +127,12 @@ boost::optional<BSONObj> PlanExecutor::executeWrite(PlanExecWriteType writeType)
         }
 
         const auto updateResult = getUpdateResult();
-        tassert(9146500,
-                "An update plan should never yield after having performed an upsert",
-                updateResult.upsertedId.isEmpty());
+        tassert(
+            9146500,
+            fmt::format(
+                "An update plan should never yield after having performed an upsert; upsertId: {}",
+                redact(updateResult.upsertedId.toString())),
+            updateResult.upsertedId.isEmpty());
         if (updateResult.numDocsModified > 0 && !getOpCtx()->isRetryableWrite() &&
             !getOpCtx()->inMultiDocumentTransaction()) {
             // An update plan can fail with StaleConfig error after having performed some writes but
