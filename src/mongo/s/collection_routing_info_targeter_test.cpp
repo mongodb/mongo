@@ -1435,8 +1435,7 @@ TEST_F(CollectionRoutingInfoTargeterTimeseriesTest, RefreshOnStaleResponse) {
               _shard1}},
             CatalogCacheMock::ExtraCollectionOptions{.timeseriesOptions{_timeseriesOptions}}));
 
-    cri.noteStaleShardResponse(
-        operationContext(), ShardEndpoint(_shard0, ShardVersion::UNSHARDED(), _dbVersion), sci);
+    cri.noteStaleCollVersionResponse(operationContext(), sci);
     ASSERT_TRUE(cri.refreshIfNeeded(operationContext()));
 
     // CollectionRoutingInfoTargeter became aware that nss is now a sharded time series.
@@ -1450,8 +1449,7 @@ TEST_F(CollectionRoutingInfoTargeterTimeseriesTest, RefreshOnStaleResponse) {
         CatalogCacheMock::makeCollectionRoutingInfoUntracked(
             bucketsNss, _dbPrimaryShard, _dbVersion));
 
-    cri.noteStaleShardResponse(
-        operationContext(), ShardEndpoint(_shard0, ShardVersion::UNSHARDED(), _dbVersion), sci);
+    cri.noteStaleCollVersionResponse(operationContext(), sci);
     ASSERT_TRUE(cri.refreshIfNeeded(operationContext()));
 
     // CollectionRoutingInfoTargeter became aware that nss is now an untracked time series.

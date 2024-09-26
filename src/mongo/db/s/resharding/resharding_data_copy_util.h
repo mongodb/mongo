@@ -228,10 +228,8 @@ auto withOneStaleConfigRetry(OperationContext* opCtx, Callable&& callable) {
         if (auto sce = ex.extraInfo<StaleConfigInfo>()) {
             // Cause a catalog cache refresh in case the index information is stale. Invalidate even
             // if the shard metadata was unknown so that we require only one stale config retry.
-            Grid::get(opCtx)
-                ->catalogCache()
-                ->invalidateShardOrEntireCollectionEntryForShardedCollection(
-                    sce->getNss(), sce->getVersionWanted(), sce->getShardId());
+            Grid::get(opCtx)->catalogCache()->onStaleCollectionVersion(sce->getNss(),
+                                                                       sce->getVersionWanted());
 
             // Recover the sharding metadata if there was no wanted version in the staleConfigInfo
             bool shardRefreshSucceeded;

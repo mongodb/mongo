@@ -1046,17 +1046,13 @@ void ParseAndRunCommand::RunAndRetry::_onNeedRetargetting(Status& status) {
     const auto staleNs = staleInfo->getNss();
     const auto& originalNs = _parc->_invocation->ns();
     auto catalogCache = Grid::get(opCtx)->catalogCache();
-    catalogCache->invalidateShardOrEntireCollectionEntryForShardedCollection(
-        staleNs, staleInfo->getVersionWanted(), staleInfo->getShardId());
+    catalogCache->onStaleCollectionVersion(staleNs, staleInfo->getVersionWanted());
 
     if ((staleNs.isTimeseriesBucketsCollection() || originalNs.isTimeseriesBucketsCollection()) &&
         staleNs != originalNs) {
         // A timeseries might've been created, so we need to invalidate the original namespace
         // version.
-        Grid::get(opCtx)
-            ->catalogCache()
-            ->invalidateShardOrEntireCollectionEntryForShardedCollection(
-                originalNs, boost::none, staleInfo->getShardId());
+        Grid::get(opCtx)->catalogCache()->onStaleCollectionVersion(originalNs, boost::none);
     }
 
     _checkRetryForTransaction(status);

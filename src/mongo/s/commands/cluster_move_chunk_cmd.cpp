@@ -243,14 +243,7 @@ public:
                                         Shard::RetryPolicy::kIdempotent);
             uassertStatusOK(Shard::CommandResponse::getEffectiveStatus(std::move(commandResponse)));
 
-            Grid::get(opCtx)
-                ->catalogCache()
-                ->invalidateShardOrEntireCollectionEntryForShardedCollection(
-                    ns(), boost::none, chunk->getShardId());
-            Grid::get(opCtx)
-                ->catalogCache()
-                ->invalidateShardOrEntireCollectionEntryForShardedCollection(
-                    ns(), boost::none, to->getId());
+            Grid::get(opCtx)->catalogCache()->onStaleCollectionVersion(ns(), boost::none);
 
             BSONObjBuilder resultbson;
             resultbson.append("millis", t.millis());

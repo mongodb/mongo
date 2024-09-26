@@ -134,7 +134,6 @@ void ShardServerProcessInterface::checkRoutingInfoEpochOrThrow(
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
     const NamespaceString& nss,
     ChunkVersion targetCollectionPlacementVersion) const {
-    auto const shardId = ShardingState::get(expCtx->opCtx)->shardId();
     auto* catalogCache = Grid::get(expCtx->opCtx)->catalogCache();
 
     auto receivedVersion = [&] {
@@ -142,7 +141,7 @@ void ShardServerProcessInterface::checkRoutingInfoEpochOrThrow(
         auto currentShardingIndexCatalogInfo =
             uassertStatusOK(catalogCache->getCollectionRoutingInfo(expCtx->opCtx, nss)).sii;
 
-        // Mark the cache entry routingInfo for the 'nss' and 'shardId' if the entry is staler than
+        // Mark the cache entry routingInfo for the 'nss' if the entry is staler than
         // 'targetCollectionPlacementVersion'.
         auto ignoreIndexVersion = ShardVersionFactory::make(
             targetCollectionPlacementVersion,
@@ -150,8 +149,7 @@ void ShardServerProcessInterface::checkRoutingInfoEpochOrThrow(
                 ? boost::make_optional(currentShardingIndexCatalogInfo->getCollectionIndexes())
                 : boost::none);
 
-        catalogCache->invalidateShardOrEntireCollectionEntryForShardedCollection(
-            nss, ignoreIndexVersion, shardId);
+        catalogCache->onStaleCollectionVersion(nss, ignoreIndexVersion);
         return ignoreIndexVersion;
     }();
 

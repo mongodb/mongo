@@ -300,14 +300,14 @@ public:
                                 const boost::optional<DatabaseVersion>& wantedVersion);
 
     /**
-     * Invalidates a single shard for the current collection if the epochs given in the chunk
-     * versions match. Otherwise, invalidates the entire collection, causing any future targetting
-     * requests to block on an upcoming catalog cache refresh.
+     * Advances the version in the cache for the given namespace.
+     *
+     * To be called with the wantedVersion. In the case the passed version is boost::none, uses a
+     * which will artificially be greater than any previously created version to force the catalog
+     * cache refresh on next causal consistence access.
      */
-    void invalidateShardOrEntireCollectionEntryForShardedCollection(
-        const NamespaceString& nss,
-        const boost::optional<ShardVersion>& wantedVersion,
-        const ShardId& shardId);
+    void onStaleCollectionVersion(const NamespaceString& nss,
+                                  const boost::optional<ShardVersion>& wantedVersion);
 
     /**
      * Notifies the cache that there is a (possibly) newer collection version on the backing store.

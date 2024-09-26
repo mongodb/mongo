@@ -182,8 +182,7 @@ public:
             auto renameCollResp = RenameCollectionResponse::parse(
                 IDLParserContext("renameCollection"), cmdResponse.response);
 
-            catalogCache->invalidateShardOrEntireCollectionEntryForShardedCollection(
-                toNss, renameCollResp.getCollectionVersion(), dbInfo->getPrimary());
+            catalogCache->onStaleCollectionVersion(toNss, renameCollResp.getCollectionVersion());
 
             catalogCache->invalidateCollectionEntry_LINEARIZABLE(fromNss);
             catalogCache->invalidateIndexEntry_LINEARIZABLE(fromNss);

@@ -95,9 +95,9 @@ namespace {
 const ReadPreferenceSetting kPrimaryOnlyReadPreference(ReadPreference::PrimaryOnly);
 
 // Helper to note several stale shard errors from a response
-void noteStaleShardResponses(OperationContext* opCtx,
-                             const std::vector<ShardError>& staleErrors,
-                             NSTargeter* targeter) {
+void noteStaleCollVersionResponses(OperationContext* opCtx,
+                                   const std::vector<ShardError>& staleErrors,
+                                   NSTargeter* targeter) {
     for (const auto& error : staleErrors) {
         LOGV2_DEBUG(22902,
                     4,
@@ -107,14 +107,14 @@ void noteStaleShardResponses(OperationContext* opCtx,
 
         auto extraInfo = error.error.getStatus().extraInfo<StaleConfigInfo>();
         invariant(extraInfo);
-        targeter->noteStaleShardResponse(opCtx, error.endpoint, *extraInfo);
+        targeter->noteStaleCollVersionResponse(opCtx, *extraInfo);
     }
 }
 
 // Helper to note several stale db errors from a response
-void noteStaleDbResponses(OperationContext* opCtx,
-                          const std::vector<ShardError>& staleErrors,
-                          NSTargeter* targeter) {
+void noteStaleDbVersionResponses(OperationContext* opCtx,
+                                 const std::vector<ShardError>& staleErrors,
+                                 NSTargeter* targeter) {
     for (const auto& error : staleErrors) {
         LOGV2_DEBUG(22903,
                     4,
@@ -123,7 +123,7 @@ void noteStaleDbResponses(OperationContext* opCtx,
                     "status"_attr = error.error.getStatus());
         auto extraInfo = error.error.getStatus().extraInfo<StaleDbRoutingVersion>();
         invariant(extraInfo);
-        targeter->noteStaleDbResponse(opCtx, error.endpoint, *extraInfo);
+        targeter->noteStaleDbVersionResponse(opCtx, *extraInfo);
     }
 }
 
@@ -291,13 +291,13 @@ bool processResponseFromRemote(OperationContext* opCtx,
 
     if (!staleConfigErrors.empty()) {
         invariant(staleDbErrors.empty());
-        noteStaleShardResponses(opCtx, staleConfigErrors, &targeter);
+        noteStaleCollVersionResponses(opCtx, staleConfigErrors, &targeter);
         ++stats->numStaleShardBatches;
     }
 
     if (!staleDbErrors.empty()) {
         invariant(staleConfigErrors.empty());
-        noteStaleDbResponses(opCtx, staleDbErrors, &targeter);
+        noteStaleDbVersionResponses(opCtx, staleDbErrors, &targeter);
         ++stats->numStaleDbBatches;
     }
 

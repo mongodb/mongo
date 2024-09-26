@@ -132,9 +132,8 @@ public:
      *
      * If stale responses are noted, we must not have noted that we cannot target.
      */
-    virtual void noteStaleShardResponse(OperationContext* opCtx,
-                                        const ShardEndpoint& endpoint,
-                                        const StaleConfigInfo& staleInfo) = 0;
+    virtual void noteStaleCollVersionResponse(OperationContext* opCtx,
+                                              const StaleConfigInfo& staleInfo) = 0;
 
     /**
      * Informs the targeter of stale db routing version responses for this db from an endpoint,
@@ -144,9 +143,8 @@ public:
      *
      * If stale responses are noted, we must not have noted that we cannot target.
      */
-    virtual void noteStaleDbResponse(OperationContext* optCtx,
-                                     const ShardEndpoint& endpoint,
-                                     const StaleDbRoutingVersion& staleInfo) = 0;
+    virtual void noteStaleDbVersionResponse(OperationContext* optCtx,
+                                            const StaleDbRoutingVersion& staleInfo) = 0;
 
     virtual bool hasStaleShardResponse() = 0;
 

@@ -765,10 +765,8 @@ void CatalogCache::onStaleDatabaseVersion(const DatabaseName& dbName,
     }
 }
 
-void CatalogCache::invalidateShardOrEntireCollectionEntryForShardedCollection(
-    const NamespaceString& nss,
-    const boost::optional<ShardVersion>& wantedVersion,
-    const ShardId& shardId) {
+void CatalogCache::onStaleCollectionVersion(const NamespaceString& nss,
+                                            const boost::optional<ShardVersion>& wantedVersion) {
     _stats.countStaleConfigErrors.addAndFetch(1);
 
     const auto newChunkVersion = wantedVersion

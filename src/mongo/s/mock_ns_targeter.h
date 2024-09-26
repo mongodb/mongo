@@ -125,15 +125,13 @@ public:
         // No-op
     }
 
-    void noteStaleShardResponse(OperationContext* opCtx,
-                                const ShardEndpoint& endpoint,
-                                const StaleConfigInfo& staleInfo) override {
+    void noteStaleCollVersionResponse(OperationContext* opCtx,
+                                      const StaleConfigInfo& staleInfo) override {
         // No-op
     }
 
-    void noteStaleDbResponse(OperationContext* opCtx,
-                             const ShardEndpoint& endpoint,
-                             const StaleDbRoutingVersion& staleInfo) override {
+    void noteStaleDbVersionResponse(OperationContext* opCtx,
+                                    const StaleDbRoutingVersion& staleInfo) override {
         // No-op
     }
 

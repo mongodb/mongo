@@ -133,13 +133,11 @@ public:
 
     void noteCouldNotTarget() override;
 
-    void noteStaleShardResponse(OperationContext* opCtx,
-                                const ShardEndpoint& endpoint,
-                                const StaleConfigInfo& staleInfo) override;
+    void noteStaleCollVersionResponse(OperationContext* opCtx,
+                                      const StaleConfigInfo& staleInfo) override;
 
-    void noteStaleDbResponse(OperationContext* opCtx,
-                             const ShardEndpoint& endpoint,
-                             const StaleDbRoutingVersion& staleInfo) override;
+    void noteStaleDbVersionResponse(OperationContext* opCtx,
+                                    const StaleDbRoutingVersion& staleInfo) override;
 
     /**
      * Returns if _lastError is StaleConfig type.

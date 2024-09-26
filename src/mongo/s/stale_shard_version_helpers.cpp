@@ -79,8 +79,8 @@ void checkErrorStatusAndMaxRetries(const Status& status,
         // If the cache currently considers the collection to be unsharded, this will trigger an
         // epoch refresh. If no shard is provided, then the epoch is stale and we must refresh.
         if (auto staleInfo = status.extraInfo<StaleConfigInfo>()) {
-            catalogCache->invalidateShardOrEntireCollectionEntryForShardedCollection(
-                staleInfo->getNss(), staleInfo->getVersionWanted(), staleInfo->getShardId());
+            catalogCache->onStaleCollectionVersion(staleInfo->getNss(),
+                                                   staleInfo->getVersionWanted());
         } else {
             catalogCache->invalidateCollectionEntry_LINEARIZABLE(nss);
         }

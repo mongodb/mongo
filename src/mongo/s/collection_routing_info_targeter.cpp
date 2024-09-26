@@ -867,27 +867,22 @@ void CollectionRoutingInfoTargeter::noteCouldNotTarget() {
     _lastError = LastErrorType::kCouldNotTarget;
 }
 
-void CollectionRoutingInfoTargeter::noteStaleShardResponse(OperationContext* opCtx,
-                                                           const ShardEndpoint& endpoint,
-                                                           const StaleConfigInfo& staleInfo) {
+void CollectionRoutingInfoTargeter::noteStaleCollVersionResponse(OperationContext* opCtx,
+                                                                 const StaleConfigInfo& staleInfo) {
     dassert(!_lastError || _lastError.value() == LastErrorType::kStaleShardVersion);
-    Grid::get(opCtx)->catalogCache()->invalidateShardOrEntireCollectionEntryForShardedCollection(
-        staleInfo.getNss(), staleInfo.getVersionWanted(), endpoint.shardName);
+    Grid::get(opCtx)->catalogCache()->onStaleCollectionVersion(staleInfo.getNss(),
+                                                               staleInfo.getVersionWanted());
 
     if (staleInfo.getNss() != _nss) {
         // This can happen when a time-series collection becomes sharded.
-        Grid::get(opCtx)
-            ->catalogCache()
-            ->invalidateShardOrEntireCollectionEntryForShardedCollection(
-                _nss, boost::none, endpoint.shardName);
+        Grid::get(opCtx)->catalogCache()->onStaleCollectionVersion(_nss, boost::none);
     }
 
     _lastError = LastErrorType::kStaleShardVersion;
 }
 
-void CollectionRoutingInfoTargeter::noteStaleDbResponse(OperationContext* opCtx,
-                                                        const ShardEndpoint& endpoint,
-                                                        const StaleDbRoutingVersion& staleInfo) {
+void CollectionRoutingInfoTargeter::noteStaleDbVersionResponse(
+    OperationContext* opCtx, const StaleDbRoutingVersion& staleInfo) {
     dassert(!_lastError || _lastError.value() == LastErrorType::kStaleDbVersion);
     Grid::get(opCtx)->catalogCache()->onStaleDatabaseVersion(_nss.dbName(),
                                                              staleInfo.getVersionWanted());

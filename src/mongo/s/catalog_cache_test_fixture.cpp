@@ -122,8 +122,7 @@ CoreCatalogCacheTestFixture::scheduleRoutingInfoIncrementalRefresh(const Namespa
     ASSERT(cm.isSharded());
 
     // Simulates the shard wanting a higher version than the one sent by the router.
-    catalogCache->invalidateShardOrEntireCollectionEntryForShardedCollection(
-        nss, boost::none, cm.dbPrimary());
+    catalogCache->onStaleCollectionVersion(nss, boost::none);
 
     return launchAsync([this, nss] {
         auto client = getServiceContext()->getService()->makeClient("Test");

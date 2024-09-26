@@ -172,16 +172,14 @@ void CollectionRouterCommon::_onException(OperationContext* opCtx,
             uassertStatusOK(s);
         }
 
-        catalogCache->invalidateShardOrEntireCollectionEntryForShardedCollection(
-            si->getNss(), si->getVersionWanted(), si->getShardId());
+        catalogCache->onStaleCollectionVersion(si->getNss(), si->getVersionWanted());
     } else if (s == ErrorCodes::StaleEpoch) {
         if (auto si = s.extraInfo<StaleEpochInfo>()) {
             if (!isNssInvolvedInRouting(si->getNss())) {
                 uassertStatusOK(s);
             }
 
-            catalogCache->invalidateShardOrEntireCollectionEntryForShardedCollection(
-                si->getNss(), si->getVersionWanted(), ShardId());
+            catalogCache->onStaleCollectionVersion(si->getNss(), si->getVersionWanted());
         }
     } else {
         uassertStatusOK(s);

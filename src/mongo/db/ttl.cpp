@@ -676,12 +676,10 @@ bool TTLMonitor::_doTTLIndexDelete(OperationContext* opCtx,
                     auto uniqueOpCtx = tc->makeOperationContext();
                     auto opCtx = uniqueOpCtx.get();
 
-                    // Invalidate cache in case index version is stale
+                    // Updates version in cache in case index version is stale.
                     if (staleInfo->getVersionWanted()) {
-                        Grid::get(opCtx)
-                            ->catalogCache()
-                            ->invalidateShardOrEntireCollectionEntryForShardedCollection(
-                                *nss, staleInfo->getVersionWanted(), staleInfo->getShardId());
+                        Grid::get(opCtx)->catalogCache()->onStaleCollectionVersion(
+                            *nss, staleInfo->getVersionWanted());
                     }
 
                     onCollectionPlacementVersionMismatchNoExcept(

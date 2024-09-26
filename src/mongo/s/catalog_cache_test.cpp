@@ -324,8 +324,7 @@ TEST_F(CatalogCacheTest, OnStaleShardVersionWithSameVersion) {
 
     loadDatabases({DatabaseType(kNss.dbName(), kShards[0], dbVersion)});
     loadCollection(cachedCollVersion);
-    _catalogCache->invalidateShardOrEntireCollectionEntryForShardedCollection(
-        kNss, cachedCollVersion, kShards[0]);
+    _catalogCache->onStaleCollectionVersion(kNss, cachedCollVersion);
     ASSERT_OK(_catalogCache->getCollectionRoutingInfo(operationContext(), kNss).getStatus());
 }
 
@@ -337,8 +336,7 @@ TEST_F(CatalogCacheTest, OnStaleShardVersionWithNoVersion) {
 
     loadDatabases({DatabaseType(kNss.dbName(), kShards[0], dbVersion)});
     loadCollection(cachedCollVersion);
-    _catalogCache->invalidateShardOrEntireCollectionEntryForShardedCollection(
-        kNss, boost::none, kShards[0]);
+    _catalogCache->onStaleCollectionVersion(kNss, boost::none);
     const auto status =
         _catalogCache->getCollectionRoutingInfo(operationContext(), kNss).getStatus();
     ASSERT(status == ErrorCodes::InternalError);
@@ -354,8 +352,7 @@ TEST_F(CatalogCacheTest, OnStaleShardVersionWithGreaterPlacementVersion) {
 
     loadDatabases({DatabaseType(kNss.dbName(), kShards[0], dbVersion)});
     loadCollection(cachedCollVersion);
-    _catalogCache->invalidateShardOrEntireCollectionEntryForShardedCollection(
-        kNss, wantedCollVersion, kShards[0]);
+    _catalogCache->onStaleCollectionVersion(kNss, wantedCollVersion);
     const auto status =
         _catalogCache->getCollectionRoutingInfo(operationContext(), kNss).getStatus();
     ASSERT(status == ErrorCodes::InternalError);
@@ -387,8 +384,7 @@ TEST_F(CatalogCacheTest, GetCollectionRoutingInfoAllowLocksNeedsToFetchNewCollIn
 
     loadDatabases({DatabaseType(kNss.dbName(), kShards[0], dbVersion)});
     loadCollection(cachedCollVersion);
-    _catalogCache->invalidateShardOrEntireCollectionEntryForShardedCollection(
-        kNss, wantedCollVersion, kShards[0]);
+    _catalogCache->onStaleCollectionVersion(kNss, wantedCollVersion);
 
     {
         FailPointEnableBlock failPoint("blockCollectionCacheLookup");
@@ -533,8 +529,7 @@ TEST_F(CatalogCacheTest, OnStaleShardVersionWithGreaterIndexVersion) {
 
     loadDatabases({DatabaseType(kNss.dbName(), kShards[0], dbVersion)});
     CollectionType coll = loadCollection(cachedCollVersion);
-    _catalogCache->invalidateShardOrEntireCollectionEntryForShardedCollection(
-        kNss, wantedCollVersion, kShards[0]);
+    _catalogCache->onStaleCollectionVersion(kNss, wantedCollVersion);
 
     auto future = launchAsync([&] {
         onCommand([&](const executor::RemoteCommandRequest& request) {
@@ -560,8 +555,7 @@ TEST_F(CatalogCacheTest, OnStaleShardVersionIndexVersionBumpNotNone) {
 
     loadDatabases({DatabaseType(kNss.dbName(), kShards[0], dbVersion)});
     CollectionType coll = loadCollection(cachedCollVersion);
-    _catalogCache->invalidateShardOrEntireCollectionEntryForShardedCollection(
-        kNss, wantedCollVersion, kShards[0]);
+    _catalogCache->onStaleCollectionVersion(kNss, wantedCollVersion);
 
     auto future = launchAsync([&] {
         onCommand([&](const executor::RemoteCommandRequest& request) {
@@ -593,8 +587,7 @@ TEST_F(CatalogCacheTest, PeekCollectionCacheVersion) {
               _catalogCache->peekCollectionCacheVersion(kNss));
 
     // If we have cached an untracked collection, then peek returns boost::none.
-    _catalogCache->invalidateShardOrEntireCollectionEntryForShardedCollection(
-        kNss, boost::none, ShardId());
+    _catalogCache->onStaleCollectionVersion(kNss, boost::none);
     loadUnshardedCollection(kNss);
 
     ASSERT_EQ(boost::none, _catalogCache->peekCollectionCacheVersion(kNss));

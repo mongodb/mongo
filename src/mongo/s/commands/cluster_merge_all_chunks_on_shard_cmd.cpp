@@ -104,10 +104,7 @@ public:
 
             uassertStatusOK(Shard::CommandResponse::getEffectiveStatus(swCommandResponse));
 
-            Grid::get(opCtx)
-                ->catalogCache()
-                ->invalidateShardOrEntireCollectionEntryForShardedCollection(
-                    nss, boost::none, shardId);
+            Grid::get(opCtx)->catalogCache()->onStaleCollectionVersion(nss, boost::none);
         }
 
     private:

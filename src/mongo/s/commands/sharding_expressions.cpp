@@ -426,11 +426,11 @@ Value ExpressionInternalOwningShard::evaluate(const Document& root, Variables* v
     const auto cri =
         uassertStatusOK(catalogCache->getCollectionRoutingInfo(opCtx, ns, true /* allowLocks */));
 
-    // Invalidate catalog cache if the chunk manager is not yet available or its version is stale.
+    // Advances the version in the cache if the chunk manager is not yet available or its version is
+    // stale.
     if (!cri.cm.hasRoutingTable() ||
         cri.cm.getVersion().isOlderThan(shardVersion.placementVersion())) {
-        catalogCache->invalidateShardOrEntireCollectionEntryForShardedCollection(
-            ns, boost::none /* wanted */, ShardId());
+        catalogCache->onStaleCollectionVersion(ns, boost::none /* wanted */);
 
         uasserted(ShardCannotRefreshDueToLocksHeldInfo(ns),
                   str::stream()

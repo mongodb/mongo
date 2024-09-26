@@ -118,15 +118,13 @@ public:
         _lastError = LastErrorType::kCouldNotTarget;
     }
 
-    void noteStaleShardResponse(OperationContext* opCtx,
-                                const ShardEndpoint& endpoint,
-                                const StaleConfigInfo& staleInfo) override {
+    void noteStaleCollVersionResponse(OperationContext* opCtx,
+                                      const StaleConfigInfo& staleInfo) override {
         _lastError = LastErrorType::kStaleShardVersion;
     }
 
-    void noteStaleDbResponse(OperationContext* opCtx,
-                             const ShardEndpoint& endpoint,
-                             const StaleDbRoutingVersion& staleInfo) override {
+    void noteStaleDbVersionResponse(OperationContext* opCtx,
+                                    const StaleDbRoutingVersion& staleInfo) override {
         _lastError = LastErrorType::kStaleDbVersion;
     }
 

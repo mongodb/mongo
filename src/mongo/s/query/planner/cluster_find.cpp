@@ -759,8 +759,7 @@ CursorId ClusterFind::runQuery(OperationContext* opCtx,
                         "error"_attr = redact(ex));
 
             if (auto staleInfo = ex.extraInfo<StaleConfigInfo>()) {
-                catalogCache->invalidateShardOrEntireCollectionEntryForShardedCollection(
-                    query.nss(), staleInfo->getVersionWanted(), staleInfo->getShardId());
+                catalogCache->onStaleCollectionVersion(query.nss(), staleInfo->getVersionWanted());
             } else {
                 catalogCache->invalidateCollectionEntry_LINEARIZABLE(query.nss());
             }
