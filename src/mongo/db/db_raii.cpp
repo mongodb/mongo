@@ -50,6 +50,7 @@
 #include "mongo/db/catalog/collection_yield_restore.h"
 #include "mongo/db/catalog/database_holder.h"
 #include "mongo/db/client.h"
+#include "mongo/db/concurrency/exception_util.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/direct_connection_util.h"
 #include "mongo/db/logical_time.h"
@@ -299,25 +300,20 @@ AutoGetCollectionForRead::AutoGetCollectionForRead(OperationContext* opCtx,
     const auto& secondaryNssOrUUIDsBegin = options._secondaryNssOrUUIDsBegin;
     const auto& secondaryNssOrUUIDsEnd = options._secondaryNssOrUUIDsEnd;
 
-    // Acquire the collection locks. If there's only one lock, then it can simply be taken. If
-    // there are many, however, the locks must be taken in _ascending_ ResourceId order to avoid
-    // deadlocks across threads.
-    if (secondaryNssOrUUIDsBegin == secondaryNssOrUUIDsEnd) {
-        uassert(ErrorCodes::InvalidNamespace,
-                fmt::format("Namespace {} is not a valid collection name",
-                            nsOrUUID.toStringForErrorMsg()),
-                nsOrUUID.isUUID() || (nsOrUUID.isNamespaceString() && nsOrUUID.nss().isValid()));
+    // Acquire the collection locks, this will also ensure that the CollectionCatalog has been
+    // correctly mapped to the given collections.
+    uassert(
+        ErrorCodes::InvalidNamespace,
+        fmt::format("Namespace {} is not a valid collection name", nsOrUUID.toStringForErrorMsg()),
+        nsOrUUID.isUUID() || (nsOrUUID.isNamespaceString() && nsOrUUID.nss().isValid()));
 
-        _collLocks.emplace_back(opCtx, nsOrUUID, modeColl, deadline);
-    } else {
-        catalog_helper::acquireCollectionLocksInResourceIdOrder(opCtx,
-                                                                nsOrUUID,
-                                                                modeColl,
-                                                                deadline,
-                                                                secondaryNssOrUUIDsBegin,
-                                                                secondaryNssOrUUIDsEnd,
-                                                                &_collLocks);
-    }
+    catalog_helper::acquireCollectionLocksInResourceIdOrder(opCtx,
+                                                            nsOrUUID,
+                                                            modeColl,
+                                                            deadline,
+                                                            secondaryNssOrUUIDsBegin,
+                                                            secondaryNssOrUUIDsEnd,
+                                                            &_collLocks);
 
     // Wait for a configured amount of time after acquiring locks if the failpoint is enabled
     catalog_helper::setAutoGetCollectionWaitFailpointExecute(
@@ -325,7 +321,12 @@ AutoGetCollectionForRead::AutoGetCollectionForRead(OperationContext* opCtx,
 
     auto catalog = CollectionCatalog::get(opCtx);
 
-    _resolvedNss = catalog->resolveNamespaceStringOrUUID(opCtx, nsOrUUID);
+    // We also check commit pending entries since we could be racing with a concurrent collection
+    // creation. We will later establish a consistent collection and check again that we correctly
+    // got the collection. This is only necessary for UUID lookups since a collection not existing
+    // causes a NamespaceNotFound error.
+    _resolvedNss =
+        catalog->resolveNamespaceStringOrUUIDWithCommitPendingEntries_UNSAFE(opCtx, nsOrUUID);
 
     // On secondaries, we have to guarantee we read at a consistent state, so we must read at the
     // lastApplied timestamp, which is set after each complete batch.
@@ -344,6 +345,13 @@ AutoGetCollectionForRead::AutoGetCollectionForRead(OperationContext* opCtx,
     // reference in the 'catalog' if needed and the collection exists at that PIT.
     _coll = CollectionPtr(catalog->establishConsistentCollection(opCtx, nsOrUUID, readTimestamp));
     _coll.makeYieldable(opCtx, LockedCollectionYieldRestore{opCtx, _coll});
+
+    // Verify the collection exists once we have acquired the consistent collection and performed a
+    // UUID lookup.
+    uassert(ErrorCodes::NamespaceNotFound,
+            str::stream() << "Namespace " << _resolvedNss.dbName().toStringForErrorMsg() << ":"
+                          << nsOrUUID.uuid() << " not found",
+            !(!_coll && nsOrUUID.isUUID()));
 
     // Validate primary collection.
     verifyNamespaceLockingRequirements(opCtx, modeColl, _resolvedNss);
@@ -571,7 +579,15 @@ ConsistentCatalogAndSnapshot getConsistentCatalogAndSnapshot(
         boost::optional<const NamespaceString&> nss = nssStorage;
 
         try {
-            nssStorage = catalogBeforeSnapshot->resolveNamespaceStringOrUUID(opCtx, nsOrUUID);
+            // This can lookup into the commit pending entries without establishing a consistent
+            // collection. This is safe because we only use this resolved namespace to check if the
+            // collection is replicated or not in order to change read source if needed. As we do
+            // not allow changing this setting by the user this is independent of the actual
+            // collection namespace. Note that a later check in the Acquisition API will establish
+            // the collection as consistent.
+            nssStorage =
+                catalogBeforeSnapshot->resolveNamespaceStringOrUUIDWithCommitPendingEntries_UNSAFE(
+                    opCtx, nsOrUUID);
         } catch (const ExceptionFor<ErrorCodes::NamespaceNotFound>&) {
             // The UUID cannot be resolved to a namespace in the latest catalog, but we allow the
             // call to continue which eventually calls

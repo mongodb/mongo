@@ -125,14 +125,10 @@ void removeByPtr(List& l, T* p) {
 }
 
 void validateResolvedCollectionByUUID(OperationContext* opCtx,
-                                      CollectionOrViewAcquisitionRequest ar,
-                                      const Collection* coll) {
+                                      const CollectionOrViewAcquisitionRequest& ar,
+                                      const NamespaceString& nss) {
     invariant(ar.nssOrUUID.isUUID());
-    uassert(ErrorCodes::NamespaceNotFound,
-            str::stream() << "Namespace " << ar.nssOrUUID.dbName().toStringForErrorMsg() << ":"
-                          << ar.nssOrUUID.uuid() << " not found",
-            coll);
-    auto shardVersion = OperationShardingState::get(opCtx).getShardVersion(coll->ns());
+    auto shardVersion = OperationShardingState::get(opCtx).getShardVersion(nss);
     uassert(ErrorCodes::IncompatibleShardingMetadata,
             str::stream() << "Collection " << ar.nssOrUUID.dbName().toStringForErrorMsg() << ":"
                           << ar.nssOrUUID.uuid()
@@ -143,8 +139,19 @@ void validateResolvedCollectionByUUID(OperationContext* opCtx,
                           << ar.nssOrUUID.dbName().toStringForErrorMsg() << ":"
                           << ar.nssOrUUID.uuid()
                           << ". Expected: " << ar.nssOrUUID.dbName().toStringForErrorMsg()
-                          << " Actual: " << coll->ns().dbName().toStringForErrorMsg(),
-            coll->ns().dbName() == ar.nssOrUUID.dbName());
+                          << " Actual: " << nss.dbName().toStringForErrorMsg(),
+            nss.dbName() == ar.nssOrUUID.dbName());
+}
+
+void validateResolvedCollectionByUUID(OperationContext* opCtx,
+                                      const CollectionOrViewAcquisitionRequest& ar,
+                                      const Collection* coll) {
+    invariant(ar.nssOrUUID.isUUID());
+    uassert(ErrorCodes::NamespaceNotFound,
+            str::stream() << "Namespace " << ar.nssOrUUID.dbName().toStringForErrorMsg() << ":"
+                          << ar.nssOrUUID.uuid() << " not found",
+            coll);
+    validateResolvedCollectionByUUID(opCtx, ar, coll->ns());
 }
 
 /**
@@ -177,19 +184,30 @@ ResolvedNamespaceOrViewAcquisitionRequests resolveNamespaceOrViewAcquisitionRequ
 
             resolvedAcquisitionRequests.emplace_back(std::move(resolvedAcquisitionRequest));
         } else if (ar.nssOrUUID.isUUID()) {
-            auto coll = catalog.lookupCollectionByUUID(opCtx, ar.nssOrUUID.uuid());
+            // We lookup in pending commit entries as well here since this function is used for
+            // UUID->NSS resolution. The usual flow for doing this in locked cases is:
+            // * Getting the NSS from the UUID considering pending entries
+            // * Acquiring a lock on the collection to prevent renames/drops
+            // * Getting the NSS again from the UUID considering pending entries
+            // In this case this method is safe to call because we will retry again if any DDL
+            // operation occurred between our lock acquisition and the next mapping attempt
+            // finished. Once the lock is acquired any DDL operation will have finished and
+            // committed and will either NOT have changed the UUID or changed it, which forces an
+            // entire retry of the operation we just described.
+            auto nss = catalog.resolveNamespaceStringOrUUIDWithCommitPendingEntries_UNSAFE(
+                opCtx, ar.nssOrUUID);
 
-            validateResolvedCollectionByUUID(opCtx, ar, coll);
+            validateResolvedCollectionByUUID(opCtx, ar, nss);
 
-            AcquisitionPrerequisites prerequisites(coll->ns(),
-                                                   coll->uuid(),
+            AcquisitionPrerequisites prerequisites(nss,
+                                                   ar.nssOrUUID.uuid(),
                                                    ar.readConcern,
                                                    ar.placementConcern,
                                                    ar.operationType,
                                                    ar.viewMode);
 
             ResolvedNamespaceOrViewAcquisitionRequest resolvedAcquisitionRequest{
-                ResourceId(RESOURCE_COLLECTION, coll->ns()),
+                ResourceId(RESOURCE_COLLECTION, nss),
                 prerequisites,
                 ResolutionType::kUUID,
                 nullptr,
@@ -924,7 +942,14 @@ void SnapshotAttempt::changeReadSourceForSecondaryReads() {
     for (auto& nsOrUUID : _acquisitionRequests) {
         NamespaceString nss;
         try {
-            nss = catalog->resolveNamespaceStringOrUUID(_opCtx, nsOrUUID);
+            // This can lookup into the commit pending entries without establishing a consistent
+            // collection. This is safe because we only use this resolved namespace to check if the
+            // collection is replicated or not. As we do not allow changing this setting by the user
+            // this is independent of the consistent collection namespace. Note that a later check
+            // in the Acquisition API will verify that it is not uncommitted in the WT snapshot. We
+            // do not allow lookups on uncommitted collections since they still do not exist.
+            nss = catalog->resolveNamespaceStringOrUUIDWithCommitPendingEntries_UNSAFE(_opCtx,
+                                                                                       nsOrUUID);
         } catch (const ExceptionFor<ErrorCodes::NamespaceNotFound>&) {
             invariant(nsOrUUID.isUUID());
 
@@ -1178,19 +1203,21 @@ CollectionOrViewAcquisitions acquireCollectionsOrViews(
         // user provided one. Note that multi-document transactions will get a WCE thrown later
         // during the checks performed by verifyDbAndCollection if the collection metadata has
         // changed.
-        bool hasOptimisticResolutionFailed = false;
-        for (auto& ar : sortedAcquisitionRequests) {
-            const auto& prerequisites = ar.prerequisites;
-            if (ar.resolvedBy != ResolutionType::kUUID) {
-                continue;
-            }
-            const auto& currentCatalog = CollectionCatalog::get(opCtx);
-            const auto coll = currentCatalog->lookupCollectionByNamespace(opCtx, prerequisites.nss);
-            if (prerequisites.uuid && (!coll || coll->uuid() != prerequisites.uuid)) {
-                hasOptimisticResolutionFailed = true;
-                break;
-            }
-        }
+        bool hasOptimisticResolutionFailed = std::any_of(
+            sortedAcquisitionRequests.begin(),
+            sortedAcquisitionRequests.end(),
+            [&](const auto& ar) {
+                const auto& prerequisites = ar.prerequisites;
+                if (ar.resolvedBy != ResolutionType::kUUID) {
+                    return false;
+                }
+                const auto& currentCatalog = CollectionCatalog::get(opCtx);
+                const auto nss =
+                    currentCatalog->resolveNamespaceStringOrUUIDWithCommitPendingEntries_UNSAFE(
+                        opCtx,
+                        NamespaceStringOrUUID{prerequisites.nss.dbName(), *prerequisites.uuid});
+                return prerequisites.nss != nss;
+            });
 
         if (MONGO_unlikely(hasOptimisticResolutionFailed)) {
             // Retry optimistic resolution.
@@ -1205,9 +1232,33 @@ CollectionOrViewAcquisitions acquireCollectionsOrViews(
         try {
             return acquireResolvedCollectionsOrViewsWithoutTakingLocks(
                 opCtx, *catalog, sortedAcquisitionRequests);
-        } catch (...) {
+        } catch (const DBException& ex) {
             if (openSnapshot && !shard_role_details::getLocker(opCtx)->inAWriteUnitOfWork())
                 shard_role_details::getRecoveryUnit(opCtx)->abandonSnapshot();
+
+            if (ex.code() == ErrorCodes::CollectionUUIDMismatch) {
+                const auto info = ex.extraInfo<CollectionUUIDMismatchInfo>();
+                // A UUID mismatch error here for a collection we requested by UUID should be
+                // transformed into a NamespaceNotFound error to avoid confusing the user if it
+                // doesn't exist in our snapshot. This error must be treated here since we do commit
+                // pending lookups for namespace resolution before we've established a consistent
+                // collection.
+                //
+                // This case could be reached by having correctly looked up a commit pending UUID
+                // twice for a collection that has just been created but not yet visible in our WT
+                // snapshot. In this case we have to reconvert the CollectionUUIDMismatch error.
+                auto isUUIDMismatchDueToFailedResolution =
+                    std::any_of(sortedAcquisitionRequests.begin(),
+                                sortedAcquisitionRequests.end(),
+                                [&](const ResolvedNamespaceOrViewAcquisitionRequest& ar) {
+                                    return ar.resolvedBy == ResolutionType::kUUID &&
+                                        ar.prerequisites.uuid == info->collectionUUID();
+                                });
+                uassert(ErrorCodes::NamespaceNotFound,
+                        str::stream() << "Namespace " << info->dbName().toStringForErrorMsg() << ":"
+                                      << info->collectionUUID() << " not found",
+                        !(isUUIDMismatchDueToFailedResolution && !info->actualCollection()));
+            }
             throw;
         }
     }
