@@ -2576,9 +2576,6 @@ export class ReplSetTest {
             options.setParameter.featureFlagAllMongodsAreSharded = true;
         }
 
-        if (jsTest.options().nonClusteredConfigTransactions) {
-            options.setParameter.featureFlagClusteredConfigTransactions = false;
-        }
         if (typeof TestData !== "undefined" && TestData.replicaSetEndpointIncompatible) {
             options.setParameter.featureFlagReplicaSetEndpoint = false;
         }

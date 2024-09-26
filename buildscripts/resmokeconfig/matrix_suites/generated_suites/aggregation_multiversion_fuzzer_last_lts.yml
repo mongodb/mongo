@@ -16,7 +16,6 @@ executor:
           clusterType: standalone
           internalQueryAppendIdToSetWindowFieldsSort: true
           internalQueryMaxAllowedDensifyDocs: 1000
-          nonClusteredConfigTransactions: true
           traceExceptions: false
           useRandomBinVersionsWithinReplicaSet: last-lts
       nodb: ""

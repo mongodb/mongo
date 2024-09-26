@@ -18,9 +18,6 @@ executor:
   config:
     shell_options:
       eval: globalThis.testingReplication = true;
-      global_vars:
-        TestData:
-          nonClusteredConfigTransactions: true
   fixture:
     class: ReplicaSetFixture
     mixed_bin_versions: new_new_old

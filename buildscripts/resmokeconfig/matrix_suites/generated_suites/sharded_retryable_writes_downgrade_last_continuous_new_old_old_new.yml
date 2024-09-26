@@ -29,7 +29,6 @@ executor:
           logRetryAttempts: true
           networkErrorAndTxnOverrideConfig:
             retryOnNetworkErrors: true
-          nonClusteredConfigTransactions: true
           overrideRetryAttempts: 3
           sessionOptions:
             readConcern:

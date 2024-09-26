@@ -20,7 +20,6 @@ executor:
               initialSync: 4
               rollback: 0
               verbosity: 3
-          nonClusteredConfigTransactions: true
           setParameters:
             numInitialSyncAttempts: 10000000
           useRandomBinVersionsWithinReplicaSet: last-lts

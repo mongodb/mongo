@@ -15,7 +15,6 @@ executor:
       global_vars:
         TestData:
           mongosBinVersion: last-continuous
-          nonClusteredConfigTransactions: true
           setParameters:
             defaultConfigCommandTimeoutMS: 90000
           setParametersMongos:

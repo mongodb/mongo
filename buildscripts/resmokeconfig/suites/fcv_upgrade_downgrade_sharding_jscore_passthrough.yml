@@ -162,7 +162,6 @@ executor:
             # Skip enforcing this check in FCV upgrade/downgrade suites as time-series buckets are not
             # always compressed in a downgraded FCV.
             skipEnforceTimeseriesBucketsAreAlwaysCompressedOnValidate: true
-            nonClusteredConfigTransactions: true
     - class: FCVUpgradeDowngradeInBackground
     - class: CleanEveryN
       n: 20

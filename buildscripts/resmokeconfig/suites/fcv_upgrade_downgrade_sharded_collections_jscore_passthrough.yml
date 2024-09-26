@@ -279,9 +279,6 @@ executor:
       eval: >-
         await import("jstests/libs/override_methods/retry_aborted_db_and_index_creation.js");
         await import("jstests/libs/override_methods/implicitly_shard_accessed_collections.js");
-      global_vars:
-        TestData:
-          nonClusteredConfigTransactions: true
   hooks:
     - class: CheckReplDBHash
     - class: CheckMetadataConsistencyInBackground

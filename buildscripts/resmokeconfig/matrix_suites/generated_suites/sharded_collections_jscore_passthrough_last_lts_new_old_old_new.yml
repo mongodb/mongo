@@ -15,9 +15,6 @@ executor:
   config:
     shell_options:
       eval: await import("jstests/libs/override_methods/implicitly_shard_accessed_collections.js");
-      global_vars:
-        TestData:
-          nonClusteredConfigTransactions: true
   fixture:
     class: ShardedClusterFixture
     enable_balancer: false

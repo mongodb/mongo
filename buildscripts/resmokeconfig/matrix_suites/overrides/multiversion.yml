@@ -1,7 +1,3 @@
-# TODO SERVER-84073 reenable the clustered config.transactions feature flag for all tests by
-# removing the nonClusteredConfigTransactions TestData variable from all overrides as well as all
-# instances of turning the clusteredConfigTransactions feature flag off across all nonmatrix tests.
-
 ### Overrides for more than 1 suite ###
 - name: replica_fixture_last_lts_new_new_old
   value:
@@ -10,11 +6,6 @@
         num_nodes: 3
         old_bin_version: last_lts
         mixed_bin_versions: new_new_old
-      config:
-        shell_options:
-          global_vars:
-            TestData:
-              nonClusteredConfigTransactions: true
 
 - name: replica_fixture_last_lts_new_old_new
   value:
@@ -23,11 +14,6 @@
         num_nodes: 3
         old_bin_version: last_lts
         mixed_bin_versions: new_old_new
-      config:
-        shell_options:
-          global_vars:
-            TestData:
-              nonClusteredConfigTransactions: true
 
 - name: replica_fixture_last_lts_old_new_new
   value:
@@ -36,11 +22,6 @@
         num_nodes: 3
         old_bin_version: last_lts
         mixed_bin_versions: old_new_new
-      config:
-        shell_options:
-          global_vars:
-            TestData:
-              nonClusteredConfigTransactions: true
 
 - name: replica_fixture_last_continuous_new_new_old
   value:
@@ -49,11 +30,6 @@
         num_nodes: 3
         old_bin_version: last_continuous
         mixed_bin_versions: new_new_old
-      config:
-        shell_options:
-          global_vars:
-            TestData:
-              nonClusteredConfigTransactions: true
 
 - name: replica_fixture_last_continuous_new_old_new
   value:
@@ -62,11 +38,6 @@
         num_nodes: 3
         old_bin_version: last_continuous
         mixed_bin_versions: new_old_new
-      config:
-        shell_options:
-          global_vars:
-            TestData:
-              nonClusteredConfigTransactions: true
 
 - name: replica_fixture_last_continuous_old_new_new
   value:
@@ -75,11 +46,6 @@
         num_nodes: 3
         old_bin_version: last_continuous
         mixed_bin_versions: old_new_new
-      config:
-        shell_options:
-          global_vars:
-            TestData:
-              nonClusteredConfigTransactions: true
 
 - name: sharded_fixture_last_lts_new_old_old_new
   value:
@@ -89,11 +55,6 @@
         num_rs_nodes_per_shard: 2
         old_bin_version: last_lts
         mixed_bin_versions: new_old_old_new
-      config:
-        shell_options:
-          global_vars:
-            TestData:
-              nonClusteredConfigTransactions: true
 
 - name: sharded_fixture_last_continuous_new_old_old_new
   value:
@@ -103,11 +64,6 @@
         num_rs_nodes_per_shard: 2
         old_bin_version: last_continuous
         mixed_bin_versions: new_old_old_new
-      config:
-        shell_options:
-          global_vars:
-            TestData:
-              nonClusteredConfigTransactions: true
 
 ### Suite-specific overrides ###
 - name: multiversion_future_git_tag_exclude_files
@@ -125,12 +81,6 @@
         - jstests/multiVersion/genericSetFCVUsage/crash_mongos_against_upgraded_cluster.js
       exclude_with_any_tags:
         - DISABLED_TEMPORARILY_DUE_TO_FCV_UPGRADE
-    executor:
-      config:
-        shell_options:
-          global_vars:
-            TestData:
-              nonClusteredConfigTransactions: true
 
 - name: multiversion_auth_future_git_tag_exclude_files
   value:
@@ -150,24 +100,12 @@
         - jstests/multiVersion/genericBinVersion/load_keys_on_upgrade.js
       exclude_with_any_tags:
         - DISABLED_TEMPORARILY_DUE_TO_FCV_UPGRADE
-    executor:
-      config:
-        shell_options:
-          global_vars:
-            TestData:
-              nonClusteredConfigTransactions: true
 
 - name: multiversion_sanity_check_selector
   value:
     selector:
       include_with_any_tags:
         - multiversion_sanity_check
-    executor:
-      config:
-        shell_options:
-          global_vars:
-            TestData:
-              nonClusteredConfigTransactions: true
 
 - name: replica_sets_multiversion_selector
   value:
@@ -185,12 +123,6 @@
         - jstests/replsets/apply_prepare_txn_write_conflict_robustness.js
         - jstests/replsets/invalidate_sessions_on_stepdown.js
         - jstests/replsets/initial_sync_fails_unclean_restart.js
-    executor:
-      config:
-        shell_options:
-          global_vars:
-            TestData:
-              nonClusteredConfigTransactions: true
 
 - name: replica_sets_multiversion_testdata_last_lts
   value:
@@ -200,7 +132,6 @@
           global_vars:
             TestData:
               useRandomBinVersionsWithinReplicaSet: "last-lts"
-              nonClusteredConfigTransactions: true
 
 - name: replica_sets_multiversion_testdata_last_continuous
   value:
@@ -210,7 +141,6 @@
           global_vars:
             TestData:
               useRandomBinVersionsWithinReplicaSet: "last-continuous"
-              nonClusteredConfigTransactions: true
 
 - name: rollback_multiversion_fuzzer_testdata_last_lts
   value:
@@ -229,7 +159,6 @@
                   verbosity: 1
               rollbackShutdowns: true
               useRandomBinVersionsWithinReplicaSet: "last-lts"
-              nonClusteredConfigTransactions: true
 
 - name: rollback_multiversion_fuzzer_testdata_last_continuous
   value:
@@ -248,7 +177,6 @@
                   verbosity: 1
               rollbackShutdowns: true
               useRandomBinVersionsWithinReplicaSet: "last-continuous"
-              nonClusteredConfigTransactions: true
 
 - name: sharding_multiversion_selector
   value:
@@ -266,12 +194,6 @@
         # TODO SERVER-46040: Enable when SERVER-46040 is backported
         - jstests/sharding/drop_indexes_with_stale_config_error.js
         - jstests/sharding/query/out_merge/merge_write_concern.js
-    executor:
-      config:
-        shell_options:
-          global_vars:
-            TestData:
-              nonClusteredConfigTransactions: true
 
 - name: sharding_multiversion_testdata_last_lts
   value:
@@ -282,7 +204,6 @@
             TestData:
               useRandomBinVersionsWithinReplicaSet: "last-lts"
               mongosBinVersion: "last-lts"
-              nonClusteredConfigTransactions: true
 
 - name: sharding_multiversion_testdata_last_continuous
   value:
@@ -313,11 +234,6 @@
             global_vars:
               TestData:
                 skipValidationOnInvalidViewDefinitions: true
-      config:
-        shell_options:
-          global_vars:
-            TestData:
-              nonClusteredConfigTransactions: true
 
 - name: jstestfuzz_sharded_multiversion_hooks
   value:
@@ -339,8 +255,3 @@
             global_vars:
               TestData:
                 skipValidationOnInvalidViewDefinitions: true
-      config:
-        shell_options:
-          global_vars:
-            TestData:
-              nonClusteredConfigTransactions: true

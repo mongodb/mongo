@@ -12,11 +12,7 @@ executor:
       - CheckReplDBHash
       - CheckMetadataConsistencyInBackground
       - ValidateCollections
-  config:
-    shell_options:
-      global_vars:
-        TestData:
-          nonClusteredConfigTransactions: true
+  config: {}
   fixture:
     class: ShardedClusterFixture
     mixed_bin_versions: new_old_old_new

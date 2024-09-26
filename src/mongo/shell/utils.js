@@ -521,7 +521,6 @@ jsTestOptions = function() {
             configShard: TestData.configShard || false,
 
             useAutoBootstrapProcedure: TestData.useAutoBootstrapProcedure || false,
-            nonClusteredConfigTransactions: TestData.nonClusteredConfigTransactions || false,
 
             embeddedRouter: TestData.embeddedRouter || false,
 

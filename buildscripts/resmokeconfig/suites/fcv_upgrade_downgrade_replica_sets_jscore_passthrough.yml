@@ -124,9 +124,6 @@ executor:
       eval: >-
         globalThis.testingReplication = true;
         await import("jstests/libs/override_methods/retry_aborted_db_and_index_creation.js");
-      global_vars:
-        TestData:
-          nonClusteredConfigTransactions: true
   hooks:
     - class: CheckReplOplogs
     - class: CheckReplDBHash

@@ -22,7 +22,6 @@ executor:
             storage:
               recovery: 3
               verbosity: 1
-          nonClusteredConfigTransactions: true
           rollbackShutdowns: true
           setParameters:
             enableIndexBuildCommitQuorum: false

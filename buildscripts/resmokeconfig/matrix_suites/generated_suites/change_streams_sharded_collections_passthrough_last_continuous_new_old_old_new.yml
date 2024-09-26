@@ -20,7 +20,6 @@ executor:
       global_vars:
         TestData:
           defaultReadConcernLevel: null
-          nonClusteredConfigTransactions: true
   fixture:
     class: ShardedClusterFixture
     mixed_bin_versions: new_old_old_new
