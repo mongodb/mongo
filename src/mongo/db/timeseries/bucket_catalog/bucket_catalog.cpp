@@ -40,7 +40,7 @@
 
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
-#include "mongo/bson/util/bsoncolumnbuilder.h"
+#include "mongo/bson/column/bsoncolumnbuilder.h"
 #include "mongo/db/concurrency/exception_util.h"
 #include "mongo/db/feature_flag.h"
 #include "mongo/db/operation_context.h"

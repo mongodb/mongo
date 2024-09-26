@@ -37,7 +37,7 @@
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement_comparator_interface.h"
 #include "mongo/bson/bsonobj.h"
-#include "mongo/bson/util/bsoncolumn.h"
+#include "mongo/bson/column/bsoncolumn.h"
 #include "mongo/db/index/multikey_paths.h"
 #include "mongo/platform/compiler.h"
 

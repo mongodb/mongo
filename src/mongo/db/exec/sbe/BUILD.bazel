@@ -248,7 +248,7 @@ mongo_cc_library(
         "//src/mongo/util/version:releases_header",
     ],
     header_deps = [
-        "//src/mongo/bson/util:bson_column",
+        "//src/mongo/bson/column",
         "//src/mongo/db/auth:cluster_auth_mode",
         "//src/mongo/db/fts:fts_query_noop",
         "//src/mongo/platform:visibility_test_libcommon",

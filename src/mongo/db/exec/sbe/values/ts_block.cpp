@@ -34,7 +34,7 @@
 #include <tuple>
 #include <utility>
 
-#include "mongo/bson/util/bsoncolumn.h"
+#include "mongo/bson/column/bsoncolumn.h"
 #include "mongo/bson/util/bsonobj_traversal.h"
 #include "mongo/db/exec/sbe/values/block_interface.h"
 #include "mongo/db/exec/sbe/values/bson_block.h"

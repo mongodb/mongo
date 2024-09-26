@@ -27,9 +27,9 @@
  *    it in the license file.
  */
 
+#include "mongo/bson/column/bsoncolumn.h"
+#include "mongo/bson/column/bsoncolumnbuilder.h"
 #include "mongo/bson/json.h"
-#include "mongo/bson/util/bsoncolumn.h"
-#include "mongo/bson/util/bsoncolumnbuilder.h"
 #include "mongo/db/exec/sbe/sbe_block_test_helpers.h"
 #include "mongo/db/exec/sbe/sbe_unittest.h"
 #include "mongo/db/exec/sbe/values/block_interface.h"

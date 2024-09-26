@@ -52,7 +52,7 @@
 #include "mongo/base/error_codes.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsontypes.h"
-#include "mongo/bson/util/bsoncolumn.h"
+#include "mongo/bson/column/bsoncolumn.h"
 #include "mongo/bson/util/builder.h"
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/concurrency/exception_util.h"

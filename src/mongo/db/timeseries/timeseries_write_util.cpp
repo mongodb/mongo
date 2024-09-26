@@ -50,7 +50,7 @@
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobjbuilder.h"
-#include "mongo/bson/util/bsoncolumn.h"
+#include "mongo/bson/column/bsoncolumn.h"
 #include "mongo/client/dbclient_cursor.h"
 #include "mongo/db/catalog/collection_operation_source.h"
 #include "mongo/db/catalog/collection_write_path.h"

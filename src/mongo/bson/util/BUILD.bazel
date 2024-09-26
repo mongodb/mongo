@@ -10,34 +10,6 @@ exports_files(
 )
 
 mongo_cc_library(
-    name = "bson_column",
-    srcs = [
-        "bsoncolumn.cpp",
-        "bsoncolumn_interleaved.cpp",
-        "bsoncolumnbuilder.cpp",
-        "simple8b_type_util.cpp",
-    ],
-    hdrs = [
-        "bsoncolumn.h",
-        "bsoncolumn.inl",
-        "bsoncolumn_helpers.h",
-        "bsoncolumn_interleaved.h",
-        "bsoncolumn_util.h",
-        "bsoncolumnbuilder.h",
-        "simple8b.h",
-        "simple8b.inl",
-        "simple8b_builder.h",
-        "simple8b_builder.inl",
-        "simple8b_helpers.h",
-        "simple8b_type_util.h",
-        "//src/mongo/util:overloaded_visitor.h",
-    ],
-    deps = [
-        "//src/mongo:base",
-    ],
-)
-
-mongo_cc_library(
     name = "bson_extract",
     srcs = [
         "bson_extract.cpp",
@@ -46,20 +18,6 @@ mongo_cc_library(
         "bson_extract.h",
     ],
     deps = [
-        "//src/mongo:base",
-    ],
-)
-
-mongo_cc_library(
-    name = "bson_column_fuzzer_impl",
-    srcs = [
-        "bsoncolumn_fuzzer_impl.cpp",
-    ],
-    hdrs = [
-        "bsoncolumn_fuzzer_impl.h",
-    ],
-    deps = [
-        ":bson_column",
         "//src/mongo:base",
     ],
 )

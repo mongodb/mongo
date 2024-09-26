@@ -111,7 +111,7 @@ mongo_cc_library(
         "//src/mongo/db/exec/timeseries:bucket_unpacker.h",
     ],
     deps = [
-        "//src/mongo/bson/util:bson_column",
+        "//src/mongo/bson/column",
         "//src/mongo/db:query_expressions",
         "//src/mongo/db/exec/document_value",
         "//src/mongo/db/query:bucket_predicate_generator",

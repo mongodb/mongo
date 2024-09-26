@@ -1742,7 +1742,7 @@ mongo_cc_library(
         "//src/mongo/db:wire_version.h",
     ],
     header_deps = [
-        "//src/mongo/bson/util:bson_column",
+        "//src/mongo/bson/column",
         "//src/mongo/db/auth:cluster_auth_mode",
         "//src/mongo/db/concurrency:flow_control_ticketholder",
         "//src/mongo/db/fts:fts_query_noop",
@@ -2295,7 +2295,7 @@ mongo_cc_library(
     ],
     deps = [
         "//src/mongo:base",
-        "//src/mongo/bson/util:bson_column",  # TODO(SERVER-93876): Remove.
+        "//src/mongo/bson/column",  # TODO(SERVER-93876): Remove.
         "//src/mongo/db/exec:js_function",
         "//src/mongo/db/query/collation:collator_interface",  # TODO(SERVER-93876): Remove.
         "//src/mongo/db/query/datetime:date_time_support",  # TODO(SERVER-93876): Remove.

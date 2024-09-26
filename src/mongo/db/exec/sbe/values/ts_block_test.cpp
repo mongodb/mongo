@@ -28,8 +28,8 @@
  */
 
 #include "mongo/bson/bsonobj.h"
+#include "mongo/bson/column/bsoncolumn.h"
 #include "mongo/bson/json.h"
-#include "mongo/bson/util/bsoncolumn.h"
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/exec/sbe/sbe_block_test_helpers.h"
 #include "mongo/db/exec/sbe/sbe_unittest.h"

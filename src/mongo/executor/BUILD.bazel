@@ -306,7 +306,7 @@ mongo_cc_library(
         "//src/mongo/s:shard_version.h",
     ],
     header_deps = [
-        "//src/mongo/bson/util:bson_column",
+        "//src/mongo/bson/column",
         "//src/mongo/db/concurrency:flow_control_ticketholder",
         "//src/mongo/db/exec/sbe:query_sbe_plan_stats",
     ],

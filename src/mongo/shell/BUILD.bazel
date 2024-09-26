@@ -166,7 +166,7 @@ mongo_cc_library(
         ":program_runner",  # TODO(SERVER-93876): Remove.
         ":shell_options_storage",
         "//src/mongo/base:environment_buffer",  # TODO(SERVER-93876): Remove.
-        "//src/mongo/bson/util:bson_column",
+        "//src/mongo/bson/column",
         "//src/mongo/client:clientdriver_network",
         "//src/mongo/db:mongohasher",  # TODO(SERVER-93876): Remove.
         "//src/mongo/db:traffic_reader",

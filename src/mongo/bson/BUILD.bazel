@@ -33,7 +33,7 @@ mongo_cc_library(
     ],
     deps = [
         "//src/mongo:base",
-        "//src/mongo/bson/util:bson_column",
+        "//src/mongo/bson/column",
         "//src/mongo/db:server_base",
         "//src/mongo/idl:idl_parser",
     ],

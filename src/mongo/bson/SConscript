@@ -7,6 +7,7 @@ env = env.Clone()
 env.SConscript(
     must_exist=1,
     dirs=[
+        "column",
         "mutable",
         "util",
     ],
@@ -31,7 +32,7 @@ env.CppUnitTest(
     LIBDEPS=[
         "$BUILD_DIR/mongo/base",
         "$BUILD_DIR/mongo/bson/bson_validate",
-        "$BUILD_DIR/mongo/bson/util/bson_column",
+        "$BUILD_DIR/mongo/bson/column/column",
     ],
 )
 
@@ -55,18 +56,6 @@ env.CppLibfuzzerTest(
     LIBDEPS=[
         "$BUILD_DIR/mongo/base",
         "$BUILD_DIR/mongo/bson/bson_validate",
-    ],
-)
-
-env.CppLibfuzzerTest(
-    target="bson_column_validate_fuzzer",
-    source=[
-        "bson_column_validate_fuzzer.cpp",
-    ],
-    LIBDEPS=[
-        "$BUILD_DIR/mongo/base",
-        "$BUILD_DIR/mongo/bson/bson_validate",
-        "$BUILD_DIR/mongo/bson/util/bson_column",
     ],
 )
 

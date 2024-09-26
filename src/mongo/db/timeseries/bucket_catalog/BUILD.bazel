@@ -43,7 +43,7 @@ mongo_cc_library(
         "write_batch.h",
     ],
     deps = [
-        "//src/mongo/bson/util:bson_column",
+        "//src/mongo/bson/column",
         "//src/mongo/db:dbdirectclient",
         "//src/mongo/db:record_id_helpers",
         "//src/mongo/db:server_base",

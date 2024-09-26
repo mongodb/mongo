@@ -923,7 +923,7 @@ mongo_cc_library(
         "//src/mongo/util/net/ssl:apple.hpp",
     ],
     header_deps = [
-        "//src/mongo/bson/util:bson_column",
+        "//src/mongo/bson/column",
         "//src/mongo/db/auth:cluster_auth_mode",
         "//src/mongo/db/concurrency:flow_control_ticketholder",
         "//src/mongo/db/exec/sbe:query_sbe_plan_stats",
@@ -1116,7 +1116,7 @@ mongo_cc_library(
         "//src/mongo/util/version:releases_header",
     ],
     header_deps = [
-        "//src/mongo/bson/util:bson_column",
+        "//src/mongo/bson/column",
         "//src/mongo/db/auth:cluster_auth_mode",
         "//src/mongo/db/concurrency:flow_control_ticketholder",
         "//src/mongo/db/exec/sbe:query_sbe_plan_stats",

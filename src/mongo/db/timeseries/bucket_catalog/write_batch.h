@@ -38,8 +38,8 @@
 
 #include "mongo/base/status_with.h"
 #include "mongo/bson/bsonobj.h"
+#include "mongo/bson/column/bsoncolumnbuilder.h"
 #include "mongo/bson/oid.h"
-#include "mongo/bson/util/bsoncolumnbuilder.h"
 #include "mongo/db/operation_id.h"
 #include "mongo/db/repl/optime.h"
 #include "mongo/db/timeseries/bucket_catalog/bucket_identifiers.h"

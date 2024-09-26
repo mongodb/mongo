@@ -292,7 +292,7 @@ env.Library(
         "validate_results.cpp",
     ],
     LIBDEPS_PRIVATE=[
-        "$BUILD_DIR/mongo/bson/util/bson_column",
+        "$BUILD_DIR/mongo/bson/column/column",
         "$BUILD_DIR/mongo/db/concurrency/exception_util",
         "$BUILD_DIR/mongo/db/index/index_access_method",
         "$BUILD_DIR/mongo/db/multi_key_path_tracker",

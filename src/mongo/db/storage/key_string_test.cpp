@@ -28,7 +28,7 @@
  */
 
 
-#include "mongo/bson/util/bsoncolumnbuilder.h"
+#include "mongo/bson/column/bsoncolumnbuilder.h"
 #include <fmt/format.h>
 // IWYU pragma: no_include "cxxabi.h"
 #include <algorithm>

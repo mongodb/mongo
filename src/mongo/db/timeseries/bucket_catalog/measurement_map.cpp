@@ -28,7 +28,7 @@
  */
 
 #include "mongo/db/timeseries/bucket_catalog/measurement_map.h"
-#include "mongo/bson/util/bsoncolumn.h"
+#include "mongo/bson/column/bsoncolumn.h"
 #include "mongo/logv2/log.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/base64.h"

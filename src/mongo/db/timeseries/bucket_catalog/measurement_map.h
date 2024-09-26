@@ -34,7 +34,7 @@
 
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
-#include "mongo/bson/util/bsoncolumnbuilder.h"
+#include "mongo/bson/column/bsoncolumnbuilder.h"
 #include "mongo/util/tracked_types.h"
 #include "mongo/util/tracking_context.h"
 
