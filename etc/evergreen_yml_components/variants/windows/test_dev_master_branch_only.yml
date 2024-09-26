@@ -79,9 +79,6 @@ buildvariants:
       exe: ".exe"
       ext: zip
       content_type: application/zip
-      compile_flags: >-
-        CPPPATH="#/sasl/include"
-        LIBPATH="#/sasl/lib"
       num_scons_link_jobs_available: 0.2
       python: "/cygdrive/c/python/python310/python.exe"
       scons_cache_scope: shared
@@ -107,8 +104,6 @@ buildvariants:
       compile_flags: >-
         --ssl
         MONGO_DISTMOD=windows
-        CPPPATH="#/sasl/include"
-        LIBPATH="#/sasl/lib"
         -j$(( $(grep -c ^processor /proc/cpuinfo) / 2 ))
         --win-version-min=win10
       num_scons_link_jobs_available: 0.5
@@ -143,11 +138,9 @@ buildvariants:
       compile_flags: >-
         --ssl
         MONGO_DISTMOD=windows
-        CPPPATH="#/sasl/include"
-        LIBPATH="#/sasl/lib"
         -j$(( $(grep -c ^processor /proc/cpuinfo) / 2 ))
         --win-version-min=win10
-      num_scons_link_jobs_available: 0.5
+      num_scons_link_jobs_available: 0.25
       python: "/cygdrive/c/python/python310/python.exe"
       ext: zip
       scons_cache_scope: shared
