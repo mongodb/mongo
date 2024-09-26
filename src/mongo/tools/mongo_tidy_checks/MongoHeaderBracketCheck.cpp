@@ -113,10 +113,16 @@ public:
             // is used double quotes.
             else if (IsAngled &&
                      startsWithAny(llvm::StringRef(header_path), Check.mongoSourceDirs)) {
-                std::string Replacement = (llvm::Twine("\"") + FileName + "\"").str();
-                Check.diag(FilenameRange.getBegin(), "mongo include '%0' should use double quotes")
-                    << FileName
-                    << clang::FixItHint::CreateReplacement(FilenameRange.getAsRange(), Replacement);
+                // TODO(SERVER-95253): Explicitly handle third party headers inside of the
+                // enterprise module directory.
+                if (!FileName.startswith("bsoncxx/") && !FileName.startswith("mongocxx/")) {
+                    std::string Replacement = (llvm::Twine("\"") + FileName + "\"").str();
+                    Check.diag(FilenameRange.getBegin(),
+                               "mongo include '%0' should use double quotes")
+                        << FileName
+                        << clang::FixItHint::CreateReplacement(FilenameRange.getAsRange(),
+                                                               Replacement);
+                }
             }
         }
     }

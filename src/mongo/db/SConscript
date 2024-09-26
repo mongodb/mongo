@@ -1254,7 +1254,9 @@ env.Program(
         "serverless-test",
         "servers",
     ],
-    SYSLIBDEPS=env.get("MONGO_LDAP_LIB", []),
+    SYSLIBDEPS=env.get("MONGO_LDAP_LIB", [])
+    + env.get("MONGO_GSSAPI_LIB", [])
+    + (["sasl2"] if "sasl" in env.get("MONGO_ENTERPRISE_FEATURES", []) else []),
 )
 
 env.Library(
