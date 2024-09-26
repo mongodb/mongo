@@ -380,6 +380,7 @@ ParsedCommandInfo parseWriteRequest(OperationContext* opCtx, const OpMsgRequest&
         if ((parsedInfo.upsert = findAndModifyRequest.getUpsert().get_value_or(false))) {
             parsedInfo.updateRequest = UpdateRequest{};
             parsedInfo.updateRequest->setNamespaceString(findAndModifyRequest.getNamespace());
+            parsedInfo.updateRequest->setYieldPolicy(PlanYieldPolicy::YieldPolicy::INTERRUPT_ONLY);
             update::makeUpdateRequest(
                 opCtx, findAndModifyRequest, boost::none, parsedInfo.updateRequest.get_ptr());
         }

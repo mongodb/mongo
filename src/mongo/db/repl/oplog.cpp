@@ -418,6 +418,7 @@ void writeToImageCollection(OperationContext* opCtx,
     request.setUpdateModification(
         write_ops::UpdateModification::parseFromClassicUpdate(imageEntry.toBSON()));
     request.setFromOplogApplication(true);
+    request.setYieldPolicy(PlanYieldPolicy::YieldPolicy::INTERRUPT_ONLY);
     // This code path can also be hit by things such as `applyOps` and tenant migrations.
     ::mongo::update(opCtx, collection, request);
 }
@@ -1773,6 +1774,7 @@ Status applyOperation_inlock(OperationContext* opCtx,
                         write_ops::UpdateModification::parseFromClassicUpdate(o));
                     request.setUpsert();
                     request.setFromOplogApplication(true);
+                    request.setYieldPolicy(PlanYieldPolicy::YieldPolicy::INTERRUPT_ONLY);
 
                     writeConflictRetryWithLimit(opCtx, "applyOps_upsert", op.getNss(), [&] {
                         WriteUnitOfWork wuow(opCtx);
@@ -1838,6 +1840,7 @@ Status applyOperation_inlock(OperationContext* opCtx,
             request.setUpdateModification(std::move(updateMod));
             request.setUpsert(upsert);
             request.setFromOplogApplication(true);
+            request.setYieldPolicy(PlanYieldPolicy::YieldPolicy::INTERRUPT_ONLY);
             if (mode != OplogApplication::Mode::kInitialSync && isDataConsistent) {
                 if (op.getNeedsRetryImage() == repl::RetryImageEnum::kPreImage) {
                     request.setReturnDocs(UpdateRequest::ReturnDocOption::RETURN_OLD);
@@ -2078,6 +2081,7 @@ Status applyOperation_inlock(OperationContext* opCtx,
                 DeleteRequest request;
                 request.setNsString(requestNss);
                 request.setQuery(deleteCriteria);
+                request.setYieldPolicy(PlanYieldPolicy::YieldPolicy::INTERRUPT_ONLY);
                 if (mode != OplogApplication::Mode::kInitialSync &&
                     op.getNeedsRetryImage() == repl::RetryImageEnum::kPreImage &&
                     isDataConsistent) {

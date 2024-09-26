@@ -341,6 +341,7 @@ void Helpers::putSingleton(OperationContext* opCtx, CollectionAcquisition& coll,
     request.setNamespaceString(coll.nss());
 
     request.setUpdateModification(write_ops::UpdateModification::parseFromClassicUpdate(obj));
+    request.setYieldPolicy(PlanYieldPolicy::YieldPolicy::INTERRUPT_ONLY);
     request.setUpsert();
 
     ::mongo::update(opCtx, coll, request);

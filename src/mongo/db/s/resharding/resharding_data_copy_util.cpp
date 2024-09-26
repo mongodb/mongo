@@ -373,6 +373,7 @@ int insertBatchTransactionally(OperationContext* opCtx,
                 updateRequest.setQuery(resumeDataBSON["_id"].wrap());
                 updateRequest.setUpdateModification(resumeDataBSON);
                 updateRequest.setUpsert(true);
+                updateRequest.setYieldPolicy(PlanYieldPolicy::YieldPolicy::INTERRUPT_ONLY);
                 UpdateResult ur = update(opCtx, resumeDataColl, updateRequest);
                 // When we have new data we always expect to make progress.  If we don't,
                 // we just inserted duplicate documents, so fail.

@@ -54,6 +54,7 @@ long long deleteObjects(OperationContext* opCtx,
     request.setMulti(!justOne);
     request.setGod(god);
     request.setFromMigrate(fromMigrate);
+    request.setYieldPolicy(PlanYieldPolicy::YieldPolicy::INTERRUPT_ONLY);
 
     ParsedDelete parsedDelete(opCtx, &request, collection.getCollectionPtr());
     uassertStatusOK(parsedDelete.parseRequest());

@@ -275,6 +275,7 @@ void ReshardingOplogApplicationRules::_applyInsert_inlock(OperationContext* opCt
         request.setUpdateModification(std::move(updateMod));
         request.setUpsert(false);
         request.setFromOplogApplication(true);
+        request.setYieldPolicy(PlanYieldPolicy::YieldPolicy::INTERRUPT_ONLY);
 
         UpdateResult ur = update(opCtx, stashColl, request);
         invariant(ur.numMatched != 0);
@@ -310,6 +311,7 @@ void ReshardingOplogApplicationRules::_applyInsert_inlock(OperationContext* opCt
         request.setUpdateModification(std::move(updateMod));
         request.setUpsert(false);
         request.setFromOplogApplication(true);
+        request.setYieldPolicy(PlanYieldPolicy::YieldPolicy::INTERRUPT_ONLY);
 
         UpdateResult ur = update(opCtx, outputColl, request);
         invariant(ur.numMatched != 0);
@@ -369,6 +371,7 @@ void ReshardingOplogApplicationRules::_applyUpdate_inlock(OperationContext* opCt
         request.setUpdateModification(std::move(updateMod));
         request.setUpsert(false);
         request.setFromOplogApplication(true);
+        request.setYieldPolicy(PlanYieldPolicy::YieldPolicy::INTERRUPT_ONLY);
         UpdateResult ur = update(opCtx, stashColl, request);
 
         invariant(ur.numMatched != 0);
@@ -403,6 +406,7 @@ void ReshardingOplogApplicationRules::_applyUpdate_inlock(OperationContext* opCt
     request.setUpdateModification(std::move(updateMod));
     request.setUpsert(false);
     request.setFromOplogApplication(true);
+    request.setYieldPolicy(PlanYieldPolicy::YieldPolicy::INTERRUPT_ONLY);
     UpdateResult ur = update(opCtx, outputColl, request);
 
     invariant(ur.numMatched != 0);

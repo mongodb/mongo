@@ -255,6 +255,7 @@ void addShardingIndexCatalogEntryToCollection(OperationContext* opCtx,
                          << ShardAuthoritativeCollectionType::kIndexVersionFieldName << lastmod));
                 request.setUpsert(true);
                 request.setFromOplogApplication(true);
+                request.setYieldPolicy(PlanYieldPolicy::YieldPolicy::INTERRUPT_ONLY);
                 mongo::update(opCtx, collsColl, request);
             }
 
@@ -338,6 +339,7 @@ void removeShardingIndexCatalogEntryFromCollection(OperationContext* opCtx,
                          << ShardAuthoritativeCollectionType::kIndexVersionFieldName << lastmod));
                 request.setUpsert(true);
                 request.setFromOplogApplication(true);
+                request.setYieldPolicy(PlanYieldPolicy::YieldPolicy::INTERRUPT_ONLY);
                 mongo::update(opCtx, collsColl, request);
             }
 
@@ -424,6 +426,7 @@ void replaceCollectionShardingIndexCatalog(OperationContext* opCtx,
                     << ShardAuthoritativeCollectionType::kIndexVersionFieldName << indexVersion));
                 request.setUpsert(true);
                 request.setFromOplogApplication(true);
+                request.setYieldPolicy(PlanYieldPolicy::YieldPolicy::INTERRUPT_ONLY);
                 mongo::update(opCtx, collsColl, request);
             }
 

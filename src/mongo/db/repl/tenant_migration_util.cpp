@@ -606,6 +606,7 @@ ExecutorFuture<void> markExternalKeysAsGarbageCollectable(
                        opCtx, "TenantMigrationMarkExternalKeysAsGarbageCollectable", nss, [&] {
                            auto request = UpdateRequest();
                            request.setNamespaceString(nss);
+                           request.setYieldPolicy(PlanYieldPolicy::YieldPolicy::INTERRUPT_ONLY);
                            request.setQuery(
                                BSON(ExternalKeysCollectionDocument::kMigrationIdFieldName
                                     << migrationId));

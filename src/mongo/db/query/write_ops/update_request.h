@@ -423,7 +423,7 @@ private:
     ReturnDocOption _returnDocs = ReturnDocOption::RETURN_NONE;
 
     // Whether or not the update should yield.
-    PlanYieldPolicy::YieldPolicy _yieldPolicy = PlanYieldPolicy::YieldPolicy::INTERRUPT_ONLY;
+    PlanYieldPolicy::YieldPolicy _yieldPolicy = PlanYieldPolicy::YieldPolicy::YIELD_AUTO;
 };
 
 }  // namespace mongo

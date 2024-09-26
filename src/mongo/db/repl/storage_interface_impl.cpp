@@ -1094,6 +1094,7 @@ Status StorageInterfaceImpl::upsertById(OperationContext* opCtx,
         request.setUpdateModification(
             write_ops::UpdateModification::parseFromClassicUpdate(update));
         request.setUpsert(true);
+        request.setYieldPolicy(PlanYieldPolicy::YieldPolicy::INTERRUPT_ONLY);
         invariant(!request.isMulti());  // This follows from using an exact _id query.
         invariant(!request.shouldReturnAnyDocs());
         invariant(PlanYieldPolicy::YieldPolicy::INTERRUPT_ONLY == request.getYieldPolicy());
@@ -1151,6 +1152,7 @@ Status StorageInterfaceImpl::putSingleton(OperationContext* opCtx,
     request.setUpdateModification(
         write_ops::UpdateModification::parseFromClassicUpdate(update.obj));
     request.setUpsert(true);
+    request.setYieldPolicy(PlanYieldPolicy::YieldPolicy::INTERRUPT_ONLY);
     invariant(!request.isMulti());  // We only want to update one document for performance.
     return _updateWithQuery(opCtx, request, update.timestamp);
 }
@@ -1164,6 +1166,7 @@ Status StorageInterfaceImpl::updateSingleton(OperationContext* opCtx,
     request.setQuery(query);
     request.setUpdateModification(
         write_ops::UpdateModification::parseFromClassicUpdate(update.obj));
+    request.setYieldPolicy(PlanYieldPolicy::YieldPolicy::INTERRUPT_ONLY);
     invariant(!request.isUpsert());
     invariant(!request.isMulti());  // We only want to update one document for performance.
     return _updateWithQuery(opCtx, request, update.timestamp);
@@ -1181,6 +1184,7 @@ Status StorageInterfaceImpl::updateDocuments(
     request.setUpdateModification(
         write_ops::UpdateModification::parseFromClassicUpdate(update.obj));
     request.setMulti(true);
+    request.setYieldPolicy(PlanYieldPolicy::YieldPolicy::INTERRUPT_ONLY);
     if (arrayFilters) {
         request.setArrayFilters(arrayFilters.get());
     }
