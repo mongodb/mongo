@@ -762,43 +762,6 @@ void CodeFragment::appendTraverseF(int codePosition, Instruction::Constants k) {
     adjustStackSimple(i);
 }
 
-void CodeFragment::appendTraverseCellValues() {
-    appendSimpleInstruction(Instruction::traverseCsiCellValues);
-}
-
-void CodeFragment::appendTraverseCellValues(int codePosition) {
-    Instruction i;
-    i.tag = Instruction::traverseCsiCellValues;
-
-    auto size = sizeof(Instruction) + sizeof(codePosition);
-    auto offset = allocateSpace(size);
-
-    int codeOffset = codePosition - _instrs.size();
-
-    offset += writeToMemory(offset, i);
-    offset += writeToMemory(offset, codeOffset);
-
-    adjustStackSimple(i);
-}
-
-void CodeFragment::appendTraverseCellTypes() {
-    appendSimpleInstruction(Instruction::traverseCsiCellTypes);
-}
-
-void CodeFragment::appendTraverseCellTypes(int codePosition) {
-    Instruction i;
-    i.tag = Instruction::traverseCsiCellTypes;
-
-    auto size = sizeof(Instruction) + sizeof(codePosition);
-    auto offset = allocateSpace(size);
-
-    int codeOffset = codePosition - _instrs.size();
-
-    offset += writeToMemory(offset, i);
-    offset += writeToMemory(offset, codeOffset);
-
-    adjustStackSimple(i);
-}
 
 void CodeFragment::appendTypeMatch(Instruction::Parameter input, uint32_t mask) {
     Instruction i;

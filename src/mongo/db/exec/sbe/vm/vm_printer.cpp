@@ -287,13 +287,6 @@ public:
                        << ", target: " << _formatter.pcPointer(pcPointer + offset);
                     break;
                 }
-                case Instruction::traverseCsiCellValues:
-                case Instruction::traverseCsiCellTypes: {
-                    auto offset = readFromMemory<int>(pcPointer);
-                    pcPointer += sizeof(offset);
-                    os << "target: " << _formatter.pcPointer(pcPointer + offset);
-                    break;
-                }
                 case Instruction::fillEmptyImm: {
                     auto k = readFromMemory<Instruction::Constants>(pcPointer);
                     pcPointer += sizeof(k);

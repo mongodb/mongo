@@ -106,11 +106,6 @@ struct Instruction {
         traverseF,  // traverse filter paths
         traverseFImm,
         magicTraverseF,
-        // Iterates over values in column index cells. Skips values from nested arrays.
-        traverseCsiCellValues,
-        // Iterates the column index cell and returns values representing the types of cell's
-        // content, including arrays and nested objects. Skips contents of nested arrays.
-        traverseCsiCellTypes,
         setField,      // add or overwrite a field in a document
         getArraySize,  // number of elements
 

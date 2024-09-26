@@ -512,8 +512,6 @@ private:
     void magicTraverseF(const CodeFragment* code);
 
     bool runLambdaPredicate(const CodeFragment* code, int64_t position);
-    void traverseCsiCellValues(const CodeFragment* code, int64_t position);
-    void traverseCsiCellTypes(const CodeFragment* code, int64_t position);
     void valueBlockApplyLambda(const CodeFragment* code);
 
     FastTuple<bool, value::TypeTags, value::Value> setField();

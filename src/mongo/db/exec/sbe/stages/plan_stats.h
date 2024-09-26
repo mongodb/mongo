@@ -43,7 +43,6 @@
 #include "mongo/db/query/plan_summary_stats.h"
 #include "mongo/db/query/stage_types.h"
 #include "mongo/db/query/tree_walker.h"
-#include "mongo/db/storage/column_store.h"
 
 namespace mongo::sbe {
 struct CommonStats {
@@ -100,47 +99,6 @@ struct ScanStats final : public SpecificStats {
     }
 
     size_t numReads{0};
-};
-
-struct ColumnScanStats final : public SpecificStats {
-    // Struct to hold relevant stats for ColumnCursor and ParentPathCursor
-    // Note: `includeInOutput` field is only relevant for ColumnCursor
-    struct CursorStats final {
-        PathValue path;
-        bool includeInOutput;
-        size_t numNexts;
-        size_t numSeeks;
-
-        CursorStats(PathValue p, bool include)
-            : path(p), includeInOutput(include), numNexts(0), numSeeks(0) {}
-    };
-
-    std::unique_ptr<SpecificStats> clone() const final {
-        return std::make_unique<ColumnScanStats>(*this);
-    }
-
-    uint64_t estimateObjectSizeInBytes() const final {
-        return sizeof(*this);
-    }
-
-    void acceptVisitor(PlanStatsConstVisitor* visitor) const final {
-        visitor->visit(this);
-    }
-
-    void acceptVisitor(PlanStatsMutableVisitor* visitor) final {
-        visitor->visit(this);
-    }
-
-    // Occasionally column scan might need to read records from the corresponding row store. It
-    // might either fetch a record by its id, or scan a few consecutive records from the current
-    // cursor's position ('numRowStoreScans' counts the total number of scanned records).
-    size_t numRowStoreFetches{0};
-    size_t numRowStoreScans{0};
-
-    // Lists holding all of the stats of current struct's cursors. These stats objects are owned
-    // here, and referred to by the cursor execution objects.
-    std::list<ColumnScanStats::CursorStats> cursorStats;
-    std::list<ColumnScanStats::CursorStats> parentCursorStats;
 };
 
 struct IndexScanStats final : public SpecificStats {

@@ -31,7 +31,6 @@
 
 #include "mongo/config.h"  // IWYU pragma: keep
 #include "mongo/db/exec/sbe/accumulator_sum_value_enum.h"
-#include "mongo/db/exec/sbe/columnar.h"
 #include "mongo/db/exec/sbe/values/arith_common.h"
 #include "mongo/db/exec/sbe/values/util.h"
 
@@ -442,122 +441,6 @@ void ByteCode::traverseFInArray(const CodeFragment* code, int64_t position, bool
     }
 
     pushStack(false, value::TypeTags::Boolean, value::bitcastFrom<bool>(false));
-}
-
-void ByteCode::traverseCsiCellValues(const CodeFragment* code, int64_t position) {
-    auto [ownCsiCell, tagCsiCell, valCsiCell] = getFromStack(0);
-    invariant(!ownCsiCell);
-    popStack();
-
-    invariant(tagCsiCell == value::TypeTags::csiCell);
-    auto csiCell = value::getCsiCellView(valCsiCell);
-    bool isTrue = false;
-
-    // If there are no doubly-nested arrays, we can avoid parsing the array info and use the simple
-    // cursor over all values in the cell.
-    if (!csiCell->splitCellView->hasDoubleNestedArrays) {
-        SplitCellView::Cursor<ColumnStoreEncoder> cellCursor =
-            csiCell->splitCellView->subcellValuesGenerator<ColumnStoreEncoder>(csiCell->encoder);
-
-        while (cellCursor.hasNext() && !isTrue) {
-            const auto& val = cellCursor.nextValue();
-            pushStack(false, val->first, val->second);
-            isTrue = runLambdaPredicate(code, position);
-        }
-    } else {
-        SplitCellView::CursorWithArrayDepth<ColumnStoreEncoder> cellCursor{
-            csiCell->pathDepth,
-            csiCell->splitCellView->firstValuePtr,
-            csiCell->splitCellView->arrInfo,
-            csiCell->encoder};
-
-        while (cellCursor.hasNext() && !isTrue) {
-            const auto& val = cellCursor.nextValue();
-
-            if (val.depthWithinDirectlyNestedArraysOnPath > 0 || val.depthAtLeaf > 1) {
-                // The value is too deep.
-                continue;
-            }
-
-            if (val.isObject) {
-                continue;
-            } else {
-                pushStack(false, val.value->first, val.value->second);
-                isTrue = runLambdaPredicate(code, position);
-            }
-        }
-    }
-    pushStack(false, value::TypeTags::Boolean, value::bitcastFrom<bool>(isTrue));
-}
-
-void ByteCode::traverseCsiCellTypes(const CodeFragment* code, int64_t position) {
-    using namespace value;
-
-    auto [ownCsiCell, tagCsiCell, valCsiCell] = getFromStack(0);
-    invariant(!ownCsiCell);
-    popStack();
-
-    invariant(tagCsiCell == TypeTags::csiCell);
-    auto csiCell = getCsiCellView(valCsiCell);
-
-    // When traversing cell types cannot use the simple cursor even if the cell doesn't contain
-    // doubly-nested arrays because must report types of objects and arrays and for that need to
-    // parse the array info.
-    SplitCellView::CursorWithArrayDepth<ColumnStoreEncoder> cellCursor{
-        csiCell->pathDepth,
-        csiCell->splitCellView->firstValuePtr,
-        csiCell->splitCellView->arrInfo,
-        csiCell->encoder};
-
-    // The dummy array/object are needed when running lambda on the type on non-empty arrays and
-    // objects. We allocate them on the stack because these values are only used in the scope of
-    // this traversal and discarded after evaluating the lambda.
-    const auto dummyArray = Array{};
-    const auto dummyObject = Object{};
-
-    bool shouldProcessArray = true;
-    bool isTrue = false;
-    while (cellCursor.hasNext() && !isTrue) {
-        const auto& val = cellCursor.nextValue();
-
-        if (val.depthWithinDirectlyNestedArraysOnPath > 0) {
-            // There is nesting on the path.
-            continue;
-        }
-
-        if (val.depthAtLeaf > 0) {
-            // Empty arrays are stored in columnstore cells as values and don't require special
-            // handling. All other arrays can be detected when their first value is seen. To apply
-            // the lambda to the leaf array type we inject a "fake" array here as the caller should
-            // only look at the returned type. Note, that we might still need to process the values
-            // inside the array.
-            if (shouldProcessArray) {
-                shouldProcessArray = false;
-
-                pushStack(false, TypeTags::Array, bitcastFrom<const Array*>(&dummyArray));
-                isTrue = runLambdaPredicate(code, position);
-                if (isTrue) {
-                    break;
-                }
-            }
-
-            if (val.depthAtLeaf > 1) {
-                // The value is inside a nested array at the leaf.
-                continue;
-            }
-        } else {
-            shouldProcessArray = true;
-        }
-
-        // Apply lambda to the types of values at the leaf.
-        if (val.isObject) {
-            pushStack(false, TypeTags::Object, bitcastFrom<const Object*>(&dummyObject));
-        } else {
-            pushStack(false, val.value->first, val.value->second);
-        }
-        isTrue = runLambdaPredicate(code, position);
-    }
-    pushStack(false, TypeTags::Boolean, bitcastFrom<bool>(isTrue));
 }
 
 FastTuple<bool, value::TypeTags, value::Value> ByteCode::setField() {

@@ -1200,59 +1200,6 @@ vm::CodeFragment generateTraverseF(CompileCtx& ctx, const EExpression::Vector& n
     return generatorLegacy<&vm::CodeFragment::appendTraverseF>(ctx, nodes, false);
 }
 
-vm::CodeFragment generateTraverseCellValues(CompileCtx& ctx,
-                                            const EExpression::Vector& nodes,
-                                            bool) {
-    if (nodes[1]->as<ELocalLambda>()) {
-        return withNewLabel(ctx, [&](vm::LabelId afterBodyLabel) {
-            vm::CodeFragment code;
-            auto lambda = nodes[1]->as<ELocalLambda>();
-
-            // Jump around the body.
-            code.appendLabelJump(afterBodyLabel);
-
-            // Remember the position and append the body.
-            auto bodyPosition = code.instrs().size();
-            code.appendNoStack(lambda->compileBodyDirect(ctx));
-
-            // Append the traverseCellValues call.
-            code.appendLabel(afterBodyLabel);
-            code.append(nodes[0]->compileDirect(ctx));
-            code.appendTraverseCellValues(bodyPosition);
-            return code;
-        });
-    }
-
-    return generatorLegacy<&vm::CodeFragment::appendTraverseCellValues>(ctx, nodes, false);
-}
-
-vm::CodeFragment generateTraverseCellTypes(CompileCtx& ctx,
-                                           const EExpression::Vector& nodes,
-                                           bool) {
-    if (nodes[1]->as<ELocalLambda>()) {
-        return withNewLabel(ctx, [&](vm::LabelId afterBodyLabel) {
-            vm::CodeFragment code;
-            auto lambda = nodes[1]->as<ELocalLambda>();
-
-            // Jump around the body.
-            code.appendLabelJump(afterBodyLabel);
-
-            // Remember the position and append the body.
-            auto bodyPosition = code.instrs().size();
-            code.appendNoStack(lambda->compileBodyDirect(ctx));
-
-            // Append the traverseCellTypes call.
-            code.appendLabel(afterBodyLabel);
-            code.append(nodes[0]->compileDirect(ctx));
-            code.appendTraverseCellTypes(bodyPosition);
-
-            return code;
-        });
-    }
-
-    return generatorLegacy<&vm::CodeFragment::appendTraverseCellTypes>(ctx, nodes, false);
-}
-
 /**
  * The map of functions that resolve directly to instructions.
  */
@@ -1268,8 +1215,6 @@ static stdx::unordered_map<std::string, InstrFn> kInstrFunctions = {
     {"traverseP", InstrFn{3, generateTraverseP, false}},
     {"traverseF", InstrFn{3, generateTraverseF, false}},
     {"magicTraverseF", InstrFn{5, generatorLegacy<&vm::CodeFragment::appendMagicTraverseF>, false}},
-    {"traverseCsiCellValues", InstrFn{2, generateTraverseCellValues, false}},
-    {"traverseCsiCellTypes", InstrFn{2, generateTraverseCellTypes, false}},
     {"setField", InstrFn{3, generatorLegacy<&vm::CodeFragment::appendSetField>, false}},
     {"sum", InstrFn{1, generatorLegacy<&vm::CodeFragment::appendSum>, true}},
     {"count", InstrFn{0, generatorLegacy<&vm::CodeFragment::appendCount>, true}},

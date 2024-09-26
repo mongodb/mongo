@@ -123,7 +123,6 @@ static constexpr int64_t kInvalidId = LLONG_MIN;
 using IndexKeysInclusionSet = std::bitset<Ordering::kMaxCompoundIndexKeys>;
 
 namespace value {
-struct CsiCell;
 struct ValueBlock;
 struct CellBlock;
 
@@ -166,9 +165,7 @@ enum class TypeTags : uint8_t {
     // and is never created, copied, or destroyed by SBE.
     sortKeyComponentVector,
 
-    // Pointer to a struct with data necessary to read values from a columnstore index cell. The
-    // values of this type are fully owned by the column_scan stage and are never created, cloned or
-    // destroyed by SBE.
+    // TODO SERVER-95276: Remove this.
     csiCell,
 
     StringSmall,
@@ -1733,10 +1730,6 @@ inline IndexBounds* getIndexBoundsView(Value val) noexcept {
 
 inline SortKeyComponentVector* getSortKeyComponentVectorView(Value v) noexcept {
     return reinterpret_cast<SortKeyComponentVector*>(v);
-}
-
-inline sbe::value::CsiCell* getCsiCellView(Value val) noexcept {
-    return reinterpret_cast<sbe::value::CsiCell*>(val);
 }
 
 inline TimeZone* getTimeZoneView(Value val) noexcept {

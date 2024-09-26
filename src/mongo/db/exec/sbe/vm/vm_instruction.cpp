@@ -128,8 +128,6 @@ int Instruction::stackOffset[Instruction::Tags::lastInstruction] = {
     -2,  // traverseF
     0,   // traverseFImm
     -4,  // magicTraverseF
-    0,   // traverseCsiCellValues
-    0,   // traverseCsiCellTypes
     -2,  // setField
     0,   // getArraySize
 
@@ -998,22 +996,6 @@ void ByteCode::runInternal(const CodeFragment* code, int64_t position) {
                 magicTraverseF(code);
                 break;
             }
-            case Instruction::traverseCsiCellValues: {
-                auto offset = readFromMemory<int>(pcPointer);
-                pcPointer += sizeof(offset);
-                auto codePosition = pcPointer - code->instrs().data() + offset;
-
-                traverseCsiCellValues(code, codePosition);
-                break;
-            }
-            case Instruction::traverseCsiCellTypes: {
-                auto offset = readFromMemory<int>(pcPointer);
-                pcPointer += sizeof(offset);
-                auto codePosition = pcPointer - code->instrs().data() + offset;
-
-                traverseCsiCellTypes(code, codePosition);
-                break;
-            }
             case Instruction::setField: {
                 auto [owned, tag, val] = setField();
                 popAndReleaseStack();
@@ -1566,10 +1548,6 @@ const char* Instruction::toString() const {
             return "traverseF";
         case traverseFImm:
             return "traverseFImm";
-        case traverseCsiCellValues:
-            return "traverseCsiCellValues";
-        case traverseCsiCellTypes:
-            return "traverseCsiCellTypes";
         case setField:
             return "setField";
         case getArraySize:
