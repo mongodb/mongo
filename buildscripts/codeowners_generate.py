@@ -6,6 +6,7 @@ import pathlib
 import subprocess
 import sys
 import yaml
+import difflib
 
 OWNERS_FILE_NAME = "OWNERS.yml"
 
@@ -152,6 +153,22 @@ def process_dir(output_lines: list[str], directory: str) -> None:
         process_dir(output_lines, path)
 
 
+def print_diff_and_instructions(old_codeowners_contents, new_codeowners_contents):
+    print("ERROR: New contents of codeowners file does not match old contents.")
+    print("\nDifferences between old and new contents:")
+    diff = difflib.unified_diff(
+        old_codeowners_contents.splitlines(keepends=True),
+        new_codeowners_contents.splitlines(keepends=True),
+        fromfile="Old CODEOWNERS",
+        tofile="New CODEOWNERS",
+    )
+    sys.stdout.writelines(diff)
+
+    print("If you are seeing this message in CI you likely need to run `bazel run //:codeowners`")
+    print("*** IF BAZEL IS NOT INSTALLED, RUN THE FOLLOWING: ***\n")
+    print("python buildscripts/install_bazel.py")
+
+
 def main():
     # If we are running in bazel, default the directory to the workspace
     default_dir = os.environ.get("BUILD_WORKSPACE_DIRECTORY")
@@ -230,12 +247,7 @@ def main():
     new_contents = "\n".join(output_lines)
     if check:
         if new_contents != old_contents:
-            print("ERROR: New contents of codeowners file does not match old contents.")
-            print(
-                "If you are seeing this message in CI you likely need to run `bazel run //:codeowners`"
-            )
-            print("*** IF BAZEL IS NOT INSTALLED, RUN THE FOLLOWING: ***\n")
-            print("python buildscripts/install_bazel.py")
+            print_diff_and_instructions(old_contents, new_contents)
             return 1
 
         print("CODEOWNERS file is up to date")
