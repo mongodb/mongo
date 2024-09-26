@@ -1,7 +1,6 @@
 /*
  * Tests that the 'changeStreamPreAndPostImages' option is settable via the collMod and create
- * commands. Also tests that this option cannot be set on collections in the 'local', 'admin',
- * 'config' databases as well as on view collections.
+ * commands. Also tests that this option cannot be set on view collections.
  * @tags: [
  * requires_fcv_60,
  * requires_replication,
@@ -11,11 +10,7 @@ import {
     assertChangeStreamPreAndPostImagesCollectionOptionIsAbsent,
     assertChangeStreamPreAndPostImagesCollectionOptionIsEnabled,
 } from "jstests/libs/change_stream_util.js";
-import {ReplSetTest} from "jstests/libs/replsettest.js";
-
-const rsTest = new ReplSetTest({name: jsTestName(), nodes: 1});
-rsTest.startSet();
-rsTest.initiate();
+import {assertDropCollection} from "jstests/libs/collection_drop_recreate.js";
 
 const dbName = 'testDB';
 const collName = 'changeStreamPreAndPostImages';
@@ -24,22 +19,9 @@ const collName3 = 'changeStreamPreAndPostImages3';
 const collName4 = 'changeStreamPreAndPostImages4';
 const viewName = "view";
 
-const primary = rsTest.getPrimary();
-const adminDB = primary.getDB("admin");
-const localDB = primary.getDB("local");
-const configDB = primary.getDB("config");
-const testDB = primary.getDB(dbName);
-
-// Check that we cannot set 'changeStreamPreAndPostImages' on the local, admin and config databases.
-for (const db of [localDB, adminDB, configDB]) {
-    assert.commandFailedWithCode(
-        db.runCommand({create: collName, changeStreamPreAndPostImages: {enabled: true}}),
-        ErrorCodes.InvalidOptions);
-
-    assert.commandWorked(db.runCommand({create: collName}));
-    assert.commandFailedWithCode(
-        db.runCommand({collMod: collName, changeStreamPreAndPostImages: {enabled: true}}),
-        ErrorCodes.InvalidOptions);
+const testDB = db.getSiblingDB(dbName);
+for (const collectionName of [collName, collName2, collName3, collName4, viewName]) {
+    assertDropCollection(testDB, collectionName);
 }
 
 // Should be able to enable the 'changeStreamPreAndPostImages' via create or collMod.
@@ -83,10 +65,28 @@ assert.commandFailedWithCode(testDB.runCommand({
 }),
                              ErrorCodes.InvalidOptions);
 
-// Should fail to enable 'changeStreamPreAndPostImages' option on a timeseries collection.
-assert.commandWorked(testDB.runCommand({create: collName4, timeseries: {timeField: 'time'}}));
-assert.commandFailedWithCode(
-    testDB.runCommand({collMod: collName4, changeStreamPreAndPostImages: {enabled: true}}),
-    ErrorCodes.InvalidOptions);
+// Creates a time-series collection with name 'collectionName' while using connection 'testDB'.
+// Returns true if the collection was created, and false otherwise.
+function createTimeSeriesCollection(collectionName) {
+    const createCommandResponse =
+        testDB.runCommand({create: collectionName, timeseries: {timeField: 'time'}});
+    try {
+        assert.commandWorked(createCommandResponse);
+        return true;
+    } catch (e) {
+        // Verify that if in some passthroughs time-series collections are not allowed, then the
+        // "create" command failed with InvalidOptions error.
+        assert.commandFailedWithCode(
+            createCommandResponse,
+            ErrorCodes.InvalidOptions,
+            "Time-series collection creation failed with an unexpected error");
+        return false;
+    }
+}
 
-rsTest.stopSet();
+if (createTimeSeriesCollection(collName4)) {
+    // Should fail to enable 'changeStreamPreAndPostImages' option on a time-series collection.
+    assert.commandFailedWithCode(
+        testDB.runCommand({collMod: collName4, changeStreamPreAndPostImages: {enabled: true}}),
+        ErrorCodes.InvalidOptions);
+}

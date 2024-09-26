@@ -281,6 +281,8 @@ selector:
     - jstests/core/write/bypass_empty_ts_replacement_timeseries.js
     # Assumes collection options do not change
     - jstests/core/rename_system_buckets_collections.js
+    # Change stream pre-/post-images are not available for time-series collections.
+    - jstests/core/query/change_streams_pre_and_post_images_in_create_and_collmod.js
     # Inserts documents that are too large for a timeseries collection.
     - jstests/core/query/bson_size_limit.js
 

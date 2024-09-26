@@ -570,7 +570,10 @@ export const kPreImagesCollectionName = "system.preimages";
  */
 export function assertChangeStreamPreAndPostImagesCollectionOptionIsEnabled(db, collName) {
     const collectionInfos = db.getCollectionInfos({name: collName});
-    assert(collectionInfos[0].options["changeStreamPreAndPostImages"]["enabled"] === true);
+    assert(collectionInfos.length === 1 && collectionInfos[0].hasOwnProperty("options") &&
+               collectionInfos[0].options.hasOwnProperty("changeStreamPreAndPostImages") &&
+               collectionInfos[0].options["changeStreamPreAndPostImages"]["enabled"] === true,
+           collectionInfos);
 }
 
 /**
