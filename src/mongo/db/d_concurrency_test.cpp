@@ -37,7 +37,6 @@
 #include <functional>
 #include <future>
 #include <memory>
-#include <ostream>
 #include <string>
 #include <type_traits>
 #include <vector>
@@ -50,7 +49,6 @@
 #include "mongo/db/client.h"
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/concurrency/exception_util.h"
-#include "mongo/db/concurrency/fast_map_noalloc.h"
 #include "mongo/db/concurrency/locker.h"
 #include "mongo/db/concurrency/replication_state_transition_lock_guard.h"
 #include "mongo/db/concurrency/resource_catalog.h"
@@ -63,7 +61,6 @@
 #include "mongo/db/transaction_resources.h"
 #include "mongo/logv2/log.h"
 #include "mongo/logv2/log_attr.h"
-#include "mongo/logv2/log_component.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/stdx/future.h"
 #include "mongo/stdx/thread.h"
@@ -143,11 +140,6 @@ private:
 
 class DConcurrencyTestFixture : public ServiceContextTest {
 public:
-    ServiceContext::UniqueOperationContext makeOperationContextWithLocker() {
-        auto opCtx = makeOperationContext();
-        return opCtx;
-    }
-
     std::vector<std::pair<ServiceContext::UniqueClient, ServiceContext::UniqueOperationContext>>
     makeKClientsWithLockers(int k) {
         std::vector<std::pair<ServiceContext::UniqueClient, ServiceContext::UniqueOperationContext>>
@@ -287,7 +279,7 @@ TEST_F(DConcurrencyTestFixture, ResourceMutex) {
 }
 
 TEST_F(DConcurrencyTestFixture, GlobalRead) {
-    auto opCtx = makeOperationContextWithLocker();
+    auto opCtx = makeOperationContext();
     Lock::GlobalRead globalRead(opCtx.get());
     ASSERT(shard_role_details::getLocker(opCtx.get())->isR());
     ASSERT_EQ(shard_role_details::getLocker(opCtx.get())
@@ -296,7 +288,7 @@ TEST_F(DConcurrencyTestFixture, GlobalRead) {
 }
 
 TEST_F(DConcurrencyTestFixture, GlobalWrite) {
-    auto opCtx = makeOperationContextWithLocker();
+    auto opCtx = makeOperationContext();
     Lock::GlobalWrite globalWrite(opCtx.get());
     ASSERT(shard_role_details::getLocker(opCtx.get())->isW());
     ASSERT_EQ(shard_role_details::getLocker(opCtx.get())
@@ -305,7 +297,7 @@ TEST_F(DConcurrencyTestFixture, GlobalWrite) {
 }
 
 TEST_F(DConcurrencyTestFixture, GlobalWriteAndGlobalRead) {
-    auto opCtx = makeOperationContextWithLocker();
+    auto opCtx = makeOperationContext();
     auto lockState = shard_role_details::getLocker(opCtx.get());
 
     Lock::GlobalWrite globalWrite(opCtx.get());
@@ -454,7 +446,7 @@ TEST_F(DConcurrencyTestFixture, DBLockSDoesNotSetGlobalWriteLockedOnOperationCon
 }
 
 TEST_F(DConcurrencyTestFixture, TenantLock) {
-    auto opCtx = makeOperationContextWithLocker();
+    auto opCtx = makeOperationContext();
     TenantId tenantId{OID::gen()};
     ResourceId tenantResourceId{ResourceType::RESOURCE_TENANT, tenantId};
     struct TestCase {
@@ -476,7 +468,7 @@ TEST_F(DConcurrencyTestFixture, TenantLock) {
 }
 
 TEST_F(DConcurrencyTestFixture, DBLockTakesTenantLock) {
-    auto opCtx = makeOperationContextWithLocker();
+    auto opCtx = makeOperationContext();
     TenantId tenantId{OID::gen()};
     ResourceId tenantResourceId{ResourceType::RESOURCE_TENANT, tenantId};
     struct TestCase {
@@ -1101,7 +1093,7 @@ TEST_F(DConcurrencyTestFixture, LockCompleteInterruptedWhenUncontested) {
 }
 
 TEST_F(DConcurrencyTestFixture, DBLockTakesS) {
-    auto opCtx = makeOperationContextWithLocker();
+    auto opCtx = makeOperationContext();
     Lock::DBLock dbRead(
         opCtx.get(), DatabaseName::createDatabaseName_forTest(boost::none, "db"), MODE_S);
 
@@ -1111,7 +1103,7 @@ TEST_F(DConcurrencyTestFixture, DBLockTakesS) {
 }
 
 TEST_F(DConcurrencyTestFixture, DBLockTakesX) {
-    auto opCtx = makeOperationContextWithLocker();
+    auto opCtx = makeOperationContext();
     Lock::DBLock dbWrite(
         opCtx.get(), DatabaseName::createDatabaseName_forTest(boost::none, "db"), MODE_X);
 
@@ -1121,35 +1113,35 @@ TEST_F(DConcurrencyTestFixture, DBLockTakesX) {
 }
 
 TEST_F(DConcurrencyTestFixture, DBLockTakesISForAdminIS) {
-    auto opCtx = makeOperationContextWithLocker();
+    auto opCtx = makeOperationContext();
     Lock::DBLock dbRead(opCtx.get(), DatabaseName::kAdmin, MODE_IS);
 
     ASSERT(shard_role_details::getLocker(opCtx.get())->getLockMode(resourceIdAdminDB) == MODE_IS);
 }
 
 TEST_F(DConcurrencyTestFixture, DBLockTakesSForAdminS) {
-    auto opCtx = makeOperationContextWithLocker();
+    auto opCtx = makeOperationContext();
     Lock::DBLock dbRead(opCtx.get(), DatabaseName::kAdmin, MODE_S);
 
     ASSERT(shard_role_details::getLocker(opCtx.get())->getLockMode(resourceIdAdminDB) == MODE_S);
 }
 
 TEST_F(DConcurrencyTestFixture, DBLockTakesIXForAdminIX) {
-    auto opCtx = makeOperationContextWithLocker();
+    auto opCtx = makeOperationContext();
     Lock::DBLock dbWrite(opCtx.get(), DatabaseName::kAdmin, MODE_IX);
 
     ASSERT(shard_role_details::getLocker(opCtx.get())->getLockMode(resourceIdAdminDB) == MODE_IX);
 }
 
 TEST_F(DConcurrencyTestFixture, DBLockTakesXForAdminX) {
-    auto opCtx = makeOperationContextWithLocker();
+    auto opCtx = makeOperationContext();
     Lock::DBLock dbWrite(opCtx.get(), DatabaseName::kAdmin, MODE_X);
 
     ASSERT(shard_role_details::getLocker(opCtx.get())->getLockMode(resourceIdAdminDB) == MODE_X);
 }
 
 TEST_F(DConcurrencyTestFixture, MultipleWriteDBLocksOnSameThread) {
-    auto opCtx = makeOperationContextWithLocker();
+    auto opCtx = makeOperationContext();
     DatabaseName dbName = DatabaseName::createDatabaseName_forTest(boost::none, "db1");
     Lock::DBLock r1(opCtx.get(), dbName, MODE_X);
     Lock::DBLock r2(opCtx.get(), dbName, MODE_X);
@@ -1158,7 +1150,7 @@ TEST_F(DConcurrencyTestFixture, MultipleWriteDBLocksOnSameThread) {
 }
 
 TEST_F(DConcurrencyTestFixture, MultipleConflictingDBLocksOnSameThread) {
-    auto opCtx = makeOperationContextWithLocker();
+    auto opCtx = makeOperationContext();
     auto lockState = shard_role_details::getLocker(opCtx.get());
     DatabaseName dbName = DatabaseName::createDatabaseName_forTest(boost::none, "db1");
     Lock::DBLock r1(opCtx.get(), dbName, MODE_X);
@@ -1169,7 +1161,7 @@ TEST_F(DConcurrencyTestFixture, MultipleConflictingDBLocksOnSameThread) {
 }
 
 TEST_F(DConcurrencyTestFixture, IsDbLockedForMode_IsCollectionLockedForMode) {
-    auto opCtx = makeOperationContextWithLocker();
+    auto opCtx = makeOperationContext();
     auto lockState = shard_role_details::getLocker(opCtx.get());
 
     // Database ownership options to test.
@@ -1289,7 +1281,7 @@ TEST_F(DConcurrencyTestFixture, IsDbLockedForMode_IsCollectionLockedForMode) {
 TEST_F(DConcurrencyTestFixture, IsCollectionLocked_DB_Locked_IS) {
     const NamespaceString ns = NamespaceString::createNamespaceString_forTest("db1.coll");
 
-    auto opCtx = makeOperationContextWithLocker();
+    auto opCtx = makeOperationContext();
     auto lockState = shard_role_details::getLocker(opCtx.get());
 
     Lock::DBLock dbLock(opCtx.get(), ns.dbName(), MODE_IS);
@@ -1316,7 +1308,7 @@ TEST_F(DConcurrencyTestFixture, IsCollectionLocked_DB_Locked_IS) {
 TEST_F(DConcurrencyTestFixture, IsCollectionLocked_DB_Locked_IX) {
     const NamespaceString ns = NamespaceString::createNamespaceString_forTest("db1.coll");
 
-    auto opCtx = makeOperationContextWithLocker();
+    auto opCtx = makeOperationContext();
     auto lockState = shard_role_details::getLocker(opCtx.get());
 
     Lock::DBLock dbLock(opCtx.get(), ns.dbName(), MODE_IX);
