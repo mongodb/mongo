@@ -38,7 +38,7 @@
 #include "mongo/db/exec/sbe/values/value.h"
 #include "mongo/db/query/ce/cbp_histogram_ce/array_histogram_helpers.h"
 #include "mongo/db/query/ce/cbp_histogram_ce/scalar_histogram_helpers.h"
-#include "mongo/db/query/ce/cbp_histogram_ce/test_helpers.h"
+#include "mongo/db/query/ce/cbp_histogram_ce/test_utils.h"
 #include "mongo/db/query/optimizer/defs.h"
 #include "mongo/db/query/stats/array_histogram.h"
 #include "mongo/db/query/stats/scalar_histogram.h"

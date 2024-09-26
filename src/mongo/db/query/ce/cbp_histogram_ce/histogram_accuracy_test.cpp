@@ -26,7 +26,7 @@
  *    exception statement from all source files in the program, then also delete
  *    it in the license file.
  */
-#include "mongo/db/query/ce/cbp_histogram_ce/accuracy_test_helpers.h"
+#include "mongo/db/query/ce/cbp_histogram_ce/accuracy_test_utils.h"
 
 using namespace mongo::optimizer::cbp::ce;
 
@@ -93,7 +93,7 @@ int main(int argc, char* argv[]) {
         const TypeCombination typeCombinationsQueries{{TypeTags::NumberInt64, 100},
                                                       {TypeTags::StringSmall, 100},
                                                       {TypeTags::NumberDouble, 100}};
-        const std::pair<size_t, size_t> dataInterval({500, 150});
+        const std::pair<size_t, size_t> dataInterval({0, 1000});
         const std::pair<size_t, size_t> queryInterval({0, 1000});
         const DataDistributionEnum dataDistribution = kNormal;
         QueryType queryType = kPoint;

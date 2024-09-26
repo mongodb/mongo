@@ -27,12 +27,19 @@
  *    it in the license file.
  */
 
+#pragma once
+
 #include "mongo/db/exec/sbe/values/value.h"
 #include "mongo/db/query/ce/cbp_histogram_ce/histogram_common.h"
 #include "mongo/db/query/stats/array_histogram.h"
 #include "mongo/db/query/stats/value_utils.h"
 
 namespace mongo::optimizer::cbp::ce {
+
+// Enable this flag to log all estimates, and let all tests pass.
+constexpr bool kCETestLogOnly = false;
+
+const double kMaxCEError = 0.01;
 
 #define ASSERT_CE_APPROX_EQUAL(estimatedCE, expectedCE, kMaxCEError) \
     ASSERT_APPROX_EQUAL(                                             \
@@ -111,5 +118,6 @@ stats::ScalarHistogram createHistogram(const std::vector<BucketData>& data);
 
 double estimateCardinalityScalarHistogramInteger(const stats::ScalarHistogram& hist,
                                                  int v,
-                                                 cbp::ce::EstimationType type);
+                                                 EstimationType type);
+
 }  // namespace mongo::optimizer::cbp::ce

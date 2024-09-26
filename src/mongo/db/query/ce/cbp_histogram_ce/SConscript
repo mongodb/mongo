@@ -20,8 +20,8 @@ env.Library(
 env.Library(
     target="cbp_ce_test_helpers",
     source=[
-        "test_helpers.cpp",
-        "accuracy_test_helpers.cpp",
+        "test_utils.cpp",
+        "accuracy_test_utils.cpp",
         "histogram_predicate_estimation.cpp",
     ],
     LIBDEPS=[

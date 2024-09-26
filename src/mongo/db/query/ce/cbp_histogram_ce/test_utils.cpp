@@ -33,25 +33,14 @@
 
 #include "mongo/db/query/ce/cbp_histogram_ce/array_histogram_helpers.h"
 #include "mongo/db/query/ce/cbp_histogram_ce/scalar_histogram_helpers.h"
-#include "mongo/db/query/ce/cbp_histogram_ce/test_helpers.h"
+#include "mongo/db/query/ce/cbp_histogram_ce/test_utils.h"
 #include "mongo/db/query/stats/rand_utils_new.h"
-#include "mongo/logv2/log.h"
-
-#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
 
 namespace mongo::optimizer::cbp::ce {
-
-double estimateCardinalityScalarHistogramInteger(const stats::ScalarHistogram& hist,
-                                                 const int v,
-                                                 const cbp::ce::EstimationType type) {
-    const auto [tag, val] =
-        std::make_pair(sbe::value::TypeTags::NumberInt64, sbe::value::bitcastFrom<int64_t>(v));
-    auto estimate = estimateCardinality(hist, tag, val, type);
-    return estimate.card;
-}
+namespace value = sbe::value;
 
 stats::ScalarHistogram createHistogram(const std::vector<BucketData>& data) {
-    sbe::value::Array bounds;
+    value::Array bounds;
     std::vector<stats::Bucket> buckets;
 
     double cumulativeFreq = 0.0;
@@ -79,5 +68,13 @@ stats::ScalarHistogram createHistogram(const std::vector<BucketData>& data) {
     }
     return stats::ScalarHistogram::make(std::move(bounds), std::move(buckets));
 }
+
+double estimateCardinalityScalarHistogramInteger(const stats::ScalarHistogram& hist,
+                                                 const int v,
+                                                 const EstimationType type) {
+    const auto [tag, val] =
+        std::make_pair(value::TypeTags::NumberInt64, value::bitcastFrom<int64_t>(v));
+    return estimateCardinality(hist, tag, val, type).card;
+};
 
 }  // namespace mongo::optimizer::cbp::ce
