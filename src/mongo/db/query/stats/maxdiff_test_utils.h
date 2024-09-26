@@ -35,7 +35,7 @@
 
 #include "mongo/db/exec/sbe/values/value.h"
 #include "mongo/db/operation_context.h"
-#include "mongo/db/query/ce/histogram_predicate_estimation.h"
+#include "mongo/db/query/ce/cbp_histogram_ce/histogram_common.h"
 #include "mongo/db/query/optimizer/node.h"
 #include "mongo/db/query/optimizer/syntax/syntax.h"
 #include "mongo/db/query/stats/array_histogram.h"
@@ -56,7 +56,7 @@ size_t getActualCard(OperationContext* opCtx,
     Given a value and a comparison operator, generate a match expression reflecting
     x cmpOp val.
 */
-std::string makeMatchExpr(const SBEValue& val, optimizer::ce::EstimationType cmpOp);
+std::string makeMatchExpr(const SBEValue& val, optimizer::cbp::ce::EstimationType cmpOp);
 
 /**
     Given a vector of values, create a histogram reflection the distribution of the vector

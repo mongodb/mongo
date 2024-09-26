@@ -34,7 +34,6 @@
 #include "mongo/db/query/ce/cbp_histogram_ce/histogram_common.h"
 #include "mongo/db/query/ce/cbp_histogram_ce/scalar_histogram_helpers.h"
 #include "mongo/db/query/ce/cbp_histogram_ce/test_utils.h"
-#include "mongo/db/query/ce/test_utils.h"
 #include "mongo/unittest/assert.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kDefault

@@ -115,7 +115,6 @@ struct BucketData {
 };
 
 stats::ScalarHistogram createHistogram(const std::vector<BucketData>& data);
-
 double estimateCardinalityScalarHistogramInteger(const stats::ScalarHistogram& hist,
                                                  int v,
                                                  EstimationType type);

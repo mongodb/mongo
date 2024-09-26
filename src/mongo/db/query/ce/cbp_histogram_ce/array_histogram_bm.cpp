@@ -36,7 +36,6 @@
 #include "mongo/db/query/ce/cbp_histogram_ce/histogram_common.h"
 #include "mongo/db/query/ce/cbp_histogram_ce/histogram_predicate_estimation.h"
 #include "mongo/db/query/ce/cbp_histogram_ce/test_utils.h"
-#include "mongo/db/query/ce/test_utils.h"
 #include "mongo/db/query/stats/array_histogram.h"
 #include "mongo/db/query/stats/max_diff.h"
 #include "mongo/db/query/stats/maxdiff_test_utils.h"

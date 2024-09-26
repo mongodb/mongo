@@ -20,19 +20,6 @@ mongo_cc_library(
     deps = [
         "//src/mongo/db/pipeline:abt_utils",
         "//src/mongo/db/query/optimizer:optimizer_rewrites",
-    ],
-)
-
-mongo_cc_library(
-    name = "ce_histogram_estimation",
-    srcs = [
-        "histogram_predicate_estimation.cpp",
-    ],
-    hdrs = [
-        "histogram_predicate_estimation.h",
-    ],
-    deps = [
-        ":ce_utils",
         "//src/mongo/db/query/stats:stats_histograms",
     ],
 )

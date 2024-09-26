@@ -43,6 +43,7 @@
 #include "mongo/db/pipeline/document_source_queue.h"
 #include "mongo/db/pipeline/expression_context_for_test.h"
 #include "mongo/db/pipeline/pipeline.h"
+#include "mongo/db/query/ce/cbp_histogram_ce/histogram_common.h"
 #include "mongo/db/query/plan_executor.h"
 #include "mongo/db/query/plan_executor_factory.h"
 #include "mongo/db/query/stats/array_histogram.h"
@@ -145,9 +146,9 @@ size_t getActualCard(OperationContext* opCtx,
     return runPipeline(opCtx, query, convertToBSON(input)).size();
 }
 
-std::string makeMatchExpr(const SBEValue& val, optimizer::ce::EstimationType cmpOp) {
+std::string makeMatchExpr(const SBEValue& val, optimizer::cbp::ce::EstimationType cmpOp) {
     std::stringstream matchExpr;
-    std::string cmpOpName = optimizer::ce::estimationTypeName.at(cmpOp);
+    std::string cmpOpName = optimizer::cbp::ce::estimationTypeName.at(cmpOp);
     matchExpr << "[{$match: {a: {$" << cmpOpName << ": " << val.get() << "}}}]";
     return matchExpr.str();
 }
