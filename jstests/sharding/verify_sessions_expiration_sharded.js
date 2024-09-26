@@ -127,6 +127,10 @@ for (let i = 0; i < 3; i++) {
             lastUseValues[j] = sessionsCollectionArray[j].lastUse;
         }
     }
+
+    // Date_t has the granularity of milliseconds, so we have to make sure we don't run this loop
+    // faster than that.
+    sleep(10);
 }
 
 // 3. Verify that letting sessions expire (simulated by manual deletion) will kill their
