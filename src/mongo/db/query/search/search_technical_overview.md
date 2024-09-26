@@ -77,6 +77,18 @@ For example, if we know that we will need all documents from mongot in order to 
 
 The $\_internalSearchIdLookup stage is responsible for recreating the entire document to give to the rest of the agg pipeline (in the above example, $match and $project) and for checking to make sure the data returned is up to date with the data on `mongod`, since `mongot`’s indexed data is eventually consistent with `mongod`. For example, if `mongot` returned the \_id to a document that had been deleted, $\_internalSearchIdLookup is responsible for catching; it won’t find a document matching that \_id and then filters out that document. The stage will also perform shard filtering, where it ensures there are no duplicates from separate shards, and it will retrieve the most up-to-date field values. However, this stage doesn’t account for documents that had been inserted to the collection but not yet propagated to `mongot` via the $changeStream; that’s why search queries are eventually consistent but don’t guarantee strong consistency.
 
+### Explains
+
+Like normal explain queries, search explain queries can be run with three different verbosities, "queryPlanner" which does not execute the query, and "executionStats" and "allPlansExecution" which do execute the query and output execution stats about the query.
+
+For queries with "queryPlanner" verbosity, we specify "queryPlanner" in our query to mongot, it returns an explain object without a cursor. We directly return this object in our explain output.
+
+For queries with "executionStats" or "allPlansExecution" verbosity levels, we follow the same path as normal search queries to establish cursor(s) on mongot. By including the explain verbosity in our query to mongot, we receive an explain object along with the usual cursor(s) containing documents. These documents are then returned to the subsequent stages of the pipeline, and the execution of the query continues. It's important to note that the merge phase of a sharded query is not executed during an explain (see [SPM-3100](https://jira.mongodb.org/browse/SPM-3100)). If a `getMore` command is issued against the cursor, mongot will return a new explain object which contains updated statistics on its execution of the query. The latest explain object is stored on the [TaskExecutorCursor](https://github.com/mongodb/mongo/blob/a71fa6a39a916983c38c23684cd23ac930ae5616/src/mongo/executor/task_executor_cursor.h#L267) as it handles the `getMore`s. We include the latest explain object from mongot in the explain for [$\_internalSearchMongotRemote, $searchMeta](https://github.com/mongodb/mongo/blob/a71fa6a39a916983c38c23684cd23ac930ae5616/src/mongo/db/pipeline/search/document_source_internal_search_mongot_remote.cpp#L112), and [$vectorSearch](https://github.com/mongodb/mongo/blob/a71fa6a39a916983c38c23684cd23ac930ae5616/src/mongo/db/pipeline/search/document_source_vector_search.cpp#L133-L134) to output the most up to date information.
+
+[comment]: # "TODO SERVER-91594 Remove the following section."
+
+Older versions of mongot do not support returning an explain object alongside the cursor with documents; they only return the explain object. We follow an explain path in [establishCursor()](https://github.com/mongodb/mongo/blob/594f8cff13c7fdd7b71fca48104b2925844be6ad/src/mongo/db/query/search/mongot_cursor.cpp#L224-L227) to handle this case. This special logic will be removed once mongot will always return a cursor with the explain object and the completion of SERVER-91594.
+
 ### Didn't Find What You're Looking For?
 
 Visit [the landing page](https://github.com/10gen/mongo/blob/master/src/mongo/db/query/search/README.md) for all $search/$vectorSearch/$searchMeta related documentation for server contributors.

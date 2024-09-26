@@ -55,6 +55,10 @@ If a user-specified `$limit` exists in the pipeline following `$vectorSearch` th
 
 Vector indexes are managed through the existing [search index management commands](https://github.com/mongodb/mongo/blob/master/src/mongo/db/query/search/README.md#search-index-commands), due to the fact that they are stored in the same way as search indexes on `mongot`.
 
+### Explain
+
+'$vectorSearch' explains follow how $search/$searchMeta explains work. Check out [search_technical_overview.md](https://github.com/10gen/mongo/blob/master/src/mongo/db/query/search/search_technical_overview.md) for more information.
+
 ### Testing
 
 The `vectorSearch` command is supported by [`mongotmock`](https://github.com/mongodb/mongo/blob/636d0c1ce26d905cc508a73ada598950e16860b5/src/mongo/db/query/search/mongotmock/mongotmock_commands.cpp#L194) for testing.
