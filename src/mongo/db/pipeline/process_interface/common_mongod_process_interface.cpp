@@ -752,21 +752,20 @@ CommonMongodProcessInterface::fieldsHaveSupportingUniqueIndex(
     const std::set<FieldPath>& fieldPaths) const {
     auto* opCtx = expCtx->opCtx;
 
-    // We purposefully avoid a helper like AutoGetCollection here because we don't want to check the
-    // db version or do anything else. We simply want to protect against concurrent modifications to
-    // the catalog.
-    Lock::DBLock dbLock(opCtx, nss.dbName(), MODE_IS);
-    Lock::CollectionLock collLock(opCtx, nss, MODE_IS);
-    auto databaseHolder = DatabaseHolder::get(opCtx);
-    auto db = databaseHolder->getDb(opCtx, nss.dbName());
-    auto collection =
-        db ? CollectionCatalog::get(opCtx)->lookupCollectionByNamespace(opCtx, nss) : nullptr;
-    if (!collection) {
+    // This method just checks metadata of the collection, which should be consistent across all
+    // shards therefore it's safe to ignore placement concern when locking the collection for read
+    // and acquiring a reference to it.
+    const auto collection = acquireCollectionMaybeLockFree(
+        opCtx,
+        CollectionAcquisitionRequest(nss,
+                                     AcquisitionPrerequisites::kPretendUnsharded,
+                                     repl::ReadConcernArgs::get(opCtx),
+                                     AcquisitionPrerequisites::kRead));
+    if (!collection.exists()) {
         return fieldPaths == std::set<FieldPath>{"_id"} ? SupportingUniqueIndex::Full
                                                         : SupportingUniqueIndex::None;
     }
-
-    auto indexIterator = collection->getIndexCatalog()->getIndexIterator(
+    auto indexIterator = collection.getCollectionPtr()->getIndexCatalog()->getIndexIterator(
         opCtx, IndexCatalog::InclusionPolicy::kReady);
     auto result = SupportingUniqueIndex::None;
     while (indexIterator->more()) {
