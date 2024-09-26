@@ -32,7 +32,7 @@
 #include <memory>
 #include <vector>
 
-#include "mongo/platform/atomic_word.h"
+#include "mongo/platform/atomic.h"
 
 
 namespace mongo {
@@ -72,18 +72,18 @@ private:
     struct TargetStats {
         // the op targeted all shards that own chunks for the collection as long as the total number
         // of shards in the cluster is > 1
-        AtomicWord<int> allShards;
+        Atomic<long long> allShards;
 
         // the op targeted > 1 shard that own chunks for the collection as long as the total number
         // of shards in the cluster is > 1
-        AtomicWord<int> manyShards;
+        Atomic<long long> manyShards;
 
         // the op targeted 1 shard (if there exists only one shard, the metric will count as
         // 'oneShard')
-        AtomicWord<int> oneShard;
+        Atomic<long long> oneShard;
 
         // the collection is unsharded
-        AtomicWord<int> unsharded;
+        Atomic<long long> unsharded;
     };
 
     std::vector<std::unique_ptr<TargetStats>> _numHostsTargeted;
