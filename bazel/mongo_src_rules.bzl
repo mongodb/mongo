@@ -451,9 +451,6 @@ GCC_OR_CLANG_WARNINGS_COPTS = select({
         # search path but can't be used.
         "-Winvalid-pch",
 
-        # Warn when hiding a virtual function.
-        "-Woverloaded-virtual",
-
         # This warning was added in g++-4.8.
         "-Wno-unused-local-typedefs",
 
@@ -477,9 +474,6 @@ GCC_OR_CLANG_WARNINGS_COPTS = select({
         # SERVER-76472 we don't try to maintain ABI so disable warnings about
         # possible ABI issues.
         "-Wno-psabi",
-
-        # Warn about moves of prvalues, which can inhibit copy elision.
-        "-Wpessimizing-move",
     ],
     "//conditions:default": [],
 })
