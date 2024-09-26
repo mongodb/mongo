@@ -134,8 +134,7 @@ public:
      * Runs the given remote command request, and returns the response.
      */
     RemoteCommandResponse runCommand(RemoteCommandRequest request) {
-        auto deferred = net->startCommand(makeCallbackHandle(), request);
-        return deferred.get();
+        return net->startCommand(makeCallbackHandle(), request).get();
     }
 
 

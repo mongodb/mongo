@@ -473,30 +473,39 @@ StatusWith<TaskExecutor::CallbackHandle> ThreadPoolTaskExecutor::scheduleRemoteC
                 "request"_attr = redact(scheduledRequest.toString()));
     lk.unlock();
 
-    auto commandStatus = _net->startCommand(
-        swCbHandle.getValue(),
-        scheduledRequest,
-        [this, scheduledRequest, cbState, cb](const ResponseStatus& response) {
-            using std::swap;
-            CallbackFn newCb = [cb, scheduledRequest, response](const CallbackArgs& cbData) {
-                remoteCommandFinished(cbData, cb, scheduledRequest, response);
-            };
-            stdx::unique_lock<Latch> lk(_mutex);
-            if (_inShutdown_inlock()) {
-                return;
-            }
-            LOGV2_DEBUG(22608,
-                        3,
-                        "Received remote response",
-                        "response"_attr = redact(response.isOK() ? response.toString()
-                                                                 : response.status.toString()));
-            swap(cbState->callback, newCb);
-            scheduleIntoPool_inlock(&_networkInProgressQueue, cbState->iter, std::move(lk));
-        },
-        baton);
-
-    if (!commandStatus.isOK())
-        return commandStatus;
+    try {
+        // TODO SERVER-93114 once all owning references to TaskExecutors are by shared_ptr, change
+        // the unsafeToInlineFuture below to thenRunOn(shared_from_this()).
+        _net->startCommand(swCbHandle.getValue(), scheduledRequest, baton)
+            .unsafeToInlineFuture()
+            .getAsync([this, scheduledRequest, cbState, cb](
+                          const StatusWith<ResponseStatus>& swResponse) {
+                if (!swResponse.getStatus().isOK()) {
+                    LOGV2(9311100,
+                          "Remote command received non-ok response",
+                          "response"_attr = redact(swResponse.getStatus().toString()));
+                    return;
+                }
+                using std::swap;
+                auto response = swResponse.getValue();
+                CallbackFn newCb = [cb, scheduledRequest, response](const CallbackArgs& cbData) {
+                    remoteCommandFinished(cbData, cb, scheduledRequest, response);
+                };
+                stdx::unique_lock<Latch> lk(_mutex);
+                if (_inShutdown_inlock()) {
+                    return;
+                }
+                LOGV2_DEBUG(22608,
+                            3,
+                            "Received remote response",
+                            "response"_attr = redact(response.isOK() ? response.toString()
+                                                                     : response.status.toString()));
+                swap(cbState->callback, newCb);
+                scheduleIntoPool_inlock(&_networkInProgressQueue, cbState->iter, std::move(lk));
+            });
+    } catch (const DBException& e) {
+        return e.toStatus();
+    }
 
     return swCbHandle;
 }

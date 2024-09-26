@@ -123,15 +123,6 @@ void NetworkInterfaceIntegrationFixture::resetIsInternalClient(bool isInternalCl
     WireSpec::getWireSpec(getGlobalServiceContext()).reset(std::move(newSpec));
 }
 
-void NetworkInterfaceIntegrationFixture::startCommand(const TaskExecutor::CallbackHandle& cbHandle,
-                                                      RemoteCommandRequest& request,
-                                                      StartCommandCB onFinish) {
-    auto cb = [onFinish = std::move(onFinish)](const TaskExecutor::ResponseStatus& rs) {
-        onFinish(rs);
-    };
-    invariant(net().startCommand(cbHandle, request, std::move(cb)));
-}
-
 Future<RemoteCommandResponse> NetworkInterfaceIntegrationFixture::runCommand(
     const TaskExecutor::CallbackHandle& cbHandle,
     RemoteCommandRequest request,
@@ -141,6 +132,7 @@ Future<RemoteCommandResponse> NetworkInterfaceIntegrationFixture::runCommand(
 
     return net()
         .startCommand(cbHandle, request, baton)
+        .unsafeToInlineFuture()
         .then([request](TaskExecutor::ResponseStatus resStatus) {
             if (resStatus.isOK()) {
                 LOGV2(4820500,

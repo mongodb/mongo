@@ -557,12 +557,12 @@ void NetworkInterfaceTL::_unregisterCommand(const TaskExecutor::CallbackHandle& 
     }
 }
 
-Status NetworkInterfaceTL::startCommand(const TaskExecutor::CallbackHandle& cbHandle,
-                                        RemoteCommandRequest& request,
-                                        RemoteCommandCompletionFn&& onFinish,
-                                        const BatonHandle& baton) try {
+SemiFuture<RemoteCommandResponse> NetworkInterfaceTL::startCommand(
+    const TaskExecutor::CallbackHandle& cbHandle,
+    RemoteCommandRequest& request,
+    const BatonHandle& baton) {
     if (inShutdown()) {
-        return kNetworkInterfaceShutdownInProgress;
+        uassertStatusOK(kNetworkInterfaceShutdownInProgress);
     }
 
     LOGV2_DEBUG(
@@ -570,20 +570,10 @@ Status NetworkInterfaceTL::startCommand(const TaskExecutor::CallbackHandle& cbHa
 
     appendMetadata(&request, _metadataHook);
 
-    auto targetNode = request.target;
-
     auto cmdState = std::make_shared<CommandState>(this, request, cbHandle, baton);
     _registerCommand(cmdState->cbHandle, cmdState);
 
-    _runCommand(cmdState).getAsync(
-        [cmdState, onFinish = std::move(onFinish)](StatusWith<RemoteCommandResponse> swResponse) {
-            invariant(swResponse);
-            onFinish(swResponse.getValue());
-        });
-
-    return Status::OK();
-} catch (const DBException& ex) {
-    return ex.toStatus();
+    return _runCommand(cmdState).semi();
 }
 
 void NetworkInterfaceTL::testEgress(const HostAndPort& hostAndPort,

@@ -141,12 +141,19 @@ TEST_F(NetworkInterfaceMockTest, ConnectionHook) {
                                                       << "12121212121212"),
                                                  Milliseconds(0)};
 
-    ASSERT_OK(net().startCommand(cb, actualCommandExpected, [&](const RemoteCommandResponse& resp) {
-        commandFinished = true;
-        if (resp.isOK()) {
-            gotCorrectCommandReply = (actualResponseExpected == resp);
-        }
-    }));
+    net()
+        .startCommand(cb, actualCommandExpected)
+        .unsafeToInlineFuture()
+        .getAsync([&](StatusWith<RemoteCommandResponse> swRcr) {
+            if (!swRcr.getStatus().isOK()) {
+                return;
+            }
+            commandFinished = true;
+            auto resp = swRcr.getValue();
+            if (resp.isOK()) {
+                gotCorrectCommandReply = (actualResponseExpected == resp);
+            }
+        });
 
     // At this point validate and makeRequest should have been called.
     ASSERT(validateCalled);
@@ -213,11 +220,18 @@ TEST_F(NetworkInterfaceMockTest, ConnectionHookFailedValidation) {
     bool statusPropagated = false;
 
     RemoteCommandRequest request{kUnimportantRequest};
-    ASSERT_OK(net().startCommand(cb, request, [&](const RemoteCommandResponse& resp) {
-        commandFinished = true;
+    net()
+        .startCommand(cb, request)
+        .unsafeToInlineFuture()
+        .getAsync([&](StatusWith<RemoteCommandResponse> swRcr) {
+            if (!swRcr.getStatus().isOK()) {
+                return;
+            }
+            commandFinished = true;
+            auto resp = swRcr.getValue();
+            statusPropagated = resp.status.code() == ErrorCodes::ConflictingOperationInProgress;
+        });
 
-        statusPropagated = resp.status.code() == ErrorCodes::ConflictingOperationInProgress;
-    }));
 
     {
         net().enterNetwork();
@@ -252,8 +266,15 @@ TEST_F(NetworkInterfaceMockTest, ConnectionHookNoRequest) {
     bool commandFinished = false;
 
     RemoteCommandRequest request{kUnimportantRequest};
-    ASSERT_OK(net().startCommand(
-        cb, request, [&](const RemoteCommandResponse& resp) { commandFinished = true; }));
+    net()
+        .startCommand(cb, request)
+        .unsafeToInlineFuture()
+        .getAsync([&](StatusWith<RemoteCommandResponse> swRcr) {
+            if (!swRcr.getStatus().isOK()) {
+                return;
+            }
+            commandFinished = true;
+        });
 
     {
         net().enterNetwork();
@@ -288,10 +309,18 @@ TEST_F(NetworkInterfaceMockTest, ConnectionHookMakeRequestFails) {
     bool errorPropagated = false;
 
     RemoteCommandRequest request{kUnimportantRequest};
-    ASSERT_OK(net().startCommand(cb, request, [&](const RemoteCommandResponse& resp) {
-        commandFinished = true;
-        errorPropagated = resp.status.code() == ErrorCodes::InvalidSyncSource;
-    }));
+    net()
+        .startCommand(cb, request)
+        .unsafeToInlineFuture()
+        .getAsync([&](StatusWith<RemoteCommandResponse> swRcr) {
+            if (!swRcr.getStatus().isOK()) {
+                return;
+            }
+            commandFinished = true;
+            auto resp = swRcr.getValue();
+            errorPropagated = resp.status.code() == ErrorCodes::InvalidSyncSource;
+        });
+
 
     {
         net().enterNetwork();
@@ -324,10 +353,18 @@ TEST_F(NetworkInterfaceMockTest, ConnectionHookHandleReplyFails) {
     bool errorPropagated = false;
 
     RemoteCommandRequest request{kUnimportantRequest};
-    ASSERT_OK(net().startCommand(cb, request, [&](const RemoteCommandResponse& resp) {
-        commandFinished = true;
-        errorPropagated = resp.status.code() == ErrorCodes::CappedPositionLost;
-    }));
+    net()
+        .startCommand(cb, request)
+        .unsafeToInlineFuture()
+        .getAsync([&](StatusWith<RemoteCommandResponse> swRcr) {
+            if (!swRcr.getStatus().isOK()) {
+                return;
+            }
+            commandFinished = true;
+            auto resp = swRcr.getValue();
+            errorPropagated = resp.status.code() == ErrorCodes::CappedPositionLost;
+        });
+
 
     ASSERT(!handleReplyCalled);
 
@@ -353,7 +390,9 @@ TEST_F(NetworkInterfaceMockTest, SetAlarmFires) {
 
     const auto deadline = net().now() + Milliseconds(100);
     net().setAlarm(deadline).unsafeToInlineFuture().getAsync([&](Status status) {
-        ASSERT_OK(status);
+        if (!status.isOK()) {
+            return;
+        }
         alarmHasFired = true;
     });
     ASSERT_FALSE(alarmHasFired);
@@ -400,13 +439,15 @@ TEST_F(NetworkInterfaceMockTest, InShutdown) {
     ASSERT(net().inShutdown());
 }
 
-TEST_F(NetworkInterfaceMockTest, StartCommandReturnsNotOKIfShutdownHasStarted) {
+TEST_F(NetworkInterfaceMockTest, StartCommandThrowsIfShutdownHasStarted) {
     startNetwork();
     tearDown();
 
     TaskExecutor::CallbackHandle cb{};
     RemoteCommandRequest request{kUnimportantRequest};
-    ASSERT_NOT_OK(net().startCommand(cb, request, [](const RemoteCommandResponse& resp) {}));
+    ASSERT_THROWS_CODE(net().startCommand(cb, request).unsafeToInlineFuture().getNoThrow(),
+                       DBException,
+                       ErrorCodes::ShutdownInProgress);
 }
 
 TEST_F(NetworkInterfaceMockTest, SetAlarmReturnsNotOKIfShutdownHasStarted) {
@@ -432,7 +473,15 @@ TEST_F(NetworkInterfaceMockTest, CommandTimeout) {
     //
     // Command times out.
     //
-    ASSERT_OK(net().startCommand(cb, request, finishFn));
+    net()
+        .startCommand(cb, request)
+        .unsafeToInlineFuture()
+        .getAsync([&](StatusWith<RemoteCommandResponse> swRcr) {
+            if (!swRcr.getStatus().isOK()) {
+                return;
+            }
+            finishFn(swRcr.getValue());
+        });
     net().enterNetwork();
     ASSERT(net().hasReadyRequests());
     net().blackHole(net().getNextReadyRequest());
@@ -445,7 +494,15 @@ TEST_F(NetworkInterfaceMockTest, CommandTimeout) {
     //
     Date_t start = net().now();
 
-    ASSERT_OK(net().startCommand(cb, request, finishFn));
+    net()
+        .startCommand(cb, request)
+        .unsafeToInlineFuture()
+        .getAsync([&](StatusWith<RemoteCommandResponse> swRcr) {
+            if (!swRcr.getStatus().isOK()) {
+                return;
+            }
+            finishFn(swRcr.getValue());
+        });
     net().enterNetwork();
     // Consume the request. We'll schedule a successful response later.
     ASSERT(net().hasReadyRequests());

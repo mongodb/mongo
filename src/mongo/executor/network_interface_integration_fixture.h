@@ -101,10 +101,6 @@ public:
 
     PseudoRandom* getRandomNumberGenerator();
 
-    void startCommand(const TaskExecutor::CallbackHandle& cbHandle,
-                      RemoteCommandRequest& request,
-                      StartCommandCB onFinish);
-
     Future<RemoteCommandResponse> runCommand(const TaskExecutor::CallbackHandle& cbHandle,
                                              RemoteCommandRequest rcroa,
                                              const std::shared_ptr<Baton>& baton = nullptr);

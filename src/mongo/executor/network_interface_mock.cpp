@@ -57,6 +57,11 @@
 namespace mongo {
 namespace executor {
 
+namespace {
+const Status kNetworkInterfaceMockShutdownInProgress = {
+    ErrorCodes::ShutdownInProgress, "NetworkInterfaceMock shutdown in progress"};
+}
+
 using CallbackHandle = TaskExecutor::CallbackHandle;
 using ResponseStatus = TaskExecutor::ResponseStatus;
 
@@ -95,13 +100,12 @@ std::string NetworkInterfaceMock::getHostName() {
  * Starts a remote command with an implementation common to both the exhaust and non-exhaust
  * variants.
  */
-template <typename CallbackFn>
-Status NetworkInterfaceMock::_startCommand(const TaskExecutor::CallbackHandle& cbHandle,
-                                           RemoteCommandRequest& request,
-                                           CallbackFn&& onResponse,
-                                           const BatonHandle& baton) {
+SemiFuture<TaskExecutor::ResponseStatus> NetworkInterfaceMock::_startCommand(
+    const TaskExecutor::CallbackHandle& cbHandle,
+    RemoteCommandRequest& request,
+    const BatonHandle& baton) {
     if (inShutdown()) {
-        return {ErrorCodes::ShutdownInProgress, "NetworkInterfaceMock shutdown in progress"};
+        uassertStatusOK(kNetworkInterfaceMockShutdownInProgress);
     }
 
     stdx::lock_guard<stdx::mutex> lk(_mutex);
@@ -110,7 +114,8 @@ Status NetworkInterfaceMock::_startCommand(const TaskExecutor::CallbackHandle& c
 
     LOGV2(5440600, "Scheduling request", "when"_attr = now, "request"_attr = request);
 
-    auto op = NetworkOperation(cbHandle, request, now, std::move(onResponse));
+    auto [promise, future] = makePromiseFuture<TaskExecutor::ResponseStatus>();
+    auto op = NetworkOperation(cbHandle, request, now, std::move(promise));
 
     // If we don't have a hook, or we have already 'connected' to this host, enqueue the op.
     if (!_hook || _connections.count(request.target)) {
@@ -119,22 +124,20 @@ Status NetworkInterfaceMock::_startCommand(const TaskExecutor::CallbackHandle& c
         _connectThenEnqueueOperation_inlock(request.target, std::move(op));
     }
 
-    return Status::OK();
+    return std::move(future).semi();
 }
 
-Status NetworkInterfaceMock::startCommand(const CallbackHandle& cbHandle,
-                                          RemoteCommandRequest& request,
-                                          RemoteCommandCompletionFn&& onFinish,
-                                          const BatonHandle& baton) {
-    return _startCommand(cbHandle, request, onFinish, baton);
+SemiFuture<TaskExecutor::ResponseStatus> NetworkInterfaceMock::startCommand(
+    const CallbackHandle& cbHandle, RemoteCommandRequest& request, const BatonHandle& baton) {
+    return _startCommand(cbHandle, request, baton);
 }
 
 Status NetworkInterfaceMock::startExhaustCommand(const CallbackHandle& cbHandle,
                                                  RemoteCommandRequest& request,
                                                  RemoteCommandOnReplyFn&& onReply,
                                                  const BatonHandle& baton) {
-
-    return _startCommand(cbHandle, request, onReply, baton);
+    // TODO: SERVER-93114 Call into _startCommand()
+    MONGO_UNREACHABLE;
 }
 
 void NetworkInterfaceMock::setHandshakeReplyForHost(
@@ -173,7 +176,7 @@ void NetworkInterfaceMock::_interruptWithResponse_inlock(const CallbackHandle& c
 
 SemiFuture<void> NetworkInterfaceMock::setAlarm(const Date_t when, const CancellationToken& token) {
     if (inShutdown()) {
-        return Status(ErrorCodes::ShutdownInProgress, "NetworkInterfaceMock shutdown in progress");
+        return kNetworkInterfaceMockShutdownInProgress;
     }
 
     stdx::unique_lock<stdx::mutex> lk(_mutex);
@@ -243,7 +246,7 @@ void NetworkInterfaceMock::shutdown() {
                                         ResponseStatus{ErrorCodes::ShutdownInProgress,
                                                        "Shutting down mock network",
                                                        Milliseconds(0)}};
-        if (op.processResponse(std::move(response))) {
+        if (op.fulfillResponse(std::move(response))) {
             LOGV2_WARNING(22590,
                           "Mock network interface shutting down with outstanding request",
                           "request"_attr = op.getRequest());
@@ -513,7 +516,7 @@ void NetworkInterfaceMock::_connectThenEnqueueOperation_inlock(const HostAndPort
     auto valid = _hook->validateHost(target, op.getRequest().cmdObj, handshakeReply);
     if (!valid.isOK()) {
         auto response = NetworkResponse{{}, _now_inlock(), valid};
-        op.processResponse(std::move(response));
+        op.fulfillResponse(std::move(response));
         return;
     }
 
@@ -521,7 +524,7 @@ void NetworkInterfaceMock::_connectThenEnqueueOperation_inlock(const HostAndPort
 
     if (!swHookPostconnectCommand.isOK()) {
         auto response = NetworkResponse{{}, _now_inlock(), swHookPostconnectCommand.getStatus()};
-        op.processResponse(std::move(response));
+        op.fulfillResponse(std::move(response));
         return;
     }
 
@@ -536,32 +539,34 @@ void NetworkInterfaceMock::_connectThenEnqueueOperation_inlock(const HostAndPort
     }
 
     auto cbh = op.getCallbackHandle();
-    // The completion handler for the postconnect command schedules the original command.
-    auto postconnectCompletionHandler =
-        [this, op = std::move(op)](TaskExecutor::ResponseStatus rs) mutable {
+
+    auto [promise, future] = makePromiseFuture<TaskExecutor::ResponseStatus>();
+    std::move(future).getAsync(
+        [this, op = std::move(op)](StatusWith<TaskExecutor::ResponseStatus> swRs) mutable {
+            if (!swRs.isOK()) {
+                return;
+            }
+
+            auto rs = swRs.getValue();
             stdx::lock_guard<stdx::mutex> lk(_mutex);
             if (!rs.isOK()) {
                 auto response = NetworkResponse{{}, _now_inlock(), rs};
-                op.processResponse(std::move(response));
+                op.fulfillResponse(std::move(response));
                 return;
             }
 
             auto handleStatus = _hook->handleReply(op.getRequest().target, std::move(rs));
-
             if (!handleStatus.isOK()) {
                 auto response = NetworkResponse{{}, _now_inlock(), handleStatus};
-                op.processResponse(std::move(response));
+                op.fulfillResponse(std::move(response));
                 return;
             }
 
             _connections.emplace(op.getRequest().target);
             _enqueueOperation_inlock(std::move(op));
-        };
-
-    auto postconnectOp = NetworkOperation(cbh,
-                                          std::move(*hookPostconnectCommand),
-                                          _now_inlock(),
-                                          std::move(postconnectCompletionHandler));
+        });
+    auto postconnectOp = NetworkOperation(
+        cbh, std::move(*hookPostconnectCommand), _now_inlock(), std::move(promise));
 
     _enqueueOperation_inlock(std::move(postconnectOp));
 }
@@ -632,13 +637,13 @@ void NetworkInterfaceMock::_runReadyNetworkOperations_inlock(stdx::unique_lock<s
         // cancellation and a 'true' scheduled response). But each request can only have one logical
         // response. This choice of the one logical response is mediated by the _isFinished field of
         // the NetworkOperation; whichever response sets this first via
-        // NetworkOperation::processResponse wins. NetworkOperation::processResponse returns `true`
+        // NetworkOperation::fulfillResponse wins. NetworkOperation::fulfillResponse returns `true`
         // if the given response was accepted by the NetworkOperation as its sole logical response.
         //
         // We care about this here because we only want to increment the counters for operations
         // succeeded/failed for the responses that are actually used,
         Status localResponseStatus = response.response.status;
-        bool noiUsedThisResponse = noi->processResponse(std::move(response));
+        bool noiUsedThisResponse = noi->fulfillResponse(std::move(response));
         if (noiUsedThisResponse) {
             _counters.sent++;
             if (localResponseStatus.isOK()) {
@@ -710,23 +715,24 @@ bool NetworkInterfaceMock::_isExecutorThreadRunnable_inlock() {
 }
 
 NetworkInterfaceMock::NetworkOperation::NetworkOperation()
-    : _requestDate(), _request(), _onResponse() {}
+    : _requestDate(), _request(), _respPromise() {}
 
-NetworkInterfaceMock::NetworkOperation::NetworkOperation(const CallbackHandle& cbHandle,
-                                                         const RemoteCommandRequest& theRequest,
-                                                         Date_t theRequestDate,
-                                                         RemoteCommandCompletionFn onResponse)
+NetworkInterfaceMock::NetworkOperation::NetworkOperation(
+    const CallbackHandle& cbHandle,
+    const RemoteCommandRequest& theRequest,
+    Date_t theRequestDate,
+    Promise<TaskExecutor::ResponseStatus> promise)
     : _requestDate(theRequestDate),
       _cbHandle(cbHandle),
       _request(theRequest),
-      _onResponse(std::move(onResponse)) {}
+      _respPromise(std::move(promise)) {}
 
 std::string NetworkInterfaceMock::NetworkOperation::getDiagnosticString() const {
     return str::stream() << "NetworkOperation -- request:'" << _request.toString()
                          << ", reqDate: " << _requestDate.toString();
 }
 
-bool NetworkInterfaceMock::NetworkOperation::processResponse(NetworkResponse response) {
+bool NetworkInterfaceMock::NetworkOperation::fulfillResponse(NetworkResponse response) {
     if (_isFinished) {
         // Nothing to do.
         return false;
@@ -734,14 +740,9 @@ bool NetworkInterfaceMock::NetworkOperation::processResponse(NetworkResponse res
 
     // If there's no more to come, then we're done after this response.
     _isFinished = !response.response.moreToCome;
-    ON_BLOCK_EXIT([&] {
-        if (_isFinished) {
-            _onResponse = {};
-        }
-    });
 
     response.response.target = _request.target;
-    _onResponse(response.response);
+    _respPromise.emplaceValue(response.response);
 
     return true;
 }

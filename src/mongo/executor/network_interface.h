@@ -214,42 +214,16 @@ public:
      *
      * The request mutated to append request metadata to be merged into the request messages.
      *
-     * Returns ErrorCodes::ShutdownInProgress if NetworkInterface::shutdown has already started
-     * and Status::OK() otherwise. If it returns Status::OK(), then the onFinish argument will be
-     * executed by NetworkInterface eventually; otherwise, it will not.
-     *
-     * Note that if you pass a baton to startCommand and that baton refuses work, then your onFinish
-     * function will not run.
-     *
-     * The `onFinish` argument must not throw exceptions.
+     * This may throw exceptions if a command is unable to be scheduled.
      */
-    virtual Status startCommand(const TaskExecutor::CallbackHandle& cbHandle,
-                                RemoteCommandRequest& request,
-                                RemoteCommandCompletionFn&& onFinish,
-                                const BatonHandle& baton = nullptr) = 0;
+    virtual SemiFuture<TaskExecutor::ResponseStatus> startCommand(
+        const TaskExecutor::CallbackHandle& cbHandle,
+        RemoteCommandRequest& request,
+        const BatonHandle& baton = nullptr) = 0;
     virtual Status startExhaustCommand(const TaskExecutor::CallbackHandle& cbHandle,
                                        RemoteCommandRequest& request,
                                        RemoteCommandOnReplyFn&& onReply,
                                        const BatonHandle& baton = nullptr) = 0;
-
-    Future<TaskExecutor::ResponseStatus> startCommand(const TaskExecutor::CallbackHandle& cbHandle,
-                                                      RemoteCommandRequest& request,
-                                                      const BatonHandle& baton = nullptr) {
-        auto pf = makePromiseFuture<TaskExecutor::ResponseStatus>();
-
-        auto status = startCommand(
-            cbHandle,
-            request,
-            [p = std::move(pf.promise)](const TaskExecutor::ResponseStatus& rs) mutable {
-                p.emplaceValue(rs);
-            },
-            baton);
-
-        if (!status.isOK()) {
-            return status;
-        }
-        return std::move(pf.future);
-    }
 
     /**
      * Requests cancellation of the network activity associated with "cbHandle" if it has not yet

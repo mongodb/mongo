@@ -108,10 +108,10 @@ public:
     void waitForWorkUntil(Date_t when) override;
     void signalWorkAvailable() override;
     Date_t now() override;
-    Status startCommand(const TaskExecutor::CallbackHandle& cbHandle,
-                        RemoteCommandRequest& request,
-                        RemoteCommandCompletionFn&& onFinish,
-                        const BatonHandle& baton) override;
+    SemiFuture<TaskExecutor::ResponseStatus> startCommand(
+        const TaskExecutor::CallbackHandle& cbHandle,
+        RemoteCommandRequest& request,
+        const BatonHandle& baton) override;
     Status startExhaustCommand(const TaskExecutor::CallbackHandle& cbHandle,
                                RemoteCommandRequest& request,
                                RemoteCommandOnReplyFn&& onReply,

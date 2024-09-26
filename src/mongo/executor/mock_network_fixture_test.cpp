@@ -73,12 +73,23 @@ public:
         mock().verifyAndClearExpectations();
     }
 
-    Status startCommand(RemoteCommandRequest& request) {
+    Status scheduleCommand(RemoteCommandRequest& request) {
         TaskExecutor::CallbackHandle cb;
-        return net().startCommand(cb, request, [&](const auto& resp) {
-            LOGV2(5015503, "Test got command response", "resp"_attr = resp);
-            _responses.push_back(resp);
-        });
+
+        try {
+            net()
+                .startCommand(cb, request)
+                .unsafeToInlineFuture()
+                .getAsync([&](StatusWith<RemoteCommandResponse> swRcr) {
+                    auto resp = swRcr.getValue();
+                    LOGV2(5015503, "Test got command response", "resp"_attr = resp);
+                    _responses.push_back(resp);
+                });
+        } catch (const DBException& e) {
+            return e.toStatus();
+        }
+
+        return Status::OK();
     }
 
     // Assumes standard responses (kExampleResponse).
@@ -125,7 +136,7 @@ TEST_F(MockNetworkTest, MockFixtureBasicTest) {
     mock().expect(kExampleCmdName, kExampleResponse);
 
     RemoteCommandRequest request{kExampleRequest};
-    ASSERT_OK(startCommand(request));
+    ASSERT_OK(scheduleCommand(request));
 
     mock().runUntilExpectationsSatisfied();
     evaluateResponses(1 /* numExpected */);
@@ -137,7 +148,7 @@ TEST_F(MockNetworkTest, MockFixtureBasicTestWithMatcherFn) {
         kExampleResponse);
 
     RemoteCommandRequest request{kExampleRequest};
-    ASSERT_OK(startCommand(request));
+    ASSERT_OK(scheduleCommand(request));
 
     mock().runUntilExpectationsSatisfied();
     evaluateResponses(1 /* numExpected */);
@@ -149,9 +160,9 @@ TEST_F(MockNetworkTest, MockFixtureBasicTestSameCommandMultipleTimes) {
     RemoteCommandRequest request{kExampleRequest};
 
     // Run command three times.
-    ASSERT_OK(startCommand(request));
-    ASSERT_OK(startCommand(request));
-    ASSERT_OK(startCommand(request));
+    ASSERT_OK(scheduleCommand(request));
+    ASSERT_OK(scheduleCommand(request));
+    ASSERT_OK(scheduleCommand(request));
 
     mock().runUntilExpectationsSatisfied();
     evaluateResponses(3 /* numExpected */);
@@ -167,11 +178,11 @@ TEST_F(MockNetworkTest, MockFixtureSeveralExpectationsUnordered) {
     RemoteCommandRequest requestTwo{kExampleRequestTwo};
 
     // Run commands in this specific order.
-    ASSERT_OK(startCommand(requestTwo));
-    ASSERT_OK(startCommand(requestOne));
-    ASSERT_OK(startCommand(requestTwo));
-    ASSERT_OK(startCommand(requestTwo));
-    ASSERT_OK(startCommand(requestOne));
+    ASSERT_OK(scheduleCommand(requestTwo));
+    ASSERT_OK(scheduleCommand(requestOne));
+    ASSERT_OK(scheduleCommand(requestTwo));
+    ASSERT_OK(scheduleCommand(requestTwo));
+    ASSERT_OK(scheduleCommand(requestOne));
 
     mock().runUntilExpectationsSatisfied();
     evaluateResponses(5 /* numExpected */);
@@ -189,8 +200,8 @@ TEST_F(MockNetworkTest, MockFixtureSimilarExpectationsSpecialization) {
     RemoteCommandRequest bsonRequest{makeRequest(BSON(kExampleCmdName << 1 << "extradata" << 1))};
 
     // Run commands starting with the one for the older (potentially overridden) expectations.
-    ASSERT_OK(startCommand(cmdNameRequest));
-    ASSERT_OK(startCommand(bsonRequest));
+    ASSERT_OK(scheduleCommand(cmdNameRequest));
+    ASSERT_OK(scheduleCommand(bsonRequest));
 
     mock().runUntilExpectationsSatisfied();
     evaluateResponses(2 /* numExpected */);
@@ -216,10 +227,10 @@ TEST_F(MockNetworkTest, MockFixtureSimilarExpectationsOverride) {
     // The first request is meant for the older expectation, however it fulfills the matching
     // requirements for the more recent one. This is a problem as the remaining user expectation
     // will be unable to match the second request (as it is missing the extra field).
-    ASSERT_OK(startCommand(bsonRequest));
+    ASSERT_OK(scheduleCommand(bsonRequest));
     // We will not be able to match this request to a user expectation at this point, so it will
     // have to use the default expectation.
-    ASSERT_OK(startCommand(cmdNameRequest));
+    ASSERT_OK(scheduleCommand(cmdNameRequest));
 
     const auto deadline = net().now() + Milliseconds(100);
     mock().runUntil(deadline);
@@ -229,7 +240,7 @@ TEST_F(MockNetworkTest, MockFixtureSimilarExpectationsOverride) {
     ASSERT(!specificExp.isSatisfied());
 
     // Fix the tally to meet all expectations.
-    ASSERT_OK(startCommand(bsonRequest));
+    ASSERT_OK(scheduleCommand(bsonRequest));
 
     mock().runUntilExpectationsSatisfied();
     evaluateResponses(3 /* numExpected */);
@@ -239,7 +250,7 @@ TEST_F(MockNetworkTest, MockFixtureRunUntilReadyRequest) {
     mock().expect(kExampleCmdName, kExampleResponse);
 
     RemoteCommandRequest request{kExampleRequest};
-    ASSERT_OK(startCommand(request));
+    ASSERT_OK(scheduleCommand(request));
 
     TaskExecutor::CallbackHandle cbAlarm;
     bool alarmFired = false;
@@ -263,7 +274,7 @@ TEST_F(MockNetworkTest, MockFixtureRunUntilNotAllExpectationsSatisfied) {
     mock().expect(kExampleCmdNameTwo, kExampleResponse);
 
     RemoteCommandRequest request{kExampleRequest};
-    ASSERT_OK(startCommand(request));
+    ASSERT_OK(scheduleCommand(request));
 
     TaskExecutor::CallbackHandle cbAlarm;
     bool alarmFired = false;
@@ -283,7 +294,7 @@ TEST_F(MockNetworkTest, MockFixtureRunUntilNotAllExpectationsSatisfied) {
 
     // Satisfy the other expectation to terminate the test.
     RemoteCommandRequest requestTwo{kExampleRequestTwo};
-    ASSERT_OK(startCommand(requestTwo));
+    ASSERT_OK(scheduleCommand(requestTwo));
 
     mock().runUntilExpectationsSatisfied();
     evaluateResponses(2 /* numExpected */);
@@ -293,7 +304,7 @@ TEST_F(MockNetworkTest, MockFixtureNotEnoughTimesMatched) {
     mock().expect(kExampleCmdName, kExampleResponse).times(2);
 
     RemoteCommandRequest request{kExampleRequest};
-    ASSERT_OK(startCommand(request));
+    ASSERT_OK(scheduleCommand(request));
 
     const auto deadline = net().now() + Milliseconds(100);
     mock().runUntil(deadline);
@@ -301,7 +312,7 @@ TEST_F(MockNetworkTest, MockFixtureNotEnoughTimesMatched) {
     // We expect to serve the same request twice but we've only received it once so far.
     ASSERT_THROWS_CODE(mock().verifyExpectations(), DBException, (ErrorCodes::Error)5015501);
 
-    ASSERT_OK(startCommand(request));
+    ASSERT_OK(scheduleCommand(request));
 
     mock().runUntilExpectationsSatisfied();
     evaluateResponses(2 /* numExpected */);
@@ -320,8 +331,8 @@ TEST_F(MockNetworkTest, MockFixtureSequenceTestCorrectOrder) {
     RemoteCommandRequest requestTwo{kExampleRequestTwo};
 
     // Run commands in this specific order.
-    ASSERT_OK(startCommand(requestOne));
-    ASSERT_OK(startCommand(requestTwo));
+    ASSERT_OK(scheduleCommand(requestOne));
+    ASSERT_OK(scheduleCommand(requestTwo));
 
     mock().runUntilExpectationsSatisfied();
     evaluateResponses(2 /* numExpected */);
@@ -344,8 +355,8 @@ TEST_F(MockNetworkTest, MockFixtureSequenceTestOppositeOrder) {
     RemoteCommandRequest requestTwo{kExampleRequestTwo};
 
     // Run commands in this specific order.
-    ASSERT_OK(startCommand(requestTwo));
-    ASSERT_OK(startCommand(requestOne));
+    ASSERT_OK(scheduleCommand(requestTwo));
+    ASSERT_OK(scheduleCommand(requestOne));
 
     mock().runUntil(net().now() + Milliseconds(100));
 
@@ -354,7 +365,7 @@ TEST_F(MockNetworkTest, MockFixtureSequenceTestOppositeOrder) {
     ASSERT_THROWS_CODE(mock().verifyExpectations(), DBException, (ErrorCodes::Error)5015501);
 
     // Now we can send a request for expectation Two again.
-    ASSERT_OK(startCommand(requestTwo));
+    ASSERT_OK(scheduleCommand(requestTwo));
 
     mock().runUntilExpectationsSatisfied();
     evaluateResponses(3 /* numExpected */);
@@ -376,9 +387,9 @@ TEST_F(MockNetworkTest, MockFixtureSequenceTestCorrectPartialOrder) {
     RemoteCommandRequest requestThree{kExampleRequestThree};
 
     // Run commands in this specific order.
-    ASSERT_OK(startCommand(requestOne));
-    ASSERT_OK(startCommand(requestThree));
-    ASSERT_OK(startCommand(requestTwo));
+    ASSERT_OK(scheduleCommand(requestOne));
+    ASSERT_OK(scheduleCommand(requestThree));
+    ASSERT_OK(scheduleCommand(requestTwo));
 
     mock().runUntilExpectationsSatisfied();
     evaluateResponses(3 /* numExpected */);
@@ -406,10 +417,10 @@ TEST_F(MockNetworkTest, MockFixtureSequenceTestTwoSequencesNoOverlap) {
     RemoteCommandRequest requestFour{kExampleRequestFour};
 
     // Run commands in this specific order.
-    ASSERT_OK(startCommand(requestOne));
-    ASSERT_OK(startCommand(requestTwo));
-    ASSERT_OK(startCommand(requestThree));
-    ASSERT_OK(startCommand(requestFour));
+    ASSERT_OK(scheduleCommand(requestOne));
+    ASSERT_OK(scheduleCommand(requestTwo));
+    ASSERT_OK(scheduleCommand(requestThree));
+    ASSERT_OK(scheduleCommand(requestFour));
 
     mock().runUntilExpectationsSatisfied();
     evaluateResponses(4 /* numExpected */);
@@ -437,10 +448,10 @@ TEST_F(MockNetworkTest, MockFixtureSequenceTestTwoSequencesPartialOrder) {
     RemoteCommandRequest requestFour{kExampleRequestFour};
 
     // Run commands in this specific order.
-    ASSERT_OK(startCommand(requestOne));
-    ASSERT_OK(startCommand(requestThree));
-    ASSERT_OK(startCommand(requestTwo));
-    ASSERT_OK(startCommand(requestFour));
+    ASSERT_OK(scheduleCommand(requestOne));
+    ASSERT_OK(scheduleCommand(requestThree));
+    ASSERT_OK(scheduleCommand(requestTwo));
+    ASSERT_OK(scheduleCommand(requestFour));
 
     mock().runUntilExpectationsSatisfied();
     evaluateResponses(4 /* numExpected */);
@@ -463,10 +474,10 @@ TEST_F(MockNetworkTest, MockFixtureSequenceTestLongerChain) {
     RemoteCommandRequest requestFour{kExampleRequestFour};
 
     // Run commands in this specific order.
-    ASSERT_OK(startCommand(requestOne));
-    ASSERT_OK(startCommand(requestTwo));
-    ASSERT_OK(startCommand(requestThree));
-    ASSERT_OK(startCommand(requestFour));
+    ASSERT_OK(scheduleCommand(requestOne));
+    ASSERT_OK(scheduleCommand(requestTwo));
+    ASSERT_OK(scheduleCommand(requestThree));
+    ASSERT_OK(scheduleCommand(requestFour));
 
     mock().runUntilExpectationsSatisfied();
     evaluateResponses(4 /* numExpected */);

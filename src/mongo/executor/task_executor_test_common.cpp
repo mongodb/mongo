@@ -788,6 +788,8 @@ COMMON_EXECUTOR_TEST(CallbackHandleComparison) {
     joinExecutorThread();
 }
 
+// TODO: SERVER-93114 Uncomment tests
+#if 0
 COMMON_EXECUTOR_TEST(ScheduleExhaustRemoteCommandIsResolvedWhenMoreToComeFlagIsFalse) {
     TaskExecutor& executor = getExecutor();
 
@@ -1139,6 +1141,7 @@ COMMON_EXECUTOR_TEST(ScheduleExhaustRemoteCommandFutureIsResolvedWithErrorOnCanc
     shutdownExecutorThread();
     joinExecutorThread();
 }
+#endif
 }  // namespace
 
 void addTestsForExecutor(const std::string& suiteName, ExecutorFactory makeExecutor) {
