@@ -212,6 +212,8 @@ buildvariants:
     tasks:
       - name: .aggfuzzer
       - name: .change_stream_fuzzer
+      - name: .config_fuzzer .suggested_excluding_required__for_devprod_mitigation_only
+      - name: .config_fuzzer_stress .suggested_excluding_required__for_devprod_mitigation_only
       - name: .query_fuzzer
       - name: .updatefuzzer
       - name: .jstestfuzz

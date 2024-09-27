@@ -1769,6 +1769,7 @@ tasks:
         "incompatible_aubsan",
         "incompatible_debug_mode",
         "incompatible_inmemory",
+        "suggested_excluding_required__for_devprod_mitigation_only",
       ]
     commands:
       - func: "generate resmoke tasks"
@@ -1796,6 +1797,7 @@ tasks:
         "jstestfuzz",
         "non_deterministic",
         "require_npm",
+        "suggested_excluding_required__for_devprod_mitigation_only",
       ]
     commands:
       - func: "generate resmoke tasks"
@@ -1825,6 +1827,7 @@ tasks:
         "incompatible_aubsan",
         "incompatible_debug_mode",
         "incompatible_inmemory",
+        "suggested_excluding_required__for_devprod_mitigation_only",
       ]
     commands:
       - func: "generate resmoke tasks"
@@ -1871,6 +1874,7 @@ tasks:
         "config_fuzzer",
         "incompatible_inmemory",
         "incompatible_tsan",
+        "suggested_excluding_required__for_devprod_mitigation_only",
       ]
     commands:
       - func: "do setup"
@@ -1894,6 +1898,7 @@ tasks:
         "incompatible_aubsan",
         "incompatible_debug_mode",
         "incompatible_inmemory",
+        "suggested_excluding_required__for_devprod_mitigation_only",
       ]
     commands:
       - func: "generate resmoke tasks"
@@ -1942,6 +1947,7 @@ tasks:
         "incompatible_aubsan",
         "incompatible_debug_mode",
         "incompatible_inmemory",
+        "suggested_excluding_required__for_devprod_mitigation_only",
       ]
     commands:
       - func: "generate resmoke tasks"
@@ -1966,6 +1972,7 @@ tasks:
         "incompatible_tsan",
         "incompatible_aubsan",
         "incompatible_debug_mode",
+        "suggested_excluding_required__for_devprod_mitigation_only",
       ]
     commands:
       - func: "generate resmoke tasks"
@@ -1989,6 +1996,7 @@ tasks:
         "incompatible_tsan",
         "incompatible_aubsan",
         "incompatible_debug_mode",
+        "suggested_excluding_required__for_devprod_mitigation_only",
       ]
     commands:
       - func: "generate resmoke tasks"
