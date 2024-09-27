@@ -22,7 +22,7 @@ env.Library(
     source=[
         "test_utils.cpp",
         "histogram_accuracy_test_utils.cpp",
-        "histogram_predicate_estimation.cpp",
+        "histogram_estimator.cpp",
     ],
     LIBDEPS=[
         "$BUILD_DIR/mongo/db/query/stats/stats_test_utils",
@@ -35,7 +35,7 @@ env.Library(
 env.CppUnitTest(
     target="histogram_estimation_test",
     source=[
-        "histogram_predicate_estimation_test.cpp",
+        "histogram_estimator_test.cpp",
         "scalar_histogram_helpers_test.cpp",
         "array_histogram_helpers_test.cpp",
     ],

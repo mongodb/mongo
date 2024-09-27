@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#include "mongo/db/query/ce/histogram_predicate_estimation.h"
+#include "mongo/db/query/ce/histogram_estimator.h"
 #include "mongo/db/exec/sbe/values/bson.h"
 #include "mongo/db/query/ce/array_histogram_helpers.h"
 #include "mongo/db/query/ce/histogram_common.h"
@@ -36,18 +36,18 @@
 
 namespace mongo::ce {
 
-Cardinality HistogramCardinalityEstimator::estimateCardinality(const stats::ArrayHistogram& hist,
-                                                               const Cardinality collectionSize,
-                                                               const Interval& interval,
-                                                               bool includeScalar) {
+Cardinality HistogramEstimator::estimateCardinality(const stats::ArrayHistogram& hist,
+                                                    const Cardinality collectionSize,
+                                                    const Interval& interval,
+                                                    bool includeScalar) {
     // Rescales the cardinality according to the current collection size.
     return (estimateIntervalCardinality(hist, interval, includeScalar) / hist.getSampleSize()) *
         collectionSize;
 }
 
-bool HistogramCardinalityEstimator::canEstimateInterval(const stats::ArrayHistogram& hist,
-                                                        const Interval& interval,
-                                                        bool includeScalar) {
+bool HistogramEstimator::canEstimateInterval(const stats::ArrayHistogram& hist,
+                                             const Interval& interval,
+                                             bool includeScalar) {
 
     auto [startTag, startVal] = sbe::bson::convertFrom<false>(interval.start);
     auto [endTag, endVal] = sbe::bson::convertFrom<false>(interval.end);

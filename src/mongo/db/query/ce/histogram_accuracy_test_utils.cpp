@@ -35,7 +35,7 @@
 #include "mongo/db/exec/sbe/values/bson.h"
 #include "mongo/db/query/ce/array_histogram_helpers.h"
 #include "mongo/db/query/ce/histogram_accuracy_test_utils.h"
-#include "mongo/db/query/ce/histogram_predicate_estimation.h"
+#include "mongo/db/query/ce/histogram_estimator.h"
 #include "mongo/db/query/ce/scalar_histogram_helpers.h"
 #include "mongo/db/query/ce/test_utils.h"
 #include "mongo/db/query/interval.h"

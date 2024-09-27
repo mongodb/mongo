@@ -34,7 +34,7 @@
 
 namespace mongo::ce {
 
-class HistogramCardinalityEstimator {
+class HistogramEstimator {
 public:
     /**
      * Estimates the cardinality of an interval based on the provided histogram.

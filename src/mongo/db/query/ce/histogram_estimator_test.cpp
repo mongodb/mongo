@@ -31,7 +31,7 @@
 
 #include "mongo/db/query/ce/array_histogram_helpers.h"
 #include "mongo/db/query/ce/histogram_common.h"
-#include "mongo/db/query/ce/histogram_predicate_estimation.h"
+#include "mongo/db/query/ce/histogram_estimator.h"
 #include "mongo/db/query/ce/scalar_histogram_helpers.h"
 #include "mongo/db/query/ce/test_utils.h"
 #include "mongo/unittest/assert.h"
@@ -108,7 +108,7 @@ TEST(HistogramPredicateEstimationTest, IntHistogramIntervalEstimation) {
     {  // {a: {$and: [{$gte: 30}, {$lte: 40}]}}
         Interval interval(BSON("" << 30 << "" << 40), true /*startIncluded*/, true /*endIncluded*/);
         ASSERT_EQ(3.0,
-                  HistogramCardinalityEstimator::estimateCardinality(
+                  HistogramEstimator::estimateCardinality(
                       *arrHist, intCnt, interval, true /*includeScalar*/));
     }
 }
@@ -206,7 +206,7 @@ TEST(HistogramPredicateEstimationTest, StrHistogramIntervalEstimation) {
                           true,
                           true);
         ASSERT_EQ(34.0,
-                  HistogramCardinalityEstimator::estimateCardinality(
+                  HistogramEstimator::estimateCardinality(
                       *arrHist, strCnt, interval, true /*includeScalar*/));
     }
 }
@@ -369,7 +369,7 @@ TEST(HistogramPredicateEstimationTest, IntArrayOnlyIntervalEstimate) {
         Interval interval(
             BSON("" << 10 << "" << 110), false /*startIncluded*/, false /*endIncluded*/);
         ASSERT_CE_APPROX_EQUAL(24.1,
-                               HistogramCardinalityEstimator::estimateCardinality(
+                               HistogramEstimator::estimateCardinality(
                                    *arrHist, totalCnt, interval, false /*includeScalar*/),
                                0.1 /* rounding error*/);
     }
@@ -403,9 +403,9 @@ DEATH_TEST(HistogramPredicateEstimationTest,
     {  // check estimation for sbe::value::TypeTags::Boolean
         Interval interval(
             BSON("" << true << "" << true), true /*startIncluded*/, true /*endIncluded*/);
-        ASSERT_EQ(true,
-                  HistogramCardinalityEstimator::canEstimateInterval(
-                      *arrHist, interval, true /*includeScalar*/));
+        ASSERT_EQ(
+            true,
+            HistogramEstimator::canEstimateInterval(*arrHist, interval, true /*includeScalar*/));
         ASSERT_CE_APPROX_EQUAL(5, /*estimatedCard */
                                estimateIntervalCardinality(*arrHist, interval),
                                0.001 /* rounding error */);
@@ -414,9 +414,9 @@ DEATH_TEST(HistogramPredicateEstimationTest,
     {  // check estimation for sbe::value::TypeTags::Nothing
         Interval interval(
             BSON("" << BSONNULL << "" << BSONNULL), true /*startIncluded*/, true /*endIncluded*/);
-        ASSERT_EQ(true,
-                  HistogramCardinalityEstimator::canEstimateInterval(
-                      *arrHist, interval, true /*includeScalar*/));
+        ASSERT_EQ(
+            true,
+            HistogramEstimator::canEstimateInterval(*arrHist, interval, true /*includeScalar*/));
         ASSERT_CE_APPROX_EQUAL(5, /*estimatedCard ,*/
                                estimateIntervalCardinality(*arrHist, interval),
                                0.001 /* rounding error */);
@@ -425,9 +425,9 @@ DEATH_TEST(HistogramPredicateEstimationTest,
     {  // check estimation for sbe::value::TypeTags::Timestamp
         Interval interval(
             BSON("" << startTs << "" << endTs), true /*startIncluded*/, true /*endIncluded*/);
-        ASSERT_EQ(true,
-                  HistogramCardinalityEstimator::canEstimateInterval(
-                      *arrHist, interval, true /*includeScalar*/));
+        ASSERT_EQ(
+            true,
+            HistogramEstimator::canEstimateInterval(*arrHist, interval, true /*includeScalar*/));
         ASSERT_CE_APPROX_EQUAL(25, /*estimatedCard ,*/
                                estimateIntervalCardinality(*arrHist, interval),
                                0.001 /* rounding error */);
@@ -441,18 +441,18 @@ DEATH_TEST(HistogramPredicateEstimationTest,
                                           << "")),
                           true /*startIncluded*/,
                           true /*endIncluded*/);
-        ASSERT_EQ(false,
-                  HistogramCardinalityEstimator::canEstimateInterval(
-                      *arrHist, interval, true /*includeScalar*/));
+        ASSERT_EQ(
+            false,
+            HistogramEstimator::canEstimateInterval(*arrHist, interval, true /*includeScalar*/));
         ASSERT_THROWS_CODE(estimateIntervalCardinality(*arrHist, interval), DBException, 9163900);
     }
 
     {  // check estimation for [Null, true]
         Interval interval(
             BSON("" << BSONNULL << "" << true), true /*startIncluded*/, true /*endIncluded*/);
-        ASSERT_EQ(true,
-                  HistogramCardinalityEstimator::canEstimateInterval(
-                      *arrHist, interval, true /*includeScalar*/));
+        ASSERT_EQ(
+            true,
+            HistogramEstimator::canEstimateInterval(*arrHist, interval, true /*includeScalar*/));
         ASSERT_CE_APPROX_EQUAL(75, /*estimatedCard ,*/
                                estimateIntervalCardinality(*arrHist, interval),
                                0.001 /* rounding error */);
@@ -461,9 +461,9 @@ DEATH_TEST(HistogramPredicateEstimationTest,
     {  // check estimation for [false, timestamp]
         Interval interval(
             BSON("" << false << "" << endTs), true /*startIncluded*/, true /*endIncluded*/);
-        ASSERT_EQ(true,
-                  HistogramCardinalityEstimator::canEstimateInterval(
-                      *arrHist, interval, true /*includeScalar*/));
+        ASSERT_EQ(
+            true,
+            HistogramEstimator::canEstimateInterval(*arrHist, interval, true /*includeScalar*/));
         ASSERT_CE_APPROX_EQUAL(50, /*estimatedCard ,*/
                                estimateIntervalCardinality(*arrHist, interval),
                                0.001 /* rounding error */);
