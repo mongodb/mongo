@@ -763,97 +763,79 @@ void WiredTigerRecordStore::reclaimOplog(OperationContext* opCtx) {
                     "numRecords"_attr = truncateMarker->records,
                     "numBytes"_attr = truncateMarker->bytes);
 
-        WiredTigerRecoveryUnit* ru =
-            WiredTigerRecoveryUnit::get(shard_role_details::getRecoveryUnit(opCtx));
-        WT_SESSION* session = ru->getSession()->getSession();
+        getNextMarker =
+            writeConflictRetry(opCtx, "reclaimOplog", NamespaceString::kRsOplogNamespace, [&] {
+                WriteUnitOfWork wuow(opCtx);
 
-        writeConflictRetry(opCtx, "reclaimOplog", NamespaceString::kRsOplogNamespace, [&] {
-            WriteUnitOfWork wuow(opCtx);
-
-            WiredTigerCursor cwrap(
-                *WiredTigerRecoveryUnit::get(shard_role_details::getRecoveryUnit(opCtx)),
-                _uri,
-                _tableId,
-                true);
-            WT_CURSOR* cursor = cwrap.get();
-
-            // The first record in the oplog should be within the truncate range.
-            int ret = wiredTigerPrepareConflictRetry(opCtx,
-                                                     *shard_role_details::getRecoveryUnit(opCtx),
-                                                     [&] { return cursor->next(cursor); });
-            invariantWTOK(ret, cursor->session);
-            RecordId firstRecord = getKey(cursor, _keyFormat);
-            if (firstRecord < _oplog->getTruncateMarkers()->firstRecord ||
-                firstRecord > truncateMarker->lastRecord) {
-                LOGV2_WARNING(7420101,
-                              "First oplog record is not in truncation range",
-                              "firstRecord"_attr = firstRecord,
-                              "truncateRangeFirstRecord"_attr =
-                                  _oplog->getTruncateMarkers()->firstRecord,
-                              "truncateRangeLastRecord"_attr = truncateMarker->lastRecord);
-            }
-
-            // It is necessary that there exists a record after the truncate marker but before or
-            // including the mayTruncateUpTo point.  Since the mayTruncateUpTo point may fall
-            // between records, the truncate marker check is not sufficient.
-            CursorKey truncateUpToKey = makeCursorKey(truncateMarker->lastRecord, _keyFormat);
-            setKey(cursor, &truncateUpToKey);
-            int cmp;
-            ret = wiredTigerPrepareConflictRetry(opCtx,
-                                                 *shard_role_details::getRecoveryUnit(opCtx),
-                                                 [&] { return cursor->search_near(cursor, &cmp); });
-            invariantWTOK(ret, cursor->session);
-
-            // Check 'cmp' to determine if we landed on the requested record. While it is often the
-            // case that truncate markers represent a perfect partitioning of the oplog, it's not
-            // guaranteed.  The truncation method is lenient to overlapping truncate markers. See
-            // SERVER-56590 for details.  If we landed land on a higher record (cmp > 0), we likely
-            // truncated a duplicate truncate marker in a previous iteration. In this case we can
-            // skip the check for oplog entries after the truncate marker we are truncating. If we
-            // landed on a prior record, then we have records that are not in truncation range of
-            // any truncate marker. This will have been logged as a warning, above.
-            if (cmp <= 0) {
-                ret = wiredTigerPrepareConflictRetry(opCtx,
-                                                     *shard_role_details::getRecoveryUnit(opCtx),
-                                                     [&] { return cursor->next(cursor); });
-                if (ret == WT_NOTFOUND) {
-                    LOGV2_DEBUG(5140900, 0, "Will not truncate entire oplog");
-                    getNextMarker = false;
-                    return;
+                auto seekableCursor =
+                    std::make_unique<WiredTigerRecordStoreCursor>(opCtx, *this, true);
+                auto firstRecordSeekable = seekableCursor->next();
+                if (!firstRecordSeekable) {
+                    LOGV2_WARNING(8841100, "The oplog is empty, there is nothing to truncate");
+                    return false;
                 }
-                invariantWTOK(ret, cursor->session);
-            }
-            RecordId nextRecord = getKey(cursor, _keyFormat);
-            if (static_cast<std::uint64_t>(nextRecord.getLong()) > mayTruncateUpTo.asULL()) {
-                LOGV2_DEBUG(
-                    5140901,
-                    0,
-                    "Cannot truncate as there are no oplog entries after the truncate marker but "
-                    "before the truncate-up-to point",
-                    "nextRecord"_attr = Timestamp(nextRecord.getLong()),
-                    "mayTruncateUpTo"_attr = mayTruncateUpTo);
-                getNextMarker = false;
-                return;
-            }
+                auto firstRecordId = firstRecordSeekable.get().id;
 
-            // After checking whether or not we should truncate, reposition the cursor back to the
-            // current truncate marker's lastRecord.
-            invariantWTOK(cursor->reset(cursor), cursor->session);
-            setKey(cursor, &truncateUpToKey);
-            invariantWTOK(session->truncate(session, nullptr, nullptr, cursor, nullptr), session);
-            _changeNumRecordsAndDataSize(opCtx, -truncateMarker->records, -truncateMarker->bytes);
+                // The first record in the oplog should be within the truncate range.
+                if (firstRecordId < _oplog->getTruncateMarkers()->firstRecord ||
+                    firstRecordId > truncateMarker->lastRecord) {
+                    LOGV2_WARNING(7420101,
+                                  "First oplog record is not in truncation range",
+                                  "firstRecord"_attr = firstRecordId,
+                                  "truncateRangeFirstRecord"_attr =
+                                      _oplog->getTruncateMarkers()->firstRecord,
+                                  "truncateRangeLastRecord"_attr = truncateMarker->lastRecord);
+                }
 
-            wuow.commit();
+                // It is necessary that there exists a record after the truncate marker but before
+                // or including the mayTruncateUpTo point.  Since the mayTruncateUpTo point may fall
+                // between records, the truncate marker check is not sufficient.
+                auto nextRecordAfterTruncateMarker = seekableCursor->seek(
+                    truncateMarker->lastRecord, SeekableRecordCursor::BoundInclusion::kExclude);
+                if (!nextRecordAfterTruncateMarker) {
+                    LOGV2_DEBUG(5140900, 0, "Will not truncate entire oplog");
+                    return false;
+                }
 
-            // Remove the truncate marker after a successful truncation.
-            _oplog->getTruncateMarkers()->popOldestMarker();
+                if (static_cast<std::uint64_t>(nextRecordAfterTruncateMarker->id.getLong()) >
+                    mayTruncateUpTo.asULL()) {
+                    LOGV2_DEBUG(5140901,
+                                0,
+                                "Cannot truncate as there are no oplog entries after the truncate "
+                                "marker but "
+                                "before the truncate-up-to point",
+                                "nextRecord"_attr =
+                                    Timestamp(nextRecordAfterTruncateMarker->id.getLong()),
+                                "mayTruncateUpTo"_attr = mayTruncateUpTo);
+                    return false;
+                }
 
-            // Stash the truncate point for next time to cleanly skip over tombstones, etc.
-            _oplog->getTruncateMarkers()->firstRecord = truncateMarker->lastRecord;
-            Timestamp firstRecordTimestamp{
-                static_cast<uint64_t>(truncateMarker->lastRecord.getLong())};
-            _oplog->getFirstRecordTimestamp().store(firstRecordTimestamp);
-        });
+                auto status = WiredTigerRecordStore::doRangeTruncate(opCtx,
+                                                                     RecordId(),
+                                                                     truncateMarker->lastRecord,
+                                                                     -truncateMarker->bytes,
+                                                                     -truncateMarker->records);
+
+                if (!status.isOK()) {
+                    LOGV2_WARNING(8841101,
+                                  "Did not successfully perform range truncation ",
+                                  "truncateMarkerLastRecord"_attr =
+                                      truncateMarker->lastRecord.getLong(),
+                                  "error"_attr = status);
+                    return false;
+                }
+                wuow.commit();
+
+                // Remove the truncate marker after a successful truncation.
+                _oplog->getTruncateMarkers()->popOldestMarker();
+
+                // Stash the truncate point for next time to cleanly skip over tombstones, etc.
+                _oplog->getTruncateMarkers()->firstRecord = truncateMarker->lastRecord;
+                Timestamp firstRecordTimestamp{
+                    static_cast<uint64_t>(truncateMarker->lastRecord.getLong())};
+                _oplog->getFirstRecordTimestamp().store(firstRecordTimestamp);
+                return true;
+            });
     }
 
     auto elapsedMicros = timer.micros();

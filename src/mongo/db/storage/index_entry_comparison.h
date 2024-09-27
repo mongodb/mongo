@@ -241,25 +241,21 @@ public:
      *
      * `isForward` and `inclusive` together decide which discriminator we will put into the
      * KeyString. This logic is closely related to how WiredTiger uses its API
-     * (search_near/prev/next) to do the seek. Other storage engines' SortedDataInterface should use
+     * (prev/next) to do the seek. Other storage engines' SortedDataInterface should use
      * the discriminator to deduce the `inclusive` and the use their own ways to seek to the right
      * position.
      *
      * 1. When isForward == true, inclusive == true, bsonKey will be encoded with kExclusiveBefore
-     * (which is less than bsonKey). WT's search_near() could land either on the previous key or
-     * bsonKey. WT will selectively call next() if it's on the previous key.
+     * (which is less than bsonKey).
      *
      * 2. When isForward == true, inclusive == false, bsonKey will be encoded with kExclusiveAfter
-     * (which is greater than bsonKey). WT's search_near() could land either on bsonKey or the next
-     * key. WT will selectively call next() if it's on bsonKey.
+     * (which is greater than bsonKey).
      *
      * 3. When isForward == false, inclusive == true, bsonKey will be encoded with kExclusiveAfter
-     * (which is greater than bsonKey). WT's search_near() could land either on bsonKey or the next
-     * key. WT will selectively call prev() if it's on the next key.
+     * (which is greater than bsonKey).
      *
      * 4. When isForward == false, inclusive == false, bsonKey will be encoded with kExclusiveBefore
-     * (which is less than bsonKey). WT's search_near() could land either on the previous key or the
-     * bsonKey. WT will selectively call prev() if it's on bsonKey.
+     * (which is less than bsonKey).
      */
     static StringData makeKeyStringFromBSONKeyForSeek(const BSONObj& bsonKey,
                                                       Ordering ord,

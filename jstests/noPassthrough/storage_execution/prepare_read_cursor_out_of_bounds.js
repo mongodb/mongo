@@ -4,11 +4,10 @@
  *
  * Create an index with a single key, "a". Insert a new key for "b" in a prepared transaction. This
  * creates a prepared, but uncommitted index entry before the key we want to search for, "c", which
- * doesn't exist. We will query (search_near internally) for "c" and the cursor will initially land
- * on "a". This is less than they key were searching for, so the cursor is advanced to the next key,
- * expecting to land on something greater than or equal to "c". Before this happens, the prepared
- * transaction commits, making "b" visible. Ensure that the cursor does not return "b" even though
- * we queried for "c".
+ * doesn't exist. We will query for "c" and the cursor will initially land on "a". This is less than
+ * they key were searching for, so the cursor is advanced to the next key, expecting to land on
+ * something greater than or equal to "c". Before this happens, the prepared transaction commits,
+ * making "b" visible. Ensure that the cursor does not return "b" even though we queried for "c".
  *
  * @tags: [
  *   requires_replication,
