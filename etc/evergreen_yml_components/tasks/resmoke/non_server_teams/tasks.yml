@@ -132,7 +132,7 @@ tasks:
     tags:
       [
         "assigned_to_jira_team_devprod_correctness",
-        "release_critical",
+        "development_critical",
         "requires_compile_variant",
         "requires_execution_on_windows_patch_build",
       ]
