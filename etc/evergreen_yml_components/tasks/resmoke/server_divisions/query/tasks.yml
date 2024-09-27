@@ -1221,22 +1221,6 @@ tasks:
       - func: "run tests"
 
   - <<: *benchmark_template
-    name: benchmarks_abt
-    tags:
-      [
-        "assigned_to_jira_team_server_query_optimization",
-        "experimental",
-        "benchmarks",
-      ]
-    commands:
-      - func: "do benchmark setup"
-      - func: "run benchmark tests"
-        vars:
-          suites: benchmarks_abt
-          exec_timeout_secs: 18000 # 5 hour timeout.
-          resmoke_jobs_max: 1
-
-  - <<: *benchmark_template
     name: benchmarks_abt_lowering
     tags:
       [
