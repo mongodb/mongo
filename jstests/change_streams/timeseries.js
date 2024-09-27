@@ -117,6 +117,12 @@ let expectedChanges = [
     },
     {
         "operationType": "create",
+        "ns": {"db": dbName, "coll": "system.views"},
+        "operationDescription":
+            {"idIndex": {"v": 2, "key": {"_id": 1}, "name": "_id_"}, "type": "collection"}
+    },
+    {
+        "operationType": "create",
         "ns": {"db": dbName, "coll": collName},
         "operationDescription": {
             "viewOn": bucketsCollName,
@@ -290,7 +296,7 @@ let expectedChanges = [
 ];
 
 if (FeatureFlagUtil.isPresentAndEnabled(testDB, "TSBucketingParametersUnchanged")) {
-    expectedChanges[9].stateBeforeChange.collectionOptions.storageEngine = {
+    expectedChanges[10].stateBeforeChange.collectionOptions.storageEngine = {
         "wiredTiger":
             {"configString": "app_metadata=(timeseriesBucketingParametersHaveChanged=true)"}
     };
@@ -298,7 +304,7 @@ if (FeatureFlagUtil.isPresentAndEnabled(testDB, "TSBucketingParametersUnchanged"
 
 if (TimeseriesTest.timeseriesAlwaysUseCompressedBucketsEnabled(db)) {
     // Check for compressed bucket changes when using always compressed buckets.
-    expectedChanges[4] = {
+    expectedChanges[5] = {
         "operationType": "insert",
         "fullDocument": {
             "control": {
@@ -316,7 +322,7 @@ if (TimeseriesTest.timeseriesAlwaysUseCompressedBucketsEnabled(db)) {
         "ns": {"db": dbName, "coll": bucketsCollName}
 
     };
-    expectedChanges[5] = {
+    expectedChanges[6] = {
         "operationType": "update",
         "updateDescription": {
             "updatedFields": {
