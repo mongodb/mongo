@@ -42,7 +42,8 @@ export var FeatureFlagUtil = (function() {
             // should guarantee that subsequent operations on the connection are retried in the
             // event of network errors in suites where that possibility exists.
             retryOnRetryableError(() => {
-                conn = new Mongo(FixtureHelpers.getAllReplicas(db)[0].getURL());
+                conn = new Mongo(
+                    FixtureHelpers.getAllReplicas(db)[0].getURL(), undefined, {gRPC: false});
             });
         };
         try {

@@ -18,7 +18,7 @@ MongoRunner.validateCollectionsCallback = function(port, options) {
 
     let conn;
     try {
-        conn = new Mongo("localhost:" + port);
+        conn = new Mongo("localhost:" + port, undefined, {gRPC: false});
     } catch (e) {
         print("Skipping collection validation because we couldn't establish a connection to the" +
               " server on port " + port);

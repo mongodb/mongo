@@ -235,8 +235,8 @@ buildvariants:
 
   - <<: *generic_linux_compile_params
     name: &linux-x86-dynamic-grpc-suggested linux-x86-dynamic-grpc-suggested
-    display_name: "* Linux x86 Shared Library Enterprise with GRPC"
-    tags: ["suggested"]
+    display_name: "~ Linux x86 Shared Library Enterprise with GRPC"
+    cron: "0 0 * * 0" # Once a week on Sunday
     stepback: false
     expansions:
       <<: *generic_linux_compile_expansions
@@ -268,7 +268,7 @@ buildvariants:
       - name: generate_buildid_to_debug_symbols_mapping
       # sharding_uninitialized_fcv_jscore_passthrough_gen spawns too many connections
       # and processes to be used with TLS on a single host.
-      - name: .jscore .common !sharding_uninitialized_fcv_jscore_passthrough_gen !.auth !.sharding !.txns
+      - name: .jscore .common !sharding_uninitialized_fcv_jscore_passthrough_gen !embedded_router_jscore_passthrough_with_balancer_gen !.auth !.txns
       - name: .lint
       - name: libdeps_graph_linting
         distros:

@@ -1116,7 +1116,7 @@ class ReplicaSetFixture(interface.ReplFixture, interface._DockerComposeInterface
                 conn_strs.append(self.initial_sync_node.get_internal_connection_string())
             return "mongodb://" + ",".join(conn_strs) + "/?replicaSet=" + self.replset_name
         else:
-            # We return a direct connection to the expected pimary when only the first node is
+            # We return a direct connection to the expected primary when only the first node is
             # electable because we want the client to error out if a stepdown occurs.
             return self.nodes[0].get_driver_connection_url()
 

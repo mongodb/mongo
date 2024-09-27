@@ -403,6 +403,9 @@ def mongo_shell_program(
     if "eval_prepend" in kwargs:
         eval_sb.append(str(kwargs.pop("eval_prepend")))
 
+    if config.SHELL_GRPC:
+        eval_sb.append('await import("jstests/libs/override_methods/enable_grpc_on_connect.js")')
+
     # If nodb is specified, pass the connection string through TestData so it can be used inside the
     # test, then delete it so it isn't given as an argument to the mongo shell.
     if "nodb" in kwargs and connection_string is not None:

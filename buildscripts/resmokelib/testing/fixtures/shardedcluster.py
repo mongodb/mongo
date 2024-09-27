@@ -405,33 +405,53 @@ class ShardedClusterFixture(interface.Fixture, interface._DockerComposeInterface
 
         return ",".join([mongos.get_internal_connection_string() for mongos in self.mongos])
 
+    def get_shell_connection_string(self):
+        if self.mongos is None:
+            raise ValueError("Must call setup() before calling get_shell_connection_string()")
+
+        return ",".join([mongos.get_shell_connection_string() for mongos in self.mongos])
+
+    def _get_replica_set_endpoint(self):
+        # The replica set endpoint would only become active after the replica set has become a
+        # config shard (i.e. after the addShard or transitionFromConfigServer step) so before
+        # that we must connect to a mongos or the router port of a mongod to run sharding
+        # commands.
+        if len(self.shards) == 0:
+            raise ValueError(
+                "Must call install_rs_shard() before calling get_internal_connection_string()"
+            )
+        if len(self.shards) > 1:
+            raise ValueError("Cannot use replica set endpoint on a multi-shard cluster")
+        return self.shards[0]
+
+    def _get_embedded_router(self):
+        # If the embedded router is enabled, we must have a mongos placed in a node acting as a
+        # configsvr.
+        config_mongos = next((mongos for mongos in self.mongos if mongos.is_from_configsvr()), None)
+        if config_mongos:
+            return config_mongos
+        else:
+            raise ValueError(
+                "Cannot use the embedded router mode without opening the routerPort of the configsvr"
+            )
+
+    def get_shell_connection_url(self):
+        """Return the driver connection URL."""
+        if self.is_ready and self.replica_endpoint_mode:
+            return self._get_replica_set_endpoint().get_shell_connection_url()
+
+        if self.embedded_router_mode:
+            return self._get_embedded_router().get_shell_connection_url()
+
+        return "mongodb://" + self.get_shell_connection_string()
+
     def get_driver_connection_url(self):
         """Return the driver connection URL."""
         if self.is_ready and self.replica_endpoint_mode:
-            # The replica set endpoint would only become active after the replica set has become a
-            # config shard (i.e. after the addShard or transitionFromConfigServer step) so before
-            # that we must connect to a mongos or the router port of a mongod to run sharding
-            # commands.
-            if len(self.shards) == 0:
-                raise ValueError(
-                    "Must call install_rs_shard() before calling get_internal_connection_string()"
-                )
-            if len(self.shards) > 1:
-                raise ValueError("Cannot use replica set endpoint on a multi-shard cluster")
-            return self.shards[0].get_driver_connection_url()
+            return self._get_replica_set_endpoint().get_driver_connection_url()
 
         if self.embedded_router_mode:
-            # If the embedded router is enabled, we must have a mongos placed in a node acting as a
-            # configsvr.
-            config_mongos = next(
-                (mongos for mongos in self.mongos if mongos.is_from_configsvr()), None
-            )
-            if config_mongos:
-                return config_mongos.get_driver_connection_url()
-            else:
-                raise ValueError(
-                    "Cannot use the embedded router mode without opening the routerPort of the configsvr"
-                )
+            return self._get_embedded_router().get_driver_connection_url()
 
         return "mongodb://" + self.get_internal_connection_string()
 
@@ -780,7 +800,8 @@ class _MongoSFixture(interface.Fixture, interface._DockerComposeInterface):
         self.port = fixturelib.get_next_port(job_num)
         self.mongos_options["port"] = self.port
         if "featureFlagGRPC" in self.config.ENABLED_FEATURE_FLAGS:
-            self.mongos_options["grpcPort"] = fixturelib.get_next_port(job_num)
+            self.grpcPort = fixturelib.get_next_port(job_num)
+            self.mongos_options["grpcPort"] = self.grpcPort
 
         self._dbpath_prefix = dbpath_prefix
 
@@ -925,9 +946,12 @@ class _MongoSFixture(interface.Fixture, interface._DockerComposeInterface):
         """Return the internal connection string."""
         return f"{self._get_hostname()}:{self.port}"
 
-    def get_shell_connection_url(self):
+    def get_shell_connection_string(self):
         port = self.port if not self.config.SHELL_GRPC else self.grpcPort
         return f"{self._get_hostname()}:{port}"
+
+    def get_shell_connection_url(self):
+        return "mongodb://" + self.get_shell_connection_string()
 
     def get_driver_connection_url(self):
         """Return the driver connection URL."""

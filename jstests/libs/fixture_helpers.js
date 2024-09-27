@@ -175,13 +175,12 @@ export var FixtureHelpers = (function() {
      * functions. If the fixture is a standalone, will run the function on the database directly.
      */
     function mapOnEachShardNode({db, func, primaryNodeOnly}) {
-        function getRequestedConns(host) {
-            const conn = new Mongo(host);
+        function getRequestedConns(conn) {
             const isMaster = conn.getDB("test").isMaster();
 
             if (isMaster.hasOwnProperty("setName")) {
                 // It's a repl set.
-                const rs = new ReplSetTest(host);
+                const rs = new ReplSetTest(isMaster.me);
                 return primaryNodeOnly ? [rs.getPrimary()] : rs.nodes;
             } else {
                 // It's a standalone.
@@ -194,10 +193,12 @@ export var FixtureHelpers = (function() {
             const shardObjs = db.getSiblingDB("config").shards.find().sort({_id: 1}).toArray();
 
             for (let shardObj of shardObjs) {
-                connList = connList.concat(getRequestedConns(shardObj.host));
+                connList = connList.concat(
+                    getRequestedConns(new Mongo(shardObj.host, undefined, {gRPC: false})));
             }
         } else {
-            connList = connList.concat(getRequestedConns(db.getMongo().host));
+            connList = getRequestedConns(
+                new Mongo(db.getMongo().host, undefined, {gRPC: db.getMongo().isGRPC()}));
         }
 
         return connList.map((conn) => func(conn.getDB(db.getName())));
@@ -237,7 +238,7 @@ export var FixtureHelpers = (function() {
         configDB.databases.find().forEach(function(dbObj) {
             if (dbObj._id === db.getName()) {
                 const shardObj = configDB.shards.findOne({_id: dbObj.primary});
-                shardConn = new Mongo(shardObj.host);
+                shardConn = new Mongo(shardObj.host, undefined, {gRPC: false});
             }
         });
         assert.neq(null, shardConn, "could not find shard hosting database " + db.getName());

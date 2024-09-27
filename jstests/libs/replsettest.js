@@ -3188,11 +3188,15 @@ function _constructStartNewInstances(rst, opts) {
     }
 }
 
+function _newMongo(host) {
+    return new Mongo(host, undefined, {gRPC: false});
+}
+
 /**
  * Constructor, which instantiates the ReplSetTest object from an existing set.
  */
 function _constructFromExistingSeedNode(rst, seedNode) {
-    const conn = new Mongo(seedNode);
+    const conn = _newMongo(seedNode);
     if (jsTest.options().keyFile) {
         rst.keyFile = jsTest.options().keyFile;
     }
@@ -3204,7 +3208,7 @@ function _constructFromExistingSeedNode(rst, seedNode) {
     rst.nodes = existingNodes.map(node => {
         // Note: the seed node is required to be operational in order for the Mongo
         // shell to connect to it. In this code there is no fallback to other nodes.
-        let conn = new Mongo(node);
+        let conn = _newMongo(node);
         conn.name = conn.host;
         return conn;
     });
@@ -3235,7 +3239,7 @@ function _constructFromExistingNodes(rst, {
 
     let i = 0;
     rst.nodes = nodeHosts.map((node) => {
-        const conn = Mongo(node);
+        const conn = _newMongo(node);
         conn.name = conn.host;
         conn.port = node.split(':')[1];
         if (pidValue !== undefined && pidValue[i] !== undefined) {

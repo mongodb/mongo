@@ -98,6 +98,9 @@ public:
     bool hasActiveSessions() const override;
     void checkMaxOpenSessionsAtStartup() const override;
     void endAllSessions(Client::TagMask tags) override;
+    const std::vector<std::unique_ptr<TransportLayer>>& getTransportLayers() const override {
+        return _tls;
+    }
 
 private:
     /**

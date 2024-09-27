@@ -46,3 +46,7 @@ structs:
         description: "TLS configuration options"
         type: ClientTLSParameters
         optional: true
+      gRPC:
+        description: "Set if the shell should use gRPC to connect"
+        type: bool
+        optional: true

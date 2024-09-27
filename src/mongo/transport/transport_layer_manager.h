@@ -69,6 +69,20 @@ public:
     virtual void appendStatsForFTDC(BSONObjBuilder& bob) const = 0;
 
     virtual TransportLayer* getEgressLayer() = 0;
+    virtual const std::vector<std::unique_ptr<TransportLayer>>& getTransportLayers() const = 0;
+
+    /**
+     * Returns the first transport layer of type T in the transport layers list.
+     */
+    template <class T>
+    T* getFirstTransportLayer() const {
+        for (auto& tl : getTransportLayers()) {
+            if (auto layer = dynamic_cast<T*>(tl.get())) {
+                return layer;
+            }
+        }
+        return nullptr;
+    }
 
 #ifdef MONGO_CONFIG_SSL
     virtual Status rotateCertificates(std::shared_ptr<SSLManagerInterface> manager,

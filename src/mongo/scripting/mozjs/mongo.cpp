@@ -762,6 +762,12 @@ void MongoExternalInfo::construct(JSContext* cx, JS::CallArgs args) {
         }
     }
 
+#ifdef MONGO_CONFIG_GRPC
+    if (mongoShellOptions.getGRPC()) {
+        cs.setIsGRPC(mongoShellOptions.getGRPC().get());
+    }
+#endif
+
     boost::optional<TransientSSLParams> transientSSLParams;
     if (mongoShellOptions.getTls() && mongoShellOptions.getTls()->getCreateNewConnection()) {
         // Empty tls options to create a new connection.

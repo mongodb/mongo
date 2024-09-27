@@ -267,6 +267,10 @@ public:
 
     // TODO: SERVER-80343 Remove this ifdef once gRPC is compiled on all variants
 #ifdef MONGO_CONFIG_GRPC
+    void setIsGRPC(bool isGRPC) {
+        _gRPC = isGRPC;
+    }
+
     bool isGRPC() const {
         return _gRPC.get_value_or(false);
     }

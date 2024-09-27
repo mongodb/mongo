@@ -829,32 +829,37 @@ int mongo_main(int argc, char* argv[]) {
         parsedURI.setOptionIfNecessary("gRPC"s, shellGlobalParams.gRPC ? "true" : "false");
 #endif
 
-        // Configure the correct TL based on URI options.
-        std::unique_ptr<transport::TransportLayer> tl;
-#ifdef MONGO_CONFIG_GRPC
-        if (parsedURI.isGRPC() || shellGlobalParams.gRPC) {
-            // Create the client metadata.
-            boost::optional<std::string> appname = parsedURI.getAppName();
-            BSONObjBuilder bob;
-            uassertStatusOK(DBClientSession::appendClientMetadata(
-                appname.value_or(MongoURI::kDefaultTestRunnerAppName), &bob));
-            auto metadataDoc = bob.obj();
+        std::vector<std::unique_ptr<transport::TransportLayer>> tls;
 
-            transport::grpc::GRPCTransportLayer::Options grpcOpts;
-            grpcOpts.enableEgress = true;
-            grpcOpts.clientMetadata = metadataDoc.getObjectField(kMetadataDocumentName).getOwned();
-            tl = std::make_unique<transport::grpc::GRPCTransportLayerImpl>(
-                serviceContext, grpcOpts, nullptr);
-        } else
+        // Create the ASIO transport layer.
+        transport::AsioTransportLayer::Options opts;
+        opts.enableIPv6 = shellGlobalParams.enableIPv6;
+        opts.mode = transport::AsioTransportLayer::Options::kEgress;
+        tls.push_back(std::make_unique<transport::AsioTransportLayer>(opts, nullptr));
+        auto asioLayer = tls[0].get();
+
+#ifdef MONGO_CONFIG_GRPC
+        // If built with gRPC support, the shell will always start an egress gRPC layer in addition
+        // to the asio one. It will decide at runtime during Mongo construction which layer to use
+        // based on the options/URI provided to it.
+
+        // Create the gRPC client metadata.
+        boost::optional<std::string> appname = parsedURI.getAppName();
+        BSONObjBuilder bob;
+        uassertStatusOK(DBClientSession::appendClientMetadata(
+            appname.value_or(MongoURI::kDefaultTestRunnerAppName), &bob));
+        auto metadataDoc = bob.obj();
+
+        // Create the gRPC transport layer.
+        transport::grpc::GRPCTransportLayer::Options grpcOpts;
+        grpcOpts.enableEgress = true;
+        grpcOpts.clientMetadata = metadataDoc.getObjectField(kMetadataDocumentName).getOwned();
+        tls.push_back(std::make_unique<transport::grpc::GRPCTransportLayerImpl>(
+            serviceContext, grpcOpts, nullptr));
 #endif
-        {
-            transport::AsioTransportLayer::Options opts;
-            opts.enableIPv6 = shellGlobalParams.enableIPv6;
-            opts.mode = transport::AsioTransportLayer::Options::kEgress;
-            tl = std::make_unique<transport::AsioTransportLayer>(opts, nullptr);
-        }
+
         serviceContext->setTransportLayerManager(
-            std::make_unique<transport::TransportLayerManagerImpl>(std::move(tl)));
+            std::make_unique<transport::TransportLayerManagerImpl>(std::move(tls), asioLayer));
 
         auto tlPtr = serviceContext->getTransportLayerManager();
         uassertStatusOK(tlPtr->setup());

@@ -10,7 +10,7 @@ const topology = DiscoverTopology.findConnectedNodes(db.getMongo());
 const hostList = [];
 
 if (topology.type === Topology.kStandalone) {
-    hostList.push(topology.mongod);
+    hostList.push(db.getMongo().host);
 } else if (topology.type === Topology.kReplicaSet) {
     hostList.push(...topology.nodes);
     new ReplSetTest(topology.nodes[0]).awaitSecondaryNodes();

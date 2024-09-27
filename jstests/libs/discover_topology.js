@@ -8,7 +8,10 @@ export var Topology = {
 };
 
 export var DiscoverTopology = (function() {
-    const kDefaultConnectFn = (host) => new Mongo(host);
+    const kDefaultConnectFn = (host) => new Mongo(host, undefined, {gRPC: false});
+    // Nodes discovered via isMaster have a MongoRPC port and must not use gRPC.
+    const kDisableGRPCConnString = (hostConn) =>
+        jsTestOptions().shellGRPC ? `mongodb://${hostConn}/?grpc=false` : hostConn;
 
     function getDataMemberConnectionStrings(conn) {
         const res = assert.commandWorked(conn.adminCommand({isMaster: 1}));
@@ -24,8 +27,8 @@ export var DiscoverTopology = (function() {
         return {
             type: Topology.kReplicaSet,
             configsvr: res.configsvr == 2,
-            primary: res.primary,
-            nodes: [...res.hosts, ...res.passives]
+            primary: kDisableGRPCConnString(res.primary),
+            nodes: [...res.hosts, ...res.passives].map(host => kDisableGRPCConnString(host))
         };
     }
 
