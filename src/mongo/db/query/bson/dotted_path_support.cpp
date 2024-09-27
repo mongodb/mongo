@@ -204,6 +204,16 @@ BSONObj extractElementsBasedOnTemplate(const BSONObj& obj,
     return b.obj();
 }
 
+BSONObj extractNullForAllFieldsBasedOnTemplate(const BSONObj& pattern) {
+    BSONObjBuilder b;
+    BSONObjIterator i(pattern);
+    while (i.more()) {
+        BSONElement e = i.next();
+        b.appendNull(e.fieldNameStringData());
+    }
+    return b.obj();
+}
+
 int compareObjectsAccordingToSort(const BSONObj& firstObj,
                                   const BSONObj& secondObj,
                                   const BSONObj& sortKey,

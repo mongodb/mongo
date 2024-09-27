@@ -47,6 +47,8 @@
 #include "mongo/bson/json.h"
 #include "mongo/bson/util/builder.h"
 #include "mongo/bson/util/builder_fwd.h"
+#include "mongo/db/exec/document_value/document.h"
+#include "mongo/db/exec/document_value/value.h"
 #include "mongo/db/query/bson/dotted_path_support.h"
 #include "mongo/unittest/assert.h"
 #include "mongo/unittest/bson_test_util.h"
@@ -100,6 +102,85 @@ TEST(DottedPathSupport, ExtractElementsBasedOnTemplate) {
                   .firstElement()
                   .fieldNameStringData(),
               "a");
+}
+
+/**
+ * We added dps::extractNullForAllFieldsBasedOnTemplate() to avoid some allocations inside
+ * $sortArray. It is used instead of extractElementsBasedOnTemplate(). Before the change, when
+ * $sortArray compared Values, it would first perform a Value to BSON transformation, then use
+ * extractElementsBasedOnTemplate() to produce the BSON document to be used for the comparison.
+ *
+ * For non-document 'Value's, all field accesses in extractElementsBasedOnTemplate() are null.
+ *
+ * To avoid the dummy BSON document allocation, we directly transforms Values into the BSON document
+ * with null values for each field.
+ *
+ * This test asserts these two processes produce the same BSON document, so as to not change sort
+ * orders in sorted arrays.
+ */
+TEST(DottedPathSupport, ExtractElementsFromValueAndBSONObjBasedOnTemplate) {
+    auto compareExtractFromValueWithExtractFromBson = [](Value&& v, BSONObj&& pattern) {
+        BSONObj lhs = dps::extractElementsBasedOnTemplate(v.isObject() ? v.getDocument().toBson()
+                                                                       : v.wrap(""),
+                                                          pattern,
+                                                          true /*useNullIfMissing*/);
+        BSONObj rhs = v.isObject() ? lhs : dps::extractNullForAllFieldsBasedOnTemplate(pattern);
+        return lhs.woCompare(rhs);
+    };
+    ASSERT_EQ(compareExtractFromValueWithExtractFromBson(Value(true), fromjson("{a: 1}")), 0);
+    ASSERT_EQ(compareExtractFromValueWithExtractFromBson(Value(true), fromjson("{}")), 0);
+    ASSERT_EQ(compareExtractFromValueWithExtractFromBson(Value(2), fromjson("{a: 1}")), 0);
+    ASSERT_EQ(
+        compareExtractFromValueWithExtractFromBson(Value(std::string("a")), fromjson("{a: 1}")), 0);
+    std::vector<std::string> jsons = {
+        "{a: 1, b: 1}",
+        "{a: 2, b: 1}",
+        "{a: [1, 2]}",
+        "{a: []}",
+        "{a: [{b:1}, {b:2}]}",
+        "{a: [{b:1}, {}]}",
+        "{a: null, b: 1}",
+        "{a: null}",
+        "{a: {a: []}}",
+        "{a: {a: {a: []}}}",
+        "{a: {a: {a: [null]}}}",
+        "{a: {a: {a: [{a: 1}, {b: 1}]}}}",
+        "{a: {a: {a: null}}}",
+        "{a: {a: {b: []}}}",
+        "{a: {a: {b: [null]}}}",
+        "{a: {a: {b: [{a: 1}, {b: 1}]}}}",
+        "{a: {a: {b: null}}}",
+        "{a: {b: {a: []}}}",
+        "{a: {b: {a: [null]}}}",
+        "{a: {b: {a: [{a: 1}, {b: 1}]}}}",
+        "{a: {b: {a: null}}}",
+        "{b: {a: {b: []}}}",
+        "{b: {a: {b: [null]}}}",
+        "{b: {a: {b: [{a: 1}, {b: 1}]}}}",
+        "{b: {a: {b: null}}}",
+        "{b: {b: {a: []}}}",
+        "{b: {b: {a: [null]}}}",
+        "{b: {b: {a: [{a: 1}, {b: 1}]}}}",
+        "{b: {b: {a: null}}}",
+        "{a: {a: []}}",
+        "{a: {a: [null]}}",
+        "{a: {a: [{}]}}",
+        "{a: {a: null}}",
+        "{a: {b: 1}, c: 1}",
+        "{a: {b: 1}}",
+        "{a: {b: 1}}",
+        "{a: {}}",
+        "{}",
+    };
+    for (const std::string& lhs : jsons) {
+        for (const std::string& rhs : jsons) {
+            ASSERT_EQ(
+                compareExtractFromValueWithExtractFromBson(Value(fromjson(lhs)), fromjson(rhs)), 0);
+            ASSERT_EQ(compareExtractFromValueWithExtractFromBson(
+                          Value({fromjson(lhs), fromjson(rhs)}), fromjson(rhs)),
+                      0);
+        }
+    }
 }
 
 void dumpBSONElementSet(const BSONElementSet& elements, StringBuilder* sb) {

@@ -52,9 +52,9 @@ namespace mongo {
 
 namespace {
 
-BSONArray rangeBSONArray(int count) {
+BSONArray rangeBSONArray(int start, int end) {
     BSONArrayBuilder builder;
-    for (int i = 0; i < count; i++) {
+    for (int i = start; i < end; i++) {
         builder.append(std::to_string(i));
     }
     return builder.arr();
@@ -123,7 +123,7 @@ void ExpressionBenchmarkFixture::noOpBenchmark(benchmark::State& state) {
  *   {"_id": ObjectId(...), "array": ["0", "1", "2", "3", "4", "5", "6", "7", "8", "9"]}
  */
 void ExpressionBenchmarkFixture::benchmarkArrayArrayElemAt0(benchmark::State& state) {
-    BSONArray array = rangeBSONArray(10);
+    BSONArray array = rangeBSONArray(0, 10);
 
     benchmarkExpression(BSON("$arrayElemAt" << BSON_ARRAY("$array" << 0)),
                         state,
@@ -137,7 +137,7 @@ void ExpressionBenchmarkFixture::benchmarkArrayArrayElemAt0(benchmark::State& st
  *   {"_id": ObjectId(...), "array": ["0", "1", "2", "3", "4", "5", "6", "7", "8", "9"]}
  */
 void ExpressionBenchmarkFixture::benchmarkArrayArrayElemAtLast(benchmark::State& state) {
-    BSONArray array = rangeBSONArray(10);
+    BSONArray array = rangeBSONArray(0, 10);
 
     benchmarkExpression(BSON("$arrayElemAt" << BSON_ARRAY("$array" << -1)),
                         state,
@@ -153,7 +153,7 @@ void ExpressionBenchmarkFixture::benchmarkArrayArrayElemAtLast(benchmark::State&
  * 0 entries will pass the filter.)
  */
 void ExpressionBenchmarkFixture::benchmarkArrayFilter0(benchmark::State& state) {
-    BSONArray array = rangeBSONArray(10);
+    BSONArray array = rangeBSONArray(0, 10);
 
     benchmarkExpression(BSON("$filter" << BSON("input"
                                                << "$array"
@@ -173,7 +173,7 @@ void ExpressionBenchmarkFixture::benchmarkArrayFilter0(benchmark::State& state) 
  * 10 entries will pass the filter.)
  */
 void ExpressionBenchmarkFixture::benchmarkArrayFilter10(benchmark::State& state) {
-    BSONArray array = rangeBSONArray(10);
+    BSONArray array = rangeBSONArray(0, 10);
 
     benchmarkExpression(BSON("$filter" << BSON("input"
                                                << "$array"
@@ -191,7 +191,7 @@ void ExpressionBenchmarkFixture::benchmarkArrayFilter10(benchmark::State& state)
  *   {"_id": ObjectId(...), "array": ["0", "1", "2", "3", "4", "5", "6", "7", "8", "9"]}
  */
 void ExpressionBenchmarkFixture::benchmarkArrayInFound0(benchmark::State& state) {
-    BSONArray array = rangeBSONArray(10);
+    BSONArray array = rangeBSONArray(0, 10);
 
     benchmarkExpression(BSON("$in" << BSON_ARRAY("0"_sd
                                                  << "$array")),
@@ -206,7 +206,7 @@ void ExpressionBenchmarkFixture::benchmarkArrayInFound0(benchmark::State& state)
  *   {"_id": ObjectId(...), "array": ["0", "1", "2", "3", "4", "5", "6", "7", "8", "9"]}
  */
 void ExpressionBenchmarkFixture::benchmarkArrayInFound9(benchmark::State& state) {
-    BSONArray array = rangeBSONArray(10);
+    BSONArray array = rangeBSONArray(0, 10);
 
     benchmarkExpression(BSON("$in" << BSON_ARRAY("9"_sd
                                                  << "$array")),
@@ -221,7 +221,7 @@ void ExpressionBenchmarkFixture::benchmarkArrayInFound9(benchmark::State& state)
  *   {"_id": ObjectId(...), "array": ["0", "1", "2", "3", "4", "5", "6", "7", "8", "9"]}
  */
 void ExpressionBenchmarkFixture::benchmarkArrayInNotFound(benchmark::State& state) {
-    BSONArray array = rangeBSONArray(10);
+    BSONArray array = rangeBSONArray(0, 10);
 
     benchmarkExpression(BSON("$in" << BSON_ARRAY("A"_sd
                                                  << "$array")),
@@ -1177,7 +1177,7 @@ void ExpressionBenchmarkFixture::benchmarkUnsetFieldEvaluateExpression(benchmark
 void ExpressionBenchmarkFixture::benchmarkSetIsSubset_allPresent(benchmark::State& state) {
     const int kMax = 100000;
     BSONArray lhs = randomBSONArray(100000, kMax);
-    BSONArray rhs = rangeBSONArray(kMax);
+    BSONArray rhs = rangeBSONArray(0, kMax);
 
     benchmarkExpression(BSON("$setIsSubset" << BSON_ARRAY("$arr" << rhs)),
                         state,
@@ -1187,7 +1187,7 @@ void ExpressionBenchmarkFixture::benchmarkSetIsSubset_allPresent(benchmark::Stat
 void ExpressionBenchmarkFixture::benchmarkSetIsSubset_nonePresent(benchmark::State& state) {
     const int kMax = 100000;
     BSONArray lhs = randomBSONArray(100000, kMax, kMax);
-    BSONArray rhs = rangeBSONArray(kMax);
+    BSONArray rhs = rangeBSONArray(0, kMax);
 
     benchmarkExpression(BSON("$setIsSubset" << BSON_ARRAY("$arr" << rhs)),
                         state,
@@ -1733,7 +1733,6 @@ void ExpressionBenchmarkFixture::benchmarkStrcasecmp(benchmark::State& state) {
                         state,
                         std::vector<Document>(1, {{"value"_sd, "Hello"_sd}}));
 }
-
 void ExpressionBenchmarkFixture::benchmarkStrcasecmpLargeString(benchmark::State& state) {
     benchmarkExpression(
         BSON("$strcasecmp" << BSON_ARRAY("hello"
@@ -1787,6 +1786,74 @@ void ExpressionBenchmarkFixture::benchmarkSubstrCPLargeString(benchmark::State& 
             1,
             {{"value"_sd,
               "This is a long string that will provide another set of benchmarks"_sd}}));
+}
+
+/**
+ * Tests performance of $sortArray on array of ints.
+ */
+void ExpressionBenchmarkFixture::benchmarkSortArrayInt(benchmark::State& state) {
+    int n = 500;
+    std::vector<int> vectorOfInts;
+    vectorOfInts.reserve(n);
+    for (int i = 0; i < n; i++) {
+        vectorOfInts.push_back(i);
+    }
+    benchmarkExpression(BSON("$sortArray" << BSON("input"
+                                                  << "$array"
+                                                  << "sortBy" << BSON("a" << 1))),
+                        state,
+                        std::vector<Document>(1, {{"array"_sd, vectorToBSON<int>(vectorOfInts)}}));
+}
+
+/**
+ * Tests performance of $sortArray on array of strings.
+ */
+void ExpressionBenchmarkFixture::benchmarkSortArrayString(benchmark::State& state) {
+    int n = 500;
+    std::vector<std::string> v;
+    v.reserve(n);
+    for (int i = 0; i < n; i++) {
+        v.push_back("This is a long string that will provide another set of benchmarks");
+    }
+    benchmarkExpression(BSON("$sortArray" << BSON("input"
+                                                  << "$array"
+                                                  << "sortBy" << BSON("a" << 1))),
+                        state,
+                        std::vector<Document>(1, {{"array"_sd, vectorToBSON<std::string>(v)}}));
+}
+
+/**
+ * Tests performance of $sortArray on array of BSONObj.
+ */
+void ExpressionBenchmarkFixture::benchmarkSortArrayBSONObj(benchmark::State& state) {
+    int n = 500;
+    std::vector<BSONObj> v;
+    v.reserve(n);
+    for (int i = 0; i < n; i++) {
+        v.push_back(BSON("a" << 1));
+    }
+    benchmarkExpression(BSON("$sortArray" << BSON("input"
+                                                  << "$array"
+                                                  << "sortBy" << BSON("a" << 1))),
+                        state,
+                        std::vector<Document>(1, {{"array"_sd, vectorToBSON<BSONObj>(v)}}));
+}
+
+/**
+ * Tests performance of $sortArray on 2D array.
+ */
+void ExpressionBenchmarkFixture::benchmarkSortArray2D(benchmark::State& state) {
+    int n = 500;
+    std::vector<BSONArray> v;
+    v.reserve(n);
+    for (int i = 0; i < n; i++) {
+        v.push_back(rangeBSONArray(i * n, (i + 1) * n));
+    }
+    benchmarkExpression(BSON("$sortArray" << BSON("input"
+                                                  << "$array"
+                                                  << "sortBy" << BSON("a" << 1))),
+                        state,
+                        std::vector<Document>(1, {{"array"_sd, vectorToBSON<BSONArray>(v)}}));
 }
 
 /**
@@ -1879,7 +1946,7 @@ void ExpressionBenchmarkFixture::benchmarkAvg(benchmark::State& state) {
  * {"_id": ObjectId(...), "array": ["0", "1", "2", "3", "4", "5", "6", "7", "8","9"]}
  */
 void ExpressionBenchmarkFixture::benchmarkSum(benchmark::State& state) {
-    BSONArray array = rangeBSONArray(10);
+    BSONArray array = rangeBSONArray(0, 10);
     benchmarkExpression(BSON("$sum"
                              << "$array"),
                         state,

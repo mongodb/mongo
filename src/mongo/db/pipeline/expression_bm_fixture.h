@@ -257,6 +257,11 @@ public:
     void benchmarkSubstrCPMultiBytes(benchmark::State& state);
     void benchmarkSubstrCPLargeString(benchmark::State& state);
 
+    void benchmarkSortArrayInt(benchmark::State& state);
+    void benchmarkSortArrayString(benchmark::State& state);
+    void benchmarkSortArrayBSONObj(benchmark::State& state);
+    void benchmarkSortArray2D(benchmark::State& state);
+
     void benchmarkRand(benchmark::State& state);
 
     void benchmarkMaxSingleInput(benchmark::State& state);
@@ -329,6 +334,22 @@ private:
     }                                                                                           \
     BENCHMARK_F(Fixture, ArrayFilter10)(benchmark::State & state) {                             \
         benchmarkArrayFilter10(state);                                                          \
+    }                                                                                           \
+                                                                                                \
+    BENCHMARK_F(Fixture, SortArrayInt)(benchmark::State & state) {                              \
+        benchmarkSortArrayInt(state);                                                           \
+    }                                                                                           \
+                                                                                                \
+    BENCHMARK_F(Fixture, SortArrayString)(benchmark::State & state) {                           \
+        benchmarkSortArrayString(state);                                                        \
+    }                                                                                           \
+                                                                                                \
+    BENCHMARK_F(Fixture, SortArrayBSONObj)(benchmark::State & state) {                          \
+        benchmarkSortArrayBSONObj(state);                                                       \
+    }                                                                                           \
+                                                                                                \
+    BENCHMARK_F(Fixture, SortArray2D)(benchmark::State & state) {                               \
+        benchmarkSortArray2D(state);                                                            \
     }                                                                                           \
                                                                                                 \
     BENCHMARK_F(Fixture, ConditionalCond)(benchmark::State & state) {                           \

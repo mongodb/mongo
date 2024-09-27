@@ -118,12 +118,12 @@ bool PatternValueCmp::operator()(const Value& lhs, const Value& rhs) const {
         return (descending ? ValueComparator(collator).getLessThan()(rhs, lhs)
                            : ValueComparator(collator).getLessThan()(lhs, rhs));
     } else {
-        BSONObj lhsObj = lhs.isObject() ? lhs.getDocument().toBson() : lhs.wrap("");
-        BSONObj rhsObj = rhs.isObject() ? rhs.getDocument().toBson() : rhs.wrap("");
-
-        BSONObj lhsKey = dps::extractElementsBasedOnTemplate(lhsObj, sortPattern, true);
-        BSONObj rhsKey = dps::extractElementsBasedOnTemplate(rhsObj, sortPattern, true);
-
+        BSONObj lhsKey = lhs.isObject()
+            ? dps::extractElementsBasedOnTemplate(lhs.getDocument().toBson(), sortPattern, true)
+            : dps::extractNullForAllFieldsBasedOnTemplate(sortPattern);
+        BSONObj rhsKey = rhs.isObject()
+            ? dps::extractElementsBasedOnTemplate(rhs.getDocument().toBson(), sortPattern, true)
+            : dps::extractNullForAllFieldsBasedOnTemplate(sortPattern);
         return lhsKey.woCompare(rhsKey, sortPattern, false, collator) < 0;
     }
 }
