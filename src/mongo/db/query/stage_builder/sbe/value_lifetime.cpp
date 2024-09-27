@@ -44,7 +44,10 @@ void ValueLifetime::validate(optimizer::ABT& node) {
 
 ValueLifetime::ValueType ValueLifetime::operator()(optimizer::ABT& node,
                                                    optimizer::Constant& value) {
-    return ValueType::LocalValue;
+    // Treat shallow types that don't require lifetime management as if they were
+    // global values.
+    return sbe::value::isShallowType(value.get().first) ? ValueType::GlobalValue
+                                                        : ValueType::LocalValue;
 }
 
 ValueLifetime::ValueType ValueLifetime::operator()(optimizer::ABT& n, optimizer::Variable& var) {
@@ -90,14 +93,12 @@ ValueLifetime::ValueType ValueLifetime::operator()(optimizer::ABT& n, optimizer:
     switch (op.op()) {
         case optimizer::Operations::FillEmpty: {
             // FillEmpty propagates either side, promote references to be local values.
-            if (lhs == ValueType::Reference || rhs == ValueType::Reference) {
-                if (lhs == ValueType::Reference && rhs == ValueType::Reference) {
-                    return ValueType::Reference;
-                } else if (lhs == ValueType::Reference) {
-                    wrapNode(op.getLeftChild());
-                } else {
-                    wrapNode(op.getRightChild());
-                }
+            if (lhs == rhs) {
+                return lhs;
+            } else if (lhs == ValueType::Reference) {
+                wrapNode(op.getLeftChild());
+            } else if (rhs == ValueType::Reference) {
+                wrapNode(op.getRightChild());
             }
             break;
         }
@@ -144,14 +145,12 @@ ValueLifetime::ValueType ValueLifetime::operator()(optimizer::ABT& n, optimizer:
     if (arity == 3 && op.name() == "fillType"s) {
         // fillType propagates either the input argument or the fallback value, promote references
         // to be local values.
-        if (argTypes[0] == ValueType::Reference || argTypes[2] == ValueType::Reference) {
-            if (argTypes[0] == ValueType::Reference && argTypes[2] == ValueType::Reference) {
-                return ValueType::Reference;
-            } else if (argTypes[0] == ValueType::Reference) {
-                wrapNode(op.nodes()[0]);
-            } else {
-                wrapNode(op.nodes()[2]);
-            }
+        if (argTypes[0] == argTypes[2]) {
+            return argTypes[0];
+        } else if (argTypes[0] == ValueType::Reference) {
+            wrapNode(op.nodes()[0]);
+        } else if (argTypes[2] == ValueType::Reference) {
+            wrapNode(op.nodes()[2]);
         }
     }
 
@@ -163,14 +162,12 @@ ValueLifetime::ValueType ValueLifetime::operator()(optimizer::ABT& n, optimizer:
     ValueType thenType = op.getThenChild().visit(*this);
     ValueType elseType = op.getElseChild().visit(*this);
 
-    if (thenType == ValueType::Reference || elseType == ValueType::Reference) {
-        if (thenType == ValueType::Reference && elseType == ValueType::Reference) {
-            return ValueType::Reference;
-        } else if (thenType == ValueType::Reference) {
-            wrapNode(op.getThenChild());
-        } else {
-            wrapNode(op.getElseChild());
-        }
+    if (thenType == elseType) {
+        return thenType;
+    } else if (thenType == ValueType::Reference) {
+        wrapNode(op.getThenChild());
+    } else if (elseType == ValueType::Reference) {
+        wrapNode(op.getElseChild());
     }
 
     return ValueType::LocalValue;

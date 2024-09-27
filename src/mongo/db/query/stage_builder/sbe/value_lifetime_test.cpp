@@ -359,6 +359,115 @@ TEST(ValueLifetimeTest, ProcessTraverseOnLocalVariable) {
         tree);
 }
 
+TEST(ValueLifetimeTest, ProcessTraverseOnFillEmpty) {
+    // Simulate a "($global.a ?: Null).b" traversal - makeOwn is not expected
+    auto tree = make<FunctionCall>(
+        "traverseF",
+        makeSeq(
+            make<Let>(
+                ProjectionName{"localVar"},
+                make<BinaryOp>(Operations::FillEmpty,
+                               make<FunctionCall>(
+                                   "getField", makeSeq(make<Variable>("s1"), Constant::str("a"))),
+                               Constant::null()),
+                make<If>(make<FunctionCall>(
+                             "typeMatch", makeSeq(make<Variable>("localVar"), Constant::int32(24))),
+                         make<Variable>("localVar"),
+                         Constant::nothing())),
+            make<LambdaAbstraction>(
+                ProjectionName{"x"},
+                make<FunctionCall>("getField", makeSeq(make<Variable>("x"), Constant::str("b")))),
+            Constant::nothing()));
+
+    ValueLifetime{}.validate(tree);
+
+    ASSERT_EXPLAIN_BSON_AUTO(
+        "{\n"
+        "    nodeType: \"FunctionCall\", \n"
+        "    name: \"traverseF\", \n"
+        "    arguments: [\n"
+        "        {\n"
+        "            nodeType: \"Let\", \n"
+        "            variable: \"localVar\", \n"
+        "            bind: {\n"
+        "                nodeType: \"BinaryOp\", \n"
+        "                op: \"FillEmpty\", \n"
+        "                left: {\n"
+        "                    nodeType: \"FunctionCall\", \n"
+        "                    name: \"getField\", \n"
+        "                    arguments: [\n"
+        "                        {\n"
+        "                            nodeType: \"Variable\", \n"
+        "                            name: \"s1\"\n"
+        "                        }, \n"
+        "                        {\n"
+        "                            nodeType: \"Const\", \n"
+        "                            tag: \"StringSmall\", \n"
+        "                            value: \"a\"\n"
+        "                        }\n"
+        "                    ]\n"
+        "                }, \n"
+        "                right: {\n"
+        "                    nodeType: \"Const\", \n"
+        "                    tag: \"Null\", \n"
+        "                    value: null\n"
+        "                }\n"
+        "            }, \n"
+        "            expression: {\n"
+        "                nodeType: \"If\", \n"
+        "                condition: {\n"
+        "                    nodeType: \"FunctionCall\", \n"
+        "                    name: \"typeMatch\", \n"
+        "                    arguments: [\n"
+        "                        {\n"
+        "                            nodeType: \"Variable\", \n"
+        "                            name: \"localVar\"\n"
+        "                        }, \n"
+        "                        {\n"
+        "                            nodeType: \"Const\", \n"
+        "                            tag: \"NumberInt32\", \n"
+        "                            value: 24\n"
+        "                        }\n"
+        "                    ]\n"
+        "                }, \n"
+        "                then: {\n"
+        "                    nodeType: \"Variable\", \n"
+        "                    name: \"localVar\"\n"
+        "                }, \n"
+        "                else: {\n"
+        "                    nodeType: \"Const\", \n"
+        "                    tag: \"Nothing\"\n"
+        "                }\n"
+        "            }\n"
+        "        }, \n"
+        "        {\n"
+        "            nodeType: \"LambdaAbstraction\", \n"
+        "            variable: \"x\", \n"
+        "            input: {\n"
+        "                nodeType: \"FunctionCall\", \n"
+        "                name: \"getField\", \n"
+        "                arguments: [\n"
+        "                    {\n"
+        "                        nodeType: \"Variable\", \n"
+        "                        name: \"x\"\n"
+        "                    }, \n"
+        "                    {\n"
+        "                        nodeType: \"Const\", \n"
+        "                        tag: \"StringSmall\", \n"
+        "                        value: \"b\"\n"
+        "                    }\n"
+        "                ]\n"
+        "            }\n"
+        "        }, \n"
+        "        {\n"
+        "            nodeType: \"Const\", \n"
+        "            tag: \"Nothing\"\n"
+        "        }\n"
+        "    ]\n"
+        "}\n",
+        tree);
+}
+
 TEST(ValueLifetimeTest, ProcessIfOnReferences) {
     // Both branches return references - no makeOwn expected
     auto tree =
