@@ -29,40 +29,22 @@
 #include <fmt/format.h>
 
 #include "mongo/db/catalog/catalog_test_fixture.h"
-#include "mongo/db/catalog/collection_write_path.h"
-#include "mongo/db/change_stream_pre_image_util.h"
-#include "mongo/db/change_stream_pre_images_collection_manager.h"
+#include "mongo/db/change_stream_pre_image_test_helpers.h"
 #include "mongo/db/change_stream_pre_images_truncate_markers_per_nsUUID.h"
-#include "mongo/db/storage/collection_truncate_markers.h"
 #include "mongo/logv2/log.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
 
 namespace mongo {
 namespace {
-// Generates a pre-image specific BSON for the CollectionTruncateMarkers::Marker with
-// the 'lastRecord's timestamp extracted when non-null.
-BSONObj toBSON(const CollectionTruncateMarkers::Marker& preImageMarker) {
-    BSONObjBuilder builder;
-    builder.append("records", preImageMarker.records);
-    builder.append("bytes", preImageMarker.bytes);
-    preImageMarker.lastRecord.serializeToken("lastRecord", &builder);
-    if (!preImageMarker.lastRecord.isNull()) {
-        builder.append(
-            "lastRecordTimestamp",
-            change_stream_pre_image_util::getPreImageTimestamp(preImageMarker.lastRecord));
-    }
-    builder.append("wallTime", preImageMarker.wallTime);
-
-    return builder.obj();
-}
+using namespace change_stream_pre_image_test_helper;
 
 BSONObj toBSON(const CollectionTruncateMarkers::InitialSetOfMarkers& initialSetOfPreImageMarkers) {
     BSONObjBuilder builder;
 
     BSONArrayBuilder markersBuilder;
     for (const auto& marker : initialSetOfPreImageMarkers.markers) {
-        markersBuilder.append(toBSON(marker));
+        markersBuilder.append(change_stream_pre_image_test_helper::toBSON(marker));
     }
     builder.appendArray("markers", markersBuilder.arr());
     builder.append("leftoverRecordsCount", initialSetOfPreImageMarkers.leftoverRecordsCount);
@@ -70,17 +52,6 @@ BSONObj toBSON(const CollectionTruncateMarkers::InitialSetOfMarkers& initialSetO
     builder.append("methodUsed",
                    CollectionTruncateMarkers::toString(initialSetOfPreImageMarkers.methodUsed));
     return builder.obj();
-}
-
-// Returns the size of the 'preImage' in bytes.
-int64_t bytes(const ChangeStreamPreImage& preImage) {
-    return preImage.toBSON().objsize();
-}
-
-CollectionTruncateMarkers::RecordIdAndWallTime extractRecordIdAndWallTime(
-    const ChangeStreamPreImage& preImage) {
-    return {change_stream_pre_image_util::toRecordId(preImage.getId()),
-            preImage.getOperationTime()};
 }
 
 // Returns a marker with the 'preImage' as its upper bound.
@@ -91,93 +62,14 @@ CollectionTruncateMarkers::Marker markerAtBound(const ChangeStreamPreImage& preI
     return CollectionTruncateMarkers::Marker{records, bytes, recordId, wallTime};
 }
 
-void createPreImagesCollection(OperationContext* opCtx, boost::optional<TenantId> tenantId) {
-    ChangeStreamPreImagesCollectionManager::get(opCtx).createPreImagesCollection(opCtx, tenantId);
-}
-
-CollectionAcquisition acquirePreImagesCollectionForRead(OperationContext* opCtx,
-                                                        boost::optional<TenantId> tenantId) {
-    return acquireCollection(
-        opCtx,
-        CollectionAcquisitionRequest(NamespaceString::makePreImageCollectionNSS(tenantId),
-                                     PlacementConcern{boost::none, ShardVersion::UNSHARDED()},
-                                     repl::ReadConcernArgs::get(opCtx),
-                                     AcquisitionPrerequisites::kRead),
-        MODE_IS);
-}
-
-ChangeStreamPreImage makePreImage(const UUID& nsUUID,
-                                  const Timestamp& timestamp,
-                                  const Date_t& wallTime) {
-    ChangeStreamPreImageId preImageId(nsUUID, timestamp, 0);
-    return ChangeStreamPreImage{std::move(preImageId), wallTime, BSON("randomField" << 'a')};
-}
-
-void insertDirectlyToPreImagesCollection(OperationContext* opCtx,
-                                         boost::optional<TenantId> tenantId,
-                                         const ChangeStreamPreImage& preImage) {
-    const auto preImagesAcq = acquireCollection(
-        opCtx,
-        CollectionAcquisitionRequest(NamespaceString::makePreImageCollectionNSS(tenantId),
-                                     PlacementConcern{boost::none, ShardVersion::UNSHARDED()},
-                                     repl::ReadConcernArgs::get(opCtx),
-                                     AcquisitionPrerequisites::kWrite),
-        MODE_IX);
-
-    WriteUnitOfWork wuow(opCtx);
-    uassertStatusOK(collection_internal::insertDocument(
-        opCtx, preImagesAcq.getCollectionPtr(), InsertStatement{preImage.toBSON()}, nullptr));
-    wuow.commit();
-}
-
-class PreImagesTruncateMarkersPerNsUUIDTest : public CatalogTestFixture {
-protected:
-    static inline const boost::optional<TenantId> kTenantId{};
-    static inline const UUID kNsUUID = UUID::gen();
-    static inline const UUID kNsUUIDOther = UUID::gen();
-
-    // Pre-images with the minimum/maximum possible expiration for pre-images from 'kNsUUID'.
-    static inline const ChangeStreamPreImage kPreImageMin{
-        ChangeStreamPreImageId{kNsUUID, Timestamp::min(), 0}, Date_t::min(), BSON("x" << 0)};
-    static inline const ChangeStreamPreImage kPreImageMax{
-        ChangeStreamPreImageId{kNsUUID, Timestamp::max(), std::numeric_limits<int64_t>::max()},
-        Date_t::max(),
-        BSON("x" << 100)};
-
-    // Pre-images for 'kNsUUID'.
-    static inline const ChangeStreamPreImage kPreImage1{
-        ChangeStreamPreImageId{kNsUUID, Timestamp(1, 1), 0},
-        dateFromISOString("2024-01-01T00:00:01.000Z").getValue(),
-        BSON("x" << 1)};
-    static inline const ChangeStreamPreImage kPreImage2{
-        ChangeStreamPreImageId{kNsUUID, Timestamp(1, 2), 0},
-        dateFromISOString("2024-01-01T00:00:02.000Z").getValue(),
-        BSON("x" << 2)};
-    static inline const ChangeStreamPreImage kPreImage3{
-        ChangeStreamPreImageId{kNsUUID, Timestamp(1, 3), 0},
-        dateFromISOString("2024-01-01T00:00:03.000Z").getValue(),
-        BSON("x" << 3)};
-
-    // Pre-images for 'kNsUUIDOther'.
-    static inline const ChangeStreamPreImage kPreImageOtherMin{
-        ChangeStreamPreImageId{kNsUUIDOther, Timestamp::min(), 0}, Date_t::min(), BSON("x" << 1)};
-    static inline const ChangeStreamPreImage kPreImageOther{
-        ChangeStreamPreImageId{kNsUUIDOther, Timestamp(1, 1), 0},
-        dateFromISOString("2024-01-01T00:00:01.000Z").getValue(),
-        BSON("x" << 1)};
-    static inline const ChangeStreamPreImage kPreImageOtherMax{
-        ChangeStreamPreImageId{kNsUUIDOther, Timestamp::max(), std::numeric_limits<int64_t>::max()},
-        Date_t::max(),
-        BSON("x" << 100)};
-};
-
 //
 // Tests the generation of 'CollectionTruncateMarkers::InitialSetOfMarkers' for an nsUUID with
 // pre-images via scanning.
 //
 // Scanning generates an initial set of markers which accounts for all bytes and records for the
 // nsUUID scanned by the pre-image collection.
-class PreImageInitialSetOfMarkersScanningTest : public PreImagesTruncateMarkersPerNsUUIDTest {};
+class PreImageInitialSetOfMarkersScanningTest : public CatalogTestFixture,
+                                                public ChangeStreamPreImageTestConstants {};
 
 TEST_F(PreImageInitialSetOfMarkersScanningTest, InitialMarkersEmptyCollection) {
     auto opCtx = operationContext();
@@ -440,7 +332,8 @@ TEST_F(PreImageInitialSetOfMarkersScanningTest, InitialMarkersIsolatedPerNsUUID)
 //
 // The samples generate an initial set of markers which only accounts for bytes and records
 // estimated to fit into whole markers.
-class PreImageInitialSetOfMarkersSamplingTest : public PreImagesTruncateMarkersPerNsUUIDTest {};
+class PreImageInitialSetOfMarkersSamplingTest : public CatalogTestFixture,
+                                                public ChangeStreamPreImageTestConstants {};
 
 // Documents that if there aren't enough samples to complete a whole marker, an empty
 // InitialSetOfMarkers is created with 'creationMethod'
@@ -532,6 +425,5 @@ TEST_F(PreImageInitialSetOfMarkersSamplingTest, InitialMarkersFullMarkerNoTracke
 
     ASSERT_BSONOBJ_EQ(toBSON(expectedInitialMarkers), toBSON(actualInitialMarkers));
 }
-
 }  // namespace
 }  // namespace mongo

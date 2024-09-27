@@ -270,6 +270,19 @@ env.Library(
     ],
 )
 
+env.Library(
+    target="change_stream_pre_image_test_helpers",
+    source=[
+        "change_stream_pre_image_test_helpers.cpp",
+    ],
+    LIBDEPS_PRIVATE=[
+        "change_stream_pre_image_util",
+        "change_stream_pre_images_collection_manager",
+        "server_base",
+        "shard_role",
+    ],
+)
+
 env.CppUnitTest(
     target="change_stream_pre_images_manager_test",
     source=[
@@ -283,6 +296,7 @@ env.CppUnitTest(
         "catalog/collection_crud",
         "change_stream_options",
         "change_stream_options_manager",
+        "change_stream_pre_image_test_helpers",
         "change_stream_pre_image_util",
         "change_stream_pre_images_collection_manager",
         "change_stream_serverless_helpers",
