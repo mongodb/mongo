@@ -29,6 +29,7 @@
 
 #pragma once
 
+#include "mongo/db/exec/sbe/abt/abt_lower.h"
 #include "mongo/db/exec/sbe/stages/loop_join.h"
 #include "mongo/db/exec/sbe/stages/scan.h"
 #include "mongo/db/exec/sbe/values/cell_interface.h"

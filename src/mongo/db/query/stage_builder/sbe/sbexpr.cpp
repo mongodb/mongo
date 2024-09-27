@@ -304,8 +304,6 @@ std::unique_ptr<sbe::EExpression> SbExpr::lower(StageBuilderState& state,
         runtimeEnv,
         *state.slotIdGenerator,
         staticData->inputParamToSlotMap,
-        {} /* scanDefs */,
-        nullptr /* nodeProps */,
         // SBE stage builders assume that binary comparison operations in ABT are type bracketed and
         // must specify this to the class responsible for lowering to SBE.
         optimizer::ComparisonOpSemantics::kTypeBracketing,

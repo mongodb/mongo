@@ -41,13 +41,11 @@
 #include <absl/container/node_hash_map.h>
 
 #include "mongo/bson/bsontypes.h"
-#include "mongo/db/exec/sbe/abt/abt_lower.h"
 #include "mongo/db/exec/sbe/expressions/runtime_environment.h"
 #include "mongo/db/query/bson_typemask.h"
 #include "mongo/db/query/collation/collator_interface.h"
 #include "mongo/db/query/optimizer/algebra/polyvalue.h"
 #include "mongo/db/query/optimizer/reference_tracker.h"
-#include "mongo/db/query/optimizer/rewrites/path_lower.h"
 #include "mongo/db/query/optimizer/utils/utils.h"
 #include "mongo/db/query/stage_builder/sbe/abt_holder_impl.h"
 #include "mongo/db/query/stage_builder/sbe/builder.h"
