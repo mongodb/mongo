@@ -821,40 +821,40 @@ def generate(env: SCons.Environment.Environment) -> None:
             distro_or_os = distro_id
 
     bazel_internal_flags = [
-        f"--//bazel/config:compiler_type={env.ToolchainName()}",
-        f'--//bazel/config:opt={env.GetOption("opt")}',
-        f'--//bazel/config:dbg={env.GetOption("dbg") == "on"}',
-        f'--//bazel/config:thin_lto={env.GetOption("thin-lto") is not None}',
-        f'--//bazel/config:separate_debug={True if env.GetOption("separate-debug") == "on" else False}',
-        f'--//bazel/config:libunwind={env.GetOption("use-libunwind")}',
-        f'--//bazel/config:use_gdbserver={False if env.GetOption("gdbserver") is None else True}',
-        f'--//bazel/config:spider_monkey_dbg={True if env.GetOption("spider-monkey-dbg") == "on" else False}',
-        f"--//bazel/config:allocator={allocator}",
-        f'--//bazel/config:use_lldbserver={False if env.GetOption("lldb-server") is None else True}',
-        f'--//bazel/config:use_wait_for_debugger={False if env.GetOption("wait-for-debugger") is None else True}',
-        f'--//bazel/config:use_ocsp_stapling={True if env.GetOption("ocsp-stapling") == "on" else False}',
-        f'--//bazel/config:use_disable_ref_track={False if env.GetOption("disable-ref-track") is None else True}',
-        f'--//bazel/config:use_wiredtiger={True if env.GetOption("wiredtiger") == "on" else False}',
-        f'--//bazel/config:use_glibcxx_debug={env.GetOption("use-glibcxx-debug") is not None}',
-        f'--//bazel/config:use_tracing_profiler={env.GetOption("use-tracing-profiler") == "on"}',
-        f'--//bazel/config:build_grpc={True if env["ENABLE_GRPC_BUILD"] else False}',
-        f'--//bazel/config:use_libcxx={env.GetOption("libc++") is not None}',
-        f'--//bazel/config:detect_odr_violations={env.GetOption("detect-odr-violations") is not None}',
-        f"--//bazel/config:linkstatic={linkstatic}",
-        f'--//bazel/config:shared_archive={env.GetOption("link-model") == "dynamic-sdk"}',
-        f'--//bazel/config:linker={env.GetOption("linker")}',
-        f'--//bazel/config:streams_release_build={env.GetOption("streams-release-build")}',
-        f'--//bazel/config:release={env.GetOption("release") == "on"}',
-        f'--//bazel/config:build_enterprise={"MONGO_ENTERPRISE_VERSION" in env}',
-        f'--//bazel/config:visibility_support={env.GetOption("visibility-support")}',
-        f'--//bazel/config:disable_warnings_as_errors={env.GetOption("disable-warnings-as-errors") == "source"}',
-        f'--//bazel/config:gcov={env.GetOption("gcov") is not None}',
-        f'--//bazel/config:pgo_profile={env.GetOption("pgo-profile") is not None}',
-        f'--//bazel/config:server_js={env.GetOption("server-js") == "on"}',
+        f"--compiler_type={env.ToolchainName()}",
+        f'--opt={env.GetOption("opt")}',
+        f'--dbg={env.GetOption("dbg") == "on"}',
+        f'--thin_lto={env.GetOption("thin-lto") is not None}',
+        f'--separate_debug={True if env.GetOption("separate-debug") == "on" else False}',
+        f'--libunwind={env.GetOption("use-libunwind")}',
+        f'--use_gdbserver={False if env.GetOption("gdbserver") is None else True}',
+        f'--spider_monkey_dbg={True if env.GetOption("spider-monkey-dbg") == "on" else False}',
+        f"--allocator={allocator}",
+        f'--use_lldbserver={False if env.GetOption("lldb-server") is None else True}',
+        f'--use_wait_for_debugger={False if env.GetOption("wait-for-debugger") is None else True}',
+        f'--use_ocsp_stapling={True if env.GetOption("ocsp-stapling") == "on" else False}',
+        f'--use_disable_ref_track={False if env.GetOption("disable-ref-track") is None else True}',
+        f'--use_wiredtiger={True if env.GetOption("wiredtiger") == "on" else False}',
+        f'--use_glibcxx_debug={env.GetOption("use-glibcxx-debug") is not None}',
+        f'--use_tracing_profiler={env.GetOption("use-tracing-profiler") == "on"}',
+        f'--build_grpc={True if env["ENABLE_GRPC_BUILD"] else False}',
+        f'--use_libcxx={env.GetOption("libc++") is not None}',
+        f'--detect_odr_violations={env.GetOption("detect-odr-violations") is not None}',
+        f"--linkstatic={linkstatic}",
+        f'--shared_archive={env.GetOption("link-model") == "dynamic-sdk"}',
+        f'--linker={env.GetOption("linker")}',
+        f'--streams_release_build={env.GetOption("streams-release-build")}',
+        f'--release={env.GetOption("release") == "on"}',
+        f'--build_enterprise={"MONGO_ENTERPRISE_VERSION" in env}',
+        f'--visibility_support={env.GetOption("visibility-support")}',
+        f'--disable_warnings_as_errors={env.GetOption("disable-warnings-as-errors") == "source"}',
+        f'--gcov={env.GetOption("gcov") is not None}',
+        f'--pgo_profile={env.GetOption("pgo-profile") is not None}',
+        f'--server_js={env.GetOption("server-js") == "on"}',
         f"--platforms=//bazel/platforms:{distro_or_os}_{normalized_arch}",
         f"--host_platform=//bazel/platforms:{distro_or_os}_{normalized_arch}",
-        f'--//bazel/config:ssl={"True" if env.GetOption("ssl") == "on" else "False"}',
-        f'--//bazel/config:js_engine={env.GetOption("js-engine")}',
+        f'--ssl={"True" if env.GetOption("ssl") == "on" else "False"}',
+        f'--js_engine={env.GetOption("js-engine")}',
         "--define",
         f"MONGO_VERSION={env['MONGO_VERSION']}",
         "--compilation_mode=dbg",  # always build this compilation mode as we always build with -g
@@ -875,11 +875,11 @@ def generate(env: SCons.Environment.Environment) -> None:
         bazel_internal_flags += ["--collect_code_coverage"]
 
     if env["DWARF_VERSION"]:
-        bazel_internal_flags.append(f"--//bazel/config:dwarf_version={env['DWARF_VERSION']}")
+        bazel_internal_flags.append(f"--dwarf_version={env['DWARF_VERSION']}")
 
     if normalized_os == "macos":
         bazel_internal_flags.append(
-            f"--//bazel/config:developer_dir={os.environ.get('DEVELOPER_DIR', '/Applications/Xcode.app')}"
+            f"--developer_dir={os.environ.get('DEVELOPER_DIR', '/Applications/Xcode.app')}"
         )
         minimum_macos_version = "11.0" if normalized_arch == "arm64" else "10.14"
         bazel_internal_flags.append(f"--macos_minimum_os={minimum_macos_version}")
@@ -887,15 +887,15 @@ def generate(env: SCons.Environment.Environment) -> None:
     http_client_option = env.GetOption("enable-http-client")
     if http_client_option is not None:
         if http_client_option in ["on", "auto"]:
-            bazel_internal_flags.append("--//bazel/config:http_client=True")
+            bazel_internal_flags.append("--http_client=True")
         elif http_client_option == "off":
-            bazel_internal_flags.append("--//bazel/config:http_client=False")
+            bazel_internal_flags.append("--http_client=False")
 
     sanitizer_option = env.GetOption("sanitize")
 
     if sanitizer_option is not None and sanitizer_option != "":
         options = sanitizer_option.split(",")
-        formatted_options = [f"--//bazel/config:{_SANITIZER_MAP[opt]}=True" for opt in options]
+        formatted_options = [f"--{_SANITIZER_MAP[opt]}=True" for opt in options]
         bazel_internal_flags.extend(formatted_options)
 
     if normalized_arch not in ["arm64", "amd64"]:

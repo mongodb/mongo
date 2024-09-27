@@ -24,6 +24,53 @@ build --experimental_cc_shared_library
 # Reuse sandboxes to save sandbox execution and deletion times.
 build --experimental_reuse_sandbox_directories
 
+# Aliases for config flags
+build --flag_alias=linkstatic=//bazel/config:linkstatic
+build --flag_alias=compiler_type=//bazel/config:compiler_type
+build --flag_alias=linker=//bazel/config:linker
+build --flag_alias=use_gdbserver=//bazel/config:use_gdbserver
+build --flag_alias=libunwind=//bazel/config:libunwind
+build --flag_alias=spider_monkey_dbg=//bazel/config:spider_monkey_dbg
+build --flag_alias=allocator=//bazel/config:allocator
+build --flag_alias=use_lldbserver=//bazel/config:use_lldbserver
+build --flag_alias=opt=//bazel/config:opt
+build --flag_alias=dbg=//bazel/config:dbg
+build --flag_alias=thin_lto=//bazel/config:thin_lto
+build --flag_alias=separate_debug=//bazel/config:separate_debug
+build --flag_alias=use_wait_for_debugger=//bazel/config:use_wait_for_debugger
+build --flag_alias=use_ocsp_stapling=//bazel/config:use_ocsp_stapling
+build --flag_alias=use_disable_ref_track=//bazel/config:use_disable_ref_track
+build --flag_alias=use_wiredtiger=//bazel/config:use_wiredtiger
+build --flag_alias=use_glibcxx_debug=//bazel/config:use_glibcxx_debug
+build --flag_alias=use_tracing_profiler=//bazel/config:use_tracing_profiler
+build --flag_alias=build_grpc=//bazel/config:build_grpc
+build --flag_alias=use_libcxx=//bazel/config:use_libcxx
+build --flag_alias=detect_odr_violations=//bazel/config:detect_odr_violations
+build --flag_alias=shared_archive=//bazel/config:shared_archive
+build --flag_alias=streams_release_build=//bazel/config:streams_release_build
+build --flag_alias=release=//bazel/config:release
+build --flag_alias=build_enterprise=//bazel/config:build_enterprise
+build --flag_alias=visibility_support=//bazel/config:visibility_support
+build --flag_alias=disable_warnings_as_errors=//bazel/config:disable_warnings_as_errors
+build --flag_alias=gcov=//bazel/config:gcov
+build --flag_alias=pgo_profile=//bazel/config:pgo_profile
+build --flag_alias=server_js=//bazel/config:server_js
+build --flag_alias=ssl=//bazel/config:ssl
+build --flag_alias=js_engine=//bazel/config:js_engine
+build --flag_alias=enterprise_feature_all=//bazel/config:enterprise_feature_all
+build --flag_alias=enterprise_feature_all=//bazel/config:enterprise_feature_all
+build --flag_alias=enterprise_feature_all=//bazel/config:enterprise_feature_all
+
+build --flag_alias=dwarf_version=//bazel/config:dwarf_version
+build --flag_alias=http_client=//bazel/config:http_client
+build --flag_alias=developer_dir=//bazel/config:developer_dir
+build --flag_alias=asan=//bazel/config:asan
+build --flag_alias=fsan=//bazel/config:fsan
+build --flag_alias=msan=//bazel/config:msan
+build --flag_alias=lsan=//bazel/config:lsan
+build --flag_alias=tsan=//bazel/config:tsan
+build --flag_alias=ubsan=//bazel/config:ubsan
+
 # Disable the default compiler flags to avoid certain flags that conflict with flags we setup.
 build:windows --features=-smaller_binary
 build:windows --features=-frame_pointer
@@ -58,7 +105,7 @@ build:linux --remote_executor=grpcs://sodalite.cluster.engflow.com
 build --remote_cache=grpcs://sodalite.cluster.engflow.com
 build --bes_backend=grpcs://sodalite.cluster.engflow.com
 build --bes_results_url=https://sodalite.cluster.engflow.com/invocation/
-build --experimental_remote_cache_compression=true 
+build --experimental_remote_cache_compression=true
 build --grpc_keepalive_time=30s
 build --nolegacy_important_outputs
 build --bes_keywords=repo:mongo
