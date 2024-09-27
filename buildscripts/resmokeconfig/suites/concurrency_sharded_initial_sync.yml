@@ -16,24 +16,17 @@ selector:
     # uses >100MB of data, which can overwhelm test hosts
 
     # compact can only be run against a standalone mongod
-    - jstests/concurrency/fsm_workloads/compact.js
 
     # can cause OOM kills on test hosts
 
     # cannot createIndex after dropDatabase without sharding first
-    - jstests/concurrency/fsm_workloads/query/plan_cache_drop_database.js
-
-    # The WTWriteConflictException failpoint is not supported on mongos.
-    - jstests/concurrency/fsm_workloads/collmod_writeconflict.js
 
     # TODO Undenylist (SERVER-38852).
 
     # serverStatus does not include transaction metrics on mongos.
-    - jstests/concurrency/fsm_workloads/multi_statement_transaction_atomicity_isolation_metrics_test.js
 
     # Uses the same transaction id across different routers, which is not allowed because when either
     # router tries to commit, it may not know the full participant list.
-    - jstests/concurrency/fsm_workloads/multi_statement_transaction_all_commands_same_session.js
 
     # ChunkHelper directly talks to the config servers and doesn't support retries for network errors
 
@@ -73,7 +66,6 @@ selector:
     - jstests/concurrency/fsm_workloads/query/agg/agg_sort.js
     - jstests/concurrency/fsm_workloads/collmod.js
     - jstests/concurrency/fsm_workloads/collmod_separate_collections.js
-    - jstests/concurrency/fsm_workloads/collmod_writeconflict.js
     - jstests/concurrency/fsm_workloads/view_catalog.js
     - jstests/concurrency/fsm_workloads/view_catalog_cycle_lookup.js
     - jstests/concurrency/fsm_workloads/view_catalog_cycle_with_drop.js
@@ -84,7 +76,6 @@ selector:
     - jstests/concurrency/fsm_workloads/drop_collection.js
 
     # serverStatus does not include transaction metrics on mongos.
-    - jstests/concurrency/fsm_workloads/multi_statement_transaction_atomicity_isolation_metrics_test.js
 
     # Use non-retryable commands not allowed by the network retry helper.
     - jstests/concurrency/fsm_workloads/snapshot_read_kill_op_only.js

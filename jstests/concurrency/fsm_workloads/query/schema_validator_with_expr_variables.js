@@ -6,7 +6,14 @@
  * the test generates a large oplog and 'inMemory' instances have limited resources to accommodate
  * all nodes in the replica set (which all run in the same instance), so it may fail with the OOM
  * error.
- * @tags: [requires_non_retryable_writes, requires_persistence, catches_command_failures]
+ * @tags: [
+ *  requires_non_retryable_writes,
+ *  requires_persistence,
+ *  catches_command_failures,
+ *  # This workload can use a lot of memory and cause an OOM on hosts if run against a larger
+ *  # topology.
+ *  requires_standalone,
+ * ]
  */
 export const $config = (function() {
     function setup(db, collName) {

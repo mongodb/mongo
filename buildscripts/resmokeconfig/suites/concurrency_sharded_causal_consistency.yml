@@ -14,15 +14,12 @@ selector:
     # uses >100MB of data, which can overwhelm test hosts
 
     # compact can only be run against a standalone mongod
-    - jstests/concurrency/fsm_workloads/compact.js
 
     # can cause OOM kills on test hosts
 
     # cannot createIndex after dropDatabase without sharding first
-    - jstests/concurrency/fsm_workloads/query/plan_cache_drop_database.js
 
     # The WTWriteConflictException failpoint is not supported on mongos.
-    - jstests/concurrency/fsm_workloads/collmod_writeconflict.js
 
   exclude_with_any_tags:
     - requires_standalone

@@ -2,7 +2,13 @@
  * This test checks high level invariants of various transaction related metrics reported in
  * serverStatus and currentOp.
  *
- * @tags: [uses_transactions, uses_prepare_transaction, assumes_snapshot_transactions]
+ * @tags: [
+ *  uses_transactions,
+ *  uses_prepare_transaction,
+ *  assumes_snapshot_transactions,
+ *  # serverStatus does not include transaction metrics on mongos.
+ *  assumes_against_mongod_not_mongos,
+ * ]
  */
 
 import {extendWorkload} from "jstests/concurrency/fsm_libs/extend_workload.js";

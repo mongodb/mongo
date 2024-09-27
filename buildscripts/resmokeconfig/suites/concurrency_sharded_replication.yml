@@ -7,37 +7,6 @@ selector:
   exclude_files:
     # Disabled due to MongoDB restrictions and/or workload restrictions
 
-    # These workloads sometimes trigger 'Could not lock auth data update lock'
-    # errors because the AuthorizationManager currently waits for only five
-    # seconds to acquire the lock for authorization documents
-
-    # uses >100MB of data, which can overwhelm test hosts
-
-    # compact can only be run against a standalone mongod
-    - jstests/concurrency/fsm_workloads/compact.js
-
-    # can cause OOM kills on test hosts
-
-    # cannot createIndex after dropDatabase without sharding first
-    - jstests/concurrency/fsm_workloads/query/plan_cache_drop_database.js
-
-    # The WTWriteConflictException failpoint is not supported on mongos.
-    - jstests/concurrency/fsm_workloads/collmod_writeconflict.js
-
-    # TODO Undenylist (SERVER-38852).
-    - jstests/concurrency/fsm_workloads/query/agg/agg_out_interrupt_cleanup.js
-    - jstests/concurrency/fsm_workloads/query/timeseries/timeseries_agg_out_interrupt_cleanup.js
-
-    # serverStatus does not include transaction metrics on mongos.
-    - jstests/concurrency/fsm_workloads/multi_statement_transaction_atomicity_isolation_metrics_test.js
-
-    # Uses the same transaction id across different routers, which is not allowed because when either
-    # router tries to commit, it may not know the full participant list.
-    - jstests/concurrency/fsm_workloads/multi_statement_transaction_all_commands_same_session.js
-
-    # The test may spuriously fail when run against sharded clusters, due to limitations of the
-    # infrastructure. See SERVER-77039 for full details.
-
   exclude_with_any_tags:
     - requires_standalone
     - requires_replication

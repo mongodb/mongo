@@ -14,7 +14,8 @@
  *  # can cause too much cache pressure for some concurrency tests with transactions.
  *  does_not_support_transactions,
  *  # Compact is not supported for in memory databases.
- *  requires_persistence
+ *  requires_persistence,
+ *  assumes_against_mongod_not_mongos,
  * ]
  */
 

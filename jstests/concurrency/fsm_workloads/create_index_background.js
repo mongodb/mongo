@@ -6,10 +6,14 @@
  * index has completed and the test no longer needs to execute more transitions.
  * The first thread (tid = 0) will be the one that creates the background index.
  *
+ * This workload implicitly assumes that its tid ranges are [0, $config.threadCount). This
+ * isn't guaranteed to be true when they are run in parallel with other workloads. Therefore
+ * it can't be run in concurrency simultaneous suites.
  * @tags: [
  *   assumes_balancer_off,
  *   creates_background_indexes,
- *   requires_getmore
+ *   requires_getmore,
+ *   incompatible_with_concurrency_simultaneous,
  * ]
  */
 import {isMongos} from "jstests/concurrency/fsm_workload_helpers/server_types.js";

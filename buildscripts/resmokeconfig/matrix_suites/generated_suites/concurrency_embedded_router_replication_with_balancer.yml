@@ -53,14 +53,7 @@ executor:
 matrix_suite: true
 selector:
   exclude_files:
-    - jstests/concurrency/fsm_workloads/compact.js
-    - jstests/concurrency/fsm_workloads/query/plan_cache_drop_database.js
-    - jstests/concurrency/fsm_workloads/collmod_writeconflict.js
     - jstests/concurrency/fsm_workloads/query/update/update_where.js
-    - jstests/concurrency/fsm_workloads/query/agg/agg_out_interrupt_cleanup.js
-    - jstests/concurrency/fsm_workloads/query/timeseries/timeseries_agg_out_interrupt_cleanup.js
-    - jstests/concurrency/fsm_workloads/multi_statement_transaction_atomicity_isolation_metrics_test.js
-    - jstests/concurrency/fsm_workloads/multi_statement_transaction_all_commands_same_session.js
     - jstests/concurrency/fsm_workloads/timeseries_insert_idle_bucket_expiration.js
   exclude_with_any_tags:
     - requires_standalone

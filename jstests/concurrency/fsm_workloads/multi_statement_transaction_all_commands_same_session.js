@@ -2,7 +2,14 @@
  * Runs update, findAndModify, delete, find, and getMore in a transaction with all threads using the
  * same session.
  *
- * @tags: [uses_transactions, state_functions_share_transaction, assumes_snapshot_transactions]
+ * @tags: [
+ *  uses_transactions,
+ *  state_functions_share_transaction,
+ *  assumes_snapshot_transactions,
+ *  # Uses the same transaction id across different routers, which is not allowed because when
+ *  # either router tries to commit, it may not know the full participant list.
+ *  assumes_against_mongod_not_mongos,
+ * ]
  */
 
 import {extendWorkload} from "jstests/concurrency/fsm_libs/extend_workload.js";

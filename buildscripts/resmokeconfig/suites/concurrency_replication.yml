@@ -10,7 +10,6 @@ selector:
     ##
 
     # OOM kills on test hosts.
-    - jstests/concurrency/fsm_workloads/query/schema_validator_with_expr_variables.js
 
   exclude_with_any_tags:
     - requires_standalone

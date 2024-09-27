@@ -15,7 +15,10 @@
  * returned batch. There should not be any 'holes' because despite the secondary applying operations
  * out of order, the scan on the ordered field 'x' guarantees we will see all inserts in-order.
  *
- * @tags: [requires_replication, uses_write_concern]
+ * This workload implicitly assumes that its tid ranges are [0, $config.threadCount). This
+ * isn't guaranteed to be true when they are run in parallel with other workloads. Therefore
+ * it can't be run in concurrency simultaneous suites.
+ * @tags: [requires_replication, uses_write_concern, incompatible_with_concurrency_simultaneous]
  */
 import {supportsCommittedReads} from "jstests/concurrency/fsm_workload_helpers/server_types.js";
 

@@ -37,8 +37,7 @@ executor:
     - class: CleanupConcurrencyWorkloads
 matrix_suite: true
 selector:
-  exclude_files:
-    - jstests/concurrency/fsm_workloads/query/schema_validator_with_expr_variables.js
+  exclude_files: null
   exclude_with_any_tags:
     - requires_standalone
     - requires_sharding

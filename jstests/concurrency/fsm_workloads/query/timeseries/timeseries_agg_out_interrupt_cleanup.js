@@ -9,6 +9,8 @@
  *   does_not_support_transactions,
  *   does_not_support_stepdowns,
  *   uses_curop_agg_stage,
+ *   # TODO Undenylist (SERVER-38852).
+ *   assumes_against_mongod_not_mongos,
  * ]
  */
 import {extendWorkload} from "jstests/concurrency/fsm_libs/extend_workload.js";

@@ -56,10 +56,6 @@ executor:
 matrix_suite: true
 selector:
   exclude_files:
-    - jstests/concurrency/fsm_workloads/query/plan_cache_drop_database.js
-    - jstests/concurrency/fsm_workloads/collmod_writeconflict.js
-    - jstests/concurrency/fsm_workloads/query/agg/agg_out_interrupt_cleanup.js
-    - jstests/concurrency/fsm_workloads/multi_statement_transaction_atomicity_isolation_metrics_test.js
     - jstests/concurrency/fsm_workloads/drop_index_during_replan.js
     - jstests/concurrency/fsm_workloads/query/drop_index_during_lookup.js
     - jstests/concurrency/fsm_workloads/query/update/update_rename.js

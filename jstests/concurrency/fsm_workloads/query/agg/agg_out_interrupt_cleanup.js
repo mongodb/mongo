@@ -8,7 +8,11 @@
  * - $config.teardown: If you want any assertion to make sure nothing got leaked or left behind by
  *   the interrupted aggregation.
  *
- * @tags: [uses_curop_agg_stage]
+ * @tags: [
+ *  uses_curop_agg_stage,
+ *  # TODO Undenylist (SERVER-38852).
+ *  assumes_against_mongod_not_mongos,
+ * ]
  */
 import {extendWorkload} from "jstests/concurrency/fsm_libs/extend_workload.js";
 import {$config as $baseConfig} from "jstests/concurrency/fsm_workloads/query/agg/agg_base.js";

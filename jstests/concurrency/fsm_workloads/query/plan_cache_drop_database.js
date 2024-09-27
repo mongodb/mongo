@@ -5,6 +5,11 @@
  * is periodically dropped (as part of a database drop).  This combination of
  * events triggers the concurrent destruction of a Collection object and
  * the updating of said object's PlanCache (SERVER-17117).
+ *
+ * @tags: [
+ *  # cannot createIndex after dropDatabase without sharding first
+ *  assumes_against_mongod_not_mongos,
+ * ]
  */
 export const $config = (function() {
     function populateData(db, collName) {

@@ -29,19 +29,15 @@ selector:
     # can cause OOM kills on test hosts
 
     # cannot createIndex after dropDatabase without sharding first
-    - jstests/concurrency/fsm_workloads/query/plan_cache_drop_database.js
 
     # The WTWriteConflictException failpoint is not supported on mongos.
-    - jstests/concurrency/fsm_workloads/collmod_writeconflict.js
 
     # SERVER-20361 Improve the behaviour of multi-update/delete against a sharded collection
     - jstests/concurrency/fsm_workloads/query/update/update_where.js
 
     # TODO Undenylist (SERVER-38852).
-    - jstests/concurrency/fsm_workloads/query/agg/agg_out_interrupt_cleanup.js
 
     # serverStatus does not include transaction metrics on mongos.
-    - jstests/concurrency/fsm_workloads/multi_statement_transaction_atomicity_isolation_metrics_test.js
 
     # Uses the same transaction id across different routers, which is not allowed because when either
     # router tries to commit, it may not know the full participant list.

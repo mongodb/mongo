@@ -9,7 +9,6 @@ selector:
   exclude_files:
     # These workloads use up to 100MB of memory, which can overwhelm test hosts.
     - jstests/concurrency/fsm_workloads/query/agg/agg_sort.js
-    - jstests/concurrency/fsm_workloads/query/schema_validator_with_expr_variables.js
 
     # These kill sessions.
     - jstests/concurrency/fsm_workloads/snapshot_read_kill_operations.js

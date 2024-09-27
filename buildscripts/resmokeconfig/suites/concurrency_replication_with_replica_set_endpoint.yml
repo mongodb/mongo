@@ -15,9 +15,6 @@ selector:
     # Disabled due to MongoDB restrictions and/or workload restrictions
     ##
 
-    # OOM kills on test hosts.
-    - jstests/concurrency/fsm_workloads/query/schema_validator_with_expr_variables.js
-
     # The tests below are disabled because of sharding auto-bootstrap and replica set endpoint.
     # TODO (SERVER-86771): renameCollection on sharded cluster doesn't support implicitly creating
     # the destination database.

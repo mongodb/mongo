@@ -5,19 +5,6 @@ selector:
     - jstests/concurrency/fsm_workloads/**/*.js
     - src/mongo/db/modules/*/jstests/concurrency/fsm_workloads/*.js
   exclude_files:
-    # These workloads implicitly assume that their tid ranges are [0, $config.threadCount). This
-    # isn't guaranteed to be true when they are run in parallel with other workloads.
-    - jstests/concurrency/fsm_workloads/query/findAndModify/findAndModify_inc_pipeline.js
-    - jstests/concurrency/fsm_workloads/list_indexes.js
-    - jstests/concurrency/fsm_workloads/query/secondary_reads.js
-    - jstests/concurrency/fsm_workloads/query/update/update_inc_capped.js
-    - jstests/concurrency/fsm_workloads/query/update/update_inc_pipeline.js
-    # These workloads implicitly assume that their tid ranges are [0, $config.threadCount), as above,
-    # but additionally require multiple threads to run, which also isn't guaranteed here.
-    - jstests/concurrency/fsm_workloads/create_index_background_partial_filter.js
-    - jstests/concurrency/fsm_workloads/create_index_background_wildcard.js
-    - jstests/concurrency/fsm_workloads/create_index_background.js
-
     # This workload kills random cursors which takes a collection lock.
     # TODO: SERVER-39939.
     - jstests/concurrency/fsm_workloads/snapshot_read_kill_operations.js
@@ -29,10 +16,6 @@ selector:
 
     # This workload assumes no locks are taken outside of the workload.
     - jstests/concurrency/fsm_workloads/access_collection_in_transaction_after_catalog_changes.js
-
-    # SERVER-43053 These workloads set a failpoint that causes intermittent WriteConflict errors,
-    # which presently can cause other simultaneous workloads to fail.
-    - jstests/concurrency/fsm_workloads/collmod_writeconflict.js
 
   exclude_with_any_tags:
     - requires_standalone

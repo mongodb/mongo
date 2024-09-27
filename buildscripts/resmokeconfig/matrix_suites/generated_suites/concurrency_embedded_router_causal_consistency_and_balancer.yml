@@ -55,9 +55,6 @@ executor:
 matrix_suite: true
 selector:
   exclude_files:
-    - jstests/concurrency/fsm_workloads/compact.js
-    - jstests/concurrency/fsm_workloads/query/plan_cache_drop_database.js
-    - jstests/concurrency/fsm_workloads/collmod_writeconflict.js
     - jstests/concurrency/fsm_workloads/query/update/update_where.js
     - jstests/concurrency/fsm_workloads/timeseries_insert_idle_bucket_expiration.js
   exclude_with_any_tags:

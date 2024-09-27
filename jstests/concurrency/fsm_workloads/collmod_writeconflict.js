@@ -2,6 +2,14 @@
  * collmod_writeconflict.js
  *
  * Ensures collMod successfully handles WriteConflictExceptions.
+ *
+ * @tags: [
+ *  # SERVER-43053 These workloads set a failpoint that causes intermittent WriteConflict errors,
+ *  # which presently can cause other simultaneous workloads to fail.
+ *  incompatible_with_concurrency_simultaneous,
+ *  # The WTWriteConflictException failpoint is not supported on mongos.
+ *  assumes_against_mongod_not_mongos,
+ * ]
  */
 import {extendWorkload} from "jstests/concurrency/fsm_libs/extend_workload.js";
 import {$config as $baseConfig} from "jstests/concurrency/fsm_workloads/collmod.js";
