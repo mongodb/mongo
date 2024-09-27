@@ -27,29 +27,10 @@
  *    it in the license file.
  */
 
-#include "mongo/db/query/stats/rand_utils_new.h"
-#include <cstddef>
-#include <iostream>
-#include <memory>
-#include <string>
-#include <vector>
-
-#include "mongo/base/string_data.h"
-#include "mongo/db/exec/sbe/values/value.h"
-#include "mongo/db/query/ce/histogram_estimation_impl.h"
 #include "mongo/db/query/ce/test_utils.h"
-#include "mongo/db/query/optimizer/defs.h"
-#include "mongo/db/query/stats/array_histogram.h"
-#include "mongo/db/query/stats/max_diff.h"
 #include "mongo/db/query/stats/maxdiff_test_utils.h"
 #include "mongo/db/query/stats/rand_utils.h"
-#include "mongo/db/query/stats/scalar_histogram.h"
-#include "mongo/db/query/stats/value_utils.h"
 #include "mongo/db/service_context_test_fixture.h"
-#include "mongo/db/storage/key_string.h"
-#include "mongo/logv2/log.h"
-#include "mongo/unittest/assert.h"
-#include "mongo/unittest/framework.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kDefault
 

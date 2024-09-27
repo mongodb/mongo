@@ -27,15 +27,8 @@
  *    it in the license file.
  */
 
-#include <vector>
-
-#include "mongo/db/query/ce/histogram_common.h"
-#include "mongo/db/query/ce/histogram_estimation_impl.h"
-#include "mongo/db/query/ce/histogram_estimator.h"
 #include "mongo/db/query/ce/test_utils.h"
-#include "mongo/unittest/assert.h"
 #include "mongo/unittest/death_test.h"
-#include "mongo/unittest/framework.h"
 
 namespace mongo::ce {
 namespace {

@@ -29,7 +29,8 @@
 
 #pragma once
 
-#include "mongo/db/exec/sbe/values/value.h"
+#include "mongo/db/query/stats/array_histogram.h"
+#include "mongo/db/query/stats/scalar_histogram.h"
 
 namespace mongo::ce {
 

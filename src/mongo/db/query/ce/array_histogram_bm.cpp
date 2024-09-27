@@ -28,20 +28,8 @@
  */
 
 #include <benchmark/benchmark.h>
-#include <vector>
 
-#include "mongo/db/exec/sbe/values/value.h"
 #include "mongo/db/query/ce/histogram_accuracy_test_utils.h"
-#include "mongo/db/query/ce/histogram_common.h"
-#include "mongo/db/query/ce/histogram_estimation_impl.h"
-#include "mongo/db/query/ce/histogram_estimator.h"
-#include "mongo/db/query/ce/test_utils.h"
-#include "mongo/db/query/stats/array_histogram.h"
-#include "mongo/db/query/stats/max_diff.h"
-#include "mongo/db/query/stats/maxdiff_test_utils.h"
-#include "mongo/unittest/assert.h"
-#include "mongo/unittest/framework.h"
-#include "mongo/util/assert_util.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kDefault
 

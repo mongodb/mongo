@@ -38,9 +38,7 @@ env.CppUnitTest(
         "histogram_estimation_impl_test.cpp",
     ],
     LIBDEPS=[
-        "$BUILD_DIR/mongo/db/query/stats/stats_test_utils",
         "ce_test_utils",
-        "histogram_estimation_impl",
     ],
 )
 
@@ -60,7 +58,6 @@ env.CppUnitTest(
         "generated_histograms_test.cpp",
     ],
     LIBDEPS=[
-        "$BUILD_DIR/mongo/db/query/stats/stats_test_utils",
         "$BUILD_DIR/mongo/db/service_context_test_fixture",
         "ce_test_utils",
     ],
@@ -71,7 +68,6 @@ env.Benchmark(
     source=["array_histogram_bm.cpp"],
     LIBDEPS=[
         "$BUILD_DIR/mongo/db/query/query_test_service_context",
-        "$BUILD_DIR/mongo/db/query/stats/stats_test_utils",
         "ce_test_utils",
     ],
 )
@@ -80,9 +76,7 @@ env.Program(
     target="histogram_estimation_accuracy_test",
     source=["histogram_accuracy_test.cpp"],
     LIBDEPS=[
-        "$BUILD_DIR/mongo/db/query/stats/stats_test_utils",
         "ce_test_utils",
-        "histogram_estimation_impl",
     ],
 )
 

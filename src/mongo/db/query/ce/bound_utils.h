@@ -27,11 +27,13 @@
  *    it in the license file.
  */
 
-#include <utility>
+#pragma once
 
 #include <boost/optional/optional.hpp>
+#include <utility>
 
 #include "mongo/db/exec/sbe/values/value.h"
+#include "mongo/db/pipeline/abt/utils.h"  // TODO: remove this somehow!!!
 #include "mongo/db/query/optimizer/index_bounds.h"
 #include "mongo/db/query/optimizer/syntax/syntax.h"
 

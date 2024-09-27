@@ -27,11 +27,7 @@
  *    it in the license file.
  */
 
-#include "mongo/db/exec/docval_to_sbeval.h"
-#include "mongo/db/exec/sbe/values/value.h"
-#include "mongo/db/query/ce/histogram_common.h"
-#include "mongo/db/query/ce/histogram_estimator.h"
-#include "mongo/db/query/stats/max_diff.h"
+#include "mongo/db/query/ce/test_utils.h"
 
 namespace mongo::ce {
 

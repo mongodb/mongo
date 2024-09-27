@@ -29,8 +29,7 @@
 
 #pragma once
 
-#include "mongo/db/query/ce/histogram_common.h"
-#include "mongo/db/query/stats/array_histogram.h"
+#include "mongo/db/query/ce/histogram_estimation_impl.h"
 
 namespace mongo::ce {
 

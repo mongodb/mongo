@@ -28,12 +28,6 @@
  */
 
 #include "mongo/db/query/ce/histogram_estimation_impl.h"
-#include "mongo/db/exec/sbe/values/bson.h"
-#include "mongo/db/exec/sbe/values/value.h"
-#include "mongo/db/query/ce/histogram_common.h"
-#include "mongo/db/query/ce/histogram_estimation_impl.h"
-#include "mongo/db/query/stats/array_histogram.h"
-#include "mongo/db/query/stats/value_utils.h"
 
 namespace mongo::ce {
 

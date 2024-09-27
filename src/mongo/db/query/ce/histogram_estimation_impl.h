@@ -29,12 +29,10 @@
 
 #pragma once
 
-#include "mongo/db/exec/sbe/values/value.h"
-#include "mongo/db/pipeline/abt/utils.h"  // TODO: remove this somehow!!!
+#include "mongo/db/exec/sbe/values/bson.h"
 #include "mongo/db/query/ce/bound_utils.h"
 #include "mongo/db/query/ce/histogram_common.h"
-#include "mongo/db/query/stats/array_histogram.h"
-#include "mongo/db/query/stats/scalar_histogram.h"
+#include "mongo/db/query/stats/value_utils.h"
 
 namespace mongo::ce {
 

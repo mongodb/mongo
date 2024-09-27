@@ -27,19 +27,9 @@
  *    it in the license file.
  */
 
-#include <absl/random/zipf_distribution.h>
 #include <sstream>
 
-#include "mongo/bson/json.h"
-#include "mongo/db/exec/docval_to_sbeval.h"
-#include "mongo/db/exec/sbe/values/bson.h"
 #include "mongo/db/query/ce/histogram_accuracy_test_utils.h"
-#include "mongo/db/query/ce/histogram_estimation_impl.h"
-#include "mongo/db/query/ce/histogram_estimator.h"
-#include "mongo/db/query/ce/test_utils.h"
-#include "mongo/db/query/interval.h"
-#include "mongo/db/query/stats/rand_utils_new.h"
-#include "mongo/logv2/log.h"
 
 namespace mongo::ce {
 
