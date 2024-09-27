@@ -5,10 +5,9 @@ Import("env")
 env = env.Clone()
 
 env.Library(
-    target="histogram_helpers",
+    target="histogram_estimation_impl",
     source=[
-        "scalar_histogram_helpers.cpp",
-        "array_histogram_helpers.cpp",
+        "histogram_estimation_impl.cpp",
     ],
     LIBDEPS=[
         "$BUILD_DIR/mongo/db/query/query_index_bounds",
@@ -28,7 +27,7 @@ env.Library(
         "$BUILD_DIR/mongo/db/query/stats/stats_test_utils",
         "$BUILD_DIR/mongo/db/sbe_values",
         "$BUILD_DIR/mongo/db/server_base",
-        "histogram_helpers",
+        "histogram_estimation_impl",
     ],
 )
 
@@ -36,13 +35,12 @@ env.CppUnitTest(
     target="histogram_estimation_test",
     source=[
         "histogram_estimator_test.cpp",
-        "scalar_histogram_helpers_test.cpp",
-        "array_histogram_helpers_test.cpp",
+        "histogram_estimation_impl_test.cpp",
     ],
     LIBDEPS=[
         "$BUILD_DIR/mongo/db/query/stats/stats_test_utils",
         "ce_test_utils",
-        "histogram_helpers",
+        "histogram_estimation_impl",
     ],
 )
 
@@ -84,7 +82,7 @@ env.Program(
     LIBDEPS=[
         "$BUILD_DIR/mongo/db/query/stats/stats_test_utils",
         "ce_test_utils",
-        "histogram_helpers",
+        "histogram_estimation_impl",
     ],
 )
 

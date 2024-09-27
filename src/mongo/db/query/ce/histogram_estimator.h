@@ -44,14 +44,14 @@ public:
      */
     static Cardinality estimateCardinality(const stats::ArrayHistogram& hist,
                                            Cardinality collectionSize,
-                                           const Interval& interval,
+                                           const mongo::Interval& interval,
                                            bool includeScalar);
 
     /**
      * Checks if given interval can be estimated.
      */
     static bool canEstimateInterval(const stats::ArrayHistogram& hist,
-                                    const Interval& interval,
+                                    const mongo::Interval& interval,
                                     bool includeScalar);
 };
 

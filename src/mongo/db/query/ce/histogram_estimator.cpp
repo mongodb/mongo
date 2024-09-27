@@ -29,8 +29,8 @@
 
 #include "mongo/db/query/ce/histogram_estimator.h"
 #include "mongo/db/exec/sbe/values/bson.h"
-#include "mongo/db/query/ce/array_histogram_helpers.h"
 #include "mongo/db/query/ce/histogram_common.h"
+#include "mongo/db/query/ce/histogram_estimation_impl.h"
 #include "mongo/db/query/stats/value_utils.h"
 
 
@@ -38,7 +38,7 @@ namespace mongo::ce {
 
 Cardinality HistogramEstimator::estimateCardinality(const stats::ArrayHistogram& hist,
                                                     const Cardinality collectionSize,
-                                                    const Interval& interval,
+                                                    const mongo::Interval& interval,
                                                     bool includeScalar) {
     // Rescales the cardinality according to the current collection size.
     return (estimateIntervalCardinality(hist, interval, includeScalar) / hist.getSampleSize()) *
@@ -46,7 +46,7 @@ Cardinality HistogramEstimator::estimateCardinality(const stats::ArrayHistogram&
 }
 
 bool HistogramEstimator::canEstimateInterval(const stats::ArrayHistogram& hist,
-                                             const Interval& interval,
+                                             const mongo::Interval& interval,
                                              bool includeScalar) {
 
     auto [startTag, startVal] = sbe::bson::convertFrom<false>(interval.start);

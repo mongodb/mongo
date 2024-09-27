@@ -33,9 +33,14 @@
 #include "mongo/db/pipeline/abt/utils.h"  // TODO: remove this somehow!!!
 #include "mongo/db/query/ce/bound_utils.h"
 #include "mongo/db/query/ce/histogram_common.h"
+#include "mongo/db/query/stats/array_histogram.h"
 #include "mongo/db/query/stats/scalar_histogram.h"
 
 namespace mongo::ce {
+
+enum class EstimationAlgo { HistogramV1, HistogramV2, HistogramV3 };
+
+// --------------------- SCALAR HISTOGRAM ESTIMATION METHODS ---------------------
 
 /**
  * Computes an estimate for a value and estimation type. Uses linear interpolation to
@@ -86,5 +91,50 @@ EstimationResult estimateRangeQueryOnArray(const stats::ScalarHistogram& histogr
                                            sbe::value::TypeTags tagHigh,
                                            sbe::value::Value valHigh);
 
+// --------------------- ARRAY HISTOGRAM ESTIMATION METHODS ---------------------
+
+/**
+ * Estimates the cardinality of an equality predicate given an ArrayHistogram and an SBE value and
+ * type tag pair.
+ */
+EstimationResult estimateCardinalityEq(const stats::ArrayHistogram& ah,
+                                       sbe::value::TypeTags tag,
+                                       sbe::value::Value val,
+                                       bool includeScalar);
+
+/**
+ * Estimates the cardinality of a range predicate given an ArrayHistogram and a range predicate.
+ * Set 'includeScalar' to true to indicate whether or not the provided range should include no-array
+ * values. The other fields define the range of the estimation.
+ */
+EstimationResult estimateCardinalityRange(const stats::ArrayHistogram& ah,
+                                          bool lowInclusive,
+                                          sbe::value::TypeTags tagLow,
+                                          sbe::value::Value valLow,
+                                          bool highInclusive,
+                                          sbe::value::TypeTags tagHigh,
+                                          sbe::value::Value valHigh,
+                                          bool includeScalar,
+                                          EstimationAlgo estAlgo = EstimationAlgo::HistogramV2);
+
+/**
+ * Estimates the selectivity of a given interval if histogram estimation is possible. Otherwise,
+ * throw an exception.
+ */
+Cardinality estimateIntervalCardinality(const stats::ArrayHistogram& ah,
+                                        const mongo::Interval& interval,
+                                        bool includeScalar = true);
+
+/**
+ * Checks if a given bound can be estimated via either histograms or type counts.
+ */
+bool canEstimateBound(const stats::ArrayHistogram& ah,
+                      sbe::value::TypeTags tag,
+                      bool includeScalar);
+
+/**
+ * Three ways TypeTags comparison (aka spaceship operator) according to the BSON type sort order.
+ */
+int compareTypeTags(sbe::value::TypeTags a, sbe::value::TypeTags b);
 
 }  // namespace mongo::ce
