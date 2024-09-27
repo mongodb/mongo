@@ -57,9 +57,14 @@ subprocess.run(
         "--out",
         OUTPUT_FULL_DIR,
         "--numSourceFiles",
-        str(min(num_changed_files, 250)),
+        str(min(num_changed_files, 100)),
         "--numGeneratedFiles",
         "250",
+        # This parameter is used to limit the output file size to avoid timeouts when running them.
+        # For this task, we just want to sanity check that we *can* generate the files so loosen
+        # the restriction.
+        "--maxFileSizeMB",
+        "10",
     ],
     check=True,
     cwd="jstestfuzz",
