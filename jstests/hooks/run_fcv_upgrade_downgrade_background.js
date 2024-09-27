@@ -1,7 +1,8 @@
 /**
  * Runs dbCheck in background.
  *
- * may need more checks, see: jstests/concurrency/fsm_workloads/drop_database_sharded_setFCV.js
+ * may need more checks, see:
+ * jstests/concurrency/fsm_workloads/ddl/drop_database/drop_database_sharded_setFCV.js
  */
 
 if (typeof db === 'undefined') {

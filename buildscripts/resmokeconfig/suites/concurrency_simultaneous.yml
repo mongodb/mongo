@@ -6,7 +6,7 @@ selector:
   exclude_files:
     # SERVER-30644 These tests create/drop/modify views which can deadlock on the ViewCatalog mutex if
     # there's a concurrent operation which acquires a MODE_X lock.
-    - jstests/concurrency/fsm_workloads/view_catalog*.js
+    - jstests/concurrency/fsm_workloads/view_catalog/view_catalog*.js
 
   exclude_with_any_tags:
     - uses_transactions

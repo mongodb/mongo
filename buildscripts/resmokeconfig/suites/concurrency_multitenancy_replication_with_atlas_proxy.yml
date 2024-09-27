@@ -12,12 +12,12 @@ selector:
     # OOM kills on test hosts.
 
     # TODO SERVER-80966: `rolesInfo` is returning unprefixed database names.
-    - jstests/concurrency/fsm_workloads/auth_privilege_cache_miss.js
-    - jstests/concurrency/fsm_workloads/auth_drop_user.js
-    - jstests/concurrency/fsm_workloads/auth_drop_role.js
-    - jstests/concurrency/fsm_workloads/auth_create_role.js
-    - jstests/concurrency/fsm_workloads/auth_create_user.js
-    - jstests/concurrency/fsm_workloads/auth_role_consistency.js
+    - jstests/concurrency/fsm_workloads/auth/auth_privilege_cache_miss.js
+    - jstests/concurrency/fsm_workloads/auth/auth_drop_user.js
+    - jstests/concurrency/fsm_workloads/auth/auth_drop_role.js
+    - jstests/concurrency/fsm_workloads/auth/auth_create_role.js
+    - jstests/concurrency/fsm_workloads/auth/auth_create_user.js
+    - jstests/concurrency/fsm_workloads/auth/auth_role_consistency.js
 
     # TODO SERVER-82260: FLE2 tests access an invalid VTS which has neither tenant nor user name.
     - src/mongo/db/modules/enterprise/jstests/concurrency/fsm_workloads/fle2_compact.js

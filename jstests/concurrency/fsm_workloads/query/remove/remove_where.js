@@ -16,7 +16,9 @@
  */
 
 import {extendWorkload} from "jstests/concurrency/fsm_libs/extend_workload.js";
-import {$config as $baseConfig} from "jstests/concurrency/fsm_workloads/indexed_insert_where.js";
+import {
+    $config as $baseConfig
+} from "jstests/concurrency/fsm_workloads/crud/indexed_insert/indexed_insert_where.js";
 
 export const $config = extendWorkload($baseConfig, function($config, $super) {
     $config.data.randomBound = 10;

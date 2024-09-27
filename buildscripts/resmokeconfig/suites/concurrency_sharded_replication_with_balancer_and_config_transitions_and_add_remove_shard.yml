@@ -20,7 +20,7 @@ selector:
     # compact can only be run against a standalone mongod
 
     # test creates too many collections for ContinuousAddRemoveShard
-    - jstests/concurrency/fsm_workloads/create_collection.js
+    - jstests/concurrency/fsm_workloads/ddl/create_collection/create_collection.js
 
     # can cause OOM kills on test hosts
 
@@ -52,10 +52,10 @@ selector:
     - jstests/concurrency/fsm_workloads/query/map_reduce/map_reduce_replace.js
     - jstests/concurrency/fsm_workloads/query/map_reduce/map_reduce_replace_remove.js
     - jstests/concurrency/fsm_workloads/query/map_reduce/map_reduce_replace_nonexistent.js
-    - jstests/concurrency/fsm_workloads/random_DDL_operations.js
-    - jstests/concurrency/fsm_workloads/rename_sharded_collection.js
-    - jstests/concurrency/fsm_workloads/rename_capped_collection_chain.js
-    - jstests/concurrency/fsm_workloads/rename_capped_collection_droptarget.js
+    - jstests/concurrency/fsm_workloads/ddl/random_ddl/random_ddl_operations.js
+    - jstests/concurrency/fsm_workloads/ddl/rename_collection/rename_sharded_collection.js
+    - jstests/concurrency/fsm_workloads/ddl/rename_collection/rename_capped_collection_chain.js
+    - jstests/concurrency/fsm_workloads/ddl/rename_collection/rename_capped_collection_droptarget.js
     - jstests/concurrency/fsm_workloads/query/timeseries/timeseries_agg_out.js
 
     # This test expects to catch QueryPlanKilled errors, but the config transition runCommand
@@ -68,22 +68,22 @@ selector:
     # open cursors can finish, such that tests using getMore must be skipped.
 
     # Connects directly to shards that might have been decomissioned, which leads to network errors.
-    - jstests/concurrency/fsm_workloads/cleanupOrphanedWhileMigrating.js
+    - jstests/concurrency/fsm_workloads/cleanup_orphaned_while_migrating.js
 
     # Tests that perform shard addition, shard removal, or movePrimary operations,
     # might interfere with the state expected during execution of the ContinuousAddRemoveShard hook.
-    - jstests/concurrency/fsm_workloads/move_primary_with_crud.js
+    - jstests/concurrency/fsm_workloads/crud/move_primary_with_crud.js
 
     # TODO SERVER-90609: movePrimary does not synchronize with index builds.
-    - jstests/concurrency/fsm_workloads/collmod_separate_collections.js
+    - jstests/concurrency/fsm_workloads/ddl/collMod/collMod_separate_collections.js
 
     # This test runs a large number of inserts, which can cause moveCollection to take a long time
     # to finish. This can cause the CheckMetadataConsistency hook to hit LockBusy errors.
-    - jstests/concurrency/fsm_workloads/timeseries_insert_idle_bucket_expiration.js
+    - jstests/concurrency/fsm_workloads/timeseries/timeseries_insert_idle_bucket_expiration.js
 
     # Exclude tests that run cleanupOrphaned, which can fail running on a config shard if a
     # concurrent migration fails due to the config shard transitioning to dedicated.
-    - jstests/concurrency/fsm_workloads/cleanupOrphanedWhileMigrating.js
+    - jstests/concurrency/fsm_workloads/cleanup_orphaned_while_migrating.js
 
   exclude_with_any_tags:
     - requires_standalone

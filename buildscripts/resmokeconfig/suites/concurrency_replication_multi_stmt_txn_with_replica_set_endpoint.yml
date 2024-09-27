@@ -16,9 +16,9 @@ selector:
 
     # Relies on having one thread observe writes from the other threads, which won't become visible
     # once a transaction in the thread is started because it'll keep reading from the same snapshot.
-    - jstests/concurrency/fsm_workloads/create_index_background.js
-    - jstests/concurrency/fsm_workloads/create_index_background_partial_filter.js
-    - jstests/concurrency/fsm_workloads/create_index_background_wildcard.js
+    - jstests/concurrency/fsm_workloads/ddl/create_index_background/create_index_background.js
+    - jstests/concurrency/fsm_workloads/ddl/create_index_background/create_index_background_partial_filter.js
+    - jstests/concurrency/fsm_workloads/ddl/create_index_background/create_index_background_wildcard.js
 
     # Expects reads to die with a particular error, but other errors are possible if the read is part
     # of a transaction (e.g. ErrorCodes.LockTimeout).
@@ -26,18 +26,18 @@ selector:
     - jstests/concurrency/fsm_workloads/query/drop_index_during_lookup.js
 
     # Performs direct writes to system.views
-    - jstests/concurrency/fsm_workloads/view_catalog_direct_system_writes.js
+    - jstests/concurrency/fsm_workloads/view_catalog/view_catalog_direct_system_writes.js
 
     # Extracts error code from write error, which is obscured by runInsideTransaction.
     - jstests/concurrency/fsm_workloads/access_collection_in_transaction_after_catalog_changes.js
 
     # Induces non-blindly-retriable errors (see SERVER-45767).
-    - jstests/concurrency/fsm_workloads/create_database.js
+    - jstests/concurrency/fsm_workloads/ddl/create_database.js
 
     # The tests below are disabled because of sharding auto-bootstrap and replica set endpoint.
     # TODO (SERVER-86771): renameCollection on sharded cluster doesn't support implicitly creating
     # the destination database.
-    - jstests/concurrency/fsm_workloads/rename_collection_dbname_chain.js
+    - jstests/concurrency/fsm_workloads/ddl/rename_collection/rename_collection_dbname_chain.js
     # TODO: $exchange is an internal stage that is not supported via a router.
     # TODO (SERVER-91885): Investigate why the invariant in AsyncResultsMerger is hit.
     # TODO (SERVER-91129): Investigate why the teardown phase in agg_unionWith_interrupt_cleanup.js

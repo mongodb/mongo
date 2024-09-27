@@ -10,9 +10,9 @@ selector:
 
     # Relies on having one thread observe writes from the other threads, which won't become visible
     # once a transaction in the thread is started because it'll keep reading from the same snapshot.
-    - jstests/concurrency/fsm_workloads/create_index_background.js
-    - jstests/concurrency/fsm_workloads/create_index_background_partial_filter.js
-    - jstests/concurrency/fsm_workloads/create_index_background_wildcard.js
+    - jstests/concurrency/fsm_workloads/ddl/create_index_background/create_index_background.js
+    - jstests/concurrency/fsm_workloads/ddl/create_index_background/create_index_background_partial_filter.js
+    - jstests/concurrency/fsm_workloads/ddl/create_index_background/create_index_background_wildcard.js
 
     # Expects reads to die with a particular error, but other errors are possible if the read is part
     # of a transaction (e.g. ErrorCodes.LockTimeout).
@@ -20,13 +20,13 @@ selector:
     - jstests/concurrency/fsm_workloads/query/drop_index_during_lookup.js
 
     # Performs direct writes to system.views
-    - jstests/concurrency/fsm_workloads/view_catalog_direct_system_writes.js
+    - jstests/concurrency/fsm_workloads/view_catalog/view_catalog_direct_system_writes.js
 
     # Extracts error code from write error, which is obscured by runInsideTransaction.
     - jstests/concurrency/fsm_workloads/access_collection_in_transaction_after_catalog_changes.js
 
     # Induces non-blindly-retriable errors (see SERVER-45767).
-    - jstests/concurrency/fsm_workloads/create_database.js
+    - jstests/concurrency/fsm_workloads/ddl/create_database.js
 
   exclude_with_any_tags:
     - requires_standalone

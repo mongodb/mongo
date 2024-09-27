@@ -24,7 +24,7 @@ selector:
     # compact can only be run against a standalone mongod
 
     # test creates too many collections for ContinuousAddRemoveShard
-    - jstests/concurrency/fsm_workloads/create_collection.js
+    - jstests/concurrency/fsm_workloads/ddl/create_collection/create_collection.js
 
     # can cause OOM kills on test hosts
 
@@ -70,14 +70,14 @@ selector:
     # TODO SERVER-90609: Enable these tests.
 
     # TODO SERVER-92349: Re-enable this test once completed.
-    - jstests/concurrency/fsm_workloads/indexed_insert_ttl.js
+    - jstests/concurrency/fsm_workloads/crud/indexed_insert/indexed_insert_ttl.js
 
     # This test runs a large number of inserts, which can cause moveCollection to take a long time
     # to finish. This can cause the CheckMetadataConsistency hook to hit LockBusy errors.
 
     # Exclude tests that run cleanupOrphaned, which can fail running on a config shard if a
     # concurrent migration fails due to the config shard transitioning to dedicated.
-    - jstests/concurrency/fsm_workloads/cleanupOrphanedWhileMigrating.js
+    - jstests/concurrency/fsm_workloads/cleanup_orphaned_while_migrating.js
 
   exclude_with_any_tags:
     - requires_standalone

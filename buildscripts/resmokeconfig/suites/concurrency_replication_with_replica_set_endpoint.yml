@@ -18,15 +18,15 @@ selector:
     # The tests below are disabled because of sharding auto-bootstrap and replica set endpoint.
     # TODO (SERVER-86771): renameCollection on sharded cluster doesn't support implicitly creating
     # the destination database.
-    - jstests/concurrency/fsm_workloads/rename_capped_collection_dbname_chain.js
-    - jstests/concurrency/fsm_workloads/rename_collection_dbname_chain.js
+    - jstests/concurrency/fsm_workloads/ddl/rename_collection/rename_capped_collection_dbname_chain.js
+    - jstests/concurrency/fsm_workloads/ddl/rename_collection/rename_collection_dbname_chain.js
     # TODO: $exchange is an internal stage that is not supported via a router.
     - jstests/concurrency/fsm_workloads/query/exchange_producer.js
     # TODO (SERVER-91885): Investigate why the invariant in AsyncResultsMerger is hit.
-    - jstests/concurrency/fsm_workloads/multi_statement_transaction_all_commands_same_session.js
+    - jstests/concurrency/fsm_workloads/txns/multi_statement_transaction/multi_statement_transaction_all_commands_same_session.js
     # TODO (SERVER-89363): Re-enable this test after investigating the 'undefined' error in the
     # checkConsistency state.
-    - jstests/concurrency/fsm_workloads/multi_statement_transaction_atomicity_isolation_metrics_test.js
+    - jstests/concurrency/fsm_workloads/txns/multi_statement_transaction/multi_statement_transaction_atomicity_isolation_metrics_test.js
     # TODO (SERVER-91129): Investigate why the teardown phase in agg_unionWith_interrupt_cleanup.js
     # could fail with FailedToSatisfyReadPreference
     - jstests/concurrency/fsm_workloads/query/agg/agg_unionWith_interrupt_cleanup.js

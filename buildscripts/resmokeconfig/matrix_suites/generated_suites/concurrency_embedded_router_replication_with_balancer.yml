@@ -54,7 +54,7 @@ matrix_suite: true
 selector:
   exclude_files:
     - jstests/concurrency/fsm_workloads/query/update/update_where.js
-    - jstests/concurrency/fsm_workloads/timeseries_insert_idle_bucket_expiration.js
+    - jstests/concurrency/fsm_workloads/timeseries/timeseries_insert_idle_bucket_expiration.js
   exclude_with_any_tags:
     - requires_standalone
     - assumes_against_mongod_not_mongos

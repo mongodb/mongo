@@ -24,7 +24,7 @@
 import {extendWorkload} from "jstests/concurrency/fsm_libs/extend_workload.js";
 import {
     $config as $baseConfig
-} from "jstests/concurrency/fsm_workloads/sharded_moveChunk_partitioned.js";
+} from "jstests/concurrency/fsm_workloads/sharded_partitioned/sharded_moveChunk_partitioned.js";
 
 export const $config = extendWorkload($baseConfig, function($config, $super) {
     // The base setup will insert 'partitionSize' number of documents per thread, evenly

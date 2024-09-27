@@ -18,8 +18,8 @@ selector:
     # The tests below are disabled because of sharding auto-bootstrap and replica set endpoint.
     # TODO (SERVER-86771): renameCollection on sharded cluster doesn't support implicitly creating
     # the destination database.
-    - jstests/concurrency/fsm_workloads/rename_capped_collection_dbname_chain.js
-    - jstests/concurrency/fsm_workloads/rename_collection_dbname_chain.js
+    - jstests/concurrency/fsm_workloads/ddl/rename_collection/rename_capped_collection_dbname_chain.js
+    - jstests/concurrency/fsm_workloads/ddl/rename_collection/rename_collection_dbname_chain.js
     # TODO: $exchange is an internal stage that is not supported via a router.
     - jstests/concurrency/fsm_workloads/query/exchange_producer.js
     # TODO (SERVER-91885): Investigate why the invariant in AsyncResultsMerger is hit.

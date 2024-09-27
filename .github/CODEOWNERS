@@ -111,14 +111,21 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 /jstests/concurrency/fsm_libs/**/reshard_collection_util.js @10gen/server-cluster-scalability @svc-auto-approve-bot
 
 # The following patterns are parsed from ./jstests/concurrency/fsm_workloads/OWNERS.yml
-/jstests/concurrency/fsm_workloads/**/*global*index* @10gen/server-cluster-scalability @svc-auto-approve-bot
-/jstests/concurrency/fsm_workloads/**/server_status.js @10gen/server-networking-and-observability @svc-auto-approve-bot
-/jstests/concurrency/fsm_workloads/**/server_status_with_time_out_cursors.js @10gen/server-networking-and-observability @svc-auto-approve-bot
-/jstests/concurrency/fsm_workloads/**/*transaction* @10gen/server-cluster-scalability @svc-auto-approve-bot
-/jstests/concurrency/fsm_workloads/**/*txn* @10gen/server-cluster-scalability @svc-auto-approve-bot
+/jstests/concurrency/fsm_workloads/crud/*global*index* @10gen/server-cluster-scalability @svc-auto-approve-bot
 /jstests/concurrency/fsm_workloads/**/*write_without_shard_key* @10gen/query-execution @svc-auto-approve-bot
 /jstests/concurrency/fsm_workloads/**/timeseries* @10gen/server-storage-execution @svc-auto-approve-bot
-/jstests/concurrency/fsm_workloads/**/CRUD_clustered_collection.js @10gen/server-storage-execution @svc-auto-approve-bot
+/jstests/concurrency/fsm_workloads/**/timeseries_agg* @10gen/query-integration @svc-auto-approve-bot
+/jstests/concurrency/fsm_workloads/**/timeseries_deletes_and_inserts.js @10gen/query-integration @svc-auto-approve-bot
+/jstests/concurrency/fsm_workloads/crud/crud_clustered_collection.js @10gen/server-storage-execution @svc-auto-approve-bot
+
+# The following patterns are parsed from ./jstests/concurrency/fsm_workloads/convert_to_capped_collection/OWNERS.yml
+/jstests/concurrency/fsm_workloads/convert_to_capped_collection/**/* @10gen/server-storage-execution @svc-auto-approve-bot
+
+# The following patterns are parsed from ./jstests/concurrency/fsm_workloads/crud/reindex/OWNERS.yml
+/jstests/concurrency/fsm_workloads/crud/reindex/**/* @10gen/server-storage-execution @svc-auto-approve-bot
+
+# The following patterns are parsed from ./jstests/concurrency/fsm_workloads/ddl/create_index_background/OWNERS.yml
+/jstests/concurrency/fsm_workloads/ddl/create_index_background/**/* @10gen/server-storage-execution @svc-auto-approve-bot
 
 # The following patterns are parsed from ./jstests/concurrency/fsm_workloads/query/OWNERS.yml
 /jstests/concurrency/fsm_workloads/query/**/* @10gen/query @svc-auto-approve-bot
@@ -146,6 +153,21 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 
 # The following patterns are parsed from ./jstests/concurrency/fsm_workloads/query/yield/OWNERS.yml
 /jstests/concurrency/fsm_workloads/query/yield/**/* @10gen/query-execution @svc-auto-approve-bot
+
+# The following patterns are parsed from ./jstests/concurrency/fsm_workloads/server_status/OWNERS.yml
+/jstests/concurrency/fsm_workloads/server_status/**/* @10gen/server-networking-and-observability @svc-auto-approve-bot
+
+# The following patterns are parsed from ./jstests/concurrency/fsm_workloads/timeseries/OWNERS.yml
+/jstests/concurrency/fsm_workloads/timeseries/**/* @10gen/server-storage-execution @svc-auto-approve-bot
+
+# The following patterns are parsed from ./jstests/concurrency/fsm_workloads/txns/internal_transactions/OWNERS.yml
+/jstests/concurrency/fsm_workloads/txns/internal_transactions/**/* @10gen/server-cluster-scalability @svc-auto-approve-bot
+
+# The following patterns are parsed from ./jstests/concurrency/fsm_workloads/txns/multi_statement_transaction/OWNERS.yml
+/jstests/concurrency/fsm_workloads/txns/multi_statement_transaction/**/* @10gen/server-cluster-scalability @svc-auto-approve-bot
+
+# The following patterns are parsed from ./jstests/concurrency/fsm_workloads/updateOne_without_shard_key/OWNERS.yml
+/jstests/concurrency/fsm_workloads/updateOne_without_shard_key/**/* @10gen/server-cluster-scalability @svc-auto-approve-bot
 
 # The following patterns are parsed from ./jstests/core/OWNERS.yml
 /jstests/core/**/connection_string_validation.js @10gen/server-networking-and-observability @svc-auto-approve-bot

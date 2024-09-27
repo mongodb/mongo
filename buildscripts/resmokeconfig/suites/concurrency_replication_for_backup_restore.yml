@@ -8,8 +8,8 @@ selector:
     - jstests/concurrency/fsm_workloads/**/*.js
   exclude_files:
     # Compact workloads can slow down the system and cause timeouts.
-    - jstests/concurrency/fsm_workloads/auto_compact.js
-    - jstests/concurrency/fsm_workloads/compact.js
+    - jstests/concurrency/fsm_workloads/compact/auto_compact.js
+    - jstests/concurrency/fsm_workloads/compact/compact.js
 
     # These workloads use up to 100MB of memory, which can overwhelm test hosts.
     - jstests/concurrency/fsm_workloads/query/agg/agg_sort.js
@@ -20,7 +20,7 @@ selector:
     - jstests/concurrency/fsm_workloads/query/globally_managed_cursors.js
 
     # These workloads use a verbose log level.
-    - jstests/concurrency/fsm_workloads/collection_uuid.js
+    - jstests/concurrency/fsm_workloads/ddl/rename_collection/collection_uuid.js
 
   exclude_with_any_tags:
     - requires_standalone

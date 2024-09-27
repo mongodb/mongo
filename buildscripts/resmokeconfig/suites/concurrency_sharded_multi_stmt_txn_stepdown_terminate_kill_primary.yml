@@ -40,9 +40,9 @@ selector:
 
     # Relies on having one thread observe writes from the other threads, which won't become visible
     # once a transaction in the thread is started because it'll keep reading from the same snapshot.
-    - jstests/concurrency/fsm_workloads/create_index_background.js
-    - jstests/concurrency/fsm_workloads/create_index_background_partial_filter.js
-    - jstests/concurrency/fsm_workloads/create_index_background_wildcard.js
+    - jstests/concurrency/fsm_workloads/ddl/create_index_background/create_index_background.js
+    - jstests/concurrency/fsm_workloads/ddl/create_index_background/create_index_background_partial_filter.js
+    - jstests/concurrency/fsm_workloads/ddl/create_index_background/create_index_background_wildcard.js
 
     # Expects reads to die with a particular error, but other errors are possible if the read is part
     # of a transaction (e.g. ErrorCodes.LockTimeout).
@@ -66,8 +66,8 @@ selector:
     ##
 
     # ChunkHelper directly talks to the config servers and doesn't support retries for network errors
-    - jstests/concurrency/fsm_workloads/sharded_mergeChunks_partitioned.js
-    - jstests/concurrency/fsm_workloads/sharded_splitChunk_partitioned.js
+    - jstests/concurrency/fsm_workloads/sharded_partitioned/sharded_mergeChunks_partitioned.js
+    - jstests/concurrency/fsm_workloads/sharded_partitioned/sharded_splitChunk_partitioned.js
 
     # These workloads frequently time out waiting for the distributed lock to drop a sharded
     # collection.
@@ -76,14 +76,14 @@ selector:
 
     # Uses non retryable commands.
     - jstests/concurrency/fsm_workloads/query/agg/agg_sort.js
-    - jstests/concurrency/fsm_workloads/collmod.js
-    - jstests/concurrency/fsm_workloads/collmod_separate_collections.js
-    - jstests/concurrency/fsm_workloads/view_catalog.js
-    - jstests/concurrency/fsm_workloads/view_catalog_cycle_with_drop.js
+    - jstests/concurrency/fsm_workloads/ddl/collMod/collMod.js
+    - jstests/concurrency/fsm_workloads/ddl/collMod/collMod_separate_collections.js
+    - jstests/concurrency/fsm_workloads/view_catalog/view_catalog.js
+    - jstests/concurrency/fsm_workloads/view_catalog/view_catalog_cycle_with_drop.js
     - jstests/concurrency/fsm_workloads/query/timeseries/timeseries_deletes_and_inserts.js
-    - jstests/concurrency/fsm_workloads/timeseries_findAndModify_remove_and_inserts.js
-    - jstests/concurrency/fsm_workloads/timeseries_updates_and_inserts.js
-    - jstests/concurrency/fsm_workloads/timeseries_upserts.js
+    - jstests/concurrency/fsm_workloads/timeseries/timeseries_findAndModify_remove_and_inserts.js
+    - jstests/concurrency/fsm_workloads/timeseries/timeseries_updates_and_inserts.js
+    - jstests/concurrency/fsm_workloads/timeseries/timeseries_upserts.js
 
     ##
     # Denylists specific to this suite
@@ -93,7 +93,7 @@ selector:
     # find or aggregate) and calling getMore(), server will throw CursortNotFound exception.
     # We currently do not retry the transaction on this exception.
     - jstests/concurrency/fsm_workloads/query/agg/agg_unionWith_interrupt_cleanup.js
-    - jstests/concurrency/fsm_workloads/query/agg/agg_union_with_chunk_migrations.js
+    - jstests/concurrency/fsm_workloads/query/agg/agg_unionWith_chunk_migrations.js
     - jstests/concurrency/fsm_workloads/list_indexes.js
 
     # Uses non-retryable commands in the same state function as a command not supported in a
@@ -103,7 +103,7 @@ selector:
 
     # JS engine interruptions on mongos return ErrorCodes::Interrupted, which isn't
     # considered a retryable or transient transaction error.
-    - jstests/concurrency/fsm_workloads/indexed_insert_where.js
+    - jstests/concurrency/fsm_workloads/crud/indexed_insert/indexed_insert_where.js
     - jstests/concurrency/fsm_workloads/query/remove/remove_where.js
     - jstests/concurrency/fsm_workloads/query/update/update_where.js
 

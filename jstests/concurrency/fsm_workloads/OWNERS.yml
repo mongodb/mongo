@@ -1,18 +1,6 @@
 version: 1.0.0
 filters:
-  - "*global*index*":
-    approvers:
-      - 10gen/server-cluster-scalability
-  - "server_status.js":
-    approvers:
-      - 10gen/server-networking-and-observability
-  - "server_status_with_time_out_cursors.js":
-    approvers:
-      - 10gen/server-networking-and-observability
-  - "*transaction*":
-    approvers:
-      - 10gen/server-cluster-scalability
-  - "*txn*":
+  - "crud/*global*index*":
     approvers:
       - 10gen/server-cluster-scalability
   - "*write_without_shard_key*":
@@ -21,6 +9,12 @@ filters:
   - "timeseries*":
     approvers:
       - 10gen/server-storage-execution
-  - "CRUD_clustered_collection.js":
+  - "timeseries_agg*":
+    approvers:
+      - 10gen/query-integration
+  - "timeseries_deletes_and_inserts.js":
+    approvers:
+      - 10gen/query-integration
+  - "crud/crud_clustered_collection.js":
     approvers:
       - 10gen/server-storage-execution

@@ -11,7 +11,7 @@ selector:
     - jstests/concurrency/fsm_workloads/query/agg/agg_sort.js
 
     # These kill sessions.
-    - jstests/concurrency/fsm_workloads/snapshot_read_kill_operations.js
+    - jstests/concurrency/fsm_workloads/txns/snapshot_read/snapshot_read_kill_operations.js
 
     # This suite has TestData.discoveryTopology: False so clusterOptions.replication.enabled doesn't
     # get set true. analyze_shard_key.js calls cluster.awaitReplication() which has an
