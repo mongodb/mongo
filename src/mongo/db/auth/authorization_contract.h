@@ -38,7 +38,7 @@
 #include "mongo/db/auth/action_type.h"
 #include "mongo/db/auth/action_type_gen.h"
 #include "mongo/db/auth/privilege.h"
-#include "mongo/platform/mutex.h"
+#include "mongo/stdx/mutex.h"
 
 namespace mongo {
 

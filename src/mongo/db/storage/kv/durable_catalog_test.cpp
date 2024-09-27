@@ -90,8 +90,8 @@
 #include "mongo/db/tenant_id.h"
 #include "mongo/db/timeseries/timeseries_gen.h"
 #include "mongo/db/transaction_resources.h"
-#include "mongo/platform/mutex.h"
 #include "mongo/stdx/condition_variable.h"
+#include "mongo/stdx/mutex.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/unittest/assert.h"
 #include "mongo/unittest/bson_test_util.h"
@@ -631,7 +631,7 @@ public:
         auto indexEntry = createIndex(keyPattern);
         auto collection = getCollection();
 
-        mongo::Mutex mutex;
+        stdx::mutex mutex;
         stdx::condition_variable cv;
         int numMultikeyCalls = 0;
 

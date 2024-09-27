@@ -42,7 +42,7 @@
 #include "mongo/executor/network_connection_hook.h"
 #include "mongo/executor/network_interface.h"
 #include "mongo/platform/atomic_word.h"
-#include "mongo/platform/mutex.h"
+#include "mongo/stdx/mutex.h"
 #include "mongo/stdx/unordered_set.h"
 #include "mongo/transport/ssl_connection_context.h"
 #include "mongo/transport/transport_layer.h"
@@ -219,7 +219,7 @@ private:
 
     // Guards assignment of the _client pointer.
     // Do not need to acquire this in contexts where the pointer is known to be valid.
-    Mutex _clientMutex;
+    stdx::mutex _clientMutex;
     std::shared_ptr<AsyncDBClient> _client;
     ConnectionMetrics _connMetrics;
 };

@@ -143,7 +143,7 @@ grpc_ssl_certificate_config_reload_status Server::_certificateConfigCallback(
     void* certState, grpc_ssl_server_certificate_config** config) {
     CertificateState* certStatePtr = reinterpret_cast<CertificateState*>(certState);
     {
-        stdx::lock_guard<Latch> lk(certStatePtr->_mutex);
+        stdx::lock_guard<stdx::mutex> lk(certStatePtr->_mutex);
         if (certStatePtr->shouldReload) {
             // gRPC library will take ownership of and free the certificate config.
             *config = certStatePtr->cache.toGRPCConfig().release();
@@ -199,7 +199,7 @@ Status Server::rotateCertificates() {
     // Set the cache to the new certs and update each port's certificate state to notify gRPC to
     // rotate them on the next new connection.
     for (auto& certState : _certificateStates) {
-        stdx::lock_guard<Latch> lk(certState->_mutex);
+        stdx::lock_guard<stdx::mutex> lk(certState->_mutex);
         certState->cache = swNewCertificates.getValue();
         certState->shouldReload = true;
     }

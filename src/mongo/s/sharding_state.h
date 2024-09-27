@@ -39,7 +39,7 @@
 #include "mongo/db/service_context.h"
 #include "mongo/db/shard_id.h"
 #include "mongo/logv2/log_severity_suppressor.h"
-#include "mongo/platform/mutex.h"
+#include "mongo/stdx/mutex.h"
 
 namespace mongo {
 

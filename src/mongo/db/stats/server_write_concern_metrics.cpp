@@ -65,7 +65,7 @@ void ServerWriteConcernMetrics::recordWriteConcernForInserts(
         return;
     }
 
-    stdx::lock_guard<Latch> lg(_mutex);
+    stdx::lock_guard<stdx::mutex> lg(_mutex);
     _insertMetrics.recordWriteConcern(writeConcernOptions, numInserts);
 }
 
@@ -75,7 +75,7 @@ void ServerWriteConcernMetrics::recordWriteConcernForUpdate(
         return;
     }
 
-    stdx::lock_guard<Latch> lg(_mutex);
+    stdx::lock_guard<stdx::mutex> lg(_mutex);
     _updateMetrics.recordWriteConcern(writeConcernOptions);
 }
 
@@ -85,7 +85,7 @@ void ServerWriteConcernMetrics::recordWriteConcernForDelete(
         return;
     }
 
-    stdx::lock_guard<Latch> lg(_mutex);
+    stdx::lock_guard<stdx::mutex> lg(_mutex);
     _deleteMetrics.recordWriteConcern(writeConcernOptions);
 }
 
@@ -94,7 +94,7 @@ BSONObj ServerWriteConcernMetrics::toBSON() const {
         return BSONObj();
     }
 
-    stdx::lock_guard<Latch> lg(_mutex);
+    stdx::lock_guard<stdx::mutex> lg(_mutex);
 
     BSONObjBuilder builder;
 

@@ -1049,7 +1049,7 @@ public:
         }
 
         bool _allowMultipleSessions = false;
-        mutable Mutex _mutex;
+        mutable stdx::mutex _mutex;
         std::vector<std::shared_ptr<Session>> _sessions;
         boost::optional<Promise<std::shared_ptr<Session>>> _promise;
     };

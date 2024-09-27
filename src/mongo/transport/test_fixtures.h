@@ -69,7 +69,7 @@ public:
     }
 
 private:
-    mutable Mutex _mu;
+    mutable stdx::mutex _mu;
     mutable stdx::condition_variable _cv;
     std::queue<T> _q;
 };

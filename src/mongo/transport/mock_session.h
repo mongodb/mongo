@@ -169,13 +169,13 @@ public:
 
     Future<void> asyncWaitForData() noexcept override {
         auto fp = makePromiseFuture<void>();
-        stdx::lock_guard<Latch> lk(_waitForDataMutex);
+        stdx::lock_guard<stdx::mutex> lk(_waitForDataMutex);
         _waitForDataQueue.emplace_back(std::move(fp.promise));
         return std::move(fp.future);
     }
 
     void signalAvailableData() {
-        stdx::lock_guard<Latch> lk(_waitForDataMutex);
+        stdx::lock_guard<stdx::mutex> lk(_waitForDataMutex);
         if (_waitForDataQueue.size() == 0)
             return;
         Promise<void> promise = std::move(_waitForDataQueue.front());

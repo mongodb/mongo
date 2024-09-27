@@ -222,7 +222,7 @@ void TransactionCoordinatorService::onStepUp(OperationContext* opCtx,
 
     joinPreviousRound();
 
-    stdx::lock_guard<Latch> lg(_mutex);
+    stdx::lock_guard<stdx::mutex> lg(_mutex);
     if (_isShuttingDown) {
         return;
     }
@@ -320,7 +320,7 @@ void TransactionCoordinatorService::onStepUp(OperationContext* opCtx,
 
 void TransactionCoordinatorService::onStepDown() {
     {
-        stdx::lock_guard<Latch> lg(_mutex);
+        stdx::lock_guard<stdx::mutex> lg(_mutex);
         if (!_catalogAndScheduler)
             return;
 
@@ -333,7 +333,7 @@ void TransactionCoordinatorService::onStepDown() {
 
 void TransactionCoordinatorService::shutdown() {
     {
-        stdx::lock_guard<Latch> lg(_mutex);
+        stdx::lock_guard<stdx::mutex> lg(_mutex);
         _isShuttingDown = true;
     }
     onStepDown();
@@ -345,7 +345,7 @@ void TransactionCoordinatorService::onShardingInitialization(OperationContext* o
     if (!isPrimary)
         return;
 
-    stdx::lock_guard<Latch> lg(_mutex);
+    stdx::lock_guard<stdx::mutex> lg(_mutex);
     if (_isShuttingDown) {
         return;
     }
@@ -359,7 +359,7 @@ void TransactionCoordinatorService::onShardingInitialization(OperationContext* o
 
 std::shared_ptr<TransactionCoordinatorService::CatalogAndScheduler>
 TransactionCoordinatorService::_getCatalogAndScheduler(OperationContext* opCtx) {
-    stdx::unique_lock<Latch> ul(_mutex);
+    stdx::unique_lock<stdx::mutex> ul(_mutex);
     uassert(ErrorCodes::NotWritablePrimary,
             "Transaction coordinator is not a primary",
             _catalogAndScheduler);
@@ -368,7 +368,7 @@ TransactionCoordinatorService::_getCatalogAndScheduler(OperationContext* opCtx) 
 }
 
 void TransactionCoordinatorService::joinPreviousRound() {
-    stdx::unique_lock<Latch> ul(_mutex);
+    stdx::unique_lock<stdx::mutex> ul(_mutex);
 
     // onStepDown must have been called
     invariant(!_catalogAndScheduler);

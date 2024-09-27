@@ -44,9 +44,9 @@
 #include "mongo/db/s/collection_metadata.h"
 #include "mongo/db/s/scoped_collection_metadata.h"
 #include "mongo/db/service_context.h"
-#include "mongo/platform/mutex.h"
 #include "mongo/s/catalog/type_chunk.h"
 #include "mongo/s/chunk_version.h"
+#include "mongo/stdx/mutex.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/concurrency/with_lock.h"
 #include "mongo/util/future.h"
@@ -86,7 +86,7 @@ public:
      * Returns the placement version of the active metadata object.
      */
     ChunkVersion getActivePlacementVersion() {
-        stdx::lock_guard<Latch> lg(_managerLock);
+        stdx::lock_guard<stdx::mutex> lg(_managerLock);
         invariant(!_metadata.empty());
         return _metadata.back()->metadata->getShardPlacementVersion();
     }

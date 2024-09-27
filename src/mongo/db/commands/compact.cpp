@@ -162,7 +162,7 @@ public:
         {
             // Do not allow concurrent compact operations on the same namespace as this
             // concurrency will impact statistic gathering and can result in incorrect reporting.
-            stdx::lock_guard<Latch> lk(mutex);
+            stdx::lock_guard<stdx::mutex> lk(mutex);
             if (compactsRunning.contains(uuid)) {
                 uasserted(ErrorCodes::OperationFailed,
                           str::stream() << "Compaction is already in progress for "
@@ -172,7 +172,7 @@ public:
         }
 
         ON_BLOCK_EXIT([&] {
-            stdx::lock_guard<Latch> lk(mutex);
+            stdx::lock_guard<stdx::mutex> lk(mutex);
             compactsRunning.erase(uuid);
         });
 

@@ -68,8 +68,8 @@
 #include "mongo/logv2/log_attr.h"
 #include "mongo/logv2/log_component.h"
 #include "mongo/platform/compiler.h"
-#include "mongo/platform/mutex.h"
 #include "mongo/rpc/get_status_from_command_result.h"
+#include "mongo/stdx/mutex.h"
 #include "mongo/stdx/unordered_map.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/clock_source.h"
@@ -181,7 +181,7 @@ BaseCloner::ClonerStages CollectionCloner::getStages() {
 
 
 void CollectionCloner::preStage() {
-    stdx::lock_guard<Latch> lk(_mutex);
+    stdx::lock_guard<stdx::mutex> lk(_mutex);
     _stats.start = getSharedData()->getClock()->now();
 
     BSONObjBuilder b(BSON("collStats" << _sourceNss.coll().toString()));
@@ -206,7 +206,7 @@ void CollectionCloner::preStage() {
 }
 
 void CollectionCloner::postStage() {
-    stdx::lock_guard<Latch> lk(_mutex);
+    stdx::lock_guard<stdx::mutex> lk(_mutex);
     _stats.end = getSharedData()->getClock()->now();
 }
 
@@ -265,7 +265,7 @@ BaseCloner::AfterStageBehavior CollectionCloner::countStage() {
 
     _progressMeter.setTotalWhileRunning(static_cast<unsigned long long>(count));
     {
-        stdx::lock_guard<Latch> lk(_mutex);
+        stdx::lock_guard<stdx::mutex> lk(_mutex);
         _stats.documentToCopy = count;
     }
     return kContinueNormally;
@@ -316,7 +316,7 @@ BaseCloner::AfterStageBehavior CollectionCloner::listIndexesStage() {
     }
 
     {
-        stdx::lock_guard<Latch> lk(_mutex);
+        stdx::lock_guard<stdx::mutex> lk(_mutex);
         _stats.indexes = _readyIndexSpecs.size() + _unfinishedIndexSpecs.size() +
             (_idIndexSpec.isEmpty() ? 0 : 1);
     };
@@ -482,7 +482,7 @@ void CollectionCloner::handleNextBatch(DBClientCursor& cursor) {
     _firstBatchOfQueryRound = false;
 
     {
-        stdx::lock_guard<Latch> lk(_mutex);
+        stdx::lock_guard<stdx::mutex> lk(_mutex);
         _stats.receivedBatches++;
         while (cursor.moreInCurrentBatch()) {
             _documentsToInsert.emplace_back(cursor.nextSafe());
@@ -517,7 +517,7 @@ void CollectionCloner::handleNextBatch(DBClientCursor& cursor) {
 void CollectionCloner::insertDocumentsCallback(const executor::TaskExecutor::CallbackArgs& cbd) {
     uassertStatusOK(cbd.status);
     {
-        stdx::lock_guard<Latch> lk(_mutex);
+        stdx::lock_guard<stdx::mutex> lk(_mutex);
         std::vector<BSONObj> docs;
         // Increment 'fetchedBatches' even if no documents were inserted to match the number of
         // 'receivedBatches'.
@@ -569,7 +569,7 @@ void CollectionCloner::waitForDatabaseWorkToComplete() {
 }
 
 CollectionCloner::Stats CollectionCloner::getStats() const {
-    stdx::lock_guard<Latch> lk(_mutex);
+    stdx::lock_guard<stdx::mutex> lk(_mutex);
     return _stats;
 }
 

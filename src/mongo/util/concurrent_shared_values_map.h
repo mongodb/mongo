@@ -33,7 +33,6 @@
 #include <memory>
 #include <utility>
 
-#include "mongo/platform/mutex.h"
 #include "mongo/stdx/mutex.h"
 
 namespace mongo {
@@ -163,6 +162,6 @@ private:
     // shared_ptr in order to allow lock-free reads of the values.
     std::shared_ptr<Map> _map;
     // Locked in order to modify the map by either inserting or removing an element.
-    Mutex _mapModificationMutex;
+    stdx::mutex _mapModificationMutex;
 };
 }  // namespace mongo

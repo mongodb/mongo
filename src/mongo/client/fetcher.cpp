@@ -226,7 +226,7 @@ std::string Fetcher::toString() const {
 }
 
 std::string Fetcher::getDiagnosticString() const {
-    stdx::lock_guard<Latch> lk(_mutex);
+    stdx::lock_guard<stdx::mutex> lk(_mutex);
     str::stream output;
     output << "Fetcher";
     output << " source: " << _source.toString();
@@ -249,7 +249,7 @@ std::string Fetcher::getDiagnosticString() const {
 }
 
 bool Fetcher::isActive() const {
-    stdx::lock_guard<Latch> lk(_mutex);
+    stdx::lock_guard<stdx::mutex> lk(_mutex);
     return _isActive_inlock();
 }
 
@@ -258,7 +258,7 @@ bool Fetcher::_isActive_inlock() const {
 }
 
 Status Fetcher::schedule() {
-    stdx::lock_guard<Latch> lock(_mutex);
+    stdx::lock_guard<stdx::mutex> lock(_mutex);
     switch (_state) {
         case State::kPreStart:
             _state = State::kRunning;
@@ -281,7 +281,7 @@ Status Fetcher::schedule() {
 }
 
 void Fetcher::shutdown() {
-    stdx::lock_guard<Latch> lock(_mutex);
+    stdx::lock_guard<stdx::mutex> lock(_mutex);
     switch (_state) {
         case State::kPreStart:
             // Transition directly from PreStart to Complete if not started yet.
@@ -306,7 +306,7 @@ void Fetcher::shutdown() {
 
 Status Fetcher::join(Interruptible* interruptible) {
     try {
-        stdx::unique_lock<Latch> lk(_mutex);
+        stdx::unique_lock<stdx::mutex> lk(_mutex);
         interruptible->waitForConditionOrInterrupt(
             _condition, lk, [this]() { return !_isActive_inlock(); });
         return Status::OK();
@@ -320,12 +320,12 @@ void Fetcher::_join() {
 }
 
 Fetcher::State Fetcher::getState_forTest() const {
-    stdx::lock_guard<Latch> lk(_mutex);
+    stdx::lock_guard<stdx::mutex> lk(_mutex);
     return _state;
 }
 
 bool Fetcher::_isShuttingDown() const {
-    stdx::lock_guard<Latch> lk(_mutex);
+    stdx::lock_guard<stdx::mutex> lk(_mutex);
     return _isShuttingDown_inlock();
 }
 
@@ -334,7 +334,7 @@ bool Fetcher::_isShuttingDown_inlock() const {
 }
 
 Status Fetcher::_scheduleGetMore(const BSONObj& cmdObj) {
-    stdx::lock_guard<Latch> lk(_mutex);
+    stdx::lock_guard<stdx::mutex> lk(_mutex);
     if (_isShuttingDown_inlock()) {
         return Status(ErrorCodes::CallbackCanceled,
                       "fetcher was shut down after previous batch was processed");
@@ -395,7 +395,7 @@ void Fetcher::_callback(const RemoteCommandCallbackArgs& rcbd, const char* batch
     batchData.otherFields.metadata = rcbd.response.data;
     batchData.elapsed = rcbd.response.elapsed.value_or(Microseconds{0});
     {
-        stdx::lock_guard<Latch> lk(_mutex);
+        stdx::lock_guard<stdx::mutex> lk(_mutex);
         batchData.first = _first;
         _first = false;
     }
@@ -468,7 +468,7 @@ void Fetcher::_finishCallback() {
     // 'tempWork' must be declared before lock guard 'lk' so that it is destroyed outside the lock.
     Fetcher::CallbackFn tempWork;
 
-    stdx::lock_guard<Latch> lk(_mutex);
+    stdx::lock_guard<stdx::mutex> lk(_mutex);
     invariant(State::kComplete != _state);
     _state = State::kComplete;
     _first = false;

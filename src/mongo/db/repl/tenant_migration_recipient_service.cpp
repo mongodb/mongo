@@ -1857,7 +1857,7 @@ SemiFuture<void> TenantMigrationRecipientService::Instance::_markStateDocAsGarba
                     auto oplogSlot = LocalOplogInfo::get(opCtx)->getNextOpTimes(opCtx, 1U)[0];
 
                     auto stateDoc = [&]() {
-                        stdx::lock_guard<Latch> lg(_mutex);
+                        stdx::lock_guard<stdx::mutex> lg(_mutex);
                         switch (nextState) {
                             case TenantMigrationRecipientStateEnum::kAborted:
                                 _stateDoc.setAbortOpTime(oplogSlot);
@@ -2473,7 +2473,7 @@ SemiFuture<void> TenantMigrationRecipientService::Instance::run(
                        }
 
                        {
-                           stdx::lock_guard<Latch> lg(_mutex);
+                           stdx::lock_guard<stdx::mutex> lg(_mutex);
                            uassert(ErrorCodes::TenantMigrationForgotten,
                                    str::stream() << "Migration " << getMigrationUUID()
                                                  << " already marked for garbage collection",
@@ -2635,7 +2635,7 @@ SemiFuture<void> TenantMigrationRecipientService::Instance::run(
         .then([this, self = shared_from_this(), token](
                   const boost::optional<TenantMigrationRecipientStateEnum>& state) {
             auto expireAt = [&]() {
-                stdx::lock_guard<Latch> lg(_mutex);
+                stdx::lock_guard<stdx::mutex> lg(_mutex);
                 return _stateDoc.getExpireAt();
             }();
             if (expireAt) {
@@ -2732,7 +2732,7 @@ SemiFuture<void> TenantMigrationRecipientService::Instance::_removeStateDoc(
 SemiFuture<void>
 TenantMigrationRecipientService::Instance::_waitForGarbageCollectionDelayThenDeleteStateDoc(
     const CancellationToken& token) {
-    stdx::lock_guard<Latch> lg(_mutex);
+    stdx::lock_guard<stdx::mutex> lg(_mutex);
     LOGV2(8423369,
           "Waiting for garbage collection delay before deleting state document",
           "migrationId"_attr = _migrationUuid,

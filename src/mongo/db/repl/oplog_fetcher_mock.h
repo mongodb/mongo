@@ -42,8 +42,8 @@
 #include "mongo/db/repl/oplog_fetcher.h"
 #include "mongo/db/repl/optime.h"
 #include "mongo/executor/task_executor.h"
-#include "mongo/platform/mutex.h"
 #include "mongo/stdx/condition_variable.h"
+#include "mongo/stdx/mutex.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/util/future.h"
 #include "mongo/util/future_impl.h"
@@ -98,7 +98,7 @@ private:
 
     void _preJoin() noexcept override {}
 
-    Mutex* _getMutex() noexcept override;
+    stdx::mutex* _getMutex() noexcept override;
 
     // ============= End AbstractAsyncComponent overrides ==============
     class TestCodeBlock {

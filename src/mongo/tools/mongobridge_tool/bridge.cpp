@@ -57,13 +57,13 @@
 #include "mongo/logv2/log_attr.h"
 #include "mongo/logv2/log_component.h"
 #include "mongo/logv2/redaction.h"
-#include "mongo/platform/mutex.h"
 #include "mongo/platform/random.h"
 #include "mongo/rpc/factory.h"
 #include "mongo/rpc/message.h"
 #include "mongo/rpc/op_msg.h"
 #include "mongo/rpc/protocol.h"
 #include "mongo/rpc/reply_builder_interface.h"
+#include "mongo/stdx/mutex.h"
 #include "mongo/tools/mongobridge_tool/bridge_commands.h"
 #include "mongo/tools/mongobridge_tool/mongobridge_options.h"
 #include "mongo/transport/asio/asio_session_manager.h"
@@ -123,7 +123,7 @@ public:
     }
 
 private:
-    Mutex _mutex;
+    stdx::mutex _mutex;
     PseudoRandom _rand;
 };
 
@@ -160,7 +160,7 @@ public:
 
     HostSettings getHostSettings(boost::optional<HostAndPort> host) {
         if (host) {
-            stdx::lock_guard<Latch> lk(_settingsMutex);
+            stdx::lock_guard<stdx::mutex> lk(_settingsMutex);
             return (_settings)[*host];
         }
         return {};

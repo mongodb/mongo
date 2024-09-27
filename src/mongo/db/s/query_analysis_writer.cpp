@@ -332,7 +332,7 @@ void QueryAnalysisWriter::onStartup(OperationContext* opCtx) {
     auto periodicRunner = serviceContext->getPeriodicRunner();
     invariant(periodicRunner);
 
-    stdx::lock_guard<Latch> lk(_mutex);
+    stdx::lock_guard<stdx::mutex> lk(_mutex);
 
     PeriodicRunner::PeriodicJob queryWriterJob(
         "QueryAnalysisQueryWriter",
@@ -497,7 +497,7 @@ void QueryAnalysisWriter::_flush(OperationContext* opCtx, Buffer* buffer) {
     // when the inserts below fail.
     std::set<int> invalid;
     {
-        stdx::lock_guard<Latch> lk(_mutex);
+        stdx::lock_guard<stdx::mutex> lk(_mutex);
         if (buffer->isEmpty()) {
             return;
         }
@@ -511,7 +511,7 @@ void QueryAnalysisWriter::_flush(OperationContext* opCtx, Buffer* buffer) {
         std::swap(tmpBuffer, *buffer);
     }
     ScopeGuard backSwapper([&] {
-        stdx::lock_guard<Latch> lk(_mutex);
+        stdx::lock_guard<stdx::mutex> lk(_mutex);
         for (int i = 0; i < tmpBuffer.getCount(); i++) {
             if (invalid.find(i) == invalid.end()) {
                 buffer->add(tmpBuffer.at(i));
@@ -616,7 +616,7 @@ void QueryAnalysisWriter::Buffer::truncate(size_t index, long long numBytes) {
 }
 
 bool QueryAnalysisWriter::_exceedsMaxSizeBytes() {
-    stdx::lock_guard<Latch> lk(_mutex);
+    stdx::lock_guard<stdx::mutex> lk(_mutex);
     return _queries.getSize() + _diffs.getSize() >= gQueryAnalysisWriterMaxMemoryUsageBytes.load();
 }
 
@@ -685,7 +685,7 @@ ExecutorFuture<void> QueryAnalysisWriter::_addReadQuery(
                                             expireAt}
                            .toBSON();
 
-            stdx::lock_guard<Latch> lk(_mutex);
+            stdx::lock_guard<stdx::mutex> lk(_mutex);
             if (_queries.add(doc)) {
                 QueryAnalysisSampleTracker::get(opCtx).incrementReads(
                     opCtx, sampledReadCmd.nss, *collUuid, doc.objsize());
@@ -733,7 +733,7 @@ ExecutorFuture<void> QueryAnalysisWriter::addUpdateQuery(SampledCommandNameEnum 
                                                 expireAt}
                                .toBSON();
 
-                stdx::lock_guard<Latch> lk(_mutex);
+                stdx::lock_guard<stdx::mutex> lk(_mutex);
                 if (_queries.add(doc)) {
                     QueryAnalysisSampleTracker::get(opCtx).incrementWrites(
                         opCtx, sampledUpdateCmd.nss, *collUuid, doc.objsize());
@@ -800,7 +800,7 @@ ExecutorFuture<void> QueryAnalysisWriter::addDeleteQuery(SampledCommandNameEnum 
                                                 expireAt}
                                .toBSON();
 
-                stdx::lock_guard<Latch> lk(_mutex);
+                stdx::lock_guard<stdx::mutex> lk(_mutex);
                 if (_queries.add(doc)) {
                     QueryAnalysisSampleTracker::get(opCtx).incrementWrites(
                         opCtx, sampledDeleteCmd.nss, *collUuid, doc.objsize());
@@ -866,7 +866,7 @@ ExecutorFuture<void> QueryAnalysisWriter::addFindAndModifyQuery(
                                             expireAt}
                            .toBSON();
 
-            stdx::lock_guard<Latch> lk(_mutex);
+            stdx::lock_guard<stdx::mutex> lk(_mutex);
             if (_queries.add(doc)) {
                 QueryAnalysisSampleTracker::get(opCtx).incrementWrites(
                     opCtx, sampledFindAndModifyCmd.nss, *collUuid, doc.objsize());
@@ -928,7 +928,7 @@ ExecutorFuture<void> QueryAnalysisWriter::addDiff(const UUID& sampleId,
             auto doc =
                 SampledQueryDiffDocument{sampleId, nss, collUuid, std::move(*diff), expireAt};
 
-            stdx::lock_guard<Latch> lk(_mutex);
+            stdx::lock_guard<stdx::mutex> lk(_mutex);
             _diffs.add(doc.toBSON());
         })
         .then([this] {

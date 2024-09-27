@@ -46,7 +46,7 @@
 #include "mongo/db/repl/optime.h"
 #include "mongo/db/repl/storage_interface.h"
 #include "mongo/executor/task_executor.h"
-#include "mongo/platform/mutex.h"
+#include "mongo/stdx/mutex.h"
 #include "mongo/util/concurrency/thread_pool.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/functional.h"

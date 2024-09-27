@@ -292,7 +292,6 @@ mongo_cc_library(
         "//src/mongo/platform:decimal128.h",
         "//src/mongo/platform:endian.h",
         "//src/mongo/platform:int128.h",
-        "//src/mongo/platform:mutex.h",
         "//src/mongo/platform:overflow_arithmetic.h",
         "//src/mongo/platform:process_id.h",
         "//src/mongo/platform:random.h",

@@ -52,7 +52,7 @@
 #include "mongo/db/repl/roll_back_local_operations.h"
 #include "mongo/db/repl/rollback.h"
 #include "mongo/db/repl/storage_interface.h"
-#include "mongo/platform/mutex.h"
+#include "mongo/stdx/mutex.h"
 #include "mongo/stdx/unordered_map.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/time_support.h"

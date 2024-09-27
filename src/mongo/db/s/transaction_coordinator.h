@@ -49,7 +49,7 @@
 #include "mongo/db/session/logical_session_id.h"
 #include "mongo/db/session/logical_session_id_gen.h"
 #include "mongo/db/shard_id.h"
-#include "mongo/platform/mutex.h"
+#include "mongo/stdx/mutex.h"
 #include "mongo/util/fail_point.h"
 #include "mongo/util/future.h"
 #include "mongo/util/future_impl.h"

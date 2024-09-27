@@ -35,7 +35,6 @@
 #include <string>
 #include <utility>
 
-#include "mongo/platform/mutex.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/time_support.h"
 

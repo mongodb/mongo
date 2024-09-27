@@ -53,7 +53,7 @@ void ReplicaSetChangeNotifier::_addListener(std::shared_ptr<Listener> listener) 
 void ReplicaSetChangeNotifier::onFoundSet(const std::string& name) noexcept {
     LOGV2_DEBUG(20158, 2, "Signaling found set", "replicaSet"_attr = name);
 
-    stdx::unique_lock<Latch> lk(_mutex);
+    stdx::unique_lock<stdx::mutex> lk(_mutex);
 
     _replicaSetStates.emplace(name, State{});
 
@@ -72,7 +72,7 @@ void ReplicaSetChangeNotifier::onPossibleSet(ConnectionString connectionString) 
 
     const auto& name = connectionString.getSetName();
 
-    stdx::unique_lock<Latch> lk(_mutex);
+    stdx::unique_lock<stdx::mutex> lk(_mutex);
 
     auto state = [&] {
         auto& state = _replicaSetStates[name];
@@ -104,7 +104,7 @@ void ReplicaSetChangeNotifier::onConfirmedSet(ConnectionString connectionString,
                 "primary"_attr = primary);
 
     const auto& name = connectionString.getSetName();
-    stdx::unique_lock<Latch> lk(_mutex);
+    stdx::unique_lock<stdx::mutex> lk(_mutex);
 
     auto state = [&] {
         auto& state = _replicaSetStates[name];
@@ -130,7 +130,7 @@ void ReplicaSetChangeNotifier::onConfirmedSet(ConnectionString connectionString,
 void ReplicaSetChangeNotifier::onDroppedSet(const std::string& name) noexcept {
     LOGV2_DEBUG(20161, 2, "Signaling dropped set", "replicaSet"_attr = name);
 
-    stdx::unique_lock<Latch> lk(_mutex);
+    stdx::unique_lock<stdx::mutex> lk(_mutex);
 
     // If we never singaled the initial possible set, we should not on dropped set
     auto it = _replicaSetStates.find(name);

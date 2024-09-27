@@ -62,8 +62,8 @@
 #include "mongo/executor/remote_command_response.h"
 #include "mongo/executor/task_executor.h"
 #include "mongo/platform/atomic_word.h"
-#include "mongo/platform/mutex.h"
 #include "mongo/stdx/condition_variable.h"
+#include "mongo/stdx/mutex.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/cancellation.h"
 #include "mongo/util/duration.h"
@@ -203,7 +203,7 @@ private:
     // All requests that have been scheduled on the mock.
     std::deque<RequestInfo> _requests;
     // Protects the above _requests queue.
-    Mutex _m;
+    stdx::mutex _m;
     stdx::condition_variable _hasRequestsCV;
 };
 
@@ -380,7 +380,7 @@ private:
     std::vector<Expectation> _expectations;
     std::vector<Request> _unexpectedRequests;
     // Protects the above _expectations queue.
-    Mutex _m;
+    stdx::mutex _m;
 };
 
 std::ostream& operator<<(std::ostream& s, const AsyncMockAsyncRPCRunner::Request& o) {

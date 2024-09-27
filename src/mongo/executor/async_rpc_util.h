@@ -135,7 +135,7 @@ Future<std::vector<SingleResult>> getAllResponsesOrFirstErrorWithCancellation(
                               size_t index) {
         if (!sw.isOK()) {
             sharedUtil->source.cancel();
-            stdx::lock_guard<Latch> lk(sharedUtil->mutex);
+            stdx::lock_guard<stdx::mutex> lk(sharedUtil->mutex);
             if (sharedUtil->results.getStatus() == Status::OK()) {
                 sharedUtil->results = sw.getStatus();
             }
@@ -150,7 +150,7 @@ Future<std::vector<SingleResult>> getAllResponsesOrFirstErrorWithCancellation(
         auto reply = sw.getValue();
         auto response = processResponse(reply, index);
 
-        stdx::lock_guard<Latch> lk(sharedUtil->mutex);
+        stdx::lock_guard<stdx::mutex> lk(sharedUtil->mutex);
         if (sharedUtil->results.getStatus() == Status::OK()) {
             sharedUtil->results.getValue().push_back(response);
         }

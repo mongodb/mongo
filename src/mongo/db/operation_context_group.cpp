@@ -64,7 +64,7 @@ OperationContextGroup::Context::Context(OperationContext& ctx, OperationContextG
 
 void OperationContextGroup::Context::discard() {
     if (!_movedFrom) {
-        stdx::lock_guard<Latch> lk(_ctxGroup._lock);
+        stdx::lock_guard<stdx::mutex> lk(_ctxGroup._lock);
         auto it = find(_ctxGroup._contexts, &_opCtx);
         _ctxGroup._contexts.erase(it);
         _movedFrom = true;
@@ -80,7 +80,7 @@ auto OperationContextGroup::makeOperationContext(Client& client) -> Context {
 auto OperationContextGroup::adopt(UniqueOperationContext opCtx) -> Context {
     auto cp = opCtx.get();
     invariant(cp);
-    stdx::lock_guard<Latch> lk(_lock);
+    stdx::lock_guard<stdx::mutex> lk(_lock);
     _contexts.emplace_back(std::move(opCtx));
     return Context(*cp, *this);
 }
@@ -90,7 +90,7 @@ auto OperationContextGroup::take(Context ctx) -> Context {
         return ctx;
     }
     {
-        stdx::lock_guard<Latch> lk(_lock);
+        stdx::lock_guard<stdx::mutex> lk(_lock);
         auto it = find(ctx._ctxGroup._contexts, &ctx._opCtx);
         _contexts.emplace_back(std::move(*it));
         ctx._ctxGroup._contexts.erase(it);
@@ -101,14 +101,14 @@ auto OperationContextGroup::take(Context ctx) -> Context {
 
 void OperationContextGroup::interrupt(ErrorCodes::Error code) {
     invariant(code);
-    stdx::lock_guard<Latch> lk(_lock);
+    stdx::lock_guard<stdx::mutex> lk(_lock);
     for (auto&& uniqueOperationContext : _contexts) {
         interruptOne(uniqueOperationContext.get(), code);
     }
 }
 
 bool OperationContextGroup::isEmpty() {
-    stdx::lock_guard<Latch> lk(_lock);
+    stdx::lock_guard<stdx::mutex> lk(_lock);
     return _contexts.empty();
 }
 

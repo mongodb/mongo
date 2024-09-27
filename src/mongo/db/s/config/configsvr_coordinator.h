@@ -47,7 +47,7 @@
 #include "mongo/db/session/logical_session_id_gen.h"
 #include "mongo/executor/scoped_task_executor.h"
 #include "mongo/logv2/log.h"
-#include "mongo/platform/mutex.h"
+#include "mongo/stdx/mutex.h"
 #include "mongo/util/cancellation.h"
 #include "mongo/util/future.h"
 #include "mongo/util/future_impl.h"

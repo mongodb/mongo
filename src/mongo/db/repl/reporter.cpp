@@ -89,17 +89,17 @@ std::string Reporter::toString() const {
 }
 
 HostAndPort Reporter::getTarget() const {
-    stdx::lock_guard<Latch> lk(_mutex);
+    stdx::lock_guard<stdx::mutex> lk(_mutex);
     return _target;
 }
 
 Milliseconds Reporter::getKeepAliveInterval() const {
-    stdx::lock_guard<Latch> lk(_mutex);
+    stdx::lock_guard<stdx::mutex> lk(_mutex);
     return _keepAliveInterval;
 }
 
 void Reporter::shutdown() {
-    stdx::lock_guard<Latch> lk(_mutex);
+    stdx::lock_guard<stdx::mutex> lk(_mutex);
 
     _status = Status(ErrorCodes::CallbackCanceled, "Reporter no longer valid");
 
@@ -135,13 +135,13 @@ void Reporter::shutdown() {
 }
 
 Status Reporter::join() {
-    stdx::unique_lock<Latch> lk(_mutex);
+    stdx::unique_lock<stdx::mutex> lk(_mutex);
     _condition.wait(lk, [this]() { return !_isActive_inlock() && !_isBackupActive_inlock(); });
     return _status;
 }
 
 Status Reporter::trigger(bool allowOneMore) {
-    stdx::lock_guard<Latch> lk(_mutex);
+    stdx::lock_guard<stdx::mutex> lk(_mutex);
 
     // If these was a previous error then the reporter is dead and return that error.
     if (!_status.isOK()) {
@@ -196,7 +196,7 @@ Status Reporter::trigger(bool allowOneMore) {
 StatusWith<BSONObj> Reporter::_prepareCommand() {
     auto prepareResult = _prepareReplSetUpdatePositionCommandFn();
 
-    stdx::lock_guard<Latch> lk(_mutex);
+    stdx::lock_guard<stdx::mutex> lk(_mutex);
 
     // Reporter could have been canceled while preparing the command.
     if (!_status.isOK()) {
@@ -253,7 +253,7 @@ void Reporter::_sendCommand_inlock(BSONObj commandRequest,
 void Reporter::_processResponseCallback(
     const executor::TaskExecutor::RemoteCommandCallbackArgs& rcbd, bool useBackupChannel) {
     {
-        stdx::lock_guard<Latch> lk(_mutex);
+        stdx::lock_guard<stdx::mutex> lk(_mutex);
 
         // If the reporter was shut down before this callback is invoked,
         // return the canceled "_status".
@@ -314,7 +314,7 @@ void Reporter::_processResponseCallback(
     // Since we unlock above, there is a chance that the main channel and backup channel reach this
     // point at about the same time and the updatePosition request would be almost the same. We may
     // save one request in that case but for now we leave it for future optimization.
-    stdx::lock_guard<Latch> lk(_mutex);
+    stdx::lock_guard<stdx::mutex> lk(_mutex);
     if (!_status.isOK()) {
         _onShutdown_inlock(useBackupChannel);
         return;
@@ -336,7 +336,7 @@ void Reporter::_prepareAndSendCommandCallback(const executor::TaskExecutor::Call
                                               bool fromTrigger,
                                               bool useBackupChannel) {
     {
-        stdx::lock_guard<Latch> lk(_mutex);
+        stdx::lock_guard<stdx::mutex> lk(_mutex);
         if (!_status.isOK()) {
             _onShutdown_inlock(useBackupChannel);
             return;
@@ -359,7 +359,7 @@ void Reporter::_prepareAndSendCommandCallback(const executor::TaskExecutor::Call
     // Must call without holding the lock.
     auto prepareResult = _prepareCommand();
 
-    stdx::lock_guard<Latch> lk(_mutex);
+    stdx::lock_guard<stdx::mutex> lk(_mutex);
     if (!_status.isOK()) {
         _onShutdown_inlock(useBackupChannel);
         return;
@@ -398,12 +398,12 @@ void Reporter::_onShutdown_inlock(bool useBackupChannel) {
 }
 
 bool Reporter::isActive() const {
-    stdx::lock_guard<Latch> lk(_mutex);
+    stdx::lock_guard<stdx::mutex> lk(_mutex);
     return _isActive_inlock();
 }
 
 bool Reporter::isBackupActive() const {
-    stdx::lock_guard<Latch> lk(_mutex);
+    stdx::lock_guard<stdx::mutex> lk(_mutex);
     return _isBackupActive_inlock();
 }
 
@@ -417,12 +417,12 @@ bool Reporter::_isBackupActive_inlock() const {
 }
 
 bool Reporter::isWaitingToSendReport() const {
-    stdx::lock_guard<Latch> lk(_mutex);
+    stdx::lock_guard<stdx::mutex> lk(_mutex);
     return _requestWaitingStatus != RequestWaitingStatus::kNoWaiting;
 }
 
 Date_t Reporter::getKeepAliveTimeoutWhen_forTest() const {
-    stdx::lock_guard<Latch> lk(_mutex);
+    stdx::lock_guard<stdx::mutex> lk(_mutex);
     return _keepAliveTimeoutWhen;
 }
 

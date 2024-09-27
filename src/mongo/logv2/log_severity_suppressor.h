@@ -41,7 +41,7 @@
 #include <mutex>
 
 #include "mongo/logv2/log_severity.h"
-#include "mongo/platform/mutex.h"
+#include "mongo/stdx/mutex.h"
 #include "mongo/stdx/unordered_map.h"
 #include "mongo/util/clock_source.h"
 #include "mongo/util/duration.h"
@@ -114,7 +114,7 @@ private:
     Milliseconds _period;
     LogSeverity _normal;
     LogSeverity _quiet;
-    Mutex _mutex;
+    stdx::mutex _mutex;
     Suppressions _suppressions;
 };
 
@@ -148,7 +148,7 @@ private:
     Milliseconds _period;
     LogSeverity _normal;
     LogSeverity _quiet;
-    Mutex _mutex;
+    stdx::mutex _mutex;
     Date_t _expire;
 };
 

@@ -80,12 +80,12 @@ public:
     }
 
     void onDurable(const Token& token) override {
-        stdx::lock_guard<Latch> lock(_mutex);
+        stdx::lock_guard<stdx::mutex> lock(_mutex);
         _onDurableToken = token.first;
     }
 
     OpTimeAndWallTime getOnDurableToken() {
-        stdx::lock_guard<Latch> lock(_mutex);
+        stdx::lock_guard<stdx::mutex> lock(_mutex);
         return _onDurableToken;
     }
 

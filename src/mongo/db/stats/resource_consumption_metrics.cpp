@@ -406,35 +406,35 @@ void ResourceConsumption::merge(OperationContext* opCtx,
 
     // Add all metrics into the the globally-aggregated metrics.
     const auto& dbNameStr = dbName.toStringForResourceId();
-    stdx::lock_guard<Mutex> lk(_mutex);
+    stdx::lock_guard<stdx::mutex> lk(_mutex);
     _dbMetrics[dbNameStr] += newMetrics;
     _cpuTime += newMetrics.cpuNanos;
 }
 
 ResourceConsumption::MetricsMap ResourceConsumption::getDbMetrics() const {
-    stdx::lock_guard<Mutex> lk(_mutex);
+    stdx::lock_guard<stdx::mutex> lk(_mutex);
     return _dbMetrics;
 }
 
 int64_t ResourceConsumption::getNumDbMetrics() const {
-    stdx::lock_guard<Mutex> lk(_mutex);
+    stdx::lock_guard<stdx::mutex> lk(_mutex);
     return _dbMetrics.size();
 }
 
 ResourceConsumption::MetricsMap ResourceConsumption::getAndClearDbMetrics() {
-    stdx::lock_guard<Mutex> lk(_mutex);
+    stdx::lock_guard<stdx::mutex> lk(_mutex);
     MetricsMap newMap;
     _dbMetrics.swap(newMap);
     return newMap;
 }
 
 Nanoseconds ResourceConsumption::getCpuTime() const {
-    stdx::lock_guard<Mutex> lk(_mutex);
+    stdx::lock_guard<stdx::mutex> lk(_mutex);
     return _cpuTime;
 }
 
 Nanoseconds ResourceConsumption::getAndClearCpuTime() {
-    stdx::lock_guard<Mutex> lk(_mutex);
+    stdx::lock_guard<stdx::mutex> lk(_mutex);
     return std::exchange(_cpuTime, {});
 }
 }  // namespace mongo

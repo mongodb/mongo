@@ -45,9 +45,9 @@
 #include "mongo/db/service_context.h"
 #include "mongo/executor/network_test_env.h"
 #include "mongo/executor/remote_command_request.h"
-#include "mongo/platform/mutex.h"
 #include "mongo/s/query/exec/blocking_results_merger.h"
 #include "mongo/s/query/exec/results_merger_test_fixture.h"
+#include "mongo/stdx/mutex.h"
 #include "mongo/unittest/assert.h"
 #include "mongo/unittest/bson_test_util.h"
 #include "mongo/unittest/framework.h"
@@ -179,12 +179,12 @@ TEST_F(ResultsMergerTestFixture, ShouldBeAbleToBlockUntilNextResultIsReadyWithDe
 
     // Used for synchronizing the background thread with this thread.
     stdx::mutex mutex;
-    stdx::unique_lock<Latch> lk(mutex);
+    stdx::unique_lock<stdx::mutex> lk(mutex);
 
     // Issue a blocking wait for the next result asynchronously on a different thread.
     future = launchAsync([&]() {
         // Block until the main thread has responded to the getMore.
-        stdx::unique_lock<Latch> lk(mutex);
+        stdx::unique_lock<stdx::mutex> lk(mutex);
 
         auto next = unittest::assertGet(blockingMerger.next(operationContext()));
         ASSERT_FALSE(next.isEOF());

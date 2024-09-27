@@ -59,7 +59,7 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/logical_time.h"
 #include "mongo/db/tenant_id.h"
-#include "mongo/platform/mutex.h"
+#include "mongo/stdx/mutex.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
 #include "mongo/util/version/releases.h"

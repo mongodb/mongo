@@ -35,7 +35,7 @@
 #include <memory>
 
 #include "mongo/db/repl/oplog_buffer.h"
-#include "mongo/platform/mutex.h"
+#include "mongo/stdx/mutex.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/interruptible.h"
 #include "mongo/util/time_support.h"

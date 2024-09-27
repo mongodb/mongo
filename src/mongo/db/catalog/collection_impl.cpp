@@ -1122,7 +1122,7 @@ std::vector<RecordId> CollectionImpl::reserveCappedRecordIds(OperationContext* o
     {
         // We must atomically allocate and register any RecordIds so that we can correctly keep
         // track of visibility. This ensures capped readers do not skip past any in-progress writes.
-        stdx::lock_guard<Latch> lk(_shared->_registerCappedIdsMutex);
+        stdx::lock_guard<stdx::mutex> lk(_shared->_registerCappedIdsMutex);
         _shared->_recordStore->reserveRecordIds(opCtx, &ids, count);
 
         // We are guaranteed to have a contiguous range so we only register the min and max.

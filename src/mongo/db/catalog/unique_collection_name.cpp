@@ -41,8 +41,8 @@
 #include "mongo/db/catalog/collection_catalog.h"
 #include "mongo/db/concurrency/lock_manager_defs.h"
 #include "mongo/db/transaction_resources.h"
-#include "mongo/platform/mutex.h"
 #include "mongo/platform/random.h"
+#include "mongo/stdx/mutex.h"
 #include "mongo/util/assert_util_core.h"
 #include "mongo/util/namespace_string_util.h"
 #include "mongo/util/str.h"
@@ -80,7 +80,7 @@ StatusWith<NamespaceString> makeUniqueCollectionName(OperationContext* opCtx,
         "abcdefghijklmnopqrstuvwxyz"_sd;
     invariant((10U + 26U * 2) == charsToChooseFrom.size());
 
-    stdx::lock_guard<Latch> lk(uniqueCollectionNameMutex);
+    stdx::lock_guard<stdx::mutex> lk(uniqueCollectionNameMutex);
 
     auto replacePercentSign = [&](char c) {
         if (c != '%') {

@@ -46,9 +46,9 @@
 #include "mongo/db/exec/sbe/vm/vm.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/query/stage_types.h"
-#include "mongo/platform/mutex.h"
 #include "mongo/stdx/condition_variable.h"
 #include "mongo/stdx/future.h"
+#include "mongo/stdx/mutex.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/concurrency/thread_pool.h"
 #include "mongo/util/future.h"
@@ -259,11 +259,11 @@ private:
 
     // This is verbose and heavyweight. Recondsider something lighter
     // at minimum try to share a single mutex (i.e. _stateMutex) if safe
-    mongo::Mutex _consumerOpenMutex;
+    stdx::mutex _consumerOpenMutex;
     stdx::condition_variable _consumerOpenCond;
     size_t _consumerOpen{0};
 
-    mongo::Mutex _consumerCloseMutex;
+    stdx::mutex _consumerCloseMutex;
     stdx::condition_variable _consumerCloseCond;
     size_t _consumerClose{0};
 };

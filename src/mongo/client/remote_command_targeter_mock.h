@@ -41,7 +41,7 @@
 #include "mongo/client/read_preference.h"
 #include "mongo/client/remote_command_targeter.h"
 #include "mongo/db/operation_context.h"
-#include "mongo/platform/mutex.h"
+#include "mongo/stdx/mutex.h"
 #include "mongo/util/cancellation.h"
 #include "mongo/util/future.h"
 #include "mongo/util/net/hostandport.h"

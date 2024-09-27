@@ -1847,7 +1847,7 @@ SemiFuture<void> ReshardingCoordinator::run(std::shared_ptr<executor::ScopedTask
     pauseBeforeCTHolderInitialization.pauseWhileSet();
 
     auto abortCalled = [&] {
-        stdx::lock_guard<Latch> lk(_abortCalledMutex);
+        stdx::lock_guard<stdx::mutex> lk(_abortCalledMutex);
         _ctHolder = std::make_unique<CoordinatorCancellationTokenHolder>(stepdownToken);
         return _abortCalled;
     }();
@@ -2092,7 +2092,7 @@ ExecutorFuture<void> ReshardingCoordinator::_onAbortCoordinatorAndParticipants(
 
 void ReshardingCoordinator::abort(bool skipQuiescePeriod) {
     auto ctHolderInitialized = [&] {
-        stdx::lock_guard<Latch> lk(_abortCalledMutex);
+        stdx::lock_guard<stdx::mutex> lk(_abortCalledMutex);
         skipQuiescePeriod = skipQuiescePeriod || _abortCalled == AbortType::kAbortSkipQuiesce;
         _abortCalled =
             skipQuiescePeriod ? AbortType::kAbortSkipQuiesce : AbortType::kAbortWithQuiesce;

@@ -96,7 +96,7 @@ void logAutoMergeChange(OperationContext* opCtx, const std::string& what) {
 
 
 void AutoMergerPolicy::enable(OperationContext* opCtx) {
-    stdx::lock_guard<Latch> lk(_mutex);
+    stdx::lock_guard<stdx::mutex> lk(_mutex);
     if (!_enabled) {
         _enabled = true;
         logAutoMergeChange(opCtx, "autoMerge.enable");
@@ -105,7 +105,7 @@ void AutoMergerPolicy::enable(OperationContext* opCtx) {
 }
 
 void AutoMergerPolicy::disable(OperationContext* opCtx) {
-    stdx::lock_guard<Latch> lk(_mutex);
+    stdx::lock_guard<stdx::mutex> lk(_mutex);
     if (_enabled) {
         _enabled = false;
         _collectionsToMergePerShard.clear();
@@ -116,12 +116,12 @@ void AutoMergerPolicy::disable(OperationContext* opCtx) {
 }
 
 bool AutoMergerPolicy::isEnabled() {
-    stdx::lock_guard<Latch> lk(_mutex);
+    stdx::lock_guard<stdx::mutex> lk(_mutex);
     return _enabled;
 }
 
 void AutoMergerPolicy::checkInternalUpdates(OperationContext* opCtx) {
-    stdx::lock_guard<Latch> lk(_mutex);
+    stdx::lock_guard<stdx::mutex> lk(_mutex);
     if (!_enabled) {
         return;
     }
@@ -134,7 +134,7 @@ StringData AutoMergerPolicy::getName() const {
 
 boost::optional<BalancerStreamAction> AutoMergerPolicy::getNextStreamingAction(
     OperationContext* opCtx) {
-    stdx::unique_lock<Latch> lk(_mutex);
+    stdx::unique_lock<stdx::mutex> lk(_mutex);
 
     if (!_enabled) {
         return boost::none;
@@ -198,7 +198,7 @@ boost::optional<BalancerStreamAction> AutoMergerPolicy::getNextStreamingAction(
 void AutoMergerPolicy::applyActionResult(OperationContext* opCtx,
                                          const BalancerStreamAction& action,
                                          const BalancerStreamActionResponse& response) {
-    stdx::unique_lock<Latch> lk(_mutex);
+    stdx::unique_lock<stdx::mutex> lk(_mutex);
 
     const ScopeGuard decrementNumberOfOutstandingActions([&] {
         --_outstandingActions;

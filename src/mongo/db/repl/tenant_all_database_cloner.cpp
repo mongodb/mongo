@@ -53,8 +53,8 @@
 #include "mongo/logv2/log_attr.h"
 #include "mongo/logv2/log_component.h"
 #include "mongo/platform/compiler.h"
-#include "mongo/platform/mutex.h"
 #include "mongo/rpc/get_status_from_command_result.h"
+#include "mongo/stdx/mutex.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/clock_source.h"
 #include "mongo/util/database_name_util.h"
@@ -217,7 +217,7 @@ BaseCloner::AfterStageBehavior TenantAllDatabaseCloner::listExistingDatabasesSta
         const auto& startingDb =
             std::lower_bound(_databases.begin(), _databases.end(), lastClonedDb);
         {
-            stdx::lock_guard<Latch> lk(_mutex);
+            stdx::lock_guard<stdx::mutex> lk(_mutex);
             if (startingDb != _databases.end() && *startingDb == lastClonedDb) {
                 _stats.databasesClonedBeforeFailover = clonedDatabases.size() - 1;
 
@@ -273,7 +273,7 @@ BaseCloner::AfterStageBehavior TenantAllDatabaseCloner::initializeStatsStage() {
         }
     }
 
-    stdx::lock_guard<Latch> lk(_mutex);
+    stdx::lock_guard<stdx::mutex> lk(_mutex);
     // The 'approxTotalDataSize' is the sum of the size copied so far and the size left to be
     // copied.
     _stats.approxTotalDataSize = _stats.approxTotalBytesCopied + approxTotalDataSizeLeftOnRemote;
@@ -291,7 +291,7 @@ BaseCloner::AfterStageBehavior TenantAllDatabaseCloner::initializeStatsStage() {
 void TenantAllDatabaseCloner::postStage() {
     for (const auto& dbName : _databases) {
         {
-            stdx::lock_guard<Latch> lk(_mutex);
+            stdx::lock_guard<stdx::mutex> lk(_mutex);
             _currentDatabaseCloner = std::make_unique<TenantDatabaseCloner>(dbName,
                                                                             getSharedData(),
                                                                             getSource(),
@@ -320,7 +320,7 @@ void TenantAllDatabaseCloner::postStage() {
             return;
         }
         {
-            stdx::lock_guard<Latch> lk(_mutex);
+            stdx::lock_guard<stdx::mutex> lk(_mutex);
             _stats.databaseStats[_stats.databasesCloned] = _currentDatabaseCloner->getStats();
             _stats.approxTotalBytesCopied +=
                 _stats.databaseStats[_stats.databasesCloned].approxTotalBytesCopied;
@@ -331,7 +331,7 @@ void TenantAllDatabaseCloner::postStage() {
 }
 
 TenantAllDatabaseCloner::Stats TenantAllDatabaseCloner::getStats() const {
-    stdx::lock_guard<Latch> lk(_mutex);
+    stdx::lock_guard<stdx::mutex> lk(_mutex);
     TenantAllDatabaseCloner::Stats stats = _stats;
     if (_currentDatabaseCloner) {
         stats.databaseStats[_stats.databasesCloned] = _currentDatabaseCloner->getStats();
@@ -342,7 +342,7 @@ TenantAllDatabaseCloner::Stats TenantAllDatabaseCloner::getStats() const {
 }
 
 std::string TenantAllDatabaseCloner::toString() const {
-    stdx::lock_guard<Latch> lk(_mutex);
+    stdx::lock_guard<stdx::mutex> lk(_mutex);
     return str::stream() << "tenant migration --"
                          << " active:" << isActive(lk) << " status:" << getStatus(lk).toString()
                          << " source:" << getSource() << " tenantId: " << _tenantId

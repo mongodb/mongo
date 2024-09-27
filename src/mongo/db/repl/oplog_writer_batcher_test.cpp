@@ -64,7 +64,7 @@ public:
     }
 
     void push_forTest(OplogWriterBatch& batch) {
-        stdx::unique_lock<Latch> lk(_mutex);
+        stdx::unique_lock<stdx::mutex> lk(_mutex);
         _queue.push(batch);
         _notEmptyCv.notify_one();
     }
@@ -74,7 +74,7 @@ public:
     }
 
     bool isEmpty() const override {
-        stdx::lock_guard<Latch> lk(_mutex);
+        stdx::lock_guard<stdx::mutex> lk(_mutex);
         return _queue.empty();
     }
 
@@ -95,7 +95,7 @@ public:
     }
 
     bool tryPopBatch(OperationContext* opCtx, OplogBatch<Value>* batch) override {
-        stdx::lock_guard<Latch> lk(_mutex);
+        stdx::lock_guard<stdx::mutex> lk(_mutex);
         if (_queue.empty()) {
             return false;
         }
@@ -105,14 +105,14 @@ public:
     }
 
     bool waitForDataFor(Milliseconds waitDuration, Interruptible* interruptible) override {
-        stdx::unique_lock<Latch> lk(_mutex);
+        stdx::unique_lock<stdx::mutex> lk(_mutex);
         interruptible->waitForConditionOrInterruptFor(
             _notEmptyCv, lk, waitDuration, [&] { return !_queue.empty(); });
         return !_queue.empty();
     }
 
     bool waitForDataUntil(Date_t deadline, Interruptible* interruptible) override {
-        stdx::unique_lock<Latch> lk(_mutex);
+        stdx::unique_lock<stdx::mutex> lk(_mutex);
         interruptible->waitForConditionOrInterruptUntil(
             _notEmptyCv, lk, deadline, [&] { return !_queue.empty(); });
         return !_queue.empty();
@@ -127,12 +127,12 @@ public:
     }
 
     void enterDrainMode() override {
-        stdx::lock_guard<Latch> lk(_mutex);
+        stdx::lock_guard<stdx::mutex> lk(_mutex);
         _drainMode = true;
     }
 
     void exitDrainMode() override {
-        stdx::lock_guard<Latch> lk(_mutex);
+        stdx::lock_guard<stdx::mutex> lk(_mutex);
         _drainMode = false;
     }
 

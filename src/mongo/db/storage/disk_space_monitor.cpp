@@ -102,12 +102,12 @@ void DiskSpaceMonitor::_stop() {
 }
 
 void DiskSpaceMonitor::registerAction(std::unique_ptr<Action> action) {
-    stdx::lock_guard<Latch> lock(_mutex);
+    stdx::lock_guard<stdx::mutex> lock(_mutex);
     _actions.push_back(std::move(action));
 }
 
 void DiskSpaceMonitor::takeAction(OperationContext* opCtx, int64_t availableBytes) {
-    stdx::lock_guard<Latch> lock(_mutex);
+    stdx::lock_guard<stdx::mutex> lock(_mutex);
 
     for (auto& action : _actions) {
         if (availableBytes <= action->getThresholdBytes()) {

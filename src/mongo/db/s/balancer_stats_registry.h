@@ -37,7 +37,7 @@
 #include "mongo/db/s/range_deleter_service.h"
 #include "mongo/db/service_context.h"
 #include "mongo/platform/atomic_word.h"
-#include "mongo/platform/mutex.h"
+#include "mongo/stdx/mutex.h"
 #include "mongo/stdx/unordered_map.h"
 #include "mongo/util/concurrency/thread_pool.h"
 #include "mongo/util/uuid.h"
@@ -117,7 +117,7 @@ private:
     /**
      * Terminate the asynchronous initialization of this registry.
      */
-    void _terminate(stdx::unique_lock<Mutex>& lock);
+    void _terminate(stdx::unique_lock<stdx::mutex>& lock);
 
     struct CollectionStats {
         // Number of orphan documents for this collection

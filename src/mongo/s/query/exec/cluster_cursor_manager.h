@@ -55,11 +55,11 @@
 #include "mongo/db/session/logical_session_id.h"
 #include "mongo/db/session/logical_session_id_gen.h"
 #include "mongo/db/session/session_killer.h"
-#include "mongo/platform/mutex.h"
 #include "mongo/platform/random.h"
 #include "mongo/s/query/exec/cluster_client_cursor.h"
 #include "mongo/s/query/exec/cluster_client_cursor_guard.h"
 #include "mongo/s/query/exec/cluster_client_cursor_params.h"
+#include "mongo/stdx/mutex.h"
 #include "mongo/stdx/unordered_map.h"
 #include "mongo/stdx/unordered_set.h"
 #include "mongo/util/assert_util_core.h"
@@ -556,7 +556,7 @@ private:
     /**
      * Will detach a cursor, release the lock and then call kill() on it.
      */
-    void detachAndKillCursor(stdx::unique_lock<Latch> lk,
+    void detachAndKillCursor(stdx::unique_lock<stdx::mutex> lk,
                              OperationContext* opCtx,
                              CursorId cursorId);
 

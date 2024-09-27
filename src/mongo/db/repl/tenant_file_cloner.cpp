@@ -57,7 +57,7 @@
 #include "mongo/logv2/log_attr.h"
 #include "mongo/logv2/log_component.h"
 #include "mongo/platform/compiler.h"
-#include "mongo/platform/mutex.h"
+#include "mongo/stdx/mutex.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/clock_source.h"
 #include "mongo/util/duration.h"
@@ -117,7 +117,7 @@ BaseCloner::ClonerStages TenantFileCloner::getStages() {
 }
 
 void TenantFileCloner::preStage() {
-    stdx::lock_guard<Latch> lk(_mutex);
+    stdx::lock_guard<stdx::mutex> lk(_mutex);
     _stats.start = getSharedData()->getClock()->now();
 
     // Construct local path name from the relative path and the temp dbpath.
@@ -161,7 +161,7 @@ void TenantFileCloner::preStage() {
 
 void TenantFileCloner::postStage() {
     _localFile.close();
-    stdx::lock_guard<Latch> lk(_mutex);
+    stdx::lock_guard<stdx::mutex> lk(_mutex);
     _stats.end = getSharedData()->getClock()->now();
 }
 
@@ -182,7 +182,7 @@ BaseCloner::AfterStageBehavior TenantFileCloner::queryStage() {
 }
 
 size_t TenantFileCloner::getFileOffset() {
-    stdx::lock_guard<Latch> lk(_mutex);
+    stdx::lock_guard<stdx::mutex> lk(_mutex);
     return _fileOffset;
 }
 
@@ -240,7 +240,7 @@ void TenantFileCloner::handleNextBatch(DBClientCursor& cursor) {
         }
     }
     {
-        stdx::lock_guard<Latch> lk(_mutex);
+        stdx::lock_guard<stdx::mutex> lk(_mutex);
         _stats.receivedBatches++;
         while (cursor.moreInCurrentBatch()) {
             _dataToWrite.emplace_back(cursor.nextSafe());
@@ -289,7 +289,7 @@ void TenantFileCloner::writeDataToFilesystemCallback(
                 "fileOffset"_attr = getFileOffset());
     uassertStatusOK(cbd.status);
     {
-        stdx::lock_guard<Latch> lk(_mutex);
+        stdx::lock_guard<stdx::mutex> lk(_mutex);
         if (_dataToWrite.size() == 0) {
             LOGV2_WARNING(6113310,
                           "writeDataToFilesystemCallback, but no data to write",
@@ -350,7 +350,7 @@ void TenantFileCloner::waitForFilesystemWorkToComplete() {
 }
 
 TenantFileCloner::Stats TenantFileCloner::getStats() const {
-    stdx::lock_guard<Latch> lk(_mutex);
+    stdx::lock_guard<stdx::mutex> lk(_mutex);
     return _stats;
 }
 

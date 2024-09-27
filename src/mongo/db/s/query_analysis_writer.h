@@ -47,10 +47,10 @@
 #include "mongo/executor/task_executor.h"
 #include "mongo/idl/mutable_observer_registry.h"
 #include "mongo/logv2/log.h"
-#include "mongo/platform/mutex.h"
 #include "mongo/s/analyze_shard_key_common_gen.h"
 #include "mongo/s/analyze_shard_key_role.h"
 #include "mongo/s/write_ops/batched_command_request.h"
+#include "mongo/stdx/mutex.h"
 #include "mongo/util/future.h"
 #include "mongo/util/periodic_runner.h"
 #include "mongo/util/uuid.h"
@@ -229,7 +229,7 @@ public:
                                  const BSONObj& postImage);
 
     int getQueriesCountForTest() const {
-        stdx::lock_guard<Latch> lk(_mutex);
+        stdx::lock_guard<stdx::mutex> lk(_mutex);
         return _queries.getCount();
     }
 
@@ -238,7 +238,7 @@ public:
     }
 
     int getDiffsCountForTest() const {
-        stdx::lock_guard<Latch> lk(_mutex);
+        stdx::lock_guard<stdx::mutex> lk(_mutex);
         return _diffs.getCount();
     }
 

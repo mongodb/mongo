@@ -41,7 +41,7 @@
 #include "mongo/db/client.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/service_context.h"
-#include "mongo/platform/mutex.h"
+#include "mongo/stdx/mutex.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/unittest/assert.h"
 #include "mongo/unittest/framework.h"
@@ -690,10 +690,10 @@ PRODUCER_CONSUMER_QUEUE_TEST(singleProducerMultiConsumer, runPermutations<false,
             {
                 try {
                     pcq.pop(opCtx);
-                    stdx::lock_guard<Latch> lk(mutex);
+                    stdx::lock_guard<stdx::mutex> lk(mutex);
                     successes++;
                 } catch (const ExceptionFor<ErrorCodes::ProducerConsumerQueueConsumed>&) {
-                    stdx::lock_guard<Latch> lk(mutex);
+                    stdx::lock_guard<stdx::mutex> lk(mutex);
                     failures++;
                 }
             }
@@ -733,10 +733,10 @@ PRODUCER_CONSUMER_QUEUE_TEST(multiProducerSingleConsumer, runPermutations<true, 
             {
                 try {
                     pcq.push(MoveOnly(1), opCtx);
-                    stdx::lock_guard<Latch> lk(mutex);
+                    stdx::lock_guard<stdx::mutex> lk(mutex);
                     success++;
                 } catch (const ExceptionFor<ErrorCodes::ProducerConsumerQueueEndClosed>&) {
-                    stdx::lock_guard<Latch> lk(mutex);
+                    stdx::lock_guard<stdx::mutex> lk(mutex);
                     failure++;
                 }
             }
@@ -746,7 +746,7 @@ PRODUCER_CONSUMER_QUEUE_TEST(multiProducerSingleConsumer, runPermutations<true, 
     pcq.pop();
 
     while (true) {
-        stdx::lock_guard<Latch> lk(mutex);
+        stdx::lock_guard<stdx::mutex> lk(mutex);
         if (success == 1)
             break;
         stdx::this_thread::yield();
@@ -815,7 +815,7 @@ PRODUCER_CONSUMER_QUEUE_TEST(multiProducerMiddleWaiterBreaks, runPermutations<tr
 
     auto threadB = helper.runThread("ProducerB", [&](OperationContext* opCtx) {
         {
-            stdx::lock_guard<Latch> lk(mutex);
+            stdx::lock_guard<stdx::mutex> lk(mutex);
             threadBopCtx = opCtx;
         }
 
@@ -831,7 +831,7 @@ PRODUCER_CONSUMER_QUEUE_TEST(multiProducerMiddleWaiterBreaks, runPermutations<tr
     };
 
     {
-        stdx::lock_guard<Latch> lk(mutex);
+        stdx::lock_guard<stdx::mutex> lk(mutex);
         ASSERT(threadBopCtx != nullptr);
     }
 

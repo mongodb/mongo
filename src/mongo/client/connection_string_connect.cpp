@@ -53,7 +53,6 @@
 #include "mongo/logv2/log.h"
 #include "mongo/logv2/log_attr.h"
 #include "mongo/logv2/log_component.h"
-#include "mongo/platform/mutex.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/net/ssl_options.h"
 
@@ -157,7 +156,7 @@ StatusWith<std::unique_ptr<DBClientBase>> ConnectionString::connect(
 
         case ConnectionType::kCustom: {
             // Lock in case other things are modifying this at the same time
-            stdx::lock_guard<Latch> lk(_connectHookMutex);
+            stdx::lock_guard<stdx::mutex> lk(_connectHookMutex);
 
             // Allow the replacement of connections with other connections - useful for testing.
 

@@ -50,7 +50,7 @@
 #include "mongo/executor/egress_connection_closer.h"
 #include "mongo/executor/egress_connection_closer_manager.h"
 #include "mongo/platform/compiler.h"
-#include "mongo/platform/mutex.h"
+#include "mongo/stdx/mutex.h"
 #include "mongo/stdx/unordered_map.h"
 #include "mongo/transport/session.h"
 #include "mongo/transport/transport_layer.h"

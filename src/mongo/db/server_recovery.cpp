@@ -50,27 +50,27 @@ bool SizeRecoveryState::collectionNeedsSizeAdjustment(const std::string& ident) 
 }
 
 bool SizeRecoveryState::collectionAlwaysNeedsSizeAdjustment(const std::string& ident) const {
-    stdx::lock_guard<Latch> lock(_mutex);
+    stdx::lock_guard<stdx::mutex> lock(_mutex);
     return _collectionsAlwaysNeedingSizeAdjustment.count(ident) > 0;
 }
 
 void SizeRecoveryState::markCollectionAsAlwaysNeedsSizeAdjustment(const std::string& ident) {
-    stdx::lock_guard<Latch> lock(_mutex);
+    stdx::lock_guard<stdx::mutex> lock(_mutex);
     _collectionsAlwaysNeedingSizeAdjustment.insert(ident);
 }
 
 void SizeRecoveryState::clearStateBeforeRecovery() {
-    stdx::lock_guard<Latch> lock(_mutex);
+    stdx::lock_guard<stdx::mutex> lock(_mutex);
     _collectionsAlwaysNeedingSizeAdjustment.clear();
 }
 
 void SizeRecoveryState::setRecordStoresShouldAlwaysCheckSize(bool shouldAlwayCheckSize) {
-    stdx::lock_guard<Latch> lock(_mutex);
+    stdx::lock_guard<stdx::mutex> lock(_mutex);
     _recordStoresShouldAlwayCheckSize = shouldAlwayCheckSize;
 }
 
 bool SizeRecoveryState::shouldRecordStoresAlwaysCheckSize() const {
-    stdx::lock_guard<Latch> lock(_mutex);
+    stdx::lock_guard<stdx::mutex> lock(_mutex);
     // Regardless of whether the _recordStoresShouldAlwayCheckSize flag is set, if we are in
     // replication recovery then sizes should always be checked. This is in case the size storer
     // information is no longer accurate. This may be necessary if a collection creation was not

@@ -47,8 +47,8 @@
 #include "mongo/client/sasl_aws_client_protocol_gen.h"
 #include "mongo/client/sasl_aws_protocol_common_gen.h"
 #include "mongo/idl/idl_parser.h"
-#include "mongo/platform/mutex.h"
 #include "mongo/platform/random.h"
+#include "mongo/stdx/mutex.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/base64.h"
 #include "mongo/util/kms_message_support.h"
@@ -67,7 +67,7 @@ std::vector<char> generateClientNonce() {
     ret.resize(kClientFirstNonceLength);
 
     {
-        stdx::lock_guard<Latch> lk(saslAWSClientMutex);
+        stdx::lock_guard<stdx::mutex> lk(saslAWSClientMutex);
         saslAWSClientGen.fill(ret.data(), ret.size());
     }
 

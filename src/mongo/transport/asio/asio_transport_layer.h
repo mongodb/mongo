@@ -36,7 +36,6 @@
 #include "mongo/base/status_with.h"
 #include "mongo/config.h"
 #include "mongo/db/server_options.h"
-#include "mongo/platform/mutex.h"
 #include "mongo/stdx/condition_variable.h"
 #include "mongo/stdx/mutex.h"
 #include "mongo/stdx/thread.h"
@@ -290,7 +289,7 @@ private:
     void _trySetListenerSocketBacklogQueueDepth(GenericAcceptor& acceptor) noexcept;
 
     stdx::mutex _mutex;
-    void stopAcceptingSessionsWithLock(stdx::unique_lock<Mutex> lk);
+    void stopAcceptingSessionsWithLock(stdx::unique_lock<stdx::mutex> lk);
 
     // There are three reactors that are used by AsioTransportLayer. The _ingressReactor contains
     // all the accepted sockets and all ingress networking activity. The _acceptorReactor contains

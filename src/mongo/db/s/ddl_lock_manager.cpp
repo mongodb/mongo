@@ -78,7 +78,7 @@ DDLLockManager* DDLLockManager::get(OperationContext* opCtx) {
 }
 
 void DDLLockManager::setState(const State& state) {
-    stdx::unique_lock<Latch> lock(_mutex);
+    stdx::unique_lock<stdx::mutex> lock(_mutex);
     _state = state;
     _stateCV.notify_all();
 }
@@ -94,7 +94,7 @@ void DDLLockManager::_lock(OperationContext* opCtx,
     Timer waitingTime;
 
     {
-        stdx::unique_lock<Latch> lock{_mutex};
+        stdx::unique_lock<stdx::mutex> lock{_mutex};
         // Wait for primary and DDL recovered state
         if (!opCtx->waitForConditionOrInterruptUntil(_stateCV, lock, deadline, [&] {
                 return _state == State::kPrimaryAndRecovered || !waitForRecovery;
@@ -115,7 +115,7 @@ void DDLLockManager::_lock(OperationContext* opCtx,
     }
 
     ScopeGuard unregisterResourceExitGuard([&] {
-        stdx::unique_lock<Latch> lock(_mutex);
+        stdx::unique_lock<stdx::mutex> lock(_mutex);
         _unregisterResourceNameIfNoLongerNeeded(lock, resId, ns);
     });
 
@@ -127,7 +127,7 @@ void DDLLockManager::_lock(OperationContext* opCtx,
         locker->lock(opCtx, resId, mode, deadline);
 
         const auto state = [this]() {
-            stdx::unique_lock<Latch> lock(_mutex);
+            stdx::unique_lock<stdx::mutex> lock(_mutex);
             return _state;
         }();
         if (state != State::kPrimaryAndRecovered && waitForRecovery) {
@@ -181,7 +181,7 @@ void DDLLockManager::_unlock(
     dassert(locker);
     locker->unlock(resId);
 
-    stdx::unique_lock<Latch> lock(_mutex);
+    stdx::unique_lock<stdx::mutex> lock(_mutex);
     _unregisterResourceNameIfNoLongerNeeded(lock, resId, ns);
 
     LOGV2(6855302,

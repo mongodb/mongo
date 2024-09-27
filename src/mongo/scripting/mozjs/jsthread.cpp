@@ -56,7 +56,6 @@
 #include "mongo/logv2/log.h"
 #include "mongo/logv2/log_attr.h"
 #include "mongo/logv2/log_component.h"
-#include "mongo/platform/mutex.h"
 #include "mongo/scripting/engine.h"
 #include "mongo/scripting/mozjs/engine.h"
 #include "mongo/scripting/mozjs/exception.h"
@@ -65,6 +64,7 @@
 #include "mongo/scripting/mozjs/jsthread.h"
 #include "mongo/scripting/mozjs/objectwrapper.h"
 #include "mongo/scripting/mozjs/valuereader.h"
+#include "mongo/stdx/mutex.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/util/assert_util.h"
 
@@ -174,12 +174,12 @@ private:
         SharedData() = default;
 
         void setErrorStatus(Status status) {
-            stdx::lock_guard<Latch> lck(_statusMutex);
+            stdx::lock_guard<stdx::mutex> lck(_statusMutex);
             _status = std::move(status);
         }
 
         Status getErrorStatus() {
-            stdx::lock_guard<Latch> lck(_statusMutex);
+            stdx::lock_guard<stdx::mutex> lck(_statusMutex);
             return _status;
         }
 

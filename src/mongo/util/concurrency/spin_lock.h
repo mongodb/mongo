@@ -39,7 +39,7 @@
 
 #include "mongo/config.h"  // IWYU pragma: keep
 #include "mongo/platform/compiler.h"
-#include "mongo/platform/mutex.h"
+#include "mongo/stdx/mutex.h"
 
 namespace mongo {
 

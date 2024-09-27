@@ -65,7 +65,7 @@
 #include "mongo/db/storage/storage_engine_interface.h"
 #include "mongo/db/storage/temporary_record_store.h"
 #include "mongo/db/tenant_id.h"
-#include "mongo/platform/mutex.h"
+#include "mongo/stdx/mutex.h"
 #include "mongo/util/periodic_runner.h"
 #include "mongo/util/uuid.h"
 

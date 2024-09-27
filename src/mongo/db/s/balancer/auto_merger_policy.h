@@ -43,7 +43,7 @@
 #include "mongo/db/s/balancer/balancer_policy.h"
 #include "mongo/db/s/balancer/cluster_statistics.h"
 #include "mongo/db/shard_id.h"
-#include "mongo/platform/mutex.h"
+#include "mongo/stdx/mutex.h"
 #include "mongo/util/concurrency/with_lock.h"
 #include "mongo/util/timer.h"
 

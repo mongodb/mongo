@@ -60,7 +60,6 @@
 #include "mongo/db/query/query_knobs_gen.h"
 #include "mongo/platform/atomic_proxy.h"
 #include "mongo/platform/atomic_word.h"
-#include "mongo/platform/mutex.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/container_size_helper.h"
 #include "mongo/util/time_support.h"

@@ -71,13 +71,13 @@ public:
 
     BSONObj generateSection(OperationContext* opCtx,
                             const BSONElement& configElement) const override {
-        stdx::lock_guard<Latch> lk(_mutex);
+        stdx::lock_guard<stdx::mutex> lk(_mutex);
         return BSON("count" << _count << "size" << _size << "rejectCount"
                             << _numSettingsWithReject);
     }
 
     void record(int count, int size, int numSettingsWithReject) {
-        stdx::lock_guard<Latch> lk(_mutex);
+        stdx::lock_guard<stdx::mutex> lk(_mutex);
         _count = count;
         _size = size;
         _numSettingsWithReject = numSettingsWithReject;

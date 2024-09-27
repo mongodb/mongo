@@ -43,7 +43,7 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/query/plan_executor.h"
 #include "mongo/db/repl/oplog.h"
-#include "mongo/platform/mutex.h"
+#include "mongo/stdx/mutex.h"
 
 namespace mongo {
 

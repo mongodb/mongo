@@ -39,8 +39,8 @@
 #include "mongo/db/multitenancy_gen.h"
 #include "mongo/logv2/log.h"
 #include "mongo/platform/atomic_word.h"
-#include "mongo/platform/mutex.h"
 #include "mongo/stdx/condition_variable.h"
+#include "mongo/stdx/mutex.h"
 #include "mongo/stdx/unordered_map.h"
 #include "mongo/transport/ingress_handshake_metrics.h"
 #include "mongo/transport/session.h"
@@ -186,7 +186,7 @@ public:
         }
 
         Sessions* _src;
-        stdx::unique_lock<Mutex> _lk;
+        stdx::unique_lock<stdx::mutex> _lk;
     };
 
     /** Returns a proxy object providing synchronized mutable access to the Sessions object. */

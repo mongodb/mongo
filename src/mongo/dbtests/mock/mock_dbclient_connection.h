@@ -54,11 +54,11 @@
 #include "mongo/db/query/client_cursor/cursor_response.h"
 #include "mongo/db/query/find_command.h"
 #include "mongo/dbtests/mock/mock_remote_db_server.h"
-#include "mongo/platform/mutex.h"
 #include "mongo/rpc/message.h"
 #include "mongo/rpc/op_msg.h"
 #include "mongo/rpc/unique_message.h"
 #include "mongo/stdx/condition_variable.h"
+#include "mongo/stdx/mutex.h"
 #include "mongo/util/net/hostandport.h"
 #include "mongo/util/net/ssl_options.h"
 

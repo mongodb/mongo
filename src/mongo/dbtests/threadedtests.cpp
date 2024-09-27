@@ -39,7 +39,6 @@
 #include "mongo/logv2/log.h"
 #include "mongo/logv2/log_attr.h"
 #include "mongo/platform/atomic_word.h"
-#include "mongo/platform/mutex.h"
 #include "mongo/stdx/mutex.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/unittest/assert.h"
@@ -268,7 +267,7 @@ private:
         Hotel(int nRooms) : _nRooms(nRooms), _checkedIn(0), _maxRooms(0) {}
 
         void checkIn() {
-            stdx::lock_guard<Latch> lk(_frontDesk);
+            stdx::lock_guard<stdx::mutex> lk(_frontDesk);
             _checkedIn++;
             MONGO_verify(_checkedIn <= _nRooms);
             if (_checkedIn > _maxRooms)
@@ -276,7 +275,7 @@ private:
         }
 
         void checkOut() {
-            stdx::lock_guard<Latch> lk(_frontDesk);
+            stdx::lock_guard<stdx::mutex> lk(_frontDesk);
             _checkedIn--;
             MONGO_verify(_checkedIn >= 0);
         }

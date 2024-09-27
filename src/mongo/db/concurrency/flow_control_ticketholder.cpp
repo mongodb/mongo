@@ -92,7 +92,7 @@ void FlowControlTicketholder::set(ServiceContext* service,
 
 void FlowControlTicketholder::refreshTo(int numTickets) {
     invariant(numTickets >= 0);
-    stdx::lock_guard<Latch> lk(_mutex);
+    stdx::lock_guard<stdx::mutex> lk(_mutex);
     LOGV2_DEBUG(20518,
                 4,
                 "Refreshing tickets. Before: {tickets} Now: {numTickets}",
@@ -104,7 +104,7 @@ void FlowControlTicketholder::refreshTo(int numTickets) {
 
 void FlowControlTicketholder::getTicket(OperationContext* opCtx,
                                         FlowControlTicketholder::CurOp* stats) {
-    stdx::unique_lock<Latch> lk(_mutex);
+    stdx::unique_lock<stdx::mutex> lk(_mutex);
     if (_inShutdown) {
         return;
     }
@@ -151,7 +151,7 @@ void FlowControlTicketholder::getTicket(OperationContext* opCtx,
 // Should only be called once, during shutdown.
 void FlowControlTicketholder::setInShutdown() {
     LOGV2(20520, "Stopping further Flow Control ticket acquisitions.");
-    stdx::lock_guard<Latch> lk(_mutex);
+    stdx::lock_guard<stdx::mutex> lk(_mutex);
     _inShutdown = true;
     _cv.notify_all();
 }

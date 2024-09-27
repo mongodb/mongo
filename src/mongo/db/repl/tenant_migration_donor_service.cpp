@@ -422,7 +422,7 @@ TenantMigrationDonorService::Instance::Instance(ServiceContext* const serviceCon
 }
 
 TenantMigrationDonorService::Instance::~Instance() {
-    stdx::lock_guard<Latch> lg(_mutex);
+    stdx::lock_guard<stdx::mutex> lg(_mutex);
     invariant(_initialDonorStateDurablePromise.getFuture().isReady());
     invariant(_receiveDonorForgetMigrationPromise.getFuture().isReady());
 }
@@ -431,7 +431,7 @@ boost::optional<BSONObj> TenantMigrationDonorService::Instance::reportForCurrent
     MongoProcessInterface::CurrentOpConnectionsMode connMode,
     MongoProcessInterface::CurrentOpSessionsMode sessionMode) noexcept {
 
-    stdx::lock_guard<Latch> lg(_mutex);
+    stdx::lock_guard<stdx::mutex> lg(_mutex);
 
     // Ignore connMode and sessionMode because tenant migrations are not associated with
     // sessions and they run in a background thread pool.
@@ -514,12 +514,12 @@ void TenantMigrationDonorService::Instance::checkIfOptionsConflict(const BSONObj
 
 boost::optional<TenantMigrationDonorService::Instance::DurableState>
 TenantMigrationDonorService::Instance::getDurableState() const {
-    stdx::lock_guard<Latch> lg(_mutex);
+    stdx::lock_guard<stdx::mutex> lg(_mutex);
     return _durableState;
 }
 
 void TenantMigrationDonorService::Instance::onReceiveDonorAbortMigration() {
-    stdx::lock_guard<Latch> lg(_mutex);
+    stdx::lock_guard<stdx::mutex> lg(_mutex);
     _abortRequested = true;
     if (_abortMigrationSource) {
         _abortMigrationSource->cancel();
@@ -530,12 +530,12 @@ void TenantMigrationDonorService::Instance::onReceiveDonorAbortMigration() {
 }
 
 void TenantMigrationDonorService::Instance::onReceiveDonorForgetMigration() {
-    stdx::lock_guard<Latch> lg(_mutex);
+    stdx::lock_guard<stdx::mutex> lg(_mutex);
     setPromiseOkIfNotReady(lg, _receiveDonorForgetMigrationPromise);
 }
 
 void TenantMigrationDonorService::Instance::interrupt(Status status) {
-    stdx::lock_guard<Latch> lg(_mutex);
+    stdx::lock_guard<stdx::mutex> lg(_mutex);
     // Resolve any unresolved promises to avoid hanging.
     setPromiseErrorIfNotReady(lg, _initialDonorStateDurablePromise, status);
     setPromiseErrorIfNotReady(lg, _receiveDonorForgetMigrationPromise, status);
@@ -549,7 +549,7 @@ void TenantMigrationDonorService::Instance::interrupt(Status status) {
 
 ExecutorFuture<repl::OpTime> TenantMigrationDonorService::Instance::_insertStateDoc(
     std::shared_ptr<executor::ScopedTaskExecutor> executor, const CancellationToken& token) {
-    stdx::lock_guard<Latch> lg(_mutex);
+    stdx::lock_guard<stdx::mutex> lg(_mutex);
 
     invariant(_stateDoc.getState() == TenantMigrationDonorStateEnum::kUninitialized);
     _stateDoc.setState(TenantMigrationDonorStateEnum::kAbortingIndexBuilds);
@@ -574,7 +574,7 @@ ExecutorFuture<repl::OpTime> TenantMigrationDonorService::Instance::_insertState
                        const auto filter =
                            BSON(TenantMigrationDonorDocument::kIdFieldName << _migrationUuid);
                        const auto updateMod = [&]() {
-                           stdx::lock_guard<Latch> lg(_mutex);
+                           stdx::lock_guard<stdx::mutex> lg(_mutex);
                            return BSON("$setOnInsert" << _stateDoc.toBSON());
                        }();
                        auto updateResult = Helpers::upsert(
@@ -605,7 +605,7 @@ ExecutorFuture<repl::OpTime> TenantMigrationDonorService::Instance::_updateState
     std::shared_ptr<executor::ScopedTaskExecutor> executor,
     const TenantMigrationDonorStateEnum nextState,
     const CancellationToken& token) {
-    stdx::lock_guard<Latch> lg(_mutex);
+    stdx::lock_guard<stdx::mutex> lg(_mutex);
 
     const auto originalStateDocBson = _stateDoc.toBSON();
 
@@ -658,7 +658,7 @@ ExecutorFuture<repl::OpTime> TenantMigrationDonorService::Instance::_updateState
                        // Reserve an opTime for the write.
                        auto oplogSlot = LocalOplogInfo::get(opCtx)->getNextOpTimes(opCtx, 1U)[0];
                        {
-                           stdx::lock_guard<Latch> lg(_mutex);
+                           stdx::lock_guard<stdx::mutex> lg(_mutex);
 
                            // Update the state.
                            _stateDoc.setState(nextState);
@@ -690,7 +690,7 @@ ExecutorFuture<repl::OpTime> TenantMigrationDonorService::Instance::_updateState
                        }
 
                        const auto updatedStateDocBson = [&]() {
-                           stdx::lock_guard<Latch> lg(_mutex);
+                           stdx::lock_guard<stdx::mutex> lg(_mutex);
                            return _stateDoc.toBSON();
                        }();
 
@@ -729,7 +729,7 @@ ExecutorFuture<repl::OpTime> TenantMigrationDonorService::Instance::_updateState
 ExecutorFuture<repl::OpTime>
 TenantMigrationDonorService::Instance::_markStateDocAsGarbageCollectable(
     std::shared_ptr<executor::ScopedTaskExecutor> executor, const CancellationToken& token) {
-    stdx::lock_guard<Latch> lg(_mutex);
+    stdx::lock_guard<stdx::mutex> lg(_mutex);
 
     _stateDoc.setExpireAt(_serviceContext->getFastClockSource()->now() +
                           Milliseconds{repl::tenantMigrationGarbageCollectionDelayMS.load()});
@@ -756,7 +756,7 @@ TenantMigrationDonorService::Instance::_markStateDocAsGarbageCollectable(
                        const auto filter =
                            BSON(TenantMigrationDonorDocument::kIdFieldName << _migrationUuid);
                        const auto updateMod = [&]() {
-                           stdx::lock_guard<Latch> lg(_mutex);
+                           stdx::lock_guard<stdx::mutex> lg(_mutex);
                            return _stateDoc.toBSON();
                        }();
                        auto updateResult = Helpers::upsert(
@@ -799,7 +799,7 @@ ExecutorFuture<void> TenantMigrationDonorService::Instance::_waitForMajorityWrit
         .waitUntilMajorityForWrite(std::move(opTime), token)
         .thenRunOn(**executor)
         .then([this, self = shared_from_this()] {
-            stdx::lock_guard<Latch> lg(_mutex);
+            stdx::lock_guard<stdx::mutex> lg(_mutex);
             switch (_stateDoc.getState()) {
                 case TenantMigrationDonorStateEnum::kAbortingIndexBuilds:
                     setPromiseOkIfNotReady(lg, _initialDonorStateDurablePromise);
@@ -842,7 +842,7 @@ ExecutorFuture<void> TenantMigrationDonorService::Instance::_sendRecipientSyncDa
     request.setMigrationRecipientCommonData(commonData);
 
     {
-        stdx::lock_guard<Latch> lg(_mutex);
+        stdx::lock_guard<stdx::mutex> lg(_mutex);
         invariant(_stateDoc.getStartMigrationDonorTimestamp());
         request.setStartMigrationDonorTimestamp(*_stateDoc.getStartMigrationDonorTimestamp());
         request.setReturnAfterReachingDonorTimestamp(_stateDoc.getBlockTimestamp());
@@ -891,7 +891,7 @@ ExecutorFuture<void> TenantMigrationDonorService::Instance::_sendRecipientForget
     MigrationRecipientCommonData commonData(
         _migrationUuid, donorConnString.toString(), _readPreference);
     {
-        stdx::lock_guard<Latch> lg(_mutex);
+        stdx::lock_guard<stdx::mutex> lg(_mutex);
         if (_protocol == MigrationProtocolEnum::kMultitenantMigrations) {
             commonData.setTenantId(boost::optional<StringData>(_tenantId));
         } else {
@@ -938,7 +938,7 @@ void TenantMigrationDonorService::Instance::validateTenantIdsForProtocol() {
 
 CancellationToken TenantMigrationDonorService::Instance::_initAbortMigrationSource(
     const CancellationToken& token) {
-    stdx::lock_guard<Latch> lg(_mutex);
+    stdx::lock_guard<stdx::mutex> lg(_mutex);
     invariant(!_abortMigrationSource);
     _abortMigrationSource = CancellationSource(token);
 
@@ -963,7 +963,7 @@ SemiFuture<void> TenantMigrationDonorService::Instance::run(
           "readPreference"_attr = _readPreference);
 
     {
-        stdx::lock_guard<Latch> lg(_mutex);
+        stdx::lock_guard<stdx::mutex> lg(_mutex);
         if (!_stateDoc.getMigrationStart()) {
             _stateDoc.setMigrationStart(_serviceContext->getFastClockSource()->now());
         }
@@ -1046,7 +1046,7 @@ SemiFuture<void> TenantMigrationDonorService::Instance::run(
             return _handleErrorOrEnterAbortedState(executor, token, abortToken, status);
         })
         .onCompletion([this, self = shared_from_this()](Status status) {
-            stdx::lock_guard<Latch> lg(_mutex);
+            stdx::lock_guard<stdx::mutex> lg(_mutex);
             if (!_stateDoc.getExpireAt()) {
                 // Avoid double counting tenant migration statistics after failover.
                 // Double counting may still happen if the failover to the same primary
@@ -1069,7 +1069,7 @@ SemiFuture<void> TenantMigrationDonorService::Instance::run(
         .then([this, self = shared_from_this(), executor, token] {
             pauseTenantMigrationDonorAfterMarkingStateGarbageCollectable.pauseWhileSet();
             {
-                stdx::lock_guard<Latch> lg(_mutex);
+                stdx::lock_guard<stdx::mutex> lg(_mutex);
                 setPromiseOkIfNotReady(lg, _forgetMigrationDurablePromise);
             }
             return _waitForGarbageCollectionDelayThenDeleteStateDoc(executor, token);
@@ -1083,7 +1083,7 @@ SemiFuture<void> TenantMigrationDonorService::Instance::run(
             // error.
             checkForTokenInterrupt(token);
 
-            stdx::lock_guard<Latch> lg(_mutex);
+            stdx::lock_guard<stdx::mutex> lg(_mutex);
 
             setPromiseFromStatusIfNotReady(lg, _forgetMigrationDurablePromise, status);
 
@@ -1112,7 +1112,7 @@ SemiFuture<void> TenantMigrationDonorService::Instance::run(
 ExecutorFuture<void> TenantMigrationDonorService::Instance::_enterAbortingIndexBuildsState(
     const std::shared_ptr<executor::ScopedTaskExecutor>& executor, const CancellationToken& token) {
     {
-        stdx::lock_guard<Latch> lg(_mutex);
+        stdx::lock_guard<stdx::mutex> lg(_mutex);
         if (_stateDoc.getState() > TenantMigrationDonorStateEnum::kUninitialized) {
             return ExecutorFuture(**executor);
         }
@@ -1134,7 +1134,7 @@ void TenantMigrationDonorService::Instance::_abortIndexBuilds(const Cancellation
     checkForTokenInterrupt(token);
 
     {
-        stdx::lock_guard<Latch> lg(_mutex);
+        stdx::lock_guard<stdx::mutex> lg(_mutex);
         if (_stateDoc.getState() > TenantMigrationDonorStateEnum::kAbortingIndexBuilds) {
             return;
         }
@@ -1160,7 +1160,7 @@ TenantMigrationDonorService::Instance::_fetchAndStoreRecipientClusterTimeKeyDocs
     std::shared_ptr<RemoteCommandTargeter> recipientTargeterRS,
     const CancellationToken& token) {
     {
-        stdx::lock_guard<Latch> lg(_mutex);
+        stdx::lock_guard<stdx::mutex> lg(_mutex);
         if (_stateDoc.getState() > TenantMigrationDonorStateEnum::kAbortingIndexBuilds) {
             return ExecutorFuture(**executor);
         }
@@ -1228,7 +1228,7 @@ TenantMigrationDonorService::Instance::_fetchAndStoreRecipientClusterTimeKeyDocs
                                executor::RemoteCommandRequest::kNoTimeout));
 
                        {
-                           stdx::lock_guard<Latch> lg(_mutex);
+                           stdx::lock_guard<stdx::mutex> lg(_mutex);
                            // Note the fetcher cannot be canceled via token, so this check for
                            // interrupt is required otherwise stepdown/shutdown could block waiting
                            // for the fetcher to complete.
@@ -1246,7 +1246,7 @@ TenantMigrationDonorService::Instance::_fetchAndStoreRecipientClusterTimeKeyDocs
                            .then(
                                [this, self = shared_from_this(), fetchStatus, keyDocs, fetcher]() {
                                    {
-                                       stdx::lock_guard<Latch> lg(_mutex);
+                                       stdx::lock_guard<stdx::mutex> lg(_mutex);
                                        _recipientKeysFetcher.reset();
                                    }
 
@@ -1294,7 +1294,7 @@ ExecutorFuture<void> TenantMigrationDonorService::Instance::_enterDataSyncState(
     const CancellationToken& abortToken) {
     pauseTenantMigrationAfterFetchingAndStoringKeys.pauseWhileSet();
     {
-        stdx::lock_guard<Latch> lg(_mutex);
+        stdx::lock_guard<stdx::mutex> lg(_mutex);
         if (_stateDoc.getState() > TenantMigrationDonorStateEnum::kAbortingIndexBuilds) {
             return ExecutorFuture(**executor);
         }
@@ -1321,7 +1321,7 @@ TenantMigrationDonorService::Instance::_waitUntilStartMigrationDonorTimestampIsC
     auto opCtxHolder = cc().makeOperationContext();
     auto opCtx = opCtxHolder.get();
     auto startMigrationDonorTimestamp = [&] {
-        stdx::lock_guard<Latch> lg(_mutex);
+        stdx::lock_guard<stdx::mutex> lg(_mutex);
         return *_stateDoc.getStartMigrationDonorTimestamp();
     }();
 
@@ -1363,7 +1363,7 @@ TenantMigrationDonorService::Instance::_waitForRecipientToBecomeConsistentAndEnt
     std::shared_ptr<RemoteCommandTargeter> recipientTargeterRS,
     const CancellationToken& abortToken) {
     {
-        stdx::lock_guard<Latch> lg(_mutex);
+        stdx::lock_guard<stdx::mutex> lg(_mutex);
         if (_stateDoc.getState() > TenantMigrationDonorStateEnum::kDataSync) {
             return ExecutorFuture(**executor);
         }
@@ -1397,7 +1397,7 @@ TenantMigrationDonorService::Instance::_waitForRecipientToReachBlockTimestampAnd
     const CancellationToken& abortToken,
     const CancellationToken& token) {
     {
-        stdx::lock_guard<Latch> lg(_mutex);
+        stdx::lock_guard<stdx::mutex> lg(_mutex);
         if (_stateDoc.getState() > TenantMigrationDonorStateEnum::kBlocking) {
             return ExecutorFuture(**executor);
         }
@@ -1471,7 +1471,7 @@ TenantMigrationDonorService::Instance::_waitForRecipientToReachBlockTimestampAnd
                     return _waitForMajorityWriteConcern(executor, std::move(opTime), token)
                         .then([this, self = shared_from_this()] {
                             pauseTenantMigrationBeforeLeavingCommittedState.pauseWhileSet();
-                            stdx::lock_guard<Latch> lg(_mutex);
+                            stdx::lock_guard<stdx::mutex> lg(_mutex);
                             // If interrupt is called at some point during execution, it is
                             // possible that interrupt() will fulfill the promise before we
                             // do.
@@ -1511,14 +1511,14 @@ ExecutorFuture<void> TenantMigrationDonorService::Instance::_handleErrorOrEnterA
         // The migration failed either before or during inserting the state doc. Use the status to
         // fulfill the _initialDonorStateDurablePromise to fail the donorStartMigration command
         // immediately.
-        stdx::lock_guard<Latch> lg(_mutex);
+        stdx::lock_guard<stdx::mutex> lg(_mutex);
         setPromiseErrorIfNotReady(lg, _initialDonorStateDurablePromise, status);
 
         return ExecutorFuture(**executor);
     } else if (ErrorCodes::isNotPrimaryError(status) || ErrorCodes::isShutdownError(status)) {
         // Don't abort the migration on retriable errors that may have been generated by the local
         // server shutting/stepping down because it can be resumed when the client retries.
-        stdx::lock_guard<Latch> lg(_mutex);
+        stdx::lock_guard<stdx::mutex> lg(_mutex);
         setPromiseErrorIfNotReady(lg, _initialDonorStateDurablePromise, status);
 
         return ExecutorFuture(**executor);
@@ -1533,7 +1533,7 @@ ExecutorFuture<void> TenantMigrationDonorService::Instance::_handleErrorOrEnterA
             .then([this, self = shared_from_this(), executor, token](repl::OpTime opTime) {
                 return _waitForMajorityWriteConcern(executor, std::move(opTime), token)
                     .then([this, self = shared_from_this()] {
-                        stdx::lock_guard<Latch> lg(_mutex);
+                        stdx::lock_guard<stdx::mutex> lg(_mutex);
                         // If interrupt is called at some point during execution, it is
                         // possible that interrupt() will fulfill the promise before we do.
                         setPromiseOkIfNotReady(lg, _decisionPromise);
@@ -1548,7 +1548,7 @@ TenantMigrationDonorService::Instance::_waitForForgetMigrationThenMarkMigrationG
     std::shared_ptr<RemoteCommandTargeter> recipientTargeterRS,
     const CancellationToken& token) {
     const bool skipWaitingForForget = [&]() {
-        stdx::lock_guard<Latch> lg(_mutex);
+        stdx::lock_guard<stdx::mutex> lg(_mutex);
         if (!isNotDurableAndServerlessConflict(lg, _initialDonorStateDurablePromise)) {
             return false;
         }
@@ -1566,7 +1566,7 @@ TenantMigrationDonorService::Instance::_waitForForgetMigrationThenMarkMigrationG
           "Waiting to receive 'donorForgetMigration' command.",
           "migrationId"_attr = _migrationUuid);
     auto expiredAt = [&]() {
-        stdx::lock_guard<Latch> lg(_mutex);
+        stdx::lock_guard<stdx::mutex> lg(_mutex);
         return _stateDoc.getExpireAt();
     }();
 
@@ -1589,7 +1589,7 @@ TenantMigrationDonorService::Instance::_waitForForgetMigrationThenMarkMigrationG
             {
                 // If the abortReason is ConflictingServerlessOperation, it means there are no
                 // document on the recipient. Do not send the forget command.
-                stdx::lock_guard<Latch> lg(_mutex);
+                stdx::lock_guard<stdx::mutex> lg(_mutex);
                 if (_protocol == MigrationProtocolEnum::kMultitenantMigrations && _abortReason &&
                     _abortReason->code() == ErrorCodes::ConflictingServerlessOperation) {
                     return ExecutorFuture(**executor);
@@ -1632,7 +1632,7 @@ TenantMigrationDonorService::Instance::_waitForGarbageCollectionDelayThenDeleteS
     const std::shared_ptr<executor::ScopedTaskExecutor>& executor, const CancellationToken& token) {
     // If the state document was not inserted due to a conflicting serverless operation, do not
     // try to delete it.
-    stdx::lock_guard<Latch> lg(_mutex);
+    stdx::lock_guard<stdx::mutex> lg(_mutex);
     if (isNotDurableAndServerlessConflict(lg, _initialDonorStateDurablePromise)) {
         return ExecutorFuture(**executor);
     }

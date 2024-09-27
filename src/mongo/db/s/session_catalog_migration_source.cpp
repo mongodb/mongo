@@ -389,7 +389,7 @@ bool SessionCatalogMigrationSource::hasMoreOplog() {
         return true;
     }
 
-    stdx::lock_guard<Latch> lk(_newOplogMutex);
+    stdx::lock_guard<stdx::mutex> lk(_newOplogMutex);
     return _hasNewWrites(lk);
 }
 
@@ -400,12 +400,12 @@ bool SessionCatalogMigrationSource::inCatchupPhase() {
 int64_t SessionCatalogMigrationSource::untransferredCatchUpDataSize() {
     invariant(inCatchupPhase());
 
-    stdx::lock_guard<Latch> _lk(_newOplogMutex);
+    stdx::lock_guard<stdx::mutex> _lk(_newOplogMutex);
     return _newWriteOpTimeList.size() * _averageSessionDocSize;
 }
 
 void SessionCatalogMigrationSource::onCommitCloneStarted() {
-    stdx::lock_guard<Latch> _lk(_newOplogMutex);
+    stdx::lock_guard<stdx::mutex> _lk(_newOplogMutex);
 
     _state = State::kCommitStarted;
     if (_newOplogNotification) {
@@ -415,7 +415,7 @@ void SessionCatalogMigrationSource::onCommitCloneStarted() {
 }
 
 void SessionCatalogMigrationSource::onCloneCleanup() {
-    stdx::lock_guard<Latch> _lk(_newOplogMutex);
+    stdx::lock_guard<stdx::mutex> _lk(_newOplogMutex);
 
     _state = State::kCleanup;
     if (_newOplogNotification) {
@@ -426,7 +426,7 @@ void SessionCatalogMigrationSource::onCloneCleanup() {
 
 SessionCatalogMigrationSource::OplogResult SessionCatalogMigrationSource::getLastFetchedOplog() {
     {
-        stdx::lock_guard<Latch> _lk(_sessionCloneMutex);
+        stdx::lock_guard<stdx::mutex> _lk(_sessionCloneMutex);
         if (_lastFetchedOplogImage) {
             return OplogResult(_lastFetchedOplogImage, false);
         } else if (_lastFetchedOplog) {
@@ -435,7 +435,7 @@ SessionCatalogMigrationSource::OplogResult SessionCatalogMigrationSource::getLas
     }
 
     {
-        stdx::lock_guard<Latch> _lk(_newOplogMutex);
+        stdx::lock_guard<stdx::mutex> _lk(_newOplogMutex);
         if (_lastFetchedNewWriteOplogImage) {
             return OplogResult(_lastFetchedNewWriteOplogImage, false);
         }
@@ -454,7 +454,7 @@ bool SessionCatalogMigrationSource::fetchNextOplog(OperationContext* opCtx) {
 std::shared_ptr<Notification<bool>> SessionCatalogMigrationSource::getNotificationForNewOplog() {
     invariant(!_hasMoreOplogFromSessionCatalog());
 
-    stdx::lock_guard<Latch> lk(_newOplogMutex);
+    stdx::lock_guard<stdx::mutex> lk(_newOplogMutex);
 
     if (_newOplogNotification) {
         return _newOplogNotification;
@@ -663,13 +663,13 @@ bool SessionCatalogMigrationSource::_handleWriteHistory(WithLock lk, OperationCo
 }
 
 bool SessionCatalogMigrationSource::_hasMoreOplogFromSessionCatalog() {
-    stdx::lock_guard<Latch> _lk(_sessionCloneMutex);
+    stdx::lock_guard<stdx::mutex> _lk(_sessionCloneMutex);
     return _lastFetchedOplog || !_unprocessedOplogBuffer.empty() ||
         !_sessionOplogIterators.empty() || _currentOplogIterator;
 }
 
 bool SessionCatalogMigrationSource::_fetchNextOplogFromSessionCatalog(OperationContext* opCtx) {
-    stdx::unique_lock<Latch> lk(_sessionCloneMutex);
+    stdx::unique_lock<stdx::mutex> lk(_sessionCloneMutex);
 
     if (_lastFetchedOplogImage) {
         // When `_lastFetchedOplogImage` is set, it means we found an oplog entry with a pre/post
@@ -704,7 +704,7 @@ bool SessionCatalogMigrationSource::_hasNewWrites(WithLock) {
         !_unprocessedNewWriteOplogBuffer.empty();
 }
 
-void SessionCatalogMigrationSource::_tryFetchNextNewWriteOplog(stdx::unique_lock<Latch>& lk,
+void SessionCatalogMigrationSource::_tryFetchNextNewWriteOplog(stdx::unique_lock<stdx::mutex>& lk,
                                                                OperationContext* opCtx) {
     invariant(_unprocessedNewWriteOplogBuffer.empty());
     invariant(!_newWriteOpTimeList.empty());
@@ -813,7 +813,7 @@ void SessionCatalogMigrationSource::_tryFetchNextNewWriteOplog(stdx::unique_lock
 }
 
 bool SessionCatalogMigrationSource::_fetchNextNewWriteOplog(OperationContext* opCtx) {
-    stdx::unique_lock<Latch> lk(_newOplogMutex);
+    stdx::unique_lock<stdx::mutex> lk(_newOplogMutex);
 
     if (_lastFetchedNewWriteOplogImage) {
         // When `_lastFetchedNewWriteOplogImage` is set, it means we found an oplog entry with
@@ -853,7 +853,7 @@ bool SessionCatalogMigrationSource::_fetchNextNewWriteOplog(OperationContext* op
 
 void SessionCatalogMigrationSource::notifyNewWriteOpTime(repl::OpTime opTime,
                                                          EntryAtOpTimeType entryAtOpTimeType) {
-    stdx::lock_guard<Latch> lk(_newOplogMutex);
+    stdx::lock_guard<stdx::mutex> lk(_newOplogMutex);
     _notifyNewWriteOpTime(lk, opTime, entryAtOpTimeType);
 }
 

@@ -142,7 +142,7 @@ public:
 
 private:
     StringMap<size_t> _atoms;
-    Mutex _mutex;
+    stdx::mutex _mutex;
 };
 
 size_t CommandNameAtomRegistry::lookup(StringData s) {

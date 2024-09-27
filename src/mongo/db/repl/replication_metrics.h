@@ -39,7 +39,7 @@
 #include "mongo/db/repl/replication_metrics_gen.h"
 #include "mongo/db/repl/topology_coordinator.h"
 #include "mongo/db/service_context.h"
-#include "mongo/platform/mutex.h"
+#include "mongo/stdx/mutex.h"
 #include "mongo/util/concurrency/with_lock.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/time_support.h"

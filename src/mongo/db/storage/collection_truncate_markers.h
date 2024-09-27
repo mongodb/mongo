@@ -54,8 +54,8 @@
 #include "mongo/db/storage/record_data.h"
 #include "mongo/db/storage/record_store.h"
 #include "mongo/platform/atomic_word.h"
-#include "mongo/platform/mutex.h"
 #include "mongo/stdx/condition_variable.h"
+#include "mongo/stdx/mutex.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/time_support.h"
 
@@ -265,7 +265,7 @@ public:
     //
 
     size_t numMarkers_forTest() const {
-        stdx::lock_guard<Latch> lk(_markersMutex);
+        stdx::lock_guard<stdx::mutex> lk(_markersMutex);
         return _markers.size();
     }
 
@@ -337,7 +337,7 @@ protected:
      * markers will be created.
      */
     bool isEmpty() const {
-        stdx::lock_guard<Latch> lk(_markersMutex);
+        stdx::lock_guard<stdx::mutex> lk(_markersMutex);
         return _markers.size() == 0 && _currentBytes.load() == 0 && _currentRecords.load() == 0;
     }
 

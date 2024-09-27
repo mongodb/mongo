@@ -86,7 +86,6 @@
 #include "mongo/logv2/log_component.h"
 #include "mongo/logv2/redaction.h"
 #include "mongo/platform/atomic_word.h"
-#include "mongo/platform/mutex.h"
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/s/catalog/sharding_catalog_client.h"
 #include "mongo/s/catalog/type_chunk.h"
@@ -96,6 +95,7 @@
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/request_types/ensure_chunk_version_is_greater_than_gen.h"
+#include "mongo/stdx/mutex.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/concurrency/thread_name.h"
 #include "mongo/util/concurrency/thread_pool.h"
@@ -153,7 +153,7 @@ public:
     }
 
     std::shared_ptr<executor::ThreadPoolTaskExecutor> getExecutor() {
-        stdx::lock_guard<Latch> lg(_mutex);
+        stdx::lock_guard<stdx::mutex> lg(_mutex);
         if (!_started) {
             _executor->startup();
             _started = true;

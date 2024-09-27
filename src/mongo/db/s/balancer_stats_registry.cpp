@@ -174,7 +174,7 @@ void BalancerStatsRegistry::_initializeAsync(OperationContext* opCtx) {
         .getAsync([](auto) {});
 }
 
-void BalancerStatsRegistry::_terminate(stdx::unique_lock<Mutex>& lock) {
+void BalancerStatsRegistry::_terminate(stdx::unique_lock<stdx::mutex>& lock) {
     {
         stdx::lock_guard lk{_stateMutex};
         _state.store(State::kTerminating);

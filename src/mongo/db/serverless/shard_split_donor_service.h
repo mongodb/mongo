@@ -53,7 +53,7 @@
 #include "mongo/executor/cancelable_executor.h"
 #include "mongo/executor/scoped_task_executor.h"
 #include "mongo/executor/task_executor.h"
-#include "mongo/platform/mutex.h"
+#include "mongo/stdx/mutex.h"
 #include "mongo/util/cancellation.h"
 #include "mongo/util/concurrency/thread_pool.h"
 #include "mongo/util/concurrency/with_lock.h"
@@ -166,7 +166,7 @@ public:
      * Returns true if the state doc was marked to expire (marked garbage collectable).
      */
     bool isGarbageCollectable() const {
-        stdx::lock_guard<Latch> lg(_mutex);
+        stdx::lock_guard<stdx::mutex> lg(_mutex);
         return !!_stateDoc.getExpireAt();
     }
 
@@ -178,7 +178,7 @@ public:
     }
 
     ShardSplitDonorStateEnum getStateDocState() const {
-        stdx::lock_guard<Latch> lg(_mutex);
+        stdx::lock_guard<stdx::mutex> lg(_mutex);
         return _stateDoc.getState();
     }
 

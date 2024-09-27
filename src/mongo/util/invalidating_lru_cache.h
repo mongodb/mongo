@@ -44,7 +44,7 @@
 
 #include "mongo/base/static_assert.h"
 #include "mongo/platform/atomic_word.h"
-#include "mongo/platform/mutex.h"
+#include "mongo/stdx/mutex.h"
 #include "mongo/stdx/trusted_hasher.h"
 #include "mongo/stdx/unordered_map.h"
 #include "mongo/util/assert_util.h"
@@ -174,7 +174,7 @@ class InvalidatingLRUCache {
             if (!owningCache)
                 return;
 
-            stdx::unique_lock<Latch> ul(owningCache->_mutex);
+            stdx::unique_lock<stdx::mutex> ul(owningCache->_mutex);
             auto& evictedCheckedOutValues = owningCache->_evictedCheckedOutValues;
             auto it = evictedCheckedOutValues.find(*key);
 
@@ -450,7 +450,7 @@ public:
     requires IsComparable<KeyType> ValueHandle
     get(const KeyType& key,
         CacheCausalConsistency causalConsistency = CacheCausalConsistency::kLatestCached) {
-        stdx::lock_guard<Latch> lg(_mutex);
+        stdx::lock_guard<stdx::mutex> lg(_mutex);
         std::shared_ptr<StoredValue> storedValue;
         if (auto it = _cache.find(key); it != _cache.end()) {
             storedValue = it->second;
@@ -508,7 +508,7 @@ public:
     template <typename KeyType>
     requires IsComparable<KeyType>
     bool advanceTimeInStore(const KeyType& key, const Time& newTimeInStore) {
-        stdx::lock_guard<Latch> lg(_mutex);
+        stdx::lock_guard<stdx::mutex> lg(_mutex);
         std::shared_ptr<StoredValue> storedValue;
         if (auto it = _cache.find(key); it != _cache.end()) {
             storedValue = it->second;
@@ -538,7 +538,7 @@ public:
     template <typename KeyType>
     requires IsComparable<KeyType> std::pair<ValueHandle, Time> getCachedValueAndTimeInStore(
         const KeyType& key) {
-        stdx::lock_guard<Latch> lg(_mutex);
+        stdx::lock_guard<stdx::mutex> lg(_mutex);
         std::shared_ptr<StoredValue> storedValue;
         if (auto it = _cache.find(key); it != _cache.end()) {
             storedValue = it->second;
@@ -608,7 +608,7 @@ public:
      * checked-out.
      */
     std::vector<CachedItemInfo> getCacheInfo() const {
-        stdx::lock_guard<Latch> lg(_mutex);
+        stdx::lock_guard<stdx::mutex> lg(_mutex);
 
         std::vector<CachedItemInfo> ret;
         ret.reserve(_cache.size() + _evictedCheckedOutValues.size());
@@ -634,7 +634,7 @@ private:
      */
     class LockGuardWithPostUnlockDestructor {
     public:
-        LockGuardWithPostUnlockDestructor(Mutex& mutex) : _ul(mutex) {}
+        LockGuardWithPostUnlockDestructor(stdx::mutex& mutex) : _ul(mutex) {}
 
         void releasePtr(std::shared_ptr<StoredValue>&& value) {
             _valuesToDestroy.emplace_back(std::move(value));
@@ -645,7 +645,7 @@ private:
         // outside of the cache's mutex
         std::vector<std::shared_ptr<StoredValue>> _valuesToDestroy;
 
-        stdx::unique_lock<Latch> _ul;
+        stdx::unique_lock<stdx::mutex> _ul;
     };
 
     /**

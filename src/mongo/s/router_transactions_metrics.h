@@ -38,9 +38,9 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/service_context.h"
 #include "mongo/platform/atomic_word.h"
-#include "mongo/platform/mutex.h"
 #include "mongo/s/router_transactions_stats_gen.h"
 #include "mongo/s/transaction_router.h"
+#include "mongo/stdx/mutex.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/hierarchical_acquisition.h"
 

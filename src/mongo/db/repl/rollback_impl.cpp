@@ -339,12 +339,12 @@ Status RollbackImpl::runRollback(OperationContext* opCtx) {
 }
 
 void RollbackImpl::shutdown() {
-    stdx::lock_guard<Latch> lock(_mutex);
+    stdx::lock_guard<stdx::mutex> lock(_mutex);
     _inShutdown = true;
 }
 
 bool RollbackImpl::_isInShutdown() const {
-    stdx::lock_guard<Latch> lock(_mutex);
+    stdx::lock_guard<stdx::mutex> lock(_mutex);
     return _inShutdown;
 }
 

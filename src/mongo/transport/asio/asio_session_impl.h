@@ -284,7 +284,7 @@ protected:
      * TODO (SERVER-83933) Remove this mutex after SSL handshake logic is moved to occur before
      * concurrent accesses can occur.
      */
-    Mutex _sslSocketLock{};
+    stdx::mutex _sslSocketLock{};
 
     AsioTransportLayer* const _tl;
     bool _isIngressSession;

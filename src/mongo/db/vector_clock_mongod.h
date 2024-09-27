@@ -38,7 +38,7 @@
 #include "mongo/db/vector_clock.h"
 #include "mongo/db/vector_clock_document_gen.h"
 #include "mongo/db/vector_clock_mutable.h"
-#include "mongo/platform/mutex.h"
+#include "mongo/stdx/mutex.h"
 #include "mongo/util/decorable.h"
 
 

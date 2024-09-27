@@ -43,12 +43,12 @@ ReadThroughCacheBase::ReadThroughCacheBase(Service* service, ThreadPoolInterface
 ReadThroughCacheBase::~ReadThroughCacheBase() = default;
 
 struct ReadThroughCacheBase::CancelToken::TaskInfo {
-    TaskInfo(Service* service, Mutex& cancelTokenMutex)
+    TaskInfo(Service* service, stdx::mutex& cancelTokenMutex)
         : service(service), cancelTokenMutex(cancelTokenMutex) {}
 
     Service* const service;
 
-    Mutex& cancelTokenMutex;
+    stdx::mutex& cancelTokenMutex;
     Status cancelStatus{Status::OK()};
     OperationContext* opCtxToCancel{nullptr};
 };

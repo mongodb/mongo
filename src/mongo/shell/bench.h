@@ -53,9 +53,9 @@
 #include "mongo/db/session/logical_session_id_gen.h"
 #include "mongo/db/tenant_id.h"
 #include "mongo/platform/atomic_word.h"
-#include "mongo/platform/mutex.h"
 #include "mongo/platform/random.h"
 #include "mongo/stdx/condition_variable.h"
+#include "mongo/stdx/mutex.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/duration.h"
@@ -625,7 +625,7 @@ public:
 
 private:
     // TODO: Same as for createWithConfig.
-    static Mutex _staticMutex;
+    static stdx::mutex _staticMutex;
     static std::map<OID, BenchRunner*> _activeRuns;
 
     OID _oid;

@@ -113,7 +113,7 @@ void ConfigsvrCoordinator::interrupt(Status status) noexcept {
                 "reason"_attr = redact(status));
 
     // Resolve any unresolved promises to avoid hanging.
-    stdx::lock_guard<Latch> lg(_mutex);
+    stdx::lock_guard<stdx::mutex> lg(_mutex);
     if (!_completionPromise.getFuture().isReady()) {
         _completionPromise.setError(status);
     }
@@ -166,14 +166,14 @@ SemiFuture<void> ConfigsvrCoordinator::run(std::shared_ptr<executor::ScopedTaskE
                               "Failed to remove ConfigsvrCoordinator state document",
                               "error"_attr = redact(ex));
                 ex.addContext("Failed to remove ConfigsvrCoordinator state document"_sd);
-                stdx::lock_guard<Latch> lg(_mutex);
+                stdx::lock_guard<stdx::mutex> lg(_mutex);
                 if (!_completionPromise.getFuture().isReady()) {
                     _completionPromise.setError(ex.toStatus());
                 }
                 throw;
             }
 
-            stdx::lock_guard<Latch> lg(_mutex);
+            stdx::lock_guard<stdx::mutex> lg(_mutex);
             if (!_completionPromise.getFuture().isReady()) {
                 _completionPromise.emplaceValue();
             }

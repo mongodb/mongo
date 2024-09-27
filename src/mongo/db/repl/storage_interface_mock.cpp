@@ -45,7 +45,7 @@ namespace repl {
 StorageInterfaceMock::StorageInterfaceMock() = default;
 
 StatusWith<int> StorageInterfaceMock::getRollbackID(OperationContext* opCtx) {
-    stdx::lock_guard<Latch> lock(_mutex);
+    stdx::lock_guard<stdx::mutex> lock(_mutex);
     if (!_rbidInitialized) {
         return Status(ErrorCodes::NamespaceNotFound, "Rollback ID not initialized");
     }
@@ -53,7 +53,7 @@ StatusWith<int> StorageInterfaceMock::getRollbackID(OperationContext* opCtx) {
 }
 
 StatusWith<int> StorageInterfaceMock::initializeRollbackID(OperationContext* opCtx) {
-    stdx::lock_guard<Latch> lock(_mutex);
+    stdx::lock_guard<stdx::mutex> lock(_mutex);
     if (_rbidInitialized) {
         return Status(ErrorCodes::NamespaceExists, "Rollback ID already initialized");
     }
@@ -65,7 +65,7 @@ StatusWith<int> StorageInterfaceMock::initializeRollbackID(OperationContext* opC
 }
 
 StatusWith<int> StorageInterfaceMock::incrementRollbackID(OperationContext* opCtx) {
-    stdx::lock_guard<Latch> lock(_mutex);
+    stdx::lock_guard<stdx::mutex> lock(_mutex);
     if (!_rbidInitialized) {
         return Status(ErrorCodes::NamespaceNotFound, "Rollback ID not initialized");
     }
@@ -76,23 +76,23 @@ StatusWith<int> StorageInterfaceMock::incrementRollbackID(OperationContext* opCt
 void StorageInterfaceMock::setStableTimestamp(ServiceContext* serviceCtx,
                                               Timestamp snapshotName,
                                               bool force) {
-    stdx::lock_guard<Latch> lock(_mutex);
+    stdx::lock_guard<stdx::mutex> lock(_mutex);
     _stableTimestamp = snapshotName;
 }
 
 void StorageInterfaceMock::setInitialDataTimestamp(ServiceContext* serviceCtx,
                                                    Timestamp snapshotName) {
-    stdx::lock_guard<Latch> lock(_mutex);
+    stdx::lock_guard<stdx::mutex> lock(_mutex);
     _initialDataTimestamp = snapshotName;
 }
 
 Timestamp StorageInterfaceMock::getStableTimestamp() const {
-    stdx::lock_guard<Latch> lock(_mutex);
+    stdx::lock_guard<stdx::mutex> lock(_mutex);
     return _stableTimestamp;
 }
 
 Timestamp StorageInterfaceMock::getInitialDataTimestamp(ServiceContext* serviceCtx) const {
-    stdx::lock_guard<Latch> lock(_mutex);
+    stdx::lock_guard<stdx::mutex> lock(_mutex);
     return _initialDataTimestamp;
 }
 

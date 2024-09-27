@@ -57,7 +57,6 @@
 #include "mongo/db/record_id.h"
 #include "mongo/db/resumable_index_builds_gen.h"
 #include "mongo/db/storage/recovery_unit.h"
-#include "mongo/platform/mutex.h"
 #include "mongo/util/fail_point.h"
 #include "mongo/util/uuid.h"
 

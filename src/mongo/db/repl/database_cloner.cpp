@@ -47,7 +47,7 @@
 #include "mongo/logv2/log.h"
 #include "mongo/logv2/log_attr.h"
 #include "mongo/logv2/log_component.h"
-#include "mongo/platform/mutex.h"
+#include "mongo/stdx/mutex.h"
 #include "mongo/stdx/unordered_set.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/clock_source.h"
@@ -81,7 +81,7 @@ BaseCloner::ClonerStages DatabaseCloner::getStages() {
 }
 
 void DatabaseCloner::preStage() {
-    stdx::lock_guard<Latch> lk(_mutex);
+    stdx::lock_guard<stdx::mutex> lk(_mutex);
     _stats.start = getSharedData()->getClock()->now();
 }
 
@@ -145,7 +145,7 @@ bool DatabaseCloner::isMyFailPoint(const BSONObj& data) const {
 
 void DatabaseCloner::postStage() {
     {
-        stdx::lock_guard<Latch> lk(_mutex);
+        stdx::lock_guard<stdx::mutex> lk(_mutex);
         _stats.collections = _collections.size();
         _stats.collectionStats.reserve(_collections.size());
         for (const auto& coll : _collections) {
@@ -157,7 +157,7 @@ void DatabaseCloner::postStage() {
         auto& sourceNss = coll.first;
         auto& collectionOptions = coll.second;
         {
-            stdx::lock_guard<Latch> lk(_mutex);
+            stdx::lock_guard<stdx::mutex> lk(_mutex);
             _currentCollectionCloner = std::make_unique<CollectionCloner>(sourceNss,
                                                                           collectionOptions,
                                                                           getSharedData(),
@@ -182,7 +182,7 @@ void DatabaseCloner::postStage() {
                      .toString()});
         }
         {
-            stdx::lock_guard<Latch> lk(_mutex);
+            stdx::lock_guard<stdx::mutex> lk(_mutex);
             _stats.collectionStats[_stats.clonedCollections] = _currentCollectionCloner->getStats();
             _currentCollectionCloner = nullptr;
             // Abort the database cloner if the collection clone failed.
@@ -191,12 +191,12 @@ void DatabaseCloner::postStage() {
             _stats.clonedCollections++;
         }
     }
-    stdx::lock_guard<Latch> lk(_mutex);
+    stdx::lock_guard<stdx::mutex> lk(_mutex);
     _stats.end = getSharedData()->getClock()->now();
 }
 
 DatabaseCloner::Stats DatabaseCloner::getStats() const {
-    stdx::lock_guard<Latch> lk(_mutex);
+    stdx::lock_guard<stdx::mutex> lk(_mutex);
     DatabaseCloner::Stats stats = _stats;
     if (_currentCollectionCloner) {
         stats.collectionStats[_stats.clonedCollections] = _currentCollectionCloner->getStats();

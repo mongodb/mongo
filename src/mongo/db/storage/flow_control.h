@@ -45,7 +45,7 @@
 #include "mongo/db/repl/replication_coordinator_fwd.h"
 #include "mongo/db/service_context.h"
 #include "mongo/platform/atomic_word.h"
-#include "mongo/platform/mutex.h"
+#include "mongo/stdx/mutex.h"
 #include "mongo/util/periodic_runner.h"
 #include "mongo/util/time_support.h"
 

@@ -30,8 +30,8 @@
 #pragma once
 
 #include "mongo/db/repl/oplog_buffer.h"
-#include "mongo/platform/mutex.h"
 #include "mongo/stdx/condition_variable.h"
+#include "mongo/stdx/mutex.h"
 
 namespace mongo {
 namespace repl {
@@ -81,7 +81,7 @@ public:
     void exitDrainMode() final;
 
 private:
-    void _waitForSpace_inlock(stdx::unique_lock<Latch>& lk, std::size_t size);
+    void _waitForSpace_inlock(stdx::unique_lock<stdx::mutex>& lk, std::size_t size);
     void _clear_inlock(WithLock lk);
 
     mutable stdx::mutex _mutex;

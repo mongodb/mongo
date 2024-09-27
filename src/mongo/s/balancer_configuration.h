@@ -40,8 +40,8 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/platform/atomic_word.h"
-#include "mongo/platform/mutex.h"
 #include "mongo/s/request_types/migration_secondary_throttle_options.h"
+#include "mongo/stdx/mutex.h"
 
 namespace mongo {
 

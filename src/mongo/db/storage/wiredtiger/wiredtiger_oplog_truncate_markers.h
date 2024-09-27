@@ -37,6 +37,7 @@
 #include "mongo/db/storage/collection_truncate_markers.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_record_store.h"
 #include "mongo/stdx/condition_variable.h"
+#include "mongo/stdx/mutex.h"
 
 namespace mongo {
 

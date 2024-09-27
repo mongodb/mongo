@@ -57,7 +57,6 @@
 #include "mongo/bson/util/builder_fwd.h"
 #include "mongo/config.h"  // IWYU pragma: keep
 #include "mongo/platform/decimal128.h"
-#include "mongo/platform/mutex.h"
 #include "mongo/platform/strnlen.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"

@@ -59,7 +59,7 @@
 #include "mongo/db/session/logical_session_id.h"
 #include "mongo/db/session/session_txn_record_gen.h"
 #include "mongo/executor/task_executor.h"
-#include "mongo/platform/mutex.h"
+#include "mongo/stdx/mutex.h"
 #include "mongo/stdx/unordered_set.h"
 #include "mongo/util/concurrency/with_lock.h"
 #include "mongo/util/future.h"
@@ -214,7 +214,7 @@ private:
      */
     void _setFinalStatusIfOk(WithLock, Status newStatus);
 
-    Mutex* _getMutex() noexcept final {
+    stdx::mutex* _getMutex() noexcept final {
         return &_mutex;
     }
 

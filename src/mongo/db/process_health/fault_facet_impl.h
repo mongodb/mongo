@@ -36,7 +36,7 @@
 #include "mongo/db/process_health/fault_manager_config.h"
 #include "mongo/db/process_health/health_check_status.h"
 #include "mongo/db/process_health/health_observer.h"
-#include "mongo/platform/mutex.h"
+#include "mongo/stdx/mutex.h"
 #include "mongo/util/clock_source.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/hierarchical_acquisition.h"

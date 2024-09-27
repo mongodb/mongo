@@ -117,14 +117,14 @@ AsyncWorkScheduler::AsyncWorkScheduler(ServiceContext* serviceContext,
 
 AsyncWorkScheduler::~AsyncWorkScheduler() {
     {
-        stdx::lock_guard<Latch> lg(_mutex);
+        stdx::lock_guard<stdx::mutex> lg(_mutex);
         invariant(_quiesced(lg));
     }
 
     if (!_parent)
         return;
 
-    stdx::lock_guard<Latch> lg(_parent->_mutex);
+    stdx::lock_guard<stdx::mutex> lg(_parent->_mutex);
     _parent->_childSchedulers.erase(_itToRemove);
     _parent->_notifyAllTasksComplete(lg);
 }
@@ -211,7 +211,7 @@ Future<executor::TaskExecutor::ResponseStatus> AsyncWorkScheduler::scheduleRemot
 
             auto pf = makePromiseFuture<ResponseStatus>();
 
-            stdx::unique_lock<Latch> ul(_mutex);
+            stdx::unique_lock<stdx::mutex> ul(_mutex);
             uassertStatusOK(_shutdownStatus);
 
             auto scheduledCommandHandle = uassertStatusOK(_executor->scheduleRemoteCommand(
@@ -239,7 +239,7 @@ Future<executor::TaskExecutor::ResponseStatus> AsyncWorkScheduler::scheduleRemot
                     } else {
                         promise->setError([&] {
                             if (status == ErrorCodes::CallbackCanceled) {
-                                stdx::unique_lock<Latch> ul(_mutex);
+                                stdx::unique_lock<stdx::mutex> ul(_mutex);
                                 return _shutdownStatus.isOK() ? status : _shutdownStatus;
                             }
                             return status;
@@ -254,7 +254,7 @@ Future<executor::TaskExecutor::ResponseStatus> AsyncWorkScheduler::scheduleRemot
 
             return std::move(pf.future).tapAll(
                 [this, it = std::move(it)](StatusWith<ResponseStatus> s) {
-                    stdx::lock_guard<Latch> lg(_mutex);
+                    stdx::lock_guard<stdx::mutex> lg(_mutex);
                     _activeHandles.erase(it);
                     _notifyAllTasksComplete(lg);
                 });
@@ -263,7 +263,7 @@ Future<executor::TaskExecutor::ResponseStatus> AsyncWorkScheduler::scheduleRemot
 
 std::unique_ptr<AsyncWorkScheduler> AsyncWorkScheduler::makeChildScheduler() {
 
-    stdx::lock_guard<Latch> lg(_mutex);
+    stdx::lock_guard<stdx::mutex> lg(_mutex);
     // This is to enable access to the private AsyncWorkScheduler ctor.
     std::unique_ptr<AsyncWorkScheduler> child(new AsyncWorkScheduler(_serviceContext, this, lg));
 
@@ -276,7 +276,7 @@ std::unique_ptr<AsyncWorkScheduler> AsyncWorkScheduler::makeChildScheduler() {
 void AsyncWorkScheduler::shutdown(Status status) {
     invariant(!status.isOK());
 
-    stdx::lock_guard<Latch> lg(_mutex);
+    stdx::lock_guard<stdx::mutex> lg(_mutex);
     if (!_shutdownStatus.isOK())
         return;
 
@@ -297,7 +297,7 @@ void AsyncWorkScheduler::shutdown(Status status) {
 }
 
 void AsyncWorkScheduler::join() {
-    stdx::unique_lock<Latch> ul(_mutex);
+    stdx::unique_lock<stdx::mutex> ul(_mutex);
     _allListsEmptyCV.wait(ul, [&] {
         return _activeOpContexts.empty() && _activeHandles.empty() && _childSchedulers.empty();
     });

@@ -67,7 +67,7 @@ void DefaultBaton::detachImpl() noexcept {
     decltype(_timers) timers;
 
     {
-        stdx::lock_guard<Latch> lk(_mutex);
+        stdx::lock_guard<stdx::mutex> lk(_mutex);
 
         invariant(_opCtx->getBaton().get() == this);
         _opCtx->setBaton(nullptr);
@@ -90,7 +90,7 @@ void DefaultBaton::detachImpl() noexcept {
 }
 
 void DefaultBaton::schedule(Task func) noexcept {
-    stdx::unique_lock<Latch> lk(_mutex);
+    stdx::unique_lock<stdx::mutex> lk(_mutex);
 
     if (!_opCtx) {
         lk.unlock();
@@ -108,7 +108,7 @@ void DefaultBaton::schedule(Task func) noexcept {
 }
 
 void DefaultBaton::notify() noexcept {
-    stdx::lock_guard<Latch> lk(_mutex);
+    stdx::lock_guard<stdx::mutex> lk(_mutex);
     _notified = true;
     _cv.notify_one();
 }
@@ -117,7 +117,7 @@ Waitable::TimeoutState DefaultBaton::run_until(ClockSource* clkSource,
                                                Date_t oldDeadline) noexcept {
     // We'll fulfill promises and run jobs on the way out, ensuring we don't hold any locks
     const ScopeGuard guard([&] {
-        stdx::unique_lock<Latch> lk(_mutex);
+        stdx::unique_lock<stdx::mutex> lk(_mutex);
 
         // Fire expired timers
         std::vector<Timer> expiredTimers;
@@ -146,7 +146,7 @@ Waitable::TimeoutState DefaultBaton::run_until(ClockSource* clkSource,
         }
     });
 
-    stdx::unique_lock<Latch> lk(_mutex);
+    stdx::unique_lock<stdx::mutex> lk(_mutex);
 
     // If anything was scheduled, run it now.
     if (_scheduled.size()) {
@@ -179,7 +179,7 @@ void DefaultBaton::run(ClockSource* clkSource) noexcept {
     run_until(clkSource, Date_t::max());
 }
 
-void DefaultBaton::_safeExecute(stdx::unique_lock<Mutex> lk, Job job) {
+void DefaultBaton::_safeExecute(stdx::unique_lock<stdx::mutex> lk, Job job) {
     if (!_opCtx) {
         // If we're detached, no job can safely execute.
         iasserted(kDetached);
@@ -188,7 +188,7 @@ void DefaultBaton::_safeExecute(stdx::unique_lock<Mutex> lk, Job job) {
     if (_sleeping) {
         _scheduled.push_back([this, job = std::move(job)](auto status) mutable {
             if (status.isOK()) {
-                job(stdx::unique_lock<Mutex>(_mutex));
+                job(stdx::unique_lock<stdx::mutex>(_mutex));
             }
         });
         lk.unlock();

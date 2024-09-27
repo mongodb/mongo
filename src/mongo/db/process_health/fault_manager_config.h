@@ -43,7 +43,7 @@
 #include "mongo/db/server_parameter.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/platform/basic.h"
-#include "mongo/platform/mutex.h"
+#include "mongo/stdx/mutex.h"
 #include "mongo/stdx/unordered_map.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/duration.h"

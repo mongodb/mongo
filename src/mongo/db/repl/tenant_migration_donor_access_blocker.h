@@ -51,7 +51,7 @@
 #include "mongo/db/service_context.h"
 #include "mongo/executor/task_executor.h"
 #include "mongo/platform/atomic_word.h"
-#include "mongo/platform/mutex.h"
+#include "mongo/stdx/mutex.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/future.h"
 #include "mongo/util/future_impl.h"
@@ -80,21 +80,21 @@ public:
     inline ~RepeatableSharedPromise();
 
     SharedSemiFuture<Payload> getFuture() {
-        stdx::unique_lock<Latch> ul(_mutex);
+        stdx::unique_lock<stdx::mutex> ul(_mutex);
         return _sharedPromise->getFuture();
     }
 
     // Set promise with value for non-void Payload or with Status.
     // In case of void Payload always use Status with or without error code.
     void setFrom(StatusOrStatusWith<const Payload> sosw) noexcept {
-        stdx::unique_lock<Latch> ul(_mutex);
+        stdx::unique_lock<stdx::mutex> ul(_mutex);
         _sharedPromise->setFrom(std::move(sosw));
         // Promise can be set only once, replace it with a new one.
         _sharedPromise = std::make_unique<SharedPromise<Payload>>();
     }
 
 private:
-    mutable Mutex _mutex;
+    mutable stdx::mutex _mutex;
     std::unique_ptr<SharedPromise<Payload>> _sharedPromise;
     // In destructor, set the final payload value to this.
     const payload_unless_void _valueAtTermination;
@@ -353,8 +353,8 @@ private:
         return _completionPromise.getFuture();
     }
 
-    void _onMajorityCommitCommitOpTime(stdx::unique_lock<Latch>& lk);
-    void _onMajorityCommitAbortOpTime(stdx::unique_lock<Latch>& lk);
+    void _onMajorityCommitCommitOpTime(stdx::unique_lock<stdx::mutex>& lk);
+    void _onMajorityCommitAbortOpTime(stdx::unique_lock<stdx::mutex>& lk);
 
     ServiceContext* _serviceContext;
 

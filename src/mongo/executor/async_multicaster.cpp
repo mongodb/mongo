@@ -35,8 +35,8 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/executor/async_multicaster.h"
 #include "mongo/executor/remote_command_request.h"
-#include "mongo/platform/mutex.h"
 #include "mongo/stdx/condition_variable.h"
+#include "mongo/stdx/mutex.h"
 #include "mongo/util/assert_util.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
@@ -72,7 +72,7 @@ std::vector<AsyncMulticaster::Reply> AsyncMulticaster::multicast(
 
     auto state = std::make_shared<State>(servers.size());
     for (const auto& server : servers) {
-        stdx::unique_lock<Latch> lk(state->mutex);
+        stdx::unique_lock<stdx::mutex> lk(state->mutex);
         // spin up no more than maxConcurrency tasks at once
         opCtx->waitForConditionOrInterrupt(
             state->cv, lk, [&] { return state->running < _options.maxConcurrency; });
@@ -81,7 +81,7 @@ std::vector<AsyncMulticaster::Reply> AsyncMulticaster::multicast(
         uassertStatusOK(_executor->scheduleRemoteCommand(
             RemoteCommandRequest{server, theDbName, theCmdObj, opCtx, timeoutMillis},
             [state](const TaskExecutor::RemoteCommandCallbackArgs& cbData) {
-                stdx::lock_guard<Latch> lk(state->mutex);
+                stdx::lock_guard<stdx::mutex> lk(state->mutex);
 
                 state->out.emplace_back(
                     std::forward_as_tuple(cbData.request.target, cbData.response));
@@ -97,7 +97,7 @@ std::vector<AsyncMulticaster::Reply> AsyncMulticaster::multicast(
             }));
     }
 
-    stdx::unique_lock<Latch> lk(state->mutex);
+    stdx::unique_lock<stdx::mutex> lk(state->mutex);
     opCtx->waitForConditionOrInterrupt(state->cv, lk, [&] { return state->leftToDo == 0; });
 
     return std::move(state->out);

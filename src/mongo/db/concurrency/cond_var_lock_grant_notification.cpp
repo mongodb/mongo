@@ -34,7 +34,7 @@
 namespace mongo {
 
 LockResult CondVarLockGrantNotification::wait(Milliseconds timeout) {
-    stdx::unique_lock<Latch> lock(_mutex);
+    stdx::unique_lock<stdx::mutex> lock(_mutex);
     return _cond.wait_for(
                lock, timeout.toSystemDuration(), [this] { return _result != LOCK_INVALID; })
         ? _result
@@ -42,7 +42,7 @@ LockResult CondVarLockGrantNotification::wait(Milliseconds timeout) {
 }
 
 LockResult CondVarLockGrantNotification::wait(OperationContext* opCtx, Milliseconds timeout) {
-    stdx::unique_lock<Latch> lock(_mutex);
+    stdx::unique_lock<stdx::mutex> lock(_mutex);
     if (opCtx->waitForConditionOrInterruptFor(
             _cond, lock, timeout, [this] { return _result != LOCK_INVALID; })) {
         // Because waitForConditionOrInterruptFor evaluates the predicate before checking for
@@ -56,7 +56,7 @@ LockResult CondVarLockGrantNotification::wait(OperationContext* opCtx, Milliseco
 }
 
 void CondVarLockGrantNotification::notify(ResourceId resId, LockResult result) {
-    stdx::unique_lock<Latch> lock(_mutex);
+    stdx::unique_lock<stdx::mutex> lock(_mutex);
     invariant(_result == LOCK_INVALID);
     _result = result;
 

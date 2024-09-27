@@ -363,7 +363,7 @@ void ProgramRegistry::insertHandleForPid(ProcessId pid, HANDLE handle) {
 
 void ProgramOutputMultiplexer::appendLine(
     int port, ProcessId pid, const std::string& name, const std::string& line, bool shouldLog) {
-    stdx::lock_guard<Latch> lk(_mongoProgramOutputMutex);
+    stdx::lock_guard<stdx::mutex> lk(_mongoProgramOutputMutex);
     auto sinkProgramOutput = [&](auto& sink) {
         if (port > 0) {
             sink << name << port << "| " << line << endl;
@@ -387,12 +387,12 @@ void ProgramOutputMultiplexer::appendLine(
 }
 
 string ProgramOutputMultiplexer::str() const {
-    stdx::lock_guard<Latch> lk(_mongoProgramOutputMutex);
+    stdx::lock_guard<stdx::mutex> lk(_mongoProgramOutputMutex);
     return _buffer.str();
 }
 
 void ProgramOutputMultiplexer::clear() {
-    stdx::lock_guard<Latch> lk(_mongoProgramOutputMutex);
+    stdx::lock_guard<stdx::mutex> lk(_mongoProgramOutputMutex);
     _buffer.str("");
 }
 
@@ -469,7 +469,7 @@ void ProgramRunner::start(bool shouldLogArgs) {
         //
         // Holding the lock for the duration of those events prevents the leaks and thus the
         // associated deadlocks.
-        stdx::lock_guard<Latch> lk(_parentRegistry->_createProcessMtx);
+        stdx::lock_guard<stdx::mutex> lk(_parentRegistry->_createProcessMtx);
         if (pipe(pipeEnds)) {
             auto ec = lastPosixError();
             LOGV2_ERROR(22830, "Failed to create pipe", "error"_attr = errorMessage(ec));

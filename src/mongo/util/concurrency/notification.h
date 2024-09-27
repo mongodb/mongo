@@ -32,8 +32,8 @@
 #include <boost/optional.hpp>
 
 #include "mongo/db/operation_context.h"
-#include "mongo/platform/mutex.h"
 #include "mongo/stdx/condition_variable.h"
+#include "mongo/stdx/mutex.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/hierarchical_acquisition.h"
@@ -60,7 +60,7 @@ public:
      * block).
      */
     explicit operator bool() const {
-        stdx::unique_lock<Latch> lock(_mutex);
+        stdx::unique_lock<stdx::mutex> lock(_mutex);
         return !!_value;
     }
 
@@ -69,7 +69,7 @@ public:
      * If the wait is interrupted, throws an exception.
      */
     T& get(OperationContext* opCtx) {
-        stdx::unique_lock<Latch> lock(_mutex);
+        stdx::unique_lock<stdx::mutex> lock(_mutex);
         opCtx->waitForConditionOrInterrupt(_condVar, lock, [this]() -> bool { return !!_value; });
         return _value.get();
     }
@@ -79,7 +79,7 @@ public:
      * This variant of get cannot be interrupted.
      */
     T& get() {
-        stdx::unique_lock<Latch> lock(_mutex);
+        stdx::unique_lock<stdx::mutex> lock(_mutex);
         while (!_value) {
             _condVar.wait(lock);
         }
@@ -92,7 +92,7 @@ public:
      * call. Must only be called once for the lifetime of the notification.
      */
     void set(T value) {
-        stdx::lock_guard<Latch> lock(_mutex);
+        stdx::lock_guard<stdx::mutex> lock(_mutex);
         invariant(!_value);
         _value = std::move(value);
         _condVar.notify_all();
@@ -105,7 +105,7 @@ public:
      * If the wait is interrupted, throws an exception.
      */
     bool waitFor(OperationContext* opCtx, Milliseconds waitTimeout) {
-        stdx::unique_lock<Latch> lock(_mutex);
+        stdx::unique_lock<stdx::mutex> lock(_mutex);
         return opCtx->waitForConditionOrInterruptFor(
             _condVar, lock, waitTimeout, [&]() { return !!_value; });
     }

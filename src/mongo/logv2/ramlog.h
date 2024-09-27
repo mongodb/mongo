@@ -36,7 +36,7 @@
 #include <vector>
 
 #include "mongo/base/string_data.h"
-#include "mongo/platform/mutex.h"
+#include "mongo/stdx/mutex.h"
 #include "mongo/util/concurrency/with_lock.h"
 
 namespace mongo::logv2 {
@@ -118,7 +118,7 @@ private:
     static constexpr size_t kMaxSizeBytes = 1024 * 1024;
 
     // Guards all non-static data.
-    // stdx::recursive_mutex // NOLINT is intentional, mongo::Mutex can not be used here
+    // stdx::recursive_mutex // NOLINT is intentional, stdx::mutex can not be used here
     mutable stdx::recursive_mutex _mutex;  // NOLINT
 
     // Array of lines

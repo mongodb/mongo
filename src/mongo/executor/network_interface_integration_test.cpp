@@ -73,10 +73,10 @@
 #include "mongo/idl/generic_argument_gen.h"
 #include "mongo/logv2/log.h"
 #include "mongo/logv2/log_component.h"
-#include "mongo/platform/mutex.h"
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/rpc/topology_version_gen.h"
 #include "mongo/stdx/condition_variable.h"
+#include "mongo/stdx/mutex.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/transport/transport_layer.h"
 #include "mongo/unittest/assert.h"
@@ -333,14 +333,14 @@ public:
         RemoteCommandResponse response;
     };
     HelloData waitForHello() {
-        stdx::unique_lock<Latch> lk(_mutex);
+        stdx::unique_lock<stdx::mutex> lk(_mutex);
         _helloCondVar.wait(lk, [this] { return _helloResult != boost::none; });
 
         return std::move(*_helloResult);
     }
 
     bool hasHelloResult() {
-        stdx::lock_guard<Latch> lk(_mutex);
+        stdx::lock_guard<stdx::mutex> lk(_mutex);
         return _helloResult != boost::none;
     }
 
@@ -352,7 +352,7 @@ private:
         Status validateHost(const HostAndPort& host,
                             const BSONObj& request,
                             const RemoteCommandResponse& helloReply) override {
-            stdx::lock_guard<Latch> lk(_parent->_mutex);
+            stdx::lock_guard<stdx::mutex> lk(_parent->_mutex);
             _parent->_helloResult = HelloData{request, helloReply};
             _parent->_helloCondVar.notify_all();
             return Status::OK();
@@ -1056,7 +1056,7 @@ public:
     }
 
     ExhaustRequestHandlerUtil::responseOutcomeCount getCountersWhenReady() {
-        stdx::unique_lock<Latch> lk(_mutex);
+        stdx::unique_lock<stdx::mutex> lk(_mutex);
         _cv.wait(_mutex, [&] { return _replyUpdated; });
         _replyUpdated = false;
         return _responseOutcomeCount;
@@ -1078,7 +1078,7 @@ private:
     std::function<void(const RemoteCommandResponse&)> _callbackFn =
         [&](const executor::RemoteCommandResponse& response) {
             {
-                stdx::unique_lock<Latch> lk(_mutex);
+                stdx::unique_lock<stdx::mutex> lk(_mutex);
                 if (response.status.isOK()) {
                     _responseOutcomeCount._success++;
                 } else {

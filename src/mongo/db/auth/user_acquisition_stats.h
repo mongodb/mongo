@@ -36,7 +36,7 @@
 #include "mongo/db/auth/ldap_operation_stats.h"
 #include "mongo/db/auth/user_cache_access_stats.h"
 #include "mongo/db/client.h"
-#include "mongo/platform/mutex.h"
+#include "mongo/stdx/mutex.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/tick_source.h"
 
@@ -67,12 +67,12 @@ public:
      * LDAPOperationStats object
      */
     bool shouldReportUserCacheAccessStats() const {
-        stdx::lock_guard<Latch> lk(_mutex);
+        stdx::lock_guard<stdx::mutex> lk(_mutex);
         return _userCacheAccessStats.shouldReport();
     }
 
     bool shouldReportLDAPOperationStats() const {
-        stdx::lock_guard<Latch> lk(_mutex);
+        stdx::lock_guard<stdx::mutex> lk(_mutex);
         return _ldapOperationStats.shouldReport();
     }
 
@@ -81,12 +81,12 @@ public:
      * to string and to BSON. Used for reporting to $currentOp, database profiling, and logging.
      */
     void reportUserCacheAcquisitionStats(BSONObjBuilder* builder, TickSource* tickSource) const {
-        stdx::lock_guard<Latch> lk(_mutex);
+        stdx::lock_guard<stdx::mutex> lk(_mutex);
         _userCacheAccessStats.report(builder, tickSource);
     }
 
     void userCacheAcquisitionStatsToString(StringBuilder* sb, TickSource* tickSource) const {
-        stdx::lock_guard<Latch> lk(_mutex);
+        stdx::lock_guard<stdx::mutex> lk(_mutex);
         _userCacheAccessStats.toString(sb, tickSource);
     }
 
@@ -95,12 +95,12 @@ public:
      * to string and to BSON. Used for reporting to $currentOp, database profiling, and logging.
      */
     void reportLdapOperationStats(BSONObjBuilder* builder, TickSource* tickSource) const {
-        stdx::lock_guard<Latch> lk(_mutex);
+        stdx::lock_guard<stdx::mutex> lk(_mutex);
         _ldapOperationStats.report(builder, tickSource);
     }
 
     void ldapOperationStatsToString(StringBuilder* sb, TickSource* tickSource) const {
-        stdx::lock_guard<Latch> lk(_mutex);
+        stdx::lock_guard<stdx::mutex> lk(_mutex);
         _ldapOperationStats.toString(sb, tickSource);
     }
 
@@ -108,7 +108,7 @@ public:
      * Returns a copy of the current _userCacheAccessStats object.
      */
     UserCacheAccessStats getUserCacheAccessStatsSnapshot() const {
-        stdx::lock_guard<Latch> lk(_mutex);
+        stdx::lock_guard<stdx::mutex> lk(_mutex);
         return _userCacheAccessStats;
     }
 
@@ -116,7 +116,7 @@ public:
      * Returns a copy of the current _ldapOperationStats object.
      */
     LDAPOperationStats getLdapOperationStatsSnapshot() const {
-        stdx::lock_guard<Latch> lk(_mutex);
+        stdx::lock_guard<stdx::mutex> lk(_mutex);
         return _ldapOperationStats;
     }
 
@@ -125,7 +125,7 @@ private:
      * Records the start time of an LDAP bind operation
      */
     void _recordBindStart(TickSource* tickSource) {
-        stdx::lock_guard<Latch> lk(_mutex);
+        stdx::lock_guard<stdx::mutex> lk(_mutex);
         _ldapOperationStats.recordBindStart(_getTime(tickSource));
     }
 
@@ -134,7 +134,7 @@ private:
      * must already be set.
      */
     void _recordBindComplete(TickSource* tickSource) {
-        stdx::lock_guard<Latch> lk(_mutex);
+        stdx::lock_guard<stdx::mutex> lk(_mutex);
         _ldapOperationStats.recordBindComplete(tickSource);
     }
 
@@ -142,7 +142,7 @@ private:
      * Records the start time of an LDAP search/query operation
      */
     void _recordSearchStart(TickSource* tickSource) {
-        stdx::lock_guard<Latch> lk(_mutex);
+        stdx::lock_guard<stdx::mutex> lk(_mutex);
         _ldapOperationStats.recordSearchStart(_getTime(tickSource));
     }
 
@@ -151,7 +151,7 @@ private:
      * time must already be set.
      */
     void _recordSearchComplete(TickSource* tickSource) {
-        stdx::lock_guard<Latch> lk(_mutex);
+        stdx::lock_guard<stdx::mutex> lk(_mutex);
         _ldapOperationStats.recordSearchComplete(tickSource);
     }
 
@@ -159,7 +159,7 @@ private:
      * Increments the number of successful referrals to another LDAP server.
      */
     void _incrementSuccessfulReferrals() {
-        stdx::lock_guard<Latch> lk(_mutex);
+        stdx::lock_guard<stdx::mutex> lk(_mutex);
         _ldapOperationStats.incrementSuccessfulReferrals();
     }
 
@@ -167,7 +167,7 @@ private:
      * Increments the number of failed referrals to another LDAP server.
      */
     void _incrementFailedReferrals() {
-        stdx::lock_guard<Latch> lk(_mutex);
+        stdx::lock_guard<stdx::mutex> lk(_mutex);
         _ldapOperationStats.incrementFailedReferrals();
     }
 
@@ -175,7 +175,7 @@ private:
      * Records the start time of a new cache access attempt.
      */
     void _recordCacheAccessStart(TickSource* tickSource) {
-        stdx::lock_guard<Latch> lk(_mutex);
+        stdx::lock_guard<stdx::mutex> lk(_mutex);
         _userCacheAccessStats.recordUserCacheAccessStart(_getTime(tickSource));
     }
 
@@ -184,7 +184,7 @@ private:
      * already be set.
      */
     void _recordCacheAccessComplete(TickSource* tickSource) {
-        stdx::lock_guard<Latch> lk(_mutex);
+        stdx::lock_guard<stdx::mutex> lk(_mutex);
         _userCacheAccessStats.recordUserCacheAccessComplete(tickSource);
     }
 

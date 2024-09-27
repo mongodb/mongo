@@ -37,8 +37,8 @@
 #include <thread>
 
 #include "mongo/platform/atomic_word.h"
-#include "mongo/platform/mutex.h"
 #include "mongo/stdx/condition_variable.h"
+#include "mongo/stdx/mutex.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/util/clock_source.h"
 #include "mongo/util/duration.h"

@@ -54,9 +54,9 @@
 #include "mongo/logv2/log_component_settings.h"
 #include "mongo/logv2/log_manager.h"
 #include "mongo/logv2/log_severity.h"
-#include "mongo/platform/mutex.h"
 #include "mongo/rpc/message.h"
 #include "mongo/rpc/op_msg.h"
+#include "mongo/stdx/mutex.h"
 #include "mongo/transport/asio/asio_session_manager.h"
 #include "mongo/transport/service_entry_point.h"
 #include "mongo/transport/service_executor.h"
@@ -280,7 +280,7 @@ public:
     }
 
 private:
-    Mutex _setupMutex;
+    stdx::mutex _setupMutex;
     int _configuredThreads = 0;
     boost::optional<ScopedValueOverride<size_t>> _savedDefaultReserved;
     std::unique_ptr<MockCoordinator> _coordinator;

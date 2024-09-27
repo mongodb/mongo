@@ -68,7 +68,7 @@ void ResourceCatalog::add(ResourceId id, DDLResourceName resourceName) {
 }
 
 void ResourceCatalog::_add(ResourceId id, std::string name) {
-    stdx::lock_guard<Latch> lk{_mutex};
+    stdx::lock_guard<stdx::mutex> lk{_mutex};
     _resources[id].insert(std::move(name));
 }
 
@@ -88,7 +88,7 @@ void ResourceCatalog::remove(ResourceId id, DDLResourceName resourceName) {
 }
 
 ResourceId ResourceCatalog::newResourceIdForMutex(std::string resourceLabel) {
-    stdx::lock_guard<Latch> lk(_mutexResourceIdLabelsMutex);
+    stdx::lock_guard<stdx::mutex> lk(_mutexResourceIdLabelsMutex);
     _mutexResourceIdLabels.emplace_back(std::move(resourceLabel));
 
     return ResourceId(
@@ -96,7 +96,7 @@ ResourceId ResourceCatalog::newResourceIdForMutex(std::string resourceLabel) {
 }
 
 void ResourceCatalog::_remove(ResourceId id, const std::string& name) {
-    stdx::lock_guard<Latch> lk{_mutex};
+    stdx::lock_guard<stdx::mutex> lk{_mutex};
 
     auto it = _resources.find(id);
     if (it == _resources.end()) {
@@ -111,7 +111,7 @@ void ResourceCatalog::_remove(ResourceId id, const std::string& name) {
 }
 
 void ResourceCatalog::clear() {
-    stdx::lock_guard<Latch> lk{_mutex};
+    stdx::lock_guard<stdx::mutex> lk{_mutex};
     _resources.clear();
 }
 
@@ -122,7 +122,7 @@ boost::optional<std::string> ResourceCatalog::name(ResourceId id) const {
         case RESOURCE_COLLECTION:
         case RESOURCE_DDL_DATABASE:
         case RESOURCE_DDL_COLLECTION: {
-            stdx::lock_guard<Latch> lk{_mutex};
+            stdx::lock_guard<stdx::mutex> lk{_mutex};
 
             auto it = _resources.find(id);
             return it == _resources.end() || it->second.size() > 1
@@ -130,7 +130,7 @@ boost::optional<std::string> ResourceCatalog::name(ResourceId id) const {
                 : boost::make_optional(*it->second.begin());
         }
         case RESOURCE_MUTEX: {
-            stdx::lock_guard<Latch> lk{_mutexResourceIdLabelsMutex};
+            stdx::lock_guard<stdx::mutex> lk{_mutexResourceIdLabelsMutex};
             return _mutexResourceIdLabels.at(id.getHashId());
         }
         default:

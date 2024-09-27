@@ -44,7 +44,7 @@
 #include "mongo/db/repl/primary_only_service.h"
 #include "mongo/db/write_concern_options.h"
 #include "mongo/executor/scoped_task_executor.h"
-#include "mongo/platform/mutex.h"
+#include "mongo/stdx/mutex.h"
 #include "mongo/util/cancellation.h"
 #include "mongo/util/future.h"
 #include "mongo/util/future_impl.h"

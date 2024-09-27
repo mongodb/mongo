@@ -55,7 +55,7 @@ namespace {
 using namespace mongo;
 using namespace mongo::repl;
 
-using LockGuard = stdx::lock_guard<Latch>;
+using LockGuard = stdx::lock_guard<stdx::mutex>;
 
 class RollbackCheckerTest : public executor::ThreadPoolExecutorTest {
 public:
@@ -75,7 +75,7 @@ void RollbackCheckerTest::setUp() {
     launchExecutorThread();
     getNet()->enterNetwork();
     _rollbackChecker = std::make_unique<RollbackChecker>(&getExecutor(), HostAndPort());
-    stdx::lock_guard<Latch> lk(_mutex);
+    stdx::lock_guard<stdx::mutex> lk(_mutex);
     _hasRolledBackResult = {ErrorCodes::NotYetInitialized, ""};
     _hasCalledCallback = false;
 }

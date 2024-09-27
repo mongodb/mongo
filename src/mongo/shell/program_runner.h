@@ -38,8 +38,8 @@
 
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/service_context.h"
-#include "mongo/platform/mutex.h"
 #include "mongo/platform/process_id.h"
+#include "mongo/stdx/mutex.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/stdx/unordered_map.h"
 #include "mongo/stdx/unordered_set.h"
@@ -118,7 +118,7 @@ private:
     stdx::unordered_map<ProcessId, stdx::thread> _outputReaderThreads;
     ProgramOutputMultiplexer _programOutputMultiplexer;
     mutable stdx::recursive_mutex _mutex;
-    mutable Mutex _createProcessMtx;
+    mutable stdx::mutex _createProcessMtx;
 
 #ifdef _WIN32
 private:

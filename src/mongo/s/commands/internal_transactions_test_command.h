@@ -182,7 +182,7 @@ public:
             static stdx::mutex mutex;
             static std::shared_ptr<executor::ThreadPoolTaskExecutor> executor;
 
-            stdx::lock_guard<Latch> lg(mutex);
+            stdx::lock_guard<stdx::mutex> lg(mutex);
             if (!executor) {
                 ThreadPool::Options options;
                 options.poolName = "InternalTransaction";

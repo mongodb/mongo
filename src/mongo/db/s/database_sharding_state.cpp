@@ -53,9 +53,9 @@
 #include "mongo/logv2/log.h"
 #include "mongo/logv2/log_attr.h"
 #include "mongo/logv2/log_component.h"
-#include "mongo/platform/mutex.h"
 #include "mongo/s/sharding_state.h"
 #include "mongo/s/stale_exception.h"
+#include "mongo/stdx/mutex.h"
 #include "mongo/stdx/unordered_map.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/database_name_util.h"
@@ -87,7 +87,7 @@ public:
     };
 
     DSSAndLock* getOrCreate(const DatabaseName& dbName) {
-        stdx::lock_guard<Latch> lg(_mutex);
+        stdx::lock_guard<stdx::mutex> lg(_mutex);
 
         auto it = _databases.find(dbName);
         if (it == _databases.end()) {

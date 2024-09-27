@@ -38,7 +38,7 @@
 #include "mongo/db/logical_time.h"
 #include "mongo/db/signed_logical_time.h"
 #include "mongo/db/time_proof_service.h"
-#include "mongo/platform/mutex.h"
+#include "mongo/stdx/mutex.h"
 
 namespace mongo {
 

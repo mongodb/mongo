@@ -91,7 +91,7 @@ void DropPendingCollectionReaper::addDropPendingNamespace(
     const OpTime& dropOpTime,
     const NamespaceString& dropPendingNamespace) {
     invariant(dropPendingNamespace.isDropPendingNamespace());
-    stdx::lock_guard<Latch> lock(_mutex);
+    stdx::lock_guard<stdx::mutex> lock(_mutex);
     const auto equalRange = _dropPendingNamespaces.equal_range(dropOpTime);
     const auto& lowerBound = equalRange.first;
     const auto& upperBound = equalRange.second;
@@ -111,7 +111,7 @@ void DropPendingCollectionReaper::addDropPendingNamespace(
     if (shard_role_details::getLocker(opCtx)->inAWriteUnitOfWork()) {
         shard_role_details::getRecoveryUnit(opCtx)->onRollback(
             [this, dropPendingNamespace, dropOpTime](OperationContext*) {
-                stdx::lock_guard<Latch> lock(_mutex);
+                stdx::lock_guard<stdx::mutex> lock(_mutex);
 
                 const auto equalRange = _dropPendingNamespaces.equal_range(dropOpTime);
                 const auto& lowerBound = equalRange.first;
@@ -128,7 +128,7 @@ void DropPendingCollectionReaper::addDropPendingNamespace(
 }
 
 boost::optional<OpTime> DropPendingCollectionReaper::getEarliestDropOpTime() {
-    stdx::lock_guard<Latch> lock(_mutex);
+    stdx::lock_guard<stdx::mutex> lock(_mutex);
     auto it = _dropPendingNamespaces.cbegin();
     if (it == _dropPendingNamespaces.cend()) {
         return boost::none;
@@ -143,7 +143,7 @@ bool DropPendingCollectionReaper::rollBackDropPendingCollection(
 
     const auto pendingNss = collectionNamespace.makeDropPendingNamespace(opTime);
     {
-        stdx::lock_guard<Latch> lock(_mutex);
+        stdx::lock_guard<stdx::mutex> lock(_mutex);
         const auto equalRange = _dropPendingNamespaces.equal_range(opTime);
         const auto& lowerBound = equalRange.first;
         const auto& upperBound = equalRange.second;
@@ -175,7 +175,7 @@ void DropPendingCollectionReaper::dropCollectionsOlderThan(OperationContext* opC
                                                            const OpTime& opTime) {
     DropPendingNamespaces toDrop;
     {
-        stdx::lock_guard<Latch> lock(_mutex);
+        stdx::lock_guard<stdx::mutex> lock(_mutex);
         for (auto it = _dropPendingNamespaces.cbegin();
              it != _dropPendingNamespaces.cend() && it->first <= opTime;
              ++it) {
@@ -221,7 +221,7 @@ void DropPendingCollectionReaper::dropCollectionsOlderThan(OperationContext* opC
     {
         // Entries must be removed AFTER drops are completed, so that getEarliestDropOpTime()
         // returns appropriate results.
-        stdx::lock_guard<Latch> lock(_mutex);
+        stdx::lock_guard<stdx::mutex> lock(_mutex);
         auto it = _dropPendingNamespaces.cbegin();
         while (it != _dropPendingNamespaces.cend() && it->first <= opTime) {
             if (toDrop.find(it->first) != toDrop.cend()) {

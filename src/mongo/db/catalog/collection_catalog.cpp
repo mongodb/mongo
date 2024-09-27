@@ -77,9 +77,9 @@
 #include "mongo/logv2/log_tag.h"
 #include "mongo/logv2/redaction.h"
 #include "mongo/platform/atomic_word.h"
-#include "mongo/platform/mutex.h"
 #include "mongo/platform/rwmutex.h"
 #include "mongo/stdx/condition_variable.h"
+#include "mongo/stdx/mutex.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/database_name_util.h"
 #include "mongo/util/decorable.h"
@@ -636,7 +636,7 @@ void CollectionCatalog::write(ServiceContext* svcCtx, CatalogWriteFn job) {
 
         struct CompletionInfo {
             // Used to wait for job to complete by worker thread
-            Mutex mutex;
+            stdx::mutex mutex;
             stdx::condition_variable cv;
 
             // Exception storage if we threw during job execution, so we can transfer the exception

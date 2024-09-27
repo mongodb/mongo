@@ -49,7 +49,6 @@
 #include "mongo/db/session/logical_session_id.h"
 #include "mongo/db/storage/storage_engine.h"
 #include "mongo/platform/atomic_word.h"
-#include "mongo/platform/mutex.h"
 #include "mongo/platform/rwmutex.h"
 #include "mongo/stdx/condition_variable.h"
 #include "mongo/stdx/mutex.h"
@@ -184,7 +183,7 @@ public:
  * This is for internal use by `ServiceContext`. Avoid using it to lock `ServiceContext` as it will
  * block normal server operations.
  */
-using ServiceContextLock = service_context_detail::ObjectLock<ServiceContext, Mutex>;
+using ServiceContextLock = service_context_detail::ObjectLock<ServiceContext, stdx::mutex>;
 
 /**
  * Classes that implement this interface can receive notification on killOp.

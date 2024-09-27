@@ -245,7 +245,7 @@ void KeysCollectionManager::cacheExternalKey(ExternalKeysCollectionDocument key)
 std::shared_ptr<Notification<void>> KeysCollectionManager::PeriodicRunner::requestRefreshAsync(
     OperationContext* opCtx) {
     auto refreshRequest = [this]() {
-        stdx::lock_guard<Latch> lk(_mutex);
+        stdx::lock_guard<stdx::mutex> lk(_mutex);
 
         if (_inShutdown) {
             uasserted(ErrorCodes::ShutdownInProgress,
@@ -269,7 +269,7 @@ void KeysCollectionManager::PeriodicRunner::_doPeriodicRefresh(ServiceContext* s
 
     // The helper for sleeping for the specified duration or until this node shuts down or there is
     // a new refresh request. Returns true if there is a shutdown error during the sleep.
-    auto waitUntilShutDownOrNextRequest = [&](stdx::unique_lock<Latch>& lock,
+    auto waitUntilShutDownOrNextRequest = [&](stdx::unique_lock<stdx::mutex>& lock,
                                               Milliseconds duration) {
         maxKeyRefreshWaitTimeOverrideMS.execute([&](const BSONObj& data) {
             duration = std::min(duration, Milliseconds(data["overrideMS"].numberInt()));
@@ -302,7 +302,7 @@ void KeysCollectionManager::PeriodicRunner::_doPeriodicRefresh(ServiceContext* s
     while (true) {
         std::shared_ptr<RefreshFunc> doRefresh;
         {
-            stdx::lock_guard<Latch> lock(_mutex);
+            stdx::lock_guard<stdx::mutex> lock(_mutex);
 
             if (_inShutdown) {
                 break;
@@ -353,7 +353,7 @@ void KeysCollectionManager::PeriodicRunner::_doPeriodicRefresh(ServiceContext* s
             // This error means that this mongod has just restarted and no majority committed
             // snapshot is available yet. To avoid returning a KeyNotFound error to the waiters, try
             // refreshing again if the number of tries has not been exhausted.
-            stdx::unique_lock<Latch> lock(_mutex);
+            stdx::unique_lock<stdx::mutex> lock(_mutex);
             if (auto inShutdown = waitUntilShutDownOrNextRequest(lock, nextRefreshInterval);
                 inShutdown) {
                 return;
@@ -370,7 +370,7 @@ void KeysCollectionManager::PeriodicRunner::_doPeriodicRefresh(ServiceContext* s
         }
         requests.clear();
 
-        stdx::unique_lock<Latch> lock(_mutex);
+        stdx::unique_lock<stdx::mutex> lock(_mutex);
         if (_refreshRequest) {
             // A fresh request came in, fulfill the request before going to sleep.
             continue;
@@ -386,7 +386,7 @@ void KeysCollectionManager::PeriodicRunner::_doPeriodicRefresh(ServiceContext* s
 }
 
 void KeysCollectionManager::PeriodicRunner::setFunc(RefreshFunc newRefreshStrategy) {
-    stdx::lock_guard<Latch> lock(_mutex);
+    stdx::lock_guard<stdx::mutex> lock(_mutex);
     if (_inShutdown) {
         uasserted(ErrorCodes::ShutdownInProgress,
                   "aborting KeysCollectionManager::PeriodicRunner::setFunc because node is "
@@ -408,7 +408,7 @@ void KeysCollectionManager::PeriodicRunner::switchFunc(OperationContext* opCtx,
 void KeysCollectionManager::PeriodicRunner::start(ServiceContext* service,
                                                   const std::string& threadName,
                                                   Milliseconds refreshInterval) {
-    stdx::lock_guard<Latch> lock(_mutex);
+    stdx::lock_guard<stdx::mutex> lock(_mutex);
     invariant(!_backgroundThread.joinable());
     invariant(!_inShutdown);
 
@@ -419,7 +419,7 @@ void KeysCollectionManager::PeriodicRunner::start(ServiceContext* service,
 
 void KeysCollectionManager::PeriodicRunner::stop() {
     {
-        stdx::lock_guard<Latch> lock(_mutex);
+        stdx::lock_guard<stdx::mutex> lock(_mutex);
         if (!_backgroundThread.joinable()) {
             return;
         }
@@ -436,7 +436,7 @@ bool KeysCollectionManager::PeriodicRunner::hasSeenKeys() const noexcept {
 }
 
 bool KeysCollectionManager::PeriodicRunner::isInShutdown() const {
-    stdx::lock_guard<Latch> lock(_mutex);
+    stdx::lock_guard<stdx::mutex> lock(_mutex);
     return _inShutdown;
 }
 

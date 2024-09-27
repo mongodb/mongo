@@ -32,7 +32,7 @@
 #include "mongo/logv2/log.h"
 #include "mongo/logv2/log_attr.h"
 #include "mongo/logv2/log_component.h"
-#include "mongo/platform/mutex.h"
+#include "mongo/stdx/mutex.h"
 #include "mongo/unittest/assert.h"
 #include "mongo/unittest/framework.h"
 #include "mongo/util/concurrency/with_lock.h"
@@ -48,15 +48,15 @@ struct Beerp {
     explicit Beerp(int i) {
         _blerp(WithLock::withoutLock(), i);
     }
-    Beerp(stdx::lock_guard<Latch> const& lk, int i) {
+    Beerp(stdx::lock_guard<stdx::mutex> const& lk, int i) {
         _blerp(lk, i);
     }
     int bleep(char n) {
-        stdx::lock_guard<Latch> lk(_m);
+        stdx::lock_guard<stdx::mutex> lk(_m);
         return _bloop(lk, n - '0');
     }
     int bleep(int i) {
-        stdx::unique_lock<Latch> lk(_m);
+        stdx::unique_lock<stdx::mutex> lk(_m);
         return _bloop(lk, i);
     }
 
@@ -77,7 +77,7 @@ TEST(WithLockTest, OverloadSet) {
     ASSERT_EQ(2, b.bleep(2));
 
     stdx::mutex m;
-    stdx::lock_guard<Latch> lk(m);
+    stdx::lock_guard<stdx::mutex> lk(m);
     Beerp(lk, 3);
 }
 

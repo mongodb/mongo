@@ -46,8 +46,8 @@
 #include "mongo/executor/remote_command_request.h"
 #include "mongo/executor/scoped_task_executor.h"
 #include "mongo/platform/compiler.h"
-#include "mongo/platform/mutex.h"
 #include "mongo/stdx/condition_variable.h"
+#include "mongo/stdx/mutex.h"
 #include "mongo/stdx/unordered_map.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/concurrency/with_lock.h"
@@ -301,7 +301,7 @@ private:
             [id, work = std::forward<Work>(work), self = shared_self()](const auto& cargs) {
                 using ArgsT = std::decay_t<decltype(cargs)>;
 
-                stdx::unique_lock<Latch> lk(self->_mutex);
+                stdx::unique_lock<stdx::mutex> lk(self->_mutex);
 
                 auto doWorkAndNotify = [&](const ArgsT& x) noexcept {
                     lk.unlock();

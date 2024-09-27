@@ -32,7 +32,7 @@
 #include <string>
 
 #include "mongo/crypto/mechanism_scram.h"
-#include "mongo/platform/mutex.h"
+#include "mongo/stdx/mutex.h"
 #include "mongo/stdx/unordered_map.h"
 #include "mongo/util/net/hostandport.h"
 
@@ -85,7 +85,7 @@ public:
      */
     scram::Secrets<HashBlock> getCachedSecrets(
         const HostAndPort& target, const scram::Presecrets<HashBlock>& presecrets) const {
-        const stdx::lock_guard<Latch> lock(_hostToSecretsMutex);
+        const stdx::lock_guard<stdx::mutex> lock(_hostToSecretsMutex);
 
         // Search the cache for a record associated with the host we're trying to connect to.
         auto foundSecret = _hostToSecrets.find(target);
@@ -114,7 +114,7 @@ public:
     void setCachedSecrets(HostAndPort target,
                           scram::Presecrets<HashBlock> presecrets,
                           scram::Secrets<HashBlock> secrets) {
-        const stdx::lock_guard<Latch> lock(_hostToSecretsMutex);
+        const stdx::lock_guard<stdx::mutex> lock(_hostToSecretsMutex);
 
         typename HostToSecretsMap::iterator it;
         bool insertionSuccessful;
@@ -132,7 +132,7 @@ public:
      * Return metrics about the cache
      */
     Stats getStats() const {
-        const stdx::lock_guard<Latch> lock(_hostToSecretsMutex);
+        const stdx::lock_guard<stdx::mutex> lock(_hostToSecretsMutex);
         Stats stats = _stats;
         stats.count = _hostToSecrets.size();
         return stats;

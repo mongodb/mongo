@@ -607,7 +607,7 @@ void TenantFileImporterService::_cloneFile(OperationContext* opCtx,
 void TenantFileImporterService::_waitUntilStartMigrationTimestampIsCheckpointed(
     OperationContext* opCtx, const UUID& migrationId) {
     const auto startMigrationTs = [&] {
-        stdx::lock_guard<Latch> lg(_mutex);
+        stdx::lock_guard<stdx::mutex> lg(_mutex);
         invariant(_mh && migrationId == _mh->migrationId);
         return _mh->startMigrationOpTime.getTimestamp();
     }();
@@ -808,7 +808,7 @@ void TenantFileImporterService::_interrupt(WithLock lk, const UUID& migrationId)
 }
 
 void TenantFileImporterService::_resetMigrationHandle(boost::optional<const UUID&> migrationId) {
-    stdx::unique_lock<Latch> lk(_mutex);
+    stdx::unique_lock<stdx::mutex> lk(_mutex);
     _resetCV.wait(lk, [this]() { return _resetInProgress == false; });
     if (!_mh) {
         return;

@@ -42,7 +42,7 @@
 #include "mongo/db/repl/oplog_entry.h"
 #include "mongo/db/repl/optime.h"
 #include "mongo/executor/task_executor.h"
-#include "mongo/platform/mutex.h"
+#include "mongo/stdx/mutex.h"
 #include "mongo/util/concurrency/with_lock.h"
 #include "mongo/util/future.h"
 #include "mongo/util/uuid.h"
@@ -119,7 +119,7 @@ private:
 
     void _preJoin() noexcept final {}
 
-    Mutex* _getMutex() noexcept final {
+    stdx::mutex* _getMutex() noexcept final {
         return &_mutex;
     }
 

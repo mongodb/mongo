@@ -79,13 +79,13 @@ void ChangeStreamOptionsManager::create(ServiceContext* service) {
 }
 
 ChangeStreamOptions ChangeStreamOptionsManager::getOptions(OperationContext* opCtx) const {
-    stdx::lock_guard<Latch> L(_mutex);
+    stdx::lock_guard<stdx::mutex> L(_mutex);
     return _changeStreamOptions;
 }
 
 StatusWith<ChangeStreamOptions> ChangeStreamOptionsManager::setOptions(
     OperationContext* opCtx, ChangeStreamOptions optionsToSet) {
-    stdx::lock_guard<Latch> L(_mutex);
+    stdx::lock_guard<stdx::mutex> L(_mutex);
     _changeStreamOptions = std::move(optionsToSet);
     return _changeStreamOptions;
 }

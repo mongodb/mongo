@@ -43,7 +43,7 @@
 #include "mongo/db/index/multikey_paths.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/platform/atomic_word.h"
-#include "mongo/platform/mutex.h"
+#include "mongo/stdx/mutex.h"
 #include "mongo/util/uuid.h"
 
 namespace mongo {
@@ -133,7 +133,7 @@ public:
         // (starting at 0) into the corresponding indexed field that represent what prefixes of the
         // indexed field cause the index to be multikey.
         // multikeyMutex must be held when accessing multikey or multikeyPaths
-        mutable Mutex multikeyMutex;
+        mutable stdx::mutex multikeyMutex;
         mutable bool multikey = false;
         mutable MultikeyPaths multikeyPaths;
         mutable AtomicWord<int32_t> concurrentWriters;

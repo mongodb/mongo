@@ -33,7 +33,6 @@
 #include <cstdint>
 #include <wiredtiger.h>
 
-#include "mongo/platform/mutex.h"
 #include "mongo/stdx/condition_variable.h"
 #include "mongo/stdx/mutex.h"
 
@@ -103,7 +102,7 @@ public:
      * Returns the number of outstanding, active statistics collection permits.
      */
     int32_t getActiveStatsReaders() const {
-        stdx::lock_guard<mongo::Mutex> lock(_mutex);
+        stdx::lock_guard<stdx::mutex> lock(_mutex);
         return _activeReaders;
     }
 
@@ -113,7 +112,7 @@ public:
      * connection stays valid, a permit must be obtained with getStatsCollectionPermit().
      */
     bool isWtConnReadyForStatsCollection() const {
-        stdx::lock_guard<mongo::Mutex> lock(_mutex);
+        stdx::lock_guard<stdx::mutex> lock(_mutex);
         return _wtConn != nullptr;
     }
 

@@ -41,8 +41,8 @@
 #include "mongo/logv2/log.h"
 #include "mongo/logv2/log_attr.h"
 #include "mongo/logv2/log_component.h"
-#include "mongo/platform/mutex.h"
 #include "mongo/stdx/condition_variable.h"
+#include "mongo/stdx/mutex.h"
 #include "mongo/stdx/unordered_map.h"
 #include "mongo/unittest/assert.h"
 #include "mongo/unittest/death_test.h"
@@ -226,7 +226,7 @@ COMMON_THREAD_POOL_TEST(RepeatedScheduleDoesntSmashStack) {
     stdx::mutex mutex;
     stdx::condition_variable condvar;
     func = [&pool, &n, &func, &condvar, &mutex, depth]() {
-        stdx::unique_lock<Latch> lk(mutex);
+        stdx::unique_lock<stdx::mutex> lk(mutex);
         if (n < depth) {
             n++;
             lk.unlock();
@@ -243,7 +243,7 @@ COMMON_THREAD_POOL_TEST(RepeatedScheduleDoesntSmashStack) {
     pool.startup();
     pool.join();
 
-    stdx::unique_lock<Latch> lk(mutex);
+    stdx::unique_lock<stdx::mutex> lk(mutex);
     condvar.wait(lk, [&n, depth] { return n == depth; });
 }
 

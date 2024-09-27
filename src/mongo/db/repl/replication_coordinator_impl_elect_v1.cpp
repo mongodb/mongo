@@ -62,7 +62,7 @@
 #include "mongo/logv2/log_attr.h"
 #include "mongo/logv2/log_component.h"
 #include "mongo/platform/compiler.h"
-#include "mongo/platform/mutex.h"
+#include "mongo/stdx/mutex.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/concurrency/admission_context.h"
 #include "mongo/util/concurrency/with_lock.h"
@@ -129,7 +129,7 @@ public:
 };
 
 void ReplicationCoordinatorImpl::cancelElection_forTest() {
-    stdx::lock_guard<Latch> lk(_mutex);
+    stdx::lock_guard<stdx::mutex> lk(_mutex);
     invariant(_electionState);
     _electionState->cancel(lk);
 }
@@ -259,7 +259,7 @@ void ReplicationCoordinatorImpl::ElectionState::start(WithLock lk, StartElection
 
 void ReplicationCoordinatorImpl::ElectionState::_processDryRunResult(
     long long originalTerm, StartElectionReasonEnum reason) {
-    stdx::lock_guard<Latch> lk(_repl->_mutex);
+    stdx::lock_guard<stdx::mutex> lk(_repl->_mutex);
     LoseElectionDryRunGuardV1 lossGuard(_repl);
     invariant(_voteRequester != nullptr);
 
@@ -384,7 +384,7 @@ void ReplicationCoordinatorImpl::ElectionState::_writeLastVoteForMyElection(
         LOGV2(4825601, "Hang due to hangInWritingLastVoteForDryRun failpoint");
         hangInWritingLastVoteForDryRun.pauseWhileSet();
     }
-    stdx::lock_guard<Latch> lk(_repl->_mutex);
+    stdx::lock_guard<stdx::mutex> lk(_repl->_mutex);
     LoseElectionDryRunGuardV1 lossGuard(_repl);
     if (status == ErrorCodes::CallbackCanceled) {
         LOGV2(6015301, "Callback for storing last vote got cancelled");
@@ -439,7 +439,7 @@ void ReplicationCoordinatorImpl::ElectionState::_requestVotesForRealElection(
 
 void ReplicationCoordinatorImpl::ElectionState::_onVoteRequestComplete(
     long long newTerm, StartElectionReasonEnum reason) {
-    stdx::lock_guard<Latch> lk(_repl->_mutex);
+    stdx::lock_guard<stdx::mutex> lk(_repl->_mutex);
     LoseElectionGuardV1 lossGuard(_repl);
     invariant(_voteRequester != nullptr);
 

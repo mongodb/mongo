@@ -110,7 +110,7 @@ boost::optional<InternalSessionPool::Session> InternalSessionPool::_acquireSessi
 
 InternalSessionPool::Session InternalSessionPool::acquireSystemSession() {
     InternalSessionPool::Session session = [&] {
-        stdx::lock_guard<Latch> lock(_mutex);
+        stdx::lock_guard<stdx::mutex> lock(_mutex);
 
         const auto& systemSession = makeSystemLogicalSessionId();
         auto session = _acquireSession(systemSession.getUid(), lock);
@@ -129,7 +129,7 @@ InternalSessionPool::Session InternalSessionPool::acquireSystemSession() {
 InternalSessionPool::Session InternalSessionPool::acquireStandaloneSession(
     OperationContext* opCtx) {
     InternalSessionPool::Session session = [&] {
-        stdx::lock_guard<Latch> lock(_mutex);
+        stdx::lock_guard<stdx::mutex> lock(_mutex);
 
         const auto& userDigest = getLogicalSessionUserDigestForLoggedInUser(opCtx);
         auto session = _acquireSession(userDigest, lock);
@@ -149,7 +149,7 @@ InternalSessionPool::Session InternalSessionPool::acquireStandaloneSession(
 InternalSessionPool::Session InternalSessionPool::acquireChildSession(
     OperationContext* opCtx, const LogicalSessionId& parentLsid) {
     InternalSessionPool::Session session = [&] {
-        stdx::lock_guard<Latch> lock(_mutex);
+        stdx::lock_guard<stdx::mutex> lock(_mutex);
 
         auto it = _childSessions.find(parentLsid);
         if (it != _childSessions.end()) {
@@ -184,10 +184,10 @@ void InternalSessionPool::release(Session session) {
     ++session._txnNumber;
     const auto& lsid = session.getSessionId();
     if (lsid.getTxnUUID()) {
-        stdx::lock_guard<Latch> lock(_mutex);
+        stdx::lock_guard<stdx::mutex> lock(_mutex);
         _childSessions.insert({*getParentSessionId(lsid), std::move(session)});
     } else {
-        stdx::lock_guard<Latch> lock(_mutex);
+        stdx::lock_guard<stdx::mutex> lock(_mutex);
 
         if (!_perUserSessionPool.contains(lsid.getUid())) {
             _perUserSessionPool.try_emplace(lsid.getUid(),

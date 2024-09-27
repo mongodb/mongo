@@ -39,7 +39,7 @@
 #include <utility>
 #include <vector>
 
-#include "mongo/platform/mutex.h"
+#include "mongo/stdx/mutex.h"
 #include "mongo/util/aligned.h"
 #include "mongo/util/assert_util.h"
 

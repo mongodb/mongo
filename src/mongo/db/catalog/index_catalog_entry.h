@@ -43,7 +43,6 @@
 #include "mongo/db/record_id.h"
 #include "mongo/db/storage/key_string.h"
 #include "mongo/platform/atomic_word.h"
-#include "mongo/platform/mutex.h"
 #include "mongo/util/debug_util.h"
 
 namespace mongo {

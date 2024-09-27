@@ -34,7 +34,6 @@
 #include <string>
 
 #include "mongo/db/service_context.h"
-#include "mongo/platform/mutex.h"
 #include "mongo/stdx/mutex.h"
 #include "mongo/util/background.h"
 
@@ -62,7 +61,7 @@ public:
     /**
      * Releases the fsync lock for shutdown.
      */
-    void shutdown(stdx::unique_lock<Latch>& lk);
+    void shutdown(stdx::unique_lock<stdx::mutex>& lk);
 
 private:
     /**
@@ -89,7 +88,7 @@ extern stdx::mutex oplogApplierLockedFsync;
 /**
  * Must be taken before accessing globalFsyncLockThread below.
  */
-extern Mutex fsyncStateMutex;
+extern stdx::mutex fsyncStateMutex;
 
 /**
  * The FSyncLockThread must be external available for interruption during shutdown.

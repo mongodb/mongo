@@ -44,8 +44,8 @@
 #include "mongo/client/mongo_uri.h"
 #include "mongo/executor/connection_pool_stats.h"
 #include "mongo/platform/atomic_word.h"
-#include "mongo/platform/mutex.h"
 #include "mongo/stdx/condition_variable.h"
+#include "mongo/stdx/mutex.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/background.h"
 #include "mongo/util/duration.h"
@@ -205,7 +205,7 @@ public:
      * throw if a free connection cannot be acquired within that amount of
      * time. Timeout is in seconds.
      */
-    void waitForFreeConnection(int timeout, stdx::unique_lock<Latch>& lk);
+    void waitForFreeConnection(int timeout, stdx::unique_lock<stdx::mutex>& lk);
 
     /**
      * Notifies any waiters that there are new connections available.

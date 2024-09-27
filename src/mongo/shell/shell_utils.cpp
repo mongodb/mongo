@@ -77,7 +77,6 @@
 #include "mongo/db/hasher.h"
 #include "mongo/db/query/collation/collator_factory_icu.h"
 #include "mongo/platform/decimal128.h"
-#include "mongo/platform/mutex.h"
 #include "mongo/platform/random.h"
 #include "mongo/scripting/engine.h"
 #include "mongo/shell/bench.h"
@@ -85,6 +84,7 @@
 #include "mongo/shell/shell_utils.h"
 #include "mongo/shell/shell_utils_extended.h"
 #include "mongo/shell/shell_utils_launcher.h"
+#include "mongo/stdx/mutex.h"
 #include "mongo/unittest/golden_test_base.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/ctype.h"
@@ -1187,14 +1187,14 @@ void ConnectionRegistry::registerConnection(DBClientBase& client, StringData uri
     }
 
     if (client.runCommand(DatabaseName::kAdmin, command, info)) {
-        stdx::lock_guard<Latch> lk(_mutex);
+        stdx::lock_guard<stdx::mutex> lk(_mutex);
         _connectionUris[uri.toString()].insert(info["you"].str());
     }
 }
 
 void ConnectionRegistry::killOperationsOnAllConnections(bool withPrompt) const {
     Prompter prompter("do you want to kill the current op(s) on the server?");
-    stdx::lock_guard<Latch> lk(_mutex);
+    stdx::lock_guard<stdx::mutex> lk(_mutex);
     for (auto& connection : _connectionUris) {
         std::string errmsg;
 

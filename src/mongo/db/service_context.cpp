@@ -147,7 +147,7 @@ ServiceContext::ServiceContext()
 
 
 ServiceContext::~ServiceContext() {
-    stdx::lock_guard<Latch> lk(_mutex);
+    stdx::lock_guard<stdx::mutex> lk(_mutex);
     for (const auto& [client, _] : _clients) {
         LOGV2_ERROR(23828,
                     "Non-empty client list when destroying service context",
@@ -230,7 +230,7 @@ ServiceContext::UniqueClient ServiceContext::makeClientForService(
     onCreate(client.get(), _clientObservers);
     auto entry = _clientsList.add(client.get());
     {
-        stdx::lock_guard<Latch> lk(_mutex);
+        stdx::lock_guard<stdx::mutex> lk(_mutex);
         invariant(_clients.insert({client.get(), entry}).second);
     }
     return UniqueClient(client.release());
@@ -474,17 +474,17 @@ void ServiceContext::unsetKillAllOperations() {
 }
 
 void ServiceContext::registerKillOpListener(KillOpListenerInterface* listener) {
-    stdx::lock_guard<Latch> clientLock(_mutex);
+    stdx::lock_guard<stdx::mutex> clientLock(_mutex);
     _killOpListeners.push_back(listener);
 }
 
 void ServiceContext::waitForStartupComplete() {
-    stdx::unique_lock<Latch> lk(_mutex);
+    stdx::unique_lock<stdx::mutex> lk(_mutex);
     _startupCompleteCondVar.wait(lk, [this] { return _startupComplete; });
 }
 
 void ServiceContext::notifyStorageStartupRecoveryComplete() {
-    stdx::unique_lock<Latch> lk(_mutex);
+    stdx::unique_lock<stdx::mutex> lk(_mutex);
     _startupComplete = true;
     lk.unlock();
     _startupCompleteCondVar.notify_all();

@@ -43,10 +43,10 @@
 #include <utility>
 
 #include "mongo/base/error_codes.h"
-#include "mongo/platform/mutex.h"
 #include "mongo/scripting/mozjs/countdownlatch.h"
 #include "mongo/scripting/mozjs/objectwrapper.h"
 #include "mongo/stdx/condition_variable.h"
+#include "mongo/stdx/mutex.h"
 #include "mongo/stdx/unordered_map.h"
 #include "mongo/util/assert_util.h"
 
@@ -74,7 +74,7 @@ public:
 
     int32_t make(int32_t count) {
         uassert(ErrorCodes::JSInterpreterFailure, "argument must be >= 0", count >= 0);
-        stdx::lock_guard<Latch> lock(_mutex);
+        stdx::lock_guard<stdx::mutex> lock(_mutex);
 
         int32_t desc = ++_counter;
         _latches.insert(std::make_pair(desc, std::make_shared<CountDownLatch>(count)));
@@ -84,7 +84,7 @@ public:
 
     void await(int32_t desc) {
         auto latch = get(desc);
-        stdx::unique_lock<Latch> lock(latch->mutex);
+        stdx::unique_lock<stdx::mutex> lock(latch->mutex);
 
         while (latch->count != 0) {
             latch->cv.wait(lock);
@@ -93,7 +93,7 @@ public:
 
     void countDown(int32_t desc) {
         auto latch = get(desc);
-        stdx::unique_lock<Latch> lock(latch->mutex);
+        stdx::unique_lock<stdx::mutex> lock(latch->mutex);
 
         if (latch->count > 0)
             latch->count--;
@@ -104,7 +104,7 @@ public:
 
     int32_t getCount(int32_t desc) {
         auto latch = get(desc);
-        stdx::unique_lock<Latch> lock(latch->mutex);
+        stdx::unique_lock<stdx::mutex> lock(latch->mutex);
 
         return latch->count;
     }
@@ -122,7 +122,7 @@ private:
     };
 
     std::shared_ptr<CountDownLatch> get(int32_t desc) {
-        stdx::lock_guard<Latch> lock(_mutex);
+        stdx::lock_guard<stdx::mutex> lock(_mutex);
 
         auto iter = _latches.find(desc);
         uassert(ErrorCodes::JSInterpreterFailure,

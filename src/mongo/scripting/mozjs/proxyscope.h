@@ -43,10 +43,10 @@
 #include "mongo/client/dbclient_cursor.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/platform/decimal128.h"
-#include "mongo/platform/mutex.h"
 #include "mongo/scripting/engine.h"
 #include "mongo/scripting/mozjs/engine.h"
 #include "mongo/stdx/condition_variable.h"
+#include "mongo/stdx/mutex.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/util/functional.h"
 

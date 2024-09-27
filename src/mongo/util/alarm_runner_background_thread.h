@@ -32,8 +32,8 @@
 #include <utility>
 #include <vector>
 
-#include "mongo/platform/mutex.h"
 #include "mongo/stdx/condition_variable.h"
+#include "mongo/stdx/mutex.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/util/alarm.h"
 #include "mongo/util/concurrency/with_lock.h"

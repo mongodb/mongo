@@ -49,9 +49,9 @@
 #include "mongo/db/session/session_txn_record_gen.h"
 #include "mongo/db/transaction/transaction_history_iterator.h"
 #include "mongo/platform/atomic_word.h"
-#include "mongo/platform/mutex.h"
 #include "mongo/s/catalog/type_chunk.h"
 #include "mongo/s/shard_key_pattern.h"
+#include "mongo/stdx/mutex.h"
 #include "mongo/util/concurrency/notification.h"
 #include "mongo/util/concurrency/with_lock.h"
 
@@ -289,7 +289,7 @@ private:
      * entry corresponds to a write against the chunk range being migrated, adds the oplog entry or
      * its inner oplog entries (for applyOps) to '_unprocessedNewWriteOplogBuffer'.
      */
-    void _tryFetchNextNewWriteOplog(stdx::unique_lock<Latch>& lk, OperationContext* opCtx);
+    void _tryFetchNextNewWriteOplog(stdx::unique_lock<stdx::mutex>& lk, OperationContext* opCtx);
 
     /**
      * If there is no stashed '_lastFetchedOplog', looks for the next opTime in

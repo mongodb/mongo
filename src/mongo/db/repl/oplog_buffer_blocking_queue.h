@@ -35,8 +35,8 @@
 
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/repl/oplog_buffer.h"
-#include "mongo/platform/mutex.h"
 #include "mongo/stdx/condition_variable.h"
+#include "mongo/stdx/mutex.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/interruptible.h"
 #include "mongo/util/queue.h"
@@ -87,7 +87,7 @@ public:
     void exitDrainMode() final;
 
 private:
-    void _waitForSpace_inlock(stdx::unique_lock<Latch>& lk, const Cost& cost);
+    void _waitForSpace_inlock(stdx::unique_lock<stdx::mutex>& lk, const Cost& cost);
     void _clear_inlock(WithLock lk);
     void _push(Batch::const_iterator begin, Batch::const_iterator end, const Cost& cost);
 

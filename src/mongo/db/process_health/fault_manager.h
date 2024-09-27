@@ -48,7 +48,7 @@
 #include "mongo/db/service_context.h"
 #include "mongo/executor/task_executor.h"
 #include "mongo/platform/atomic_word.h"
-#include "mongo/platform/mutex.h"
+#include "mongo/stdx/mutex.h"
 #include "mongo/stdx/unordered_map.h"
 #include "mongo/stdx/unordered_set.h"
 #include "mongo/util/cancellation.h"

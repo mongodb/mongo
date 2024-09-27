@@ -33,8 +33,8 @@
 #include "mongo/base/status.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/executor/task_executor.h"
-#include "mongo/platform/mutex.h"
 #include "mongo/stdx/condition_variable.h"
+#include "mongo/stdx/mutex.h"
 
 namespace mongo {
 struct HostAndPort;

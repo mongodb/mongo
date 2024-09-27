@@ -129,7 +129,7 @@ std::shared_ptr<const HelloResponse> TopologyVersionObserver::getCached() noexce
 
     // Acquires the lock to avoid potential races with `_workerThreadBody()`.
     // Atomics cannot be used here as `shared_ptr` cannot be atomically updated.
-    stdx::lock_guard<Mutex> lk(_mutex);
+    stdx::lock_guard<stdx::mutex> lk(_mutex);
     return _cache;
 }
 

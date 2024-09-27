@@ -56,7 +56,6 @@
 #include "mongo/db/storage/storage_engine.h"
 #include "mongo/db/storage/write_unit_of_work.h"
 #include "mongo/db/transaction_resources.h"
-#include "mongo/platform/mutex.h"
 #include "mongo/stdx/mutex.h"
 #include "mongo/util/assert_util_core.h"
 #include "mongo/util/decorable.h"
@@ -149,7 +148,8 @@ void cappedDeleteUntilBelowConfiguredMaximum(OperationContext* opCtx,
     const auto& nss = collection->ns();
     auto& ccs = cappedCollectionState(*collection->getSharedDecorations());
 
-    stdx::unique_lock<Latch> cappedFirstRecordMutex(ccs.cappedFirstRecordMutex, stdx::defer_lock);
+    stdx::unique_lock<stdx::mutex> cappedFirstRecordMutex(ccs.cappedFirstRecordMutex,
+                                                          stdx::defer_lock);
 
     if (collection->needsCappedLock()) {
         // As capped deletes can be part of a larger WriteUnitOfWork, we need a way to protect

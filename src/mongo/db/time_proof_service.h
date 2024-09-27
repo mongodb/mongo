@@ -37,7 +37,7 @@
 #include "mongo/crypto/hash_block.h"
 #include "mongo/crypto/sha1_block.h"
 #include "mongo/db/logical_time.h"
-#include "mongo/platform/mutex.h"
+#include "mongo/stdx/mutex.h"
 
 namespace mongo {
 

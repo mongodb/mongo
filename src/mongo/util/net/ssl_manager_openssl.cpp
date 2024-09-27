@@ -1328,7 +1328,7 @@ public:
     SSLInformationToLog getSSLInformationToLog() const final;
 
     std::shared_ptr<OCSPStaplingContext> getOcspStaplingContext() {
-        stdx::lock_guard<mongo::Mutex> guard(_sharedResponseMutex);
+        stdx::lock_guard<stdx::mutex> guard(_sharedResponseMutex);
         return _ocspStaplingContext;
     }
 
@@ -1374,7 +1374,7 @@ private:
 
         /** Either returns a cached password, or prompts the user to enter one. */
         StatusWith<StringData> fetchPassword() {
-            stdx::lock_guard<Latch> lock(_mutex);
+            stdx::lock_guard<stdx::mutex> lock(_mutex);
             if (_password->size()) {
                 return StringData(_password->c_str());
             }
@@ -1403,7 +1403,7 @@ private:
          * @returns cached password if available, error if password is not cached.
          */
         StatusWith<StringData> fetchCachedPasswordNoPrompt() {
-            stdx::lock_guard<Latch> lock(_mutex);
+            stdx::lock_guard<stdx::mutex> lock(_mutex);
             if (_password->size()) {
                 return StringData(_password->c_str());
             }
@@ -2268,7 +2268,7 @@ Milliseconds getPeriodForStapleJob(StatusWith<Milliseconds> swDuration) {
 }
 
 void OCSPFetcher::startPeriodicJob(StatusWith<Milliseconds> swDurationInitial) {
-    stdx::lock_guard<Latch> lock(_staplingMutex);
+    stdx::lock_guard<stdx::mutex> lock(_staplingMutex);
 
     if (_ocspStaplingAnchor) {
         return;
@@ -2298,7 +2298,7 @@ void OCSPFetcher::doPeriodicJob() try {
                               "reason"_attr = swDuration.getStatus());
             }
 
-            stdx::lock_guard<Latch> lock(this->_staplingMutex);
+            stdx::lock_guard<stdx::mutex> lock(this->_staplingMutex);
 
             if (_isShutdownConditionLocked(lock)) {
                 return;
@@ -2391,7 +2391,7 @@ Future<Milliseconds> OCSPFetcher::fetchAndStaple(Promise<void>* promise) {
         .onCompletion(
             [this, promise](StatusWith<OCSPFetchResponse> swResponse) mutable -> Milliseconds {
                 LOGV2_INFO(577165, "OCSP fetch/staple completion");
-                stdx::lock_guard<Latch> lock(this->_staplingMutex);
+                stdx::lock_guard<stdx::mutex> lock(this->_staplingMutex);
 
                 if (_isShutdownConditionLocked(lock)) {
                     return kOCSPUnknownStatusRefreshRate;
@@ -2412,7 +2412,7 @@ Future<Milliseconds> OCSPFetcher::fetchAndStaple(Promise<void>* promise) {
 }
 
 void OCSPFetcher::shutdown() {
-    stdx::lock_guard<Mutex> lock(_staplingMutex);
+    stdx::lock_guard<stdx::mutex> lock(_staplingMutex);
     _shutdownLocked(lock);
 }
 
@@ -2431,7 +2431,7 @@ void SSLManagerOpenSSL::stopJobs() {
 
 Milliseconds SSLManagerOpenSSL::updateOcspStaplingContextWithResponse(
     StatusWith<OCSPFetchResponse> swResponse) {
-    stdx::lock_guard<mongo::Mutex> guard(_sharedResponseMutex);
+    stdx::lock_guard<stdx::mutex> guard(_sharedResponseMutex);
 
     if (!swResponse.isOK() || !swResponse.getValue().cacheable()) {
         if (!swResponse.isOK()) {

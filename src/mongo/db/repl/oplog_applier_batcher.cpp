@@ -80,7 +80,7 @@ OplogApplierBatcher::~OplogApplierBatcher() {
 }
 
 OplogApplierBatch OplogApplierBatcher::getNextBatch(Seconds maxWaitTime) {
-    stdx::unique_lock<Latch> lk(_mutex);
+    stdx::unique_lock<stdx::mutex> lk(_mutex);
     // _ops can indicate the following cases:
     // 1. A new batch is ready to consume.
     // 2. Shutdown.
@@ -437,7 +437,7 @@ void OplogApplierBatcher::_run(StorageInterface* storageInterface) {
             }
         }
 
-        stdx::unique_lock<Latch> lk(_mutex);
+        stdx::unique_lock<stdx::mutex> lk(_mutex);
         // Block until the previous batch has been taken.
         _cv.wait(lk, [&] { return _ops.empty() && !_ops.termWhenExhausted(); });
         _ops = std::move(ops);

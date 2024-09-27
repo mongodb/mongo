@@ -31,7 +31,6 @@
 
 #include <cstddef>
 
-#include "mongo/platform/mutex.h"
 #include "mongo/util/lru_cache.h"
 #include "mongo/util/synchronized_value.h"
 #include "mongo/util/uuid.h"

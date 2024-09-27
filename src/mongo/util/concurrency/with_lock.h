@@ -32,7 +32,7 @@
 #include <mutex>
 #include <utility>
 
-#include "mongo/platform/mutex.h"
+#include "mongo/stdx/mutex.h"
 #include "mongo/util/assert_util.h"
 
 namespace mongo {
@@ -57,7 +57,7 @@ namespace mongo {
  *
  * A call to such a function looks like this:
  *
- *     stdx::lock_guard<Latch> lk(_mutex);
+ *     stdx::lock_guard<stdx::mutex> lk(_mutex);
  *     _clobber(lk, opCtx);  // instead of _clobber_inlock(opCtx)
  *
  * Note that the formal argument need not (and should not) be named unless it is needed to pass
@@ -89,9 +89,9 @@ struct WithLock {
 
     // No moving a lock_guard<> or unique_lock<> in.
     template <typename Mutex>
-    WithLock(stdx::lock_guard<Latch>&&) = delete;
+    WithLock(stdx::lock_guard<stdx::mutex>&&) = delete;
     template <typename Mutex>
-    WithLock(stdx::unique_lock<Latch>&&) = delete;
+    WithLock(stdx::unique_lock<stdx::mutex>&&) = delete;
 
     /*
      * Produces a WithLock without benefit of any actual lock, for use in cases where a lock is not

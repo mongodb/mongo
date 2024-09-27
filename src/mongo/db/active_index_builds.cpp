@@ -62,7 +62,7 @@ void ActiveIndexBuilds::waitForAllIndexBuildsToStopForShutdown() {
 }
 
 void ActiveIndexBuilds::waitForAllIndexBuildsToStop(Interruptible* interruptible) {
-    stdx::unique_lock<Latch> lk(_mutex);
+    stdx::unique_lock<stdx::mutex> lk(_mutex);
 
     // All index builds should have been signaled to stop via the ServiceContext.
 
@@ -87,7 +87,7 @@ void ActiveIndexBuilds::waitForAllIndexBuildsToStop(Interruptible* interruptible
 }
 
 void ActiveIndexBuilds::assertNoIndexBuildInProgress() const {
-    stdx::unique_lock<Latch> lk(_mutex);
+    stdx::unique_lock<stdx::mutex> lk(_mutex);
     if (!_allIndexBuilds.empty()) {
         auto firstIndexBuild = _allIndexBuilds.cbegin()->second;
         uasserted(ErrorCodes::BackgroundOperationInProgressForDatabase,
@@ -99,7 +99,7 @@ void ActiveIndexBuilds::assertNoIndexBuildInProgress() const {
 }
 
 void ActiveIndexBuilds::waitUntilAnIndexBuildFinishes(OperationContext* opCtx, Date_t deadline) {
-    stdx::unique_lock<Latch> lk(_mutex);
+    stdx::unique_lock<stdx::mutex> lk(_mutex);
     if (_allIndexBuilds.empty()) {
         return;
     }
@@ -109,19 +109,19 @@ void ActiveIndexBuilds::waitUntilAnIndexBuildFinishes(OperationContext* opCtx, D
 }
 
 void ActiveIndexBuilds::sleepIndexBuilds_forTestOnly(bool sleep) {
-    stdx::unique_lock<Latch> lk(_mutex);
+    stdx::unique_lock<stdx::mutex> lk(_mutex);
     _sleepForTest = sleep;
 }
 
 void ActiveIndexBuilds::verifyNoIndexBuilds_forTestOnly() const {
-    stdx::unique_lock<Latch> lk(_mutex);
+    stdx::unique_lock<stdx::mutex> lk(_mutex);
     invariant(_allIndexBuilds.empty());
 }
 
 void ActiveIndexBuilds::awaitNoIndexBuildInProgressForCollection(OperationContext* opCtx,
                                                                  const UUID& collectionUUID,
                                                                  IndexBuildProtocol protocol) {
-    stdx::unique_lock<Latch> lk(_mutex);
+    stdx::unique_lock<stdx::mutex> lk(_mutex);
     auto noIndexBuildsPred = [&, this]() {
         auto indexBuilds = _filterIndexBuilds_inlock(lk, [&](const auto& replState) {
             return collectionUUID == replState.collectionUUID && protocol == replState.protocol;
@@ -133,7 +133,7 @@ void ActiveIndexBuilds::awaitNoIndexBuildInProgressForCollection(OperationContex
 
 void ActiveIndexBuilds::awaitNoIndexBuildInProgressForCollection(OperationContext* opCtx,
                                                                  const UUID& collectionUUID) {
-    stdx::unique_lock<Latch> lk(_mutex);
+    stdx::unique_lock<stdx::mutex> lk(_mutex);
     auto pred = [&, this]() {
         auto indexBuilds = _filterIndexBuilds_inlock(
             lk, [&](const auto& replState) { return collectionUUID == replState.collectionUUID; });
@@ -144,7 +144,7 @@ void ActiveIndexBuilds::awaitNoIndexBuildInProgressForCollection(OperationContex
 
 StatusWith<std::shared_ptr<ReplIndexBuildState>> ActiveIndexBuilds::getIndexBuild(
     const UUID& buildUUID) const {
-    stdx::unique_lock<Latch> lk(_mutex);
+    stdx::unique_lock<stdx::mutex> lk(_mutex);
     auto it = _allIndexBuilds.find(buildUUID);
     if (it == _allIndexBuilds.end()) {
         return {ErrorCodes::NoSuchKey, str::stream() << "No index build with UUID: " << buildUUID};
@@ -153,7 +153,7 @@ StatusWith<std::shared_ptr<ReplIndexBuildState>> ActiveIndexBuilds::getIndexBuil
 }
 
 std::vector<std::shared_ptr<ReplIndexBuildState>> ActiveIndexBuilds::getAllIndexBuilds() const {
-    stdx::unique_lock<Latch> lk(_mutex);
+    stdx::unique_lock<stdx::mutex> lk(_mutex);
     return _filterIndexBuilds_inlock(lk, [](const auto& replState) { return true; });
 }
 
@@ -161,7 +161,7 @@ void ActiveIndexBuilds::unregisterIndexBuild(
     IndexBuildsManager* indexBuildsManager,
     std::shared_ptr<ReplIndexBuildState> replIndexBuildState) {
 
-    stdx::unique_lock<Latch> lk(_mutex);
+    stdx::unique_lock<stdx::mutex> lk(_mutex);
 
     invariant(_allIndexBuilds.erase(replIndexBuildState->buildUUID));
 
@@ -179,7 +179,7 @@ void ActiveIndexBuilds::unregisterIndexBuild(
 std::vector<std::shared_ptr<ReplIndexBuildState>> ActiveIndexBuilds::filterIndexBuilds(
     IndexBuildFilterFn indexBuildFilter) const {
 
-    stdx::unique_lock<Latch> lk(_mutex);
+    stdx::unique_lock<stdx::mutex> lk(_mutex);
     return _filterIndexBuilds_inlock(lk, indexBuildFilter);
 }
 
@@ -199,7 +199,7 @@ std::vector<std::shared_ptr<ReplIndexBuildState>> ActiveIndexBuilds::_filterInde
 
 void ActiveIndexBuilds::awaitNoBgOpInProgForDb(OperationContext* opCtx,
                                                const DatabaseName& dbName) {
-    stdx::unique_lock<Latch> lk(_mutex);
+    stdx::unique_lock<stdx::mutex> lk(_mutex);
     auto indexBuildFilter = [dbName](const auto& replState) {
         return dbName == replState.dbName;
     };
@@ -213,7 +213,7 @@ void ActiveIndexBuilds::awaitNoBgOpInProgForDb(OperationContext* opCtx,
 Status ActiveIndexBuilds::registerIndexBuild(
     std::shared_ptr<ReplIndexBuildState> replIndexBuildState) {
 
-    stdx::unique_lock<Latch> lk(_mutex);
+    stdx::unique_lock<stdx::mutex> lk(_mutex);
     // Check whether any indexes are already being built with the same index name(s). (Duplicate
     // specs will be discovered by the index builder.)
     auto pred = [&](const auto& replState) {
@@ -239,12 +239,12 @@ Status ActiveIndexBuilds::registerIndexBuild(
 }
 
 size_t ActiveIndexBuilds::getActiveIndexBuildsCount() const {
-    stdx::unique_lock<Latch> lk(_mutex);
+    stdx::unique_lock<stdx::mutex> lk(_mutex);
     return _allIndexBuilds.size();
 }
 
 void ActiveIndexBuilds::appendBuildInfo(const UUID& buildUUID, BSONObjBuilder* builder) const {
-    stdx::unique_lock<Latch> lk(_mutex);
+    stdx::unique_lock<stdx::mutex> lk(_mutex);
     auto it = _allIndexBuilds.find(buildUUID);
     if (it == _allIndexBuilds.end()) {
         return;
@@ -253,7 +253,7 @@ void ActiveIndexBuilds::appendBuildInfo(const UUID& buildUUID, BSONObjBuilder* b
 }
 
 void ActiveIndexBuilds::sleepIfNecessary_forTestOnly() const {
-    stdx::unique_lock<Latch> lk(_mutex);
+    stdx::unique_lock<stdx::mutex> lk(_mutex);
     while (_sleepForTest) {
         lk.unlock();
         sleepmillis(100);

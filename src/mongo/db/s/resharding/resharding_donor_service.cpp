@@ -331,7 +331,7 @@ ExecutorFuture<void> ReshardingDonorService::DonorStateMachine::_runUntilBlockin
                   "error"_attr = status);
 
             {
-                stdx::lock_guard<Latch> lk(_mutex);
+                stdx::lock_guard<stdx::mutex> lk(_mutex);
                 ensureFulfilledPromise(lk, _critSecWasAcquired, status);
                 ensureFulfilledPromise(lk, _critSecWasPromoted, status);
             }
@@ -364,7 +364,7 @@ ExecutorFuture<void> ReshardingDonorService::DonorStateMachine::_runUntilBlockin
             {
                 // The donor is done with all local transitions until the coordinator makes its
                 // decision.
-                stdx::lock_guard<Latch> lk(_mutex);
+                stdx::lock_guard<stdx::mutex> lk(_mutex);
                 invariant(_donorCtx.getState() >= DonorStateEnum::kError);
                 ensureFulfilledPromise(lk, _inBlockingWritesOrError);
             }
@@ -377,7 +377,7 @@ ExecutorFuture<void> ReshardingDonorService::DonorStateMachine::_notifyCoordinat
     const CancellationToken& abortToken) noexcept {
     if (_donorCtx.getState() == DonorStateEnum::kDone) {
         {
-            stdx::lock_guard<Latch> lk(_mutex);
+            stdx::lock_guard<stdx::mutex> lk(_mutex);
             ensureFulfilledPromise(lk, _critSecWasPromoted);
         }
         return ExecutorFuture(**executor);
@@ -421,7 +421,7 @@ ExecutorFuture<void> ReshardingDonorService::DonorStateMachine::_finishReshardin
                } else if (_donorCtx.getState() != DonorStateEnum::kDone) {
                    {
                        // Unblock the RecoverRefreshThread as quickly as possible when aborting.
-                       stdx::lock_guard<Latch> lk(_mutex);
+                       stdx::lock_guard<stdx::mutex> lk(_mutex);
                        ensureFulfilledPromise(lk,
                                               _critSecWasAcquired,
                                               {ErrorCodes::ReshardCollectionAborted, "aborted"});
@@ -511,7 +511,7 @@ Status ReshardingDonorService::DonorStateMachine::_runMandatoryCleanup(
                      "stepdown"}
             : status;
 
-        stdx::lock_guard<Latch> lk(_mutex);
+        stdx::lock_guard<stdx::mutex> lk(_mutex);
 
         ensureFulfilledPromise(lk, _critSecWasAcquired, statusForPromise);
         ensureFulfilledPromise(lk, _critSecWasPromoted, statusForPromise);
@@ -594,7 +594,7 @@ void ReshardingDonorService::DonorStateMachine::onReshardingFieldsChanges(
 
     const CoordinatorStateEnum coordinatorState = reshardingFields.getState();
     {
-        stdx::lock_guard<Latch> lk(_mutex);
+        stdx::lock_guard<stdx::mutex> lk(_mutex);
         if (coordinatorState >= CoordinatorStateEnum::kApplying) {
             ensureFulfilledPromise(lk, _allRecipientsDoneCloning);
         }
@@ -782,7 +782,7 @@ ExecutorFuture<void> ReshardingDonorService::DonorStateMachine::
 void ReshardingDonorService::DonorStateMachine::
     _writeTransactionOplogEntryThenTransitionToBlockingWrites() {
     if (_donorCtx.getState() > DonorStateEnum::kPreparingToBlockWrites) {
-        stdx::lock_guard<Latch> lk(_mutex);
+        stdx::lock_guard<stdx::mutex> lk(_mutex);
         ensureFulfilledPromise(lk, _critSecWasAcquired);
         return;
     }
@@ -800,7 +800,7 @@ void ReshardingDonorService::DonorStateMachine::
     }
 
     {
-        stdx::lock_guard<Latch> lk(_mutex);
+        stdx::lock_guard<stdx::mutex> lk(_mutex);
         ensureFulfilledPromise(lk, _critSecWasAcquired);
     }
 
@@ -850,7 +850,7 @@ void ReshardingDonorService::DonorStateMachine::
             }
 
             {
-                stdx::lock_guard<Latch> lg(_mutex);
+                stdx::lock_guard<stdx::mutex> lg(_mutex);
                 LOGV2_DEBUG(5279504,
                             0,
                             "Committed oplog entries to temporarily block writes for resharding",
@@ -862,7 +862,7 @@ void ReshardingDonorService::DonorStateMachine::
             }
         } catch (const DBException& e) {
             const auto& status = e.toStatus();
-            stdx::lock_guard<Latch> lg(_mutex);
+            stdx::lock_guard<stdx::mutex> lg(_mutex);
             LOGV2_ERROR(5279508,
                         "Exception while writing resharding final oplog entries",
                         "reshardingUUID"_attr = _metadata.getReshardingUUID(),
@@ -882,7 +882,7 @@ SharedSemiFuture<void> ReshardingDonorService::DonorStateMachine::awaitFinalOplo
 void ReshardingDonorService::DonorStateMachine::_dropOriginalCollectionThenTransitionToDone() {
     if (_donorCtx.getState() > DonorStateEnum::kBlockingWrites) {
         {
-            stdx::lock_guard<Latch> lk(_mutex);
+            stdx::lock_guard<stdx::mutex> lk(_mutex);
             ensureFulfilledPromise(lk, _critSecWasPromoted);
         }
         return;
@@ -899,7 +899,7 @@ void ReshardingDonorService::DonorStateMachine::_dropOriginalCollectionThenTrans
     }
 
     {
-        stdx::lock_guard<Latch> lk(_mutex);
+        stdx::lock_guard<stdx::mutex> lk(_mutex);
         ensureFulfilledPromise(lk, _critSecWasPromoted);
     }
 
@@ -1085,7 +1085,7 @@ void ReshardingDonorService::DonorStateMachine::insertStateDocument(
 }
 
 void ReshardingDonorService::DonorStateMachine::commit() {
-    stdx::lock_guard<Latch> lk(_mutex);
+    stdx::lock_guard<stdx::mutex> lk(_mutex);
     tassert(ErrorCodes::ReshardCollectionInProgress,
             "Attempted to commit the resharding operation in an incorrect state",
             _donorCtx.getState() >= DonorStateEnum::kBlockingWrites);
@@ -1123,7 +1123,7 @@ void ReshardingDonorService::DonorStateMachine::_updateDonorDocument(
         wuow.commit();
     });
 
-    stdx::lock_guard<Latch> lk(_mutex);
+    stdx::lock_guard<stdx::mutex> lk(_mutex);
     _donorCtx = newDonorCtx;
 }
 
@@ -1150,7 +1150,7 @@ void ReshardingDonorService::DonorStateMachine::_removeDonorDocument(
         shard_role_details::getRecoveryUnit(opCtx.get())
             ->onCommit(
                 [this, stepdownToken, aborted](OperationContext*, boost::optional<Timestamp>) {
-                    stdx::lock_guard<Latch> lk(_mutex);
+                    stdx::lock_guard<stdx::mutex> lk(_mutex);
                     _completionPromise.emplaceValue();
                 });
 
@@ -1167,7 +1167,7 @@ void ReshardingDonorService::DonorStateMachine::_removeDonorDocument(
 CancellationToken ReshardingDonorService::DonorStateMachine::_initAbortSource(
     const CancellationToken& stepdownToken) {
     {
-        stdx::lock_guard<Latch> lk(_mutex);
+        stdx::lock_guard<stdx::mutex> lk(_mutex);
         _abortSource = CancellationSource(stepdownToken);
     }
 
@@ -1194,7 +1194,7 @@ CancellationToken ReshardingDonorService::DonorStateMachine::_initAbortSource(
 
 void ReshardingDonorService::DonorStateMachine::abort(bool isUserCancelled) {
     auto abortSource = [&]() -> boost::optional<CancellationSource> {
-        stdx::lock_guard<Latch> lk(_mutex);
+        stdx::lock_guard<stdx::mutex> lk(_mutex);
 
         if (_abortSource) {
             return _abortSource;

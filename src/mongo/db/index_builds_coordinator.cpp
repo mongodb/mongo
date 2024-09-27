@@ -1429,7 +1429,7 @@ void IndexBuildsCoordinator::abortAllIndexBuildsWithReason(OperationContext* opC
 
 void IndexBuildsCoordinator::setNewIndexBuildsBlocked(const bool newValue,
                                                       boost::optional<std::string> reason) {
-    stdx::unique_lock<Latch> lk(_newIndexBuildsBlockedMutex);
+    stdx::unique_lock<stdx::mutex> lk(_newIndexBuildsBlockedMutex);
     invariant(newValue != _newIndexBuildsBlocked);
     invariant((newValue && reason) || (!newValue && !reason));
 
@@ -2296,7 +2296,7 @@ void IndexBuildsCoordinator::_waitIfNewIndexBuildsBlocked(OperationContext* opCt
                                                           const UUID& collectionUUID,
                                                           const std::vector<BSONObj>& specs,
                                                           const UUID& buildUUID) {
-    stdx::unique_lock<Latch> lk(_newIndexBuildsBlockedMutex);
+    stdx::unique_lock<stdx::mutex> lk(_newIndexBuildsBlockedMutex);
     bool messageLogged = false;
 
     opCtx->waitForConditionOrInterrupt(_newIndexBuildsBlockedCV, lk, [&] {

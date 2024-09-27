@@ -41,8 +41,8 @@
 #include "mongo/base/status.h"
 #include "mongo/base/string_data.h"
 #include "mongo/platform/atomic_word.h"
-#include "mongo/platform/mutex.h"
 #include "mongo/stdx/condition_variable.h"
+#include "mongo/stdx/mutex.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/stdx/type_traits.h"
 #include "mongo/unittest/assert.h"
@@ -80,7 +80,7 @@ protected:
     }
 
     void blockingWork() {
-        stdx::unique_lock<Latch> lk(mutex);
+        stdx::unique_lock<stdx::mutex> lk(mutex);
         ++count1;
         cv1.notify_all();
         while (!flag2) {
@@ -96,7 +96,7 @@ protected:
 
 private:
     void tearDown() override {
-        stdx::unique_lock<Latch> lk(mutex);
+        stdx::unique_lock<stdx::mutex> lk(mutex);
         flag2 = true;
         cv2.notify_all();
         lk.unlock();
@@ -113,7 +113,7 @@ TEST_F(ThreadPoolTest, MinPoolSize0) {
     auto& pool = makePool(options);
     pool.startup();
     ASSERT_EQ(0U, pool.getStats().numThreads);
-    stdx::unique_lock<Latch> lk(mutex);
+    stdx::unique_lock<stdx::mutex> lk(mutex);
     pool.schedule([this](auto status) {
         ASSERT_OK(status);
         blockingWork();
@@ -165,7 +165,7 @@ TEST_F(ThreadPoolTest, MaxPoolSize20MinPoolSize15) {
     options.maxIdleThreadAge = Milliseconds(100);
     auto& pool = makePool(options);
     pool.startup();
-    stdx::unique_lock<Latch> lk(mutex);
+    stdx::unique_lock<stdx::mutex> lk(mutex);
     for (size_t i = 0U; i < 30U; ++i) {
         pool.schedule([this, i](auto status) {
             ASSERT_OK(status) << i;
@@ -239,16 +239,16 @@ DEATH_TEST_REGEX(ThreadPoolTest,
     pool->startup();
     ASSERT_EQ(1U, pool->getStats().numThreads);
 
-    stdx::unique_lock<Latch> lk(mutex);
+    stdx::unique_lock<stdx::mutex> lk(mutex);
     // Schedule 2 tasks to ensure that independent thread join() is blocked draining the tasks and
     // causing the ThreadPool destructor join to fail due to double-join.
     pool->schedule([&mutex](auto status) {
         ASSERT_OK(status);
-        stdx::lock_guard<Latch> lk(mutex);
+        stdx::lock_guard<stdx::mutex> lk(mutex);
     });
     pool->schedule([&mutex](auto status) {
         ASSERT_OK(status);
-        stdx::lock_guard<Latch> lk(mutex);
+        stdx::lock_guard<stdx::mutex> lk(mutex);
     });
 
     stdx::thread t;

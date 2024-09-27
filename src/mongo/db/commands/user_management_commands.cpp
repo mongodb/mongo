@@ -114,13 +114,13 @@
 #include "mongo/logv2/log_component.h"
 #include "mongo/logv2/redaction.h"
 #include "mongo/platform/atomic_word.h"
-#include "mongo/platform/mutex.h"
 #include "mongo/rpc/factory.h"
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/rpc/op_msg.h"
 #include "mongo/rpc/op_msg_rpc_impls.h"
 #include "mongo/rpc/reply_interface.h"
 #include "mongo/s/write_ops/batched_command_response.h"
+#include "mongo/stdx/mutex.h"
 #include "mongo/stdx/unordered_set.h"
 #include "mongo/transport/service_entry_point.h"
 #include "mongo/transport/session.h"
@@ -606,17 +606,17 @@ public:
     AuthzLockGuard& operator=(AuthzLockGuard&&) = default;
 
 private:
-    static Decorable<ServiceContext>::Decoration<Mutex> _UMCMutexDecoration;
+    static Decorable<ServiceContext>::Decoration<stdx::mutex> _UMCMutexDecoration;
 
     OperationContext* _opCtx;
     AuthorizationManager* _authzManager;
-    stdx::unique_lock<Latch> _lock;
+    stdx::unique_lock<stdx::mutex> _lock;
     InvalidationMode _mode;
     OID _cacheGeneration;
 };
 
-Decorable<ServiceContext>::Decoration<Mutex> AuthzLockGuard::_UMCMutexDecoration =
-    ServiceContext::declareDecoration<Mutex>();
+Decorable<ServiceContext>::Decoration<stdx::mutex> AuthzLockGuard::_UMCMutexDecoration =
+    ServiceContext::declareDecoration<stdx::mutex>();
 
 /**
  * Returns Status::OK() if the current Auth schema version is at least the auth schema version

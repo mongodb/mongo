@@ -70,7 +70,7 @@
 #include "mongo/db/timeseries/timeseries_gen.h"
 #include "mongo/db/views/view.h"
 #include "mongo/platform/atomic_word.h"
-#include "mongo/platform/mutex.h"
+#include "mongo/stdx/mutex.h"
 #include "mongo/stdx/unordered_map.h"
 #include "mongo/stdx/unordered_set.h"
 #include "mongo/util/hierarchical_acquisition.h"

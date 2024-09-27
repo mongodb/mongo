@@ -46,8 +46,8 @@
 #include "mongo/db/pipeline/aggregate_command_gen.h"
 #include "mongo/db/repl/optime.h"
 #include "mongo/db/repl/read_concern_level.h"
-#include "mongo/platform/mutex.h"
 #include "mongo/s/client/shard.h"
+#include "mongo/stdx/mutex.h"
 #include "mongo/util/hierarchical_acquisition.h"
 
 namespace mongo {

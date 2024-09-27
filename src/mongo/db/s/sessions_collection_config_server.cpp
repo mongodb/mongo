@@ -186,7 +186,7 @@ void SessionsCollectionConfigServer::setupSessionsCollection(OperationContext* o
             "sharding state is not yet initialized",
             Grid::get(opCtx)->isShardingInitialized());
 
-    stdx::lock_guard<Latch> lk(_mutex);
+    stdx::lock_guard<stdx::mutex> lk(_mutex);
 
     _shardCollectionIfNeeded(opCtx);
     _generateIndexesIfNeeded(opCtx);

@@ -36,7 +36,7 @@
 #include "mongo/base/status.h"
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/s/resharding/coordinator_document_gen.h"
-#include "mongo/platform/mutex.h"
+#include "mongo/stdx/mutex.h"
 #include "mongo/util/concurrency/with_lock.h"
 #include "mongo/util/future.h"
 #include "mongo/util/future_impl.h"
@@ -121,7 +121,7 @@ public:
      * Indicates that the ReshardingCoordinator::run method has been called.
      */
     void reshardingCoordinatorRunCalled() {
-        stdx::lock_guard<Latch> lg(_mutex);
+        stdx::lock_guard<stdx::mutex> lg(_mutex);
         _reshardingCoordinatorRunCalled = true;
     }
 

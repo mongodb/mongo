@@ -397,7 +397,7 @@ void FaultManager::logMessageReceived(FaultState state, const HealthCheckStatus&
 
 void FaultManager::logCurrentState(FaultState, FaultState newState, const OptionalMessageType&) {
     {
-        stdx::lock_guard<Latch> lk(_stateMutex);
+        stdx::lock_guard<stdx::mutex> lk(_stateMutex);
         _lastTransitionTime = _svcCtx->getFastClockSource()->now();
     }
     if (_fault) {
@@ -513,7 +513,7 @@ FaultState FaultManager::getFaultState() const {
 }
 
 Date_t FaultManager::getLastTransitionTime() const {
-    stdx::lock_guard<Latch> lk(_stateMutex);
+    stdx::lock_guard<stdx::mutex> lk(_stateMutex);
     return _lastTransitionTime;
 }
 
@@ -715,7 +715,7 @@ void FaultManager::_init() {
 
 std::vector<HealthObserver*> FaultManager::getHealthObservers() const {
     std::vector<HealthObserver*> result;
-    stdx::lock_guard<Latch> lk(_mutex);
+    stdx::lock_guard<stdx::mutex> lk(_mutex);
     result.reserve(_observers.size());
     std::transform(_observers.cbegin(),
                    _observers.cend(),
@@ -737,7 +737,7 @@ std::vector<HealthObserver*> FaultManager::getActiveHealthObservers() const {
 }
 
 HealthObserver* FaultManager::getHealthObserver(FaultFacetType type) const {
-    stdx::lock_guard<Latch> lk(_mutex);
+    stdx::lock_guard<stdx::mutex> lk(_mutex);
     auto observerIt = std::find_if(
         _observers.begin(), _observers.end(), [type](auto& o) { return o->getType() == type; });
     if (observerIt != _observers.end()) {

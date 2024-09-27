@@ -70,10 +70,10 @@
 #include "mongo/logv2/log_component.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/platform/compiler.h"
-#include "mongo/platform/mutex.h"
 #include "mongo/platform/random.h"
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/rpc/metadata/metadata_hook.h"
+#include "mongo/stdx/mutex.h"
 #include "mongo/stdx/unordered_map.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/concurrency/thread_pool.h"
@@ -237,7 +237,7 @@ public:
     public:
         void onResponseReceived(const HostAndPort& host) noexcept {
             const auto hostName = host.toString();
-            stdx::lock_guard<Mutex> lk(_mutex);
+            stdx::lock_guard<stdx::mutex> lk(_mutex);
 
             if (_resolved.find(hostName) == _resolved.end()) {
                 _resolved[hostName] = 0;
@@ -247,7 +247,7 @@ public:
         }
 
         BSONObj toBSON() const noexcept {
-            stdx::lock_guard<Mutex> lk(_mutex);
+            stdx::lock_guard<stdx::mutex> lk(_mutex);
             BSONObjBuilder bob;
             for (const auto& entry : _resolved) {
                 bob.append(entry.first, entry.second);

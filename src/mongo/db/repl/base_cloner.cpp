@@ -76,7 +76,7 @@ BaseCloner::BaseCloner(StringData clonerName,
 
 Status BaseCloner::run() {
     {
-        stdx::lock_guard<Latch> lk(_mutex);
+        stdx::lock_guard<stdx::mutex> lk(_mutex);
         _active = true;
     }
     try {
@@ -89,7 +89,7 @@ Status BaseCloner::run() {
         setSyncFailedStatus(e.toStatus());
     }
     {
-        stdx::lock_guard<Latch> lk(_mutex);
+        stdx::lock_guard<stdx::mutex> lk(_mutex);
         _active = false;
         if (!_status.isOK()) {
             return _status;
@@ -215,7 +215,7 @@ BaseCloner::AfterStageBehavior BaseCloner::runStageWithRetries(BaseClonerStage* 
 std::pair<Future<void>, TaskExecutor::EventHandle> BaseCloner::runOnExecutorEvent(
     TaskExecutor* executor) {
     {
-        stdx::lock_guard<Latch> lk(_mutex);
+        stdx::lock_guard<stdx::mutex> lk(_mutex);
         invariant(!_active && !_startedAsync);
         _startedAsync = true;
     }
@@ -226,7 +226,7 @@ std::pair<Future<void>, TaskExecutor::EventHandle> BaseCloner::runOnExecutorEven
     auto callback = [this](const TaskExecutor::CallbackArgs& args) mutable {
         if (!args.status.isOK()) {
             {
-                stdx::lock_guard<Latch> lk(_mutex);
+                stdx::lock_guard<stdx::mutex> lk(_mutex);
                 _startedAsync = false;
             }
             // The _promise can run the error callback on this thread, so we must not hold the lock
@@ -236,7 +236,7 @@ std::pair<Future<void>, TaskExecutor::EventHandle> BaseCloner::runOnExecutorEven
         }
         _promise.setWith([this] {
             Status status = run();
-            stdx::lock_guard<Latch> lk(_mutex);
+            stdx::lock_guard<stdx::mutex> lk(_mutex);
             _startedAsync = false;
             return status;
         });
@@ -280,7 +280,7 @@ BaseCloner::AfterStageBehavior BaseCloner::runStages() {
 void BaseCloner::setSyncFailedStatus(Status status) {
     invariant(!status.isOK());
     {
-        stdx::lock_guard<Latch> lk(_mutex);
+        stdx::lock_guard<stdx::mutex> lk(_mutex);
         _status = status;
     }
     stdx::lock_guard<ReplSyncSharedData> lk(*_sharedData);

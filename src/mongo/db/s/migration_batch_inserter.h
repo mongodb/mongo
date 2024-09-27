@@ -52,9 +52,9 @@
 #include "mongo/db/session/session_catalog_mongod.h"
 #include "mongo/db/write_concern_options.h"
 #include "mongo/logv2/log.h"
-#include "mongo/platform/mutex.h"
 #include "mongo/s/catalog/type_chunk.h"
 #include "mongo/s/grid.h"
+#include "mongo/stdx/mutex.h"
 #include "mongo/util/concurrency/semaphore_ticketholder.h"
 #include "mongo/util/uuid.h"
 
@@ -63,7 +63,7 @@ namespace mongo {
 // The purpose of this type is to allow inserters to communicate
 // their progress to the outside world.
 class MigrationCloningProgressSharedState {
-    mutable Mutex _m;
+    mutable stdx::mutex _m;
     repl::OpTime _maxOptime;
     long long _numCloned = 0;
     long long _numBytes = 0;

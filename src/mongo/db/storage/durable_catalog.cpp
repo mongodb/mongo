@@ -136,7 +136,7 @@ public:
 
     void commit(OperationContext* opCtx, boost::optional<Timestamp>) override {}
     void rollback(OperationContext* opCtx) override {
-        stdx::lock_guard<Latch> lk(_catalog->_catalogIdToEntryMapLock);
+        stdx::lock_guard<stdx::mutex> lk(_catalog->_catalogIdToEntryMapLock);
         _catalog->_catalogIdToEntryMap.erase(_catalogId);
     }
 
@@ -157,7 +157,7 @@ DurableCatalog::DurableCatalog(RecordStore* rs,
       _engine(engine) {}
 
 bool DurableCatalog::_hasEntryCollidingWithRand(WithLock) const {
-    stdx::lock_guard<Latch> lk(_catalogIdToEntryMapLock);
+    stdx::lock_guard<stdx::mutex> lk(_catalogIdToEntryMapLock);
     for (auto it = _catalogIdToEntryMap.begin(); it != _catalogIdToEntryMap.end(); ++it) {
         if (StringData(it->second.ident).endsWith(_rand))
             return true;
@@ -166,7 +166,7 @@ bool DurableCatalog::_hasEntryCollidingWithRand(WithLock) const {
 }
 
 std::string DurableCatalog::_newInternalIdent(StringData identStem) {
-    stdx::lock_guard<Latch> lk(_randLock);
+    stdx::lock_guard<stdx::mutex> lk(_randLock);
     StringBuilder buf;
     buf << _kInternalIdentPrefix;
     buf << identStem;
@@ -188,7 +188,7 @@ std::string DurableCatalog::getFilesystemPathForDb(const DatabaseName& dbName) c
 
 std::string DurableCatalog::generateUniqueIdent(NamespaceString nss, const char* kind) {
     // If this changes to not put _rand at the end, _hasEntryCollidingWithRand will need fixing.
-    stdx::lock_guard<Latch> lk(_randLock);
+    stdx::lock_guard<stdx::mutex> lk(_randLock);
     StringBuilder buf;
     if (_directoryPerDb) {
         buf << escapeDbName(nss.dbName()) << '/';
@@ -218,7 +218,7 @@ void DurableCatalog::init(OperationContext* opCtx) {
     }
 
     // In the unlikely event that we have used this _rand before generate a new one.
-    stdx::lock_guard<Latch> lk(_randLock);
+    stdx::lock_guard<stdx::mutex> lk(_randLock);
     while (_hasEntryCollidingWithRand(lk)) {
         _rand = _newRand();
     }
@@ -281,7 +281,7 @@ boost::optional<DurableCatalogEntry> DurableCatalog::scanForCatalogEntryByUUID(
 }
 
 DurableCatalog::EntryIdentifier DurableCatalog::getEntry(const RecordId& catalogId) const {
-    stdx::lock_guard<Latch> lk(_catalogIdToEntryMapLock);
+    stdx::lock_guard<stdx::mutex> lk(_catalogIdToEntryMapLock);
     auto it = _catalogIdToEntryMap.find(catalogId);
     invariant(it != _catalogIdToEntryMap.end());
     return it->second;
@@ -290,7 +290,7 @@ DurableCatalog::EntryIdentifier DurableCatalog::getEntry(const RecordId& catalog
 NamespaceString DurableCatalog::getNSSFromCatalog(OperationContext* opCtx,
                                                   const RecordId& catalogId) const {
     {
-        stdx::lock_guard<Latch> lk(_catalogIdToEntryMapLock);
+        stdx::lock_guard<stdx::mutex> lk(_catalogIdToEntryMapLock);
         auto it = _catalogIdToEntryMap.find(catalogId);
         if (it != _catalogIdToEntryMap.end()) {
             return it->second.nss;
@@ -340,7 +340,7 @@ StatusWith<DurableCatalog::EntryIdentifier> DurableCatalog::_addEntry(
     if (!res.isOK())
         return res.getStatus();
 
-    stdx::lock_guard<Latch> lk(_catalogIdToEntryMapLock);
+    stdx::lock_guard<stdx::mutex> lk(_catalogIdToEntryMapLock);
     invariant(_catalogIdToEntryMap.find(res.getValue()) == _catalogIdToEntryMap.end());
     _catalogIdToEntryMap[res.getValue()] = {res.getValue(), ident, nss};
     shard_role_details::getRecoveryUnit(opCtx)->registerChange(
@@ -365,7 +365,7 @@ StatusWith<DurableCatalog::EntryIdentifier> DurableCatalog::_importEntry(Operati
     if (!res.isOK())
         return res.getStatus();
 
-    stdx::lock_guard<Latch> lk(_catalogIdToEntryMapLock);
+    stdx::lock_guard<stdx::mutex> lk(_catalogIdToEntryMapLock);
     invariant(_catalogIdToEntryMap.find(res.getValue()) == _catalogIdToEntryMap.end());
     _catalogIdToEntryMap[res.getValue()] = {res.getValue(), ident, nss};
     shard_role_details::getRecoveryUnit(opCtx)->registerChange(
@@ -484,7 +484,7 @@ void DurableCatalog::putMetaData(OperationContext* opCtx,
 }
 
 Status DurableCatalog::_removeEntry(OperationContext* opCtx, const RecordId& catalogId) {
-    stdx::lock_guard<Latch> lk(_catalogIdToEntryMapLock);
+    stdx::lock_guard<stdx::mutex> lk(_catalogIdToEntryMapLock);
     const auto it = _catalogIdToEntryMap.find(catalogId);
     if (it == _catalogIdToEntryMap.end()) {
         return Status(ErrorCodes::NamespaceNotFound, "collection not found");
@@ -492,7 +492,7 @@ Status DurableCatalog::_removeEntry(OperationContext* opCtx, const RecordId& cat
 
     shard_role_details::getRecoveryUnit(opCtx)->onRollback(
         [this, catalogId, entry = it->second](OperationContext*) {
-            stdx::lock_guard<Latch> lk(_catalogIdToEntryMapLock);
+            stdx::lock_guard<stdx::mutex> lk(_catalogIdToEntryMapLock);
             _catalogIdToEntryMap[catalogId] = entry;
         });
 
@@ -560,7 +560,7 @@ StatusWith<std::string> DurableCatalog::newOrphanedIdent(OperationContext* opCtx
     if (!res.isOK())
         return res.getStatus();
 
-    stdx::lock_guard<Latch> lk(_catalogIdToEntryMapLock);
+    stdx::lock_guard<stdx::mutex> lk(_catalogIdToEntryMapLock);
     invariant(_catalogIdToEntryMap.find(res.getValue()) == _catalogIdToEntryMap.end());
     _catalogIdToEntryMap[res.getValue()] = EntryIdentifier(res.getValue(), ident, nss);
     shard_role_details::getRecoveryUnit(opCtx)->registerChange(
@@ -695,7 +695,7 @@ StatusWith<DurableCatalog::ImportResult> DurableCatalog::importCollection(
             return false;
         };
 
-        stdx::lock_guard<Latch> lk(_randLock);
+        stdx::lock_guard<stdx::mutex> lk(_randLock);
         while (!importOptions.skipIdentCollisionCheck &&
                (_hasEntryCollidingWithRand(lk) || identsToImportConflict(lk))) {
             _rand = _newRand();
@@ -753,7 +753,7 @@ Status DurableCatalog::renameCollection(OperationContext* opCtx,
         fassert(28522, status);
     }
 
-    stdx::lock_guard<Latch> lk(_catalogIdToEntryMapLock);
+    stdx::lock_guard<stdx::mutex> lk(_catalogIdToEntryMapLock);
     const auto it = _catalogIdToEntryMap.find(catalogId);
     invariant(it != _catalogIdToEntryMap.end());
 
@@ -761,7 +761,7 @@ Status DurableCatalog::renameCollection(OperationContext* opCtx,
     it->second.nss = toNss;
     shard_role_details::getRecoveryUnit(opCtx)->onRollback(
         [this, catalogId, fromName](OperationContext*) {
-            stdx::lock_guard<Latch> lk(_catalogIdToEntryMapLock);
+            stdx::lock_guard<stdx::mutex> lk(_catalogIdToEntryMapLock);
             const auto it = _catalogIdToEntryMap.find(catalogId);
             invariant(it != _catalogIdToEntryMap.end());
             it->second.nss = fromName;
@@ -773,7 +773,7 @@ Status DurableCatalog::renameCollection(OperationContext* opCtx,
 Status DurableCatalog::dropCollection(OperationContext* opCtx, const RecordId& catalogId) {
     EntryIdentifier entry;
     {
-        stdx::lock_guard<Latch> lk(_catalogIdToEntryMapLock);
+        stdx::lock_guard<stdx::mutex> lk(_catalogIdToEntryMapLock);
         entry = _catalogIdToEntryMap[catalogId];
     }
 

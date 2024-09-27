@@ -68,7 +68,6 @@
 #include "mongo/db/transaction/transaction_api.h"
 #include "mongo/db/write_concern_options.h"
 #include "mongo/executor/task_executor.h"
-#include "mongo/platform/mutex.h"
 #include "mongo/s/catalog/sharding_catalog_client.h"
 #include "mongo/s/catalog/type_chunk.h"
 #include "mongo/s/catalog/type_collection.h"
@@ -80,6 +79,7 @@
 #include "mongo/s/database_version.h"
 #include "mongo/s/shard_key_pattern.h"
 #include "mongo/s/write_ops/batched_command_request.h"
+#include "mongo/stdx/mutex.h"
 #include "mongo/util/functional.h"
 #include "mongo/util/uuid.h"
 

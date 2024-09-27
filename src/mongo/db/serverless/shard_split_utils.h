@@ -46,7 +46,7 @@
 #include "mongo/db/repl/optime_with.h"
 #include "mongo/db/repl/repl_set_config.h"
 #include "mongo/db/serverless/shard_split_state_machine_gen.h"
-#include "mongo/platform/mutex.h"
+#include "mongo/stdx/mutex.h"
 #include "mongo/stdx/unordered_map.h"
 #include "mongo/util/future.h"
 #include "mongo/util/future_impl.h"

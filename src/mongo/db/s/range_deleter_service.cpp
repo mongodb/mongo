@@ -140,7 +140,7 @@ RangeDeleterService::ReadyRangeDeletionsProcessor::~ReadyRangeDeletionsProcessor
 }
 
 void RangeDeleterService::ReadyRangeDeletionsProcessor::shutdown() {
-    stdx::lock_guard<Latch> lock(_mutex);
+    stdx::lock_guard<stdx::mutex> lock(_mutex);
     if (_state == kStopped)
         return;
 
@@ -153,13 +153,13 @@ void RangeDeleterService::ReadyRangeDeletionsProcessor::shutdown() {
 }
 
 bool RangeDeleterService::ReadyRangeDeletionsProcessor::_stopRequested() const {
-    stdx::unique_lock<Latch> lock(_mutex);
+    stdx::unique_lock<stdx::mutex> lock(_mutex);
     return _state == kStopped;
 }
 
 void RangeDeleterService::ReadyRangeDeletionsProcessor::emplaceRangeDeletion(
     const RangeDeletionTask& rdt) {
-    stdx::unique_lock<Latch> lock(_mutex);
+    stdx::unique_lock<stdx::mutex> lock(_mutex);
     if (_state != kRunning) {
         return;
     }
@@ -168,7 +168,7 @@ void RangeDeleterService::ReadyRangeDeletionsProcessor::emplaceRangeDeletion(
 }
 
 void RangeDeleterService::ReadyRangeDeletionsProcessor::_completedRangeDeletion() {
-    stdx::unique_lock<Latch> lock(_mutex);
+    stdx::unique_lock<stdx::mutex> lock(_mutex);
     dassert(!_queue.empty());
     _queue.pop();
 }
@@ -178,7 +178,7 @@ void RangeDeleterService::ReadyRangeDeletionsProcessor::_runRangeDeletions() {
                               _service->getService(ClusterRole::ShardServer));
 
     {
-        stdx::lock_guard<Latch> lock(_mutex);
+        stdx::lock_guard<stdx::mutex> lock(_mutex);
         if (_state != kRunning) {
             return;
         }
@@ -188,13 +188,13 @@ void RangeDeleterService::ReadyRangeDeletionsProcessor::_runRangeDeletions() {
     auto opCtx = _threadOpCtxHolder.get();
 
     ON_BLOCK_EXIT([this]() {
-        stdx::lock_guard<Latch> lock(_mutex);
+        stdx::lock_guard<stdx::mutex> lock(_mutex);
         _threadOpCtxHolder.reset();
     });
 
     while (!_stopRequested()) {
         {
-            stdx::unique_lock<Latch> lock(_mutex);
+            stdx::unique_lock<stdx::mutex> lock(_mutex);
             try {
                 opCtx->waitForConditionOrInterrupt(_condVar, lock, [&] { return !_queue.empty(); });
             } catch (const DBException& ex) {

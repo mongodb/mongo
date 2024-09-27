@@ -103,7 +103,7 @@ public:
     }
 
 private:
-    mutable Mutex _mutex;
+    mutable stdx::mutex _mutex;
     DataType _data;
 };
 

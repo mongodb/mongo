@@ -46,7 +46,7 @@
 #include "mongo/db/repl/optime.h"
 #include "mongo/db/service_context.h"
 #include "mongo/executor/task_executor.h"
-#include "mongo/platform/mutex.h"
+#include "mongo/stdx/mutex.h"
 #include "mongo/util/future.h"
 #include "mongo/util/uuid.h"
 

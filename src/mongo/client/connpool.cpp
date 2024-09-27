@@ -265,7 +265,7 @@ void PoolForHost::initializeHostName(const std::string& hostName) {
     }
 }
 
-void PoolForHost::waitForFreeConnection(int timeout, stdx::unique_lock<Latch>& lk) {
+void PoolForHost::waitForFreeConnection(int timeout, stdx::unique_lock<stdx::mutex>& lk) {
     auto condition = [&] {
         return (numInUse() < _maxInUse || _inShutdown.load());
     };
@@ -320,7 +320,7 @@ public:
             // there are too many connections in this pool to make a new one, block until a
             // connection is released.
             {
-                stdx::unique_lock<Latch> lk(_this->_mutex);
+                stdx::unique_lock<stdx::mutex> lk(_this->_mutex);
                 PoolForHost& p = _this->_pools[PoolKey(host, timeout)];
 
                 if (p.openConnections() >= _this->_maxInUse) {
@@ -375,7 +375,7 @@ DBConnectionPool::DBConnectionPool()
 
 void DBConnectionPool::shutdown() {
     if (!_inShutdown.swap(true)) {
-        stdx::lock_guard<Latch> L(_mutex);
+        stdx::lock_guard<stdx::mutex> L(_mutex);
         for (auto i = _pools.begin(); i != _pools.end(); i++) {
             PoolForHost& p = i->second;
             p.shutdown();
@@ -389,7 +389,7 @@ DBClientBase* DBConnectionPool::_get(const string& ident,
     uassert(ErrorCodes::ShutdownInProgress,
             "Can't use connection pool during shutdown",
             !globalInShutdownDeprecated());
-    stdx::lock_guard<Latch> L(_mutex);
+    stdx::lock_guard<stdx::mutex> L(_mutex);
     PoolForHost& p = _pools[PoolKey(ident, socketTimeout)];
     p.setMaxPoolSize(_maxPoolSize);
     p.setSocketTimeout(socketTimeout);
@@ -400,7 +400,7 @@ DBClientBase* DBConnectionPool::_get(const string& ident,
 }
 
 int DBConnectionPool::openConnections(const string& ident, double socketTimeout) {
-    stdx::lock_guard<Latch> L(_mutex);
+    stdx::lock_guard<stdx::mutex> L(_mutex);
     PoolForHost& p = _pools[PoolKey(ident, socketTimeout)];
     return p.openConnections();
 }
@@ -410,7 +410,7 @@ DBClientBase* DBConnectionPool::_finishCreate(const string& ident,
                                               DBClientBase* conn,
                                               Date_t& connRequestedAt) {
     {
-        stdx::lock_guard<Latch> L(_mutex);
+        stdx::lock_guard<stdx::mutex> L(_mutex);
         PoolForHost& p = _pools[PoolKey(ident, socketTimeout)];
         p.setMaxPoolSize(_maxPoolSize);
         p.initializeHostName(ident);
@@ -480,7 +480,7 @@ DBClientBase* DBConnectionPool::get(const MongoURI& uri, double socketTimeout) {
 Milliseconds DBConnectionPool::getPoolHostConnTime_forTest(const std::string& host,
                                                            double timeout) const {
     if (TestingProctor::instance().isEnabled()) {
-        stdx::lock_guard<Latch> L(_mutex);
+        stdx::lock_guard<stdx::mutex> L(_mutex);
         auto it = _pools.find(PoolKey(host, timeout));
         iassert(9047201,
                 "Couldn't find a connection that matches the provided host and timeout pair!",
@@ -491,13 +491,13 @@ Milliseconds DBConnectionPool::getPoolHostConnTime_forTest(const std::string& ho
 }
 
 int DBConnectionPool::getNumAvailableConns(const string& host, double socketTimeout) const {
-    stdx::lock_guard<Latch> L(_mutex);
+    stdx::lock_guard<stdx::mutex> L(_mutex);
     auto it = _pools.find(PoolKey(host, socketTimeout));
     return (it == _pools.end()) ? 0 : it->second.numAvailable();
 }
 
 int DBConnectionPool::getNumBadConns(const string& host, double socketTimeout) const {
-    stdx::lock_guard<Latch> L(_mutex);
+    stdx::lock_guard<stdx::mutex> L(_mutex);
     auto it = _pools.find(PoolKey(host, socketTimeout));
     return (it == _pools.end()) ? 0 : it->second.getNumBadConns();
 }
@@ -542,7 +542,7 @@ void DBConnectionPool::decrementEgress(const string& host, DBClientBase* c) {
 DBConnectionPool::~DBConnectionPool() {
     // Do not log in destruction, because global connection pools get
     // destroyed after the logging framework.
-    stdx::lock_guard<Latch> L(_mutex);
+    stdx::lock_guard<stdx::mutex> L(_mutex);
     for (PoolMap::iterator i = _pools.begin(); i != _pools.end(); i++) {
         PoolForHost& p = i->second;
         p._parentDestroyed = true;
@@ -554,7 +554,7 @@ DBConnectionPool::~DBConnectionPool() {
 }
 
 void DBConnectionPool::flush() {
-    stdx::lock_guard<Latch> L(_mutex);
+    stdx::lock_guard<stdx::mutex> L(_mutex);
     for (PoolMap::iterator i = _pools.begin(); i != _pools.end(); i++) {
         PoolForHost& p = i->second;
         p.flush();
@@ -562,7 +562,7 @@ void DBConnectionPool::flush() {
 }
 
 void DBConnectionPool::clear() {
-    stdx::lock_guard<Latch> L(_mutex);
+    stdx::lock_guard<stdx::mutex> L(_mutex);
     LOGV2_DEBUG(20114,
                 2,
                 "Removing all connectionns associated with this set of pools",
@@ -573,7 +573,7 @@ void DBConnectionPool::clear() {
 }
 
 void DBConnectionPool::removeHost(const string& host) {
-    stdx::lock_guard<Latch> L(_mutex);
+    stdx::lock_guard<stdx::mutex> L(_mutex);
     LOGV2_DEBUG(
         20115, 2, "Removing connections from all pools to a host", "connString"_attr = host);
     for (PoolMap::iterator i = _pools.begin(); i != _pools.end(); ++i) {
@@ -618,7 +618,7 @@ void DBConnectionPool::onDestroy(DBClientBase* conn) {
 
 void DBConnectionPool::appendConnectionStats(executor::ConnectionPoolStats* stats) const {
     {
-        stdx::lock_guard<Latch> lk(_mutex);
+        stdx::lock_guard<stdx::mutex> lk(_mutex);
         for (PoolMap::const_iterator i = _pools.begin(); i != _pools.end(); ++i) {
             if (i->second.numCreated() == 0)
                 continue;
@@ -692,7 +692,7 @@ bool DBConnectionPool::isConnectionGood(const string& hostName, DBClientBase* co
     }
 
     {
-        stdx::lock_guard<Latch> sl(_mutex);
+        stdx::lock_guard<stdx::mutex> sl(_mutex);
         PoolForHost& pool = _pools[PoolKey(hostName, conn->getSoTimeout())];
         if (pool.isBadSocketCreationTime(conn->getSockCreationMicroSec())) {
             return false;
@@ -708,7 +708,7 @@ void DBConnectionPool::taskDoWork() {
     {
         // we need to get the connections inside the lock
         // but we can actually delete them outside
-        stdx::lock_guard<Latch> lk(_mutex);
+        stdx::lock_guard<stdx::mutex> lk(_mutex);
         for (PoolMap::iterator i = _pools.begin(); i != _pools.end(); ++i) {
             i->second.getStaleConnections(idleThreshold, toDelete);
         }

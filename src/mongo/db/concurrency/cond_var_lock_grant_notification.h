@@ -30,8 +30,8 @@
 #pragma once
 
 #include "mongo/db/concurrency/lock_manager_defs.h"
-#include "mongo/platform/mutex.h"
 #include "mongo/stdx/condition_variable.h"
+#include "mongo/stdx/mutex.h"
 
 namespace mongo {
 

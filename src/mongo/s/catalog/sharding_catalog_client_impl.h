@@ -56,7 +56,6 @@
 #include "mongo/db/repl/read_concern_level.h"
 #include "mongo/db/shard_id.h"
 #include "mongo/db/write_concern_options.h"
-#include "mongo/platform/mutex.h"
 #include "mongo/s/catalog/sharding_catalog_client.h"
 #include "mongo/s/catalog/type_chunk.h"
 #include "mongo/s/catalog/type_index_catalog_gen.h"

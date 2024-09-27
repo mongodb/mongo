@@ -96,7 +96,7 @@ PeriodicShardedIndexConsistencyChecker& PeriodicShardedIndexConsistencyChecker::
 
 long long PeriodicShardedIndexConsistencyChecker::getNumShardedCollsWithInconsistentIndexes()
     const {
-    stdx::lock_guard<Latch> lk(_mutex);
+    stdx::lock_guard<stdx::mutex> lk(_mutex);
     return _numShardedCollsWithInconsistentIndexes;
 }
 
@@ -232,7 +232,7 @@ void PeriodicShardedIndexConsistencyChecker::_launchShardedIndexConsistencyCheck
                 // Update the count if this node is still primary. This is necessary because a
                 // stepdown may complete while this job is running and the count should always be
                 // zero on a non-primary node.
-                stdx::lock_guard<Latch> lk(_mutex);
+                stdx::lock_guard<stdx::mutex> lk(_mutex);
                 if (_isPrimary) {
                     _numShardedCollsWithInconsistentIndexes =
                         numShardedCollsWithInconsistentIndexes;
@@ -289,7 +289,7 @@ void PeriodicShardedIndexConsistencyChecker::_launchOrResumeShardedTimeseriesSha
 }
 
 void PeriodicShardedIndexConsistencyChecker::onStepUp(ServiceContext* serviceContext) {
-    stdx::lock_guard<Latch> lk(_mutex);
+    stdx::lock_guard<stdx::mutex> lk(_mutex);
     if (!_isPrimary) {
         _isPrimary = true;
         if (!_shardedIndexConsistencyChecker.isValid()) {
@@ -305,7 +305,7 @@ void PeriodicShardedIndexConsistencyChecker::onStepUp(ServiceContext* serviceCon
 }
 
 void PeriodicShardedIndexConsistencyChecker::onStepDown() {
-    stdx::lock_guard<Latch> lk(_mutex);
+    stdx::lock_guard<stdx::mutex> lk(_mutex);
     if (_isPrimary) {
         _isPrimary = false;
         invariant(_shardedIndexConsistencyChecker.isValid());

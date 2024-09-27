@@ -38,8 +38,8 @@
 #include "mongo/platform/rwmutex.h"
 
 #include "mongo/platform/compiler.h"
-#include "mongo/platform/mutex.h"
 #include "mongo/platform/waitable_atomic.h"
+#include "mongo/stdx/mutex.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/concurrency/with_lock.h"
 #include "mongo/util/static_immortal.h"
@@ -136,7 +136,7 @@ private:
         _blockHoldersHead.store(bh.release());
     }
 
-    Mutex _mutex;
+    stdx::mutex _mutex;
     std::forward_list<LockEntry*> _freeList;
 
     // Debug-only counter that tracks the number of checked-out instances of `LockEntry`.

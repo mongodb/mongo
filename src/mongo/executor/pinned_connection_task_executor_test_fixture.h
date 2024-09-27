@@ -144,7 +144,7 @@ public:
 
 private:
     std::shared_ptr<transport::Session> _session;
-    mutable Mutex _mutex;
+    mutable stdx::mutex _mutex;
     // We use two condition variables to handle the synchronous nature of this fixture:
     // _readyRequestCV is notified when a request is received, whereas _readyResponseCV is notified
     // when a response to a request (a request handler) is provided.

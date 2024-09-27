@@ -72,10 +72,10 @@
 #include "mongo/logv2/log_component.h"
 #include "mongo/logv2/redaction.h"
 #include "mongo/platform/compiler.h"
-#include "mongo/platform/mutex.h"
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/rpc/metadata.h"
 #include "mongo/rpc/metadata/repl_set_metadata.h"
+#include "mongo/stdx/mutex.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/clock_source.h"
 #include "mongo/util/decorable.h"
@@ -156,12 +156,12 @@ BaseCloner::ClonerStages TenantCollectionCloner::getStages() {
 }
 
 void TenantCollectionCloner::preStage() {
-    stdx::lock_guard<Latch> lk(_mutex);
+    stdx::lock_guard<stdx::mutex> lk(_mutex);
     _stats.start = getSharedData()->getClock()->now();
 }
 
 void TenantCollectionCloner::postStage() {
-    stdx::lock_guard<Latch> lk(_mutex);
+    stdx::lock_guard<stdx::mutex> lk(_mutex);
     _stats.end = getSharedData()->getClock()->now();
 }
 
@@ -216,7 +216,7 @@ BaseCloner::AfterStageBehavior TenantCollectionCloner::countStage() {
 
     _progressMeter.setTotalWhileRunning(static_cast<unsigned long long>(count));
     {
-        stdx::lock_guard<Latch> lk(_mutex);
+        stdx::lock_guard<stdx::mutex> lk(_mutex);
         _stats.documentsToCopyAtStartOfClone = count;
         _stats.approxTotalDataSize = status.isOK() ? res.getField("size").safeNumberLong() : 0;
         _stats.avgObjSize =
@@ -303,7 +303,7 @@ BaseCloner::AfterStageBehavior TenantCollectionCloner::listIndexesStage() {
         }
     }
     {
-        stdx::lock_guard<Latch> lk(_mutex);
+        stdx::lock_guard<stdx::mutex> lk(_mutex);
         _stats.indexes = _readyIndexSpecs.size() + (_idIndexSpec.isEmpty() ? 0 : 1);
     };
 
@@ -379,7 +379,7 @@ BaseCloner::AfterStageBehavior TenantCollectionCloner::createCollectionStage() {
             _readyIndexSpecs.clear();
             auto count = client.count(_sourceDbAndUuid);
             {
-                stdx::lock_guard<Latch> lk(_mutex);
+                stdx::lock_guard<stdx::mutex> lk(_mutex);
                 _stats.documentsCopied += count;
                 _stats.approxTotalBytesCopied = ((long)_stats.documentsCopied) * _stats.avgObjSize;
                 _progressMeter.hit(count);
@@ -527,7 +527,7 @@ void TenantCollectionCloner::runQuery() {
 void TenantCollectionCloner::handleNextBatch(DBClientCursor& cursor) {
     std::vector<BSONObj> docsToInsert;
     {
-        stdx::lock_guard<Latch> lk(_mutex);
+        stdx::lock_guard<stdx::mutex> lk(_mutex);
         _stats.receivedBatches++;
         while (cursor.moreInCurrentBatch()) {
             docsToInsert.emplace_back(cursor.nextSafe());
@@ -565,7 +565,7 @@ void TenantCollectionCloner::insertDocuments(std::vector<BSONObj> docsToInsert) 
                   toStringForLogging(_sourceNss), _tenantId));
 
     {
-        stdx::lock_guard<Latch> lk(_mutex);
+        stdx::lock_guard<stdx::mutex> lk(_mutex);
         _stats.documentsCopied += docsToInsert.size();
         _stats.approxTotalBytesCopied = ((long)_stats.documentsCopied) * _stats.avgObjSize;
         ++_stats.insertedBatches;
@@ -611,7 +611,7 @@ bool TenantCollectionCloner::isMyFailPoint(const BSONObj& data) const {
 }
 
 TenantCollectionCloner::Stats TenantCollectionCloner::getStats() const {
-    stdx::lock_guard<Latch> lk(_mutex);
+    stdx::lock_guard<stdx::mutex> lk(_mutex);
     return _stats;
 }
 

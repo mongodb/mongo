@@ -60,7 +60,7 @@ const ServiceContext::Decoration<ServerlessOperationLockRegistry>
 
 void ServerlessOperationLockRegistry::acquireLock(
     ServerlessOperationLockRegistry::LockType lockType, const UUID& operationId) {
-    stdx::lock_guard<Latch> lg(_mutex);
+    stdx::lock_guard<stdx::mutex> lg(_mutex);
 
     // Verify there is no serverless operation in progress or it is the same type as the one
     // acquiring the lock.
@@ -85,7 +85,7 @@ void ServerlessOperationLockRegistry::acquireLock(
 
 void ServerlessOperationLockRegistry::releaseLock(
     ServerlessOperationLockRegistry::LockType lockType, const UUID& operationId) {
-    stdx::lock_guard<Latch> lg(_mutex);
+    stdx::lock_guard<stdx::mutex> lg(_mutex);
 
     invariant(_activeLockType && *_activeLockType == lockType,
               "Cannot release a serverless lock that is not owned by the given lock type.");
@@ -105,7 +105,7 @@ void ServerlessOperationLockRegistry::releaseLock(
 }
 
 void ServerlessOperationLockRegistry::onDropStateCollection(LockType lockType) {
-    stdx::lock_guard<Latch> lg(_mutex);
+    stdx::lock_guard<stdx::mutex> lg(_mutex);
 
     if (!_activeLockType || *_activeLockType != lockType) {
         return;
@@ -120,7 +120,7 @@ void ServerlessOperationLockRegistry::onDropStateCollection(LockType lockType) {
 }
 
 void ServerlessOperationLockRegistry::clear() {
-    stdx::lock_guard<Latch> lg(_mutex);
+    stdx::lock_guard<stdx::mutex> lg(_mutex);
     LOGV2(6531504,
           "Clearing serverless operation lock registry on shutdown",
           "ns"_attr = _activeLockType);
@@ -202,7 +202,7 @@ void ServerlessOperationLockRegistry::recoverLocks(OperationContext* opCtx) {
 
 const std::string kOperationLockFieldName = "operationLock";
 void ServerlessOperationLockRegistry::appendInfoForServerStatus(BSONObjBuilder* builder) const {
-    stdx::lock_guard<Latch> lg(_mutex);
+    stdx::lock_guard<stdx::mutex> lg(_mutex);
 
     if (!_activeLockType) {
         builder->append(kOperationLockFieldName, 0);
@@ -227,7 +227,7 @@ void ServerlessOperationLockRegistry::appendInfoForServerStatus(BSONObjBuilder* 
 
 boost::optional<ServerlessOperationLockRegistry::LockType>
 ServerlessOperationLockRegistry::getActiveOperationType_forTest() {
-    stdx::lock_guard<Latch> lg(_mutex);
+    stdx::lock_guard<stdx::mutex> lg(_mutex);
 
     return _activeLockType;
 }

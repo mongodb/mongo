@@ -52,9 +52,9 @@
 #include "mongo/executor/network_interface_thread_pool.h"
 #include "mongo/executor/task_executor.h"
 #include "mongo/executor/thread_pool_task_executor.h"
-#include "mongo/platform/mutex.h"
 #include "mongo/s/catalog/type_chunk.h"
 #include "mongo/stdx/condition_variable.h"
+#include "mongo/stdx/mutex.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/stdx/unordered_map.h"
 #include "mongo/util/assert_util.h"
@@ -208,15 +208,15 @@ private:
     ServiceContext::UniqueOperationContext _initOpCtxHolder;
 
     /* Acquire mutex only if service is up (for "user" operation) */
-    [[nodiscard]] stdx::unique_lock<Latch> _acquireMutexFailIfServiceNotUp() {
-        stdx::unique_lock<Latch> lg(_mutex_DO_NOT_USE_DIRECTLY);
+    [[nodiscard]] stdx::unique_lock<stdx::mutex> _acquireMutexFailIfServiceNotUp() {
+        stdx::unique_lock<stdx::mutex> lg(_mutex_DO_NOT_USE_DIRECTLY);
         uassert(ErrorCodes::NotYetInitialized, "Range deleter service not up", _state == kUp);
         return lg;
     }
 
     /* Unconditionally acquire mutex (for internal operations) */
-    [[nodiscard]] stdx::unique_lock<Latch> _acquireMutexUnconditionally() {
-        stdx::unique_lock<Latch> lg(_mutex_DO_NOT_USE_DIRECTLY);
+    [[nodiscard]] stdx::unique_lock<stdx::mutex> _acquireMutexUnconditionally() {
+        stdx::unique_lock<stdx::mutex> lg(_mutex_DO_NOT_USE_DIRECTLY);
         return lg;
     }
 

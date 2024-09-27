@@ -36,8 +36,8 @@
 #include <grpcpp/support/status.h>
 
 #include "mongo/db/service_context_test_fixture.h"
-#include "mongo/platform/mutex.h"
 #include "mongo/rpc/message.h"
+#include "mongo/stdx/mutex.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/transport/grpc/metadata.h"
 #include "mongo/transport/grpc/mock_server_context.h"

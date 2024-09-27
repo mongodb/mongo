@@ -44,7 +44,7 @@
 #include "mongo/db/session/logical_session_cache_gen.h"
 #include "mongo/db/session/logical_session_id.h"
 #include "mongo/db/session/logical_session_id_gen.h"
-#include "mongo/platform/mutex.h"
+#include "mongo/stdx/mutex.h"
 #include "mongo/stdx/unordered_map.h"
 #include "mongo/util/concurrency/with_lock.h"
 #include "mongo/util/duration.h"

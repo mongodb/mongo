@@ -1102,7 +1102,7 @@ TEST_F(ShardRoleTest, AcquireCollectionByUUIDInCommitPendingCollection) {
 
     unsigned int numCalls = 0;
     stdx::condition_variable cv;
-    Mutex mutex;
+    stdx::mutex mutex;
 
     stdx::thread parallelThread([&] {
         ThreadClient client(operationContext()->getService());
@@ -1180,7 +1180,7 @@ TEST_F(ShardRoleTest, AcquireCollectionByUUIDInCommitPendingCollectionAfterDurab
 
     unsigned int numCalls = 0;
     stdx::condition_variable cv;
-    Mutex mutex;
+    stdx::mutex mutex;
 
     stdx::thread parallelThread([&] {
         ThreadClient client(operationContext()->getService());

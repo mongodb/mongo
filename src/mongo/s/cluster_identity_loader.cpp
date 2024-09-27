@@ -66,7 +66,7 @@ OID ClusterIdentityLoader::getClusterId() {
             "Unexpectedly tried to get cluster id on a non config server node",
             serverGlobalParams.clusterRole.has(ClusterRole::ConfigServer));
 
-    stdx::unique_lock<Latch> lk(_mutex);
+    stdx::unique_lock<stdx::mutex> lk(_mutex);
     invariant(_initializationState == InitializationState::kInitialized && _lastLoadResult.isOK());
     return _lastLoadResult.getValue();
 }
@@ -74,7 +74,7 @@ OID ClusterIdentityLoader::getClusterId() {
 Status ClusterIdentityLoader::loadClusterId(OperationContext* opCtx,
                                             ShardingCatalogClient* catalogClient,
                                             const repl::ReadConcernLevel& readConcernLevel) {
-    stdx::unique_lock<Latch> lk(_mutex);
+    stdx::unique_lock<stdx::mutex> lk(_mutex);
     if (_initializationState == InitializationState::kInitialized) {
         invariant(_lastLoadResult.getStatus());
         return Status::OK();
@@ -117,7 +117,7 @@ StatusWith<OID> ClusterIdentityLoader::_fetchClusterIdFromConfig(
 }
 
 void ClusterIdentityLoader::discardCachedClusterId() {
-    stdx::lock_guard<Latch> lk(_mutex);
+    stdx::lock_guard<stdx::mutex> lk(_mutex);
 
     if (_initializationState == InitializationState::kUninitialized) {
         return;

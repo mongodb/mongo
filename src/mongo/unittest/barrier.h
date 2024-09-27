@@ -33,8 +33,8 @@
 #include <cstdint>
 #include <mutex>
 
-#include "mongo/platform/mutex.h"
 #include "mongo/stdx/condition_variable.h"
+#include "mongo/stdx/mutex.h"
 
 namespace mongo {
 namespace unittest {

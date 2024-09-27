@@ -40,7 +40,7 @@
 #include "mongo/db/session/logical_session_id.h"
 #include "mongo/db/session/service_liaison.h"
 #include "mongo/db/session/session_killer.h"
-#include "mongo/platform/mutex.h"
+#include "mongo/stdx/mutex.h"
 #include "mongo/util/hierarchical_acquisition.h"
 #include "mongo/util/periodic_runner.h"
 #include "mongo/util/time_support.h"

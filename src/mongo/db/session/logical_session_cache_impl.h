@@ -46,7 +46,7 @@
 #include "mongo/db/session/logical_session_id_gen.h"
 #include "mongo/db/session/service_liaison.h"
 #include "mongo/db/session/sessions_collection.h"
-#include "mongo/platform/mutex.h"
+#include "mongo/stdx/mutex.h"
 #include "mongo/util/concurrency/with_lock.h"
 #include "mongo/util/functional.h"
 #include "mongo/util/hierarchical_acquisition.h"

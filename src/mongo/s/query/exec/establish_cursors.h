@@ -44,7 +44,6 @@
 #include "mongo/db/service_context.h"
 #include "mongo/db/shard_id.h"
 #include "mongo/executor/task_executor.h"
-#include "mongo/platform/mutex.h"
 #include "mongo/s/async_requests_sender.h"
 #include "mongo/s/client/shard.h"
 #include "mongo/s/query/exec/async_results_merger_params_gen.h"

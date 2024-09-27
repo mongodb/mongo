@@ -50,7 +50,7 @@ const std::vector<SplitSessionInfo>& SplitPrepareSessionManager::splitSession(
 
     auto numSplits = requesterIds.size();
     invariant(numSplits > 0);
-    stdx::lock_guard<Latch> lk(_mutex);
+    stdx::lock_guard<stdx::mutex> lk(_mutex);
 
     auto [it, succ] =
         _splitSessionMap.try_emplace(sessionId, txnNumber, std::vector<SplitSessionInfo>());
@@ -70,7 +70,7 @@ const std::vector<SplitSessionInfo>& SplitPrepareSessionManager::splitSession(
 
 boost::optional<const std::vector<SplitSessionInfo>&> SplitPrepareSessionManager::getSplitSessions(
     const LogicalSessionId& sessionId, TxnNumber txnNumber) const {
-    stdx::lock_guard<Latch> lk(_mutex);
+    stdx::lock_guard<stdx::mutex> lk(_mutex);
 
     auto it = _splitSessionMap.find(sessionId);
     if (it == _splitSessionMap.end()) {
@@ -85,7 +85,7 @@ boost::optional<const std::vector<SplitSessionInfo>&> SplitPrepareSessionManager
 
 bool SplitPrepareSessionManager::isSessionSplit(const LogicalSessionId& sessionId,
                                                 TxnNumber txnNumber) const {
-    stdx::lock_guard<Latch> lk(_mutex);
+    stdx::lock_guard<stdx::mutex> lk(_mutex);
 
     auto it = _splitSessionMap.find(sessionId);
     if (it == _splitSessionMap.end()) {
@@ -100,7 +100,7 @@ bool SplitPrepareSessionManager::isSessionSplit(const LogicalSessionId& sessionI
 
 void SplitPrepareSessionManager::releaseSplitSessions(const LogicalSessionId& sessionId,
                                                       TxnNumber txnNumber) {
-    stdx::lock_guard<Latch> lk(_mutex);
+    stdx::lock_guard<stdx::mutex> lk(_mutex);
 
     auto it = _splitSessionMap.find(sessionId);
 
@@ -119,7 +119,7 @@ void SplitPrepareSessionManager::releaseSplitSessions(const LogicalSessionId& se
 }
 
 void SplitPrepareSessionManager::releaseAllSplitSessions() {
-    stdx::lock_guard<Latch> lk(_mutex);
+    stdx::lock_guard<stdx::mutex> lk(_mutex);
 
     for (const auto& entry : _splitSessionMap) {
         for (const auto& sessInfo : entry.second.second) {

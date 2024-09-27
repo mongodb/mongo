@@ -63,7 +63,7 @@ namespace {
 class SessionManagerUtil : public transport::SessionManager {
 public:
     void startSession(std::shared_ptr<transport::Session> session) override {
-        stdx::unique_lock<Latch> lk(_mutex);
+        stdx::unique_lock<stdx::mutex> lk(_mutex);
         _sessions.push_back(std::move(session));
         LOGV2(2303202, "started session");
         _cv.notify_one();
@@ -75,7 +75,7 @@ public:
         LOGV2(2303302, "end all sessions");
         std::vector<std::shared_ptr<transport::Session>> old_sessions;
         {
-            stdx::unique_lock<Latch> lock(_mutex);
+            stdx::unique_lock<stdx::mutex> lock(_mutex);
             old_sessions.swap(_sessions);
         }
         old_sessions.clear();
@@ -86,7 +86,7 @@ public:
     }
 
     size_t numOpenSessions() const override {
-        stdx::unique_lock<Latch> lock(_mutex);
+        stdx::unique_lock<stdx::mutex> lock(_mutex);
         return _sessions.size();
     }
 
@@ -95,7 +95,7 @@ public:
     }
 
     void waitForConnect() {
-        stdx::unique_lock<Latch> lock(_mutex);
+        stdx::unique_lock<stdx::mutex> lock(_mutex);
         _cv.wait(lock, [&] { return !_sessions.empty(); });
     }
 

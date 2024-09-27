@@ -99,7 +99,7 @@ public:
     ~FSyncCore() {
         // The FSyncLockThread is owned by the FSyncCommand and accesses FsyncCommand state. It must
         // be shut down prior to FSyncCommand destruction.
-        stdx::unique_lock<Latch> lk(fsyncStateMutex);
+        stdx::unique_lock<stdx::mutex> lk(fsyncStateMutex);
         if (_lockCount > 0) {
             _lockCount = 0;
             releaseFsyncLockSyncCV.notify_one();
@@ -158,7 +158,7 @@ public:
         if (lockCountAtStart == 0) {
             Status status = Status::OK();
             {
-                stdx::unique_lock<Latch> lk(fsyncStateMutex);
+                stdx::unique_lock<stdx::mutex> lk(fsyncStateMutex);
                 threadStatus = Status::OK();
                 threadStarted = false;
                 Milliseconds deadline = Milliseconds::max();
@@ -212,7 +212,7 @@ public:
      * Returns whether we are currently fsyncLocked. For use by callers not holding fsyncStateMutex.
      */
     bool fsyncLocked() {
-        stdx::unique_lock<Latch> lkFsyncLocked(_fsyncLockedMutex);
+        stdx::unique_lock<stdx::mutex> lkFsyncLocked(_fsyncLockedMutex);
         return _fsyncLocked;
     }
 
@@ -220,7 +220,7 @@ public:
      * For callers not already holding 'fsyncStateMutex'.
      */
     int64_t getLockCount() {
-        stdx::unique_lock<Latch> lk(fsyncStateMutex);
+        stdx::unique_lock<stdx::mutex> lk(fsyncStateMutex);
         return getLockCount_inLock();
     }
 
@@ -232,7 +232,7 @@ public:
     }
 
     void releaseLock() {
-        stdx::unique_lock<Latch> lk(fsyncStateMutex);
+        stdx::unique_lock<stdx::mutex> lk(fsyncStateMutex);
         releaseLock_inLock(lk);
     }
 
@@ -240,13 +240,13 @@ public:
      * Returns false if the fsync lock was recursively locked. Returns true if the fysnc lock is
      * released.
      */
-    bool releaseLock_inLock(stdx::unique_lock<Latch>& lk) {
+    bool releaseLock_inLock(stdx::unique_lock<stdx::mutex>& lk) {
         invariant(_lockCount >= 1);
         _lockCount--;
 
         if (_lockCount == 0) {
             {
-                stdx::unique_lock<Latch> lkFsyncLocked(_fsyncLockedMutex);
+                stdx::unique_lock<stdx::mutex> lkFsyncLocked(_fsyncLockedMutex);
                 _fsyncLocked = false;
             }
             releaseFsyncLockSyncCV.notify_one();
@@ -270,11 +270,11 @@ public:
 
 private:
     void acquireLock() {
-        stdx::unique_lock<Latch> lk(fsyncStateMutex);
+        stdx::unique_lock<stdx::mutex> lk(fsyncStateMutex);
         _lockCount++;
 
         if (_lockCount == 1) {
-            stdx::unique_lock<Latch> lkFsyncLocked(_fsyncLockedMutex);
+            stdx::unique_lock<stdx::mutex> lkFsyncLocked(_fsyncLockedMutex);
             _fsyncLocked = true;
         }
     }
@@ -394,7 +394,7 @@ bool FSyncCore::runFsyncUnlockCommand(OperationContext* opCtx,
 
         Lock::ExclusiveLock lk(opCtx, fsyncSingleCommandExclusionMutex);
 
-        stdx::unique_lock<Latch> stateLock(fsyncStateMutex);
+        stdx::unique_lock<stdx::mutex> stateLock(fsyncStateMutex);
 
         auto lockCount = getLockCount_inLock();
 
@@ -423,7 +423,7 @@ bool FSyncCore::runFsyncUnlockCommand(OperationContext* opCtx,
 
 }  // namespace
 
-void FSyncLockThread::shutdown(stdx::unique_lock<Latch>& stateLock) {
+void FSyncLockThread::shutdown(stdx::unique_lock<stdx::mutex>& stateLock) {
     if (fsyncCore.getLockCount_inLock() > 0) {
         LOGV2_WARNING(20469, "Interrupting fsync because the server is shutting down");
         while (!fsyncCore.releaseLock_inLock(stateLock))
@@ -447,7 +447,7 @@ void FSyncLockThread::run() {
     stdx::lock_guard<stdx::mutex> writerLk(oplogWriterLockedFsync);
     _waitUntilLastAppliedCatchupLastWritten();
     stdx::lock_guard<stdx::mutex> applierLk(oplogApplierLockedFsync);
-    stdx::unique_lock<Latch> stateLock(fsyncStateMutex);
+    stdx::unique_lock<stdx::mutex> stateLock(fsyncStateMutex);
 
     invariant(fsyncCore.getLockCount_inLock() == 1);
 

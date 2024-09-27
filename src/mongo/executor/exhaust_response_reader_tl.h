@@ -35,7 +35,6 @@
 #include "mongo/db/baton.h"
 #include "mongo/executor/connection_pool.h"
 #include "mongo/executor/network_interface.h"
-#include "mongo/platform/mutex.h"
 #include "mongo/transport/transport_layer.h"
 #include "mongo/util/cancellation.h"
 #include "mongo/util/future.h"

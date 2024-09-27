@@ -32,7 +32,7 @@
 #include <vector>
 
 #include "mongo/base/status.h"
-#include "mongo/platform/mutex.h"
+#include "mongo/stdx/mutex.h"
 #include "mongo/util/functional.h"
 #include "mongo/util/hierarchical_acquisition.h"
 

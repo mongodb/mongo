@@ -74,7 +74,7 @@ void DefaultPrimaryOnlyServiceInstance::interrupt(Status status) noexcept {
                 "reason"_attr = redact(status));
 
     // Resolve any unresolved promises to avoid hanging.
-    stdx::lock_guard<Latch> lg(_mutex);
+    stdx::lock_guard<stdx::mutex> lg(_mutex);
     if (!_completionPromise.getFuture().isReady()) {
         _completionPromise.setError(status);
     }
@@ -119,7 +119,7 @@ SemiFuture<void> DefaultPrimaryOnlyServiceInstance::run(
                 ex.addContext(str::stream()
                               << "Failed to remove state document from " << getInstanceName());
 
-                stdx::lock_guard<Latch> lg(_mutex);
+                stdx::lock_guard<stdx::mutex> lg(_mutex);
                 if (!_completionPromise.getFuture().isReady()) {
                     _completionPromise.setError(ex.toStatus());
                 }
@@ -127,7 +127,7 @@ SemiFuture<void> DefaultPrimaryOnlyServiceInstance::run(
                 throw;
             }
 
-            stdx::lock_guard<Latch> lg(_mutex);
+            stdx::lock_guard<stdx::mutex> lg(_mutex);
             if (!_completionPromise.getFuture().isReady()) {
                 _completionPromise.emplaceValue();
             }

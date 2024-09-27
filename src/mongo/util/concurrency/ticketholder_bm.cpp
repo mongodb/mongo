@@ -35,8 +35,8 @@
 #include "mongo/db/admission/execution_admission_context.h"
 #include "mongo/db/client.h"
 #include "mongo/db/service_context.h"
-#include "mongo/platform/mutex.h"
 #include "mongo/stdx/condition_variable.h"
+#include "mongo/stdx/mutex.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/concurrency/admission_context.h"
 #include "mongo/util/concurrency/priority_ticketholder.h"
@@ -86,7 +86,7 @@ public:
 };
 
 
-static Mutex isReadyMutex;
+static stdx::mutex isReadyMutex;
 static stdx::condition_variable isReadyCv;
 static bool isReady = false;
 

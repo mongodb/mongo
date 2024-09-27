@@ -33,7 +33,6 @@
 #include "mongo/base/init.h"
 #include "mongo/config.h"
 #include "mongo/logv2/log.h"
-#include "mongo/platform/mutex.h"
 #include "mongo/stdx/mutex.h"
 #include "mongo/util/net/ssl_manager.h"
 #include "mongo/util/net/ssl_options.h"
@@ -121,7 +120,7 @@ private:
     class ThreadIDManager {
     public:
         unsigned long reserveID() {
-            stdx::unique_lock<Latch> lock(_idMutex);
+            stdx::unique_lock<stdx::mutex> lock(_idMutex);
             if (!_idLast.empty()) {
                 unsigned long ret = _idLast.top();
                 _idLast.pop();
@@ -131,7 +130,7 @@ private:
         }
 
         void releaseID(unsigned long id) {
-            stdx::unique_lock<Latch> lock(_idMutex);
+            stdx::unique_lock<stdx::mutex> lock(_idMutex);
             _idLast.push(id);
         }
 

@@ -66,7 +66,7 @@ BSONObj FLEStatusSection::generateSection(OperationContext* opCtx,
     {
         CompactStats temp;
         {
-            stdx::lock_guard<Mutex> lock(_compactMutex);
+            stdx::lock_guard<stdx::mutex> lock(_compactMutex);
             temp = _compactStats;
         }
         auto sub = BSONObjBuilder(builder.subobjStart("compactStats"));
@@ -75,7 +75,7 @@ BSONObj FLEStatusSection::generateSection(OperationContext* opCtx,
     {
         CleanupStats temp;
         {
-            stdx::lock_guard<Mutex> lock(_cleanupMutex);
+            stdx::lock_guard<stdx::mutex> lock(_cleanupMutex);
             temp = _cleanupStats;
         }
         auto sub = BSONObjBuilder(builder.subobjStart("cleanupStats"));

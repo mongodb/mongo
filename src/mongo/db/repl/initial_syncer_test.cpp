@@ -102,9 +102,9 @@
 #include "mongo/logv2/log.h"
 #include "mongo/logv2/log_attr.h"
 #include "mongo/logv2/log_component.h"
-#include "mongo/platform/mutex.h"
 #include "mongo/rpc/metadata/oplog_query_metadata.h"
 #include "mongo/rpc/metadata/repl_set_metadata.h"
+#include "mongo/stdx/mutex.h"
 #include "mongo/stdx/type_traits.h"
 #include "mongo/unittest/assert.h"
 #include "mongo/unittest/bson_test_util.h"
@@ -156,9 +156,9 @@ using executor::NetworkInterfaceMock;
 using executor::RemoteCommandRequest;
 using executor::RemoteCommandResponse;
 
-using LockGuard = stdx::lock_guard<Latch>;
+using LockGuard = stdx::lock_guard<stdx::mutex>;
 using NetworkGuard = executor::NetworkInterfaceMock::InNetworkGuard;
-using UniqueLock = stdx::unique_lock<Latch>;
+using UniqueLock = stdx::unique_lock<stdx::mutex>;
 
 const BSONObj kListDatabasesFailPointData = BSON("cloner"
                                                  << "AllDatabaseCloner"

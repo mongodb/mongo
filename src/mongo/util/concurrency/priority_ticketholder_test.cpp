@@ -38,7 +38,7 @@
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/logv2/log.h"
-#include "mongo/platform/mutex.h"
+#include "mongo/stdx/mutex.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/unittest/assert.h"
 #include "mongo/unittest/barrier.h"
@@ -209,7 +209,7 @@ TEST_F(PriorityTicketHolderTest, OnlyLowPriorityOps) {
 
     // This mutex is to avoid data race conditions between checking for the ticket state and setting
     // it in the worker threads.
-    Mutex ticketCheckMutex;
+    stdx::mutex ticketCheckMutex;
 
     {
         // Allocate the only available ticket. Priority is irrelevant when there are tickets
@@ -589,7 +589,7 @@ TEST_F(PriorityTicketHolderTest, LowPriorityExpedited) {
     std::vector<stdx::thread> threads;
     MockAdmission lowPriorityAdmission(svcCtx, AdmissionContext::Priority::kLow);
     // This mutex protects the lowPriorityAdmission ticket
-    Mutex ticketMutex;
+    stdx::mutex ticketMutex;
 
     threads.emplace_back([&]() {
         auto ticket =

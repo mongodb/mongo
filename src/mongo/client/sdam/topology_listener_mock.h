@@ -36,7 +36,7 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/client/sdam/sdam_datatypes.h"
 #include "mongo/client/sdam/topology_listener.h"
-#include "mongo/platform/mutex.h"
+#include "mongo/stdx/mutex.h"
 #include "mongo/stdx/unordered_map.h"
 #include "mongo/util/concurrency/with_lock.h"
 #include "mongo/util/net/hostandport.h"
@@ -82,7 +82,7 @@ public:
     std::vector<StatusWith<HelloRTT>> getPingResponse(const HostAndPort& hostAndPort);
 
 private:
-    Mutex _mutex;
+    stdx::mutex _mutex;
     stdx::unordered_map<HostAndPort, std::vector<Status>> _serverHelloReplies;
     stdx::unordered_map<HostAndPort, std::vector<StatusWith<HelloRTT>>> _serverPingRTTs;
 };

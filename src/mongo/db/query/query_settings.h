@@ -43,7 +43,7 @@
 #include "mongo/db/query/index_entry.h"
 #include "mongo/db/query/plan_cache/plan_cache.h"
 #include "mongo/platform/atomic.h"
-#include "mongo/platform/mutex.h"
+#include "mongo/stdx/mutex.h"
 #include "mongo/stdx/unordered_map.h"
 #include "mongo/stdx/unordered_set.h"
 

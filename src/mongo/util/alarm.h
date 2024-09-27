@@ -40,7 +40,7 @@
 #include <boost/optional/optional.hpp>
 
 #include "mongo/base/status.h"
-#include "mongo/platform/mutex.h"
+#include "mongo/stdx/mutex.h"
 #include "mongo/util/clock_source.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/functional.h"
@@ -196,7 +196,7 @@ private:
     using AlarmMap = std::multimap<Date_t, AlarmData>;
     using AlarmMapIt = AlarmMap::iterator;
 
-    void _clearAllAlarmsImpl(stdx::unique_lock<Latch>& lk);
+    void _clearAllAlarmsImpl(stdx::unique_lock<stdx::mutex>& lk);
 
     stdx::mutex _mutex;
     bool _shutdown = false;

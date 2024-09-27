@@ -52,7 +52,6 @@
 #include "mongo/db/operation_id.h"
 #include "mongo/db/repl/optime.h"
 #include "mongo/executor/task_executor.h"
-#include "mongo/platform/mutex.h"
 #include "mongo/stdx/condition_variable.h"
 #include "mongo/stdx/mutex.h"
 #include "mongo/util/assert_util.h"
@@ -561,7 +560,7 @@ public:
      * entry in "config.system.indexBuilds" collection should take this lock in exclusive mode.
      *
      * Resource mutex will be initialized only for 2 phase index protocol.
-     * Mutex lock order:
+     * stdx::mutex lock order:
      * commitQuorumLock -> mutex.
      */
     boost::optional<Lock::ResourceMutex> commitQuorumLock;

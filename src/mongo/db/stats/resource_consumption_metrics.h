@@ -42,7 +42,7 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/operation_cpu_timer.h"
 #include "mongo/db/service_context.h"
-#include "mongo/platform/mutex.h"
+#include "mongo/stdx/mutex.h"
 #include "mongo/util/assert_util_core.h"
 #include "mongo/util/duration.h"
 

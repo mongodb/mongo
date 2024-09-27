@@ -32,7 +32,7 @@
 #include <random>
 
 #include "mongo/platform/atomic_word.h"
-#include "mongo/platform/mutex.h"
+#include "mongo/stdx/mutex.h"
 #include "mongo/util/duration.h"
 
 namespace mongo::workload_simulation {

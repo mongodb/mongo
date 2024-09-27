@@ -100,7 +100,7 @@ void TopologyEventsPublisher::onServerHandshakeCompleteEvent(HelloRTT duration,
                                                              const HostAndPort& address,
                                                              const BSONObj reply) {
     {
-        stdx::lock_guard<Mutex> lock(_eventQueueMutex);
+        stdx::lock_guard<stdx::mutex> lock(_eventQueueMutex);
         EventPtr event = std::make_unique<Event>();
         event->type = EventType::HANDSHAKE_COMPLETE;
         event->duration = duration;
@@ -115,7 +115,7 @@ void TopologyEventsPublisher::onServerHandshakeFailedEvent(const HostAndPort& ad
                                                            const Status& status,
                                                            const BSONObj reply) {
     {
-        stdx::lock_guard<Mutex> lock(_eventQueueMutex);
+        stdx::lock_guard<stdx::mutex> lock(_eventQueueMutex);
         EventPtr event = std::make_unique<Event>();
         event->type = EventType::HANDSHAKE_FAILURE;
         event->hostAndPort = address;

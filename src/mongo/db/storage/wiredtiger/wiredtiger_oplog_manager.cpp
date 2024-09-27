@@ -50,7 +50,7 @@
 #include "mongo/logv2/log_attr.h"
 #include "mongo/logv2/log_component.h"
 #include "mongo/platform/compiler.h"
-#include "mongo/platform/mutex.h"
+#include "mongo/stdx/mutex.h"
 #include "mongo/util/assert_util_core.h"
 #include "mongo/util/concurrency/idle_thread_block.h"
 #include "mongo/util/duration.h"
@@ -98,7 +98,7 @@ void WiredTigerOplogManager::startVisibilityThread(OperationContext* opCtx,
 
     // Need to obtain the mutex before starting the thread, as otherwise it may race ahead
     // see _shuttingDown as true and quit prematurely.
-    stdx::lock_guard<Latch> lk(_oplogVisibilityStateMutex);
+    stdx::lock_guard<stdx::mutex> lk(_oplogVisibilityStateMutex);
     _oplogVisibilityThread = stdx::thread(
         &WiredTigerOplogManager::_updateOplogVisibilityLoop,
         this,
@@ -122,7 +122,7 @@ void WiredTigerOplogManager::haltVisibilityThread() {
     }
 
     {
-        stdx::lock_guard<Latch> lk(_oplogVisibilityStateMutex);
+        stdx::lock_guard<stdx::mutex> lk(_oplogVisibilityStateMutex);
 
         // In between when we checked '_isRunning' above and when we acquired the mutex, it's
         // possible another thread modified '_isRunning', so check it again.
@@ -141,7 +141,7 @@ void WiredTigerOplogManager::haltVisibilityThread() {
 }
 
 void WiredTigerOplogManager::triggerOplogVisibilityUpdate() {
-    stdx::lock_guard<Latch> lk(_oplogVisibilityStateMutex);
+    stdx::lock_guard<stdx::mutex> lk(_oplogVisibilityStateMutex);
     if (!_triggerOplogVisibilityUpdate) {
         _triggerOplogVisibilityUpdate = true;
         _oplogVisibilityThreadCV.notify_one();
@@ -172,7 +172,7 @@ void WiredTigerOplogManager::waitForAllEarlierOplogWritesToBeVisible(
     // Close transaction before we wait.
     shard_role_details::getRecoveryUnit(opCtx)->abandonSnapshot();
 
-    stdx::unique_lock<Latch> lk(_oplogVisibilityStateMutex);
+    stdx::unique_lock<stdx::mutex> lk(_oplogVisibilityStateMutex);
 
     // Prevent any scheduled oplog visibility updates from being delayed for batching and blocking
     // this wait excessively.
@@ -223,7 +223,7 @@ void WiredTigerOplogManager::_updateOplogVisibilityLoop(WiredTigerSessionCache* 
     // consequently missing data that was not there yet when scanning went passed up to a later
     // timestamp.
     while (true) {
-        stdx::unique_lock<Latch> lk(_oplogVisibilityStateMutex);
+        stdx::unique_lock<stdx::mutex> lk(_oplogVisibilityStateMutex);
         {
             MONGO_IDLE_THREAD_BLOCK;
             _oplogVisibilityThreadCV.wait(
@@ -298,7 +298,7 @@ std::uint64_t WiredTigerOplogManager::getOplogReadTimestamp() const {
 }
 
 void WiredTigerOplogManager::setOplogReadTimestamp(Timestamp ts) {
-    stdx::lock_guard<Latch> lk(_oplogVisibilityStateMutex);
+    stdx::lock_guard<stdx::mutex> lk(_oplogVisibilityStateMutex);
     _setOplogReadTimestamp(lk, ts.asULL());
 }
 

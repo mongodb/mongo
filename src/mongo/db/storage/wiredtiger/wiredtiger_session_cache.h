@@ -41,6 +41,7 @@
 #include "mongo/db/storage/wiredtiger/wiredtiger_snapshot_manager.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/stdx/condition_variable.h"
+#include "mongo/stdx/mutex.h"
 #include "mongo/util/clock_source.h"
 #include "mongo/util/time_support.h"
 

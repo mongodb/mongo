@@ -58,8 +58,8 @@
 #include "mongo/db/storage/journal_listener.h"
 #include "mongo/db/storage/snapshot_manager.h"
 #include "mongo/executor/task_executor.h"
-#include "mongo/platform/mutex.h"
 #include "mongo/stdx/condition_variable.h"
+#include "mongo/stdx/mutex.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/util/concurrency/thread_pool.h"
 #include "mongo/util/duration.h"
@@ -158,7 +158,7 @@ private:
     /**
      * Stops data replication and returns with 'lock' locked.
      */
-    void _stopDataReplication_inlock(OperationContext* opCtx, stdx::unique_lock<Latch>& lock);
+    void _stopDataReplication_inlock(OperationContext* opCtx, stdx::unique_lock<stdx::mutex>& lock);
 
     /**
      * Called when the instance transitions to primary in order to notify a potentially sharded host

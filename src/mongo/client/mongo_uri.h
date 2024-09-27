@@ -46,7 +46,6 @@
 #include "mongo/bson/util/builder.h"
 #include "mongo/bson/util/builder_fwd.h"
 #include "mongo/client/connection_string.h"
-#include "mongo/platform/mutex.h"
 #include "mongo/transport/transport_layer.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/net/hostandport.h"

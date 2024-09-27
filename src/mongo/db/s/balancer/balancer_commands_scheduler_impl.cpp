@@ -132,7 +132,7 @@ BalancerCommandsSchedulerImpl::~BalancerCommandsSchedulerImpl() {
 
 void BalancerCommandsSchedulerImpl::start(OperationContext* opCtx) {
     LOGV2(5847200, "Balancer command scheduler start requested");
-    stdx::lock_guard<Latch> lg(_mutex);
+    stdx::lock_guard<stdx::mutex> lg(_mutex);
     invariant(!_workerThreadHandle.joinable());
     if (!_executor) {
         _executor = std::make_unique<executor::ScopedTaskExecutor>(
@@ -156,7 +156,7 @@ void BalancerCommandsSchedulerImpl::start(OperationContext* opCtx) {
 void BalancerCommandsSchedulerImpl::stop() {
     LOGV2(5847201, "Balancer command scheduler stop requested");
     {
-        stdx::lock_guard<Latch> lg(_mutex);
+        stdx::lock_guard<stdx::mutex> lg(_mutex);
         if (_state == SchedulerState::Stopped) {
             return;
         }
@@ -292,7 +292,7 @@ Future<executor::RemoteCommandResponse> BalancerCommandsSchedulerImpl::_buildAnd
 
     RequestData pendingRequest(newRequestId, std::move(commandInfo));
 
-    stdx::unique_lock<Latch> ul(_mutex);
+    stdx::unique_lock<stdx::mutex> ul(_mutex);
     _stateUpdatedCV.wait(ul, [this] { return _state != SchedulerState::Recovering; });
     auto outcomeFuture = pendingRequest.getOutcomeFuture();
     _enqueueRequest(ul, std::move(pendingRequest));
@@ -373,7 +373,7 @@ void BalancerCommandsSchedulerImpl::_applySubmissionResult(
 void BalancerCommandsSchedulerImpl::_applyCommandResponse(
     UUID requestId, const executor::RemoteCommandResponse& response) {
     {
-        stdx::lock_guard<Latch> lg(_mutex);
+        stdx::lock_guard<stdx::mutex> lg(_mutex);
         tassert(8245207, "Scheduler is stopped", _state != SchedulerState::Stopped);
         auto requestIt = _requests.find(requestId);
         tassert(8245208, "Request ID is already in use", requestIt != _requests.end());
@@ -396,7 +396,7 @@ void BalancerCommandsSchedulerImpl::_applyCommandResponse(
 void BalancerCommandsSchedulerImpl::_workerThread() {
     ON_BLOCK_EXIT([this] {
         LOGV2(5847208, "Leaving balancer command scheduler thread");
-        stdx::lock_guard<Latch> lg(_mutex);
+        stdx::lock_guard<stdx::mutex> lg(_mutex);
         _state = SchedulerState::Stopped;
         _stateUpdatedCV.notify_all();
     });
@@ -413,7 +413,7 @@ void BalancerCommandsSchedulerImpl::_workerThread() {
 
         // 1. Check the internal state and plan for the actions to be taken ont this round.
         {
-            stdx::unique_lock<Latch> ul(_mutex);
+            stdx::unique_lock<stdx::mutex> ul(_mutex);
             tassert(8245209, "Scheduler is stopped", _state != SchedulerState::Stopped);
             _stateUpdatedCV.wait(ul, [this] {
                 return ((!_unsubmittedRequestIds.empty() &&
@@ -460,7 +460,7 @@ void BalancerCommandsSchedulerImpl::_workerThread() {
 
         // 3. Process the outcome of each submission.
         if (!submissionResults.empty()) {
-            stdx::lock_guard<Latch> lg(_mutex);
+            stdx::lock_guard<stdx::mutex> lg(_mutex);
             for (auto& submissionResult : submissionResults) {
                 _applySubmissionResult(lg, std::move(submissionResult));
             }
@@ -471,7 +471,7 @@ void BalancerCommandsSchedulerImpl::_workerThread() {
     (*_executor)->join();
 
     {
-        stdx::unique_lock<Latch> ul(_mutex);
+        stdx::unique_lock<stdx::mutex> ul(_mutex);
         _requests.clear();
         _recentlyCompletedRequestIds.clear();
         _executor.reset();

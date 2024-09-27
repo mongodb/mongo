@@ -57,7 +57,7 @@ const char kHostFieldName[] = "host";
 
 class CmdDelayMessagesFrom final : public BridgeCommand {
 public:
-    Status run(const BSONObj& cmdObj, Mutex* settingsMutex, HostSettingsMap* settings) final {
+    Status run(const BSONObj& cmdObj, stdx::mutex* settingsMutex, HostSettingsMap* settings) final {
         invariant(settingsMutex);
         invariant(settings);
 
@@ -78,7 +78,7 @@ public:
 
         HostAndPort host(hostName);
         {
-            stdx::lock_guard<Latch> lk(*settingsMutex);
+            stdx::lock_guard<stdx::mutex> lk(*settingsMutex);
             auto& hostSettings = (*settings)[host];
             hostSettings.state = HostSettings::State::kForward;
             hostSettings.delay = Milliseconds{newDelay};
@@ -89,7 +89,7 @@ public:
 
 class CmdAcceptConnectionsFrom final : public BridgeCommand {
 public:
-    Status run(const BSONObj& cmdObj, Mutex* settingsMutex, HostSettingsMap* settings) final {
+    Status run(const BSONObj& cmdObj, stdx::mutex* settingsMutex, HostSettingsMap* settings) final {
         invariant(settingsMutex);
         invariant(settings);
 
@@ -101,7 +101,7 @@ public:
 
         HostAndPort host(hostName);
         {
-            stdx::lock_guard<Latch> lk(*settingsMutex);
+            stdx::lock_guard<stdx::mutex> lk(*settingsMutex);
             auto& hostSettings = (*settings)[host];
             hostSettings.state = HostSettings::State::kForward;
         }
@@ -111,7 +111,7 @@ public:
 
 class CmdRejectConnectionsFrom final : public BridgeCommand {
 public:
-    Status run(const BSONObj& cmdObj, Mutex* settingsMutex, HostSettingsMap* settings) final {
+    Status run(const BSONObj& cmdObj, stdx::mutex* settingsMutex, HostSettingsMap* settings) final {
         invariant(settingsMutex);
         invariant(settings);
 
@@ -123,7 +123,7 @@ public:
 
         HostAndPort host(hostName);
         {
-            stdx::lock_guard<Latch> lk(*settingsMutex);
+            stdx::lock_guard<stdx::mutex> lk(*settingsMutex);
             auto& hostSettings = (*settings)[host];
             hostSettings.state = HostSettings::State::kHangUp;
         }
@@ -133,7 +133,7 @@ public:
 
 class CmdDiscardMessagesFrom final : public BridgeCommand {
 public:
-    Status run(const BSONObj& cmdObj, Mutex* settingsMutex, HostSettingsMap* settings) final {
+    Status run(const BSONObj& cmdObj, stdx::mutex* settingsMutex, HostSettingsMap* settings) final {
         invariant(settingsMutex);
         invariant(settings);
 
@@ -160,7 +160,7 @@ public:
 
         HostAndPort host(hostName);
         {
-            stdx::lock_guard<Latch> lk(*settingsMutex);
+            stdx::lock_guard<stdx::mutex> lk(*settingsMutex);
             auto& hostSettings = (*settings)[host];
             hostSettings.state = HostSettings::State::kDiscard;
             hostSettings.loss = newLoss;

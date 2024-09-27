@@ -67,8 +67,8 @@
 #include "mongo/executor/scoped_task_executor.h"
 #include "mongo/executor/task_executor.h"
 #include "mongo/platform/atomic_word.h"
-#include "mongo/platform/mutex.h"
 #include "mongo/stdx/condition_variable.h"
+#include "mongo/stdx/mutex.h"
 #include "mongo/util/concurrency/thread_pool.h"
 #include "mongo/util/concurrency/with_lock.h"
 #include "mongo/util/duration.h"
@@ -557,7 +557,8 @@ private:
      * Passes 'lock' through to completion guard.
      */
     void _checkApplierProgressAndScheduleGetNextApplierBatch_inlock(
-        const stdx::lock_guard<Latch>& lock, std::shared_ptr<OnCompletionGuard> onCompletionGuard);
+        const stdx::lock_guard<stdx::mutex>& lock,
+        std::shared_ptr<OnCompletionGuard> onCompletionGuard);
 
     /**
      * Schedules a rollback checker to get the rollback ID after data cloning or applying. This
@@ -567,7 +568,8 @@ private:
      * Passes 'lock' through to completion guard.
      */
     void _scheduleRollbackCheckerCheckForRollback_inlock(
-        const stdx::lock_guard<Latch>& lock, std::shared_ptr<OnCompletionGuard> onCompletionGuard);
+        const stdx::lock_guard<stdx::mutex>& lock,
+        std::shared_ptr<OnCompletionGuard> onCompletionGuard);
 
     /**
      * Check if a status is one which means there's a retriable error and we should retry the

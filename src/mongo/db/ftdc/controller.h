@@ -42,8 +42,8 @@
 #include "mongo/db/ftdc/file_manager.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/platform/atomic.h"
-#include "mongo/platform/mutex.h"
 #include "mongo/stdx/condition_variable.h"
+#include "mongo/stdx/mutex.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/util/duration.h"
 

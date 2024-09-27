@@ -35,7 +35,6 @@
 
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/service_context.h"
-#include "mongo/platform/mutex.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/concurrency/admission_context.h"
 #include "mongo/util/concurrency/ticket_pool.h"

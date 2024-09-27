@@ -63,7 +63,7 @@ QueryAnalysisSampleTracker& QueryAnalysisSampleTracker::get(ServiceContext* serv
 
 void QueryAnalysisSampleTracker::refreshConfigurations(
     const std::vector<CollectionQueryAnalyzerConfiguration>& configurations) {
-    stdx::lock_guard<Latch> lk(_mutex);
+    stdx::lock_guard<stdx::mutex> lk(_mutex);
     std::map<NamespaceString, std::shared_ptr<QueryAnalysisSampleTracker::CollectionSampleTracker>>
         newTrackers;
 
@@ -93,7 +93,7 @@ void QueryAnalysisSampleTracker::incrementReads(OperationContext* opCtx,
                                                 const NamespaceString& nss,
                                                 const boost::optional<UUID>& collUuid,
                                                 boost::optional<int64_t> size) {
-    stdx::lock_guard<Latch> lk(_mutex);
+    stdx::lock_guard<stdx::mutex> lk(_mutex);
     auto counters = _getOrCreateCollectionSampleTracker(lk, opCtx, nss, collUuid);
     counters->incrementReads(size);
     ++_totalSampledReadsCount;
@@ -106,7 +106,7 @@ void QueryAnalysisSampleTracker::incrementWrites(OperationContext* opCtx,
                                                  const NamespaceString& nss,
                                                  const boost::optional<UUID>& collUuid,
                                                  boost::optional<int64_t> size) {
-    stdx::lock_guard<Latch> lk(_mutex);
+    stdx::lock_guard<stdx::mutex> lk(_mutex);
     auto counters = _getOrCreateCollectionSampleTracker(lk, opCtx, nss, collUuid);
     counters->incrementWrites(size);
     ++_totalSampledWritesCount;
@@ -138,7 +138,7 @@ QueryAnalysisSampleTracker::_getOrCreateCollectionSampleTracker(
 }
 
 void QueryAnalysisSampleTracker::reportForCurrentOp(std::vector<BSONObj>* ops) const {
-    stdx::lock_guard<Latch> lk(_mutex);
+    stdx::lock_guard<stdx::mutex> lk(_mutex);
     for (auto const& it : _trackers) {
         ops->push_back(it.second->reportForCurrentOp());
     }
@@ -164,7 +164,7 @@ BSONObj QueryAnalysisSampleTracker::CollectionSampleTracker::reportForCurrentOp(
 }
 
 BSONObj QueryAnalysisSampleTracker::reportForServerStatus() const {
-    stdx::lock_guard<Latch> lk(_mutex);
+    stdx::lock_guard<stdx::mutex> lk(_mutex);
 
     QueryAnalysisServerStatus res;
     res.setActiveCollections(static_cast<int64_t>(_trackers.size()));
@@ -180,7 +180,7 @@ BSONObj QueryAnalysisSampleTracker::reportForServerStatus() const {
 
 bool QueryAnalysisSampleTracker::isSamplingActive(const NamespaceString& nss,
                                                   const UUID& collUuid) {
-    stdx::lock_guard<Latch> lk(_mutex);
+    stdx::lock_guard<stdx::mutex> lk(_mutex);
 
     auto it = _trackers.find(nss);
     if (it == _trackers.end()) {

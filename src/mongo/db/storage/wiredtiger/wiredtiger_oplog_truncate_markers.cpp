@@ -119,12 +119,12 @@ WiredTigerOplogTruncateMarkers::WiredTigerOplogTruncateMarkers(
                          CollectionTruncateMarkers::MarkersCreationMethod::Sampling) {}
 
 bool WiredTigerOplogTruncateMarkers::isDead() {
-    stdx::lock_guard<Latch> lk(_reclaimMutex);
+    stdx::lock_guard<stdx::mutex> lk(_reclaimMutex);
     return _isDead;
 }
 
 void WiredTigerOplogTruncateMarkers::kill() {
-    stdx::lock_guard<Latch> lk(_reclaimMutex);
+    stdx::lock_guard<stdx::mutex> lk(_reclaimMutex);
     _isDead = true;
     _reclaimCv.notify_one();
 }
@@ -183,7 +183,7 @@ void WiredTigerOplogTruncateMarkers::getOplogTruncateMarkersStats(BSONObjBuilder
 
 bool WiredTigerOplogTruncateMarkers::awaitHasExcessMarkersOrDead(OperationContext* opCtx) {
     // Wait until kill() is called or there are too many collection markers.
-    stdx::unique_lock<Latch> lock(_reclaimMutex);
+    stdx::unique_lock<stdx::mutex> lock(_reclaimMutex);
     MONGO_IDLE_THREAD_BLOCK;
     auto isWaitConditionSatisfied = opCtx->waitForConditionOrInterruptFor(
         _reclaimCv, lock, Seconds(gOplogTruncationCheckPeriodSeconds), [this, opCtx] {

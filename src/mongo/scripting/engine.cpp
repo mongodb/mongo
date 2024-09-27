@@ -59,9 +59,9 @@
 #include "mongo/logv2/log_component.h"
 #include "mongo/logv2/redaction.h"
 #include "mongo/platform/compiler.h"
-#include "mongo/platform/mutex.h"
 #include "mongo/scripting/dbdirectclient_factory.h"
 #include "mongo/scripting/engine.h"
+#include "mongo/stdx/mutex.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/util/ctype.h"
 #include "mongo/util/decorable.h"
@@ -397,7 +397,7 @@ class ScopeCache {
 public:
     using PoolName = std::tuple<DatabaseName, string>;
     void release(const PoolName& poolName, const std::shared_ptr<Scope>& scope) {
-        stdx::lock_guard<Latch> lk(_mutex);
+        stdx::lock_guard<stdx::mutex> lk(_mutex);
 
         if (scope->hasOutOfMemoryException()) {
             // make some room
@@ -425,7 +425,7 @@ public:
     }
 
     std::shared_ptr<Scope> tryAcquire(OperationContext* opCtx, const PoolName& poolName) {
-        stdx::lock_guard<Latch> lk(_mutex);
+        stdx::lock_guard<stdx::mutex> lk(_mutex);
 
         for (Pools::iterator it = _pools.begin(); it != _pools.end(); ++it) {
             if (it->poolName == poolName) {
@@ -441,7 +441,7 @@ public:
     }
 
     void clear() {
-        stdx::lock_guard<Latch> lk(_mutex);
+        stdx::lock_guard<stdx::mutex> lk(_mutex);
 
         _pools.clear();
     }

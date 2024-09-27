@@ -517,7 +517,7 @@ void ShardingInitializationMongoD::initializeFromShardIdentity(
 
     hangDuringShardingInitialization.pauseWhileSet();
 
-    stdx::unique_lock<Latch> ul(_initSynchronizationMutex);
+    stdx::unique_lock<stdx::mutex> ul(_initSynchronizationMutex);
 
     if (shardingState->enabled()) {
         uassert(40371,

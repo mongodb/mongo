@@ -51,7 +51,7 @@
 #include "mongo/db/storage/key_format.h"
 #include "mongo/db/storage/record_data.h"
 #include "mongo/db/storage/record_store.h"
-#include "mongo/platform/mutex.h"
+#include "mongo/stdx/mutex.h"
 #include "mongo/util/assert_util_core.h"
 #include "mongo/util/concurrency/with_lock.h"
 #include "mongo/util/uuid.h"

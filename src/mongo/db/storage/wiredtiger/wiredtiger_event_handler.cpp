@@ -35,7 +35,7 @@ namespace mongo {
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kWiredTiger
 
 void WiredTigerEventHandler::setWtConnReady(WT_CONNECTION* conn) {
-    stdx::unique_lock<mongo::Mutex> lock(_mutex);
+    stdx::unique_lock<stdx::mutex> lock(_mutex);
     _wtConn = conn;
     if (_activeReaders == 0 || conn) {
         return;
@@ -47,7 +47,7 @@ void WiredTigerEventHandler::setWtConnReady(WT_CONNECTION* conn) {
 }
 
 WT_CONNECTION* WiredTigerEventHandler::getStatsCollectionPermit() {
-    stdx::lock_guard<mongo::Mutex> lock(_mutex);
+    stdx::lock_guard<stdx::mutex> lock(_mutex);
     if (_wtConn) {
         _activeReaders++;
         return _wtConn;
@@ -56,7 +56,7 @@ WT_CONNECTION* WiredTigerEventHandler::getStatsCollectionPermit() {
 }
 
 void WiredTigerEventHandler::releaseStatsCollectionPermit() {
-    stdx::unique_lock<mongo::Mutex> lock(_mutex);
+    stdx::unique_lock<stdx::mutex> lock(_mutex);
     _activeReaders--;
     if (_activeReaders == 0 && !_wtConn) {
         _idleCondition.notify_all();

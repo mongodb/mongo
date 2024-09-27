@@ -192,7 +192,7 @@ public:
     }
 
     SemiFuture<BSONObj> runCommand(const DatabaseName& dbName, BSONObj cmd) const override {
-        stdx::unique_lock<Latch> ul(_mutex);
+        stdx::unique_lock<stdx::mutex> ul(_mutex);
         [&]() {
             StringData cmdName = cmd.firstElementFieldNameStringData();
             if (!(cmdName == AbortTransaction::kCommandName ||
@@ -274,7 +274,7 @@ public:
     }
 
     BSONObj getLastSentRequest() {
-        stdx::lock_guard<Latch> lg(_mutex);
+        stdx::lock_guard<stdx::mutex> lg(_mutex);
         if (_sentRequests.empty()) {
             return BSONObj();
         }
@@ -282,17 +282,17 @@ public:
     }
 
     const std::vector<BSONObj>& getSentRequests() {
-        stdx::lock_guard<Latch> lg(_mutex);
+        stdx::lock_guard<stdx::mutex> lg(_mutex);
         return _sentRequests;
     }
 
     void setNextCommandResponse(StatusWith<BSONObj> res) {
-        stdx::lock_guard<Latch> lg(_mutex);
+        stdx::lock_guard<stdx::mutex> lg(_mutex);
         _responses.push(res);
     }
 
     void setHangNextCommitOrAbortCommand(bool enable) {
-        stdx::lock_guard<Latch> lg(_mutex);
+        stdx::lock_guard<stdx::mutex> lg(_mutex);
         _hangNextCommitOrAbortCommand = enable;
 
         // Wake up any waiting threads.

@@ -49,9 +49,9 @@
 #include "mongo/db/shard_id.h"
 #include "mongo/executor/task_executor.h"
 #include "mongo/executor/task_executor_pool.h"
-#include "mongo/platform/mutex.h"
 #include "mongo/s/client/shard.h"
 #include "mongo/stdx/condition_variable.h"
+#include "mongo/stdx/mutex.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/concurrency/with_lock.h"
 #include "mongo/util/duration.h"
@@ -105,7 +105,7 @@ public:
         auto pf = makePromiseFuture<ReturnType>();
         auto taskCompletionPromise = std::make_shared<Promise<ReturnType>>(std::move(pf.promise));
         try {
-            stdx::unique_lock<Latch> ul(_mutex);
+            stdx::unique_lock<stdx::mutex> ul(_mutex);
             uassertStatusOK(_shutdownStatus);
 
             auto scheduledWorkHandle = uassertStatusOK(_executor->scheduleWorkAt(
@@ -153,7 +153,7 @@ public:
 
             return std::move(pf.future).tapAll(
                 [this, it = std::move(it)](StatusOrStatusWith<ReturnType> s) {
-                    stdx::lock_guard<Latch> lg(_mutex);
+                    stdx::lock_guard<stdx::mutex> lg(_mutex);
                     _activeHandles.erase(it);
                     _notifyAllTasksComplete(lg);
                 });
@@ -371,7 +371,7 @@ Future<GlobalResult> collect(std::vector<Future<IndividualResult>>&& futures,
     for (auto&& localFut : futures) {
         std::move(localFut)
             .then([sharedBlock](IndividualResult res) {
-                stdx::unique_lock<Latch> lk(sharedBlock->mutex);
+                stdx::unique_lock<stdx::mutex> lk(sharedBlock->mutex);
                 if (sharedBlock->shouldStopIteration == ShouldStopIteration::kNo &&
                     sharedBlock->status.isOK()) {
                     sharedBlock->shouldStopIteration =
@@ -379,14 +379,14 @@ Future<GlobalResult> collect(std::vector<Future<IndividualResult>>&& futures,
                 }
             })
             .onError([sharedBlock](Status s) {
-                stdx::unique_lock<Latch> lk(sharedBlock->mutex);
+                stdx::unique_lock<stdx::mutex> lk(sharedBlock->mutex);
                 if (sharedBlock->shouldStopIteration == ShouldStopIteration::kNo &&
                     sharedBlock->status.isOK()) {
                     sharedBlock->status = s;
                 }
             })
             .getAsync([sharedBlock](Status s) {
-                stdx::unique_lock<Latch> lk(sharedBlock->mutex);
+                stdx::unique_lock<stdx::mutex> lk(sharedBlock->mutex);
                 sharedBlock->numOutstandingResponses--;
                 if (sharedBlock->numOutstandingResponses == 0) {
                     // Unlock before emplacing the result in case any continuations do expensive

@@ -42,8 +42,8 @@
 #include "mongo/db/repl/replica_set_aware_service.h"
 #include "mongo/db/s/type_shard_identity.h"
 #include "mongo/db/service_context.h"
-#include "mongo/platform/mutex.h"
 #include "mongo/s/sharding_initialization.h"
+#include "mongo/stdx/mutex.h"
 
 namespace mongo {
 

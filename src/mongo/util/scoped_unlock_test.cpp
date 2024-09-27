@@ -33,7 +33,7 @@
 #include <string>
 
 #include "mongo/base/string_data.h"
-#include "mongo/platform/mutex.h"
+#include "mongo/stdx/mutex.h"
 #include "mongo/unittest/assert.h"
 #include "mongo/unittest/death_test.h"
 #include "mongo/unittest/framework.h"
@@ -41,7 +41,7 @@
 namespace mongo {
 namespace {
 TEST(ScopedUnlockTest, Relocked) {
-    Mutex mutex;
+    stdx::mutex mutex;
     stdx::unique_lock lk(mutex);
 
     { ScopedUnlock scopedUnlock(lk); }
@@ -50,8 +50,8 @@ TEST(ScopedUnlockTest, Relocked) {
 }
 
 TEST(ScopedUnlockTest, Unlocked) {
-    Mutex mutex;
-    stdx::unique_lock<Mutex> lk(mutex);
+    stdx::mutex mutex;
+    stdx::unique_lock<stdx::mutex> lk(mutex);
 
     ScopedUnlock scopedUnlock(lk);
 
@@ -59,8 +59,8 @@ TEST(ScopedUnlockTest, Unlocked) {
 }
 
 TEST(ScopedUnlockTest, Dismissed) {
-    Mutex mutex;
-    stdx::unique_lock<Mutex> lk(mutex);
+    stdx::mutex mutex;
+    stdx::unique_lock<stdx::mutex> lk(mutex);
 
     {
         ScopedUnlock scopedUnlock(lk);
@@ -73,8 +73,8 @@ TEST(ScopedUnlockTest, Dismissed) {
 DEATH_TEST(ScopedUnlockTest,
            InitUnlocked,
            "Locks in ScopedUnlock must be locked on initialization.") {
-    Mutex mutex;
-    stdx::unique_lock<Mutex> lk(mutex);
+    stdx::mutex mutex;
+    stdx::unique_lock<stdx::mutex> lk(mutex);
     lk.unlock();
 
     ScopedUnlock scopedUnlock(lk);

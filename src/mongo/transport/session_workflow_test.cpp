@@ -64,10 +64,10 @@
 #include "mongo/logv2/log_attr.h"
 #include "mongo/logv2/log_component.h"
 #include "mongo/platform/atomic_word.h"
-#include "mongo/platform/mutex.h"
 #include "mongo/rpc/message.h"
 #include "mongo/rpc/op_msg.h"
 #include "mongo/stdx/condition_variable.h"
+#include "mongo/stdx/mutex.h"
 #include "mongo/transport/service_entry_point.h"
 #include "mongo/transport/service_executor.h"
 #include "mongo/transport/session_manager_common.h"
@@ -222,7 +222,7 @@ public:
     }
 
 private:
-    mutable Mutex _mutex;
+    mutable stdx::mutex _mutex;
     stdx::condition_variable _cv;
     std::unique_ptr<BasicExpectation> _cb;
 };

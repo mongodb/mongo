@@ -48,7 +48,7 @@
 #include "mongo/executor/network_interface_factory.h"
 #include "mongo/executor/task_executor.h"
 #include "mongo/executor/thread_pool_task_executor.h"
-#include "mongo/platform/mutex.h"
+#include "mongo/stdx/mutex.h"
 #include "mongo/stdx/unordered_map.h"
 #include "mongo/util/assert_util_core.h"
 #include "mongo/util/concurrency/thread_pool.h"

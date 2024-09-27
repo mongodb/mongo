@@ -99,7 +99,7 @@ BENCHMARK_DEFINE_F(LockManagerTest, BM_LockUnlock_Mutex)(benchmark::State& state
     static stdx::mutex mtx;
 
     for (auto keepRunning : state) {
-        stdx::unique_lock<Latch> lk(mtx);
+        stdx::unique_lock<stdx::mutex> lk(mtx);
     }
 }
 

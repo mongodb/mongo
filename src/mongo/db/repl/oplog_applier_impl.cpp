@@ -89,7 +89,6 @@
 #include "mongo/logv2/redaction.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/platform/compiler.h"
-#include "mongo/platform/mutex.h"
 #include "mongo/stdx/condition_variable.h"
 #include "mongo/stdx/mutex.h"
 #include "mongo/stdx/thread.h"
@@ -418,7 +417,7 @@ private:
 };
 
 ApplyBatchFinalizerForJournal::~ApplyBatchFinalizerForJournal() {
-    stdx::unique_lock<Latch> lock(_mutex);
+    stdx::unique_lock<stdx::mutex> lock(_mutex);
     _shutdownSignaled = true;
     _cond.notify_all();
     lock.unlock();
@@ -429,7 +428,7 @@ ApplyBatchFinalizerForJournal::~ApplyBatchFinalizerForJournal() {
 void ApplyBatchFinalizerForJournal::record(const OpTimeAndWallTime& newOpTimeAndWallTime) {
     _recordApplied(newOpTimeAndWallTime);
 
-    stdx::unique_lock<Latch> lock(_mutex);
+    stdx::unique_lock<stdx::mutex> lock(_mutex);
     _latestOpTimeAndWallTime = newOpTimeAndWallTime;
     _cond.notify_all();
 }
@@ -445,7 +444,7 @@ void ApplyBatchFinalizerForJournal::_run() {
 
     while (true) {
         {
-            stdx::unique_lock<Latch> lock(_mutex);
+            stdx::unique_lock<stdx::mutex> lock(_mutex);
             while (_latestOpTimeAndWallTime.opTime.isNull() && !_shutdownSignaled) {
                 _cond.wait(lock);
             }

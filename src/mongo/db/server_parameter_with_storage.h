@@ -59,7 +59,7 @@
 #include "mongo/idl/idl_parser.h"
 #include "mongo/platform/atomic_proxy.h"
 #include "mongo/platform/atomic_word.h"
-#include "mongo/platform/mutex.h"
+#include "mongo/stdx/mutex.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
 #include "mongo/util/synchronized_value.h"
@@ -231,12 +231,12 @@ struct storage_wrapper<TenantIdMap<U>> {
     storage_wrapper(TenantIdMap<U>& storage) : _storage(storage) {}
 
     void store(const U& value, const boost::optional<TenantId>& id) {
-        stdx::lock_guard<Latch> lg(_storageMutex);
+        stdx::lock_guard<stdx::mutex> lg(_storageMutex);
         _storage[id] = value;
     }
 
     U load(const boost::optional<TenantId>& id) const {
-        stdx::lock_guard<Latch> lg(_storageMutex);
+        stdx::lock_guard<stdx::mutex> lg(_storageMutex);
         auto it = _storage.find(id);
         if (it != _storage.end()) {
             return it->second;
@@ -246,7 +246,7 @@ struct storage_wrapper<TenantIdMap<U>> {
     }
 
     void reset(const boost::optional<TenantId>& id) {
-        stdx::lock_guard<Latch> lg(_storageMutex);
+        stdx::lock_guard<stdx::mutex> lg(_storageMutex);
         _storage.erase(id);
     }
 
@@ -274,19 +274,19 @@ struct storage_wrapper {
 
     void store(const U& value, const boost::optional<TenantId>& id) {
         invariant(!id.is_initialized());
-        stdx::lock_guard<Latch> lg(_storageMutex);
+        stdx::lock_guard<stdx::mutex> lg(_storageMutex);
         _storage = value;
     }
 
     U load(const boost::optional<TenantId>& id) const {
         invariant(!id.is_initialized());
-        stdx::lock_guard<Latch> lg(_storageMutex);
+        stdx::lock_guard<stdx::mutex> lg(_storageMutex);
         return _storage;
     }
 
     void reset(const boost::optional<TenantId>& id) {
         invariant(!id.is_initialized());
-        stdx::lock_guard<Latch> lg(_storageMutex);
+        stdx::lock_guard<stdx::mutex> lg(_storageMutex);
         _storage = _defaultValue;
     }
 

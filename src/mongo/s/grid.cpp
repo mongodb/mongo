@@ -106,12 +106,12 @@ void Grid::setShardingInitialized() {
 }
 
 Grid::CustomConnectionPoolStatsFn Grid::getCustomConnectionPoolStatsFn() const {
-    stdx::lock_guard<Latch> lk(_mutex);
+    stdx::lock_guard<stdx::mutex> lk(_mutex);
     return _customConnectionPoolStatsFn;
 }
 
 void Grid::setCustomConnectionPoolStatsFn(CustomConnectionPoolStatsFn statsFn) {
-    stdx::lock_guard<Latch> lk(_mutex);
+    stdx::lock_guard<stdx::mutex> lk(_mutex);
     invariant(!_customConnectionPoolStatsFn || !statsFn);
     _customConnectionPoolStatsFn = std::move(statsFn);
 }

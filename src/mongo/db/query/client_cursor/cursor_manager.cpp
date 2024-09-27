@@ -363,7 +363,7 @@ stdx::unordered_set<CursorId> CursorManager::getCursorsForOpKeys(
     std::vector<OperationKey> opKeys) const {
     stdx::unordered_set<CursorId> cursors;
 
-    stdx::lock_guard<Latch> lk(_opKeyMutex);
+    stdx::lock_guard<stdx::mutex> lk(_opKeyMutex);
     for (auto opKey : opKeys) {
         if (auto it = _opKeyMap.find(opKey); it != _opKeyMap.end()) {
             for (auto cursor : it->second) {
@@ -410,7 +410,7 @@ ClientCursorPin CursorManager::registerCursor(OperationContext* opCtx,
 
     // If set, store the mapping of OperationKey to the generated CursorID.
     if (auto opKey = opCtx->getOperationKey()) {
-        stdx::lock_guard<Latch> lk(_opKeyMutex);
+        stdx::lock_guard<stdx::mutex> lk(_opKeyMutex);
         auto it = _opKeyMap.find(*opKey);
         if (it != _opKeyMap.end()) {
             it->second.insert(cursorId);

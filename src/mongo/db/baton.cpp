@@ -36,7 +36,7 @@
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
 #include "mongo/db/baton.h"
-#include "mongo/platform/mutex.h"
+#include "mongo/stdx/mutex.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/clock_source.h"
 #include "mongo/util/functional.h"
@@ -84,7 +84,7 @@ public:
         }
 
         _baton->schedule([this, anchor = shared_from_this()](Status status) {
-            _runJobs(stdx::unique_lock<Latch>(_mutex), status);
+            _runJobs(stdx::unique_lock<stdx::mutex>(_mutex), status);
         });
     }
 
@@ -113,7 +113,7 @@ public:
     }
 
     void detachImpl() noexcept override {
-        stdx::unique_lock<Latch> lk(_mutex);
+        stdx::unique_lock<stdx::mutex> lk(_mutex);
         _isDead = true;
 
         _runJobs(std::move(lk), kDetached);
@@ -128,7 +128,7 @@ public:
     }
 
 private:
-    void _runJobs(stdx::unique_lock<Latch> lk, Status status) {
+    void _runJobs(stdx::unique_lock<stdx::mutex> lk, Status status) {
         if (status.isOK() && _isDead) {
             status = kDetached;
         }

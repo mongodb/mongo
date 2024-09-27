@@ -53,9 +53,9 @@
 #include "mongo/db/storage/named_pipe.h"
 #include "mongo/db/storage/record_data.h"
 #include "mongo/db/storage/record_store.h"
-#include "mongo/platform/mutex.h"
 #include "mongo/platform/random.h"
 #include "mongo/stdx/condition_variable.h"
+#include "mongo/stdx/mutex.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/unittest/assert.h"
 #include "mongo/unittest/framework.h"
@@ -84,7 +84,7 @@ public:
     }
 
 private:
-    Mutex m;
+    stdx::mutex m;
     stdx::condition_variable cv;
     bool pipeCreated = false;
 };

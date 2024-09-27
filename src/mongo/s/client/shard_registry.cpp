@@ -149,7 +149,7 @@ void ShardRegistry::init() {
         LOGV2_DEBUG(
             5123000, 1, "Initializing ShardRegistry", "configServers"_attr = _initConfigServerCS);
 
-        stdx::lock_guard<Latch> lk(_mutex);
+        stdx::lock_guard<stdx::mutex> lk(_mutex);
         _initConfigShard(lk, *_initConfigServerCS);
         _isInitialized.store(true);
     } else {
@@ -333,7 +333,7 @@ ConnectionString ShardRegistry::getConfigServerConnectionString() const {
 }
 
 std::shared_ptr<Shard> ShardRegistry::getConfigShard() const {
-    stdx::lock_guard<Latch> lk(_mutex);
+    stdx::lock_guard<stdx::mutex> lk(_mutex);
     auto configShard = _configShardData.findShard(ShardId::kConfigServerId);
     // Note this should only throw if the local node has not learned its replica set config yet.
     uassert(ErrorCodes::NotYetInitialized, "Config shard has not been set up yet", configShard);
@@ -350,7 +350,7 @@ StatusWith<std::shared_ptr<Shard>> ShardRegistry::getShard(OperationContext* opC
 
     // then check if this is a config shard (this call is blocking in any case)
     {
-        stdx::lock_guard<Latch> lk(_mutex);
+        stdx::lock_guard<stdx::mutex> lk(_mutex);
         if (auto shard = _configShardData.findShard(shardId)) {
             return shard;
         }
@@ -379,7 +379,7 @@ SemiFuture<std::shared_ptr<Shard>> ShardRegistry::getShard(ExecutorPtr executor,
 
             // then check if this is a config shard (this call is blocking in any case)
             {
-                stdx::lock_guard<Latch> lk(_mutex);
+                stdx::lock_guard<stdx::mutex> lk(_mutex);
                 if (auto shard = _configShardData.findShard(shardId)) {
                     return SemiFuture<std::shared_ptr<Shard>>::makeReady(std::move(shard));
                 }
@@ -423,12 +423,12 @@ int ShardRegistry::getNumShards(OperationContext* opCtx) {
 
 std::vector<ShardRegistry::LatestConnStrings::value_type> ShardRegistry::_getLatestConnStrings()
     const {
-    stdx::unique_lock<Latch> lock(_mutex);
+    stdx::unique_lock<stdx::mutex> lock(_mutex);
     return {_latestConnStrings.begin(), _latestConnStrings.end()};
 }
 
 void ShardRegistry::_removeReplicaSet(const std::string& setName) {
-    stdx::lock_guard<Latch> lk(_mutex);
+    stdx::lock_guard<stdx::mutex> lk(_mutex);
     _latestConnStrings.erase(setName);
 }
 
@@ -440,7 +440,7 @@ void ShardRegistry::updateReplSetHosts(const ConnectionString& givenConnString,
     auto setName = givenConnString.getSetName();
 
     {
-        stdx::lock_guard<Latch> lk(_mutex);
+        stdx::lock_guard<stdx::mutex> lk(_mutex);
 
         ConnectionString newConnString =
             (updateType == ConnectionStringUpdateType::kPossible &&
@@ -495,7 +495,7 @@ void ShardRegistry::toBSON(BSONObjBuilder* result) const {
         data->toBSON(&map, &hosts, &connStrings);
     }
     {
-        stdx::lock_guard<Latch> lk(_mutex);
+        stdx::lock_guard<stdx::mutex> lk(_mutex);
         _configShardData.toBSON(&map, &hosts, &connStrings);
     }
     result->append("map", map.obj());
@@ -655,7 +655,7 @@ boost::optional<bool> ShardRegistry::cachedClusterHasConfigShard() const {
 std::shared_ptr<Shard> ShardRegistry::getShardForHostNoReload(const HostAndPort& host) const {
     // First check if this is a config shard lookup.
     {
-        stdx::lock_guard<Latch> lk(_mutex);
+        stdx::lock_guard<stdx::mutex> lk(_mutex);
         if (auto shard = _configShardData.findByHostAndPort(host)) {
             return shard;
         }
@@ -700,7 +700,7 @@ void ShardRegistry::_initConfigShard(WithLock wl, const ConnectionString& config
 
 void ShardRegistry::initConfigShardIfNecessary(const ConnectionString& configCS) {
     {
-        stdx::lock_guard<Latch> lk(_mutex);
+        stdx::lock_guard<stdx::mutex> lk(_mutex);
         if (_isInitialized.load()) {
             return;
         }

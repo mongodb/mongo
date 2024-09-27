@@ -54,7 +54,7 @@
 #include "mongo/db/repl_index_build_state.h"
 #include "mongo/db/resumable_index_builds_gen.h"
 #include "mongo/db/storage/recovery_unit.h"
-#include "mongo/platform/mutex.h"
+#include "mongo/stdx/mutex.h"
 #include "mongo/util/uuid.h"
 
 namespace mongo {

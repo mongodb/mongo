@@ -46,7 +46,7 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/tenant_id.h"
-#include "mongo/platform/mutex.h"
+#include "mongo/stdx/mutex.h"
 #include "mongo/util/decorable.h"
 
 namespace mongo {
@@ -113,7 +113,7 @@ Status AllowListedClusterNetworkSetting::set(const mongo::BSONElement& e,
     const auto service = Client::getCurrent()->getServiceContext();
     const auto updater = getClusterNetworkRestrictionManager(service).get();
     if (updater) {
-        stdx::lock_guard<Mutex> guard(mtxSetAllowListedCluster);
+        stdx::lock_guard<stdx::mutex> guard(mtxSetAllowListedCluster);
         std::atomic_store(&mongodGlobalParams.allowlistedClusterNetwork,
                           std::move(allowlistedClusterNetwork));
         updater->updateClusterNetworkRestrictions();

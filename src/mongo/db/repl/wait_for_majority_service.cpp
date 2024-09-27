@@ -251,7 +251,7 @@ SemiFuture<void> WaitForMajorityServiceImplBase::_periodicallyWaitForMajority() 
      */
     return AsyncTry([this] {
                auto clientGuard = _waitForMajorityClient->bind();
-               stdx::unique_lock<Latch> lk(_mutex);
+               stdx::unique_lock<stdx::mutex> lk(_mutex);
                if (_queuedOpTimes.empty()) {
                    return _hasNewOpTimeCV.onNotify();
                }

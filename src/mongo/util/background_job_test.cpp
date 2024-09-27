@@ -32,7 +32,7 @@
 
 #include "mongo/base/string_data.h"
 #include "mongo/platform/atomic_word.h"
-#include "mongo/platform/mutex.h"
+#include "mongo/stdx/mutex.h"
 #include "mongo/unittest/assert.h"
 #include "mongo/unittest/framework.h"
 #include "mongo/util/assert_util.h"
@@ -116,7 +116,7 @@ TEST(BackgroundJobLifeCycle, Go) {
 
         void run() override {
             {
-                stdx::lock_guard<Latch> lock(_mutex);
+                stdx::lock_guard<stdx::mutex> lock(_mutex);
                 ASSERT_FALSE(_hasRun);
                 _hasRun = true;
             }

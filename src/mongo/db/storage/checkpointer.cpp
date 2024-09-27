@@ -96,7 +96,7 @@ void Checkpointer::run() {
         auto opCtx = tc->makeOperationContext();
 
         {
-            stdx::unique_lock<Latch> lock(_mutex);
+            stdx::unique_lock<stdx::mutex> lock(_mutex);
             MONGO_IDLE_THREAD_BLOCK;
 
             // Wait for 'storageGlobalParams.syncdelay' seconds; or until either shutdown is
@@ -151,7 +151,7 @@ void Checkpointer::run() {
 void Checkpointer::triggerFirstStableCheckpoint(Timestamp prevStable,
                                                 Timestamp initialData,
                                                 Timestamp currStable) {
-    stdx::unique_lock<Latch> lock(_mutex);
+    stdx::unique_lock<stdx::mutex> lock(_mutex);
     invariant(!_hasTriggeredFirstStableCheckpoint);
     if (prevStable < initialData && currStable >= initialData) {
         LOGV2(22310,
@@ -166,7 +166,7 @@ void Checkpointer::triggerFirstStableCheckpoint(Timestamp prevStable,
 }
 
 bool Checkpointer::hasTriggeredFirstStableCheckpoint() {
-    stdx::unique_lock<Latch> lock(_mutex);
+    stdx::unique_lock<stdx::mutex> lock(_mutex);
     return _hasTriggeredFirstStableCheckpoint;
 }
 
@@ -174,7 +174,7 @@ void Checkpointer::shutdown(const Status& reason) {
     LOGV2(22322, "Shutting down checkpoint thread");
 
     {
-        stdx::unique_lock<Latch> lock(_mutex);
+        stdx::unique_lock<stdx::mutex> lock(_mutex);
         _shuttingDown = true;
         _shutdownReason = reason;
 

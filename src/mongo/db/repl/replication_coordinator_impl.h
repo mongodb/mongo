@@ -93,7 +93,6 @@
 #include "mongo/db/write_concern_options.h"
 #include "mongo/executor/task_executor.h"
 #include "mongo/platform/atomic_word.h"
-#include "mongo/platform/mutex.h"
 #include "mongo/platform/random.h"
 #include "mongo/rpc/metadata/oplog_query_metadata.h"
 #include "mongo/rpc/metadata/repl_set_metadata.h"
@@ -1345,7 +1344,7 @@ private:
      * When prioritized is set to true, the reporter will try to schedule an updatePosition request
      * even there is already one in flight.
      */
-    void _reportUpstream(stdx::unique_lock<Latch> lock, bool prioritized);
+    void _reportUpstream(stdx::unique_lock<stdx::mutex> lock, bool prioritized);
 
     /**
      * Helpers to set the last written, applied and durable OpTime.
@@ -1658,10 +1657,10 @@ private:
      *
      * Requires "lock" to own _mutex, and returns the same unique_lock.
      */
-    stdx::unique_lock<Latch> _handleHeartbeatResponseAction(
+    stdx::unique_lock<stdx::mutex> _handleHeartbeatResponseAction(
         const HeartbeatResponseAction& action,
         const StatusWith<ReplSetHeartbeatResponse>& responseStatus,
-        stdx::unique_lock<Latch> lock);
+        stdx::unique_lock<stdx::mutex> lock);
 
     /**
      * Updates the last committed OpTime to be 'committedOpTime' if it is more recent than the

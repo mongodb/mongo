@@ -38,7 +38,6 @@
 #include "mongo/client/sdam/sdam_datatypes.h"
 #include "mongo/client/sdam/server_description.h"
 #include "mongo/client/sdam/topology_description.h"
-#include "mongo/platform/mutex.h"
 #include "mongo/util/net/hostandport.h"
 
 namespace mongo::sdam {

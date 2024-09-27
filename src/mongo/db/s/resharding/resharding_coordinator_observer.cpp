@@ -153,7 +153,7 @@ boost::optional<Status> getAbortReasonIfExists(
 ReshardingCoordinatorObserver::ReshardingCoordinatorObserver() = default;
 
 ReshardingCoordinatorObserver::~ReshardingCoordinatorObserver() {
-    stdx::lock_guard<Latch> lg(_mutex);
+    stdx::lock_guard<stdx::mutex> lg(_mutex);
 
     // Rarely, when there is a short period of time between stepdown and stepup, the
     // ReshardingCoordinator::run() method is not called causing the invariants below
@@ -170,7 +170,7 @@ ReshardingCoordinatorObserver::~ReshardingCoordinatorObserver() {
 
 void ReshardingCoordinatorObserver::onReshardingParticipantTransition(
     const ReshardingCoordinatorDocument& updatedStateDoc) {
-    stdx::lock_guard<Latch> lk(_mutex);
+    stdx::lock_guard<stdx::mutex> lk(_mutex);
     if (auto abortReason = getAbortReasonIfExists(updatedStateDoc)) {
         _onAbortOrStepdown(lk, abortReason.value());
         // Don't exit early since the coordinator waits for all participants to report state 'done'.
@@ -231,7 +231,7 @@ ReshardingCoordinatorObserver::awaitAllRecipientsDone() {
 }
 
 void ReshardingCoordinatorObserver::interrupt(Status status) {
-    stdx::lock_guard<Latch> lk(_mutex);
+    stdx::lock_guard<stdx::mutex> lk(_mutex);
     _onAbortOrStepdown(lk, status);
 
     if (!_allRecipientsDone.getFuture().isReady()) {
@@ -244,7 +244,7 @@ void ReshardingCoordinatorObserver::interrupt(Status status) {
 }
 
 void ReshardingCoordinatorObserver::fulfillPromisesBeforePersistingStateDoc() {
-    stdx::lock_guard<Latch> lk(_mutex);
+    stdx::lock_guard<stdx::mutex> lk(_mutex);
     invariant(!_allDonorsReportedMinFetchTimestamp.getFuture().isReady());
     invariant(!_allRecipientsFinishedCloning.getFuture().isReady());
     invariant(!_allRecipientsReportedStrictConsistencyTimestamp.getFuture().isReady());
@@ -258,7 +258,7 @@ void ReshardingCoordinatorObserver::fulfillPromisesBeforePersistingStateDoc() {
 }
 
 void ReshardingCoordinatorObserver::onCriticalSectionTimeout() {
-    stdx::lock_guard<Latch> lk(_mutex);
+    stdx::lock_guard<stdx::mutex> lk(_mutex);
     if (!_allRecipientsReportedStrictConsistencyTimestamp.getFuture().isReady()) {
         _allRecipientsReportedStrictConsistencyTimestamp.setError(
             Status{ErrorCodes::ReshardingCriticalSectionTimeout,

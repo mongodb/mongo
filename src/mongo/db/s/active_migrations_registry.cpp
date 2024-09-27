@@ -80,7 +80,7 @@ ActiveMigrationsRegistry& ActiveMigrationsRegistry::get(OperationContext* opCtx)
 void ActiveMigrationsRegistry::lock(OperationContext* opCtx, StringData reason) {
     // The method requires the requesting operation to be interruptible
     invariant(opCtx->shouldAlwaysInterruptAtStepDownOrUp());
-    stdx::unique_lock<Latch> lock(_mutex);
+    stdx::unique_lock<stdx::mutex> lock(_mutex);
 
     // This wait is to hold back additional lock requests while there is already one in progress
     opCtx->waitForConditionOrInterrupt(
@@ -112,7 +112,7 @@ void ActiveMigrationsRegistry::lock(OperationContext* opCtx, StringData reason) 
 }
 
 void ActiveMigrationsRegistry::unlock(StringData reason) {
-    stdx::lock_guard<Latch> lock(_mutex);
+    stdx::lock_guard<stdx::mutex> lock(_mutex);
 
     LOGV2(467561, "Going to stop blocking migrations", "reason"_attr = reason);
     _migrationsBlocked = false;
@@ -122,7 +122,7 @@ void ActiveMigrationsRegistry::unlock(StringData reason) {
 
 StatusWith<ScopedDonateChunk> ActiveMigrationsRegistry::registerDonateChunk(
     OperationContext* opCtx, const ShardsvrMoveRange& args) {
-    stdx::unique_lock<Latch> ul(_mutex);
+    stdx::unique_lock<stdx::mutex> ul(_mutex);
 
     opCtx->waitForConditionOrInterrupt(_chunkOperationsStateChangedCV, ul, [&] {
         return !_activeSplitMergeChunkStates.count(args.getCommandParameter());
@@ -179,7 +179,7 @@ StatusWith<ScopedReceiveChunk> ActiveMigrationsRegistry::registerReceiveChunk(
     const ChunkRange& chunkRange,
     const ShardId& fromShardId,
     bool waitForCompletionOfConflictingOps) {
-    stdx::unique_lock<Latch> ul(_mutex);
+    stdx::unique_lock<stdx::mutex> ul(_mutex);
 
     if (waitForCompletionOfConflictingOps) {
         opCtx->waitForConditionOrInterrupt(_chunkOperationsStateChangedCV, ul, [this] {
@@ -212,7 +212,7 @@ StatusWith<ScopedReceiveChunk> ActiveMigrationsRegistry::registerReceiveChunk(
 
 StatusWith<ScopedSplitMergeChunk> ActiveMigrationsRegistry::registerSplitOrMergeChunk(
     OperationContext* opCtx, const NamespaceString& nss, const ChunkRange& chunkRange) {
-    stdx::unique_lock<Latch> ul(_mutex);
+    stdx::unique_lock<stdx::mutex> ul(_mutex);
 
     opCtx->waitForConditionOrInterrupt(_chunkOperationsStateChangedCV, ul, [&] {
         return !(_activeMoveChunkState &&
@@ -228,7 +228,7 @@ StatusWith<ScopedSplitMergeChunk> ActiveMigrationsRegistry::registerSplitOrMerge
 }
 
 boost::optional<NamespaceString> ActiveMigrationsRegistry::getActiveDonateChunkNss() {
-    stdx::lock_guard<Latch> lk(_mutex);
+    stdx::lock_guard<stdx::mutex> lk(_mutex);
     if (_activeMoveChunkState) {
         return _activeMoveChunkState->args.getCommandParameter();
     }
@@ -239,7 +239,7 @@ boost::optional<NamespaceString> ActiveMigrationsRegistry::getActiveDonateChunkN
 BSONObj ActiveMigrationsRegistry::getActiveMigrationStatusReport(OperationContext* opCtx) {
     boost::optional<NamespaceString> nss;
     {
-        stdx::lock_guard<Latch> lk(_mutex);
+        stdx::lock_guard<stdx::mutex> lk(_mutex);
 
         if (_activeMoveChunkState) {
             nss = _activeMoveChunkState->args.getCommandParameter();
@@ -270,7 +270,7 @@ BSONObj ActiveMigrationsRegistry::getActiveMigrationStatusReport(OperationContex
 }
 
 void ActiveMigrationsRegistry::_clearDonateChunk() {
-    stdx::lock_guard<Latch> lk(_mutex);
+    stdx::lock_guard<stdx::mutex> lk(_mutex);
     invariant(_activeMoveChunkState);
     LOGV2(6386803,
           "Unregistering donate chunk",
@@ -283,7 +283,7 @@ void ActiveMigrationsRegistry::_clearDonateChunk() {
 }
 
 void ActiveMigrationsRegistry::_clearReceiveChunk() {
-    stdx::lock_guard<Latch> lk(_mutex);
+    stdx::lock_guard<stdx::mutex> lk(_mutex);
     invariant(_activeReceiveChunkState);
     LOGV2(5004703,
           "clearReceiveChunk",
@@ -295,7 +295,7 @@ void ActiveMigrationsRegistry::_clearReceiveChunk() {
 }
 
 void ActiveMigrationsRegistry::_clearSplitMergeChunk(const NamespaceString& nss) {
-    stdx::lock_guard<Latch> lk(_mutex);
+    stdx::lock_guard<stdx::mutex> lk(_mutex);
     invariant(_activeSplitMergeChunkStates.erase(nss));
     _chunkOperationsStateChangedCV.notify_all();
 }

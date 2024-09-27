@@ -59,7 +59,7 @@
 #include "mongo/logv2/log_attr.h"
 #include "mongo/logv2/log_component.h"
 #include "mongo/platform/atomic_word.h"
-#include "mongo/platform/mutex.h"
+#include "mongo/stdx/mutex.h"
 #include "mongo/util/str.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kNetwork
@@ -672,7 +672,7 @@ void StreamableReplicaSetMonitor::_setConfirmedNotifierState(
 
 void StreamableReplicaSetMonitor::onTopologyDescriptionChangedEvent(
     TopologyDescriptionPtr previousDescription, TopologyDescriptionPtr newDescription) {
-    stdx::unique_lock<Latch> lock(_mutex);
+    stdx::unique_lock<stdx::mutex> lock(_mutex);
     if (_isDropped.load())
         return;
 

@@ -44,8 +44,8 @@
 #include "mongo/logv2/log.h"
 #include "mongo/logv2/log_component.h"
 #include "mongo/platform/atomic_word.h"
-#include "mongo/platform/mutex.h"
 #include "mongo/stdx/condition_variable.h"
+#include "mongo/stdx/mutex.h"
 #include "mongo/util/assert_util_core.h"
 #include "mongo/util/background.h"
 #include "mongo/util/concurrency/idle_thread_block.h"
@@ -118,7 +118,7 @@ public:
                 // shutdown is requested.
                 auto deadline = iterationStartTime +
                     Seconds(gExpiredChangeStreamPreImageRemovalJobSleepSecs.load());
-                stdx::unique_lock<Latch> lk(_stateMutex);
+                stdx::unique_lock<stdx::mutex> lk(_stateMutex);
 
                 MONGO_IDLE_THREAD_BLOCK;
                 _shuttingDownCV.wait_until(
@@ -137,7 +137,7 @@ public:
     void shutdown() {
         LOGV2(6278515, "Shutting down Change Stream Expired Pre-images Remover thread");
         {
-            stdx::lock_guard<Latch> lk(_stateMutex);
+            stdx::lock_guard<stdx::mutex> lk(_stateMutex);
             _shuttingDown = true;
         }
         _shuttingDownCV.notify_one();

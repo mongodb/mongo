@@ -105,7 +105,7 @@
 #include "mongo/logv2/log_attr.h"
 #include "mongo/logv2/log_component.h"
 #include "mongo/logv2/redaction.h"
-#include "mongo/platform/mutex.h"
+#include "mongo/stdx/mutex.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/concurrency/admission_context.h"
 #include "mongo/util/decorable.h"
@@ -124,7 +124,7 @@ const char StorageInterfaceImpl::kRollbackIdFieldName[] = "rollbackId";
 const char StorageInterfaceImpl::kRollbackIdDocumentId[] = "rollbackId";
 
 namespace {
-using UniqueLock = stdx::unique_lock<Latch>;
+using UniqueLock = stdx::unique_lock<stdx::mutex>;
 
 const auto kIdIndexName = IndexConstants::kIdIndexName;
 

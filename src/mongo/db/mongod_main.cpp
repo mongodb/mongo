@@ -248,7 +248,6 @@
 #include "mongo/logv2/redaction.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/platform/compiler.h"
-#include "mongo/platform/mutex.h"
 #include "mongo/platform/process_id.h"
 #include "mongo/platform/random.h"
 #include "mongo/rpc/metadata/egress_metadata_hook_list.h"
@@ -268,6 +267,7 @@
 #include "mongo/s/sharding_state.h"
 #include "mongo/scripting/dbdirectclient_factory.h"
 #include "mongo/scripting/engine.h"
+#include "mongo/stdx/mutex.h"
 #include "mongo/transport/ingress_handshake_metrics.h"
 #include "mongo/transport/session_manager_common.h"
 #include "mongo/transport/transport_layer.h"
@@ -1633,7 +1633,7 @@ void shutdownTask(const ShutdownTaskArgs& shutdownArgs) {
 
     // Before doing anything else, ensure fsync is inactive or make it release its GlobalRead lock.
     {
-        stdx::unique_lock<Latch> stateLock(fsyncStateMutex);
+        stdx::unique_lock<stdx::mutex> stateLock(fsyncStateMutex);
         if (globalFsyncLockThread) {
             globalFsyncLockThread->shutdown(stateLock);
         }

@@ -43,7 +43,7 @@
 #include "mongo/db/tenant_id.h"
 #include "mongo/executor/connection_pool.h"
 #include "mongo/platform/atomic_word.h"
-#include "mongo/platform/mutex.h"
+#include "mongo/stdx/mutex.h"
 #include "mongo/stdx/unordered_map.h"
 #include "mongo/stdx/unordered_set.h"
 #include "mongo/util/assert_util.h"

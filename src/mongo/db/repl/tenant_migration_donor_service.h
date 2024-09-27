@@ -58,7 +58,7 @@
 #include "mongo/executor/scoped_task_executor.h"
 #include "mongo/executor/task_executor.h"
 #include "mongo/executor/thread_pool_task_executor.h"
-#include "mongo/platform/mutex.h"
+#include "mongo/stdx/mutex.h"
 #include "mongo/transport/transport_layer.h"
 #include "mongo/util/cancellation.h"
 #include "mongo/util/concurrency/thread_pool.h"

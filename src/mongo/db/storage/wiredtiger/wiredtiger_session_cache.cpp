@@ -269,7 +269,7 @@ void WiredTigerSessionCache::waitUntilPreparedUnitOfWorkCommitsOrAborts(
     // caller is already expecting spurious wakeups, we impose a large timeout to periodically force
     // the caller to retry its operation.
     const auto deadline = Date_t::now() + Seconds(1);
-    stdx::unique_lock<Latch> lk(_prepareCommittedOrAbortedMutex);
+    stdx::unique_lock<stdx::mutex> lk(_prepareCommittedOrAbortedMutex);
     if (lastCount == _prepareCommitOrAbortCounter.loadRelaxed()) {
         interruptible.waitForConditionOrInterruptUntil(
             _prepareCommittedOrAbortedCond, lk, deadline, [&] {
@@ -279,21 +279,21 @@ void WiredTigerSessionCache::waitUntilPreparedUnitOfWorkCommitsOrAborts(
 }
 
 void WiredTigerSessionCache::notifyPreparedUnitOfWorkHasCommittedOrAborted() {
-    stdx::unique_lock<Latch> lk(_prepareCommittedOrAbortedMutex);
+    stdx::unique_lock<stdx::mutex> lk(_prepareCommittedOrAbortedMutex);
     _prepareCommitOrAbortCounter.fetchAndAdd(1);
     _prepareCommittedOrAbortedCond.notify_all();
 }
 
 
 void WiredTigerSessionCache::closeAllCursors(const std::string& uri) {
-    stdx::lock_guard<Latch> lock(_cacheLock);
+    stdx::lock_guard<stdx::mutex> lock(_cacheLock);
     for (SessionCache::iterator i = _sessions.begin(); i != _sessions.end(); i++) {
         (*i)->closeAllCursors(uri);
     }
 }
 
 size_t WiredTigerSessionCache::getIdleSessionsCount() {
-    stdx::lock_guard<Latch> lock(_cacheLock);
+    stdx::lock_guard<stdx::mutex> lock(_cacheLock);
     return _sessions.size();
 }
 
@@ -307,7 +307,7 @@ void WiredTigerSessionCache::closeExpiredIdleSessions(int64_t idleTimeMillis) {
     SessionCache sessionsToClose;
 
     {
-        stdx::lock_guard<Latch> lock(_cacheLock);
+        stdx::lock_guard<stdx::mutex> lock(_cacheLock);
         // Discard all sessions that became idle before the cutoff time
         for (auto it = _sessions.begin(); it != _sessions.end();) {
             auto session = *it;
@@ -333,7 +333,7 @@ void WiredTigerSessionCache::closeAll() {
     SessionCache swap;
 
     {
-        stdx::lock_guard<Latch> lock(_cacheLock);
+        stdx::lock_guard<stdx::mutex> lock(_cacheLock);
         _epoch.fetchAndAdd(1);
         _sessions.swap(swap);
     }
@@ -353,7 +353,7 @@ UniqueWiredTigerSession WiredTigerSessionCache::getSession() {
     invariant(!(_shuttingDown.load() & kShuttingDownMask));
 
     {
-        stdx::lock_guard<Latch> lock(_cacheLock);
+        stdx::lock_guard<stdx::mutex> lock(_cacheLock);
         if (!_sessions.empty()) {
             // Get the most recently used session so that if we discard sessions, we're
             // discarding older ones
@@ -413,7 +413,7 @@ void WiredTigerSessionCache::releaseSession(WiredTigerSession* session) {
     session->setIdleExpireTime(_clockSource->now());
 
     if (session->_getEpoch() == currentEpoch) {  // check outside of lock to reduce contention
-        stdx::lock_guard<Latch> lock(_cacheLock);
+        stdx::lock_guard<stdx::mutex> lock(_cacheLock);
         if (session->_getEpoch() == _epoch.load()) {  // recheck inside the lock for correctness
             returnedToCache = true;
             _sessions.push_back(session);

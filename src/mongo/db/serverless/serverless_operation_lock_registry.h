@@ -36,7 +36,7 @@
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/service_context.h"
-#include "mongo/platform/mutex.h"
+#include "mongo/stdx/mutex.h"
 #include "mongo/util/uuid.h"
 
 namespace mongo {

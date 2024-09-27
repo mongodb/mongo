@@ -50,8 +50,8 @@
 #include "mongo/logv2/log_component.h"
 #include "mongo/logv2/redaction.h"
 #include "mongo/platform/atomic_word.h"
-#include "mongo/platform/mutex.h"
 #include "mongo/stdx/condition_variable.h"
+#include "mongo/stdx/mutex.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/concurrency/idle_thread_block.h"
 #include "mongo/util/concurrency/thread_name.h"
@@ -160,12 +160,12 @@ private:
     /**
      * Implementation of join once _mutex is owned by "lk".
      */
-    void _join_inlock(stdx::unique_lock<Latch>& lk);
+    void _join_inlock(stdx::unique_lock<stdx::mutex>& lk);
 
     /**
      * Implementation of waitForIdle once _mutex is locked
      */
-    void _waitForIdle(stdx::unique_lock<Latch>& lk);
+    void _waitForIdle(stdx::unique_lock<stdx::mutex>& lk);
 
     /**
      * Returns true when there are no _pendingTasks and all _threads are idle, including
@@ -177,13 +177,13 @@ private:
      * Runs the remaining tasks on a new thread as part of the join process, blocking until
      * complete.
      */
-    void _drainPendingTasks(stdx::unique_lock<Latch>& lk);
+    void _drainPendingTasks(stdx::unique_lock<stdx::mutex>& lk);
 
     /**
      * Executes one task from _pendingTasks. "lk" must own _mutex, and _pendingTasks must have at
      * least one entry.
      */
-    void _doOneTask(stdx::unique_lock<Latch>* lk) noexcept;
+    void _doOneTask(stdx::unique_lock<stdx::mutex>* lk) noexcept;
 
     /**
      * Changes the lifecycle state (_state) of the pool and wakes up any threads waiting for a state
@@ -246,7 +246,7 @@ private:
 ThreadPool::Impl::Impl(Options options) : _options(cleanUpOptions(std::move(options))) {}
 
 ThreadPool::Impl::~Impl() {
-    stdx::unique_lock<Latch> lk(_mutex);
+    stdx::unique_lock<stdx::mutex> lk(_mutex);
     _shutdown_inlock();
     if (_state != shutdownComplete) {
         _join_inlock(lk);
@@ -260,7 +260,7 @@ ThreadPool::Impl::~Impl() {
 }
 
 void ThreadPool::Impl::startup() {
-    stdx::lock_guard<Latch> lk(_mutex);
+    stdx::lock_guard<stdx::mutex> lk(_mutex);
     if (_state != preStart) {
         LOGV2_FATAL(28698,
                     "Attempted to start pool that has already started",
@@ -275,7 +275,7 @@ void ThreadPool::Impl::startup() {
 }
 
 void ThreadPool::Impl::shutdown() {
-    stdx::lock_guard<Latch> lk(_mutex);
+    stdx::lock_guard<stdx::mutex> lk(_mutex);
     _shutdown_inlock();
 }
 
@@ -295,7 +295,7 @@ void ThreadPool::Impl::_shutdown_inlock() {
 }
 
 void ThreadPool::Impl::join() {
-    stdx::unique_lock<Latch> lk(_mutex);
+    stdx::unique_lock<stdx::mutex> lk(_mutex);
     _join_inlock(lk);
 }
 
@@ -309,7 +309,7 @@ void ThreadPool::Impl::_joinRetired_inlock() {
     }
 }
 
-void ThreadPool::Impl::_join_inlock(stdx::unique_lock<Latch>& lk) {
+void ThreadPool::Impl::_join_inlock(stdx::unique_lock<stdx::mutex>& lk) {
     _stateChange.wait(lk, [this] { return _state != preStart && _state != running; });
     if (_state != joinRequired) {
         LOGV2_FATAL(
@@ -333,7 +333,7 @@ void ThreadPool::Impl::_join_inlock(stdx::unique_lock<Latch>& lk) {
     _setState_inlock(shutdownComplete);
 }
 
-void ThreadPool::Impl::_drainPendingTasks(stdx::unique_lock<Latch>& lk) {
+void ThreadPool::Impl::_drainPendingTasks(stdx::unique_lock<stdx::mutex>& lk) {
     // Tasks cannot be run inline because they can create OperationContexts and the join() caller
     // may already have one associated with the thread.
     ++_numIdleThreads;
@@ -342,7 +342,7 @@ void ThreadPool::Impl::_drainPendingTasks(stdx::unique_lock<Latch>& lk) {
         setThreadName(threadName);
         if (_options.onCreateThread)
             _options.onCreateThread(threadName);
-        stdx::unique_lock<Latch> lock(_mutex);
+        stdx::unique_lock<stdx::mutex> lock(_mutex);
         while (!_pendingTasks.empty()) {
             _doOneTask(&lock);
         }
@@ -357,7 +357,7 @@ void ThreadPool::Impl::_drainPendingTasks(stdx::unique_lock<Latch>& lk) {
 }
 
 void ThreadPool::Impl::schedule(Task task) {
-    stdx::unique_lock<Latch> lk(_mutex);
+    stdx::unique_lock<stdx::mutex> lk(_mutex);
 
     switch (_state) {
         case joinRequired:
@@ -392,11 +392,11 @@ void ThreadPool::Impl::schedule(Task task) {
 }
 
 void ThreadPool::Impl::waitForIdle() {
-    stdx::unique_lock<Latch> lk(_mutex);
+    stdx::unique_lock<stdx::mutex> lk(_mutex);
     _waitForIdle(lk);
 }
 
-void ThreadPool::Impl::_waitForIdle(stdx::unique_lock<Latch>& lk) {
+void ThreadPool::Impl::_waitForIdle(stdx::unique_lock<stdx::mutex>& lk) {
     _poolIsIdle.wait(lk, [&] { return _isPoolIdle(lk); });
 }
 
@@ -406,7 +406,7 @@ bool ThreadPool::Impl::_isPoolIdle(WithLock) {
 }
 
 ThreadPool::Stats ThreadPool::Impl::getStats() const {
-    stdx::lock_guard<Latch> lk(_mutex);
+    stdx::lock_guard<stdx::mutex> lk(_mutex);
     Stats result;
     result.options = _options;
     result.numThreads = _threads.size() + (_cleanUpThread ? 1 : 0);
@@ -434,7 +434,7 @@ void ThreadPool::Impl::_workerThreadBody(const std::string& threadName) noexcept
 }
 
 void ThreadPool::Impl::_consumeTasks() {
-    stdx::unique_lock<Latch> lk(_mutex);
+    stdx::unique_lock<stdx::mutex> lk(_mutex);
     while (_state == running) {
         if (!_pendingTasks.empty()) {
             _doOneTask(&lk);
@@ -527,7 +527,7 @@ void ThreadPool::Impl::_consumeTasks() {
     _retiredThreads.splice(_retiredThreads.end(), _threads, pos);
 }
 
-void ThreadPool::Impl::_doOneTask(stdx::unique_lock<Latch>* lk) noexcept {
+void ThreadPool::Impl::_doOneTask(stdx::unique_lock<stdx::mutex>* lk) noexcept {
     invariant(!_pendingTasks.empty());
     LOGV2_DEBUG(
         23109, 3, "Executing a task on behalf of pool", "poolName"_attr = _options.poolName);

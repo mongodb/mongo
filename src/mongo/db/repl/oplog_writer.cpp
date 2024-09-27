@@ -62,12 +62,12 @@ Future<void> OplogWriter::startup() {
 }
 
 void OplogWriter::shutdown() {
-    stdx::lock_guard<Latch> lock(_mutex);
+    stdx::lock_guard<stdx::mutex> lock(_mutex);
     _inShutdown = true;
 }
 
 bool OplogWriter::inShutdown() const {
-    stdx::lock_guard<Latch> lock(_mutex);
+    stdx::lock_guard<stdx::mutex> lock(_mutex);
     return _inShutdown;
 }
 

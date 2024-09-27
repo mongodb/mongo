@@ -52,14 +52,14 @@ MONGO_FAIL_POINT_DEFINE(hangBeforeMajorityReadTransactionStarted);
 }
 
 void WiredTigerSnapshotManager::setCommittedSnapshot(const Timestamp& timestamp) {
-    stdx::lock_guard<Latch> lock(_committedSnapshotMutex);
+    stdx::lock_guard<stdx::mutex> lock(_committedSnapshotMutex);
 
     invariant(!_committedSnapshot || *_committedSnapshot <= timestamp);
     _committedSnapshot = timestamp;
 }
 
 void WiredTigerSnapshotManager::setLastApplied(const Timestamp& timestamp) {
-    stdx::lock_guard<Latch> lock(_lastAppliedMutex);
+    stdx::lock_guard<stdx::mutex> lock(_lastAppliedMutex);
     if (timestamp.isNull())
         _lastApplied = boost::none;
     else
@@ -67,17 +67,17 @@ void WiredTigerSnapshotManager::setLastApplied(const Timestamp& timestamp) {
 }
 
 boost::optional<Timestamp> WiredTigerSnapshotManager::getLastApplied() {
-    stdx::lock_guard<Latch> lock(_lastAppliedMutex);
+    stdx::lock_guard<stdx::mutex> lock(_lastAppliedMutex);
     return _lastApplied;
 }
 
 void WiredTigerSnapshotManager::clearCommittedSnapshot() {
-    stdx::lock_guard<Latch> lock(_committedSnapshotMutex);
+    stdx::lock_guard<stdx::mutex> lock(_committedSnapshotMutex);
     _committedSnapshot = boost::none;
 }
 
 boost::optional<Timestamp> WiredTigerSnapshotManager::getMinSnapshotForNextCommittedRead() const {
-    stdx::lock_guard<Latch> lock(_committedSnapshotMutex);
+    stdx::lock_guard<stdx::mutex> lock(_committedSnapshotMutex);
     return _committedSnapshot;
 }
 
@@ -88,7 +88,7 @@ Timestamp WiredTigerSnapshotManager::beginTransactionOnCommittedSnapshot(
     RecoveryUnit::UntimestampedWriteAssertionLevel untimestampedWriteAssertion) const {
 
     auto committedSnapshot = [this]() {
-        stdx::lock_guard<Latch> lock(_committedSnapshotMutex);
+        stdx::lock_guard<stdx::mutex> lock(_committedSnapshotMutex);
         uassert(ErrorCodes::ReadConcernMajorityNotAvailableYet,
                 "Committed view disappeared while running operation",
                 _committedSnapshot);

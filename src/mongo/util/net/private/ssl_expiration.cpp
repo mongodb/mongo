@@ -45,7 +45,7 @@ static const auto oneDay = Hours(24);
 CertificateExpirationMonitor* theCertificateExpirationMonitor;
 
 void CertificateExpirationMonitor::updateExpirationDeadline(Date_t date) {
-    stdx::lock_guard<Mutex> lock(_mutex);
+    stdx::lock_guard<stdx::mutex> lock(_mutex);
     _certExpiration = date;
 }
 
@@ -57,7 +57,7 @@ CertificateExpirationMonitor* CertificateExpirationMonitor::get() {
 }
 
 void CertificateExpirationMonitor::start(ServiceContext* service) {
-    stdx::lock_guard<Mutex> lock(_mutex);
+    stdx::lock_guard<stdx::mutex> lock(_mutex);
 
     auto periodicRunner = service->getPeriodicRunner();
     invariant(periodicRunner);
@@ -76,7 +76,7 @@ void CertificateExpirationMonitor::start(ServiceContext* service) {
 
 void CertificateExpirationMonitor::run(Client*) {
     const Date_t now = Date_t::now();
-    stdx::lock_guard<Mutex> lock(_mutex);
+    stdx::lock_guard<stdx::mutex> lock(_mutex);
     if (_certExpiration <= now) {
         // The certificate has expired.
         LOGV2_WARNING(23785,

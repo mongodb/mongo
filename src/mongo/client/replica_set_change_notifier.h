@@ -40,7 +40,7 @@
 
 #include "mongo/client/connection_string.h"
 #include "mongo/executor/task_executor.h"
-#include "mongo/platform/mutex.h"
+#include "mongo/stdx/mutex.h"
 #include "mongo/stdx/unordered_map.h"
 #include "mongo/util/functional.h"
 #include "mongo/util/hierarchical_acquisition.h"

@@ -42,7 +42,7 @@
 #include "mongo/db/query/stats/collection_statistics.h"
 #include "mongo/db/query/stats/stats_cache_loader.h"
 #include "mongo/db/service_context.h"
-#include "mongo/platform/mutex.h"
+#include "mongo/stdx/mutex.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/concurrency/thread_pool.h"
 #include "mongo/util/concurrency/thread_pool_interface.h"

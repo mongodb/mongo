@@ -287,7 +287,7 @@ void OplogFetcher::_doShutdown_inlock() noexcept {
     _shutdownCondVar.notify_all();
 }
 
-Mutex* OplogFetcher::_getMutex() noexcept {
+stdx::mutex* OplogFetcher::_getMutex() noexcept {
     return &_mutex;
 }
 
@@ -342,7 +342,7 @@ Milliseconds OplogFetcher::getRetriedFindMaxTime_forTest() const {
 }
 
 void OplogFetcher::_setSocketTimeout(long long timeout) {
-    stdx::lock_guard<Latch> lock(_mutex);
+    stdx::lock_guard<stdx::mutex> lock(_mutex);
     invariant(_conn);
     // setSoTimeout takes a double representing the number of seconds for send and receive
     // timeouts. Thus, we must express the timeout in milliseconds and divide by 1000.0 to get
@@ -351,7 +351,7 @@ void OplogFetcher::_setSocketTimeout(long long timeout) {
 }
 
 OpTime OplogFetcher::_getLastOpTimeFetched() const {
-    stdx::lock_guard<Latch> lock(_mutex);
+    stdx::lock_guard<stdx::mutex> lock(_mutex);
     return _lastFetched;
 }
 
@@ -375,7 +375,7 @@ void OplogFetcher::_finishCallback(Status status) {
 
     decltype(_onShutdownCallbackFn) onShutdownCallbackFn;
     decltype(_oplogFetcherRestartDecision) oplogFetcherRestartDecision;
-    stdx::lock_guard<Latch> lock(_mutex);
+    stdx::lock_guard<stdx::mutex> lock(_mutex);
     _transitionToComplete_inlock();
 
     // Release any resources that might be held by the '_onShutdownCallbackFn' function object.
@@ -399,7 +399,7 @@ void OplogFetcher::_runQuery(const executor::TaskExecutor::CallbackArgs& callbac
 
     bool hadExistingConnection = true;
     {
-        stdx::lock_guard<Latch> lock(_mutex);
+        stdx::lock_guard<stdx::mutex> lock(_mutex);
         if (!_conn) {
             _conn = _createClientFn();
             hadExistingConnection = false;
@@ -432,7 +432,7 @@ void OplogFetcher::_runQuery(const executor::TaskExecutor::CallbackArgs& callbac
         {
             // Both of these checks need to happen while holding the mutex since they could race
             // with shutdown.
-            stdx::lock_guard<Latch> lock(_mutex);
+            stdx::lock_guard<stdx::mutex> lock(_mutex);
             if (_isShuttingDown_inlock()) {
                 status = {ErrorCodes::CallbackCanceled, "oplog fetcher shutting down"};
             } else if (_runQueryHandle.isCanceled()) {
@@ -487,7 +487,7 @@ void OplogFetcher::_runQuery(const executor::TaskExecutor::CallbackArgs& callbac
             if (!_cursor->tailable()) {
                 try {
                     auto opCtx = cc().makeOperationContext();
-                    stdx::unique_lock<Latch> lk(_mutex);
+                    stdx::unique_lock<stdx::mutex> lk(_mutex);
                     // Wait a little before re-running the aggregation command on the donor's
                     // oplog. We are not actually intending to wait for shutdown here, we use
                     // this as a way to wait while still being able to be interrupted outside of
@@ -1002,7 +1002,7 @@ Status OplogFetcher::_onSuccessfulBatch(const Documents& documents) {
                     "Oplog fetcher setting last fetched optime ahead after batch",
                     "lastDocOpTime"_attr = lastDocOpTime);
 
-        stdx::lock_guard<Latch> lock(_mutex);
+        stdx::lock_guard<stdx::mutex> lock(_mutex);
         _lastFetched = lastDocOpTime;
     }
 

@@ -402,7 +402,7 @@ ReshardingRecipientService::RecipientStateMachine::_runUntilStrictConsistencyOrE
             {
                 // The recipient is done with all local transitions until the coordinator makes its
                 // decision.
-                stdx::lock_guard<Latch> lk(_mutex);
+                stdx::lock_guard<stdx::mutex> lk(_mutex);
                 invariant(_recipientCtx.getState() >= RecipientStateEnum::kError);
                 ensureFulfilledPromise(lk, _inStrictConsistencyOrError);
             }
@@ -569,7 +569,7 @@ ExecutorFuture<void> ReshardingRecipientService::RecipientStateMachine::_runMand
 
             // Wait for all of the data replication components to halt. We ignore any data
             // replication errors because resharding is known to have failed already.
-            stdx::lock_guard<Latch> lk(_mutex);
+            stdx::lock_guard<stdx::mutex> lk(_mutex);
             ensureFulfilledPromise(lk, _completionPromise, outerStatus);
             return outerStatus;
         });
@@ -633,7 +633,7 @@ SemiFuture<void> ReshardingRecipientService::RecipientStateMachine::run(
 }
 
 void ReshardingRecipientService::RecipientStateMachine::interrupt(Status status) {
-    stdx::lock_guard<Latch> lk(_mutex);
+    stdx::lock_guard<stdx::mutex> lk(_mutex);
     if (_dataReplication) {
         _dataReplication->shutdown();
     }
@@ -661,7 +661,7 @@ void ReshardingRecipientService::RecipientStateMachine::onReshardingFieldsChange
         return;
     }
 
-    stdx::lock_guard<Latch> lk(_mutex);
+    stdx::lock_guard<stdx::mutex> lk(_mutex);
     auto coordinatorState = reshardingFields.getState();
     if (coordinatorState >= CoordinatorStateEnum::kCloning) {
         auto recipientFields = *reshardingFields.getRecipientFields();
@@ -1373,7 +1373,7 @@ void ReshardingRecipientService::RecipientStateMachine::insertStateDocument(
 }
 
 void ReshardingRecipientService::RecipientStateMachine::commit() {
-    stdx::lock_guard<Latch> lk(_mutex);
+    stdx::lock_guard<stdx::mutex> lk(_mutex);
     tassert(ErrorCodes::ReshardCollectionInProgress,
             "Attempted to commit the resharding operation in an incorrect state",
             _recipientCtx.getState() >= RecipientStateEnum::kStrictConsistency);
@@ -1430,7 +1430,7 @@ void ReshardingRecipientService::RecipientStateMachine::_updateRecipientDocument
                  kNoWaitWriteConcern);
 
     {
-        stdx::lock_guard<Latch> lk(_mutex);
+        stdx::lock_guard<stdx::mutex> lk(_mutex);
         _recipientCtx = newRecipientCtx;
     }
     setMeticsAfterWrite(_metrics.get(), newRecipientCtx.getState(), timestamp);
@@ -1467,7 +1467,7 @@ void ReshardingRecipientService::RecipientStateMachine::_removeRecipientDocument
 
         shard_role_details::getRecoveryUnit(opCtx.get())
             ->onCommit([this](OperationContext*, boost::optional<Timestamp>) {
-                stdx::lock_guard<Latch> lk(_mutex);
+                stdx::lock_guard<stdx::mutex> lk(_mutex);
                 _completionPromise.emplaceValue();
             });
 
@@ -1598,7 +1598,7 @@ void ReshardingRecipientService::RecipientStateMachine::_restoreMetrics(
 CancellationToken ReshardingRecipientService::RecipientStateMachine::_initAbortSource(
     const CancellationToken& stepdownToken) {
     {
-        stdx::lock_guard<Latch> lk(_mutex);
+        stdx::lock_guard<stdx::mutex> lk(_mutex);
         _abortSource = CancellationSource(stepdownToken);
     }
 
@@ -1645,7 +1645,7 @@ void ReshardingRecipientService::RecipientStateMachine::_tryFetchBuildIndexMetri
 
 void ReshardingRecipientService::RecipientStateMachine::abort(bool isUserCancelled) {
     auto abortSource = [&]() -> boost::optional<CancellationSource> {
-        stdx::lock_guard<Latch> lk(_mutex);
+        stdx::lock_guard<stdx::mutex> lk(_mutex);
         _userCanceled.emplace(isUserCancelled);
         if (_dataReplication) {
             _dataReplication->shutdown();

@@ -39,7 +39,6 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/executor/remote_command_response.h"
 #include "mongo/executor/task_executor.h"
-#include "mongo/platform/mutex.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/net/hostandport.h"
 

@@ -48,8 +48,8 @@
 #include "mongo/db/service_context.h"
 #include "mongo/executor/scoped_task_executor.h"
 #include "mongo/idl/idl_parser.h"
-#include "mongo/platform/mutex.h"
 #include "mongo/s/request_types/sharded_ddl_commands_gen.h"
+#include "mongo/stdx/mutex.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/cancellation.h"
 #include "mongo/util/concurrency/thread_pool.h"
@@ -137,7 +137,7 @@ public:
      * after releasing the critical section on source and target collection.
      */
     boost::optional<SharedSemiFuture<void>> getUnblockCrudFutureFor(const UUID& sourceUUID) {
-        stdx::lock_guard<Latch> lg(_stateMutex);
+        stdx::lock_guard<stdx::mutex> lg(_stateMutex);
         if (sourceUUID != _doc.getSourceUUID()) {
             return boost::none;
         }

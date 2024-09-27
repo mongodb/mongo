@@ -74,8 +74,8 @@
 #include "mongo/db/storage/write_unit_of_work.h"
 #include "mongo/db/transaction_resources.h"
 #include "mongo/idl/server_parameter_test_util.h"
-#include "mongo/platform/mutex.h"
 #include "mongo/stdx/condition_variable.h"
+#include "mongo/stdx/mutex.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/unittest/assert.h"
 #include "mongo/unittest/bson_test_util.h"
@@ -1279,7 +1279,7 @@ private:
         Timestamp timestamp,
         Callable&& ddlOperation,
         std::function<void(OperationContext* opCtx)> catalogOperations) {
-        mongo::Mutex mutex;
+        stdx::mutex mutex;
         stdx::condition_variable cv;
         int numCalls = 0;
 
@@ -1362,7 +1362,7 @@ private:
         bool expectedExistence,
         int expectedNumIndexes,
         std::function<void()> verifyStateCallback = {}) {
-        mongo::Mutex mutex;
+        stdx::mutex mutex;
         stdx::condition_variable cv;
         int numCalls = 0;
 

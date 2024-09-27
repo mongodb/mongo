@@ -40,11 +40,11 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/repl/replica_set_aware_service.h"
 #include "mongo/db/service_context.h"
-#include "mongo/platform/mutex.h"
 #include "mongo/s/analyze_shard_key_common_gen.h"
 #include "mongo/s/analyze_shard_key_documents_gen.h"
 #include "mongo/s/analyze_shard_key_role.h"
 #include "mongo/s/catalog/type_mongos.h"
+#include "mongo/stdx/mutex.h"
 #include "mongo/stdx/unordered_map.h"
 #include "mongo/util/periodic_runner.h"
 #include "mongo/util/string_map.h"
@@ -134,22 +134,22 @@ public:
 
 
     CollectionQueryAnalyzerConfigurationMap getConfigurationsForTest() const {
-        stdx::lock_guard<Latch> lk(_mutex);
+        stdx::lock_guard<stdx::mutex> lk(_mutex);
         return _configurations;
     }
 
     void clearConfigurationsForTest() {
-        stdx::lock_guard<Latch> lk(_mutex);
+        stdx::lock_guard<stdx::mutex> lk(_mutex);
         _configurations.clear();
     }
 
     StringMap<Sampler> getSamplersForTest() const {
-        stdx::lock_guard<Latch> lk(_mutex);
+        stdx::lock_guard<stdx::mutex> lk(_mutex);
         return _samplers;
     }
 
     void clearSamplersForTest() {
-        stdx::lock_guard<Latch> lk(_mutex);
+        stdx::lock_guard<stdx::mutex> lk(_mutex);
         _samplers.clear();
     }
 

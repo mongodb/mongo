@@ -38,7 +38,7 @@
 #include "mongo/db/commands/server_status.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/platform/atomic_word.h"
-#include "mongo/platform/mutex.h"
+#include "mongo/stdx/mutex.h"
 #include "mongo/util/tick_source.h"
 #include "mongo/util/timer.h"
 
@@ -115,14 +115,14 @@ public:
     EmuBinaryTracker makeEmuBinaryTracker();
 
     void updateCompactionStats(const CompactStats& stats) {
-        stdx::lock_guard<Mutex> lock(_compactMutex);
+        stdx::lock_guard<stdx::mutex> lock(_compactMutex);
         _hasStats.store(true);
         FLEStatsUtil::accumulateStats(_compactStats.getEsc(), stats.getEsc());
         FLEStatsUtil::accumulateStats(_compactStats.getEcoc(), stats.getEcoc());
     }
 
     void updateCleanupStats(const CleanupStats& stats) {
-        stdx::lock_guard<Mutex> lock(_cleanupMutex);
+        stdx::lock_guard<stdx::mutex> lock(_cleanupMutex);
         _hasStats.store(true);
         FLEStatsUtil::accumulateStats(_cleanupStats.getEsc(), stats.getEsc());
         FLEStatsUtil::accumulateStats(_cleanupStats.getEcoc(), stats.getEcoc());

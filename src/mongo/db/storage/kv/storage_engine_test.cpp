@@ -80,8 +80,8 @@
 #include "mongo/logv2/log.h"
 #include "mongo/logv2/log_component.h"
 #include "mongo/platform/atomic_word.h"
-#include "mongo/platform/mutex.h"
 #include "mongo/stdx/condition_variable.h"
+#include "mongo/stdx/mutex.h"
 #include "mongo/unittest/assert.h"
 #include "mongo/unittest/framework.h"
 #include "mongo/util/assert_util.h"
@@ -701,7 +701,7 @@ TEST_F(TimestampKVEngineTest, TimestampMonitorNotifiesListeners) {
     bool changes[4] = {false, false, false, false};
 
     TimestampListener first(checkpoint, [&](OperationContext* opCtx, Timestamp timestamp) {
-        stdx::lock_guard<Latch> lock(mutex);
+        stdx::lock_guard<stdx::mutex> lock(mutex);
         if (!changes[0]) {
             changes[0] = true;
             cv.notify_all();
@@ -709,7 +709,7 @@ TEST_F(TimestampKVEngineTest, TimestampMonitorNotifiesListeners) {
     });
 
     TimestampListener second(oldest, [&](OperationContext* opCtx, Timestamp timestamp) {
-        stdx::lock_guard<Latch> lock(mutex);
+        stdx::lock_guard<stdx::mutex> lock(mutex);
         if (!changes[1]) {
             changes[1] = true;
             cv.notify_all();
@@ -717,7 +717,7 @@ TEST_F(TimestampKVEngineTest, TimestampMonitorNotifiesListeners) {
     });
 
     TimestampListener third(stable, [&](OperationContext* opCtx, Timestamp timestamp) {
-        stdx::lock_guard<Latch> lock(mutex);
+        stdx::lock_guard<stdx::mutex> lock(mutex);
         if (!changes[2]) {
             changes[2] = true;
             cv.notify_all();
@@ -725,7 +725,7 @@ TEST_F(TimestampKVEngineTest, TimestampMonitorNotifiesListeners) {
     });
 
     TimestampListener fourth(stable, [&](OperationContext* opCtx, Timestamp timestamp) {
-        stdx::lock_guard<Latch> lock(mutex);
+        stdx::lock_guard<stdx::mutex> lock(mutex);
         if (!changes[3]) {
             changes[3] = true;
             cv.notify_all();
@@ -739,7 +739,7 @@ TEST_F(TimestampKVEngineTest, TimestampMonitorNotifiesListeners) {
 
     // Wait until all 4 listeners get notified at least once.
     {
-        stdx::unique_lock<Latch> lk(mutex);
+        stdx::unique_lock<stdx::mutex> lk(mutex);
         cv.wait(lk, [&] {
             for (auto const& change : changes) {
                 if (!change) {

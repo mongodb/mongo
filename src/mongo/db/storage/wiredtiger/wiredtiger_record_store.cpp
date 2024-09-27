@@ -1634,7 +1634,7 @@ void WiredTigerRecordStore::_initNextIdIfNeeded(OperationContext* opCtx) {
     }
 
     // Only one thread needs to do this.
-    stdx::lock_guard<Latch> lk(_initNextIdMutex);
+    stdx::lock_guard<stdx::mutex> lk(_initNextIdMutex);
     if (_nextIdNum.load() > 0) {
         return;
     }

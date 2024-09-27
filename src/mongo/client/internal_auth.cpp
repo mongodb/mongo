@@ -45,7 +45,7 @@
 #include "mongo/db/auth/sasl_command_constants.h"
 #include "mongo/db/auth/user.h"
 #include "mongo/db/auth/user_name.h"
-#include "mongo/platform/mutex.h"
+#include "mongo/stdx/mutex.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/password_digest.h"
 #include "mongo/util/read_through_cache.h"
@@ -60,7 +60,7 @@ static std::vector<std::string> internalAuthKeys;
 static BSONObj internalAuthParams;
 
 void setInternalAuthKeys(const std::vector<std::string>& keys) {
-    stdx::lock_guard<Latch> lk(internalAuthKeysMutex);
+    stdx::lock_guard<stdx::mutex> lk(internalAuthKeysMutex);
 
     internalAuthKeys = keys;
     fassert(50996, internalAuthKeys.size() > 0);
@@ -68,19 +68,19 @@ void setInternalAuthKeys(const std::vector<std::string>& keys) {
 }
 
 void setInternalUserAuthParams(BSONObj obj) {
-    stdx::lock_guard<Latch> lk(internalAuthKeysMutex);
+    stdx::lock_guard<stdx::mutex> lk(internalAuthKeysMutex);
     internalAuthParams = obj.getOwned();
     internalAuthKeys.clear();
     internalAuthSet = true;
 }
 
 bool hasMultipleInternalAuthKeys() {
-    stdx::lock_guard<Latch> lk(internalAuthKeysMutex);
+    stdx::lock_guard<stdx::mutex> lk(internalAuthKeysMutex);
     return internalAuthSet && internalAuthKeys.size() > 1;
 }
 
 bool isInternalAuthSet() {
-    stdx::lock_guard<Latch> lk(internalAuthKeysMutex);
+    stdx::lock_guard<stdx::mutex> lk(internalAuthKeysMutex);
     return internalAuthSet;
 }
 
@@ -97,7 +97,7 @@ BSONObj createInternalX509AuthDocument(boost::optional<StringData> userName) {
 }
 
 BSONObj getInternalAuthParams(size_t idx, StringData mechanism) {
-    stdx::lock_guard<Latch> lk(internalAuthKeysMutex);
+    stdx::lock_guard<stdx::mutex> lk(internalAuthKeysMutex);
     if (!internalAuthSet) {
         return BSONObj();
     }
@@ -137,7 +137,7 @@ std::string getBSONString(const BSONObj& container, StringData field) {
 
 
 std::string getInternalAuthDB() {
-    stdx::lock_guard<Latch> lk(internalAuthKeysMutex);
+    stdx::lock_guard<stdx::mutex> lk(internalAuthKeysMutex);
 
     if (!internalAuthParams.isEmpty()) {
         return getBSONString(internalAuthParams, saslCommandUserDBFieldName);

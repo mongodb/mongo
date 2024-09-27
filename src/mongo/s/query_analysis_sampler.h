@@ -38,10 +38,10 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/service_context.h"
-#include "mongo/platform/mutex.h"
 #include "mongo/s/analyze_shard_key_common_gen.h"
 #include "mongo/s/analyze_shard_key_role.h"
 #include "mongo/s/analyze_shard_key_server_parameters_gen.h"
+#include "mongo/stdx/mutex.h"
 #include "mongo/util/assert_util_core.h"
 #include "mongo/util/periodic_runner.h"
 #include "mongo/util/tick_source.h"
@@ -207,7 +207,7 @@ public:
     void onShutdown();
 
     void gotCommand(StringData cmdName) {
-        stdx::lock_guard<Latch> lk(_queryStatsMutex);
+        stdx::lock_guard<stdx::mutex> lk(_queryStatsMutex);
         _queryStats.gotCommand(cmdName);
     }
 
@@ -227,7 +227,7 @@ public:
     }
 
     QueryStats getQueryStatsForTest() const {
-        stdx::lock_guard<Latch> lk(_queryStatsMutex);
+        stdx::lock_guard<stdx::mutex> lk(_queryStatsMutex);
         return _queryStats;
     }
 
@@ -236,7 +236,7 @@ public:
     }
 
     std::map<NamespaceString, SampleRateLimiter> getRateLimitersForTest() const {
-        stdx::lock_guard<Latch> lk(_sampleRateLimitersMutex);
+        stdx::lock_guard<stdx::mutex> lk(_sampleRateLimitersMutex);
         return _sampleRateLimiters;
     }
 

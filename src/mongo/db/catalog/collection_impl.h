@@ -72,7 +72,7 @@
 #include "mongo/db/timeseries/timeseries_gen.h"
 #include "mongo/db/transaction_resources.h"
 #include "mongo/platform/atomic_word.h"
-#include "mongo/platform/mutex.h"
+#include "mongo/stdx/mutex.h"
 #include "mongo/util/uuid.h"
 #include "mongo/util/version/releases.h"
 

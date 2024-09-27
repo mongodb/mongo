@@ -54,8 +54,8 @@
 #include "mongo/executor/network_interface_mock.h"
 #include "mongo/executor/task_executor_test_fixture.h"
 #include "mongo/executor/thread_pool_task_executor_test_fixture.h"
-#include "mongo/platform/mutex.h"
 #include "mongo/rpc/metadata/repl_set_metadata.h"
+#include "mongo/stdx/mutex.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/stdx/unordered_set.h"
 #include "mongo/unittest/assert.h"
@@ -131,13 +131,13 @@ Status CheckQuorumTest::waitForQuorumCheck() {
 }
 
 bool CheckQuorumTest::isQuorumCheckDone() {
-    stdx::lock_guard<Latch> lk(_mutex);
+    stdx::lock_guard<stdx::mutex> lk(_mutex);
     return _isQuorumCheckDone;
 }
 
 void CheckQuorumTest::_runQuorumCheck(const ReplSetConfig& config, int myIndex) {
     _quorumCheckStatus = _runQuorumCheckImpl(config, myIndex);
-    stdx::lock_guard<Latch> lk(_mutex);
+    stdx::lock_guard<stdx::mutex> lk(_mutex);
     _isQuorumCheckDone = true;
 }
 

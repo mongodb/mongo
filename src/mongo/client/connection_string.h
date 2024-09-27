@@ -40,7 +40,7 @@
 #include "mongo/base/string_data.h"
 #include "mongo/bson/util/builder.h"
 #include "mongo/bson/util/builder_fwd.h"
-#include "mongo/platform/mutex.h"
+#include "mongo/stdx/mutex.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/net/hostandport.h"
 
@@ -185,12 +185,12 @@ public:
     };
 
     static void setConnectionHook(ConnectionHook* hook) {
-        stdx::lock_guard<Latch> lk(_connectHookMutex);
+        stdx::lock_guard<stdx::mutex> lk(_connectHookMutex);
         _connectHook = hook;
     }
 
     static ConnectionHook* getConnectionHook() {
-        stdx::lock_guard<Latch> lk(_connectHookMutex);
+        stdx::lock_guard<stdx::mutex> lk(_connectHookMutex);
         return _connectHook;
     }
 
@@ -225,7 +225,7 @@ private:
     std::string _string;
     std::string _replicaSetName;
 
-    static Mutex _connectHookMutex;
+    static stdx::mutex _connectHookMutex;
     static ConnectionHook* _connectHook;
 };
 

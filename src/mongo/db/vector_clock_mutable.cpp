@@ -39,7 +39,7 @@
 #include "mongo/logv2/log.h"
 #include "mongo/logv2/log_attr.h"
 #include "mongo/logv2/log_component.h"
-#include "mongo/platform/mutex.h"
+#include "mongo/stdx/mutex.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/clock_source.h"
 #include "mongo/util/decorable.h"
@@ -80,7 +80,7 @@ void VectorClockMutable::registerVectorClockOnServiceContext(
 LogicalTime VectorClockMutable::_advanceComponentTimeByTicks(Component component, uint64_t nTicks) {
     invariant(nTicks > 0 && nTicks <= kMaxValue);
 
-    stdx::lock_guard<Latch> lock(_mutex);
+    stdx::lock_guard<stdx::mutex> lock(_mutex);
 
     LogicalTime time = _vectorTime[component];
 
@@ -126,7 +126,7 @@ LogicalTime VectorClockMutable::_advanceComponentTimeByTicks(Component component
 }
 
 void VectorClockMutable::_advanceComponentTimeTo(Component component, LogicalTime&& newTime) {
-    stdx::lock_guard<Latch> lock(_mutex);
+    stdx::lock_guard<stdx::mutex> lock(_mutex);
 
     // Rate limit checks are skipped here so a server with no activity for longer than
     // maxAcceptableLogicalClockDriftSecs seconds can still have its cluster time initialized.

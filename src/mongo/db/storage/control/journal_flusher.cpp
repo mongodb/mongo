@@ -100,7 +100,7 @@ void JournalFlusher::run() {
     // infrastructure is still being set up and expects sole access to the service context (there is
     // no conurrency control on the service context during this phase).
     if (_disablePeriodicFlushes) {
-        stdx::unique_lock<Latch> lk(_stateMutex);
+        stdx::unique_lock<stdx::mutex> lk(_stateMutex);
         _flushJournalNowCV.wait(lk,
                                 [&] { return _flushJournalNow || _needToPause || _shuttingDown; });
     }
@@ -122,7 +122,7 @@ void JournalFlusher::run() {
     };
 
     {
-        stdx::lock_guard<Latch> lk(_opCtxMutex);
+        stdx::lock_guard<stdx::mutex> lk(_opCtxMutex);
         setUpOpCtx(lk);
     }
 
@@ -139,7 +139,7 @@ void JournalFlusher::run() {
         } catch (const AssertionException& e) {
             {
                 // Reset opCtx if we get an error.
-                stdx::lock_guard<Latch> lk(_opCtxMutex);
+                stdx::lock_guard<stdx::mutex> lk(_opCtxMutex);
                 tearDownOpCtx(lk);
                 setUpOpCtx(lk);
             }
@@ -173,7 +173,7 @@ void JournalFlusher::run() {
         auto deadline =
             Date_t::now() + Milliseconds(storageGlobalParams.journalCommitIntervalMs.load());
 
-        stdx::unique_lock<Latch> lk(_stateMutex);
+        stdx::unique_lock<stdx::mutex> lk(_stateMutex);
 
         MONGO_IDLE_THREAD_BLOCK;
         if (_disablePeriodicFlushes || MONGO_unlikely(pauseJournalFlusherThread.shouldFail())) {
@@ -208,7 +208,7 @@ void JournalFlusher::run() {
             _state = States::ShutDown;
             _stateChangeCV.notify_all();
 
-            stdx::lock_guard<Latch> lk(_opCtxMutex);
+            stdx::lock_guard<stdx::mutex> lk(_opCtxMutex);
             tearDownOpCtx(lk);
             return;
         }
@@ -222,7 +222,7 @@ void JournalFlusher::run() {
 void JournalFlusher::shutdown(const Status& reason) {
     LOGV2(22320, "Shutting down journal flusher thread");
     {
-        stdx::lock_guard<Latch> lk(_stateMutex);
+        stdx::lock_guard<stdx::mutex> lk(_stateMutex);
         _shuttingDown = true;
         _shutdownReason = reason;
         _flushJournalNowCV.notify_one();
@@ -234,7 +234,7 @@ void JournalFlusher::shutdown(const Status& reason) {
 void JournalFlusher::pause() {
     LOGV2(5142500, "Pausing journal flusher thread");
     {
-        stdx::unique_lock<Latch> lk(_stateMutex);
+        stdx::unique_lock<stdx::mutex> lk(_stateMutex);
         _needToPause = true;
         _stateChangeCV.wait(lk,
                             [&] { return _state == States::Paused || _state == States::ShutDown; });
@@ -245,7 +245,7 @@ void JournalFlusher::pause() {
 void JournalFlusher::resume() {
     LOGV2(5142502, "Resuming journal flusher thread");
     {
-        stdx::lock_guard<Latch> lk(_stateMutex);
+        stdx::lock_guard<stdx::mutex> lk(_stateMutex);
         _needToPause = false;
         _flushJournalNowCV.notify_one();
     }
@@ -254,7 +254,7 @@ void JournalFlusher::resume() {
 
 void JournalFlusher::waitForJournalFlush(Interruptible* interruptible) {
     auto myFuture = [&]() {
-        stdx::lock_guard<Latch> lk(_stateMutex);
+        stdx::lock_guard<stdx::mutex> lk(_stateMutex);
         _triggerJournalFlush(lk);
         return _nextSharedPromise->getFuture();
     }();
@@ -264,12 +264,12 @@ void JournalFlusher::waitForJournalFlush(Interruptible* interruptible) {
 }
 
 void JournalFlusher::triggerJournalFlush() {
-    stdx::unique_lock<Latch> lk(_stateMutex);
+    stdx::unique_lock<stdx::mutex> lk(_stateMutex);
     _triggerJournalFlush(lk);
 }
 
 void JournalFlusher::interruptJournalFlusherForReplStateChange() {
-    stdx::lock_guard<Latch> lk(_opCtxMutex);
+    stdx::lock_guard<stdx::mutex> lk(_opCtxMutex);
     if (_uniqueCtx) {
         stdx::lock_guard<Client> lk(*_uniqueCtx->get()->getClient());
         _uniqueCtx->get()->markKilled(ErrorCodes::InterruptedDueToReplStateChange);

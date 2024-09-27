@@ -61,9 +61,9 @@
 #include "mongo/db/service_context_d_test_fixture.h"
 #include "mongo/db/storage/named_pipe.h"
 #include "mongo/db/tenant_id.h"
-#include "mongo/platform/mutex.h"
 #include "mongo/platform/random.h"
 #include "mongo/stdx/condition_variable.h"
+#include "mongo/stdx/mutex.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/unittest/assert.h"
 #include "mongo/unittest/bson_test_util.h"
@@ -90,7 +90,7 @@ public:
     }
 
 private:
-    Mutex m;
+    stdx::mutex m;
     stdx::condition_variable cv;
     bool pipeCreated = false;
 };

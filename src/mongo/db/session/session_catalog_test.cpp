@@ -1606,7 +1606,7 @@ TEST_F(SessionCatalogTestWithDefaultOpCtx, ConcurrentCheckOutAndKill) {
             {
                 stdx::mutex m;
                 stdx::condition_variable cond;
-                stdx::unique_lock<Latch> lock(m);
+                stdx::unique_lock<stdx::mutex> lock(m);
                 ASSERT_THROWS_CODE(
                     opCtx->waitForConditionOrInterrupt(cond, lock, [] { return false; }),
                     DBException,

@@ -90,7 +90,7 @@ WatchdogPeriodicThread::WatchdogPeriodicThread(Milliseconds period, StringData t
 
 void WatchdogPeriodicThread::start() {
     {
-        stdx::lock_guard<Latch> lock(_mutex);
+        stdx::lock_guard<stdx::mutex> lock(_mutex);
 
         invariant(_state == State::kNotStarted);
         _state = State::kStarted;
@@ -105,7 +105,7 @@ void WatchdogPeriodicThread::shutdown() {
     stdx::thread thread;
 
     {
-        stdx::lock_guard<Latch> lock(_mutex);
+        stdx::lock_guard<stdx::mutex> lock(_mutex);
 
         bool started = (_state == State::kStarted);
 
@@ -127,14 +127,14 @@ void WatchdogPeriodicThread::shutdown() {
     thread.join();
 
     {
-        stdx::lock_guard<Latch> lock(_mutex);
+        stdx::lock_guard<stdx::mutex> lock(_mutex);
         invariant(_state == State::kShutdownRequested);
         _state = State::kDone;
     }
 }
 
 void WatchdogPeriodicThread::setPeriod(Milliseconds period) {
-    stdx::lock_guard<Latch> lock(_mutex);
+    stdx::lock_guard<stdx::mutex> lock(_mutex);
 
     bool wasEnabled = _enabled;
 
@@ -170,7 +170,7 @@ void WatchdogPeriodicThread::doLoop() {
     auto preciseClockSource = client->getServiceContext()->getPreciseClockSource();
 
     {
-        stdx::lock_guard<Latch> lock(_mutex);
+        stdx::lock_guard<stdx::mutex> lock(_mutex);
 
         // Ensure state is starting from a clean slate.
         resetState();
@@ -184,7 +184,7 @@ void WatchdogPeriodicThread::doLoop() {
         Date_t startTime = preciseClockSource->now();
 
         {
-            stdx::unique_lock<Latch> lock(_mutex);
+            stdx::unique_lock<stdx::mutex> lock(_mutex);
             MONGO_IDLE_THREAD_BLOCK;
 
             while ((startTime + _period) > preciseClockSource->now()) {
@@ -347,7 +347,7 @@ void WatchdogMonitor::start() {
     _watchdogMonitorThread.start();
 
     {
-        stdx::lock_guard<Latch> lock(_mutex);
+        stdx::lock_guard<stdx::mutex> lock(_mutex);
 
         invariant(_state == State::kNotStarted);
         _state = State::kStarted;
@@ -356,7 +356,7 @@ void WatchdogMonitor::start() {
 
 void WatchdogMonitor::pauseChecks() {
     {
-        stdx::lock_guard<Latch> lock(_mutex);
+        stdx::lock_guard<stdx::mutex> lock(_mutex);
         if (_state == State::kStarted || _state == State::kShutdownRequested) {
             LOGV2(8350800, "WatchdogMonitor pausing watchdog checks");
             _watchdogCheckThread.setShouldRunChecks(false);
@@ -366,7 +366,7 @@ void WatchdogMonitor::pauseChecks() {
 
 void WatchdogMonitor::unpauseChecks() {
     {
-        stdx::lock_guard<Latch> lock(_mutex);
+        stdx::lock_guard<stdx::mutex> lock(_mutex);
         if (_state == State::kStarted || _state == State::kShutdownRequested) {
             LOGV2(8350801, "WatchdogMonitor unpausing watchdog checks");
             _watchdogCheckThread.setShouldRunChecks(true);
@@ -380,7 +380,7 @@ bool WatchdogMonitor::getShouldRunChecks_forTest() {
 
 void WatchdogMonitor::setPeriod(Milliseconds duration) {
     {
-        stdx::lock_guard<Latch> lock(_mutex);
+        stdx::lock_guard<stdx::mutex> lock(_mutex);
 
         if (duration > Milliseconds(0)) {
             dassert(duration >= Milliseconds(1));
@@ -408,7 +408,7 @@ void WatchdogMonitor::setPeriod(Milliseconds duration) {
 
 void WatchdogMonitor::shutdown() {
     {
-        stdx::lock_guard<Latch> lock(_mutex);
+        stdx::lock_guard<stdx::mutex> lock(_mutex);
 
         bool started = (_state == State::kStarted);
 
@@ -427,7 +427,7 @@ void WatchdogMonitor::shutdown() {
     _watchdogCheckThread.shutdown();
 
     {
-        stdx::lock_guard<Latch> lock(_mutex);
+        stdx::lock_guard<stdx::mutex> lock(_mutex);
         invariant(_state == State::kShutdownRequested);
         _state = State::kDone;
     }

@@ -39,8 +39,8 @@
 #include "mongo/db/service_context_d_test_fixture.h"
 #include "mongo/db/storage/snapshot_manager.h"
 #include "mongo/db/storage/storage_engine.h"
-#include "mongo/platform/mutex.h"
 #include "mongo/stdx/condition_variable.h"
+#include "mongo/stdx/mutex.h"
 #include "mongo/unittest/assert.h"
 #include "mongo/unittest/framework.h"
 #include "mongo/util/cancellation.h"
@@ -85,7 +85,7 @@ public:
         auto opTimeBefore = _lastOpTimeWaited;
 
         do {
-            stdx::unique_lock<Latch> lk(_mutex);
+            stdx::unique_lock<stdx::mutex> lk(_mutex);
             _isTestReady = true;
             _isTestReadyCV.notify_one();
 
@@ -96,7 +96,7 @@ public:
     }
 
     Status waitForWriteConcernStub(OperationContext* opCtx, const repl::OpTime& opTime) {
-        stdx::unique_lock<Latch> lk(_mutex);
+        stdx::unique_lock<stdx::mutex> lk(_mutex);
 
         _waitForMajorityCallCount++;
         _callCountChangedCV.notify_one();
@@ -118,7 +118,7 @@ public:
     }
 
     const repl::OpTime& getLastOpTimeWaited() {
-        stdx::lock_guard<Latch> lk(_mutex);
+        stdx::lock_guard<stdx::mutex> lk(_mutex);
         return _lastOpTimeWaited;
     }
 

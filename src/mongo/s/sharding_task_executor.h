@@ -38,7 +38,6 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/executor/remote_command_request.h"
 #include "mongo/executor/task_executor.h"
-#include "mongo/platform/mutex.h"
 #include "mongo/stdx/condition_variable.h"
 #include "mongo/util/future.h"
 #include "mongo/util/interruptible.h"

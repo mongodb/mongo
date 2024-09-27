@@ -60,7 +60,7 @@
 #include "mongo/db/storage/record_store.h"
 #include "mongo/db/transaction_resources.h"
 #include "mongo/platform/atomic_word.h"
-#include "mongo/platform/mutex.h"
+#include "mongo/stdx/mutex.h"
 #include "mongo/util/string_listset.h"
 #include "mongo/util/string_map.h"
 #include "mongo/util/uuid.h"

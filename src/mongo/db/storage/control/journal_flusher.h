@@ -36,8 +36,8 @@
 
 #include "mongo/base/status.h"
 #include "mongo/db/service_context.h"
-#include "mongo/platform/mutex.h"
 #include "mongo/stdx/condition_variable.h"
+#include "mongo/stdx/mutex.h"
 #include "mongo/util/background.h"
 #include "mongo/util/future.h"
 #include "mongo/util/future_impl.h"

@@ -85,7 +85,7 @@ public:
     }
 
     // Run callback with a CallbackCanceled error.
-    static void runCallbackCanceled(stdx::unique_lock<Latch>& lk,
+    static void runCallbackCanceled(stdx::unique_lock<stdx::mutex>& lk,
                                     RequestAndCallback rcb,
                                     TaskExecutor* exec) {
         CallbackHandle cbHandle;
@@ -99,7 +99,7 @@ public:
     }
 
     // Run callback with the provided result.
-    static void runCallbackFinished(stdx::unique_lock<Latch>& lk,
+    static void runCallbackFinished(stdx::unique_lock<stdx::mutex>& lk,
                                     RequestAndCallback rcb,
                                     TaskExecutor* exec,
                                     const StatusWith<RemoteCommandResponse>& result,
@@ -179,7 +179,7 @@ StatusWith<TaskExecutor::CallbackHandle> PinnedConnectionTaskExecutor::scheduleR
     const RemoteCommandCallbackFn& cb,
     const BatonHandle& baton) {
 
-    stdx::unique_lock<Latch> lk{_mutex};
+    stdx::unique_lock<stdx::mutex> lk{_mutex};
     if (_state != State::running) {
         return {ErrorCodes::ShutdownInProgress, "Shutdown in progress"};
     }
@@ -279,7 +279,7 @@ Future<executor::RemoteCommandResponse> PinnedConnectionTaskExecutor::_runSingle
 }
 
 boost::optional<PinnedConnectionTaskExecutor::RequestAndCallback>
-PinnedConnectionTaskExecutor::_getFirstUncanceledRequest(stdx::unique_lock<Latch>& lk) {
+PinnedConnectionTaskExecutor::_getFirstUncanceledRequest(stdx::unique_lock<stdx::mutex>& lk) {
     while (!_requestQueue.empty()) {
         auto req = std::move(_requestQueue.front());
         _requestQueue.pop_front();
@@ -292,7 +292,7 @@ PinnedConnectionTaskExecutor::_getFirstUncanceledRequest(stdx::unique_lock<Latch
     return boost::none;
 }
 
-void PinnedConnectionTaskExecutor::_doNetworking(stdx::unique_lock<Latch>&& lk) {
+void PinnedConnectionTaskExecutor::_doNetworking(stdx::unique_lock<stdx::mutex>&& lk) {
     _isDoingNetworking = true;
     // Find the first non-canceled request.
     boost::optional<RequestAndCallback> maybeReqToRun = _getFirstUncanceledRequest(lk);
@@ -316,7 +316,7 @@ void PinnedConnectionTaskExecutor::_doNetworking(stdx::unique_lock<Latch>&& lk) 
         .then([req, this]() { return _runSingleCommand(req.first, req.second); })
         .thenRunOn(makeGuaranteedExecutor(req.second->baton, _cancellationExecutor))
         .getAsync([req, this](StatusWith<RemoteCommandResponse> result) {
-            stdx::unique_lock<Latch> lk{_mutex};
+            stdx::unique_lock<stdx::mutex> lk{_mutex};
             _inProgressRequest.reset();
             // If we used the _stream, update it accordingly.
             if (req.second->startedNetworking) {

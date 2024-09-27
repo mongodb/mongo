@@ -58,9 +58,9 @@
 #include "mongo/logv2/log.h"
 #include "mongo/logv2/log_attr.h"
 #include "mongo/logv2/log_component.h"
-#include "mongo/platform/mutex.h"
 #include "mongo/rpc/metadata/egress_metadata_hook_list.h"
 #include "mongo/rpc/metadata/metadata_hook.h"
+#include "mongo/stdx/mutex.h"
 #include "mongo/transport/transport_layer.h"
 #include "mongo/util/decorable.h"
 #include "mongo/util/str.h"
@@ -139,7 +139,7 @@ ReplicaSetMonitorManager* ReplicaSetMonitorManager::get() {
 }
 
 shared_ptr<ReplicaSetMonitor> ReplicaSetMonitorManager::getMonitor(StringData setName) {
-    stdx::lock_guard<Latch> lk(_mutex);
+    stdx::lock_guard<stdx::mutex> lk(_mutex);
     _doGarbageCollectionLocked(lk);
 
     if (auto monitor = _monitors[setName].lock()) {
@@ -183,7 +183,7 @@ shared_ptr<ReplicaSetMonitor> ReplicaSetMonitorManager::getOrCreateMonitor(
 shared_ptr<ReplicaSetMonitor> ReplicaSetMonitorManager::getOrCreateMonitor(
     const MongoURI& uri, std::function<void()> cleanupCallback) {
     invariant(uri.type() == ConnectionString::ConnectionType::kReplicaSet);
-    stdx::lock_guard<Latch> lk(_mutex);
+    stdx::lock_guard<stdx::mutex> lk(_mutex);
     uassert(ErrorCodes::ShutdownInProgress,
             str::stream() << "Unable to get monitor for '" << uri << "' due to shutdown",
             !_isShutdown);
@@ -218,7 +218,7 @@ shared_ptr<ReplicaSetMonitor> ReplicaSetMonitorManager::getMonitorForHost(const 
     // the mutex.
     vector<shared_ptr<ReplicaSetMonitor>> rsmPtrs;
 
-    stdx::lock_guard<Latch> lk(_mutex);
+    stdx::lock_guard<stdx::mutex> lk(_mutex);
 
     for (const auto& entry : _monitors) {
         auto monitor = entry.second.lock();
@@ -233,7 +233,7 @@ shared_ptr<ReplicaSetMonitor> ReplicaSetMonitorManager::getMonitorForHost(const 
 
 vector<string> ReplicaSetMonitorManager::getAllSetNames() const {
     vector<string> allNames;
-    stdx::lock_guard<Latch> lk(_mutex);
+    stdx::lock_guard<stdx::mutex> lk(_mutex);
 
     for (const auto& entry : _monitors) {
         if (entry.second.lock()) {
@@ -245,12 +245,12 @@ vector<string> ReplicaSetMonitorManager::getAllSetNames() const {
 }
 
 size_t ReplicaSetMonitorManager::getNumMonitors() const {
-    stdx::lock_guard<Latch> lk(_mutex);
+    stdx::lock_guard<stdx::mutex> lk(_mutex);
     return _monitors.size();
 }
 
 void ReplicaSetMonitorManager::removeMonitor(StringData setName) {
-    stdx::lock_guard<Latch> lk(_mutex);
+    stdx::lock_guard<stdx::mutex> lk(_mutex);
     ReplicaSetMonitorsMap::const_iterator it = _monitors.find(setName);
     if (it != _monitors.end()) {
         if (auto monitor = it->second.lock()) {
@@ -262,7 +262,7 @@ void ReplicaSetMonitorManager::removeMonitor(StringData setName) {
 }
 
 void ReplicaSetMonitorManager::registerForGarbageCollection(StringData setName) {
-    stdx::lock_guard<Latch> lk(_gcMutex);
+    stdx::lock_guard<stdx::mutex> lk(_gcMutex);
     _gcQueue.emplace_back(setName);
 }
 
@@ -270,7 +270,7 @@ void ReplicaSetMonitorManager::_doGarbageCollectionLocked(WithLock) {
     if (_isShutdown) {
         return;
     }
-    stdx::lock_guard<Latch> lk(_gcMutex);
+    stdx::lock_guard<stdx::mutex> lk(_gcMutex);
 
     while (!_gcQueue.empty()) {
         std::string setName = std::move(_gcQueue.front());
@@ -288,7 +288,7 @@ void ReplicaSetMonitorManager::shutdown() {
     decltype(_taskExecutor) taskExecutor;
     decltype(_connectionManager) connectionManager;
     {
-        stdx::lock_guard<Latch> lk(_mutex);
+        stdx::lock_guard<stdx::mutex> lk(_mutex);
         if (std::exchange(_isShutdown, true)) {
             return;
         }
@@ -317,7 +317,7 @@ void ReplicaSetMonitorManager::removeAllMonitors() {
     shutdown();
 
     {
-        stdx::lock_guard<Latch> lk(_mutex);
+        stdx::lock_guard<stdx::mutex> lk(_mutex);
         _isShutdown = false;
     }
 }
@@ -366,7 +366,7 @@ ReplicaSetChangeNotifier& ReplicaSetMonitorManager::getNotifier() {
 }
 
 bool ReplicaSetMonitorManager::isShutdown() const {
-    stdx::lock_guard<Latch> lk(_mutex);
+    stdx::lock_guard<stdx::mutex> lk(_mutex);
     return _isShutdown;
 }
 
@@ -375,7 +375,7 @@ void ReplicaSetMonitorConnectionManager::dropConnections(const HostAndPort& host
 }
 
 void ReplicaSetMonitorManager::installMonitor_forTests(std::shared_ptr<ReplicaSetMonitor> monitor) {
-    stdx::lock_guard<Latch> lk(_mutex);
+    stdx::lock_guard<stdx::mutex> lk(_mutex);
     _monitors[monitor->getName()] = monitor;
 }
 

@@ -51,19 +51,19 @@ EgressConnectionCloserManager& EgressConnectionCloserManager::get(ServiceContext
 }
 
 void EgressConnectionCloserManager::add(EgressConnectionCloser* ecc) {
-    stdx::lock_guard<Latch> lk(_mutex);
+    stdx::lock_guard<stdx::mutex> lk(_mutex);
 
     _egressConnectionClosers.insert(ecc);
 }
 
 void EgressConnectionCloserManager::remove(EgressConnectionCloser* ecc) {
-    stdx::lock_guard<Latch> lk(_mutex);
+    stdx::lock_guard<stdx::mutex> lk(_mutex);
 
     _egressConnectionClosers.erase(ecc);
 }
 
 void EgressConnectionCloserManager::dropConnections() {
-    stdx::lock_guard<Latch> lk(_mutex);
+    stdx::lock_guard<stdx::mutex> lk(_mutex);
 
     for (auto ecc : _egressConnectionClosers) {
         ecc->dropConnections();
@@ -71,7 +71,7 @@ void EgressConnectionCloserManager::dropConnections() {
 }
 
 void EgressConnectionCloserManager::dropConnections(const HostAndPort& hostAndPort) {
-    stdx::lock_guard<Latch> lk(_mutex);
+    stdx::lock_guard<stdx::mutex> lk(_mutex);
 
     for (auto ecc : _egressConnectionClosers) {
         ecc->dropConnections(hostAndPort);
@@ -79,7 +79,7 @@ void EgressConnectionCloserManager::dropConnections(const HostAndPort& hostAndPo
 }
 
 void EgressConnectionCloserManager::setKeepOpen(const HostAndPort& hostAndPort, bool keepOpen) {
-    stdx::lock_guard<Latch> lk(_mutex);
+    stdx::lock_guard<stdx::mutex> lk(_mutex);
 
     for (auto ecc : _egressConnectionClosers) {
         ecc->setKeepOpen(hostAndPort, keepOpen);

@@ -32,7 +32,7 @@
 #include <cstdint>
 
 #include "mongo/base/static_assert.h"
-#include "mongo/platform/mutex.h"
+#include "mongo/stdx/mutex.h"
 #include "mongo/stdx/unordered_map.h"
 
 namespace mongo {
@@ -91,7 +91,7 @@ private:
     struct IdPool;
     friend struct ClientState;
 
-    mutable Mutex _mutex;
+    mutable stdx::mutex _mutex;
     std::unique_ptr<IdPool> _pool;
     stdx::unordered_map<OperationId, Client*> _clientByOperationId;
 

@@ -68,7 +68,7 @@ ConcurrentMemoryAggregator::~ConcurrentMemoryAggregator() {
 
 std::shared_ptr<ChunkedMemoryAggregator> ConcurrentMemoryAggregator::createChunkedMemoryAggregator(
     ChunkedMemoryAggregator::Options options) {
-    stdx::lock_guard<Latch> lock(_mutex);
+    stdx::lock_guard<stdx::mutex> lock(_mutex);
     int64_t id = ++_chunkedMemoryAggregatorIDCounter;
     std::shared_ptr<ChunkedMemoryAggregator> agg(
         new ChunkedMemoryAggregator(
@@ -99,7 +99,7 @@ void ConcurrentMemoryAggregator::poll(ChunkedMemoryAggregator* sourceAggregator)
 
 void ConcurrentMemoryAggregator::visitAll(
     std::function<void(std::shared_ptr<const ChunkedMemoryAggregator>)> callback) const {
-    stdx::lock_guard<Latch> lock(_mutex);
+    stdx::lock_guard<stdx::mutex> lock(_mutex);
     for (const auto& [_, c] : _chunkedMemoryAggregators) {
         auto chunked = c.lock();
         invariant(chunked);
@@ -108,7 +108,7 @@ void ConcurrentMemoryAggregator::visitAll(
 }
 
 void ConcurrentMemoryAggregator::remove(const ChunkedMemoryAggregator* chunkedMemoryAggregator) {
-    stdx::lock_guard<Latch> lock(_mutex);
+    stdx::lock_guard<stdx::mutex> lock(_mutex);
     auto it = _chunkedMemoryAggregators.find(chunkedMemoryAggregator->getId());
     dassert(it != _chunkedMemoryAggregators.end());
     if (it != _chunkedMemoryAggregators.end()) {

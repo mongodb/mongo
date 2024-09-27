@@ -60,8 +60,8 @@
 #include "mongo/logv2/log.h"
 #include "mongo/logv2/log_attr.h"
 #include "mongo/logv2/log_component.h"
-#include "mongo/platform/mutex.h"
 #include "mongo/rpc/get_status_from_command_result.h"
+#include "mongo/stdx/mutex.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/database_name_util.h"
 #include "mongo/util/net/ssl_options.h"
@@ -237,7 +237,7 @@ void AllDatabaseCloner::handleAdminDbNotValid(const Status& errorStatus) {
 
 void AllDatabaseCloner::postStage() {
     {
-        stdx::lock_guard<Latch> lk(_mutex);
+        stdx::lock_guard<stdx::mutex> lk(_mutex);
         _stats.databasesCloned = 0;
         _stats.databasesToClone = _databases.size();
         _stats.databaseStats.reserve(_databases.size());
@@ -272,7 +272,7 @@ void AllDatabaseCloner::postStage() {
     bool foundUser = false;
     for (const auto& dbName : _databases) {
         {
-            stdx::lock_guard<Latch> lk(_mutex);
+            stdx::lock_guard<stdx::mutex> lk(_mutex);
             _currentDatabaseCloner = std::make_unique<DatabaseCloner>(dbName,
                                                                       getSharedData(),
                                                                       getSource(),
@@ -359,7 +359,7 @@ void AllDatabaseCloner::postStage() {
             }
         }
         {
-            stdx::lock_guard<Latch> lk(_mutex);
+            stdx::lock_guard<stdx::mutex> lk(_mutex);
             _stats.databaseStats[_stats.databasesCloned] = _currentDatabaseCloner->getStats();
             _currentDatabaseCloner = nullptr;
             _stats.databasesCloned++;
@@ -369,7 +369,7 @@ void AllDatabaseCloner::postStage() {
 }
 
 AllDatabaseCloner::Stats AllDatabaseCloner::getStats() const {
-    stdx::lock_guard<Latch> lk(_mutex);
+    stdx::lock_guard<stdx::mutex> lk(_mutex);
     AllDatabaseCloner::Stats stats = _stats;
     if (_currentDatabaseCloner) {
         stats.databaseStats[_stats.databasesCloned] = _currentDatabaseCloner->getStats();
@@ -378,7 +378,7 @@ AllDatabaseCloner::Stats AllDatabaseCloner::getStats() const {
 }
 
 std::string AllDatabaseCloner::toString() const {
-    stdx::lock_guard<Latch> lk(_mutex);
+    stdx::lock_guard<stdx::mutex> lk(_mutex);
     return str::stream() << "initial sync --"
                          << " active:" << isActive(lk) << " status:" << getStatus(lk).toString()
                          << " source:" << getSource()

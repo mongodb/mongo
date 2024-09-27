@@ -41,7 +41,6 @@
 #include "mongo/logv2/log_attr.h"
 #include "mongo/logv2/log_component.h"
 #include "mongo/logv2/redaction.h"
-#include "mongo/platform/mutex.h"
 #include "mongo/stdx/condition_variable.h"
 #include "mongo/stdx/mutex.h"
 #include "mongo/stdx/thread.h"
@@ -168,7 +167,7 @@ void BackgroundJob::jobBody() {
     {
         // It is illegal to access any state owned by this BackgroundJob after leaving this
         // scope, with the exception of the call to 'delete this' below.
-        stdx::unique_lock<Latch> l(_status->mutex);
+        stdx::unique_lock<stdx::mutex> l(_status->mutex);
         _status->state = Done;
         _status->done.notify_all();
     }
@@ -178,7 +177,7 @@ void BackgroundJob::jobBody() {
 }
 
 void BackgroundJob::go() {
-    stdx::unique_lock<Latch> l(_status->mutex);
+    stdx::unique_lock<stdx::mutex> l(_status->mutex);
     massert(17234,
             str::stream() << "backgroundJob already running: " << name(),
             _status->state != Running);
@@ -194,7 +193,7 @@ void BackgroundJob::go() {
 }
 
 Status BackgroundJob::cancel() {
-    stdx::unique_lock<Latch> l(_status->mutex);
+    stdx::unique_lock<stdx::mutex> l(_status->mutex);
 
     if (_status->state == Running)
         return Status(ErrorCodes::IllegalOperation, "Cannot cancel a running BackgroundJob");
@@ -210,7 +209,7 @@ Status BackgroundJob::cancel() {
 bool BackgroundJob::wait(unsigned msTimeOut) {
     MONGO_verify(!_selfDelete);  // you cannot call wait on a self-deleting job
     const auto deadline = Date_t::now() + Milliseconds(msTimeOut);
-    stdx::unique_lock<Latch> l(_status->mutex);
+    stdx::unique_lock<stdx::mutex> l(_status->mutex);
     while (_status->state != Done) {
         if (msTimeOut) {
             if (stdx::cv_status::timeout ==
@@ -224,12 +223,12 @@ bool BackgroundJob::wait(unsigned msTimeOut) {
 }
 
 BackgroundJob::State BackgroundJob::getState() const {
-    stdx::unique_lock<Latch> l(_status->mutex);
+    stdx::unique_lock<stdx::mutex> l(_status->mutex);
     return _status->state;
 }
 
 bool BackgroundJob::running() const {
-    stdx::unique_lock<Latch> l(_status->mutex);
+    stdx::unique_lock<stdx::mutex> l(_status->mutex);
     return _status->state == Running;
 }
 
@@ -284,12 +283,12 @@ Status PeriodicTask::stopRunningPeriodicTasks(int gracePeriodMillis) {
 }
 
 void PeriodicTaskRunner::add(PeriodicTask* task) {
-    stdx::lock_guard<Latch> lock(_mutex);
+    stdx::lock_guard<stdx::mutex> lock(_mutex);
     _tasks.push_back(task);
 }
 
 void PeriodicTaskRunner::remove(PeriodicTask* task) {
-    stdx::lock_guard<Latch> lock(_mutex);
+    stdx::lock_guard<stdx::mutex> lock(_mutex);
     for (size_t i = 0; i != _tasks.size(); i++) {
         if (_tasks[i] == task) {
             _tasks[i] = nullptr;
@@ -300,7 +299,7 @@ void PeriodicTaskRunner::remove(PeriodicTask* task) {
 
 Status PeriodicTaskRunner::stop(int gracePeriodMillis) {
     {
-        stdx::lock_guard<Latch> lock(_mutex);
+        stdx::lock_guard<stdx::mutex> lock(_mutex);
         _shutdownRequested = true;
         _cond.notify_one();
     }
@@ -316,7 +315,7 @@ void PeriodicTaskRunner::run() {
     // Use a shorter cycle time in debug mode to help catch race conditions.
     const Seconds waitTime(kDebugBuild ? 5 : 60);
 
-    stdx::unique_lock<Latch> lock(_mutex);
+    stdx::unique_lock<stdx::mutex> lock(_mutex);
     while (!_shutdownRequested) {
         {
             MONGO_IDLE_THREAD_BLOCK;

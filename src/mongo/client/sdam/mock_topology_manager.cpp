@@ -49,20 +49,20 @@ bool MockTopologyManager::onServerDescription(const HelloOutcome& helloOutcome) 
 }
 
 std::shared_ptr<TopologyDescription> MockTopologyManager::getTopologyDescription() const {
-    stdx::lock_guard<mongo::Mutex> lock(_mutex);
+    stdx::lock_guard<stdx::mutex> lock(_mutex);
     return _topologyDescription;
 }
 
 void MockTopologyManager::onServerRTTUpdated(HostAndPort hostAndPort, HelloRTT rtt) {}
 
 void MockTopologyManager::setTopologyDescription(TopologyDescriptionPtr newDescription) {
-    stdx::lock_guard<mongo::Mutex> lock(_mutex);
+    stdx::lock_guard<stdx::mutex> lock(_mutex);
     _topologyDescription = newDescription;
 }
 
 SemiFuture<std::vector<HostAndPort>> MockTopologyManager::executeWithLock(
     std::function<SemiFuture<std::vector<HostAndPort>>(const TopologyDescriptionPtr&)> func) {
-    stdx::lock_guard<mongo::Mutex> lock(_mutex);
+    stdx::lock_guard<stdx::mutex> lock(_mutex);
     return func(_topologyDescription);
 }
 

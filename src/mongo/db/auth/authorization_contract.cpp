@@ -51,7 +51,7 @@
 namespace mongo {
 
 void AuthorizationContract::clear() {
-    stdx::lock_guard<Mutex> lck(_mutex);
+    stdx::lock_guard<stdx::mutex> lck(_mutex);
 
     _checks.reset();
     for (size_t i = 0; i < _privilegeChecks.size(); ++i) {
@@ -64,13 +64,13 @@ void AuthorizationContract::addAccessCheck(AccessCheckEnum check) {
         return;
     }
 
-    stdx::lock_guard<Mutex> lck(_mutex);
+    stdx::lock_guard<stdx::mutex> lck(_mutex);
 
     _checks.set(static_cast<size_t>(check), true);
 }
 
 bool AuthorizationContract::hasAccessCheck(AccessCheckEnum check) const {
-    stdx::lock_guard<Mutex> lck(_mutex);
+    stdx::lock_guard<stdx::mutex> lck(_mutex);
 
     return _checks.test(static_cast<size_t>(check));
 }
@@ -80,7 +80,7 @@ void AuthorizationContract::addPrivilege(const Privilege& p) {
         return;
     }
 
-    stdx::lock_guard<Mutex> lck(_mutex);
+    stdx::lock_guard<stdx::mutex> lck(_mutex);
 
     auto matchType = p.getResourcePattern().matchType();
 
@@ -88,7 +88,7 @@ void AuthorizationContract::addPrivilege(const Privilege& p) {
 }
 
 bool AuthorizationContract::hasPrivileges(const Privilege& p) const {
-    stdx::lock_guard<Mutex> lck(_mutex);
+    stdx::lock_guard<stdx::mutex> lck(_mutex);
 
     auto matchType = p.getResourcePattern().matchType();
 
@@ -101,7 +101,7 @@ bool AuthorizationContract::contains(const AuthorizationContract& other) const {
         return true;  // this and other are same - so contains is necessarily true
     }
 
-    std::scoped_lock<Mutex, Mutex> lk(_mutex, other._mutex);
+    std::scoped_lock<stdx::mutex, stdx::mutex> lk(_mutex, other._mutex);
 
     if ((_checks | other._checks) != _checks) {
         if (kDebugBuild) {

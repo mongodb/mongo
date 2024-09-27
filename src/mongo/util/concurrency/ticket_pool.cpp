@@ -47,8 +47,8 @@
 #include "mongo/logv2/log_attr.h"
 #include "mongo/logv2/log_component.h"
 #include "mongo/platform/atomic_word.h"
-#include "mongo/platform/mutex.h"
 #include "mongo/stdx/condition_variable.h"
+#include "mongo/stdx/mutex.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/errno_util.h"
 
@@ -144,7 +144,7 @@ bool TicketPool<Queue>::acquire(AdmissionContext* admCtx, Date_t deadline) {
     waiter->context = admCtx;
 
     {
-        stdx::unique_lock<Mutex> lk(_mutex);
+        stdx::unique_lock<stdx::mutex> lk(_mutex);
         // It is important to check for a ticket one more time before queueing, as a ticket may have
         // just become available.
         if (tryAcquire()) {
@@ -174,7 +174,7 @@ bool TicketPool<Queue>::acquire(AdmissionContext* admCtx, Date_t deadline) {
 
 template <class Queue>
 std::shared_ptr<TicketWaiter> TicketPool<Queue>::_popWaiterOrAddTicketToPool() {
-    stdx::unique_lock<Mutex> lock(_mutex);
+    stdx::unique_lock<stdx::mutex> lock(_mutex);
     auto waiter = _waiters.pop();
     if (!waiter) {
         // We need to ensure we add the ticket back to the pool while holding the mutex. This

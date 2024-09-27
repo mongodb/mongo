@@ -114,7 +114,7 @@ SharedSemiFuture<void> TenantMigrationRecipientAccessBlocker::getCanRunCommandFu
         return boost::none;
     }();
 
-    stdx::lock_guard<Latch> lk(_mutex);
+    stdx::lock_guard<stdx::mutex> lk(_mutex);
     if (_state.isRejectReadsAndWrites()) {
         // Something is likely wrong with the proxy if we end up here. Traffic should not be routed
         // to the recipient while in the `kRejectReadsAndWrites` state.
@@ -194,12 +194,12 @@ Status TenantMigrationRecipientAccessBlocker::checkIfCanGetMoreChangeStream() {
 }
 
 bool TenantMigrationRecipientAccessBlocker::checkIfShouldBlockTTL() const {
-    stdx::lock_guard<Latch> lg(_mutex);
+    stdx::lock_guard<stdx::mutex> lg(_mutex);
     return _ttlIsBlocked;
 }
 
 void TenantMigrationRecipientAccessBlocker::stopBlockingTTL() {
-    stdx::lock_guard<Latch> lg(_mutex);
+    stdx::lock_guard<stdx::mutex> lg(_mutex);
     _ttlIsBlocked = false;
 }
 
@@ -210,7 +210,7 @@ void TenantMigrationRecipientAccessBlocker::onMajorityCommitPointUpdate(repl::Op
 
 void TenantMigrationRecipientAccessBlocker::appendInfoForServerStatus(
     BSONObjBuilder* builder) const {
-    stdx::lock_guard<Latch> lg(_mutex);
+    stdx::lock_guard<stdx::mutex> lg(_mutex);
 
     getMigrationId().appendToBuilder(builder, "migrationId");
     builder->append("state", _state.toString());
@@ -232,7 +232,7 @@ std::string TenantMigrationRecipientAccessBlocker::BlockerState::toString() cons
 }
 
 void TenantMigrationRecipientAccessBlocker::startRejectingReadsBefore(const Timestamp& timestamp) {
-    stdx::lock_guard<Latch> lk(_mutex);
+    stdx::lock_guard<stdx::mutex> lk(_mutex);
     _state.transitionToRejectReadsBefore();
     if (!_rejectBeforeTimestamp || timestamp > *_rejectBeforeTimestamp) {
         LOGV2(5358100,

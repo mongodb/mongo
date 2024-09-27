@@ -408,7 +408,7 @@ bool IndexBuildsManager::isBackgroundBuilding(const UUID& buildUUID) {
 }
 
 void IndexBuildsManager::appendBuildInfo(const UUID& buildUUID, BSONObjBuilder* builder) const {
-    stdx::unique_lock<Latch> lk(_mutex);
+    stdx::unique_lock<stdx::mutex> lk(_mutex);
 
     auto builderIt = _builders.find(buildUUID);
     if (builderIt == _builders.end()) {
@@ -423,14 +423,14 @@ void IndexBuildsManager::verifyNoIndexBuilds_forTestOnly() {
 }
 
 void IndexBuildsManager::_registerIndexBuild(UUID buildUUID) {
-    stdx::unique_lock<Latch> lk(_mutex);
+    stdx::unique_lock<stdx::mutex> lk(_mutex);
 
     auto mib = std::make_unique<MultiIndexBlock>();
     invariant(_builders.insert(std::make_pair(buildUUID, std::move(mib))).second);
 }
 
 void IndexBuildsManager::tearDownAndUnregisterIndexBuild(const UUID& buildUUID) {
-    stdx::unique_lock<Latch> lk(_mutex);
+    stdx::unique_lock<stdx::mutex> lk(_mutex);
 
     auto builderIt = _builders.find(buildUUID);
     if (builderIt == _builders.end()) {
@@ -440,7 +440,7 @@ void IndexBuildsManager::tearDownAndUnregisterIndexBuild(const UUID& buildUUID) 
 }
 
 StatusWith<MultiIndexBlock*> IndexBuildsManager::_getBuilder(const UUID& buildUUID) {
-    stdx::unique_lock<Latch> lk(_mutex);
+    stdx::unique_lock<stdx::mutex> lk(_mutex);
     auto builderIt = _builders.find(buildUUID);
     if (builderIt == _builders.end()) {
         return {ErrorCodes::NoSuchKey, str::stream() << "No index build with UUID: " << buildUUID};

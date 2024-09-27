@@ -818,7 +818,7 @@ Future<std::shared_ptr<Session>> AsioTransportLayer::asyncConnect(
                                      connector->resolvedEndpoint));
 
                 std::error_code ec;
-                stdx::lock_guard<Latch> lk(connector->mutex);
+                stdx::lock_guard<stdx::mutex> lk(connector->mutex);
                 connector->resolver.cancel();
                 if (connector->session) {
                     connector->session->end();
@@ -867,7 +867,7 @@ Future<std::shared_ptr<Session>> AsioTransportLayer::asyncConnect(
                     networkCounter.incrementNumSlowDNSOperations();
                 }
 
-                stdx::lock_guard<Latch> lk(connector->mutex);
+                stdx::lock_guard<stdx::mutex> lk(connector->mutex);
 
                 connector->resolvedEndpoint = results.front();
                 connector->socket.open(connector->resolvedEndpoint->protocol());
@@ -884,7 +884,7 @@ Future<std::shared_ptr<Session>> AsioTransportLayer::asyncConnect(
         .then([this, connector, sslMode, transientSSLContext, connectionMetrics]() -> Future<void> {
             connectionMetrics->onTCPConnectionEstablished();
 
-            stdx::unique_lock<Latch> lk(connector->mutex);
+            stdx::unique_lock<stdx::mutex> lk(connector->mutex);
             connector->session = [&] {
                 try {
                     return std::make_shared<AsyncAsioSession>(this,
@@ -1258,7 +1258,7 @@ void AsioTransportLayer::shutdown() {
     }
 }
 
-void AsioTransportLayer::stopAcceptingSessionsWithLock(stdx::unique_lock<Mutex> lk) {
+void AsioTransportLayer::stopAcceptingSessionsWithLock(stdx::unique_lock<stdx::mutex> lk) {
     if (!_listenerOptions.isIngress()) {
         // Egress only reactors never start a listener
         return;

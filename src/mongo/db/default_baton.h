@@ -32,8 +32,8 @@
 #include <vector>
 
 #include "mongo/db/baton.h"
-#include "mongo/platform/mutex.h"
 #include "mongo/stdx/condition_variable.h"
+#include "mongo/stdx/mutex.h"
 #include "mongo/stdx/unordered_map.h"
 #include "mongo/util/clock_source.h"
 #include "mongo/util/functional.h"
@@ -71,7 +71,7 @@ private:
     };
     void detachImpl() noexcept override;
 
-    using Job = unique_function<void(stdx::unique_lock<Mutex>)>;
+    using Job = unique_function<void(stdx::unique_lock<stdx::mutex>)>;
 
     /**
      * Invokes a job with exclusive access to the baton's internals.
@@ -86,7 +86,7 @@ private:
      * Also note that the job may not run inline, and may get scheduled to run by the baton, so it
      * should never throw.
      */
-    void _safeExecute(stdx::unique_lock<Mutex> lk, Job job);
+    void _safeExecute(stdx::unique_lock<stdx::mutex> lk, Job job);
 
     stdx::mutex _mutex;
     stdx::condition_variable _cv;

@@ -51,9 +51,9 @@
 #include "mongo/db/repl/sync_source_selector.h"
 #include "mongo/db/storage/storage_engine.h"
 #include "mongo/executor/task_executor.h"
-#include "mongo/platform/mutex.h"
 #include "mongo/rpc/metadata/oplog_query_metadata.h"
 #include "mongo/rpc/metadata/repl_set_metadata.h"
+#include "mongo/stdx/mutex.h"
 #include "mongo/util/concurrency/thread_pool.h"
 #include "mongo/util/net/hostandport.h"
 
@@ -108,57 +108,57 @@ public:
     JournalListener* getReplicationJournalListener() override;
 
     void setCurrentTerm(long long newTerm) {
-        stdx::lock_guard<Latch> lk(_mutex);
+        stdx::lock_guard<stdx::mutex> lk(_mutex);
         currentTerm = newTerm;
     }
 
     long long getCurrentTerm() const {
-        stdx::lock_guard<Latch> lk(_mutex);
+        stdx::lock_guard<stdx::mutex> lk(_mutex);
         return currentTerm;
     }
 
     void setLastCommittedOpTime(OpTime newOpTime) {
-        stdx::lock_guard<Latch> lk(_mutex);
+        stdx::lock_guard<stdx::mutex> lk(_mutex);
         lastCommittedOpTime = newOpTime;
     }
 
     void setShouldStopFetchingResult(ChangeSyncSourceAction result) {
-        stdx::lock_guard<Latch> lk(_mutex);
+        stdx::lock_guard<stdx::mutex> lk(_mutex);
         shouldStopFetchingResult = result;
     }
 
     void setReplSetConfigResult(StatusWith<ReplSetConfig> config) {
-        stdx::lock_guard<Latch> lk(_mutex);
+        stdx::lock_guard<stdx::mutex> lk(_mutex);
         replSetConfigResult = config;
     }
 
     bool getIsPrimary() const {
-        stdx::lock_guard<Latch> lk(_mutex);
+        stdx::lock_guard<stdx::mutex> lk(_mutex);
         return replMetadataProcessed.getIsPrimary();
     }
 
     bool getHasPrimaryIndex() const {
-        stdx::lock_guard<Latch> lk(_mutex);
+        stdx::lock_guard<stdx::mutex> lk(_mutex);
         return oqMetadataProcessed.hasPrimaryIndex();
     }
 
     bool getMetadataWasProcessed() const {
-        stdx::lock_guard<Latch> lk(_mutex);
+        stdx::lock_guard<stdx::mutex> lk(_mutex);
         return metadataWasProcessed;
     }
 
     HostAndPort getLastSyncSourceChecked() const {
-        stdx::lock_guard<Latch> lk(_mutex);
+        stdx::lock_guard<stdx::mutex> lk(_mutex);
         return lastSyncSourceChecked;
     }
 
     OpTime getSyncSourceLastOpTime() const {
-        stdx::lock_guard<Latch> lk(_mutex);
+        stdx::lock_guard<stdx::mutex> lk(_mutex);
         return syncSourceLastOpTime;
     }
 
     bool getSyncSourceHasSyncSource() const {
-        stdx::lock_guard<Latch> lk(_mutex);
+        stdx::lock_guard<stdx::mutex> lk(_mutex);
         return syncSourceHasSyncSource;
     }
 

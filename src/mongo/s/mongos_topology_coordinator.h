@@ -35,9 +35,9 @@
 #include <utility>
 
 #include "mongo/db/operation_context.h"
-#include "mongo/platform/mutex.h"
 #include "mongo/rpc/topology_version_gen.h"
 #include "mongo/s/mongos_hello_response.h"
+#include "mongo/stdx/mutex.h"
 #include "mongo/transport/hello_metrics.h"
 #include "mongo/util/concurrency/with_lock.h"
 #include "mongo/util/duration.h"

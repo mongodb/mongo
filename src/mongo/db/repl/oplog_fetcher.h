@@ -53,8 +53,8 @@
 #include "mongo/db/repl/replication_process.h"
 #include "mongo/db/vector_clock_metadata_hook.h"
 #include "mongo/executor/task_executor.h"
-#include "mongo/platform/mutex.h"
 #include "mongo/stdx/condition_variable.h"
+#include "mongo/stdx/mutex.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/fail_point.h"
 #include "mongo/util/net/hostandport.h"
@@ -341,7 +341,7 @@ private:
 
     void _preJoin() noexcept override {}
 
-    Mutex* _getMutex() noexcept override;
+    stdx::mutex* _getMutex() noexcept override;
 
     // ============= End AbstractAsyncComponent overrides ==============
 

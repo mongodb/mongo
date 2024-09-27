@@ -259,7 +259,7 @@ bool ReplicationCoordinatorExternalStateImpl::isInitialSyncFlagSet(OperationCont
 void ReplicationCoordinatorExternalStateImpl::startSteadyStateReplication(
     OperationContext* opCtx, ReplicationCoordinator* replCoord) {
 
-    stdx::unique_lock<Latch> lk(_threadMutex);
+    stdx::unique_lock<stdx::mutex> lk(_threadMutex);
 
     // We've shut down the external state, don't start again.
     if (_inShutdown)
@@ -360,7 +360,7 @@ void ReplicationCoordinatorExternalStateImpl::startSteadyStateReplication(
 }
 
 void ReplicationCoordinatorExternalStateImpl::_stopDataReplication_inlock(
-    OperationContext* opCtx, stdx::unique_lock<Latch>& lock) {
+    OperationContext* opCtx, stdx::unique_lock<stdx::mutex>& lock) {
     // Make sue no other _stopDataReplication calls are in progress.
     _dataReplicationStopped.wait(lock, [this]() { return !_stoppingDataReplication; });
     _stoppingDataReplication = true;
@@ -463,7 +463,7 @@ JournalListener* ReplicationCoordinatorExternalStateImpl::getReplicationJournalL
 }
 
 void ReplicationCoordinatorExternalStateImpl::startThreads() {
-    stdx::lock_guard<Latch> lk(_threadMutex);
+    stdx::lock_guard<stdx::mutex> lk(_threadMutex);
     if (_startedThreads) {
         return;
     }
@@ -492,7 +492,7 @@ void ReplicationCoordinatorExternalStateImpl::startThreads() {
 }
 
 void ReplicationCoordinatorExternalStateImpl::shutdown(OperationContext* opCtx) {
-    stdx::unique_lock<Latch> lk(_threadMutex);
+    stdx::unique_lock<stdx::mutex> lk(_threadMutex);
     _inShutdown = true;
     if (!_startedThreads) {
         return;
@@ -1242,14 +1242,14 @@ void ReplicationCoordinatorExternalStateImpl::_shardingOnTransitionToPrimaryHook
 }
 
 void ReplicationCoordinatorExternalStateImpl::signalApplierToChooseNewSyncSource() {
-    stdx::lock_guard<Latch> lk(_threadMutex);
+    stdx::lock_guard<stdx::mutex> lk(_threadMutex);
     if (_bgSync) {
         _bgSync->clearSyncTarget();
     }
 }
 
 void ReplicationCoordinatorExternalStateImpl::stopProducer() {
-    stdx::lock_guard<Latch> lk(_threadMutex);
+    stdx::lock_guard<stdx::mutex> lk(_threadMutex);
     if (_bgSync) {
         _bgSync->stop(false);
     }
@@ -1265,7 +1265,7 @@ void ReplicationCoordinatorExternalStateImpl::stopProducer() {
 }
 
 void ReplicationCoordinatorExternalStateImpl::startProducerIfStopped() {
-    stdx::lock_guard<Latch> lk(_threadMutex);
+    stdx::lock_guard<stdx::mutex> lk(_threadMutex);
     // When _oplogWriteBuffer is not null, featureFlagReduceMajorityWriteLatency is enabled.
     // We call exitDrainMode() on both buffers, but it is possible that the apply buffer is
     // not even in drain mode when exitDrainMode() is called, which can happen if the node
@@ -1283,14 +1283,14 @@ void ReplicationCoordinatorExternalStateImpl::startProducerIfStopped() {
 }
 
 void ReplicationCoordinatorExternalStateImpl::notifyOtherMemberDataChanged() {
-    stdx::lock_guard<Latch> lk(_threadMutex);
+    stdx::lock_guard<stdx::mutex> lk(_threadMutex);
     if (_bgSync) {
         _bgSync->notifySyncSourceSelectionDataChanged();
     }
 }
 
 bool ReplicationCoordinatorExternalStateImpl::tooStale() {
-    stdx::lock_guard<Latch> lk(_threadMutex);
+    stdx::lock_guard<stdx::mutex> lk(_threadMutex);
     if (_bgSync) {
         return _bgSync->tooStale();
     }

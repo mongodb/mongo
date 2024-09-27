@@ -59,7 +59,7 @@ TimeProofService::Key TimeProofService::generateRandomKey() {
 }
 
 TimeProofService::TimeProof TimeProofService::getProof(LogicalTime time, const Key& key) {
-    stdx::lock_guard<Latch> lk(_cacheMutex);
+    stdx::lock_guard<stdx::mutex> lk(_cacheMutex);
     auto timeCeil = LogicalTime(Timestamp(time.asTimestamp().asULL() | kRangeMask));
     if (_cache && _cache->hasProof(timeCeil, key)) {
         return _cache->_proof;
@@ -84,7 +84,7 @@ Status TimeProofService::checkProof(LogicalTime time, const TimeProof& proof, co
 }
 
 void TimeProofService::resetCache() {
-    stdx::lock_guard<Latch> lk(_cacheMutex);
+    stdx::lock_guard<stdx::mutex> lk(_cacheMutex);
     if (_cache) {
         _cache = boost::none;
     }

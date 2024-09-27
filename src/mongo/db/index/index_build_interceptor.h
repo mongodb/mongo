@@ -60,7 +60,7 @@
 #include "mongo/db/storage/temporary_record_store.h"
 #include "mongo/db/yieldable.h"
 #include "mongo/platform/atomic_word.h"
-#include "mongo/platform/mutex.h"
+#include "mongo/stdx/mutex.h"
 #include "mongo/util/fail_point.h"
 
 namespace mongo {

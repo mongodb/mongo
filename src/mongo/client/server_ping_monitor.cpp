@@ -263,7 +263,7 @@ void ServerPingMonitor::shutdown() {
     decltype(_serverPingMonitorMap) serverPingMonitorMap;
     decltype(_executor) executor;
     {
-        stdx::lock_guard<Latch> lk(_mutex);
+        stdx::lock_guard<stdx::mutex> lk(_mutex);
         if (std::exchange(_isShutdown, true)) {
             return;
         }

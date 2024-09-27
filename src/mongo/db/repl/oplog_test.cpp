@@ -59,7 +59,7 @@
 #include "mongo/db/repl/tenant_migration_decoration.h"
 #include "mongo/db/service_context_d_test_fixture.h"
 #include "mongo/db/storage/write_unit_of_work.h"
-#include "mongo/platform/mutex.h"
+#include "mongo/stdx/mutex.h"
 #include "mongo/unittest/assert.h"
 #include "mongo/unittest/barrier.h"
 #include "mongo/unittest/bson_test_util.h"
@@ -222,7 +222,7 @@ void _testConcurrentLogOp(const F& makeTaskFunction,
     std::reverse(oplogEntries->begin(), oplogEntries->end());
 
     // Look up namespaces and their respective optimes (returned by logOp()) in the map.
-    stdx::lock_guard<Latch> lock(mtx);
+    stdx::lock_guard<stdx::mutex> lock(mtx);
     ASSERT_EQUALS(2U, opTimeNssMap->size());
 }
 
@@ -232,7 +232,7 @@ void _testConcurrentLogOp(const F& makeTaskFunction,
  * Returns optime of generated oplog entry.
  */
 OpTime _logOpNoopWithMsg(OperationContext* opCtx,
-                         Mutex* mtx,
+                         stdx::mutex* mtx,
                          OpTimeNamespaceStringMap* opTimeNssMap,
                          const NamespaceString& nss) {
     MutableOplogEntry oplogEntry;
@@ -243,7 +243,7 @@ OpTime _logOpNoopWithMsg(OperationContext* opCtx,
     auto opTime = logOp(opCtx, &oplogEntry);
     ASSERT_FALSE(opTime.isNull());
 
-    stdx::lock_guard<Latch> lock(*mtx);
+    stdx::lock_guard<stdx::mutex> lock(*mtx);
     ASSERT(opTimeNssMap->find(opTime) == opTimeNssMap->end())
         << "Unable to add namespace " << nss.toStringForErrorMsg()
         << " to map - map contains duplicate entry for optime " << opTime;
@@ -258,7 +258,7 @@ TEST_F(OplogTest, ConcurrentLogOp) {
 
     _testConcurrentLogOp(
         [](const NamespaceString& nss,
-           Mutex* mtx,
+           stdx::mutex* mtx,
            OpTimeNamespaceStringMap* opTimeNssMap,
            unittest::Barrier* barrier) {
             return [=] {
@@ -289,7 +289,7 @@ TEST_F(OplogTest, ConcurrentLogOpRevertFirstOplogEntry) {
 
     _testConcurrentLogOp(
         [](const NamespaceString& nss,
-           Mutex* mtx,
+           stdx::mutex* mtx,
            OpTimeNamespaceStringMap* opTimeNssMap,
            unittest::Barrier* barrier) {
             return [=] {
@@ -307,7 +307,7 @@ TEST_F(OplogTest, ConcurrentLogOpRevertFirstOplogEntry) {
                 // Revert the first logOp() call and confirm that there are no holes in the
                 // oplog after committing the oplog entry with the more recent optime.
                 {
-                    stdx::lock_guard<Latch> lock(*mtx);
+                    stdx::lock_guard<stdx::mutex> lock(*mtx);
                     auto firstOpTimeAndNss = *(opTimeNssMap->cbegin());
                     if (opTime == firstOpTimeAndNss.first) {
                         ASSERT_EQUALS(nss, firstOpTimeAndNss.second)
@@ -335,7 +335,7 @@ TEST_F(OplogTest, ConcurrentLogOpRevertLastOplogEntry) {
 
     _testConcurrentLogOp(
         [](const NamespaceString& nss,
-           Mutex* mtx,
+           stdx::mutex* mtx,
            OpTimeNamespaceStringMap* opTimeNssMap,
            unittest::Barrier* barrier) {
             return [=] {
@@ -353,7 +353,7 @@ TEST_F(OplogTest, ConcurrentLogOpRevertLastOplogEntry) {
                 // Revert the last logOp() call and confirm that there are no holes in the
                 // oplog after committing the oplog entry with the earlier optime.
                 {
-                    stdx::lock_guard<Latch> lock(*mtx);
+                    stdx::lock_guard<stdx::mutex> lock(*mtx);
                     auto lastOpTimeAndNss = *(opTimeNssMap->crbegin());
                     if (opTime == lastOpTimeAndNss.first) {
                         ASSERT_EQUALS(nss, lastOpTimeAndNss.second)

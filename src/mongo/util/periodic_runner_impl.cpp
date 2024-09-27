@@ -103,7 +103,7 @@ void PeriodicRunnerImpl::PeriodicJobImpl::_run() {
             }
             startPromise.emplaceValue();
 
-            stdx::unique_lock<Latch> lk(_mutex);
+            stdx::unique_lock<stdx::mutex> lk(_mutex);
             while (_execStatus != ExecutionStatus::CANCELED) {
                 // Wait until it's unpaused or canceled
                 _condvar.wait(lk, [&] { return _execStatus != ExecutionStatus::PAUSED; });
@@ -149,7 +149,7 @@ void PeriodicRunnerImpl::PeriodicJobImpl::start() {
 }
 
 void PeriodicRunnerImpl::PeriodicJobImpl::pause() {
-    stdx::lock_guard<Latch> lk(_mutex);
+    stdx::lock_guard<stdx::mutex> lk(_mutex);
     if (MONGO_unlikely(_execStatus == ExecutionStatus::CANCELED))
         uasserted(ErrorCodes::PeriodicJobIsStopped, "Attempted to pause an already stopped job");
     invariant(_execStatus == PeriodicJobImpl::ExecutionStatus::RUNNING);
@@ -158,7 +158,7 @@ void PeriodicRunnerImpl::PeriodicJobImpl::pause() {
 
 void PeriodicRunnerImpl::PeriodicJobImpl::resume() {
     {
-        stdx::lock_guard<Latch> lk(_mutex);
+        stdx::lock_guard<stdx::mutex> lk(_mutex);
         if (MONGO_unlikely(_execStatus == ExecutionStatus::CANCELED))
             uasserted(ErrorCodes::PeriodicJobIsStopped,
                       "Attempted to resume an already stopped job");
@@ -170,7 +170,7 @@ void PeriodicRunnerImpl::PeriodicJobImpl::resume() {
 
 void PeriodicRunnerImpl::PeriodicJobImpl::stop() {
     auto lastExecStatus = [&] {
-        stdx::lock_guard<Latch> lk(_mutex);
+        stdx::lock_guard<stdx::mutex> lk(_mutex);
 
         return std::exchange(_execStatus, ExecutionStatus::CANCELED);
     }();
@@ -192,7 +192,7 @@ void PeriodicRunnerImpl::PeriodicJobImpl::stop() {
         // So long as `_job` returns upon receiving the kill signal, the following ensures liveness
         // (i.e., this method will eventually return).
         if (!stopFuture.isReady()) {
-            stdx::lock_guard<Latch> lk(_mutex);
+            stdx::lock_guard<stdx::mutex> lk(_mutex);
             // Check if the client thread has already returned.
             if (_client) {
                 _client->setKilled();
@@ -206,12 +206,12 @@ void PeriodicRunnerImpl::PeriodicJobImpl::stop() {
 }
 
 Milliseconds PeriodicRunnerImpl::PeriodicJobImpl::getPeriod() const {
-    stdx::lock_guard<Latch> lk(_mutex);
+    stdx::lock_guard<stdx::mutex> lk(_mutex);
     return _job.interval;
 }
 
 void PeriodicRunnerImpl::PeriodicJobImpl::setPeriod(Milliseconds ms) {
-    stdx::lock_guard<Latch> lk(_mutex);
+    stdx::lock_guard<stdx::mutex> lk(_mutex);
     _job.interval = ms;
 
     if (_execStatus == PeriodicJobImpl::ExecutionStatus::RUNNING) {

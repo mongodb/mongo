@@ -307,7 +307,7 @@ void ShardingDDLCoordinator::interrupt(Status status) {
                 logv2::DynamicAttributes{getCoordinatorLogAttrs(), "reason"_attr = redact(status)});
 
     // Resolve any unresolved promises to avoid hanging.
-    stdx::lock_guard<Latch> lg(_mutex);
+    stdx::lock_guard<stdx::mutex> lg(_mutex);
     if (!_constructionCompletionPromise.getFuture().isReady()) {
         _constructionCompletionPromise.setError(status);
     }
@@ -376,7 +376,7 @@ SemiFuture<void> ShardingDDLCoordinator::run(std::shared_ptr<executor::ScopedTas
             return _translateTimeseriesNss(executor, token);
         })
         .then([this, anchor = shared_from_this()] {
-            stdx::lock_guard<Latch> lg(_mutex);
+            stdx::lock_guard<stdx::mutex> lg(_mutex);
             if (!_constructionCompletionPromise.getFuture().isReady()) {
                 _constructionCompletionPromise.emplaceValue();
             }
@@ -401,7 +401,7 @@ SemiFuture<void> ShardingDDLCoordinator::run(std::shared_ptr<executor::ScopedTas
                 errorMsg,
                 logv2::DynamicAttributes{getCoordinatorLogAttrs(), "reason"_attr = redact(status)});
 
-            stdx::lock_guard<Latch> lg(_mutex);
+            stdx::lock_guard<stdx::mutex> lg(_mutex);
             if (!_constructionCompletionPromise.getFuture().isReady()) {
                 _constructionCompletionPromise.setError(status);
             }
@@ -516,7 +516,7 @@ SemiFuture<void> ShardingDDLCoordinator::run(std::shared_ptr<executor::ScopedTas
                 _scopedLocks.pop();
             }
 
-            stdx::lock_guard<Latch> lg(_mutex);
+            stdx::lock_guard<stdx::mutex> lg(_mutex);
             if (!_completionPromise.getFuture().isReady()) {
                 _completionPromise.setFrom(completionStatus);
             }

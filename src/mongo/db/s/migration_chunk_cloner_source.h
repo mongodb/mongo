@@ -65,10 +65,10 @@
 #include "mongo/db/storage/recovery_unit.h"
 #include "mongo/db/storage/snapshot.h"
 #include "mongo/db/write_concern_options.h"
-#include "mongo/platform/mutex.h"
 #include "mongo/s/request_types/move_range_request_gen.h"
 #include "mongo/s/shard_key_pattern.h"
 #include "mongo/stdx/condition_variable.h"
+#include "mongo/stdx/mutex.h"
 #include "mongo/util/assert_util_core.h"
 #include "mongo/util/concurrency/notification.h"
 #include "mongo/util/concurrency/with_lock.h"
@@ -664,7 +664,7 @@ private:
      * function. Should only be used in the cleanup for this class. Should use a lock wrapped
      * around this class's mutex.
      */
-    void _drainAllOutstandingOperationTrackRequests(stdx::unique_lock<Latch>& lk);
+    void _drainAllOutstandingOperationTrackRequests(stdx::unique_lock<stdx::mutex>& lk);
 
     /**
      * Sends _recvChunkStatus to the recipient shard until it receives 'steady' from the recipient,

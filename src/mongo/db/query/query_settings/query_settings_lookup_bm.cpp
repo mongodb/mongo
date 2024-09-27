@@ -333,7 +333,7 @@ public:
     virtual bool isMultitenacyEnabled() const = 0;
 
 protected:
-    Mutex _setupMutex;
+    stdx::mutex _setupMutex;
 
     // Indicates how many threads have executed the setup code.
     size_t _configuredThreads = 0;

@@ -186,7 +186,7 @@ public:
 
     std::unique_ptr<CommandInvocation> parse(OperationContext* opCtx,
                                              const OpMsgRequest& request) final {
-        stdx::lock_guard<Latch> lg(_mutex);
+        stdx::lock_guard<stdx::mutex> lg(_mutex);
         _hasBeenCalled = true;
         _msg = request.body;
         return std::make_unique<MockReplReconfigCommandInvocation>(this);
@@ -197,7 +197,7 @@ public:
     }
 
     BSONObj getLatestConfig() {
-        stdx::lock_guard<Latch> lg(_mutex);
+        stdx::lock_guard<stdx::mutex> lg(_mutex);
         ASSERT_TRUE(_hasBeenCalled);
         return _msg;
     }

@@ -77,7 +77,6 @@
 #include "mongo/db/timeseries/timeseries_gen.h"
 #include "mongo/db/yieldable.h"
 #include "mongo/logv2/log_attr.h"
-#include "mongo/platform/mutex.h"
 #include "mongo/s/shard_key_pattern.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/decorable.h"

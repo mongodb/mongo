@@ -58,7 +58,6 @@
 #include "mongo/executor/task_executor.h"
 #include "mongo/logv2/log_severity.h"
 #include "mongo/platform/atomic_word.h"
-#include "mongo/platform/mutex.h"
 #include "mongo/rpc/metadata/metadata_hook.h"
 #include "mongo/stdx/condition_variable.h"
 #include "mongo/stdx/mutex.h"
@@ -351,7 +350,7 @@ private:
     }
 
     // Guards _state, _inProgress, and _inProgressAlarms.
-    mutable Mutex _mutex;
+    mutable stdx::mutex _mutex;
 
     // This condition variable is dedicated to block a thread calling this class
     // destructor, strictly when another thread is performing the network

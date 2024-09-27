@@ -191,7 +191,7 @@ boost::optional<BSONObj> RenameParticipantInstance::reportForCurrentOp(
     bob.append("op", "command");
 
     {
-        stdx::lock_guard<Latch> lg(_stateMutex);
+        stdx::lock_guard<stdx::mutex> lg(_stateMutex);
         bob.append("ns",
                    NamespaceStringUtil::serialize(_doc.getFromNss(),
                                                   SerializationContext::stateDefault()));
@@ -248,7 +248,7 @@ void RenameParticipantInstance::_enterPhase(Phase newPhase) {
     }
 
     {
-        stdx::lock_guard<Latch> lg(_stateMutex);
+        stdx::lock_guard<stdx::mutex> lg(_stateMutex);
         _doc = std::move(newDoc);
     }
 }
@@ -266,7 +266,7 @@ void RenameParticipantInstance::_removeStateDocument(OperationContext* opCtx) {
                           _doc.getFromNss(), SerializationContext::stateDefault())),
                  WriteConcerns::kMajorityWriteConcernNoTimeout);
     {
-        stdx::lock_guard<Latch> lg(_stateMutex);
+        stdx::lock_guard<stdx::mutex> lg(_stateMutex);
         _doc = {};
     }
 }
@@ -299,7 +299,7 @@ SemiFuture<void> RenameParticipantInstance::run(
         .onCompletion([this, anchor = shared_from_this()](const Status& status) {
             if (!status.isOK()) {
                 // The token gets canceled in case of stepdown/shutdown
-                stdx::lock_guard<Latch> lg(_stateMutex);
+                stdx::lock_guard<stdx::mutex> lg(_stateMutex);
                 _invalidateFutures(status, lg);
                 return;
             }
@@ -313,14 +313,14 @@ SemiFuture<void> RenameParticipantInstance::run(
                               "Failed to remove rename participant state document",
                               "error"_attr = redact(ex));
                 ex.addContext("Failed to remove rename participant state document"_sd);
-                stdx::lock_guard<Latch> lg(_stateMutex);
+                stdx::lock_guard<stdx::mutex> lg(_stateMutex);
                 if (!_unblockCRUDPromise.getFuture().isReady()) {
                     _unblockCRUDPromise.setError(ex.toStatus());
                 }
                 throw;
             }
 
-            stdx::lock_guard<Latch> lg(_stateMutex);
+            stdx::lock_guard<stdx::mutex> lg(_stateMutex);
             if (!_unblockCRUDPromise.getFuture().isReady()) {
                 _unblockCRUDPromise.emplaceValue();
             }
@@ -398,7 +398,7 @@ SemiFuture<void> RenameParticipantInstance::_runImpl(
                 rangedeletionutil::deleteRangeDeletionTasksForRename(opCtx, fromNss, toNss);
 
                 {
-                    stdx::lock_guard<Latch> lg(_stateMutex);
+                    stdx::lock_guard<stdx::mutex> lg(_stateMutex);
                     if (!_blockCRUDAndRenameCompletionPromise.getFuture().isReady()) {
                         _blockCRUDAndRenameCompletionPromise.setFrom(Status::OK());
                     }
@@ -485,7 +485,7 @@ void RenameParticipantInstance::interrupt(Status status) noexcept {
     invariant(status.isA<ErrorCategory::NotPrimaryError>() ||
               status.isA<ErrorCategory::ShutdownError>());
 
-    stdx::lock_guard<Latch> lg(_stateMutex);
+    stdx::lock_guard<stdx::mutex> lg(_stateMutex);
     _invalidateFutures(status, lg);
 }
 

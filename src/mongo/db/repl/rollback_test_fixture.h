@@ -68,7 +68,7 @@
 #include "mongo/db/tenant_id.h"
 #include "mongo/logv2/log_component.h"
 #include "mongo/logv2/log_severity.h"
-#include "mongo/platform/mutex.h"
+#include "mongo/stdx/mutex.h"
 #include "mongo/stdx/unordered_map.h"
 #include "mongo/unittest/log_test.h"
 #include "mongo/unittest/unittest.h"
@@ -173,7 +173,7 @@ public:
     void setStableTimestamp(ServiceContext* serviceCtx,
                             Timestamp snapshotName,
                             bool force = false) override {
-        stdx::lock_guard<Latch> lock(_mutex);
+        stdx::lock_guard<stdx::mutex> lock(_mutex);
         _stableTimestamp = snapshotName;
     }
 
@@ -183,7 +183,7 @@ public:
      * of '_currTimestamp'.
      */
     Timestamp recoverToStableTimestamp(OperationContext* opCtx) override {
-        stdx::lock_guard<Latch> lock(_mutex);
+        stdx::lock_guard<stdx::mutex> lock(_mutex);
         if (_recoverToTimestampStatus) {
             fassert(4584700, _recoverToTimestampStatus.get());
         }
@@ -206,17 +206,17 @@ public:
     }
 
     void setRecoverToTimestampStatus(Status status) {
-        stdx::lock_guard<Latch> lock(_mutex);
+        stdx::lock_guard<stdx::mutex> lock(_mutex);
         _recoverToTimestampStatus = status;
     }
 
     void setCurrentTimestamp(Timestamp ts) {
-        stdx::lock_guard<Latch> lock(_mutex);
+        stdx::lock_guard<stdx::mutex> lock(_mutex);
         _currTimestamp = ts;
     }
 
     Timestamp getCurrentTimestamp() {
-        stdx::lock_guard<Latch> lock(_mutex);
+        stdx::lock_guard<stdx::mutex> lock(_mutex);
         return _currTimestamp;
     }
 
@@ -226,7 +226,7 @@ public:
     Status setCollectionCount(OperationContext* opCtx,
                               const NamespaceStringOrUUID& nsOrUUID,
                               long long newCount) override {
-        stdx::lock_guard<Latch> lock(_mutex);
+        stdx::lock_guard<stdx::mutex> lock(_mutex);
         if (_setCollectionCountStatus && _setCollectionCountStatusUUID &&
             nsOrUUID.uuid() == _setCollectionCountStatusUUID) {
             return *_setCollectionCountStatus;
@@ -236,13 +236,13 @@ public:
     }
 
     void setSetCollectionCountStatus(UUID uuid, Status status) {
-        stdx::lock_guard<Latch> lock(_mutex);
+        stdx::lock_guard<stdx::mutex> lock(_mutex);
         _setCollectionCountStatus = status;
         _setCollectionCountStatusUUID = uuid;
     }
 
     long long getFinalCollectionCount(const UUID& uuid) {
-        stdx::lock_guard<Latch> lock(_mutex);
+        stdx::lock_guard<stdx::mutex> lock(_mutex);
         return _newCounts[uuid];
     }
 

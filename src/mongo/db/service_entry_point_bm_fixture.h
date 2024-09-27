@@ -111,7 +111,7 @@ public:
 private:
     Atomic<uint64_t> _nextClientId{0};
 
-    Mutex _setupMutex;
+    stdx::mutex _setupMutex;
     ReadWriteConcernDefaultsLookupMock _lookupMock;
     size_t _configuredThreads = 0;
 };

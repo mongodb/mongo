@@ -43,7 +43,7 @@
 #include "mongo/db/repl/optime.h"
 #include "mongo/db/repl/replication_consistency_markers.h"
 #include "mongo/db/repl/replication_consistency_markers_gen.h"
-#include "mongo/platform/mutex.h"
+#include "mongo/stdx/mutex.h"
 
 namespace mongo {
 

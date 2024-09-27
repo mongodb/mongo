@@ -54,7 +54,6 @@
 #include "mongo/db/session/logical_session_id.h"
 #include "mongo/db/session/logical_session_id_gen.h"
 #include "mongo/db/session/session_killer.h"
-#include "mongo/platform/mutex.h"
 #include "mongo/platform/random.h"
 #include "mongo/stdx/mutex.h"
 #include "mongo/stdx/unordered_map.h"
@@ -251,7 +250,7 @@ private:
         // Remove from the opKey map first since erasing from the map may free the pointer for
         // 'cursor'.
         if (auto opKey = cursor->getOperationKey()) {
-            stdx::lock_guard<Latch> lk(_opKeyMutex);
+            stdx::lock_guard<stdx::mutex> lk(_opKeyMutex);
             auto it = _opKeyMap.find(*opKey);
             if (it != _opKeyMap.end()) {
                 it->second.erase(cursor->cursorid());

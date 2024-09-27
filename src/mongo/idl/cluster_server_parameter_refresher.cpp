@@ -225,7 +225,7 @@ void ClusterServerParameterRefresher::setPeriod(Milliseconds period) {
 
 Status ClusterServerParameterRefresher::refreshParameters(OperationContext* opCtx,
                                                           bool ensureReadYourWritesConsistency) {
-    stdx::unique_lock<Latch> lk(_mutex);
+    stdx::unique_lock<stdx::mutex> lk(_mutex);
 
     // If Read Your Writes consistency is requested and a request to fetch the parameter values is
     // in progress, then wait until that request completes.

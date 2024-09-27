@@ -52,7 +52,6 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/storage/write_unit_of_work.h"
 #include "mongo/platform/atomic_word.h"
-#include "mongo/platform/mutex.h"
 #include "mongo/stdx/mutex.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/unittest/assert.h"
@@ -241,7 +240,7 @@ TEST_F(CatalogTestFixture, ConcurrentCatalogWritesSerialized) {
     constexpr int32_t WritesPerThread = 1000;
 
     unittest::Barrier barrier(NumThreads);
-    Mutex m;
+    stdx::mutex m;
     auto job = [&]() {
         barrier.countDownAndWait();
 

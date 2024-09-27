@@ -84,7 +84,7 @@ TopologyManagerImpl::TopologyManagerImpl(SdamConfiguration config,
       _topologyEventsPublisher(eventsPublisher) {}
 
 bool TopologyManagerImpl::onServerDescription(const HelloOutcome& helloOutcome) {
-    stdx::lock_guard<mongo::Mutex> lock(_mutex);
+    stdx::lock_guard<stdx::mutex> lock(_mutex);
 
     boost::optional<HelloRTT> lastRTT;
     boost::optional<TopologyVersion> lastTopologyVersion;
@@ -127,13 +127,13 @@ bool TopologyManagerImpl::onServerDescription(const HelloOutcome& helloOutcome) 
 }
 
 std::shared_ptr<TopologyDescription> TopologyManagerImpl::getTopologyDescription() const {
-    stdx::lock_guard<mongo::Mutex> lock(_mutex);
+    stdx::lock_guard<stdx::mutex> lock(_mutex);
     return _topologyDescription;
 }
 
 void TopologyManagerImpl::onServerRTTUpdated(HostAndPort hostAndPort, HelloRTT rtt) {
     {
-        stdx::lock_guard<mongo::Mutex> lock(_mutex);
+        stdx::lock_guard<stdx::mutex> lock(_mutex);
 
         auto oldServerDescription = _topologyDescription->findServerByAddress(hostAndPort);
         if (oldServerDescription) {
@@ -157,7 +157,7 @@ void TopologyManagerImpl::onServerRTTUpdated(HostAndPort hostAndPort, HelloRTT r
 
 SemiFuture<std::vector<HostAndPort>> TopologyManagerImpl::executeWithLock(
     std::function<SemiFuture<std::vector<HostAndPort>>(const TopologyDescriptionPtr&)> func) {
-    stdx::lock_guard<mongo::Mutex> lock(_mutex);
+    stdx::lock_guard<stdx::mutex> lock(_mutex);
     return func(_topologyDescription);
 }
 

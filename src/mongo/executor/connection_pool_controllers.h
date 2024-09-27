@@ -38,7 +38,7 @@
 #include "mongo/base/string_data.h"
 #include "mongo/executor/connection_pool.h"
 #include "mongo/executor/connection_pool_stats.h"
-#include "mongo/platform/mutex.h"
+#include "mongo/stdx/mutex.h"
 #include "mongo/stdx/unordered_map.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/net/hostandport.h"

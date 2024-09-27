@@ -39,7 +39,6 @@
 
 #include "mongo/base/init.h"
 #include "mongo/config.h"
-#include "mongo/stdx/mutex.h"
 #include "mongo/stdx/unordered_set.h"
 #include "mongo/util/aligned.h"
 #include "mongo/util/fixed_string.h"

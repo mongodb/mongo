@@ -37,7 +37,7 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/operation_id.h"
 #include "mongo/db/service_context.h"
-#include "mongo/platform/mutex.h"
+#include "mongo/stdx/mutex.h"
 #include "mongo/stdx/unordered_map.h"
 
 namespace mongo {

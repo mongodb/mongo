@@ -65,13 +65,13 @@
 #include "mongo/logv2/log.h"
 #include "mongo/logv2/log_attr.h"
 #include "mongo/logv2/log_component.h"
-#include "mongo/platform/mutex.h"
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/rpc/op_msg.h"
 #include "mongo/rpc/reply_interface.h"
 #include "mongo/rpc/unique_message.h"
 #include "mongo/stdx/condition_variable.h"
 #include "mongo/stdx/future.h"
+#include "mongo/stdx/mutex.h"
 #include "mongo/unittest/assert.h"
 #include "mongo/unittest/bson_test_util.h"
 #include "mongo/unittest/framework.h"
@@ -257,7 +257,7 @@ auto startExhaustQuery(
 
     // Wait until the parallel operation initializes its cursor.
     {
-        stdx::unique_lock<Latch> lk(cursorIdMutex);
+        stdx::unique_lock<stdx::mutex> lk(cursorIdMutex);
         cursorIdCV.wait_for(lk, parallelWaitTimeoutMS, [&] { return cursorId.has_value(); });
     }
     ASSERT(cursorId);

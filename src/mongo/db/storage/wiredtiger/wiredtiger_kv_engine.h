@@ -72,6 +72,7 @@
 #include "mongo/db/tenant_id.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/stdx/condition_variable.h"
+#include "mongo/stdx/mutex.h"
 #include "mongo/util/clock_source.h"
 #include "mongo/util/concurrency/with_lock.h"
 #include "mongo/util/elapsed_tracker.h"

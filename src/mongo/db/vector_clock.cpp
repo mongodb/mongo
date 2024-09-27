@@ -102,7 +102,7 @@ void VectorClock::registerVectorClockOnServiceContext(ServiceContext* service,
 }
 
 VectorClock::VectorTime VectorClock::getTime() const {
-    stdx::lock_guard<Latch> lock(_mutex);
+    stdx::lock_guard<stdx::mutex> lock(_mutex);
     return VectorTime(_vectorTime);
 }
 
@@ -138,7 +138,7 @@ void VectorClock::_ensurePassesRateLimiter(ServiceContext* service,
 void VectorClock::_advanceTime(LogicalTimeArray&& newTime) {
     _ensurePassesRateLimiter(_service, newTime);
 
-    stdx::lock_guard<Latch> lock(_mutex);
+    stdx::lock_guard<stdx::mutex> lock(_mutex);
 
     auto it = _vectorTime.begin();
     auto newIt = newTime.begin();
@@ -439,7 +439,7 @@ void VectorClock::_disable() {
 }
 
 void VectorClock::resetVectorClock_forTest() {
-    stdx::lock_guard<Latch> lock(_mutex);
+    stdx::lock_guard<stdx::mutex> lock(_mutex);
     auto it = _vectorTime.begin();
     for (; it != _vectorTime.end(); ++it) {
         *it = VectorClock::kInitialComponentTime;

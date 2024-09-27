@@ -55,8 +55,8 @@
 #include "mongo/db/storage/durable_catalog_entry.h"
 #include "mongo/db/storage/record_store.h"
 #include "mongo/db/storage/storage_engine.h"
-#include "mongo/platform/mutex.h"
 #include "mongo/platform/random.h"
+#include "mongo/stdx/mutex.h"
 #include "mongo/util/assert_util_core.h"
 #include "mongo/util/concurrency/with_lock.h"
 #include "mongo/util/str.h"
@@ -338,12 +338,12 @@ public:
                          MultikeyPaths* multikeyPaths) const;
 
     void setRand_forTest(const std::string& rand) {
-        stdx::lock_guard<Latch> lk(_randLock);
+        stdx::lock_guard<stdx::mutex> lk(_randLock);
         _rand = rand;
     }
 
     std::string getRand_forTest() const {
-        stdx::lock_guard<Latch> lk(_randLock);
+        stdx::lock_guard<stdx::mutex> lk(_randLock);
         return _rand;
     }
 

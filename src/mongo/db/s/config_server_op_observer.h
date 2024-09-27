@@ -42,7 +42,6 @@
 #include "mongo/db/repl/optime.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/session/logical_session_id.h"
-#include "mongo/platform/mutex.h"
 #include "mongo/util/uuid.h"
 
 namespace mongo {

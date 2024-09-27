@@ -44,8 +44,8 @@
 #include "mongo/executor/remote_command_response.h"
 #include "mongo/executor/scoped_task_executor.h"
 #include "mongo/executor/task_executor.h"
-#include "mongo/platform/mutex.h"
 #include "mongo/stdx/condition_variable.h"
+#include "mongo/stdx/mutex.h"
 #include "mongo/transport/transport_layer.h"
 #include "mongo/util/concurrency/with_lock.h"
 #include "mongo/util/duration.h"
@@ -171,7 +171,7 @@ private:
                                        transport::ConnectSSLMode sslMode);
 
     // Start processing pending/queued RPCs.
-    void _doNetworking(stdx::unique_lock<Latch>&&);
+    void _doNetworking(stdx::unique_lock<stdx::mutex>&&);
 
     // CallbackState for RPCs. Non-RPC callbacks use the CallbackState from the _underlyingExecutor.
     class CallbackState;
@@ -190,11 +190,11 @@ private:
 
     // Helper that walks the _requestQueue in-order, completing any canceled callbacks, until
     // it finds the first uncanceled one (if any), which it returns.
-    boost::optional<RequestAndCallback> _getFirstUncanceledRequest(stdx::unique_lock<Latch>&);
+    boost::optional<RequestAndCallback> _getFirstUncanceledRequest(stdx::unique_lock<stdx::mutex>&);
 
     // Synchronizes access to the _requestQueue, _stream, and _isDoingNetworking variables, as well
     // as all CallbackState members.
-    mutable Mutex _mutex;
+    mutable stdx::mutex _mutex;
 
     ScopedTaskExecutor _executor;
     // Owned by the TaskExecutor backing _executor above. Since ScopedTaskExecutor keeps a

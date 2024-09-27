@@ -63,7 +63,7 @@
 #include "mongo/logv2/log_manager.h"
 #include "mongo/logv2/log_severity.h"
 #include "mongo/platform/atomic_word.h"
-#include "mongo/platform/mutex.h"
+#include "mongo/stdx/mutex.h"
 #include "mongo/unittest/assert.h"
 #include "mongo/unittest/framework.h"
 #include "mongo/unittest/temp_dir.h"
@@ -95,7 +95,7 @@ public:
     void onCreateClient(Client* client) override {}
     void onDestroyClient(Client* client) override {}
     void onCreateOperationContext(OperationContext* opCtx) override {
-        stdx::unique_lock<Latch> lock(_mutex);
+        stdx::unique_lock<stdx::mutex> lock(_mutex);
         shard_role_details::setRecoveryUnit(
             opCtx,
             std::unique_ptr<RecoveryUnit>(_kvEngine->newRecoveryUnit()),
@@ -104,7 +104,7 @@ public:
     void onDestroyOperationContext(OperationContext* opCtx) override {}
 
     void setKVEngine(KVEngine* kvEngine) {
-        stdx::unique_lock<Latch> lock(_mutex);
+        stdx::unique_lock<stdx::mutex> lock(_mutex);
         _kvEngine = kvEngine;
     }
 

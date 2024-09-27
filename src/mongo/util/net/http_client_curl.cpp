@@ -48,7 +48,7 @@
 #include "mongo/executor/connection_pool.h"
 #include "mongo/executor/connection_pool_stats.h"
 #include "mongo/logv2/log.h"
-#include "mongo/platform/mutex.h"
+#include "mongo/stdx/mutex.h"
 #include "mongo/stdx/unordered_map.h"
 #include "mongo/transport/transport_layer.h"
 #include "mongo/util/alarm.h"

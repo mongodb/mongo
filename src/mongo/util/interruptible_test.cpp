@@ -27,8 +27,8 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/mutex.h"
 #include "mongo/stdx/condition_variable.h"
+#include "mongo/stdx/mutex.h"
 #include "mongo/unittest/assert.h"
 #include "mongo/unittest/framework.h"
 #include "mongo/util/interruptible.h"
@@ -46,7 +46,7 @@ TEST_F(InterruptibleTest, NotInterruptibleWaitForConditionFailsWithOverflowError
 
     stdx::mutex mutex;
     stdx::condition_variable cv;
-    stdx::unique_lock<Latch> lk(mutex);
+    stdx::unique_lock<stdx::mutex> lk(mutex);
 
     auto overflowDeadline = Date_t::max() - Milliseconds(1);
 

@@ -330,7 +330,7 @@ void GlobalIndexCloningService::CloningStateMachine::checkIfOptionsConflict(
 CancellationToken GlobalIndexCloningService::CloningStateMachine::_initCleanupToken(
     const CancellationToken& stepdownToken) {
     auto cleanupCalled = ([&] {
-        stdx::lock_guard<Latch> lk(_mutex);
+        stdx::lock_guard<stdx::mutex> lk(_mutex);
         _cleanupSignalSource = CancellationSource(stepdownToken);
 
         return _cleanupCalled;

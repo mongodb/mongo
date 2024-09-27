@@ -42,8 +42,8 @@
 #include "mongo/base/status_with.h"
 #include "mongo/base/string_data.h"
 #include "mongo/platform/atomic_word.h"
-#include "mongo/platform/mutex.h"
 #include "mongo/stdx/condition_variable.h"
+#include "mongo/stdx/mutex.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/lockable_adapter.h"
@@ -231,7 +231,7 @@ public:
     void sleepUntil(Date_t deadline) {
         stdx::mutex m;
         stdx::condition_variable cv;
-        stdx::unique_lock<Latch> lk(m);
+        stdx::unique_lock<stdx::mutex> lk(m);
         invariant(!waitForConditionOrInterruptUntil(cv, lk, deadline, [] { return false; }));
     }
 
@@ -242,7 +242,7 @@ public:
     void sleepFor(Milliseconds duration) {
         stdx::mutex m;
         stdx::condition_variable cv;
-        stdx::unique_lock<Latch> lk(m);
+        stdx::unique_lock<stdx::mutex> lk(m);
         invariant(!waitForConditionOrInterruptFor(cv, lk, duration, [] { return false; }));
     }
 

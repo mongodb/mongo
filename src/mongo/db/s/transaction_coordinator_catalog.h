@@ -44,8 +44,8 @@
 #include "mongo/db/s/transaction_coordinator.h"
 #include "mongo/db/session/logical_session_id.h"
 #include "mongo/db/session/logical_session_id_gen.h"
-#include "mongo/platform/mutex.h"
 #include "mongo/stdx/condition_variable.h"
+#include "mongo/stdx/mutex.h"
 #include "mongo/util/concurrency/with_lock.h"
 
 namespace mongo {
@@ -141,7 +141,7 @@ private:
      * Blocks in an interruptible wait until the catalog is not marked as having a stepup in
      * progress.
      */
-    void _waitForStepUpToComplete(stdx::unique_lock<Latch>& lk, OperationContext* opCtx);
+    void _waitForStepUpToComplete(stdx::unique_lock<stdx::mutex>& lk, OperationContext* opCtx);
 
     /**
      * Removes the coordinator with the given session id and transaction number from the catalog, if

@@ -34,9 +34,9 @@
 #include <limits>
 #include <queue>
 
-#include "mongo/platform/mutex.h"
 #include "mongo/stdx/chrono.h"
 #include "mongo/stdx/condition_variable.h"
+#include "mongo/stdx/mutex.h"
 #include "mongo/util/hierarchical_acquisition.h"
 
 namespace mongo {
@@ -67,7 +67,7 @@ public:
      * NOTE: Should only be used in a single producer case.
      */
     void waitForSpace(size_t size) {
-        stdx::unique_lock<Latch> lk(_lock);
+        stdx::unique_lock<stdx::mutex> lk(_lock);
         _waitForSpace_inlock(size, lk);
     }
 
@@ -91,7 +91,7 @@ public:
         // Block until enough space is available.
         waitForSpace(size);
 
-        stdx::unique_lock<Latch> lk(_lock);
+        stdx::unique_lock<stdx::mutex> lk(_lock);
         const auto startedEmpty = _queue.empty();
         _clearing = false;
 
@@ -108,7 +108,7 @@ public:
     }
 
     bool empty() const {
-        stdx::lock_guard<Latch> lk(_lock);
+        stdx::lock_guard<stdx::mutex> lk(_lock);
         return _queue.empty();
     }
 
@@ -116,7 +116,7 @@ public:
      * The size as measured by the size function. Default to counting each item
      */
     size_t size() const {
-        stdx::lock_guard<Latch> lk(_lock);
+        stdx::lock_guard<stdx::mutex> lk(_lock);
         return _currentSize;
     }
 
@@ -131,12 +131,12 @@ public:
      * The number/count of items in the queue ( _queue.size() )
      */
     size_t count() const {
-        stdx::lock_guard<Latch> lk(_lock);
+        stdx::lock_guard<stdx::mutex> lk(_lock);
         return _queue.size();
     }
 
     void clear() {
-        stdx::lock_guard<Latch> lk(_lock);
+        stdx::lock_guard<stdx::mutex> lk(_lock);
         _clearing = true;
         _queue = std::queue<T>();
         _currentSize = 0;
@@ -145,7 +145,7 @@ public:
     }
 
     bool tryPop(T& t) {
-        stdx::lock_guard<Latch> lk(_lock);
+        stdx::lock_guard<stdx::mutex> lk(_lock);
         if (_queue.empty())
             return false;
 
@@ -158,7 +158,7 @@ public:
     }
 
     T blockingPop() {
-        stdx::unique_lock<Latch> lk(_lock);
+        stdx::unique_lock<stdx::mutex> lk(_lock);
         _clearing = false;
         while (_queue.empty() && !_clearing)
             _cvNoLongerEmpty.wait(lk);
@@ -183,7 +183,7 @@ public:
     bool blockingPop(T& t, int maxSecondsToWait) {
         using namespace stdx::chrono;
         const auto deadline = system_clock::now() + seconds(maxSecondsToWait);
-        stdx::unique_lock<Latch> lk(_lock);
+        stdx::unique_lock<stdx::mutex> lk(_lock);
         _clearing = false;
         while (_queue.empty() && !_clearing) {
             if (stdx::cv_status::timeout == _cvNoLongerEmpty.wait_until(lk, deadline))
@@ -205,7 +205,7 @@ public:
     bool blockingPeek(T& t, int maxSecondsToWait) {
         using namespace stdx::chrono;
         const auto deadline = system_clock::now() + seconds(maxSecondsToWait);
-        stdx::unique_lock<Latch> lk(_lock);
+        stdx::unique_lock<stdx::mutex> lk(_lock);
         _clearing = false;
         while (_queue.empty() && !_clearing) {
             if (stdx::cv_status::timeout == _cvNoLongerEmpty.wait_until(lk, deadline))
@@ -221,7 +221,7 @@ public:
     // Obviously, this should only be used when you have
     // only one consumer
     bool peek(T& t) {
-        stdx::unique_lock<Latch> lk(_lock);
+        stdx::unique_lock<stdx::mutex> lk(_lock);
         if (_queue.empty()) {
             return false;
         }
@@ -234,7 +234,7 @@ public:
      * Returns the item most recently added to the queue or nothing if the queue is empty.
      */
     boost::optional<T> lastObjectPushed() const {
-        stdx::unique_lock<Latch> lk(_lock);
+        stdx::unique_lock<stdx::mutex> lk(_lock);
         if (_queue.empty()) {
             return {};
         }
@@ -246,7 +246,7 @@ private:
     /**
      * Returns when enough space is available.
      */
-    void _waitForSpace_inlock(size_t size, stdx::unique_lock<Latch>& lk) {
+    void _waitForSpace_inlock(size_t size, stdx::unique_lock<stdx::mutex>& lk) {
         while (_currentSize + size > _maxSize) {
             _cvNoLongerFull.wait(lk);
         }

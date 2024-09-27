@@ -124,7 +124,7 @@
 #include "mongo/executor/task_executor.h"
 #include "mongo/idl/idl_parser.h"
 #include "mongo/platform/atomic_word.h"
-#include "mongo/platform/mutex.h"
+#include "mongo/stdx/mutex.h"
 #include "mongo/unittest/assert.h"
 #include "mongo/unittest/bson_test_util.h"
 #include "mongo/unittest/death_test.h"
@@ -1991,7 +1991,7 @@ protected:
             _insertOp2->getOpTime());
         _opObserver->onInsertsFn =
             [&](OperationContext*, const NamespaceString& nss, const std::vector<BSONObj>& docs) {
-                stdx::lock_guard<Latch> lock(_insertMutex);
+                stdx::lock_guard<stdx::mutex> lock(_insertMutex);
                 if (nss.isOplog()) {
                     _insertedOplogDocs.insert(_insertedOplogDocs.end(), docs.begin(), docs.end());
                 } else if (nss == _nss1 || nss == _nss2 ||
@@ -2530,7 +2530,7 @@ protected:
                                                 const NamespaceString& collNss,
                                                 const CollectionOptions&,
                                                 const BSONObj&) {
-            stdx::lock_guard<Latch> lock(_mutex);
+            stdx::lock_guard<stdx::mutex> lock(_mutex);
             if (collNss.isOplog()) {
                 _oplogDocs.insert(_oplogDocs.end(), BSON("create" << collNss.coll()));
             } else if (collNss == _nss ||
@@ -2546,7 +2546,7 @@ protected:
         _opObserver->onInsertsFn = [&](OperationContext*,
                                        const NamespaceString& nss,
                                        const std::vector<BSONObj>& docs) {
-            stdx::lock_guard<Latch> lock(_mutex);
+            stdx::lock_guard<stdx::mutex> lock(_mutex);
             if (nss.isOplog()) {
                 _oplogDocs.insert(_oplogDocs.end(), docs.begin(), docs.end());
             } else if (nss == _nss || nss == NamespaceString::kSessionTransactionsTableNamespace) {
@@ -3359,7 +3359,7 @@ protected:
                                       StmtId,
                                       const BSONObj&,
                                       const OplogDeleteEntryArgs& args) {
-            stdx::lock_guard<Latch> lock(_deleteMutex);
+            stdx::lock_guard<stdx::mutex> lock(_deleteMutex);
             auto nss = coll->ns();
             if (nss == _nss1 || nss == _nss2 ||
                 nss == NamespaceString::kSessionTransactionsTableNamespace) {

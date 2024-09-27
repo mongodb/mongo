@@ -69,7 +69,7 @@ void LDAPCumulativeOperationStats::report(BSONObjBuilder* builder) const {
         subObjBuildr.append(kLDAPMetricDuration, durationCount<Microseconds>(stats.totalTime));
     };
 
-    stdx::lock_guard<Latch> lock(_memberAccessMutex);
+    stdx::lock_guard<stdx::mutex> lock(_memberAccessMutex);
 
     builder->append(kNumberOfSuccessfulReferrals, _numSuccessfulReferrals);
     builder->append(kNumberOfFailedReferrals, _numFailedReferrals);
@@ -84,7 +84,7 @@ void LDAPCumulativeOperationStats::toString(StringBuilder* sb) const {
             << kLDAPMetricDuration << ":" << durationCount<Microseconds>(stats.totalTime) << "}";
     };
 
-    stdx::lock_guard<Latch> lock(_memberAccessMutex);
+    stdx::lock_guard<stdx::mutex> lock(_memberAccessMutex);
 
     *sb << "{" << kNumberOfSuccessfulReferrals << ":" << _numSuccessfulReferrals << ",";
     *sb << kNumberOfFailedReferrals << ":" << _numFailedReferrals << ",";
@@ -95,7 +95,7 @@ void LDAPCumulativeOperationStats::toString(StringBuilder* sb) const {
 }
 
 bool LDAPCumulativeOperationStats::hasData() const {
-    stdx::lock_guard<Latch> lock(_memberAccessMutex);
+    stdx::lock_guard<stdx::mutex> lock(_memberAccessMutex);
     return _numSuccessfulReferrals > 0 || _numFailedReferrals > 0 || _bindStats.numOps > 0 ||
         _searchStats.numOps > 0;
 }
@@ -106,7 +106,7 @@ void LDAPCumulativeOperationStats::recordOpStats(const LDAPOperationStats& stats
         stats.totalTime += ldapOpStats.timeElapsed(getGlobalServiceContext()->getTickSource());
     };
 
-    stdx::lock_guard<Latch> lock(_memberAccessMutex);
+    stdx::lock_guard<stdx::mutex> lock(_memberAccessMutex);
 
     _numSuccessfulReferrals += stats._numSuccessfulReferrals;
     _numFailedReferrals += stats._numFailedReferrals;

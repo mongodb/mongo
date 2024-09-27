@@ -96,7 +96,7 @@ bool QueryAnalysisCoordinator::shouldRegisterReplicaSetAwareService() const {
 }
 
 void QueryAnalysisCoordinator::onConfigurationInsert(const QueryAnalyzerDocument& doc) {
-    stdx::lock_guard<Latch> lk(_mutex);
+    stdx::lock_guard<stdx::mutex> lk(_mutex);
 
     LOGV2(7372308, "Detected new query analyzer configuration", "configuration"_attr = doc);
     if (doc.getMode() == QueryAnalyzerModeEnum::kOff) {
@@ -109,7 +109,7 @@ void QueryAnalysisCoordinator::onConfigurationInsert(const QueryAnalyzerDocument
 }
 
 void QueryAnalysisCoordinator::onConfigurationUpdate(const QueryAnalyzerDocument& doc) {
-    stdx::lock_guard<Latch> lk(_mutex);
+    stdx::lock_guard<stdx::mutex> lk(_mutex);
 
     LOGV2(7372309, "Detected a query analyzer configuration update", "configuration"_attr = doc);
     if (doc.getMode() == QueryAnalyzerModeEnum::kOff) {
@@ -133,7 +133,7 @@ void QueryAnalysisCoordinator::onConfigurationUpdate(const QueryAnalyzerDocument
 }
 
 void QueryAnalysisCoordinator::onConfigurationDelete(const QueryAnalyzerDocument& doc) {
-    stdx::lock_guard<Latch> lk(_mutex);
+    stdx::lock_guard<stdx::mutex> lk(_mutex);
 
     LOGV2(7372310, "Detected a query analyzer configuration delete", "configuration"_attr = doc);
     _configurations.erase(doc.getNs());
@@ -159,7 +159,7 @@ void QueryAnalysisCoordinator::Sampler::resetLastNumQueriesExecutedPerSecond() {
 
 void QueryAnalysisCoordinator::onSamplerInsert(const MongosType& doc) {
     invariant(serverGlobalParams.clusterRole.has(ClusterRole::ConfigServer));
-    stdx::lock_guard<Latch> lk(_mutex);
+    stdx::lock_guard<stdx::mutex> lk(_mutex);
 
     if (doc.getPing() < _getMinLastPingTime()) {
         return;
@@ -170,7 +170,7 @@ void QueryAnalysisCoordinator::onSamplerInsert(const MongosType& doc) {
 
 void QueryAnalysisCoordinator::onSamplerUpdate(const MongosType& doc) {
     invariant(serverGlobalParams.clusterRole.has(ClusterRole::ConfigServer));
-    stdx::lock_guard<Latch> lk(_mutex);
+    stdx::lock_guard<stdx::mutex> lk(_mutex);
 
     auto it = _samplers.find(doc.getName());
     if (it == _samplers.end()) {
@@ -183,7 +183,7 @@ void QueryAnalysisCoordinator::onSamplerUpdate(const MongosType& doc) {
 
 void QueryAnalysisCoordinator::onSamplerDelete(const MongosType& doc) {
     invariant(serverGlobalParams.clusterRole.has(ClusterRole::ConfigServer));
-    stdx::lock_guard<Latch> lk(_mutex);
+    stdx::lock_guard<stdx::mutex> lk(_mutex);
 
     auto erased = _samplers.erase(doc.getName());
     invariant(erased);
@@ -194,7 +194,7 @@ void QueryAnalysisCoordinator::onStartup(OperationContext* opCtx) {
         return;
     }
 
-    stdx::lock_guard<Latch> lk(_mutex);
+    stdx::lock_guard<stdx::mutex> lk(_mutex);
 
     DBDirectClient client(opCtx);
 
@@ -239,7 +239,7 @@ void QueryAnalysisCoordinator::onSetCurrentConfig(OperationContext* opCtx) {
     }
 
     if (serverGlobalParams.clusterRole.has(ClusterRole::None)) {
-        stdx::lock_guard<Latch> lk(_mutex);
+        stdx::lock_guard<stdx::mutex> lk(_mutex);
 
         StringMap<Sampler> samplers;
 
@@ -267,7 +267,7 @@ void QueryAnalysisCoordinator::onSetCurrentConfig(OperationContext* opCtx) {
 }
 
 void QueryAnalysisCoordinator::onStepUpBegin(OperationContext* opCtx, long long term) {
-    stdx::lock_guard<Latch> lk(_mutex);
+    stdx::lock_guard<stdx::mutex> lk(_mutex);
     for (auto& [_, sampler] : _samplers) {
         sampler.resetLastNumQueriesExecutedPerSecond();
     }
@@ -277,7 +277,7 @@ std::vector<CollectionQueryAnalyzerConfiguration>
 QueryAnalysisCoordinator::getNewConfigurationsForSampler(OperationContext* opCtx,
                                                          StringData samplerName,
                                                          double numQueriesExecutedPerSecond) {
-    stdx::lock_guard<Latch> lk(_mutex);
+    stdx::lock_guard<stdx::mutex> lk(_mutex);
 
     // Update the last ping time and last number of queries executed per second of this sampler.
     auto now = opCtx->getServiceContext()->getFastClockSource()->now();

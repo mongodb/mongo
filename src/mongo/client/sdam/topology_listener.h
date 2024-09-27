@@ -37,7 +37,7 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/client/sdam/sdam_datatypes.h"
 #include "mongo/executor/task_executor.h"
-#include "mongo/platform/mutex.h"
+#include "mongo/stdx/mutex.h"
 #include "mongo/util/hierarchical_acquisition.h"
 #include "mongo/util/net/hostandport.h"
 

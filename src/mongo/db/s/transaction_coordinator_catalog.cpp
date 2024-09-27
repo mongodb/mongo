@@ -74,14 +74,14 @@ void TransactionCoordinatorCatalog::exitStepUp(Status status) {
                       "error"_attr = status);
     }
 
-    stdx::lock_guard<Latch> lk(_mutex);
+    stdx::lock_guard<stdx::mutex> lk(_mutex);
     invariant(!_stepUpCompletionStatus);
     _stepUpCompletionStatus = std::move(status);
     _stepUpCompleteCV.notify_all();
 }
 
 void TransactionCoordinatorCatalog::onStepDown() {
-    stdx::unique_lock<Latch> ul(_mutex);
+    stdx::unique_lock<stdx::mutex> ul(_mutex);
 
     std::vector<std::shared_ptr<TransactionCoordinator>> coordinatorsToCancel;
     for (auto&& [sessionId, coordinatorsForSession] : _coordinatorsBySession) {
@@ -113,7 +113,7 @@ void TransactionCoordinatorCatalog::insert(OperationContext* opCtx,
     auto txnNumber = txnNumberAndRetryCounter.getTxnNumber();
     auto txnRetryCounter = *txnNumberAndRetryCounter.getTxnRetryCounter();
 
-    stdx::unique_lock<Latch> ul(_mutex);
+    stdx::unique_lock<stdx::mutex> ul(_mutex);
     if (!forStepUp) {
         _waitForStepUpToComplete(ul, opCtx);
     }
@@ -172,7 +172,7 @@ std::shared_ptr<TransactionCoordinator> TransactionCoordinatorCatalog::get(
     auto txnNumber = txnNumberAndRetryCounter.getTxnNumber();
     auto txnRetryCounter = *txnNumberAndRetryCounter.getTxnRetryCounter();
 
-    stdx::unique_lock<Latch> ul(_mutex);
+    stdx::unique_lock<stdx::mutex> ul(_mutex);
     _waitForStepUpToComplete(ul, opCtx);
 
     std::shared_ptr<TransactionCoordinator> coordinatorToReturn;
@@ -196,7 +196,7 @@ std::shared_ptr<TransactionCoordinator> TransactionCoordinatorCatalog::get(
 boost::optional<std::pair<TxnNumberAndRetryCounter, std::shared_ptr<TransactionCoordinator>>>
 TransactionCoordinatorCatalog::getLatestOnSession(OperationContext* opCtx,
                                                   const LogicalSessionId& lsid) {
-    stdx::unique_lock<Latch> ul(_mutex);
+    stdx::unique_lock<stdx::mutex> ul(_mutex);
     _waitForStepUpToComplete(ul, opCtx);
 
     const auto& coordinatorsForSessionIter = _coordinatorsBySession.find(lsid);
@@ -237,7 +237,7 @@ void TransactionCoordinatorCatalog::_remove(
     auto txnNumber = txnNumberAndRetryCounter.getTxnNumber();
     auto txnRetryCounter = *txnNumberAndRetryCounter.getTxnRetryCounter();
 
-    stdx::lock_guard<Latch> lk(_mutex);
+    stdx::lock_guard<stdx::mutex> lk(_mutex);
 
     const auto& coordinatorsForSessionIter = _coordinatorsBySession.find(lsid);
 
@@ -269,7 +269,7 @@ void TransactionCoordinatorCatalog::_remove(
 }
 
 void TransactionCoordinatorCatalog::join() {
-    stdx::unique_lock<Latch> ul(_mutex);
+    stdx::unique_lock<stdx::mutex> ul(_mutex);
 
     while (!_noActiveCoordinatorsCV.wait_for(
         ul, stdx::chrono::seconds{5}, [this] { return _coordinatorsBySession.empty(); })) {
@@ -282,11 +282,11 @@ void TransactionCoordinatorCatalog::join() {
 }
 
 std::string TransactionCoordinatorCatalog::toString() const {
-    stdx::lock_guard<Latch> lk(_mutex);
+    stdx::lock_guard<stdx::mutex> lk(_mutex);
     return _toString(lk);
 }
 
-void TransactionCoordinatorCatalog::_waitForStepUpToComplete(stdx::unique_lock<Latch>& lk,
+void TransactionCoordinatorCatalog::_waitForStepUpToComplete(stdx::unique_lock<stdx::mutex>& lk,
                                                              OperationContext* opCtx) {
     invariant(lk.owns_lock());
     opCtx->waitForConditionOrInterrupt(
@@ -309,7 +309,7 @@ std::string TransactionCoordinatorCatalog::_toString(WithLock wl) const {
 }
 
 void TransactionCoordinatorCatalog::filter(FilterPredicate predicate, FilterVisitor visitor) {
-    stdx::lock_guard<Latch> lk(_mutex);
+    stdx::lock_guard<stdx::mutex> lk(_mutex);
     for (auto&& [sessionId, coordinatorsForSession] : _coordinatorsBySession) {
         for (auto&& [txnNumber, coordinatorsForTxnNumber] : coordinatorsForSession) {
             for (auto&& [txnRetryCounter, coordinator] : coordinatorsForTxnNumber) {

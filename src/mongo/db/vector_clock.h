@@ -46,7 +46,7 @@
 #include "mongo/db/service_context.h"
 #include "mongo/db/vector_clock_document_gen.h"
 #include "mongo/db/vector_clock_gen.h"
-#include "mongo/platform/mutex.h"
+#include "mongo/stdx/mutex.h"
 #include "mongo/transport/session.h"
 #include "mongo/util/assert_util_core.h"
 

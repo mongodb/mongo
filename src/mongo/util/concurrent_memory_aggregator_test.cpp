@@ -34,8 +34,8 @@
 #include <tuple>
 #include <vector>
 
-#include "mongo/platform/mutex.h"
 #include "mongo/stdx/condition_variable.h"
+#include "mongo/stdx/mutex.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/unittest/assert.h"
 #include "mongo/unittest/framework.h"
@@ -315,7 +315,7 @@ TEST_F(ConcurrentMemoryAggregatorTest, ConcurrentChunkedMemoryAggregators) {
                 handle.add(multiplier * j * kMemoryUsageUpdateBatchSize);
             }
 
-            stdx::unique_lock<Latch> lock(mutex);
+            stdx::unique_lock<stdx::mutex> lock(mutex);
             ++numCompleted;
             completedCv.notify_one();
             shutdownCv.wait(lock);
@@ -324,7 +324,7 @@ TEST_F(ConcurrentMemoryAggregatorTest, ConcurrentChunkedMemoryAggregators) {
 
     {
         // Wait until all the concurrent local memory aggregators are done.
-        stdx::unique_lock<Latch> lock(mutex);
+        stdx::unique_lock<stdx::mutex> lock(mutex);
         completedCv.wait(
             lock, [&]() -> bool { return numCompleted == kNumConcurrentChunkedMemoryAggregators; });
     }

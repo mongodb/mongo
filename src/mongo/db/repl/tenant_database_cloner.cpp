@@ -58,8 +58,8 @@
 #include "mongo/logv2/log_attr.h"
 #include "mongo/logv2/log_component.h"
 #include "mongo/platform/compiler.h"
-#include "mongo/platform/mutex.h"
 #include "mongo/rpc/get_status_from_command_result.h"
+#include "mongo/stdx/mutex.h"
 #include "mongo/stdx/unordered_set.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/clock_source.h"
@@ -107,7 +107,7 @@ BaseCloner::ClonerStages TenantDatabaseCloner::getStages() {
 }
 
 void TenantDatabaseCloner::preStage() {
-    stdx::lock_guard<Latch> lk(_mutex);
+    stdx::lock_guard<stdx::mutex> lk(_mutex);
     _stats.start = getSharedData()->getClock()->now();
 }
 
@@ -293,7 +293,7 @@ BaseCloner::AfterStageBehavior TenantDatabaseCloner::listExistingCollectionsStag
             lastClonedCollectionUUID,
             [](const auto& collection, const auto& uuid) { return collection.second.uuid < uuid; });
         {
-            stdx::lock_guard<Latch> lk(_mutex);
+            stdx::lock_guard<stdx::mutex> lk(_mutex);
             if (startingCollection != _collections.end() &&
                 startingCollection->second.uuid == lastClonedCollectionUUID) {
                 _stats.clonedCollectionsBeforeFailover = clonedCollectionUUIDs.size() - 1;
@@ -332,7 +332,7 @@ bool TenantDatabaseCloner::isMyFailPoint(const BSONObj& data) const {
 
 void TenantDatabaseCloner::postStage() {
     {
-        stdx::lock_guard<Latch> lk(_mutex);
+        stdx::lock_guard<stdx::mutex> lk(_mutex);
         _stats.collections = _collections.size();
         _stats.collectionStats.reserve(_collections.size());
         for (const auto& coll : _collections) {
@@ -345,7 +345,7 @@ void TenantDatabaseCloner::postStage() {
         auto& sourceNss = coll.first;
         auto& collectionOptions = coll.second;
         {
-            stdx::lock_guard<Latch> lk(_mutex);
+            stdx::lock_guard<stdx::mutex> lk(_mutex);
             _currentCollectionCloner =
                 std::make_unique<TenantCollectionCloner>(sourceNss,
                                                          collectionOptions,
@@ -375,7 +375,7 @@ void TenantDatabaseCloner::postStage() {
             setSyncFailedStatus(collStatus.withReason(message.toString()));
         }
         {
-            stdx::lock_guard<Latch> lk(_mutex);
+            stdx::lock_guard<stdx::mutex> lk(_mutex);
             _stats.collectionStats[_stats.clonedCollections] = _currentCollectionCloner->getStats();
             _stats.approxTotalBytesCopied +=
                 _stats.collectionStats[_stats.clonedCollections].approxTotalBytesCopied;
@@ -386,12 +386,12 @@ void TenantDatabaseCloner::postStage() {
             _stats.clonedCollections++;
         }
     }
-    stdx::lock_guard<Latch> lk(_mutex);
+    stdx::lock_guard<stdx::mutex> lk(_mutex);
     _stats.end = getSharedData()->getClock()->now();
 }
 
 TenantDatabaseCloner::Stats TenantDatabaseCloner::getStats() const {
-    stdx::lock_guard<Latch> lk(_mutex);
+    stdx::lock_guard<stdx::mutex> lk(_mutex);
     TenantDatabaseCloner::Stats stats = _stats;
     if (_currentCollectionCloner) {
         stats.collectionStats[_stats.clonedCollections] = _currentCollectionCloner->getStats();

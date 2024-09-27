@@ -94,7 +94,7 @@ public:
           }) {}
 
     ~PeriodicNoopRunner() {
-        stdx::unique_lock<Latch> lk(_mutex);
+        stdx::unique_lock<stdx::mutex> lk(_mutex);
         _inShutdown = true;
         _cv.notify_all();
         lk.unlock();
@@ -111,7 +111,7 @@ private:
                 const ServiceContext::UniqueOperationContext opCtxPtr = cc().makeOperationContext();
                 OperationContext& opCtx = *opCtxPtr;
                 {
-                    stdx::unique_lock<Latch> lk(_mutex);
+                    stdx::unique_lock<stdx::mutex> lk(_mutex);
                     MONGO_IDLE_THREAD_BLOCK;
                     _cv.wait_for(lk, waitTime.toSystemDuration(), [&] { return _inShutdown; });
 
@@ -159,7 +159,7 @@ NoopWriter::~NoopWriter() {
 }
 
 Status NoopWriter::startWritingPeriodicNoops(OpTime lastKnownOpTime) {
-    stdx::lock_guard<Latch> lk(_mutex);
+    stdx::lock_guard<stdx::mutex> lk(_mutex);
     _lastKnownOpTime = lastKnownOpTime;
 
     invariant(!_noopRunner);
@@ -176,7 +176,7 @@ Status NoopWriter::startWritingPeriodicNoops(OpTime lastKnownOpTime) {
 }
 
 void NoopWriter::stopWritingPeriodicNoops() {
-    stdx::lock_guard<Latch> lk(_mutex);
+    stdx::lock_guard<stdx::mutex> lk(_mutex);
     _noopRunner.reset();
 }
 

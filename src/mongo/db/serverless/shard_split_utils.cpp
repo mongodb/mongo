@@ -352,7 +352,7 @@ const std::string kLastWriteFieldName = "lastWrite";
 const std::string kLastWriteOpTimeFieldName = "opTime";
 void RecipientAcceptSplitListener::onServerHeartbeatSucceededEvent(const HostAndPort& hostAndPort,
                                                                    const BSONObj reply) {
-    stdx::lock_guard<Latch> lg(_mutex);
+    stdx::lock_guard<stdx::mutex> lg(_mutex);
     if (_fulfilled || !reply.hasField(kSetNameFieldName)) {
         return;
     }

@@ -123,7 +123,7 @@ UncommittedRecords* CappedVisibilityObserver::registerWriter(
     auto it = tmp.insert(tmp.begin(), uncommitted);
     uncommitted->setIterator(std::move(it));
     {
-        stdx::unique_lock<Mutex> lk(_mutex);
+        stdx::unique_lock<stdx::mutex> lk(_mutex);
         _uncommittedRecords.splice(_uncommittedRecords.end(), tmp);
     }
 
@@ -159,7 +159,7 @@ void CappedVisibilityObserver::_onWriterCommittedOrAborted(CappedWriter* writer,
     // outside of the mutex.
     std::list<UncommittedRecords*> tmp;
     {
-        stdx::unique_lock<Mutex> lk(_mutex);
+        stdx::unique_lock<stdx::mutex> lk(_mutex);
         // We only want to advance the highest record when a transaction commits.
         if (committed) {
             if (max > _highestRecord) {
@@ -171,12 +171,12 @@ void CappedVisibilityObserver::_onWriterCommittedOrAborted(CappedWriter* writer,
 }
 
 void CappedVisibilityObserver::setRecordImmediatelyVisible(const RecordId& rid) {
-    stdx::unique_lock<Mutex> lk(_mutex);
+    stdx::unique_lock<stdx::mutex> lk(_mutex);
     _highestRecord = rid;
 }
 
 CappedVisibilitySnapshot CappedVisibilityObserver::makeSnapshot() const {
-    stdx::unique_lock<Mutex> lk(_mutex);
+    stdx::unique_lock<stdx::mutex> lk(_mutex);
     return _makeSnapshot(lk);
 }
 

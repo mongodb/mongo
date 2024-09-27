@@ -119,7 +119,7 @@ std::vector<OplogSlot> LocalOplogInfo::getNextOpTimes(OperationContext* opCtx, s
     // Allow the storage engine to start the transaction outside the critical section.
     shard_role_details::getRecoveryUnit(opCtx)->preallocateSnapshot();
     {
-        stdx::lock_guard<Latch> lk(_newOpMutex);
+        stdx::lock_guard<stdx::mutex> lk(_newOpMutex);
 
         ts = VectorClockMutable::get(opCtx)->tickClusterTime(count).asTimestamp();
         const bool orderedCommit = false;

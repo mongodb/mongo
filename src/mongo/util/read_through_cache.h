@@ -46,7 +46,7 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/service_context.h"
 #include "mongo/logv2/log.h"
-#include "mongo/platform/mutex.h"
+#include "mongo/stdx/mutex.h"
 #include "mongo/stdx/unordered_map.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/concurrency/thread_pool_interface.h"
@@ -545,7 +545,7 @@ public:
      * invocation of `lookup`. Specifically, several concurrent invocations of `acquire` for the
      * same key may group together for a single `lookup`.
      */
-    ReadThroughCache(Mutex& mutex,
+    ReadThroughCache(stdx::mutex& mutex,
                      Service* service,
                      ThreadPoolInterface& threadPool,
                      LookupFn lookupFn,
@@ -663,7 +663,7 @@ private:
     // Used to protect the shared below. Has a lock level of 3, meaning that while held, any code is
     // only allowed to take '_cancelTokensMutex' (which in turn is allowed to be followed by the
     // Client lock).
-    Mutex& _mutex;
+    stdx::mutex& _mutex;
 
     // Blocking function which will be invoked to retrieve entries from the backing store. It will
     // be supplied with the arguments specified by the LookupArgs parameter pack.

@@ -41,7 +41,7 @@
 #include "mongo/client/connection_string.h"
 #include "mongo/client/mongo_uri.h"
 #include "mongo/db/jsobj.h"
-#include "mongo/platform/mutex.h"
+#include "mongo/stdx/mutex.h"
 
 namespace mongo {
 
