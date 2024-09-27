@@ -678,6 +678,7 @@ server_parameters:
       expr: 100 * 1024 * 1024
     validator:
         gt: 0
+    on_update: plan_cache_util::clearSbeCacheOnParameterChange
     redact: false
   
   internalQueryMaxSetUnionBytes:
@@ -690,6 +691,7 @@ server_parameters:
       expr: 100 * 1024 * 1024
     validator:
         gt: 0
+    on_update: plan_cache_util::clearSbeCacheOnParameterChange
     redact: false
   
   internalQueryMaxPercentileAccumulatorBytes:

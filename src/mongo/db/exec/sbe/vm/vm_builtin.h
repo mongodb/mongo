@@ -90,6 +90,11 @@ enum class Builtin : uint16_t {
     collAddToSetCapped,  // agg function to append to a set (with collation), fails when the set
                          // reaches specified size
 
+    setUnionCapped,  // Agg function to add the elements of an array to a set, fails when the set
+                     // reaches specified size.
+    collSetUnionCapped,  // Agg function to add the elements of an array to a set (with collation),
+                         // fails when the set reaches the specified size.
+
     // Special double summation.
     doubleDoubleSum,
     // Accumulator to merge simple sums into a double double summation.

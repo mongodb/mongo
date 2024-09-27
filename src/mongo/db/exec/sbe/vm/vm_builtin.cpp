@@ -117,6 +117,10 @@ std::string builtinToString(Builtin b) {
             return "collAddToSet";
         case Builtin::collAddToSetCapped:
             return "collAddToSetCapped";
+        case Builtin::setUnionCapped:
+            return "setUnionCapped";
+        case Builtin::collSetUnionCapped:
+            return "collSetUnionCapped";
         case Builtin::doubleDoubleSum:
             return "doubleDoubleSum";
         case Builtin::convertSimpleSumToDoubleDoubleSum:
@@ -788,6 +792,10 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::dispatchBuiltin(Builtin
             return builtinAggSetUnionCapped(arity);
         case Builtin::aggCollSetUnionCapped:
             return builtinAggCollSetUnionCapped(arity);
+        case Builtin::setUnionCapped:
+            return builtinSetUnionCapped(arity);
+        case Builtin::collSetUnionCapped:
+            return builtinCollSetUnionCapped(arity);
         case Builtin::isMember:
             return builtinIsMember(arity);
         case Builtin::collIsMember:

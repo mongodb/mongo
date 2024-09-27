@@ -721,6 +721,54 @@ SbExpr buildFinalizeCount(const AccumOp& acc,
     }
 }
 
+SbExpr::Vector buildAccumAggsSetUnionHelper(SbExpr arg,
+                                            StringData funcName,
+                                            StringData funcNameWithCollator,
+                                            StageBuilderState& state) {
+    SbExprBuilder b(state);
+
+    auto frameId = state.frameId();
+    auto argValue = SbLocalVar{frameId, 0};
+    auto expr = b.makeIf(
+        b.makeFunction("isArray", argValue),
+        argValue,
+        b.makeFail(ErrorCodes::TypeMismatch, "Expected new value for $setUnion to be an array"_sd));
+
+    auto argWithTypeCheck = b.makeLet(frameId, SbExpr::makeSeq(std::move(arg)), std::move(expr));
+
+    const int cap = internalQueryMaxSetUnionBytes.load();
+
+    auto collatorSlot = state.getCollatorSlot();
+
+    if (collatorSlot) {
+        return SbExpr::makeSeq(b.makeFunction(funcNameWithCollator,
+                                              SbVar{*collatorSlot},
+                                              std::move(argWithTypeCheck),
+                                              b.makeInt32Constant(cap)));
+    } else {
+        return SbExpr::makeSeq(
+            b.makeFunction(funcName, std::move(argWithTypeCheck), b.makeInt32Constant(cap)));
+    }
+}
+
+SbExpr::Vector buildAccumAggsSetUnion(const AccumOp& acc,
+                                      std::unique_ptr<AddSingleInput> inputs,
+                                      StageBuilderState& state) {
+    return buildAccumAggsSetUnionHelper(
+        std::move(inputs->inputExpr), "setUnionCapped"_sd, "collSetUnionCapped"_sd, state);
+}
+
+SbExpr::Vector buildCombineAggsSetUnion(const AccumOp& acc,
+                                        StageBuilderState& state,
+                                        const SbSlotVector& inputSlots) {
+    tassert(9238805,
+            "partial agg combiner for $setUnion should have exactly one input slot",
+            inputSlots.size() == 1);
+    auto arg = inputSlots[0];
+    return buildAccumAggsSetUnionHelper(
+        std::move(arg), "aggSetUnionCapped"_sd, "aggCollSetUnionCapped"_sd, state);
+}
+
 SbExpr::Vector buildAccumAggsAddToSetHelper(SbExpr arg,
                                             StringData funcName,
                                             StringData funcNameWithCollator,
@@ -1857,6 +1905,12 @@ static const StringDataMap<AccumOpInfo> accumOpInfoMap = {
     {AccumulatorRank::kName,
      AccumOpInfo{.buildAddAggs = makeBuildFn(&buildAccumAggsRank),
                  .buildFinalize = makeBuildFn(&buildFinalizeRank)}},
+
+    // SetUnion
+    {AccumulatorSetUnion::kName,
+     AccumOpInfo{.buildAddAggs = makeBuildFn(&buildAccumAggsSetUnion),
+                 .buildFinalize = makeBuildFn(&buildFinalizeCappedAccumulator),
+                 .buildCombineAggs = makeBuildFn(&buildCombineAggsSetUnion)}},
 
     // StdDevPop
     {AccumulatorStdDevPop::kName,

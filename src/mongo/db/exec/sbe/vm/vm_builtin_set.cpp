@@ -131,6 +131,62 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinCollAddToSetCapp
                               value::getCollatorView(valColl));
 }
 
+FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinSetUnionCapped(ArityType arity) {
+    auto [tagNewElem, valNewElem] = moveOwnedFromStack(1);
+
+    // Note that we do not call 'reset()' on the guard below, as 'setUnionAccumImpl' assumes that
+    // callers will manage the memory associated with 'tag/valNewElem'. See the comment on
+    // 'setUnionAccumImpl' for more details.
+    value::ValueGuard guardNewElem{tagNewElem, valNewElem};
+    auto [_, tagSizeCap, valSizeCap] = getFromStack(2);
+
+    if (tagSizeCap != value::TypeTags::NumberInt32) {
+        auto [ownArr, tagArr, valArr] = getFromStack(0);
+        topStack(false, value::TypeTags::Nothing, 0);
+        return {ownArr, tagArr, valArr};
+    }
+
+    auto [ownAcc, tagAcc, valAcc] = getFromStack(0);
+
+    return setUnionAccumImpl(tagNewElem,
+                             valNewElem,
+                             value::bitcastTo<int32_t>(valSizeCap),
+                             ownAcc,
+                             tagAcc,
+                             valAcc,
+                             nullptr /*collator*/);
+}
+
+FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinCollSetUnionCapped(
+    ArityType arity) {
+    auto [_1, tagColl, valColl] = getFromStack(1);
+    auto [tagNewElem, valNewElem] = moveOwnedFromStack(2);
+
+    // Note that we do not call 'reset()' on the guard below, as 'setUnionAccumImpl' assumes that
+    // callers will manage the memory associated with 'tag/valNewElem'. See the comment on
+    // 'setUnionAccumImpl' for more details.
+    value::ValueGuard guardNewElem{tagNewElem, valNewElem};
+    auto [_2, tagSizeCap, valSizeCap] = getFromStack(3);
+
+    // If the collator is Nothing or if it's some unexpected type, don't push back the value and
+    // just return the accumulator.
+    if (tagColl != value::TypeTags::collator || tagSizeCap != value::TypeTags::NumberInt32) {
+        auto [ownArr, tagArr, valArr] = getFromStack(0);
+        topStack(false, value::TypeTags::Nothing, 0);
+        return {ownArr, tagArr, valArr};
+    }
+
+    auto [ownAcc, tagAcc, valAcc] = getFromStack(0);
+
+    return setUnionAccumImpl(tagNewElem,
+                             valNewElem,
+                             value::bitcastTo<int32_t>(valSizeCap),
+                             ownAcc,
+                             tagAcc,
+                             valAcc,
+                             value::getCollatorView(valColl));
+}
+
 namespace {
 FastTuple<bool, value::TypeTags, value::Value> setUnion(
     const std::vector<value::TypeTags>& argTags,

@@ -34,7 +34,7 @@ namespace mongo {
 
 REGISTER_UNSTABLE_ACCUMULATOR_WITH_FEATURE_FLAG(
     setUnion,
-    genericParseSBEUnsupportedSingleExpressionAccumulator<AccumulatorSetUnion>,
+    genericParseSingleExpressionAccumulator<AccumulatorSetUnion>,
     feature_flags::gFeatureFlagArrayAccumulators);
 
 REGISTER_WINDOW_FUNCTION_WITH_FEATURE_FLAG(

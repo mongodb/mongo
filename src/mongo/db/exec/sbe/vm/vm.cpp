@@ -798,23 +798,16 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::addToSetCappedImpl(
     return {ownArr, tagArr, valArr};
 }
 
-FastTuple<bool, value::TypeTags, value::Value> ByteCode::aggSetUnionCappedImpl(
+FastTuple<bool, value::TypeTags, value::Value> ByteCode::setUnionAccumImpl(
     value::TypeTags tagNewElem,
     value::Value valNewElem,
     int32_t sizeCap,
+    bool ownAcc,
+    value::TypeTags tagAcc,
+    value::Value valAcc,
     CollatorInterface* collator) {
-    value::ValueGuard guardNewElem{tagNewElem, valNewElem};
-    auto [ownAcc, tagAcc, valAcc] = getFromStack(0);
 
-    // We expect the new value we are adding to the accumulator to be a two-element array where
-    // the first element is the new set of values and the second value is the corresponding size.
-    tassert(7039526, "expected value of type 'Array'", tagNewElem == value::TypeTags::Array);
-    auto newArr = value::getArrayView(valNewElem);
-    tassert(7039528,
-            "array had unexpected size",
-            newArr->size() == static_cast<size_t>(AggArrayWithSize::kLast));
-
-    // Create a new array is it does not exist yet.
+    // Create a new array as it does not exist yet.
     if (tagAcc == value::TypeTags::Nothing) {
         ownAcc = true;
         std::tie(tagAcc, valAcc) = value::makeNewArray();
@@ -832,8 +825,19 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::aggSetUnionCappedImpl(
         topStack(false, value::TypeTags::Nothing, 0);
     }
 
+    // If the field resolves to Nothing (e.g. if it is missing in the document), then we want to
+    // leave the accumulator as is.
+    if (tagNewElem == value::TypeTags::Nothing) {
+        return {ownAcc, tagAcc, valAcc};
+    }
+
     tassert(7039520, "expected accumulator value to be owned", ownAcc);
     value::ValueGuard guardArr{tagAcc, valAcc};
+
+    // We expect the field to be an array. Thus, we return Nothing on an unexpected input type.
+    if (!value::isArray(tagNewElem)) {
+        return {false, value::TypeTags::Nothing, 0};
+    }
 
     tassert(
         7039521, "expected accumulator to be of type 'Array'", tagAcc == value::TypeTags::Array);
@@ -856,14 +860,8 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::aggSetUnionCappedImpl(
     tassert(7039524, "expected 64-bit int", tagAccSize == value::TypeTags::NumberInt64);
     int64_t currentSize = value::bitcastTo<int64_t>(valAccSize);
 
-    auto [tagNewValSet, valNewValSet] =
-        newArr->getAt(static_cast<size_t>(AggArrayWithSize::kValues));
-    tassert(
-        7039525, "expected value of type 'ArraySet'", tagNewValSet == value::TypeTags::ArraySet);
-
-
     value::arrayForEach<true>(
-        tagNewValSet, valNewValSet, [&](value::TypeTags elTag, value::Value elVal) {
+        tagNewElem, valNewElem, [&](value::TypeTags elTag, value::Value elVal) {
             int elemSize = value::getApproximateSize(elTag, elVal);
             bool inserted = accArrSet->push_back(elTag, elVal);
 
@@ -886,6 +884,33 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::aggSetUnionCappedImpl(
 
     guardArr.reset();
     return {ownAcc, tagAcc, valAcc};
+}
+
+FastTuple<bool, value::TypeTags, value::Value> ByteCode::aggSetUnionCappedImpl(
+    value::TypeTags tagNewElem,
+    value::Value valNewElem,
+    int32_t sizeCap,
+    CollatorInterface* collator) {
+    // Note that we do not call 'reset()' on the guard below, as 'setUnionAccumImpl' assumes that
+    // callers will manage the memory associated with 'tag/valNewElem'. See the comment on
+    // 'setUnionAccumImpl' for more details.
+    value::ValueGuard guardNewElem{tagNewElem, valNewElem};
+    auto [ownAcc, tagAcc, valAcc] = getFromStack(0);
+
+    // We expect the new value we are adding to the accumulator to be a two-element array where
+    // the first element is the new set of values and the second value is the corresponding size.
+    tassert(7039526, "expected value of type 'Array'", tagNewElem == value::TypeTags::Array);
+    auto newArr = value::getArrayView(valNewElem);
+    tassert(7039528,
+            "array had unexpected size",
+            newArr->size() == static_cast<size_t>(AggArrayWithSize::kLast));
+
+    auto [tagNewValSet, valNewValSet] =
+        newArr->getAt(static_cast<size_t>(AggArrayWithSize::kValues));
+    tassert(
+        7039525, "expected value of type 'ArraySet'", tagNewValSet == value::TypeTags::ArraySet);
+
+    return setUnionAccumImpl(tagNewValSet, valNewValSet, sizeCap, ownAcc, tagAcc, valAcc, collator);
 }
 
 ByteCode::MultiAccState ByteCode::getMultiAccState(value::TypeTags stateTag,

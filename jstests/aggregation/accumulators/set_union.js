@@ -104,6 +104,23 @@ assert.eq(result, [{_id: null, setUnionArr: ["Happy!", "Smile :)"]}]);
 
 assert(coll.drop());
 
+// $setUnion dotted field.
+assert.commandWorked(coll.insert([
+    {_id: 1, a: [{b: [1, 2, 3]}, {b: [4, 5, 6]}]},
+    {_id: 2, a: [{b: [7, 8, 9]}, {b: [10, 11, 12]}]},
+    {_id: 3, a: [{b: [7, 8, 9]}]}
+]));
+result = coll.aggregate([
+                 {$sort: {_id: 1}},
+                 {$group: {_id: null, nums: {$setUnion: '$a.b'}}},
+                 {$project: {_id: 1, setUnionArr: {$sortArray: {input: '$nums', sortBy: 1}}}}
+             ])
+             .toArray();
+
+assert.eq(result, [{_id: null, setUnionArr: [[1, 2, 3], [4, 5, 6], [7, 8, 9], [10, 11, 12]]}]);
+
+assert(coll.drop());
+
 // Test for errors on non-array types ($setUnion only supports arrays).
 const notArrays = [1, "string", {object: "object"}, null];
 
