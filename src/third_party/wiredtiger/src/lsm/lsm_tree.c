@@ -1224,7 +1224,7 @@ __wt_lsm_compact(WT_SESSION_IMPL *session, const char *name, bool *skipp)
          * we're making the problem worse.
          */
         WT_ERR(__wt_session_compact_check_interrupted(session));
-        if (__wt_cache_stuck(session))
+        if (__wt_evict_cache_stuck(session))
             WT_ERR(EBUSY);
         __wt_sleep(1, 0);
 

@@ -379,7 +379,7 @@ __wti_lsm_checkpoint_chunk(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree, WT_L
          * If there is cache pressure consider making a chunk evictable to avoid the cache getting
          * stuck when history is required.
          */
-        if (__wt_eviction_needed(session, false, false, NULL))
+        if (__wt_evict_needed(session, false, false, NULL))
             WT_ERR(__wti_lsm_manager_push_entry(session, WT_LSM_WORK_ENABLE_EVICT, 0, lsm_tree));
 
         __wt_verbose_debug2(
@@ -493,7 +493,7 @@ __wti_lsm_work_enable_evict(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
     WT_CLEAR(cookie);
 
     /* Only do this if there is cache pressure */
-    if (!__wt_eviction_needed(session, false, false, NULL))
+    if (!__wt_evict_needed(session, false, false, NULL))
         return (0);
 
     WT_RET(__lsm_copy_chunks(session, lsm_tree, &cookie, false));

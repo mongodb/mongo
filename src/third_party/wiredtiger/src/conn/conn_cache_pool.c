@@ -658,7 +658,7 @@ __cache_pool_adjust(WT_SESSION_IMPL *session, uint64_t highest, uint64_t bump_th
          * the most active the more cache we should get assigned.
          */
         pressure = cache->cp_pass_pressure / highest_percentile;
-        busy = __wt_eviction_needed(entry->default_session, false, true, &pct_full);
+        busy = __wt_evict_needed(entry->default_session, false, true, &pct_full);
 
         __wt_verbose_debug2(session, WT_VERB_SHARED_CACHE,
           "\t%5" PRIu64 ", %3" PRIu64 ", %2" PRIu32 ", %d, %2.3f", entry->cache_size >> 20,

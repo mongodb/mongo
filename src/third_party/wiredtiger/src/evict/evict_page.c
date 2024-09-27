@@ -45,55 +45,6 @@ __evict_exclusive(WT_SESSION_IMPL *session, WT_REF *ref)
     return (__wt_set_return(session, EBUSY));
 }
 
-/*
- * __wt_page_release_evict --
- *     Release a reference to a page, and attempt to immediately evict it.
- */
-int
-__wt_page_release_evict(WT_SESSION_IMPL *session, WT_REF *ref, uint32_t flags)
-{
-    WT_BTREE *btree;
-    WT_DECL_RET;
-    WT_REF_STATE previous_state;
-    uint32_t evict_flags;
-    bool locked;
-
-    btree = S2BT(session);
-
-    /*
-     * This function always releases the hazard pointer - ensure that's done regardless of whether
-     * we can get exclusive access. Take some care with order of operations: if we release the
-     * hazard pointer without first locking the page, it could be evicted in between.
-     */
-    previous_state = WT_REF_GET_STATE(ref);
-    locked =
-      previous_state == WT_REF_MEM && WT_REF_CAS_STATE(session, ref, previous_state, WT_REF_LOCKED);
-    if ((ret = __wt_hazard_clear(session, ref)) != 0 || !locked) {
-        if (locked)
-            WT_REF_SET_STATE(ref, previous_state);
-        return (ret == 0 ? EBUSY : ret);
-    }
-
-    evict_flags = LF_ISSET(WT_READ_NO_SPLIT) ? WT_EVICT_CALL_NO_SPLIT : 0;
-    FLD_SET(evict_flags, WT_EVICT_CALL_URGENT);
-
-    /*
-     * There is no need to cache a history store cursor if evicting a readonly page. That includes
-     * pages from a checkpoint. Note that opening a history store cursor on a checkpoint page from
-     * here will explode because the identity of the matching history store checkpoint isn't
-     * available.
-     */
-    if (ref->page != NULL && !__wt_page_evict_clean(ref->page)) {
-        WT_ASSERT(session, !WT_READING_CHECKPOINT(session));
-        WT_RET(__wt_curhs_cache(session));
-    }
-    (void)__wt_atomic_addv32(&btree->evict_busy, 1);
-    ret = __wt_evict(session, ref, previous_state, evict_flags);
-    (void)__wt_atomic_subv32(&btree->evict_busy, 1);
-
-    return (ret);
-}
-
 #define WT_EVICT_STATS_CLEAN 0x01
 #define WT_EVICT_STATS_FORCE_HS 0x02
 #define WT_EVICT_STATS_SUCCESS 0x04
@@ -740,7 +691,7 @@ __evict_review_obsolete_time_window(WT_SESSION_IMPL *session, WT_REF *ref)
         return (0);
 
     /* Don't add more cache pressure. */
-    if (__wt_eviction_needed(session, false, false, NULL) || __wt_cache_stuck(session))
+    if (__wt_evict_needed(session, false, false, NULL) || __wt_evict_cache_stuck(session))
         return (0);
 
     /*
@@ -875,7 +826,7 @@ __evict_review(WT_SESSION_IMPL *session, WT_REF *ref, uint32_t evict_flags, bool
      * the cache size limit.
      */
     if (conn->txn_global.checkpoint_running_hs && !WT_IS_HS(btree->dhandle) &&
-      __wti_cache_hs_dirty(session) && __wt_cache_full(session)) {
+      __wti_evict_hs_dirty(session) && __wt_cache_full(session)) {
         WT_STAT_CONN_INCR(session, cache_eviction_blocked_checkpoint_hs);
         return (__wt_set_return(session, EBUSY));
     }

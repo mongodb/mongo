@@ -52,7 +52,7 @@ __wt_btree_stat_init(WT_SESSION_IMPL *session, WT_CURSOR_STAT *cst)
       session, stats, compress_precomp_intl_max_page_size, btree->maxintlpage_precomp);
 
     if (F_ISSET(cst, WT_STAT_TYPE_CACHE_WALK))
-        __wt_curstat_cache_walk(session);
+        __wt_evict_stat_walk(session);
 
     if (F_ISSET(cst, WT_STAT_TYPE_TREE_WALK))
         WT_RET(__stat_tree_walk(session));

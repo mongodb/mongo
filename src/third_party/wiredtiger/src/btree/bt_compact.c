@@ -256,7 +256,7 @@ __compact_walk_internal(WT_SESSION_IMPL *session, WT_REF *parent)
 
         WT_RET(__wt_session_compact_check_interrupted(session));
 
-        if (__wt_cache_stuck(session))
+        if (__wt_evict_cache_stuck(session))
             WT_RET(EBUSY);
 
         __wt_sleep(1, 0);
@@ -373,7 +373,7 @@ __wt_compact(WT_SESSION_IMPL *session)
                 bm->compact_progress(bm, session);
             WT_ERR(__wt_session_compact_check_interrupted(session));
 
-            if (__wt_cache_stuck(session))
+            if (__wt_evict_cache_stuck(session))
                 WT_ERR(EBUSY);
 
             first = false;
@@ -384,7 +384,7 @@ __wt_compact(WT_SESSION_IMPL *session)
          * Compact pulls pages into cache during the walk without checking whether the cache is
          * full. Check now to throttle compact to match eviction speed.
          */
-        WT_ERR(__wt_cache_eviction_check(session, false, false, &eviction_happened));
+        WT_ERR(__wt_evict_app_assist_worker_check(session, false, false, &eviction_happened));
         if (eviction_happened)
             WT_STAT_CONN_INCR(session, session_table_compact_eviction);
 

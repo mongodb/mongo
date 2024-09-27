@@ -380,7 +380,7 @@ restart:
              * deleted, mark it for eviction.
              */
             if (empty_internal) {
-                __wt_page_evict_soon(session, ref);
+                __wt_evict_page_soon(session, ref);
                 empty_internal = false;
             }
 

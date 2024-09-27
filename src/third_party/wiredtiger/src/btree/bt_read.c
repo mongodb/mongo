@@ -78,10 +78,59 @@ __evict_force_check(WT_SESSION_IMPL *session, WT_REF *ref)
         return (false);
 
     /* Trigger eviction on the next page release. */
-    __wt_page_evict_soon(session, ref);
+    __wt_evict_page_soon(session, ref);
 
     /* If eviction cannot succeed, don't try. */
     return (__wt_page_can_evict(session, ref, NULL));
+}
+
+/*
+ * __wt_page_release_evict --
+ *     Release a reference to a page, and attempt to immediately evict it.
+ */
+int
+__wt_page_release_evict(WT_SESSION_IMPL *session, WT_REF *ref, uint32_t flags)
+{
+    WT_BTREE *btree;
+    WT_DECL_RET;
+    WT_REF_STATE previous_state;
+    uint32_t evict_flags;
+    bool locked;
+
+    btree = S2BT(session);
+
+    /*
+     * This function always releases the hazard pointer - ensure that's done regardless of whether
+     * we can get exclusive access. Take some care with order of operations: if we release the
+     * hazard pointer without first locking the page, it could be evicted in between.
+     */
+    previous_state = WT_REF_GET_STATE(ref);
+    locked =
+      previous_state == WT_REF_MEM && WT_REF_CAS_STATE(session, ref, previous_state, WT_REF_LOCKED);
+    if ((ret = __wt_hazard_clear(session, ref)) != 0 || !locked) {
+        if (locked)
+            WT_REF_SET_STATE(ref, previous_state);
+        return (ret == 0 ? EBUSY : ret);
+    }
+
+    evict_flags = LF_ISSET(WT_READ_NO_SPLIT) ? WT_EVICT_CALL_NO_SPLIT : 0;
+    FLD_SET(evict_flags, WT_EVICT_CALL_URGENT);
+
+    /*
+     * There is no need to cache a history store cursor if evicting a readonly page. That includes
+     * pages from a checkpoint. Note that opening a history store cursor on a checkpoint page from
+     * here will explode because the identity of the matching history store checkpoint isn't
+     * available.
+     */
+    if (ref->page != NULL && !__wt_page_evict_clean(ref->page)) {
+        WT_ASSERT(session, !WT_READING_CHECKPOINT(session));
+        WT_RET(__wt_curhs_cache(session));
+    }
+    (void)__wt_atomic_addv32(&btree->evict_busy, 1);
+    ret = __wt_evict(session, ref, previous_state, evict_flags);
+    (void)__wt_atomic_subv32(&btree->evict_busy, 1);
+
+    return (ret);
 }
 
 /*
@@ -315,7 +364,8 @@ read:
              * space in the cache.
              */
             if (!LF_ISSET(WT_READ_IGNORE_CACHE_SIZE))
-                WT_RET(__wt_cache_eviction_check(session, true, txn->mod_count == 0, NULL));
+                WT_RET(
+                  __wt_evict_app_assist_worker_check(session, true, txn->mod_count == 0, NULL));
             WT_RET(__page_read(session, ref, flags));
 
             /* We just read a page, don't evict it before we have a chance to use it. */
@@ -471,9 +521,9 @@ skip_evict:
                 if (wont_need)
                     __wt_atomic_store64(&page->read_gen, WT_READGEN_WONT_NEED);
                 else
-                    __wt_cache_read_gen_new(session, page);
+                    __wt_evict_read_gen_new(session, page);
             } else if (!LF_ISSET(WT_READ_NO_GEN))
-                __wt_cache_read_gen_bump(session, page);
+                __wt_evict_read_gen_bump(session, page);
 
             /*
              * Check if we need an autocommit transaction. Starting a transaction can trigger
@@ -512,7 +562,7 @@ skip_evict:
          * cache, substitute that for a sleep.
          */
         if (!LF_ISSET(WT_READ_IGNORE_CACHE_SIZE)) {
-            WT_RET(__wt_cache_eviction_check(session, true, true, &cache_work));
+            WT_RET(__wt_evict_app_assist_worker_check(session, true, true, &cache_work));
             if (cache_work)
                 continue;
         }

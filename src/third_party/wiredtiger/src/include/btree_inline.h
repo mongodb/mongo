@@ -72,11 +72,11 @@ __wt_readgen_evict_soon(uint64_t *readgen)
 }
 
 /*
- * __wt_page_evict_soon_check --
+ * __wt_evict_page_soon_check --
  *     Check whether the page should be evicted urgently.
  */
 static WT_INLINE bool
-__wt_page_evict_soon_check(WT_SESSION_IMPL *session, WT_REF *ref, bool *inmem_split)
+__wt_evict_page_soon_check(WT_SESSION_IMPL *session, WT_REF *ref, bool *inmem_split)
 {
     WT_BTREE *btree;
     WT_PAGE *page;
@@ -99,6 +99,20 @@ __wt_page_evict_soon_check(WT_SESSION_IMPL *session, WT_REF *ref, bool *inmem_sp
       (!WT_SESSION_IS_CHECKPOINT(session) || __wt_page_evict_clean(page)))
         return (true);
     return (false);
+}
+
+/*
+ * __wt_page_dirty_and_evict_soon --
+ *     Mark a page dirty and set it to be evicted as soon as possible.
+ */
+static WT_INLINE int
+__wt_page_dirty_and_evict_soon(WT_SESSION_IMPL *session, WT_REF *ref)
+{
+    WT_RET(__wt_page_modify_init(session, ref->page));
+    __wt_page_modify_set(session, ref->page);
+    __wt_evict_page_soon(session, ref);
+
+    return (0);
 }
 
 /*
@@ -712,7 +726,7 @@ __wt_page_only_modify_set(WT_SESSION_IMPL *session, WT_PAGE *page)
          * generation to avoid evicting a dirty page prematurely.
          */
         if (__wt_atomic_load64(&page->read_gen) == WT_READGEN_WONT_NEED)
-            __wt_cache_read_gen_new(session, page);
+            __wt_evict_read_gen_new(session, page);
 
         /*
          * We won the race to dirty the page, but another thread could have committed in the
@@ -1858,7 +1872,7 @@ __wt_page_evict_retry(WT_SESSION_IMPL *session, WT_PAGE *page)
      * Retry if a reasonable amount of eviction time has passed, the choice of 5 eviction passes as
      * a reasonable amount of time is currently pretty arbitrary.
      */
-    if (__wt_cache_aggressive(session) ||
+    if (__wt_evict_aggressive(session) ||
       mod->last_evict_pass_gen + 5 < __wt_atomic_load64(&S2C(session)->cache->evict_pass_gen))
         return (true);
 
@@ -2026,7 +2040,7 @@ __wt_page_release(WT_SESSION_IMPL *session, WT_REF *ref, uint32_t flags)
         return (0);
     }
 
-    if (__wt_page_evict_soon_check(session, ref, &inmem_split)) {
+    if (__wt_evict_page_soon_check(session, ref, &inmem_split)) {
         /*
          * If the operation has disabled eviction or splitting, or the session is preventing from
          * reconciling, then just queue the page for urgent eviction. Otherwise, attempt to release
@@ -2034,7 +2048,7 @@ __wt_page_release(WT_SESSION_IMPL *session, WT_REF *ref, uint32_t flags)
          */
         if (LF_ISSET(WT_READ_NO_EVICT) ||
           (inmem_split ? LF_ISSET(WT_READ_NO_SPLIT) : F_ISSET(session, WT_SESSION_NO_RECONCILE)))
-            WT_IGNORE_RET(__wt_page_evict_urgent(session, ref));
+            WT_IGNORE_RET(__wt_evict_page_urgent(session, ref));
         else {
             WT_RET_BUSY_OK(__wt_page_release_evict(session, ref, flags));
             return (0);

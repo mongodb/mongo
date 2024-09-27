@@ -250,7 +250,7 @@ __wt_timing_stress_sleep_random(WT_SESSION_IMPL *session)
      * totally full, return.
      */
     pct = 0.0;
-    if (__wt_eviction_needed(session, false, false, &pct))
+    if (__wt_evict_needed(session, false, false, &pct))
         max = 5;
     else
         max = 9;

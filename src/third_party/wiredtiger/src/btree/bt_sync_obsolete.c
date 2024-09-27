@@ -164,7 +164,7 @@ __sync_obsolete_inmem_evict_or_mark_dirty(WT_SESSION_IMPL *session, WT_REF *ref)
         }
 
         /* Mark the obsolete page to evict soon. */
-        __wt_page_evict_soon(session, ref);
+        __wt_evict_page_soon(session, ref);
         WT_STAT_CONN_DSRC_INCR(session, checkpoint_cleanup_pages_evict);
     } else if (__sync_obsolete_tw_check(session, newest_ta)) {
 
@@ -416,8 +416,8 @@ __checkpoint_cleanup_page_skip(
      * and also it can dirty the already existing in-memory page in the cache, skip if eviction is
      * needed.
      */
-    if (__wt_eviction_needed(session, false, false, NULL) || __wt_cache_aggressive(session) ||
-      __wt_cache_full(session) || __wt_cache_stuck(session)) {
+    if (__wt_evict_needed(session, false, false, NULL) || __wt_evict_aggressive(session) ||
+      __wt_cache_full(session) || __wt_evict_cache_stuck(session)) {
         *skipp = true;
         return (0);
     }

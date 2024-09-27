@@ -227,7 +227,7 @@ __cursor_enter(WT_SESSION_IMPL *session)
      * If there are no other cursors positioned in the session, check whether the cache is full.
      */
     if (session->ncursors == 0)
-        WT_RET(__wt_cache_eviction_check(session, false, false, NULL));
+        WT_RET(__wt_evict_app_assist_worker_check(session, false, false, NULL));
     ++session->ncursors;
     return (0);
 }

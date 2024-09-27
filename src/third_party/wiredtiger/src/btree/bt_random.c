@@ -88,7 +88,7 @@ __random_skip_entries(WT_CURSOR_BTREE *cbt, WT_INSERT_HEAD *ins_head)
      * traversing the skip list each time accumulates to real time.
      */
     if (entries > WT_RANDOM_SKIP_EVICT_SOON)
-        __wt_page_evict_soon(session, cbt->ref);
+        __wt_evict_page_soon(session, cbt->ref);
 
     return (entries);
 }

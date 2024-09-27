@@ -63,7 +63,7 @@ __prefetch_thread_run(WT_SESSION_IMPL *session, WT_THREAD *thread)
          * eligible pages (allowing pre-fetch to read into the cache), or we iterate through and
          * remove all the refs from the pre-fetch queue and pre-fetch becomes a no-op.
          */
-        if (__wt_eviction_clean_pressure(session)) {
+        if (__wt_evict_clean_pressure(session)) {
             F_CLR_ATOMIC_8(pe->ref, WT_REF_FLAG_PREFETCH);
             __wt_spin_unlock(session, &conn->prefetch_lock);
             __wt_free(session, pe);
@@ -178,7 +178,7 @@ __wt_conn_prefetch_queue_push(WT_SESSION_IMPL *session, WT_REF *ref)
      * the queue. It should take a more conservative approach and stop as soon as it detects that we
      * are close to hitting the eviction clean trigger.
      */
-    if (__wt_eviction_clean_pressure(session))
+    if (__wt_evict_clean_pressure(session))
         return (EBUSY);
 
     WT_RET(__wt_calloc_one(session, &pe));

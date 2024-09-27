@@ -622,7 +622,7 @@ __background_compact_server(void *arg)
          * - The cache content is almost at the eviction_trigger threshold.
          */
         cache_pressure =
-          __wt_eviction_dirty_needed(session, NULL) || __wt_eviction_clean_needed(session, NULL);
+          __wt_evict_dirty_needed(session, NULL) || __wt_evict_clean_needed(session, NULL);
         if (cache_pressure)
             continue;
 
@@ -661,7 +661,7 @@ __background_compact_server(void *arg)
             WT_STAT_CONN_INCR(session, background_compact_fail);
             /* The following errors are always silenced. */
             if (ret == EBUSY || ret == ENOENT || ret == ETIMEDOUT || ret == WT_ROLLBACK) {
-                if (ret == EBUSY && __wt_cache_stuck(session))
+                if (ret == EBUSY && __wt_evict_cache_stuck(session))
                     WT_STAT_CONN_INCR(session, background_compact_fail_cache_pressure);
                 else if (ret == ETIMEDOUT)
                     WT_STAT_CONN_INCR(session, background_compact_timeout);
