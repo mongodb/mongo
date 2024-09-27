@@ -86,8 +86,6 @@ class AuthorizationSession {
     AuthorizationSession& operator=(const AuthorizationSession&) = delete;
 
 public:
-    static std::unique_ptr<AuthorizationSession> create(AuthorizationManager*);
-
     AuthorizationSession() = default;
 
     /**
@@ -147,8 +145,6 @@ public:
     // Takes ownership of the externalState.
     virtual ~AuthorizationSession() = 0;
 
-    virtual AuthorizationManager& getAuthorizationManager() = 0;
-
     // Should be called at the beginning of every new request.  This performs the checks
     // necessary to determine if localhost connections should be given full access.
     // TODO: try to eliminate the need for this call.
@@ -192,16 +188,16 @@ public:
     virtual RoleNameIterator getAuthenticatedRoleNames() = 0;
 
     // Removes all authenticated principals while in kSecurityToken authentication mode.
-    virtual void logoutSecurityTokenUser(Client* client) = 0;
+    virtual void logoutSecurityTokenUser() = 0;
 
     // Removes any authenticated principals and revokes any privileges that were granted via those
     // principals. This function modifies state. Synchronizes with the Client lock.
-    virtual void logoutAllDatabases(Client* client, StringData reason) = 0;
+    virtual void logoutAllDatabases(StringData reason) = 0;
 
     // Removes any authenticated principals whose authorization credentials came from the given
     // database, and revokes any privileges that were granted via that principal. This function
     // modifies state. Synchronizes with the Client lock.
-    virtual void logoutDatabase(Client* client, const DatabaseName& dbname, StringData reason) = 0;
+    virtual void logoutDatabase(const DatabaseName& dbname, StringData reason) = 0;
 
     // How the active session is authenticated.
     enum class AuthenticationMode {
@@ -215,8 +211,7 @@ public:
     // Adds the internalSecurity user to the set of authenticated users.
     // Used to grant internal threads full access. Takes in the Client
     // as a parameter so it can take out a lock on the client.
-    virtual void grantInternalAuthorization(Client* client) = 0;
-    virtual void grantInternalAuthorization(OperationContext* opCtx) = 0;
+    virtual void grantInternalAuthorization() = 0;
 
     // Checks if the current session is authorized to list the collections in the given
     // database. If it is, return a privilegeVector containing the privileges used to authorize

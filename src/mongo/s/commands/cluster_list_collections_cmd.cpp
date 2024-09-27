@@ -272,8 +272,8 @@ public:
         BSONObj newCmd = cmdObj;
 
         const bool authorizedCollections = requestParser.request().getAuthorizedCollections();
-        AuthorizationSession* authzSession = AuthorizationSession::get(opCtx->getClient());
-        if (authzSession->getAuthorizationManager().isAuthEnabled() && authorizedCollections) {
+        if (AuthorizationManager::get(opCtx->getService())->isAuthEnabled() &&
+            authorizedCollections) {
             newCmd = rewriteCommandForListingOwnCollections(opCtx, dbName, cmdObj);
         }
 

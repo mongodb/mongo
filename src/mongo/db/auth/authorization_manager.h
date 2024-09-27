@@ -50,6 +50,7 @@
 #include "mongo/db/auth/role_name.h"
 #include "mongo/db/auth/user.h"
 #include "mongo/db/auth/user_name.h"
+#include "mongo/db/client.h"
 #include "mongo/db/database_name.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
@@ -61,6 +62,7 @@ namespace mongo {
 
 class AuthorizationSession;
 class AuthzManagerExternalState;
+class Client;
 class OperationContext;
 class ServiceContext;
 
@@ -170,7 +172,7 @@ public:
     /**
      * Returns a new AuthorizationSession for use with this AuthorizationManager.
      */
-    virtual std::unique_ptr<AuthorizationSession> makeAuthorizationSession() = 0;
+    virtual std::unique_ptr<AuthorizationSession> makeAuthorizationSession(Client* client) = 0;
 
     /**
      * Sets whether or not startup AuthSchema validation checks should be applied in this manager.

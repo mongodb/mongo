@@ -538,7 +538,7 @@ std::vector<GenericCursor> ClusterCursorManager::getIdleCursors(
     for (auto&& [cursorId, entry] : _cursorEntryMap) {
         // If auth is enabled, and userMode is allUsers, check if the current user has
         // permission to see this cursor.
-        if (ctxAuth->getAuthorizationManager().isAuthEnabled() &&
+        if (AuthorizationManager::get(opCtx->getService())->isAuthEnabled() &&
             userMode == MongoProcessInterface::CurrentOpUserMode::kExcludeOthers &&
             !ctxAuth->isCoauthorizedWith(entry.getAuthenticatedUser())) {
             continue;

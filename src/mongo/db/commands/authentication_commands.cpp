@@ -134,7 +134,7 @@ public:
             auto dbname = request().getDbName();
             auto* as = AuthorizationSession::get(opCtx->getClient());
 
-            as->logoutDatabase(opCtx->getClient(), dbname, "Logging out on user request");
+            as->logoutDatabase(dbname, "Logging out on user request");
             if (getTestCommandsEnabled() && (dbname.isAdminDB())) {
                 // Allows logging out as the internal user against the admin database, however
                 // this actually logs out of the local database as well. This is to
@@ -142,7 +142,6 @@ public:
                 // local database on a mongos, so you can't logout as the internal user
                 // without this).
                 as->logoutDatabase(
-                    opCtx->getClient(),
                     DatabaseNameUtil::deserialize(dbname.tenantId(),
                                                   DatabaseName::kLocal.db(omitTenant),
                                                   request().getSerializationContext()),
@@ -270,7 +269,7 @@ void _authenticateX509(OperationContext* opCtx, AuthenticationSession* session) 
             }
 
             session->setAsClusterMember();
-            authorizationSession->grantInternalAuthorization(client);
+            authorizationSession->grantInternalAuthorization();
         }
     } else {
         // Handle normal client authentication, only applies to client-server connections

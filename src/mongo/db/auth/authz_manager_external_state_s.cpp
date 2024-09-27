@@ -97,8 +97,8 @@ AuthzManagerExternalStateMongos::AuthzManagerExternalStateMongos() = default;
 AuthzManagerExternalStateMongos::~AuthzManagerExternalStateMongos() = default;
 
 std::unique_ptr<AuthzSessionExternalState>
-AuthzManagerExternalStateMongos::makeAuthzSessionExternalState(AuthorizationManager* authzManager) {
-    return std::make_unique<AuthzSessionExternalStateMongos>(authzManager);
+AuthzManagerExternalStateMongos::makeAuthzSessionExternalState(Client* client) {
+    return std::make_unique<AuthzSessionExternalStateMongos>(client);
 }
 
 Status AuthzManagerExternalStateMongos::getStoredAuthorizationVersion(OperationContext* opCtx,

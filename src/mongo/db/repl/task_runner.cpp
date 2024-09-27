@@ -146,7 +146,7 @@ void TaskRunner::_runTasks() {
     // client used to create the operation context.
     Client* client = &cc();
     if (AuthorizationManager::get(client->getService())->isAuthEnabled()) {
-        AuthorizationSession::get(client)->grantInternalAuthorization(client);
+        AuthorizationSession::get(client)->grantInternalAuthorization();
     }
 
     while (Task task = _waitForNextTask()) {

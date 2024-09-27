@@ -52,8 +52,8 @@ AuthzManagerExternalStateMongod::AuthzManagerExternalStateMongod() = default;
 AuthzManagerExternalStateMongod::~AuthzManagerExternalStateMongod() = default;
 
 std::unique_ptr<AuthzSessionExternalState>
-AuthzManagerExternalStateMongod::makeAuthzSessionExternalState(AuthorizationManager* authzManager) {
-    return std::make_unique<AuthzSessionExternalStateMongod>(authzManager);
+AuthzManagerExternalStateMongod::makeAuthzSessionExternalState(Client* client) {
+    return std::make_unique<AuthzSessionExternalStateMongod>(client);
 }
 Status AuthzManagerExternalStateMongod::query(
     OperationContext* opCtx,

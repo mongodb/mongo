@@ -834,7 +834,7 @@ public:
 
         auto as = AuthorizationSession::get(_client.get());
         if (as) {
-            as->grantInternalAuthorization(_client.get());
+            as->grantInternalAuthorization();
         }
 
         AlternativeClientRegion clientRegion(_client);

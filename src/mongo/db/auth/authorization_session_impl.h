@@ -79,15 +79,10 @@ class Client;
  */
 class AuthorizationSessionImpl : public AuthorizationSession {
 public:
-    struct InstallMockForTestingOrAuthImpl {
-        explicit InstallMockForTestingOrAuthImpl() = default;
-    };
     explicit AuthorizationSessionImpl(std::unique_ptr<AuthzSessionExternalState> externalState,
-                                      InstallMockForTestingOrAuthImpl);
+                                      Client* client);
 
     ~AuthorizationSessionImpl() override;
-
-    AuthorizationManager& getAuthorizationManager() override;
 
     void startRequest(OperationContext* opCtx) override;
 
@@ -111,17 +106,15 @@ public:
 
     RoleNameIterator getAuthenticatedRoleNames() override;
 
-    void logoutSecurityTokenUser(Client* client) override;
-    void logoutAllDatabases(Client* client, StringData reason) override;
-    void logoutDatabase(Client* client, const DatabaseName& dbname, StringData reason) override;
+    void logoutSecurityTokenUser() override;
+    void logoutAllDatabases(StringData reason) override;
+    void logoutDatabase(const DatabaseName& dbname, StringData reason) override;
 
     AuthenticationMode getAuthenticationMode() const override {
         return _authenticationMode;
     }
 
-    void grantInternalAuthorization(Client* client) override;
-
-    void grantInternalAuthorization(OperationContext* opCtx) override;
+    void grantInternalAuthorization() override;
 
     StatusWith<PrivilegeVector> checkAuthorizedToListCollections(const ListCollections&) override;
 
@@ -198,6 +191,8 @@ protected:
     // date.
     void _updateInternalAuthorizationState();
 
+    AuthorizationManager* _getAuthorizationManager();
+
     // The User who has been authenticated on this connection.
     boost::optional<UserHandle> _authenticatedUser;
 
@@ -259,5 +254,8 @@ private:
     // login time is recorded when the user is added and authorized. This information is used in
     // lout logs.
     boost::optional<Date_t> _loginTime;
+
+    // Pointer to owning client.
+    Client* _client;
 };
 }  // namespace mongo

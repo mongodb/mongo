@@ -273,11 +273,11 @@ AuthorizationManagerImpl::AuthorizationManagerImpl(
 }
 AuthorizationManagerImpl::~AuthorizationManagerImpl() = default;
 
-std::unique_ptr<AuthorizationSession> AuthorizationManagerImpl::makeAuthorizationSession() {
+std::unique_ptr<AuthorizationSession> AuthorizationManagerImpl::makeAuthorizationSession(
+    Client* client) {
     invariant(_externalState != nullptr);
     return std::make_unique<AuthorizationSessionImpl>(
-        _externalState->makeAuthzSessionExternalState(this),
-        AuthorizationSessionImpl::InstallMockForTestingOrAuthImpl{});
+        _externalState->makeAuthzSessionExternalState(client), client);
 }
 
 void AuthorizationManagerImpl::setShouldValidateAuthSchemaOnStartup(bool validate) {

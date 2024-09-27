@@ -456,7 +456,7 @@ ExecutorFuture<void> TransactionWithRetries::_bestEffortAbort() {
 void primeInternalClient(Client* client) {
     auto as = AuthorizationSession::get(client);
     if (as) {
-        as->grantInternalAuthorization(client);
+        as->grantInternalAuthorization();
     }
 }
 

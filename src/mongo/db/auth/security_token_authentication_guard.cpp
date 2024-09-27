@@ -72,7 +72,7 @@ SecurityTokenAuthenticationGuard::SecurityTokenAuthenticationGuard(
 SecurityTokenAuthenticationGuard::~SecurityTokenAuthenticationGuard() {
     if (_client) {
         // SecurityToken based users are "logged out" at the end of their request.
-        AuthorizationSession::get(_client)->logoutSecurityTokenUser(_client);
+        AuthorizationSession::get(_client)->logoutSecurityTokenUser();
     }
 }
 

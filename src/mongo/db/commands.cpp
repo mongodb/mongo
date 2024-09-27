@@ -111,7 +111,7 @@ bool checkAuthorizationImplPreParse(
                         command->getName()),
             !command->requiresAuth() || !authzSession->isExpired());
 
-    if (!authzSession->getAuthorizationManager().isAuthEnabled()) {
+    if (!AuthorizationManager::get(opCtx->getService())->isAuthEnabled()) {
         // Running without auth, so everything should be allowed except remotely invoked
         // commands that have the 'localHostOnlyIfNoAuth' restriction.
         uassert(ErrorCodes::Unauthorized,

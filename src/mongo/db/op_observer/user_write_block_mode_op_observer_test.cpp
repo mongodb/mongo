@@ -328,7 +328,7 @@ TEST_F(UserWriteBlockModeOpObserverTest, WriteBlockingDisabledWithBypass) {
     // Disable blocking and enable bypass
     GlobalUserWriteBlockState::get(opCtx.get())->disableUserWriteBlocking(opCtx.get());
     auto authSession = AuthorizationSession::get(opCtx->getClient());
-    authSession->grantInternalAuthorization(opCtx.get());
+    authSession->grantInternalAuthorization();
     ASSERT(authSession->mayBypassWriteBlockingMode());
 
     WriteBlockBypass::get(opCtx.get()).setFromMetadata(opCtx.get(), {});
@@ -376,7 +376,7 @@ TEST_F(UserWriteBlockModeOpObserverTest, WriteBlockingEnabledWithBypass) {
     // Enable blocking and enable bypass
     GlobalUserWriteBlockState::get(opCtx.get())->enableUserWriteBlocking(opCtx.get());
     auto authSession = AuthorizationSession::get(opCtx->getClient());
-    authSession->grantInternalAuthorization(opCtx.get());
+    authSession->grantInternalAuthorization();
     ASSERT(authSession->mayBypassWriteBlockingMode());
 
     WriteBlockBypass::get(opCtx.get()).setFromMetadata(opCtx.get(), {});

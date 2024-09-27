@@ -100,7 +100,7 @@ public:
             threadPoolOptions.onCreateThread = [opCtx](const std::string& threadName) {
                 Client::initThread(threadName.c_str(), opCtx->getService());
                 auto* client = Client::getCurrent();
-                AuthorizationSession::get(*client)->grantInternalAuthorization(client);
+                AuthorizationSession::get(*client)->grantInternalAuthorization();
             };
 
             auto metrics = ReshardingMetrics::makeInstance(

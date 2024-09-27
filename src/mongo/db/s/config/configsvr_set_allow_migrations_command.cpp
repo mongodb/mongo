@@ -117,7 +117,7 @@ public:
                     cc().makeOperationContext(), opCtx->getCancellationToken(), executor);
 
                 AuthorizationSession::get(newOpCtxPtr.get()->getClient())
-                    ->grantInternalAuthorization(newOpCtxPtr.get()->getClient());
+                    ->grantInternalAuthorization();
                 newOpCtxPtr->setWriteConcern(opCtx->getWriteConcern());
 
                 // Set the operation context read concern level to local for reads into the config

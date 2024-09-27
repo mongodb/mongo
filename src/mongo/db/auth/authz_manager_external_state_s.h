@@ -45,6 +45,7 @@
 #include "mongo/db/auth/role_name.h"
 #include "mongo/db/auth/user.h"
 #include "mongo/db/auth/user_name.h"
+#include "mongo/db/client.h"
 #include "mongo/db/database_name.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/tenant_id.h"
@@ -62,8 +63,7 @@ public:
     AuthzManagerExternalStateMongos();
     ~AuthzManagerExternalStateMongos() final;
 
-    std::unique_ptr<AuthzSessionExternalState> makeAuthzSessionExternalState(
-        AuthorizationManager* authzManager) final;
+    std::unique_ptr<AuthzSessionExternalState> makeAuthzSessionExternalState(Client* client) final;
 
     Status hasValidStoredAuthorizationVersion(OperationContext* opCtx,
                                               BSONObj* foundVersionDoc) override {

@@ -835,8 +835,7 @@ void CommonMongodProcessInterface::_reportCurrentOpsForIdleSessions(
     OperationContext* opCtx, CurrentOpUserMode userMode, std::vector<BSONObj>* ops) const {
     auto sessionCatalog = SessionCatalog::get(opCtx);
 
-    const bool authEnabled =
-        AuthorizationSession::get(opCtx->getClient())->getAuthorizationManager().isAuthEnabled();
+    const bool authEnabled = AuthorizationManager::get(opCtx->getService())->isAuthEnabled();
 
     // If the user is listing only their own ops, we use makeSessionFilterForAuthenticatedUsers to
     // create a pattern that will match against all authenticated usernames for the current client.

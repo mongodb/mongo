@@ -173,16 +173,18 @@ MONGO_FAIL_POINT_DEFINE(allowMultipleUsersWithApiStrict);
 }  // namespace
 
 AuthorizationSessionImpl::AuthorizationSessionImpl(
-    std::unique_ptr<AuthzSessionExternalState> externalState, InstallMockForTestingOrAuthImpl)
-    : _externalState(std::move(externalState)), _contract(TestingProctor::instance().isEnabled()) {}
+    std::unique_ptr<AuthzSessionExternalState> externalState, Client* client)
+    : _externalState(std::move(externalState)),
+      _contract(TestingProctor::instance().isEnabled()),
+      _client(client) {}
 
 AuthorizationSessionImpl::~AuthorizationSessionImpl() {
     invariant(_authenticatedUser == boost::none,
               "The authenticated user should have been logged out by the Client destruction hook");
 }
 
-AuthorizationManager& AuthorizationSessionImpl::getAuthorizationManager() {
-    return _externalState->getAuthorizationManager();
+AuthorizationManager* AuthorizationSessionImpl::_getAuthorizationManager() {
+    return AuthorizationManager::get(_client->getService());
 }
 
 void AuthorizationSessionImpl::startRequest(OperationContext* opCtx) {
@@ -278,7 +280,7 @@ Status AuthorizationSessionImpl::addAndAuthorizeUser(OperationContext* opCtx,
         return AuthorizationManager::authenticationFailedStatus;
     }
 
-    stdx::lock_guard<Client> lk(*opCtx->getClient());
+    stdx::lock_guard<Client> lk(*_client);
 
     auto validatedTenancyScope = auth::ValidatedTenancyScope::get(opCtx);
     if (validatedTenancyScope && validatedTenancyScope->hasAuthenticatedUser()) {
@@ -334,8 +336,8 @@ boost::optional<UserHandle> AuthorizationSessionImpl::getAuthenticatedUser() {
     return _authenticatedUser;
 }
 
-void AuthorizationSessionImpl::logoutSecurityTokenUser(Client* client) {
-    stdx::lock_guard<Client> lk(*client);
+void AuthorizationSessionImpl::logoutSecurityTokenUser() {
+    stdx::lock_guard<Client> lk(*_client);
 
     uassert(6161503,
             "Attempted to deauth a security token user while using standard login",
@@ -356,8 +358,8 @@ void AuthorizationSessionImpl::logoutSecurityTokenUser(Client* client) {
     _loginTime = boost::none;
 }
 
-void AuthorizationSessionImpl::logoutAllDatabases(Client* client, StringData reason) {
-    stdx::lock_guard<Client> lk(*client);
+void AuthorizationSessionImpl::logoutAllDatabases(StringData reason) {
+    stdx::lock_guard<Client> lk(*_client);
 
     uassert(6161504,
             "May not log out while using a security token based authentication",
@@ -368,10 +370,10 @@ void AuthorizationSessionImpl::logoutAllDatabases(Client* client, StringData rea
 
     if (authenticatedUser) {
         auto names = BSON_ARRAY(authenticatedUser.value()->getName().toBSON());
-        audit::logLogout(client, reason, names, BSONArray(), _loginTime);
+        audit::logLogout(_client, reason, names, BSONArray(), _loginTime);
     } else if (expiredUserName) {
         auto names = BSON_ARRAY(expiredUserName.value().toBSON());
-        audit::logLogout(client, reason, names, BSONArray(), _loginTime);
+        audit::logLogout(_client, reason, names, BSONArray(), _loginTime);
     } else {
         return;
     }
@@ -384,9 +386,7 @@ void AuthorizationSessionImpl::logoutAllDatabases(Client* client, StringData rea
 }
 
 
-void AuthorizationSessionImpl::logoutDatabase(Client* client,
-                                              const DatabaseName& dbname,
-                                              StringData reason) {
+void AuthorizationSessionImpl::logoutDatabase(const DatabaseName& dbname, StringData reason) {
     bool isLoggedInOnDB =
         (_authenticatedUser && _authenticatedUser.value()->getName().getDatabaseName() == dbname);
     bool isExpiredOnDB = (_expiredUserName && _expiredUserName.value().getDatabaseName() == dbname);
@@ -394,7 +394,7 @@ void AuthorizationSessionImpl::logoutDatabase(Client* client,
     if (isLoggedInOnDB || isExpiredOnDB) {
         // The session either has an authenticated or expired user belonging to the database being
         // logged out from. Calling logoutAllDatabases() will clear that user out.
-        logoutAllDatabases(client, reason);
+        logoutAllDatabases(reason);
     }
 }
 
@@ -414,8 +414,8 @@ RoleNameIterator AuthorizationSessionImpl::getAuthenticatedRoleNames() {
     return makeRoleNameIterator(_authenticatedRoleNames.begin(), _authenticatedRoleNames.end());
 }
 
-void AuthorizationSessionImpl::grantInternalAuthorization(Client* client) {
-    stdx::lock_guard<Client> lk(*client);
+void AuthorizationSessionImpl::grantInternalAuthorization() {
+    stdx::lock_guard<Client> lk(*_client);
     if (MONGO_unlikely(_authenticatedUser != boost::none)) {
         auto previousUser = _authenticatedUser.value()->getName();
         uassert(ErrorCodes::Unauthorized,
@@ -434,14 +434,6 @@ void AuthorizationSessionImpl::grantInternalAuthorization(Client* client) {
     _authenticationMode = AuthenticationMode::kConnection;
     _expirationTime = boost::none;
     _updateInternalAuthorizationState();
-}
-
-/**
- * Overloaded function - takes in the opCtx of the current AuthSession
- * and calls the function above.
- */
-void AuthorizationSessionImpl::grantInternalAuthorization(OperationContext* opCtx) {
-    grantInternalAuthorization(opCtx->getClient());
 }
 
 PrivilegeVector AuthorizationSessionImpl::_getDefaultPrivileges() {
@@ -660,7 +652,7 @@ void AuthorizationSessionImpl::_refreshUserInfoAsNeeded(OperationContext* opCtx)
         _updateInternalAuthorizationState();
     };
 
-    auto swUser = AuthorizationManager::get(opCtx->getService())->reacquireUser(opCtx, currentUser);
+    auto swUser = _getAuthorizationManager()->reacquireUser(opCtx, currentUser);
     if (!swUser.isOK()) {
         auto& status = swUser.getStatus();
         switch (status.code()) {
@@ -928,7 +920,7 @@ bool AuthorizationSessionImpl::isCoauthorizedWithClient(Client* opClient, WithLo
 
 bool AuthorizationSessionImpl::isCoauthorizedWith(const boost::optional<UserName>& userName) {
     _contract.addAccessCheck(AccessCheckEnum::kIsCoauthorizedWith);
-    if (!getAuthorizationManager().isAuthEnabled()) {
+    if (!_getAuthorizationManager()->isAuthEnabled()) {
         return true;
     }
 
@@ -953,7 +945,7 @@ RoleNameIterator AuthorizationSessionImpl::getImpersonatedRoleNames() {
 bool AuthorizationSessionImpl::isUsingLocalhostBypass() {
     _contract.addAccessCheck(AccessCheckEnum::kIsUsingLocalhostBypass);
 
-    return getAuthorizationManager().isAuthEnabled() && _externalState->shouldAllowLocalhost();
+    return _getAuthorizationManager()->isAuthEnabled() && _externalState->shouldAllowLocalhost();
 }
 
 // Clear the vectors of impersonated usernames and roles.
@@ -983,7 +975,7 @@ auto AuthorizationSessionImpl::checkCursorSessionPrivilege(
     };
 
     auto authIsOn = [authSession = this] {
-        return authSession->getAuthorizationManager().isAuthEnabled();
+        return authSession->_getAuthorizationManager()->isAuthEnabled();
     };
 
     auto sessionIdToStringOrNone =
@@ -1095,7 +1087,7 @@ void AuthorizationSessionImpl::_updateInternalAuthorizationState() {
     }
 
     // Update cached cluster/any action types for non-tenant resources.
-    if (!getAuthorizationManager().isAuthEnabled()) {
+    if (!_getAuthorizationManager()->isAuthEnabled()) {
         _nonTenantClusterActions.addAllActions();
     } else if (!isAuthenticated()) {
         _nonTenantClusterActions.removeAllActions();

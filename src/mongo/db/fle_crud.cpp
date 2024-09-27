@@ -1652,7 +1652,7 @@ uint64_t FLEQueryInterfaceImpl::countDocuments(const NamespaceString& nss) {
     AlternativeClientRegion clientRegion(client);
     auto opCtx = cc().makeOperationContext();
     auto as = AuthorizationSession::get(cc());
-    as->grantInternalAuthorization(opCtx.get());
+    as->grantInternalAuthorization();
 
     CountCommandRequest ccr(nss);
     auto opMsgRequest = ccr.serialize();
@@ -1979,7 +1979,7 @@ std::vector<std::vector<FLEEdgeCountInfo>> FLETagNoTXNQuery::getTags(
     AlternativeClientRegion clientRegion(client);
     auto opCtx = cc().makeOperationContext();
     auto as = AuthorizationSession::get(cc());
-    as->grantInternalAuthorization(opCtx.get());
+    as->grantInternalAuthorization();
 
     const auto setDollarTenant = nss.tenantId() && gMultitenancySupport;
     const auto vts = auth::ValidatedTenancyScope::get(_opCtx);

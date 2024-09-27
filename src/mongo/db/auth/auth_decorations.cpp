@@ -77,7 +77,7 @@ class AuthzClientObserver final : public ServiceContext::ClientObserver {
 public:
     void onCreateClient(Client* client) override {
         if (auto authzManager = AuthorizationManager::get(client->getService())) {
-            AuthorizationSession::set(client, authzManager->makeAuthorizationSession());
+            AuthorizationSession::set(client, authzManager->makeAuthorizationSession(client));
         }
     }
 
@@ -85,7 +85,7 @@ public:
         // Logout before the client is destroyed.
         auto& authzSession = getAuthorizationSession(client);
         if (authzSession) {
-            authzSession->logoutAllDatabases(client, "Client has disconnected");
+            authzSession->logoutAllDatabases("Client has disconnected");
         }
     }
 

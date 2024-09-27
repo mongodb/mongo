@@ -44,8 +44,8 @@
 
 namespace mongo {
 
-AuthzSessionExternalStateMongod::AuthzSessionExternalStateMongod(AuthorizationManager* authzManager)
-    : AuthzSessionExternalStateServerCommon(authzManager) {}
+AuthzSessionExternalStateMongod::AuthzSessionExternalStateMongod(Client* client)
+    : AuthzSessionExternalStateServerCommon(client) {}
 AuthzSessionExternalStateMongod::~AuthzSessionExternalStateMongod() {}
 
 void AuthzSessionExternalStateMongod::startRequest(OperationContext* opCtx) {

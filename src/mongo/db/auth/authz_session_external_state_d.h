@@ -32,6 +32,7 @@
 #include "mongo/base/status.h"
 #include "mongo/db/auth/authorization_manager.h"
 #include "mongo/db/auth/authz_session_external_state_server_common.h"
+#include "mongo/db/client.h"
 #include "mongo/db/operation_context.h"
 
 namespace mongo {
@@ -44,7 +45,7 @@ class AuthzSessionExternalStateMongod : public AuthzSessionExternalStateServerCo
     AuthzSessionExternalStateMongod& operator=(const AuthzSessionExternalStateMongod&) = delete;
 
 public:
-    AuthzSessionExternalStateMongod(AuthorizationManager* authzManager);
+    AuthzSessionExternalStateMongod(Client* client);
     ~AuthzSessionExternalStateMongod() override;
 
     bool shouldIgnoreAuthChecks() const override;

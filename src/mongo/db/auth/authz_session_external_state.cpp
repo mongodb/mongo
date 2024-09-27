@@ -29,17 +29,14 @@
 
 #include <string>
 
-#include "mongo/base/shim.h"
 #include "mongo/db/auth/authz_session_external_state.h"
+
+#include "mongo/base/shim.h"
+#include "mongo/db/auth/authorization_manager.h"
 
 namespace mongo {
 
-AuthzSessionExternalState::AuthzSessionExternalState(AuthorizationManager* authzManager)
-    : _authzManager(authzManager) {}
+AuthzSessionExternalState::AuthzSessionExternalState(Client* client) : _client(client) {}
 AuthzSessionExternalState::~AuthzSessionExternalState() {}
-
-AuthorizationManager& AuthzSessionExternalState::getAuthorizationManager() {
-    return *_authzManager;
-}
 
 }  // namespace mongo

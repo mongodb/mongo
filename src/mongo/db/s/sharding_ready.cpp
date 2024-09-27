@@ -106,7 +106,7 @@ void ShardingReady::_transitionToConfigShard(ServiceContext* serviceContext) {
     auto uniqueOpCtx = clientGuard->makeOperationContext();
 
     auto as = AuthorizationSession::get(uniqueOpCtx->getClient());
-    as->grantInternalAuthorization(uniqueOpCtx.get());
+    as->grantInternalAuthorization();
 
     ShardingCatalogManager::get(uniqueOpCtx.get())->addConfigShard(uniqueOpCtx.get());
     LOGV2(7910800, "Auto-bootstrap to config shard complete.");

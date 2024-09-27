@@ -618,7 +618,7 @@ void runTransactionOnShardingCatalog(OperationContext* opCtx,
             ->makeClient("ShardingCatalogTransaction");
     }();
 
-    AuthorizationSession::get(newClient.get())->grantInternalAuthorization(newClient.get());
+    AuthorizationSession::get(newClient.get())->grantInternalAuthorization();
     AlternativeClientRegion acr(newClient);
 
     auto newOpCtxHolder = CancelableOperationContext(

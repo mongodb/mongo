@@ -40,6 +40,7 @@
 #include "mongo/db/auth/authz_manager_external_state_local.h"
 #include "mongo/db/auth/builtin_roles.h"
 #include "mongo/db/auth/user_name.h"
+#include "mongo/db/client.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 
@@ -56,8 +57,7 @@ public:
     AuthzManagerExternalStateMongod();
     ~AuthzManagerExternalStateMongod() override;
 
-    std::unique_ptr<AuthzSessionExternalState> makeAuthzSessionExternalState(
-        AuthorizationManager* authzManager) final;
+    std::unique_ptr<AuthzSessionExternalState> makeAuthzSessionExternalState(Client* client) final;
 
     Status findOne(OperationContext* opCtx,
                    const NamespaceString& collectionName,

@@ -109,7 +109,7 @@ SaslConversation::SaslConversation(std::string mech)
       authManagerExternalState(new AuthzManagerExternalStateMock),
       authManager(new AuthorizationManagerImpl(
           getService(), std::unique_ptr<AuthzManagerExternalState>(authManagerExternalState))),
-      authSession(authManager->makeAuthorizationSession()),
+      authSession(authManager->makeAuthorizationSession(opCtx->getClient())),
       registry(getService(), {"SCRAM-SHA-1", "SCRAM-SHA-256", "PLAIN"}),
       mechanism(mech) {
 

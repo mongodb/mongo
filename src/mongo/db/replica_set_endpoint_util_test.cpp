@@ -426,7 +426,7 @@ TEST_F(ReplicaSetEndpointUtilTest, ShouldNotRoute_InternalClientWithSession) {
     client->setIsInternalClient(true);
     // shouldRouteRequest()'s Check for internalClient predicates on having
     // ActionType::internal, so grant it for the purposes of this test.
-    AuthorizationSession::get(*client)->grantInternalAuthorization(client.get());
+    AuthorizationSession::get(*client)->grantInternalAuthorization();
     auto opCtx = client->makeOperationContext();
 
     auto ns = NamespaceString::createNamespaceString_forTest(kTestDbName, kTestCollName);

@@ -50,6 +50,7 @@
 #include "mongo/db/auth/user.h"
 #include "mongo/db/auth/user_acquisition_stats.h"
 #include "mongo/db/auth/user_name.h"
+#include "mongo/db/client.h"
 #include "mongo/db/database_name.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
@@ -72,16 +73,12 @@ namespace mongo {
  */
 class AuthorizationManagerImpl : public AuthorizationManager {
 public:
-    struct InstallMockForTestingOrAuthImpl {
-        explicit InstallMockForTestingOrAuthImpl() = default;
-    };
-
     AuthorizationManagerImpl(Service* service,
                              std::unique_ptr<AuthzManagerExternalState> externalState);
     ~AuthorizationManagerImpl() override;
 
 
-    std::unique_ptr<AuthorizationSession> makeAuthorizationSession() override;
+    std::unique_ptr<AuthorizationSession> makeAuthorizationSession(Client* client) override;
 
     void setShouldValidateAuthSchemaOnStartup(bool validate) override;
 

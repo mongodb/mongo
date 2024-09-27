@@ -73,7 +73,7 @@ public:
     void setUp() override;
 
     void tearDown() override {
-        authzSession->logoutAllDatabases(_client.get(), "Ending AuthorizationSessionTest");
+        authzSession->logoutAllDatabases("Ending AuthorizationSessionTest");
         ServiceContextMongoDTest::tearDown();
         gMultitenancySupport = false;
     }

@@ -89,7 +89,7 @@ std::vector<BSONObj> CommonProcessInterface::getCurrentOps(
     auto reportCurrentOpForService = [&](Service* service) {
         for (Service::LockedClientsCursor cursor(service); ClientLock lc = cursor.next();) {
             Client* client = &*lc;
-            if (ctxAuth->getAuthorizationManager().isAuthEnabled()) {
+            if (AuthorizationManager::get(opCtx->getService())->isAuthEnabled()) {
                 // If auth is disabled, ignore the allUsers parameter.
                 if (userMode == CurrentOpUserMode::kExcludeOthers &&
                     !ctxAuth->isCoauthorizedWithClient(client, lc)) {
@@ -170,7 +170,7 @@ std::vector<BSONObj> CommonProcessInterface::getCurrentOps(
         _reportCurrentOpsForIdleSessions(opCtx, userMode, &ops);
     }
 
-    if (!ctxAuth->getAuthorizationManager().isAuthEnabled() ||
+    if (!AuthorizationManager::get(opCtx->getService())->isAuthEnabled() ||
         userMode == CurrentOpUserMode::kIncludeAll) {
         _reportCurrentOpsForTransactionCoordinators(
             opCtx, sessionMode == MongoProcessInterface::CurrentOpSessionsMode::kIncludeIdle, &ops);

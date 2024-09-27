@@ -191,7 +191,7 @@ public:
                     cc().makeOperationContext(), opCtx->getCancellationToken(), executor);
 
                 AuthorizationSession::get(newOpCtxPtr.get()->getClient())
-                    ->grantInternalAuthorization(newOpCtxPtr.get()->getClient());
+                    ->grantInternalAuthorization();
                 newOpCtxPtr->setWriteConcern(ShardingCatalogClient::kLocalWriteConcern);
                 WriteBlockBypass::get(newOpCtxPtr.get()).set(true);
                 cloneDatabase(newOpCtxPtr.get(), dbName, from, result);

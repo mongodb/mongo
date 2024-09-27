@@ -62,11 +62,10 @@ public:
     AuthzManagerExternalStateMock();
     ~AuthzManagerExternalStateMock() override;
 
-    void setAuthorizationManager(AuthorizationManager* authzManager);
     void setAuthzVersion(OperationContext* opCtx, int version);
 
     std::unique_ptr<AuthzSessionExternalState> makeAuthzSessionExternalState(
-        AuthorizationManager* authzManager) override;
+        Client* client) override;
 
     Status findOne(OperationContext* opCtx,
                    const NamespaceString& collectionName,
@@ -148,8 +147,7 @@ private:
                         std::vector<BSONObjCollection::iterator>* result);
 
 
-    AuthorizationManager* _authzManager;  // For reporting logOps.
-    NamespaceDocumentMap _documents;      // Mock database.
+    NamespaceDocumentMap _documents;  // Mock database.
 };
 
 }  // namespace mongo

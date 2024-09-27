@@ -85,7 +85,6 @@ void OpMsgFuzzerFixture::_setAuthorizationManager() {
     auto localAuthzManager = std::make_unique<AuthorizationManagerImpl>(
         _serviceContext->getService(), std::move(localExternalState));
     _authzManager = localAuthzManager.get();
-    _externalState->setAuthorizationManager(_authzManager);
     _authzManager->setAuthEnabled(true);
 
     AuthorizationManager::set(_serviceContext->getService(), std::move(localAuthzManager));

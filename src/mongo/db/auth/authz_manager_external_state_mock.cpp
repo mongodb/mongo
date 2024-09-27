@@ -101,12 +101,8 @@ void addPrivilegeObjectsOrWarningsToArrayElement(mutablebson::Element privileges
 
 }  // namespace
 
-AuthzManagerExternalStateMock::AuthzManagerExternalStateMock() : _authzManager(nullptr) {}
+AuthzManagerExternalStateMock::AuthzManagerExternalStateMock() {}
 AuthzManagerExternalStateMock::~AuthzManagerExternalStateMock() {}
-
-void AuthzManagerExternalStateMock::setAuthorizationManager(AuthorizationManager* authzManager) {
-    _authzManager = authzManager;
-}
 
 void AuthzManagerExternalStateMock::setAuthzVersion(OperationContext* opCtx, int version) {
     auto backendMock = reinterpret_cast<auth::AuthorizationBackendMock*>(
@@ -116,9 +112,9 @@ void AuthzManagerExternalStateMock::setAuthzVersion(OperationContext* opCtx, int
 }
 
 std::unique_ptr<AuthzSessionExternalState>
-AuthzManagerExternalStateMock::makeAuthzSessionExternalState(AuthorizationManager* authzManager) {
-    auto ret = std::make_unique<AuthzSessionExternalStateMock>(authzManager);
-    if (!authzManager->isAuthEnabled()) {
+AuthzManagerExternalStateMock::makeAuthzSessionExternalState(Client* client) {
+    auto ret = std::make_unique<AuthzSessionExternalStateMock>(client);
+    if (!AuthorizationManager::get(client->getService())->isAuthEnabled()) {
         // Construct a `AuthzSessionExternalStateMock` structure that represents the default no-auth
         // state of a running mongod.
         ret->setReturnValueForShouldIgnoreAuthChecks(true);

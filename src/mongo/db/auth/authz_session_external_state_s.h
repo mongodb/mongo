@@ -33,6 +33,7 @@
 #include "mongo/db/auth/authorization_client_handle.h"
 #include "mongo/db/auth/authorization_manager.h"
 #include "mongo/db/auth/authz_session_external_state_server_common.h"
+#include "mongo/db/client.h"
 #include "mongo/db/operation_context.h"
 
 namespace mongo {
@@ -45,7 +46,7 @@ class AuthzSessionExternalStateMongos : public AuthzSessionExternalStateServerCo
     AuthzSessionExternalStateMongos& operator=(const AuthzSessionExternalStateMongos&) = delete;
 
 public:
-    AuthzSessionExternalStateMongos(AuthorizationManager* authzManager);
+    AuthzSessionExternalStateMongos(Client* client);
     ~AuthzSessionExternalStateMongos() override;
 
     void startRequest(OperationContext* opCtx) override;

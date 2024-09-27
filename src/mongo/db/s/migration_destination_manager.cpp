@@ -1270,7 +1270,7 @@ void MigrationDestinationManager::_migrateThread(CancellationToken cancellationT
         auto opCtx = uniqueOpCtx.get();
 
         if (AuthorizationManager::get(opCtx->getService())->isAuthEnabled()) {
-            AuthorizationSession::get(opCtx->getClient())->grantInternalAuthorization(opCtx);
+            AuthorizationSession::get(opCtx->getClient())->grantInternalAuthorization();
         }
 
         try {

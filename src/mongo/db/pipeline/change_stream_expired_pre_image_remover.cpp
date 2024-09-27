@@ -104,7 +104,7 @@ public:
         LOGV2(7080100, "Starting Change Stream Expired Pre-images Remover thread");
         ThreadClient tc(name(), getGlobalServiceContext()->getService(ClusterRole::ShardServer));
 
-        AuthorizationSession::get(cc())->grantInternalAuthorization(&cc());
+        AuthorizationSession::get(cc())->grantInternalAuthorization();
 
         while (true) {
             LOGV2_DEBUG(6278517, 3, "Thread awake");

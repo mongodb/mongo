@@ -254,7 +254,7 @@ bool BackgroundSync::_inShutdown_inlock() const {
 void BackgroundSync::_run() {
     Client::initThread("BackgroundSync",
                        getGlobalServiceContext()->getService(ClusterRole::ShardServer));
-    AuthorizationSession::get(cc())->grantInternalAuthorization(&cc());
+    AuthorizationSession::get(cc())->grantInternalAuthorization();
 
     {
         stdx::lock_guard<Client> lk(cc());

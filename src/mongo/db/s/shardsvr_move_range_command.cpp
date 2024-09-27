@@ -174,7 +174,7 @@ public:
                                 // Note: This internal authorization is tied to the lifetime of the
                                 // client.
                                 AuthorizationSession::get(executorOpCtx->getClient())
-                                    ->grantInternalAuthorization(executorOpCtx->getClient());
+                                    ->grantInternalAuthorization();
                                 _runImpl(executorOpCtx, std::move(req), std::move(writeConcern));
                                 status = Status::OK();
                             } catch (const DBException& e) {

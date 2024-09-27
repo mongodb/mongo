@@ -415,7 +415,7 @@ void TTLMonitor::updateSleepSeconds(Seconds newSeconds) {
 
 void TTLMonitor::run() {
     ThreadClient tc(name(), getGlobalServiceContext()->getService(ClusterRole::ShardServer));
-    AuthorizationSession::get(cc())->grantInternalAuthorization(&cc());
+    AuthorizationSession::get(cc())->grantInternalAuthorization();
 
     while (true) {
         {
@@ -910,7 +910,7 @@ void TTLMonitor::onStepUp() {
     stdx::thread([]() mutable {
         ThreadClient tc("InvalidTTLIndexFixer",
                         getGlobalServiceContext()->getService(ClusterRole::ShardServer));
-        AuthorizationSession::get(cc())->grantInternalAuthorization(&cc());
+        AuthorizationSession::get(cc())->grantInternalAuthorization();
         const auto opCtxCtr = cc().makeOperationContext();
         auto opCtx = opCtxCtr.get();
         auto&& ttlCollectionCache = TTLCollectionCache::get(opCtx->getServiceContext());

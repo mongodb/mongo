@@ -609,7 +609,7 @@ private:
         threadPoolOptions.onCreateThread = [](const std::string& threadName) {
             Client::initThread(threadName.c_str(), getGlobalServiceContext()->getService());
             auto* client = Client::getCurrent();
-            AuthorizationSession::get(*client)->grantInternalAuthorization(client);
+            AuthorizationSession::get(*client)->grantInternalAuthorization();
         };
 
         auto hookList = std::make_unique<rpc::EgressMetadataHookList>();

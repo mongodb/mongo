@@ -494,7 +494,7 @@ void runWithTransactionFromOpCtx(OperationContext* opCtx,
     auto* const client = opCtx->getClient();
     opCtx->setAlwaysInterruptAtStepDownOrUp_UNSAFE();
 
-    AuthorizationSession::get(client)->grantInternalAuthorization(client);
+    AuthorizationSession::get(client)->grantInternalAuthorization();
     TxnNumber txnNumber = *opCtx->getTxnNumber();
     opCtx->setInMultiDocumentTransaction();
 

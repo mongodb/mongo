@@ -214,8 +214,7 @@ BSONObj commitOrAbortTransaction(OperationContext* opCtx,
     AlternativeClientRegion acr(newClient);
     auto newOpCtx = cc().makeOperationContext();
     newOpCtx->setAlwaysInterruptAtStepDownOrUp_UNSAFE();
-    AuthorizationSession::get(newOpCtx.get()->getClient())
-        ->grantInternalAuthorization(newOpCtx.get()->getClient());
+    AuthorizationSession::get(newOpCtx.get()->getClient())->grantInternalAuthorization();
     {
         auto lk = stdx::lock_guard(*newOpCtx->getClient());
         newOpCtx->setLogicalSessionId(opCtx->getLogicalSessionId().value());
@@ -1357,7 +1356,7 @@ void ShardingCatalogManager::withTransaction(
     AlternativeSessionRegion asr(opCtx);
     auto* const client = asr.opCtx()->getClient();
     asr.opCtx()->setAlwaysInterruptAtStepDownOrUp_UNSAFE();
-    AuthorizationSession::get(client)->grantInternalAuthorization(client);
+    AuthorizationSession::get(client)->grantInternalAuthorization();
     TxnNumber txnNumber = 0;
 
     ScopeGuard guard([opCtx = asr.opCtx(), &txnNumber, &writeConcern] {
@@ -1550,7 +1549,7 @@ void ShardingCatalogManager::initializePlacementHistory(OperationContext* opCtx)
             stdx::lock_guard<Client> lk(*altClient.get());
             altClient.get()->setSystemOperationUnkillableByStepdown(lk);
         }
-        AuthorizationSession::get(altClient.get())->grantInternalAuthorization(altClient.get());
+        AuthorizationSession::get(altClient.get())->grantInternalAuthorization();
         AlternativeClientRegion acr(altClient);
         auto executor =
             Grid::get(opCtx->getServiceContext())->getExecutorPool()->getFixedExecutor();

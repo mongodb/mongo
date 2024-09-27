@@ -191,7 +191,7 @@ std::unique_ptr<ThreadPool> makeReplWorkerPool(int threadCount,
         Client::initThread(getThreadName(),
                            getGlobalServiceContext()->getService(ClusterRole::ShardServer));
         auto client = Client::getCurrent();
-        AuthorizationSession::get(*client)->grantInternalAuthorization(client);
+        AuthorizationSession::get(*client)->grantInternalAuthorization();
 
         if (!isKillableByStepdown) {
             stdx::lock_guard<Client> lk(*client);

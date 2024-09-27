@@ -203,7 +203,7 @@ std::shared_ptr<executor::TaskExecutor> ReshardingDataReplication::_makeCollecti
         Client::initThread(threadName.c_str(),
                            getGlobalServiceContext()->getService(ClusterRole::ShardServer));
         auto* client = Client::getCurrent();
-        AuthorizationSession::get(*client)->grantInternalAuthorization(client);
+        AuthorizationSession::get(*client)->grantInternalAuthorization();
     };
 
     auto executor = executor::ThreadPoolTaskExecutor::create(

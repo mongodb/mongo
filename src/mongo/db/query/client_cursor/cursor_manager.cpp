@@ -327,7 +327,7 @@ std::vector<GenericCursor> CursorManager::getIdleCursors(
             auto cursor = entry.second;
 
             // Exclude cursors that this user does not own if auth is enabled.
-            if (ctxAuth->getAuthorizationManager().isAuthEnabled() &&
+            if (AuthorizationManager::get(opCtx->getService())->isAuthEnabled() &&
                 userMode == MongoProcessInterface::CurrentOpUserMode::kExcludeOthers &&
                 !ctxAuth->isCoauthorizedWith(cursor->getAuthenticatedUser())) {
                 continue;

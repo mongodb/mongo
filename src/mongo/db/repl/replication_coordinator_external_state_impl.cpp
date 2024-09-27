@@ -199,7 +199,7 @@ auto makeThreadPool(const std::string& poolName, const std::string& threadName) 
             cc().setSystemOperationUnkillableByStepdown(lk);
         }
 
-        AuthorizationSession::get(cc())->grantInternalAuthorization(&cc());
+        AuthorizationSession::get(cc())->grantInternalAuthorization();
     };
     return std::make_unique<ThreadPool>(threadPoolOptions);
 }

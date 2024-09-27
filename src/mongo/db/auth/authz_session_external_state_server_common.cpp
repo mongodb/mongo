@@ -48,9 +48,8 @@ std::once_flag checkShouldAllowLocalhostOnceFlag;
 // NOTE: we default _allowLocalhost to true under the assumption that _checkShouldAllowLocalhost
 // will always be called before any calls to shouldAllowLocalhost.  If this is not the case,
 // it could cause a security hole.
-AuthzSessionExternalStateServerCommon::AuthzSessionExternalStateServerCommon(
-    AuthorizationManager* authzManager)
-    : AuthzSessionExternalState(authzManager), _allowLocalhost(enableLocalhostAuthBypass) {}
+AuthzSessionExternalStateServerCommon::AuthzSessionExternalStateServerCommon(Client* client)
+    : AuthzSessionExternalState(client), _allowLocalhost(enableLocalhostAuthBypass) {}
 AuthzSessionExternalStateServerCommon::~AuthzSessionExternalStateServerCommon() {}
 
 void AuthzSessionExternalStateServerCommon::_checkShouldAllowLocalhost(OperationContext* opCtx) {
@@ -89,7 +88,7 @@ bool AuthzSessionExternalStateServerCommon::shouldAllowLocalhost() const {
 }
 
 bool AuthzSessionExternalStateServerCommon::shouldIgnoreAuthChecks() const {
-    return !_authzManager->isAuthEnabled();
+    return !AuthorizationManager::get(_client->getService())->isAuthEnabled();
 }
 
 }  // namespace mongo

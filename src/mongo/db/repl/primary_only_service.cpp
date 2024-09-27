@@ -353,7 +353,7 @@ void PrimaryOnlyService::startup(OperationContext* opCtx) {
         Client::initThread(threadName.c_str(),
                            getGlobalServiceContext()->getService(ClusterRole::ShardServer));
         auto client = Client::getCurrent();
-        AuthorizationSession::get(*client)->grantInternalAuthorization(&cc());
+        AuthorizationSession::get(*client)->grantInternalAuthorization();
 
         // Associate this Client with this PrimaryOnlyService
         primaryOnlyServiceStateForClient(client).primaryOnlyService = this;

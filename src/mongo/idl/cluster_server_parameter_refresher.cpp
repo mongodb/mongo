@@ -112,7 +112,7 @@ getFCVAndClusterParametersFromConfigServer() {
     AlternativeClientRegion clientRegion(altClient);
     auto opCtx = cc().makeOperationContext();
     auto as = AuthorizationSession::get(cc());
-    as->grantInternalAuthorization(opCtx.get());
+    as->grantInternalAuthorization();
 
     auto configServers = Grid::get(opCtx.get())->shardRegistry()->getConfigShard();
     // Note that we get the list of tenants outside of the transaction. This should be okay, as if

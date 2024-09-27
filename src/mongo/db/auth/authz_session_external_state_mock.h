@@ -32,6 +32,7 @@
 #include "mongo/base/status.h"
 #include "mongo/db/auth/authorization_manager.h"
 #include "mongo/db/auth/authz_session_external_state.h"
+#include "mongo/db/client.h"
 #include "mongo/db/operation_context.h"
 
 namespace mongo {
@@ -44,8 +45,8 @@ class AuthzSessionExternalStateMock : public AuthzSessionExternalState {
     AuthzSessionExternalStateMock& operator=(const AuthzSessionExternalStateMock&) = delete;
 
 public:
-    AuthzSessionExternalStateMock(AuthorizationManager* authzManager)
-        : AuthzSessionExternalState(authzManager),
+    AuthzSessionExternalStateMock(Client* client)
+        : AuthzSessionExternalState(client),
           _ignoreAuthChecksReturnValue(false),
           _allowLocalhostReturnValue(false),
           _serverIsArbiterReturnValue(false) {}
