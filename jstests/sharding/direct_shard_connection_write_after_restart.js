@@ -10,6 +10,11 @@
  * a result, the StaleConfig error is transient and the write may be retried by the client.
  *
  * This test was originally written to reproduce SERVER-95244.
+ *
+ * @tags: [
+ *   # This test restarts a shard and expects its state to persist after restart.
+ *   requires_persistence,
+ * ]
  */
 
 import {ShardingTest} from "jstests/libs/shardingtest.js";
