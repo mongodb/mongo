@@ -34,7 +34,7 @@
 #include "mongo/db/query/stats/array_histogram.h"
 #include "mongo/db/query/stats/value_utils.h"
 
-namespace mongo::optimizer::cbp::ce {
+namespace mongo::ce {
 
 // Enable this flag to log all estimates, and let all tests pass.
 constexpr bool kCETestLogOnly = false;
@@ -119,4 +119,4 @@ double estimateCardinalityScalarHistogramInteger(const stats::ScalarHistogram& h
                                                  int v,
                                                  EstimationType type);
 
-}  // namespace mongo::optimizer::cbp::ce
+}  // namespace mongo::ce

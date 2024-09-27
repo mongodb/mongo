@@ -31,7 +31,7 @@
 
 #include "mongo/db/exec/sbe/values/value.h"
 
-namespace mongo::optimizer::cbp::ce {
+namespace mongo::ce {
 
 using Cardinality = double;
 using Selectivity = double;
@@ -82,4 +82,4 @@ inline bool reversedInterval(sbe::value::TypeTags tagLow,
     return false;
 }
 
-}  // namespace mongo::optimizer::cbp::ce
+}  // namespace mongo::ce

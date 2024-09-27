@@ -46,7 +46,7 @@
 #include "mongo/unittest/assert.h"
 #include "mongo/unittest/framework.h"
 
-namespace mongo::optimizer::cbp::ce {
+namespace mongo::ce {
 namespace {
 namespace value = sbe::value;
 
@@ -373,4 +373,4 @@ TEST(EstimatorTest, IntStrArrayEstimate) {
     ASSERT_CE_APPROX_EQUAL(156.1, expectedCard.card, kErrorBound);
 }
 }  // namespace
-}  // namespace mongo::optimizer::cbp::ce
+}  // namespace mongo::ce

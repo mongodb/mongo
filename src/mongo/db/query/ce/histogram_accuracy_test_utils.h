@@ -33,7 +33,7 @@
 #include "mongo/db/query/ce/histogram_predicate_estimation.h"
 #include "mongo/db/query/stats/max_diff.h"
 
-namespace mongo::optimizer::cbp::ce {
+namespace mongo::ce {
 
 using stats::TypeCounts;
 using TypeTags = sbe::value::TypeTags;
@@ -144,4 +144,4 @@ void runAccuracyTestConfiguration(DataDistributionEnum dataDistribution,
                                   size_t seed,
                                   bool printResults);
 
-}  // namespace mongo::optimizer::cbp::ce
+}  // namespace mongo::ce

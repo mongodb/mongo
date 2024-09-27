@@ -32,7 +32,7 @@
 #include "mongo/db/query/ce/histogram_common.h"
 #include "mongo/db/query/stats/array_histogram.h"
 
-namespace mongo::optimizer::cbp::ce {
+namespace mongo::ce {
 
 enum class EstimationAlgo { HistogramV1, HistogramV2, HistogramV3 };
 
@@ -80,4 +80,4 @@ bool canEstimateBound(const stats::ArrayHistogram& ah,
  */
 int compareTypeTags(sbe::value::TypeTags a, sbe::value::TypeTags b);
 
-}  // namespace mongo::optimizer::cbp::ce
+}  // namespace mongo::ce

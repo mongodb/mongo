@@ -35,7 +35,9 @@
 #include "mongo/db/query/optimizer/index_bounds.h"
 #include "mongo/db/query/optimizer/syntax/syntax.h"
 
-namespace mongo::optimizer::ce {
+namespace mongo::ce {
+
+using namespace mongo::optimizer;
 
 /**
  * Helper function to extract a tag & value from an ABT node if it turns out to be a Constant node
@@ -71,4 +73,4 @@ IntervalRequirement getMinMaxIntervalForType(sbe::value::TypeTags type);
  */
 bool isIntervalSubsetOfType(const IntervalRequirement& interval, sbe::value::TypeTags type);
 
-}  // namespace mongo::optimizer::ce
+}  // namespace mongo::ce

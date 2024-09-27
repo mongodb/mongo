@@ -47,7 +47,7 @@
 #include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
 
-namespace mongo::optimizer::ce {
+namespace mongo::ce {
 
 boost::optional<std::pair<sbe::value::TypeTags, sbe::value::Value>> getConstTypeVal(
     const ABT& abt) {
@@ -107,4 +107,4 @@ bool isIntervalSubsetOfType(const IntervalRequirement& interval, sbe::value::Typ
     return intersectDNFIntervals(intervals, ConstEval::constFold).has_value();
 }
 
-}  // namespace mongo::optimizer::ce
+}  // namespace mongo::ce

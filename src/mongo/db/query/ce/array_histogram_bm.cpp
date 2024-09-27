@@ -31,8 +31,8 @@
 #include <vector>
 
 #include "mongo/db/exec/sbe/values/value.h"
-#include "mongo/db/query/ce/accuracy_test_utils.h"
 #include "mongo/db/query/ce/array_histogram_helpers.h"
+#include "mongo/db/query/ce/histogram_accuracy_test_utils.h"
 #include "mongo/db/query/ce/histogram_common.h"
 #include "mongo/db/query/ce/histogram_predicate_estimation.h"
 #include "mongo/db/query/ce/test_utils.h"
@@ -45,7 +45,7 @@
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kDefault
 
-namespace mongo::optimizer::cbp::ce {
+namespace mongo::ce {
 
 enum DataType { kInt, kStringSmall, kString, kDouble };
 
@@ -327,4 +327,4 @@ BENCHMARK(BM_RunHistogramEstimations)
             /*dataType*/ kString,
             /*queryType*/ kRange});
 
-}  // namespace mongo::optimizer::cbp::ce
+}  // namespace mongo::ce

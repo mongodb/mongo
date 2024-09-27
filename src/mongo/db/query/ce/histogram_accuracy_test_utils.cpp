@@ -33,8 +33,8 @@
 #include "mongo/bson/json.h"
 #include "mongo/db/exec/docval_to_sbeval.h"
 #include "mongo/db/exec/sbe/values/bson.h"
-#include "mongo/db/query/ce/accuracy_test_utils.h"
 #include "mongo/db/query/ce/array_histogram_helpers.h"
+#include "mongo/db/query/ce/histogram_accuracy_test_utils.h"
 #include "mongo/db/query/ce/histogram_predicate_estimation.h"
 #include "mongo/db/query/ce/scalar_histogram_helpers.h"
 #include "mongo/db/query/ce/test_utils.h"
@@ -42,7 +42,7 @@
 #include "mongo/db/query/stats/rand_utils_new.h"
 #include "mongo/logv2/log.h"
 
-namespace mongo::optimizer::cbp::ce {
+namespace mongo::ce {
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kDefault
 
@@ -365,7 +365,7 @@ ErrorCalculationSummary runQueries(size_t size,
                     calculateFrequencyFromDataVectorEq(data, queryTypeInfo.first, sbeValLow[i]);
 
                 // Estimate result.
-                estimatedCard = mongo::optimizer::cbp::ce::estimateCardinalityEq(
+                estimatedCard = estimateCardinalityEq(
                     *arrHist, queryTypeInfo.first, sbeValLow[i].getValue(), includeScalar);
                 break;
             }
@@ -382,15 +382,14 @@ ErrorCalculationSummary runQueries(size_t size,
                     data, queryTypeInfo.first, sbeValLow[i], sbeValHigh[i]);
 
                 // Estimate result.
-                estimatedCard =
-                    mongo::optimizer::cbp::ce::estimateCardinalityRange(*arrHist,
-                                                                        true /*lowInclusive*/,
-                                                                        queryTypeInfo.first,
-                                                                        sbeValLow[i].getValue(),
-                                                                        true /*highInclusive*/,
-                                                                        queryTypeInfo.first,
-                                                                        sbeValHigh[i].getValue(),
-                                                                        includeScalar);
+                estimatedCard = estimateCardinalityRange(*arrHist,
+                                                         true /*lowInclusive*/,
+                                                         queryTypeInfo.first,
+                                                         sbeValLow[i].getValue(),
+                                                         true /*highInclusive*/,
+                                                         queryTypeInfo.first,
+                                                         sbeValHigh[i].getValue(),
+                                                         includeScalar);
                 break;
             }
         }
@@ -512,4 +511,4 @@ void runAccuracyTestConfiguration(const DataDistributionEnum dataDistribution,
     }
 }
 
-}  // namespace mongo::optimizer::cbp::ce
+}  // namespace mongo::ce

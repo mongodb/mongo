@@ -38,7 +38,7 @@
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kDefault
 
-namespace mongo::optimizer::cbp::ce {
+namespace mongo::ce {
 
 namespace {
 namespace value = sbe::value;
@@ -1000,4 +1000,4 @@ TEST(ArrayHistogramHelpersTest, Histogram1000ArraysLarge10Buckets) {
     }
 }
 }  // namespace
-}  // namespace mongo::optimizer::cbp::ce
+}  // namespace mongo::ce

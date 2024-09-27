@@ -39,7 +39,7 @@
 #include "mongo/unittest/assert.h"
 #include "mongo/unittest/framework.h"
 
-namespace mongo::optimizer::cbp::ce {
+namespace mongo::ce {
 
 namespace {
 namespace value = sbe::value;
@@ -872,4 +872,4 @@ TEST(ScalarHistogramHelpersTest, MinValueMixedHistogramFromBuckets) {
 }
 
 }  // namespace
-}  // namespace mongo::optimizer::cbp::ce
+}  // namespace mongo::ce

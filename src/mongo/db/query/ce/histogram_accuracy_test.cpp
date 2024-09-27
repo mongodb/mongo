@@ -27,9 +27,9 @@
  *    it in the license file.
  */
 
-#include "mongo/db/query/ce/accuracy_test_utils.h"
+#include "mongo/db/query/ce/histogram_accuracy_test_utils.h"
 
-using namespace mongo::optimizer::cbp::ce;
+using namespace mongo::ce;
 
 /**
  * This program generates accuracy calculations for histogram frequency estimates.

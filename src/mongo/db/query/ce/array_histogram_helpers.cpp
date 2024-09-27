@@ -36,7 +36,7 @@
 #include "mongo/db/query/stats/array_histogram.h"
 #include "mongo/db/query/stats/value_utils.h"
 
-namespace mongo::optimizer::cbp::ce {
+namespace mongo::ce {
 
 int compareTypeTags(sbe::value::TypeTags a, sbe::value::TypeTags b) {
     auto orderOfA = canonicalizeBSONTypeUnsafeLookup(tagToType(a));
@@ -223,4 +223,4 @@ Cardinality estimateIntervalCardinality(const stats::ArrayHistogram& ah,
     MONGO_UNREACHABLE_TASSERT(8870500);
 }
 
-}  // namespace mongo::optimizer::cbp::ce
+}  // namespace mongo::ce

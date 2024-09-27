@@ -146,9 +146,9 @@ size_t getActualCard(OperationContext* opCtx,
     return runPipeline(opCtx, query, convertToBSON(input)).size();
 }
 
-std::string makeMatchExpr(const SBEValue& val, optimizer::cbp::ce::EstimationType cmpOp) {
+std::string makeMatchExpr(const SBEValue& val, ce::EstimationType cmpOp) {
     std::stringstream matchExpr;
-    std::string cmpOpName = optimizer::cbp::ce::estimationTypeName.at(cmpOp);
+    std::string cmpOpName = ce::estimationTypeName.at(cmpOp);
     matchExpr << "[{$match: {a: {$" << cmpOpName << ": " << val.get() << "}}}]";
     return matchExpr.str();
 }

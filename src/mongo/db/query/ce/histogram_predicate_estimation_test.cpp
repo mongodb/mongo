@@ -38,7 +38,7 @@
 #include "mongo/unittest/death_test.h"
 #include "mongo/unittest/framework.h"
 
-namespace mongo::optimizer::cbp::ce {
+namespace mongo::ce {
 namespace {
 
 namespace value = sbe::value;
@@ -471,4 +471,4 @@ DEATH_TEST(HistogramPredicateEstimationTest,
 }
 
 }  // namespace
-}  // namespace mongo::optimizer::cbp::ce
+}  // namespace mongo::ce

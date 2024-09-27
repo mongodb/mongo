@@ -30,7 +30,7 @@
 #include "mongo/db/query/ce/scalar_histogram_helpers.h"
 #include "mongo/db/query/stats/value_utils.h"
 
-namespace mongo::optimizer::cbp::ce {
+namespace mongo::ce {
 
 using stats::Bucket;
 using stats::compareValues;
@@ -187,8 +187,7 @@ EstimationResult interpolateEstimateInBucket(const ScalarHistogram& h,
     // If the value is minimal for its type, and the operation is $lt or $lte return cardinality up
     // to the previous bucket.
     auto&& [minConstant, inclusive] = getMinMaxBoundForType(true /*isMin*/, tag);
-    auto [minTag, minVal] =
-        *mongo::optimizer::ce::getConstTypeVal(*minConstant);  // TODO: fix this (clean namespaces)
+    auto [minTag, minVal] = *getConstTypeVal(*minConstant);
     if (compareValues(minTag, minVal, tag, val) == 0) {
         return {resultCard, resultNDV};
     }
@@ -243,4 +242,4 @@ EstimationResult estimateRangeQueryOnArray(const ScalarHistogram& histogramAmin,
     return highEstimate - lowEstimate;
 }
 
-}  // namespace mongo::optimizer::cbp::ce
+}  // namespace mongo::ce

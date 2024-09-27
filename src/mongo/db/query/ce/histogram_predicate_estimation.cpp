@@ -34,7 +34,7 @@
 #include "mongo/db/query/stats/value_utils.h"
 
 
-namespace mongo::optimizer::cbp::ce {
+namespace mongo::ce {
 
 Cardinality HistogramCardinalityEstimator::estimateCardinality(const stats::ArrayHistogram& hist,
                                                                const Cardinality collectionSize,
@@ -62,4 +62,4 @@ bool HistogramCardinalityEstimator::canEstimateInterval(const stats::ArrayHistog
     return false;
 }
 
-}  // namespace mongo::optimizer::cbp::ce
+}  // namespace mongo::ce

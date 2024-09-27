@@ -36,7 +36,7 @@
 #include "mongo/db/query/ce/test_utils.h"
 #include "mongo/db/query/stats/rand_utils_new.h"
 
-namespace mongo::optimizer::cbp::ce {
+namespace mongo::ce {
 namespace value = sbe::value;
 
 stats::ScalarHistogram createHistogram(const std::vector<BucketData>& data) {
@@ -76,5 +76,4 @@ double estimateCardinalityScalarHistogramInteger(const stats::ScalarHistogram& h
         std::make_pair(value::TypeTags::NumberInt64, value::bitcastFrom<int64_t>(v));
     return estimateCardinality(hist, tag, val, type).card;
 };
-
-}  // namespace mongo::optimizer::cbp::ce
+}  // namespace mongo::ce

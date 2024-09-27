@@ -35,7 +35,7 @@
 #include "mongo/db/query/ce/histogram_common.h"
 #include "mongo/db/query/stats/scalar_histogram.h"
 
-namespace mongo::optimizer::cbp::ce {
+namespace mongo::ce {
 
 /**
  * Computes an estimate for a value and estimation type. Uses linear interpolation to
@@ -87,4 +87,4 @@ EstimationResult estimateRangeQueryOnArray(const stats::ScalarHistogram& histogr
                                            sbe::value::Value valHigh);
 
 
-}  // namespace mongo::optimizer::cbp::ce
+}  // namespace mongo::ce
