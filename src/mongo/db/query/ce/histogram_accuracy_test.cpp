@@ -26,7 +26,8 @@
  *    exception statement from all source files in the program, then also delete
  *    it in the license file.
  */
-#include "mongo/db/query/ce/cbp_histogram_ce/accuracy_test_utils.h"
+
+#include "mongo/db/query/ce/accuracy_test_utils.h"
 
 using namespace mongo::optimizer::cbp::ce;
 

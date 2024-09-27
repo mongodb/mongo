@@ -29,11 +29,11 @@
 
 #include <vector>
 
-#include "mongo/db/query/ce/cbp_histogram_ce/array_histogram_helpers.h"
-#include "mongo/db/query/ce/cbp_histogram_ce/histogram_common.h"
-#include "mongo/db/query/ce/cbp_histogram_ce/histogram_predicate_estimation.h"
-#include "mongo/db/query/ce/cbp_histogram_ce/scalar_histogram_helpers.h"
-#include "mongo/db/query/ce/cbp_histogram_ce/test_utils.h"
+#include "mongo/db/query/ce/array_histogram_helpers.h"
+#include "mongo/db/query/ce/histogram_common.h"
+#include "mongo/db/query/ce/histogram_predicate_estimation.h"
+#include "mongo/db/query/ce/scalar_histogram_helpers.h"
+#include "mongo/db/query/ce/test_utils.h"
 #include "mongo/unittest/assert.h"
 #include "mongo/unittest/death_test.h"
 #include "mongo/unittest/framework.h"

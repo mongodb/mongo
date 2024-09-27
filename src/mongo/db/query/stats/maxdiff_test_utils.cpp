@@ -43,7 +43,7 @@
 #include "mongo/db/pipeline/document_source_queue.h"
 #include "mongo/db/pipeline/expression_context_for_test.h"
 #include "mongo/db/pipeline/pipeline.h"
-#include "mongo/db/query/ce/cbp_histogram_ce/histogram_common.h"
+#include "mongo/db/query/ce/histogram_common.h"
 #include "mongo/db/query/plan_executor.h"
 #include "mongo/db/query/plan_executor_factory.h"
 #include "mongo/db/query/stats/array_histogram.h"

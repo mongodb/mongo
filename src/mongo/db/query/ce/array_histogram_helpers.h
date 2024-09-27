@@ -29,7 +29,7 @@
 
 #pragma once
 
-#include "mongo/db/query/ce/cbp_histogram_ce/histogram_common.h"
+#include "mongo/db/query/ce/histogram_common.h"
 #include "mongo/db/query/stats/array_histogram.h"
 
 namespace mongo::optimizer::cbp::ce {

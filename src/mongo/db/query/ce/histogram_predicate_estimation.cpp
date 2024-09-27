@@ -27,11 +27,10 @@
  *    it in the license file.
  */
 
-#include "mongo/db/query/ce/cbp_histogram_ce/histogram_predicate_estimation.h"
-
+#include "mongo/db/query/ce/histogram_predicate_estimation.h"
 #include "mongo/db/exec/sbe/values/bson.h"
-#include "mongo/db/query/ce/cbp_histogram_ce/array_histogram_helpers.h"
-#include "mongo/db/query/ce/cbp_histogram_ce/histogram_common.h"
+#include "mongo/db/query/ce/array_histogram_helpers.h"
+#include "mongo/db/query/ce/histogram_common.h"
 #include "mongo/db/query/stats/value_utils.h"
 
 

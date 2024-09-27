@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#include "mongo/db/query/ce/cbp_histogram_ce/scalar_histogram_helpers.h"
+#include "mongo/db/query/ce/scalar_histogram_helpers.h"
 #include "mongo/db/query/stats/value_utils.h"
 
 namespace mongo::optimizer::cbp::ce {

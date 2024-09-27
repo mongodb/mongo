@@ -31,9 +31,9 @@
 #include <absl/random/zipf_distribution.h>
 #include <sstream>
 
-#include "mongo/db/query/ce/cbp_histogram_ce/array_histogram_helpers.h"
-#include "mongo/db/query/ce/cbp_histogram_ce/scalar_histogram_helpers.h"
-#include "mongo/db/query/ce/cbp_histogram_ce/test_utils.h"
+#include "mongo/db/query/ce/array_histogram_helpers.h"
+#include "mongo/db/query/ce/scalar_histogram_helpers.h"
+#include "mongo/db/query/ce/test_utils.h"
 #include "mongo/db/query/stats/rand_utils_new.h"
 
 namespace mongo::optimizer::cbp::ce {
