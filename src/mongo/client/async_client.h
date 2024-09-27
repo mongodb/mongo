@@ -177,26 +177,31 @@ private:
 
         // Make sure to attach the cancellation callback after kicking off the async work to ensure
         // cancellation can't "miss" it.
-        subToken.onCancel().thenRunOn(_reactor).getAsync(
+        subToken.onCancel().unsafeToInlineFuture().getAsync(
             [this, weakSelf = weak_from_this(), weakOpState = std::weak_ptr(opState)](Status s) {
                 if (!s.isOK()) {
                     return;
                 }
 
-                auto opState = weakOpState.lock();
-                if (!opState) {
-                    return;
-                }
+                _reactor->schedule([this, weakSelf, weakOpState](Status s) {
+                    if (!s.isOK()) {
+                        return;
+                    }
+                    auto opState = weakOpState.lock();
+                    if (!opState) {
+                        return;
+                    }
 
-                auto anchor = weakSelf.lock();
-                if (!anchor) {
-                    return;
-                }
+                    auto anchor = weakSelf.lock();
+                    if (!anchor) {
+                        return;
+                    }
 
-                if (opState->done.swap(true)) {
-                    return;
-                }
-                cancel(opState->baton);
+                    if (opState->done.swap(true)) {
+                        return;
+                    }
+                    cancel(opState->baton);
+                });
             });
 
         return fut;

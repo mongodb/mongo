@@ -803,18 +803,23 @@ SemiFuture<void> NetworkInterfaceTL::setAlarm(Date_t when, const CancellationTok
     auto future =
         alarmState->timer->waitUntil(when, nullptr).tapAll([alarmState](Status status) {});
 
-    alarmState->source.token().onCancel().thenRunOn(_reactor).getAsync(
+    alarmState->source.token().onCancel().unsafeToInlineFuture().getAsync(
         [this, weakAlarmState = std::weak_ptr(alarmState)](Status status) {
             if (!status.isOK()) {
                 return;
             }
 
-            auto alarmState = weakAlarmState.lock();
-            if (!alarmState) {
-                return;
-            }
+            _reactor->schedule([this, weakAlarmState = std::move(weakAlarmState)](Status s) {
+                if (!s.isOK()) {
+                    return;
+                }
+                auto alarmState = weakAlarmState.lock();
+                if (!alarmState) {
+                    return;
+                }
 
-            alarmState->timer->cancel();
+                alarmState->timer->cancel();
+            });
         });
 
     return std::move(future).semi();
