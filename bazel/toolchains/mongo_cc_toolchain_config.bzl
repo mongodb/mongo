@@ -606,7 +606,7 @@ def _impl(ctx):
     # Warn when hiding a virtual function.
     overloaded_virtual_warning_feature = feature(
         name = "overloaded_virtual_warning",
-        enabled = True,
+        enabled = False,
         flag_sets = [
             flag_set(
                 actions = all_cpp_compile_actions,
