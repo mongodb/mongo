@@ -128,16 +128,19 @@ void coordinateIndexCatalogModificationAcrossCollectionShards(
     // Stop migrations so the cluster is in a steady state.
     sharding_ddl_util::stopMigrations(opCtx, userCollectionNss, collectionUUID);
 
-    // Get an up to date shard distribution.
-    auto [routingInfo, _] = uassertStatusOK(
-        Grid::get(opCtx)->catalogCache()->getCollectionRoutingInfoWithPlacementRefresh(
-            opCtx, userCollectionNss));
-    uassert(ErrorCodes::NamespaceNotSharded,
-            str::stream() << "collection " << userCollectionNss.toStringForErrorMsg()
-                          << " is not sharded",
-            routingInfo.isSharded());
-    std::set<ShardId> shardIdsSet;
-    routingInfo.getAllShardIds(&shardIdsSet);
+    const std::set<ShardId> shardIdsSet = [&]() {
+        // Get an up to date shard distribution.
+        const auto cm =
+            uassertStatusOK(Grid::get(opCtx)->catalogCache()->getCollectionPlacementInfoWithRefresh(
+                opCtx, userCollectionNss));
+        uassert(ErrorCodes::NamespaceNotSharded,
+                str::stream() << "collection " << userCollectionNss.toStringForErrorMsg()
+                              << " is not sharded",
+                cm.isSharded());
+        std::set<ShardId> owningShards;
+        cm.getAllShardIds(&owningShards);
+        return owningShards;
+    }();
 
     if (!firstExecution) {
         // If this is not the first execution (as in, there was a stepdown) advance the

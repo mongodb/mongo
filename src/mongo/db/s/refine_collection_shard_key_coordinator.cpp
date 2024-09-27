@@ -259,8 +259,8 @@ ExecutorFuture<void> RefineCollectionShardKeyCoordinator::_runImpl(
                 // From this point on considering a steady state cluster, we do another refresh, in
                 // case a migration committed before the previous command in order to get a fresh
                 // routing data.
-                const auto _ = uassertStatusOK(
-                    catalogCache->getCollectionRoutingInfoWithPlacementRefresh(opCtx, ns));
+                const auto _ =
+                    uassertStatusOK(catalogCache->getCollectionPlacementInfoWithRefresh(opCtx, ns));
 
                 shardVersionRetry(
                     opCtx,

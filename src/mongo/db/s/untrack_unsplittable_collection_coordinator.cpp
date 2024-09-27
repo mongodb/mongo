@@ -69,9 +69,9 @@ void UntrackUnsplittableCollectionCoordinator::_checkPreconditions() {
     _completeOnError = true;
 
     // TODO SERVER-84243: Use the CatalogCache instance for filtering metadata.
-    const auto& [chunkManager, _] = uassertStatusOK(
-        Grid::get(opCtx)->catalogCache()->getCollectionRoutingInfoWithPlacementRefresh(opCtx,
-                                                                                       nss()));
+    const auto chunkManager = uassertStatusOK(
+        Grid::get(opCtx)->catalogCache()->getCollectionPlacementInfoWithRefresh(opCtx, nss()));
+
     if (!chunkManager.hasRoutingTable()) {
         uasserted(ErrorCodes::RequestAlreadyFulfilled,
                   str::stream() << "The collection " << nss().toStringForErrorMsg()

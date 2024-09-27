@@ -361,8 +361,8 @@ void replaceShardingIndexCatalogInShardIfNeeded(OperationContext* opCtx,
         return;
     }
 
-    auto [_, optSii] = uassertStatusOK(
-        Grid::get(opCtx)->catalogCache()->getCollectionRoutingInfoWithIndexRefresh(opCtx, nss));
+    auto optSii = uassertStatusOK(
+        Grid::get(opCtx)->catalogCache()->getCollectionIndexInfoWithRefresh(opCtx, nss));
 
     if (optSii) {
         std::vector<IndexCatalogType> indexes;

@@ -466,8 +466,8 @@ void MigrationSourceManager::startClone() {
     // Refreshing the collection routing information after starting the clone driver will give us a
     // stable view on whether the recipient is owning other chunks of the collection (a condition
     // that will be later evaluated).
-    uassertStatusOK(Grid::get(_opCtx)->catalogCache()->getCollectionRoutingInfoWithPlacementRefresh(
-        _opCtx, nss()));
+    uassertStatusOK(
+        Grid::get(_opCtx)->catalogCache()->getCollectionPlacementInfoWithRefresh(_opCtx, nss()));
 
     if (replEnabled) {
         auto const readConcernArgs = repl::ReadConcernArgs(

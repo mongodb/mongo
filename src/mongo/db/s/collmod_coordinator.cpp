@@ -186,8 +186,8 @@ void CollModCoordinator::_saveShardingInfoOnCoordinatorIfNecessary(OperationCont
     if (!_shardingInfo && _collInfo->isTracked) {
         ShardingInfo info;
         info.isPrimaryOwningChunks = false;
-        const auto [chunkManager, _] = uassertStatusOK(
-            Grid::get(opCtx)->catalogCache()->getCollectionRoutingInfoWithPlacementRefresh(
+        const auto chunkManager =
+            uassertStatusOK(Grid::get(opCtx)->catalogCache()->getCollectionPlacementInfoWithRefresh(
                 opCtx, _collInfo->nsForTargeting));
 
         // Coordinator is guaranteed to be running on primary shard

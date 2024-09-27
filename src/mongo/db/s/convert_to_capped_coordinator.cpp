@@ -164,9 +164,8 @@ void ConvertToCappedCoordinator::_checkPreconditions(OperationContext* opCtx) {
                 !(coll->isCapped() && (coll->getCappedMaxSize() == _doc.getSize())));
     }
 
-    const auto& [chunkManager, _] = uassertStatusOK(
-        Grid::get(opCtx)->catalogCache()->getCollectionRoutingInfoWithPlacementRefresh(opCtx,
-                                                                                       nss()));
+    const auto chunkManager = uassertStatusOK(
+        Grid::get(opCtx)->catalogCache()->getCollectionPlacementInfoWithRefresh(opCtx, nss()));
 
     uassert(ErrorCodes::NamespaceCannotBeSharded,
             "Can't convert a sharded collection to a capped collection",

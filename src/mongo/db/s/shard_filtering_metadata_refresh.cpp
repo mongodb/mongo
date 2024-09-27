@@ -660,9 +660,8 @@ CollectionMetadata forceGetCurrentMetadata(OperationContext* opCtx, const Namesp
     shardingState->assertCanAcceptShardedCommands();
 
     try {
-        const auto [cm, _] = uassertStatusOK(
-            Grid::get(opCtx)->catalogCache()->getCollectionRoutingInfoWithPlacementRefresh(opCtx,
-                                                                                           nss));
+        const auto cm = uassertStatusOK(
+            Grid::get(opCtx)->catalogCache()->getCollectionPlacementInfoWithRefresh(opCtx, nss));
 
         if (!cm.hasRoutingTable()) {
             return CollectionMetadata();
@@ -690,8 +689,8 @@ ChunkVersion forceShardFilteringMetadataRefresh(OperationContext* opCtx,
     auto* const shardingState = ShardingState::get(opCtx);
     shardingState->assertCanAcceptShardedCommands();
 
-    const auto [cm, _] = uassertStatusOK(
-        Grid::get(opCtx)->catalogCache()->getCollectionRoutingInfoWithPlacementRefresh(opCtx, nss));
+    const auto cm = uassertStatusOK(
+        Grid::get(opCtx)->catalogCache()->getCollectionPlacementInfoWithRefresh(opCtx, nss));
 
     if (!cm.hasRoutingTable()) {
         // DBLock and CollectionLock are used here to avoid throwing further recursive stale

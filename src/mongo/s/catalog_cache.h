@@ -228,21 +228,15 @@ public:
         OperationContext* opCtx, const NamespaceString& nss);
 
     /**
-     * Same as getCollectionRoutingInfo above, but in addition, causes the placement information for
-     * the namespace to be refreshed. Will only refresh the index information if the collection
-     * uuid from the placement information does not match the collection uuid from the cached index
-     * information.
+     * Blocking method to retrieve refreshed collection placement information (ChunkManager).
      */
-    StatusWith<CollectionRoutingInfo> getCollectionRoutingInfoWithPlacementRefresh(
-        OperationContext* opCtx, const NamespaceString& nss);
+    StatusWith<ChunkManager> getCollectionPlacementInfoWithRefresh(OperationContext* opCtx,
+                                                                   const NamespaceString& nss);
 
     /**
-     * Same as getCollectionRoutingInfo above, but in addition, causes the index information for the
-     * namespace to be refreshed. Will only refresh the placement information if the collection uuid
-     * from the index information does not match the collection uuid from the cached placement
-     * information.
+     * Blocking method to get the refreshed index information for a given collection.
      */
-    StatusWith<CollectionRoutingInfo> getCollectionRoutingInfoWithIndexRefresh(
+    StatusWith<boost::optional<ShardingIndexesCatalogCache>> getCollectionIndexInfoWithRefresh(
         OperationContext* opCtx, const NamespaceString& nss);
 
     /**
@@ -441,23 +435,24 @@ private:
                                                 const DatabaseName& dbName,
                                                 bool allowLocks = false);
 
+    StatusWith<CollectionRoutingInfo> _getCollectionRoutingInfoAt(
+        OperationContext* opCtx,
+        const NamespaceString& nss,
+        boost::optional<Timestamp> optAtClusterTime,
+        bool allowLocks = false);
+
     StatusWith<ChunkManager> _getCollectionPlacementInfoAt(OperationContext* opCtx,
                                                            const NamespaceString& nss,
                                                            boost::optional<Timestamp> atClusterTime,
                                                            bool allowLocks = false);
 
-    boost::optional<ShardingIndexesCatalogCache> _getCollectionIndexInfoAt(
-        OperationContext* opCtx, const NamespaceString& nss, bool allowLocks = false);
+    boost::optional<ShardingIndexesCatalogCache> _getCollectionIndexInfo(OperationContext* opCtx,
+                                                                         const NamespaceString& nss,
+                                                                         bool allowLocks = false);
 
     void _triggerPlacementVersionRefresh(const NamespaceString& nss);
 
     void _triggerIndexVersionRefresh(const NamespaceString& nss);
-
-    // Same as getCollectionRoutingInfo but will fetch the index information from the cache even if
-    // the placement information is not sharded. Used internally when the a refresh is requested for
-    // the index component.
-    StatusWith<CollectionRoutingInfo> _getCollectionRoutingInfoWithoutOptimization(
-        OperationContext* opCtx, const NamespaceString& nss);
 
     StatusWith<CollectionRoutingInfo> _retryUntilConsistentRoutingInfo(
         OperationContext* opCtx,

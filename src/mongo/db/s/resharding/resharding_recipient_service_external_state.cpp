@@ -202,7 +202,7 @@ boost::optional<ShardingIndexesCatalogCache>
 RecipientStateMachineExternalStateImpl::getCollectionIndexInfoWithRefresh(
     OperationContext* opCtx, const NamespaceString& nss) {
     auto catalogCache = Grid::get(opCtx)->catalogCache();
-    return uassertStatusOK(catalogCache->getCollectionRoutingInfoWithIndexRefresh(opCtx, nss)).sii;
+    return uassertStatusOK(catalogCache->getCollectionIndexInfoWithRefresh(opCtx, nss));
 }
 
 void RecipientStateMachineExternalStateImpl::withShardVersionRetry(
