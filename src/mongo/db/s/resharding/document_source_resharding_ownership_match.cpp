@@ -37,6 +37,7 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsontypes.h"
 #include "mongo/db/exec/document_value/document.h"
+#include "mongo/db/feature_flag.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/pipeline/lite_parsed_document_source.h"
 #include "mongo/db/s/resharding/document_source_resharding_ownership_match.h"
@@ -45,6 +46,7 @@
 #include "mongo/s/catalog_cache.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/resharding/common_types_gen.h"
+#include "mongo/s/resharding/resharding_feature_flag_gen.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/intrusive_counter.h"
 #include "mongo/util/str.h"
@@ -63,9 +65,12 @@ boost::intrusive_ptr<DocumentSourceReshardingOwnershipMatch>
 DocumentSourceReshardingOwnershipMatch::create(
     ShardId recipientShardId,
     ShardKeyPattern reshardingKey,
+    boost::optional<NamespaceString> temporaryReshardingNamespace,
     const boost::intrusive_ptr<ExpressionContext>& expCtx) {
-    return new DocumentSourceReshardingOwnershipMatch(
-        std::move(recipientShardId), std::move(reshardingKey), expCtx);
+    return new DocumentSourceReshardingOwnershipMatch(std::move(recipientShardId),
+                                                      std::move(reshardingKey),
+                                                      std::move(temporaryReshardingNamespace),
+                                                      expCtx);
 }
 
 boost::intrusive_ptr<DocumentSourceReshardingOwnershipMatch>
@@ -78,17 +83,21 @@ DocumentSourceReshardingOwnershipMatch::createFromBson(
     auto parsed = DocumentSourceReshardingOwnershipMatchSpec::parse(
         IDLParserContext{"DocumentSourceReshardingOwnershipMatchSpec"}, elem.embeddedObject());
 
-    return new DocumentSourceReshardingOwnershipMatch(
-        parsed.getRecipientShardId(), ShardKeyPattern(parsed.getReshardingKey()), expCtx);
+    return new DocumentSourceReshardingOwnershipMatch(parsed.getRecipientShardId(),
+                                                      ShardKeyPattern(parsed.getReshardingKey()),
+                                                      parsed.getTemporaryReshardingNamespace(),
+                                                      expCtx);
 }
 
 DocumentSourceReshardingOwnershipMatch::DocumentSourceReshardingOwnershipMatch(
     ShardId recipientShardId,
     ShardKeyPattern reshardingKey,
+    boost::optional<NamespaceString> temporaryReshardingNamespace,
     const boost::intrusive_ptr<ExpressionContext>& expCtx)
     : DocumentSource(kStageName, expCtx),
       _recipientShardId{std::move(recipientShardId)},
-      _reshardingKey{std::move(reshardingKey)} {}
+      _reshardingKey{std::move(reshardingKey)},
+      _temporaryReshardingNamespace{std::move(temporaryReshardingNamespace)} {}
 
 StageConstraints DocumentSourceReshardingOwnershipMatch::constraints(
     Pipeline::SplitState pipeState) const {
@@ -104,10 +113,14 @@ StageConstraints DocumentSourceReshardingOwnershipMatch::constraints(
 }
 
 Value DocumentSourceReshardingOwnershipMatch::serialize(const SerializationOptions& opts) const {
-    return Value{Document{{kStageName,
-                           DocumentSourceReshardingOwnershipMatchSpec(
-                               _recipientShardId, _reshardingKey.getKeyPattern())
-                               .toBSON(opts)}}};
+    auto spec = DocumentSourceReshardingOwnershipMatchSpec(_recipientShardId,
+                                                           _reshardingKey.getKeyPattern());
+    // TODO SERVER-92437 ensure this behavior is safe during FCV upgrade/downgrade
+    if (resharding::gFeatureFlagReshardingRelaxedMode.isEnabled(
+            serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
+        spec.setTemporaryReshardingNamespace(_temporaryReshardingNamespace);
+    }
+    return Value{Document{{kStageName, spec.toBSON(opts)}}};
 }
 
 DepsTracker::State DocumentSourceReshardingOwnershipMatch::getDependencies(
@@ -126,14 +139,13 @@ DocumentSource::GetModPathsReturn DocumentSourceReshardingOwnershipMatch::getMod
 
 DocumentSource::GetNextResult DocumentSourceReshardingOwnershipMatch::doGetNext() {
     if (!_tempReshardingChunkMgr) {
-        // TODO: Actually propagate the temporary resharding namespace from the recipient.
-        auto tempReshardingNss =
-            resharding::constructTemporaryReshardingNss(pExpCtx->ns, *pExpCtx->uuid);
-
         auto* catalogCache = Grid::get(pExpCtx->opCtx)->catalogCache();
+        auto tempNss = _temporaryReshardingNamespace
+            ? _temporaryReshardingNamespace.value()
+            : resharding::constructTemporaryReshardingNss(pExpCtx->ns, *pExpCtx->uuid);
         _tempReshardingChunkMgr =
             uassertStatusOK(catalogCache->getTrackedCollectionRoutingInfoWithPlacementRefresh(
-                                pExpCtx->opCtx, tempReshardingNss))
+                                pExpCtx->opCtx, tempNss))
                 .cm;
     }
 

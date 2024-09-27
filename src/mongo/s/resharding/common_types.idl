@@ -338,6 +338,12 @@ structs:
                 type: KeyPattern
                 description: "The index specification document to use as the new shard key."
                 query_shape: custom
+            temporaryReshardingNamespace:
+                type: namespacestring
+                description: "The namespace of the temporary resharding collection that exists on
+                              recipient shards."
+                query_shape: custom
+                optional: true
     ShardKeyRange:
         description: "A struct to represent the key ranges of shards."
         fields:

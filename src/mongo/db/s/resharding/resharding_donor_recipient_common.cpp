@@ -367,6 +367,8 @@ ReshardingRecipientDocument constructRecipientDocumentFromReshardingFields(
 
     recipientDoc.setOplogBatchTaskCount(recipientFields->getOplogBatchTaskCount());
 
+    recipientDoc.setRelaxed(recipientFields->getRelaxed());
+
     return recipientDoc;
 }
 

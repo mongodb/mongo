@@ -65,6 +65,7 @@ public:
     static boost::intrusive_ptr<DocumentSourceReshardingOwnershipMatch> create(
         ShardId recipientShardId,
         ShardKeyPattern reshardingKey,
+        boost::optional<NamespaceString> temporaryReshardingNamespace,
         const boost::intrusive_ptr<ExpressionContext>& expCtx);
 
     static boost::intrusive_ptr<DocumentSourceReshardingOwnershipMatch> createFromBson(
@@ -93,14 +94,17 @@ public:
     }
 
 private:
-    DocumentSourceReshardingOwnershipMatch(ShardId recipientShardId,
-                                           ShardKeyPattern reshardingKey,
-                                           const boost::intrusive_ptr<ExpressionContext>& expCtx);
+    DocumentSourceReshardingOwnershipMatch(
+        ShardId recipientShardId,
+        ShardKeyPattern reshardingKey,
+        boost::optional<NamespaceString> temporaryReshardingNamespace,
+        const boost::intrusive_ptr<ExpressionContext>& expCtx);
 
     DocumentSource::GetNextResult doGetNext() final;
 
     const ShardId _recipientShardId;
     const ShardKeyPattern _reshardingKey;
+    const boost::optional<NamespaceString> _temporaryReshardingNamespace;
 
     // _tempReshardingChunkMgr is used to decide to which recipient shard that documents in the
     // source collection should be routed. It is safe to cache this information for the duration of

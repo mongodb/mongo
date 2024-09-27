@@ -61,3 +61,10 @@ commands:
         description: "The unique identifier for the resharding run."
         optional: true
         type: uuid
+      relaxed:
+        description: >-
+                    "Runs the cloner aggregation without specifying a collection
+                    uuid to avoid errors in a scenario where the collection UUIDs
+                    are inconsistent among shards."
+        type: bool
+        default: false

@@ -52,6 +52,7 @@
 #include "mongo/db/repl/read_concern_args.h"
 #include "mongo/db/repl/read_concern_level.h"
 #include "mongo/db/s/resharding/document_source_resharding_ownership_match.h"
+#include "mongo/db/s/resharding/resharding_util.h"
 #include "mongo/db/session/logical_session_id_helpers.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/shard_key_pattern.h"
@@ -148,9 +149,12 @@ std::vector<BSONObj> buildRawPipelineForCloner(
     rawPipeline.emplace_back(BSON("$sort" << BSON("_id" << 1)));
 
     auto keyPattern = ShardKeyPattern(globalIndexKeyPattern).toBSON();
-    rawPipeline.emplace_back(
-        BSON(DocumentSourceReshardingOwnershipMatch::kStageName
-             << BSON("recipientShardId" << myShardId << "reshardingKey" << keyPattern)));
+    auto tempNss = resharding::constructTemporaryReshardingNss(expCtx->ns, *expCtx->uuid);
+    rawPipeline.emplace_back(BSON(
+        DocumentSourceReshardingOwnershipMatch::kStageName
+        << BSON("recipientShardId"
+                << myShardId << "reshardingKey" << keyPattern << "temporaryReshardingNamespace"
+                << NamespaceStringUtil::serialize(tempNss, SerializationContext::stateDefault()))));
 
     const BSONObj replaceWithExpression =
         BSON("$replaceRoot" << BSON("newRoot" << buildInitialReplaceRootForCloner(

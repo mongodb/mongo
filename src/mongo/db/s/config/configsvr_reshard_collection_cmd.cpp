@@ -310,6 +310,7 @@ public:
                 coordinatorDoc.setImplicitlyCreateIndex(request().getImplicitlyCreateIndex());
                 coordinatorDoc.setRecipientOplogBatchTaskCount(
                     request().getRecipientOplogBatchTaskCount());
+                coordinatorDoc.setRelaxed(request().getRelaxed());
 
                 auto instance = getOrCreateReshardingCoordinator(opCtx, coordinatorDoc);
                 instance->getCoordinatorDocWrittenFuture().get(opCtx);

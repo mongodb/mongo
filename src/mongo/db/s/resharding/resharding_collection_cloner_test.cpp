@@ -147,7 +147,8 @@ protected:
             _sourceUUID,
             recipientShard,
             Timestamp(1, 0), /* dummy value */
-            tempNss);
+            tempNss,
+            false);
 
         getCatalogCacheMock()->setCollectionReturnValue(
             tempNss,

@@ -79,7 +79,8 @@ public:
                                const UUID& sourceUUID,
                                ShardId recipientShard,
                                Timestamp atClusterTime,
-                               NamespaceString outputNss);
+                               NamespaceString outputNss,
+                               bool relaxed);
 
     std::pair<std::vector<BSONObj>, boost::intrusive_ptr<ExpressionContext>> makeRawPipeline(
         OperationContext* opCtx,
@@ -153,6 +154,7 @@ private:
     const ShardId _recipientShard;
     const Timestamp _atClusterTime;
     const NamespaceString _outputNss;
+    const bool _relaxed;
 };
 
 }  // namespace mongo

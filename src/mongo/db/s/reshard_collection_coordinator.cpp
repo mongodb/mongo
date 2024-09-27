@@ -152,6 +152,14 @@ ExecutorFuture<void> ReshardCollectionCoordinator::_runImpl(
             configsvrReshardCollection.setRecipientOplogBatchTaskCount(
                 _doc.getRecipientOplogBatchTaskCount());
 
+            // TODO SERVER-92437 ensure this behavior is safe during FCV upgrade/downgrade
+            if (!resharding::gFeatureFlagReshardingRelaxedMode.isEnabled(
+                    serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
+                uassert(ErrorCodes::InvalidOptions,
+                        "Relaxed mode is not enabled, reject relaxed parameter",
+                        !_doc.getRelaxed().has_value());
+            }
+
             if (!resharding::gFeatureFlagReshardingImprovements.isEnabled(
                     serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
                 uassert(
@@ -185,6 +193,7 @@ ExecutorFuture<void> ReshardCollectionCoordinator::_runImpl(
                             _doc.getProvenance().get() == ProvenanceEnum::kReshardCollection);
             }
 
+            configsvrReshardCollection.setRelaxed(_doc.getRelaxed());
             configsvrReshardCollection.setShardDistribution(_doc.getShardDistribution());
             configsvrReshardCollection.setForceRedistribution(_doc.getForceRedistribution());
             configsvrReshardCollection.setReshardingUUID(_doc.getReshardingUUID());

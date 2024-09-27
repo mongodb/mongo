@@ -164,7 +164,8 @@ public:
         Timestamp cloneTimestamp,
         bool cloningDone,
         ShardId myShardId,
-        ChunkManager sourceChunkMgr);
+        ChunkManager sourceChunkMgr,
+        bool relaxed);
 
     // The TrustedInitTag being a private class makes this constructor effectively private. However,
     // it needs to technically be a public constructor for std::make_unique to be able to call it.
@@ -217,7 +218,8 @@ private:
         ReshardingMetrics* metrics,
         const CommonReshardingMetadata& metadata,
         const ShardId& myShardId,
-        Timestamp cloneTimestamp);
+        Timestamp cloneTimestamp,
+        bool relaxed);
 
     static std::vector<std::unique_ptr<ReshardingTxnCloner>> _makeTxnCloners(
         const CommonReshardingMetadata& metadata,

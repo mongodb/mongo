@@ -65,3 +65,9 @@ feature_flags:
         cpp_varname: gFeatureFlagReshardingSpuriousDuplicateKeyErrors
         default: false
         shouldBeFCVGated: true
+    featureFlagRelaxedMode:
+        description: "Feature flag for implmenting relaxed resharding mode."
+        cpp_varname: gFeatureFlagReshardingRelaxedMode
+        default: true
+        version: 8.1
+        shouldBeFCVGated: true

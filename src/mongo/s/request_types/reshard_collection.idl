@@ -91,6 +91,12 @@ commands:
         description: "Whether to create an index on the shard key pattern if the shard key
                       does not already have a support index."
         default: true
+      relaxed:
+        type: optionalBool
+        description: >-
+          "Runs the cloner aggregation without specifying a collection
+          uuid to avoid errors in a scenario where the collection UUIDs
+          are inconsistent among shards."
 
   _configsvrReshardCollection:
     command_name: _configsvrReshardCollection
@@ -156,6 +162,12 @@ commands:
           "The number of subtasks to divide a single oplog batch into, so that it may be applied
           concurrently by multiple threads on the recipient."
         optional: true
+      relaxed:
+        type: optionalBool
+        description: >-
+          "Runs the cloner aggregation without specifying a collection
+          uuid to avoid errors in a scenario where the collection UUIDs
+          are inconsistent among shards."
 
 
   moveCollection:

@@ -86,6 +86,12 @@ structs:
                     "The number of subtasks to divide a single oplog batch into,
                     so that it may be applied concurrently by multiple threads."
                 optional: true
+            relaxed:
+                type: optionalBool
+                description: >-
+                    "Runs the cloner aggregation without specifying a collection
+                    uuid to avoid errors in a scenario where the collection UUIDs
+                    are inconsistent among shards."
 
     TypeCollectionReshardingFields:
         description: "Resharding-related fields meant to be stored in a config.collections

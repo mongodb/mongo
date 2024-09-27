@@ -96,6 +96,21 @@ void emplaceCloneTimestampIfExists(ClassWithCloneTimestamp& c,
     c.setCloneTimestamp(*cloneTimestamp);
 }
 
+template <typename ClassWithRelaxed>
+void emplaceRelaxedIfExists(ClassWithRelaxed& c, OptionalBool relaxed) {
+    if (!relaxed.has_value()) {
+        return;
+    }
+
+    if (auto alreadyExistingRelaxed = c.getRelaxed()) {
+        uassert(ErrorCodes::BadValue,
+                "Existing and new values for relaxed are expected to be equal.",
+                relaxed == alreadyExistingRelaxed);
+    }
+
+    c.setRelaxed(relaxed);
+}
+
 template <typename ClassWithOplogBatchTaskCount>
 void emplaceOplogBatchTaskCountIfExists(ClassWithOplogBatchTaskCount& c,
                                         boost::optional<std::int64_t> oplogBatchTaskCount) {

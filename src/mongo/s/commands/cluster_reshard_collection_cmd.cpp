@@ -120,6 +120,7 @@ public:
             reshardCollectionRequest.setShardDistribution(request().getShardDistribution());
             reshardCollectionRequest.setForceRedistribution(request().getForceRedistribution());
             reshardCollectionRequest.setReshardingUUID(request().getReshardingUUID());
+            reshardCollectionRequest.setRelaxed(request().getRelaxed());
             if (resharding::gFeatureFlagMoveCollection.isEnabled(
                     serverGlobalParams.featureCompatibility.acquireFCVSnapshot()) ||
                 resharding::gFeatureFlagUnshardCollection.isEnabled(

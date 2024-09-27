@@ -113,3 +113,9 @@ structs:
                     "The number of subtasks to divide a single oplog batch into,
                     so that it may be applied concurrently by multiple threads."
                 optional: true
+            relaxed:
+                type: optionalBool
+                description: >-
+                    "Runs the cloner aggregation without specifying a collection
+                    UUID to avoid errors in a scenario where the collection UUIDs
+                    are inconsistent among shards."

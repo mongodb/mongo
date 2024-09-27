@@ -339,6 +339,7 @@ private:
     const CommonReshardingMetadata _metadata;
     const Milliseconds _minimumOperationDuration;
     const boost::optional<std::size_t> _oplogBatchTaskCount;
+    const OptionalBool _relaxed;
 
     // The in-memory representation of the mutable portion of the document in
     // config.localReshardingOperations.recipient.

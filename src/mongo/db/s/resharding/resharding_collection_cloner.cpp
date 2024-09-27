@@ -127,7 +127,8 @@ ReshardingCollectionCloner::ReshardingCollectionCloner(ReshardingMetrics* metric
                                                        const UUID& sourceUUID,
                                                        ShardId recipientShard,
                                                        Timestamp atClusterTime,
-                                                       NamespaceString outputNss)
+                                                       NamespaceString outputNss,
+                                                       bool relaxed)
     : _metrics(metrics),
       _reshardingUUID(reshardingUUID),
       _newShardKeyPattern(std::move(newShardKeyPattern)),
@@ -135,7 +136,8 @@ ReshardingCollectionCloner::ReshardingCollectionCloner(ReshardingMetrics* metric
       _sourceUUID(sourceUUID),
       _recipientShard(std::move(recipientShard)),
       _atClusterTime(atClusterTime),
-      _outputNss(std::move(outputNss)) {}
+      _outputNss(std::move(outputNss)),
+      _relaxed(std::move(relaxed)) {}
 
 std::pair<std::vector<BSONObj>, boost::intrusive_ptr<ExpressionContext>>
 ReshardingCollectionCloner::makeRawPipeline(
@@ -190,9 +192,12 @@ ReshardingCollectionCloner::makeRawPipeline(
     }
 
     auto keyPattern = ShardKeyPattern(_newShardKeyPattern.getKeyPattern()).toBSON();
-    rawPipeline.emplace_back(
-        BSON(DocumentSourceReshardingOwnershipMatch::kStageName
-             << BSON("recipientShardId" << _recipientShard << "reshardingKey" << keyPattern)));
+    rawPipeline.emplace_back(BSON(
+        DocumentSourceReshardingOwnershipMatch::kStageName
+        << BSON("recipientShardId"
+                << _recipientShard << "reshardingKey" << keyPattern
+                << "temporaryReshardingNamespace"
+                << NamespaceStringUtil::serialize(tempNss, SerializationContext::stateDefault()))));
 
     // We use $arrayToObject to synthesize the $sortKeys needed by the AsyncResultsMerger to
     // merge the results from all of the donor shards by {_id: 1}. This expression wouldn't
@@ -241,9 +246,12 @@ ReshardingCollectionCloner::makeRawNaturalOrderPipeline(
     std::vector<BSONObj> rawPipeline;
 
     auto keyPattern = ShardKeyPattern(_newShardKeyPattern.getKeyPattern()).toBSON();
-    rawPipeline.emplace_back(
-        BSON(DocumentSourceReshardingOwnershipMatch::kStageName
-             << BSON("recipientShardId" << _recipientShard << "reshardingKey" << keyPattern)));
+    rawPipeline.emplace_back(BSON(
+        DocumentSourceReshardingOwnershipMatch::kStageName
+        << BSON("recipientShardId"
+                << _recipientShard << "reshardingKey" << keyPattern
+                << "temporaryReshardingNamespace"
+                << NamespaceStringUtil::serialize(tempNss, SerializationContext::stateDefault()))));
 
     return std::make_pair(std::move(rawPipeline), std::move(expCtx));
 }
@@ -262,8 +270,11 @@ std::unique_ptr<Pipeline, PipelineDeleter> ReshardingCollectionCloner::_targetAg
     }
 
     AggregateCommandRequest request(_sourceNss, rawPipeline);
-    request.setCollectionUUID(_sourceUUID);
-
+    // If running in "relaxed" mode, do not set CollectionUUID to prevent NamespaceNotFound or
+    // CollectionUUIDMismatch errors.
+    if (!_relaxed) {
+        request.setCollectionUUID(_sourceUUID);
+    }
     auto hint = collectionHasSimpleCollation(opCtx, _sourceNss)
         ? boost::optional<BSONObj>{BSON("_id" << 1)}
         : boost::none;
@@ -606,7 +617,12 @@ ReshardingCollectionCloner::_queryOnceWithNaturalOrder(
     }
 
     auto request = AggregateCommandRequest(expCtx->ns, rawPipeline);
-    request.setCollectionUUID(_sourceUUID);
+    // If running in "relaxed" mode, do not set CollectionUUID to prevent NamespaceNotFound or
+    // CollectionUUIDMismatch errors.
+    if (!_relaxed) {
+        request.setCollectionUUID(_sourceUUID);
+    }
+
     // In the case of a single-shard command, dispatchShardPipeline uses the passed-in batch
     // size instead of 0.  The ReshardingCloneFetcher does not handle cursors with a populated
     // first batch nor a cursor already complete (id 0), so avoid that by setting the batch size

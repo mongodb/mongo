@@ -427,6 +427,12 @@ structs:
                     gte: 1
                     lte: 256
                 optional: true
+            relaxed:
+                type: optionalBool
+                description: >-
+                    "Runs the cloner aggregation without specifying a collection
+                    uuid to avoid errors in a scenario where the collection UUIDs
+                    are inconsistent among shards."
 
     SetAllowMigrationsRequest:
         description: "Parameters sent for the set allow migrations command"

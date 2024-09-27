@@ -386,7 +386,7 @@ TypeCollectionRecipientFields constructRecipientFields(
         recipientFields, coordinatorDoc.getReshardingApproxCopySizeStruct());
     resharding::emplaceOplogBatchTaskCountIfExists(
         recipientFields, coordinatorDoc.getRecipientOplogBatchTaskCount());
-
+    resharding::emplaceRelaxedIfExists(recipientFields, coordinatorDoc.getRelaxed());
     return recipientFields;
 }
 

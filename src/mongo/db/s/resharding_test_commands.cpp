@@ -130,7 +130,8 @@ public:
                                               request().getUuid(),
                                               request().getShardId(),
                                               request().getAtClusterTime(),
-                                              request().getOutputNs());
+                                              request().getOutputNs(),
+                                              request().getRelaxed());
 
             std::shared_ptr<ThreadPool> cancelableOperationContextPool = [] {
                 ThreadPool::Options options;
