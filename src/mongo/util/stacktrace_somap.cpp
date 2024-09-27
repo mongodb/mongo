@@ -30,6 +30,7 @@
 #include <cstdint>
 #include <cstdlib>
 #include <cstring>
+#include <filesystem>
 #include <fmt/format.h>
 #include <string>
 #include <utility>
@@ -206,27 +207,56 @@ void processLoadSegment(const dl_phdr_info& info, const ElfW(Phdr) & phdr, BSONO
 }
 
 /**
+ * Reads the name of the running binary from /proc/self/exe, and returns it.
+ * Logs a warning and returns an empty string if anything goes wrong.
+ */
+std::string readProcSelfExe() {
+    constexpr auto exePath = "/proc/self/exe";
+    std::error_code ec;
+    auto resolvedPath = std::filesystem::read_symlink(exePath, ec);
+    if (ec) {
+        LOGV2_WARNING(9450300,
+                      "Failed to read symlink",
+                      "path"_attr = exePath,
+                      "error"_attr = errorMessage(ec));
+        return {};
+    }
+    return resolvedPath;
+}
+
+/**
  * Callback that processes an ELF object linked into the current address space.
  *
  * Used by dl_iterate_phdr in ExtractSOMap, below, to build up the list of linked
  * objects.
  *
- * Each entry built by an invocation of ths function may have the following fields:
+ * Each entry built by an invocation of this function may have the following fields:
  * * "b", the base address at which an object is loaded.
  * * "path", the path on the file system to the object.
  * * "buildId", the GNU Build ID of the object.
  * * "elfType", the ELF type of the object, typically 2 or 3 (executable or SO).
  *
  * At post-processing time, the buildId field can be used to identify the file containing
- * debug symbols for objects loaded at the given "laodAddr", which in turn can be used with
+ * debug symbols for objects loaded at the given "loadAddr", which in turn can be used with
  * the "backtrace" displayed in printStackTrace to get detailed unwind information.
  */
 int outputSOInfo(dl_phdr_info* info, size_t sz, void* data) {
-    BSONObjBuilder soInfo(reinterpret_cast<BSONArrayBuilder*>(data)->subobjStart());
+    auto arrayBuilder = reinterpret_cast<BSONArrayBuilder*>(data);
+    const auto arrayIndex = arrayBuilder->arrSize();
+    BSONObjBuilder soInfo(arrayBuilder->subobjStart());
     if (info->dlpi_addr)
         soInfo.append("b", unsignedHex(ElfW(Addr)(info->dlpi_addr)));
-    if (info->dlpi_name && *info->dlpi_name)
-        soInfo.append("path", info->dlpi_name);
+    const auto path = [&]() -> std::string {
+        if (info->dlpi_name && *info->dlpi_name) {
+            return info->dlpi_name;
+        }
+        if (arrayIndex == 0) {  // Main binary is always index 0.
+            return readProcSelfExe();
+        }
+        return {};
+    }();
+    if (!path.empty())
+        soInfo.append("path", path);
 
     for (ElfW(Half) i = 0; i < info->dlpi_phnum; ++i) {
         const ElfW(Phdr) & phdr(info->dlpi_phdr[i]);

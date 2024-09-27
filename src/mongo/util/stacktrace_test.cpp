@@ -224,9 +224,13 @@ TEST(StackTrace, PosixFormat) {
         auto soObj = so.Obj();
         SoMapEntry ent{};
         ent.base = fromHex(soObj["b"].String());
-        if (soObj.hasField("path")) {
-            ent.path = soObj["path"].String();
-        }
+        ASSERT_TRUE(soObj.hasField("path"))
+            << "no path for entry with base address " << soObj["b"].String();
+        ent.path = soObj["path"].String();
+        ASSERT_FALSE(ent.path.empty());
+        ASSERT_TRUE(soMap.find(ent.base) == soMap.end())
+            << "Duplicate entry for base address " << soObj["b"].String() << " found both "
+            << ent.path << " and " << soMap[ent.base].path;
         soMap[ent.base] = ent;
     }
 

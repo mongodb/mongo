@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 """Script and library for symbolizing MongoDB stack traces.
 
 To use as a script, paste the JSON object on the line after ----- BEGIN BACKTRACE ----- into the
@@ -701,7 +702,7 @@ def make_argument_parser(parser=None, **kwargs):
     # to enable it after completing the implementation
 
     # Look for symbols in the cwd by default.
-    parser.add_argument("path_to_executable", nargs="?")
+    parser.add_argument("path_to_executable", nargs="?", default="")
     return parser
 
 
