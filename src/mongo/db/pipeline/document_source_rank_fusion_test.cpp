@@ -96,9 +96,7 @@ TEST_F(DocumentSourceRankFusionTest, ErrorsIfMissingPipeline) {
     auto spec = fromjson(R"({
         $rankFusion: {
             inputs: [
-                {
-                    rankConstant: 5
-                }
+                {}
             ]
         }
     })");
@@ -146,31 +144,6 @@ TEST_F(DocumentSourceRankFusionTest, ErrorsIfUnknownFieldInsideInputs) {
                        ErrorCodes::IDLUnknownField);
 }
 
-TEST_F(DocumentSourceRankFusionTest, ErrorsIfRankConstantIsNotInt) {
-    auto spec = fromjson(R"({
-        $rankFusion: {
-            inputs: [
-               {
-                pipeline: [
-                    { $match : { author : "Agatha Christie" } },
-                    { $sort: {author: 1} }
-                ],
-                rankConstant: 1.5
-               },
-               {
-                pipeline: [
-                    { $match : { author : "Agatha Christie" } },
-                    { $sort: {author: 1} }
-                ]
-               }
-            ]
-        }
-    })");
-
-    ASSERT_THROWS_CODE(DocumentSourceRankFusion::createFromBson(spec.firstElement(), getExpCtx()),
-                       AssertionException,
-                       ErrorCodes::TypeMismatch);
-}
 
 TEST_F(DocumentSourceRankFusionTest, ErrorsIfAsIsNotString) {
     auto spec = fromjson(R"({
@@ -231,7 +204,6 @@ TEST_F(DocumentSourceRankFusionTest, CheckMultiplePipelinesAndOptionalArgumentsA
                     { $match : { author : "Agatha Christie" } },
                     { $sort: {author: 1} }
                 ],
-                rankConstant: 2,
                 as: "matchAuthor"
                },
                {
@@ -246,7 +218,6 @@ TEST_F(DocumentSourceRankFusionTest, CheckMultiplePipelinesAndOptionalArgumentsA
                         }
                     }
                 ],
-                rankConstant: 2,
                 as: "matchGenres"
                },
                {
@@ -261,7 +232,6 @@ TEST_F(DocumentSourceRankFusionTest, CheckMultiplePipelinesAndOptionalArgumentsA
                         }
                     }
                 ],
-                rankConstant: 2,
                 as: "matchPlot"
                }
             ]
@@ -281,7 +251,6 @@ TEST_F(DocumentSourceRankFusionTest, ErrorsIfSearchMetaUsed) {
                     { $match : { author : "Agatha Christie" } },
                     { $sort: {author: 1} }
                 ],
-                rankConstant: 2,
                 as: "matchAuthor"
                },
                {
@@ -297,7 +266,6 @@ TEST_F(DocumentSourceRankFusionTest, ErrorsIfSearchMetaUsed) {
                     },
                     { $sort: {genres: 1} }
                 ],
-                rankConstant: 2,
                 as: "matchGenres"
                }
             ]
@@ -318,7 +286,6 @@ TEST_F(DocumentSourceRankFusionTest, ErrorsIfSearchStoredSourceUsed) {
                     { $match : { author : "Agatha Christie" } },
                     { $sort: {author: 1} }
                 ],
-                rankConstant: 2,
                 as: "matchAuthor"
                },
                {
@@ -335,7 +302,6 @@ TEST_F(DocumentSourceRankFusionTest, ErrorsIfSearchStoredSourceUsed) {
                     },
                     { $sort: {genres: 1} }
                 ],
-                rankConstant: 2,
                 as: "matchGenres"
                }
             ]
@@ -356,7 +322,6 @@ TEST_F(DocumentSourceRankFusionTest, ErrorsIfInternalSearchMongotRemoteUsed) {
                     { $match : { author : "Agatha Christie" } },
                     { $sort: {author: 1} }
                 ],
-                rankConstant: 2,
                 as: "matchAuthor"
                },
                {
@@ -372,7 +337,6 @@ TEST_F(DocumentSourceRankFusionTest, ErrorsIfInternalSearchMongotRemoteUsed) {
                     },
                     { $sort: {genres: 1} }
                 ],
-                rankConstant: 2,
                 as: "matchGenres"
                }
             ]

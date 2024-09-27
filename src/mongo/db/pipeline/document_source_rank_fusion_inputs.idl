@@ -39,11 +39,6 @@ structs:
         description: Ranked pipeline operating on the same collection.
         type: pipeline
         optional: false
-      rankConstant:
-        description: The rankConstant penalty to give to this input pipeline. The higher the penalty, 
-                     the less weight the results of that pipeline have. 
-        type: int
-        default: 1
       as:
         description: The name to associate with this pipeline in 'scoreDetails'.
         type: string

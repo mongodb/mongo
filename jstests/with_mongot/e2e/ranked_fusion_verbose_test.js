@@ -26,8 +26,9 @@ coll.createSearchIndex(getVectorSearchIndexSpec());
 const limit = 20;
 // Multiplication factor of limit for numCandidates in $vectorSearch.
 const vectorSearchOverrequestFactor = 10;
+const kRankConstant = 60;
 
-function getSearchPipeline(fullTextSearchConstant) {
+function getSearchPipeline() {
     let searchPipeline = [
         {
             $search: {
@@ -41,7 +42,7 @@ function getSearchPipeline(fullTextSearchConstant) {
         {
             $addFields: {
                 // RRF: 1 divided by rank + full text search rank constant.
-                fts_score: {$divide: [1.0, {$add: ["$fts_rank", fullTextSearchConstant]}]}
+                fts_score: {$divide: [1.0, {$add: ["$fts_rank", kRankConstant]}]}
             }
         },
         {
@@ -58,7 +59,7 @@ function getSearchPipeline(fullTextSearchConstant) {
     return searchPipeline;
 }
 
-function getVectorSearchPipeline(vectorSearchConstant) {
+function getVectorSearchPipeline() {
     let vectorSearchPipeline = [
         {
             $vectorSearch: {
@@ -80,7 +81,7 @@ function getVectorSearchPipeline(vectorSearchConstant) {
                         {
                             $add: [
                                 "$vs_rank",
-                                vectorSearchConstant
+                                kRankConstant
                             ]  // RRF: 1 divided by rank + vector search constant
                         }
                     ]
@@ -133,19 +134,18 @@ let hybridSearchProcessingPipeline = [
 // Perform a hybrid search with a $vectorSearch on plot_embedding for the plot_embedding of
 // and a 'Tarzan the Ape Man' $search on fullplot and title for the keyword "ape"
 // Note: In rank fusion a higher rank constant will result in downplaying those results.
-function runTest(vectorSearchConstant, fullTextSearchConstant, expectedResultIds) {
+function runTest(expectedResultIds) {
     let unionWithSearch = [
         {
             $unionWith: {
                 coll: collName,
-                pipeline: getSearchPipeline(fullTextSearchConstant),
+                pipeline: getSearchPipeline(),
             }
         },
 
     ];
-    let hybridSearchQuery = getVectorSearchPipeline(vectorSearchConstant)
-                                .concat(unionWithSearch)
-                                .concat(hybridSearchProcessingPipeline);
+    let hybridSearchQuery =
+        getVectorSearchPipeline().concat(unionWithSearch).concat(hybridSearchProcessingPipeline);
     let results = coll.aggregate(hybridSearchQuery).toArray();
 
     assertDocArrExpectedFuzzy(buildExpectedResults(expectedResultIds), results);
@@ -154,35 +154,21 @@ function runTest(vectorSearchConstant, fullTextSearchConstant, expectedResultIds
 // Perform a hybrid search with $search on fullplot and title for the keyword "ape"
 // and a $vectorSearch on plot_embedding for the plot_embedding of 'Tarzan the Ape Man'.
 // Note: In rank fusion a higher rank constant will result in downplaying those results.
-function runTestFlipped(vectorSearchConstant, fullTextSearchConstant, expectedResultIds) {
+function runTestFlipped(expectedResultIds) {
     let unionWithVectorSearch = [{
         $unionWith: {
             coll: collName,
-            pipeline: getVectorSearchPipeline(vectorSearchConstant),
+            pipeline: getVectorSearchPipeline(),
         }
     }];
-    let hybridSearchQuery = getSearchPipeline(fullTextSearchConstant)
-                                .concat(unionWithVectorSearch)
-                                .concat(hybridSearchProcessingPipeline);
+    let hybridSearchQuery =
+        getSearchPipeline().concat(unionWithVectorSearch).concat(hybridSearchProcessingPipeline);
     let results = coll.aggregate(hybridSearchQuery).toArray();
 
     assert.eq(results, buildExpectedResults(expectedResultIds));
 }
 
-// The default rank constants for reciprocal rank fusion is 1.
-runTest(/*vectorSearchConstant*/ 1,
-        /*fullTextSearchConstant*/ 1,
-        /*expectedResultIds*/[6, 4, 1, 2, 3, 8, 5, 9, 10, 12, 13, 14, 11, 7, 15]);
+const expectedResultIdOrder = [6, 4, 1, 5, 2, 3, 8, 9, 10, 12, 13, 14, 11, 7, 15];
+runTest(expectedResultIdOrder);
 
-runTestFlipped(/*vectorSearchConstant*/ 1,
-               /*fullTextSearchConstant*/ 1,
-               /*expectedResultIds*/[6, 4, 1, 2, 3, 8, 5, 9, 10, 12, 13, 14, 11, 7, 15]);
-
-// Customize the rank constants to penalize full text search.
-runTest(/*vectorSearchConstant*/ 2,
-        /*fullTextSearchConstant*/ 5,
-        /*expectedResultIds*/[6, 4, 1, 8, 2, 5, 3, 9, 10, 12, 13, 14, 11, 7, 15]);
-
-runTestFlipped(/*vectorSearchConstant*/ 2,
-               /*fullTextSearchConstant*/ 5,
-               /*expectedResultIds*/[6, 4, 1, 8, 2, 5, 3, 9, 10, 12, 13, 14, 11, 7, 15]);
+runTestFlipped(expectedResultIdOrder);
