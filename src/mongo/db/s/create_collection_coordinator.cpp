@@ -1293,11 +1293,9 @@ void commit(OperationContext* opCtx,
             std::function<OperationSessionInfo(OperationContext*)> newSessionBuilder) {
     LOGV2_DEBUG(5277906, 2, "Create collection commit", logAttrs(nss));
 
-    // Never track as unsplittable system.session.
-    // It is expected for create("config.system.session") to create the collection locally.
-    // TODO SERVER-83924 this should never happen as
-    // checkIfCollectionAlreadyExistsWithSameOptions should early exit. Remove this check once
-    // the issue is fixed
+    // Never track the `system.session` collection as unsplittable . Note that this code will be
+    // reached only when a CSRS is designated as a coordinator. The CSRS is not capable of early
+    // exit because the `system.session` collection won't be found locally.
     if (nss == NamespaceString::kLogicalSessionsNamespace && isUnsplittable(request)) {
         return;
     }

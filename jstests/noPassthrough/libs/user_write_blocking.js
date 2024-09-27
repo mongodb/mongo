@@ -321,15 +321,6 @@ export const UserWriteBlockHelpers = (function() {
                                   .featureCompatibilityVersion.version;
             assert.eq(actualFCV, expectedFCV);
         }
-
-        // TODO (SERVER-83924) Remove once feature flag checks are not necessary.
-        checkFailPointEnabled(failpointName) {
-            const primary = this.st.rs0.getPrimary();
-            return authutil.asCluster(
-                primary,
-                keyfile,
-                () => FeatureFlagUtil.isPresentAndEnabled(primary, failpointName));
-        }
     }
 
     return {
