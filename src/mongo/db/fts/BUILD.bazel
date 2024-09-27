@@ -109,3 +109,14 @@ mongo_cc_library(
         "//src/mongo/util:md5",
     ],
 )
+
+mongo_cc_library(
+    name = "ftsmongod",
+    srcs = [
+        "ftsmongod.cpp",
+    ],
+    deps = [
+        ":base_fts",
+        "//src/mongo:base",
+    ],
+)

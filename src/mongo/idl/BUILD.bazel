@@ -154,3 +154,19 @@ mongo_cc_library(
         "//src/mongo:base",
     ],
 )
+
+mongo_cc_library(
+    name = "cluster_parameter_synchronization_helpers",
+    srcs = [
+        "cluster_parameter_synchronization_helpers.cpp",
+    ],
+    hdrs = [
+        "cluster_parameter_synchronization_helpers.h",
+    ],
+    deps = [
+        "//src/mongo/db:audit",
+        "//src/mongo/db:server_base",
+        "//src/mongo/db:shard_role",
+        "//src/mongo/db/catalog:collection_catalog",
+    ],
+)

@@ -37,3 +37,32 @@ idl_generator(
         "//src/mongo/db/repl:replication_types_gen",
     ],
 )
+
+mongo_cc_library(
+    name = "transaction_api",
+    srcs = [
+        "internal_transaction_metrics.cpp",
+        "transaction_api.cpp",
+    ],
+    hdrs = [
+        "internal_transaction_metrics.h",
+        "transaction_api.h",
+    ],
+    deps = [
+        "//src/mongo/db:operation_time_tracker",
+        "//src/mongo/db:service_context",
+        "//src/mongo/db:shard_role_api",
+        "//src/mongo/db:shared_request_handling",
+        "//src/mongo/db/auth",
+        "//src/mongo/db/query:command_request_response",
+        "//src/mongo/db/query:query_request",
+        "//src/mongo/db/repl:repl_coordinator_interface",
+        "//src/mongo/db/session:logical_session_id",
+        "//src/mongo/db/session:logical_session_id_helpers",
+        "//src/mongo/db/session:session_catalog",
+        "//src/mongo/executor:inline_executor",
+        "//src/mongo/executor:task_executor_interface",
+        "//src/mongo/rpc",
+        "//src/mongo/rpc:command_status",
+    ],
+)

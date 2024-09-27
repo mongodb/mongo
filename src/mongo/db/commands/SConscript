@@ -153,46 +153,6 @@ env.Library(
     ],
 )
 
-env.Library(
-    target="mongod_fsync",
-    source=[
-        "fsync.cpp",
-        "fsync_gen.cpp",
-    ],
-    LIBDEPS_PRIVATE=[
-        "$BUILD_DIR/mongo/db/auth/auth",
-        "$BUILD_DIR/mongo/db/auth/authprivilege",
-        "$BUILD_DIR/mongo/db/commands",
-        "$BUILD_DIR/mongo/db/concurrency/exception_util",
-        "$BUILD_DIR/mongo/db/concurrency/lock_manager",
-        "$BUILD_DIR/mongo/db/dbdirectclient",
-        "$BUILD_DIR/mongo/db/query/query_stats/query_stats",
-        "$BUILD_DIR/mongo/db/storage/backup_cursor_hooks",
-        "$BUILD_DIR/mongo/util/background_job",
-        "$BUILD_DIR/mongo/util/concurrency/spin_lock",
-        "fsync_locked",
-    ],
-)
-
-env.Library(
-    target="mongod_fcv",
-    source=[
-        "feature_compatibility_version.cpp",
-        "feature_compatibility_version_gen.cpp",
-    ],
-    LIBDEPS_PRIVATE=[
-        "$BUILD_DIR/mongo/db/catalog/collection_options",
-        "$BUILD_DIR/mongo/db/commands",
-        "$BUILD_DIR/mongo/db/dbdirectclient",
-        "$BUILD_DIR/mongo/db/repl/repl_coordinator_interface",
-        "$BUILD_DIR/mongo/db/repl/repl_server_parameters",
-        "$BUILD_DIR/mongo/db/repl/repl_settings",
-        "$BUILD_DIR/mongo/db/server_base",
-        "$BUILD_DIR/mongo/db/shard_role",
-        "$BUILD_DIR/mongo/db/storage/storage_options",
-    ],
-)
-
 # Commands that are present in both mongod and embedded
 env.Library(
     target="standalone",
@@ -341,18 +301,6 @@ env.Library(
         "$BUILD_DIR/mongo/db/shard_role",
         "$BUILD_DIR/mongo/util/system_perf",
         "test_commands_enabled",
-    ],
-)
-
-env.Library(
-    target="set_index_commit_quorum_idl",
-    source=[
-        "set_index_commit_quorum_gen.cpp",
-    ],
-    LIBDEPS_PRIVATE=[
-        "$BUILD_DIR/mongo/db/catalog/commit_quorum_options",
-        "$BUILD_DIR/mongo/db/rw_concern_d",
-        "$BUILD_DIR/mongo/idl/idl_parser",
     ],
 )
 
@@ -530,47 +478,6 @@ env.Library(
         "$BUILD_DIR/mongo/db/operation_killer",
         "$BUILD_DIR/mongo/db/query/command_request_response",
         "kill_operations_idl",
-    ],
-)
-
-env.Library(
-    target="profile_common",
-    source=[
-        "profile_common.cpp",
-        "profile_gen.cpp",
-        "$BUILD_DIR/mongo/db/profile_filter_impl.cpp",
-        "set_profiling_filter_globally_cmd.cpp",
-    ],
-    LIBDEPS=[
-        "$BUILD_DIR/mongo/db/commands",
-    ],
-    LIBDEPS_PRIVATE=[
-        "$BUILD_DIR/mongo/db/auth/auth",
-        "$BUILD_DIR/mongo/db/auth/authprivilege",
-        "$BUILD_DIR/mongo/db/profile_settings",
-        "$BUILD_DIR/mongo/db/query/query_stats/query_stats",
-        "$BUILD_DIR/mongo/db/query_expressions",
-        "$BUILD_DIR/mongo/db/server_base",
-        "$BUILD_DIR/mongo/db/shard_role_api",
-    ],
-)
-
-env.Library(
-    target="tenant_migration_cmds_request",
-    source=[
-        "tenant_migration_donor_cmds_gen.cpp",
-        "tenant_migration_recipient_cmds_gen.cpp",
-    ],
-    LIBDEPS=[
-        "$BUILD_DIR/mongo/base",
-        "$BUILD_DIR/mongo/client/connection_string",
-        "$BUILD_DIR/mongo/client/read_preference",
-        "$BUILD_DIR/mongo/db/repl/repl_coordinator_interface",
-        "$BUILD_DIR/mongo/db/repl/repl_server_parameters",
-        "$BUILD_DIR/mongo/db/repl/tenant_migration_state_machine_idl",
-        "$BUILD_DIR/mongo/db/server_base",
-        "$BUILD_DIR/mongo/db/serverless/serverless_types_idl",
-        "$BUILD_DIR/mongo/idl/idl_parser",
     ],
 )
 

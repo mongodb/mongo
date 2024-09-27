@@ -361,17 +361,6 @@ env.Benchmark(
     LIBDEPS=[],
 )
 
-if env.TargetOSIs("windows"):
-    env.Library(
-        target="perfctr_collect",
-        source=[
-            "perfctr_collect.cpp",
-        ],
-        LIBDEPS=[
-            "$BUILD_DIR/mongo/base",
-        ],
-    )
-
 icuEnv = env.Clone()
 
 if not use_system_version_of_library("icu"):

@@ -140,20 +140,6 @@ env.Library(
     ],
 )
 
-env.Library(
-    target="user_write_block_mode_op_observer",
-    source=[
-        "user_write_block_mode_op_observer.cpp",
-    ],
-    LIBDEPS=[
-        "op_observer",
-    ],
-    LIBDEPS_PRIVATE=[
-        "$BUILD_DIR/mongo/db/s/user_writes_recoverable_critical_section",
-        "$BUILD_DIR/mongo/db/shard_role_api",
-    ],
-)
-
 env.CppUnitTest(
     target="db_op_observer_test",
     source=[

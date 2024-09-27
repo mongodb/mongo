@@ -51,31 +51,6 @@ env.Library(
     ],
 )
 
-env.Library(
-    target="transaction_api",
-    source=[
-        "internal_transaction_metrics.cpp",
-        "transaction_api.cpp",
-    ],
-    LIBDEPS_PRIVATE=[
-        "$BUILD_DIR/mongo/db/auth/auth",
-        "$BUILD_DIR/mongo/db/operation_time_tracker",
-        "$BUILD_DIR/mongo/db/query/command_request_response",
-        "$BUILD_DIR/mongo/db/query/query_request",
-        "$BUILD_DIR/mongo/db/repl/repl_coordinator_interface",
-        "$BUILD_DIR/mongo/db/service_context",
-        "$BUILD_DIR/mongo/db/session/logical_session_id",
-        "$BUILD_DIR/mongo/db/session/logical_session_id_helpers",
-        "$BUILD_DIR/mongo/db/session/session_catalog",
-        "$BUILD_DIR/mongo/db/shard_role_api",
-        "$BUILD_DIR/mongo/db/shared_request_handling",
-        "$BUILD_DIR/mongo/executor/inline_executor",
-        "$BUILD_DIR/mongo/executor/task_executor_interface",
-        "$BUILD_DIR/mongo/rpc/command_status",
-        "$BUILD_DIR/mongo/rpc/rpc",
-    ],
-)
-
 env.CppUnitTest(
     target="db_transaction_test",
     source=[

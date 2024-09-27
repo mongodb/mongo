@@ -155,3 +155,50 @@ mongo_cc_library(
         "//src/mongo/db/query/write_ops:write_ops_parsers",  # TODO(SERVER-93876): Remove.
     ],
 )
+
+mongo_cc_library(
+    name = "bulk_write_common",
+    srcs = [
+        "bulk_write_common.cpp",
+    ],
+    hdrs = [
+        "bulk_write_common.h",
+        "//src/mongo/db/exec/sbe:in_list.h",
+        "//src/mongo/db/query:explain.h",
+        "//src/mongo/db/query:multiple_collection_accessor.h",
+        "//src/mongo/db/query/plan_cache:sbe_plan_cache.h",
+        "//src/mongo/db/query/stage_builder/sbe:builder_data.h",
+        "//src/mongo/db/query/write_ops:update_request.h",
+    ],
+    deps = [
+        ":bulk_write_parser",
+        ":update_metrics",
+        ":write_commands_common",
+        "//src/mongo/db:query_expressions",
+        "//src/mongo/db:server_base",
+        "//src/mongo/db:service_context",
+        "//src/mongo/db/auth:authprivilege",
+        "//src/mongo/db/query/write_ops:delete_request_idl",
+        "//src/mongo/db/query/write_ops:write_ops_parsers",
+        "//src/mongo/logv2:logv2_options",
+    ],
+)
+
+mongo_cc_library(
+    name = "search_index_commands",
+    srcs = [
+        "search_index_commands.cpp",
+        "search_test_cmds.cpp",
+        ":search_index_commands_gen",
+    ],
+    deps = [
+        "//src/mongo/db:commands",
+        "//src/mongo/db:server_base",
+        "//src/mongo/db:service_context",
+        "//src/mongo/db/auth:auth_checks",
+        "//src/mongo/db/query/search:search_index_common",
+        "//src/mongo/db/query/search:search_index_options",
+        "//src/mongo/db/query/search:search_index_process_interface",
+        "//src/mongo/db/query/search:search_task_executors",
+    ],
+)

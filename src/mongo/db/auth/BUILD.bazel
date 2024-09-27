@@ -831,3 +831,23 @@ mongo_cc_library(
         "//src/mongo/db/stats:counters",  # TODO(SERVER-93876): Remove.
     ],
 )
+
+mongo_cc_library(
+    name = "auth_op_observer",
+    srcs = [
+        "auth_op_observer.cpp",
+    ],
+    hdrs = [
+        "auth_op_observer.h",
+    ],
+    deps = [
+        ":auth",
+        "//src/mongo:base",
+        "//src/mongo/db:audit",
+        "//src/mongo/db/catalog:collection_options",
+        "//src/mongo/db/index:index_access_method",
+        "//src/mongo/db/op_observer",
+        "//src/mongo/db/op_observer:op_observer_util",
+        "//src/mongo/db/repl:oplog_entry",
+    ],
+)

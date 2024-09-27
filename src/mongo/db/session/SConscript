@@ -16,22 +16,6 @@ env.Library(
 )
 
 env.Library(
-    target="sessions_collection_rs",
-    source=[
-        "sessions_collection_rs.cpp",
-    ],
-    LIBDEPS=[
-        "$BUILD_DIR/mongo/base",
-        "$BUILD_DIR/mongo/client/authentication",
-        "$BUILD_DIR/mongo/client/remote_command_targeter",
-        "$BUILD_DIR/mongo/db/concurrency/lock_manager",
-        "$BUILD_DIR/mongo/db/dbdirectclient",
-        "$BUILD_DIR/mongo/db/repl/repl_coordinator_interface",
-        "sessions_collection",
-    ],
-)
-
-env.Library(
     target="service_liaison_mongod",
     source=[
         "service_liaison_shard.cpp",
@@ -52,26 +36,6 @@ env.Library(
         "$BUILD_DIR/mongo/s/query/exec/cluster_cursor_manager",
         "$BUILD_DIR/mongo/util/clock_sources",
         "$BUILD_DIR/mongo/util/periodic_runner",
-    ],
-)
-
-env.Library(
-    target="logical_session_cache_impl",
-    source=[
-        "logical_session_cache_impl.cpp",
-        "service_liaison_impl.cpp",
-        "service_liaison_router.cpp",
-        "service_liaison.cpp",
-    ],
-    LIBDEPS=[
-        "kill_sessions",
-        "logical_session_cache",
-        "logical_session_id_helpers",
-        "sessions_collection",
-    ],
-    LIBDEPS_PRIVATE=[
-        "$BUILD_DIR/mongo/db/internal_transactions_feature_flag",
-        "$BUILD_DIR/mongo/db/shard_role_api",
     ],
 )
 

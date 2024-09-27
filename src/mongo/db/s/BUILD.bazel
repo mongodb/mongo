@@ -435,3 +435,35 @@ mongo_cc_library(
     srcs = ["//src/mongo/db/s/resharding:resharding_server_parameters_gen"],
     deps = ["//src/mongo/db:server_base"],
 )
+
+mongo_cc_library(
+    name = "analyze_shard_key_util",
+    srcs = [
+        "analyze_shard_key_util.cpp",
+    ],
+    hdrs = [
+        "analyze_shard_key_util.h",
+    ],
+    deps = [
+        "//src/mongo/db:shard_role",
+        "//src/mongo/s:analyze_shard_key_common",
+    ],
+)
+
+mongo_cc_library(
+    name = "user_writes_recoverable_critical_section",
+    srcs = [
+        "user_writes_recoverable_critical_section_service.cpp",
+        ":user_writes_critical_section_document_gen",
+    ],
+    hdrs = [
+        "user_writes_recoverable_critical_section_service.h",
+        "//src/mongo/db:persistent_task_store.h",
+    ],
+    deps = [
+        "//src/mongo/db:dbdirectclient",
+        "//src/mongo/db:rw_concern_d",
+        "//src/mongo/db:shard_role_api",
+        "//src/mongo/db/repl:replica_set_aware_service",
+    ],
+)

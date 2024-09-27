@@ -197,28 +197,6 @@ env.Library(
 )
 
 env.Library(
-    target="replication_consistency_markers_impl",
-    source=[
-        "replication_consistency_markers_impl.cpp",
-    ],
-    LIBDEPS=[
-        "$BUILD_DIR/mongo/db/catalog/collection_crud",
-        "$BUILD_DIR/mongo/db/concurrency/exception_util",
-        "$BUILD_DIR/mongo/db/server_options",
-        "$BUILD_DIR/mongo/db/storage/record_store_base",
-        "optime",
-        "repl_coordinator_interface",
-        "replication_consistency_markers_idl",
-    ],
-    LIBDEPS_PRIVATE=[
-        "$BUILD_DIR/mongo/db/catalog/collection_options",
-        "$BUILD_DIR/mongo/db/index/index_access_method",
-        "$BUILD_DIR/mongo/db/shard_role",
-        "$BUILD_DIR/mongo/db/storage/journal_flusher",
-    ],
-)
-
-env.Library(
     target="replication_recovery",
     source=[
         "replication_recovery.cpp",
@@ -276,16 +254,6 @@ env.Library(
         "$BUILD_DIR/mongo/base",
         "$BUILD_DIR/mongo/util/net/network",
         "oplog_entry",
-    ],
-)
-
-env.Library(
-    target="oplog_interface_remote",
-    source=[
-        "oplog_interface_remote.cpp",
-    ],
-    LIBDEPS=[
-        "$BUILD_DIR/mongo/client/clientdriver_network",
     ],
 )
 
@@ -655,31 +623,6 @@ env.Library(
 )
 
 env.Library(
-    target="repl_set_status_commands",
-    source=[
-        "repl_set_command.cpp",
-        "repl_set_get_status_cmd.cpp",
-        "repl_set_test_egress.cpp",
-        "repl_set_test_egress_gen.cpp",
-    ],
-    LIBDEPS=[
-        "$BUILD_DIR/mongo/base",
-        "$BUILD_DIR/mongo/db/auth/auth",
-        "$BUILD_DIR/mongo/db/auth/authprivilege",
-        "$BUILD_DIR/mongo/db/commands",
-        "$BUILD_DIR/mongo/db/commands/test_commands_enabled",
-        "$BUILD_DIR/mongo/db/not_primary_error_tracker",
-        "repl_coordinator_interface",
-    ],
-    LIBDEPS_PRIVATE=[
-        "$BUILD_DIR/mongo/executor/connection_pool_executor",
-        "$BUILD_DIR/mongo/executor/network_interface",
-        "$BUILD_DIR/mongo/executor/network_interface_factory",
-        "$BUILD_DIR/mongo/executor/network_interface_tl",
-    ],
-)
-
-env.Library(
     target="repl_set_commands",
     source=[
         "repl_set_commands.cpp",
@@ -862,23 +805,6 @@ env.Library(
 )
 
 env.Library(
-    target="base_cloner",
-    source=[
-        "base_cloner.cpp",
-    ],
-    LIBDEPS=[
-        "$BUILD_DIR/mongo/base",
-        "$BUILD_DIR/mongo/client/clientdriver_network",
-        "$BUILD_DIR/mongo/util/fail_point",
-        "repl_sync_shared_data",
-    ],
-    LIBDEPS_PRIVATE=[
-        "repl_server_parameters",
-        "replication_consistency_markers_impl",
-    ],
-)
-
-env.Library(
     target="initial_syncer",
     source=[
         "initial_syncer.cpp",
@@ -942,24 +868,6 @@ env.Library(
         "primary_only_service",
         "replication_auth",
         "split_horizon",
-    ],
-)
-
-env.Library(
-    target="tenant_migration_state_machine_idl",
-    source=[
-        "tenant_migration_state_machine_gen.cpp",
-    ],
-    LIBDEPS=[
-        "$BUILD_DIR/mongo/base",
-        "$BUILD_DIR/mongo/client/connection_string",
-        "$BUILD_DIR/mongo/client/read_preference",
-        "$BUILD_DIR/mongo/db/commands/mongod_fcv",
-        "$BUILD_DIR/mongo/db/serverless/serverless_types_idl",
-        "$BUILD_DIR/mongo/idl/idl_parser",
-        "$BUILD_DIR/mongo/util/net/ssl_manager",
-        "optime",
-        "repl_coordinator_interface",
     ],
 )
 

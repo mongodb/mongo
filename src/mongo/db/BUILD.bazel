@@ -2503,3 +2503,127 @@ mongo_cc_library(
         "//src/mongo/util:summation",  # TODO(SERVER-93876): Remove.
     ],
 )
+
+mongo_cc_library(
+    name = "mirror_maestro",
+    srcs = [
+        "mirror_maestro.cpp",
+        "mirroring_sampler.cpp",
+        ":mirror_maestro_gen",
+    ],
+    hdrs = [
+        "mirror_maestro.h",
+        "mirroring_sampler.h",
+    ],
+    deps = [
+        ":client_out_of_line_executor",
+        ":commands",
+        ":server_base",
+        ":service_context",
+        "//src/mongo/bson/util:bson_extract",
+        "//src/mongo/db/auth:security_token_auth",
+        "//src/mongo/db/commands:server_status_core",
+        "//src/mongo/db/repl:repl_coordinator_interface",
+        "//src/mongo/db/repl:repl_settings",
+        "//src/mongo/db/repl:replica_set_messages",
+        "//src/mongo/db/repl:topology_version_observer",
+        "//src/mongo/executor:network_interface_factory",
+        "//src/mongo/executor:task_executor_interface",
+        "//src/mongo/executor:thread_pool_task_executor",
+        "//src/mongo/rpc:message",
+        "//src/mongo/util/concurrency:thread_pool",
+        "//src/mongo/util/net:network",
+    ],
+)
+
+mongo_cc_library(
+    name = "change_stream_options_manager",
+    srcs = [
+        "change_stream_options_manager.cpp",
+        ":change_stream_options_parameter_gen",
+    ],
+    hdrs = [
+        "change_stream_options_manager.h",
+    ],
+    deps = [
+        ":change_stream_options",
+        ":change_stream_serverless_helpers",
+        ":server_base",
+        ":service_context",
+        "//src/mongo/db/repl:repl_coordinator_interface",
+        "//src/mongo/db/repl:repl_settings",
+    ],
+)
+
+mongo_cc_library(
+    name = "change_streams_cluster_parameter",
+    srcs = [
+        "change_streams_cluster_parameter.cpp",
+        ":change_streams_cluster_parameter_gen",
+    ],
+    hdrs = [
+        "change_streams_cluster_parameter.h",
+    ],
+    deps = [
+        ":change_stream_serverless_helpers",
+        ":server_base",
+        "//src/mongo/db/repl:repl_coordinator_interface",
+        "//src/mongo/db/repl:repl_settings",
+        "//src/mongo/idl:cluster_server_parameter",
+    ],
+)
+
+mongo_cc_library(
+    name = "rs_local_client",
+    srcs = [
+        "rs_local_client.cpp",
+    ],
+    hdrs = [
+        "rs_local_client.h",
+    ],
+    deps = [
+        ":dbdirectclient",
+        ":rw_concern_d",
+        "//src/mongo/db/concurrency:lock_manager",
+        "//src/mongo/db/repl:repl_coordinator_interface",
+    ],
+)
+
+mongo_cc_library(
+    name = "keys_collection_client_direct",
+    srcs = [
+        "keys_collection_client_direct.cpp",
+    ],
+    hdrs = [
+        "keys_collection_client_direct.h",
+    ],
+    deps = [
+        ":keys_collection_document",
+        ":rs_local_client",
+        ":server_base",
+        "//src/mongo/s/catalog:sharding_catalog_client",
+        "//src/mongo/s/client:shard_interface",
+    ],
+)
+
+mongo_cc_library(
+    name = "vector_clock_mongod",
+    srcs = [
+        "vector_clock_mongod.cpp",
+        "//src/mongo/db/s:topology_time_ticker.cpp",
+    ],
+    hdrs = [
+        "persistent_task_store.h",
+        "vector_clock_mongod.h",
+        "//src/mongo/db/s:topology_time_ticker.h",
+    ],
+    deps = [
+        ":dbdirectclient",
+        ":rw_concern_d",
+        ":server_base",
+        ":vector_clock_mutable",
+        "//src/mongo/db/concurrency:lock_manager",
+        "//src/mongo/db/repl:replica_set_aware_service",
+        "//src/mongo/s:grid",
+    ],
+)

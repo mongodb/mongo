@@ -17,6 +17,7 @@ mongo_cc_library(
     ],
     hdrs = [
         "op_observer.h",
+        "op_observer_noop.h",
         "op_observer_registry.h",
         "//src/mongo/base:data_type_validated.h",
         "//src/mongo/bson:bsonelement_comparator.h",
@@ -153,5 +154,20 @@ mongo_cc_library(
     ],
     deps = [
         "//src/mongo:base",
+    ],
+)
+
+mongo_cc_library(
+    name = "user_write_block_mode_op_observer",
+    srcs = [
+        "user_write_block_mode_op_observer.cpp",
+    ],
+    hdrs = [
+        "user_write_block_mode_op_observer.h",
+    ],
+    deps = [
+        ":op_observer",
+        "//src/mongo/db:shard_role_api",
+        "//src/mongo/db/s:user_writes_recoverable_critical_section",
     ],
 )

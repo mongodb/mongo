@@ -5,25 +5,6 @@ Import("env")
 env = env.Clone()
 
 env.Library(
-    target="bulk_write_common",
-    source=[
-        "bulk_write_common.cpp",
-    ],
-    LIBDEPS_PRIVATE=[
-        "$BUILD_DIR/mongo/db/auth/authprivilege",
-        "$BUILD_DIR/mongo/db/query/write_ops/delete_request_idl",
-        "$BUILD_DIR/mongo/db/query/write_ops/write_ops_parsers",
-        "$BUILD_DIR/mongo/db/query_expressions",
-        "$BUILD_DIR/mongo/db/server_base",
-        "$BUILD_DIR/mongo/db/service_context",
-        "$BUILD_DIR/mongo/logv2/logv2_options",
-        "bulk_write_parser",
-        "update_metrics",
-        "write_commands_common",
-    ],
-)
-
-env.Library(
     target="bulk_write_command",
     source=[
         "bulk_write.cpp",
@@ -126,24 +107,5 @@ env.CppUnitTest(
         "$BUILD_DIR/mongo/db/service_context_d_test_fixture",
         "$BUILD_DIR/mongo/db/storage/two_phase_index_build_knobs_idl",
         "map_reduce_agg",
-    ],
-)
-
-env.Library(
-    target="search_index_commands",
-    source=[
-        "search_index_commands_gen.cpp",
-        "search_index_commands.cpp",
-        "search_test_cmds.cpp",
-    ],
-    LIBDEPS_PRIVATE=[
-        "$BUILD_DIR/mongo/db/auth/auth_checks",
-        "$BUILD_DIR/mongo/db/commands",
-        "$BUILD_DIR/mongo/db/query/search/search_index_common",
-        "$BUILD_DIR/mongo/db/query/search/search_index_options",
-        "$BUILD_DIR/mongo/db/query/search/search_index_process_interface",
-        "$BUILD_DIR/mongo/db/query/search/search_task_executors",
-        "$BUILD_DIR/mongo/db/server_base",
-        "$BUILD_DIR/mongo/db/service_context",
     ],
 )

@@ -5,23 +5,6 @@ Import("env", "get_option")
 env = env.Clone()
 
 env.Library(
-    target="auth_op_observer",
-    source=[
-        "auth_op_observer.cpp",
-    ],
-    LIBDEPS_PRIVATE=[
-        "$BUILD_DIR/mongo/base",
-        "$BUILD_DIR/mongo/db/audit",
-        "$BUILD_DIR/mongo/db/catalog/collection_options",
-        "$BUILD_DIR/mongo/db/index/index_access_method",
-        "$BUILD_DIR/mongo/db/op_observer/op_observer",
-        "$BUILD_DIR/mongo/db/op_observer/op_observer_util",
-        "$BUILD_DIR/mongo/db/repl/oplog_entry",
-        "auth",
-    ],
-)
-
-env.Library(
     target="authorization_session_test_fixture",
     source=[
         "authorization_session_for_test.cpp",

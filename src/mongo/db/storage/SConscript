@@ -32,24 +32,6 @@ ksdecode = env.Program(
 )
 
 env.Library(
-    target="oplog_cap_maintainer_thread",
-    source=[
-        "oplog_cap_maintainer_thread.cpp",
-    ],
-    LIBDEPS_PRIVATE=[
-        "$BUILD_DIR/mongo/db/catalog/collection_catalog",
-        "$BUILD_DIR/mongo/db/catalog/database_holder",
-        "$BUILD_DIR/mongo/db/catalog/local_oplog_info",
-        "$BUILD_DIR/mongo/db/concurrency/lock_manager",
-        "$BUILD_DIR/mongo/db/server_base",
-        "$BUILD_DIR/mongo/db/service_context",
-        "$BUILD_DIR/mongo/db/shard_role",
-        "$BUILD_DIR/mongo/util/background_job",
-        "$BUILD_DIR/mongo/util/concurrency/spin_lock",
-    ],
-)
-
-env.Library(
     target="sorted_data_interface_test_harness",
     source=[
         "sorted_data_interface_test_harness.cpp",
@@ -167,25 +149,6 @@ env.Library(
     ],
 )
 
-env.Library(
-    target="storage_engine_common",
-    source=[
-        "storage_engine_init.cpp",
-        "storage_engine_change_context.cpp",
-    ],
-    LIBDEPS_PRIVATE=[
-        "$BUILD_DIR/mongo/db/exec/scoped_timer",
-        "$BUILD_DIR/mongo/db/service_context",
-        "$BUILD_DIR/mongo/db/shard_role_api",
-        "$BUILD_DIR/mongo/util/concurrency/spin_lock",
-        "storage_control",
-        "storage_engine_lock_file",
-        "storage_engine_metadata",
-        "storage_options",
-        "storage_repair_observer",
-    ],
-)
-
 env.Benchmark(
     target="storage_key_string_bm",
     source=[
@@ -258,32 +221,6 @@ env.CppUnitTest(
         "storage_engine_common",
         "storage_engine_lock_file",
         "storage_engine_metadata",
-        "storage_options",
-    ],
-)
-
-env.Library(
-    target="storage_util",
-    source=[
-        "storage_util.cpp",
-    ],
-    LIBDEPS_PRIVATE=[
-        "$BUILD_DIR/mongo/db/catalog/collection_catalog",
-        "$BUILD_DIR/mongo/db/multitenancy",
-        "durable_catalog",
-        "kv/kv_drop_pending_ident_reaper",
-        "storage_options",
-    ],
-)
-
-env.Library(
-    target="backup_block",
-    source=[
-        "backup_block.cpp",
-    ],
-    LIBDEPS_PRIVATE=[
-        "$BUILD_DIR/mongo/db/server_base",
-        "$BUILD_DIR/mongo/db/shard_role_api",
         "storage_options",
     ],
 )

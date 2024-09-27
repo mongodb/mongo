@@ -41,24 +41,6 @@ env.Library(
 )
 
 env.Library(
-    target="index_repair",
-    source=[
-        "index_repair.cpp",
-    ],
-    LIBDEPS_PRIVATE=[
-        "$BUILD_DIR/mongo/db/concurrency/exception_util",
-        "$BUILD_DIR/mongo/db/index/index_access_method",
-        "$BUILD_DIR/mongo/db/query/query_stats/query_stats",
-        "$BUILD_DIR/mongo/db/shard_role",
-        "$BUILD_DIR/mongo/db/storage/duplicate_key_error_info",
-        "$BUILD_DIR/mongo/db/storage/key_string",
-        "collection_crud",
-        "collection_options",
-        "validate_state",
-    ],
-)
-
-env.Library(
     target="index_builds_manager",
     source=[
         "index_builds_manager.cpp",
@@ -74,43 +56,6 @@ env.Library(
         "$BUILD_DIR/mongo/util/progress_meter",
         "index_repair",
         "multi_index_block",
-    ],
-)
-
-env.Library(
-    target="index_key_validate",
-    source=[
-        "index_key_validate.cpp",
-    ],
-    LIBDEPS_PRIVATE=[
-        "$BUILD_DIR/mongo/db/common",
-        "$BUILD_DIR/mongo/db/index/index_access_method",
-        "$BUILD_DIR/mongo/db/query/collation/collator_factory_interface",
-        "$BUILD_DIR/mongo/db/query_expressions",
-        "$BUILD_DIR/mongo/db/server_base",
-        "$BUILD_DIR/mongo/db/storage/storage_options",
-        "$BUILD_DIR/mongo/util/fail_point",
-    ],
-)
-
-env.Library(
-    target="index_build_block",
-    source=[
-        "index_build_block.cpp",
-    ],
-    LIBDEPS_PRIVATE=[
-        "$BUILD_DIR/mongo/db/audit",
-        "$BUILD_DIR/mongo/db/collection_index_usage_tracker",
-        "$BUILD_DIR/mongo/db/common",
-        "$BUILD_DIR/mongo/db/index/index_access_method",
-        "$BUILD_DIR/mongo/db/repl/repl_coordinator_interface",
-        "$BUILD_DIR/mongo/db/server_base",
-        "$BUILD_DIR/mongo/db/storage/durable_catalog",
-        "$BUILD_DIR/mongo/db/ttl_collection_cache",
-        "$BUILD_DIR/mongo/db/vector_clock",
-        "collection_catalog",
-        "collection_query_info",
-        "index_key_validate",
     ],
 )
 
@@ -176,28 +121,6 @@ env.Library(
         "catalog_stats",
         "collection_catalog",
         "database_holder",
-    ],
-)
-
-env.Library(
-    target="validate_state",
-    source=[
-        "validate_state.cpp",
-    ],
-    LIBDEPS_PRIVATE=[
-        "$BUILD_DIR/mongo/db/multitenancy",
-        "$BUILD_DIR/mongo/db/repl/repl_coordinator_interface",
-        "$BUILD_DIR/mongo/db/server_base",
-        "$BUILD_DIR/mongo/db/shard_role",
-        "$BUILD_DIR/mongo/db/storage/durable_catalog",
-        "$BUILD_DIR/mongo/db/storage/storage_options",
-        "$BUILD_DIR/mongo/db/views/views",
-        "$BUILD_DIR/mongo/util/fail_point",
-        "collection_catalog",
-        "database_holder",
-        "index_catalog",
-        "throttle_cursor",
-        "validate_idl",
     ],
 )
 
@@ -271,20 +194,6 @@ env.Library(
 )
 
 env.Library(
-    target="catalog_stats",
-    source=[
-        "catalog_stats.cpp",
-    ],
-    LIBDEPS_PRIVATE=[
-        "$BUILD_DIR/mongo/db/commands/server_status_core",
-        "$BUILD_DIR/mongo/db/multitenancy",
-        "$BUILD_DIR/mongo/db/views/views",
-        "collection_catalog",
-        "database_holder",
-    ],
-)
-
-env.Library(
     target="collection_validation",
     source=[
         "collection_validation.cpp",
@@ -314,20 +223,6 @@ env.Library(
         "index_key_validate",
         "throttle_cursor",
         "validate_state",
-    ],
-)
-
-env.Library(
-    target="throttle_cursor",
-    source=[
-        "throttle_cursor.cpp",
-    ],
-    LIBDEPS_PRIVATE=[
-        "$BUILD_DIR/mongo/db/index/index_access_method",
-        "$BUILD_DIR/mongo/db/query/query_stats/query_stats",
-        "$BUILD_DIR/mongo/util/concurrency/spin_lock",
-        "$BUILD_DIR/mongo/util/fail_point",
-        "validate_idl",
     ],
 )
 

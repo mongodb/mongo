@@ -200,3 +200,20 @@ mongo_cc_library(
         "//src/mongo/db/update:update_common",
     ],
 )
+
+mongo_cc_library(
+    name = "timeseries_op_observer",
+    srcs = [
+        "timeseries_op_observer.cpp",
+    ],
+    hdrs = [
+        "timeseries_op_observer.h",
+    ],
+    deps = [
+        ":timeseries_extended_range",
+        "//src/mongo/db/catalog:collection_catalog",
+        "//src/mongo/db/concurrency:lock_manager",
+        "//src/mongo/db/op_observer",
+        "//src/mongo/db/timeseries/bucket_catalog",
+    ],
+)

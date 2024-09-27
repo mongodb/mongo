@@ -468,3 +468,21 @@ mongo_cc_library(
         "//src/mongo/rpc:command_status",
     ],
 )
+
+mongo_cc_library(
+    name = "remote_command_targeter",
+    srcs = [
+        "remote_command_targeter_factory_impl.cpp",
+        "remote_command_targeter_rs.cpp",
+        "remote_command_targeter_standalone.cpp",
+    ],
+    hdrs = [
+        "remote_command_targeter_factory_impl.h",
+        "remote_command_targeter_rs.h",
+        "remote_command_targeter_standalone.h",
+    ],
+    deps = [
+        ":clientdriver_network",
+        "//src/mongo/db:service_context",
+    ],
+)

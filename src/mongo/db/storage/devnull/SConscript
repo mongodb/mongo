@@ -5,25 +5,6 @@ Import("env")
 env = env.Clone()
 
 env.Library(
-    target="storage_devnull_core",
-    source=[
-        "devnull_kv_engine.cpp",
-        "ephemeral_catalog_record_store.cpp",
-    ],
-    LIBDEPS=[
-        "$BUILD_DIR/mongo/db/record_id_helpers",
-        "$BUILD_DIR/mongo/db/storage/record_store_base",
-        "$BUILD_DIR/mongo/db/storage/recovery_unit_base",
-    ],
-    LIBDEPS_PRIVATE=[
-        "$BUILD_DIR/mongo/db/catalog/collection_options",
-        "$BUILD_DIR/mongo/db/server_base",
-        "$BUILD_DIR/mongo/db/storage/backup_block",
-        "$BUILD_DIR/mongo/db/storage/storage_options",
-    ],
-)
-
-env.Library(
     target="storage_devnull",
     source=[
         "devnull_init.cpp",

@@ -568,3 +568,79 @@ mongo_cc_library(
         "//src/mongo:base",
     ],
 )
+
+mongo_cc_library(
+    name = "backup_block",
+    srcs = [
+        "backup_block.cpp",
+    ],
+    hdrs = [
+        "backup_block.h",
+    ],
+    deps = [
+        ":storage_options",
+        "//src/mongo/db:server_base",
+        "//src/mongo/db:shard_role_api",
+    ],
+)
+
+mongo_cc_library(
+    name = "oplog_cap_maintainer_thread",
+    srcs = [
+        "oplog_cap_maintainer_thread.cpp",
+    ],
+    hdrs = [
+        "oplog_cap_maintainer_thread.h",
+    ],
+    deps = [
+        "//src/mongo/db:server_base",
+        "//src/mongo/db:service_context",
+        "//src/mongo/db:shard_role",
+        "//src/mongo/db/catalog:collection_catalog",
+        "//src/mongo/db/catalog:database_holder",
+        "//src/mongo/db/catalog:local_oplog_info",
+        "//src/mongo/db/concurrency:lock_manager",
+        "//src/mongo/util:background_job",
+        "//src/mongo/util/concurrency:spin_lock",
+    ],
+)
+
+mongo_cc_library(
+    name = "storage_engine_common",
+    srcs = [
+        "storage_engine_change_context.cpp",
+        "storage_engine_init.cpp",
+    ],
+    hdrs = [
+        "storage_engine_change_context.h",
+        "storage_engine_init.h",
+    ],
+    deps = [
+        ":storage_control",
+        ":storage_engine_lock_file",
+        ":storage_engine_metadata",
+        ":storage_options",
+        ":storage_repair_observer",
+        "//src/mongo/db:service_context",
+        "//src/mongo/db:shard_role_api",
+        "//src/mongo/db/exec:scoped_timer",
+        "//src/mongo/util/concurrency:spin_lock",
+    ],
+)
+
+mongo_cc_library(
+    name = "storage_util",
+    srcs = [
+        "storage_util.cpp",
+    ],
+    hdrs = [
+        "storage_util.h",
+    ],
+    deps = [
+        ":durable_catalog",
+        ":storage_options",
+        "//src/mongo/db:multitenancy",
+        "//src/mongo/db/catalog:collection_catalog",
+        "//src/mongo/db/storage/kv:kv_drop_pending_ident_reaper",
+    ],
+)

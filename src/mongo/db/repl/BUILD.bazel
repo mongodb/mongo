@@ -1306,3 +1306,104 @@ mongo_cc_library(
         "//src/mongo/util/concurrency:thread_pool",
     ],
 )
+
+mongo_cc_library(
+    name = "oplog_interface_remote",
+    srcs = [
+        "oplog_interface_remote.cpp",
+    ],
+    hdrs = [
+        "oplog_interface.h",
+        "oplog_interface_remote.h",
+        "//src/mongo/db/transaction:transaction_history_iterator.h",
+    ],
+    deps = [
+        "//src/mongo/client:clientdriver_network",
+    ],
+)
+
+mongo_cc_library(
+    name = "repl_set_status_commands",
+    srcs = [
+        "repl_set_command.cpp",
+        "repl_set_get_status_cmd.cpp",
+        "repl_set_test_egress.cpp",
+        ":repl_set_test_egress_gen",
+    ],
+    hdrs = [
+        "repl_set_command.h",
+    ],
+    deps = [
+        ":repl_coordinator_interface",
+        "//src/mongo:base",
+        "//src/mongo/db:commands",
+        "//src/mongo/db:not_primary_error_tracker",
+        "//src/mongo/db/auth",
+        "//src/mongo/db/auth:authprivilege",
+        "//src/mongo/db/commands:test_commands_enabled",
+        "//src/mongo/executor:connection_pool_executor",
+        "//src/mongo/executor:network_interface",
+        "//src/mongo/executor:network_interface_factory",
+        "//src/mongo/executor:network_interface_tl",
+    ],
+)
+
+mongo_cc_library(
+    name = "replication_consistency_markers_impl",
+    srcs = [
+        "//src/mongo/db/repl:replication_consistency_markers_impl.cpp",
+    ],
+    hdrs = [
+        "//src/mongo/db/repl:replication_consistency_markers_impl.h",
+    ],
+    deps = [
+        ":optime",
+        ":repl_coordinator_interface",
+        ":replication_consistency_markers_idl",
+        "//src/mongo/db:server_options",
+        "//src/mongo/db:shard_role",
+        "//src/mongo/db/catalog:collection_crud",
+        "//src/mongo/db/catalog:collection_options",
+        "//src/mongo/db/concurrency:exception_util",
+        "//src/mongo/db/index:index_access_method",
+        "//src/mongo/db/storage:journal_flusher",
+        "//src/mongo/db/storage:record_store_base",
+    ],
+)
+
+mongo_cc_library(
+    name = "base_cloner",
+    srcs = [
+        "base_cloner.cpp",
+    ],
+    hdrs = [
+        "base_cloner.h",
+        "replication_auth.h",
+    ],
+    deps = [
+        ":repl_server_parameters",
+        ":repl_sync_shared_data",
+        ":replication_consistency_markers_impl",
+        "//src/mongo:base",
+        "//src/mongo/client:clientdriver_network",
+        "//src/mongo/util:fail_point",
+    ],
+)
+
+mongo_cc_library(
+    name = "tenant_migration_state_machine_idl",
+    srcs = [
+        ":tenant_migration_state_machine_gen",
+    ],
+    deps = [
+        ":optime",
+        ":repl_coordinator_interface",
+        "//src/mongo:base",
+        "//src/mongo/client:connection_string",
+        "//src/mongo/client:read_preference",
+        "//src/mongo/db/commands:mongod_fcv",
+        "//src/mongo/db/serverless:serverless_types_idl",
+        "//src/mongo/idl:idl_parser",
+        "//src/mongo/util/net:ssl_manager",
+    ],
+)

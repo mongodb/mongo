@@ -4,52 +4,6 @@ Import("env")
 
 env = env.Clone()
 
-env.Library(
-    target="fault_manager",
-    source=[
-        "dns_health_observer.cpp",
-        "fault_facet_impl.cpp",
-        "fault_manager_config.cpp",
-        "fault_manager.cpp",
-        "fault.cpp",
-        "health_monitoring_server_parameters.cpp",
-        "health_monitoring_server_parameters_gen.cpp",
-        "health_monitoring_server_status_section.cpp",
-        "health_observer_base.cpp",
-        "health_observer_registration.cpp",
-        "progress_monitor.cpp",
-        "test_health_observer.cpp",
-    ],
-    LIBDEPS=[
-        "$BUILD_DIR/mongo/db/commands/test_commands_enabled",
-        "$BUILD_DIR/mongo/db/service_context",
-        "$BUILD_DIR/mongo/executor/network_interface",
-        "$BUILD_DIR/mongo/executor/network_interface_factory",
-        "$BUILD_DIR/mongo/executor/network_interface_thread_pool",
-        "$BUILD_DIR/mongo/executor/thread_pool_task_executor",
-    ],
-    LIBDEPS_PRIVATE=[
-        "$BUILD_DIR/mongo/db/server_base",
-        "$BUILD_DIR/mongo/s/grid",
-        "$BUILD_DIR/mongo/util/concurrency/spin_lock",
-        "$BUILD_DIR/mongo/util/concurrency/thread_pool",
-    ],
-)
-
-env.Library(
-    target="config_server_health_observer",
-    source=[
-        "config_server_health_observer.cpp",
-    ],
-    LIBDEPS_PRIVATE=[
-        "$BUILD_DIR/mongo/db/query/query_request",
-        "$BUILD_DIR/mongo/db/repl/read_concern_args",
-        "$BUILD_DIR/mongo/s/grid",
-        "$BUILD_DIR/mongo/util/concurrency/spin_lock",
-        "fault_manager",
-    ],
-)
-
 env.CppUnitTest(
     target="fault_base_classes_test",
     source=[

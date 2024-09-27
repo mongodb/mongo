@@ -159,3 +159,18 @@ mongo_cc_library(
         "//src/mongo/util/net:network",
     ],
 )
+
+mongo_cc_library(
+    name = "search_index_process_shard",
+    srcs = [
+        "search_index_process_shard.cpp",
+    ],
+    hdrs = [
+        "search_index_process_shard.h",
+    ],
+    deps = [
+        ":search_index_process_interface",
+        "//src/mongo/db/catalog:collection_catalog",
+        "//src/mongo/db/views:view_catalog_helpers",
+    ],
+)

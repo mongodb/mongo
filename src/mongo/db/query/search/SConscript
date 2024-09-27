@@ -45,18 +45,6 @@ env.CppUnitTest(
 )
 
 env.Library(
-    target="search_index_process_shard",
-    source=[
-        "search_index_process_shard.cpp",
-    ],
-    LIBDEPS_PRIVATE=[
-        "$BUILD_DIR/mongo/db/catalog/collection_catalog",
-        "$BUILD_DIR/mongo/db/views/view_catalog_helpers",
-        "search_index_process_interface",
-    ],
-)
-
-env.Library(
     target="search_index_process_router",
     source=[
         "search_index_process_router.cpp",

@@ -51,19 +51,6 @@ if shouldBuildGRPC(env):
     clientDriverEnv.InjectThirdParty(libraries=["grpc"])
 
 env.Library(
-    target="remote_command_targeter",
-    source=[
-        "remote_command_targeter_factory_impl.cpp",
-        "remote_command_targeter_rs.cpp",
-        "remote_command_targeter_standalone.cpp",
-    ],
-    LIBDEPS=[
-        "$BUILD_DIR/mongo/db/service_context",
-        "clientdriver_network",
-    ],
-)
-
-env.Library(
     target="remote_command_targeter_mock",
     source=[
         "remote_command_targeter_mock.cpp",

@@ -18,19 +18,6 @@ env.Library(
 )
 
 env.Library(
-    target="cluster_parameter_synchronization_helpers",
-    source=[
-        "cluster_parameter_synchronization_helpers.cpp",
-    ],
-    LIBDEPS_PRIVATE=[
-        "$BUILD_DIR/mongo/db/audit",
-        "$BUILD_DIR/mongo/db/catalog/collection_catalog",
-        "$BUILD_DIR/mongo/db/server_base",
-        "$BUILD_DIR/mongo/db/shard_role",
-    ],
-)
-
-env.Library(
     target="cluster_server_parameter_op_observer",
     source=[
         "cluster_server_parameter_op_observer.cpp",

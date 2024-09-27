@@ -180,3 +180,46 @@ mongo_cc_library(
         "//src/mongo/db:server_base",
     ],
 )
+
+mongo_cc_library(
+    name = "logical_session_cache_impl",
+    srcs = [
+        "logical_session_cache_impl.cpp",
+        "service_liaison.cpp",
+        "service_liaison_impl.cpp",
+        "service_liaison_router.cpp",
+    ],
+    hdrs = [
+        "logical_session_cache_impl.h",
+        "service_liaison.h",
+        "service_liaison_impl.h",
+        "service_liaison_router.h",
+    ],
+    deps = [
+        ":kill_sessions",
+        ":logical_session_cache",
+        ":logical_session_id_helpers",
+        ":sessions_collection",
+        "//src/mongo/db:internal_transactions_feature_flag",
+        "//src/mongo/db:shard_role_api",
+    ],
+)
+
+mongo_cc_library(
+    name = "sessions_collection_rs",
+    srcs = [
+        "sessions_collection_rs.cpp",
+    ],
+    hdrs = [
+        "sessions_collection_rs.h",
+    ],
+    deps = [
+        ":sessions_collection",
+        "//src/mongo:base",
+        "//src/mongo/client:authentication",
+        "//src/mongo/client:remote_command_targeter",
+        "//src/mongo/db:dbdirectclient",
+        "//src/mongo/db/concurrency:lock_manager",
+        "//src/mongo/db/repl:repl_coordinator_interface",
+    ],
+)

@@ -238,20 +238,6 @@ env.Library(
 )
 
 env.Library(
-    target="user_writes_recoverable_critical_section",
-    source=[
-        "user_writes_critical_section_document_gen.cpp",
-        "user_writes_recoverable_critical_section_service.cpp",
-    ],
-    LIBDEPS_PRIVATE=[
-        "$BUILD_DIR/mongo/db/dbdirectclient",
-        "$BUILD_DIR/mongo/db/repl/replica_set_aware_service",
-        "$BUILD_DIR/mongo/db/rw_concern_d",
-        "$BUILD_DIR/mongo/db/shard_role_api",
-    ],
-)
-
-env.Library(
     target="transaction_coordinator",
     source=[
         "server_transaction_coordinators_metrics.cpp",
@@ -609,17 +595,6 @@ env.Library(
         "sharding_logging",
         "sharding_runtime_d",
         "user_writes_recoverable_critical_section",
-    ],
-)
-
-env.Library(
-    target="analyze_shard_key_util",
-    source=[
-        "analyze_shard_key_util.cpp",
-    ],
-    LIBDEPS_PRIVATE=[
-        "$BUILD_DIR/mongo/db/shard_role",
-        "$BUILD_DIR/mongo/s/analyze_shard_key_common",
     ],
 )
 

@@ -605,3 +605,20 @@ mongo_cc_library(
         "//conditions:default": [],
     }),
 )
+
+mongo_cc_library(
+    name = "perfctr_collect",
+    srcs = [
+        "perfctr_collect.cpp",
+    ],
+    hdrs = [
+        "perfctr_collect.h",
+    ],
+    target_compatible_with = select({
+        "@platforms//os:windows": [],
+        "//conditions:default": ["@platforms//:incompatible"],
+    }),
+    deps = [
+        "//src/mongo:base",
+    ],
+)

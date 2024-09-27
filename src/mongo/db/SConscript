@@ -142,37 +142,6 @@ env.Library(
 )
 
 env.Library(
-    target="change_stream_options_manager",
-    source=[
-        "change_stream_options_manager.cpp",
-        "change_stream_options_parameter_gen.cpp",
-    ],
-    LIBDEPS_PRIVATE=[
-        "change_stream_options",
-        "change_stream_serverless_helpers",
-        "repl/repl_coordinator_interface",
-        "repl/repl_settings",
-        "server_base",
-        "service_context",
-    ],
-)
-
-env.Library(
-    target="change_streams_cluster_parameter",
-    source=[
-        "change_streams_cluster_parameter_gen.cpp",
-        "change_streams_cluster_parameter.cpp",
-    ],
-    LIBDEPS_PRIVATE=[
-        "$BUILD_DIR/mongo/idl/cluster_server_parameter",
-        "change_stream_serverless_helpers",
-        "repl/repl_coordinator_interface",
-        "repl/repl_settings",
-        "server_base",
-    ],
-)
-
-env.Library(
     target="set_change_stream_state_coordinator",
     source=[
         "set_change_stream_state_coordinator.cpp",
@@ -341,36 +310,6 @@ env.CppUnitTest(
     LIBDEPS=[
         "$BUILD_DIR/mongo/unittest/unittest",
         "prepare_conflict_tracker",
-    ],
-)
-
-env.Library(
-    target="mirror_maestro",
-    source=[
-        "mirror_maestro.cpp",
-        "mirror_maestro_gen.cpp",
-        "mirroring_sampler.cpp",
-    ],
-    LIBDEPS=[
-        "$BUILD_DIR/mongo/executor/task_executor_interface",
-        "$BUILD_DIR/mongo/rpc/message",
-        "$BUILD_DIR/mongo/util/net/network",
-        "client_out_of_line_executor",
-        "service_context",
-    ],
-    LIBDEPS_PRIVATE=[
-        "$BUILD_DIR/mongo/bson/util/bson_extract",
-        "$BUILD_DIR/mongo/db/auth/security_token_auth",
-        "$BUILD_DIR/mongo/executor/network_interface_factory",
-        "$BUILD_DIR/mongo/executor/thread_pool_task_executor",
-        "$BUILD_DIR/mongo/util/concurrency/thread_pool",
-        "commands",
-        "commands/server_status_core",
-        "repl/repl_coordinator_interface",
-        "repl/repl_settings",
-        "repl/replica_set_messages",
-        "repl/topology_version_observer",
-        "server_base",
     ],
 )
 
@@ -808,19 +747,6 @@ env.Library(
 )
 
 env.Library(
-    target="rs_local_client",
-    source=[
-        "rs_local_client.cpp",
-    ],
-    LIBDEPS_PRIVATE=[
-        "concurrency/lock_manager",
-        "dbdirectclient",
-        "repl/repl_coordinator_interface",
-        "rw_concern_d",
-    ],
-)
-
-env.Library(
     target="keys_collection_util",
     source=[
         "keys_collection_util.cpp",
@@ -830,41 +756,6 @@ env.Library(
         "dbhelpers",
         "keys_collection_document",
         "shard_role",
-    ],
-)
-
-env.Library(
-    target="keys_collection_client_direct",
-    source=[
-        "keys_collection_client_direct.cpp",
-    ],
-    LIBDEPS=[
-        "keys_collection_document",
-    ],
-    LIBDEPS_PRIVATE=[
-        "$BUILD_DIR/mongo/s/catalog/sharding_catalog_client",
-        "$BUILD_DIR/mongo/s/client/shard_interface",
-        "rs_local_client",
-        "server_base",
-    ],
-)
-
-env.Library(
-    target="vector_clock_mongod",
-    source=[
-        "s/topology_time_ticker.cpp",
-        "vector_clock_mongod.cpp",
-    ],
-    LIBDEPS=[
-        "vector_clock_mutable",
-    ],
-    LIBDEPS_PRIVATE=[
-        "$BUILD_DIR/mongo/s/grid",
-        "concurrency/lock_manager",
-        "dbdirectclient",
-        "repl/replica_set_aware_service",
-        "rw_concern_d",
-        "server_base",
     ],
 )
 

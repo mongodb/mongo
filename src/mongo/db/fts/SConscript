@@ -14,19 +14,6 @@ env.SConscript(
     ],
 )
 
-env.Library(
-    target="ftsmongod",
-    source=[
-        "ftsmongod.cpp",
-    ],
-    LIBDEPS=[
-        "base_fts",
-    ],
-    LIBDEPS_PRIVATE=[
-        "$BUILD_DIR/mongo/base",
-    ],
-)
-
 env.CppUnitTest(
     target="db_fts_test",
     source=[

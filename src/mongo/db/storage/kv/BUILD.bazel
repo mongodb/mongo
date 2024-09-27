@@ -8,3 +8,22 @@ exports_files(
         "*.cpp",
     ]),
 )
+
+# Should not be referenced outside this build file.
+mongo_cc_library(
+    name = "kv_drop_pending_ident_reaper",
+    srcs = [
+        "kv_drop_pending_ident_reaper.cpp",
+        "//src/mongo/db/catalog:import_options.h",
+    ],
+    hdrs = [
+        "kv_drop_pending_ident_reaper.h",
+        "kv_engine.h",
+    ],
+    deps = [
+        "//src/mongo/db:shard_role_api",
+        "//src/mongo/db/concurrency:exception_util",
+        "//src/mongo/db/concurrency:lock_manager",
+        "//src/mongo/db/query/query_stats",
+    ],
+)
