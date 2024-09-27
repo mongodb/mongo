@@ -1,12 +1,70 @@
+import * as backupUtils from "jstests/libs/backup_utils.js";
 /**
  * This class implements helpers for testing the magic restore process. It wraps a ReplSetTest
  * object and maintains the state of the backup cursor, handles writing objects to named pipes and
  * running the restore process. It exposes some of this state so that individual tests can make
  * specific assertions as needed.
+ *
+ * @class
  */
-import * as backupUtils from "jstests/libs/backup_utils.js";
-
 export class MagicRestoreTest {
+    /**
+     * Creates a new MagicRestoreTest instance.
+     *
+     * @constructor
+     * @param {Object} [params] The parameters object for the MagicRestoreTest.
+     * @param {Object} [params.rst] The ReplSetTest object.
+     * @param {string} [params.pipeDir] The file path of the named pipe. The pipe is used by magic
+     *     restore to read the restore configuration and any additional PIT oplog entries. This
+     *     should usually be 'MongoRunner.dataDir'.
+     * @param {boolean} [params.insertHigherTermOplogEntry=false] Whether to insert a higher-term
+     *     oplog entry during the restore procedure. This is used by Cloud to maintain MongoDB
+     *     driver connections to a node after restore.
+     *
+     * @property {Object} [backupSource] The connection object to the node used for backup. We
+     * perform backup and restore for all nodes in a replica set using one set of data files.
+     * @property {string} [backupDbPath] The file path used to store backed up data files. We'll
+     * copy these data files into separate dbpaths for each node.
+     * @property {Array.<string>} [restoreDbPaths] The file paths for each restored node's data
+     * files. Each dbpath ends with '/restore_${nodeId}'.
+     * @property {boolean} [isPit] Whether or not this particular restore is a point-in-time
+     * restore.
+     * @property {boolean} [insertHigherTermOplogEntry] Whether to insert a higher-term
+     * oplog entry during the restore procedure. This is used by Cloud to maintain MongoDB
+     * driver connections to a node after restore.
+     * @property {number} [restoreToHigherTermThan] Default higher term value to pass into magic
+     * restore when 'insertHigherTermOplogEntry' is set to true.
+     * @property {Object} [expectedConfig] The expected replica set config after the restore. Used
+     * to make assertions about a node post-restore.
+     * @property {Object} [backupCursor] The WiredTiger backup cursor object.
+     * @property {number} [backupId] The WiredTiger backup cursor ID.
+     * @property {Object} [checkpointTimestamp] The checkpoint timestamp from the WiredTiger backup
+     * cursor.
+     * @property {Object} [pointInTimeTimestamp] The timestamp to restore to with additional oplog
+     * entries in a PIT restore.
+     * @property {Array.<Object>} [collectionsToRestore] A list of objects containing namespace and
+     * UUID pairs. Used to perform a selective restore.
+     * @property {Object} [preRestoreDbHashes] An object containing database and collection hashes
+     * before restore. Used to compare on-disk data before and after restore. Produces an object
+     * with the shape:
+     * {
+     *     "db0": {
+     *         "coll0": <hash>,
+     *         "coll1": <hash>,
+     *         ...
+     *     },
+     *     "db1": {
+     *         "coll0": <hash>,
+     *         "coll1": <hash>,
+     *         ...
+     *     }
+     *     ...
+     * }
+     * @property {Array.<Object>} [entriesAfterBackup] A list of oplog entries after the backup
+     * cursor was opened. Used to perform a PIT restore.
+     * @property {Object} [expectedStableTimestamp] The expected stable timestamp after magic
+     * restore completes.
+     */
     constructor({rst, pipeDir, insertHigherTermOplogEntry}) {
         this.rst = rst;
         this.pipeDir = pipeDir;
@@ -35,8 +93,8 @@ export class MagicRestoreTest {
         this.checkpointTimestamp = undefined;
         this.pointInTimeTimestamp = undefined;
         // When we perform a selective restore, we need to store a list of collections to restore to
-        // pass into the restore configuration. This list includes namespaces for this particular
-        // replica set.
+        // pass into the restore configuration. This list includes namespaces and UUIDs for this
+        // particular replica set.
         this.collectionsToRestore = [];
 
         // Store dbhashes for each db and collection prior to restore. After magic restore
@@ -295,10 +353,17 @@ export class MagicRestoreTest {
         return dbHashes;
     }
 
+    /**
+     * Calculates and stores pre-restore collection hashes.
+     */
     storePreRestoreDbHashes() {
         this.preRestoreDbHashes = this._getDbHashes(this.backupSource);
     }
 
+    /**
+     * Retrieves collection hashes after the restore and compares them against pre-restore hashes
+     * for consistency checking.
+     */
     checkPostRestoreDbHashes(excludedCollections) {
         this.rst.nodes.forEach((node) => {
             const pre = this.preRestoreDbHashes;
