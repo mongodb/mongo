@@ -908,9 +908,12 @@ UpdateResult performUpdate(OperationContext* opCtx,
         // would cause some documents to be updated twice. To prevent that, we rewrite the error
         // code to QueryPlanKilled, which routers won't retry on.
         const auto updateResult = exec->getUpdateResult();
-        tassert(9146501,
-                "An update plan should never yield after having performed an upsert",
-                updateResult.upsertedId.isEmpty());
+        tassert(
+            9146501,
+            fmt::format(
+                "An update plan should never yield after having performed an upsert; upsertId: {}",
+                redact(updateResult.upsertedId.toString())),
+            updateResult.upsertedId.isEmpty());
         if (updateResult.numDocsModified > 0 && !opCtx->isRetryableWrite()) {
             ex.addContext("Update plan failed after having partially executed");
             uasserted(ErrorCodes::QueryPlanKilled, ex.reason());
