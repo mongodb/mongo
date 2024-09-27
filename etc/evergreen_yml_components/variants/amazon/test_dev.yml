@@ -250,3 +250,4 @@ buildvariants:
       - name: concurrency_gen
       - name: concurrency_replication_gen
       - name: concurrency_sharded_replication_gen
+      - name: .fuzzer_deterministic

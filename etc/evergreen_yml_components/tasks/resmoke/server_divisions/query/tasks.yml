@@ -242,6 +242,47 @@ tasks:
           npm_command: agg-fuzzer
           run_no_feature_flag_tests: "true"
 
+  ## Like "aggregation_multiversion_fuzzer_gen", but it uses a pinned git revision for the
+  ## "jstestfuzz" repo and it uses a fixed seed.
+  - <<: *jstestfuzz_template
+    name: aggregation_multiversion_fuzzer_deterministic_gen
+    tags:
+      [
+        "assigned_to_jira_team_server_query_execution",
+        "release_critical",
+        "fuzzer_deterministic",
+        "common",
+        "multiversion",
+        "incompatible_mac",
+        "incompatible_ppc",
+        "incompatible_s390x",
+        "incompatible_windows",
+        "incompatible_tsan",
+        "incompatible_aubsan",
+        "incompatible_debug_mode",
+        "require_npm",
+        "random_name",
+        "future_git_tag_incompatible",
+      ]
+    commands:
+      - func: "initialize multiversion tasks"
+        vars:
+          aggregation_multiversion_fuzzer_deterministic_last_lts: last_lts
+          aggregation_multiversion_fuzzer_deterministic_last_continuous: last_continuous
+      - func: "generate resmoke tasks"
+        vars:
+          <<: *jstestfuzz_config_vars
+          # This task used a fixed git revision for the jstestfuzz repo. As changes are made
+          # to the mongo repo over time, the fixed jstestfuzz git rev used here will need to
+          # be updated every so often (once every few months).
+          num_files: 24
+          num_tasks: 2
+          npm_command: agg-fuzzer
+          suite: aggregation_multiversion_fuzzer
+          resmoke_args: "--mongodSetParameters='{logComponentVerbosity: {command: 2}}'"
+          jstestfuzz_vars: --metaSeed 1726779665485 --jstestfuzzGitRev 8ddd8f12cab0
+          run_no_feature_flag_tests: "true"
+
   - <<: *task_template
     name: aggregation_one_shard_sharded_collections
     tags:
@@ -359,6 +400,41 @@ tasks:
           npm_command: agg-fuzzer
           suite: generational_fuzzer
           resmoke_args: "--mongodSetParameters='{logComponentVerbosity: {command: 2}}'"
+
+  ## Like "aggregation_timeseries_fuzzer_gen", but it uses a pinned git revision for the
+  ## "jstestfuzz" repo and it uses a fixed seed.
+  - <<: *jstestfuzz_template
+    name: aggregation_timeseries_fuzzer_deterministic_gen
+    tags:
+      [
+        "assigned_to_jira_team_server_query_execution",
+        "release_critical",
+        "fuzzer_deterministic",
+        "common",
+        "timeseries",
+        "incompatible_mac",
+        "incompatible_ppc",
+        "incompatible_s390x",
+        "incompatible_windows",
+        "incompatible_tsan",
+        "incompatible_aubsan",
+        "incompatible_debug_mode",
+        "require_npm",
+        "random_name",
+      ]
+    commands:
+      - func: "generate resmoke tasks"
+        vars:
+          <<: *jstestfuzz_config_vars
+          # This task used a fixed git revision for the jstestfuzz repo. As changes are made
+          # to the mongo repo over time, the fixed jstestfuzz git rev used here will need to
+          # be updated every so often (once every few months).
+          num_files: 60
+          num_tasks: 2
+          npm_command: agg-fuzzer
+          suite: generational_fuzzer
+          resmoke_args: "--mongodSetParameters='{logComponentVerbosity: {command: 2}}'"
+          jstestfuzz_vars: --diffTestingMode timeseries --numPipelines=1000 --metaSeed 1726779665485 --jstestfuzzGitRev 8ddd8f12cab0
 
   ## Standalone fuzzer for checking block_processing correctness ##
   - <<: *jstestfuzz_template
@@ -1115,6 +1191,46 @@ tasks:
           resmoke_args: "--mongodSetParameters='{logComponentVerbosity: {command: 2}}'"
           run_no_feature_flag_tests: "true"
 
+  ## Like "update_fuzzer_replication_gen", but it uses a pinned git revision for the "jstestfuzz"
+  ## repo and it uses a fixed seed.
+  - <<: *jstestfuzz_template
+    name: update_fuzzer_replication_deterministic_gen
+    tags:
+      [
+        "assigned_to_jira_team_server_query_execution",
+        "release_critical",
+        "fuzzer_deterministic",
+        "multiversion",
+        "incompatible_mac",
+        "incompatible_ppc",
+        "incompatible_s390x",
+        "incompatible_windows",
+        "incompatible_tsan",
+        "incompatible_aubsan",
+        "incompatible_debug_mode",
+        "require_npm",
+        "random_name",
+        "future_git_tag_incompatible",
+      ]
+    commands:
+      - func: "initialize multiversion tasks"
+        vars:
+          update_fuzzer_replication_deterministic_last_lts: last_lts
+          update_fuzzer_replication_deterministic_last_continuous: last_continuous
+      - func: "generate resmoke tasks"
+        vars:
+          <<: *jstestfuzz_config_vars
+          # This task used a fixed git revision for the jstestfuzz repo. As changes are made
+          # to the mongo repo over time, the fixed jstestfuzz git rev used here will need to
+          # be updated every so often (once every few months).
+          num_files: 16
+          num_tasks: 2
+          npm_command: update-fuzzer
+          suite: update_fuzzer_replication
+          resmoke_args: "--mongodSetParameters='{logComponentVerbosity: {command: 2}}'"
+          jstestfuzz_vars: --metaSeed 1726779665485 --jstestfuzzGitRev 8ddd8f12cab0
+          run_no_feature_flag_tests: "true"
+
   # jstestfuzz standalone update time-series generational fuzzer ##
   - <<: *jstestfuzz_template
     name: update_timeseries_fuzzer_gen
@@ -1210,6 +1326,37 @@ tasks:
           suite: generational_fuzzer
           resmoke_args: "--mongodSetParameters='{logComponentVerbosity: {command: 2}}'"
           npm_command: agg-fuzzer
+
+  ## Like "aggregation_optimization_fuzzer_gen", but it uses a pinned git revision for the
+  ## "jstestfuzz" repo and it uses a fixed seed.
+  - <<: *jstestfuzz_template
+    name: aggregation_optimization_fuzzer_deterministic_gen
+    tags:
+      [
+        "assigned_to_jira_team_server_query_optimization",
+        "release_critical",
+        "fuzzer_deterministic",
+        "optimization",
+        "incompatible_mac",
+        "incompatible_ppc",
+        "incompatible_s390x",
+        "incompatible_windows",
+        "incompatible_tsan",
+        "incompatible_aubsan",
+        "incompatible_debug_mode",
+        "require_npm",
+        "random_name",
+      ]
+    commands:
+      - func: "generate resmoke tasks"
+        vars:
+          <<: *jstestfuzz_config_vars
+          num_files: 14
+          num_tasks: 2
+          npm_command: agg-fuzzer
+          suite: generational_fuzzer
+          resmoke_args: "--mongodSetParameters='{logComponentVerbosity: {command: 2}}'"
+          jstestfuzz_vars: --diffTestingMode optimization --metaSeed 1726779665485 --jstestfuzzGitRev 8ddd8f12cab0
 
   - <<: *task_template
     name: aggregation_repeat_queries_multiplan_single_solutions

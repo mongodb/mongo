@@ -320,8 +320,8 @@ buildvariants:
       - name: .development_critical .requires_large_host !.requires_compile_variant !.incompatible_development_variant !.incompatible_community !.requires_all_feature_flags !.suggested_excluding_required__for_devprod_mitigation_only
         distros:
           - rhel8.8-medium
-      - name: .release_critical !.requires_large_host !.requires_compile_variant !.incompatible_development_variant !.incompatible_community !.requires_all_feature_flags !.suggested_excluding_required__for_devprod_mitigation_only
-      - name: .release_critical .requires_large_host !.requires_compile_variant !.incompatible_development_variant !.incompatible_community !.requires_all_feature_flags !.suggested_excluding_required__for_devprod_mitigation_only
+      - name: .release_critical !.requires_large_host !.requires_compile_variant !.incompatible_development_variant !.incompatible_community !.requires_all_feature_flags !.fuzzer_deterministic !.suggested_excluding_required__for_devprod_mitigation_only
+      - name: .release_critical .requires_large_host !.requires_compile_variant !.incompatible_development_variant !.incompatible_community !.requires_all_feature_flags !.fuzzer_deterministic !.suggested_excluding_required__for_devprod_mitigation_only
         distros:
           - rhel8.8-medium
 
