@@ -27,18 +27,6 @@ env.Library(
     ],
 )
 
-env.Library(
-    target="docs_needed_bounds_visitor",
-    source=["visitors/document_source_visitor_docs_needed_bounds.cpp"],
-    LIBDEPS_PRIVATE=[
-        "change_stream_pipeline",
-        "docs_needed_bounds",
-        "document_source_internal_apply_oplog_update",
-        "pipeline",
-        "pipeline_visitor",
-    ],
-)
-
 env.Benchmark(
     target="document_source_group_bm",
     source=[

@@ -205,3 +205,50 @@ mongo_cc_library(
         "//src/mongo:base",
     ],
 )
+
+mongo_cc_library(
+    name = "common_process_interface",
+    srcs = [
+        "common_process_interface.cpp",
+    ],
+    hdrs = [
+        "common_process_interface.h",
+    ],
+    deps = [
+        "//src/mongo/db:operation_time_tracker",
+        "//src/mongo/db/auth",
+        "//src/mongo/db/concurrency:lock_manager",
+        "//src/mongo/db/pipeline:field_path",
+        "//src/mongo/db/query/client_cursor:generic_cursor",
+        "//src/mongo/s:sharding_router_api",
+        "//src/mongo/util/concurrency:spin_lock",
+    ],
+)
+
+mongo_cc_library(
+    name = "mongos_process_interface",
+    srcs = [
+        "mongos_process_interface.cpp",
+    ],
+    hdrs = [
+        "mongos_process_interface.h",
+    ],
+    deps = [
+        ":common_process_interface",
+        "//src/mongo/db/pipeline",
+        "//src/mongo/db/pipeline:sharded_agg_helpers",
+        "//src/mongo/db/session:session_catalog",
+        "//src/mongo/s/query/exec:async_results_merger",
+        "//src/mongo/s/query/exec:cluster_cursor",
+    ],
+)
+
+mongo_cc_library(
+    name = "mongos_process_interface_factory",
+    srcs = [
+        "mongos_process_interface_factory.cpp",
+    ],
+    deps = [
+        ":mongos_process_interface",
+    ],
+)

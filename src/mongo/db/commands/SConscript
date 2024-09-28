@@ -16,76 +16,6 @@ env.SConscript(
     ],
 )
 
-# Commands available in every process that executes commands
-env.Library(
-    target="core",
-    source=[
-        "end_sessions_command.cpp",
-        "fail_point_cmd.cpp",
-        "fle2_cleanup_gen.cpp",
-        "fle2_compact.cpp",
-        "fle2_compact_gen.cpp",
-        "generic.cpp",
-        "generic_gen.cpp",
-        "hashcmd.cpp",
-        "kill_all_sessions_by_pattern_command.cpp",
-        "kill_all_sessions_command.cpp",
-        "kill_sessions_command.cpp",
-        "parameters.cpp",
-        "parameters_gen.cpp",
-        "parse_log_component_settings.cpp",
-        "refresh_logical_session_cache_now.cpp",
-        "refresh_sessions_command.cpp",
-        "rename_collection_common.cpp",
-        "server_status_command.cpp",
-        "sessions_commands_gen.cpp",
-        "start_session_command.cpp",
-    ],
-    LIBDEPS=[
-        "query_cmd/update_metrics",
-        "query_cmd/write_commands_common",
-    ],
-    LIBDEPS_PRIVATE=[
-        "$BUILD_DIR/mongo/bson/mutable/mutable_bson",
-        "$BUILD_DIR/mongo/crypto/encrypted_field_config",
-        "$BUILD_DIR/mongo/crypto/fle_crypto",
-        "$BUILD_DIR/mongo/db/auth/auth",
-        "$BUILD_DIR/mongo/db/auth/authprivilege",
-        "$BUILD_DIR/mongo/db/commands",
-        "$BUILD_DIR/mongo/db/common",
-        "$BUILD_DIR/mongo/db/dbdirectclient",
-        "$BUILD_DIR/mongo/db/fle_crud",
-        "$BUILD_DIR/mongo/db/mongohasher",
-        "$BUILD_DIR/mongo/db/pipeline/lite_parsed_document_source",
-        "$BUILD_DIR/mongo/db/query/write_ops/write_ops_parsers",
-        "$BUILD_DIR/mongo/db/server_base",
-        "$BUILD_DIR/mongo/db/session/kill_sessions",
-        "$BUILD_DIR/mongo/db/session/logical_session_cache",
-        "$BUILD_DIR/mongo/db/session/logical_session_id_helpers",
-        "$BUILD_DIR/mongo/db/stats/counters",
-        "$BUILD_DIR/mongo/db/transaction/transaction_api",
-        "$BUILD_DIR/mongo/logv2/logv2_options",
-        "$BUILD_DIR/mongo/rpc/message",
-        "$BUILD_DIR/mongo/util/net/http_client",
-        "server_status_core",
-        "test_commands_enabled",
-    ],
-)
-
-env.Library(
-    target="set_cluster_parameter_impl",
-    source=[
-        "set_cluster_parameter_command_impl.cpp",
-    ],
-    LIBDEPS_PRIVATE=[
-        "$BUILD_DIR/mongo/db/dbdirectclient",
-        "$BUILD_DIR/mongo/db/server_feature_flags",
-        "$BUILD_DIR/mongo/s/grid",
-        "cluster_server_parameter_commands_invocation",
-        "mongod_fcv",
-    ],
-)
-
 # Commands available in all mongodb server processes (mongod, mongos, etc.)
 xray_files = []
 
@@ -437,21 +367,6 @@ env.Library(
         "test_commands_enabled",
         "txn_cmd_request",
         "umc_commands_idl",
-    ],
-)
-
-env.Library(
-    target="cluster_server_parameter_commands_invocation",
-    source=[
-        "get_cluster_parameter_invocation.cpp",
-        "set_cluster_parameter_invocation.cpp",
-    ],
-    LIBDEPS=[
-        "$BUILD_DIR/mongo/base",
-        "$BUILD_DIR/mongo/db/audit",
-        "$BUILD_DIR/mongo/db/server_base",
-        "$BUILD_DIR/mongo/s/sharding_api",
-        "cluster_server_parameter_cmds_idl",
     ],
 )
 

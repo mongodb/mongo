@@ -141,29 +141,6 @@ env.Library(
 )
 
 env.Library(
-    target="dbcheck",
-    source=[
-        "dbcheck.cpp",
-        "dbcheck_idl.cpp",
-        "dbcheck_gen.cpp",
-    ],
-    LIBDEPS=[
-        "$BUILD_DIR/mongo/bson/bson_validate",
-        "$BUILD_DIR/mongo/db/catalog/health_log_interface",
-        "$BUILD_DIR/mongo/db/shard_role",
-    ],
-    LIBDEPS_PRIVATE=[
-        "$BUILD_DIR/mongo/db/catalog/collection_options",
-        "$BUILD_DIR/mongo/db/catalog/throttle_cursor",
-        "$BUILD_DIR/mongo/db/query_exec",
-        "$BUILD_DIR/mongo/db/record_id_helpers",
-        "$BUILD_DIR/mongo/db/repl/repl_server_parameters",
-        "$BUILD_DIR/mongo/db/server_base",
-        "$BUILD_DIR/mongo/util/md5",
-    ],
-)
-
-env.Library(
     target="storage_interface_impl",
     source=[
         "storage_interface_impl.cpp",
@@ -872,33 +849,6 @@ env.Library(
 )
 
 env.Library(
-    target="tenant_migration_utils",
-    source=[
-        "tenant_migration_shard_merge_util.cpp",
-        "tenant_migration_util.cpp",
-        "tenant_migration_recipient_entry_helpers.cpp",
-    ],
-    LIBDEPS=[
-        "$BUILD_DIR/mongo/db/keys_collection_util",
-        "$BUILD_DIR/mongo/util/future_util",
-        "repl_coordinator_interface",
-        "repl_server_parameters",
-        "wait_for_majority_service",
-    ],
-    LIBDEPS_PRIVATE=[
-        "$BUILD_DIR/mongo/db/concurrency/exception_util",
-        "$BUILD_DIR/mongo/db/dbhelpers",
-        "$BUILD_DIR/mongo/db/query/write_ops/write_ops",
-        "$BUILD_DIR/mongo/db/server_base",
-        "$BUILD_DIR/mongo/db/service_context",
-        "$BUILD_DIR/mongo/db/shard_role",
-        "$BUILD_DIR/mongo/db/storage/storage_file_util",
-        "$BUILD_DIR/mongo/db/storage/storage_options",
-        "tenant_migration_state_machine_idl",
-    ],
-)
-
-env.Library(
     target="shard_merge_recipient_service",
     source=[
         "shard_merge_recipient_op_observer.cpp",
@@ -982,41 +932,6 @@ env.Library(
         "tenant_migration_cloners",
         "tenant_migration_state_machine_idl",
         "tenant_oplog_processing",
-    ],
-)
-
-env.Library(
-    target="tenant_migration_access_blocker",
-    source=[
-        "tenant_migration_access_blocker_registry.cpp",
-        "tenant_migration_access_blocker_server_status_section.cpp",
-        "tenant_migration_access_blocker_util.cpp",
-        "tenant_migration_donor_access_blocker.cpp",
-        "tenant_migration_recipient_access_blocker.cpp",
-    ],
-    LIBDEPS=[
-        "$BUILD_DIR/mongo/base",
-        "$BUILD_DIR/mongo/client/remote_command_targeter",
-        "$BUILD_DIR/mongo/db/commands/server_status_core",
-        "$BUILD_DIR/mongo/db/commands/tenant_migration_cmds_request",
-        "$BUILD_DIR/mongo/db/dbhelpers",
-        "$BUILD_DIR/mongo/db/rw_concern_d",
-        "$BUILD_DIR/mongo/db/serverless/shard_split_state_machine",
-        "$BUILD_DIR/mongo/db/service_context",
-        "$BUILD_DIR/mongo/db/shard_role",
-        "$BUILD_DIR/mongo/executor/network_interface_factory",
-        "$BUILD_DIR/mongo/executor/thread_pool_task_executor",
-        "$BUILD_DIR/mongo/util/future_util",
-        "optime",
-        "repl_coordinator_interface",
-        "tenant_migration_decoration",
-        "tenant_migration_errors",
-        "tenant_migration_state_machine_idl",
-    ],
-    LIBDEPS_PRIVATE=[
-        "$BUILD_DIR/mongo/db/catalog/local_oplog_info",
-        "$BUILD_DIR/mongo/db/concurrency/exception_util",
-        "tenant_migration_utils",
     ],
 )
 
@@ -1505,37 +1420,6 @@ env.Library(
         "$BUILD_DIR/mongo/db/auth/saslauth",
         "$BUILD_DIR/mongo/db/commands/authentication_commands",
         "hello_command",
-    ],
-)
-
-env.Library(
-    target="primary_only_service",
-    source=[
-        "primary_only_service.cpp",
-        "primary_only_service_util.cpp",
-        "primary_only_service_op_observer.cpp",
-    ],
-    LIBDEPS=[
-        "$BUILD_DIR/mongo/executor/task_executor_interface",
-    ],
-    LIBDEPS_PRIVATE=[
-        "$BUILD_DIR/mongo/db/dbdirectclient",
-        "$BUILD_DIR/mongo/db/logical_time_metadata_hook",
-        "$BUILD_DIR/mongo/db/server_base",
-        "$BUILD_DIR/mongo/db/shard_role",
-        "$BUILD_DIR/mongo/executor/connection_pool_executor",
-        "$BUILD_DIR/mongo/executor/network_interface",
-        "$BUILD_DIR/mongo/executor/network_interface_factory",
-        "$BUILD_DIR/mongo/executor/network_interface_thread_pool",
-        "$BUILD_DIR/mongo/executor/network_interface_tl",
-        "$BUILD_DIR/mongo/executor/scoped_task_executor",
-        "$BUILD_DIR/mongo/executor/thread_pool_task_executor",
-        "$BUILD_DIR/mongo/util/concurrency/spin_lock",
-        "$BUILD_DIR/mongo/util/concurrency/thread_pool",
-        "repl_coordinator_interface",
-        "repl_server_parameters",
-        "replica_set_aware_service",
-        "wait_for_majority_service",
     ],
 )
 

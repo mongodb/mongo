@@ -142,3 +142,15 @@ mongo_cc_library(
         "//src/mongo/db:query_expressions",
     ],
 )
+
+mongo_cc_library(
+    name = "stagedebug_cmd",
+    srcs = [
+        "stagedebug_cmd.cpp",
+    ],
+    deps = [
+        "//src/mongo/db:query_exec",
+        "//src/mongo/db/commands:test_commands_enabled",
+        "//src/mongo/db/index:index_access_method",
+    ],
+)

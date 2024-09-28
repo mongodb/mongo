@@ -8,3 +8,54 @@ exports_files(
         "*.cpp",
     ]),
 )
+
+mongo_cc_library(
+    name = "cluster_aggregate",
+    srcs = [
+        "cluster_aggregate.cpp",
+        "cluster_aggregation_planner.cpp",
+    ],
+    hdrs = [
+        "cluster_aggregate.h",
+        "cluster_aggregation_planner.h",
+    ],
+    deps = [
+        "//src/mongo/db:fle_crud",
+        "//src/mongo/db:shared_request_handling",
+        "//src/mongo/db/catalog:collection_uuid_mismatch_info",
+        "//src/mongo/db/pipeline",
+        "//src/mongo/db/pipeline:docs_needed_bounds_visitor",
+        "//src/mongo/db/pipeline:sharded_agg_helpers",
+        "//src/mongo/db/pipeline/process_interface:mongos_process_interface",
+        "//src/mongo/db/query/query_settings:utils",
+        "//src/mongo/db/query/query_shape",
+        "//src/mongo/db/timeseries:timeseries_options",
+        "//src/mongo/db/views",
+        "//src/mongo/db/views:view_catalog_helpers",
+        "//src/mongo/s/query/exec:async_results_merger",
+        "//src/mongo/s/query/exec:router_exec_stage",
+        "//src/mongo/util/concurrency:spin_lock",
+    ],
+)
+
+mongo_cc_library(
+    name = "cluster_find",
+    srcs = [
+        "cluster_find.cpp",
+    ],
+    hdrs = [
+        "cluster_find.h",
+    ],
+    deps = [
+        "//src/mongo/db:commands",
+        "//src/mongo/db:curop_failpoint_helpers",
+        "//src/mongo/db:server_base",
+        "//src/mongo/db/catalog:collection_uuid_mismatch_info",
+        "//src/mongo/db/query:command_request_response",
+        "//src/mongo/db/query:query_common",
+        "//src/mongo/db/query/query_stats",
+        "//src/mongo/s:sharding_router_api",
+        "//src/mongo/s/query/exec:cluster_cursor",
+        "//src/mongo/util/concurrency:spin_lock",
+    ],
+)
