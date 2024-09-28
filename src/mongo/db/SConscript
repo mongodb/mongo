@@ -1089,6 +1089,7 @@ env.Library(
         "s/sessions_collection_config_server",
         "s/sharding_commands_d",
         "s/sharding_runtime_d",
+        "server_lifecycle_monitor",
         "serverinit",
         "serverless/shard_split_donor_service",
         "service_context_d",
@@ -1670,5 +1671,25 @@ bmEnv.Library(
     LIBDEPS=[
         "$BUILD_DIR/mongo/base",
         "$BUILD_DIR/third_party/benchmark/benchmark",
+    ],
+)
+
+env.Library(
+    target="server_lifecycle_monitor",
+    source=[
+        "server_lifecycle_monitor.cpp",
+    ],
+    LIBDEPS=[
+        "$BUILD_DIR/mongo/base",
+    ],
+)
+
+env.CppUnitTest(
+    target="server_lifecycle_monitor_test",
+    source=[
+        "server_lifecycle_monitor_test.cpp",
+    ],
+    LIBDEPS=[
+        "server_lifecycle_monitor",
     ],
 )

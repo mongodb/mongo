@@ -157,3 +157,6 @@ filters:
   - "vector_clock*":
     approvers:
       - 10gen/server-catalog-and-routing
+  - "server_lifecycle_monitor*":
+    approvers:
+      - 10gen/server-programmability
