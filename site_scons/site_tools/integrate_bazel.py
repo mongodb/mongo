@@ -900,6 +900,7 @@ def generate(env: SCons.Environment.Environment) -> None:
 
     if normalized_arch not in ["arm64", "amd64"]:
         bazel_internal_flags.append("--config=local")
+        bazel_internal_flags.append("--jobs=4")
 
     # Disable remote execution for public release builds.
     if env.GetOption("release") == "on" and (
