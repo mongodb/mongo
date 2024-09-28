@@ -194,6 +194,7 @@
 #include "mongo/db/s/sharding_initialization_mongod.h"
 #include "mongo/db/s/sharding_ready.h"
 #include "mongo/db/s/transaction_coordinator_service.h"
+#include "mongo/db/server_lifecycle_monitor.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/serverless/shard_split_donor_op_observer.h"
 #include "mongo/db/serverless/shard_split_donor_service.h"
@@ -1208,6 +1209,8 @@ ExitCode _initAndListen(ServiceContext* serviceContext, int listenPort) {
         }
         return getMagicRestoreMain()(serviceContext);
     }
+
+    globalServerLifecycleMonitor().onFinishingStartup();
 
     logStartupStats.dismiss();
     logMongodStartupTimeElapsedStatistics(serviceContext,
