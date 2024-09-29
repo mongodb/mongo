@@ -202,33 +202,3 @@ mongo_cc_library(
         "//src/mongo/db/query/search:search_task_executors",
     ],
 )
-
-mongo_cc_library(
-    name = "query_settings_cmds",
-    srcs = [
-        # This document source has been re-located here from 'pipeline' to avoid
-        # the 'pipeline' -> 'query_settings_utils' -> 'pipeline' cyclic
-        # dependency. Generating the Debug Query Shape requires re-parsing the
-        # query instance via `query_settings::utils::createRepresentativeInfo()`
-        # which internally uses `Pipeline::parse()`.
-        "//src/mongo/db/pipeline:document_source_query_settings.cpp",
-        ":query_settings_cmds_gen",
-        "query_settings_cmds.cpp",
-    ],
-    hdrs = [
-        "//src/mongo/db/pipeline:document_source_query_settings.h",
-    ],
-    deps = [
-        "//src/mongo/client:clientdriver_minimal",
-        "//src/mongo/db:commands",
-        "//src/mongo/db:dbdirectclient",
-        "//src/mongo/db/commands:cluster_server_parameter_cmds_idl",
-        "//src/mongo/db/commands:set_cluster_parameter_impl",
-        "//src/mongo/db/query:canonical_query",
-        "//src/mongo/db/query/plan_cache:query_plan_cache",
-        "//src/mongo/db/query/query_settings:manager",
-        "//src/mongo/db/query/query_settings:utils",
-        "//src/mongo/db/query/query_shape",
-        "//src/mongo/db/repl:repl_settings",
-    ],
-)

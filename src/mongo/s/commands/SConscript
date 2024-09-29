@@ -5,6 +5,25 @@ Import("get_option")
 
 env = env.Clone()
 
+# These commands are registered with both the router and shard command registries.
+env.Library(
+    target="sharded_cluster_sharding_commands",
+    source=[
+        "flush_router_config_cmd.cpp",
+        "get_shard_map_cmd.cpp",
+        "sharding_expressions.cpp",
+    ],
+    LIBDEPS_PRIVATE=[
+        "$BUILD_DIR/mongo/db/catalog/index_key_validate",
+        "$BUILD_DIR/mongo/db/commands",
+        "$BUILD_DIR/mongo/db/fts/base_fts",
+        "$BUILD_DIR/mongo/db/index/expression_params",
+        "$BUILD_DIR/mongo/db/index/index_access_method",
+        "$BUILD_DIR/mongo/db/shard_role_api",
+        "$BUILD_DIR/mongo/s/grid",
+    ],
+)
+
 # These commands are registered only with the router-role.
 env.Library(
     target="cluster_commands",
@@ -176,6 +195,40 @@ env.Library(
         "$BUILD_DIR/mongo/transport/message_compressor",
         "$BUILD_DIR/mongo/transport/transport_layer_common",
         "cluster_commands_common",
+    ],
+)
+
+env.Library(
+    target="cluster_commands_common",
+    source=[
+        "document_shard_key_update_util.cpp",
+        "query_cmd/cluster_explain.cpp",
+        "query_cmd/cluster_write_cmd.cpp",
+        "strategy.cpp",
+    ],
+    LIBDEPS_PRIVATE=[
+        "$BUILD_DIR/mongo/db/commands/core",
+        "$BUILD_DIR/mongo/db/default_max_time_ms_cluster_parameter",
+        "$BUILD_DIR/mongo/db/fle_crud",
+        "$BUILD_DIR/mongo/db/internal_transactions_feature_flag",
+        "$BUILD_DIR/mongo/db/operation_time_tracker",
+        "$BUILD_DIR/mongo/db/read_write_concern_defaults",
+        "$BUILD_DIR/mongo/db/repl/repl_server_parameters",
+        "$BUILD_DIR/mongo/db/shared_request_handling",
+        "$BUILD_DIR/mongo/db/stats/api_version_metrics",
+        "$BUILD_DIR/mongo/db/stats/counters",
+        "$BUILD_DIR/mongo/db/transaction/transaction_api",
+        "$BUILD_DIR/mongo/db/validate_api_parameters",
+        "$BUILD_DIR/mongo/executor/inline_executor",
+        "$BUILD_DIR/mongo/rpc/metadata",
+        "$BUILD_DIR/mongo/rpc/rewrite_state_change_errors",
+        "$BUILD_DIR/mongo/s/load_balancer_support",
+        "$BUILD_DIR/mongo/s/mongos_topology_coordinator",
+        "$BUILD_DIR/mongo/s/query/planner/cluster_aggregate",
+        "$BUILD_DIR/mongo/s/sharding_api",
+        "$BUILD_DIR/mongo/transport/message_compressor",
+        "$BUILD_DIR/mongo/transport/service_executor",
+        "$BUILD_DIR/mongo/transport/transport_layer_common",
     ],
 )
 

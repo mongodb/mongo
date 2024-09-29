@@ -30,6 +30,111 @@ def shouldBuildGRPC(myEnv):
     return myEnv.TargetOSIs("linux") and myEnv["ENABLE_GRPC_BUILD"]
 
 
+# This is the main library to use for consumers of sharding. It will pull the routing and targeting
+# functionality.
+#
+# This is the only library, which should be referenced directly outside of mongo/s/ and mongo/db/s/
+env.Library(
+    target="sharding_api",
+    source=[
+        "cluster_ddl.cpp",
+        "cluster_write.cpp",
+        "collection_routing_info_targeter.cpp",
+        "write_ops/batch_write_exec.cpp",
+        "write_ops/batch_write_op.cpp",
+        "write_ops/bulk_write_exec.cpp",
+        "write_ops/coordinate_multi_update_util.cpp",
+        "write_ops/pause_migrations_during_multi_updates_enablement.cpp",
+        "write_ops/write_op.cpp",
+        "write_ops/write_without_shard_key_util.cpp",
+    ],
+    LIBDEPS=[
+        "$BUILD_DIR/mongo/db/commands/query_cmd/bulk_write_common",
+        "$BUILD_DIR/mongo/db/fle_crud",
+        "$BUILD_DIR/mongo/db/not_primary_error_tracker",
+        "$BUILD_DIR/mongo/db/pipeline/pipeline",
+        "$BUILD_DIR/mongo/db/pipeline/process_interface/mongos_process_interface",
+        "$BUILD_DIR/mongo/db/query/write_ops/parsed_update",
+        "$BUILD_DIR/mongo/db/storage/storage_options",
+        "$BUILD_DIR/mongo/db/timeseries/timeseries_conversion_util",
+        "$BUILD_DIR/mongo/db/timeseries/timeseries_metadata",
+        "$BUILD_DIR/mongo/db/timeseries/timeseries_options",
+        "$BUILD_DIR/mongo/db/timeseries/timeseries_write_util",
+        "query/planner/cluster_find",
+        "sharding_router_api",
+        "write_ops/batch_write_types",
+    ],
+    LIBDEPS_PRIVATE=[
+        "$BUILD_DIR/mongo/db/catalog/collection_uuid_mismatch_info",
+        "$BUILD_DIR/mongo/db/internal_transactions_feature_flag",
+        "$BUILD_DIR/mongo/db/transaction/transaction_api",
+        "$BUILD_DIR/mongo/executor/inline_executor",
+    ],
+)
+
+# Functionality for initializing all the services used by sharding, which are common between MongoS
+# and MongoD
+env.Library(
+    target="sharding_initialization",
+    source=[
+        "sharding_task_executor_pool_controller.cpp",
+        "sharding_task_executor_pool_gen.cpp",
+        "sharding_initialization.cpp",
+        "initialize_tenant_to_shard_cache.cpp",
+        "client_metadata_propagation_egress_hook.cpp",
+        "client/sharding_network_connection_hook.cpp",
+        "client/sharding_connection_hook.cpp",
+        "routing_table_cache_gossip_metadata_hook.cpp",
+    ],
+    LIBDEPS_PRIVATE=[
+        "$BUILD_DIR/mongo/db/repl/repl_coordinator_interface",
+        "$BUILD_DIR/mongo/db/server_base",
+        "$BUILD_DIR/mongo/db/server_feature_flags",
+        "$BUILD_DIR/mongo/executor/async_multicaster",
+        "$BUILD_DIR/mongo/executor/connection_pool_executor",
+        "$BUILD_DIR/mongo/executor/scoped_task_executor",
+        "$BUILD_DIR/mongo/executor/thread_pool_task_executor",
+        "$BUILD_DIR/mongo/rpc/client_metadata",
+        "$BUILD_DIR/mongo/rpc/metadata",
+        "$BUILD_DIR/mongo/rpc/metadata_impersonated_user",
+        "$BUILD_DIR/mongo/util/periodic_runner_factory",
+        "catalog/sharding_catalog_client_impl",
+        "grid",
+        "query_analysis_sampler",
+        "sharding_task_executor",
+    ],
+)
+
+env.Library(
+    target="sharding_task_executor",
+    source=[
+        "sharding_task_executor.cpp",
+    ],
+    LIBDEPS=[
+        "$BUILD_DIR/mongo/executor/thread_pool_task_executor",
+    ],
+    LIBDEPS_PRIVATE=[
+        "$BUILD_DIR/mongo/db/operation_time_tracker",
+        "$BUILD_DIR/mongo/db/server_base",
+        "client/sharding_client",
+        "sharding_router_api",
+    ],
+)
+
+env.Library(
+    target="sessions_collection_sharded",
+    source=[
+        "sessions_collection_sharded.cpp",
+    ],
+    LIBDEPS=[
+        "$BUILD_DIR/mongo/db/session/sessions_collection",
+    ],
+    LIBDEPS_PRIVATE=[
+        "$BUILD_DIR/mongo/db/server_base",
+        "sharding_api",
+    ],
+)
+
 env.Library(
     target="startup_initialization",
     source=[

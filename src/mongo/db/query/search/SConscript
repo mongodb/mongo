@@ -43,3 +43,15 @@ env.CppUnitTest(
         "$BUILD_DIR/mongo/db/pipeline/pipeline",
     ],
 )
+
+env.Library(
+    target="search_index_process_router",
+    source=[
+        "search_index_process_router.cpp",
+    ],
+    LIBDEPS_PRIVATE=[
+        "$BUILD_DIR/mongo/s/catalog/sharding_catalog_client",
+        "$BUILD_DIR/mongo/s/sharding_router_api",
+        "search_index_process_interface",
+    ],
+)

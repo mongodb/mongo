@@ -171,22 +171,3 @@ mongo_cc_library(
         "//src/mongo/db/s:user_writes_recoverable_critical_section",
     ],
 )
-
-mongo_cc_library(
-    name = "find_and_modify_images_op_observer",
-    srcs = [
-        "find_and_modify_images_op_observer.cpp",
-    ],
-    hdrs = [
-        "find_and_modify_images_op_observer.h",
-    ],
-    deps = [
-        "//src/mongo:base",
-        "//src/mongo/db:commands",
-        "//src/mongo/db:dbhelpers",
-        "//src/mongo/db:shard_role",
-        "//src/mongo/db/catalog:document_validation",
-        "//src/mongo/db/concurrency:lock_manager",
-        "//src/mongo/db/repl:image_collection_entry",
-    ],
-)

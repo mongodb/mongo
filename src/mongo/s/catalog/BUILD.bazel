@@ -100,26 +100,3 @@ mongo_cc_library(
         "//src/mongo/db:server_base",
     ],
 )
-
-mongo_cc_library(
-    name = "sharding_catalog_client_impl",
-    srcs = [
-        "sharding_catalog_client_impl.cpp",
-    ],
-    hdrs = [
-        "sharding_catalog_client_impl.h",
-    ],
-    deps = [
-        ":sharding_catalog_client",
-        "//src/mongo/db/pipeline",
-        "//src/mongo/db/query:projection_ast",
-        "//src/mongo/db/repl:read_concern_args",
-        "//src/mongo/db/session:logical_session_id_helpers",
-        "//src/mongo/db/storage:duplicate_key_error_info",
-        "//src/mongo/executor:network_interface",
-        "//src/mongo/s:common_s",
-        "//src/mongo/s:grid",
-        "//src/mongo/s/client:sharding_client",
-        "//src/mongo/util:pcre_wrapper",
-    ],
-)

@@ -16,6 +16,20 @@ env.SConscript(
 )
 
 env.Library(
+    target="health_log",
+    source=[
+        "health_log.cpp",
+    ],
+    LIBDEPS_PRIVATE=[
+        "$BUILD_DIR/mongo/db/concurrency/deferred_writer",
+        "$BUILD_DIR/mongo/db/server_base",
+        "$BUILD_DIR/mongo/db/service_context",
+        "collection_options",
+        "health_log_interface",
+    ],
+)
+
+env.Library(
     target="health_log_mock",
     source=[
         "health_log_mock.cpp",
@@ -23,6 +37,54 @@ env.Library(
     LIBDEPS_PRIVATE=[
         "$BUILD_DIR/mongo/db/server_base",
         "health_log_interface",
+    ],
+)
+
+env.Library(
+    target="index_builds_manager",
+    source=[
+        "index_builds_manager.cpp",
+    ],
+    LIBDEPS_PRIVATE=[
+        "$BUILD_DIR/mongo/base",
+        "$BUILD_DIR/mongo/db/concurrency/exception_util",
+        "$BUILD_DIR/mongo/db/query/query_stats/query_stats",
+        "$BUILD_DIR/mongo/db/shard_role",
+        "$BUILD_DIR/mongo/db/storage/record_store_base",
+        "$BUILD_DIR/mongo/db/storage/storage_options",
+        "$BUILD_DIR/mongo/db/storage/storage_repair_observer",
+        "$BUILD_DIR/mongo/util/progress_meter",
+        "index_repair",
+        "multi_index_block",
+    ],
+)
+
+env.Library(
+    target="multi_index_block",
+    source=[
+        "multi_index_block.cpp",
+        "multi_index_block_gen.cpp",
+    ],
+    LIBDEPS_PRIVATE=[
+        "$BUILD_DIR/mongo/db/concurrency/exception_util",
+        "$BUILD_DIR/mongo/db/index/index_access_method",
+        "$BUILD_DIR/mongo/db/multi_key_path_tracker",
+        "$BUILD_DIR/mongo/db/query/query_stats/query_stats",
+        "$BUILD_DIR/mongo/db/query_exec",
+        "$BUILD_DIR/mongo/db/repl/repl_coordinator_interface",
+        "$BUILD_DIR/mongo/db/resumable_index_builds_idl",
+        "$BUILD_DIR/mongo/db/server_base",
+        "$BUILD_DIR/mongo/db/service_context",
+        "$BUILD_DIR/mongo/db/shard_role",
+        "$BUILD_DIR/mongo/db/storage/storage_options",
+        "$BUILD_DIR/mongo/db/timeseries/timeseries_conversion_util",
+        "$BUILD_DIR/mongo/util/fail_point",
+        "$BUILD_DIR/mongo/util/log_and_backoff",
+        "$BUILD_DIR/mongo/util/progress_meter",
+        "collection_catalog",
+        "collection_query_info",
+        "index_build_block",
+        "index_catalog",
     ],
 )
 
@@ -161,6 +223,65 @@ env.Library(
         "index_key_validate",
         "throttle_cursor",
         "validate_state",
+    ],
+)
+
+env.Library(
+    target="catalog_helpers",
+    source=[
+        "backwards_compatible_collection_options_util.cpp",
+        "capped_utils.cpp",
+        "coll_mod.cpp",
+        "coll_mod_index.cpp",
+        "collection_catalog_helper.cpp",
+        "collection_compact.cpp",
+        "create_collection.cpp",
+        "drop_collection.cpp",
+        "drop_database.cpp",
+        "drop_indexes.cpp",
+        "external_data_source_scope_guard.cpp",
+        "list_indexes.cpp",
+        "rename_collection.cpp",
+        "unique_collection_name.cpp",
+    ],
+    LIBDEPS_PRIVATE=[
+        "$BUILD_DIR/mongo/base",
+        "$BUILD_DIR/mongo/db/audit",
+        "$BUILD_DIR/mongo/db/coll_mod_command_idl",
+        "$BUILD_DIR/mongo/db/concurrency/exception_util",
+        "$BUILD_DIR/mongo/db/index/index_access_method",
+        "$BUILD_DIR/mongo/db/index_builds_coordinator_interface",
+        "$BUILD_DIR/mongo/db/index_commands_idl",
+        "$BUILD_DIR/mongo/db/internal_transactions_feature_flag",
+        "$BUILD_DIR/mongo/db/multitenancy",
+        "$BUILD_DIR/mongo/db/query/write_ops/write_ops",
+        "$BUILD_DIR/mongo/db/query_exec",
+        "$BUILD_DIR/mongo/db/repl/drop_pending_collection_reaper",
+        "$BUILD_DIR/mongo/db/server_base",
+        "$BUILD_DIR/mongo/db/server_feature_flags",
+        "$BUILD_DIR/mongo/db/shard_role",
+        "$BUILD_DIR/mongo/db/stats/top",
+        "$BUILD_DIR/mongo/db/storage/index_entry_comparison",
+        "$BUILD_DIR/mongo/db/storage/key_string",
+        "$BUILD_DIR/mongo/db/storage/record_store_base",
+        "$BUILD_DIR/mongo/db/storage/storage_options",
+        "$BUILD_DIR/mongo/db/timeseries/catalog_helper",
+        "$BUILD_DIR/mongo/db/timeseries/timeseries_conversion_util",
+        "$BUILD_DIR/mongo/db/timeseries/timeseries_options",
+        "$BUILD_DIR/mongo/db/ttl_collection_cache",
+        "$BUILD_DIR/mongo/db/views/view_catalog_helpers",
+        "$BUILD_DIR/mongo/db/views/views",
+        "cannot_convert_index_to_unique_info",
+        "collection_crud",
+        "collection_options",
+        "collection_uuid_mismatch_info",
+        "document_validation",
+        "index_catalog",
+        "index_key_validate",
+        "local_oplog_info",
+        "multi_index_block",
+        "throttle_cursor",
+        "validate_idl",
     ],
 )
 

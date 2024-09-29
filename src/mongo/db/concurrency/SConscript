@@ -5,6 +5,21 @@ Import("env")
 
 env = env.Clone()
 
+env.Library(
+    target="deferred_writer",
+    source=[
+        "deferred_writer.cpp",
+    ],
+    LIBDEPS_PRIVATE=[
+        "$BUILD_DIR/mongo/db/catalog/catalog_helpers",
+        "$BUILD_DIR/mongo/db/concurrency/exception_util",
+        "$BUILD_DIR/mongo/db/dbhelpers",
+        "$BUILD_DIR/mongo/db/server_base",
+        "$BUILD_DIR/mongo/db/shard_role",
+        "$BUILD_DIR/mongo/util/concurrency/thread_pool",
+    ],
+)
+
 env.CppUnitTest(
     target="lock_manager_test",
     source=[

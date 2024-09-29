@@ -174,18 +174,3 @@ mongo_cc_library(
         "//src/mongo/db/views:view_catalog_helpers",
     ],
 )
-
-mongo_cc_library(
-    name = "search_index_process_router",
-    srcs = [
-        "search_index_process_router.cpp",
-    ],
-    hdrs = [
-        "search_index_process_router.h",
-    ],
-    deps = [
-        ":search_index_process_interface",
-        "//src/mongo/s:sharding_router_api",
-        "//src/mongo/s/catalog:sharding_catalog_client",
-    ],
-)

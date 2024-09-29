@@ -3,6 +3,66 @@ Import("env")
 
 env = env.Clone()
 
+env.Library(
+    target="cluster_server_parameter_initializer",
+    source=[
+        "cluster_server_parameter_initializer.cpp",
+    ],
+    LIBDEPS_PRIVATE=[
+        "$BUILD_DIR/mongo/db/catalog/collection_catalog",
+        "$BUILD_DIR/mongo/db/repl/replica_set_aware_service",
+        "$BUILD_DIR/mongo/db/server_base",
+        "$BUILD_DIR/mongo/db/shard_role",
+        "cluster_parameter_synchronization_helpers",
+    ],
+)
+
+env.Library(
+    target="cluster_server_parameter_op_observer",
+    source=[
+        "cluster_server_parameter_op_observer.cpp",
+    ],
+    LIBDEPS_PRIVATE=[
+        "$BUILD_DIR/mongo/db/dbdirectclient",
+        "$BUILD_DIR/mongo/db/op_observer/op_observer",
+        "$BUILD_DIR/mongo/db/server_base",
+        "$BUILD_DIR/mongo/db/shard_role",
+        "cluster_parameter_synchronization_helpers",
+        "cluster_server_parameter_initializer",
+    ],
+)
+
+env.Library(
+    target="cluster_server_parameter_common",
+    source=[
+        "cluster_server_parameter_common.cpp",
+    ],
+    LIBDEPS=[
+        "$BUILD_DIR/mongo/base",
+    ],
+    LIBDEPS_PRIVATE=[
+        "$BUILD_DIR/mongo/db/commands/list_databases_for_all_tenants_command",
+        "$BUILD_DIR/mongo/s/grid",
+    ],
+)
+
+env.Library(
+    target="cluster_server_parameter_refresher",
+    source=[
+        "cluster_server_parameter_refresher.cpp",
+        "cluster_server_parameter_refresher_gen.cpp",
+    ],
+    LIBDEPS_PRIVATE=[
+        "$BUILD_DIR/mongo/db/audit",
+        "$BUILD_DIR/mongo/db/server_base",
+        "$BUILD_DIR/mongo/db/transaction/transaction_api",
+        "$BUILD_DIR/mongo/executor/inline_executor",
+        "$BUILD_DIR/mongo/s/grid",
+        "cluster_server_parameter",
+        "cluster_server_parameter_common",
+    ],
+)
+
 env.CppUnitTest(
     target="cluster_server_parameter_test",
     source=[

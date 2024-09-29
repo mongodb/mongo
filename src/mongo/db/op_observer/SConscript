@@ -108,6 +108,22 @@ env.Library(
 )
 
 env.Library(
+    target="find_and_modify_images_op_observer",
+    source=[
+        "find_and_modify_images_op_observer.cpp",
+    ],
+    LIBDEPS_PRIVATE=[
+        "$BUILD_DIR/mongo/base",
+        "$BUILD_DIR/mongo/db/catalog/document_validation",
+        "$BUILD_DIR/mongo/db/commands",
+        "$BUILD_DIR/mongo/db/concurrency/lock_manager",
+        "$BUILD_DIR/mongo/db/dbhelpers",
+        "$BUILD_DIR/mongo/db/repl/image_collection_entry",
+        "$BUILD_DIR/mongo/db/shard_role",
+    ],
+)
+
+env.Library(
     target="fcv_op_observer",
     source=[
         "fcv_op_observer.cpp",
