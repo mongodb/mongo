@@ -44,7 +44,7 @@ const indexIdUri = getUriForIndex(testDB.getCollection("a"), /*indexName=*/ "_id
 const indexXUri = getUriForIndex(testDB.getCollection("a"), /*indexName=*/ "x_1");
 
 MongoRunner.stopMongod(mongod);
-awaitIndexBuild();
+awaitIndexBuild({checkExitSuccess: false});
 
 // Remove data files for collection "a" after shutting down.
 removeFile(dbpath + "/" + collUri + ".wt");
