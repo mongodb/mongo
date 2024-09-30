@@ -14,18 +14,6 @@ env.SConscript(
     ],
 )
 
-env.CppUnitTest(
-    target="optimizer_proj_spec_test",
-    source=[
-        "rewrites/proj_spec_test.cpp",
-    ],
-    LIBDEPS=[
-        "$BUILD_DIR/mongo/db/exec/sbe/query_sbe",  # needed to register extended type destruction for MakeObjSpec :(
-        "optimizer_rewrites",
-        "unit_test_utils",
-    ],
-)
-
 # Lightweight test utils.
 env.Library(
     target="unit_test_utils",
@@ -53,19 +41,6 @@ env.CppUnitTest(
     ],
     LIBDEPS=[
         "$BUILD_DIR/mongo/db/exec/sbe/query_sbe",  # needed to register extended type destruction for MakeObjSpec :(
-        "unit_test_utils",
-    ],
-)
-
-env.Benchmark(
-    target="path_lower_bm",
-    source=[
-        "rewrites/path_lower_bm.cpp",
-    ],
-    LIBDEPS=[
-        "$BUILD_DIR/mongo/db/concurrency/lock_manager",
-        "$BUILD_DIR/mongo/unittest/unittest",
-        "optimizer_rewrites",
         "unit_test_utils",
     ],
 )

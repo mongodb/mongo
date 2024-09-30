@@ -33,7 +33,6 @@
 
 #include "mongo/db/exec/sbe/abt/abt_lower.h"
 #include "mongo/db/query/optimizer/reference_tracker.h"
-#include "mongo/db/query/optimizer/rewrites/path_lower.h"
 #include "mongo/db/query/stage_builder/sbe/abt_holder_impl.h"
 #include "mongo/db/query/stage_builder/sbe/builder.h"
 #include "mongo/db/query/stage_builder/sbe/expression_const_eval.h"
@@ -146,10 +145,6 @@ TypeSignature constantFold(optimizer::ABT& abt,
 
     // Do not use descriptive names here.
     auto prefixId = optimizer::PrefixId::create(false /*useDescriptiveNames*/);
-
-    // Convert paths into ABT expressions.
-    optimizer::EvalPathLowering pathLower{prefixId};
-    pathLower.optimize(abt);
 
     const CollatorInterface* collator = nullptr;
     boost::optional<SlotId> collatorSlot = state.getCollatorSlot();

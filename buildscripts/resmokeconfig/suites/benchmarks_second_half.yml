@@ -15,7 +15,6 @@ selector:
     - build/install/bin/base64_bm*
     - build/install/bin/lock_manager_bm*
     - build/install/bin/uuid_bm*
-    - build/install/bin/path_lower_bm*
     - build/install/bin/storage_record_id_bm*
     - build/install/bin/storage_wiredtiger_begin_transaction_block_bm*
     - build/install/bin/commands_bm*

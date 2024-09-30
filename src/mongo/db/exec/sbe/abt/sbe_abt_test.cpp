@@ -64,7 +64,6 @@
 #include "mongo/db/query/optimizer/node_defs.h"
 #include "mongo/db/query/optimizer/reference_tracker.h"
 #include "mongo/db/query/optimizer/rewrites/const_eval.h"
-#include "mongo/db/query/optimizer/rewrites/path_lower.h"
 #include "mongo/db/query/optimizer/syntax/expr.h"
 #include "mongo/db/query/optimizer/syntax/path.h"
 #include "mongo/db/query/optimizer/syntax/syntax.h"
@@ -236,113 +235,6 @@ TEST_F(AbtToSbeExpression, Lower5) {
     auto compiledExpr = compileExpression(*expr);
     auto [resultTag, resultVal] = runCompiledExpression(compiledExpr.get());
     sbe::value::ValueGuard guard(resultTag, resultVal);
-}
-
-TEST_F(AbtToSbeExpression, Lower6) {
-    auto prefixId = PrefixId::createForTests();
-
-    auto [tagObj, valObj] = sbe::value::makeNewObject();
-    auto obj = sbe::value::getObjectView(valObj);
-
-    auto [tagObjIn, valObjIn] = sbe::value::makeNewObject();
-    auto objIn = sbe::value::getObjectView(valObjIn);
-    objIn->push_back("fieldB", sbe::value::TypeTags::NumberInt64, 100);
-    obj->push_back("fieldA", tagObjIn, valObjIn);
-
-    sbe::value::OwnedValueAccessor accessor;
-    auto slotId = bindAccessor(&accessor);
-    SlotVarMap map;
-    map["root"] = slotId;
-
-    accessor.reset(tagObj, valObj);
-
-    auto tree = make<EvalPath>(
-        make<PathField>(
-            "fieldA",
-            make<PathTraverse>(
-                PathTraverse::kUnlimited,
-                make<PathComposeM>(
-                    make<PathField>("fieldB", make<PathDefault>(Constant::int64(0))),
-                    make<PathField>("fieldC", make<PathConstant>(Constant::int64(50)))))),
-        make<Variable>("root"));
-    auto env = VariableEnvironment::build(tree);
-
-    // Run rewriters while things change
-    bool changed = false;
-    do {
-        changed = false;
-        if (PathLowering{prefixId}.optimize(tree)) {
-            changed = true;
-            env.rebuild(tree);
-        }
-        if (ConstEval{env}.optimize(tree)) {
-            changed = true;
-        }
-    } while (changed);
-
-    sbe::InputParamToSlotMap inputParamToSlotMap;
-    auto expr =
-        SBEExpressionLowering{env, map, *runtimeEnv(), slotIdGenerator(), inputParamToSlotMap}
-            .optimize(tree);
-
-    ASSERT(expr);
-
-    auto compiledExpr = compileExpression(*expr);
-    auto [resultTag, resultVal] = runCompiledExpression(compiledExpr.get());
-    sbe::value::ValueGuard guard(resultTag, resultVal);
-
-    ASSERT(sbe::value::isObject(resultTag));
-}
-
-TEST_F(AbtToSbeExpression, Lower7) {
-    auto prefixId = PrefixId::createForTests();
-
-    auto [tagArr, valArr] = sbe::value::makeNewArray();
-    auto arr = sbe::value::getArrayView(valArr);
-    arr->push_back(sbe::value::TypeTags::NumberInt64, 1);
-    arr->push_back(sbe::value::TypeTags::NumberInt64, 2);
-    arr->push_back(sbe::value::TypeTags::NumberInt64, 3);
-
-    auto [tagObj, valObj] = sbe::value::makeNewObject();
-    auto obj = sbe::value::getObjectView(valObj);
-    obj->push_back("fieldA", tagArr, valArr);
-
-    sbe::value::OwnedValueAccessor accessor;
-    auto slotId = bindAccessor(&accessor);
-    SlotVarMap map;
-    map["root"] = slotId;
-
-    accessor.reset(tagObj, valObj);
-    auto tree = make<EvalFilter>(
-        make<PathGet>("fieldA",
-                      make<PathTraverse>(PathTraverse::kSingleLevel,
-                                         make<PathCompare>(Operations::Eq, Constant::int64(2)))),
-        make<Variable>("root"));
-
-    auto env = VariableEnvironment::build(tree);
-
-    // Run rewriters while things change
-    bool changed = false;
-    do {
-        changed = false;
-        if (PathLowering{prefixId}.optimize(tree)) {
-            changed = true;
-        }
-        if (ConstEval{env}.optimize(tree)) {
-            changed = true;
-        }
-    } while (changed);
-
-    sbe::InputParamToSlotMap inputParamToSlotMap;
-    auto expr =
-        SBEExpressionLowering{env, map, *runtimeEnv(), slotIdGenerator(), inputParamToSlotMap}
-            .optimize(tree);
-
-    ASSERT(expr);
-    auto compiledExpr = compileExpression(*expr);
-    auto result = runCompiledExpressionPredicate(compiledExpr.get());
-
-    ASSERT(result);
 }
 
 TEST_F(AbtToSbeExpression, LowerFunctionCallFail) {

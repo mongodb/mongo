@@ -70,17 +70,11 @@ mongo_cc_library(
         "//src/mongo/db/query/optimizer/rewrites:const_eval.cpp",
         "//src/mongo/db/query/optimizer/rewrites:normalize_projections.cpp",
         "//src/mongo/db/query/optimizer/rewrites:path.cpp",
-        "//src/mongo/db/query/optimizer/rewrites:path_lower.cpp",
-        "//src/mongo/db/query/optimizer/rewrites:proj_spec_builder.cpp",
-        "//src/mongo/db/query/optimizer/rewrites:proj_spec_lower.cpp",
     ],
     hdrs = [
         "//src/mongo/db/query/optimizer/rewrites:const_eval.h",
         "//src/mongo/db/query/optimizer/rewrites:normalize_projections.h",
         "//src/mongo/db/query/optimizer/rewrites:path.h",
-        "//src/mongo/db/query/optimizer/rewrites:path_lower.h",
-        "//src/mongo/db/query/optimizer/rewrites:proj_spec_builder.h",
-        "//src/mongo/db/query/optimizer/rewrites:proj_spec_lower.h",
     ],
     deps = [
         ":optimizer_base",
