@@ -243,6 +243,74 @@ public:
         ASSERT_FALSE(secondCursor->getNext(opCtx.get()));
     }
 
+    /**
+     * Tests that TaskExecutorCursors that share PinnedConnectionTaskExecutors can be destroyed
+     * without impacting/canceling work on other TaskExecutorCursors. See SERVER-93583 for details.
+     */
+    void CancelTECWhileSharedPCTEInUse() {
+        const auto aggCmd = BSON("aggregate"
+                                 << "test"
+                                 << "pipeline"
+                                 << BSON_ARRAY(BSON("returnMultipleCursors" << true)));
+
+        std::vector<size_t> cursorIds{1, 2};
+        RemoteCommandRequest rcr(HostAndPort("localhost"),
+                                 DatabaseName::createDatabaseName_forTest(boost::none, "test"),
+                                 aggCmd,
+                                 opCtx.get());
+        std::vector<std::unique_ptr<TaskExecutorCursor>> cursorVec;
+        {
+            auto tec = makeTec(rcr);
+
+            ASSERT_BSONOBJ_EQ(aggCmd,
+                              scheduleSuccessfulMultiCursorResponse("firstBatch", 1, 2, cursorIds));
+            // Get data from cursor.
+            ASSERT_EQUALS(tec->getNext(opCtx.get()).value()["x"].Int(), 1);
+            ASSERT_EQUALS(tec->getNext(opCtx.get()).value()["x"].Int(), 2);
+
+            cursorVec = tec->releaseAdditionalCursors();
+            ASSERT_EQUALS(cursorVec.size(), 1);
+            // Destroy initial cursor.
+        }
+        // Schedule EOF on the first cursor to satisfy the prefetch and show that the operation can
+        // safely come back error-free.
+        ASSERT_BSONOBJ_EQ(BSON("getMore" << 1LL << "collection"
+                                         << "test"),
+                          scheduleSuccessfulCursorResponse("nextBatch", 3, 3, 0));
+
+        auto secondCursor = std::move(cursorVec[0]);
+        // Fetch first set of pre-fetched data from the second cursor.
+        ASSERT_EQUALS(secondCursor->getNext(opCtx.get()).value()["x"].Int(), 2);
+        ASSERT_EQUALS(secondCursor->getNext(opCtx.get()).value()["x"].Int(), 4);
+
+        // Next, respond to the outstanding getMore requests on the secondCursor. This would be
+        // impossible if the underlying executor was cancelled.
+        ASSERT_BSONOBJ_EQ(BSON("getMore" << 2LL << "collection"
+                                         << "test"),
+                          scheduleSuccessfulCursorResponse("nextBatch", 6, 8, cursorIds[1]));
+
+        ASSERT_EQUALS(secondCursor->getNext(opCtx.get()).value()["x"].Int(), 6);
+        ASSERT_EQUALS(secondCursor->getNext(opCtx.get()).value()["x"].Int(), 7);
+        ASSERT_EQUALS(secondCursor->getNext(opCtx.get()).value()["x"].Int(), 8);
+
+        // Next, a killCursor command is scheduled by the destructor of the first TEC (AFTER
+        // successful completion of its outstanding operations) to ensure we don't leak that cursor.
+        ASSERT_BSONOBJ_EQ(BSON("killCursors"
+                               << "test"
+                               << "cursors" << BSON_ARRAY((int)cursorIds[0])),
+                          scheduleSuccessfulKillCursorResponse(cursorIds[0]));
+
+        // Finally, schedule EOF on the second cursor.
+        ASSERT_BSONOBJ_EQ(BSON("getMore" << 2LL << "collection"
+                                         << "test"),
+                          scheduleSuccessfulCursorResponse("nextBatch", 12, 12, 0));
+        ASSERT_EQUALS(secondCursor->getNext(opCtx.get()).value()["x"].Int(), 12);
+
+        // There are no outstanding requests and the second cursor is closed.
+        ASSERT_FALSE(hasReadyRequests());
+        ASSERT_FALSE(secondCursor->getNext(opCtx.get()));
+    }
+
     void MultipleCursorsGetMoreWorksTest() {
         const auto aggCmd = BSON("aggregate"
                                  << "test"
@@ -708,6 +776,16 @@ TEST_F(NonPinningDefaultTaskExecutorCursorTestFixture, NoPrefetchGetMore) {
 
 TEST_F(PinnedConnDefaultTaskExecutorCursorTestFixture, NoPrefetchWithPinning) {
     NoPrefetchGetMore();
+}
+
+TEST_F(PinnedConnDefaultTaskExecutorCursorTestFixture, MultipleCursorsCancellation) {
+    CancelTECWhileSharedPCTEInUse();
+}
+
+TEST_F(NonPinningDefaultTaskExecutorCursorTestFixture, MultipleCursorsCancellation) {
+    // For good measure, run this test in non-pinned mode as well. This test was motivated by
+    // SERVER-93583, which exposed a bug in pinning mode, but should pass in both modes.
+    CancelTECWhileSharedPCTEInUse();
 }
 
 }  // namespace
